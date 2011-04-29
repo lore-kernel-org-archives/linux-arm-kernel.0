@@ -1,30 +1,95 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 29 Apr 2011 00:11:41 -0700
-Subject: [PATCH 9/9] ARM: zImage: make sure no GOTOFF relocs are used
-	with .bss symbols
-In-Reply-To: <1304031024-5121-10-git-send-email-nico@fluxnic.net>
-References: <1304031024-5121-1-git-send-email-nico@fluxnic.net>
-	<1304031024-5121-10-git-send-email-nico@fluxnic.net>
-Message-ID: <20110429071141.GT3755@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 29 Apr 2011 01:15:27 -0600
+Subject: [PATCH v5 0/8] Basic ARM devicetree support
+Message-ID: <20110429070135.12522.35745.stgit@ponder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [110428 15:47]:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> To be able to relocate the .bss section at run time independently from
-> the rest of the code, we must make sure that no GOTOFF relocations are
-> used with .bss symbols.  This usually means that no global variables can
-> be marked static unless they're also const.
-> 
-> To enforce this, suffice to fail the build whenever a private symbol
-> is allocated to .bss and list those symbols for convenience.
-> 
-> The user_stack and user_stack_end labels in head.S were converted into
-> non exported symbols to remove false positives.
-> 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+Well, it's been a while since I've posted these, so it's probably
+about time to circulate them again.
 
-Marking something static in uncompress.h now fails with this patch, so:
+v5 rebases on top of 2.6.39-rc5 plus one patch to allow arch code
+to pass in a pointer to the command_line buffer, and the virq rework
+series that (finally!) implements devicetree irq mapping support for
+all architectures.  All prerequisite patches were posted earlier today,
+I've also pushed them out to:
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+    git://git.secretlab.ca/git/linux-2.6 devicetree/irq-domain.
+
+Patch 5 in this series cleans up for the irq-domain change, but this
+series can be used on a vanilla 2.6.39-rc5 by dropping patch #5, and
+adding the cmd_line prerequisite patch.
+
+Both devicetree/arm and devicetree/test branches on
+git://git.secretlab.ca/git/linux-2.6 reflect the current state of this
+patch series (although there is all kinds of crud committed on top of
+them in devicetree/test)
+
+I'm not asking for these patches to be merged into mainline yet, but
+I'm fairly confident that they should be pretty close to their final
+form.
+
+Please test.
+
+Thanks,
+g.
+
+---
+
+ This patch series allows CONFIG_OF to be enabled on ARM and allows the
+ kernel to accept a dtb pointer from boot firmware instead of atags.
+ If a dtb is passed, then the kernel will use the root 'compatible'
+ property to find a matching machine_desc, and it will use it to obtain
+ the memory layout, initrd location and kernel parameters string.
+
+ Only limited device tree support is enabled here.  It does not perform
+ any kind of device registration from device tree data.  That support
+ will be enabled in a later patch set.  Rather, this series is a stable
+ base that other engineers can use to start working on device tree
+ support for their platforms.
+
+---
+
+Grant Likely (8):
+      arm/dt: Make __vet_atags also accept a dtb image
+      arm/dt: Allow CONFIG_OF on ARM
+      arm/dt: consolidate atags setup into setup_machine_atags
+      arm/dt: probe for platforms via the device tree
+      arm/dt: Drop irq_create_of_mapping() from arm code.
+      arm/dt: Basic versatile devicetree support
+      arm/dt: Basic tegra devicetree support
+      dt: add documentation of ARM dt boot interface
+
+
+ Documentation/arm/Booting                       |   33 +++++-
+ Documentation/devicetree/booting-without-of.txt |   48 ++++++++
+ arch/arm/Kconfig                                |    7 +
+ arch/arm/boot/dts/omap4-panda.dts               |   11 ++
+ arch/arm/boot/dts/skeleton.dtsi                 |   13 ++
+ arch/arm/boot/dts/tegra-harmony.dts             |    7 +
+ arch/arm/boot/dts/versatile-ab.dts              |    7 +
+ arch/arm/boot/dts/versatile-pb.dts              |    7 +
+ arch/arm/include/asm/mach/arch.h                |    9 ++
+ arch/arm/include/asm/prom.h                     |   37 ++++++
+ arch/arm/include/asm/setup.h                    |    4 +
+ arch/arm/kernel/Makefile                        |    1 
+ arch/arm/kernel/devtree.c                       |  131 +++++++++++++++++++++++
+ arch/arm/kernel/head-common.S                   |   24 +++-
+ arch/arm/kernel/head.S                          |    8 +
+ arch/arm/kernel/setup.c                         |   90 ++++++++++------
+ arch/arm/mach-omap2/board-omap4panda.c          |    6 +
+ arch/arm/mach-tegra/board-harmony.c             |    6 +
+ arch/arm/mach-versatile/versatile_ab.c          |    6 +
+ arch/arm/mach-versatile/versatile_pb.c          |    6 +
+ arch/arm/mm/init.c                              |   11 ++
+ 21 files changed, 422 insertions(+), 50 deletions(-)
+ create mode 100644 arch/arm/boot/dts/omap4-panda.dts
+ create mode 100644 arch/arm/boot/dts/skeleton.dtsi
+ create mode 100644 arch/arm/boot/dts/tegra-harmony.dts
+ create mode 100644 arch/arm/boot/dts/versatile-ab.dts
+ create mode 100644 arch/arm/boot/dts/versatile-pb.dts
+ create mode 100644 arch/arm/include/asm/prom.h
+ create mode 100644 arch/arm/kernel/devtree.c
+
+-- 
+Signature
