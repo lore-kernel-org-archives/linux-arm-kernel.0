@@ -1,37 +1,55 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 29 Apr 2011 12:33:43 -0600 (MDT)
-Subject: [GIT PULL] OMAP hwmod/PRCM/clock: patches for 2.6.39-rc
-Message-ID: <alpine.DEB.2.00.1104291232450.18555@utopia.booyaka.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 29 Apr 2011 15:14:31 -0400 (EDT)
+Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary to be
+	appended to zImage
+In-Reply-To: <20110429135334.GR5126@n2100.arm.linux.org.uk>
+References: <20110413140030.GE12665@atomide.com>
+	<20110420054746.GA31127@S2100-06.ap.freescale.net>
+	<20110420073445.GB31127@S2100-06.ap.freescale.net>
+	<20110421080238.GE13688@atomide.com>
+	<20110421124618.GA15060@atomide.com>
+	<20110427142306.GI3755@atomide.com>
+	<alpine.LFD.2.00.1104271036520.24613@xanadu.home>
+	<20110427144335.GK3755@atomide.com> <20110429102623.GX3755@atomide.com>
+	<alpine.LFD.2.00.1104290909310.24613@xanadu.home>
+	<20110429135334.GR5126@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1104291509540.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony
+On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
 
-The following changes since commit 8e10cd74342c7f5ce259cceca36f6eba084f5d58:
+> On Fri, Apr 29, 2011 at 09:16:39AM -0400, Nicolas Pitre wrote:
+> > On Fri, 29 Apr 2011, Tony Lindgren wrote:
+> > 
+> > > If the compressed image is smaller than BSS, then we end up
+> > > having DT data in the BSS area. In this case the compressed
+> > > image is about 2.3 MB for LZMA.
+> > > 
+> > > The uncompress code does not know about the kernel BSS,
+> > > and does not necessarily relocate anything depending on the
+> > > compressed image load address.
+> > > 
+> > > So in which code do we want to relocate the DT data?
+> > > 
+> > > We could do it based on estimated BSS size in uncompress code,
+> > > or based on the real BSS size in __mmap_switched before BSS
+> > > gets reset.
+> > 
+> > Estimations for that kind of thing is always bound to create problems 
+> > some day.
+> > 
+> > The DT data should probably be moved out of the way from 
+> > arch/arm/kernel/head.S before the .bss is cleared, and even before 
+> > enabling the MMU, like in __vet_atags.
+> 
+> Err, no.  Moving stuff around becomes quite expensive when the cache is
+> not on.  It's far better to work out where to place it first time around
+> so its not in the way.
 
-  Linux 2.6.39-rc5 (2011-04-26 20:48:50 -0700)
+I don't think the DT data is that huge, but that's a point in favor of 
+doing it in the zImage code.  We'll just need to feed the total size of 
+the uncompressed kernel .bss section to zImage when compiling it.
 
-are available in the git repository at:
-  git://git.pwsan.com/linux-2.6 for_tony_a_2.6.39rc
 
-Avinash.H.M (1):
-      OMAP2/3: hwmod: fix gpio-reset timeouts seen during bootup.
-
-Benoit Cousson (1):
-      OMAP2+: hwmod data: Fix wrong dma_system end address
-
-Eduardo Valentin (2):
-      OMAP2+: PM: Fix the saving of CM_AUTOIDLE_PLL register on scratchpad area
-      OMAP3: PM: Do not rely on ROM code to restore CM_AUTOIDLE_PLL.AUTO_PERIPH_DPLL
-
-Tomi Valkeinen (1):
-      OMAP4: clock data: Change DSS clock aliases
-
- arch/arm/mach-omap2/clock44xx_data.c       |    9 ++-------
- arch/arm/mach-omap2/cm2xxx_3xxx.c          |   17 +++++++++++++++++
- arch/arm/mach-omap2/control.c              |    8 +++++++-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c |    6 +++++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    7 ++++++-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    8 +++++++-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- 7 files changed, 45 insertions(+), 12 deletions(-)
+Nicolas
