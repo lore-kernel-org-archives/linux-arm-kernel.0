@@ -1,51 +1,29 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 29 Apr 2011 09:21:22 -0400 (EDT)
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary to be
-	appended to zImage
-In-Reply-To: <20110429130939.GB3755@atomide.com>
-References: <20110413140030.GE12665@atomide.com>
-	<20110420054746.GA31127@S2100-06.ap.freescale.net>
-	<20110420073445.GB31127@S2100-06.ap.freescale.net>
-	<20110421080238.GE13688@atomide.com>
-	<20110421124618.GA15060@atomide.com>
-	<20110427142306.GI3755@atomide.com>
-	<alpine.LFD.2.00.1104271036520.24613@xanadu.home>
-	<20110427144335.GK3755@atomide.com> <20110429102623.GX3755@atomide.com>
-	<BANLkTi=jcb8Piki6RrijGOQG=wJ=ULv5Gw@mail.gmail.com>
-	<20110429130939.GB3755@atomide.com>
-Message-ID: <alpine.LFD.2.00.1104290918050.24613@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2011 14:26:13 +0100
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <alpine.LFD.2.02.1104291344020.3005@ionos>
+References: <1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<alpine.LFD.2.02.1104211045220.3323@ionos>
+	<20110429103723.GF5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291252080.3005@ionos>
+	<20110429110610.GJ5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291344020.3005@ionos>
+Message-ID: <20110429132613.GL5126@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2011, Tony Lindgren wrote:
+On Fri, Apr 29, 2011 at 02:13:06PM +0200, Thomas Gleixner wrote:
+> This are all well defined semantical problems and should be solved in
+> common code rather than having different buggy implementations in each
+> SoC clock "framework".
 
-> * Grant Likely <grant.likely@secretlab.ca> [110429 05:59]:
-> > On Fri, Apr 29, 2011 at 4:26 AM, Tony Lindgren <tony@atomide.com> wrote:
-> > > * Tony Lindgren <tony@atomide.com> [110427 07:41]:
-> > >
-> > > If the compressed image is smaller than BSS, then we end up
-> > > having DT data in the BSS area. In this case the compressed
-> > > image is about 2.3 MB for LZMA.
-> > >
-> > > The uncompress code does not know about the kernel BSS,
-> > > and does not necessarily relocate anything depending on the
-> > > compressed image load address.
-> > >
-> > > So in which code do we want to relocate the DT data?
-> > >
-> > > We could do it based on estimated BSS size in uncompress code,
-> > > or based on the real BSS size in __mmap_switched before BSS
-> > > gets reset.
-> > 
-> > How about telling the wrapper what the final size will be by scraping
-> > the __bss_end value out of System.map?
-> 
-> That sounds doable to me. It should probably be done in the uncompress
-> code so the kernel code can stay generic for the DT data handling.
+Why are you associating functional elements in drivers/clk with the
+SoC clock framework?
 
-Well, that's probably doable too.  If the final kernel's .bss conflicts 
-with the DT data, then moving the DT data above the malloc space in the 
-decompressor is trivial too.
-
-
-Nicolas
+I think that's the root cause of this misunderstanding, and until you
+start realising that these building blocks are not part of the SoC
+implementation, we're going to continue arguing about this.
