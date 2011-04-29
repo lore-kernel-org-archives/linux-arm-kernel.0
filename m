@@ -1,53 +1,51 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 28 Apr 2011 21:00:08 -0400 (EDT)
-Subject: [PATCH] ARM: Include Makefile.boot only when it exists
-In-Reply-To: <20110428152735.GU17290@n2100.arm.linux.org.uk>
-References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
-	<20110420083258.GB1517@S2100-06.ap.freescale.net>
-	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
-	<20110428152735.GU17290@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1104281925500.24613@xanadu.home>
+From: b32955@freescale.com (Huang Shijie)
+Date: Fri, 29 Apr 2011 09:42:20 +0800
+Subject: [PATCH v6 1/3] MTD : add the common code for GPMI controller
+	driver
+In-Reply-To: <20110428192017.GO17290@n2100.arm.linux.org.uk>
+References: <1303267549-18377-1-git-send-email-b32955@freescale.com>
+	<1303267549-18377-2-git-send-email-b32955@freescale.com>
+	<20110428192017.GO17290@n2100.arm.linux.org.uk>
+Message-ID: <4DBA177C.50805@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 28 Apr 2011, Russell King - ARM Linux wrote:
+hi:
+> On Wed, Apr 20, 2011 at 10:45:47AM +0800, Huang Shijie wrote:
+>> +static inline int acquire_clock(struct gpmi_nfc_data *this, struct clk **clock)
+>> +{
+>> +	struct clk *c;
+>> +
+>> +	c = clk_get(&this->pdev->dev, NULL);
+>> +	if (IS_ERR(c)) {
+>> +		log("Can't own clock");
+>> +		return PTR_ERR(c);
+>> +	}
+>> +	*clock = c;
+>> +	return 0;
+>> +}
+>> +
+>> +static void release_clock(struct gpmi_nfc_data *this, struct clk *clock)
+>> +{
+>> +	clk_put(clock);
+>> +}
+> Do you really need to abstract like this?  It appears to just complicate
+> the code unnecessarily.
+>
+ok, I can remove the two functions.
+>> +#define log(a, ...) printk(KERN_INFO "[ %s : %.3d ] "a"\n", \
+>> +			__func__, __LINE__,  ## __VA_ARGS__)
+> Also, I don't like this log() function.  You can do the same with:
+>
+> #define pr_fmt(fmt) "[ %s : %.3d ] " fmt, __func__, __LINE__
+>
+> and use pr_info() instead.  Note that it's generally frowned upon to
+> hide the \n inside the pr_fmt().
+>
+ok, I will change it.
 
-> If/when we move to DT, do people think that Linus is going to accept
-> having the DT files in the kernel for all these platforms, and will he
-> be happy to see stuff like the files containing the OMAP clock definitions
-> being constantly patched?  Remember, it's *exactly* this data which Linus
-> wants out of the kernel source.
-
-Well, here's what he said:
-
-|But trust me, if you start doing a better job at platform code, I
-|won't be complaining when I get lots of deleted code, or when I start
-|getting devicetree descriptions instead of new drivers.
-(http://article.gmane.org/gmane.linux.kernel/1121387)
-
-So of course this "getting devicetree descriptions" might be interpreted 
-to mean different things.
-
-OTOH, the device tree source files can be arranged with common 
-definitions in something like a header file that is included by board 
-specific files.  So, at least in theory, differences between similar 
-boards should be small, hopefully smaller than the equivalent in C.
-
-Also, DT files should be a representation of the hardware which is meant 
-to be stable.  If it wasn't stable, there would be no point using a data 
-structure that can also be used outside of the kernel.  Remember that 
-one of the selling point for DT is to be able to boot an existing kernel 
-binary on yet-to-be-created hardware simply by creating the appropriate 
-DT description for it.  Hence the DT files for existing hardware 
-shouldn't have to change even if the kernel side implementation does.
-
-> I suspect the answer to that is no.  So I think we should start right now
-> with the idea that putting DT files - even the core SoC ones - into the
-> kernel isn't going to be acceptable.
-
-Well, if you look at arch/powerpc/boot/dts/* you'll find a bunch of 
-board specific DT files in there already, and Linus has identified PPC 
-as one architecture that did it right in his mind.
+Thanks .
 
 
-Nicolas
+Best Regards
+Huang Shijie
