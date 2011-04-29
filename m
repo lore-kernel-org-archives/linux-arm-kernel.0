@@ -1,70 +1,63 @@
-From: thellstrom@vmware.com (Thomas Hellstrom)
-Date: Fri, 29 Apr 2011 12:55:11 +0200
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <1304062523.2513.235.camel@pasglop>
-References: <201104212129.17013.arnd@arndb.de>	
-	<201104281428.56780.arnd@arndb.de>	
-	<20110428131531.GK17290@n2100.arm.linux.org.uk>	
-	<201104281629.52863.arnd@arndb.de>	
-	<20110428143440.GP17290@n2100.arm.linux.org.uk>	
-	<BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>	
-	<1304036962.2513.202.camel@pasglop> <4DBA5194.7080609@vmware.com>
-	<1304062523.2513.235.camel@pasglop>
-Message-ID: <4DBA990F.6040203@vmware.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Apr 2011 03:58:33 -0700
+Subject: [PATCH 01/10] Add a common struct clk
+In-Reply-To: <alpine.LFD.2.02.1104291223250.3005@ionos>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
+	<alpine.LFD.2.02.1104212146400.3323@ionos>
+	<20110429100927.GC5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291223250.3005@ionos>
+Message-ID: <20110429105832.GY3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2011 09:35 AM, Benjamin Herrenschmidt wrote:
->
-> We have problems with AGP and macs, we chose to mostly ignore them and
-> things have been working so-so ... with the old DRM. With DRI2 being
-> much more aggressive at mapping/unmapping things, things became a lot
-> less stable and it could be in part related to that. IE. Aliases are
-> similarily forbidden but we create them anyways.
->
->    
+* Thomas Gleixner <tglx@linutronix.de> [110429 03:42]:
+> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+> 
+> > On Thu, Apr 21, 2011 at 09:48:28PM +0200, Thomas Gleixner wrote:
+> > > On Fri, 15 Apr 2011, Sascha Hauer wrote:
+> > > > From: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > > > + * @get:	Called by the core clock code when a device driver acquires a
+> > > > + *		clock via clk_get(). Optional.
+> > > > + *
+> > > > + * @put:	Called by the core clock code when a devices driver releases a
+> > > > + *		clock via clk_put(). Optional.
+> > > 
+> > > These callbacks are completely pointless. There are only two non empty
+> > > implementations in tree:
+> > > 
+> > > One does a try_module_get(clk->owner), which should be done in generic
+> > > code. The other does special clock enabling magic which wants to go to
+> > > clk->prepare().
+> > 
+> > I disagree.  Most clocks don't live in a module - there's only one
+> > platform which does at present.  To force every clock to have an owner
+> > field is rediculous.  We already know that the OMAP tree represents a
+> 
+> So we trade an owner field (which can be NULL) versus two function
+> pointers in the clk_ops struct, which are of course subject to be
+> abused for all kind of crap which does not belong there at all.
+> 
+> > significant amount of data, and for every additional unnecessary word,
+> > it gobbles up another 4K of data space.
+> 
+> What are we talking about?
+> 
+> arch/arm/mach-omap2/clock2420_data.c:117
+> arch/arm/mach-omap2/clock2430_data.c:126
+> arch/arm/mach-omap2/clock3xxx_data.c:235
+> arch/arm/mach-omap2/clock44xx_data.c:228
+> 
+> So even if we could build a common kernel for all these omaps, then
+> adding owner to struct clk will consume ~2800 bytes.
 
-Do you have any idea how other OS's solve this AGP issue on Macs?
-Using a fixed pool of write-combined pages?
+Just to correct something, we are already building a common kernel
+for all these, see omap2plus_defconfig.
 
->> c)  If neither of the above applies, we might be able to either use
->> explicit cache flushes (which will require a TTM cache sync API), or
->> require the device to use snooping mode. The architecture may also
->> perhaps have a pool of write-combined pages that we can use. This should
->> be indicated by defines in the api header.
->>      
-> Right. We should still shoot HW designers who give up coherency for the
-> sake of 3D benchmarks. It's insanely stupid.
->    
+For the size, device tree will shrink down that data where only
+only one set of clock data is passed to the kernel. So I don't
+think the size is such a big issue.
 
-I agree. From a driver writer's perspective having the GPU always 
-snooping the system pages would be a dream. On the GPUs that do support 
-snooping that I have looked at, its internal MMU usually support both 
-modes, but the snooping mode is way slower (we're talking 50-70% or so 
-slower texturing operations), and often buggy causing crashes or scanout 
-timing issues since system designers apparently don't really count on it 
-being used. I've found it usable for device-to-system memory blits.
+Regards,
 
-In addition memcpy to device is usually way faster if the destination is 
-write-combined. Probably due to cache thrashing effects.
-
-/Thomas
-
-> Cheers,
-> Ben.
->
->    
->> /Thomas
->>
->>
->>
->>
->>      
->>> _______________________________________________
->>> Linaro-mm-sig mailing list
->>> Linaro-mm-sig at lists.linaro.org
->>> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
->>>
->>>        
->
->    
+Tony
