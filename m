@@ -1,35 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 11:30:55 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104202113250.3323@ionos>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-Message-ID: <20110429103055.GE5126@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 29 Apr 2011 13:32:09 +0300
+Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource
+	based sched_clock
+In-Reply-To: <alpine.LFD.2.02.1104291217120.3005@ionos>
+References: <20110423205036.795894921@linutronix.de>
+	<20110429094606.GA5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291217120.3005@ionos>
+Message-ID: <20110429103208.GA2849@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Apr 20, 2011 at 09:52:15PM +0200, Thomas Gleixner wrote:
-> On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
-> > struct clk has no parent member, there is only clk_get_parent(). If
+* Thomas Gleixner <tglx@linutronix.de> [110429 13:19]:
+> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
 > 
-> Which is a complete failure to begin with. Why the heck do you need a
-> callback to figure that out?
+> > On Sat, Apr 23, 2011 at 08:54:39PM -0000, Thomas Gleixner wrote:
+> > > Most of ARM sched_clocks is using the timekeeping clocksource as the
+> > > sched_clock. Only versatile uses a different clock for it, but there
+> > > is no real reason why it can't use the clocksource as well.
+> > 
+> > sched_clock really needs to be setup earlier than clocksources are setup,
+> > before sched_init() is called in init/main.c.  This is where the scheduler
+> > reads the initial value of sched_clock() to start its time measurements.
+> > This is well before clocksources are initialized, or even the irq subsystem.
+> > 
+> > So I don't believe bolting it directly into the clocksource code in this
+> > way is correct.  As things are currently setup with my sched_clock()
+> > implementation, we can (and in any cases do) get the sched_clock() up
+> > and running really early which is what's required.
+> 
+> Not really. There is no requirement to have a high resolution sched
+> clock in the early boot process. The only requirement is that
+> sched_clock is monotonic increasing nsecs. So the code utilizes
+> jiffies up to the point where the clocksource is installed and then
+> switches over keeping the clock monotonic. The scheduler does not care
+> whether it gets coarse grained time information in the early boot
+> stage and then fine grained information at some point later.
+> 
+> The only drawback is that you don't get precise timestamps for tracing
+> up to the point where the clock source is installed. But that's really
+> not a big deal to worry about.
 
-Thomas, you're wrong.  You're looking at things far too simply, because
-all you can see is a tree of clocks.
+What about PRINTK_TIME? I think that uses sched_clock right from the
+start.
 
-When you have MUXes, a clock can have one of many parents.  So a single
-clk->parent doesn't hack it.  That's one reason why clk_get_parent()
-exists, so that MUXes can return the appropriate parent for the current
-MUX setting.
-
-You may wish to store the current setting in clk->parent, but I'd argue
-that's a recipe for things going wrong when the MUX settings differ from
-the cached clk->parent value.  Instead, having clk_get_parent()s
-implementation return the _current_ parent and let MUXes do the right
-thing depending on hardware is much easier and more reliably correct.
-
-So I don't agree with you on some of these points.
+Tony
