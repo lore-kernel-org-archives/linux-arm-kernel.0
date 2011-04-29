@@ -1,67 +1,51 @@
-From: jbarnes@virtuousgeek.org (Jesse Barnes)
-Date: Fri, 29 Apr 2011 09:32:09 -0700
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110429075958.GV17290@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 29 Apr 2011 17:42:59 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104291741.18190.arnd@arndb.de>
 References: <201104212129.17013.arnd@arndb.de>
-	<201104281428.56780.arnd@arndb.de>
-	<20110428131531.GK17290@n2100.arm.linux.org.uk>
-	<201104281629.52863.arnd@arndb.de>
-	<20110428143440.GP17290@n2100.arm.linux.org.uk>
-	<BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>
-	<1304036962.2513.202.camel@pasglop> <4DBA5194.7080609@vmware.com>
-	<20110429075958.GV17290@n2100.arm.linux.org.uk>
-Message-ID: <20110429093209.1926c732@jbarnes-desktop>
+	<201104271243.16868.arnd@arndb.de>
+	<1303902508.15101.21.camel@e102109-lin.cambridge.arm.com>
+	<201104291741.18190.arnd@arndb.de>
+Message-ID: <BANLkTimJoc_DR3bjxehDFcTM13CavAX_=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2011 08:59:58 +0100
-Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Friday, 29 April 2011, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Wednesday 27 April 2011, Catalin Marinas wrote:
+>> > >
+>> > > It's not broken since we moved to using Normal non-cacheable memory
+>> > > for the coherent DMA buffers (as long as you flush the cacheable alias
+>> > > before using the buffer, as we already do). The ARM ARM currently says
+>> > > unpredictable for such situations but this is being clarified in
+>> > > future updates and the Normal non-cacheable vs cacheable aliases can
+>> > > be used (given correct cache maintenance before using the buffer).
+>> >
+>> > Thanks for that information, I believe a number of people in the
+>> > previous discussions were relying on the information from the
+>> > documentation. Are you sure that this is not only correct for the
+>> > cores made by ARM ltd but also for the other implementations that
+>> > may have relied on documentation?
+>>
+>> It is a clarification in the ARM ARM so it covers all the cores made by
+>> architecture licensees, not just ARM Ltd. It basically makes the
+>> "unpredictable" part more predictable to allow certain types of aliases
+>> (e.g. Strongly Ordered vs Normal memory would still be disallowed).
+>>
+>> All the current implementations are safe with Normal memory aliases
+>> (cacheable vs non-cacheable) but of course, there may be some
+>> performance benefits in not having any alias.
+>
+> A lot of the discussions we are about to have in Budapest will be
+> around solving the problem of having only valid combinations of
+> mappings, so we really need to have a clear statement in specification
+> form about what is actually valid.
+>
+> Would it be possible to have an updated version of the relevant
+> section of the ARM ARM by next week so we can use that as the
+> base for our discussions?
 
-> On Fri, Apr 29, 2011 at 07:50:12AM +0200, Thomas Hellstrom wrote:
-> > However, we should be able to construct a completely generic api around  
-> > these operations, and for architectures that don't support them we need  
-> > to determine
-> >
-> > a)  Whether we want to support them anyway (IIRC the problem with PPC is  
-> > that the linear kernel map has huge tlb entries that are very  
-> > inefficient to break up?)
-> 
-> That same issue applies to ARM too - you'd need to stop the entire
-> machine, rewrite all processes page tables, flush tlbs, and only
-> then restart.  Otherwise there's the possibility of ending up with
-> conflicting types of TLB entries, and I'm not sure what the effect
-> of having two matching TLB entries for the same address would be.
-
-Right, I don't think anyone wants to see this sort of thing happen with
-any frequency.  So either a large, uncached region can be set up a boot
-time for allocations, or infrequent, large requests and conversions can
-be made on demand, with memory being freed back to the main, coherent
-pool under pressure.
-
-> > b)  Whether they are needed at all on the particular architecture. The  
-> > Intel x86 spec is, (according to AMD), supposed to forbid conflicting  
-> > caching attributes, but the Intel graphics guys use them for GEM. PPC  
-> > appears not to need it.
-> 
-> Some versions of the architecture manual say that having multiple
-> mappings with differing attributes is unpredictable.
-
-Yes, there's a bit of abuse going on there.  We've received a guarantee
-that if the CPU speculates a line into the cache, as long as it's not
-modified through the cacheable mapping the CPU won't write it back to
-memory; it'll discard the line as needed instead (iirc AMD CPUs will
-actually write back clean lines, so GEM wouldn't work the same way
-there).
-
-But even with GEM, there is a large performance penalty for having to
-allocate a new buffer object the first time.  Even though we don't have
-to change mappings by stopping the machine etc, we still have to flush
-out everything from the CPU relating to the object (since some lines
-may be dirty), and then flush the memory controller buffers before
-accessing it through the uncached mapping.  So at least currently,
-we're all in the same boat when it comes to new object allocations:
-they will be expensive unless you already have some uncached mappings
-you can re-use.
+I'll ask the architecture people here in ARM and get back to you
+(there is holiday until Tuesday next week in the UK).
 
 -- 
-Jesse Barnes, Intel Open Source Technology Center
+Catalin
