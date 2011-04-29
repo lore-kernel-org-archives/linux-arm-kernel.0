@@ -1,83 +1,140 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 10:28:12 +0100
-Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
-In-Reply-To: <20110428233823.GC13104@game.jcrosoft.org>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-9-git-send-email-plagnioj@jcrosoft.com>
-	<BANLkTi=2_9Xcz45jyOnbxv6xwC2R5U__VA@mail.gmail.com>
-	<20110428113427.GG17290@n2100.arm.linux.org.uk>
-	<20110428131538.GA10594@game.jcrosoft.org>
-	<1304009792.3081.8.camel@redbox>
-	<20110428181502.GE17290@n2100.arm.linux.org.uk>
-	<BANLkTimT4dpOKcuMbWOWU4Mz=Uk81642Rw@mail.gmail.com>
-	<20110428214632.GQ17290@n2100.arm.linux.org.uk>
-	<20110428233823.GC13104@game.jcrosoft.org>
-Message-ID: <20110429092812.GA17290@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Fri, 29 Apr 2011 11:26:25 +0200
+Subject: [PATCH 4/5] OMAP3: cpuidle: code rework for improved readability
+In-Reply-To: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
+References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
+Message-ID: <1304069186-3086-5-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 01:38:23AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 22:46 Thu 28 Apr     , Russell King - ARM Linux wrote:
-> > On Thu, Apr 28, 2011 at 10:47:37PM +0200, Andrew Victor wrote:
-> > > hi Russell,
-> > > 
-> > > >> I think it would be cleaner still if the "struct sys_timer" could
-> > > >> include a register-base-address field. ?Russell?
-> > > >
-> > > > That's not really what all platforms want, and with the advent of
-> > > > clocksources and clock events, I think the sys_timer thing is mostly
-> > > > dead.
-> > > 
-> > > How would those systems initialize the system-timer?
-> > > An "init_timer" method in the machine-description?
-> > 
-> > I was thinking of an init_timekeeping() callback in the machine record
-> > rather than having platforms provide a useless sys_timer structure, and
-> > maybe having an ARM generic init_legacy_timekeeping() function for those
-> > platforms which still use sys_timer() to put into the init_timekeeping()
-> > hook.
-> > 
-> > I've not really firmed up the idea yet though.
-> > 
-> > Alternatively, if someone wants to come up with a better way to initialize
-> > the clocksource and clock event stuff across all platforms...
-> 
-> I propose we use early device as I did and Magnus did on SH-Mobile
-> 
-> we will have a common early param "earlytimer"
-> 
-> then we register the drivers like this
-> 
-> early_platform_init("earlytimer", &time_device_driver);
-> 
-> and in the arm init we just have to do
-> early_platform_driver_register_all("earlytimer");
-> and call
-> early_platform_driver_probe("earlytimer", 1 , 0);
-> or let the platform do so as some of them may have more than 1 timer to
-> register example on shmobile
-> 
-> We could also have two init one for soc one for machine
-> if (machine_time_init)
-> 	machine_time_init()
-> else
-> 	soc_time_init()
-> 
-> as the timer is not really is ofen not machine specific but platform specific.
-> I see that on shmobile, at91 (3 timers sam9, rm9200, x40), nomadok, and other
-> 
-> This will simplify timer sharing across architecture such shmobile arm and sh
-> for renesas but other vendor get the same issue when they soc on different
-> architecture
+From: Jean Pihet <j-pihet@ti.com>
 
-It doesn't sound like this eliminates anything - it just makes things
-more complex.  It seems we _still_ need a callback into the platform
-code to execute some kind of initialization, eg calling
-early_platform_driver_* with appropriate arguments.  So I'm not sure
-what we're saving by effectively breaking the initialization function
-out into two separate functions and an early platform driver thing.
+Signed-off-by: Jean Pihet <j-pihet@ti.com>
+---
+ arch/arm/mach-omap2/cpuidle34xx.c |   52 +++++++++++++-----------------------
+ 1 files changed, 19 insertions(+), 33 deletions(-)
 
-It all sounds much more complex to me with very little benefit for the
-majority of platforms, and it doesn't seem to change what's required
-from core code at all - we still need to provide an initialization
-call into platform code at the appropriate time.
+diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+index f84315c..4673cc6 100644
+--- a/arch/arm/mach-omap2/cpuidle34xx.c
++++ b/arch/arm/mach-omap2/cpuidle34xx.c
+@@ -80,13 +80,6 @@ static struct cpuidle_params cpuidle_params_table[OMAP3_MAX_STATES] = {
+ 	{10000 + 30000, 300000, 1},
+ };
+ 
+-static int omap3_idle_bm_check(void)
+-{
+-	if (!omap3_can_sleep())
+-		return 1;
+-	return 0;
+-}
+-
+ static int _cpuidle_allow_idle(struct powerdomain *pwrdm,
+ 				struct clockdomain *clkdm)
+ {
+@@ -166,9 +159,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+ 					      struct cpuidle_state *curr)
+ {
+ 	struct cpuidle_state *next = NULL;
+-	struct omap3_idle_statedata *cx;
+-
+-	cx = cpuidle_get_statedata(curr);
++	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr);
+ 
+ 	/* Check if current state is valid */
+ 	if (cx->valid) {
+@@ -176,9 +167,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+ 	} else {
+ 		u8 idx = OMAP3_STATE_MAX;
+ 
+-		/*
+-		 * Reach the current state starting at highest C-state
+-		 */
++		/* Reach the current state starting at highest C-state */
+ 		for (; idx >= OMAP3_STATE_C1; idx--) {
+ 			if (&dev->states[idx] == curr) {
+ 				next = &dev->states[idx];
+@@ -186,9 +175,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+ 			}
+ 		}
+ 
+-		/*
+-		 * Should never hit this condition.
+-		 */
++		/* Should never hit this condition */
+ 		WARN_ON(next == NULL);
+ 
+ 		/*
+@@ -223,29 +210,16 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+ 			       struct cpuidle_state *state)
+ {
+-	struct cpuidle_state *new_state = next_valid_state(dev, state);
+-	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
+-	u32 cam_state;
++	struct cpuidle_state *new_state;
++	u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
+ 	struct omap3_idle_statedata *cx;
+ 	int ret;
+ 
+-	if (omap3_idle_bm_check()) {
+-		BUG_ON(!dev->safe_state);
++	if (!omap3_can_sleep()) {
+ 		new_state = dev->safe_state;
+ 		goto select_state;
+ 	}
+ 
+-	cx = cpuidle_get_statedata(state);
+-	core_next_state = cx->core_state;
+-
+-	/*
+-	 * FIXME: we currently manage device-specific idle states
+-	 *        for PER and CORE in combination with CPU-specific
+-	 *        idle states.  This is wrong, and device-specific
+-	 *        idle management needs to be separated out into 
+-	 *        its own code.
+-	 */
+-
+ 	/*
+ 	 * Prevent idle completely if CAM is active.
+ 	 * CAM does not have wakeup capability in OMAP3.
+@@ -257,9 +231,19 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+ 	}
+ 
+ 	/*
++	 * FIXME: we currently manage device-specific idle states
++	 *        for PER and CORE in combination with CPU-specific
++	 *        idle states.  This is wrong, and device-specific
++	 *        idle management needs to be separated out into
++	 *        its own code.
++	 */
++
++	/*
+ 	 * Prevent PER off if CORE is not in retention or off as this
+ 	 * would disable PER wakeups completely.
+ 	 */
++	cx = cpuidle_get_statedata(state);
++	core_next_state = cx->core_state;
+ 	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
+ 	if ((per_next_state == PWRDM_POWER_OFF) &&
+ 	    (core_next_state > PWRDM_POWER_RET))
+@@ -269,6 +253,8 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+ 	if (per_next_state != per_saved_state)
+ 		pwrdm_set_next_pwrst(per_pd, per_next_state);
+ 
++	new_state = next_valid_state(dev, state);
++
+ select_state:
+ 	dev->last_state = new_state;
+ 	ret = omap3_enter_idle(dev, new_state);
+@@ -329,7 +315,7 @@ struct cpuidle_driver omap3_idle_driver = {
+ 	.owner = 	THIS_MODULE,
+ };
+ 
+-/* Fill in the state data from the mach tables and register the driver_data */
++/* Helper to fill the C-state common data and register the driver_data */
+ #define FILL_IN_STATE(idx, descr)					\
+ do {									\
+ 	state				= &dev->states[count];		\
+-- 
+1.7.1
