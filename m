@@ -1,30 +1,27 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 29 Apr 2011 16:44:33 +0530
-Subject: [PATCH 1/5] OMAP3 cpuidle: remove useless SDP specific timings
-In-Reply-To: <1304069186-3086-2-git-send-email-j-pihet@ti.com>
-References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-	<1304069186-3086-2-git-send-email-j-pihet@ti.com>
-Message-ID: <4DBA9D99.4070908@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 29 Apr 2011 13:21:16 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <1304036754.2513.201.camel@pasglop>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110428131531.GK17290@n2100.arm.linux.org.uk>
+	<1304036754.2513.201.camel@pasglop>
+Message-ID: <201104291321.16191.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4/29/2011 2:56 PM, jean.pihet at newoldbits.com wrote:
-> From: Jean Pihet<j-pihet@ti.com>
->
-> The cpuidle states settings can be overriden by some board-
-> specific settings, by calling omap3_pm_init_cpuidle.
-> Remove the 3430SDP specific states settings registration
-> since the figures are identical to the default ones (in cpuidle34xx.c).
->
-> Signed-off-by: Jean Pihet<j-pihet@ti.com>
-> ---
->   arch/arm/mach-omap2/board-3430sdp.c |   19 -------------------
->   1 files changed, 0 insertions(+), 19 deletions(-)
->
-Looks like the example table to show the API usage never got
-updated with board specific timings :)
+On Friday 29 April 2011, Benjamin Herrenschmidt wrote:
+> 
+> > However, dma_alloc_coherent() memory can't be used with the dma_sync_*
+> > API as its return address (unlike other architectures) is not in the
+> > kernel direct mapped memory range.
+> 
+> Well, on non-coherent architectures, dma_sync_* are cache flushes, I
+> don't see the point of doing those on a non-cachable mapping anyways.
+> 
+The point was that you cannot do
 
--19 lines more :)
+#define dma_alloc_coherent dma_alloc_noncoherent
 
-Regards
-Santosh
+on ARM, as some other architectures do.
+
+	Arnd
