@@ -1,44 +1,81 @@
-From: j.glisse@gmail.com (Jerome Glisse)
-Date: Fri, 29 Apr 2011 10:19:58 -0400
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110429134231.GI13402@8bytes.org>
-References: <201104212129.17013.arnd@arndb.de>
-	<201104281428.56780.arnd@arndb.de>
-	<20110428131531.GK17290@n2100.arm.linux.org.uk>
-	<201104281629.52863.arnd@arndb.de>
-	<20110428143440.GP17290@n2100.arm.linux.org.uk>
-	<BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>
-	<20110429134231.GI13402@8bytes.org>
-Message-ID: <BANLkTi=EQMuuGzDgKF3i-jukDh31gzn_JA@mail.gmail.com>
+From: vikram186@gmail.com (Vikram Narayanan)
+Date: Fri, 29 Apr 2011 19:56:56 +0530
+Subject: Architecture specific implementations for tickless kernel and
+	deferrable timers
+In-Reply-To: <20110428182420.GF17290@n2100.arm.linux.org.uk>
+References: <4DB0F249.6000307@codeaurora.org>
+	<BANLkTinkkMkyy3OnSiOqgUBHiytFPparbQ@mail.gmail.com>
+	<20110426203756.GD17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
+	<alpine.LFD.2.02.1104271015000.3323@ionos>
+	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
+	<20110428133826.GM17290@n2100.arm.linux.org.uk>
+	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
+	<20110428142822.GN17290@n2100.arm.linux.org.uk>
+	<BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
+	<20110428182420.GF17290@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTi=Xb7c9GeNJ_Our0+euEmumk_0-OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 9:42 AM, Joerg Roedel <joro@8bytes.org> wrote:
-> On Thu, Apr 28, 2011 at 03:37:00PM -0400, Jerome Glisse wrote:
->> As Jesse pointed out already, for performance reasons it's lot better
->> if you let the driver decide even if you have an iommu capable of
->> handling coherency for you. My understanding is that each time
->> coherency is asked for it trigger bus activities of some kind (i think
->> snoop is the term used for pci) this traffic can slow down both the
->> cpu and the device. For graphic driver we have a lot of write once and
->> use (once or more) buffer and it makes a lot of sense to have those
->> buffer allocated using uncached memory so we can tell the device (in
->> case of drm driver) that there is no need to trigger snoop activities
->> for coherency. So i believe the decision should ultimately be in the
->> driver side.
+On Thu, Apr 28, 2011 at 11:54 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Apr 28, 2011 at 10:59:01PM +0530, Vikram Narayanan wrote:
+>> On Thu, Apr 28, 2011 at 7:58 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > What basically happens is:
+>> >
+>> > ? ? ? ?now = cs->read(cs);
+>> > ? ? ? ?delta = (now - cs->cycle_last) & cs->mask;
+>> > ? ? ? ?cs->cycle_last = now;
+>> >
+>> > ? ? ? ?ns = clocksource_cyc2ns(delta, cs...);
+>> >
+>> > ns now represents the amount of time which passed between this read and
+>> > the previous read. ?Note the mask in the calculation of delta ensures
+>> > that overflows are taken care of.
+>>
+>> The timekeeping_get_ns() in kernel/time/timekeeping.c takes care of the above.
+>> So my job is to provide a good *continuous* clocksource with correct
+>> mult,shift and mask values.
+>> And also, the mult and shift values can be calculated from the
+>> clocks_calc_mult_shift() function.
 >
-> Stupid question: Couldn't these write-once-read-often buffers just stay
-> in the memory of the GPU instead of refetching them every time from main
-> memory? Or is that necessary because of the limited space on some GPUs?
+> For clocksources, please, no, don't use clocks_calc_mult_shift(). ?There
+> is clocksource_register_hz() and clocksource_register_khz() which will
+> sort out the shift and multiplier automatically for you.
+Ok. I will use this.
 >
-> Regards,
+>> The define HZ is important only for one-shot mode. and for a tickless
+>> kernel this value is not of great importance.
 >
-> ? ? ? ?Joerg
+> ITYM periodic mode.
+Yes. in periodic mode. I mistyped it.
 >
+>> And also if I use the same timer for clocksource and clockevent, it
+>> will surely gonna mess up my system's time sooner or latter.
+>
+> Indeed it will.
+Can you also give some idea on how the system's RTC is hooked up with
+the generic timekeeping code.
+Is it hooked up in someway so that the walltime is calculated wrt the
+initial value of the RTC?
+>
+>> > When you're called to switch to one-shot mode, program it for one-shot
+>> > mode, disable it, and wait for set_next_event(). ?On set_next_event(),
+>> > you program the timer to produce an interrupt after the specified
+>> > interval and enable it.
+>>
+>> For the clockevent device, If I provide all the data structures,
+>> next_event and set_mode, then this will work perfectly.
+>>
+>> Hope I have understood your explanations in the right way and all my
+>> above statements make sense.
+>
+> I think so.
+>
+Thanks for your detailed explanations.
+Will update this thread if I have more doubts on this.
 
-We might be talking about several G of data, so using system is not
-uncommon. Also when uploading data to GPU vram is better to let the
-GPU do dma from system memory rather than having the CPU do memcpy.
-
-Cheers,
-Jerome
+Thanks,
+Vikram
