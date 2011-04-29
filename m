@@ -1,84 +1,23 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 29 Apr 2011 08:32:59 -0400 (EDT)
-Subject: [PATCH] ARM: Include Makefile.boot only when it exists
-In-Reply-To: <20110429075346.GU17290@n2100.arm.linux.org.uk>
-References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
-	<20110420083258.GB1517@S2100-06.ap.freescale.net>
-	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
-	<20110428152735.GU17290@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104281925500.24613@xanadu.home>
-	<20110429075346.GU17290@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1104290814380.24613@xanadu.home>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 29 Apr 2011 16:39:56 +0400
+Subject: [PATCH 1/2] AM35xx-Craneboard: USB EHCI: Fix USB ECHI PHY reset
+In-Reply-To: <1304077261-17811-1-git-send-email-srinath@mistralsolutions.com>
+References: <[PATCH]>
+	<1304077261-17811-1-git-send-email-srinath@mistralsolutions.com>
+Message-ID: <4DBAB19C.2030103@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
+Hello.
 
-> On Thu, Apr 28, 2011 at 09:00:08PM -0400, Nicolas Pitre wrote:
-> > On Thu, 28 Apr 2011, Russell King - ARM Linux wrote:
-> > 
-> > > If/when we move to DT, do people think that Linus is going to accept
-> > > having the DT files in the kernel for all these platforms, and will he
-> > > be happy to see stuff like the files containing the OMAP clock definitions
-> > > being constantly patched?  Remember, it's *exactly* this data which Linus
-> > > wants out of the kernel source.
-> > 
-> > Well, here's what he said:
-> > 
-> > |But trust me, if you start doing a better job at platform code, I
-> > |won't be complaining when I get lots of deleted code, or when I start
-> > |getting devicetree descriptions instead of new drivers.
-> > (http://article.gmane.org/gmane.linux.kernel/1121387)
-> > 
-> > So of course this "getting devicetree descriptions" might be interpreted 
-> > to mean different things.
-> > 
-> > OTOH, the device tree source files can be arranged with common 
-> > definitions in something like a header file that is included by board 
-> > specific files.  So, at least in theory, differences between similar 
-> > boards should be small, hopefully smaller than the equivalent in C.
-> > 
-> > Also, DT files should be a representation of the hardware which is meant 
-> > to be stable.  If it wasn't stable, there would be no point using a data 
-> > structure that can also be used outside of the kernel.  Remember that 
-> > one of the selling point for DT is to be able to boot an existing kernel 
-> > binary on yet-to-be-created hardware simply by creating the appropriate 
-> > DT description for it.  Hence the DT files for existing hardware 
-> > shouldn't have to change even if the kernel side implementation does.
-> >
-> > > I suspect the answer to that is no.  So I think we should start right now
-> > > with the idea that putting DT files - even the core SoC ones - into the
-> > > kernel isn't going to be acceptable.
-> > 
-> > Well, if you look at arch/powerpc/boot/dts/* you'll find a bunch of 
-> > board specific DT files in there already, and Linus has identified PPC 
-> > as one architecture that did it right in his mind.
-> 
-> Sigh, you really don't understand.
-> 
-> For OMAP we're likely to see several dts files around 200K in size
-> describing _just_ the clock trees.  As we've seen, the OMAP clock tree
-> information is modified fairly regularly, adding new clocks, changing
-> flags, and so forth.
+On 29-04-2011 15:41, srinath at mistralsolutions.com wrote:
 
-What do I not understand?  Let me repeat myself again:
+> From: Srinath <srinath@mistralsolutions.com>
 
-| DT files should be a representation of the hardware which is meant to 
-| be stable. [...] Hence the DT files for existing hardware shouldn't 
-| have to change even if the kernel side implementation does.
+> This patch fixes the EHCI PHY reset issue found on CraneBoard.
 
-So there shouldn't be constant changes to those files as they are 
-supposed to be hardware description only.
+> Signed-off-by: Srinath <srinath@mistralsolutions.com>
 
-I agree that having a DT source file for every piece of hardware in 
-existence out there being stuffed in the kernel tree is a bit silly.  
-In a perfect world, the DT data would be tied and maintained with the 
-bootloader, but I'm a bit skeptical about this going well given past 
-history with even much simpler data. Therefore I think it is important 
-to have at least a few ones being shipped with the kernel tree to 
-provide at least a few reference cases for which the corresponding 
-kernel code was tested and thus having some kind of officially validated 
-combinations available.
+    AFAIK full name required in signoff.
 
-
-Nicolas
+WBR, Sergei
