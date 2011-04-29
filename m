@@ -1,134 +1,59 @@
-From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
-Date: Fri, 29 Apr 2011 17:11:01 +0530
-Subject: [PATCH 2/2] AM35xx-Craneboard:Display: Add DVI and TV Support
-In-Reply-To: <[PATCH]>
-References: <[PATCH]>
-Message-ID: <1304077261-17811-2-git-send-email-srinath@mistralsolutions.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 29 Apr 2011 14:28:32 +0200 (CEST)
+Subject: [patch 07/16] arm: omap: Use clocksource based sched_clock
+In-Reply-To: <20110429115744.GZ3755@atomide.com>
+References: <20110423205036.795894921@linutronix.de>
+	<20110423205132.221790438@linutronix.de>
+	<20110429115744.GZ3755@atomide.com>
+Message-ID: <alpine.LFD.2.02.1104291420240.3005@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath <srinath@mistralsolutions.com>
+B1;2601;0cOn Fri, 29 Apr 2011, Tony Lindgren wrote:
 
-Added Display (DVI and TV) support for CraneBoard.
+> * Thomas Gleixner <tglx@linutronix.de> [110423 13:51]:
+> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> > ---
+> >  arch/arm/mach-omap1/time.c               |   62 +--------------------------
+> >  arch/arm/mach-omap2/timer-gp.c           |   17 -------
+> >  arch/arm/plat-omap/counter_32k.c         |   71 ++-----------------------------
+> >  arch/arm/plat-omap/dmtimer.c             |    4 -
+> >  arch/arm/plat-omap/include/plat/common.h |    1 
+> >  5 files changed, 13 insertions(+), 142 deletions(-)
+> 
+> This one needs the following patch to compile. Also, this
+> fails with following, probably because the clocks are not
+> set up at that point.
+> 
+> Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> pgd = c0004000
+> [00000000] *pgd=00000000
+> Internal error: Oops: 80000005 [#1] SMP
+> last sysfs file: 
+> Modules linked in:
+> CPU: 0    Not tainted  (2.6.39-rc5-00081-gc3dec8c #166)
+> PC is at 0x0
+> LR is at read_persistent_clock+0x24/0xb4
 
-Signed-off-by: Srinath <srinath@mistralsolutions.com>
----
- arch/arm/mach-omap2/board-am3517crane.c |   78 +++++++++++++++++++++++++++++++
- 1 files changed, 78 insertions(+), 0 deletions(-)
+> The generic code should probably just return 0 until the clocks are
+> initialized. Or do you have some other solution for that in mind?
 
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index 05867b5..83fe85b 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -29,12 +29,15 @@
- #include <plat/board.h>
- #include <plat/common.h>
- #include <plat/usb.h>
-+#include <plat/display.h>
-+#include <plat/panel-generic-dpi.h>
- 
- #include "mux.h"
- #include "control.h"
- 
- #define GPIO_USB_POWER		35
- #define GPIO_USB_NRESET		38
-+#define GPIO_DVI_ENABLE		52
- 
- 
- /* Board initialization */
-@@ -66,11 +69,83 @@ static struct usbhs_omap_board_data usbhs_bdata __initdata = {
- 	.reset_gpio_port[2]  = -EINVAL
- };
- 
-+static void __init am3517_crane_display_init(void)
-+{
-+	int ret;
-+
-+	ret = omap_mux_init_gpio(GPIO_DVI_ENABLE, OMAP_PIN_OUTPUT);
-+	if (ret < 0) {
-+		pr_err("Can not configure mux for GPIO_DVI_ENABLE %d\n",
-+			GPIO_DVI_ENABLE);
-+		return;
-+	}
-+
-+	ret = gpio_request(GPIO_DVI_ENABLE, "dvi_enable");
-+	if (ret < 0) {
-+		pr_err("Can not request GPIO %d\n", GPIO_DVI_ENABLE);
-+		return;
-+	}
-+
-+	ret = gpio_direction_output(GPIO_DVI_ENABLE, 1);
-+	if (ret < 0) {
-+		gpio_free(GPIO_DVI_ENABLE);
-+		pr_err("Unable to enable DVI\n");
-+		return;
-+	}
-+}
-+
-+static struct omap_dss_device am3517_crane_tv_device = {
-+	.type                   = OMAP_DISPLAY_TYPE_VENC,
-+	.name                   = "tv",
-+	.driver_name            = "venc",
-+	.phy.venc.type          = OMAP_DSS_VENC_TYPE_COMPOSITE,
-+	.platform_enable        = NULL,
-+	.platform_disable       = NULL,
-+};
-+
-+static int am3517_crane_panel_enable_dvi(struct omap_dss_device *dssdev)
-+{
-+	gpio_set_value(GPIO_DVI_ENABLE, 1);
-+	return 0;
-+}
-+
-+static void am3517_crane_panel_disable_dvi(struct omap_dss_device *dssdev)
-+{
-+	gpio_set_value(GPIO_DVI_ENABLE, 0);
-+}
-+
-+
-+static struct panel_generic_dpi_data dvi_panel = {
-+	.name                   = "generic",
-+	.platform_enable        = am3517_crane_panel_enable_dvi,
-+	.platform_disable       = am3517_crane_panel_disable_dvi,
-+};
-+
-+static struct omap_dss_device am3517_crane_dvi_device = {
-+	.type                   = OMAP_DISPLAY_TYPE_DPI,
-+	.name                   = "dvi",
-+	.driver_name            = "generic_dpi_panel",
-+	.data                   = &dvi_panel,
-+	.phy.dpi.data_lines     = 24,
-+};
-+
-+static struct omap_dss_device *am3517_crane_dss_devices[] = {
-+	&am3517_crane_tv_device,
-+	&am3517_crane_dvi_device,
-+};
-+
-+static struct omap_dss_board_info am3517_crane_dss_data = {
-+	.num_devices    = ARRAY_SIZE(am3517_crane_dss_devices),
-+	.devices        = am3517_crane_dss_devices,
-+	.default_device = &am3517_crane_dvi_device,
-+};
-+
- static void __init am3517_crane_init(void)
- {
- 	int ret;
- 
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_display_init(&am3517_crane_dss_data);
- 	omap_serial_init();
- 
- 	omap_board_config = am3517_crane_config;
-@@ -103,6 +178,9 @@ static void __init am3517_crane_init(void)
- 	}
- 
- 	usbhs_init(&usbhs_bdata);
-+
-+	/* DSS */
-+	am3517_crane_display_init();
- }
- 
- MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
--- 
-1.7.1.226.g770c5
+The generic sched_clock implementation returns a jiffies based value
+as long as there is no clocksource registered. But the above does not
+fail in sched_clock() it fails in read_persistent_clock() which does
+
+        last_cycles = cycles;
+        cycles = clocksource_32k.read(&clocksource_32k);
+
+So the following change causes this:
+
+-     .read           = omap_32k_read_dummy,
+
+Which leads to the question why you have a read_persistent_clock() at
+all if it always reads 0 via omap_32k_read_dummy ? Or is this meant
+just for the resume case? Then the above and the removal of
+omap_32k_read_dummy() needs to be undone.
+
+Thanks,
+
+	tglx
