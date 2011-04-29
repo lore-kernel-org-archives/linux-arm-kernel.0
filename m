@@ -1,57 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 11:56:08 +0100
-Subject: [PATCH RFC] clk: add support for automatic parent handling
-In-Reply-To: <alpine.LFD.2.02.1104291246200.3005@ionos>
-References: <alpine.LFD.2.00.1104192339180.2744@localhost6.localdomain6>
-	<1303308457-7501-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<alpine.LFD.2.02.1104201704350.3323@ionos>
-	<20110420185922.GD31131@pengutronix.de>
-	<alpine.LFD.2.02.1104202113250.3323@ionos>
-	<20110429103055.GE5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291246200.3005@ionos>
-Message-ID: <20110429105608.GH5126@n2100.arm.linux.org.uk>
+From: thellstrom@vmware.com (Thomas Hellstrom)
+Date: Fri, 29 Apr 2011 12:55:11 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <1304062523.2513.235.camel@pasglop>
+References: <201104212129.17013.arnd@arndb.de>	
+	<201104281428.56780.arnd@arndb.de>	
+	<20110428131531.GK17290@n2100.arm.linux.org.uk>	
+	<201104281629.52863.arnd@arndb.de>	
+	<20110428143440.GP17290@n2100.arm.linux.org.uk>	
+	<BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>	
+	<1304036962.2513.202.camel@pasglop> <4DBA5194.7080609@vmware.com>
+	<1304062523.2513.235.camel@pasglop>
+Message-ID: <4DBA990F.6040203@vmware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 12:51:44PM +0200, Thomas Gleixner wrote:
-> On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
-> 
-> > On Wed, Apr 20, 2011 at 09:52:15PM +0200, Thomas Gleixner wrote:
-> > > On Wed, 20 Apr 2011, Uwe Kleine-K?nig wrote:
-> > > > struct clk has no parent member, there is only clk_get_parent(). If
-> > > 
-> > > Which is a complete failure to begin with. Why the heck do you need a
-> > > callback to figure that out?
-> > 
-> > Thomas, you're wrong.  You're looking at things far too simply, because
-> > all you can see is a tree of clocks.
-> 
-> And that's what it is. Even if the clock can have sevaral possible
-> parents, then there is only one active parent at a time. It's still a
-> tree.
->  
-> > When you have MUXes, a clock can have one of many parents.  So a single
-> > clk->parent doesn't hack it.  That's one reason why clk_get_parent()
-> > exists, so that MUXes can return the appropriate parent for the current
-> > MUX setting.
-> 
-> That's only ever needed when you register a clk with the framework to
-> decode the current setting from the hardware.
->  
-> > You may wish to store the current setting in clk->parent, but I'd argue
-> > that's a recipe for things going wrong when the MUX settings differ from
-> > the cached clk->parent value.  Instead, having clk_get_parent()s
-> > implementation return the _current_ parent and let MUXes do the right
-> > thing depending on hardware is much easier and more reliably correct.
-> 
-> If something changes the clk parent in the hardware without going
-> through common framework functions, which take care of updating
-> clk->parent in the proper way, then the implementer got it wrong
-> badly. That's the same thing as if you change the clock rate of your
-> timekeeping clock behind the timekeeping core and then complain about
-> timekeeping going awry.
+On 04/29/2011 09:35 AM, Benjamin Herrenschmidt wrote:
+>
+> We have problems with AGP and macs, we chose to mostly ignore them and
+> things have been working so-so ... with the old DRM. With DRI2 being
+> much more aggressive at mapping/unmapping things, things became a lot
+> less stable and it could be in part related to that. IE. Aliases are
+> similarily forbidden but we create them anyways.
+>
+>    
 
-No, the question is whether you cache the parent clock in a pointer,
-or use an abstraction to obtain the parent clock.  It's merely an
-implementation detail and is not as big a problem as you've been
-trying to make it out to be.
+Do you have any idea how other OS's solve this AGP issue on Macs?
+Using a fixed pool of write-combined pages?
+
+>> c)  If neither of the above applies, we might be able to either use
+>> explicit cache flushes (which will require a TTM cache sync API), or
+>> require the device to use snooping mode. The architecture may also
+>> perhaps have a pool of write-combined pages that we can use. This should
+>> be indicated by defines in the api header.
+>>      
+> Right. We should still shoot HW designers who give up coherency for the
+> sake of 3D benchmarks. It's insanely stupid.
+>    
+
+I agree. From a driver writer's perspective having the GPU always 
+snooping the system pages would be a dream. On the GPUs that do support 
+snooping that I have looked at, its internal MMU usually support both 
+modes, but the snooping mode is way slower (we're talking 50-70% or so 
+slower texturing operations), and often buggy causing crashes or scanout 
+timing issues since system designers apparently don't really count on it 
+being used. I've found it usable for device-to-system memory blits.
+
+In addition memcpy to device is usually way faster if the destination is 
+write-combined. Probably due to cache thrashing effects.
+
+/Thomas
+
+> Cheers,
+> Ben.
+>
+>    
+>> /Thomas
+>>
+>>
+>>
+>>
+>>      
+>>> _______________________________________________
+>>> Linaro-mm-sig mailing list
+>>> Linaro-mm-sig at lists.linaro.org
+>>> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+>>>
+>>>        
+>
+>    
