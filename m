@@ -1,21 +1,33 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 29 Apr 2011 15:30:32 +0100
-Subject: [PATCH 0/5] convert stmp into mxs and delete the then obsolete
-	platform
-In-Reply-To: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
-References: <1304082403-8897-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20110429143032.GT5126@n2100.arm.linux.org.uk>
+Date: Fri, 29 Apr 2011 15:34:35 +0100
+Subject: Architecture specific implementations for tickless kernel and
+	deferrable timers
+In-Reply-To: <BANLkTi=Xb7c9GeNJ_Our0+euEmumk_0-OA@mail.gmail.com>
+References: <20110426203756.GD17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Y0CdRt1ktCs7NwG4pLqWeZeLQPg@mail.gmail.com>
+	<alpine.LFD.2.02.1104271015000.3323@ionos>
+	<BANLkTi=WRw9pphieBAnDRhSH_WSdyUdb_A@mail.gmail.com>
+	<20110428133826.GM17290@n2100.arm.linux.org.uk>
+	<BANLkTi=rG8y=OeF8jc8R48tMLm=eH1=gqQ@mail.gmail.com>
+	<20110428142822.GN17290@n2100.arm.linux.org.uk>
+	<BANLkTin9_=zwLCkqVcAfg-_pGTXk9GaZsg@mail.gmail.com>
+	<20110428182420.GF17290@n2100.arm.linux.org.uk>
+	<BANLkTi=Xb7c9GeNJ_Our0+euEmumk_0-OA@mail.gmail.com>
+Message-ID: <20110429143435.GU5126@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 03:06:38PM +0200, Wolfram Sang wrote:
-> The larger patches will probably take a while until they are moderated.
-> You can have a look already at my public branch, coordinates below.
-> There are more details in those patch descriptions, so please read them
-> to get the bigger picture.
+On Fri, Apr 29, 2011 at 07:56:56PM +0530, Vikram Narayanan wrote:
+> Can you also give some idea on how the system's RTC is hooked up with
+> the generic timekeeping code.
+> Is it hooked up in someway so that the walltime is calculated wrt the
+> initial value of the RTC?
 
-Thanks for doing this.
+I'd like to pass you over to the RTC folk, but I don't think they're
+very active anymore.
 
-So, does anyone have any objections to this?  If not, I'll merge it
-into my tree by the end of today, unless someone from mxs says they're
-handling these patches.
+Suffice it to say that the RTC subsystem will set the system date/time
+on initialization from the RTC device if one is provided.  All I can
+suggest is to look at drivers/rtc and include/linux/rtc.h for the
+details.  The MAINTAINERS file should list who is responsible for RTC
+stuff as well as a mailing list for it.
