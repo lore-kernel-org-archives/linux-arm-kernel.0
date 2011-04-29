@@ -1,41 +1,42 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 29 Apr 2011 15:48:42 +0530
-Subject: [PATCH V3 2/7] dmaengine/dw_dmac: Replace spin_lock* with	irqsave
-	variants
-In-Reply-To: <20110428171020.GB17290@n2100.arm.linux.org.uk>
-References: <cover.1303896566.git.viresh.kumar@st.com>
-	<50dc2f47f2c9f94fce78583568830a66af49307d.1303896567.git.viresh.kumar@st.com>
-	<20110428171020.GB17290@n2100.arm.linux.org.uk>
-Message-ID: <4DBA9082.6040907@st.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 29 Apr 2011 11:20:39 +0100
+Subject: [PATCH 04/10] clk: implement parent pass through functions
+In-Reply-To: <20110419175318.GB15233@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-5-git-send-email-s.hauer@pengutronix.de>
+	<4DADC45C.1020202@codeaurora.org>
+	<20110419175318.GB15233@pengutronix.de>
+Message-ID: <20110429102039.GD5126@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2011 10:40 PM, Russell King - ARM Linux wrote:
-> On Wed, Apr 27, 2011 at 03:06:44PM +0530, Viresh Kumar wrote:
->> @@ -407,6 +410,8 @@ EXPORT_SYMBOL(dw_dma_get_dst_addr);
->>  static void dwc_handle_cyclic(struct dw_dma *dw, struct dw_dma_chan *dwc,
->>  		u32 status_block, u32 status_err, u32 status_xfer)
->>  {
->> +	unsigned long flags;
->> +
->>  	if (status_block & dwc->mask) {
->>  		void (*callback)(void *param);
->>  		void *callback_param;
->> @@ -418,9 +423,9 @@ static void dwc_handle_cyclic(struct dw_dma *dw, struct dw_dma_chan *dwc,
->>  		callback = dwc->cdesc->period_callback;
->>  		callback_param = dwc->cdesc->period_callback_param;
->>  		if (callback) {
->> -			spin_unlock(&dwc->lock);
->> +			spin_unlock_irqrestore(&dwc->lock, flags);
->>  			callback(callback_param);
->> -			spin_lock(&dwc->lock);
->> +			spin_lock_irqsave(&dwc->lock, flags);
-> 
-> I'm really not convinced that this is anywhere near correct.  I'm
-> surprised this doesn't spit out a compiler warning.
-> 
+On Tue, Apr 19, 2011 at 07:53:18PM +0200, Sascha Hauer wrote:
+> That's the current behaviour (except that ERR_PTR(-ENOSYS) is returned
+> instead of NULL).
 
-Sorry, this is done by mistake.
+I think you're getting confused about clk being NULL.  Let's take a
+step backwards shall we?
 
--- 
-viresh
+A NULL clk has no pointers to anything useful.  It gets treated by the
+clk_* functions as a no-op.  So, if clk_get_parent() returns NULL, then
+internally within the clk code, we know that it's going to be reated as
+a no-op clock.  If it's a no-op clock then there is no parent.
+
+The next point is - should clk_get_parent() return NULL?  It can do
+as that's a valid return from clk_get() which is not an error case.
+Any driver asking for the parent clock should treat it no different
+from a non-NULL value:
+
+/**
+ * clk_get_parent - get the parent clock source for this clock
+ * @clk: clock source
+ *
+ * Returns struct clk corresponding to parent clock source, or
+ * valid IS_ERR() condition containing errno.
+ */
+struct clk *clk_get_parent(struct clk *clk);
+
+However, internally within the clk API we can make the assumption that
+a NULL return value means "no clk" because the clk internals is on the
+clock implementation side of the API dividing line and can deal with
+this knowledge.
