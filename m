@@ -1,86 +1,88 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 29 Apr 2011 21:08:16 -0500
-Subject: [PATCH 09/10] ARM: shmobile: use common scu_init_cpus
-In-Reply-To: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
-References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1304129297-6614-10-git-send-email-robherring2@gmail.com>
+From: ccross@google.com (Colin Cross)
+Date: Fri, 29 Apr 2011 19:38:17 -0700
+Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
+In-Reply-To: <1302633340-4795-7-git-send-email-will.deacon@arm.com>
+References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
+	<1302633340-4795-7-git-send-email-will.deacon@arm.com>
+Message-ID: <BANLkTi=rM=r5UdUHPG5XceX=ppnQ44K+oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Tue, Apr 12, 2011 at 11:35 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Currently, the gic uses handle_level_irq for handling SPIs (Shared
+> Peripheral Interrupts), requiring active interrupts to be masked at
+> the distributor level during IRQ handling.
+>
+> On a virtualised system, only the CPU interfaces are virtualised in
+> hardware. Accesses to the distributor must be trapped by the
+> hypervisor, adding latency to the critical interrupt path in Linux.
+>
+> This patch modifies the GIC code to use handle_fasteoi_irq for handling
+> interrupts, which only requires us to signal EOI to the CPU interface
+> when handling is complete. Cascaded IRQ handling is also updated to use
+> the chained IRQ enter/exit functions to honour the flow control of the
+> parent chip.
+>
+> Note that commit 846afbd1 ("GIC: Dont disable INT in ack callback")
+> broke cascading interrupts by forgetting to add IRQ masking. This is
+> no longer an issue because the unmask call is now unnecessary.
+>
+> Tested on Versatile Express and Realview EB (1176 w/ cascaded GICs).
+>
+> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
+> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Convert shmobile to use common scu_init_cpus function.
+After further testing, I'm having a problem with this patch, although
+I think its more of a core issue than the fault of this patch.  One of
+my interrupts is getting stuck with the PENDING flag set, and
+preventing suspend.  The flow that triggers this is:
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/mach-shmobile/include/mach/common.h |    2 +-
- arch/arm/mach-shmobile/platsmp.c             |   15 ++-------------
- arch/arm/mach-shmobile/smp-sh73a0.c          |    6 ++----
- 3 files changed, 5 insertions(+), 18 deletions(-)
+level triggered irq
+ handle_fasteoi_irq
+  handle_irq_event
+   isr
+    disable_irq_nosync
+    schedule_work (because it takes a sleeping i2c transaction to
+deassert the irq pin)
+   irq_eoi
+same irq
+ handle_fasteoi_irq
+  mark irq pending
+  mask_irq
+work function
+ causes level triggered irq to go low
+ enable_irq
+  unmask_irq
+  check_irq_resend (returns immediately)
 
-diff --git a/arch/arm/mach-shmobile/include/mach/common.h b/arch/arm/mach-shmobile/include/mach/common.h
-index 013ac0e..6401490 100644
---- a/arch/arm/mach-shmobile/include/mach/common.h
-+++ b/arch/arm/mach-shmobile/include/mach/common.h
-@@ -41,7 +41,7 @@ extern void sh73a0_pinmux_init(void);
- extern struct clk sh73a0_extal1_clk;
- extern struct clk sh73a0_extal2_clk;
- 
--extern unsigned int sh73a0_get_core_count(void);
-+extern void sh73a0_smp_init_cpus(void);
- extern void sh73a0_secondary_init(unsigned int cpu);
- extern int sh73a0_boot_secondary(unsigned int cpu);
- extern void sh73a0_smp_prepare_cpus(void);
-diff --git a/arch/arm/mach-shmobile/platsmp.c b/arch/arm/mach-shmobile/platsmp.c
-index 65e879b..c681333 100644
---- a/arch/arm/mach-shmobile/platsmp.c
-+++ b/arch/arm/mach-shmobile/platsmp.c
-@@ -20,14 +20,6 @@
- #include <asm/mach-types.h>
- #include <mach/common.h>
- 
--static unsigned int __init shmobile_smp_get_core_count(void)
--{
--	if (machine_is_ag5evm())
--		return sh73a0_get_core_count();
--
--	return 1;
--}
--
- static void __init shmobile_smp_prepare_cpus(void)
- {
- 	if (machine_is_ag5evm())
-@@ -52,11 +44,8 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 
- void __init smp_init_cpus(void)
- {
--	unsigned int ncores = shmobile_smp_get_core_count();
--	unsigned int i;
--
--	for (i = 0; i < ncores; i++)
--		set_cpu_possible(i, true);
-+	if (machine_is_ag5evm())
-+		sh73a0_smp_init_cpus();
- }
- 
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-diff --git a/arch/arm/mach-shmobile/smp-sh73a0.c b/arch/arm/mach-shmobile/smp-sh73a0.c
-index a156d21..018a24f 100644
---- a/arch/arm/mach-shmobile/smp-sh73a0.c
-+++ b/arch/arm/mach-shmobile/smp-sh73a0.c
-@@ -55,11 +55,9 @@ static void modify_scu_cpu_psr(unsigned long set, unsigned long clr)
- 	__raw_writel(tmp, scu_base + 8);
- }
- 
--unsigned int __init sh73a0_get_core_count(void)
-+void __init sh73a0_smp_init_cpus(void)
- {
--	void __iomem *scu_base = scu_base_addr();
--
--	return scu_get_core_count(scu_base);
-+	scu_init_cpus(scu_base_addr());
- }
- 
- void __cpuinit sh73a0_secondary_init(unsigned int cpu)
--- 
-1.7.1
+At this point, the irq is unmasked, but not being asserted, and marked
+as pending.  check_irq_resend doesn't clear the pending flag for level
+triggered interrupts, so the pending flag will stay set until the next
+time the interrupt occurs.
+
+Should handle_fasteoi_irq mask the interrupt before eoi if it was
+disabled by the interrupt handler?  Otherwise, every level triggered
+interrupt that is not deasserted by the interrupt handler will
+interrupt the cpu twice.  There is still the case where a driver
+disables the irq, the interrupt goes high, then goes low again before
+enable_irq is called.
+
+This patch fixes the double interrupt problem, but not the vanishing
+interrupt problem:
+
+diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
+index 4af1e2b..424bdfc 100644
+--- a/kernel/irq/chip.c
++++ b/kernel/irq/chip.c
+@@ -398,6 +398,9 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
+        preflow_handler(desc);
+        handle_irq_event(desc);
+
++       if (irqd_irq_disabled(&desc->irq_data) &&
++           !irqd_irq_masked(&desc->irq_data))
++               mask_irq(desc);
+ out_eoi:
+        desc->irq_data.chip->irq_eoi(&desc->irq_data);
+ out_unlock:
