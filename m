@@ -1,22 +1,56 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 30 Apr 2011 18:30:11 +0200
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <20110430090159.GA22821@n2100.arm.linux.org.uk>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<BANLkTim5qh_G9t9ucFu8OUzYGceszth1wg@mail.gmail.com>
-	<20110430090159.GA22821@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTiknEJQxZRZJDMXxQBeeUce5JLVXCg@mail.gmail.com>
+From: torbenh@gmx.de (torbenh)
+Date: Sat, 30 Apr 2011 16:27:02 +0200
+Subject: [PATCH RFC] clk: add support for automatic parent handling
+In-Reply-To: <20110429132613.GL5126@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1104201704350.3323@ionos>
+	<20110420185922.GD31131@pengutronix.de>
+	<alpine.LFD.2.02.1104202113250.3323@ionos>
+	<20110421072259.GG31131@pengutronix.de>
+	<alpine.LFD.2.02.1104211045220.3323@ionos>
+	<20110429103723.GF5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291252080.3005@ionos>
+	<20110429110610.GJ5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291344020.3005@ionos>
+	<20110429132613.GL5126@n2100.arm.linux.org.uk>
+Message-ID: <20110430142702.GH13755@siel.b>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/30 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+On Fri, Apr 29, 2011 at 02:26:13PM +0100, Russell King - ARM Linux wrote:
+> On Fri, Apr 29, 2011 at 02:13:06PM +0200, Thomas Gleixner wrote:
+> > This are all well defined semantical problems and should be solved in
+> > common code rather than having different buggy implementations in each
+> > SoC clock "framework".
+> 
+> Why are you associating functional elements in drivers/clk with the
+> SoC clock framework?
 
-> we decided that the enable call shall be
-> non-sleeping for everything. ?That's why we introduced the prepare
-> call for the sleeping part of the problem.
+i think i pretty much understand what thomas is after. but i have
+problems understanding, what you want here.
 
-Ah, that makes perfect sense. Let's go ahead with this.
+until this point, it looks like you only want the driver/clk to
+model the clock endpoints inside the devices. A device itself shouldnt
+be caring for clock parents or anything. its only concern is that a
+clock pin is fed with the right frequency, or off...
 
-Yours,
-Linus Walleij
+> 
+> I think that's the root cause of this misunderstanding, and until you
+> start realising that these building blocks are not part of the SoC
+> implementation, we're going to continue arguing about this.
+
+what you say now, pretty much sounds like what thomas wants.
+these building blocks would be objects derived from the clock baseclass,
+which thomas is trying to define. he doesnt seem to be concerned about
+the second more special layer yet.
+
+i am quite puzzled, what exactly your fighting over :S
+
+
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+torben Hohn
