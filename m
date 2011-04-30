@@ -1,69 +1,52 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 30 Apr 2011 10:06:18 +0200
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <BANLkTim5qh_G9t9ucFu8OUzYGceszth1wg@mail.gmail.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Sat, 30 Apr 2011 10:38:53 +0200
+Subject: console_cpu_notify can cause scheduling BUG during CPU hotplug
+In-Reply-To: <4DB894C3.2040300@codeaurora.org>
+References: <4DB604C7.8090305@codeaurora.org>
+	<BANLkTimPHaiiiVC_A6jtUtaa_pYJuhepYg@mail.gmail.com>
+	<4DB65EEC.7060604@ti.com> <4DB733D4.3000002@codeaurora.org>
+	<20110427073839.GA16718@liondog.tnic>
+	<4DB894C3.2040300@codeaurora.org>
+Message-ID: <20110430083853.GB3705@liondog.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/15 Sascha Hauer <s.hauer@pengutronix.de>:
-> From: Jeremy Kerr <jeremy.kerr@canonical.com>
+On Wed, Apr 27, 2011 at 03:12:19PM -0700, Michael Bohan wrote:
+> On 4/27/2011 12:38 AM, Borislav Petkov wrote:
+> >Great, whatever you guys come up with, we'd like to give it a run too.
+> >We (AMD) hit the same issue in one of our tests but in our case we end
+> >up in an endless loop of the state machine at stop_machine_cpu_stop()
+> >since the core being offlined cannot ack the state transition to
+> >STOPMACHINE_EXIT due to a similar reason.
+> >
+> >One possible fix is dropping CPU_DYING from console_cpu_notify()
+> >since it is called into by the offlining path in
+> >kernel/cpu.c::take_cpu_down().
+> 
+> This seems to be a different problem. Could you elaborate about why
+> removing CPU_DYING from console_cpu_notify resolves your problem?
 
-> We currently have ~21 definitions of struct clk in the ARM architecture,
-> each defined on a per-platform basis. This makes it difficult to define
-> platform- (or architecture-) independent clock sources without making
-> assumptions about struct clk, and impossible to compile two
-> platforms with different struct clks into a single image.
+Ok, I have to admit, I haven't spent a whole lot of time debugging this
+but here's what I know:
 
-Sorry for this late comment, maybe already adressed:
+First of all, how we trigger this? Our crazy testers have a script that
+takes cores off- and online in a random manner repeatedly and, if you go
+to another tty and do 'dmesg' in the same time, you can be absolutely
+sure that after a few times, you end up in the endless loop scenario
+above.
 
-> +int clk_enable(struct clk *clk)
-> +{
-> + ? ? ? unsigned long flags;
-> + ? ? ? int ret = 0;
-> +
-> + ? ? ? WARN_ON(clk->prepare_count == 0);
-> +
-> + ? ? ? spin_lock_irqsave(&clk->enable_lock, flags);
-> + ? ? ? if (clk->enable_count == 0 && clk->ops->enable)
-> + ? ? ? ? ? ? ? ret = clk->ops->enable(clk);
+Don't ask me why they do that - they're just crazy! :) But yeah,
+even with a the test sequence as far fetched as this one, the kernel
+shouldn't "freeze".
 
-Here the spinlock is held requiring the clock implementation to
-be non-sleeping, something that has been discussed at no end,
-without addressing that eternal debate, please just drop the
-spinlock during the ->enable() call, what is it protecting during
-that time anyway...
+Wait... I'm looking at the code now and it looks like Tejun changed the
+state machine implementation (3fc1f1e27a5b807791d72e5d992aa33b668a6626)
+so we'll have to retest to see whether this still happens.
 
-> +
-> + ? ? ? if (!ret)
-> + ? ? ? ? ? ? ? clk->enable_count++;
-> + ? ? ? spin_unlock_irqrestore(&clk->enable_lock, flags);
-> +
-> + ? ? ? return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_enable);
-> +
-> +void clk_disable(struct clk *clk)
-> +{
-> + ? ? ? unsigned long flags;
-> +
-> + ? ? ? spin_lock_irqsave(&clk->enable_lock, flags);
-> +
-> + ? ? ? WARN_ON(clk->enable_count == 0);
-> +
-> + ? ? ? if (!--clk->enable_count == 0 && clk->ops->disable)
-> + ? ? ? ? ? ? ? clk->ops->disable(clk);
+Can you trigger your crash with latest kernel too?
 
-Same here.
+Thanks.
 
-> +
-> + ? ? ? spin_unlock_irqrestore(&clk->enable_lock, flags);
-> +}
-> +EXPORT_SYMBOL_GPL(clk_disable);
-
-Apart from that I need to add that I really like the spirit this patch.
-
-Yours,
-Linus Walleij
+-- 
+Regards/Gruss,
+    Boris.
