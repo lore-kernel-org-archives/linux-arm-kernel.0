@@ -1,61 +1,69 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 30 Apr 2011 00:30:05 -0600
-Subject: [PATCH v5 8/8] dt: add documentation of ARM dt boot interface
-In-Reply-To: <alpine.LFD.2.00.1104292034450.24613@xanadu.home>
-References: <20110429070135.12522.35745.stgit@ponder>
-	<20110429071608.12522.7764.stgit@ponder>
-	<alpine.LFD.2.00.1104292034450.24613@xanadu.home>
-Message-ID: <20110430063005.GB3103@ponder.secretlab.ca>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 30 Apr 2011 10:06:18 +0200
+Subject: [PATCH 01/10] Add a common struct clk
+In-Reply-To: <1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <BANLkTim5qh_G9t9ucFu8OUzYGceszth1wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 08:37:24PM -0400, Nicolas Pitre wrote:
-> On Fri, 29 Apr 2011, Grant Likely wrote:
-> 
-> > diff --git a/Documentation/devicetree/booting-without-of.txt b/Documentation/devicetree/booting-without-of.txt
-> > index 50619a0..31d7e8a 100644
-> > --- a/Documentation/devicetree/booting-without-of.txt
-> > +++ b/Documentation/devicetree/booting-without-of.txt
-> [...]
-> > +1) Entry point for arch/arm
-> > +---------------------------
-> > +
-> > +   There is one single entry point to the kernel, at the start
-> > +   of the kernel image. That entry point supports two calling
-> > +   conventions.  A summary of the interface is described here.  A full
-> > +   description of the boot requirements is documented in
-> > +   Documentation/arm/Booting
-> > +
-> > +        a) ATAGS interface.  Minimal information is passed from firmware
-> > +        to the kernel with a tagged list of predefined parameters.
-> > +
-> > +                r0 : 0
-> > +
-> > +                r1 : Machine type number
-> > +
-> > +                r2 : Physical address of tagged list in system RAM
-> > +
-> > +        b) Entry with a flattened device-tree block.  Firmware loads the
-> > +        physical address of the flattened device tree block (dtb) into r2,
-> > +        r1 is not used, but it is considered good practise to use a valid
-> > +        machine number as described in Documentation/arm/Booting.
-> > +
-> > +                r0 : 0
-> > +
-> > +                r1 : Valid machine type number.  When using a device tree,
-> > +                a single machine type number will often be assigned to
-> > +                represent a class or family of SoCs.
-> > +
-> > +                r2 : physical pointer to the device-tree block
-> > +                (defined in chapter II) in RAM.  Device tree can be located
-> > +                anywhere in system RAM, but it should be aligned on a 64 bit
-> > +                boundary.
-> > +
-> > +   The kernel will differentiate between ATAGS and device tree booting by
-> > +   reading the memory pointed to by r1 and looking for either the flattened
-> 
-> s/r1/r2/
+2011/4/15 Sascha Hauer <s.hauer@pengutronix.de>:
+> From: Jeremy Kerr <jeremy.kerr@canonical.com>
 
-Good catch. Thanks.
+> We currently have ~21 definitions of struct clk in the ARM architecture,
+> each defined on a per-platform basis. This makes it difficult to define
+> platform- (or architecture-) independent clock sources without making
+> assumptions about struct clk, and impossible to compile two
+> platforms with different struct clks into a single image.
 
-g.
+Sorry for this late comment, maybe already adressed:
+
+> +int clk_enable(struct clk *clk)
+> +{
+> + ? ? ? unsigned long flags;
+> + ? ? ? int ret = 0;
+> +
+> + ? ? ? WARN_ON(clk->prepare_count == 0);
+> +
+> + ? ? ? spin_lock_irqsave(&clk->enable_lock, flags);
+> + ? ? ? if (clk->enable_count == 0 && clk->ops->enable)
+> + ? ? ? ? ? ? ? ret = clk->ops->enable(clk);
+
+Here the spinlock is held requiring the clock implementation to
+be non-sleeping, something that has been discussed at no end,
+without addressing that eternal debate, please just drop the
+spinlock during the ->enable() call, what is it protecting during
+that time anyway...
+
+> +
+> + ? ? ? if (!ret)
+> + ? ? ? ? ? ? ? clk->enable_count++;
+> + ? ? ? spin_unlock_irqrestore(&clk->enable_lock, flags);
+> +
+> + ? ? ? return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(clk_enable);
+> +
+> +void clk_disable(struct clk *clk)
+> +{
+> + ? ? ? unsigned long flags;
+> +
+> + ? ? ? spin_lock_irqsave(&clk->enable_lock, flags);
+> +
+> + ? ? ? WARN_ON(clk->enable_count == 0);
+> +
+> + ? ? ? if (!--clk->enable_count == 0 && clk->ops->disable)
+> + ? ? ? ? ? ? ? clk->ops->disable(clk);
+
+Same here.
+
+> +
+> + ? ? ? spin_unlock_irqrestore(&clk->enable_lock, flags);
+> +}
+> +EXPORT_SYMBOL_GPL(clk_disable);
+
+Apart from that I need to add that I really like the spirit this patch.
+
+Yours,
+Linus Walleij
