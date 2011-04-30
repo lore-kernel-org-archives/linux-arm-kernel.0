@@ -1,50 +1,36 @@
-From: jbarnes@virtuousgeek.org (Jesse Barnes)
-Date: Fri, 29 Apr 2011 19:45:20 -0700
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <1304117214.2513.262.camel@pasglop>
-References: <201104212129.17013.arnd@arndb.de>
-	<201104281428.56780.arnd@arndb.de>
-	<20110428131531.GK17290@n2100.arm.linux.org.uk>
-	<201104281629.52863.arnd@arndb.de>
-	<20110428143440.GP17290@n2100.arm.linux.org.uk>
-	<BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>
-	<1304036962.2513.202.camel@pasglop> <4DBA5194.7080609@vmware.com>
-	<1304062523.2513.235.camel@pasglop>
-	<20110429092712.5bbd6948@jbarnes-desktop>
-	<1304117214.2513.262.camel@pasglop>
-Message-ID: <20110429194520.14a8cce5@jbarnes-desktop>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 29 Apr 2011 22:58:33 -0700
+Subject: Resend [PATCH 00/10] ARM: SMP initialization consolidation
+In-Reply-To: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
+References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
+Message-ID: <4DBBA509.6080203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 30 Apr 2011 08:46:54 +1000
-Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
+On 04/29/2011 07:08 PM, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+>
+> Resending since the patches didn't make it thru the 1st time.
+>
+> In order to avoid duplicating the same platform code yet again for a new 
+> platform, this series consolidates platforms using similar SMP startup code to
+> a common implementation. A new kconfig entry SMP_COMMON_PEN is added for
+> platforms using the common pen functions.
+>
+> OMAP uses a h/w mechansism for its pen, but it seems like it could use the same
+> mechansism.
 
-> > Ah if it were that simple. :)  There are big costs to implementing full
-> > coherency for all your devices, as you well know, so it's just not a
-> > question of benchmark optimization.  
-> 
-> But it -is- that simple.
-> 
-> You do have to deal with coherency anyways for your PHB unless you start
-> advocating that we should make everything else non coherent as well. So
-> you have the logic. Just make your GPU operate on the same protocol.
-> 
-> It's really only a perf tradeoff I believe. And a bad one.
+Have you seen Russell's response to similar attempts posted a few months
+back?
 
-Ok so I was the one oversimplifying. :)  Yes, it's definitely doable to
-make a cache coherent PHB, and is awfully nice from a perf and
-programming perspective.
+https://lkml.org/lkml/2010/11/30/243
 
-But as you say, to make a high performance one for things like gfx, or
-even to handle things like atomic ops, adds a lot of expense (in the
-case of graphics, a whole lot unless you can integrate with the CPU,
-and even then display can be tough to deal with).
+and
 
-I don't see even good coherent implementations being good enough for
-high perf graphics in the near term (though at least on relatively high
-power designs like Sandy Bridge we're getting close) so we'll have to
-solve the uncached and simultaneous mapping issue both for today's
-hardware and the near future.
+http://lists.linaro.org/pipermail/linaro-dev/2010-November/001663.html
+
+Just something to look over and consider.
 
 -- 
-Jesse Barnes, Intel Open Source Technology Center
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
