@@ -1,88 +1,50 @@
-From: ccross@google.com (Colin Cross)
-Date: Fri, 29 Apr 2011 19:38:17 -0700
-Subject: [PATCH 6/6] ARM: gic: use handle_fasteoi_irq for SPIs
-In-Reply-To: <1302633340-4795-7-git-send-email-will.deacon@arm.com>
-References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
-	<1302633340-4795-7-git-send-email-will.deacon@arm.com>
-Message-ID: <BANLkTi=rM=r5UdUHPG5XceX=ppnQ44K+oA@mail.gmail.com>
+From: jbarnes@virtuousgeek.org (Jesse Barnes)
+Date: Fri, 29 Apr 2011 19:45:20 -0700
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <1304117214.2513.262.camel@pasglop>
+References: <201104212129.17013.arnd@arndb.de>
+	<201104281428.56780.arnd@arndb.de>
+	<20110428131531.GK17290@n2100.arm.linux.org.uk>
+	<201104281629.52863.arnd@arndb.de>
+	<20110428143440.GP17290@n2100.arm.linux.org.uk>
+	<BANLkTinhm7ar1mf1D-dSMiLtw5hRNY36RA@mail.gmail.com>
+	<1304036962.2513.202.camel@pasglop> <4DBA5194.7080609@vmware.com>
+	<1304062523.2513.235.camel@pasglop>
+	<20110429092712.5bbd6948@jbarnes-desktop>
+	<1304117214.2513.262.camel@pasglop>
+Message-ID: <20110429194520.14a8cce5@jbarnes-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Apr 12, 2011 at 11:35 AM, Will Deacon <will.deacon@arm.com> wrote:
-> Currently, the gic uses handle_level_irq for handling SPIs (Shared
-> Peripheral Interrupts), requiring active interrupts to be masked at
-> the distributor level during IRQ handling.
->
-> On a virtualised system, only the CPU interfaces are virtualised in
-> hardware. Accesses to the distributor must be trapped by the
-> hypervisor, adding latency to the critical interrupt path in Linux.
->
-> This patch modifies the GIC code to use handle_fasteoi_irq for handling
-> interrupts, which only requires us to signal EOI to the CPU interface
-> when handling is complete. Cascaded IRQ handling is also updated to use
-> the chained IRQ enter/exit functions to honour the flow control of the
-> parent chip.
->
-> Note that commit 846afbd1 ("GIC: Dont disable INT in ack callback")
-> broke cascading interrupts by forgetting to add IRQ masking. This is
-> no longer an issue because the unmask call is now unnecessary.
->
-> Tested on Versatile Express and Realview EB (1176 w/ cascaded GICs).
->
-> Cc: Abhijeet Dharmapurikar <adharmap@codeaurora.org>
-> Cc: Russell King - ARM Linux <linux@arm.linux.org.uk>
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On Sat, 30 Apr 2011 08:46:54 +1000
+Benjamin Herrenschmidt <benh@kernel.crashing.org> wrote:
 
-After further testing, I'm having a problem with this patch, although
-I think its more of a core issue than the fault of this patch.  One of
-my interrupts is getting stuck with the PENDING flag set, and
-preventing suspend.  The flow that triggers this is:
+> > Ah if it were that simple. :)  There are big costs to implementing full
+> > coherency for all your devices, as you well know, so it's just not a
+> > question of benchmark optimization.  
+> 
+> But it -is- that simple.
+> 
+> You do have to deal with coherency anyways for your PHB unless you start
+> advocating that we should make everything else non coherent as well. So
+> you have the logic. Just make your GPU operate on the same protocol.
+> 
+> It's really only a perf tradeoff I believe. And a bad one.
 
-level triggered irq
- handle_fasteoi_irq
-  handle_irq_event
-   isr
-    disable_irq_nosync
-    schedule_work (because it takes a sleeping i2c transaction to
-deassert the irq pin)
-   irq_eoi
-same irq
- handle_fasteoi_irq
-  mark irq pending
-  mask_irq
-work function
- causes level triggered irq to go low
- enable_irq
-  unmask_irq
-  check_irq_resend (returns immediately)
+Ok so I was the one oversimplifying. :)  Yes, it's definitely doable to
+make a cache coherent PHB, and is awfully nice from a perf and
+programming perspective.
 
-At this point, the irq is unmasked, but not being asserted, and marked
-as pending.  check_irq_resend doesn't clear the pending flag for level
-triggered interrupts, so the pending flag will stay set until the next
-time the interrupt occurs.
+But as you say, to make a high performance one for things like gfx, or
+even to handle things like atomic ops, adds a lot of expense (in the
+case of graphics, a whole lot unless you can integrate with the CPU,
+and even then display can be tough to deal with).
 
-Should handle_fasteoi_irq mask the interrupt before eoi if it was
-disabled by the interrupt handler?  Otherwise, every level triggered
-interrupt that is not deasserted by the interrupt handler will
-interrupt the cpu twice.  There is still the case where a driver
-disables the irq, the interrupt goes high, then goes low again before
-enable_irq is called.
+I don't see even good coherent implementations being good enough for
+high perf graphics in the near term (though at least on relatively high
+power designs like Sandy Bridge we're getting close) so we'll have to
+solve the uncached and simultaneous mapping issue both for today's
+hardware and the near future.
 
-This patch fixes the double interrupt problem, but not the vanishing
-interrupt problem:
-
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index 4af1e2b..424bdfc 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -398,6 +398,9 @@ handle_fasteoi_irq(unsigned int irq, struct irq_desc *desc)
-        preflow_handler(desc);
-        handle_irq_event(desc);
-
-+       if (irqd_irq_disabled(&desc->irq_data) &&
-+           !irqd_irq_masked(&desc->irq_data))
-+               mask_irq(desc);
- out_eoi:
-        desc->irq_data.chip->irq_eoi(&desc->irq_data);
- out_unlock:
+-- 
+Jesse Barnes, Intel Open Source Technology Center
