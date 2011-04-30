@@ -1,40 +1,52 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sat, 30 Apr 2011 16:57:48 +0200
-Subject: [PATCH v3 4/5] dmaengine: at_hdmac: remove channel status testing in
-	tasklet
-In-Reply-To: <1303791881.896.18.camel@vkoul-udesk3>
-References: <1303791881.896.18.camel@vkoul-udesk3>
-Message-ID: <3ed5a90ff2cf3b531d967ca80359de25c7c430f0.1304174965.git.nicolas.ferre@atmel.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 30 Apr 2011 17:59:41 +0000
+Subject: [PATCH] pxa/hx4700: Add ASIC3 LED support
+Message-ID: <E1QGESE-0007gF-VJ@outmx08.plus.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no need to test if channel is enabled in tasklet:
-- in error path, channel is disabled in interrupt routine
-- in normal path, this test is performed in sub functions to report
-a misuse of the engine.
+Add LED support for the HTC ASIC3. Underlying support is provided by the mfd/asic3 and leds/leds-asic3 drivers. An example configuration is provided by the pxa/hx4700 platform.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 ---
- drivers/dma/at_hdmac.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index 8f50a0f..65bd52a 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -472,13 +472,6 @@ static void atc_tasklet(unsigned long data)
- {
- 	struct at_dma_chan *atchan = (struct at_dma_chan *)data;
+diff -uprN clean-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c linux-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c
+--- clean-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c	2011-04-28 11:18:09.310551240 +0100
++++ linux-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c	2011-04-30 15:52:19.956069045 +0100
+@@ -23,6 +23,7 @@
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
+ #include <linux/lcd.h>
++#include <linux/leds.h>
+ #include <linux/mfd/htc-egpio.h>
+ #include <linux/mfd/asic3.h>
+ #include <linux/mtd/physmap.h>
+@@ -280,6 +281,21 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOD15_nPIOW,
+ };
  
--	/* Channel cannot be enabled here */
--	if (atc_chan_is_enabled(atchan)) {
--		dev_err(chan2dev(&atchan->chan_common),
--			"BUG: channel enabled in tasklet\n");
--		return;
--	}
--
- 	spin_lock(&atchan->lock);
- 	if (test_and_clear_bit(ATC_IS_ERROR, &atchan->status))
- 		atc_handle_error(atchan);
--- 
-1.7.3
++static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
++	[0] = {
++		.name = "hx4700:amber",
++		.default_trigger = "ds2760-battery.0-charging-blink-full-solid",
++	},
++	[1] = {
++		.name = "hx4700:green",
++		.default_trigger = "unused",
++	},
++	[2] = {
++		.name = "hx4700:blue",
++		.default_trigger = "hx4700-radio",
++	},
++};
++
+ static struct resource asic3_resources[] = {
+ 	/* GPIO part */
+ 	[0] = {
+@@ -310,6 +326,7 @@ static struct asic3_platform_data asic3_
+ 	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
+ 	.irq_base        = IRQ_BOARD_START,
+ 	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
++	.leds            = asic3_leds,
+ };
+ 
+ static struct platform_device asic3 = {
