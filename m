@@ -1,36 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 29 Apr 2011 22:58:33 -0700
-Subject: Resend [PATCH 00/10] ARM: SMP initialization consolidation
-In-Reply-To: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
-References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
-Message-ID: <4DBBA509.6080203@codeaurora.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 30 Apr 2011 00:28:06 -0600
+Subject: [PATCH v5 5/8] arm/dt: Drop irq_create_of_mapping() from arm code.
+In-Reply-To: <alpine.LFD.2.00.1104292027560.24613@xanadu.home>
+References: <20110429070135.12522.35745.stgit@ponder>
+	<20110429071553.12522.65073.stgit@ponder>
+	<alpine.LFD.2.00.1104292027560.24613@xanadu.home>
+Message-ID: <20110430062806.GA3103@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/29/2011 07:08 PM, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
->
-> Resending since the patches didn't make it thru the 1st time.
->
-> In order to avoid duplicating the same platform code yet again for a new 
-> platform, this series consolidates platforms using similar SMP startup code to
-> a common implementation. A new kconfig entry SMP_COMMON_PEN is added for
-> platforms using the common pen functions.
->
-> OMAP uses a h/w mechansism for its pen, but it seems like it could use the same
-> mechansism.
+On Fri, Apr 29, 2011 at 08:28:47PM -0400, Nicolas Pitre wrote:
+> On Fri, 29 Apr 2011, Grant Likely wrote:
+> 
+> > It is now implemented by core code.
+> > 
+> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> > ---
+> >  arch/arm/kernel/devtree.c |   14 --------------
+> >  1 files changed, 0 insertions(+), 14 deletions(-)
+> 
+> Maybe this should be folded in the patch that introduced this instead?
 
-Have you seen Russell's response to similar attempts posted a few months
-back?
+Yes, it should; but I've kept it separate for now because I don't have
+an ack from benh to merge the core changes that do this yet.  When
+that happens I'll squish the two patches together.
 
-https://lkml.org/lkml/2010/11/30/243
-
-and
-
-http://lists.linaro.org/pipermail/linaro-dev/2010-November/001663.html
-
-Just something to look over and consider.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+g.
