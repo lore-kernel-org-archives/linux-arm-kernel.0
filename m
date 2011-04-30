@@ -1,9 +1,9 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 29 Apr 2011 21:08:09 -0500
-Subject: [PATCH 02/10] ARM: ux500: convert to use common secondary pen code
+Date: Fri, 29 Apr 2011 21:08:10 -0500
+Subject: [PATCH 03/10] ARM: msm: use common secondary pen code
 In-Reply-To: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
 References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1304129297-6614-3-git-send-email-robherring2@gmail.com>
+Message-ID: <1304129297-6614-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,48 +11,47 @@ From: Rob Herring <rob.herring@calxeda.com>
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/mach-ux500/Kconfig            |    1 +
- arch/arm/mach-ux500/Makefile           |    2 +-
- arch/arm/mach-ux500/headsmp.S          |   37 ---------------
- arch/arm/mach-ux500/include/mach/smp.h |    4 +-
- arch/arm/mach-ux500/platsmp.c          |   79 +-------------------------------
- 5 files changed, 5 insertions(+), 118 deletions(-)
- delete mode 100644 arch/arm/mach-ux500/headsmp.S
+ arch/arm/Kconfig            |    1 +
+ arch/arm/mach-msm/Makefile  |    2 +-
+ arch/arm/mach-msm/headsmp.S |   40 -----------------------
+ arch/arm/mach-msm/platsmp.c |   73 ++-----------------------------------------
+ 4 files changed, 5 insertions(+), 111 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/headsmp.S
 
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 5862601..ba5c78c 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -7,6 +7,7 @@ config UX500_SOC_COMMON
- 	select HAS_MTU
- 	select NOMADIK_GPIO
- 	select ARM_ERRATA_753970
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 84e2127..959b27f 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -647,6 +647,7 @@ config ARCH_MSM
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
 +	select SMP_COMMON_PEN if SMP
+ 	help
+ 	  Support for Qualcomm MSM/QSD based systems.  This runs on the
+ 	  apps processor of the MSM/QSD and depends on a shared memory
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 9519fd2..8460f98 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -16,7 +16,7 @@ obj-$(CONFIG_MSM_SMD) += last_radio_log.o
+ obj-$(CONFIG_MSM_SCM) += scm.o scm-boot.o
  
- menu "Ux500 SoC"
+ obj-$(CONFIG_HOTPLUG_CPU) += hotplug.o
+-obj-$(CONFIG_SMP) += headsmp.o platsmp.o
++obj-$(CONFIG_SMP) += platsmp.o
  
-diff --git a/arch/arm/mach-ux500/Makefile b/arch/arm/mach-ux500/Makefile
-index b549a8f..8c89d18 100644
---- a/arch/arm/mach-ux500/Makefile
-+++ b/arch/arm/mach-ux500/Makefile
-@@ -12,7 +12,7 @@ obj-$(CONFIG_MACH_U8500)	+= board-mop500.o board-mop500-sdi.o \
- 				board-mop500-u8500uib.o \
- 				board-mop500-pins.o
- obj-$(CONFIG_MACH_U5500)	+= board-u5500.o board-u5500-sdi.o
--obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
-+obj-$(CONFIG_SMP)		+= platsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
- obj-$(CONFIG_U5500_MODEM_IRQ)	+= modem-irq-db5500.o
-diff --git a/arch/arm/mach-ux500/headsmp.S b/arch/arm/mach-ux500/headsmp.S
+ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o devices-msm7x00.o
+ obj-$(CONFIG_MACH_TROUT) += board-trout.o board-trout-gpio.o board-trout-mmc.o board-trout-panel.o devices-msm7x00.o
+diff --git a/arch/arm/mach-msm/headsmp.S b/arch/arm/mach-msm/headsmp.S
 deleted file mode 100644
-index 64fa451..0000000
---- a/arch/arm/mach-ux500/headsmp.S
+index 0c631a9..0000000
+--- a/arch/arm/mach-msm/headsmp.S
 +++ /dev/null
-@@ -1,37 +0,0 @@
+@@ -1,40 +0,0 @@
 -/*
-- *  Copyright (c) 2009 ST-Ericsson
-- *	This file is based  ARM Realview platform
+- *  linux/arch/arm/mach-realview/headsmp.S
+- *
 - *  Copyright (c) 2003 ARM Limited
 - *  All Rights Reserved
 - *
@@ -63,12 +62,14 @@ index 64fa451..0000000
 -#include <linux/linkage.h>
 -#include <linux/init.h>
 -
--	__INIT
+-	__CPUINIT
 -
 -/*
-- * U8500 specific entry point for secondary CPUs.
+- * MSM specific entry point for secondary CPUs.  This provides
+- * a "holding pen" into which all secondary cores are held until we're
+- * ready for them to initialise.
 - */
--ENTRY(u8500_secondary_startup)
+-ENTRY(msm_secondary_startup)
 -	mrc	p15, 0, r0, c0, c0, 5
 -	and	r0, r0, #15
 -	adr	r4, 1f
@@ -85,61 +86,31 @@ index 64fa451..0000000
 -	 */
 -	b	secondary_startup
 -
+-	.align
 -1:	.long	.
 -	.long	pen_release
-diff --git a/arch/arm/mach-ux500/include/mach/smp.h b/arch/arm/mach-ux500/include/mach/smp.h
-index ca2b15b..a99d674 100644
---- a/arch/arm/mach-ux500/include/mach/smp.h
-+++ b/arch/arm/mach-ux500/include/mach/smp.h
-@@ -11,8 +11,8 @@
+diff --git a/arch/arm/mach-msm/platsmp.c b/arch/arm/mach-msm/platsmp.c
+index 0f427bc..4315bb5 100644
+--- a/arch/arm/mach-msm/platsmp.c
++++ b/arch/arm/mach-msm/platsmp.c
+@@ -31,45 +31,18 @@
+ /* Mask for edge trigger PPIs except AVS_SVICINT and AVS_SVICINTSWDONE */
+ #define GIC_PPI_EDGE_MASK 0xFFFFD7FF
  
- #include <asm/hardware/gic.h>
- 
--/* This is required to wakeup the secondary core */
--extern void u8500_secondary_startup(void);
-+#define boot_secondary pen_boot_secondary
-+#define platform_secondary_init pen_secondary_init
- 
- /*
-  * We use IRQ1 as the IPI
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 4fff4d4..88f30b8 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -22,25 +22,6 @@
- #include <mach/hardware.h>
- #include <mach/setup.h>
- 
+-extern void msm_secondary_startup(void);
 -/*
 - * control for which core is the next to come out of the secondary
-- * boot "holding pen"
+- * boot "holding pen".
 - */
 -volatile int pen_release = -1;
 -
--/*
-- * Write pen_release in a way that is guaranteed to be visible to all
-- * observers, irrespective of whether they're taking part in coherency
-- * or not.  This is necessary for the hotplug code to work reliably.
-- */
--static void write_pen_release(int val)
--{
--	pen_release = val;
--	smp_wmb();
--	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
--	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
--}
--
- static void __iomem *scu_base_addr(void)
- {
- 	if (cpu_is_u5500())
-@@ -53,64 +34,6 @@ static void __iomem *scu_base_addr(void)
- 	return NULL;
- }
- 
 -static DEFINE_SPINLOCK(boot_lock);
 -
--void __cpuinit platform_secondary_init(unsigned int cpu)
--{
+ void __cpuinit platform_secondary_init(unsigned int cpu)
+ {
+ 	/* Configure edge-triggered PPIs */
+ 	writel(GIC_PPI_EDGE_MASK, MSM_QGIC_DIST_BASE + GIC_DIST_CONFIG + 4);
+ 
 -	/*
 -	 * if any interrupts are already enabled for the primary
 -	 * core (e.g. timer irq), then they will not have been enabled
@@ -151,19 +122,29 @@ index 4fff4d4..88f30b8 100644
 -	 * let the primary processor know we're out of the
 -	 * pen, then head off into the C entry point
 -	 */
--	write_pen_release(-1);
+-	pen_release = -1;
+-	smp_wmb();
 -
 -	/*
 -	 * Synchronise with the boot thread.
 -	 */
 -	spin_lock(&boot_lock);
 -	spin_unlock(&boot_lock);
--}
--
--int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
--{
--	unsigned long timeout;
--
++	pen_secondary_init(cpu);
+ }
+ 
+ static __cpuinit void prepare_cold_cpu(unsigned int cpu)
+ {
+ 	int ret;
+-	ret = scm_set_boot_addr(virt_to_phys(msm_secondary_startup),
++	ret = scm_set_boot_addr(virt_to_phys(pen_secondary_startup),
+ 				SCM_FLAG_COLDBOOT_CPU1);
+ 	if (ret == 0) {
+ 		void *sc1_base_ptr;
+@@ -96,47 +69,7 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 		cold_boot_done = true;
+ 	}
+ 
 -	/*
 -	 * set synchronisation state between this boot processor
 -	 * and the secondary one
@@ -174,15 +155,28 @@ index 4fff4d4..88f30b8 100644
 -	 * The secondary processor is waiting to be released from
 -	 * the holding pen - release it, then wait for it to flag
 -	 * that it has been released by resetting pen_release.
+-	 *
+-	 * Note that "pen_release" is the hardware CPU ID, whereas
+-	 * "cpu" is Linux's internal ID.
 -	 */
--	write_pen_release(cpu);
+-	pen_release = cpu;
+-	__cpuc_flush_dcache_area((void *)&pen_release, sizeof(pen_release));
+-	outer_clean_range(__pa(&pen_release), __pa(&pen_release + 1));
 -
+-	/*
+-	 * Send the secondary CPU a soft interrupt, thereby causing
+-	 * the boot monitor to read the system wide flags register,
+-	 * and branch to the address found there.
+-	 */
 -	smp_cross_call(cpumask_of(cpu), 1);
 -
 -	timeout = jiffies + (1 * HZ);
 -	while (time_before(jiffies, timeout)) {
+-		smp_rmb();
 -		if (pen_release == -1)
 -			break;
+-
+-		udelay(10);
 -	}
 -
 -	/*
@@ -192,19 +186,9 @@ index 4fff4d4..88f30b8 100644
 -	spin_unlock(&boot_lock);
 -
 -	return pen_release != -1 ? -ENOSYS : 0;
--}
--
- static void __init wakeup_secondary(void)
- {
- 	void __iomem *backupram;
-@@ -129,7 +52,7 @@ static void __init wakeup_secondary(void)
- 	 * is waiting for. This would wake up the secondary core from WFE
- 	 */
- #define UX500_CPU1_JUMPADDR_OFFSET 0x1FF4
--	__raw_writel(virt_to_phys(u8500_secondary_startup),
-+	__raw_writel(virt_to_phys(pen_secondary_startup),
- 		     backupram + UX500_CPU1_JUMPADDR_OFFSET);
++	return pen_boot_secondary(cpu, idle);
+ }
  
- #define UX500_CPU1_WAKEMAGIC_OFFSET 0x1FF0
+ /*
 -- 
 1.7.1
