@@ -1,7 +1,7 @@
 From: xuexucheng@yahoo.com (Frank Xue)
-Date: Sun, 1 May 2011 00:47:29 -0700 (PDT)
+Date: Sun, 1 May 2011 00:53:40 -0700 (PDT)
 Subject: How to port linux to my own board?
-Message-ID: <418862.95574.qm@web121610.mail.ne1.yahoo.com>
+Message-ID: <670471.11033.qm@web121619.mail.ne1.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,4 +19,4 @@ Thanks in advance!
 Frank
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110501/037729b2/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110501/532d68c0/attachment-0001.html>
