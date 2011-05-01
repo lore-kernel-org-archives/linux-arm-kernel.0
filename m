@@ -1,31 +1,119 @@
 From: ccross@android.com (Colin Cross)
-Date: Sun,  1 May 2011 14:10:09 -0700
-Subject: [PATCH 0/4] Tegra irq cleanups
-Message-ID: <1304284213-11950-1-git-send-email-ccross@android.com>
+Date: Sun,  1 May 2011 14:10:10 -0700
+Subject: [PATCH 1/4] ARM: tegra: irq: convert to gic arch extensions
+In-Reply-To: <1304284213-11950-1-git-send-email-ccross@android.com>
+References: <1304284213-11950-1-git-send-email-ccross@android.com>
+Message-ID: <1304284213-11950-2-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series cleans up the Tegra irq subsystem, and allows
-the GIC to be switched to the fasteoi handler.  The first three
-patches have no dependencies on any other trees.  Patch 4 should
-only go in at the same time as Will Deacon's fasteoi patches,
-and could be squashed into his patch.
+Replace the ugly hack that inserts legacy irq controller calls
+into the irq call paths by reading and replacing the gic irq
+chip with the new gic arch extensions.
 
-As part of this series, power management support is removed from
-the Tegra irq subsystem.  PM support will be added back in a
-future patch set along with PM support for the rest of the
-platform.
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/mach-tegra/irq.c |   54 +++++++++++++-------------------------------
+ 1 files changed, 16 insertions(+), 38 deletions(-)
 
-Colin Cross (4):
-      ARM: tegra: irq: convert to gic arch extensions
-      ARM: tegra: irq: Remove PM support
-      ARM: tegra: irq: Move legacy_irq.c into irq.c
-      ARM: tegra: irq: Replace tegra_ack with tegra_eoi
-
- arch/arm/mach-tegra/Makefile                  |    2 +-
- arch/arm/mach-tegra/include/mach/legacy_irq.h |   35 ----
- arch/arm/mach-tegra/irq.c                     |  181 +++++++++------------
- arch/arm/mach-tegra/legacy_irq.c              |  215 -------------------------
- 4 files changed, 77 insertions(+), 356 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/include/mach/legacy_irq.h
- delete mode 100644 arch/arm/mach-tegra/legacy_irq.c
+diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+index 4330d89..567b75c 100644
+--- a/arch/arm/mach-tegra/irq.c
++++ b/arch/arm/mach-tegra/irq.c
+@@ -1,8 +1,8 @@
+ /*
+- * Copyright (C) 2010 Google, Inc.
++ * Copyright (C) 2011 Google, Inc.
+  *
+  * Author:
+- *	Colin Cross <ccross@google.com>
++ *	Colin Cross <ccross@android.com>
+  *
+  * Copyright (C) 2010, NVIDIA Corporation
+  *
+@@ -46,10 +46,6 @@ static u32 tegra_lp0_wake_enb;
+ static u32 tegra_lp0_wake_level;
+ static u32 tegra_lp0_wake_level_any;
+ 
+-static void (*tegra_gic_mask_irq)(struct irq_data *d);
+-static void (*tegra_gic_unmask_irq)(struct irq_data *d);
+-static void (*tegra_gic_ack_irq)(struct irq_data *d);
+-
+ /* ensures that sufficient time is passed for a register write to
+  * serialize into the 32KHz domain */
+ static void pmc_32kwritel(u32 val, unsigned long offs)
+@@ -103,58 +99,40 @@ void tegra_set_lp0_wake_pads(u32 wake_enb, u32 wake_level, u32 wake_any)
+ 
+ static void tegra_mask(struct irq_data *d)
+ {
+-	tegra_gic_mask_irq(d);
+-	tegra_legacy_mask_irq(d->irq);
++	if (d->irq >= 32)
++		tegra_legacy_mask_irq(d->irq);
+ }
+ 
+ static void tegra_unmask(struct irq_data *d)
+ {
+-	tegra_gic_unmask_irq(d);
+-	tegra_legacy_unmask_irq(d->irq);
++	if (d->irq >= 32)
++		tegra_legacy_unmask_irq(d->irq);
+ }
+ 
+ static void tegra_ack(struct irq_data *d)
+ {
+-	tegra_legacy_force_irq_clr(d->irq);
+-	tegra_gic_ack_irq(d);
++	if (d->irq >= 32)
++		tegra_legacy_force_irq_clr(d->irq);
+ }
+ 
+ static int tegra_retrigger(struct irq_data *d)
+ {
++	if (d->irq < 32)
++		return 0;
++
+ 	tegra_legacy_force_irq_set(d->irq);
+ 	return 1;
+ }
+ 
+-static struct irq_chip tegra_irq = {
+-	.name			= "PPI",
+-	.irq_ack		= tegra_ack,
+-	.irq_mask		= tegra_mask,
+-	.irq_unmask		= tegra_unmask,
+-	.irq_retrigger		= tegra_retrigger,
+-};
+-
+ void __init tegra_init_irq(void)
+ {
+-	struct irq_chip *gic;
+-	unsigned int i;
+-	int irq;
+-
+ 	tegra_init_legacy_irq();
+ 
++	gic_arch_extn.irq_ack = tegra_ack;
++	gic_arch_extn.irq_mask = tegra_mask;
++	gic_arch_extn.irq_unmask = tegra_unmask;
++	gic_arch_extn.irq_retrigger = tegra_retrigger;
++
+ 	gic_init(0, 29, IO_ADDRESS(TEGRA_ARM_INT_DIST_BASE),
+ 		 IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x100));
+-
+-	gic = irq_get_chip(29);
+-	tegra_gic_unmask_irq = gic->irq_unmask;
+-	tegra_gic_mask_irq = gic->irq_mask;
+-	tegra_gic_ack_irq = gic->irq_ack;
+-#ifdef CONFIG_SMP
+-	tegra_irq.irq_set_affinity = gic->irq_set_affinity;
+-#endif
+-
+-	for (i = 0; i < INT_MAIN_NR; i++) {
+-		irq = INT_PRI_BASE + i;
+-		irq_set_chip_and_handler(irq, &tegra_irq, handle_level_irq);
+-		set_irq_flags(irq, IRQF_VALID);
+-	}
+ }
+-- 
+1.7.4.1
