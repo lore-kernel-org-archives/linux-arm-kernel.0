@@ -1,49 +1,34 @@
-From: ccross@android.com (Colin Cross)
-Date: Sun,  1 May 2011 15:27:34 -0700
-Subject: [PATCHv2 4/4] ARM: tegra: irq: Add tegra_eoi
-In-Reply-To: <1304284213-11950-5-git-send-email-ccross@android.com>
-References: <1304284213-11950-5-git-send-email-ccross@android.com>
-Message-ID: <1304288854-11011-1-git-send-email-ccross@android.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Mon, 2 May 2011 00:02:13 +0100
+Subject: Status of arch/arm in linux-next
+In-Reply-To: <201104261605.26791.arnd@arndb.de>
+References: <20110414094447.GA1611@n2100.arm.linux.org.uk>
+	<20110421201455.GA18083@redhat.com>
+	<alpine.LFD.2.00.1104211629300.24613@xanadu.home>
+	<201104261605.26791.arnd@arndb.de>
+Message-ID: <20110501230213.GG5832@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement irq_eoi to allow the GIC irq chip flow controller to
-be changed to fasteoi.
+Arnd Bergmann wrote:
+> On Thursday 21 April 2011, Nicolas Pitre wrote:
+> > > if there's commonality between some of the ARM arch drivers, why can't
+> > > there be a arch/arm/cpufreq/ dir for the shared code, and do everything there ?
+> > 
+> > Because usually there isn't.  "ARM" is just a CPU architecture, not a 
+> > system architecture.  Everything around the core is different from one 
+> > vendor to the next.  And when commonality exists it is much easier to 
+> > deal with if it is close together.
+> 
+> Exactly. To make matters worse, we are starting to see a number of vendors
+> that use multiple CPU architectures with the same I/O devices (e.g. Renesas,
+> Freescale, Xilinx, TI, ...). Not sure if any of these use the same cpufreq
+> register on more than one architecture, but it's quite likely to happen
+> at some point.
 
-Signed-off-by: Colin Cross <ccross@android.com>
----
-v2: Add tegra_eoi without removing tegra_ack, patch can now be
-    merged safely before Will Deacon's gic fasteoi patch
+Can't comment on in-tree SoCs, but out of tree (they use Linux but
+don't submit anything upstream as far as I can tell), Sigma Designs
+use ARM & MIPS CPU architectures, with the clock/timing registers, irq
+registers and more or less everything else being the same among them.
 
- arch/arm/mach-tegra/irq.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-index da17491..4956c3c 100644
---- a/arch/arm/mach-tegra/irq.c
-+++ b/arch/arm/mach-tegra/irq.c
-@@ -95,6 +95,14 @@ static void tegra_ack(struct irq_data *d)
- 	tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
- }
- 
-+static void tegra_eoi(struct irq_data *d)
-+{
-+	if (d->irq < FIRST_LEGACY_IRQ)
-+		return;
-+
-+	tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
-+}
-+
- static int tegra_retrigger(struct irq_data *d)
- {
- 	if (d->irq < FIRST_LEGACY_IRQ)
-@@ -116,6 +124,7 @@ void __init tegra_init_irq(void)
- 	}
- 
- 	gic_arch_extn.irq_ack = tegra_ack;
-+	gic_arch_extn.irq_eoi = tegra_eoi;
- 	gic_arch_extn.irq_mask = tegra_mask;
- 	gic_arch_extn.irq_unmask = tegra_unmask;
- 	gic_arch_extn.irq_retrigger = tegra_retrigger;
--- 
-1.7.4.1
+-- Jamie
