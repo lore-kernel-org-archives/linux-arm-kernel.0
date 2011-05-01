@@ -1,43 +1,44 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 01 May 2011 13:42:08 +0100
-Subject: [PATCH 2/6] ARM: tegra: update GPIO chained IRQ handler to use
-	entry/exit functions
-In-Reply-To: <BANLkTik4u=f+pFe0mQDV6Moj=-x2JQ1SMQ@mail.gmail.com>
-References: <1302633340-4795-1-git-send-email-will.deacon@arm.com>
-	<1302633340-4795-3-git-send-email-will.deacon@arm.com>
-	<BANLkTik4u=f+pFe0mQDV6Moj=-x2JQ1SMQ@mail.gmail.com>
-Message-ID: <1304253728.4547.3.camel@jazzbox>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 01 May 2011 09:07:53 -0400 (EDT)
+Subject: [PATCH] ARM: Include Makefile.boot only when it exists
+In-Reply-To: <20110501060922.GB2967@riccoc20.at.omicron.at>
+References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
+	<20110420083258.GB1517@S2100-06.ap.freescale.net>
+	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
+	<20110428152735.GU17290@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104281925500.24613@xanadu.home>
+	<20110501060922.GB2967@riccoc20.at.omicron.at>
+Message-ID: <alpine.LFD.2.00.1105010848360.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+On Sun, 1 May 2011, Richard Cochran wrote:
 
-On Sun, 2011-05-01 at 08:26 +0100, Colin Cross wrote:
-> On Tue, Apr 12, 2011 at 11:35 AM, Will Deacon <will.deacon@arm.com> wrote:
-> > This patch updates the Tegra gpio chained IRQ handler to use the chained
-> > IRQ enter/exit functions in order to function correctly on primary
-> > controllers with different methods of flow control.
-> >
-> > This is required for the GIC to move to fasteoi interrupt handling.
-> >
-> > Cc: Colin Cross <ccross@android.com>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/mach-tegra/gpio.c |    9 ++++++---
-> >  arch/arm/mach-tegra/irq.c  |   12 ++++++------
-> >  2 files changed, 12 insertions(+), 9 deletions(-)
+> On Thu, Apr 28, 2011 at 09:00:08PM -0400, Nicolas Pitre wrote:
+>  
+> > Remember that one of the selling point for DT is to be able to boot
+> > an existing kernel binary on yet-to-be-created hardware simply by
+> > creating the appropriate DT description for it.
+> 
+> So, can you report from your own experience that it really works like
+> that?
 
-[...]
+No.  I'm firmly in the DT-still-has-to-prove-itself camp and I wish I 
+I'd never had to deal with it.  I believe that the current way for 
+configuring hardware on ARM is more reliable and less prone to errors 
+and bugs such as what you described about Freescale powerpc boards.  
 
-> This version of the patch contains changes to gpio.c and irq.c.  If
-> you drop the irq.c changes (which I will fix in my upcoming patch),
+And for the record I don't believe the current crisis about ARM board 
+code duplication can be directly linked to the lack of DT support on ARM 
+even if many people are blending those issues together.
 
-Yes please! I'm more than happy to drop the changes to irq.c. Please CC
-me on your patch so that I know when it's safe to continue pushing the
-fasteoi change.
+> I surely cannot.
 
-> Acked-by: Colin Cross <ccross@android.com>
+If so then this whole DT idea has been oversold with false pretenses.  
+In good faith I'm willing to try it out and so I'm working towards its 
+implementation for ARM not against it, but if the DTS files are to be 
+maintained out of tree then all I can see for the future is additional 
+maintenance pain not less.
 
-Cheers,
 
-Will
+Nicolas
