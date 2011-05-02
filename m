@@ -1,70 +1,127 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 2 May 2011 21:16:08 +0200
-Subject: [PATCH 0/4] Pinmux subsystem
-Message-ID: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+Date: Mon, 2 May 2011 21:16:49 +0200
+Subject: [PATCH 3/4] amba: request muxing for PrimeCell devices
+Message-ID: <1304363809-30444-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-This patchset creates a pinmux subsystem and switches U300 to use that new
-subsystem as an example. The problem is not that fantastically hard to
-solve in a general way, nobody got around to it because it requires some
-upfront code I believe, and this is my stab at it.
+This makes the AMBA PrimeCell drivers request padmuxing for
+themselves in the same manner as clocks and voltage is currently
+requested.
 
-For details about what pinmuxing is see the Documentation/pinmux.txt file
-in the patchset.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/amba/bus.c       |   49 ++++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/amba/bus.h |    2 +
+ 2 files changed, 49 insertions(+), 2 deletions(-)
 
-The problem is not ARM specific at all, I haven't looked around deeply but I
-expect the same type of hacks to exist in most embedded hardware.
-
-This patchset goes on top of my previous gpio consolidation patches that
-bring the U300 GPIO driver into drivers/gpio.
-
-If there is nothing fundamentally insane about the design I will likely
-attempt to optimistically push it for 2.6.40 as part of the ARM depopulation
-work.
-
-Linus Walleij (4):
-  drivers: create a pinmux subsystem
-  pinmux: add a driver for the U300 pinmux
-  amba: request muxing for PrimeCell devices
-  pinmux: activate pinmux driver, delete old padmux driver
-
- Documentation/ABI/testing/sysfs-class-pinmux |   11 +
- Documentation/pinmux.txt                     |  306 +++++++++++
- MAINTAINERS                                  |    5 +
- arch/arm/mach-u300/Kconfig                   |    2 +
- arch/arm/mach-u300/Makefile                  |    2 +-
- arch/arm/mach-u300/core.c                    |   30 +-
- arch/arm/mach-u300/include/mach/pinmux.h     |    2 +
- arch/arm/mach-u300/include/mach/syscon.h     |  136 -----
- arch/arm/mach-u300/mmc.c                     |   16 -
- arch/arm/mach-u300/padmux.c                  |  367 -------------
- arch/arm/mach-u300/padmux.h                  |   39 --
- arch/arm/mach-u300/spi.c                     |   20 -
- drivers/Kconfig                              |    4 +
- drivers/Makefile                             |    2 +
- drivers/amba/bus.c                           |   49 ++-
- drivers/pinmux/Kconfig                       |   32 ++
- drivers/pinmux/Makefile                      |    6 +
- drivers/pinmux/core.c                        |  732 ++++++++++++++++++++++++++
- drivers/pinmux/pinmux-u300.c                 |  361 +++++++++++++
- drivers/pinmux/pinmux-u300.h                 |  141 +++++
- include/linux/amba/bus.h                     |    2 +
- include/linux/pinmux.h                       |  217 ++++++++
- 22 files changed, 1899 insertions(+), 583 deletions(-)
- create mode 100644 Documentation/ABI/testing/sysfs-class-pinmux
- create mode 100644 Documentation/pinmux.txt
- create mode 100644 arch/arm/mach-u300/include/mach/pinmux.h
- delete mode 100644 arch/arm/mach-u300/padmux.c
- delete mode 100644 arch/arm/mach-u300/padmux.h
- create mode 100644 drivers/pinmux/Kconfig
- create mode 100644 drivers/pinmux/Makefile
- create mode 100644 drivers/pinmux/core.c
- create mode 100644 drivers/pinmux/pinmux-u300.c
- create mode 100644 drivers/pinmux/pinmux-u300.h
- create mode 100644 include/linux/pinmux.h
-
+diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+index 7025593..0cedda6 100644
+--- a/drivers/amba/bus.c
++++ b/drivers/amba/bus.c
+@@ -474,6 +474,40 @@ static void amba_put_disable_vcore(struct amba_device *pcdev)
+ 	}
+ }
+ 
++static int amba_get_enable_pinmux(struct amba_device *pcdev)
++{
++	struct pinmux *pmx = pinmux_get(&pcdev->dev, NULL);
++	int ret;
++
++	pcdev->pmx = pmx;
++
++	if (IS_ERR(pmx)) {
++		/* It is OK not to supply a pinmux regulator */
++		if (PTR_ERR(pmx) == -ENODEV)
++			return 0;
++		return PTR_ERR(pmx);
++	}
++
++	ret = pinmux_enable(pmx);
++	if (ret) {
++		pinmux_put(pmx);
++		pcdev->pmx = ERR_PTR(-ENODEV);
++	}
++
++	return ret;
++}
++
++static void amba_put_disable_pinmux(struct amba_device *pcdev)
++{
++	struct pinmux *pmx = pcdev->pmx;
++
++	if (!IS_ERR(pmx)) {
++		pinmux_disable(pmx);
++		pinmux_put(pmx);
++	}
++}
++
++
+ /*
+  * These are the device model conversion veneers; they convert the
+  * device model structures to our more specific structures.
+@@ -486,13 +520,22 @@ static int amba_probe(struct device *dev)
+ 	int ret;
+ 
+ 	do {
+-		ret = amba_get_enable_vcore(pcdev);
++		ret = amba_get_enable_pinmux(pcdev);
+ 		if (ret)
+ 			break;
+ 
++		ret = amba_get_enable_vcore(pcdev);
++		if (ret) {
++			amba_put_disable_pinmux(pcdev);
++			break;
++		}
++
+ 		ret = amba_get_enable_pclk(pcdev);
+-		if (ret)
++		if (ret) {
++			amba_put_disable_pinmux(pcdev);
++			amba_put_disable_vcore(pcdev);
+ 			break;
++		}
+ 
+ 		ret = pcdrv->probe(pcdev, id);
+ 		if (ret == 0)
+@@ -500,6 +543,7 @@ static int amba_probe(struct device *dev)
+ 
+ 		amba_put_disable_pclk(pcdev);
+ 		amba_put_disable_vcore(pcdev);
++		amba_put_disable_pinmux(pcdev);
+ 	} while (0);
+ 
+ 	return ret;
+@@ -513,6 +557,7 @@ static int amba_remove(struct device *dev)
+ 
+ 	amba_put_disable_pclk(pcdev);
+ 	amba_put_disable_vcore(pcdev);
++	amba_put_disable_pinmux(pcdev);
+ 
+ 	return ret;
+ }
+diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+index fcbbe71..7b5a2a5 100644
+--- a/include/linux/amba/bus.h
++++ b/include/linux/amba/bus.h
+@@ -19,6 +19,7 @@
+ #include <linux/err.h>
+ #include <linux/resource.h>
+ #include <linux/regulator/consumer.h>
++#include <linux/pinmux.h>
+ 
+ #define AMBA_NR_IRQS	2
+ #define AMBA_CID	0xb105f00d
+@@ -30,6 +31,7 @@ struct amba_device {
+ 	struct resource		res;
+ 	struct clk		*pclk;
+ 	struct regulator	*vcore;
++	struct pinmux		*pmx;
+ 	u64			dma_mask;
+ 	unsigned int		periphid;
+ 	unsigned int		irq[AMBA_NR_IRQS];
 -- 
 1.7.3.2
