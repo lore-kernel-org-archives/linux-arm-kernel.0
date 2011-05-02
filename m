@@ -1,27 +1,35 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Mon, 02 May 2011 15:44:04 +0530
-Subject: [PATCH v3 1/5] dmaengine: at_hdmac: modify way to use interrupts
-In-Reply-To: <35f32b2bdf51d9d5867ca352ce96d786c74a58eb.1304174965.git.nicolas.ferre@atmel.com>
-References: <1303791881.896.18.camel@vkoul-udesk3>
-	<35f32b2bdf51d9d5867ca352ce96d786c74a58eb.1304174965.git.nicolas.ferre@atmel.com>
-Message-ID: <1304331244.1589.25.camel@vkoul-udesk3>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 May 2011 13:26:09 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <8yapqo1ogrk.fsf@huya.qualcomm.com>
+References: <201104212129.17013.arnd@arndb.de>
+	<20110429221554.GD14871@n2100.arm.linux.org.uk>
+	<8yapqo1ogrk.fsf@huya.qualcomm.com>
+Message-ID: <201105021326.09725.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-04-30 at 16:57 +0200, Nicolas Ferre wrote:
-> Now we use Buffer Transfer Completed interrupts. If we
-> want a chained buffer completed information, we setup the
-> ATC_IEN bit in CTRLB register in the lli.
-> This is done by set_desc_eol() function and used by
-> memcpy/slave_sg functions.
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
->  drivers/dma/at_hdmac.c      |    4 ++--
->  drivers/dma/at_hdmac_regs.h |   11 ++++++++---
->  2 files changed, 10 insertions(+), 5 deletions(-)
-> 
-All, Applied, Thanks
+On Monday 02 May 2011, David Brown wrote:
+> I'll confirm this from the Qualcomm side as well.  You cannot have
+> multiple inconsistent mappings of the same page without having difficult
+> to find problems.
 
--- 
-~Vinod
+I believe Catalin was referring to the case where you have only
+one nonconsistent (cacheable) mapping plus multiple consistent
+(cacheable) mappings. I don't think anyone has suggested doing
+DMA to a page that has multiple nonconsistent mappings with
+virtually indexed caches.
+
+> The spec clarifications appear to give ways of dealing with it if it
+> happens, and bounds on what can go wrong, but I wouldn't call it
+> something we want to do normally.  Corrupt data is arguably less of a
+> problem than nasal demons, but still a problem.
+
+Anything that has a theoretical chance of corrupting data is not an
+option, but I'd really like to see what the clarified spec says
+about this. Even if there is a way to legally leave a page for
+dma_alloc_coherent in the linear mapping, it might turn out to
+be harder to do than using highmem pages or unmapping supersections
+at run time as was suggested.
+
+	Arnd
