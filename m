@@ -1,220 +1,108 @@
-From: avinashhm@ti.com (Avinash.H.M)
-Date: Mon, 2 May 2011 14:51:51 +0530
-Subject: [PATCH v3] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
-Message-ID: <1304328111-15999-1-git-send-email-avinashhm@ti.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Mon, 2 May 2011 10:27:34 +0100
+Subject: [PATCH 1/3] i2c: append hardware lock with bus lock
+In-Reply-To: <1304003746-12127-1-git-send-email-haojian.zhuang@gmail.com>
+References: <1304003746-12127-1-git-send-email-haojian.zhuang@gmail.com>
+Message-ID: <20110502092734.GV15795@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sequence of _ocp_softreset doesn't work for i2c. The i2c module has a
-special sequence to reset the module. The sequence is
- - Disable the I2C.
- - Write to SOFTRESET bit.
- - Enable the I2C.
- - Poll on the RESETDONE bit.
-The sequence is implemented as a function and the i2c_class is updated with
-the correct 'reset' pointer.  omap_hwmod_softreset function is implemented
-which triggers the softreset by writing into sysconfig register. On following
-this sequence, i2c module resets properly and timeouts are not seen.
+On Thu, Apr 28, 2011 at 11:15:44PM +0800, Haojian Zhuang wrote:
+> Both AP and CP are contained in Marvell PXA910 silicon. These two ARM
+> cores are sharing one pair of I2C pins.
+> 
+> In order to keep I2C transaction operated with atomic, hardware lock
+> (RIPC) is required. Because of this, bus lock in AP side can't afford
+> this requirement. Now hardware lock is appended.
+> 
+> Signed-off-by: Haojian Zhuang <haojian.zhuang@marvell.com>
+> Cc: Ben Dooks <ben-linux@fluff.org>
+> Cc: Jean Delvare <khali@linux-fr.org>
 
-Cc: Rajendra Nayak <rnayak@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
-Cc: Benoit Cousson <b-cousson@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Avinash.H.M <avinashhm@ti.com>
----
+Right, this looks like a reasonable explanation of what is going on here
+and if Jean is happy with the core changes I'll look at where the driver
+change can go.
 
-The patch is based on
- * git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
- * master branch.
- * 9be20f0 commit. ( Linux-omap rebuilt: Updated to -rc5 )
+> ---
+>  drivers/i2c/i2c-core.c |   22 ++++++++++++++++++----
+>  include/linux/i2c.h    |    3 +++
+>  2 files changed, 21 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/i2c/i2c-core.c b/drivers/i2c/i2c-core.c
+> index 045ba6e..132d46c 100644
+> --- a/drivers/i2c/i2c-core.c
+> +++ b/drivers/i2c/i2c-core.c
+> @@ -448,8 +448,11 @@ void i2c_lock_adapter(struct i2c_adapter *adapter)
+>  
+>  	if (parent)
+>  		i2c_lock_adapter(parent);
+> -	else
+> +	else {
+>  		rt_mutex_lock(&adapter->bus_lock);
+> +		if (adapter->hardware_lock)
+> +			adapter->hardware_lock(adapter);
+> +	}
+>  }
+>  EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+>  
+> @@ -460,11 +463,19 @@ EXPORT_SYMBOL_GPL(i2c_lock_adapter);
+>  static int i2c_trylock_adapter(struct i2c_adapter *adapter)
+>  {
+>  	struct i2c_adapter *parent = i2c_parent_is_i2c_adapter(adapter);
+> +	int ret = 0;
+>  
+>  	if (parent)
+>  		return i2c_trylock_adapter(parent);
+> -	else
+> -		return rt_mutex_trylock(&adapter->bus_lock);
+> +	else {
+> +		ret = rt_mutex_trylock(&adapter->bus_lock);
+> +		if (ret && adapter->hardware_trylock) {
+> +			ret = adapter->hardware_trylock(adapter);
+> +			if (!ret)
+> +				i2c_unlock_adapter(adapter);
+> +		}
+> +		return ret;
+> +	}
+>  }
+>  
+>  /**
+> @@ -477,8 +488,11 @@ void i2c_unlock_adapter(struct i2c_adapter *adapter)
+>  
+>  	if (parent)
+>  		i2c_unlock_adapter(parent);
+> -	else
+> +	else {
+> +		if (adapter->hardware_unlock)
+> +			adapter->hardware_unlock(adapter);
+>  		rt_mutex_unlock(&adapter->bus_lock);
+> +	}
+>  }
+>  EXPORT_SYMBOL_GPL(i2c_unlock_adapter);
+>  
+> diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+> index 06a8d9c..f4ef5b0 100644
+> --- a/include/linux/i2c.h
+> +++ b/include/linux/i2c.h
+> @@ -361,6 +361,9 @@ struct i2c_adapter {
+>  
+>  	/* data fields that are valid for all devices	*/
+>  	struct rt_mutex bus_lock;
+> +	void (*hardware_lock)(struct i2c_adapter *);
+> +	void (*hardware_unlock)(struct i2c_adapter *);
+> +	int (*hardware_trylock)(struct i2c_adapter *);
+>  
+>  	int timeout;			/* in jiffies */
+>  	int retries;
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Changes from previous versions:
-from v1:
-	- moved i2c specific things from hwmod files to i2c files.
-	- fixed comments from Paul.
-	- http://www.spinics.net/lists/linux-omap/msg49483.html
-
-from v2: 
-	- Avoided direct SYSCONFIG access in i2c.c
-	- http://www.spinics.net/lists/linux-omap/msg49632.html
-
-Testing:
-* build tested omap2plus_defconfig for warnings and errors. none introduced.
-* boot tested on 2430. 
-* tested for 'core off' in suspend resume on 3430 sdp. core off counters
-  increment after suspend resume. 
-
- arch/arm/mach-omap2/i2c.c                    |   54 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |   12 ++++++
- arch/arm/mach-omap2/omap_hwmod_2420_data.c   |    1 +
- arch/arm/mach-omap2/omap_hwmod_2430_data.c   |    1 +
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c   |    1 +
- arch/arm/plat-omap/include/plat/i2c.h        |    4 ++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 7 files changed, 74 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/i2c.c b/arch/arm/mach-omap2/i2c.c
-index 79c478c..bd50e26 100644
---- a/arch/arm/mach-omap2/i2c.c
-+++ b/arch/arm/mach-omap2/i2c.c
-@@ -21,9 +21,16 @@
- 
- #include <plat/cpu.h>
- #include <plat/i2c.h>
-+#include <plat/common.h>
- 
- #include "mux.h"
- 
-+/* In register I2C_CON, Bit 15 is the I2C enable bit */
-+#define I2C_EN				BIT(15)
-+#define I2C_CON_OFFSET			0x24
-+/* Maximum microseconds to wait for OMAP module to softreset */
-+#define MAX_MODULE_SOFTRESET_WAIT	10000
-+
- void __init omap2_i2c_mux_pins(int bus_id)
- {
- 	char mux_name[sizeof("i2c2_scl.i2c2_scl")];
-@@ -37,3 +44,50 @@ void __init omap2_i2c_mux_pins(int bus_id)
- 	sprintf(mux_name, "i2c%i_sda.i2c%i_sda", bus_id, bus_id);
- 	omap_mux_init_signal(mux_name, OMAP_PIN_INPUT);
- }
-+
-+/**
-+ * omap_i2c_reset- reset the omap i2c module.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * The i2c moudle in omap2, omap3 had a special sequence to reset. The
-+ * sequence is:
-+ * - Disable the I2C.
-+ * - Write to SOFTRESET bit.
-+ * - Enable the I2C.
-+ * - Poll on the RESETDONE bit.
-+ * The sequence is implemented in below function. This is called for 2420,
-+ * 2430 and omap3.
-+ */
-+int omap_i2c_reset(struct omap_hwmod *oh)
-+{
-+	u32 v;
-+	int c = 0;
-+
-+	/* Disable I2C */
-+	v = omap_hwmod_read(oh, I2C_CON_OFFSET);
-+	v = v & ~I2C_EN;
-+	omap_hwmod_write(v, oh, I2C_CON_OFFSET);
-+
-+	/* Write to the SOFTRESET bit */
-+	omap_hwmod_softreset(oh);
-+
-+	/* Enable I2C */
-+	v = omap_hwmod_read(oh, I2C_CON_OFFSET);
-+	v |= I2C_EN;
-+	omap_hwmod_write(v, oh, I2C_CON_OFFSET);
-+
-+	/* Poll on RESETDONE bit */
-+	omap_test_timeout((omap_hwmod_read(oh,
-+				oh->class->sysc->syss_offs)
-+				& SYSS_RESETDONE_MASK),
-+				MAX_MODULE_SOFTRESET_WAIT, c);
-+
-+	if (c == MAX_MODULE_SOFTRESET_WAIT)
-+		pr_warning("%s: %s: softreset failed (waited %d usec)\n",
-+			__func__, oh->name, MAX_MODULE_SOFTRESET_WAIT);
-+	else
-+		pr_debug("%s: %s: softreset in %d usec\n", __func__,
-+			oh->name, c);
-+
-+	return 0;
-+}
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index e034294..771fc15 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -1561,6 +1561,18 @@ void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs)
- 		__raw_writel(v, oh->_mpu_rt_va + reg_offs);
- }
- 
-+void omap_hwmod_softreset(struct omap_hwmod *oh)
-+{
-+	u32 v;
-+
-+	/* Write to the SOFTRESET bit in SYSCONFIG */
-+	v = oh->_sysc_cache;
-+	v |= (0x1 << oh->class->sysc->sysc_fields->srst_shift);
-+
-+	oh->_sysc_cache = v;
-+	omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
-+}
-+
- /**
-  * omap_hwmod_set_slave_idlemode - set the hwmod's OCP slave idlemode
-  * @oh: struct omap_hwmod *
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-index e9a416c..fd386af 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
-@@ -1447,6 +1447,7 @@ static struct omap_hwmod_class_sysconfig i2c_sysc = {
- static struct omap_hwmod_class i2c_class = {
- 	.name		= "i2c",
- 	.sysc		= &i2c_sysc,
-+	.reset		= &omap_i2c_reset,
- 	.rev		= OMAP_I2C_IP_VERSION_1,
- };
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index beedda6..4ad4188 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -1524,6 +1524,7 @@ static struct omap_hwmod_class_sysconfig i2c_sysc = {
- static struct omap_hwmod_class i2c_class = {
- 	.name		= "i2c",
- 	.sysc		= &i2c_sysc,
-+	.reset		= &omap_i2c_reset,
- 	.rev		= OMAP_I2C_IP_VERSION_1,
- };
- 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index dec1a38..e938810 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -1460,6 +1460,7 @@ static struct omap_hwmod omap3xxx_uart4_hwmod = {
- static struct omap_hwmod_class i2c_class = {
- 	.name = "i2c",
- 	.sysc = &i2c_sysc,
-+	.reset = &omap_i2c_reset,
- 	.rev  = OMAP_I2C_IP_VERSION_1,
- };
- 
-diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/plat-omap/include/plat/i2c.h
-index fd75dad..20237c1 100644
---- a/arch/arm/plat-omap/include/plat/i2c.h
-+++ b/arch/arm/plat-omap/include/plat/i2c.h
-@@ -24,6 +24,8 @@
- #include <linux/i2c.h>
- #include <linux/i2c-omap.h>
- 
-+#include <plat/omap_hwmod.h>
-+
- #if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
- extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
- 				 struct i2c_board_info const *info,
-@@ -53,4 +55,6 @@ struct omap_i2c_dev_attr {
- void __init omap1_i2c_mux_pins(int bus_id);
- void __init omap2_i2c_mux_pins(int bus_id);
- 
-+int omap_i2c_reset(struct omap_hwmod *oh);
-+
- #endif /* __ASM__ARCH_OMAP_I2C_H */
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 1adea9c..9637130 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -572,6 +572,7 @@ void omap_hwmod_ocp_barrier(struct omap_hwmod *oh);
- 
- void omap_hwmod_write(u32 v, struct omap_hwmod *oh, u16 reg_offs);
- u32 omap_hwmod_read(struct omap_hwmod *oh, u16 reg_offs);
-+void omap_hwmod_softreset(struct omap_hwmod *oh);
- 
- int omap_hwmod_count_resources(struct omap_hwmod *oh);
- int omap_hwmod_fill_resources(struct omap_hwmod *oh, struct resource *res);
 -- 
-1.7.1
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
