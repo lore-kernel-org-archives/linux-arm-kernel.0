@@ -1,85 +1,213 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 03 May 2011 09:27:12 +1200
-Subject: [PATCH 05/14] at91: use structure to store the current soc
-In-Reply-To: <20110502205154.GC13724@game.jcrosoft.org>
-References: <20110425180847.GA12904@game.jcrosoft.org>
-	<1303756284-26529-5-git-send-email-plagnioj@jcrosoft.com>
-	<4DB5F0C7.2070903@bluewatersys.com>
-	<20110426042131.GD12904@game.jcrosoft.org>
-	<BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
-	<20110502153852.GI1212@game.jcrosoft.org>
-	<4DBF1342.6070406@bluewatersys.com>
-	<20110502202449.GB13724@game.jcrosoft.org>
-	<4DBF164C.7030900@bluewatersys.com>
-	<20110502205154.GC13724@game.jcrosoft.org>
-Message-ID: <4DBF21B0.5060202@bluewatersys.com>
+From: johnlinn@comcast.net (johnlinn at comcast.net)
+Date: Mon, 2 May 2011 21:27:04 +0000 (UTC)
+Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <1518608384.2203937.1304349657551.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+Message-ID: <538266033.2230575.1304371624720.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/03/2011 08:51 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:38 Tue 03 May     , Ryan Mallon wrote:
->> On 05/03/2011 08:24 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->>>>>> So I don't see how you can "detect" the CPU without first knowing
->>>>>> which CPU and therefore where the DBGU register is anyway.
->>>>>> And probing different addresses for a value is not an acceptable solution.
->>>>> we have 2 different register 0xfffff200 and 0xffffee00
->>>>> which are the DBGU or the PIOA
->>>>>
->>>>> and on the PIOA at the offset 0x40 if you try to read the cpu will always
->>>>> return 0x0, and have no effect on the soc
->>>>>
->>>>> so I do not think there is a big issue to read 2 register to detect the soc
->>>>> automatically
->>>>
->>>> This does rely on Atmel not making another soc which has the DBGU at an
->>>> address which does cause a conflict (low possibility, but would be very
->>>> annoying). It's also really ugly to read random registers until we get
->>>> the one we want.
->>>>
->>>> However, I still do not see what is wrong with the current approach of
->>>> the boards explicitly specifying the soc type. The correct soc/cpu type
->>>> can already be determined without changing the code. So why are we
->>>> changing the code?
->>> Because some hardware design architecture such as CPU module do allow to have
->>> the SAME board with different SOC. So have one machine ID per combinaison because
->>> we just change the soc is a non-sense.
->>
->> You haven't named such a piece of hardware yet. We have boards like our
->> own Snapper 9260/9G20 where the same mach-type is used for two boards,
->> one with a SAM9260 and the other with a SAM9G20. Because these are
->> variants of the same soc we know that the DBGU is at the same address on
->> both and so we can read the cpuid registers to determine which board it is.
-> take a look on the Ronetix
-> http://www.ronetix.at/
+
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de] 
+> Sent: Monday, May 02, 2011 2:40 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: grant.likely at secretlab.ca; Nicolas Pitre; Russell King;
+> devicetree-discuss at lists.ozlabs.org; linux-kernel at vger.kernel.org;
+> John
+> Linn
+> Subject: Re: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
 > 
-> and this is just one the example
+> On Monday 02 May 2011 07:08:00 Grant Likely wrote:
+> > The 1st board support is minimal to get a system up and running
+> > on the Xilinx platform.
+> > 
+> > This platform reuses the clock implementation from plat-versatile,
+> and
+> > it depends entirely on CONFIG_OF support.  There is only one board
+> > support file which obtains all device information from a device
+> tree
+> > dtb file which is passed to the kernel at boot time.
+> 
+> Very cool stuff!
+> 
+> > +
+> > +	amba {
+> > +		compatible = "simple-bus";
+> > +		#address-cells = <1>;
+> > +		#size-cells = <1>;
+> > +		ranges;
+> 
+> Shouldn't we have a way to identify amba buses by the compatible
+> property
+> as well, rather than only declaring it simple-bus?
+> 
+> We might be able to do some more automatic probing in the amba
+> code in cases where the architected registers are actually filled
+> with meaningful data there.
+> 
+> Is the empty ranges property technically correct? Excuse my poor
+> knowledge of amba, but I would have assumed that only a range
+> of addresses is actually put on the bus, while others (e.g. RAM)
+> are not visible on AMBA.
+> 
 
-Why would each of those three modules not have their own mach-type? They
-could be implemented as a single board file, with three MACHINE_START
-sections at the bottom of the file. All three could be compiled into a
-single kernel and the cpu_is macros can be used for the soc specific stuff.
+Grant can comment on the ranges technical correctness, I see it other
+places but that's doesn't mean it's right.
 
->> Can you give me an example of a mach-type which is used for two or more
->> boards that cannot be differentiated this way?
-> today we can not do so, so people multiplicate the machine ID which is wrong
-> and please do not only see the Snapper there is much more hardware provider
+AFAIK, everything is visible from this bus including RAM.
 
-I think that these boards are different enough (they have cpus with
-different memory layouts) that they should be specified by their own
-mach-type.
+> > +static struct of_device_id zynq_of_bus_ids[] __initdata = {
+> > +	{ .compatible = "simple-bus", },
+> > +	{}
+> > +};
+> > +
+> > +static struct of_device_id gic_match[] = {
+> > +	{ .compatible = "arm,gic", },
+> > +	{}
+> > +};
+> > +
+> > +/**
+> > + * xilinx_init_machine() - System specific initialization,
+> intended
+> to be
+> > + *			   called from board specific initialization.
+> > + */
+> > +void __init xilinx_init_machine(void)
+> > +{
+> > +	struct device_node *node = of_find_matching_node(NULL,
+> gic_match);
+> > +
+> > +	if (node)
+> > +		of_irq_domain_add_simple(node, 0, NR_IRQS);
+> > +
+> > +#ifdef CONFIG_CACHE_L2X0
+> > +	/*
+> > +	 * 64KB way size, 8-way associativity, parity disabled
+> > +	 */
+> > +	l2x0_init(PL310_L2CC_BASE, 0x02060000, 0xF0F0FFFF);
+> > +#endif
+> > +
+> > +/**
+> > + * xilinx_irq_init() - Interrupt controller initialization for the
+> GIC.
+> > + */
+> > +void __init xilinx_irq_init(void)
+> > +{
+> > +	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
+> > +}
+> 
+> I think we can do better than this, there is still more hardcoded
+> stuff
+> in here than I think should be. I understand that you tried to
+> minimize
+> the size of the patch set for obvious reasons, but none of this
+> seems too board specific to put into common code in one way or
+> another.
+> 
+> Of course we can not fix all of this at once, but maybe we can have
+> an explanation for each hardcoded setting on why it is still needed
+> and what would have to be done to make it go away.
+> 
 
-Russell, what is your opinion on this? Should we use individual
-mach-types for the above boards and have them explicitly specify their
-cpu/soc type, or should we be aiming to have a single mach-type for all
-of them and determine the cpu/soc type in code?
+Yes we could explain hard coded numbers.  Ideally GIC driver would support
+device tree it seems like to me.
 
-~Ryan
+> > +/* The minimum devices needed to be mapped before the VM system is
+> up
+> and
+> > + * running include the GIC, UART and Timer Counter.
+> > + */
+> > +
+> > +static struct map_desc io_desc[] __initdata = {
+> > +	{
+> > +		.virtual	= TTC0_VIRT,
+> > +		.pfn		= __phys_to_pfn(TTC0_PHYS),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= SCU_PERIPH_VIRT,
+> > +		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
+> > +		.length		= SZ_8K,
+> > +		.type		= MT_DEVICE,
+> > +	}, {
+> > +		.virtual	= PL310_L2CC_VIRT,
+> > +		.pfn		= __phys_to_pfn(PL310_L2CC_PHYS),
+> > +		.length		= SZ_4K,
+> > +		.type		= MT_DEVICE,
+> > +	},
+> 
+> I especially dislike the idea of having to set up iotables, these
+> seem completely counterintuitive when we probe the devices from the
+> device tree.
+> 
+> AFAICT, all of init_irq, time_init and init_machine are called way
+> after
+> mm_init, so you should have ioremap available by the time you need to
+> access these virtual memory ranges.
+> 
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+Seems like the GIC driver could remap it's own memory but maybe that won't
+work across all platforms and then the platform would need to do it.
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+Yes the timer driver could remap it's own memory.
+
+> I can understand why you'd want to special-case PCI I/O space windows
+> and early serial port access, but I think we should handle them
+> differently
+> and give them fixed machine independent virtual addresses.
+> 
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/io.h
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/irqs.h
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/memory.h
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/system.h
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/timex.h
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/vmalloc.h
+> 
+> These are all either completely generic versions that could be reused
+> on a number of other machines, or they could be turned into such
+> files.
+> 
+> For the global inlude/asm-generic files, we have just added a
+> mechanism
+> to share that kind of file across multiple architectures using some
+> Makefile magic. Should we perhaps do something similar here to avoid
+> having to create more of the same files?
+> 
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/uart.h
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/include/mach/uncompress.h
+> 
+> For these, it obviously won't work.
+> 
+> > diff --git a/arch/arm/mach-zynq/timer.c
+> b/arch/arm/mach-zynq/timer.c
+> > new file mode 100644
+> > index 0000000..c2c96cc
+> > --- /dev/null
+> > +++ b/arch/arm/mach-zynq/timer.c
+> 
+> In the light of the recent discussions of drivers moving out of
+> platforms into common Linux code, do we expect this to also
+> happen to timers any time soon?
+
+I'm not sure on the rest. Thanks Arnd, appreciate the help.
+
+-- John
+
+> 
+> 	Arnd
+> 
+> 
+> This email and any attachments are intended for the sole use of the
+> named recipient(s) and contain(s) confidential information that may be
+> proprietary, privileged or copyrighted under applicable law. If you
+> are not the intended recipient, do not read, copy, or forward this
+> email message or any attachments. Delete this email message and any
+> attachments immediately.
