@@ -1,33 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2011 00:40:12 +0100
-Subject: Resend [PATCH 00/10] ARM: SMP initialization consolidation
-In-Reply-To: <4DBBA509.6080203@codeaurora.org>
-References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
-	<4DBBA509.6080203@codeaurora.org>
-Message-ID: <20110502234012.GJ28001@n2100.arm.linux.org.uk>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 2 May 2011 16:38:52 -0700
+Subject: [PATCH 7/7] gpio-vbus: ask for vbus_draw regulator before
+	registering xceiv
+In-Reply-To: <BANLkTimhus3KjV=RXbpLmn6hy2xY9ZZM+Q@mail.gmail.com>
+References: <1301666188-11822-1-git-send-email-dbaryshkov@gmail.com>
+	<1301666188-11822-7-git-send-email-dbaryshkov@gmail.com>
+	<BANLkTimhus3KjV=RXbpLmn6hy2xY9ZZM+Q@mail.gmail.com>
+Message-ID: <20110502233852.GA10108@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 10:58:33PM -0700, Stephen Boyd wrote:
-> Have you seen Russell's response to similar attempts posted a few months
-> back?
+On Mon, Apr 18, 2011 at 04:42:28PM +0800, Eric Miao wrote:
+> On Fri, Apr 1, 2011 at 9:56 PM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
+> > Ask for vbus_draw regulator before registering tranceiver to disallow possible
+> > race between registration and set_power/etc.
+> >
+> > Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 > 
-> https://lkml.org/lkml/2010/11/30/243
+> Acked-by: Eric Miao <eric.y.miao@gmail.com>
 > 
-> and
-> 
-> http://lists.linaro.org/pipermail/linaro-dev/2010-November/001663.html
-> 
-> Just something to look over and consider.
+> Greg, can you help take this patch. This looks like a good fix.
 
-I know of one SoC which has three cores on it, where two are optimized
-for performance and one for low power.  They're all connected to the
-SCU, and so are visible as three symetric CPUs.
+I could if I could get it in a format I could apply it in :(
 
-Such a SoC may wish to do things differently from the current approach
-(which is basically bring up all cores at boot) particularly as the
-performance gained from each CPU is far from identical.  So I've been
-nervous about moving the CPU map initialization into core code.
+Can someone resend it?
 
-Note that the low power CPU may not be the last in the set, so merely
-limiting the system to two CPUs is not the answer.
+thanks,
+
+greg k-h
