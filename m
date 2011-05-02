@@ -1,54 +1,102 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Sun, 01 May 2011 21:42:07 -0700
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <20110429221554.GD14871@n2100.arm.linux.org.uk> (Russell King's
-	message of "Fri, 29 Apr 2011 23:15:54 +0100")
-References: <201104212129.17013.arnd@arndb.de>
-	<20110429075958.GV17290@n2100.arm.linux.org.uk>
-	<20110429093209.1926c732@jbarnes-desktop>
-	<201104292029.50680.arnd@arndb.de>
-	<20110429221554.GD14871@n2100.arm.linux.org.uk>
-Message-ID: <8yapqo1ogrk.fsf@huya.qualcomm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 01 May 2011 23:07:39 -0600
+Subject: [RFC PATCH 0/4] ARM: Basic Xilinx Support
+Message-ID: <20110502045207.24800.91172.stgit@ponder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29 2011, Russell King - ARM Linux wrote:
+Hi Russell,
 
-> On Fri, Apr 29, 2011 at 08:29:50PM +0200, Arnd Bergmann wrote:
+Just for giggles, here is the Xilinx board support series reworked a
+bit to depend entirely on CONFIG_OF and not use any static device
+registrations other than what is needed to bootstrap the system, and
+adds as little code as possible in terms of new infrastructure.  All
+told, the 4th patch adds less than 950 lines of code to the kernel,
+which is pretty darn good for a whole new subarch.
 
->> I'd like to first have an official confirmation from the CPU designers
->> if there is actually a problem with mapping a single page both cacheable
->> and noncacheable.
->
-> Everytime this gets discussed, someone says that because they don't
-> believe what I say.  OMAP folk confirmed it last time around.
+The zynq platform is a pretty ideal test case for this since the goal
+has been from day one to depend on CONFIG_OF.  The previous series
+only used static device registrations because device tree on arm isn't
+yet in mainline.  Plus, xilinx is already quite comfortable with how
+to use the device tree since their other two architectures (powerpc and
+microblaze) have depended on device tree for years now.
 
-I'll confirm this from the Qualcomm side as well.  You cannot have
-multiple inconsistent mappings of the same page without having difficult
-to find problems.
+I'd like to get your thoughts on the reuse of plat-versatile for the
+struct clk implementation.  I'm certainly not excited about creating
+yet another implementation, and versatile seems to be ideal to reuse.
 
-The spec clarifications appear to give ways of dealing with it if it
-happens, and bounds on what can go wrong, but I wouldn't call it
-something we want to do normally.  Corrupt data is arguably less of a
-problem than nasal demons, but still a problem.
+The previous version of this board support has already been in
+linux-next for quite a while now.  If you do decide to pick up
+device tree support for 2.6.40, then it would pretty low risk thing to
+queue up this board support also.
 
-David
+The 2nd and 3rd patches aren't actually part of the board support, but
+I included them here because they're needed to get the patch to apply.
+The whole series is based on top of both the irq_domain series I
+posted last week and the latest arm device tree support series.
 
-> I'm getting tired of this.  I'm going to give up with answering any
-> further Linux questions until next week and I'll delete my entire
-> mailbox this weekend as I really can't be bothered to catch up with all
-> the crap that's happened over easter.  I'm really getting pissed off at
-> all the shite crap that's flying around at the moment that I'm really
-> starting to not care one ounce about Linux, either on ARM or on this
-> utterly shite and broken x86 hardware.
->
-> Let ARM rot in mainline.  I really don't care anymore.
->
-> _______________________________________________
-> Linaro-mm-sig mailing list
-> Linaro-mm-sig at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+g.
+
+---
+
+Grant Likely (4):
+      arm/dt: Add dt machine definition
+      of/address: Add of_find_matching_node_by_address helper
+      dt/irq: add of_irq_domain_add_simple() helper
+      ARM: Xilinx: Adding Xilinx board support
+
+
+ Documentation/devicetree/bindings/arm/xilinx.txt |    7 +
+ arch/arm/Kconfig                                 |   14 +
+ arch/arm/Makefile                                |    2 
+ arch/arm/boot/dts/zynq-ep107.dts                 |   52 ++++
+ arch/arm/include/asm/mach/arch.h                 |    9 +
+ arch/arm/mach-zynq/Makefile                      |    6 
+ arch/arm/mach-zynq/Makefile.boot                 |    3 
+ arch/arm/mach-zynq/board_dt.c                    |   36 +++
+ arch/arm/mach-zynq/common.c                      |  112 ++++++++
+ arch/arm/mach-zynq/common.h                      |   29 ++
+ arch/arm/mach-zynq/include/mach/clkdev.h         |   32 ++
+ arch/arm/mach-zynq/include/mach/debug-macro.S    |   36 +++
+ arch/arm/mach-zynq/include/mach/entry-macro.S    |   30 ++
+ arch/arm/mach-zynq/include/mach/hardware.h       |   18 +
+ arch/arm/mach-zynq/include/mach/io.h             |   33 ++
+ arch/arm/mach-zynq/include/mach/irqs.h           |   21 ++
+ arch/arm/mach-zynq/include/mach/memory.h         |   22 ++
+ arch/arm/mach-zynq/include/mach/system.h         |   28 ++
+ arch/arm/mach-zynq/include/mach/timex.h          |   23 ++
+ arch/arm/mach-zynq/include/mach/uart.h           |   25 ++
+ arch/arm/mach-zynq/include/mach/uncompress.h     |   51 ++++
+ arch/arm/mach-zynq/include/mach/vmalloc.h        |   20 +
+ arch/arm/mach-zynq/include/mach/zynq_soc.h       |   48 ++++
+ arch/arm/mach-zynq/timer.c                       |  298 ++++++++++++++++++++++
+ arch/arm/mm/Kconfig                              |    2 
+ drivers/of/address.c                             |   18 +
+ drivers/of/irq.c                                 |   44 +++
+ include/linux/of_address.h                       |    4 
+ include/linux/of_irq.h                           |    2 
+ 29 files changed, 1024 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/xilinx.txt
+ create mode 100644 arch/arm/boot/dts/zynq-ep107.dts
+ create mode 100644 arch/arm/mach-zynq/Makefile
+ create mode 100644 arch/arm/mach-zynq/Makefile.boot
+ create mode 100644 arch/arm/mach-zynq/board_dt.c
+ create mode 100644 arch/arm/mach-zynq/common.c
+ create mode 100644 arch/arm/mach-zynq/common.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/clkdev.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/debug-macro.S
+ create mode 100644 arch/arm/mach-zynq/include/mach/entry-macro.S
+ create mode 100644 arch/arm/mach-zynq/include/mach/hardware.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/io.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/irqs.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/memory.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/system.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/timex.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/uart.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/uncompress.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/vmalloc.h
+ create mode 100644 arch/arm/mach-zynq/include/mach/zynq_soc.h
+ create mode 100644 arch/arm/mach-zynq/timer.c
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Signature
