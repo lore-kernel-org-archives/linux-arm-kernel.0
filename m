@@ -1,323 +1,95 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue,  3 May 2011 00:19:50 +0200
-Subject: [RFC PATCH] arm: add global early device init
-In-Reply-To: <20110502221522.GG13724@game.jcrosoft.org>
-References: <20110502221522.GG13724@game.jcrosoft.org>
-Message-ID: <1304374790-29290-1-git-send-email-plagnioj@jcrosoft.com>
+From: ryan@bluewatersys.com (Ryan Mallon)
+Date: Tue, 03 May 2011 10:32:26 +1200
+Subject: [PATCH 05/14] at91: use structure to store the current soc
+In-Reply-To: <20110502220643.GF13724@game.jcrosoft.org>
+References: <20110426042131.GD12904@game.jcrosoft.org>
+	<BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
+	<20110502153852.GI1212@game.jcrosoft.org>
+	<4DBF1342.6070406@bluewatersys.com>
+	<20110502202449.GB13724@game.jcrosoft.org>
+	<4DBF164C.7030900@bluewatersys.com>
+	<20110502205154.GC13724@game.jcrosoft.org>
+	<4DBF21B0.5060202@bluewatersys.com>
+	<20110502212920.GD13724@game.jcrosoft.org>
+	<4DBF2A9E.5010201@bluewatersys.com>
+	<20110502220643.GF13724@game.jcrosoft.org>
+Message-ID: <4DBF30FA.5000708@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will init earlytimer and will try to probe 1 or 2 timers for clockevents
-and clocksource
+On 05/03/2011 10:06 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> The boards are different. They have a common base pinout, but their
+>> peripheral pinouts are different. Multiple mach-types cost nothing and
+>> are a well understood part of ARM Linux. Your proposed cpu detection
+>> code adds complexity and code, and has zero benefit for any of the
+>> boards currently in mainline.
+> So we will do an other re-architecture in the few months
+> Linus is going to said no
+> We do need to stop to do changset again and again just because we don't solve
+> the issue at the beginning
 
-This will also allow to share timer cross arch such as sh-mobile and sh
+Agreed. That is why I am saying that we should focusing on reducing the
+size and complexity of AT91 and getting a single kernel working for all
+of the at91 boards which are currently in mainline.
 
-all arm timers will be update to early device step by step
+>> Carrier boards are a separate issue, and there has not really been a
+>> consensus on what the best way to solve the issue of combining system on
+>> modules (SoMs) with carrier boards. Should the mach-type belong to the
+>> SoM or to the system as a whole (SoM + carrier board)? There is
+>> currently a push to get ARM to consolidate on things rather than each
+>> sub-architecture doing things its own way.
+> Sorry but cpu detection is soc specific
 
-tested on at91sam9263-ek, at91rm9200-ek and qemu versatilepb
+The method for specifying the setup of a system including SoM and
+carrier board(s) is not cpu/soc specific and does not necessarily need
+to be done via cpu detection. In fact, I think cpu detection is a bad
+way to do it.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
----
- arch/arm/kernel/time.c                  |   18 +++++++++++-
- arch/arm/mach-shmobile/Makefile         |    2 +-
- arch/arm/mach-shmobile/board-ag5evm.c   |   13 +--------
- arch/arm/mach-shmobile/board-ap4evb.c   |   18 +++---------
- arch/arm/mach-shmobile/board-g3evm.c    |   12 +-------
- arch/arm/mach-shmobile/board-g4evm.c    |   12 +-------
- arch/arm/mach-shmobile/board-mackerel.c |   18 +++---------
- arch/arm/mach-shmobile/timer.c          |   46 -------------------------------
- 8 files changed, 28 insertions(+), 111 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/timer.c
+> hardcode it via machine ID is not good
+>> So if you want a way to
+>> differentiate carrier boards, then I think that needs to be discussed
+>> with other sub-architecture maintainers so that a common approach can be
+>> devised. I don't think that cpu detection is a robust solution. Device
+>> tree is probably the long-term solution to this.
+>>
+>> In short, your soc detection patches add additional complexity, but have
+>> zero effect on the possibility of supporting all of the current mainline
+>> at91 platforms in a single kernel. We need to fix the other barriers to
+>> this support first (such as the work Andrew Victor is doing).
+> Which can be also simply be knowning the CPU you are on
+> 
+> If you take a look on other arch they do cpu detection and there is nothing
+> wrong about it.
 
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 1ff46ca..cb40bbc 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -13,6 +13,7 @@
-  */
- #include <linux/module.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/time.h>
- #include <linux/init.h>
-@@ -161,9 +162,22 @@ device_initcall(timer_init_sysfs);
- void __init time_init(void)
- {
- 	system_timer = machine_desc->timer;
--	system_timer->init();
-+	if (system_timer->init)
-+		system_timer->init();
-+
-+	/*
-+	 * Make sure all compiled-in early timers register themselves.
-+	 *
-+	 * Run probe() for two "earlytimer" devices, these will be the
-+	 * clockevents and clocksource devices respectively. In the event
-+	 * that only a clockevents device is available, we -ENODEV on the
-+	 * clocksource and the jiffies clocksource is used transparently
-+	 * instead. No error handling is necessary here.
-+	 */
-+	early_platform_driver_register_all("earlytimer");
-+	early_platform_driver_probe("earlytimer", 2, 0);
-+
- #ifdef CONFIG_HAVE_SCHED_CLOCK
- 	sched_clock_postinit();
- #endif
- }
--
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 260e09d..6a1cc9e 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Common objects
--obj-y				:= map_io.o timer.o console.o clock.o pm_runtime.o
-+obj-y				:= map_io.o console.o clock.o pm_runtime.o
- 
- # CPU objects
- obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index b30b11d..cd9ba29 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -339,6 +339,7 @@ static void __init ag5evm_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh73a0_add_early_devices();
- 	shmobile_setup_console();
-+	sh73a0_clock_init();
- }
- 
- #define PINTC_ADDR	0xe6900000
-@@ -447,22 +448,10 @@ static void __init ag5evm_init(void)
- 	platform_add_devices(ag5evm_devices, ARRAY_SIZE(ag5evm_devices));
- }
- 
--static void __init ag5evm_timer_init(void)
--{
--	sh73a0_clock_init();
--	shmobile_timer.init();
--	return;
--}
--
--struct sys_timer ag5evm_timer = {
--	.init	= ag5evm_timer_init,
--};
--
- MACHINE_START(AG5EVM, "ag5evm")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= ag5evm_init_irq,
- 	.handle_irq	= shmobile_handle_irq_gic,
- 	.init_early	= ag5evm_init_early,
- 	.init_machine	= ag5evm_init,
--	.timer		= &ag5evm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index ed55c01..f800cae 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -1096,6 +1096,10 @@ static void __init ap4evb_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7372_add_early_devices();
- 	shmobile_setup_console();
-+	sh7372_clock_init();
-+
-+	/* External clock source */
-+	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
- }
- 
- #define GPIO_PORT9CR	0xE6051009
-@@ -1330,24 +1334,10 @@ static void __init ap4evb_init(void)
- 	fsi_init_pm_clock();
- }
- 
--static void __init ap4evb_timer_init(void)
--{
--	sh7372_clock_init();
--	shmobile_timer.init();
--
--	/* External clock source */
--	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
--}
--
--static struct sys_timer ap4evb_timer = {
--	.init		= ap4evb_timer_init,
--};
--
- MACHINE_START(AP4EVB, "ap4evb")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7372_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= ap4evb_init_early,
- 	.init_machine	= ap4evb_init,
--	.timer		= &ap4evb_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
-index 20eeacf..63a6c35 100644
---- a/arch/arm/mach-shmobile/board-g3evm.c
-+++ b/arch/arm/mach-shmobile/board-g3evm.c
-@@ -249,6 +249,7 @@ static void __init g3evm_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7367_add_early_devices();
- 	shmobile_setup_console();
-+	sh7367_clock_init();
- }
- 
- static void __init g3evm_init(void)
-@@ -338,21 +339,10 @@ static void __init g3evm_init(void)
- 	platform_add_devices(g3evm_devices, ARRAY_SIZE(g3evm_devices));
- }
- 
--static void __init g3evm_timer_init(void)
--{
--	sh7367_clock_init();
--	shmobile_timer.init();
--}
--
--static struct sys_timer g3evm_timer = {
--	.init		= g3evm_timer_init,
--};
--
- MACHINE_START(G3EVM, "g3evm")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7367_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= g3evm_init_early,
- 	.init_machine	= g3evm_init,
--	.timer		= &g3evm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
-index 079dd35..46e1b0c 100644
---- a/arch/arm/mach-shmobile/board-g4evm.c
-+++ b/arch/arm/mach-shmobile/board-g4evm.c
-@@ -263,6 +263,7 @@ static void __init g4evm_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7377_add_early_devices();
- 	shmobile_setup_console();
-+	sh7377_clock_init();
- }
- 
- #define GPIO_SDHID0_D0	0xe60520fc
-@@ -381,21 +382,10 @@ static void __init g4evm_init(void)
- 	platform_add_devices(g4evm_devices, ARRAY_SIZE(g4evm_devices));
- }
- 
--static void __init g4evm_timer_init(void)
--{
--	sh7377_clock_init();
--	shmobile_timer.init();
--}
--
--static struct sys_timer g4evm_timer = {
--	.init		= g4evm_timer_init,
--};
--
- MACHINE_START(G4EVM, "g4evm")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7377_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= g4evm_init_early,
- 	.init_machine	= g4evm_init,
--	.timer		= &g4evm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index f05a673..d52f323 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1011,6 +1011,10 @@ static void __init mackerel_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7372_add_early_devices();
- 	shmobile_setup_console();
-+	sh7372_clock_init();
-+
-+	/* External clock source */
-+	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
- }
- 
- #define GPIO_PORT9CR	0xE6051009
-@@ -1203,24 +1207,10 @@ static void __init mackerel_init(void)
- 	hdmi_init_pm_clock();
- }
- 
--static void __init mackerel_timer_init(void)
--{
--	sh7372_clock_init();
--	shmobile_timer.init();
--
--	/* External clock source */
--	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
--}
--
--static struct sys_timer mackerel_timer = {
--	.init		= mackerel_timer_init,
--};
--
- MACHINE_START(MACKEREL, "mackerel")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7372_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= mackerel_init_early,
- 	.init_machine	= mackerel_init,
--	.timer		= &mackerel_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-deleted file mode 100644
-index 895794b..0000000
---- a/arch/arm/mach-shmobile/timer.c
-+++ /dev/null
-@@ -1,46 +0,0 @@
--/*
-- * SH-Mobile Timer
-- *
-- * Copyright (C) 2010  Magnus Damm
-- * Copyright (C) 2002 - 2009  Paul Mundt
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- *
-- */
--#include <linux/platform_device.h>
--#include <asm/mach/time.h>
--
--static void __init shmobile_late_time_init(void)
--{
--	/*
--	 * Make sure all compiled-in early timers register themselves.
--	 *
--	 * Run probe() for two "earlytimer" devices, these will be the
--	 * clockevents and clocksource devices respectively. In the event
--	 * that only a clockevents device is available, we -ENODEV on the
--	 * clocksource and the jiffies clocksource is used transparently
--	 * instead. No error handling is necessary here.
--	 */
--	early_platform_driver_register_all("earlytimer");
--	early_platform_driver_probe("earlytimer", 2, 0);
--}
--
--static void __init shmobile_timer_init(void)
--{
--	late_time_init = shmobile_late_time_init;
--}
--
--struct sys_timer shmobile_timer = {
--	.init		= shmobile_timer_init,
--};
+There is nothing wrong with the current solution for at91, yet you are
+trying to add code which is confusing (two sets of cpu_is macros) and
+adds more lines for something which _already works_.
+
+This argument is getting frustrating. My current objections to this
+patch are:
+
+- The current solution (explicitly specifying the soc type) works for
+all of the at91 boards currently in mainline.
+- It adds two sets of cpu_is macros (second set with __ prefix), which
+is confusing and pointless.
+- You have implied that the __cpu_is macros will be removed at a later
+date. Since they are basically useless now, this is just more code churn
+when we are trying to reduce it on ARM.
+- The patch as it stands won't work in a unified at91 kernel because the
+address of the DBGU registers is different on some at91 platforms.
+- By itself this patch adds complexity without fixing anything and
+without introducing any functional change.
+- There are other barriers to having a unified at91 kernel which need to
+be solved first. This patch is trying to jump ahead and solve problems
+that don't exist yet.
+
+~Ryan
+
 -- 
-1.7.4.1
+Bluewater Systems Ltd - ARM Technology Solution Centre
+
+Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
+ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
+http://www.bluewatersys.com	New Zealand
+Phone: +64 3 3779127		Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135			  USA 1800 261 2934
