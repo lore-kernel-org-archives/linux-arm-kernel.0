@@ -1,71 +1,62 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 2 May 2011 17:25:34 +0300
-Subject: [PATCH 4/4] omap: musb: introduce default baord config
-In-Reply-To: <20110502142051.GC2092@atomide.com>
-References: <cover.1303682352.git.mike@compulab.co.il>
-	<c18b58e93a67116f06e8ffbf097c2bd8e4f642a5.1303682352.git.mike@compulab.co.il>
-	<FD6AF712-BD76-4E30-8ED8-6903987E5C2C@linuxhacker.ru>
-	<20110428141818.GE19709@n2100.arm.linux.org.uk>
-	<9B236748-29D6-4129-AFCD-5D223CE18ECD@linuxhacker.ru>
-	<20110428162820.GF19709@n2100.arm.linux.org.uk>
-	<9D42099B-0C25-4407-88B2-2574E9233B2A@linuxhacker.ru>
-	<20110502142051.GC2092@atomide.com>
-Message-ID: <20110502142533.GJ2529@legolas.emea.dhcp.ti.com>
+From: kostap@gmail.com (Konstantin Porotchkin)
+Date: Mon, 2 May 2011 17:56:48 +0300
+Subject: [PATCH 1/2] Moving Marvell Dove platform defaults to ARMv7
+In-Reply-To: <1302173382-25577-1-git-send-email-kostap@marvell.com>
+References: <1302173382-25577-1-git-send-email-kostap@marvell.com>
+Message-ID: <BANLkTikCBDCYr6BHz4zWPvHfuAQ+eCtvNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2011 at 07:20:52AM -0700, Tony Lindgren wrote:
-> * Oleg Drokin <green@linuxhacker.ru> [110428 09:33]:
-> > Hello!
-> > On Apr 28, 2011, at 12:28 PM, Russell King - ARM Linux wrote:
-> > > mm, it looks to me like we're ending up with two layers on top of
-> > > each other, both trying to provide some kind of generic board interface.
-> > > 
-> > > I think they should be squashed together.  And that:
-> > > 
-> > > static struct musb_hdrc_platform_data musb_plat = {
-> > > #ifdef CONFIG_USB_MUSB_OTG
-> > >        .mode           = MUSB_OTG,
-> > > #elif defined(CONFIG_USB_MUSB_HDRC_HCD)
-> > >        .mode           = MUSB_HOST,
-> > > #elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
-> > >        .mode           = MUSB_PERIPHERAL,
-> > > #endif
-> > > 
-> > > in usb-musb.c needs the same treatment as I mentioned in the previous
-> > > message if it really is board specific.  If not, I see no reason why
-> > > the above can't go into the musb driver itself.
-> > 
-> > In the end it's chip dependent. And the musb can work in all three modes.
-> > Of course the board dictates if the power is supplied to the bus in host
-> > mode and such, but even that could be worked around as nokia 9x0 saga for
-> > USB host shows.
-> > So to me it looks like something totally in realm of musb driver itself.
-> > Nothing bad happens if you configure your MUSB as say OTG while in fact only
-> > peripheral mode was implemented, it continues to work as it did.
-> > Of course enabling HOST mode may not magically make things work, but
-> > I suspect this could be addressed from Kconfig itself instead.
-> > 
-> > Now I totally expect musb maintainer to jump in and explain
-> > how many misconceptions I have ;)
-> 
-> As far as I remember MUSB always relies on the OTG hardware to enable
-> the host mode.. So I don't even know if the driver is usable with
-> host only configuration. And for the peripheral mode, it should be
+Hello, Nico,
 
-yes, it is :-)
+I believe the past two patches were OK. Are you going to integrate them?
 
-> possible to have OTG enabled, for cert testing some strings need
-> to be changed in that case for peripheral only configuration.
-> 
-> I think Felipe already has some patches to remove the various Kconfig
-> options for musb?  In any case, the musb configuration should be a
-> runtime configuration passed in the platform data or cmdline.
+Thank you for your help
+Konstantin
 
-Yeah, I'm planning to get rid of all the ifdeferry and always compile it
-with HOST and Peripheral support. It's only few extra tens of bytes
-anyway. Still, I doubt I can get that done for this merge window, I
-already have pending the debugging rework.
-
--- 
-balbi
+On Thu, Apr 7, 2011 at 1:49 PM, Konstantin Porotchkin
+<kostap@marvell.com> wrote:
+> Disabled legacy support for ARMv6 archtecture on Dove platform.
+> Latest Dove HW uses only ARMv7 model.
+>
+> Signed-off-by: Konstantin Porotchkin <kostap@marvell.com>
+> ---
+> ?arch/arm/Kconfig ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?arch/arm/configs/dove_defconfig | ? ?2 --
+> ?2 files changed, 1 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 599e163..e9d9a4f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -463,7 +463,7 @@ config ARCH_IXP4XX
+>
+> ?config ARCH_DOVE
+> ? ? ? ?bool "Marvell Dove"
+> - ? ? ? select CPU_V6K
+> + ? ? ? select CPU_V7
+> ? ? ? ?select PCI
+> ? ? ? ?select ARCH_REQUIRE_GPIOLIB
+> ? ? ? ?select GENERIC_CLOCKEVENTS
+> diff --git a/arch/arm/configs/dove_defconfig b/arch/arm/configs/dove_defconfig
+> index 54bf5ee..d7c3cfa 100644
+> --- a/arch/arm/configs/dove_defconfig
+> +++ b/arch/arm/configs/dove_defconfig
+> @@ -8,8 +8,6 @@ CONFIG_MODULE_UNLOAD=y
+> ?# CONFIG_BLK_DEV_BSG is not set
+> ?CONFIG_ARCH_DOVE=y
+> ?CONFIG_MACH_DOVE_DB=y
+> -CONFIG_CPU_V6=y
+> -CONFIG_CPU_32v6K=y
+> ?CONFIG_NO_HZ=y
+> ?CONFIG_HIGH_RES_TIMERS=y
+> ?CONFIG_AEABI=y
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
