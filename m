@@ -1,54 +1,33 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 3 May 2011 01:28:25 +0200
-Subject: [PATCH 3/3] at91: make PLAT_PHYS_OFFSET depending on
-	!ARM_PATCH_PHYS_VIRT or XIP_KERNEL
-In-Reply-To: <20110502230940.GF28001@n2100.arm.linux.org.uk>
-References: <1304374403-28513-1-git-send-email-plagnioj@jcrosoft.com>
-	<1304374403-28513-3-git-send-email-plagnioj@jcrosoft.com>
-	<20110502225242.GC28001@n2100.arm.linux.org.uk>
-	<20110502225046.GI13724@game.jcrosoft.org>
-	<20110502230940.GF28001@n2100.arm.linux.org.uk>
-Message-ID: <20110502232825.GC2802@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 May 2011 00:40:12 +0100
+Subject: Resend [PATCH 00/10] ARM: SMP initialization consolidation
+In-Reply-To: <4DBBA509.6080203@codeaurora.org>
+References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
+	<4DBBA509.6080203@codeaurora.org>
+Message-ID: <20110502234012.GJ28001@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 00:09 Tue 03 May     , Russell King - ARM Linux wrote:
-> On Tue, May 03, 2011 at 12:50:46AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 23:52 Mon 02 May     , Russell King - ARM Linux wrote:
-> > > Ideally, I'd like to see platforms not provide PLAT_PHYS_OFFSET.
-> > > However, there are two cases where it's needed by generic ARM code as
-> > > you've identified above.
-> > > 
-> > > Does AT91 support XIP_KERNEL?  It doesn't support XIP from flash (MTD_XIP)
-> > > so I suspect this isn't a particularly useful configuration.
-> >
-> > I never see a board using it
+On Fri, Apr 29, 2011 at 10:58:33PM -0700, Stephen Boyd wrote:
+> Have you seen Russell's response to similar attempts posted a few months
+> back?
 > 
-> I think Nicolas questioned whether it was worth keeping XIP support in
-> the kernel - I suspect there are very few users of that.
+> https://lkml.org/lkml/2010/11/30/243
 > 
-> We know that MTD_XIP is only used on OMAP1, PXA and SA1100 platforms.
-> Anyone else using XIP_KERNEL either has the kernel in some kind of ROM
-> or off-line updatable flash (while the kernel runs from it, this flash
-> would have to be read-only without MTD_XIP support.)
-I agree too
+> and
 > 
-> > > As far as ARM_PATCH_PHYS_VIRT, maybe AT91 should force this to always
-> > > be selected.  That then means it can eliminate the PLAT_PHYS_OFFSET
-> > > definition entirely.
-> >
-> > I get this in mind too but as it's sleep mark EXPERIMANTAL I was not sure
-> > to enable it by default
+> http://lists.linaro.org/pipermail/linaro-dev/2010-November/001663.html
 > 
-> It's marked experimental because it's a new feature which needs testing
-> to fully prove itself across all platforms.  If you're happy that it
-> works for your class of platforms, then there shouldn't be much of a
-> problem.
-> 
-> SMP is also marked experimental, but has been around for a while now,
-> and the norm for some systems already.  However, SMP has been around for
-> a while and can have that tag dropped now.
-goot for me I drop it
+> Just something to look over and consider.
 
-Best Regards,
-J.
+I know of one SoC which has three cores on it, where two are optimized
+for performance and one for low power.  They're all connected to the
+SCU, and so are visible as three symetric CPUs.
+
+Such a SoC may wish to do things differently from the current approach
+(which is basically bring up all cores at boot) particularly as the
+performance gained from each CPU is far from identical.  So I've been
+nervous about moving the CPU map initialization into core code.
+
+Note that the low power CPU may not be the last in the set, so merely
+limiting the system to two CPUs is not the answer.
