@@ -1,66 +1,47 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 2 May 2011 01:10:28 -0700
-Subject: [patch 07/16] arm: omap: Use clocksource based sched_clock
-In-Reply-To: <alpine.LFD.2.02.1104291616160.3005@ionos>
+Date: Mon, 2 May 2011 01:18:47 -0700
+Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource
+	based sched_clock
+In-Reply-To: <alpine.LFD.2.02.1104292355210.3005@ionos>
 References: <20110423205036.795894921@linutronix.de>
-	<20110423205132.221790438@linutronix.de>
-	<20110429115744.GZ3755@atomide.com>
-	<alpine.LFD.2.02.1104291420240.3005@ionos>
-	<20110429125155.GA3755@atomide.com>
-	<alpine.LFD.2.02.1104291616160.3005@ionos>
-Message-ID: <20110502081028.GC3755@atomide.com>
+	<20110429094606.GA5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291217120.3005@ionos>
+	<20110429103208.GA2849@atomide.com>
+	<alpine.LFD.2.02.1104291900290.3005@ionos>
+	<BANLkTi=Xymqw9H+aNPbYUWDs7w5HzmJVkw@mail.gmail.com>
+	<alpine.LFD.2.02.1104292355210.3005@ionos>
+Message-ID: <20110502081846.GD3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Gleixner <tglx@linutronix.de> [110429 07:16]:
-> On Fri, 29 Apr 2011, Tony Lindgren wrote:
-> > * Thomas Gleixner <tglx@linutronix.de> [110429 05:25]:
-> > > 
-> > > The generic sched_clock implementation returns a jiffies based value
-> > > as long as there is no clocksource registered. But the above does not
-> > > fail in sched_clock() it fails in read_persistent_clock() which does
-> > > 
-> > >         last_cycles = cycles;
-> > >         cycles = clocksource_32k.read(&clocksource_32k);
-> > > 
-> > > So the following change causes this:
-> > > 
-> > > -     .read           = omap_32k_read_dummy,
-> > 
-> > Ah right.
-> >  
-> > > Which leads to the question why you have a read_persistent_clock() at
-> > > all if it always reads 0 via omap_32k_read_dummy ? Or is this meant
-> > > just for the resume case? Then the above and the removal of
-> > > omap_32k_read_dummy() needs to be undone.
-> > 
-> > The omap_32k_read_dummy needs to return 0 until the clocks are
-> > enabled and the right read function is selected. The .read gets
-> > then set in omap_init_clocksource_32k.
-> > 
-> > It would be nice to handle that in a generic way though,
-> > I would assume the same issue exists for other platforms too.
+* Thomas Gleixner <tglx@linutronix.de> [110429 14:54]:
+> On Fri, 29 Apr 2011, Linus Walleij wrote:
 > 
-> static inline cycles_t clocksource_read_safe(struct clocksource *c)
-> {
-> 	return c->read ? c->read(c) : 0;
-> }
+> > 2011/4/29 Thomas Gleixner <tglx@linutronix.de>:
+> > > On Fri, 29 Apr 2011, Tony Lindgren wrote:
+> > >> What about PRINTK_TIME? I think that uses sched_clock right from the
+> > >> start.
+> > >
+> > > Right, but where is the problem ? A few time stamps with jiffies
+> > > resolution and then the finegrained ones.
+> > 
+> > Jonas ?berg has this pending patch that we call "boot time recorder".
+> > What it does is basically start a free running timer before the
+> > kernel is booted, e.g. in U-boot or even in the ROM of your
+> > machine if you can.
+> > 
+> > If we need more finegrained sched_clock() before the
+> > clocksource is up, a good approach would be to utilize
+> > something like that for sched_clock up to that point, plus
+> > it has the upside that [0.000000] is as close to electrical
+> > power-on as possible.
+> 
+> Well, you can read out that value at the point the clocksource gets
+> installed so you have the time spent up to that point without adding
+> another facility, level of indirection ...
 
-That adds testing for it for each read.. So the current setup
-is better.
- 
-> For the core timekeeping code that's a non issue as nothing should
-> register a clocksource with an invalid read function pointer :)
-
-Looks like omap_device code calls read_persistent_clock before
-omap_init_clocksource_32k is run. I'll take a look and see if that
-is needed when I refresh other omap init_early patches.
-
-Anyways, currently nothing prevents calling read_persistent_clock
-before it's initialized and a platform specific hack is needed.
-Maybe the default should be clocksource_read_safe that gets
-changed by the platform code when initializing?
-
-Regards,
+I think the problem here too is that we are calling read_persistent_clock
+and sched_clock before they're initialized. So we should default to
+jiffies based value before the platform code enables the hardware.
 
 Tony
