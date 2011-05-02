@@ -1,132 +1,71 @@
-From: srinath@mistralsolutions.com (srinath at mistralsolutions.com)
-Date: Mon,  2 May 2011 19:10:43 +0530
-Subject: [Patch v2] AM35xx-Craneboard:Display: Add DVI and TV Support
-In-Reply-To: <[PATCH]>
-References: <[PATCH]>
-Message-ID: <1304343643-3148-2-git-send-email-srinath@mistralsolutions.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 2 May 2011 17:25:34 +0300
+Subject: [PATCH 4/4] omap: musb: introduce default baord config
+In-Reply-To: <20110502142051.GC2092@atomide.com>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<c18b58e93a67116f06e8ffbf097c2bd8e4f642a5.1303682352.git.mike@compulab.co.il>
+	<FD6AF712-BD76-4E30-8ED8-6903987E5C2C@linuxhacker.ru>
+	<20110428141818.GE19709@n2100.arm.linux.org.uk>
+	<9B236748-29D6-4129-AFCD-5D223CE18ECD@linuxhacker.ru>
+	<20110428162820.GF19709@n2100.arm.linux.org.uk>
+	<9D42099B-0C25-4407-88B2-2574E9233B2A@linuxhacker.ru>
+	<20110502142051.GC2092@atomide.com>
+Message-ID: <20110502142533.GJ2529@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Srinath.R <srinath@mistralsolutions.com>
+On Mon, May 02, 2011 at 07:20:52AM -0700, Tony Lindgren wrote:
+> * Oleg Drokin <green@linuxhacker.ru> [110428 09:33]:
+> > Hello!
+> > On Apr 28, 2011, at 12:28 PM, Russell King - ARM Linux wrote:
+> > > mm, it looks to me like we're ending up with two layers on top of
+> > > each other, both trying to provide some kind of generic board interface.
+> > > 
+> > > I think they should be squashed together.  And that:
+> > > 
+> > > static struct musb_hdrc_platform_data musb_plat = {
+> > > #ifdef CONFIG_USB_MUSB_OTG
+> > >        .mode           = MUSB_OTG,
+> > > #elif defined(CONFIG_USB_MUSB_HDRC_HCD)
+> > >        .mode           = MUSB_HOST,
+> > > #elif defined(CONFIG_USB_GADGET_MUSB_HDRC)
+> > >        .mode           = MUSB_PERIPHERAL,
+> > > #endif
+> > > 
+> > > in usb-musb.c needs the same treatment as I mentioned in the previous
+> > > message if it really is board specific.  If not, I see no reason why
+> > > the above can't go into the musb driver itself.
+> > 
+> > In the end it's chip dependent. And the musb can work in all three modes.
+> > Of course the board dictates if the power is supplied to the bus in host
+> > mode and such, but even that could be worked around as nokia 9x0 saga for
+> > USB host shows.
+> > So to me it looks like something totally in realm of musb driver itself.
+> > Nothing bad happens if you configure your MUSB as say OTG while in fact only
+> > peripheral mode was implemented, it continues to work as it did.
+> > Of course enabling HOST mode may not magically make things work, but
+> > I suspect this could be addressed from Kconfig itself instead.
+> > 
+> > Now I totally expect musb maintainer to jump in and explain
+> > how many misconceptions I have ;)
+> 
+> As far as I remember MUSB always relies on the OTG hardware to enable
+> the host mode.. So I don't even know if the driver is usable with
+> host only configuration. And for the peripheral mode, it should be
 
-Added Display (DVI and TV) support for CraneBoard.
+yes, it is :-)
 
-History:
-https://patchwork.kernel.org/patch/740761/
+> possible to have OTG enabled, for cert testing some strings need
+> to be changed in that case for peripheral only configuration.
+> 
+> I think Felipe already has some patches to remove the various Kconfig
+> options for musb?  In any case, the musb configuration should be a
+> runtime configuration passed in the platform data or cmdline.
 
-Signed-off-by: Srinath.R <srinath@mistralsolutions.com>
----
- arch/arm/mach-omap2/board-am3517crane.c |   73 +++++++++++++++++++++++++++++++
- 1 files changed, 73 insertions(+), 0 deletions(-)
+Yeah, I'm planning to get rid of all the ifdeferry and always compile it
+with HOST and Peripheral support. It's only few extra tens of bytes
+anyway. Still, I doubt I can get that done for this merge window, I
+already have pending the debugging rework.
 
-diff --git a/arch/arm/mach-omap2/board-am3517crane.c b/arch/arm/mach-omap2/board-am3517crane.c
-index 05867b5..26fa565 100644
---- a/arch/arm/mach-omap2/board-am3517crane.c
-+++ b/arch/arm/mach-omap2/board-am3517crane.c
-@@ -29,12 +29,15 @@
- #include <plat/board.h>
- #include <plat/common.h>
- #include <plat/usb.h>
-+#include <plat/display.h>
-+#include <plat/panel-generic-dpi.h>
- 
- #include "mux.h"
- #include "control.h"
- 
- #define GPIO_USB_POWER		35
- #define GPIO_USB_NRESET		38
-+#define GPIO_DVI_ENABLE		52
- 
- 
- /* Board initialization */
-@@ -66,11 +69,78 @@ static struct usbhs_omap_board_data usbhs_bdata __initdata = {
- 	.reset_gpio_port[2]  = -EINVAL
- };
- 
-+static void __init am3517_crane_display_init(void)
-+{
-+	int ret;
-+
-+	ret = omap_mux_init_gpio(GPIO_DVI_ENABLE, OMAP_PIN_OUTPUT);
-+	if (ret < 0) {
-+		pr_err("Can not configure mux for GPIO_DVI_ENABLE %d\n",
-+			GPIO_DVI_ENABLE);
-+		return;
-+	}
-+
-+	ret = gpio_request_one(GPIO_DVI_ENABLE, GPIOF_OUT_INIT_HIGH,
-+				"dvi_enable");
-+	if (ret < 0) {
-+		pr_err("Can not request GPIO %d\n", GPIO_DVI_ENABLE);
-+		return;
-+	}
-+
-+}
-+
-+static struct omap_dss_device am3517_crane_tv_device = {
-+	.type                   = OMAP_DISPLAY_TYPE_VENC,
-+	.name                   = "tv",
-+	.driver_name            = "venc",
-+	.phy.venc.type          = OMAP_DSS_VENC_TYPE_COMPOSITE,
-+	.platform_enable        = NULL,
-+	.platform_disable       = NULL,
-+};
-+
-+static int am3517_crane_panel_enable_dvi(struct omap_dss_device *dssdev)
-+{
-+	gpio_set_value(GPIO_DVI_ENABLE, 1);
-+	return 0;
-+}
-+
-+static void am3517_crane_panel_disable_dvi(struct omap_dss_device *dssdev)
-+{
-+	gpio_set_value(GPIO_DVI_ENABLE, 0);
-+}
-+
-+
-+static struct panel_generic_dpi_data dvi_panel = {
-+	.name                   = "generic",
-+	.platform_enable        = am3517_crane_panel_enable_dvi,
-+	.platform_disable       = am3517_crane_panel_disable_dvi,
-+};
-+
-+static struct omap_dss_device am3517_crane_dvi_device = {
-+	.type                   = OMAP_DISPLAY_TYPE_DPI,
-+	.name                   = "dvi",
-+	.driver_name            = "generic_dpi_panel",
-+	.data                   = &dvi_panel,
-+	.phy.dpi.data_lines     = 24,
-+};
-+
-+static struct omap_dss_device *am3517_crane_dss_devices[] = {
-+	&am3517_crane_tv_device,
-+	&am3517_crane_dvi_device,
-+};
-+
-+static struct omap_dss_board_info am3517_crane_dss_data = {
-+	.num_devices    = ARRAY_SIZE(am3517_crane_dss_devices),
-+	.devices        = am3517_crane_dss_devices,
-+	.default_device = &am3517_crane_dvi_device,
-+};
-+
- static void __init am3517_crane_init(void)
- {
- 	int ret;
- 
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-+	omap_display_init(&am3517_crane_dss_data);
- 	omap_serial_init();
- 
- 	omap_board_config = am3517_crane_config;
-@@ -103,6 +173,9 @@ static void __init am3517_crane_init(void)
- 	}
- 
- 	usbhs_init(&usbhs_bdata);
-+
-+	/* DSS */
-+	am3517_crane_display_init();
- }
- 
- MACHINE_START(CRANEBOARD, "AM3517/05 CRANEBOARD")
 -- 
-1.5.3.4
+balbi
