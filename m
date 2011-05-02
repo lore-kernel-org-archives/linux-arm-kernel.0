@@ -1,30 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2011 00:19:19 +0100
-Subject: [RFC PATCH] arm: move timer init to late_timer_init
-In-Reply-To: <20110502221522.GG13724@game.jcrosoft.org>
-References: <1304368940-19340-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110502222211.GA28001@n2100.arm.linux.org.uk>
-	<20110502221522.GG13724@game.jcrosoft.org>
-Message-ID: <20110502231919.GH28001@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 3 May 2011 01:16:30 +0200
+Subject: [PATCH 05/14] at91: use structure to store the current soc
+In-Reply-To: <20110502231638.GG28001@n2100.arm.linux.org.uk>
+References: <4DB5F0C7.2070903@bluewatersys.com>
+	<20110426042131.GD12904@game.jcrosoft.org>
+	<BANLkTi=vkTonFWqqaQ2X0hVLb9Uzh_DEgw@mail.gmail.com>
+	<20110502153852.GI1212@game.jcrosoft.org>
+	<4DBF1342.6070406@bluewatersys.com>
+	<20110502202449.GB13724@game.jcrosoft.org>
+	<4DBF164C.7030900@bluewatersys.com>
+	<20110502205154.GC13724@game.jcrosoft.org>
+	<4DBF21B0.5060202@bluewatersys.com>
+	<20110502231638.GG28001@n2100.arm.linux.org.uk>
+Message-ID: <20110502231630.GD32605@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2011 at 12:15:22AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 23:22 Mon 02 May     , Russell King - ARM Linux wrote:
-> > On Mon, May 02, 2011 at 10:42:20PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > and add global early device init
-> > > this will init earlytimer and will try to probe 1 or 2 timers for clockevents
-> > > and clocksource
-> > 
-> > Why should this change the positioning of sched_clock initialization
-> > too?
-> > 
-> > You know, to spend time sorting out the sched_clock crap that platform
-> > people came up with, to get sched_clock working at the right point in
-> > the init sequence so that everything is happy, and then to have all
-> > that work undone one kernel version later... well, why did I even bother.
-> so is it ok to put the early init in time_init for you?
+On 00:16 Tue 03 May     , Russell King - ARM Linux wrote:
+> On Tue, May 03, 2011 at 09:27:12AM +1200, Ryan Mallon wrote:
+> > Russell, what is your opinion on this? Should we use individual
+> > mach-types for the above boards and have them explicitly specify their
+> > cpu/soc type, or should we be aiming to have a single mach-type for all
+> > of them and determine the cpu/soc type in code?
+> 
+> I don't like answering these questions because it requires understanding
+> the differences between the various individual SoCs to determine what's
+> possible.
+> 
+> You are correct that CPU type is determined at run-time by the kernel,
+> and whether its an 920T or 926T CPU is neither here or there to the
+> kernel.  It's really the SoC type that's the problem, and we don't have
+> a very good way of specifying that (partly as there is no standard way
+> to tell what sort of SoC we have.)
+> 
+> So, really, it's a platform specific question.  If there is some way
+> that the SoC type can be detected from the hardware, that may be an
+> appropriate way to deal with that issue.  If not, then the mach-type
+> approach (which I assume is what AT91 currently does) is probably as
+> good as any other until we have something like DT.
+Except we have Russell it's we need to read 2 registers differents
 
-If it works there, then there's no problem.  I'm just left wondering why
-you decided to try the late_time_init() thing in the first place.  Was
-there a specific reason?
+which is 0x0 if does not containt a cpu id
+or or the cpu id of the current chip
+
+So I do not see the big deal
+
+Best Regards,
+J.
