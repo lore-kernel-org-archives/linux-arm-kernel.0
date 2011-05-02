@@ -1,187 +1,330 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Mon, 2 May 2011 13:52:05 -0700
-Subject: [PATCH 1/4] drivers: create a pinmux subsystem
-In-Reply-To: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
-References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0497F1B201@HQMAIL01.nvidia.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Mon,  2 May 2011 22:42:20 +0200
+Subject: [RFC PATCH] arm: move timer init to late_timer_init
+Message-ID: <1304368940-19340-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Monday, May 02, 2011 1:16 PM:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> This creates a subsystem for handling of pinmux devices. These are
-> devices that enable and disable groups of pins on primarily PGA and
-> BGA type of chip packages and common in embedded systems.
+and add global early device init
+this will init earlytimer and will try to probe 1 or 2 timers for clockevents
+and clocksource
 
-I would avoid any references to particular package types; I've seen
-pinmuxing applied to PLCC and DIP/DIL too, and in general, it's possible
-irrespective of package type.
+This will also allow to share timer cross arch such as sh-mobile and sh
 
-> This is being done to depopulate the arch/arm/* directory of such
-> custom drivers and try to abstract the infrastructure they all
-> need. See the Documentation/pinmux.txt file that is part of this
-> patch for more details.
+all arm timers will be update to early device step by step
 
-> diff --git a/Documentation/pinmux.txt b/Documentation/pinmux.txt
->...
-> +The mux settings are:
-> +
-> +- Oriented around enumerated physical pins or pads denoted by unsigned
-> +  integers in the range 0..MAX_INT. Every pin on your system (or atleast
-> +  every pin that can be muxed) should have a unique number. The numberspace
+tested on at91sam9263-ek, at91rm9200-ek and qemu versatilepb
 
-Does this imply a model where each pin's "special function" can be
-controlled independently? I think reading through the document that
-isn't the case, but I just wanted to be sure.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+---
+ arch/arm/kernel/time.c                  |   23 ++++++++++++++-
+ arch/arm/mach-shmobile/Makefile         |    2 +-
+ arch/arm/mach-shmobile/board-ag5evm.c   |   13 +--------
+ arch/arm/mach-shmobile/board-ap4evb.c   |   18 +++---------
+ arch/arm/mach-shmobile/board-g3evm.c    |   12 +-------
+ arch/arm/mach-shmobile/board-g4evm.c    |   12 +-------
+ arch/arm/mach-shmobile/board-mackerel.c |   18 +++---------
+ arch/arm/mach-shmobile/timer.c          |   46 -------------------------------
+ 8 files changed, 33 insertions(+), 111 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/timer.c
 
-In particular, NVIDIA Tegra has a setup where:
-
-* Pinmux configuration for "special functions" is at a "pad-group"
-  level, where there may be 1..N pins in a pad-group, and there is a
-  single register field that defines the current special function routed
-  to/from all pins in that pad-group at once.
-
-* Each pad group can be assigned 1 of N special functions (none might be
-  an option in some/all cases too)
-
-* Some special functions may be assignable to multiple pad groups,
-  although obviously only 1 pad group per function at a time.
-
-* GPIO selection is at per-pin granularity; individual pins may be used
-  as a GPIO irrespective of what SFR is selected for the pad group
-  containing the pin.
-
-* There are also other configurations associated with pinmuxing, such
-  as drive strength, pull up/down enables, etc.
-
-Also, some of our drivers use "dynamic pinmuxing". For example, our
-downstream I2C driver exposes N I2C busses and reprograms the pinmux
-at runtime to attach the actual I2C controller to different sets of
-pins, essentially multi-plexing the control across N physical busses.
-
-> diff --git a/include/linux/pinmux.h b/include/linux/pinmux.h
-> new file mode 100644
-> index 0000000..9bdcc33
-> --- /dev/null
-> +++ b/include/linux/pinmux.h
-
-> +/**
-> + * struct pinmux_map - boards/machines shall provide this map for devices
-> + * @node: list node - only for internal use
-
-Node isn't in the structure.
-
-> + * @function: a functional name for this mapping so it can be passed down
-> + *	to the driver to invoke that function and be referenced by this ID
-> + *	in e.g. pinmux_get()
-> + * @dev: the device using this specific mapping, may be NULL if you provide
-> + *	.dev_name instead (this is more common)
-> + * @dev_name: the name of the device using this specific mapping, the name
-> + *	must be the same that will return your struct device*
-> + */
-> +struct pinmux_map {
-> +	const char *function;
-> +	struct device *dev;
-> +	const char *dev_name;
-> +};
-
-> +/*
-> + * The pin number is a global pin number space, nominally the arch shall define
-> + * the number of pins in *total* across all chips in the arch/system.
-> + *
-> + * Example: if your arch has two chips with 64 pins each, you have
-> + * 8*3 = 24 MACH_NR_PINS.
-
-2*64 = 128 MACH_NR_PINS ?
-
-> +struct pinmux_dev;
-> +
-> +/**
-> + * struct pinmux_ops - pinmux operations, to be implemented by drivers
-> + * @request: called by the core to see if a certain pin can be muxed in
-> + *	and made available in a certain mux setting The driver is allowed
-> + *	to answer "no" by returning a negative error code
-> + * @list_functions: list the number of selectable named functions available
-> + *	in this pinmux driver, the core will begin on 0 and call this
-> + *	repeatedly as long as it returns >= 0 to enumerate mux settings
-> + * @get_function_name: return the function name of the muxing selector,
-> + *	called by the core to figure out which mux setting it shall map a
-> + *	certain device to
-> + * @get_function_pins: return an array of pins corresponding to a certain
-> + *	function selector in @pins, and the size of the array in @num_pins
-> + * @enable: enable a certain muxing enumerator. The driver does not need to
-> + *	figure out whether enabling this function conflicts some other use
-> + *	of the pins, such collisions are handled by the pinmux subsystem
-> + * @disable: disable a certain muxing enumerator
-> + * @gpio_request_enable: requests and enables GPIO on a certain pin.
-> + *	Implement this only if you can mux every pin individually as GPIO. If
-> + *	your gpio assignments are grouped, so you cannot control the GPIO
-> + *	muxing of every indvidual pin.
-> + * @dbg_show: optional debugfs display hook that will provide per-device
-> + *	info for a certain pin in debugfs
-> + */
-> +struct pinmux_ops {
-> +	int (*request) (struct pinmux_dev *pmxdev, unsigned offset);
-
-s/offset/pin/? I assume that's what it means. Same for gpio_request_enable
-below too.
-
-> +	int (*free) (struct pinmux_dev *pmxdev, unsigned offset);
-> +	int (*list_functions) (struct pinmux_dev *pmxdev, unsigned selector);
-> +	const char *(*get_function_name) (struct pinmux_dev *pmxdev,
-> +					unsigned selector);
-> +	int (*get_function_pins) (struct pinmux_dev *pmxdev, unsigned selector,
-> +			unsigned ** const pins, unsigned * const num_pins);
-> +	int (*enable) (struct pinmux_dev *pmxdev, unsigned selector);
-> +	void (*disable) (struct pinmux_dev *pmxdev, unsigned selector);
-> +	int (*gpio_request_enable) (struct pinmux_dev *pmxdev, unsigned offset);
-> +	void (*dbg_show) (struct pinmux_dev *pmxdev, struct seq_file *s,
-> +			  unsigned offset);
-> +};
-> +
-> +/**
-> + * struct pinmux_desc - pinmux descriptor, register this to pinmux subsystem
-> + * @name: name for the pinmux
-> + * @ops: pinmux operation table
-> + * @owner: module providing the pinmux, used for refcounting
-> + * @base: the number of the first pin handled by this pinmux, in the global
-> + *	pin space, subtracted from a given pin to get the offset into the range
-> + *	of a certain pinmux
-> + * @no_pin_settings: the number of pins handled by this pinmux - note that
-
-That's npins below.
-
-> + *	this is the number of possible pin settings, if your driver handles
-> + *	8 pins that each can be muxed in 3 different ways, you reserve 24
-> + *	pins in the global pin space and set this to 24
-> + */
-> +struct pinmux_desc {
-> +	const char *name;
-> +	struct pinmux_ops *ops;
-> +	struct module *owner;
-> +	int base;
-> +	int npins;
-> +};
-
-> +/* External interface to pinmux */
-> +extern int pinmux_request_gpio(int pin, unsigned gpio);
-> +extern void pinmux_free_gpio(int pin);
-
-Is there (or should there be) any automatic interaction with gpiolib?
-
-> +extern int pinmux_register_mappings(struct pinmux_map const *map,
-> +				    unsigned num_maps);
-> +extern struct pinmux *pinmux_get(struct device *dev, const char *func);
-
-I feel slightly uneasy tying the pinmux API to devices rather than
-Letting it be more free-form. I've seen this pattern for clocks too,
-but IIRC there is an override there allowing specification of a NULL
-device in order to look up a clock by raw clock name instead of
-device + sub-clock-name right?
-
-Still, I'm a relative neophyte regarding internal Linux kernel APIs,
-so my opinion here may not be particularly relevant.
-
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index 1ff46ca..7cc21ca 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -13,6 +13,7 @@
+  */
+ #include <linux/module.h>
+ #include <linux/kernel.h>
++#include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/time.h>
+ #include <linux/init.h>
+@@ -158,12 +159,30 @@ static int __init timer_init_sysfs(void)
+ 
+ device_initcall(timer_init_sysfs);
+ 
+-void __init time_init(void)
++static void arm_late_time_init(void)
+ {
+ 	system_timer = machine_desc->timer;
+-	system_timer->init();
++	if (system_timer->init)
++		system_timer->init();
++
++	/*
++	 * Make sure all compiled-in early timers register themselves.
++	 *
++	 * Run probe() for two "earlytimer" devices, these will be the
++	 * clockevents and clocksource devices respectively. In the event
++	 * that only a clockevents device is available, we -ENODEV on the
++	 * clocksource and the jiffies clocksource is used transparently
++	 * instead. No error handling is necessary here.
++	 */
++	early_platform_driver_register_all("earlytimer");
++	early_platform_driver_probe("earlytimer", 2, 0);
++
+ #ifdef CONFIG_HAVE_SCHED_CLOCK
+ 	sched_clock_postinit();
+ #endif
+ }
+ 
++void __init time_init(void)
++{
++	late_time_init = arm_late_time_init;
++}
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 260e09d..6a1cc9e 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -3,7 +3,7 @@
+ #
+ 
+ # Common objects
+-obj-y				:= map_io.o timer.o console.o clock.o pm_runtime.o
++obj-y				:= map_io.o console.o clock.o pm_runtime.o
+ 
+ # CPU objects
+ obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
+diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
+index b30b11d..cd9ba29 100644
+--- a/arch/arm/mach-shmobile/board-ag5evm.c
++++ b/arch/arm/mach-shmobile/board-ag5evm.c
+@@ -339,6 +339,7 @@ static void __init ag5evm_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh73a0_add_early_devices();
+ 	shmobile_setup_console();
++	sh73a0_clock_init();
+ }
+ 
+ #define PINTC_ADDR	0xe6900000
+@@ -447,22 +448,10 @@ static void __init ag5evm_init(void)
+ 	platform_add_devices(ag5evm_devices, ARRAY_SIZE(ag5evm_devices));
+ }
+ 
+-static void __init ag5evm_timer_init(void)
+-{
+-	sh73a0_clock_init();
+-	shmobile_timer.init();
+-	return;
+-}
+-
+-struct sys_timer ag5evm_timer = {
+-	.init	= ag5evm_timer_init,
+-};
+-
+ MACHINE_START(AG5EVM, "ag5evm")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= ag5evm_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_gic,
+ 	.init_early	= ag5evm_init_early,
+ 	.init_machine	= ag5evm_init,
+-	.timer		= &ag5evm_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index ed55c01..f800cae 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -1096,6 +1096,10 @@ static void __init ap4evb_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7372_add_early_devices();
+ 	shmobile_setup_console();
++	sh7372_clock_init();
++
++	/* External clock source */
++	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+ }
+ 
+ #define GPIO_PORT9CR	0xE6051009
+@@ -1330,24 +1334,10 @@ static void __init ap4evb_init(void)
+ 	fsi_init_pm_clock();
+ }
+ 
+-static void __init ap4evb_timer_init(void)
+-{
+-	sh7372_clock_init();
+-	shmobile_timer.init();
+-
+-	/* External clock source */
+-	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+-}
+-
+-static struct sys_timer ap4evb_timer = {
+-	.init		= ap4evb_timer_init,
+-};
+-
+ MACHINE_START(AP4EVB, "ap4evb")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7372_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= ap4evb_init_early,
+ 	.init_machine	= ap4evb_init,
+-	.timer		= &ap4evb_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
+index 20eeacf..63a6c35 100644
+--- a/arch/arm/mach-shmobile/board-g3evm.c
++++ b/arch/arm/mach-shmobile/board-g3evm.c
+@@ -249,6 +249,7 @@ static void __init g3evm_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7367_add_early_devices();
+ 	shmobile_setup_console();
++	sh7367_clock_init();
+ }
+ 
+ static void __init g3evm_init(void)
+@@ -338,21 +339,10 @@ static void __init g3evm_init(void)
+ 	platform_add_devices(g3evm_devices, ARRAY_SIZE(g3evm_devices));
+ }
+ 
+-static void __init g3evm_timer_init(void)
+-{
+-	sh7367_clock_init();
+-	shmobile_timer.init();
+-}
+-
+-static struct sys_timer g3evm_timer = {
+-	.init		= g3evm_timer_init,
+-};
+-
+ MACHINE_START(G3EVM, "g3evm")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7367_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= g3evm_init_early,
+ 	.init_machine	= g3evm_init,
+-	.timer		= &g3evm_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
+index 079dd35..46e1b0c 100644
+--- a/arch/arm/mach-shmobile/board-g4evm.c
++++ b/arch/arm/mach-shmobile/board-g4evm.c
+@@ -263,6 +263,7 @@ static void __init g4evm_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7377_add_early_devices();
+ 	shmobile_setup_console();
++	sh7377_clock_init();
+ }
+ 
+ #define GPIO_SDHID0_D0	0xe60520fc
+@@ -381,21 +382,10 @@ static void __init g4evm_init(void)
+ 	platform_add_devices(g4evm_devices, ARRAY_SIZE(g4evm_devices));
+ }
+ 
+-static void __init g4evm_timer_init(void)
+-{
+-	sh7377_clock_init();
+-	shmobile_timer.init();
+-}
+-
+-static struct sys_timer g4evm_timer = {
+-	.init		= g4evm_timer_init,
+-};
+-
+ MACHINE_START(G4EVM, "g4evm")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7377_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= g4evm_init_early,
+ 	.init_machine	= g4evm_init,
+-	.timer		= &g4evm_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index f05a673..d52f323 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -1011,6 +1011,10 @@ static void __init mackerel_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7372_add_early_devices();
+ 	shmobile_setup_console();
++	sh7372_clock_init();
++
++	/* External clock source */
++	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+ }
+ 
+ #define GPIO_PORT9CR	0xE6051009
+@@ -1203,24 +1207,10 @@ static void __init mackerel_init(void)
+ 	hdmi_init_pm_clock();
+ }
+ 
+-static void __init mackerel_timer_init(void)
+-{
+-	sh7372_clock_init();
+-	shmobile_timer.init();
+-
+-	/* External clock source */
+-	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+-}
+-
+-static struct sys_timer mackerel_timer = {
+-	.init		= mackerel_timer_init,
+-};
+-
+ MACHINE_START(MACKEREL, "mackerel")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7372_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= mackerel_init_early,
+ 	.init_machine	= mackerel_init,
+-	.timer		= &mackerel_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+deleted file mode 100644
+index 895794b..0000000
+--- a/arch/arm/mach-shmobile/timer.c
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/*
+- * SH-Mobile Timer
+- *
+- * Copyright (C) 2010  Magnus Damm
+- * Copyright (C) 2002 - 2009  Paul Mundt
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+- *
+- */
+-#include <linux/platform_device.h>
+-#include <asm/mach/time.h>
+-
+-static void __init shmobile_late_time_init(void)
+-{
+-	/*
+-	 * Make sure all compiled-in early timers register themselves.
+-	 *
+-	 * Run probe() for two "earlytimer" devices, these will be the
+-	 * clockevents and clocksource devices respectively. In the event
+-	 * that only a clockevents device is available, we -ENODEV on the
+-	 * clocksource and the jiffies clocksource is used transparently
+-	 * instead. No error handling is necessary here.
+-	 */
+-	early_platform_driver_register_all("earlytimer");
+-	early_platform_driver_probe("earlytimer", 2, 0);
+-}
+-
+-static void __init shmobile_timer_init(void)
+-{
+-	late_time_init = shmobile_late_time_init;
+-}
+-
+-struct sys_timer shmobile_timer = {
+-	.init		= shmobile_timer_init,
+-};
 -- 
-nvpublic
+1.7.4.1
