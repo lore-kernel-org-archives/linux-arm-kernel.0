@@ -1,79 +1,24 @@
-From: ccross@google.com (Colin Cross)
-Date: Mon, 2 May 2011 14:30:10 -0700
-Subject: [PATCH 1/4] drivers: create a pinmux subsystem
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF0497F1B201@HQMAIL01.nvidia.com>
-References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0497F1B201@HQMAIL01.nvidia.com>
-Message-ID: <BANLkTimKU-=GXzrn8=MQn-GAmKHOvKmuNQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 May 2011 23:36:52 +0200
+Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <538266033.2230575.1304371624720.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+References: <538266033.2230575.1304371624720.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+Message-ID: <201105022336.52663.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 2, 2011 at 1:52 PM, Stephen Warren <swarren@nvidia.com> wrote:
-> Linus Walleij wrote at Monday, May 02, 2011 1:16 PM:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> This creates a subsystem for handling of pinmux devices. These are
->> devices that enable and disable groups of pins on primarily PGA and
->> BGA type of chip packages and common in embedded systems.
->
-> I would avoid any references to particular package types; I've seen
-> pinmuxing applied to PLCC and DIP/DIL too, and in general, it's possible
-> irrespective of package type.
->
->> This is being done to depopulate the arch/arm/* directory of such
->> custom drivers and try to abstract the infrastructure they all
->> need. See the Documentation/pinmux.txt file that is part of this
->> patch for more details.
->
->> diff --git a/Documentation/pinmux.txt b/Documentation/pinmux.txt
->>...
->> +The mux settings are:
->> +
->> +- Oriented around enumerated physical pins or pads denoted by unsigned
->> + ?integers in the range 0..MAX_INT. Every pin on your system (or atleast
->> + ?every pin that can be muxed) should have a unique number. The numberspace
->
-> Does this imply a model where each pin's "special function" can be
-> controlled independently? I think reading through the document that
-> isn't the case, but I just wanted to be sure.
->
-> In particular, NVIDIA Tegra has a setup where:
->
-> * Pinmux configuration for "special functions" is at a "pad-group"
-> ?level, where there may be 1..N pins in a pad-group, and there is a
-> ?single register field that defines the current special function routed
-> ?to/from all pins in that pad-group at once.
->
-> * Each pad group can be assigned 1 of N special functions (none might be
-> ?an option in some/all cases too)
->
-> * Some special functions may be assignable to multiple pad groups,
-> ?although obviously only 1 pad group per function at a time.
->
-> * GPIO selection is at per-pin granularity; individual pins may be used
-> ?as a GPIO irrespective of what SFR is selected for the pad group
-> ?containing the pin.
->
-> * There are also other configurations associated with pinmuxing, such
-> ?as drive strength, pull up/down enables, etc.
->
-> Also, some of our drivers use "dynamic pinmuxing". For example, our
-> downstream I2C driver exposes N I2C busses and reprograms the pinmux
-> at runtime to attach the actual I2C controller to different sets of
-> pins, essentially multi-plexing the control across N physical busses.
+On Monday 02 May 2011 23:27:04 johnlinn at comcast.net wrote:
+> Yes we could explain hard coded numbers.  Ideally GIC driver would support
+> device tree it seems like to me.
 
-Tegra has more fun pinmux quirks than just those :)
+> 
+> Seems like the GIC driver could remap it's own memory but maybe that won't
+> work across all platforms and then the platform would need to do it.
 
-* Drive strength is also controlled through groups of pins, but
-different groups than pinmux.  Most of the drive strength groups are
-collections of pad mux groups, but there are a few pins that are in
-the same pad mux group but a different drive strength group.
-* Setting a pin as a GPIO overrides its group's mux setting, except
-for the group's tristate.  You must untristate the entire group to use
-a single pin as a GPIO.
-* Each group has a "safe mode", but which mux id to select to enter
-the safe mode is completely random.
+Why not just add a stub in the xilinx platform for now that remaps the
+memory using ioremap and calls the regular GIC initialization?
 
-In the end, we determined that there was no way to sanely handle
-setting up Tegra's pinmux programatically, and instead required each
-board to pass in a table of pinmux settings.
+That function can then easily be moved to common code when another
+platform uses it.
+
+	Arnd
