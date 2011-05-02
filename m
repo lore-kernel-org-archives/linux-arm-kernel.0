@@ -1,32 +1,54 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Mon, 02 May 2011 18:13:04 +0100
-Subject: Patch 6853/1 incorrectly moved to superseeded ?
-In-Reply-To: <4DBEDD44.7040509@nokia.com>
-References: <4DBEDD44.7040509@nokia.com>
-Message-ID: <1304356384.5092.32.camel@computer2.home>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 2 May 2011 22:45:53 +0530
+Subject: [PATCH v4 08/11] tty: add pruss SUART driver
+In-Reply-To: <AD18C961F5D84B92B2611F80E80B3D6F@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
+	<20110425212056.GA29313@kroah.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CAE36A6@dbde02.ent.ti.com>
+	<20110426124519.GC5977@suse.de>
+	<35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9959@dbde02.ent.ti.com>
+	<F6E90395B84D4E9FA9497247841035FC@subhasishg>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9B31@dbde02.ent.ti.com>
+	<AD18C961F5D84B92B2611F80E80B3D6F@subhasishg>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CC3B025@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-02 at 19:35 +0300, Viktor Rosendahl wrote:
-> Hello Russell,
-> 
-> I got a message that you moved my patch "Patch 6853/1: Fix ldrd/strd 
-> emulation for kprobes" to superseeded based on the assumption that it 
-> would have been superseeded by John Medhurst's patch "ARM: kprobes: Fix 
-> emulation of LDRD and STRD instructions".
-> 
-> However, when I look at John's patch, it seems to me that his patch is 
-> supposed to sit on top of my patch, not to replacing it.
-> 
-> Nicolas and Tixy, feel free to correct me if I am wrong.
+On Mon, May 02, 2011 at 14:04:11, Subhasish Ghosh wrote:
 
-Viktor is correct. My patches were applied on top of his, and both are
-required for the code to work correctly.
+> >> SG - So, should I call the sram_alloc() in the platform setup function. 
+> > 
+> > Can you please shed some light on how SRAM
+> > is being used in the driver? Looking at the
+> > driver, it looks like it is used as a shared
+> > buffer between the PRU firmware and kernel.
+> > 
+> > If yes, how do you cope with dynamic allocation
+> > of SRAM? That is, how do you inform the firmware
+> > what portion of SRAM has been allocated to the
+> > driver?
+> > 
+> > Also, usage of SRAM is not required for basic driver
+> > function, correct? So, a platform which does not
+> > have SRAM to spare for this driver could still have
+> > a portion of SDRAM/DDR allocated to be used as the
+> > shared buffer? I guess SRAM was used only for lower
+> > access times. But it should still be possible to
+> > sustain lower baudrates with SDRAM/DDR?
+> 
+> The sram is allocated dynamically in the driver. 
+> After allocation, we write the pointer into the PRU, so in case the
+> driver allocates memory form the DDR, it will write this info into the
+> PRU and it will work. But, because of DDR access latencies, the UART
+> will work only for lower baud rates. 
 
-However, Nicolas put Viktor's patch into his branch together with my
-patches, so it may be that the pull from Nicolas' branch will also get
-Viltor's patch. Meaning that patch 6853/1 doesn't need to be applied as
-well.(?)
+Thanks for the clarification. In this case, the driver
+should use platform callbacks to get/put fast fifo
+space. In case this callback is not populated by the
+platform or returns an error, the driver should fall
+back to allocating from DDR.
 
--- 
-Tixy
+Thanks,
+Sekhar
