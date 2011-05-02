@@ -1,65 +1,66 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 2 May 2011 09:58:56 +0200
-Subject: [PATCH 05/10] clk: Add support for simple dividers
-In-Reply-To: <20110428152217.GT17290@n2100.arm.linux.org.uk>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
-	<20110418094909.GE31131@pengutronix.de>
-	<20110428152217.GT17290@n2100.arm.linux.org.uk>
-Message-ID: <20110502075856.GW14770@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 2 May 2011 01:10:28 -0700
+Subject: [patch 07/16] arm: omap: Use clocksource based sched_clock
+In-Reply-To: <alpine.LFD.2.02.1104291616160.3005@ionos>
+References: <20110423205036.795894921@linutronix.de>
+	<20110423205132.221790438@linutronix.de>
+	<20110429115744.GZ3755@atomide.com>
+	<alpine.LFD.2.02.1104291420240.3005@ionos>
+	<20110429125155.GA3755@atomide.com>
+	<alpine.LFD.2.02.1104291616160.3005@ionos>
+Message-ID: <20110502081028.GC3755@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 04:22:17PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Apr 18, 2011 at 11:49:09AM +0200, Uwe Kleine-K?nig wrote:
-> > > +static int clk_divider_set_rate(struct clk *clk, unsigned long rate)
-> > > +{
-> > > +	unsigned long best_parent_rate;
-> > > +	struct clk_divider *divider = to_clk_divider(clk);
-> > > +	unsigned int div;
-> > > +	int ret;
-> > > +	unsigned long flags = 0;
-> > > +	u32 val;
-> > > +
-> > > +	div = clk_divider_bestdiv(clk, rate, &best_parent_rate);
-> > > +
-> > > +	if (rate != best_parent_rate / div)
-> > > +		return -EINVAL;
-> > This is too harsh, isn't it. Or can you expect to only get values that
-> > are returned by round_rate? Again you need DIV_ROUND_UP.
+* Thomas Gleixner <tglx@linutronix.de> [110429 07:16]:
+> On Fri, 29 Apr 2011, Tony Lindgren wrote:
+> > * Thomas Gleixner <tglx@linutronix.de> [110429 05:25]:
+> > > 
+> > > The generic sched_clock implementation returns a jiffies based value
+> > > as long as there is no clocksource registered. But the above does not
+> > > fail in sched_clock() it fails in read_persistent_clock() which does
+> > > 
+> > >         last_cycles = cycles;
+> > >         cycles = clocksource_32k.read(&clocksource_32k);
+> > > 
+> > > So the following change causes this:
+> > > 
+> > > -     .read           = omap_32k_read_dummy,
+> > 
+> > Ah right.
+> >  
+> > > Which leads to the question why you have a read_persistent_clock() at
+> > > all if it always reads 0 via omap_32k_read_dummy ? Or is this meant
+> > > just for the resume case? Then the above and the removal of
+> > > omap_32k_read_dummy() needs to be undone.
+> > 
+> > The omap_32k_read_dummy needs to return 0 until the clocks are
+> > enabled and the right read function is selected. The .read gets
+> > then set in omap_init_clocksource_32k.
+> > 
+> > It would be nice to handle that in a generic way though,
+> > I would assume the same issue exists for other platforms too.
 > 
-> It is too harsh, and I've wished many a time that people would implement
-> clk_set_rate() and clk_round_rate() as:
-> 
-> long clk_round_rate(struct clk *clk, unsigned long rate)
+> static inline cycles_t clocksource_read_safe(struct clocksource *c)
 > {
-> 	err = calculate_clock_paramters(clk, params, rate);
-> 	if (err < 0)
-> 		return err;
-> 	return calculate_clock_rate(clk, params);
+> 	return c->read ? c->read(c) : 0;
 > }
-> 
-> int clk_set_rate(struct clk *clk, unsigned long rate)
-> {
-> 	err = calculate_clock_parameters(clk, params, rate);
-> 	if (err < 0)
-> 		return err;
-> 	set_clock_parameters(clk, params);
-> 	clk->rate = calculate_clock_rate(clk, params);
-> 	return 0;
-> }
-> 
-> IOW, clk_round_rate() does what clk_set_rate() does but does _not_ set
-> the hardware rate itself.
 
-Ok. It's easier to implement anyway since rounding errors do not have
-such a bad impact.
+That adds testing for it for each read.. So the current setup
+is better.
+ 
+> For the core timekeeping code that's a non issue as nothing should
+> register a clocksource with an invalid read function pointer :)
 
-Sascha
+Looks like omap_device code calls read_persistent_clock before
+omap_init_clocksource_32k is run. I'll take a look and see if that
+is needed when I refresh other omap init_early patches.
 
+Anyways, currently nothing prevents calling read_persistent_clock
+before it's initialized and a platform specific hack is needed.
+Maybe the default should be clocksource_read_safe that gets
+changed by the platform code when initializing?
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Tony
