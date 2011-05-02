@@ -1,55 +1,158 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Mon, 2 May 2011 14:04:11 +0530
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CBA9B31@dbde02.ent.ti.com>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
-	<20110425212056.GA29313@kroah.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CAE36A6@dbde02.ent.ti.com>
-	<20110426124519.GC5977@suse.de>
-	<35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9959@dbde02.ent.ti.com>
-	<F6E90395B84D4E9FA9497247841035FC@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9B31@dbde02.ent.ti.com>
-Message-ID: <AD18C961F5D84B92B2611F80E80B3D6F@subhasishg>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 2 May 2011 10:39:32 +0200
+Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <20110502050800.24800.13738.stgit@ponder>
+References: <20110502045207.24800.91172.stgit@ponder>
+	<20110502050800.24800.13738.stgit@ponder>
+Message-ID: <201105021039.32374.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Monday 02 May 2011 07:08:00 Grant Likely wrote:
+> The 1st board support is minimal to get a system up and running
+> on the Xilinx platform.
+> 
+> This platform reuses the clock implementation from plat-versatile, and
+> it depends entirely on CONFIG_OF support.  There is only one board
+> support file which obtains all device information from a device tree
+> dtb file which is passed to the kernel at boot time.
 
-> Hi Subhasish,
-> 
-> On Wed, Apr 27, 2011 at 18:45:06, Subhasish Ghosh wrote:
->>  >> >>The driver should probably just get sram
->> >> >> space through platform data so that it doesn't depend on the
->> >> >> platform specific sram allocation function.
->> >>
->> >> Are you suggesting that I go back to that implementation.
->> >
->> > No, the platform code should use the SRAM allocator and
->> > pass on the allocated memory to the driver.
->> 
->> SG - So, should I call the sram_alloc() in the platform setup function. 
-> 
-> Can you please shed some light on how SRAM
-> is being used in the driver? Looking at the
-> driver, it looks like it is used as a shared
-> buffer between the PRU firmware and kernel.
-> 
-> If yes, how do you cope with dynamic allocation
-> of SRAM? That is, how do you inform the firmware
-> what portion of SRAM has been allocated to the
-> driver?
-> 
-> Also, usage of SRAM is not required for basic driver
-> function, correct? So, a platform which does not
-> have SRAM to spare for this driver could still have
-> a portion of SDRAM/DDR allocated to be used as the
-> shared buffer? I guess SRAM was used only for lower
-> access times. But it should still be possible to
-> sustain lower baudrates with SDRAM/DDR?
+Very cool stuff!
 
-The sram is allocated dynamically in the driver. 
-After allocation, we write the pointer into the PRU, so in case the
-driver allocates memory form the DDR, it will write this info into the
-PRU and it will work. But, because of DDR access latencies, the UART
-will work only for lower baud rates. 
+> +
+> +	amba {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+
+Shouldn't we have a way to identify amba buses by the compatible property
+as well, rather than only declaring it simple-bus?
+
+We might be able to do some more automatic probing in the amba
+code in cases where the architected registers are actually filled
+with meaningful data there.
+
+Is the empty ranges property technically correct? Excuse my poor
+knowledge of amba, but I would have assumed that only a range
+of addresses is actually put on the bus, while others (e.g. RAM)
+are not visible on AMBA.
+
+> +static struct of_device_id zynq_of_bus_ids[] __initdata = {
+> +	{ .compatible = "simple-bus", },
+> +	{}
+> +};
+> +
+> +static struct of_device_id gic_match[] = {
+> +	{ .compatible = "arm,gic", },
+> +	{}
+> +};
+> +
+> +/**
+> + * xilinx_init_machine() - System specific initialization, intended to be
+> + *			   called from board specific initialization.
+> + */
+> +void __init xilinx_init_machine(void)
+> +{
+> +	struct device_node *node = of_find_matching_node(NULL, gic_match);
+> +
+> +	if (node)
+> +		of_irq_domain_add_simple(node, 0, NR_IRQS);
+> +
+> +#ifdef CONFIG_CACHE_L2X0
+> +	/*
+> +	 * 64KB way size, 8-way associativity, parity disabled
+> +	 */
+> +	l2x0_init(PL310_L2CC_BASE, 0x02060000, 0xF0F0FFFF);
+> +#endif
+> +
+> +/**
+> + * xilinx_irq_init() - Interrupt controller initialization for the GIC.
+> + */
+> +void __init xilinx_irq_init(void)
+> +{
+> +	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
+> +}
+
+I think we can do better than this, there is still more hardcoded stuff
+in here than I think should be. I understand that you tried to minimize
+the size of the patch set for obvious reasons, but none of this
+seems too board specific to put into common code in one way or another.
+
+Of course we can not fix all of this at once, but maybe we can have
+an explanation for each hardcoded setting on why it is still needed
+and what would have to be done to make it go away.
+
+> +/* The minimum devices needed to be mapped before the VM system is up and
+> + * running include the GIC, UART and Timer Counter.
+> + */
+> +
+> +static struct map_desc io_desc[] __initdata = {
+> +	{
+> +		.virtual	= TTC0_VIRT,
+> +		.pfn		= __phys_to_pfn(TTC0_PHYS),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+> +	}, {
+> +		.virtual	= SCU_PERIPH_VIRT,
+> +		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
+> +		.length		= SZ_8K,
+> +		.type		= MT_DEVICE,
+> +	}, {
+> +		.virtual	= PL310_L2CC_VIRT,
+> +		.pfn		= __phys_to_pfn(PL310_L2CC_PHYS),
+> +		.length		= SZ_4K,
+> +		.type		= MT_DEVICE,
+> +	},
+
+I especially dislike the idea of having to set up iotables, these
+seem completely counterintuitive when we probe the devices from the
+device tree.
+
+AFAICT, all of init_irq, time_init and init_machine are called way after
+mm_init, so you should have ioremap available by the time you need to
+access these virtual memory ranges.
+
+I can understand why you'd want to special-case PCI I/O space windows
+and early serial port access, but I think we should handle them differently
+and give them fixed machine independent virtual addresses.
+
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/io.h
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/irqs.h
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/memory.h
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/system.h
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/timex.h
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/vmalloc.h
+
+These are all either completely generic versions that could be reused
+on a number of other machines, or they could be turned into such files.
+
+For the global inlude/asm-generic files, we have just added a mechanism
+to share that kind of file across multiple architectures using some
+Makefile magic. Should we perhaps do something similar here to avoid
+having to create more of the same files?
+
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/uart.h
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/include/mach/uncompress.h
+
+For these, it obviously won't work.
+
+> diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
+> new file mode 100644
+> index 0000000..c2c96cc
+> --- /dev/null
+> +++ b/arch/arm/mach-zynq/timer.c
+
+In the light of the recent discussions of drivers moving out of
+platforms into common Linux code, do we expect this to also
+happen to timers any time soon?
+
+	Arnd
