@@ -1,38 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2011 00:28:15 +0100
-Subject: [RFC PATCH] arm: move timer init to late_timer_init
-In-Reply-To: <20110502231714.GE32605@game.jcrosoft.org>
-References: <1304368940-19340-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110502222211.GA28001@n2100.arm.linux.org.uk>
-	<20110502221522.GG13724@game.jcrosoft.org>
-	<20110502231919.GH28001@n2100.arm.linux.org.uk>
-	<20110502231714.GE32605@game.jcrosoft.org>
-Message-ID: <20110502232815.GI28001@n2100.arm.linux.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 2 May 2011 17:36:04 -0600
+Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <20110502230118.GE28001@n2100.arm.linux.org.uk>
+References: <90477150.2231869.1304372815517.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+	<1319927287.2232106.1304373011082.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+	<20110502230118.GE28001@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTim4PFNbnD2LwZRwNKTQLiuNpGjrBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2011 at 01:17:14AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 00:19 Tue 03 May     , Russell King - ARM Linux wrote:
-> > On Tue, May 03, 2011 at 12:15:22AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 23:22 Mon 02 May     , Russell King - ARM Linux wrote:
-> > > > On Mon, May 02, 2011 at 10:42:20PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > and add global early device init
-> > > > > this will init earlytimer and will try to probe 1 or 2 timers for clockevents
-> > > > > and clocksource
-> > > > 
-> > > > Why should this change the positioning of sched_clock initialization
-> > > > too?
-> > > > 
-> > > > You know, to spend time sorting out the sched_clock crap that platform
-> > > > people came up with, to get sched_clock working at the right point in
-> > > > the init sequence so that everything is happy, and then to have all
-> > > > that work undone one kernel version later... well, why did I even bother.
-> > > so is it ok to put the early init in time_init for you?
-> > 
-> > If it works there, then there's no problem.  I'm just left wondering why
-> > you decided to try the late_time_init() thing in the first place.  Was
-> > there a specific reason?
+On Mon, May 2, 2011 at 5:01 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, May 02, 2011 at 09:50:11PM +0000, johnlinn at comcast.net wrote:
+>> Seems easy enough assuming we don't need the SCU early for the core count
+>> and can get that from the device tree.
 >
-> sh-mobile and sh use it this way
+> Beware. ?Things may not be that trivial when you start considering some
+> of the weirdnesses that some vendors start coming out with.
+>
+>> Since the SCU and part of the GIC end up in the same 4K page they need to be
+>> together (unless I'm thinking about that wrong).
+>>
+>> SCU 0xF8000000
+>> GIC_CPU 0xF8000100
+>> GIC_DIS 0xF8001000
+>
+> It is preferable to use the same mapping, as it ensures that you're not
+> going to create incompatible aliases.
+>
+> But, before we get too bogged down with this, please realise that it is
+> possible to setup early mappings from the device tree for things like the
+> SCU. ?Maybe not using ioremap(), but I'm sure we can find some way to use
+> the iotable_init() stuff to setup some early mappings from DT for this
+> stuff.
 
-Do we know why they do?
+absolutely.
+
+g.
