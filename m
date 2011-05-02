@@ -1,42 +1,28 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 2 May 2011 23:52:42 +0100
-Subject: [PATCH 3/3] at91: make PLAT_PHYS_OFFSET depending on
-	!ARM_PATCH_PHYS_VIRT or XIP_KERNEL
-In-Reply-To: <1304374403-28513-3-git-send-email-plagnioj@jcrosoft.com>
-References: <1304374403-28513-1-git-send-email-plagnioj@jcrosoft.com>
-	<1304374403-28513-3-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20110502225242.GC28001@n2100.arm.linux.org.uk>
+Date: Mon, 2 May 2011 23:57:08 +0100
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110502225708.GD28001@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2011 at 12:13:23AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> diff --git a/arch/arm/mach-at91/include/mach/memory.h b/arch/arm/mach-at91/include/mach/memory.h
-> index c2cfe50..a643b4e 100644
-> --- a/arch/arm/mach-at91/include/mach/memory.h
-> +++ b/arch/arm/mach-at91/include/mach/memory.h
-> @@ -23,6 +23,15 @@
->  
->  #include <mach/hardware.h>
->  
-> -#define PLAT_PHYS_OFFSET	(AT91_SDRAM_BASE)
-> +#define AT91_SDRAM_BASE		AT91_CHIPSELECT_1
-> +#define AT91SAM9G45_SDRAM_BASE	AT91_CHIPSELECT_6
-> +
-> +#if !defined(CONFIG_ARM_PATCH_PHYS_VIRT) || defined(CONFIG_XIP_KERNEL)
-> +# if defined CONFIG_ARCH_AT91SAM9G45
-> +#  define PLAT_PHYS_OFFSET		AT91SAM9G45_SDRAM_BASE
-> +# else
-> +#  define PLAT_PHYS_OFFSET		AT91_SDRAM_BASE
-> +# endif
-> +#endif
+On Mon, May 02, 2011 at 09:16:08PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This patchset creates a pinmux subsystem and switches U300 to use that new
+> subsystem as an example. The problem is not that fantastically hard to
+> solve in a general way, nobody got around to it because it requires some
+> upfront code I believe, and this is my stab at it.
 
-Ideally, I'd like to see platforms not provide PLAT_PHYS_OFFSET.
-However, there are two cases where it's needed by generic ARM code as
-you've identified above.
+While I like the idea of consolidating the pinmuxing stuff, I'm not sure
+about having a struct pin_mux pointer in each bus types device structure.
+It'd mean this would have to be added to platform devices as well...
 
-Does AT91 support XIP_KERNEL?  It doesn't support XIP from flash (MTD_XIP)
-so I suspect this isn't a particularly useful configuration.
+Then there's SA1100 (and PXA?) to consider with its IrDA setup, where its
+necessary to switch the pin muxing during driver operation, when switching
+between SIR and FIR modes (SIR uses the UART, FIR uses a separate hardware
+block.)
 
-As far as ARM_PATCH_PHYS_VIRT, maybe AT91 should force this to always
-be selected.  That then means it can eliminate the PLAT_PHYS_OFFSET
-definition entirely.
+So any per-device pinmuxing subsystem also needs a way that a driver can
+change the pinmuxing of its associated pins on the fly too.
