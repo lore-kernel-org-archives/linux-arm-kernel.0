@@ -1,158 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 2 May 2011 10:39:32 +0200
-Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
-In-Reply-To: <20110502050800.24800.13738.stgit@ponder>
-References: <20110502045207.24800.91172.stgit@ponder>
-	<20110502050800.24800.13738.stgit@ponder>
-Message-ID: <201105021039.32374.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 2 May 2011 10:49:16 +0200
+Subject: [PATCH v2 2/3] ARM: mx5/mx51_babbage: Use gpio_request_one
+	when possible
+In-Reply-To: <1304037804-4411-2-git-send-email-festevam@gmail.com>
+References: <1304037804-4411-1-git-send-email-festevam@gmail.com>
+	<1304037804-4411-2-git-send-email-festevam@gmail.com>
+Message-ID: <20110502084916.GX14770@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 May 2011 07:08:00 Grant Likely wrote:
-> The 1st board support is minimal to get a system up and running
-> on the Xilinx platform.
+Hi Fabio,
+
+On Thu, Apr 28, 2011 at 09:43:23PM -0300, Fabio Estevam wrote:
+> Instead of using gpio_request followed by gpio_direction_output use gpio_request_one.
 > 
-> This platform reuses the clock implementation from plat-versatile, and
-> it depends entirely on CONFIG_OF support.  There is only one board
-> support file which obtains all device information from a device tree
-> dtb file which is passed to the kernel at boot time.
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+> No changes since v1. Only added a third patch to the series
+> 
+>  arch/arm/mach-mx5/board-mx51_babbage.c |    8 ++++----
+>  1 files changed, 4 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+> index 7b919bc..00203fb 100644
+> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+> @@ -179,25 +179,25 @@ static int gpio_usbh1_active(void)
+>  
+>  	/* Set USBH1_STP to GPIO and toggle it */
+>  	mxc_iomux_v3_setup_pad(usbh1stp_gpio);
+> -	ret = gpio_request(BABBAGE_USBH1_STP, "usbh1_stp");
+> +	ret = gpio_request_one(BABBAGE_USBH1_STP,
+> +					GPIOF_OUT_INIT_LOW, "usbh1_stp");
+>  
+>  	if (ret) {
+>  		pr_debug("failed to get MX51_PAD_USBH1_STP__GPIO_1_27: %d\n", ret);
+>  		return ret;
+>  	}
+> -	gpio_direction_output(BABBAGE_USBH1_STP, 0);
+>  	gpio_set_value(BABBAGE_USBH1_STP, 1);
+>  	msleep(100);
+>  	gpio_free(BABBAGE_USBH1_STP);
+>  
+>  	/* De-assert USB PHY RESETB */
+> -	ret = gpio_request(BABBAGE_USB_PHY_RESET, "phy_reset");
+> +	ret = gpio_request_one(BABBAGE_USB_PHY_RESET,
+> +					GPIOF_OUT_INIT_HIGH, "phy_reset");
+>  
+>  	if (ret) {
+>  		pr_debug("failed to get MX51_PAD_EIM_D21__GPIO_2_5: %d\n", ret);
+>  		return ret;
+>  	}
+> -	gpio_direction_output(BABBAGE_USB_PHY_RESET, 1);
 
-Very cool stuff!
+This can be done better. Why not move all babbage gpios into a
 
-> +
-> +	amba {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
+/* initial gpio settings */
+static struct gpio[] = {
+	{ .gpio = BABBAGE_USBH1_STP, .flags = GPIOF_OUT_INIT_LOW },
+	{ .gpio = BABBAGE_PHY_RESET, .flags = GPIOF_OUT_INIT_LOW },
+	{ .gpio = BABBAGE_USB_HUB_RESET, flags = GPIOF_OUT_INIT_LOW },
+	{ .gpio = BABBAGE_FEC_PHY_RESET, .flags = GPIOF_OUT_INIT_LOW },
+};
 
-Shouldn't we have a way to identify amba buses by the compatible property
-as well, rather than only declaring it simple-bus?
+and use gpio_request_array on this. Then we have solved this for all
+board specific gpios. (I didn't care for correct output value in the
+example above)
 
-We might be able to do some more automatic probing in the amba
-code in cases where the architected registers are actually filled
-with meaningful data there.
+Furthermore we can move MX51_PAD_USBH1_STP__GPIO1_27,
+MX51_PAD_EIM_D21__GPIO2_5 and _MX51_PAD_EIM_A27__GPIO2_21 to
+mx51babbage_pads.
 
-Is the empty ranges property technically correct? Excuse my poor
-knowledge of amba, but I would have assumed that only a range
-of addresses is actually put on the bus, while others (e.g. RAM)
-are not visible on AMBA.
+Sascha
 
-> +static struct of_device_id zynq_of_bus_ids[] __initdata = {
-> +	{ .compatible = "simple-bus", },
-> +	{}
-> +};
-> +
-> +static struct of_device_id gic_match[] = {
-> +	{ .compatible = "arm,gic", },
-> +	{}
-> +};
-> +
-> +/**
-> + * xilinx_init_machine() - System specific initialization, intended to be
-> + *			   called from board specific initialization.
-> + */
-> +void __init xilinx_init_machine(void)
-> +{
-> +	struct device_node *node = of_find_matching_node(NULL, gic_match);
-> +
-> +	if (node)
-> +		of_irq_domain_add_simple(node, 0, NR_IRQS);
-> +
-> +#ifdef CONFIG_CACHE_L2X0
-> +	/*
-> +	 * 64KB way size, 8-way associativity, parity disabled
-> +	 */
-> +	l2x0_init(PL310_L2CC_BASE, 0x02060000, 0xF0F0FFFF);
-> +#endif
-> +
-> +/**
-> + * xilinx_irq_init() - Interrupt controller initialization for the GIC.
-> + */
-> +void __init xilinx_irq_init(void)
-> +{
-> +	gic_init(0, 29, SCU_GIC_DIST_BASE, SCU_GIC_CPU_BASE);
-> +}
-
-I think we can do better than this, there is still more hardcoded stuff
-in here than I think should be. I understand that you tried to minimize
-the size of the patch set for obvious reasons, but none of this
-seems too board specific to put into common code in one way or another.
-
-Of course we can not fix all of this at once, but maybe we can have
-an explanation for each hardcoded setting on why it is still needed
-and what would have to be done to make it go away.
-
-> +/* The minimum devices needed to be mapped before the VM system is up and
-> + * running include the GIC, UART and Timer Counter.
-> + */
-> +
-> +static struct map_desc io_desc[] __initdata = {
-> +	{
-> +		.virtual	= TTC0_VIRT,
-> +		.pfn		= __phys_to_pfn(TTC0_PHYS),
-> +		.length		= SZ_4K,
-> +		.type		= MT_DEVICE,
-> +	}, {
-> +		.virtual	= SCU_PERIPH_VIRT,
-> +		.pfn		= __phys_to_pfn(SCU_PERIPH_PHYS),
-> +		.length		= SZ_8K,
-> +		.type		= MT_DEVICE,
-> +	}, {
-> +		.virtual	= PL310_L2CC_VIRT,
-> +		.pfn		= __phys_to_pfn(PL310_L2CC_PHYS),
-> +		.length		= SZ_4K,
-> +		.type		= MT_DEVICE,
-> +	},
-
-I especially dislike the idea of having to set up iotables, these
-seem completely counterintuitive when we probe the devices from the
-device tree.
-
-AFAICT, all of init_irq, time_init and init_machine are called way after
-mm_init, so you should have ioremap available by the time you need to
-access these virtual memory ranges.
-
-I can understand why you'd want to special-case PCI I/O space windows
-and early serial port access, but I think we should handle them differently
-and give them fixed machine independent virtual addresses.
-
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/io.h
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/irqs.h
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/memory.h
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/system.h
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/timex.h
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/vmalloc.h
-
-These are all either completely generic versions that could be reused
-on a number of other machines, or they could be turned into such files.
-
-For the global inlude/asm-generic files, we have just added a mechanism
-to share that kind of file across multiple architectures using some
-Makefile magic. Should we perhaps do something similar here to avoid
-having to create more of the same files?
-
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/uart.h
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/include/mach/uncompress.h
-
-For these, it obviously won't work.
-
-> diff --git a/arch/arm/mach-zynq/timer.c b/arch/arm/mach-zynq/timer.c
-> new file mode 100644
-> index 0000000..c2c96cc
-> --- /dev/null
-> +++ b/arch/arm/mach-zynq/timer.c
-
-In the light of the recent discussions of drivers moving out of
-platforms into common Linux code, do we expect this to also
-happen to timers any time soon?
-
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
