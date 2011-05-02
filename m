@@ -1,54 +1,47 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 2 May 2011 22:45:53 +0530
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <AD18C961F5D84B92B2611F80E80B3D6F@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
-	<20110425212056.GA29313@kroah.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CAE36A6@dbde02.ent.ti.com>
-	<20110426124519.GC5977@suse.de>
-	<35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9959@dbde02.ent.ti.com>
-	<F6E90395B84D4E9FA9497247841035FC@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9B31@dbde02.ent.ti.com>
-	<AD18C961F5D84B92B2611F80E80B3D6F@subhasishg>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CC3B025@dbde02.ent.ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 02 May 2011 10:31:28 -0700
+Subject: [PATCH 01/10] Add a common struct clk
+In-Reply-To: <8yabozlniu2.fsf@huya.qualcomm.com>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>	<4DBDC3B5.7070808@gmail.com>
+	<1304298586.2686.29.camel@pororo>	<4DBE2064.2060303@gmail.com>
+	<1304307632.2686.33.camel@pororo>
+	<8yabozlniu2.fsf@huya.qualcomm.com>
+Message-ID: <4DBEEA70.4040501@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2011 at 14:04:11, Subhasish Ghosh wrote:
+On 05/02/2011 09:55 AM, David Brown wrote:
+> On Sun, May 01 2011, Jeremy Kerr wrote:
+>
+>> Hi Rob,
+>>
+>>> I think you will find many examples in the kernel where that is not done 
+>>> by drivers.
+>> Drivers should be checking the return value of clk_get - if they don't,
+>> it's a bug. This is the logical place to check, rather than before all
+>> clock API calls.
+>>
+>> For cases where there is no clock provided for the device (but is a
+>> valid clock on some machines), the platform code should return a no-op
+>> clock from the clk_get call. This 'noop clock' would be a good contender
+>> for inclusion into the kernel-wide infrastructure, like clk_fixed.
+> Having a general fixed clock is a good idea.  There seem to be several
+> 'dummy' clocks under various subarchs, and Stephen Boyd posted one for
+> MSM on March 24.
+>
+> Most of the MSM drivers check the clk_get and fail to probe the driver
+> if the clock is unavailable.
 
-> >> SG - So, should I call the sram_alloc() in the platform setup function. 
-> > 
-> > Can you please shed some light on how SRAM
-> > is being used in the driver? Looking at the
-> > driver, it looks like it is used as a shared
-> > buffer between the PRU firmware and kernel.
-> > 
-> > If yes, how do you cope with dynamic allocation
-> > of SRAM? That is, how do you inform the firmware
-> > what portion of SRAM has been allocated to the
-> > driver?
-> > 
-> > Also, usage of SRAM is not required for basic driver
-> > function, correct? So, a platform which does not
-> > have SRAM to spare for this driver could still have
-> > a portion of SDRAM/DDR allocated to be used as the
-> > shared buffer? I guess SRAM was used only for lower
-> > access times. But it should still be possible to
-> > sustain lower baudrates with SDRAM/DDR?
-> 
-> The sram is allocated dynamically in the driver. 
-> After allocation, we write the pointer into the PRU, so in case the
-> driver allocates memory form the DDR, it will write this info into the
-> PRU and it will work. But, because of DDR access latencies, the UART
-> will work only for lower baud rates. 
+Actually I would like to build the dummy clock into the core and just
+have the dummy clock be a NULL pointer. I didn't do this in the MSM code
+because clkdev wasn't properly handling the NULL clock case. That has
+since been fixed by Russell elsewhere in this thread.
 
-Thanks for the clarification. In this case, the driver
-should use platform callbacks to get/put fast fifo
-space. In case this callback is not populated by the
-platform or returns an error, the driver should fall
-back to allocating from DDR.
+Subject: Re: [PATCH 06/10] clk: Add support for a generic clock multiplexer
+Message-ID: <20110418184138.GE25671@n2100.arm.linux.org.uk>
+http://lkml.kernel.org/n/20110418184138.GE25671 at n2100.arm.linux.org.uk
 
-Thanks,
-Sekhar
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
