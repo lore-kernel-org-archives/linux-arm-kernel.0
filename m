@@ -1,42 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 01 May 2011 22:09:24 -0500
+From: jeremy.kerr@canonical.com (Jeremy Kerr)
+Date: Mon, 02 May 2011 11:40:32 +0800
 Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <1304298586.2686.29.camel@pororo>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>	
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>	
+In-Reply-To: <4DBE2064.2060303@gmail.com>
+References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
+	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
 	<4DBDC3B5.7070808@gmail.com> <1304298586.2686.29.camel@pororo>
-Message-ID: <4DBE2064.2060303@gmail.com>
+	<4DBE2064.2060303@gmail.com>
+Message-ID: <1304307632.2686.33.camel@pororo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jeremy,
+Hi Rob,
 
-On 05/01/2011 08:09 PM, Jeremy Kerr wrote:
-> Hi Rob,
->
->>> +int clk_prepare(struct clk *clk)
->>> +{
->>> +	int ret = 0;
->>> +
->>
->> Shouldn't all these functions have some clk pointer checks:
->>
->> 	if (IS_ERR_OR_NULL(clk))
->> 		return -EINVAL;
->>
->
-> No, I'd prefer not to. The driver code should be responsible for passing
-> a valid pointer here, by doing this check once (where the clock is
-> initially acquired through clk_get), rather than the core code doing it
-> on each function call.
+> I think you will find many examples in the kernel where that is not done 
+> by drivers.
 
-I think you will find many examples in the kernel where that is not done 
-by drivers. It is also common that the same driver is used on platforms 
-with and without clock support. Adding NULL ptr checks around every clk 
-api function makes for ugly and duplicated code.
+Drivers should be checking the return value of clk_get - if they don't,
+it's a bug. This is the logical place to check, rather than before all
+clock API calls.
 
-Every implementation of clk_enable that I looked at does this check in 
-their implementation. I looked at omap, imx, spear, and samsung. Seems 
-like we should try to minimize breakage from switching to common struct clk.
+For cases where there is no clock provided for the device (but is a
+valid clock on some machines), the platform code should return a no-op
+clock from the clk_get call. This 'noop clock' would be a good contender
+for inclusion into the kernel-wide infrastructure, like clk_fixed.
 
-Rob
+Cheers,
+
+
+Jeremy
