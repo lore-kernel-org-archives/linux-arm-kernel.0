@@ -1,205 +1,88 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue,  3 May 2011 12:03:37 +1200
-Subject: [PATCH V4 23/23] at91: Remove mAgic and ISI device code
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 3 May 2011 02:08:20 +0200
+Subject: [PATCH V4 00/23] Create common framework for AT91 device
+	initialisation
 In-Reply-To: <1304381017-17912-1-git-send-email-ryan@bluewatersys.com>
 References: <1304381017-17912-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1304381017-17912-24-git-send-email-ryan@bluewatersys.com>
+Message-ID: <20110503000820.GD2802@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AT572D940HF mAgic device and the AT91SAM9263 ISI device do not
-have drivers yet and therefore the platform code in arch/arm/mach-at91
-is unused and can be removed.
+On 12:03 Tue 03 May     , Ryan Mallon wrote:
+> Each AT91 variant (AT91RM9200, AT91SAM9260, etc) currently has its own
+> devices file, which includes the MMIO address, interrupt
+> configuration, GPIO setup, etc for each device. This results in a large
+> amount of duplicated code.
+> 
+> This patch set introduces a framework for adding shared devices for the
+> AT91 platform and replaces the multiple device setup implementations for
+> each device with single implementations in the new framework. This has
+> a net reduction of over 5000 lines of code.
+> 
+> Each of the arch/arm/mach-at91/*_devices.c files becomes a collection of
+> structures (with some initialisation callbacks where necessary) with a
+> table of devices which are present on the particular AT91 variant. All
+> structures/functions are marked as __init/__initdata so there is little
+> additional memory overhead. This also means that the #ifdefs around each
+> device can be removed from the *_devices.c files (but remain in the new
+> common devices.c file) without overhead.
+> 
+> This is also a step towards allowing more than one AT91 variant to be
+> built into a single kernel by removing duplicate function names across
+> the *_devices.c files.
+> 
+> I have build tested the patch series for all of the  AT91 variants 
+> and devices, and have boot tested it on the AT91SAM9G20 (Snapper 9G20
+> board) and tested basic device functionality.
+> 
+> Changes from v1:
+>  - Moved __initdata to the end of lines
+>  - Fixed at572d940hf EMAC MMIO base
+>  - Fixed some whitespace issues
+> 
+> Changes from v2:
+>  - Renamed UART identifiers from AT91_ID_USx to AT91_UART_USx. The
+>    AT91_UARTx names are already in use. See patch 12 for more details.
+>  - Removed some left over debugging.
+> 
+> Changes from v3:
+>  - Made resource/data allocation dynamic to remove all of the near
+>    empty static declarations.
+>  - Use arrays when multiple devices exist to reduce code complexity
+>  - Fixed indendation on some structures and initialisers 
+>  - Fixed some additional bugs
+>  - Now removes over 5000 lines of code :-)
+> 
+> Ryan Mallon (23):
+>   at91: Add common devices framework
+>   at91: Make Ethernet device common
+>   at91: Make USB OHCI/EHCI devices common
+>   at91: Make UDC device common
+>   at91: Make MMC device common
+>   at91: Make NAND device common
+>   at91: Make TWI device common
+>   at91: Make SPI device common
+>   at91: Make TCB device common
+>   at91: Make RTT device common
+>   at91: Make watchdog device common
+>   at91: Make UART devices common
+>   at91: Make PWM device common
+>   at91: Make SSC device common
+>   at91: Make AC97 device common
+>   at91: Make LCD controller device common
+>   at91: Make touchscreen device common
+>   at91: Make HDMAC device common
+>   at91: Make RTC device common
+>   at91: Make high speed USB gadget device common
+>   at91: Make compact flash device common
+>   at91: Move at91sam9263 CAN device to common devices
+>   at91: Remove mAgic and ISI device code
+good patch
 
-Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
----
- arch/arm/mach-at91/at572d940hf_devices.c  |   73 -----------------------------
- arch/arm/mach-at91/at91sam9263_devices.c  |   50 --------------------
- arch/arm/mach-at91/board-at572d940hf_ek.c |    2 -
- arch/arm/mach-at91/include/mach/board.h   |    6 --
- 4 files changed, 0 insertions(+), 131 deletions(-)
+I'll send some comment to remove more
+and we have issue on some of the api we need to fix first so as I tell you
+before we keep in hold until we fix it as they are in confict
+suc as GPIO, RTC, TIMERS, clock etc...
 
-diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
-index 9910fc8..26aa567 100644
---- a/arch/arm/mach-at91/at572d940hf_devices.c
-+++ b/arch/arm/mach-at91/at572d940hf_devices.c
-@@ -250,79 +250,6 @@ static struct at91_dev_table_uart device_uart2 __initdata = {
- 	.cts_pin	= {AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},
- };
- 
--/* --------------------------------------------------------------------
-- *  mAgic
-- * -------------------------------------------------------------------- */
--
--#ifdef CONFIG_MAGICV
--static struct resource mAgic_resources[] = {
--	{
--		.start = AT91_MAGIC_PM_BASE,
--		.end   = AT91_MAGIC_PM_BASE + AT91_MAGIC_PM_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.start = AT91_MAGIC_DM_I_BASE,
--		.end   = AT91_MAGIC_DM_I_BASE + AT91_MAGIC_DM_I_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.start = AT91_MAGIC_DM_F_BASE,
--		.end   = AT91_MAGIC_DM_F_BASE + AT91_MAGIC_DM_F_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.start = AT91_MAGIC_DM_DB_BASE,
--		.end   = AT91_MAGIC_DM_DB_BASE + AT91_MAGIC_DM_DB_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.start = AT91_MAGIC_REGS_BASE,
--		.end   = AT91_MAGIC_REGS_BASE + AT91_MAGIC_REGS_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.start = AT91_MAGIC_EXTPAGE_BASE,
--		.end   = AT91_MAGIC_EXTPAGE_BASE + AT91_MAGIC_EXTPAGE_SIZE - 1,
--		.flags = IORESOURCE_MEM,
--	},
--	{
--		.start  = AT572D940HF_ID_MSIRQ0,
--		.end    = AT572D940HF_ID_MSIRQ0,
--		.flags  = IORESOURCE_IRQ,
--	},
--	{
--		.start  = AT572D940HF_ID_MHALT,
--		.end    = AT572D940HF_ID_MHALT,
--		.flags  = IORESOURCE_IRQ,
--	},
--	{
--		.start  = AT572D940HF_ID_MEXC,
--		.end    = AT572D940HF_ID_MEXC,
--		.flags  = IORESOURCE_IRQ,
--	},
--	{
--		.start  = AT572D940HF_ID_MEDMA,
--		.end    = AT572D940HF_ID_MEDMA,
--		.flags  = IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device mAgic_device = {
--	.name           = "mAgic",
--	.id             = -1,
--	.num_resources  = ARRAY_SIZE(mAgic_resources),
--	.resource       = mAgic_resources,
--};
--
--void __init at91_add_device_mAgic(void)
--{
--	platform_device_register(&mAgic_device);
--}
--#else
--void __init at91_add_device_mAgic(void) {}
--#endif
--
- static struct at91_device_table at572d940hf_device_table __initdata = {
- 	.ethernet	= &device_eth,
- 	.usbh_ohci	= &device_usbh_ohci,
-diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index b06246c..4bb42ae 100644
---- a/arch/arm/mach-at91/at91sam9263_devices.c
-+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -309,56 +309,6 @@ static struct at91_dev_table_lcdc device_lcdc __initdata = {
- };
- 
- /* --------------------------------------------------------------------
-- *  Image Sensor Interface
-- * -------------------------------------------------------------------- */
--
--#if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
--
--struct resource isi_resources[] = {
--	[0] = {
--		.start	= AT91SAM9263_BASE_ISI,
--		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	[1] = {
--		.start	= AT91SAM9263_ID_ISI,
--		.end	= AT91SAM9263_ID_ISI,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device at91sam9263_isi_device = {
--	.name		= "at91_isi",
--	.id		= -1,
--	.resource	= isi_resources,
--	.num_resources	= ARRAY_SIZE(isi_resources),
--};
--
--void __init at91_add_device_isi(void)
--{
--	at91_set_A_periph(AT91_PIN_PE0, 0);	/* ISI_D0 */
--	at91_set_A_periph(AT91_PIN_PE1, 0);	/* ISI_D1 */
--	at91_set_A_periph(AT91_PIN_PE2, 0);	/* ISI_D2 */
--	at91_set_A_periph(AT91_PIN_PE3, 0);	/* ISI_D3 */
--	at91_set_A_periph(AT91_PIN_PE4, 0);	/* ISI_D4 */
--	at91_set_A_periph(AT91_PIN_PE5, 0);	/* ISI_D5 */
--	at91_set_A_periph(AT91_PIN_PE6, 0);	/* ISI_D6 */
--	at91_set_A_periph(AT91_PIN_PE7, 0);	/* ISI_D7 */
--	at91_set_A_periph(AT91_PIN_PE8, 0);	/* ISI_PCK */
--	at91_set_A_periph(AT91_PIN_PE9, 0);	/* ISI_HSYNC */
--	at91_set_A_periph(AT91_PIN_PE10, 0);	/* ISI_VSYNC */
--	at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
--	at91_set_B_periph(AT91_PIN_PE12, 0);	/* ISI_PD8 */
--	at91_set_B_periph(AT91_PIN_PE13, 0);	/* ISI_PD9 */
--	at91_set_B_periph(AT91_PIN_PE14, 0);	/* ISI_PD10 */
--	at91_set_B_periph(AT91_PIN_PE15, 0);	/* ISI_PD11 */
--}
--#else
--void __init at91_add_device_isi(void) {}
--#endif
--
--
--/* --------------------------------------------------------------------
-  *  Timer/Counter block
-  * -------------------------------------------------------------------- */
- 
-diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
-index 8955133..ff62346 100644
---- a/arch/arm/mach-at91/board-at572d940hf_ek.c
-+++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
-@@ -312,8 +312,6 @@ static void __init eb_board_init(void)
- 	at91_add_device_mmc(0, &eb_mmc_data);
- 	/* Ethernet */
- 	at91_add_device_eth(&eb_eth_data);
--	/* mAgic */
--	at91_add_device_mAgic();
- }
- 
- MACHINE_START(AT572D940HFEB, "Atmel AT91D940HF-EB")
-diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
-index 25a6127..33ba440 100644
---- a/arch/arm/mach-at91/include/mach/board.h
-+++ b/arch/arm/mach-at91/include/mach/board.h
-@@ -186,9 +186,6 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
-  /* AC97 */
- extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
- 
-- /* ISI */
--extern void __init at91_add_device_isi(void);
--
-  /* Touchscreen Controller */
- struct at91_tsadcc_data {
- 	unsigned int    adc_clock;
-@@ -208,9 +205,6 @@ extern void __init at91_init_leds(u8 cpu_led, u8 timer_led);
- extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
- extern void __init at91_pwm_leds(struct gpio_led *leds, int nr);
- 
-- /* AT572D940HF DSP */
--extern void __init at91_add_device_mAgic(void);
--
- /* FIXME: this needs a better location, but gets stuff building again */
- extern int at91_suspend_entering_slow_clock(void);
- 
--- 
-1.7.0.4
+Best Regards,
+J.
