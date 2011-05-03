@@ -1,52 +1,29 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue,  3 May 2011 12:46:46 +0400
-Subject: [PATCH] gpio-vbus: ask for vbus_draw regulator before registering
-	xceiv
-In-Reply-To: <20110502233852.GA10108@kroah.com>
-References: <20110502233852.GA10108@kroah.com>
-Message-ID: <1304412406-9466-1-git-send-email-dbaryshkov@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 May 2011 09:52:20 +0100
+Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <201105030958.14698.arnd@arndb.de>
+References: <90477150.2231869.1304372815517.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+	<1319927287.2232106.1304373011082.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+	<20110502230118.GE28001@n2100.arm.linux.org.uk>
+	<201105030958.14698.arnd@arndb.de>
+Message-ID: <20110503085220.GL28001@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ask for vbus_draw regulator before registering tranceiver to disallow possible
-race between registration and set_power/etc.
+On Tue, May 03, 2011 at 09:58:14AM +0200, Arnd Bergmann wrote:
+> On Tuesday 03 May 2011 01:01:18 Russell King - ARM Linux wrote:
+> > It is preferable to use the same mapping, as it ensures that you're not
+> > going to create incompatible aliases.
+> 
+> Is aliasing a problem for MMIO mappings? I would think that you can
+> ioremap registers anywhere and as often as you want because they are
+> never cacheable.
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- drivers/usb/otg/gpio_vbus.c |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+Provided the type and sharability is identical then there is no problem.
+I wasn't referring to multiple ioremap()s of the same region - that
+should be fine as the same attributes will be used.  If you mix ioremap()
+and iotable_init() then you _could_ have problems if you don't use
+MT_DEVICE in the iotable.
 
-diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
-index 221c444..52733d9 100644
---- a/drivers/usb/otg/gpio_vbus.c
-+++ b/drivers/usb/otg/gpio_vbus.c
-@@ -279,6 +279,13 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
- 	}
- 	INIT_WORK(&gpio_vbus->work, gpio_vbus_work);
- 
-+	gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
-+	if (IS_ERR(gpio_vbus->vbus_draw)) {
-+		dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
-+			PTR_ERR(gpio_vbus->vbus_draw));
-+		gpio_vbus->vbus_draw = NULL;
-+	}
-+
- 	/* only active when a gadget is registered */
- 	err = otg_set_transceiver(&gpio_vbus->otg);
- 	if (err) {
-@@ -287,13 +294,6 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
- 		goto err_otg;
- 	}
- 
--	gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
--	if (IS_ERR(gpio_vbus->vbus_draw)) {
--		dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
--			PTR_ERR(gpio_vbus->vbus_draw));
--		gpio_vbus->vbus_draw = NULL;
--	}
--
- 	return 0;
- err_otg:
- 	free_irq(irq, &pdev->dev);
--- 
-1.7.4.4
+What I'm basically saying is that mixing the methods of creating these
+mappings makes it much easier to get tripped up over these issues.
