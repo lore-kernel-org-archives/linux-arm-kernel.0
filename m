@@ -1,58 +1,109 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 3 May 2011 15:45:03 +0100
-Subject: [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201104281412.40991.arnd@arndb.de>
-References: <201104212129.17013.arnd@arndb.de> <11431.1303949729@localhost>
-	<1303979259.26744.3.camel@e102109-lin.cambridge.arm.com>
-	<201104281412.40991.arnd@arndb.de>
-Message-ID: <20110503144503.GA2645@arm.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 3 May 2011 17:05:39 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104271243.16868.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de>
+	<BANLkTinPbZZS9F1tRCA73fgoD-y__jSfCA@mail.gmail.com>
+	<201104271243.16868.arnd@arndb.de>
+Message-ID: <201105031705.39957.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 02:12:40PM +0200, Arnd Bergmann wrote:
-> On Thursday 28 April 2011, Catalin Marinas wrote:
-> > On Thu, 2011-04-28 at 01:15 +0100, Valdis.Kletnieks at vt.edu wrote:
-> > > On Wed, 27 Apr 2011 12:08:28 BST, Catalin Marinas said:
+On Wednesday 27 April 2011 12:43:16 Arnd Bergmann wrote:
+> On Wednesday 27 April 2011, Catalin Marinas wrote:
+> > On 21 April 2011 20:29, Arnd Bergmann <arnd@arndb.de> wrote:
+> > > I think the recent discussions on linaro-mm-sig and the BoF last week
+> > > at ELC have been quite productive, and at least my understanding
+> > > of the missing pieces has improved quite a bit. This is a list of
+> > > things that I think need to be done in the kernel. Please complain
+> > > if any of these still seem controversial:
 > > > 
-> > > > The current version of the ARM ARM says "unpredictable". But this
-> > > > general definition of "unpredictable" does not allow it to deadlock
-> > > > (hardware) or have security implications. It is however allowed to
-> > > > corrupt data.
+> > > 1. Fix the arm version of dma_alloc_coherent. It's in use today and
 > > > 
-> > > Not allowed to have security implications, but is allowed to corrupt data.
+> > >   is broken on modern CPUs because it results in both cached and
+> > >   uncached mappings. Rebecca suggested different approaches how to
+> > >   get there.
 > > 
-> > By security I was referring to TrustZone extensions. IOW, unpredictable
-> > in normal (non-secure) world should not cause data corruption in the
-> > secure world.
+> > It's not broken since we moved to using Normal non-cacheable memory
+> > for the coherent DMA buffers (as long as you flush the cacheable alias
+> > before using the buffer, as we already do). The ARM ARM currently says
+> > unpredictable for such situations but this is being clarified in
+> > future updates and the Normal non-cacheable vs cacheable aliases can
+> > be used (given correct cache maintenance before using the buffer).
 > 
-> That definition is rather useless for operating systems that don't use
-> Trustzone then, right?
-
-IIUC, the restriction on unpredictable behaviour is basically that the processor
-can't do anything which would result in or otherwise imply an escalation of
-privilege.
-
-TrustZone is one kind of privilege, but there are plenty of other operations
-implying privilege (entering privileged mode from user mode, masking or
-intercepting interrupts or exceptions, bypassing or reconfiguring MMU permissions
-etc.)  "Unpredictable" behaviours are not allowed to have any such consequences
-IIRC.  Without that restriction you wouldn't really have any OS security at all.
-
-In the kernel, we do have to be careful about avoiding unpredictable behaviours,
-since we're already running at maximum privilege (not including TZ) -- so the
-damage which unpredictable behaviours can wreak is much greater, by running
-invalid code, misconfiguring the MMU, allowing caches to get out of sync etc.
-But that's not fundamentally different from the general need to avoid kernel bugs
--- the scope of _any_ kernel code to do damage is greater than for userspace code,
-whether it involves architecturally unpredictable behaviour, or just plain
-ordinary bugs or security holes in the C code.
-
----Dave
-
+> Thanks for that information, I believe a number of people in the
+> previous discussions were relying on the information from the
+> documentation. Are you sure that this is not only correct for the
+> cores made by ARM ltd but also for the other implementations that
+> may have relied on documentation?
 > 
-> 	Arnd
+> As I mentioned before, there are other architectures, where having
+> conflicting cache settings in TLB entries for the same pysical page
+> immediately checkstops the CPU, and I guess that this was also allowed
+> by the current version of the ARM ARM.
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > > 2. Implement dma_alloc_noncoherent on ARM. Marek pointed out
+> > > 
+> > >   that this is needed, and it currently is not implemented, with
+> > >   an outdated comment explaining why it used to not be possible
+> > >   to do it.
+> > 
+> > As Russell pointed out, there are 4 main combinations with iommu and
+> > some coherency support (i.e. being able to snoop the CPU caches). But
+> > in an SoC you can have different devices with different iommu and
+> > coherency configurations. Some of them may even be able to see the L2
+> > cache but not the L1 (in which case it would help if we can get an
+> > inner non-cacheable outer cacheable mapping).
+> > 
+> > Anyway, we end up with different DMA ops per device via dev_archdata.
+> 
+> Having different DMA ops per device was the solution that I was suggesting
+> with dma_mapping_common.h, but Russell pointed out that it may not be
+> the best option.
+> 
+> The alternative would be to have just one set of dma_mapping functions
+> as we do today, but to extend the functions to also cover the iommu
+> case, for instance (example, don't take literally):
+> 
+> static inline dma_addr_t dma_map_single(struct device *dev, void *cpu_addr,
+>                 size_t size, enum dma_data_direction dir)
+> {
+> 	dma_addr_t ret;
+> 
+> #ifdef CONFIG_DMABOUNCE
+> 	if (dev->archdata.dmabounce)
+> 		return dmabounce_map_single(dev, cpu_addr, size, dir);
+> #endif
+> 
+> #ifdef CONFIG_IOMMU
+> 	if (dev->archdata.iommu)
+> 		ret = iommu_map_single(dev, cpu_addr, size, dir);
+> 	else
+> #endif
+
+I wish it was that simple.
+
+The OMAP4 ISS (Imaging Subsystem) has no IOMMU, but it can use the OMAP4 DMM 
+(Dynamic Memory Manager) which acts as a memory remapper. Basically (if my 
+understanding is correct), the ISS is configured to read/write from/to 
+physical addresses. If those physical addresses are in the DMM address range, 
+the DMM translates the accesses to physical accesses, acting as an IOMMU.
+
+The ISS can thus write to physically contiguous memory directly, or to 
+scattered physical pages through the DMM. Whether an IOMMU (or, to be correct 
+in this case, the IOMMU-like DMM) needs to handle the DMA is a per-buffer 
+decision, not a per-device decision.
+
+> 		dma_addr = virt_to_dma(dev, ptr);
+> 
+> 	dma_sync_single_for_device(dev, dma_addr, size, dir);
+> }
+> 
+> This would not even conflict with having a common implementation
+> for iommu based dma_map_ops -- we would just call the iommu functions
+> directly when needed rather than having an indirect function call.
+
+-- 
+Regards,
+
+Laurent Pinchart
