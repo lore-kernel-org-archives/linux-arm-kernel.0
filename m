@@ -1,34 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 May 2011 17:31:24 +0200
-Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
-In-Reply-To: <201105031705.39957.laurent.pinchart@ideasonboard.com>
-References: <201104212129.17013.arnd@arndb.de>
-	<201104271243.16868.arnd@arndb.de>
-	<201105031705.39957.laurent.pinchart@ideasonboard.com>
-Message-ID: <201105031731.24626.arnd@arndb.de>
+From: camhirundo@gmail.com (Hirundo Cam)
+Date: Tue, 3 May 2011 23:55:39 +0800
+Subject: [PATCH] kirkwood: add dir-665 support
+In-Reply-To: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
+References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
+Message-ID: <BANLkTimL8yKk3UfA1_2nuDaJFahEDGLFdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 May 2011, Laurent Pinchart wrote:
-> I wish it was that simple.
-> 
-> The OMAP4 ISS (Imaging Subsystem) has no IOMMU, but it can use the OMAP4 DMM 
-> (Dynamic Memory Manager) which acts as a memory remapper. Basically (if my 
-> understanding is correct), the ISS is configured to read/write from/to 
-> physical addresses. If those physical addresses are in the DMM address range, 
-> the DMM translates the accesses to physical accesses, acting as an IOMMU.
-> 
-> The ISS can thus write to physically contiguous memory directly, or to 
-> scattered physical pages through the DMM. Whether an IOMMU (or, to be correct 
-> in this case, the IOMMU-like DMM) needs to handle the DMA is a per-buffer 
-> decision, not a per-device decision.
+Hi  Robin, Nicolas, and Mike
 
-This doesn't sound too unusual for IOMMU implementations. A lot of time
-you can access e.g. low memory using a direct mapping but you need the
-IOMMU code for highmem. I've also seen a machine where a linear mapping
-exists for all the memory in strict ordering, while you can use relaxed
-DMA ordering when you go through the IOMMU address range. If we manage
-to come up with a common dma-mapping API implementation for all IOMMUs,
-it certainly needs to handle that case as well.
+2011/4/28 Hirundo Cam <camhirundo@gmail.com>:
+> This patch is a hack to dir-665 by referencing mv88f6281gtw_ge board.
+> LEDs, GPIO, Buttons remains unknown.
+>
+> To use this patch, u-boot must also be modified.
+>
+> Signed-off-by: Hirundo Cam <camhirundo@gmail.com>
+> ---
+> ?arch/arm/mach-kirkwood/Kconfig ? ? ? ? ? ?| ? ?6 ++
+> ?arch/arm/mach-kirkwood/Makefile ? ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-kirkwood/mv88f6281_dir665.c | ?107 +++++++++++++++++++++++++++++
+> ?arch/arm/tools/mach-types ? ? ? ? ? ? ? ? | ? ?1 +
+> ?4 files changed, 115 insertions(+), 0 deletions(-)
 
-	Arnd
+I'm new to arm-linux mailing list. Since I have done a hack to DIR-665
+which uses mv88f6281_A1 (kirkwood), then I'm willing to send a patch to kernel.
+
+I've found you have commit kirkwood related patches in to kernel.
+Would you help on review this patch?
+Thanks.
+
+regards,
+Hirundo Cam.
