@@ -1,61 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 03 May 2011 10:29:33 +0100
-Subject: [PATCHv2 4/4] ARM: tegra: irq: Add tegra_eoi
-In-Reply-To: <1304288854-11011-1-git-send-email-ccross@android.com>
-References: <1304284213-11950-5-git-send-email-ccross@android.com>
-	<1304288854-11011-1-git-send-email-ccross@android.com>
-Message-ID: <1304414973.27863.2.camel@e102144-lin.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 3 May 2011 10:36:59 +0100
+Subject: [PATCH v4 1/2] ARM: ELF: Define new core note type for VFP
+	registers
+In-Reply-To: <20110428184925.GM17290@n2100.arm.linux.org.uk>
+References: <1302688597-2969-1-git-send-email-dave.martin@linaro.org>
+	<1302688597-2969-2-git-send-email-dave.martin@linaro.org>
+	<20110428184925.GM17290@n2100.arm.linux.org.uk>
+Message-ID: <20110503093659.GA2503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
-
-On Sun, 2011-05-01 at 23:27 +0100, Colin Cross wrote:
-> Implement irq_eoi to allow the GIC irq chip flow controller to
-> be changed to fasteoi.
+On Thu, Apr 28, 2011 at 07:49:25PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 13, 2011 at 10:56:36AM +0100, Dave Martin wrote:
+> > The VFP registers are not currently included in coredumps,
+> > and there's no existing note type where they can sensibly be
+> > included, so this patch defines a dedicated note type for them.
 > 
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
-> v2: Add tegra_eoi without removing tegra_ack, patch can now be
->     merged safely before Will Deacon's gic fasteoi patch
-> 
->  arch/arm/mach-tegra/irq.c |    9 +++++++++
->  1 files changed, 9 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
-> index da17491..4956c3c 100644
-> --- a/arch/arm/mach-tegra/irq.c
-> +++ b/arch/arm/mach-tegra/irq.c
-> @@ -95,6 +95,14 @@ static void tegra_ack(struct irq_data *d)
->         tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
->  }
-> 
-> +static void tegra_eoi(struct irq_data *d)
-> +{
-> +       if (d->irq < FIRST_LEGACY_IRQ)
-> +               return;
-> +
-> +       tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
-> +}
-> +
->  static int tegra_retrigger(struct irq_data *d)
->  {
->         if (d->irq < FIRST_LEGACY_IRQ)
-> @@ -116,6 +124,7 @@ void __init tegra_init_irq(void)
->         }
-> 
->         gic_arch_extn.irq_ack = tegra_ack;
-> +       gic_arch_extn.irq_eoi = tegra_eoi;
->         gic_arch_extn.irq_mask = tegra_mask;
->         gic_arch_extn.irq_unmask = tegra_unmask;
->         gic_arch_extn.irq_retrigger = tegra_retrigger;
-> --
-> 1.7.4.1
+> This probably wants to be copied to LKML (added).
 
-Just the job!
+Good point-- thanks.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
+---Dave
 
-Thanks,
-
-Will
+> 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > Acked-by: Will Deacon <Will.Deacon@arm.com>
+> > ---
+> >  include/linux/elf.h |    1 +
+> >  1 files changed, 1 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/include/linux/elf.h b/include/linux/elf.h
+> > index 4d60801..110821c 100644
+> > --- a/include/linux/elf.h
+> > +++ b/include/linux/elf.h
+> > @@ -395,6 +395,7 @@ typedef struct elf64_shdr {
+> >  #define NT_S390_CTRS	0x304		/* s390 control registers */
+> >  #define NT_S390_PREFIX	0x305		/* s390 prefix register */
+> >  #define NT_S390_LAST_BREAK	0x306	/* s390 breaking event address */
+> > +#define NT_ARM_VFP	0x400		/* ARM VFP/NEON registers */
+> >  
+> >  
+> >  /* Note header in a PT_NOTE section */
+> > -- 
+> > 1.7.1
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
