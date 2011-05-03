@@ -1,28 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 03 May 2011 15:59:46 -0400 (EDT)
-Subject: Git pull request: switch Dove to ARMv7 mode only
-Message-ID: <alpine.LFD.2.00.1105031546350.24613@xanadu.home>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue,  3 May 2011 22:04:47 +0200
+Subject: [PATCH] sdio: optimized SDIO IRQ handling for single function
+Message-ID: <1304453087-7365-1-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, could you pull the following:
+From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
 
-	git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git
+If there is only 1 function registered, and IRQ:s are supported and
+currently enabled, call the callback handler directly
+without checking the CCCR registers.
 
-This contains the removal of ARMv6 mode support for Dove.  Because Dove 
-can do both ARMv6 and ARMv7, there is no point keeping special support
-in ARMv6 mode for it.  This also makes for a diffstat that is in line
-with the current theme on ARM.
+Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+---
+ drivers/mmc/core/sdio_irq.c |   14 ++++++++++++++
+ 1 files changed, 14 insertions(+), 0 deletions(-)
 
-Konstantin Porotchkin (2):
-      ARM: Moving Marvell Dove platform defaults to ARMv7
-      ARM: Sync Marvell Dove defconfig with latest kernel
-
-Nicolas Pitre (1):
-      ARM: PJ4: remove the ARMv6 compatible cache method entries
-
- arch/arm/Kconfig                |    2 +-
- arch/arm/boot/compressed/head.S |    6 -----
- arch/arm/configs/dove_defconfig |   12 +----------
- arch/arm/mm/proc-v6.S           |   34 ---------------------------------
- 4 files changed, 2 insertions(+), 52 deletions(-)
+diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
+index b300161..25291bf 100644
+--- a/drivers/mmc/core/sdio_irq.c
++++ b/drivers/mmc/core/sdio_irq.c
+@@ -32,6 +32,20 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
+ 	int i, ret, count;
+ 	unsigned char pending;
+ 
++	/*
++	 * If there is only 1 function registered
++	 * call irq directly without checking the CCCR registers.
++	 */
++	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
++	    card->host->sdio_irqs && (card->sdio_funcs == 1))
++		for (i = 0; i < SDIO_MAX_FUNCS; i++) {
++			struct sdio_func *func = card->sdio_func[i];
++			if (func && func->irq_handler) {
++				func->irq_handler(func);
++				return 1;
++			}
++		}
++
+ 	ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
+ 	if (ret) {
+ 		printk(KERN_DEBUG "%s: error %d reading SDIO_CCCR_INTx\n",
+-- 
+1.7.4.1
