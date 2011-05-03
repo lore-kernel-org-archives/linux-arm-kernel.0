@@ -1,55 +1,35 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Tue, 03 May 2011 17:18:49 +0100
-Subject: [RFC PATCH 03/12] ARM: omap4: use remapped PPI interrupts for
-	local timer
-In-Reply-To: <4DBA67A5.4060803@ti.com>
-References: <1303326501-15664-1-git-send-email-marc.zyngier@arm.com>
-	<1303326501-15664-4-git-send-email-marc.zyngier@arm.com>
-	<4DBA67A5.4060803@ti.com>
-Message-ID: <1304439529.27148.188.camel@e102391-lin.cambridge.arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 03 May 2011 09:22:03 -0700
+Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
+In-Reply-To: <BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com> (Linus
+	Walleij's message of "Wed, 27 Apr 2011 15:18:55 +0200")
+References: <1303139217-10285-1-git-send-email-charu@ti.com>
+	<20110419062633.GA15620@atomide.com> <87r58w4gq3.fsf@ti.com>
+	<20110421054221.GF5918@atomide.com>
+	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
+	<20110426072941.GA3755@atomide.com>
+	<BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com>
+Message-ID: <87y62ng3f8.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-04-29 at 12:54 +0530, Santosh Shilimkar wrote:
+Linus Walleij <linus.walleij@linaro.org> writes:
 
-Hi Santosh,
+> 2011/4/26 Tony Lindgren <tony@atomide.com>:
+>> * Linus Walleij <linus.walleij@linaro.org> [110423 01:32]:
+>>> Since you'll probably be dependent on stuff happening in my patches
+>>> to move stuff into drivers/gpio I'll be happy to carry the patches in my
+>>> gpio-consolidation branch with Tony's ACKs if need be.
+>>
+>> Sounds good to me.
+>
+> I've just posted a patch series that moves "our" two GPIO drivers to
+> drivers/gpio, they should serve as good inspiration... Tell me if I can
+> help out, stack patches on top of this series and I'll carry them.
 
-> On 4/21/2011 12:38 AM, Marc Zyngier wrote:
-> > Use the normal interrupt scheme for the local timers by using
-> > a remapped PPI interrupt.
-> >
-> > Tested on a Pandaboard.
-> >
-> > Cc: Tony Lindgren<tony@atomide.com>
-> > Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
-> > Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
-> > ---
-> 
-> Have reviewed and tested your series along with
-> OMAP changes. It boots fine on OMAP4430 SDP.
-> 
-> # cat /proc/interrupts
->             CPU0       CPU1
-> .
-> 410:       3678          0   GIC-PPI  local_timer
-> 413:          0       1042   GIC-PPI  local_timer
-> .
-> LOC:          0          0  Local timer interrupts
-> .
-> 
-> Though above output would be bit miss leading, this
-> series removes the duplicate code from platforms and
-> consolidate it at one place.
+Great, thanks.
 
-The LOC line is gone in the next iteration of the patch serie.
+Are you OK with a move of the current OMAP GPIO drivers (rather ugly)
+into drivers/gpio first, followed by the cleanup/restructure patches?
 
-> FWIW, you can add my
-> 
-> Reviewedd-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-
-Thanks for testing.
-
-	M.
--- 
-Reality is an implementation detail.
+Kevin
