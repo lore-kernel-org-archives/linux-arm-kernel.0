@@ -1,64 +1,64 @@
-From: philipp.zabel@gmail.com (Philipp Zabel)
-Date: Tue, 03 May 2011 12:15:56 +0200
-Subject: [PATCH] pxa/hx4700: Add ASIC3 LED support
-In-Reply-To: <E1QGESE-0007gF-VJ@outmx08.plus.net>
-References: <E1QGESE-0007gF-VJ@outmx08.plus.net>
-Message-ID: <1304417758.13769.1.camel@flow>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 3 May 2011 11:25:36 +0100
+Subject: [PATCH] ARM: Include Makefile.boot only when it exists
+In-Reply-To: <BANLkTikd_u0+yyFYG_0FR--430z=LQ61Ww@mail.gmail.com>
+References: <1303103976-4922-1-git-send-email-eric.y.miao@gmail.com>
+	<20110420083258.GB1517@S2100-06.ap.freescale.net>
+	<BANLkTiknesdF7cMZ=RGJAh75aW_wRpyj-w@mail.gmail.com>
+	<20110428152735.GU17290@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104281925500.24613@xanadu.home>
+	<20110429075346.GU17290@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104290814380.24613@xanadu.home>
+	<20110429133340.GN5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104291514390.24613@xanadu.home>
+	<BANLkTikd_u0+yyFYG_0FR--430z=LQ61Ww@mail.gmail.com>
+Message-ID: <20110503102536.GC27833@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, den 30.04.2011, 17:59 +0000 schrieb Paul Parsons:
-> Add LED support for the HTC ASIC3. Underlying support is provided by the mfd/asic3 and leds/leds-asic3 drivers. An example configuration is provided by the pxa/hx4700 platform.
-> 
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> ---
-> diff -uprN clean-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c linux-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c
-> --- clean-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c	2011-04-28 11:18:09.310551240 +0100
-> +++ linux-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c	2011-04-30 15:52:19.956069045 +0100
-> @@ -23,6 +23,7 @@
->  #include <linux/gpio_keys.h>
->  #include <linux/input.h>
->  #include <linux/lcd.h>
-> +#include <linux/leds.h>
+On Sat, Apr 30, 2011 at 01:44:15AM -0700, Brian Swetland wrote:
+> On Fri, Apr 29, 2011 at 12:43 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
+> > On Fri, 29 Apr 2011, Russell King - ARM Linux wrote:
 
-This is not needed anymore.
+> >> It doesn't _matter_ how it is represented, it will continue to be patched
+> >> whether it's structures in a .c file (as it currently is) or whether it's
+> >> a device tree description for each clock.
 
->  #include <linux/mfd/htc-egpio.h>
->  #include <linux/mfd/asic3.h>
->  #include <linux/mtd/physmap.h>
-> @@ -280,6 +281,21 @@ static u16 asic3_gpio_config[] = {
->  	ASIC3_GPIOD15_nPIOW,
->  };
->  
-> +static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
-> +	[0] = {
-> +		.name = "hx4700:amber",
-> +		.default_trigger = "ds2760-battery.0-charging-blink-full-solid",
-> +	},
-> +	[1] = {
-> +		.name = "hx4700:green",
-> +		.default_trigger = "unused",
-> +	},
-> +	[2] = {
-> +		.name = "hx4700:blue",
-> +		.default_trigger = "hx4700-radio",
-> +	},
-> +};
-> +
->  static struct resource asic3_resources[] = {
->  	/* GPIO part */
->  	[0] = {
-> @@ -310,6 +326,7 @@ static struct asic3_platform_data asic3_
->  	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
->  	.irq_base        = IRQ_BOARD_START,
->  	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
-> +	.leds            = asic3_leds,
->  };
->  
->  static struct platform_device asic3 = {
+> > If that is the case, the associated drivers have to change as well to be
+> > in sync with the new flags, etc. ??And to me it is way better to have
+> > both the data and the drivers maintained in a single place compared to
+> > the unavoidable bugs that will crop up due to version skews.
 
-After removal of the superfluous include,
-Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
+> This is a one reason why I'm skeptical of the "device tree" approach
+> and somewhat concerned about a potential future where board files
+> would vanish, to be replaced by device trees which may well come from
+> some place disconnected from the kernel that will depend on them being
+> correct to work.
 
-regards
-Philipp
+I agree for that particular argument for device tree - I've had to push
+back on some of the audio drivers that use device tree currently, the
+maintainers were trying to push changes which would result in an
+immediate ABI break in the device tree files.  That sort of stuff is
+completely insane 
+
+This sort of stuff is the major reason for supporting multiple DT blobs
+- it allows the descriptions of the chip internals outside of the per
+board device tree so we could ship that bit in the kernel (I know Russel
+is pushing back against that right now but...).
+
+> The other reason is that I've rarely seen a board spin that didn't
+> involve some quirky change that would be hard to represent in a static
+> configuration format.  Oh, you need to power up this level shifter
+> before you can talk to the back half of that i2c bus, by way of this
+> gpio over here?  Eventually you end up with something like a byte-code
+> or forth runtime to handle these cases and then things really get fun
+> from the "where's the code that does what?!" standpoint.
+
+This sort of thing is more a problem in the smartphone space - they're
+generally pushing pretty much any limit you can think of here.  For 
+lower complexity/density designs it tends to be more plausible to just
+describe the system this way.
+
+My expectation is that device tree will help quite a lot with designs
+that don't push the limits quite so hard, which there are quite a lot of
+out there.
