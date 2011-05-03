@@ -1,399 +1,410 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue,  3 May 2011 12:03:27 +1200
-Subject: [PATCH V4 13/23] at91: Make PWM device common
+Date: Tue,  3 May 2011 12:03:29 +1200
+Subject: [PATCH V4 15/23] at91: Make AC97 device common
 In-Reply-To: <1304381017-17912-1-git-send-email-ryan@bluewatersys.com>
 References: <1304381017-17912-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1304381017-17912-14-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1304381017-17912-16-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the individual PWM code for each at91 variant with a single
+Replace the individual AC97 code for each at91 variant with a single
 implementation in devices.c
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at91cap9_devices.c    |   56 +++++-------------------------
- arch/arm/mach-at91/at91sam9263_devices.c |   55 +++++------------------------
- arch/arm/mach-at91/at91sam9g45_devices.c |   55 +++++------------------------
- arch/arm/mach-at91/at91sam9rl_devices.c  |   55 +++++------------------------
- arch/arm/mach-at91/devices.c             |   36 +++++++++++++++++++
+ arch/arm/mach-at91/at91cap9_devices.c    |   57 +++++-------------------------
+ arch/arm/mach-at91/at91sam9263_devices.c |   56 +++++------------------------
+ arch/arm/mach-at91/at91sam9g45_devices.c |   57 +++++-------------------------
+ arch/arm/mach-at91/at91sam9rl_devices.c  |   57 +++++-------------------------
+ arch/arm/mach-at91/devices.c             |   41 +++++++++++++++++++++
  arch/arm/mach-at91/devices.h             |    7 ++++
- 6 files changed, 79 insertions(+), 185 deletions(-)
+ 6 files changed, 84 insertions(+), 191 deletions(-)
 
 diff --git a/arch/arm/mach-at91/at91cap9_devices.c b/arch/arm/mach-at91/at91cap9_devices.c
-index 754a562..30889ec 100644
+index 0a2272b..b2392f0 100644
 --- a/arch/arm/mach-at91/at91cap9_devices.c
 +++ b/arch/arm/mach-at91/at91cap9_devices.c
-@@ -302,56 +302,17 @@ static struct at91_dev_table_rtt device_rtt __initdata = {
-  *  PWM
-  * --------------------------------------------------------------------*/
+@@ -317,57 +317,17 @@ static struct at91_dev_table_pwm device_pwm __initdata = {
+  *  AC97
+  * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_ATMEL_PWM)
--static u32 pwm_mask;
+-#if defined(CONFIG_SND_ATMEL_AC97C) || defined(CONFIG_SND_ATMEL_AC97C_MODULE)
+-static u64 ac97_dmamask = DMA_BIT_MASK(32);
+-static struct ac97c_platform_data ac97_data;
 -
--static struct resource pwm_resources[] = {
+-static struct resource ac97_resources[] = {
 -	[0] = {
--		.start	= AT91CAP9_BASE_PWMC,
--		.end	= AT91CAP9_BASE_PWMC + SZ_16K - 1,
+-		.start	= AT91CAP9_BASE_AC97C,
+-		.end	= AT91CAP9_BASE_AC97C + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91CAP9_ID_PWMC,
--		.end	= AT91CAP9_ID_PWMC,
+-		.start	= AT91CAP9_ID_AC97C,
+-		.end	= AT91CAP9_ID_AC97C,
 -		.flags	= IORESOURCE_IRQ,
-+static struct at91_dev_table_pwm device_pwm __initdata = {
-+	.mmio_base	= AT91CAP9_BASE_PWMC,
-+	.irq		= AT91CAP9_ID_PWMC,
-+	.pwm_pins	= {
-+		{AT91_PIN_PB19, AT91_PIN_PERIPH_A, 1, 0, 0},
-+		{AT91_PIN_PB8,  AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PC29, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PA11, AT91_PIN_PERIPH_B, 1, 0, 0},
- 	},
- };
- 
--static struct platform_device at91cap9_pwm0_device = {
--	.name	= "atmel_pwm",
--	.id	= -1,
--	.dev	= {
--		.platform_data		= &pwm_mask,
 -	},
--	.resource	= pwm_resources,
--	.num_resources	= ARRAY_SIZE(pwm_resources),
 -};
 -
--void __init at91_add_device_pwm(u32 mask)
+-static struct platform_device at91cap9_ac97_device = {
+-	.name		= "atmel_ac97c",
+-	.id		= 1,
+-	.dev		= {
+-				.dma_mask		= &ac97_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &ac97_data,
++static struct at91_dev_table_ac97 device_ac97 __initdata = {
++	.mmio_base	= AT91CAP9_BASE_AC97C,
++	.irq		= AT91CAP9_ID_AC97C,
++	.pins		= {
++		{AT91_PIN_PA6, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97FS */
++		{AT91_PIN_PA7, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97CK */
++		{AT91_PIN_PA8, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97TX */
++		{AT91_PIN_PA9, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97RX */
+ 	},
+-	.resource	= ac97_resources,
+-	.num_resources	= ARRAY_SIZE(ac97_resources),
+ };
+ 
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data)
 -{
--	if (mask & (1 << AT91_PWM0))
--		at91_set_A_periph(AT91_PIN_PB19, 1);	/* enable PWM0 */
+-	if (!data)
+-		return;
 -
--	if (mask & (1 << AT91_PWM1))
--		at91_set_B_periph(AT91_PIN_PB8, 1);	/* enable PWM1 */
+-	at91_set_A_periph(AT91_PIN_PA6, 0);	/* AC97FS */
+-	at91_set_A_periph(AT91_PIN_PA7, 0);	/* AC97CK */
+-	at91_set_A_periph(AT91_PIN_PA8, 0);	/* AC97TX */
+-	at91_set_A_periph(AT91_PIN_PA9, 0);	/* AC97RX */
 -
--	if (mask & (1 << AT91_PWM2))
--		at91_set_B_periph(AT91_PIN_PC29, 1);	/* enable PWM2 */
+-	/* reset */
+-	if (data->reset_pin)
+-		at91_set_gpio_output(data->reset_pin, 0);
 -
--	if (mask & (1 << AT91_PWM3))
--		at91_set_B_periph(AT91_PIN_PA11, 1);	/* enable PWM3 */
--
--	pwm_mask = mask;
--
--	platform_device_register(&at91cap9_pwm0_device);
+-	ac97_data = *data;
+-	platform_device_register(&at91cap9_ac97_device);
 -}
 -#else
--void __init at91_add_device_pwm(u32 mask) {}
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
 -#endif
 -
 -
--
  /* --------------------------------------------------------------------
-  *  AC97
+  *  LCD Controller
   * -------------------------------------------------------------------- */
-@@ -679,6 +640,7 @@ static struct at91_device_table at91cap9_device_table __initdata = {
- 	.uart[0]	= &device_uart0,
- 	.uart[1]	= &device_uart1,
- 	.uart[2]	= &device_uart2,
-+	.pwm		= &device_pwm,
+@@ -547,6 +507,7 @@ static struct at91_device_table at91cap9_device_table __initdata = {
+ 	.pwm		= &device_pwm,
+ 	.ssc[0]		= &device_ssc0,
+ 	.ssc[1]		= &device_ssc1,
++	.ac97		= &device_ac97,
  };
  
  void __init at91cap9_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index 1bc3da2..ff490bc 100644
+index cfac78b..1375776 100644
 --- a/arch/arm/mach-at91/at91sam9263_devices.c
 +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -536,55 +536,17 @@ static struct at91_dev_table_rtt device_rtt1 __initdata = {
-  *  PWM
-  * --------------------------------------------------------------------*/
+@@ -299,56 +299,17 @@ static struct at91_dev_table_spi device_spi1 __initdata = {
+  *  AC97
+  * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_ATMEL_PWM)
--static u32 pwm_mask;
+-#if defined(CONFIG_SND_ATMEL_AC97C) || defined(CONFIG_SND_ATMEL_AC97C_MODULE)
+-static u64 ac97_dmamask = DMA_BIT_MASK(32);
+-static struct ac97c_platform_data ac97_data;
 -
--static struct resource pwm_resources[] = {
+-static struct resource ac97_resources[] = {
 -	[0] = {
--		.start	= AT91SAM9263_BASE_PWMC,
--		.end	= AT91SAM9263_BASE_PWMC + SZ_16K - 1,
+-		.start	= AT91SAM9263_BASE_AC97C,
+-		.end	= AT91SAM9263_BASE_AC97C + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91SAM9263_ID_PWMC,
--		.end	= AT91SAM9263_ID_PWMC,
+-		.start	= AT91SAM9263_ID_AC97C,
+-		.end	= AT91SAM9263_ID_AC97C,
 -		.flags	= IORESOURCE_IRQ,
-+static struct at91_dev_table_pwm device_pwm __initdata = {
-+	.mmio_base	= AT91SAM9263_BASE_PWMC,
-+	.irq		= AT91SAM9263_ID_PWMC,
-+	.pwm_pins	= {
-+		{AT91_PIN_PB7,  AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PB8,  AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PC29, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PB29, AT91_PIN_PERIPH_B, 1, 0, 0},
- 	},
- };
- 
--static struct platform_device at91sam9263_pwm0_device = {
--	.name	= "atmel_pwm",
--	.id	= -1,
--	.dev	= {
--		.platform_data		= &pwm_mask,
 -	},
--	.resource	= pwm_resources,
--	.num_resources	= ARRAY_SIZE(pwm_resources),
 -};
 -
--void __init at91_add_device_pwm(u32 mask)
+-static struct platform_device at91sam9263_ac97_device = {
+-	.name		= "atmel_ac97c",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &ac97_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &ac97_data,
++static struct at91_dev_table_ac97 device_ac97 __initdata = {
++	.mmio_base	= AT91SAM9263_BASE_AC97C,
++	.irq		= AT91SAM9263_ID_AC97C,
++	.pins		= {
++		{AT91_PIN_PB0, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97FS */
++		{AT91_PIN_PB1, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97CK */
++		{AT91_PIN_PB2, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97TX */
++		{AT91_PIN_PB3, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97RX */
+ 	},
+-	.resource	= ac97_resources,
+-	.num_resources	= ARRAY_SIZE(ac97_resources),
+ };
+ 
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data)
 -{
--	if (mask & (1 << AT91_PWM0))
--		at91_set_B_periph(AT91_PIN_PB7, 1);	/* enable PWM0 */
+-	if (!data)
+-		return;
 -
--	if (mask & (1 << AT91_PWM1))
--		at91_set_B_periph(AT91_PIN_PB8, 1);	/* enable PWM1 */
+-	at91_set_A_periph(AT91_PIN_PB0, 0);	/* AC97FS */
+-	at91_set_A_periph(AT91_PIN_PB1, 0);	/* AC97CK */
+-	at91_set_A_periph(AT91_PIN_PB2, 0);	/* AC97TX */
+-	at91_set_A_periph(AT91_PIN_PB3, 0);	/* AC97RX */
 -
--	if (mask & (1 << AT91_PWM2))
--		at91_set_B_periph(AT91_PIN_PC29, 1);	/* enable PWM2 */
+-	/* reset */
+-	if (data->reset_pin)
+-		at91_set_gpio_output(data->reset_pin, 0);
 -
--	if (mask & (1 << AT91_PWM3))
--		at91_set_B_periph(AT91_PIN_PB29, 1);	/* enable PWM3 */
--
--	pwm_mask = mask;
--
--	platform_device_register(&at91sam9263_pwm0_device);
+-	ac97_data = *data;
+-	platform_device_register(&at91sam9263_ac97_device);
 -}
 -#else
--void __init at91_add_device_pwm(u32 mask) {}
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
 -#endif
 -
--
  /* --------------------------------------------------------------------
-  *  SSC -- Synchronous Serial Controller
+  *  CAN Controller
   * -------------------------------------------------------------------- */
-@@ -787,6 +749,7 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
- 	.uart[0]	= &device_uart0,
- 	.uart[1]	= &device_uart1,
- 	.uart[2]	= &device_uart2,
-+	.pwm		= &device_pwm,
+@@ -656,6 +617,7 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
+ 	.pwm		= &device_pwm,
+ 	.ssc[0]		= &device_ssc0,
+ 	.ssc[1]		= &device_ssc1,
++	.ac97		= &device_ac97,
  };
  
  void __init at91sam9263_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9g45_devices.c b/arch/arm/mach-at91/at91sam9g45_devices.c
-index be9435b..17eb984 100644
+index 8ad9c12..431bc98 100644
 --- a/arch/arm/mach-at91/at91sam9g45_devices.c
 +++ b/arch/arm/mach-at91/at91sam9g45_devices.c
-@@ -569,55 +569,17 @@ static struct at91_dev_table_rtt device_rtt __initdata = {
-  *  PWM
-  * --------------------------------------------------------------------*/
+@@ -331,57 +331,17 @@ static struct at91_dev_table_spi device_spi1 __initdata = {
+  *  AC97
+  * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_ATMEL_PWM) || defined(CONFIG_ATMEL_PWM_MODULE)
--static u32 pwm_mask;
+-#if defined(CONFIG_SND_ATMEL_AC97C) || defined(CONFIG_SND_ATMEL_AC97C_MODULE)
+-static u64 ac97_dmamask = DMA_BIT_MASK(32);
+-static struct ac97c_platform_data ac97_data;
 -
--static struct resource pwm_resources[] = {
+-static struct resource ac97_resources[] = {
 -	[0] = {
--		.start	= AT91SAM9G45_BASE_PWMC,
--		.end	= AT91SAM9G45_BASE_PWMC + SZ_16K - 1,
+-		.start	= AT91SAM9G45_BASE_AC97C,
+-		.end	= AT91SAM9G45_BASE_AC97C + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91SAM9G45_ID_PWMC,
--		.end	= AT91SAM9G45_ID_PWMC,
+-		.start	= AT91SAM9G45_ID_AC97C,
+-		.end	= AT91SAM9G45_ID_AC97C,
 -		.flags	= IORESOURCE_IRQ,
-+static struct at91_dev_table_pwm device_pwm __initdata = {
-+	.mmio_base	= AT91SAM9G45_BASE_PWMC,
-+	.irq		= AT91SAM9G45_ID_PWMC,
-+	.pwm_pins	= {
-+		{AT91_PIN_PD24, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PD31, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PD26, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PD0,  AT91_PIN_PERIPH_B, 1, 0, 0},
- 	},
- };
- 
--static struct platform_device at91sam9g45_pwm0_device = {
--	.name	= "atmel_pwm",
--	.id	= -1,
--	.dev	= {
--		.platform_data		= &pwm_mask,
 -	},
--	.resource	= pwm_resources,
--	.num_resources	= ARRAY_SIZE(pwm_resources),
 -};
 -
--void __init at91_add_device_pwm(u32 mask)
+-static struct platform_device at91sam9g45_ac97_device = {
+-	.name		= "atmel_ac97c",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &ac97_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &ac97_data,
++static struct at91_dev_table_ac97 device_ac97 __initdata = {
++	.mmio_base	= AT91SAM9G45_BASE_AC97C,
++	.irq		= AT91SAM9G45_ID_AC97C,
++	.pins		= {
++		{AT91_PIN_PD8, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97FS */
++		{AT91_PIN_PD9, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97CK */
++		{AT91_PIN_PD7, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97TX */
++		{AT91_PIN_PD6, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97RX */
+ 	},
+-	.resource	= ac97_resources,
+-	.num_resources	= ARRAY_SIZE(ac97_resources),
+ };
+ 
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data)
 -{
--	if (mask & (1 << AT91_PWM0))
--		at91_set_B_periph(AT91_PIN_PD24, 1);	/* enable PWM0 */
+-	if (!data)
+-		return;
 -
--	if (mask & (1 << AT91_PWM1))
--		at91_set_B_periph(AT91_PIN_PD31, 1);	/* enable PWM1 */
+-	at91_set_A_periph(AT91_PIN_PD8, 0);	/* AC97FS */
+-	at91_set_A_periph(AT91_PIN_PD9, 0);	/* AC97CK */
+-	at91_set_A_periph(AT91_PIN_PD7, 0);	/* AC97TX */
+-	at91_set_A_periph(AT91_PIN_PD6, 0);	/* AC97RX */
 -
--	if (mask & (1 << AT91_PWM2))
--		at91_set_B_periph(AT91_PIN_PD26, 1);	/* enable PWM2 */
+-	/* reset */
+-	if (data->reset_pin)
+-		at91_set_gpio_output(data->reset_pin, 0);
 -
--	if (mask & (1 << AT91_PWM3))
--		at91_set_B_periph(AT91_PIN_PD0, 1);	/* enable PWM3 */
--
--	pwm_mask = mask;
--
--	platform_device_register(&at91sam9g45_pwm0_device);
+-	ac97_data = *data;
+-	platform_device_register(&at91sam9g45_ac97_device);
 -}
 -#else
--void __init at91_add_device_pwm(u32 mask) {}
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  SSC -- Synchronous Serial Controller
+  *  LCD Controller
   * -------------------------------------------------------------------- */
-@@ -836,6 +798,7 @@ static struct at91_device_table at91sam9g45_device_table __initdata = {
- 	.uart[1]	= &device_uart1,
- 	.uart[2]	= &device_uart2,
- 	.uart[3]	= &device_uart3,
-+	.pwm		= &device_pwm,
+@@ -705,6 +665,7 @@ static struct at91_device_table at91sam9g45_device_table __initdata = {
+ 	.pwm		= &device_pwm,
+ 	.ssc[0]		= &device_ssc0,
+ 	.ssc[1]		= &device_ssc1,
++	.ac97		= &device_ac97,
  };
  
  void __init at91sam9g45_init_devices(void)
 diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index 8f43d23..76aa9b6 100644
+index 20f516d..63d7fcd 100644
 --- a/arch/arm/mach-at91/at91sam9rl_devices.c
 +++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -447,55 +447,17 @@ static struct at91_dev_table_rtt device_rtt __initdata = {
-  *  PWM
-  * --------------------------------------------------------------------*/
+@@ -227,57 +227,17 @@ static struct at91_dev_table_spi device_spi __initdata = {
+  *  AC97
+  * -------------------------------------------------------------------- */
  
--#if defined(CONFIG_ATMEL_PWM)
--static u32 pwm_mask;
+-#if defined(CONFIG_SND_ATMEL_AC97C) || defined(CONFIG_SND_ATMEL_AC97C_MODULE)
+-static u64 ac97_dmamask = DMA_BIT_MASK(32);
+-static struct ac97c_platform_data ac97_data;
 -
--static struct resource pwm_resources[] = {
+-static struct resource ac97_resources[] = {
 -	[0] = {
--		.start	= AT91SAM9RL_BASE_PWMC,
--		.end	= AT91SAM9RL_BASE_PWMC + SZ_16K - 1,
+-		.start	= AT91SAM9RL_BASE_AC97C,
+-		.end	= AT91SAM9RL_BASE_AC97C + SZ_16K - 1,
 -		.flags	= IORESOURCE_MEM,
 -	},
 -	[1] = {
--		.start	= AT91SAM9RL_ID_PWMC,
--		.end	= AT91SAM9RL_ID_PWMC,
+-		.start	= AT91SAM9RL_ID_AC97C,
+-		.end	= AT91SAM9RL_ID_AC97C,
 -		.flags	= IORESOURCE_IRQ,
-+static struct at91_dev_table_pwm device_pwm __initdata = {
-+	.mmio_base	= AT91SAM9RL_BASE_PWMC,
-+	.irq		= AT91SAM9RL_ID_PWMC,
-+	.pwm_pins	= {
-+		{AT91_PIN_PB8, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PB9, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PD5, AT91_PIN_PERIPH_B, 1, 0, 0},
-+		{AT91_PIN_PD8, AT91_PIN_PERIPH_B, 1, 0, 0},
- 	},
- };
- 
--static struct platform_device at91sam9rl_pwm0_device = {
--	.name	= "atmel_pwm",
--	.id	= -1,
--	.dev	= {
--		.platform_data		= &pwm_mask,
 -	},
--	.resource	= pwm_resources,
--	.num_resources	= ARRAY_SIZE(pwm_resources),
 -};
 -
--void __init at91_add_device_pwm(u32 mask)
+-static struct platform_device at91sam9rl_ac97_device = {
+-	.name		= "atmel_ac97c",
+-	.id		= 0,
+-	.dev		= {
+-				.dma_mask		= &ac97_dmamask,
+-				.coherent_dma_mask	= DMA_BIT_MASK(32),
+-				.platform_data		= &ac97_data,
++static struct at91_dev_table_ac97 device_ac97 __initdata = {
++	.mmio_base	= AT91SAM9RL_BASE_AC97C,
++	.irq		= AT91SAM9RL_ID_AC97C,
++	.pins		= {
++		{AT91_PIN_PD1, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97FS */
++		{AT91_PIN_PD2, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97CK */
++		{AT91_PIN_PD3, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97TX */
++		{AT91_PIN_PD4, AT91_PIN_PERIPH_A, 0, 0, 0},	/* AC97RX */
+ 	},
+-	.resource	= ac97_resources,
+-	.num_resources	= ARRAY_SIZE(ac97_resources),
+ };
+ 
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data)
 -{
--	if (mask & (1 << AT91_PWM0))
--		at91_set_B_periph(AT91_PIN_PB8, 1);	/* enable PWM0 */
+-	if (!data)
+-		return;
 -
--	if (mask & (1 << AT91_PWM1))
--		at91_set_B_periph(AT91_PIN_PB9, 1);	/* enable PWM1 */
+-	at91_set_A_periph(AT91_PIN_PD1, 0);	/* AC97FS */
+-	at91_set_A_periph(AT91_PIN_PD2, 0);	/* AC97CK */
+-	at91_set_A_periph(AT91_PIN_PD3, 0);	/* AC97TX */
+-	at91_set_A_periph(AT91_PIN_PD4, 0);	/* AC97RX */
 -
--	if (mask & (1 << AT91_PWM2))
--		at91_set_B_periph(AT91_PIN_PD5, 1);	/* enable PWM2 */
+-	/* reset */
+-	if (data->reset_pin)
+-		at91_set_gpio_output(data->reset_pin, 0);
 -
--	if (mask & (1 << AT91_PWM3))
--		at91_set_B_periph(AT91_PIN_PD8, 1);	/* enable PWM3 */
--
--	pwm_mask = mask;
--
--	platform_device_register(&at91sam9rl_pwm0_device);
+-	ac97_data = *data;
+-	platform_device_register(&at91sam9rl_ac97_device);
 -}
 -#else
--void __init at91_add_device_pwm(u32 mask) {}
+-void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
 -#endif
 -
 -
  /* --------------------------------------------------------------------
-  *  SSC -- Synchronous Serial Controller
+  *  LCD Controller
   * -------------------------------------------------------------------- */
-@@ -711,6 +673,7 @@ static struct at91_device_table at91sam9rl_device_table __initdata = {
- 	.uart[1]	= &device_uart1,
- 	.uart[2]	= &device_uart2,
- 	.uart[3]	= &device_uart3,
-+	.pwm		= &device_pwm,
+@@ -580,6 +540,7 @@ static struct at91_device_table at91sam9rl_device_table __initdata = {
+ 	.pwm		= &device_pwm,
+ 	.ssc[0]		= &device_ssc0,
+ 	.ssc[1]		= &device_ssc1,
++	.ac97		= &device_ac97,
  };
  
  void __init at91sam9rl_init_devices(void)
 diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index f2cc755..f79a98a 100644
+index 3671e9e..e0ab172 100644
 --- a/arch/arm/mach-at91/devices.c
 +++ b/arch/arm/mach-at91/devices.c
-@@ -939,6 +939,42 @@ void __init at91_set_serial_console(unsigned portnr) {}
- void __init at91_add_device_serial(void) {}
+@@ -1065,6 +1065,47 @@ void __init at91_add_device_ssc(unsigned id, unsigned pins)
+ void __init at91_add_device_ssc(unsigned id, unsigned pins) {}
  #endif
  
 +/* --------------------------------------------------------------------
-+ *  PWM
-+ * --------------------------------------------------------------------*/
++ *  AC97
++ * -------------------------------------------------------------------- */
 +
-+#if defined(CONFIG_ATMEL_PWM)
-+static struct platform_device at91_pwm_device = {
-+	.name	= "atmel_pwm",
-+	.id	= -1,
++#if defined(CONFIG_SND_ATMEL_AC97C) || defined(CONFIG_SND_ATMEL_AC97C_MODULE)
++static u64 ac97_dmamask = DMA_BIT_MASK(32);
++
++static struct platform_device at91_ac97_device = {
++	.name	= "atmel_ac97c",
++	.id	= 0,
++	.dev	= {
++		.dma_mask		= &ac97_dmamask,
++		.coherent_dma_mask	= DMA_BIT_MASK(32),
++	},
 +};
 +
-+void __init at91_add_device_pwm(u32 mask)
++void __init at91_add_device_ac97(struct ac97c_platform_data *data)
 +{
-+	struct at91_dev_table_pwm *info = devices->pwm;
++	struct at91_dev_table_ac97 *info = devices->ac97;
 +	struct resource resources[2] = {{0}};
 +
 +	BUG_ON(!info);
 +	init_resource_mem(&resources[0], info->mmio_base, SZ_16K);
-+	init_resource_irq(&resources[1], info->irq);
++	init_resource_irq(&resources[0], info->irq);
 +
-+	if (mask & (1 << AT91_PWM0))
-+		at91_config_pins(&info->pwm_pins[0], 1); /* enable PWM0 */
-+	if (mask & (1 << AT91_PWM1))
-+		at91_config_pins(&info->pwm_pins[1], 1); /* enable PWM1 */
-+	if (mask & (1 << AT91_PWM2))
-+		at91_config_pins(&info->pwm_pins[2], 1); /* enable PWM2 */
-+	if (mask & (1 << AT91_PWM3))
-+		at91_config_pins(&info->pwm_pins[3], 1); /* enable PWM3 */
-+	
-+	at91_add_platform_device(&at91_pwm_device, resources,
-+				 ARRAY_SIZE(resources), (void *)mask,
-+				 sizeof(mask));
++	if (!data)
++		return;
++
++	at91_config_pins(info->pins, ARRAY_SIZE(info->pins));
++
++	/* reset */
++	if (data->reset_pin)
++		at91_set_gpio_output(data->reset_pin, 0);
++
++	at91_add_platform_device(&at91_ac97_device, resources,
++				 ARRAY_SIZE(resources), data, sizeof(*data));
 +}
 +#else
-+void __init at91_add_device_pwm(u32 mask) {}
++void __init at91_add_device_ac97(struct ac97c_platform_data *data) {}
 +#endif
 +
  static int __init at91_add_standard_devices(void)
  {
  	at91_add_device_tc();
 diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index c535f58..52563be 100644
+index 177fc3d..3d6ca83 100644
 --- a/arch/arm/mach-at91/devices.h
 +++ b/arch/arm/mach-at91/devices.h
-@@ -122,6 +122,12 @@ struct at91_dev_table_uart {
- 	struct at91_pin_config	dsr_pin;
+@@ -141,6 +141,12 @@ struct at91_dev_table_ssc {
+ 	struct at91_pin_config	rk_pin;
  };
  
-+struct at91_dev_table_pwm {
++struct at91_dev_table_ac97 {
 +	unsigned		mmio_base;
 +	int			irq;
-+	struct at91_pin_config	pwm_pins[4];
++	struct at91_pin_config	pins[4];	/* FS, CK, TX, RX */
 +};
 +
  struct at91_device_table {
  	struct at91_dev_table_ethernet		*ethernet;
  	struct at91_dev_table_usb_ohci		*usbh_ohci;
-@@ -135,6 +141,7 @@ struct at91_device_table {
- 	struct at91_dev_table_rtt		*rtt[2];
- 	struct at91_dev_table_uart		*dbgu;
+@@ -156,6 +162,7 @@ struct at91_device_table {
  	struct at91_dev_table_uart		*uart[6];
-+	struct at91_dev_table_pwm		*pwm;
+ 	struct at91_dev_table_pwm		*pwm;
+ 	struct at91_dev_table_ssc		*ssc[4];
++	struct at91_dev_table_ac97		*ac97;
  };
  
  extern void __init at91_init_devices(struct at91_device_table *device_table);
