@@ -1,32 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2011 09:44:37 +0100
-Subject: dma_alloc_writecombine() and MAX_ORDER
-In-Reply-To: <4DBF9FDC.6080400@linuxtv.org>
-References: <4DBAB41D.7030705@linuxtv.org>
-	<20110429142755.GS5126@n2100.arm.linux.org.uk>
-	<4DBF9FDC.6080400@linuxtv.org>
-Message-ID: <20110503084437.GK28001@n2100.arm.linux.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue,  3 May 2011 12:46:46 +0400
+Subject: [PATCH] gpio-vbus: ask for vbus_draw regulator before registering
+	xceiv
+In-Reply-To: <20110502233852.GA10108@kroah.com>
+References: <20110502233852.GA10108@kroah.com>
+Message-ID: <1304412406-9466-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2011 at 08:25:32AM +0200, Michael Hunold wrote:
-> Hello Russell,
-> 
-> on 04/29/2011 04:27 PM Russell King - ARM Linux said the following:
-> > On Fri, Apr 29, 2011 at 02:50:37PM +0200, Michael Hunold wrote:
-> 
-> >> Now I have a new panel with a higher resolution and more bits-per-pixel.
-> >> I want to use double-buffering with DirectFB and so my framebuffer size
-> >> exceeds 4Mb.
-> 
-> > You could try this patch.  It steals the memory for the coherent and
-> > writecombine memory at boot time, so MAX_ORDER no longer comes into the
-> > problem.  You may need to define CONSISTENT_WC_SIZE and CONSISTENT_DMA_SIZE
-> > appropriately to gain sufficient memory.  Note that the sum of those two
-> > must be a multiple of 2MB, and individually must be a multiple of 1MB.
-> 
-> I really want to try this patch out, but unfortunately, I don't know to
-> which tree I can apply it to. :-(
+Ask for vbus_draw regulator before registering tranceiver to disallow possible
+race between registration and set_power/etc.
 
-You may need 516295e (ARM: pgtable: add pud-level code) from a later
-kernel as well then.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/usb/otg/gpio_vbus.c |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
+index 221c444..52733d9 100644
+--- a/drivers/usb/otg/gpio_vbus.c
++++ b/drivers/usb/otg/gpio_vbus.c
+@@ -279,6 +279,13 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
+ 	}
+ 	INIT_WORK(&gpio_vbus->work, gpio_vbus_work);
+ 
++	gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
++	if (IS_ERR(gpio_vbus->vbus_draw)) {
++		dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
++			PTR_ERR(gpio_vbus->vbus_draw));
++		gpio_vbus->vbus_draw = NULL;
++	}
++
+ 	/* only active when a gadget is registered */
+ 	err = otg_set_transceiver(&gpio_vbus->otg);
+ 	if (err) {
+@@ -287,13 +294,6 @@ static int __init gpio_vbus_probe(struct platform_device *pdev)
+ 		goto err_otg;
+ 	}
+ 
+-	gpio_vbus->vbus_draw = regulator_get(&pdev->dev, "vbus_draw");
+-	if (IS_ERR(gpio_vbus->vbus_draw)) {
+-		dev_dbg(&pdev->dev, "can't get vbus_draw regulator, err: %ld\n",
+-			PTR_ERR(gpio_vbus->vbus_draw));
+-		gpio_vbus->vbus_draw = NULL;
+-	}
+-
+ 	return 0;
+ err_otg:
+ 	free_irq(irq, &pdev->dev);
+-- 
+1.7.4.4
