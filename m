@@ -1,53 +1,132 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 03 May 2011 09:38:51 -0700
-Subject: [PATCH 15/15] OMAP: GPIO: cleanup show revision,
-	remove cpu_is checks, display only once
-In-Reply-To: <BANLkTimwFezON_qX+wr3Gj+A3EOEbD81YQ@mail.gmail.com> (Charulatha
-	Varadarajan's message of "Tue, 26 Apr 2011 17:18:47 +0530")
-References: <1303513327-14532-1-git-send-email-khilman@ti.com>
-	<1303513327-14532-16-git-send-email-khilman@ti.com>
-	<BANLkTimwFezON_qX+wr3Gj+A3EOEbD81YQ@mail.gmail.com>
-Message-ID: <874o5bg2n8.fsf@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 3 May 2011 17:50:27 +0100
+Subject: [PATCH v2 1/2] regulator: pm8921-regulator: Add regulator
+	driver for PM8921
+In-Reply-To: <1304438756-28125-1-git-send-email-collinsd@codeaurora.org>
+References: <1304438668-23680-1-git-send-email-collinsd@codeaurora.org>
+	<1304438756-28125-1-git-send-email-collinsd@codeaurora.org>
+Message-ID: <20110503165027.GC1762@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Varadarajan, Charulatha" <charu@ti.com> writes:
+On Tue, May 03, 2011 at 09:05:56AM -0700, David Collins wrote:
+> Create a regulator driver to control all regulators on a Qualcomm
+> PM8921 PMIC chip.  This chip contains many different types of
+> regulators with a wide range of abilities and voltage ranges.
 
-> Kevin,
->
-> On Sat, Apr 23, 2011 at 04:32, Kevin Hilman <khilman@ti.com> wrote:
->> Remove cpu_is_* checks from gpio_show_revision() by passing in the
->> revision address offset from platform data. ?SoCs with no revision
->> register (15xx, 7xx, and all MPUIOs) use -1 to signify no register.
->>
->> While here, all GPIO banks are assumed to be the same revision, so fix
->> show_revision() to only show the revision for the first bank it finds.
->> This removes duplicate GPIO revision prints during boot.
->>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->> ---
->> ?arch/arm/mach-omap1/gpio15xx.c ? ? ? ? | ? ?2 ++
->> ?arch/arm/mach-omap1/gpio16xx.c ? ? ? ? | ? ?2 ++
->> ?arch/arm/mach-omap1/gpio7xx.c ? ? ? ? ?| ? ?2 ++
->> ?arch/arm/mach-omap2/gpio.c ? ? ? ? ? ? | ? ?2 ++
->> ?arch/arm/plat-omap/gpio.c ? ? ? ? ? ? ?| ? 14 ++++++--------
->> ?arch/arm/plat-omap/include/plat/gpio.h | ? ?1 +
->> ?6 files changed, 15 insertions(+), 8 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
->> index 9175624..6f77c36 100644
->> --- a/arch/arm/mach-omap1/gpio15xx.c
->> +++ b/arch/arm/mach-omap1/gpio15xx.c
->> @@ -35,6 +35,7 @@ static struct __initdata resource omap15xx_mpu_gpio_resources[] = {
->> ?};
->>
->> ?static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
->> + ? ? ? .revision ? ? ? = -1,
->
-> Assigning -1 to u16 type. Instead you may want to use 0xffff?
->
+This is basically OK but a few comments below.
 
-The compiler will do the right thing, so personally, I prefer using -1.
-It's safer if/when the type is changed, but the mask not updated.
+> Eight different regulator types are available on the PM8921.  These
+> are managed via 7 different type values in the driver:
+> 
+> LDO      - low drop out regulator (supports both NMOS and PMOS LDOs)
+> NLDO1200 - 1.2A NMOS LDO (different control structure than other LDOs)
+> SMPS     - switched-mode power supply
+> FTSMPS   - fast transient SMPS
+> VS       - voltage switch
+> VS300    - 300mA voltage switch (different control structure than
+>              other switches)
+> NCP      - negative charge pump
 
-Kevin
+Given that I'm not seeing much code sharing except is_enabled() it might
+be nice to split the driver up by regulator, it's very large.
+
+> +		for (i = 0; i < pdata->num_regulators; i++) {
+> +			mfd_regulators[i].name = PM8921_REGULATOR_DEV_NAME;
+> +			mfd_regulators[i].id = pdata->regulator_pdatas[i].id;
+> +			mfd_regulators[i].platform_data =
+> +				&(pdata->regulator_pdatas[i]);
+> +			mfd_regulators[i].pdata_size =
+> +				sizeof(struct pm8921_regulator_platform_data);
+> +		}
+> +		ret = mfd_add_devices(pmic->dev, 0, mfd_regulators,
+> +				pdata->num_regulators, NULL, irq_base);
+
+I'm having a hard time liking this.
+
+> +static int pm8921_vreg_masked_write(struct pm8921_vreg *vreg, u16 addr, u8 val,
+> +		u8 mask, u8 *reg_save)
+> +{
+> +	int rc = 0;
+> +	u8 reg;
+> +
+> +	reg = (*reg_save & ~mask) | (val & mask);
+> +	if (reg != *reg_save)
+> +		rc = pm8xxx_writeb(vreg->dev->parent, addr, reg);
+> +
+> +	if (rc)
+> +		pr_err("pm8xxx_writeb failed; addr=0x%03X, rc=%d\n", addr, rc);
+
+dev_err or one of your custom error macros.
+
+> +static int _pm8921_vreg_is_enabled(struct pm8921_vreg *vreg)
+> +{
+> +	int rc = 0;
+> +
+> +	/*
+> +	 * All regulator types except advanced mode SMPS, FTSMPS, and VS300 have
+> +	 * enable bit in bit 7 of the control register.
+> +	 */
+> +	switch (vreg->type) {
+
+If they're all checking bit 7 the switch statement feels a bit odd...
+
+> +static int pm8921_nldo_list_voltage(struct regulator_dev *rdev,
+> +				    unsigned selector)
+> +{
+> +	if (selector >= NLDO_SET_POINTS)
+> +		return 0;
+
+That looks like it should be returning an error.  0 is for things that
+are in range but can't be set for some reason (it's more intended for
+values knocked out by constraints or similar).
+
+> +static int _pm8921_nldo1200_get_voltage(struct pm8921_vreg *vreg)
+> +{
+> +	int uV = 0;
+> +	int vprog;
+> +
+> +	if (!NLDO1200_IN_ADVANCED_MODE(vreg)) {
+> +		pr_warn("%s: currently in legacy mode; voltage unknown.\n",
+> +			vreg->name);
+> +		return vreg->save_uV;
+> +	}
+> +
+> +	vprog = vreg->ctrl_reg & NLDO1200_CTRL_VPROG_MASK;
+> +
+> +	if ((vreg->ctrl_reg & NLDO1200_CTRL_RANGE_MASK)
+> +	    == NLDO1200_CTRL_RANGE_LOW)
+> +		uV = vprog * NLDO1200_LOW_UV_STEP + NLDO1200_LOW_UV_MIN;
+> +	else
+> +		uV = vprog * NLDO1200_HIGH_UV_STEP + NLDO1200_HIGH_UV_MIN;
+
+Just implement get_voltage_sel() - the same thing applies to most of the
+other regulators that have meaningful selectors.
+
+> +		/* Advanced mode */
+> +		if ((vreg->test_reg[2] & NLDO1200_ADVANCED_PM_MASK)
+> +		    == NLDO1200_ADVANCED_PM_LPM)
+
+Do we need #defines for the indexes into these arrays?  It's a bit magic
+and the code is complicated enough.
+
+> +	if (mode != REGULATOR_MODE_NORMAL && mode != REGULATOR_MODE_IDLE) {
+> +		vreg_err(vreg, "invalid mode: %u\n", mode);
+> +		return -EINVAL;
+> +	}
+
+switch would be clearer.
+
+> +/**
+> + * struct pm8921_regulator_platform_data - PMIC 8921 regulator platform data
+> + * @init_data:		regulator constraints
+> + * @id:			regulator id; from enum pm8921_vreg_id
+> + * @pull_down_enable:	0 = no pulldown, 1 = pulldown when regulator disabled
+> + * @pin_ctrl:		pin control inputs to use for the regulator; should be
+> + *			a combination of PM8921_VREG_PIN_CTRL_* values
+> + * @pin_fn:		action to perform when pin control pin is active
+> + * @system_uA:		current drawn from regulator not accounted for by any
+> + *			regulator framework consumer
+
+Having system_uA here seems wrong, this is hardly something that is
+specific to this chip.
