@@ -1,35 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 May 2011 12:35:41 +0200
-Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
-In-Reply-To: <20110503085220.GL28001@n2100.arm.linux.org.uk>
-References: <90477150.2231869.1304372815517.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-	<201105030958.14698.arnd@arndb.de>
-	<20110503085220.GL28001@n2100.arm.linux.org.uk>
-Message-ID: <201105031235.41888.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 3 May 2011 03:39:53 -0700
+Subject: [PATCH] arm: omap2plus: GPIO cleanup mach-omap2/*
+In-Reply-To: <4DB9146F.2080002@compulab.co.il>
+References: <1303895153-451-1-git-send-email-grinberg@compulab.co.il>
+	<20110427140129.GH3755@atomide.com>
+	<BANLkTik4qvrYBs4O90c8ZekW6ULh1tRxEA@mail.gmail.com>
+	<4DB9146F.2080002@compulab.co.il>
+Message-ID: <20110503103952.GP2092@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 May 2011, Russell King - ARM Linux wrote:
-> On Tue, May 03, 2011 at 09:58:14AM +0200, Arnd Bergmann wrote:
-> > On Tuesday 03 May 2011 01:01:18 Russell King - ARM Linux wrote:
-> > > It is preferable to use the same mapping, as it ensures that you're not
-> > > going to create incompatible aliases.
-> > 
-> > Is aliasing a problem for MMIO mappings? I would think that you can
-> > ioremap registers anywhere and as often as you want because they are
-> > never cacheable.
+* Igor Grinberg <grinberg@compulab.co.il> [110428 00:13]:
+> On 04/27/11 18:58, Grazvydas Ignotas wrote:
 > 
-> Provided the type and sharability is identical then there is no problem.
-> I wasn't referring to multiple ioremap()s of the same region - that
-> should be fine as the same attributes will be used.  If you mix ioremap()
-> and iotable_init() then you _could_ have problems if you don't use
-> MT_DEVICE in the iotable.
+> > On Wed, Apr 27, 2011 at 5:01 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >> * Igor Grinberg <grinberg@compulab.co.il> [110427 02:02]:
+> >>> use gpio_request_<one|array>() instead of multiple gpiolib calls,
+> >>> remove unneeded variables, etc.
+> >> Great :)
+> > I think this does conflict with Mike's "omap: cleanup board files"
+> > series though.
 > 
-> What I'm basically saying is that mixing the methods of creating these
-> mappings makes it much easier to get tripped up over these issues.
- 
-Ok, makes sense.
+> Yep, as I've stated in the description ;)
+> 
+> I've started working on this before Mike submitted his series and now
+> I want to get some responses before any rebase work is done.
+
+Mike's series is now applied into devel-cleanup, can you please
+rebase on top of commit ff08a05b6ca3a22107d621b1417e703af25b1298?
 
 Thanks,
 
-	Arnd
+Tony
