@@ -1,29 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 May 2011 09:52:20 +0100
-Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
-In-Reply-To: <201105030958.14698.arnd@arndb.de>
-References: <90477150.2231869.1304372815517.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-	<1319927287.2232106.1304373011082.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-	<20110502230118.GE28001@n2100.arm.linux.org.uk>
-	<201105030958.14698.arnd@arndb.de>
-Message-ID: <20110503085220.GL28001@n2100.arm.linux.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 03 May 2011 10:29:33 +0100
+Subject: [PATCHv2 4/4] ARM: tegra: irq: Add tegra_eoi
+In-Reply-To: <1304288854-11011-1-git-send-email-ccross@android.com>
+References: <1304284213-11950-5-git-send-email-ccross@android.com>
+	<1304288854-11011-1-git-send-email-ccross@android.com>
+Message-ID: <1304414973.27863.2.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2011 at 09:58:14AM +0200, Arnd Bergmann wrote:
-> On Tuesday 03 May 2011 01:01:18 Russell King - ARM Linux wrote:
-> > It is preferable to use the same mapping, as it ensures that you're not
-> > going to create incompatible aliases.
+Hi Colin,
+
+On Sun, 2011-05-01 at 23:27 +0100, Colin Cross wrote:
+> Implement irq_eoi to allow the GIC irq chip flow controller to
+> be changed to fasteoi.
 > 
-> Is aliasing a problem for MMIO mappings? I would think that you can
-> ioremap registers anywhere and as often as you want because they are
-> never cacheable.
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+> v2: Add tegra_eoi without removing tegra_ack, patch can now be
+>     merged safely before Will Deacon's gic fasteoi patch
+> 
+>  arch/arm/mach-tegra/irq.c |    9 +++++++++
+>  1 files changed, 9 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-tegra/irq.c b/arch/arm/mach-tegra/irq.c
+> index da17491..4956c3c 100644
+> --- a/arch/arm/mach-tegra/irq.c
+> +++ b/arch/arm/mach-tegra/irq.c
+> @@ -95,6 +95,14 @@ static void tegra_ack(struct irq_data *d)
+>         tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
+>  }
+> 
+> +static void tegra_eoi(struct irq_data *d)
+> +{
+> +       if (d->irq < FIRST_LEGACY_IRQ)
+> +               return;
+> +
+> +       tegra_irq_write_mask(d->irq, ICTLR_CPU_IEP_FIR_CLR);
+> +}
+> +
+>  static int tegra_retrigger(struct irq_data *d)
+>  {
+>         if (d->irq < FIRST_LEGACY_IRQ)
+> @@ -116,6 +124,7 @@ void __init tegra_init_irq(void)
+>         }
+> 
+>         gic_arch_extn.irq_ack = tegra_ack;
+> +       gic_arch_extn.irq_eoi = tegra_eoi;
+>         gic_arch_extn.irq_mask = tegra_mask;
+>         gic_arch_extn.irq_unmask = tegra_unmask;
+>         gic_arch_extn.irq_retrigger = tegra_retrigger;
+> --
+> 1.7.4.1
 
-Provided the type and sharability is identical then there is no problem.
-I wasn't referring to multiple ioremap()s of the same region - that
-should be fine as the same attributes will be used.  If you mix ioremap()
-and iotable_init() then you _could_ have problems if you don't use
-MT_DEVICE in the iotable.
+Just the job!
 
-What I'm basically saying is that mixing the methods of creating these
-mappings makes it much easier to get tripped up over these issues.
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Thanks,
+
+Will
