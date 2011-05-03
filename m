@@ -1,365 +1,121 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue,  3 May 2011 06:03:29 +0200
-Subject: [V3 PATCH] arm: add global early device init
-In-Reply-To: <1304368940-19340-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1304368940-19340-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1304395409-30965-1-git-send-email-plagnioj@jcrosoft.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Tue, 3 May 2011 14:15:16 +0800
+Subject: [PATCH V3 1/3] ARM: mxs: add GPMI support for imx23/imx28
+In-Reply-To: <1303726826-31660-1-git-send-email-b32955@freescale.com>
+References: <1303726826-31660-1-git-send-email-b32955@freescale.com>
+Message-ID: <4DBF9D74.5090103@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this will init earlytimer and will try to probe 1 or 2 timers for clockevents
-and clocksource
+hi:
+Does some one have any comments about these three patches?
 
-This will also allow to share timer cross arch such as sh-mobile and sh
+Thanks
+Huang Shijie
 
-all arm timers will be update to early device step by step
-
-on ARM sh-mobile we do not need to use the late_time_init
-as the irq are setup before the probe of the timers
-
-tested on at91sam9263-ek, at91rm9200-ek
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Magnus Damm <magnus.damm@gmail.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
----
-V3:
-	now we can do not specify the .timer at all
-	and just realy on the early device
-
-	on ARM sh-mobile we do not need to use the late_time_init
-	as the irq are setup before the probe of the timers
-
-	the only remaing question is is ok to move the clock_init in the
-	.init_early on sh-mobile
-
-	this patch depends on [PATCH] shmobile: fix map_io init usage
-
-Best Regards,
-J.
-
- arch/arm/kernel/time.c                  |   28 +++++++++++++++++--
- arch/arm/mach-shmobile/Makefile         |    2 +-
- arch/arm/mach-shmobile/board-ag5evm.c   |   13 +--------
- arch/arm/mach-shmobile/board-ap4evb.c   |   18 +++---------
- arch/arm/mach-shmobile/board-g3evm.c    |   12 +-------
- arch/arm/mach-shmobile/board-g4evm.c    |   12 +-------
- arch/arm/mach-shmobile/board-mackerel.c |   18 +++---------
- arch/arm/mach-shmobile/timer.c          |   46 -------------------------------
- 8 files changed, 37 insertions(+), 112 deletions(-)
- delete mode 100644 arch/arm/mach-shmobile/timer.c
-
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 1ff46ca..12cee50 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -13,6 +13,7 @@
-  */
- #include <linux/module.h>
- #include <linux/kernel.h>
-+#include <linux/platform_device.h>
- #include <linux/interrupt.h>
- #include <linux/time.h>
- #include <linux/init.h>
-@@ -77,6 +78,9 @@ EXPORT_SYMBOL(profile_pc);
- #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
- u32 arch_gettimeoffset(void)
- {
-+	if (!system_timer)
-+		return 0;
-+
- 	if (system_timer->offset != NULL)
- 		return system_timer->offset() * 1000;
- 
-@@ -147,7 +151,12 @@ static struct sysdev_class timer_sysclass = {
- 
- static int __init timer_init_sysfs(void)
- {
--	int ret = sysdev_class_register(&timer_sysclass);
-+	int ret;
-+
-+	if (!system_timer)
-+		return 0;
-+
-+	ret = sysdev_class_register(&timer_sysclass);
- 	if (ret == 0) {
- 		system_timer->dev.cls = &timer_sysclass;
- 		ret = sysdev_register(&system_timer->dev);
-@@ -161,9 +170,22 @@ device_initcall(timer_init_sysfs);
- void __init time_init(void)
- {
- 	system_timer = machine_desc->timer;
--	system_timer->init();
-+	if (system_timer && system_timer->init)
-+		system_timer->init();
-+
-+	/*
-+	 * Make sure all compiled-in early timers register themselves.
-+	 *
-+	 * Run probe() for two "earlytimer" devices, these will be the
-+	 * clockevents and clocksource devices respectively. In the event
-+	 * that only a clockevents device is available, we -ENODEV on the
-+	 * clocksource and the jiffies clocksource is used transparently
-+	 * instead. No error handling is necessary here.
-+	 */
-+	early_platform_driver_register_all("earlytimer");
-+	early_platform_driver_probe("earlytimer", 2, 0);
-+
- #ifdef CONFIG_HAVE_SCHED_CLOCK
- 	sched_clock_postinit();
- #endif
- }
--
-diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
-index 260e09d..6a1cc9e 100644
---- a/arch/arm/mach-shmobile/Makefile
-+++ b/arch/arm/mach-shmobile/Makefile
-@@ -3,7 +3,7 @@
- #
- 
- # Common objects
--obj-y				:= map_io.o timer.o console.o clock.o pm_runtime.o
-+obj-y				:= map_io.o console.o clock.o pm_runtime.o
- 
- # CPU objects
- obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
-diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
-index b30b11d..cd9ba29 100644
---- a/arch/arm/mach-shmobile/board-ag5evm.c
-+++ b/arch/arm/mach-shmobile/board-ag5evm.c
-@@ -339,6 +339,7 @@ static void __init ag5evm_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh73a0_add_early_devices();
- 	shmobile_setup_console();
-+	sh73a0_clock_init();
- }
- 
- #define PINTC_ADDR	0xe6900000
-@@ -447,22 +448,10 @@ static void __init ag5evm_init(void)
- 	platform_add_devices(ag5evm_devices, ARRAY_SIZE(ag5evm_devices));
- }
- 
--static void __init ag5evm_timer_init(void)
--{
--	sh73a0_clock_init();
--	shmobile_timer.init();
--	return;
--}
--
--struct sys_timer ag5evm_timer = {
--	.init	= ag5evm_timer_init,
--};
--
- MACHINE_START(AG5EVM, "ag5evm")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= ag5evm_init_irq,
- 	.handle_irq	= shmobile_handle_irq_gic,
- 	.init_early	= ag5evm_init_early,
- 	.init_machine	= ag5evm_init,
--	.timer		= &ag5evm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
-index ed55c01..f800cae 100644
---- a/arch/arm/mach-shmobile/board-ap4evb.c
-+++ b/arch/arm/mach-shmobile/board-ap4evb.c
-@@ -1096,6 +1096,10 @@ static void __init ap4evb_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7372_add_early_devices();
- 	shmobile_setup_console();
-+	sh7372_clock_init();
-+
-+	/* External clock source */
-+	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
- }
- 
- #define GPIO_PORT9CR	0xE6051009
-@@ -1330,24 +1334,10 @@ static void __init ap4evb_init(void)
- 	fsi_init_pm_clock();
- }
- 
--static void __init ap4evb_timer_init(void)
--{
--	sh7372_clock_init();
--	shmobile_timer.init();
--
--	/* External clock source */
--	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
--}
--
--static struct sys_timer ap4evb_timer = {
--	.init		= ap4evb_timer_init,
--};
--
- MACHINE_START(AP4EVB, "ap4evb")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7372_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= ap4evb_init_early,
- 	.init_machine	= ap4evb_init,
--	.timer		= &ap4evb_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
-index 20eeacf..63a6c35 100644
---- a/arch/arm/mach-shmobile/board-g3evm.c
-+++ b/arch/arm/mach-shmobile/board-g3evm.c
-@@ -249,6 +249,7 @@ static void __init g3evm_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7367_add_early_devices();
- 	shmobile_setup_console();
-+	sh7367_clock_init();
- }
- 
- static void __init g3evm_init(void)
-@@ -338,21 +339,10 @@ static void __init g3evm_init(void)
- 	platform_add_devices(g3evm_devices, ARRAY_SIZE(g3evm_devices));
- }
- 
--static void __init g3evm_timer_init(void)
--{
--	sh7367_clock_init();
--	shmobile_timer.init();
--}
--
--static struct sys_timer g3evm_timer = {
--	.init		= g3evm_timer_init,
--};
--
- MACHINE_START(G3EVM, "g3evm")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7367_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= g3evm_init_early,
- 	.init_machine	= g3evm_init,
--	.timer		= &g3evm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
-index 079dd35..46e1b0c 100644
---- a/arch/arm/mach-shmobile/board-g4evm.c
-+++ b/arch/arm/mach-shmobile/board-g4evm.c
-@@ -263,6 +263,7 @@ static void __init g4evm_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7377_add_early_devices();
- 	shmobile_setup_console();
-+	sh7377_clock_init();
- }
- 
- #define GPIO_SDHID0_D0	0xe60520fc
-@@ -381,21 +382,10 @@ static void __init g4evm_init(void)
- 	platform_add_devices(g4evm_devices, ARRAY_SIZE(g4evm_devices));
- }
- 
--static void __init g4evm_timer_init(void)
--{
--	sh7377_clock_init();
--	shmobile_timer.init();
--}
--
--static struct sys_timer g4evm_timer = {
--	.init		= g4evm_timer_init,
--};
--
- MACHINE_START(G4EVM, "g4evm")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7377_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= g4evm_init_early,
- 	.init_machine	= g4evm_init,
--	.timer		= &g4evm_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
-index f05a673..d52f323 100644
---- a/arch/arm/mach-shmobile/board-mackerel.c
-+++ b/arch/arm/mach-shmobile/board-mackerel.c
-@@ -1011,6 +1011,10 @@ static void __init mackerel_init_early(void)
- 	/* setup early devices and console here as well */
- 	sh7372_add_early_devices();
- 	shmobile_setup_console();
-+	sh7372_clock_init();
-+
-+	/* External clock source */
-+	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
- }
- 
- #define GPIO_PORT9CR	0xE6051009
-@@ -1203,24 +1207,10 @@ static void __init mackerel_init(void)
- 	hdmi_init_pm_clock();
- }
- 
--static void __init mackerel_timer_init(void)
--{
--	sh7372_clock_init();
--	shmobile_timer.init();
--
--	/* External clock source */
--	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
--}
--
--static struct sys_timer mackerel_timer = {
--	.init		= mackerel_timer_init,
--};
--
- MACHINE_START(MACKEREL, "mackerel")
- 	.map_io		= shmobile_map_io,
- 	.init_irq	= sh7372_init_irq,
- 	.handle_irq	= shmobile_handle_irq_intc,
- 	.init_early	= mackerel_init_early,
- 	.init_machine	= mackerel_init,
--	.timer		= &mackerel_timer,
- MACHINE_END
-diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
-deleted file mode 100644
-index 895794b..0000000
---- a/arch/arm/mach-shmobile/timer.c
-+++ /dev/null
-@@ -1,46 +0,0 @@
--/*
-- * SH-Mobile Timer
-- *
-- * Copyright (C) 2010  Magnus Damm
-- * Copyright (C) 2002 - 2009  Paul Mundt
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; version 2 of the License.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-- *
-- */
--#include <linux/platform_device.h>
--#include <asm/mach/time.h>
--
--static void __init shmobile_late_time_init(void)
--{
--	/*
--	 * Make sure all compiled-in early timers register themselves.
--	 *
--	 * Run probe() for two "earlytimer" devices, these will be the
--	 * clockevents and clocksource devices respectively. In the event
--	 * that only a clockevents device is available, we -ENODEV on the
--	 * clocksource and the jiffies clocksource is used transparently
--	 * instead. No error handling is necessary here.
--	 */
--	early_platform_driver_register_all("earlytimer");
--	early_platform_driver_probe("earlytimer", 2, 0);
--}
--
--static void __init shmobile_timer_init(void)
--{
--	late_time_init = shmobile_late_time_init;
--}
--
--struct sys_timer shmobile_timer = {
--	.init		= shmobile_timer_init,
--};
--- 
-1.7.4.1
+> add gpmi support for imx23 and imx28.
+>
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
+> ---
+>  arch/arm/mach-mxs/Kconfig                 |    2 +
+>  arch/arm/mach-mxs/include/mach/gpmi-nfc.h |   71 +++++++++++++++++++++++++++++
+>  2 files changed, 73 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+>
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 4f6f174..8132f1a 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -22,6 +22,7 @@ config MACH_MX23EVK
+>  	select SOC_IMX23
+>  	select MXS_HAVE_AMBA_DUART
+>  	select MXS_HAVE_PLATFORM_AUART
+> +	select MXS_HAVE_PLATFORM_GPMI_NFC
+>  	select MXS_HAVE_PLATFORM_MXSFB
+>  	default y
+>  	help
+> @@ -35,6 +36,7 @@ config MACH_MX28EVK
+>  	select MXS_HAVE_PLATFORM_AUART
+>  	select MXS_HAVE_PLATFORM_FEC
+>  	select MXS_HAVE_PLATFORM_FLEXCAN
+> +	select MXS_HAVE_PLATFORM_GPMI_NFC
+>  	select MXS_HAVE_PLATFORM_MXSFB
+>  	select MXS_OCOTP
+>  	default y
+> diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+> new file mode 100644
+> index 0000000..25fc605
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+> @@ -0,0 +1,71 @@
+> +/*
+> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License along
+> + * with this program; if not, write to the Free Software Foundation, Inc.,
+> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+> + */
+> +
+> +#ifndef __INCLUDE_GPMI_NFC_H
+> +#define __INCLUDE_GPMI_NFC_H
+> +
+> +/* The size of the resource is fixed. */
+> +#define RES_SIZE	6
+> +
+> +/* Resource names for the GPMI NFC driver. */
+> +#define GPMI_NFC_GPMI_REGS_ADDR_RES_NAME  "GPMI NFC GPMI Registers"
+> +#define GPMI_NFC_GPMI_INTERRUPT_RES_NAME  "GPMI NFC GPMI Interrupt"
+> +#define GPMI_NFC_BCH_REGS_ADDR_RES_NAME   "GPMI NFC BCH Registers"
+> +#define GPMI_NFC_BCH_INTERRUPT_RES_NAME   "GPMI NFC BCH Interrupt"
+> +#define GPMI_NFC_DMA_CHANNELS_RES_NAME    "GPMI NFC DMA Channels"
+> +#define GPMI_NFC_DMA_INTERRUPT_RES_NAME   "GPMI NFC DMA Interrupt"
+> +
+> +/**
+> + * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
+> + *
+> + * This structure communicates platform-specific information to the GPMI NFC
+> + * driver that can't be expressed as resources.
+> + *
+> + * @platform_init:           A pointer to a function the driver will call to
+> + *                           initialize the platform (e.g., set up the pin mux).
+> + * @platform_exit:           A pointer to a function the driver will call to
+> + *                           exit the platform (e.g., free pins).
+> + * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
+> + *                           from the NAND Flash device, in nanoseconds.
+> + * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
+> + *                           from the NAND Flash device, in nanoseconds.
+> + * @max_chip_count:          The maximum number of chips for which the driver
+> + *                           should configure the hardware. This value most
+> + *                           likely reflects the number of pins that are
+> + *                           connected to a NAND Flash device. If this is
+> + *                           greater than the SoC hardware can support, the
+> + *                           driver will print a message and fail to initialize.
+> + * @partitions:              An optional pointer to an array of partition
+> + *                           descriptions.
+> + * @partition_count:         The number of elements in the partitions array.
+> + */
+> +struct gpmi_nfc_platform_data {
+> +	/* SoC hardware information. */
+> +	int		(*platform_init)(void);
+> +	void		(*platform_exit)(void);
+> +
+> +	/* NAND Flash information. */
+> +	unsigned int	min_prop_delay_in_ns;
+> +	unsigned int	max_prop_delay_in_ns;
+> +	unsigned int	max_chip_count;
+> +
+> +	/* Medium information. */
+> +	struct mtd_partition *partitions;
+> +	unsigned	partition_count;
+> +};
+> +#endif
