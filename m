@@ -1,57 +1,64 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 03 May 2011 15:44:53 +0530
-Subject: [PATCH V3] ARM: GIC: Convert GIC library to use the IO relaxed
-	operations
-In-Reply-To: <1304417481.19196.60.camel@e102109-lin.cambridge.arm.com>
-References: <1304058131-8375-1-git-send-email-santosh.shilimkar@ti.com>
-	<1304417481.19196.60.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <4DBFD59D.50008@ti.com>
+From: philipp.zabel@gmail.com (Philipp Zabel)
+Date: Tue, 03 May 2011 12:15:56 +0200
+Subject: [PATCH] pxa/hx4700: Add ASIC3 LED support
+In-Reply-To: <E1QGESE-0007gF-VJ@outmx08.plus.net>
+References: <E1QGESE-0007gF-VJ@outmx08.plus.net>
+Message-ID: <1304417758.13769.1.camel@flow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/3/2011 3:41 PM, Catalin Marinas wrote:
-[...]
+Am Samstag, den 30.04.2011, 17:59 +0000 schrieb Paul Parsons:
+> Add LED support for the HTC ASIC3. Underlying support is provided by the mfd/asic3 and leds/leds-asic3 drivers. An example configuration is provided by the pxa/hx4700 platform.
+> 
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
+> ---
+> diff -uprN clean-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c linux-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c
+> --- clean-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c	2011-04-28 11:18:09.310551240 +0100
+> +++ linux-2.6.39-rc5/arch/arm/mach-pxa/hx4700.c	2011-04-30 15:52:19.956069045 +0100
+> @@ -23,6 +23,7 @@
+>  #include <linux/gpio_keys.h>
+>  #include <linux/input.h>
+>  #include <linux/lcd.h>
+> +#include <linux/leds.h>
 
->> diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
->> index e9c2ff8..80b3d3c 100644
->> --- a/arch/arm/common/gic.c
->> +++ b/arch/arm/common/gic.c
->> @@ -89,7 +89,8 @@ static void gic_mask_irq(struct irq_data *d)
->>          u32 mask = 1<<  (d->irq % 32);
->>
->>          spin_lock(&irq_controller_lock);
->> -       writel(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
->> +       writel_relaxed(mask, gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
->> +       readl_relaxed(gic_dist_base(d) + GIC_DIST_ENABLE_CLEAR + (gic_irq(d) / 32) * 4);
->
-> As I commented on the version 2 of this patch, I don't think we should
-> even bother with the additional readl_relaxed() here. It's not enough to
-> prevent spurious interrupts anyway.
->
-I forgot to drop this one.
+This is not needed anymore.
 
+>  #include <linux/mfd/htc-egpio.h>
+>  #include <linux/mfd/asic3.h>
+>  #include <linux/mtd/physmap.h>
+> @@ -280,6 +281,21 @@ static u16 asic3_gpio_config[] = {
+>  	ASIC3_GPIOD15_nPIOW,
+>  };
+>  
+> +static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
+> +	[0] = {
+> +		.name = "hx4700:amber",
+> +		.default_trigger = "ds2760-battery.0-charging-blink-full-solid",
+> +	},
+> +	[1] = {
+> +		.name = "hx4700:green",
+> +		.default_trigger = "unused",
+> +	},
+> +	[2] = {
+> +		.name = "hx4700:blue",
+> +		.default_trigger = "hx4700-radio",
+> +	},
+> +};
+> +
+>  static struct resource asic3_resources[] = {
+>  	/* GPIO part */
+>  	[0] = {
+> @@ -310,6 +326,7 @@ static struct asic3_platform_data asic3_
+>  	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
+>  	.irq_base        = IRQ_BOARD_START,
+>  	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
+> +	.leds            = asic3_leds,
+>  };
+>  
+>  static struct platform_device asic3 = {
 
->> @@ -392,6 +393,7 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
->>          unsigned long map = *cpus_addr(*mask);
->>
->>          /* this always happens on GIC0 */
->> -       writel(map<<  16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
->> +       dsb();
->> +       writel_relaxed(map<<  16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
->
-> I would add a comment before the dsb() on why it is needed. Maybe something like:
->
-> /*
->   * Ensure that stores to Normal memory are visible to the other CPUs before
->   * issuing the IPI.
->   */
->
->
-> Otherwise the patch looks fine (I'll add my ack after you fix the above).
->
-Thanks. Will add above comment, drop the readl and repost with your ack.
+After removal of the superfluous include,
+Acked-by: Philipp Zabel <philipp.zabel@gmail.com>
 
-Same will push it the patch system
-
-Regards
-Santosh
+regards
+Philipp
