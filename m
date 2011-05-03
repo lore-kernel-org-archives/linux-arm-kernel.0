@@ -1,46 +1,195 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue,  3 May 2011 22:04:47 +0200
-Subject: [PATCH] sdio: optimized SDIO IRQ handling for single function
-Message-ID: <1304453087-7365-1-git-send-email-per.forlin@linaro.org>
+From: mike@compulab.co.il (mike at compulab.co.il)
+Date: Tue, 3 May 2011 23:51:09 +0300
+Subject: [PATCH] kirkwood: add dir-665 support
+In-Reply-To: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
+References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
+Message-ID: <20110503205056.GA13075@gentoodev.compulab.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+Hello Hirundo Cam,
 
-If there is only 1 function registered, and IRQ:s are supported and
-currently enabled, call the callback handler directly
-without checking the CCCR registers.
+I'm not Kirkwood expert, so my comments are quite general.
 
-Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- drivers/mmc/core/sdio_irq.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+On Thu, Apr 28, 2011 at 12:34:46AM +0800, Hirundo Cam wrote:
+> This patch is a hack to dir-665 by referencing mv88f6281gtw_ge board.
+> LEDs, GPIO, Buttons remains unknown.
+> 
+> To use this patch, u-boot must also be modified.
+> 
+> Signed-off-by: Hirundo Cam <camhirundo@gmail.com>
+> ---
+>  arch/arm/mach-kirkwood/Kconfig            |    6 ++
+>  arch/arm/mach-kirkwood/Makefile           |    1 +
+>  arch/arm/mach-kirkwood/mv88f6281_dir665.c |  107 +++++++++++++++++++++++++++++
+>  arch/arm/tools/mach-types                 |    1 +
+>  4 files changed, 115 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-kirkwood/mv88f6281_dir665.c
+> 
+> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> index 7fc603b..296d97f 100644
+> --- a/arch/arm/mach-kirkwood/Kconfig
+> +++ b/arch/arm/mach-kirkwood/Kconfig
+> @@ -26,6 +26,12 @@ config MACH_MV88F6281GTW_GE
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Marvell 88F6281 GTW GE Board.
+>  
+> +config MACH_MV88F6281_DIR665
+> +	bool "Marvell 88F6281 DIR665 Board"
+> +	help
 
-diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-index b300161..25291bf 100644
---- a/drivers/mmc/core/sdio_irq.c
-+++ b/drivers/mmc/core/sdio_irq.c
-@@ -32,6 +32,20 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
- 	int i, ret, count;
- 	unsigned char pending;
- 
-+	/*
-+	 * If there is only 1 function registered
-+	 * call irq directly without checking the CCCR registers.
-+	 */
-+	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
-+	    card->host->sdio_irqs && (card->sdio_funcs == 1))
-+		for (i = 0; i < SDIO_MAX_FUNCS; i++) {
-+			struct sdio_func *func = card->sdio_func[i];
-+			if (func && func->irq_handler) {
-+				func->irq_handler(func);
-+				return 1;
-+			}
-+		}
-+
- 	ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
- 	if (ret) {
- 		printk(KERN_DEBUG "%s: error %d reading SDIO_CCCR_INTx\n",
--- 
-1.7.4.1
+Citing checkpatch.pl:
+"WARNIING: please write a paragraph that describes the config symbol fully"
+
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  88F6281 DIR665 Board.
+> +
+>  config MACH_SHEEVAPLUG
+>  	bool "Marvell SheevaPlug Reference Board"
+>  	help
+> diff --git a/arch/arm/mach-kirkwood/Makefile b/arch/arm/mach-kirkwood/Makefile
+> index 5dcaa81..f86649f 100644
+> --- a/arch/arm/mach-kirkwood/Makefile
+> +++ b/arch/arm/mach-kirkwood/Makefile
+> @@ -3,6 +3,7 @@ obj-y				+= common.o addr-map.o irq.o pcie.o mpp.o
+>  obj-$(CONFIG_MACH_DB88F6281_BP)		+= db88f6281-bp-setup.o
+>  obj-$(CONFIG_MACH_RD88F6192_NAS)	+= rd88f6192-nas-setup.o
+>  obj-$(CONFIG_MACH_RD88F6281)		+= rd88f6281-setup.o
+> +obj-$(CONFIG_MACH_MV88F6281_DIR665)	+= mv88f6281_dir665.o
+>  obj-$(CONFIG_MACH_MV88F6281GTW_GE)	+= mv88f6281gtw_ge-setup.o
+>  obj-$(CONFIG_MACH_SHEEVAPLUG)		+= sheevaplug-setup.o
+>  obj-$(CONFIG_MACH_ESATA_SHEEVAPLUG)	+= sheevaplug-setup.o
+> diff --git a/arch/arm/mach-kirkwood/mv88f6281_dir665.c b/arch/arm/mach-kirkwood/mv88f6281_dir665.c
+> new file mode 100644
+> index 0000000..41aa7ef
+> --- /dev/null
+> +++ b/arch/arm/mach-kirkwood/mv88f6281_dir665.c
+> @@ -0,0 +1,107 @@
+> +/*
+> + * arch/arm/mach-kirkwood/mv88f6281_dir665.c
+> + *
+> + * Marvell 88F6281 DIR-665 Board Setup
+> + *
+> + * This file is licensed under the terms of the GNU General Public
+> + * License version 2.  This program is licensed "as is" without any
+> + * warranty of any kind, whether express or implied.
+> + */
+> +
+> +#include <linux/kernel.h>
+> +#include <linux/init.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/pci.h>
+> +#include <linux/irq.h>
+> +#include <linux/mtd/physmap.h>
+> +#include <linux/timer.h>
+> +#include <linux/mv643xx_eth.h>
+> +#include <linux/ethtool.h>
+> +#include <linux/gpio.h>
+> +#include <linux/leds.h>
+> +#include <linux/input.h>
+> +#include <linux/gpio_keys.h>
+> +#include <linux/spi/flash.h>
+> +#include <linux/spi/spi.h>
+> +#include <linux/spi/orion_spi.h>
+> +#include <net/dsa.h>
+> +#include <asm/mach-types.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach/pci.h>
+> +#include <mach/kirkwood.h>
+> +#include "common.h"
+> +#include "mpp.h"
+
+Please check what headers are actually needed. I belieive that
+linux/input.h, linux/leds.h, linux/gpio.h and most probably many others
+can be safely removed.
+
+> +static struct mv643xx_eth_platform_data mv88f6281_dir665_ge00_data = {
+> +	.phy_addr	= MV643XX_ETH_PHY_NONE,
+> +	.speed		= SPEED_1000,
+> +	.duplex		= DUPLEX_FULL,
+> +};
+> +
+> +static struct mv643xx_eth_platform_data mv88f6281_dir665_ge01_data = {
+> +	.phy_addr	= MV643XX_ETH_PHY_NONE,
+> +	.speed		= SPEED_1000,
+> +	.duplex		= DUPLEX_FULL,
+> +};
+> +
+> +static struct dsa_chip_data mv88f6281_dir665_switch_chip_data = {
+> +	.port_names[0]	= "lan4",
+> +	.port_names[1]	= "lan3",
+> +	.port_names[2]	= "lan2",
+> +	.port_names[3]	= "lan1",
+> +	.port_names[6]	= "cpu",
+> +};
+> +
+> +static struct dsa_platform_data mv88f6281_dir665_switch_plat_data = {
+> +	.nr_chips	= 1,
+> +	.chip		= &mv88f6281_dir665_switch_chip_data,
+> +};
+> +
+> +static const struct flash_platform_data mv88f6281_dir665_spi_slave_data = {
+> +	.type		= "mx25l12805d",
+> +};
+> +
+> +static struct spi_board_info __initdata mv88f6281_dir665_spi_slave_info[] = {
+> +	{
+> +		.modalias	= "m25p80",
+> +		.platform_data	= &mv88f6281_dir665_spi_slave_data,
+> +		.irq		= -1,
+> +		.max_speed_hz	= 50000000,
+> +		.bus_num	= 0,
+> +		.chip_select	= 0,
+> +	},
+> +};
+> +
+> +static void __init mv88f6281_dir665_init(void)
+> +{
+> +	/*
+> +	 * Basic setup. Needs to be called early.
+> +	 */
+> +	kirkwood_init();
+> +
+> +	kirkwood_ehci_init();
+> +	kirkwood_ge00_init(&mv88f6281_dir665_ge00_data);
+> +	kirkwood_ge01_init(&mv88f6281_dir665_ge01_data);
+> +	kirkwood_ge00_switch_init(&mv88f6281_dir665_switch_plat_data, NO_IRQ);
+> +	spi_register_board_info(mv88f6281_dir665_spi_slave_info,
+> +				ARRAY_SIZE(mv88f6281_dir665_spi_slave_info));
+> +	kirkwood_spi_init();
+> +	kirkwood_uart0_init();
+> +}
+> +
+> +static int __init mv88f6281_dir665_pci_init(void)
+> +{
+> +	if (machine_is_mv88f6281_dir665())
+> +		kirkwood_pcie_init(KW_PCIE0);
+> +
+> +	return 0;
+> +}
+> +subsys_initcall(mv88f6281_dir665_pci_init);
+> +
+> +MACHINE_START(MV88F6281_DIR665, "Marvell 88F6281 DIR665 Board")
+> +	.boot_params	= 0x00000100,
+> +	.init_machine	= mv88f6281_dir665_init,
+> +	.map_io		= kirkwood_map_io,
+> +	.init_irq	= kirkwood_init_irq,
+> +	.timer		= &kirkwood_timer,
+> +MACHINE_END
+> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+> index 7ca41f0..02d008d 100644
+> --- a/arch/arm/tools/mach-types
+> +++ b/arch/arm/tools/mach-types
+> @@ -1099,3 +1099,4 @@ ecuv5			MACH_ECUV5		ECUV5			3421
+>  hsgx6d			MACH_HSGX6D		HSGX6D			3422
+>  dawad7			MACH_DAWAD7		DAWAD7			3423
+>  sam9repeater		MACH_SAM9REPEATER	SAM9REPEATER		3424
+> +mv88f6281_dir665	MACH_MV88F6281_DIR665	MV88F6281_DIR665	3425
+
+You should add the dir665 machine into the machine registry at
+http://www.arm.linux.org.uk/developer/machines/ rather than modify the
+mach-types file.
+
+--
+Sincerely yours,
+Mike.
