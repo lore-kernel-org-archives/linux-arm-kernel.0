@@ -1,26 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 3 May 2011 15:57:42 +0200
-Subject: Resend [PATCH 00/10] ARM: SMP initialization consolidation
-In-Reply-To: <20110502234012.GJ28001@n2100.arm.linux.org.uk>
-References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>
-	<4DBBA509.6080203@codeaurora.org>
-	<20110502234012.GJ28001@n2100.arm.linux.org.uk>
-Message-ID: <201105031557.42355.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 3 May 2011 15:45:03 +0100
+Subject: [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201104281412.40991.arnd@arndb.de>
+References: <201104212129.17013.arnd@arndb.de> <11431.1303949729@localhost>
+	<1303979259.26744.3.camel@e102109-lin.cambridge.arm.com>
+	<201104281412.40991.arnd@arndb.de>
+Message-ID: <20110503144503.GA2645@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 May 2011, Russell King - ARM Linux wrote:
-> Such a SoC may wish to do things differently from the current approach
-> (which is basically bring up all cores at boot) particularly as the
-> performance gained from each CPU is far from identical.  So I've been
-> nervous about moving the CPU map initialization into core code.
+On Thu, Apr 28, 2011 at 02:12:40PM +0200, Arnd Bergmann wrote:
+> On Thursday 28 April 2011, Catalin Marinas wrote:
+> > On Thu, 2011-04-28 at 01:15 +0100, Valdis.Kletnieks at vt.edu wrote:
+> > > On Wed, 27 Apr 2011 12:08:28 BST, Catalin Marinas said:
+> > > 
+> > > > The current version of the ARM ARM says "unpredictable". But this
+> > > > general definition of "unpredictable" does not allow it to deadlock
+> > > > (hardware) or have security implications. It is however allowed to
+> > > > corrupt data.
+> > > 
+> > > Not allowed to have security implications, but is allowed to corrupt data.
+> > 
+> > By security I was referring to TrustZone extensions. IOW, unpredictable
+> > in normal (non-secure) world should not cause data corruption in the
+> > secure world.
 > 
-> Note that the low power CPU may not be the last in the set, so merely
-> limiting the system to two CPUs is not the answer.
+> That definition is rather useless for operating systems that don't use
+> Trustzone then, right?
 
-If I read the patches correctly, it's still strictly opt-in per platform.
-When a platform wants to support the setup you mentioned or something
-even stranger, all it would have to do is provide its own versions of
-the SMP pen and scu init function, right?
+IIUC, the restriction on unpredictable behaviour is basically that the processor
+can't do anything which would result in or otherwise imply an escalation of
+privilege.
 
-	Arnd
+TrustZone is one kind of privilege, but there are plenty of other operations
+implying privilege (entering privileged mode from user mode, masking or
+intercepting interrupts or exceptions, bypassing or reconfiguring MMU permissions
+etc.)  "Unpredictable" behaviours are not allowed to have any such consequences
+IIRC.  Without that restriction you wouldn't really have any OS security at all.
+
+In the kernel, we do have to be careful about avoiding unpredictable behaviours,
+since we're already running at maximum privilege (not including TZ) -- so the
+damage which unpredictable behaviours can wreak is much greater, by running
+invalid code, misconfiguring the MMU, allowing caches to get out of sync etc.
+But that's not fundamentally different from the general need to avoid kernel bugs
+-- the scope of _any_ kernel code to do damage is greater than for userspace code,
+whether it involves architecturally unpredictable behaviour, or just plain
+ordinary bugs or security holes in the C code.
+
+---Dave
+
+> 
+> 	Arnd
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
