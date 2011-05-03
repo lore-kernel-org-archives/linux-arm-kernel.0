@@ -1,121 +1,43 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Tue, 3 May 2011 14:15:16 +0800
-Subject: [PATCH V3 1/3] ARM: mxs: add GPMI support for imx23/imx28
-In-Reply-To: <1303726826-31660-1-git-send-email-b32955@freescale.com>
-References: <1303726826-31660-1-git-send-email-b32955@freescale.com>
-Message-ID: <4DBF9D74.5090103@freescale.com>
+From: hunold@linuxtv.org (Michael Hunold)
+Date: Tue, 03 May 2011 08:25:32 +0200
+Subject: dma_alloc_writecombine() and MAX_ORDER
+In-Reply-To: <20110429142755.GS5126@n2100.arm.linux.org.uk>
+References: <4DBAB41D.7030705@linuxtv.org>
+	<20110429142755.GS5126@n2100.arm.linux.org.uk>
+Message-ID: <4DBF9FDC.6080400@linuxtv.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi:
-Does some one have any comments about these three patches?
+Hello Russell,
 
-Thanks
-Huang Shijie
+on 04/29/2011 04:27 PM Russell King - ARM Linux said the following:
+> On Fri, Apr 29, 2011 at 02:50:37PM +0200, Michael Hunold wrote:
 
-> add gpmi support for imx23 and imx28.
->
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  arch/arm/mach-mxs/Kconfig                 |    2 +
->  arch/arm/mach-mxs/include/mach/gpmi-nfc.h |   71 +++++++++++++++++++++++++++++
->  2 files changed, 73 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
->
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 4f6f174..8132f1a 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -22,6 +22,7 @@ config MACH_MX23EVK
->  	select SOC_IMX23
->  	select MXS_HAVE_AMBA_DUART
->  	select MXS_HAVE_PLATFORM_AUART
-> +	select MXS_HAVE_PLATFORM_GPMI_NFC
->  	select MXS_HAVE_PLATFORM_MXSFB
->  	default y
->  	help
-> @@ -35,6 +36,7 @@ config MACH_MX28EVK
->  	select MXS_HAVE_PLATFORM_AUART
->  	select MXS_HAVE_PLATFORM_FEC
->  	select MXS_HAVE_PLATFORM_FLEXCAN
-> +	select MXS_HAVE_PLATFORM_GPMI_NFC
->  	select MXS_HAVE_PLATFORM_MXSFB
->  	select MXS_OCOTP
->  	default y
-> diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
-> new file mode 100644
-> index 0000000..25fc605
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
-> @@ -0,0 +1,71 @@
-> +/*
-> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along
-> + * with this program; if not, write to the Free Software Foundation, Inc.,
-> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-> + */
-> +
-> +#ifndef __INCLUDE_GPMI_NFC_H
-> +#define __INCLUDE_GPMI_NFC_H
-> +
-> +/* The size of the resource is fixed. */
-> +#define RES_SIZE	6
-> +
-> +/* Resource names for the GPMI NFC driver. */
-> +#define GPMI_NFC_GPMI_REGS_ADDR_RES_NAME  "GPMI NFC GPMI Registers"
-> +#define GPMI_NFC_GPMI_INTERRUPT_RES_NAME  "GPMI NFC GPMI Interrupt"
-> +#define GPMI_NFC_BCH_REGS_ADDR_RES_NAME   "GPMI NFC BCH Registers"
-> +#define GPMI_NFC_BCH_INTERRUPT_RES_NAME   "GPMI NFC BCH Interrupt"
-> +#define GPMI_NFC_DMA_CHANNELS_RES_NAME    "GPMI NFC DMA Channels"
-> +#define GPMI_NFC_DMA_INTERRUPT_RES_NAME   "GPMI NFC DMA Interrupt"
-> +
-> +/**
-> + * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
-> + *
-> + * This structure communicates platform-specific information to the GPMI NFC
-> + * driver that can't be expressed as resources.
-> + *
-> + * @platform_init:           A pointer to a function the driver will call to
-> + *                           initialize the platform (e.g., set up the pin mux).
-> + * @platform_exit:           A pointer to a function the driver will call to
-> + *                           exit the platform (e.g., free pins).
-> + * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
-> + *                           from the NAND Flash device, in nanoseconds.
-> + * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
-> + *                           from the NAND Flash device, in nanoseconds.
-> + * @max_chip_count:          The maximum number of chips for which the driver
-> + *                           should configure the hardware. This value most
-> + *                           likely reflects the number of pins that are
-> + *                           connected to a NAND Flash device. If this is
-> + *                           greater than the SoC hardware can support, the
-> + *                           driver will print a message and fail to initialize.
-> + * @partitions:              An optional pointer to an array of partition
-> + *                           descriptions.
-> + * @partition_count:         The number of elements in the partitions array.
-> + */
-> +struct gpmi_nfc_platform_data {
-> +	/* SoC hardware information. */
-> +	int		(*platform_init)(void);
-> +	void		(*platform_exit)(void);
-> +
-> +	/* NAND Flash information. */
-> +	unsigned int	min_prop_delay_in_ns;
-> +	unsigned int	max_prop_delay_in_ns;
-> +	unsigned int	max_chip_count;
-> +
-> +	/* Medium information. */
-> +	struct mtd_partition *partitions;
-> +	unsigned	partition_count;
-> +};
-> +#endif
+>> Now I have a new panel with a higher resolution and more bits-per-pixel.
+>> I want to use double-buffering with DirectFB and so my framebuffer size
+>> exceeds 4Mb.
+
+> You could try this patch.  It steals the memory for the coherent and
+> writecombine memory at boot time, so MAX_ORDER no longer comes into the
+> problem.  You may need to define CONSISTENT_WC_SIZE and CONSISTENT_DMA_SIZE
+> appropriately to gain sufficient memory.  Note that the sum of those two
+> must be a multiple of 2MB, and individually must be a multiple of 1MB.
+
+I really want to try this patch out, but unfortunately, I don't know to
+which tree I can apply it to. :-(
+
+I'm working on a tree which is based on vanilla 2.6.38 and has the
+additions for the platform I'm working with, but there the patch won't
+apply cleanly.
+
+The tree can be found here
+http://git.labs.kernelconcepts.de/?p=topas.git;a=summary
+
+So I thought I should try "devel-stable" from
+http://ftp.arm.linux.org.uk/pub/linux/arm/kernel/git-cur/linux-2.6-arm.git
+but there are even more rejects there.
+
+Can you please tell me from which tree you created this patch?
+
+Best regards
+Michael.
