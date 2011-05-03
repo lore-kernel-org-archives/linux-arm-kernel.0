@@ -1,47 +1,34 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 03 May 2011 18:30:58 +0300
-Subject: [PATCH] arm: omap3: cm-t3517: fix section mismatch warning
-In-Reply-To: <1303850474-25106-1-git-send-email-grinberg@compulab.co.il>
-References: <1303850474-25106-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <4DC01FB2.9060806@compulab.co.il>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 May 2011 17:31:24 +0200
+Subject: [Linaro-mm-sig] [RFC] ARM DMA mapping TODO, v1
+In-Reply-To: <201105031705.39957.laurent.pinchart@ideasonboard.com>
+References: <201104212129.17013.arnd@arndb.de>
+	<201104271243.16868.arnd@arndb.de>
+	<201105031705.39957.laurent.pinchart@ideasonboard.com>
+Message-ID: <201105031731.24626.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ping!
+On Tuesday 03 May 2011, Laurent Pinchart wrote:
+> I wish it was that simple.
+> 
+> The OMAP4 ISS (Imaging Subsystem) has no IOMMU, but it can use the OMAP4 DMM 
+> (Dynamic Memory Manager) which acts as a memory remapper. Basically (if my 
+> understanding is correct), the ISS is configured to read/write from/to 
+> physical addresses. If those physical addresses are in the DMM address range, 
+> the DMM translates the accesses to physical accesses, acting as an IOMMU.
+> 
+> The ISS can thus write to physically contiguous memory directly, or to 
+> scattered physical pages through the DMM. Whether an IOMMU (or, to be correct 
+> in this case, the IOMMU-like DMM) needs to handle the DMA is a per-buffer 
+> decision, not a per-device decision.
 
+This doesn't sound too unusual for IOMMU implementations. A lot of time
+you can access e.g. low memory using a direct mapping but you need the
+IOMMU code for highmem. I've also seen a machine where a linear mapping
+exists for all the memory in strict ordering, while you can use relaxed
+DMA ordering when you go through the IOMMU address range. If we manage
+to come up with a common dma-mapping API implementation for all IOMMUs,
+it certainly needs to handle that case as well.
 
-Just to make sure you haven't missed this one liner ;)
-
-
-On 04/26/11 23:41, Igor Grinberg wrote:
-
-> WARNING: arch/arm/mach-omap2/built-in.o(.text+0x11014): Section mismatch
-> in reference from the function cm_t3517_init_usbh() to the (unknown
-> reference) .init.data:(unknown)
-> The function cm_t3517_init_usbh() references
-> the (unknown reference) __initdata (unknown).
-> This is often because cm_t3517_init_usbh lacks a __initdata
-> annotation or the annotation of (unknown) is wrong.
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-> index a27e3ee..802cb60 100644
-> --- a/arch/arm/mach-omap2/board-cm-t3517.c
-> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
-> @@ -178,7 +178,7 @@ static struct usbhs_omap_board_data cm_t3517_ehci_pdata __initdata = {
->  	.reset_gpio_port[2]  = -EINVAL,
->  };
->  
-> -static int cm_t3517_init_usbh(void)
-> +static int __init cm_t3517_init_usbh(void)
->  {
->  	int err;
->  
-
--- 
-Regards,
-Igor.
+	Arnd
