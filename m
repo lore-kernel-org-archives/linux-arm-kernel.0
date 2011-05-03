@@ -1,132 +1,58 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 3 May 2011 17:50:27 +0100
-Subject: [PATCH v2 1/2] regulator: pm8921-regulator: Add regulator
-	driver for PM8921
-In-Reply-To: <1304438756-28125-1-git-send-email-collinsd@codeaurora.org>
-References: <1304438668-23680-1-git-send-email-collinsd@codeaurora.org>
-	<1304438756-28125-1-git-send-email-collinsd@codeaurora.org>
-Message-ID: <20110503165027.GC1762@opensource.wolfsonmicro.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 May 2011 19:27:12 +0200
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110503172712.GE6538@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 03, 2011 at 09:05:56AM -0700, David Collins wrote:
-> Create a regulator driver to control all regulators on a Qualcomm
-> PM8921 PMIC chip.  This chip contains many different types of
-> regulators with a wide range of abilities and voltage ranges.
-
-This is basically OK but a few comments below.
-
-> Eight different regulator types are available on the PM8921.  These
-> are managed via 7 different type values in the driver:
+On Mon, May 02, 2011 at 09:16:08PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
 > 
-> LDO      - low drop out regulator (supports both NMOS and PMOS LDOs)
-> NLDO1200 - 1.2A NMOS LDO (different control structure than other LDOs)
-> SMPS     - switched-mode power supply
-> FTSMPS   - fast transient SMPS
-> VS       - voltage switch
-> VS300    - 300mA voltage switch (different control structure than
->              other switches)
-> NCP      - negative charge pump
+> This patchset creates a pinmux subsystem and switches U300 to use that new
+> subsystem as an example. The problem is not that fantastically hard to
+> solve in a general way, nobody got around to it because it requires some
+> upfront code I believe, and this is my stab at it.
 
-Given that I'm not seeing much code sharing except is_enabled() it might
-be nice to split the driver up by regulator, it's very large.
+Hi Linus
 
-> +		for (i = 0; i < pdata->num_regulators; i++) {
-> +			mfd_regulators[i].name = PM8921_REGULATOR_DEV_NAME;
-> +			mfd_regulators[i].id = pdata->regulator_pdatas[i].id;
-> +			mfd_regulators[i].platform_data =
-> +				&(pdata->regulator_pdatas[i]);
-> +			mfd_regulators[i].pdata_size =
-> +				sizeof(struct pm8921_regulator_platform_data);
-> +		}
-> +		ret = mfd_add_devices(pmic->dev, 0, mfd_regulators,
-> +				pdata->num_regulators, NULL, irq_base);
+I have some questions about how you see the following situations been
+solved.
 
-I'm having a hard time liking this.
+Say i have a UART core. I can be used as a 3-wire serial port, or
+additionally it can have hardware flow control, or additionally it can
+have all the modem signals. What would i expect to find in the pinmux
+driver?
 
-> +static int pm8921_vreg_masked_write(struct pm8921_vreg *vreg, u16 addr, u8 val,
-> +		u8 mask, u8 *reg_save)
-> +{
-> +	int rc = 0;
-> +	u8 reg;
-> +
-> +	reg = (*reg_save & ~mask) | (val & mask);
-> +	if (reg != *reg_save)
-> +		rc = pm8xxx_writeb(vreg->dev->parent, addr, reg);
-> +
-> +	if (rc)
-> +		pr_err("pm8xxx_writeb failed; addr=0x%03X, rc=%d\n", addr, rc);
+I can think of two different solutions: 
 
-dev_err or one of your custom error macros.
+1) Three functions: uart-3wire, uart-hw-flow, uart-hw-flow-modem.  The
+   first just has 2 pins, the second 4 and the last 8. The board code
+   selects one of these for the serial driver to use.
 
-> +static int _pm8921_vreg_is_enabled(struct pm8921_vreg *vreg)
-> +{
-> +	int rc = 0;
-> +
-> +	/*
-> +	 * All regulator types except advanced mode SMPS, FTSMPS, and VS300 have
-> +	 * enable bit in bit 7 of the control register.
-> +	 */
-> +	switch (vreg->type) {
+2) Three functions: uart-core, uart-hw-flow, uart-mode.  The first has
+   2 pins, the second has 2 pins and the last 4 pins. The board code tells
+   the driver to use uart-core, plus say uart-hw-flow.
 
-If they're all checking bit 7 the switch statement feels a bit odd...
+Do you think the documentation should have guidelines how best to do
+this sort of core + additional optional extras?
 
-> +static int pm8921_nldo_list_voltage(struct regulator_dev *rdev,
-> +				    unsigned selector)
-> +{
-> +	if (selector >= NLDO_SET_POINTS)
-> +		return 0;
+Say i have a SoC with an SPI core. This core has the usual MISC, MOSI
+and SCLK. It additionally has 4 chip select lines. My board uses chip
+select lines 2 and 3 for SPI, and select lines 0 and 1 as GPIO lines.
+How does the pinmux driver handle this? Again, it is the problems of a
+few core pins plus additional optional extras.
 
-That looks like it should be returning an error.  0 is for things that
-are in range but can't be set for some reason (it's more intended for
-values knocked out by constraints or similar).
+Maybe the documentation should make some recommendations about what is
+placed into the drivers/pinmux/pinmux-foo.c and what should be kept in
+the board specific code? Without these guidelines, it seems to me,
+each board for a given SoC is going to add its own peculiar pin
+combination to the drivers/pinmux/pinmux-foo.c file.  Maybe it makes
+more sense to have a collection of standard pin functions in
+drivers/pinmux/pinmux-foo.c, which cover 75% of the likely
+combinations. And recommend a board file to have its own additional
+list of strange pin functions which it registers with the pinmux core?
 
-> +static int _pm8921_nldo1200_get_voltage(struct pm8921_vreg *vreg)
-> +{
-> +	int uV = 0;
-> +	int vprog;
-> +
-> +	if (!NLDO1200_IN_ADVANCED_MODE(vreg)) {
-> +		pr_warn("%s: currently in legacy mode; voltage unknown.\n",
-> +			vreg->name);
-> +		return vreg->save_uV;
-> +	}
-> +
-> +	vprog = vreg->ctrl_reg & NLDO1200_CTRL_VPROG_MASK;
-> +
-> +	if ((vreg->ctrl_reg & NLDO1200_CTRL_RANGE_MASK)
-> +	    == NLDO1200_CTRL_RANGE_LOW)
-> +		uV = vprog * NLDO1200_LOW_UV_STEP + NLDO1200_LOW_UV_MIN;
-> +	else
-> +		uV = vprog * NLDO1200_HIGH_UV_STEP + NLDO1200_HIGH_UV_MIN;
-
-Just implement get_voltage_sel() - the same thing applies to most of the
-other regulators that have meaningful selectors.
-
-> +		/* Advanced mode */
-> +		if ((vreg->test_reg[2] & NLDO1200_ADVANCED_PM_MASK)
-> +		    == NLDO1200_ADVANCED_PM_LPM)
-
-Do we need #defines for the indexes into these arrays?  It's a bit magic
-and the code is complicated enough.
-
-> +	if (mode != REGULATOR_MODE_NORMAL && mode != REGULATOR_MODE_IDLE) {
-> +		vreg_err(vreg, "invalid mode: %u\n", mode);
-> +		return -EINVAL;
-> +	}
-
-switch would be clearer.
-
-> +/**
-> + * struct pm8921_regulator_platform_data - PMIC 8921 regulator platform data
-> + * @init_data:		regulator constraints
-> + * @id:			regulator id; from enum pm8921_vreg_id
-> + * @pull_down_enable:	0 = no pulldown, 1 = pulldown when regulator disabled
-> + * @pin_ctrl:		pin control inputs to use for the regulator; should be
-> + *			a combination of PM8921_VREG_PIN_CTRL_* values
-> + * @pin_fn:		action to perform when pin control pin is active
-> + * @system_uA:		current drawn from regulator not accounted for by any
-> + *			regulator framework consumer
-
-Having system_uA here seems wrong, this is hardly something that is
-specific to this chip.
+     Thanks
+        Andrew
