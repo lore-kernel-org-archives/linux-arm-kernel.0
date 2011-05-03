@@ -1,46 +1,60 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue,  3 May 2011 22:51:21 +0200
-Subject: [PATCH resend] sdio: optimized SDIO IRQ handling for single function
-Message-ID: <1304455881-10010-1-git-send-email-per.forlin@linaro.org>
+From: simon@sequanux.org (Simon Guinot)
+Date: Tue, 3 May 2011 21:14:35 +0000
+Subject: [PATCH] kirkwood: add dir-665 support
+In-Reply-To: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
+References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
+Message-ID: <20110503211435.GW19806@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+Hi Hirundo,
 
-If there is only 1 function registered it is possible to
-improve performance by avoiding the overhead of reading the
-CCCR registers and directly call the function handler.
+On Thu, Apr 28, 2011 at 12:34:46AM +0800, Hirundo Cam wrote:
+> This patch is a hack to dir-665 by referencing mv88f6281gtw_ge board.
+> LEDs, GPIO, Buttons remains unknown.
 
-Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- drivers/mmc/core/sdio_irq.c |   14 ++++++++++++++
- 1 files changed, 14 insertions(+), 0 deletions(-)
+You could use the GPIO sysfs API to discover the LEDs and buttons GPIOs.
 
-diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-index b300161..25291bf 100644
---- a/drivers/mmc/core/sdio_irq.c
-+++ b/drivers/mmc/core/sdio_irq.c
-@@ -32,6 +32,20 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
- 	int i, ret, count;
- 	unsigned char pending;
- 
-+	/*
-+	 * If there is only 1 function registered
-+	 * call irq directly without checking the CCCR registers.
-+	 */
-+	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
-+	    card->host->sdio_irqs && (card->sdio_funcs == 1))
-+		for (i = 0; i < SDIO_MAX_FUNCS; i++) {
-+			struct sdio_func *func = card->sdio_func[i];
-+			if (func && func->irq_handler) {
-+				func->irq_handler(func);
-+				return 1;
-+			}
-+		}
-+
- 	ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
- 	if (ret) {
- 		printk(KERN_DEBUG "%s: error %d reading SDIO_CCCR_INTx\n",
--- 
-1.7.4.1
+> 
+> To use this patch, u-boot must also be modified.
+
+What kind of modifications ?
+
+> 
+> Signed-off-by: Hirundo Cam <camhirundo@gmail.com>
+> ---
+>  arch/arm/mach-kirkwood/Kconfig            |    6 ++
+>  arch/arm/mach-kirkwood/Makefile           |    1 +
+>  arch/arm/mach-kirkwood/mv88f6281_dir665.c |  107 +++++++++++++++++++++++++++++
+>  arch/arm/tools/mach-types                 |    1 +
+>  4 files changed, 115 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/mach-kirkwood/mv88f6281_dir665.c
+> 
+> diff --git a/arch/arm/mach-kirkwood/Kconfig b/arch/arm/mach-kirkwood/Kconfig
+> index 7fc603b..296d97f 100644
+> --- a/arch/arm/mach-kirkwood/Kconfig
+> +++ b/arch/arm/mach-kirkwood/Kconfig
+> @@ -26,6 +26,12 @@ config MACH_MV88F6281GTW_GE
+>  	  Say 'Y' here if you want your kernel to support the
+>  	  Marvell 88F6281 GTW GE Board.
+>  
+> +config MACH_MV88F6281_DIR665
+> +	bool "Marvell 88F6281 DIR665 Board"
+> +	help
+> +	  Say 'Y' here if you want your kernel to support the
+> +	  88F6281 DIR665 Board.
+> +
+
+Probably than 'MV88F6281' should not be a part of the D-Link DIR665
+machine name.
+
+Regards,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110503/71ffc192/attachment.sig>
