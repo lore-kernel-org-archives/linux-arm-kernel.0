@@ -1,70 +1,365 @@
-From: skannan@codeaurora.org (Saravana Kannan)
-Date: Mon, 02 May 2011 20:37:06 -0700
-Subject: [PATCH 05/10] clk: Add support for simple dividers
-In-Reply-To: <20110428151447.GS17290@n2100.arm.linux.org.uk>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-6-git-send-email-s.hauer@pengutronix.de>
-	<20110418094909.GE31131@pengutronix.de>
-	<20110418100716.GJ14770@pengutronix.de>
-	<4DACF761.3050503@codeaurora.org>
-	<20110428151447.GS17290@n2100.arm.linux.org.uk>
-Message-ID: <4DBF7862.3050103@codeaurora.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue,  3 May 2011 06:03:29 +0200
+Subject: [V3 PATCH] arm: add global early device init
+In-Reply-To: <1304368940-19340-1-git-send-email-plagnioj@jcrosoft.com>
+References: <1304368940-19340-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1304395409-30965-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/28/2011 08:14 AM, Russell King - ARM Linux wrote:
-> On Mon, Apr 18, 2011 at 07:45:53PM -0700, Saravana Kannan wrote:
->> On 04/18/2011 03:07 AM, Sascha Hauer wrote:
->>> AFAIK there are two different implementation types in the tree. Some
->>> implementations only allow to set to the exact rate round_rate returns
->>> while others round down in set_rate.
->>>
->>> Has this been specified what behaviour is expected?
->>>
->>
->> This is something I have nagged Russell once or twice about and then
->> sent out an email to the list for which there was very limited response.
->> I think clk_round_rate() is too generic and not very useful.
->
-> As I've always said, clk_round_rate() returns the rate which you will
-> get if you ask clk_set_rate() to set the same rate.  It's not ment to
-> be "tell me the clock rate which I'd like to then pass to clk_set_rate(),
-> oh that's not good enough, so lets tweak it a bit and try again".
+this will init earlytimer and will try to probe 1 or 2 timers for clockevents
+and clocksource
 
-Yes, I understood the purpose of clk_round_rate() from the previous 
-discussion we had.
+This will also allow to share timer cross arch such as sh-mobile and sh
 
-> For example, take a video driver.  The user passes in the pixel clock as
-> a picosecond argument.  This gets converted to Hz.  We can then use
-> clk_round_rate() to find out what clock rate we _actually_ end up with
-> when we set that rate using clk_set_rate(), and return that rate (again
-> as ps) back to the user before we alter anything.  The user can then
-> make a decision whether they want to actually set it.
+all arm timers will be update to early device step by step
 
-Sure clk_round_rate() might be sufficient for this case.
+on ARM sh-mobile we do not need to use the late_time_init
+as the irq are setup before the probe of the timers
 
-> Having some sort of range stuff doesn't help you there because you're
-> not supplied a range from userspace.  You're just asked to set a 39752ps
-> clock rate.
+tested on at91sam9263-ek, at91rm9200-ek
 
-But this not the problem I'm trying to solve though. There are several 
-devices that have a freq operating range in their spec sheet and they 
-can't operate outside of that range. As of today, when the 
-device/drivers are used in multiple soc/arch, they are solving that 
-issue either by using clk_round_rate() in a way that you didn't intend 
-(to search for a freq that will work for them) or by passing in the 
-clock freq through platform data.
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
+---
+V3:
+	now we can do not specify the .timer at all
+	and just realy on the early device
 
-I think a better way to solve this problem is to have a 
-clk_set_rate_range() and hence suggesting it. This would also help 
-reduce the no. of lines/data passed in board files which I think helps 
-clean up ARM code.
+	on ARM sh-mobile we do not need to use the late_time_init
+	as the irq are setup before the probe of the timers
 
-Btw, one of the use cases this would help is actually related to display 
-too. It's some clock that's fed to the display panel (I don't think it's 
-the pixel clock) which has a 96 MHz - 103 MHz operating range.
+	the only remaing question is is ok to move the clock_init in the
+	.init_early on sh-mobile
 
--Saravana
+	this patch depends on [PATCH] shmobile: fix map_io init usage
+
+Best Regards,
+J.
+
+ arch/arm/kernel/time.c                  |   28 +++++++++++++++++--
+ arch/arm/mach-shmobile/Makefile         |    2 +-
+ arch/arm/mach-shmobile/board-ag5evm.c   |   13 +--------
+ arch/arm/mach-shmobile/board-ap4evb.c   |   18 +++---------
+ arch/arm/mach-shmobile/board-g3evm.c    |   12 +-------
+ arch/arm/mach-shmobile/board-g4evm.c    |   12 +-------
+ arch/arm/mach-shmobile/board-mackerel.c |   18 +++---------
+ arch/arm/mach-shmobile/timer.c          |   46 -------------------------------
+ 8 files changed, 37 insertions(+), 112 deletions(-)
+ delete mode 100644 arch/arm/mach-shmobile/timer.c
+
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index 1ff46ca..12cee50 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -13,6 +13,7 @@
+  */
+ #include <linux/module.h>
+ #include <linux/kernel.h>
++#include <linux/platform_device.h>
+ #include <linux/interrupt.h>
+ #include <linux/time.h>
+ #include <linux/init.h>
+@@ -77,6 +78,9 @@ EXPORT_SYMBOL(profile_pc);
+ #ifdef CONFIG_ARCH_USES_GETTIMEOFFSET
+ u32 arch_gettimeoffset(void)
+ {
++	if (!system_timer)
++		return 0;
++
+ 	if (system_timer->offset != NULL)
+ 		return system_timer->offset() * 1000;
+ 
+@@ -147,7 +151,12 @@ static struct sysdev_class timer_sysclass = {
+ 
+ static int __init timer_init_sysfs(void)
+ {
+-	int ret = sysdev_class_register(&timer_sysclass);
++	int ret;
++
++	if (!system_timer)
++		return 0;
++
++	ret = sysdev_class_register(&timer_sysclass);
+ 	if (ret == 0) {
+ 		system_timer->dev.cls = &timer_sysclass;
+ 		ret = sysdev_register(&system_timer->dev);
+@@ -161,9 +170,22 @@ device_initcall(timer_init_sysfs);
+ void __init time_init(void)
+ {
+ 	system_timer = machine_desc->timer;
+-	system_timer->init();
++	if (system_timer && system_timer->init)
++		system_timer->init();
++
++	/*
++	 * Make sure all compiled-in early timers register themselves.
++	 *
++	 * Run probe() for two "earlytimer" devices, these will be the
++	 * clockevents and clocksource devices respectively. In the event
++	 * that only a clockevents device is available, we -ENODEV on the
++	 * clocksource and the jiffies clocksource is used transparently
++	 * instead. No error handling is necessary here.
++	 */
++	early_platform_driver_register_all("earlytimer");
++	early_platform_driver_probe("earlytimer", 2, 0);
++
+ #ifdef CONFIG_HAVE_SCHED_CLOCK
+ 	sched_clock_postinit();
+ #endif
+ }
+-
+diff --git a/arch/arm/mach-shmobile/Makefile b/arch/arm/mach-shmobile/Makefile
+index 260e09d..6a1cc9e 100644
+--- a/arch/arm/mach-shmobile/Makefile
++++ b/arch/arm/mach-shmobile/Makefile
+@@ -3,7 +3,7 @@
+ #
+ 
+ # Common objects
+-obj-y				:= map_io.o timer.o console.o clock.o pm_runtime.o
++obj-y				:= map_io.o console.o clock.o pm_runtime.o
+ 
+ # CPU objects
+ obj-$(CONFIG_ARCH_SH7367)	+= setup-sh7367.o clock-sh7367.o intc-sh7367.o
+diff --git a/arch/arm/mach-shmobile/board-ag5evm.c b/arch/arm/mach-shmobile/board-ag5evm.c
+index b30b11d..cd9ba29 100644
+--- a/arch/arm/mach-shmobile/board-ag5evm.c
++++ b/arch/arm/mach-shmobile/board-ag5evm.c
+@@ -339,6 +339,7 @@ static void __init ag5evm_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh73a0_add_early_devices();
+ 	shmobile_setup_console();
++	sh73a0_clock_init();
+ }
+ 
+ #define PINTC_ADDR	0xe6900000
+@@ -447,22 +448,10 @@ static void __init ag5evm_init(void)
+ 	platform_add_devices(ag5evm_devices, ARRAY_SIZE(ag5evm_devices));
+ }
+ 
+-static void __init ag5evm_timer_init(void)
+-{
+-	sh73a0_clock_init();
+-	shmobile_timer.init();
+-	return;
+-}
+-
+-struct sys_timer ag5evm_timer = {
+-	.init	= ag5evm_timer_init,
+-};
+-
+ MACHINE_START(AG5EVM, "ag5evm")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= ag5evm_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_gic,
+ 	.init_early	= ag5evm_init_early,
+ 	.init_machine	= ag5evm_init,
+-	.timer		= &ag5evm_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-ap4evb.c b/arch/arm/mach-shmobile/board-ap4evb.c
+index ed55c01..f800cae 100644
+--- a/arch/arm/mach-shmobile/board-ap4evb.c
++++ b/arch/arm/mach-shmobile/board-ap4evb.c
+@@ -1096,6 +1096,10 @@ static void __init ap4evb_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7372_add_early_devices();
+ 	shmobile_setup_console();
++	sh7372_clock_init();
++
++	/* External clock source */
++	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+ }
+ 
+ #define GPIO_PORT9CR	0xE6051009
+@@ -1330,24 +1334,10 @@ static void __init ap4evb_init(void)
+ 	fsi_init_pm_clock();
+ }
+ 
+-static void __init ap4evb_timer_init(void)
+-{
+-	sh7372_clock_init();
+-	shmobile_timer.init();
+-
+-	/* External clock source */
+-	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+-}
+-
+-static struct sys_timer ap4evb_timer = {
+-	.init		= ap4evb_timer_init,
+-};
+-
+ MACHINE_START(AP4EVB, "ap4evb")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7372_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= ap4evb_init_early,
+ 	.init_machine	= ap4evb_init,
+-	.timer		= &ap4evb_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-g3evm.c b/arch/arm/mach-shmobile/board-g3evm.c
+index 20eeacf..63a6c35 100644
+--- a/arch/arm/mach-shmobile/board-g3evm.c
++++ b/arch/arm/mach-shmobile/board-g3evm.c
+@@ -249,6 +249,7 @@ static void __init g3evm_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7367_add_early_devices();
+ 	shmobile_setup_console();
++	sh7367_clock_init();
+ }
+ 
+ static void __init g3evm_init(void)
+@@ -338,21 +339,10 @@ static void __init g3evm_init(void)
+ 	platform_add_devices(g3evm_devices, ARRAY_SIZE(g3evm_devices));
+ }
+ 
+-static void __init g3evm_timer_init(void)
+-{
+-	sh7367_clock_init();
+-	shmobile_timer.init();
+-}
+-
+-static struct sys_timer g3evm_timer = {
+-	.init		= g3evm_timer_init,
+-};
+-
+ MACHINE_START(G3EVM, "g3evm")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7367_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= g3evm_init_early,
+ 	.init_machine	= g3evm_init,
+-	.timer		= &g3evm_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-g4evm.c b/arch/arm/mach-shmobile/board-g4evm.c
+index 079dd35..46e1b0c 100644
+--- a/arch/arm/mach-shmobile/board-g4evm.c
++++ b/arch/arm/mach-shmobile/board-g4evm.c
+@@ -263,6 +263,7 @@ static void __init g4evm_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7377_add_early_devices();
+ 	shmobile_setup_console();
++	sh7377_clock_init();
+ }
+ 
+ #define GPIO_SDHID0_D0	0xe60520fc
+@@ -381,21 +382,10 @@ static void __init g4evm_init(void)
+ 	platform_add_devices(g4evm_devices, ARRAY_SIZE(g4evm_devices));
+ }
+ 
+-static void __init g4evm_timer_init(void)
+-{
+-	sh7377_clock_init();
+-	shmobile_timer.init();
+-}
+-
+-static struct sys_timer g4evm_timer = {
+-	.init		= g4evm_timer_init,
+-};
+-
+ MACHINE_START(G4EVM, "g4evm")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7377_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= g4evm_init_early,
+ 	.init_machine	= g4evm_init,
+-	.timer		= &g4evm_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/board-mackerel.c b/arch/arm/mach-shmobile/board-mackerel.c
+index f05a673..d52f323 100644
+--- a/arch/arm/mach-shmobile/board-mackerel.c
++++ b/arch/arm/mach-shmobile/board-mackerel.c
+@@ -1011,6 +1011,10 @@ static void __init mackerel_init_early(void)
+ 	/* setup early devices and console here as well */
+ 	sh7372_add_early_devices();
+ 	shmobile_setup_console();
++	sh7372_clock_init();
++
++	/* External clock source */
++	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+ }
+ 
+ #define GPIO_PORT9CR	0xE6051009
+@@ -1203,24 +1207,10 @@ static void __init mackerel_init(void)
+ 	hdmi_init_pm_clock();
+ }
+ 
+-static void __init mackerel_timer_init(void)
+-{
+-	sh7372_clock_init();
+-	shmobile_timer.init();
+-
+-	/* External clock source */
+-	clk_set_rate(&sh7372_dv_clki_clk, 27000000);
+-}
+-
+-static struct sys_timer mackerel_timer = {
+-	.init		= mackerel_timer_init,
+-};
+-
+ MACHINE_START(MACKEREL, "mackerel")
+ 	.map_io		= shmobile_map_io,
+ 	.init_irq	= sh7372_init_irq,
+ 	.handle_irq	= shmobile_handle_irq_intc,
+ 	.init_early	= mackerel_init_early,
+ 	.init_machine	= mackerel_init,
+-	.timer		= &mackerel_timer,
+ MACHINE_END
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+deleted file mode 100644
+index 895794b..0000000
+--- a/arch/arm/mach-shmobile/timer.c
++++ /dev/null
+@@ -1,46 +0,0 @@
+-/*
+- * SH-Mobile Timer
+- *
+- * Copyright (C) 2010  Magnus Damm
+- * Copyright (C) 2002 - 2009  Paul Mundt
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License as published by
+- * the Free Software Foundation; version 2 of the License.
+- *
+- * This program is distributed in the hope that it will be useful,
+- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+- * GNU General Public License for more details.
+- *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+- *
+- */
+-#include <linux/platform_device.h>
+-#include <asm/mach/time.h>
+-
+-static void __init shmobile_late_time_init(void)
+-{
+-	/*
+-	 * Make sure all compiled-in early timers register themselves.
+-	 *
+-	 * Run probe() for two "earlytimer" devices, these will be the
+-	 * clockevents and clocksource devices respectively. In the event
+-	 * that only a clockevents device is available, we -ENODEV on the
+-	 * clocksource and the jiffies clocksource is used transparently
+-	 * instead. No error handling is necessary here.
+-	 */
+-	early_platform_driver_register_all("earlytimer");
+-	early_platform_driver_probe("earlytimer", 2, 0);
+-}
+-
+-static void __init shmobile_timer_init(void)
+-{
+-	late_time_init = shmobile_late_time_init;
+-}
+-
+-struct sys_timer shmobile_timer = {
+-	.init		= shmobile_timer_init,
+-};
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.4.1
