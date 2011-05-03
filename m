@@ -1,35 +1,52 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 03 May 2011 09:22:03 -0700
-Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
-In-Reply-To: <BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com> (Linus
-	Walleij's message of "Wed, 27 Apr 2011 15:18:55 +0200")
-References: <1303139217-10285-1-git-send-email-charu@ti.com>
-	<20110419062633.GA15620@atomide.com> <87r58w4gq3.fsf@ti.com>
-	<20110421054221.GF5918@atomide.com>
-	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
-	<20110426072941.GA3755@atomide.com>
-	<BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com>
-Message-ID: <87y62ng3f8.fsf@ti.com>
+Date: Tue, 03 May 2011 09:27:36 -0700
+Subject: [PATCH 02/15] OMAP: GPIO: remove MPUIO handling from
+	_clear_gpio_irqbank()
+In-Reply-To: <BANLkTinmf5EWwbWrYJHz=Z19v1EkG-MPvg@mail.gmail.com> (Charulatha
+	Varadarajan's message of "Mon, 25 Apr 2011 19:18:49 +0530")
+References: <1303513327-14532-1-git-send-email-khilman@ti.com>
+	<1303513327-14532-3-git-send-email-khilman@ti.com>
+	<BANLkTinmf5EWwbWrYJHz=Z19v1EkG-MPvg@mail.gmail.com>
+Message-ID: <87hb9bg35z.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-> 2011/4/26 Tony Lindgren <tony@atomide.com>:
->> * Linus Walleij <linus.walleij@linaro.org> [110423 01:32]:
->>> Since you'll probably be dependent on stuff happening in my patches
->>> to move stuff into drivers/gpio I'll be happy to carry the patches in my
->>> gpio-consolidation branch with Tony's ACKs if need be.
->>
->> Sounds good to me.
+> Kevin,
 >
-> I've just posted a patch series that moves "our" two GPIO drivers to
-> drivers/gpio, they should serve as good inspiration... Tell me if I can
-> help out, stack patches on top of this series and I'll carry them.
+> On Sat, Apr 23, 2011 at 04:31, Kevin Hilman <khilman@ti.com> wrote:
+>> Remove the OMAP1 #ifdef and MPUIO special case for _clear_gpio_irqbank()
+>>
+>> The MPUIOs do not need a register access to ack/clear the IRQ status,
+>> since reading the IRQ status clears it. ?In addition, the MPUIO
+>> irq_chip has an empty ack method, so _clear_gpio_irqbank() is never
+>> used for MPUIOs.
+>>
+>> Signed-off-by: Kevin Hilman <khilman@ti.com>
+>> ---
+>> ?arch/arm/plat-omap/gpio.c | ? ?6 ------
+>> ?1 files changed, 0 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+>> index fe6971a..8b5ca6e 100644
+>> --- a/arch/arm/plat-omap/gpio.c
+>> +++ b/arch/arm/plat-omap/gpio.c
+>> @@ -770,12 +770,6 @@ static void _clear_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
+>> ? ? ? ?void __iomem *reg = bank->base;
+>>
+>> ? ? ? ?switch (bank->method) {
+>> -#ifdef CONFIG_ARCH_OMAP1
+>> - ? ? ? case METHOD_MPUIO:
+>> - ? ? ? ? ? ? ? /* MPUIO irqstatus is reset by reading the status register,
+>> - ? ? ? ? ? ? ? ?* so do nothing here */
+>> - ? ? ? ? ? ? ? return;
+>> -#endif
+>
+> The default case has a "WARN_ON(1)". I guess WARN_ON()
+> is not required for METHOD_MPUIO.
 
-Great, thanks.
-
-Are you OK with a move of the current OMAP GPIO drivers (rather ugly)
-into drivers/gpio first, followed by the cleanup/restructure patches?
+As stated in the changelog, this function is never called for MPUIO
+banks, so the warning should not be hit.
 
 Kevin
