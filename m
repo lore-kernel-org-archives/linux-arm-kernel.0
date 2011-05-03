@@ -1,45 +1,32 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 3 May 2011 00:50:13 -0700
-Subject: [PATCH 4/4] omap: musb: introduce default baord config
-In-Reply-To: <20110502142533.GJ2529@legolas.emea.dhcp.ti.com>
-References: <cover.1303682352.git.mike@compulab.co.il>
-	<c18b58e93a67116f06e8ffbf097c2bd8e4f642a5.1303682352.git.mike@compulab.co.il>
-	<FD6AF712-BD76-4E30-8ED8-6903987E5C2C@linuxhacker.ru>
-	<20110428141818.GE19709@n2100.arm.linux.org.uk>
-	<9B236748-29D6-4129-AFCD-5D223CE18ECD@linuxhacker.ru>
-	<20110428162820.GF19709@n2100.arm.linux.org.uk>
-	<9D42099B-0C25-4407-88B2-2574E9233B2A@linuxhacker.ru>
-	<20110502142051.GC2092@atomide.com>
-	<20110502142533.GJ2529@legolas.emea.dhcp.ti.com>
-Message-ID: <20110503075013.GL2092@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 3 May 2011 09:58:14 +0200
+Subject: [RFC PATCH 4/4] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <20110502230118.GE28001@n2100.arm.linux.org.uk>
+References: <90477150.2231869.1304372815517.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+	<1319927287.2232106.1304373011082.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+	<20110502230118.GE28001@n2100.arm.linux.org.uk>
+Message-ID: <201105030958.14698.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [110502 07:22]:
-> On Mon, May 02, 2011 at 07:20:52AM -0700, Tony Lindgren wrote:
-> > * Oleg Drokin <green@linuxhacker.ru> [110428 09:33]:
-> > > 
-> > > So to me it looks like something totally in realm of musb driver itself.
-> > > Nothing bad happens if you configure your MUSB as say OTG while in fact only
-> > > peripheral mode was implemented, it continues to work as it did.
-> > > Of course enabling HOST mode may not magically make things work, but
-> > > I suspect this could be addressed from Kconfig itself instead.
+On Tuesday 03 May 2011 01:01:18 Russell King - ARM Linux wrote:
+> It is preferable to use the same mapping, as it ensures that you're not
+> going to create incompatible aliases.
 
-So based on the discussion it sounds like we still the board specific
-configuration for the mode in some cases.
+Is aliasing a problem for MMIO mappings? I would think that you can
+ioremap registers anywhere and as often as you want because they are
+never cacheable.
 
-> > I think Felipe already has some patches to remove the various Kconfig
-> > options for musb?  In any case, the musb configuration should be a
-> > runtime configuration passed in the platform data or cmdline.
-> 
-> Yeah, I'm planning to get rid of all the ifdeferry and always compile it
-> with HOST and Peripheral support. It's only few extra tens of bytes
-> anyway. Still, I doubt I can get that done for this merge window, I
-> already have pending the debugging rework.
+> But, before we get too bogged down with this, please realise that it is
+> possible to setup early mappings from the device tree for things like the
+> SCU.  Maybe not using ioremap(), but I'm sure we can find some way to use
+> the iotable_init() stuff to setup some early mappings from DT for this
+> stuff.
 
-So care to ack the original patch then? It still allows overriding
-the default mode from board-*.c file as needed.
+Good point. It doesn't really matter how the entries get into the page
+table, whether you call it ioremap, iotable_init, create_mapping or
+ioremap_early. What matters is that we don't hardcode the physical
+address in the board code, because that limits the possible reuse
+on other device tree enabled targets.
 
-Regards,
-
-Tony
+	Arnd
