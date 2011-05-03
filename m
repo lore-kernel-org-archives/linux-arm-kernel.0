@@ -1,545 +1,205 @@
 From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue,  3 May 2011 12:03:35 +1200
-Subject: [PATCH V4 21/23] at91: Make compact flash device common
+Date: Tue,  3 May 2011 12:03:37 +1200
+Subject: [PATCH V4 23/23] at91: Remove mAgic and ISI device code
 In-Reply-To: <1304381017-17912-1-git-send-email-ryan@bluewatersys.com>
 References: <1304381017-17912-1-git-send-email-ryan@bluewatersys.com>
-Message-ID: <1304381017-17912-22-git-send-email-ryan@bluewatersys.com>
+Message-ID: <1304381017-17912-24-git-send-email-ryan@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the individual compact flash device code for each at91 variant with
-a single implementation in devices.c
+The AT572D940HF mAgic device and the AT91SAM9263 ISI device do not
+have drivers yet and therefore the platform code in arch/arm/mach-at91
+is unused and can be removed.
 
 Signed-off-by: Ryan Mallon <ryan@bluewatersys.com>
 ---
- arch/arm/mach-at91/at91rm9200_devices.c  |   74 ++++++--------------
- arch/arm/mach-at91/at91sam9260_devices.c |  114 +++++++-----------------------
- arch/arm/mach-at91/at91sam9263_devices.c |  102 +++++++--------------------
- arch/arm/mach-at91/devices.c             |   74 +++++++++++++++++++
- arch/arm/mach-at91/devices.h             |   14 ++++
- 5 files changed, 162 insertions(+), 216 deletions(-)
+ arch/arm/mach-at91/at572d940hf_devices.c  |   73 -----------------------------
+ arch/arm/mach-at91/at91sam9263_devices.c  |   50 --------------------
+ arch/arm/mach-at91/board-at572d940hf_ek.c |    2 -
+ arch/arm/mach-at91/include/mach/board.h   |    6 --
+ 4 files changed, 0 insertions(+), 131 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91rm9200_devices.c b/arch/arm/mach-at91/at91rm9200_devices.c
-index f251ed1..5ffa946 100644
---- a/arch/arm/mach-at91/at91rm9200_devices.c
-+++ b/arch/arm/mach-at91/at91rm9200_devices.c
-@@ -84,38 +84,12 @@ static struct at91_dev_table_ethernet device_eth __initdata = {
-  *  Compact Flash / PCMCIA
-  * -------------------------------------------------------------------- */
+diff --git a/arch/arm/mach-at91/at572d940hf_devices.c b/arch/arm/mach-at91/at572d940hf_devices.c
+index 9910fc8..26aa567 100644
+--- a/arch/arm/mach-at91/at572d940hf_devices.c
++++ b/arch/arm/mach-at91/at572d940hf_devices.c
+@@ -250,79 +250,6 @@ static struct at91_dev_table_uart device_uart2 __initdata = {
+ 	.cts_pin	= {AT91_PIN_PA16, AT91_PIN_PERIPH_A, 0, 0, 0},
+ };
  
--#if defined(CONFIG_AT91_CF) || defined(CONFIG_AT91_CF_MODULE)
--static struct at91_cf_data cf_data;
+-/* --------------------------------------------------------------------
+- *  mAgic
+- * -------------------------------------------------------------------- */
 -
--#define CF_BASE		AT91_CHIPSELECT_4
--
--static struct resource cf_resources[] = {
--	[0] = {
--		.start	= CF_BASE,
--		/* ties up CS4, CS5 and CS6 */
--		.end	= CF_BASE + (0x30000000 - 1),
--		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_8AND16BIT,
+-#ifdef CONFIG_MAGICV
+-static struct resource mAgic_resources[] = {
+-	{
+-		.start = AT91_MAGIC_PM_BASE,
+-		.end   = AT91_MAGIC_PM_BASE + AT91_MAGIC_PM_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_DM_I_BASE,
+-		.end   = AT91_MAGIC_DM_I_BASE + AT91_MAGIC_DM_I_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_DM_F_BASE,
+-		.end   = AT91_MAGIC_DM_F_BASE + AT91_MAGIC_DM_F_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_DM_DB_BASE,
+-		.end   = AT91_MAGIC_DM_DB_BASE + AT91_MAGIC_DM_DB_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_REGS_BASE,
+-		.end   = AT91_MAGIC_REGS_BASE + AT91_MAGIC_REGS_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start = AT91_MAGIC_EXTPAGE_BASE,
+-		.end   = AT91_MAGIC_EXTPAGE_BASE + AT91_MAGIC_EXTPAGE_SIZE - 1,
+-		.flags = IORESOURCE_MEM,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MSIRQ0,
+-		.end    = AT572D940HF_ID_MSIRQ0,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MHALT,
+-		.end    = AT572D940HF_ID_MHALT,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MEXC,
+-		.end    = AT572D940HF_ID_MEXC,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-	{
+-		.start  = AT572D940HF_ID_MEDMA,
+-		.end    = AT572D940HF_ID_MEDMA,
+-		.flags  = IORESOURCE_IRQ,
 -	},
 -};
 -
--static struct platform_device at91rm9200_cf_device = {
--	.name		= "at91_cf",
--	.id		= -1,
--	.dev		= {
--				.platform_data		= &cf_data,
--	},
--	.resource	= cf_resources,
--	.num_resources	= ARRAY_SIZE(cf_resources),
+-static struct platform_device mAgic_device = {
+-	.name           = "mAgic",
+-	.id             = -1,
+-	.num_resources  = ARRAY_SIZE(mAgic_resources),
+-	.resource       = mAgic_resources,
 -};
 -
--void __init at91_add_device_cf(struct at91_cf_data *data)
-+static int __init at91rm9200_cf_init(struct at91_cf_data *data, int *slot)
- {
- 	unsigned int csa;
- 
--	if (!data)
--		return;
--
- 	data->chipselect = 4;		/* can only use EBI ChipSelect 4 */
-+	*slot = 0;			/* only one CF slot */
- 
- 	/* CF takes over CS4, CS5, CS6 */
- 	csa = at91_sys_read(AT91_EBI_CSA);
-@@ -136,35 +110,30 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- 				| AT91_SMC_RWHOLD_(4)	/* hold time */
- 	);
- 
--	/* input/irq */
--	if (data->irq_pin) {
--		at91_set_gpio_input(data->irq_pin, 1);
--		at91_set_deglitch(data->irq_pin, 1);
--	}
--	at91_set_gpio_input(data->det_pin, 1);
--	at91_set_deglitch(data->det_pin, 1);
--
--	/* outputs, initially off */
--	if (data->vcc_pin)
--		at91_set_gpio_output(data->vcc_pin, 0);
--	at91_set_gpio_output(data->rst_pin, 0);
-+	return 0;
-+}
- 
-+static struct at91_pin_config cf_pins[] __initdata = {
- 	/* force poweron defaults for these pins ... */
--	at91_set_A_periph(AT91_PIN_PC9, 0);	/* A25/CFRNW */
--	at91_set_A_periph(AT91_PIN_PC10, 0);	/* NCS4/CFCS */
--	at91_set_A_periph(AT91_PIN_PC11, 0);	/* NCS5/CFCE1 */
--	at91_set_A_periph(AT91_PIN_PC12, 0);	/* NCS6/CFCE2 */
-+	{AT91_PIN_PC9,  AT91_PIN_PERIPH_A, 0, 0, 0},	/* A25/CFRNW */
-+	{AT91_PIN_PC10, AT91_PIN_PERIPH_A, 0, 0, 0},	/* NCS4/CFCS */
-+	{AT91_PIN_PC11, AT91_PIN_PERIPH_A, 0, 0, 0},	/* NCS5/CFCE1 */
-+	{AT91_PIN_PC12, AT91_PIN_PERIPH_A, 0, 0, 0},	/* NCS6/CFCE2 */
- 
- 	/* nWAIT is _not_ a default setting */
--	at91_set_A_periph(AT91_PIN_PC6, 1);	/* nWAIT */
--
--	cf_data = *data;
--	platform_device_register(&at91rm9200_cf_device);
+-void __init at91_add_device_mAgic(void)
+-{
+-	platform_device_register(&mAgic_device);
 -}
 -#else
--void __init at91_add_device_cf(struct at91_cf_data *data) {}
+-void __init at91_add_device_mAgic(void) {}
 -#endif
-+	{AT91_PIN_PC6,  AT91_PIN_PERIPH_A, 1, 0, 0},	/* nWAIT */
-+};
- 
-+static struct at91_dev_table_cf device_cf __initdata = {
-+	.slot[0]	= {
-+		/* ties up CS4, CS5 and CS6 */
-+		.mmio_base	= AT91_CHIPSELECT_4,
-+		.mmio_size	= 0x30000000,
-+	},
-+	.device_init	= at91rm9200_cf_init,
-+	.pins		= cf_pins,
-+	.nr_pins	= ARRAY_SIZE(cf_pins),
-+};
- 
- /* --------------------------------------------------------------------
-  *  MMC / SD
-@@ -419,6 +388,7 @@ static struct at91_device_table at91rm9200_device_table __initdata = {
- 	.ssc[0]		= &device_ssc0,
- 	.ssc[1]		= &device_ssc1,
- 	.ssc[2]		= &device_ssc2,
-+	.cf		= &device_cf,
- };
- 
- void __init at91rm9200_init_devices(void)
-diff --git a/arch/arm/mach-at91/at91sam9260_devices.c b/arch/arm/mach-at91/at91sam9260_devices.c
-index 891e8bf..21c541b 100644
---- a/arch/arm/mach-at91/at91sam9260_devices.c
-+++ b/arch/arm/mach-at91/at91sam9260_devices.c
-@@ -318,56 +318,10 @@ static struct at91_dev_table_uart device_uart5 __initdata = {
-  *  CF/IDE
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_BLK_DEV_IDE_AT91) || defined(CONFIG_BLK_DEV_IDE_AT91_MODULE) || \
--	defined(CONFIG_PATA_AT91) || defined(CONFIG_PATA_AT91_MODULE) || \
--	defined(CONFIG_AT91_CF) || defined(CONFIG_AT91_CF_MODULE)
 -
--static struct at91_cf_data cf0_data;
--
--static struct resource cf0_resources[] = {
--	[0] = {
--		.start	= AT91_CHIPSELECT_4,
--		.end	= AT91_CHIPSELECT_4 + SZ_256M - 1,
--		.flags	= IORESOURCE_MEM,
--	}
--};
--
--static struct platform_device cf0_device = {
--	.id		= 0,
--	.dev		= {
--				.platform_data	= &cf0_data,
--	},
--	.resource	= cf0_resources,
--	.num_resources	= ARRAY_SIZE(cf0_resources),
--};
--
--static struct at91_cf_data cf1_data;
--
--static struct resource cf1_resources[] = {
--	[0] = {
--		.start	= AT91_CHIPSELECT_5,
--		.end	= AT91_CHIPSELECT_5 + SZ_256M - 1,
--		.flags	= IORESOURCE_MEM,
--	}
--};
--
--static struct platform_device cf1_device = {
--	.id		= 1,
--	.dev		= {
--				.platform_data	= &cf1_data,
--	},
--	.resource	= cf1_resources,
--	.num_resources	= ARRAY_SIZE(cf1_resources),
--};
--
--void __init at91_add_device_cf(struct at91_cf_data *data)
-+static int __init at91sam9260_cf_init(struct at91_cf_data *data, int *slot)
- {
--	struct platform_device *pdev;
- 	unsigned long csa;
- 
--	if (!data)
--		return;
--
- 	csa = at91_sys_read(AT91_MATRIX_EBICSA);
- 
- 	switch (data->chipselect) {
-@@ -375,61 +329,44 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- 		at91_set_multi_drive(AT91_PIN_PC8, 0);
- 		at91_set_A_periph(AT91_PIN_PC8, 0);
- 		csa |= AT91_MATRIX_CS4A_SMC_CF1;
--		cf0_data = *data;
--		pdev = &cf0_device;
-+		*slot = 0;
- 		break;
- 	case 5:
- 		at91_set_multi_drive(AT91_PIN_PC9, 0);
- 		at91_set_A_periph(AT91_PIN_PC9, 0);
- 		csa |= AT91_MATRIX_CS5A_SMC_CF2;
--		cf1_data = *data;
--		pdev = &cf1_device;
-+		*slot = 1;
- 		break;
- 	default:
- 		printk(KERN_ERR "AT91 CF: bad chip-select requested (%u)\n",
- 		       data->chipselect);
--		return;
-+		return -EINVAL;
- 	}
- 
- 	at91_sys_write(AT91_MATRIX_EBICSA, csa);
--
--	if (data->rst_pin) {
--		at91_set_multi_drive(data->rst_pin, 0);
--		at91_set_gpio_output(data->rst_pin, 1);
--	}
--
--	if (data->irq_pin) {
--		at91_set_gpio_input(data->irq_pin, 0);
--		at91_set_deglitch(data->irq_pin, 1);
--	}
--
--	if (data->det_pin) {
--		at91_set_gpio_input(data->det_pin, 0);
--		at91_set_deglitch(data->det_pin, 1);
--	}
--
--	at91_set_B_periph(AT91_PIN_PC6, 0);     /* CFCE1 */
--	at91_set_B_periph(AT91_PIN_PC7, 0);     /* CFCE2 */
--	at91_set_A_periph(AT91_PIN_PC10, 0);    /* CFRNW */
--	at91_set_A_periph(AT91_PIN_PC15, 1);    /* NWAIT */
--
--	if (data->flags & AT91_CF_TRUE_IDE)
--#if defined(CONFIG_PATA_AT91) || defined(CONFIG_PATA_AT91_MODULE)
--		pdev->name = "pata_at91";
--#elif defined(CONFIG_BLK_DEV_IDE_AT91) || defined(CONFIG_BLK_DEV_IDE_AT91_MODULE)
--		pdev->name = "at91_ide";
--#else
--#warning "board requires AT91_CF_TRUE_IDE: enable either at91_ide or pata_at91"
--#endif
--	else
--		pdev->name = "at91_cf";
--
--	platform_device_register(pdev);
-+	return 0;
- }
- 
--#else
--void __init at91_add_device_cf(struct at91_cf_data * data) {}
--#endif
-+static struct at91_pin_config cf_pins[] __initdata = {
-+	{AT91_PIN_PC6,  AT91_PIN_PERIPH_B, 0, 0, 0}, /* CFCE1 */
-+	{AT91_PIN_PC7,  AT91_PIN_PERIPH_B, 0, 0, 0}, /* CFCE2 */
-+	{AT91_PIN_PC10, AT91_PIN_PERIPH_A, 0, 0, 0}, /* CFRNW */
-+	{AT91_PIN_PC15, AT91_PIN_PERIPH_A, 1, 0, 0}, /* NWAIT */
-+};
-+
-+static struct at91_dev_table_cf device_cf __initdata = {
-+	.slot[0]	= {
-+		.mmio_base	= AT91_CHIPSELECT_4,
-+		.mmio_size	= SZ_256M,
-+	},
-+	.slot[1] 	= {
-+		.mmio_base	= AT91_CHIPSELECT_5,
-+		.mmio_size	= SZ_256M,
-+	},
-+	.device_init	= at91sam9260_cf_init,
-+	.pins		= cf_pins,
-+	.nr_pins	= ARRAY_SIZE(cf_pins),
-+};
- 
- static struct at91_device_table at91sam9260_device_table __initdata = {
+ static struct at91_device_table at572d940hf_device_table __initdata = {
  	.ethernet	= &device_eth,
-@@ -451,6 +388,7 @@ static struct at91_device_table at91sam9260_device_table __initdata = {
- 	.uart[4]	= &device_uart4,
- 	.uart[5]	= &device_uart5,
- 	.ssc[0]		= &device_ssc,
-+	.cf		= &device_cf,
- };
- 
- void __init at91sam9260_init_devices(void)
+ 	.usbh_ohci	= &device_usbh_ohci,
 diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-index d858ac6..70cf41a 100644
+index b06246c..4bb42ae 100644
 --- a/arch/arm/mach-at91/at91sam9263_devices.c
 +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-@@ -142,54 +142,9 @@ static struct at91_dev_table_mmc device_mmc1 __initdata = {
-  *  Compact Flash (PCMCIA or IDE)
-  * -------------------------------------------------------------------- */
- 
--#if defined(CONFIG_AT91_CF) || defined(CONFIG_AT91_CF_MODULE) || \
--    defined(CONFIG_BLK_DEV_IDE_AT91) || defined(CONFIG_BLK_DEV_IDE_AT91_MODULE)
--
--static struct at91_cf_data cf0_data;
--
--static struct resource cf0_resources[] = {
--	[0] = {
--		.start	= AT91_CHIPSELECT_4,
--		.end	= AT91_CHIPSELECT_4 + SZ_256M - 1,
--		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_8AND16BIT,
--	}
--};
--
--static struct platform_device cf0_device = {
--	.id		= 0,
--	.dev		= {
--				.platform_data	= &cf0_data,
--	},
--	.resource	= cf0_resources,
--	.num_resources	= ARRAY_SIZE(cf0_resources),
--};
--
--static struct at91_cf_data cf1_data;
--
--static struct resource cf1_resources[] = {
--	[0] = {
--		.start	= AT91_CHIPSELECT_5,
--		.end	= AT91_CHIPSELECT_5 + SZ_256M - 1,
--		.flags	= IORESOURCE_MEM | IORESOURCE_MEM_8AND16BIT,
--	}
--};
--
--static struct platform_device cf1_device = {
--	.id		= 1,
--	.dev		= {
--				.platform_data	= &cf1_data,
--	},
--	.resource	= cf1_resources,
--	.num_resources	= ARRAY_SIZE(cf1_resources),
--};
--
--void __init at91_add_device_cf(struct at91_cf_data *data)
-+static int __init at91sam9263_cf_init(struct at91_cf_data *data, int *slot)
- {
- 	unsigned long ebi0_csa;
--	struct platform_device *pdev;
--
--	if (!data)
--		return;
- 
- 	/*
- 	 * assign CS4 or CS5 to SMC with Compact Flash logic support,
-@@ -201,48 +156,42 @@ void __init at91_add_device_cf(struct at91_cf_data *data)
- 	case 4:
- 		at91_set_A_periph(AT91_PIN_PD6, 0);  /* EBI0_NCS4/CFCS0 */
- 		ebi0_csa |= AT91_MATRIX_EBI0_CS4A_SMC_CF1;
--		cf0_data = *data;
--		pdev = &cf0_device;
-+		*slot = 0;
- 		break;
- 	case 5:
- 		at91_set_A_periph(AT91_PIN_PD7, 0);  /* EBI0_NCS5/CFCS1 */
- 		ebi0_csa |= AT91_MATRIX_EBI0_CS5A_SMC_CF2;
--		cf1_data = *data;
--		pdev = &cf1_device;
-+		*slot = 1;
- 		break;
- 	default:
- 		printk(KERN_ERR "AT91 CF: bad chip-select requested (%u)\n",
- 		       data->chipselect);
--		return;
-+		return -EINVAL;
- 	}
- 	at91_sys_write(AT91_MATRIX_EBI0CSA, ebi0_csa);
-+	return 0;
-+}
- 
--	if (data->det_pin) {
--		at91_set_gpio_input(data->det_pin, 1);
--		at91_set_deglitch(data->det_pin, 1);
--	}
--
--	if (data->irq_pin) {
--		at91_set_gpio_input(data->irq_pin, 1);
--		at91_set_deglitch(data->irq_pin, 1);
--	}
--
--	if (data->vcc_pin)
--		/* initially off */
--		at91_set_gpio_output(data->vcc_pin, 0);
--
--	/* enable EBI controlled pins */
--	at91_set_A_periph(AT91_PIN_PD5, 1);  /* NWAIT */
--	at91_set_A_periph(AT91_PIN_PD8, 0);  /* CFCE1 */
--	at91_set_A_periph(AT91_PIN_PD9, 0);  /* CFCE2 */
--	at91_set_A_periph(AT91_PIN_PD14, 0); /* CFNRW */
-+static struct at91_pin_config cf_pins[] __initdata = {
-+	{AT91_PIN_PD5,  AT91_PIN_PERIPH_A, 1, 0, 0}, /* NWAIT */
-+	{AT91_PIN_PD8,  AT91_PIN_PERIPH_A, 0, 0, 0}, /* CFCE1 */
-+	{AT91_PIN_PD9,  AT91_PIN_PERIPH_A, 0, 0, 0}, /* CFCE2 */
-+	{AT91_PIN_PD14, AT91_PIN_PERIPH_A, 0, 0, 0}, /* CFNRW */
-+};
- 
--	pdev->name = (data->flags & AT91_CF_TRUE_IDE) ? "at91_ide" : "at91_cf";
--	platform_device_register(pdev);
--}
--#else
--void __init at91_add_device_cf(struct at91_cf_data *data) {}
--#endif
-+static struct at91_dev_table_cf device_cf __initdata = {
-+	.slot[0]	= {
-+		.mmio_base	= AT91_CHIPSELECT_4,
-+		.mmio_size	= SZ_256M,
-+	},
-+	.slot[1] 	= {
-+		.mmio_base	= AT91_CHIPSELECT_5,
-+		.mmio_size	= SZ_256M,
-+	},
-+	.device_init	= at91sam9263_cf_init,
-+	.pins		= cf_pins,
-+	.nr_pins	= ARRAY_SIZE(cf_pins),
-+};
+@@ -309,56 +309,6 @@ static struct at91_dev_table_lcdc device_lcdc __initdata = {
+ };
  
  /* --------------------------------------------------------------------
-  *  NAND / SmartMedia
-@@ -586,6 +535,7 @@ static struct at91_device_table at91sam9263_device_table __initdata = {
- 	.ssc[1]		= &device_ssc1,
- 	.ac97		= &device_ac97,
- 	.lcdc		= &device_lcdc,
-+	.cf		= &device_cf,
- };
+- *  Image Sensor Interface
+- * -------------------------------------------------------------------- */
+-
+-#if defined(CONFIG_VIDEO_AT91_ISI) || defined(CONFIG_VIDEO_AT91_ISI_MODULE)
+-
+-struct resource isi_resources[] = {
+-	[0] = {
+-		.start	= AT91SAM9263_BASE_ISI,
+-		.end	= AT91SAM9263_BASE_ISI + SZ_16K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	[1] = {
+-		.start	= AT91SAM9263_ID_ISI,
+-		.end	= AT91SAM9263_ID_ISI,
+-		.flags	= IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device at91sam9263_isi_device = {
+-	.name		= "at91_isi",
+-	.id		= -1,
+-	.resource	= isi_resources,
+-	.num_resources	= ARRAY_SIZE(isi_resources),
+-};
+-
+-void __init at91_add_device_isi(void)
+-{
+-	at91_set_A_periph(AT91_PIN_PE0, 0);	/* ISI_D0 */
+-	at91_set_A_periph(AT91_PIN_PE1, 0);	/* ISI_D1 */
+-	at91_set_A_periph(AT91_PIN_PE2, 0);	/* ISI_D2 */
+-	at91_set_A_periph(AT91_PIN_PE3, 0);	/* ISI_D3 */
+-	at91_set_A_periph(AT91_PIN_PE4, 0);	/* ISI_D4 */
+-	at91_set_A_periph(AT91_PIN_PE5, 0);	/* ISI_D5 */
+-	at91_set_A_periph(AT91_PIN_PE6, 0);	/* ISI_D6 */
+-	at91_set_A_periph(AT91_PIN_PE7, 0);	/* ISI_D7 */
+-	at91_set_A_periph(AT91_PIN_PE8, 0);	/* ISI_PCK */
+-	at91_set_A_periph(AT91_PIN_PE9, 0);	/* ISI_HSYNC */
+-	at91_set_A_periph(AT91_PIN_PE10, 0);	/* ISI_VSYNC */
+-	at91_set_B_periph(AT91_PIN_PE11, 0);	/* ISI_MCK (PCK3) */
+-	at91_set_B_periph(AT91_PIN_PE12, 0);	/* ISI_PD8 */
+-	at91_set_B_periph(AT91_PIN_PE13, 0);	/* ISI_PD9 */
+-	at91_set_B_periph(AT91_PIN_PE14, 0);	/* ISI_PD10 */
+-	at91_set_B_periph(AT91_PIN_PE15, 0);	/* ISI_PD11 */
+-}
+-#else
+-void __init at91_add_device_isi(void) {}
+-#endif
+-
+-
+-/* --------------------------------------------------------------------
+  *  Timer/Counter block
+  * -------------------------------------------------------------------- */
  
- void __init at91sam9263_init_devices(void)
-diff --git a/arch/arm/mach-at91/devices.c b/arch/arm/mach-at91/devices.c
-index 8828ccb..65cd36b 100644
---- a/arch/arm/mach-at91/devices.c
-+++ b/arch/arm/mach-at91/devices.c
-@@ -1318,6 +1318,80 @@ void __init at91_add_device_usba(struct usba_platform_data *data)
- void __init at91_add_device_usba(struct usba_platform_data *data) {}
- #endif
+diff --git a/arch/arm/mach-at91/board-at572d940hf_ek.c b/arch/arm/mach-at91/board-at572d940hf_ek.c
+index 8955133..ff62346 100644
+--- a/arch/arm/mach-at91/board-at572d940hf_ek.c
++++ b/arch/arm/mach-at91/board-at572d940hf_ek.c
+@@ -312,8 +312,6 @@ static void __init eb_board_init(void)
+ 	at91_add_device_mmc(0, &eb_mmc_data);
+ 	/* Ethernet */
+ 	at91_add_device_eth(&eb_eth_data);
+-	/* mAgic */
+-	at91_add_device_mAgic();
+ }
  
-+
-+/* --------------------------------------------------------------------
-+ *  Compact Flash (PCMCIA or IDE)
-+ * -------------------------------------------------------------------- */
-+
-+#if defined(CONFIG_AT91_CF) || defined(CONFIG_AT91_CF_MODULE) || \
-+    defined(CONFIG_BLK_DEV_IDE_AT91) || defined(CONFIG_BLK_DEV_IDE_AT91_MODULE)
-+static struct platform_device at91_cf_devices[] = {
-+	/* We fill in the platform device name below */
-+	[0] = {
-+		.id	= 0,
-+	},
-+	[1] = {
-+		.id	= 1,
-+	},
-+};
-+
-+void __init at91_add_device_cf(struct at91_cf_data *data)
-+{
-+	struct at91_dev_table_cf *info = devices->cf;
-+	struct resource resource = {0};
-+	int err, slot;
-+
-+	BUG_ON(!info);
-+	if (!data)
-+		return;
-+
-+	/* Platform specific device initialisation */
-+	if (info->device_init) {
-+		err = info->device_init(data, &slot);
-+		if (err)
-+			return;
-+	}
-+	
-+	init_resource_mem(&resource, info->slot[slot].mmio_base,
-+			  info->slot[slot].mmio_size);
-+	resource.flags |= IORESOURCE_MEM_8AND16BIT;
-+	
-+	if (data->det_pin) {
-+		at91_set_gpio_input(data->det_pin, 1);
-+		at91_set_deglitch(data->det_pin, 1);
-+	}
-+
-+	if (data->irq_pin) {
-+		at91_set_gpio_input(data->irq_pin, 1);
-+		at91_set_deglitch(data->irq_pin, 1);
-+	}
-+
-+	/* outputs, initially off */
-+	if (data->vcc_pin)
-+		at91_set_gpio_output(data->vcc_pin, 0);
-+	if (data->rst_pin)
-+		at91_set_gpio_output(data->rst_pin, 0);
-+
-+	at91_config_pins(info->pins, info->nr_pins);
-+
-+	if (data->flags & AT91_CF_TRUE_IDE)
-+#if defined(CONFIG_PATA_AT91) || defined(CONFIG_PATA_AT91_MODULE)
-+		at91_cf_devices[slot].name = "pata_at91";
-+#elif defined(CONFIG_BLK_DEV_IDE_AT91) || defined(CONFIG_BLK_DEV_IDE_AT91_MODULE)
-+		at91_cf_devices[slot].name = "at91_ide";
-+#else
-+#warning "board requires AT91_CF_TRUE_IDE: enable either at91_ide or pata_at91"
-+#endif
-+	else
-+		at91_cf_devices[slot].name = "at91_cf";
-+
-+	at91_add_platform_device(&at91_cf_devices[slot], &resource, 1,
-+				 data, sizeof(*data));
-+}
-+#else
-+void __init at91_add_device_cf(struct at91_cf_data *data) {}
-+#endif
-+
- static int __init at91_add_standard_devices(void)
- {
- 	at91_add_device_tc();
-diff --git a/arch/arm/mach-at91/devices.h b/arch/arm/mach-at91/devices.h
-index a1374fa..74f1b9a 100644
---- a/arch/arm/mach-at91/devices.h
-+++ b/arch/arm/mach-at91/devices.h
-@@ -189,6 +189,19 @@ struct at91_dev_table_udc_hs {
- 	int			nr_endpoints;
- };
+ MACHINE_START(AT572D940HFEB, "Atmel AT91D940HF-EB")
+diff --git a/arch/arm/mach-at91/include/mach/board.h b/arch/arm/mach-at91/include/mach/board.h
+index 25a6127..33ba440 100644
+--- a/arch/arm/mach-at91/include/mach/board.h
++++ b/arch/arm/mach-at91/include/mach/board.h
+@@ -186,9 +186,6 @@ extern void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data);
+  /* AC97 */
+ extern void __init at91_add_device_ac97(struct ac97c_platform_data *data);
  
-+struct at91_cf_slot {
-+	unsigned		mmio_base;
-+	unsigned		mmio_size;
-+};
-+
-+struct at91_dev_table_cf {
-+	struct at91_cf_slot	slot[2];
-+	int			(*device_init)(struct at91_cf_data *data,
-+					       int *slot);
-+	struct at91_pin_config	*pins;
-+	int			nr_pins;
-+};
-+
- struct at91_device_table {
- 	struct at91_dev_table_ethernet		*ethernet;
- 	struct at91_dev_table_usb_ohci		*usbh_ohci;
-@@ -209,6 +222,7 @@ struct at91_device_table {
- 	struct at91_dev_table_tsadcc		*tsadcc;
- 	struct at91_dev_table_hdmac		*hdmac;
- 	struct at91_dev_table_udc_hs		*udc_hs;
-+	struct at91_dev_table_cf		*cf;
- };
+- /* ISI */
+-extern void __init at91_add_device_isi(void);
+-
+  /* Touchscreen Controller */
+ struct at91_tsadcc_data {
+ 	unsigned int    adc_clock;
+@@ -208,9 +205,6 @@ extern void __init at91_init_leds(u8 cpu_led, u8 timer_led);
+ extern void __init at91_gpio_leds(struct gpio_led *leds, int nr);
+ extern void __init at91_pwm_leds(struct gpio_led *leds, int nr);
  
- extern void __init at91_init_devices(struct at91_device_table *device_table);
+- /* AT572D940HF DSP */
+-extern void __init at91_add_device_mAgic(void);
+-
+ /* FIXME: this needs a better location, but gets stuff building again */
+ extern int at91_suspend_entering_slow_clock(void);
+ 
 -- 
 1.7.0.4
