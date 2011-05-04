@@ -1,32 +1,30 @@
-From: green@linuxhacker.ru (Oleg Drokin)
-Date: Wed, 4 May 2011 11:54:28 -0400
-Subject: [PATCH 3/4] omap: move detection of NAND CS to
-	common-board-devices
-In-Reply-To: <4DC0F469.9030406@compulab.co.il>
-References: <cover.1303682352.git.mike@compulab.co.il>
-	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
-	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
-	<44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
-	<4DC0F469.9030406@compulab.co.il>
-Message-ID: <217399A1-383F-4F69-B9D1-0421A48481C8@linuxhacker.ru>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Wed, 4 May 2011 10:56:10 -0500
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
+	i.MX53
+In-Reply-To: <BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110413122503.GB1897@S2100-06.ap.freescale.net>
+	<20110413124149.GR18850@pengutronix.de>
+	<BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
+Message-ID: <BANLkTikHwmhrJHk7w+9WvLqVdhzbLM+qew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+> address. I noticed in a patch somewhere last night that if MACH_MX5 is
+> enabled, it uses 'and' instead of 'andne' to perform the masking. This
+> will basically mean the derived address is still entirely CPU
+> specific... unless I am out of date on the patches I am reviewing..
 
-On May 4, 2011, at 2:38 AM, Mike Rapoport wrote:
+http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/boot/compressed/head.S;h=437943d6b55e4282d03145dea77e36841e30c151;hb=bc676214b92db468c7b72dc495312809dbfc37bf#l248
 
-> On 05/04/11 07:10, Oleg Drokin wrote:
->> Ok, so here's a simple patch to save everyone trouble, I guess.
->> 
->> Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
->> might not be desirable for people that don't use anything from that file.
-> Since the common-board-devices.c has TWL initialization I doubt there would a
-> board that does not use it at all...
+Just backing myself up with the patch I'm referencing.
 
-Actually the twl init you have is somewhat inflexible.
-E.g. on the Nook Color the 1st i2c bus has the twl and some other devices, but I don't see how
-to put more than just the twl on the first bus with your common code.
+Curious question, where is the canonical tree-to-look-at for the
+patches we're talking about? I don't feel comfortable at all
+referencing a BSP kernel on a mainline mailing list :D
 
-Bye,
-    Oleg
+-- -
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
