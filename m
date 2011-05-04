@@ -1,36 +1,33 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 04 May 2011 09:32:20 +0300
-Subject: [PATCH] kirkwood: add dir-665 support
-In-Reply-To: <BANLkTimzZr0vfOdNwVev2A_xoU_1k+SB_w@mail.gmail.com>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>	<20110503205056.GA13075@gentoodev.compulab.local>	<BANLkTimQM_J2ZbDjAewUsp+XSEP+x+eniA@mail.gmail.com>	<BANLkTinybLSF418PsocXR6dwuaksv_+UCQ@mail.gmail.com>
-	<BANLkTimzZr0vfOdNwVev2A_xoU_1k+SB_w@mail.gmail.com>
-Message-ID: <4DC0F2F4.6000404@compulab.co.il>
+Date: Wed, 04 May 2011 09:38:33 +0300
+Subject: [PATCH 3/4] omap: move detection of NAND CS to
+	common-board-devices
+In-Reply-To: <44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
+	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
+	<44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
+Message-ID: <4DC0F469.9030406@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/11 06:00, Hirundo Cam wrote:
-> Hi Mike and Simon
+On 05/04/11 07:10, Oleg Drokin wrote:
+> Ok, so here's a simple patch to save everyone trouble, I guess.
 > 
-> 2011/5/4 Hirundo Cam <camhirundo@gmail.com>:
->> Hi Mike and Simon,
->>
->> I've send a machine submit to arm-linux, it generated the mach-types as
->>
->> [stripped]
->> mx51_moray              MACH_MX51_MORAY         MX51_MORAY              3484
->> thales_cbc              MACH_THALES_CBC         THALES_CBC              3485
->> bluepoint               MACH_BLUEPOINT          BLUEPOINT               3486
->> dir665                  MACH_DIR665             DIR665                  3487
->>
->> Is this correct for the DIR665 board using mv88f6281 chips?
-> 
-> Is this implied that I could get rid of the modification to mach-type
-> in my patch?
+> Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
+> might not be desirable for people that don't use anything from that file.
 
-Yes, as soon as mach-types update is pushed into the kernel.
+Since the common-board-devices.c has TWL initialization I doubt there would a
+board that does not use it at all...
 
-> Thanks!
+> Would it be a better idea to split it to a file-per-feature?
 
+Splitting the common-board-devices into a file-per-feature will diminish its
+added value, IMO.
+We can either continue to use #ifdef CONFIG_SOMETHING in both
+common-board-devices.[ch] as your fix proposes or just drop #ifdefs and inlines
+from the header.
+Tony, what is your preference?
 
 -- 
 Sincerely yours,
