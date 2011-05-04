@@ -1,37 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 May 2011 09:46:15 +0300
-Subject: [PATCH 3/4] omap: move detection of NAND CS to
-	common-board-devices
-In-Reply-To: <4DC0F469.9030406@compulab.co.il>
-References: <cover.1303682352.git.mike@compulab.co.il>
-	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
-	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
-	<44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
-	<4DC0F469.9030406@compulab.co.il>
-Message-ID: <20110504064614.GG27860@atomide.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Wed, 4 May 2011 09:57:01 +0300
+Subject: [PATCH 1/2] Moving Marvell Dove platform defaults to ARMv7
+In-Reply-To: <alpine.LFD.2.00.1105031542480.24613@xanadu.home>
+References: <1302173382-25577-1-git-send-email-kostap@marvell.com>
+	<BANLkTikCBDCYr6BHz4zWPvHfuAQ+eCtvNg@mail.gmail.com>
+	<alpine.LFD.2.00.1105021354410.24613@xanadu.home>
+	<alpine.LFD.2.00.1105021434230.24613@xanadu.home>
+	<BANLkTimdti4Cj2BMqsRdnmOB7Dtt9=QTCQ@mail.gmail.com>
+	<BANLkTimXLfcAsU47R+xEvU8Nq-A8NEWmOw@mail.gmail.com>
+	<alpine.LFD.2.00.1105031542480.24613@xanadu.home>
+Message-ID: <BANLkTins+RioLLufdu2Wnt=Heyp12z5NXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Rapoport <mike@compulab.co.il> [110504 09:35]:
-> On 05/04/11 07:10, Oleg Drokin wrote:
-> > Ok, so here's a simple patch to save everyone trouble, I guess.
-> > 
-> > Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
-> > might not be desirable for people that don't use anything from that file.
-> 
-> Since the common-board-devices.c has TWL initialization I doubt there would a
-> board that does not use it at all...
-> 
-> > Would it be a better idea to split it to a file-per-feature?
-> 
-> Splitting the common-board-devices into a file-per-feature will diminish its
-> added value, IMO.
-> We can either continue to use #ifdef CONFIG_SOMETHING in both
-> common-board-devices.[ch] as your fix proposes or just drop #ifdefs and inlines
-> from the header.
-> Tony, what is your preference?
-
-We should consider the code size too.. Maybe see if you can make them
-weak instead of the ifdefs?
-
-Tony
+>>
+>> I'm OK on this change. MMP2 (PJ4 core) is also used as ARMv7 capable.
+>
+> So I did remove those entries. ?That also allows for the Dove kernel to
+> be compiled using Thumb2 without any additional changes.
+have you also loaded that kernel?
+thanks
+saeed
