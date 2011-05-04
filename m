@@ -1,25 +1,31 @@
-From: green@linuxhacker.ru (Oleg Drokin)
-Date: Wed, 4 May 2011 00:10:56 -0400
-Subject: [PATCH 3/4] omap: move detection of NAND CS to
-	common-board-devices
-In-Reply-To: <724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
-References: <cover.1303682352.git.mike@compulab.co.il>
-	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
-	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
-Message-ID: <44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Wed, 4 May 2011 00:44:46 -0400
+Subject: [PATCH] atomic: add *_dec_not_zero
+In-Reply-To: <1304458235-28473-1-git-send-email-sven@narfation.org>
+References: <1304458235-28473-1-git-send-email-sven@narfation.org>
+Message-ID: <BANLkTiminpyJ_opxhqG0E0gBOrF490b+tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, so here's a simple patch to save everyone trouble, I guess.
+On Tue, May 3, 2011 at 17:30, Sven Eckelmann wrote:
+> Introduce an *_dec_not_zero operation. ?Make this a special case of
+> *_add_unless because batman-adv uses atomic_dec_not_zero in different
+> places like re-broadcast queue or aggregation queue management. There
+> are other non-final patches which may also want to use this macro.
+>
+> Cc: uclinux-dist-devel at blackfin.uclinux.org
+>
+> --- a/arch/blackfin/include/asm/atomic.h
+> +++ b/arch/blackfin/include/asm/atomic.h
+> @@ -103,6 +103,7 @@ static inline int atomic_test_mask(int mask, atomic_t *v)
+>        c != (u);                                               \
+>  })
+>  #define atomic_inc_not_zero(v) atomic_add_unless((v), 1, 0)
+> +#define atomic_dec_not_zero(v) atomic_add_unless((v), -1, 0)
+>
+>  /*
+>  * atomic_inc_and_test - increment and test
 
-Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
-might not be desirable for people that don't use anything from that file.
-Would it be a better idea to split it to a file-per-feature?
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: compile-fix.diff
-Type: application/octet-stream
-Size: 1123 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110504/b83fcf3f/attachment.obj>
+no opinion on the actual idea, but for the Blackfin pieces:
+Acked-by: Mike Frysinger <vapier@gentoo.org>
+-mike
