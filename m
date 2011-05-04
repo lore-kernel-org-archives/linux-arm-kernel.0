@@ -1,62 +1,44 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 05 May 2011 08:56:06 +1200
-Subject: AT91: Interrupt handling independent of processor base-address
-In-Reply-To: <4DC1B9A3.7050107@bluewatersys.com>
-References: <1304291042.22966.12.camel@redbox>
-	<4DC1B9A3.7050107@bluewatersys.com>
-Message-ID: <4DC1BD66.5060905@bluewatersys.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Wed, 4 May 2011 15:05:21 -0600 (MDT)
+Subject: [PATCH v2 04/12] Serial: OMAP: Add runtime pm support for
+	omap-serial driver
+In-Reply-To: <87hb9aqk53.fsf@ti.com>
+References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+	<1304080796-625-5-git-send-email-govindraj.raja@ti.com>
+	<87hb9aqk53.fsf@ti.com>
+Message-ID: <alpine.DEB.2.00.1105041503260.30136@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2011 08:40 AM, Ryan Mallon wrote:
-> On 05/02/2011 11:04 AM, Andrew Victor wrote:
->> For supporting multiple AT91 processors in a single kernel image, the
->> base address of the AIC controller needs to be calculated in the
->> processor initialization code and then provided to the AIC driver.
->>  * Low-level IRQ hander in entry-macro.S also updated.
->>  * AT91_AIC definitions renamed to AT91xxx_AIC.
->>
->> All these patches are here:
->>  git://github.com/at91linux/linux-2.6-at91.git/av-devel
->>
->> Signed-off-by: Andrew Victor <linux@maxim.org.za>
+Hi Govindraj,
 
-<snip>
+On Wed, 4 May 2011, Kevin Hilman wrote:
 
->> diff --git a/arch/arm/mach-at91/irq.c b/arch/arm/mach-at91/irq.c
->> index aff808b..8b04b3c 100644
->> --- a/arch/arm/mach-at91/irq.c
->> +++ b/arch/arm/mach-at91/irq.c
->> @@ -33,23 +33,26 @@
->>  #include <asm/mach/irq.h>
->>  #include <asm/mach/map.h>
->>  
->> +/* Base IO address of AIC */
->> +void __iomem *at91_aic_base_addr __read_mostly;
->> +
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
 > 
-> Since we eventually will have a number of these base addresses as
-> variables is it worth consolidating them into a single struct, i.e:
-> 
-> struct at91_sys {
-> 	void __iomem *aic;
-> 	void __iomem *dbgu;
-> 	void __iomem *pioa;
-> 	...
-> };
-> 
-> struct at91_sys at91_sys __read_mostly;
+> > +++ b/arch/arm/mach-omap2/serial.c
+> > @@ -189,6 +189,21 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+> >  	}
+> >  }
+> >  
+> > +static void omap_uart_wakeup_enable(struct platform_device *pdev, bool enable)
+> > +{
+> > +	struct omap_uart_port_info *up = pdev->dev.platform_data;
+> > +
+> > +	/* Set or clear wake-enable bit */
+> > +	if (up->wk_en && up->wk_mask) {
+> > +		u32 v = __raw_readl(up->wk_en);
+> > +		if (enable)
+> > +			v |= up->wk_mask;
+> > +		else
+> > +			v &= ~up->wk_mask;
+> > +		__raw_writel(v, up->wk_en);
+> > +	}
+> > +}
 
-Ignore this. Looking at the other patches you have posted its not a
-viable idea.
+To be a little more direct: there should be no PRCM register interactions 
+in the driver, absolutely none.  This stuff needs to go through 
+omap_device/omap_hwmod functions if it's really needed.
 
-~Ryan
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+- Paul
