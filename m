@@ -1,53 +1,69 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 4 May 2011 12:43:08 +0530
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <201104271525.28512.arnd@arndb.de>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
-	<4DB5D452.9050500@grandegger.com>
-	<46D523E49EFF489F9B088AE7B9CD7286@subhasishg>
-	<201104271525.28512.arnd@arndb.de>
-Message-ID: <15AD189F851849F69A011B6F4D1DDB6C@subhasishg>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 04 May 2011 10:17:13 +0300
+Subject: [PATCH 3/4] omap: move detection of NAND CS to
+	common-board-devices
+In-Reply-To: <20110504064614.GG27860@atomide.com>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
+	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
+	<44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
+	<4DC0F469.9030406@compulab.co.il>
+	<20110504064614.GG27860@atomide.com>
+Message-ID: <4DC0FD79.2020005@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wednesday 27 April 2011, Subhasish Ghosh wrote:
->> >
->> > - Use just one value per sysfs file
->> 
->> SG - I felt adding entry for each mbx_id will clutter the sysfs.
->>         Is it ok to do that.
+On 05/04/11 09:46, Tony Lindgren wrote:
+> * Mike Rapoport <mike@compulab.co.il> [110504 09:35]:
+>> On 05/04/11 07:10, Oleg Drokin wrote:
+>>> Ok, so here's a simple patch to save everyone trouble, I guess.
+>>>
+>>> Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
+>>> might not be desirable for people that don't use anything from that file.
+>>
+>> Since the common-board-devices.c has TWL initialization I doubt there would a
+>> board that does not use it at all...
+>>
+>>> Would it be a better idea to split it to a file-per-feature?
+>>
+>> Splitting the common-board-devices into a file-per-feature will diminish its
+>> added value, IMO.
+>> We can either continue to use #ifdef CONFIG_SOMETHING in both
+>> common-board-devices.[ch] as your fix proposes or just drop #ifdefs and inlines
+>> from the header.
+>> Tony, what is your preference?
 > 
-> That is probably not much better either.
-> 
-> Note also that every sysfs file needs to come with associated
-> documentation in Documentation/ABI/*/ to make sure that users
-> will know exactly how the file is meant to work. 
-> 
-> Why do you need to export these values in the first place? Is
-> it just for debugging or do you expect all CAN user space
-> to look at this?
-> 
-> If it's for debugging, please don't export the files through sysfs.
-> Depending on how useful the data is to regular users, you can
-> still export it through a debugfs file in that case, which has
-> much less strict rules.
-> 
-> If the file is instead meant as part of the regular operation of
-> the device, it should not be in debugfs but probably be integrated
-> into the CAN socket interface, so that users don't need to work
-> with two different ways of getting to the device (socket and sysfs).
-> 
+> We should consider the code size too.. Maybe see if you can make them
+> weak instead of the ifdefs?
 
-CAN requires mail box IDs to be programmed in. But, the socket
-CAN subsystem supports only software filtering of the mail box IDs.
+Unless I completely misunderstand how weak works, we'll still have ifdefs in .c
+file, i.e.
 
-So, the mail box IDs programmed into socket CAN during initialization
-does not propagate into the hardware. This is planned to be a future
-implementation in Socket CAN.
+common-board-devices.h:
 
-In our case, we support hardware filtering, to work around with this,
-Wolfgang (Socket CAN owner) suggested that we implement
-this using sysfs.
+void __omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts)
+{
+}
 
-These setting are not for debugging, but to program the mail box IDs
-into the hardware. 
+void omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts)
+__attribute__((weak, alias("__omap_nand_flash_init")));
+
+common-board-devices.c:
+#if defined(CONFIG_MTD_NAND_OMAP2) || defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+void omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts)
+{
+...
+}
+#endif
+
+Yet, we can keep the ifdefs only in common-board-devices.c and get rid if
+inlines in the header.
+Also, all the code in common-board-devices.c is __init, so it's eventually
+dropped in runtime
+
+> Tony
+
+
+-- 
+Sincerely yours,
+Mike.
