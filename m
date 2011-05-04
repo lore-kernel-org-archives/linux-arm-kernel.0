@@ -1,70 +1,85 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 04 May 2011 13:09:08 -0700
-Subject: [PATCH 2/5] OMAP3: clean-up mach specific cpuidle data structures
-In-Reply-To: <1304069186-3086-3-git-send-email-j-pihet@ti.com> (jean pihet's
-	message of "Fri, 29 Apr 2011 11:26:23 +0200")
-References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-	<1304069186-3086-3-git-send-email-j-pihet@ti.com>
-Message-ID: <8762pqrzx7.fsf@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 4 May 2011 16:22:53 -0400 (EDT)
+Subject: [PATCH v2] sdio: optimized SDIO IRQ handling for single irq
+In-Reply-To: <BANLkTik+LWiYYPTqR5pNKsZfSMGGE3xCZg@mail.gmail.com>
+References: <1304525161-14448-1-git-send-email-per.forlin@linaro.org>
+	<1304525161-14448-2-git-send-email-per.forlin@linaro.org>
+	<alpine.LFD.2.00.1105041217380.24613@xanadu.home>
+	<BANLkTik+LWiYYPTqR5pNKsZfSMGGE3xCZg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1105041618400.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-jean.pihet at newoldbits.com writes:
+On Wed, 4 May 2011, Per Forlin wrote:
 
-> From: Jean Pihet <j-pihet@ti.com>
->
-> - sleep_latency and wake_latency are not used, replace them by
->   exit_latency which is used by cpuidle. exit_latency simply is
->   the sum of sleep_latency and wake_latency,
-> - replace threshold by target_residency,
-> - changed the OMAP3 specific cpuidle code accordingly,
-> - changed the OMAP3 board code accordingly.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> On 4 May 2011 19:34, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> > On Wed, 4 May 2011, Per Forlin wrote:
+> >
+> >> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+> >>
+> >> If there is only 1 function registered it is possible to
+> >> improve performance by directly calling the irq handler
+> >> and avoiding the overhead of reading the CCCR registers.
+> >>
+> >> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> >> Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> >> ---
+> >> ?drivers/mmc/core/sdio_irq.c | ? 30 ++++++++++++++++++++++++++++++
+> >> ?include/linux/mmc/card.h ? ?| ? ?1 +
+> >> ?2 files changed, 31 insertions(+), 0 deletions(-)
+> >>
+> >> diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
+> >> index b300161..64c4409 100644
+> >> --- a/drivers/mmc/core/sdio_irq.c
+> >> +++ b/drivers/mmc/core/sdio_irq.c
+> >> @@ -32,6 +32,16 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
+> >> ? ? ? int i, ret, count;
+> >> ? ? ? unsigned char pending;
+> >>
+> >> + ? ? /*
+> >> + ? ? ?* Optimization, if there is only 1 function registered
+> >> + ? ? ?* call irq handler directly
+> >> + ? ? ?*/
+> >> + ? ? if (card->sdio_single_irq && card->sdio_single_irq->irq_handler) {
+> >> + ? ? ? ? ? ? struct sdio_func *func = card->sdio_single_irq;
+> >> + ? ? ? ? ? ? func->irq_handler(func);
+> >
+> > I think there is little point using a func variable here, especially
+> > since you already reference the handler pointer in the if() statement.
+> > Hence:
+> >
+> > ? ? ? ?if (card->sdio_single_irq && card->sdio_single_irq->irq_handler) {
+> > ? ? ? ? ? ? ? ?card->sdio_single_irq->irq_handler();
+> > ? ? ? ? ? ? ? ?return 1;
+> > ? ? ? ?}
+> >
+> What do you think about:
+> +       struct sdio_func *func = card->sdio_single_irq;
+> +
+> +       /*
+> +        * Optimization, if there is only 1 function interrupt registered
+> +        * call irq handler directly
+> +        */
+> +       if (func) {
+> +               func->irq_handler(func);
+> +               return 1;
+> +       }
 
-One minor comment...
+Sure, but I'd move the assignment right before the if() in that case for 
+clarity:
 
-> ---
->  arch/arm/mach-omap2/board-rx51.c  |   15 +++---
->  arch/arm/mach-omap2/cpuidle34xx.c |  103 +++++++++++++++---------------------
->  arch/arm/mach-omap2/pm.h          |   13 +++--
->  3 files changed, 60 insertions(+), 71 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-> index f8ba20a..44656e8 100644
-> --- a/arch/arm/mach-omap2/board-rx51.c
-> +++ b/arch/arm/mach-omap2/board-rx51.c
-> @@ -58,21 +58,22 @@ static struct platform_device leds_gpio = {
->  	},
->  };
->  
-> +/* cpuidle C-states definition override from the default values */
+       struct sdio_func *func;
 
-Please add a line here describing the sum in the table entries
-(e.g. it's sleep + wakeup latency.)
+       /*
+        * Optimization, if there is only 1 function interrupt registered
+        * call irq handler directly
+        */
+       func = card->sdio_single_irq;
+       if (func) {
+               func->irq_handler(func);
+               return 1;
+       }
+       [...]
 
->  static struct cpuidle_params rx51_cpuidle_params[] = {
->  	/* C1 */
-> -	{1, 110, 162, 5},
-> +	{110 + 162, 5 , 1},
->  	/* C2 */
-> -	{1, 106, 180, 309},
-> +	{106 + 180, 309, 1},
->  	/* C3 */
-> -	{0, 107, 410, 46057},
-> +	{107 + 410, 46057, 0},
->  	/* C4 */
-> -	{0, 121, 3374, 46057},
-> +	{121 + 3374, 46057, 0},
->  	/* C5 */
-> -	{1, 855, 1146, 46057},
-> +	{855 + 1146, 46057, 1},
->  	/* C6 */
-> -	{0, 7580, 4134, 484329},
-> +	{7580 + 4134, 484329, 0},
->  	/* C7 */
-> -	{1, 7505, 15274, 484329},
-> +	{7505 + 15274, 484329, 1},
->  };
 
-Kevin
+Nicolas
