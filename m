@@ -1,27 +1,22 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 04 May 2011 18:01:42 +0100
-Subject: [PATCHv2 4/4] ARM: tegra: irq: Add tegra_eoi
-In-Reply-To: <BANLkTi=a26_A7yAAfkQd5NSxbR+reQCZ1g@mail.gmail.com>
-References: <1304284213-11950-5-git-send-email-ccross@android.com>
-	<1304288854-11011-1-git-send-email-ccross@android.com>
-	<1304414973.27863.2.camel@e102144-lin.cambridge.arm.com>
-	<BANLkTi=a26_A7yAAfkQd5NSxbR+reQCZ1g@mail.gmail.com>
-Message-ID: <1304528502.1935.2.camel@craptop>
+Date: Wed, 04 May 2011 18:04:15 +0100
+Subject: [PATCH V3] ARM: GIC: Convert GIC library to use the IO relaxed
+	operations
+In-Reply-To: <4DC13252.2080308@ti.com>
+References: <1304058131-8375-1-git-send-email-santosh.shilimkar@ti.com>
+	<1304417481.19196.60.camel@e102109-lin.cambridge.arm.com>
+	<4DBFD59D.50008@ti.com>  <4DC13252.2080308@ti.com>
+Message-ID: <1304528655.1935.4.camel@craptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-05-03 at 19:41 +0100, Colin Cross wrote:
-> What is your plan for merging the fasteoi patches?  If you are
-> planning to put them in 2.6.40, can you pull these patches into your
-> tree?  I don't have any other Tegra changes planned for 2.6.40, so
-> they shouldn't cause conflicts later.
+Hi Santosh,
 
-Ok, since Santosh would like me to take his relaxed I/O stuff for the
-GIC too then I guess I can put all of this into an irq branch along with
-the fasteoi changes.
+On Wed, 2011-05-04 at 12:02 +0100, Santosh Shilimkar wrote:
+> Will,
+> Can you queue this patch part of your series please?
 
-Russell - would you be happy pulling this from me if I put it together?
-
-Cheers,
+Yes, providing that Russell is happy to pull the IRQ stuff (fasteoi,
+Tegra changes and this) from me.
 
 Will
