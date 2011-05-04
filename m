@@ -1,65 +1,42 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Wed, 04 May 2011 16:33:59 +0200
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <201105041511.54095.arnd@arndb.de>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
-	<201104271525.28512.arnd@arndb.de>
-	<15AD189F851849F69A011B6F4D1DDB6C@subhasishg>
-	<201105041511.54095.arnd@arndb.de>
-Message-ID: <4DC163D7.9010309@grandegger.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 04 May 2011 07:36:58 -0700
+Subject: [PATCH 1/8] OMAP PM: create a PM layer plugin for per-device
+	constraints
+In-Reply-To: <20110504135930.GE2092@atomide.com> (Tony Lindgren's message of
+	"Wed, 4 May 2011 06:59:30 -0700")
+References: <1304516117-9334-1-git-send-email-j-pihet@ti.com>
+	<1304516117-9334-2-git-send-email-j-pihet@ti.com>
+	<20110504135930.GE2092@atomide.com>
+Message-ID: <87vcxqv8fp.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Tony,
 
-On 05/04/2011 03:11 PM, Arnd Bergmann wrote:
-> On Wednesday 04 May 2011, Subhasish Ghosh wrote:
->> CAN requires mail box IDs to be programmed in. But, the socket
->> CAN subsystem supports only software filtering of the mail box IDs.
+Tony Lindgren <tony@atomide.com> writes:
+
+> * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [110504 06:32]:
 >>
->> So, the mail box IDs programmed into socket CAN during initialization
->> does not propagate into the hardware. This is planned to be a future
->> implementation in Socket CAN.
->>
->> In our case, we support hardware filtering, to work around with this,
->> Wolfgang (Socket CAN owner) suggested that we implement
->> this using sysfs.
->>
->> These setting are not for debugging, but to program the mail box IDs
->> into the hardware. 
-> 
-> Ok, I see. Can you point me to that discussion?
-> 
-> Wolfgang, I'm a bit worried by the API being split between sockets and sysfs.
-> The problem is that once the sysfs API is established, users will start
-> relying on it, and you can no longer migrate away from it, even when
-> a later version of the Socket CAN also supports setting through a different
-> interface. What is the current interface to set mail box IDs in software?
+>> +int omap_pm_set_max_mpu_wakeup_lat(struct device *dev, long t)
+> ...
+>
+>> +int omap_pm_set_max_dev_wakeup_lat(struct device *req_dev, struct device *dev,
+> ...
+>
+>> +int omap_pm_set_min_clk_rate(struct device *dev, struct clk *c, long r)
+> ...
+>
+> You should implement this as a Linux generic framework, we don't
+> want to add more omap specific frameworks.
 
-Note that this CAN controller is *very* special. It cannot handle all
-CAN id's due to a lack or resources. The PRUSS firmware is able to
-manage just up to 8 different CAN identifiers out of the usual 4096
-(12-bit) or even more for the extended CAN ids using 29 bits. There is
-no other CAN controller with such rather serious limitations and
-therefore there exists also no appropriate interface. I think using
-sysfs is OK for such device-specific parameters, at least for the time
-being.
+This series isn't adding any new OMAP-specific frameworks.  The OMAP PM
+layer is already in place, and has been there for awhile.  OMAP PM is a
+layer which can have "plugins" so we can experiment with ways of
+handling constraints without changing the driver interface, and this
+series is just implementing a new plugin.
 
-> How hard would it be to implement that feature in Socket CAN?
+Once we are happy with a constraint layer, and can prove it will work,
+the plan is to get rid of the (existing) OMAP-specific APIs and propose
+a generic interface.
 
-CAN controllers usually provide some kind of hardware CAN id filtering,
-but in a very hardware dependent way. A generic interface may be able to
-handle the PRUSS restrictions as well. CAN devices are usually
-configured through the netlink interface. e.g.
-
-  $ ip link set can0 up type can bitrate 125000
-
-and such a common interface would be netlink based as well.
-
-> Is that something that Subhasish or someone else could to as a prerequisite
-> to merging the driver?
-
-Any ideas on how to handle hardware filtering in a generic way are
-welcome. I will try to come up with a proposal sooner than later.
-
-Wolfgang.
+Kevin
