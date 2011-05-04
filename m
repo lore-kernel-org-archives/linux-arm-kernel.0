@@ -1,48 +1,36 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Wed, 04 May 2011 18:09:21 +0200
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <20110504155750.GC322@e-circ.dyndns.org>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<201104271525.28512.arnd@arndb.de>	<15AD189F851849F69A011B6F4D1DDB6C@subhasishg>	<201105041511.54095.arnd@arndb.de>	<4DC163D7.9010309@grandegger.com>
-	<20110504155750.GC322@e-circ.dyndns.org>
-Message-ID: <4DC17A31.8070409@grandegger.com>
+From: oskar.andero@sonyericsson.com (oskar.andero at sonyericsson.com)
+Date: Wed, 4 May 2011 18:10:18 +0200
+Subject: [PATCH] ARM: Allow for kernel command line concatenation
+In-Reply-To: <20110504151140.GJ11574@pengutronix.de>
+References: <1302255383-12375-1-git-send-email-oskar.andero@sonyericsson.com>
+	<20110504150352.GA19335@caracas.corpusers.net>
+	<20110504151140.GJ11574@pengutronix.de>
+Message-ID: <20110504161018.GA19897@caracas.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kurt,
-
-On 05/04/2011 05:57 PM, Kurt Van Dijck wrote:
->>
->>> How hard would it be to implement that feature in Socket CAN?
->>
->> CAN controllers usually provide some kind of hardware CAN id filtering,
->> but in a very hardware dependent way. A generic interface may be able to
->> handle the PRUSS restrictions as well. CAN devices are usually
->> configured through the netlink interface. e.g.
->>
->>   $ ip link set can0 up type can bitrate 125000
->>
->> and such a common interface would be netlink based as well.
-> ack.
->>
->>> Is that something that Subhasish or someone else could to as a prerequisite
->>> to merging the driver?
->>
->> Any ideas on how to handle hardware filtering in a generic way are
->> welcome. I will try to come up with a proposal sooner than later.
+On 17:11 Wed 04 May     , Uwe Kleine-K?nig wrote:
+> Hello Oskar,
 > 
-> When doing so, I'd vote for an unlimited(by software) list of hardware filters (id/mask).
-> The hardware must abort when no more filters are available.
+> On Wed, May 04, 2011 at 05:03:52PM +0200, oskar.andero at sonyericsson.com wrote:
+> > Ping.
+> > 
+> > On 11:36 Fri 08 Apr, oskar.andero at sonyericsson.com wrote:
+> > > From: Victor Boivie <victor.boivie@sonyericsson.com>
+> > > 
+> > > This patch allows the provided CONFIG_CMDLINE to be concatenated
+> > > with the one provided by the boot loader. This is useful to
+> > > merge the static values defined in CONFIG_CMDLINE with the
+> > > boot loader's (possibly) more dynamic values, such as startup
+> > > reasons and more.
+> > > 
+> > > Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
+> > > Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
+> > > Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+> > > Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > > Acked-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
+> > > ---
+> It can probably go to Russell's patch system[1].
+Thanks! That one was new to me!
 
-Sounds good and not even to complicated. For the SJA1000 we would just
-allow to set the global mask.
-
-> I think that when using hardware filters, knowing the actual device
-> with it's amount of hardware filters is the least of your problems.
-> Userspace applications that suddenly stop working properly due to
-> hw filters (i.e. some traffic not coming in anymore) will be a major
-> source of bugreports.
-
-Well, hardware filtering will be off by default and must explicitly be
-set by the user, like for the bitrate setting.
-
-Wolfgang.
+-Oskar
