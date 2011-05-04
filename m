@@ -1,25 +1,53 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Wed, 4 May 2011 09:03:12 +0200
-Subject: [PATCH] atomic: add *_dec_not_zero
-In-Reply-To: <1304458235-28473-1-git-send-email-sven@narfation.org>
-References: <1304458235-28473-1-git-send-email-sven@narfation.org>
-Message-ID: <20110504070312.GD20828@elte.hu>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Wed, 4 May 2011 12:43:08 +0530
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <201104271525.28512.arnd@arndb.de>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<4DB5D452.9050500@grandegger.com>
+	<46D523E49EFF489F9B088AE7B9CD7286@subhasishg>
+	<201104271525.28512.arnd@arndb.de>
+Message-ID: <15AD189F851849F69A011B6F4D1DDB6C@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+> On Wednesday 27 April 2011, Subhasish Ghosh wrote:
+>> >
+>> > - Use just one value per sysfs file
+>> 
+>> SG - I felt adding entry for each mbx_id will clutter the sysfs.
+>>         Is it ok to do that.
+> 
+> That is probably not much better either.
+> 
+> Note also that every sysfs file needs to come with associated
+> documentation in Documentation/ABI/*/ to make sure that users
+> will know exactly how the file is meant to work. 
+> 
+> Why do you need to export these values in the first place? Is
+> it just for debugging or do you expect all CAN user space
+> to look at this?
+> 
+> If it's for debugging, please don't export the files through sysfs.
+> Depending on how useful the data is to regular users, you can
+> still export it through a debugfs file in that case, which has
+> much less strict rules.
+> 
+> If the file is instead meant as part of the regular operation of
+> the device, it should not be in debugfs but probably be integrated
+> into the CAN socket interface, so that users don't need to work
+> with two different ways of getting to the device (socket and sysfs).
+> 
 
-* Sven Eckelmann <sven@narfation.org> wrote:
+CAN requires mail box IDs to be programmed in. But, the socket
+CAN subsystem supports only software filtering of the mail box IDs.
 
-> Introduce an *_dec_not_zero operation.  Make this a special case of
-> *_add_unless because batman-adv uses atomic_dec_not_zero in different
-> places like re-broadcast queue or aggregation queue management. There
-> are other non-final patches which may also want to use this macro.
+So, the mail box IDs programmed into socket CAN during initialization
+does not propagate into the hardware. This is planned to be a future
+implementation in Socket CAN.
 
->  arch/x86/include/asm/atomic.h      |    1 +
->  arch/x86/include/asm/atomic64_64.h |    1 +
+In our case, we support hardware filtering, to work around with this,
+Wolfgang (Socket CAN owner) suggested that we implement
+this using sysfs.
 
-Acked-by: Ingo Molnar <mingo@elte.hu>
-
-Thanks,
-
-	Ingo
+These setting are not for debugging, but to program the mail box IDs
+into the hardware. 
