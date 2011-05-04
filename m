@@ -1,55 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 May 2011 09:19:38 +0100
-Subject: [PATCH] ARM: EXYNOS4: Bugfix Hotplug
-In-Reply-To: <1304470284-25770-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1304470284-25770-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <20110504081937.GA24071@n2100.arm.linux.org.uk>
+From: sven@narfation.org (Sven Eckelmann)
+Date: Wed, 4 May 2011 10:21:16 +0200
+Subject: [PATCH] atomic: add *_dec_not_zero
+In-Reply-To: <AE90C24D6B3A694183C094C60CF0A2F6D8AD0D@saturn3.aculab.com>
+References: <AE90C24D6B3A694183C094C60CF0A2F6D8AD0D@saturn3.aculab.com>
+Message-ID: <201105041021.22082.sven@narfation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 04, 2011 at 09:51:24AM +0900, MyungJoo Ham wrote:
-> When tested with "NURI" board, Exynos4 has not been working
-> properly and showed error messages when the secondary core is being
-> enabled with hotplug. The NURI board has Exynos4 of revision 1.
+On Wednesday 04 May 2011 10:05:53 David Laight wrote:
+> > Introduce an *_dec_not_zero operation.  Make this a special case of
+> > *_add_unless because batman-adv uses atomic_dec_not_zero in different
+> > places like re-broadcast queue or aggregation queue management. There
+> > are other non-final patches which may also want to use this macro.
+> 
+> Isn't there a place where a default definition of this can be
+> defined? Instead of adding it separately to every architecture.
 
-NAK.
+Not that I would know about such a place - and all other atomic* macro 
+definitions also suggest that there is no such place.
 
-> diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-exynos4/hotplug.c
-> index 2b5909e..b81a24a 100644
-> --- a/arch/arm/mach-exynos4/hotplug.c
-> +++ b/arch/arm/mach-exynos4/hotplug.c
-> @@ -30,13 +30,13 @@ static inline void cpu_enter_lowpower(void)
->  	 * Turn off coherency
->  	 */
->  	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	bic	%0, %0, %3\n"
-> +	"	bic	%0, %0, #0x41\n"
->  	"	mcr	p15, 0, %0, c1, c0, 1\n"
->  	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	bic	%0, %0, %2\n"
-> +	"	bic	%0, %0, #0x04\n"
->  	"	mcr	p15, 0, %0, c1, c0, 0\n"
->  	  : "=&r" (v)
-> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
-> +	  : "r" (0)
-
-Why not just change the '0x40' to '0x41' ?
-
-> @@ -45,14 +45,14 @@ static inline void cpu_leave_lowpower(void)
->  	unsigned int v;
->  
->  	asm volatile(
-> -	"mrc	p15, 0, %0, c1, c0, 0\n"
-> -	"	orr	%0, %0, %1\n"
-> +	"	mrc	p15, 0, %0, c1, c0, 0\n"
-> +	"	orr	%0, %0, #0x04\n"
->  	"	mcr	p15, 0, %0, c1, c0, 0\n"
->  	"	mrc	p15, 0, %0, c1, c0, 1\n"
-> -	"	orr	%0, %0, %2\n"
-> +	"	orr	%0, %0, #0x41\n"
->  	"	mcr	p15, 0, %0, c1, c0, 1\n"
->  	  : "=&r" (v)
-> -	  : "Ir" (CR_C), "Ir" (0x40)
-> +	  :
-
-Same comment.
+Kind regards,
+	Sven
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 836 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110504/1066a527/attachment.sig>
