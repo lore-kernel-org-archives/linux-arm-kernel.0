@@ -1,29 +1,108 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 04 May 2011 09:35:10 -0400 (EDT)
-Subject: [PATCH 1/2] Moving Marvell Dove platform defaults to ARMv7
-In-Reply-To: <BANLkTins+RioLLufdu2Wnt=Heyp12z5NXw@mail.gmail.com>
-References: <1302173382-25577-1-git-send-email-kostap@marvell.com>
-	<BANLkTikCBDCYr6BHz4zWPvHfuAQ+eCtvNg@mail.gmail.com>
-	<alpine.LFD.2.00.1105021354410.24613@xanadu.home>
-	<alpine.LFD.2.00.1105021434230.24613@xanadu.home>
-	<BANLkTimdti4Cj2BMqsRdnmOB7Dtt9=QTCQ@mail.gmail.com>
-	<BANLkTimXLfcAsU47R+xEvU8Nq-A8NEWmOw@mail.gmail.com>
-	<alpine.LFD.2.00.1105031542480.24613@xanadu.home>
-	<BANLkTins+RioLLufdu2Wnt=Heyp12z5NXw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1105040934350.24613@xanadu.home>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Wed,  4 May 2011 15:35:09 +0200
+Subject: [PATCH v4 0/8] OMAP: add PM_CONSTRAINTS framework
+Message-ID: <1304516117-9334-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 May 2011, saeed bishara wrote:
+From: Jean Pihet <j-pihet@ti.com>
 
-> >>
-> >> I'm OK on this change. MMP2 (PJ4 core) is also used as ARMv7 capable.
-> >
-> > So I did remove those entries. ?That also allows for the Dove kernel to
-> > be compiled using Thumb2 without any additional changes.
-> have you also loaded that kernel?
+Implement OMAP PM layer omap_pm_set_max_dev_wakeup_lat API by
+creating a unified API which calls omap_device_set_dev_constraint
+for all classes of constraints (devices wake-up latency, devices
+throughput...).
+The implementation of the constraints framework is at the omap_device
+level: management and storage of the constraints, dispatching of the
+constraints to the appropriate low level layers.
 
-Yes, of course.  And it works just fine.
+NOTE: only works for devices which have been converted to use
+     omap_device/omap_hwmod.
 
+Longer term, we could possibly remove this API from the OMAP PM layer,
+and instead directly use the device level API.
 
-Nicolas
+For the devices wake-up latency constraints, the power domains get
+the next power state programmed directly in the registers via
+pwrdm_wakeuplat_update_pwrst.
+
+Note about PM QOS: the MPU and CORE power domains get the next power
+state via cpuidle, which get the strongest wake-up latency constraint
+by querying PM QOS. The usage of PM QOS is temporary, until a generic
+solution is in place.
+
+The bus throughput constraints framework is supported by still is a
+no-op for the moment.
+
+For the wake-up latency constraints framework to have effect on the
+power domains states, CONFIG_CPU_IDLE and CONFIG_OMAP_PM_CONSTRAINTS
+must be enabled.
+
+Based on Vibhore's original patch and completely reworked using
+omap_device, omap_hwmod, powerdomain and PM QOS frameworks.
+Cc: Vibhore Vardhan <vvardhan@ti.com>
+
+Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
+on MPU, CORE and PER.
+
+Based on khilman's pm-core branch
+
+v4:
+. updated after review comments on linux-omap mailing list,
+. bug fix in the use of plist_first and plist_last if the list is empty.
+
+v3:
+. updated after review comments from Kevin,
+. patches re-ordering for git bisect compliance,
+. reworked the constraints storage and management:
+  - the omap_device layer stores all constraints in per-omap_device
+    constraints lists,
+  - the powerdomain layer manages the wake-up latency constraints in
+    per-pwrdm constraint list and applies the constraint to the
+    corresponding power domain.
+. add the support for the INACTIVE power state,
+. move the power domains state initialization from pwrdms_setup to an early init call.
+
+v2:
+. updated after review comments from Kevin and Paul,
+. initial patch split according to the layering,
+. added support for ascending or descending order of constraints values,
+. added throughput constraints to the framework, although the tput implementation
+ currently is a no-op.
+
+To Do:
+. refine the wake-up latency figures by defining the conditions of measurements and by
+ measuring on actual OMAP3 hardware,
+. define the effect of power domains states combinations,
+. debug: add some control knobs for the wake-up latencies in /sysfs,
+. add a user-space API to request and remove constraints,
+. add OMAP4 support when low power modes code is merged in.
+
+Jean Pihet (8):
+  OMAP PM: create a PM layer plugin for per-device constraints
+  OMAP2+: powerdomain: control power domains next state
+  OMAP3: powerdomain data: add wake-up latency figures
+  OMAP2+: omap_hwmod: manage the omap_devices the wake-up latency
+    constraints
+  OMAP: PM CONSTRAINTS: add an enum for the classes of constraint
+  OMAP2+: omap_device: implement the constraints management code
+  OMAP: PM CONSTRAINTS: implement wake-up latency constraints
+  OMAP PM: early init of the pwrdms states
+
+ arch/arm/mach-omap2/omap_hwmod.c              |   26 ++-
+ arch/arm/mach-omap2/pm34xx.c                  |    2 +-
+ arch/arm/mach-omap2/pm44xx.c                  |    2 +-
+ arch/arm/mach-omap2/powerdomain.c             |  213 ++++++++++++++
+ arch/arm/mach-omap2/powerdomain.h             |   42 +++-
+ arch/arm/mach-omap2/powerdomains3xxx_data.c   |   84 ++++++-
+ arch/arm/plat-omap/Kconfig                    |    7 +
+ arch/arm/plat-omap/Makefile                   |    1 +
+ arch/arm/plat-omap/include/plat/omap-pm.h     |    4 +
+ arch/arm/plat-omap/include/plat/omap_device.h |   15 +-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    2 +
+ arch/arm/plat-omap/omap-pm-constraints.c      |  369 +++++++++++++++++++++++++
+ arch/arm/plat-omap/omap_device.c              |  191 +++++++++++++
+ 13 files changed, 950 insertions(+), 8 deletions(-)
+ create mode 100644 arch/arm/plat-omap/omap-pm-constraints.c
+
+-- 
+1.7.2.5
