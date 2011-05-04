@@ -1,36 +1,35 @@
 From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed, 04 May 2011 09:31:25 +0300
+Date: Wed, 04 May 2011 09:32:20 +0300
 Subject: [PATCH] kirkwood: add dir-665 support
-In-Reply-To: <BANLkTimtGMQC6yokSQ_cDAtcunzL8Pr_8w@mail.gmail.com>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>	<20110503205056.GA13075@gentoodev.compulab.local>
-	<BANLkTimtGMQC6yokSQ_cDAtcunzL8Pr_8w@mail.gmail.com>
-Message-ID: <4DC0F2BD.4080806@compulab.co.il>
+In-Reply-To: <BANLkTimzZr0vfOdNwVev2A_xoU_1k+SB_w@mail.gmail.com>
+References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>	<20110503205056.GA13075@gentoodev.compulab.local>	<BANLkTimQM_J2ZbDjAewUsp+XSEP+x+eniA@mail.gmail.com>	<BANLkTinybLSF418PsocXR6dwuaksv_+UCQ@mail.gmail.com>
+	<BANLkTimzZr0vfOdNwVev2A_xoU_1k+SB_w@mail.gmail.com>
+Message-ID: <4DC0F2F4.6000404@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/11 06:30, Hirundo Cam wrote:
-> Hi Mike,
+On 05/04/11 06:00, Hirundo Cam wrote:
+> Hi Mike and Simon
 > 
->>> +config MACH_MV88F6281_DIR665
->>> +     bool "Marvell 88F6281 DIR665 Board"
->>> +     help
+> 2011/5/4 Hirundo Cam <camhirundo@gmail.com>:
+>> Hi Mike and Simon,
 >>
->> Citing checkpatch.pl:
->> "WARNIING: please write a paragraph that describes the config symbol fully"
+>> I've send a machine submit to arm-linux, it generated the mach-types as
+>>
+>> [stripped]
+>> mx51_moray              MACH_MX51_MORAY         MX51_MORAY              3484
+>> thales_cbc              MACH_THALES_CBC         THALES_CBC              3485
+>> bluepoint               MACH_BLUEPOINT          BLUEPOINT               3486
+>> dir665                  MACH_DIR665             DIR665                  3487
+>>
+>> Is this correct for the DIR665 board using mv88f6281 chips?
 > 
-> I've removed Kconfig and re-add the Kconfig in my git repo.
-> (rm is 1 commit, and the add is the following commit)
-> And then I've found most of those paragraph is this Kconfig has the
-> same problem.
-> So I have no idea where the problem is .
+> Is this implied that I could get rid of the modification to mach-type
+> in my patch?
 
-checkpatch.pl expects more elaborate description of the Kconfig option in the
-help text and warns if such description can't be found. Since your description
-is much the same as for other boards in arch/arm/mach-kirkwood, I suppose you
-can ignore this warning.
+Yes, as soon as mach-types update is pushed into the kernel.
 
-> Regards,
-> Hirundo Cam
+> Thanks!
 
 
 -- 
