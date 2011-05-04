@@ -1,25 +1,49 @@
-From: green@linuxhacker.ru (Oleg Drokin)
-Date: Wed, 4 May 2011 12:02:57 -0400
-Subject: [PATCH] omap: fix build when MTD_NAND_OMAP2 and
-	TOUCHSCREEN_ADS7846 are disabled
-In-Reply-To: <1304515622-25113-1-git-send-email-mike@compulab.co.il>
-References: <1304515622-25113-1-git-send-email-mike@compulab.co.il>
-Message-ID: <53A11D3C-4DBA-4772-AF14-3590772F6AA1@linuxhacker.ru>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 4 May 2011 18:03:13 +0200
+Subject: [PATCH] sdio: optimized SDIO IRQ handling for single function
+In-Reply-To: <alpine.LFD.2.00.1105041117170.24613@xanadu.home>
+References: <1304453087-7365-1-git-send-email-per.forlin@linaro.org>
+	<alpine.LFD.2.00.1105032339370.24613@xanadu.home>
+	<BANLkTim_x28NyWzo-Ug3+ZprgeT=VFwEfQ@mail.gmail.com>
+	<alpine.LFD.2.00.1105041117170.24613@xanadu.home>
+Message-ID: <BANLkTinUnDN_ZE5hQuQvDUTFUJV+ZpTTag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On 4 May 2011 17:20, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Wed, 4 May 2011, Per Forlin wrote:
+>
+>> On 4 May 2011 05:40, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+>> > On Tue, 3 May 2011, Per Forlin wrote:
+>> >
+>> >> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+>> >>
+>> >> If there is only 1 function registered, and IRQ:s are supported and
+>> >> currently enabled, call the callback handler directly
+>> >> without checking the CCCR registers.
+>> >>
+>> >> Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+>> >> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+>> >
+>> > Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+>> >
+>> I am working o a patch version 2 after offline discussion with Ulf Hansson.
+>> Instead of adding this code here.
+>> Add sdio_single_func member in mmc_card. Set and reset this function
+>> in sdio_claim_irq and sdio_release_irq.
+>> process_sdio_pending_irqs would only check if sdio_single_func is !=
+>> null and call it.
+>
+> Yes, that's what I was about to propose after thinking about it some
+> more.
+>
+>> This will result in a bigger patch overall but the new code in
+>> process_sdio_pending_irqs will be minimal.
+>
+> Something like this (untested) ?
+>
+What I had in mind is similar. Please let me know what you think. I am
+about to post "patch v2"
 
-On May 4, 2011, at 9:27 AM, Mike Rapoport wrote:
-
-> Commits 5e6a64b36ce346b7a2d481ef9fa315290eb28e5e (omap: move detection of
-> NAND CS to common-board-devices) and 96974a249b0cf3537f49115a59be67e2c54f315c
-> (omap: consolidate touch screen initialization among different boards)
-> break compilation when CONFIG_MTD_NAND_OMAP2 and
-> CONFIG_TOUCHSCREEN_ADS7846 are not selected.
-> Removing ifdefs and stubs from common-board-devices.h fixes the problem.
-
-Works for me.
-
-Bye, 
-   Oleg
+Regards,
+Per
