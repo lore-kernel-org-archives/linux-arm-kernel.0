@@ -1,30 +1,55 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Wed, 4 May 2011 08:16:27 +0000
-Subject: [PATCH v2] kirkwood: add dir-665 support
-In-Reply-To: <1304496346-13557-1-git-send-email-camhirundo@gmail.com>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-	<1304496346-13557-1-git-send-email-camhirundo@gmail.com>
-Message-ID: <20110504081627.GY19806@kw.sim.vm.gnt>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 May 2011 09:19:38 +0100
+Subject: [PATCH] ARM: EXYNOS4: Bugfix Hotplug
+In-Reply-To: <1304470284-25770-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1304470284-25770-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <20110504081937.GA24071@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hirundo,
+On Wed, May 04, 2011 at 09:51:24AM +0900, MyungJoo Ham wrote:
+> When tested with "NURI" board, Exynos4 has not been working
+> properly and showed error messages when the secondary core is being
+> enabled with hotplug. The NURI board has Exynos4 of revision 1.
 
-On Wed, May 04, 2011 at 04:05:46PM +0800, Hirundo Cam wrote:
-> This patch is a hack to dir-665 by referencing mv88f6281gtw_ge board.
-> LEDs, GPIO, Buttons remains unknown.
-> 
-> To use this patch, on board u-boot must also be recompiled and replaced.
+NAK.
 
-Just for curiosity, what is the problem the stock U-Boot ?
+> diff --git a/arch/arm/mach-exynos4/hotplug.c b/arch/arm/mach-exynos4/hotplug.c
+> index 2b5909e..b81a24a 100644
+> --- a/arch/arm/mach-exynos4/hotplug.c
+> +++ b/arch/arm/mach-exynos4/hotplug.c
+> @@ -30,13 +30,13 @@ static inline void cpu_enter_lowpower(void)
+>  	 * Turn off coherency
+>  	 */
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	bic	%0, %0, %3\n"
+> +	"	bic	%0, %0, #0x41\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	bic	%0, %0, %2\n"
+> +	"	bic	%0, %0, #0x04\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	  : "=&r" (v)
+> -	  : "r" (0), "Ir" (CR_C), "Ir" (0x40)
+> +	  : "r" (0)
 
-Regards,
+Why not just change the '0x40' to '0x41' ?
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110504/36703340/attachment.sig>
+> @@ -45,14 +45,14 @@ static inline void cpu_leave_lowpower(void)
+>  	unsigned int v;
+>  
+>  	asm volatile(
+> -	"mrc	p15, 0, %0, c1, c0, 0\n"
+> -	"	orr	%0, %0, %1\n"
+> +	"	mrc	p15, 0, %0, c1, c0, 0\n"
+> +	"	orr	%0, %0, #0x04\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 0\n"
+>  	"	mrc	p15, 0, %0, c1, c0, 1\n"
+> -	"	orr	%0, %0, %2\n"
+> +	"	orr	%0, %0, #0x41\n"
+>  	"	mcr	p15, 0, %0, c1, c0, 1\n"
+>  	  : "=&r" (v)
+> -	  : "Ir" (CR_C), "Ir" (0x40)
+> +	  :
+
+Same comment.
