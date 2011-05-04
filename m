@@ -1,42 +1,113 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 04 May 2011 07:36:58 -0700
-Subject: [PATCH 1/8] OMAP PM: create a PM layer plugin for per-device
-	constraints
-In-Reply-To: <20110504135930.GE2092@atomide.com> (Tony Lindgren's message of
-	"Wed, 4 May 2011 06:59:30 -0700")
-References: <1304516117-9334-1-git-send-email-j-pihet@ti.com>
-	<1304516117-9334-2-git-send-email-j-pihet@ti.com>
-	<20110504135930.GE2092@atomide.com>
-Message-ID: <87vcxqv8fp.fsf@ti.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 4 May 2011 20:08:30 +0530
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <2543A75FDDB244D2A148C14BCAA5FD88@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201104271605.09537.arnd@arndb.de>
+	<CF1FC9DE1796407FB4D636189646927F@subhasishg>
+	<201104280935.38787.arnd@arndb.de>
+	<2543A75FDDB244D2A148C14BCAA5FD88@subhasishg>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CD0B8CC@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Hi Subhasish,
 
-Tony Lindgren <tony@atomide.com> writes:
+On Wed, May 04, 2011 at 12:48:43, Subhasish Ghosh wrote:
+> Hi Arnd,
+> 
+> How about just doing something like:
+> 
+> #> echo da8xx_pruss_uart >> firmware.bin
+> 
+> i.e  just append the device name (from the board file) into the firmware
+> file.
+> 
+> In the driver probe, we can parse from the bottom, when it reaches
+> "da8xx_pruss", the rest of the upper data is the firmware and from
+> the full name, we can determine if it's a CAN, UART or any other
+> peripheral.
+> 
+> So, based on the platform_data, which the MFD driver received,
+> it can find out which device to initialize.
 
-> * jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [110504 06:32]:
->>
->> +int omap_pm_set_max_mpu_wakeup_lat(struct device *dev, long t)
-> ...
->
->> +int omap_pm_set_max_dev_wakeup_lat(struct device *req_dev, struct device *dev,
-> ...
->
->> +int omap_pm_set_min_clk_rate(struct device *dev, struct clk *c, long r)
-> ...
->
-> You should implement this as a Linux generic framework, we don't
-> want to add more omap specific frameworks.
+If you are defining a firmware header, it may be
+worthwhile making sure you include information
+on features of the device being supported (I
+assume there will be differences in CAN features if
+the firmware uses both PRUs to support CAN versus
+UART on one PRU and CAN on another PRU).
 
-This series isn't adding any new OMAP-specific frameworks.  The OMAP PM
-layer is already in place, and has been there for awhile.  OMAP PM is a
-layer which can have "plugins" so we can experiment with ways of
-handling constraints without changing the driver interface, and this
-series is just implementing a new plugin.
+The MFD driver can parse this information and
+pass this on to the UART or CAN drivers.
 
-Once we are happy with a constraint layer, and can prove it will work,
-the plan is to get rid of the (existing) OMAP-specific APIs and propose
-a generic interface.
+Thanks,
+Sekhar
 
-Kevin
+> 
+> Also, does the line wrapping look any better ?
+> 
+> 
+> > On Thursday 28 April 2011 09:17:21 Subhasish Ghosh wrote:
+> >> >
+> >> > You can easily do that by adding a small header to the firmware
+> >> > format and interpret that header by the MFD driver. When the name
+> >> > of the subdevice is part of that header, the MFD driver does not
+> >> > need to understand the difference, it can simply pass that on
+> >> > when creating its child devices.
+> >>
+> >> I don't understand why loading the firmware should be done at the MFD
+> >> driver.
+> >> The user already specifies the device he/she wants to start on the PRU
+> >> via
+> >> modprobe.
+> >> A driver can be inserted, which can download a printer firmware on one
+> >> PRU
+> >> and a
+> >> scanner firmware on the other. This way both cores can be used for
+> >> separate
+> >> purposes.
+> >> I mean, say in a real MFD controller, that will also have two separate
+> >> cores
+> >> running on it,
+> >> just that, the firmware on it would not be downloaded runtime but fused
+> >> in
+> >> some non volatile memory.
+> >
+> > Then I must be misreading what your code currently does, because it does
+> > not
+> > match your explanations. What I see in the platform code is that you
+> > create
+> > MFD cells for specific devices that get automatically created by the MFD
+> > driver. This will cause udev to load the drivers for these devices, which
+> > then load the firmware they need.
+> >
+> > Also, I cannot see how the method you describe would make it possible to
+> > the same driver into both units, e.g. when you want to have two serial
+> > ports. The reason is that you currently hardcode the PRU number in the
+> > driver and that you cannot load a single driver twice.
+> >
+> > Finally, I'm trying to make sure that whatever solution you come up with
+> > will still work when we migrate the code to using a flattened device tree.
+> > In that case, you would ideally put the device firmware into the device
+> > tree as a property that matches whatever you have connected on the
+> > specific
+> > board (at least as an option, you can still fall back to
+> > request_firmware).
+> > You definitely want automatic module loading in that case.
+> >
+> > Note that using module loading with specific parameters in order to
+> > match the hardware is not a recommended procedure any more. The code
+> > really needs to work the same way when all drivers are built into the
+> > kernel. It should not be hard to use the firmware loading mechanism
+> > in the MFD driver to both load the firmware and configure the devices
+> > appropriately so we always use the right driver for the currently
+> > active devices.
+> >
+> > Arnd
+> >
+> > BTW, something is wrong with your email client line wrapping. I've fixed
+> > this up manually before when replying, but please find a way to get this
+> > right in the future. 
+> 
+> 
