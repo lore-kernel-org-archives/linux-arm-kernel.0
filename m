@@ -1,124 +1,146 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 4 May 2011 11:20:08 -0400 (EDT)
-Subject: [PATCH] sdio: optimized SDIO IRQ handling for single function
-In-Reply-To: <BANLkTim_x28NyWzo-Ug3+ZprgeT=VFwEfQ@mail.gmail.com>
-References: <1304453087-7365-1-git-send-email-per.forlin@linaro.org>
-	<alpine.LFD.2.00.1105032339370.24613@xanadu.home>
-	<BANLkTim_x28NyWzo-Ug3+ZprgeT=VFwEfQ@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1105041117170.24613@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 04 May 2011 08:32:51 -0700
+Subject: [PATCH 4/5] OMAP3: cpuidle: code rework for improved readability
+In-Reply-To: <1304069186-3086-5-git-send-email-j-pihet@ti.com> (jean pihet's
+	message of "Fri, 29 Apr 2011 11:26:25 +0200")
+References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
+	<1304069186-3086-5-git-send-email-j-pihet@ti.com>
+Message-ID: <87zkn2tra4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 May 2011, Per Forlin wrote:
+jean.pihet at newoldbits.com writes:
 
-> On 4 May 2011 05:40, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> > On Tue, 3 May 2011, Per Forlin wrote:
-> >
-> >> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
-> >>
-> >> If there is only 1 function registered, and IRQ:s are supported and
-> >> currently enabled, call the callback handler directly
-> >> without checking the CCCR registers.
-> >>
-> >> Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
-> >> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> >
-> > Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> >
-> I am working o a patch version 2 after offline discussion with Ulf Hansson.
-> Instead of adding this code here.
-> Add sdio_single_func member in mmc_card. Set and reset this function
-> in sdio_claim_irq and sdio_release_irq.
-> process_sdio_pending_irqs would only check if sdio_single_func is !=
-> null and call it.
+> From: Jean Pihet <j-pihet@ti.com>
 
-Yes, that's what I was about to propose after thinking about it some 
-more.
+Please summarize changes here.
 
-> This will result in a bigger patch overall but the new code in
-> process_sdio_pending_irqs will be minimal.
+Kevin
 
-Something like this (untested) ?
-
-diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-index b300161..4552727 100644
---- a/drivers/mmc/core/sdio_irq.c
-+++ b/drivers/mmc/core/sdio_irq.c
-@@ -32,6 +32,12 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
- 	int i, ret, count;
- 	unsigned char pending;
- 
-+	if (card->sdio_single_irq) {
-+		struct sdio_func *func = card->sdio_single_irq;
-+		func->irq_handler(func);
-+		return 1;
-+	}
-+
- 	ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
- 	if (ret) {
- 		printk(KERN_DEBUG "%s: error %d reading SDIO_CCCR_INTx\n",
-@@ -166,6 +172,7 @@ static int sdio_card_irq_get(struct mmc_card *card)
- 			host->sdio_irqs--;
- 			return err;
- 		}
-+		return 1;
- 	}
- 
- 	return 0;
-@@ -183,7 +190,7 @@ static int sdio_card_irq_put(struct mmc_card *card)
- 		kthread_stop(host->sdio_irq_thread);
- 	}
- 
--	return 0;
-+	return (host->sdio_irqs == 1);
- }
- 
- /**
-@@ -225,8 +232,12 @@ int sdio_claim_irq(struct sdio_func *func, sdio_irq_handler_t *handler)
- 
- 	func->irq_handler = handler;
- 	ret = sdio_card_irq_get(func->card);
--	if (ret)
-+	if (ret < 0) {
- 		func->irq_handler = NULL;
-+	} else if (ret == 1) {
-+		card->sdio_single_irq = func;
-+		ret = 0;
-+	}
- 
- 	return ret;
- }
-@@ -250,7 +261,17 @@ int sdio_release_irq(struct sdio_func *func)
- 
- 	if (func->irq_handler) {
- 		func->irq_handler = NULL;
--		sdio_card_irq_put(func->card);
-+		if (sdio_card_irq_put(func->card) == 1) {
-+			int i;
-+			for (i = 0, i < 7; i++) {
-+				if (func->card->sdio_func[i].irq_handler) {
-+					func->card->sdio_single_irq =
-+						func->card->sdio_func[i];
-+					break;
-+				}
-+			}
-+		} else
-+			func->card->sdio_single_irq = NULL;
- 	}
- 
- 	ret = mmc_io_rw_direct(func->card, 0, 0, SDIO_CCCR_IENx, 0, &reg);
-diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-index adb4888..fee3df3 100644
---- a/include/linux/mmc/card.h
-+++ b/include/linux/mmc/card.h
-@@ -145,6 +145,7 @@ struct mmc_card {
- 	struct sdio_cccr	cccr;		/* common card info */
- 	struct sdio_cis		cis;		/* common tuple info */
- 	struct sdio_func	*sdio_func[SDIO_MAX_FUNCS]; /* SDIO functions (devices) */
-+	struct sdio_func	*sdio_single_irq;		/* SDIO function when only one IRQ active */
- 	unsigned		num_info;	/* number of info strings */
- 	const char		**info;		/* info strings */
- 	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
-
-
-Nicolas
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> ---
+>  arch/arm/mach-omap2/cpuidle34xx.c |   52 +++++++++++++-----------------------
+>  1 files changed, 19 insertions(+), 33 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
+> index f84315c..4673cc6 100644
+> --- a/arch/arm/mach-omap2/cpuidle34xx.c
+> +++ b/arch/arm/mach-omap2/cpuidle34xx.c
+> @@ -80,13 +80,6 @@ static struct cpuidle_params cpuidle_params_table[OMAP3_MAX_STATES] = {
+>  	{10000 + 30000, 300000, 1},
+>  };
+>  
+> -static int omap3_idle_bm_check(void)
+> -{
+> -	if (!omap3_can_sleep())
+> -		return 1;
+> -	return 0;
+> -}
+> -
+>  static int _cpuidle_allow_idle(struct powerdomain *pwrdm,
+>  				struct clockdomain *clkdm)
+>  {
+> @@ -166,9 +159,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+>  					      struct cpuidle_state *curr)
+>  {
+>  	struct cpuidle_state *next = NULL;
+> -	struct omap3_idle_statedata *cx;
+> -
+> -	cx = cpuidle_get_statedata(curr);
+> +	struct omap3_idle_statedata *cx = cpuidle_get_statedata(curr);
+>  
+>  	/* Check if current state is valid */
+>  	if (cx->valid) {
+> @@ -176,9 +167,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+>  	} else {
+>  		u8 idx = OMAP3_STATE_MAX;
+>  
+> -		/*
+> -		 * Reach the current state starting at highest C-state
+> -		 */
+> +		/* Reach the current state starting at highest C-state */
+>  		for (; idx >= OMAP3_STATE_C1; idx--) {
+>  			if (&dev->states[idx] == curr) {
+>  				next = &dev->states[idx];
+> @@ -186,9 +175,7 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+>  			}
+>  		}
+>  
+> -		/*
+> -		 * Should never hit this condition.
+> -		 */
+> +		/* Should never hit this condition */
+>  		WARN_ON(next == NULL);
+>  
+>  		/*
+> @@ -223,29 +210,16 @@ static struct cpuidle_state *next_valid_state(struct cpuidle_device *dev,
+>  static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>  			       struct cpuidle_state *state)
+>  {
+> -	struct cpuidle_state *new_state = next_valid_state(dev, state);
+> -	u32 core_next_state, per_next_state = 0, per_saved_state = 0;
+> -	u32 cam_state;
+> +	struct cpuidle_state *new_state;
+> +	u32 core_next_state, per_next_state = 0, per_saved_state = 0, cam_state;
+>  	struct omap3_idle_statedata *cx;
+>  	int ret;
+>  
+> -	if (omap3_idle_bm_check()) {
+> -		BUG_ON(!dev->safe_state);
+> +	if (!omap3_can_sleep()) {
+>  		new_state = dev->safe_state;
+>  		goto select_state;
+>  	}
+>  
+> -	cx = cpuidle_get_statedata(state);
+> -	core_next_state = cx->core_state;
+> -
+> -	/*
+> -	 * FIXME: we currently manage device-specific idle states
+> -	 *        for PER and CORE in combination with CPU-specific
+> -	 *        idle states.  This is wrong, and device-specific
+> -	 *        idle management needs to be separated out into 
+> -	 *        its own code.
+> -	 */
+> -
+>  	/*
+>  	 * Prevent idle completely if CAM is active.
+>  	 * CAM does not have wakeup capability in OMAP3.
+> @@ -257,9 +231,19 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>  	}
+>  
+>  	/*
+> +	 * FIXME: we currently manage device-specific idle states
+> +	 *        for PER and CORE in combination with CPU-specific
+> +	 *        idle states.  This is wrong, and device-specific
+> +	 *        idle management needs to be separated out into
+> +	 *        its own code.
+> +	 */
+> +
+> +	/*
+>  	 * Prevent PER off if CORE is not in retention or off as this
+>  	 * would disable PER wakeups completely.
+>  	 */
+> +	cx = cpuidle_get_statedata(state);
+> +	core_next_state = cx->core_state;
+>  	per_next_state = per_saved_state = pwrdm_read_next_pwrst(per_pd);
+>  	if ((per_next_state == PWRDM_POWER_OFF) &&
+>  	    (core_next_state > PWRDM_POWER_RET))
+> @@ -269,6 +253,8 @@ static int omap3_enter_idle_bm(struct cpuidle_device *dev,
+>  	if (per_next_state != per_saved_state)
+>  		pwrdm_set_next_pwrst(per_pd, per_next_state);
+>  
+> +	new_state = next_valid_state(dev, state);
+> +
+>  select_state:
+>  	dev->last_state = new_state;
+>  	ret = omap3_enter_idle(dev, new_state);
+> @@ -329,7 +315,7 @@ struct cpuidle_driver omap3_idle_driver = {
+>  	.owner = 	THIS_MODULE,
+>  };
+>  
+> -/* Fill in the state data from the mach tables and register the driver_data */
+> +/* Helper to fill the C-state common data and register the driver_data */
+>  #define FILL_IN_STATE(idx, descr)					\
+>  do {									\
+>  	state				= &dev->states[count];		\
