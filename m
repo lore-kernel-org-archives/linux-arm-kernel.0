@@ -1,84 +1,39 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Wed,  4 May 2011 15:35:17 +0200
-Subject: [PATCH 8/8] OMAP PM: early init of the pwrdms states
-In-Reply-To: <1304516117-9334-1-git-send-email-j-pihet@ti.com>
-References: <1304516117-9334-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1304516117-9334-9-git-send-email-j-pihet@ti.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 04 May 2011 09:38:50 -0400 (EDT)
+Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary to be
+	appended to zImage
+In-Reply-To: <20110504072317.GU2092@atomide.com>
+References: <20110420073445.GB31127@S2100-06.ap.freescale.net>
+	<20110421080238.GE13688@atomide.com>
+	<20110421124618.GA15060@atomide.com>
+	<20110427142306.GI3755@atomide.com>
+	<alpine.LFD.2.00.1104271036520.24613@xanadu.home>
+	<20110427144335.GK3755@atomide.com> <20110429102623.GX3755@atomide.com>
+	<alpine.LFD.2.00.1104290909310.24613@xanadu.home>
+	<20110429135334.GR5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104291509540.24613@xanadu.home>
+	<20110504072317.GU2092@atomide.com>
+Message-ID: <alpine.LFD.2.00.1105040936040.24613@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On Wed, 4 May 2011, Tony Lindgren wrote:
 
-The powerdomains next states are initialized in pwrdms_setup as a
-late_initcall. Because the wake-up constraint can be requested
-early in the boot sequence, the power domains next states can be
-overwritten by pwrdms_setup.
+> * Nicolas Pitre <nico@fluxnic.net> [110429 12:11]:
+> > I don't think the DT data is that huge, but that's a point in favor of 
+> > doing it in the zImage code.  We'll just need to feed the total size of 
+> > the uncompressed kernel .bss section to zImage when compiling it.
+> 
+> One more thing to consider though.. I don't think we want to copy the
+> DT data twice. It's not big right now, but could get large if we pass
+> all the clocks in it.
+> 
+> So this should be probably fixed in the original patch.. John got
+> any thoughts on that?
 
-This patch fixes it by initializing the power domains next states
-early at boot, so that the constraints can be applied.
-Later in the pwrdms_setup function the currently programmed
-next states are re-used as next state values.
+No.  The original patch is good (and complex) enough as it is now.  It 
+already required 3 rounds of reviews before it was right. This should be 
+fixed in a subsequent patch.
 
-Applies to OMAP3 and OMAP4.
 
-Tested on OMAP3 Beagleboard in RET/OFF using wake-up latency constraints
-on MPU, CORE and PER.
-
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/pm34xx.c      |    2 +-
- arch/arm/mach-omap2/pm44xx.c      |    2 +-
- arch/arm/mach-omap2/powerdomain.c |    5 +++++
- 3 files changed, 7 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 0c5e3a4..8d202a7 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -840,7 +840,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	if (!pwrst)
- 		return -ENOMEM;
- 	pwrst->pwrdm = pwrdm;
--	pwrst->next_state = PWRDM_POWER_RET;
-+	pwrst->next_state = pwrdm_read_next_pwrst(pwrdm);
- 	list_add(&pwrst->node, &pwrst_list);
- 
- 	if (pwrdm_has_hdwr_sar(pwrdm))
-diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-index 59a870b..049efe9 100644
---- a/arch/arm/mach-omap2/pm44xx.c
-+++ b/arch/arm/mach-omap2/pm44xx.c
-@@ -84,7 +84,7 @@ static int __init pwrdms_setup(struct powerdomain *pwrdm, void *unused)
- 	if (!pwrst)
- 		return -ENOMEM;
- 	pwrst->pwrdm = pwrdm;
--	pwrst->next_state = PWRDM_POWER_ON;
-+	pwrdm->state = pwrdm_read_pwrst(pwrdm);
- 	list_add(&pwrst->node, &pwrst_list);
- 
- 	return pwrdm_set_next_pwrst(pwrst->pwrdm, pwrst->next_state);
-diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-index 9860630..3294707 100644
---- a/arch/arm/mach-omap2/powerdomain.c
-+++ b/arch/arm/mach-omap2/powerdomain.c
-@@ -78,6 +78,7 @@ static struct powerdomain *_pwrdm_lookup(const char *name)
- static int _pwrdm_register(struct powerdomain *pwrdm)
- {
- 	int i;
-+	int next_state = PWRDM_POWER_RET;
- 
- 	if (!pwrdm || !pwrdm->name)
- 		return -EINVAL;
-@@ -114,6 +115,10 @@ static int _pwrdm_register(struct powerdomain *pwrdm)
- 	pwrdm_wait_transition(pwrdm);
- 	pwrdm->state = pwrdm_read_pwrst(pwrdm);
- 	pwrdm->state_counter[pwrdm->state] = 1;
-+	/* Early init of the next power state */
-+	if (cpu_is_omap44xx())
-+		next_state = PWRDM_POWER_ON;
-+	pwrdm_set_next_pwrst(pwrdm, next_state);
- 
- 	pr_debug("powerdomain: registered %s\n", pwrdm->name);
- 
--- 
-1.7.2.5
+Nicolas
