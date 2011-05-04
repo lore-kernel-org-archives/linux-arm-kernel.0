@@ -1,42 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 4 May 2011 09:19:05 +0300
-Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
-In-Reply-To: <BANLkTimW1PTavvxjPujVMEV38vzMvja9mw@mail.gmail.com>
-References: <1303139217-10285-1-git-send-email-charu@ti.com>
-	<20110419062633.GA15620@atomide.com> <87r58w4gq3.fsf@ti.com>
-	<20110421054221.GF5918@atomide.com>
-	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
-	<20110426072941.GA3755@atomide.com>
-	<BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com>
-	<87y62ng3f8.fsf@ti.com>
-	<BANLkTimW1PTavvxjPujVMEV38vzMvja9mw@mail.gmail.com>
-Message-ID: <20110504061905.GD27860@atomide.com>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Wed, 04 May 2011 09:31:25 +0300
+Subject: [PATCH] kirkwood: add dir-665 support
+In-Reply-To: <BANLkTimtGMQC6yokSQ_cDAtcunzL8Pr_8w@mail.gmail.com>
+References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>	<20110503205056.GA13075@gentoodev.compulab.local>
+	<BANLkTimtGMQC6yokSQ_cDAtcunzL8Pr_8w@mail.gmail.com>
+Message-ID: <4DC0F2BD.4080806@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Linus Walleij <linus.walleij@linaro.org> [110504 00:37]:
-> 2011/5/3 Kevin Hilman <khilman@ti.com>:
+On 05/04/11 06:30, Hirundo Cam wrote:
+> Hi Mike,
 > 
-> > Are you OK with a move of the current OMAP GPIO drivers (rather ugly)
-> > into drivers/gpio first, followed by the cleanup/restructure patches?
+>>> +config MACH_MV88F6281_DIR665
+>>> +     bool "Marvell 88F6281 DIR665 Board"
+>>> +     help
+>>
+>> Citing checkpatch.pl:
+>> "WARNIING: please write a paragraph that describes the config symbol fully"
 > 
-> In my case I actually did some cleanup after moving the driver for
-> U300, but I think this is a question to the GPIO maintainer who
-> I want to ACK this stuff in the end.
-> 
-> Grant?
-> 
-> You can always squash it later ...
+> I've removed Kconfig and re-add the Kconfig in my git repo.
+> (rm is 1 commit, and the add is the following commit)
+> And then I've found most of those paragraph is this Kconfig has the
+> same problem.
+> So I have no idea where the problem is .
 
-Personally I would prefer absolutely minimal clean-up of current
-code before moving to drivers/gpio to cut down the "crazy churn" in
-arch/arm/. Also then further changes are easier for the GPIO
-maintainers to review.
+checkpatch.pl expects more elaborate description of the Kconfig option in the
+help text and warns if such description can't be found. Since your description
+is much the same as for other boards in arch/arm/mach-kirkwood, I suppose you
+can ignore this warning.
 
-Of course I understand that this might cause extra load for the
-GPIO maintainers, so it's up to the GPIO maintainers to set the
-required standards before accepting the code into drivers/gpio.
+> Regards,
+> Hirundo Cam
 
-Regards,
 
-Tony
+-- 
+Sincerely yours,
+Mike.
