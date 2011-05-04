@@ -1,39 +1,52 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 04 May 2011 09:38:50 -0400 (EDT)
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary to be
-	appended to zImage
-In-Reply-To: <20110504072317.GU2092@atomide.com>
-References: <20110420073445.GB31127@S2100-06.ap.freescale.net>
-	<20110421080238.GE13688@atomide.com>
-	<20110421124618.GA15060@atomide.com>
-	<20110427142306.GI3755@atomide.com>
-	<alpine.LFD.2.00.1104271036520.24613@xanadu.home>
-	<20110427144335.GK3755@atomide.com> <20110429102623.GX3755@atomide.com>
-	<alpine.LFD.2.00.1104290909310.24613@xanadu.home>
-	<20110429135334.GR5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104291509540.24613@xanadu.home>
-	<20110504072317.GU2092@atomide.com>
-Message-ID: <alpine.LFD.2.00.1105040936040.24613@xanadu.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 May 2011 15:44:19 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <2543A75FDDB244D2A148C14BCAA5FD88@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201104280935.38787.arnd@arndb.de>
+	<2543A75FDDB244D2A148C14BCAA5FD88@subhasishg>
+Message-ID: <201105041544.19726.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 May 2011, Tony Lindgren wrote:
-
-> * Nicolas Pitre <nico@fluxnic.net> [110429 12:11]:
-> > I don't think the DT data is that huge, but that's a point in favor of 
-> > doing it in the zImage code.  We'll just need to feed the total size of 
-> > the uncompressed kernel .bss section to zImage when compiling it.
+On Wednesday 04 May 2011, Subhasish Ghosh wrote:
+> How about just doing something like:
 > 
-> One more thing to consider though.. I don't think we want to copy the
-> DT data twice. It's not big right now, but could get large if we pass
-> all the clocks in it.
+> #> echo da8xx_pruss_uart >> firmware.bin
 > 
-> So this should be probably fixed in the original patch.. John got
-> any thoughts on that?
+> i.e  just append the device name (from the board file) into the firmware
+> file.
 
-No.  The original patch is good (and complex) enough as it is now.  It 
-already required 3 rounds of reviews before it was right. This should be 
-fixed in a subsequent patch.
+That sounds fine to me. I would put a header in the beginning, but feel free
+to use whatever format you find useful there.
 
+> In the driver probe, we can parse from the bottom, when it reaches
+> "da8xx_pruss", the rest of the upper data is the firmware and from
+> the full name, we can determine if it's a CAN, UART or any other
+> peripheral.
+> 
+> So, based on the platform_data, which the MFD driver received,
+> it can find out which device to initialize.
 
-Nicolas
+In my opinion, the MFD driver should not know the possible values
+at all, or look at platform_data for the children, but take all
+that information from the firmware file.
+
+The only thing that the MFD driver needs to know is how many PRUs
+there are and how they are connected to the host bus (memory
+regions, irqs, clocks, ...). It can then load firmware files,
+either one for the entire MFD or one per PRU core (whatever
+works best for you) and create child devices with the information
+it finds in there about what code to load into each PRU
+and what drivers to load for them.
+
+When you prepend the "da8xx_pruss_" string to the name you find
+in the firmware file, the pruss driver can be sure that it does
+not accidentally load a different module, e.g. when a malicious
+user was able to exchange the firmware file.
+
+> Also, does the line wrapping look any better ?
+
+Looks good now, yes.
+
+	Arnd
