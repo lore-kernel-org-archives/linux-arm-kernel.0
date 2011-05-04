@@ -1,30 +1,40 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 04 May 2011 18:10:04 +0300
-Subject: [PATCH 1/4] omap: consolidate touch screen initialization among
-	different boards
-In-Reply-To: <4DC15C60.9060401@gmail.com>
-References: <cover.1303682352.git.mike@compulab.co.il>
-	<1738251a50b70224f124d4a54c157cc5e3c6db77.1303682352.git.mike@compulab.co.il>
-	<4DC15C60.9060401@gmail.com>
-Message-ID: <4DC16C4C.6030506@compulab.co.il>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 4 May 2011 17:11:40 +0200
+Subject: [PATCH] ARM: Allow for kernel command line concatenation
+In-Reply-To: <20110504150352.GA19335@caracas.corpusers.net>
+References: <1302255383-12375-1-git-send-email-oskar.andero@sonyericsson.com>
+	<20110504150352.GA19335@caracas.corpusers.net>
+Message-ID: <20110504151140.GJ11574@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Hello Oskar,
 
-On 05/04/11 17:02, Thomas Weber wrote:
+On Wed, May 04, 2011 at 05:03:52PM +0200, oskar.andero at sonyericsson.com wrote:
+> Ping.
+> 
+> On 11:36 Fri 08 Apr, oskar.andero at sonyericsson.com wrote:
+> > From: Victor Boivie <victor.boivie@sonyericsson.com>
+> > 
+> > This patch allows the provided CONFIG_CMDLINE to be concatenated
+> > with the one provided by the boot loader. This is useful to
+> > merge the static values defined in CONFIG_CMDLINE with the
+> > boot loader's (possibly) more dynamic values, such as startup
+> > reasons and more.
+> > 
+> > Signed-off-by: Victor Boivie <victor.boivie@sonyericsson.com>
+> > Reviewed-by: Bjorn Andersson <bjorn.andersson@sonyericsson.com>
+> > Signed-off-by: Oskar Andero <oskar.andero@sonyericsson.com>
+> > Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Acked-by: Uwe Kleine-K??nig <u.kleine-koenig@pengutronix.de>
+> > ---
+It can probably go to Russell's patch system[1].
 
-> Hello,
->
-> because ads7846_get_pendown_state() is not longer set in
-> ads7846_platform_data, the ads7846_setup_pendown tries to request the
-> pendown gpio and fails because the gpio is already requested.
+Best regards
+Uwe
 
-Thanks, for testing.
-
-I've sent a patch for this a couple of minutes ago.
-
+[1] http://www.arm.linux.org.uk/developer/patches/
 
 -- 
-Regards,
-Igor.
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
