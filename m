@@ -1,22 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 04 May 2011 18:04:15 +0100
-Subject: [PATCH V3] ARM: GIC: Convert GIC library to use the IO relaxed
-	operations
-In-Reply-To: <4DC13252.2080308@ti.com>
-References: <1304058131-8375-1-git-send-email-santosh.shilimkar@ti.com>
-	<1304417481.19196.60.camel@e102109-lin.cambridge.arm.com>
-	<4DBFD59D.50008@ti.com>  <4DC13252.2080308@ti.com>
-Message-ID: <1304528655.1935.4.camel@craptop>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed,  4 May 2011 20:14:12 +0200
+Subject: [PATCH 1/2] dmaengine: at_hdmac: set residue as total len in
+	atc_tx_status
+Message-ID: <f4341d4672a23a958398b75cb4305e0e680f2e32.1304532833.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Santosh,
+If transfer status is !=DMA_SUCCESS, return total transfer len as residue,
+instead of zero.
 
-On Wed, 2011-05-04 at 12:02 +0100, Santosh Shilimkar wrote:
-> Will,
-> Can you queue this patch part of your series please?
+Idea from dw_dmac patch by Viresh Kumar.
 
-Yes, providing that Russell is happy to pull the IRQ stuff (fasteoi,
-Tegra changes and this) from me.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/dma/at_hdmac.c |    7 ++++++-
+ 1 files changed, 6 insertions(+), 1 deletions(-)
 
-Will
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index f52c9e3..ba0b5ec 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -1026,7 +1026,12 @@ atc_tx_status(struct dma_chan *chan,
+ 
+ 	spin_unlock_bh(&atchan->lock);
+ 
+-	dma_set_tx_state(txstate, last_complete, last_used, 0);
++	if (ret != DMA_SUCCESS)
++		dma_set_tx_state(txstate, last_complete, last_used,
++			atc_first_active(atchan)->len);
++	else
++		dma_set_tx_state(txstate, last_complete, last_used, 0);
++
+ 	dev_vdbg(chan2dev(chan), "tx_status: %d (d%d, u%d)\n",
+ 		 cookie, last_complete ? last_complete : 0,
+ 		 last_used ? last_used : 0);
+-- 
+1.7.3
