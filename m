@@ -1,113 +1,67 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 4 May 2011 20:08:30 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <2543A75FDDB244D2A148C14BCAA5FD88@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201104271605.09537.arnd@arndb.de>
-	<CF1FC9DE1796407FB4D636189646927F@subhasishg>
-	<201104280935.38787.arnd@arndb.de>
-	<2543A75FDDB244D2A148C14BCAA5FD88@subhasishg>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CD0B8CC@dbde02.ent.ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 04 May 2011 07:40:01 -0700
+Subject: [PATCH 1/5] OMAP3 cpuidle: remove useless SDP specific timings
+In-Reply-To: <1304069186-3086-2-git-send-email-j-pihet@ti.com> (jean pihet's
+	message of "Fri, 29 Apr 2011 11:26:22 +0200")
+References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
+	<1304069186-3086-2-git-send-email-j-pihet@ti.com>
+Message-ID: <87oc3iv8am.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Subhasish,
+jean.pihet at newoldbits.com writes:
 
-On Wed, May 04, 2011 at 12:48:43, Subhasish Ghosh wrote:
-> Hi Arnd,
-> 
-> How about just doing something like:
-> 
-> #> echo da8xx_pruss_uart >> firmware.bin
-> 
-> i.e  just append the device name (from the board file) into the firmware
-> file.
-> 
-> In the driver probe, we can parse from the bottom, when it reaches
-> "da8xx_pruss", the rest of the upper data is the firmware and from
-> the full name, we can determine if it's a CAN, UART or any other
-> peripheral.
-> 
-> So, based on the platform_data, which the MFD driver received,
-> it can find out which device to initialize.
+> From: Jean Pihet <j-pihet@ti.com>
+>
+> The cpuidle states settings can be overriden by some board-
+> specific settings, by calling omap3_pm_init_cpuidle.
+> Remove the 3430SDP specific states settings registration
+> since the figures are identical to the default ones (in cpuidle34xx.c).
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-If you are defining a firmware header, it may be
-worthwhile making sure you include information
-on features of the device being supported (I
-assume there will be differences in CAN features if
-the firmware uses both PRUs to support CAN versus
-UART on one PRU and CAN on another PRU).
+Thanks,  queuing for 2.6.40 (branch: for_2.6.40/pm-cleanup)
 
-The MFD driver can parse this information and
-pass this on to the UART or CAN drivers.
+Kevin
 
-Thanks,
-Sekhar
-
-> 
-> Also, does the line wrapping look any better ?
-> 
-> 
-> > On Thursday 28 April 2011 09:17:21 Subhasish Ghosh wrote:
-> >> >
-> >> > You can easily do that by adding a small header to the firmware
-> >> > format and interpret that header by the MFD driver. When the name
-> >> > of the subdevice is part of that header, the MFD driver does not
-> >> > need to understand the difference, it can simply pass that on
-> >> > when creating its child devices.
-> >>
-> >> I don't understand why loading the firmware should be done at the MFD
-> >> driver.
-> >> The user already specifies the device he/she wants to start on the PRU
-> >> via
-> >> modprobe.
-> >> A driver can be inserted, which can download a printer firmware on one
-> >> PRU
-> >> and a
-> >> scanner firmware on the other. This way both cores can be used for
-> >> separate
-> >> purposes.
-> >> I mean, say in a real MFD controller, that will also have two separate
-> >> cores
-> >> running on it,
-> >> just that, the firmware on it would not be downloaded runtime but fused
-> >> in
-> >> some non volatile memory.
-> >
-> > Then I must be misreading what your code currently does, because it does
-> > not
-> > match your explanations. What I see in the platform code is that you
-> > create
-> > MFD cells for specific devices that get automatically created by the MFD
-> > driver. This will cause udev to load the drivers for these devices, which
-> > then load the firmware they need.
-> >
-> > Also, I cannot see how the method you describe would make it possible to
-> > the same driver into both units, e.g. when you want to have two serial
-> > ports. The reason is that you currently hardcode the PRU number in the
-> > driver and that you cannot load a single driver twice.
-> >
-> > Finally, I'm trying to make sure that whatever solution you come up with
-> > will still work when we migrate the code to using a flattened device tree.
-> > In that case, you would ideally put the device firmware into the device
-> > tree as a property that matches whatever you have connected on the
-> > specific
-> > board (at least as an option, you can still fall back to
-> > request_firmware).
-> > You definitely want automatic module loading in that case.
-> >
-> > Note that using module loading with specific parameters in order to
-> > match the hardware is not a recommended procedure any more. The code
-> > really needs to work the same way when all drivers are built into the
-> > kernel. It should not be hard to use the firmware loading mechanism
-> > in the MFD driver to both load the firmware and configure the devices
-> > appropriately so we always use the right driver for the currently
-> > active devices.
-> >
-> > Arnd
-> >
-> > BTW, something is wrong with your email client line wrapping. I've fixed
-> > this up manually before when replying, but please find a way to get this
-> > right in the future. 
-> 
-> 
+> ---
+>  arch/arm/mach-omap2/board-3430sdp.c |   19 -------------------
+>  1 files changed, 0 insertions(+), 19 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
+> index 9afd087..7ffad7b 100644
+> --- a/arch/arm/mach-omap2/board-3430sdp.c
+> +++ b/arch/arm/mach-omap2/board-3430sdp.c
+> @@ -59,24 +59,6 @@
+>  
+>  #define TWL4030_MSECURE_GPIO 22
+>  
+> -/* FIXME: These values need to be updated based on more profiling on 3430sdp*/
+> -static struct cpuidle_params omap3_cpuidle_params_table[] = {
+> -	/* C1 */
+> -	{1, 2, 2, 5},
+> -	/* C2 */
+> -	{1, 10, 10, 30},
+> -	/* C3 */
+> -	{1, 50, 50, 300},
+> -	/* C4 */
+> -	{1, 1500, 1800, 4000},
+> -	/* C5 */
+> -	{1, 2500, 7500, 12000},
+> -	/* C6 */
+> -	{1, 3000, 8500, 15000},
+> -	/* C7 */
+> -	{1, 10000, 30000, 300000},
+> -};
+> -
+>  static uint32_t board_keymap[] = {
+>  	KEY(0, 0, KEY_LEFT),
+>  	KEY(0, 1, KEY_RIGHT),
+> @@ -883,7 +865,6 @@ static void __init omap_3430sdp_init(void)
+>  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+>  	omap_board_config = sdp3430_config;
+>  	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
+> -	omap3_pm_init_cpuidle(omap3_cpuidle_params_table);
+>  	omap3430_i2c_init();
+>  	omap_display_init(&sdp3430_dss_data);
+>  	if (omap_rev() > OMAP3430_REV_ES1_0)
