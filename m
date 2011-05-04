@@ -1,29 +1,37 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 4 May 2011 08:40:15 +0200
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <4DBF4AA9.7010309@codeaurora.org>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<4DBDC3B5.7070808@gmail.com> <1304298586.2686.29.camel@pororo>
-	<4DBE2064.2060303@gmail.com> <1304307632.2686.33.camel@pororo>
-	<4DBEDC12.4090203@gmail.com>
-	<20110502223636.GB28001@n2100.arm.linux.org.uk>
-	<4DBF4AA9.7010309@codeaurora.org>
-Message-ID: <20110504064015.GZ14770@pengutronix.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 May 2011 09:46:15 +0300
+Subject: [PATCH 3/4] omap: move detection of NAND CS to
+	common-board-devices
+In-Reply-To: <4DC0F469.9030406@compulab.co.il>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
+	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
+	<44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
+	<4DC0F469.9030406@compulab.co.il>
+Message-ID: <20110504064614.GG27860@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 02, 2011 at 05:22:01PM -0700, Saravana Kannan wrote:
-> >This does bring us to an interesting question though: should clk_set_rate()
-> >succeed or fail with a NULL clk?  There is no clock to control, so my
-> >feeling is that it should fail, just like clk_get_rate() should return
-> >zero because the rate is meaningless.  There is no rate to get and no
-> >rate to set.
+* Mike Rapoport <mike@compulab.co.il> [110504 09:35]:
+> On 05/04/11 07:10, Oleg Drokin wrote:
+> > Ok, so here's a simple patch to save everyone trouble, I guess.
+> > 
+> > Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
+> > might not be desirable for people that don't use anything from that file.
 > 
-> I think having NULL clocks return success on set_rate() would be
-> more useful. The most common use case for NULL clocks is when a
-> clocks is present in some soc/arch/mach but is not present in
-> another. Instead of having the consumers having an "if" around every
-> clk_* calls on that clk, they would get a NULL clk. If NULL clk
-> starts failing for clk_set_rate(), I think the point of a NULL clk
-> will get defeated.
+> Since the common-board-devices.c has TWL initialization I doubt there would a
+> board that does not use it at all...
+> 
+> > Would it be a better idea to split it to a file-per-feature?
+> 
+> Splitting the common-board-devices into a file-per-feature will diminish its
+> added value, IMO.
+> We can either continue to use #ifdef CONFIG_SOMETHING in both
+> common-board-devices.[ch] as your fix proposes or just drop #ifdefs and inlines
+> from the header.
+> Tony, what is your preference?
+
+We should consider the code size too.. Maybe see if you can make them
+weak instead of the ifdefs?
+
+Tony
