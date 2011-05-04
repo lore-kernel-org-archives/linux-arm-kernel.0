@@ -1,80 +1,74 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 4 May 2011 10:36:11 +0200
-Subject: [PATCH] sdio: optimized SDIO IRQ handling for single function
-In-Reply-To: <alpine.LFD.2.00.1105032339370.24613@xanadu.home>
-References: <1304453087-7365-1-git-send-email-per.forlin@linaro.org>
-	<alpine.LFD.2.00.1105032339370.24613@xanadu.home>
-Message-ID: <BANLkTim_x28NyWzo-Ug3+ZprgeT=VFwEfQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 May 2011 11:38:59 +0300
+Subject: [PATCH 3/4] omap: move detection of NAND CS to
+	common-board-devices
+In-Reply-To: <4DC0FD79.2020005@compulab.co.il>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
+	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
+	<44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
+	<4DC0F469.9030406@compulab.co.il>
+	<20110504064614.GG27860@atomide.com>
+	<4DC0FD79.2020005@compulab.co.il>
+Message-ID: <20110504083858.GH27860@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 May 2011 05:40, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Tue, 3 May 2011, Per Forlin wrote:
->
->> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
->>
->> If there is only 1 function registered, and IRQ:s are supported and
->> currently enabled, call the callback handler directly
->> without checking the CCCR registers.
->>
->> Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
->> Signed-off-by: Per Forlin <per.forlin@linaro.org>
->
-> Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->
-I am working o a patch version 2 after offline discussion with Ulf Hansson.
-Instead of adding this code here.
-Add sdio_single_func member in mmc_card. Set and reset this function
-in sdio_claim_irq and sdio_release_irq.
-process_sdio_pending_irqs would only check if sdio_single_func is !=
-null and call it.
+* Mike Rapoport <mike@compulab.co.il> [110504 10:13]:
+> On 05/04/11 09:46, Tony Lindgren wrote:
+> > * Mike Rapoport <mike@compulab.co.il> [110504 09:35]:
+> >> On 05/04/11 07:10, Oleg Drokin wrote:
+> >>> Ok, so here's a simple patch to save everyone trouble, I guess.
+> >>>
+> >>> Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
+> >>> might not be desirable for people that don't use anything from that file.
+> >>
+> >> Since the common-board-devices.c has TWL initialization I doubt there would a
+> >> board that does not use it at all...
+> >>
+> >>> Would it be a better idea to split it to a file-per-feature?
+> >>
+> >> Splitting the common-board-devices into a file-per-feature will diminish its
+> >> added value, IMO.
+> >> We can either continue to use #ifdef CONFIG_SOMETHING in both
+> >> common-board-devices.[ch] as your fix proposes or just drop #ifdefs and inlines
+> >> from the header.
+> >> Tony, what is your preference?
+> > 
+> > We should consider the code size too.. Maybe see if you can make them
+> > weak instead of the ifdefs?
+> 
+> Unless I completely misunderstand how weak works, we'll still have ifdefs in .c
+> file, i.e.
+> 
+> common-board-devices.h:
+> 
+> void __omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts)
+> {
+> }
+> 
+> void omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts)
+> __attribute__((weak, alias("__omap_nand_flash_init")));
+> 
+> common-board-devices.c:
+> #if defined(CONFIG_MTD_NAND_OMAP2) || defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+> void omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts)
+> {
+> ...
+> }
+> #endif
+> 
+> Yet, we can keep the ifdefs only in common-board-devices.c and get rid if
+> inlines in the header.
+> Also, all the code in common-board-devices.c is __init, so it's eventually
+> dropped in runtime
 
-This will result in a bigger patch overall but the new code in
-process_sdio_pending_irqs will be minimal.
+Sounds OK to me for the simple platform init functions used for most
+common devices.
 
->> ---
->> ?drivers/mmc/core/sdio_irq.c | ? 14 ++++++++++++++
->> ?1 files changed, 14 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
->> index b300161..25291bf 100644
->> --- a/drivers/mmc/core/sdio_irq.c
->> +++ b/drivers/mmc/core/sdio_irq.c
->> @@ -32,6 +32,20 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
->> ? ? ? int i, ret, count;
->> ? ? ? unsigned char pending;
->>
->> + ? ? /*
->> + ? ? ?* If there is only 1 function registered
->> + ? ? ?* call irq directly without checking the CCCR registers.
->> + ? ? ?*/
->> + ? ? if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
+For anything more complex, we can have a separate file with ifdef in the
+header and Makefile compiling it in only as selected.
 
->> + ? ? ? ? card->host->sdio_irqs && (card->sdio_funcs == 1))
->> + ? ? ? ? ? ? for (i = 0; i < SDIO_MAX_FUNCS; i++) {
-Minor adjustments.
-card->sdio_funcs may be > 1 but still only one irq is registered.
-No need to iterate more than "sdio_funcs" number of elements.
-+ card->host->sdio_irqs == 1)
-+             for (i = 0; i < card->sdio_funcs; i++) {
+Regards,
 
->> + ? ? ? ? ? ? ? ? ? ? struct sdio_func *func = card->sdio_func[i];
->> + ? ? ? ? ? ? ? ? ? ? if (func && func->irq_handler) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? func->irq_handler(func);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? return 1;
->> + ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? }
->> +
->> ? ? ? ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
->> ? ? ? if (ret) {
->> ? ? ? ? ? ? ? printk(KERN_DEBUG "%s: error %d reading SDIO_CCCR_INTx\n",
->> --
->> 1.7.4.1
->>
->>
->> _______________________________________________
->> linaro-dev mailing list
->> linaro-dev at lists.linaro.org
->> http://lists.linaro.org/mailman/listinfo/linaro-dev
->>
->
+Tony
