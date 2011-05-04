@@ -1,27 +1,31 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 3 May 2011 19:04:48 -0600
-Subject: [PATCH] ARM: add DT support to the S3C SDI driver
-In-Reply-To: <201104141151.50497.anarsoul@gmail.com>
-References: <20110413172547.GA27819@dandreoli.com>
-	<201104141151.50497.anarsoul@gmail.com>
-Message-ID: <20110504010448.GA4952@ponder.secretlab.ca>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Wed, 4 May 2011 11:07:21 +0900
+Subject: [PATCH] ARM: EXYNOS4: Bugfix Hotplug
+In-Reply-To: <1304470284-25770-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1304470284-25770-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <BANLkTinsfxW+4Xp5_dgY0b3w291ya86vJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 14, 2011 at 11:51:50AM +0300, Vasily Khoruzhick wrote:
-> On Wednesday 13 April 2011 20:25:47 Domenico Andreoli wrote:
-> > From: Domenico Andreoli <cavokz@gmail.com>
-> > 
-> > This patch adds DeviceTree support to the S3C SDI driver.
-> > 
-> > It implements all the configurations of the platform driver except the
-> > set_power() callback and the ocr_avail mask.
-> > 
-> > Signed-off-by: Domenico Andreoli <cavokz@gmail.com>
-> 
-> Hm, but is there any bootloader with dt support for s3c24xx?
+On Wed, May 4, 2011 at 9:51 AM, MyungJoo Ham <myungjoo.ham@samsung.com> wrote:
+> When tested with "NURI" board, Exynos4 has not been working
+> properly and showed error messages when the secondary core is being
+> enabled with hotplug. The NURI board has Exynos4 of revision 1.
+>
+> This patch enables Exynos4's hotplug to work properly.
+>
+> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-On current u-boot mainline, all arm platforms can now add devicetree
-support by enabling CONFIG_OF_LIBFDT.
+Sorry, but it requires further modifications at platsmp.c to run
+hotplug in Exynos4 without another issue and I've missed that file in
+this patch.
 
-g.
+I'll submit it as soon as the patch is cleaned up.
+
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
