@@ -1,30 +1,66 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 4 May 2011 17:35:36 -0600 (MDT)
-Subject: [PATCH 01/10] Add a common struct clk
-In-Reply-To: <20110502223636.GB28001@n2100.arm.linux.org.uk>
-References: <1302894495-6879-1-git-send-email-s.hauer@pengutronix.de>
-	<1302894495-6879-2-git-send-email-s.hauer@pengutronix.de>
-	<4DBDC3B5.7070808@gmail.com> <1304298586.2686.29.camel@pororo>
-	<4DBE2064.2060303@gmail.com> <1304307632.2686.33.camel@pororo>
-	<4DBEDC12.4090203@gmail.com>
-	<20110502223636.GB28001@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1105041732290.30136@utopia.booyaka.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 04 May 2011 16:59:40 -0700
+Subject: [PATCH v2 10/12] OMAP2+: hwmod: Add api to enable io_ring wakeup.
+In-Reply-To: <1304080796-625-11-git-send-email-govindraj.raja@ti.com>
+	(Govindraj R.'s message of "Fri, 29 Apr 2011 18:09:54 +0530")
+References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+	<1304080796-625-11-git-send-email-govindraj.raja@ti.com>
+Message-ID: <87mxj2nhjn.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-On Mon, 2 May 2011, Russell King - ARM Linux wrote:
+> Add api to enable io_pad wakeup based on mux dynamic pad and
 
-> This does bring us to an interesting question though: should clk_set_rate()
-> succeed or fail with a NULL clk?  There is no clock to control, so my
-> feeling is that it should fail, just like clk_get_rate() should return
-> zero because the rate is meaningless.  There is no rate to get and no
-> rate to set.
+s/api/API/
+s/io_pad/IO pad/
 
-Returning an error would be my preference when a NULL or bogus clock 
-pointer is passed to any clk_* operation, especially since those 
-operations will need to dereference the clock pointer.
+> wake_up enable flag initialized during hwmod_mux.
+>
+> Use the wakeup flag and pad_remux flag and enable wakeup capability
+> for the pad having these flags enabled.
+>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 
+This patch (except for the serial.c hange) isn't really dependent on the
+rest of this series, and should be a separate patch to be merged by
+Paul.
 
-- Paul
+Some other comments below...
+
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c              |   34 +++++++++++++++++++++++++
+>  arch/arm/mach-omap2/serial.c                  |    6 ++++
+>  arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    1 +
+>  arch/arm/plat-omap/omap_device.c              |   26 +++++++++++++++++++
+>  5 files changed, 68 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index e034294..4a12336 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2369,3 +2369,37 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
+>  
+>  	return 0;
+>  }
+> +
+> +/**
+> + * omap_hwmod_enable_ioring_wakeup - Set wakeup bit for iopad ring.
+> + * @oh: struct omap_hwmod *
+> + * @enable: based on 0 or 1 set or unset wakeup bit.
+
+more specifically, when true, set wakeup bit, when false, clear wakeup bit
+
+> + * traverse through dynamic pads. If pad is enabled then
+> + * set wakeup bit for the mux pin. Return error if pads are
+> + * not enabled or not available.
+> + */
+
+The comment here should be clearer about when the bit actually gets
+set.  Specifically, this function doesn't actually write the value out,
+but instead it configures the value which will be used during the hwmod 
+idle transition.
+
+Kevin
