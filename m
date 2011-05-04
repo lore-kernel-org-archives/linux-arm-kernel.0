@@ -1,90 +1,25 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Wed, 04 May 2011 18:00:49 +0200
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <201105041648.37199.arnd@arndb.de>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105041511.54095.arnd@arndb.de>
-	<4DC163D7.9010309@grandegger.com>
-	<201105041648.37199.arnd@arndb.de>
-Message-ID: <4DC17831.3070801@grandegger.com>
+From: green@linuxhacker.ru (Oleg Drokin)
+Date: Wed, 4 May 2011 12:02:57 -0400
+Subject: [PATCH] omap: fix build when MTD_NAND_OMAP2 and
+	TOUCHSCREEN_ADS7846 are disabled
+In-Reply-To: <1304515622-25113-1-git-send-email-mike@compulab.co.il>
+References: <1304515622-25113-1-git-send-email-mike@compulab.co.il>
+Message-ID: <53A11D3C-4DBA-4772-AF14-3590772F6AA1@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/04/2011 04:48 PM, Arnd Bergmann wrote:
-> On Wednesday 04 May 2011, Wolfgang Grandegger wrote:
->> On 05/04/2011 03:11 PM, Arnd Bergmann wrote:
-> 
->>> Wolfgang, I'm a bit worried by the API being split between sockets and sysfs.
->>> The problem is that once the sysfs API is established, users will start
->>> relying on it, and you can no longer migrate away from it, even when
->>> a later version of the Socket CAN also supports setting through a different
->>> interface. What is the current interface to set mail box IDs in software?
->>
->> Note that this CAN controller is *very* special. It cannot handle all
->> CAN id's due to a lack or resources. The PRUSS firmware is able to
->> manage just up to 8 different CAN identifiers out of the usual 4096
->> (12-bit) or even more for the extended CAN ids using 29 bits. 
-> 
-> So for other controllers, they can simply access every ID within
-> the range (12 or 29 bits), but there is no need to configure?
+Hello!
 
-Yes, 11 or 29 bits, to be correct.
+On May 4, 2011, at 9:27 AM, Mike Rapoport wrote:
 
-> What are these IDs for? Do they identify a local port, a remote address,
-> a connection, or something else?
+> Commits 5e6a64b36ce346b7a2d481ef9fa315290eb28e5e (omap: move detection of
+> NAND CS to common-board-devices) and 96974a249b0cf3537f49115a59be67e2c54f315c
+> (omap: consolidate touch screen initialization among different boards)
+> break compilation when CONFIG_MTD_NAND_OMAP2 and
+> CONFIG_TOUCHSCREEN_ADS7846 are not selected.
+> Removing ifdefs and stubs from common-board-devices.h fixes the problem.
 
-It's a message identifier, which is used for bus arbitration and which
-other CAN nodes can listen to. See also:
+Works for me.
 
-http://lxr.linux.no/#linux+v2.6.38/Documentation/networking/can.txt#L146
-http://en.wikipedia.org/wiki/Controller_area_network
-
->> There is
->> no other CAN controller with such rather serious limitations and
->> therefore there exists also no appropriate interface. I think using
->> sysfs is OK for such device-specific parameters, at least for the time
->> being.
-> 
-> It sounds like it's not very scalable, especially since the implementation
-> is done completely in firmware. Imagine a new firmware version suddenly
-> supporting 256 ids instead of 8 -- you'd then have to create 256 sysfs
-> files to be compatible if I understand you correctly.
-
-Well, than an array of CAN identifiers per file would indeed be more
-appropriate.
-
->>> How hard would it be to implement that feature in Socket CAN?
->>
->> CAN controllers usually provide some kind of hardware CAN id filtering,
->> but in a very hardware dependent way. A generic interface may be able to
->> handle the PRUSS restrictions as well. CAN devices are usually
->> configured through the netlink interface. e.g.
->>
->>   $ ip link set can0 up type can bitrate 125000
->>
->> and such a common interface would be netlink based as well.
-> 
-> Agreed.
-> 
->>> Is that something that Subhasish or someone else could to as a prerequisite
->>> to merging the driver?
->>
->> Any ideas on how to handle hardware filtering in a generic way are
->> welcome. I will try to come up with a proposal sooner than later.
-> 
-> It sounds to me like the best solution would be change the firmware
-> to lift that restriction and simply allow all IDs, in case it's not
-> actually a hardware limitation (which sounds unlikely).
-
-Yes, that would be best but they told us, that it's not possible with
-the available hardware resources. Subhasish?
-
-> If that's not possible, maybe it's possible to define a generic
-> filtering interface using netlink, and then either do it completely
-> in the kernel, or using the hardware support.
-
-Well, I hesitate to implement an interface especially for such an exotic
-device. Fine if it could be handled by a generic CAN hardware filter
-interface, which is especially useful for normal CAN controllers.
-
-Wolfgang.
+Bye, 
+   Oleg
