@@ -1,147 +1,78 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 20 May 2011 14:38:25 +0100
-Subject: [PATCH] ARM: exynos4: fix secondary CPU boot on early SoC revision=
-Message-ID: <mailman.27.1308131645.24103.linux-arm-kernel@lists.infradead.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 May 2011 09:23:15 +0100
+Subject: [RFC PATCH 06/15] ARM: perf: move platform device to struct arm_pmu
+Message-ID: <mailman.76.1313415783.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s
+Currently the ARM perf code supports having a single struct
+platform_device to supply IRQ numbers, limiting it to supporting a
+single PMU.
 
-It appears that the system-wide flags register that used to be at
-0x02025000 on the first revision of Exynos4 has moved to 0x02020000.
+This patch makes a platform_device instance variable on struct arm_pmu.
+This should allow for multiple PMUs to be supported in future.
 
-The kernel has been updated accordingly, but this unfortunately leaves
-early boards without SMP support (the secondary CPU spins endlessly
-in BL0 waiting for an address to be written at that memory location).
-
-Solve the problem by providing an s3c_get_chip_id() function, common
-to all s3c/s5p implementations, and test the result on the secondary boot
-path.
-
-Revision table, as provided by Kyungmin Park <kmpark@infradead.org>:
-0x4320 0200 EVT0
-0x4321 0210 EVT1
-0x4321 0211 EVT2
-
-The last 8 bits can be overrided by efuses, so only bits [16:19] are
-used to identify the revision.
-
-Tested on a vintage SMDK-v310.
-
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Cc: Kyungmin Park <kmpark@infradead.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mach-exynos4/include/mach/map.h |    1 +
- arch/arm/mach-exynos4/platsmp.c          |   22 +++++++++++++++++++++-
- arch/arm/plat-samsung/include/plat/cpu.h |    2 ++
- arch/arm/plat-samsung/init.c             |    8 ++++++++
- 4 files changed, 32 insertions(+), 1 deletions(-)
+ arch/arm/kernel/perf_event.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exyno=
-s4/include/mach/map.h
-index 57d8074..da08f5c 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos4/include/mach/map.h
-@@ -24,6 +24,7 @@
- #include <plat/map-s5p.h>
-=20
- #define EXYNOS4_PA_SYSRAM=09=090x02020000
-+#define EXYNOS4_PA_SYSRAM_EVT0=09=090x02025000
-=20
- #define EXYNOS4_PA_FIMC0=09=090x11800000
- #define EXYNOS4_PA_FIMC1=09=090x11810000
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsm=
-p.c
-index c5e65a0..086d1e3 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -26,6 +26,8 @@
- #include <asm/smp_scu.h>
- #include <asm/unified.h>
-=20
-+#include <plat/cpu.h>
-+
- #include <mach/hardware.h>
- #include <mach/regs-clock.h>
-=20
-@@ -170,6 +172,24 @@ void __init platform_smp_prepare_cpus(unsigned int max=
-_cpus)
- =09 * system-wide flags register. The boot monitor waits
- =09 * until it receives a soft interrupt, and then the
- =09 * secondary CPU branches to this address.
-+=09 *
-+=09 * EVT0 has the system-wide flags register at a different
-+=09 * address, hence the following hackery...
- =09 */
--=09__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), S5P_VA_SYSR=
-AM);
-+=09if (s3c_get_chip_id() & 0xF0000UL)
-+=09=09__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-+=09=09=09     S5P_VA_SYSRAM);
-+=09else {
-+=09=09void __iomem *sysram_evt0;
-+
-+=09=09sysram_evt0 =3D ioremap(EXYNOS4_PA_SYSRAM_EVT0, SZ_4K);
-+=09=09if (!sysram_evt0) {
-+=09=09=09pr_err("Unable to remap EXYNOS4_PA_SYSRAM_EVT0\n");
-+=09=09=09return;
-+=09=09}
-+=09=09__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-+=09=09=09     sysram_evt0);
-+=09=09iounmap(sysram_evt0);
-+=09}
-+
- }
-diff --git a/arch/arm/plat-samsung/include/plat/cpu.h b/arch/arm/plat-samsu=
-ng/include/plat/cpu.h
-index c0a5741..41573cc 100644
---- a/arch/arm/plat-samsung/include/plat/cpu.h
-+++ b/arch/arm/plat-samsung/include/plat/cpu.h
-@@ -44,6 +44,8 @@ struct cpu_table {
- extern void s3c_init_cpu(unsigned long idcode,
- =09=09=09 struct cpu_table *cpus, unsigned int cputab_size);
-=20
-+extern unsigned long s3c_get_chip_id(void);
-+
- /* core initialisation functions */
-=20
- extern void s3c24xx_init_irq(void);
-diff --git a/arch/arm/plat-samsung/init.c b/arch/arm/plat-samsung/init.c
-index 79d10fc..320b88f 100644
---- a/arch/arm/plat-samsung/init.c
-+++ b/arch/arm/plat-samsung/init.c
-@@ -30,6 +30,7 @@
- #include <plat/regs-serial.h>
-=20
- static struct cpu_table *cpu;
-+static unsigned long s3c_chip_id;
-=20
- static struct cpu_table * __init s3c_lookup_cpu(unsigned long idcode,
- =09=09=09=09=09=09struct cpu_table *tab,
-@@ -60,6 +61,8 @@ void __init s3c_init_cpu(unsigned long idcode,
- =09=09panic("Unsupported Samsung CPU");
- =09}
-=20
-+=09s3c_chip_id =3D idcode;
-+
- =09cpu->map_io();
- }
-=20
-@@ -140,6 +143,11 @@ void __init s3c24xx_init_uarts(struct s3c2410_uartcfg =
-*cfg, int no)
- =09=09(cpu->init_uarts)(cfg, no);
- }
-=20
-+unsigned long s3c_get_chip_id(void)
-+{
-+=09return s3c_chip_id;
-+}
-+
- static int __init s3c_arch_init(void)
+diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
+index 9874395..1d648d1 100644
+--- a/arch/arm/kernel/perf_event.c
++++ b/arch/arm/kernel/perf_event.c
+@@ -26,8 +26,6 @@
+ #include <asm/pmu.h>
+ #include <asm/stacktrace.h>
+ 
+-static struct platform_device *pmu_device;
+-
+ /*
+  * Hardware lock to serialize accesses to PMU registers. Needed for the
+  * read/modify/write sequences.
+@@ -85,6 +83,7 @@ struct arm_pmu {
+ 	atomic_t	active_events;
+ 	struct mutex	reserve_mutex;
+ 	u64		max_period;
++	struct platform_device	*plat_device;
+ };
+ 
+ /* Set at runtime when we know what CPU type we are. */
+@@ -374,7 +373,8 @@ validate_group(struct perf_event *event)
+ 
+ static irqreturn_t armpmu_platform_irq(int irq, void *dev)
  {
- =09int ret;
---=20
+-	struct arm_pmu_platdata *plat = dev_get_platdata(&pmu_device->dev);
++	struct platform_device *plat_device = armpmu->plat_device;
++	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
+ 
+ 	return plat->handle_irq(irq, dev, armpmu->handle_irq);
+ }
+@@ -383,6 +383,7 @@ static void
+ armpmu_release_hardware(void)
+ {
+ 	int i, irq, irqs;
++	struct platform_device *pmu_device = armpmu->plat_device;
+ 
+ 	irqs = min(pmu_device->num_resources, num_possible_cpus());
+ 
+@@ -404,6 +405,7 @@ armpmu_reserve_hardware(void)
+ 	struct arm_pmu_platdata *plat;
+ 	irq_handler_t handle_irq;
+ 	int i, err, irq, irqs;
++	struct platform_device *pmu_device = armpmu->plat_device;
+ 
+ 	err = reserve_pmu(ARM_PMU_DEVICE_CPU);
+ 	if (err) {
+@@ -657,7 +659,7 @@ static struct platform_device_id armpmu_plat_device_ids[] = {
+ 
+ static int __devinit armpmu_device_probe(struct platform_device *pdev)
+ {
+-	pmu_device = pdev;
++	armpmu->plat_device = pdev;
+ 	return 0;
+ }
+ 
+-- 
 1.7.0.4
-
---------------030601050903020505020403--
