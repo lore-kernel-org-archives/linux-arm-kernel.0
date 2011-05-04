@@ -1,60 +1,32 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 4 May 2011 10:48:40 -0500
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
-	i.MX53
-In-Reply-To: <20110413124149.GR18850@pengutronix.de>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110413122503.GB1897@S2100-06.ap.freescale.net>
-	<20110413124149.GR18850@pengutronix.de>
-Message-ID: <BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
+From: green@linuxhacker.ru (Oleg Drokin)
+Date: Wed, 4 May 2011 11:54:28 -0400
+Subject: [PATCH 3/4] omap: move detection of NAND CS to
+	common-board-devices
+In-Reply-To: <4DC0F469.9030406@compulab.co.il>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
+	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
+	<44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
+	<4DC0F469.9030406@compulab.co.il>
+Message-ID: <217399A1-383F-4F69-B9D1-0421A48481C8@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/13 Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>:
-> Hi Shawn,
->
-> On Wed, Apr 13, 2011 at 08:25:04PM +0800, Shawn Guo wrote:
->> On Sun, Apr 10, 2011 at 09:49:01PM +0200, Uwe Kleine-K?nig wrote:
->> [...]
->> > + ? ? This enables support for machines using Freescale's i.MX50 and i.MX51
->> s/MX51/MX53/
-> yeah, thanks, as you're not the first one to point this out I already
-> sent a fixup to Sascha.
+Hello!
 
-Can someone confirm the following for me (Uwe probably as it's his
-patch most recently)
+On May 4, 2011, at 2:38 AM, Mike Rapoport wrote:
 
-CONFIG_RUNTIME_PHYS_OFFSET
-CONFIG_ARM_PATCH_PHYS_VIRT
+> On 05/04/11 07:10, Oleg Drokin wrote:
+>> Ok, so here's a simple patch to save everyone trouble, I guess.
+>> 
+>> Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
+>> might not be desirable for people that don't use anything from that file.
+> Since the common-board-devices.c has TWL initialization I doubt there would a
+> board that does not use it at all...
 
-These two config options, with absolutely no bootloader changes, will
-basically mask off some address (instruction pointer?) at the time of
-the check and therefore derive a perfectly good PHYS_OFFSET at runtime
-and make sure it is in use... within some limits (first 128MB, assumes
-that start of memory is at some particular alignment)?
+Actually the twl init you have is somewhat inflexible.
+E.g. on the Nook Color the 1st i2c bus has the twl and some other devices, but I don't see how
+to put more than just the twl on the first bus with your common code.
 
-I am confused about Nicolas' CONFIG_AUTO_ZRELADDR comment and how this
-applies. I am working out a way to have U-Boot ignore the hardcoded
-image entry point in a uImage to enable the above.
-
-I consider that the problem with the above is not so much with
-supporting multiple SoCs in the same kernel of the same pedigree
-(MX5x) but with completely different vendor SoCs and anything where
-PHYS_OFFSET is somehow differently masked off of the abovementioned
-address. I noticed in a patch somewhere last night that if MACH_MX5 is
-enabled, it uses 'and' instead of 'andne' to perform the masking. This
-will basically mean the derived address is still entirely CPU
-specific... unless I am out of date on the patches I am reviewing..
-
-Uwe you had a patch about a year ago that passed PHYS_OFFSET in r3,
-that isn't true anymore? Is there potential for an override, such that
-if if r3 is set and valid, it is used, if not a determination is made
-at runtime which may possibly fail? Is compiling an unbootable kernel
-for an old firmware an acceptable scenario for the edge case where
-MX50, MX51, MX53 are in the kernel along with.. say.. OMAP? Wouldn't
-we consider this a distro tool problem and not a kernel problem?
-
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+Bye,
+    Oleg
