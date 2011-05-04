@@ -1,29 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 4 May 2011 14:17:51 +0200
-Subject: [PATCH] atomic: add *_dec_not_zero
-In-Reply-To: <1304458235-28473-1-git-send-email-sven@narfation.org>
-References: <1304458235-28473-1-git-send-email-sven@narfation.org>
-Message-ID: <BANLkTi=kRLxKS417xhaWDpF4h8+VTcUQQA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 May 2011 15:11:53 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <15AD189F851849F69A011B6F4D1DDB6C@subhasishg>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<201104271525.28512.arnd@arndb.de>
+	<15AD189F851849F69A011B6F4D1DDB6C@subhasishg>
+Message-ID: <201105041511.54095.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 3, 2011 at 23:30, Sven Eckelmann <sven@narfation.org> wrote:
-> Introduce an *_dec_not_zero operation. ?Make this a special case of
-> *_add_unless because batman-adv uses atomic_dec_not_zero in different
-> places like re-broadcast queue or aggregation queue management. There
-> are other non-final patches which may also want to use this macro.
+On Wednesday 04 May 2011, Subhasish Ghosh wrote:
+> CAN requires mail box IDs to be programmed in. But, the socket
+> CAN subsystem supports only software filtering of the mail box IDs.
+> 
+> So, the mail box IDs programmed into socket CAN during initialization
+> does not propagate into the hardware. This is planned to be a future
+> implementation in Socket CAN.
+> 
+> In our case, we support hardware filtering, to work around with this,
+> Wolfgang (Socket CAN owner) suggested that we implement
+> this using sysfs.
+> 
+> These setting are not for debugging, but to program the mail box IDs
+> into the hardware. 
 
-> ?arch/m68k/include/asm/atomic.h ? ? | ? ?1 +
+Ok, I see. Can you point me to that discussion?
 
-Acked-by: Geert Uytterhoeven <geert@linux-m68k.org>
+Wolfgang, I'm a bit worried by the API being split between sockets and sysfs.
+The problem is that once the sysfs API is established, users will start
+relying on it, and you can no longer migrate away from it, even when
+a later version of the Socket CAN also supports setting through a different
+interface. What is the current interface to set mail box IDs in software?
+How hard would it be to implement that feature in Socket CAN?
 
-Gr{oetje,eeting}s,
+Is that something that Subhasish or someone else could to as a prerequisite
+to merging the driver?
 
-? ? ? ? ? ? ? ? ? ? ? ? Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+	Arnd
