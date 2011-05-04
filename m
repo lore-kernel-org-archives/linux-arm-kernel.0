@@ -1,30 +1,52 @@
-From: camhirundo@gmail.com (Hirundo Cam)
-Date: Wed, 4 May 2011 11:00:40 +0800
-Subject: [PATCH] kirkwood: add dir-665 support
-In-Reply-To: <BANLkTinybLSF418PsocXR6dwuaksv_+UCQ@mail.gmail.com>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-	<20110503205056.GA13075@gentoodev.compulab.local>
-	<BANLkTimQM_J2ZbDjAewUsp+XSEP+x+eniA@mail.gmail.com>
-	<BANLkTinybLSF418PsocXR6dwuaksv_+UCQ@mail.gmail.com>
-Message-ID: <BANLkTimzZr0vfOdNwVev2A_xoU_1k+SB_w@mail.gmail.com>
+From: green@linuxhacker.ru (Oleg Drokin)
+Date: Tue, 3 May 2011 23:10:29 -0400
+Subject: [PATCH 1/4] omap: consolidate touch screen initialization among
+	different boards
+In-Reply-To: <1738251a50b70224f124d4a54c157cc5e3c6db77.1303682352.git.mike@compulab.co.il>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<1738251a50b70224f124d4a54c157cc5e3c6db77.1303682352.git.mike@compulab.co.il>
+Message-ID: <D9D18474-D2A3-468B-88B3-2D18537E70D2@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mike and Simon
+Hello!
 
-2011/5/4 Hirundo Cam <camhirundo@gmail.com>:
-> Hi Mike and Simon,
->
-> I've send a machine submit to arm-linux, it generated the mach-types as
->
-> [stripped]
-> mx51_moray ? ? ? ? ? ? ?MACH_MX51_MORAY ? ? ? ? MX51_MORAY ? ? ? ? ? ? ?3484
-> thales_cbc ? ? ? ? ? ? ?MACH_THALES_CBC ? ? ? ? THALES_CBC ? ? ? ? ? ? ?3485
-> bluepoint ? ? ? ? ? ? ? MACH_BLUEPOINT ? ? ? ? ?BLUEPOINT ? ? ? ? ? ? ? 3486
-> dir665 ? ? ? ? ? ? ? ? ?MACH_DIR665 ? ? ? ? ? ? DIR665 ? ? ? ? ? ? ? ? ?3487
->
-> Is this correct for the DIR665 board using mv88f6281 chips?
+This patch breaks compile for me.
 
-Is this implied that I could get rid of the modification to mach-type
-in my patch?
-Thanks!
+On Apr 24, 2011, at 6:09 PM, Mike Rapoport wrote:
+
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/common-board-devices.c
+> @@ -0,0 +1,85 @@
+> 
+> +void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+> +			      struct ads7846_platform_data *board_pdata)
+> +{
+> ...
+
+> +}
+> diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
+> new file mode 100644
+> index 0000000..75f9248d
+> --- /dev/null
+> +++ b/arch/arm/mach-omap2/common-board-devices.h
+> @@ -0,0 +1,18 @@
+> +#ifndef __OMAP_COMMON_BOARD_DEVICES__
+> +#define __OMAP_COMMON_BOARD_DEVICES__
+> +
+> +#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
+> +	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+> +struct ads7846_platform_data;
+> +
+> +void omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+> +		       struct ads7846_platform_data *board_pdata);
+> +#else
+
+
+arch/arm/mach-omap2/common-board-devices.c:80: error: redefinition of 'omap_ads7846_init'
+arch/arm/mach-omap2/common-board-devices.h:36: note: previous definition of 'omap_ads7846_init' was here
+
+Of course I don't have the CONFIG_TOUCHSCREEN_ADS7846 defined.
+
+Bye,
+    Oleg
