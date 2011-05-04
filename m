@@ -1,60 +1,25 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 3 May 2011 23:40:23 -0400 (EDT)
-Subject: [PATCH] sdio: optimized SDIO IRQ handling for single function
-In-Reply-To: <1304453087-7365-1-git-send-email-per.forlin@linaro.org>
-References: <1304453087-7365-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1105032339370.24613@xanadu.home>
+From: green@linuxhacker.ru (Oleg Drokin)
+Date: Wed, 4 May 2011 00:10:56 -0400
+Subject: [PATCH 3/4] omap: move detection of NAND CS to
+	common-board-devices
+In-Reply-To: <724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
+References: <cover.1303682352.git.mike@compulab.co.il>
+	<e2d77d1e885e6878ffbc9bf9dcf0b2dbea2b5d1f.1303682352.git.mike@compulab.co.il>
+	<724FD998-C5DC-4C36-911B-52037F6D4323@linuxhacker.ru>
+Message-ID: <44342B2F-34C0-490C-91B8-96A9EA683F9B@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 3 May 2011, Per Forlin wrote:
+Ok, so here's a simple patch to save everyone trouble, I guess.
 
-> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
-> 
-> If there is only 1 function registered, and IRQ:s are supported and
-> currently enabled, call the callback handler directly
-> without checking the CCCR registers.
-> 
-> Signed-off-by: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+Though on the other hand I can imagine that perhaps including this generic common-board-devices.c
+might not be desirable for people that don't use anything from that file.
+Would it be a better idea to split it to a file-per-feature?
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-> ---
->  drivers/mmc/core/sdio_irq.c |   14 ++++++++++++++
->  1 files changed, 14 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-> index b300161..25291bf 100644
-> --- a/drivers/mmc/core/sdio_irq.c
-> +++ b/drivers/mmc/core/sdio_irq.c
-> @@ -32,6 +32,20 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
->  	int i, ret, count;
->  	unsigned char pending;
->  
-> +	/*
-> +	 * If there is only 1 function registered
-> +	 * call irq directly without checking the CCCR registers.
-> +	 */
-> +	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
-> +	    card->host->sdio_irqs && (card->sdio_funcs == 1))
-> +		for (i = 0; i < SDIO_MAX_FUNCS; i++) {
-> +			struct sdio_func *func = card->sdio_func[i];
-> +			if (func && func->irq_handler) {
-> +				func->irq_handler(func);
-> +				return 1;
-> +			}
-> +		}
-> +
->  	ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
->  	if (ret) {
->  		printk(KERN_DEBUG "%s: error %d reading SDIO_CCCR_INTx\n",
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-dev
-> 
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: compile-fix.diff
+Type: application/octet-stream
+Size: 1123 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110504/b83fcf3f/attachment.obj>
