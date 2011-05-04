@@ -1,57 +1,35 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Wed,  4 May 2011 16:27:02 +0300
-Subject: [PATCH] omap: fix build when MTD_NAND_OMAP2 and TOUCHSCREEN_ADS7846
-	are disabled
-Message-ID: <1304515622-25113-1-git-send-email-mike@compulab.co.il>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 May 2011 15:21:26 +0100
+Subject: [ARM]crash on 2.6.35.11
+In-Reply-To: <BANLkTik17MGwWwFb=CzBduFy9Mn-Ze+ptA@mail.gmail.com>
+References: <BANLkTimLd-qY-OeKqnf2EoTfvAHWQZVchw@mail.gmail.com>
+	<BANLkTi=xz4w3p4bc5T4-YvkC3tYdwKhWGA@mail.gmail.com>
+	<BANLkTik17MGwWwFb=CzBduFy9Mn-Ze+ptA@mail.gmail.com>
+Message-ID: <BANLkTi=WYk3_wQ8R1x9JD3-A+asO3cyo4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commits 5e6a64b36ce346b7a2d481ef9fa315290eb28e5e (omap: move detection of
-NAND CS to common-board-devices) and 96974a249b0cf3537f49115a59be67e2c54f315c
-(omap: consolidate touch screen initialization among different boards)
-break compilation when CONFIG_MTD_NAND_OMAP2 and
-CONFIG_TOUCHSCREEN_ADS7846 are not selected.
-Removing ifdefs and stubs from common-board-devices.h fixes the problem.
+(fixing up the linux-arm-kernel list address)
 
-Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-CC: Oleg Drokin <green@linuxhacker.ru>
----
-17 more lines are gone ;-)
+On 4 May 2011 14:18, naveen yadav <yad.naveen@gmail.com> wrote:
+> On Wed, May 4, 2011 at 3:55 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> On 4 May 2011 11:09, naveen yadav <yad.naveen@gmail.com> wrote:
+>>> We are running linux kernel 2.6.35.11 on Cortex a-8. when I run a
+>>> simple program expect to give oom.
+>>> ?But it crash with following crash log
+>>
+>> Could you post the full kernel boot log and .config file?
+>
+> Pls find attached log
 
- arch/arm/mach-omap2/common-board-devices.h |   17 -----------------
- 1 files changed, 0 insertions(+), 17 deletions(-)
+It looks like a problem with the memory configuration on your board.
+You have sparsemem sections which are not fully populated. The
+mainline kernel still has problems in this area.
 
-diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
-index ca03abf..eb80b3b 100644
---- a/arch/arm/mach-omap2/common-board-devices.h
-+++ b/arch/arm/mach-omap2/common-board-devices.h
-@@ -26,27 +26,10 @@ static inline void omap4_pmic_init(const char *pmic_type,
- 	omap_pmic_init(1, 400, pmic_type, OMAP44XX_IRQ_SYS_1N, pmic_data);
- }
- 
--#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
--	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
- struct ads7846_platform_data;
- 
- void omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
- 		       struct ads7846_platform_data *board_pdata);
--#else
--static inline void omap_ads7846_init(int bus_num,
--				     int gpio_pendown, int gpio_debounce,
--				     struct ads7846_platform_data *board_data)
--{
--}
--#endif
--
--#if defined(CONFIG_MTD_NAND_OMAP2) || defined(CONFIG_MTD_NAND_OMAP2_MODULE)
- void omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts);
--#else
--static inline void omap_nand_flash_init(int opts, struct mtd_partition *parts,
--					int nr_parts)
--{
--}
--#endif
- 
- #endif /* __OMAP_COMMON_BOARD_DEVICES__ */
+You can try this patch (not sure it applies cleanly on 2.6.35 but it's
+not difficult to fix):
+
+http://article.gmane.org/gmane.linux.ports.arm.kernel/112994
+
 -- 
-1.7.3.1
+Catalin
