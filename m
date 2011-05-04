@@ -1,78 +1,89 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 May 2011 09:23:15 +0100
-Subject: [RFC PATCH 06/15] ARM: perf: move platform device to struct arm_pmu
-Message-ID: <mailman.76.1313415783.20020.linux-arm-kernel@lists.infradead.org>
+Date: Wed, 4 May 2011 09:23:51 +0100
+Subject: [RFC PATCH 07/15] ARM: perf: indirect access to cpu_hw_events
+Message-ID: <mailman.77.1313415783.20020.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the ARM perf code supports having a single struct
-platform_device to supply IRQ numbers, limiting it to supporting a
-single PMU.
+Currently, cpu_hw_events is a global per-CPU variable. To enable
+support for multiple PMUs, there needs to be a mapping from an instance
+of arm_pmu to its cpu_hw_events. Additionally, as system PMUs are not
+CPU-affine, they should not have this stored per-CPU.
 
-This patch makes a platform_device instance variable on struct arm_pmu.
-This should allow for multiple PMUs to be supported in future.
+This patch moves access to the hardware events data behind an accessor
+function (arm_pmu::get_hw_events). This allows each instance to have
+its own hardware event data, which can be stored per-CPU or globally as
+required.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm/kernel/perf_event.c |   18 +++++++++++++++---
+ 1 files changed, 15 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index 9874395..1d648d1 100644
+index 1d648d1..9d6ac99 100644
 --- a/arch/arm/kernel/perf_event.c
 +++ b/arch/arm/kernel/perf_event.c
-@@ -26,8 +26,6 @@
- #include <asm/pmu.h>
- #include <asm/stacktrace.h>
- 
--static struct platform_device *pmu_device;
--
- /*
-  * Hardware lock to serialize accesses to PMU registers. Needed for the
-  * read/modify/write sequences.
-@@ -85,6 +83,7 @@ struct arm_pmu {
- 	atomic_t	active_events;
+@@ -84,6 +84,7 @@ struct arm_pmu {
  	struct mutex	reserve_mutex;
  	u64		max_period;
-+	struct platform_device	*plat_device;
+ 	struct platform_device	*plat_device;
++	struct cpu_hw_events	*(*get_hw_events)(void);
  };
  
  /* Set at runtime when we know what CPU type we are. */
-@@ -374,7 +373,8 @@ validate_group(struct perf_event *event)
- 
- static irqreturn_t armpmu_platform_irq(int irq, void *dev)
+@@ -284,7 +285,7 @@ armpmu_start(struct perf_event *event, int flags)
+ static void
+ armpmu_del(struct perf_event *event, int flags)
  {
--	struct arm_pmu_platdata *plat = dev_get_platdata(&pmu_device->dev);
-+	struct platform_device *plat_device = armpmu->plat_device;
-+	struct arm_pmu_platdata *plat = dev_get_platdata(&plat_device->dev);
+-	struct cpu_hw_events *cpuc = &__get_cpu_var(cpu_hw_events);
++	struct cpu_hw_events *cpuc = armpmu->get_hw_events();
+ 	struct hw_perf_event *hwc = &event->hw;
+ 	int idx = hwc->idx;
  
- 	return plat->handle_irq(irq, dev, armpmu->handle_irq);
+@@ -300,7 +301,7 @@ armpmu_del(struct perf_event *event, int flags)
+ static int
+ armpmu_add(struct perf_event *event, int flags)
+ {
+-	struct cpu_hw_events *cpuc = &__get_cpu_var(cpu_hw_events);
++	struct cpu_hw_events *cpuc = armpmu->get_hw_events();
+ 	struct hw_perf_event *hwc = &event->hw;
+ 	int idx;
+ 	int err = 0;
+@@ -585,7 +586,7 @@ static void armpmu_enable(struct pmu *pmu)
+ {
+ 	/* Enable all of the perf events on hardware. */
+ 	int idx, enabled = 0;
+-	struct cpu_hw_events *cpuc = &__get_cpu_var(cpu_hw_events);
++	struct cpu_hw_events *cpuc = armpmu->get_hw_events();
+ 
+ 	for (idx = 0; idx < armpmu->num_events; ++idx) {
+ 		struct perf_event *event = cpuc->events[idx];
+@@ -678,6 +679,16 @@ static int __init register_pmu_driver(void)
  }
-@@ -383,6 +383,7 @@ static void
- armpmu_release_hardware(void)
- {
- 	int i, irq, irqs;
-+	struct platform_device *pmu_device = armpmu->plat_device;
+ device_initcall(register_pmu_driver);
  
- 	irqs = min(pmu_device->num_resources, num_possible_cpus());
- 
-@@ -404,6 +405,7 @@ armpmu_reserve_hardware(void)
- 	struct arm_pmu_platdata *plat;
- 	irq_handler_t handle_irq;
- 	int i, err, irq, irqs;
-+	struct platform_device *pmu_device = armpmu->plat_device;
- 
- 	err = reserve_pmu(ARM_PMU_DEVICE_CPU);
- 	if (err) {
-@@ -657,7 +659,7 @@ static struct platform_device_id armpmu_plat_device_ids[] = {
- 
- static int __devinit armpmu_device_probe(struct platform_device *pdev)
- {
--	pmu_device = pdev;
-+	armpmu->plat_device = pdev;
- 	return 0;
- }
- 
++static struct cpu_hw_events *armpmu_get_cpu_events(void)
++{
++	return &__get_cpu_var(cpu_hw_events);
++}
++
++static void __init cpu_pmu_init(struct arm_pmu *armpmu)
++{
++	armpmu->get_hw_events = armpmu_get_cpu_events;
++}
++
+ /*
+  * CPU PMU identification and registration.
+  */
+@@ -728,6 +739,7 @@ init_hw_perf_events(void)
+ 	if (armpmu) {
+ 		pr_info("enabled with %s PMU driver, %d counters available\n",
+ 			armpmu->name, armpmu->num_events);
++		cpu_pmu_init(armpmu);
+ 		armpmu_init(armpmu);
+ 		perf_pmu_register(&pmu, "cpu", PERF_TYPE_RAW);
+ 	} else {
 -- 
 1.7.0.4
