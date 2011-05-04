@@ -1,24 +1,33 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Wed, 4 May 2011 12:50:08 +0300
-Subject: [PATCH v2] kirkwood: add dir-665 support
-In-Reply-To: <20110504081627.GY19806@kw.sim.vm.gnt>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-	<1304496346-13557-1-git-send-email-camhirundo@gmail.com>
-	<20110504081627.GY19806@kw.sim.vm.gnt>
-Message-ID: <BANLkTim6J-wpp+=xsaaxwjmr4XLe-Aa8KA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 May 2011 02:55:46 -0700
+Subject: [PATCH v2 07/12] OMAP: Serial: Allow UART parameters to be
+	configured from board file
+In-Reply-To: <1304080796-625-8-git-send-email-govindraj.raja@ti.com>
+References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+	<1304080796-625-8-git-send-email-govindraj.raja@ti.com>
+Message-ID: <20110504095546.GY2092@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 4, 2011 at 11:16 AM, Simon Guinot <simon@sequanux.org> wrote:
-> Hi Hirundo,
->
-> On Wed, May 04, 2011 at 04:05:46PM +0800, Hirundo Cam wrote:
->> This patch is a hack to dir-665 by referencing mv88f6281gtw_ge board.
->> LEDs, GPIO, Buttons remains unknown.
-Hirundo,
-   if this board is very similar to mv88f6281gtw_ge, you should use
-the same board setup file. it will be great if you specify the
-differences between the two boards.
-   please have a look at sheevaplug-setup.c to see how multiple boards
-supported in same setup file.
-saeed
+* Govindraj.R <govindraj.raja@ti.com> [110429 05:39]:
+> @@ -250,7 +251,7 @@ static void __init omap_2430sdp_init(void)
+>  	omap2430_i2c_init();
+>  
+>  	platform_add_devices(sdp2430_devices, ARRAY_SIZE(sdp2430_devices));
+> -	omap_serial_init();
+> +	omap_serial_init(NULL);
+>  	omap2_hsmmc_init(mmc);
+>  	omap2_usbfs_init(&sdp2430_usb_config);
+...
+  
+>  static inline void board_serial_init(void)
+>  {
+> -	omap_serial_init();
+> +	omap_serial_init(NULL);
+>  }
+
+This change seems like "crazy churn" and probably not needed
+if it's always null. Boards using platform_data can use
+omap_serial_init_port instead, right?  
+
+Tony
