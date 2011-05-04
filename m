@@ -1,45 +1,28 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 04 May 2011 09:51:27 -0400 (EDT)
-Subject: [PATCH] kirkwood: add dir-665 support
-In-Reply-To: <20110504080924.GX19806@kw.sim.vm.gnt>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-	<20110503205056.GA13075@gentoodev.compulab.local>
-	<BANLkTimQM_J2ZbDjAewUsp+XSEP+x+eniA@mail.gmail.com>
-	<BANLkTinybLSF418PsocXR6dwuaksv_+UCQ@mail.gmail.com>
-	<20110504080924.GX19806@kw.sim.vm.gnt>
-Message-ID: <alpine.LFD.2.00.1105040940410.24613@xanadu.home>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 4 May 2011 06:59:30 -0700
+Subject: [PATCH 1/8] OMAP PM: create a PM layer plugin for per-device
+	constraints
+In-Reply-To: <1304516117-9334-2-git-send-email-j-pihet@ti.com>
+References: <1304516117-9334-1-git-send-email-j-pihet@ti.com>
+	<1304516117-9334-2-git-send-email-j-pihet@ti.com>
+Message-ID: <20110504135930.GE2092@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 May 2011, Simon Guinot wrote:
+* jean.pihet at newoldbits.com <jean.pihet@newoldbits.com> [110504 06:32]:
+>
+> +int omap_pm_set_max_mpu_wakeup_lat(struct device *dev, long t)
+...
 
-> Hi Hirundo,
-> 
-> On Wed, May 04, 2011 at 10:54:52AM +0800, Hirundo Cam wrote:
-> > Hi Mike and Simon,
-> > 
-> > I've send a machine submit to arm-linux, it generated the mach-types as
-> > 
-> > [stripped]
-> > mx51_moray		MACH_MX51_MORAY		MX51_MORAY		3484
-> > thales_cbc		MACH_THALES_CBC		THALES_CBC		3485
-> > bluepoint		MACH_BLUEPOINT		BLUEPOINT		3486
-> > dir665			MACH_DIR665		DIR665			3487
-> > 
-> > Is this correct for the DIR665 board using mv88f6281 chips?
-> 
-> It looks correct.
+> +int omap_pm_set_max_dev_wakeup_lat(struct device *req_dev, struct device *dev,
+...
 
-It may look correct, but I'll ask that you hang to it for a while as 
-there is a desire to stop the addition of such board specific files to 
-the kernel and move towards a solution such as device tree instead to 
-represent those board details.
+> +int omap_pm_set_min_clk_rate(struct device *dev, struct clk *c, long r)
+...
 
-I think that Kirkwood is actually a good case for device tree as the 
-differences between boards is really simple as it usually boils down to 
-different GPIO usage and MPP assignments.  If someone would like to 
-contribute to the DT effort on ARM then this would be a nice and easy 
-target to convert over.
+You should implement this as a Linux generic framework, we don't
+want to add more omap specific frameworks.
 
+Or maybe you can leave this out if they're just stubs for TI CDP code?
 
-Nicolas
+Tony
