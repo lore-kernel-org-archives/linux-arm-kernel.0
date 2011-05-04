@@ -1,35 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 May 2011 15:21:26 +0100
-Subject: [ARM]crash on 2.6.35.11
-In-Reply-To: <BANLkTik17MGwWwFb=CzBduFy9Mn-Ze+ptA@mail.gmail.com>
-References: <BANLkTimLd-qY-OeKqnf2EoTfvAHWQZVchw@mail.gmail.com>
-	<BANLkTi=xz4w3p4bc5T4-YvkC3tYdwKhWGA@mail.gmail.com>
-	<BANLkTik17MGwWwFb=CzBduFy9Mn-Ze+ptA@mail.gmail.com>
-Message-ID: <BANLkTi=WYk3_wQ8R1x9JD3-A+asO3cyo4Q@mail.gmail.com>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Wed, 04 May 2011 16:33:59 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <201105041511.54095.arnd@arndb.de>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<201104271525.28512.arnd@arndb.de>
+	<15AD189F851849F69A011B6F4D1DDB6C@subhasishg>
+	<201105041511.54095.arnd@arndb.de>
+Message-ID: <4DC163D7.9010309@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(fixing up the linux-arm-kernel list address)
+Hi Arnd,
 
-On 4 May 2011 14:18, naveen yadav <yad.naveen@gmail.com> wrote:
-> On Wed, May 4, 2011 at 3:55 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On 4 May 2011 11:09, naveen yadav <yad.naveen@gmail.com> wrote:
->>> We are running linux kernel 2.6.35.11 on Cortex a-8. when I run a
->>> simple program expect to give oom.
->>> ?But it crash with following crash log
+On 05/04/2011 03:11 PM, Arnd Bergmann wrote:
+> On Wednesday 04 May 2011, Subhasish Ghosh wrote:
+>> CAN requires mail box IDs to be programmed in. But, the socket
+>> CAN subsystem supports only software filtering of the mail box IDs.
 >>
->> Could you post the full kernel boot log and .config file?
->
-> Pls find attached log
+>> So, the mail box IDs programmed into socket CAN during initialization
+>> does not propagate into the hardware. This is planned to be a future
+>> implementation in Socket CAN.
+>>
+>> In our case, we support hardware filtering, to work around with this,
+>> Wolfgang (Socket CAN owner) suggested that we implement
+>> this using sysfs.
+>>
+>> These setting are not for debugging, but to program the mail box IDs
+>> into the hardware. 
+> 
+> Ok, I see. Can you point me to that discussion?
+> 
+> Wolfgang, I'm a bit worried by the API being split between sockets and sysfs.
+> The problem is that once the sysfs API is established, users will start
+> relying on it, and you can no longer migrate away from it, even when
+> a later version of the Socket CAN also supports setting through a different
+> interface. What is the current interface to set mail box IDs in software?
 
-It looks like a problem with the memory configuration on your board.
-You have sparsemem sections which are not fully populated. The
-mainline kernel still has problems in this area.
+Note that this CAN controller is *very* special. It cannot handle all
+CAN id's due to a lack or resources. The PRUSS firmware is able to
+manage just up to 8 different CAN identifiers out of the usual 4096
+(12-bit) or even more for the extended CAN ids using 29 bits. There is
+no other CAN controller with such rather serious limitations and
+therefore there exists also no appropriate interface. I think using
+sysfs is OK for such device-specific parameters, at least for the time
+being.
 
-You can try this patch (not sure it applies cleanly on 2.6.35 but it's
-not difficult to fix):
+> How hard would it be to implement that feature in Socket CAN?
 
-http://article.gmane.org/gmane.linux.ports.arm.kernel/112994
+CAN controllers usually provide some kind of hardware CAN id filtering,
+but in a very hardware dependent way. A generic interface may be able to
+handle the PRUSS restrictions as well. CAN devices are usually
+configured through the netlink interface. e.g.
 
--- 
-Catalin
+  $ ip link set can0 up type can bitrate 125000
+
+and such a common interface would be netlink based as well.
+
+> Is that something that Subhasish or someone else could to as a prerequisite
+> to merging the driver?
+
+Any ideas on how to handle hardware filtering in a generic way are
+welcome. I will try to come up with a proposal sooner than later.
+
+Wolfgang.
