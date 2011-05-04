@@ -1,375 +1,47 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Thu, 05 May 2011 08:53:14 +1200
-Subject: AT91: PIO base-address should be calculated by processor-specific
-	code
-In-Reply-To: <1304086303.21884.36.camel@redbox>
-References: <1304086303.21884.36.camel@redbox>
-Message-ID: <4DC1BCBA.6010603@bluewatersys.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Wed, 04 May 2011 22:55:25 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DC17A31.8070409@grandegger.com>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<201104271525.28512.arnd@arndb.de>	<15AD189F851849F69A011B6F4D1DDB6C@subhasishg>	<201105041511.54095.arnd@arndb.de>	<4DC163D7.9010309@grandegger.com>
+	<20110504155750.GC322@e-circ.dyndns.org>
+	<4DC17A31.8070409@grandegger.com>
+Message-ID: <4DC1BD3D.800@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/30/2011 02:11 AM, Andrew Victor wrote:
-> For supporting multiple AT91 processors in a single kernel image, the
-> base-address of the system peripherals is processor-dependent.  The GPIO
-> driver should therefore not reference AT91_VA_BASE_SYS, but rather the
-> correct peripheral base-address needs to be provided by the
-> processor-specific initialization code.
-> 
-> 
-> Signed-off-by: Andrew Victor <linux@maxim.org.za>
+On 04.05.2011 18:09, Wolfgang Grandegger wrote:
 
-With your suggested change to rename AT91_PIOA to AT91RM9200_PIO, etc:
+> On 05/04/2011 05:57 PM, Kurt Van Dijck wrote:
 
-Acked-by: Ryan Mallon <ryan@bluewatersys.com>
-
+>> When doing so, I'd vote for an unlimited(by software) list of hardware filters (id/mask).
+>> The hardware must abort when no more filters are available.
 > 
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at572d940hf.c linux-2.6/arch/arm/mach-at91/at572d940hf.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at572d940hf.c	2010-12-24 16:52:59.323332139 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at572d940hf.c	2011-04-28 14:51:20.626598251 +0200
-> @@ -279,15 +279,15 @@
->  static struct at91_gpio_bank at572d940hf_gpio[] = {
->  	{
->  		.id		= AT572D940HF_ID_PIOA,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioA_clk,
->  	}, {
->  		.id		= AT572D940HF_ID_PIOB,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioB_clk,
->  	}, {
->  		.id		= AT572D940HF_ID_PIOC,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioC_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91cap9.c linux-2.6/arch/arm/mach-at91/at91cap9.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at91cap9.c	2009-06-10 05:05:27.000000000 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at91cap9.c	2011-04-28 14:52:15.627736528 +0200
-> @@ -271,19 +271,19 @@
->  static struct at91_gpio_bank at91cap9_gpio[] = {
->  	{
->  		.id		= AT91CAP9_ID_PIOABCD,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioABCD_clk,
->  	}, {
->  		.id		= AT91CAP9_ID_PIOABCD,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioABCD_clk,
->  	}, {
->  		.id		= AT91CAP9_ID_PIOABCD,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioABCD_clk,
->  	}, {
->  		.id		= AT91CAP9_ID_PIOABCD,
-> -		.offset		= AT91_PIOD,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
->  		.clock		= &pioABCD_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91rm9200.c linux-2.6/arch/arm/mach-at91/at91rm9200.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at91rm9200.c	2009-06-10 05:05:27.000000000 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at91rm9200.c	2011-04-28 14:33:14.161390776 +0200
-> @@ -240,19 +240,19 @@
->  static struct at91_gpio_bank at91rm9200_gpio[] = {
->  	{
->  		.id		= AT91RM9200_ID_PIOA,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioA_clk,
->  	}, {
->  		.id		= AT91RM9200_ID_PIOB,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioB_clk,
->  	}, {
->  		.id		= AT91RM9200_ID_PIOC,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioC_clk,
->  	}, {
->  		.id		= AT91RM9200_ID_PIOD,
-> -		.offset		= AT91_PIOD,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
->  		.clock		= &pioD_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9260.c linux-2.6/arch/arm/mach-at91/at91sam9260.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9260.c	2011-04-26 20:02:18.348726273 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at91sam9260.c	2011-04-28 14:53:53.510630116 +0200
-> @@ -266,15 +266,15 @@
->  static struct at91_gpio_bank at91sam9260_gpio[] = {
->  	{
->  		.id		= AT91SAM9260_ID_PIOA,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioA_clk,
->  	}, {
->  		.id		= AT91SAM9260_ID_PIOB,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioB_clk,
->  	}, {
->  		.id		= AT91SAM9260_ID_PIOC,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioC_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9261.c linux-2.6/arch/arm/mach-at91/at91sam9261.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9261.c	2011-04-26 20:02:18.348726273 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at91sam9261.c	2011-04-28 14:54:36.792366992 +0200
-> @@ -244,15 +244,15 @@
->  static struct at91_gpio_bank at91sam9261_gpio[] = {
->  	{
->  		.id		= AT91SAM9261_ID_PIOA,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioA_clk,
->  	}, {
->  		.id		= AT91SAM9261_ID_PIOB,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioB_clk,
->  	}, {
->  		.id		= AT91SAM9261_ID_PIOC,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioC_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9263.c linux-2.6/arch/arm/mach-at91/at91sam9263.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9263.c	2011-04-26 20:02:18.348726273 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at91sam9263.c	2011-04-28 14:55:50.240519738 +0200
-> @@ -248,23 +248,23 @@
->  static struct at91_gpio_bank at91sam9263_gpio[] = {
->  	{
->  		.id		= AT91SAM9263_ID_PIOA,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioA_clk,
->  	}, {
->  		.id		= AT91SAM9263_ID_PIOB,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioB_clk,
->  	}, {
->  		.id		= AT91SAM9263_ID_PIOCDE,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioCDE_clk,
->  	}, {
->  		.id		= AT91SAM9263_ID_PIOCDE,
-> -		.offset		= AT91_PIOD,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
->  		.clock		= &pioCDE_clk,
->  	}, {
->  		.id		= AT91SAM9263_ID_PIOCDE,
-> -		.offset		= AT91_PIOE,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOE,
->  		.clock		= &pioCDE_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9g45.c linux-2.6/arch/arm/mach-at91/at91sam9g45.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9g45.c	2010-12-24 16:54:07.564396678 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at91sam9g45.c	2011-04-28 14:56:43.621718542 +0200
-> @@ -270,23 +270,23 @@
->  static struct at91_gpio_bank at91sam9g45_gpio[] = {
->  	{
->  		.id		= AT91SAM9G45_ID_PIOA,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioA_clk,
->  	}, {
->  		.id		= AT91SAM9G45_ID_PIOB,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioB_clk,
->  	}, {
->  		.id		= AT91SAM9G45_ID_PIOC,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioC_clk,
->  	}, {
->  		.id		= AT91SAM9G45_ID_PIODE,
-> -		.offset		= AT91_PIOD,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
->  		.clock		= &pioDE_clk,
->  	}, {
->  		.id		= AT91SAM9G45_ID_PIODE,
-> -		.offset		= AT91_PIOE,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOE,
->  		.clock		= &pioDE_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/at91sam9rl.c linux-2.6/arch/arm/mach-at91/at91sam9rl.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/at91sam9rl.c	2011-04-26 20:02:18.348726273 +0200
-> +++ linux-2.6/arch/arm/mach-at91/at91sam9rl.c	2011-04-28 14:57:24.215612004 +0200
-> @@ -225,19 +225,19 @@
->  static struct at91_gpio_bank at91sam9rl_gpio[] = {
->  	{
->  		.id		= AT91SAM9RL_ID_PIOA,
-> -		.offset		= AT91_PIOA,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOA,
->  		.clock		= &pioA_clk,
->  	}, {
->  		.id		= AT91SAM9RL_ID_PIOB,
-> -		.offset		= AT91_PIOB,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOB,
->  		.clock		= &pioB_clk,
->  	}, {
->  		.id		= AT91SAM9RL_ID_PIOC,
-> -		.offset		= AT91_PIOC,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOC,
->  		.clock		= &pioC_clk,
->  	}, {
->  		.id		= AT91SAM9RL_ID_PIOD,
-> -		.offset		= AT91_PIOD,
-> +		.regbase	= (void __iomem *)AT91_VA_BASE_SYS + AT91_PIOD,
->  		.clock		= &pioD_clk,
->  	}
->  };
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/generic.h linux-2.6/arch/arm/mach-at91/generic.h
-> --- linux-2.6.38.at91/arch/arm/mach-at91/generic.h	2011-04-28 17:01:30.074425436 +0200
-> +++ linux-2.6/arch/arm/mach-at91/generic.h	2011-04-28 14:39:51.365842238 +0200
-> @@ -56,7 +56,7 @@
->  
->  struct at91_gpio_bank {
->  	unsigned short id;		/* peripheral ID */
-> -	unsigned long offset;		/* offset from system peripheral base */
-> +	void __iomem *regbase;		/* base address of PIO register bank */
->  	struct clk *clock;		/* associated clock */
->  };
->  extern void __init at91_gpio_init(struct at91_gpio_bank *, int nr_banks);
-> diff -urN -x CVS linux-2.6.38.at91/arch/arm/mach-at91/gpio.c linux-2.6/arch/arm/mach-at91/gpio.c
-> --- linux-2.6.38.at91/arch/arm/mach-at91/gpio.c	2011-04-28 17:01:35.838026699 +0200
-> +++ linux-2.6/arch/arm/mach-at91/gpio.c	2011-04-28 14:40:55.418627104 +0200
-> @@ -32,7 +32,6 @@
->  	struct gpio_chip	chip;
->  	struct at91_gpio_chip	*next;		/* Bank sharing same clock */
->  	struct at91_gpio_bank	*bank;		/* Bank definition */
-> -	void __iomem		*regbase;	/* Base of register bank */
->  };
->  
->  #define to_at91_gpio_chip(c) container_of(c, struct at91_gpio_chip, chip)
-> @@ -74,7 +73,7 @@
->  	pin -= PIN_BASE;
->  	pin /= 32;
->  	if (likely(pin < gpio_banks))
-> -		return gpio_chip[pin].regbase;
-> +		return gpio_chip[pin].bank->regbase;
->  
->  	return NULL;
->  }
-> @@ -297,7 +296,7 @@
->  	int i;
->  
->  	for (i = 0; i < gpio_banks; i++) {
-> -		void __iomem	*pio = gpio_chip[i].regbase;
-> +		void __iomem	*pio = gpio_chip[i].bank->regbase;
->  
->  		backups[i] = __raw_readl(pio + PIO_IMR);
->  		__raw_writel(backups[i], pio + PIO_IDR);
-> @@ -318,7 +317,7 @@
->  	int i;
->  
->  	for (i = 0; i < gpio_banks; i++) {
-> -		void __iomem	*pio = gpio_chip[i].regbase;
-> +		void __iomem	*pio = gpio_chip[i].bank->regbase;
->  
->  		if (!wakeups[i])
->  			clk_enable(gpio_chip[i].bank->clock);
-> @@ -390,7 +389,7 @@
->  	u32		isr;
->  
->  	at91_gpio = get_irq_chip_data(irq);
-> -	pio = at91_gpio->regbase;
-> +	pio = at91_gpio->bank->regbase;
->  
->  	for (;;) {
->  		/* Reading ISR acks pending (edge triggered) GPIO interrupts.
-> @@ -402,7 +401,7 @@
->  			if (!at91_gpio->next)
->  				break;
->  			at91_gpio = at91_gpio->next;
-> -			pio = at91_gpio->regbase;
-> +			pio = at91_gpio->bank->regbase;
->  			continue;
->  		}
->  
-> @@ -513,7 +512,7 @@
->  		unsigned	id = this->bank->id;
->  		unsigned	i;
->  
-> -		__raw_writel(~0, this->regbase + PIO_IDR);
-> +		__raw_writel(~0, this->bank->regbase + PIO_IDR);
->  
->  		for (i = 0, pin = this->chip.base; i < 32; i++, pin++) {
->  			lockdep_set_class(&irq_desc[pin].lock, &gpio_lock_class);
-> @@ -545,7 +544,7 @@
->  					unsigned offset)
->  {
->  	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> -	void __iomem *pio = at91_gpio->regbase;
-> +	void __iomem *pio = at91_gpio->bank->regbase;
->  	unsigned mask = 1 << offset;
->  
->  	__raw_writel(mask, pio + PIO_ODR);
-> @@ -556,7 +555,7 @@
->  					 unsigned offset, int val)
->  {
->  	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> -	void __iomem *pio = at91_gpio->regbase;
-> +	void __iomem *pio = at91_gpio->bank->regbase;
->  	unsigned mask = 1 << offset;
->  
->  	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
-> @@ -567,7 +566,7 @@
->  static int at91_gpiolib_get(struct gpio_chip *chip, unsigned offset)
->  {
->  	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> -	void __iomem *pio = at91_gpio->regbase;
-> +	void __iomem *pio = at91_gpio->bank->regbase;
->  	unsigned mask = 1 << offset;
->  	u32 pdsr;
->  
-> @@ -578,7 +577,7 @@
->  static void at91_gpiolib_set(struct gpio_chip *chip, unsigned offset, int val)
->  {
->  	struct at91_gpio_chip *at91_gpio = to_at91_gpio_chip(chip);
-> -	void __iomem *pio = at91_gpio->regbase;
-> +	void __iomem *pio = at91_gpio->bank->regbase;
->  	unsigned mask = 1 << offset;
->  
->  	__raw_writel(mask, pio + (val ? PIO_SODR : PIO_CODR));
-> @@ -627,8 +626,6 @@
->  
->  		at91_gpio->bank = &data[i];
->  		at91_gpio->chip.base = PIN_BASE + i * 32;
-> -		at91_gpio->regbase = at91_gpio->bank->offset +
-> -			(void __iomem *)AT91_VA_BASE_SYS;
->  
->  		/* enable PIO controller's clock */
->  		clk_enable(at91_gpio->bank->clock);
-> 
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Sounds good and not even to complicated. For the SJA1000 we would just
+> allow to set the global mask.
 
+Yes. "unlimited(by software)" was a bit misleading at first reading, as we
+should not filter IDs by software in the irq handler. But to create a API that
+supports as much HW filters as the hardware provides is a good idea.
 
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
+>> I think that when using hardware filters, knowing the actual device
+>> with it's amount of hardware filters is the least of your problems.
+>> Userspace applications that suddenly stop working properly due to
+>> hw filters (i.e. some traffic not coming in anymore) will be a major
+>> source of bugreports.
+> 
+> Well, hardware filtering will be off by default and must explicitly be
+> set by the user, like for the bitrate setting.
 
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+To be correct: By the admin.
+
+The setting of CAN HW filters has a system-wide effect to all users on the
+local host. The same effect as we have for the setting of the bitrate. This is
+the major difference to the user-configurable per-socket CAN-ID filters that
+are provided e.g. by the CAN_RAW socket.
+
+As the current netlink configuration interface for CAN interfaces is not
+accessible for standard users also this would be the right place to extend the
+netlink interface.
+
+Regards,
+Oliver
