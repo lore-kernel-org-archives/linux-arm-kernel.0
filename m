@@ -1,30 +1,41 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 4 May 2011 10:56:10 -0500
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51 and
-	i.MX53
-In-Reply-To: <BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110413122503.GB1897@S2100-06.ap.freescale.net>
-	<20110413124149.GR18850@pengutronix.de>
-	<BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
-Message-ID: <BANLkTikHwmhrJHk7w+9WvLqVdhzbLM+qew@mail.gmail.com>
+From: kurt.van.dijck@eia.be (Kurt Van Dijck)
+Date: Wed, 4 May 2011 17:57:50 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DC163D7.9010309@grandegger.com>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<201104271525.28512.arnd@arndb.de>
+	<15AD189F851849F69A011B6F4D1DDB6C@subhasishg>
+	<201105041511.54095.arnd@arndb.de>
+	<4DC163D7.9010309@grandegger.com>
+Message-ID: <20110504155750.GC322@e-circ.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> address. I noticed in a patch somewhere last night that if MACH_MX5 is
-> enabled, it uses 'and' instead of 'andne' to perform the masking. This
-> will basically mean the derived address is still entirely CPU
-> specific... unless I am out of date on the patches I am reviewing..
+> 
+> > How hard would it be to implement that feature in Socket CAN?
+> 
+> CAN controllers usually provide some kind of hardware CAN id filtering,
+> but in a very hardware dependent way. A generic interface may be able to
+> handle the PRUSS restrictions as well. CAN devices are usually
+> configured through the netlink interface. e.g.
+> 
+>   $ ip link set can0 up type can bitrate 125000
+> 
+> and such a common interface would be netlink based as well.
+ack.
+> 
+> > Is that something that Subhasish or someone else could to as a prerequisite
+> > to merging the driver?
+> 
+> Any ideas on how to handle hardware filtering in a generic way are
+> welcome. I will try to come up with a proposal sooner than later.
 
-http://opensource.freescale.com/git?p=imx/linux-2.6-imx.git;a=blob;f=arch/arm/boot/compressed/head.S;h=437943d6b55e4282d03145dea77e36841e30c151;hb=bc676214b92db468c7b72dc495312809dbfc37bf#l248
+When doing so, I'd vote for an unlimited(by software) list of hardware filters (id/mask).
+The hardware must abort when no more filters are available.
+I think that when using hardware filters, knowing the actual device
+with it's amount of hardware filters is the least of your problems.
+Userspace applications that suddenly stop working properly due to
+hw filters (i.e. some traffic not coming in anymore) will be a major
+source of bugreports.
 
-Just backing myself up with the patch I'm referencing.
-
-Curious question, where is the canonical tree-to-look-at for the
-patches we're talking about? I don't feel comfortable at all
-referencing a BSP kernel on a mainline mailing list :D
-
--- -
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+Kurt
