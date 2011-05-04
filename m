@@ -1,37 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 May 2011 22:12:29 +0100
-Subject: AT91: Convert WDT driver to be independent of processor
-	base-address
-In-Reply-To: <1304110090.14210.2.camel@redbox>
-References: <1304110090.14210.2.camel@redbox>
-Message-ID: <20110504211229.GA31808@n2100.arm.linux.org.uk>
+From: ccross@android.com (Colin Cross)
+Date: Wed,  4 May 2011 14:57:44 -0700
+Subject: [PATCH] ARM: omap4: Enable keypad controller hwmod
+Message-ID: <1304546264-28922-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 10:48:10PM +0200, Andrew Victor wrote:
-> @@ -248,11 +250,17 @@ static struct miscdevice at91wdt_miscdev = {
->  
->  static int __init at91wdt_probe(struct platform_device *pdev)
->  {
-> +	struct resource	*r;
->  	int res;
->  
-> +	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!r)
-> +		return -ENODEV;
-> +
->  	if (at91wdt_miscdev.parent)
->  		return -EBUSY;
->  	at91wdt_miscdev.parent = &pdev->dev;
-> +	at91wdt_private.regbase = (void __force __iomem *) r->start;
+The keypad controller hwmod was left commented out, but the
+omap4-keypad driver requires it to function.
 
-Passing virtual addresses through iomem resources really isn't nice - they
-get added to the resource tree as bus addresses, which actually being
-virtual addresses can conflict with real bus addresses.
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-The proper way to handle this is like every other platform driver, and to
-use ioremap() on the resource to obtain a virtual mapping for the device.
-
-If you wish to reuse your fixed io mapping, then override ioremap() in
-a similar way to OMAP and arrange for bus addresses in the fixed io
-mapping to return an appropriate iomem pointer for those.
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index abc548a..e1c69ff 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -5109,7 +5109,7 @@ static __initdata struct omap_hwmod *omap44xx_hwmods[] = {
+ 	&omap44xx_iva_seq1_hwmod,
+ 
+ 	/* kbd class */
+-/*	&omap44xx_kbd_hwmod, */
++	&omap44xx_kbd_hwmod,
+ 
+ 	/* mailbox class */
+ 	&omap44xx_mailbox_hwmod,
+-- 
+1.7.4.1
