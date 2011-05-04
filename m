@@ -1,67 +1,70 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 04 May 2011 07:40:01 -0700
-Subject: [PATCH 1/5] OMAP3 cpuidle: remove useless SDP specific timings
-In-Reply-To: <1304069186-3086-2-git-send-email-j-pihet@ti.com> (jean pihet's
-	message of "Fri, 29 Apr 2011 11:26:22 +0200")
-References: <1304069186-3086-1-git-send-email-j-pihet@ti.com>
-	<1304069186-3086-2-git-send-email-j-pihet@ti.com>
-Message-ID: <87oc3iv8am.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 4 May 2011 16:48:36 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DC163D7.9010309@grandegger.com>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105041511.54095.arnd@arndb.de>
+	<4DC163D7.9010309@grandegger.com>
+Message-ID: <201105041648.37199.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-jean.pihet at newoldbits.com writes:
+On Wednesday 04 May 2011, Wolfgang Grandegger wrote:
+> On 05/04/2011 03:11 PM, Arnd Bergmann wrote:
 
-> From: Jean Pihet <j-pihet@ti.com>
->
-> The cpuidle states settings can be overriden by some board-
-> specific settings, by calling omap3_pm_init_cpuidle.
-> Remove the 3430SDP specific states settings registration
-> since the figures are identical to the default ones (in cpuidle34xx.c).
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> > Wolfgang, I'm a bit worried by the API being split between sockets and sysfs.
+> > The problem is that once the sysfs API is established, users will start
+> > relying on it, and you can no longer migrate away from it, even when
+> > a later version of the Socket CAN also supports setting through a different
+> > interface. What is the current interface to set mail box IDs in software?
+> 
+> Note that this CAN controller is *very* special. It cannot handle all
+> CAN id's due to a lack or resources. The PRUSS firmware is able to
+> manage just up to 8 different CAN identifiers out of the usual 4096
+> (12-bit) or even more for the extended CAN ids using 29 bits. 
 
-Thanks,  queuing for 2.6.40 (branch: for_2.6.40/pm-cleanup)
+So for other controllers, they can simply access every ID within
+the range (12 or 29 bits), but there is no need to configure?
 
-Kevin
+What are these IDs for? Do they identify a local port, a remote address,
+a connection, or something else?
 
-> ---
->  arch/arm/mach-omap2/board-3430sdp.c |   19 -------------------
->  1 files changed, 0 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-3430sdp.c b/arch/arm/mach-omap2/board-3430sdp.c
-> index 9afd087..7ffad7b 100644
-> --- a/arch/arm/mach-omap2/board-3430sdp.c
-> +++ b/arch/arm/mach-omap2/board-3430sdp.c
-> @@ -59,24 +59,6 @@
->  
->  #define TWL4030_MSECURE_GPIO 22
->  
-> -/* FIXME: These values need to be updated based on more profiling on 3430sdp*/
-> -static struct cpuidle_params omap3_cpuidle_params_table[] = {
-> -	/* C1 */
-> -	{1, 2, 2, 5},
-> -	/* C2 */
-> -	{1, 10, 10, 30},
-> -	/* C3 */
-> -	{1, 50, 50, 300},
-> -	/* C4 */
-> -	{1, 1500, 1800, 4000},
-> -	/* C5 */
-> -	{1, 2500, 7500, 12000},
-> -	/* C6 */
-> -	{1, 3000, 8500, 15000},
-> -	/* C7 */
-> -	{1, 10000, 30000, 300000},
-> -};
-> -
->  static uint32_t board_keymap[] = {
->  	KEY(0, 0, KEY_LEFT),
->  	KEY(0, 1, KEY_RIGHT),
-> @@ -883,7 +865,6 @@ static void __init omap_3430sdp_init(void)
->  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->  	omap_board_config = sdp3430_config;
->  	omap_board_config_size = ARRAY_SIZE(sdp3430_config);
-> -	omap3_pm_init_cpuidle(omap3_cpuidle_params_table);
->  	omap3430_i2c_init();
->  	omap_display_init(&sdp3430_dss_data);
->  	if (omap_rev() > OMAP3430_REV_ES1_0)
+> There is
+> no other CAN controller with such rather serious limitations and
+> therefore there exists also no appropriate interface. I think using
+> sysfs is OK for such device-specific parameters, at least for the time
+> being.
+
+It sounds like it's not very scalable, especially since the implementation
+is done completely in firmware. Imagine a new firmware version suddenly
+supporting 256 ids instead of 8 -- you'd then have to create 256 sysfs
+files to be compatible if I understand you correctly.
+
+> > How hard would it be to implement that feature in Socket CAN?
+> 
+> CAN controllers usually provide some kind of hardware CAN id filtering,
+> but in a very hardware dependent way. A generic interface may be able to
+> handle the PRUSS restrictions as well. CAN devices are usually
+> configured through the netlink interface. e.g.
+> 
+>   $ ip link set can0 up type can bitrate 125000
+> 
+> and such a common interface would be netlink based as well.
+
+Agreed.
+
+> > Is that something that Subhasish or someone else could to as a prerequisite
+> > to merging the driver?
+> 
+> Any ideas on how to handle hardware filtering in a generic way are
+> welcome. I will try to come up with a proposal sooner than later.
+
+It sounds to me like the best solution would be change the firmware
+to lift that restriction and simply allow all IDs, in case it's not
+actually a hardware limitation (which sounds unlikely).
+
+If that's not possible, maybe it's possible to define a generic
+filtering interface using netlink, and then either do it completely
+in the kernel, or using the hardware support.
+
+	Arnd
