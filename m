@@ -1,57 +1,75 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:10 +0300
-Subject: [PATCH 10/22] mmc: omap_hsmmc: reduce a bit the error handlers in
-	probe()
+Date: Thu,  5 May 2011 14:51:12 +0300
+Subject: [PATCH 12/22] mmc: omap_hsmmc: introduce start_clock and re-use
+	stop_clock
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-11-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-13-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
+There is similar piece of code in two functions which enables clock. Split this
+code to omap_hsmmc_start_clock(). Re-use omap_hsmmc_stop_clock() in
+omap_hsmmc_context_restore() as well.
+
 Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   17 ++++++-----------
- 1 files changed, 6 insertions(+), 11 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   19 +++++++++++++------
+ 1 files changed, 13 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index a727bf8..7a153af 100644
+index 045c581..ae6d204 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -2204,18 +2204,11 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 	/* we start off in DISABLED state */
- 	host->dpm_state = DISABLED;
+@@ -560,6 +560,15 @@ static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
+ }
  
--	if (clk_enable(host->iclk) != 0) {
--		clk_put(host->iclk);
--		clk_put(host->fclk);
--		goto err1;
--	}
-+	if (clk_enable(host->iclk) != 0)
-+		goto err2;
+ /*
++ * Start clock to the card
++ */
++static void omap_hsmmc_start_clock(struct omap_hsmmc_host *host)
++{
++	OMAP_HSMMC_WRITE(host->base, SYSCTL,
++		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
++}
++
++/*
+  * Stop clock to the card
+  */
+ static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
+@@ -700,8 +709,8 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 		break;
+ 	}
  
--	if (mmc_host_enable(host->mmc) != 0) {
--		clk_disable(host->iclk);
--		clk_put(host->iclk);
--		clk_put(host->fclk);
--		goto err1;
--	}
-+	if (mmc_host_enable(host->mmc) != 0)
-+		goto err3;
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+-		OMAP_HSMMC_READ(host->base, SYSCTL) & ~CEN);
++	omap_hsmmc_stop_clock(host);
++
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+ 		(calc_divisor(ios) << 6) | (DTO << 16));
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+@@ -712,8 +721,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 		&& time_before(jiffies, timeout))
+ 		;
  
- 	if (cpu_is_omap2430()) {
- 		host->dbclk = clk_get(&pdev->dev, "mmchsdb_fck");
-@@ -2382,7 +2375,9 @@ err_irq:
- 				host->dma_ctrl_buf,
- 				host->dma_ctrl_buf_phy);
- 	mmc_host_disable(host->mmc);
-+err3:
- 	clk_disable(host->iclk);
-+err2:
- 	clk_put(host->fclk);
- 	clk_put(host->iclk);
- 	if (host->got_dbclk) {
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+-		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
++	omap_hsmmc_start_clock(host);
+ 
+ 	con = OMAP_HSMMC_READ(host->base, CON);
+ 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
+@@ -1692,8 +1700,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		&& time_before(jiffies, timeout))
+ 		msleep(1);
+ 
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+-		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
++	omap_hsmmc_start_clock(host);
+ 
+ 	if (do_send_init_stream)
+ 		send_init_stream(host);
 -- 
 1.7.0.4
