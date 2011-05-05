@@ -1,49 +1,47 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:15 +0300
-Subject: [PATCH 15/22] OMAP: hsmmc: Do not mux the slot if non default muxing
-	is already done
+Date: Thu,  5 May 2011 14:51:09 +0300
+Subject: [PATCH 09/22] mmc: omap_hsmmc: move hardcoded frequency constants to
+	definition block
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-16-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-10-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jarkko Lavinen <jarkko.lavinen@nokia.com>
+From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
-Allow the bootloader do all the muxing.
+Move the min and max frequency constants to the definition block in the source
+file.
 
-Signed-off-by: Jarkko Lavinen <jarkko.lavinen@nokia.com>
+Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- arch/arm/mach-omap2/hsmmc.c |    3 ++-
- arch/arm/mach-omap2/hsmmc.h |    1 +
- 2 files changed, 3 insertions(+), 1 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index b2f30be..6b97fae 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -440,7 +440,8 @@ void __init omap_init_hsmmc(struct omap2_hsmmc_info *hsmmcinfo, int ctrl_nr)
- 		pr_err("%s fails!\n", __func__);
- 		goto done;
- 	}
--	omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
-+	if (!hsmmcinfo->nomux)
-+		omap_hsmmc_mux(mmc_data, (ctrl_nr - 1));
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index a1a1101..a727bf8 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -120,6 +120,8 @@
  
- 	name = "omap_hsmmc";
- 	ohl = omap_hsmmc_latency;
-diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-index f119348..0f2a87e 100644
---- a/arch/arm/mach-omap2/hsmmc.h
-+++ b/arch/arm/mach-omap2/hsmmc.h
-@@ -19,6 +19,7 @@ struct omap2_hsmmc_info {
- 	bool	power_saving;	/* Try to sleep or power off when possible */
- 	bool	no_off;		/* power_saving and power is not to go off */
- 	bool	vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
-+	bool    nomux;          /* No default muxing for this slot */
- 	int	gpio_cd;	/* or -EINVAL */
- 	int	gpio_wp;	/* or -EINVAL */
- 	char	*name;		/* or NULL for default */
+ #define MMC_TIMEOUT_MS		20
+ #define OMAP_MMC_MASTER_CLOCK	96000000
++#define OMAP_MMC_MIN_CLOCK	400000
++#define OMAP_MMC_MAX_CLOCK	52000000
+ #define DRIVER_NAME		"omap_hsmmc"
+ 
+ #define DMA_TYPE_NODMA	0
+@@ -2176,8 +2178,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 	if (mmc_slot(host).vcc_aux_disable_is_sleep)
+ 		mmc_slot(host).no_off = 1;
+ 
+-	mmc->f_min	= 400000;
+-	mmc->f_max	= 52000000;
++	mmc->f_min	= OMAP_MMC_MIN_CLOCK;
++	mmc->f_max	= OMAP_MMC_MAX_CLOCK;
+ 
+ 	spin_lock_init(&host->irq_lock);
+ 
 -- 
 1.7.0.4
