@@ -1,75 +1,158 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:12 +0300
-Subject: [PATCH 12/22] mmc: omap_hsmmc: introduce start_clock and re-use
-	stop_clock
+Date: Thu,  5 May 2011 14:51:14 +0300
+Subject: [PATCH 14/22] mmc: omap_hsmmc: split same pieces of code to separate
+	functions
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-13-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-15-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
-There is similar piece of code in two functions which enables clock. Split this
-code to omap_hsmmc_start_clock(). Re-use omap_hsmmc_stop_clock() in
-omap_hsmmc_context_restore() as well.
+There are few places with the same functionality. This patch creates two
+functions omap_hsmmc_set_bus_width() and omap_hsmmc_set_bus_mode() to do the
+job.
 
 Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   19 +++++++++++++------
- 1 files changed, 13 insertions(+), 6 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   85 ++++++++++++++++++++---------------------
+ 1 files changed, 41 insertions(+), 44 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 045c581..ae6d204 100644
+index 3c76911..e7c181a 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -560,6 +560,15 @@ static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
+@@ -645,6 +645,41 @@ static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
+ 	omap_hsmmc_start_clock(host);
  }
  
- /*
-+ * Start clock to the card
-+ */
-+static void omap_hsmmc_start_clock(struct omap_hsmmc_host *host)
++static void omap_hsmmc_set_bus_width(struct omap_hsmmc_host *host)
 +{
-+	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-+		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
++	struct mmc_ios *ios = &host->mmc->ios;
++	u32 con;
++
++	con = OMAP_HSMMC_READ(host->base, CON);
++	switch (ios->bus_width) {
++	case MMC_BUS_WIDTH_8:
++		OMAP_HSMMC_WRITE(host->base, CON, con | DW8);
++		break;
++	case MMC_BUS_WIDTH_4:
++		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
++		OMAP_HSMMC_WRITE(host->base, HCTL,
++			OMAP_HSMMC_READ(host->base, HCTL) | FOUR_BIT);
++		break;
++	case MMC_BUS_WIDTH_1:
++		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
++		OMAP_HSMMC_WRITE(host->base, HCTL,
++			OMAP_HSMMC_READ(host->base, HCTL) & ~FOUR_BIT);
++		break;
++	}
 +}
 +
-+/*
-  * Stop clock to the card
-  */
- static void omap_hsmmc_stop_clock(struct omap_hsmmc_host *host)
-@@ -700,8 +709,8 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
- 		break;
- 	}
- 
--	OMAP_HSMMC_WRITE(host->base, SYSCTL,
--		OMAP_HSMMC_READ(host->base, SYSCTL) & ~CEN);
-+	omap_hsmmc_stop_clock(host);
++static void omap_hsmmc_set_bus_mode(struct omap_hsmmc_host *host)
++{
++	struct mmc_ios *ios = &host->mmc->ios;
++	u32 con;
 +
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
- 		(calc_divisor(ios) << 6) | (DTO << 16));
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-@@ -712,8 +721,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
- 		&& time_before(jiffies, timeout))
- 		;
++	con = OMAP_HSMMC_READ(host->base, CON);
++	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
++		OMAP_HSMMC_WRITE(host->base, CON, con | OD);
++	else
++		OMAP_HSMMC_WRITE(host->base, CON, con & ~OD);
++}
++
+ #ifdef CONFIG_PM
  
--	OMAP_HSMMC_WRITE(host->base, SYSCTL,
--		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
-+	omap_hsmmc_start_clock(host);
+ /*
+@@ -656,7 +691,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 	struct mmc_ios *ios = &host->mmc->ios;
+ 	struct omap_mmc_platform_data *pdata = host->pdata;
+ 	int context_loss = 0;
+-	u32 hctl, capa, con;
++	u32 hctl, capa;
+ 	unsigned long timeout;
  
- 	con = OMAP_HSMMC_READ(host->base, CON);
- 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
-@@ -1692,8 +1700,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		&& time_before(jiffies, timeout))
- 		msleep(1);
+ 	if (pdata->get_context_loss_count) {
+@@ -718,30 +753,12 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 	if (host->power_mode == MMC_POWER_OFF)
+ 		goto out;
  
--	OMAP_HSMMC_WRITE(host->base, SYSCTL,
--		OMAP_HSMMC_READ(host->base, SYSCTL) | CEN);
-+	omap_hsmmc_start_clock(host);
+-	con = OMAP_HSMMC_READ(host->base, CON);
+-	switch (ios->bus_width) {
+-	case MMC_BUS_WIDTH_8:
+-		OMAP_HSMMC_WRITE(host->base, CON, con | DW8);
+-		break;
+-	case MMC_BUS_WIDTH_4:
+-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
+-		OMAP_HSMMC_WRITE(host->base, HCTL,
+-			OMAP_HSMMC_READ(host->base, HCTL) | FOUR_BIT);
+-		break;
+-	case MMC_BUS_WIDTH_1:
+-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
+-		OMAP_HSMMC_WRITE(host->base, HCTL,
+-			OMAP_HSMMC_READ(host->base, HCTL) & ~FOUR_BIT);
+-		break;
+-	}
++	omap_hsmmc_set_bus_width(host);
  
+ 	omap_hsmmc_set_clock(host);
+ 
+-	con = OMAP_HSMMC_READ(host->base, CON);
+-	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
+-		OMAP_HSMMC_WRITE(host->base, CON, con | OD);
+-	else
+-		OMAP_HSMMC_WRITE(host->base, CON, con & ~OD);
++	omap_hsmmc_set_bus_mode(host);
++
+ out:
+ 	host->context_loss = context_loss;
+ 
+@@ -1636,7 +1653,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct omap_hsmmc_host *host = mmc_priv(mmc);
+-	u32 con;
+ 	int do_send_init_stream = 0;
+ 
+ 	mmc_host_enable(host->mmc);
+@@ -1662,22 +1678,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 
+ 	/* FIXME: set registers based only on changes to ios */
+ 
+-	con = OMAP_HSMMC_READ(host->base, CON);
+-	switch (mmc->ios.bus_width) {
+-	case MMC_BUS_WIDTH_8:
+-		OMAP_HSMMC_WRITE(host->base, CON, con | DW8);
+-		break;
+-	case MMC_BUS_WIDTH_4:
+-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
+-		OMAP_HSMMC_WRITE(host->base, HCTL,
+-			OMAP_HSMMC_READ(host->base, HCTL) | FOUR_BIT);
+-		break;
+-	case MMC_BUS_WIDTH_1:
+-		OMAP_HSMMC_WRITE(host->base, CON, con & ~DW8);
+-		OMAP_HSMMC_WRITE(host->base, HCTL,
+-			OMAP_HSMMC_READ(host->base, HCTL) & ~FOUR_BIT);
+-		break;
+-	}
++	omap_hsmmc_set_bus_width(host);
+ 
+ 	if (host->pdata->controller_flags & OMAP_HSMMC_SUPPORTS_DUAL_VOLT) {
+ 		/* Only MMC1 can interface at 3V without some flavor
+@@ -1702,11 +1703,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  	if (do_send_init_stream)
  		send_init_stream(host);
+ 
+-	con = OMAP_HSMMC_READ(host->base, CON);
+-	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
+-		OMAP_HSMMC_WRITE(host->base, CON, con | OD);
+-	else
+-		OMAP_HSMMC_WRITE(host->base, CON, con & ~OD);
++	omap_hsmmc_set_bus_mode(host);
+ 
+ 	if (host->power_mode == MMC_POWER_OFF)
+ 		mmc_host_disable(host->mmc);
 -- 
 1.7.0.4
