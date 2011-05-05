@@ -1,29 +1,51 @@
-From: arend@broadcom.com (Arend van Spriel)
-Date: Thu, 5 May 2011 14:54:48 +0200
-Subject: AXI driver status => previously: Re: Could I (ab)use bus
-	(struct bus_type) for virtual Broadcom bus?
-In-Reply-To: <BANLkTi=4zxFWKymsnZuycMowXJz_ciHuVQ@mail.gmail.com>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<201104171938.12834.arnd@arndb.de> <op.vt6ufu1n3ri7v4@arend-laptop>
-	<201104191635.40351.arnd@arndb.de> <op.vt76hofg3ri7v4@arend-laptop>
-	<BANLkTinMe-KedeOAiQYES-LCC2O4BoE28w@mail.gmail.com>
-	<4DC2991F.6030703@broadcom.com>
-	<BANLkTi=4zxFWKymsnZuycMowXJz_ciHuVQ@mail.gmail.com>
-Message-ID: <4DC29E18.8070905@broadcom.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 05 May 2011 17:08:59 +0400
+Subject: [PATCH 07/22] mmc: omap_hsmmc: fix missing mmc_release_host()
+	in no_off case
+In-Reply-To: <1304596282-4095-8-git-send-email-adrian.hunter@nokia.com>
+References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
+	<1304596282-4095-8-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <4DC2A16B.8050209@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2011 02:48 PM, Rafa? Mi?ecki wrote:
+Hello.
+
+On 05-05-2011 15:51, Adrian Hunter wrote:
+
+> From: Sudhir Bera <ext-sudhir.bera@nokia.com>
+
+> In fact the no_off check here will not be hit because
+> 'omap_hsmmc_disabled_to_sleep()' won't schedule a
+> deeper disable in the no_off case.
+
+> Signed-off-by: Sudhir Bera <ext-sudhir.bera@nokia.com>
+> Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+> ---
+>   drivers/mmc/host/omap_hsmmc.c |    7 +++----
+>   1 files changed, 3 insertions(+), 4 deletions(-)
+
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index bab25ff..bd52849 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -1852,14 +1852,13 @@ static int omap_hsmmc_sleep_to_off(struct omap_hsmmc_host *host)
+>   		return 0;
 >
-> Hey,
+>   	if (mmc_slot(host).no_off)
+> -		return 0;
+> +		goto out;
 >
-> I got some unique possibility to work on machine affected by DMA
-> errors and I spent last 2 weeks only on solving this issue. I'm going
-> to go back to AMBA topic again soo.
+>   	if (!((host->mmc->caps&  MMC_CAP_NONREMOVABLE) ||
+>   	      mmc_slot(host).card_detect ||
+>   	      (mmc_slot(host).get_cover_state &&
+> 	       mmc_slot(host).get_cover_state(host->dev, host->slot_id)))) {
+> -		mmc_release_host(host->mmc);
+> -		return 0;
+> +		goto out;
+>   	}
 
-Great,
+    This has become a single statement, so {} shpould be removed, no? 
+checkpatch.pl probably warns here?..
 
-I was spending some time on other stuff as well. I will be picking up 
-integrating the module in our brcm80211 driver to get a feel how it fits.
-
-Gr. AvS
+WBR, Sergei
