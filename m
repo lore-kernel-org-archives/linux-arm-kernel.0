@@ -1,35 +1,67 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Thu, 5 May 2011 14:48:31 +0200
-Subject: AXI driver status => previously: Re: Could I (ab)use bus (struct
-	bus_type) for virtual Broadcom bus?
-In-Reply-To: <4DC2991F.6030703@broadcom.com>
-References: <BANLkTim7Uj2tsgFngWhUqFK_hk3Leg+sQA@mail.gmail.com>
-	<201104171938.12834.arnd@arndb.de> <op.vt6ufu1n3ri7v4@arend-laptop>
-	<201104191635.40351.arnd@arndb.de> <op.vt76hofg3ri7v4@arend-laptop>
-	<BANLkTinMe-KedeOAiQYES-LCC2O4BoE28w@mail.gmail.com>
-	<4DC2991F.6030703@broadcom.com>
-Message-ID: <BANLkTi=4zxFWKymsnZuycMowXJz_ciHuVQ@mail.gmail.com>
+From: notasas@gmail.com (Grazvydas Ignotas)
+Date: Thu, 5 May 2011 15:53:45 +0300
+Subject: [PATCH 13/22] mmc: omap_hsmmc: fix few bugs when set the clock
+	divisor
+In-Reply-To: <1304596282-4095-14-git-send-email-adrian.hunter@nokia.com>
+References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
+	<1304596282-4095-14-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <BANLkTikwqcgcy2dnD=2_DGUQM=0a1JtfoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 5 maja 2011 14:33 u?ytkownik Arend van Spriel
-<arend@broadcom.com> napisa?:
-> On 04/20/2011 09:29 AM, Rafa? Mi?ecki wrote:
->>
->> I do not register that exceptional devices in my code.
+On Thu, May 5, 2011 at 2:51 PM, Adrian Hunter <adrian.hunter@nokia.com> wrote:
+> From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 >
-> Hi Rafa?,
+> There are two pieces of code which similar, but not the same. Each of them
+> contains a bug.
 >
-> There has been some radio silence on the subject of the (bcm)axi driver. I
-> was getting a feeling that my concerns were almost all out of the way in
-> latest emails I got from Arnd and/or Jonas. Do you have an update of what
-> plans you have with this module.
+> The SYSCTL register should be read before write in the
+> omap_hsmmc_context_restore() to remain the state of the reserved bits.
+>
+> Before set the clock divisor and DTO bits the value from the SYSCTL register
+> should be masked properly. We were lucky to have no problems with DTO bits. So,
+> make sure we have clear DTO bits properly in the omap_hsmmc_set_ios().
+>
+> Additionally get rid of msleep(1). The actual time rare higher than 30us on
+> OMAP 3630.
+>
+> The result pieces of code are split to omap_hsmmc_set_clock() function.
+>
+> Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
+> Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+> ---
+> ?drivers/mmc/host/omap_hsmmc.c | ? 59 +++++++++++++++++++---------------------
+> ?1 files changed, 28 insertions(+), 31 deletions(-)
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index ae6d204..3c76911 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -619,6 +619,32 @@ static u16 calc_divisor(struct mmc_ios *ios)
+> ? ? ? ?return dsor;
+> ?}
+>
+> +static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
+> +{
+> + ? ? ? struct mmc_ios *ios = &host->mmc->ios;
+> + ? ? ? unsigned long regval;
+> + ? ? ? unsigned long timeout;
+> +
+> + ? ? ? dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
+> +
+> + ? ? ? omap_hsmmc_stop_clock(host);
+> +
+> + ? ? ? regval = OMAP_HSMMC_READ(host->base, SYSCTL);
+> + ? ? ? regval = regval & ~(CLKD_MASK | DTO_MASK);
+> + ? ? ? regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
+> + ? ? ? OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
+> + ? ? ? OMAP_HSMMC_WRITE(host->base, SYSCTL,
+> + ? ? ? ? ? ? ? OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+> +
+> + ? ? ? /* Wait till the ICS bit is set */
+> + ? ? ? timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
+> + ? ? ? while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
+> + ? ? ? ? ? ? ? && time_before(jiffies, timeout))
+> + ? ? ? ? ? ? ? ;
 
-Hey,
-
-I got some unique possibility to work on machine affected by DMA
-errors and I spent last 2 weeks only on solving this issue. I'm going
-to go back to AMBA topic again soo.
-
--- 
-Rafa?
+Since you are busywaiting now, cpu_relax() is advisable I guess.
