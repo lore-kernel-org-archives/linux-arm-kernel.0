@@ -1,42 +1,207 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu,  5 May 2011 21:22:58 +0800
-Subject: [PATCH v2 7/7] ARM: mxc: remove esdhc.h and use the public one
-In-Reply-To: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
-References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1304601778-13837-8-git-send-email-shawn.guo@linaro.org>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Thu, 5 May 2011 18:55:27 +0530
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CD0B8CC@dbde02.ent.ti.com>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201104271605.09537.arnd@arndb.de>
+	<CF1FC9DE1796407FB4D636189646927F@subhasishg>
+	<201104280935.38787.arnd@arndb.de>
+	<2543A75FDDB244D2A148C14BCAA5FD88@subhasishg>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CD0B8CC@dbde02.ent.ti.com>
+Message-ID: <613E2AF627DE4ABE92AD42D5D9E1BFE5@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |    1 -
- arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +-
- 2 files changed, 1 insertions(+), 2 deletions(-)
+I am a bit lost,
 
-diff --git a/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c b/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
-index 6b2940b..b401689 100644
---- a/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
-+++ b/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
-@@ -8,7 +8,6 @@
- 
- #include <mach/hardware.h>
- #include <mach/devices-common.h>
--#include <mach/esdhc.h>
- 
- #define imx_sdhci_esdhc_imx_data_entry_single(soc, _id, hwid) \
- 	{								\
-diff --git a/arch/arm/plat-mxc/include/mach/devices-common.h b/arch/arm/plat-mxc/include/mach/devices-common.h
-index 8658c9c..c95ab13 100644
---- a/arch/arm/plat-mxc/include/mach/devices-common.h
-+++ b/arch/arm/plat-mxc/include/mach/devices-common.h
-@@ -243,7 +243,7 @@ struct imx_mxc_w1_data {
- struct platform_device *__init imx_add_mxc_w1(
- 		const struct imx_mxc_w1_data *data);
- 
--#include <mach/esdhc.h>
-+#include <linux/mmc/esdhc.h>
- struct imx_sdhci_esdhc_imx_data {
- 	int id;
- 	resource_size_t iobase;
--- 
-1.7.4.1
+If I understand correctly, there are two problems
+
+1. In case of udev based driver loading, we will end up
+loading both the drivers and the associated firmware.
+This is not acceptable because both UART & CAN
+use PRU0 & PRU1.
+
+2. How do we switch between devices at run time.
+This is required because MFD devices should be
+capable of doing that.
+
+
+Ok, if that understanding is somewhat correct, then, what we are
+trying to do is load the firmware from the MFD driver itself.
+
+So, in case of a switch between device, say from UART to CAN,
+all the user has to do is copy a new firmware.
+
+This firmware should contain some info regarding the device, like
+say, device name & prunum.
+
+So, in case a device requires both PRUs, then the firmware would
+download for both PRUs.
+
+In case a device requires only one PRU, then it can be downloaded
+only into the requested PRU. So, the other PRU remains open for
+any other firmware/device.
+
+After loading the firmware, the MFD device should create the
+platform devices based upon the firmware.
+
+So, if only one PRU is used for UART, then the other PRU can be
+used for CAN and the MFD should create two platform_devices.
+
+If the UART uses both the PRUs, then the MFD should download
+the firmware into both the PRUs but create only one platform_device.
+
+But, in this case how do we download two different firmware
+on two different PRUs. One way is to keep the firmware files
+as its now, but add another file say firmware-config.txt,
+consisting a list of parameters like,
+
+START
+MFD_ID0#0
+MFD_ID0_PRU_NUM#PRU0
+MFD_ID1#1
+MFD_ID1_PRU_NUM#PRU1
+END
+
+OR
+
+START
+MFD_ID0#0
+MFD_ID0_PRU_NUM#PRU0:PRU1
+END
+
+So, the MFD driver can do a request_firmware on this file first,
+parse the device info and decide to request the main firmware.
+This becomes something like the devices table that we have on
+PPC.
+
+Also, if PRU0 is loaded, we need some way of maintaining the
+usage_count, So that the PRU0 is not loaded again accidently.
+We can increase the usage_count from the MFD driver.
+But, to decrement the usage_count, we can add an API
+which will be called when the CAN or UART driver is rmmod.
+
+
+Now how do we handle switch between devices.
+
+We can either do a rmmod of the MFD driver, then again modprobe it.
+So, the request_firmware is run again and the appropriate device is
+loaded based upon the changed firmware-config.txt.
+
+But, this does not look good, say what if the MFD driver is in-build.
+Another way is that we can add a sysfs entry, which when written
+with anything can re-evaluate the firmware_config.
+
+What the hell, does anything make any sense ?
+
+
+> Hi Subhasish,
+>
+> On Wed, May 04, 2011 at 12:48:43, Subhasish Ghosh wrote:
+>> Hi Arnd,
+>>
+>> How about just doing something like:
+>>
+>> #> echo da8xx_pruss_uart >> firmware.bin
+>>
+>> i.e  just append the device name (from the board file) into the firmware
+>> file.
+>>
+>> In the driver probe, we can parse from the bottom, when it reaches
+>> "da8xx_pruss", the rest of the upper data is the firmware and from
+>> the full name, we can determine if it's a CAN, UART or any other
+>> peripheral.
+>>
+>> So, based on the platform_data, which the MFD driver received,
+>> it can find out which device to initialize.
+>
+> If you are defining a firmware header, it may be
+> worthwhile making sure you include information
+> on features of the device being supported (I
+> assume there will be differences in CAN features if
+> the firmware uses both PRUs to support CAN versus
+> UART on one PRU and CAN on another PRU).
+>
+> The MFD driver can parse this information and
+> pass this on to the UART or CAN drivers.
+>
+> Thanks,
+> Sekhar
+>
+>>
+>> Also, does the line wrapping look any better ?
+>>
+>>
+>> > On Thursday 28 April 2011 09:17:21 Subhasish Ghosh wrote:
+>> >> >
+>> >> > You can easily do that by adding a small header to the firmware
+>> >> > format and interpret that header by the MFD driver. When the name
+>> >> > of the subdevice is part of that header, the MFD driver does not
+>> >> > need to understand the difference, it can simply pass that on
+>> >> > when creating its child devices.
+>> >>
+>> >> I don't understand why loading the firmware should be done at the MFD
+>> >> driver.
+>> >> The user already specifies the device he/she wants to start on the PRU
+>> >> via
+>> >> modprobe.
+>> >> A driver can be inserted, which can download a printer firmware on one
+>> >> PRU
+>> >> and a
+>> >> scanner firmware on the other. This way both cores can be used for
+>> >> separate
+>> >> purposes.
+>> >> I mean, say in a real MFD controller, that will also have two separate
+>> >> cores
+>> >> running on it,
+>> >> just that, the firmware on it would not be downloaded runtime but 
+>> >> fused
+>> >> in
+>> >> some non volatile memory.
+>> >
+>> > Then I must be misreading what your code currently does, because it 
+>> > does
+>> > not
+>> > match your explanations. What I see in the platform code is that you
+>> > create
+>> > MFD cells for specific devices that get automatically created by the 
+>> > MFD
+>> > driver. This will cause udev to load the drivers for these devices, 
+>> > which
+>> > then load the firmware they need.
+>> >
+>> > Also, I cannot see how the method you describe would make it possible 
+>> > to
+>> > the same driver into both units, e.g. when you want to have two serial
+>> > ports. The reason is that you currently hardcode the PRU number in the
+>> > driver and that you cannot load a single driver twice.
+>> >
+>> > Finally, I'm trying to make sure that whatever solution you come up 
+>> > with
+>> > will still work when we migrate the code to using a flattened device 
+>> > tree.
+>> > In that case, you would ideally put the device firmware into the device
+>> > tree as a property that matches whatever you have connected on the
+>> > specific
+>> > board (at least as an option, you can still fall back to
+>> > request_firmware).
+>> > You definitely want automatic module loading in that case.
+>> >
+>> > Note that using module loading with specific parameters in order to
+>> > match the hardware is not a recommended procedure any more. The code
+>> > really needs to work the same way when all drivers are built into the
+>> > kernel. It should not be hard to use the firmware loading mechanism
+>> > in the MFD driver to both load the firmware and configure the devices
+>> > appropriately so we always use the right driver for the currently
+>> > active devices.
+>> >
+>> > Arnd
+>> >
+>> > BTW, something is wrong with your email client line wrapping. I've 
+>> > fixed
+>> > this up manually before when replying, but please find a way to get 
+>> > this
+>> > right in the future.
+>>
+>>
+> 
