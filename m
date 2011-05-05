@@ -1,93 +1,62 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:22 +0300
-Subject: [PATCH 22/22] mmc: omap_hsmmc: add a hardware reset before
-	initialization
+Date: Thu,  5 May 2011 14:51:21 +0300
+Subject: [PATCH 21/22] OMAP: hsmmc: add platform data for eMMC hardware reset
+	gpio
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-23-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-22-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a warm restart, an eMMC which cannot be powered off is
-in an unknown state, so reset it to be sure it will initialize.
+eMMC may have a hardware reset line connected to a gpio,
+so pass it to the driver.
 
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   38 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 37 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/hsmmc.c           |    5 +++++
+ arch/arm/mach-omap2/hsmmc.h           |    1 +
+ arch/arm/plat-omap/include/plat/mmc.h |    1 +
+ 3 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 8c5e7d3..c791230 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -542,10 +542,25 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
- 	} else
- 		pdata->slots[0].gpio_wp = -EINVAL;
+diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+index 34cba89..85f27af 100644
+--- a/arch/arm/mach-omap2/hsmmc.c
++++ b/arch/arm/mach-omap2/hsmmc.c
+@@ -472,6 +472,11 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+ 	mmc->slots[0].switch_pin = c->gpio_cd;
+ 	mmc->slots[0].gpio_wp = c->gpio_wp;
  
-+	if (gpio_is_valid(pdata->slots[0].gpio_hw_reset)) {
-+		ret = gpio_request(pdata->slots[0].gpio_hw_reset,
-+				   "mmc_hw_reset");
-+		if (ret)
-+			goto err_free_wp;
-+		ret = gpio_direction_output(pdata->slots[0].gpio_hw_reset, 1);
-+		if (ret)
-+			goto err_free_hw_reset;
-+	} else
-+		pdata->slots[0].gpio_hw_reset = -EINVAL;
++	if (c->gpio_hw_reset)
++		mmc->slots[0].gpio_hw_reset = c->gpio_hw_reset;
++	else
++		mmc->slots[0].gpio_hw_reset = -EINVAL;
 +
- 	return 0;
+ 	mmc->slots[0].remux = c->remux;
+ 	mmc->slots[0].init_card = c->init_card;
  
-+
-+err_free_hw_reset:
-+	gpio_free(pdata->slots[0].gpio_hw_reset);
- err_free_wp:
--	gpio_free(pdata->slots[0].gpio_wp);
-+	if (gpio_is_valid(pdata->slots[0].gpio_wp))
-+		gpio_free(pdata->slots[0].gpio_wp);
- err_free_cd:
- 	if (gpio_is_valid(pdata->slots[0].switch_pin))
- err_free_sp:
-@@ -555,6 +570,8 @@ err_free_sp:
+diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+index 0f2a87e..b78ed41 100644
+--- a/arch/arm/mach-omap2/hsmmc.h
++++ b/arch/arm/mach-omap2/hsmmc.h
+@@ -22,6 +22,7 @@ struct omap2_hsmmc_info {
+ 	bool    nomux;          /* No default muxing for this slot */
+ 	int	gpio_cd;	/* or -EINVAL */
+ 	int	gpio_wp;	/* or -EINVAL */
++	int     gpio_hw_reset;  /* hardware reset */
+ 	char	*name;		/* or NULL for default */
+ 	struct device *dev;	/* returned: pointer to mmc adapter */
+ 	int	ocr_mask;	/* temporary HACK */
+diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+index e3c9b20..9b69b7e 100644
+--- a/arch/arm/plat-omap/include/plat/mmc.h
++++ b/arch/arm/plat-omap/include/plat/mmc.h
+@@ -119,6 +119,7 @@ struct omap_mmc_platform_data {
  
- static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
- {
-+	if (gpio_is_valid(pdata->slots[0].gpio_hw_reset))
-+		gpio_free(pdata->slots[0].gpio_hw_reset);
- 	if (gpio_is_valid(pdata->slots[0].gpio_wp))
- 		gpio_free(pdata->slots[0].gpio_wp);
- 	if (gpio_is_valid(pdata->slots[0].switch_pin))
-@@ -815,6 +832,18 @@ static void omap_hsmmc_context_save(struct omap_hsmmc_host *host)
+ 		int switch_pin;			/* gpio (card detect) */
+ 		int gpio_wp;			/* gpio (write protect) */
++		int gpio_hw_reset;              /* gpio (hardware reset) */
  
- #endif
- 
-+static void omap_hsmmc_do_hw_reset(struct omap_hsmmc_host *host)
-+{
-+	if (!gpio_is_valid(mmc_slot(host).gpio_hw_reset))
-+		return;
-+
-+	gpio_set_value_cansleep(mmc_slot(host).gpio_hw_reset, 0);
-+	udelay(9);
-+	gpio_set_value_cansleep(mmc_slot(host).gpio_hw_reset, 1);
-+	usleep_range(1000, 2000);
-+	printk(KERN_INFO "%s: hardware reset done\n", mmc_hostname(host->mmc));
-+}
-+
- /*
-  * Send init stream sequence to card
-  * before sending IDLE command
-@@ -827,6 +856,13 @@ static void send_init_stream(struct omap_hsmmc_host *host)
- 	if (host->protect_card)
- 		return;
- 
-+	/*
-+	 * After a warm restart, an eMMC which cannot be powered off is in an
-+	 * unknown state so reset it to be sure it will initialize.
-+	 */
-+	if (mmc_slot(host).no_off)
-+		omap_hsmmc_do_hw_reset(host);
-+
- 	disable_irq(host->irq);
- 
- 	OMAP_HSMMC_WRITE(host->base, IE, INT_EN_MASK);
+ 		int (*set_bus_mode)(struct device *dev, int slot, int bus_mode);
+ 		int (*set_power)(struct device *dev, int slot,
 -- 
 1.7.0.4
