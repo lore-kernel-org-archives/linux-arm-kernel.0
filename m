@@ -1,54 +1,67 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:07 +0300
-Subject: [PATCH 07/22] mmc: omap_hsmmc: fix missing mmc_release_host() in
-	no_off case
+Date: Thu,  5 May 2011 14:51:08 +0300
+Subject: [PATCH 08/22] mmc: omap_hsmmc: correct debug report error status
+	mnemonics
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-8-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-9-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sudhir Bera <ext-sudhir.bera@nokia.com>
+CERR and BADA were in the wrong place and there are only
+32 not 35.
 
-In fact the no_off check here will not be hit because
-'omap_hsmmc_disabled_to_sleep()' won't schedule a
-deeper disable in the no_off case.
-
-Signed-off-by: Sudhir Bera <ext-sudhir.bera@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |    7 +++----
- 1 files changed, 3 insertions(+), 4 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   19 +++++++++++--------
+ 1 files changed, 11 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index bab25ff..bd52849 100644
+index bd52849..a1a1101 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -1852,14 +1852,13 @@ static int omap_hsmmc_sleep_to_off(struct omap_hsmmc_host *host)
- 		return 0;
+@@ -982,14 +982,14 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
+  * Readable error output
+  */
+ #ifdef CONFIG_MMC_DEBUG
+-static void omap_hsmmc_report_irq(struct omap_hsmmc_host *host, u32 status)
++static void omap_hsmmc_dbg_report_irq(struct omap_hsmmc_host *host, u32 status)
+ {
+ 	/* --- means reserved bit without definition at documentation */
+ 	static const char *omap_hsmmc_status_bits[] = {
+-		"CC", "TC", "BGE", "---", "BWR", "BRR", "---", "---", "CIRQ",
+-		"OBI", "---", "---", "---", "---", "---", "ERRI", "CTO", "CCRC",
+-		"CEB", "CIE", "DTO", "DCRC", "DEB", "---", "ACE", "---",
+-		"---", "---", "---", "CERR", "CERR", "BADA", "---", "---", "---"
++		"CC"  , "TC"  , "BGE", "---", "BWR" , "BRR" , "---" , "---" ,
++		"CIRQ",	"OBI" , "---", "---", "---" , "---" , "---" , "ERRI",
++		"CTO" , "CCRC", "CEB", "CIE", "DTO" , "DCRC", "DEB" , "---" ,
++		"ACE" , "---" , "---", "---", "CERR", "BADA", "---" , "---"
+ 	};
+ 	char res[256];
+ 	char *buf = res;
+@@ -1006,6 +1006,11 @@ static void omap_hsmmc_report_irq(struct omap_hsmmc_host *host, u32 status)
  
- 	if (mmc_slot(host).no_off)
--		return 0;
-+		goto out;
+ 	dev_dbg(mmc_dev(host->mmc), "%s\n", res);
+ }
++#else
++static inline void omap_hsmmc_dbg_report_irq(struct omap_hsmmc_host *host,
++					     u32 status)
++{
++}
+ #endif  /* CONFIG_MMC_DEBUG */
  
- 	if (!((host->mmc->caps & MMC_CAP_NONREMOVABLE) ||
- 	      mmc_slot(host).card_detect ||
- 	      (mmc_slot(host).get_cover_state &&
- 	       mmc_slot(host).get_cover_state(host->dev, host->slot_id)))) {
--		mmc_release_host(host->mmc);
--		return 0;
-+		goto out;
- 	}
+ /*
+@@ -1064,9 +1069,7 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
+ 	dev_dbg(mmc_dev(host->mmc), "IRQ Status is %x\n", status);
  
- 	mmc_slot(host).set_power(host->dev, host->slot_id, 0, 0);
-@@ -1870,7 +1869,7 @@ static int omap_hsmmc_sleep_to_off(struct omap_hsmmc_host *host)
- 		host->dpm_state == CARDSLEEP ? "CARDSLEEP" : "REGSLEEP");
- 
- 	host->dpm_state = OFF;
--
-+out:
- 	mmc_release_host(host->mmc);
- 
- 	return 0;
+ 	if (status & ERR) {
+-#ifdef CONFIG_MMC_DEBUG
+-		omap_hsmmc_report_irq(host, status);
+-#endif
++		omap_hsmmc_dbg_report_irq(host, status);
+ 		if ((status & CMD_TIMEOUT) ||
+ 			(status & CMD_CRC)) {
+ 			if (host->cmd) {
 -- 
 1.7.0.4
