@@ -1,67 +1,114 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:08 +0300
-Subject: [PATCH 08/22] mmc: omap_hsmmc: correct debug report error status
-	mnemonics
+Date: Thu,  5 May 2011 14:51:11 +0300
+Subject: [PATCH 11/22] mmc: omap_hsmmc: split duplicate code to calc_divisor()
+	function
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-9-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-12-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CERR and BADA were in the wrong place and there are only
-32 not 35.
+From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
+There are two places where the same calculations are done. Let's split them to
+separate function.
+
+In addition the new function is simplified by usage DIV_ROUND_UP kernel macro.
+
+Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   19 +++++++++++--------
- 1 files changed, 11 insertions(+), 8 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   45 ++++++++++++++++------------------------
+ 1 files changed, 18 insertions(+), 27 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index bd52849..a1a1101 100644
+index 7a153af..045c581 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -982,14 +982,14 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
-  * Readable error output
-  */
- #ifdef CONFIG_MMC_DEBUG
--static void omap_hsmmc_report_irq(struct omap_hsmmc_host *host, u32 status)
-+static void omap_hsmmc_dbg_report_irq(struct omap_hsmmc_host *host, u32 status)
- {
- 	/* --- means reserved bit without definition at documentation */
- 	static const char *omap_hsmmc_status_bits[] = {
--		"CC", "TC", "BGE", "---", "BWR", "BRR", "---", "---", "CIRQ",
--		"OBI", "---", "---", "---", "---", "---", "ERRI", "CTO", "CCRC",
--		"CEB", "CIE", "DTO", "DCRC", "DEB", "---", "ACE", "---",
--		"---", "---", "---", "CERR", "CERR", "BADA", "---", "---", "---"
-+		"CC"  , "TC"  , "BGE", "---", "BWR" , "BRR" , "---" , "---" ,
-+		"CIRQ",	"OBI" , "---", "---", "---" , "---" , "---" , "ERRI",
-+		"CTO" , "CCRC", "CEB", "CIE", "DTO" , "DCRC", "DEB" , "---" ,
-+		"ACE" , "---" , "---", "---", "CERR", "BADA", "---" , "---"
- 	};
- 	char res[256];
- 	char *buf = res;
-@@ -1006,6 +1006,11 @@ static void omap_hsmmc_report_irq(struct omap_hsmmc_host *host, u32 status)
- 
- 	dev_dbg(mmc_dev(host->mmc), "%s\n", res);
+@@ -596,6 +596,20 @@ static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
+ 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
  }
-+#else
-+static inline void omap_hsmmc_dbg_report_irq(struct omap_hsmmc_host *host,
-+					     u32 status)
+ 
++/* Calculate divisor for the given clock frequency */
++static u16 calc_divisor(struct mmc_ios *ios)
 +{
++	u16 dsor = 0;
++
++	if (ios->clock) {
++		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, ios->clock);
++		if (dsor > 250)
++			dsor = 250;
++	}
++
++	return dsor;
 +}
- #endif  /* CONFIG_MMC_DEBUG */
++
+ #ifdef CONFIG_PM
  
  /*
-@@ -1064,9 +1069,7 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
- 	dev_dbg(mmc_dev(host->mmc), "IRQ Status is %x\n", status);
+@@ -608,7 +622,6 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 	struct omap_mmc_platform_data *pdata = host->pdata;
+ 	int context_loss = 0;
+ 	u32 hctl, capa, con;
+-	u16 dsor = 0;
+ 	unsigned long timeout;
  
- 	if (status & ERR) {
--#ifdef CONFIG_MMC_DEBUG
--		omap_hsmmc_report_irq(host, status);
--#endif
-+		omap_hsmmc_dbg_report_irq(host, status);
- 		if ((status & CMD_TIMEOUT) ||
- 			(status & CMD_CRC)) {
- 			if (host->cmd) {
+ 	if (pdata->get_context_loss_count) {
+@@ -687,21 +700,10 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 		break;
+ 	}
+ 
+-	if (ios->clock) {
+-		dsor = OMAP_MMC_MASTER_CLOCK / ios->clock;
+-		if (dsor < 1)
+-			dsor = 1;
+-
+-		if (OMAP_MMC_MASTER_CLOCK / dsor > ios->clock)
+-			dsor++;
+-
+-		if (dsor > 250)
+-			dsor = 250;
+-	}
+-
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+ 		OMAP_HSMMC_READ(host->base, SYSCTL) & ~CEN);
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL, (dsor << 6) | (DTO << 16));
++	OMAP_HSMMC_WRITE(host->base, SYSCTL,
++		(calc_divisor(ios) << 6) | (DTO << 16));
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+ 		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+ 
+@@ -1612,7 +1614,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ {
+ 	struct omap_hsmmc_host *host = mmc_priv(mmc);
+-	u16 dsor = 0;
+ 	unsigned long regval;
+ 	unsigned long timeout;
+ 	u32 con;
+@@ -1676,21 +1677,11 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		}
+ 	}
+ 
+-	if (ios->clock) {
+-		dsor = OMAP_MMC_MASTER_CLOCK / ios->clock;
+-		if (dsor < 1)
+-			dsor = 1;
+-
+-		if (OMAP_MMC_MASTER_CLOCK / dsor > ios->clock)
+-			dsor++;
+-
+-		if (dsor > 250)
+-			dsor = 250;
+-	}
+ 	omap_hsmmc_stop_clock(host);
++
+ 	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
+ 	regval = regval & ~(CLKD_MASK);
+-	regval = regval | (dsor << 6) | (DTO << 16);
++	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+ 		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
 -- 
 1.7.0.4
