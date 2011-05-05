@@ -1,125 +1,49 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:13 +0300
-Subject: [PATCH 13/22] mmc: omap_hsmmc: fix few bugs when set the clock divisor
+Date: Thu,  5 May 2011 14:51:06 +0300
+Subject: [PATCH 06/22] mmc: omap_hsmmc: limit scatterlist size for sDMA
+	autoloading
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-14-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-7-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
+The sDMA descriptor autoloading feature uses a fixed size
+buffer to store descriptors for scatterlist segments.
+That limits the scatterlist size to the maximum number
+of descriptors that fit in the buffer.  The driver must
+set this limit for upper layers to obey.
 
-There are two pieces of code which similar, but not the same. Each of them
-contains a bug.
-
-The SYSCTL register should be read before write in the
-omap_hsmmc_context_restore() to remain the state of the reserved bits.
-
-Before set the clock divisor and DTO bits the value from the SYSCTL register
-should be masked properly. We were lucky to have no problems with DTO bits. So,
-make sure we have clear DTO bits properly in the omap_hsmmc_set_ios().
-
-Additionally get rid of msleep(1). The actual time rare higher than 30us on
-OMAP 3630.
-
-The result pieces of code are split to omap_hsmmc_set_clock() function.
-
-Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   59 +++++++++++++++++++---------------------
- 1 files changed, 28 insertions(+), 31 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   15 ++++++++++++---
+ 1 files changed, 12 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index ae6d204..3c76911 100644
+index 114cd68..bab25ff 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -619,6 +619,32 @@ static u16 calc_divisor(struct mmc_ios *ios)
- 	return dsor;
- }
- 
-+static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
-+{
-+	struct mmc_ios *ios = &host->mmc->ios;
-+	unsigned long regval;
-+	unsigned long timeout;
-+
-+	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
-+
-+	omap_hsmmc_stop_clock(host);
-+
-+	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
-+	regval = regval & ~(CLKD_MASK | DTO_MASK);
-+	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
-+	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
-+	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-+		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
-+
-+	/* Wait till the ICS bit is set */
-+	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
-+	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
-+		&& time_before(jiffies, timeout))
-+		;
-+
-+	omap_hsmmc_start_clock(host);
-+}
-+
- #ifdef CONFIG_PM
- 
- /*
-@@ -709,19 +735,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
- 		break;
+@@ -2239,9 +2239,18 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 			host->dma_caps |= DMA_TYPE_SDMA_DLOAD;
  	}
  
--	omap_hsmmc_stop_clock(host);
--
--	OMAP_HSMMC_WRITE(host->base, SYSCTL,
--		(calc_divisor(ios) << 6) | (DTO << 16));
--	OMAP_HSMMC_WRITE(host->base, SYSCTL,
--		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
--
--	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
--	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
--		&& time_before(jiffies, timeout))
--		;
--
--	omap_hsmmc_start_clock(host);
-+	omap_hsmmc_set_clock(host);
+-	/* Since we do only SG emulation, we can have as many segs
+-	 * as we want. */
+-	mmc->max_segs = 1024;
++	if (host->dma_caps & DMA_TYPE_SDMA_DLOAD) {
++		unsigned int max = DMA_CTRL_BUF_SIZE /
++				   sizeof(struct omap_dma_sglist_node);
++
++		mmc->max_segs = 1 << (fls(max) - 1);
++	} else {
++		/*
++		 * Since we do only SG emulation, we can have as many segs as we
++		 * want.
++		 */
++		mmc->max_segs = 1024;
++	}
  
- 	con = OMAP_HSMMC_READ(host->base, CON);
- 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
-@@ -1622,8 +1636,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
- static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- {
- 	struct omap_hsmmc_host *host = mmc_priv(mmc);
--	unsigned long regval;
--	unsigned long timeout;
- 	u32 con;
- 	int do_send_init_stream = 0;
- 
-@@ -1685,22 +1697,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		}
- 	}
- 
--	omap_hsmmc_stop_clock(host);
--
--	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
--	regval = regval & ~(CLKD_MASK);
--	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
--	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
--	OMAP_HSMMC_WRITE(host->base, SYSCTL,
--		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
--
--	/* Wait till the ICS bit is set */
--	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
--	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
--		&& time_before(jiffies, timeout))
--		msleep(1);
--
--	omap_hsmmc_start_clock(host);
-+	omap_hsmmc_set_clock(host);
- 
- 	if (do_send_init_stream)
- 		send_init_stream(host);
+ 	mmc->max_blk_size = 512;       /* Block Length at max can be 1024 */
+ 	mmc->max_blk_count = 0xFFFF;    /* No. of Blocks is 16 bits */
 -- 
 1.7.0.4
