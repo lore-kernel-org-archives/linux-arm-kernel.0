@@ -1,114 +1,182 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:11 +0300
-Subject: [PATCH 11/22] mmc: omap_hsmmc: split duplicate code to calc_divisor()
-	function
+Date: Thu,  5 May 2011 14:51:20 +0300
+Subject: [PATCH 20/22] mmc: omap_hsmmc: adjust host controller clock in regard
+	to current OPP
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-12-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-21-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
-There are two places where the same calculations are done. Let's split them to
-separate function.
-
-In addition the new function is simplified by usage DIV_ROUND_UP kernel macro.
+We should like to adjust MMC host controller clock whenever the OPP is changed.
+OPP affects to L3/L4 bus frequency. Due to this we update the maximum frequency
+limits before each upcoming request and when the divisor is calculated.
 
 Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   45 ++++++++++++++++------------------------
- 1 files changed, 18 insertions(+), 27 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   65 +++++++++++++++++++++++++++++++++++++----
+ 1 files changed, 59 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 7a153af..045c581 100644
+index 2c8fa01..8c5e7d3 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -596,6 +596,20 @@ static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
+@@ -199,6 +199,9 @@ struct omap_hsmmc_host {
+ 	int			use_reg;
+ 	int			req_in_progress;
+ 
++	/* Actual output frequency of host controller */
++	unsigned int		freq;
++
+ 	struct	omap_mmc_platform_data	*pdata;
+ };
+ 
+@@ -604,13 +607,31 @@ static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
  	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
  }
  
-+/* Calculate divisor for the given clock frequency */
-+static u16 calc_divisor(struct mmc_ios *ios)
++/*
++ * Recalculate desired clock frequency with regard to maximum possible
++ * frequency at current OPP.
++ *
++ * Choose either target frequency (ios->clock) or maximum possible frequency at
++ * current OPP (get_max_freq() returns this limit)
++ */
++static void omap_hsmmc_recalc_freq(struct omap_hsmmc_host *host,
++				   struct mmc_ios *ios)
 +{
-+	u16 dsor = 0;
++	struct omap_mmc_platform_data *pdata = host->pdata;
 +
-+	if (ios->clock) {
-+		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, ios->clock);
-+		if (dsor > 250)
-+			dsor = 250;
-+	}
-+
-+	return dsor;
++	if (pdata->get_max_freq)
++		host->freq = min(ios->clock, pdata->get_max_freq(host->dev));
++	else
++		host->freq = ios->clock;
 +}
 +
- #ifdef CONFIG_PM
- 
- /*
-@@ -608,7 +622,6 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
- 	struct omap_mmc_platform_data *pdata = host->pdata;
- 	int context_loss = 0;
- 	u32 hctl, capa, con;
--	u16 dsor = 0;
- 	unsigned long timeout;
- 
- 	if (pdata->get_context_loss_count) {
-@@ -687,21 +700,10 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
- 		break;
- 	}
+ /* Calculate divisor for the given clock frequency */
+-static u16 calc_divisor(struct mmc_ios *ios)
++static u16 calc_divisor(struct omap_hsmmc_host *host)
+ {
+ 	u16 dsor = 0;
  
 -	if (ios->clock) {
--		dsor = OMAP_MMC_MASTER_CLOCK / ios->clock;
--		if (dsor < 1)
--			dsor = 1;
--
--		if (OMAP_MMC_MASTER_CLOCK / dsor > ios->clock)
--			dsor++;
--
--		if (dsor > 250)
--			dsor = 250;
--	}
--
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
- 		OMAP_HSMMC_READ(host->base, SYSCTL) & ~CEN);
--	OMAP_HSMMC_WRITE(host->base, SYSCTL, (dsor << 6) | (DTO << 16));
-+	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-+		(calc_divisor(ios) << 6) | (DTO << 16));
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
- 		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+-		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, ios->clock);
++	if (host->freq) {
++		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, host->freq);
+ 		if (dsor > 250)
+ 			dsor = 250;
+ 	}
+@@ -620,17 +641,16 @@ static u16 calc_divisor(struct mmc_ios *ios)
  
-@@ -1612,7 +1614,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
- static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
  {
- 	struct omap_hsmmc_host *host = mmc_priv(mmc);
--	u16 dsor = 0;
+-	struct mmc_ios *ios = &host->mmc->ios;
  	unsigned long regval;
  	unsigned long timeout;
- 	u32 con;
-@@ -1676,21 +1677,11 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		}
- 	}
  
--	if (ios->clock) {
--		dsor = OMAP_MMC_MASTER_CLOCK / ios->clock;
--		if (dsor < 1)
--			dsor = 1;
--
--		if (OMAP_MMC_MASTER_CLOCK / dsor > ios->clock)
--			dsor++;
--
--		if (dsor > 250)
--			dsor = 250;
--	}
+-	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
++	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", host->freq);
+ 
  	omap_hsmmc_stop_clock(host);
-+
+ 
  	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
- 	regval = regval & ~(CLKD_MASK);
--	regval = regval | (dsor << 6) | (DTO << 16);
-+	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
+ 	regval = regval & ~(CLKD_MASK | DTO_MASK);
+-	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
++	regval = regval | (calc_divisor(host) << 6) | (DTO << 16);
  	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
  	OMAP_HSMMC_WRITE(host->base, SYSCTL,
  		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+@@ -754,6 +774,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 
+ 	omap_hsmmc_set_bus_width(host);
+ 
++	omap_hsmmc_recalc_freq(host, ios);
+ 	omap_hsmmc_set_clock(host);
+ 
+ 	omap_hsmmc_set_bus_mode(host);
+@@ -937,6 +958,8 @@ static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_req
+ 	if (mrq->data && host->dma_in_use && dma_ch != -1)
+ 		return;
+ 	host->mrq = NULL;
++	if (host->pdata->inactive)
++		host->pdata->inactive(host->dev);
+ 	mmc_request_done(host->mmc, mrq);
+ }
+ 
+@@ -996,6 +1019,9 @@ omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
+ 	}
+ 	if ((host->data == NULL && !host->response_busy) || cmd->error)
+ 		omap_hsmmc_request_done(host, cmd->mrq);
++	else if (host->data == NULL && host->response_busy &&
++		 host->pdata->inactive)
++		host->pdata->inactive(host->dev);
+ }
+ 
+ /*
+@@ -1418,6 +1444,8 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
+ 		struct mmc_request *mrq = host->mrq;
+ 
+ 		host->mrq = NULL;
++		if (host->pdata->inactive)
++			host->pdata->inactive(host->dev);
+ 		mmc_request_done(host->mmc, mrq);
+ 	}
+ }
+@@ -1615,6 +1643,26 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 
+ 	BUG_ON(host->req_in_progress);
+ 	BUG_ON(host->dma_ch != -1);
++
++	if (host->pdata->active) {
++		unsigned int new_freq;
++
++		/*
++		 * active() returns minimum of two (target, maximum)
++		 * frequencies.
++		 */
++		new_freq = host->pdata->active(host->dev, mmc->ios.clock);
++
++		/*
++		 * We need to update actual frequency if it is not equal to the
++		 * minimum of two (target and maximum) frequencies
++		 */
++		if (host->freq != new_freq) {
++			host->freq = new_freq;
++			omap_hsmmc_set_clock(host);
++		}
++	}
++
+ 	if (host->protect_card) {
+ 		if (host->reqs_blocked < 3) {
+ 			/*
+@@ -1630,6 +1678,8 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 		if (req->data)
+ 			req->data->error = -EBADF;
+ 		req->cmd->retries = 0;
++		if (host->pdata->inactive)
++			host->pdata->inactive(host->dev);
+ 		mmc_request_done(mmc, req);
+ 		return;
+ 	} else if (host->reqs_blocked)
+@@ -1642,6 +1692,8 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 		if (req->data)
+ 			req->data->error = err;
+ 		host->mrq = NULL;
++		if (host->pdata->inactive)
++			host->pdata->inactive(host->dev);
+ 		mmc_request_done(mmc, req);
+ 		return;
+ 	}
+@@ -1698,6 +1750,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		}
+ 	}
+ 
++	omap_hsmmc_recalc_freq(host, ios);
+ 	omap_hsmmc_set_clock(host);
+ 
+ 	if (do_send_init_stream)
 -- 
 1.7.0.4
