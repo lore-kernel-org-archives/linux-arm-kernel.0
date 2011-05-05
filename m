@@ -1,25 +1,58 @@
-From: ldewangan@nvidia.com (Laxman Dewangan)
-Date: Thu, 5 May 2011 15:46:45 +0530
-Subject: Tegra gpio driver: Need to configure pins in gpio mode/nontristate
-	with  gpio-request
-Message-ID: <96C9D994977DD0439FB6D3FE3B13DD906B1331B068@BGMAIL01.nvidia.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu,  5 May 2011 12:22:15 +0200
+Subject: [PATCH 0/6] drop IRQF_DISABLED from RTC,
+	then convert stmp-rtc to mach-mxs
+Message-ID: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi All,
-When working on gpio driver for tegra, I found that gpio_request() does not
-make the corresponding soc pins to gpio mode. It still keeps the pins in SFIO mode.
-So we need to call two extra function along with gpio_request():
-Tegra_gpio_enable() and function for setting the pins in no non-tristate.
+First, cleanup RTC to remove the deprecated IRQF_DISABLED which is a
+nop these days.
 
-Sue to this, the gpio sysfs interface does not work properly from user space /sys/class/gpio/.
-To make the pin in gpio mode fom user space, need to have changes in kernel.
+Then, because plat-stmp is going to be removed and merged with mxs, this
+patch series will convert the stmp-rtc driver for usage with mach-mxs.
+Quite some platform-specific dependencies have been removed, so the
+driver should be better reusable.
 
-I think the gpio_request() should make the pins to gpio mode and make ready for use.
-Similarly gpio_free() should again put the pin into sfio mode with tristate disable.
+The driver has successfully been tested on an i.MX28-board and passed the RTC
+test program.
 
-Please comment if there is any better way..
+Regards,
 
+   Wolfram
 
-Thanks,
-Laxman
+Wolfram Sang (6):
+  rtc: remove IRQF_DISABLED
+  rtc: stmp3xxx: get rid of platform-specific register include
+  rtc: stmp3xxx: port stmp-functions to mxs-equivalents
+  rtc: stmp3xxx: fix crash on boot
+  rtc: stmp3xxx: get rid of mach-specific accessors
+  rtc: stmp3xxx: remove UIE handlers
+
+ drivers/rtc/Kconfig         |    6 +-
+ drivers/rtc/rtc-at91sam9.c  |    3 +-
+ drivers/rtc/rtc-cmos.c      |    5 +-
+ drivers/rtc/rtc-coh901331.c |    2 +-
+ drivers/rtc/rtc-davinci.c   |    2 +-
+ drivers/rtc/rtc-ds1511.c    |    2 +-
+ drivers/rtc/rtc-ds1553.c    |    2 +-
+ drivers/rtc/rtc-lpc32xx.c   |    2 +-
+ drivers/rtc/rtc-mpc5121.c   |    4 +-
+ drivers/rtc/rtc-mrst.c      |    5 +-
+ drivers/rtc/rtc-mv.c        |    3 +-
+ drivers/rtc/rtc-nuc900.c    |    2 +-
+ drivers/rtc/rtc-omap.c      |    4 +-
+ drivers/rtc/rtc-pl030.c     |    3 +-
+ drivers/rtc/rtc-pl031.c     |    2 +-
+ drivers/rtc/rtc-pxa.c       |    6 +-
+ drivers/rtc/rtc-s3c.c       |    4 +-
+ drivers/rtc/rtc-sa1100.c    |    4 +-
+ drivers/rtc/rtc-sh.c        |    8 +-
+ drivers/rtc/rtc-stk17ta8.c  |    3 +-
+ drivers/rtc/rtc-stmp3xxx.c  |  150 ++++++++++++++++++++++---------------------
+ drivers/rtc/rtc-tx4939.c    |    2 +-
+ drivers/rtc/rtc-vr41xx.c    |    4 +-
+ 23 files changed, 112 insertions(+), 116 deletions(-)
+
+-- 
+1.7.2.5
