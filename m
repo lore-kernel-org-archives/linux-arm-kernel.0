@@ -1,46 +1,24 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 5 May 2011 17:38:47 +0200
-Subject: [RFC PATCH] arm: drop Execute-In-Place
-In-Reply-To: <BANLkTikm-raTgJsu7yvaENCfpFsCeKjRNg@mail.gmail.com>
-References: <1304607121-13612-1-git-send-email-plagnioj@jcrosoft.com>
-	<BANLkTikm-raTgJsu7yvaENCfpFsCeKjRNg@mail.gmail.com>
-Message-ID: <20110505153847.GE11267@game.jcrosoft.org>
+From: ccross@google.com (Colin Cross)
+Date: Thu, 5 May 2011 09:49:24 -0700
+Subject: Tegra gpio driver: Need to configure pins in gpio
+	mode/nontristate with gpio-request
+In-Reply-To: <96C9D994977DD0439FB6D3FE3B13DD906B1331B068@BGMAIL01.nvidia.com>
+References: <96C9D994977DD0439FB6D3FE3B13DD906B1331B068@BGMAIL01.nvidia.com>
+Message-ID: <BANLkTikFgc2Oe5BrOpzYkjs7wnMdfNY4_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:17 Thu 05 May     , Vitaly Wool wrote:
-> On Thu, May 5, 2011 at 4:52 PM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > nearly no-one use it, only amop1, pxa and sa1100 implement it
-> 
-> What's amop1?
-omap1
-> 
-> > this is the only reason why we need to keep the PLAT_PHY_OFFSET
-> > and do not enable the "Patch physical to virtual translations at runtime"
-> > support when have MMU enabled
-> 
-> I'm actually poking around several SoCs that have relatively large and
-> fast NOR flash and they do use XIP.
-which one?
-we do not see them at the mainline
-> 
-> > As done on AT91
-> >
-> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Cc: Eric Miao <eric.miao@canonical.com>
-> > Cc: Tony Lindgren <tony@atomide.com>
-> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> 
-> So this is most definitely a NAK from my side. By killing XIP we're
-> moving Linux kernel out of Automotive scope.
-even on autmotive we see nand and spi flash and will see soon emmc
-> 
-> I'd rather let at91 go.
-no at91 do switch to "Patch physical to virtual translations at runtime"
-by default
-
-Best Regards,
-J.
+On Thu, May 5, 2011 at 3:16 AM, Laxman Dewangan <ldewangan@nvidia.com> wrote:
+> Hi All,
+> When working on gpio driver for tegra, I found that gpio_request() does not
+> make the corresponding soc pins to gpio mode. It still keeps the pins in SFIO mode.
+> So we need to call two extra function along with gpio_request():
+> Tegra_gpio_enable() and function for setting the pins in no non-tristate.
+>
+> Sue to this, the gpio sysfs interface does not work properly from user space /sys/class/gpio/.
+> To make the pin in gpio mode fom user space, need to have changes in kernel.
+>
+> I think the gpio_request() should make the pins to gpio mode and make ready for use.
+> Similarly gpio_free() should again put the pin into sfio mode with tristate disable.
+>
+> Please comment if there is any better way..
