@@ -1,58 +1,66 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu,  5 May 2011 12:22:15 +0200
-Subject: [PATCH 0/6] drop IRQF_DISABLED from RTC,
-	then convert stmp-rtc to mach-mxs
-Message-ID: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
+Date: Thu,  5 May 2011 12:22:19 +0200
+Subject: [PATCH 4/6] rtc: stmp3xxx: fix crash on boot
+In-Reply-To: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
+References: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1304590941-11813-5-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-First, cleanup RTC to remove the deprecated IRQF_DISABLED which is a
-nop these days.
+Commit f44f7f96a20 ("RTC: Initialize kernel state from RTC") caused a
+crash using the mxs/stmp-rtc driver.
 
-Then, because plat-stmp is going to be removed and merged with mxs, this
-patch series will convert the stmp-rtc driver for usage with mach-mxs.
-Quite some platform-specific dependencies have been removed, so the
-driver should be better reusable.
+The reason is that rtc_device_register() calls rtc_read_alarm() after
+that change, when the driver does not have all driver data set up yet.
 
-The driver has successfully been tested on an i.MX28-board and passed the RTC
-test program.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+---
+ drivers/rtc/rtc-stmp3xxx.c |    7 +++++--
+ 1 files changed, 5 insertions(+), 2 deletions(-)
 
-Regards,
-
-   Wolfram
-
-Wolfram Sang (6):
-  rtc: remove IRQF_DISABLED
-  rtc: stmp3xxx: get rid of platform-specific register include
-  rtc: stmp3xxx: port stmp-functions to mxs-equivalents
-  rtc: stmp3xxx: fix crash on boot
-  rtc: stmp3xxx: get rid of mach-specific accessors
-  rtc: stmp3xxx: remove UIE handlers
-
- drivers/rtc/Kconfig         |    6 +-
- drivers/rtc/rtc-at91sam9.c  |    3 +-
- drivers/rtc/rtc-cmos.c      |    5 +-
- drivers/rtc/rtc-coh901331.c |    2 +-
- drivers/rtc/rtc-davinci.c   |    2 +-
- drivers/rtc/rtc-ds1511.c    |    2 +-
- drivers/rtc/rtc-ds1553.c    |    2 +-
- drivers/rtc/rtc-lpc32xx.c   |    2 +-
- drivers/rtc/rtc-mpc5121.c   |    4 +-
- drivers/rtc/rtc-mrst.c      |    5 +-
- drivers/rtc/rtc-mv.c        |    3 +-
- drivers/rtc/rtc-nuc900.c    |    2 +-
- drivers/rtc/rtc-omap.c      |    4 +-
- drivers/rtc/rtc-pl030.c     |    3 +-
- drivers/rtc/rtc-pl031.c     |    2 +-
- drivers/rtc/rtc-pxa.c       |    6 +-
- drivers/rtc/rtc-s3c.c       |    4 +-
- drivers/rtc/rtc-sa1100.c    |    4 +-
- drivers/rtc/rtc-sh.c        |    8 +-
- drivers/rtc/rtc-stk17ta8.c  |    3 +-
- drivers/rtc/rtc-stmp3xxx.c  |  150 ++++++++++++++++++++++---------------------
- drivers/rtc/rtc-tx4939.c    |    2 +-
- drivers/rtc/rtc-vr41xx.c    |    4 +-
- 23 files changed, 112 insertions(+), 116 deletions(-)
-
+diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
+index 2f8f32e..d3937eb 100644
+--- a/drivers/rtc/rtc-stmp3xxx.c
++++ b/drivers/rtc/rtc-stmp3xxx.c
+@@ -172,6 +172,7 @@ static int stmp3xxx_rtc_remove(struct platform_device *pdev)
+ 	free_irq(rtc_data->irq_alarm, &pdev->dev);
+ 	free_irq(rtc_data->irq_1msec, &pdev->dev);
+ 	rtc_device_unregister(rtc_data->rtc);
++	platform_set_drvdata(pdev, NULL);
+ 	iounmap(rtc_data->io);
+ 	kfree(rtc_data);
+ 
+@@ -212,11 +213,14 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
+ 		goto out_remap;
+ 	}
+ 
++	platform_set_drvdata(pdev, rtc_data);
++
+ 	mxs_reset_block(rtc_data->io);
+ 	__mxs_clrl(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
+ 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN |
+ 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE,
+ 			rtc_data->io + STMP3XXX_RTC_PERSISTENT0);
++
+ 	rtc_data->rtc = rtc_device_register(pdev->name, &pdev->dev,
+ 				&stmp3xxx_rtc_ops, THIS_MODULE);
+ 	if (IS_ERR(rtc_data->rtc)) {
+@@ -240,8 +244,6 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
+ 		goto out_irq1;
+ 	}
+ 
+-	platform_set_drvdata(pdev, rtc_data);
+-
+ 	return 0;
+ 
+ out_irq1:
+@@ -251,6 +253,7 @@ out_irq_alarm:
+ 			rtc_data->io + STMP3XXX_RTC_CTRL);
+ 	rtc_device_unregister(rtc_data->rtc);
+ out_remap:
++	platform_set_drvdata(pdev, NULL);
+ 	iounmap(rtc_data->io);
+ out_free:
+ 	kfree(rtc_data);
 -- 
 1.7.2.5
