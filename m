@@ -1,47 +1,57 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Thu,  5 May 2011 14:51:09 +0300
-Subject: [PATCH 09/22] mmc: omap_hsmmc: move hardcoded frequency constants to
-	definition block
+Date: Thu,  5 May 2011 14:51:10 +0300
+Subject: [PATCH 10/22] mmc: omap_hsmmc: reduce a bit the error handlers in
+	probe()
 In-Reply-To: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304596282-4095-10-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304596282-4095-11-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
-Move the min and max frequency constants to the definition block in the source
-file.
-
 Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   17 ++++++-----------
+ 1 files changed, 6 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index a1a1101..a727bf8 100644
+index a727bf8..7a153af 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -120,6 +120,8 @@
+@@ -2204,18 +2204,11 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
+ 	/* we start off in DISABLED state */
+ 	host->dpm_state = DISABLED;
  
- #define MMC_TIMEOUT_MS		20
- #define OMAP_MMC_MASTER_CLOCK	96000000
-+#define OMAP_MMC_MIN_CLOCK	400000
-+#define OMAP_MMC_MAX_CLOCK	52000000
- #define DRIVER_NAME		"omap_hsmmc"
+-	if (clk_enable(host->iclk) != 0) {
+-		clk_put(host->iclk);
+-		clk_put(host->fclk);
+-		goto err1;
+-	}
++	if (clk_enable(host->iclk) != 0)
++		goto err2;
  
- #define DMA_TYPE_NODMA	0
-@@ -2176,8 +2178,8 @@ static int __init omap_hsmmc_probe(struct platform_device *pdev)
- 	if (mmc_slot(host).vcc_aux_disable_is_sleep)
- 		mmc_slot(host).no_off = 1;
+-	if (mmc_host_enable(host->mmc) != 0) {
+-		clk_disable(host->iclk);
+-		clk_put(host->iclk);
+-		clk_put(host->fclk);
+-		goto err1;
+-	}
++	if (mmc_host_enable(host->mmc) != 0)
++		goto err3;
  
--	mmc->f_min	= 400000;
--	mmc->f_max	= 52000000;
-+	mmc->f_min	= OMAP_MMC_MIN_CLOCK;
-+	mmc->f_max	= OMAP_MMC_MAX_CLOCK;
- 
- 	spin_lock_init(&host->irq_lock);
- 
+ 	if (cpu_is_omap2430()) {
+ 		host->dbclk = clk_get(&pdev->dev, "mmchsdb_fck");
+@@ -2382,7 +2375,9 @@ err_irq:
+ 				host->dma_ctrl_buf,
+ 				host->dma_ctrl_buf_phy);
+ 	mmc_host_disable(host->mmc);
++err3:
+ 	clk_disable(host->iclk);
++err2:
+ 	clk_put(host->fclk);
+ 	clk_put(host->iclk);
+ 	if (host->got_dbclk) {
 -- 
 1.7.0.4
