@@ -1,214 +1,156 @@
-From: phil@nwl.cc (Phil Sutter)
-Date: Thu, 5 May 2011 16:11:07 +0200
-Subject: ARM, AF_PACKET: caching problems on Marvell Kirkwood
-In-Reply-To: <20110408130643.GA8730@orbit.nwl.cc>
-References: <20110408130643.GA8730@orbit.nwl.cc>
-Message-ID: <20110505141107.GC30443@orbit.nwl.cc>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 5 May 2011 16:12:18 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <613E2AF627DE4ABE92AD42D5D9E1BFE5@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CD0B8CC@dbde02.ent.ti.com>
+	<613E2AF627DE4ABE92AD42D5D9E1BFE5@subhasishg>
+Message-ID: <201105051612.18522.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday 05 May 2011, Subhasish Ghosh wrote:
+> I am a bit lost,
+> 
+> If I understand correctly, there are two problems
+> 
+> 1. In case of udev based driver loading, we will end up
+> loading both the drivers and the associated firmware.
+> This is not acceptable because both UART & CAN
+> use PRU0 & PRU1.
+> 
+> 2. How do we switch between devices at run time.
+> This is required because MFD devices should be
+> capable of doing that.
+> 
+> 
+> Ok, if that understanding is somewhat correct, then, what we are
+> trying to do is load the firmware from the MFD driver itself.
 
-Hasn't anyone experienced this bug but me? Can anyone reproduce the
-described behaviour on his Kirkwood-based (or even generic ARM) machine?
-I am still not sure if this is a problem of just my CPU or common
-amongst Kirkwood/VIPT/ARM machines.
+I would describe the problem differently:
 
-My workaround looks like this:
-| diff --git a/net/packet/af_packet.c b/net/packet/af_packet.c
-| index b5362e9..0672f50 100644
-| --- a/net/packet/af_packet.c
-| +++ b/net/packet/af_packet.c
-| @@ -1298,10 +1298,13 @@ static int packet_sendmsg(struct kiocb *iocb, struct socket *sock,
-|  {
-|         struct sock *sk = sock->sk;
-|         struct packet_sock *po = pkt_sk(sk);
-| -       if (po->tx_ring.pg_vec)
-| -               return tpacket_snd(po, msg);
-| -       else
-| -               return packet_snd(sock, msg, len);
-| +       int rc;
-| +
-| +       flush_cache_all();
-| +       rc = po->tx_ring.pg_vec ? tpacket_snd(po, msg) :
-| +                       packet_snd(sock, msg, len);
-| +       flush_cache_all();
-| +       return rc;
-|  }
-|  
-|  /*
+You hardcode the usage of the pruss in the platform code,
+even though it is completely defined by the software you
+load into it. I think it is essential that all the configuration
+of the pruss is dynamic and not hardcoded in the platform
+code, so that it is at all possible to load other firmware
+into it.
 
-Greetings, Phil
+Describing the device in the firmware file instead of the platform
+code is one way to get there, but there may be other ways that
+you could come up with.
 
-(Full-quoting here because I've added the TX ring author and the Kirkwood
-maintainers to Cc.)
+> So, in case of a switch between device, say from UART to CAN,
+> all the user has to do is copy a new firmware.
+> 
+> This firmware should contain some info regarding the device, like
+> say, device name & prunum.
 
-On Fri, Apr 08, 2011 at 03:06:43PM +0200, Phil Sutter wrote:
-> Dear lists,
+Right.
+
+> So, in case a device requires both PRUs, then the firmware would
+> download for both PRUs.
 > 
-> I am experiencing severe caching issues using the TX_RING feature of
-> AF_PACKET on a Kirkwood-based system (i.e., OpenRD). This may likely be
-> a bug of the CPU/SoC itself, at least it reacts a bit picky when using
-> the preload data instruction (pld) in rather useless cases (but that's a
-> different story).
+> In case a device requires only one PRU, then it can be downloaded
+> only into the requested PRU. So, the other PRU remains open for
+> any other firmware/device.
 > 
-> There is simple testing code at the end of this email, effectively just
-> preparing a packet in the TX_RING and triggering it's delivery once per
-> second. The experienced symptom is that sporadically nothing goes out in
-> one iteration, and two packets in the following one.
+> After loading the firmware, the MFD device should create the
+> platform devices based upon the firmware.
 > 
-> It looks like the kernel doesn't get the changed value of tp_status in
-> time, although userspace sees the correct value. Note that moving the
-> sleep(1) from the end of the loop to just before calling sendto() fixes
-> the problem.
+> So, if only one PRU is used for UART, then the other PRU can be
+> used for CAN and the MFD should create two platform_devices.
 > 
-> Another (more useful) workaround is to call flush_cache_all() at the
-> beginning of packet_sendmsg() in net/packet/af_packet.c. I was not able
-> to fix this with some more specific flushing at that place. Anyway, the
-> call to flush_dcache_page() from __packet_get_status() in the same
-> source file is meant to do the trick I guess. But somehow doesn't.
+> If the UART uses both the PRUs, then the MFD should download
+> the firmware into both the PRUs but create only one platform_device.
+
+As I mentioned, I did not have a good idea for how to abstract
+the fact that there may be either one or two child devices,
+depending on the firmware. A possible way to deal with this
+would be to have only a single firmware image files that contains
+the code for both PRUs, with a header indicating how many devices
+there should be and what they are called.
+
+> But, in this case how do we download two different firmware
+> on two different PRUs. One way is to keep the firmware files
+> as its now, but add another file say firmware-config.txt,
+> consisting a list of parameters like,
 > 
-> Feedback regardles of which kind is highly appreciated, of course!
+> START
+> MFD_ID0#0
+> MFD_ID0_PRU_NUM#PRU0
+> MFD_ID1#1
+> MFD_ID1_PRU_NUM#PRU1
+> END
 > 
-> Greetings, Phil
+> OR
 > 
-> ------------------[start of packet_mmap_test.c]--------------------
-> #include <stdint.h>
-> #include <stdio.h>
-> #include <stdlib.h>
-> #include <string.h>
-> #include <linux/if_ether.h>
-> #include <linux/if_packet.h>
-> #include <net/if.h>
-> #include <sys/ioctl.h>
-> #include <sys/mman.h>
-> #include <sys/socket.h>
-> #include <sys/types.h>
+> START
+> MFD_ID0#0
+> MFD_ID0_PRU_NUM#PRU0:PRU1
+> END
 > 
-> #define PERROR_EXIT(rc, mesg) { \
-> 	perror(mesg); \
-> 	return rc; \
-> }
+> So, the MFD driver can do a request_firmware on this file first,
+> parse the device info and decide to request the main firmware.
+> This becomes something like the devices table that we have on
+> PPC.
+
+Yes, this would be another option. I generally don't like
+parsing data in the kernel, but it's not completely unrealistic.
+
+> Also, if PRU0 is loaded, we need some way of maintaining the
+> usage_count, So that the PRU0 is not loaded again accidently.
+> We can increase the usage_count from the MFD driver.
+> But, to decrement the usage_count, we can add an API
+> which will be called when the CAN or UART driver is rmmod.
+
+Not necesarily. You can make the interface so that the
+child device gets registered after the firmware got loaded,
+but unregistered if you start loading new firmware. We have
+hotplug support for a lot of devices, and it's not hard to
+write the serial/can/... drivers in a way that allows the
+underlying device to go away.
+
+You should not actually need to unload the device driver.
+E.g. when the drivers are built into the kernel, you can still
+remove the device and put it back in there using the 
+->probe and ->remove callbacks of the platform driver.
+
+> Now how do we handle switch between devices.
 > 
-> int main(void)
-> {
-> 	uint32_t size;
-> 	struct sockaddr_ll sa;
-> 	struct ifreq ifr;
-> 	int index;
-> 	int tmp;
-> 	int fd;
-> 	struct tpacket_req packet_req;
-> 	struct tpacket2_hdr * ps_header_start, *ps_header;
+> We can either do a rmmod of the MFD driver, then again modprobe it.
+> So, the request_firmware is run again and the appropriate device is
+> loaded based upon the changed firmware-config.txt.
 > 
-> 	if ((fd = socket(AF_PACKET, SOCK_DGRAM, htons(ETH_P_ALL))) < 0)
-> 		PERROR_EXIT(EXIT_FAILURE, "socket");
-> 
-> 	/* retrieve eth0's interface index number */
-> 	strncpy (ifr.ifr_name, "eth0", sizeof(ifr.ifr_name));
-> 	if (ioctl(fd, SIOCGIFINDEX, &ifr) < 0)
-> 		PERROR_EXIT(EXIT_FAILURE, "ioctl(SIOCGIFINDEX)");
-> 
-> 	/* set sockaddr info */
-> 	memset(&sa, 0, sizeof(sa));
-> 	sa.sll_family = AF_PACKET;
-> 	sa.sll_protocol = ETH_P_ALL;
-> 	sa.sll_ifindex = ifr.ifr_ifindex;
-> 
-> 	/* bind port */
-> 	if (bind(fd, (struct sockaddr *)&sa, sizeof(sa)) < 0)
-> 		PERROR_EXIT(EXIT_FAILURE, "bind()");
-> 
-> 	tmp = TPACKET_V2;
-> 	if (setsockopt(fd, SOL_PACKET, PACKET_VERSION, &tmp, sizeof(tmp)) < 0)
-> 		PERROR_EXIT(EXIT_FAILURE, "setsockopt(PACKET_VERSION)");
-> 
-> 	/* set packet loss option */
-> 	tmp = 1;
-> 	if (setsockopt(fd, SOL_PACKET, PACKET_LOSS, &tmp, sizeof(tmp)) < 0)
-> 		PERROR_EXIT(EXIT_FAILURE, "setsockopt(PACKET_LOSS)");
-> 
-> 	/* prepare Tx ring request */
-> 	packet_req.tp_block_size = 1024 * 8;
-> 	packet_req.tp_frame_size = 1024 * 8;
-> 	packet_req.tp_block_nr = 1024;
-> 	packet_req.tp_frame_nr = 1024;
-> 
-> 	/* send TX ring request */
-> 	if (setsockopt(fd, SOL_PACKET, PACKET_TX_RING,
-> 	               &packet_req, sizeof(packet_req)) < 0)
-> 		PERROR_EXIT(EXIT_FAILURE, "setsockopt: PACKET_TX_RING");
-> 
-> 	/* calculate memory to mmap in the kernel */
-> 	size = packet_req.tp_block_size * packet_req.tp_block_nr;
-> 
-> 	/* mmap Tx ring buffers memory */
-> 	ps_header_start = mmap(0, size,
-> 			PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
-> 	if (ps_header_start < 0)
-> 		PERROR_EXIT(EXIT_FAILURE, "mmap");
-> 
-> 	/* fill peer sockaddr for SOCK_DGRAM */
-> 	sa.sll_family = AF_PACKET;
-> 	sa.sll_protocol = htons(ETH_P_IP);
-> 	sa.sll_ifindex = ifr.ifr_ifindex;
-> 	sa.sll_halen = ETH_ALEN;
-> 	memset(&sa.sll_addr, 0xff, ETH_ALEN);
-> 
-> 	ps_header = ps_header_start;
-> 	while (1) {
-> 		int sendlen, j;
-> 
-> 		char *data = (void*)ps_header + TPACKET_HDRLEN
-> 		              - sizeof(struct sockaddr_ll);
-> 
-> 		switch((volatile uint32_t)ps_header->tp_status)
-> 		{
-> 		case TP_STATUS_AVAILABLE:
-> 			memset(data, 0x23, 150);
-> 			break;
-> 
-> 		case TP_STATUS_WRONG_FORMAT:
-> 			printf("An error has occured during transfer\n");
-> 			exit(EXIT_FAILURE);
-> 			break;
-> 
-> 		default:
-> 			printf("Buffer is not available, aborting\n");
-> 			exit(1);
-> 			break;
-> 		}
-> 		ps_header->tp_len = 150;
-> 		ps_header->tp_status = TP_STATUS_SEND_REQUEST;
-> 
-> 		sendlen = sendto(fd, NULL, 0, 0,
-> 				(struct sockaddr *)&sa, sizeof(sa));
-> 		if (sendlen < 0)
-> 			perror("sendto");
-> 		else if (sendlen == 0)
-> 			printf("sendto(): nothing sent!\n");
-> 		else
-> 			printf("sendto(): sent %d bytes out\n", sendlen);
-> 
-> #define ST_IS(x) ((volatile uint32_t)ps_header->tp_status == x)
-> 		printf("tp_status after sending: %s\n",
-> 				ST_IS(TP_STATUS_AVAILABLE) ? "AVAILABLE" :
-> 				ST_IS(TP_STATUS_SEND_REQUEST) ? "SEND_REQUEST" :
-> 				ST_IS(TP_STATUS_WRONG_FORMAT) ? "WRONG_FORMAT" :
-> 				"unknown");
-> #undef ST_IS
-> 
-> 		ps_header = (void *)ps_header + packet_req.tp_frame_size;
-> 		if (ps_header >= ps_header_start + size)
-> 			ps_header = ps_header_start;
-> 
-> 		sleep(1);
-> 	}
-> 	return 0;
-> }
-> --------------------[end of packet_mmap_test.c]--------------------
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> But, this does not look good, say what if the MFD driver is in-build.
+> Another way is that we can add a sysfs entry, which when written
+> with anything can re-evaluate the firmware_config.
+
+Yes, I think that a sysfs entry would be good here, basically
+to reset the entire unit and remove the child devices, followed
+by a new call to request_firmware.
+
+Instead of passing a configuration file into the MFD driver and
+calling it a firmware, I can see three other options that I believe
+would be nicer:
+
+1. have a single firmware blob that describes the child devices
+and the code that is to be loaded into both units. If they are
+acting as one device, either make sure you only create one
+child node, or create one with a name that no driver binds to.
+
+2. Call request_firmware separately for the two child devices,
+and configure them separately based on the information in the
+firmware files. In the case where they should act as a single
+device, call the children e.g. "pruss-uart-a" and "pruss-uart-b",
+then bind to both names in the pruss-uart drivers and only
+start using the device when you have both nodes for the same
+parent.
+
+3. Do the configuration through sysfs files in the MFD device node,
+which then cause the creation of the child devices. This means you
+need extra user space scripts to write the addititonal files, but
+is also the most flexible way.
+
+
+	Arnd
