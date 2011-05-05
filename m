@@ -1,70 +1,60 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Thu, 5 May 2011 15:06:34 +0000
-Subject: [PATCH] kirkwood: add dir-665 support
-In-Reply-To: <alpine.LFD.2.00.1105040940410.24613@xanadu.home>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-	<20110503205056.GA13075@gentoodev.compulab.local>
-	<BANLkTimQM_J2ZbDjAewUsp+XSEP+x+eniA@mail.gmail.com>
-	<BANLkTinybLSF418PsocXR6dwuaksv_+UCQ@mail.gmail.com>
-	<20110504080924.GX19806@kw.sim.vm.gnt>
-	<alpine.LFD.2.00.1105040940410.24613@xanadu.home>
-Message-ID: <20110505150634.GC19806@kw.sim.vm.gnt>
+From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
+Date: Thu,  5 May 2011 17:12:35 +0200
+Subject: [PATCH v2 0/4] OMAP: cpuidle code clean-up
+Message-ID: <1304608359-18061-1-git-send-email-j-pihet@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+From: Jean Pihet <j-pihet@ti.com>
 
-On Wed, May 04, 2011 at 09:51:27AM -0400, Nicolas Pitre wrote:
-> On Wed, 4 May 2011, Simon Guinot wrote:
-> 
-> > Hi Hirundo,
-> > 
-> > On Wed, May 04, 2011 at 10:54:52AM +0800, Hirundo Cam wrote:
-> > > Hi Mike and Simon,
-> > > 
-> > > I've send a machine submit to arm-linux, it generated the mach-types as
-> > > 
-> > > [stripped]
-> > > mx51_moray		MACH_MX51_MORAY		MX51_MORAY		3484
-> > > thales_cbc		MACH_THALES_CBC		THALES_CBC		3485
-> > > bluepoint		MACH_BLUEPOINT		BLUEPOINT		3486
-> > > dir665			MACH_DIR665		DIR665			3487
-> > > 
-> > > Is this correct for the DIR665 board using mv88f6281 chips?
-> > 
-> > It looks correct.
-> 
-> It may look correct, but I'll ask that you hang to it for a while as 
-> there is a desire to stop the addition of such board specific files to 
-> the kernel and move towards a solution such as device tree instead to 
-> represent those board details.
+Rework of the OMAP2+ cpuidle code
 
-For my curiosity, how a device tree kernel will deal with ATAGs ?
-Is there a compatibility layer planned ?
+v2: rework after comments on linux-omap ML:
+- remove useless macros,
+- replace the C-state common data fill-in helper macro by an inline
+   function, for better readability,
+- update commits description.
 
-I mean... For now, the boards on market are not providing a device tree
-capable bootloader. Without a compatibility layer, the kernel support
-for this boards can't rely on device tree.
+v1:
+- optimize the cpuidle C-states data registration and storage,
+- change the interaction with the debugfs 'enable_off_mode' knob
+ and the use of the C-states 'valid' internal field,
+- remove dead code,
+- improve code readability.
 
-I assume it is the dir665 case.
+Tested on Beagleboard B5 with cpuidle in RET and OFF modes.
 
-> 
-> I think that Kirkwood is actually a good case for device tree as the 
-> differences between boards is really simple as it usually boils down to 
-> different GPIO usage and MPP assignments.  If someone would like to 
-> contribute to the DT effort on ARM then this would be a nice and easy 
-> target to convert over.
+Another 145 lines of OMAP code gone ;p
 
-I am still not familiar with the device tree format and usage but I will
-have a look.
+Notes:
+1) the debugfs 'enable_off_mode' knob will be deprecated by the use
+ of the devices constraints framework to restrict the power domains
+ power modes.
+2) the MPU and CORE power domains low power modes are controlled
+ by cpuidle, based on the allowed overall sleep+wake-up latencies
+ and the wake-up latency constraints on the MPU. This is incorrect.
+ The devices constraints framework shall be used instead to control
+ all power domains.
 
-Regards,
+ToDo:
+- integrate cpuidle with the devices constraints framework, when merged in,
+- refine the latency figures and express them in term of available data
+ from other frameworks (OMAP PM, constaints framework, omap_devices,
+ new VC/VP voltage and DVFS code ...),
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110505/228645f9/attachment-0001.sig>
+Rebased on khilman's for_2.6.40/pm-cleanup branch
+
+Jean Pihet (4):
+  OMAP3: clean-up mach specific cpuidle data structures
+  OMAP3: cpuidle: re-organize the C-states data
+  OMAP3: cpuidle: code rework for improved readability
+  OMAP3: cpuidle: change the power domains modes determination logic
+
+ arch/arm/mach-omap2/board-rx51.c  |   18 +-
+ arch/arm/mach-omap2/cpuidle34xx.c |  426 +++++++++++++------------------------
+ arch/arm/mach-omap2/pm.h          |   17 +-
+ arch/arm/mach-omap2/pm34xx.c      |   12 -
+ 4 files changed, 164 insertions(+), 309 deletions(-)
+
+-- 
+1.7.2.5
