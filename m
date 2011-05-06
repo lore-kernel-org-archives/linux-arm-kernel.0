@@ -1,121 +1,28 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Fri, 6 May 2011 15:39:17 +0530
-Subject: [PATCH 2/2] OMAP2+: hwmod: Add API to check IO PAD wakeup status
-In-Reply-To: <1304676557-15613-1-git-send-email-govindraj.raja@ti.com>
-References: <1304676557-15613-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1304676557-15613-3-git-send-email-govindraj.raja@ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  6 May 2011 11:33:05 +0100
+Subject: [RFC PATCH v2 00/12] Consolidating GIC per-cpu interrupts
+Message-ID: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add API to determine IO-PAD wakeup event status for a given
-hwmod dynamic_mux pad.
+The current GIC per-cpu interrupt (aka PPIs) suffers from a number of
+problems:
 
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/mux.c                    |   28 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/mux.h                    |   13 ++++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |   14 +++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 4 files changed, 56 insertions(+), 0 deletions(-)
+- It uses a completely separate scheme to handle the interrupts,
+  mostly because the PPI concept doesn't really match the kernel view
+  of an interrupt.
+- Some low-level code gets duplicated, as usual...
+- At least one platform (msm) has started implementing its own
+  alternative scheme.
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index a4ab1e3..b40aebe 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -348,6 +348,34 @@ err1:
- 	return NULL;
- }
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Gets the wakeup status of given pad from omap-hwmod.
-+ * Returns true if wakeup event is set for pad else false
-+ * if wakeup is not occured or pads are not avialable.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	int i;
-+	unsigned int val;
-+	u8 ret = false;
-+
-+	for (i = 0; i < hmux->nr_pads; i++) {
-+		struct omap_device_pad *pad = &hmux->pads[i];
-+
-+		val = omap_mux_read(pad->partition,
-+					pad->mux->reg_offset);
-+		if (val & OMAP_WAKEUP_EVENT) {
-+			ret = true;
-+			break;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
- /* Assumes the calling function takes care of locking */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- {
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 137f321..86a0051 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -225,8 +225,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
-  */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Called only from omap_hwmod.c, do not use.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux);
- #else
- 
-+static inline bool
-+omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	return 0;
-+}
-+
- static inline int omap_mux_init_gpio(int gpio, int val)
- {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 97d3302..6891c4f 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2404,3 +2404,17 @@ int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh, bool enable)
- 
- 	return ret;
- }
-+
-+/**
-+ * omap_hwmod_pad_get_wakeup_status - get pad wakeup status if mux is available.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Returns the wake_up status bit of available pad mux pin.
-+ * return error if no mux pads are available.
-+ */
-+int omap_hmwod_pad_get_wakeup_status(struct omap_hwmod *oh)
-+{
-+	if (oh->mux)
-+		return omap_hwmod_mux_get_wake_status(oh->mux);
-+	return -EINVAL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index b7f8d1b..b0535b7 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -603,6 +603,7 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
- int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh, bool enable);
- 
-+int omap_hmwod_pad_get_wakeup_status(struct omap_hwmod *oh);
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
--- 
-1.7.1
+The proposed solution is to let the GIC code expose the PPIs as
+something that the kernel can manage. Instead of having a single
+interrupt number shared on all cores, make the interrupt number be
+different on each CPU.
+
+This enables the use of the normal kernel API (request_irq() and
+friends) and the elimination of some low level code.
+
+This patch set is based on 2.6.39-rc6, and depends on Will Deacon's
+GIC fasteoi patches. Tested on VExpress, PB-11MP, Pandaboard and
+SMDK-S5PV310.
