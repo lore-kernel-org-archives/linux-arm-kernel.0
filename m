@@ -1,54 +1,65 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 May 2011 13:58:21 +0900
-Subject: [PATCH] ARM: S3C6410: Add some lower frequencies for 800MHz base
-	clock operation
-In-Reply-To: <1304004383-16133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1304004383-16133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <00fa01cc0baa$3af45a20$b0dd0e60$%kim@samsung.com>
+Date: Fri, 06 May 2011 13:59:33 +0900
+Subject: [PATCH v2] ARM: S3C64XX: Remove gpio-bank-X header files
+In-Reply-To: <1303972369-17563-1-git-send-email-jy0922.shim@samsung.com>
+References: <1303972369-17563-1-git-send-email-jy0922.shim@samsung.com>
+Message-ID: <00fb01cc0baa$6a728e20$3f57aa60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown wrote:
+Joonyoung Shim wrote:
 > 
-> By extension from the 667MHz based clocks currently supported add 100MHz
-> and 200MHz operating points. Due to a lack of documentation these have not
-> been confirmed as supported but by extension from the existing frequencies
-> they should be OK and there is less risk than with the previuus patch for
-> 800MHz operation.
+> The gpio-bank-X header files of S3C64XX have defines which can be
+> substituted by more common API, so they can be removed. This is compile
+> tested only.
 > 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Signed-off-by: Joonyoung Shim <jy0922.shim@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > ---
-> 
-> In spite of the commit log this is based on top of the previous patch.
-> 
->  arch/arm/mach-s3c64xx/cpufreq.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-
-> s3c64xx/cpufreq.c
-> index db722a5..1e7df30 100644
-> --- a/arch/arm/mach-s3c64xx/cpufreq.c
-> +++ b/arch/arm/mach-s3c64xx/cpufreq.c
-> @@ -37,7 +37,9 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
-> 
->  static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
->  	{ 0,  66000 },
-> +	{ 0, 100000 },
->  	{ 0, 133000 },
-> +	{ 1, 200000 },
->  	{ 1, 222000 },
->  	{ 1, 266000 },
->  	{ 2, 333000 },
+>  arch/arm/mach-s3c64xx/dev-spi.c                  |   20 ++----
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h |   48 --------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h |   60 -----------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h |   53 ---------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h |   49 --------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h |   44 -------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h |   71
+--------------------
+> -
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h |   42 ------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h |   74
+--------------------
 > --
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h |   40 ------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h |   36 -----------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h |   54 ----------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h |   70
+--------------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h |   69
+--------------------
+>  arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h |   46 -------------
+>  arch/arm/mach-s3c64xx/mach-smdk6410.c            |    1 -
+>  arch/arm/mach-s3c64xx/pm.c                       |   34 ++++++-----
+>  arch/arm/mach-s3c64xx/setup-i2c0.c               |    7 +--
+>  arch/arm/mach-s3c64xx/setup-i2c1.c               |    7 +--
+>  arch/arm/mach-s3c64xx/sleep.S                    |    8 ++-
+>  20 files changed, 37 insertions(+), 796 deletions(-)
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-a.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-b.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-c.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-d.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-e.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-f.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-g.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-h.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-i.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-j.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-n.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-o.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-p.h
+>  delete mode 100644 arch/arm/mach-s3c64xx/include/mach/gpio-bank-q.h
+> 
 
-Hmm, I'm not sure this should be OK...because guided(or tested?) dvfs level
-is following for 800Mhz.
-L3: 133, L2: 266, L1: 400 and L0: 800.
-
-And I couldn't find about supporting of 100Mhz or 200Mhz in its hw design
-guide. Of course, it doesn't mean this is wrong but at least need to check
-again.
-
+Looks ok to me, will apply.
 Thanks.
 
 Best regards,
