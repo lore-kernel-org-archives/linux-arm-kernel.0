@@ -1,115 +1,247 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 May 2011 11:33:16 +0100
-Subject: [RFC PATCH v2 11/12] ARM: gic: add compute_irqnr macro for exynos4
+Date: Fri,  6 May 2011 11:33:15 +0100
+Subject: [RFC PATCH v2 10/12] ARM: gic: remove previous local timer interrupt
+	handling
 In-Reply-To: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
 References: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1304677997-26947-12-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1304677997-26947-11-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-exynos4 has a full copy of entry-macro-gic.S, just for the sake
-of an offset added to the IRQ number read from the GIC.
+Now that all users of local timers are using CONFIG_ARM_GIC_VPPI,
+the now unused local timer infrastructure can be safely removed.
 
-Add a compute_irqnr macro to entry-macro-gic.S so that any platform
-can add it's own hook without having to copy the whole file again.
-
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/hardware/entry-macro-gic.S  |    3 +
- arch/arm/mach-exynos4/include/mach/entry-macro.S |   60 ++--------------------
- 2 files changed, 8 insertions(+), 55 deletions(-)
+ arch/arm/common/gic.c                           |   10 --------
+ arch/arm/include/asm/entry-macro-multi.S        |    7 -----
+ arch/arm/include/asm/hardirq.h                  |    3 --
+ arch/arm/include/asm/hardware/entry-macro-gic.S |   13 ----------
+ arch/arm/include/asm/hardware/gic.h             |    1 -
+ arch/arm/include/asm/localtimer.h               |    5 ----
+ arch/arm/include/asm/smp.h                      |    5 ----
+ arch/arm/kernel/irq.c                           |    3 --
+ arch/arm/kernel/smp.c                           |   29 -----------------------
+ arch/arm/kernel/smp_twd.c                       |    7 -----
+ 10 files changed, 0 insertions(+), 83 deletions(-)
 
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 529a8ed..d39a164 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -501,16 +501,6 @@ void __cpuinit gic_secondary_init(unsigned int gic_nr)
+ 	gic_cpu_init(&gic_data[gic_nr]);
+ }
+ 
+-void __cpuinit gic_enable_ppi(unsigned int irq)
+-{
+-	unsigned long flags;
+-
+-	local_irq_save(flags);
+-	irq_set_status_flags(irq, IRQ_NOPROBE);
+-	gic_unmask_irq(irq_get_irq_data(irq));
+-	local_irq_restore(flags);
+-}
+-
+ #ifdef CONFIG_SMP
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ {
+diff --git a/arch/arm/include/asm/entry-macro-multi.S b/arch/arm/include/asm/entry-macro-multi.S
+index c599795..4ef27af 100644
+--- a/arch/arm/include/asm/entry-macro-multi.S
++++ b/arch/arm/include/asm/entry-macro-multi.S
+@@ -23,13 +23,6 @@
+ 	movne	r1, sp
+ 	adrne	lr, BSYM(1b)
+ 	bne	do_IPI
+-
+-#if defined(CONFIG_LOCAL_TIMERS) && !defined(CONFIG_ARM_GIC_VPPI)
+-	test_for_ltirq r0, r6, r5, lr
+-	movne	r0, sp
+-	adrne	lr, BSYM(1b)
+-	bne	do_local_timer
+-#endif
+ #endif
+ 9997:
+ 	.endm
+diff --git a/arch/arm/include/asm/hardirq.h b/arch/arm/include/asm/hardirq.h
+index 89ad180..ddf07a9 100644
+--- a/arch/arm/include/asm/hardirq.h
++++ b/arch/arm/include/asm/hardirq.h
+@@ -9,9 +9,6 @@
+ 
+ typedef struct {
+ 	unsigned int __softirq_pending;
+-#ifdef CONFIG_LOCAL_TIMERS
+-	unsigned int local_timer_irqs;
+-#endif
+ #ifdef CONFIG_SMP
+ 	unsigned int ipi_irqs[NR_IPI];
+ #endif
 diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
-index db83287..a01dc80 100644
+index 14a3363..db83287 100644
 --- a/arch/arm/include/asm/hardware/entry-macro-gic.S
 +++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
-@@ -50,6 +50,9 @@
- 	cmpcc	\irqnr, \irqnr
- 	cmpne	\irqnr, \tmp
+@@ -65,16 +65,3 @@
+ 	strcc	\irqstat, [\base, #GIC_CPU_EOI]
  	cmpcs	\irqnr, \irqnr
-+#ifdef HAVE_GIC_BASE_OFFSET
-+	compute_irqnr	\irqnr, \tmp
-+#endif
  	.endm
+-
+-#ifndef CONFIG_ARM_GIC_VPPI
+-/* As above, this assumes that irqstat and base are preserved.. */
+-
+-	.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-	bic	\irqnr, \irqstat, #0x1c00
+-	mov 	\tmp, #0
+-	cmp	\irqnr, #29
+-	moveq	\tmp, #1
+-	streq	\irqstat, [\base, #GIC_CPU_EOI]
+-	cmp	\tmp, #0
+-	.endm
+-#endif
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 9dbffed..069d4c0 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -42,7 +42,6 @@ void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
+ void gic_secondary_init(unsigned int);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+-void gic_enable_ppi(unsigned int);
+ #ifdef CONFIG_ARM_GIC_VPPI
+ unsigned int gic_ppi_to_vppi(unsigned int irq);
+ #else
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index bef44b3..5c8acb4 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -20,11 +20,6 @@ struct clock_event_device;
+ void percpu_timer_setup(void);
  
- /* We assume that irqstat (the raw value of the IRQ acknowledge
-diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-index f007168..7d87d4e 100644
---- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
-+++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-@@ -9,66 +9,16 @@
-  * warranty of any kind, whether express or implied.
- */
+ /*
+- * Called from assembly, this is the local timer IRQ handler
+- */
+-asmlinkage void do_local_timer(struct pt_regs *);
+-
+-/*
+  * Per-cpu timer IRQ handler
+  */
+ irqreturn_t percpu_timer_handler(int irq, void *dev_id);
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 96ed521..6cf609c 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -95,9 +95,4 @@ extern void platform_cpu_enable(unsigned int cpu);
+ extern void arch_send_call_function_single_ipi(int cpu);
+ extern void arch_send_call_function_ipi_mask(const struct cpumask *mask);
  
--#include <mach/hardware.h>
--#include <asm/hardware/gic.h>
-+#define HAVE_GIC_BASE_OFFSET	1
-+#include <asm/hardware/entry-macro-gic.S>
+-/*
+- * show local interrupt info
+- */
+-extern void show_local_irqs(struct seq_file *, int);
+-
+ #endif /* ifndef __ASM_ARM_SMP_H */
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 237959f..9f3e427 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -59,9 +59,6 @@ int arch_show_interrupts(struct seq_file *p, int prec)
+ #ifdef CONFIG_SMP
+ 	show_ipi_list(p, prec);
+ #endif
+-#ifdef CONFIG_LOCAL_TIMERS
+-	show_local_irqs(p, prec);
+-#endif
+ 	seq_printf(p, "%*s: %10lu\n", prec, "Err", irq_err_count);
+ 	return 0;
+ }
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 30201a0..84bc221 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -418,10 +418,6 @@ u64 smp_irq_stat_cpu(unsigned int cpu)
+ 	for (i = 0; i < NR_IPI; i++)
+ 		sum += __get_irq_stat(cpu, ipi_irqs[i]);
  
--		.macro	disable_fiq
-+		.macro	compute_irqnr, irqnr, tmp
-+		addne	\irqnr, #32
- 		.endm
+-#ifdef CONFIG_LOCAL_TIMERS
+-	sum += __get_irq_stat(cpu, local_timer_irqs);
+-#endif
+-
+ 	return sum;
+ }
  
--		.macro  get_irqnr_preamble, base, tmp
--		ldr	\base, =gic_cpu_base_addr
--		ldr	\base, [\base]
-+		.macro	disable_fiq
- 		.endm
+@@ -439,19 +435,6 @@ static void ipi_timer(void)
+ }
  
- 		.macro  arch_ret_to_user, tmp1, tmp2
- 		.endm
+ #ifdef CONFIG_LOCAL_TIMERS
+-asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
+-{
+-	struct pt_regs *old_regs = set_irq_regs(regs);
+-	int cpu = smp_processor_id();
+-
+-	if (local_timer_ack()) {
+-		__inc_irq_stat(cpu, local_timer_irqs);
+-		ipi_timer();
+-	}
+-
+-	set_irq_regs(old_regs);
+-}
+-
+ irqreturn_t percpu_timer_handler(int irq, void *dev_id)
+ {
+ 	struct clock_event_device *evt = dev_id;
+@@ -463,18 +446,6 @@ irqreturn_t percpu_timer_handler(int irq, void *dev_id)
  
--		/*
--		 * The interrupt numbering scheme is defined in the
--		 * interrupt controller spec.  To wit:
--		 *
--		 * Interrupts 0-15 are IPI
--		 * 16-28 are reserved
--		 * 29-31 are local.  We allow 30 to be used for the watchdog.
--		 * 32-1020 are global
--		 * 1021-1022 are reserved
--		 * 1023 is "spurious" (no interrupt)
--		 *
--		 * For now, we ignore all local interrupts so only return an interrupt if it's
--		 * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
--		 *
--		 * A simple read from the controller will tell us the number of the highest
--                 * priority enabled interrupt.  We then just need to check whether it is in the
--		 * valid range for an IRQ (30-1020 inclusive).
--		 */
+ 	return IRQ_NONE;
+ }
 -
--		.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+-void show_local_irqs(struct seq_file *p, int prec)
+-{
+-	unsigned int cpu;
 -
--		ldr     \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 = src CPU, 9-0 = int # */
+-	seq_printf(p, "%*s: ", prec, "LOC");
 -
--		ldr	\tmp, =1021
+-	for_each_present_cpu(cpu)
+-		seq_printf(p, "%10u ", __get_irq_stat(cpu, local_timer_irqs));
 -
--		bic     \irqnr, \irqstat, #0x1c00
--
--		cmp     \irqnr, #15
--		cmpcc	\irqnr, \irqnr
--		cmpne	\irqnr, \tmp
--		cmpcs	\irqnr, \irqnr
--		addne	\irqnr, \irqnr, #32
--
--		.endm
--
--		/* We assume that irqstat (the raw value of the IRQ acknowledge
--		 * register) is preserved from the macro above.
--		 * If there is an IPI, we immediately signal end of interrupt on the
--		 * controller, since this requires the original irqstat value which
--		 * we won't easily be able to recreate later.
--		 */
--
--		.macro test_for_ipi, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		cmp	\irqnr, #16
--		strcc	\irqstat, [\base, #GIC_CPU_EOI]
--		cmpcs	\irqnr, \irqnr
--		.endm
--
+-	seq_printf(p, " Local timer interrupts\n");
+-}
+ #endif
+ 
+ #ifdef CONFIG_GENERIC_CLOCKEVENTS_BROADCAST
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 2256360..72ae9e3 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -44,10 +44,8 @@ static void twd_set_mode(enum clock_event_mode mode,
+ 		ctrl = TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT;
+ 		break;
+ 	case CLOCK_EVT_MODE_UNUSED:
+-#ifdef CONFIG_ARM_GIC_VPPI
+ 		free_irq(clk->irq, clk);
+ 		/* fall through */
+-#endif
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
+ 	default:
+ 		ctrl = 0;
+@@ -144,7 +142,6 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
+ 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
+ 
+-#ifdef CONFIG_ARM_GIC_VPPI
+ 	err = request_irq(clk->irq, percpu_timer_handler,
+ 			  IRQF_PERCPU | IRQF_NOBALANCING | IRQF_TIMER,
+ 			  clk->name, clk);
+@@ -153,10 +150,6 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 		       clk->name, clk->irq, smp_processor_id(), err);
+ 		return;
+ 	}
+-#else
+-	/* Make sure our local interrupt controller has this enabled */
+-	gic_enable_ppi(clk->irq);
+-#endif
+ 
+ 	clockevents_register_device(clk);
+ }
 -- 
 1.7.0.4
