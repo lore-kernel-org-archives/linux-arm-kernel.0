@@ -1,144 +1,50 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 6 May 2011 10:15:05 +0800
-Subject: [PATCH v2 3/7] mmc: sdhci: make sdhci-of device drivers self
-	registered
-In-Reply-To: <20110505142344.GA13400@oksana.dev.rtsoft.ru>
-References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
-	<1304601778-13837-4-git-send-email-shawn.guo@linaro.org>
-	<20110505142344.GA13400@oksana.dev.rtsoft.ru>
-Message-ID: <20110506021504.GA21667@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 06 May 2011 13:15:27 +0900
+Subject: [PATCH] leds: drop leds-h1940 driver
+In-Reply-To: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
+References: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
+Message-ID: <00f701cc0ba4$3cb4b680$b61e2380$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2011 at 06:23:44PM +0400, Anton Vorontsov wrote:
-> On Thu, May 05, 2011 at 09:22:54PM +0800, Shawn Guo wrote:
-> [...]
-> > - * Copyright (c) 2007 Freescale Semiconductor, Inc.
-> > - * Copyright (c) 2009 MontaVista Software, Inc.
-> > - *
-> > - * Authors: Xiaobo Xie <X.Xie@freescale.com>
-> > - *	    Anton Vorontsov <avorontsov@ru.mvista.com>
-> [...]
-> > -#ifdef CONFIG_MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER
-> > -
-> > -/*
-> > - * These accessors are designed for big endian hosts doing I/O to
-> > - * little endian controllers incorporating a 32-bit hardware byte swapper.
-> > - */
-> > -
-> > -u32 sdhci_be32bs_readl(struct sdhci_host *host, int reg)
-> > -{
-> > -	return in_be32(host->ioaddr + reg);
-> > -}
-> > -
-> > -u16 sdhci_be32bs_readw(struct sdhci_host *host, int reg)
-> > -{
-> > -	return in_be16(host->ioaddr + (reg ^ 0x2));
-> > -}
-> > -
-> > -u8 sdhci_be32bs_readb(struct sdhci_host *host, int reg)
-> > -{
-> > -	return in_8(host->ioaddr + (reg ^ 0x3));
-> > -}
-> > -
-> > -void sdhci_be32bs_writel(struct sdhci_host *host, u32 val, int reg)
-> > -{
-> > -	out_be32(host->ioaddr + reg, val);
-> > -}
-> > -
-> > -void sdhci_be32bs_writew(struct sdhci_host *host, u16 val, int reg)
-> > -{
-> > -	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> > -	int base = reg & ~0x3;
-> > -	int shift = (reg & 0x2) * 8;
-> > -
-> > -	switch (reg) {
-> > -	case SDHCI_TRANSFER_MODE:
-> > -		/*
-> > -		 * Postpone this write, we must do it together with a
-> > -		 * command write that is down below.
-> > -		 */
-> > -		pltfm_host->xfer_mode_shadow = val;
-> > -		return;
-> > -	case SDHCI_COMMAND:
-> > -		sdhci_be32bs_writel(host, val << 16 | pltfm_host->xfer_mode_shadow,
-> > -				    SDHCI_TRANSFER_MODE);
-> > -		return;
-> > -	}
-> > -	clrsetbits_be32(host->ioaddr + base, 0xffff << shift, val << shift);
-> > -}
-> > -
-> > -void sdhci_be32bs_writeb(struct sdhci_host *host, u8 val, int reg)
-> > -{
-> > -	int base = reg & ~0x3;
-> > -	int shift = (reg & 0x3) * 8;
-> > -
-> > -	clrsetbits_be32(host->ioaddr + base , 0xff << shift, val << shift);
-> > -}
-> > -#endif /* CONFIG_MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER */
-> [...]
-> > +#ifdef CONFIG_MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER
-> > +/*
-> > + * These accessors are designed for big endian hosts doing I/O to
-> > + * little endian controllers incorporating a 32-bit hardware byte swapper.
-> > + */
-> > +u32 sdhci_be32bs_readl(struct sdhci_host *host, int reg)
-> > +{
-> > +	return in_be32(host->ioaddr + reg);
-> > +}
-> > +
-> > +u16 sdhci_be32bs_readw(struct sdhci_host *host, int reg)
-> > +{
-> > +	return in_be16(host->ioaddr + (reg ^ 0x2));
-> > +}
-> > +
-> > +u8 sdhci_be32bs_readb(struct sdhci_host *host, int reg)
-> > +{
-> > +	return in_8(host->ioaddr + (reg ^ 0x3));
-> > +}
-> > +
-> > +void sdhci_be32bs_writel(struct sdhci_host *host, u32 val, int reg)
-> > +{
-> > +	out_be32(host->ioaddr + reg, val);
-> > +}
-> > +
-> > +void sdhci_be32bs_writew(struct sdhci_host *host, u16 val, int reg)
-> > +{
-> > +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> > +	int base = reg & ~0x3;
-> > +	int shift = (reg & 0x2) * 8;
-> > +
-> > +	switch (reg) {
-> > +	case SDHCI_TRANSFER_MODE:
-> > +		/*
-> > +		 * Postpone this write, we must do it together with a
-> > +		 * command write that is down below.
-> > +		 */
-> > +		pltfm_host->xfer_mode_shadow = val;
-> > +		return;
-> > +	case SDHCI_COMMAND:
-> > +		sdhci_be32bs_writel(host, val << 16 | pltfm_host->xfer_mode_shadow,
-> > +				    SDHCI_TRANSFER_MODE);
-> > +		return;
-> > +	}
-> > +	clrsetbits_be32(host->ioaddr + base, 0xffff << shift, val << shift);
-> > +}
-> > +
-> > +void sdhci_be32bs_writeb(struct sdhci_host *host, u8 val, int reg)
-> > +{
-> > +	int base = reg & ~0x3;
-> > +	int shift = (reg & 0x3) * 8;
-> > +
-> > +	clrsetbits_be32(host->ioaddr + base , 0xff << shift, val << shift);
-> > +}
-> > +#endif /* CONFIG_MMC_SDHCI_BIG_ENDIAN_32BIT_BYTE_SWAPPER */
+Vasily Khoruzhick wrote:
 > 
-> I noticed you're very careful wrt copyright/authorship notices,
-> except for this case. How about retaining copyright stuff when
-> you merge these two files?
+> H1940 machine now uses leds-gpio and leds-h1940 has no users anymore. So
+> drop it.
 > 
-Obviously, need to be more careful.  Will add.  Thanks.
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  drivers/leds/Kconfig      |    7 --
+>  drivers/leds/Makefile     |    1 -
+>  drivers/leds/leds-h1940.c |  170
+-------------------------------------------
+> --
+>  3 files changed, 0 insertions(+), 178 deletions(-)
+>  delete mode 100644 drivers/leds/leds-h1940.c
+> 
+Hi Vasily,
 
--- 
-Regards,
-Shawn
+Hmm, regarding maintainer who is Richard Purdie(LED) in this case should be
+added in Cc. (Cc'ed him)
+
+And I think need following with this patch.
+
+--- a/arch/arm/configs/s3c2410_defconfig
++++ b/arch/arm/configs/s3c2410_defconfig
+@@ -389,7 +389,6 @@ CONFIG_MMC_SPI=m
+ CONFIG_MMC_S3C=y
+ CONFIG_LEDS_CLASS=m
+ CONFIG_LEDS_S3C24XX=m
+-CONFIG_LEDS_H1940=m
+ CONFIG_LEDS_PCA9532=m
+ CONFIG_LEDS_GPIO=m
+ CONFIG_LEDS_PCA955X=m
+
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
