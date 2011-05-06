@@ -1,67 +1,19 @@
-From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Fri,  6 May 2011 11:00:05 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 May 2011 10:04:49 +0100
 Subject: [PATCH] [RFC] USB: fsl_udc_core: fix build-failure for ARM
-In-Reply-To: <20110505135029.0c068b8e@wker>
+In-Reply-To: <1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
 References: <20110505135029.0c068b8e@wker>
-Message-ID: <1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110506090449.GA18408@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit
+On Fri, May 06, 2011 at 11:00:05AM +0200, Uwe Kleine-K?nig wrote:
+> I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
+> a flush ARM probably does, too, no?
+> If so, what it the right thing to do? Implement flush_dcache_range for
+> ARM (just wrapping flush_dcache_page?)?
 
-	09ba0de (USB: fsl_udc_core: prepare for SoCs with BE registers and descriptors)
-
-introduced two function pointers _fsl_readl and _fsl_writel in an #ifdef
-CONFIG_PPC32 block and used then unconditionally in fsl_udc_probe.
-To make the driver compile again this use has to be protected by
-an #ifdef, too. Moreover ARM doesn't have flush_dcache_range so this
-is #ifdefed out, too.
-
-Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Hello,
-
-I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
-a flush ARM probably does, too, no?
-If so, what it the right thing to do? Implement flush_dcache_range for
-ARM (just wrapping flush_dcache_page?)?
-
-Best regards
-Uwe
-
- drivers/usb/gadget/fsl_udc_core.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
-index 999eafe..47152e0 100644
---- a/drivers/usb/gadget/fsl_udc_core.c
-+++ b/drivers/usb/gadget/fsl_udc_core.c
-@@ -1333,8 +1333,10 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
- 	/* Fill in the reqest structure */
- 	*((u16 *) req->req.buf) = cpu_to_le16(tmp);
- 
-+#ifdef CONFIG_PPC32
- 	/* flush cache for the req buffer */
- 	flush_dcache_range((u32)req->req.buf, (u32)req->req.buf + 8);
-+#endif
- 
- 	req->ep = ep;
- 	req->req.length = 2;
-@@ -2455,6 +2457,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* Set accessors only after pdata->init() ! */
-+#ifdef CONFIG_PPC32
- 	if (pdata->big_endian_mmio) {
- 		_fsl_readl = _fsl_readl_be;
- 		_fsl_writel = _fsl_writel_be;
-@@ -2462,6 +2465,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
- 		_fsl_readl = _fsl_readl_le;
- 		_fsl_writel = _fsl_writel_le;
- 	}
-+#endif
- 
- #ifndef CONFIG_ARCH_MXC
- 	if (pdata->have_sysif_regs)
--- 
-1.7.4.1
+On ARM, we assume all new pages have dirty dcache, which allows us to
+neatly end the ever-increasing quantity of drivers which need to be
+patched to work on ARM.  PowerPC doesn't do this.
