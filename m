@@ -1,66 +1,166 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Fri, 06 May 2011 17:29:39 +0100
-Subject: [RFC] What is the preferred way to share ADC unit between	hwmon
-	and input(ts) drivers?
-In-Reply-To: <20110506155636.GA23646@sirena.org.uk>
-References: <4DB4C252.30005@emcraft.com> <20110425110230.GD4768@sirena.org.uk>
-	<4DC3FB15.5090307@cam.ac.uk>
-	<1304691206.2256.55.camel@team-embedded-2>
-	<20110506142316.GP23729@opensource.wolfsonmicro.com>
-	<4DC4108D.6020601@cam.ac.uk> <20110506155636.GA23646@sirena.org.uk>
-Message-ID: <4DC421F3.40404@cam.ac.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  6 May 2011 19:56:52 +0200
+Subject: [PATCH v2 2/3] dmaengine: at_hdmac: implement pause and resume in
+	atc_control
+In-Reply-To: <f4341d4672a23a958398b75cb4305e0e680f2e32.1304532833.git.nicolas.ferre@atmel.com>
+References: <f4341d4672a23a958398b75cb4305e0e680f2e32.1304532833.git.nicolas.ferre@atmel.com>
+Message-ID: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/11 16:56, Mark Brown wrote:
-> On Fri, May 06, 2011 at 04:15:25PM +0100, Jonathan Cameron wrote:
-> 
->> We can add in kernel hooks to IIO (would be easy enough -
->> for low rate stuff). I'd be happy to accept patches for this (it's not
->> a priority for any current active developers as far as I know).
-> 
-> The fact that the interface is stuck in staging has been putting me off
-> looking at this, building on top of staging would be a step back for the
-> uses I have.  I'd guess that most of the existing users have no other
-> option than to use IIO which isn't the case for this sort of user.
-Sure - this sort of user isn't what I at least conceive IIO as being for.
-> 
->> However, that's silly if all you want is to pass it directly to input and hwmon.
->> Just write a driver that registers both interfaces directly.
->> If one of the adc channels needs stuff from IIO, add that as well.
-> 
-> The pattern that's present in a lot of PMICs it that there's an AUXADC
-> which is used for voltage/temperature monitoring (typically exposed by
-> hwmon and power) and can also be used for random inputs (in the style of
-> IIO).  The AUXADC is logically just a bunch of random ADC channels that
-> needs some software on top of it to provide semantics, which sounds a
-> lot like IIO.
-> 
-> Currently you end up with a part-specific ADC interface that some of the
-> other drivers are consumers for.  I'd really expect that IIO would be
-> able to save everyone having to reinvent this per chip.
-Currently at least, IIO sits at the same level as input and hwmon. We
-are interested in handling parts that are too fast / too complicated or just
-plain don't fit in one of those.  It would be easy enough to add what you
-are talking about, but in the same fashion as in theory input could add
-interfaces for hwmon if they wanted to.  The question is whether this a
-job for IIO or should be abstracted below this level (and I agree there
-is scope for abstraction here).  I'm a little worried that if we put
-it in IIO it will result in bloat away from the core aims of handling
-the many weird and wonderful sensors out there in a coherent way.
+Pause and resume controls are useful for audio devices. This also returns
+correct status from atc_tx_status() in case chan is paused.
 
-So you could write a hwmon driver that talks through an iio driver
-(easy enough to do I think - though only a small subset of stuff would
-be supported). It's also low rate so the iio and hwmon interfaces
-wouldn't get in each others way very much.
+Idea from dw_dmac patch by Linus Walleij.
 
-Input is trickier as the data paths for IIO and input
-are deliberately rather different due to different requirements.
-Yes we could write a driver that hooks in at a low level, but that
-would then break the IIO data flow.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/dma/at_hdmac.c      |   97 +++++++++++++++++++++++++++++++------------
+ drivers/dma/at_hdmac_regs.h |    1 +
+ 2 files changed, 71 insertions(+), 27 deletions(-)
 
-Basically, yes - we could bludgeon support for ADC in kernel sharing
-into IIO, but its not all that close to our current scope.  If anyone
-wants to look at that, feel free, but I still feel that this sits
-better in mfd.  Often you will be sharing interrupts as well and they
-may well be a mix of ADC and non ADC sources.
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index ba0b5ec..5968245 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -508,7 +508,8 @@ static irqreturn_t at_dma_interrupt(int irq, void *dev_id)
+ 			if (pending & (AT_DMA_BTC(i) | AT_DMA_ERR(i))) {
+ 				if (pending & AT_DMA_ERR(i)) {
+ 					/* Disable channel on AHB error */
+-					dma_writel(atdma, CHDR, atchan->mask);
++					dma_writel(atdma, CHDR,
++						AT_DMA_RES(i) | atchan->mask);
+ 					/* Give information to tasklet */
+ 					set_bit(ATC_IS_ERROR, &atchan->status);
+ 				}
+@@ -952,39 +953,78 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ {
+ 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+ 	struct at_dma		*atdma = to_at_dma(chan->device);
+-	struct at_desc		*desc, *_desc;
++	int			chan_id = atchan->chan_common.chan_id;
++
+ 	LIST_HEAD(list);
+ 
+-	/* Only supports DMA_TERMINATE_ALL */
+-	if (cmd != DMA_TERMINATE_ALL)
+-		return -ENXIO;
++	dev_vdbg(chan2dev(chan), "atc_control (%d)\n", cmd);
+ 
+-	/*
+-	 * This is only called when something went wrong elsewhere, so
+-	 * we don't really care about the data. Just disable the
+-	 * channel. We still have to poll the channel enable bit due
+-	 * to AHB/HSB limitations.
+-	 */
+-	spin_lock_bh(&atchan->lock);
++	if (cmd == DMA_PAUSE) {
++		int pause_timeout = 1000;
+ 
+-	dma_writel(atdma, CHDR, atchan->mask);
++		spin_lock_bh(&atchan->lock);
+ 
+-	/* confirm that this channel is disabled */
+-	while (dma_readl(atdma, CHSR) & atchan->mask)
+-		cpu_relax();
++		dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
++
++		/* wait for FIFO to be empty */
++		while (!(dma_readl(atdma, CHSR) & AT_DMA_EMPT(chan_id))) {
++			if (pause_timeout-- > 0) {
++				/* the FIFO can only drain if the peripheral
++				 * is still requesting data:
++				 * -> timeout if it is not the case. */
++				dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
++				spin_unlock_bh(&atchan->lock);
++				return -ETIMEDOUT;
++			}
++			cpu_relax();
++		}
+ 
+-	/* active_list entries will end up before queued entries */
+-	list_splice_init(&atchan->queue, &list);
+-	list_splice_init(&atchan->active_list, &list);
++		set_bit(ATC_IS_PAUSED, &atchan->status);
+ 
+-	/* Flush all pending and queued descriptors */
+-	list_for_each_entry_safe(desc, _desc, &list, desc_node)
+-		atc_chain_complete(atchan, desc);
++		spin_unlock_bh(&atchan->lock);
++	} else if (cmd == DMA_RESUME) {
++		if (!test_bit(ATC_IS_PAUSED, &atchan->status))
++			return 0;
+ 
+-	/* if channel dedicated to cyclic operations, free it */
+-	clear_bit(ATC_IS_CYCLIC, &atchan->status);
++		spin_lock_bh(&atchan->lock);
+ 
+-	spin_unlock_bh(&atchan->lock);
++		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
++		clear_bit(ATC_IS_PAUSED, &atchan->status);
++
++		spin_unlock_bh(&atchan->lock);
++	} else if (cmd == DMA_TERMINATE_ALL) {
++		struct at_desc	*desc, *_desc;
++		/*
++		 * This is only called when something went wrong elsewhere, so
++		 * we don't really care about the data. Just disable the
++		 * channel. We still have to poll the channel enable bit due
++		 * to AHB/HSB limitations.
++		 */
++		spin_lock_bh(&atchan->lock);
++
++		/* disabling channel: must also remove suspend state */
++		dma_writel(atdma, CHDR, AT_DMA_RES(chan_id) | atchan->mask);
++
++		/* confirm that this channel is disabled */
++		while (dma_readl(atdma, CHSR) & atchan->mask)
++			cpu_relax();
++
++		/* active_list entries will end up before queued entries */
++		list_splice_init(&atchan->queue, &list);
++		list_splice_init(&atchan->active_list, &list);
++
++		/* Flush all pending and queued descriptors */
++		list_for_each_entry_safe(desc, _desc, &list, desc_node)
++			atc_chain_complete(atchan, desc);
++
++		clear_bit(ATC_IS_PAUSED, &atchan->status);
++		/* if channel dedicated to cyclic operations, free it */
++		clear_bit(ATC_IS_CYCLIC, &atchan->status);
++
++		spin_unlock_bh(&atchan->lock);
++	} else {
++		return -ENXIO;
++	}
+ 
+ 	return 0;
+ }
+@@ -1032,8 +1072,11 @@ atc_tx_status(struct dma_chan *chan,
+ 	else
+ 		dma_set_tx_state(txstate, last_complete, last_used, 0);
+ 
+-	dev_vdbg(chan2dev(chan), "tx_status: %d (d%d, u%d)\n",
+-		 cookie, last_complete ? last_complete : 0,
++	if (test_bit(ATC_IS_PAUSED, &atchan->status))
++		ret = DMA_PAUSED;
++
++	dev_vdbg(chan2dev(chan), "tx_status %d: cookie = %d (d%d, u%d)\n",
++		 ret, cookie, last_complete ? last_complete : 0,
+ 		 last_used ? last_used : 0);
+ 
+ 	return ret;
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index ae3056d..087dbf1 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -191,6 +191,7 @@ txd_to_at_desc(struct dma_async_tx_descriptor *txd)
+  */
+ enum atc_status {
+ 	ATC_IS_ERROR = 0,
++	ATC_IS_PAUSED = 1,
+ 	ATC_IS_CYCLIC = 24,
+ };
+ 
+-- 
+1.7.3
