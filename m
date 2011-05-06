@@ -1,182 +1,182 @@
-From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Fri,  6 May 2011 12:14:13 +0300
-Subject: [PATCH V2 14/16] mmc: omap_hsmmc: adjust host controller clock in
-	regard to current OPP
-In-Reply-To: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304673255-31634-15-git-send-email-adrian.hunter@nokia.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Fri, 6 May 2011 15:04:28 +0530
+Subject: [PATCH v2 12/12] OMAP2: Serial: Add no async wake flag.
+In-Reply-To: <87k4e5hx32.fsf@ti.com>
+References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+	<1304080796-625-13-git-send-email-govindraj.raja@ti.com>
+	<87k4e5hx32.fsf@ti.com>
+Message-ID: <BANLkTimg2-eJtDnAykDmciEf7s9siuG_QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
+On Thu, May 5, 2011 at 11:02 PM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> For omap2 cpu_idle thread will not be available
+>
+> Why not?
+>
+>> and uart_clock cutting happens only in suspend path.
+>
+> Aren't clocks also cut after runtime PM autosuspend?
+>
+>> Prior to this patch the uart_clock was cut using prepare/resume
+>> calls since these funcs are no more available with runtime
+>> changes use no_async_wake flag to keep clock active during bootup
+>> otherwise uart port will disabled during boot-up and cannot be
+>> enabled back.
+>
+> This doesn't just keep clock active during bootup, but it keeps clock
+> active always, except during suspend.
+>
+>> Also based on this flag we can disable uart port during suspend
+>> and enable back during resume.
+>
+> I think disabling UART port during suspend should already be part of an
+> earlier patch. ?This patch should then only make it conditional.
+>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? ?7 +++++++
+>> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?3 +++
+>> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 14 ++++++++++++++
+>> ?3 files changed, 24 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+>> index d4ef370..1af9fd5 100644
+>> --- a/arch/arm/mach-omap2/serial.c
+>> +++ b/arch/arm/mach-omap2/serial.c
+>> @@ -245,6 +245,12 @@ static void omap_uart_wakeup_enable(struct platform_device *pdev, bool enable)
+>> ?static void omap_uart_idle_init(struct omap_uart_port_info *uart,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned short num)
+>> ?{
+>> + ? ? /* On omap2 no cpu_idle and async wakeup from prcm_module.
+>
+> Please remove comments about CPU idle, as the need for this has nothing
+> to do with CPU idle.
+>
+>> + ? ? ?* This flag can be used to cut clocks only in suspend path.
+>> + ? ? ?* to avoid boot break due to aggressive clock cutting from
+>> + ? ? ?* omap-serial driver.
+>> + ? ? ?*/
+>
+> fix multi-line comment style throughout
+>
+>> + ? ? uart->no_async_wake = true;
+>
+> If needed (which I still don't think I understand),
 
-We should like to adjust MMC host controller clock whenever the OPP is changed.
-OPP affects to L3/L4 bus frequency. Due to this we update the maximum frequency
-limits before each upcoming request and when the divisor is calculated.
+Looking into the pm24xx.c code what I understood is..
 
-Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
-Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
----
- drivers/mmc/host/omap_hsmmc.c |   65 +++++++++++++++++++++++++++++++++++++----
- 1 files changed, 59 insertions(+), 6 deletions(-)
+(1) omap2_enter_full_retention was cutting and enabling the uart
+clocks back whether in idle patch or in suspend path.
 
-diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index ee57b9b..e1c9017 100644
---- a/drivers/mmc/host/omap_hsmmc.c
-+++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -187,6 +187,9 @@ struct omap_hsmmc_host {
- 	int			use_reg;
- 	int			req_in_progress;
- 
-+	/* Actual output frequency of host controller */
-+	unsigned int		freq;
-+
- 	struct	omap_mmc_platform_data	*pdata;
- };
- 
-@@ -592,13 +595,31 @@ static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
- 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
- }
- 
-+/*
-+ * Recalculate desired clock frequency with regard to maximum possible
-+ * frequency at current OPP.
-+ *
-+ * Choose either target frequency (ios->clock) or maximum possible frequency at
-+ * current OPP (get_max_freq() returns this limit)
-+ */
-+static void omap_hsmmc_recalc_freq(struct omap_hsmmc_host *host,
-+				   struct mmc_ios *ios)
-+{
-+	struct omap_mmc_platform_data *pdata = host->pdata;
-+
-+	if (pdata->get_max_freq)
-+		host->freq = min(ios->clock, pdata->get_max_freq(host->dev));
-+	else
-+		host->freq = ios->clock;
-+}
-+
- /* Calculate divisor for the given clock frequency */
--static u16 calc_divisor(struct mmc_ios *ios)
-+static u16 calc_divisor(struct omap_hsmmc_host *host)
- {
- 	u16 dsor = 0;
- 
--	if (ios->clock) {
--		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, ios->clock);
-+	if (host->freq) {
-+		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, host->freq);
- 		if (dsor > 250)
- 			dsor = 250;
- 	}
-@@ -608,17 +629,16 @@ static u16 calc_divisor(struct mmc_ios *ios)
- 
- static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
- {
--	struct mmc_ios *ios = &host->mmc->ios;
- 	unsigned long regval;
- 	unsigned long timeout;
- 
--	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
-+	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", host->freq);
- 
- 	omap_hsmmc_stop_clock(host);
- 
- 	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
- 	regval = regval & ~(CLKD_MASK | DTO_MASK);
--	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
-+	regval = regval | (calc_divisor(host) << 6) | (DTO << 16);
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
- 		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
-@@ -742,6 +762,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
- 
- 	omap_hsmmc_set_bus_width(host);
- 
-+	omap_hsmmc_recalc_freq(host, ios);
- 	omap_hsmmc_set_clock(host);
- 
- 	omap_hsmmc_set_bus_mode(host);
-@@ -925,6 +946,8 @@ static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_req
- 	if (mrq->data && host->use_dma && dma_ch != -1)
- 		return;
- 	host->mrq = NULL;
-+	if (host->pdata->inactive)
-+		host->pdata->inactive(host->dev);
- 	mmc_request_done(host->mmc, mrq);
- }
- 
-@@ -984,6 +1007,9 @@ omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
- 	}
- 	if ((host->data == NULL && !host->response_busy) || cmd->error)
- 		omap_hsmmc_request_done(host, cmd->mrq);
-+	else if (host->data == NULL && host->response_busy &&
-+		 host->pdata->inactive)
-+		host->pdata->inactive(host->dev);
- }
- 
- /*
-@@ -1404,6 +1430,8 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
- 		struct mmc_request *mrq = host->mrq;
- 
- 		host->mrq = NULL;
-+		if (host->pdata->inactive)
-+			host->pdata->inactive(host->dev);
- 		mmc_request_done(host->mmc, mrq);
- 	}
- }
-@@ -1533,6 +1561,26 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
- 
- 	BUG_ON(host->req_in_progress);
- 	BUG_ON(host->dma_ch != -1);
-+
-+	if (host->pdata->active) {
-+		unsigned int new_freq;
-+
-+		/*
-+		 * active() returns minimum of two (target, maximum)
-+		 * frequencies.
-+		 */
-+		new_freq = host->pdata->active(host->dev, mmc->ios.clock);
-+
-+		/*
-+		 * We need to update actual frequency if it is not equal to the
-+		 * minimum of two (target and maximum) frequencies
-+		 */
-+		if (host->freq != new_freq) {
-+			host->freq = new_freq;
-+			omap_hsmmc_set_clock(host);
-+		}
-+	}
-+
- 	if (host->protect_card) {
- 		if (host->reqs_blocked < 3) {
- 			/*
-@@ -1548,6 +1596,8 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
- 		if (req->data)
- 			req->data->error = -EBADF;
- 		req->cmd->retries = 0;
-+		if (host->pdata->inactive)
-+			host->pdata->inactive(host->dev);
- 		mmc_request_done(mmc, req);
- 		return;
- 	} else if (host->reqs_blocked)
-@@ -1560,6 +1610,8 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
- 		if (req->data)
- 			req->data->error = err;
- 		host->mrq = NULL;
-+		if (host->pdata->inactive)
-+			host->pdata->inactive(host->dev);
- 		mmc_request_done(mmc, req);
- 		return;
- 	}
-@@ -1616,6 +1668,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
- 		}
- 	}
- 
-+	omap_hsmmc_recalc_freq(host, ios);
- 	omap_hsmmc_set_clock(host);
- 
- 	if (do_send_init_stream)
--- 
-1.7.0.4
+(2) since we cut clocks outside this retention path I don't know
+how to wake back uart as don't see any irq_handlers servicing
+wake-up events in pm24xx.c
+[Correct me if I am missing something here.]
+
+(3) Since there was no async wakeup mechanism I could see
+on pm24xx.c so one approach was to use of these flags.
+[If I cut clocks during boot using put_sync in uart code since no
+wakeup mechanism will break boot]
+
+(4) For socs with no aync wakeup we are keeping clocks active from
+probe and disabling/enabling clocks in suspend/resume hooks.
+
+> for readability sake
+> this flag should be called 'has_async_wake', and default to false. ?It
+> should then be set to true on available SoCs.
+
+Yes sure I can rename the flag and use above approach.
+
+--
+Thanks,
+Govindraj.R
+
+
+>
+> Kevin
+>
+>> ? ? ? if (cpu_is_omap34xx()) {
+>> ? ? ? ? ? ? ? u32 mod = num > 1 ? OMAP3430_PER_MOD : CORE_MOD;
+>> ? ? ? ? ? ? ? u32 wk_mask = 0;
+>> @@ -266,6 +272,7 @@ static void omap_uart_idle_init(struct omap_uart_port_info *uart,
+>> ? ? ? ? ? ? ? ? ? ? ? break;
+>> ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? uart->wk_mask = wk_mask;
+>> + ? ? ? ? ? ? uart->no_async_wake = false;
+>> ? ? ? } else if (cpu_is_omap24xx()) {
+>> ? ? ? ? ? ? ? u32 wk_mask = 0;
+>> ? ? ? ? ? ? ? u32 wk_en = PM_WKEN1, wk_st = PM_WKST1;
+>> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+>> index b5117bd..1de5bc4 100644
+>> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
+>> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+>> @@ -79,6 +79,7 @@ struct omap_uart_port_info {
+>> ? ? ? void __iomem *wk_st;
+>> ? ? ? void __iomem *wk_en;
+>> ? ? ? u32 wk_mask;
+>> + ? ? bool ? ? ? ? ? ? ? ? ? ?no_async_wake;
+>> ?};
+>>
+>> ?struct uart_omap_dma {
+>> @@ -134,6 +135,8 @@ struct uart_omap_port {
+>> ? ? ? unsigned int ? ? ? ? ? ?errata;
+>> ? ? ? void (*enable_wakeup)(struct platform_device *, bool);
+>> ? ? ? bool (*chk_wakeup)(struct platform_device *);
+>> +
+>> + ? ? bool ? ? ? ? ? ? ? ? ? ?no_async_wake;
+>> ?};
+>>
+>> ?#endif /* __OMAP_SERIAL_H__ */
+>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>> index eea478c..59f548f 100644
+>> --- a/drivers/tty/serial/omap-serial.c
+>> +++ b/drivers/tty/serial/omap-serial.c
+>> @@ -1168,6 +1168,13 @@ static int serial_omap_suspend(struct device *dev)
+>> ? ? ? ? ? ? ? uart_suspend_port(&serial_omap_reg, &up->port);
+>> ? ? ? ? ? ? ? console_trylock();
+>> ? ? ? ? ? ? ? serial_omap_pm(&up->port, 3, 0);
+>> +
+>> + ? ? ? ? ? ? /* OMAP2 dont have cpu_idle thread and async wakeup from prcm.
+>> + ? ? ? ? ? ? ?* For such socs clocks will be kept active from probe and
+>> + ? ? ? ? ? ? ?* cut only in suspend path.
+>> + ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? if (up->no_async_wake)
+>> + ? ? ? ? ? ? ? ? ? ? serial_omap_port_disable(up);
+>> ? ? ? }
+>> ? ? ? return 0;
+>> ?}
+>> @@ -1179,6 +1186,9 @@ static int serial_omap_resume(struct device *dev)
+>> ? ? ? if (up) {
+>> ? ? ? ? ? ? ? uart_resume_port(&serial_omap_reg, &up->port);
+>> ? ? ? ? ? ? ? console_unlock();
+>> +
+>> + ? ? ? ? ? ? if (up->no_async_wake)
+>> + ? ? ? ? ? ? ? ? ? ? serial_omap_port_enable(up);
+>> ? ? ? }
+>>
+>> ? ? ? return 0;
+>> @@ -1402,6 +1412,7 @@ static int serial_omap_probe(struct platform_device *pdev)
+>> ? ? ? up->errata = omap_up_info->errata;
+>> ? ? ? up->enable_wakeup = omap_up_info->enable_wakeup;
+>> ? ? ? up->chk_wakeup = omap_up_info->chk_wakeup;
+>> + ? ? up->no_async_wake = omap_up_info->no_async_wake;
+>>
+>> ? ? ? if (omap_up_info->dma_enabled) {
+>> ? ? ? ? ? ? ? up->uart_dma.uart_dma_tx = dma_tx->start;
+>> @@ -1430,6 +1441,9 @@ static int serial_omap_probe(struct platform_device *pdev)
+>> ? ? ? ? ? ? ? serial_omap_port_disable(up);
+>> ? ? ? }
+>>
+>> + ? ? if (up->no_async_wake)
+>> + ? ? ? ? ? ? serial_omap_port_enable(up);
+>> +
+>> ? ? ? ui[pdev->id] = up;
+>> ? ? ? serial_omap_add_console_port(up);
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
