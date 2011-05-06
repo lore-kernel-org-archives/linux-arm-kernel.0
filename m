@@ -1,114 +1,126 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Fri,  6 May 2011 12:14:04 +0300
-Subject: [PATCH V2 05/16] mmc: omap_hsmmc: split duplicate code to
-	calc_divisor() function
+Date: Fri,  6 May 2011 12:14:06 +0300
+Subject: [PATCH V2 07/16] mmc: omap_hsmmc: fix few bugs when set the clock
+	divisor
 In-Reply-To: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304673255-31634-6-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304673255-31634-8-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
-There are two places where the same calculations are done. Let's split them to
-separate function.
+There are two pieces of code which similar, but not the same. Each of them
+contains a bug.
 
-In addition the new function is simplified by usage DIV_ROUND_UP kernel macro.
+The SYSCTL register should be read before write in the
+omap_hsmmc_context_restore() to remain the state of the reserved bits.
+
+Before set the clock divisor and DTO bits the value from the SYSCTL register
+should be masked properly. We were lucky to have no problems with DTO bits. So,
+make sure we have clear DTO bits properly in the omap_hsmmc_set_ios().
+
+Additionally get rid of msleep(1). The actual time rare higher than 30us on
+OMAP 3630.
+
+The result pieces of code are split to omap_hsmmc_set_clock() function.
 
 Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   45 ++++++++++++++++------------------------
- 1 files changed, 18 insertions(+), 27 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   59 +++++++++++++++++++---------------------
+ 1 files changed, 28 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index 3121293..af2dbd3 100644
+index 915d08b..dd0d9d5 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -584,6 +584,20 @@ static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
- 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+@@ -607,6 +607,32 @@ static u16 calc_divisor(struct mmc_ios *ios)
+ 	return dsor;
  }
  
-+/* Calculate divisor for the given clock frequency */
-+static u16 calc_divisor(struct mmc_ios *ios)
++static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
 +{
-+	u16 dsor = 0;
++	struct mmc_ios *ios = &host->mmc->ios;
++	unsigned long regval;
++	unsigned long timeout;
 +
-+	if (ios->clock) {
-+		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, ios->clock);
-+		if (dsor > 250)
-+			dsor = 250;
-+	}
++	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
 +
-+	return dsor;
++	omap_hsmmc_stop_clock(host);
++
++	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
++	regval = regval & ~(CLKD_MASK | DTO_MASK);
++	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
++	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
++	OMAP_HSMMC_WRITE(host->base, SYSCTL,
++		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
++
++	/* Wait till the ICS bit is set */
++	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
++	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
++		&& time_before(jiffies, timeout))
++		cpu_relax();
++
++	omap_hsmmc_start_clock(host);
 +}
 +
  #ifdef CONFIG_PM
  
  /*
-@@ -596,7 +610,6 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
- 	struct omap_mmc_platform_data *pdata = host->pdata;
- 	int context_loss = 0;
- 	u32 hctl, capa, con;
--	u16 dsor = 0;
- 	unsigned long timeout;
- 
- 	if (pdata->get_context_loss_count) {
-@@ -675,21 +688,10 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+@@ -697,19 +723,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
  		break;
  	}
  
--	if (ios->clock) {
--		dsor = OMAP_MMC_MASTER_CLOCK / ios->clock;
--		if (dsor < 1)
--			dsor = 1;
+-	omap_hsmmc_stop_clock(host);
 -
--		if (OMAP_MMC_MASTER_CLOCK / dsor > ios->clock)
--			dsor++;
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+-		(calc_divisor(ios) << 6) | (DTO << 16));
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+-		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
 -
--		if (dsor > 250)
--			dsor = 250;
--	}
+-	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
+-	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
+-		&& time_before(jiffies, timeout))
+-		;
 -
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
- 		OMAP_HSMMC_READ(host->base, SYSCTL) & ~CEN);
--	OMAP_HSMMC_WRITE(host->base, SYSCTL, (dsor << 6) | (DTO << 16));
-+	OMAP_HSMMC_WRITE(host->base, SYSCTL,
-+		(calc_divisor(ios) << 6) | (DTO << 16));
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
- 		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+-	omap_hsmmc_start_clock(host);
++	omap_hsmmc_set_clock(host);
  
-@@ -1530,7 +1532,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 	con = OMAP_HSMMC_READ(host->base, CON);
+ 	if (ios->bus_mode == MMC_BUSMODE_OPENDRAIN)
+@@ -1540,8 +1554,6 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
  static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  {
  	struct omap_hsmmc_host *host = mmc_priv(mmc);
--	u16 dsor = 0;
- 	unsigned long regval;
- 	unsigned long timeout;
+-	unsigned long regval;
+-	unsigned long timeout;
  	u32 con;
-@@ -1594,21 +1595,11 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	int do_send_init_stream = 0;
+ 
+@@ -1603,22 +1615,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
  		}
  	}
  
--	if (ios->clock) {
--		dsor = OMAP_MMC_MASTER_CLOCK / ios->clock;
--		if (dsor < 1)
--			dsor = 1;
+-	omap_hsmmc_stop_clock(host);
 -
--		if (OMAP_MMC_MASTER_CLOCK / dsor > ios->clock)
--			dsor++;
+-	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
+-	regval = regval & ~(CLKD_MASK);
+-	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
+-	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+-		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
 -
--		if (dsor > 250)
--			dsor = 250;
--	}
- 	omap_hsmmc_stop_clock(host);
-+
- 	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
- 	regval = regval & ~(CLKD_MASK);
--	regval = regval | (dsor << 6) | (DTO << 16);
-+	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
- 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
- 		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+-	/* Wait till the ICS bit is set */
+-	timeout = jiffies + msecs_to_jiffies(MMC_TIMEOUT_MS);
+-	while ((OMAP_HSMMC_READ(host->base, SYSCTL) & ICS) != ICS
+-		&& time_before(jiffies, timeout))
+-		msleep(1);
+-
+-	omap_hsmmc_start_clock(host);
++	omap_hsmmc_set_clock(host);
+ 
+ 	if (do_send_init_stream)
+ 		send_init_stream(host);
 -- 
 1.7.0.4
