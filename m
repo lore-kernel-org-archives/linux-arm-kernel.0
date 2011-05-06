@@ -1,38 +1,58 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Fri, 6 May 2011 11:01:34 +0300
-Subject: [PATCH] leds: drop leds-h1940 driver
-In-Reply-To: <00f701cc0ba4$3cb4b680$b61e2380$%kim@samsung.com>
-References: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
-	<00f701cc0ba4$3cb4b680$b61e2380$%kim@samsung.com>
-Message-ID: <201105061101.34589.anarsoul@gmail.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Fri, 6 May 2011 17:13:25 +0900
+Subject: Common clock and dvfs
+In-Reply-To: <4DC311C6.7090707@ti.com>
+References: <4DC07F10.6010305@ti.com> <4DC230E0.7090909@ti.com>
+	<BANLkTi=gP80iiJTECUoc+36z_1J68ALJNA@mail.gmail.com>
+	<4DC311C6.7090707@ti.com>
+Message-ID: <BANLkTikSFpNm55F66_DkabNTX8Yfh37NxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 06 May 2011 07:15:27 Kukjin Kim wrote:
-> Hi Vasily,
+On Fri, May 6, 2011 at 6:08 AM, Cousson, Benoit <b-cousson@ti.com> wrote:
+[]
+>
+> Devices will indeed never care about voltage directly, but that will happen
+> indirectly because of:
+> - voltage domains dependency: Changing the MPU or IVA voltage domain might
+> force the CORE voltage to increase its voltage due to HW limitation. We
+> cannot have the CPU at 1GHz while the interconnect is at the lowest OPP.
+> - voltage domain increase due to one device frequency increase might force
+> the other voltage domain devices to increase their frequency.
+> - Thermal management might be a good example as well, but in general
+> changing the main contributors frequency (MPU, GPU) should be enough.
+>
+> In both cases, the indirect voltage change will trigger potentially
+> frequency change.
+>
+> vdd1 <--> vdd2
+> ?| ? ? ? ? |
+> ?+----+ ? ?+----+
+> ?| ? ?| ? ?| ? ?|
+> devA devB devC devD
+>
+> With such partitioning, an increase of devA OPP, will increase vdd1 that
+> will trigger an increase of vdd2 that will then broadcast to devices that
+> belong to it. devC and devD might or not increase their frequency to reduce
+> the energy consumption.
+> Any devices like processors that can run fast and idle must run at the max
+> frequency allowed by the current voltage.
 
-Hi
- 
-> Hmm, regarding maintainer who is Richard Purdie(LED) in this case should be
-> added in Cc. (Cc'ed him)
+As long as the voltage change in vdd1, which changes vdd2 (vdd1 and 2
+are consumers of the same regulator, right?), can update OPP entries
+related (enable/disable entries), devfreq can handle this.
 
-Sorry, forgot to add him to CC :(
+If the clocks and devices (A~D) related are using devfreq, disabling,
+enabling, and adding OPPs will instantly affect devfreq and adjust
+clock frequency based on the enabled OPP entries only. Thus, if a
+module is increasing the voltage, it just needs to disable some
+low-voltage OPP entries although some set_min/max APIs mentioned by
+Colin will be more useful.
 
-> And I think need following with this patch.
-> 
-> --- a/arch/arm/configs/s3c2410_defconfig
-> +++ b/arch/arm/configs/s3c2410_defconfig
-> @@ -389,7 +389,6 @@ CONFIG_MMC_SPI=m
->  CONFIG_MMC_S3C=y
->  CONFIG_LEDS_CLASS=m
->  CONFIG_LEDS_S3C24XX=m
-> -CONFIG_LEDS_H1940=m
->  CONFIG_LEDS_PCA9532=m
->  CONFIG_LEDS_GPIO=m
->  CONFIG_LEDS_PCA955X=m
 
-Sure. Can you commit this change to your tree, or should I resend patch with 
-this change?
-
-Regards
-Vasily
+-- 
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
