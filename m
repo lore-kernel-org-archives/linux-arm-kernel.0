@@ -1,49 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  6 May 2011 11:33:12 +0100
-Subject: [RFC PATCH v2 07/12] ARM: tegra: use remapped PPI interrupts for
+Date: Fri,  6 May 2011 11:33:09 +0100
+Subject: [RFC PATCH v2 04/12] ARM: versatile: use remapped PPI interrupts for
 	local timer
 In-Reply-To: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
 References: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1304677997-26947-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1304677997-26947-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the normal interrupt scheme for the local timers by using
 a remapped PPI interrupt.
 
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
+Tested on VExpress and PB-11MP.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/Kconfig      |    1 +
- arch/arm/mach-tegra/localtimer.c |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-realview/Kconfig       |    2 ++
+ arch/arm/mach-vexpress/Kconfig       |    1 +
+ arch/arm/plat-versatile/localtimer.c |    3 ++-
+ 3 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 3cdeffc..67f478b 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index b9a9805..12c7c56 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -38,6 +38,7 @@ config MACH_REALVIEW_PB11MP
+ 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
+ 	select CPU_V6K
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_HAS_BARRIERS if SMP
+ 	help
+@@ -76,6 +77,7 @@ config MACH_REALVIEW_PBA8
+ config MACH_REALVIEW_PBX
+ 	bool "Support RealView(R) Platform Baseboard Explore"
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
+ 	select ZONE_DMA if SPARSEMEM
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 9311484..07a53aa 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -5,6 +5,7 @@ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
  	select CPU_V7
  	select ARM_GIC
 +	select ARM_GIC_VPPI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
-index e91d681..97cd0a9 100644
---- a/arch/arm/mach-tegra/localtimer.c
-+++ b/arch/arm/mach-tegra/localtimer.c
-@@ -14,13 +14,14 @@
- #include <asm/irq.h>
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_751472
+ 	select ARM_ERRATA_753970
+diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+index 0fb3961..a76daf4 100644
+--- a/arch/arm/plat-versatile/localtimer.c
++++ b/arch/arm/plat-versatile/localtimer.c
+@@ -14,6 +14,7 @@
+ 
  #include <asm/smp_twd.h>
  #include <asm/localtimer.h>
 +#include <asm/hardware/gic.h>
+ #include <mach/irqs.h>
  
  /*
-  * Setup the local clock events for a CPU.
+@@ -21,7 +22,7 @@
   */
  int __cpuinit local_timer_setup(struct clock_event_device *evt)
  {
