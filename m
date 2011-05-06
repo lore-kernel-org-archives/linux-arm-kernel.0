@@ -1,21 +1,22 @@
 From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 6 May 2011 14:07:34 -0600 (MDT)
-Subject: [RFC/PATCH] OMAP PM: remove OMAP_PM_NONE config option
-In-Reply-To: <BANLkTimgrpKq_SrD=U9rzXspKv8eOcsv0w@mail.gmail.com>
-References: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
-	<alpine.DEB.2.00.1105061016070.30136@utopia.booyaka.com>
-	<BANLkTimgrpKq_SrD=U9rzXspKv8eOcsv0w@mail.gmail.com>
-Message-ID: <alpine.DEB.2.00.1105061407140.30136@utopia.booyaka.com>
+Date: Fri, 6 May 2011 14:24:40 -0600 (MDT)
+Subject: [PATCH v4 1/4] OMAP2+: PM: omap device: API's for handling
+	mstandby mode
+In-Reply-To: <1301322422-29886-2-git-send-email-manjugk@ti.com>
+References: <1301322422-29886-1-git-send-email-manjugk@ti.com>
+	<1301322422-29886-2-git-send-email-manjugk@ti.com>
+Message-ID: <alpine.DEB.2.00.1105061423570.30136@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 May 2011, Jean Pihet wrote:
+On Mon, 28 Mar 2011, G, Manjunath Kondaiah wrote:
 
-> I checked the patch against the master branch of both Tony's and
-> Linus's trees, it applies and compiles OK.
-> Is that OK to you?
+> Certain errata in OMAP2+ processors will require forcing
+> master standby to "no standby" mode before completing on going
+> operation. Without this, the results will be unpredictable.
 
-If it applies cleanly against Linus's current tree, then yes, that's fine.
+Thanks, I've queued this one (provisionally) for 2.6.40, assuming we have 
+the diffstat budget for it.
 
 
 - Paul
