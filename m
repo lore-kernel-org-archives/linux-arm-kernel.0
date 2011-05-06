@@ -1,28 +1,29 @@
-From: maxin.john@gmail.com (Maxin John)
-Date: Fri, 6 May 2011 19:51:59 +0300
-Subject: [PATCH] arm: kernel: module: Remove the r_offset check which is
-	always false
-Message-ID: <BANLkTin7e1xkXTWMLQ5fyAZStiCGO-Apug@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri, 06 May 2011 18:56:33 +0200
+Subject: [PATCH v2 2/3] dmaengine: at_hdmac: implement pause and resume
+	in atc_control
+In-Reply-To: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
+References: <f4341d4672a23a958398b75cb4305e0e680f2e32.1304532833.git.nicolas.ferre@atmel.com>
+	<be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
+Message-ID: <4DC42841.9040103@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Checking the unsigned 'r_offset' for less than zero will always be false.
+Le 06/05/2011 19:56, Nicolas Ferre :
+> Pause and resume controls are useful for audio devices. This also returns
+> correct status from atc_tx_status() in case chan is paused.
+> 
+> Idea from dw_dmac patch by Linus Walleij.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
 
-Signed-off-by: Maxin B. John <maxin.john@gmail.com>
----
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index fee7c36..fc74bd3 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -92,7 +92,7 @@ apply_relocate(Elf32_Shdr *sechdrs, const char
-*strtab, unsigned int symindex,
-                sym = ((Elf32_Sym *)symsec->sh_addr) + offset;
-                symname = strtab + sym->st_name;
+V2: In case of pause, some peripheral are not draining data out of FIFO
+    if they are stopped or not clocked: we need to find a way out with
+    a simple timeout.
 
--               if (rel->r_offset < 0 || rel->r_offset >
-dstsec->sh_size - sizeof(u32)) {
-+               if (rel->r_offset > dstsec->sh_size - sizeof(u32)) {
-                        pr_err("%s: section %u reloc %u sym '%s': out
-of bounds relocation, offset %d size %u\n",
-                               module->name, relindex, i, symname,
-                               rel->r_offset, dstsec->sh_size);
+[..]
+
+Best regards,
+-- 
+Nicolas Ferre
