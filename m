@@ -1,47 +1,57 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 May 2011 13:15:27 +0900
-Subject: [PATCH] leds: drop leds-h1940 driver
-In-Reply-To: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
-References: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
-Message-ID: <00f701cc0ba4$3cb4b680$b61e2380$%kim@samsung.com>
+Date: Fri, 06 May 2011 13:48:44 +0900
+Subject: [PATCH] ARM: S3C6410: Support 800MHz operation in cpufreq
+In-Reply-To: <1304003329-15116-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1304003329-15116-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <00f901cc0ba8$e2c45270$a84cf750$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily Khoruzhick wrote:
+Mark Brown wrote:
 > 
-> H1940 machine now uses leds-gpio and leds-h1940 has no users anymore. So
-> drop it.
+> At least some newer S3C6410 silicon supports operation up to 800MHz rather
+> than just 667MHz. Unfortunately I don't have access to any of
+documentation
+> of this other than some running systems, add a new cpufreq table entry for
+> this based on the behaviour of those systems.
 > 
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
->  drivers/leds/Kconfig      |    7 --
->  drivers/leds/Makefile     |    1 -
->  drivers/leds/leds-h1940.c |  170
--------------------------------------------
-> --
->  3 files changed, 0 insertions(+), 178 deletions(-)
->  delete mode 100644 drivers/leds/leds-h1940.c
+>  arch/arm/mach-s3c64xx/cpufreq.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
-Hi Vasily,
+> diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-
+> s3c64xx/cpufreq.c
+> index 4375b97..db722a5 100644
+> --- a/arch/arm/mach-s3c64xx/cpufreq.c
+> +++ b/arch/arm/mach-s3c64xx/cpufreq.c
+> @@ -32,6 +32,7 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
+>  	[1] = { 1050000, 1150000 },
+>  	[2] = { 1100000, 1150000 },
+>  	[3] = { 1200000, 1350000 },
+> +	[4] = { 1300000, 1350000 },
+>  };
+> 
+>  static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
+> @@ -44,6 +45,7 @@ static struct cpufreq_frequency_table
+s3c64xx_freq_table[]
+> = {
+>  	{ 2, 532000 },
+>  	{ 2, 533000 },
+>  	{ 3, 667000 },
+> +	{ 4, 800000 },
+>  	{ 0, CPUFREQ_TABLE_END },
+>  };
+>  #endif
+> --
 
-Hmm, regarding maintainer who is Richard Purdie(LED) in this case should be
-added in Cc. (Cc'ed him)
+Hi Mark,
 
-And I think need following with this patch.
+Yes, some newer S3C6410 can support 800Mhz(ARM clock) and you can
+distinguish it from its marking on top of silicon. According to a design
+guide, its typical VDD ARM is 1.3V :)
 
---- a/arch/arm/configs/s3c2410_defconfig
-+++ b/arch/arm/configs/s3c2410_defconfig
-@@ -389,7 +389,6 @@ CONFIG_MMC_SPI=m
- CONFIG_MMC_S3C=y
- CONFIG_LEDS_CLASS=m
- CONFIG_LEDS_S3C24XX=m
--CONFIG_LEDS_H1940=m
- CONFIG_LEDS_PCA9532=m
- CONFIG_LEDS_GPIO=m
- CONFIG_LEDS_PCA955X=m
-
-
-Thanks.
+Will apply and thanks.
 
 Best regards,
 Kgene.
