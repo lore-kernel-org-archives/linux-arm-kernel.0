@@ -1,65 +1,22 @@
-From: rpurdie@rpsys.net (Richard Purdie)
-Date: Fri, 06 May 2011 22:03:22 +0100
-Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
-In-Reply-To: <20110413062316.GH18850@pengutronix.de>
-References: <1302097097.22904.41.camel@rex>
-	<1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110412214848.GI7806@n2100.arm.linux.org.uk>
-	<20110413062316.GH18850@pengutronix.de>
-Message-ID: <1304715802.30391.157.camel@rex>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 6 May 2011 15:49:34 -0600 (MDT)
+Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
+In-Reply-To: <BANLkTi=Ab0EJ3fAQGHBOyPd+eAJHWcjtuA@mail.gmail.com>
+References: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
+	<alpine.DEB.2.00.1104201351180.12683@utopia.booyaka.com>
+	<BANLkTi=Ab0EJ3fAQGHBOyPd+eAJHWcjtuA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1105061549150.30136@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-04-13 at 08:23 +0200, Uwe Kleine-K?nig wrote:
-> On Tue, Apr 12, 2011 at 10:48:48PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, Apr 11, 2011 at 10:35:57PM +0200, Uwe Kleine-K?nig wrote:
-> > > diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-> > > index 9bec869..e8e101e 100644
-> > > --- a/drivers/leds/Kconfig
-> > > +++ b/drivers/leds/Kconfig
-> > > @@ -14,6 +14,11 @@ config LEDS_CLASS
-> > >  	  This option enables the led sysfs class in /sys/class/leds.  You'll
-> > >  	  need this to do anything useful with LEDs.  If unsure, say N.
-> > >  
-> > > +config LED_REGISTER_GPIO
-> > > +	bool
-> > > +	help
-> > > +	  This option provides the function gpio_led_register_device.
-> > > +
-> > >  if NEW_LEDS
-> > >  
-> > >  comment "LED drivers"
-> > > diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-> > > index 39c80fc..ca428bd 100644
-> > > --- a/drivers/leds/Makefile
-> > > +++ b/drivers/leds/Makefile
-> > > @@ -3,6 +3,7 @@
-> > >  obj-$(CONFIG_NEW_LEDS)			+= led-core.o
-> > >  obj-$(CONFIG_LEDS_CLASS)		+= led-class.o
-> > >  obj-$(CONFIG_LEDS_TRIGGERS)		+= led-triggers.o
-> > > +obj-y					+= led-register.o
-> > 
-> > Why not obj-$(CONFIG_LED_REGISTER_GPIO) += led-register.o
-> > 
-> > rather than wrapping the code of led-register.c with a #ifdef for the
-> > same symbol?
-> I thought that the registration for other led-devices could go into that
-> file, too. That's why I choosed the name led-register and not
-> leds-gpio-register.c. Agreed? I don't insist on that.
+On Thu, 21 Apr 2011, Gulati, Shweta wrote:
 
-I'm not sure we want/need to put other registration functions in this
-file? obj-$(CONFIG_LED_REGISTER_GPIO) probably therefore makes sense
-until some other registration need arises.
+> Yes, but in current code clk_set_rate of dpll3_m2 -
+> 'omap3_core_dpll_m2_set_rate'
+> doesn't update clk.rate, I will submit patch fixing that bug and will
+> make sure that
+> set_rate of all clocks should update clk.rate
 
-Regardless, I'm happier with this patch than the previous ones. If you
-change it to use obj-$(CONFIG_LED_REGISTER_GPIO), 
+Ping.  Do you plan to post this soon?  This should be a trivial patch.
 
-Acked-by: Richard Purdie <richard.purdie@linuxfoundation.org>
-
-Cheers,
-
-Richard
-
--- 
-Linux Foundation
-http://www.yoctoproject.org/
+- Paul
