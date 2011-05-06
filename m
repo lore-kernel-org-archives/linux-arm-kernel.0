@@ -1,100 +1,93 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Fri, 6 May 2011 14:46:48 +0530
-Subject: [PATCH v2 11/12] OMAP: Serial: Use resume call from prcm to
-	enable uart
-In-Reply-To: <87liylkxdi.fsf@ti.com>
-References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
-	<1304080796-625-12-git-send-email-govindraj.raja@ti.com>
-	<87pqnym2f2.fsf@ti.com>
-	<BANLkTi=32NfMr7exWpOoPHX7_-Jc0i5LqA@mail.gmail.com>
-	<87liylkxdi.fsf@ti.com>
-Message-ID: <BANLkTinr8n0P31LWPrwL83sWCzVQOqo6=Q@mail.gmail.com>
+From: adrian.hunter@nokia.com (Adrian Hunter)
+Date: Fri,  6 May 2011 12:14:15 +0300
+Subject: [PATCH V2 16/16] mmc: omap_hsmmc: add a hardware reset before
+	initialization
+In-Reply-To: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
+References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304673255-31634-17-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 5, 2011 at 8:28 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Govindraj <govindraj.ti@gmail.com> writes:
->
-> [...]
->
->>>
->>> ... this is just putting back basically the same thing that was removed in
->>> patch 1. ?IOW, this is now being checked for *every* PRCM wakeup, which
->>> is no different than having it in the idle path.
->>>
->>> I thought I understood that you had the SW IRQ triggering working, so
->>> this part should not be necessary.
->>
->> Actually I tried few experiments but couldn't get it working.
->
-> What exactly is not working? ? The interrupt is not firing at all? ?The
-> driver's ISR is not being called?
->
+After a warm restart, an eMMC which cannot be powered off is
+in an unknown state, so reset it to be sure it will initialize.
 
-It throws a oops as here
+Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+---
+ drivers/mmc/host/omap_hsmmc.c |   38 +++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 37 insertions(+), 1 deletions(-)
 
-http://pastebin.com/5bcPjAA0
-
-Reproduced with below [EXP-1] change + below kernel.
-
-git://gitorious.org/uart_runtime/pm.git
-[Has uart runtime patches based on pm-core branch]
-
->> Tried below but didn't help.
->>
->> ------------------------------------
->> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->> index 3960330..2c1dfc2 100644
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -288,6 +288,16 @@ static irqreturn_t prcm_interrupt_handler (int
->> irq, void *dev_id)
->> ? ? ? ? do {
->> ? ? ? ? ? ? ? ? if (irqstatus_mpu & (OMAP3430_WKUP_ST_MASK |
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP3430_IO_ST_MASK)) {
->> +#if 1
->> + ? ? ? ? ? ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ? ? ? ? ? ?* EXP-1: SET UART1 SOFT IRQ BIT
->> + ? ? ? ? ? ? ? ? ? ? ? ?* 3430 -SDP UART1 console.
->> + ? ? ? ? ? ? ? ? ? ? ? ?* M_IRQ_72, INTCPS_ISR_SET
->> + ? ? ? ? ? ? ? ? ? ? ? ?* 0x4820 0090 + (0x20 * n)
->> + ? ? ? ? ? ? ? ? ? ? ? ?* bit-8 n = 2
->> + ? ? ? ? ? ? ? ? ? ? ? ?*/
->> + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x100 , 0x482000D0);
->> +#endif
->> ? ? ? ? ? ? ? ? ? ? ? ? c = _prcm_int_handle_wakeup();
->>
->> ? ? ? ? ? ? ? ? ? ? ? ? /*
->>
->> -----------------------------------
->>
->> Currently we are planning to integrate irq_chaining patches
->> on top uart_runtime patches which is work-in-progress.
->> Will remove resume_idle once we have irq_chaining patches available.
->
-> Well, I'm not OK with $SUBJECT patch as it is since it's just moving an
-> ugly hack from serial.c to the PRCM ISR. ?If the hack is going to stay,
-> then it should stay where it is until it can be fixed for real.
-
-Now with runtime changes we are cutting clocks independently
-whereas prior to this we where cutting clocks only in sram_idle path.
-
-With runtime changes:
-1.) Once we cut uart clocks and send a char to uart it directs wakeup_irq to
-prcm_irq_handler the one way to wakeup uart from there was to check
-uart mod wakeup status bits if wakeup event occurred then wakeup the
-particular uart.
-2.) Moving this resume back to sram path will break module wakeup after
-uart clocks are disabled(using put_sync)
-
-Thats the reason I have moved this to prcm_irq path to ensure
-once auto-suspend happens after inactivity period we have resume_call
-to wakeup uart port.
-
---
-Thanks,
-Govindraj.R
-
->
-> Kevin
->
+diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+index e1c9017..70b8ef8 100644
+--- a/drivers/mmc/host/omap_hsmmc.c
++++ b/drivers/mmc/host/omap_hsmmc.c
+@@ -530,10 +530,25 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
+ 	} else
+ 		pdata->slots[0].gpio_wp = -EINVAL;
+ 
++	if (gpio_is_valid(pdata->slots[0].gpio_hw_reset)) {
++		ret = gpio_request(pdata->slots[0].gpio_hw_reset,
++				   "mmc_hw_reset");
++		if (ret)
++			goto err_free_wp;
++		ret = gpio_direction_output(pdata->slots[0].gpio_hw_reset, 1);
++		if (ret)
++			goto err_free_hw_reset;
++	} else
++		pdata->slots[0].gpio_hw_reset = -EINVAL;
++
+ 	return 0;
+ 
++
++err_free_hw_reset:
++	gpio_free(pdata->slots[0].gpio_hw_reset);
+ err_free_wp:
+-	gpio_free(pdata->slots[0].gpio_wp);
++	if (gpio_is_valid(pdata->slots[0].gpio_wp))
++		gpio_free(pdata->slots[0].gpio_wp);
+ err_free_cd:
+ 	if (gpio_is_valid(pdata->slots[0].switch_pin))
+ err_free_sp:
+@@ -543,6 +558,8 @@ err_free_sp:
+ 
+ static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
+ {
++	if (gpio_is_valid(pdata->slots[0].gpio_hw_reset))
++		gpio_free(pdata->slots[0].gpio_hw_reset);
+ 	if (gpio_is_valid(pdata->slots[0].gpio_wp))
+ 		gpio_free(pdata->slots[0].gpio_wp);
+ 	if (gpio_is_valid(pdata->slots[0].switch_pin))
+@@ -803,6 +820,18 @@ static void omap_hsmmc_context_save(struct omap_hsmmc_host *host)
+ 
+ #endif
+ 
++static void omap_hsmmc_do_hw_reset(struct omap_hsmmc_host *host)
++{
++	if (!gpio_is_valid(mmc_slot(host).gpio_hw_reset))
++		return;
++
++	gpio_set_value_cansleep(mmc_slot(host).gpio_hw_reset, 0);
++	udelay(9);
++	gpio_set_value_cansleep(mmc_slot(host).gpio_hw_reset, 1);
++	usleep_range(1000, 2000);
++	printk(KERN_INFO "%s: hardware reset done\n", mmc_hostname(host->mmc));
++}
++
+ /*
+  * Send init stream sequence to card
+  * before sending IDLE command
+@@ -815,6 +844,13 @@ static void send_init_stream(struct omap_hsmmc_host *host)
+ 	if (host->protect_card)
+ 		return;
+ 
++	/*
++	 * After a warm restart, an eMMC which cannot be powered off is in an
++	 * unknown state so reset it to be sure it will initialize.
++	 */
++	if (mmc_slot(host).no_off)
++		omap_hsmmc_do_hw_reset(host);
++
+ 	disable_irq(host->irq);
+ 
+ 	OMAP_HSMMC_WRITE(host->base, IE, INT_EN_MASK);
+-- 
+1.7.0.4
