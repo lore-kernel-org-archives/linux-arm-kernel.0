@@ -1,35 +1,98 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 May 2011 19:47:47 +0100
-Subject: [PATCH] [RFC] USB: fsl_udc_core: fix build-failure for ARM
-In-Reply-To: <20110506100310.GT11574@pengutronix.de>
-References: <20110505135029.0c068b8e@wker>
-	<1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110506090449.GA18408@n2100.arm.linux.org.uk>
-	<20110506100310.GT11574@pengutronix.de>
-Message-ID: <20110506184747.GA3390@n2100.arm.linux.org.uk>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Fri,  6 May 2011 22:58:13 +0300
+Subject: [PATCH v2] omap: fix build when MTD_NAND_OMAP2 and
+	TOUCHSCREEN_ADS7846 are disabled
+In-Reply-To: <20110506072523.GA25670@atomide.com>
+References: <20110506072523.GA25670@atomide.com>
+Message-ID: <1304711893-24299-1-git-send-email-mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2011 at 12:03:10PM +0200, Uwe Kleine-K?nig wrote:
-> Hi Russell,
-> 
-> On Fri, May 06, 2011 at 10:04:49AM +0100, Russell King - ARM Linux wrote:
-> > On Fri, May 06, 2011 at 11:00:05AM +0200, Uwe Kleine-K?nig wrote:
-> > > I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
-> > > a flush ARM probably does, too, no?
-> > > If so, what it the right thing to do? Implement flush_dcache_range for
-> > > ARM (just wrapping flush_dcache_page?)?
-> > 
-> > On ARM, we assume all new pages have dirty dcache, which allows us to
-> > neatly end the ever-increasing quantity of drivers which need to be
-> > patched to work on ARM.  PowerPC doesn't do this.
-> Unless I'm missing something the cache flushed here isn't necessarily
-> for a new page. (And even if the flush isn't needed here for ARM, not
-> having flush_dcache_range results in #ifdefs for each user of it. So a
-> definition would be nice, wouldn't it?)
+Commits 5e6a64b36ce346b7a2d481ef9fa315290eb28e5e (omap: move detection of
+NAND CS to common-board-devices) and 96974a249b0cf3537f49115a59be67e2c54f315c
+(omap: consolidate touch screen initialization among different boards)
+break compilation when CONFIG_MTD_NAND_OMAP2 and
+CONFIG_TOUCHSCREEN_ADS7846 are not selected.
+Removing ifdefs and stubs from common-board-devices.h fixes the problem.
 
-Well, the folk introducing it should have added it to cachetlb.txt so
-that other folk know what the intentions of it are.  At the moment it
-seems to be an unofficial extension with unknown semantics.  Maybe the
-PPC folk can clear it up and fix other arches if they wish to make it
-an official arch cachetlb extension.
+Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+CC: Oleg Drokin <green@linuxhacker.ru>
+---
+Hope this one is better.
+
+ arch/arm/mach-omap2/common-board-devices.c |   15 +++++++++++++++
+ arch/arm/mach-omap2/common-board-devices.h |   17 -----------------
+ 2 files changed, 15 insertions(+), 17 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
+index d57c71d..e94903b 100644
+--- a/arch/arm/mach-omap2/common-board-devices.c
++++ b/arch/arm/mach-omap2/common-board-devices.c
+@@ -50,6 +50,8 @@ void __init omap_pmic_init(int bus, u32 clkrate,
+ 	omap_register_i2c_bus(bus, clkrate, &pmic_i2c_board_info, 1);
+ }
+ 
++#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
++	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ static struct omap2_mcspi_device_config ads7846_mcspi_config = {
+ 	.turbo_mode	= 0,
+ 	.single_channel	= 1,	/* 0: slave, 1: master */
+@@ -105,7 +107,14 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+ 
+ 	spi_register_board_info(&ads7846_spi_board_info, 1);
+ }
++#else
++void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
++			      struct ads7846_platform_data *board_pdata)
++{
++}
++#endif
+ 
++#if defined(CONFIG_MTD_NAND_OMAP2) || defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+ static struct omap_nand_platform_data nand_data = {
+ 	.dma_channel	= -1,		/* disable DMA in OMAP NAND driver */
+ };
+@@ -146,3 +155,9 @@ void __init omap_nand_flash_init(int options, struct mtd_partition *parts,
+ 			printk(KERN_ERR "Unable to register NAND device\n");
+ 	}
+ }
++#else
++void __init omap_nand_flash_init(int options, struct mtd_partition *parts,
++				 int nr_parts)
++{
++}
++#endif
+diff --git a/arch/arm/mach-omap2/common-board-devices.h b/arch/arm/mach-omap2/common-board-devices.h
+index ca03abf..eb80b3b 100644
+--- a/arch/arm/mach-omap2/common-board-devices.h
++++ b/arch/arm/mach-omap2/common-board-devices.h
+@@ -26,27 +26,10 @@ static inline void omap4_pmic_init(const char *pmic_type,
+ 	omap_pmic_init(1, 400, pmic_type, OMAP44XX_IRQ_SYS_1N, pmic_data);
+ }
+ 
+-#if defined(CONFIG_TOUCHSCREEN_ADS7846) || \
+-	defined(CONFIG_TOUCHSCREEN_ADS7846_MODULE)
+ struct ads7846_platform_data;
+ 
+ void omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
+ 		       struct ads7846_platform_data *board_pdata);
+-#else
+-static inline void omap_ads7846_init(int bus_num,
+-				     int gpio_pendown, int gpio_debounce,
+-				     struct ads7846_platform_data *board_data)
+-{
+-}
+-#endif
+-
+-#if defined(CONFIG_MTD_NAND_OMAP2) || defined(CONFIG_MTD_NAND_OMAP2_MODULE)
+ void omap_nand_flash_init(int opts, struct mtd_partition *parts, int n_parts);
+-#else
+-static inline void omap_nand_flash_init(int opts, struct mtd_partition *parts,
+-					int nr_parts)
+-{
+-}
+-#endif
+ 
+ #endif /* __OMAP_COMMON_BOARD_DEVICES__ */
+-- 
+1.7.3.1
