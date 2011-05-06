@@ -1,34 +1,44 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 6 May 2011 11:58:16 +0200
-Subject: [PATCH] mach-ux500: fix SMP secondary startup regression
-Message-ID: <1304675896-2747-1-git-send-email-linus.walleij@stericsson.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Fri,  6 May 2011 13:08:43 +0200
+Subject: [PATCH] avr32: add some more at91 to cpu.h definition
+Message-ID: <1304680123-20218-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit e2a083dc0da9aa6437e14811198379b18cdfa7f8
-"ARM: consolidate SMP cross call implementation" broke the ux500
-compilation since the smp.h header declared a function called
-from headsmp.S. This fixes it up by declaring it locally instead.
+Somme common drivers will need those at91 cpu_is_xxx() definitions.
+Those definitions are already in Linus' tree so if we want to use them
+in common drivers, we will need them in AVR32 cpu.h file.
 
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/mach-ux500/platsmp.c |    3 +++
- 1 files changed, 3 insertions(+), 0 deletions(-)
+ arch/avr32/mach-at32ap/include/mach/cpu.h |   13 +++++++++++++
+ 1 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/platsmp.c b/arch/arm/mach-ux500/platsmp.c
-index 4e33846..0c527fe 100644
---- a/arch/arm/mach-ux500/platsmp.c
-+++ b/arch/arm/mach-ux500/platsmp.c
-@@ -23,6 +23,9 @@
- #include <mach/hardware.h>
- #include <mach/setup.h>
- 
-+/* This is called from headsmp.S to wakeup the secondary core */
-+extern void u8500_secondary_startup(void);
+diff --git a/arch/avr32/mach-at32ap/include/mach/cpu.h b/arch/avr32/mach-at32ap/include/mach/cpu.h
+index 9c96a13..a927d9e 100644
+--- a/arch/avr32/mach-at32ap/include/mach/cpu.h
++++ b/arch/avr32/mach-at32ap/include/mach/cpu.h
+@@ -31,8 +31,21 @@
+ #define cpu_is_at91sam9263()	(0)
+ #define cpu_is_at91sam9rl()	(0)
+ #define cpu_is_at91cap9()	(0)
++#define cpu_is_at91cap9_revB()	(0)
++#define cpu_is_at91cap9_revC()	(0)
+ #define cpu_is_at91sam9g10()	(0)
++#define cpu_is_at91sam9g20()	(0)
+ #define cpu_is_at91sam9g45()	(0)
+ #define cpu_is_at91sam9g45es()	(0)
++#define cpu_is_at91sam9m10()	(0)
++#define cpu_is_at91sam9g46()	(0)
++#define cpu_is_at91sam9m11()	(0)
++#define cpu_is_at91sam9x5()	(0)
++#define cpu_is_at91sam9g15()	(0)
++#define cpu_is_at91sam9g35()	(0)
++#define cpu_is_at91sam9x35()	(0)
++#define cpu_is_at91sam9g25()	(0)
++#define cpu_is_at91sam9x25()	(0)
 +
- /*
-  * control for which core is the next to come out of the secondary
-  * boot "holding pen"
+ 
+ #endif /* __ASM_ARCH_CPU_H */
 -- 
-1.7.3.2
+1.7.3
