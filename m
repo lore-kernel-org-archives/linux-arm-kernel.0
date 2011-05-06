@@ -1,70 +1,52 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 May 2011 14:19:51 +0900
-Subject: [PATCH] ARM: EXYNOS4: Add to support ORIGEN board
-In-Reply-To: <1303796228-9729-1-git-send-email-snow.jhkim@gmail.com>
-References: <1303796228-9729-1-git-send-email-snow.jhkim@gmail.com>
-Message-ID: <00fd01cc0bad$3b961100$b2c23300$%kim@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 6 May 2011 07:17:17 +0200
+Subject: [RFC PATCH] arm: drop Execute-In-Place
+In-Reply-To: <BANLkTi=qiX9oG=ZMx0nZXrG811L7OZg4ww@mail.gmail.com>
+References: <4DC2E5AA.5010604@am.sony.com> <4DC2E669.2000101@am.sony.com>
+	<1304620350.2398.29.camel@i7.infradead.org>
+	<4DC2EF19.5010309@am.sony.com>
+	<alpine.LFD.2.00.1105051453280.24613@xanadu.home>
+	<BANLkTimfKJPcDN+L4+z1DnsMv_BMOHpyew@mail.gmail.com>
+	<4DC2F6B0.80800@am.sony.com>
+	<BANLkTincnFhwXAyvua5mtZDHqXs5Vts--Q@mail.gmail.com>
+	<4DC307D0.3090704@am.sony.com>
+	<BANLkTi=qiX9oG=ZMx0nZXrG811L7OZg4ww@mail.gmail.com>
+Message-ID: <20110506051717.GG11267@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-JeongHyeon Kim wrote:
+On 16:31 Thu 05 May     , Mike Frysinger wrote:
+> On Thu, May 5, 2011 at 16:25, Tim Bird wrote:
+> > On 05/05/2011 12:27 PM, Mike Frysinger wrote:
+> >> On Thu, May 5, 2011 at 15:12, Tim Bird wrote:
+> >>> As for in-tree-ness - I thought the most recent message was to stay
+> >>> out of tree until the refactoring was over. ;-)
+> >>
+> >> to be fair, does this have any relevance whatsoever to NEC parts ?
+> >> istm that the hindrance here is NEC doing any actual work for
+> >> mainline. ?even if there was no refactoring, i find it hard to believe
+> >> that an NEC port would be posted. ?if it were actually something that
+> >> could happen, then they should already be posting patches for *basic*
+> >> review to get the pieces unrelated to the refactoring worked out.
+> >> there's no reason this has to be done serially.
+> >
+> > Well, OK. ?I just don't want to lob bombs at NEC and then
+> > have some poor soul over there get immediately rebuffed, due to
+> > basic ARM churn. ?Maybe not having naviengine support upstream
+> > is my fault, but Sony doesn't make the CPU, so it doesn't seem
+> > like it should be my job to mainline the chip support. ?About
+> > the only thing I have at my disposal is pressure not to buy
+> > the chip (but this is harder to exercise than one might think.)
 > 
-> From: JeongHyeon Kim <jhkim@insignal.co.kr>
+> i dont have any vested interest either way wrt NEC or ARM/XIP.  i was
+> just trying to highlight what i saw as a red herring.
 > 
-> This patch adds to support Insignal's ORIGEN board.
-> 
-> Signed-off-by: JeongHyeon Kim <jhkim@insignal.co.kr>
-> ---
->  arch/arm/mach-exynos4/Kconfig       |   10 +++
->  arch/arm/mach-exynos4/Makefile      |    1 +
->  arch/arm/mach-exynos4/mach-origen.c |  108
-> +++++++++++++++++++++++++++++++++++
->  3 files changed, 119 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-exynos4/mach-origen.c
-> 
-Hi Jeonghyeon,
+> i think the axiom "post early & post often" holds just as true here.
+I've the same felling as Mike or David
 
-Basically, adding board file cannot be merged(applied) into regarding ARM
-maintainer tree now even though your patch has no problem. You can easily
-find the reason when you read some threads in here.
+Out of tree does not exist
 
-So I'm not sure when your patch can be merged.
+Specially when they do effort to come mainline
 
-There is comment. But no need to re-submit, if required, I can fix it when I
-apply this.
-
-> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-> index e849f67..0a61cf3 100644
-> --- a/arch/arm/mach-exynos4/Kconfig
-> +++ b/arch/arm/mach-exynos4/Kconfig
-> @@ -177,6 +177,16 @@ config MACH_NURI
->  	help
->  	  Machine support for Samsung Mobile NURI Board.
-> 
-> +config MACH_ORIGEN
-> +        bool "ORIGEN"
-   ^^^^^^^^
-> +        select CPU_EXYNOS4210
-   ^^^^^^^^
-> +        select S3C_DEV_RTC
-   ^^^^^^^^
-> +        select S3C_DEV_WDT
-   ^^^^^^^^
-> +        select S3C_DEV_HSMMC2
-   ^^^^^^^^
-> +        select EXYNOS4_SETUP_SDHCI
-   ^^^^^^^^
-> +        help
-   ^^^^^^^^
-> +          Machine support for ORIGEN based on Samsung S5PV310
-   ^^^^^^^^
-
-Should be tab...
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Best Regards,
+J.
