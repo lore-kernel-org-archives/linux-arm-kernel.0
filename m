@@ -1,54 +1,32 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 May 2011 14:33:12 +0900
-Subject: [PATCH] arm: exynos4: PM Bugfix for not waking up from
-	suspend-to-RAM
-In-Reply-To: <1303706457-20936-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1303706457-20936-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <00fe01cc0baf$192b9250$4b82b6f0$%kim@samsung.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 May 2011 09:07:36 +0300
+Subject: [RFC PATCH] arm: drop Execute-In-Place
+In-Reply-To: <alpine.LFD.2.00.1105051518580.24613@xanadu.home>
+References: <1304607121-13612-1-git-send-email-plagnioj@jcrosoft.com>
+	<4DC2E5AA.5010604@am.sony.com> <4DC2E669.2000101@am.sony.com>
+	<1304620350.2398.29.camel@i7.infradead.org>
+	<4DC2EF19.5010309@am.sony.com>
+	<alpine.LFD.2.00.1105051453280.24613@xanadu.home>
+	<BANLkTimfKJPcDN+L4+z1DnsMv_BMOHpyew@mail.gmail.com>
+	<4DC2F6B0.80800@am.sony.com>
+	<alpine.LFD.2.00.1105051518580.24613@xanadu.home>
+Message-ID: <20110506060733.GP27860@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110505 22:23]:
+> On Thu, 5 May 2011, Tim Bird wrote:
+> > 
+> > I should add that I tried to use XIP on omap (for research purposes),
+> > but it was broken and I didn't have time to fix it.  My bad.
 > 
-> Exynos4210 EVT1 (s5pc210-evt1) has an issue of not waking up from
-> suspend-to-RAM WAKEUP_MASK register's 31'b is not cleared before
-> entering a suspend. This patch clears every undocumented bits of
-> WAKEUP_MASK before entering a suspend and enabled sleep/wake in the
-> specified chip.
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/mach-exynos4/pm.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
-> index 10d917d..1cef195 100644
-> --- a/arch/arm/mach-exynos4/pm.c
-> +++ b/arch/arm/mach-exynos4/pm.c
-> @@ -326,6 +326,10 @@ static void exynos4_pm_prepare(void)
->  	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
->  	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
-> 
-> +	/* EVT1 issues with undocumented S5P_WAKEUP_MASK bits. */
-> +	tmp = __raw_readl(S5P_WAKEUP_MASK);
-> +	__raw_writel(0x000fffff & tmp, S5P_WAKEUP_MASK);
+> OMAP is doing pretty nasty things with their early serial port support.  
+> This is most likely to screw up XIP.
 
-Hmm, according to your above description about 31th bit, should be 'tmp &=
-~(1 << 31); then write'?
-Or do we _really_ need to clear other 11bits [30:20] like your comments,
-every undocumented bits?
+Yes to debug it you'd have to hardcode the uart_phys and virt
+in the debug-macro.S for DEBUG_LL and EARLY_PRINTK. But should
+be easy enough to do for anybody using XIP.
 
-As I know, NO.
+Of course there may also be other issues too :)
 
-In addition, to clear 31th bit is added s3c_pm_arch_prepare_irqs() of
-arch/arm/mach-exynos4/include/mach/pm-core.h and it is called before
-entering suspend mode.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Tony
