@@ -1,44 +1,34 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  6 May 2011 13:08:43 +0200
-Subject: [PATCH] avr32: add some more at91 to cpu.h definition
-Message-ID: <1304680123-20218-1-git-send-email-nicolas.ferre@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 6 May 2011 12:03:10 +0200
+Subject: [PATCH] [RFC] USB: fsl_udc_core: fix build-failure for ARM
+In-Reply-To: <20110506090449.GA18408@n2100.arm.linux.org.uk>
+References: <20110505135029.0c068b8e@wker>
+	<1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110506090449.GA18408@n2100.arm.linux.org.uk>
+Message-ID: <20110506100310.GT11574@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Somme common drivers will need those at91 cpu_is_xxx() definitions.
-Those definitions are already in Linus' tree so if we want to use them
-in common drivers, we will need them in AVR32 cpu.h file.
+Hi Russell,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- arch/avr32/mach-at32ap/include/mach/cpu.h |   13 +++++++++++++
- 1 files changed, 13 insertions(+), 0 deletions(-)
+On Fri, May 06, 2011 at 10:04:49AM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 06, 2011 at 11:00:05AM +0200, Uwe Kleine-K?nig wrote:
+> > I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
+> > a flush ARM probably does, too, no?
+> > If so, what it the right thing to do? Implement flush_dcache_range for
+> > ARM (just wrapping flush_dcache_page?)?
+> 
+> On ARM, we assume all new pages have dirty dcache, which allows us to
+> neatly end the ever-increasing quantity of drivers which need to be
+> patched to work on ARM.  PowerPC doesn't do this.
+Unless I'm missing something the cache flushed here isn't necessarily
+for a new page. (And even if the flush isn't needed here for ARM, not
+having flush_dcache_range results in #ifdefs for each user of it. So a
+definition would be nice, wouldn't it?)
 
-diff --git a/arch/avr32/mach-at32ap/include/mach/cpu.h b/arch/avr32/mach-at32ap/include/mach/cpu.h
-index 9c96a13..a927d9e 100644
---- a/arch/avr32/mach-at32ap/include/mach/cpu.h
-+++ b/arch/avr32/mach-at32ap/include/mach/cpu.h
-@@ -31,8 +31,21 @@
- #define cpu_is_at91sam9263()	(0)
- #define cpu_is_at91sam9rl()	(0)
- #define cpu_is_at91cap9()	(0)
-+#define cpu_is_at91cap9_revB()	(0)
-+#define cpu_is_at91cap9_revC()	(0)
- #define cpu_is_at91sam9g10()	(0)
-+#define cpu_is_at91sam9g20()	(0)
- #define cpu_is_at91sam9g45()	(0)
- #define cpu_is_at91sam9g45es()	(0)
-+#define cpu_is_at91sam9m10()	(0)
-+#define cpu_is_at91sam9g46()	(0)
-+#define cpu_is_at91sam9m11()	(0)
-+#define cpu_is_at91sam9x5()	(0)
-+#define cpu_is_at91sam9g15()	(0)
-+#define cpu_is_at91sam9g35()	(0)
-+#define cpu_is_at91sam9x35()	(0)
-+#define cpu_is_at91sam9g25()	(0)
-+#define cpu_is_at91sam9x25()	(0)
-+
- 
- #endif /* __ASM_ARCH_CPU_H */
+Best regards
+Uwe
+
 -- 
-1.7.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
