@@ -1,73 +1,26 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Fri, 6 May 2011 14:05:44 +0530
-Subject: [PATCH 08/22] mmc: omap_hsmmc: correct debug report error status
-	mnemonics
-In-Reply-To: <1304596282-4095-9-git-send-email-adrian.hunter@nokia.com>
-References: <1304596282-4095-1-git-send-email-adrian.hunter@nokia.com>
-	<1304596282-4095-9-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <BANLkTim963pDi_awSYefAqMwPSi5L3k_mA@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 6 May 2011 10:39:59 +0200
+Subject: [PATCH v2 7/7] ARM: mxc: remove esdhc.h and use the public one
+In-Reply-To: <1304601778-13837-8-git-send-email-shawn.guo@linaro.org>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+	<1304601778-13837-8-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110506083959.GS11574@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 5, 2011 at 5:21 PM, Adrian Hunter <adrian.hunter@nokia.com> wrote:
-> CERR and BADA were in the wrong place and there are only
-> 32 not 35.
->
-> Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
+Hello Shawn,
+
+On Thu, May 05, 2011 at 09:22:58PM +0800, Shawn Guo wrote:
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
-> ?drivers/mmc/host/omap_hsmmc.c | ? 19 +++++++++++--------
-> ?1 files changed, 11 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index bd52849..a1a1101 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -982,14 +982,14 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
-> ?* Readable error output
-> ?*/
-> ?#ifdef CONFIG_MMC_DEBUG
-> -static void omap_hsmmc_report_irq(struct omap_hsmmc_host *host, u32 status)
-> +static void omap_hsmmc_dbg_report_irq(struct omap_hsmmc_host *host, u32 status)
-> ?{
-> ? ? ? ?/* --- means reserved bit without definition at documentation */
-> ? ? ? ?static const char *omap_hsmmc_status_bits[] = {
-> - ? ? ? ? ? ? ? "CC", "TC", "BGE", "---", "BWR", "BRR", "---", "---", "CIRQ",
-> - ? ? ? ? ? ? ? "OBI", "---", "---", "---", "---", "---", "ERRI", "CTO", "CCRC",
-> - ? ? ? ? ? ? ? "CEB", "CIE", "DTO", "DCRC", "DEB", "---", "ACE", "---",
-> - ? ? ? ? ? ? ? "---", "---", "---", "CERR", "CERR", "BADA", "---", "---", "---"
-> + ? ? ? ? ? ? ? "CC" ?, "TC" ?, "BGE", "---", "BWR" , "BRR" , "---" , "---" ,
-> + ? ? ? ? ? ? ? "CIRQ", "OBI" , "---", "---", "---" , "---" , "---" , "ERRI",
-> + ? ? ? ? ? ? ? "CTO" , "CCRC", "CEB", "CIE", "DTO" , "DCRC", "DEB" , "---" ,
-> + ? ? ? ? ? ? ? "ACE" , "---" , "---", "---", "CERR", "BADA", "---" , "---"
-> ? ? ? ?};
-> ? ? ? ?char res[256];
-> ? ? ? ?char *buf = res;
-> @@ -1006,6 +1006,11 @@ static void omap_hsmmc_report_irq(struct omap_hsmmc_host *host, u32 status)
->
-> ? ? ? ?dev_dbg(mmc_dev(host->mmc), "%s\n", res);
-> ?}
-> +#else
-> +static inline void omap_hsmmc_dbg_report_irq(struct omap_hsmmc_host *host,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?u32 status)
-> +{
-> +}
-> ?#endif ?/* CONFIG_MMC_DEBUG */
->
-> ?/*
-> @@ -1064,9 +1069,7 @@ static void omap_hsmmc_do_irq(struct omap_hsmmc_host *host, int status)
-> ? ? ? ?dev_dbg(mmc_dev(host->mmc), "IRQ Status is %x\n", status);
->
-> ? ? ? ?if (status & ERR) {
-> -#ifdef CONFIG_MMC_DEBUG
-> - ? ? ? ? ? ? ? omap_hsmmc_report_irq(host, status);
-> -#endif
-> + ? ? ? ? ? ? ? omap_hsmmc_dbg_report_irq(host, status);
-> ? ? ? ? ? ? ? ?if ((status & CMD_TIMEOUT) ||
-> ? ? ? ? ? ? ? ? ? ? ? ?(status & CMD_CRC)) {
-> ? ? ? ? ? ? ? ? ? ? ? ?if (host->cmd) {
-> --
-> 1.7.0.4
->
-I checked against the TRM and you are right.
-FWIW,
- Reviewed-by: Venkatraman S <svenkatr@ti.com>
+>  .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |    1 -
+>  arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +-
+what about removing arch/arm/plat-mxc/include/mach/esdhc.h in this
+patch as advertised in the subject?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
