@@ -1,65 +1,59 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 6 May 2011 18:20:02 +0100
-Subject: [RFC] What is the preferred way to share ADC unit between
-	hwmon and input(ts) drivers?
-In-Reply-To: <4DC421F3.40404@cam.ac.uk>
-References: <4DB4C252.30005@emcraft.com> <20110425110230.GD4768@sirena.org.uk>
-	<4DC3FB15.5090307@cam.ac.uk>
-	<1304691206.2256.55.camel@team-embedded-2>
-	<20110506142316.GP23729@opensource.wolfsonmicro.com>
-	<4DC4108D.6020601@cam.ac.uk> <20110506155636.GA23646@sirena.org.uk>
-	<4DC421F3.40404@cam.ac.uk>
-Message-ID: <20110506172002.GB23646@sirena.org.uk>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 6 May 2011 11:36:31 -0600 (MDT)
+Subject: Common clock and dvfs
+In-Reply-To: <BANLkTik+LRWvJzppof1zngdrZEPXzMc_UQ@mail.gmail.com>
+References: <4DC07F10.6010305@ti.com> <4DC230E0.7090909@ti.com>
+	<BANLkTi=gP80iiJTECUoc+36z_1J68ALJNA@mail.gmail.com>
+	<4DC311C6.7090707@ti.com>
+	<BANLkTik+LRWvJzppof1zngdrZEPXzMc_UQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1105061100460.30136@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2011 at 05:29:39PM +0100, Jonathan Cameron wrote:
 
-> Currently at least, IIO sits at the same level as input and hwmon. We
-> are interested in handling parts that are too fast / too complicated or just
-> plain don't fit in one of those.  It would be easy enough to add what you
-> are talking about, but in the same fashion as in theory input could add
-> interfaces for hwmon if they wanted to.  The question is whether this a
-> job for IIO or should be abstracted below this level (and I agree there
-> is scope for abstraction here).  I'm a little worried that if we put
-> it in IIO it will result in bloat away from the core aims of handling
-> the many weird and wonderful sensors out there in a coherent way.
+Not that this is particularly related to DVFS, but:
 
-I'm not clear what an abstraction below IIO for a plain ADC would be.
+On Thu, 5 May 2011, Colin Cross wrote:
 
-> Input is trickier as the data paths for IIO and input
-> are deliberately rather different due to different requirements.
-> Yes we could write a driver that hooks in at a low level, but that
-> would then break the IIO data flow.
+> On Thu, May 5, 2011 at 2:08 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>
+> > Colin Cross wrote:
+> 
+> >> omap_hwmod is entirely omap specific, and any generic solution cannot
+> >> be based on it.
+> >
+> > For the moment, because it is a fairly new design, but nothing should
+> > prevent us to make it generic if this abstraction is relevant for other SoC.
+> 
+> That's not how you design abstractions.
 
-I'm not personally interested in that case, but if the input device is
-really reading from the ADC using the same ADC interface as the rest of
-the world then presumably the abstraction mismatch would be handled
-above IIO?  I can't think what would be unusual about this from the
-point of view of the ADC.
+Oh really?
 
-> Basically, yes - we could bludgeon support for ADC in kernel sharing
-> into IIO, but its not all that close to our current scope.  If anyone
+> You can't abstract one case, without considering other SoCs, and then 
+> make it generic if it fits other SoCs - it will never fit other SoCs.  
+> You have to consider all the cases you want it to cover, and design an 
+> abstraction that makes sense for the superset.
 
-It's not really ADC sharing as such - there's one physical ADC but to
-software these things look like a multi-channel ADC that happens to have
-a single register to push data out of.  It happens to be lower volume
-than most of the IIO ADCs but that doesn't seem like it should make too
-much of a difference?
+In actual practice, one often does not know in advance the entire universe 
+of cases that one needs to cover.  Even just for one SoC.
 
-> wants to look at that, feel free, but I still feel that this sits
-> better in mfd.
+Consider that you mentioned earlier that you had to rewrite the Tegra 
+clock code several times.  Now, add several other families of SoCs to the 
+requirements.  If the documentation for these chips is even available at 
+all, it is often misleading or wrong.
 
-I'm not clear why MFD would be useful here?  These things are single
-function ADCs and don't always appear as part of a larger Linux device.
-Some CPUs have these, for example, so they just appear as a memory
-mapped platform device.  They often end up with the custom API in the
-core MFD driver where there is one of those but that's not because the
-MFD API is relevant. 
+Attempting to create an abstraction before one knows the underlying 
+requirements of what one is actually trying to abstract is a plan for 
+intense suffering.  There's little glory in it.
 
->                 Often you will be sharing interrupts as well and they
-> may well be a mix of ADC and non ADC sources.
+...
 
-You will generally be sharing an interrupt, yes.  I'm not sure what you
-mean by a mix of ADC and non-ADC sources, though - the devices I'm
-thinking of really are just ADCs.
+In the specific case of omap_hwmod, the core of the omap_hwmod data 
+structures were designed such that they could apply to any SoC with a 
+complex interconnect.  The design was based on hardware principles common 
+to any SoC: interconnects, IP blocks, reset lines, etc.  There are 
+OMAP-specific parts, but if others found omap_hwmod useful, they're 
+trivial to abstract.  We haven't sought to force it on others.
+
+
+- Paul
