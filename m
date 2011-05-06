@@ -1,32 +1,21 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 May 2011 09:07:36 +0300
-Subject: [RFC PATCH] arm: drop Execute-In-Place
-In-Reply-To: <alpine.LFD.2.00.1105051518580.24613@xanadu.home>
-References: <1304607121-13612-1-git-send-email-plagnioj@jcrosoft.com>
-	<4DC2E5AA.5010604@am.sony.com> <4DC2E669.2000101@am.sony.com>
-	<1304620350.2398.29.camel@i7.infradead.org>
-	<4DC2EF19.5010309@am.sony.com>
-	<alpine.LFD.2.00.1105051453280.24613@xanadu.home>
-	<BANLkTimfKJPcDN+L4+z1DnsMv_BMOHpyew@mail.gmail.com>
-	<4DC2F6B0.80800@am.sony.com>
-	<alpine.LFD.2.00.1105051518580.24613@xanadu.home>
-Message-ID: <20110506060733.GP27860@atomide.com>
+Date: Fri, 6 May 2011 09:20:11 +0300
+Subject: [PATCH 1/8] OMAP PM: create a PM layer plugin for per-device
+	constraints
+In-Reply-To: <20110505060013.GJ27860@atomide.com>
+References: <1304516117-9334-1-git-send-email-j-pihet@ti.com>
+	<1304516117-9334-2-git-send-email-j-pihet@ti.com>
+	<20110504135930.GE2092@atomide.com> <87vcxqv8fp.fsf@ti.com>
+	<20110505060013.GJ27860@atomide.com>
+Message-ID: <20110506062011.GS27860@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110505 22:23]:
-> On Thu, 5 May 2011, Tim Bird wrote:
-> > 
-> > I should add that I tried to use XIP on omap (for research purposes),
-> > but it was broken and I didn't have time to fix it.  My bad.
+* Tony Lindgren <tony@atomide.com> [110505 08:56]:
 > 
-> OMAP is doing pretty nasty things with their early serial port support.  
-> This is most likely to screw up XIP.
+> So the problem is patches 1 & 8 in this series. The rest is just fine
+> as it's the necessary omap hardware specific implementation.
 
-Yes to debug it you'd have to hardcode the uart_phys and virt
-in the debug-macro.S for DEBUG_LL and EARLY_PRINTK. But should
-be easy enough to do for anybody using XIP.
-
-Of course there may also be other issues too :)
+Sorry, patches 1 & 7 I mean.
 
 Tony
