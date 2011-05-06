@@ -1,37 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 May 2011 00:25:23 -0700
-Subject: [PATCH] omap: fix build when MTD_NAND_OMAP2 and
-	TOUCHSCREEN_ADS7846 are disabled
-In-Reply-To: <53A11D3C-4DBA-4772-AF14-3590772F6AA1@linuxhacker.ru>
-References: <1304515622-25113-1-git-send-email-mike@compulab.co.il>
-	<53A11D3C-4DBA-4772-AF14-3590772F6AA1@linuxhacker.ru>
-Message-ID: <20110506072523.GA25670@atomide.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Fri, 6 May 2011 11:01:34 +0300
+Subject: [PATCH] leds: drop leds-h1940 driver
+In-Reply-To: <00f701cc0ba4$3cb4b680$b61e2380$%kim@samsung.com>
+References: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
+	<00f701cc0ba4$3cb4b680$b61e2380$%kim@samsung.com>
+Message-ID: <201105061101.34589.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Oleg Drokin <green@linuxhacker.ru> [110504 08:59]:
-> Hello!
+On Friday 06 May 2011 07:15:27 Kukjin Kim wrote:
+> Hi Vasily,
+
+Hi
+ 
+> Hmm, regarding maintainer who is Richard Purdie(LED) in this case should be
+> added in Cc. (Cc'ed him)
+
+Sorry, forgot to add him to CC :(
+
+> And I think need following with this patch.
 > 
-> On May 4, 2011, at 9:27 AM, Mike Rapoport wrote:
-> 
-> > Commits 5e6a64b36ce346b7a2d481ef9fa315290eb28e5e (omap: move detection of
-> > NAND CS to common-board-devices) and 96974a249b0cf3537f49115a59be67e2c54f315c
-> > (omap: consolidate touch screen initialization among different boards)
-> > break compilation when CONFIG_MTD_NAND_OMAP2 and
-> > CONFIG_TOUCHSCREEN_ADS7846 are not selected.
-> > Removing ifdefs and stubs from common-board-devices.h fixes the problem.
-> 
-> Works for me.
+> --- a/arch/arm/configs/s3c2410_defconfig
+> +++ b/arch/arm/configs/s3c2410_defconfig
+> @@ -389,7 +389,6 @@ CONFIG_MMC_SPI=m
+>  CONFIG_MMC_S3C=y
+>  CONFIG_LEDS_CLASS=m
+>  CONFIG_LEDS_S3C24XX=m
+> -CONFIG_LEDS_H1940=m
+>  CONFIG_LEDS_PCA9532=m
+>  CONFIG_LEDS_GPIO=m
+>  CONFIG_LEDS_PCA955X=m
 
-We should not build in code unnecessarily unless the boards has
-ads7847. Many boards don't have it.
+Sure. Can you commit this change to your tree, or should I resend patch with 
+this change?
 
-So how about do the ifdef optimization for ads7846_spi_board_info
-and omap_ads7846_init in common-board-devices.c?
-
-That keeps the header clean and the we have all the code in one
-place in a way where it's optimized out if not selected.
-
-Regards,
-
-Tony
+Regards
+Vasily
