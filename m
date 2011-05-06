@@ -1,93 +1,182 @@
 From: adrian.hunter@nokia.com (Adrian Hunter)
-Date: Fri,  6 May 2011 12:14:15 +0300
-Subject: [PATCH V2 16/16] mmc: omap_hsmmc: add a hardware reset before
-	initialization
+Date: Fri,  6 May 2011 12:14:13 +0300
+Subject: [PATCH V2 14/16] mmc: omap_hsmmc: adjust host controller clock in
+	regard to current OPP
 In-Reply-To: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
 References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <1304673255-31634-17-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <1304673255-31634-15-git-send-email-adrian.hunter@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a warm restart, an eMMC which cannot be powered off is
-in an unknown state, so reset it to be sure it will initialize.
+From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 
+We should like to adjust MMC host controller clock whenever the OPP is changed.
+OPP affects to L3/L4 bus frequency. Due to this we update the maximum frequency
+limits before each upcoming request and when the divisor is calculated.
+
+Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
 ---
- drivers/mmc/host/omap_hsmmc.c |   38 +++++++++++++++++++++++++++++++++++++-
- 1 files changed, 37 insertions(+), 1 deletions(-)
+ drivers/mmc/host/omap_hsmmc.c |   65 +++++++++++++++++++++++++++++++++++++----
+ 1 files changed, 59 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-index e1c9017..70b8ef8 100644
+index ee57b9b..e1c9017 100644
 --- a/drivers/mmc/host/omap_hsmmc.c
 +++ b/drivers/mmc/host/omap_hsmmc.c
-@@ -530,10 +530,25 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
- 	} else
- 		pdata->slots[0].gpio_wp = -EINVAL;
+@@ -187,6 +187,9 @@ struct omap_hsmmc_host {
+ 	int			use_reg;
+ 	int			req_in_progress;
  
-+	if (gpio_is_valid(pdata->slots[0].gpio_hw_reset)) {
-+		ret = gpio_request(pdata->slots[0].gpio_hw_reset,
-+				   "mmc_hw_reset");
-+		if (ret)
-+			goto err_free_wp;
-+		ret = gpio_direction_output(pdata->slots[0].gpio_hw_reset, 1);
-+		if (ret)
-+			goto err_free_hw_reset;
-+	} else
-+		pdata->slots[0].gpio_hw_reset = -EINVAL;
++	/* Actual output frequency of host controller */
++	unsigned int		freq;
 +
- 	return 0;
+ 	struct	omap_mmc_platform_data	*pdata;
+ };
  
-+
-+err_free_hw_reset:
-+	gpio_free(pdata->slots[0].gpio_hw_reset);
- err_free_wp:
--	gpio_free(pdata->slots[0].gpio_wp);
-+	if (gpio_is_valid(pdata->slots[0].gpio_wp))
-+		gpio_free(pdata->slots[0].gpio_wp);
- err_free_cd:
- 	if (gpio_is_valid(pdata->slots[0].switch_pin))
- err_free_sp:
-@@ -543,6 +558,8 @@ err_free_sp:
+@@ -592,13 +595,31 @@ static void omap_hsmmc_disable_irq(struct omap_hsmmc_host *host)
+ 	OMAP_HSMMC_WRITE(host->base, STAT, STAT_CLEAR);
+ }
  
- static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
- {
-+	if (gpio_is_valid(pdata->slots[0].gpio_hw_reset))
-+		gpio_free(pdata->slots[0].gpio_hw_reset);
- 	if (gpio_is_valid(pdata->slots[0].gpio_wp))
- 		gpio_free(pdata->slots[0].gpio_wp);
- 	if (gpio_is_valid(pdata->slots[0].switch_pin))
-@@ -803,6 +820,18 @@ static void omap_hsmmc_context_save(struct omap_hsmmc_host *host)
- 
- #endif
- 
-+static void omap_hsmmc_do_hw_reset(struct omap_hsmmc_host *host)
++/*
++ * Recalculate desired clock frequency with regard to maximum possible
++ * frequency at current OPP.
++ *
++ * Choose either target frequency (ios->clock) or maximum possible frequency at
++ * current OPP (get_max_freq() returns this limit)
++ */
++static void omap_hsmmc_recalc_freq(struct omap_hsmmc_host *host,
++				   struct mmc_ios *ios)
 +{
-+	if (!gpio_is_valid(mmc_slot(host).gpio_hw_reset))
-+		return;
++	struct omap_mmc_platform_data *pdata = host->pdata;
 +
-+	gpio_set_value_cansleep(mmc_slot(host).gpio_hw_reset, 0);
-+	udelay(9);
-+	gpio_set_value_cansleep(mmc_slot(host).gpio_hw_reset, 1);
-+	usleep_range(1000, 2000);
-+	printk(KERN_INFO "%s: hardware reset done\n", mmc_hostname(host->mmc));
++	if (pdata->get_max_freq)
++		host->freq = min(ios->clock, pdata->get_max_freq(host->dev));
++	else
++		host->freq = ios->clock;
 +}
 +
- /*
-  * Send init stream sequence to card
-  * before sending IDLE command
-@@ -815,6 +844,13 @@ static void send_init_stream(struct omap_hsmmc_host *host)
- 	if (host->protect_card)
+ /* Calculate divisor for the given clock frequency */
+-static u16 calc_divisor(struct mmc_ios *ios)
++static u16 calc_divisor(struct omap_hsmmc_host *host)
+ {
+ 	u16 dsor = 0;
+ 
+-	if (ios->clock) {
+-		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, ios->clock);
++	if (host->freq) {
++		dsor = DIV_ROUND_UP(OMAP_MMC_MASTER_CLOCK, host->freq);
+ 		if (dsor > 250)
+ 			dsor = 250;
+ 	}
+@@ -608,17 +629,16 @@ static u16 calc_divisor(struct mmc_ios *ios)
+ 
+ static void omap_hsmmc_set_clock(struct omap_hsmmc_host *host)
+ {
+-	struct mmc_ios *ios = &host->mmc->ios;
+ 	unsigned long regval;
+ 	unsigned long timeout;
+ 
+-	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", ios->clock);
++	dev_dbg(mmc_dev(host->mmc), "Set clock to %uHz\n", host->freq);
+ 
+ 	omap_hsmmc_stop_clock(host);
+ 
+ 	regval = OMAP_HSMMC_READ(host->base, SYSCTL);
+ 	regval = regval & ~(CLKD_MASK | DTO_MASK);
+-	regval = regval | (calc_divisor(ios) << 6) | (DTO << 16);
++	regval = regval | (calc_divisor(host) << 6) | (DTO << 16);
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL, regval);
+ 	OMAP_HSMMC_WRITE(host->base, SYSCTL,
+ 		OMAP_HSMMC_READ(host->base, SYSCTL) | ICE);
+@@ -742,6 +762,7 @@ static int omap_hsmmc_context_restore(struct omap_hsmmc_host *host)
+ 
+ 	omap_hsmmc_set_bus_width(host);
+ 
++	omap_hsmmc_recalc_freq(host, ios);
+ 	omap_hsmmc_set_clock(host);
+ 
+ 	omap_hsmmc_set_bus_mode(host);
+@@ -925,6 +946,8 @@ static void omap_hsmmc_request_done(struct omap_hsmmc_host *host, struct mmc_req
+ 	if (mrq->data && host->use_dma && dma_ch != -1)
  		return;
+ 	host->mrq = NULL;
++	if (host->pdata->inactive)
++		host->pdata->inactive(host->dev);
+ 	mmc_request_done(host->mmc, mrq);
+ }
  
-+	/*
-+	 * After a warm restart, an eMMC which cannot be powered off is in an
-+	 * unknown state so reset it to be sure it will initialize.
-+	 */
-+	if (mmc_slot(host).no_off)
-+		omap_hsmmc_do_hw_reset(host);
+@@ -984,6 +1007,9 @@ omap_hsmmc_cmd_done(struct omap_hsmmc_host *host, struct mmc_command *cmd)
+ 	}
+ 	if ((host->data == NULL && !host->response_busy) || cmd->error)
+ 		omap_hsmmc_request_done(host, cmd->mrq);
++	else if (host->data == NULL && host->response_busy &&
++		 host->pdata->inactive)
++		host->pdata->inactive(host->dev);
+ }
+ 
+ /*
+@@ -1404,6 +1430,8 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
+ 		struct mmc_request *mrq = host->mrq;
+ 
+ 		host->mrq = NULL;
++		if (host->pdata->inactive)
++			host->pdata->inactive(host->dev);
+ 		mmc_request_done(host->mmc, mrq);
+ 	}
+ }
+@@ -1533,6 +1561,26 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 
+ 	BUG_ON(host->req_in_progress);
+ 	BUG_ON(host->dma_ch != -1);
 +
- 	disable_irq(host->irq);
++	if (host->pdata->active) {
++		unsigned int new_freq;
++
++		/*
++		 * active() returns minimum of two (target, maximum)
++		 * frequencies.
++		 */
++		new_freq = host->pdata->active(host->dev, mmc->ios.clock);
++
++		/*
++		 * We need to update actual frequency if it is not equal to the
++		 * minimum of two (target and maximum) frequencies
++		 */
++		if (host->freq != new_freq) {
++			host->freq = new_freq;
++			omap_hsmmc_set_clock(host);
++		}
++	}
++
+ 	if (host->protect_card) {
+ 		if (host->reqs_blocked < 3) {
+ 			/*
+@@ -1548,6 +1596,8 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 		if (req->data)
+ 			req->data->error = -EBADF;
+ 		req->cmd->retries = 0;
++		if (host->pdata->inactive)
++			host->pdata->inactive(host->dev);
+ 		mmc_request_done(mmc, req);
+ 		return;
+ 	} else if (host->reqs_blocked)
+@@ -1560,6 +1610,8 @@ static void omap_hsmmc_request(struct mmc_host *mmc, struct mmc_request *req)
+ 		if (req->data)
+ 			req->data->error = err;
+ 		host->mrq = NULL;
++		if (host->pdata->inactive)
++			host->pdata->inactive(host->dev);
+ 		mmc_request_done(mmc, req);
+ 		return;
+ 	}
+@@ -1616,6 +1668,7 @@ static void omap_hsmmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 		}
+ 	}
  
- 	OMAP_HSMMC_WRITE(host->base, IE, INT_EN_MASK);
++	omap_hsmmc_recalc_freq(host, ios);
+ 	omap_hsmmc_set_clock(host);
+ 
+ 	if (do_send_init_stream)
 -- 
 1.7.0.4
