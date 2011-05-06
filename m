@@ -1,172 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 6 May 2011 16:05:31 +0200
-Subject: [PATCH][WAS:bcmai,
-	axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-Message-ID: <201105061605.31625.arnd@arndb.de>
+From: ithamar.adema@team-embedded.nl (Ithamar R. Adema)
+Date: Fri, 06 May 2011 16:13:26 +0200
+Subject: [RFC] What is the preferred way to share ADC unit between
+	hwmon and input(ts) drivers?
+In-Reply-To: <4DC3FB15.5090307@cam.ac.uk>
+References: <4DB4C252.30005@emcraft.com>
+	<20110425110230.GD4768@sirena.org.uk>  <4DC3FB15.5090307@cam.ac.uk>
+Message-ID: <1304691206.2256.55.camel@team-embedded-2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafa?,
+On Fri, 2011-05-06 at 14:43 +0100, Jonathan Cameron wrote:
+> The touch screen element should definitely be in input though so
+> you will need a solution to the problem of shared registers.
 
-I haven't looked in detail, but since I'll be travelling for the next
-two weeks, here is a really quick review. Overall, the bus driver
-looks really nice, except for a few things that I guess should be
-easy to resolve.
+Would it be worth considering generalizing the model that s3c uses[1]
+for adc? I've reused that for at least two other platforms already,
+though not mainlined (yet).
 
-On Thursday 05 May 2011, Rafa? Mi?ecki wrote:
-> Cc: Greg KH <greg@kroah.com>
-> Cc: Michael B?sch <mb@bu3sch.de>
-> Cc: Larry Finger <Larry.Finger@lwfinger.net>
-> Cc: George Kashperko <george@znau.edu.ua>
-> Cc: Arend van Spriel <arend@broadcom.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Russell King <rmk@arm.linux.org.uk>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Andy Botting <andy@andybotting.com>
-> Cc: linuxdriverproject <devel@linuxdriverproject.org>
-> Cc: linux-kernel at vger.kernel.org <linux-kernel@vger.kernel.org>
-> Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+It could make for a good /drivers/adc/ base IMHO. Any opinions?
 
-This really needs a changelog. You've probably written all of
-it before, just explain above the Cc what bcma is, where it's
-used, why you use a bus_type. This will be the place where
-people look when they want to find out what it is, so try
-to make a good description.
+Regards,
 
-> new file mode 100644
-> index 0000000..b52cd2b
-> --- /dev/null
-> +++ b/drivers/bcma/README
-> @@ -0,0 +1,18 @@
-> +Broadcom introduced new bus as replacement for older SSB. It is based on AMBA,
-> +however from programming point of view there is nothing AMBA specific we use.
-> +
-> +Standard AMBA drivers are platform specific, have hardcoded addresses and use
-> +AMBA standard fields like CID and PID.
-> +
-> +In case of Broadcom's cards every device consists of:
-> +1) Broadcom specific AMBA device. It is put on AMBA bus, but can not be treated
-> +   as standard AMBA device. Reading it's CID or PID can cause machine lockup.
-> +2) AMBA standard devices called ports or wrappers. They have CIDs (AMBA_CID)
-> +   and PIDs (0x103BB369), but we do not use that info for anything. One of that
-> +   devices is used for managing Broadcom specific core.
-> +
-> +Addresses of AMBA devices are not hardcoded in driver and have to be read from
-> +EPROM.
-> +
-> +In this situation we decided to introduce separated bus with devices identified
-> +by Broadcom specific fields, read from EPROM.
+Ithamar.
 
-This would be a good start for the changelog. You don't actually need the
-readme in the code directory, it's better to put the information somewhere
-in the Documentation/ directory.
-
-> diff --git a/drivers/bcma/TODO b/drivers/bcma/TODO
-> new file mode 100644
-> index 0000000..45eadc9
-> --- /dev/null
-> +++ b/drivers/bcma/TODO
-> @@ -0,0 +1,3 @@
-> +- Interrupts
-> +- Defines for PCI core driver
-> +- Convert bcma_bus->cores into linked list
-
-The last item doesn't make sense to me. Since you are using the regular
-driver model, you can simply iterate over all child devices of any
-dev.
-
-> +static void bcma_core_disable(struct bcma_device *core, u32 flags)
-> +{
-> +	if (bcma_aread32(core, BCMA_RESET_CTL) & BCMA_RESET_CTL_RESET)
-> +		return;
-> +
-> +	bcma_awrite32(core, BCMA_IOCTL, flags);
-> +	bcma_aread32(core, BCMA_IOCTL);
-> +	udelay(10);
-> +
-> +	bcma_awrite32(core, BCMA_RESET_CTL, BCMA_RESET_CTL_RESET);
-> +	udelay(1);
-> +}
-> +
-> +int bcma_core_enable(struct bcma_device *core, u32 flags)
-> +{
-> +	bcma_core_disable(core, flags);
-> +
-> +	bcma_awrite32(core, BCMA_IOCTL, (BCMA_IOCTL_CLK | BCMA_IOCTL_FGC | flags));
-> +	bcma_aread32(core, BCMA_IOCTL);
-> +
-> +	bcma_awrite32(core, BCMA_RESET_CTL, 0);
-> +	udelay(1);
-> +
-> +	bcma_awrite32(core, BCMA_IOCTL, (BCMA_IOCTL_CLK | flags));
-> +	bcma_aread32(core, BCMA_IOCTL);
-> +	udelay(1);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(bcma_core_enable);
-
-I don't know if we discussed this before. Normally, you should not need such
-udelay() calls, at least if you have the correct I/O barriers in place.
-
-> +#include "bcma_private.h"
-> +#include <linux/bcma/bcma.h>
-> +
-> +MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
-> +MODULE_LICENSE("GPL");
-> +
-> +static int bcma_bus_match(struct device *dev, struct device_driver *drv);
-> +static int bcma_device_probe(struct device *dev);
-> +static int bcma_device_remove(struct device *dev);
-
-Try to reorder your functions so you don't need any forward declarations.
-
-> +const char *bcma_device_name(u16 coreid)
-> +{
-> +	switch (coreid) {
-> +	case BCMA_CORE_OOB_ROUTER:
-> +		return "OOB Router";
-> +	case BCMA_CORE_INVALID:
-> +		return "Invalid";
-> +	case BCMA_CORE_CHIPCOMMON:
-> +		return "ChipCommon";
-> +	case BCMA_CORE_ILINE20:
-> +		return "ILine 20";
-
-It's better to make that a data structure than a switch() statement,
-both from readability and efficiency aspects.
-
-> +
-> +/* 1) It is not allowed to put struct device statically in bcma_device
-> + * 2) We can not just use pointer to struct device because we use container_of
-> + * 3) We do not have pointer to struct bcma_device in struct device
-> + * Solution: use such a dummy wrapper
-> + */
-> +struct __bcma_dev_wrapper {
-> +	struct device dev;
-> +	struct bcma_device *core;
-> +};
-> +
-> +struct bcma_device {
-> +	struct bcma_bus *bus;
-> +	struct bcma_device_id id;
-> +
-> +	struct device *dev;
-> +
-> +	u8 core_index;
-> +
-> +	u32 addr;
-> +	u32 wrap;
-> +
-> +	void *drvdata;
-> +};
-
-Something went wrong here, maybe you misunderstood the API, or I
-misunderstood what you are trying to do. When you define your own bus
-type, the private device (struct bcma_device) should definitely contain
-a struct device as a member, and you allocate that structure dynamically
-when probing the bus. I don't see any reason for that wrapper.
-
-	Arnd
+[1]:
+http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;a=blob;f=arch/arm/plat-samsung/adc.c
