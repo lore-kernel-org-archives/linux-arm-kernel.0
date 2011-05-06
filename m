@@ -1,31 +1,32 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Fri,  6 May 2011 12:05:35 +0200
-Subject: [PATCH] mx23: register clocks for mmc
-Message-ID: <1304676335-1710-1-git-send-email-jacmet@sunsite.dk>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Fri, 6 May 2011 15:39:15 +0530
+Subject: [PATCH 0/2] OMAP2+: hwmod: Add hwmod's API's for pad wakeup
+Message-ID: <1304676557-15613-1-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 47babe69 (mxs: dynamically allocate mmc device) added the ssp
-setup and mmc clocks for mx23/28, but forgot to register the mmc clocks
-on mx23.
+Add two API's to set IO Pad wakeup capability based on hwmod
+mux pins available and also to check the status of IO Pad wakeup
+event.
 
-Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
----
- arch/arm/mach-mxs/clock-mx23.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+This two patches are separated from uart_runtime patches posted
+earlier and uart_runtime adaptation relies on these two API's.
 
-diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
-index c3577ea..0163b6d 100644
---- a/arch/arm/mach-mxs/clock-mx23.c
-+++ b/arch/arm/mach-mxs/clock-mx23.c
-@@ -446,6 +446,8 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
- 	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
- 	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
-+	_REGISTER_CLOCK("mxs-mmc.0", NULL, ssp_clk)
-+	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp_clk)
- 	_REGISTER_CLOCK(NULL, "usb", usb_clk)
- 	_REGISTER_CLOCK(NULL, "audio", audio_clk)
- 	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
--- 
-1.7.2.3
+Based on 2.6.39-rc6
+
+Reference to Discussion:
+------------------------
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg49000.html
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg49001.html
+
+Govindraj.R (2):
+  OMAP2+: hwmod: Add API to enable IO ring wakeup.
+  OMAP2+: hwmod: Add API to check IO PAD wakeup status
+
+ arch/arm/mach-omap2/mux.c                     |   28 ++++++++++++++
+ arch/arm/mach-omap2/mux.h                     |   13 +++++++
+ arch/arm/mach-omap2/omap_hwmod.c              |   49 +++++++++++++++++++++++++
+ arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    2 +
+ arch/arm/plat-omap/omap_device.c              |   27 ++++++++++++++
+ 6 files changed, 120 insertions(+), 0 deletions(-)
