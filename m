@@ -1,57 +1,55 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 06 May 2011 13:48:44 +0900
-Subject: [PATCH] ARM: S3C6410: Support 800MHz operation in cpufreq
-In-Reply-To: <1304003329-15116-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1304003329-15116-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <00f901cc0ba8$e2c45270$a84cf750$%kim@samsung.com>
+Date: Fri, 06 May 2011 13:58:21 +0900
+Subject: [PATCH] ARM: S3C6410: Add some lower frequencies for 800MHz base
+	clock operation
+In-Reply-To: <1304004383-16133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <1304004383-16133-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <00fa01cc0baa$3af45a20$b0dd0e60$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Mark Brown wrote:
 > 
-> At least some newer S3C6410 silicon supports operation up to 800MHz rather
-> than just 667MHz. Unfortunately I don't have access to any of
-documentation
-> of this other than some running systems, add a new cpufreq table entry for
-> this based on the behaviour of those systems.
+> By extension from the 667MHz based clocks currently supported add 100MHz
+> and 200MHz operating points. Due to a lack of documentation these have not
+> been confirmed as supported but by extension from the existing frequencies
+> they should be OK and there is less risk than with the previuus patch for
+> 800MHz operation.
 > 
 > Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
+> 
+> In spite of the commit log this is based on top of the previous patch.
+> 
 >  arch/arm/mach-s3c64xx/cpufreq.c |    2 ++
 >  1 files changed, 2 insertions(+), 0 deletions(-)
 > 
 > diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/arch/arm/mach-
 > s3c64xx/cpufreq.c
-> index 4375b97..db722a5 100644
+> index db722a5..1e7df30 100644
 > --- a/arch/arm/mach-s3c64xx/cpufreq.c
 > +++ b/arch/arm/mach-s3c64xx/cpufreq.c
-> @@ -32,6 +32,7 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
->  	[1] = { 1050000, 1150000 },
->  	[2] = { 1100000, 1150000 },
->  	[3] = { 1200000, 1350000 },
-> +	[4] = { 1300000, 1350000 },
->  };
+> @@ -37,7 +37,9 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
 > 
 >  static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
-> @@ -44,6 +45,7 @@ static struct cpufreq_frequency_table
-s3c64xx_freq_table[]
-> = {
->  	{ 2, 532000 },
->  	{ 2, 533000 },
->  	{ 3, 667000 },
-> +	{ 4, 800000 },
->  	{ 0, CPUFREQ_TABLE_END },
->  };
->  #endif
+>  	{ 0,  66000 },
+> +	{ 0, 100000 },
+>  	{ 0, 133000 },
+> +	{ 1, 200000 },
+>  	{ 1, 222000 },
+>  	{ 1, 266000 },
+>  	{ 2, 333000 },
 > --
 
-Hi Mark,
+Hmm, I'm not sure this should be OK...because guided(or tested?) dvfs level
+is following for 800Mhz.
+L3: 133, L2: 266, L1: 400 and L0: 800.
 
-Yes, some newer S3C6410 can support 800Mhz(ARM clock) and you can
-distinguish it from its marking on top of silicon. According to a design
-guide, its typical VDD ARM is 1.3V :)
+And I couldn't find about supporting of 100Mhz or 200Mhz in its hw design
+guide. Of course, it doesn't mean this is wrong but at least need to check
+again.
 
-Will apply and thanks.
+Thanks.
 
 Best regards,
 Kgene.
