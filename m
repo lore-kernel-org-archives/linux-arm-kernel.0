@@ -1,43 +1,58 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 6 May 2011 14:38:48 +0300
-Subject: [PATCH V2 04/16] mmc: omap_hsmmc: reduce a bit the error handlers
-	in probe()
-In-Reply-To: <BANLkTi=wiC13bh5vO6rouzCwZCO+-cxbuQ@mail.gmail.com>
-References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-	<1304673255-31634-5-git-send-email-adrian.hunter@nokia.com>
-	<BANLkTi=wiC13bh5vO6rouzCwZCO+-cxbuQ@mail.gmail.com>
-Message-ID: <BANLkTimBafJFE7+WBobBV7pc+X_=FBsTMw@mail.gmail.com>
+From: hans-christian.egtvedt@atmel.com (Hans-Christian Egtvedt)
+Date: Fri, 06 May 2011 14:04:40 +0200
+Subject: [PATCH] avr32: add some more at91 to cpu.h definition
+In-Reply-To: <1304680123-20218-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1304680123-20218-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1304683480.3025.2.camel@hcegtvedt.norway.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 6, 2011 at 2:34 PM, Varadarajan, Charulatha <charu@ti.com> wrote:
-> On Fri, May 6, 2011 at 14:44, Adrian Hunter <adrian.hunter@nokia.com> wrote:
->> From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
->>
->
-> Add patch description here.
-You mean something like following:
-"The code contains similarities in the error path of probe function.
-Let's combine them at one place."
-?
+On Fri, 2011-05-06 at 13:08 +0200, Nicolas Ferre wrote:
+> Somme common drivers will need those at91 cpu_is_xxx() definitions.
+> Those definitions are already in Linus' tree so if we want to use them
+> in common drivers, we will need them in AVR32 cpu.h file.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
->
->> Signed-off-by: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
->> Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
->> ---
->> ?drivers/mmc/host/omap_hsmmc.c | ? 17 ++++++-----------
->> ?1 files changed, 6 insertions(+), 11 deletions(-)
->>
->
-> <<snip>>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+Will you push this update for 2.6.39? I don't have anything for Linus
+right now.
 
+Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+with one comment...
 
+> ---
+>  arch/avr32/mach-at32ap/include/mach/cpu.h |   13 +++++++++++++
+>  1 files changed, 13 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/avr32/mach-at32ap/include/mach/cpu.h b/arch/avr32/mach-at32ap/include/mach/cpu.h
+> index 9c96a13..a927d9e 100644
+> --- a/arch/avr32/mach-at32ap/include/mach/cpu.h
+> +++ b/arch/avr32/mach-at32ap/include/mach/cpu.h
+> @@ -31,8 +31,21 @@
+>  #define cpu_is_at91sam9263()	(0)
+>  #define cpu_is_at91sam9rl()	(0)
+>  #define cpu_is_at91cap9()	(0)
+> +#define cpu_is_at91cap9_revB()	(0)
+> +#define cpu_is_at91cap9_revC()	(0)
+>  #define cpu_is_at91sam9g10()	(0)
+> +#define cpu_is_at91sam9g20()	(0)
+>  #define cpu_is_at91sam9g45()	(0)
+>  #define cpu_is_at91sam9g45es()	(0)
+> +#define cpu_is_at91sam9m10()	(0)
+> +#define cpu_is_at91sam9g46()	(0)
+> +#define cpu_is_at91sam9m11()	(0)
+> +#define cpu_is_at91sam9x5()	(0)
+> +#define cpu_is_at91sam9g15()	(0)
+> +#define cpu_is_at91sam9g35()	(0)
+> +#define cpu_is_at91sam9x35()	(0)
+> +#define cpu_is_at91sam9g25()	(0)
+> +#define cpu_is_at91sam9x25()	(0)
+> +
+
+No need for this extra newline.
+
+>  
+>  #endif /* __ASM_ARCH_CPU_H */
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Hans-Christian Egtvedt
