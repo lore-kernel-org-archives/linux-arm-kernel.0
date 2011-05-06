@@ -1,38 +1,28 @@
-From: phil@nwl.cc (Phil Sutter)
-Date: Fri, 6 May 2011 18:12:09 +0200
-Subject: ARM, AF_PACKET: caching problems on Marvell Kirkwood
-In-Reply-To: <1304607362.3032.84.camel@edumazet-laptop>
-References: <20110408130643.GA8730@orbit.nwl.cc>
-	<20110505141107.GC30443@orbit.nwl.cc>
-	<1304607362.3032.84.camel@edumazet-laptop>
-Message-ID: <20110506161209.GB20777@orbit.nwl.cc>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 6 May 2011 10:16:44 -0600 (MDT)
+Subject: [RFC/PATCH] OMAP PM: remove OMAP_PM_NONE config option
+In-Reply-To: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
+References: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
+Message-ID: <alpine.DEB.2.00.1105061016070.30136@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Salut Jean
 
-On Thu, May 05, 2011 at 04:56:02PM +0200, Eric Dumazet wrote:
-> I assume you use latest linux-2.6 or net-next-2.6 ?
+On Fri, 6 May 2011, Jean Pihet wrote:
 
-Well, initially we noticed the problem on 2.6.34.7, but I verified it
-against both 2.6.37 and linux-2.6 from three days ago.
-
-> Could you try to force vmalloc() use ?
+> The current code base is not linking with the OMAP_PM_NONE
+> option set.
+> Since the option OMAP_PM_NOOP provides a no-op/debug layer,
+> OMAP_PM_NONE can be removed.
+> OMAP_PM_NOOP is enabled by default by Kconfig.
 > 
-> diff --git a/net/packet/af_packet.c b/net/packet/af_packet.c
-> index b5362e9..0b5a89c 100644
-> --- a/net/packet/af_packet.c
-> +++ b/net/packet/af_packet.c
-> @@ -2383,7 +2383,7 @@ static inline char *alloc_one_pg_vec_page(unsigned long order)
->  	gfp_t gfp_flags = GFP_KERNEL | __GFP_COMP |
->  			  __GFP_ZERO | __GFP_NOWARN | __GFP_NORETRY;
->  
-> -	buffer = (char *) __get_free_pages(gfp_flags, order);
-> +	buffer = NULL;
->  
->  	if (buffer)
->  		return buffer;
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-Thanks for the hint. I tried that, but the problem persists.
+I'm okay with this but could you please base it on v2.6.39-rc6 so I can 
+merge it here?
 
-Greetings, Phil
+thanks
+
+
+- Paul
