@@ -1,77 +1,29 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Fri, 6 May 2011 18:56:36 +0530
-Subject: [PATCH V2 16/16] mmc: omap_hsmmc: add a hardware reset before
-	initialization
-In-Reply-To: <1304673255-31634-17-git-send-email-adrian.hunter@nokia.com>
-References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-	<1304673255-31634-17-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <BANLkTim3aZutT36j4TE9gnmpny9gN6=GUw@mail.gmail.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Fri, 06 May 2011 14:43:49 +0100
+Subject: [RFC] What is the preferred way to share ADC unit between hwmon
+	and input(ts) drivers?
+In-Reply-To: <20110425110230.GD4768@sirena.org.uk>
+References: <4DB4C252.30005@emcraft.com> <20110425110230.GD4768@sirena.org.uk>
+Message-ID: <4DC3FB15.5090307@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 04/25/11 12:02, Mark Brown wrote:
+> On Mon, Apr 25, 2011 at 04:37:38AM +0400, Ilya Yanok wrote:
+> 
+>> So, to add both input and hwmon drivers we need to serialize the
+>> register accesses. I was thinking about adding some middle-layer to
+>> perform the actual conversion. The question is what is the preferred way
+>> to add such a middle layer? Should we use a multi-function device driver
+>> for this or just some platform-specific code (as S3C does)? Or maybe
+>> there is another way?
+> 
+> IIO would probably be the standard API to use but that's still stuck in
+> staging.  I'd suggest doing a custom API and then transitioning to IIO
+> when that moves out of staging.
+IIO is fine for the adc side if it is general purpose (and typically
+used as such). If it's typically used for power supply monitoring then
+hwmon is the right place.
 
-On Fri, May 6, 2011 at 14:44, Adrian Hunter <adrian.hunter@nokia.com> wrote:
-> After a warm restart, an eMMC which cannot be powered off is
-> in an unknown state, so reset it to be sure it will initialize.
->
-> Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
-> ---
-> ?drivers/mmc/host/omap_hsmmc.c | ? 38 +++++++++++++++++++++++++++++++++++++-
-> ?1 files changed, 37 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index e1c9017..70b8ef8 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -530,10 +530,25 @@ static int omap_hsmmc_gpio_init(struct omap_mmc_platform_data *pdata)
-> ? ? ? ?} else
-> ? ? ? ? ? ? ? ?pdata->slots[0].gpio_wp = -EINVAL;
->
-> + ? ? ? if (gpio_is_valid(pdata->slots[0].gpio_hw_reset)) {
-
-Not required as gpio_request takes care of it.
-
-> + ? ? ? ? ? ? ? ret = gpio_request(pdata->slots[0].gpio_hw_reset,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?"mmc_hw_reset");
-> + ? ? ? ? ? ? ? if (ret)
-> + ? ? ? ? ? ? ? ? ? ? ? goto err_free_wp;
-> + ? ? ? ? ? ? ? ret = gpio_direction_output(pdata->slots[0].gpio_hw_reset, 1);
-
-Use gpio_request_one instead.
-
-> + ? ? ? ? ? ? ? if (ret)
-> + ? ? ? ? ? ? ? ? ? ? ? goto err_free_hw_reset;
-> + ? ? ? } else
-> + ? ? ? ? ? ? ? pdata->slots[0].gpio_hw_reset = -EINVAL;
-> +
-> ? ? ? ?return 0;
->
-> +
-> +err_free_hw_reset:
-> + ? ? ? gpio_free(pdata->slots[0].gpio_hw_reset);
-> ?err_free_wp:
-> - ? ? ? gpio_free(pdata->slots[0].gpio_wp);
-> + ? ? ? if (gpio_is_valid(pdata->slots[0].gpio_wp))
-
-Not required as gpio_free takes care of it.
-
-> + ? ? ? ? ? ? ? gpio_free(pdata->slots[0].gpio_wp);
-> ?err_free_cd:
-> ? ? ? ?if (gpio_is_valid(pdata->slots[0].switch_pin))
-> ?err_free_sp:
-> @@ -543,6 +558,8 @@ err_free_sp:
->
-> ?static void omap_hsmmc_gpio_free(struct omap_mmc_platform_data *pdata)
-> ?{
-> + ? ? ? if (gpio_is_valid(pdata->slots[0].gpio_hw_reset))
-
-ditto
-
-> + ? ? ? ? ? ? ? gpio_free(pdata->slots[0].gpio_hw_reset);
-> ? ? ? ?if (gpio_is_valid(pdata->slots[0].gpio_wp))
-> ? ? ? ? ? ? ? ?gpio_free(pdata->slots[0].gpio_wp);
-> ? ? ? ?if (gpio_is_valid(pdata->slots[0].switch_pin))
-
-
-<<snip>>
+The touch screen element should definitely be in input though so
+you will need a solution to the problem of shared registers.
