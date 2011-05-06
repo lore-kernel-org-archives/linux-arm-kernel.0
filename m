@@ -1,28 +1,26 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 6 May 2011 10:16:44 -0600 (MDT)
-Subject: [RFC/PATCH] OMAP PM: remove OMAP_PM_NONE config option
-In-Reply-To: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
-References: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
-Message-ID: <alpine.DEB.2.00.1105061016070.30136@utopia.booyaka.com>
+From: phil@nwl.cc (Phil Sutter)
+Date: Fri, 6 May 2011 18:17:53 +0200
+Subject: ARM, AF_PACKET: caching problems on Marvell Kirkwood
+In-Reply-To: <20110505194601.GA10565@lunn.ch>
+References: <20110408130643.GA8730@orbit.nwl.cc>
+	<20110505141107.GC30443@orbit.nwl.cc>
+	<20110505194601.GA10565@lunn.ch>
+Message-ID: <20110506161753.GC20777@orbit.nwl.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Salut Jean
+Hi,
 
-On Fri, 6 May 2011, Jean Pihet wrote:
-
-> The current code base is not linking with the OMAP_PM_NONE
-> option set.
-> Since the option OMAP_PM_NOOP provides a no-op/debug layer,
-> OMAP_PM_NONE can be removed.
-> OMAP_PM_NOOP is enabled by default by Kconfig.
+On Thu, May 05, 2011 at 09:46:01PM +0200, Andrew Lunn wrote:
+> I can reproduce it on a Kirkwood:
 > 
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
+> [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=00053977
 
-I'm okay with this but could you please base it on v2.6.39-rc6 so I can 
-merge it here?
+Thanks for the information. Seems like we have the same CPU:
 
-thanks
+| [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=00053177
+| [    0.000000] CPU: VIVT data cache, VIVT instruction cache
 
+and it's actually VIVT, not VIPT as I wrote in an earlier mail.
 
-- Paul
+Greetings, Phil
