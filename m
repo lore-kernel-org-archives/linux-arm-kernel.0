@@ -1,78 +1,116 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Fri, 6 May 2011 15:41:51 +0000
-Subject: [PATCH] kirkwood: add dir-665 support
-In-Reply-To: <alpine.LFD.2.00.1105051549430.24613@xanadu.home>
-References: <1303922086-10531-1-git-send-email-camhirundo@gmail.com>
-	<20110503205056.GA13075@gentoodev.compulab.local>
-	<BANLkTimQM_J2ZbDjAewUsp+XSEP+x+eniA@mail.gmail.com>
-	<BANLkTinybLSF418PsocXR6dwuaksv_+UCQ@mail.gmail.com>
-	<20110504080924.GX19806@kw.sim.vm.gnt>
-	<alpine.LFD.2.00.1105040940410.24613@xanadu.home>
-	<20110505150634.GC19806@kw.sim.vm.gnt>
-	<alpine.LFD.2.00.1105051549430.24613@xanadu.home>
-Message-ID: <20110506154150.GE19806@kw.sim.vm.gnt>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 06 May 2011 08:55:53 -0700
+Subject: [PATCH v2 11/12] OMAP: Serial: Use resume call from prcm to
+	enable uart
+In-Reply-To: <BANLkTinr8n0P31LWPrwL83sWCzVQOqo6=Q@mail.gmail.com> (Govindraj's
+	message of "Fri, 6 May 2011 14:46:48 +0530")
+References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+	<1304080796-625-12-git-send-email-govindraj.raja@ti.com>
+	<87pqnym2f2.fsf@ti.com>
+	<BANLkTi=32NfMr7exWpOoPHX7_-Jc0i5LqA@mail.gmail.com>
+	<87liylkxdi.fsf@ti.com>
+	<BANLkTinr8n0P31LWPrwL83sWCzVQOqo6=Q@mail.gmail.com>
+Message-ID: <87bozf962e.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+Govindraj <govindraj.ti@gmail.com> writes:
 
-On Thu, May 05, 2011 at 03:55:39PM -0400, Nicolas Pitre wrote:
-> On Thu, 5 May 2011, Simon Guinot wrote:
-> 
-> > Hi Nicolas,
-> > 
-> > On Wed, May 04, 2011 at 09:51:27AM -0400, Nicolas Pitre wrote:
-> > > On Wed, 4 May 2011, Simon Guinot wrote:
-> > > 
-> > > > Hi Hirundo,
-> > > > 
-> > > > On Wed, May 04, 2011 at 10:54:52AM +0800, Hirundo Cam wrote:
-> > > > > Hi Mike and Simon,
-> > > > > 
-> > > > > I've send a machine submit to arm-linux, it generated the mach-types as
-> > > > > 
-> > > > > [stripped]
-> > > > > mx51_moray		MACH_MX51_MORAY		MX51_MORAY		3484
-> > > > > thales_cbc		MACH_THALES_CBC		THALES_CBC		3485
-> > > > > bluepoint		MACH_BLUEPOINT		BLUEPOINT		3486
-> > > > > dir665			MACH_DIR665		DIR665			3487
-> > > > > 
-> > > > > Is this correct for the DIR665 board using mv88f6281 chips?
-> > > > 
-> > > > It looks correct.
-> > > 
-> > > It may look correct, but I'll ask that you hang to it for a while as 
-> > > there is a desire to stop the addition of such board specific files to 
-> > > the kernel and move towards a solution such as device tree instead to 
-> > > represent those board details.
-> > 
-> > For my curiosity, how a device tree kernel will deal with ATAGs ?
-> 
-> The kernel may use either.  The DTB is meant to supersede ATAGs.
+> On Thu, May 5, 2011 at 8:28 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> Govindraj <govindraj.ti@gmail.com> writes:
+>>
+>> [...]
+>>
+>>>>
+>>>> ... this is just putting back basically the same thing that was removed in
+>>>> patch 1. ?IOW, this is now being checked for *every* PRCM wakeup, which
+>>>> is no different than having it in the idle path.
+>>>>
+>>>> I thought I understood that you had the SW IRQ triggering working, so
+>>>> this part should not be necessary.
+>>>
+>>> Actually I tried few experiments but couldn't get it working.
+>>
+>> What exactly is not working? ? The interrupt is not firing at all? ?The
+>> driver's ISR is not being called?
+>>
+>
+> It throws a oops as here
+>
+> http://pastebin.com/5bcPjAA0
 
-Ok. The board specific files are still needed to handle ATAGs (and "old"
-bootloader version), how it is possible to stop the addition of this
-files ?
+This doesn't help understand what exactly is not working.  This needs
+to be debugged further to understand the root cause.
 
-> 
-> > Is there a compatibility layer planned ?
-> > 
-> > I mean... For now, the boards on market are not providing a device tree
-> > capable bootloader. Without a compatibility layer, the kernel support
-> > for this boards can't rely on device tree.
-> 
-> There is a patch allowing for you to simply concatenate the appropriate 
-> DTB data to the kernel zImage.  With this the existing bootloaders can 
-> be used unchanged.
+A quick glance at the oops shows a fault when accessing a *physical*
+address within the INTC.  The MMU is enabled here, and HW accesss should
+be using a virtual address.  
 
-And I will end up with a kernel zImage per board...
-It looks not very attractive.
+Also, early in the boot there are a pile of other errors coming from the
+clock framework suggesting that this kernel has some other basic
+problems as well.
 
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110506/7fb7e60e/attachment.sig>
+> Reproduced with below [EXP-1] change + below kernel.
+>
+> git://gitorious.org/uart_runtime/pm.git
+> [Has uart runtime patches based on pm-core branch]
+>
+>>> Tried below but didn't help.
+>>>
+>>> ------------------------------------
+>>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>>> index 3960330..2c1dfc2 100644
+>>> --- a/arch/arm/mach-omap2/pm34xx.c
+>>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>>> @@ -288,6 +288,16 @@ static irqreturn_t prcm_interrupt_handler (int
+>>> irq, void *dev_id)
+>>> ? ? ? ? do {
+>>> ? ? ? ? ? ? ? ? if (irqstatus_mpu & (OMAP3430_WKUP_ST_MASK |
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP3430_IO_ST_MASK)) {
+>>> +#if 1
+>>> + ? ? ? ? ? ? ? ? ? ? ? /*
+>>> + ? ? ? ? ? ? ? ? ? ? ? ?* EXP-1: SET UART1 SOFT IRQ BIT
+>>> + ? ? ? ? ? ? ? ? ? ? ? ?* 3430 -SDP UART1 console.
+>>> + ? ? ? ? ? ? ? ? ? ? ? ?* M_IRQ_72, INTCPS_ISR_SET
+>>> + ? ? ? ? ? ? ? ? ? ? ? ?* 0x4820 0090 + (0x20 * n)
+>>> + ? ? ? ? ? ? ? ? ? ? ? ?* bit-8 n = 2
+>>> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+>>> + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x100 , 0x482000D0);
+>>> +#endif
+>>> ? ? ? ? ? ? ? ? ? ? ? ? c = _prcm_int_handle_wakeup();
+>>>
+>>> ? ? ? ? ? ? ? ? ? ? ? ? /*
+>>>
+>>> -----------------------------------
+>>>
+>>> Currently we are planning to integrate irq_chaining patches
+>>> on top uart_runtime patches which is work-in-progress.
+>>> Will remove resume_idle once we have irq_chaining patches available.
+>>
+>> Well, I'm not OK with $SUBJECT patch as it is since it's just moving an
+>> ugly hack from serial.c to the PRCM ISR. ?If the hack is going to stay,
+>> then it should stay where it is until it can be fixed for real.
+>
+> Now with runtime changes we are cutting clocks independently
+> whereas prior to this we where cutting clocks only in sram_idle path.
+>
+> With runtime changes:
+> 1.) Once we cut uart clocks and send a char to uart it directs wakeup_irq to
+> prcm_irq_handler the one way to wakeup uart from there was to check
+> uart mod wakeup status bits if wakeup event occurred then wakeup the
+> particular uart.
+> 2.) Moving this resume back to sram path will break module wakeup after
+> uart clocks are disabled(using put_sync)
+>
+> Thats the reason I have moved this to prcm_irq path to ensure
+> once auto-suspend happens after inactivity period we have resume_call
+> to wakeup uart port.
+
+I understand, but the point is that this approach is still the same as
+the previous hack (check for UART wakeup on *every* wakeup event.)
+
+What is needed is to further investigate using SW triggered IRQs can be
+done for these wakeup events so we can get away from the above approach
+all together.
+
+Kevin
