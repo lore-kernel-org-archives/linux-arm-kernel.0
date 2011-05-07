@@ -1,66 +1,304 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Sat, 07 May 2011 00:26:00 -0400 (EDT)
-Subject: Git pull request: zImage fixes
-Message-ID: <alpine.LFD.2.00.1105070011540.24613@xanadu.home>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri,  6 May 2011 22:57:11 -0700
+Subject: [PATCH] lib: Consolidate DEBUG_STACK_USAGE option
+Message-ID: <1304747831-2098-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, please pull:
+Most arches define CONFIG_DEBUG_STACK_USAGE exactly the same way.
+Move it to lib/Kconfig.debug so each arch doesn't have to define
+it. This obviously makes the option generic, but that's fine
+because the config is already used in generic code.
 
-	git://git.linaro.org/people/nico/linux zImage_fixes
+It's not obvious to me that sysrq-P actually does anything
+different with this option enabled, but I erred on the side of
+caution by keeping the most inclusive wording.
 
-this is based on v2.6.39-rc1.  This contains the same set of patches 
-that were posted before, with Acked-by/Tested-by tags added and a minor 
-Thumb2 compatibility fix.
+Cc: linux-arch at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: uclinux-dist-devel at blackfin.uclinux.org
+Cc: linux-m32r at ml.linux-m32r.org
+Cc: linux-mips at linux-mips.org
+Cc: linuxppc-dev at lists.ozlabs.org
+Cc: linux-sh at vger.kernel.org
+Cc: sparclinux at vger.kernel.org
+Cc: Chris Metcalf <cmetcalf@tilera.com>
+Cc: user-mode-linux-devel at lists.sourceforge.net
+Cc: x86 at kernel.org
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
 
-You may pull the whole branch for the next merge window.  I'd suggest 
-that you also merge commit ea9df3b168 into your "fixes" branch and send 
-that to Linus before final 2.6.39, which consists of the first 4 patches 
-fixing bugs in the current code.
+This is on top of mmotm's lib-conslidate-debug_per_cpu_maps patch.
 
-[PATCH 1/9] ARM: zImage: make sure the stack is 64-bit aligned
-[PATCH 2/9] ARM: zImage: Fix bad SP address after relocating kernel
-[PATCH 3/9] ARM: zImage: make sure not to relocate on top of the relocation code
-[PATCH 4/9] ARM: zImage: the page table memory must be considered before relocation
+ arch/arm/Kconfig.debug       |    7 -------
+ arch/blackfin/Kconfig.debug  |    9 ---------
+ arch/m32r/Kconfig.debug      |    9 ---------
+ arch/mips/Kconfig.debug      |    9 ---------
+ arch/powerpc/Kconfig.debug   |    9 ---------
+ arch/score/Kconfig.debug     |    9 ---------
+ arch/sh/Kconfig.debug        |    9 ---------
+ arch/sparc/Kconfig.debug     |    9 ---------
+ arch/tile/Kconfig.debug      |    9 ---------
+ arch/um/Kconfig.debug        |    9 ---------
+ arch/unicore32/Kconfig.debug |    7 -------
+ arch/x86/Kconfig.debug       |    9 ---------
+ lib/Kconfig.debug            |    9 +++++++++
+ 13 files changed, 9 insertions(+), 104 deletions(-)
 
-Up to here the diffstat is:
-
- arch/arm/boot/compressed/Makefile       |    2 +-
- arch/arm/boot/compressed/head.S         |   35 +++++++++++++++++--------
- arch/arm/boot/compressed/vmlinux.lds.in |    1 +
- 3 files changed, 26 insertions(+), 12 deletions(-)
-
-[PATCH 5/9] ARM: zImage: no need to get the decompressed size from the filesystem
-[PATCH 6/9] ARM: zImage: simplify decompress_kernel()
-[PATCH 7/9] ARM: zImage: don't ignore error returned from decompress()
-[PATCH 8/9] ARM: zImage: remove the static qualifier from global data variables
-[PATCH 9/9] ARM: zImage: make sure no GOTOFF relocs are used with .bss symbols
-
-The diffstat for the entire series is:
-
- arch/arm/boot/compressed/Makefile               |   19 +++++-
- arch/arm/boot/compressed/decompress.c           |    4 +-
- arch/arm/boot/compressed/head.S                 |   57 ++++++++++++-----
- arch/arm/boot/compressed/misc.c                 |   24 +++----
- arch/arm/boot/compressed/vmlinux.lds.in         |    1 +
- arch/arm/mach-davinci/include/mach/uncompress.h |    5 +-
- arch/arm/mach-gemini/include/mach/uncompress.h  |    2 +-
- arch/arm/mach-iop32x/include/mach/uncompress.h  |    2 +-
- arch/arm/mach-iop33x/include/mach/uncompress.h  |    2 +-
- arch/arm/mach-ixp4xx/include/mach/uncompress.h  |    2 +-
- arch/arm/mach-mmp/include/mach/uncompress.h     |    2 +-
- arch/arm/mach-mxs/include/mach/uncompress.h     |    2 +-
- arch/arm/mach-ns9xxx/include/mach/uncompress.h  |    2 +-
- arch/arm/mach-nuc93x/include/mach/uncompress.h  |    2 +-
- arch/arm/mach-pxa/include/mach/uncompress.h     |    6 +-
- arch/arm/mach-rpc/include/mach/uncompress.h     |   12 ++--
- arch/arm/mach-s5p64x0/include/mach/uncompress.h |    6 +-
- arch/arm/mach-ux500/include/mach/uncompress.h   |    2 +-
- arch/arm/mach-w90x900/include/mach/uncompress.h |    2 +-
- arch/arm/plat-mxc/include/mach/uncompress.h     |    2 +-
- arch/arm/plat-omap/include/plat/uncompress.h    |    4 +-
- arch/arm/plat-samsung/include/plat/uncompress.h |    4 +-
- 22 files changed, 100 insertions(+), 64 deletions(-)
-
-
-Nicolas
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 03d01d7..81cbe40 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -63,13 +63,6 @@ config DEBUG_USER
+ 	      8 - SIGSEGV faults
+ 	     16 - SIGBUS faults
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Enable stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T output.
+-
+ # These options are only for real kernel hackers who want to get their hands dirty.
+ config DEBUG_LL
+ 	bool "Kernel low-level debugging functions"
+diff --git a/arch/blackfin/Kconfig.debug b/arch/blackfin/Kconfig.debug
+index 2641731..19ccfb3 100644
+--- a/arch/blackfin/Kconfig.debug
++++ b/arch/blackfin/Kconfig.debug
+@@ -9,15 +9,6 @@ config DEBUG_STACKOVERFLOW
+ 	  This option will cause messages to be printed if free stack space
+ 	  drops below a certain limit.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Enable stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config DEBUG_VERBOSE
+ 	bool "Verbose fault messages"
+ 	default y
+diff --git a/arch/m32r/Kconfig.debug b/arch/m32r/Kconfig.debug
+index 2e1019d..bb1afc1 100644
+--- a/arch/m32r/Kconfig.debug
++++ b/arch/m32r/Kconfig.debug
+@@ -9,15 +9,6 @@ config DEBUG_STACKOVERFLOW
+ 	  This option will cause messages to be printed if free stack space
+ 	  drops below a certain limit.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config DEBUG_PAGEALLOC
+ 	bool "Debug page memory allocations"
+ 	depends on DEBUG_KERNEL && BROKEN
+diff --git a/arch/mips/Kconfig.debug b/arch/mips/Kconfig.debug
+index 5358f90..83ed00a 100644
+--- a/arch/mips/Kconfig.debug
++++ b/arch/mips/Kconfig.debug
+@@ -76,15 +76,6 @@ config DEBUG_STACKOVERFLOW
+ 	  provides another way to check stack overflow happened on kernel mode
+ 	  stack usually caused by nested interruption.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Enable stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config SMTC_IDLE_HOOK_DEBUG
+ 	bool "Enable additional debug checks before going into CPU idle loop"
+ 	depends on DEBUG_KERNEL && MIPS_MT_SMTC
+diff --git a/arch/powerpc/Kconfig.debug b/arch/powerpc/Kconfig.debug
+index 12a8d18..f862fc0 100644
+--- a/arch/powerpc/Kconfig.debug
++++ b/arch/powerpc/Kconfig.debug
+@@ -35,15 +35,6 @@ config DEBUG_STACKOVERFLOW
+ 	  This option will cause messages to be printed if free stack space
+ 	  drops below a certain limit.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config HCALL_STATS
+ 	bool "Hypervisor call instrumentation"
+ 	depends on PPC_PSERIES && DEBUG_FS && TRACEPOINTS
+diff --git a/arch/score/Kconfig.debug b/arch/score/Kconfig.debug
+index 451ed54..a1f346d 100644
+--- a/arch/score/Kconfig.debug
++++ b/arch/score/Kconfig.debug
+@@ -16,15 +16,6 @@ config CMDLINE
+ 	  other cases you can specify kernel args so that you don't have
+ 	  to set them up in board prom initialization routines.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Enable stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config RUNTIME_DEBUG
+ 	bool "Enable run-time debugging"
+ 	depends on DEBUG_KERNEL
+diff --git a/arch/sh/Kconfig.debug b/arch/sh/Kconfig.debug
+index 1553d56..c1d5a82 100644
+--- a/arch/sh/Kconfig.debug
++++ b/arch/sh/Kconfig.debug
+@@ -28,15 +28,6 @@ config STACK_DEBUG
+ 	  every function call and will therefore incur a major
+ 	  performance hit. Most users should say N.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config 4KSTACKS
+ 	bool "Use 4Kb for kernel stacks instead of 8Kb"
+ 	depends on DEBUG_KERNEL && (MMU || BROKEN) && !PAGE_SIZE_64KB
+diff --git a/arch/sparc/Kconfig.debug b/arch/sparc/Kconfig.debug
+index d9a795e..6db35fb 100644
+--- a/arch/sparc/Kconfig.debug
++++ b/arch/sparc/Kconfig.debug
+@@ -6,15 +6,6 @@ config TRACE_IRQFLAGS_SUPPORT
+ 
+ source "lib/Kconfig.debug"
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Enable stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config DEBUG_DCFLUSH
+ 	bool "D-cache flush debugging"
+ 	depends on SPARC64 && DEBUG_KERNEL
+diff --git a/arch/tile/Kconfig.debug b/arch/tile/Kconfig.debug
+index 9bc161a..ddbfc33 100644
+--- a/arch/tile/Kconfig.debug
++++ b/arch/tile/Kconfig.debug
+@@ -21,15 +21,6 @@ config DEBUG_STACKOVERFLOW
+ 	  This option will cause messages to be printed if free stack space
+ 	  drops below a certain limit.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config DEBUG_EXTRA_FLAGS
+ 	string "Additional compiler arguments when building with '-g'"
+ 	depends on DEBUG_INFO
+diff --git a/arch/um/Kconfig.debug b/arch/um/Kconfig.debug
+index 8fce5e5..34ac57f 100644
+--- a/arch/um/Kconfig.debug
++++ b/arch/um/Kconfig.debug
+@@ -28,13 +28,4 @@ config GCOV
+ 	  If you're involved in UML kernel development and want to use gcov,
+ 	  say Y.  If you're unsure, say N.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Stack utilization instrumentation"
+-	default N
+-	help
+-	  Track the maximum kernel stack usage - this will look at each
+-	  kernel stack at process exit and log it if it's the deepest
+-	  stack seen so far.
+-
+-	  This option will slow down process creation and destruction somewhat.
+ endmenu
+diff --git a/arch/unicore32/Kconfig.debug b/arch/unicore32/Kconfig.debug
+index 3140151..ae2ec33 100644
+--- a/arch/unicore32/Kconfig.debug
++++ b/arch/unicore32/Kconfig.debug
+@@ -27,13 +27,6 @@ config EARLY_PRINTK
+ 	  with klogd/syslogd or the X server. You should normally N here,
+ 	  unless you want to debug such a crash.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Enable stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	help
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T output.
+-
+ # These options are only for real kernel hackers who want to get their hands dirty.
+ config DEBUG_LL
+ 	bool "Kernel low-level debugging functions"
+diff --git a/arch/x86/Kconfig.debug b/arch/x86/Kconfig.debug
+index 1bf8839..c0f8a5c 100644
+--- a/arch/x86/Kconfig.debug
++++ b/arch/x86/Kconfig.debug
+@@ -66,15 +66,6 @@ config DEBUG_STACKOVERFLOW
+ 	  This option will cause messages to be printed if free stack space
+ 	  drops below a certain limit.
+ 
+-config DEBUG_STACK_USAGE
+-	bool "Stack utilization instrumentation"
+-	depends on DEBUG_KERNEL
+-	---help---
+-	  Enables the display of the minimum amount of free stack which each
+-	  task has ever had available in the sysrq-T and sysrq-P debug output.
+-
+-	  This option will slow down process creation somewhat.
+-
+ config X86_PTDUMP
+ 	bool "Export kernel pagetable layout to userspace via debugfs"
+ 	depends on DEBUG_KERNEL
+diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
+index c0872ee..37fae12 100644
+--- a/lib/Kconfig.debug
++++ b/lib/Kconfig.debug
+@@ -654,6 +654,15 @@ config STACKTRACE
+ 	bool
+ 	depends on STACKTRACE_SUPPORT
+ 
++config DEBUG_STACK_USAGE
++	bool "Stack utilization instrumentation"
++	depends on DEBUG_KERNEL
++	help
++	  Enables the display of the minimum amount of free stack which each
++	  task has ever had available in the sysrq-T and sysrq-P debug output.
++
++	  This option will slow down process creation somewhat.
++
+ config DEBUG_KOBJECT
+ 	bool "kobject debugging"
+ 	depends on DEBUG_KERNEL
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
