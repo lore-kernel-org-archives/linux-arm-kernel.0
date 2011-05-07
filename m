@@ -1,38 +1,59 @@
-From: richard.weinberger@gmail.com (richard -rw- weinberger)
-Date: Sat, 7 May 2011 11:34:13 +0200
-Subject: [PATCH] lib: Consolidate DEBUG_STACK_USAGE option
-In-Reply-To: <1304747831-2098-1-git-send-email-sboyd@codeaurora.org>
-References: <1304747831-2098-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <BANLkTi=h-151_cMPpii6O+kowvc=0WxKjQ@mail.gmail.com>
+From: maxim.osipov@gmail.com (Maxim Osipov)
+Date: Sat, 07 May 2011 12:47:00 +0100
+Subject: [PATCH] AT91: Add external RTC for Flexibity board
+Message-ID: <4DC53134.8070706@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 7, 2011 at 7:57 AM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> Most arches define CONFIG_DEBUG_STACK_USAGE exactly the same way.
-> Move it to lib/Kconfig.debug so each arch doesn't have to define
-> it. This obviously makes the option generic, but that's fine
-> because the config is already used in generic code.
->
-> It's not obvious to me that sysrq-P actually does anything
-> different with this option enabled, but I erred on the side of
-> caution by keeping the most inclusive wording.
->
-> Cc: linux-arch at vger.kernel.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: uclinux-dist-devel at blackfin.uclinux.org
-> Cc: linux-m32r at ml.linux-m32r.org
-> Cc: linux-mips at linux-mips.org
-> Cc: linuxppc-dev at lists.ozlabs.org
-> Cc: linux-sh at vger.kernel.org
-> Cc: sparclinux at vger.kernel.org
-> Cc: Chris Metcalf <cmetcalf@tilera.com>
-> Cc: user-mode-linux-devel at lists.sourceforge.net
-> Cc: x86 at kernel.org
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+Hello,
 
-Acked-by: Richard Weinberger <richard@nod.at>
+This patch enables external RTC support on AT91 Flexibity board.
 
+Kind regards,
+Maxim
+
+
+Signed-off-by: Maxim Osipov <maxim.osipov@gmail.com>
+---
+ arch/arm/mach-at91/board-flexibity.c |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
+index c8a62dc..4fdc96c 100644
+--- a/arch/arm/mach-at91/board-flexibity.c
++++ b/arch/arm/mach-at91/board-flexibity.c
+@@ -1,7 +1,7 @@
+ /*
+  * linux/arch/arm/mach-at91/board-flexibity.c
+  *
+- *  Copyright (C) 2010 Flexibity
++ *  Copyright (C) 2010-2011 Flexibity
+  *  Copyright (C) 2005 SAN People
+  *  Copyright (C) 2006 Atmel
+  *
+@@ -65,6 +65,13 @@ static struct at91_udc_data __initdata flexibity_udc_data = {
+ 	.pullup_pin	= 0,		/* pull-up driven by UDC */
+ };
+ 
++/* I2C devices */
++static struct i2c_board_info __initdata flexibity_i2c_devices[] = {
++	{
++		I2C_BOARD_INFO("ds1307", 0x68),
++	},
++};
++
+ /* SPI devices */
+ static struct spi_board_info flexibity_spi_devices[] = {
+ 	{	/* DataFlash chip */
+@@ -143,6 +150,9 @@ static void __init flexibity_board_init(void)
+ 	at91_add_device_usbh(&flexibity_usbh_data);
+ 	/* USB Device */
+ 	at91_add_device_udc(&flexibity_udc_data);
++	/* I2C */
++	at91_add_device_i2c(flexibity_i2c_devices,
++		ARRAY_SIZE(flexibity_i2c_devices));
+ 	/* SPI */
+ 	at91_add_device_spi(flexibity_spi_devices,
+ 		ARRAY_SIZE(flexibity_spi_devices));
 -- 
-Thanks,
-//richard
+1.7.4.1
