@@ -1,25 +1,31 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 7 May 2011 20:05:47 +0200
-Subject: [PATCH 2/2] dmaengine: at_hdmac: implement pause and resume in
-	atc_control
-In-Reply-To: <47964dd140b0d36db6979f6cd945212ae566e60a.1304532833.git.nicolas.ferre@atmel.com>
-References: <f4341d4672a23a958398b75cb4305e0e680f2e32.1304532833.git.nicolas.ferre@atmel.com>
-	<47964dd140b0d36db6979f6cd945212ae566e60a.1304532833.git.nicolas.ferre@atmel.com>
-Message-ID: <BANLkTi=tVoFLgnVUpj6pXOVN4ACsPed2bQ@mail.gmail.com>
+Date: Sat, 7 May 2011 20:11:00 +0200
+Subject: [RFC] What is the preferred way to share ADC unit between hwmon
+	and input(ts) drivers?
+In-Reply-To: <4DB4C252.30005@emcraft.com>
+References: <4DB4C252.30005@emcraft.com>
+Message-ID: <BANLkTikOjdAjbo+qcKoH_uqpb4YikbHxzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/4 Nicolas Ferre <nicolas.ferre@atmel.com>:
+2011/4/25 Ilya Yanok <yanok@emcraft.com>:
 
-> Pause and resume controls are useful for audio devices. This also returns
-> correct status from atc_tx_status() in case chan is paused.
->
-> Idea from dw_dmac patch by Linus Walleij.
->
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> So, to add both input and hwmon drivers we need to serialize the
+> register accesses.(...) Should we use a multi-function device driver
+> for this
 
-Looks good 2 me!
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Yes. Use MFD. We use MFD for say drivers/mfd/ab3100-core.c and
+what is does is essentially serialize the I2C read/writes using a
+mutex, it spawnd MFD cell children for say drivers/regulator/ab3100.c
+
+In your case spawn a foo-hwmon and foo-input MFD cell from your
+MFD driver core.
+
+> or just some platform-specific code (as S3C does)?
+
+And where are you going to put that? Into arch/arm/mach-* where
+Linus (the other one) is already upset with the prevalence of
+driver code not being factored to share common infrastructure?
 
 Yours,
 Linus Walleij
