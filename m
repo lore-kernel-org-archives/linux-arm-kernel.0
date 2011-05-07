@@ -1,57 +1,63 @@
-From: mike.rapoport@gmail.com (Mike Rapoport)
-Date: Sat, 7 May 2011 22:06:47 +0300
-Subject: [PATCH 1/4] drivers: create a pinmux subsystem
-In-Reply-To: <20110504092219.GW2092@atomide.com>
-References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0497F1B201@HQMAIL01.nvidia.com>
-	<BANLkTimKU-=GXzrn8=MQn-GAmKHOvKmuNQ@mail.gmail.com>
-	<20110504092219.GW2092@atomide.com>
-Message-ID: <BANLkTin9-aKZjEGdBeZqDwHwADXCYERErg@mail.gmail.com>
+From: george@znau.edu.ua (George Kashperko)
+Date: Sat, 07 May 2011 22:02:11 +0300
+Subject: [PATCH][WAS:bcmai,axi] bcma: add Broadcom specific AMBA bus driver
+In-Reply-To: <BANLkTi=6BFD4OmtU1WPxjbFJQe36=mZKEA@mail.gmail.com>
+References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
+	<201105061605.31625.arnd@arndb.de>
+	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
+	<BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
+	<1304790665.13983.10.camel@dev.znau.edu.ua>
+	<BANLkTikLFff_86Fvg+jSty9vGLENiELF2Q@mail.gmail.com>
+	<1304792795.13983.28.camel@dev.znau.edu.ua>
+	<BANLkTi=6BFD4OmtU1WPxjbFJQe36=mZKEA@mail.gmail.com>
+Message-ID: <1304794931.13983.44.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 4, 2011 at 12:22 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Colin Cross <ccross@google.com> [110502 14:26]:
->> On Mon, May 2, 2011 at 1:52 PM, Stephen Warren <swarren@nvidia.com> wrote:
->>
->> * Drive strength is also controlled through groups of pins, but
->> different groups than pinmux. ?Most of the drive strength groups are
->> collections of pad mux groups, but there are a few pins that are in
->> the same pad mux group but a different drive strength group.
->> * Setting a pin as a GPIO overrides its group's mux setting, except
->> for the group's tristate. ?You must untristate the entire group to use
->> a single pin as a GPIO.
->> * Each group has a "safe mode", but which mux id to select to enter
->> the safe mode is completely random.
->
-> Just posted something in this thread regarding using standard data and
-> standard read and write functions, then allow setting platform specific
-> custom flags as needed. Care to see if that works for you too?
+> >>
+> >> The purpose is ridiculously trivial. Print user-friendly names on
+> >> scanning. Why not do that?
+> > Output like
+> > Core 0: ChipCommon (id 0x800, rev 18, vendor 0x14e4)
+> > and
+> > Core 0: id 0x800, rev 18, vendor 0x14e4
+> > both give to 99% of linux systems' end-users exactly the same consistent
+> > information. Its more than enough for diagnostic purposes (I guess
+> > scanning code does outputs this for diagnostic purposes by those less
+> > than 1% of people who are aware wth is actually that ChipCommon is, not
+> > to be just user friendly?).
+> 
+> Really, what's wrong with that? Does it kill anyone's pet we print
+> this? We also do:
+> pr_err("Scanning failed because of wrong CID\n");
+> return -1;
+> While we could drop pr_err. Why to do this? Advanced used can always
+> check what -1 means.
+> 
+> I just like this. I find situations when it's useful, while I don't
+> see real negatives. I want to keep this. Can we leave this that way?
+> Unless someone finds some really bad effects of this?
+Nothing wrong except it makes kernel larger while gives _absolutely_ no
+benefit to end users. Regardless bus code prints core name or not it
+(core name) have absolutely no impact on driver matching.
 
-Tegra does not allow pin muxing on the pin by pin basis. And,
-registers that define mux config differ from those that define flags
-(pull, driver strength, safe mode etc).
+Imagine yourself an end-user who haven't got his 80211 core matched with
+driver and therefore he haven't got WiFi working.
+If bus driver code outputs
+Core X: id 0x812, rev. 8, vendor 0x4BF
+you (as end user) will look where is 0x4BF/0x812 driver supporting
+rev.8.
+But if bus driver code outputs
+Core X: MAC 802.11 (core id 0x812, rev. 8, vendor 0x4BF)
+you (as end user) empowered with MAC 802.11 name knowledge will still
+look where is 0x4BF/0x812 driver supporting rev.8.
 
->> In the end, we determined that there was no way to sanely handle
->> setting up Tegra's pinmux programatically, and instead required each
->> board to pass in a table of pinmux settings.
->
-> Eventually we should get the package specific table of available pins
-> and the board specific settings in devicetree data. And then it's
-> easy to set the pins as desired while being able to debug it.
->
-> Regards,
->
-> Tony
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+Really, there will be more and more core codes/types/name. Why hardcode
+those into kernel for some e. g. memory-constraint system while you
+still can (and in most cases also will) have them in dedicated drivers?
 
+Btw, have you ever suffered hardly from PCI naming devices xxxx.xx.xx.x
+but not "Network device" ?
 
-
--- 
-? ? Sincerely Yours,
-? ? ? ? Mike.
+Have nice day,
+George
