@@ -1,32 +1,37 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat,  7 May 2011 22:28:47 +0530
-Subject: [PATCH] OMAP4: fix return value of omap4_l3_init
-Message-ID: <1304787527-8314-1-git-send-email-rabin@rab.in>
+From: arend@broadcom.com (Arend van Spriel)
+Date: Sat, 7 May 2011 19:04:01 +0200
+Subject: [PATCH][WAS:bcmai,axi] bcma: add Broadcom specific AMBA bus driver
+In-Reply-To: <BANLkTi=GJs=04H=HpCDy_o1JnhY4+aPgxA@mail.gmail.com>
+References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
+	<201105061605.31625.arnd@arndb.de>
+	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
+	<BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
+	<1304776555.16344.2.camel@maggie> <4DC57383.3050903@broadcom.com>
+	<BANLkTi=GJs=04H=HpCDy_o1JnhY4+aPgxA@mail.gmail.com>
+Message-ID: <4DC57B81.6030705@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't PTR_ERR() a non-error pointer:
+On 05/07/2011 06:49 PM, Rafa? Mi?ecki wrote:
+> 2011/5/7 Arend van Spriel<arend@broadcom.com>:
+>> On 05/07/2011 03:55 PM, Michael B?sch wrote:
+>>>> Arnd: did you have a look at defines at all?
+>>>>
+>>>> Most of the defines have values in range 0x800 ? 0x837. Converting
+>>>> this to array means loosing 0x800 u16 entries. We can not use 0x800
+>>>> offset, because there are also some defined between 0x000 and 0x800:
+>>>> #define BCMA_CORE_OOB_ROUTER           0x367   /* Out of band */
+>>>> #define BCMA_CORE_INVALID              0x700
+>> Please be aware that the core identifier itself is not unique (in the
+>> current list they are). In the scan the BCMA_CORE_OOB_ROUTER will always
+>> show BCMA_MANUF_ARM (did not look up the proper manufacturer define but you
+>> get the idea, i hope).
+> Unfortunately, I don't. Could you explain this? How core identified
+> can be not unique? Can 0x800 mean ChipCommon but also SuperPCIeX?
+Yes, if ChipCommon is Broadcom core and SuperPCIeX is ARM core (or some 
+other). The core identifiers are chosen by a chip manufacturer (eg. 
+Broadcom ;-) ). They are not unique by itself so that is why the 
+bcma_device_id consists of manufacturer, id, rev, and class. Providing a 
+device table with ANY_MANUF would be a bad idea.
 
- initcall omap4_l3_init+0x0/0xdc returned -544980480 after 0 usecs
- initcall omap4_l3_init+0x0/0xdc returned with error code -544980480
-
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/mach-omap2/devices.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 7b85585..5b8ca68 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -97,7 +97,7 @@ static int __init omap4_l3_init(void)
- 
- 	WARN(IS_ERR(od), "could not build omap_device for %s\n", oh_name);
- 
--	return PTR_ERR(od);
-+	return IS_ERR(od) ? PTR_ERR(od) : 0;
- }
- postcore_initcall(omap4_l3_init);
- 
--- 
-1.7.4.1
+Gr. AvS
