@@ -1,49 +1,54 @@
-From: konkers@google.com (Erik Gilling)
-Date: Thu, 5 May 2011 07:23:12 -0700
-Subject: Tegra gpio driver: Need to configure pins in gpio
-	mode/nontristate with gpio-request
-In-Reply-To: <96C9D994977DD0439FB6D3FE3B13DD906B1331B068@BGMAIL01.nvidia.com>
-References: <96C9D994977DD0439FB6D3FE3B13DD906B1331B068@BGMAIL01.nvidia.com>
-Message-ID: <BANLkTimxGs44zkVHm-ZNL5kXryAPy0ChYA@mail.gmail.com>
+From: toddpoynor@google.com (Todd Poynor)
+Date: Sat, 7 May 2011 10:54:34 -0700
+Subject: [PATCH 1/2] OMAP2+: hwmod: Add API to enable IO ring wakeup.
+In-Reply-To: <1304676557-15613-2-git-send-email-govindraj.raja@ti.com>
+References: <1304676557-15613-1-git-send-email-govindraj.raja@ti.com>
+	<1304676557-15613-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <BANLkTikoYy1E2vyFjR-fKqOsC7B-xWDWbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GPIO and pinmuxing are two different things.  The GPIO api
-docs explicitly state the gpio_request should take no affect ofther than
-marking that GPIO as in use.
+On Fri, May 6, 2011 at 3:09 AM, Govindraj.R <govindraj.raja@ti.com> wrote:
 
--Erik
+> ...
+> +
+> +/**
+> + * omap_hwmod_enable_ioring_wakeup - Set wakeup bit for iopad ring.
+> + * @oh: struct omap_hwmod *
+> + * @enable: based on 0 or 1 set or unset wakeup bit.
+> + *
+> + * Traverse through dynamic pads, if pad is enabled then
+> + * set wakeup enable bit flag for the mux pin. Wakeup pad bit
+> + * will be set during hwmod idle transistion.
+> + * Return error if pads are not enabled or not available.
+> + */
+> +int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh, bool enable)
+> +{
+> +       struct omap_device_pad *pad;
+> +       int ret = -EINVAL, j;
+> +       int val = 0;
+> +
+> +       /* Enable pin mux to make pad wake-up capable */
+> +       if (enable)
+> +               val = OMAP_WAKEUP_EN;
+> +       else
+> +               val = ~OMAP_WAKEUP_EN;
+> +
+> +       if (oh->mux->enabled) {
+> +               for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
+> +                       pad = oh->mux->pads_dynamic[j];
+> +                       if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
+> +                               pad->idle = pad->enable | val;
+>
 
-On Thu, May 5, 2011 at 3:16 AM, Laxman Dewangan <ldewangan@nvidia.com>wrote:
+I haven't gone to find the patch uses the pad->idle value (or the TRM docs),
+but the !enable case that OR's in every bit except for OMAP_WAKEUP_EN seems
+strange, should the non-wakeup-enabled idle value for the pad set all other
+bits in that reg?
 
-> Hi All,
-> When working on gpio driver for tegra, I found that gpio_request() does not
-> make the corresponding soc pins to gpio mode. It still keeps the pins in
-> SFIO mode.
-> So we need to call two extra function along with gpio_request():
-> Tegra_gpio_enable() and function for setting the pins in no non-tristate.
->
-> Sue to this, the gpio sysfs interface does not work properly from user
-> space /sys/class/gpio/.
-> To make the pin in gpio mode fom user space, need to have changes in
-> kernel.
->
-> I think the gpio_request() should make the pins to gpio mode and make ready
-> for use.
-> Similarly gpio_free() should again put the pin into sfio mode with tristate
-> disable.
->
-> Please comment if there is any better way..
->
->
-> Thanks,
-> Laxman
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+..
+
+Todd
 -------------- next part --------------
 An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110505/859103e5/attachment-0001.html>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110507/796e9df6/attachment-0001.html>
