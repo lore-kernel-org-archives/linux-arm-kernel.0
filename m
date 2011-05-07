@@ -1,32 +1,54 @@
 From: george@znau.edu.ua (George Kashperko)
-Date: Sat, 07 May 2011 20:45:24 +0300
+Date: Sat, 07 May 2011 20:51:05 +0300
 Subject: [PATCH][WAS:bcmai,axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <4DC5805C.2010202@hauke-m.de>
+In-Reply-To: <BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
 References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-	<4DC56FB9.5000208@hauke-m.de>
-	<BANLkTi=FfjK7obq0hj4TjYZc-GgzTuUC6g@mail.gmail.com>
-	<4DC57425.30206@hauke-m.de>
-	<BANLkTikTarvigU-xZNZikhLyvUWse448Tg@mail.gmail.com>
-	<4DC5805C.2010202@hauke-m.de>
-Message-ID: <1304790324.13983.5.camel@dev.znau.edu.ua>
+	<201105061605.31625.arnd@arndb.de>
+	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
+	<BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
+Message-ID: <1304790665.13983.10.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-> Some of the embedded devices also have a USB core on the BCMA bus and a
-> pci(e) host controller to connect other pci(e) devices. As most of the
-> patches for ssb came from the wireless guys and I do not thing this will
-> be different for bcma, I thing the wireless mailing list is the correct
-> place.
+> 2011/5/6 Rafa? Mi?ecki <zajec5@gmail.com>:
+> > 2011/5/6 Arnd Bergmann <arnd@arndb.de>:
+> >>> +const char *bcma_device_name(u16 coreid)
+> >>> +{
+> >>> +     switch (coreid) {
+> >>> +     case BCMA_CORE_OOB_ROUTER:
+> >>> +             return "OOB Router";
+> >>> +     case BCMA_CORE_INVALID:
+> >>> +             return "Invalid";
+> >>> +     case BCMA_CORE_CHIPCOMMON:
+> >>> +             return "ChipCommon";
+> >>> +     case BCMA_CORE_ILINE20:
+> >>> +             return "ILine 20";
+> >>
+> >> It's better to make that a data structure than a switch() statement,
+> >> both from readability and efficiency aspects.
+> >
+> > Well, maybe. We call it only once, at init time. In any case we're
+> > still waiting for Broadcom to clarify which cores are really used for
+> > BCMA.
 > 
-> @George what is the status of adding support for the embedded devices?
-Haven't been looking into Rafal's code closely yet. I'm working on
-another solution suitable for SSB, AXI and hopefully UBUS as well but I
-don't ready to publish it yet.
-
-Regarding ethernet driver, still no feedback on GPL-friendly licensing
-possibility for the code from Broadcom.
+> Arnd: did you have a look at defines at all?
+> 
+> Most of the defines have values in range 0x800 ? 0x837. Converting
+> this to array means loosing 0x800 u16 entries. We can not use 0x800
+> offset, because there are also some defined between 0x000 and 0x800:
+> #define BCMA_CORE_OOB_ROUTER           0x367   /* Out of band */
+> #define BCMA_CORE_INVALID              0x700
+> 
+> Oh and there is still:
+> #define BCMA_CORE_DEFAULT              0xFFF
+> we could want to include. Then we would loose additional (0xFFF -
+> 0x837) u16 entries in array.
+What is the purpose for bcma_device_name in bus driver code ? Why not
+define const char *name in struct bcma_driver and let driver writers
+supply kernel with knowledge on new cores' names rather than hard type
+those into the bus code ? Also this will close the question Arend asked
+you regarding same core ids with different manufacturer ids.
 
 Have nice day,
 George
