@@ -1,70 +1,25 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 7 May 2011 20:05:24 +0200
-Subject: [PATCH][WAS:bcmai,
-	axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <1304790665.13983.10.camel@dev.znau.edu.ua>
-References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-	<201105061605.31625.arnd@arndb.de>
-	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
-	<BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
-	<1304790665.13983.10.camel@dev.znau.edu.ua>
-Message-ID: <BANLkTikLFff_86Fvg+jSty9vGLENiELF2Q@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 7 May 2011 20:05:47 +0200
+Subject: [PATCH 2/2] dmaengine: at_hdmac: implement pause and resume in
+	atc_control
+In-Reply-To: <47964dd140b0d36db6979f6cd945212ae566e60a.1304532833.git.nicolas.ferre@atmel.com>
+References: <f4341d4672a23a958398b75cb4305e0e680f2e32.1304532833.git.nicolas.ferre@atmel.com>
+	<47964dd140b0d36db6979f6cd945212ae566e60a.1304532833.git.nicolas.ferre@atmel.com>
+Message-ID: <BANLkTi=tVoFLgnVUpj6pXOVN4ACsPed2bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/7 George Kashperko <george@znau.edu.ua>:
+2011/5/4 Nicolas Ferre <nicolas.ferre@atmel.com>:
+
+> Pause and resume controls are useful for audio devices. This also returns
+> correct status from atc_tx_status() in case chan is paused.
 >
->> 2011/5/6 Rafa? Mi?ecki <zajec5@gmail.com>:
->> > 2011/5/6 Arnd Bergmann <arnd@arndb.de>:
->> >>> +const char *bcma_device_name(u16 coreid)
->> >>> +{
->> >>> + ? ? switch (coreid) {
->> >>> + ? ? case BCMA_CORE_OOB_ROUTER:
->> >>> + ? ? ? ? ? ? return "OOB Router";
->> >>> + ? ? case BCMA_CORE_INVALID:
->> >>> + ? ? ? ? ? ? return "Invalid";
->> >>> + ? ? case BCMA_CORE_CHIPCOMMON:
->> >>> + ? ? ? ? ? ? return "ChipCommon";
->> >>> + ? ? case BCMA_CORE_ILINE20:
->> >>> + ? ? ? ? ? ? return "ILine 20";
->> >>
->> >> It's better to make that a data structure than a switch() statement,
->> >> both from readability and efficiency aspects.
->> >
->> > Well, maybe. We call it only once, at init time. In any case we're
->> > still waiting for Broadcom to clarify which cores are really used for
->> > BCMA.
->>
->> Arnd: did you have a look at defines at all?
->>
->> Most of the defines have values in range 0x800 ? 0x837. Converting
->> this to array means loosing 0x800 u16 entries. We can not use 0x800
->> offset, because there are also some defined between 0x000 and 0x800:
->> #define BCMA_CORE_OOB_ROUTER ? ? ? ? ? 0x367 ? /* Out of band */
->> #define BCMA_CORE_INVALID ? ? ? ? ? ? ?0x700
->>
->> Oh and there is still:
->> #define BCMA_CORE_DEFAULT ? ? ? ? ? ? ?0xFFF
->> we could want to include. Then we would loose additional (0xFFF -
->> 0x837) u16 entries in array.
-> What is the purpose for bcma_device_name in bus driver code ? Why not
-> define const char *name in struct bcma_driver and let driver writers
-> supply kernel with knowledge on new cores' names rather than hard type
-> those into the bus code ?
+> Idea from dw_dmac patch by Linus Walleij.
+>
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-The purpose is ridiculously trivial. Print user-friendly names on
-scanning. Why not do that?
+Looks good 2 me!
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Let's allow user understand what his bus contains without looking info
-defines in .h.
-
-
-> Also this will close the question Arend asked
-> you regarding same core ids with different manufacturer ids.
-
-I don't know what was Arend's question. I asked but it was few minutes
-ago. I guess he just wanted to point there can be other manufacturer's
-cores.
-
--- 
-Rafa?
+Yours,
+Linus Walleij
