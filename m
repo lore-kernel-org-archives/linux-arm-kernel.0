@@ -1,8 +1,7 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sat, 7 May 2011 21:21:46 +0200
-Subject: [PATCH][WAS:bcmai,
-	axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <1304794931.13983.44.camel@dev.znau.edu.ua>
+From: george@znau.edu.ua (George Kashperko)
+Date: Sat, 07 May 2011 22:35:56 +0300
+Subject: [PATCH][WAS:bcmai,axi] bcma: add Broadcom specific AMBA bus driver
+In-Reply-To: <BANLkTik9FWgzpNWuMXXRjOj-rDvPNY_nCA@mail.gmail.com>
 References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
 	<201105061605.31625.arnd@arndb.de>
 	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
@@ -12,66 +11,46 @@ References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
 	<1304792795.13983.28.camel@dev.znau.edu.ua>
 	<BANLkTi=6BFD4OmtU1WPxjbFJQe36=mZKEA@mail.gmail.com>
 	<1304794931.13983.44.camel@dev.znau.edu.ua>
-Message-ID: <BANLkTik9FWgzpNWuMXXRjOj-rDvPNY_nCA@mail.gmail.com>
+	<BANLkTik9FWgzpNWuMXXRjOj-rDvPNY_nCA@mail.gmail.com>
+Message-ID: <1304796956.13983.65.camel@dev.znau.edu.ua>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/7 George Kashperko <george@znau.edu.ua>:
->> >>
->> >> The purpose is ridiculously trivial. Print user-friendly names on
->> >> scanning. Why not do that?
->> > Output like
->> > Core 0: ChipCommon (id 0x800, rev 18, vendor 0x14e4)
->> > and
->> > Core 0: id 0x800, rev 18, vendor 0x14e4
->> > both give to 99% of linux systems' end-users exactly the same consistent
->> > information. Its more than enough for diagnostic purposes (I guess
->> > scanning code does outputs this for diagnostic purposes by those less
->> > than 1% of people who are aware wth is actually that ChipCommon is, not
->> > to be just user friendly?).
->>
->> Really, what's wrong with that? Does it kill anyone's pet we print
->> this? We also do:
->> pr_err("Scanning failed because of wrong CID\n");
->> return -1;
->> While we could drop pr_err. Why to do this? Advanced used can always
->> check what -1 means.
->>
->> I just like this. I find situations when it's useful, while I don't
->> see real negatives. I want to keep this. Can we leave this that way?
->> Unless someone finds some really bad effects of this?
-> Nothing wrong except it makes kernel larger while gives _absolutely_ no
-> benefit to end users. Regardless bus code prints core name or not it
-> (core name) have absolutely no impact on driver matching.
->
-> Imagine yourself an end-user who haven't got his 80211 core matched with
-> driver and therefore he haven't got WiFi working.
-> If bus driver code outputs
-> Core X: id 0x812, rev. 8, vendor 0x4BF
-> you (as end user) will look where is 0x4BF/0x812 driver supporting
-> rev.8.
-> But if bus driver code outputs
-> Core X: MAC 802.11 (core id 0x812, rev. 8, vendor 0x4BF)
-> you (as end user) empowered with MAC 802.11 name knowledge will still
-> look where is 0x4BF/0x812 driver supporting rev.8.
+> I'll ask linux-wireless instead of linux-usb or linux-arm.
+If you know you haven't got wireless working by some reason you will ask
+at linux-wireless anyway. And people there will ask you for id/ven/rev
+rather than core name reported by bus driver.
 
-I'll ask linux-wireless instead of linux-usb or linux-arm.
+> I didn't expect longer discussion so I got this trivial example of
+> pr_err. But it appears to be good example/question.
+> 
+> How do you see relation between bcma_device_name and:
+> int zd_ioread32v_locked(...) {
+> 	if (r) {
+> 		dev_dbg_f(zd_chip_dev(chip),
+> 			  "error: zd_ioread16v_locked. Error number %d\n", r);
+> 		return r;
+> 	}
+> }
+No relation at all. It like comparing warm and soft. It will be if you
+do something like
 
-I didn't expect longer discussion so I got this trivial example of
-pr_err. But it appears to be good example/question.
-
-How do you see relation between bcma_device_name and:
-int zd_ioread32v_locked(...) {
-	if (r) {
-		dev_dbg_f(zd_chip_dev(chip),
-			  "error: zd_ioread16v_locked. Error number %d\n", r);
-		return r;
-	}
+dbg_bcma_device_name
+{
+#ifdef DEBUG
+		case/switch/if/else stuff
+#endif
+		return NULL;
 }
+But I don't see here much sense to hardcode names other than those of
+buscommons/buscores for debugging purposes.
 
-I believe according to your theory we should drop thi error message,
-right? It eats memory to keep this string while error code can always
-be checked in source.
+> 
+> I believe according to your theory we should drop thi error message,
+> right? It eats memory to keep this string while error code can always
+> be checked in source.
+> 
+My theory ? o.O
 
--- 
-Rafa?
+Have nice day,
+George
