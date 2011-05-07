@@ -1,59 +1,54 @@
-From: maxim.osipov@gmail.com (Maxim Osipov)
-Date: Sat, 07 May 2011 12:47:00 +0100
-Subject: [PATCH] AT91: Add external RTC for Flexibity board
-Message-ID: <4DC53134.8070706@gmail.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Sat, 7 May 2011 15:34:20 +0200
+Subject: [PATCH][WAS:bcmai,
+	axi] bcma: add Broadcom specific AMBA bus driver
+In-Reply-To: <BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
+References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
+	<201105061605.31625.arnd@arndb.de>
+	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
+Message-ID: <BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+2011/5/6 Rafa? Mi?ecki <zajec5@gmail.com>:
+> 2011/5/6 Arnd Bergmann <arnd@arndb.de>:
+>>> +const char *bcma_device_name(u16 coreid)
+>>> +{
+>>> + ? ? switch (coreid) {
+>>> + ? ? case BCMA_CORE_OOB_ROUTER:
+>>> + ? ? ? ? ? ? return "OOB Router";
+>>> + ? ? case BCMA_CORE_INVALID:
+>>> + ? ? ? ? ? ? return "Invalid";
+>>> + ? ? case BCMA_CORE_CHIPCOMMON:
+>>> + ? ? ? ? ? ? return "ChipCommon";
+>>> + ? ? case BCMA_CORE_ILINE20:
+>>> + ? ? ? ? ? ? return "ILine 20";
+>>
+>> It's better to make that a data structure than a switch() statement,
+>> both from readability and efficiency aspects.
+>
+> Well, maybe. We call it only once, at init time. In any case we're
+> still waiting for Broadcom to clarify which cores are really used for
+> BCMA.
 
-This patch enables external RTC support on AT91 Flexibity board.
+Arnd: did you have a look at defines at all?
 
-Kind regards,
-Maxim
+Most of the defines have values in range 0x800 ? 0x837. Converting
+this to array means loosing 0x800 u16 entries. We can not use 0x800
+offset, because there are also some defined between 0x000 and 0x800:
+#define BCMA_CORE_OOB_ROUTER           0x367   /* Out of band */
+#define BCMA_CORE_INVALID              0x700
 
+Oh and there is still:
+#define BCMA_CORE_DEFAULT              0xFFF
+we could want to include. Then we would loose additional (0xFFF -
+0x837) u16 entries in array.
 
-Signed-off-by: Maxim Osipov <maxim.osipov@gmail.com>
----
- arch/arm/mach-at91/board-flexibity.c |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
+I'll just leave this huge "case". As I said, it's called only once on
+initialization time. For standard PCI cards there are usually 3-5
+cores, for embedded systems this number can be bigger, but still is
+limited with 16 for 1 bus:
+#define BCMA_MAX_NR_CORES              16
 
-diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-index c8a62dc..4fdc96c 100644
---- a/arch/arm/mach-at91/board-flexibity.c
-+++ b/arch/arm/mach-at91/board-flexibity.c
-@@ -1,7 +1,7 @@
- /*
-  * linux/arch/arm/mach-at91/board-flexibity.c
-  *
-- *  Copyright (C) 2010 Flexibity
-+ *  Copyright (C) 2010-2011 Flexibity
-  *  Copyright (C) 2005 SAN People
-  *  Copyright (C) 2006 Atmel
-  *
-@@ -65,6 +65,13 @@ static struct at91_udc_data __initdata flexibity_udc_data = {
- 	.pullup_pin	= 0,		/* pull-up driven by UDC */
- };
- 
-+/* I2C devices */
-+static struct i2c_board_info __initdata flexibity_i2c_devices[] = {
-+	{
-+		I2C_BOARD_INFO("ds1307", 0x68),
-+	},
-+};
-+
- /* SPI devices */
- static struct spi_board_info flexibity_spi_devices[] = {
- 	{	/* DataFlash chip */
-@@ -143,6 +150,9 @@ static void __init flexibity_board_init(void)
- 	at91_add_device_usbh(&flexibity_usbh_data);
- 	/* USB Device */
- 	at91_add_device_udc(&flexibity_udc_data);
-+	/* I2C */
-+	at91_add_device_i2c(flexibity_i2c_devices,
-+		ARRAY_SIZE(flexibity_i2c_devices));
- 	/* SPI */
- 	at91_add_device_spi(flexibity_spi_devices,
- 		ARRAY_SIZE(flexibity_spi_devices));
 -- 
-1.7.4.1
+Rafa?
