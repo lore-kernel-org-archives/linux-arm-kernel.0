@@ -1,39 +1,31 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sun, 08 May 2011 14:48:15 +0200
-Subject: [PATCH][WAS:bcmai,
-	axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-Message-ID: <4DC6910F.2020008@hauke-m.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun,  8 May 2011 13:51:20 +0100
+Subject: [PATCH v5 01/19] ARM: LPAE: Use long long printk format for
+	displaying the pud
+In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1304859098-10760-2-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/05/2011 11:59 PM, Rafa? Mi?ecki wrote:
-.....
-> --- /dev/null
-> +++ b/drivers/bcma/bcma_private.h
-.....
-> +
-> +#define BCMA_ADDR_BASE		0x18000000
-> +#define BCMA_WRAP_BASE		0x18100000
-> +
-......
-> --- /dev/null
-> +++ b/drivers/bcma/scan.h
-> @@ -0,0 +1,56 @@
-> +#ifndef BCMA_SCAN_H_
-> +#define BCMA_SCAN_H_
-> +
-> +#define BCMA_ADDR_BASE		0x18000000
-> +#define BCMA_WRAP_BASE		0x18100000
-> +
-.....
+Currently using just long but this is not enough for the LPAE format
+(64-bit entries).
 
-While graping through the code I found this. BCMA_ADDR_BASE and
-BCMA_WRAP_BASE are defined twice.
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/mm/fault.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Why are some constants defined in purpose specific headers in
-drivers/bcma/*.h like drivers/bcma/scan.h and some in
-drivers/bcma/bcma_private.h and other in include/linux/bcma/bcma_regs.h ?
-
-Hauke
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index bc0e1d8..ee76923 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -94,7 +94,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+ 
+ 		pud = pud_offset(pgd, addr);
+ 		if (PTRS_PER_PUD != 1)
+-			printk(", *pud=%08lx", pud_val(*pud));
++			printk(", *pud=%08llx", (long long)pud_val(*pud));
+ 
+ 		if (pud_none(*pud))
+ 			break;
