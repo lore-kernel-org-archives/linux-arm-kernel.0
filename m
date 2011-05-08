@@ -1,32 +1,35 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 8 May 2011 19:19:18 +0200
-Subject: [PATCH 13/14] [dove] Remove mpp.[ch]. They are not used.
-In-Reply-To: <BANLkTi=mLaj0wa0PA9uokZ5ekuNbSEPthQ@mail.gmail.com>
+Date: Sun, 8 May 2011 19:28:32 +0200
+Subject: [PATCH 14/14] [orion5x] Refactor mpp code to use common orion
+	platform mpp.
+In-Reply-To: <BANLkTikj2xNA3Px1mvrRf0qb6W4M92nPCg@mail.gmail.com>
 References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-	<1304864141-1121-14-git-send-email-andrew@lunn.ch>
-	<BANLkTi=mLaj0wa0PA9uokZ5ekuNbSEPthQ@mail.gmail.com>
-Message-ID: <20110508171918.GC4071@lunn.ch>
+	<1304864141-1121-15-git-send-email-andrew@lunn.ch>
+	<BANLkTikj2xNA3Px1mvrRf0qb6W4M92nPCg@mail.gmail.com>
+Message-ID: <20110508172832.GD4071@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 08, 2011 at 05:39:08PM +0300, saeed bishara wrote:
-> On Sun, May 8, 2011 at 5:15 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> > ---
-> > ??arch/arm/mach-dove/Makefile | ?? ??2 +-
-> > ??arch/arm/mach-dove/mpp.c ?? ??| ??209 ----------------------------------------
-> > ??arch/arm/mach-dove/mpp.h ?? ??| ??220 -------------------------------------------
-> > ??3 files changed, 1 insertions(+), 430 deletions(-)
-> > ??delete mode 100644 arch/arm/mach-dove/mpp.c
-> > ??delete mode 100644 arch/arm/mach-dove/mpp.h
-> No, it currently not used, by we for sure will use at some point. we
-> are planning to prepare such patches for the next release. so please
-> keep it.
+> > diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
+..
 
-O.K. I can drop this patch.
+ > +#define MPP19_UNUSED ?? ?? ?? ?? ?? MPP(19, 0x0, 1, 1, 1, ?? 1, ?? 1)
+> > +#define MPP19_GPIO ?? ?? ?? ?? ?? ?? MPP(19, 0x5, 1, 1, 0, ?? 1, ?? 0)
+> > +#define MPP19_GIGE ?? ?? ?? ?? ?? ?? ??MPP(19, 0x1, 1, 1, 1, ?? 1, ?? 1)
+> > +#define MPP19_UART ?? ?? ?? ?? ?? ?? ??MPP(19, 0x0, 1, 1, 0, ?? 1, ?? 1)
+>
+> there have been some effort to enable building single image for
+> orion5x/kw/dove etc, and I think the defines here collides with those
+> defined by kw.
 
-I don't have a datasheet for the Dove. Do you think it is possible to
-merge the dove mpp setup code with the kirkwood and mv78xx0?
+Please could you point me at this code which merges these three.
 
-      Thanks
-	Andrew
+I also don't see how these defines cause a problem. In fact, having
+just one generic mpp configuration function helps in building one
+image for all these SoC. Each SoC will have to retain its per pin
+configuration, which is what the mach-*/mpp.h contains, but these
+mpp.h are not in the platform, so i don't see how they hinder a single
+image.
+
+	Thanks
+		Andrew
