@@ -1,63 +1,36 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun,  8 May 2011 13:51:21 +0100
-Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
+Date: Sun,  8 May 2011 13:51:22 +0100
+Subject: [PATCH v5 03/19] ARM: LPAE: Use unsigned long for __phys_to_virt and
+	__virt_to_phys
 In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
 References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1304859098-10760-4-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+The !CONFIG_ARM_PATCH_PHYS_VIRT case uses macros for __phys_to_virt and
+__virt_to_phys but does not use any type casting. This causes issues
+with LPAE where the phys_addr_t is 64-bit. Note that these macros are
+only valid for lowmem physical addresses where the range is within
+32-bit.
 
-Before we enable the MMU, we must ensure that the TTBR registers contain
-sane values. After the MMU has been enabled, we jump to the *virtual*
-address of the following function, so we also need to ensure that the
-SCTLR write has taken effect.
-
-This patch adds ISB instructions around the SCTLR write to ensure the
-visibility of the above.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/assembler.h |   11 +++++++++++
- arch/arm/kernel/head.S           |    2 ++
- 2 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/memory.h |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index bc2d2d7..2bcc456 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -184,6 +184,17 @@
+diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
+index 431077c..10e4b4c 100644
+--- a/arch/arm/include/asm/memory.h
++++ b/arch/arm/include/asm/memory.h
+@@ -194,8 +194,8 @@ static inline unsigned long __phys_to_virt(unsigned long x)
+ 	return t;
+ }
+ #else
+-#define __virt_to_phys(x)	((x) - PAGE_OFFSET + PHYS_OFFSET)
+-#define __phys_to_virt(x)	((x) - PHYS_OFFSET + PAGE_OFFSET)
++#define __virt_to_phys(x)	((unsigned long)(x) - PAGE_OFFSET + PHYS_OFFSET)
++#define __phys_to_virt(x)	((unsigned long)(x) - PHYS_OFFSET + PAGE_OFFSET)
+ #endif
  #endif
  
- /*
-+ * Instruction barrier
-+ */
-+	.macro	instr_sync
-+#if __LINUX_ARM_ARCH__ >= 7
-+	isb
-+#elif __LINUX_ARM_ARCH__ == 6
-+	mcr	p15, 0, r0, c7, c5, 4
-+#endif
-+	.endm
-+
-+/*
-  * SMP data memory barrier
-  */
- 	.macro	smp_dmb mode
-diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
-index c9173cf..ea8fae7 100644
---- a/arch/arm/kernel/head.S
-+++ b/arch/arm/kernel/head.S
-@@ -385,8 +385,10 @@ ENDPROC(__enable_mmu)
- 	.align	5
- __turn_mmu_on:
- 	mov	r0, r0
-+	instr_sync
- 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
- 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
-+	instr_sync
- 	mov	r3, r3
- 	mov	r3, r13
- 	mov	pc, r3
