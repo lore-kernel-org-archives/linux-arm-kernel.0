@@ -1,42 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 8 May 2011 22:34:30 +0200
-Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
-	sched_clock
-In-Reply-To: <alpine.LFD.2.02.1104292355210.3005@ionos>
-References: <20110423205036.795894921@linutronix.de>
-	<20110429094606.GA5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1104291217120.3005@ionos>
-	<20110429103208.GA2849@atomide.com>
-	<alpine.LFD.2.02.1104291900290.3005@ionos>
-	<BANLkTi=Xymqw9H+aNPbYUWDs7w5HzmJVkw@mail.gmail.com>
-	<alpine.LFD.2.02.1104292355210.3005@ionos>
-Message-ID: <BANLkTimgJbxuqcRXxvPs0HjP_AbdD81O_w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 8 May 2011 22:41:01 +0100
+Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
+In-Reply-To: <1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20110508214101.GO27807@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 11:57 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Fri, 29 Apr 2011, Linus Walleij wrote:
->>
->> Jonas ?berg has this pending patch that we call "boot time recorder".
->> What it does is basically start a free running timer before the
->> kernel is booted, e.g. in U-boot or even in the ROM of your
->> machine if you can.
->>
->> If we need more finegrained sched_clock() before the
->> clocksource is up, a good approach would be to utilize
->> something like that for sched_clock up to that point, plus
->> it has the upside that [0.000000] is as close to electrical
->> power-on as possible.
->
-> Well, you can read out that value at the point the clocksource gets
-> installed so you have the time spent up to that point without adding
-> another facility, level of indirection ...
+On Sun, May 08, 2011 at 01:51:21PM +0100, Catalin Marinas wrote:
+> From: Will Deacon <will.deacon@arm.com>
+> 
+> Before we enable the MMU, we must ensure that the TTBR registers contain
+> sane values. After the MMU has been enabled, we jump to the *virtual*
+> address of the following function, so we also need to ensure that the
+> SCTLR write has taken effect.
+> 
+> This patch adds ISB instructions around the SCTLR write to ensure the
+> visibility of the above.
 
-That too (one does not exclude the other), what I was getting at is that
-systems may have something alredy running that is monotonic and
-trustable, and would likely go into some early_timer() or similar familiar
-kernel naming scheme. But no point in doing any of that sort now, let's
-have jiffies for now and get that to work.
+Maybe this should be extended to the arch/arm/kernel/sleep.S code too?
 
-Thanks,
-Linus Walleij
+>  __turn_mmu_on:
+>  	mov	r0, r0
+> +	instr_sync
+>  	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+>  	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
+> +	instr_sync
+>  	mov	r3, r3
+>  	mov	r3, r13
+>  	mov	pc, r3
+
+Could we avoid the second isb by doing something like this instead:
+
+	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
+	and	r3, r3, r13
+	orr	r3, r3, r13
+	mov	pc, r3
+
+The read from the ID register must complete before the branch can be
+taken as the value is involved in computing the address to jump to
+(even though that value has no actual effect on that address.)  This
+assumes that the read from CP15 can't complete until the previous
+write has completed.
+
+What I'm concerned about is adding additional code to this path - we
+know it has some strict alignment requirements on some CPUs which
+otherwise misbehave, normally by faulting in some way.
