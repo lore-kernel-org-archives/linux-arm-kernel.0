@@ -1,45 +1,39 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sun, 8 May 2011 12:37:15 +0200
-Subject: [PATCH][WAS:bcmai,
-	axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <20110508101609.GF27807@n2100.arm.linux.org.uk>
-References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-	<201105061605.31625.arnd@arndb.de>
-	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
-	<BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
-	<1304790665.13983.10.camel@dev.znau.edu.ua>
-	<BANLkTikLFff_86Fvg+jSty9vGLENiELF2Q@mail.gmail.com>
-	<1304792795.13983.28.camel@dev.znau.edu.ua>
-	<BANLkTi=6BFD4OmtU1WPxjbFJQe36=mZKEA@mail.gmail.com>
-	<20110508101609.GF27807@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikMruTibp64GjE9qP9r80JiHgAFXw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 8 May 2011 11:42:01 +0100
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
+	and i.MX53
+In-Reply-To: <BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110413122503.GB1897@S2100-06.ap.freescale.net>
+	<20110413124149.GR18850@pengutronix.de>
+	<BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
+Message-ID: <20110508104201.GH27807@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/8 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Sat, May 07, 2011 at 08:48:10PM +0200, Rafa? Mi?ecki wrote:
->> Really, what's wrong with that? Does it kill anyone's pet we print
->> this? We also do:
->> pr_err("Scanning failed because of wrong CID\n");
->> return -1;
->> While we could drop pr_err. Why to do this? Advanced used can always
->> check what -1 means.
->
-> And why return -1 when we have a system of error codes? ?I _really_ wish
-> people would stop returning -1 for "some random error occurred".
+On Wed, May 04, 2011 at 10:48:40AM -0500, Matt Sealey wrote:
+> CONFIG_ARM_PATCH_PHYS_VIRT
+> 
+> These two config options, with absolutely no bootloader changes, will
+> basically mask off some address (instruction pointer?) at the time of
+> the check and therefore derive a perfectly good PHYS_OFFSET at runtime
+> and make sure it is in use... within some limits (first 128MB, assumes
+> that start of memory is at some particular alignment)?
 
-You commented on imagined code, but we actually do sth similar in code.
+The V:P fixup will only handle bits 31-24, or 31-16 if the
+ARM_PATCH_PHYS_VIRT_16BIT option is selected (for MSM).  If the offset
+doesn't wholy fit into these, then the fixup function will complain and
+your kernel won't boot.  So, it'll go down to 64K alignment.
 
-I did this because:
-1) I had no idea what err code would be valid for invalid EPROM layout
-(content). Nothing from include/asm-generic/errno-base.h sounds
-reasonable.
-2) I wanted to use different error codes for different EPROM layout
-issues. Sometimes we don't get CIA block. Sometimes we don't get CIB
-block. Sometimes there is problem with master port (not found in EPROM
-when expected). They all would probably use the same errno.
+It does rely on the kernel being placed correctly in memory.  So if the
+start of the kernel text is built to be 32K above PAGE_OFFSET, then the
+kernel will assume that physical memory starts 32K below where the
+'Image' ended up in physical memory.  If you place the kernel in physical
+memory 16MB above the start, then it'll assume that physical memory starts
+16MB above where it actually did.
 
-Could you help me with this?
-
--- 
-Rafa?
+There is one thing to watch out for though - if you did place it 16MB
+above, but still tell the kernel via ATAGs that the physical memory
+starts where it really does, then I'd expect things to explode as
+the kernel direct mapped memory would likely extend below PAGE_OFFSET.
