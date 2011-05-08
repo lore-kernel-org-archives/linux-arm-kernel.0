@@ -1,88 +1,49 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 8 May 2011 12:44:51 +0200
-Subject: [PATCH 09/14] at91: switch pit timer to early platform devices
-In-Reply-To: <20110508100841.GE27807@n2100.arm.linux.org.uk>
-References: <20110428113427.GG17290@n2100.arm.linux.org.uk>
-	<20110428131538.GA10594@game.jcrosoft.org>
-	<1304009792.3081.8.camel@redbox>
-	<20110428181502.GE17290@n2100.arm.linux.org.uk>
-	<BANLkTimT4dpOKcuMbWOWU4Mz=Uk81642Rw@mail.gmail.com>
-	<20110428214632.GQ17290@n2100.arm.linux.org.uk>
-	<20110428233823.GC13104@game.jcrosoft.org>
-	<20110429092812.GA17290@n2100.arm.linux.org.uk>
-	<20110430013658.GC1212@game.jcrosoft.org>
-	<20110508100841.GE27807@n2100.arm.linux.org.uk>
-Message-ID: <20110508104451.GB11530@game.jcrosoft.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 08 May 2011 15:17:52 +0400
+Subject: [PATCH 2/4] ARM: S3C24XX: Add plaform device definition for USB
+	High-Speed gadget controller.
+In-Reply-To: <201105072226.53556.heiko@sntech.de>
+References: <Pine.LNX.4.44L0.1104141313210.2487-100000@iolanthe.rowland.org>
+	<20110416145830.GA8811@kroah.com>
+	<201105072223.44163.heiko@sntech.de>
+	<201105072226.53556.heiko@sntech.de>
+Message-ID: <4DC67BE0.9080905@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:08 Sun 08 May     , Russell King - ARM Linux wrote:
-> On Sat, Apr 30, 2011 at 03:36:58AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > yes we still need a calback to call the early probe
-> > but just a callback for the init no resume, suspend
-> > 
-> > if we want multiple timer early which I do not think is necessarly
-> > for really early one timer is enough if you need more you can initialise them
-> > later
-> > 
-> > so if we keep this constrain
-> > 
-> > in the arm timer init
-> > early_platform_driver_register_all("earlytimer");
-> > early_platform_driver_probe("earlytimer", 1 , 0);
-> > 
-> > and in the init_early you just need to do
-> > early_platform_add_devices(devices, nb);
-> > 
-> > so it's more generic
-> 
-> I'm still not convinced.  What it seems to be doing is moving from this:
-> 
-> time_init() ->
-> 	system_timer->init() ->
-> 		platform code
-> 
-> to this:
-> 
-> setup_arch() ->
-> 	init_early() ->
-> 		platform code ->
-> 			early_platform_add_devices()
-> time_init() ->
-> 	early_platform_driver_register_all(),
-> 	early_platform_driver_probe() ->
-> 		early timer probe function (platform code)
-> 
-> which to me just looks a whole lot more complex without benefit.
-> 
-> Platform code still has to make the decision at some point about which
-> timers are added - in the former case via the system_timer->init()
-> callback or in the latter case by the init_early() callback.
-> 
-> I can't see how this results in something better, either by simplifing
-> the code or resulting in any kind of consolidation.  That's backed up
-> by this patch adding around 230 lines of code.
-Simplify cross arch timer drivers
-Example on SH-Mobile
+Hello.
 
-And Renesas is not the only vendor to have multiple ARCH ip shared
-more are arriving
+On 08-05-2011 0:26, Heiko St?bner wrote:
 
-allow to probe more than one timer genericly
-allow to pass resource and platform data in a standard way
+> From: Thomas Abraham<thomas.ab@samsung.com>
 
-this patch switch from static to allocated device that's why we add 230 lines
-if you just add the early device only
-you need aboud 20 lines maybe less
+> S3C2416, S3C2443 and S3C2450 includes a USB High-Speed Gadget controller module.
+> This patch adds the following for supporting this controller.
 
-We could have a common cross ARCH way to init timer
-via earlytimer
-so the drivers are arch independant
+> 1. Definition for USB High-Speed controller base address.
+> 2. Platform device instantiation.
+> 3. Declaration for platform data structure.
+> 4. Functionality to setup platform data for the controller.
 
-and no need anymore to store the timer in arch/arm/....
-but all timer move to drivers/clocksource/
-so less code in arch specially on arm where nearly all vendor have it's own
-timer drivers
+> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
+> Signed-off-by: Sangbeom Kim<sbkim73@samsung.com>
+[...]
 
-Best Regards,
-J.
+> diff --git a/arch/arm/plat-s3c24xx/devs.c b/arch/arm/plat-s3c24xx/devs.c
+> index 268f3ed..7366799 100644
+> --- a/arch/arm/plat-s3c24xx/devs.c
+> +++ b/arch/arm/plat-s3c24xx/devs.c
+[...]
+> @@ -233,6 +234,46 @@ void __init s3c24xx_udc_set_platdata(struct s3c2410_udc_mach_info *pd)
+[...]
+> +void __init s3c24xx_hsudc_set_platdata(struct s3c24xx_hsudc_platdata *pd)
+> +{
+> +	struct s3c24xx_hsudc_platdata *npd;
+> +
+> +	npd = kmalloc(sizeof(*npd), GFP_KERNEL);
+> +	if (npd) {
+> +		memcpy(npd, pd, sizeof(*npd));
+
+    You could use kmemdup() (from mm/util.c) instead...
+
+WBR, Sergei
