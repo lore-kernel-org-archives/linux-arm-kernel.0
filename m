@@ -1,59 +1,38 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sun,  8 May 2011 14:51:54 +0530
-Subject: [PATCH] OMAP: don't trace functions called from sched_clock
-Message-ID: <1304846514-15641-1-git-send-email-rabin@rab.in>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 8 May 2011 10:24:03 +0100
+Subject: [PATCH] atomic: add *_dec_not_zero
+In-Reply-To: <1304458235-28473-1-git-send-email-sven@narfation.org>
+References: <1304458235-28473-1-git-send-email-sven@narfation.org>
+Message-ID: <20110508092403.GB27807@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-omap_readl() is used from the sched_clock() implementations and so must
-be marked notrace to avoid recursion in ftrace.  Same thing with
-mpu_read() for OMAP1.
+On Tue, May 03, 2011 at 11:30:35PM +0200, Sven Eckelmann wrote:
+> Introduce an *_dec_not_zero operation.  Make this a special case of
+> *_add_unless because batman-adv uses atomic_dec_not_zero in different
+> places like re-broadcast queue or aggregation queue management. There
+> are other non-final patches which may also want to use this macro.
+...
+> diff --git a/arch/arm/include/asm/atomic.h b/arch/arm/include/asm/atomic.h
+> index 7e79503..a005265 100644
+> --- a/arch/arm/include/asm/atomic.h
+> +++ b/arch/arm/include/asm/atomic.h
+> @@ -218,6 +218,7 @@ static inline int atomic_add_unless(atomic_t *v, int a, int u)
+>  	return c != u;
+>  }
+>  #define atomic_inc_not_zero(v) atomic_add_unless((v), 1, 0)
+> +#define atomic_dec_not_zero(v) atomic_add_unless((v), -1, 0)
+>  
+>  #define atomic_inc(v)		atomic_add(1, v)
+>  #define atomic_dec(v)		atomic_sub(1, v)
+> @@ -459,6 +460,7 @@ static inline int atomic64_add_unless(atomic64_t *v, u64 a, u64 u)
+>  #define atomic64_dec_return(v)		atomic64_sub_return(1LL, (v))
+>  #define atomic64_dec_and_test(v)	(atomic64_dec_return((v)) == 0)
+>  #define atomic64_inc_not_zero(v)	atomic64_add_unless((v), 1LL, 0LL)
+> +#define atomic64_dec_not_zero(v)	atomic64_add_unless((v), -1LL, 0LL)
+>  
+>  #else /* !CONFIG_GENERIC_ATOMIC64 */
+>  #include <asm-generic/atomic64.h>
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- arch/arm/mach-omap1/io.c   |    2 +-
- arch/arm/mach-omap1/time.c |    2 +-
- arch/arm/mach-omap2/io.c   |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/io.c b/arch/arm/mach-omap1/io.c
-index 870886a..36ec2d7 100644
---- a/arch/arm/mach-omap1/io.c
-+++ b/arch/arm/mach-omap1/io.c
-@@ -158,7 +158,7 @@ u16 omap_readw(u32 pa)
- }
- EXPORT_SYMBOL(omap_readw);
- 
--u32 omap_readl(u32 pa)
-+u32 notrace omap_readl(u32 pa)
- {
- 	return __raw_readl(OMAP1_IO_ADDRESS(pa));
- }
-diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
-index 6885d2f..88c5c5e 100644
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -203,7 +203,7 @@ static struct irqaction omap_mpu_timer2_irq = {
- 	.handler	= omap_mpu_timer2_interrupt,
- };
- 
--static cycle_t mpu_read(struct clocksource *cs)
-+static cycle_t notrace mpu_read(struct clocksource *cs)
- {
- 	return ~omap_mpu_timer_read(1);
- }
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 441e79d..f1987b1 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -441,7 +441,7 @@ u16 omap_readw(u32 pa)
- }
- EXPORT_SYMBOL(omap_readw);
- 
--u32 omap_readl(u32 pa)
-+u32 notrace omap_readl(u32 pa)
- {
- 	return __raw_readl(OMAP2_L4_IO_ADDRESS(pa));
- }
--- 
-1.7.4.1
+Do we need atomic_dec_not_zero() et.al. in every arch header - is there no
+generic header which it could be added to?
