@@ -1,48 +1,95 @@
-From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
-Date: Sun, 8 May 2011 14:55:54 +0200
-Subject: [PATCH][WAS:bcmai,
-	axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <4DC6910F.2020008@hauke-m.de>
-References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-	<4DC6910F.2020008@hauke-m.de>
-Message-ID: <BANLkTi=wtxH6suf8D=nzYKrBjWV9-yAQLw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun,  8 May 2011 13:51:37 +0100
+Subject: [PATCH v5 18/19] ARM: LPAE: add support for ATAG_MEM64
+In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1304859098-10760-19-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/8 Hauke Mehrtens <hauke@hauke-m.de>:
-> On 05/05/2011 11:59 PM, Rafa? Mi?ecki wrote:
-> .....
->> --- /dev/null
->> +++ b/drivers/bcma/bcma_private.h
-> .....
->> +
->> +#define BCMA_ADDR_BASE ? ? ? ? ? ? ? 0x18000000
->> +#define BCMA_WRAP_BASE ? ? ? ? ? ? ? 0x18100000
->> +
-> ......
->> --- /dev/null
->> +++ b/drivers/bcma/scan.h
->> @@ -0,0 +1,56 @@
->> +#ifndef BCMA_SCAN_H_
->> +#define BCMA_SCAN_H_
->> +
->> +#define BCMA_ADDR_BASE ? ? ? ? ? ? ? 0x18000000
->> +#define BCMA_WRAP_BASE ? ? ? ? ? ? ? 0x18100000
->> +
-> .....
->
-> While graping through the code I found this. BCMA_ADDR_BASE and
-> BCMA_WRAP_BASE are defined twice.
+From: Will Deacon <will.deacon@arm.com>
 
-Will fix, thx.
+LPAE provides support for memory banks with physical addresses of up
+to 40 bits.
 
+This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
+informed about memory that exists above the 4GB boundary.
 
-> Why are some constants defined in purpose specific headers in
-> drivers/bcma/*.h like drivers/bcma/scan.h and some in
-> drivers/bcma/bcma_private.h and other in include/linux/bcma/bcma_regs.h ?
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/setup.h |   10 +++++++++-
+ arch/arm/kernel/compat.c     |    4 ++--
+ arch/arm/kernel/setup.c      |   12 +++++++++++-
+ 3 files changed, 22 insertions(+), 4 deletions(-)
 
-What is unclear to you in this split? It says everything. scan.h for
-scanning, regs for registers, private for internal functions.
-
--- 
-Rafa?
+diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
+index 95176af..5e3587c 100644
+--- a/arch/arm/include/asm/setup.h
++++ b/arch/arm/include/asm/setup.h
+@@ -43,6 +43,13 @@ struct tag_mem32 {
+ 	__u32	start;	/* physical start address */
+ };
+ 
++#define ATAG_MEM64	0x54420002
++
++struct tag_mem64 {
++	__u64	size;
++	__u64	start;	/* physical start address */
++};
++
+ /* VGA text type displays */
+ #define ATAG_VIDEOTEXT	0x54410003
+ 
+@@ -147,7 +154,8 @@ struct tag {
+ 	struct tag_header hdr;
+ 	union {
+ 		struct tag_core		core;
+-		struct tag_mem32	mem;
++		struct tag_mem32	mem32;
++		struct tag_mem64	mem64;
+ 		struct tag_videotext	videotext;
+ 		struct tag_ramdisk	ramdisk;
+ 		struct tag_initrd	initrd;
+diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
+index 9256523..f224d95 100644
+--- a/arch/arm/kernel/compat.c
++++ b/arch/arm/kernel/compat.c
+@@ -86,8 +86,8 @@ static struct tag * __init memtag(struct tag *tag, unsigned long start, unsigned
+ 	tag = tag_next(tag);
+ 	tag->hdr.tag = ATAG_MEM;
+ 	tag->hdr.size = tag_size(tag_mem32);
+-	tag->u.mem.size = size;
+-	tag->u.mem.start = start;
++	tag->u.mem32.size = size;
++	tag->u.mem32.start = start;
+ 
+ 	return tag;
+ }
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 006c1e8..4158e4d 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -611,11 +611,21 @@ __tagtable(ATAG_CORE, parse_tag_core);
+ 
+ static int __init parse_tag_mem32(const struct tag *tag)
+ {
+-	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
++	return arm_add_memory(tag->u.mem32.start, tag->u.mem32.size);
+ }
+ 
+ __tagtable(ATAG_MEM, parse_tag_mem32);
+ 
++#ifdef CONFIG_PHYS_ADDR_T_64BIT
++static int __init parse_tag_mem64(const struct tag *tag)
++{
++	/* We only use 32-bits for the size. */
++	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
++}
++
++__tagtable(ATAG_MEM64, parse_tag_mem64);
++#endif /* CONFIG_PHYS_ADDR_T_64BIT */
++
+ #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
+ struct screen_info screen_info = {
+  .orig_video_lines	= 30,
