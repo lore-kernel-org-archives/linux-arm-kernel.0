@@ -1,31 +1,63 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun,  8 May 2011 13:51:20 +0100
-Subject: [PATCH v5 01/19] ARM: LPAE: Use long long printk format for
-	displaying the pud
+Date: Sun,  8 May 2011 13:51:21 +0100
+Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
 In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
 References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1304859098-10760-2-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently using just long but this is not enough for the LPAE format
-(64-bit entries).
+From: Will Deacon <will.deacon@arm.com>
 
+Before we enable the MMU, we must ensure that the TTBR registers contain
+sane values. After the MMU has been enabled, we jump to the *virtual*
+address of the following function, so we also need to ensure that the
+SCTLR write has taken effect.
+
+This patch adds ISB instructions around the SCTLR write to ensure the
+visibility of the above.
+
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/mm/fault.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/assembler.h |   11 +++++++++++
+ arch/arm/kernel/head.S           |    2 ++
+ 2 files changed, 13 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index bc0e1d8..ee76923 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -94,7 +94,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index bc2d2d7..2bcc456 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -184,6 +184,17 @@
+ #endif
  
- 		pud = pud_offset(pgd, addr);
- 		if (PTRS_PER_PUD != 1)
--			printk(", *pud=%08lx", pud_val(*pud));
-+			printk(", *pud=%08llx", (long long)pud_val(*pud));
- 
- 		if (pud_none(*pud))
- 			break;
+ /*
++ * Instruction barrier
++ */
++	.macro	instr_sync
++#if __LINUX_ARM_ARCH__ >= 7
++	isb
++#elif __LINUX_ARM_ARCH__ == 6
++	mcr	p15, 0, r0, c7, c5, 4
++#endif
++	.endm
++
++/*
+  * SMP data memory barrier
+  */
+ 	.macro	smp_dmb mode
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index c9173cf..ea8fae7 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -385,8 +385,10 @@ ENDPROC(__enable_mmu)
+ 	.align	5
+ __turn_mmu_on:
+ 	mov	r0, r0
++	instr_sync
+ 	mcr	p15, 0, r0, c1, c0, 0		@ write control reg
+ 	mrc	p15, 0, r3, c0, c0, 0		@ read id reg
++	instr_sync
+ 	mov	r3, r3
+ 	mov	r3, r13
+ 	mov	pc, r3
