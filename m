@@ -1,63 +1,158 @@
-From: george@znau.edu.ua (George Kashperko)
-Date: Sun, 08 May 2011 05:01:09 +0300
-Subject: [PATCH][WAS:bcmai,axi] bcma: add Broadcom specific AMBA bus driver
-In-Reply-To: <1304819081.21680.6.camel@maggie>
-References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
-	<201105061605.31625.arnd@arndb.de>
-	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
-	<BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
-	<1304790665.13983.10.camel@dev.znau.edu.ua>
-	<BANLkTikLFff_86Fvg+jSty9vGLENiELF2Q@mail.gmail.com>
-	<1304792795.13983.28.camel@dev.znau.edu.ua>
-	<BANLkTi=6BFD4OmtU1WPxjbFJQe36=mZKEA@mail.gmail.com>
-	<1304794931.13983.44.camel@dev.znau.edu.ua>
-	<BANLkTik9FWgzpNWuMXXRjOj-rDvPNY_nCA@mail.gmail.com>
-	<1304796956.13983.65.camel@dev.znau.edu.ua>
-	<1304819081.21680.6.camel@maggie>
-Message-ID: <1304820069.13983.82.camel@dev.znau.edu.ua>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun,  8 May 2011 10:20:31 +0300
+Subject: [PATCH v2] arm: omap3: cm-t35: add support for cm-t3730
+In-Reply-To: <4DC27317.7020206@compulab.co.il>
+References: <4DC27317.7020206@compulab.co.il>
+Message-ID: <1304839231-11329-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Sat, 2011-05-07 at 22:35 +0300, George Kashperko wrote: 
-> > dbg_bcma_device_name
-> > {
-> > #ifdef DEBUG
-> > 		case/switch/if/else stuff
-> > #endif
-> > 		return NULL;
-> > }
-> > But I don't see here much sense to hardcode names other than those of
-> > buscommons/buscores for debugging purposes.
-> 
-> Would you please read and understand the code before discussing this?
-> That would help the discussion on the technical side.
-> 
-> Those names are hardcoded by definition. And just like 14e4 is the PCI
-> ID for Broadcom devices, 800 is the AXI ID for Broadcom Chipcommon.
-> 
-> And building an #ifdef mess around this stuff is not better than having
-> a few bytes of _helpful_ information messages.
-> You are absolutely right that those messages only help 1% of the people.
-> Just as _any_ other kernel message.
-> 
+cm-t3730 is basically the same board as cm-t35, but has DM3730 SoC
+assembled and therefore some changes are required.
 
-Following is first part of my comment with "case/switch/if/else stuff"
-which you didn't quoted and which I was actually commented at:
-> > How do you see relation between bcma_device_name and:
-> > int zd_ioread32v_locked(...) {
-> >       if (r) {
-> >               dev_dbg_f(zd_chip_dev(chip),
-> >                         "error: zd_ioread16v_locked. Error number %d\n", r);
-> >               return r;
-> >       }
-> }
-> No relation at all. It like comparing warm and soft. It will be if you
-> do something like
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Acked-by: Mike Rapoport <mike@compulab.co.il>
+---
+v2:	Add debug uart entry
 
-Original discussion on the bcma_device_name was started by Arend
-pointing that there can be cores with same id but different vendor code.
-As one among ways to deal with this I've proposed to remove
-bcma_device_name and let drivers supply core name.
+ arch/arm/mach-omap2/Kconfig                  |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c           |   62 +++++++++++++++++++------
+ arch/arm/plat-omap/include/plat/uncompress.h |    1 +
+ 3 files changed, 49 insertions(+), 16 deletions(-)
 
-Have nice day,
-George
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index b997a35..920b6bc 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -266,7 +266,7 @@ config MACH_OMAP_ZOOM3
+ 	select REGULATOR_FIXED_VOLTAGE
+ 
+ config MACH_CM_T35
+-	bool "CompuLab CM-T35 module"
++	bool "CompuLab CM-T35/CM-T3730 modules"
+ 	depends on ARCH_OMAP3
+ 	default y
+ 	select OMAP_PACKAGE_CUS
+diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+index 6063be8..c0f6ce0 100644
+--- a/arch/arm/mach-omap2/board-cm-t35.c
++++ b/arch/arm/mach-omap2/board-cm-t35.c
+@@ -524,7 +524,7 @@ static void __init cm_t35_init_early(void)
+ }
+ 
+ #ifdef CONFIG_OMAP_MUX
+-static struct omap_board_mux board_mux[] __initdata = {
++static struct omap_board_mux cm_t35_common_board_mux[] __initdata = {
+ 	/* nCS and IRQ for CM-T35 ethernet */
+ 	OMAP3_MUX(GPMC_NCS5, OMAP_MUX_MODE0),
+ 	OMAP3_MUX(UART3_CTS_RCTX, OMAP_MUX_MODE4 | OMAP_PIN_INPUT_PULLUP),
+@@ -580,17 +580,12 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 	OMAP3_MUX(UART1_TX, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(UART1_RX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
+ 
+-	/* DSS */
++	/* common DSS */
+ 	OMAP3_MUX(DSS_PCLK, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(DSS_HSYNC, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(DSS_VSYNC, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(DSS_ACBIAS, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA0, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA1, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA2, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA3, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA4, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA5, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
++
+ 	OMAP3_MUX(DSS_DATA6, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(DSS_DATA7, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(DSS_DATA8, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+@@ -603,12 +598,6 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 	OMAP3_MUX(DSS_DATA15, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(DSS_DATA16, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 	OMAP3_MUX(DSS_DATA17, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA18, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA19, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA20, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA21, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA22, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+-	OMAP3_MUX(DSS_DATA23, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
+ 
+ 	/* display controls */
+ 	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
+@@ -621,6 +610,39 @@ static struct omap_board_mux board_mux[] __initdata = {
+ 
+ 	{ .reg_offset = OMAP_MUX_TERMINATOR },
+ };
++
++static void cm_t35_mux_init(void)
++{
++	int mux_mode = OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT;
++
++	omap3_mux_init(cm_t35_common_board_mux, OMAP_PACKAGE_CUS);
++
++	if (cpu_is_omap34xx()) {
++		omap_mux_init_signal("gpio_70", mux_mode);
++		omap_mux_init_signal("gpio_71", mux_mode);
++		omap_mux_init_signal("gpio_72", mux_mode);
++		omap_mux_init_signal("gpio_73", mux_mode);
++		omap_mux_init_signal("gpio_74", mux_mode);
++		omap_mux_init_signal("gpio_75", mux_mode);
++	} else if (cpu_is_omap3630()) {
++		mux_mode = OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT;
++		omap_mux_init_signal("sys_boot0", mux_mode);
++		omap_mux_init_signal("sys_boot1", mux_mode);
++		omap_mux_init_signal("sys_boot3", mux_mode);
++		omap_mux_init_signal("sys_boot4", mux_mode);
++		omap_mux_init_signal("sys_boot5", mux_mode);
++		omap_mux_init_signal("sys_boot6", mux_mode);
++	}
++
++	omap_mux_init_signal("dss_data18", mux_mode);
++	omap_mux_init_signal("dss_data19", mux_mode);
++	omap_mux_init_signal("dss_data20", mux_mode);
++	omap_mux_init_signal("dss_data21", mux_mode);
++	omap_mux_init_signal("dss_data22", mux_mode);
++	omap_mux_init_signal("dss_data23", mux_mode);
++}
++#else
++static inline void cm_t35_mux_init(void) {}
+ #endif
+ 
+ static struct omap_board_config_kernel cm_t35_config[] __initdata = {
+@@ -630,7 +652,7 @@ static void __init cm_t35_init(void)
+ {
+ 	omap_board_config = cm_t35_config;
+ 	omap_board_config_size = ARRAY_SIZE(cm_t35_config);
+-	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
++	cm_t35_mux_init();
+ 	omap_serial_init();
+ 	cm_t35_init_i2c();
+ 	cm_t35_init_nand();
+@@ -652,3 +674,13 @@ MACHINE_START(CM_T35, "Compulab CM-T35")
+ 	.init_machine	= cm_t35_init,
+ 	.timer		= &omap_timer,
+ MACHINE_END
++
++MACHINE_START(CM_T3730, "Compulab CM-T3730")
++	.boot_params	= 0x80000100,
++	.reserve	= omap_reserve,
++	.map_io		= omap3_map_io,
++	.init_early	= cm_t35_init_early,
++	.init_irq	= omap_init_irq,
++	.init_machine	= cm_t35_init,
++	.timer		= &omap_timer,
++MACHINE_END
+diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
+index 30b891c..1fdabe0 100644
+--- a/arch/arm/plat-omap/include/plat/uncompress.h
++++ b/arch/arm/plat-omap/include/plat/uncompress.h
+@@ -149,6 +149,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
+ 		/* omap3 based boards using UART3 */
+ 		DEBUG_LL_OMAP3(3, cm_t35);
+ 		DEBUG_LL_OMAP3(3, cm_t3517);
++		DEBUG_LL_OMAP3(3, cm_t3730);
+ 		DEBUG_LL_OMAP3(3, craneboard);
+ 		DEBUG_LL_OMAP3(3, devkit8000);
+ 		DEBUG_LL_OMAP3(3, igep0020);
+-- 
+1.7.3.4
