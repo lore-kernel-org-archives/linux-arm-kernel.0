@@ -1,31 +1,75 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 8 May 2011 20:46:35 +0200
-Subject: [PATCH 03/14] [orion] Consolidate the creation of the RTC
-	platform data.
-In-Reply-To: <BANLkTikzAv8LJgU4Abjb+DVqbZTdJFi5HQ@mail.gmail.com>
-References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-	<1304864141-1121-4-git-send-email-andrew@lunn.ch>
-	<BANLkTikzAv8LJgU4Abjb+DVqbZTdJFi5HQ@mail.gmail.com>
-Message-ID: <20110508184635.GE4071@lunn.ch>
+From: robherring2@gmail.com (Rob Herring)
+Date: Sun, 08 May 2011 14:38:18 -0500
+Subject: Resend [PATCH 00/10] ARM: SMP initialization consolidation
+In-Reply-To: <20110508094215.GC27807@n2100.arm.linux.org.uk>
+References: <1304129297-6614-1-git-send-email-robherring2@gmail.com>	<4DBBA509.6080203@codeaurora.org>	<20110502234012.GJ28001@n2100.arm.linux.org.uk>	<201105031557.42355.arnd@arndb.de>
+	<20110508094215.GC27807@n2100.arm.linux.org.uk>
+Message-ID: <4DC6F12A.9010904@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > ??static void __init kirkwood_rtc_init(void)
-> > ??{
-> > - ?? ?? ?? platform_device_register_simple("rtc-mv", -1, &kirkwood_rtc_resource, 1);
-> > + ?? ?? ?? orion_rtc_init(RTC_PHYS_BASE, IRQ_KIRKWOOD_RTC);
+On 05/08/2011 04:42 AM, Russell King - ARM Linux wrote:
+> On Tue, May 03, 2011 at 03:57:42PM +0200, Arnd Bergmann wrote:
+>> On Tuesday 03 May 2011, Russell King - ARM Linux wrote:
+>>> Such a SoC may wish to do things differently from the current approach
+>>> (which is basically bring up all cores at boot) particularly as the
+>>> performance gained from each CPU is far from identical.  So I've been
+>>> nervous about moving the CPU map initialization into core code.
+>>>
+>>> Note that the low power CPU may not be the last in the set, so merely
+>>> limiting the system to two CPUs is not the answer.
+>>
+>> If I read the patches correctly, it's still strictly opt-in per platform.
+>
+> Except where things are moved into the generic code, such as the setting
+> of present CPUs.
 
-> the rtc-mv.c driver enables the alarm support when IRQ resource is
-> provided. so this patch actually adds support for rtc alarm, does the
-> alarm works for you?
+Is there any harm in making the default be mark all cores present then 
+let the platform code clear the present state if so desired? This was my 
+intention.
 
-I ran the test code in Documentation/rtc.txt. The alarm interrupt does
-work.
+>
+>> When a platform wants to support the setup you mentioned or something
+>> even stranger, all it would have to do is provide its own versions of
+>> the SMP pen and scu init function, right?
+>
+> No.
+>
+> As I've already said in the past, I doubt that very many platforms actually
+> need the SMP pen stuff.  There are two situations where you need that:
+>
+> 1. If you have more than two CPUs, _and_ you have no way to control which
+>     of those CPUs are triggered to jump into the kernel.
+> 2. If you have hotplug and you have no way to power down or reset the
+>     CPUs.
+>
+> There seems to be few platforms which fall into (1) - most SMP
+> implementations are based around two CPUs today so if you only have one
+> secondary CPU, there's no point triggering it via a soft irq to enter the
+> kernel, then hold it in a pen, then release it from the pen, etc.
+>
+> Those which seem to fall into (2) do so because they've cut'n'pasted the
+> code from the Realview platforms, along with its bugs with the auxillary
+> control register, which subseqently get tweaked.
+>
+> My feeling is that most of the hotplug implementations are just basic "this
+> seems to approximately work" kind of things rather than someone taking a
+> look at what the hardware supports and doing something more useful (such
+> as powering down the CPU, placing it in reset, etc.)
+>
+> However, (2) is dependent on (1) as both share pen_release.  (2) needs to
+> be sorted by platforms before the (1) can be eliminated from platform code.
+>
+> I'd much rather see the pen_release stuff being eliminated from platforms
+> where it's not necessary, rather than being turned into a generic thing
+> which everyone uses because its there.  Not only should this simplify the
+> code, but also reduce the size of the platform SMP support code.
+>
 
-> so I suggest to split it to two patches, one consolidates the rtc, and
-> the second adds alarm support for KW.
+Thanks for the explanation. I now see that for my case I won't need the 
+pen code at all.
 
-O.K. Will do.
+What about the scu_init_cpus patch? You posted something similar as 
+Stephen pointed out that I had missed. Do you plan to merge that?
 
-Thanks
-	Andrew
+Rob
