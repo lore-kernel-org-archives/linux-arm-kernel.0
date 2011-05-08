@@ -1,134 +1,47 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sun, 8 May 2011 18:10:54 +0300
-Subject: [PATCH 03/14] [orion] Consolidate the creation of the RTC
-	platform data.
-In-Reply-To: <1304864141-1121-4-git-send-email-andrew@lunn.ch>
-References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-	<1304864141-1121-4-git-send-email-andrew@lunn.ch>
-Message-ID: <BANLkTikzAv8LJgU4Abjb+DVqbZTdJFi5HQ@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Sun, 8 May 2011 11:23:21 -0400 (EDT)
+Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
+	and i.MX53
+In-Reply-To: <20110508150530.GL27807@n2100.arm.linux.org.uk>
+References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110413122503.GB1897@S2100-06.ap.freescale.net>
+	<20110413124149.GR18850@pengutronix.de>
+	<BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
+	<20110508104201.GH27807@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1105081027190.1001@xanadu.home>
+	<20110508150530.GL27807@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1105081119160.1666@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2011 at 5:15 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> ---
-> ?arch/arm/mach-dove/common.c ? ? ? ? ? ? ? ?| ? 13 +------------
-> ?arch/arm/mach-kirkwood/common.c ? ? ? ? ? ?| ? ?8 +-------
-> ?arch/arm/mach-kirkwood/include/mach/irqs.h | ? ?1 +
-> ?arch/arm/plat-orion/common.c ? ? ? ? ? ? ? | ? 18 ++++++++++++++++++
-> ?arch/arm/plat-orion/include/plat/common.h ?| ? ?3 +++
-> ?5 files changed, 24 insertions(+), 19 deletions(-)
->
-> diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-> index fffa92e..8a414cb 100644
-> --- a/arch/arm/mach-dove/common.c
-> +++ b/arch/arm/mach-dove/common.c
-> @@ -205,20 +205,9 @@ void __init dove_ge00_init(struct mv643xx_eth_platform_data *eth_data)
-> ?/*****************************************************************************
-> ?* SoC RTC
-> ?****************************************************************************/
-> -static struct resource dove_rtc_resource[] = {
-> - ? ? ? {
-> - ? ? ? ? ? ? ? .start ?= DOVE_RTC_PHYS_BASE,
-> - ? ? ? ? ? ? ? .end ? ?= DOVE_RTC_PHYS_BASE + 32 - 1,
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_MEM,
-> - ? ? ? }, {
-> - ? ? ? ? ? ? ? .start ?= IRQ_DOVE_RTC,
-> - ? ? ? ? ? ? ? .flags ?= IORESOURCE_IRQ,
-> - ? ? ? }
-> -};
-> -
-> ?void __init dove_rtc_init(void)
-> ?{
-> - ? ? ? platform_device_register_simple("rtc-mv", -1, dove_rtc_resource, 2);
-> + ? ? ? orion_rtc_init(DOVE_RTC_PHYS_BASE, IRQ_DOVE_RTC);
-> ?}
->
-> ?/*****************************************************************************
-> diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-> index 8cdf9f9..f6868fc 100644
-> --- a/arch/arm/mach-kirkwood/common.c
-> +++ b/arch/arm/mach-kirkwood/common.c
-> @@ -326,15 +326,9 @@ void __init kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
-> ?/*****************************************************************************
-> ?* SoC RTC
-> ?****************************************************************************/
-> -static struct resource kirkwood_rtc_resource = {
-> - ? ? ? .start ?= RTC_PHYS_BASE,
-> - ? ? ? .end ? ?= RTC_PHYS_BASE + SZ_16 - 1,
-> - ? ? ? .flags ?= IORESOURCE_MEM,
-> -};
-> -
-> ?static void __init kirkwood_rtc_init(void)
-> ?{
-> - ? ? ? platform_device_register_simple("rtc-mv", -1, &kirkwood_rtc_resource, 1);
-> + ? ? ? orion_rtc_init(RTC_PHYS_BASE, IRQ_KIRKWOOD_RTC);
-the rtc-mv.c driver enables the alarm support when IRQ resource is
-provided. so this patch actually adds support for rtc alarm, does the
-alarm works for you?
-so I suggest to split it to two patches, one consolidates the rtc, and
-the second adds alarm support for KW.
+On Sun, 8 May 2011, Russell King - ARM Linux wrote:
 
-> ?}
->
->
-> diff --git a/arch/arm/mach-kirkwood/include/mach/irqs.h b/arch/arm/mach-kirkwood/include/mach/irqs.h
-> index 9da2eb5..2bf8161 100644
-> --- a/arch/arm/mach-kirkwood/include/mach/irqs.h
-> +++ b/arch/arm/mach-kirkwood/include/mach/irqs.h
-> @@ -51,6 +51,7 @@
-> ?#define IRQ_KIRKWOOD_GPIO_HIGH_16_23 ? 41
-> ?#define IRQ_KIRKWOOD_GE00_ERR ?46
-> ?#define IRQ_KIRKWOOD_GE01_ERR ?47
-> +#define IRQ_KIRKWOOD_RTC ? ? ? ?53
->
-> ?/*
-> ?* KIRKWOOD General Purpose Pins
-> diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-> index 4eac532..d065591 100644
-> --- a/arch/arm/plat-orion/common.c
-> +++ b/arch/arm/plat-orion/common.c
-> @@ -169,3 +169,21 @@ void __init orion_uart3_init(unsigned int membase,
-> ? ? ? ?uart_complete(&orion_uart3, orion_uart3_data, orion_uart3_resources,
-> ? ? ? ? ? ? ? ? ? ? ?membase, mapbase, irq, uartclk);
-> ?}
-> +
-> +/*****************************************************************************
-> + * SoC RTC
-> + ****************************************************************************/
-> +static struct resource orion_rtc_resource[2];
-> +
-> +void __init orion_rtc_init(unsigned long mapbase,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long irq)
-> +{
-> + ? ? ? orion_rtc_resource[0].start = mapbase;
-> + ? ? ? orion_rtc_resource[0].end = mapbase + SZ_32 - 1;
-> + ? ? ? orion_rtc_resource[0].flags = IORESOURCE_MEM;
-> + ? ? ? orion_rtc_resource[1].start = irq;
-> + ? ? ? orion_rtc_resource[1].end = irq;
-> + ? ? ? orion_rtc_resource[1].flags = IORESOURCE_IRQ;
-> +
-> + ? ? ? platform_device_register_simple("rtc-mv", -1, orion_rtc_resource, 2);
-> +}
-> diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-> index d57e3bb..7cba5e8 100644
-> --- a/arch/arm/plat-orion/include/plat/common.h
-> +++ b/arch/arm/plat-orion/include/plat/common.h
-> @@ -30,5 +30,8 @@ void __init orion_uart3_init(unsigned int membase,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? resource_size_t mapbase,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int irq,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int uartclk);
-> +
-> +void __init orion_rtc_init(unsigned long mapbase,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long irq);
-> ?#endif
->
-> --
-> 1.7.4.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> On Sun, May 08, 2011 at 11:00:30AM -0400, Nicolas Pitre wrote:
+> > If CONFIG_AUTO_ZRELADDR is set, then zImage will automatically place the 
+> > kernel Image correctly in memory, assuming that zImage is itself loaded 
+> > within the first 128MB of memory.
+> 
+> I was only covering the requirements of the Image, rather than zImage which
+> you covered in a subsequent message.
+
+Sorry if I already covered that.  I'm jet-lagged at the moment and my 
+memory is fuzzy.
+
+> > > There is one thing to watch out for though - if you did place it 16MB
+> > > above, but still tell the kernel via ATAGs that the physical memory
+> > > starts where it really does, then I'd expect things to explode as
+> > > the kernel direct mapped memory would likely extend below PAGE_OFFSET.
+> > 
+> > Yeah... We should probably add a warning and truncate the beginning of 
+> > the memory bank in that case.  This would also prevent memory from being 
+> > wrongly declared below PHYS_OFFSET even without the P2V feature enabled.
+> 
+> We don't encouter the situation today, so lets leave it until we actually
+> have a problem.  There's no point bloating the kernel with such checks if
+> they're never going to fire.
+
+OK.
+
+
+Nicolas
