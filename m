@@ -1,95 +1,103 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun,  8 May 2011 13:51:37 +0100
-Subject: [PATCH v5 18/19] ARM: LPAE: add support for ATAG_MEM64
-In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1304859098-10760-19-git-send-email-catalin.marinas@arm.com>
+Date: Sun,  8 May 2011 13:51:19 +0100
+Subject: [PATCH v5 00/19] ARM: Add support for the Large Physical Address
+	Extensions
+Message-ID: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+Hi,
 
-LPAE provides support for memory banks with physical addresses of up
-to 40 bits.
+This set of patches adds support for the Large Physical Extensions on
+the ARM architecture (available with the Cortex-A15 processor). LPAE
+comes with a 3-level page table format (compared to 2-level for the
+classic one), allowing up to 40-bit physical address space.
 
-This patch adds a new atag, ATAG_MEM64, so that the Kernel can be
-informed about memory that exists above the 4GB boundary.
+The ARM LPAE documentation is available from (free registration needed):
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/include/asm/setup.h |   10 +++++++++-
- arch/arm/kernel/compat.c     |    4 ++--
- arch/arm/kernel/setup.c      |   12 +++++++++++-
- 3 files changed, 22 insertions(+), 4 deletions(-)
+http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index 95176af..5e3587c 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -43,6 +43,13 @@ struct tag_mem32 {
- 	__u32	start;	/* physical start address */
- };
- 
-+#define ATAG_MEM64	0x54420002
-+
-+struct tag_mem64 {
-+	__u64	size;
-+	__u64	start;	/* physical start address */
-+};
-+
- /* VGA text type displays */
- #define ATAG_VIDEOTEXT	0x54410003
- 
-@@ -147,7 +154,8 @@ struct tag {
- 	struct tag_header hdr;
- 	union {
- 		struct tag_core		core;
--		struct tag_mem32	mem;
-+		struct tag_mem32	mem32;
-+		struct tag_mem64	mem64;
- 		struct tag_videotext	videotext;
- 		struct tag_ramdisk	ramdisk;
- 		struct tag_initrd	initrd;
-diff --git a/arch/arm/kernel/compat.c b/arch/arm/kernel/compat.c
-index 9256523..f224d95 100644
---- a/arch/arm/kernel/compat.c
-+++ b/arch/arm/kernel/compat.c
-@@ -86,8 +86,8 @@ static struct tag * __init memtag(struct tag *tag, unsigned long start, unsigned
- 	tag = tag_next(tag);
- 	tag->hdr.tag = ATAG_MEM;
- 	tag->hdr.size = tag_size(tag_mem32);
--	tag->u.mem.size = size;
--	tag->u.mem.start = start;
-+	tag->u.mem32.size = size;
-+	tag->u.mem32.start = start;
- 
- 	return tag;
- }
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 006c1e8..4158e4d 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -611,11 +611,21 @@ __tagtable(ATAG_CORE, parse_tag_core);
- 
- static int __init parse_tag_mem32(const struct tag *tag)
- {
--	return arm_add_memory(tag->u.mem.start, tag->u.mem.size);
-+	return arm_add_memory(tag->u.mem32.start, tag->u.mem32.size);
- }
- 
- __tagtable(ATAG_MEM, parse_tag_mem32);
- 
-+#ifdef CONFIG_PHYS_ADDR_T_64BIT
-+static int __init parse_tag_mem64(const struct tag *tag)
-+{
-+	/* We only use 32-bits for the size. */
-+	return arm_add_memory(tag->u.mem64.start, (unsigned long)tag->u.mem64.size);
-+}
-+
-+__tagtable(ATAG_MEM64, parse_tag_mem64);
-+#endif /* CONFIG_PHYS_ADDR_T_64BIT */
-+
- #if defined(CONFIG_VGA_CONSOLE) || defined(CONFIG_DUMMY_CONSOLE)
- struct screen_info screen_info = {
-  .orig_video_lines	= 30,
+The full set of patches on top of linux-next (LPAE, support for an
+emulated Versatile Express with Cortex-A15 tile and generic timers) is
+available on this branch:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae-next
+
+Changelog:
+
+- Rebased on top of linux-next 20110503.
+- Using pgtable-nopud.h (following Russell's patch for the classic page
+  table format).
+- Other fixes related to the nopud and v2p changes (mainly idmap).
+- The SMP support patch was dropped and a more generic variant added that
+  makes TTBR1 always point to swapper_pg_dir on ARMv7.
+- Some of the previous patches already merged into mainline.
+
+
+Catalin Marinas (15):
+  ARM: LPAE: Use long long printk format for displaying the pud
+  ARM: LPAE: Use unsigned long for __phys_to_virt and __virt_to_phys
+  ARM: LPAE: Make TTBR1 always point to swapper_pg_dir on ARMv7
+  ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*
+  ARM: LPAE: Factor out 2-level page table definitions into separate
+    files
+  ARM: LPAE: Add (pte|pmd|pgd|pgprot)val_t type definitions as u32
+  ARM: LPAE: Use a mask for physical addresses in page table entries
+  ARM: LPAE: Introduce the 3-level page table format definitions
+  ARM: LPAE: Page table maintenance for the 3-level format
+  ARM: LPAE: MMU setup for the 3-level page table format
+  ARM: LPAE: Add fault handling support
+  ARM: LPAE: Add context switching support
+  ARM: LPAE: Add identity mapping support for the 3-level page table
+    format
+  ARM: LPAE: Add support for cpu_v7_do_(suspend|resume)
+  ARM: LPAE: Add the Kconfig entries
+
+Will Deacon (4):
+  ARM: LPAE: add ISBs around MMU enabling code
+  ARM: LPAE: Use generic dma_addr_t type definition
+  ARM: LPAE: mark memory banks with start > ULONG_MAX as highmem
+  ARM: LPAE: add support for ATAG_MEM64
+
+ arch/arm/Kconfig                            |    2 +-
+ arch/arm/include/asm/assembler.h            |   11 ++
+ arch/arm/include/asm/memory.h               |    4 +-
+ arch/arm/include/asm/page.h                 |   44 +-----
+ arch/arm/include/asm/pgalloc.h              |   28 ++++-
+ arch/arm/include/asm/pgtable-2level-hwdef.h |   93 ++++++++++++
+ arch/arm/include/asm/pgtable-2level-types.h |   67 +++++++++
+ arch/arm/include/asm/pgtable-2level.h       |  143 ++++++++++++++++++
+ arch/arm/include/asm/pgtable-3level-hwdef.h |   81 ++++++++++
+ arch/arm/include/asm/pgtable-3level-types.h |   68 +++++++++
+ arch/arm/include/asm/pgtable-3level.h       |  106 ++++++++++++++
+ arch/arm/include/asm/pgtable-hwdef.h        |   81 +----------
+ arch/arm/include/asm/pgtable.h              |  211 +++++++++------------------
+ arch/arm/include/asm/proc-fns.h             |   25 +++
+ arch/arm/include/asm/setup.h                |   10 +-
+ arch/arm/include/asm/smp.h                  |    1 +
+ arch/arm/include/asm/tlbflush.h             |    4 +-
+ arch/arm/include/asm/types.h                |   11 +--
+ arch/arm/kernel/compat.c                    |    4 +-
+ arch/arm/kernel/head.S                      |  126 +++++++++++-----
+ arch/arm/kernel/module.c                    |    2 +-
+ arch/arm/kernel/setup.c                     |   12 ++-
+ arch/arm/kernel/smp.c                       |    1 +
+ arch/arm/mm/Kconfig                         |   13 ++
+ arch/arm/mm/alignment.c                     |    8 +-
+ arch/arm/mm/context.c                       |   19 ++-
+ arch/arm/mm/dma-mapping.c                   |    6 +-
+ arch/arm/mm/fault.c                         |   82 ++++++++++-
+ arch/arm/mm/idmap.c                         |   36 +++++-
+ arch/arm/mm/ioremap.c                       |    8 +-
+ arch/arm/mm/mm.h                            |    4 +-
+ arch/arm/mm/mmu.c                           |   51 +++++--
+ arch/arm/mm/pgd.c                           |   51 ++++++-
+ arch/arm/mm/proc-macros.S                   |    5 +-
+ arch/arm/mm/proc-v7.S                       |  152 +++++++++++++++++--
+ 35 files changed, 1207 insertions(+), 363 deletions(-)
+ create mode 100644 arch/arm/include/asm/pgtable-2level-hwdef.h
+ create mode 100644 arch/arm/include/asm/pgtable-2level-types.h
+ create mode 100644 arch/arm/include/asm/pgtable-2level.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level-hwdef.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level-types.h
+ create mode 100644 arch/arm/include/asm/pgtable-3level.h
