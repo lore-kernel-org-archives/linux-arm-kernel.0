@@ -1,1629 +1,2442 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun,  8 May 2011 16:15:41 +0200
-Subject: [PATCH 14/14] [orion5x] Refactor mpp code to use common orion
-	platform mpp.
-In-Reply-To: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1304864141-1121-15-git-send-email-andrew@lunn.ch>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Sun,  8 May 2011 17:06:58 +0200
+Subject: [PATCH V6] bcma: add Broadcom specific AMBA bus driver
+Message-ID: <1304867218-5750-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+Cc: Greg KH <greg@kroah.com>
+Cc: Michael B?sch <mb@bu3sch.de>
+Cc: Larry Finger <Larry.Finger@lwfinger.net>
+Cc: George Kashperko <george@znau.edu.ua>
+Cc: Arend van Spriel <arend@broadcom.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Cc: Russell King <rmk@arm.linux.org.uk>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Andy Botting <andy@andybotting.com>
+Cc: linuxdriverproject <devel@linuxdriverproject.org>
+Cc: linux-kernel at vger.kernel.org <linux-kernel@vger.kernel.org>
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
 ---
- arch/arm/mach-orion5x/d2net-setup.c            |   44 +++---
- arch/arm/mach-orion5x/db88f5281-setup.c        |   44 +++---
- arch/arm/mach-orion5x/dns323-setup.c           |  132 ++++++++--------
- arch/arm/mach-orion5x/edmini_v2-setup.c        |   44 +++---
- arch/arm/mach-orion5x/kurobox_pro-setup.c      |   44 +++---
- arch/arm/mach-orion5x/ls-chl-setup.c           |   44 +++---
- arch/arm/mach-orion5x/ls_hgl-setup.c           |   44 +++---
- arch/arm/mach-orion5x/lsmini-setup.c           |   44 +++---
- arch/arm/mach-orion5x/mpp.c                    |  150 ++-----------------
- arch/arm/mach-orion5x/mpp.h                    |  191 +++++++++++++++---------
- arch/arm/mach-orion5x/mss2-setup.c             |   44 +++---
- arch/arm/mach-orion5x/mv2120-setup.c           |   44 +++---
- arch/arm/mach-orion5x/net2big-setup.c          |   44 +++---
- arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |   44 +++---
- arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |   44 +++---
- arch/arm/mach-orion5x/rd88f5182-setup.c        |   44 +++---
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c   |    1 -
- arch/arm/mach-orion5x/terastation_pro2-setup.c |   44 +++---
- arch/arm/mach-orion5x/ts209-setup.c            |   44 +++---
- arch/arm/mach-orion5x/ts409-setup.c            |   44 +++---
- arch/arm/mach-orion5x/ts78xx-setup.c           |   44 +++---
- arch/arm/mach-orion5x/wnr854t-setup.c          |   44 +++---
- arch/arm/mach-orion5x/wrt350n-v2-setup.c       |   44 +++---
- 23 files changed, 622 insertions(+), 688 deletions(-)
+V2: Rename to axi
+    Use DEFINE_PCI_DEVICE_TABLE in bridge
+    Make use of pr_fmt and pr_*
+    Store core class
+    Rename bridge to not b43 specific
+    Replace magic 0x1000 with BCMAI_CORE_SIZE
+    Remove some old "ssb" names and defines
+    Move BCMAI_ADDR_BASE def
+    Add drvdata field
+V3: Fix reloading (kfree issue)
+    Add 14e4:0x4331
+    Fix non-initialized struct issue
+    Drop useless inline functions wrappers for pci core drv
+    Proper pr_* usage
+V3.1: Include forgotten changes (pr_* and include related)
+    Explain why we dare to implement empty release function
+V4: Add ABI documentation
+    Move struct device to wrapper and alloc it dynamically
+    checkpatch.pl pointed fixes
+V5: Rename to bcma, AXI was really bad name
+    Use EXPORT_SYMBOL_GPL
+    Set pci driver fields in one place
+    Drop unlikely
+    Use BCMA_CORE_SIZE for calc in awrite32
+    Add README
+    Fix compilation (delay.h)
+V6: Replace AXI in Documentation
+    Fill MAINTAINERS
+    Names only for Broadcom
+    Update TODO and README
+    Use errno
+---
+ Documentation/ABI/testing/sysfs-bus-bcma    |   31 ++
+ MAINTAINERS                                 |    7 +
+ drivers/Kconfig                             |    2 +
+ drivers/Makefile                            |    1 +
+ drivers/bcma/Kconfig                        |   33 +++
+ drivers/bcma/Makefile                       |    7 +
+ drivers/bcma/README                         |   19 ++
+ drivers/bcma/TODO                           |    4 +
+ drivers/bcma/bcma_private.h                 |   28 ++
+ drivers/bcma/core.c                         |   51 ++++
+ drivers/bcma/driver_chipcommon.c            |   87 ++++++
+ drivers/bcma/driver_chipcommon_pmu.c        |  134 +++++++++
+ drivers/bcma/driver_pci.c                   |  163 +++++++++++
+ drivers/bcma/host_pci.c                     |  196 +++++++++++++
+ drivers/bcma/main.c                         |  271 ++++++++++++++++++
+ drivers/bcma/scan.c                         |  394 +++++++++++++++++++++++++++
+ drivers/bcma/scan.h                         |   56 ++++
+ include/linux/bcma/bcma.h                   |  232 ++++++++++++++++
+ include/linux/bcma/bcma_driver_chipcommon.h |  297 ++++++++++++++++++++
+ include/linux/bcma/bcma_driver_pci.h        |   89 ++++++
+ include/linux/bcma/bcma_regs.h              |   34 +++
+ include/linux/mod_devicetable.h             |   17 ++
+ scripts/mod/file2alias.c                    |   22 ++
+ 23 files changed, 2175 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-bcma
+ create mode 100644 drivers/bcma/Kconfig
+ create mode 100644 drivers/bcma/Makefile
+ create mode 100644 drivers/bcma/README
+ create mode 100644 drivers/bcma/TODO
+ create mode 100644 drivers/bcma/bcma_private.h
+ create mode 100644 drivers/bcma/core.c
+ create mode 100644 drivers/bcma/driver_chipcommon.c
+ create mode 100644 drivers/bcma/driver_chipcommon_pmu.c
+ create mode 100644 drivers/bcma/driver_pci.c
+ create mode 100644 drivers/bcma/host_pci.c
+ create mode 100644 drivers/bcma/main.c
+ create mode 100644 drivers/bcma/scan.c
+ create mode 100644 drivers/bcma/scan.h
+ create mode 100644 include/linux/bcma/bcma.h
+ create mode 100644 include/linux/bcma/bcma_driver_chipcommon.h
+ create mode 100644 include/linux/bcma/bcma_driver_pci.h
+ create mode 100644 include/linux/bcma/bcma_regs.h
 
-diff --git a/arch/arm/mach-orion5x/d2net-setup.c b/arch/arm/mach-orion5x/d2net-setup.c
-index 4258075..19cf5bf 100644
---- a/arch/arm/mach-orion5x/d2net-setup.c
-+++ b/arch/arm/mach-orion5x/d2net-setup.c
-@@ -267,28 +267,28 @@ static struct platform_device d2net_gpio_buttons = {
-  * General Setup
-  ****************************************************************************/
+diff --git a/Documentation/ABI/testing/sysfs-bus-bcma b/Documentation/ABI/testing/sysfs-bus-bcma
+new file mode 100644
+index 0000000..06b62ba
+--- /dev/null
++++ b/Documentation/ABI/testing/sysfs-bus-bcma
+@@ -0,0 +1,31 @@
++What:		/sys/bus/bcma/devices/.../manuf
++Date:		May 2011
++KernelVersion:	2.6.40
++Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
++Description:
++		Each BCMA core has it's manufacturer id. See
++		include/linux/bcma/bcma.h for possible values.
++
++What:		/sys/bus/bcma/devices/.../id
++Date:		May 2011
++KernelVersion:	2.6.40
++Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
++Description:
++		There are a few types of BCMA cores, they can be identified by
++		id field.
++
++What:		/sys/bus/bcma/devices/.../rev
++Date:		May 2011
++KernelVersion:	2.6.40
++Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
++Description:
++		BCMA cores of the same type can still slightly differ depending
++		on their revision. Use it for detailed programming.
++
++What:		/sys/bus/bcma/devices/.../class
++Date:		May 2011
++KernelVersion:	2.6.40
++Contact:	Rafa? Mi?ecki <zajec5@gmail.com>
++Description:
++		Each BCMA core is identified by few fields, including class it
++		belongs to. See include/linux/bcma/bcma.h for possible values.
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f7cb5a7..f1e235a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5816,6 +5816,13 @@ S:	Maintained
+ F:	drivers/ssb/
+ F:	include/linux/ssb/
  
--static struct orion5x_mpp_mode d2net_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },	/* Board ID (bit 0) */
--	{  1, MPP_GPIO },	/* Board ID (bit 1) */
--	{  2, MPP_GPIO },	/* Board ID (bit 2) */
--	{  3, MPP_GPIO },	/* SATA 0 power */
--	{  4, MPP_UNUSED },
--	{  5, MPP_GPIO },	/* Fan fail detection */
--	{  6, MPP_GPIO },	/* Red front LED */
--	{  7, MPP_UNUSED },
--	{  8, MPP_GPIO },	/* Rear power switch (on|auto) */
--	{  9, MPP_GPIO },	/* Rear power switch (auto|off) */
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_GPIO },	/* SATA 1 power */
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_SATA_LED },	/* SATA 0 active */
--	{ 15, MPP_SATA_LED },	/* SATA 1 active */
--	{ 16, MPP_GPIO },	/* Blue front LED blink control */
--	{ 17, MPP_UNUSED },
--	{ 18, MPP_GPIO },	/* Front button (0 = Released, 1 = Pushed ) */
--	{ 19, MPP_UNUSED },
--	{ -1 }
-+static unsigned int d2net_mpp_modes[] __initdata = {
-+	MPP0_GPIO,	/* Board ID (bit 0) */
-+	MPP1_GPIO,	/* Board ID (bit 1) */
-+	MPP2_GPIO,	/* Board ID (bit 2) */
-+	MPP3_GPIO,	/* SATA 0 power */
-+	MPP4_UNUSED,
-+	MPP5_GPIO,	/* Fan fail detection */
-+	MPP6_GPIO,	/* Red front LED */
-+	MPP7_UNUSED,
-+	MPP8_GPIO,	/* Rear power switch (on|auto) */
-+	MPP9_GPIO,	/* Rear power switch (auto|off) */
-+	MPP10_UNUSED,
-+	MPP11_UNUSED,
-+	MPP12_GPIO,	/* SATA 1 power */
-+	MPP13_UNUSED,
-+	MPP14_SATA_LED,	/* SATA 0 active */
-+	MPP15_SATA_LED,	/* SATA 1 active */
-+	MPP16_GPIO,	/* Blue front LED blink control */
-+	MPP17_UNUSED,
-+	MPP18_GPIO,	/* Front button (0 = Released, 1 = Pushed ) */
-+	MPP19_UNUSED,
-+	0,
- 	/* 22: USB port 1 fuse (0 = Fail, 1 = Ok) */
- 	/* 23: Blue front LED off */
- 	/* 24: Inhibit board power off (0 = Disabled, 1 = Enabled) */
-diff --git a/arch/arm/mach-orion5x/db88f5281-setup.c b/arch/arm/mach-orion5x/db88f5281-setup.c
-index c10a117..24587b7 100644
---- a/arch/arm/mach-orion5x/db88f5281-setup.c
-+++ b/arch/arm/mach-orion5x/db88f5281-setup.c
-@@ -298,28 +298,28 @@ static struct i2c_board_info __initdata db88f5281_i2c_rtc = {
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode db88f5281_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* USB Over Current */
--	{  1, MPP_GPIO },		/* USB Vbat input */
--	{  2, MPP_PCI_ARB },		/* PCI_REQn[2] */
--	{  3, MPP_PCI_ARB },		/* PCI_GNTn[2] */
--	{  4, MPP_PCI_ARB },		/* PCI_REQn[3] */
--	{  5, MPP_PCI_ARB },		/* PCI_GNTn[3] */
--	{  6, MPP_GPIO },		/* JP0, CON17.2 */
--	{  7, MPP_GPIO },		/* JP1, CON17.1 */
--	{  8, MPP_GPIO },		/* JP2, CON11.2 */
--	{  9, MPP_GPIO },		/* JP3, CON11.3 */
--	{ 10, MPP_GPIO },		/* RTC int */
--	{ 11, MPP_GPIO },		/* Baud Rate Generator */
--	{ 12, MPP_GPIO },		/* PCI int 1 */
--	{ 13, MPP_GPIO },		/* PCI int 2 */
--	{ 14, MPP_NAND },		/* NAND_REn[2] */
--	{ 15, MPP_NAND },		/* NAND_WEn[2] */
--	{ 16, MPP_UART },		/* UART1_RX */
--	{ 17, MPP_UART },		/* UART1_TX */
--	{ 18, MPP_UART },		/* UART1_CTSn */
--	{ 19, MPP_UART },		/* UART1_RTSn */
--	{ -1 },
-+static unsigned int db88f5281_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* USB Over Current */
-+	MPP1_GPIO,		/* USB Vbat input */
-+	MPP2_PCI_ARB,		/* PCI_REQn[2] */
-+	MPP3_PCI_ARB,		/* PCI_GNTn[2] */
-+	MPP4_PCI_ARB,		/* PCI_REQn[3] */
-+	MPP5_PCI_ARB,		/* PCI_GNTn[3] */
-+	MPP6_GPIO,		/* JP0, CON17.2 */
-+	MPP7_GPIO,		/* JP1, CON17.1 */
-+	MPP8_GPIO,		/* JP2, CON11.2 */
-+	MPP9_GPIO,		/* JP3, CON11.3 */
-+	MPP10_GPIO,		/* RTC int */
-+	MPP11_GPIO,		/* Baud Rate Generator */
-+	MPP12_GPIO,		/* PCI int 1 */
-+	MPP13_GPIO,		/* PCI int 2 */
-+	MPP14_NAND,		/* NAND_REn[2] */
-+	MPP15_NAND,		/* NAND_WEn[2] */
-+	MPP16_UART,		/* UART1_RX */
-+	MPP17_UART,		/* UART1_TX */
-+	MPP18_UART,		/* UART1_CTSn */
-+	MPP19_UART,		/* UART1_RTSn */
-+	0,
- };
++BROADCOM SPECIFIC AMBA DRIVER (BCMA)
++M:	Rafa? Mi?ecki <zajec5@gmail.com>
++L:	linux-wireless at vger.kernel.org
++S:	Maintained
++F:	drivers/bcma/
++F:	include/linux/bcma/
++
+ SONY VAIO CONTROL DEVICE DRIVER
+ M:	Mattia Dongili <malattia@linux.it>
+ L:	platform-driver-x86 at vger.kernel.org
+diff --git a/drivers/Kconfig b/drivers/Kconfig
+index 177c7d1..aca7067 100644
+--- a/drivers/Kconfig
++++ b/drivers/Kconfig
+@@ -68,6 +68,8 @@ source "drivers/watchdog/Kconfig"
  
- static void __init db88f5281_init(void)
-diff --git a/arch/arm/mach-orion5x/dns323-setup.c b/arch/arm/mach-orion5x/dns323-setup.c
-index 90ab022..855e0e7 100644
---- a/arch/arm/mach-orion5x/dns323-setup.c
-+++ b/arch/arm/mach-orion5x/dns323-setup.c
-@@ -385,76 +385,76 @@ static struct mv_sata_platform_data dns323_sata_data = {
- /****************************************************************************
-  * General Setup
-  */
--static struct orion5x_mpp_mode dns323a_mpp_modes[] __initdata = {
--	{  0, MPP_PCIE_RST_OUTn },
--	{  1, MPP_GPIO },		/* right amber LED (sata ch0) */
--	{  2, MPP_GPIO },		/* left amber LED (sata ch1) */
--	{  3, MPP_UNUSED },
--	{  4, MPP_GPIO },		/* power button LED */
--	{  5, MPP_GPIO },		/* power button LED */
--	{  6, MPP_GPIO },		/* GMT G751-2f overtemp */
--	{  7, MPP_GPIO },		/* M41T80 nIRQ/OUT/SQW */
--	{  8, MPP_GPIO },		/* triggers power off */
--	{  9, MPP_GPIO },		/* power button switch */
--	{ 10, MPP_GPIO },		/* reset button switch */
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_UNUSED },
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_UNUSED },
--	{ 15, MPP_UNUSED },
--	{ 16, MPP_UNUSED },
--	{ 17, MPP_UNUSED },
--	{ 18, MPP_UNUSED },
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int dns323a_mpp_modes[] __initdata = {
-+	MPP0_PCIE_RST_OUTn,
-+	MPP1_GPIO,		/* right amber LED (sata ch0) */
-+	MPP2_GPIO,		/* left amber LED (sata ch1) */
-+	MPP3_UNUSED,
-+	MPP4_GPIO,		/* power button LED */
-+	MPP5_GPIO,		/* power button LED */
-+	MPP6_GPIO,		/* GMT G751-2f overtemp */
-+	MPP7_GPIO,		/* M41T80 nIRQ/OUT/SQW */
-+	MPP8_GPIO,		/* triggers power off */
-+	MPP9_GPIO,		/* power button switch */
-+	MPP10_GPIO,		/* reset button switch */
-+	MPP11_UNUSED,
-+	MPP12_UNUSED,
-+	MPP13_UNUSED,
-+	MPP14_UNUSED,
-+	MPP15_UNUSED,
-+	MPP16_UNUSED,
-+	MPP17_UNUSED,
-+	MPP18_UNUSED,
-+	MPP19_UNUSED,
-+	0,
- };
+ source "drivers/ssb/Kconfig"
  
--static struct orion5x_mpp_mode dns323b_mpp_modes[] __initdata = {
--	{  0, MPP_UNUSED },
--	{  1, MPP_GPIO },		/* right amber LED (sata ch0) */
--	{  2, MPP_GPIO },		/* left amber LED (sata ch1) */
--	{  3, MPP_GPIO },		/* system up flag */
--	{  4, MPP_GPIO },		/* power button LED */
--	{  5, MPP_GPIO },		/* power button LED */
--	{  6, MPP_GPIO },		/* GMT G751-2f overtemp */
--	{  7, MPP_GPIO },		/* M41T80 nIRQ/OUT/SQW */
--	{  8, MPP_GPIO },		/* triggers power off */
--	{  9, MPP_GPIO },		/* power button switch */
--	{ 10, MPP_GPIO },		/* reset button switch */
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_SATA_LED },
--	{ 13, MPP_SATA_LED },
--	{ 14, MPP_SATA_LED },
--	{ 15, MPP_SATA_LED },
--	{ 16, MPP_UNUSED },
--	{ 17, MPP_UNUSED },
--	{ 18, MPP_UNUSED },
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int dns323b_mpp_modes[] __initdata = {
-+	MPP0_UNUSED,
-+	MPP1_GPIO,		/* right amber LED (sata ch0) */
-+	MPP2_GPIO,		/* left amber LED (sata ch1) */
-+	MPP3_GPIO,		/* system up flag */
-+	MPP4_GPIO,		/* power button LED */
-+	MPP5_GPIO,		/* power button LED */
-+	MPP6_GPIO,		/* GMT G751-2f overtemp */
-+	MPP7_GPIO,		/* M41T80 nIRQ/OUT/SQW */
-+	MPP8_GPIO,		/* triggers power off */
-+	MPP9_GPIO,		/* power button switch */
-+	MPP10_GPIO,		/* reset button switch */
-+	MPP11_UNUSED,
-+	MPP12_SATA_LED,
-+	MPP13_SATA_LED,
-+	MPP14_SATA_LED,
-+	MPP15_SATA_LED,
-+	MPP16_UNUSED,
-+	MPP17_UNUSED,
-+	MPP18_UNUSED,
-+	MPP19_UNUSED,
-+	0,
- };
++source "drivers/bcma/Kconfig"
++
+ source "drivers/mfd/Kconfig"
  
--static struct orion5x_mpp_mode dns323c_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* ? input */
--	{  1, MPP_GPIO },		/* input power switch (0 = pressed) */
--	{  2, MPP_GPIO },		/* output power off */
--	{  3, MPP_UNUSED },		/* ? output */
--	{  4, MPP_UNUSED },		/* ? output */
--	{  5, MPP_UNUSED },		/* ? output */
--	{  6, MPP_UNUSED },		/* ? output */
--	{  7, MPP_UNUSED },		/* ? output */
--	{  8, MPP_GPIO },		/* i/o right amber LED */
--	{  9, MPP_GPIO },		/* i/o left amber LED */
--	{ 10, MPP_GPIO },		/* input */
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_SATA_LED },
--	{ 13, MPP_SATA_LED },
--	{ 14, MPP_SATA_LED },
--	{ 15, MPP_SATA_LED },
--	{ 16, MPP_UNUSED },
--	{ 17, MPP_GPIO },		/* power button LED */
--	{ 18, MPP_GPIO },		/* fan speed bit 0 */
--	{ 19, MPP_GPIO },		/* fan speed bit 1 */
--	{ -1 },
-+static unsigned int dns323c_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* ? input */
-+	MPP1_GPIO,		/* input power switch (0 = pressed) */
-+	MPP2_GPIO,		/* output power off */
-+	MPP3_UNUSED,		/* ? output */
-+	MPP4_UNUSED,		/* ? output */
-+	MPP5_UNUSED,		/* ? output */
-+	MPP6_UNUSED,		/* ? output */
-+	MPP7_UNUSED,		/* ? output */
-+	MPP8_GPIO,		/* i/o right amber LED */
-+	MPP9_GPIO,		/* i/o left amber LED */
-+	MPP10_GPIO,		/* input */
-+	MPP11_UNUSED,
-+	MPP12_SATA_LED,
-+	MPP13_SATA_LED,
-+	MPP14_SATA_LED,
-+	MPP15_SATA_LED,
-+	MPP16_UNUSED,
-+	MPP17_GPIO,		/* power button LED */
-+	MPP18_GPIO,		/* fan speed bit 0 */
-+	MPP19_GPIO,		/* fan speed bit 1 */
-+	0,
- };
- 
- /* Rev C1 Fan speed notes:
-diff --git a/arch/arm/mach-orion5x/edmini_v2-setup.c b/arch/arm/mach-orion5x/edmini_v2-setup.c
-index d037a90..b67cff0 100644
---- a/arch/arm/mach-orion5x/edmini_v2-setup.c
-+++ b/arch/arm/mach-orion5x/edmini_v2-setup.c
-@@ -180,31 +180,31 @@ static struct platform_device edmini_v2_gpio_buttons = {
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode edminiv2_mpp_modes[] __initdata = {
--	{  0, MPP_UNUSED },
--	{  1, MPP_UNUSED },
--	{  2, MPP_UNUSED },
--	{  3, MPP_GPIO },	/* RTC interrupt */
--	{  4, MPP_UNUSED },
--	{  5, MPP_UNUSED },
--	{  6, MPP_UNUSED },
--	{  7, MPP_UNUSED },
--	{  8, MPP_UNUSED },
--	{  9, MPP_UNUSED },
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_SATA_LED },	/* SATA 0 presence */
--	{ 13, MPP_SATA_LED },	/* SATA 1 presence */
--	{ 14, MPP_SATA_LED },	/* SATA 0 active */
--	{ 15, MPP_SATA_LED },	/* SATA 1 active */
-+static unsigned int edminiv2_mpp_modes[] __initdata = {
-+	MPP0_UNUSED,
-+	MPP1_UNUSED,
-+	MPP2_UNUSED,
-+	MPP3_GPIO,	/* RTC interrupt */
-+	MPP4_UNUSED,
-+	MPP5_UNUSED,
-+	MPP6_UNUSED,
-+	MPP7_UNUSED,
-+	MPP8_UNUSED,
-+	MPP9_UNUSED,
-+	MPP10_UNUSED,
-+	MPP11_UNUSED,
-+	MPP12_SATA_LED,	/* SATA 0 presence */
-+	MPP13_SATA_LED,	/* SATA 1 presence */
-+	MPP14_SATA_LED,	/* SATA 0 active */
-+	MPP15_SATA_LED,	/* SATA 1 active */
- 	/* 16: Power LED control (0 = On, 1 = Off) */
--	{ 16, MPP_GPIO },
-+	MPP16_GPIO,
- 	/* 17: Power LED control select (0 = CPLD, 1 = GPIO16) */
--	{ 17, MPP_GPIO },
-+	MPP17_GPIO,
- 	/* 18: Power button status (0 = Released, 1 = Pressed) */
--	{ 18, MPP_GPIO },
--	{ 19, MPP_UNUSED },
--	{ -1 }
-+	MPP18_GPIO,
-+	MPP19_UNUSED,
-+	0,
- };
- 
- static void __init edmini_v2_init(void)
-diff --git a/arch/arm/mach-orion5x/kurobox_pro-setup.c b/arch/arm/mach-orion5x/kurobox_pro-setup.c
-index 47497c7..c0eb646 100644
---- a/arch/arm/mach-orion5x/kurobox_pro-setup.c
-+++ b/arch/arm/mach-orion5x/kurobox_pro-setup.c
-@@ -315,28 +315,28 @@ static void kurobox_pro_power_off(void)
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode kurobox_pro_mpp_modes[] __initdata = {
--	{  0, MPP_UNUSED },
--	{  1, MPP_UNUSED },
--	{  2, MPP_GPIO },		/* GPIO Micon */
--	{  3, MPP_GPIO },		/* GPIO Rtc */
--	{  4, MPP_UNUSED },
--	{  5, MPP_UNUSED },
--	{  6, MPP_NAND },		/* NAND Flash REn */
--	{  7, MPP_NAND },		/* NAND Flash WEn */
--	{  8, MPP_UNUSED },
--	{  9, MPP_UNUSED },
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_SATA_LED },		/* SATA 0 presence */
--	{ 13, MPP_SATA_LED },		/* SATA 1 presence */
--	{ 14, MPP_SATA_LED },		/* SATA 0 active */
--	{ 15, MPP_SATA_LED },		/* SATA 1 active */
--	{ 16, MPP_UART },		/* UART1 RXD */
--	{ 17, MPP_UART },		/* UART1 TXD */
--	{ 18, MPP_UART },		/* UART1 CTSn */
--	{ 19, MPP_UART },		/* UART1 RTSn */
--	{ -1 },
-+static unsigned int kurobox_pro_mpp_modes[] __initdata = {
-+	MPP0_UNUSED,
-+	MPP1_UNUSED,
-+	MPP2_GPIO,		/* GPIO Micon */
-+	MPP3_GPIO,		/* GPIO Rtc */
-+	MPP4_UNUSED,
-+	MPP5_UNUSED,
-+	MPP6_NAND,		/* NAND Flash REn */
-+	MPP7_NAND,		/* NAND Flash WEn */
-+	MPP8_UNUSED,
-+	MPP9_UNUSED,
-+	MPP10_UNUSED,
-+	MPP11_UNUSED,
-+	MPP12_SATA_LED,		/* SATA 0 presence */
-+	MPP13_SATA_LED,		/* SATA 1 presence */
-+	MPP14_SATA_LED,		/* SATA 0 active */
-+	MPP15_SATA_LED,		/* SATA 1 active */
-+	MPP16_UART,		/* UART1 RXD */
-+	MPP17_UART,		/* UART1 TXD */
-+	MPP18_UART,		/* UART1 CTSn */
-+	MPP19_UART,		/* UART1 RTSn */
-+	0,
- };
- 
- static void __init kurobox_pro_init(void)
-diff --git a/arch/arm/mach-orion5x/ls-chl-setup.c b/arch/arm/mach-orion5x/ls-chl-setup.c
-index 6ae12aa..5065803 100644
---- a/arch/arm/mach-orion5x/ls-chl-setup.c
-+++ b/arch/arm/mach-orion5x/ls-chl-setup.c
-@@ -251,28 +251,28 @@ static struct platform_device lschl_fan_device = {
-  * GPIO Data
-  ****************************************************************************/
- 
--static struct orion5x_mpp_mode lschl_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO }, /* LED POWER */
--	{  1, MPP_GPIO }, /* HDD POWER */
--	{  2, MPP_GPIO }, /* LED ALARM */
--	{  3, MPP_GPIO }, /* LED INFO */
--	{  4, MPP_UNUSED },
--	{  5, MPP_UNUSED },
--	{  6, MPP_GPIO }, /* FAN LOCK */
--	{  7, MPP_GPIO }, /* SW INIT */
--	{  8, MPP_GPIO }, /* SW POWER */
--	{  9, MPP_GPIO }, /* USB POWER */
--	{ 10, MPP_GPIO }, /* SW AUTO POWER */
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_UNUSED },
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_GPIO }, /* FAN HIGH */
--	{ 15, MPP_GPIO }, /* SW FUNC */
--	{ 16, MPP_GPIO }, /* FAN LOW */
--	{ 17, MPP_GPIO }, /* LED FUNC */
--	{ 18, MPP_UNUSED },
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int lschl_mpp_modes[] __initdata = {
-+	MPP0_GPIO, /* LED POWER */
-+	MPP1_GPIO, /* HDD POWER */
-+	MPP2_GPIO, /* LED ALARM */
-+	MPP3_GPIO, /* LED INFO */
-+	MPP4_UNUSED,
-+	MPP5_UNUSED,
-+	MPP6_GPIO, /* FAN LOCK */
-+	MPP7_GPIO, /* SW INIT */
-+	MPP8_GPIO, /* SW POWER */
-+	MPP9_GPIO, /* USB POWER */
-+	MPP10_GPIO, /* SW AUTO POWER */
-+	MPP11_UNUSED,
-+	MPP12_UNUSED,
-+	MPP13_UNUSED,
-+	MPP14_GPIO, /* FAN HIGH */
-+	MPP15_GPIO, /* SW FUNC */
-+	MPP16_GPIO, /* FAN LOW */
-+	MPP17_GPIO, /* LED FUNC */
-+	MPP18_UNUSED,
-+	MPP19_UNUSED,
-+	0,
- };
- 
- static void __init lschl_init(void)
-diff --git a/arch/arm/mach-orion5x/ls_hgl-setup.c b/arch/arm/mach-orion5x/ls_hgl-setup.c
-index 7adafd7..8503d0a 100644
---- a/arch/arm/mach-orion5x/ls_hgl-setup.c
-+++ b/arch/arm/mach-orion5x/ls_hgl-setup.c
-@@ -200,28 +200,28 @@ static void ls_hgl_power_off(void)
- 
- #define LS_HGL_GPIO_HDD_POWER	1
- 
--static struct orion5x_mpp_mode ls_hgl_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO }, /* LED_PWR */
--	{  1, MPP_GPIO }, /* HDD_PWR */
--	{  2, MPP_GPIO }, /* LED_ALARM */
--	{  3, MPP_GPIO }, /* LED_INFO */
--	{  4, MPP_UNUSED },
--	{  5, MPP_UNUSED },
--	{  6, MPP_GPIO }, /* FAN_LCK */
--	{  7, MPP_GPIO }, /* INIT */
--	{  8, MPP_GPIO }, /* POWER */
--	{  9, MPP_GPIO }, /* USB_PWR */
--	{ 10, MPP_GPIO }, /* AUTO_POWER */
--	{ 11, MPP_UNUSED }, /* LED_ETH (dummy) */
--	{ 12, MPP_UNUSED },
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_UNUSED },
--	{ 15, MPP_GPIO }, /* FUNC */
--	{ 16, MPP_UNUSED },
--	{ 17, MPP_GPIO }, /* LED_FUNC */
--	{ 18, MPP_UNUSED },
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int ls_hgl_mpp_modes[] __initdata = {
-+	MPP0_GPIO, /* LED_PWR */
-+	MPP1_GPIO, /* HDD_PWR */
-+	MPP2_GPIO, /* LED_ALARM */
-+	MPP3_GPIO, /* LED_INFO */
-+	MPP4_UNUSED,
-+	MPP5_UNUSED,
-+	MPP6_GPIO, /* FAN_LCK */
-+	MPP7_GPIO, /* INIT */
-+	MPP8_GPIO, /* POWER */
-+	MPP9_GPIO, /* USB_PWR */
-+	MPP10_GPIO, /* AUTO_POWER */
-+	MPP11_UNUSED, /* LED_ETH (dummy) */
-+	MPP12_UNUSED,
-+	MPP13_UNUSED,
-+	MPP14_UNUSED,
-+	MPP15_GPIO, /* FUNC */
-+	MPP16_UNUSED,
-+	MPP17_GPIO, /* LED_FUNC */
-+	MPP18_UNUSED,
-+	MPP19_UNUSED,
-+	0,
- };
- 
- static void __init ls_hgl_init(void)
-diff --git a/arch/arm/mach-orion5x/lsmini-setup.c b/arch/arm/mach-orion5x/lsmini-setup.c
-index 869958f..9c82723 100644
---- a/arch/arm/mach-orion5x/lsmini-setup.c
-+++ b/arch/arm/mach-orion5x/lsmini-setup.c
-@@ -201,28 +201,28 @@ static void lsmini_power_off(void)
- #define LSMINI_GPIO_HDD_POWER0	1
- #define LSMINI_GPIO_HDD_POWER1	19
- 
--static struct orion5x_mpp_mode lsmini_mpp_modes[] __initdata = {
--	{  0, MPP_UNUSED }, /* LED_RESERVE1 (unused) */
--	{  1, MPP_GPIO }, /* HDD_PWR */
--	{  2, MPP_GPIO }, /* LED_ALARM */
--	{  3, MPP_GPIO }, /* LED_INFO */
--	{  4, MPP_UNUSED },
--	{  5, MPP_UNUSED },
--	{  6, MPP_UNUSED },
--	{  7, MPP_UNUSED },
--	{  8, MPP_UNUSED },
--	{  9, MPP_GPIO }, /* LED_FUNC */
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED }, /* LED_ETH (dummy) */
--	{ 12, MPP_UNUSED },
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_GPIO }, /* LED_PWR */
--	{ 15, MPP_GPIO }, /* FUNC */
--	{ 16, MPP_GPIO }, /* USB_PWR */
--	{ 17, MPP_GPIO }, /* AUTO_POWER */
--	{ 18, MPP_GPIO }, /* POWER */
--	{ 19, MPP_GPIO }, /* HDD_PWR1 */
--	{ -1 },
-+static unsigned int lsmini_mpp_modes[] __initdata = {
-+	MPP0_UNUSED, /* LED_RESERVE1 (unused) */
-+	MPP1_GPIO, /* HDD_PWR */
-+	MPP2_GPIO, /* LED_ALARM */
-+	MPP3_GPIO, /* LED_INFO */
-+	MPP4_UNUSED,
-+	MPP5_UNUSED,
-+	MPP6_UNUSED,
-+	MPP7_UNUSED,
-+	MPP8_UNUSED,
-+	MPP9_GPIO, /* LED_FUNC */
-+	MPP10_UNUSED,
-+	MPP11_UNUSED, /* LED_ETH (dummy) */
-+	MPP12_UNUSED,
-+	MPP13_UNUSED,
-+	MPP14_GPIO, /* LED_PWR */
-+	MPP15_GPIO, /* FUNC */
-+	MPP16_GPIO, /* USB_PWR */
-+	MPP17_GPIO, /* AUTO_POWER */
-+	MPP18_GPIO, /* POWER */
-+	MPP19_GPIO, /* HDD_PWR1 */
-+	0,
- };
- 
- static void __init lsmini_init(void)
-diff --git a/arch/arm/mach-orion5x/mpp.c b/arch/arm/mach-orion5x/mpp.c
-index 2288207..f12c41b 100644
---- a/arch/arm/mach-orion5x/mpp.c
-+++ b/arch/arm/mach-orion5x/mpp.c
-@@ -12,154 +12,34 @@
- #include <linux/init.h>
- #include <linux/mbus.h>
- #include <linux/io.h>
--#include <asm/gpio.h>
- #include <mach/hardware.h>
--#include "common.h"
-+#include <plat/mpp.h>
- #include "mpp.h"
-+#include "common.h"
- 
--static int is_5181l(void)
--{
--	u32 dev;
--	u32 rev;
--
--	orion5x_pcie_id(&dev, &rev);
--
--	return !!(dev == MV88F5181_DEV_ID && rev >= MV88F5181L_REV_A0);
--}
--
--static int is_5182(void)
-+static unsigned int __init orion5x_variant(void)
- {
- 	u32 dev;
- 	u32 rev;
- 
- 	orion5x_pcie_id(&dev, &rev);
- 
--	return !!(dev == MV88F5182_DEV_ID);
--}
-+	if (dev == MV88F5181_DEV_ID && rev >= MV88F5181L_REV_A0)
-+		return MPP_F5181_MASK;
- 
--static int is_5281(void)
--{
--	u32 dev;
--	u32 rev;
-+	if (dev == MV88F5182_DEV_ID)
-+		return MPP_F5182_MASK;
- 
--	orion5x_pcie_id(&dev, &rev);
-+	if (dev == MV88F5281_DEV_ID)
-+		return MPP_F5281_MASK;
- 
--	return !!(dev == MV88F5281_DEV_ID);
-+	printk(KERN_ERR "MPP setup: unknown orion5x variant "
-+	       "(dev %#x rev %#x)\n", dev, rev);
+ source "drivers/regulator/Kconfig"
+diff --git a/drivers/Makefile b/drivers/Makefile
+index 3f135b6..a29527f 100644
+--- a/drivers/Makefile
++++ b/drivers/Makefile
+@@ -110,6 +110,7 @@ obj-$(CONFIG_HID)		+= hid/
+ obj-$(CONFIG_PPC_PS3)		+= ps3/
+ obj-$(CONFIG_OF)		+= of/
+ obj-$(CONFIG_SSB)		+= ssb/
++obj-$(CONFIG_BCMA)		+= bcma/
+ obj-$(CONFIG_VHOST_NET)		+= vhost/
+ obj-$(CONFIG_VLYNQ)		+= vlynq/
+ obj-$(CONFIG_STAGING)		+= staging/
+diff --git a/drivers/bcma/Kconfig b/drivers/bcma/Kconfig
+new file mode 100644
+index 0000000..353781b
+--- /dev/null
++++ b/drivers/bcma/Kconfig
+@@ -0,0 +1,33 @@
++config BCMA_POSSIBLE
++	bool
++	depends on HAS_IOMEM && HAS_DMA
++	default y
++
++menu "Broadcom specific AMBA"
++	depends on BCMA_POSSIBLE
++
++config BCMA
++	tristate "BCMA support"
++	depends on BCMA_POSSIBLE
++	help
++	  Bus driver for Broadcom specific Advanced Microcontroller Bus
++	  Architecture.
++
++config BCMA_HOST_PCI_POSSIBLE
++	bool
++	depends on BCMA && PCI = y
++	default y
++
++config BCMA_HOST_PCI
++	bool "Support for BCMA on PCI-host bus"
++	depends on BCMA_HOST_PCI_POSSIBLE
++
++config BCMA_DEBUG
++	bool "BCMA debugging"
++	depends on BCMA
++	help
++	  This turns on additional debugging messages.
++
++	  If unsure, say N
++
++endmenu
+diff --git a/drivers/bcma/Makefile b/drivers/bcma/Makefile
+new file mode 100644
+index 0000000..0d56245
+--- /dev/null
++++ b/drivers/bcma/Makefile
+@@ -0,0 +1,7 @@
++bcma-y					+= main.o scan.o core.o
++bcma-y					+= driver_chipcommon.o driver_chipcommon_pmu.o
++bcma-y					+= driver_pci.o
++bcma-$(CONFIG_BCMA_HOST_PCI)		+= host_pci.o
++obj-$(CONFIG_BCMA)			+= bcma.o
++
++ccflags-$(CONFIG_BCMA_DEBUG)		:= -DDEBUG
+diff --git a/drivers/bcma/README b/drivers/bcma/README
+new file mode 100644
+index 0000000..f7e7ce4
+--- /dev/null
++++ b/drivers/bcma/README
+@@ -0,0 +1,19 @@
++Broadcom introduced new bus as replacement for older SSB. It is based on AMBA,
++however from programming point of view there is nothing AMBA specific we use.
++
++Standard AMBA drivers are platform specific, have hardcoded addresses and use
++AMBA standard fields like CID and PID.
++
++In case of Broadcom's cards every device consists of:
++1) Broadcom specific AMBA device. It is put on AMBA bus, but can not be treated
++   as standard AMBA device. Reading it's CID or PID can cause machine lockup.
++2) AMBA standard devices called ports or wrappers. They have CIDs (AMBA_CID)
++   and PIDs (0x103BB369), but we do not use that info for anything. One of that
++   devices is used for managing Broadcom specific core.
++
++Addresses of AMBA devices are not hardcoded in driver and have to be read from
++EPROM.
++
++In this situation we decided to introduce separated bus. It can contain up to
++16 devices identified by Broadcom specific fields: manufacturer, id, revision
++and class.
+diff --git a/drivers/bcma/TODO b/drivers/bcma/TODO
+new file mode 100644
+index 0000000..f186e2c
+--- /dev/null
++++ b/drivers/bcma/TODO
+@@ -0,0 +1,4 @@
++- Interrupts
++- Defines for PCI core driver
++- Convert bcma_bus->cores into linked list
++- Make kernel Documentation (use info from README)
+diff --git a/drivers/bcma/bcma_private.h b/drivers/bcma/bcma_private.h
+new file mode 100644
+index 0000000..2f72e9c
+--- /dev/null
++++ b/drivers/bcma/bcma_private.h
+@@ -0,0 +1,28 @@
++#ifndef LINUX_BCMA_PRIVATE_H_
++#define LINUX_BCMA_PRIVATE_H_
++
++#ifndef pr_fmt
++#define pr_fmt(fmt)		KBUILD_MODNAME ": " fmt
++#endif
++
++#include <linux/bcma/bcma.h>
++#include <linux/delay.h>
++
++#define BCMA_CORE_SIZE		0x1000
++
++struct bcma_bus;
++
++/* main.c */
++extern int bcma_bus_register(struct bcma_bus *bus);
++extern void bcma_bus_unregister(struct bcma_bus *bus);
++
++/* scan.c */
++int bcma_bus_scan(struct bcma_bus *bus);
++
++#ifdef CONFIG_BCMA_HOST_PCI
++/* host_pci.c */
++extern int __init bcma_host_pci_init(void);
++extern void __exit bcma_host_pci_exit(void);
++#endif /* CONFIG_BCMA_HOST_PCI */
++
++#endif
+diff --git a/drivers/bcma/core.c b/drivers/bcma/core.c
+new file mode 100644
+index 0000000..ced379f
+--- /dev/null
++++ b/drivers/bcma/core.c
+@@ -0,0 +1,51 @@
++/*
++ * Broadcom specific AMBA
++ * Core ops
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "bcma_private.h"
++#include <linux/bcma/bcma.h>
++
++bool bcma_core_is_enabled(struct bcma_device *core)
++{
++	if ((bcma_aread32(core, BCMA_IOCTL) & (BCMA_IOCTL_CLK | BCMA_IOCTL_FGC))
++	    != BCMA_IOCTL_CLK)
++		return false;
++	if (bcma_aread32(core, BCMA_RESET_CTL) & BCMA_RESET_CTL_RESET)
++		return false;
++	return true;
++}
++EXPORT_SYMBOL_GPL(bcma_core_is_enabled);
++
++static void bcma_core_disable(struct bcma_device *core, u32 flags)
++{
++	if (bcma_aread32(core, BCMA_RESET_CTL) & BCMA_RESET_CTL_RESET)
++		return;
++
++	bcma_awrite32(core, BCMA_IOCTL, flags);
++	bcma_aread32(core, BCMA_IOCTL);
++	udelay(10);
++
++	bcma_awrite32(core, BCMA_RESET_CTL, BCMA_RESET_CTL_RESET);
++	udelay(1);
++}
++
++int bcma_core_enable(struct bcma_device *core, u32 flags)
++{
++	bcma_core_disable(core, flags);
++
++	bcma_awrite32(core, BCMA_IOCTL, (BCMA_IOCTL_CLK | BCMA_IOCTL_FGC | flags));
++	bcma_aread32(core, BCMA_IOCTL);
++
++	bcma_awrite32(core, BCMA_RESET_CTL, 0);
++	udelay(1);
++
++	bcma_awrite32(core, BCMA_IOCTL, (BCMA_IOCTL_CLK | flags));
++	bcma_aread32(core, BCMA_IOCTL);
++	udelay(1);
++
 +	return 0;
++}
++EXPORT_SYMBOL_GPL(bcma_core_enable);
+diff --git a/drivers/bcma/driver_chipcommon.c b/drivers/bcma/driver_chipcommon.c
+new file mode 100644
+index 0000000..caf5960
+--- /dev/null
++++ b/drivers/bcma/driver_chipcommon.c
+@@ -0,0 +1,87 @@
++/*
++ * Broadcom specific AMBA
++ * ChipCommon core driver
++ *
++ * Copyright 2005, Broadcom Corporation
++ * Copyright 2006, 2007, Michael Buesch <mb@bu3sch.de>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "bcma_private.h"
++#include <linux/bcma/bcma.h>
++
++static inline u32 bcma_cc_write32_masked(struct bcma_drv_cc *cc, u16 offset,
++					 u32 mask, u32 value)
++{
++	value &= mask;
++	value |= bcma_cc_read32(cc, offset) & ~mask;
++	bcma_cc_write32(cc, offset, value);
++
++	return value;
++}
++
++void bcma_core_chipcommon_init(struct bcma_drv_cc *cc)
++{
++	if (cc->core->id.rev >= 11)
++		cc->status = bcma_cc_read32(cc, BCMA_CC_CHIPSTAT);
++	cc->capabilities = bcma_cc_read32(cc, BCMA_CC_CAP);
++	if (cc->core->id.rev >= 35)
++		cc->capabilities_ext = bcma_cc_read32(cc, BCMA_CC_CAP_EXT);
++
++	bcma_cc_write32(cc, 0x58, 0);
++	bcma_cc_write32(cc, 0x5C, 0);
++
++	if (cc->capabilities & BCMA_CC_CAP_PMU)
++		bcma_pmu_init(cc);
++	if (cc->capabilities & BCMA_CC_CAP_PCTL)
++		pr_err("Power control not implemented!\n");
++}
++
++/* Set chip watchdog reset timer to fire in 'ticks' backplane cycles */
++void bcma_chipco_watchdog_timer_set(struct bcma_drv_cc *cc, u32 ticks)
++{
++	/* instant NMI */
++	bcma_cc_write32(cc, BCMA_CC_WATCHDOG, ticks);
++}
++
++void bcma_chipco_irq_mask(struct bcma_drv_cc *cc, u32 mask, u32 value)
++{
++	bcma_cc_write32_masked(cc, BCMA_CC_IRQMASK, mask, value);
++}
++
++u32 bcma_chipco_irq_status(struct bcma_drv_cc *cc, u32 mask)
++{
++	return bcma_cc_read32(cc, BCMA_CC_IRQSTAT) & mask;
++}
++
++u32 bcma_chipco_gpio_in(struct bcma_drv_cc *cc, u32 mask)
++{
++	return bcma_cc_read32(cc, BCMA_CC_GPIOIN) & mask;
++}
++
++u32 bcma_chipco_gpio_out(struct bcma_drv_cc *cc, u32 mask, u32 value)
++{
++	return bcma_cc_write32_masked(cc, BCMA_CC_GPIOOUT, mask, value);
++}
++
++u32 bcma_chipco_gpio_outen(struct bcma_drv_cc *cc, u32 mask, u32 value)
++{
++	return bcma_cc_write32_masked(cc, BCMA_CC_GPIOOUTEN, mask, value);
++}
++
++u32 bcma_chipco_gpio_control(struct bcma_drv_cc *cc, u32 mask, u32 value)
++{
++	return bcma_cc_write32_masked(cc, BCMA_CC_GPIOCTL, mask, value);
++}
++EXPORT_SYMBOL_GPL(bcma_chipco_gpio_control);
++
++u32 bcma_chipco_gpio_intmask(struct bcma_drv_cc *cc, u32 mask, u32 value)
++{
++	return bcma_cc_write32_masked(cc, BCMA_CC_GPIOIRQ, mask, value);
++}
++
++u32 bcma_chipco_gpio_polarity(struct bcma_drv_cc *cc, u32 mask, u32 value)
++{
++	return bcma_cc_write32_masked(cc, BCMA_CC_GPIOPOL, mask, value);
++}
+diff --git a/drivers/bcma/driver_chipcommon_pmu.c b/drivers/bcma/driver_chipcommon_pmu.c
+new file mode 100644
+index 0000000..f44177a
+--- /dev/null
++++ b/drivers/bcma/driver_chipcommon_pmu.c
+@@ -0,0 +1,134 @@
++/*
++ * Broadcom specific AMBA
++ * ChipCommon Power Management Unit driver
++ *
++ * Copyright 2009, Michael Buesch <mb@bu3sch.de>
++ * Copyright 2007, Broadcom Corporation
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "bcma_private.h"
++#include <linux/bcma/bcma.h>
++
++static void bcma_chipco_chipctl_maskset(struct bcma_drv_cc *cc,
++					u32 offset, u32 mask, u32 set)
++{
++	u32 value;
++
++	bcma_cc_read32(cc, BCMA_CC_CHIPCTL_ADDR);
++	bcma_cc_write32(cc, BCMA_CC_CHIPCTL_ADDR, offset);
++	bcma_cc_read32(cc, BCMA_CC_CHIPCTL_ADDR);
++	value = bcma_cc_read32(cc, BCMA_CC_CHIPCTL_DATA);
++	value &= mask;
++	value |= set;
++	bcma_cc_write32(cc, BCMA_CC_CHIPCTL_DATA, value);
++	bcma_cc_read32(cc, BCMA_CC_CHIPCTL_DATA);
++}
++
++static void bcma_pmu_pll_init(struct bcma_drv_cc *cc)
++{
++	struct bcma_bus *bus = cc->core->bus;
++
++	switch (bus->chipinfo.id) {
++	case 0x4313:
++	case 0x4331:
++	case 43224:
++	case 43225:
++		break;
++	default:
++		pr_err("PLL init unknown for device 0x%04X\n",
++			bus->chipinfo.id);
++	}
++}
++
++static void bcma_pmu_resources_init(struct bcma_drv_cc *cc)
++{
++	struct bcma_bus *bus = cc->core->bus;
++	u32 min_msk = 0, max_msk = 0;
++
++	switch (bus->chipinfo.id) {
++	case 0x4313:
++		min_msk = 0x200D;
++		max_msk = 0xFFFF;
++		break;
++	case 43224:
++		break;
++	default:
++		pr_err("PMU resource config unknown for device 0x%04X\n",
++			bus->chipinfo.id);
++	}
++
++	/* Set the resource masks. */
++	if (min_msk)
++		bcma_cc_write32(cc, BCMA_CC_PMU_MINRES_MSK, min_msk);
++	if (max_msk)
++		bcma_cc_write32(cc, BCMA_CC_PMU_MAXRES_MSK, max_msk);
++}
++
++void bcma_pmu_swreg_init(struct bcma_drv_cc *cc)
++{
++	struct bcma_bus *bus = cc->core->bus;
++
++	switch (bus->chipinfo.id) {
++	case 0x4313:
++	case 0x4331:
++	case 43224:
++		break;
++	default:
++		pr_err("PMU switch/regulators init unknown for device "
++			"0x%04X\n", bus->chipinfo.id);
++	}
++}
++
++void bcma_pmu_workarounds(struct bcma_drv_cc *cc)
++{
++	struct bcma_bus *bus = cc->core->bus;
++
++	switch (bus->chipinfo.id) {
++	case 0x4313:
++		bcma_chipco_chipctl_maskset(cc, 0, ~0, 0x7);
++		break;
++	case 0x4331:
++		pr_err("Enabling Ext PA lines not implemented\n");
++		break;
++	case 43224:
++		if (bus->chipinfo.rev == 0) {
++			pr_err("Workarounds for 43224 rev 0 not fully "
++				"implemented\n");
++			bcma_chipco_chipctl_maskset(cc, 0, ~0, 0xF0);
++		} else {
++			bcma_chipco_chipctl_maskset(cc, 0, ~0, 0xF0);
++		}
++		break;
++	default:
++		pr_err("Workarounds unknown for device 0x%04X\n",
++			bus->chipinfo.id);
++	}
++}
++
++void bcma_pmu_init(struct bcma_drv_cc *cc)
++{
++	u32 pmucap;
++
++	pmucap = bcma_cc_read32(cc, BCMA_CC_PMU_CAP);
++	cc->pmu.rev = (pmucap & BCMA_CC_PMU_CAP_REVISION);
++
++	pr_debug("Found rev %u PMU (capabilities 0x%08X)\n", cc->pmu.rev,
++		 pmucap);
++
++	if (cc->pmu.rev == 1)
++		bcma_cc_mask32(cc, BCMA_CC_PMU_CTL,
++			      ~BCMA_CC_PMU_CTL_NOILPONW);
++	else
++		bcma_cc_set32(cc, BCMA_CC_PMU_CTL,
++			     BCMA_CC_PMU_CTL_NOILPONW);
++
++	if (cc->core->id.id == 0x4329 && cc->core->id.rev == 2)
++		pr_err("Fix for 4329b0 bad LPOM state not implemented!\n");
++
++	bcma_pmu_pll_init(cc);
++	bcma_pmu_resources_init(cc);
++	bcma_pmu_swreg_init(cc);
++	bcma_pmu_workarounds(cc);
++}
+diff --git a/drivers/bcma/driver_pci.c b/drivers/bcma/driver_pci.c
+new file mode 100644
+index 0000000..b98b835
+--- /dev/null
++++ b/drivers/bcma/driver_pci.c
+@@ -0,0 +1,163 @@
++/*
++ * Broadcom specific AMBA
++ * PCI Core
++ *
++ * Copyright 2005, Broadcom Corporation
++ * Copyright 2006, 2007, Michael Buesch <mb@bu3sch.de>
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "bcma_private.h"
++#include <linux/bcma/bcma.h>
++
++/**************************************************
++ * R/W ops.
++ **************************************************/
++
++static u32 bcma_pcie_read(struct bcma_drv_pci *pc, u32 address)
++{
++	pcicore_write32(pc, 0x130, address);
++	pcicore_read32(pc, 0x130);
++	return pcicore_read32(pc, 0x134);
++}
++
++#if 0
++static void bcma_pcie_write(struct bcma_drv_pci *pc, u32 address, u32 data)
++{
++	pcicore_write32(pc, 0x130, address);
++	pcicore_read32(pc, 0x130);
++	pcicore_write32(pc, 0x134, data);
++}
++#endif
++
++static void bcma_pcie_mdio_set_phy(struct bcma_drv_pci *pc, u8 phy)
++{
++	const u16 mdio_control = 0x128;
++	const u16 mdio_data = 0x12C;
++	u32 v;
++	int i;
++
++	v = (1 << 30); /* Start of Transaction */
++	v |= (1 << 28); /* Write Transaction */
++	v |= (1 << 17); /* Turnaround */
++	v |= (0x1F << 18);
++	v |= (phy << 4);
++	pcicore_write32(pc, mdio_data, v);
++
++	udelay(10);
++	for (i = 0; i < 200; i++) {
++		v = pcicore_read32(pc, mdio_control);
++		if (v & 0x100 /* Trans complete */)
++			break;
++		msleep(1);
++	}
++}
++
++static u16 bcma_pcie_mdio_read(struct bcma_drv_pci *pc, u8 device, u8 address)
++{
++	const u16 mdio_control = 0x128;
++	const u16 mdio_data = 0x12C;
++	int max_retries = 10;
++	u16 ret = 0;
++	u32 v;
++	int i;
++
++	v = 0x80; /* Enable Preamble Sequence */
++	v |= 0x2; /* MDIO Clock Divisor */
++	pcicore_write32(pc, mdio_control, v);
++
++	if (pc->core->id.rev >= 10) {
++		max_retries = 200;
++		bcma_pcie_mdio_set_phy(pc, device);
++	}
++
++	v = (1 << 30); /* Start of Transaction */
++	v |= (1 << 29); /* Read Transaction */
++	v |= (1 << 17); /* Turnaround */
++	if (pc->core->id.rev < 10)
++		v |= (u32)device << 22;
++	v |= (u32)address << 18;
++	pcicore_write32(pc, mdio_data, v);
++	/* Wait for the device to complete the transaction */
++	udelay(10);
++	for (i = 0; i < 200; i++) {
++		v = pcicore_read32(pc, mdio_control);
++		if (v & 0x100 /* Trans complete */) {
++			udelay(10);
++			ret = pcicore_read32(pc, mdio_data);
++			break;
++		}
++		msleep(1);
++	}
++	pcicore_write32(pc, mdio_control, 0);
++	return ret;
++}
++
++static void bcma_pcie_mdio_write(struct bcma_drv_pci *pc, u8 device,
++				u8 address, u16 data)
++{
++	const u16 mdio_control = 0x128;
++	const u16 mdio_data = 0x12C;
++	int max_retries = 10;
++	u32 v;
++	int i;
++
++	v = 0x80; /* Enable Preamble Sequence */
++	v |= 0x2; /* MDIO Clock Divisor */
++	pcicore_write32(pc, mdio_control, v);
++
++	if (pc->core->id.rev >= 10) {
++		max_retries = 200;
++		bcma_pcie_mdio_set_phy(pc, device);
++	}
++
++	v = (1 << 30); /* Start of Transaction */
++	v |= (1 << 28); /* Write Transaction */
++	v |= (1 << 17); /* Turnaround */
++	if (pc->core->id.rev < 10)
++		v |= (u32)device << 22;
++	v |= (u32)address << 18;
++	v |= data;
++	pcicore_write32(pc, mdio_data, v);
++	/* Wait for the device to complete the transaction */
++	udelay(10);
++	for (i = 0; i < max_retries; i++) {
++		v = pcicore_read32(pc, mdio_control);
++		if (v & 0x100 /* Trans complete */)
++			break;
++		msleep(1);
++	}
++	pcicore_write32(pc, mdio_control, 0);
++}
++
++/**************************************************
++ * Workarounds.
++ **************************************************/
++
++static u8 bcma_pcicore_polarity_workaround(struct bcma_drv_pci *pc)
++{
++	return (bcma_pcie_read(pc, 0x204) & 0x10) ? 0xC0 : 0x80;
++}
++
++static void bcma_pcicore_serdes_workaround(struct bcma_drv_pci *pc)
++{
++	const u8 serdes_pll_device = 0x1D;
++	const u8 serdes_rx_device = 0x1F;
++	u16 tmp;
++
++	bcma_pcie_mdio_write(pc, serdes_rx_device, 1 /* Control */,
++			      bcma_pcicore_polarity_workaround(pc));
++	tmp = bcma_pcie_mdio_read(pc, serdes_pll_device, 1 /* Control */);
++	if (tmp & 0x4000)
++		bcma_pcie_mdio_write(pc, serdes_pll_device, 1, tmp & ~0x4000);
++}
++
++/**************************************************
++ * Init.
++ **************************************************/
++
++void bcma_core_pci_init(struct bcma_drv_pci *pc)
++{
++	bcma_pcicore_serdes_workaround(pc);
++}
+diff --git a/drivers/bcma/host_pci.c b/drivers/bcma/host_pci.c
+new file mode 100644
+index 0000000..99dd36e
+--- /dev/null
++++ b/drivers/bcma/host_pci.c
+@@ -0,0 +1,196 @@
++/*
++ * Broadcom specific AMBA
++ * PCI Host
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "bcma_private.h"
++#include <linux/bcma/bcma.h>
++#include <linux/pci.h>
++
++static void bcma_host_pci_switch_core(struct bcma_device *core)
++{
++	pci_write_config_dword(core->bus->host_pci, BCMA_PCI_BAR0_WIN,
++			       core->addr);
++	pci_write_config_dword(core->bus->host_pci, BCMA_PCI_BAR0_WIN2,
++			       core->wrap);
++	core->bus->mapped_core = core;
++	pr_debug("Switched to core: 0x%X\n", core->id.id);
++}
++
++static u8 bcma_host_pci_read8(struct bcma_device *core, u16 offset)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	return ioread8(core->bus->mmio + offset);
++}
++
++static u16 bcma_host_pci_read16(struct bcma_device *core, u16 offset)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	return ioread16(core->bus->mmio + offset);
++}
++
++static u32 bcma_host_pci_read32(struct bcma_device *core, u16 offset)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	return ioread32(core->bus->mmio + offset);
++}
++
++static void bcma_host_pci_write8(struct bcma_device *core, u16 offset,
++				 u8 value)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	iowrite8(value, core->bus->mmio + offset);
++}
++
++static void bcma_host_pci_write16(struct bcma_device *core, u16 offset,
++				 u16 value)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	iowrite16(value, core->bus->mmio + offset);
++}
++
++static void bcma_host_pci_write32(struct bcma_device *core, u16 offset,
++				 u32 value)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	iowrite32(value, core->bus->mmio + offset);
++}
++
++static u32 bcma_host_pci_aread32(struct bcma_device *core, u16 offset)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	return ioread32(core->bus->mmio + (1 * BCMA_CORE_SIZE) + offset);
++}
++
++static void bcma_host_pci_awrite32(struct bcma_device *core, u16 offset,
++				  u32 value)
++{
++	if (core->bus->mapped_core != core)
++		bcma_host_pci_switch_core(core);
++	iowrite32(value, core->bus->mmio + (1 * BCMA_CORE_SIZE) + offset);
++}
++
++const struct bcma_host_ops bcma_host_pci_ops = {
++	.read8		= bcma_host_pci_read8,
++	.read16		= bcma_host_pci_read16,
++	.read32		= bcma_host_pci_read32,
++	.write8		= bcma_host_pci_write8,
++	.write16	= bcma_host_pci_write16,
++	.write32	= bcma_host_pci_write32,
++	.aread32	= bcma_host_pci_aread32,
++	.awrite32	= bcma_host_pci_awrite32,
++};
++
++static int bcma_host_pci_probe(struct pci_dev *dev,
++			     const struct pci_device_id *id)
++{
++	struct bcma_bus *bus;
++	int err = -ENOMEM;
++	const char *name;
++	u32 val;
++
++	/* Alloc */
++	bus = kzalloc(sizeof(*bus), GFP_KERNEL);
++	if (!bus)
++		goto out;
++
++	/* Basic PCI configuration */
++	err = pci_enable_device(dev);
++	if (err)
++		goto err_kfree_bus;
++
++	name = dev_name(&dev->dev);
++	if (dev->driver && dev->driver->name)
++		name = dev->driver->name;
++	err = pci_request_regions(dev, name);
++	if (err)
++		goto err_pci_disable;
++	pci_set_master(dev);
++
++	/* Disable the RETRY_TIMEOUT register (0x41) to keep
++	 * PCI Tx retries from interfering with C3 CPU state */
++	pci_read_config_dword(dev, 0x40, &val);
++	if ((val & 0x0000ff00) != 0)
++		pci_write_config_dword(dev, 0x40, val & 0xffff00ff);
++
++	/* SSB needed additional powering up, do we have any AMBA PCI cards? */
++	if (!pci_is_pcie(dev))
++		pr_err("PCI card detected, report problems.\n");
++
++	/* Map MMIO */
++	err = -ENOMEM;
++	bus->mmio = pci_iomap(dev, 0, ~0UL);
++	if (!bus->mmio)
++		goto err_pci_release_regions;
++
++	/* Host specific */
++	bus->host_pci = dev;
++	bus->hosttype = BCMA_HOSTTYPE_PCI;
++	bus->ops = &bcma_host_pci_ops;
++
++	/* Register */
++	err = bcma_bus_register(bus);
++	if (err)
++		goto err_pci_unmap_mmio;
++
++	pci_set_drvdata(dev, bus);
++
++out:
++	return err;
++
++err_pci_unmap_mmio:
++	pci_iounmap(dev, bus->mmio);
++err_pci_release_regions:
++	pci_release_regions(dev);
++err_pci_disable:
++	pci_disable_device(dev);
++err_kfree_bus:
++	kfree(bus);
++	return err;
++}
++
++static void bcma_host_pci_remove(struct pci_dev *dev)
++{
++	struct bcma_bus *bus = pci_get_drvdata(dev);
++
++	bcma_bus_unregister(bus);
++	pci_iounmap(dev, bus->mmio);
++	pci_release_regions(dev);
++	pci_disable_device(dev);
++	kfree(bus);
++	pci_set_drvdata(dev, NULL);
++}
++
++static DEFINE_PCI_DEVICE_TABLE(bcma_pci_bridge_tbl) = {
++	{ PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4331) },
++	{ PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4353) },
++	{ PCI_DEVICE(PCI_VENDOR_ID_BROADCOM, 0x4727) },
++	{ 0, },
++};
++MODULE_DEVICE_TABLE(pci, bcma_pci_bridge_tbl);
++
++static struct pci_driver bcma_pci_bridge_driver = {
++	.name = "bcma-pci-bridge",
++	.id_table = bcma_pci_bridge_tbl,
++	.probe = bcma_host_pci_probe,
++	.remove = bcma_host_pci_remove,
++};
++
++int __init bcma_host_pci_init(void)
++{
++	return pci_register_driver(&bcma_pci_bridge_driver);
++}
++
++void __exit bcma_host_pci_exit(void)
++{
++	pci_unregister_driver(&bcma_pci_bridge_driver);
++}
+diff --git a/drivers/bcma/main.c b/drivers/bcma/main.c
+new file mode 100644
+index 0000000..a46c0fd
+--- /dev/null
++++ b/drivers/bcma/main.c
+@@ -0,0 +1,271 @@
++/*
++ * Broadcom specific AMBA
++ * Bus subsystem
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "bcma_private.h"
++#include <linux/bcma/bcma.h>
++
++MODULE_DESCRIPTION("Broadcom's specific AMBA driver");
++MODULE_LICENSE("GPL");
++
++static int bcma_bus_match(struct device *dev, struct device_driver *drv);
++static int bcma_device_probe(struct device *dev);
++static int bcma_device_remove(struct device *dev);
++
++static ssize_t manuf_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	return sprintf(buf, "0x%03X\n", wrapper->core->id.manuf);
++}
++static ssize_t id_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	return sprintf(buf, "0x%03X\n", wrapper->core->id.id);
++}
++static ssize_t rev_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	return sprintf(buf, "0x%02X\n", wrapper->core->id.rev);
++}
++static ssize_t class_show(struct device *dev, struct device_attribute *attr, char *buf)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	return sprintf(buf, "0x%X\n", wrapper->core->id.class);
++}
++static struct device_attribute bcma_device_attrs[] = {
++	__ATTR_RO(manuf),
++	__ATTR_RO(id),
++	__ATTR_RO(rev),
++	__ATTR_RO(class),
++	__ATTR_NULL,
++};
++
++static struct bus_type bcma_bus_type = {
++	.name		= "bcma",
++	.match		= bcma_bus_match,
++	.probe		= bcma_device_probe,
++	.remove		= bcma_device_remove,
++	.dev_attrs	= bcma_device_attrs,
++};
++
++static struct bcma_device *bcma_find_core(struct bcma_bus *bus, u16 coreid)
++{
++	u8 i;
++	for (i = 0; i < bus->nr_cores; i++) {
++		if (bus->cores[i].id.id == coreid)
++			return &bus->cores[i];
++	}
++	return NULL;
++}
++
++static void bcma_release_core_dev(struct device *dev)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	kfree(wrapper);
++}
++
++static int bcma_register_cores(struct bcma_bus *bus)
++{
++	struct bcma_device *core;
++	struct __bcma_dev_wrapper *wrapper;
++	int i, err, dev_id = 0;
++
++	for (i = 0; i < bus->nr_cores; i++) {
++		core = &(bus->cores[i]);
++
++		/* We support that cores ourself */
++		switch (core->id.id) {
++		case BCMA_CORE_CHIPCOMMON:
++		case BCMA_CORE_PCI:
++		case BCMA_CORE_PCIE:
++			continue;
++		}
++
++		wrapper = kzalloc(sizeof(*wrapper), GFP_KERNEL);
++		if (!wrapper) {
++			pr_err("Could not allocate wrapper for core 0x%03X\n",
++			       core->id.id);
++			continue;
++		}
++
++		wrapper->core = core;
++		wrapper->dev.release = bcma_release_core_dev;
++		wrapper->dev.bus = &bcma_bus_type;
++		dev_set_name(&wrapper->dev, "bcma%d:%d", 0/*bus->num*/, dev_id);
++
++		switch (bus->hosttype) {
++		case BCMA_HOSTTYPE_PCI:
++			wrapper->dev.parent = &bus->host_pci->dev;
++			break;
++		case BCMA_HOSTTYPE_NONE:
++		case BCMA_HOSTTYPE_SDIO:
++			break;
++		}
++
++		err = device_register(&wrapper->dev);
++		if (err) {
++			pr_err("Could not register dev for core 0x%03X\n",
++			       core->id.id);
++			kfree(wrapper);
++			continue;
++		}
++		core->dev = &wrapper->dev;
++		dev_id++;
++	}
++
++	return 0;
++}
++
++static void bcma_unregister_cores(struct bcma_bus *bus)
++{
++	struct bcma_device *core;
++	int i;
++
++	for (i = 0; i < bus->nr_cores; i++) {
++		core = &(bus->cores[i]);
++		if (core->dev)
++			device_unregister(core->dev);
++	}
++}
++
++int bcma_bus_register(struct bcma_bus *bus)
++{
++	int err;
++	struct bcma_device *core;
++
++	/* Scan for devices (cores) */
++	err = bcma_bus_scan(bus);
++	if (err) {
++		pr_err("Failed to scan: %d\n", err);
++		return -1;
++	}
++
++	/* Init CC core */
++	core = bcma_find_core(bus, BCMA_CORE_CHIPCOMMON);
++	if (core) {
++		bus->drv_cc.core = core;
++		bcma_core_chipcommon_init(&bus->drv_cc);
++	}
++
++	/* Init PCIE core */
++	core = bcma_find_core(bus, BCMA_CORE_PCIE);
++	if (core) {
++		bus->drv_pci.core = core;
++		bcma_core_pci_init(&bus->drv_pci);
++	}
++
++	/* Register found cores */
++	bcma_register_cores(bus);
++
++	pr_info("Bus registered\n");
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(bcma_bus_register);
++
++void bcma_bus_unregister(struct bcma_bus *bus)
++{
++	bcma_unregister_cores(bus);
++}
++EXPORT_SYMBOL_GPL(bcma_bus_unregister);
++
++int __bcma_driver_register(struct bcma_driver *drv, struct module *owner)
++{
++	drv->drv.name = drv->name;
++	drv->drv.bus = &bcma_bus_type;
++	drv->drv.owner = owner;
++
++	return driver_register(&drv->drv);
++}
++EXPORT_SYMBOL_GPL(__bcma_driver_register);
++
++void bcma_driver_unregister(struct bcma_driver *drv)
++{
++	driver_unregister(&drv->drv);
++}
++EXPORT_SYMBOL_GPL(bcma_driver_unregister);
++
++static int bcma_bus_match(struct device *dev, struct device_driver *drv)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	struct bcma_device *core = wrapper->core;
++	struct bcma_driver *adrv = container_of(drv, struct bcma_driver, drv);
++	const struct bcma_device_id *cid = &core->id;
++	const struct bcma_device_id *did;
++
++	for (did = adrv->id_table; did->manuf || did->id || did->rev; did++) {
++	    if ((did->manuf == cid->manuf || did->manuf == BCMA_ANY_MANUF) &&
++		(did->id == cid->id || did->id == BCMA_ANY_ID) &&
++		(did->rev == cid->rev || did->rev == BCMA_ANY_REV) &&
++		(did->class == cid->class || did->class == BCMA_ANY_CLASS))
++			return 1;
++	}
++	return 0;
++}
++
++static int bcma_device_probe(struct device *dev)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	struct bcma_device *core = wrapper->core;
++	struct bcma_driver *adrv = container_of(dev->driver, struct bcma_driver,
++					       drv);
++	int err = 0;
++
++	if (adrv->probe)
++		err = adrv->probe(core);
++
++	return err;
++}
++
++static int bcma_device_remove(struct device *dev)
++{
++	struct __bcma_dev_wrapper *wrapper = container_of(dev,
++						struct __bcma_dev_wrapper, dev);
++	struct bcma_device *core = wrapper->core;
++	struct bcma_driver *adrv = container_of(dev->driver, struct bcma_driver,
++					       drv);
++
++	if (adrv->remove)
++		adrv->remove(core);
++
++	return 0;
++}
++
++static int __init bcma_modinit(void)
++{
++	int err;
++
++	err = bus_register(&bcma_bus_type);
++	if (err)
++		return err;
++
++#ifdef CONFIG_BCMA_HOST_PCI
++	err = bcma_host_pci_init();
++	if (err) {
++		pr_err("PCI host initialization failed\n");
++		err = 0;
++	}
++#endif
++
++	return err;
++}
++fs_initcall(bcma_modinit);
++
++static void __exit bcma_modexit(void)
++{
++#ifdef CONFIG_BCMA_HOST_PCI
++	bcma_host_pci_exit();
++#endif
++	bus_unregister(&bcma_bus_type);
++}
++module_exit(bcma_modexit)
+diff --git a/drivers/bcma/scan.c b/drivers/bcma/scan.c
+new file mode 100644
+index 0000000..1e61e3f
+--- /dev/null
++++ b/drivers/bcma/scan.c
+@@ -0,0 +1,394 @@
++/*
++ * Broadcom specific AMBA
++ * Bus scanning
++ *
++ * Licensed under the GNU/GPL. See COPYING for details.
++ */
++
++#include "scan.h"
++#include "bcma_private.h"
++
++#include <linux/bcma/bcma.h>
++#include <linux/bcma/bcma_regs.h>
++#include <linux/pci.h>
++#include <linux/io.h>
++#include <linux/dma-mapping.h>
++#include <linux/slab.h>
++
++const char *bcma_device_name(struct bcma_device_id *id)
++{
++	if (id->manuf == BCMA_MANUF_BCM) {
++		switch (id->id) {
++		case BCMA_CORE_OOB_ROUTER:
++			return "OOB Router";
++		case BCMA_CORE_INVALID:
++			return "Invalid";
++		case BCMA_CORE_CHIPCOMMON:
++			return "ChipCommon";
++		case BCMA_CORE_ILINE20:
++			return "ILine 20";
++		case BCMA_CORE_SRAM:
++			return "SRAM";
++		case BCMA_CORE_SDRAM:
++			return "SDRAM";
++		case BCMA_CORE_PCI:
++			return "PCI";
++		case BCMA_CORE_MIPS:
++			return "MIPS";
++		case BCMA_CORE_ETHERNET:
++			return "Fast Ethernet";
++		case BCMA_CORE_V90:
++			return "V90";
++		case BCMA_CORE_USB11_HOSTDEV:
++			return "USB 1.1 Hostdev";
++		case BCMA_CORE_ADSL:
++			return "ADSL";
++		case BCMA_CORE_ILINE100:
++			return "ILine 100";
++		case BCMA_CORE_IPSEC:
++			return "IPSEC";
++		case BCMA_CORE_UTOPIA:
++			return "UTOPIA";
++		case BCMA_CORE_PCMCIA:
++			return "PCMCIA";
++		case BCMA_CORE_INTERNAL_MEM:
++			return "Internal Memory";
++		case BCMA_CORE_MEMC_SDRAM:
++			return "MEMC SDRAM";
++		case BCMA_CORE_OFDM:
++			return "OFDM";
++		case BCMA_CORE_EXTIF:
++			return "EXTIF";
++		case BCMA_CORE_80211:
++			return "IEEE 802.11";
++		case BCMA_CORE_PHY_A:
++			return "PHY A";
++		case BCMA_CORE_PHY_B:
++			return "PHY B";
++		case BCMA_CORE_PHY_G:
++			return "PHY G";
++		case BCMA_CORE_MIPS_3302:
++			return "MIPS 3302";
++		case BCMA_CORE_USB11_HOST:
++			return "USB 1.1 Host";
++		case BCMA_CORE_USB11_DEV:
++			return "USB 1.1 Device";
++		case BCMA_CORE_USB20_HOST:
++			return "USB 2.0 Host";
++		case BCMA_CORE_USB20_DEV:
++			return "USB 2.0 Device";
++		case BCMA_CORE_SDIO_HOST:
++			return "SDIO Host";
++		case BCMA_CORE_ROBOSWITCH:
++			return "Roboswitch";
++		case BCMA_CORE_PARA_ATA:
++			return "PATA";
++		case BCMA_CORE_SATA_XORDMA:
++			return "SATA XOR-DMA";
++		case BCMA_CORE_ETHERNET_GBIT:
++			return "GBit Ethernet";
++		case BCMA_CORE_PCIE:
++			return "PCIe";
++		case BCMA_CORE_PHY_N:
++			return "PHY N";
++		case BCMA_CORE_SRAM_CTL:
++			return "SRAM Controller";
++		case BCMA_CORE_MINI_MACPHY:
++			return "Mini MACPHY";
++		case BCMA_CORE_ARM_1176:
++			return "ARM 1176";
++		case BCMA_CORE_ARM_7TDMI:
++			return "ARM 7TDMI";
++		case BCMA_CORE_PHY_LP:
++			return "PHY LP";
++		case BCMA_CORE_PMU:
++			return "PMU";
++		case BCMA_CORE_PHY_SSN:
++			return "PHY SSN";
++		case BCMA_CORE_SDIO_DEV:
++			return "SDIO Device";
++		case BCMA_CORE_ARM_CM3:
++			return "ARM CM3";
++		case BCMA_CORE_PHY_HT:
++			return "PHY HT";
++		case BCMA_CORE_MIPS_74K:
++			return "MIPS 74K";
++		case BCMA_CORE_MAC_GBIT:
++			return "GBit MAC";
++		case BCMA_CORE_DDR12_MEM_CTL:
++			return "DDR1/DDR2 Memory Controller";
++		case BCMA_CORE_PCIE_RC:
++			return "PCIe Root Complex";
++		case BCMA_CORE_OCP_OCP_BRIDGE:
++			return "OCP to OCP Bridge";
++		case BCMA_CORE_SHARED_COMMON:
++			return "Common Shared";
++		case BCMA_CORE_OCP_AHB_BRIDGE:
++			return "OCP to AHB Bridge";
++		case BCMA_CORE_SPI_HOST:
++			return "SPI Host";
++		case BCMA_CORE_I2S:
++			return "I2S";
++		case BCMA_CORE_SDR_DDR1_MEM_CTL:
++			return "SDR/DDR1 Memory Controller";
++		case BCMA_CORE_SHIM:
++			return "SHIM";
++		case BCMA_CORE_DEFAULT:
++			return "Default";
++		}
++	}
++	return "UNKNOWN";
++}
++
++static u32 bcma_scan_read32(struct bcma_bus *bus, u8 current_coreidx,
++		       u16 offset)
++{
++	return readl(bus->mmio + offset);
++}
++
++static void bcma_scan_switch_core(struct bcma_bus *bus, u32 addr)
++{
++	if (bus->hosttype == BCMA_HOSTTYPE_PCI)
++		pci_write_config_dword(bus->host_pci, BCMA_PCI_BAR0_WIN,
++				       addr);
++}
++
++static u32 bcma_erom_get_ent(struct bcma_bus *bus, u32 **eromptr)
++{
++	u32 ent = readl(*eromptr);
++	(*eromptr)++;
++	return ent;
++}
++
++static void bcma_erom_push_ent(u32 **eromptr)
++{
++	(*eromptr)--;
++}
++
++static s32 bcma_erom_get_ci(struct bcma_bus *bus, u32 **eromptr)
++{
++	u32 ent = bcma_erom_get_ent(bus, eromptr);
++	if (!(ent & SCAN_ER_VALID))
++		return -ENOENT;
++	if ((ent & SCAN_ER_TAG) != SCAN_ER_TAG_CI)
++		return -ENOENT;
++	return ent;
++}
++
++static bool bcma_erom_is_end(struct bcma_bus *bus, u32 **eromptr)
++{
++	u32 ent = bcma_erom_get_ent(bus, eromptr);
++	bcma_erom_push_ent(eromptr);
++	return (ent == (SCAN_ER_TAG_END | SCAN_ER_VALID));
++}
++
++static bool bcma_erom_is_bridge(struct bcma_bus *bus, u32 **eromptr)
++{
++	u32 ent = bcma_erom_get_ent(bus, eromptr);
++	bcma_erom_push_ent(eromptr);
++	return (((ent & SCAN_ER_VALID)) &&
++		((ent & SCAN_ER_TAGX) == SCAN_ER_TAG_ADDR) &&
++		((ent & SCAN_ADDR_TYPE) == SCAN_ADDR_TYPE_BRIDGE));
++}
++
++static void bcma_erom_skip_component(struct bcma_bus *bus, u32 **eromptr)
++{
++	u32 ent;
++	while (1) {
++		ent = bcma_erom_get_ent(bus, eromptr);
++		if ((ent & SCAN_ER_VALID) &&
++		    ((ent & SCAN_ER_TAG) == SCAN_ER_TAG_CI))
++			break;
++		if (ent == (SCAN_ER_TAG_END | SCAN_ER_VALID))
++			break;
++	}
++	bcma_erom_push_ent(eromptr);
++}
++
++static s32 bcma_erom_get_mst_port(struct bcma_bus *bus, u32 **eromptr)
++{
++	u32 ent = bcma_erom_get_ent(bus, eromptr);
++	if (!(ent & SCAN_ER_VALID))
++		return -ENOENT;
++	if ((ent & SCAN_ER_TAG) != SCAN_ER_TAG_MP)
++		return -ENOENT;
++	return ent;
++}
++
++static s32 bcma_erom_get_addr_desc(struct bcma_bus *bus, u32 **eromptr,
++				  u32 type, u8 port)
++{
++	u32 addrl, addrh, sizel, sizeh = 0;
++	u32 size;
++
++	u32 ent = bcma_erom_get_ent(bus, eromptr);
++	if ((!(ent & SCAN_ER_VALID)) ||
++	    ((ent & SCAN_ER_TAGX) != SCAN_ER_TAG_ADDR) ||
++	    ((ent & SCAN_ADDR_TYPE) != type) ||
++	    (((ent & SCAN_ADDR_PORT) >> SCAN_ADDR_PORT_SHIFT) != port)) {
++		bcma_erom_push_ent(eromptr);
++		return -EINVAL;
++	}
++
++	addrl = ent & SCAN_ADDR_ADDR;
++	if (ent & SCAN_ADDR_AG32)
++		addrh = bcma_erom_get_ent(bus, eromptr);
++	else
++		addrh = 0;
++
++	if ((ent & SCAN_ADDR_SZ) == SCAN_ADDR_SZ_SZD) {
++		size = bcma_erom_get_ent(bus, eromptr);
++		sizel = size & SCAN_SIZE_SZ;
++		if (size & SCAN_SIZE_SG32)
++			sizeh = bcma_erom_get_ent(bus, eromptr);
++	} else
++		sizel = SCAN_ADDR_SZ_BASE <<
++				((ent & SCAN_ADDR_SZ) >> SCAN_ADDR_SZ_SHIFT);
++
++	return addrl;
++}
++
++int bcma_bus_scan(struct bcma_bus *bus)
++{
++	u32 erombase;
++	u32 __iomem *eromptr, *eromend;
++
++	s32 cia, cib;
++	u8 ports[2], wrappers[2];
++
++	s32 tmp;
++	u8 i, j;
++
++	bus->nr_cores = 0;
++
++	bcma_scan_switch_core(bus, BCMA_ADDR_BASE);
++
++	tmp = bcma_scan_read32(bus, 0, BCMA_CC_ID);
++	bus->chipinfo.id = (tmp & BCMA_CC_ID_ID) >> BCMA_CC_ID_ID_SHIFT;
++	bus->chipinfo.rev = (tmp & BCMA_CC_ID_REV) >> BCMA_CC_ID_REV_SHIFT;
++	bus->chipinfo.pkg = (tmp & BCMA_CC_ID_PKG) >> BCMA_CC_ID_PKG_SHIFT;
++
++	erombase = bcma_scan_read32(bus, 0, BCMA_CC_EROM);
++	eromptr = bus->mmio;
++	eromend = eromptr + BCMA_CORE_SIZE / sizeof(u32);
++
++	bcma_scan_switch_core(bus, erombase);
++
++	while (eromptr < eromend) {
++		struct bcma_device core = { };
++		core.bus = bus;
++
++		/* get CIs */
++		cia = bcma_erom_get_ci(bus, &eromptr);
++		if (cia < 0) {
++			bcma_erom_push_ent(&eromptr);
++			if (bcma_erom_is_end(bus, &eromptr))
++				break;
++			return -EILSEQ;
++		}
++		cib = bcma_erom_get_ci(bus, &eromptr);
++		if (cib < 0)
++			return -EILSEQ;
++
++		/* parse CIs */
++		core.id.class = (cia & SCAN_CIA_CLASS) >> SCAN_CIA_CLASS_SHIFT;
++		core.id.id = (cia & SCAN_CIA_ID) >> SCAN_CIA_ID_SHIFT;
++		core.id.manuf = (cia & SCAN_CIA_MANUF) >> SCAN_CIA_MANUF_SHIFT;
++		ports[0] = (cib & SCAN_CIB_NMP) >> SCAN_CIB_NMP_SHIFT;
++		ports[1] = (cib & SCAN_CIB_NSP) >> SCAN_CIB_NSP_SHIFT;
++		wrappers[0] = (cib & SCAN_CIB_NMW) >> SCAN_CIB_NMW_SHIFT;
++		wrappers[1] = (cib & SCAN_CIB_NSW) >> SCAN_CIB_NSW_SHIFT;
++		core.id.rev = (cib & SCAN_CIB_REV) >> SCAN_CIB_REV_SHIFT;
++
++		if (((core.id.manuf == BCMA_MANUF_ARM) &&
++		     (core.id.id == 0xFFF)) ||
++		    (ports[1] == 0)) {
++			bcma_erom_skip_component(bus, &eromptr);
++			continue;
++		}
++
++		/* check if component is a core at all */
++		if (wrappers[0] + wrappers[1] == 0) {
++			/* we could save addrl of the router
++			if (cid == BCMA_CORE_OOB_ROUTER)
++			 */
++			bcma_erom_skip_component(bus, &eromptr);
++			continue;
++		}
++
++		if (bcma_erom_is_bridge(bus, &eromptr)) {
++			bcma_erom_skip_component(bus, &eromptr);
++			continue;
++		}
++
++		/* get & parse master ports */
++		for (i = 0; i < ports[0]; i++) {
++			u32 mst_port_d = bcma_erom_get_mst_port(bus, &eromptr);
++			if (mst_port_d < 0)
++				return -EILSEQ;
++		}
++
++		/* get & parse slave ports */
++		for (i = 0; i < ports[1]; i++) {
++			for (j = 0; ; j++) {
++				tmp = bcma_erom_get_addr_desc(bus, &eromptr,
++					SCAN_ADDR_TYPE_SLAVE, i);
++				if (tmp < 0) {
++					/* no more entries for port _i_ */
++					/* pr_debug("erom: slave port %d "
++					 * "has %d descriptors\n", i, j); */
++					break;
++				} else {
++					if (i == 0 && j == 0)
++						core.addr = tmp;
++				}
++			}
++		}
++
++		/* get & parse master wrappers */
++		for (i = 0; i < wrappers[0]; i++) {
++			for (j = 0; ; j++) {
++				tmp = bcma_erom_get_addr_desc(bus, &eromptr,
++					SCAN_ADDR_TYPE_MWRAP, i);
++				if (tmp < 0) {
++					/* no more entries for port _i_ */
++					/* pr_debug("erom: master wrapper %d "
++					 * "has %d descriptors\n", i, j); */
++					break;
++				} else {
++					if (i == 0 && j == 0)
++						core.wrap = tmp;
++				}
++			}
++		}
++
++		/* get & parse slave wrappers */
++		for (i = 0; i < wrappers[1]; i++) {
++			u8 hack = (ports[1] == 1) ? 0 : 1;
++			for (j = 0; ; j++) {
++				tmp = bcma_erom_get_addr_desc(bus, &eromptr,
++					SCAN_ADDR_TYPE_SWRAP, i + hack);
++				if (tmp < 0) {
++					/* no more entries for port _i_ */
++					/* pr_debug("erom: master wrapper %d "
++					 * has %d descriptors\n", i, j); */
++					break;
++				} else {
++					if (wrappers[0] == 0 && !i && !j)
++						core.wrap = tmp;
++				}
++			}
++		}
++
++		pr_info("Core %d found: %s "
++			"(manuf 0x%03X, id 0x%03X, rev 0x%02X, class 0x%X)\n",
++			bus->nr_cores, bcma_device_name(&core.id),
++			core.id.manuf, core.id.id, core.id.rev,
++			core.id.class);
++
++		core.core_index = bus->nr_cores;
++		bus->cores[bus->nr_cores++] = core;
++	}
++
++	return 0;
++}
+diff --git a/drivers/bcma/scan.h b/drivers/bcma/scan.h
+new file mode 100644
+index 0000000..113e6a6
+--- /dev/null
++++ b/drivers/bcma/scan.h
+@@ -0,0 +1,56 @@
++#ifndef BCMA_SCAN_H_
++#define BCMA_SCAN_H_
++
++#define BCMA_ADDR_BASE		0x18000000
++#define BCMA_WRAP_BASE		0x18100000
++
++#define SCAN_ER_VALID		0x00000001
++#define SCAN_ER_TAGX		0x00000006 /* we have to ignore 0x8 bit when checking tag for SCAN_ER_TAG_ADDR */
++#define SCAN_ER_TAG		0x0000000E
++#define  SCAN_ER_TAG_CI		0x00000000
++#define  SCAN_ER_TAG_MP		0x00000002
++#define  SCAN_ER_TAG_ADDR	0x00000004
++#define  SCAN_ER_TAG_END	0x0000000E
++#define SCAN_ER_BAD		0xFFFFFFFF
++
++#define SCAN_CIA_CLASS		0x000000F0
++#define SCAN_CIA_CLASS_SHIFT	4
++#define SCAN_CIA_ID		0x000FFF00
++#define SCAN_CIA_ID_SHIFT	8
++#define SCAN_CIA_MANUF		0xFFF00000
++#define SCAN_CIA_MANUF_SHIFT	20
++
++#define SCAN_CIB_NMP		0x000001F0
++#define SCAN_CIB_NMP_SHIFT	4
++#define SCAN_CIB_NSP		0x00003E00
++#define SCAN_CIB_NSP_SHIFT	9
++#define SCAN_CIB_NMW		0x0007C000
++#define SCAN_CIB_NMW_SHIFT	14
++#define SCAN_CIB_NSW		0x00F80000
++#define SCAN_CIB_NSW_SHIFT	17
++#define SCAN_CIB_REV		0xFF000000
++#define SCAN_CIB_REV_SHIFT	24
++
++#define SCAN_ADDR_AG32		0x00000008
++#define SCAN_ADDR_SZ		0x00000030
++#define SCAN_ADDR_SZ_SHIFT	4
++#define  SCAN_ADDR_SZ_4K	0x00000000
++#define  SCAN_ADDR_SZ_8K	0x00000010
++#define  SCAN_ADDR_SZ_16K	0x00000020
++#define  SCAN_ADDR_SZ_SZD	0x00000030
++#define SCAN_ADDR_TYPE		0x000000C0
++#define  SCAN_ADDR_TYPE_SLAVE	0x00000000
++#define  SCAN_ADDR_TYPE_BRIDGE	0x00000040
++#define  SCAN_ADDR_TYPE_SWRAP	0x00000080
++#define  SCAN_ADDR_TYPE_MWRAP	0x000000C0
++#define SCAN_ADDR_PORT		0x00000F00
++#define SCAN_ADDR_PORT_SHIFT	8
++#define SCAN_ADDR_ADDR		0xFFFFF000
++
++#define SCAN_ADDR_SZ_BASE	0x00001000	/* 4KB */
++
++#define SCAN_SIZE_SZ_ALIGN	0x00000FFF
++#define SCAN_SIZE_SZ		0xFFFFF000
++#define SCAN_SIZE_SG32		0x00000008
++
++#endif /* BCMA_SCAN_H_ */
+diff --git a/include/linux/bcma/bcma.h b/include/linux/bcma/bcma.h
+new file mode 100644
+index 0000000..0df6633
+--- /dev/null
++++ b/include/linux/bcma/bcma.h
+@@ -0,0 +1,232 @@
++#ifndef LINUX_BCMA_H_
++#define LINUX_BCMA_H_
++
++#include <linux/pci.h>
++#include <linux/mod_devicetable.h>
++
++#include <linux/bcma/bcma_driver_chipcommon.h>
++#include <linux/bcma/bcma_driver_pci.h>
++
++#include "bcma_regs.h"
++
++struct bcma_device;
++struct bcma_bus;
++
++enum bcma_hosttype {
++	BCMA_HOSTTYPE_NONE,
++	BCMA_HOSTTYPE_PCI,
++	BCMA_HOSTTYPE_SDIO,
++};
++
++struct bcma_chipinfo {
++	u16 id;
++	u8 rev;
++	u8 pkg;
++};
++
++struct bcma_host_ops {
++	u8 (*read8)(struct bcma_device *core, u16 offset);
++	u16 (*read16)(struct bcma_device *core, u16 offset);
++	u32 (*read32)(struct bcma_device *core, u16 offset);
++	void (*write8)(struct bcma_device *core, u16 offset, u8 value);
++	void (*write16)(struct bcma_device *core, u16 offset, u16 value);
++	void (*write32)(struct bcma_device *core, u16 offset, u32 value);
++	/* Agent ops */
++	u32 (*aread32)(struct bcma_device *core, u16 offset);
++	void (*awrite32)(struct bcma_device *core, u16 offset, u32 value);
++};
++
++/* Core manufacturers */
++#define BCMA_MANUF_ARM			0x43B
++#define BCMA_MANUF_MIPS			0x4A7
++#define BCMA_MANUF_BCM			0x4BF
++
++/* Core class values. */
++#define BCMA_CL_SIM			0x0
++#define BCMA_CL_EROM			0x1
++#define BCMA_CL_CORESIGHT		0x9
++#define BCMA_CL_VERIF			0xB
++#define BCMA_CL_OPTIMO			0xD
++#define BCMA_CL_GEN			0xE
++#define BCMA_CL_PRIMECELL		0xF
++
++/* Core-ID values. */
++#define BCMA_CORE_OOB_ROUTER		0x367	/* Out of band */
++#define BCMA_CORE_INVALID		0x700
++#define BCMA_CORE_CHIPCOMMON		0x800
++#define BCMA_CORE_ILINE20		0x801
++#define BCMA_CORE_SRAM			0x802
++#define BCMA_CORE_SDRAM			0x803
++#define BCMA_CORE_PCI			0x804
++#define BCMA_CORE_MIPS			0x805
++#define BCMA_CORE_ETHERNET		0x806
++#define BCMA_CORE_V90			0x807
++#define BCMA_CORE_USB11_HOSTDEV		0x808
++#define BCMA_CORE_ADSL			0x809
++#define BCMA_CORE_ILINE100		0x80A
++#define BCMA_CORE_IPSEC			0x80B
++#define BCMA_CORE_UTOPIA		0x80C
++#define BCMA_CORE_PCMCIA		0x80D
++#define BCMA_CORE_INTERNAL_MEM		0x80E
++#define BCMA_CORE_MEMC_SDRAM		0x80F
++#define BCMA_CORE_OFDM			0x810
++#define BCMA_CORE_EXTIF			0x811
++#define BCMA_CORE_80211			0x812
++#define BCMA_CORE_PHY_A			0x813
++#define BCMA_CORE_PHY_B			0x814
++#define BCMA_CORE_PHY_G			0x815
++#define BCMA_CORE_MIPS_3302		0x816
++#define BCMA_CORE_USB11_HOST		0x817
++#define BCMA_CORE_USB11_DEV		0x818
++#define BCMA_CORE_USB20_HOST		0x819
++#define BCMA_CORE_USB20_DEV		0x81A
++#define BCMA_CORE_SDIO_HOST		0x81B
++#define BCMA_CORE_ROBOSWITCH		0x81C
++#define BCMA_CORE_PARA_ATA		0x81D
++#define BCMA_CORE_SATA_XORDMA		0x81E
++#define BCMA_CORE_ETHERNET_GBIT		0x81F
++#define BCMA_CORE_PCIE			0x820
++#define BCMA_CORE_PHY_N			0x821
++#define BCMA_CORE_SRAM_CTL		0x822
++#define BCMA_CORE_MINI_MACPHY		0x823
++#define BCMA_CORE_ARM_1176		0x824
++#define BCMA_CORE_ARM_7TDMI		0x825
++#define BCMA_CORE_PHY_LP		0x826
++#define BCMA_CORE_PMU			0x827
++#define BCMA_CORE_PHY_SSN		0x828
++#define BCMA_CORE_SDIO_DEV		0x829
++#define BCMA_CORE_ARM_CM3		0x82A
++#define BCMA_CORE_PHY_HT		0x82B
++#define BCMA_CORE_MIPS_74K		0x82C
++#define BCMA_CORE_MAC_GBIT		0x82D
++#define BCMA_CORE_DDR12_MEM_CTL		0x82E
++#define BCMA_CORE_PCIE_RC		0x82F	/* PCIe Root Complex */
++#define BCMA_CORE_OCP_OCP_BRIDGE	0x830
++#define BCMA_CORE_SHARED_COMMON		0x831
++#define BCMA_CORE_OCP_AHB_BRIDGE	0x832
++#define BCMA_CORE_SPI_HOST		0x833
++#define BCMA_CORE_I2S			0x834
++#define BCMA_CORE_SDR_DDR1_MEM_CTL	0x835	/* SDR/DDR1 memory controller core */
++#define BCMA_CORE_SHIM			0x837	/* SHIM component in ubus/6362 */
++#define BCMA_CORE_DEFAULT		0xFFF
++
++#define BCMA_MAX_NR_CORES		16
++
++/* 1) It is not allowed to put struct device statically in bcma_device
++ * 2) We can not just use pointer to struct device because we use container_of
++ * 3) We do not have pointer to struct bcma_device in struct device
++ * Solution: use such a dummy wrapper
++ */
++struct __bcma_dev_wrapper {
++	struct device dev;
++	struct bcma_device *core;
++};
++
++struct bcma_device {
++	struct bcma_bus *bus;
++	struct bcma_device_id id;
++
++	struct device *dev;
++
++	u8 core_index;
++
++	u32 addr;
++	u32 wrap;
++
++	void *drvdata;
++};
++
++static inline void *bcma_get_drvdata(struct bcma_device *core)
++{
++	return core->drvdata;
++}
++static inline void bcma_set_drvdata(struct bcma_device *core, void *drvdata)
++{
++	core->drvdata = drvdata;
++}
++
++struct bcma_driver {
++	const char *name;
++	const struct bcma_device_id *id_table;
++
++	int (*probe)(struct bcma_device *dev);
++	void (*remove)(struct bcma_device *dev);
++	int (*suspend)(struct bcma_device *dev, pm_message_t state);
++	int (*resume)(struct bcma_device *dev);
++	void (*shutdown)(struct bcma_device *dev);
++
++	struct device_driver drv;
++};
++extern
++int __bcma_driver_register(struct bcma_driver *drv, struct module *owner);
++static inline int bcma_driver_register(struct bcma_driver *drv)
++{
++	return __bcma_driver_register(drv, THIS_MODULE);
++}
++extern void bcma_driver_unregister(struct bcma_driver *drv);
++
++struct bcma_bus {
++	/* The MMIO area. */
++	void __iomem *mmio;
++
++	const struct bcma_host_ops *ops;
++
++	enum bcma_hosttype hosttype;
++	union {
++		/* Pointer to the PCI bus (only for BCMA_HOSTTYPE_PCI) */
++		struct pci_dev *host_pci;
++		/* Pointer to the SDIO device (only for BCMA_HOSTTYPE_SDIO) */
++		struct sdio_func *host_sdio;
++	};
++
++	struct bcma_chipinfo chipinfo;
++
++	struct bcma_device *mapped_core;
++	struct bcma_device cores[BCMA_MAX_NR_CORES];
++	u8 nr_cores;
++
++	struct bcma_drv_cc drv_cc;
++	struct bcma_drv_pci drv_pci;
++};
++
++extern inline u32 bcma_read8(struct bcma_device *core, u16 offset)
++{
++	return core->bus->ops->read8(core, offset);
++}
++extern inline u32 bcma_read16(struct bcma_device *core, u16 offset)
++{
++	return core->bus->ops->read16(core, offset);
++}
++extern inline u32 bcma_read32(struct bcma_device *core, u16 offset)
++{
++	return core->bus->ops->read32(core, offset);
++}
++extern inline
++void bcma_write8(struct bcma_device *core, u16 offset, u32 value)
++{
++	core->bus->ops->write8(core, offset, value);
++}
++extern inline
++void bcma_write16(struct bcma_device *core, u16 offset, u32 value)
++{
++	core->bus->ops->write16(core, offset, value);
++}
++extern inline
++void bcma_write32(struct bcma_device *core, u16 offset, u32 value)
++{
++	core->bus->ops->write32(core, offset, value);
++}
++extern inline u32 bcma_aread32(struct bcma_device *core, u16 offset)
++{
++	return core->bus->ops->aread32(core, offset);
++}
++extern inline
++void bcma_awrite32(struct bcma_device *core, u16 offset, u32 value)
++{
++	core->bus->ops->awrite32(core, offset, value);
++}
++
++extern bool bcma_core_is_enabled(struct bcma_device *core);
++extern int bcma_core_enable(struct bcma_device *core, u32 flags);
++
++#endif /* LINUX_BCMA_H_ */
+diff --git a/include/linux/bcma/bcma_driver_chipcommon.h b/include/linux/bcma/bcma_driver_chipcommon.h
+new file mode 100644
+index 0000000..4f8fd6a
+--- /dev/null
++++ b/include/linux/bcma/bcma_driver_chipcommon.h
+@@ -0,0 +1,297 @@
++#ifndef LINUX_BCMA_DRIVER_CC_H_
++#define LINUX_BCMA_DRIVER_CC_H_
++
++/** ChipCommon core registers. **/
++#define BCMA_CC_ID			0x0000
++#define  BCMA_CC_ID_ID			0x0000FFFF
++#define  BCMA_CC_ID_ID_SHIFT		0
++#define  BCMA_CC_ID_REV			0x000F0000
++#define  BCMA_CC_ID_REV_SHIFT		16
++#define  BCMA_CC_ID_PKG			0x00F00000
++#define  BCMA_CC_ID_PKG_SHIFT		20
++#define  BCMA_CC_ID_NRCORES		0x0F000000
++#define  BCMA_CC_ID_NRCORES_SHIFT	24
++#define  BCMA_CC_ID_TYPE		0xF0000000
++#define  BCMA_CC_ID_TYPE_SHIFT		28
++#define BCMA_CC_CAP			0x0004		/* Capabilities */
++#define  BCMA_CC_CAP_NRUART		0x00000003	/* # of UARTs */
++#define  BCMA_CC_CAP_MIPSEB		0x00000004	/* MIPS in BigEndian Mode */
++#define  BCMA_CC_CAP_UARTCLK		0x00000018	/* UART clock select */
++#define   BCMA_CC_CAP_UARTCLK_INT	0x00000008	/* UARTs are driven by internal divided clock */
++#define  BCMA_CC_CAP_UARTGPIO		0x00000020	/* UARTs on GPIO 15-12 */
++#define  BCMA_CC_CAP_EXTBUS		0x000000C0	/* External buses present */
++#define  BCMA_CC_CAP_FLASHT		0x00000700	/* Flash Type */
++#define   BCMA_CC_FLASHT_NONE		0x00000000	/* No flash */
++#define   BCMA_CC_FLASHT_STSER		0x00000100	/* ST serial flash */
++#define   BCMA_CC_FLASHT_ATSER		0x00000200	/* Atmel serial flash */
++#define	  BCMA_CC_FLASHT_PARA		0x00000700	/* Parallel flash */
++#define  BCMA_CC_CAP_PLLT		0x00038000	/* PLL Type */
++#define   BCMA_PLLTYPE_NONE		0x00000000
++#define   BCMA_PLLTYPE_1		0x00010000	/* 48Mhz base, 3 dividers */
++#define   BCMA_PLLTYPE_2		0x00020000	/* 48Mhz, 4 dividers */
++#define   BCMA_PLLTYPE_3		0x00030000	/* 25Mhz, 2 dividers */
++#define   BCMA_PLLTYPE_4		0x00008000	/* 48Mhz, 4 dividers */
++#define   BCMA_PLLTYPE_5		0x00018000	/* 25Mhz, 4 dividers */
++#define   BCMA_PLLTYPE_6		0x00028000	/* 100/200 or 120/240 only */
++#define   BCMA_PLLTYPE_7		0x00038000	/* 25Mhz, 4 dividers */
++#define  BCMA_CC_CAP_PCTL		0x00040000	/* Power Control */
++#define  BCMA_CC_CAP_OTPS		0x00380000	/* OTP size */
++#define  BCMA_CC_CAP_OTPS_SHIFT		19
++#define  BCMA_CC_CAP_OTPS_BASE		5
++#define  BCMA_CC_CAP_JTAGM		0x00400000	/* JTAG master present */
++#define  BCMA_CC_CAP_BROM		0x00800000	/* Internal boot ROM active */
++#define  BCMA_CC_CAP_64BIT		0x08000000	/* 64-bit Backplane */
++#define  BCMA_CC_CAP_PMU		0x10000000	/* PMU available (rev >= 20) */
++#define  BCMA_CC_CAP_ECI		0x20000000	/* ECI available (rev >= 20) */
++#define  BCMA_CC_CAP_SPROM		0x40000000	/* SPROM present */
++#define BCMA_CC_CORECTL			0x0008
++#define  BCMA_CC_CORECTL_UARTCLK0	0x00000001	/* Drive UART with internal clock */
++#define	 BCMA_CC_CORECTL_SE		0x00000002	/* sync clk out enable (corerev >= 3) */
++#define  BCMA_CC_CORECTL_UARTCLKEN	0x00000008	/* UART clock enable (rev >= 21) */
++#define BCMA_CC_BIST			0x000C
++#define BCMA_CC_OTPS			0x0010		/* OTP status */
++#define	 BCMA_CC_OTPS_PROGFAIL		0x80000000
++#define	 BCMA_CC_OTPS_PROTECT		0x00000007
++#define	 BCMA_CC_OTPS_HW_PROTECT	0x00000001
++#define	 BCMA_CC_OTPS_SW_PROTECT	0x00000002
++#define	 BCMA_CC_OTPS_CID_PROTECT	0x00000004
++#define BCMA_CC_OTPC			0x0014		/* OTP control */
++#define	 BCMA_CC_OTPC_RECWAIT		0xFF000000
++#define	 BCMA_CC_OTPC_PROGWAIT		0x00FFFF00
++#define	 BCMA_CC_OTPC_PRW_SHIFT		8
++#define	 BCMA_CC_OTPC_MAXFAIL		0x00000038
++#define	 BCMA_CC_OTPC_VSEL		0x00000006
++#define	 BCMA_CC_OTPC_SELVL		0x00000001
++#define BCMA_CC_OTPP			0x0018		/* OTP prog */
++#define	 BCMA_CC_OTPP_COL		0x000000FF
++#define	 BCMA_CC_OTPP_ROW		0x0000FF00
++#define	 BCMA_CC_OTPP_ROW_SHIFT		8
++#define	 BCMA_CC_OTPP_READERR		0x10000000
++#define	 BCMA_CC_OTPP_VALUE		0x20000000
++#define	 BCMA_CC_OTPP_READ		0x40000000
++#define	 BCMA_CC_OTPP_START		0x80000000
++#define	 BCMA_CC_OTPP_BUSY		0x80000000
++#define BCMA_CC_IRQSTAT			0x0020
++#define BCMA_CC_IRQMASK			0x0024
++#define	 BCMA_CC_IRQ_GPIO		0x00000001	/* gpio intr */
++#define	 BCMA_CC_IRQ_EXT		0x00000002	/* ro: ext intr pin (corerev >= 3) */
++#define	 BCMA_CC_IRQ_WDRESET		0x80000000	/* watchdog reset occurred */
++#define BCMA_CC_CHIPCTL			0x0028		/* Rev >= 11 only */
++#define BCMA_CC_CHIPSTAT		0x002C		/* Rev >= 11 only */
++#define BCMA_CC_JCMD			0x0030		/* Rev >= 10 only */
++#define  BCMA_CC_JCMD_START		0x80000000
++#define  BCMA_CC_JCMD_BUSY		0x80000000
++#define  BCMA_CC_JCMD_PAUSE		0x40000000
++#define  BCMA_CC_JCMD0_ACC_MASK		0x0000F000
++#define  BCMA_CC_JCMD0_ACC_IRDR		0x00000000
++#define  BCMA_CC_JCMD0_ACC_DR		0x00001000
++#define  BCMA_CC_JCMD0_ACC_IR		0x00002000
++#define  BCMA_CC_JCMD0_ACC_RESET	0x00003000
++#define  BCMA_CC_JCMD0_ACC_IRPDR	0x00004000
++#define  BCMA_CC_JCMD0_ACC_PDR		0x00005000
++#define  BCMA_CC_JCMD0_IRW_MASK		0x00000F00
++#define  BCMA_CC_JCMD_ACC_MASK		0x000F0000	/* Changes for corerev 11 */
++#define  BCMA_CC_JCMD_ACC_IRDR		0x00000000
++#define  BCMA_CC_JCMD_ACC_DR		0x00010000
++#define  BCMA_CC_JCMD_ACC_IR		0x00020000
++#define  BCMA_CC_JCMD_ACC_RESET		0x00030000
++#define  BCMA_CC_JCMD_ACC_IRPDR		0x00040000
++#define  BCMA_CC_JCMD_ACC_PDR		0x00050000
++#define  BCMA_CC_JCMD_IRW_MASK		0x00001F00
++#define  BCMA_CC_JCMD_IRW_SHIFT		8
++#define  BCMA_CC_JCMD_DRW_MASK		0x0000003F
++#define BCMA_CC_JIR			0x0034		/* Rev >= 10 only */
++#define BCMA_CC_JDR			0x0038		/* Rev >= 10 only */
++#define BCMA_CC_JCTL			0x003C		/* Rev >= 10 only */
++#define  BCMA_CC_JCTL_FORCE_CLK		4		/* Force clock */
++#define  BCMA_CC_JCTL_EXT_EN		2		/* Enable external targets */
++#define  BCMA_CC_JCTL_EN		1		/* Enable Jtag master */
++#define BCMA_CC_FLASHCTL		0x0040
++#define  BCMA_CC_FLASHCTL_START		0x80000000
++#define  BCMA_CC_FLASHCTL_BUSY		BCMA_CC_FLASHCTL_START
++#define BCMA_CC_FLASHADDR		0x0044
++#define BCMA_CC_FLASHDATA		0x0048
++#define BCMA_CC_BCAST_ADDR		0x0050
++#define BCMA_CC_BCAST_DATA		0x0054
++#define BCMA_CC_GPIOIN			0x0060
++#define BCMA_CC_GPIOOUT			0x0064
++#define BCMA_CC_GPIOOUTEN		0x0068
++#define BCMA_CC_GPIOCTL			0x006C
++#define BCMA_CC_GPIOPOL			0x0070
++#define BCMA_CC_GPIOIRQ			0x0074
++#define BCMA_CC_WATCHDOG		0x0080
++#define BCMA_CC_GPIOTIMER		0x0088		/* LED powersave (corerev >= 16) */
++#define  BCMA_CC_GPIOTIMER_ONTIME_SHIFT	16
++#define BCMA_CC_GPIOTOUTM		0x008C		/* LED powersave (corerev >= 16) */
++#define BCMA_CC_CLOCK_N			0x0090
++#define BCMA_CC_CLOCK_SB		0x0094
++#define BCMA_CC_CLOCK_PCI		0x0098
++#define BCMA_CC_CLOCK_M2		0x009C
++#define BCMA_CC_CLOCK_MIPS		0x00A0
++#define BCMA_CC_CLKDIV			0x00A4		/* Rev >= 3 only */
++#define	 BCMA_CC_CLKDIV_SFLASH		0x0F000000
++#define	 BCMA_CC_CLKDIV_SFLASH_SHIFT	24
++#define	 BCMA_CC_CLKDIV_OTP		0x000F0000
++#define	 BCMA_CC_CLKDIV_OTP_SHIFT	16
++#define	 BCMA_CC_CLKDIV_JTAG		0x00000F00
++#define	 BCMA_CC_CLKDIV_JTAG_SHIFT	8
++#define	 BCMA_CC_CLKDIV_UART		0x000000FF
++#define BCMA_CC_CAP_EXT			0x00AC		/* Capabilities */
++#define BCMA_CC_PLLONDELAY		0x00B0		/* Rev >= 4 only */
++#define BCMA_CC_FREFSELDELAY		0x00B4		/* Rev >= 4 only */
++#define BCMA_CC_SLOWCLKCTL		0x00B8		/* 6 <= Rev <= 9 only */
++#define  BCMA_CC_SLOWCLKCTL_SRC		0x00000007	/* slow clock source mask */
++#define	  BCMA_CC_SLOWCLKCTL_SRC_LPO	0x00000000	/* source of slow clock is LPO */
++#define   BCMA_CC_SLOWCLKCTL_SRC_XTAL	0x00000001	/* source of slow clock is crystal */
++#define	  BCMA_CC_SLOECLKCTL_SRC_PCI	0x00000002	/* source of slow clock is PCI */
++#define  BCMA_CC_SLOWCLKCTL_LPOFREQ	0x00000200	/* LPOFreqSel, 1: 160Khz, 0: 32KHz */
++#define  BCMA_CC_SLOWCLKCTL_LPOPD	0x00000400	/* LPOPowerDown, 1: LPO is disabled, 0: LPO is enabled */
++#define  BCMA_CC_SLOWCLKCTL_FSLOW	0x00000800	/* ForceSlowClk, 1: sb/cores running on slow clock, 0: power logic control */
++#define  BCMA_CC_SLOWCLKCTL_IPLL	0x00001000	/* IgnorePllOffReq, 1/0: power logic ignores/honors PLL clock disable requests from core */
++#define  BCMA_CC_SLOWCLKCTL_ENXTAL	0x00002000	/* XtalControlEn, 1/0: power logic does/doesn't disable crystal when appropriate */
++#define  BCMA_CC_SLOWCLKCTL_XTALPU	0x00004000	/* XtalPU (RO), 1/0: crystal running/disabled */
++#define  BCMA_CC_SLOWCLKCTL_CLKDIV	0xFFFF0000	/* ClockDivider (SlowClk = 1/(4+divisor)) */
++#define  BCMA_CC_SLOWCLKCTL_CLKDIV_SHIFT	16
++#define BCMA_CC_SYSCLKCTL		0x00C0		/* Rev >= 3 only */
++#define	 BCMA_CC_SYSCLKCTL_IDLPEN	0x00000001	/* ILPen: Enable Idle Low Power */
++#define	 BCMA_CC_SYSCLKCTL_ALPEN	0x00000002	/* ALPen: Enable Active Low Power */
++#define	 BCMA_CC_SYSCLKCTL_PLLEN	0x00000004	/* ForcePLLOn */
++#define	 BCMA_CC_SYSCLKCTL_FORCEALP	0x00000008	/* Force ALP (or HT if ALPen is not set */
++#define	 BCMA_CC_SYSCLKCTL_FORCEHT	0x00000010	/* Force HT */
++#define  BCMA_CC_SYSCLKCTL_CLKDIV	0xFFFF0000	/* ClkDiv  (ILP = 1/(4+divisor)) */
++#define  BCMA_CC_SYSCLKCTL_CLKDIV_SHIFT	16
++#define BCMA_CC_CLKSTSTR		0x00C4		/* Rev >= 3 only */
++#define BCMA_CC_EROM			0x00FC
++#define BCMA_CC_PCMCIA_CFG		0x0100
++#define BCMA_CC_PCMCIA_MEMWAIT		0x0104
++#define BCMA_CC_PCMCIA_ATTRWAIT		0x0108
++#define BCMA_CC_PCMCIA_IOWAIT		0x010C
++#define BCMA_CC_IDE_CFG			0x0110
++#define BCMA_CC_IDE_MEMWAIT		0x0114
++#define BCMA_CC_IDE_ATTRWAIT		0x0118
++#define BCMA_CC_IDE_IOWAIT		0x011C
++#define BCMA_CC_PROG_CFG		0x0120
++#define BCMA_CC_PROG_WAITCNT		0x0124
++#define BCMA_CC_FLASH_CFG		0x0128
++#define BCMA_CC_FLASH_WAITCNT		0x012C
++#define BCMA_CC_CLKCTLST		0x01E0 /* Clock control and status (rev >= 20) */
++#define  BCMA_CC_CLKCTLST_FORCEALP	0x00000001 /* Force ALP request */
++#define  BCMA_CC_CLKCTLST_FORCEHT	0x00000002 /* Force HT request */
++#define  BCMA_CC_CLKCTLST_FORCEILP	0x00000004 /* Force ILP request */
++#define  BCMA_CC_CLKCTLST_HAVEALPREQ	0x00000008 /* ALP available request */
++#define  BCMA_CC_CLKCTLST_HAVEHTREQ	0x00000010 /* HT available request */
++#define  BCMA_CC_CLKCTLST_HWCROFF	0x00000020 /* Force HW clock request off */
++#define  BCMA_CC_CLKCTLST_HAVEHT	0x00010000 /* HT available */
++#define  BCMA_CC_CLKCTLST_HAVEALP	0x00020000 /* APL available */
++#define BCMA_CC_HW_WORKAROUND		0x01E4 /* Hardware workaround (rev >= 20) */
++#define BCMA_CC_UART0_DATA		0x0300
++#define BCMA_CC_UART0_IMR		0x0304
++#define BCMA_CC_UART0_FCR		0x0308
++#define BCMA_CC_UART0_LCR		0x030C
++#define BCMA_CC_UART0_MCR		0x0310
++#define BCMA_CC_UART0_LSR		0x0314
++#define BCMA_CC_UART0_MSR		0x0318
++#define BCMA_CC_UART0_SCRATCH		0x031C
++#define BCMA_CC_UART1_DATA		0x0400
++#define BCMA_CC_UART1_IMR		0x0404
++#define BCMA_CC_UART1_FCR		0x0408
++#define BCMA_CC_UART1_LCR		0x040C
++#define BCMA_CC_UART1_MCR		0x0410
++#define BCMA_CC_UART1_LSR		0x0414
++#define BCMA_CC_UART1_MSR		0x0418
++#define BCMA_CC_UART1_SCRATCH		0x041C
++/* PMU registers (rev >= 20) */
++#define BCMA_CC_PMU_CTL			0x0600 /* PMU control */
++#define  BCMA_CC_PMU_CTL_ILP_DIV	0xFFFF0000 /* ILP div mask */
++#define  BCMA_CC_PMU_CTL_ILP_DIV_SHIFT	16
++#define  BCMA_CC_PMU_CTL_NOILPONW	0x00000200 /* No ILP on wait */
++#define  BCMA_CC_PMU_CTL_HTREQEN	0x00000100 /* HT req enable */
++#define  BCMA_CC_PMU_CTL_ALPREQEN	0x00000080 /* ALP req enable */
++#define  BCMA_CC_PMU_CTL_XTALFREQ	0x0000007C /* Crystal freq */
++#define  BCMA_CC_PMU_CTL_XTALFREQ_SHIFT	2
++#define  BCMA_CC_PMU_CTL_ILPDIVEN	0x00000002 /* ILP div enable */
++#define  BCMA_CC_PMU_CTL_LPOSEL		0x00000001 /* LPO sel */
++#define BCMA_CC_PMU_CAP			0x0604 /* PMU capabilities */
++#define  BCMA_CC_PMU_CAP_REVISION	0x000000FF /* Revision mask */
++#define BCMA_CC_PMU_STAT		0x0608 /* PMU status */
++#define  BCMA_CC_PMU_STAT_INTPEND	0x00000040 /* Interrupt pending */
++#define  BCMA_CC_PMU_STAT_SBCLKST	0x00000030 /* Backplane clock status? */
++#define  BCMA_CC_PMU_STAT_HAVEALP	0x00000008 /* ALP available */
++#define  BCMA_CC_PMU_STAT_HAVEHT	0x00000004 /* HT available */
++#define  BCMA_CC_PMU_STAT_RESINIT	0x00000003 /* Res init */
++#define BCMA_CC_PMU_RES_STAT		0x060C /* PMU res status */
++#define BCMA_CC_PMU_RES_PEND		0x0610 /* PMU res pending */
++#define BCMA_CC_PMU_TIMER		0x0614 /* PMU timer */
++#define BCMA_CC_PMU_MINRES_MSK		0x0618 /* PMU min res mask */
++#define BCMA_CC_PMU_MAXRES_MSK		0x061C /* PMU max res mask */
++#define BCMA_CC_PMU_RES_TABSEL		0x0620 /* PMU res table sel */
++#define BCMA_CC_PMU_RES_DEPMSK		0x0624 /* PMU res dep mask */
++#define BCMA_CC_PMU_RES_UPDNTM		0x0628 /* PMU res updown timer */
++#define BCMA_CC_PMU_RES_TIMER		0x062C /* PMU res timer */
++#define BCMA_CC_PMU_CLKSTRETCH		0x0630 /* PMU clockstretch */
++#define BCMA_CC_PMU_WATCHDOG		0x0634 /* PMU watchdog */
++#define BCMA_CC_PMU_RES_REQTS		0x0640 /* PMU res req timer sel */
++#define BCMA_CC_PMU_RES_REQT		0x0644 /* PMU res req timer */
++#define BCMA_CC_PMU_RES_REQM		0x0648 /* PMU res req mask */
++#define BCMA_CC_CHIPCTL_ADDR		0x0650
++#define BCMA_CC_CHIPCTL_DATA		0x0654
++#define BCMA_CC_REGCTL_ADDR		0x0658
++#define BCMA_CC_REGCTL_DATA		0x065C
++#define BCMA_CC_PLLCTL_ADDR		0x0660
++#define BCMA_CC_PLLCTL_DATA		0x0664
++
++/* Data for the PMU, if available.
++ * Check availability with ((struct bcma_chipcommon)->capabilities & BCMA_CC_CAP_PMU)
++ */
++struct bcma_chipcommon_pmu {
++	u8 rev;			/* PMU revision */
++	u32 crystalfreq;	/* The active crystal frequency (in kHz) */
++};
++
++struct bcma_drv_cc {
++	struct bcma_device *core;
++	u32 status;
++	u32 capabilities;
++	u32 capabilities_ext;
++	/* Fast Powerup Delay constant */
++	u16 fast_pwrup_delay;
++	struct bcma_chipcommon_pmu pmu;
++};
++
++/* Register access */
++#define bcma_cc_read32(cc, offset) \
++	bcma_read32((cc)->core, offset)
++#define bcma_cc_write32(cc, offset, val) \
++	bcma_write32((cc)->core, offset, val)
++
++#define bcma_cc_mask32(cc, offset, mask) \
++	bcma_cc_write32(cc, offset, bcma_cc_read32(cc, offset) & (mask))
++#define bcma_cc_set32(cc, offset, set) \
++	bcma_cc_write32(cc, offset, bcma_cc_read32(cc, offset) | (set))
++#define bcma_cc_maskset32(cc, offset, mask, set) \
++	bcma_cc_write32(cc, offset, (bcma_cc_read32(cc, offset) & (mask)) | (set))
++
++extern void bcma_core_chipcommon_init(struct bcma_drv_cc *cc);
++
++extern void bcma_chipco_suspend(struct bcma_drv_cc *cc);
++extern void bcma_chipco_resume(struct bcma_drv_cc *cc);
++
++extern void bcma_chipco_watchdog_timer_set(struct bcma_drv_cc *cc,
++					  u32 ticks);
++
++void bcma_chipco_irq_mask(struct bcma_drv_cc *cc, u32 mask, u32 value);
++
++u32 bcma_chipco_irq_status(struct bcma_drv_cc *cc, u32 mask);
++
++/* Chipcommon GPIO pin access. */
++u32 bcma_chipco_gpio_in(struct bcma_drv_cc *cc, u32 mask);
++u32 bcma_chipco_gpio_out(struct bcma_drv_cc *cc, u32 mask, u32 value);
++u32 bcma_chipco_gpio_outen(struct bcma_drv_cc *cc, u32 mask, u32 value);
++u32 bcma_chipco_gpio_control(struct bcma_drv_cc *cc, u32 mask, u32 value);
++u32 bcma_chipco_gpio_intmask(struct bcma_drv_cc *cc, u32 mask, u32 value);
++u32 bcma_chipco_gpio_polarity(struct bcma_drv_cc *cc, u32 mask, u32 value);
++
++/* PMU support */
++extern void bcma_pmu_init(struct bcma_drv_cc *cc);
++
++#endif /* LINUX_BCMA_DRIVER_CC_H_ */
+diff --git a/include/linux/bcma/bcma_driver_pci.h b/include/linux/bcma/bcma_driver_pci.h
+new file mode 100644
+index 0000000..b7e191c
+--- /dev/null
++++ b/include/linux/bcma/bcma_driver_pci.h
+@@ -0,0 +1,89 @@
++#ifndef LINUX_BCMA_DRIVER_PCI_H_
++#define LINUX_BCMA_DRIVER_PCI_H_
++
++#include <linux/types.h>
++
++struct pci_dev;
++
++/** PCI core registers. **/
++#define BCMA_CORE_PCI_CTL			0x0000	/* PCI Control */
++#define  BCMA_CORE_PCI_CTL_RST_OE		0x00000001 /* PCI_RESET Output Enable */
++#define  BCMA_CORE_PCI_CTL_RST			0x00000002 /* PCI_RESET driven out to pin */
++#define  BCMA_CORE_PCI_CTL_CLK_OE		0x00000004 /* Clock gate Output Enable */
++#define  BCMA_CORE_PCI_CTL_CLK			0x00000008 /* Gate for clock driven out to pin */
++#define BCMA_CORE_PCI_ARBCTL			0x0010	/* PCI Arbiter Control */
++#define  BCMA_CORE_PCI_ARBCTL_INTERN		0x00000001 /* Use internal arbiter */
++#define  BCMA_CORE_PCI_ARBCTL_EXTERN		0x00000002 /* Use external arbiter */
++#define  BCMA_CORE_PCI_ARBCTL_PARKID		0x00000006 /* Mask, selects which agent is parked on an idle bus */
++#define   BCMA_CORE_PCI_ARBCTL_PARKID_LAST	0x00000000 /* Last requestor */
++#define   BCMA_CORE_PCI_ARBCTL_PARKID_4710	0x00000002 /* 4710 */
++#define   BCMA_CORE_PCI_ARBCTL_PARKID_EXT0	0x00000004 /* External requestor 0 */
++#define   BCMA_CORE_PCI_ARBCTL_PARKID_EXT1	0x00000006 /* External requestor 1 */
++#define BCMA_CORE_PCI_ISTAT			0x0020	/* Interrupt status */
++#define  BCMA_CORE_PCI_ISTAT_INTA		0x00000001 /* PCI INTA# */
++#define  BCMA_CORE_PCI_ISTAT_INTB		0x00000002 /* PCI INTB# */
++#define  BCMA_CORE_PCI_ISTAT_SERR		0x00000004 /* PCI SERR# (write to clear) */
++#define  BCMA_CORE_PCI_ISTAT_PERR		0x00000008 /* PCI PERR# (write to clear) */
++#define  BCMA_CORE_PCI_ISTAT_PME		0x00000010 /* PCI PME# */
++#define BCMA_CORE_PCI_IMASK			0x0024	/* Interrupt mask */
++#define  BCMA_CORE_PCI_IMASK_INTA		0x00000001 /* PCI INTA# */
++#define  BCMA_CORE_PCI_IMASK_INTB		0x00000002 /* PCI INTB# */
++#define  BCMA_CORE_PCI_IMASK_SERR		0x00000004 /* PCI SERR# */
++#define  BCMA_CORE_PCI_IMASK_PERR		0x00000008 /* PCI PERR# */
++#define  BCMA_CORE_PCI_IMASK_PME		0x00000010 /* PCI PME# */
++#define BCMA_CORE_PCI_MBOX			0x0028	/* Backplane to PCI Mailbox */
++#define  BCMA_CORE_PCI_MBOX_F0_0		0x00000100 /* PCI function 0, INT 0 */
++#define  BCMA_CORE_PCI_MBOX_F0_1		0x00000200 /* PCI function 0, INT 1 */
++#define  BCMA_CORE_PCI_MBOX_F1_0		0x00000400 /* PCI function 1, INT 0 */
++#define  BCMA_CORE_PCI_MBOX_F1_1		0x00000800 /* PCI function 1, INT 1 */
++#define  BCMA_CORE_PCI_MBOX_F2_0		0x00001000 /* PCI function 2, INT 0 */
++#define  BCMA_CORE_PCI_MBOX_F2_1		0x00002000 /* PCI function 2, INT 1 */
++#define  BCMA_CORE_PCI_MBOX_F3_0		0x00004000 /* PCI function 3, INT 0 */
++#define  BCMA_CORE_PCI_MBOX_F3_1		0x00008000 /* PCI function 3, INT 1 */
++#define BCMA_CORE_PCI_BCAST_ADDR		0x0050	/* Backplane Broadcast Address */
++#define  BCMA_CORE_PCI_BCAST_ADDR_MASK		0x000000FF
++#define BCMA_CORE_PCI_BCAST_DATA		0x0054	/* Backplane Broadcast Data */
++#define BCMA_CORE_PCI_GPIO_IN			0x0060	/* rev >= 2 only */
++#define BCMA_CORE_PCI_GPIO_OUT			0x0064	/* rev >= 2 only */
++#define BCMA_CORE_PCI_GPIO_ENABLE		0x0068	/* rev >= 2 only */
++#define BCMA_CORE_PCI_GPIO_CTL			0x006C	/* rev >= 2 only */
++#define BCMA_CORE_PCI_SBTOPCI0			0x0100	/* Backplane to PCI translation 0 (sbtopci0) */
++#define  BCMA_CORE_PCI_SBTOPCI0_MASK		0xFC000000
++#define BCMA_CORE_PCI_SBTOPCI1			0x0104	/* Backplane to PCI translation 1 (sbtopci1) */
++#define  BCMA_CORE_PCI_SBTOPCI1_MASK		0xFC000000
++#define BCMA_CORE_PCI_SBTOPCI2			0x0108	/* Backplane to PCI translation 2 (sbtopci2) */
++#define  BCMA_CORE_PCI_SBTOPCI2_MASK		0xC0000000
++#define BCMA_CORE_PCI_PCICFG0			0x0400	/* PCI config space 0 (rev >= 8) */
++#define BCMA_CORE_PCI_PCICFG1			0x0500	/* PCI config space 1 (rev >= 8) */
++#define BCMA_CORE_PCI_PCICFG2			0x0600	/* PCI config space 2 (rev >= 8) */
++#define BCMA_CORE_PCI_PCICFG3			0x0700	/* PCI config space 3 (rev >= 8) */
++#define BCMA_CORE_PCI_SPROM(wordoffset)		(0x0800 + ((wordoffset) * 2)) /* SPROM shadow area (72 bytes) */
++
++/* SBtoPCIx */
++#define BCMA_CORE_PCI_SBTOPCI_MEM		0x00000000
++#define BCMA_CORE_PCI_SBTOPCI_IO		0x00000001
++#define BCMA_CORE_PCI_SBTOPCI_CFG0		0x00000002
++#define BCMA_CORE_PCI_SBTOPCI_CFG1		0x00000003
++#define BCMA_CORE_PCI_SBTOPCI_PREF		0x00000004 /* Prefetch enable */
++#define BCMA_CORE_PCI_SBTOPCI_BURST		0x00000008 /* Burst enable */
++#define BCMA_CORE_PCI_SBTOPCI_MRM		0x00000020 /* Memory Read Multiple */
++#define BCMA_CORE_PCI_SBTOPCI_RC		0x00000030 /* Read Command mask (rev >= 11) */
++#define  BCMA_CORE_PCI_SBTOPCI_RC_READ		0x00000000 /* Memory read */
++#define  BCMA_CORE_PCI_SBTOPCI_RC_READL		0x00000010 /* Memory read line */
++#define  BCMA_CORE_PCI_SBTOPCI_RC_READM		0x00000020 /* Memory read multiple */
++
++/* PCIcore specific boardflags */
++#define BCMA_CORE_PCI_BFL_NOPCI			0x00000400 /* Board leaves PCI floating */
++
++struct bcma_drv_pci {
++	struct bcma_device *core;
++	u8 setup_done:1;
++};
++
++/* Register access */
++#define pcicore_read32(pc, offset)		bcma_read32((pc)->core, offset)
++#define pcicore_write32(pc, offset, val)	bcma_write32((pc)->core, offset, val)
++
++extern void bcma_core_pci_init(struct bcma_drv_pci *pc);
++
++#endif /* LINUX_BCMA_DRIVER_PCI_H_ */
+diff --git a/include/linux/bcma/bcma_regs.h b/include/linux/bcma/bcma_regs.h
+new file mode 100644
+index 0000000..f82d88a
+--- /dev/null
++++ b/include/linux/bcma/bcma_regs.h
+@@ -0,0 +1,34 @@
++#ifndef LINUX_BCMA_REGS_H_
++#define LINUX_BCMA_REGS_H_
++
++/* Agent registers (common for every core) */
++#define BCMA_IOCTL			0x0408
++#define  BCMA_IOCTL_CLK			0x0001
++#define  BCMA_IOCTL_FGC			0x0002
++#define  BCMA_IOCTL_CORE_BITS		0x3FFC
++#define  BCMA_IOCTL_PME_EN		0x4000
++#define  BCMA_IOCTL_BIST_EN		0x8000
++#define BCMA_RESET_CTL			0x0800
++#define  BCMA_RESET_CTL_RESET		0x0001
++
++/* BCMA PCI config space registers. */
++#define BCMA_PCI_PMCSR			0x44
++#define  BCMA_PCI_PE			0x100
++#define BCMA_PCI_BAR0_WIN		0x80	/* Backplane address space 0 */
++#define BCMA_PCI_BAR1_WIN		0x84	/* Backplane address space 1 */
++#define BCMA_PCI_SPROMCTL		0x88	/* SPROM control */
++#define  BCMA_PCI_SPROMCTL_WE		0x10	/* SPROM write enable */
++#define BCMA_PCI_BAR1_CONTROL		0x8c	/* Address space 1 burst control */
++#define BCMA_PCI_IRQS			0x90	/* PCI interrupts */
++#define BCMA_PCI_IRQMASK		0x94	/* PCI IRQ control and mask (pcirev >= 6 only) */
++#define BCMA_PCI_BACKPLANE_IRQS		0x98	/* Backplane Interrupts */
++#define BCMA_PCI_BAR0_WIN2		0xAC
++#define BCMA_PCI_GPIO_IN		0xB0	/* GPIO Input (pcirev >= 3 only) */
++#define BCMA_PCI_GPIO_OUT		0xB4	/* GPIO Output (pcirev >= 3 only) */
++#define BCMA_PCI_GPIO_OUT_ENABLE	0xB8	/* GPIO Output Enable/Disable (pcirev >= 3 only) */
++#define  BCMA_PCI_GPIO_SCS		0x10	/* PCI config space bit 4 for 4306c0 slow clock source */
++#define  BCMA_PCI_GPIO_HWRAD		0x20	/* PCI config space GPIO 13 for hw radio disable */
++#define  BCMA_PCI_GPIO_XTAL		0x40	/* PCI config space GPIO 14 for Xtal powerup */
++#define  BCMA_PCI_GPIO_PLL		0x80	/* PCI config space GPIO 15 for PLL powerdown */
++
++#endif /* LINUX_BCMA_REGS_H_ */
+diff --git a/include/linux/mod_devicetable.h b/include/linux/mod_devicetable.h
+index 48c007d..ae28e93 100644
+--- a/include/linux/mod_devicetable.h
++++ b/include/linux/mod_devicetable.h
+@@ -382,6 +382,23 @@ struct ssb_device_id {
+ #define SSB_ANY_ID		0xFFFF
+ #define SSB_ANY_REV		0xFF
+ 
++/* Broadcom's specific AMBA core, see drivers/bcma/ */
++struct bcma_device_id {
++	__u16	manuf;
++	__u16	id;
++	__u8	rev;
++	__u8	class;
++};
++#define BCMA_CORE(_manuf, _id, _rev, _class)  \
++	{ .manuf = _manuf, .id = _id, .rev = _rev, .class = _class, }
++#define BCMA_CORETABLE_END  \
++	{ 0, },
++
++#define BCMA_ANY_MANUF		0xFFFF
++#define BCMA_ANY_ID		0xFFFF
++#define BCMA_ANY_REV		0xFF
++#define BCMA_ANY_CLASS		0xFF
++
+ struct virtio_device_id {
+ 	__u32 device;
+ 	__u32 vendor;
+diff --git a/scripts/mod/file2alias.c b/scripts/mod/file2alias.c
+index 88f3f07..e26e2fb 100644
+--- a/scripts/mod/file2alias.c
++++ b/scripts/mod/file2alias.c
+@@ -702,6 +702,24 @@ static int do_ssb_entry(const char *filename,
+ 	return 1;
  }
  
--static int __init determine_type_encoding(int mpp, enum orion5x_mpp_type type)
-+void __init orion5x_mpp_conf(unsigned int *mpp_list)
- {
--	switch (type) {
--	case MPP_UNUSED:
--	case MPP_GPIO:
--		if (mpp == 0)
--			return 3;
--		if (mpp >= 1 && mpp <= 15)
--			return 0;
--		if (mpp >= 16 && mpp <= 19) {
--			if (is_5182())
--				return 5;
--			if (type == MPP_UNUSED)
--				return 0;
--		}
--		return -1;
--
--	case MPP_PCIE_RST_OUTn:
--		if (mpp == 0)
--			return 0;
--		return -1;
--
--	case MPP_PCI_ARB:
--		if (mpp >= 0 && mpp <= 7)
--			return 2;
--		return -1;
--
--	case MPP_PCI_PMEn:
--		if (mpp == 2)
--			return 3;
--		return -1;
--
--	case MPP_GIGE:
--		if (mpp >= 8 && mpp <= 19)
--			return 1;
--		return -1;
--
--	case MPP_NAND:
--		if (is_5182() || is_5281()) {
--			if (mpp >= 4 && mpp <= 7)
--				return 4;
--			if (mpp >= 12 && mpp <= 17)
--				return 4;
--		}
--		return -1;
--
--	case MPP_PCI_CLK:
--		if (is_5181l() && mpp >= 6 && mpp <= 7)
--			return 5;
--		return -1;
--
--	case MPP_SATA_LED:
--		if (is_5182()) {
--			if (mpp >= 4 && mpp <= 7)
--				return 5;
--			if (mpp >= 12 && mpp <= 15)
--				return 5;
--		}
--		return -1;
--
--	case MPP_UART:
--		if (mpp >= 16 && mpp <= 19)
--			return 0;
--		return -1;
--	}
--
--	printk(KERN_INFO "unknown MPP type %d\n", type);
--
--	return -1;
--}
--
--void __init orion5x_mpp_conf(struct orion5x_mpp_mode *mode)
--{
--	u32 mpp_0_7_ctrl = readl(MPP_0_7_CTRL);
--	u32 mpp_8_15_ctrl = readl(MPP_8_15_CTRL);
--	u32 mpp_16_19_ctrl = readl(MPP_16_19_CTRL);
--
--	for ( ; mode->mpp >= 0; mode++) {
--		u32 *reg;
--		int num_type;
--		int shift;
--
--		if (mode->mpp >= 0 && mode->mpp <= 7)
--			reg = &mpp_0_7_ctrl;
--		else if (mode->mpp >= 8 && mode->mpp <= 15)
--			reg = &mpp_8_15_ctrl;
--		else if (mode->mpp >= 16 && mode->mpp <= 19)
--			reg = &mpp_16_19_ctrl;
--		else {
--			printk(KERN_ERR "orion5x_mpp_conf: invalid MPP "
--					"(%d)\n", mode->mpp);
--			continue;
--		}
--
--		num_type = determine_type_encoding(mode->mpp, mode->type);
--		if (num_type < 0) {
--			printk(KERN_ERR "orion5x_mpp_conf: invalid MPP "
--					"combination (%d, %d)\n", mode->mpp,
--					mode->type);
--			continue;
--		}
--
--		shift = (mode->mpp & 7) << 2;
--		*reg &= ~(0xf << shift);
--		*reg |= (num_type & 0xf) << shift;
--
--		if (mode->type == MPP_UNUSED && (mode->mpp < 16 || is_5182()))
--			orion_gpio_set_unused(mode->mpp);
--
--		orion_gpio_set_valid(mode->mpp, !!(mode->type == MPP_GPIO));
--	}
--
--	writel(mpp_0_7_ctrl, MPP_0_7_CTRL);
--	writel(mpp_8_15_ctrl, MPP_8_15_CTRL);
--	writel(mpp_16_19_ctrl, MPP_16_19_CTRL);
-+	orion_mpp_conf(mpp_list, orion5x_variant(),
-+		       MPP_MAX, ORION5X_DEV_BUS_VIRT_BASE);
- }
-diff --git a/arch/arm/mach-orion5x/mpp.h b/arch/arm/mach-orion5x/mpp.h
-index 290e610..e1ad611 100644
---- a/arch/arm/mach-orion5x/mpp.h
-+++ b/arch/arm/mach-orion5x/mpp.h
-@@ -1,74 +1,129 @@
- #ifndef __ARCH_ORION5X_MPP_H
- #define __ARCH_ORION5X_MPP_H
- 
--enum orion5x_mpp_type {
--	/*
--	 * This MPP is unused.
--	 */
--	MPP_UNUSED,
--
--	/*
--	 * This MPP pin is used as a generic GPIO pin.  Valid for
--	 * MPPs 0-15 and device bus data pins 16-31.  On 5182, also
--	 * valid for MPPs 16-19.
--	 */
--	MPP_GPIO,
--
--	/*
--	 * This MPP is used as PCIe_RST_OUTn pin.  Valid for
--	 * MPP 0 only.
--	 */
--	MPP_PCIE_RST_OUTn,
--
--	/*
--	 * This MPP is used as PCI arbiter pin (REQn/GNTn).
--	 * Valid for MPPs 0-7 only.
--	 */
--	MPP_PCI_ARB,
--
--	/*
--	 * This MPP is used as PCI_PMEn pin.  Valid for MPP 2 only.
--	 */
--	MPP_PCI_PMEn,
--
--	/*
--	 * This MPP is used as GigE half-duplex (COL, CRS) or GMII
--	 * (RXERR, CRS, TXERR, TXD[7:4], RXD[7:4]) pin.  Valid for
--	 * MPPs 8-19 only.
--	 */
--	MPP_GIGE,
--
--	/*
--	 * This MPP is used as NAND REn/WEn pin.  Valid for MPPs
--	 * 4-7 and 12-17 only, and only on the 5181l/5182/5281.
--	 */
--	MPP_NAND,
--
--	/*
--	 * This MPP is used as a PCI clock output pin.  Valid for
--	 * MPPs 6-7 only, and only on the 5181l.
--	 */
--	MPP_PCI_CLK,
--
--	/*
--	 * This MPP is used as a SATA presence/activity LED.
--	 * Valid for MPPs 4-7 and 12-15 only, and only on the 5182.
--	 */
--	MPP_SATA_LED,
--
--	/*
--	 * This MPP is used as UART1 RXD/TXD/CTSn/RTSn pin.
--	 * Valid for MPPs 16-19 only.
--	 */
--	MPP_UART,
--};
--
--struct orion5x_mpp_mode {
--	int			mpp;
--	enum orion5x_mpp_type	type;
--};
--
--void orion5x_mpp_conf(struct orion5x_mpp_mode *mode);
-+#define MPP(_num, _sel, _in, _out, _F5181l, _F5182, _F5281) ( \
-+	/* MPP number */		((_num) & 0xff) | \
-+	/* MPP select value */		(((_sel) & 0xf) << 8) | \
-+	/* may be input signal */	((!!(_in)) << 12) | \
-+	/* may be output signal */	((!!(_out)) << 13) | \
-+	/* available on F5181l */	((!!(_F5181l)) << 14) | \
-+	/* available on F5182 */	((!!(_F5182)) << 15) | \
-+	/* available on F5281 */	((!!(_F5281)) << 16))
- 
-+				/* num sel  i  o  5181 5182 5281 */
++/* Looks like: bcma:mNidNrevNclN. */
++static int do_bcma_entry(const char *filename,
++			 struct bcma_device_id *id, char *alias)
++{
++	id->manuf = TO_NATIVE(id->manuf);
++	id->id = TO_NATIVE(id->id);
++	id->rev = TO_NATIVE(id->rev);
++	id->class = TO_NATIVE(id->class);
 +
-+#define MPP_F5181_MASK		MPP(0,  0x0, 0, 0, 1,   0,   0)
-+#define MPP_F5182_MASK		MPP(0,  0x0, 0, 0, 0,   1,   0)
-+#define MPP_F5281_MASK		MPP(0,  0x0, 0, 0, 0,   0,   1)
++	strcpy(alias, "bcma:");
++	ADD(alias, "m", id->manuf != BCMA_ANY_MANUF, id->manuf);
++	ADD(alias, "id", id->id != BCMA_ANY_ID, id->id);
++	ADD(alias, "rev", id->rev != BCMA_ANY_REV, id->rev);
++	ADD(alias, "cl", id->class != BCMA_ANY_CLASS, id->class);
++	add_wildcard(alias);
++	return 1;
++}
 +
-+#define MPP0_UNUSED	        MPP(0,  0x3, 1, 1, 1,   1,   1)
-+#define MPP0_GPIO		MPP(0,  0x3, 1, 1, 1,   1,   1)
-+#define MPP0_PCIE_RST_OUTn	MPP(0,  0x0, 1, 1, 1,   1,   1)
-+#define MPP0_PCI_ARB            MPP(0,  0x2, 1, 1, 1,   1,   1)
-+
-+#define MPP1_UNUSED		MPP(1,  0x0, 1, 1, 1,   1,   1)
-+#define MPP1_GPIO		MPP(1,  0x0, 1, 1, 1,   1,   1)
-+#define MPP1_PCI_ARB            MPP(1,  0x2, 1, 1, 1,   1,   1)
-+
-+#define MPP2_UNUSED		MPP(2,  0x0, 1, 1, 1,   1,   1)
-+#define MPP2_GPIO		MPP(2,  0x0, 1, 1, 1,   1,   1)
-+#define MPP2_PCI_ARB            MPP(2,  0x2, 1, 1, 1,   1,   1)
-+#define MPP2_PCI_PMEn           MPP(2,  0x3, 1, 1, 1,   1,   1)
-+
-+#define MPP3_UNUSED		MPP(3,  0x0, 1, 1, 1,   1,   1)
-+#define MPP3_GPIO		MPP(3,  0x0, 1, 1, 1,   1,   1)
-+#define MPP3_PCI_ARB            MPP(3,  0x2, 1, 1, 1,   1,   1)
-+
-+#define MPP4_UNUSED		MPP(4,  0x0, 1, 1, 1,   1,   1)
-+#define MPP4_GPIO		MPP(4,  0x0, 1, 1, 1,   1,   1)
-+#define MPP4_PCI_ARB            MPP(4,  0x2, 1, 1, 1,   1,   1)
-+#define MPP4_NAND               MPP(4,  0x4, 1, 1, 0,   1,   1)
-+#define MPP4_SATA_LED           MPP(4,  0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP5_UNUSED		MPP(5,  0x0, 1, 1, 1,   1,   1)
-+#define MPP5_GPIO		MPP(5,  0x0, 1, 1, 1,   1,   1)
-+#define MPP5_PCI_ARB            MPP(5,  0x2, 1, 1, 1,   1,   1)
-+#define MPP5_NAND               MPP(5,  0x4, 1, 1, 0,   1,   1)
-+#define MPP5_SATA_LED           MPP(5,  0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP6_UNUSED		MPP(6,  0x0, 1, 1, 1,   1,   1)
-+#define MPP6_GPIO		MPP(6,  0x0, 1, 1, 1,   1,   1)
-+#define MPP6_PCI_ARB            MPP(6,  0x2, 1, 1, 1,   1,   1)
-+#define MPP6_NAND               MPP(6,  0x4, 1, 1, 0,   1,   1)
-+#define MPP6_PCI_CLK            MPP(6,  0x5, 1, 1, 1,   0,   0)
-+#define MPP6_SATA_LED           MPP(6,  0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP7_UNUSED		MPP(7,  0x0, 1, 1, 1,   1,   1)
-+#define MPP7_GPIO		MPP(7,  0x0, 1, 1, 1,   1,   1)
-+#define MPP7_PCI_ARB            MPP(7,  0x2, 1, 1, 1,   1,   1)
-+#define MPP7_NAND               MPP(7,  0x4, 1, 1, 0,   1,   1)
-+#define MPP7_PCI_CLK            MPP(7,  0x5, 1, 1, 1,   0,   0)
-+#define MPP7_SATA_LED           MPP(7,  0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP8_UNUSED		MPP(8,  0x0, 1, 1, 1,   1,   1)
-+#define MPP8_GPIO		MPP(8,  0x0, 1, 1, 1,   1,   1)
-+#define MPP8_GIGE               MPP(8,  0x1, 1, 1, 1,   1,   1)
-+
-+#define MPP9_UNUSED		MPP(9,  0x0, 1, 1, 1,   1,   1)
-+#define MPP9_GPIO		MPP(9,  0x0, 1, 1, 1,   1,   1)
-+#define MPP9_GIGE               MPP(9,  0x1, 1, 1, 1,   1,   1)
-+
-+#define MPP10_UNUSED		MPP(10, 0x0, 1, 1, 1,   1,   1)
-+#define MPP10_GPIO		MPP(10, 0x0, 1, 1, 1,   1,   1)
-+#define MPP10_GIGE              MPP(10, 0x1, 1, 1, 1,   1,   1)
-+
-+#define MPP11_UNUSED		MPP(11, 0x0, 1, 1, 1,   1,   1)
-+#define MPP11_GPIO		MPP(11, 0x0, 1, 1, 1,   1,   1)
-+#define MPP11_GIGE              MPP(11, 0x1, 1, 1, 1,   1,   1)
-+
-+#define MPP12_UNUSED		MPP(12, 0x0, 1, 1, 1,   1,   1)
-+#define MPP12_GPIO		MPP(12, 0x0, 1, 1, 1,   1,   1)
-+#define MPP12_GIGE              MPP(12, 0x1, 1, 1, 1,   1,   1)
-+#define MPP12_NAND              MPP(12, 0x4, 1, 1, 0,   1,   1)
-+#define MPP12_SATA_LED          MPP(12, 0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP13_UNUSED		MPP(13, 0x0, 1, 1, 1,   1,   1)
-+#define MPP13_GPIO		MPP(13, 0x0, 1, 1, 1,   1,   1)
-+#define MPP13_GIGE              MPP(13, 0x1, 1, 1, 1,   1,   1)
-+#define MPP13_NAND              MPP(13, 0x4, 1, 1, 0,   1,   1)
-+#define MPP13_SATA_LED          MPP(13, 0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP14_UNUSED		MPP(14, 0x0, 1, 1, 1,   1,   1)
-+#define MPP14_GPIO		MPP(14, 0x0, 1, 1, 1,   1,   1)
-+#define MPP14_GIGE              MPP(14, 0x1, 1, 1, 1,   1,   1)
-+#define MPP14_NAND              MPP(14, 0x4, 1, 1, 0,   1,   1)
-+#define MPP14_SATA_LED          MPP(14, 0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP15_UNUSED		MPP(15, 0x0, 1, 1, 1,   1,   1)
-+#define MPP15_GPIO		MPP(15, 0x0, 1, 1, 1,   1,   1)
-+#define MPP15_GIGE              MPP(15, 0x1, 1, 1, 1,   1,   1)
-+#define MPP15_NAND              MPP(15, 0x4, 1, 1, 0,   1,   1)
-+#define MPP15_SATA_LED          MPP(15, 0x5, 1, 1, 0,   1,   0)
-+
-+#define MPP16_UNUSED		MPP(16, 0x0, 1, 1, 1,   1,   1)
-+#define MPP16_GPIO		MPP(16, 0x5, 1, 1, 0,   1,   0)
-+#define MPP16_GIGE              MPP(16, 0x1, 1, 1, 1,   1,   1)
-+#define MPP16_NAND              MPP(16, 0x4, 1, 1, 0,   1,   1)
-+#define MPP16_UART              MPP(16, 0x0, 1, 1, 0,   1,   1)
-+
-+#define MPP17_UNUSED		MPP(17, 0x0, 1, 1, 1,   1,   1)
-+#define MPP17_GPIO		MPP(17, 0x5, 1, 1, 0,   1,   0)
-+#define MPP17_GIGE              MPP(17, 0x1, 1, 1, 1,   1,   1)
-+#define MPP17_NAND              MPP(17, 0x4, 1, 1, 0,   1,   1)
-+#define MPP17_UART              MPP(17, 0x0, 1, 1, 0,   1,   1)
-+
-+#define MPP18_UNUSED		MPP(18, 0x0, 1, 1, 1,   1,   1)
-+#define MPP18_GPIO		MPP(18, 0x5, 1, 1, 0,   1,   0)
-+#define MPP18_GIGE              MPP(18, 0x1, 1, 1, 1,   1,   1)
-+#define MPP18_UART              MPP(18, 0x0, 1, 1, 0,   1,   1)
-+
-+#define MPP19_UNUSED		MPP(19, 0x0, 1, 1, 1,   1,   1)
-+#define MPP19_GPIO		MPP(19, 0x5, 1, 1, 0,   1,   0)
-+#define MPP19_GIGE              MPP(19, 0x1, 1, 1, 1,   1,   1)
-+#define MPP19_UART              MPP(19, 0x0, 1, 1, 0,   1,   1)
-+
-+#define MPP_MAX			19
-+
-+void orion5x_mpp_conf(unsigned int *mpp_list);
- 
- #endif
-diff --git a/arch/arm/mach-orion5x/mss2-setup.c b/arch/arm/mach-orion5x/mss2-setup.c
-index b43b208..59263b7 100644
---- a/arch/arm/mach-orion5x/mss2-setup.c
-+++ b/arch/arm/mach-orion5x/mss2-setup.c
-@@ -193,28 +193,28 @@ static void mss2_power_off(void)
- /****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode mss2_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* Power LED */
--	{  1, MPP_GPIO },		/* Error LED */
--	{  2, MPP_UNUSED },
--	{  3, MPP_GPIO },		/* RTC interrupt */
--	{  4, MPP_GPIO },		/* HDD ind. (Single/Dual)*/
--	{  5, MPP_GPIO },		/* HD0 5V control */
--	{  6, MPP_GPIO },		/* HD0 12V control */
--	{  7, MPP_GPIO },		/* HD1 5V control */
--	{  8, MPP_GPIO },		/* HD1 12V control */
--	{  9, MPP_UNUSED },
--	{ 10, MPP_GPIO },		/* Fan control */
--	{ 11, MPP_GPIO },		/* Power button */
--	{ 12, MPP_GPIO },		/* Reset button */
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_SATA_LED },		/* SATA 0 active */
--	{ 15, MPP_SATA_LED },		/* SATA 1 active */
--	{ 16, MPP_UNUSED },
--	{ 17, MPP_UNUSED },
--	{ 18, MPP_UNUSED },
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int mss2_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* Power LED */
-+	MPP1_GPIO,		/* Error LED */
-+	MPP2_UNUSED,
-+	MPP3_GPIO,		/* RTC interrupt */
-+	MPP4_GPIO,		/* HDD ind. (Single/Dual)*/
-+	MPP5_GPIO,		/* HD0 5V control */
-+	MPP6_GPIO,		/* HD0 12V control */
-+	MPP7_GPIO,		/* HD1 5V control */
-+	MPP8_GPIO,		/* HD1 12V control */
-+	MPP9_UNUSED,
-+	MPP10_GPIO,		/* Fan control */
-+	MPP11_GPIO,		/* Power button */
-+	MPP12_GPIO,		/* Reset button */
-+	MPP13_UNUSED,
-+	MPP14_SATA_LED,		/* SATA 0 active */
-+	MPP15_SATA_LED,		/* SATA 1 active */
-+	MPP16_UNUSED,
-+	MPP17_UNUSED,
-+	MPP18_UNUSED,
-+	MPP19_UNUSED,
-+	0,
- };
- 
- static void __init mss2_init(void)
-diff --git a/arch/arm/mach-orion5x/mv2120-setup.c b/arch/arm/mach-orion5x/mv2120-setup.c
-index c55d071..63ff10c 100644
---- a/arch/arm/mach-orion5x/mv2120-setup.c
-+++ b/arch/arm/mach-orion5x/mv2120-setup.c
-@@ -108,28 +108,28 @@ static struct platform_device mv2120_button_device = {
- /****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode mv2120_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* Sys status LED */
--	{  1, MPP_GPIO },		/* Sys error LED */
--	{  2, MPP_GPIO },		/* OverTemp interrupt */
--	{  3, MPP_GPIO },		/* RTC interrupt */
--	{  4, MPP_GPIO },		/* V_LED 5V */
--	{  5, MPP_GPIO },		/* V_LED 3.3V */
--	{  6, MPP_UNUSED },
--	{  7, MPP_UNUSED },
--	{  8, MPP_GPIO },		/* SATA 0 fail LED */
--	{  9, MPP_GPIO },		/* SATA 1 fail LED */
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_SATA_LED },		/* SATA 0 presence */
--	{ 13, MPP_SATA_LED },		/* SATA 1 presence */
--	{ 14, MPP_SATA_LED },		/* SATA 0 active */
--	{ 15, MPP_SATA_LED },		/* SATA 1 active */
--	{ 16, MPP_UNUSED },
--	{ 17, MPP_GPIO },		/* Reset button */
--	{ 18, MPP_GPIO },		/* Power button */
--	{ 19, MPP_GPIO },		/* Power off */
--	{ -1 },
-+static unsigned int mv2120_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* Sys status LED */
-+	MPP1_GPIO,		/* Sys error LED */
-+	MPP2_GPIO,		/* OverTemp interrupt */
-+	MPP3_GPIO,		/* RTC interrupt */
-+	MPP4_GPIO,		/* V_LED 5V */
-+	MPP5_GPIO,		/* V_LED 3.3V */
-+	MPP6_UNUSED,
-+	MPP7_UNUSED,
-+	MPP8_GPIO,		/* SATA 0 fail LED */
-+	MPP9_GPIO,		/* SATA 1 fail LED */
-+	MPP10_UNUSED,
-+	MPP11_UNUSED,
-+	MPP12_SATA_LED,		/* SATA 0 presence */
-+	MPP13_SATA_LED,		/* SATA 1 presence */
-+	MPP14_SATA_LED,		/* SATA 0 active */
-+	MPP15_SATA_LED,		/* SATA 1 active */
-+	MPP16_UNUSED,
-+	MPP17_GPIO,		/* Reset button */
-+	MPP18_GPIO,		/* Power button */
-+	MPP19_GPIO,		/* Power off */
-+	0,
- };
- 
- static struct i2c_board_info __initdata mv2120_i2c_rtc = {
-diff --git a/arch/arm/mach-orion5x/net2big-setup.c b/arch/arm/mach-orion5x/net2big-setup.c
-index 429ecaf..a9609b0 100644
---- a/arch/arm/mach-orion5x/net2big-setup.c
-+++ b/arch/arm/mach-orion5x/net2big-setup.c
-@@ -339,28 +339,28 @@ static struct platform_device net2big_gpio_buttons = {
-  * General Setup
-  ****************************************************************************/
- 
--static struct orion5x_mpp_mode net2big_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },	/* Raid mode (bit 0) */
--	{  1, MPP_GPIO },	/* USB port 2 fuse (0 = Fail, 1 = Ok) */
--	{  2, MPP_GPIO },	/* Raid mode (bit 1) */
--	{  3, MPP_GPIO },	/* Board ID (bit 0) */
--	{  4, MPP_GPIO },	/* Fan activity (0 = Off, 1 = On) */
--	{  5, MPP_GPIO },	/* Fan fail detection */
--	{  6, MPP_GPIO },	/* Red front LED (0 = Off, 1 = On) */
--	{  7, MPP_GPIO },	/* Disable initial blinking on front LED */
--	{  8, MPP_GPIO },	/* Rear power switch (on|auto) */
--	{  9, MPP_GPIO },	/* Rear power switch (auto|off) */
--	{ 10, MPP_GPIO },	/* SATA 1 red LED (0 = Off, 1 = On) */
--	{ 11, MPP_GPIO },	/* SATA 0 red LED (0 = Off, 1 = On) */
--	{ 12, MPP_GPIO },	/* Board ID (bit 1) */
--	{ 13, MPP_GPIO },	/* SATA 1 blue LED blink control */
--	{ 14, MPP_SATA_LED },
--	{ 15, MPP_SATA_LED },
--	{ 16, MPP_GPIO },	/* Blue front LED control */
--	{ 17, MPP_GPIO },	/* SATA 0 blue LED blink control */
--	{ 18, MPP_GPIO },	/* Front button (0 = Released, 1 = Pushed ) */
--	{ 19, MPP_GPIO },	/* SATA{0,1} power On/Off request */
--	{ -1 }
-+static unsigned int net2big_mpp_modes[] __initdata = {
-+	MPP0_GPIO,	/* Raid mode (bit 0) */
-+	MPP1_GPIO,	/* USB port 2 fuse (0 = Fail, 1 = Ok) */
-+	MPP2_GPIO,	/* Raid mode (bit 1) */
-+	MPP3_GPIO,	/* Board ID (bit 0) */
-+	MPP4_GPIO,	/* Fan activity (0 = Off, 1 = On) */
-+	MPP5_GPIO,	/* Fan fail detection */
-+	MPP6_GPIO,	/* Red front LED (0 = Off, 1 = On) */
-+	MPP7_GPIO,	/* Disable initial blinking on front LED */
-+	MPP8_GPIO,	/* Rear power switch (on|auto) */
-+	MPP9_GPIO,	/* Rear power switch (auto|off) */
-+	MPP10_GPIO,	/* SATA 1 red LED (0 = Off, 1 = On) */
-+	MPP11_GPIO,	/* SATA 0 red LED (0 = Off, 1 = On) */
-+	MPP12_GPIO,	/* Board ID (bit 1) */
-+	MPP13_GPIO,	/* SATA 1 blue LED blink control */
-+	MPP14_SATA_LED,
-+	MPP15_SATA_LED,
-+	MPP16_GPIO,	/* Blue front LED control */
-+	MPP17_GPIO,	/* SATA 0 blue LED blink control */
-+	MPP18_GPIO,	/* Front button (0 = Released, 1 = Pushed ) */
-+	MPP19_GPIO,	/* SATA{0,1} power On/Off request */
-+	0,
- 	/* 22: USB port 1 fuse (0 = Fail, 1 = Ok) */
- 	/* 23: SATA 0 power status */
- 	/* 24: Board power off */
-diff --git a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
-index 34310ab..9eec7c2 100644
---- a/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c
-@@ -64,28 +64,28 @@ static struct platform_device rd88f5181l_fxo_nor_boot_flash = {
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode rd88f5181l_fxo_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* LED1 CardBus LED (front panel) */
--	{  1, MPP_GPIO },		/* PCI_intA */
--	{  2, MPP_GPIO },		/* Hard Reset / Factory Init*/
--	{  3, MPP_GPIO },		/* FXS or DAA select */
--	{  4, MPP_GPIO },		/* LED6 - phone LED (front panel) */
--	{  5, MPP_GPIO },		/* LED5 - phone LED (front panel) */
--	{  6, MPP_PCI_CLK },		/* CPU PCI refclk */
--	{  7, MPP_PCI_CLK },		/* PCI/PCIe refclk */
--	{  8, MPP_GPIO },		/* CardBus reset */
--	{  9, MPP_GPIO },		/* GE_RXERR */
--	{ 10, MPP_GPIO },		/* LED2 MiniPCI LED (front panel) */
--	{ 11, MPP_GPIO },		/* Lifeline control */
--	{ 12, MPP_GIGE },		/* GE_TXD[4] */
--	{ 13, MPP_GIGE },		/* GE_TXD[5] */
--	{ 14, MPP_GIGE },		/* GE_TXD[6] */
--	{ 15, MPP_GIGE },		/* GE_TXD[7] */
--	{ 16, MPP_GIGE },		/* GE_RXD[4] */
--	{ 17, MPP_GIGE },		/* GE_RXD[5] */
--	{ 18, MPP_GIGE },		/* GE_RXD[6] */
--	{ 19, MPP_GIGE },		/* GE_RXD[7] */
--	{ -1 },
-+static unsigned int rd88f5181l_fxo_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* LED1 CardBus LED (front panel) */
-+	MPP1_GPIO,		/* PCI_intA */
-+	MPP2_GPIO,		/* Hard Reset / Factory Init*/
-+	MPP3_GPIO,		/* FXS or DAA select */
-+	MPP4_GPIO,		/* LED6 - phone LED (front panel) */
-+	MPP5_GPIO,		/* LED5 - phone LED (front panel) */
-+	MPP6_PCI_CLK,		/* CPU PCI refclk */
-+	MPP7_PCI_CLK,		/* PCI/PCIe refclk */
-+	MPP8_GPIO,		/* CardBus reset */
-+	MPP9_GPIO,		/* GE_RXERR */
-+	MPP10_GPIO,		/* LED2 MiniPCI LED (front panel) */
-+	MPP11_GPIO,		/* Lifeline control */
-+	MPP12_GIGE,		/* GE_TXD[4] */
-+	MPP13_GIGE,		/* GE_TXD[5] */
-+	MPP14_GIGE,		/* GE_TXD[6] */
-+	MPP15_GIGE,		/* GE_TXD[7] */
-+	MPP16_GIGE,		/* GE_RXD[4] */
-+	MPP17_GIGE,		/* GE_RXD[5] */
-+	MPP18_GIGE,		/* GE_RXD[6] */
-+	MPP19_GIGE,		/* GE_RXD[7] */
-+	0,
- };
- 
- static struct mv643xx_eth_platform_data rd88f5181l_fxo_eth_data = {
-diff --git a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
-index c1f79fa..0cc90bb 100644
---- a/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f5181l-ge-setup.c
-@@ -65,28 +65,28 @@ static struct platform_device rd88f5181l_ge_nor_boot_flash = {
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode rd88f5181l_ge_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* LED1 */
--	{  1, MPP_GPIO },		/* LED5 */
--	{  2, MPP_GPIO },		/* LED4 */
--	{  3, MPP_GPIO },		/* LED3 */
--	{  4, MPP_GPIO },		/* PCI_intA */
--	{  5, MPP_GPIO },		/* RTC interrupt */
--	{  6, MPP_PCI_CLK },		/* CPU PCI refclk */
--	{  7, MPP_PCI_CLK },		/* PCI/PCIe refclk */
--	{  8, MPP_GPIO },		/* 88e6131 interrupt */
--	{  9, MPP_GPIO },		/* GE_RXERR */
--	{ 10, MPP_GPIO },		/* PCI_intB */
--	{ 11, MPP_GPIO },		/* LED2 */
--	{ 12, MPP_GIGE },		/* GE_TXD[4] */
--	{ 13, MPP_GIGE },		/* GE_TXD[5] */
--	{ 14, MPP_GIGE },		/* GE_TXD[6] */
--	{ 15, MPP_GIGE },		/* GE_TXD[7] */
--	{ 16, MPP_GIGE },		/* GE_RXD[4] */
--	{ 17, MPP_GIGE },		/* GE_RXD[5] */
--	{ 18, MPP_GIGE },		/* GE_RXD[6] */
--	{ 19, MPP_GIGE },		/* GE_RXD[7] */
--	{ -1 },
-+static unsigned int rd88f5181l_ge_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* LED1 */
-+	MPP1_GPIO,		/* LED5 */
-+	MPP2_GPIO,		/* LED4 */
-+	MPP3_GPIO,		/* LED3 */
-+	MPP4_GPIO,		/* PCI_intA */
-+	MPP5_GPIO,		/* RTC interrupt */
-+	MPP6_PCI_CLK,		/* CPU PCI refclk */
-+	MPP7_PCI_CLK,		/* PCI/PCIe refclk */
-+	MPP8_GPIO,		/* 88e6131 interrupt */
-+	MPP9_GPIO,		/* GE_RXERR */
-+	MPP10_GPIO,		/* PCI_intB */
-+	MPP11_GPIO,		/* LED2 */
-+	MPP12_GIGE,		/* GE_TXD[4] */
-+	MPP13_GIGE,		/* GE_TXD[5] */
-+	MPP14_GIGE,		/* GE_TXD[6] */
-+	MPP15_GIGE,		/* GE_TXD[7] */
-+	MPP16_GIGE,		/* GE_RXD[4] */
-+	MPP17_GIGE,		/* GE_RXD[5] */
-+	MPP18_GIGE,		/* GE_RXD[6] */
-+	MPP19_GIGE,		/* GE_RXD[7] */
-+	0,
- };
- 
- static struct mv643xx_eth_platform_data rd88f5181l_ge_eth_data = {
-diff --git a/arch/arm/mach-orion5x/rd88f5182-setup.c b/arch/arm/mach-orion5x/rd88f5182-setup.c
-index 67ec695..e29852a 100644
---- a/arch/arm/mach-orion5x/rd88f5182-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f5182-setup.c
-@@ -241,28 +241,28 @@ static struct mv_sata_platform_data rd88f5182_sata_data = {
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode rd88f5182_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* Debug Led */
--	{  1, MPP_GPIO },		/* Reset Switch */
--	{  2, MPP_UNUSED },
--	{  3, MPP_GPIO },		/* RTC Int */
--	{  4, MPP_GPIO },
--	{  5, MPP_GPIO },
--	{  6, MPP_GPIO },		/* PCI_intA */
--	{  7, MPP_GPIO },		/* PCI_intB */
--	{  8, MPP_UNUSED },
--	{  9, MPP_UNUSED },
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_SATA_LED },		/* SATA 0 presence */
--	{ 13, MPP_SATA_LED },		/* SATA 1 presence */
--	{ 14, MPP_SATA_LED },		/* SATA 0 active */
--	{ 15, MPP_SATA_LED },		/* SATA 1 active */
--	{ 16, MPP_UNUSED },
--	{ 17, MPP_UNUSED },
--	{ 18, MPP_UNUSED },
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int rd88f5182_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* Debug Led */
-+	MPP1_GPIO,		/* Reset Switch */
-+	MPP2_UNUSED,
-+	MPP3_GPIO,		/* RTC Int */
-+	MPP4_GPIO,
-+	MPP5_GPIO,
-+	MPP6_GPIO,		/* PCI_intA */
-+	MPP7_GPIO,		/* PCI_intB */
-+	MPP8_UNUSED,
-+	MPP9_UNUSED,
-+	MPP10_UNUSED,
-+	MPP11_UNUSED,
-+	MPP12_SATA_LED,		/* SATA 0 presence */
-+	MPP13_SATA_LED,		/* SATA 1 presence */
-+	MPP14_SATA_LED,		/* SATA 0 active */
-+	MPP15_SATA_LED,		/* SATA 1 active */
-+	MPP16_UNUSED,
-+	MPP17_UNUSED,
-+	MPP18_UNUSED,
-+	MPP19_UNUSED,
-+	0,
- };
- 
- static void __init rd88f5182_init(void)
-diff --git a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-index b080c69..ad2eba9 100644
---- a/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-+++ b/arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c
-@@ -27,7 +27,6 @@
- #include <asm/mach/pci.h>
- #include <mach/orion5x.h>
- #include "common.h"
--#include "mpp.h"
- 
- static struct mv643xx_eth_platform_data rd88f6183ap_ge_eth_data = {
- 	.phy_addr	= -1,
-diff --git a/arch/arm/mach-orion5x/terastation_pro2-setup.c b/arch/arm/mach-orion5x/terastation_pro2-setup.c
-index 5653ee6..de8db88 100644
---- a/arch/arm/mach-orion5x/terastation_pro2-setup.c
-+++ b/arch/arm/mach-orion5x/terastation_pro2-setup.c
-@@ -295,28 +295,28 @@ static void tsp2_power_off(void)
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode tsp2_mpp_modes[] __initdata = {
--	{  0, MPP_PCIE_RST_OUTn },
--	{  1, MPP_UNUSED },
--	{  2, MPP_UNUSED },
--	{  3, MPP_UNUSED },
--	{  4, MPP_NAND },		/* BOOT NAND Flash REn */
--	{  5, MPP_NAND },		/* BOOT NAND Flash WEn */
--	{  6, MPP_NAND },		/* BOOT NAND Flash HREn[0] */
--	{  7, MPP_NAND },		/* BOOT NAND Flash WEn[0] */
--	{  8, MPP_GPIO },		/* MICON int */
--	{  9, MPP_GPIO },		/* RTC int */
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_GPIO },		/* PCI Int A */
--	{ 12, MPP_UNUSED },
--	{ 13, MPP_GPIO },		/* UPS on UART0 enable */
--	{ 14, MPP_GPIO },		/* UPS low battery detection */
--	{ 15, MPP_UNUSED },
--	{ 16, MPP_UART },		/* UART1 RXD */
--	{ 17, MPP_UART },		/* UART1 TXD */
--	{ 18, MPP_UART },		/* UART1 CTSn */
--	{ 19, MPP_UART },		/* UART1 RTSn */
--	{ -1 },
-+static unsigned int tsp2_mpp_modes[] __initdata = {
-+	MPP0_PCIE_RST_OUTn,
-+	MPP1_UNUSED,
-+	MPP2_UNUSED,
-+	MPP3_UNUSED,
-+	MPP4_NAND,		/* BOOT NAND Flash REn */
-+	MPP5_NAND,		/* BOOT NAND Flash WEn */
-+	MPP6_NAND,		/* BOOT NAND Flash HREn[0] */
-+	MPP7_NAND,		/* BOOT NAND Flash WEn[0] */
-+	MPP8_GPIO,		/* MICON int */
-+	MPP9_GPIO,		/* RTC int */
-+	MPP10_UNUSED,
-+	MPP11_GPIO,		/* PCI Int A */
-+	MPP12_UNUSED,
-+	MPP13_GPIO,		/* UPS on UART0 enable */
-+	MPP14_GPIO,		/* UPS low battery detection */
-+	MPP15_UNUSED,
-+	MPP16_UART,		/* UART1 RXD */
-+	MPP17_UART,		/* UART1 TXD */
-+	MPP18_UART,		/* UART1 CTSn */
-+	MPP19_UART,		/* UART1 RTSn */
-+	0,
- };
- 
- static void __init tsp2_init(void)
-diff --git a/arch/arm/mach-orion5x/ts209-setup.c b/arch/arm/mach-orion5x/ts209-setup.c
-index 8bbd27e..a53c8b3 100644
---- a/arch/arm/mach-orion5x/ts209-setup.c
-+++ b/arch/arm/mach-orion5x/ts209-setup.c
-@@ -244,28 +244,28 @@ static struct mv_sata_platform_data qnap_ts209_sata_data = {
- 
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode ts209_mpp_modes[] __initdata = {
--	{  0, MPP_UNUSED },
--	{  1, MPP_GPIO },		/* USB copy button */
--	{  2, MPP_GPIO },		/* Load defaults button */
--	{  3, MPP_GPIO },		/* GPIO RTC */
--	{  4, MPP_UNUSED },
--	{  5, MPP_UNUSED },
--	{  6, MPP_GPIO },		/* PCI Int A */
--	{  7, MPP_GPIO },		/* PCI Int B */
--	{  8, MPP_UNUSED },
--	{  9, MPP_UNUSED },
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_SATA_LED },		/* SATA 0 presence */
--	{ 13, MPP_SATA_LED },		/* SATA 1 presence */
--	{ 14, MPP_SATA_LED },		/* SATA 0 active */
--	{ 15, MPP_SATA_LED },		/* SATA 1 active */
--	{ 16, MPP_UART },		/* UART1 RXD */
--	{ 17, MPP_UART },		/* UART1 TXD */
--	{ 18, MPP_GPIO },		/* SW_RST */
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int ts209_mpp_modes[] __initdata = {
-+	MPP0_UNUSED,
-+	MPP1_GPIO,		/* USB copy button */
-+	MPP2_GPIO,		/* Load defaults button */
-+	MPP3_GPIO,		/* GPIO RTC */
-+	MPP4_UNUSED,
-+	MPP5_UNUSED,
-+	MPP6_GPIO,		/* PCI Int A */
-+	MPP7_GPIO,		/* PCI Int B */
-+	MPP8_UNUSED,
-+	MPP9_UNUSED,
-+	MPP10_UNUSED,
-+	MPP11_UNUSED,
-+	MPP12_SATA_LED,		/* SATA 0 presence */
-+	MPP13_SATA_LED,		/* SATA 1 presence */
-+	MPP14_SATA_LED,		/* SATA 0 active */
-+	MPP15_SATA_LED,		/* SATA 1 active */
-+	MPP16_UART,		/* UART1 RXD */
-+	MPP17_UART,		/* UART1 TXD */
-+	MPP18_GPIO,		/* SW_RST */
-+	MPP19_UNUSED,
-+	0,
- };
- 
- static void __init qnap_ts209_init(void)
-diff --git a/arch/arm/mach-orion5x/ts409-setup.c b/arch/arm/mach-orion5x/ts409-setup.c
-index 92f393f..366247f 100644
---- a/arch/arm/mach-orion5x/ts409-setup.c
-+++ b/arch/arm/mach-orion5x/ts409-setup.c
-@@ -242,28 +242,28 @@ static struct platform_device qnap_ts409_button_device = {
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode ts409_mpp_modes[] __initdata = {
--	{  0, MPP_UNUSED },
--	{  1, MPP_UNUSED },
--	{  2, MPP_UNUSED },
--	{  3, MPP_UNUSED },
--	{  4, MPP_GPIO },		/* HDD 1 status */
--	{  5, MPP_GPIO },		/* HDD 2 status */
--	{  6, MPP_GPIO },		/* HDD 3 status */
--	{  7, MPP_GPIO },		/* HDD 4 status */
--	{  8, MPP_UNUSED },
--	{  9, MPP_UNUSED },
--	{ 10, MPP_GPIO },		/* RTC int */
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_UNUSED },
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_GPIO },		/* SW_RST */
--	{ 15, MPP_GPIO },		/* USB copy button */
--	{ 16, MPP_UART },		/* UART1 RXD */
--	{ 17, MPP_UART },		/* UART1 TXD */
--	{ 18, MPP_UNUSED },
--	{ 19, MPP_UNUSED },
--	{ -1 },
-+static unsigned int ts409_mpp_modes[] __initdata = {
-+	MPP0_UNUSED,
-+	MPP1_UNUSED,
-+	MPP2_UNUSED,
-+	MPP3_UNUSED,
-+	MPP4_GPIO,		/* HDD 1 status */
-+	MPP5_GPIO,		/* HDD 2 status */
-+	MPP6_GPIO,		/* HDD 3 status */
-+	MPP7_GPIO,		/* HDD 4 status */
-+	MPP8_UNUSED,
-+	MPP9_UNUSED,
-+	MPP10_GPIO,		/* RTC int */
-+	MPP11_UNUSED,
-+	MPP12_UNUSED,
-+	MPP13_UNUSED,
-+	MPP14_GPIO,		/* SW_RST */
-+	MPP15_GPIO,		/* USB copy button */
-+	MPP16_UART,		/* UART1 RXD */
-+	MPP17_UART,		/* UART1 TXD */
-+	MPP18_UNUSED,
-+	MPP19_UNUSED,
-+	0,
- };
- 
- static void __init qnap_ts409_init(void)
-diff --git a/arch/arm/mach-orion5x/ts78xx-setup.c b/arch/arm/mach-orion5x/ts78xx-setup.c
-index 8554707..8211fa6 100644
---- a/arch/arm/mach-orion5x/ts78xx-setup.c
-+++ b/arch/arm/mach-orion5x/ts78xx-setup.c
-@@ -557,27 +557,27 @@ static struct kobj_attribute ts78xx_fpga_attr =
- /*****************************************************************************
-  * General Setup
-  ****************************************************************************/
--static struct orion5x_mpp_mode ts78xx_mpp_modes[] __initdata = {
--	{  0, MPP_UNUSED },
--	{  1, MPP_GPIO },		/* JTAG Clock */
--	{  2, MPP_GPIO },		/* JTAG Data In */
--	{  3, MPP_GPIO },		/* Lat ECP2 256 FPGA - PB2B */
--	{  4, MPP_GPIO },		/* JTAG Data Out */
--	{  5, MPP_GPIO },		/* JTAG TMS */
--	{  6, MPP_GPIO },		/* Lat ECP2 256 FPGA - PB31A_CLK4+ */
--	{  7, MPP_GPIO },		/* Lat ECP2 256 FPGA - PB22B */
--	{  8, MPP_UNUSED },
--	{  9, MPP_UNUSED },
--	{ 10, MPP_UNUSED },
--	{ 11, MPP_UNUSED },
--	{ 12, MPP_UNUSED },
--	{ 13, MPP_UNUSED },
--	{ 14, MPP_UNUSED },
--	{ 15, MPP_UNUSED },
--	{ 16, MPP_UART },
--	{ 17, MPP_UART },
--	{ 18, MPP_UART },
--	{ 19, MPP_UART },
-+static unsigned int ts78xx_mpp_modes[] __initdata = {
-+	MPP0_UNUSED,
-+	MPP1_GPIO,		/* JTAG Clock */
-+	MPP2_GPIO,		/* JTAG Data In */
-+	MPP3_GPIO,		/* Lat ECP2 256 FPGA - PB2B */
-+	MPP4_GPIO,		/* JTAG Data Out */
-+	MPP5_GPIO,		/* JTAG TMS */
-+	MPP6_GPIO,		/* Lat ECP2 256 FPGA - PB31A_CLK4+ */
-+	MPP7_GPIO,		/* Lat ECP2 256 FPGA - PB22B */
-+	MPP8_UNUSED,
-+	MPP9_UNUSED,
-+	MPP10_UNUSED,
-+	MPP11_UNUSED,
-+	MPP12_UNUSED,
-+	MPP13_UNUSED,
-+	MPP14_UNUSED,
-+	MPP15_UNUSED,
-+	MPP16_UART,
-+	MPP17_UART,
-+	MPP18_UART,
-+	MPP19_UART,
- 	/*
- 	 * MPP[20] PCI Clock Out 1
- 	 * MPP[21] PCI Clock Out 0
-@@ -586,7 +586,7 @@ static struct orion5x_mpp_mode ts78xx_mpp_modes[] __initdata = {
- 	 * MPP[24] Unused
- 	 * MPP[25] Unused
- 	 */
--	{ -1 },
-+	0,
- };
- 
- static void __init ts78xx_init(void)
-diff --git a/arch/arm/mach-orion5x/wnr854t-setup.c b/arch/arm/mach-orion5x/wnr854t-setup.c
-index 4e5216b..444a1c7 100644
---- a/arch/arm/mach-orion5x/wnr854t-setup.c
-+++ b/arch/arm/mach-orion5x/wnr854t-setup.c
-@@ -24,28 +24,28 @@
- #include "common.h"
- #include "mpp.h"
- 
--static struct orion5x_mpp_mode wnr854t_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* Power LED green (0=on) */
--	{  1, MPP_GPIO },		/* Reset Button (0=off) */
--	{  2, MPP_GPIO },		/* Power LED blink (0=off) */
--	{  3, MPP_GPIO },		/* WAN Status LED amber (0=off) */
--	{  4, MPP_GPIO },		/* PCI int */
--	{  5, MPP_GPIO },		/* ??? */
--	{  6, MPP_GPIO },		/* ??? */
--	{  7, MPP_GPIO },		/* ??? */
--	{  8, MPP_UNUSED },		/* ??? */
--	{  9, MPP_GIGE },		/* GE_RXERR */
--	{ 10, MPP_UNUSED },		/* ??? */
--	{ 11, MPP_UNUSED },		/* ??? */
--	{ 12, MPP_GIGE },		/* GE_TXD[4] */
--	{ 13, MPP_GIGE },		/* GE_TXD[5] */
--	{ 14, MPP_GIGE },		/* GE_TXD[6] */
--	{ 15, MPP_GIGE },		/* GE_TXD[7] */
--	{ 16, MPP_GIGE },		/* GE_RXD[4] */
--	{ 17, MPP_GIGE },		/* GE_RXD[5] */
--	{ 18, MPP_GIGE },		/* GE_RXD[6] */
--	{ 19, MPP_GIGE },		/* GE_RXD[7] */
--	{ -1 },
-+static unsigned int wnr854t_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* Power LED green (0=on) */
-+	MPP1_GPIO,		/* Reset Button (0=off) */
-+	MPP2_GPIO,		/* Power LED blink (0=off) */
-+	MPP3_GPIO,		/* WAN Status LED amber (0=off) */
-+	MPP4_GPIO,		/* PCI int */
-+	MPP5_GPIO,		/* ??? */
-+	MPP6_GPIO,		/* ??? */
-+	MPP7_GPIO,		/* ??? */
-+	MPP8_UNUSED,		/* ??? */
-+	MPP9_GIGE,		/* GE_RXERR */
-+	MPP10_UNUSED,		/* ??? */
-+	MPP11_UNUSED,		/* ??? */
-+	MPP12_GIGE,		/* GE_TXD[4] */
-+	MPP13_GIGE,		/* GE_TXD[5] */
-+	MPP14_GIGE,		/* GE_TXD[6] */
-+	MPP15_GIGE,		/* GE_TXD[7] */
-+	MPP16_GIGE,		/* GE_RXD[4] */
-+	MPP17_GIGE,		/* GE_RXD[5] */
-+	MPP18_GIGE,		/* GE_RXD[6] */
-+	MPP19_GIGE,		/* GE_RXD[7] */
-+	0,
- };
- 
- /*
-diff --git a/arch/arm/mach-orion5x/wrt350n-v2-setup.c b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
-index fab79d0..d1952be 100644
---- a/arch/arm/mach-orion5x/wrt350n-v2-setup.c
-+++ b/arch/arm/mach-orion5x/wrt350n-v2-setup.c
-@@ -101,28 +101,28 @@ static struct platform_device wrt350n_v2_button_device = {
- /*
-  * General setup
-  */
--static struct orion5x_mpp_mode wrt350n_v2_mpp_modes[] __initdata = {
--	{  0, MPP_GPIO },		/* Power LED green (0=on) */
--	{  1, MPP_GPIO },		/* Security LED (0=on) */
--	{  2, MPP_GPIO },		/* Internal Button (0=on) */
--	{  3, MPP_GPIO },		/* Reset Button (0=on) */
--	{  4, MPP_GPIO },		/* PCI int */
--	{  5, MPP_GPIO },		/* Power LED orange (0=on) */
--	{  6, MPP_GPIO },		/* USB LED (0=on) */
--	{  7, MPP_GPIO },		/* Wireless LED (0=on) */
--	{  8, MPP_UNUSED },		/* ??? */
--	{  9, MPP_GIGE },		/* GE_RXERR */
--	{ 10, MPP_UNUSED },		/* ??? */
--	{ 11, MPP_UNUSED },		/* ??? */
--	{ 12, MPP_GIGE },		/* GE_TXD[4] */
--	{ 13, MPP_GIGE },		/* GE_TXD[5] */
--	{ 14, MPP_GIGE },		/* GE_TXD[6] */
--	{ 15, MPP_GIGE },		/* GE_TXD[7] */
--	{ 16, MPP_GIGE },		/* GE_RXD[4] */
--	{ 17, MPP_GIGE },		/* GE_RXD[5] */
--	{ 18, MPP_GIGE },		/* GE_RXD[6] */
--	{ 19, MPP_GIGE },		/* GE_RXD[7] */
--	{ -1 },
-+static unsigned int wrt350n_v2_mpp_modes[] __initdata = {
-+	MPP0_GPIO,		/* Power LED green (0=on) */
-+	MPP1_GPIO,		/* Security LED (0=on) */
-+	MPP2_GPIO,		/* Internal Button (0=on) */
-+	MPP3_GPIO,		/* Reset Button (0=on) */
-+	MPP4_GPIO,		/* PCI int */
-+	MPP5_GPIO,		/* Power LED orange (0=on) */
-+	MPP6_GPIO,		/* USB LED (0=on) */
-+	MPP7_GPIO,		/* Wireless LED (0=on) */
-+	MPP8_UNUSED,		/* ??? */
-+	MPP9_GIGE,		/* GE_RXERR */
-+	MPP10_UNUSED,		/* ??? */
-+	MPP11_UNUSED,		/* ??? */
-+	MPP12_GIGE,		/* GE_TXD[4] */
-+	MPP13_GIGE,		/* GE_TXD[5] */
-+	MPP14_GIGE,		/* GE_TXD[6] */
-+	MPP15_GIGE,		/* GE_TXD[7] */
-+	MPP16_GIGE,		/* GE_RXD[4] */
-+	MPP17_GIGE,		/* GE_RXD[5] */
-+	MPP18_GIGE,		/* GE_RXD[6] */
-+	MPP19_GIGE,		/* GE_RXD[7] */
-+	0,
- };
- 
- /*
+ /* Looks like: virtio:dNvN */
+ static int do_virtio_entry(const char *filename, struct virtio_device_id *id,
+ 			   char *alias)
+@@ -968,6 +986,10 @@ void handle_moddevtable(struct module *mod, struct elf_info *info,
+ 		do_table(symval, sym->st_size,
+ 			 sizeof(struct ssb_device_id), "ssb",
+ 			 do_ssb_entry, mod);
++	else if (sym_is(symname, "__mod_bcma_device_table"))
++		do_table(symval, sym->st_size,
++			 sizeof(struct bcma_device_id), "bcma",
++			 do_bcma_entry, mod);
+ 	else if (sym_is(symname, "__mod_virtio_device_table"))
+ 		do_table(symval, sym->st_size,
+ 			 sizeof(struct virtio_device_id), "virtio",
 -- 
-1.7.4.4
+1.7.3.4
