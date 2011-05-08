@@ -1,59 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 8 May 2011 16:05:30 +0100
-Subject: [PATCH 4/6] ARM: mxc: don't allow to compile together i.MX51
-	and i.MX53
-In-Reply-To: <alpine.LFD.2.00.1105081027190.1001@xanadu.home>
-References: <1302464943-20721-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1302464943-20721-4-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110413122503.GB1897@S2100-06.ap.freescale.net>
-	<20110413124149.GR18850@pengutronix.de>
-	<BANLkTinaFVXP10vbaF_We+kS2onwZAugQA@mail.gmail.com>
-	<20110508104201.GH27807@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1105081027190.1001@xanadu.home>
-Message-ID: <20110508150530.GL27807@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 8 May 2011 17:06:12 +0200
+Subject: [PATCH][WAS:bcmai,
+	axi] bcma: add Broadcom specific AMBA bus driver
+In-Reply-To: <BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
+References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
+	<BANLkTikjr0ZTNOu69F+iKhwufE9KKMg4Tg@mail.gmail.com>
+	<BANLkTimGBNT4FkS4mO9ToLWft0bCEYcEgg@mail.gmail.com>
+Message-ID: <201105081706.12449.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 08, 2011 at 11:00:30AM -0400, Nicolas Pitre wrote:
-> On Sun, 8 May 2011, Russell King - ARM Linux wrote:
+On Saturday 07 May 2011, Rafa? Mi?ecki wrote:
+> > Well, maybe. We call it only once, at init time. In any case we're
+> > still waiting for Broadcom to clarify which cores are really used for
+> > BCMA.
 > 
-> > On Wed, May 04, 2011 at 10:48:40AM -0500, Matt Sealey wrote:
-> > > CONFIG_ARM_PATCH_PHYS_VIRT
-> > > 
-> > > These two config options, with absolutely no bootloader changes, will
-> > > basically mask off some address (instruction pointer?) at the time of
-> > > the check and therefore derive a perfectly good PHYS_OFFSET at runtime
-> > > and make sure it is in use... within some limits (first 128MB, assumes
-> > > that start of memory is at some particular alignment)?
-> > 
-> > The V:P fixup will only handle bits 31-24, or 31-16 if the
-> > ARM_PATCH_PHYS_VIRT_16BIT option is selected (for MSM).  If the offset
-> > doesn't wholy fit into these, then the fixup function will complain and
-> > your kernel won't boot.  So, it'll go down to 64K alignment.
-> > 
-> > It does rely on the kernel being placed correctly in memory.  So if the
-> > start of the kernel text is built to be 32K above PAGE_OFFSET, then the
-> > kernel will assume that physical memory starts 32K below where the
-> > 'Image' ended up in physical memory.  If you place the kernel in physical
-> > memory 16MB above the start, then it'll assume that physical memory starts
-> > 16MB above where it actually did.
+> Arnd: did you have a look at defines at all?
 > 
-> If CONFIG_AUTO_ZRELADDR is set, then zImage will automatically place the 
-> kernel Image correctly in memory, assuming that zImage is itself loaded 
-> within the first 128MB of memory.
+> Most of the defines have values in range 0x800 ? 0x837. Converting
+> this to array means loosing 0x800 u16 entries. We can not use 0x800
+> offset, because there are also some defined between 0x000 and 0x800:
+> #define BCMA_CORE_OOB_ROUTER           0x367   /* Out of band */
+> #define BCMA_CORE_INVALID              0x700
 
-I was only covering the requirements of the Image, rather than zImage which
-you covered in a subsequent message.
+I did not mean using the enum value as index, just make an array of
+simple structs:
 
-> > There is one thing to watch out for though - if you did place it 16MB
-> > above, but still tell the kernel via ATAGs that the physical memory
-> > starts where it really does, then I'd expect things to explode as
-> > the kernel direct mapped memory would likely extend below PAGE_OFFSET.
-> 
-> Yeah... We should probably add a warning and truncate the beginning of 
-> the memory bank in that case.  This would also prevent memory from being 
-> wrongly declared below PHYS_OFFSET even without the P2V feature enabled.
+struct bcma_device_name {
+	unsigned int id;
+	const char *name;
+};
 
-We don't encouter the situation today, so lets leave it until we actually
-have a problem.  There's no point bloating the kernel with such checks if
-they're never going to fire.
+struct bcma_device_name bcma_device_names = {
+	{ BCMA_CORE_OOB_ROUTER, "Out of band router" },
+	{ BCMA_CORE_INVALID,	"Invalid" },
+	...
+};
+
+The data size for this should be way smaller than the code needed
+to represent the whole function otherwise, and be more readable.
+
+	Arnd
