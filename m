@@ -1,28 +1,42 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 8 May 2011 22:13:29 +0200
-Subject: [PATCH 2/2] mmci: fixup sg buffer handling in mmci_pio_irq.
-In-Reply-To: <20110508102219.GG27807@n2100.arm.linux.org.uk>
-References: <1304594063-19408-1-git-send-email-linus.walleij@stericsson.com>
-	<20110508102219.GG27807@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=KswoqCqb_favD7EdX0NE47rM7Ew@mail.gmail.com>
+Date: Sun, 8 May 2011 22:34:30 +0200
+Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
+	sched_clock
+In-Reply-To: <alpine.LFD.2.02.1104292355210.3005@ionos>
+References: <20110423205036.795894921@linutronix.de>
+	<20110429094606.GA5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1104291217120.3005@ionos>
+	<20110429103208.GA2849@atomide.com>
+	<alpine.LFD.2.02.1104291900290.3005@ionos>
+	<BANLkTi=Xymqw9H+aNPbYUWDs7w5HzmJVkw@mail.gmail.com>
+	<alpine.LFD.2.02.1104292355210.3005@ionos>
+Message-ID: <BANLkTimgJbxuqcRXxvPs0HjP_AbdD81O_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2011 at 12:22 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, May 05, 2011 at 01:14:23PM +0200, Linus Walleij wrote:
->> The patch fix the problem by checking result of mmci_pio_write().
+On Fri, Apr 29, 2011 at 11:57 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> On Fri, 29 Apr 2011, Linus Walleij wrote:
 >>
->> The fault was introduced in the change:
->> ? ? ? I2e506ec1f5a7fadf9780c18d8d31573eaf048273
->> ? ? ? MMCI: Fixup sg buffer handling in pio_write
+>> Jonas ?berg has this pending patch that we call "boot time recorder".
+>> What it does is basically start a free running timer before the
+>> kernel is booted, e.g. in U-boot or even in the ROM of your
+>> machine if you can.
+>>
+>> If we need more finegrained sched_clock() before the
+>> clocksource is up, a good approach would be to utilize
+>> something like that for sched_clock up to that point, plus
+>> it has the upside that [0.000000] is as close to electrical
+>> power-on as possible.
 >
-> I assume this isn't for mainline as that commit isn't present.
+> Well, you can read out that value at the point the clocksource gets
+> installed so you have the time spent up to that point without adding
+> another facility, level of indirection ...
 
-No I screwed up, I will post a combined patch with both and an
-explanation instead, only relates to SDIO FWIW.
+That too (one does not exclude the other), what I was getting at is that
+systems may have something alredy running that is monotonic and
+trustable, and would likely go into some early_timer() or similar familiar
+kernel naming scheme. But no point in doing any of that sort now, let's
+have jiffies for now and get that to work.
 
-Thanks for your patience.
-
-Yours,
+Thanks,
 Linus Walleij
