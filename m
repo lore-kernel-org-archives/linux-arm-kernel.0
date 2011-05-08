@@ -1,167 +1,358 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun,  8 May 2011 16:15:38 +0200
-Subject: [PATCH 11/14] [orion] Consolidate setup of the crypto engine.
+Date: Sun,  8 May 2011 16:15:39 +0200
+Subject: [PATCH 12/14] [orion] Refactor the MPP code. Common code in the orion
+	platform.
 In-Reply-To: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
 References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1304864141-1121-12-git-send-email-andrew@lunn.ch>
+Message-ID: <1304864141-1121-13-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+mv78xx0 and kirkwood use identical mpp code. It should also be
+possible to rewrite the orion5x mpp to use this platform code.
+
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-kirkwood/common.c           |   30 +-------------------------
- arch/arm/mach-orion5x/common.c            |   32 ++++------------------------
- arch/arm/plat-orion/common.c              |   31 ++++++++++++++++++++++++++++
- arch/arm/plat-orion/include/plat/common.h |    5 ++++
- 4 files changed, 43 insertions(+), 55 deletions(-)
+ arch/arm/mach-kirkwood/mpp.c           |   58 +---------------------
+ arch/arm/mach-kirkwood/mpp.h           |    6 --
+ arch/arm/mach-mv78xx0/mpp.c            |   58 +---------------------
+ arch/arm/mach-mv78xx0/mpp.h            |    6 --
+ arch/arm/plat-orion/Makefile           |    2 +-
+ arch/arm/plat-orion/include/plat/mpp.h |   34 +++++++++++++
+ arch/arm/plat-orion/mpp.c              |   81 ++++++++++++++++++++++++++++++++
+ 7 files changed, 122 insertions(+), 123 deletions(-)
+ create mode 100644 arch/arm/plat-orion/include/plat/mpp.h
+ create mode 100644 arch/arm/plat-orion/mpp.c
 
-diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index e0562e4..c77d62a 100644
---- a/arch/arm/mach-kirkwood/common.c
-+++ b/arch/arm/mach-kirkwood/common.c
-@@ -270,37 +270,11 @@ void __init kirkwood_uart1_init(void)
- /*****************************************************************************
-  * Cryptographic Engines and Security Accelerator (CESA)
-  ****************************************************************************/
+diff --git a/arch/arm/mach-kirkwood/mpp.c b/arch/arm/mach-kirkwood/mpp.c
+index 7ce2018..b0a7d97 100644
+--- a/arch/arm/mach-kirkwood/mpp.c
++++ b/arch/arm/mach-kirkwood/mpp.c
+@@ -14,6 +14,7 @@
+ #include <linux/io.h>
+ #include <asm/gpio.h>
+ #include <mach/hardware.h>
++#include <plat/mpp.h>
+ #include "common.h"
+ #include "mpp.h"
+ 
+@@ -36,61 +37,8 @@ static unsigned int __init kirkwood_variant(void)
+ 	return 0;
+ }
+ 
+-#define MPP_CTRL(i)	(DEV_BUS_VIRT_BASE + (i) * 4)
+-#define MPP_NR_REGS	(1 + MPP_MAX/8)
 -
--static struct resource kirkwood_crypto_res[] = {
--	{
--		.name   = "regs",
--		.start  = CRYPTO_PHYS_BASE,
--		.end    = CRYPTO_PHYS_BASE + 0xffff,
--		.flags  = IORESOURCE_MEM,
--	}, {
--		.name   = "sram",
--		.start  = KIRKWOOD_SRAM_PHYS_BASE,
--		.end    = KIRKWOOD_SRAM_PHYS_BASE + KIRKWOOD_SRAM_SIZE - 1,
--		.flags  = IORESOURCE_MEM,
--	}, {
--		.name   = "crypto interrupt",
--		.start  = IRQ_KIRKWOOD_CRYPTO,
--		.end    = IRQ_KIRKWOOD_CRYPTO,
--		.flags  = IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device kirkwood_crypto_device = {
--	.name           = "mv_crypto",
--	.id             = -1,
--	.num_resources  = ARRAY_SIZE(kirkwood_crypto_res),
--	.resource       = kirkwood_crypto_res,
--};
--
- void __init kirkwood_crypto_init(void)
+ void __init kirkwood_mpp_conf(unsigned int *mpp_list)
  {
- 	kirkwood_clk_ctrl |= CGC_CRYPTO;
--	platform_device_register(&kirkwood_crypto_device);
-+	orion_crypto_init(CRYPTO_PHYS_BASE, KIRKWOOD_SRAM_PHYS_BASE,
-+			  KIRKWOOD_SRAM_SIZE, IRQ_KIRKWOOD_CRYPTO);
+-	u32 mpp_ctrl[MPP_NR_REGS];
+-	unsigned int variant_mask;
+-	int i;
+-
+-	variant_mask = kirkwood_variant();
+-	if (!variant_mask)
+-		return;
+-
+-	printk(KERN_DEBUG "initial MPP regs:");
+-	for (i = 0; i < MPP_NR_REGS; i++) {
+-		mpp_ctrl[i] = readl(MPP_CTRL(i));
+-		printk(" %08x", mpp_ctrl[i]);
+-	}
+-	printk("\n");
+-
+-	for ( ; *mpp_list; mpp_list++) {
+-		unsigned int num = MPP_NUM(*mpp_list);
+-		unsigned int sel = MPP_SEL(*mpp_list);
+-		int shift, gpio_mode;
+-
+-		if (num > MPP_MAX) {
+-			printk(KERN_ERR "kirkwood_mpp_conf: invalid MPP "
+-					"number (%u)\n", num);
+-			continue;
+-		}
+-		if (!(*mpp_list & variant_mask)) {
+-			printk(KERN_WARNING
+-			       "kirkwood_mpp_conf: requested MPP%u config "
+-			       "unavailable on this hardware\n", num);
+-			continue;
+-		}
+-
+-		shift = (num & 7) << 2;
+-		mpp_ctrl[num / 8] &= ~(0xf << shift);
+-		mpp_ctrl[num / 8] |= sel << shift;
+-
+-		gpio_mode = 0;
+-		if (*mpp_list & MPP_INPUT_MASK)
+-			gpio_mode |= GPIO_INPUT_OK;
+-		if (*mpp_list & MPP_OUTPUT_MASK)
+-			gpio_mode |= GPIO_OUTPUT_OK;
+-		if (sel != 0)
+-			gpio_mode = 0;
+-		orion_gpio_set_valid(num, gpio_mode);
+-	}
+-
+-	printk(KERN_DEBUG "  final MPP regs:");
+-	for (i = 0; i < MPP_NR_REGS; i++) {
+-		writel(mpp_ctrl[i], MPP_CTRL(i));
+-		printk(" %08x", mpp_ctrl[i]);
+-	}
+-	printk("\n");
++	orion_mpp_conf(mpp_list, kirkwood_variant(),
++		       MPP_MAX, DEV_BUS_VIRT_BASE);
+ }
+diff --git a/arch/arm/mach-kirkwood/mpp.h b/arch/arm/mach-kirkwood/mpp.h
+index 9b0a94d..ac78795 100644
+--- a/arch/arm/mach-kirkwood/mpp.h
++++ b/arch/arm/mach-kirkwood/mpp.h
+@@ -22,14 +22,8 @@
+ 	/* available on F6281 */	((!!(_F6281)) << 17) | \
+ 	/* available on F6282 */	((!!(_F6282)) << 18))
+ 
+-#define MPP_NUM(x)	((x) & 0xff)
+-#define MPP_SEL(x)	(((x) >> 8) & 0xf)
+-
+ 				/*   num sel  i  o  6180 6190 6192 6281 6282 */
+ 
+-#define MPP_INPUT_MASK		MPP(  0, 0x0, 1, 0, 0,   0,   0,   0,   0 )
+-#define MPP_OUTPUT_MASK		MPP(  0, 0x0, 0, 1, 0,   0,   0,   0,   0 )
+-
+ #define MPP_F6180_MASK		MPP(  0, 0x0, 0, 0, 1,   0,   0,   0,   0 )
+ #define MPP_F6190_MASK		MPP(  0, 0x0, 0, 0, 0,   1,   0,   0,   0 )
+ #define MPP_F6192_MASK		MPP(  0, 0x0, 0, 0, 0,   0,   1,   0,   0 )
+diff --git a/arch/arm/mach-mv78xx0/mpp.c b/arch/arm/mach-mv78xx0/mpp.c
+index 65b72c4..59b7686 100644
+--- a/arch/arm/mach-mv78xx0/mpp.c
++++ b/arch/arm/mach-mv78xx0/mpp.c
+@@ -12,6 +12,7 @@
+ #include <linux/init.h>
+ #include <linux/mbus.h>
+ #include <linux/io.h>
++#include <plat/mpp.h>
+ #include <asm/gpio.h>
+ #include <mach/hardware.h>
+ #include "common.h"
+@@ -31,61 +32,8 @@ static unsigned int __init mv78xx0_variant(void)
+ 	return 0;
  }
  
- 
-diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 1c4945c..33954f3 100644
---- a/arch/arm/mach-orion5x/common.c
-+++ b/arch/arm/mach-orion5x/common.c
-@@ -164,32 +164,9 @@ void __init orion5x_xor_init(void)
- 			IRQ_ORION5X_XOR0, IRQ_ORION5X_XOR1);
- }
- 
--static struct resource orion5x_crypto_res[] = {
--	{
--		.name   = "regs",
--		.start  = ORION5X_CRYPTO_PHYS_BASE,
--		.end    = ORION5X_CRYPTO_PHYS_BASE + 0xffff,
--		.flags  = IORESOURCE_MEM,
--	}, {
--		.name   = "sram",
--		.start  = ORION5X_SRAM_PHYS_BASE,
--		.end    = ORION5X_SRAM_PHYS_BASE + SZ_8K - 1,
--		.flags  = IORESOURCE_MEM,
--	}, {
--		.name   = "crypto interrupt",
--		.start  = IRQ_ORION5X_CESA,
--		.end    = IRQ_ORION5X_CESA,
--		.flags  = IORESOURCE_IRQ,
--	},
--};
+-#define MPP_CTRL(i)	(DEV_BUS_VIRT_BASE + (i) * 4)
+-#define MPP_NR_REGS	(1 + MPP_MAX/8)
 -
--static struct platform_device orion5x_crypto_device = {
--	.name           = "mv_crypto",
--	.id             = -1,
--	.num_resources  = ARRAY_SIZE(orion5x_crypto_res),
--	.resource       = orion5x_crypto_res,
--};
--
-+/*****************************************************************************
-+ * Cryptographic Engines and Security Accelerator (CESA)
-+ ****************************************************************************/
- static int __init orion5x_crypto_init(void)
+ void __init mv78xx0_mpp_conf(unsigned int *mpp_list)
  {
- 	int ret;
-@@ -198,7 +175,8 @@ static int __init orion5x_crypto_init(void)
- 	if (ret)
- 		return ret;
- 
--	return platform_device_register(&orion5x_crypto_device);
-+	orion_crypto_init(ORION5X_CRYPTO_PHYS_BASE, ORION5X_SRAM_PHYS_BASE,
-+			  SZ_8K, IRQ_ORION5X_CESA);
+-	u32 mpp_ctrl[MPP_NR_REGS];
+-	unsigned int variant_mask;
+-	int i;
+-
+-	variant_mask = mv78xx0_variant();
+-	if (!variant_mask)
+-		return;
+-
+-	printk(KERN_DEBUG "initial MPP regs:");
+-	for (i = 0; i < MPP_NR_REGS; i++) {
+-		mpp_ctrl[i] = readl(MPP_CTRL(i));
+-		printk(" %08x", mpp_ctrl[i]);
+-	}
+-	printk("\n");
+-
+-	for ( ; *mpp_list; mpp_list++) {
+-		unsigned int num = MPP_NUM(*mpp_list);
+-		unsigned int sel = MPP_SEL(*mpp_list);
+-		int shift, gpio_mode;
+-
+-		if (num > MPP_MAX) {
+-			printk(KERN_ERR "mv78xx0_mpp_conf: invalid MPP "
+-					"number (%u)\n", num);
+-			continue;
+-		}
+-		if (!(*mpp_list & variant_mask)) {
+-			printk(KERN_WARNING
+-					"mv78xx0_mpp_conf: requested MPP%u config "
+-					"unavailable on this hardware\n", num);
+-			continue;
+-		}
+-
+-		shift = (num & 7) << 2;
+-		mpp_ctrl[num / 8] &= ~(0xf << shift);
+-		mpp_ctrl[num / 8] |= sel << shift;
+-
+-		gpio_mode = 0;
+-		if (*mpp_list & MPP_INPUT_MASK)
+-			gpio_mode |= GPIO_INPUT_OK;
+-		if (*mpp_list & MPP_OUTPUT_MASK)
+-			gpio_mode |= GPIO_OUTPUT_OK;
+-		if (sel != 0)
+-			gpio_mode = 0;
+-		orion_gpio_set_valid(num, gpio_mode);
+-	}
+-
+-	printk(KERN_DEBUG "  final MPP regs:");
+-	for (i = 0; i < MPP_NR_REGS; i++) {
+-		writel(mpp_ctrl[i], MPP_CTRL(i));
+-		printk(" %08x", mpp_ctrl[i]);
+-	}
+-	printk("\n");
++	orion_mpp_conf(mpp_list, mv78xx0_variant(),
++		       MPP_MAX, DEV_BUS_VIRT_BASE);
  }
+diff --git a/arch/arm/mach-mv78xx0/mpp.h b/arch/arm/mach-mv78xx0/mpp.h
+index 80840b7..b61b509 100644
+--- a/arch/arm/mach-mv78xx0/mpp.h
++++ b/arch/arm/mach-mv78xx0/mpp.h
+@@ -19,14 +19,8 @@
+     /* may be output signal */    ((!!(_out)) << 13) | \
+     /* available on A0 */    ((!!(_78100_A0)) << 14))
  
- /*****************************************************************************
-diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 0984232..c21d4a7 100644
---- a/arch/arm/plat-orion/common.c
-+++ b/arch/arm/plat-orion/common.c
-@@ -927,4 +927,35 @@ void __init orion_sata_init(struct mv_sata_platform_data *sata_data,
- 	platform_device_register(&orion_sata);
- }
+-#define MPP_NUM(x)    ((x) & 0xff)
+-#define MPP_SEL(x)    (((x) >> 8) & 0xf)
+-
+                 /*   num sel  i  o  78100_A0  */
  
-+/*****************************************************************************
-+ * Cryptographic Engines and Security Accelerator (CESA)
-+ ****************************************************************************/
-+static struct resource orion_crypto_resources[] = {
-+	{
-+		.name   = "regs",
-+	}, {
-+		.name   = "crypto interrupt",
-+	}, {
-+		.name   = "sram",
-+		.flags  = IORESOURCE_MEM,
-+	},
-+};
+-#define MPP_INPUT_MASK        MPP(0, 0x0, 1, 0, 0)
+-#define MPP_OUTPUT_MASK        MPP(0, 0x0, 0, 1, 0)
+-
+ #define MPP_78100_A0_MASK    MPP(0, 0x0, 0, 0, 1)
  
-+static struct platform_device orion_crypto = {
-+	.name           = "mv_crypto",
-+	.id             = -1,
-+};
+ #define MPP0_GPIO        MPP(0, 0x0, 1, 1, 1)
+diff --git a/arch/arm/plat-orion/Makefile b/arch/arm/plat-orion/Makefile
+index 0f048c5..95a5fc5 100644
+--- a/arch/arm/plat-orion/Makefile
++++ b/arch/arm/plat-orion/Makefile
+@@ -2,7 +2,7 @@
+ # Makefile for the linux kernel.
+ #
+ 
+-obj-y	:= irq.o pcie.o time.o common.o
++obj-y	:= irq.o pcie.o time.o common.o mpp.o
+ obj-m	:=
+ obj-n	:=
+ obj-	:=
+diff --git a/arch/arm/plat-orion/include/plat/mpp.h b/arch/arm/plat-orion/include/plat/mpp.h
+new file mode 100644
+index 0000000..723adce
+--- /dev/null
++++ b/arch/arm/plat-orion/include/plat/mpp.h
+@@ -0,0 +1,34 @@
++/*
++ * arch/arm/plat-orion/include/plat/mpp.h
++ *
++ * Marvell Orion SoC MPP handling.
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
 +
-+void __init orion_crypto_init(unsigned long mapbase,
-+			      unsigned long srambase,
-+			      unsigned long sram_size,
-+			      unsigned long irq)
++#ifndef __PLAT_MPP_H
++#define __PLAT_MPP_H
++
++#define MPP_NUM(x)	((x) & 0xff)
++#define MPP_SEL(x)	(((x) >> 8) & 0xf)
++
++/* This is the generic MPP macro, without any variant information.
++   Each machine architecture is expected to extend this with further
++   bit fields indicating which MPP configurations are valid for a
++   specific variant. */
++
++#define GENERIC_MPP(_num, _sel, _in, _out) ( \
++	/* MPP number */		((_num) & 0xff) | \
++	/* MPP select value */		(((_sel) & 0xf) << 8) | \
++	/* may be input signal */	((!!(_in)) << 12) | \
++	/* may be output signal */	((!!(_out)) << 13))
++
++#define MPP_INPUT_MASK		GENERIC_MPP(0, 0x0, 1, 0)
++#define MPP_OUTPUT_MASK		GENERIC_MPP(0, 0x0, 0, 1)
++
++void __init orion_mpp_conf(unsigned int *mpp_list, unsigned int variant_mask,
++			   unsigned int mpp_max, unsigned int dev_bus);
++
++#endif
+diff --git a/arch/arm/plat-orion/mpp.c b/arch/arm/plat-orion/mpp.c
+new file mode 100644
+index 0000000..248c022
+--- /dev/null
++++ b/arch/arm/plat-orion/mpp.c
+@@ -0,0 +1,81 @@
++/*
++ * arch/arm/plat-orion/mpp.c
++ *
++ * MPP functions for Marvell orion SoCs
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/mbus.h>
++#include <linux/io.h>
++#include <linux/gpio.h>
++#include <mach/hardware.h>
++#include <plat/mpp.h>
++
++/* Address of the ith MPP control register */
++static __init unsigned long mpp_ctrl_addr(unsigned int i,
++					  unsigned long dev_bus)
 +{
-+	fill_resources(&orion_crypto, orion_crypto_resources,
-+		       mapbase, 0xffff, irq);
-+	orion_crypto.num_resources = 3;
-+	orion_crypto_resources[2].start = srambase;
-+	orion_crypto_resources[2].end = srambase + sram_size - 1;
-+
-+	platform_device_register(&orion_crypto);
++	return dev_bus + (i) * 4;
 +}
-diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-index b93837a..cdbf649 100644
---- a/arch/arm/plat-orion/include/plat/common.h
-+++ b/arch/arm/plat-orion/include/plat/common.h
-@@ -113,4 +113,9 @@ void __init orion_sata_init(struct mv_sata_platform_data *sata_data,
- 			    struct mbus_dram_target_info *mbus_dram_info,
- 			    unsigned long mapbase,
- 			    unsigned long irq);
 +
-+void __init orion_crypto_init(unsigned long mapbase,
-+			      unsigned long srambase,
-+			      unsigned long sram_size,
-+			      unsigned long irq);
- #endif
++
++void __init orion_mpp_conf(unsigned int *mpp_list, unsigned int variant_mask,
++			   unsigned int mpp_max, unsigned int dev_bus)
++{
++	unsigned int mpp_nr_regs = (1 + mpp_max/8);
++	u32 mpp_ctrl[mpp_nr_regs];
++	int i;
++
++	if (!variant_mask)
++		return;
++
++	printk(KERN_DEBUG "initial MPP regs:");
++	for (i = 0; i < mpp_nr_regs; i++) {
++		mpp_ctrl[i] = readl(mpp_ctrl_addr(i, dev_bus));
++		printk(" %08x", mpp_ctrl[i]);
++	}
++	printk("\n");
++
++	for ( ; *mpp_list; mpp_list++) {
++		unsigned int num = MPP_NUM(*mpp_list);
++		unsigned int sel = MPP_SEL(*mpp_list);
++		int shift, gpio_mode;
++
++		if (num > mpp_max) {
++			printk(KERN_ERR "orion_mpp_conf: invalid MPP "
++					"number (%u)\n", num);
++			continue;
++		}
++		if (!(*mpp_list & variant_mask)) {
++			printk(KERN_WARNING
++			       "orion_mpp_conf: requested MPP%u config "
++			       "unavailable on this hardware\n", num);
++			continue;
++		}
++
++		shift = (num & 7) << 2;
++		mpp_ctrl[num / 8] &= ~(0xf << shift);
++		mpp_ctrl[num / 8] |= sel << shift;
++
++		gpio_mode = 0;
++		if (*mpp_list & MPP_INPUT_MASK)
++			gpio_mode |= GPIO_INPUT_OK;
++		if (*mpp_list & MPP_OUTPUT_MASK)
++			gpio_mode |= GPIO_OUTPUT_OK;
++		if (sel != 0)
++			gpio_mode = 0;
++		orion_gpio_set_valid(num, gpio_mode);
++	}
++
++	printk(KERN_DEBUG "  final MPP regs:");
++	for (i = 0; i < mpp_nr_regs; i++) {
++		writel(mpp_ctrl[i], mpp_ctrl_addr(i, dev_bus));
++		printk(" %08x", mpp_ctrl[i]);
++	}
++	printk("\n");
++}
 -- 
 1.7.4.4
