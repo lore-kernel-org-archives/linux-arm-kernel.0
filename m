@@ -1,33 +1,47 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Mon, 9 May 2011 11:48:57 +0800
-Subject: [PATCH] pxa: Fix PGSR register address calculation
-In-Reply-To: <E1QItCc-0003up-FQ@outmx08.plus.net>
-References: <E1QItCc-0003up-FQ@outmx08.plus.net>
-Message-ID: <BANLkTi=N5YWeouh6U8sxByR9eAFmBiT8SA@mail.gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Mon, 09 May 2011 10:32:51 +0530
+Subject: [PATCH V4 1/5] dmaengine/dw_dmac: don't call callback routine
+	in case dmaengine_terminate_all() is called
+In-Reply-To: <8d1b15be425a70cdbd30725b88bd303cc74e706d.1304596524.git.viresh.kumar@st.com>
+References: <cover.1304596524.git.viresh.kumar@st.com>
+	<8d1b15be425a70cdbd30725b88bd303cc74e706d.1304596524.git.viresh.kumar@st.com>
+Message-ID: <1304917371.32447.10.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2011 at 9:54 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> The file mfp-pxa2xx.c defines a macro, PGSR(), which translates a gpio bank number to a PGSR register address. The function pxa2xx_mfp_suspend() erroneously passed in a gpio number instead of a gpio bank number.
->
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-
-Applied to 'fix'.
-
+On Thu, 2011-05-05 at 17:30 +0530, Viresh Kumar wrote:
+> If dmaengine_terminate_all() is called for dma channel, then it doesn't make
+> much sense to call registered callback routine. While in case of success or
+> failure it must be called.
+> 
+> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
 > ---
-> --- clean-2.6.39-rc6/arch/arm/mach-pxa/mfp-pxa2xx.c ? ? 2011-03-15 01:20:32.000000000 +0000
-> +++ linux-2.6.39-rc6/arch/arm/mach-pxa/mfp-pxa2xx.c ? ? 2011-05-08 02:09:36.706294235 +0100
-> @@ -347,9 +347,9 @@ static int pxa2xx_mfp_suspend(struct sys
-> ? ? ? ? ? ? ? ?if ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
-> ? ? ? ? ? ? ? ? ? ?(GPDR(i) & GPIO_bit(i))) {
-> ? ? ? ? ? ? ? ? ? ? ? ?if (GPLR(i) & GPIO_bit(i))
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(i) |= GPIO_bit(i);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(gpio_to_bank(i)) |= GPIO_bit(i);
-> ? ? ? ? ? ? ? ? ? ? ? ?else
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(i) &= ~GPIO_bit(i);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(gpio_to_bank(i)) &= ~GPIO_bit(i);
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ?}
->
->
->
+>  drivers/dma/dw_dmac.c |   31 ++++++++++++++++---------------
+>  1 files changed, 16 insertions(+), 15 deletions(-)
+> 
+> diff --git a/drivers/dma/dw_dmac.c b/drivers/dma/dw_dmac.c
+> index 1bd4803..d28cd84 100644
+> --- a/drivers/dma/dw_dmac.c
+> +++ b/drivers/dma/dw_dmac.c
+> @@ -195,18 +195,21 @@ static void dwc_dostart(struct dw_dma_chan *dwc, struct dw_desc *first)
+>  /*----------------------------------------------------------------------*/
+>  
+
+> -	/*
+> -	 * The API requires that no submissions are done from a
+> -	 * callback, so we don't need to drop the lock here
+> -	 */
+> -	if (callback)
+> -		callback(param);
+> +	if (callback_required) {
+> +		if (callback)
+> +			callback(param);
+> +	}
+How about changing this to:
+	if (callback_required && callback)
+		callback(param)
+This will make it look cleaner ...
+
+
+-- 
+~Vinod
