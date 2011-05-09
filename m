@@ -1,132 +1,72 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Mon,  9 May 2011 14:41:49 +0300
-Subject: [PATCH 4/4] arm: pxa3xx: cm-x300: update cm_x300_defconfig
-In-Reply-To: <1304941309-13288-1-git-send-email-grinberg@compulab.co.il>
-References: <1304941309-13288-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <1304941309-13288-4-git-send-email-grinberg@compulab.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 May 2011 13:05:09 +0100
+Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
+In-Reply-To: <1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
+	<20110508214101.GO27807@n2100.arm.linux.org.uk>
+	<1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
+	<20110509103242.GQ27807@n2100.arm.linux.org.uk>
+	<1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110509120509.GR27807@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, May 09, 2011 at 11:59:54AM +0100, Catalin Marinas wrote:
+> On Mon, 2011-05-09 at 11:32 +0100, Russell King - ARM Linux wrote:
+> > On Mon, May 09, 2011 at 11:22:19AM +0100, Catalin Marinas wrote:
+> > > Alternatively an exception return would do as well (like movs pc, lr)
+> > > but I think we still add some code for setting up the SPSR.
+> > 
+> > That gives us a way out of both of these without introducing any CPU
+> > specific code.  We can setup the SPSR before this block of code, and
+> > call it with two movs pc, reg instructions which will provide the
+> > necessary synchronization.
+> 
+> We still need an ISB before enabling the MMU to make sure that the TTBR
+> changing is visible. We may run with the MMU enabled (in the identity
+> mapping) before the exception return but with random data in TTBR.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
----
- arch/arm/configs/cm_x300_defconfig |   18 ++++--------------
- 1 files changed, 4 insertions(+), 14 deletions(-)
+  Changes to CP15 registers and the memory order model
+  All changes to CP15 registers that appear in program order after any
+  explicit memory operations are guaranteed not to affect those memory
+  operations.
 
-diff --git a/arch/arm/configs/cm_x300_defconfig b/arch/arm/configs/cm_x300_defconfig
-index 921e56a..f4b7672 100644
---- a/arch/arm/configs/cm_x300_defconfig
-+++ b/arch/arm/configs/cm_x300_defconfig
-@@ -5,7 +5,6 @@ CONFIG_SYSVIPC=y
- CONFIG_IKCONFIG=y
- CONFIG_IKCONFIG_PROC=y
- CONFIG_LOG_BUF_SHIFT=18
--CONFIG_SYSFS_DEPRECATED_V2=y
- CONFIG_BLK_DEV_INITRD=y
- # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
- CONFIG_MODULES=y
-@@ -13,6 +12,7 @@ CONFIG_MODULE_UNLOAD=y
- CONFIG_MODULE_FORCE_UNLOAD=y
- # CONFIG_BLK_DEV_BSG is not set
- CONFIG_ARCH_PXA=y
-+CONFIG_GPIO_PCA953X=y
- CONFIG_MACH_CM_X300=y
- CONFIG_NO_HZ=y
- CONFIG_AEABI=y
-@@ -23,7 +23,6 @@ CONFIG_CMDLINE="root=/dev/mtdblock5 rootfstype=ubifs console=ttyS2,38400"
- CONFIG_CPU_FREQ=y
- CONFIG_CPU_FREQ_GOV_USERSPACE=y
- CONFIG_FPE_NWFPE=y
--CONFIG_PM=y
- CONFIG_APM_EMULATION=y
- CONFIG_NET=y
- CONFIG_PACKET=y
-@@ -40,8 +39,8 @@ CONFIG_IP_PNP_RARP=y
- # CONFIG_INET_DIAG is not set
- # CONFIG_IPV6 is not set
- CONFIG_BT=m
--CONFIG_BT_L2CAP=m
--CONFIG_BT_SCO=m
-+CONFIG_BT_L2CAP=y
-+CONFIG_BT_SCO=y
- CONFIG_BT_RFCOMM=m
- CONFIG_BT_RFCOMM_TTY=y
- CONFIG_BT_BNEP=m
-@@ -60,7 +59,6 @@ CONFIG_MTD_NAND_PXA3xx=y
- CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
- CONFIG_BLK_DEV_RAM=y
--# CONFIG_MISC_DEVICES is not set
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
- CONFIG_NETDEVICES=y
-@@ -81,16 +79,15 @@ CONFIG_TOUCHSCREEN_WM97XX=m
- # CONFIG_TOUCHSCREEN_WM9705 is not set
- # CONFIG_TOUCHSCREEN_WM9713 is not set
- # CONFIG_SERIO is not set
-+# CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_PXA=y
- CONFIG_SERIAL_PXA_CONSOLE=y
--# CONFIG_LEGACY_PTYS is not set
- # CONFIG_HW_RANDOM is not set
- CONFIG_I2C=y
- CONFIG_I2C_PXA=y
- CONFIG_SPI=y
- CONFIG_SPI_GPIO=y
- CONFIG_GPIO_SYSFS=y
--CONFIG_GPIO_PCA953X=y
- # CONFIG_HWMON is not set
- CONFIG_PMIC_DA903X=y
- CONFIG_REGULATOR=y
-@@ -102,7 +99,6 @@ CONFIG_LCD_CLASS_DEVICE=y
- CONFIG_LCD_TDO24M=y
- # CONFIG_BACKLIGHT_GENERIC is not set
- CONFIG_BACKLIGHT_DA903X=m
--# CONFIG_VGA_CONSOLE is not set
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
- CONFIG_FONTS=y
-@@ -131,7 +127,6 @@ CONFIG_HID_GREENASIA=y
- CONFIG_HID_SMARTJOYPLUS=y
- CONFIG_HID_TOPSEED=y
- CONFIG_HID_THRUSTMASTER=y
--CONFIG_HID_WACOM=m
- CONFIG_HID_ZEROPLUS=y
- CONFIG_USB=y
- CONFIG_USB_DEVICEFS=y
-@@ -152,7 +147,6 @@ CONFIG_RTC_DRV_PXA=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- # CONFIG_EXT3_FS_XATTR is not set
--CONFIG_INOTIFY=y
- CONFIG_MSDOS_FS=m
- CONFIG_VFAT_FS=m
- CONFIG_TMPFS=y
-@@ -164,7 +158,6 @@ CONFIG_NFS_V3=y
- CONFIG_NFS_V3_ACL=y
- CONFIG_NFS_V4=y
- CONFIG_ROOT_NFS=y
--CONFIG_SMB_FS=m
- CONFIG_CIFS=m
- CONFIG_CIFS_WEAK_PW_HASH=y
- CONFIG_PARTITION_ADVANCED=y
-@@ -172,9 +165,7 @@ CONFIG_NLS_CODEPAGE_437=m
- CONFIG_NLS_ISO8859_1=m
- CONFIG_DEBUG_FS=y
- CONFIG_DEBUG_KERNEL=y
--# CONFIG_DETECT_SOFTLOCKUP is not set
- # CONFIG_SCHED_DEBUG is not set
--# CONFIG_RCU_CPU_STALL_DETECTOR is not set
- CONFIG_SYSCTL_SYSCALL_CHECK=y
- # CONFIG_FTRACE is not set
- CONFIG_DEBUG_USER=y
-@@ -182,7 +173,6 @@ CONFIG_DEBUG_LL=y
- CONFIG_CRYPTO_ECB=m
- CONFIG_CRYPTO_MICHAEL_MIC=m
- CONFIG_CRYPTO_AES=m
--CONFIG_CRYPTO_ARC4=m
- # CONFIG_CRYPTO_ANSI_CPRNG is not set
- # CONFIG_CRYPTO_HW is not set
- CONFIG_CRC_T10DIF=y
--- 
-1.7.3.4
+  Any change to CP15 registers is guaranteed to be visible to subsequent
+  instructions only after one of:
+  ? the execution of an ISB instruction
+  ? the taking of an exception
+  ? the return from an exception.
+
+  To guarantee the visibility of changes to some CP15 registers, additional
+  operations might be required, on a case by case basis, before the ISB
+  instruction, exception or return from exception. These cases are
+  identified specifically in the definition of the registers.
+
+  However, for CP15 register accesses, all MRC and MCR instructions to
+  the same register using the same register number appear to occur in
+  program order relative to each other without context synchronization.
+
+So, my reading of this suggests that ISB and returning from an exception
+(iow, movs pc, reg) have the same properties.  So:
+
+        mcr     p15, 0, r5, c3, c0, 0           @ load domain access register
+        mcr     p15, 0, r4, c2, c0, 0           @ load page table pointer
+-       b       __turn_mmu_on
++	mrs	r4, cpsr			@ copy cpsr to spsr
++	msr	spsr, r4
++	adr	r4, BSYM(__turn_mmu_on)
++	movs	pc, r4				@ synchronizing
+
+        .align  5
+__turn_mmu_on:
+        mov     r0, r0
+        mcr     p15, 0, r0, c1, c0, 0           @ write control reg
+        mrc     p15, 0, r3, c0, c0, 0           @ read id reg
+        mov     r3, r3
+        mov     r3, r13
+-       mov     pc, r3
++       movs    pc, r3				@ synchronizing
+
+should be sufficient - and has the advantage that it should work on
+existing CPUs.
