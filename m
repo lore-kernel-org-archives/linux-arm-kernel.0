@@ -1,37 +1,68 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 9 May 2011 13:46:27 +0530
-Subject: [PATCH V4 3/5] dmaengine/dw_dmac: Divide one sg to many desc,
-	if sg len is greater than DWC_MAX_COUNT
-In-Reply-To: <1304921462.32447.35.camel@vkoul-udesk3>
-References: <cover.1304596524.git.viresh.kumar@st.com>	
-	<f3150fa0fb160c70760b95ac72423ebba354f188.1304596524.git.viresh.kumar@st.com>	
-	<1304918425.32447.20.camel@vkoul-udesk3> <4DC783A9.5060802@st.com>	
-	<1304920041.32447.33.camel@vkoul-udesk3> <4DC78ABB.2030800@st.com>
-	<1304921462.32447.35.camel@vkoul-udesk3>
-Message-ID: <4DC7A2DB.3040601@st.com>
+From: phil@nwl.cc (Phil Sutter)
+Date: Mon, 9 May 2011 10:59:42 +0200
+Subject: ARM, AF_PACKET: caching problems on Marvell Kirkwood
+In-Reply-To: <20110506161753.GC20777@orbit.nwl.cc>
+References: <20110408130643.GA8730@orbit.nwl.cc>
+	<20110505141107.GC30443@orbit.nwl.cc>
+	<20110505194601.GA10565@lunn.ch>
+	<20110506161753.GC20777@orbit.nwl.cc>
+Message-ID: <20110509085942.GA3439@orbit.nwl.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/09/2011 11:41 AM, Koul, Vinod wrote:
-> On Mon, 2011-05-09 at 12:03 +0530, viresh kumar wrote:
->> On 05/09/2011 11:17 AM, Koul, Vinod wrote:
->>> Ah, then there is another todo for this driver. Move from chan->private
->>> to DMA_SLAVE_CONFIG.
->>>
->>> struct dma_slave_config has dedicated fields for both source and
->>> destination widths, src_addr_width & dst_addr_width please use them...
->>> You should pass this structure to device control API as:
->>> dmaengine_device_control(
->>> 	chan, DMA_SLAVE_CONFIG, (unsigned long)&slave_config);
->>
->> As soon as i get some time, will study & implement this.
->> For now, please push this patchset (if it looks fine).
->>
-> rest looks OK. Please fix the patch1.
-> 
-> 
+Hi,
 
-I am resending all 5 patches, so that they get rebased cleanly.
+On Fri, May 06, 2011 at 06:17:53PM +0200, Phil Sutter wrote:
+> On Thu, May 05, 2011 at 09:46:01PM +0200, Andrew Lunn wrote:
+> > I can reproduce it on a Kirkwood:
+> > 
+> > [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=00053977
+> 
+> Thanks for the information. Seems like we have the same CPU:
+> 
+> | [    0.000000] CPU: Feroceon 88FR131 [56251311] revision 1 (ARMv5TE), cr=00053177
+> | [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+> 
+> and it's actually VIVT, not VIPT as I wrote in an earlier mail.
 
--- 
-viresh
+Interesting news, a friend of mine can reproduce the problem on a
+Foxboard (FOXG20):
+
+| root at localhost:/root # dmesg |head -4
+| [    0.000000] Linux version 2.6.37 (wbx at chrom) (gcc version 4.5.2 (GCC) ) #1 Sat May 7 19:37:30 CEST 2011
+| [    0.000000] CPU: ARM926EJ-S [41069265] revision 5 (ARMv5TEJ), cr=00053177
+| [    0.000000] CPU: VIVT data cache, VIVT instruction cache
+| [    0.000000] Machine: Acme Systems FOXG20
+| root at localhost:/root # uname -a
+| Linux localhost 2.6.37 #1 Sat May 7 19:37:30 CEST 2011 armv5tejl GNU/Linux
+| root at localhost:/root # /mmap
+| sendto(): nothing sent!
+| tp_status after sending: SEND_REQUEST
+| sendto(): nothing sent!
+| tp_status after sending: SEND_REQUEST
+| sendto(): sent 450 bytes out
+| tp_status after sending: AVAILABLE
+| sendto(): sent 150 bytes out
+| tp_status after sending: AVAILABLE
+| sendto(): nothing sent!
+| tp_status after sending: SEND_REQUEST
+| sendto(): nothing sent!
+| tp_status after sending: SEND_REQUEST
+| sendto(): sent 300 bytes out
+| tp_status after sending: SEND_REQUEST
+| sendto(): nothing sent!
+| tp_status after sending: SEND_REQUEST
+| sendto(): sent 300 bytes out
+| tp_status after sending: SEND_REQUEST
+| sendto(): sent 150 bytes out
+| tp_status after sending: SEND_REQUEST
+| sendto(): sent 150 bytes out
+| tp_status after sending: SEND_REQUEST
+| sendto(): sent 300 bytes out
+| tp_status after sending: AVAILABLE
+| sendto(): nothing sent!
+| tp_status after sending: SEND_REQUEST
+| sendto(): sent 150 bytes out
+| tp_status after sending: SEND_REQUEST
+
+Greetings, Phil
