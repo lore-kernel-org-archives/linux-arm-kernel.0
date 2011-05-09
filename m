@@ -1,32 +1,33 @@
-From: vapier.adi@gmail.com (Mike Frysinger)
-Date: Sun, 8 May 2011 22:38:43 -0400
-Subject: [PATCH] atomic: add *_dec_not_zero
-In-Reply-To: <201105081133.50824.sven@narfation.org>
-References: <1304458235-28473-1-git-send-email-sven@narfation.org>
-	<20110508092403.GB27807@n2100.arm.linux.org.uk>
-	<201105081133.50824.sven@narfation.org>
-Message-ID: <BANLkTim+z0mv7oXZHr0YnoxtfnoDZTEr9Q@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Mon, 9 May 2011 11:48:57 +0800
+Subject: [PATCH] pxa: Fix PGSR register address calculation
+In-Reply-To: <E1QItCc-0003up-FQ@outmx08.plus.net>
+References: <E1QItCc-0003up-FQ@outmx08.plus.net>
+Message-ID: <BANLkTi=N5YWeouh6U8sxByR9eAFmBiT8SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2011 at 05:33, Sven Eckelmann wrote:
-> Russell King - ARM Linux wrote:
-> [...]
->> Do we need atomic_dec_not_zero() et.al. in every arch header - is there no
->> generic header which it could be added to?
+On Sun, May 8, 2011 at 9:54 AM, Paul Parsons <lost.distance@yahoo.com> wrote:
+> The file mfp-pxa2xx.c defines a macro, PGSR(), which translates a gpio bank number to a PGSR register address. The function pxa2xx_mfp_suspend() erroneously passed in a gpio number instead of a gpio bank number.
 >
-> Mike Frysinger already tried to answer it in
-> <BANLkTimctgbto3dsnJ3d3r7NggS0KF9_Sw@mail.gmail.com>:
->> that's what asm-generic is for. ?if the arch isnt using it, it's
->> either because the arch needs to convert to it, or they're using SMP
->> and asm-generic doesnt yet support that for atomic.h.
->>
->> for example, the Blackfin port only needed updating for the SMP case.
->> in the non-SMP case, we're getting the def from asm-generic/atomic.h.
->
-> Feel free to change that but I just followed the style used by all other
-> macros and will not redesign the complete atomic*.h idea.
+> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 
-what you're doing is currently correct.  i think merging SMP support
-into asm-generic for atomic* will take a bit of pondering first.
--mike
+Applied to 'fix'.
+
+> ---
+> --- clean-2.6.39-rc6/arch/arm/mach-pxa/mfp-pxa2xx.c ? ? 2011-03-15 01:20:32.000000000 +0000
+> +++ linux-2.6.39-rc6/arch/arm/mach-pxa/mfp-pxa2xx.c ? ? 2011-05-08 02:09:36.706294235 +0100
+> @@ -347,9 +347,9 @@ static int pxa2xx_mfp_suspend(struct sys
+> ? ? ? ? ? ? ? ?if ((gpio_desc[i].config & MFP_LPM_KEEP_OUTPUT) &&
+> ? ? ? ? ? ? ? ? ? ?(GPDR(i) & GPIO_bit(i))) {
+> ? ? ? ? ? ? ? ? ? ? ? ?if (GPLR(i) & GPIO_bit(i))
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(i) |= GPIO_bit(i);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(gpio_to_bank(i)) |= GPIO_bit(i);
+> ? ? ? ? ? ? ? ? ? ? ? ?else
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(i) &= ~GPIO_bit(i);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? PGSR(gpio_to_bank(i)) &= ~GPIO_bit(i);
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?}
+>
+>
+>
