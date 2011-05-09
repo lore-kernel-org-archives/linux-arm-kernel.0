@@ -1,49 +1,82 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 May 2011 16:34:16 +0100
-Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
-In-Reply-To: <1304953316.7658.71.camel@e102109-lin.cambridge.arm.com>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
-	<20110508214101.GO27807@n2100.arm.linux.org.uk>
-	<1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
-	<20110509103242.GQ27807@n2100.arm.linux.org.uk>
-	<1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
-	<20110509120509.GR27807@n2100.arm.linux.org.uk>
-	<1304953316.7658.71.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110509153416.GC16919@n2100.arm.linux.org.uk>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 9 May 2011 08:37:28 -0700
+Subject: [PATCH][WAS:bcmai, axi] bcma: add Broadcom specific AMBA bus
+	driver
+In-Reply-To: <BANLkTikoLnrVvAWC7v7+q1fe4+Qt3HF4ug@mail.gmail.com>
+References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
+	<201105081647.22091.arnd@arndb.de>
+	<BANLkTimhOCL7O1ERqUKkH_4sgq5xNYJZRg@mail.gmail.com>
+	<201105081759.03032.arnd@arndb.de>
+	<BANLkTikoLnrVvAWC7v7+q1fe4+Qt3HF4ug@mail.gmail.com>
+Message-ID: <20110509153728.GA29762@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2011 at 04:01:56PM +0100, Catalin Marinas wrote:
-> This doesn't work. From the ARM ARM (B1.3.3):
+On Mon, May 09, 2011 at 04:33:43PM +0200, Rafa? Mi?ecki wrote:
+> 2011/5/8 Arnd Bergmann <arnd@arndb.de>:
+> > On Sunday 08 May 2011 16:59:55 Rafa? Mi?ecki wrote:
+> >> 2011/5/8 Arnd Bergmann <arnd@arndb.de>:
+> >> >> >> diff --git a/drivers/bcma/TODO b/drivers/bcma/TODO
+> >> >> >> new file mode 100644
+> >> >> >> index 0000000..45eadc9
+> >> >> >> --- /dev/null
+> >> >> >> +++ b/drivers/bcma/TODO
+> >> >> >> @@ -0,0 +1,3 @@
+> >> >> >> +- Interrupts
+> >> >> >> +- Defines for PCI core driver
+> >> >> >> +- Convert bcma_bus->cores into linked list
+> >> >> >
+> >> >> > The last item doesn't make sense to me. Since you are using the regular
+> >> >> > driver model, you can simply iterate over all child devices of any
+> >> >> > dev.
+> >> >>
+> >> >> It's about optimization. Right now bcma_bus->cores is static array, we
+> >> >> probably never will use all entries.
+> >> >
+> >> > Oh, I see. You should probably have neither of them. Instead allocate
+> >> > the devices dynamically as you find them and do a device_register,
+> >> > which will add the device into linked list.
+> >>
+> >> As I said, and wrote: TODO.
+> >
+> > Well, I think getting this part right is essential before the
+> > patch can get merged.
+> >
+> >> > Maybe you didn't understand what I said: This should be
+> >> >
+> >> > struct bcma_device {
+> >> > ? ? struct bcma_bus *bus;
+> >> > ? ? struct bcma_device_id id;
+> >> > ? ? struct device dev;
+> >> > ? ? u8 core_index;
+> >> >
+> >> > ? ? u32 addr;
+> >> > ? ? u32 wrap;
+> >> >
+> >> > ? ? void *drvdata;
+> >> > };
+> >> >
+> >> > Here, bcma_device is the device, no need to follow pointers
+> >> > around. It's how all bus_types work, you should just do the same.
+> >>
+> >> We can not use static "struct device", see Greg's comments in:
+> >> [RFC][PATCH V3] axi: add AXI bus driver
+> >> (not to mention we would have unused "struct device" in ChipCommon's
+> >> and PCI's "struct bcma_device").
+> >
+> > Please reread what Greg explained, it's actually the same as what
+> > I said here: Don't make the device static (you already don't),
+> > don't put the device structure as a member in the bus structure
+> > (as discussed above). Make the device a member of bcma_device,
+> > so you get proper reference counting for it, in the way that
+> > Greg explained.
 > 
->         The execution state bits are the IT[7:0], J, E, and T bits. In
->         exception modes you can read or write these bits in the current
->         SPSR.
->         In the CPSR, unless the processor is in Debug state:
->         ? The execution state bits, other than the E bit, are RAZ when
->         read by an MRS instruction.
-> 
-> So reading the CPSR doesn't copy the T and E bits. Of course, we could
-> set them explicitly but I find the ISB much simpler (and in practice we
-> only need it for ARMv7 onwards but adding the ARMv6 in case we have a
-> kernel compiled for both).
+> Thanks for help & explaining! Unfortunately Greg didn't answer if my
+> changed implementation is fine. I'll fix this!
 
-Err.  If that's correct then the Linux kernel is totally broken, and
-that's an incompatible change to the behaviour of the MRS and MSR
-instructions which has gone unnoticed.
+Greg didn't know that you changed it, or that you wanted review comments
+on it.
 
-We use "MRS reg, cpsr" for saving the IRQ state in SVC mode and
-"MSR cpsr, reg" to restore the interrupt state.  If the T bit gets
-reset by that, then Thumb kernels can never work.
+thanks,
 
-What you've just said tells me that our implementation of:
-- arch_local_irq_save()
-- arch_local_save_flags()
-- arch_local_irq_restore()
-won't work because we can't read or write the I and F bits using
-MSR/MRS, even in SVC mode.
-
-What is the replacement method for doing this?
-
-If there isn't a replacement method...
+greg "please be specific when asking for review" k-h
