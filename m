@@ -1,58 +1,50 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 09 May 2011 16:38:50 +0100
-Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
-In-Reply-To: <20110509153416.GC16919@n2100.arm.linux.org.uk>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
-	<20110508214101.GO27807@n2100.arm.linux.org.uk>
-	<1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
-	<20110509103242.GQ27807@n2100.arm.linux.org.uk>
-	<1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
-	<20110509120509.GR27807@n2100.arm.linux.org.uk>
-	<1304953316.7658.71.camel@e102109-lin.cambridge.arm.com>
-	<20110509153416.GC16919@n2100.arm.linux.org.uk>
-Message-ID: <1304955530.7658.74.camel@e102109-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 May 2011 08:46:44 -0700
+Subject: [PATCH 1/4] drivers: create a pinmux subsystem
+In-Reply-To: <BANLkTimrGP1ohGX1B4teaNMbgVjSb5Mw5Q@mail.gmail.com>
+References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
+	<20110504091619.GV2092@atomide.com>
+	<BANLkTimrGP1ohGX1B4teaNMbgVjSb5Mw5Q@mail.gmail.com>
+Message-ID: <20110509154644.GE11410@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-09 at 16:34 +0100, Russell King - ARM Linux wrote:
-> On Mon, May 09, 2011 at 04:01:56PM +0100, Catalin Marinas wrote:
-> > This doesn't work. From the ARM ARM (B1.3.3):
+* Mike Rapoport <mike.rapoport@gmail.com> [110507 12:07]:
+> On Wed, May 4, 2011 at 12:16 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Linus Walleij <linus.walleij@stericsson.com> [110502 12:13]:
 > >
-> >         The execution state bits are the IT[7:0], J, E, and T bits. In
-> >         exception modes you can read or write these bits in the current
-> >         SPSR.
-> >         In the CPSR, unless the processor is in Debug state:
-> >         ? The execution state bits, other than the E bit, are RAZ when
-> >         read by an MRS instruction.
+> > Good to see this, looks like this should work for omaps too.
 > >
-> > So reading the CPSR doesn't copy the T and E bits. Of course, we could
-> > set them explicitly but I find the ISB much simpler (and in practice we
-> > only need it for ARMv7 onwards but adding the ARMv6 in case we have a
-> > kernel compiled for both).
+> > The numbering solves the issue where we have multiple
+> > pinmux domains (base + offset for each domain).
+> >
+> > Then I would assume that for most cases the pin access can be
+> > described with:
+> >
+> > unsigned long pinmux_base; ? ? ?/* Can have multiple pinux domains */
+> > u16 pinmux_reg_offset; ? ? ? ? ?/* Register offset from pinmux_base */
+> > u16 flags; ? ? ? ? ? ? ? ? ? ? ?/* Register width etc */
+> >
+> > Which can be accessed with read[bwl] and write[bwl], so we
+> > can have default access functions in the pinux framework and
+> > don't necessarily have to implement them for each platform.
 > 
-> Err.  If that's correct then the Linux kernel is totally broken, and
-> that's an incompatible change to the behaviour of the MRS and MSR
-> instructions which has gone unnoticed.
-> 
-> We use "MRS reg, cpsr" for saving the IRQ state in SVC mode and
-> "MSR cpsr, reg" to restore the interrupt state.  If the T bit gets
-> reset by that, then Thumb kernels can never work.
-> 
-> What you've just said tells me that our implementation of:
-> - arch_local_irq_save()
-> - arch_local_save_flags()
-> - arch_local_irq_restore()
-> won't work because we can't read or write the I and F bits using
-> MSR/MRS, even in SVC mode.
+> On some platforms setting the pin configuration won't require to keep
+> that lot of data, see, e.g. Orion and it's successors.
 
-You can't write the execution state bits: IT[7:0], E and T.
+Yeah but if we can figure out some common data format the wasted
+memory won't matter compared to having common code.
 
-You can write mask bits A, I and F using MSR.
+I guess if we plan on passing the mux registers in devicetree data,
+we actually should just have something like this for each mux entry: 
 
-> What is the replacement method for doing this?
+address
+muxmodes
+flags
 
-For changing the execution state - SETEND, BX etc.
+Don't know how well that would work for tegra, can you calculate
+the configuration registers from some base address maybe?
 
--- 
-Catalin
+Regards,
+
+Tony
