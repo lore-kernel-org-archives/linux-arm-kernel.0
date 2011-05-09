@@ -1,111 +1,192 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 9 May 2011 16:39:40 +0200
-Subject: [RFC] What is the preferred way to share ADC unit between	hwmon
-	and input(ts) drivers?
-In-Reply-To: <4DC7EB55.1040109@cam.ac.uk>
-References: <4DC7EB55.1040109@cam.ac.uk>
-Message-ID: <20110509143939.GG3225@opensource.wolfsonmicro.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 9 May 2011 08:48:02 -0600 (MDT)
+Subject: [PATCH 1/2 v2] OMAP2+: hwmod: Add API to enable IO ring
+ wakeup.
+In-Reply-To: <1304944530-12998-2-git-send-email-govindraj.raja@ti.com>
+References: <1304944530-12998-1-git-send-email-govindraj.raja@ti.com>
+	<1304944530-12998-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <alpine.DEB.2.00.1105090845480.19521@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2011 at 02:25:41PM +0100, Jonathan Cameron wrote:
-> On 05/06/11 18:20, Mark Brown wrote:
+Hello Govindraj
 
-> > I'm not clear what an abstraction below IIO for a plain ADC would be.
+On Mon, 9 May 2011, Govindraj.R wrote:
 
-> In summary what bothers me is not that IIO can't handle this - it can
-> with a few minor tweaks but rather that using IIO is massive overkill.
-> I can certainly see the benefit in adding what you suggest, but I'm a
-> little worried the main response would be 'why are you putting
-> all this stuff in place given you are just acting as distribution
-> layer for adc reading?'.
+> Add API to enable IO pad wakeup capability based on mux dynamic pad and
+> wake_up enable flag available from hwmod_mux initialization.
+> 
+> Use the wakeup_enable flag and enable wakeup capability
+> for the given pads. Wakeup capability will be enabled/disabled
+> during hmwod idle transition based on whether wakeup_flag is
+> set or cleared.
+> 
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod.c              |   51 +++++++++++++++++++++++++
+>  arch/arm/plat-omap/include/plat/omap_device.h |    2 +
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    3 +
+>  arch/arm/plat-omap/omap_device.c              |   50 ++++++++++++++++++++++++
+>  4 files changed, 106 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+> index e034294..bbbe1ed 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod.c
+> @@ -2369,3 +2369,54 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
+>  
+>  	return 0;
+>  }
+> +
+> +static int omap_hwmod_configure_ioring_wakeup(struct omap_hwmod *oh, u16 val)
 
-Isn't that essentially what IIO is (well, there's the DAC side as well)?
-You're currently focusing on distributing data to userspace but that
-seems like a fixable limitation rather than anything else, I don't see a
-fundamental disconnect between users.
+What about Todd's comments?
 
-> > I'm not personally interested in that case, but if the input device is
-> > really reading from the ADC using the same ADC interface as the rest of
-> > the world then presumably the abstraction mismatch would be handled
-> > above IIO?
+If this function is still valid after considering those comments -- 
+perhaps by adding a 'mask' argument -- then lease change this function's 
+name to simply _set_ioring_wakeup() and move it up towards the top of the 
+file with the rest of the static functions.
 
-> This is my point. IIO is high performance - if there is 'above' IIO, then
-> you've just wrecked one of our main reasons for existence.  IIO goes to userspace
-> via the shortest possible path.
+> +{
+> +	struct omap_device_pad *pad;
+> +	int ret = -EINVAL, j;
+> +
+> +	if (oh->mux->enabled) {
+> +		for (j = 0; j < oh->mux->nr_pads_dynamic; j++) {
+> +			pad = oh->mux->pads_dynamic[j];
+> +			if (pad->flags & OMAP_DEVICE_PAD_WAKEUP) {
+> +				pad->idle = pad->enable | val;
+> +				ret = 0;
+> +			}
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * omap_hwmod_enable_ioring_wakeup - Set wakeup flag for iopad.
+> + * @oh: struct omap_hwmod *
+> + *
+> + * Traverse through dynamic pads, if pad is enabled then
+> + * set wakeup enable bit flag for the mux pin. Wakeup pad bit
+> + * will be set during hwmod idle transistion.
+> + * Return error if pads are not enabled or not available.
+> + */
+> +int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh)
+> +{
+> +	/* Enable pad wake-up capability */
+> +	return omap_hwmod_configure_ioring_wakeup(oh, OMAP_WAKEUP_EN);
+> +}
+> +
+> +/**
+> + * omap_hwmod_disable_ioring_wakeup - Clear wakeup flag for iopad.
+> + * @oh: struct omap_hwmod *
+> + *
+> + * Traverse through dynamic pads, if pad is enabled then
+> + * clear wakeup enable bit flag for the mux pin. Wakeup pad bit
+> + * will be set during hwmod idle transistion.
+> + * Return error if pads are not enabled or not available.
+> + */
+> +int omap_hwmod_disable_ioring_wakeup(struct omap_hwmod *oh)
+> +{
+> +	u16 val = 0;
+> +
+> +	/* Disable pad wakeup capability */
+> +	val &= ~OMAP_WAKEUP_EN;
+> +	return omap_hwmod_configure_ioring_wakeup(oh, val);
+> +}
+> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+> index e4c349f..a377dd0 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_device.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
+> @@ -117,6 +117,8 @@ int omap_device_enable_hwmods(struct omap_device *od);
+>  int omap_device_disable_clocks(struct omap_device *od);
+>  int omap_device_enable_clocks(struct omap_device *od);
+>  
+> +int omap_device_enable_ioring_wakeup(struct platform_device *pdev);
+> +int omap_device_disable_ioring_wakeup(struct platform_device *pdev);
+>  
+>  /*
+>   * Entries should be kept in latency order ascending
+> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> index 1adea9c..7ef11a6 100644
+> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+> @@ -602,6 +602,9 @@ u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+>  
+>  int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
+>  
+> +int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh);
+> +int omap_hwmod_disable_ioring_wakeup(struct omap_hwmod *oh);
+> +
+>  /*
+>   * Chip variant-specific hwmod init routines - XXX should be converted
+>   * to use initcalls once the initial boot ordering is straightened out
+> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+> index 9bbda9a..04a4f15 100644
+> --- a/arch/arm/plat-omap/omap_device.c
+> +++ b/arch/arm/plat-omap/omap_device.c
+> @@ -742,6 +742,56 @@ void __iomem *omap_device_get_rt_va(struct omap_device *od)
+>  	return omap_hwmod_get_mpu_rt_va(od->hwmods[0]);
+>  }
+>  
+> +/**
+> + * omap_device_enable_ioring_wakeup - Set wakeup bit for iopad ring.
+> + * @pdev: platform_device for which wakeup needs to be set.
+> + *
+> + * Caller should ensure this is called if device_may_wakeup(dev) is true
+> + * traverse through each hwmod and check each available pads
+> + * if pad is enabled then set wakeup enable flag for the mux pin.
+> + * Return error if pads are not enabled or not available.
+> + * Wakeup enable flag will be we used during hwmod idle transistion.
+> + */
+> +int omap_device_enable_ioring_wakeup(struct platform_device *pdev)
+> +{
+> +	int ret = -EINVAL, i;
+> +	struct omap_device *od;
+> +	struct omap_hwmod *oh;
+> +
+> +	od = _find_by_pdev(pdev);
+> +	for (i = 0; i < od->hwmods_cnt; i++) {
+> +		oh = od->hwmods[i];
+> +		ret = omap_hwmod_enable_ioring_wakeup(oh);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * omap_device_disable_ioring_wakeup - Clear wakeup bit for iopad ring.
+> + * @pdev: platform_device for which wakeup needs to be cleared.
+> + *
+> + * Caller should ensure this is called if device_may_wakeup(dev) is false
+> + * traverse through each hwmod and check each available pads
+> + * if pad is enabled then clear wakeup enable flag for the mux pin.
+> + * Return error if pads are not enabled or not available.
+> + * Wakeup enable flag will be we used during hwmod idle transistion.
+> + */
+> +int omap_device_disable_ioring_wakeup(struct platform_device *pdev)
+> +{
+> +	int ret = -EINVAL, i;
+> +	struct omap_device *od;
+> +	struct omap_hwmod *oh;
+> +
+> +	od = _find_by_pdev(pdev);
+> +	for (i = 0; i < od->hwmods_cnt; i++) {
+> +		oh = od->hwmods[i];
+> +		ret = omap_hwmod_disable_ioring_wakeup(oh);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  /*
+>   * Public functions intended for use in omap_device_pm_latency
+>   * .activate_func and .deactivate_func function pointers
+> -- 
+> 1.7.1
+> 
 
-It doesn't seem terribly invasive to be able to have a choice of things
-to notify, you already have to at least be able to work out which
-userspace thing to tell...  It certainly doesn't seem like we'd want
-another subsystem to offer a different userspace interface, or even a
-reimplementation of the same userspace interface, for the generic
-channels.  It also doesn't seem like kernel space is going to be
-explicitly looking for low performance, in the touchscreen example you
-mentioned the focus is typically very much on reducing latency.
 
-> > I can't think what would be unusual about this from the
-> > point of view of the ADC.
-
-> I really think you have misunderstood what IIO is targeting.  It is not
-> currently about providing a small layer to allow other kernel subsystems
-> to access an adc - it's about two main things.  Unified consistent userspace
-> interfaces and the option of a fast data path to userspace.  We can put in
-> what you want and have sufficient information to do it (unlike hwmon and input
-> I guess), but as yet I'm unconvinced that we should.
-
-Well, if we don't do that I guess we have to invent another subsystem
-for generic ADCs and DACs which doesn't seem ideal either, and I'd guess
-a bunch of drivers (at a guess many of them) would get pushed down from
-IIO into that and use some generic IIO to convertor adaption layer?
-
-> > It's not really ADC sharing as such - there's one physical ADC but to
-> > software these things look like a multi-channel ADC that happens to have
-> > a single register to push data out of.  It happens to be lower volume
-> > than most of the IIO ADCs but that doesn't seem like it should make too
-> > much of a difference?
-
-> We would have no problem handing the ADC's what we would need to add
-> is the description layer that provides the right information to input
-> and hwmon drivers sat on top + a few bits of infrastructure to connect
-> it all up.  Basically anything beyond the trivial adc channels with no
-> side information, would be rapidly become complex.
-
-Can't the higher level subsystems deal with this?  It doesn't seem like
-a problem the ADC layer should be worrying about.
-
-> > I'm not clear why MFD would be useful here?  These things are single
-> > function ADCs and don't always appear as part of a larger Linux device.
-> > Some CPUs have these, for example, so they just appear as a memory
-> > mapped platform device.  They often end up with the custom API in the
-> > core MFD driver where there is one of those but that's not because the
-> > MFD API is relevant.
-
-> You may view an adc as a single device - but if you want the option in
-> kernel to have it sometimes act as input and sometimes act as hwmon -
-> to do it coherently you probably need to viewing it as a combined hwmon
-> and input device (and IIO).  Thus it has multiple functions and so
-> to my mind belongs as an mfd core and separate hwmon and input drivers.
-
-Like I say this isn't really the model the hardware is presenting here -
-it looks much more like a set of n ADC channels some of which have
-fixed purposes and some of which are generic than a single ADC.
-
-> I am thoroughly in favour of unifying code at this sort of low level for
-> the various subsystems that need to read from the ADC. All I'm arguing is
-> that IIO is not the right place.  What you need here is a clean abstraction
-> for what is effectively reading from a device register.
-
-> Then you need to have a 'bus' to which your hwmon / input / iio drivers
-> appear to be connected.  The irq stuff can be handled using irq chips.
-
-You could do that, but like I say if we do that then what it's
-suggesting to me is that we should be pulling the chip drivers out of
-IIO and pushing them down into some new subsystem, leaving IIO as a
-wrapper around that subsystem for otherwise unclaimed channels (or
-possibly explicitly exposed channels).
-
-What I'm looking for here is a standard way of writing drivers for
-generic ADCs and DACs.  It doesn't have to be IIO but if it isn't then
-it's really suggesting to me that we need to start pushing things down
-out of IIO so we have a consistent way to implement support for random
-generic ADCs and DACs.
+- Paul
