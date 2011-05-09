@@ -1,72 +1,132 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 May 2011 13:05:09 +0100
-Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
-In-Reply-To: <1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
-	<20110508214101.GO27807@n2100.arm.linux.org.uk>
-	<1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
-	<20110509103242.GQ27807@n2100.arm.linux.org.uk>
-	<1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110509120509.GR27807@n2100.arm.linux.org.uk>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 9 May 2011 17:53:34 +0530
+Subject: [PATCH v2 11/12] OMAP: Serial: Use resume call from prcm to
+	enable uart
+In-Reply-To: <87bozf962e.fsf@ti.com>
+References: <1304080796-625-1-git-send-email-govindraj.raja@ti.com>
+	<1304080796-625-12-git-send-email-govindraj.raja@ti.com>
+	<87pqnym2f2.fsf@ti.com>
+	<BANLkTi=32NfMr7exWpOoPHX7_-Jc0i5LqA@mail.gmail.com>
+	<87liylkxdi.fsf@ti.com>
+	<BANLkTinr8n0P31LWPrwL83sWCzVQOqo6=Q@mail.gmail.com>
+	<87bozf962e.fsf@ti.com>
+Message-ID: <BANLkTimruC2dWUCEUyiABQ-M5PABtL32SA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2011 at 11:59:54AM +0100, Catalin Marinas wrote:
-> On Mon, 2011-05-09 at 11:32 +0100, Russell King - ARM Linux wrote:
-> > On Mon, May 09, 2011 at 11:22:19AM +0100, Catalin Marinas wrote:
-> > > Alternatively an exception return would do as well (like movs pc, lr)
-> > > but I think we still add some code for setting up the SPSR.
-> > 
-> > That gives us a way out of both of these without introducing any CPU
-> > specific code.  We can setup the SPSR before this block of code, and
-> > call it with two movs pc, reg instructions which will provide the
-> > necessary synchronization.
-> 
-> We still need an ISB before enabling the MMU to make sure that the TTBR
-> changing is visible. We may run with the MMU enabled (in the identity
-> mapping) before the exception return but with random data in TTBR.
+On Fri, May 6, 2011 at 9:25 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Govindraj <govindraj.ti@gmail.com> writes:
+>
+>> On Thu, May 5, 2011 at 8:28 PM, Kevin Hilman <khilman@ti.com> wrote:
+>>> Govindraj <govindraj.ti@gmail.com> writes:
+>>>
+>>> [...]
+>>>
+>>>>>
+>>>>> ... this is just putting back basically the same thing that was removed in
+>>>>> patch 1. ?IOW, this is now being checked for *every* PRCM wakeup, which
+>>>>> is no different than having it in the idle path.
+>>>>>
+>>>>> I thought I understood that you had the SW IRQ triggering working, so
+>>>>> this part should not be necessary.
+>>>>
+>>>> Actually I tried few experiments but couldn't get it working.
+>>>
+>>> What exactly is not working? ? The interrupt is not firing at all? ?The
+>>> driver's ISR is not being called?
+>>>
+>>
+>> It throws a oops as here
+>>
+>> http://pastebin.com/5bcPjAA0
+>
+> This doesn't help understand what exactly is not working. ?This needs
+> to be debugged further to understand the root cause.
+>
+> A quick glance at the oops shows a fault when accessing a *physical*
+> address within the INTC. ?The MMU is enabled here, and HW accesss should
+> be using a virtual address.
 
-  Changes to CP15 registers and the memory order model
-  All changes to CP15 registers that appear in program order after any
-  explicit memory operations are guaranteed not to affect those memory
-  operations.
+Today we could get console_uart booted with irq_patches + uart_runtime
+shared by Avinash [Irq_chaining + some local hacks, still not clean patches]
 
-  Any change to CP15 registers is guaranteed to be visible to subsequent
-  instructions only after one of:
-  ? the execution of an ISB instruction
-  ? the taking of an exception
-  ? the return from an exception.
+But AFAIK looks like still soft irq method is not generic as we dont
+have any similar mechanism for omap4 so how to keep it consistent.
 
-  To guarantee the visibility of changes to some CP15 registers, additional
-  operations might be required, on a case by case basis, before the ISB
-  instruction, exception or return from exception. These cases are
-  identified specifically in the definition of the registers.
+So Shall we retain resume method until we have a generic approach ?
 
-  However, for CP15 register accesses, all MRC and MCR instructions to
-  the same register using the same register number appear to occur in
-  program order relative to each other without context synchronization.
+--
+Thanks,
+Govindraj.R
 
-So, my reading of this suggests that ISB and returning from an exception
-(iow, movs pc, reg) have the same properties.  So:
 
-        mcr     p15, 0, r5, c3, c0, 0           @ load domain access register
-        mcr     p15, 0, r4, c2, c0, 0           @ load page table pointer
--       b       __turn_mmu_on
-+	mrs	r4, cpsr			@ copy cpsr to spsr
-+	msr	spsr, r4
-+	adr	r4, BSYM(__turn_mmu_on)
-+	movs	pc, r4				@ synchronizing
-
-        .align  5
-__turn_mmu_on:
-        mov     r0, r0
-        mcr     p15, 0, r0, c1, c0, 0           @ write control reg
-        mrc     p15, 0, r3, c0, c0, 0           @ read id reg
-        mov     r3, r3
-        mov     r3, r13
--       mov     pc, r3
-+       movs    pc, r3				@ synchronizing
-
-should be sufficient - and has the advantage that it should work on
-existing CPUs.
+>
+> Also, early in the boot there are a pile of other errors coming from the
+> clock framework suggesting that this kernel has some other basic
+> problems as well.
+>
+>> Reproduced with below [EXP-1] change + below kernel.
+>>
+>> git://gitorious.org/uart_runtime/pm.git
+>> [Has uart runtime patches based on pm-core branch]
+>>
+>>>> Tried below but didn't help.
+>>>>
+>>>> ------------------------------------
+>>>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>>>> index 3960330..2c1dfc2 100644
+>>>> --- a/arch/arm/mach-omap2/pm34xx.c
+>>>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>>>> @@ -288,6 +288,16 @@ static irqreturn_t prcm_interrupt_handler (int
+>>>> irq, void *dev_id)
+>>>> ? ? ? ? do {
+>>>> ? ? ? ? ? ? ? ? if (irqstatus_mpu & (OMAP3430_WKUP_ST_MASK |
+>>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP3430_IO_ST_MASK)) {
+>>>> +#if 1
+>>>> + ? ? ? ? ? ? ? ? ? ? ? /*
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ?* EXP-1: SET UART1 SOFT IRQ BIT
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ?* 3430 -SDP UART1 console.
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ?* M_IRQ_72, INTCPS_ISR_SET
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ?* 0x4820 0090 + (0x20 * n)
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ?* bit-8 n = 2
+>>>> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+>>>> + ? ? ? ? ? ? ? ? ? ? ? __raw_writel(0x100 , 0x482000D0);
+>>>> +#endif
+>>>> ? ? ? ? ? ? ? ? ? ? ? ? c = _prcm_int_handle_wakeup();
+>>>>
+>>>> ? ? ? ? ? ? ? ? ? ? ? ? /*
+>>>>
+>>>> -----------------------------------
+>>>>
+>>>> Currently we are planning to integrate irq_chaining patches
+>>>> on top uart_runtime patches which is work-in-progress.
+>>>> Will remove resume_idle once we have irq_chaining patches available.
+>>>
+>>> Well, I'm not OK with $SUBJECT patch as it is since it's just moving an
+>>> ugly hack from serial.c to the PRCM ISR. ?If the hack is going to stay,
+>>> then it should stay where it is until it can be fixed for real.
+>>
+>> Now with runtime changes we are cutting clocks independently
+>> whereas prior to this we where cutting clocks only in sram_idle path.
+>>
+>> With runtime changes:
+>> 1.) Once we cut uart clocks and send a char to uart it directs wakeup_irq to
+>> prcm_irq_handler the one way to wakeup uart from there was to check
+>> uart mod wakeup status bits if wakeup event occurred then wakeup the
+>> particular uart.
+>> 2.) Moving this resume back to sram path will break module wakeup after
+>> uart clocks are disabled(using put_sync)
+>>
+>> Thats the reason I have moved this to prcm_irq path to ensure
+>> once auto-suspend happens after inactivity period we have resume_call
+>> to wakeup uart port.
+>
+> I understand, but the point is that this approach is still the same as
+> the previous hack (check for UART wakeup on *every* wakeup event.)
+>
+> What is needed is to further investigate using SW triggered IRQs can be
+> done for these wakeup events so we can get away from the above approach
+> all together.
+>
+> Kevin
+>
