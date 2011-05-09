@@ -1,31 +1,35 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Mon, 9 May 2011 14:55:34 +0100
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <3A9C5CD56396439DBF825BB4E5779DB9@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
-	<034A6447E0D54737B5CEE009A4D20B37@subhasishg>
-	<20110509144610.6b4f7090@lxorguk.ukuu.org.uk>
-	<3A9C5CD56396439DBF825BB4E5779DB9@subhasishg>
-Message-ID: <20110509145534.2677dfa1@lxorguk.ukuu.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 9 May 2011 16:08:10 +0200
+Subject: [PATCH 04/14] [orion] Consolidate ethernet platform data
+In-Reply-To: <BANLkTim4uDH54+zj7XAxHi24a0X_-r2BSQ@mail.gmail.com>
+References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
+	<1304864141-1121-5-git-send-email-andrew@lunn.ch>
+	<BANLkTim4uDH54+zj7XAxHi24a0X_-r2BSQ@mail.gmail.com>
+Message-ID: <20110509140810.GA31070@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 May 2011 19:20:17 +0530
-"Subhasish Ghosh" <subhasish@mistralsolutions.com> wrote:
+On Sun, May 08, 2011 at 06:29:54PM +0300, saeed bishara wrote:
+> On Sun, May 8, 2011 at 5:15 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> > -static struct resource dove_ge00_shared_resources[] = {
+> > - ?? ?? ?? {
+> > - ?? ?? ?? ?? ?? ?? ?? .name ?? = "ge00 base",
+> > - ?? ?? ?? ?? ?? ?? ?? .start ??= DOVE_GE00_PHYS_BASE + 0x2000,
+> > - ?? ?? ?? ?? ?? ?? ?? .end ?? ??= DOVE_GE00_PHYS_BASE + SZ_16K - 1,
 
-> >> I then modified this function to as follows and the error is not observed
-> >> anymore.
-> >
-> > That looks like you are somehow calling uart_carrier_raised somewhere
-> > with interrupts disabled ?
-> >
-> I am not calling this function in my driver atall, this is getting called by 
-> tty_port.c
+> I looked at the KW/Dove/mv87xx specs, the giga port doesn't use more
+> than 4K address space. so you can assume drop the size parameter from
+> the orion_gexx_init functions.
 
-Can you verify the status of the interrupt flags at the point that
-routine is called in your code and get a backtrace of the path. It
-should never be gettng called with interrupts off, and if it is we need
-to know what the path is. Otherwise that code change would imply a bug
-in the core code for the platform which seems less likely.
- 
+I'm not sure this is true. I have the document
+FS_88F6180_9x_6281_OpenSource.pdf which describes the
+88F6180/88F619x/88F6281. It states that:
+
+Destination Address Filter Unicast Table (DFUT) Register (n=0-3)
+Port0: Register0: 0x73600, Register1: 0x73604, Register2: 0x73608, Register3: 0x7360C
+
+0x7360c is about 5.5K after GE00_PHYS_BASE.
+
+I think 16K address space is correct.
+
+  Andrew
