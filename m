@@ -1,35 +1,50 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 9 May 2011 19:09:38 +0200
-Subject: Thomas' IRQ patches for Samsung
-Message-ID: <20110509170938.GA5851@opensource.wolfsonmicro.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Mon, 9 May 2011 21:35:37 +0200
+Subject: [PATCH v2 0/4] s3c2440: mini2440: Add missing code parts to be
+	fully working with latest kernel.
+In-Reply-To: <1302094897-18446-1-git-send-email-marek.belisko@open-nandra.com>
+References: <1302094897-18446-1-git-send-email-marek.belisko@open-nandra.com>
+Message-ID: <BANLkTikUUUUU90Kd53qW=DyX6f8pdjakdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It turns out that when Thomas sent his IRQ patches to Russell he didn't
-include any of the arch patches, and since none have been sent to
-Russell he just dropped the core changes until such time as they are
-merged.  In order to try to help get the changes in for Samsung I've
-created the branch below - it's based off Thomas' core changes in
-irq/for-arm in the tip tree so I've sent it as a pull request rather
-than resending the patches as I'd normally do.  Hope this is OK with
-people.
+On Wed, Apr 6, 2011 at 3:01 PM, Marek Belisko
+<marek.belisko@open-nandra.com> wrote:
+> changes from v1 to v2: Replace original patch [4] with generic leds-gpio driver.
+>
+> Patch add new LCD panels with which was board produced. Also add touchscreen
+> support. Enabling LCD backlight during early booting stage also added.
+>
+> Some code parts are collected or inspired from other code (authors are in CC).
+>
+> Marek Belisko (4):
+> ?s3c2440: mini2440: Add support for new LCD panels.
+> ?s3c2440: mini2440: Add touchscreen support for mini2440.
+> ?s3c2440: mini2440: Select touchscreen by default.
+> ?s3c2440: mini2440: Use leds-gpio driver for board leds handling.
+>
+> ?arch/arm/mach-s3c2440/Kconfig ? ? ? ? | ? ?1 +
+> ?arch/arm/mach-s3c2440/mach-mini2440.c | ?176 ++++++++++++++++++++-------------
+> ?2 files changed, 107 insertions(+), 70 deletions(-)
+Sorry but I received no objections on this patches (no objections for
+any patch previously send to mach-mini2440).
+Ben could you please apply this serie to get full mini2440 support
+mainstream or?
+>
+>
 
-The following changes since commit cfefd21e693dca791bf9ecfc9dd3794facad533c:
+thanks,
 
-  genirq: Add chip suspend and resume callbacks (2011-04-23 15:56:24 +0200)
+marek
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc-2.6.git samsung-irq
+-- 
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
 
-Thomas Gleixner (3):
-      ARM: SAMSUNG: S5P: Convert irq-gpioint to generic irq chip
-      ARM: SAMSUNG: Convert irq-vic-timer to generic irq chip
-      ARM: SAMSUNG: Convert irq-uart to generic irq chip
-
- arch/arm/mach-s3c64xx/irq.c                        |    7 +-
- arch/arm/plat-s5p/irq-gpioint.c                    |  116 +++++---------------
- arch/arm/plat-s5p/irq.c                            |    6 +-
- arch/arm/plat-samsung/include/plat/irq-vic-timer.h |    2 +-
- arch/arm/plat-samsung/irq-uart.c                   |   83 ++------------
- arch/arm/plat-samsung/irq-vic-timer.c              |   69 +++++-------
- 6 files changed, 68 insertions(+), 215 deletions(-)
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+icq: 290551086
+web: http://open-nandra.com
