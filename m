@@ -1,27 +1,40 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 May 2011 08:19:35 -0700
-Subject: [PATCH v2] omap: fix build when MTD_NAND_OMAP2 and
-	TOUCHSCREEN_ADS7846 are disabled
-In-Reply-To: <1304711893-24299-1-git-send-email-mike@compulab.co.il>
-References: <20110506072523.GA25670@atomide.com>
-	<1304711893-24299-1-git-send-email-mike@compulab.co.il>
-Message-ID: <20110509151935.GC11410@atomide.com>
+Date: Mon, 9 May 2011 08:25:47 -0700
+Subject: [PATCH 1/4] drivers: create a pinmux subsystem
+In-Reply-To: <BANLkTin9-aKZjEGdBeZqDwHwADXCYERErg@mail.gmail.com>
+References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF0497F1B201@HQMAIL01.nvidia.com>
+	<BANLkTimKU-=GXzrn8=MQn-GAmKHOvKmuNQ@mail.gmail.com>
+	<20110504092219.GW2092@atomide.com>
+	<BANLkTin9-aKZjEGdBeZqDwHwADXCYERErg@mail.gmail.com>
+Message-ID: <20110509152547.GD11410@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Rapoport <mike@compulab.co.il> [110506 12:54]:
-> Commits 5e6a64b36ce346b7a2d481ef9fa315290eb28e5e (omap: move detection of
-> NAND CS to common-board-devices) and 96974a249b0cf3537f49115a59be67e2c54f315c
-> (omap: consolidate touch screen initialization among different boards)
-> break compilation when CONFIG_MTD_NAND_OMAP2 and
-> CONFIG_TOUCHSCREEN_ADS7846 are not selected.
-> Removing ifdefs and stubs from common-board-devices.h fixes the problem.
+* Mike Rapoport <mike.rapoport@gmail.com> [110507 12:03]:
+> On Wed, May 4, 2011 at 12:22 PM, Tony Lindgren <tony@atomide.com> wrote:
+> > * Colin Cross <ccross@google.com> [110502 14:26]:
+> >> On Mon, May 2, 2011 at 1:52 PM, Stephen Warren <swarren@nvidia.com> wrote:
+> >>
+> >> * Drive strength is also controlled through groups of pins, but
+> >> different groups than pinmux. ?Most of the drive strength groups are
+> >> collections of pad mux groups, but there are a few pins that are in
+> >> the same pad mux group but a different drive strength group.
+> >> * Setting a pin as a GPIO overrides its group's mux setting, except
+> >> for the group's tristate. ?You must untristate the entire group to use
+> >> a single pin as a GPIO.
+> >> * Each group has a "safe mode", but which mux id to select to enter
+> >> the safe mode is completely random.
+> >
+> > Just posted something in this thread regarding using standard data and
+> > standard read and write functions, then allow setting platform specific
+> > custom flags as needed. Care to see if that works for you too?
 > 
-> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
-> CC: Oleg Drokin <green@linuxhacker.ru>
-> ---
-> Hope this one is better.
+> Tegra does not allow pin muxing on the pin by pin basis. And,
+> registers that define mux config differ from those that define flags
+> (pull, driver strength, safe mode etc).
 
-Thanks, I'll fold this into your original patch.
+Hmm well the separate config register could be added easily. But the
+grouping of pins might be tricky then :)
 
 Tony
