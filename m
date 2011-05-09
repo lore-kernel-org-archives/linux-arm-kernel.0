@@ -1,48 +1,128 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 10 May 2011 05:16:31 +0800
-Subject: [PATCH v4] ARM: vfp: Always save VFP state in vfp_pm_suspend
-Message-ID: <1304975791-8175-1-git-send-email-21cnbao@gmail.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 9 May 2011 15:02:54 -0700
+Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
+In-Reply-To: <1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1302097097.22904.41.camel@rex>
+	<1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110509150254.e7da059f.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+On Mon, 11 Apr 2011 22:35:57 +0200
+Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
 
-vfp_pm_suspend should save the VFP state any time there is
-a last_VFP_context.  If it only saves when the VFP is enabled,
-the state can get lost when, on a UP system:
-   Thread 1 uses the VFP
-   Context switch occurs to thread 2, VFP is disabled but the
-      VFP context is not saved to allow lazy save and restore
-   Thread 2 initiates suspend
-   vfp_pm_suspend is called with the VFP disabled, but the
-      context has not been saved.
+> This function makes a deep copy of the platform data to allow it to live
+> in init memory.
+> The definition cannot go into leds-gpio.c because it needs to be builtin
+> to be usable by platforms.
+> 
 
-Modify vfp_pm_suspend to save the VFP context whenever
-last_VFP_context is set.
+Well...  why?  The changelog tells us what the function does but
+provides no information explaining why you think it's needed, nor how
+it is expected to be used, etc.
 
-Signed-off-by: Colin Cross <ccross@android.com>
-Cc: Binghua Duan <binghua.duan@csr.com>
-Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
-Signed-off-by: Barry Song <21cnbao@gmail.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/vfp/vfpmodule.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Please send a complete and useful changelog!
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index f746950..e6fe6ae 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -412,6 +412,10 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
- 
- 		/* disable, just in case */
- 		fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
-+	} else if (last_VFP_context[ti->cpu]) {
-+		fmxr(FPEXC, fpexc | FPEXC_EN);
-+		vfp_save_state(last_VFP_context[ti->cpu], fpexc);
-+		fmxr(FPEXC, fpexc);
- 	}
- 
- 	/* clear any information we had about last context state */
--- 
-1.6.0.4
+> --- a/drivers/leds/Kconfig
+> +++ b/drivers/leds/Kconfig
+> @@ -14,6 +14,11 @@ config LEDS_CLASS
+>  	  This option enables the led sysfs class in /sys/class/leds.  You'll
+>  	  need this to do anything useful with LEDs.  If unsure, say N.
+>  
+> +config LED_REGISTER_GPIO
+> +	bool
+> +	help
+> +	  This option provides the function gpio_led_register_device.
+> +
+
+Every other LEDS Kconfig symbol uses "LEDS", not "LED".  I'll make that
+change.
+
+>  if NEW_LEDS
+>  
+>  comment "LED drivers"
+> diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
+> index 39c80fc..ca428bd 100644
+> --- a/drivers/leds/Makefile
+> +++ b/drivers/leds/Makefile
+> @@ -3,6 +3,7 @@
+>  obj-$(CONFIG_NEW_LEDS)			+= led-core.o
+>  obj-$(CONFIG_LEDS_CLASS)		+= led-class.o
+>  obj-$(CONFIG_LEDS_TRIGGERS)		+= led-triggers.o
+> +obj-y					+= led-register.o
+>  
+>  # LED Platform Drivers
+>  obj-$(CONFIG_LEDS_88PM860X)		+= leds-88pm860x.o
+> diff --git a/drivers/leds/led-register.c b/drivers/leds/led-register.c
+> new file mode 100644
+> index 0000000..d3731ea
+> --- /dev/null
+> +++ b/drivers/leds/led-register.c
+> @@ -0,0 +1,33 @@
+> +/*
+> + * Copyright (C) 2011 Pengutronix
+> + * Uwe Kleine-Koenig <u.kleine-koenig@pengutronix.de>
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <linux/err.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <linux/leds.h>
+> +
+> +#if defined(CONFIG_LED_REGISTER_GPIO)
+> +struct platform_device *__init gpio_led_register_device(
+> +		int id, const struct gpio_led_platform_data *pdata)
+> +{
+> +	struct platform_device *ret;
+> +	struct gpio_led_platform_data _pdata = *pdata;
+> +
+> +	_pdata.leds = kmemdup(pdata->leds,
+> +			pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
+> +	if (!_pdata.leds)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	ret = platform_device_register_resndata(NULL, "leds-gpio", id,
+> +			NULL, 0, &_pdata, sizeof(_pdata));
+> +	if (IS_ERR(ret))
+> +		kfree(_pdata.leds);
+> +
+> +	return ret;
+> +}
+> +#endif
+> diff --git a/include/linux/leds.h b/include/linux/leds.h
+> index 61e0340..b20474d 100644
+> --- a/include/linux/leds.h
+> +++ b/include/linux/leds.h
+> @@ -207,5 +207,17 @@ struct gpio_led_platform_data {
+>  					unsigned long *delay_off);
+>  };
+>  
+> +/**
+> + * gpio_led_register_device - register a gpio-led device
+> + * @pdata: the platform data used for the new device
+> + *
+> + * Use this function instead of platform_device_add()ing a static struct
+> + * platform_device.
+> + *
+> + * Note: as pdata and pdata->leds is copied these usually can and should be
+> + * __initdata.
+> + */
+> +struct platform_device *gpio_led_register_device(
+> +		int id, const struct gpio_led_platform_data *pdata);
+
+It's unusual to document functions in the .h file.  There's a bit of
+precedent for that in leds.h, but there is more precedent in
+drivers/leds/*.c
+
+Personally I think that putting the documentation in .h is rather sucky
+- it happens so rarely that one just doesn't think of looking in there.
+
+The description isn't terribly useful if the reader doesn't know what
+"platform_device_add()ing a static struct platform_device" is for.  Can
+we describe this in some manner whcih doesn't refer to something else
+which is probably undocumented?
+
+The comment doesn't document return values.
