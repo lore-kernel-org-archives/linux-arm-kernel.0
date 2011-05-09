@@ -1,35 +1,76 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 9 May 2011 16:08:10 +0200
-Subject: [PATCH 04/14] [orion] Consolidate ethernet platform data
-In-Reply-To: <BANLkTim4uDH54+zj7XAxHi24a0X_-r2BSQ@mail.gmail.com>
-References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-	<1304864141-1121-5-git-send-email-andrew@lunn.ch>
-	<BANLkTim4uDH54+zj7XAxHi24a0X_-r2BSQ@mail.gmail.com>
-Message-ID: <20110509140810.GA31070@lunn.ch>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 9 May 2011 16:33:43 +0200
+Subject: [PATCH][WAS:bcmai,
+	axi] bcma: add Broadcom specific AMBA bus driver
+In-Reply-To: <201105081759.03032.arnd@arndb.de>
+References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
+	<201105081647.22091.arnd@arndb.de>
+	<BANLkTimhOCL7O1ERqUKkH_4sgq5xNYJZRg@mail.gmail.com>
+	<201105081759.03032.arnd@arndb.de>
+Message-ID: <BANLkTikoLnrVvAWC7v7+q1fe4+Qt3HF4ug@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 08, 2011 at 06:29:54PM +0300, saeed bishara wrote:
-> On Sun, May 8, 2011 at 5:15 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> > -static struct resource dove_ge00_shared_resources[] = {
-> > - ?? ?? ?? {
-> > - ?? ?? ?? ?? ?? ?? ?? .name ?? = "ge00 base",
-> > - ?? ?? ?? ?? ?? ?? ?? .start ??= DOVE_GE00_PHYS_BASE + 0x2000,
-> > - ?? ?? ?? ?? ?? ?? ?? .end ?? ??= DOVE_GE00_PHYS_BASE + SZ_16K - 1,
+2011/5/8 Arnd Bergmann <arnd@arndb.de>:
+> On Sunday 08 May 2011 16:59:55 Rafa? Mi?ecki wrote:
+>> 2011/5/8 Arnd Bergmann <arnd@arndb.de>:
+>> >> >> diff --git a/drivers/bcma/TODO b/drivers/bcma/TODO
+>> >> >> new file mode 100644
+>> >> >> index 0000000..45eadc9
+>> >> >> --- /dev/null
+>> >> >> +++ b/drivers/bcma/TODO
+>> >> >> @@ -0,0 +1,3 @@
+>> >> >> +- Interrupts
+>> >> >> +- Defines for PCI core driver
+>> >> >> +- Convert bcma_bus->cores into linked list
+>> >> >
+>> >> > The last item doesn't make sense to me. Since you are using the regular
+>> >> > driver model, you can simply iterate over all child devices of any
+>> >> > dev.
+>> >>
+>> >> It's about optimization. Right now bcma_bus->cores is static array, we
+>> >> probably never will use all entries.
+>> >
+>> > Oh, I see. You should probably have neither of them. Instead allocate
+>> > the devices dynamically as you find them and do a device_register,
+>> > which will add the device into linked list.
+>>
+>> As I said, and wrote: TODO.
+>
+> Well, I think getting this part right is essential before the
+> patch can get merged.
+>
+>> > Maybe you didn't understand what I said: This should be
+>> >
+>> > struct bcma_device {
+>> > ? ? struct bcma_bus *bus;
+>> > ? ? struct bcma_device_id id;
+>> > ? ? struct device dev;
+>> > ? ? u8 core_index;
+>> >
+>> > ? ? u32 addr;
+>> > ? ? u32 wrap;
+>> >
+>> > ? ? void *drvdata;
+>> > };
+>> >
+>> > Here, bcma_device is the device, no need to follow pointers
+>> > around. It's how all bus_types work, you should just do the same.
+>>
+>> We can not use static "struct device", see Greg's comments in:
+>> [RFC][PATCH V3] axi: add AXI bus driver
+>> (not to mention we would have unused "struct device" in ChipCommon's
+>> and PCI's "struct bcma_device").
+>
+> Please reread what Greg explained, it's actually the same as what
+> I said here: Don't make the device static (you already don't),
+> don't put the device structure as a member in the bus structure
+> (as discussed above). Make the device a member of bcma_device,
+> so you get proper reference counting for it, in the way that
+> Greg explained.
 
-> I looked at the KW/Dove/mv87xx specs, the giga port doesn't use more
-> than 4K address space. so you can assume drop the size parameter from
-> the orion_gexx_init functions.
+Thanks for help & explaining! Unfortunately Greg didn't answer if my
+changed implementation is fine. I'll fix this!
 
-I'm not sure this is true. I have the document
-FS_88F6180_9x_6281_OpenSource.pdf which describes the
-88F6180/88F619x/88F6281. It states that:
-
-Destination Address Filter Unicast Table (DFUT) Register (n=0-3)
-Port0: Register0: 0x73600, Register1: 0x73604, Register2: 0x73608, Register3: 0x7360C
-
-0x7360c is about 5.5K after GE00_PHYS_BASE.
-
-I think 16K address space is correct.
-
-  Andrew
+-- 
+Rafa?
