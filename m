@@ -1,20 +1,19 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 9 May 2011 21:23:25 +0100
-Subject: [PATCH] pxamci: remove an ifdef about CONFIG_REGULATOR
-In-Reply-To: <1304971869-20161-1-git-send-email-ospite@studenti.unina.it>
-References: <1304971869-20161-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <20110509202325.GD16919@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 9 May 2011 21:28:08 +0100
+Subject: [PATCH 1/2] Initial B&N Nook Color (encore) support.
+In-Reply-To: <1304891407-29364-2-git-send-email-green@linuxhacker.ru>
+References: <1304891407-29364-1-git-send-email-green@linuxhacker.ru>
+	<1304891407-29364-2-git-send-email-green@linuxhacker.ru>
+Message-ID: <20110509202807.GA19492@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2011 at 10:11:09PM +0200, Antonio Ospite wrote:
-> Don't wrap regulator_get() inside an #ifdef CONFIG_REGULATOR anymore, as
-> now (since be1a50d) it correctly degenerates and returns NULL when the
-> regulator framework is disabled.
-> 
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+On Sun, May 08, 2011 at 05:50:06PM -0400, green at linuxhacker.ru wrote:
 
-NAK.  This has been proposed before, and rejected.  See the comments
-against the original proposal:
+> +	/*
+> +	 * link regulators to MMC adapters ... we "know" the
+> +	 * regulators will be set up only *after* we return.
+> +	 */
+> +	encore_vmmc1_supply.dev = mmc[1].dev;
 
-http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6525/1
+Just specify dev_name in the supply rather than doing this.
