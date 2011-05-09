@@ -1,30 +1,28 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 9 May 2011 14:23:25 +0800
-Subject: [PATCH v2 7/7] ARM: mxc: remove esdhc.h and use the public one
-In-Reply-To: <20110506083959.GS11574@pengutronix.de>
-References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
-	<1304601778-13837-8-git-send-email-shawn.guo@linaro.org>
-	<20110506083959.GS11574@pengutronix.de>
-Message-ID: <20110509062324.GA2577@freescale.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Mon, 9 May 2011 12:03:31 +0530
+Subject: [PATCH V4 3/5] dmaengine/dw_dmac: Divide one sg to many desc,
+	if sg len is greater than DWC_MAX_COUNT
+In-Reply-To: <1304920041.32447.33.camel@vkoul-udesk3>
+References: <cover.1304596524.git.viresh.kumar@st.com>	
+	<f3150fa0fb160c70760b95ac72423ebba354f188.1304596524.git.viresh.kumar@st.com>	
+	<1304918425.32447.20.camel@vkoul-udesk3> <4DC783A9.5060802@st.com>
+	<1304920041.32447.33.camel@vkoul-udesk3>
+Message-ID: <4DC78ABB.2030800@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-On Fri, May 06, 2011 at 10:39:59AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Shawn,
+On 05/09/2011 11:17 AM, Koul, Vinod wrote:
+> Ah, then there is another todo for this driver. Move from chan->private
+> to DMA_SLAVE_CONFIG.
 > 
-> On Thu, May 05, 2011 at 09:22:58PM +0800, Shawn Guo wrote:
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |    1 -
-> >  arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +-
-> what about removing arch/arm/plat-mxc/include/mach/esdhc.h in this
-> patch as advertised in the subject?
-> 
-Yes, will do if the patch #4 will finally stands.  People are voting
-for it.  Let's see Wolfram's position.
+> struct dma_slave_config has dedicated fields for both source and
+> destination widths, src_addr_width & dst_addr_width please use them...
+> You should pass this structure to device control API as:
+> dmaengine_device_control(
+> 	chan, DMA_SLAVE_CONFIG, (unsigned long)&slave_config);
 
--- 
-Regards,
-Shawn
+As soon as i get some time, will study & implement this.
+For now, please push this patchset (if it looks fine).
+
+--
+viresh
