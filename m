@@ -1,121 +1,95 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Mon, 9 May 2011 18:05:30 +0530
-Subject: [PATCH 2/2 v2] OMAP2+: hwmod: Add API to check IO PAD wakeup status
-In-Reply-To: <1304944530-12998-1-git-send-email-govindraj.raja@ti.com>
-References: <1304944530-12998-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1304944530-12998-3-git-send-email-govindraj.raja@ti.com>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Mon, 9 May 2011 18:18:42 +0530
+Subject: [PATCH v3] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
+In-Reply-To: <alpine.DEB.2.00.1105051548210.30136@utopia.booyaka.com>
+References: <1304328111-15999-1-git-send-email-avinashhm@ti.com>
+	<alpine.DEB.2.00.1105051548210.30136@utopia.booyaka.com>
+Message-ID: <20110509124842.GA25211@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add API to determine IO-PAD wakeup event status for a given
-hwmod dynamic_mux pad.
+On Thu, May 05, 2011 at 03:58:56PM -0600, Paul Walmsley wrote:
 
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
----
- arch/arm/mach-omap2/mux.c                    |   28 ++++++++++++++++++++++++++
- arch/arm/mach-omap2/mux.h                    |   13 ++++++++++++
- arch/arm/mach-omap2/omap_hwmod.c             |   14 +++++++++++++
- arch/arm/plat-omap/include/plat/omap_hwmod.h |    1 +
- 4 files changed, 56 insertions(+), 0 deletions(-)
+Hi Paul ,
 
-diff --git a/arch/arm/mach-omap2/mux.c b/arch/arm/mach-omap2/mux.c
-index a4ab1e3..b40aebe 100644
---- a/arch/arm/mach-omap2/mux.c
-+++ b/arch/arm/mach-omap2/mux.c
-@@ -348,6 +348,34 @@ err1:
- 	return NULL;
- }
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Gets the wakeup status of given pad from omap-hwmod.
-+ * Returns true if wakeup event is set for pad else false
-+ * if wakeup is not occured or pads are not avialable.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	int i;
-+	unsigned int val;
-+	u8 ret = false;
-+
-+	for (i = 0; i < hmux->nr_pads; i++) {
-+		struct omap_device_pad *pad = &hmux->pads[i];
-+
-+		val = omap_mux_read(pad->partition,
-+					pad->mux->reg_offset);
-+		if (val & OMAP_WAKEUP_EVENT) {
-+			ret = true;
-+			break;
-+		}
-+	}
-+
-+	return ret;
-+}
-+
- /* Assumes the calling function takes care of locking */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state)
- {
-diff --git a/arch/arm/mach-omap2/mux.h b/arch/arm/mach-omap2/mux.h
-index 137f321..86a0051 100644
---- a/arch/arm/mach-omap2/mux.h
-+++ b/arch/arm/mach-omap2/mux.h
-@@ -225,8 +225,21 @@ omap_hwmod_mux_init(struct omap_device_pad *bpads, int nr_pads);
-  */
- void omap_hwmod_mux(struct omap_hwmod_mux_info *hmux, u8 state);
- 
-+/**
-+ * omap_hwmod_mux_get_wake_status - omap hwmod check pad wakeup
-+ * @hmux:		Pads for a hwmod
-+ *
-+ * Called only from omap_hwmod.c, do not use.
-+ */
-+bool omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux);
- #else
- 
-+static inline bool
-+omap_hwmod_mux_get_wake_status(struct omap_hwmod_mux_info *hmux)
-+{
-+	return 0;
-+}
-+
- static inline int omap_mux_init_gpio(int gpio, int val)
- {
- 	return 0;
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index bbbe1ed..3311234 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2420,3 +2420,17 @@ int omap_hwmod_disable_ioring_wakeup(struct omap_hwmod *oh)
- 	val &= ~OMAP_WAKEUP_EN;
- 	return omap_hwmod_configure_ioring_wakeup(oh, val);
- }
-+
-+/**
-+ * omap_hwmod_pad_get_wakeup_status - get pad wakeup status if mux is available.
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Returns the wake_up status bit of available pad mux pin.
-+ * return error if no mux pads are available.
-+ */
-+int omap_hmwod_pad_get_wakeup_status(struct omap_hwmod *oh)
-+{
-+	if (oh->mux)
-+		return omap_hwmod_mux_get_wake_status(oh->mux);
-+	return -EINVAL;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 7ef11a6..664975c 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -605,6 +605,7 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
- int omap_hwmod_enable_ioring_wakeup(struct omap_hwmod *oh);
- int omap_hwmod_disable_ioring_wakeup(struct omap_hwmod *oh);
- 
-+int omap_hmwod_pad_get_wakeup_status(struct omap_hwmod *oh);
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-  * to use initcalls once the initial boot ordering is straightened out
--- 
-1.7.1
+> > 
+> > The patch is based on
+> >  * git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+> >  * master branch.
+> >  * 9be20f0 commit. ( Linux-omap rebuilt: Updated to -rc5 )
+> 
+> Please base all your patches against mainline commits.  I suggest using 
+> v2.6.39-rc6.
+
+OK Paul. I will rebase against mainline, -rc6.
+
+> 
+> Also some comments:
+> 
+> > Changes from previous versions:
+> > from v1:
+> > 	- moved i2c specific things from hwmod files to i2c files.
+> > 	- fixed comments from Paul.
+> > 	- http://www.spinics.net/lists/linux-omap/msg49483.html
+> > 
+> > +
+> > +/**
+> > + * omap_i2c_reset- reset the omap i2c module.
+> 
+> Please put a space before the dash.
+
+OK. I ll correct.
+
+> 
+> > + * @oh: struct omap_hwmod *
+> > + *
+> > + * The i2c moudle in omap2, omap3 had a special sequence to reset. The
+> > + * sequence is:
+> > + * - Disable the I2C.
+> > + * - Write to SOFTRESET bit.
+> > + * - Enable the I2C.
+> > + * - Poll on the RESETDONE bit.
+> > + * The sequence is implemented in below function. This is called for 2420,
+> > + * 2430 and omap3.
+> > + */
+> > +int omap_i2c_reset(struct omap_hwmod *oh)
+> > +{
+> You're missing kerneldoc here.  Please add it.
+
+OK. I ll add the kerneldoc.
+
+> 
+> > +void omap_hwmod_softreset(struct omap_hwmod *oh)
+> > +{
+> > +	u32 v;
+> > +
+> > +	/* Write to the SOFTRESET bit in SYSCONFIG */
+> > +	v = oh->_sysc_cache;
+> > +	v |= (0x1 << oh->class->sysc->sysc_fields->srst_shift);
+> > +
+> > +	oh->_sysc_cache = v;
+> > +	omap_hwmod_write(v, oh, oh->class->sysc->sysc_offs);
+> > +}
+> 
+> This is a public function, so you need to validate your oh argument and 
+> return an error if something isn't right.  Similarly, you should use the 
+> existing function _set_softreset() to set the bit, because it also does 
+> some errorchecking.
+> 
+
+
+I agree. I ll use _set_softreset to set the bit and check for the
+argument sanity.
+
+> > +
+> >  /**
+> >   * omap_hwmod_set_slave_idlemode - set the hwmod's OCP slave idlemode
+> >   * @oh: struct omap_hwmod *
+> > diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+
+thanks for reviewing.
+
+- Avinash
+> 
+> 
+> - Paul
