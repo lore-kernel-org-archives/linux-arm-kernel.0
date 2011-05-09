@@ -1,123 +1,149 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Mon, 09 May 2011 14:25:41 +0100
-Subject: [RFC] What is the preferred way to share ADC unit between	hwmon
-	and input(ts) drivers?
-In-Reply-To: <20110506172002.GB23646@sirena.org.uk>
-References: <4DB4C252.30005@emcraft.com> <20110425110230.GD4768@sirena.org.uk>
-	<4DC3FB15.5090307@cam.ac.uk>
-	<1304691206.2256.55.camel@team-embedded-2>
-	<20110506142316.GP23729@opensource.wolfsonmicro.com>
-	<4DC4108D.6020601@cam.ac.uk> <20110506155636.GA23646@sirena.org.uk>
-	<4DC421F3.40404@cam.ac.uk> <20110506172002.GB23646@sirena.org.uk>
-Message-ID: <4DC7EB55.1040109@cam.ac.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Mon, 9 May 2011 15:24:39 +0200
+Subject: [RFC] Generic dma_ops using iommu-api - some thoughts
+Message-ID: <20110509132439.GC19909@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/06/11 18:20, Mark Brown wrote:
-> On Fri, May 06, 2011 at 05:29:39PM +0100, Jonathan Cameron wrote:
-> 
->> Currently at least, IIO sits at the same level as input and hwmon. We
->> are interested in handling parts that are too fast / too complicated or just
->> plain don't fit in one of those.  It would be easy enough to add what you
->> are talking about, but in the same fashion as in theory input could add
->> interfaces for hwmon if they wanted to.  The question is whether this a
->> job for IIO or should be abstracted below this level (and I agree there
->> is scope for abstraction here).  I'm a little worried that if we put
->> it in IIO it will result in bloat away from the core aims of handling
->> the many weird and wonderful sensors out there in a coherent way.
-> 
-> I'm not clear what an abstraction below IIO for a plain ADC would be.
-In summary what bothers me is not that IIO can't handle this - it can
-with a few minor tweaks but rather that using IIO is massive overkill.
-I can certainly see the benefit in adding what you suggest, but I'm a
-little worried the main response would be 'why are you putting
-all this stuff in place given you are just acting as distribution
-layer for adc reading?'.
+Hi,
 
-Basically my worry is bloat - IIO can't be everything
+as promised here is a write-up of my thoughts about implementing generic
+dma_ops on-top of the IOMMU-API and what is required for that. I am
+pretty sure I forgot some people on the Cc-list, so if anybody is
+missing feel free to add her/him.
 
-Perhaps I will have a moment to give this a go on top of IIO and
-see whether it is simpler than I currently think...
-> 
->> Input is trickier as the data paths for IIO and input
->> are deliberately rather different due to different requirements.
->> Yes we could write a driver that hooks in at a low level, but that
->> would then break the IIO data flow.
-> 
-> I'm not personally interested in that case, but if the input device is
-> really reading from the ADC using the same ADC interface as the rest of
-> the world then presumably the abstraction mismatch would be handled
-> above IIO?
-This is my point. IIO is high performance - if there is 'above' IIO, then
-you've just wrecked one of our main reasons for existence.  IIO goes to userspace
-via the shortest possible path.
+All kinds of useful comments appreciated, too :-)
 
-The only valid hook in point would be to divert right at the bottom from our
-slow read route (read_raw in the patches currently under review).  The burden
-of ensuring that multiple drivers from different subsystems could safely
-manipulate this would be pushed to the drivers.
-> I can't think what would be unusual about this from the
-> point of view of the ADC.
-I really think you have misunderstood what IIO is targeting.  It is not
-currently about providing a small layer to allow other kernel subsystems
-to access an adc - it's about two main things.  Unified consistent userspace
-interfaces and the option of a fast data path to userspace.  We can put in
-what you want and have sufficient information to do it (unlike hwmon and input
-I guess), but as yet I'm unconvinced that we should.
-> 
->> Basically, yes - we could bludgeon support for ADC in kernel sharing
->> into IIO, but its not all that close to our current scope.  If anyone
-> 
-> It's not really ADC sharing as such - there's one physical ADC but to
-> software these things look like a multi-channel ADC that happens to have
-> a single register to push data out of.  It happens to be lower volume
-> than most of the IIO ADCs but that doesn't seem like it should make too
-> much of a difference?
-We would have no problem handing the ADC's what we would need to add
-is the description layer that provides the right information to input
-and hwmon drivers sat on top + a few bits of infrastructure to connect
-it all up.  Basically anything beyond the trivial adc channels with no
-side information, would be rapidly become complex.
-> 
->> wants to look at that, feel free, but I still feel that this sits
->> better in mfd.
-> 
-> I'm not clear why MFD would be useful here?  These things are single
-> function ADCs and don't always appear as part of a larger Linux device.
-> Some CPUs have these, for example, so they just appear as a memory
-> mapped platform device.  They often end up with the custom API in the
-> core MFD driver where there is one of those but that's not because the
-> MFD API is relevant.
-You may view an adc as a single device - but if you want the option in
-kernel to have it sometimes act as input and sometimes act as hwmon -
-to do it coherently you probably need to viewing it as a combined hwmon
-and input device (and IIO).  Thus it has multiple functions and so
-to my mind belongs as an mfd core and separate hwmon and input drivers.
+Okay, here is the text:
 
-I agree we would be replicating a few bits of IIO (basically just the
-iio_chan_spec structures for describing channels) and a few callback
-functions.
-> 
->>                 Often you will be sharing interrupts as well and they
->> may well be a mix of ADC and non ADC sources.
-> 
-> You will generally be sharing an interrupt, yes.  I'm not sure what you
-> mean by a mix of ADC and non-ADC sources, though - the devices I'm
-> thinking of really are just ADCs.
-Fair enough, but on some PMICs for example IIRC that isn't the case.
+Some Thoughts About a Generic DMA-API Implemention Using IOMMU-API
+=======================================================================
 
-I am thoroughly in favour of unifying code at this sort of low level for
-the various subsystems that need to read from the ADC. All I'm arguing is
-that IIO is not the right place.  What you need here is a clean abstraction
-for what is effectively reading from a device register.
+This document describes some ideas about a generic implementation for
+the DMA-API which only uses the IOMMU-API as its backend. Many IOMMU
+drivers for Linux exist and they all implement their own implementation
+for the DMA-API. A generic implementation would allow to put all
+hardware specifics into the IOMMU-API and factor out the common code.
 
-Then you need to have a 'bus' to which your hwmon / input / iio drivers
-appear to be connected.  The irq stuff can be handled using irq chips.
+Types of IOMMUs
+-----------------------------------------------------------------------
 
-And please note, this is not a general purpose bit of code covering all adcs.
-There are certainly cases that would benefit, but it's no where near all of
-them.
+Most IOMMUs around fit in one of two categories:
 
-All comments on what is currently in IIO welcomed of course!
+Type 1: I call these GART-like IOMMUs. These IOMMUs provide an aperture
+        range which can be remapped by a page-table (often single-level)
+	This type of IOMMU exists on different architectures and there
+	are also multiple hardware variants of them on the same
+	architecture.
+	These IOMMUs have no or only limited support for
+	device-isolation. The different hardware implementations vary in
+	some side-parameters like the size of the aperture and whether
+	devices are allowed to use addresses outside of the aperture.
 
-Jonathan
+Type 2: Full-isolation capable IOMMUs. There are only two of them known
+        to me: VT-d and AMD-Vi. These IOMMUs support a full 64 bit
+	device address space and have support for full-isolation. This
+	means that they can configure a seperate address space for each
+	device.
+	These IOMMUs may also have support for Interrupt remapping. But
+	this feature is not subject of the IOMMU-API.
+
+Differences between DMA-API and IOMMU-API
+-----------------------------------------------------------------------
+
+The difference between these two APIs is basically the scope. The
+IOMMU-API only cares about address remapping for devices. This proposal
+does not intend to change that.
+The scope of the DMA-API is to provide dma handles for device drivers
+and to maintain the coherency between device and cpu view of memory. So
+the scope of the DMA-API is much larger. From an implementation pov it
+looks like that:
+
+	IOMMU-API <-------------------- DMA-API
+	(hardare access and		(implements address allocator
+	 remapping setup)		 and maintains cache coherency)
+
+The IOMMU-API
+-----------------------------------------------------------------------
+
+The API to support IOMMUs does only handle type 2. This was sufficient
+when the IOMMU-API was introduced because the only reason was to provide
+device-passthrough support for KVM.
+When we want to write a a DMA-API layer on-top of that API is makes a
+lot of sense to extend it to type 1 because most IOMMUs belong to that
+type.
+Lets first look what the IOMMU-API provides today. A domain is an
+abstraction for a device address space. The most important
+data-structure there-in is the page-table.
+
+iommu_found()		All other functions can only called safely when
+			this returns true
+iommu_domain_alloc()    Allocates a new domain
+iommu_domain_free()	Destroys a domain
+iommu_attach_device()   Put a device into a given domain
+iommu_detach_device()   Removes a device from a given domain
+iommu_map()		Maps a given system physical address to a given
+			io virtual address in one domain
+iommu_unmap()		Removes a mapping from a domain
+iommu_iova_to_phys()    Returns physical address for a io virtual one if
+			it exists
+iommu_domain_has_cap()	Check for IOMMU capablilities. Only used for
+			PCIe snoop-bit forcing today
+
+Changes to the IOMMU-API
+-----------------------------------------------------------------------
+
+The current assumption about a domain is that any io virtual address can
+be mapped to any system physical address. This can not longer be assumed
+when type 1 IOMMUs are supported. The part of the io address space that
+can be remapped may be very small (ususally 64MB for an AMD NB-GART) and
+may not start@address zero. Additional function(s) are needed so that
+the DMA-API implementation can query these properties from a domain.
+
+Further it is currently undefined in which domain a device is per
+default. For supporting the DMA-API every device needs to be put into a
+default domain by the IOMMU driver. This domain is then used by the
+DMA-API code.
+
+The DMA-API manages the address allocator, so it needs to keep track of
+the allocator state for each domain. This can be solved by storing a
+private pointer into a domain.
+
+Also, the IOMMU driver may need to put multiple devices into the same
+domain. This is necessary for type 2 IOMMUs too because the hardware
+may not be able to distinguisch between all devices (so it is usually
+not possible to distinguish between different 32-bit PCI devices on the
+same bus). Support for different domains is even more limited on type 1
+IOMMUs. The AMD NB-GART supports only one domain for all devices.
+Therefore it may be helpful to find the domain associated with one
+device. This is also needed for the DMA-API to get a pointer to the
+default domain for each device.
+
+With these changes I think we can handle type 1 and 2 IOMMUs in the
+IOMMU-API and use it as a basis for the DMA-API. The IOMMU driver
+provides a default domain which contains an aperture where addresses can
+be remapped. Type 2 IOMMUs can provide apertures that cover the whole
+address space or emulate a type 1 IOMMU by providing a smaller aperture.
+The IOMMU driver also provides the capabilities of the aperture like if
+it is possible to use addresses outside of the aperture directly.
+
+DMA-API Considerations
+-----------------------------------------------------------------------
+
+The question here is which address allocator should be implemented.
+Almost all IOMMU drivers today implement a bitmap based allocator. This
+one has advantages because it is very simple, has proven existing code
+which can be reused and allows neat optimizations in IOMMU TLB flushing.
+Flushing the TLB of an IOMMU is usually an expensive operation.
+
+On the other hand the bitmap allocator does not scale very well with the
+size of the remapable area. Therefore the VT-d driver implements a
+tree-based allocator which can handle a large address space efficiently,
+but does not allow to optimize IO/TLB flushing.
+
+It remains to be determined which allocator algortihm fits best.
+
+
+Regards,
+
+	Joerg
