@@ -1,72 +1,118 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 09 May 2011 14:36:35 +0100
-Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
-In-Reply-To: <20110509120509.GR27807@n2100.arm.linux.org.uk>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
-	<20110508214101.GO27807@n2100.arm.linux.org.uk>
-	<1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
-	<20110509103242.GQ27807@n2100.arm.linux.org.uk>
-	<1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
-	<20110509120509.GR27807@n2100.arm.linux.org.uk>
-Message-ID: <1304948195.7658.66.camel@e102109-lin.cambridge.arm.com>
+From: prakity@marvell.com (Philip Rakity)
+Date: Mon, 9 May 2011 06:44:05 -0700
+Subject: [PATCH v3 00/12] mmc: use nonblock mmc requests to minimize
+	latency
+In-Reply-To: <BANLkTikid1yHh6AdgOeqy7NqS8D=W0SWTw@mail.gmail.com>
+References: <1304795706-27308-1-git-send-email-per.forlin@linaro.org>
+	<0F831E97-0168-4CD5-985C-4965BFF816A0@marvell.com>
+	<BANLkTikid1yHh6AdgOeqy7NqS8D=W0SWTw@mail.gmail.com>
+Message-ID: <5D6BC6C8-D3C6-4987-B8AF-523A500D8309@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-09 at 13:05 +0100, Russell King - ARM Linux wrote:
-> On Mon, May 09, 2011 at 11:59:54AM +0100, Catalin Marinas wrote:
-> > On Mon, 2011-05-09 at 11:32 +0100, Russell King - ARM Linux wrote:
-> > > On Mon, May 09, 2011 at 11:22:19AM +0100, Catalin Marinas wrote:
-> > > > Alternatively an exception return would do as well (like movs pc, lr)
-> > > > but I think we still add some code for setting up the SPSR.
-> > >
-> > > That gives us a way out of both of these without introducing any CPU
-> > > specific code.  We can setup the SPSR before this block of code, and
-> > > call it with two movs pc, reg instructions which will provide the
-> > > necessary synchronization.
-> >
-> > We still need an ISB before enabling the MMU to make sure that the TTBR
-> > changing is visible. We may run with the MMU enabled (in the identity
-> > mapping) before the exception return but with random data in TTBR.
-> 
->   Changes to CP15 registers and the memory order model
->   All changes to CP15 registers that appear in program order after any
->   explicit memory operations are guaranteed not to affect those memory
->   operations.
-> 
->   Any change to CP15 registers is guaranteed to be visible to subsequent
->   instructions only after one of:
->   ? the execution of an ISB instruction
->   ? the taking of an exception
->   ? the return from an exception.
-...
-> So, my reading of this suggests that ISB and returning from an exception
-> (iow, movs pc, reg) have the same properties.  So:
-> 
->         mcr     p15, 0, r5, c3, c0, 0           @ load domain access register
->         mcr     p15, 0, r4, c2, c0, 0           @ load page table pointer
-> -       b       __turn_mmu_on
-> +       mrs     r4, cpsr                        @ copy cpsr to spsr
-> +       msr     spsr, r4
-> +       adr     r4, BSYM(__turn_mmu_on)
-> +       movs    pc, r4                          @ synchronizing
-> 
->         .align  5
-> __turn_mmu_on:
->         mov     r0, r0
->         mcr     p15, 0, r0, c1, c0, 0           @ write control reg
->         mrc     p15, 0, r3, c0, c0, 0           @ read id reg
->         mov     r3, r3
->         mov     r3, r13
-> -       mov     pc, r3
-> +       movs    pc, r3                          @ synchronizing
-> 
-> should be sufficient - and has the advantage that it should work on
-> existing CPUs.
 
-With two exception returns it should work. Only that we need to use LR
-so that it compiles fine on Thumb-2 (found a bug in my TTBR1 patch as
-well with using r13 as general purpose register, I'll fix it).
+On May 9, 2011, at 5:34 AM, Per Forlin wrote:
 
--- 
-Catalin
+> On 9 May 2011 04:05, Philip Rakity <prakity@marvell.com> wrote:
+>> 
+>> Hi Per,
+>> 
+>> We noticed on some of our systems if we ADMA or SDMA and a bounce buffer it is significantly faster then SDMA.
+>> 
+> I have not done work with ADMA or SDMA. Where should I look to read
+> more about it?
+> Are these the right places. DMA iop-dma.c and imx-sdma.c, MMC: sdhci.c.
+
+sdhci.c for ADMA and SDMA
+
+spec is at
+http://www.sdcard.org/developers/tech/sdcard/pls/simplified_specs/
+
+version 3 discusses ADMA
+
+> 
+>> I believe ADMA will do large transfers.  Another data point.
+>> 
+>> Philip
+> Thanks,
+> Per
+> 
+>> 
+>> On May 7, 2011, at 12:14 PM, Per Forlin wrote:
+>> 
+>>> How significant is the cache maintenance over head?
+>>> It depends, the eMMC are much faster now
+>>> compared to a few years ago and cache maintenance cost more due to
+>>> multiple cache levels and speculative cache pre-fetch. In relation the
+>>> cost for handling the caches have increased and is now a bottle neck
+>>> dealing with fast eMMC together with DMA.
+>>> 
+>>> The intention for introducing none blocking mmc requests is to minimize the
+>>> time between a mmc request ends and another mmc request starts. In the
+>>> current implementation the MMC controller is idle when dma_map_sg and
+>>> dma_unmap_sg is processing. Introducing none blocking mmc request makes it
+>>> possible to prepare the caches for next job parallel with an active
+>>> mmc request.
+>>> 
+>>> This is done by making the issue_rw_rq() none blocking.
+>>> The increase in throughput is proportional to the time it takes to
+>>> prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
+>>> a request and how fast the memory is. The faster the MMC/SD is
+>>> the more significant the prepare request time becomes. Measurements on U5500
+>>> and Panda on eMMC and SD shows significant performance gain for for large
+>>> reads when running DMA mode. In the PIO case the performance is unchanged.
+>>> 
+>>> There are two optional hooks pre_req() and post_req() that the host driver
+>>> may implement in order to move work to before and after the actual mmc_request
+>>> function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
+>>> the dma descriptor and post_req runs the dma_unmap_sg.
+>>> 
+>>> Details on measurements from IOZone and mmc_test:
+>>> https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
+>>> 
+>>> Under consideration:
+>>> * Make pre_req and post_req private to core.c.
+>>> * Generalize implementation and make it available for SDIO.
+>>> 
+>>> Changes since v2:
+>>> * Fix compile warnings in core.c and block.c
+>>> * Simplify max transfer size in mmc_test
+>>> * set TASK_RUNNING in queue.c before issue_req()
+>>> 
+>>> Per Forlin (12):
+>>>  mmc: add none blocking mmc request function
+>>>  mmc: mmc_test: add debugfs file to list all tests
+>>>  mmc: mmc_test: add test for none blocking transfers
+>>>  mmc: add member in mmc queue struct to hold request data
+>>>  mmc: add a block request prepare function
+>>>  mmc: move error code in mmc_block_issue_rw_rq to a separate function.
+>>>  mmc: add a second mmc queue request member
+>>>  mmc: add handling for two parallel block requests in issue_rw_rq
+>>>  mmc: test: add random fault injection in core.c
+>>>  omap_hsmmc: use original sg_len for dma_unmap_sg
+>>>  omap_hsmmc: add support for pre_req and post_req
+>>>  mmci: implement pre_req() and post_req()
+>>> 
+>>> drivers/mmc/card/block.c      |  493 +++++++++++++++++++++++++++--------------
+>>> drivers/mmc/card/mmc_test.c   |  340 +++++++++++++++++++++++++++-
+>>> drivers/mmc/card/queue.c      |  180 ++++++++++------
+>>> drivers/mmc/card/queue.h      |   31 ++-
+>>> drivers/mmc/core/core.c       |  132 ++++++++++-
+>>> drivers/mmc/core/debugfs.c    |    5 +
+>>> drivers/mmc/host/mmci.c       |  146 +++++++++++-
+>>> drivers/mmc/host/mmci.h       |    8 +
+>>> drivers/mmc/host/omap_hsmmc.c |   90 +++++++-
+>>> include/linux/mmc/core.h      |    9 +-
+>>> include/linux/mmc/host.h      |   13 +-
+>>> lib/Kconfig.debug             |   11 +
+>>> 12 files changed, 1174 insertions(+), 284 deletions(-)
+>>> 
+>>> --
+>>> 1.7.4.1
+>>> 
+>>> --
+>>> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> 
+>> 
