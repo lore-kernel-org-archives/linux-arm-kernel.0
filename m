@@ -1,281 +1,74 @@
-From: jean.pihet@newoldbits.com (jean.pihet at newoldbits.com)
-Date: Mon,  9 May 2011 12:02:13 +0200
-Subject: [PATCH 1/4] OMAP3: clean-up mach specific cpuidle data structures
-In-Reply-To: <1304935336-6308-1-git-send-email-j-pihet@ti.com>
-References: <1304935336-6308-1-git-send-email-j-pihet@ti.com>
-Message-ID: <1304935336-6308-2-git-send-email-j-pihet@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 09 May 2011 11:22:19 +0100
+Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
+In-Reply-To: <20110508214101.GO27807@n2100.arm.linux.org.uk>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
+	<20110508214101.GO27807@n2100.arm.linux.org.uk>
+Message-ID: <1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jean Pihet <j-pihet@ti.com>
+On Sun, 2011-05-08 at 22:41 +0100, Russell King - ARM Linux wrote:
+> On Sun, May 08, 2011 at 01:51:21PM +0100, Catalin Marinas wrote:
+> > From: Will Deacon <will.deacon@arm.com>
+> >
+> > Before we enable the MMU, we must ensure that the TTBR registers contain
+> > sane values. After the MMU has been enabled, we jump to the *virtual*
+> > address of the following function, so we also need to ensure that the
+> > SCTLR write has taken effect.
+> >
+> > This patch adds ISB instructions around the SCTLR write to ensure the
+> > visibility of the above.
+> 
+> Maybe this should be extended to the arch/arm/kernel/sleep.S code too?
 
-- sleep_latency and wake_latency are not used, replace them by
-  exit_latency which is used by cpuidle. exit_latency simply is
-  the sum of sleep_latency and wake_latency,
-- replace threshold by target_residency,
-- changed the OMAP3 specific cpuidle code accordingly,
-- changed the OMAP3 board code accordingly.
+Yes.
 
-Signed-off-by: Jean Pihet <j-pihet@ti.com>
----
- arch/arm/mach-omap2/board-rx51.c  |   18 ++++---
- arch/arm/mach-omap2/cpuidle34xx.c |  103 +++++++++++++++---------------------
- arch/arm/mach-omap2/pm.h          |   13 +++--
- 3 files changed, 63 insertions(+), 71 deletions(-)
+> >  __turn_mmu_on:
+> >       mov     r0, r0
+> > +     instr_sync
+> >       mcr     p15, 0, r0, c1, c0, 0           @ write control reg
+> >       mrc     p15, 0, r3, c0, c0, 0           @ read id reg
+> > +     instr_sync
+> >       mov     r3, r3
+> >       mov     r3, r13
+> >       mov     pc, r3
+> 
+> Could we avoid the second isb by doing something like this instead:
+> 
+>         mrc     p15, 0, r3, c0, c0, 0           @ read id reg
+>         and     r3, r3, r13
+>         orr     r3, r3, r13
+>         mov     pc, r3
+> 
+> The read from the ID register must complete before the branch can be
+> taken as the value is involved in computing the address to jump to
+> (even though that value has no actual effect on that address.)  This
+> assumes that the read from CP15 can't complete until the previous
+> write has completed.
 
-diff --git a/arch/arm/mach-omap2/board-rx51.c b/arch/arm/mach-omap2/board-rx51.c
-index e964895..3629f9e 100644
---- a/arch/arm/mach-omap2/board-rx51.c
-+++ b/arch/arm/mach-omap2/board-rx51.c
-@@ -58,21 +58,25 @@ static struct platform_device leds_gpio = {
- 	},
- };
- 
-+/*
-+ * cpuidle C-states definition override from the default values.
-+ * The 'exit_latency' field is the sum of sleep and wake-up latencies.
-+ */
- static struct cpuidle_params rx51_cpuidle_params[] = {
- 	/* C1 */
--	{1, 110, 162, 5},
-+	{110 + 162, 5 , 1},
- 	/* C2 */
--	{1, 106, 180, 309},
-+	{106 + 180, 309, 1},
- 	/* C3 */
--	{0, 107, 410, 46057},
-+	{107 + 410, 46057, 0},
- 	/* C4 */
--	{0, 121, 3374, 46057},
-+	{121 + 3374, 46057, 0},
- 	/* C5 */
--	{1, 855, 1146, 46057},
-+	{855 + 1146, 46057, 1},
- 	/* C6 */
--	{0, 7580, 4134, 484329},
-+	{7580 + 4134, 484329, 0},
- 	/* C7 */
--	{1, 7505, 15274, 484329},
-+	{7505 + 15274, 484329, 1},
- };
- 
- static struct omap_lcd_config rx51_lcd_config = {
-diff --git a/arch/arm/mach-omap2/cpuidle34xx.c b/arch/arm/mach-omap2/cpuidle34xx.c
-index 1c240ef..d7bc31a 100644
---- a/arch/arm/mach-omap2/cpuidle34xx.c
-+++ b/arch/arm/mach-omap2/cpuidle34xx.c
-@@ -52,11 +52,10 @@
- struct omap3_processor_cx {
- 	u8 valid;
- 	u8 type;
--	u32 sleep_latency;
--	u32 wakeup_latency;
-+	u32 exit_latency;
- 	u32 mpu_state;
- 	u32 core_state;
--	u32 threshold;
-+	u32 target_residency;
- 	u32 flags;
- 	const char *desc;
- };
-@@ -75,19 +74,19 @@ struct powerdomain *cam_pd;
-  */
- static struct cpuidle_params cpuidle_params_table[] = {
- 	/* C1 */
--	{1, 2, 2, 5},
-+	{2 + 2, 5, 1},
- 	/* C2 */
--	{1, 10, 10, 30},
-+	{10 + 10, 30, 1},
- 	/* C3 */
--	{1, 50, 50, 300},
-+	{50 + 50, 300, 1},
- 	/* C4 */
--	{1, 1500, 1800, 4000},
-+	{1500 + 1800, 4000, 1},
- 	/* C5 */
--	{1, 2500, 7500, 12000},
-+	{2500 + 7500, 12000, 1},
- 	/* C6 */
--	{1, 3000, 8500, 15000},
-+	{3000 + 8500, 15000, 1},
- 	/* C7 */
--	{1, 10000, 30000, 300000},
-+	{10000 + 30000, 300000, 1},
- };
- 
- static int omap3_idle_bm_check(void)
-@@ -330,12 +329,10 @@ void omap3_pm_init_cpuidle(struct cpuidle_params *cpuidle_board_params)
- 	for (i = OMAP3_STATE_C1; i < OMAP3_MAX_STATES; i++) {
- 		cpuidle_params_table[i].valid =
- 			cpuidle_board_params[i].valid;
--		cpuidle_params_table[i].sleep_latency =
--			cpuidle_board_params[i].sleep_latency;
--		cpuidle_params_table[i].wake_latency =
--			cpuidle_board_params[i].wake_latency;
--		cpuidle_params_table[i].threshold =
--			cpuidle_board_params[i].threshold;
-+		cpuidle_params_table[i].exit_latency =
-+			cpuidle_board_params[i].exit_latency;
-+		cpuidle_params_table[i].target_residency =
-+			cpuidle_board_params[i].target_residency;
- 	}
- 	return;
- }
-@@ -357,12 +354,10 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C1].valid =
- 			cpuidle_params_table[OMAP3_STATE_C1].valid;
- 	omap3_power_states[OMAP3_STATE_C1].type = OMAP3_STATE_C1;
--	omap3_power_states[OMAP3_STATE_C1].sleep_latency =
--			cpuidle_params_table[OMAP3_STATE_C1].sleep_latency;
--	omap3_power_states[OMAP3_STATE_C1].wakeup_latency =
--			cpuidle_params_table[OMAP3_STATE_C1].wake_latency;
--	omap3_power_states[OMAP3_STATE_C1].threshold =
--			cpuidle_params_table[OMAP3_STATE_C1].threshold;
-+	omap3_power_states[OMAP3_STATE_C1].exit_latency =
-+			cpuidle_params_table[OMAP3_STATE_C1].exit_latency;
-+	omap3_power_states[OMAP3_STATE_C1].target_residency =
-+			cpuidle_params_table[OMAP3_STATE_C1].target_residency;
- 	omap3_power_states[OMAP3_STATE_C1].mpu_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C1].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C1].flags = CPUIDLE_FLAG_TIME_VALID;
-@@ -372,12 +367,10 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C2].valid =
- 			cpuidle_params_table[OMAP3_STATE_C2].valid;
- 	omap3_power_states[OMAP3_STATE_C2].type = OMAP3_STATE_C2;
--	omap3_power_states[OMAP3_STATE_C2].sleep_latency =
--			cpuidle_params_table[OMAP3_STATE_C2].sleep_latency;
--	omap3_power_states[OMAP3_STATE_C2].wakeup_latency =
--			cpuidle_params_table[OMAP3_STATE_C2].wake_latency;
--	omap3_power_states[OMAP3_STATE_C2].threshold =
--			cpuidle_params_table[OMAP3_STATE_C2].threshold;
-+	omap3_power_states[OMAP3_STATE_C2].exit_latency =
-+			cpuidle_params_table[OMAP3_STATE_C2].exit_latency;
-+	omap3_power_states[OMAP3_STATE_C2].target_residency =
-+			cpuidle_params_table[OMAP3_STATE_C2].target_residency;
- 	omap3_power_states[OMAP3_STATE_C2].mpu_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C2].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C2].flags = CPUIDLE_FLAG_TIME_VALID |
-@@ -388,12 +381,10 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C3].valid =
- 			cpuidle_params_table[OMAP3_STATE_C3].valid;
- 	omap3_power_states[OMAP3_STATE_C3].type = OMAP3_STATE_C3;
--	omap3_power_states[OMAP3_STATE_C3].sleep_latency =
--			cpuidle_params_table[OMAP3_STATE_C3].sleep_latency;
--	omap3_power_states[OMAP3_STATE_C3].wakeup_latency =
--			cpuidle_params_table[OMAP3_STATE_C3].wake_latency;
--	omap3_power_states[OMAP3_STATE_C3].threshold =
--			cpuidle_params_table[OMAP3_STATE_C3].threshold;
-+	omap3_power_states[OMAP3_STATE_C3].exit_latency =
-+			cpuidle_params_table[OMAP3_STATE_C3].exit_latency;
-+	omap3_power_states[OMAP3_STATE_C3].target_residency =
-+			cpuidle_params_table[OMAP3_STATE_C3].target_residency;
- 	omap3_power_states[OMAP3_STATE_C3].mpu_state = PWRDM_POWER_RET;
- 	omap3_power_states[OMAP3_STATE_C3].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C3].flags = CPUIDLE_FLAG_TIME_VALID |
-@@ -404,12 +395,10 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C4].valid =
- 			cpuidle_params_table[OMAP3_STATE_C4].valid;
- 	omap3_power_states[OMAP3_STATE_C4].type = OMAP3_STATE_C4;
--	omap3_power_states[OMAP3_STATE_C4].sleep_latency =
--			cpuidle_params_table[OMAP3_STATE_C4].sleep_latency;
--	omap3_power_states[OMAP3_STATE_C4].wakeup_latency =
--			cpuidle_params_table[OMAP3_STATE_C4].wake_latency;
--	omap3_power_states[OMAP3_STATE_C4].threshold =
--			cpuidle_params_table[OMAP3_STATE_C4].threshold;
-+	omap3_power_states[OMAP3_STATE_C4].exit_latency =
-+			cpuidle_params_table[OMAP3_STATE_C4].exit_latency;
-+	omap3_power_states[OMAP3_STATE_C4].target_residency =
-+			cpuidle_params_table[OMAP3_STATE_C4].target_residency;
- 	omap3_power_states[OMAP3_STATE_C4].mpu_state = PWRDM_POWER_OFF;
- 	omap3_power_states[OMAP3_STATE_C4].core_state = PWRDM_POWER_ON;
- 	omap3_power_states[OMAP3_STATE_C4].flags = CPUIDLE_FLAG_TIME_VALID |
-@@ -420,12 +409,10 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C5].valid =
- 			cpuidle_params_table[OMAP3_STATE_C5].valid;
- 	omap3_power_states[OMAP3_STATE_C5].type = OMAP3_STATE_C5;
--	omap3_power_states[OMAP3_STATE_C5].sleep_latency =
--			cpuidle_params_table[OMAP3_STATE_C5].sleep_latency;
--	omap3_power_states[OMAP3_STATE_C5].wakeup_latency =
--			cpuidle_params_table[OMAP3_STATE_C5].wake_latency;
--	omap3_power_states[OMAP3_STATE_C5].threshold =
--			cpuidle_params_table[OMAP3_STATE_C5].threshold;
-+	omap3_power_states[OMAP3_STATE_C5].exit_latency =
-+			cpuidle_params_table[OMAP3_STATE_C5].exit_latency;
-+	omap3_power_states[OMAP3_STATE_C5].target_residency =
-+			cpuidle_params_table[OMAP3_STATE_C5].target_residency;
- 	omap3_power_states[OMAP3_STATE_C5].mpu_state = PWRDM_POWER_RET;
- 	omap3_power_states[OMAP3_STATE_C5].core_state = PWRDM_POWER_RET;
- 	omap3_power_states[OMAP3_STATE_C5].flags = CPUIDLE_FLAG_TIME_VALID |
-@@ -436,12 +423,10 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C6].valid =
- 			cpuidle_params_table[OMAP3_STATE_C6].valid;
- 	omap3_power_states[OMAP3_STATE_C6].type = OMAP3_STATE_C6;
--	omap3_power_states[OMAP3_STATE_C6].sleep_latency =
--			cpuidle_params_table[OMAP3_STATE_C6].sleep_latency;
--	omap3_power_states[OMAP3_STATE_C6].wakeup_latency =
--			cpuidle_params_table[OMAP3_STATE_C6].wake_latency;
--	omap3_power_states[OMAP3_STATE_C6].threshold =
--			cpuidle_params_table[OMAP3_STATE_C6].threshold;
-+	omap3_power_states[OMAP3_STATE_C6].exit_latency =
-+			cpuidle_params_table[OMAP3_STATE_C6].exit_latency;
-+	omap3_power_states[OMAP3_STATE_C6].target_residency =
-+			cpuidle_params_table[OMAP3_STATE_C6].target_residency;
- 	omap3_power_states[OMAP3_STATE_C6].mpu_state = PWRDM_POWER_OFF;
- 	omap3_power_states[OMAP3_STATE_C6].core_state = PWRDM_POWER_RET;
- 	omap3_power_states[OMAP3_STATE_C6].flags = CPUIDLE_FLAG_TIME_VALID |
-@@ -452,12 +437,10 @@ void omap_init_power_states(void)
- 	omap3_power_states[OMAP3_STATE_C7].valid =
- 			cpuidle_params_table[OMAP3_STATE_C7].valid;
- 	omap3_power_states[OMAP3_STATE_C7].type = OMAP3_STATE_C7;
--	omap3_power_states[OMAP3_STATE_C7].sleep_latency =
--			cpuidle_params_table[OMAP3_STATE_C7].sleep_latency;
--	omap3_power_states[OMAP3_STATE_C7].wakeup_latency =
--			cpuidle_params_table[OMAP3_STATE_C7].wake_latency;
--	omap3_power_states[OMAP3_STATE_C7].threshold =
--			cpuidle_params_table[OMAP3_STATE_C7].threshold;
-+	omap3_power_states[OMAP3_STATE_C7].exit_latency =
-+			cpuidle_params_table[OMAP3_STATE_C7].exit_latency;
-+	omap3_power_states[OMAP3_STATE_C7].target_residency =
-+			cpuidle_params_table[OMAP3_STATE_C7].target_residency;
- 	omap3_power_states[OMAP3_STATE_C7].mpu_state = PWRDM_POWER_OFF;
- 	omap3_power_states[OMAP3_STATE_C7].core_state = PWRDM_POWER_OFF;
- 	omap3_power_states[OMAP3_STATE_C7].flags = CPUIDLE_FLAG_TIME_VALID |
-@@ -512,8 +495,8 @@ int __init omap3_idle_init(void)
- 		if (!cx->valid)
- 			continue;
- 		cpuidle_set_statedata(state, cx);
--		state->exit_latency = cx->sleep_latency + cx->wakeup_latency;
--		state->target_residency = cx->threshold;
-+		state->exit_latency = cx->exit_latency;
-+		state->target_residency = cx->target_residency;
- 		state->flags = cx->flags;
- 		state->enter = (state->flags & CPUIDLE_FLAG_CHECK_BM) ?
- 			omap3_enter_idle_bm : omap3_enter_idle;
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 797bfd1..32dbc13 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -36,11 +36,16 @@ static inline int omap4_opp_init(void)
- }
- #endif
- 
-+/*
-+ * cpuidle mach specific parameters
-+ *
-+ * The board code can override the default C-states definition using
-+ * omap3_pm_init_cpuidle
-+ */
- struct cpuidle_params {
--	u8  valid;
--	u32 sleep_latency;
--	u32 wake_latency;
--	u32 threshold;
-+	u32 exit_latency;	/* exit_latency = sleep + wake-up latencies */
-+	u32 target_residency;
-+	u8 valid;		/* validates the C-state */
- };
- 
- #if defined(CONFIG_PM) && defined(CONFIG_CPU_IDLE)
+I'm not entirely sure this would work on all (future) implementations.
+There may be a slight difference between completion vs visibility to
+subsequent instructions.
+
+The MMU enable bit status may be already sampled by instructions in the
+pipeline. Even if the "mov pc, r3" waits (pipeline stalled) for the read
+back from SCTLR, it may still consider the MMU as being disabled by
+having sampled the corresponding bit earlier. That's why CP15 operations
+changing translations etc. require ISB and A15 is more restrictive here
+(or we could say more relaxed on when the CP15 operation have an
+effect).
+
+Alternatively an exception return would do as well (like movs pc, lr)
+but I think we still add some code for setting up the SPSR.
+
+> What I'm concerned about is adding additional code to this path - we
+> know it has some strict alignment requirements on some CPUs which
+> otherwise misbehave, normally by faulting in some way.
+
+The code path would be only changed on ARMv6+, otherwise the macro is
+empty. Have you seen any issues with changing this code on newer CPUs?
+
 -- 
-1.7.2.5
+Catalin
