@@ -1,45 +1,48 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 9 May 2011 15:38:05 +0800
-Subject: [PATCH] mx23: register clocks for mmc
-In-Reply-To: <1304676335-1710-1-git-send-email-jacmet@sunsite.dk>
-References: <1304676335-1710-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <20110509073803.GA3375@freescale.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 9 May 2011 10:00:02 +0200
+Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
+In-Reply-To: <1304715802.30391.157.camel@rex>
+References: <1302097097.22904.41.camel@rex>
+	<1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110412214848.GI7806@n2100.arm.linux.org.uk>
+	<20110413062316.GH18850@pengutronix.de>
+	<1304715802.30391.157.camel@rex>
+Message-ID: <20110509080002.GA29089@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 06, 2011 at 12:05:35PM +0200, Peter Korsgaard wrote:
-> Commit 47babe69 (mxs: dynamically allocate mmc device) added the ssp
-> setup and mmc clocks for mx23/28, but forgot to register the mmc clocks
-> on mx23.
+Hello Richard,
+
+On Fri, May 06, 2011 at 10:03:22PM +0100, Richard Purdie wrote:
+> On Wed, 2011-04-13 at 08:23 +0200, Uwe Kleine-K?nig wrote:
+> > On Tue, Apr 12, 2011 at 10:48:48PM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, Apr 11, 2011 at 10:35:57PM +0200, Uwe Kleine-K?nig wrote:
+> > > > +obj-y					+= led-register.o
+> > > 
+> > > Why not obj-$(CONFIG_LED_REGISTER_GPIO) += led-register.o
+> > > 
+> > > rather than wrapping the code of led-register.c with a #ifdef for the
+> > > same symbol?
+> > I thought that the registration for other led-devices could go into that
+> > file, too. That's why I choosed the name led-register and not
+> > leds-gpio-register.c. Agreed? I don't insist on that.
 > 
-> Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
+> I'm not sure we want/need to put other registration functions in this
+> file? obj-$(CONFIG_LED_REGISTER_GPIO) probably therefore makes sense
+> until some other registration need arises.
+OK, then I will name the file leds-gpio-register.c. This can be renamed
+to led-register.c when/if other registrations follow.
 
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
+> Regardless, I'm happier with this patch than the previous ones. If you
+> change it to use obj-$(CONFIG_LED_REGISTER_GPIO), 
+> 
+> Acked-by: Richard Purdie <richard.purdie@linuxfoundation.org>
+Who will take the patch then? Andrew? Or is there someone else I need to
+Cc?
 
-Somehow, this piece of the code got lost in the v4 of that patch.
+Thanks
+Uwe
 
 -- 
-Regards,
-Shawn
-
-> ---
->  arch/arm/mach-mxs/clock-mx23.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
-> index c3577ea..0163b6d 100644
-> --- a/arch/arm/mach-mxs/clock-mx23.c
-> +++ b/arch/arm/mach-mxs/clock-mx23.c
-> @@ -446,6 +446,8 @@ static struct clk_lookup lookups[] = {
->  	_REGISTER_CLOCK("rtc", NULL, rtc_clk)
->  	_REGISTER_CLOCK("mxs-dma-apbh", NULL, hbus_clk)
->  	_REGISTER_CLOCK("mxs-dma-apbx", NULL, xbus_clk)
-> +	_REGISTER_CLOCK("mxs-mmc.0", NULL, ssp_clk)
-> +	_REGISTER_CLOCK("mxs-mmc.1", NULL, ssp_clk)
->  	_REGISTER_CLOCK(NULL, "usb", usb_clk)
->  	_REGISTER_CLOCK(NULL, "audio", audio_clk)
->  	_REGISTER_CLOCK("mxs-pwm.0", NULL, pwm_clk)
-> -- 
-> 1.7.2.3
-> 
-> 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
