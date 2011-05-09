@@ -1,24 +1,37 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 May 2011 04:23:53 -0700
-Subject: [PATCHv3] ARM:boot:device tree: Allow the device tree binary
-	to be appended to zImage
-In-Reply-To: <20110324231830.2586.7150.stgit@riker>
-References: <20110324231830.2586.7150.stgit@riker>
-Message-ID: <20110509112353.GB11410@atomide.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon,  9 May 2011 14:41:46 +0300
+Subject: [PATCH 1/4] arm: pxa3xx: cm-x300: fix V3020 RTC functionality
+Message-ID: <1304941309-13288-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* John Bonesio <bones@secretlab.ca> [110324 16:17]:
-> This patch provides the ability to boot using a device tree that is appended
-> to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+While in sleep mode the CS# and other V3020 RTC GPIOs must be driven
+high, otherwise V3020 RTC fails to keep the right time in sleep mode.
 
-I suggest adding something like this to the description:
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+Cc: stable at kernel.org
+---
+ arch/arm/mach-pxa/cm-x300.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-Note that a follow-up patch is needed to add checking for
-kernel BSS overlapping the device tree data.
-
-Other than that, I got /proc/device-tree entries showing up with
-this patch + the uncompress fixes + the kernel BSS check I posted
-as a reply to this thread, so:
-
-Tested-by: Tony Lindgren <tony@atomide.com>
+diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
+index b2248e7..8a03487 100644
+--- a/arch/arm/mach-pxa/cm-x300.c
++++ b/arch/arm/mach-pxa/cm-x300.c
+@@ -161,10 +161,10 @@ static mfp_cfg_t cm_x3xx_mfp_cfg[] __initdata = {
+ 	GPIO99_GPIO,			/* Ethernet IRQ */
+ 
+ 	/* RTC GPIOs */
+-	GPIO95_GPIO,			/* RTC CS */
+-	GPIO96_GPIO,			/* RTC WR */
+-	GPIO97_GPIO,			/* RTC RD */
+-	GPIO98_GPIO,			/* RTC IO */
++	GPIO95_GPIO | MFP_LPM_DRIVE_HIGH,	/* RTC CS */
++	GPIO96_GPIO | MFP_LPM_DRIVE_HIGH,	/* RTC WR */
++	GPIO97_GPIO | MFP_LPM_DRIVE_HIGH,	/* RTC RD */
++	GPIO98_GPIO,				/* RTC IO */
+ 
+ 	/* Standard I2C */
+ 	GPIO21_I2C_SCL,
+-- 
+1.7.3.4
