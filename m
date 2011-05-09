@@ -1,50 +1,97 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 May 2011 08:46:44 -0700
-Subject: [PATCH 1/4] drivers: create a pinmux subsystem
-In-Reply-To: <BANLkTimrGP1ohGX1B4teaNMbgVjSb5Mw5Q@mail.gmail.com>
-References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
-	<20110504091619.GV2092@atomide.com>
-	<BANLkTimrGP1ohGX1B4teaNMbgVjSb5Mw5Q@mail.gmail.com>
-Message-ID: <20110509154644.GE11410@atomide.com>
+From: zajec5@gmail.com (=?UTF-8?B?UmFmYcWCIE1pxYJlY2tp?=)
+Date: Mon, 9 May 2011 17:48:14 +0200
+Subject: [PATCH][WAS:bcmai,
+	axi] bcma: add Broadcom specific AMBA bus driver
+In-Reply-To: <20110509153728.GA29762@kroah.com>
+References: <1304632783-8781-1-git-send-email-zajec5@gmail.com>
+	<201105081647.22091.arnd@arndb.de>
+	<BANLkTimhOCL7O1ERqUKkH_4sgq5xNYJZRg@mail.gmail.com>
+	<201105081759.03032.arnd@arndb.de>
+	<BANLkTikoLnrVvAWC7v7+q1fe4+Qt3HF4ug@mail.gmail.com>
+	<20110509153728.GA29762@kroah.com>
+Message-ID: <BANLkTi=08EDyiXPV1pPJzsjMF7JDXjkK-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Mike Rapoport <mike.rapoport@gmail.com> [110507 12:07]:
-> On Wed, May 4, 2011 at 12:16 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Linus Walleij <linus.walleij@stericsson.com> [110502 12:13]:
-> >
-> > Good to see this, looks like this should work for omaps too.
-> >
-> > The numbering solves the issue where we have multiple
-> > pinmux domains (base + offset for each domain).
-> >
-> > Then I would assume that for most cases the pin access can be
-> > described with:
-> >
-> > unsigned long pinmux_base; ? ? ?/* Can have multiple pinux domains */
-> > u16 pinmux_reg_offset; ? ? ? ? ?/* Register offset from pinmux_base */
-> > u16 flags; ? ? ? ? ? ? ? ? ? ? ?/* Register width etc */
-> >
-> > Which can be accessed with read[bwl] and write[bwl], so we
-> > can have default access functions in the pinux framework and
-> > don't necessarily have to implement them for each platform.
-> 
-> On some platforms setting the pin configuration won't require to keep
-> that lot of data, see, e.g. Orion and it's successors.
+2011/5/9 Greg KH <greg@kroah.com>:
+> On Mon, May 09, 2011 at 04:33:43PM +0200, Rafa? Mi?ecki wrote:
+>> 2011/5/8 Arnd Bergmann <arnd@arndb.de>:
+>> > On Sunday 08 May 2011 16:59:55 Rafa? Mi?ecki wrote:
+>> >> 2011/5/8 Arnd Bergmann <arnd@arndb.de>:
+>> >> >> >> diff --git a/drivers/bcma/TODO b/drivers/bcma/TODO
+>> >> >> >> new file mode 100644
+>> >> >> >> index 0000000..45eadc9
+>> >> >> >> --- /dev/null
+>> >> >> >> +++ b/drivers/bcma/TODO
+>> >> >> >> @@ -0,0 +1,3 @@
+>> >> >> >> +- Interrupts
+>> >> >> >> +- Defines for PCI core driver
+>> >> >> >> +- Convert bcma_bus->cores into linked list
+>> >> >> >
+>> >> >> > The last item doesn't make sense to me. Since you are using the regular
+>> >> >> > driver model, you can simply iterate over all child devices of any
+>> >> >> > dev.
+>> >> >>
+>> >> >> It's about optimization. Right now bcma_bus->cores is static array, we
+>> >> >> probably never will use all entries.
+>> >> >
+>> >> > Oh, I see. You should probably have neither of them. Instead allocate
+>> >> > the devices dynamically as you find them and do a device_register,
+>> >> > which will add the device into linked list.
+>> >>
+>> >> As I said, and wrote: TODO.
+>> >
+>> > Well, I think getting this part right is essential before the
+>> > patch can get merged.
+>> >
+>> >> > Maybe you didn't understand what I said: This should be
+>> >> >
+>> >> > struct bcma_device {
+>> >> > ? ? struct bcma_bus *bus;
+>> >> > ? ? struct bcma_device_id id;
+>> >> > ? ? struct device dev;
+>> >> > ? ? u8 core_index;
+>> >> >
+>> >> > ? ? u32 addr;
+>> >> > ? ? u32 wrap;
+>> >> >
+>> >> > ? ? void *drvdata;
+>> >> > };
+>> >> >
+>> >> > Here, bcma_device is the device, no need to follow pointers
+>> >> > around. It's how all bus_types work, you should just do the same.
+>> >>
+>> >> We can not use static "struct device", see Greg's comments in:
+>> >> [RFC][PATCH V3] axi: add AXI bus driver
+>> >> (not to mention we would have unused "struct device" in ChipCommon's
+>> >> and PCI's "struct bcma_device").
+>> >
+>> > Please reread what Greg explained, it's actually the same as what
+>> > I said here: Don't make the device static (you already don't),
+>> > don't put the device structure as a member in the bus structure
+>> > (as discussed above). Make the device a member of bcma_device,
+>> > so you get proper reference counting for it, in the way that
+>> > Greg explained.
+>>
+>> Thanks for help & explaining! Unfortunately Greg didn't answer if my
+>> changed implementation is fine. I'll fix this!
+>
+> Greg didn't know that you changed it, or that you wanted review comments
+> on it.
+>
+> thanks,
+>
+> greg "please be specific when asking for review" k-h
 
-Yeah but if we can figure out some common data format the wasted
-memory won't matter compared to having common code.
+Ups :) I asked for opinion in:
+Date: Tue, 12 Apr 2011 20:52:55 +0200
+Message-Id: <1302634375-2378-1-git-send-email-zajec5@gmail.com>
 
-I guess if we plan on passing the mux registers in devicetree data,
-we actually should just have something like this for each mux entry: 
+> Greg: is this what you expected from dynamic allocation and documentation?
 
-address
-muxmodes
-flags
 
-Don't know how well that would work for tegra, can you calculate
-the configuration registers from some base address maybe?
+But it was hidden in commit comment and there were so many e-mails, it
+was probably easy to do not notice it.
 
-Regards,
-
-Tony
+-- 
+Rafa?
