@@ -1,66 +1,66 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 09 May 2011 16:01:56 +0100
-Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
-In-Reply-To: <20110509120509.GR27807@n2100.arm.linux.org.uk>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
-	<20110508214101.GO27807@n2100.arm.linux.org.uk>
-	<1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
-	<20110509103242.GQ27807@n2100.arm.linux.org.uk>
-	<1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
-	<20110509120509.GR27807@n2100.arm.linux.org.uk>
-Message-ID: <1304953316.7658.71.camel@e102109-lin.cambridge.arm.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon,  9 May 2011 18:11:37 +0200
+Subject: [PATCH] dmaengine: at_hdmac: pause: no need to wait for FIFO empty
+In-Reply-To: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
+References: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
+Message-ID: <1304957497-22814-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-09 at 13:05 +0100, Russell King - ARM Linux wrote:
-> On Mon, May 09, 2011 at 11:59:54AM +0100, Catalin Marinas wrote:
-> > On Mon, 2011-05-09 at 11:32 +0100, Russell King - ARM Linux wrote:
-> > > On Mon, May 09, 2011 at 11:22:19AM +0100, Catalin Marinas wrote:
-> > > > Alternatively an exception return would do as well (like movs pc, lr)
-> > > > but I think we still add some code for setting up the SPSR.
-> > >
-> > > That gives us a way out of both of these without introducing any CPU
-> > > specific code.  We can setup the SPSR before this block of code, and
-> > > call it with two movs pc, reg instructions which will provide the
-> > > necessary synchronization.
-> >
-> > We still need an ISB before enabling the MMU to make sure that the TTBR
-> > changing is visible. We may run with the MMU enabled (in the identity
-> > mapping) before the exception return but with random data in TTBR.
-> 
->   Changes to CP15 registers and the memory order model
->   All changes to CP15 registers that appear in program order after any
->   explicit memory operations are guaranteed not to affect those memory
->   operations.
-> 
->   Any change to CP15 registers is guaranteed to be visible to subsequent
->   instructions only after one of:
->   ? the execution of an ISB instruction
->   ? the taking of an exception
->   ? the return from an exception.
-...
-> So, my reading of this suggests that ISB and returning from an exception
-> (iow, movs pc, reg) have the same properties.  So:
-> 
->         mcr     p15, 0, r5, c3, c0, 0           @ load domain access register
->         mcr     p15, 0, r4, c2, c0, 0           @ load page table pointer
-> -       b       __turn_mmu_on
-> +       mrs     r4, cpsr                        @ copy cpsr to spsr
-> +       msr     spsr, r4
+The addition of the pause feature to atc_control an active wait was introduced
+to check the FIFO empty event. This event was not always happening and
+a timout contition was needed.
+But, in some cases, this event depend on the peripheral connected to the
+channel that is paused: FIFO becomes empty if the peripheral consumes data.
+The timeout is pretty difficult to evaluate. Moreover, this check is not
+needed.
+In conclusion, it seems sensible to entirely remove the checking of
+"FIFO empty" status when pausing.
 
-This doesn't work. From the ARM ARM (B1.3.3):
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+Vinod,
 
-        The execution state bits are the IT[7:0], J, E, and T bits. In
-        exception modes you can read or write these bits in the current
-        SPSR.
-        In the CPSR, unless the processor is in Debug state:
-        ? The execution state bits, other than the E bit, are RAZ when
-        read by an MRS instruction.
+This additional patch goes on top of your current "next" branch. It is a
+removing of some code added to the pause/resume patch sent earlier and can be
+folded into this one if you want to.
 
-So reading the CPSR doesn't copy the T and E bits. Of course, we could
-set them explicitly but I find the ISB much simpler (and in practice we
-only need it for ARMv7 onwards but adding the ARMv6 in case we have a
-kernel compiled for both).
+Thanks, best regards,
+
+Nicolas.
+
+ drivers/dma/at_hdmac.c |   16 ----------------
+ 1 files changed, 0 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 2c6bc3a..3134003 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -933,25 +933,9 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 	dev_vdbg(chan2dev(chan), "atc_control (%d)\n", cmd);
  
-Catalin
+ 	if (cmd == DMA_PAUSE) {
+-		int pause_timeout = 1000;
+-
+ 		spin_lock_bh(&atchan->lock);
+ 
+ 		dma_writel(atdma, CHER, AT_DMA_SUSP(chan_id));
+-
+-		/* wait for FIFO to be empty */
+-		while (!(dma_readl(atdma, CHSR) & AT_DMA_EMPT(chan_id))) {
+-			if (pause_timeout-- > 0) {
+-				/* the FIFO can only drain if the peripheral
+-				 * is still requesting data:
+-				 * -> timeout if it is not the case. */
+-				dma_writel(atdma, CHDR, AT_DMA_RES(chan_id));
+-				spin_unlock_bh(&atchan->lock);
+-				return -ETIMEDOUT;
+-			}
+-			cpu_relax();
+-		}
+-
+ 		set_bit(ATC_IS_PAUSED, &atchan->status);
+ 
+ 		spin_unlock_bh(&atchan->lock);
+-- 
+1.7.3
