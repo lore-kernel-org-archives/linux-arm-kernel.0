@@ -1,68 +1,35 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 10 May 2011 00:55:41 +0800
-Subject: [PATCH v3] ARM: vfp: Always save VFP state in vfp_pm_suspend
-In-Reply-To: <BANLkTi=qLawbPdewuKrtu4r1kAaTNhFjZA@mail.gmail.com>
-References: <1304489790-30126-1-git-send-email-bs14@csr.com>
-	<BANLkTi=qLawbPdewuKrtu4r1kAaTNhFjZA@mail.gmail.com>
-Message-ID: <BANLkTimJj6271NT4ULuTLYD1gyg+UAh8vg@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 9 May 2011 19:09:38 +0200
+Subject: Thomas' IRQ patches for Samsung
+Message-ID: <20110509170938.GA5851@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/10 Catalin Marinas <catalin.marinas@arm.com>:
-> On 4 May 2011 07:16, Barry Song <bs14@csr.com> wrote:
->> From: Colin Cross <ccross@android.com>
->>
->> vfp_pm_suspend should save the VFP state any time there is
->> a last_VFP_context. ?If it only saves when the VFP is enabled,
->> the state can get lost when, on a UP system:
->> ? Thread 1 uses the VFP
->> ? Context switch occurs to thread 2, VFP is disabled but the
->> ? ? ?VFP context is not saved to allow lazy save and restore
->> ? Thread 2 initiates suspend
->> ? vfp_pm_suspend is called with the VFP disabled, but the
->> ? ? ?context has not been saved.
->>
->> Modify vfp_pm_suspend to save the VFP context whenever
->> last_VFP_context is set.
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> Cc: Catalin Marinas <catalin.marinas@arm.com>
->> Cc: Binghua Duan <binghua.duan@csr.com>
->> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
->> Signed-off-by: Barry Song <21cnbao@gmail.com>
->> ---
->> ?arch/arm/vfp/vfpmodule.c | ? ?6 ++++++
->> ?1 files changed, 6 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
->> index bbf3da0..a54c4d6 100644
->> --- a/arch/arm/vfp/vfpmodule.c
->> +++ b/arch/arm/vfp/vfpmodule.c
->> @@ -392,6 +392,12 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
->>
->> ? ? ? ? ? ? ? ?/* disable, just in case */
->> ? ? ? ? ? ? ? ?fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
->> + ? ? ? } else {
->> + ? ? ? ? ? ? ? if (last_VFP_context[ti->cpu]) {
->> + ? ? ? ? ? ? ? ? ? ? ? fmxr(FPEXC, fpexc | FPEXC_EN);
->> + ? ? ? ? ? ? ? ? ? ? ? vfp_save_state(last_VFP_context[ti->cpu], fpexc);
->> + ? ? ? ? ? ? ? ? ? ? ? fmxr(FPEXC, fpexc);
->> + ? ? ? ? ? ? ? }
->> ? ? ? ?}
->
-> I would use
->
-> ? ? ? ?} else if () {
->
-> ? ? ? ?}
->
-> to avoid another level of indentation.
->
-> Otherwise the patch looks fine to me (I haven't tested it).
->
+It turns out that when Thomas sent his IRQ patches to Russell he didn't
+include any of the arch patches, and since none have been sent to
+Russell he just dropped the core changes until such time as they are
+merged.  In order to try to help get the changes in for Samsung I've
+created the branch below - it's based off Thomas' core changes in
+irq/for-arm in the tip tree so I've sent it as a pull request rather
+than resending the patches as I'd normally do.  Hope this is OK with
+people.
 
-looks good to me.
+The following changes since commit cfefd21e693dca791bf9ecfc9dd3794facad533c:
 
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->
-then i will send out v4.
+  genirq: Add chip suspend and resume callbacks (2011-04-23 15:56:24 +0200)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc-2.6.git samsung-irq
+
+Thomas Gleixner (3):
+      ARM: SAMSUNG: S5P: Convert irq-gpioint to generic irq chip
+      ARM: SAMSUNG: Convert irq-vic-timer to generic irq chip
+      ARM: SAMSUNG: Convert irq-uart to generic irq chip
+
+ arch/arm/mach-s3c64xx/irq.c                        |    7 +-
+ arch/arm/plat-s5p/irq-gpioint.c                    |  116 +++++---------------
+ arch/arm/plat-s5p/irq.c                            |    6 +-
+ arch/arm/plat-samsung/include/plat/irq-vic-timer.h |    2 +-
+ arch/arm/plat-samsung/irq-uart.c                   |   83 ++------------
+ arch/arm/plat-samsung/irq-vic-timer.c              |   69 +++++-------
+ 6 files changed, 68 insertions(+), 215 deletions(-)
