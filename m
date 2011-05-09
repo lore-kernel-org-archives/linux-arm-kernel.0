@@ -1,149 +1,72 @@
-From: joro@8bytes.org (Joerg Roedel)
-Date: Mon, 9 May 2011 15:24:39 +0200
-Subject: [RFC] Generic dma_ops using iommu-api - some thoughts
-Message-ID: <20110509132439.GC19909@8bytes.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 09 May 2011 14:36:35 +0100
+Subject: [PATCH v5 02/19] ARM: LPAE: add ISBs around MMU enabling code
+In-Reply-To: <20110509120509.GR27807@n2100.arm.linux.org.uk>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<1304859098-10760-3-git-send-email-catalin.marinas@arm.com>
+	<20110508214101.GO27807@n2100.arm.linux.org.uk>
+	<1304936539.7658.31.camel@e102109-lin.cambridge.arm.com>
+	<20110509103242.GQ27807@n2100.arm.linux.org.uk>
+	<1304938794.7658.56.camel@e102109-lin.cambridge.arm.com>
+	<20110509120509.GR27807@n2100.arm.linux.org.uk>
+Message-ID: <1304948195.7658.66.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2011-05-09 at 13:05 +0100, Russell King - ARM Linux wrote:
+> On Mon, May 09, 2011 at 11:59:54AM +0100, Catalin Marinas wrote:
+> > On Mon, 2011-05-09 at 11:32 +0100, Russell King - ARM Linux wrote:
+> > > On Mon, May 09, 2011 at 11:22:19AM +0100, Catalin Marinas wrote:
+> > > > Alternatively an exception return would do as well (like movs pc, lr)
+> > > > but I think we still add some code for setting up the SPSR.
+> > >
+> > > That gives us a way out of both of these without introducing any CPU
+> > > specific code.  We can setup the SPSR before this block of code, and
+> > > call it with two movs pc, reg instructions which will provide the
+> > > necessary synchronization.
+> >
+> > We still need an ISB before enabling the MMU to make sure that the TTBR
+> > changing is visible. We may run with the MMU enabled (in the identity
+> > mapping) before the exception return but with random data in TTBR.
+> 
+>   Changes to CP15 registers and the memory order model
+>   All changes to CP15 registers that appear in program order after any
+>   explicit memory operations are guaranteed not to affect those memory
+>   operations.
+> 
+>   Any change to CP15 registers is guaranteed to be visible to subsequent
+>   instructions only after one of:
+>   ? the execution of an ISB instruction
+>   ? the taking of an exception
+>   ? the return from an exception.
+...
+> So, my reading of this suggests that ISB and returning from an exception
+> (iow, movs pc, reg) have the same properties.  So:
+> 
+>         mcr     p15, 0, r5, c3, c0, 0           @ load domain access register
+>         mcr     p15, 0, r4, c2, c0, 0           @ load page table pointer
+> -       b       __turn_mmu_on
+> +       mrs     r4, cpsr                        @ copy cpsr to spsr
+> +       msr     spsr, r4
+> +       adr     r4, BSYM(__turn_mmu_on)
+> +       movs    pc, r4                          @ synchronizing
+> 
+>         .align  5
+> __turn_mmu_on:
+>         mov     r0, r0
+>         mcr     p15, 0, r0, c1, c0, 0           @ write control reg
+>         mrc     p15, 0, r3, c0, c0, 0           @ read id reg
+>         mov     r3, r3
+>         mov     r3, r13
+> -       mov     pc, r3
+> +       movs    pc, r3                          @ synchronizing
+> 
+> should be sufficient - and has the advantage that it should work on
+> existing CPUs.
 
-as promised here is a write-up of my thoughts about implementing generic
-dma_ops on-top of the IOMMU-API and what is required for that. I am
-pretty sure I forgot some people on the Cc-list, so if anybody is
-missing feel free to add her/him.
+With two exception returns it should work. Only that we need to use LR
+so that it compiles fine on Thumb-2 (found a bug in my TTBR1 patch as
+well with using r13 as general purpose register, I'll fix it).
 
-All kinds of useful comments appreciated, too :-)
-
-Okay, here is the text:
-
-Some Thoughts About a Generic DMA-API Implemention Using IOMMU-API
-=======================================================================
-
-This document describes some ideas about a generic implementation for
-the DMA-API which only uses the IOMMU-API as its backend. Many IOMMU
-drivers for Linux exist and they all implement their own implementation
-for the DMA-API. A generic implementation would allow to put all
-hardware specifics into the IOMMU-API and factor out the common code.
-
-Types of IOMMUs
------------------------------------------------------------------------
-
-Most IOMMUs around fit in one of two categories:
-
-Type 1: I call these GART-like IOMMUs. These IOMMUs provide an aperture
-        range which can be remapped by a page-table (often single-level)
-	This type of IOMMU exists on different architectures and there
-	are also multiple hardware variants of them on the same
-	architecture.
-	These IOMMUs have no or only limited support for
-	device-isolation. The different hardware implementations vary in
-	some side-parameters like the size of the aperture and whether
-	devices are allowed to use addresses outside of the aperture.
-
-Type 2: Full-isolation capable IOMMUs. There are only two of them known
-        to me: VT-d and AMD-Vi. These IOMMUs support a full 64 bit
-	device address space and have support for full-isolation. This
-	means that they can configure a seperate address space for each
-	device.
-	These IOMMUs may also have support for Interrupt remapping. But
-	this feature is not subject of the IOMMU-API.
-
-Differences between DMA-API and IOMMU-API
------------------------------------------------------------------------
-
-The difference between these two APIs is basically the scope. The
-IOMMU-API only cares about address remapping for devices. This proposal
-does not intend to change that.
-The scope of the DMA-API is to provide dma handles for device drivers
-and to maintain the coherency between device and cpu view of memory. So
-the scope of the DMA-API is much larger. From an implementation pov it
-looks like that:
-
-	IOMMU-API <-------------------- DMA-API
-	(hardare access and		(implements address allocator
-	 remapping setup)		 and maintains cache coherency)
-
-The IOMMU-API
------------------------------------------------------------------------
-
-The API to support IOMMUs does only handle type 2. This was sufficient
-when the IOMMU-API was introduced because the only reason was to provide
-device-passthrough support for KVM.
-When we want to write a a DMA-API layer on-top of that API is makes a
-lot of sense to extend it to type 1 because most IOMMUs belong to that
-type.
-Lets first look what the IOMMU-API provides today. A domain is an
-abstraction for a device address space. The most important
-data-structure there-in is the page-table.
-
-iommu_found()		All other functions can only called safely when
-			this returns true
-iommu_domain_alloc()    Allocates a new domain
-iommu_domain_free()	Destroys a domain
-iommu_attach_device()   Put a device into a given domain
-iommu_detach_device()   Removes a device from a given domain
-iommu_map()		Maps a given system physical address to a given
-			io virtual address in one domain
-iommu_unmap()		Removes a mapping from a domain
-iommu_iova_to_phys()    Returns physical address for a io virtual one if
-			it exists
-iommu_domain_has_cap()	Check for IOMMU capablilities. Only used for
-			PCIe snoop-bit forcing today
-
-Changes to the IOMMU-API
------------------------------------------------------------------------
-
-The current assumption about a domain is that any io virtual address can
-be mapped to any system physical address. This can not longer be assumed
-when type 1 IOMMUs are supported. The part of the io address space that
-can be remapped may be very small (ususally 64MB for an AMD NB-GART) and
-may not start@address zero. Additional function(s) are needed so that
-the DMA-API implementation can query these properties from a domain.
-
-Further it is currently undefined in which domain a device is per
-default. For supporting the DMA-API every device needs to be put into a
-default domain by the IOMMU driver. This domain is then used by the
-DMA-API code.
-
-The DMA-API manages the address allocator, so it needs to keep track of
-the allocator state for each domain. This can be solved by storing a
-private pointer into a domain.
-
-Also, the IOMMU driver may need to put multiple devices into the same
-domain. This is necessary for type 2 IOMMUs too because the hardware
-may not be able to distinguisch between all devices (so it is usually
-not possible to distinguish between different 32-bit PCI devices on the
-same bus). Support for different domains is even more limited on type 1
-IOMMUs. The AMD NB-GART supports only one domain for all devices.
-Therefore it may be helpful to find the domain associated with one
-device. This is also needed for the DMA-API to get a pointer to the
-default domain for each device.
-
-With these changes I think we can handle type 1 and 2 IOMMUs in the
-IOMMU-API and use it as a basis for the DMA-API. The IOMMU driver
-provides a default domain which contains an aperture where addresses can
-be remapped. Type 2 IOMMUs can provide apertures that cover the whole
-address space or emulate a type 1 IOMMU by providing a smaller aperture.
-The IOMMU driver also provides the capabilities of the aperture like if
-it is possible to use addresses outside of the aperture directly.
-
-DMA-API Considerations
------------------------------------------------------------------------
-
-The question here is which address allocator should be implemented.
-Almost all IOMMU drivers today implement a bitmap based allocator. This
-one has advantages because it is very simple, has proven existing code
-which can be reused and allows neat optimizations in IOMMU TLB flushing.
-Flushing the TLB of an IOMMU is usually an expensive operation.
-
-On the other hand the bitmap allocator does not scale very well with the
-size of the remapable area. Therefore the VT-d driver implements a
-tree-based allocator which can handle a large address space efficiently,
-but does not allow to optimize IO/TLB flushing.
-
-It remains to be determined which allocator algortihm fits best.
-
-
-Regards,
-
-	Joerg
+-- 
+Catalin
