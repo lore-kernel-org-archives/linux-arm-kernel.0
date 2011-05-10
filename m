@@ -1,51 +1,49 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 10 May 2011 15:23:18 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201105051612.18522.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024CD0B8CC@dbde02.ent.ti.com>
-	<613E2AF627DE4ABE92AD42D5D9E1BFE5@subhasishg>
-	<201105051612.18522.arnd@arndb.de>
-Message-ID: <FBFC0000E34D487086421780A0F5252A@subhasishg>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 May 2011 10:59:20 +0100
+Subject: [PATCH 06/13] clocksource: add common mmio clocksource
+In-Reply-To: <E1QJhNe-0000yh-HS@rmk-PC.arm.linux.org.uk>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+	<E1QJhNe-0000yh-HS@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110510095920.GB29977@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Instead of passing a configuration file into the MFD driver and
-> calling it a firmware, I can see three other options that I believe
-> would be nicer:
-> 
-> 1. have a single firmware blob that describes the child devices
-> and the code that is to be loaded into both units. If they are
-> acting as one device, either make sure you only create one
-> child node, or create one with a name that no driver binds to.
-> 
-> 2. Call request_firmware separately for the two child devices,
-> and configure them separately based on the information in the
-> firmware files. In the case where they should act as a single
-> device, call the children e.g. "pruss-uart-a" and "pruss-uart-b",
-> then bind to both names in the pruss-uart drivers and only
-> start using the device when you have both nodes for the same
-> parent.
-> 
-> 3. Do the configuration through sysfs files in the MFD device node,
-> which then cause the creation of the child devices. This means you
-> need extra user space scripts to write the addititonal files, but
-> is also the most flexible way.
-> 
+On Tue, May 10, 2011 at 08:29:18AM +0100, Russell King - ARM Linux wrote:
+> +cycle_t clocksource_mmio_readl_up(struct clocksource *c)
+> +{
+> +	return readl_relaxed(to_mmio_clksrc(c)->reg);
+> +}
+> +
+> +cycle_t clocksource_mmio_readl_down(struct clocksource *c)
+> +{
+> +	return ~readl_relaxed(to_mmio_clksrc(c)->reg);
+> +}
+> +
+> +cycle_t clocksource_mmio_readw_up(struct clocksource *c)
+> +{
+> +	return readw_relaxed(to_mmio_clksrc(c)->reg);
+> +}
+> +
+> +cycle_t clocksource_mmio_readw_down(struct clocksource *c)
+> +{
+> +	return ~(unsigned)readw_relaxed(to_mmio_clksrc(c)->reg);
+> +}
 
-Are you suggesting something like:
+I probably ought to point out why that cast is there: readw* returns an
+u16.
 
-/sys..../pruss/pru0/id
-/sys..../pruss/pru0/fw_name
-/sys..../pruss/pru0/load
+u16 will be promoted to 'int' by the compiler, then not'd, and then
+extended to cycle_t (64-bit).  This extension is a signed extension
+which not only results in more code than required, but also results in
+a delay slot not being filled.
 
-/sys..../pruss/pru1/id
-/sys..../pruss/pru1/fw_name
-/sys..../pruss/pru1/load
+It's the u16 -> signed int -> cycle_t which causes the signed extension.
 
-I can program these configs and store them in the pru private.
-Then write something into load.
-This can load the PRU based upon the configs.
-But, I am not sure how to do this effectively using sysfs,
-I mean I don't want to end up writing six write and six read
-handlers. 
+u16 -> cycle_t doesn't involve changing the signed-ness of the type, so
+doesn't suffer.
+
+Neither does readl as it returns a u32 which doesn't need any promotion
+to an int type.
+
+So, rather than allow the compiler to do automatic promotion to a signed
+int, the cast is there to ensure that it becomes an unsigned int instead.
