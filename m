@@ -1,254 +1,162 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 10 May 2011 10:13:42 +0200
-Subject: [PATCH v6] [ARM] MX1: Add ARMadeus Systems APF9328 board support
-In-Reply-To: <1304054499-42526-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-References: <1304054499-42526-1-git-send-email-gwenhael.goavec-merou@armadeus.com>
-Message-ID: <20110510081342.GG29089@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 10 May 2011 10:38:41 +0200
+Subject: [PATCH 06/13] clocksource: add common mmio clocksource
+In-Reply-To: <E1QJhNe-0000yh-HS@rmk-PC.arm.linux.org.uk>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+	<E1QJhNe-0000yh-HS@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110510083841.GF30963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Apr 29, 2011 at 05:21:39AM +0000, Gwenhael Goavec-Merou wrote:
-> APF9328 is an i.MXL based SOM (System On Module) that can be plugged on
-> several docking/development boards. Here only basic module support
-> is added (Ethernet, Serial, NOR Flash).
+On Tue, May 10, 2011 at 08:29:18AM +0100, Russell King - ARM Linux wrote:
+> Add a generic mmio clocksource, covering both 32-bit and 16-bit register
+> access sizes, for up or down counters.  This can be used to easily
+> create clocksources for simple counter-based implementations.
 > 
-> Signed-off-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
-> Signed-off-by: Eric Jarrige <eric.jarrige@armadeus.org>
-> Signed-off-by: Nicolas Colombain <nicolas.colombain@armadeus.com>
-> Signed-off-by: Julien Boibessot <julien.boibessot@armadeus.com>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Erik Gilling <konkers@android.com>
+> Cc: "Hans J. Koch" <hjk@hansjkoch.de>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 > ---
+>  drivers/Kconfig              |    3 ++
+>  drivers/clocksource/Kconfig  |    2 +
+>  drivers/clocksource/Makefile |    1 +
+>  drivers/clocksource/mmio.c   |   72 ++++++++++++++++++++++++++++++++++++++++++
+>  include/linux/clocksource.h  |    8 +++++
+>  5 files changed, 86 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/clocksource/Kconfig
+>  create mode 100644 drivers/clocksource/mmio.c
 > 
-> Changes since v5:
-> 	- suppress array index for struct resource
-> 
-> Changes since v4:
-> 	- use constant instead of multiplications
-> 	- change maintainer description
-> 
-> Changes since v3:
-> 	- suppress const and __initconst attributes for platform_data and 
-> 		resource,
-> 	- add SOC_IMX1 in Kconfig
-> 
-> Changes since v2:
-> 	- add const and __initconst attributes for platform_data and resource,
-> 	- suppress boot_params.
-> 
-> Changes since v1:
-> 	- merge pins tables for UART
-> 	- suppress init/exit driver callbacks for UART
-> 
->  arch/arm/configs/mx1_defconfig   |    1 +
->  arch/arm/mach-imx/Kconfig        |    7 ++
->  arch/arm/mach-imx/Makefile       |    1 +
->  arch/arm/mach-imx/mach-apf9328.c |  144 ++++++++++++++++++++++++++++++++++++++
->  4 files changed, 153 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-imx/mach-apf9328.c
-> 
-> diff --git a/arch/arm/configs/mx1_defconfig b/arch/arm/configs/mx1_defconfig
-> index ff96e8f..e6f6579 100644
-> --- a/arch/arm/configs/mx1_defconfig
-> +++ b/arch/arm/configs/mx1_defconfig
-> @@ -14,6 +14,7 @@ CONFIG_ARCH_MXC=y
->  CONFIG_ARCH_MX1=y
->  CONFIG_ARCH_MX1ADS=y
->  CONFIG_MACH_SCB9328=y
-> +CONFIG_MACH_APF9328=y
->  CONFIG_MXC_IRQ_PRIOR=y
->  CONFIG_MXC_PWM=y
->  CONFIG_NO_HZ=y
-> diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-> index 0382301..4f556ee 100644
-> --- a/arch/arm/mach-imx/Kconfig
-> +++ b/arch/arm/mach-imx/Kconfig
-> @@ -86,6 +86,13 @@ config MACH_SCB9328
->  	help
->  	  Say Y here if you are using a Synertronixx scb9328 board
+> diff --git a/drivers/Kconfig b/drivers/Kconfig
+> index 177c7d1..557a469 100644
+> --- a/drivers/Kconfig
+> +++ b/drivers/Kconfig
+> @@ -119,4 +119,7 @@ source "drivers/platform/Kconfig"
+>  source "drivers/clk/Kconfig"
 >  
-> +config MACH_APF9328
-> +	bool "APF9328"
-> +	select SOC_IMX1
-> +	select IMX_HAVE_PLATFORM_IMX_UART
-> +	help
-> +	  Say Yes here if you are using the Armadeus APF9328 development board
+>  source "drivers/hwspinlock/Kconfig"
 > +
->  endif
->  
->  if MACH_MX21
-> diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
-> index 6d51e65..e9eb36d 100644
-> --- a/arch/arm/mach-imx/Makefile
-> +++ b/arch/arm/mach-imx/Makefile
-> @@ -18,6 +18,7 @@ obj-$(CONFIG_MX1_VIDEO) += mx1-camera-fiq.o mx1-camera-fiq-ksym.o
->  # i.MX1 based machines
->  obj-$(CONFIG_ARCH_MX1ADS) += mach-mx1ads.o
->  obj-$(CONFIG_MACH_SCB9328) += mach-scb9328.o
-> +obj-$(CONFIG_MACH_APF9328) += mach-apf9328.o
->  
->  # i.MX21 based machines
->  obj-$(CONFIG_MACH_MX21ADS) += mach-mx21ads.o
-> diff --git a/arch/arm/mach-imx/mach-apf9328.c b/arch/arm/mach-imx/mach-apf9328.c
+> +source "drivers/clocksource/Kconfig"
+> +
+>  endmenu
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
 > new file mode 100644
-> index 0000000..15e45c8
+> index 0000000..47f37b1
 > --- /dev/null
-> +++ b/arch/arm/mach-imx/mach-apf9328.c
-> @@ -0,0 +1,144 @@
+> +++ b/drivers/clocksource/Kconfig
+> @@ -0,0 +1,2 @@
+> +config CLKSRC_MMIO
+> +	bool
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index be61ece..9b2ba29 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -6,3 +6,4 @@ obj-$(CONFIG_CS5535_CLOCK_EVENT_SRC)	+= cs5535-clockevt.o
+>  obj-$(CONFIG_SH_TIMER_CMT)	+= sh_cmt.o
+>  obj-$(CONFIG_SH_TIMER_MTU2)	+= sh_mtu2.o
+>  obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
+> +obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+> diff --git a/drivers/clocksource/mmio.c b/drivers/clocksource/mmio.c
+> new file mode 100644
+> index 0000000..71ad3a3
+> --- /dev/null
+> +++ b/drivers/clocksource/mmio.c
+> @@ -0,0 +1,72 @@
 > +/*
-> + * linux/arch/arm/mach-imx/mach-apf9328.c
-> + *
-> + * Copyright (c) 2005-2011 ARMadeus systems <support@armadeus.com>
-> + *
-> + * This work is based on mach-scb9328.c which is:
-> + * Copyright (c) 2004 Sascha Hauer <saschahauer@web.de>
-> + * Copyright (c) 2006-2008 Juergen Beisert <jbeisert@netscape.net>
+> + * Generic MMIO clocksource support
 > + *
 > + * This program is free software; you can redistribute it and/or modify
 > + * it under the terms of the GNU General Public License version 2 as
 > + * published by the Free Software Foundation.
-> + *
 > + */
-> +
+> +#include <linux/clocksource.h>
+> +#include <linux/errno.h>
 > +#include <linux/init.h>
-> +#include <linux/kernel.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/mtd/physmap.h>
-> +#include <linux/dm9000.h>
+> +#include <linux/slab.h>
 > +
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach/time.h>
-> +
-> +#include <mach/common.h>
-> +#include <mach/hardware.h>
-> +#include <mach/irqs.h>
-> +#include <mach/iomux-mx1.h>
-> +
-> +#include "devices-imx1.h"
-> +
-> +static const int apf9328_pins[] __initconst = {
-> +	/* UART1 */
-> +	PC9_PF_UART1_CTS,
-> +	PC10_PF_UART1_RTS,
-> +	PC11_PF_UART1_TXD,
-> +	PC12_PF_UART1_RXD,
-> +	/* UART2 */
-> +	PB28_PF_UART2_CTS,
-> +	PB29_PF_UART2_RTS,
-> +	PB30_PF_UART2_TXD,
-> +	PB31_PF_UART2_RXD,
+> +struct clocksource_mmio {
+> +	void __iomem *reg;
+> +	struct clocksource clksrc;
 > +};
 > +
-> +/*
-> + * The APF9328 can have up to 32MB NOR Flash
-> + */
-> +static struct resource flash_resource = {
-> +	.start	= MX1_CS0_PHYS,
-> +	.end	= MX1_CS0_PHYS + SZ_32M - 1,
-> +	.flags	= IORESOURCE_MEM,
-> +};
-> +
-> +static struct physmap_flash_data apf9328_flash_data = {
-> +	.width  = 2,
-> +};
-> +
-> +static struct platform_device apf9328_flash_device = {
-> +	.name		= "physmap-flash",
-> +	.id		= 0,
-> +	.dev = {
-> +		.platform_data = &apf9328_flash_data,
-> +	},
-> +	.resource = &flash_resource,
-> +	.num_resources = 1,
-> +};
-> +
-> +/*
-> + * APF9328 has a DM9000 Ethernet controller
-> + */
-> +static struct dm9000_plat_data dm9000_setup = {
-> +	.flags          = DM9000_PLATF_16BITONLY
-> +};
-> +
-> +static struct resource dm9000_resources[] = {
-> +	{
-> +		.start  = MX1_CS4_PHYS + 0x00C00000,
-> +		.end    = MX1_CS4_PHYS + 0x00C00001,
-> +		.flags  = IORESOURCE_MEM,
-> +	}, {
-> +		.start  = MX1_CS4_PHYS + 0x00C00002,
-> +		.end    = MX1_CS4_PHYS + 0x00C00003,
-> +		.flags  = IORESOURCE_MEM,
-> +	}, {
-> +		.start  = IRQ_GPIOB(14),
-> +		.end    = IRQ_GPIOB(14),
-> +		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_LOWLEVEL,
-> +	},
-> +};
-> +
-> +static struct platform_device dm9000x_device = {
-> +	.name		= "dm9000",
-> +	.id		= 0,
-> +	.num_resources	= ARRAY_SIZE(dm9000_resources),
-> +	.resource	= dm9000_resources,
-> +	.dev		= {
-> +		.platform_data = &dm9000_setup,
-> +	}
-> +};
-> +
-> +/* --- SERIAL RESSOURCE --- */
-> +static const struct imxuart_platform_data uart0_pdata __initconst = {
-> +	.flags = 0,
-> +};
-> +
-> +static const struct imxuart_platform_data uart1_pdata __initconst = {
-> +	.flags = IMXUART_HAVE_RTSCTS,
-> +};
-> +
-> +static struct platform_device *devices[] __initdata = {
-> +	&apf9328_flash_device,
-> +	&dm9000x_device,
-> +};
-> +
-> +static void __init apf9328_init(void)
+> +static inline struct clocksource_mmio *to_mmio_clksrc(struct clocksource *c)
 > +{
-> +	mxc_gpio_setup_multiple_pins(apf9328_pins,
-> +			ARRAY_SIZE(apf9328_pins),
-> +			"APF9328");
-> +
-> +	imx1_add_imx_uart0(&uart0_pdata);
-> +	imx1_add_imx_uart1(&uart1_pdata);
-> +
-> +	platform_add_devices(devices, ARRAY_SIZE(devices));
+> +	return container_of(c, struct clocksource_mmio, clksrc);
 > +}
 > +
-> +static void __init apf9328_timer_init(void)
+> +cycle_t clocksource_mmio_readl_up(struct clocksource *c)
 > +{
-> +	mx1_clocks_init(32768);
+> +	return readl_relaxed(to_mmio_clksrc(c)->reg);
 > +}
 > +
-> +static struct sys_timer apf9328_timer = {
-> +	.init	= apf9328_timer_init,
-> +};
+> +cycle_t clocksource_mmio_readl_down(struct clocksource *c)
+> +{
+> +	return ~readl_relaxed(to_mmio_clksrc(c)->reg);
+> +}
 > +
-> +MACHINE_START(APF9328, "Armadeus APF9328")
-> +	/* Maintainer: Gwenhael Goavec-Merou, ARMadeus Systems */
-> +	.map_io       = mx1_map_io,
-> +	.init_early   = imx1_init_early,
-> +	.init_irq     = mx1_init_irq,
-> +	.timer        = &apf9328_timer,
-> +	.init_machine = apf9328_init,
-> +MACHINE_END
-> -- 
-> 1.7.3.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+> +cycle_t clocksource_mmio_readw_up(struct clocksource *c)
+> +{
+> +	return readw_relaxed(to_mmio_clksrc(c)->reg);
+> +}
+> +
+> +cycle_t clocksource_mmio_readw_down(struct clocksource *c)
+> +{
+> +	return ~(unsigned)readw_relaxed(to_mmio_clksrc(c)->reg);
+> +}
+> +
+> +/**
+> + * clocksource_mmio_init - Initialize a simple mmio based clocksource
+> + * @base:	Virtual address of the clock readout register
+> + * @name:	Name of the clocksource
+> + * @hz:		Frequency of the clocksource in Hz
+> + * @rating:	Rating of the clocksource
+> + * @bits:	Number of valid bits
+> + * @read:	One of clocksource_mmio_read*() above
+> + */
+> +int __init clocksource_mmio_init(void __iomem *base, const char *name,
+> +	unsigned long hz, int rating, unsigned bits,
+> +	cycle_t (*read)(struct clocksource *))
+> +{
+> +	struct clocksource_mmio *cs;
+> +
+> +	if (bits > 32 || bits < 16)
+> +		return -EINVAL;
+> +
+> +	cs = kzalloc(sizeof(struct clocksource_mmio), GFP_KERNEL);
+> +	if (!cs)
+> +		return -ENOMEM;
+> +
+> +	cs->clksrc.name = name;
+> +	cs->clksrc.rating = rating;
+> +	cs->clksrc.read = read;
+> +	cs->clksrc.mask = CLOCKSOURCE_MASK(bits);
+> +	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
+
+You forgot to initialize cs->reg. With this:
+
+Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+
+(For the i.MX part)
+
+Sascha
+
 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Pengutronix e.K.                           |                             |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
