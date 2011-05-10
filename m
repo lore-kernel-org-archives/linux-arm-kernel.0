@@ -1,48 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 May 2011 08:48:38 +0200
-Subject: Question about multi-bank memory usage in ARM platform
-In-Reply-To: <BANLkTik2wzXouKNcBAJ6AJr0fjAuaOjwJw@mail.gmail.com>
-References: <BANLkTik2wzXouKNcBAJ6AJr0fjAuaOjwJw@mail.gmail.com>
-Message-ID: <20110510064838.GH18791@game.jcrosoft.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 May 2011 08:27:00 +0100
+Subject: [PATCH 00/13] Consolidate simple ARM MMIO clock sources
+Message-ID: <20110510072700.GA29869@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In a similar light to the i8253 series, this consolidates 17 ARM
+MMIO counter clocksources into a single common implementation.  This
+common implementation caters for 32-bit and 16-bit register access
+sizes, up and down counters, and various bit sizes of those counters.
 
-	A minimum of respect will to put your name in the e-mail
-	and hide the chip and other information will not convince people to
-	help you.
+Patch 1 is already in John Stultz tree, but is included for
+completeness and to get rid of a build warning.
 
-	my 0.02$
-
-Best Regards,
-J.
-On 13:45 Tue 10 May     , os user wrote:
-> Hi Russell and list,
-> 
-> I have a question about multi-bank memory usage in ARM platform (arm926).
-> 
-> I have two banks of SDRAM, one is  64M at 0x20000000, another is
-> 64M at 0x60000000. I tried to use both of them in Linux (2.6.38). I hope
-> the kernel will print
-> 
-> Memory: 128MB = 128MB total
-> Memory: 126236KB available (xxx code, xxx data, 112K init, 0K highmem)
-> 
-> So I tried passing 'mem=64M at 0x20000000 mem=64M at 0x60000000' to Kernel
-> command line.
-> 
-> >From the kernel message, I failed to achieve my goal. The kernel says,
-> 
-> Ignoring RAM at 60000000-63ffffff (vmalloc region overlap).
-> 
-> Could you or someone else please give me a hint how to deal with this?
-> 
-> Thanks a lot.
-> 
-> BR
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+ arch/arm/Kconfig                         |   14 ++++++
+ arch/arm/common/timer-sp.c               |   22 +--------
+ arch/arm/mach-integrator/Kconfig         |    1 +
+ arch/arm/mach-integrator/integrator_ap.c |   21 +-------
+ arch/arm/mach-ixp4xx/common.c            |   16 +------
+ arch/arm/mach-lpc32xx/timer.c            |   17 +------
+ arch/arm/mach-mxs/timer.c                |   20 +++-----
+ arch/arm/mach-netx/time.c                |   16 +------
+ arch/arm/mach-omap1/time.c               |   69 +++++++++-------------------
+ arch/arm/mach-pxa/time.c                 |   17 +------
+ arch/arm/mach-sa1100/time.c              |   24 ++--------
+ arch/arm/mach-tcc8k/time.c               |   16 +------
+ arch/arm/mach-tegra/timer.c              |   16 +------
+ arch/arm/mach-u300/timer.c               |   18 +------
+ arch/arm/mach-w90x900/time.c             |   17 +------
+ arch/arm/plat-mxc/epit.c                 |   18 +-------
+ arch/arm/plat-mxc/time.c                 |   38 +++-------------
+ arch/arm/plat-nomadik/Kconfig            |    1 +
+ arch/arm/plat-nomadik/timer.c            |   31 +------------
+ arch/arm/plat-omap/Kconfig               |    1 +
+ arch/arm/plat-orion/time.c               |   21 +--------
+ arch/arm/plat-s5p/s5p-time.c             |   58 +++++++-----------------
+ arch/arm/plat-spear/time.c               |   16 +------
+ drivers/Kconfig                          |    3 +
+ drivers/clocksource/Kconfig              |    2 +
+ drivers/clocksource/Makefile             |    1 +
+ drivers/clocksource/mmio.c               |   72 ++++++++++++++++++++++++++++++
+ include/linux/clocksource.h              |   10 ++++-
+ 28 files changed, 194 insertions(+), 382 deletions(-)
