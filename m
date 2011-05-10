@@ -1,74 +1,93 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 May 2011 08:31:45 +0100
-Subject: [PATCH 10/13] clocksource: convert Integrator/AP 16-bit down
-	counting clocksource
-In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-Message-ID: <E1QJhQ1-0000yy-91@rmk-PC.arm.linux.org.uk>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 10 May 2011 09:31:52 +0200
+Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
+In-Reply-To: <20110509150254.e7da059f.akpm@linux-foundation.org>
+References: <1302097097.22904.41.camel@rex>
+	<1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110509150254.e7da059f.akpm@linux-foundation.org>
+Message-ID: <20110510073152.GF29089@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Integrator/AP 16-bit down-counting clocksource to the
-generic clocksource infrastructure.
+Hi Andrew,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-integrator/Kconfig         |    1 +
- arch/arm/mach-integrator/integrator_ap.c |   21 +++------------------
- 2 files changed, 4 insertions(+), 18 deletions(-)
+On Mon, May 09, 2011 at 03:02:54PM -0700, Andrew Morton wrote:
+> On Mon, 11 Apr 2011 22:35:57 +0200
+> Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
+> 
+> > This function makes a deep copy of the platform data to allow it to live
+> > in init memory.
+> > The definition cannot go into leds-gpio.c because it needs to be builtin
+> > to be usable by platforms.
+> > 
+> 
+> Well...  why?  The changelog tells us what the function does but
+> provides no information explaining why you think it's needed, nor how
+> it is expected to be used, etc.
+> 
+> Please send a complete and useful changelog!
+OK, will try to do better for v4.
 
-diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
-index d701d32..dfd18f3 100644
---- a/arch/arm/mach-integrator/Kconfig
-+++ b/arch/arm/mach-integrator/Kconfig
-@@ -4,6 +4,7 @@ menu "Integrator Options"
+> > --- a/drivers/leds/Kconfig
+> > +++ b/drivers/leds/Kconfig
+> > @@ -14,6 +14,11 @@ config LEDS_CLASS
+> >  	  This option enables the led sysfs class in /sys/class/leds.  You'll
+> >  	  need this to do anything useful with LEDs.  If unsure, say N.
+> >  
+> > +config LED_REGISTER_GPIO
+> > +	bool
+> > +	help
+> > +	  This option provides the function gpio_led_register_device.
+> > +
+> 
+> Every other LEDS Kconfig symbol uses "LEDS", not "LED".  I'll make that
+> change.
+I used LED only to match led-register.c. There led- seemed reasonable to
+me because it's only the drivers that use leds-, but there is
+led-core.o, led-class.o and led-triggers.o.
+Hmm, I don't care much.
  
- config ARCH_INTEGRATOR_AP
- 	bool "Support Integrator/AP and Integrator/PP2 platforms"
-+	select CLKSRC_MMIO
- 	select MIGHT_HAVE_PCI
- 	help
- 	  Include support for the ARM(R) Integrator/AP and
-diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
-index 980803f..9c61acf 100644
---- a/arch/arm/mach-integrator/integrator_ap.c
-+++ b/arch/arm/mach-integrator/integrator_ap.c
-@@ -343,25 +343,9 @@ static void __init ap_init(void)
- 
- static unsigned long timer_reload;
- 
--static void __iomem * const clksrc_base = (void __iomem *)TIMER2_VA_BASE;
--
--static cycle_t timersp_read(struct clocksource *cs)
--{
--	return ~(readl(clksrc_base + TIMER_VALUE) & 0xffff);
--}
--
--static struct clocksource clocksource_timersp = {
--	.name		= "timer2",
--	.rating		= 200,
--	.read		= timersp_read,
--	.mask		= CLOCKSOURCE_MASK(16),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
- static void integrator_clocksource_init(u32 khz)
- {
--	struct clocksource *cs = &clocksource_timersp;
--	void __iomem *base = clksrc_base;
-+	void __iomem *base = (void __iomem *)TIMER2_VA_BASE;
- 	u32 ctrl = TIMER_CTRL_ENABLE;
- 
- 	if (khz >= 1500) {
-@@ -372,7 +356,8 @@ static void integrator_clocksource_init(u32 khz)
- 	writel(ctrl, base + TIMER_CTRL);
- 	writel(0xffff, base + TIMER_LOAD);
- 
--	clocksource_register_khz(cs, khz);
-+	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
-+		khz * 1000, 200, 16, clocksource_mmio_readl_down);
- }
- 
- static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
+> >  if NEW_LEDS
+> >  
+> >  comment "LED drivers"
+> > [...]
+> > --- a/include/linux/leds.h
+> > +++ b/include/linux/leds.h
+> > @@ -207,5 +207,17 @@ struct gpio_led_platform_data {
+> >  					unsigned long *delay_off);
+> >  };
+> >  
+> > +/**
+> > + * gpio_led_register_device - register a gpio-led device
+> > + * @pdata: the platform data used for the new device
+> > + *
+> > + * Use this function instead of platform_device_add()ing a static struct
+> > + * platform_device.
+> > + *
+> > + * Note: as pdata and pdata->leds is copied these usually can and should be
+> > + * __initdata.
+> > + */
+> > +struct platform_device *gpio_led_register_device(
+> > +		int id, const struct gpio_led_platform_data *pdata);
+> 
+> It's unusual to document functions in the .h file.  There's a bit of
+> precedent for that in leds.h, but there is more precedent in
+> drivers/leds/*.c
+> 
+> Personally I think that putting the documentation in .h is rather sucky
+> - it happens so rarely that one just doesn't think of looking in there.
+> 
+> The description isn't terribly useful if the reader doesn't know what
+> "platform_device_add()ing a static struct platform_device" is for.  Can
+> we describe this in some manner whcih doesn't refer to something else
+> which is probably undocumented?
+> 
+> The comment doesn't document return values.
+OK, will fix in v4.
+
+Best regards
+Uwe
+
 -- 
-1.7.4.4
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
