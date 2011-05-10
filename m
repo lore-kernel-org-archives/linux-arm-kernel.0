@@ -1,69 +1,48 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 10 May 2011 08:45:04 +0200
-Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
-In-Reply-To: <20110509221719.GE16919@n2100.arm.linux.org.uk>
-References: <1302097097.22904.41.camel@rex>
-	<1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110509150254.e7da059f.akpm@linux-foundation.org>
-	<20110509221719.GE16919@n2100.arm.linux.org.uk>
-Message-ID: <20110510064504.GC29089@pengutronix.de>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 10 May 2011 08:48:38 +0200
+Subject: Question about multi-bank memory usage in ARM platform
+In-Reply-To: <BANLkTik2wzXouKNcBAJ6AJr0fjAuaOjwJw@mail.gmail.com>
+References: <BANLkTik2wzXouKNcBAJ6AJr0fjAuaOjwJw@mail.gmail.com>
+Message-ID: <20110510064838.GH18791@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 09, 2011 at 11:17:19PM +0100, Russell King - ARM Linux wrote:
-> On Mon, May 09, 2011 at 03:02:54PM -0700, Andrew Morton wrote:
-> > On Mon, 11 Apr 2011 22:35:57 +0200
-> > Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
-> > > +#if defined(CONFIG_LED_REGISTER_GPIO)
-> > > +struct platform_device *__init gpio_led_register_device(
-> > > +		int id, const struct gpio_led_platform_data *pdata)
-> > > +{
-> > > +	struct platform_device *ret;
-> > > +	struct gpio_led_platform_data _pdata = *pdata;
-> > > +
-> > > +	_pdata.leds = kmemdup(pdata->leds,
-> > > +			pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
-> > > +	if (!_pdata.leds)
-> > > +		return ERR_PTR(-ENOMEM);
-> > > +
-> > > +	ret = platform_device_register_resndata(NULL, "leds-gpio", id,
-> > > +			NULL, 0, &_pdata, sizeof(_pdata));
-> > > +	if (IS_ERR(ret))
-> > > +		kfree(_pdata.leds);
-> > > +
-> > > +	return ret;
-> > > +}
-> > > +#endif
-> ...
-> > The comment doesn't document return values.
+Hi,
+
+	A minimum of respect will to put your name in the e-mail
+	and hide the chip and other information will not convince people to
+	help you.
+
+	my 0.02$
+
+Best Regards,
+J.
+On 13:45 Tue 10 May     , os user wrote:
+> Hi Russell and list,
 > 
-> Two further comments.
+> I have a question about multi-bank memory usage in ARM platform (arm926).
 > 
-> 1. Why is this .c file always built, but _all_ the containing code is
-> wrapped up in an ifdef?  It seems a waste of resources to compile a .c
-> file with all code #ifdef'd out.
-This was done because I thought that the .c file could contain other
-registration routines later. Richard requested to use
-
-	obj-$(CONFIG_LED_REGISTER_GPIO) += ...
-
-then the #ifdef can go away, too. (@Andrew: Richard's ack was only for a
-patch that used that. You took the patch anyhow and added his ack.)
-
-> 2. What is the point of returning the platform device structure?  You've
-> already registered it, so you must _not_ modify any data in that structure
-> which may be used by the driver.  The only thing which you can safely do
-> with it is unregister it.
-pdev->device can be used as parent for another device. (OK, probably not
-an led device. The origin of this function is the imx device
-registration stuff, and all these functions return a platform device).
-The other case where I needed to have the device created was to fill a
-struct regulator_consumer_supply, but nowadays this is done using just
-the name.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+> I have two banks of SDRAM, one is  64M at 0x20000000, another is
+> 64M at 0x60000000. I tried to use both of them in Linux (2.6.38). I hope
+> the kernel will print
+> 
+> Memory: 128MB = 128MB total
+> Memory: 126236KB available (xxx code, xxx data, 112K init, 0K highmem)
+> 
+> So I tried passing 'mem=64M at 0x20000000 mem=64M at 0x60000000' to Kernel
+> command line.
+> 
+> >From the kernel message, I failed to achieve my goal. The kernel says,
+> 
+> Ignoring RAM at 60000000-63ffffff (vmalloc region overlap).
+> 
+> Could you or someone else please give me a hint how to deal with this?
+> 
+> Thanks a lot.
+> 
+> BR
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
