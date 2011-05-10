@@ -1,79 +1,91 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 May 2011 08:34:00 +0100
-Subject: [PATCH 12/13] clocksource: convert MXS timrotv2 to 32-bit down
-	counting clocksource
+Date: Tue, 10 May 2011 08:34:21 +0100
+Subject: [PATCH 13/13] clocksource: convert OMAP1 to 32-bit down counting
+	clocksource
 In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
 References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-Message-ID: <E1QJhSC-0000z6-H6@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QJhSX-0000zA-0E@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the MXS timrotv2 32-bit down counting clocksource to the
-generic clocksource infrastructure.
+Convert the OMAP1 32-bit down counting clocksource to the generic
+clocksource infrastructure.
 
-Cc: Sascha Hauer <kernel@pengutronix.de>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig          |    1 +
- arch/arm/mach-mxs/timer.c |   20 +++++++-------------
- 2 files changed, 8 insertions(+), 13 deletions(-)
+ arch/arm/mach-omap1/time.c |   23 ++++++-----------------
+ arch/arm/plat-omap/Kconfig |    1 +
+ 2 files changed, 7 insertions(+), 17 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index cbc27fb..43f003a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -376,6 +376,7 @@ config ARCH_MXS
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_REQUIRE_GPIOLIB
+diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
+index e7ab616..03e1e10 100644
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -190,24 +190,11 @@ static __init void omap_init_mpu_timer(unsigned long rate)
+  * ---------------------------------------------------------------------------
+  */
+ 
+-static cycle_t mpu_read(struct clocksource *cs)
+-{
+-	return ~omap_mpu_timer_read(1);
+-}
+-
+-static struct clocksource clocksource_mpu = {
+-	.name		= "mpu_timer2",
+-	.rating		= 300,
+-	.read		= mpu_read,
+-	.mask		= CLOCKSOURCE_MASK(32),
+-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+ static DEFINE_CLOCK_DATA(cd);
+ 
+ static inline unsigned long long notrace _omap_mpu_sched_clock(void)
+ {
+-	u32 cyc = mpu_read(&clocksource_mpu);
++	u32 cyc = ~omap_mpu_timer_read(1);
+ 	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
+ }
+ 
+@@ -225,20 +212,22 @@ static unsigned long long notrace omap_mpu_sched_clock(void)
+ 
+ static void notrace mpu_update_sched_clock(void)
+ {
+-	u32 cyc = mpu_read(&clocksource_mpu);
++	u32 cyc = ~omap_mpu_timer_read(1);
+ 	update_sched_clock(&cd, cyc, (u32)~0);
+ }
+ 
+ static void __init omap_init_clocksource(unsigned long rate)
+ {
++	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(1);
+ 	static char err[] __initdata = KERN_ERR
+ 			"%s: can't register clocksource!\n";
+ 
+ 	omap_mpu_timer_start(1, ~0, 1);
+ 	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
+ 
+-	if (clocksource_register_hz(&clocksource_mpu, rate))
+-		printk(err, clocksource_mpu.name);
++	if (clocksource_mmio_init(&timer->read_tim, "mpu_timer2", rate,
++			300, 32, clocksource_mmio_readl_down))
++		printk(err, "mpu_timer2");
+ }
+ 
+ static void __init omap_mpu_timer_init(void)
+diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+index cd5f993..e9c0efc 100644
+--- a/arch/arm/plat-omap/Kconfig
++++ b/arch/arm/plat-omap/Kconfig
+@@ -12,6 +12,7 @@ choice
+ config ARCH_OMAP1
+ 	bool "TI OMAP1"
  	select CLKDEV_LOOKUP
 +	select CLKSRC_MMIO
  	help
- 	  Support for Freescale MXS-based family of processors
+ 	  "Systems based on omap7xx, omap15xx or omap16xx"
  
-diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-index 13647f3..27bebf2 100644
---- a/arch/arm/mach-mxs/timer.c
-+++ b/arch/arm/mach-mxs/timer.c
-@@ -101,11 +101,6 @@ static cycle_t timrotv1_get_cycles(struct clocksource *cs)
- 			& 0xffff0000) >> 16);
- }
- 
--static cycle_t timrotv2_get_cycles(struct clocksource *cs)
--{
--	return ~__raw_readl(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1));
--}
--
- static int timrotv1_set_next_event(unsigned long evt,
- 					struct clock_event_device *dev)
- {
-@@ -230,8 +225,8 @@ static int __init mxs_clockevent_init(struct clk *timer_clk)
- static struct clocksource clocksource_mxs = {
- 	.name		= "mxs_timer",
- 	.rating		= 200,
--	.read		= timrotv2_get_cycles,
--	.mask		= CLOCKSOURCE_MASK(32),
-+	.read		= timrotv1_get_cycles,
-+	.mask		= CLOCKSOURCE_MASK(16),
- 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
- };
- 
-@@ -239,12 +234,11 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
- {
- 	unsigned int c = clk_get_rate(timer_clk);
- 
--	if (timrot_is_v1()) {
--		clocksource_mxs.read = timrotv1_get_cycles;
--		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
--	}
--
--	clocksource_register_hz(&clocksource_mxs, c);
-+	if (timrot_is_v1())
-+		clocksource_register_hz(&clocksource_mxs, c);
-+	else
-+		clocksource_mmio_init(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1)),
-+			"mxs_timer", c, 200, 32, clocksource_mmio_readl_down);
- 
- 	return 0;
- }
 -- 
 1.7.4.4
