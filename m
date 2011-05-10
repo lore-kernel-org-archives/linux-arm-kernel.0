@@ -1,52 +1,113 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 10 May 2011 23:25:44 +0200
+Date: Tue, 10 May 2011 23:42:47 +0200
 Subject: [PATCH 0/4] Pinmux subsystem
-In-Reply-To: <20110502225708.GD28001@n2100.arm.linux.org.uk>
+In-Reply-To: <20110503172712.GE6538@lunn.ch>
 References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
-	<20110502225708.GD28001@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikSwkYEvbQ8XVrB3LUetVqBBUjT2g@mail.gmail.com>
+	<20110503172712.GE6538@lunn.ch>
+Message-ID: <BANLkTi=ncV3M1q5SXNdUaXmtfkZ8Wn9dmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Finally I'm back at the pinmux patch set trying to answer all questions
-accumulated:
+2011/5/3 Andrew Lunn <andrew@lunn.ch>:
 
-2011/5/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> Say i have a UART core. I can be used as a 3-wire serial port, or
+> additionally it can have hardware flow control, or additionally it can
+> have all the modem signals. What would i expect to find in the pinmux
+> driver?
 
-> While I like the idea of consolidating the pinmuxing stuff, I'm not sure
-> about having a struct pin_mux pointer in each bus types device structure.
-> It'd mean this would have to be added to platform devices as well...
+If and only if it involves reassigning the pins coming out of your package,
+enumerated as a one dimensional array, to alternative functions,
+defined as possibly overlapping groups of pins in said array.
 
-Yeah I'm not sure about the patch to the AMBA/PrimeCell bus really,
-an alternative is for all drivers to request their mux individually. But in
-the AMBA bus we already request the silicon block clock and the
-silicon power switch so it seemed natural to also request a mux setting,
-if there is one.
+Anything else is orthogonal.
 
-> Then there's SA1100 (and PXA?) to consider with its IrDA setup, where its
-> necessary to switch the pin muxing during driver operation, when switching
-> between SIR and FIR modes (SIR uses the UART, FIR uses a separate hardware
-> block.)
->
-> So any per-device pinmuxing subsystem also needs a way that a driver can
-> change the pinmuxing of its associated pins on the fly too.
+> 1) Three functions: uart-3wire, uart-hw-flow, uart-hw-flow-modem. ?The
+> ? first just has 2 pins, the second 4 and the last 8. The board code
+> ? selects one of these for the serial driver to use.
 
-It can, basically:
+Sounds like a solid case for pinmuxing. Here the board code defines
+three mux settings by name that your pinmux driver shall be able to handle,
+and associate each of them with the same device.
 
-struct pinmux *pmx;
+> 2) Three functions: uart-core, uart-hw-flow, uart-mode. ?The first has
+> ? 2 pins, the second has 2 pins and the last 4 pins. The board code tells
+> ? the driver to use uart-core, plus say uart-hw-flow.
 
-pmx = pinmux_get(dev, "irda-uart");
-pinmux_enable(pmx);
-(... SIR UART operations ...)
-pinmux_disable(pmx);
-pinmux_put(pmx);
-(... stuff to init FIR silicon ...)
-pmx = pinmux_get(dev, "irda-fir");
-pinmux_enable(pmx);
-(... etc ...)
+Same thing.
 
-Just like you would take an alternative clock or regulator in case using i would
-exclude the use of another clock/regulator.
+> Do you think the documentation should have guidelines how best to do
+> this sort of core + additional optional extras?
+
+I believe it already has, it describes a simple case of an overlapping
+I2C and SPI port, two overlapping UART configurations are not
+conceptually different.
+
+> Say i have a SoC with an SPI core. This core has the usual MISC, MOSI
+> and SCLK. It additionally has 4 chip select lines. My board uses chip
+> select lines 2 and 3 for SPI, and select lines 0 and 1 as GPIO lines.
+> How does the pinmux driver handle this? Again, it is the problems of a
+> few core pins plus additional optional extras.
+
+The pinmux API keeps track of individual pins and whether they are in
+use or not. It keeps track of groups of pins and whether they overlap.
+It denies a certain function to be muxed in in case its desired pins
+overlap with another function.
+
+Once you start modeling it you decide what overlapping means,
+and in practice in this case taking the two lines that could have been
+used for SPI chipselects as GPIO lines assures any attempts to
+use them as SPI chipselects at the same time will be denied.
+
+So the idea is not to keep track of all possible weird ways you may
+use your pins, the idea is to put constraints on what you can physically
+do and from there define the groups of pins you may use in practice.
+Additionally requesting a single GPIO pin will mark a single pin as
+"taken".
+
+I *could* have modeled every pin that can be taken for GPIO as a
+function containing a single pin but it seems too silly, mathematicians
+would have loved it.
+
+> Maybe the documentation should make some recommendations about what is
+> placed into the drivers/pinmux/pinmux-foo.c and what should be kept in
+> the board specific code?
+
+It does by written example. And as an additional example a real-world
+pinmux for the U300 has been moved from mach-u300 to
+drivers/pinmux.
+
+> Without these guidelines, it seems to me,
+> each board for a given SoC is going to add its own peculiar pin
+> combination to the drivers/pinmux/pinmux-foo.c file.
+
+No not board. The driver is a driver for the package or pad ring,
+nothing else. And the package certainly knows, by virtue of knowing
+what differernt functions it can mux in/out by poking bits in the
+hardware, about the actual groups that exists on the package.
+
+The board in turn defines which of these possible functions that
+it wants to mux in to certain devices. Note that it can assign multiple
+functions to a single device, as mentioned in the reply to Russell.
+
+> ?Maybe it makes
+> more sense to have a collection of standard pin functions in
+> drivers/pinmux/pinmux-foo.c, which cover 75% of the likely
+> combinations.
+
+I don't get it. There are as many combinations as there are
+chips. A function on pin 12, 13 and 35 on my package is very
+unlikely to be viable on another package.
+
+The pinmux API is *not* about keeping track of the fact that
+SPI uses so or so many pins, it's just about groups of pins
+in an array, nothing else.
+
+> And recommend a board file to have its own additional
+> list of strange pin functions which it registers with the pinmux core?
+
+The board file only references the functions that the the package
+can mux. The board file should *never* define any functions
+or pin groups whatsoever, the pinmux driver knows about those.
 
 Thanks,
 Linus Walleij
