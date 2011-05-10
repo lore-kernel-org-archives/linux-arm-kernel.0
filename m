@@ -1,76 +1,69 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 10 May 2011 11:47:02 +0530
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <20110509145534.2677dfa1@lxorguk.ukuu.org.uk>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com><1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com><034A6447E0D54737B5CEE009A4D20B37@subhasishg><20110509144610.6b4f7090@lxorguk.ukuu.org.uk><3A9C5CD56396439DBF825BB4E5779DB9@subhasishg>
-	<20110509145534.2677dfa1@lxorguk.ukuu.org.uk>
-Message-ID: <F0818DA1343E4FF1B3096048359CCC4C@subhasishg>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 10 May 2011 08:45:04 +0200
+Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
+In-Reply-To: <20110509221719.GE16919@n2100.arm.linux.org.uk>
+References: <1302097097.22904.41.camel@rex>
+	<1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110509150254.e7da059f.akpm@linux-foundation.org>
+	<20110509221719.GE16919@n2100.arm.linux.org.uk>
+Message-ID: <20110510064504.GC29089@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Mon, May 09, 2011 at 11:17:19PM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 09, 2011 at 03:02:54PM -0700, Andrew Morton wrote:
+> > On Mon, 11 Apr 2011 22:35:57 +0200
+> > Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
+> > > +#if defined(CONFIG_LED_REGISTER_GPIO)
+> > > +struct platform_device *__init gpio_led_register_device(
+> > > +		int id, const struct gpio_led_platform_data *pdata)
+> > > +{
+> > > +	struct platform_device *ret;
+> > > +	struct gpio_led_platform_data _pdata = *pdata;
+> > > +
+> > > +	_pdata.leds = kmemdup(pdata->leds,
+> > > +			pdata->num_leds * sizeof(*pdata->leds), GFP_KERNEL);
+> > > +	if (!_pdata.leds)
+> > > +		return ERR_PTR(-ENOMEM);
+> > > +
+> > > +	ret = platform_device_register_resndata(NULL, "leds-gpio", id,
+> > > +			NULL, 0, &_pdata, sizeof(_pdata));
+> > > +	if (IS_ERR(ret))
+> > > +		kfree(_pdata.leds);
+> > > +
+> > > +	return ret;
+> > > +}
+> > > +#endif
+> ...
+> > The comment doesn't document return values.
+> 
+> Two further comments.
+> 
+> 1. Why is this .c file always built, but _all_ the containing code is
+> wrapped up in an ifdef?  It seems a waste of resources to compile a .c
+> file with all code #ifdef'd out.
+This was done because I thought that the .c file could contain other
+registration routines later. Richard requested to use
 
->> >> I then modified this function to as follows and the error is not 
->> >> observed
->> >> anymore.
->> >
->> > That looks like you are somehow calling uart_carrier_raised somewhere
->> > with interrupts disabled ?
->> >
->> I am not calling this function in my driver atall, this is getting called 
->> by
->> tty_port.c
->
-> Can you verify the status of the interrupt flags at the point that
-> routine is called in your code and get a backtrace of the path. It
-> should never be gettng called with interrupts off, and if it is we need
-> to know what the path is. Otherwise that code change would imply a bug
-> in the core code for the platform which seems less likely.
+	obj-$(CONFIG_LED_REGISTER_GPIO) += ...
 
-Here is the back trace:
+then the #ifdef can go away, too. (@Andrew: Richard's ack was only for a
+patch that used that. You took the patch anyhow and added his ack.)
 
-root at arago:~# ------------[ cut here ]------------
-WARNING: at drivers/tty/serial/pruss_suart.c:295 
-uart_carrier_raised+0x2c/0x74()
-Modules linked in: pruss_uart
-[<c002e888>] (unwind_backtrace+0x0/0xec) from [<c003e400>] 
-(warn_slowpath_common+0x4c/0x64)
-[<c003e400>] (warn_slowpath_common+0x4c/0x64) from [<c003e430>] 
-(warn_slowpath_null+0x18/0x1c)
-[<c003e430>] (warn_slowpath_null+0x18/0x1c) from [<c0190744>] 
-(uart_carrier_raised+0x2c/0x74)
-[<c0190744>] (uart_carrier_raised+0x2c/0x74) from [<c0182b84>] 
-(tty_port_carrier_raised+0x1c/0x20)
-[<c0182b84>] (tty_port_carrier_raised+0x1c/0x20) from [<c0183174>] 
-(tty_port_block_til_ready+0x254/0x328)
-[<c0183174>] (tty_port_block_til_ready+0x254/0x328) from [<c017d3ac>] 
-(tty_open+0x310/0x478)
-[<c017d3ac>] (tty_open+0x310/0x478) from [<c009f5d8>] 
-(chrdev_open+0x1b4/0x1d0)
-[<c009f5d8>] (chrdev_open+0x1b4/0x1d0) from [<c009ae34>] 
-(__dentry_open+0x170/0x27c)
-[<c009ae34>] (__dentry_open+0x170/0x27c) from [<c009b008>] 
-(nameidata_to_filp+0x50/0x5c)
-[<c009b008>] (nameidata_to_filp+0x50/0x5c) from [<c00a70e0>] 
-(finish_open+0x90/0x17c)
-[<c00a70e0>] (finish_open+0x90/0x17c) from [<c00a8fa4>] 
-(do_filp_open+0x23c/0x520)
-[<c00a8fa4>] (do_filp_open+0x23c/0x520) from [<c009ac0c>] 
-(do_sys_open+0x58/0xe4)
-[<c009ac0c>] (do_sys_open+0x58/0xe4) from [<c0029fa0>] 
-(ret_fast_syscall+0x0/0x2c)
+> 2. What is the point of returning the platform device structure?  You've
+> already registered it, so you must _not_ modify any data in that structure
+> which may be used by the driver.  The only thing which you can safely do
+> with it is unregister it.
+pdev->device can be used as parent for another device. (OK, probably not
+an led device. The origin of this function is the imx device
+registration stuff, and all these functions return a platform device).
+The other case where I needed to have the device created was to fill a
+struct regulator_consumer_supply, but nowadays this is done using just
+the name.
 
-flags ---> 0xA0000013
+Best regards
+Uwe
 
-
-This is how I generated the trace:
-
-static void pruss_suart_enable_ms(struct uart_port *port)
-{
-        struct omapl_pru_suart *soft_uart =
-            container_of(port, struct omapl_pru_suart, port[port->line]);
-        struct device *dev = soft_uart->dev;
-
-        WARN_ON(1);
-        dev_dbg(dev, "modem control timer not supported\n");
-} 
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
