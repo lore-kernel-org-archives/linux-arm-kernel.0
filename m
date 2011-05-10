@@ -1,83 +1,46 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 11 May 2011 00:58:53 +0100
-Subject: [PATCH] drivers: create a pinmux subsystem v2
-In-Reply-To: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
-References: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20110510235853.GM26703@pulham.picochip.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 11 May 2011 01:53:24 +0200
+Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
+In-Reply-To: <20110510170500.GB15675@kroah.com>
+References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
+	<4DC95D19.7070707@ru.mvista.com>
+	<20110510155038.GJ18791@game.jcrosoft.org>
+	<20110510170500.GB15675@kroah.com>
+Message-ID: <20110510235324.GD18929@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
-
-I haven't had chance to try this on my platform yet, but I have a couple 
-of questions on how to deal with a few oddities that we have.
-
-Thanks,
-
-Jamie
-
-On Wed, May 11, 2011 at 01:39:43AM +0200, Linus Walleij wrote:
-> This creates a subsystem for handling of pinmux devices. These are
-> devices that enable and disable groups of pins on primarily PGA and
-> BGA type of chip packages and common in embedded systems.
+On 10:05 Tue 10 May     , Greg KH wrote:
+> On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
+> > > Hello.
+> > > 
+> > > Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > 
+> > > >on 9g20 they are the same as the 9261
+> > > 
+> > > >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > >---
+> > > > drivers/usb/gadget/at91_udc.c |    2 +-
+> > > > 1 files changed, 1 insertions(+), 1 deletions(-)
+> > > 
+> > > >diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+> > > >index 9b7cdb1..41dc093 100644
+> > > >--- a/drivers/usb/gadget/at91_udc.c
+> > > >+++ b/drivers/usb/gadget/at91_udc.c
+> > > >@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+> > > > 	}
+> > > > 	/* newer chips have more FIFO memory than rm9200 */
+> > > >-	if (cpu_is_at91sam9260()) {
+> > > >+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
+> > > 
+> > >    These shouldn't be used in the drivers at all.
+> > Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
 > 
-> This is being done to depopulate the arch/arm/* directory of such
-> custom drivers and try to abstract the infrastructure they all
-> need. See the Documentation/pinmux.txt file that is part of this
-> patch for more details.
-> 
-> Cc: Stephen Warren <swarren@nvidia.com>
-> Cc: Joe Perches <joe@perches.com>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-[...]
-> +static struct foo_pmx_func myfuncs[] = {
-> +	{
-> +		.name = "spi0-0",
-> +		.pins = spi0_0_pins,
-> +		.num_pins = ARRAY_SIZE(spi0_1_pins),
-> +	},
-> +	{
-> +		.name = "i2c0",
-> +		.pins = i2c0_pins,
-> +		.num_pins = ARRAY_SIZE(i2c0_pins),
-> +	},
-> +	{
-> +		.name = "spi0-1",
-> +		.pins = spi0_1_pins,
-> +		.num_pins = ARRAY_SIZE(spi0_1_pins),
-> +	},
-> +};
+> How could I apply this to the tree for the .40 release then?
+it's also the case these patch apply from kernel v2.6.26 to above
 
-So I can see how this works well for these examples, but on our devices, 
-we have some interfaces for connecting to radios and these have a pair 
-of 8-bit RX and TX busses.  However, depending on what radio you 
-connect, you may not need all 8 bits of each and this is dependent on 
-the board.  What would be the best way to deal with that in this scheme 
-where say we only wanted 4 bits of each, saving the others for GPIO?  
-Would this need to be a function for each configuration?
+for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
 
-[...]
-> +/**
-> + * pinmux_request_gpio() - request a single pin to be muxed in to be used
-> + *	as a GPIO pin
-> + * @pin: the pin to mux in as GPIO
-> + * @gpio: the corresponding GPIO pin number
-> + */
-> +int pinmux_request_gpio(int pin, unsigned gpio)
-> +{
-> +	char gpiostr[16];
-> +
-> +	snprintf(gpiostr, 15, "gpio%d", gpio);
-> +	return pin_request(pin, gpiostr, true);
-> +}
-> +EXPORT_SYMBOL_GPL(pinmux_request_gpio);
-
-Our devices have two different GPIO controllers, which can be muxed to 
-the same pad (they're slightly different - one is a bit slower but can 
-do sigma-delta output) and our pinmux driver would need to know what 
-GPIO controller it should route to the pad.  Could gpio_request_enable() 
-be passed the GPIO number or is there a better way to do this?
-
-Jamie
+Best Regards,
+J.
