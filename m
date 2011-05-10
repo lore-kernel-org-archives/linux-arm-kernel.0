@@ -1,91 +1,22 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 May 2011 08:34:21 +0100
-Subject: [PATCH 13/13] clocksource: convert OMAP1 to 32-bit down counting
-	clocksource
-In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-Message-ID: <E1QJhSX-0000zA-0E@rmk-PC.arm.linux.org.uk>
+From: rubini@unipv.it (Alessandro Rubini)
+Date: Tue, 10 May 2011 09:39:30 +0200
+Subject: [PATCH 08/13] clocksource: convert ARM 32-bit down counting
+	clocksources
+In-Reply-To: <E1QJhPM-0000yq-ED@rmk-PC.arm.linux.org.uk>
+References: <E1QJhPM-0000yq-ED@rmk-PC.arm.linux.org.uk>
+	<20110510072700.GA29869@n2100.arm.linux.org.uk>
+Message-ID: <20110510073930.GA19558@mail.gnudd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP1 32-bit down counting clocksource to the generic
-clocksource infrastructure.
+> Convert MXC, Nomadik and Orion 32-bit down-counting clocksources to
+> generic mmio clocksource infrastructure.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-omap1/time.c |   23 ++++++-----------------
- arch/arm/plat-omap/Kconfig |    1 +
- 2 files changed, 7 insertions(+), 17 deletions(-)
+Ok, but I think Linusw should ack this as there is the issue of
+dummy-read used initially, that I really didn't understand.
 
-diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
-index e7ab616..03e1e10 100644
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -190,24 +190,11 @@ static __init void omap_init_mpu_timer(unsigned long rate)
-  * ---------------------------------------------------------------------------
-  */
- 
--static cycle_t mpu_read(struct clocksource *cs)
--{
--	return ~omap_mpu_timer_read(1);
--}
--
--static struct clocksource clocksource_mpu = {
--	.name		= "mpu_timer2",
--	.rating		= 300,
--	.read		= mpu_read,
--	.mask		= CLOCKSOURCE_MASK(32),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
- static DEFINE_CLOCK_DATA(cd);
- 
- static inline unsigned long long notrace _omap_mpu_sched_clock(void)
- {
--	u32 cyc = mpu_read(&clocksource_mpu);
-+	u32 cyc = ~omap_mpu_timer_read(1);
- 	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
- }
- 
-@@ -225,20 +212,22 @@ static unsigned long long notrace omap_mpu_sched_clock(void)
- 
- static void notrace mpu_update_sched_clock(void)
- {
--	u32 cyc = mpu_read(&clocksource_mpu);
-+	u32 cyc = ~omap_mpu_timer_read(1);
- 	update_sched_clock(&cd, cyc, (u32)~0);
- }
- 
- static void __init omap_init_clocksource(unsigned long rate)
- {
-+	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(1);
- 	static char err[] __initdata = KERN_ERR
- 			"%s: can't register clocksource!\n";
- 
- 	omap_mpu_timer_start(1, ~0, 1);
- 	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
- 
--	if (clocksource_register_hz(&clocksource_mpu, rate))
--		printk(err, clocksource_mpu.name);
-+	if (clocksource_mmio_init(&timer->read_tim, "mpu_timer2", rate,
-+			300, 32, clocksource_mmio_readl_down))
-+		printk(err, "mpu_timer2");
- }
- 
- static void __init omap_mpu_timer_init(void)
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index cd5f993..e9c0efc 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -12,6 +12,7 @@ choice
- config ARCH_OMAP1
- 	bool "TI OMAP1"
- 	select CLKDEV_LOOKUP
-+	select CLKSRC_MMIO
- 	help
- 	  "Systems based on omap7xx, omap15xx or omap16xx"
- 
--- 
-1.7.4.4
+> +	if (clocksource_mmio_init(mti_base + MTU_VAL(0), "mtu_0",
+
+Typo. That's "mtu_base", not "mti".
+
+/alessandro
