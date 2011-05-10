@@ -1,321 +1,112 @@
-From: shweta.gulati@ti.com (Gulati, Shweta)
-Date: Tue, 10 May 2011 10:03:23 +0530
-Subject: [PATCH V2] OMAP2+: SR Layer Cleanup.
-In-Reply-To: <BANLkTinFZAYPdqXwuYZgv6buBuA-q_+seQ@mail.gmail.com>
-References: <1302243280-10891-1-git-send-email-shweta.gulati@ti.com>
-	<BANLkTinFZAYPdqXwuYZgv6buBuA-q_+seQ@mail.gmail.com>
-Message-ID: <BANLkTi=t+Yq-s5XQfrxuHMr2JUMtdQMgrg@mail.gmail.com>
+From: amit.virdi@st.com (Amit Virdi)
+Date: Tue, 10 May 2011 11:08:24 +0530
+Subject: BUG: sleeping function called from invalid context
+Message-ID: <4DC8CF50.4040003@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-On Tue, May 10, 2011 at 5:52 AM, Menon, Nishanth <nm@ti.com> wrote:
-> might be a bit late, but seeing that Kevin has'nt picked this up yet,
-> a couple of cosmetic comments
-> I think it might be great if it could be folded into one of kevin's patches.
-> else,
-> $subject - OMAP3+ and could you drop the .?
-Will correct the Subject line
-> On Fri, Apr 8, 2011 at 01:14, Shweta Gulati <shweta.gulati@ti.com> wrote:
->> As a part of Voltage Layer Cleanup Patches,
->> submitted by Kevin Hilman, Voltage domain
->> Information is removed from hwmod,
->> So the patch removes 'vdd_name' info from omap_hwmod
->> and adds that info into dev_attr as SR code uses vdd_name
->> to get voltagedomain sructure info.
-> word wrap cleanup a bit, also please indicate the issue you see if the
-> patch is not applied.
-Would Rephrase the commit log.
-> Regards,
-> Nishanth Menon
->
->
->>
->> Tested on OMAP3630 SDP and OMAP4430 SDP Board
->>
->> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
->
->
->
->> ---
->> ?V2:
->> ?Rebased on latest 'pm-wip/voltdm_a' branch.
->>
->> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c ? | ? 17 +++++++++++++----
->> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c ? | ? 19 ++++++++++++++++---
->> ?arch/arm/mach-omap2/smartreflex.h ? ? ? ? ? ?| ? 10 ++++++++++
->> ?arch/arm/mach-omap2/sr_device.c ? ? ? ? ? ? ?| ? 11 +++++++----
->> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 -
->> ?5 files changed, 46 insertions(+), 12 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> index 3cd91ac..6a704bd 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->> @@ -29,6 +29,7 @@
->>
->> ?#include "omap_hwmod_common_data.h"
->>
->> +#include "smartreflex.h"
->> ?#include "prm-regbits-34xx.h"
->> ?#include "cm-regbits-34xx.h"
->> ?#include "wd_timer.h"
->> @@ -2904,6 +2905,10 @@ static struct omap_hwmod_class omap36xx_smartreflex_hwmod_class = {
->> ?};
->>
->> ?/* SR1 */
->> +static struct omap_sr_dev_attr sr1_dev_attr = {
->> + ? ? ? .voltdm_name ? = "mpu_iva",
->> +};
->> +
->> ?static struct omap_hwmod_ocp_if *omap3_sr1_slaves[] = {
->> ? ? ? ?&omap3_l4_core__sr1,
->> ?};
->> @@ -2912,7 +2917,6 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
->> ? ? ? ?.name ? ? ? ? ? = "sr1_hwmod",
->> ? ? ? ?.class ? ? ? ? ?= &omap34xx_smartreflex_hwmod_class,
->> ? ? ? ?.main_clk ? ? ? = "sr1_fck",
->> - ? ? ? .vdd_name ? ? ? = "mpu_iva",
->> ? ? ? ?.prcm ? ? ? ? ? = {
->> ? ? ? ? ? ? ? ?.omap2 = {
->> ? ? ? ? ? ? ? ? ? ? ? ?.prcm_reg_id = 1,
->> @@ -2924,6 +2928,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
->> ? ? ? ?},
->> ? ? ? ?.slaves ? ? ? ? = omap3_sr1_slaves,
->> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap3_sr1_slaves),
->> + ? ? ? .dev_attr ? ? ? = &sr1_dev_attr,
->> ? ? ? ?.omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?CHIP_IS_OMAP3430ES3_0 |
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?CHIP_IS_OMAP3430ES3_1),
->> @@ -2934,7 +2939,6 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
->> ? ? ? ?.name ? ? ? ? ? = "sr1_hwmod",
->> ? ? ? ?.class ? ? ? ? ?= &omap36xx_smartreflex_hwmod_class,
->> ? ? ? ?.main_clk ? ? ? = "sr1_fck",
->> - ? ? ? .vdd_name ? ? ? = "mpu_iva",
->> ? ? ? ?.prcm ? ? ? ? ? = {
->> ? ? ? ? ? ? ? ?.omap2 = {
->> ? ? ? ? ? ? ? ? ? ? ? ?.prcm_reg_id = 1,
->> @@ -2946,10 +2950,15 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
->> ? ? ? ?},
->> ? ? ? ?.slaves ? ? ? ? = omap3_sr1_slaves,
->> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap3_sr1_slaves),
->> + ? ? ? .dev_attr ? ? ? = &sr1_dev_attr,
->> ? ? ? ?.omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
->> ?};
->>
->> ?/* SR2 */
->> +static struct omap_sr_dev_attr sr2_dev_attr = {
->> + ? ? ? .voltdm_name ? ?= "core",
->> +};
->> +
->> ?static struct omap_hwmod_ocp_if *omap3_sr2_slaves[] = {
->> ? ? ? ?&omap3_l4_core__sr2,
->> ?};
->> @@ -2958,7 +2967,6 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
->> ? ? ? ?.name ? ? ? ? ? = "sr2_hwmod",
->> ? ? ? ?.class ? ? ? ? ?= &omap34xx_smartreflex_hwmod_class,
->> ? ? ? ?.main_clk ? ? ? = "sr2_fck",
->> - ? ? ? .vdd_name ? ? ? = "core",
->> ? ? ? ?.prcm ? ? ? ? ? = {
->> ? ? ? ? ? ? ? ?.omap2 = {
->> ? ? ? ? ? ? ? ? ? ? ? ?.prcm_reg_id = 1,
->> @@ -2970,6 +2978,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
->> ? ? ? ?},
->> ? ? ? ?.slaves ? ? ? ? = omap3_sr2_slaves,
->> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap3_sr2_slaves),
->> + ? ? ? .dev_attr ? ? ? = &sr2_dev_attr,
->> ? ? ? ?.omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?CHIP_IS_OMAP3430ES3_0 |
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?CHIP_IS_OMAP3430ES3_1),
->> @@ -2980,7 +2989,6 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
->> ? ? ? ?.name ? ? ? ? ? = "sr2_hwmod",
->> ? ? ? ?.class ? ? ? ? ?= &omap36xx_smartreflex_hwmod_class,
->> ? ? ? ?.main_clk ? ? ? = "sr2_fck",
->> - ? ? ? .vdd_name ? ? ? = "core",
->> ? ? ? ?.prcm ? ? ? ? ? = {
->> ? ? ? ? ? ? ? ?.omap2 = {
->> ? ? ? ? ? ? ? ? ? ? ? ?.prcm_reg_id = 1,
->> @@ -2992,6 +3000,7 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
->> ? ? ? ?},
->> ? ? ? ?.slaves ? ? ? ? = omap3_sr2_slaves,
->> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap3_sr2_slaves),
->> + ? ? ? .dev_attr ? ? ? = &sr2_dev_attr,
->> ? ? ? ?.omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
->> ?};
->>
->> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> index 3e88dd3..1331b39 100644
->> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->> @@ -30,6 +30,7 @@
->>
->> ?#include "omap_hwmod_common_data.h"
->>
->> +#include "smartreflex.h"
->> ?#include "cm1_44xx.h"
->> ?#include "cm2_44xx.h"
->> ?#include "prm44xx.h"
->> @@ -3775,6 +3776,10 @@ static struct omap_hwmod_class omap44xx_smartreflex_hwmod_class = {
->> ?};
->>
->> ?/* smartreflex_core */
->> +static struct omap_sr_dev_attr sr_core_dev_attr = {
->> + ? ? ? .voltdm_name ? = "core",
->> +};
->> +
->> ?static struct omap_hwmod omap44xx_smartreflex_core_hwmod;
->> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_core_irqs[] = {
->> ? ? ? ?{ .irq = 19 + OMAP44XX_IRQ_GIC_START },
->> @@ -3809,7 +3814,6 @@ static struct omap_hwmod omap44xx_smartreflex_core_hwmod = {
->> ? ? ? ?.mpu_irqs ? ? ? = omap44xx_smartreflex_core_irqs,
->> ? ? ? ?.mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_core_irqs),
->> ? ? ? ?.main_clk ? ? ? = "smartreflex_core_fck",
->> - ? ? ? .vdd_name ? ? ? = "core",
->> ? ? ? ?.prcm = {
->> ? ? ? ? ? ? ? ?.omap4 = {
->> ? ? ? ? ? ? ? ? ? ? ? ?.clkctrl_reg = OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
->> @@ -3817,10 +3821,15 @@ static struct omap_hwmod omap44xx_smartreflex_core_hwmod = {
->> ? ? ? ?},
->> ? ? ? ?.slaves ? ? ? ? = omap44xx_smartreflex_core_slaves,
->> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_core_slaves),
->> + ? ? ? .dev_attr ? ? ? = &sr_core_dev_attr,
->> ? ? ? ?.omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> ?};
->>
->> ?/* smartreflex_iva */
->> +static struct omap_sr_dev_attr sr_iva_dev_attr = {
->> + ? ? ? .voltdm_name ? = "iva",
->> +};
->> +
->> ?static struct omap_hwmod omap44xx_smartreflex_iva_hwmod;
->> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_iva_irqs[] = {
->> ? ? ? ?{ .irq = 102 + OMAP44XX_IRQ_GIC_START },
->> @@ -3855,7 +3864,6 @@ static struct omap_hwmod omap44xx_smartreflex_iva_hwmod = {
->> ? ? ? ?.mpu_irqs ? ? ? = omap44xx_smartreflex_iva_irqs,
->> ? ? ? ?.mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_iva_irqs),
->> ? ? ? ?.main_clk ? ? ? = "smartreflex_iva_fck",
->> - ? ? ? .vdd_name ? ? ? = "iva",
->> ? ? ? ?.prcm = {
->> ? ? ? ? ? ? ? ?.omap4 = {
->> ? ? ? ? ? ? ? ? ? ? ? ?.clkctrl_reg = OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
->> @@ -3863,10 +3871,15 @@ static struct omap_hwmod omap44xx_smartreflex_iva_hwmod = {
->> ? ? ? ?},
->> ? ? ? ?.slaves ? ? ? ? = omap44xx_smartreflex_iva_slaves,
->> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_iva_slaves),
->> + ? ? ? .dev_attr ? ? ? = &sr_iva_dev_attr,
->> ? ? ? ?.omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> ?};
->>
->> ?/* smartreflex_mpu */
->> +static struct omap_sr_dev_attr sr_mpu_dev_attr = {
->> + ? ? ? .voltdm_name ? = "mpu",
->> +};
->> +
->> ?static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod;
->> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_mpu_irqs[] = {
->> ? ? ? ?{ .irq = 18 + OMAP44XX_IRQ_GIC_START },
->> @@ -3901,7 +3914,6 @@ static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod = {
->> ? ? ? ?.mpu_irqs ? ? ? = omap44xx_smartreflex_mpu_irqs,
->> ? ? ? ?.mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_mpu_irqs),
->> ? ? ? ?.main_clk ? ? ? = "smartreflex_mpu_fck",
->> - ? ? ? .vdd_name ? ? ? = "mpu",
->> ? ? ? ?.prcm = {
->> ? ? ? ? ? ? ? ?.omap4 = {
->> ? ? ? ? ? ? ? ? ? ? ? ?.clkctrl_reg = OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
->> @@ -3909,6 +3921,7 @@ static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod = {
->> ? ? ? ?},
->> ? ? ? ?.slaves ? ? ? ? = omap44xx_smartreflex_mpu_slaves,
->> ? ? ? ?.slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_mpu_slaves),
->> + ? ? ? .dev_attr ? ? ? = &sr_mpu_dev_attr,
->> ? ? ? ?.omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->> ?};
->>
->> diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
->> index 5f35b9e..9a7f770 100644
->> --- a/arch/arm/mach-omap2/smartreflex.h
->> +++ b/arch/arm/mach-omap2/smartreflex.h
->> @@ -197,6 +197,16 @@ struct omap_sr_nvalue_table {
->> ?};
->>
->> ?/**
->> + * struct omap_sr_dev_attr - Smartreflex Device attribute.
->> + *
->> + * @voltdm_name: ? ? ? Name of voltdomain of SR instance
->> + */
->> +
->> +struct omap_sr_dev_attr {
->> + ? ? ? const char ? ? ?*voltdm_name;
->> +};
->> +
->> +/**
->> ?* struct omap_sr_data - Smartreflex platform data.
->> ?*
->> ?* @ip_type: ? ? ? ? ? Smartreflex IP type.
->> diff --git a/arch/arm/mach-omap2/sr_device.c b/arch/arm/mach-omap2/sr_device.c
->> index 2782d3f..65b2aae 100644
->> --- a/arch/arm/mach-omap2/sr_device.c
->> +++ b/arch/arm/mach-omap2/sr_device.c
->> @@ -82,6 +82,7 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
->> ? ? ? ?struct omap_sr_data *sr_data;
->> ? ? ? ?struct omap_device *od;
->> ? ? ? ?struct omap_volt_data *volt_data;
->> + ? ? ? struct omap_sr_dev_attr *sr_dev_attr;
->> ? ? ? ?char *name = "smartreflex";
->> ? ? ? ?static int i;
->>
->> @@ -92,9 +93,11 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
->> ? ? ? ? ? ? ? ?return -ENOMEM;
->> ? ? ? ?}
->>
->> - ? ? ? if (!oh->vdd_name) {
->> + ? ? ? sr_dev_attr = (struct omap_sr_dev_attr *)oh->dev_attr;
->> + ? ? ? if (!sr_dev_attr->voltdm_name) {
->> ? ? ? ? ? ? ? ?pr_err("%s: No voltage domain specified for %s."
->> - ? ? ? ? ? ? ? ? ? ? ? "Cannot initialize\n", __func__, oh->name);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "Cannot initialize\n", __func__,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sr_dev_attr->voltdm_name);
->> ? ? ? ? ? ? ? ?goto exit;
->> ? ? ? ?}
->>
->> @@ -102,10 +105,10 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
->> ? ? ? ?sr_data->senn_mod = 0x1;
->> ? ? ? ?sr_data->senp_mod = 0x1;
->>
->> - ? ? ? sr_data->voltdm = voltdm_lookup(oh->vdd_name);
->> + ? ? ? sr_data->voltdm = voltdm_lookup(sr_dev_attr->voltdm_name);
->> ? ? ? ?if (IS_ERR(sr_data->voltdm)) {
->> ? ? ? ? ? ? ? ?pr_err("%s: Unable to get voltage domain pointer for VDD %s\n",
->> - ? ? ? ? ? ? ? ? ? ? ? __func__, oh->vdd_name);
->> + ? ? ? ? ? ? ? ? ? ? ? __func__, sr_dev_attr->voltdm_name);
->> ? ? ? ? ? ? ? ?goto exit;
->> ? ? ? ?}
->>
->> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> index a5fa7c1..39d809a 100644
->> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
->> @@ -519,7 +519,6 @@ struct omap_hwmod {
->> ? ? ? ?const char ? ? ? ? ? ? ? ? ? ? ?*main_clk;
->> ? ? ? ?struct clk ? ? ? ? ? ? ? ? ? ? ?*_clk;
->> ? ? ? ?struct omap_hwmod_opt_clk ? ? ? *opt_clks;
->> - ? ? ? char ? ? ? ? ? ? ? ? ? ? ? ? ? ?*vdd_name;
->> ? ? ? ?struct omap_hwmod_ocp_if ? ? ? ?**masters; /* connect to *_IA */
->> ? ? ? ?struct omap_hwmod_ocp_if ? ? ? ?**slaves; ?/* connect to *_TA */
->> ? ? ? ?void ? ? ? ? ? ? ? ? ? ? ? ? ? ?*dev_attr;
->> --
->> 1.7.0.4
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
->
+I'm testing the driver, based on Linux Kernel 2.6.37, for DICE's Fast 
+IrDA controller device. I'm using IrCOMM as the upper IrDA layer and 
+using PPP over it.
 
+While testing, I'm getting the following backtrace repeatedly:
 
+=====================================
+BUG: sleeping function called from invalid context at 
+/data/csd_sw/spear/drives_os/amitvi/spear/kernel/linux-2.6/kernel/mutex.c:85
+in_atomic(): 1, irqs_disabled(): 0, pid: 0, name: swapper
+Backtrace:
+[<c0030b48>] (dump_backtrace+0x0/0x110) from [<c0030c8c>] 
+(dump_stack+0x18/0x1c)
+  r6:00000000 r5:c725a038 r4:c042c000
+[<c0030c74>] (dump_stack+0x0/0x1c) from [<c003b8b4>] 
+(__might_sleep+0xc8/0xe8)
+[<c003b7ec>] (__might_sleep+0x0/0xe8) from [<c0332bec>] 
+(mutex_lock+0x24/0x44)
+  r4:c725a038
+[<c0332bc8>] (mutex_lock+0x0/0x44) from [<c019f348>] 
+(tty_unthrottle+0x1c/0x64)
+  r4:c725a000
+[<c019f32c>] (tty_unthrottle+0x0/0x64) from [<c0225b08>] 
+(ppp_asynctty_receive+0x484/0x4a4)
+  r5:c7816000 r4:c726a180
+[<c0225684>] (ppp_asynctty_receive+0x0/0x4a4) from [<c030f944>] 
+(ircomm_tty_data_indication+0x138/0x184)
+[<c030f80c>] (ircomm_tty_data_indication+0x0/0x184) from [<c030c8e8>] 
+(ircomm_data_indication+0x7c/0xb4)
+  r6:c7011300 r5:c726a900 r4:c7011300
+[<c030c86c>] (ircomm_data_indication+0x0/0xb4) from [<c030d31c>] 
+(ircomm_process_data+0x110/0x160)
+  r5:c726a900 r4:c7011300
+[<c030d20c>] (ircomm_process_data+0x0/0x160) from [<c030d6e0>] 
+(ircomm_state_conn+0x60/0xec)
+  r7:00000000 r6:00000000 r5:c726a900 r4:c7011300
+[<c030d680>] (ircomm_state_conn+0x0/0xec) from [<c030d664>] 
+(ircomm_do_event+0x6c/0x88)
+  r6:c726a900 r5:00000009 r4:00000003
+[<c030d5f8>] (ircomm_do_event+0x0/0x88) from [<c030e850>] 
+(ircomm_ttp_data_indication+0xbc/0xf4)
+  r7:00000002 r6:00000000 r5:c726a900 r4:c7011300
+[<c030e794>] (ircomm_ttp_data_indication+0x0/0xf4) from [<c03048c0>] 
+(irttp_do_data_indication+0x44/0x8c)
+  r5:c726a900 r4:c79f3200
+[<c030487c>] (irttp_do_data_indication+0x0/0x8c) from [<c03049b4>] 
+(irttp_run_rx_queue+0xac/0x318)
+  r6:c726a900 r5:00000000 r4:c79f3200
+[<c0304908>] (irttp_run_rx_queue+0x0/0x318) from [<c0306194>] 
+(irttp_data_indication+0x90/0xac)
+[<c0306104>] (irttp_data_indication+0x0/0xac) from [<c02f8158>] 
+(irlmp_data_indication+0x5c/0x60)
+  r7:c726a900 r6:c7120022 r5:c71cb300 r4:c726a900
+[<c02f80fc>] (irlmp_data_indication+0x0/0x60) from [<c02fad20>] 
+(irlmp_link_data_indication+0x2fc/0x35c)
+  r5:c72c2280 r4:c71cb300
+[<c02faa24>] (irlmp_link_data_indication+0x0/0x35c) from [<c02fc0d4>] 
+(irlap_data_indication+0x38/0x3c)
+[<c02fc09c>] (irlap_data_indication+0x0/0x3c) from [<c02ff434>] 
+(irlap_state_nrm_s+0x208/0x7e0)
+  r6:c7214400 r5:00000001 r4:00000010
+[<c02ff22c>] (irlap_state_nrm_s+0x0/0x7e0) from [<c02fced8>] 
+(irlap_do_event+0x84/0x17c)
+[<c02fce54>] (irlap_do_event+0x0/0x17c) from [<c02ffeb0>] 
+(irlap_driver_rcv+0x178/0xc34)
+  r8:c7214400 r7:c726a900 r6:c78e7800 r5:00000001 r4:00000000
+[<c02ffd38>] (irlap_driver_rcv+0x0/0xc34) from [<c0287a3c>] 
+(__netif_receive_skb+0x348/0x39c)
+  r8:00000000 r7:00001700 r6:c78e7800 r5:c05ee8c4 r4:c726a900
+[<c02876f4>] (__netif_receive_skb+0x0/0x39c) from [<c028aec4>] 
+(process_backlog+0x8c/0x154)
+[<c028ae38>] (process_backlog+0x0/0x154) from [<c028aff8>] 
+(net_rx_action+0x6c/0x188)
+[<c028af8c>] (net_rx_action+0x0/0x188) from [<c0046f94>] 
+(__do_softirq+0x84/0x118)
+[<c0046f10>] (__do_softirq+0x0/0x118) from [<c00472a8>] (irq_exit+0x44/0x4c)
+[<c0047264>] (irq_exit+0x0/0x4c) from [<c002c080>] (asm_do_IRQ+0x80/0xa0)
+[<c002c000>] (asm_do_IRQ+0x0/0xa0) from [<c002cb50>] (__irq_svc+0x30/0x80)
+Exception stack(0xc042df40 to 0xc042df88)
+df40: 00000000 0005317f 0005217f 60000013 c042c000 c042fcdc c046418c 
+c042fcd0
+df60: 0002661c 41069265 00026580 c042df94 600000d3 c042df88 c002e694 
+c002e6a0
+df80: 60000013 ffffffff
+  r5:f1100000 r4:ffffffff
+[<c002e670>] (default_idle+0x0/0x34) from [<c002e458>] (cpu_idle+0x60/0xa4)
+[<c002e3f8>] (cpu_idle+0x0/0xa4) from [<c032d5c4>] (rest_init+0x5c/0x74)
+  r6:c0027e60 r5:c046415c r4:c0488aa4
+[<c032d568>] (rest_init+0x0/0x74) from [<c0008a8c>] 
+(start_kernel+0x278/0x2e0)
+[<c0008814>] (start_kernel+0x0/0x2e0) from [<00008034>] (0x8034)
+=====================================
 
--- 
-Thanks,
-Regards,
-Shweta
+On analysis, I found that this is due to the change introduced in 
+tty_ioctl.c where the termios mutex is taken to protect against parallel 
+throttle/unthrottle. Probably IrCOMM stack code wasn't tested before 
+merging this patch.
+
+Please suggest what should be done with the IrCOMM protocol stack code 
+to resolve this problem?
+
+Thanks
+~Amit Virdi
