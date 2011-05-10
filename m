@@ -1,93 +1,68 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 10 May 2011 09:31:52 +0200
-Subject: [PATCH v3] leds: provide helper to register "leds-gpio" devices
-In-Reply-To: <20110509150254.e7da059f.akpm@linux-foundation.org>
-References: <1302097097.22904.41.camel@rex>
-	<1302554157-24145-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110509150254.e7da059f.akpm@linux-foundation.org>
-Message-ID: <20110510073152.GF29089@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 May 2011 08:32:05 +0100
+Subject: [PATCH 11/13] clocksource: convert SPEAr platforms 16-bit up
+	counting clocksource
+In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+Message-ID: <E1QJhQL-0000z2-PA@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+Convert SPEAr platforms 16-bit up counting clocksource, which requires
+a 16-bit register access read rather than 32-bit.
 
-On Mon, May 09, 2011 at 03:02:54PM -0700, Andrew Morton wrote:
-> On Mon, 11 Apr 2011 22:35:57 +0200
-> Uwe Kleine-K__nig  <u.kleine-koenig@pengutronix.de> wrote:
-> 
-> > This function makes a deep copy of the platform data to allow it to live
-> > in init memory.
-> > The definition cannot go into leds-gpio.c because it needs to be builtin
-> > to be usable by platforms.
-> > 
-> 
-> Well...  why?  The changelog tells us what the function does but
-> provides no information explaining why you think it's needed, nor how
-> it is expected to be used, etc.
-> 
-> Please send a complete and useful changelog!
-OK, will try to do better for v4.
+Cc: Viresh Kumar <viresh.kumar@st.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig           |    1 +
+ arch/arm/plat-spear/time.c |   16 ++--------------
+ 2 files changed, 3 insertions(+), 14 deletions(-)
 
-> > --- a/drivers/leds/Kconfig
-> > +++ b/drivers/leds/Kconfig
-> > @@ -14,6 +14,11 @@ config LEDS_CLASS
-> >  	  This option enables the led sysfs class in /sys/class/leds.  You'll
-> >  	  need this to do anything useful with LEDs.  If unsure, say N.
-> >  
-> > +config LED_REGISTER_GPIO
-> > +	bool
-> > +	help
-> > +	  This option provides the function gpio_led_register_device.
-> > +
-> 
-> Every other LEDS Kconfig symbol uses "LEDS", not "LED".  I'll make that
-> change.
-I used LED only to match led-register.c. There led- seemed reasonable to
-me because it's only the drivers that use leds-, but there is
-led-core.o, led-class.o and led-triggers.o.
-Hmm, I don't care much.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index bab25a0..cbc27fb 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -884,6 +884,7 @@ config PLAT_SPEAR
+ 	select ARM_AMBA
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select CLKDEV_LOOKUP
++	select CLKSRC_MMIO
+ 	select GENERIC_CLOCKEVENTS
+ 	select HAVE_CLK
+ 	help
+diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
+index dbb6e4f..0c77e42 100644
+--- a/arch/arm/plat-spear/time.c
++++ b/arch/arm/plat-spear/time.c
+@@ -70,19 +70,6 @@ static void clockevent_set_mode(enum clock_event_mode mode,
+ static int clockevent_next_event(unsigned long evt,
+ 				 struct clock_event_device *clk_event_dev);
  
-> >  if NEW_LEDS
-> >  
-> >  comment "LED drivers"
-> > [...]
-> > --- a/include/linux/leds.h
-> > +++ b/include/linux/leds.h
-> > @@ -207,5 +207,17 @@ struct gpio_led_platform_data {
-> >  					unsigned long *delay_off);
-> >  };
-> >  
-> > +/**
-> > + * gpio_led_register_device - register a gpio-led device
-> > + * @pdata: the platform data used for the new device
-> > + *
-> > + * Use this function instead of platform_device_add()ing a static struct
-> > + * platform_device.
-> > + *
-> > + * Note: as pdata and pdata->leds is copied these usually can and should be
-> > + * __initdata.
-> > + */
-> > +struct platform_device *gpio_led_register_device(
-> > +		int id, const struct gpio_led_platform_data *pdata);
-> 
-> It's unusual to document functions in the .h file.  There's a bit of
-> precedent for that in leds.h, but there is more precedent in
-> drivers/leds/*.c
-> 
-> Personally I think that putting the documentation in .h is rather sucky
-> - it happens so rarely that one just doesn't think of looking in there.
-> 
-> The description isn't terribly useful if the reader doesn't know what
-> "platform_device_add()ing a static struct platform_device" is for.  Can
-> we describe this in some manner whcih doesn't refer to something else
-> which is probably undocumented?
-> 
-> The comment doesn't document return values.
-OK, will fix in v4.
-
-Best regards
-Uwe
-
+-static cycle_t clocksource_read_cycles(struct clocksource *cs)
+-{
+-	return (cycle_t) readw(gpt_base + COUNT(CLKSRC));
+-}
+-
+-static struct clocksource clksrc = {
+-	.name = "tmr1",
+-	.rating = 200,		/* its a pretty decent clock */
+-	.read = clocksource_read_cycles,
+-	.mask = 0xFFFF,		/* 16 bits */
+-	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+ static void spear_clocksource_init(void)
+ {
+ 	u32 tick_rate;
+@@ -103,7 +90,8 @@ static void spear_clocksource_init(void)
+ 	writew(val, gpt_base + CR(CLKSRC));
+ 
+ 	/* register the clocksource */
+-	clocksource_register_hz(&clksrc, tick_rate);
++	clocksource_mmio_init(gpt_base + COUNT(CLKSRC), "tmr1", tick_rate,
++		200, 16, clocksource_mmio_readw_up);
+ }
+ 
+ static struct clock_event_device clkevt = {
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.4.4
