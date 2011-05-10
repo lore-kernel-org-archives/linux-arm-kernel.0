@@ -1,83 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2011 01:15:12 +0200
-Subject: [PATCH 0/4] Pinmux subsystem
-In-Reply-To: <20110510214518.GB5315@n2100.arm.linux.org.uk>
-References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
-	<20110502225708.GD28001@n2100.arm.linux.org.uk>
-	<BANLkTikSwkYEvbQ8XVrB3LUetVqBBUjT2g@mail.gmail.com>
-	<20110510214518.GB5315@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTinhDWsZuUdeNObSOmsS2_ES9G3Bww@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 10 May 2011 16:22:14 -0700
+Subject: [RFC 1/2] ARM: Tegra: Device Tree Support: Update how sdhci
+	devices are initialized
+In-Reply-To: <4DC9BD39.30108@secretlab.ca>
+References: <20110510201108.22693.50319.stgit@riker>
+	<20110510201414.22693.7427.stgit@riker>
+	<74CDBE0F657A3D45AFBB94109FB122FF04986AA06A@HQMAIL01.nvidia.com>
+	<BANLkTingm7PCJPC-xCremYg_Ab7qFvPSag@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04986AA077@HQMAIL01.nvidia.com>
+	<4DC9BD39.30108@secretlab.ca>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04986AA0A6@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, May 10, 2011 at 11:25:44PM +0200, Linus Walleij wrote:
->> It can, basically:
->>
->> struct pinmux *pmx;
->>
->> pmx = pinmux_get(dev, "irda-uart");
->> pinmux_enable(pmx);
->> (... SIR UART operations ...)
->> pinmux_disable(pmx);
->> pinmux_put(pmx);
->> (... stuff to init FIR silicon ...)
->> pmx = pinmux_get(dev, "irda-fir");
->> pinmux_enable(pmx);
->> (... etc ...)
->
-> You really don't want to do this. ?It's not that SIR and FIR are that
-> exclusive. ?You only switch to FIR mode when you've negotiated in SIR
-> mode, and then there's tight timings for doing that. ?Essentially you
-> agree in SIR mode to switch to FIR mode, switch to FIR mode and expect
-> a response in FIR mode from the remote end.
->
-> Calling out to lots of functions to perform the switch is asking for
-> that response to be missed because you've not set things up for it.
->
-> You'd want to have SIR and FIR mode 'got', and then switch as quickly
-> as possible between them.
+John Bonesio wrote at Tuesday, May 10, 2011 4:33 PM:
+> The goal I'm working towards right now is to have the platform specific
+> code continue to register the devices that are inside the SoC. Then use
+> the device tree to register all other on board devices.
 
-Sorry I might have got things backwards here, let me see if I got it:
+Sure, that sounds right.
 
-Either the SIR and FIR modes use the exact same pins albeit pushing
-in a differnt silicon block to control them without any side-effects.
-In that case from the pinmux API point of view there is no conflict,
-since there is no competition for using the same pins, the pinmux API
-get/put is about resolving such conflicts.
+Which branch are your patches aimed at? My discussions are all based
+on my experience with Grant's devicetree/test branch.
 
-So if we want to use the pinmux_enable()/disable() to quickly poke
-some bit to switch between these two, I could think about things like
-encoding the pins in the first setting and not encoding any pins at
-all in the second one and then they can both be be get/put without
-conflicting, and the only possible conflict would be if you tried
-to enable both at the same time and this can be handled by the
-specific pinmux driver.
+> This patch doesn't accomplish the whole goal in one step, but gets the
+> code a little closer toward this goal.
 
-Albeit not elegant, it works for this scenario.
+So what's confusing me is that I think the devicetree/test branch is
+already there; board-dt.c registers all 4 SDHCI controllers,
+tegra250.dtsi defines each controller's memory map etc., and disables
+them all, then tegra-harmony.dts and tegra-seaboard.dts enable the
+relevant subset of those controllers, and provides the required
+platform data for them.
 
-A more elegant way is that I supply the same custom configuration
-extension mechanism for pinmux as for GPIO, similar to ioctl()
-like so:
+When adding the I2C controllers, it seems like they'd just work the
+same way as the existing SDHCI code.
 
-pmx = pinmux_get(dev, "irda-sir-fir");
-pmx_enable(pmx);
-/* Unless the first enablement implies SIR mode */
-pmx_config(pmx, PINMUX_CONFIG_CUSTOM_SIR, NULL);
-(... negotiated ...)
-pmx_config(pmx, PINMUX_CONFIG_CUSTOM_FIR, NULL);
-(...)
-pmx_disable(pmx);
-pmx_put(pmx);
+So, all this already works without putting the board-specific platform
+data definitions into board-dt.c as an temporary measure.
 
-I planned to add this interface anyway (needed for pin biasing and
-such fun stuff), so I'll poke it in.
-
-The latter would be analog to suppling an enumerated "what" to
-the pinmux_enable() function, if it turns out to be an everyday
-thing we can think about a more generic extension like
-pinmux_enable_selector(struct pinmux *pmx, unsigned selector);
-in the API but I feel the above will cut it just as fine.
-
-Yours,
-Linus Walleij
+-- 
+nvpublic
