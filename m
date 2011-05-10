@@ -1,379 +1,220 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 10 May 2011 18:34:11 +0200
-Subject: [PATCH 1/9] at91rm9200: introduce at91rm9200_set_type to specficy cpu
-	package
+Date: Tue, 10 May 2011 18:34:17 +0200
+Subject: [PATCH 7/9] at91: move register clocks to soc generic init
 In-Reply-To: <20110510162730.GA18929@game.jcrosoft.org>
 References: <20110510162730.GA18929@game.jcrosoft.org>
-Message-ID: <1305045259-23066-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1305045259-23066-7-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-as we can not detect it
-by defaut the type will be bga
-introduce cpu_is_at91rm9200_bga and cpu_is_at91rm9200_pqfp
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
- arch/arm/mach-at91/at91rm9200.c       |   13 +++++++++++--
- arch/arm/mach-at91/board-1arm.c       |    6 +++++-
- arch/arm/mach-at91/board-carmeva.c    |    2 +-
- arch/arm/mach-at91/board-cpuat91.c    |    6 +++++-
- arch/arm/mach-at91/board-csb337.c     |    2 +-
- arch/arm/mach-at91/board-csb637.c     |    2 +-
- arch/arm/mach-at91/board-eb9200.c     |    2 +-
- arch/arm/mach-at91/board-ecbat91.c    |    6 +++++-
- arch/arm/mach-at91/board-eco920.c     |    7 ++++++-
- arch/arm/mach-at91/board-kafa.c       |    6 +++++-
- arch/arm/mach-at91/board-kb9202.c     |    7 +++++--
- arch/arm/mach-at91/board-picotux200.c |    2 +-
- arch/arm/mach-at91/board-rm9200dk.c   |    2 +-
- arch/arm/mach-at91/board-rm9200ek.c   |    2 +-
- arch/arm/mach-at91/board-yl-9200.c    |    6 +++++-
- arch/arm/mach-at91/generic.h          |    3 ++-
- arch/arm/mach-at91/include/mach/cpu.h |    7 +++++++
- 17 files changed, 63 insertions(+), 18 deletions(-)
+ arch/arm/mach-at91/at572d940hf.c |    4 +---
+ arch/arm/mach-at91/at91cap9.c    |    4 +---
+ arch/arm/mach-at91/at91rm9200.c  |    4 +---
+ arch/arm/mach-at91/at91sam9260.c |    4 +---
+ arch/arm/mach-at91/at91sam9261.c |    4 +---
+ arch/arm/mach-at91/at91sam9263.c |    4 +---
+ arch/arm/mach-at91/at91sam9g45.c |    4 +---
+ arch/arm/mach-at91/at91sam9rl.c  |    4 +---
+ arch/arm/mach-at91/setup.c       |    3 +++
+ arch/arm/mach-at91/soc.h         |    1 +
+ 10 files changed, 12 insertions(+), 24 deletions(-)
 
+diff --git a/arch/arm/mach-at91/at572d940hf.c b/arch/arm/mach-at91/at572d940hf.c
+index 8c9ad21..f3e2c65 100644
+--- a/arch/arm/mach-at91/at572d940hf.c
++++ b/arch/arm/mach-at91/at572d940hf.c
+@@ -373,9 +373,6 @@ static void __init at572d940hf_initialize(void)
+ 	at91_extern_irq = (1 << AT572D940HF_ID_IRQ0) | (1 << AT572D940HF_ID_IRQ1)
+ 			| (1 << AT572D940HF_ID_IRQ2);
+ 
+-	/* Register the processor-specific clocks */
+-	at572d940hf_register_clocks();
+-
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at572d940hf_gpio, 3);
+ }
+@@ -425,5 +422,6 @@ static unsigned int at572d940hf_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at572d940hf_soc = {
+ 	.map_io = at572d940hf_map_io,
+ 	.default_irq_priority = at572d940hf_default_irq_priority,
++	.register_clocks = at572d940hf_register_clocks,
+ 	.init = at572d940hf_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+index f4219a8..23790b9 100644
+--- a/arch/arm/mach-at91/at91cap9.c
++++ b/arch/arm/mach-at91/at91cap9.c
+@@ -368,9 +368,6 @@ static void __init at91cap9_initialize(void)
+ 	pm_power_off = at91cap9_poweroff;
+ 	at91_extern_irq = (1 << AT91CAP9_ID_IRQ0) | (1 << AT91CAP9_ID_IRQ1);
+ 
+-	/* Register the processor-specific clocks */
+-	at91cap9_register_clocks();
+-
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91cap9_gpio, 4);
+ 
+@@ -426,5 +423,6 @@ static unsigned int at91cap9_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at91cap9_soc = {
+ 	.map_io = at91cap9_map_io,
+ 	.default_irq_priority = at91cap9_default_irq_priority,
++	.register_clocks = at91cap9_register_clocks,
+ 	.init = at91cap9_initialize,
+ };
 diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
-index 47d99a4..a67143a 100644
+index 80e624e..0b512a3 100644
 --- a/arch/arm/mach-at91/at91rm9200.c
 +++ b/arch/arm/mach-at91/at91rm9200.c
-@@ -18,6 +18,7 @@
- #include <mach/at91rm9200.h>
- #include <mach/at91_pmc.h>
- #include <mach/at91_st.h>
-+#include <mach/cpu.h>
+@@ -330,9 +330,6 @@ static void __init at91rm9200_initialize(void)
+ 			| (1 << AT91RM9200_ID_IRQ4) | (1 << AT91RM9200_ID_IRQ5)
+ 			| (1 << AT91RM9200_ID_IRQ6);
  
- #include "generic.h"
- #include "clock.h"
-@@ -316,6 +317,13 @@ static void at91rm9200_reset(void)
- 	at91_sys_write(AT91_ST_CR, AT91_ST_WDRST);
- }
- 
-+int rm9200_type;
-+EXPORT_SYMBOL(rm9200_type);
-+
-+void __init at91rm9200_set_type(int type)
-+{
-+	rm9200_type = type;
-+}
- 
- /* --------------------------------------------------------------------
-  *  AT91RM9200 processor initialization
-@@ -326,7 +334,7 @@ void __init at91rm9200_map_io(void)
- 	iotable_init(at91rm9200_io_desc, ARRAY_SIZE(at91rm9200_io_desc));
- }
- 
--void __init at91rm9200_initialize(unsigned long main_clock, unsigned short banks)
-+void __init at91rm9200_initialize(unsigned long main_clock)
- {
- 	at91_arch_reset = at91rm9200_reset;
- 	at91_extern_irq = (1 << AT91RM9200_ID_IRQ0) | (1 << AT91RM9200_ID_IRQ1)
-@@ -341,7 +349,8 @@ void __init at91rm9200_initialize(unsigned long main_clock, unsigned short banks
- 	at91rm9200_register_clocks();
- 
- 	/* Initialize GPIO subsystem */
--	at91_gpio_init(at91rm9200_gpio, banks);
-+	at91_gpio_init(at91rm9200_gpio,
-+		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
- }
- 
- 
-diff --git a/arch/arm/mach-at91/board-1arm.c b/arch/arm/mach-at91/board-1arm.c
-index 73372ca..ab1d463 100644
---- a/arch/arm/mach-at91/board-1arm.c
-+++ b/arch/arm/mach-at91/board-1arm.c
-@@ -35,14 +35,18 @@
- 
- #include <mach/board.h>
- #include <mach/gpio.h>
-+#include <mach/cpu.h>
- 
- #include "generic.h"
- 
- 
- static void __init onearm_init_early(void)
- {
-+	/* Set cpu type: PQFP */
-+	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
-+
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
-+	at91rm9200_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-carmeva.c b/arch/arm/mach-at91/board-carmeva.c
-index 3929b11..f36b186 100644
---- a/arch/arm/mach-at91/board-carmeva.c
-+++ b/arch/arm/mach-at91/board-carmeva.c
-@@ -43,7 +43,7 @@
- static void __init carmeva_init_early(void)
- {
- 	/* Initialize processor: 20.000 MHz crystal */
--	at91rm9200_initialize(20000000, AT91RM9200_BGA);
-+	at91rm9200_initialize(20000000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-cpuat91.c b/arch/arm/mach-at91/board-cpuat91.c
-index 620a36a..6daabe3 100644
---- a/arch/arm/mach-at91/board-cpuat91.c
-+++ b/arch/arm/mach-at91/board-cpuat91.c
-@@ -38,6 +38,7 @@
- #include <mach/board.h>
- #include <mach/gpio.h>
- #include <mach/at91rm9200_mc.h>
-+#include <mach/cpu.h>
- 
- #include "generic.h"
- 
-@@ -52,8 +53,11 @@ static struct gpio_led cpuat91_leds[] = {
- 
- static void __init cpuat91_init_early(void)
- {
-+	/* Set cpu type: PQFP */
-+	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
-+
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
-+	at91rm9200_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-csb337.c b/arch/arm/mach-at91/board-csb337.c
-index a7be81e..d98bcec 100644
---- a/arch/arm/mach-at91/board-csb337.c
-+++ b/arch/arm/mach-at91/board-csb337.c
-@@ -46,7 +46,7 @@
- static void __init csb337_init_early(void)
- {
- 	/* Initialize processor: 3.6864 MHz crystal */
--	at91rm9200_initialize(3686400, AT91RM9200_BGA);
-+	at91rm9200_initialize(3686400);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
-diff --git a/arch/arm/mach-at91/board-csb637.c b/arch/arm/mach-at91/board-csb637.c
-index 58a80c3..019aab4 100644
---- a/arch/arm/mach-at91/board-csb637.c
-+++ b/arch/arm/mach-at91/board-csb637.c
-@@ -43,7 +43,7 @@
- static void __init csb637_init_early(void)
- {
- 	/* Initialize processor: 3.6864 MHz crystal */
--	at91rm9200_initialize(3686400, AT91RM9200_BGA);
-+	at91rm9200_initialize(3686400);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-eb9200.c b/arch/arm/mach-at91/board-eb9200.c
-index e9fff80..e948453 100644
---- a/arch/arm/mach-at91/board-eb9200.c
-+++ b/arch/arm/mach-at91/board-eb9200.c
-@@ -43,7 +43,7 @@
- static void __init eb9200_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_BGA);
-+	at91rm9200_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-ecbat91.c b/arch/arm/mach-at91/board-ecbat91.c
-index eea65ea..a6f57fa 100644
---- a/arch/arm/mach-at91/board-ecbat91.c
-+++ b/arch/arm/mach-at91/board-ecbat91.c
-@@ -38,14 +38,18 @@
- 
- #include <mach/board.h>
- #include <mach/gpio.h>
-+#include <mach/cpu.h>
- 
- #include "generic.h"
- 
- 
- static void __init ecb_at91init_early(void)
- {
-+	/* Set cpu type: PQFP */
-+	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
-+
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
-+	at91rm9200_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PC7, AT91_PIN_PC7);
-diff --git a/arch/arm/mach-at91/board-eco920.c b/arch/arm/mach-at91/board-eco920.c
-index 90a44e5..bfc0062 100644
---- a/arch/arm/mach-at91/board-eco920.c
-+++ b/arch/arm/mach-at91/board-eco920.c
-@@ -26,11 +26,16 @@
- 
- #include <mach/board.h>
- #include <mach/at91rm9200_mc.h>
-+#include <mach/cpu.h>
-+
- #include "generic.h"
- 
- static void __init eco920_init_early(void)
- {
--	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
-+	/* Set cpu type: PQFP */
-+	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
-+
-+	at91rm9200_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB0, AT91_PIN_PB1);
-diff --git a/arch/arm/mach-at91/board-kafa.c b/arch/arm/mach-at91/board-kafa.c
-index 4f17a1c..9b003ff 100644
---- a/arch/arm/mach-at91/board-kafa.c
-+++ b/arch/arm/mach-at91/board-kafa.c
-@@ -35,14 +35,18 @@
- 
- #include <mach/board.h>
- #include <mach/gpio.h>
-+#include <mach/cpu.h>
- 
- #include "generic.h"
- 
- 
- static void __init kafa_init_early(void)
- {
-+	/* Set cpu type: PQFP */
-+	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
-+
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
-+	at91rm9200_initialize(18432000);
- 
- 	/* Set up the LEDs */
- 	at91_init_leds(AT91_PIN_PB4, AT91_PIN_PB4);
-diff --git a/arch/arm/mach-at91/board-kb9202.c b/arch/arm/mach-at91/board-kb9202.c
-index 39247fa..a813a74 100644
---- a/arch/arm/mach-at91/board-kb9202.c
-+++ b/arch/arm/mach-at91/board-kb9202.c
-@@ -36,7 +36,7 @@
- 
- #include <mach/board.h>
- #include <mach/gpio.h>
+-	/* Register the processor-specific clocks */
+-	at91rm9200_register_clocks();
 -
-+#include <mach/cpu.h>
- #include <mach/at91rm9200_mc.h>
+ 	/* Initialize GPIO subsystem */
+ 	at91_gpio_init(at91rm9200_gpio,
+ 		cpu_is_at91rm9200_bga() ? AT91RM9200_BGA : AT91RM9200_PQFP);
+@@ -384,5 +381,6 @@ static unsigned int at91rm9200_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at91rm9200_soc = {
+ 	.map_io = at91rm9200_map_io,
+ 	.default_irq_priority = at91rm9200_default_irq_priority,
++	.register_clocks = at91rm9200_register_clocks,
+ 	.init = at91rm9200_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
+index 47ead44..7da4f2a 100644
+--- a/arch/arm/mach-at91/at91sam9260.c
++++ b/arch/arm/mach-at91/at91sam9260.c
+@@ -369,9 +369,6 @@ static void __init at91sam9260_initialize(void)
+ 	at91_extern_irq = (1 << AT91SAM9260_ID_IRQ0) | (1 << AT91SAM9260_ID_IRQ1)
+ 			| (1 << AT91SAM9260_ID_IRQ2);
  
- #include "generic.h"
-@@ -44,8 +44,11 @@
+-	/* Register the processor-specific clocks */
+-	at91sam9260_register_clocks();
+-
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9260_gpio, 3);
+ }
+@@ -421,5 +418,6 @@ static unsigned int at91sam9260_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at91sam9260_soc = {
+ 	.map_io = at91sam9260_map_io,
+ 	.default_irq_priority = at91sam9260_default_irq_priority,
++	.register_clocks = at91sam9260_register_clocks,
+ 	.init = at91sam9260_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9261.c b/arch/arm/mach-at91/at91sam9261.c
+index 50506c2..bbaf72b 100644
+--- a/arch/arm/mach-at91/at91sam9261.c
++++ b/arch/arm/mach-at91/at91sam9261.c
+@@ -329,9 +329,6 @@ static void __init at91sam9261_initialize(void)
+ 	at91_extern_irq = (1 << AT91SAM9261_ID_IRQ0) | (1 << AT91SAM9261_ID_IRQ1)
+ 			| (1 << AT91SAM9261_ID_IRQ2);
  
- static void __init kb9202_init_early(void)
- {
-+	/* Set cpu type: PQFP */
-+	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
+-	/* Register the processor-specific clocks */
+-	at91sam9261_register_clocks();
+-
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9261_gpio, 3);
+ }
+@@ -381,5 +378,6 @@ static unsigned int at91sam9261_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at91sam9261_soc = {
+ 	.map_io = at91sam9261_map_io,
+ 	.default_irq_priority = at91sam9261_default_irq_priority,
++	.register_clocks = at91sam9261_register_clocks,
+ 	.init = at91sam9261_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9263.c b/arch/arm/mach-at91/at91sam9263.c
+index 038b3d7..88de596 100644
+--- a/arch/arm/mach-at91/at91sam9263.c
++++ b/arch/arm/mach-at91/at91sam9263.c
+@@ -340,9 +340,6 @@ static void __init at91sam9263_initialize(void)
+ 	pm_power_off = at91sam9263_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9263_ID_IRQ0) | (1 << AT91SAM9263_ID_IRQ1);
+ 
+-	/* Register the processor-specific clocks */
+-	at91sam9263_register_clocks();
+-
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9263_gpio, 5);
+ }
+@@ -392,5 +389,6 @@ static unsigned int at91sam9263_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at91sam9263_soc = {
+ 	.map_io = at91sam9263_map_io,
+ 	.default_irq_priority = at91sam9263_default_irq_priority,
++	.register_clocks = at91sam9263_register_clocks,
+ 	.init = at91sam9263_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9g45.c b/arch/arm/mach-at91/at91sam9g45.c
+index 294126f..0e5dace 100644
+--- a/arch/arm/mach-at91/at91sam9g45.c
++++ b/arch/arm/mach-at91/at91sam9g45.c
+@@ -359,9 +359,6 @@ static void __init at91sam9g45_initialize(void)
+ 	pm_power_off = at91sam9g45_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9G45_ID_IRQ0);
+ 
+-	/* Register the processor-specific clocks */
+-	at91sam9g45_register_clocks();
+-
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9g45_gpio, 5);
+ }
+@@ -411,5 +408,6 @@ static unsigned int at91sam9g45_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at91sam9g45_soc = {
+ 	.map_io = at91sam9g45_map_io,
+ 	.default_irq_priority = at91sam9g45_default_irq_priority,
++	.register_clocks = at91sam9g45_register_clocks,
+ 	.init = at91sam9g45_initialize,
+ };
+diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
+index 5b23536..adad00d 100644
+--- a/arch/arm/mach-at91/at91sam9rl.c
++++ b/arch/arm/mach-at91/at91sam9rl.c
+@@ -322,9 +322,6 @@ static void __init at91sam9rl_initialize(void)
+ 	pm_power_off = at91sam9rl_poweroff;
+ 	at91_extern_irq = (1 << AT91SAM9RL_ID_IRQ0);
+ 
+-	/* Register the processor-specific clocks */
+-	at91sam9rl_register_clocks();
+-
+ 	/* Register GPIO subsystem */
+ 	at91_gpio_init(at91sam9rl_gpio, 4);
+ }
+@@ -374,5 +371,6 @@ static unsigned int at91sam9rl_default_irq_priority[NR_AIC_IRQS] __initdata = {
+ struct at91_soc __initdata at91sam9rl_soc = {
+ 	.map_io = at91sam9rl_map_io,
+ 	.default_irq_priority = at91sam9rl_default_irq_priority,
++	.register_clocks = at91sam9rl_register_clocks,
+ 	.init = at91sam9rl_initialize,
+ };
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index d65cfe7..9aaca5f 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -255,5 +255,8 @@ void __init at91_initialize(unsigned long main_clock)
+ 	/* Init clock subsystem */
+ 	at91_clock_init(main_clock);
+ 
++	/* Register the processor-specific clocks */
++	at91_boot_soc.register_clocks();
 +
- 	/* Initialize processor: 10 MHz crystal */
--	at91rm9200_initialize(10000000, AT91RM9200_PQFP);
-+	at91rm9200_initialize(10000000);
+ 	at91_boot_soc.init();
+ }
+diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
+index a62baf8..ea6c3e4 100644
+--- a/arch/arm/mach-at91/soc.h
++++ b/arch/arm/mach-at91/soc.h
+@@ -7,6 +7,7 @@
+ struct at91_soc {
+ 	unsigned int *default_irq_priority;
+ 	void (*map_io)(void);
++	void (*register_clocks)(void);
+ 	void (*init)(void);
+ };
  
- 	/* Set up the LEDs */
- 	at91_init_leds(AT91_PIN_PC19, AT91_PIN_PC18);
-diff --git a/arch/arm/mach-at91/board-picotux200.c b/arch/arm/mach-at91/board-picotux200.c
-index 8294eae..756cc2a 100644
---- a/arch/arm/mach-at91/board-picotux200.c
-+++ b/arch/arm/mach-at91/board-picotux200.c
-@@ -46,7 +46,7 @@
- static void __init picotux200_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_BGA);
-+	at91rm9200_initialize(18432000);
- 
- 	/* DBGU on ttyS0. (Rx & Tx only) */
- 	at91_register_uart(0, 0, 0);
-diff --git a/arch/arm/mach-at91/board-rm9200dk.c b/arch/arm/mach-at91/board-rm9200dk.c
-index b90d0f9..aef9627 100644
---- a/arch/arm/mach-at91/board-rm9200dk.c
-+++ b/arch/arm/mach-at91/board-rm9200dk.c
-@@ -48,7 +48,7 @@
- static void __init dk_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_BGA);
-+	at91rm9200_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB2, AT91_PIN_PB2);
-diff --git a/arch/arm/mach-at91/board-rm9200ek.c b/arch/arm/mach-at91/board-rm9200ek.c
-index 51c2668..015a021 100644
---- a/arch/arm/mach-at91/board-rm9200ek.c
-+++ b/arch/arm/mach-at91/board-rm9200ek.c
-@@ -48,7 +48,7 @@
- static void __init ek_init_early(void)
- {
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_BGA);
-+	at91rm9200_initialize(18432000);
- 
- 	/* Setup the LEDs */
- 	at91_init_leds(AT91_PIN_PB1, AT91_PIN_PB2);
-diff --git a/arch/arm/mach-at91/board-yl-9200.c b/arch/arm/mach-at91/board-yl-9200.c
-index 167337f..c208cc3 100644
---- a/arch/arm/mach-at91/board-yl-9200.c
-+++ b/arch/arm/mach-at91/board-yl-9200.c
-@@ -45,14 +45,18 @@
- #include <mach/board.h>
- #include <mach/gpio.h>
- #include <mach/at91rm9200_mc.h>
-+#include <mach/cpu.h>
- 
- #include "generic.h"
- 
- 
- static void __init yl9200_init_early(void)
- {
-+	/* Set cpu type: PQFP */
-+	at91rm9200_set_type(ARCH_REVISON_9200_PQFP);
-+
- 	/* Initialize processor: 18.432 MHz crystal */
--	at91rm9200_initialize(18432000, AT91RM9200_PQFP);
-+	at91rm9200_initialize(18432000);
- 
- 	/* Setup the LEDs D2=PB17 (timer), D3=PB16 (cpu) */
- 	at91_init_leds(AT91_PIN_PB16, AT91_PIN_PB17);
-diff --git a/arch/arm/mach-at91/generic.h b/arch/arm/mach-at91/generic.h
-index 109f13e..46721996 100644
---- a/arch/arm/mach-at91/generic.h
-+++ b/arch/arm/mach-at91/generic.h
-@@ -22,7 +22,8 @@ extern void __init at91cap9_map_io(void);
- extern void __init at572d940hf_map_io(void);
- 
-  /* Processors */
--extern void __init at91rm9200_initialize(unsigned long main_clock, unsigned short banks);
-+extern void __init at91rm9200_set_type(int type);
-+extern void __init at91rm9200_initialize(unsigned long main_clock);
- extern void __init at91sam9260_initialize(unsigned long main_clock);
- extern void __init at91sam9261_initialize(unsigned long main_clock);
- extern void __init at91sam9263_initialize(unsigned long main_clock);
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index 0700f21..ab00372 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -90,9 +90,16 @@ static inline unsigned long at91cap9_rev_identify(void)
- #endif
- 
- #ifdef CONFIG_ARCH_AT91RM9200
-+extern int rm9200_type;
-+#define ARCH_REVISON_9200_BGA	(0 << 0)
-+#define ARCH_REVISON_9200_PQFP	(1 << 0)
- #define cpu_is_at91rm9200()	(at91_cpu_identify() == ARCH_ID_AT91RM9200)
-+#define cpu_is_at91rm9200_bga()	(!cpu_is_at91rm9200_pqfp())
-+#define cpu_is_at91rm9200_pqfp() (cpu_is_at91rm9200() && rm9200_type & ARCH_REVISON_9200_PQFP)
- #else
- #define cpu_is_at91rm9200()	(0)
-+#define cpu_is_at91rm9200_bga()	(0)
-+#define cpu_is_at91rm9200_pqfp() (0)
- #endif
- 
- #ifdef CONFIG_ARCH_AT91SAM9260
 -- 
 1.7.4.1
