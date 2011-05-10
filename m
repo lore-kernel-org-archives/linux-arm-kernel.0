@@ -1,41 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2011 00:52:20 +0200
-Subject: [PATCH 1/4] drivers: create a pinmux subsystem
-In-Reply-To: <1305067020.19586.130.camel@Joe-Laptop>
-References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
-	<1304365077.7792.40.camel@Joe-Laptop>
-	<BANLkTi=XSevO72NqCYOYuketjE8XjeQU+A@mail.gmail.com>
-	<1305067020.19586.130.camel@Joe-Laptop>
-Message-ID: <BANLkTi=zDJLHUa2ogTeEkmdsbkhvGJCsEw@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 10 May 2011 18:02:20 -0500
+Subject: [PATCH] [wip] ARM: imx: register "leds-gpio" device using new
+	helper function
+In-Reply-To: <1305017456-10910-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <20110510073152.GF29089@pengutronix.de>
+	<1305017456-10910-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1305017456-10910-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <0D753D10438DA54287A00B027084269764D2C3CD1E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/11 Joe Perches <joe@perches.com>:
-> On Wed, 2011-05-11 at 00:18 +0200, Linus Walleij wrote:
->> 2011/5/2 Joe Perches <joe@perches.com>:
->> > On Mon, 2011-05-02 at 21:16 +0200, Linus Walleij wrote:
->> >> From: Linus Walleij <linus.walleij@linaro.org>
->> >> diff --git a/drivers/pinmux/core.c b/drivers/pinmux/core.c
->> > Trivial comments follow
->> >> +static inline int pin_is_valid(int pin)
->> >> +{
->> >> + ? ? return ((unsigned)pin) < MACH_NR_PINS;
->> >> +}
->> > Couldn't pin just be declared unsigned or maybe u32?
->> No, because like in the GPIO subsystem you *may* want to send in invalid
->> pins, and those are identified by negative numbers.
+On Tuesday, May 10, 2011 1:51 AM, Uwe Kleine-K?nig wrote:
 >
-> Then I think this is clearer and the compiler
-> should produce the same code.
+> This converts eukrea_mbimx27-baseboard to the new helper function.
 >
-> static inline bool pin_is_valid(int pin)
-> {
-> ? ? ? ?return pin >= 0 && pin < MACH_NR_PINS;
-> }
+> bloat-o-meter reports for this change:
+>
+>	add/remove: 1/1 grow/shrink: 0/1 up/down: 128/-220 (-92)
+>	function                                     old     new   delta
+>	gpio_led_register_device                       -     128    +128
+>	platform_devices                              28      24      -4
+>	leds_gpio                                    216       -    -216
+>
+> Additionally gpio_led_info (12 bytes) and gpio_leds (32 Bytes) are
+> initdata now as is gpio_led_register_device.
 
-Yes indeed, I'll fix. Can you propose a patch to the same pattern
-found in include/asm-generic/gpio.h? It would bring equal
-clarity there I believe.
+FWIW, similar results with ep93xx:
 
-Thanks!
-Linus Walleij
+add/remove: 1/1 grow/shrink: 2/0 up/down: 137/-240 (-103)
+function                                     old     new   delta
+gpio_led_register_device                       -     128    +128
+kernel_config_data                         10474   10479      +5
+ep93xx_init_devices                          116     120      +4
+ep93xx_leds                                  240       -    -240
+
+Regards,
+Hartley
