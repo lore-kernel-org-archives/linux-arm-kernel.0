@@ -1,76 +1,74 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 May 2011 08:31:24 +0100
-Subject: [PATCH 09/13] clocksource: convert W90x900 24-bit down counting
-	clocksource
+Date: Tue, 10 May 2011 08:31:45 +0100
+Subject: [PATCH 10/13] clocksource: convert Integrator/AP 16-bit down
+	counting clocksource
 In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
 References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-Message-ID: <E1QJhPg-0000yu-Ri@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QJhQ1-0000yy-91@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the W90x900 24-bit down-counting clocksource to the generic
-mmio clocksource infrastructure
+Convert the Integrator/AP 16-bit down-counting clocksource to the
+generic clocksource infrastructure.
 
-Cc: Wan ZongShun <mcuos.com@gmail.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig             |    1 +
- arch/arm/mach-w90x900/time.c |   17 ++---------------
- 2 files changed, 3 insertions(+), 15 deletions(-)
+ arch/arm/mach-integrator/Kconfig         |    1 +
+ arch/arm/mach-integrator/integrator_ap.c |   21 +++------------------
+ 2 files changed, 4 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 0a05a57..bab25a0 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -575,6 +575,7 @@ config ARCH_W90X900
- 	select CPU_ARM926T
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
+diff --git a/arch/arm/mach-integrator/Kconfig b/arch/arm/mach-integrator/Kconfig
+index d701d32..dfd18f3 100644
+--- a/arch/arm/mach-integrator/Kconfig
++++ b/arch/arm/mach-integrator/Kconfig
+@@ -4,6 +4,7 @@ menu "Integrator Options"
+ 
+ config ARCH_INTEGRATOR_AP
+ 	bool "Support Integrator/AP and Integrator/PP2 platforms"
 +	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
+ 	select MIGHT_HAVE_PCI
  	help
- 	  Support for Nuvoton (Winbond logic dept.) ARM9 processor,
-diff --git a/arch/arm/mach-w90x900/time.c b/arch/arm/mach-w90x900/time.c
-index 4b089cb..a2c4e2d 100644
---- a/arch/arm/mach-w90x900/time.c
-+++ b/arch/arm/mach-w90x900/time.c
-@@ -43,7 +43,6 @@
- #define PRESCALE	0x63 /* Divider = prescale + 1 */
+ 	  Include support for the ARM(R) Integrator/AP and
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 980803f..9c61acf 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -343,25 +343,9 @@ static void __init ap_init(void)
  
- #define	TDR_SHIFT	24
--#define	TDR_MASK	((1 << TDR_SHIFT) - 1)
+ static unsigned long timer_reload;
  
- static unsigned int timer0_load;
- 
-@@ -143,19 +142,6 @@ static void __init nuc900_clockevents_init(void)
- 	clockevents_register_device(&nuc900_clockevent_device);
- }
- 
--static cycle_t nuc900_get_cycles(struct clocksource *cs)
+-static void __iomem * const clksrc_base = (void __iomem *)TIMER2_VA_BASE;
+-
+-static cycle_t timersp_read(struct clocksource *cs)
 -{
--	return (~__raw_readl(REG_TDR1)) & TDR_MASK;
+-	return ~(readl(clksrc_base + TIMER_VALUE) & 0xffff);
 -}
 -
--static struct clocksource clocksource_nuc900 = {
--	.name	= "nuc900-timer1",
--	.rating	= 200,
--	.read	= nuc900_get_cycles,
--	.mask	= CLOCKSOURCE_MASK(TDR_SHIFT),
--	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
+-static struct clocksource clocksource_timersp = {
+-	.name		= "timer2",
+-	.rating		= 200,
+-	.read		= timersp_read,
+-	.mask		= CLOCKSOURCE_MASK(16),
+-	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
 -};
 -
- static void __init nuc900_clocksource_init(void)
+ static void integrator_clocksource_init(u32 khz)
  {
- 	unsigned int val;
-@@ -175,7 +161,8 @@ static void __init nuc900_clocksource_init(void)
- 	val |= (COUNTEN | PERIOD | PRESCALE);
- 	__raw_writel(val, REG_TCSR1);
+-	struct clocksource *cs = &clocksource_timersp;
+-	void __iomem *base = clksrc_base;
++	void __iomem *base = (void __iomem *)TIMER2_VA_BASE;
+ 	u32 ctrl = TIMER_CTRL_ENABLE;
  
--	clocksource_register_hz(&clocksource_nuc900, rate);
-+	clocksource_mmio_init(REG_TDR1, "nuc900-timer1", rate, 200,
-+		TDR_SHIFT, clocksource_mmio_readl_down);
+ 	if (khz >= 1500) {
+@@ -372,7 +356,8 @@ static void integrator_clocksource_init(u32 khz)
+ 	writel(ctrl, base + TIMER_CTRL);
+ 	writel(0xffff, base + TIMER_LOAD);
+ 
+-	clocksource_register_khz(cs, khz);
++	clocksource_mmio_init(base + TIMER_VALUE, "timer2",
++		khz * 1000, 200, 16, clocksource_mmio_readl_down);
  }
  
- static void __init nuc900_timer_init(void)
+ static void __iomem * const clkevt_base = (void __iomem *)TIMER1_VA_BASE;
 -- 
 1.7.4.4
