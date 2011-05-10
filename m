@@ -1,68 +1,79 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 May 2011 08:32:05 +0100
-Subject: [PATCH 11/13] clocksource: convert SPEAr platforms 16-bit up
+Date: Tue, 10 May 2011 08:34:00 +0100
+Subject: [PATCH 12/13] clocksource: convert MXS timrotv2 to 32-bit down
 	counting clocksource
 In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
 References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-Message-ID: <E1QJhQL-0000z2-PA@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QJhSC-0000z6-H6@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert SPEAr platforms 16-bit up counting clocksource, which requires
-a 16-bit register access read rather than 32-bit.
+Convert the MXS timrotv2 32-bit down counting clocksource to the
+generic clocksource infrastructure.
 
-Cc: Viresh Kumar <viresh.kumar@st.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/Kconfig           |    1 +
- arch/arm/plat-spear/time.c |   16 ++--------------
- 2 files changed, 3 insertions(+), 14 deletions(-)
+ arch/arm/Kconfig          |    1 +
+ arch/arm/mach-mxs/timer.c |   20 +++++++-------------
+ 2 files changed, 8 insertions(+), 13 deletions(-)
 
 diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index bab25a0..cbc27fb 100644
+index cbc27fb..43f003a 100644
 --- a/arch/arm/Kconfig
 +++ b/arch/arm/Kconfig
-@@ -884,6 +884,7 @@ config PLAT_SPEAR
- 	select ARM_AMBA
+@@ -376,6 +376,7 @@ config ARCH_MXS
+ 	select GENERIC_CLOCKEVENTS
  	select ARCH_REQUIRE_GPIOLIB
  	select CLKDEV_LOOKUP
 +	select CLKSRC_MMIO
- 	select GENERIC_CLOCKEVENTS
- 	select HAVE_CLK
  	help
-diff --git a/arch/arm/plat-spear/time.c b/arch/arm/plat-spear/time.c
-index dbb6e4f..0c77e42 100644
---- a/arch/arm/plat-spear/time.c
-+++ b/arch/arm/plat-spear/time.c
-@@ -70,19 +70,6 @@ static void clockevent_set_mode(enum clock_event_mode mode,
- static int clockevent_next_event(unsigned long evt,
- 				 struct clock_event_device *clk_event_dev);
+ 	  Support for Freescale MXS-based family of processors
  
--static cycle_t clocksource_read_cycles(struct clocksource *cs)
--{
--	return (cycle_t) readw(gpt_base + COUNT(CLKSRC));
--}
--
--static struct clocksource clksrc = {
--	.name = "tmr1",
--	.rating = 200,		/* its a pretty decent clock */
--	.read = clocksource_read_cycles,
--	.mask = 0xFFFF,		/* 16 bits */
--	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
- static void spear_clocksource_init(void)
- {
- 	u32 tick_rate;
-@@ -103,7 +90,8 @@ static void spear_clocksource_init(void)
- 	writew(val, gpt_base + CR(CLKSRC));
- 
- 	/* register the clocksource */
--	clocksource_register_hz(&clksrc, tick_rate);
-+	clocksource_mmio_init(gpt_base + COUNT(CLKSRC), "tmr1", tick_rate,
-+		200, 16, clocksource_mmio_readw_up);
+diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+index 13647f3..27bebf2 100644
+--- a/arch/arm/mach-mxs/timer.c
++++ b/arch/arm/mach-mxs/timer.c
+@@ -101,11 +101,6 @@ static cycle_t timrotv1_get_cycles(struct clocksource *cs)
+ 			& 0xffff0000) >> 16);
  }
  
- static struct clock_event_device clkevt = {
+-static cycle_t timrotv2_get_cycles(struct clocksource *cs)
+-{
+-	return ~__raw_readl(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1));
+-}
+-
+ static int timrotv1_set_next_event(unsigned long evt,
+ 					struct clock_event_device *dev)
+ {
+@@ -230,8 +225,8 @@ static int __init mxs_clockevent_init(struct clk *timer_clk)
+ static struct clocksource clocksource_mxs = {
+ 	.name		= "mxs_timer",
+ 	.rating		= 200,
+-	.read		= timrotv2_get_cycles,
+-	.mask		= CLOCKSOURCE_MASK(32),
++	.read		= timrotv1_get_cycles,
++	.mask		= CLOCKSOURCE_MASK(16),
+ 	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+ };
+ 
+@@ -239,12 +234,11 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
+ {
+ 	unsigned int c = clk_get_rate(timer_clk);
+ 
+-	if (timrot_is_v1()) {
+-		clocksource_mxs.read = timrotv1_get_cycles;
+-		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
+-	}
+-
+-	clocksource_register_hz(&clocksource_mxs, c);
++	if (timrot_is_v1())
++		clocksource_register_hz(&clocksource_mxs, c);
++	else
++		clocksource_mmio_init(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1)),
++			"mxs_timer", c, 200, 32, clocksource_mmio_readl_down);
+ 
+ 	return 0;
+ }
 -- 
 1.7.4.4
