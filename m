@@ -1,33 +1,67 @@
-From: s-anna@ti.com (Suman Anna)
-Date: Wed, 4 May 2011 17:45:37 -0500
-Subject: [PATCH] omap: iommu: fix pte attributes for super section
-Message-ID: <mailman.223.1305048323.1530.linux-arm-kernel@lists.infradead.org>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Tue, 10 May 2011 22:02:14 +0200
+Subject: [PATCH] pxamci: remove an ifdef about CONFIG_REGULATOR
+In-Reply-To: <20110509203612.GC21323@opensource.wolfsonmicro.com>
+References: <1304971869-20161-1-git-send-email-ospite@studenti.unina.it>
+	<20110509202325.GD16919@n2100.arm.linux.org.uk>
+	<20110509203612.GC21323@opensource.wolfsonmicro.com>
+Message-ID: <20110510220214.916621d1.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PTE programming causes a 16MB entry to be interpreted
-as a 4K entry because of the bitwise check, and therefore does
-not set the attributes properly in the first-level descriptor
-table. The bitwise check has been replaced appropriately.
+On Mon, 9 May 2011 22:36:12 +0200
+Mark Brown <broonie@opensource.wolfsonmicro.com> wrote:
 
-Signed-off-by: Suman Anna <s-anna@ti.com>
----
- arch/arm/mach-omap2/iommu2.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+> On Mon, May 09, 2011 at 09:23:25PM +0100, Russell King - ARM Linux wrote:
+> 
+> > NAK.  This has been proposed before, and rejected.  See the comments
+> > against the original proposal:
+> 
+> > http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6525/1
+> 
+> Hrm, this looks like the bodge we're doing for !REGULATOR isn't actually
+> helping here unless we do a NULL || IS_ERR() in the error check.  The
+> ifdefs are certainly fail.
+> 
 
-diff --git a/arch/arm/mach-omap2/iommu2.c b/arch/arm/mach-omap2/iommu2.c
-index adb083e..c21fbe6 100644
---- a/arch/arm/mach-omap2/iommu2.c
-+++ b/arch/arm/mach-omap2/iommu2.c
-@@ -225,7 +225,8 @@ static u32 omap2_get_pte_attr(struct iotlb_entry *e)
-        attr = e->mixed << 5;
-        attr |= e->endian;
-        attr |= e->elsz >> 3;
--       attr <<= ((e->pgsz & MMU_CAM_PGSZ_4K) ? 0 : 6);
-+       attr <<= (((e->pgsz == MMU_CAM_PGSZ_4K) ||
-+                       (e->pgsz == MMU_CAM_PGSZ_64K)) ? 0 : 6);
+[Adding Linus Walleij to CC as he was the author of a similar NAKed
+patch]
 
-        return attr;
- }
---
-1.7.0.4
+I was blindly trusting code already in mainline again, and for that I
+apologize, I finally took the time to look at the implementation
+of IS_ERR() and test its use, and being IS_ERR(NULL) true it is not what
+we want indeed, see the attached test program.
+
+So, I am going to remove the ifdefs anyway but use IS_ERR_OR_NULL();
+how does that sound? Am I still missing anything?
+Or changing the regulator_get() stub to return an error (-ENOSYS?) might
+be worth it?
+
+Thanks Russel for pointing out the issue BTW.
+
+Thanks,
+   Antonio
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: IS_ERR_regulator_get.c
+Type: text/x-csrc
+Size: 1590 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110510/12e659f9/attachment.bin>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110510/12e659f9/attachment.sig>
