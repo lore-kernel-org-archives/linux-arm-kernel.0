@@ -1,62 +1,57 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 May 2011 15:42:08 +0200
-Subject: [PATCH] CPUFREQ/S3C64xx: Move S3C64xx CPUfreq driver into
-	drivers/cpufreq
-Message-ID: <1305034928-25835-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Tue, 10 May 2011 19:12:16 +0530
+Subject: [PATCH] OMAP: Added recalculation of clock rate in 'clk_set_rate'
+In-Reply-To: <BANLkTikjm7th9mv9MOBdMT7j6QPo5Ke7Xw@mail.gmail.com>
+References: <1303291509-2305-1-git-send-email-shweta.gulati@ti.com>
+	<alpine.DEB.2.00.1104201351180.12683@utopia.booyaka.com>
+	<BANLkTi=Ab0EJ3fAQGHBOyPd+eAJHWcjtuA@mail.gmail.com>
+	<alpine.DEB.2.00.1105061549150.30136@utopia.booyaka.com>
+	<BANLkTikjm7th9mv9MOBdMT7j6QPo5Ke7Xw@mail.gmail.com>
+Message-ID: <20110510134216.GG25479@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a straight code motion patch, there are no changes to the driver
-itself. The Kconfig is left untouched as the ARM CPUfreq Kconfig is all
-in one big block in arm/Kconfig and should be moved en masse rather than
-being done piecemeal.
+On Tue, May 10, 2011 at 04:25:19PM +0530, Gulati, Shweta wrote:
+> Hi,
+> 
+> On Sat, May 7, 2011 at 3:19 AM, Paul Walmsley <paul@pwsan.com> wrote:
+> > On Thu, 21 Apr 2011, Gulati, Shweta wrote:
+> >
+> >> Yes, but in current code clk_set_rate of dpll3_m2 -
+> >> 'omap3_core_dpll_m2_set_rate'
+> >> doesn't update clk.rate, I will submit patch fixing that bug and will
+> >> make sure that
+> >> set_rate of all clocks should update clk.rate
+> >
+> > Ping. ?Do you plan to post this soon? ?This should be a trivial patch.
+> Sorry for the delay, I will post today.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/mach-s3c64xx/Makefile                     |    4 ----
- drivers/cpufreq/Makefile                           |    2 ++
- .../cpufreq.c => drivers/cpufreq/s3c64xx.c         |    3 +--
- 3 files changed, 3 insertions(+), 6 deletions(-)
- rename arch/arm/mach-s3c64xx/cpufreq.c => drivers/cpufreq/s3c64xx.c (99%)
+Hi Shweta ,
 
-diff --git a/arch/arm/mach-s3c64xx/Makefile b/arch/arm/mach-s3c64xx/Makefile
-index 88d7fd2..61b4034 100644
---- a/arch/arm/mach-s3c64xx/Makefile
-+++ b/arch/arm/mach-s3c64xx/Makefile
-@@ -23,10 +23,6 @@ obj-$(CONFIG_CPU_S3C6410)	+= s3c6410.o
- obj-y				+= irq.o
- obj-y				+= irq-eint.o
- 
--# CPU frequency scaling
--
--obj-$(CONFIG_CPU_FREQ_S3C64XX)  += cpufreq.o
--
- # DMA support
- 
- obj-$(CONFIG_S3C64XX_DMA)	+= dma.o
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index e3fc242..2edd08f 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -39,3 +39,5 @@ obj-$(CONFIG_X86_CPUFREQ_NFORCE2)	+= cpufreq-nforce2.o
- 
- ##################################################################################d
- 
-+# ARM CPUfreq drivers
-+obj-$(CONFIG_CPU_FREQ_S3C64XX)  += s3c64xx.o
-diff --git a/arch/arm/mach-s3c64xx/cpufreq.c b/drivers/cpufreq/s3c64xx.c
-similarity index 99%
-rename from arch/arm/mach-s3c64xx/cpufreq.c
-rename to drivers/cpufreq/s3c64xx.c
-index 1e7df30..c370935 100644
---- a/arch/arm/mach-s3c64xx/cpufreq.c
-+++ b/drivers/cpufreq/s3c64xx.c
-@@ -1,5 +1,4 @@
--/* linux/arch/arm/plat-s3c64xx/cpufreq.c
-- *
-+/*
-  * Copyright 2009 Wolfson Microelectronics plc
-  *
-  * S3C64xx CPUfreq Support
--- 
-1.7.4.1
+To avoid delay, yesterday posted a patch for the same with your signed
+off by : 
+
+http://www.spinics.net/lists/linux-omap/msg50776.html
+
+Please verify the patch and if anything is missing, please submit a new
+patch.
+
+thanks ,
+
+- Avinash
+
+
+> > - Paul
+> >
+> 
+> 
+> 
+> -- 
+> Thanks,
+> Regards,
+> Shweta
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
