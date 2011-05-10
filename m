@@ -1,53 +1,83 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 11 May 2011 01:45:26 +0200
-Subject: [PATCH] AT91: Add external RTC for Flexibity board
-In-Reply-To: <4DC53134.8070706@gmail.com>
-References: <4DC53134.8070706@gmail.com>
-Message-ID: <20110510234526.GC18929@game.jcrosoft.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 11 May 2011 00:58:53 +0100
+Subject: [PATCH] drivers: create a pinmux subsystem v2
+In-Reply-To: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
+References: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20110510235853.GM26703@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:47 Sat 07 May     , Maxim Osipov wrote:
-> Hello,
+Hi Linus,
+
+I haven't had chance to try this on my platform yet, but I have a couple 
+of questions on how to deal with a few oddities that we have.
+
+Thanks,
+
+Jamie
+
+On Wed, May 11, 2011 at 01:39:43AM +0200, Linus Walleij wrote:
+> This creates a subsystem for handling of pinmux devices. These are
+> devices that enable and disable groups of pins on primarily PGA and
+> BGA type of chip packages and common in embedded systems.
 > 
-> This patch enables external RTC support on AT91 Flexibity board.
+> This is being done to depopulate the arch/arm/* directory of such
+> custom drivers and try to abstract the infrastructure they all
+> need. See the Documentation/pinmux.txt file that is part of this
+> patch for more details.
 > 
-> Kind regards,
-> Maxim
-> 
-> 
-> Signed-off-by: Maxim Osipov <maxim.osipov@gmail.com>
+> Cc: Stephen Warren <swarren@nvidia.com>
+> Cc: Joe Perches <joe@perches.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  arch/arm/mach-at91/board-flexibity.c |   12 +++++++++++-
->  1 files changed, 11 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
-> index c8a62dc..4fdc96c 100644
-> --- a/arch/arm/mach-at91/board-flexibity.c
-> +++ b/arch/arm/mach-at91/board-flexibity.c
-> @@ -1,7 +1,7 @@
->  /*
->   * linux/arch/arm/mach-at91/board-flexibity.c
->   *
-> - *  Copyright (C) 2010 Flexibity
-> + *  Copyright (C) 2010-2011 Flexibity
->   *  Copyright (C) 2005 SAN People
->   *  Copyright (C) 2006 Atmel
->   *
-> @@ -65,6 +65,13 @@ static struct at91_udc_data __initdata flexibity_udc_data = {
->  	.pullup_pin	= 0,		/* pull-up driven by UDC */
->  };
->  
-> +/* I2C devices */
-> +static struct i2c_board_info __initdata flexibity_i2c_devices[] = {
+[...]
+> +static struct foo_pmx_func myfuncs[] = {
 > +	{
-> +		I2C_BOARD_INFO("ds1307", 0x68),
+> +		.name = "spi0-0",
+> +		.pins = spi0_0_pins,
+> +		.num_pins = ARRAY_SIZE(spi0_1_pins),
+> +	},
+> +	{
+> +		.name = "i2c0",
+> +		.pins = i2c0_pins,
+> +		.num_pins = ARRAY_SIZE(i2c0_pins),
+> +	},
+> +	{
+> +		.name = "spi0-1",
+> +		.pins = spi0_1_pins,
+> +		.num_pins = ARRAY_SIZE(spi0_1_pins),
 > +	},
 > +};
+
+So I can see how this works well for these examples, but on our devices, 
+we have some interfaces for connecting to radios and these have a pair 
+of 8-bit RX and TX busses.  However, depending on what radio you 
+connect, you may not need all 8 bits of each and this is dependent on 
+the board.  What would be the best way to deal with that in this scheme 
+where say we only wanted 4 bits of each, saving the others for GPIO?  
+Would this need to be a function for each configuration?
+
+[...]
+> +/**
+> + * pinmux_request_gpio() - request a single pin to be muxed in to be used
+> + *	as a GPIO pin
+> + * @pin: the pin to mux in as GPIO
+> + * @gpio: the corresponding GPIO pin number
+> + */
+> +int pinmux_request_gpio(int pin, unsigned gpio)
+> +{
+> +	char gpiostr[16];
 > +
-looks fine just one comment please add your board to the new at91sam9260_defconfig
+> +	snprintf(gpiostr, 15, "gpio%d", gpio);
+> +	return pin_request(pin, gpiostr, true);
+> +}
+> +EXPORT_SYMBOL_GPL(pinmux_request_gpio);
 
-so we can compile it when compiling all the sam9260
+Our devices have two different GPIO controllers, which can be muxed to 
+the same pad (they're slightly different - one is a bit slower but can 
+do sigma-delta output) and our pinmux driver would need to know what 
+GPIO controller it should route to the pad.  Could gpio_request_enable() 
+be passed the GPIO number or is there a better way to do this?
 
-Best Regards,
-J.
+Jamie
