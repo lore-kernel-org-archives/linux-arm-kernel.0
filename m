@@ -1,49 +1,89 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 May 2011 08:28:58 +0100
-Subject: [PATCH 05/13] ARM: update sa1100 to reflect PXA updates
+Date: Tue, 10 May 2011 08:28:37 +0100
+Subject: [PATCH 04/13] ARM: omap1: convert to using readl/writel instead of
+	volatile struct
 In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
 References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-Message-ID: <E1QJhNK-0000yd-4V@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QJhMz-0000yZ-NF@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update sa1100 clockevents code to reflect what its later derivative
-does with clockevents_calc_mult_shift().  Use OSSR_M* constants too.
-
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/time.c |    8 +++-----
- 1 files changed, 3 insertions(+), 5 deletions(-)
+ arch/arm/mach-omap1/time.c |   31 ++++++++++++++++---------------
+ 1 files changed, 16 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/time.c b/arch/arm/mach-sa1100/time.c
-index ae4f3d8..51c0529 100644
---- a/arch/arm/mach-sa1100/time.c
-+++ b/arch/arm/mach-sa1100/time.c
-@@ -92,7 +92,6 @@ sa1100_osmr0_set_mode(enum clock_event_mode mode, struct clock_event_device *c)
- static struct clock_event_device ckevt_sa1100_osmr0 = {
- 	.name		= "osmr0",
- 	.features	= CLOCK_EVT_FEAT_ONESHOT,
--	.shift		= 32,
- 	.rating		= 200,
- 	.set_next_event	= sa1100_osmr0_set_next_event,
- 	.set_mode	= sa1100_osmr0_set_mode,
-@@ -120,14 +119,13 @@ static struct irqaction sa1100_timer_irq = {
+diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
+index e2c29b4..e7ab616 100644
+--- a/arch/arm/mach-omap1/time.c
++++ b/arch/arm/mach-omap1/time.c
+@@ -68,49 +68,50 @@ typedef struct {
+ } omap_mpu_timer_regs_t;
  
- static void __init sa1100_timer_init(void)
+ #define omap_mpu_timer_base(n)							\
+-((volatile omap_mpu_timer_regs_t*)OMAP1_IO_ADDRESS(OMAP_MPU_TIMER_BASE +	\
++((omap_mpu_timer_regs_t __iomem *)OMAP1_IO_ADDRESS(OMAP_MPU_TIMER_BASE +	\
+ 				 (n)*OMAP_MPU_TIMER_OFFSET))
+ 
+ static inline unsigned long notrace omap_mpu_timer_read(int nr)
  {
--	OIER = 0;		/* disable any timer interrupts */
--	OSSR = 0xf;		/* clear status on all timers */
-+	OIER = 0;
-+	OSSR = OSSR_M0 | OSSR_M1 | OSSR_M2 | OSSR_M3;
+-	volatile omap_mpu_timer_regs_t* timer = omap_mpu_timer_base(nr);
+-	return timer->read_tim;
++	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(nr);
++	return readl(&timer->read_tim);
+ }
  
- 	init_fixed_sched_clock(&cd, sa1100_update_sched_clock, 32,
- 			       3686400, SC_MULT, SC_SHIFT);
+ static inline void omap_mpu_set_autoreset(int nr)
+ {
+-	volatile omap_mpu_timer_regs_t* timer = omap_mpu_timer_base(nr);
++	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(nr);
  
--	ckevt_sa1100_osmr0.mult =
--		div_sc(3686400, NSEC_PER_SEC, ckevt_sa1100_osmr0.shift);
-+	clockevents_calc_mult_shift(&ckevt_sa1100_osmr0, 3686400, 4);
- 	ckevt_sa1100_osmr0.max_delta_ns =
- 		clockevent_delta2ns(0x7fffffff, &ckevt_sa1100_osmr0);
- 	ckevt_sa1100_osmr0.min_delta_ns =
+-	timer->cntl = timer->cntl | MPU_TIMER_AR;
++	writel(readl(&timer->cntl) | MPU_TIMER_AR, &timer->cntl);
+ }
+ 
+ static inline void omap_mpu_remove_autoreset(int nr)
+ {
+-	volatile omap_mpu_timer_regs_t* timer = omap_mpu_timer_base(nr);
++	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(nr);
+ 
+-	timer->cntl = timer->cntl & ~MPU_TIMER_AR;
++	writel(readl(&timer->cntl) & ~MPU_TIMER_AR, &timer->cntl);
+ }
+ 
+ static inline void omap_mpu_timer_start(int nr, unsigned long load_val,
+ 					int autoreset)
+ {
+-	volatile omap_mpu_timer_regs_t* timer = omap_mpu_timer_base(nr);
+-	unsigned int timerflags = (MPU_TIMER_CLOCK_ENABLE | MPU_TIMER_ST);
++	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(nr);
++	unsigned int timerflags = MPU_TIMER_CLOCK_ENABLE | MPU_TIMER_ST;
+ 
+-	if (autoreset) timerflags |= MPU_TIMER_AR;
++	if (autoreset)
++		timerflags |= MPU_TIMER_AR;
+ 
+-	timer->cntl = MPU_TIMER_CLOCK_ENABLE;
++	writel(MPU_TIMER_CLOCK_ENABLE, &timer->cntl);
+ 	udelay(1);
+-	timer->load_tim = load_val;
++	writel(load_val, &timer->load_tim);
+         udelay(1);
+-	timer->cntl = timerflags;
++	writel(timerflags, &timer->cntl);
+ }
+ 
+ static inline void omap_mpu_timer_stop(int nr)
+ {
+-	volatile omap_mpu_timer_regs_t* timer = omap_mpu_timer_base(nr);
++	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(nr);
+ 
+-	timer->cntl &= ~MPU_TIMER_ST;
++	writel(readl(&timer->cntl) & ~MPU_TIMER_ST, &timer->cntl);
+ }
+ 
+ /*
 -- 
 1.7.4.4
