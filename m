@@ -1,28 +1,23 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 10 May 2011 23:40:45 +0100
-Subject: [PATCH 1/4] drivers: create a pinmux subsystem
-In-Reply-To: <BANLkTi=XSevO72NqCYOYuketjE8XjeQU+A@mail.gmail.com>
-References: <1304363786-30376-1-git-send-email-linus.walleij@stericsson.com>
-	<1304365077.7792.40.camel@Joe-Laptop>
-	<BANLkTi=XSevO72NqCYOYuketjE8XjeQU+A@mail.gmail.com>
-Message-ID: <20110510224045.GA19154@sirena.org.uk>
+Date: Tue, 10 May 2011 23:42:33 +0100
+Subject: [RFC 1/2] ARM: Tegra: Device Tree Support: Update how sdhci
+	devices are initialized
+In-Reply-To: <4DC9BD39.30108@secretlab.ca>
+References: <20110510201108.22693.50319.stgit@riker>
+	<20110510201414.22693.7427.stgit@riker>
+	<74CDBE0F657A3D45AFBB94109FB122FF04986AA06A@HQMAIL01.nvidia.com>
+	<BANLkTingm7PCJPC-xCremYg_Ab7qFvPSag@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04986AA077@HQMAIL01.nvidia.com>
+	<4DC9BD39.30108@secretlab.ca>
+Message-ID: <20110510224233.GB19154@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 12:18:00AM +0200, Linus Walleij wrote:
+On Tue, May 10, 2011 at 03:33:29PM -0700, John Bonesio wrote:
 
-> This is the idiomatic way of providing sysfs strings (compare e.g.
-> *_show() in drivers/regulator/core.c), the char *buf comes
-> from the sysfs core in struct device_attribute in <linus/device.h>
-> with this prototype:
+> A following patch, which I'll send later this week/early next week, will
+> instantiate the wm8903 audio codec device solely from the device tree.
 
->  ssize_t (*show)(struct device *dev, struct device_attribute *attr,
->                         char *buf);
-
-> and I have no way of knowing how large that buffer is. Migrating all
-
-It's implicitly PAGE_SIZE.  In pretty much all users the buffer is
-constrained to well below that by the inputs (sometimes with some help
-from users not using insanely long names for things) and the sysfs
-semantics which mean you probably got something badly wrong if you get
-anywhere near PAGE_SIZE.
+Please CC me on this work - I've got an interest both from the chip and
+subsystem point of view in how this stuff ends up looking and there's
+some fun and games with audio in device tree.
