@@ -1,34 +1,167 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 11 May 2011 14:58:23 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201105102344.58598.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105051612.18522.arnd@arndb.de>
-	<FBFC0000E34D487086421780A0F5252A@subhasishg>
-	<201105102344.58598.arnd@arndb.de>
-Message-ID: <82D549BB195345A1A189D569952B387C@subhasishg>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 11 May 2011 11:50:31 +0200
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <BANLkTi=ncV3M1q5SXNdUaXmtfkZ8Wn9dmw@mail.gmail.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+	<20110503172712.GE6538@lunn.ch>
+	<BANLkTi=ncV3M1q5SXNdUaXmtfkZ8Wn9dmw@mail.gmail.com>
+Message-ID: <20110511095031.GD31070@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Please look into implementing one of the three I suggested before
-> you go off in another direction. In case of the third one, the idea
-> was to configure the name of the device for each pru using sysfs,
-> which then gets bound to the driver, which loads its own firmware
-> as you do today. Only in the first two suggestions, the mfd driver
-> would be responsible for loading the firmware.
+> > 1) Three functions: uart-3wire, uart-hw-flow, uart-hw-flow-modem. ?The
+> > ? first just has 2 pins, the second 4 and the last 8. The board code
+> > ? selects one of these for the serial driver to use.
+> 
+> Sounds like a solid case for pinmuxing. Here the board code defines
+> three mux settings by name that your pinmux driver shall be able to handle,
+> and associate each of them with the same device.
+> 
+> > 2) Three functions: uart-core, uart-hw-flow, uart-mode. ?The first has
+> > ? 2 pins, the second has 2 pins and the last 4 pins. The board code tells
+> > ? the driver to use uart-core, plus say uart-hw-flow.
+> No not board. The driver is a driver for the package or pad ring,
+> nothing else. And the package certainly knows, by virtue of knowing
+> what differernt functions it can mux in/out by poking bits in the
+> hardware, about the actual groups that exists on the package.
+> 
+> The board in turn defines which of these possible functions that
+> it wants to mux in to certain devices. Note that it can assign multiple
+> functions to a single device, as mentioned in the reply to Russell.
+> 
+> > ?Maybe it makes
+> > more sense to have a collection of standard pin functions in
+> > drivers/pinmux/pinmux-foo.c, which cover 75% of the likely
+> > combinations.
+> 
+> I don't get it. There are as many combinations as there are
+> chips. A function on pin 12, 13 and 35 on my package is very
+> unlikely to be viable on another package.
+> 
+> The pinmux API is *not* about keeping track of the fact that
+> SPI uses so or so many pins, it's just about groups of pins
+> in an array, nothing else.
+> 
+> > And recommend a board file to have its own additional
+> > list of strange pin functions which it registers with the pinmux core?
+> 
+> The board file only references the functions that the the package
+> can mux. The board file should *never* define any functions
+> or pin groups whatsoever, the pinmux driver knows about those.
 
-Ok, thanks for the clarification.
-Instead of passing the device name, will it be ok to pass the mfd_id.
-The benefit will be that I can use the ID directly as an array
-index for the mfd_cell entries.
+Hi Linus
 
-Just to verify my understanding, all that's needs to be done is add
-a sysfs entry at 
-/sys/devices/platform/pruss_mfd/mfd_id
+Thanks for your reply. 
 
-Writing to this entry would create the respective device.
-Rewriting would unload the old (mfd_remove_device)
-and reload the new device.
-Reading may return the various devices and their name
-aliases.
- 
+I still however don't get how the different part of this are spread
+around the different levels of the logical hierarchy.
+
+Lets take a system i'm familiar with. I'm working of a kirkwood board,
+called bubba3. The logical hierarchy is:
+
+linux | arm | plat-orion | mach-kirkwood | bubba3.
+
+The pinmux core belongs in the linux level. It can be used by any
+architecture. It is generic.
+
+For the arm level, we have nothing.
+
+plat-orion knows about the registers for controlling muxing.  It knows
+it has a bank of four registers, each register containing one nibble
+per pad. It can provide functions to set these registers. However
+plat-orion has no idea what these pads are used for. It does not know
+what functions each pad has.
+
+mach-kirkwood does know what selection of functions each pad can take.
+PAD0 can be a GPIO, or a NAND FLASH data bit2, or an SPI chip select
+line. Maybe more interestingly, PAD4 can be UART0 RXD, but also PAD11
+can also be UART0 RXD. It can also know that the TWI interface 0 needs
+PADs 8 and 9 and that there are no other alternatives. So it could
+export this information. However TWI interface 1 has two pads for SDA
+and two pads for SCL. It could in theory export all four combinations
+which make valid TWI configurations.
+
+bubba3 board code knows that the board uses UART0 RXD from PAD 10. It
+also knows that its a simple 3 wire UART, so the flow control signals
+on various pads are not needed etc.
+
+Now lets map these different logical hierarchies onto a pinmux driver
+that would be placed into drivers/pinmux/kirkwood.c. I'm making a big
+assumption here. Each mach will provide a pinmux driver, not each
+board. We are trying to reduce code bloat, so we want to minimize
+repeated code. This is why i expect a pinmux driver per mach, not per
+board, since i expect there is a lot of duplication between boards of
+the same mach. We also want to keep maintenance simple, so what is
+probably never going to be used outside of bubba3 should probably be
+kept in the bubba3 board file.
+
+foo_enable() and foo_disable() methods come from plat-orion. So i
+#include <plat/orion> and use the functions. That works fine for all
+the other systems based on orion.
+
+Now to pins
+
+The example driver in your Documentation has
+
+static unsigned int i2c0_pins[] = { 24, 25 };
+
+We can do the same for the TWI interface 0
+
+static unsigned int twi_0_pins[] = { 8, 9};
+
+but what about TWI interface 1? There are only four combinations, so i
+could do:
+
+static unsigned int twi_1_a_pins[] = { 12, 17};
+static unsigned int twi_1_b_pins[] = { 12, 37};
+static unsigned int twi_1_c_pins[] = { 36, 17};
+static unsigned int twi_1_d_pins[] = { 36, 37;
+
+static struct foo_pmx_func myfuncs[] = {
+       {
+               .name = "twi-1-a",
+               .pins = twi-1-a,
+               .num_pins = ARRAY_SIZE(twi_1_a_pins),
+       },
+       {
+               .name = "twi-1-b",
+               .pins = twi-1-b,
+               .num_pins = ARRAY_SIZE(twi_1_b_pins),
+       },
+       {
+               .name = "twi-1-c",
+               .pins = twi-1-c,
+               .num_pins = ARRAY_SIZE(twi_1_c_pins),
+       },
+       {
+               .name = "twi-1-d",
+               .pins = twi-1-d,
+               .num_pins = ARRAY_SIZE(twi_1_d_pins),
+       },
+};
+
+and let the board tell the Marvell TWI driver to use twi-1-c with:
+
+       PINMUX_MAP("twi-1-c", "mv-spi.1")
+
+Four combinations is not too bad. But SPI is worse, there are
+something like 32 combinations, maybe more. I could look at all the
+different kirkwood boards and find the subset used and add just those?
+And when a new board is added, it might have to add yet another
+combination. The same problem exists for the UART. Not just which pins
+are used, but also, is HW flow control used, are modem lines used,
+etc.
+
+To me, it makes more sense that drivers/pinmux/kirkwood.c provides the
+unique pin functions, where there are no alternatives, eg the twi
+0. It could also provide the pin functions used my Marvell in the
+kirkwood reference design. It is likely that many real boards will be
+based on that. However, if my bubba3 SPI pins don't fit with the
+Marvell RDK, i probably want to put them in my board file.
+
+Looking at the API, i don't see how my board could provide the list of
+SPI pins. So it looks like each kirkwood board will have to extend
+drivers/pinmux/kirkwood.c with its own specific pin definitions. This
+i don't like.
+
+     Andrew
