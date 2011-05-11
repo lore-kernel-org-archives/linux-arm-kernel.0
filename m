@@ -1,28 +1,40 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Wed, 11 May 2011 12:31:01 +0530
-Subject: [PATCH v4 08/11] tty: add pruss SUART driver
-In-Reply-To: <20110510143243.3e6f4050@lxorguk.ukuu.org.uk>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com><1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com><034A6447E0D54737B5CEE009A4D20B37@subhasishg><20110509144610.6b4f7090@lxorguk.ukuu.org.uk><3A9C5CD56396439DBF825BB4E5779DB9@subhasishg><20110509145534.2677dfa1@lxorguk.ukuu.org.uk><F0818DA1343E4FF1B3096048359CCC4C@subhasishg>
-	<20110510143243.3e6f4050@lxorguk.ukuu.org.uk>
-Message-ID: <F0F0851DD515419B962AB1646D333CB1@subhasishg>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 11 May 2011 08:17:54 +0100
+Subject: [QUERY] Behavior of spi slave memories w.r.t chip select signal.
+In-Reply-To: <4DCA0B77.8060700@st.com>
+References: <4DCA0B77.8060700@st.com>
+Message-ID: <20110511071754.GN26703@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Trace all looks fine. I can't see anything else taking the lock so you'll
-> need to do a bit more debugging and find out why the spin lock change
-> makes the difference and what the real root cause is.
+On Wed, May 11, 2011 at 09:37:19AM +0530, viresh kumar wrote:
+> Following is what i understood after reading m25p80 driver and spi 
+> master drivers in drivers/spi folder.
+> 
+> "chip_select signal controls start and end of transfer. For ex: if we have to read
+> status reg of spi memory, then we use write_and_then_read() routine. which writes
+> 0x9F in one spi transfer and writes dummy bytes and reads rx reg in other transfer.
+> And these two transfers are part of single spi_message.
+> 
+> Now, it is controllable to handle cs, and if we send cs_change == 0, then chip select
+> is activated at start of message and deactivated at end of message, instead at end
+> of every transfer.
+> 
+> Which means, even if there is a delay between command and dummy bytes received at
+> spi memory, current transfer will not be terminated by memory as cs is low."
+> 
+> Is this correct??
+> 
+> Actually i am seeing a different behavior by some of the spi memories, like m25p10.
+> If there is a delay between read_sts_reg command and dummy bytes, then 0xFFFFFF is
+> returned in response. If there is no delay then transfer always passes.
 
-We do not support Modem control signals. So, I use -clocal with stty,
-but I observe that still enable_ms and get_mctrl handlers get called.
-Is that normal, how can I disable these functions from getting called.
+What SPI controller are you using?  I've seen a similar issue with the 
+Synopsys DesignWare SPI controller where the controller manages the chip 
+select itself, and once the FIFO is emptied the CS goes away, but the 
+flash chip requires it to stay high for the whole transaction.  In this 
+case the workaround is to use a GPIO as a chip select and there are 
+other controllers that do the same thing for the same reason (I think 
+that pxa2xx_spi is one of them).
 
-Actually, this same driver works perfectly with 2.6.33 kernel.
-With this Kernel I do not observe that these handlers getting called.
-So, basically the code path is different.
-
-Further, I only use the port->lock to disable interrupts, so its never 
-possible that
-while interrupts are disabled by my driver, the TTY is executing anything.
-
-There is another lock in the MFD driver, but that only uses spin_lock/unlock
-variant. 
+Jamie
