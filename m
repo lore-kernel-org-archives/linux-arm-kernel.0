@@ -1,25 +1,43 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Wed, 11 May 2011 12:49:42 +0530
-Subject: [QUERY] Behavior of spi slave memories w.r.t chip select signal.
-In-Reply-To: <20110511071754.GN26703@pulham.picochip.com>
-References: <4DCA0B77.8060700@st.com>
-	<20110511071754.GN26703@pulham.picochip.com>
-Message-ID: <4DCA388E.5060003@st.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Wed, 11 May 2011 09:30:12 +0200
+Subject: [PATCH 5/9] at91: use structure to store the current soc
+In-Reply-To: <20110511041951.GD22009@game.jcrosoft.org>
+References: <20110510162730.GA18929@game.jcrosoft.org>
+	<1305045259-23066-5-git-send-email-plagnioj@jcrosoft.com>
+	<4DC9B422.6070205@bluewatersys.com>
+	<20110510234033.GB18929@game.jcrosoft.org>
+	<4DC9DAAC.7060506@bluewatersys.com>
+	<20110511032633.GG18929@game.jcrosoft.org>
+	<4DCA0CB8.6060205@bluewatersys.com>
+	<20110511041951.GD22009@game.jcrosoft.org>
+Message-ID: <BANLkTi=Zn3V8y=RgJGrmmDe+XxjXoJAgyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2011 12:47 PM, Jamie Iles wrote:
-> What SPI controller are you using?  I've seen a similar issue with the 
-> Synopsys DesignWare SPI controller where the controller manages the chip 
-> select itself, and once the FIFO is emptied the CS goes away, but the 
-> flash chip requires it to stay high for the whole transaction.  In this 
-> case the workaround is to use a GPIO as a chip select and there are 
-> other controllers that do the same thing for the same reason (I think 
-> that pxa2xx_spi is one of them).
+hi,
 
-I am using amba pl022 controller and using external gpio's to control
-chip select signal. cs is kept low for entire message, but still i am facing
-this issue.
+>> You are missing the point. You have a function called soc_detect which
+>> returns void. It modifies a structure called at91_soc_data (this is not
+>> obvious from looking just at the function declaration) and returns
+> no sorry it's very clear
 
--- 
-viresh
+Even better would be:
+    struct at91_soc* at91_soc_detect();
+
+It returns NULL if the AT91 is not detected or not supported in the
+kernel image.
+
+
+> at91 for the arch
+> soc_data data related to the soc
+>
+> you can see 1000 times of time in the kernel
+> gic_data
+> cpu_data etc....
+
+If it's a shared with other ARM processors (ie, OMAP, PXA, etc), then soc_data.
+If it's only used on AT91 processors, then it gets prefixed with at91_.
+
+
+Regards,
+  Andrew Victor
