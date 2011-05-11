@@ -1,193 +1,55 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 11 May 2011 12:39:08 +1200
-Subject: [PATCH 5/9] at91: use structure to store the current soc
-In-Reply-To: <20110510234033.GB18929@game.jcrosoft.org>
-References: <20110510162730.GA18929@game.jcrosoft.org>
-	<1305045259-23066-5-git-send-email-plagnioj@jcrosoft.com>
-	<4DC9B422.6070205@bluewatersys.com>
-	<20110510234033.GB18929@game.jcrosoft.org>
-Message-ID: <4DC9DAAC.7060506@bluewatersys.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 10 May 2011 18:58:29 -0700
+Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
+In-Reply-To: <20110510235324.GD18929@game.jcrosoft.org>
+References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
+	<4DC95D19.7070707@ru.mvista.com>
+	<20110510155038.GJ18791@game.jcrosoft.org>
+	<20110510170500.GB15675@kroah.com>
+	<20110510235324.GD18929@game.jcrosoft.org>
+Message-ID: <20110511015829.GB6840@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2011 11:40 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
->  
->>> +
->>> +static void soc_detect(u32 dbgu_base)
->>> +{
->>
->> This looks far better than your previous patch, and is how I suggested
->> it should have been done :-).
->>
->> I think possibly that this function should return an boolean indicating
->> whether or not it was able to detect the cpu, rather than the calling
->> function checking the internals of the at91_soc_data structure.
-> no need as at91_soc_data.type is init to SOC_AT91_NONE first
-> this ways we use less code
-
-Read the second part of my sentence. I think it is clearer/cleaner to
-have a return value specifying that the soc detection failed rather than
-checking the internals of the structure.
-
->>
->>> +	u32 cidr, socid;
->>> +
->>> +	cidr = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_CIDR);
->>> +	socid = cidr & ~AT91_CIDR_VERSION;
->>>
->>> +	switch (socid) {
->>> +	case ARCH_ID_AT572D940HF:
->>> +		at91_soc_data.type = SOC_572D940HF;
->>> +		set_at91_boot_soc(at572d940hf_soc);
->>> +		break;
->>> +
->>> +	case ARCH_ID_AT91CAP9: {
->>> +#ifdef CONFIG_AT91_PMC_UNIT
->>> +		u32 pmc_ver = at91_sys_read(AT91_PMC_VER);
->>> +
->>> +		if (pmc_ver == ARCH_REVISION_CAP9_B)
->>> +			at91_soc_data.subtype = SOC_CAP9_REV_B;
->>> +		else if (pmc_ver == ARCH_REVISION_CAP9_C)
->>> +			at91_soc_data.subtype = SOC_CAP9_REV_C;
->>> +#endif
->>> +		at91_soc_data.type = SOC_CAP9;
->>> +		set_at91_boot_soc(at91cap9_soc);
->>> +		break;
->>> +	}
->>> +
->>> +	case ARCH_ID_AT91RM9200:
->>> +		at91_soc_data.type = SOC_RM9200;
->>> +		set_at91_boot_soc(at91rm9200_soc);
->>> +		break;
->>> +
->>> +	case ARCH_ID_AT91SAM9260:
->>> +		at91_soc_data.type = SOC_SAM9260;
->>> +		set_at91_boot_soc(at91sam9260_soc);
->>> +		break;
->>> +
->>> +	case ARCH_ID_AT91SAM9261:
->>> +		at91_soc_data.type = SOC_SAM9261;
->>> +		set_at91_boot_soc(at91sam9261_soc);
->  > +
->>> +	if (at91_soc_data.type == SOC_AT91_NONE)
->>> +		return;
->>> +
->>> +	at91_soc_data.cidr = cidr;
->>
->> Why not directly assign this to at91_soc_data.cidr above and remove the
->> cidr local variable?
-> because I prefer to udpate the global struct only if we detect the soc
-
-Okay.
-
->>
->>> +
->>> +	/* sub version of soc */
->>> +	at91_soc_data.exid = __raw_readl(AT91_IO_P2V(dbgu_base) + AT91_DBGU_EXID);
->>> +
+On Wed, May 11, 2011 at 01:53:24AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:05 Tue 10 May     , Greg KH wrote:
+> > On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
+> > > > Hello.
+> > > > 
+> > > > Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > 
+> > > > >on 9g20 they are the same as the 9261
+> > > > 
+> > > > >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > > >---
+> > > > > drivers/usb/gadget/at91_udc.c |    2 +-
+> > > > > 1 files changed, 1 insertions(+), 1 deletions(-)
+> > > > 
+> > > > >diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+> > > > >index 9b7cdb1..41dc093 100644
+> > > > >--- a/drivers/usb/gadget/at91_udc.c
+> > > > >+++ b/drivers/usb/gadget/at91_udc.c
+> > > > >@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+> > > > > 	}
+> > > > > 	/* newer chips have more FIFO memory than rm9200 */
+> > > > >-	if (cpu_is_at91sam9260()) {
+> > > > >+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
+> > > > 
+> > > >    These shouldn't be used in the drivers at all.
+> > > Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
+> > 
+> > How could I apply this to the tree for the .40 release then?
+> it's also the case these patch apply from kernel v2.6.26 to above
 > 
->>> +		case ARCH_EXID_AT91SAM9M11:
->>> +			at91_soc_data.subtype = SOC_SAM9M11;
->>> +			break;
->>> +		}
->>
->> If we reused the ARCH_EXID_ defines, then the above could become:
->>
->> 	at91_soc_data.subtype = at91_soc_data.exid;
-> as sais in the commint comment to have a uniq subtype accross soc as example
-> g35 and 9m11 have the same exid
+> for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
 
-Why is this necessary? The cpu_is_macros, which are the _only_ way that
-the cpu/soc type should ever be checked, can do this. For example:
+That makes no sense, how can I go back in time and apply this to an
+older kernel version?
 
-#define cpu_is_at91sam9m11() \
-	(at91_soc_data.type == ARCH_ID_AT91SAM9G45 &&
-	 at91_soc_data.subtype == ARCH_EXID_AT91SAM9M11)
+Please provide a patch that I can apply against the linux-next tree if
+you want this change to be accepted.
 
-This way you don't need any extra #defines, and the switch statements
-for the exid in soc_detect can be removed.
+thanks,
 
-This would also result in a smaller impact change since the cpu_is
-macros would still work exactly the same, just the method used to read
-the id and exid change.
-
->>> +
->>> +const char *get_at91_soc_type(struct at91_socinfo *c)
->>> +{
->>
->> Should probably be called at91_get_soc_type_name. Get get_type implies
->> it will return the enum type value. I think the at91 prefix belongs at
->> the start also.
->>
->> Also, since at91_boot_soc is __initdata, the soc_name array should also
->> be __initdata and this function should be __init.
-> no this data will be use for sysfs export later
-> and at91_soc_data is not __initdata
-
-Okay. I still think the function names should be changed.
-
->>
->>> +
->>> +	if (at91_soc_data.type == SOC_AT91_NONE)
->>> +		panic("AT91: Impossible to detect the SOC type");
->>> +
->>> +	pr_info("AT91: Detected soc type: %s\n", get_at91_soc_type(&at91_soc_data));
->>> +	pr_info("AT91: Detected soc subtype: %s\n", get_at91_soc_subtype(&at91_soc_data));
->>> +
->>> +	if (!at91_boot_soc.init)
->>> +		panic("AT91: Soc not enabled");
->>
->> I would still like to see if it is possible to reorder these patches so
->> that this intermediate rewrite is not needed.
-> there is none intermedaite write
-
-You snipped it out in the reply :-). Patch 2/9 adds soc detection in
-at91_map_io via a series of 'if (cpu_is_xxx)' statements. This patch
-then removes that method and replaces it with the switch statement in
-soc_detect. It would be nice to try and avoid the intermediate step in
-at91_map_io since it only exists for three commits.
-
->>>  
->>>  	if (at91_boot_soc.map_io)
->>>  		at91_boot_soc.map_io();
->>> diff --git a/arch/arm/mach-at91/soc.h b/arch/arm/mach-at91/soc.h
->>> index d847565..1125671 100644
->>> --- a/arch/arm/mach-at91/soc.h
->>> +++ b/arch/arm/mach-at91/soc.h
->>> @@ -20,3 +20,41 @@ extern struct at91_soc at91sam9263_soc;
->>>  extern struct at91_soc at91sam9g45_soc;
->>>  extern struct at91_soc at91sam9rl_soc;
->>>  extern struct at91_soc at91sam9x5_soc;
->>> +
->>> +#define set_at91_boot_soc(c) do { at91_boot_soc = c; } while(0)
->>
->> Should be a static inline function.
-> a macro is fine here
-
-Static inlines are the preferred method wherever possible.
-
->>
->>> +
->>> +#if !defined(CONFIG_ARCH_AT572D940HF)
->>> +#define at572d940hf_soc	at91_boot_soc
->>> +#endif
->>
->> Possibly this needs to be reworked a little so that the user gets an
->> informative if the soc type is detected correctly, but support for the
->> soc is not included in the kernel?
-> it's already the case
-
-Okay.
-
-Thanks,
-~Ryan
-
-
--- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+greg k-h
