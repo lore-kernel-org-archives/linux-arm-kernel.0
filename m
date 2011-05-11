@@ -1,63 +1,37 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 May 2011 14:40:49 +0100
-Subject: [PATCH 20/19] ARM: LPAE: Invalidate the TLB before freeing the PMD
-In-Reply-To: <20110511105419.GD5315@n2100.arm.linux.org.uk>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1305109399-13156-1-git-send-email-catalin.marinas@arm.com>
-	<20110511105419.GD5315@n2100.arm.linux.org.uk>
-Message-ID: <1305121249.10103.45.camel@e102109-lin.cambridge.arm.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 11 May 2011 15:45:59 +0200 (CEST)
+Subject: [PATCH 08/13] clocksource: convert ARM 32-bit down counting
+	clocksources
+In-Reply-To: <20110511075316.GC15120@n2100.arm.linux.org.uk>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+	<E1QJhPM-0000yq-ED@rmk-PC.arm.linux.org.uk>
+	<alpine.LFD.2.00.1105100838530.15037@xanadu.home>
+	<20110511075316.GC15120@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1105111544480.21845@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-11 at 11:54 +0100, Russell King - ARM Linux wrote:
-> On Wed, May 11, 2011 at 11:23:19AM +0100, Catalin Marinas wrote:
-> > +static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
-> > +                               unsigned long addr)
-> > +{
-> > +#ifdef CONFIG_ARM_LPAE
-> > +     tlb_add_flush(tlb, addr);
-> > +     tlb_flush(tlb);
-> > +     pmd_free((tlb)->mm, pmdp);
-> > +#endif
-> > +}
-> 
-> You're:
-> 
-> 1. tlb_add_flush() - Adding the address which covers the PMD to the range
->    of virtual addresses which need flushing - ok.
-> 2. tlb_flush() - You're then forcing a flush.
-> 3. pmd_free() - You're now freeing the page.
-> 
-> One of the points about the shootdown interface is that it batches things
-> up.  So what's wrong with:
-> 
-> static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
->         unsigned long addr)
-> {
-> #ifdef CONFIG_ARM_LPAE
->         tlb_add_flush(tlb, addr);
->         tlb_remove_page(tlb, virt_to_page(pmdp));
-> #endif
-> }
-> 
-> and leave the tlb invalidate and actual page freeing to the batching code
-> to deal with?
+On Wed, 11 May 2011, Russell King - ARM Linux wrote:
 
-There isn't a big overhead with my initial code as a pmd covers 1GB and
-we only have 1 or 2 pmds per process that we can free.
+> On Tue, May 10, 2011 at 08:39:58AM -0400, Nicolas Pitre wrote:
+> > On Tue, 10 May 2011, Russell King - ARM Linux wrote:
+> > 
+> > > Convert MXC, Nomadik and Orion 32-bit down-counting clocksources to
+> > > generic mmio clocksource infrastructure.
+> > > 
+> > > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > > Cc: Alessandro Rubini <rubini@unipv.it>
+> > > Cc: Linus Walleij <linus.walleij@stericsson.com>
+> > > Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> > > Cc: Nicolas Pitre <nico@fluxnic.net>
+> > > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > 
+> > Acked-by: Nicolas Pitre <nico@fluxnic.net>
+> 
+> Does that apply to patch 6 too?
 
-Is there any room for optimising the mmu_gather range? I think this only
-matters for case 1 in your tlb_flush() comment - unmapping a page range
-with a few pages in one pmd and a few other pages in the next pmd we get
-over 1GB range when we actually only need to flush the TLB for a few
-pages.
+y
+Yes, you can add my ACK to patch 6.
 
-If tlb_add_flush would get a start/end range (or addr/size), we know
-that any TLB flush within the start..end range would be enough and thus
-we avoid artificially increasing the range.
 
-We could also modify flush_tlb_range() to branch to flush_tlb_mm() for
-big ranges.
-
--- 
-Catalin
+Nicolas
