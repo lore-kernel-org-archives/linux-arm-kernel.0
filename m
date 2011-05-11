@@ -1,36 +1,47 @@
-From: ospite@studenti.unina.it (Antonio Ospite)
-Date: Wed, 11 May 2011 12:19:57 +0200
-Subject: [PATCH 2/2] pxamci: fix coding style for multi statement conditionals
-In-Reply-To: <20110510203629.GB8726@opensource.wolfsonmicro.com>
-References: <20110510203629.GB8726@opensource.wolfsonmicro.com>
-Message-ID: <1305109197-16613-1-git-send-email-ospite@studenti.unina.it>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 May 2011 11:23:19 +0100
+Subject: [PATCH 20/19] ARM: LPAE: Invalidate the TLB before freeing the PMD
+In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1305109399-13156-1-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Put parentheses around single-statement 'if' branches when the else
-branch is not a single statement as suggested in
-Documentation/CodingStyle Chapter 3.
+Similar to the PTE freeing, this patch introduced __pmd_free_tlb() which
+invalidates the TLB before freeing a PMD page. This is needed because on
+newer processors the entry in the upper page table may be cached by the
+TLB and point to random data after the PMD has been freed.
 
-Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- drivers/mmc/host/pxamci.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-index 3a89fb2..fbdb21e 100644
---- a/drivers/mmc/host/pxamci.c
-+++ b/drivers/mmc/host/pxamci.c
-@@ -81,9 +81,9 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
- {
- 	host->vcc = regulator_get(mmc_dev(host->mmc), "vmmc");
+This patch should be part of the LPAE series but I haven't included it in the
+latest series post.
+
+ arch/arm/include/asm/tlb.h |   12 +++++++++++-
+ 1 files changed, 11 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
+index f9f6ecd..ef72f19 100644
+--- a/arch/arm/include/asm/tlb.h
++++ b/arch/arm/include/asm/tlb.h
+@@ -181,8 +181,18 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
+ 	tlb_remove_page(tlb, pte);
+ }
  
--	if (IS_ERR_OR_NULL(host->vcc))
-+	if (IS_ERR_OR_NULL(host->vcc)) {
- 		host->vcc = NULL;
--	else {
-+	} else {
- 		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
- 		if (host->pdata && host->pdata->ocr_mask)
- 			dev_warn(mmc_dev(host->mmc),
--- 
-1.7.5.1
++static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
++				  unsigned long addr)
++{
++#ifdef CONFIG_ARM_LPAE
++	tlb_add_flush(tlb, addr);
++	tlb_flush(tlb);
++	pmd_free((tlb)->mm, pmdp);
++#endif
++}
++
+ #define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
+-#define pmd_free_tlb(tlb, pmdp, addr)	pmd_free((tlb)->mm, pmdp)
++#define pmd_free_tlb(tlb, pmdp, addr)	__pmd_free_tlb(tlb, pmdp, addr)
+ #define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
+ 
+ #define tlb_migrate_finish(mm)		do { } while (0)
