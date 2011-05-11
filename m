@@ -1,58 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 May 2011 22:03:54 +0200
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <82D549BB195345A1A189D569952B387C@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105102344.58598.arnd@arndb.de>
-	<82D549BB195345A1A189D569952B387C@subhasishg>
-Message-ID: <201105112203.54838.arnd@arndb.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 May 2011 22:13:46 +0200
+Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
+In-Reply-To: <BANLkTikAZjUw5q6FnbwaD_HzTG8BYp9TRQ@mail.gmail.com>
+References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
+	<20110419092049.GC22799@n2100.arm.linux.org.uk>
+	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
+	<20110419120344.GG22799@n2100.arm.linux.org.uk>
+	<BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
+	<20110428170342.GA17290@n2100.arm.linux.org.uk>
+	<BANLkTikAZjUw5q6FnbwaD_HzTG8BYp9TRQ@mail.gmail.com>
+Message-ID: <BANLkTinTwieS6Nng3vc+KnusAFdpczUoWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 May 2011, Subhasish Ghosh wrote:
-> > Please look into implementing one of the three I suggested before
-> > you go off in another direction. In case of the third one, the idea
-> > was to configure the name of the device for each pru using sysfs,
-> > which then gets bound to the driver, which loads its own firmware
-> > as you do today. Only in the first two suggestions, the mfd driver
-> > would be responsible for loading the firmware.
-> 
-> Ok, thanks for the clarification.
-> Instead of passing the device name, will it be ok to pass the mfd_id.
-> The benefit will be that I can use the ID directly as an array
-> index for the mfd_cell entries.
+2011/4/29 Martin Furmanski <martin.furmanski@gmail.com>:
 
-I think a device name would be clearer here, especially in order
-to avoid conflicts when the list gets extended in different ways
-depending on which kernel runs.
+[About waiting for the DMA engine to complete]
 
-We had a little discussion at the Linaro Developer Summit about your
-driver and mfd drivers in general. There was a general feeling among
-some people (including me) that by the point you dynamically create
-the subdevices, MFD is probably not the right abstraction any more,
-as it does not provide any service that you need.
+> Even this would be no guarantee. The callback is hopefully a guarantee
+> that the clr has been asserted, but for the peripheral's state machine
+> there is still an uncertain time left, so the callback is a guess as good as
+> any other, although the reference point has been shifted forwards. Since the
+> time is uncertain, might just add a suitable delay. Preferably based on VHDL
+> analysis and as a function of peripheral clock.
 
-Instead, maybe you can simply call platform_device_register
-at that stage to create the children and not use MFD at all.
+The proper thing is to get the VHDL up in the testbench (synopsys)
+analyze it by running it and measure the number of cycles until idle.
+Then we can calculate the necessary delay from
+udelay(DIV_ROUND_UP(clockrate * cycles, 1000000));
 
-Samuel, can you comment on this as well? Do you still see pruss
-as an MFD driver when the uses are completely dynamic and determined
-by the firmware loaded into it?
+Now I need to figure out if I can pull that off :-/
 
-> Just to verify my understanding, all that's needs to be done is add
-> a sysfs entry at 
-> /sys/devices/platform/pruss_mfd/mfd_id
-> 
-> Writing to this entry would create the respective device.
-> Rewriting would unload the old (mfd_remove_device)
-> and reload the new device.
+> At the very least the last data element should be out of the FIFO when
+> RxDataAvlbl deasserts
 
-Yes
+Yes, but which FIFO?
 
-> Reading may return the various devices and their name
-> aliases.
+> and a read of status should not arrive any
+> sooner than that element to the DMAC.
 
-I would just return the current value. You might want to have two
-files in sysfs, one per PRU, so you can set them individually.
+As far as I can see there is no guarantee for that in the PL180 controller.
+IIRC the FIFO toward the card is a separate state machine, and it's the
+status of that state machine you're reading out in RxDataAvlbl.
 
-	Arnd
+It hands the read tokens to the MMCI DMA state machine with a simple
+handshake, and from that point on the position of the data in the system
+is the matter of the DMA statemachine, which in turn talks to the DMA
+controller. The state of the DMA statemachine (like when it goes idle) is
+not visible on the outside of the MMCI block in any flag register or so.
+
+So when the MMCI DMA state machine takes over the last tokens,
+the DMA engine can for example stop handshaking for an indefinate
+amount of time, while there are still tokens in the DMA part of MMCI.
+And in that time the driver may choose to initialize the MMCI for the
+next transfer, which screws everything up.
+
+So getting the callback from the DMA engine is what gives us the
+certainty that CLR has been asserted.
+
+Actually you probably need both: wait for the DMA ACK *and*
+a few cycles more determined by analysis for the state machine
+to settle, to be absolutely sure.
+
+But waiting for the DMA engine to complete the transfer is necessary
+as far as I can tell. Then you know there are no tokens stuck
+anywhere in the pipeline...
+
+> If this is true, then the read
+> of status itself implies that the DMAC has asserted clr (or in some
+> very pessimistic scenario within a few cycles?),
+
+As said, the status comes from the FIFO toward the card, the
+token queue in the DMA part of MMCI is something else.
+
+Or am I getting things backwards? If you like we can have a
+look at the hardware code together sometime and see if we can
+figure it out...
+
+Thanks,
+Linus Walleij
