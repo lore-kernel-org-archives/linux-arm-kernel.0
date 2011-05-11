@@ -1,59 +1,39 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 11 May 2011 22:44:49 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 22:14:38 +0100
 Subject: [PATCH v6 0/5] Basic ARM devicetree support
-Message-ID: <BANLkTi=yCmxgv1fQKRJSZK3FkkRwjS2r=Q@mail.gmail.com>
+In-Reply-To: <BANLkTi=yCmxgv1fQKRJSZK3FkkRwjS2r=Q@mail.gmail.com>
+References: <BANLkTi=yCmxgv1fQKRJSZK3FkkRwjS2r=Q@mail.gmail.com>
+Message-ID: <20110511211438.GM5315@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, May 11, 2011 at 10:44:49PM +0200, Grant Likely wrote:
+> Right now it merges cleanly with linux-next and the resulting tree
+> builds and boots at least on qemu.  Unless you really object, I'm
+> going to ask Stephen to add the following branch to the /end/ of the
+> list of trees for linux-next so it can easily be dropped it if it
+> causes any problems.
 
-Here's the current state of the device tree patches for basic
-infrastructure support.  It's pretty much the same as the last series
-I sent to you, except I've dropped the patches that add .dts files and
-board support simply because the final location for storing .dtb files
-is still up in the air.
+As far as the set of five patches looks fine to me, I don't have any
+objections against them.  So I think we can merge them for .40.
 
-After hearing from multiple people this week at UDS, and specifically
-having a long conversation about it with tglx, I'd really think it's
-time to start getting some wider testing in linux-next since it has
-seemed to be quite stable for a while now.  In fact, I want to put it
-in right now so that there is the /option/ of getting it into 2.6.40
-with a separate pull request near the end of the merge window (I'm not
-asking you to commit to merging it, but it isn't even an option if it
-isn't in linux-next).
+What I've always worried about is the platform stuff, and that's
+something I'm going to continue worrying about because I don't think
+we have sufficient review capacity to ensure that we don't end up
+with lots of stupidities.
 
-Right now it merges cleanly with linux-next and the resulting tree
-builds and boots at least on qemu.  Unless you really object, I'm
-going to ask Stephen to add the following branch to the /end/ of the
-list of trees for linux-next so it can easily be dropped it if it
-causes any problems.
+Eg, we need to properly sort out how we're going to represent stuff
+so we don't end up with X IRQ controllers, Y clock events, etc.  In
+other words, I don't want to see DT growing an AT91 IRQ controller,
+PXA IRQ controller, SA1100 IRQ controller, etc.
 
-git://git.secretlab.ca/git/linux-2.6 devicetree/arm-next
+One of the things we must deal with is how do we reduce the amount
+of IRQ controller code, clock event code, etc that we have in the
+kernel tree.  That means coming up with some generic representation
+of these facilities and having the right DT properties in place to
+be able to describe to the generic representation what's required of
+it.
 
-g.
-
----
-
-Grant Likely (5):
-      arm/dt: Make __vet_atags also accept a dtb image
-      arm/dt: Allow CONFIG_OF on ARM
-      arm/dt: consolidate atags setup into setup_machine_atags
-      arm/dt: probe for platforms via the device tree
-      dt: add documentation of ARM dt boot interface
-
-
- Documentation/arm/Booting                       |   33 +++++
- Documentation/devicetree/booting-without-of.txt |   48 +++++++-
- arch/arm/Kconfig                                |    7 +
- arch/arm/include/asm/mach/arch.h                |    9 +
- arch/arm/include/asm/prom.h                     |   37 ++++++
- arch/arm/include/asm/setup.h                    |    4 +
- arch/arm/kernel/Makefile                        |    1-
- arch/arm/kernel/devtree.c                       |  145 +++++++++++++++++++++++
- arch/arm/kernel/head-common.S                   |   24 +++-
- arch/arm/kernel/head.S                          |    8 +
- arch/arm/kernel/setup.c                         |   90 +++++++++-----
- arch/arm/mm/init.c                              |   11 ++
- 12 files changed, 367 insertions(+), 50 deletions(-)
- create mode 100644 arch/arm/include/asm/prom.h
- create mode 100644 arch/arm/kernel/devtree.c
+If we can't do that, then DT isn't solving the problem which Linus
+has complained about, and we will still be in the situation where
+platform X wants its own IRQ controller, clock event, etc code.
