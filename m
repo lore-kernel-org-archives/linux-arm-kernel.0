@@ -1,7 +1,7 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 May 2011 18:55:22 +0100
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 11 May 2011 19:58:37 +0200
 Subject: genirq: Generic irq chip available in git
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CE66709@dbde02.ent.ti.com>
+In-Reply-To: <20110511175522.GI5315@n2100.arm.linux.org.uk>
 References: <alpine.LFD.2.02.1104231805321.3323@ionos>
 	<20110427212542.GD17290@n2100.arm.linux.org.uk>
 	<20110508082222.GA27807@n2100.arm.linux.org.uk>
@@ -9,15 +9,38 @@ References: <alpine.LFD.2.02.1104231805321.3323@ionos>
 	<20110508140023.GK27807@n2100.arm.linux.org.uk>
 	<20110508140344.GC15968@opensource.wolfsonmicro.com>
 	<B85A65D85D7EB246BE421B3FB0FBB593024CE66709@dbde02.ent.ti.com>
-Message-ID: <20110511175522.GI5315@n2100.arm.linux.org.uk>
+	<20110511175522.GI5315@n2100.arm.linux.org.uk>
+Message-ID: <20110511175837.GA21150@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 11:15:57PM +0530, Nori, Sekhar wrote:
-> Hi Russell,
-> 
-> I have included Thomas's davinci platform update with the relevant
-> acks in the following pull request. There was also a checkpatch
-> error that I fixed up locally. Hope this helps.
+On Wed, May 11, 2011 at 06:55:22PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 11, 2011 at 11:15:57PM +0530, Nori, Sekhar wrote:
 
-Thanks, pulled this.
+> > I have included Thomas's davinci platform update with the relevant
+> > acks in the following pull request. There was also a checkpatch
+> > error that I fixed up locally. Hope this helps.
+
+> Thanks, pulled this.
+
+FWIW I sent a similar pull request to Kukjin a few days ago for Samsung:
+
+The following changes since commit cfefd21e693dca791bf9ecfc9dd3794facad533c:
+
+  genirq: Add chip suspend and resume callbacks (2011-04-23 15:56:24 +0200)
+
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc-2.6.git samsung-irq
+
+Thomas Gleixner (3):
+      ARM: SAMSUNG: S5P: Convert irq-gpioint to generic irq chip
+      ARM: SAMSUNG: Convert irq-vic-timer to generic irq chip
+      ARM: SAMSUNG: Convert irq-uart to generic irq chip
+
+ arch/arm/mach-s3c64xx/irq.c                        |    7 +-
+ arch/arm/plat-s5p/irq-gpioint.c                    |  116 +++++---------------
+ arch/arm/plat-s5p/irq.c                            |    6 +-
+ arch/arm/plat-samsung/include/plat/irq-vic-timer.h |    2 +-
+ arch/arm/plat-samsung/irq-uart.c                   |   83 ++------------
+ arch/arm/plat-samsung/irq-vic-timer.c              |   69 +++++-------
+ 6 files changed, 68 insertions(+), 215 deletions(-)
