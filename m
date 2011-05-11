@@ -1,49 +1,35 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Wed, 11 May 2011 19:49:20 +0000
-Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
-Message-ID: <E1QKFPN-0003xV-Sf@outmx07.plus.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 20:58:30 +0100
+Subject: Error in head-common.S file while ARM Linux booting
+In-Reply-To: <BANLkTikQHho9o+3dzbB-0Tq-ai2R5AAc5w@mail.gmail.com>
+References: <BANLkTi=rVF1r-3WpF+iBWMSgy46VnoVx=A@mail.gmail.com>
+	<alpine.LFD.2.00.1104211614140.24613@xanadu.home>
+	<BANLkTikQHho9o+3dzbB-0Tq-ai2R5AAc5w@mail.gmail.com>
+Message-ID: <20110511195830.GL5315@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basic suspend/resume is fixed by ensuring that the PGSR registers are set correctly before sleep mode is entered. In particular four of the active low resets need to be driven high while in sleep mode, otherwise the unit resets itself instead of suspending. Another problem was that the PCFR_GPROD bit is apparently set by the HTC bootloader; this caused GPIO reset (i.e. the reset button) to fail immediately after returning from sleep mode.
+On Thu, May 05, 2011 at 12:54:11PM +0530, Madhavi Manchala wrote:
+> <stdin>:46:0: warning: "__IGNORE_migrate_pages" redefined
+> /home/openwrt-s3c2510/trunk/build_dir/linux-s3c2510/linux-2.6.36/arch/arm/include/asm/unistd.h:476:0: note: this is the location of the previous definition
+>   CHK     include/generated/compile.h
+>   AS      arch/arm/kernel/debug.o
+> In file included from include/linux/cache.h:4:0,
+>                  from include/linux/time.h:7,
+>                  from include/linux/stat.h:60,
+>                  from include/linux/module.h:10,
+>                  from arch/arm/mach-s3c2510/include/mach/debug-macro.S:16,
+>                  from arch/arm/kernel/debug.S:130:
+> include/linux/kernel.h:42:0: warning: "ALIGN" redefined
+> include/linux/linkage.h:61:0: note: this is the location of the previous definition
+> include/linux/stddef.h: Assembler messages:
+> include/linux/stddef.h:15: Error: bad instruction `enum {'
+> include/linux/stddef.h:16: Error: junk at end of line, first unrecognized character is `,'
+> include/linux/stddef.h:18: Error: junk at end of line, first unrecognized character is `}'
 
-Driver-specific bugs still remain. In particular the mmc driver does not resume properly after returning from sleep mode, thus preventing sleep mode from being entered a second time.
+Looks to me like you're trying to include header files which contain C
+constructs into an assembly file.  There's nothing much more than "don't
+do that" to be said about this.
 
-Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
----
---- clean-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 00:54:10.787247169 +0100
-+++ linux-2.6.39-rc7/arch/arm/mach-pxa/hx4700.c	2011-05-11 20:21:54.026109594 +0100
-@@ -120,7 +120,11 @@ static unsigned long hx4700_pin_config[]
- 	GPIO19_SSP2_SCLK,
- 	GPIO86_SSP2_RXD,
- 	GPIO87_SSP2_TXD,
--	GPIO88_GPIO,
-+	MFP_CFG_OUT(GPIO88, AF0, KEEP_OUTPUT),	/* TSC2046_CS */
-+
-+	/* BQ24022 Regulator */
-+	MFP_CFG_OUT(GPIO72, AF0, KEEP_OUTPUT),	/* BQ24022_nCHARGE_EN */
-+	MFP_CFG_OUT(GPIO96, AF0, KEEP_OUTPUT),	/* BQ24022_ISET2 */
- 
- 	/* HX4700 specific input GPIOs */
- 	GPIO12_GPIO,	/* ASIC3_IRQ */
-@@ -133,6 +137,11 @@ static unsigned long hx4700_pin_config[]
- 	GPIO108_GPIO,	/* GSM_READY */
- 	GPIO58_GPIO,	/* TSC2046_nPENIRQ */
- 	GPIO66_GPIO,	/* nSDIO_IRQ */
-+
-+	MFP_CFG_OUT(GPIO61, AF0, DRIVE_HIGH),	/* W3220_nRESET */
-+	MFP_CFG_OUT(GPIO71, AF0, DRIVE_HIGH),	/* ASIC3_nRESET */
-+	MFP_CFG_OUT(GPIO81, AF0, DRIVE_HIGH),	/* CPU_GP_nRESET */
-+	MFP_CFG_OUT(GPIO116, AF0, DRIVE_HIGH),	/* CPU_HW_nRESET */
- };
- 
- #define HX4700_GPIO_IN(num, _desc) \
-@@ -847,6 +872,8 @@ static struct gpio_ress global_gpios[] =
- 
- static void __init hx4700_init(void)
- {
-+	PCFR &= ~PCFR_GPROD;	/* Else GPIO reset fails after sleep mode */
-+
- 	pxa2xx_mfp_config(ARRAY_AND_SIZE(hx4700_pin_config));
- 	hx4700_gpio_request(ARRAY_AND_SIZE(global_gpios));
- 
+Eg, you certainly shouldn't be including linux/module.h into
+debug-macro.S.
