@@ -1,42 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 May 2011 15:00:10 +0100
-Subject: [PATCH 20/19] ARM: LPAE: Invalidate the TLB before freeing the PMD
-In-Reply-To: <1305121249.10103.45.camel@e102109-lin.cambridge.arm.com>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1305109399-13156-1-git-send-email-catalin.marinas@arm.com>
-	<20110511105419.GD5315@n2100.arm.linux.org.uk>
-	<1305121249.10103.45.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110511140010.GE5315@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 May 2011 16:11:53 +0200
+Subject: moving gpio driver to drivers/gpio, how to initialize?
+Message-ID: <20110511141153.GJ30963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 02:40:49PM +0100, Catalin Marinas wrote:
-> On Wed, 2011-05-11 at 11:54 +0100, Russell King - ARM Linux wrote:
-> > One of the points about the shootdown interface is that it batches things
-> > up.  So what's wrong with:
-> > 
-> > static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
-> >         unsigned long addr)
-> > {
-> > #ifdef CONFIG_ARM_LPAE
-> >         tlb_add_flush(tlb, addr);
-> >         tlb_remove_page(tlb, virt_to_page(pmdp));
-> > #endif
-> > }
-> > 
-> > and leave the tlb invalidate and actual page freeing to the batching code
-> > to deal with?
-> 
-> There isn't a big overhead with my initial code as a pmd covers 1GB and
-> we only have 1 or 2 pmds per process that we can free.
-> 
-> Is there any room for optimising the mmu_gather range? I think this only
-> matters for case 1 in your tlb_flush() comment - unmapping a page range
-> with a few pages in one pmd and a few other pages in the next pmd we get
-> over 1GB range when we actually only need to flush the TLB for a few
-> pages.
+I think we mostly agree on moving the gpio drivers from arch/arm to
+drivers/gpio.  A question we have to answer is how we want to initialize
+these drivers. On nomadik these are platform drivers, but on i.MX and
+others platform drivers initialize too late, since the gpio functions
+are already used at init_machine time. PXA uses sysdev for their gpios,
+but is this the correct answer?
 
-One of the points is to keep the code as similar to other architectures
-so that the folk who are working on consolidating this stuff across other
-architectures don't have to wonder why ARM is _unnecessarily_ doing things
-differently.
+I have the impression that a platform device is the right answer to
+this, but it would require changes in many boards.
+
+Any thoughts?
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
