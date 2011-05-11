@@ -1,47 +1,43 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 11 May 2011 11:23:19 +0100
-Subject: [PATCH 20/19] ARM: LPAE: Invalidate the TLB before freeing the PMD
-In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1305109399-13156-1-git-send-email-catalin.marinas@arm.com>
+From: ospite@studenti.unina.it (Antonio Ospite)
+Date: Wed, 11 May 2011 12:26:56 +0200
+Subject: [PATCH] pxamci: remove an ifdef about CONFIG_REGULATOR
+In-Reply-To: <20110510220214.916621d1.ospite@studenti.unina.it>
+References: <1304971869-20161-1-git-send-email-ospite@studenti.unina.it>
+	<20110509202325.GD16919@n2100.arm.linux.org.uk>
+	<20110509203612.GC21323@opensource.wolfsonmicro.com>
+	<20110510220214.916621d1.ospite@studenti.unina.it>
+Message-ID: <20110511122656.de4cfbec.ospite@studenti.unina.it>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similar to the PTE freeing, this patch introduced __pmd_free_tlb() which
-invalidates the TLB before freeing a PMD page. This is needed because on
-newer processors the entry in the upper page table may be cached by the
-TLB and point to random data after the PMD has been freed.
-
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
-
-This patch should be part of the LPAE series but I haven't included it in the
-latest series post.
-
- arch/arm/include/asm/tlb.h |   12 +++++++++++-
- 1 files changed, 11 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/include/asm/tlb.h b/arch/arm/include/asm/tlb.h
-index f9f6ecd..ef72f19 100644
---- a/arch/arm/include/asm/tlb.h
-+++ b/arch/arm/include/asm/tlb.h
-@@ -181,8 +181,18 @@ static inline void __pte_free_tlb(struct mmu_gather *tlb, pgtable_t pte,
- 	tlb_remove_page(tlb, pte);
- }
+On Tue, 10 May 2011 22:02:14 +0200
+Antonio Ospite <ospite@studenti.unina.it> wrote:
  
-+static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
-+				  unsigned long addr)
-+{
-+#ifdef CONFIG_ARM_LPAE
-+	tlb_add_flush(tlb, addr);
-+	tlb_flush(tlb);
-+	pmd_free((tlb)->mm, pmdp);
-+#endif
-+}
-+
- #define pte_free_tlb(tlb, ptep, addr)	__pte_free_tlb(tlb, ptep, addr)
--#define pmd_free_tlb(tlb, pmdp, addr)	pmd_free((tlb)->mm, pmdp)
-+#define pmd_free_tlb(tlb, pmdp, addr)	__pmd_free_tlb(tlb, pmdp, addr)
- #define pud_free_tlb(tlb, pudp, addr)	pud_free((tlb)->mm, pudp)
- 
- #define tlb_migrate_finish(mm)		do { } while (0)
+> I was blindly trusting code already in mainline again, and for that I
+> apologize, I finally took the time to look at the implementation
+> of IS_ERR() and test its use, and being IS_ERR(NULL) true it is not what
+> we want indeed, see the attached test program.
+> 
+
+Just for the records, I meant to say "being IS_ERR(NULL) _false_" but
+you got it anyways.
+
+Regards,
+   Antonio
+
+-- 
+Antonio Ospite
+http://ao2.it
+
+PGP public key ID: 0x4553B001
+
+A: Because it messes up the order in which people normally read text.
+   See http://en.wikipedia.org/wiki/Posting_style
+Q: Why is top-posting such a bad thing?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110511/8314eb4a/attachment.sig>
