@@ -1,111 +1,121 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 11 May 2011 05:26:33 +0200
-Subject: [PATCH 5/9] at91: use structure to store the current soc
-In-Reply-To: <4DC9DAAC.7060506@bluewatersys.com>
-References: <20110510162730.GA18929@game.jcrosoft.org>
-	<1305045259-23066-5-git-send-email-plagnioj@jcrosoft.com>
-	<4DC9B422.6070205@bluewatersys.com>
-	<20110510234033.GB18929@game.jcrosoft.org>
-	<4DC9DAAC.7060506@bluewatersys.com>
-Message-ID: <20110511032633.GG18929@game.jcrosoft.org>
+From: cjb@laptop.org (Chris Ball)
+Date: Tue, 10 May 2011 23:51:12 -0400
+Subject: [PATCH v3] sdio: optimized SDIO IRQ handling for single irq
+In-Reply-To: <1304622843-5123-2-git-send-email-per.forlin@linaro.org> (Per
+	Forlin's message of "Thu, 5 May 2011 21:14:03 +0200")
+References: <1304622843-5123-1-git-send-email-per.forlin@linaro.org>
+	<1304622843-5123-2-git-send-email-per.forlin@linaro.org>
+Message-ID: <m3aaet51zj.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:39 Wed 11 May     , Ryan Mallon wrote:
-> On 05/11/2011 11:40 AM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >  
-> >>> +
-> >>> +static void soc_detect(u32 dbgu_base)
-> >>> +{
-> >>
-> >> This looks far better than your previous patch, and is how I suggested
-> >> it should have been done :-).
-> >>
-> >> I think possibly that this function should return an boolean indicating
-> >> whether or not it was able to detect the cpu, rather than the calling
-> >> function checking the internals of the at91_soc_data structure.
-> > no need as at91_soc_data.type is init to SOC_AT91_NONE first
-> > this ways we use less code
-> 
-> Read the second part of my sentence. I think it is clearer/cleaner to
-> have a return value specifying that the soc detection failed rather than
-> checking the internals of the structure.
-no the init of the struct is done on purpose to mach with the string table
-and set as not detectd for type and subtype first
-add a return to the soc detection just increase the code where the
-information si already present in the structure
-> 
-> >>
-> >>> +		case ARCH_EXID_AT91SAM9M11:
-> >>> +			at91_soc_data.subtype = SOC_SAM9M11;
-> >>> +			break;
-> >>> +		}
-> >>
-> >> If we reused the ARCH_EXID_ defines, then the above could become:
-> >>
-> >> 	at91_soc_data.subtype = at91_soc_data.exid;
-> > as sais in the commint comment to have a uniq subtype accross soc as example
-> > g35 and 9m11 have the same exid
-> 
-> Why is this necessary? The cpu_is_macros, which are the _only_ way that
-> the cpu/soc type should ever be checked, can do this. For example:
-> 
-> #define cpu_is_at91sam9m11() \
-> 	(at91_soc_data.type == ARCH_ID_AT91SAM9G45 &&
-> 	 at91_soc_data.subtype == ARCH_EXID_AT91SAM9M11)
-> 
-> This way you don't need any extra #defines, and the switch statements
-> for the exid in soc_detect can be removed.
-> 
-> This would also result in a smaller impact change since the cpu_is
-> macros would still work exactly the same, just the method used to read
-> the id and exid change.
-no more code and more assembly
-furthermore we associate the subtype with the subtype name where each entry
-are uniq
+Hi Per,
 
+On Thu, May 05 2011, Per Forlin wrote:
+> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
+>
+> If there is only 1 function interrupt registered it is possible to
+> improve performance by directly calling the irq handler
+> and avoiding the overhead of reading the CCCR registers.
+>
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
+> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
+>  drivers/mmc/core/sdio_irq.c |   33 ++++++++++++++++++++++++++++++++-
+>  include/linux/mmc/card.h    |    1 +
+>  2 files changed, 33 insertions(+), 1 deletions(-)
+>
+> diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
+> index b300161..03ead02 100644
+> --- a/drivers/mmc/core/sdio_irq.c
+> +++ b/drivers/mmc/core/sdio_irq.c
+> @@ -31,6 +31,17 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
+>  {
+>  	int i, ret, count;
+>  	unsigned char pending;
+> +	struct sdio_func *func;
+> +
+> +	/*
+> +	 * Optimization, if there is only 1 function interrupt registered
+> +	 * call irq handler directly
+> +	 */
+> +	func = card->sdio_single_irq;
+> +	if (func) {
+> +		func->irq_handler(func);
+> +		return 1;
+> +	}
+>  
+>  	ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
+>  	if (ret) {
+> @@ -42,7 +53,7 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
+>  	count = 0;
+>  	for (i = 1; i <= 7; i++) {
+>  		if (pending & (1 << i)) {
+> -			struct sdio_func *func = card->sdio_func[i - 1];
+> +			func = card->sdio_func[i - 1];
+>  			if (!func) {
+>  				printk(KERN_WARNING "%s: pending IRQ for "
+>  					"non-existent function\n",
+> @@ -186,6 +197,24 @@ static int sdio_card_irq_put(struct mmc_card *card)
+>  	return 0;
+>  }
+>  
+> +/* If there is only 1 function registered set sdio_single_irq */
+> +static void sdio_single_irq_set(struct mmc_card *card)
+> +{
+> +	struct sdio_func *func;
+> +	int i;
+> +
+> +	card->sdio_single_irq = NULL;
+> +	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
+> +	    card->host->sdio_irqs == 1)
+> +		for (i = 0; i < card->sdio_funcs; i++) {
+> +		       func = card->sdio_func[i];
+> +		       if (func && func->irq_handler) {
+> +			       card->sdio_single_irq = func;
+> +			       break;
+> +		       }
+> +	       }
+> +}
+> +
+>  /**
+>   *	sdio_claim_irq - claim the IRQ for a SDIO function
+>   *	@func: SDIO function
+> @@ -227,6 +256,7 @@ int sdio_claim_irq(struct sdio_func *func, sdio_irq_handler_t *handler)
+>  	ret = sdio_card_irq_get(func->card);
+>  	if (ret)
+>  		func->irq_handler = NULL;
+> +	sdio_single_irq_set(func->card);
+>  
+>  	return ret;
+>  }
+> @@ -251,6 +281,7 @@ int sdio_release_irq(struct sdio_func *func)
+>  	if (func->irq_handler) {
+>  		func->irq_handler = NULL;
+>  		sdio_card_irq_put(func->card);
+> +		sdio_single_irq_set(func->card);
+>  	}
+>  
+>  	ret = mmc_io_rw_direct(func->card, 0, 0, SDIO_CCCR_IENx, 0, &reg);
+> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+> index adb4888..0d64211 100644
+> --- a/include/linux/mmc/card.h
+> +++ b/include/linux/mmc/card.h
+> @@ -145,6 +145,7 @@ struct mmc_card {
+>  	struct sdio_cccr	cccr;		/* common card info */
+>  	struct sdio_cis		cis;		/* common tuple info */
+>  	struct sdio_func	*sdio_func[SDIO_MAX_FUNCS]; /* SDIO functions (devices) */
+> +	struct sdio_func	*sdio_single_irq; /* SDIO function when only one IRQ active */
+>  	unsigned		num_info;	/* number of info strings */
+>  	const char		**info;		/* info strings */
+>  	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
 
-> 
-> >>> +
-> >>> +const char *get_at91_soc_type(struct at91_socinfo *c)
-> >>> +{
-> >>
-> >> Should probably be called at91_get_soc_type_name. Get get_type implies
-> >> it will return the enum type value. I think the at91 prefix belongs at
-> >> the start also.
-> >>
-> >> Also, since at91_boot_soc is __initdata, the soc_name array should also
-> >> be __initdata and this function should be __init.
-> > no this data will be use for sysfs export later
-> > and at91_soc_data is not __initdata
-> 
-> Okay. I still think the function names should be changed.
-we use the same convention on sh and it's clear for me
-> 
-> >>
-> >>> +
-> >>> +	if (at91_soc_data.type == SOC_AT91_NONE)
-> >>> +		panic("AT91: Impossible to detect the SOC type");
-> >>> +
-> >>> +	pr_info("AT91: Detected soc type: %s\n", get_at91_soc_type(&at91_soc_data));
-> >>> +	pr_info("AT91: Detected soc subtype: %s\n", get_at91_soc_subtype(&at91_soc_data));
-> >>> +
-> >>> +	if (!at91_boot_soc.init)
-> >>> +		panic("AT91: Soc not enabled");
-> >>
-> >> I would still like to see if it is possible to reorder these patches so
-> >> that this intermediate rewrite is not needed.
-> > there is none intermedaite write
-> 
-> You snipped it out in the reply :-). Patch 2/9 adds soc detection in
-> at91_map_io via a series of 'if (cpu_is_xxx)' statements. This patch
-> then removes that method and replaces it with the switch statement in
-> soc_detect. It would be nice to try and avoid the intermediate step in
-> at91_map_io since it only exists for three commits.
-no this two different changes with huge impact
-first one factorize the map_io and change the AT91_BASE_SYS
+This patch doesn't apply cleanly -- please re-send against mmc-next.
 
-so I do prefer to keep them seperated and bre able to bisect them
+Thanks,
 
-Best Resgards,
-J.
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
