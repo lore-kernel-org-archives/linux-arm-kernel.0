@@ -1,29 +1,29 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 11 May 2011 11:07:22 -0500
-Subject: moving gpio driver to drivers/gpio, how to initialize?
-In-Reply-To: <20110511142016.GG3188@pulham.picochip.com>
-References: <20110511141153.GJ30963@pengutronix.de>
-	<20110511142016.GG3188@pulham.picochip.com>
-Message-ID: <4DCAB43A.8090003@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 17:24:50 +0100
+Subject: [PATCH 0/2] Consolidate zone adjustment
+Message-ID: <20110511162450.GF5315@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/2011 09:20 AM, Jamie Iles wrote:
-> On Wed, May 11, 2011 at 04:11:53PM +0200, Sascha Hauer wrote:
->> I think we mostly agree on moving the gpio drivers from arch/arm to
->> drivers/gpio.  A question we have to answer is how we want to initialize
->> these drivers. On nomadik these are platform drivers, but on i.MX and
->> others platform drivers initialize too late, since the gpio functions
->> are already used at init_machine time. PXA uses sysdev for their gpios,
->> but is this the correct answer?
->
-> The omap gpio driver registers the platform_driver as a
-> postcore_initcall so that it can use GPIO in the machine init for this
-> reason.  A platform_device/driver feels like the right way to do this
-> IMHO.
->
-An early_platform_device may be a better approach to avoid init level 
-tweaking. This would be needed for timers if the SH timer approach is 
-adopted.
+This patch mini-series consolidates the adjustment to system zones
+which some of our platforms require.  Rather than having each
+platform/machine class specify ISA_DMA_THRESHOLD, MAX_DMA_ADDRESS
+and an arch_adjust_zones function, they really only need to provide
+a single sizing definition, which in this series will be called
+ARM_DMA_ZONE_SIZE.
 
-Rob
+ arch/arm/common/sa1111.c                     |    8 -------
+ arch/arm/include/asm/dma.h                   |    4 ++-
+ arch/arm/include/asm/memory.h                |   10 ++------
+ arch/arm/mach-davinci/include/mach/memory.h  |   18 +----------------
+ arch/arm/mach-h720x/include/mach/memory.h    |    3 +-
+ arch/arm/mach-ixp4xx/common-pci.c            |   23 ----------------------
+ arch/arm/mach-ixp4xx/include/mach/memory.h   |   12 +---------
+ arch/arm/mach-pxa/cm-x2xx-pci.c              |   27 --------------------------
+ arch/arm/mach-pxa/include/mach/memory.h      |   10 +-------
+ arch/arm/mach-realview/core.c                |   19 ------------------
+ arch/arm/mach-realview/include/mach/memory.h |    9 +------
+ arch/arm/mach-sa1100/include/mach/memory.h   |   12 +----------
+ arch/arm/mach-shark/include/mach/memory.h    |   20 +------------------
+ arch/arm/mm/init.c                           |   23 +++++++++++++++++++++-
+ 14 files changed, 38 insertions(+), 160 deletions(-)
