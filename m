@@ -1,35 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 May 2011 20:58:30 +0100
-Subject: Error in head-common.S file while ARM Linux booting
-In-Reply-To: <BANLkTikQHho9o+3dzbB-0Tq-ai2R5AAc5w@mail.gmail.com>
-References: <BANLkTi=rVF1r-3WpF+iBWMSgy46VnoVx=A@mail.gmail.com>
-	<alpine.LFD.2.00.1104211614140.24613@xanadu.home>
-	<BANLkTikQHho9o+3dzbB-0Tq-ai2R5AAc5w@mail.gmail.com>
-Message-ID: <20110511195830.GL5315@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 May 2011 22:03:54 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <82D549BB195345A1A189D569952B387C@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105102344.58598.arnd@arndb.de>
+	<82D549BB195345A1A189D569952B387C@subhasishg>
+Message-ID: <201105112203.54838.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2011 at 12:54:11PM +0530, Madhavi Manchala wrote:
-> <stdin>:46:0: warning: "__IGNORE_migrate_pages" redefined
-> /home/openwrt-s3c2510/trunk/build_dir/linux-s3c2510/linux-2.6.36/arch/arm/include/asm/unistd.h:476:0: note: this is the location of the previous definition
->   CHK     include/generated/compile.h
->   AS      arch/arm/kernel/debug.o
-> In file included from include/linux/cache.h:4:0,
->                  from include/linux/time.h:7,
->                  from include/linux/stat.h:60,
->                  from include/linux/module.h:10,
->                  from arch/arm/mach-s3c2510/include/mach/debug-macro.S:16,
->                  from arch/arm/kernel/debug.S:130:
-> include/linux/kernel.h:42:0: warning: "ALIGN" redefined
-> include/linux/linkage.h:61:0: note: this is the location of the previous definition
-> include/linux/stddef.h: Assembler messages:
-> include/linux/stddef.h:15: Error: bad instruction `enum {'
-> include/linux/stddef.h:16: Error: junk at end of line, first unrecognized character is `,'
-> include/linux/stddef.h:18: Error: junk at end of line, first unrecognized character is `}'
+On Wednesday 11 May 2011, Subhasish Ghosh wrote:
+> > Please look into implementing one of the three I suggested before
+> > you go off in another direction. In case of the third one, the idea
+> > was to configure the name of the device for each pru using sysfs,
+> > which then gets bound to the driver, which loads its own firmware
+> > as you do today. Only in the first two suggestions, the mfd driver
+> > would be responsible for loading the firmware.
+> 
+> Ok, thanks for the clarification.
+> Instead of passing the device name, will it be ok to pass the mfd_id.
+> The benefit will be that I can use the ID directly as an array
+> index for the mfd_cell entries.
 
-Looks to me like you're trying to include header files which contain C
-constructs into an assembly file.  There's nothing much more than "don't
-do that" to be said about this.
+I think a device name would be clearer here, especially in order
+to avoid conflicts when the list gets extended in different ways
+depending on which kernel runs.
 
-Eg, you certainly shouldn't be including linux/module.h into
-debug-macro.S.
+We had a little discussion at the Linaro Developer Summit about your
+driver and mfd drivers in general. There was a general feeling among
+some people (including me) that by the point you dynamically create
+the subdevices, MFD is probably not the right abstraction any more,
+as it does not provide any service that you need.
+
+Instead, maybe you can simply call platform_device_register
+at that stage to create the children and not use MFD at all.
+
+Samuel, can you comment on this as well? Do you still see pruss
+as an MFD driver when the uses are completely dynamic and determined
+by the firmware loaded into it?
+
+> Just to verify my understanding, all that's needs to be done is add
+> a sysfs entry at 
+> /sys/devices/platform/pruss_mfd/mfd_id
+> 
+> Writing to this entry would create the respective device.
+> Rewriting would unload the old (mfd_remove_device)
+> and reload the new device.
+
+Yes
+
+> Reading may return the various devices and their name
+> aliases.
+
+I would just return the current value. You might want to have two
+files in sysfs, one per PRU, so you can set them individually.
+
+	Arnd
