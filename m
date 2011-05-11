@@ -1,26 +1,31 @@
-From: avictor.za@gmail.com (Andrew Victor)
-Date: Wed, 11 May 2011 09:44:52 +0200
-Subject: [PATCH] AT91: Add external RTC for Flexibity board
-In-Reply-To: <20110510234526.GC18929@game.jcrosoft.org>
-References: <4DC53134.8070706@gmail.com>
-	<20110510234526.GC18929@game.jcrosoft.org>
-Message-ID: <BANLkTikvCiXgnm_hVTqDmzZ6yDf6H5WaCw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 08:52:46 +0100
+Subject: [PATCH 07/13] clocksource: convert ARM 32-bit up counting
+	clocksources
+In-Reply-To: <BANLkTikqsxBs90+zk36MGj=3ekmfFpEZdA@mail.gmail.com>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+	<E1QJhNy-0000yl-V0@rmk-PC.arm.linux.org.uk>
+	<BANLkTikqsxBs90+zk36MGj=3ekmfFpEZdA@mail.gmail.com>
+Message-ID: <20110511075246.GA15120@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Tue, May 10, 2011 at 11:10:08PM +0200, Linus Walleij wrote:
+> 2011/5/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> > Convert ixp4xx, lpc32xx, mxc, netx, pxa, sa1100, tcc8k, tegra and u300
+> > to use the generic mmio clocksource recently introduced.
+> >
+> > Cc: Imre Kaloz <kaloz@openwrt.org>
+> > Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> > Cc: Eric Miao <eric.y.miao@gmail.com>
+> > Cc: "Hans J. Koch" <hjk@hansjkoch.de>
+> > Cc: Colin Cross <ccross@android.com>
+> > Cc: Erik Gilling <konkers@android.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Linus Walleij <linus.walleij@stericsson.com>
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
->> This patch enables external RTC support on AT91 Flexibity board.
-
-Acked-by: Andrew Victor <linux@maxim.org.za>
-
-Maxim: You can submit it to Russell's patch system.
-
-
-> looks fine just one comment please add your board to the new at91sam9260_defconfig
-
-That file does not exist in any mainline kernel.
-
-
-Regards,
-  Andrew Victor
+Does that apply to patch 6 too?
