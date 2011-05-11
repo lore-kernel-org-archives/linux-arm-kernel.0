@@ -1,24 +1,33 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 11 May 2011 05:49:01 +0200
-Subject: AT91: Remove fixed mapping for AT91RM9200 ethernet
-In-Reply-To: <1304884489.6089.13.camel@redbox>
-References: <1304884489.6089.13.camel@redbox>
-Message-ID: <20110511034901.GA22009@game.jcrosoft.org>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Wed, 11 May 2011 09:37:19 +0530
+Subject: [QUERY] Behavior of spi slave memories w.r.t chip select signal.
+Message-ID: <4DCA0B77.8060700@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21:54 Sun 08 May     , Andrew Victor wrote:
-> The AT91RM9200 Ethernet controller still has a fixed IO mapping.
-> So:
-> * Remove the fixed IO mapping and AT91_VA_BASE_EMAC definition.
-> * Pass the physical base-address via platform-resources to the driver.
-> * Convert at91_ether.c driver to perform an ioremap().
-> * Ethernet PHY detection needs to be performed during the driver
-> initialization process, it can no longer be done first.
-we need to pass the irq too as the hw ip does not belong to Atmel
-so it can be attached to any irq
 
-ca we split is in two file on for -net and the other one for at91 tree
+Hello,
 
-Best Regards,
-J.
+Following is what i understood after reading m25p80 driver and spi master
+drivers in drivers/spi folder.
+
+"chip_select signal controls start and end of transfer. For ex: if we have to read
+status reg of spi memory, then we use write_and_then_read() routine. which writes
+0x9F in one spi transfer and writes dummy bytes and reads rx reg in other transfer.
+And these two transfers are part of single spi_message.
+
+Now, it is controllable to handle cs, and if we send cs_change == 0, then chip select
+is activated at start of message and deactivated at end of message, instead at end
+of every transfer.
+
+Which means, even if there is a delay between command and dummy bytes received at
+spi memory, current transfer will not be terminated by memory as cs is low."
+
+Is this correct??
+
+Actually i am seeing a different behavior by some of the spi memories, like m25p10.
+If there is a delay between read_sts_reg command and dummy bytes, then 0xFFFFFF is
+returned in response. If there is no delay then transfer always passes.
+
+-- 
+viresh
