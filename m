@@ -1,18 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 11 May 2011 15:57:08 +0200
-Subject: [PATCH] ASoC: omap-mcbsp: Remove restrictive checks for cpu type
-In-Reply-To: <1305122135-27938-1-git-send-email-premi@ti.com>
-References: <1305122135-27938-1-git-send-email-premi@ti.com>
-Message-ID: <20110511135708.GE12469@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 15:00:10 +0100
+Subject: [PATCH 20/19] ARM: LPAE: Invalidate the TLB before freeing the PMD
+In-Reply-To: <1305121249.10103.45.camel@e102109-lin.cambridge.arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<1305109399-13156-1-git-send-email-catalin.marinas@arm.com>
+	<20110511105419.GD5315@n2100.arm.linux.org.uk>
+	<1305121249.10103.45.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110511140010.GE5315@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 07:25:35PM +0530, Sanjeev Premi wrote:
-> Current checks for cpu type were too restrictive leading
-> to failures for other silicons in same family.
+On Wed, May 11, 2011 at 02:40:49PM +0100, Catalin Marinas wrote:
+> On Wed, 2011-05-11 at 11:54 +0100, Russell King - ARM Linux wrote:
+> > One of the points about the shootdown interface is that it batches things
+> > up.  So what's wrong with:
+> > 
+> > static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+> >         unsigned long addr)
+> > {
+> > #ifdef CONFIG_ARM_LPAE
+> >         tlb_add_flush(tlb, addr);
+> >         tlb_remove_page(tlb, virt_to_page(pmdp));
+> > #endif
+> > }
+> > 
+> > and leave the tlb invalidate and actual page freeing to the batching code
+> > to deal with?
 > 
-> The problem was found while testing audio playback on
-> AM37x and AM35x processors. But should exist on OMAP36xx
-> as well.
+> There isn't a big overhead with my initial code as a pmd covers 1GB and
+> we only have 1 or 2 pmds per process that we can free.
+> 
+> Is there any room for optimising the mmu_gather range? I think this only
+> matters for case 1 in your tlb_flush() comment - unmapping a page range
+> with a few pages in one pmd and a few other pages in the next pmd we get
+> over 1GB range when we actually only need to flush the TLB for a few
+> pages.
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+One of the points is to keep the code as similar to other architectures
+so that the folk who are working on consolidating this stuff across other
+architectures don't have to wonder why ARM is _unnecessarily_ doing things
+differently.
