@@ -1,69 +1,35 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 11 May 2011 10:41:43 -0400
-Subject: [PATCH v2 1/2] pxamci: remove the ifdef CONFIG_REGULATOR
-In-Reply-To: <1305109145-16567-1-git-send-email-ospite@studenti.unina.it>
-	(Antonio Ospite's message of "Wed, 11 May 2011 12:19:05 +0200")
-References: <20110510203629.GB8726@opensource.wolfsonmicro.com>
-	<1305109145-16567-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <m38vud2taw.fsf@pullcord.laptop.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 11 May 2011 16:42:21 +0200
+Subject: moving gpio driver to drivers/gpio, how to initialize?
+In-Reply-To: <20110511142016.GG3188@pulham.picochip.com>
+References: <20110511141153.GJ30963@pengutronix.de>
+	<20110511142016.GG3188@pulham.picochip.com>
+Message-ID: <20110511144221.GK30963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antonio,
+On Wed, May 11, 2011 at 03:20:16PM +0100, Jamie Iles wrote:
+> On Wed, May 11, 2011 at 04:11:53PM +0200, Sascha Hauer wrote:
+> > I think we mostly agree on moving the gpio drivers from arch/arm to
+> > drivers/gpio.  A question we have to answer is how we want to initialize
+> > these drivers. On nomadik these are platform drivers, but on i.MX and
+> > others platform drivers initialize too late, since the gpio functions
+> > are already used at init_machine time. PXA uses sysdev for their gpios,
+> > but is this the correct answer?
+> 
+> The omap gpio driver registers the platform_driver as a 
+> postcore_initcall so that it can use GPIO in the machine init for this 
+> reason.  A platform_device/driver feels like the right way to do this 
+> IMHO.
 
-On Wed, May 11 2011, Antonio Ospite wrote:
-> Don't wrap regulator_get() inside an ifdef CONFIG_REGULATOR anymore, as
-> now it degenerates and returns NULL when the regulator framework is
-> disabled (since commit be1a50d: regulator: Let drivers know when they
-> use the stub API); and use IS_ERR_OR_NULL() to handle the stub function 
-> correctly.
->
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
-> ---
->
-> Changes since v1:
->   - Use IS_ERR_OR_NULL() to correctly handle the stub regulator_get()
->   - Put the short commit message of be1a50d so it is easier to see what it is 
->     about, for the long commit and the actual code changes the git history can 
->     be queried.
->
-> Thanks,
->    Antonio Ospite
->    http://ao2.it
->
->  drivers/mmc/host/pxamci.c |    5 ++---
->  1 files changed, 2 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/mmc/host/pxamci.c b/drivers/mmc/host/pxamci.c
-> index 7257738..3a89fb2 100644
-> --- a/drivers/mmc/host/pxamci.c
-> +++ b/drivers/mmc/host/pxamci.c
-> @@ -79,10 +79,9 @@ struct pxamci_host {
->  
->  static inline void pxamci_init_ocr(struct pxamci_host *host)
->  {
-> -#ifdef CONFIG_REGULATOR
->  	host->vcc = regulator_get(mmc_dev(host->mmc), "vmmc");
->  
-> -	if (IS_ERR(host->vcc))
-> +	if (IS_ERR_OR_NULL(host->vcc))
->  		host->vcc = NULL;
->  	else {
->  		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
-> @@ -90,7 +89,7 @@ static inline void pxamci_init_ocr(struct pxamci_host *host)
->  			dev_warn(mmc_dev(host->mmc),
->  				"ocr_mask/setpower will not be used\n");
->  	}
-> -#endif
-> +
->  	if (host->vcc == NULL) {
->  		/* fall-back to platform data */
->  		host->mmc->ocr_avail = host->pdata ?
+Ah, I somehow missed that platform drivers can be up and running at
+init_machine time. Then this is not a problem at all.
 
-Thanks, I've merged this and squashed the 2/2 punctuation patch into it;
-it didn't seem worth having a separate patch when both touch the same code.
+Sascha
 
-- Chris.
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
