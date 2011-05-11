@@ -1,27 +1,27 @@
-From: hjk@hansjkoch.de (Hans J. Koch)
-Date: Wed, 11 May 2011 02:16:53 +0200
-Subject: [PATCH 07/13] clocksource: convert ARM 32-bit up counting
-	clocksources
-In-Reply-To: <E1QJhNy-0000yl-V0@rmk-PC.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-	<E1QJhNy-0000yl-V0@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110511001653.GA7602@local>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 May 2011 02:17:11 +0200
+Subject: [PATCH 2/4] pinmux: add a driver for the U300 pinmux
+In-Reply-To: <1304365233.7792.42.camel@Joe-Laptop>
+References: <1304363798-30409-1-git-send-email-linus.walleij@stericsson.com>
+	<1304365233.7792.42.camel@Joe-Laptop>
+Message-ID: <BANLkTinnPWu9TZ72xdnXayrG0QYF+0mMBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2011 at 08:29:38AM +0100, Russell King - ARM Linux wrote:
-> Convert ixp4xx, lpc32xx, mxc, netx, pxa, sa1100, tcc8k, tegra and u300
-> to use the generic mmio clocksource recently introduced.
-> 
-> Cc: Imre Kaloz <kaloz@openwrt.org>
-> Cc: Krzysztof Halasa <khc@pm.waw.pl>
-> Cc: Eric Miao <eric.y.miao@gmail.com>
-> Cc: "Hans J. Koch" <hjk@hansjkoch.de>
-> Cc: Colin Cross <ccross@android.com>
-> Cc: Erik Gilling <konkers@android.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Linus Walleij <linus.walleij@stericsson.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+2011/5/2 Joe Perches <joe@perches.com>:
+> On Mon, 2011-05-02 at 21:16 +0200, Linus Walleij wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+> []
+>> diff --git a/drivers/pinmux/pinmux-u300.c b/drivers/pinmux/pinmux-u300.c
+>> +++ b/drivers/pinmux/pinmux-u300.c
+>> +struct u300_pin_desc {
+>> + ? ? unsigned number;
+>> + ? ? char *name;
+>
+> const char *name?
 
-Acked-by: "Hans J. Koch" <hjk@hansjkoch.de>
+Thanks, fixed!
+
+Can I have your reviewed-by for this patch given I fixed that?
+
+Linus Walleij
