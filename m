@@ -1,42 +1,50 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 11 May 2011 22:53:55 +0530
-Subject: [patch 0/4] [RFC] mcount address adjustment
-In-Reply-To: <20110510081039.241831019@de.ibm.com>
-References: <20110510081039.241831019@de.ibm.com>
-Message-ID: <BANLkTi=6FLtzXwg1yLAkLhP4GA4apSQ46g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 18:24:33 +0100
+Subject: [PATCH 2/2] ARM: use ARM_DMA_ZONE_SIZE to adjust the zone sizes
+In-Reply-To: <1305134498.10103.123.camel@e102109-lin.cambridge.arm.com>
+References: <20110511162450.GF5315@n2100.arm.linux.org.uk>
+	<E1QKCEB-0007Ns-AN@rmk-PC.arm.linux.org.uk>
+	<1305134498.10103.123.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110511172433.GH5315@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 10, 2011 at 13:40, Martin Schwidefsky
-<schwidefsky@de.ibm.com> wrote:
-> That leaves arm as the last remaining architecture with a non trivial
-> ftrace_call_adjust function. There the least significant bit is removed
-> from the address with an and operation. The comment says this is done
-> for Thumb-2. This implies that for Thumb-1 the offset is 0 and for
-> Thumb-2 the offset is -1, correct?
+On Wed, May 11, 2011 at 06:21:38PM +0100, Catalin Marinas wrote:
+> On Wed, 2011-05-11 at 17:25 +0100, Russell King - ARM Linux wrote:
+> > Rather than each platform providing its own function to adjust the
+> > zone sizes, use the new ARM_DMA_ZONE_SIZE definition to perform this
+> > adjustment.  This ensures that the actual DMA zone size and the
+> > ISA_DMA_THRESHOLD/MAX_DMA_ADDRESS definitions are consistent with
+> > each other, and moves this complexity out of the platform code.
+> ...
+> > diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
+> > index 973428d..1759fa6 100644
+> > --- a/arch/arm/mach-realview/include/mach/memory.h
+> > +++ b/arch/arm/mach-realview/include/mach/memory.h
+> > @@ -29,11 +29,7 @@
+> >  #define PLAT_PHYS_OFFSET               UL(0x00000000)
+> >  #endif
+> > 
+> > -#if !defined(__ASSEMBLY__) && defined(CONFIG_ZONE_DMA)
+> > -extern void realview_adjust_zones(unsigned long *size, unsigned long *hole);
+> > -#define arch_adjust_zones(size, hole) \
+> > -       realview_adjust_zones(size, hole)
+> > -
+> > +#ifdef CONFIG_ZONE_DMA
+> >  #define ARM_DMA_ZONE_SIZE      SZ_256M
+> >  #endif
+> 
+> We only use ZONE_DMA for PBX and realview_adjust_zones() does this
+> check. We end up with limiting the DMA zone to 256MB on all RealView
+> platforms if we compile a single kernel image that includes PBX. Not a
+> big problem though:
 
-ARM supports building the kernel using either the ARM instruction set or
-the Thumb-2 instruction set.  The kernel cannot be built with the
-"Thumb-1" instruction set (btw usually referred to as just Thumb).
+You've already implicitly limited it by the ISA_DMA_THRESHOLD/
+MAX_DMA_ADDRESS definition - what's left is an inconsistent relative
+size of those definitions and the actual DMA zone.  That inconsistency
+can cause the DMA allocator to fail unexpectedly as it assumes that
+GFP_DMA will return a page which will satisfy ISA_DMA_THRESHOLD.
 
-Thumb-2 via recordmcount.pl needs the clearing of the lsb because the
-relocation (R_ARM_ABS32) that gets used for the assembly file
-that recordmcount.pl generates and assembles dictates that the lsb be
-set if the target symbol is Thumb/Thumb-2 function.  mcount_adjust would
-not help here since the ORing is done later, when the relocation is
-applied.
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 
-Thumb-2 via recordmcount.c does not need the clearing of the lsb in
-ftrace_call_adjust.
-
-Building with the ARM instruction set also does not need the clearing
-of the lsb.
-
-> Thumb-2 the offset is -1, correct? If there is a way to distinguish
-> the two targets in recordmcount at compile time we could convert arm
-> as well. Which would allow us to remove the ftrace_call_adjust function.
-
-To remove ftrace_call_adjust, we could either deprecate the
-recordmcount.pl usage for ARM (you already have to edit the Kconfig to
-use it) or modify it to generate specific relocations explicitly instead
-of using the assembler data directives.
+Thanks.
