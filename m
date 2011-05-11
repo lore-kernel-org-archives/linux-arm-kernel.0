@@ -1,81 +1,126 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 11 May 2011 22:13:46 +0200
-Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
-In-Reply-To: <BANLkTikAZjUw5q6FnbwaD_HzTG8BYp9TRQ@mail.gmail.com>
-References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
-	<20110419092049.GC22799@n2100.arm.linux.org.uk>
-	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
-	<20110419120344.GG22799@n2100.arm.linux.org.uk>
-	<BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
-	<20110428170342.GA17290@n2100.arm.linux.org.uk>
-	<BANLkTikAZjUw5q6FnbwaD_HzTG8BYp9TRQ@mail.gmail.com>
-Message-ID: <BANLkTinTwieS6Nng3vc+KnusAFdpczUoWw@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 11 May 2011 22:14:01 +0200
+Subject: [PATCH v6 1/5] arm/dt: Make __vet_atags also accept a dtb image
+Message-ID: <20110511201401.21615.38893.stgit@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/29 Martin Furmanski <martin.furmanski@gmail.com>:
+The dtb is passed to the kernel via register r2, which is the same
+method that is used to pass an atags pointer.  This patch modifies
+__vet_atags to not clear r2 when it encounters a dtb image.
 
-[About waiting for the DMA engine to complete]
+v2: fixed bugs pointed out by Nicolas Pitre
 
-> Even this would be no guarantee. The callback is hopefully a guarantee
-> that the clr has been asserted, but for the peripheral's state machine
-> there is still an uncertain time left, so the callback is a guess as good as
-> any other, although the reference point has been shifted forwards. Since the
-> time is uncertain, might just add a suitable delay. Preferably based on VHDL
-> analysis and as a function of peripheral clock.
+Tested-by: Tony Lindgren <tony@atomide.com>
+Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+---
+ arch/arm/kernel/head-common.S |   24 ++++++++++++++++++------
+ arch/arm/kernel/head.S        |    8 ++++----
+ 2 files changed, 22 insertions(+), 10 deletions(-)
 
-The proper thing is to get the VHDL up in the testbench (synopsys)
-analyze it by running it and measure the number of cycles until idle.
-Then we can calculate the necessary delay from
-udelay(DIV_ROUND_UP(clockrate * cycles, 1000000));
-
-Now I need to figure out if I can pull that off :-/
-
-> At the very least the last data element should be out of the FIFO when
-> RxDataAvlbl deasserts
-
-Yes, but which FIFO?
-
-> and a read of status should not arrive any
-> sooner than that element to the DMAC.
-
-As far as I can see there is no guarantee for that in the PL180 controller.
-IIRC the FIFO toward the card is a separate state machine, and it's the
-status of that state machine you're reading out in RxDataAvlbl.
-
-It hands the read tokens to the MMCI DMA state machine with a simple
-handshake, and from that point on the position of the data in the system
-is the matter of the DMA statemachine, which in turn talks to the DMA
-controller. The state of the DMA statemachine (like when it goes idle) is
-not visible on the outside of the MMCI block in any flag register or so.
-
-So when the MMCI DMA state machine takes over the last tokens,
-the DMA engine can for example stop handshaking for an indefinate
-amount of time, while there are still tokens in the DMA part of MMCI.
-And in that time the driver may choose to initialize the MMCI for the
-next transfer, which screws everything up.
-
-So getting the callback from the DMA engine is what gives us the
-certainty that CLR has been asserted.
-
-Actually you probably need both: wait for the DMA ACK *and*
-a few cycles more determined by analysis for the state machine
-to settle, to be absolutely sure.
-
-But waiting for the DMA engine to complete the transfer is necessary
-as far as I can tell. Then you know there are no tokens stuck
-anywhere in the pipeline...
-
-> If this is true, then the read
-> of status itself implies that the DMAC has asserted clr (or in some
-> very pessimistic scenario within a few cycles?),
-
-As said, the status comes from the FIFO toward the card, the
-token queue in the DMA part of MMCI is something else.
-
-Or am I getting things backwards? If you like we can have a
-look at the hardware code together sometime and see if we can
-figure it out...
-
-Thanks,
-Linus Walleij
+diff --git a/arch/arm/kernel/head-common.S b/arch/arm/kernel/head-common.S
+index c84b57d..854bd22 100644
+--- a/arch/arm/kernel/head-common.S
++++ b/arch/arm/kernel/head-common.S
+@@ -15,6 +15,12 @@
+ #define ATAG_CORE_SIZE ((2*4 + 3*4) >> 2)
+ #define ATAG_CORE_SIZE_EMPTY ((2*4) >> 2)
+ 
++#ifdef CONFIG_CPU_BIG_ENDIAN
++#define OF_DT_MAGIC 0xd00dfeed
++#else
++#define OF_DT_MAGIC 0xedfe0dd0 /* 0xd00dfeed in big-endian */
++#endif
++
+ /*
+  * Exception handling.  Something went wrong and we can't proceed.  We
+  * ought to tell the user, but since we don't have any guarantee that
+@@ -28,20 +34,26 @@
+ 
+ /* Determine validity of the r2 atags pointer.  The heuristic requires
+  * that the pointer be aligned, in the first 16k of physical RAM and
+- * that the ATAG_CORE marker is first and present.  Future revisions
++ * that the ATAG_CORE marker is first and present.  If CONFIG_OF_FLATTREE
++ * is selected, then it will also accept a dtb pointer.  Future revisions
+  * of this function may be more lenient with the physical address and
+  * may also be able to move the ATAGS block if necessary.
+  *
+  * Returns:
+- *  r2 either valid atags pointer, or zero
++ *  r2 either valid atags pointer, valid dtb pointer, or zero
+  *  r5, r6 corrupted
+  */
+ __vet_atags:
+ 	tst	r2, #0x3			@ aligned?
+ 	bne	1f
+ 
+-	ldr	r5, [r2, #0]			@ is first tag ATAG_CORE?
+-	cmp	r5, #ATAG_CORE_SIZE
++	ldr	r5, [r2, #0]
++#ifdef CONFIG_OF_FLATTREE
++	ldr	r6, =OF_DT_MAGIC		@ is it a DTB?
++	cmp	r5, r6
++	beq	2f
++#endif
++	cmp	r5, #ATAG_CORE_SIZE		@ is first tag ATAG_CORE?
+ 	cmpne	r5, #ATAG_CORE_SIZE_EMPTY
+ 	bne	1f
+ 	ldr	r5, [r2, #4]
+@@ -49,7 +61,7 @@ __vet_atags:
+ 	cmp	r5, r6
+ 	bne	1f
+ 
+-	mov	pc, lr				@ atag pointer is ok
++2:	mov	pc, lr				@ atag/dtb pointer is ok
+ 
+ 1:	mov	r2, #0
+ 	mov	pc, lr
+@@ -61,7 +73,7 @@ ENDPROC(__vet_atags)
+  *
+  *  r0  = cp#15 control register
+  *  r1  = machine ID
+- *  r2  = atags pointer
++ *  r2  = atags/dtb pointer
+  *  r9  = processor ID
+  */
+ 	__INIT
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index c9173cf..a5e5c5b 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -59,7 +59,7 @@
+  *
+  * This is normally called from the decompressor code.  The requirements
+  * are: MMU = off, D-cache = off, I-cache = dont care, r0 = 0,
+- * r1 = machine nr, r2 = atags pointer.
++ * r1 = machine nr, r2 = atags or dtb pointer.
+  *
+  * This code is mostly position independent, so if you link the kernel at
+  * 0xc0008000, you call this at __pa(0xc0008000).
+@@ -91,7 +91,7 @@ ENTRY(stext)
+ #endif
+ 
+ 	/*
+-	 * r1 = machine no, r2 = atags,
++	 * r1 = machine no, r2 = atags or dtb,
+ 	 * r8 = phys_offset, r9 = cpuid, r10 = procinfo
+ 	 */
+ 	bl	__vet_atags
+@@ -339,7 +339,7 @@ __secondary_data:
+  *
+  *  r0  = cp#15 control register
+  *  r1  = machine ID
+- *  r2  = atags pointer
++ *  r2  = atags or dtb pointer
+  *  r4  = page table pointer
+  *  r9  = processor ID
+  *  r13 = *virtual* address to jump to upon completion
+@@ -376,7 +376,7 @@ ENDPROC(__enable_mmu)
+  *
+  *  r0  = cp#15 control register
+  *  r1  = machine ID
+- *  r2  = atags pointer
++ *  r2  = atags or dtb pointer
+  *  r9  = processor ID
+  *  r13 = *virtual* address to jump to upon completion
+  *
