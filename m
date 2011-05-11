@@ -1,67 +1,65 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 11 May 2011 06:50:41 -0700
-Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
-In-Reply-To: <20110511031854.GF18929@game.jcrosoft.org>
-References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
-	<4DC95D19.7070707@ru.mvista.com>
-	<20110510155038.GJ18791@game.jcrosoft.org>
-	<20110510170500.GB15675@kroah.com>
-	<20110510235324.GD18929@game.jcrosoft.org>
-	<20110511015829.GB6840@kroah.com>
-	<20110511031854.GF18929@game.jcrosoft.org>
-Message-ID: <20110511135041.GC12717@kroah.com>
+From: premi@ti.com (Sanjeev Premi)
+Date: Wed, 11 May 2011 19:25:35 +0530
+Subject: [PATCH] ASoC: omap-mcbsp: Remove restrictive checks for cpu type
+Message-ID: <1305122135-27938-1-git-send-email-premi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 05:18:54AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 18:58 Tue 10 May     , Greg KH wrote:
-> > On Wed, May 11, 2011 at 01:53:24AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 10:05 Tue 10 May     , Greg KH wrote:
-> > > > On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
-> > > > > > Hello.
-> > > > > > 
-> > > > > > Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > > 
-> > > > > > >on 9g20 they are the same as the 9261
-> > > > > > 
-> > > > > > >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > > > >---
-> > > > > > > drivers/usb/gadget/at91_udc.c |    2 +-
-> > > > > > > 1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > > > 
-> > > > > > >diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> > > > > > >index 9b7cdb1..41dc093 100644
-> > > > > > >--- a/drivers/usb/gadget/at91_udc.c
-> > > > > > >+++ b/drivers/usb/gadget/at91_udc.c
-> > > > > > >@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
-> > > > > > > 	}
-> > > > > > > 	/* newer chips have more FIFO memory than rm9200 */
-> > > > > > >-	if (cpu_is_at91sam9260()) {
-> > > > > > >+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
-> > > > > > 
-> > > > > >    These shouldn't be used in the drivers at all.
-> > > > > Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
-> > > > 
-> > > > How could I apply this to the tree for the .40 release then?
-> > > it's also the case these patch apply from kernel v2.6.26 to above
-> > > 
-> > > for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
-> > 
-> > That makes no sense, how can I go back in time and apply this to an
-> > older kernel version?
-> I known we just need for the longterm and stable tree
-> and the .39-rc8
-> > 
-> > Please provide a patch that I can apply against the linux-next tree if
-> > you want this change to be accepted.
-> it's appy to the -next
+Current checks for cpu type were too restrictive leading
+to failures for other silicons in same family.
 
-I have no idea what you are trying to say here.
+The problem was found while testing audio playback on
+AM37x and AM35x processors. But should exist on OMAP36xx
+as well.
 
-Care to resend this patch, the correct one, that I can apply to my
-usb-next tree for merging in the .40 merge cycle?
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+cc: Liam Girdwood <lrg@ti.com>
+cc: Jarkko Nikula <jhnikula@gmail.com>
+---
 
-totally confused,
+ Changes in v4:
+   Reposting after validating that patch still applies cleanly on
+   linux-omap master [46966f1]
 
-greg k-h
+   Changed the subject as suggested by Jarkko. Since the subject
+   has changed, i have omitted v4.
+
+ Changes in v3::
+   None. Reposting[1] after subscribing to alsa-devel list
+
+ Changes in v2:
+   1) Added one more check to the changes.
+   2) Updated commit message to use plurals.
+
+
+ [1] http://marc.info/?l=linux-omap&m=130026430110592&w=2
+
+
+ sound/soc/omap/omap-mcbsp.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/sound/soc/omap/omap-mcbsp.c b/sound/soc/omap/omap-mcbsp.c
+index 2175f09..a88a0bf 100644
+--- a/sound/soc/omap/omap-mcbsp.c
++++ b/sound/soc/omap/omap-mcbsp.c
+@@ -146,7 +146,7 @@ static int omap_mcbsp_dai_startup(struct snd_pcm_substream *substream,
+ 	 * 2 channels (stereo): size is 128 / 2 = 64 frames (2 * 64 words)
+ 	 * 4 channels: size is 128 / 4 = 32 frames (4 * 32 words)
+ 	 */
+-	if (cpu_is_omap343x() || cpu_is_omap44xx()) {
++	if (cpu_is_omap34xx() || cpu_is_omap44xx()) {
+ 		/*
+ 		* Rule for the buffer size. We should not allow
+ 		* smaller buffer than the FIFO size to avoid underruns
+@@ -258,7 +258,7 @@ static int omap_mcbsp_dai_hw_params(struct snd_pcm_substream *substream,
+ 	default:
+ 		return -EINVAL;
+ 	}
+-	if (cpu_is_omap343x()) {
++	if (cpu_is_omap34xx()) {
+ 		dma_data->set_threshold = omap_mcbsp_set_threshold;
+ 		/* TODO: Currently, MODE_ELEMENT == MODE_FRAME */
+ 		if (omap_mcbsp_get_dma_op_mode(bus_id) ==
+-- 
+1.7.2.2
