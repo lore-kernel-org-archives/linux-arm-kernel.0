@@ -1,50 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 May 2011 18:24:33 +0100
-Subject: [PATCH 2/2] ARM: use ARM_DMA_ZONE_SIZE to adjust the zone sizes
-In-Reply-To: <1305134498.10103.123.camel@e102109-lin.cambridge.arm.com>
-References: <20110511162450.GF5315@n2100.arm.linux.org.uk>
-	<E1QKCEB-0007Ns-AN@rmk-PC.arm.linux.org.uk>
-	<1305134498.10103.123.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110511172433.GH5315@n2100.arm.linux.org.uk>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 11 May 2011 22:23:20 +0530
+Subject: [PATCH] dmaengine: at_hdmac: pause: no need to wait for FIFO empty
+In-Reply-To: <4DC929EC.6040706@atmel.com>
+References: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
+	<1304957497-22814-1-git-send-email-nicolas.ferre@atmel.com>
+	<4DC927DF.1060808@ru.mvista.com>  <4DC929EC.6040706@atmel.com>
+Message-ID: <1305132800.28926.53.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 06:21:38PM +0100, Catalin Marinas wrote:
-> On Wed, 2011-05-11 at 17:25 +0100, Russell King - ARM Linux wrote:
-> > Rather than each platform providing its own function to adjust the
-> > zone sizes, use the new ARM_DMA_ZONE_SIZE definition to perform this
-> > adjustment.  This ensures that the actual DMA zone size and the
-> > ISA_DMA_THRESHOLD/MAX_DMA_ADDRESS definitions are consistent with
-> > each other, and moves this complexity out of the platform code.
-> ...
-> > diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
-> > index 973428d..1759fa6 100644
-> > --- a/arch/arm/mach-realview/include/mach/memory.h
-> > +++ b/arch/arm/mach-realview/include/mach/memory.h
-> > @@ -29,11 +29,7 @@
-> >  #define PLAT_PHYS_OFFSET               UL(0x00000000)
-> >  #endif
+On Tue, 2011-05-10 at 14:05 +0200, Nicolas Ferre wrote:
+> Le 10/05/2011 13:56, Sergei Shtylyov :
+> > Hello.
 > > 
-> > -#if !defined(__ASSEMBLY__) && defined(CONFIG_ZONE_DMA)
-> > -extern void realview_adjust_zones(unsigned long *size, unsigned long *hole);
-> > -#define arch_adjust_zones(size, hole) \
-> > -       realview_adjust_zones(size, hole)
-> > -
-> > +#ifdef CONFIG_ZONE_DMA
-> >  #define ARM_DMA_ZONE_SIZE      SZ_256M
-> >  #endif
+> > On 09-05-2011 20:11, Nicolas Ferre wrote:
+> > 
+> >> The addition of the pause feature to atc_control an active wait was
+> >> introduced
+> >> to check the FIFO empty event.
+> > 
+> >    Couldn't parse this -- did you forget "with"at the start of the
+> > statement?
 > 
-> We only use ZONE_DMA for PBX and realview_adjust_zones() does this
-> check. We end up with limiting the DMA zone to 256MB on all RealView
-> platforms if we compile a single kernel image that includes PBX. Not a
-> big problem though:
+> Absolutely. A comma can also improve things... is it better like this?
+> 
+> "
+> With the addition of the "pause" feature, an active wait loop was
+> introduced to check the "FIFO empty" event.
+> "
+> 
+> Vinod, tell me if you want me to send a new patch.
+Its okay, I can fix the commit
 
-You've already implicitly limited it by the ISA_DMA_THRESHOLD/
-MAX_DMA_ADDRESS definition - what's left is an inconsistent relative
-size of those definitions and the actual DMA zone.  That inconsistency
-can cause the DMA allocator to fail unexpectedly as it assumes that
-GFP_DMA will return a page which will satisfy ISA_DMA_THRESHOLD.
 
-> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-
-Thanks.
+-- 
+~Vinod
