@@ -1,121 +1,24 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 10 May 2011 23:51:12 -0400
-Subject: [PATCH v3] sdio: optimized SDIO IRQ handling for single irq
-In-Reply-To: <1304622843-5123-2-git-send-email-per.forlin@linaro.org> (Per
-	Forlin's message of "Thu, 5 May 2011 21:14:03 +0200")
-References: <1304622843-5123-1-git-send-email-per.forlin@linaro.org>
-	<1304622843-5123-2-git-send-email-per.forlin@linaro.org>
-Message-ID: <m3aaet51zj.fsf@pullcord.laptop.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 11 May 2011 05:49:01 +0200
+Subject: AT91: Remove fixed mapping for AT91RM9200 ethernet
+In-Reply-To: <1304884489.6089.13.camel@redbox>
+References: <1304884489.6089.13.camel@redbox>
+Message-ID: <20110511034901.GA22009@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Per,
+On 21:54 Sun 08 May     , Andrew Victor wrote:
+> The AT91RM9200 Ethernet controller still has a fixed IO mapping.
+> So:
+> * Remove the fixed IO mapping and AT91_VA_BASE_EMAC definition.
+> * Pass the physical base-address via platform-resources to the driver.
+> * Convert at91_ether.c driver to perform an ioremap().
+> * Ethernet PHY detection needs to be performed during the driver
+> initialization process, it can no longer be done first.
+we need to pass the irq too as the hw ip does not belong to Atmel
+so it can be attached to any irq
 
-On Thu, May 05 2011, Per Forlin wrote:
-> From: Stefan Nilsson XK <stefan.xk.nilsson@stericsson.com>
->
-> If there is only 1 function interrupt registered it is possible to
-> improve performance by directly calling the irq handler
-> and avoiding the overhead of reading the CCCR registers.
->
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> Acked-by: Ulf Hansson <ulf.hansson@stericsson.com>
-> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> ---
->  drivers/mmc/core/sdio_irq.c |   33 ++++++++++++++++++++++++++++++++-
->  include/linux/mmc/card.h    |    1 +
->  2 files changed, 33 insertions(+), 1 deletions(-)
->
-> diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-> index b300161..03ead02 100644
-> --- a/drivers/mmc/core/sdio_irq.c
-> +++ b/drivers/mmc/core/sdio_irq.c
-> @@ -31,6 +31,17 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
->  {
->  	int i, ret, count;
->  	unsigned char pending;
-> +	struct sdio_func *func;
-> +
-> +	/*
-> +	 * Optimization, if there is only 1 function interrupt registered
-> +	 * call irq handler directly
-> +	 */
-> +	func = card->sdio_single_irq;
-> +	if (func) {
-> +		func->irq_handler(func);
-> +		return 1;
-> +	}
->  
->  	ret = mmc_io_rw_direct(card, 0, 0, SDIO_CCCR_INTx, 0, &pending);
->  	if (ret) {
-> @@ -42,7 +53,7 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
->  	count = 0;
->  	for (i = 1; i <= 7; i++) {
->  		if (pending & (1 << i)) {
-> -			struct sdio_func *func = card->sdio_func[i - 1];
-> +			func = card->sdio_func[i - 1];
->  			if (!func) {
->  				printk(KERN_WARNING "%s: pending IRQ for "
->  					"non-existent function\n",
-> @@ -186,6 +197,24 @@ static int sdio_card_irq_put(struct mmc_card *card)
->  	return 0;
->  }
->  
-> +/* If there is only 1 function registered set sdio_single_irq */
-> +static void sdio_single_irq_set(struct mmc_card *card)
-> +{
-> +	struct sdio_func *func;
-> +	int i;
-> +
-> +	card->sdio_single_irq = NULL;
-> +	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
-> +	    card->host->sdio_irqs == 1)
-> +		for (i = 0; i < card->sdio_funcs; i++) {
-> +		       func = card->sdio_func[i];
-> +		       if (func && func->irq_handler) {
-> +			       card->sdio_single_irq = func;
-> +			       break;
-> +		       }
-> +	       }
-> +}
-> +
->  /**
->   *	sdio_claim_irq - claim the IRQ for a SDIO function
->   *	@func: SDIO function
-> @@ -227,6 +256,7 @@ int sdio_claim_irq(struct sdio_func *func, sdio_irq_handler_t *handler)
->  	ret = sdio_card_irq_get(func->card);
->  	if (ret)
->  		func->irq_handler = NULL;
-> +	sdio_single_irq_set(func->card);
->  
->  	return ret;
->  }
-> @@ -251,6 +281,7 @@ int sdio_release_irq(struct sdio_func *func)
->  	if (func->irq_handler) {
->  		func->irq_handler = NULL;
->  		sdio_card_irq_put(func->card);
-> +		sdio_single_irq_set(func->card);
->  	}
->  
->  	ret = mmc_io_rw_direct(func->card, 0, 0, SDIO_CCCR_IENx, 0, &reg);
-> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
-> index adb4888..0d64211 100644
-> --- a/include/linux/mmc/card.h
-> +++ b/include/linux/mmc/card.h
-> @@ -145,6 +145,7 @@ struct mmc_card {
->  	struct sdio_cccr	cccr;		/* common card info */
->  	struct sdio_cis		cis;		/* common tuple info */
->  	struct sdio_func	*sdio_func[SDIO_MAX_FUNCS]; /* SDIO functions (devices) */
-> +	struct sdio_func	*sdio_single_irq; /* SDIO function when only one IRQ active */
->  	unsigned		num_info;	/* number of info strings */
->  	const char		**info;		/* info strings */
->  	struct sdio_func_tuple	*tuples;	/* unknown common tuples */
+ca we split is in two file on for -net and the other one for at91 tree
 
-This patch doesn't apply cleanly -- please re-send against mmc-next.
-
-Thanks,
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Best Regards,
+J.
