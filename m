@@ -1,46 +1,69 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 11 May 2011 01:53:24 +0200
-Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
-In-Reply-To: <20110510170500.GB15675@kroah.com>
-References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
-	<4DC95D19.7070707@ru.mvista.com>
-	<20110510155038.GJ18791@game.jcrosoft.org>
-	<20110510170500.GB15675@kroah.com>
-Message-ID: <20110510235324.GD18929@game.jcrosoft.org>
+From: joe@perches.com (Joe Perches)
+Date: Tue, 10 May 2011 17:15:14 -0700
+Subject: [PATCH] drivers: create a pinmux subsystem v2
+In-Reply-To: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
+References: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1305072914.19586.166.camel@Joe-Laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:05 Tue 10 May     , Greg KH wrote:
-> On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
-> > > Hello.
-> > > 
-> > > Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > 
-> > > >on 9g20 they are the same as the 9261
-> > > 
-> > > >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > >---
-> > > > drivers/usb/gadget/at91_udc.c |    2 +-
-> > > > 1 files changed, 1 insertions(+), 1 deletions(-)
-> > > 
-> > > >diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> > > >index 9b7cdb1..41dc093 100644
-> > > >--- a/drivers/usb/gadget/at91_udc.c
-> > > >+++ b/drivers/usb/gadget/at91_udc.c
-> > > >@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
-> > > > 	}
-> > > > 	/* newer chips have more FIFO memory than rm9200 */
-> > > >-	if (cpu_is_at91sam9260()) {
-> > > >+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
-> > > 
-> > >    These shouldn't be used in the drivers at all.
-> > Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
-> 
-> How could I apply this to the tree for the .40 release then?
-it's also the case these patch apply from kernel v2.6.26 to above
+On Wed, 2011-05-11 at 01:39 +0200, Linus Walleij wrote:
+> This creates a subsystem for handling of pinmux devices.
+[]
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+[]
 
-for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
+Nice work and yes, more trivia...
 
-Best Regards,
-J.
+> diff --git a/drivers/pinmux/core.c b/drivers/pinmux/core.c
+[]
+> +struct pin_desc {
+> +	struct pinmux_dev *pmxdev;
+> +	bool	requested;
+> +	char	function[16];
+
+Magic number 16 used here and a couple other places.
+
+I also think function is a poor variable name for a descriptor.
+Might ever this need the size increased or the use changed
+to const char* func_desc (with kstrdup or equivalent)
+
+> +	if (status) {
+> +		pr_err("->request on device %s failed "
+> +		       "for pin %d (offset %d)\n",
+
+I think prefacing with "->" doesn't add anything and
+I think it's better to ignore 80 column line lengths for
+formats.  Maybe:
+
+		pr_err("device %s: request for pin %d/offset %d failed\n",
+
+> +	strncpy(desc->function, function, 16);
+> +	desc->function[15] = '\0';
+
+Here's that magic number again.  Maybe:
+	strlcpy(desc->function, function, sizeof(desc->function));
+or maybe:
+	kstrdup(desc->func_name, function, GFP_KERNEL);
+
+> +
+> +out:
+> +	spin_unlock_irqrestore(&pin_desc_lock, flags);
+> +	if (status)
+> +		pr_err("pin-%d (%s) status %d\n",
+> +		       pin, function ? : "?", status);
+
+Why test function for non-null only here?
+
+> +int pinmux_register_mappings(struct pinmux_map const *maps, unsigned num_maps)
+
+const struct pinmux_map *maps?
+Normal kernel style uses const before struct.
+
+> +void pinmux_put(struct pinmux *pmx)
+[]
+> +		pr_warn("pinmux: releasing pinmux with active users!\n");
+
+I think you don't need the prefix anymore.
+
+cheers, Joe
