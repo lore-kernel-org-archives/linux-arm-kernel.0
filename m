@@ -1,14 +1,15 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 11 May 2011 17:44:01 +0300
-Subject: [alsa-devel] [PATCH] ASoC: omap-mcbsp: Remove restrictive checks
-	for cpu type
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Wed, 11 May 2011 18:38:58 +0300
+Subject: [PATCH] ASoC: omap-mcbsp: Remove restrictive checks for cpu type
 In-Reply-To: <1305122135-27938-1-git-send-email-premi@ti.com>
 References: <1305122135-27938-1-git-send-email-premi@ti.com>
-Message-ID: <201105111744.01865.peter.ujfalusi@ti.com>
+Message-ID: <20110511183858.4ada5071.jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 May 2011 16:55:35 Premi, Sanjeev wrote:
+On Wed, 11 May 2011 19:25:35 +0530
+Sanjeev Premi <premi@ti.com> wrote:
+
 > Current checks for cpu type were too restrictive leading
 > to failures for other silicons in same family.
 > 
@@ -21,5 +22,4 @@ On Wednesday 11 May 2011 16:55:35 Premi, Sanjeev wrote:
 > cc: Liam Girdwood <lrg@ti.com>
 > cc: Jarkko Nikula <jhnikula@gmail.com>
 > ---
-
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Acked-by: Jarkko Nikula <jhnikula@gmail.com>
