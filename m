@@ -1,60 +1,52 @@
-From: gregkh@suse.de (Greg KH)
-Date: Wed, 11 May 2011 08:54:46 -0700
-Subject: [PATCH] [RFC] USB: fsl_udc_core: fix build-failure for ARM
-In-Reply-To: <20110511063954.GJ29089@pengutronix.de>
-References: <20110505135029.0c068b8e@wker>
-	<1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110511063954.GJ29089@pengutronix.de>
-Message-ID: <20110511155446.GA20920@suse.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 11 May 2011 16:58:36 +0100
+Subject: [PATCH 20/19] ARM: LPAE: Invalidate the TLB before freeing the PMD
+In-Reply-To: <20110511140010.GE5315@n2100.arm.linux.org.uk>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<1305109399-13156-1-git-send-email-catalin.marinas@arm.com>
+	<20110511105419.GD5315@n2100.arm.linux.org.uk>
+	<1305121249.10103.45.camel@e102109-lin.cambridge.arm.com>
+	<20110511140010.GE5315@n2100.arm.linux.org.uk>
+Message-ID: <1305129516.10103.82.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 08:39:54AM +0200, Uwe Kleine-K?nig wrote:
-> Hello Greg,
+On Wed, 2011-05-11 at 15:00 +0100, Russell King - ARM Linux wrote:
+> On Wed, May 11, 2011 at 02:40:49PM +0100, Catalin Marinas wrote:
+> > On Wed, 2011-05-11 at 11:54 +0100, Russell King - ARM Linux wrote:
+> > > One of the points about the shootdown interface is that it batches things
+> > > up.  So what's wrong with:
+> > >
+> > > static inline void __pmd_free_tlb(struct mmu_gather *tlb, pmd_t *pmdp,
+> > >         unsigned long addr)
+> > > {
+> > > #ifdef CONFIG_ARM_LPAE
+> > >         tlb_add_flush(tlb, addr);
+> > >         tlb_remove_page(tlb, virt_to_page(pmdp));
+> > > #endif
+> > > }
+> > >
+> > > and leave the tlb invalidate and actual page freeing to the batching code
+> > > to deal with?
+> >
+> > There isn't a big overhead with my initial code as a pmd covers 1GB and
+> > we only have 1 or 2 pmds per process that we can free.
+> >
+> > Is there any room for optimising the mmu_gather range? I think this only
+> > matters for case 1 in your tlb_flush() comment - unmapping a page range
+> > with a few pages in one pmd and a few other pages in the next pmd we get
+> > over 1GB range when we actually only need to flush the TLB for a few
+> > pages.
 > 
-> On Fri, May 06, 2011 at 11:00:05AM +0200, Uwe Kleine-K?nig wrote:
-> > Commit
-> > 
-> > 	09ba0de (USB: fsl_udc_core: prepare for SoCs with BE registers and descriptors)
-> > 
-> > introduced two function pointers _fsl_readl and _fsl_writel in an #ifdef
-> > CONFIG_PPC32 block and used then unconditionally in fsl_udc_probe.
-> > To make the driver compile again this use has to be protected by
-> > an #ifdef, too. Moreover ARM doesn't have flush_dcache_range so this
-> > is #ifdefed out, too.
-> > 
-> > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > ---
-> > Hello,
-> > 
-> > I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
-> > a flush ARM probably does, too, no?
-> > If so, what it the right thing to do? Implement flush_dcache_range for
-> > ARM (just wrapping flush_dcache_page?)?
-> As Russell seem to be OK with the #ifdef, can you please take this
-> patch?
+> One of the points is to keep the code as similar to other architectures
+> so that the folk who are working on consolidating this stuff across other
+> architectures don't have to wonder why ARM is _unnecessarily_ doing things
+> differently.
+> 
+Actually Peter Zijlstra's proposal uses a tlb_track_range() function
+which takes start and end range arguments.
 
-Ick, no.
+But I'm fine with your variant for now.
 
-> >  drivers/usb/gadget/fsl_udc_core.c |    4 ++++
-> >  1 files changed, 4 insertions(+), 0 deletions(-)
-> > 
-> > diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
-> > index 999eafe..47152e0 100644
-> > --- a/drivers/usb/gadget/fsl_udc_core.c
-> > +++ b/drivers/usb/gadget/fsl_udc_core.c
-> > @@ -1333,8 +1333,10 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
-> >  	/* Fill in the reqest structure */
-> >  	*((u16 *) req->req.buf) = cpu_to_le16(tmp);
-> >  
-> > +#ifdef CONFIG_PPC32
-> >  	/* flush cache for the req buffer */
-> >  	flush_dcache_range((u32)req->req.buf, (u32)req->req.buf + 8);
-> > +#endif
-
-Come on, we don't have ifdefs in .c files for a reason, surely there is
-a better fix for this some other way?
-
-thanks,
-
-greg k-h
+-- 
+Catalin
