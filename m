@@ -1,52 +1,22 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Wed, 11 May 2011 09:36:12 -0700
-Subject: [PATCH V3] OMAP3+: SR Layer Cleanup
-In-Reply-To: <1305105166-26109-1-git-send-email-shweta.gulati@ti.com>
-References: <1305105166-26109-1-git-send-email-shweta.gulati@ti.com>
-Message-ID: <BANLkTin07ZkWwhMtqUEMhLtwugKNmhku9g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 20:36:02 +0100
+Subject: Fwd: [ARM]crash on 2.6.35.11
+In-Reply-To: <BANLkTi=oZ0Mr33rL=QNmzDuaKLNezoKBXg@mail.gmail.com>
+References: <BANLkTimLd-qY-OeKqnf2EoTfvAHWQZVchw@mail.gmail.com>
+	<BANLkTi=oZ0Mr33rL=QNmzDuaKLNezoKBXg@mail.gmail.com>
+Message-ID: <20110511193602.GK5315@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 2:12 AM, Shweta Gulati <shweta.gulati@ti.com> wrote:
-...
+On Wed, May 04, 2011 at 03:46:55PM +0530, naveen yadav wrote:
+> Attaching test case
+> 
+> Dear all,
+> 
+> We are running linux kernel 2.6.35.11 on Cortex a-8. when I run a
+> simple program expect to give oom.
+> ?But it crash with following crash log
 
-> diff --git a/arch/arm/mach-omap2/sr_device.c
-> b/arch/arm/mach-omap2/sr_device.c
-> index 2782d3f..65b2aae 100644
-> --- a/arch/arm/mach-omap2/sr_device.c
-> +++ b/arch/arm/mach-omap2/sr_device.c
-> @@ -82,6 +82,7 @@ static int sr_dev_init(struct omap_hwmod *oh, void *user)
->        struct omap_sr_data *sr_data;
->        struct omap_device *od;
->        struct omap_volt_data *volt_data;
-> +       struct omap_sr_dev_attr *sr_dev_attr;
->        char *name = "smartreflex";
->        static int i;
->
-> @@ -92,9 +93,11 @@ static int sr_dev_init(struct omap_hwmod *oh, void
-> *user)
->                return -ENOMEM;
->        }
->
-> -       if (!oh->vdd_name) {
-> +       sr_dev_attr = (struct omap_sr_dev_attr *)oh->dev_attr;
-> +       if (!sr_dev_attr->voltdm_name) {
->                pr_err("%s: No voltage domain specified for %s."
->
-
-Suggest if (!sr_dev_attr || !sr_dev_attr->voltdm_name) to catch this error.
-
-
-> -                       "Cannot initialize\n", __func__, oh->name);
-> +                               "Cannot initialize\n", __func__,
-> +                                       sr_dev_attr->voltdm_name);
->
-
-Should leave the hwmod's oh->name as the pr_err
-param, sr_dev_attr->voltdm_name has just been verified bogus.
-
-
-Todd
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110511/561cf08c/attachment-0001.html>
+You need to include the memory layout information - eg, the boot log,
+and /proc/iomem.  Also are you using sparsemem?  If so, how is it
+configured?
