@@ -1,75 +1,28 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 11 May 2011 08:39:54 +0200
-Subject: [PATCH] [RFC] USB: fsl_udc_core: fix build-failure for ARM
-In-Reply-To: <1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <20110505135029.0c068b8e@wker>
-	<1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110511063954.GJ29089@pengutronix.de>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Wed, 11 May 2011 12:31:01 +0530
+Subject: [PATCH v4 08/11] tty: add pruss SUART driver
+In-Reply-To: <20110510143243.3e6f4050@lxorguk.ukuu.org.uk>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com><1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com><034A6447E0D54737B5CEE009A4D20B37@subhasishg><20110509144610.6b4f7090@lxorguk.ukuu.org.uk><3A9C5CD56396439DBF825BB4E5779DB9@subhasishg><20110509145534.2677dfa1@lxorguk.ukuu.org.uk><F0818DA1343E4FF1B3096048359CCC4C@subhasishg>
+	<20110510143243.3e6f4050@lxorguk.ukuu.org.uk>
+Message-ID: <F0F0851DD515419B962AB1646D333CB1@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Greg,
+> Trace all looks fine. I can't see anything else taking the lock so you'll
+> need to do a bit more debugging and find out why the spin lock change
+> makes the difference and what the real root cause is.
 
-On Fri, May 06, 2011 at 11:00:05AM +0200, Uwe Kleine-K?nig wrote:
-> Commit
-> 
-> 	09ba0de (USB: fsl_udc_core: prepare for SoCs with BE registers and descriptors)
-> 
-> introduced two function pointers _fsl_readl and _fsl_writel in an #ifdef
-> CONFIG_PPC32 block and used then unconditionally in fsl_udc_probe.
-> To make the driver compile again this use has to be protected by
-> an #ifdef, too. Moreover ARM doesn't have flush_dcache_range so this
-> is #ifdefed out, too.
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
-> a flush ARM probably does, too, no?
-> If so, what it the right thing to do? Implement flush_dcache_range for
-> ARM (just wrapping flush_dcache_page?)?
-As Russell seem to be OK with the #ifdef, can you please take this
-patch?
- 
-Thanks
-Uwe
+We do not support Modem control signals. So, I use -clocal with stty,
+but I observe that still enable_ms and get_mctrl handlers get called.
+Is that normal, how can I disable these functions from getting called.
 
->  drivers/usb/gadget/fsl_udc_core.c |    4 ++++
->  1 files changed, 4 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
-> index 999eafe..47152e0 100644
-> --- a/drivers/usb/gadget/fsl_udc_core.c
-> +++ b/drivers/usb/gadget/fsl_udc_core.c
-> @@ -1333,8 +1333,10 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
->  	/* Fill in the reqest structure */
->  	*((u16 *) req->req.buf) = cpu_to_le16(tmp);
->  
-> +#ifdef CONFIG_PPC32
->  	/* flush cache for the req buffer */
->  	flush_dcache_range((u32)req->req.buf, (u32)req->req.buf + 8);
-> +#endif
->  
->  	req->ep = ep;
->  	req->req.length = 2;
-> @@ -2455,6 +2457,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
->  	}
->  
->  	/* Set accessors only after pdata->init() ! */
-> +#ifdef CONFIG_PPC32
->  	if (pdata->big_endian_mmio) {
->  		_fsl_readl = _fsl_readl_be;
->  		_fsl_writel = _fsl_writel_be;
-> @@ -2462,6 +2465,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
->  		_fsl_readl = _fsl_readl_le;
->  		_fsl_writel = _fsl_writel_le;
->  	}
-> +#endif
->  
->  #ifndef CONFIG_ARCH_MXC
->  	if (pdata->have_sysif_regs)
+Actually, this same driver works perfectly with 2.6.33 kernel.
+With this Kernel I do not observe that these handlers getting called.
+So, basically the code path is different.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Further, I only use the port->lock to disable interrupts, so its never 
+possible that
+while interrupts are disabled by my driver, the TTY is executing anything.
+
+There is another lock in the MFD driver, but that only uses spin_lock/unlock
+variant. 
