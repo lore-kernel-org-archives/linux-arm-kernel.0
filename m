@@ -1,21 +1,28 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 11 May 2011 09:53:35 +0200
-Subject: [PATCH v4] sdio: optimized SDIO IRQ handling for single irq
-Message-ID: <1305100416-5395-1-git-send-email-per.forlin@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 11 May 2011 08:53:27 +0100
+Subject: [PATCH 08/13] clocksource: convert ARM 32-bit down counting
+	clocksources
+In-Reply-To: <BANLkTi=7Lxs6gMfi-n4_4cdD4C2G887E=g@mail.gmail.com>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+	<E1QJhPM-0000yq-ED@rmk-PC.arm.linux.org.uk>
+	<BANLkTi=7Lxs6gMfi-n4_4cdD4C2G887E=g@mail.gmail.com>
+Message-ID: <20110511075327.GD15120@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Optimize performance for single irq
+On Tue, May 10, 2011 at 11:04:38PM +0200, Linus Walleij wrote:
+> 2011/5/10 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> 
+> > Convert MXC, Nomadik and Orion 32-bit down-counting clocksources to
+> > generic mmio clocksource infrastructure.
+> >
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Cc: Alessandro Rubini <rubini@unipv.it>
+> > Cc: Linus Walleij <linus.walleij@stericsson.com>
+> > Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> > Cc: Nicolas Pitre <nico@fluxnic.net>
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-Changes since v2.
- * Rebase on mmc-next, change of line numbers no code changes.
-
-Stefan Nilsson XK (1):
-  sdio: optimized SDIO IRQ handling for single irq
-
- drivers/mmc/core/sdio_irq.c |   33 ++++++++++++++++++++++++++++++++-
- include/linux/mmc/card.h    |    1 +
- 2 files changed, 33 insertions(+), 1 deletions(-)
-
--- 
-1.7.4.1
+Does that apply to patch 6 too?
