@@ -1,39 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 11 May 2011 22:14:38 +0100
-Subject: [PATCH v6 0/5] Basic ARM devicetree support
-In-Reply-To: <BANLkTi=yCmxgv1fQKRJSZK3FkkRwjS2r=Q@mail.gmail.com>
-References: <BANLkTi=yCmxgv1fQKRJSZK3FkkRwjS2r=Q@mail.gmail.com>
-Message-ID: <20110511211438.GM5315@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 May 2011 23:31:47 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <2BFFDAA0A0DE4820876E5549867938EC@subhasishg>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<20110510112734.54160824@lxorguk.ukuu.org.uk>
+	<2BFFDAA0A0DE4820876E5549867938EC@subhasishg>
+Message-ID: <201105112331.47954.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 10:44:49PM +0200, Grant Likely wrote:
-> Right now it merges cleanly with linux-next and the resulting tree
-> builds and boots at least on qemu.  Unless you really object, I'm
-> going to ask Stephen to add the following branch to the /end/ of the
-> list of trees for linux-next so it can easily be dropped it if it
-> causes any problems.
+On Tuesday 10 May 2011, Subhasish Ghosh wrote:
+> 
+> >> Yes, In case if we allow the ALL implementation, it hogs the CPU.
+> >> In that case we do not need the PRU. The whole purpose of the PRU
+> >> is to offload the processor for any such implementations. 
+> > 
+> > So the kernel presumably needs to switch between using the PRU and native
+> > according to the number of ids being requested at the time ?
+> 
+> All the IDs are programmed into the PRU data RAM.
+> The Kernel receives interrupts based upon these IDs.
+> I could not clearly follow "PRU and native", could you please elaborate.
 
-As far as the set of five patches looks fine to me, I don't have any
-objections against them.  So I think we can merge them for .40.
+We would really like all CAN drivers to behave the same way. All other
+drivers are able to work without filters, so pruss_can should allow that
+too, even if it becomes a CPU hog at that time.
 
-What I've always worried about is the platform stuff, and that's
-something I'm going to continue worrying about because I don't think
-we have sufficient review capacity to ensure that we don't end up
-with lots of stupidities.
+It seems to me that the pruss can implementation has one thing backwards:
+it assumes a specific usage model for CAN that it is trying to do offload
+for. However, that usage model is currently not even supported by Socket
+CAN. If I understand Wolfgang correctly, it is in fact considered an
+unwanted limitation of the pruss can driver, instead of a useful feature.
 
-Eg, we need to properly sort out how we're going to represent stuff
-so we don't end up with X IRQ controllers, Y clock events, etc.  In
-other words, I don't want to see DT growing an AT91 IRQ controller,
-PXA IRQ controller, SA1100 IRQ controller, etc.
+If that interpretation is right, I would seriously recommend rethinking
+the design of the CAN firmware for pruss, so you can start doing something
+useful with the offload engine that fits into the Socket CAN API, or that
+would be a useful extension to Socket CAN that is also implementable in
+the kernel for all other drivers in a meaningful way.
 
-One of the things we must deal with is how do we reduce the amount
-of IRQ controller code, clock event code, etc that we have in the
-kernel tree.  That means coming up with some generic representation
-of these facilities and having the right DT properties in place to
-be able to describe to the generic representation what's required of
-it.
-
-If we can't do that, then DT isn't solving the problem which Linus
-has complained about, and we will still be in the situation where
-platform X wants its own IRQ controller, clock event, etc code.
+	Arnd
