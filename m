@@ -1,67 +1,42 @@
 From: rabin@rab.in (Rabin Vincent)
-Date: Wed, 11 May 2011 22:53:51 +0530
-Subject: [PATCH] ftrace: recordmcount: avoid STT_FUNC symbols as base on ARM
-Message-ID: <1305134631-31617-1-git-send-email-rabin@rab.in>
+Date: Wed, 11 May 2011 22:53:55 +0530
+Subject: [patch 0/4] [RFC] mcount address adjustment
+In-Reply-To: <20110510081039.241831019@de.ibm.com>
+References: <20110510081039.241831019@de.ibm.com>
+Message-ID: <BANLkTi=6FLtzXwg1yLAkLhP4GA4apSQ46g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While find_secsym_ndx often finds the unamed local STT_SECTION, if a
-section has only one function in it, the ARM toolchain generates the
-STT_FUNC symbol before the STT_SECTION, and recordmcount finds this
-instead.
+On Tue, May 10, 2011 at 13:40, Martin Schwidefsky
+<schwidefsky@de.ibm.com> wrote:
+> That leaves arm as the last remaining architecture with a non trivial
+> ftrace_call_adjust function. There the least significant bit is removed
+> from the address with an and operation. The comment says this is done
+> for Thumb-2. This implies that for Thumb-1 the offset is 0 and for
+> Thumb-2 the offset is -1, correct?
 
-This is problematic on ARM because in ARM ELFs, "if a [STT_FUNC] symbol
-addresses a Thumb instruction, its value is the address of the
-instruction with bit zero set (in a relocatable object, the section
-offset with bit zero set)".  This leads to incorrect mcount addresses
-being recorded.
+ARM supports building the kernel using either the ARM instruction set or
+the Thumb-2 instruction set.  The kernel cannot be built with the
+"Thumb-1" instruction set (btw usually referred to as just Thumb).
 
-Fix this by not using STT_FUNC symbols as the base on ARM.
+Thumb-2 via recordmcount.pl needs the clearing of the lsb because the
+relocation (R_ARM_ABS32) that gets used for the assembly file
+that recordmcount.pl generates and assembles dictates that the lsb be
+set if the target symbol is Thumb/Thumb-2 function.  mcount_adjust would
+not help here since the ORing is done later, when the relocation is
+applied.
 
-Signed-off-by: Rabin Vincent <rabin@rab.in>
----
- scripts/recordmcount.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Thumb-2 via recordmcount.c does not need the clearing of the lsb in
+ftrace_call_adjust.
 
-diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
-index baf187b..0e2944a 100644
---- a/scripts/recordmcount.h
-+++ b/scripts/recordmcount.h
-@@ -39,6 +39,7 @@
- #undef ELF_R_INFO
- #undef Elf_r_info
- #undef ELF_ST_BIND
-+#undef ELF_ST_TYPE
- #undef fn_ELF_R_SYM
- #undef fn_ELF_R_INFO
- #undef uint_t
-@@ -68,6 +69,7 @@
- # define ELF_R_INFO		ELF64_R_INFO
- # define Elf_r_info		Elf64_r_info
- # define ELF_ST_BIND		ELF64_ST_BIND
-+# define ELF_ST_TYPE		ELF64_ST_TYPE
- # define fn_ELF_R_SYM		fn_ELF64_R_SYM
- # define fn_ELF_R_INFO		fn_ELF64_R_INFO
- # define uint_t			uint64_t
-@@ -96,6 +98,7 @@
- # define ELF_R_INFO		ELF32_R_INFO
- # define Elf_r_info		Elf32_r_info
- # define ELF_ST_BIND		ELF32_ST_BIND
-+# define ELF_ST_TYPE		ELF32_ST_TYPE
- # define fn_ELF_R_SYM		fn_ELF32_R_SYM
- # define fn_ELF_R_INFO		fn_ELF32_R_INFO
- # define uint_t			uint32_t
-@@ -333,6 +336,11 @@ static unsigned find_secsym_ndx(unsigned const txtndx,
- 		if (txtndx == w2(symp->st_shndx)
- 			/* avoid STB_WEAK */
- 		    && (STB_LOCAL == st_bind || STB_GLOBAL == st_bind)) {
-+			/* function symbols on ARM have quirks, avoid them */
-+			if (w2(ehdr->e_machine) == EM_ARM
-+			    && ELF_ST_TYPE(symp->st_info) == STT_FUNC)
-+				continue;
-+
- 			*recvalp = _w(symp->st_value);
- 			return symp - sym0;
- 		}
--- 
-1.7.4.1
+Building with the ARM instruction set also does not need the clearing
+of the lsb.
+
+> Thumb-2 the offset is -1, correct? If there is a way to distinguish
+> the two targets in recordmcount at compile time we could convert arm
+> as well. Which would allow us to remove the ftrace_call_adjust function.
+
+To remove ftrace_call_adjust, we could either deprecate the
+recordmcount.pl usage for ARM (you already have to edit the Kconfig to
+use it) or modify it to generate specific relocations explicitly instead
+of using the assembler data directives.
