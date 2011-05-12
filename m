@@ -1,54 +1,72 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 May 2011 10:11:10 +0900
-Subject: [PATCH 3/7] [media] s5p-fimc: Remove to support fimc for S5PC100
+Date: Thu, 12 May 2011 10:11:13 +0900
+Subject: [PATCH 6/7] video: s3c-fb: Remove to support fb for S5PC100
 In-Reply-To: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
 References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1305162674-25860-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1305162674-25860-7-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 According to removing ARCH_S5PC100, we don't need to support
-fimc for S5PC100.
+fb for S5PC100.
 
-Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+Cc: Ben Dooks <ben-linux@fluff.org>
+Cc: Paul Mundt <lethal@linux-sh.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/media/video/s5p-fimc/fimc-core.c |   14 --------------
- 1 files changed, 0 insertions(+), 14 deletions(-)
+ drivers/video/s3c-fb.c |   33 ---------------------------------
+ 1 files changed, 0 insertions(+), 33 deletions(-)
 
-diff --git a/drivers/media/video/s5p-fimc/fimc-core.c b/drivers/media/video/s5p-fimc/fimc-core.c
-index dc91a85..89d59d6 100644
---- a/drivers/media/video/s5p-fimc/fimc-core.c
-+++ b/drivers/media/video/s5p-fimc/fimc-core.c
-@@ -1871,17 +1871,6 @@ static struct samsung_fimc_variant fimc2_variant_exynos4 = {
- 	.pix_limit	 = &s5p_pix_limit[3],
+diff --git a/drivers/video/s3c-fb.c b/drivers/video/s3c-fb.c
+index 3b6cdca..9928c7e 100644
+--- a/drivers/video/s3c-fb.c
++++ b/drivers/video/s3c-fb.c
+@@ -1696,36 +1696,6 @@ static struct s3c_fb_driverdata s3c_fb_data_64xx = {
+ 	.win[4]	= &s3c_fb_data_64xx_wins[4],
  };
  
--/* S5PC100 */
--static struct samsung_fimc_driverdata fimc_drvdata_s5p = {
+-static struct s3c_fb_driverdata s3c_fb_data_s5pc100 = {
 -	.variant = {
--		[0] = &fimc0_variant_s5p,
--		[1] = &fimc0_variant_s5p,
--		[2] = &fimc2_variant_s5p,
+-		.nr_windows	= 5,
+-		.vidtcon	= VIDTCON0,
+-		.wincon		= WINCON(0),
+-		.winmap		= WINxMAP(0),
+-		.keycon		= WKEYCON,
+-		.osd		= VIDOSD_BASE,
+-		.osd_stride	= 16,
+-		.buf_start	= VIDW_BUF_START(0),
+-		.buf_size	= VIDW_BUF_SIZE(0),
+-		.buf_end	= VIDW_BUF_END(0),
+-
+-		.palette = {
+-			[0] = 0x2400,
+-			[1] = 0x2800,
+-			[2] = 0x2c00,
+-			[3] = 0x3000,
+-			[4] = 0x3400,
+-		},
+-
+-		.has_prtcon	= 1,
 -	},
--	.num_entities = 3,
--	.lclk_frequency = 133000000UL,
+-	.win[0]	= &s3c_fb_data_64xx_wins[0],
+-	.win[1]	= &s3c_fb_data_64xx_wins[1],
+-	.win[2]	= &s3c_fb_data_64xx_wins[2],
+-	.win[3]	= &s3c_fb_data_64xx_wins[3],
+-	.win[4]	= &s3c_fb_data_64xx_wins[4],
 -};
 -
- /* S5PV210, S5PC110 */
- static struct samsung_fimc_driverdata fimc_drvdata_s5pv210 = {
+ static struct s3c_fb_driverdata s3c_fb_data_s5pv210 = {
  	.variant = {
-@@ -1907,9 +1896,6 @@ static struct samsung_fimc_driverdata fimc_drvdata_exynos4 = {
- 
- static struct platform_device_id fimc_driver_ids[] = {
- 	{
--		.name		= "s5p-fimc",
--		.driver_data	= (unsigned long)&fimc_drvdata_s5p,
+ 		.nr_windows	= 5,
+@@ -1797,9 +1767,6 @@ static struct platform_device_id s3c_fb_driver_ids[] = {
+ 		.name		= "s3c-fb",
+ 		.driver_data	= (unsigned long)&s3c_fb_data_64xx,
+ 	}, {
+-		.name		= "s5pc100-fb",
+-		.driver_data	= (unsigned long)&s3c_fb_data_s5pc100,
 -	}, {
- 		.name		= "s5pv210-fimc",
- 		.driver_data	= (unsigned long)&fimc_drvdata_s5pv210,
+ 		.name		= "s5pv210-fb",
+ 		.driver_data	= (unsigned long)&s3c_fb_data_s5pv210,
  	}, {
 -- 
 1.7.1
