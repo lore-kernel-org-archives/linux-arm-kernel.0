@@ -1,40 +1,44 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 12 May 2011 11:57:51 -0700
-Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
-In-Reply-To: <20110512183839.GK18952@game.jcrosoft.org>
-References: <20110510170500.GB15675@kroah.com>
-	<20110510235324.GD18929@game.jcrosoft.org>
-	<20110511015829.GB6840@kroah.com>
-	<20110511031854.GF18929@game.jcrosoft.org>
-	<20110511135041.GC12717@kroah.com>
-	<20110512013038.GA24270@game.jcrosoft.org>
-	<20110512044731.GA24746@kroah.com> <4DCBD11A.8060906@ru.mvista.com>
-	<20110512150800.GE30910@kroah.com>
-	<20110512183839.GK18952@game.jcrosoft.org>
-Message-ID: <20110512185751.GA6525@kroah.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Thu, 12 May 2011 12:06:43 -0700
+Subject: [PATCH V2] genalloc: add support to specify the physical address
+In-Reply-To: <20110512173832.GA8633@n2100.arm.linux.org.uk>
+References: <1303282455-26649-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110428081535.GI17290@n2100.arm.linux.org.uk>
+	<20110512173832.GA8633@n2100.arm.linux.org.uk>
+Message-ID: <20110512120643.67e7929d.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 08:38:39PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 08:08 Thu 12 May     , Greg KH wrote:
-> > On Thu, May 12, 2011 at 04:22:50PM +0400, Sergei Shtylyov wrote:
-> > > Hello.
+On Thu, 12 May 2011 18:38:32 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+
+> On Thu, Apr 28, 2011 at 09:15:35AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Apr 20, 2011 at 08:54:15AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > so we specify the virtual address as base of the pool chunk and then
+> > > get the physical address for hardware IP
 > > > 
-> > > On 12-05-2011 8:47, Greg KH wrote:
+> > > as example on at91 we will use on spi, uart or macb
 > > > 
-> > > >No, I can't apply it because of the comments above Sergei.  Please fix
-> > > >that and get his approval and then I will be able to apply it.
+> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > Cc: Patrice VILCHEZ <patrice.vilchez@atmel.com>
+> > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > ---
+> > > Hi Andrew,
+> > > 	I integrate the documentation fix
+> > > 	could replace the previous one with this one
 > > > 
-> > >    I'm OK with applying the patch to 2.6.39 actually. If I
-> > > understood correctly, the code will be reworked to get rid of
-> > > cpu_is_*() for 2.6.40+...
+> > > V2:
+> > > 	update documentation
+> > > 	use phys_addr_t for physical addr
+> > > Best Regards,
 > > 
-> > It's too late for .39, sorry.
-> can we have it for the stable kernel at least
+> > I notice no comments on this - maybe it needs to be Cc'd to linux-mm too?
+> > 
+> > Andrew - do you have any views on this?
+> 
+> Still haven't heard anything.  What's the status?
 
-Please go read Documentation/stable_kernel_rules.txt for how to get
-patches into the stable kernel trees.
-
-thanks,
-
-greg k-h
+Sorry, I missed the earlier email.  I've had v2 queued for 2.6.39 for a
+month.  If someone merges it into some other tree then that's OK by me
+- I'll just drop my copy when it turns up in -next.
