@@ -1,42 +1,20 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Thu, 12 May 2011 12:49:16 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <20110512092424.GO28888@outflux.net>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<20110512092424.GO28888@outflux.net>
-Message-ID: <20110512104916.GJ9937@elte.hu>
+From: kurt.van.dijck@eia.be (Kurt Van Dijck)
+Date: Thu, 12 May 2011 05:58:48 -0500
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DCB88A4.2010901@grandegger.com>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<2BFFDAA0A0DE4820876E5549867938EC@subhasishg>
+	<201105112331.47954.arnd@arndb.de>
+	<201105112344.44171.arnd@arndb.de>
+	<4DCB88A4.2010901@grandegger.com>
+Message-ID: <20110512105822.GA252@e-circ.dyndns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* Kees Cook <kees.cook@canonical.com> wrote:
-
-> Hi,
+On Thu, May 12, 2011 at 09:13:40AM +0200, Wolfgang Grandegger wrote:
+> A simple interface using:
 > 
-> On Thu, May 12, 2011 at 09:48:50AM +0200, Ingo Molnar wrote:
-> > 1) We already have a specific ABI for this: you can set filters for events via 
-> >    an event fd.
-> > 
-> >    Why not extend that mechanism instead and improve *both* your sandboxing
-> >    bits and the events code? This new seccomp code has a lot more
-> >    to do with trace event filters than the minimal old seccomp code ...
+>   ip link set can0 type can filter <id>:<mask> [<id>:<mask> ...]
 > 
-> Would this require privileges to get the event fd to start with? [...]
-
-No special privileges with the default perf_events_paranoid value.
-
-> [...] If so, I would prefer to avoid that, since using prctl() as shown in 
-> the patch set won't require any privs.
-
-and we could also explicitly allow syscall events without any privileges, 
-regardless of the setting of 'perf_events_paranoid' config value.
-
-Obviously a sandboxing host process wants to run with as low privileges as it 
-can.
-
-Thanks,
-
-	Ingo
+> would just be fine.
+Yep.
