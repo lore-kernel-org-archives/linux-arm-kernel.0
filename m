@@ -1,102 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 May 2011 10:34:34 +0100
-Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface (ISI)
-	support
-In-Reply-To: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
-References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20110512093433.GD1356@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 12 May 2011 02:40:01 -0700
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <20110512074421.GA2429@pengutronix.de>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+	<20110512074421.GA2429@pengutronix.de>
+Message-ID: <20110512094001.GH31483@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 03:42:18PM +0800, Josh Wu wrote:
-> This patch is to enable Atmel Image Sensor Interface (ISI) driver support. 
-> - Using soc-camera framework with videobuf2 dma-contig allocator
-> - Supporting video streaming of YUV packed format
-> - Tested on AT91SAM9M10G45-EK with OV2640
+* Sascha Hauer <s.hauer@pengutronix.de> [110512 00:40]:
+> 
+> These all basically describe the same thing: put pad x into one of modes
+> a, b, c and apply certain flags like drive strength on this.
+> 
+> the other class of pin muxing I know of is that a whole group of pads
+> can be switched to a particular mode using a mux register like I think
+> is used used in your ux300 driver.
+> 
+> I'd like to have a unified way to describe this. If we ever want to move
+> this into the device tree we need this anyway as I think it's not an
+> option to have completely different SoC specific descriptions in the
+> device tree.
 
-A few more points...
+Me too. Otherwise we'll have multiple different device tree implementations.
 
-> +static int __init atmel_isi_probe(struct platform_device *pdev)
+We might as well have the data in suitable format for device tree to
+start with, and then have common access functions that can be replaced
+for various platforms if necessary.
 
-Should be __devinit otherwise you'll have section errors.
+Regards,
 
-> +{
-> +	unsigned int irq;
-> +	struct atmel_isi *isi;
-> +	struct clk *pclk;
-> +	struct resource *regs;
-> +	int ret;
-> +	struct device *dev = &pdev->dev;
-> +	struct isi_platform_data *pdata;
-> +	struct soc_camera_host *soc_host;
-> +
-> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	if (!regs)
-> +		return -ENXIO;
-> +
-> +	pclk = clk_get(&pdev->dev, "isi_clk");
-> +	if (IS_ERR(pclk))
-> +		return PTR_ERR(pclk);
-> +
-> +	clk_enable(pclk);
-
-Return value of clk_enable() should be checked.
-
-> +
-> +	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
-> +	if (!isi) {
-> +		ret = -ENOMEM;
-> +		dev_err(&pdev->dev, "can't allocate interface!\n");
-> +		goto err_alloc_isi;
-> +	}
-> +
-> +	isi->pclk = pclk;
-> +
-> +	spin_lock_init(&isi->lock);
-> +	init_waitqueue_head(&isi->capture_wq);
-> +
-> +	isi->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
-> +	if (IS_ERR(isi->alloc_ctx)) {
-> +		ret = PTR_ERR(isi->alloc_ctx);
-> +		goto err_alloc_isi;
-> +	}
-> +
-> +	isi->regs = ioremap(regs->start, resource_size(regs));
-> +	if (!isi->regs) {
-> +		ret = -ENOMEM;
-> +		goto err_ioremap;
-> +	}
-> +
-> +	if (dev->platform_data)
-> +		pdata = (struct isi_platform_data *) dev->platform_data;
-> +	else {
-> +		static struct isi_platform_data isi_default_data = {
-> +			.frate		= 0,
-> +			.has_emb_sync	= 0,
-> +			.emb_crc_sync	= 0,
-> +			.hsync_act_low	= 0,
-> +			.vsync_act_low	= 0,
-> +			.pclk_act_falling = 0,
-> +			.isi_full_mode	= 1,
-> +			/* to use codec and preview path simultaneously */
-> +			.flags = ISI_DATAWIDTH_8 |
-> +				ISI_DATAWIDTH_10,
-> +		};
-> +		dev_info(&pdev->dev,
-> +			"No config available using default values\n");
-> +		pdata = &isi_default_data;
-> +	}
-> +
-> +	isi->pdata = pdata;
-> +	isi->platform_flags = pdata->flags;
-> +	if (isi->platform_flags == 0)
-> +		isi->platform_flags = ISI_DATAWIDTH_8;
-> +
-> +	isi_writel(isi, V2_CTRL, ISI_BIT(V2_DIS));
-> +	/* Check if module disable */
-> +	while (isi_readl(isi, V2_STATUS) & ISI_BIT(V2_DIS))
-> +		cpu_relax();
-> +
-> +	irq = platform_get_irq(pdev, 0);
-
-This should also be checked.
+Tony
