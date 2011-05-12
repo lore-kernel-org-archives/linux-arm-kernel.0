@@ -1,79 +1,60 @@
-From: greg@kroah.com (Greg KH)
-Date: Wed, 11 May 2011 21:47:31 -0700
-Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
-In-Reply-To: <20110512013038.GA24270@game.jcrosoft.org>
-References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
-	<4DC95D19.7070707@ru.mvista.com>
-	<20110510155038.GJ18791@game.jcrosoft.org>
-	<20110510170500.GB15675@kroah.com>
-	<20110510235324.GD18929@game.jcrosoft.org>
-	<20110511015829.GB6840@kroah.com>
-	<20110511031854.GF18929@game.jcrosoft.org>
-	<20110511135041.GC12717@kroah.com>
-	<20110512013038.GA24270@game.jcrosoft.org>
-Message-ID: <20110512044731.GA24746@kroah.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 12 May 2011 06:47:24 +0200
+Subject: [RFC 2/3] ARM: Tegra: Device Tree Support: Add i2c devices
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04986AA2C5@HQMAIL01.nvidia.com>
+References: <20110511231905.10362.12844.stgit@riker>
+	<20110511232659.10362.45811.stgit@riker>
+	<74CDBE0F657A3D45AFBB94109FB122FF04986AA2C5@HQMAIL01.nvidia.com>
+Message-ID: <BANLkTinvDRDfdGawFBb=OE8DqG_DW7L6qQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 03:30:38AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> On 06:50 Wed 11 May     , Greg KH wrote:
-> > On Wed, May 11, 2011 at 05:18:54AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > On 18:58 Tue 10 May     , Greg KH wrote:
-> > > > On Wed, May 11, 2011 at 01:53:24AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > On 10:05 Tue 10 May     , Greg KH wrote:
-> > > > > > On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > > > On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
-> > > > > > > > Hello.
-> > > > > > > > 
-> > > > > > > > Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > > > > 
-> > > > > > > > >on 9g20 they are the same as the 9261
-> > > > > > > > 
-> > > > > > > > >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > > > > > >---
-> > > > > > > > > drivers/usb/gadget/at91_udc.c |    2 +-
-> > > > > > > > > 1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > > > > > 
-> > > > > > > > >diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> > > > > > > > >index 9b7cdb1..41dc093 100644
-> > > > > > > > >--- a/drivers/usb/gadget/at91_udc.c
-> > > > > > > > >+++ b/drivers/usb/gadget/at91_udc.c
-> > > > > > > > >@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
-> > > > > > > > > 	}
-> > > > > > > > > 	/* newer chips have more FIFO memory than rm9200 */
-> > > > > > > > >-	if (cpu_is_at91sam9260()) {
-> > > > > > > > >+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
-> > > > > > > > 
-> > > > > > > >    These shouldn't be used in the drivers at all.
-> > > > > > > Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
-> > > > > > 
-> > > > > > How could I apply this to the tree for the .40 release then?
-> > > > > it's also the case these patch apply from kernel v2.6.26 to above
-> > > > > 
-> > > > > for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
-> > > > 
-> > > > That makes no sense, how can I go back in time and apply this to an
-> > > > older kernel version?
-> > > I known we just need for the longterm and stable tree
-> > > and the .39-rc8
-> > > > 
-> > > > Please provide a patch that I can apply against the linux-next tree if
-> > > > you want this change to be accepted.
-> > > it's appy to the -next
-> > 
-> > I have no idea what you are trying to say here.
-> > 
-> > Care to resend this patch, the correct one, that I can apply to my
-> > usb-next tree for merging in the .40 merge cycle?
-> It does apply on the linux-next
-> and previous kernel version
-> 
-> and this patch is a fix for the current kernel
-> so I would like to have it for this release and the stable tree
+On Thu, May 12, 2011 at 6:34 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> John Bonesio wrote at Wednesday, May 11, 2011 5:27 PM:
+>> This patch initializes i2c controller devices in board-dt.c. The i2c controller
+>> is added to tegra250.dtsi so later on-board i2c devices can be found and
+>> initialized based on the device tree information.
+>>...
+>> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+>>...
+>> +#include <linux/i2c.h>
+>> +#include <linux/i2c-tegra.h>
+>
+> I don't think those headers are needed now the platform data isn't set up here.
+>
+>> diff --git a/drivers/i2c/busses/i2c-tegra.c b/drivers/i2c/busses/i2c-tegra.c
+>>...
+>> @@ -598,6 +609,7 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+>> ? ? ? i2c_dev->adapter.algo = &tegra_i2c_algo;
+>> ? ? ? i2c_dev->adapter.dev.parent = &pdev->dev;
+>> ? ? ? i2c_dev->adapter.nr = pdev->id;
+>> + ? ? i2c_dev->adapter.dev.of_node = of_node_get(pdev->dev.of_node);
+>
+> It seems like users of this of_node (i.e. the probe function) could just
+> access pdev->dev.of_node directly (since pdev is already passed in)
+> rather than storing a copy here. At least, sdhci-tegra.c works that way.
+> Still, this isn't a big deal, I think.
 
-No, I can't apply it because of the comments above Sergei.  Please fix
-that and get his approval and then I will be able to apply it.
+Actually, using of_node_get() here is the right thing since it
+increases the reference count on the of_node.  However, the patch
+should also do an of_node_put() in the remove hook, or in the .probe
+error path.
 
-thanks,
+>
+>> @@ -605,6 +617,8 @@ static int tegra_i2c_probe(struct platform_device *pdev)
+>> ? ? ? ? ? ? ? goto err_free_irq;
+>> ? ? ? }
+>>
+>> + ? ? of_i2c_register_devices(&i2c_dev->adapter);
+>> +
+>
+> I would have expected that to be performed inside the core I2C code,
+> probably inside i2c_add_numbered_adapter? Still, it looks like the
+> other I2C controllers don't already work that way, so this is probably
+> more a suggestion for future cleanup than something to be addressed in
+> this patch.
 
-greg k-h
+This may move into core code in the future, but for the moment the
+drivers need to call it explicitly.
+
+g.
