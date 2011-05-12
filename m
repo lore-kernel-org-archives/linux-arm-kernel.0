@@ -1,38 +1,64 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 12 May 2011 11:20:22 +0200
-Subject: [PATCH] dmaengine: at_hdmac: pause: no need to wait for FIFO empty
-In-Reply-To: <1305188936.28926.66.camel@vkoul-udesk3>
-References: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>	
-	<1304957497-22814-1-git-send-email-nicolas.ferre@atmel.com>
-	<1305188936.28926.66.camel@vkoul-udesk3>
-Message-ID: <4DCBA656.3060608@atmel.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Thu, 12 May 2011 11:23:35 +0200
+Subject: [PATCH 3/7] [media] s5p-fimc: Remove to support fimc for S5PC100
+In-Reply-To: <1305162674-25860-4-git-send-email-kgene.kim@samsung.com>
+References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
+	<1305162674-25860-4-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4DCBA717.3090307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 12/05/2011 10:28, Koul, Vinod :
-> On Mon, 2011-05-09 at 18:11 +0200, Nicolas Ferre wrote:
->> The addition of the pause feature to atc_control an active wait was introduced
->> to check the FIFO empty event. This event was not always happening and
->> a timout contition was needed.
->> But, in some cases, this event depend on the peripheral connected to the
->> channel that is paused: FIFO becomes empty if the peripheral consumes data.
->> The timeout is pretty difficult to evaluate. Moreover, this check is not
->> needed.
->> In conclusion, it seems sensible to entirely remove the checking of
->> "FIFO empty" status when pausing.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->> Vinod,
->>
->> This additional patch goes on top of your current "next" branch. It is a
->> removing of some code added to the pause/resume patch sent earlier and can be
->> folded into this one if you want to.
->>
-> Applied with edit in commit msg, Thanks
+Hi Kukjin,
 
-Thanks a lot.
+Shouldn't there be some deprecation period for whole s5pc100 support removal ?
+It looks a bit rude to me that suddenly whole support for the SoC is vanished.
+I know at least one active user of mainline FIMC driver @ s5pc100.
 
-Bye,
+On 05/12/2011 03:11 AM, Kukjin Kim wrote:
+> According to removing ARCH_S5PC100, we don't need to support
+> fimc for S5PC100.
+> 
+> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+> Cc: Kyungmin Park <kyungmin.park@samsung.com>
+> Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  drivers/media/video/s5p-fimc/fimc-core.c |   14 --------------
+>  1 files changed, 0 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/media/video/s5p-fimc/fimc-core.c b/drivers/media/video/s5p-fimc/fimc-core.c
+> index dc91a85..89d59d6 100644
+> --- a/drivers/media/video/s5p-fimc/fimc-core.c
+> +++ b/drivers/media/video/s5p-fimc/fimc-core.c
+> @@ -1871,17 +1871,6 @@ static struct samsung_fimc_variant fimc2_variant_exynos4 = {
+>  	.pix_limit	 = &s5p_pix_limit[3],
+>  };
+>  
+> -/* S5PC100 */
+> -static struct samsung_fimc_driverdata fimc_drvdata_s5p = {
+> -	.variant = {
+> -		[0] = &fimc0_variant_s5p,
+> -		[1] = &fimc0_variant_s5p,
+> -		[2] = &fimc2_variant_s5p,
+> -	},
+> -	.num_entities = 3,
+> -	.lclk_frequency = 133000000UL,
+> -};
+> -
+>  /* S5PV210, S5PC110 */
+>  static struct samsung_fimc_driverdata fimc_drvdata_s5pv210 = {
+>  	.variant = {
+> @@ -1907,9 +1896,6 @@ static struct samsung_fimc_driverdata fimc_drvdata_exynos4 = {
+>  
+>  static struct platform_device_id fimc_driver_ids[] = {
+>  	{
+> -		.name		= "s5p-fimc",
+> -		.driver_data	= (unsigned long)&fimc_drvdata_s5p,
+> -	}, {
+>  		.name		= "s5pv210-fimc",
+>  		.driver_data	= (unsigned long)&fimc_drvdata_s5pv210,
+>  	}, {
+
 -- 
-Nicolas Ferre
+Sylwester Nawrocki
+Samsung Poland R&D Center
