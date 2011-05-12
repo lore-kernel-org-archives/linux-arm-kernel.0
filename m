@@ -1,85 +1,34 @@
-From: socketcan@hartkopp.net (Oliver Hartkopp)
-Date: Thu, 12 May 2011 16:41:58 +0200
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <4DCB88A4.2010901@grandegger.com>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<2BFFDAA0A0DE4820876E5549867938EC@subhasishg>	<201105112331.47954.arnd@arndb.de>	<201105112344.44171.arnd@arndb.de>
-	<4DCB88A4.2010901@grandegger.com>
-Message-ID: <4DCBF1B6.6000104@hartkopp.net>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 12 May 2011 08:08:00 -0700
+Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
+In-Reply-To: <4DCBD11A.8060906@ru.mvista.com>
+References: <4DC95D19.7070707@ru.mvista.com>
+	<20110510155038.GJ18791@game.jcrosoft.org>
+	<20110510170500.GB15675@kroah.com>
+	<20110510235324.GD18929@game.jcrosoft.org>
+	<20110511015829.GB6840@kroah.com>
+	<20110511031854.GF18929@game.jcrosoft.org>
+	<20110511135041.GC12717@kroah.com>
+	<20110512013038.GA24270@game.jcrosoft.org>
+	<20110512044731.GA24746@kroah.com> <4DCBD11A.8060906@ru.mvista.com>
+Message-ID: <20110512150800.GE30910@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.05.2011 09:13, Wolfgang Grandegger wrote:
-> On 05/11/2011 11:44 PM, Arnd Bergmann wrote:
->> On Wednesday 11 May 2011, Arnd Bergmann wrote:
->>> If that interpretation is right, I would seriously recommend rethinking
->>> the design of the CAN firmware for pruss, so you can start doing something
->>> useful with the offload engine that fits into the Socket CAN API, or that
->>> would be a useful extension to Socket CAN that is also implementable in
->>> the kernel for all other drivers in a meaningful way.
->>
->> I've looked some more into the CAN socket implementation, and I suppose that
->> the idea of the pruss driver was really to help do the work from the
->> can_rcv_filter function in hardware.
+On Thu, May 12, 2011 at 04:22:50PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> That software filter is per socket while the hardware filter will be per
-> device.
-
-Hi all,
-
-i took some while to get behind all the arguments for me :-)
-
-Wolfgangs suggestion
-
->  A simple interface using:
+> On 12-05-2011 8:47, Greg KH wrote:
 > 
->   ip link set can0 type can filter <id>:<mask> [<id>:<mask> ...]
+> >No, I can't apply it because of the comments above Sergei.  Please fix
+> >that and get his approval and then I will be able to apply it.
 > 
+>    I'm OK with applying the patch to 2.6.39 actually. If I
+> understood correctly, the code will be reworked to get rid of
+> cpu_is_*() for 2.6.40+...
 
-indeed would just be fine - but IMHO it doesn't help for the pruss CAN driver.
+It's too late for .39, sorry.
 
-The problem is, that you plan to filter on a CAN-identifier base. This is not
-only very application dependent (as Kurt already pointed out) - it also does
-not bring any safety that your system does not explode on heavy CAN load.
+thanks,
 
-E.g. assume you need the CAN-IDs 0x100, 0x200 and 0x300 in your application
-and for that reason you configure these IDs in the pruss CAN driver.
-
-What if someone generates a 100% CAN busload exactly on CAN-ID 0x100 then?
-
-Worst case (1MBit/s, DLC=0) you would need to handle about 21.000 irqs/s for
-the correctly received CAN frames with the filtered CAN-ID 0x100 ...
-
-At the beginnig of the SocketCAN development, we had a PowerPC (E603) @ 133MHz
-that was able to handle 4 (dumb) SJA1000 CAN controllers without problems.
-
-Maybe i should tell a bit more about what's happening at CAN frame receive time:
-
-1. IRQ happens
-2. Read CAN frame from CAN controller registers
-3. Allocate a socketbuffer (skb) and queue it into the netdevice rx queue
-4. Softirq handles the new skb
-5. Check the (specialized/optimized) CAN-ID filters for this CAN device
-6. Enqueue the data to the sockets recv buffer(s) and/or drop the skb.
-
-This all depends heavily on Linux networking (skb handling, caching, etc) and
-is pretty fast and optimized!! That was also the reason why it ran on the old
-PowerPC that smoothly. The mostly seen effect if anything drops is when the
-application (holding the socket) was not fast enough to handle the incoming
-data. NB: For that reason we implemented a CAN content filter (CAN_BCM) that
-is able to do content filtering and timeout monitoring in Kernelspace - all
-performed in the SoftIRQ.
-
-Having 'Mailboxes' bound to CAN-IDs is something that's useful for 8/16 bit
-CPUs where an application is tightly bound to the embedded ECUs functionality.
-
-IMO you should try to implement an 'open' pruss CAN driver without filtering
-as it doesn't really help (see above). The networking stack can cope with the
-load. In all cases (with/without filters) the reduction the irqload could be a
-way to investigate (e.g. think about dropping CAN frames based on the irqload).
-
-But you should try the 'open' way first. And i think with your current driver
-you could just filter for one CAN-ID (e.g. 0x100) and then produce the heavy
-CAN busload with this CAN-ID 0x100 and a second CAN node, right?
-
-Regards,
-Oliver
+greg k-h
