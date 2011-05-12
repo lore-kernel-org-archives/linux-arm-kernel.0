@@ -1,54 +1,66 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 12 May 2011 20:34:06 +0200
-Subject: [PATCH V2] genalloc: add support to specify the physical address
-In-Reply-To: <20110512173832.GA8633@n2100.arm.linux.org.uk>
-References: <1303282455-26649-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110428081535.GI17290@n2100.arm.linux.org.uk>
-	<20110512173832.GA8633@n2100.arm.linux.org.uk>
-Message-ID: <20110512183406.GI18952@game.jcrosoft.org>
+Date: Thu, 12 May 2011 20:35:08 +0200
+Subject: [RFC PATCH v3] Consolidate SRAM support
+In-Reply-To: <20110512174546.GB8633@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<20110512174546.GB8633@n2100.arm.linux.org.uk>
+Message-ID: <20110512183508.GJ18952@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:38 Thu 12 May     , Russell King - ARM Linux wrote:
-> On Thu, Apr 28, 2011 at 09:15:35AM +0100, Russell King - ARM Linux wrote:
-> > On Wed, Apr 20, 2011 at 08:54:15AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > so we specify the virtual address as base of the pool chunk and then
-> > > get the physical address for hardware IP
-> > > 
-> > > as example on at91 we will use on spi, uart or macb
-> > > 
-> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > > Cc: Patrice VILCHEZ <patrice.vilchez@atmel.com>
-> > > Cc: Andrew Morton <akpm@linux-foundation.org>
-> > > ---
-> > > Hi Andrew,
-> > > 	I integrate the documentation fix
-> > > 	could replace the previous one with this one
-> > > 
-> > > V2:
-> > > 	update documentation
-> > > 	use phys_addr_t for physical addr
-> > > Best Regards,
-> > 
-> > I notice no comments on this - maybe it needs to be Cc'd to linux-mm too?
-> > 
-> > Andrew - do you have any views on this?
+On 18:45 Thu 12 May     , Russell King - ARM Linux wrote:
+> On Fri, Apr 15, 2011 at 02:06:07PM +0100, Russell King - ARM Linux wrote:
+> This is work in progress.
 > 
-> Still haven't heard anything.  What's the status?
+> We have two SoCs using SRAM, both with their own allocation systems,
+> and both with their own ways of copying functions into the SRAM.
 > 
-> If this isn't going into mainline, I'll queue up my work consolidating
-> the existing ARM sram allocators instead, and when this hits we can see
-> about moving stuff over to it then.
-Andrew - do you plan to add it for the -next?
+> Let's unify this before we have additional SoCs re-implementing this
+> obviously common functionality themselves.
+> 
+> Unfortunately, we end up with code growth through doing this, but that
+> will become a win when we have another SoC using this (which I know
+> there's at least one in the pipeline).
+> 
+> One of the considerations here is that we can easily convert sram-pool.c
+> to hook into device tree stuff, which can tell the sram allocator:
+> 	- physical address of sram
+> 	- size of sram
+> 	- allocation granularity
+> and then we just need to ensure that it is appropriately mapped.
+> 
+> This uses the physical address, and unlike Davinci's dma address usage,
+> it always wants to have the physical address, and will always return
+> the corresponding physical address when passed that pointer.
+> 
+> OMAP could probably do with some more work to make the omapfb and other
+> allocations use the sram allocator, rather than hooking in before the
+> sram allocator is initialized - and then further cleanups so that we
+> have an initialization function which just does
+> 
+> sram_create(phys, size)
+> 	virt = map sram(phys, size)
+> 	create sram pool(virt, phys, size, min_alloc_order)
+> 
+> Another question is whether we should allow multiple SRAM pools or not -
+> this code does allow multiple pools, but so far we only have one pool
+> per SoC.  Overdesign?  Maybe, but it prevents SoCs wanting to duplicate
+> it if they want to partition the SRAM, or have peripheral-local SRAMs.
+> 
+> Lastly, uio_pruss should probably take the SRAM pool pointer via
+> platform data so that it doesn't have to include Davinci specific
+> includes.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+> 
+> This version fixes the davinci pm free, and adds updates for the
+> davinci pcm driver.  As I don't know what's happening with Jean's
+> patch tweaking the genpool allocator, I've kept my version.
+> 
+> This still suffers from the "only one region per pvpool" problem
+> which I believe Jean's patch doesn't suffer.
+yes excatly and on at91sam9263 I need this :(
 
-I also need to implement at91 sram support for ethernet, spi and other drivers
-
-and as Russell point other ARM need it also for consolidation.
-
-And I'll not be able to use Russell's patch as I've to manage two sram in one
-allocator on at91sam9263
-
-Tks by advance
 Best Regards,
 J.
