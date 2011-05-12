@@ -1,35 +1,36 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 12 May 2011 08:07:45 -0700
-Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
-In-Reply-To: <4DCB8AC3.2020403@atmel.com>
-References: <4DC95D19.7070707@ru.mvista.com>
-	<20110510155038.GJ18791@game.jcrosoft.org>
-	<20110510170500.GB15675@kroah.com>
-	<20110510235324.GD18929@game.jcrosoft.org>
-	<20110511015829.GB6840@kroah.com>
-	<20110511031854.GF18929@game.jcrosoft.org>
-	<20110511135041.GC12717@kroah.com>
-	<20110512013038.GA24270@game.jcrosoft.org>
-	<20110512044731.GA24746@kroah.com> <4DCB8AC3.2020403@atmel.com>
-Message-ID: <20110512150745.GD30910@kroah.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 May 2011 17:14:49 +0200
+Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
+In-Reply-To: <AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
+References: <1290060899-9786-1-git-send-email-ccross@android.com>
+	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
+	<4D70BE9D.4000507@stericsson.com>
+	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
+	<4D714C17.7080102@gmail.com>
+	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
+	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
+	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
+	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
+	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
+	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
+Message-ID: <BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 09:22:43AM +0200, Nicolas Ferre wrote:
-> > No, I can't apply it because of the comments above Sergei.  Please fix
-> > that and get his approval and then I will be able to apply it.
-> 
-> I see...
-> 
-> Jean-Christophe already posted a V2 patch (on lakml and linux-usb):
-> "[PATCH V2] usb/gadget: at91sam9g20 fix end point max packet size"
-> 
-> with proper comment and my "Acked-by".
-> 
-> Is it ok for you?
+2011/3/6 Linus Walleij <linus.walleij@linaro.org>:
+> On Sun, Mar 6, 2011 at 6:42 PM, Colin Cross <ccross@android.com> wrote:
+>
+>> Is there any way
+>> for a clockevent to invalidate the current event and ask for it to be
+>> reprogrammed?
+>
+> TGLX will know for sure... Thomas?
+>
+> (This is inside a CPUfreq hook for a localtimer for the record.)
 
-I don't have it here anymore, care to resend it?
+I discussed this briefly with TGLX at the UDS here and he's confident
+we could add some nifty feature to reprogram an event. I dare not
+try to guess where the code would sit or how it'd look...
 
-thanks,
-
-greg k-h
+Yours,
+Linus Walleij
