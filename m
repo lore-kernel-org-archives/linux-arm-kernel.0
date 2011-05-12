@@ -1,35 +1,42 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Thu, 12 May 2011 13:40:40 +0300
-Subject: [PATCH 13/14] [dove] Remove mpp.[ch]. They are not used.
-In-Reply-To: <20110508171918.GC4071@lunn.ch>
-References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
-	<1304864141-1121-14-git-send-email-andrew@lunn.ch>
-	<BANLkTi=mLaj0wa0PA9uokZ5ekuNbSEPthQ@mail.gmail.com>
-	<20110508171918.GC4071@lunn.ch>
-Message-ID: <BANLkTikrZuNbxp0uPnARXpoQWoALBo8EnA@mail.gmail.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Thu, 12 May 2011 12:49:16 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <20110512092424.GO28888@outflux.net>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<20110512092424.GO28888@outflux.net>
+Message-ID: <20110512104916.GJ9937@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 8, 2011 at 8:19 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Sun, May 08, 2011 at 05:39:08PM +0300, saeed bishara wrote:
->> On Sun, May 8, 2011 at 5:15 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
->> > ---
->> > ??arch/arm/mach-dove/Makefile | ?? ??2 +-
->> > ??arch/arm/mach-dove/mpp.c ?? ??| ??209 ----------------------------------------
->> > ??arch/arm/mach-dove/mpp.h ?? ??| ??220 -------------------------------------------
->> > ??3 files changed, 1 insertions(+), 430 deletions(-)
->> > ??delete mode 100644 arch/arm/mach-dove/mpp.c
->> > ??delete mode 100644 arch/arm/mach-dove/mpp.h
->> No, it currently not used, by we for sure will use at some point. we
->> are planning to prepare such patches for the next release. so please
->> keep it.
->
-> O.K. I can drop this patch.
->
-> I don't have a datasheet for the Dove. Do you think it is possible to
-> merge the dove mpp setup code with the kirkwood and mv78xx0?
-I think that low mpps (0-23) can be configured using this common code.
-> ? ? ?Thanks
-> ? ? ? ?Andrew
->
+
+* Kees Cook <kees.cook@canonical.com> wrote:
+
+> Hi,
+> 
+> On Thu, May 12, 2011 at 09:48:50AM +0200, Ingo Molnar wrote:
+> > 1) We already have a specific ABI for this: you can set filters for events via 
+> >    an event fd.
+> > 
+> >    Why not extend that mechanism instead and improve *both* your sandboxing
+> >    bits and the events code? This new seccomp code has a lot more
+> >    to do with trace event filters than the minimal old seccomp code ...
+> 
+> Would this require privileges to get the event fd to start with? [...]
+
+No special privileges with the default perf_events_paranoid value.
+
+> [...] If so, I would prefer to avoid that, since using prctl() as shown in 
+> the patch set won't require any privs.
+
+and we could also explicitly allow syscall events without any privileges, 
+regardless of the setting of 'perf_events_paranoid' config value.
+
+Obviously a sandboxing host process wants to run with as low privileges as it 
+can.
+
+Thanks,
+
+	Ingo
