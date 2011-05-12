@@ -1,54 +1,75 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 May 2011 10:34:40 +0900
-Subject: [PATCH] leds: drop leds-h1940 driver
-In-Reply-To: <201105061101.34589.anarsoul@gmail.com>
-References: <1303912597-32653-1-git-send-email-anarsoul@gmail.com>
-	<00f701cc0ba4$3cb4b680$b61e2380$%kim@samsung.com>
-	<201105061101.34589.anarsoul@gmail.com>
-Message-ID: <03c101cc1044$c53b7350$4fb259f0$%kim@samsung.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 12 May 2011 03:30:38 +0200
+Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
+In-Reply-To: <20110511135041.GC12717@kroah.com>
+References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
+	<4DC95D19.7070707@ru.mvista.com>
+	<20110510155038.GJ18791@game.jcrosoft.org>
+	<20110510170500.GB15675@kroah.com>
+	<20110510235324.GD18929@game.jcrosoft.org>
+	<20110511015829.GB6840@kroah.com>
+	<20110511031854.GF18929@game.jcrosoft.org>
+	<20110511135041.GC12717@kroah.com>
+Message-ID: <20110512013038.GA24270@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vasily Khoruzhick wrote:
+On 06:50 Wed 11 May     , Greg KH wrote:
+> On Wed, May 11, 2011 at 05:18:54AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 18:58 Tue 10 May     , Greg KH wrote:
+> > > On Wed, May 11, 2011 at 01:53:24AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > On 10:05 Tue 10 May     , Greg KH wrote:
+> > > > > On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > > On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
+> > > > > > > Hello.
+> > > > > > > 
+> > > > > > > Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > > > > > 
+> > > > > > > >on 9g20 they are the same as the 9261
+> > > > > > > 
+> > > > > > > >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > > > > > >---
+> > > > > > > > drivers/usb/gadget/at91_udc.c |    2 +-
+> > > > > > > > 1 files changed, 1 insertions(+), 1 deletions(-)
+> > > > > > > 
+> > > > > > > >diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+> > > > > > > >index 9b7cdb1..41dc093 100644
+> > > > > > > >--- a/drivers/usb/gadget/at91_udc.c
+> > > > > > > >+++ b/drivers/usb/gadget/at91_udc.c
+> > > > > > > >@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+> > > > > > > > 	}
+> > > > > > > > 	/* newer chips have more FIFO memory than rm9200 */
+> > > > > > > >-	if (cpu_is_at91sam9260()) {
+> > > > > > > >+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
+> > > > > > > 
+> > > > > > >    These shouldn't be used in the drivers at all.
+> > > > > > Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
+> > > > > 
+> > > > > How could I apply this to the tree for the .40 release then?
+> > > > it's also the case these patch apply from kernel v2.6.26 to above
+> > > > 
+> > > > for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
+> > > 
+> > > That makes no sense, how can I go back in time and apply this to an
+> > > older kernel version?
+> > I known we just need for the longterm and stable tree
+> > and the .39-rc8
+> > > 
+> > > Please provide a patch that I can apply against the linux-next tree if
+> > > you want this change to be accepted.
+> > it's appy to the -next
 > 
-> On Friday 06 May 2011 07:15:27 Kukjin Kim wrote:
-> > Hi Vasily,
+> I have no idea what you are trying to say here.
 > 
-> Hi
-> 
-Hi :)
+> Care to resend this patch, the correct one, that I can apply to my
+> usb-next tree for merging in the .40 merge cycle?
+It does apply on the linux-next
+and previous kernel version
 
-> > Hmm, regarding maintainer who is Richard Purdie(LED) in this case should
-be
-> > added in Cc. (Cc'ed him)
-> 
-> Sorry, forgot to add him to CC :(
-> 
-No problem :)
+and this patch is a fix for the current kernel
+so I would like to have it for this release and the stable tree
 
-> > And I think need following with this patch.
-> >
-> > --- a/arch/arm/configs/s3c2410_defconfig
-> > +++ b/arch/arm/configs/s3c2410_defconfig
-> > @@ -389,7 +389,6 @@ CONFIG_MMC_SPI=m
-> >  CONFIG_MMC_S3C=y
-> >  CONFIG_LEDS_CLASS=m
-> >  CONFIG_LEDS_S3C24XX=m
-> > -CONFIG_LEDS_H1940=m
-> >  CONFIG_LEDS_PCA9532=m
-> >  CONFIG_LEDS_GPIO=m
-> >  CONFIG_LEDS_PCA955X=m
-> 
-> Sure. Can you commit this change to your tree, or should I resend patch
-with
-> this change?
-> 
-Ok, I will do it after merging your patch into Richard's tree.
+hope it's clear
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Best Regards,
+J.
