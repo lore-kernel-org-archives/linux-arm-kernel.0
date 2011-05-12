@@ -1,24 +1,58 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2011 03:16:31 -0700
-Subject: [PATCH v2] arm: omap2plus: GPIO cleanup
-In-Reply-To: <4DCA3D02.9070608@compulab.co.il>
-References: <20110503103952.GP2092@atomide.com>
-	<1304436129-7165-1-git-send-email-grinberg@compulab.co.il>
-	<4DCA3D02.9070608@compulab.co.il>
-Message-ID: <20110512101630.GI31483@atomide.com>
+Date: Thu, 12 May 2011 03:37:23 -0700
+Subject: [PATCH V2 13/16] OMAP: hsmmc: implement clock switcher
+In-Reply-To: <1304673255-31634-14-git-send-email-adrian.hunter@nokia.com>
+References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
+	<1304673255-31634-14-git-send-email-adrian.hunter@nokia.com>
+Message-ID: <20110512103723.GJ31483@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [110511 00:35]:
-> ping!
+* Adrian Hunter <adrian.hunter@nokia.com> [110506 02:13]:
+> From: Andy Shevchenko <ext-andriy.shevchenko@nokia.com>
 > 
-> On 05/03/11 18:22, Igor Grinberg wrote:
+> There are 3 new platform data methods which should help us to do a clock
+> switching when notification is happened or request is started.
 > 
-> > use gpio_request_<one|array>() instead of multiple gpiolib calls,
-> > remove unneeded variables, etc.
+> The purpose of the patch is to avoid high frequency of MMC controller on low
+> OPPs due to an HW bug in OMAP 3630.
+...
 
-Thanks that shrinks down the board files nicely. Applying to
-devel-cleanup.
+> +static int hsmmc_clk_notifier(struct notifier_block *nb, unsigned long event,
+> +			      void *data)
+> +{
+> +	struct cpufreq_freqs *freqs = data;
+> +	unsigned int threshold = 400000; /* between opp1 and opp2 */
+> +
+> +	switch (event) {
+> +	case CPUFREQ_PRECHANGE:
+> +		if (freqs->new < threshold && freqs->old >= threshold) {
+> +			/* opp2 -> opp1 */
+> +			hsmmc_max_freq = HSMMC_MAX_FREQ >> 1;
+> +
+> +			/* Timeout is 1 sec */
+> +			if (!wait_event_timeout(hsmmc_max_freq_wq,
+> +						hsmmc_max_freq_ok(),
+> +						msecs_to_jiffies(1000)))
+> +				pr_err("MMC violates maximum frequency "
+> +				       "constraint\n");
+> +		}
+> +		break;
+> +	case CPUFREQ_POSTCHANGE:
+> +		if (freqs->old < threshold && freqs->new >= threshold) {
+> +			/* opp1 -> opp2 */
+> +			hsmmc_max_freq = HSMMC_MAX_FREQ;
+> +		}
+> +		break;
+> +	default:
+> +		break;
+> +	}
+> +
+> +	return NOTIFY_DONE;
+> +}
+
+I think the cpufreq notifier code should be in the driver, the platform
+init code should just prepare things for the driver.
 
 Regards,
 
