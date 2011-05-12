@@ -1,65 +1,80 @@
-From: fweisbec@gmail.com (Frederic Weisbecker)
-Date: Thu, 12 May 2011 14:15:42 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
-	call filtering
-In-Reply-To: <20110512074850.GA9937@elte.hu>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-Message-ID: <20110512121539.GA7410@nowhere>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 12 May 2011 16:22:50 +0400
+Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
+In-Reply-To: <20110512044731.GA24746@kroah.com>
+References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
+	<4DC95D19.7070707@ru.mvista.com>
+	<20110510155038.GJ18791@game.jcrosoft.org>
+	<20110510170500.GB15675@kroah.com>
+	<20110510235324.GD18929@game.jcrosoft.org>
+	<20110511015829.GB6840@kroah.com>
+	<20110511031854.GF18929@game.jcrosoft.org>
+	<20110511135041.GC12717@kroah.com>
+	<20110512013038.GA24270@game.jcrosoft.org>
+	<20110512044731.GA24746@kroah.com>
+Message-ID: <4DCBD11A.8060906@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 09:48:50AM +0200, Ingo Molnar wrote:
-> To restrict execution to system calls.
-> 
-> Two observations:
-> 
-> 1) We already have a specific ABI for this: you can set filters for events via 
->    an event fd.
-> 
->    Why not extend that mechanism instead and improve *both* your sandboxing
->    bits and the events code? This new seccomp code has a lot more
->    to do with trace event filters than the minimal old seccomp code ...
-> 
->    kernel/trace/trace_event_filter.c is 2000 lines of tricky code that
->    interprets the ASCII filter expressions. kernel/seccomp.c is 86 lines of
->    mostly trivial code.
-> 
-> 2) Why should this concept not be made available wider, to allow the 
->    restriction of not just system calls but other security relevant components 
->    of the kernel as well?
-> 
->    This too, if you approach the problem via the events code, will be a natural 
->    end result, while if you approach it from the seccomp prctl angle it will be
->    a limited hack only.
-> 
-> Note, the end result will be the same - just using a different ABI.
-> 
-> So i really think the ABI itself should be closer related to the event code. 
-> What this "seccomp" code does is that it uses specific syscall events to 
-> restrict execution of certain event generating codepaths, such as system calls.
-> 
-> Thanks,
-> 
-> 	Ingo
+Hello.
 
-What's positive with that approach is that the code is all there already.
-Create a perf event for a given trace event, attach a filter to it.
+On 12-05-2011 8:47, Greg KH wrote:
 
-What needs to be added is an override of the effect of the filter. By default
-it's dropping the event, but there may be different flavours, including sending
-a signal. All in one, extending the current code to allow that looks trivial.
+>>>>>>>>> Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-The negative points are that
+>>>>>>>>>> on 9g20 they are the same as the 9261
 
-* trace events are supposed to stay passive and not act on the system, except
-doing some endpoint things like writing to a buffer. We can't call do_exit()
-from a tracepoint for example, preemption is disabled there.
+>>>>>>>>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD<plagnioj@jcrosoft.com>
+>>>>>>>>>> ---
+>>>>>>>>>> drivers/usb/gadget/at91_udc.c |    2 +-
+>>>>>>>>>> 1 files changed, 1 insertions(+), 1 deletions(-)
 
-* Also, is it actually relevant to extend that seccomp filtering to other events
-than syscalls? Exposing kernel events to filtering sounds actually to me bringing
-a new potential security issue. But with fine restrictions this can probably
-be dealt with. Especially if by default only syscalls can be filtered
+>>>>>>>>>> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+>>>>>>>>>> index 9b7cdb1..41dc093 100644
+>>>>>>>>>> --- a/drivers/usb/gadget/at91_udc.c
+>>>>>>>>>> +++ b/drivers/usb/gadget/at91_udc.c
+>>>>>>>>>> @@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+>>>>>>>>>> 	}
+>>>>>>>>>> 	/* newer chips have more FIFO memory than rm9200 */
+>>>>>>>>>> -	if (cpu_is_at91sam9260()) {
+>>>>>>>>>> +	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
 
-* I think Peter did not want to give such "active" role to perf in the system.
+>>>>>>>>>     These shouldn't be used in the drivers at all.
+>>>>>>>> Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
+
+>>>>>>> How could I apply this to the tree for the .40 release then?
+>>>>>> it's also the case these patch apply from kernel v2.6.26 to above
+
+>>>>>> for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
+
+>>>>> That makes no sense, how can I go back in time and apply this to an
+>>>>> older kernel version?
+
+>>>> I known we just need for the longterm and stable tree
+>>>> and the .39-rc8
+
+>>>>> Please provide a patch that I can apply against the linux-next tree if
+>>>>> you want this change to be accepted.
+>>>> it's appy to the -next
+
+>>> I have no idea what you are trying to say here.
+
+>>> Care to resend this patch, the correct one, that I can apply to my
+>>> usb-next tree for merging in the .40 merge cycle?
+>> It does apply on the linux-next
+>> and previous kernel version
+
+>> and this patch is a fix for the current kernel
+>> so I would like to have it for this release and the stable tree
+
+> No, I can't apply it because of the comments above Sergei.  Please fix
+> that and get his approval and then I will be able to apply it.
+
+    I'm OK with applying the patch to 2.6.39 actually. If I understood 
+correctly, the code will be reworked to get rid of cpu_is_*() for 2.6.40+...
+
+> thanks,
+
+> greg k-h
+
+WBR, Sergei
