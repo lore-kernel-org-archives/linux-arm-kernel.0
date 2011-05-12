@@ -1,33 +1,58 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 12 May 2011 13:58:56 +0530
-Subject: [PATCH] dmaengine: at_hdmac: pause: no need to wait for FIFO empty
-In-Reply-To: <1304957497-22814-1-git-send-email-nicolas.ferre@atmel.com>
-References: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
-	<1304957497-22814-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <1305188936.28926.66.camel@vkoul-udesk3>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 May 2011 10:05:27 +0100
+Subject: [PATCH] ARM: Suspend: Fix build error on ARCH_S5PC100
+In-Reply-To: <07e601cc0865$b08be8e0$11a3baa0$%kim@samsung.com>
+References: <1301710155-16373-1-git-send-email-kgene.kim@samsung.com>
+	<20110402091904.GH8482@n2100.arm.linux.org.uk>
+	<02c701cbf2be$0ebebb80$2c3c3280$%kim@samsung.com>
+	<20110428184332.GK17290@n2100.arm.linux.org.uk>
+	<07e601cc0865$b08be8e0$11a3baa0$%kim@samsung.com>
+Message-ID: <20110512090527.GB1356@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-09 at 18:11 +0200, Nicolas Ferre wrote:
-> The addition of the pause feature to atc_control an active wait was introduced
-> to check the FIFO empty event. This event was not always happening and
-> a timout contition was needed.
-> But, in some cases, this event depend on the peripheral connected to the
-> channel that is paused: FIFO becomes empty if the peripheral consumes data.
-> The timeout is pretty difficult to evaluate. Moreover, this check is not
-> needed.
-> In conclusion, it seems sensible to entirely remove the checking of
-> "FIFO empty" status when pausing.
+On Mon, May 02, 2011 at 10:09:55AM +0900, Kukjin Kim wrote:
+> Russell King - ARM Linux wrote:
+> > 
+> > On Mon, Apr 04, 2011 at 08:47:17PM +0900, Kukjin Kim wrote:
+> > > Russell King - ARM Linux wrote:
+> > > >
+> > > > On Sat, Apr 02, 2011 at 11:09:15AM +0900, Kukjin Kim wrote:
+> > > > > The current mainline codes of ARCH_S5PC100 can not support
+> > > > > suspend to ram. So needs this for preventing build error.
+> > > > >
+> > > > > Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> > > > > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> > > > > ---
+> > > > > Oops, I missed this in my previous patch.
+> > > > >
+> > > > > As I know, firstly ARCH_S5P64X0 will support suspend to ram
+> > > > > then ARCH_S5PC100 will do it. But right now, we need this.
+> > > >
+> > > > I'd much rather do this a different way - let me know if this means
+> > > > the SoC based dependencies can be dropped.  Patches to follow.
+> > >
+> > > Yeah, I checked your patches. It's ok to me but this is also needed
+> right
+> > > now for preventing build errors with s5pc100_defconfig...because there
+> is
+> > no
+> > > regarding headers for supporting suspend to ram.
+> > >
+> > > However as I mentioned, the suspend to ram will be supported soon on
+> them
+> > > then we can drop its dependencies.
+> > 
+> > Could I have an updated patch which applies to mainline please?
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-> Vinod,
+> From: Kukjin Kim <kgene.kim@samsung.com>
+> Date: Mon, 2 May 2011 09:33:01 +0900
+> Subject: [PATCH] ARM: Suspend: Fix build error on ARCH_S5PC100
 > 
-> This additional patch goes on top of your current "next" branch. It is a
-> removing of some code added to the pause/resume patch sent earlier and can be
-> folded into this one if you want to.
+> The current mainline codes of ARCH_S5PC100 cannot support
+> suspend to ram. So needs this for preventing build error.
 > 
-Applied with edit in commit msg, Thanks
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 
--- 
-~Vinod
+Looks fine, but can it go to the patch system please?
