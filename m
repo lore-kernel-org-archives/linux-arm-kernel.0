@@ -1,44 +1,39 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 May 2011 16:53:59 +0900
-Subject: [PATCH 2/7] ASoC: Remove to support sound for S5PC100
-In-Reply-To: <BANLkTinqyFCwp3FCOyW=gVhotd1p8DnDyw@mail.gmail.com>
-References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<1305162674-25860-3-git-send-email-kgene.kim@samsung.com>
-	<BANLkTinqyFCwp3FCOyW=gVhotd1p8DnDyw@mail.gmail.com>
-Message-ID: <03fa01cc1079$c2583670$4708a350$%kim@samsung.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 12 May 2011 10:03:26 +0200 (CEST)
+Subject: [PATCH 06/13] clocksource: add common mmio clocksource
+In-Reply-To: <E1QJhNe-0000yh-HS@rmk-PC.arm.linux.org.uk>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+	<E1QJhNe-0000yh-HS@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1105121001590.2794@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jassi Brar wrote:
+On Tue, 10 May 2011, Russell King - ARM Linux wrote:
+
+> Add a generic mmio clocksource, covering both 32-bit and 16-bit register
+> access sizes, for up or down counters.  This can be used to easily
+> create clocksources for simple counter-based implementations.
 > 
-> On Thu, May 12, 2011 at 6:41 AM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-> > According to removing ARCH_S5PC100, we don't need to support
-> > sound for S5PC100.
-> >
-> > Cc: Jassi Brar <jassisinghbrar@gmail.com>
-> > Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> > Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> > ---
-> >  sound/soc/samsung/Kconfig |    2 +-
-> 
-Hi Jassi,
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Erik Gilling <konkers@android.com>
+> Cc: "Hans J. Koch" <hjk@hansjkoch.de>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Oops...Yeah, you're right.
-Thanks for your pointing out :)
+Reviewed-by: Thomas Gleixner <tglx@linutronix.de>
 
-Will update soon.
-
-> You might also want to remove smdkc100 support from
->  sound/soc/samsung/smdk_wm9713.c
->  sound/soc/samsung/smdk_wm8580.c
-> And three other references to smdkc100 in sound/soc/samsung/Kconfig
-
-I found something for smdkc100 in smdk_wm8580.c but I'm not sure which should be removed in smdk_wm9713.c.
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Please take this through the ARM tree. It's not conflicting with
+anything in my tree.
