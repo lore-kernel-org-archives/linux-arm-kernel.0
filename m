@@ -1,73 +1,123 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Thu, 12 May 2011 19:00:13 +0530
-Subject: [patch 0/4] [RFC] mcount address adjustment
-In-Reply-To: <20110512112454.2fa7e6d6@mschwide>
-References: <20110510081039.241831019@de.ibm.com>
-	<BANLkTi=6FLtzXwg1yLAkLhP4GA4apSQ46g@mail.gmail.com>
-	<20110512112454.2fa7e6d6@mschwide>
-Message-ID: <BANLkTinY+gDxoHk4378kXd8WH-hf9CN6ZA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 May 2011 14:49:24 +0100
+Subject: [PATCH 14/13] clocksource: ARM sp804: allow clocksource name to be
+	specified
+In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+Message-ID: <20110512134924.GB6098@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 14:54, Martin Schwidefsky
-<schwidefsky@de.ibm.com> wrote:
-> On Wed, 11 May 2011 22:53:55 +0530 Rabin Vincent <rabin@rab.in> wrote:
->> On Tue, May 10, 2011 at 13:40, Martin Schwidefsky <schwidefsky@de.ibm.com> wrote:
->> Thumb-2 via recordmcount.pl needs the clearing of the lsb because the
->> relocation (R_ARM_ABS32) that gets used for the assembly file
->> that recordmcount.pl generates and assembles dictates that the lsb be
->> set if the target symbol is Thumb/Thumb-2 function. ?mcount_adjust would
->> not help here since the ORing is done later, when the relocation is
->> applied.
->
-> Hmm, from what I can make out the C version of recordmcount uses R_ARM_ABS32
-> as well.
+This allows platforms to specify the clocksource name upon
+registration, which is necessary should they wish to register more
+than one sp804 clocksource.
 
-Right.  It worked when I initially implemented ARM support there because
-recordmcount.c always found the STT_SECTION symbol as a base and not a
-STT_FUNC symbol.  However, I noticed yesterday that this does not happen
-in some cases, so I sent a patch to avoid STT_FUNC symbol as bases on
-ARM, not because of this relocation, but because of a slightly different
-oddity of Thumb symbols:
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/common/timer-sp.c               |    4 ++--
+ arch/arm/include/asm/hardware/timer-sp.h |    2 +-
+ arch/arm/mach-integrator/integrator_cp.c |    2 +-
+ arch/arm/mach-realview/core.c            |    2 +-
+ arch/arm/mach-versatile/core.c           |    2 +-
+ arch/arm/mach-vexpress/ct-ca9x4.c        |    2 +-
+ arch/arm/mach-vexpress/v2m.c             |    2 +-
+ 7 files changed, 8 insertions(+), 8 deletions(-)
 
-http://lkml.org/lkml/2011/5/11/304
-
-(The relocation problem alone could be solved by using R_ARM_ABS32_NOI
- instead.)
-
->
->> Thumb-2 via recordmcount.c does not need the clearing of the lsb in
->> ftrace_call_adjust.
->
-> So the clearing of the lsb is only required if the recordmcount.pl script
-> is used?
-
-Yes.
-
->> Building with the ARM instruction set also does not need the clearing
->> of the lsb.
->
-> Who does the ORing? I can't find anything in recordmount.pl/recordmcount.c
-> which looks like doing an OR, does the assembler do that based on the
-> symbol type?
-
-The lsb is set to 1 by the linker, when it applies the relocations as it
-links vmlinux.
-
->
->> > Thumb-2 the offset is -1, correct? If there is a way to distinguish
->> > the two targets in recordmcount at compile time we could convert arm
->> > as well. Which would allow us to remove the ftrace_call_adjust function.
->>
->> To remove ftrace_call_adjust, we could either deprecate the
->> recordmcount.pl usage for ARM (you already have to edit the Kconfig to
->> use it) or modify it to generate specific relocations explicitly instead
->> of using the assembler data directives.
->
-> Hmm, it would be a desirable property if the C version and the pearl
-> version of recordmcount would do the same. Or we could remove the arm
-> support from the pearl script, the C version is faster anyway.
-
-I'm OK with removing the ARM support from recordmcount.pl; it doesn't
-seem needed to make significant modifications to it for ARM when we
-don't use it anyway.
+diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+index 445b05e..f6b9011 100644
+--- a/arch/arm/common/timer-sp.c
++++ b/arch/arm/common/timer-sp.c
+@@ -32,7 +32,7 @@
+ #define TIMER_FREQ_KHZ	(1000)
+ #define TIMER_RELOAD	(TIMER_FREQ_KHZ * 1000 / HZ)
+ 
+-void __init sp804_clocksource_init(void __iomem *base)
++void __init sp804_clocksource_init(void __iomem *base, const char *name)
+ {
+ 	/* setup timer 0 as free-running clocksource */
+ 	writel(0, base + TIMER_CTRL);
+@@ -41,7 +41,7 @@ void __init sp804_clocksource_init(void __iomem *base)
+ 	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+ 		base + TIMER_CTRL);
+ 
+-	clocksource_mmio_init(base + TIMER_VALUE, "timer3",
++	clocksource_mmio_init(base + TIMER_VALUE, name,
+ 		TIMER_FREQ_KHZ * 1000, 200, 32, clocksource_mmio_readl_down);
+ }
+ 
+diff --git a/arch/arm/include/asm/hardware/timer-sp.h b/arch/arm/include/asm/hardware/timer-sp.h
+index 21e75e3..11c386b 100644
+--- a/arch/arm/include/asm/hardware/timer-sp.h
++++ b/arch/arm/include/asm/hardware/timer-sp.h
+@@ -1,2 +1,2 @@
+-void sp804_clocksource_init(void __iomem *);
++void sp804_clocksource_init(void __iomem *, const char *);
+ void sp804_clockevents_init(void __iomem *, unsigned int);
+diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
+index 9e3ce26..46fb7f5 100644
+--- a/arch/arm/mach-integrator/integrator_cp.c
++++ b/arch/arm/mach-integrator/integrator_cp.c
+@@ -476,7 +476,7 @@ static void __init intcp_timer_init(void)
+ 	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
+ 	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(TIMER2_VA_BASE);
++	sp804_clocksource_init(TIMER2_VA_BASE, "timer2");
+ 	sp804_clockevents_init(TIMER1_VA_BASE, IRQ_TIMERINT1);
+ }
+ 
+diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
+index 75dbc87..6356b5e 100644
+--- a/arch/arm/mach-realview/core.c
++++ b/arch/arm/mach-realview/core.c
+@@ -545,7 +545,7 @@ void __init realview_timer_init(unsigned int timer_irq)
+ 	writel(0, timer2_va_base + TIMER_CTRL);
+ 	writel(0, timer3_va_base + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(timer3_va_base);
++	sp804_clocksource_init(timer3_va_base, "timer3");
+ 	sp804_clockevents_init(timer0_va_base, timer_irq);
+ }
+ 
+diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
+index eb7ffa0..aad6d39 100644
+--- a/arch/arm/mach-versatile/core.c
++++ b/arch/arm/mach-versatile/core.c
+@@ -764,7 +764,7 @@ static void __init versatile_timer_init(void)
+ 	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
+ 	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(TIMER3_VA_BASE);
++	sp804_clocksource_init(TIMER3_VA_BASE, "timer3");
+ 	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMERINT0_1);
+ }
+ 
+diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
+index ebc22e7..c833fd9 100644
+--- a/arch/arm/mach-vexpress/ct-ca9x4.c
++++ b/arch/arm/mach-vexpress/ct-ca9x4.c
+@@ -71,7 +71,7 @@ static void __init ct_ca9x4_timer_init(void)
+ 	writel(0, MMIO_P2V(CT_CA9X4_TIMER0) + TIMER_CTRL);
+ 	writel(0, MMIO_P2V(CT_CA9X4_TIMER1) + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1));
++	sp804_clocksource_init(MMIO_P2V(CT_CA9X4_TIMER1), "ct-timer1");
+ 	sp804_clockevents_init(MMIO_P2V(CT_CA9X4_TIMER0), IRQ_CT_CA9X4_TIMER0);
+ }
+ 
+diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
+index ba46e8e..ccf1f89 100644
+--- a/arch/arm/mach-vexpress/v2m.c
++++ b/arch/arm/mach-vexpress/v2m.c
+@@ -65,7 +65,7 @@ static void __init v2m_timer_init(void)
+ 	writel(0, MMIO_P2V(V2M_TIMER0) + TIMER_CTRL);
+ 	writel(0, MMIO_P2V(V2M_TIMER1) + TIMER_CTRL);
+ 
+-	sp804_clocksource_init(MMIO_P2V(V2M_TIMER1));
++	sp804_clocksource_init(MMIO_P2V(V2M_TIMER1), "v2m-timer1");
+ 	sp804_clockevents_init(MMIO_P2V(V2M_TIMER0), IRQ_V2M_TIMER0);
+ }
+ 
+-- 
+1.7.4.4
