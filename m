@@ -1,295 +1,73 @@
-From: shweta.gulati@ti.com (Gulati, Shweta)
-Date: Thu, 12 May 2011 18:53:51 +0530
-Subject: [PATCH V3] OMAP3+: SR Layer Cleanup
-In-Reply-To: <BANLkTinCjAh_huFr3Oy-RU81W=L=L5xohQ@mail.gmail.com>
-References: <1305105166-26109-1-git-send-email-shweta.gulati@ti.com>
-	<4DCBC74C.4020101@ti.com>
-	<BANLkTinCjAh_huFr3Oy-RU81W=L=L5xohQ@mail.gmail.com>
-Message-ID: <BANLkTik4e=LiTUK1FgPsNWy3TqHGw55FRQ@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Thu, 12 May 2011 19:00:13 +0530
+Subject: [patch 0/4] [RFC] mcount address adjustment
+In-Reply-To: <20110512112454.2fa7e6d6@mschwide>
+References: <20110510081039.241831019@de.ibm.com>
+	<BANLkTi=6FLtzXwg1yLAkLhP4GA4apSQ46g@mail.gmail.com>
+	<20110512112454.2fa7e6d6@mschwide>
+Message-ID: <BANLkTinY+gDxoHk4378kXd8WH-hf9CN6ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, May 12, 2011 at 14:54, Martin Schwidefsky
+<schwidefsky@de.ibm.com> wrote:
+> On Wed, 11 May 2011 22:53:55 +0530 Rabin Vincent <rabin@rab.in> wrote:
+>> On Tue, May 10, 2011 at 13:40, Martin Schwidefsky <schwidefsky@de.ibm.com> wrote:
+>> Thumb-2 via recordmcount.pl needs the clearing of the lsb because the
+>> relocation (R_ARM_ABS32) that gets used for the assembly file
+>> that recordmcount.pl generates and assembles dictates that the lsb be
+>> set if the target symbol is Thumb/Thumb-2 function. ?mcount_adjust would
+>> not help here since the ORing is done later, when the relocation is
+>> applied.
+>
+> Hmm, from what I can make out the C version of recordmcount uses R_ARM_ABS32
+> as well.
 
-On Thu, May 12, 2011 at 6:19 PM, Gulati, Shweta <shweta.gulati@ti.com> wrote:
-> Hi,
->
-> On Thu, May 12, 2011 at 5:11 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
->> Hi Shweta,
->>
->> On 5/11/2011 11:12 AM, Gulati, Shweta wrote:
->>>
->>> To set sr ntarget values ?for all volt_domain,
->>> volt_table is retrieved by doing a look_up of 'vdd_name'
->>> field from omap_hwmod but voltage domain pointer does not
->>> belong to omap_hwmod and is not used anywhere else.
->>> As a part of voltage layer and SR Layer clean up volt
->>> pointer is removed from omap_hwmod and added in dev
->>> attributes of SR.
->>>
->>> Tested on OMAP3630 SDP and OMAP4430 SDP Board
->>>
->>> Signed-off-by: Shweta Gulati<shweta.gulati@ti.com>
->>> Cc: Nishanth Menon<nm@ti.com>
->>> ---
->>> V3:
->>> ? ?Changed the Subject and Rephrased Commit log as reviewed
->>> ? ?by Nishanth Menon.
->>> ?V2:
->>> ? ?Rebased on latest 'pm-wip/voltdm_a' branch.
->>>
->>> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c ? | ? 17 +++++++++++++----
->>> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c ? | ? 19 ++++++++++++++++---
->>
->> Since this patch is touching some hwmod files, it will be good to Cc Paul
->> and me. It is far from obvious from the subject that hwmod data are involved
->> in this patch.
-> Will do
->>> ?arch/arm/mach-omap2/smartreflex.h ? ? ? ? ? ?| ? 10 ++++++++++
->>> ?arch/arm/mach-omap2/sr_device.c ? ? ? ? ? ? ?| ? 11 +++++++----
->>> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 -
->>> ?5 files changed, 46 insertions(+), 12 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->>> b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->>> index 3cd91ac..6a704bd 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
->>> @@ -29,6 +29,7 @@
->>>
->>> ?#include "omap_hwmod_common_data.h"
->>>
->>> +#include "smartreflex.h"
->>> ?#include "prm-regbits-34xx.h"
->>> ?#include "cm-regbits-34xx.h"
->>> ?#include "wd_timer.h"
->>> @@ -2904,6 +2905,10 @@ static struct omap_hwmod_class
->>> omap36xx_smartreflex_hwmod_class = {
->>> ?};
->>>
->>> ?/* SR1 */
->>> +static struct omap_sr_dev_attr sr1_dev_attr = {
->>> + ? ? ? .voltdm_name ? = "mpu_iva",
->>> +};
->>> +
->>> ?static struct omap_hwmod_ocp_if *omap3_sr1_slaves[] = {
->>> ? ? ? ? &omap3_l4_core__sr1,
->>> ?};
->>> @@ -2912,7 +2917,6 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
->>> ? ? ? ? .name ? ? ? ? ? = "sr1_hwmod",
->>> ? ? ? ? .class ? ? ? ? ?=&omap34xx_smartreflex_hwmod_class,
->>> ? ? ? ? .main_clk ? ? ? = "sr1_fck",
->>> - ? ? ? .vdd_name ? ? ? = "mpu_iva",
->>> ? ? ? ? .prcm ? ? ? ? ? = {
->>> ? ? ? ? ? ? ? ? .omap2 = {
->>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
->>> @@ -2924,6 +2928,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
->>> ? ? ? ? },
->>> ? ? ? ? .slaves ? ? ? ? = omap3_sr1_slaves,
->>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr1_slaves),
->>> + ? ? ? .dev_attr ? ? ? =&sr1_dev_attr,
->>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_0 |
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_1),
->>> @@ -2934,7 +2939,6 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
->>> ? ? ? ? .name ? ? ? ? ? = "sr1_hwmod",
->>> ? ? ? ? .class ? ? ? ? ?=&omap36xx_smartreflex_hwmod_class,
->>> ? ? ? ? .main_clk ? ? ? = "sr1_fck",
->>> - ? ? ? .vdd_name ? ? ? = "mpu_iva",
->>> ? ? ? ? .prcm ? ? ? ? ? = {
->>> ? ? ? ? ? ? ? ? .omap2 = {
->>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
->>> @@ -2946,10 +2950,15 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
->>> ? ? ? ? },
->>> ? ? ? ? .slaves ? ? ? ? = omap3_sr1_slaves,
->>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr1_slaves),
->>> + ? ? ? .dev_attr ? ? ? =&sr1_dev_attr,
->>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
->>> ?};
->>>
->>> ?/* SR2 */
->>> +static struct omap_sr_dev_attr sr2_dev_attr = {
->>> + ? ? ? .voltdm_name ? ?= "core",
->>> +};
->>> +
->>> ?static struct omap_hwmod_ocp_if *omap3_sr2_slaves[] = {
->>> ? ? ? ? &omap3_l4_core__sr2,
->>> ?};
->>> @@ -2958,7 +2967,6 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
->>> ? ? ? ? .name ? ? ? ? ? = "sr2_hwmod",
->>> ? ? ? ? .class ? ? ? ? ?=&omap34xx_smartreflex_hwmod_class,
->>> ? ? ? ? .main_clk ? ? ? = "sr2_fck",
->>> - ? ? ? .vdd_name ? ? ? = "core",
->>> ? ? ? ? .prcm ? ? ? ? ? = {
->>> ? ? ? ? ? ? ? ? .omap2 = {
->>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
->>> @@ -2970,6 +2978,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
->>> ? ? ? ? },
->>> ? ? ? ? .slaves ? ? ? ? = omap3_sr2_slaves,
->>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr2_slaves),
->>> + ? ? ? .dev_attr ? ? ? =&sr2_dev_attr,
->>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_0 |
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_1),
->>> @@ -2980,7 +2989,6 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
->>> ? ? ? ? .name ? ? ? ? ? = "sr2_hwmod",
->>> ? ? ? ? .class ? ? ? ? ?=&omap36xx_smartreflex_hwmod_class,
->>> ? ? ? ? .main_clk ? ? ? = "sr2_fck",
->>> - ? ? ? .vdd_name ? ? ? = "core",
->>> ? ? ? ? .prcm ? ? ? ? ? = {
->>> ? ? ? ? ? ? ? ? .omap2 = {
->>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
->>> @@ -2992,6 +3000,7 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
->>> ? ? ? ? },
->>> ? ? ? ? .slaves ? ? ? ? = omap3_sr2_slaves,
->>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr2_slaves),
->>> + ? ? ? .dev_attr ? ? ? =&sr2_dev_attr,
->>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
->>> ?};
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->>> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->>> index 3e88dd3..1331b39 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
->>> @@ -30,6 +30,7 @@
->>>
->>> ?#include "omap_hwmod_common_data.h"
->>>
->>> +#include "smartreflex.h"
->>> ?#include "cm1_44xx.h"
->>> ?#include "cm2_44xx.h"
->>> ?#include "prm44xx.h"
->>> @@ -3775,6 +3776,10 @@ static struct omap_hwmod_class
->>> omap44xx_smartreflex_hwmod_class = {
->>> ?};
->>>
->>> ?/* smartreflex_core */
->>> +static struct omap_sr_dev_attr sr_core_dev_attr = {
->>
->> In order to stick to the convention used so far for the other dev_attr,
->> please use the following :
->> +/* smartreflex_core dev_attr */
->> +static struct omap_smartreflex_dev_attr smartreflex_core_dev_attr = {
->>
->>> + ? ? ? .voltdm_name ? = "core",
->>> +};
->>
->> And you should move it on top of the omap44xx_smartreflex_XXX_hwmod
->> structure.
-> Will do.
->>> +
->>> ?static struct omap_hwmod omap44xx_smartreflex_core_hwmod;
->>> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_core_irqs[] = {
->>> ? ? ? ? { .irq = 19 + OMAP44XX_IRQ_GIC_START },
->>> @@ -3809,7 +3814,6 @@ static struct omap_hwmod
->>> omap44xx_smartreflex_core_hwmod = {
->>> ? ? ? ? .mpu_irqs ? ? ? = omap44xx_smartreflex_core_irqs,
->>> ? ? ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_core_irqs),
->>> ? ? ? ? .main_clk ? ? ? = "smartreflex_core_fck",
->>> - ? ? ? .vdd_name ? ? ? = "core",
->>> ? ? ? ? .prcm = {
->>> ? ? ? ? ? ? ? ? .omap4 = {
->>> ? ? ? ? ? ? ? ? ? ? ? ? .clkctrl_reg = OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
->>> @@ -3817,10 +3821,15 @@ static struct omap_hwmod
->>> omap44xx_smartreflex_core_hwmod = {
->>> ? ? ? ? },
->>> ? ? ? ? .slaves ? ? ? ? = omap44xx_smartreflex_core_slaves,
->>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_core_slaves),
->>> + ? ? ? .dev_attr ? ? ? =&sr_core_dev_attr,
->>
->> Move .dev_attr before the .slaves.
-Following the convention used with other dev_attr, all dev_attr are
-defined after slaves.
->> The two last points are applicable for every SR instances.
-> Ok.
->>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>> ?};
->>>
->>> ?/* smartreflex_iva */
->>> +static struct omap_sr_dev_attr sr_iva_dev_attr = {
->>> + ? ? ? .voltdm_name ? = "iva",
->>> +};
->>> +
->>> ?static struct omap_hwmod omap44xx_smartreflex_iva_hwmod;
->>> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_iva_irqs[] = {
->>> ? ? ? ? { .irq = 102 + OMAP44XX_IRQ_GIC_START },
->>> @@ -3855,7 +3864,6 @@ static struct omap_hwmod
->>> omap44xx_smartreflex_iva_hwmod = {
->>> ? ? ? ? .mpu_irqs ? ? ? = omap44xx_smartreflex_iva_irqs,
->>> ? ? ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_iva_irqs),
->>> ? ? ? ? .main_clk ? ? ? = "smartreflex_iva_fck",
->>> - ? ? ? .vdd_name ? ? ? = "iva",
->>> ? ? ? ? .prcm = {
->>> ? ? ? ? ? ? ? ? .omap4 = {
->>> ? ? ? ? ? ? ? ? ? ? ? ? .clkctrl_reg = OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
->>> @@ -3863,10 +3871,15 @@ static struct omap_hwmod
->>> omap44xx_smartreflex_iva_hwmod = {
->>> ? ? ? ? },
->>> ? ? ? ? .slaves ? ? ? ? = omap44xx_smartreflex_iva_slaves,
->>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_iva_slaves),
->>> + ? ? ? .dev_attr ? ? ? =&sr_iva_dev_attr,
->>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>> ?};
->>>
->>> ?/* smartreflex_mpu */
->>> +static struct omap_sr_dev_attr sr_mpu_dev_attr = {
->>> + ? ? ? .voltdm_name ? = "mpu",
->>> +};
->>> +
->>> ?static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod;
->>> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_mpu_irqs[] = {
->>> ? ? ? ? { .irq = 18 + OMAP44XX_IRQ_GIC_START },
->>> @@ -3901,7 +3914,6 @@ static struct omap_hwmod
->>> omap44xx_smartreflex_mpu_hwmod = {
->>> ? ? ? ? .mpu_irqs ? ? ? = omap44xx_smartreflex_mpu_irqs,
->>> ? ? ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_mpu_irqs),
->>> ? ? ? ? .main_clk ? ? ? = "smartreflex_mpu_fck",
->>> - ? ? ? .vdd_name ? ? ? = "mpu",
->>> ? ? ? ? .prcm = {
->>> ? ? ? ? ? ? ? ? .omap4 = {
->>> ? ? ? ? ? ? ? ? ? ? ? ? .clkctrl_reg = OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
->>> @@ -3909,6 +3921,7 @@ static struct omap_hwmod
->>> omap44xx_smartreflex_mpu_hwmod = {
->>> ? ? ? ? },
->>> ? ? ? ? .slaves ? ? ? ? = omap44xx_smartreflex_mpu_slaves,
->>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_mpu_slaves),
->>> + ? ? ? .dev_attr ? ? ? =&sr_mpu_dev_attr,
->>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->>> ?};
->>>
->>> diff --git a/arch/arm/mach-omap2/smartreflex.h
->>> b/arch/arm/mach-omap2/smartreflex.h
->>> index 5f35b9e..9a7f770 100644
->>> --- a/arch/arm/mach-omap2/smartreflex.h
->>> +++ b/arch/arm/mach-omap2/smartreflex.h
->>> @@ -197,6 +197,16 @@ struct omap_sr_nvalue_table {
->>> ?};
->>>
->>> ?/**
->>> + * struct omap_sr_dev_attr - Smartreflex Device attribute.
->>> + *
->>> + * @voltdm_name: ? ? ? Name of voltdomain of SR instance
->>
->> You should be more specific. This is the name of the SR sensor voltage
->> domain.
->> The Smartreflex controller IPs are all inside the CORE voltage domain.
-> Ok.
->> Regards,
->> Benoit
->>
->
->
->
-> --
-> Thanks,
-> Regards,
-> Shweta
->
+Right.  It worked when I initially implemented ARM support there because
+recordmcount.c always found the STT_SECTION symbol as a base and not a
+STT_FUNC symbol.  However, I noticed yesterday that this does not happen
+in some cases, so I sent a patch to avoid STT_FUNC symbol as bases on
+ARM, not because of this relocation, but because of a slightly different
+oddity of Thumb symbols:
 
+http://lkml.org/lkml/2011/5/11/304
 
+(The relocation problem alone could be solved by using R_ARM_ABS32_NOI
+ instead.)
 
--- 
-Thanks,
-Regards,
-Shweta
+>
+>> Thumb-2 via recordmcount.c does not need the clearing of the lsb in
+>> ftrace_call_adjust.
+>
+> So the clearing of the lsb is only required if the recordmcount.pl script
+> is used?
+
+Yes.
+
+>> Building with the ARM instruction set also does not need the clearing
+>> of the lsb.
+>
+> Who does the ORing? I can't find anything in recordmount.pl/recordmcount.c
+> which looks like doing an OR, does the assembler do that based on the
+> symbol type?
+
+The lsb is set to 1 by the linker, when it applies the relocations as it
+links vmlinux.
+
+>
+>> > Thumb-2 the offset is -1, correct? If there is a way to distinguish
+>> > the two targets in recordmcount at compile time we could convert arm
+>> > as well. Which would allow us to remove the ftrace_call_adjust function.
+>>
+>> To remove ftrace_call_adjust, we could either deprecate the
+>> recordmcount.pl usage for ARM (you already have to edit the Kconfig to
+>> use it) or modify it to generate specific relocations explicitly instead
+>> of using the assembler data directives.
+>
+> Hmm, it would be a desirable property if the C version and the pearl
+> version of recordmcount would do the same. Or we could remove the arm
+> support from the pearl script, the C version is faster anyway.
+
+I'm OK with removing the ARM support from recordmcount.pl; it doesn't
+seem needed to make significant modifications to it for ARM when we
+don't use it anyway.
