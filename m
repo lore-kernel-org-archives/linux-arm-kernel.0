@@ -1,149 +1,50 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 May 2011 16:01:20 +0900
-Subject: [PATCH 02/13] ARM: s5p: consolidate selection of timer register
-In-Reply-To: <E1QJhMK-0000yR-Q5@rmk-PC.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-	<E1QJhMK-0000yR-Q5@rmk-PC.arm.linux.org.uk>
-Message-ID: <03f501cc1072$6788da80$369a8f80$%kim@samsung.com>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Thu, 12 May 2011 09:04:40 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <201105112331.47954.arnd@arndb.de>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<20110510112734.54160824@lxorguk.ukuu.org.uk>	<2BFFDAA0A0DE4820876E5549867938EC@subhasishg>
+	<201105112331.47954.arnd@arndb.de>
+Message-ID: <4DCB8688.7070400@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+On 05/11/2011 11:31 PM, Arnd Bergmann wrote:
+> On Tuesday 10 May 2011, Subhasish Ghosh wrote:
+>>
+>>>> Yes, In case if we allow the ALL implementation, it hogs the CPU.
+>>>> In that case we do not need the PRU. The whole purpose of the PRU
+>>>> is to offload the processor for any such implementations. 
+>>>
+>>> So the kernel presumably needs to switch between using the PRU and native
+>>> according to the number of ids being requested at the time ?
+>>
+>> All the IDs are programmed into the PRU data RAM.
+>> The Kernel receives interrupts based upon these IDs.
+>> I could not clearly follow "PRU and native", could you please elaborate.
 > 
-> s5p duplicates the runtime selection of the timer register three times.
-> Move this out into a separate function.
+> We would really like all CAN drivers to behave the same way. All other
+> drivers are able to work without filters, so pruss_can should allow that
+> too, even if it becomes a CPU hog at that time.
 > 
-> FIXME: It is unclear whether this code needs to support true runtime
-> selection of the timer register, or whether it can be selected once at
-> init time.
+> It seems to me that the pruss can implementation has one thing backwards:
+> it assumes a specific usage model for CAN that it is trying to do offload
+> for. However, that usage model is currently not even supported by Socket
+> CAN. If I understand Wolfgang correctly, it is in fact considered an
+> unwanted limitation of the pruss can driver, instead of a useful feature.
 
-Now, implementation is the latter :)
+"Unwanted" is not the right word. I see it as a piece of CAN hardware
+with some serious limitations and I doubt that it will make real CAN
+users happy. But well, I might be wrong.
 
-> 
-> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> If that interpretation is right, I would seriously recommend rethinking
+> the design of the CAN firmware for pruss, so you can start doing something
+> useful with the offload engine that fits into the Socket CAN API, or that
+> would be a useful extension to Socket CAN that is also implementable in
+> the kernel for all other drivers in a meaningful way.
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+It would be really nice if they could provide a better firmware. Anyway,
+the generic CAN hardware filter interface we spoke about in a previous
+mail would fit for the PRUSS CAN hardware as well. It just needs to be
+implemented.
 
-It works fine on SMDKC110 and SMDK6440.
-But there is small comment...
-
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/plat-s5p/s5p-time.c |   58
-++++++++++++----------------------------
-> -
->  1 files changed, 17 insertions(+), 41 deletions(-)
-> 
-> diff --git a/arch/arm/plat-s5p/s5p-time.c b/arch/arm/plat-s5p/s5p-time.c
-> index 8090403..9052f2a 100644
-> --- a/arch/arm/plat-s5p/s5p-time.c
-> +++ b/arch/arm/plat-s5p/s5p-time.c
-> @@ -290,7 +290,7 @@ static void __init s5p_clockevent_init(void)
->  	setup_irq(irq_number, &s5p_clock_event_irq);
->  }
-> 
-> -static cycle_t s5p_timer_read(struct clocksource *cs)
-> +static void __iomem *s5p_timer_reg(void)
->  {
->  	unsigned long offset = 0;
-> 
-> @@ -308,10 +308,17 @@ static cycle_t s5p_timer_read(struct clocksource
-*cs)
-> 
->  	default:
->  		printk(KERN_ERR "Invalid Timer %d\n",
-timer_source.source_id);
-> -		return 0;
-> +		return NULL;
->  	}
-> 
-> -	return (cycle_t) ~__raw_readl(S3C_TIMERREG(offset));
-> +	return S3C_TIMERREG(offset);
-> +}
-> +
-> +static cycle_t s5p_timer_read(struct clocksource *cs)
-> +{
-> +	void __iomem *reg = s5p_timer_reg();
-> +
-> +	return (cycle_t) (reg ? ~__raw_readl(reg) : 0);
->  }
-> 
->  /*
-> @@ -325,53 +332,22 @@ static DEFINE_CLOCK_DATA(cd);
-> 
->  unsigned long long notrace sched_clock(void)
->  {
-> -	u32 cyc;
-> -	unsigned long offset = 0;
-> -
-> -	switch (timer_source.source_id) {
-> -	case S5P_PWM0:
-> -	case S5P_PWM1:
-> -	case S5P_PWM2:
-> -	case S5P_PWM3:
-> -		offset = (timer_source.source_id * 0x0c) + 0x14;
-> -		break;
-> -
-> -	case S5P_PWM4:
-> -		offset = 0x40;
-> -		break;
-> +	void __iomem *reg = s5p_timer_reg();
-> 
-> -	default:
-> -		printk(KERN_ERR "Invalid Timer %d\n",
-timer_source.source_id);
-> +	if (!reg)
->  		return 0;
-> -	}
-> 
-> -	cyc = ~__raw_readl(S3C_TIMERREG(offset));
-> -	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
-> +	return cyc_to_sched_clock(&cd, ~__raw_readl(reg), (u32)~0);
->  }
-> 
->  static void notrace s5p_update_sched_clock(void)
->  {
-> -	u32 cyc;
-> -	unsigned long offset = 0;
-> -
-> -	switch (timer_source.source_id) {
-> -	case S5P_PWM0:
-> -	case S5P_PWM1:
-> -	case S5P_PWM2:
-> -	case S5P_PWM3:
-> -		offset = (timer_source.source_id * 0x0c) + 0x14;
-> -		break;
-> -
-> -	case S5P_PWM4:
-> -		offset = 0x40;
-> -		break;
-> +	void __iomem *reg = s5p_timer_reg();
-> 
-> -	default:
-> -		printk(KERN_ERR "Invalid Timer %d\n",
-timer_source.source_id);
-> -	}
-> +	if (!reg)
-> +		return 0;
-
-Should be just 'return;' without a value?
-
-> 
-> -	cyc = ~__raw_readl(S3C_TIMERREG(offset));
-> -	update_sched_clock(&cd, cyc, (u32)~0);
-> +	update_sched_clock(&cd, ~__raw_readl(reg), (u32)~0);
->  }
-> 
->  struct clocksource time_clocksource = {
-> --
-> 1.7.4.4
-
-And will test with your 6th patch soon :)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Wolfgang.
