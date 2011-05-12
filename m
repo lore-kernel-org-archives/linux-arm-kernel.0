@@ -1,75 +1,72 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 12 May 2011 03:30:38 +0200
-Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
-In-Reply-To: <20110511135041.GC12717@kroah.com>
-References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>
-	<4DC95D19.7070707@ru.mvista.com>
-	<20110510155038.GJ18791@game.jcrosoft.org>
-	<20110510170500.GB15675@kroah.com>
-	<20110510235324.GD18929@game.jcrosoft.org>
-	<20110511015829.GB6840@kroah.com>
-	<20110511031854.GF18929@game.jcrosoft.org>
-	<20110511135041.GC12717@kroah.com>
-Message-ID: <20110512013038.GA24270@game.jcrosoft.org>
+From: paulo@nlink.com.br (Paulo Fragoso)
+Date: Wed, 11 May 2011 23:23:24 -0300
+Subject: External serial 8250/16550
+In-Reply-To: <4DC8AFF9.9030508@nlink.com.br>
+References: <4DB44883.3000608@nlink.com.br>	<BANLkTinMrZvO_bNcAKXvaa_pXE+jOxO2uw@mail.gmail.com>	<4DC3F035.9030208@nlink.com.br>
+	<4DC8AFF9.9030508@nlink.com.br>
+Message-ID: <4DCB449C.8060808@nlink.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06:50 Wed 11 May     , Greg KH wrote:
-> On Wed, May 11, 2011 at 05:18:54AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > On 18:58 Tue 10 May     , Greg KH wrote:
-> > > On Wed, May 11, 2011 at 01:53:24AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > On 10:05 Tue 10 May     , Greg KH wrote:
-> > > > > On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > > On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
-> > > > > > > Hello.
-> > > > > > > 
-> > > > > > > Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > > > > > > 
-> > > > > > > >on 9g20 they are the same as the 9261
-> > > > > > > 
-> > > > > > > >Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> > > > > > > >---
-> > > > > > > > drivers/usb/gadget/at91_udc.c |    2 +-
-> > > > > > > > 1 files changed, 1 insertions(+), 1 deletions(-)
-> > > > > > > 
-> > > > > > > >diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-> > > > > > > >index 9b7cdb1..41dc093 100644
-> > > > > > > >--- a/drivers/usb/gadget/at91_udc.c
-> > > > > > > >+++ b/drivers/usb/gadget/at91_udc.c
-> > > > > > > >@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
-> > > > > > > > 	}
-> > > > > > > > 	/* newer chips have more FIFO memory than rm9200 */
-> > > > > > > >-	if (cpu_is_at91sam9260()) {
-> > > > > > > >+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
-> > > > > > > 
-> > > > > > >    These shouldn't be used in the drivers at all.
-> > > > > > Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
-> > > > > 
-> > > > > How could I apply this to the tree for the .40 release then?
-> > > > it's also the case these patch apply from kernel v2.6.26 to above
-> > > > 
-> > > > for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
-> > > 
-> > > That makes no sense, how can I go back in time and apply this to an
-> > > older kernel version?
-> > I known we just need for the longterm and stable tree
-> > and the .39-rc8
-> > > 
-> > > Please provide a patch that I can apply against the linux-next tree if
-> > > you want this change to be accepted.
-> > it's appy to the -next
-> 
-> I have no idea what you are trying to say here.
-> 
-> Care to resend this patch, the correct one, that I can apply to my
-> usb-next tree for merging in the .40 merge cycle?
-It does apply on the linux-next
-and previous kernel version
+On 10-05-2011 00:24, Paulo Fragoso wrote:
+>
+>
+> On 06-05-2011 09:57, Paulo Fragoso wrote:
+>> Em 26/04/2011 13:39, Andrew Victor escreveu:
+>>
+>>>
+>>> Those AT91_SMC registers and bits only exist on the AT91RM9200,
+>>> whereas you're using a SAM9-based processor.
+>>>
+>>> You should be configuring the memory controller by:
+>>> #include<mach/at91sam9_smc.h>
+>>> #include "sam9_smc.h"
+>>>
+>>> and declaring a "struct sam9_smc_config" with all the setting&
+>>
+>> I changed the code following TL16C2550 datasheet and now I am using
+>> correct registers for AT91sam:
+>>
+>> static struct sam9_smc_config tms_uart_smc_config = {
+>> .ncs_read_setup = 0,
+>> .nrd_setup = 2,
+>> .ncs_write_setup = 0,
+>> .nwe_setup = 2,
+>>
+>> .ncs_read_pulse = 5,
+>> .nrd_pulse = 4,
+>> .ncs_write_pulse = 4,
+>> .nwe_pulse = 3,
+>>
+>> .read_cycle = 10,
+>> .write_cycle = 9,
+>>
+>> .mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
+>> AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8 | AT91_SMC_BAT_WRITE,
+>> .tdf_cycles = 3,
+>> };
+>>
 
-and this patch is a fix for the current kernel
-so I would like to have it for this release and the stable tree
+I have one doubt about new-style UART initialization, how can I 
+initialize a board using AT91sam9 with two internal USART and two 
+external 8250 UART at same time?
 
-hope it's clear
+For example:
 
-Best Regards,
-J.
+	/* DGBU on ttyS0. (Rx & Tx only) */
+	at91_register_uart(0, 0, 0);
+
+	/* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
+	at91_register_uart(AT91SAM9G45_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
+
+	/* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
+	at91_register_uart(AT91SAM9G45_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
+
+If I wish to put two more 8250 external serial in sequence (ttyS3 and 
+ttyS4) which ID will be used at at91_register_uart function?
+
+Looking at91_register_uart function all structs pdev are defined 
+internaly, how I will define serila8250 platform_device and pass at 
+at91_register_uart function?
+
+Paulo.
