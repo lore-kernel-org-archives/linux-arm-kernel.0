@@ -1,110 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 May 2011 16:02:35 +0200
-Subject: [PATCH 0/4] Pinmux subsystem
-In-Reply-To: <20110512074421.GA2429@pengutronix.de>
-References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
-	<20110512074421.GA2429@pengutronix.de>
-Message-ID: <BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Thu, 12 May 2011 16:41:58 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DCB88A4.2010901@grandegger.com>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<2BFFDAA0A0DE4820876E5549867938EC@subhasishg>	<201105112331.47954.arnd@arndb.de>	<201105112344.44171.arnd@arndb.de>
+	<4DCB88A4.2010901@grandegger.com>
+Message-ID: <4DCBF1B6.6000104@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/12 Sascha Hauer <s.hauer@pengutronix.de>:
+On 12.05.2011 09:13, Wolfgang Grandegger wrote:
+> On 05/11/2011 11:44 PM, Arnd Bergmann wrote:
+>> On Wednesday 11 May 2011, Arnd Bergmann wrote:
+>>> If that interpretation is right, I would seriously recommend rethinking
+>>> the design of the CAN firmware for pruss, so you can start doing something
+>>> useful with the offload engine that fits into the Socket CAN API, or that
+>>> would be a useful extension to Socket CAN that is also implementable in
+>>> the kernel for all other drivers in a meaningful way.
+>>
+>> I've looked some more into the CAN socket implementation, and I suppose that
+>> the idea of the pruss driver was really to help do the work from the
+>> can_rcv_filter function in hardware.
+> 
+> That software filter is per socket while the hardware filter will be per
+> device.
 
-> What I'm missing though is a generic way a single pad/mux mode
-> combination can be described. Let me take a look around how the
-> different subarchs do this:
->
-> omap:
->
-> ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA21, 91,
-> ? ? ? ? ? ? ? ?"dss_data21", NULL, "mcspi3_cs0", "dss_data3",
-> ? ? ? ? ? ? ? ?"gpio_91", NULL, NULL, "safe_mode"),
-> ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA22, 92,
-> ? ? ? ? ? ? ? ?"dss_data22", NULL, "mcspi3_cs1", "dss_data4",
-> ? ? ? ? ? ? ? ?"gpio_92", NULL, NULL, "safe_mode"),
->
-> pxa:
->
-> #define GPIO16_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO16, AF3, DRIVE_HIGH)
-> #define GPIO37_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO37, AF3, DRIVE_HIGH)
-> #define GPIO39_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO39, AF2, DRIVE_HIGH)
-> #define GPIO83_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO83, AF2, DRIVE_HIGH)
-> #define GPIO99_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO99, AF3, DRIVE_HIGH)
->
-> i.MX:
->
-> #define _MX51_PAD_UART3_RXD__CSI1_D0 ? ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
-> #define _MX51_PAD_UART3_RXD__GPIO1_22 ? ? ? ? ? IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
-> #define _MX51_PAD_UART3_RXD__UART1_DTR ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
-> #define _MX51_PAD_UART3_RXD__UART3_RXD ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 1, 0x09f4, 4, 0)
-> #define _MX51_PAD_UART3_TXD__CSI1_D1 ? ? ? ? ? ?IOMUX_PAD(0x634, 0x244, 2, 0x0000, 0, 0)
->
-> These all basically describe the same thing: put pad x into one of modes
-> a, b, c and apply certain flags like drive strength on this.
->
-> the other class of pin muxing I know of is that a whole group of pads
-> can be switched to a particular mode using a mux register like I think
-> is used used in your ux300 driver.
->
-> I'd like to have a unified way to describe this.
+Hi all,
 
-Hm, so some of the structure I currently have inside the specific U300 driver
-need to become generic, in such way that say by activating 8 different
-padmux functions at the same, this can boil down to a single register
-write instead of 8 different register writes?
+i took some while to get behind all the arguments for me :-)
 
-> Do you think it's possible to do some consolidation on this level
-> aswell? It would really bring different SoCs more together.
+Wolfgangs suggestion
 
-I am thinking on the abstract level, now we would have:
+>  A simple interface using:
+> 
+>   ip link set can0 type can filter <id>:<mask> [<id>:<mask> ...]
+> 
 
-Board:
-static struct pinmux_map pmx_map[] = {
-        PINMUX_MAP("foo0", "foo0-1"),
-        PINMUX_MAP("bar0", "bar0-1"),
-};
-pinmux_register_mappings(pmx_map, ARRAY_SIZE(pmx_map));
+indeed would just be fine - but IMHO it doesn't help for the pruss CAN driver.
 
-Driver:
-pmx = pinmux_get("foo0", NULL);
-pinmux_enable(pmx);
+The problem is, that you plan to filter on a CAN-identifier base. This is not
+only very application dependent (as Kurt already pointed out) - it also does
+not bring any safety that your system does not explode on heavy CAN load.
 
-For each of the mux functions. Now we need a grouping of
-these functions.
+E.g. assume you need the CAN-IDs 0x100, 0x200 and 0x300 in your application
+and for that reason you configure these IDs in the pruss CAN driver.
 
-So if I invent say pinmux function groups and add an argument
-to pinmux_register_mappings() so it takes an optional groupname
-arg, you can add several mappings and group them:
+What if someone generates a 100% CAN busload exactly on CAN-ID 0x100 then?
 
-pinmux_register_mappings("foogrp", pmx_map1, ARRAY_SIZE(pmx_map1));
-pinmux_register_mappings("bargrp", pmx_map2, ARRAY_SIZE(pmx_map2));
+Worst case (1MBit/s, DLC=0) you would need to handle about 21.000 irqs/s for
+the correctly received CAN frames with the filtered CAN-ID 0x100 ...
 
-The pinmux core remember this association and add a
-new API:
+At the beginnig of the SocketCAN development, we had a PowerPC (E603) @ 133MHz
+that was able to handle 4 (dumb) SJA1000 CAN controllers without problems.
 
-struct pinmux_group *pmxgrp = pinmux_group_get("foogrp");
-pinmux_group_enable(pmxgrp);
-pinmux_group_control(pmxgrp, N, N);
-pinmux_group_disable(pmxgrp);
-pinmux_group_put(pmxgrp);
+Maybe i should tell a bit more about what's happening at CAN frame receive time:
 
-If then the driver API adds an optional hook like this:
-int (*enable_group) (struct pinmux_dev *pmxdev, unsigned *selector,
-unsigned num_selectors);
-void (*disable_group) (struct pinmux_dev *pmxdev, unsigned *selector,
-unsigned num_selectors);
+1. IRQ happens
+2. Read CAN frame from CAN controller registers
+3. Allocate a socketbuffer (skb) and queue it into the netdevice rx queue
+4. Softirq handles the new skb
+5. Check the (specialized/optimized) CAN-ID filters for this CAN device
+6. Enqueue the data to the sockets recv buffer(s) and/or drop the skb.
 
-This way the driver can provide each muxing individually, the core keep
-track of any grouping and making sure group sets does not clash,
-and the driver can implement optional enable/disable calls that write entire
-groups of pins at once and the driver knows how to combine these into a
-few single register writes.
+This all depends heavily on Linux networking (skb handling, caching, etc) and
+is pretty fast and optimized!! That was also the reason why it ran on the old
+PowerPC that smoothly. The mostly seen effect if anything drops is when the
+application (holding the socket) was not fast enough to handle the incoming
+data. NB: For that reason we implemented a CAN content filter (CAN_BCM) that
+is able to do content filtering and timeout monitoring in Kernelspace - all
+performed in the SoftIRQ.
 
-Would this work?
+Having 'Mailboxes' bound to CAN-IDs is something that's useful for 8/16 bit
+CPUs where an application is tightly bound to the embedded ECUs functionality.
 
-I see it as a clear, backwards-compatible superset to the current
-patchset, so can go in a separate add-on if the current stuff go in first,
-so we don't try to drink the entire ocean at once.
+IMO you should try to implement an 'open' pruss CAN driver without filtering
+as it doesn't really help (see above). The networking stack can cope with the
+load. In all cases (with/without filters) the reduction the irqload could be a
+way to investigate (e.g. think about dropping CAN frames based on the irqload).
 
-Yours,
-Linus Walleij
+But you should try the 'open' way first. And i think with your current driver
+you could just filter for one CAN-ID (e.g. 0x100) and then produce the heavy
+CAN busload with this CAN-ID 0x100 and a second CAN node, right?
+
+Regards,
+Oliver
