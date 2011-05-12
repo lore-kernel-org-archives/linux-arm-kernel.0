@@ -1,24 +1,74 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2011 00:43:26 -0700
-Subject: [PATCH 06/13] clocksource: add common mmio clocksource
-In-Reply-To: <20110510084648.GA31122@n2100.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-	<E1QJhNe-0000yh-HS@rmk-PC.arm.linux.org.uk>
-	<20110510083841.GF30963@pengutronix.de>
-	<20110510084648.GA31122@n2100.arm.linux.org.uk>
-Message-ID: <20110512074325.GE31483@atomide.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 12 May 2011 09:44:21 +0200
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110512074421.GA2429@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110510 01:44]:
-> On Tue, May 10, 2011 at 10:38:41AM +0200, Sascha Hauer wrote:
-> > You forgot to initialize cs->reg. With this:
-> 
-> Damnit.  Fixed.
-> 
-> > Tested-by: Sascha Hauer <s.hauer@pengutronix.de>
+Hi Linus,
 
-With cs->reg initialization and CONFIG_OMAP_MPU_TIMER=y things
-boot tested on omap1 osk:
+On Mon, May 02, 2011 at 09:16:08PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This patchset creates a pinmux subsystem and switches U300 to use that new
+> subsystem as an example. The problem is not that fantastically hard to
+> solve in a general way, nobody got around to it because it requires some
+> upfront code I believe, and this is my stab at it.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+This is a good step in the right direction. It solves the problem of
+potential conflicts between different mux functions. Also it gives a
+well defined interface between drivers and board code.
+
+What I'm missing though is a generic way a single pad/mux mode
+combination can be described. Let me take a look around how the
+different subarchs do this:
+
+omap:
+
+	_OMAP3_MUXENTRY(DSS_DATA21, 91,
+		"dss_data21", NULL, "mcspi3_cs0", "dss_data3",
+		"gpio_91", NULL, NULL, "safe_mode"),
+	_OMAP3_MUXENTRY(DSS_DATA22, 92,
+		"dss_data22", NULL, "mcspi3_cs1", "dss_data4",
+		"gpio_92", NULL, NULL, "safe_mode"),
+
+pxa:
+
+#define GPIO16_FFUART_TXD       MFP_CFG_OUT(GPIO16, AF3, DRIVE_HIGH)
+#define GPIO37_FFUART_TXD       MFP_CFG_OUT(GPIO37, AF3, DRIVE_HIGH)
+#define GPIO39_FFUART_TXD       MFP_CFG_OUT(GPIO39, AF2, DRIVE_HIGH)
+#define GPIO83_FFUART_TXD       MFP_CFG_OUT(GPIO83, AF2, DRIVE_HIGH)
+#define GPIO99_FFUART_TXD       MFP_CFG_OUT(GPIO99, AF3, DRIVE_HIGH)
+
+i.MX:
+
+#define _MX51_PAD_UART3_RXD__CSI1_D0            IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
+#define _MX51_PAD_UART3_RXD__GPIO1_22           IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
+#define _MX51_PAD_UART3_RXD__UART1_DTR          IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
+#define _MX51_PAD_UART3_RXD__UART3_RXD          IOMUX_PAD(0x630, 0x240, 1, 0x09f4, 4, 0)
+#define _MX51_PAD_UART3_TXD__CSI1_D1            IOMUX_PAD(0x634, 0x244, 2, 0x0000, 0, 0)
+
+These all basically describe the same thing: put pad x into one of modes
+a, b, c and apply certain flags like drive strength on this.
+
+the other class of pin muxing I know of is that a whole group of pads
+can be switched to a particular mode using a mux register like I think
+is used used in your ux300 driver.
+
+I'd like to have a unified way to describe this. If we ever want to move
+this into the device tree we need this anyway as I think it's not an
+option to have completely different SoC specific descriptions in the
+device tree.
+
+Do you think it's possible to do some consolidation on this level
+aswell? It would really bring different SoCs more together.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
