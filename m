@@ -1,43 +1,54 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 May 2011 10:11:12 +0900
-Subject: [PATCH 5/7] tty: Remove to support serial for S5PC100
+Date: Thu, 12 May 2011 10:11:10 +0900
+Subject: [PATCH 3/7] [media] s5p-fimc: Remove to support fimc for S5PC100
 In-Reply-To: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
 References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1305162674-25860-6-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1305162674-25860-4-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 According to removing ARCH_S5PC100, we don't need to support
-serial for S5PC100.
+fimc for S5PC100.
 
-Cc: Alan Cox <alan@lxorguk.ukuu.org.uk>
-Cc: Greg Kroah-Hartman <gregkh at suse.de
+Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
+Cc: Kyungmin Park <kyungmin.park@samsung.com>
+Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/tty/serial/Kconfig |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+ drivers/media/video/s5p-fimc/fimc-core.c |   14 --------------
+ 1 files changed, 0 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-index 80484af..28c4f1a 100644
---- a/drivers/tty/serial/Kconfig
-+++ b/drivers/tty/serial/Kconfig
-@@ -527,13 +527,13 @@ config SERIAL_S3C24A0
- 	  Serial port support for the Samsung S3C24A0 SoC
+diff --git a/drivers/media/video/s5p-fimc/fimc-core.c b/drivers/media/video/s5p-fimc/fimc-core.c
+index dc91a85..89d59d6 100644
+--- a/drivers/media/video/s5p-fimc/fimc-core.c
++++ b/drivers/media/video/s5p-fimc/fimc-core.c
+@@ -1871,17 +1871,6 @@ static struct samsung_fimc_variant fimc2_variant_exynos4 = {
+ 	.pix_limit	 = &s5p_pix_limit[3],
+ };
  
- config SERIAL_S3C6400
--	tristate "Samsung S3C6400/S3C6410/S5P6440/S5P6450/S5PC100 Serial port support"
--	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440 || CPU_S5P6450 || CPU_S5PC100)
-+	tristate "Samsung S3C6400/S3C6410/S5P6440/S5P6450 Serial port support"
-+	depends on SERIAL_SAMSUNG && (CPU_S3C6400 || CPU_S3C6410 || CPU_S5P6440 || CPU_S5P6450)
- 	select SERIAL_SAMSUNG_UARTS_4
- 	default y
- 	help
--	  Serial port support for the Samsung S3C6400, S3C6410, S5P6440, S5P6450
--	  and S5PC100 SoCs
-+	  Serial port support for the Samsung S3C6400, S3C6410, S5P6440
-+	  and S5P6450 SoCs
+-/* S5PC100 */
+-static struct samsung_fimc_driverdata fimc_drvdata_s5p = {
+-	.variant = {
+-		[0] = &fimc0_variant_s5p,
+-		[1] = &fimc0_variant_s5p,
+-		[2] = &fimc2_variant_s5p,
+-	},
+-	.num_entities = 3,
+-	.lclk_frequency = 133000000UL,
+-};
+-
+ /* S5PV210, S5PC110 */
+ static struct samsung_fimc_driverdata fimc_drvdata_s5pv210 = {
+ 	.variant = {
+@@ -1907,9 +1896,6 @@ static struct samsung_fimc_driverdata fimc_drvdata_exynos4 = {
  
- config SERIAL_S5PV210
- 	tristate "Samsung S5PV210 Serial port support"
+ static struct platform_device_id fimc_driver_ids[] = {
+ 	{
+-		.name		= "s5p-fimc",
+-		.driver_data	= (unsigned long)&fimc_drvdata_s5p,
+-	}, {
+ 		.name		= "s5pv210-fimc",
+ 		.driver_data	= (unsigned long)&fimc_drvdata_s5pv210,
+ 	}, {
 -- 
 1.7.1
