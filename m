@@ -1,33 +1,102 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Thu, 12 May 2011 11:32:18 +0200 (CEST)
-Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface
-	(ISI)support
-In-Reply-To: <4C79549CB6F772498162A641D92D532801AC28CD@penmb01.corp.atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 May 2011 10:34:34 +0100
+Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface (ISI)
+	support
+In-Reply-To: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
 References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
-	<20110512074725.GA1356@n2100.arm.linux.org.uk>
-	<4C79549CB6F772498162A641D92D532801AC28CD@penmb01.corp.atmel.com>
-Message-ID: <Pine.LNX.4.64.1105121131040.24486@axis700.grange>
+Message-ID: <20110512093433.GD1356@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 May 2011, Wu, Josh wrote:
+On Thu, May 12, 2011 at 03:42:18PM +0800, Josh Wu wrote:
+> This patch is to enable Atmel Image Sensor Interface (ISI) driver support. 
+> - Using soc-camera framework with videobuf2 dma-contig allocator
+> - Supporting video streaming of YUV packed format
+> - Tested on AT91SAM9M10G45-EK with OV2640
 
-> Hi, Russell
-> 
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] Sent: Thursday, May 12, 2011 3:47 PM
-> > On Thu, May 12, 2011 at 03:42:18PM +0800, Josh Wu wrote:
-> >> +err_alloc_isi:
-> >> +	clk_disable(pclk);
-> > clk_put() ?
-> Ok, will be fixed in V2 patch. Thanks.
+A few more points...
 
-You might wait with v2 until I find time to review your patch. Will take a 
-couple of days, I think. A general question, though: how compatible is 
-this driver with the AVR32?
+> +static int __init atmel_isi_probe(struct platform_device *pdev)
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+Should be __devinit otherwise you'll have section errors.
+
+> +{
+> +	unsigned int irq;
+> +	struct atmel_isi *isi;
+> +	struct clk *pclk;
+> +	struct resource *regs;
+> +	int ret;
+> +	struct device *dev = &pdev->dev;
+> +	struct isi_platform_data *pdata;
+> +	struct soc_camera_host *soc_host;
+> +
+> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!regs)
+> +		return -ENXIO;
+> +
+> +	pclk = clk_get(&pdev->dev, "isi_clk");
+> +	if (IS_ERR(pclk))
+> +		return PTR_ERR(pclk);
+> +
+> +	clk_enable(pclk);
+
+Return value of clk_enable() should be checked.
+
+> +
+> +	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
+> +	if (!isi) {
+> +		ret = -ENOMEM;
+> +		dev_err(&pdev->dev, "can't allocate interface!\n");
+> +		goto err_alloc_isi;
+> +	}
+> +
+> +	isi->pclk = pclk;
+> +
+> +	spin_lock_init(&isi->lock);
+> +	init_waitqueue_head(&isi->capture_wq);
+> +
+> +	isi->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
+> +	if (IS_ERR(isi->alloc_ctx)) {
+> +		ret = PTR_ERR(isi->alloc_ctx);
+> +		goto err_alloc_isi;
+> +	}
+> +
+> +	isi->regs = ioremap(regs->start, resource_size(regs));
+> +	if (!isi->regs) {
+> +		ret = -ENOMEM;
+> +		goto err_ioremap;
+> +	}
+> +
+> +	if (dev->platform_data)
+> +		pdata = (struct isi_platform_data *) dev->platform_data;
+> +	else {
+> +		static struct isi_platform_data isi_default_data = {
+> +			.frate		= 0,
+> +			.has_emb_sync	= 0,
+> +			.emb_crc_sync	= 0,
+> +			.hsync_act_low	= 0,
+> +			.vsync_act_low	= 0,
+> +			.pclk_act_falling = 0,
+> +			.isi_full_mode	= 1,
+> +			/* to use codec and preview path simultaneously */
+> +			.flags = ISI_DATAWIDTH_8 |
+> +				ISI_DATAWIDTH_10,
+> +		};
+> +		dev_info(&pdev->dev,
+> +			"No config available using default values\n");
+> +		pdata = &isi_default_data;
+> +	}
+> +
+> +	isi->pdata = pdata;
+> +	isi->platform_flags = pdata->flags;
+> +	if (isi->platform_flags == 0)
+> +		isi->platform_flags = ISI_DATAWIDTH_8;
+> +
+> +	isi_writel(isi, V2_CTRL, ISI_BIT(V2_DIS));
+> +	/* Check if module disable */
+> +	while (isi_readl(isi, V2_STATUS) & ISI_BIT(V2_DIS))
+> +		cpu_relax();
+> +
+> +	irq = platform_get_irq(pdev, 0);
+
+This should also be checked.
