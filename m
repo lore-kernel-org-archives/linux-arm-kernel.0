@@ -1,32 +1,54 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Thu, 12 May 2011 21:33:03 +0300
-Subject: [PATCH 2/2] ARM: fix the note about dcache lazy flushing for SMP
-	systems
-In-Reply-To: <1305225183-15521-1-git-send-email-saeed@marvell.com>
-References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
-Message-ID: <1305225183-15521-2-git-send-email-saeed@marvell.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 12 May 2011 20:34:06 +0200
+Subject: [PATCH V2] genalloc: add support to specify the physical address
+In-Reply-To: <20110512173832.GA8633@n2100.arm.linux.org.uk>
+References: <1303282455-26649-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110428081535.GI17290@n2100.arm.linux.org.uk>
+	<20110512173832.GA8633@n2100.arm.linux.org.uk>
+Message-ID: <20110512183406.GI18952@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 18:38 Thu 12 May     , Russell King - ARM Linux wrote:
+> On Thu, Apr 28, 2011 at 09:15:35AM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Apr 20, 2011 at 08:54:15AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > > so we specify the virtual address as base of the pool chunk and then
+> > > get the physical address for hardware IP
+> > > 
+> > > as example on at91 we will use on spi, uart or macb
+> > > 
+> > > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > > Cc: Patrice VILCHEZ <patrice.vilchez@atmel.com>
+> > > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > > ---
+> > > Hi Andrew,
+> > > 	I integrate the documentation fix
+> > > 	could replace the previous one with this one
+> > > 
+> > > V2:
+> > > 	update documentation
+> > > 	use phys_addr_t for physical addr
+> > > Best Regards,
+> > 
+> > I notice no comments on this - maybe it needs to be Cc'd to linux-mm too?
+> > 
+> > Andrew - do you have any views on this?
+> 
+> Still haven't heard anything.  What's the status?
+> 
+> If this isn't going into mainline, I'll queue up my work consolidating
+> the existing ARM sram allocators instead, and when this hits we can see
+> about moving stuff over to it then.
+Andrew - do you plan to add it for the -next?
 
-Signed-off-by: Saeed Bishara <saeed@marvell.com>
----
- arch/arm/mm/flush.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+I also need to implement at91 sram support for ethernet, spi and other drivers
 
-diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
-index f1b7998..e632363 100644
---- a/arch/arm/mm/flush.c
-+++ b/arch/arm/mm/flush.c
-@@ -275,7 +275,8 @@ void __sync_icache_dcache(pte_t pteval)
-  *  kernel cache lines for later.  Otherwise, we assume we have
-  *  aliasing mappings.
-  *
-- * Note that we disable the lazy flush for SMP.
-+ * Note that we disable the lazy flush for SMP configurations where
-+ * the cache maintenance operations are not automatically broadcasted
-  */
- void flush_dcache_page(struct page *page)
- {
--- 
-1.7.1
+and as Russell point other ARM need it also for consolidation.
+
+And I'll not be able to use Russell's patch as I've to manage two sram in one
+allocator on at91sam9263
+
+Tks by advance
+Best Regards,
+J.
