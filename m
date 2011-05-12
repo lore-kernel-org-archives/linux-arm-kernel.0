@@ -1,23 +1,17 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Thu, 12 May 2011 22:57:46 +0100
-Subject: [PATCH] fix build warnings on defconfigs
-In-Reply-To: <1302375858-11253-1-git-send-email-wanlong.gao@gmail.com>
-References: <1302375858-11253-1-git-send-email-wanlong.gao@gmail.com>
-Message-ID: <20110512215746.GB21865@linux-mips.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 May 2011 23:01:29 +0100
+Subject: [PATCH] ARM: Do not use__init annotations to declarations
+In-Reply-To: <4DC597E4.2030003@freescale.com>
+References: <1302388820-18783-1-git-send-email-festevam@gmail.com>
+	<4DC597E4.2030003@freescale.com>
+Message-ID: <20110512220129.GE6098@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Apr 10, 2011 at 03:04:18AM +0800, wanlong.gao at gmail.com wrote:
+On Sat, May 07, 2011 at 04:05:08PM -0300, Fabio Estevam wrote:
+> Is this patch OK?
 
-> Subject: [PATCH] fix build warnings on defconfigs
-> 
-> From: Wanlong Gao <wanlong.gao@gmail.com>
-> 
-> Change the BT_L2CAP and BT_SCO defconfigs from 'm' to 'y',
-> since BT_L2CAP and BT_SCO had changed to bool configs.
-> 
-> Signed-off-by: Wanlong Gao <wanlong.gao@gmail.com>
-
-I've queued the MIPS bits only for 2.6.40.  Thanks.
-
-  Ralf
+Patch is fine as far as it goes.  However, with the current focus on
+the amount of churn in the ARM tree, I'm debating whether or not to
+take this, or wait until these files get touched by some other patch
+first.
