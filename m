@@ -1,26 +1,295 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 12 May 2011 15:15:35 +0200
-Subject: [PATCH] mmci: sync DATAEND irq with dma transfer done
-In-Reply-To: <BANLkTin7_4ijP92u4Zd55zWaMEbv=zbOgA@mail.gmail.com>
-References: <1303203754-1731-1-git-send-email-linus.walleij@stericsson.com>
-	<20110419092049.GC22799@n2100.arm.linux.org.uk>
-	<BANLkTik4mmJzYsOit-5vNzchtHVUyEL+jg@mail.gmail.com>
-	<20110419120344.GG22799@n2100.arm.linux.org.uk>
-	<BANLkTimrsn1MxY+L7_yt0b1LXmaXxpMHPg@mail.gmail.com>
-	<BANLkTin7_4ijP92u4Zd55zWaMEbv=zbOgA@mail.gmail.com>
-Message-ID: <BANLkTik1UzRnCFep1PK75MKmf7zDdDxbEA@mail.gmail.com>
+From: shweta.gulati@ti.com (Gulati, Shweta)
+Date: Thu, 12 May 2011 18:53:51 +0530
+Subject: [PATCH V3] OMAP3+: SR Layer Cleanup
+In-Reply-To: <BANLkTinCjAh_huFr3Oy-RU81W=L=L5xohQ@mail.gmail.com>
+References: <1305105166-26109-1-git-send-email-shweta.gulati@ti.com>
+	<4DCBC74C.4020101@ti.com>
+	<BANLkTinCjAh_huFr3Oy-RU81W=L=L5xohQ@mail.gmail.com>
+Message-ID: <BANLkTik4e=LiTUK1FgPsNWy3TqHGw55FRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/12 Per Forlin <per.forlin@linaro.org>:
+Hi,
 
-> I am willingly to test this dma race condition if there are
-> any doubts whether it still exists or not.
+On Thu, May 12, 2011 at 6:19 PM, Gulati, Shweta <shweta.gulati@ti.com> wrote:
+> Hi,
+>
+> On Thu, May 12, 2011 at 5:11 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+>> Hi Shweta,
+>>
+>> On 5/11/2011 11:12 AM, Gulati, Shweta wrote:
+>>>
+>>> To set sr ntarget values ?for all volt_domain,
+>>> volt_table is retrieved by doing a look_up of 'vdd_name'
+>>> field from omap_hwmod but voltage domain pointer does not
+>>> belong to omap_hwmod and is not used anywhere else.
+>>> As a part of voltage layer and SR Layer clean up volt
+>>> pointer is removed from omap_hwmod and added in dev
+>>> attributes of SR.
+>>>
+>>> Tested on OMAP3630 SDP and OMAP4430 SDP Board
+>>>
+>>> Signed-off-by: Shweta Gulati<shweta.gulati@ti.com>
+>>> Cc: Nishanth Menon<nm@ti.com>
+>>> ---
+>>> V3:
+>>> ? ?Changed the Subject and Rephrased Commit log as reviewed
+>>> ? ?by Nishanth Menon.
+>>> ?V2:
+>>> ? ?Rebased on latest 'pm-wip/voltdm_a' branch.
+>>>
+>>> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c ? | ? 17 +++++++++++++----
+>>> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c ? | ? 19 ++++++++++++++++---
+>>
+>> Since this patch is touching some hwmod files, it will be good to Cc Paul
+>> and me. It is far from obvious from the subject that hwmod data are involved
+>> in this patch.
+> Will do
+>>> ?arch/arm/mach-omap2/smartreflex.h ? ? ? ? ? ?| ? 10 ++++++++++
+>>> ?arch/arm/mach-omap2/sr_device.c ? ? ? ? ? ? ?| ? 11 +++++++----
+>>> ?arch/arm/plat-omap/include/plat/omap_hwmod.h | ? ?1 -
+>>> ?5 files changed, 46 insertions(+), 12 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>>> b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>>> index 3cd91ac..6a704bd 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+>>> @@ -29,6 +29,7 @@
+>>>
+>>> ?#include "omap_hwmod_common_data.h"
+>>>
+>>> +#include "smartreflex.h"
+>>> ?#include "prm-regbits-34xx.h"
+>>> ?#include "cm-regbits-34xx.h"
+>>> ?#include "wd_timer.h"
+>>> @@ -2904,6 +2905,10 @@ static struct omap_hwmod_class
+>>> omap36xx_smartreflex_hwmod_class = {
+>>> ?};
+>>>
+>>> ?/* SR1 */
+>>> +static struct omap_sr_dev_attr sr1_dev_attr = {
+>>> + ? ? ? .voltdm_name ? = "mpu_iva",
+>>> +};
+>>> +
+>>> ?static struct omap_hwmod_ocp_if *omap3_sr1_slaves[] = {
+>>> ? ? ? ? &omap3_l4_core__sr1,
+>>> ?};
+>>> @@ -2912,7 +2917,6 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+>>> ? ? ? ? .name ? ? ? ? ? = "sr1_hwmod",
+>>> ? ? ? ? .class ? ? ? ? ?=&omap34xx_smartreflex_hwmod_class,
+>>> ? ? ? ? .main_clk ? ? ? = "sr1_fck",
+>>> - ? ? ? .vdd_name ? ? ? = "mpu_iva",
+>>> ? ? ? ? .prcm ? ? ? ? ? = {
+>>> ? ? ? ? ? ? ? ? .omap2 = {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+>>> @@ -2924,6 +2928,7 @@ static struct omap_hwmod omap34xx_sr1_hwmod = {
+>>> ? ? ? ? },
+>>> ? ? ? ? .slaves ? ? ? ? = omap3_sr1_slaves,
+>>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr1_slaves),
+>>> + ? ? ? .dev_attr ? ? ? =&sr1_dev_attr,
+>>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_0 |
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_1),
+>>> @@ -2934,7 +2939,6 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
+>>> ? ? ? ? .name ? ? ? ? ? = "sr1_hwmod",
+>>> ? ? ? ? .class ? ? ? ? ?=&omap36xx_smartreflex_hwmod_class,
+>>> ? ? ? ? .main_clk ? ? ? = "sr1_fck",
+>>> - ? ? ? .vdd_name ? ? ? = "mpu_iva",
+>>> ? ? ? ? .prcm ? ? ? ? ? = {
+>>> ? ? ? ? ? ? ? ? .omap2 = {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+>>> @@ -2946,10 +2950,15 @@ static struct omap_hwmod omap36xx_sr1_hwmod = {
+>>> ? ? ? ? },
+>>> ? ? ? ? .slaves ? ? ? ? = omap3_sr1_slaves,
+>>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr1_slaves),
+>>> + ? ? ? .dev_attr ? ? ? =&sr1_dev_attr,
+>>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+>>> ?};
+>>>
+>>> ?/* SR2 */
+>>> +static struct omap_sr_dev_attr sr2_dev_attr = {
+>>> + ? ? ? .voltdm_name ? ?= "core",
+>>> +};
+>>> +
+>>> ?static struct omap_hwmod_ocp_if *omap3_sr2_slaves[] = {
+>>> ? ? ? ? &omap3_l4_core__sr2,
+>>> ?};
+>>> @@ -2958,7 +2967,6 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+>>> ? ? ? ? .name ? ? ? ? ? = "sr2_hwmod",
+>>> ? ? ? ? .class ? ? ? ? ?=&omap34xx_smartreflex_hwmod_class,
+>>> ? ? ? ? .main_clk ? ? ? = "sr2_fck",
+>>> - ? ? ? .vdd_name ? ? ? = "core",
+>>> ? ? ? ? .prcm ? ? ? ? ? = {
+>>> ? ? ? ? ? ? ? ? .omap2 = {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+>>> @@ -2970,6 +2978,7 @@ static struct omap_hwmod omap34xx_sr2_hwmod = {
+>>> ? ? ? ? },
+>>> ? ? ? ? .slaves ? ? ? ? = omap3_sr2_slaves,
+>>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr2_slaves),
+>>> + ? ? ? .dev_attr ? ? ? =&sr2_dev_attr,
+>>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3430ES2 |
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_0 |
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CHIP_IS_OMAP3430ES3_1),
+>>> @@ -2980,7 +2989,6 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
+>>> ? ? ? ? .name ? ? ? ? ? = "sr2_hwmod",
+>>> ? ? ? ? .class ? ? ? ? ?=&omap36xx_smartreflex_hwmod_class,
+>>> ? ? ? ? .main_clk ? ? ? = "sr2_fck",
+>>> - ? ? ? .vdd_name ? ? ? = "core",
+>>> ? ? ? ? .prcm ? ? ? ? ? = {
+>>> ? ? ? ? ? ? ? ? .omap2 = {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? .prcm_reg_id = 1,
+>>> @@ -2992,6 +3000,7 @@ static struct omap_hwmod omap36xx_sr2_hwmod = {
+>>> ? ? ? ? },
+>>> ? ? ? ? .slaves ? ? ? ? = omap3_sr2_slaves,
+>>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap3_sr2_slaves),
+>>> + ? ? ? .dev_attr ? ? ? =&sr2_dev_attr,
+>>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP3630ES1),
+>>> ?};
+>>>
+>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> index 3e88dd3..1331b39 100644
+>>> --- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> +++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+>>> @@ -30,6 +30,7 @@
+>>>
+>>> ?#include "omap_hwmod_common_data.h"
+>>>
+>>> +#include "smartreflex.h"
+>>> ?#include "cm1_44xx.h"
+>>> ?#include "cm2_44xx.h"
+>>> ?#include "prm44xx.h"
+>>> @@ -3775,6 +3776,10 @@ static struct omap_hwmod_class
+>>> omap44xx_smartreflex_hwmod_class = {
+>>> ?};
+>>>
+>>> ?/* smartreflex_core */
+>>> +static struct omap_sr_dev_attr sr_core_dev_attr = {
+>>
+>> In order to stick to the convention used so far for the other dev_attr,
+>> please use the following :
+>> +/* smartreflex_core dev_attr */
+>> +static struct omap_smartreflex_dev_attr smartreflex_core_dev_attr = {
+>>
+>>> + ? ? ? .voltdm_name ? = "core",
+>>> +};
+>>
+>> And you should move it on top of the omap44xx_smartreflex_XXX_hwmod
+>> structure.
+> Will do.
+>>> +
+>>> ?static struct omap_hwmod omap44xx_smartreflex_core_hwmod;
+>>> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_core_irqs[] = {
+>>> ? ? ? ? { .irq = 19 + OMAP44XX_IRQ_GIC_START },
+>>> @@ -3809,7 +3814,6 @@ static struct omap_hwmod
+>>> omap44xx_smartreflex_core_hwmod = {
+>>> ? ? ? ? .mpu_irqs ? ? ? = omap44xx_smartreflex_core_irqs,
+>>> ? ? ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_core_irqs),
+>>> ? ? ? ? .main_clk ? ? ? = "smartreflex_core_fck",
+>>> - ? ? ? .vdd_name ? ? ? = "core",
+>>> ? ? ? ? .prcm = {
+>>> ? ? ? ? ? ? ? ? .omap4 = {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? .clkctrl_reg = OMAP4430_CM_ALWON_SR_CORE_CLKCTRL,
+>>> @@ -3817,10 +3821,15 @@ static struct omap_hwmod
+>>> omap44xx_smartreflex_core_hwmod = {
+>>> ? ? ? ? },
+>>> ? ? ? ? .slaves ? ? ? ? = omap44xx_smartreflex_core_slaves,
+>>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_core_slaves),
+>>> + ? ? ? .dev_attr ? ? ? =&sr_core_dev_attr,
+>>
+>> Move .dev_attr before the .slaves.
+Following the convention used with other dev_attr, all dev_attr are
+defined after slaves.
+>> The two last points are applicable for every SR instances.
+> Ok.
+>>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+>>> ?};
+>>>
+>>> ?/* smartreflex_iva */
+>>> +static struct omap_sr_dev_attr sr_iva_dev_attr = {
+>>> + ? ? ? .voltdm_name ? = "iva",
+>>> +};
+>>> +
+>>> ?static struct omap_hwmod omap44xx_smartreflex_iva_hwmod;
+>>> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_iva_irqs[] = {
+>>> ? ? ? ? { .irq = 102 + OMAP44XX_IRQ_GIC_START },
+>>> @@ -3855,7 +3864,6 @@ static struct omap_hwmod
+>>> omap44xx_smartreflex_iva_hwmod = {
+>>> ? ? ? ? .mpu_irqs ? ? ? = omap44xx_smartreflex_iva_irqs,
+>>> ? ? ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_iva_irqs),
+>>> ? ? ? ? .main_clk ? ? ? = "smartreflex_iva_fck",
+>>> - ? ? ? .vdd_name ? ? ? = "iva",
+>>> ? ? ? ? .prcm = {
+>>> ? ? ? ? ? ? ? ? .omap4 = {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? .clkctrl_reg = OMAP4430_CM_ALWON_SR_IVA_CLKCTRL,
+>>> @@ -3863,10 +3871,15 @@ static struct omap_hwmod
+>>> omap44xx_smartreflex_iva_hwmod = {
+>>> ? ? ? ? },
+>>> ? ? ? ? .slaves ? ? ? ? = omap44xx_smartreflex_iva_slaves,
+>>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_iva_slaves),
+>>> + ? ? ? .dev_attr ? ? ? =&sr_iva_dev_attr,
+>>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+>>> ?};
+>>>
+>>> ?/* smartreflex_mpu */
+>>> +static struct omap_sr_dev_attr sr_mpu_dev_attr = {
+>>> + ? ? ? .voltdm_name ? = "mpu",
+>>> +};
+>>> +
+>>> ?static struct omap_hwmod omap44xx_smartreflex_mpu_hwmod;
+>>> ?static struct omap_hwmod_irq_info omap44xx_smartreflex_mpu_irqs[] = {
+>>> ? ? ? ? { .irq = 18 + OMAP44XX_IRQ_GIC_START },
+>>> @@ -3901,7 +3914,6 @@ static struct omap_hwmod
+>>> omap44xx_smartreflex_mpu_hwmod = {
+>>> ? ? ? ? .mpu_irqs ? ? ? = omap44xx_smartreflex_mpu_irqs,
+>>> ? ? ? ? .mpu_irqs_cnt ? = ARRAY_SIZE(omap44xx_smartreflex_mpu_irqs),
+>>> ? ? ? ? .main_clk ? ? ? = "smartreflex_mpu_fck",
+>>> - ? ? ? .vdd_name ? ? ? = "mpu",
+>>> ? ? ? ? .prcm = {
+>>> ? ? ? ? ? ? ? ? .omap4 = {
+>>> ? ? ? ? ? ? ? ? ? ? ? ? .clkctrl_reg = OMAP4430_CM_ALWON_SR_MPU_CLKCTRL,
+>>> @@ -3909,6 +3921,7 @@ static struct omap_hwmod
+>>> omap44xx_smartreflex_mpu_hwmod = {
+>>> ? ? ? ? },
+>>> ? ? ? ? .slaves ? ? ? ? = omap44xx_smartreflex_mpu_slaves,
+>>> ? ? ? ? .slaves_cnt ? ? = ARRAY_SIZE(omap44xx_smartreflex_mpu_slaves),
+>>> + ? ? ? .dev_attr ? ? ? =&sr_mpu_dev_attr,
+>>> ? ? ? ? .omap_chip ? ? ?= OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
+>>> ?};
+>>>
+>>> diff --git a/arch/arm/mach-omap2/smartreflex.h
+>>> b/arch/arm/mach-omap2/smartreflex.h
+>>> index 5f35b9e..9a7f770 100644
+>>> --- a/arch/arm/mach-omap2/smartreflex.h
+>>> +++ b/arch/arm/mach-omap2/smartreflex.h
+>>> @@ -197,6 +197,16 @@ struct omap_sr_nvalue_table {
+>>> ?};
+>>>
+>>> ?/**
+>>> + * struct omap_sr_dev_attr - Smartreflex Device attribute.
+>>> + *
+>>> + * @voltdm_name: ? ? ? Name of voltdomain of SR instance
+>>
+>> You should be more specific. This is the name of the SR sensor voltage
+>> domain.
+>> The Smartreflex controller IPs are all inside the CORE voltage domain.
+> Ok.
+>> Regards,
+>> Benoit
+>>
+>
+>
+>
+> --
+> Thanks,
+> Regards,
+> Shweta
+>
 
-That'd be super, can you test on U8500 and U5500 alike and report
-results, but if it's gone I'd very much like to know why, since in
-theory the problem is still there (provided I'm not completely
-misunderstanding the hardware, which is quite possible).
 
+
+-- 
 Thanks,
-Linus Walleij
+Regards,
+Shweta
