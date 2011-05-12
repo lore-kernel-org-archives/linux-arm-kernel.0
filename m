@@ -1,167 +1,82 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 12 May 2011 09:16:16 +0200 (CEST)
-Subject: [PATCH 1/2] ARM: Replace platform definition of
-	ISA_DMA_THRESHOLD/MAX_DMA_ADDRESS
-In-Reply-To: <E1QKCDr-0007Nk-4P@rmk-PC.arm.linux.org.uk>
-References: <20110511162450.GF5315@n2100.arm.linux.org.uk>
-	<E1QKCDr-0007Nk-4P@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1105120914420.28229@xanadu.home>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 12 May 2011 09:22:43 +0200
+Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
+In-Reply-To: <20110512044731.GA24746@kroah.com>
+References: <1305037463-10222-1-git-send-email-plagnioj@jcrosoft.com>	<4DC95D19.7070707@ru.mvista.com>	<20110510155038.GJ18791@game.jcrosoft.org>	<20110510170500.GB15675@kroah.com>	<20110510235324.GD18929@game.jcrosoft.org>	<20110511015829.GB6840@kroah.com>	<20110511031854.GF18929@game.jcrosoft.org>	<20110511135041.GC12717@kroah.com>	<20110512013038.GA24270@game.jcrosoft.org>
+	<20110512044731.GA24746@kroah.com>
+Message-ID: <4DCB8AC3.2020403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 May 2011, Russell King - ARM Linux wrote:
-
-> The values of ISA_DMA_THRESHOLD and MAX_DMA_ADDRESS are related; one is
-> the physical/bus address, the other is the virtual address.  Both need
-> to be kept in step, so rather than having platforms define both, allow
-> them to define a single macro which sets both of these macros
-> appropraitely.
+Le 12/05/2011 06:47, Greg KH :
+> On Thu, May 12, 2011 at 03:30:38AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> On 06:50 Wed 11 May     , Greg KH wrote:
+>>> On Wed, May 11, 2011 at 05:18:54AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>> On 18:58 Tue 10 May     , Greg KH wrote:
+>>>>> On Wed, May 11, 2011 at 01:53:24AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>>> On 10:05 Tue 10 May     , Greg KH wrote:
+>>>>>>> On Tue, May 10, 2011 at 05:50:38PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>>>>> On 19:43 Tue 10 May     , Sergei Shtylyov wrote:
+>>>>>>>>> Hello.
+>>>>>>>>>
+>>>>>>>>> Jean-Christophe PLAGNIOL-VILLARD wrote:
+>>>>>>>>>
+>>>>>>>>>> on 9g20 they are the same as the 9261
+>>>>>>>>>
+>>>>>>>>>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>>>>>>>>>> ---
+>>>>>>>>>> drivers/usb/gadget/at91_udc.c |    2 +-
+>>>>>>>>>> 1 files changed, 1 insertions(+), 1 deletions(-)
+>>>>>>>>>
+>>>>>>>>>> diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
+>>>>>>>>>> index 9b7cdb1..41dc093 100644
+>>>>>>>>>> --- a/drivers/usb/gadget/at91_udc.c
+>>>>>>>>>> +++ b/drivers/usb/gadget/at91_udc.c
+>>>>>>>>>> @@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
+>>>>>>>>>> 	}
+>>>>>>>>>> 	/* newer chips have more FIFO memory than rm9200 */
+>>>>>>>>>> -	if (cpu_is_at91sam9260()) {
+>>>>>>>>>> +	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
+>>>>>>>>>
+>>>>>>>>>    These shouldn't be used in the drivers at all.
+>>>>>>>> Sorry this is a bug fix for the current rc and 2.6.38 and older stable tree
+>>>>>>>
+>>>>>>> How could I apply this to the tree for the .40 release then?
+>>>>>> it's also the case these patch apply from kernel v2.6.26 to above
+>>>>>>
+>>>>>> for the 2.6.40 we will rewrite the soc init so we may chane this in .40 or .41
+>>>>>
+>>>>> That makes no sense, how can I go back in time and apply this to an
+>>>>> older kernel version?
+>>>> I known we just need for the longterm and stable tree
+>>>> and the .39-rc8
+>>>>>
+>>>>> Please provide a patch that I can apply against the linux-next tree if
+>>>>> you want this change to be accepted.
+>>>> it's appy to the -next
+>>>
+>>> I have no idea what you are trying to say here.
+>>>
+>>> Care to resend this patch, the correct one, that I can apply to my
+>>> usb-next tree for merging in the .40 merge cycle?
+>> It does apply on the linux-next
+>> and previous kernel version
+>>
+>> and this patch is a fix for the current kernel
+>> so I would like to have it for this release and the stable tree
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> No, I can't apply it because of the comments above Sergei.  Please fix
+> that and get his approval and then I will be able to apply it.
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+I see...
 
-> ---
->  arch/arm/include/asm/dma.h                   |    4 +++-
->  arch/arm/include/asm/memory.h                |    4 +++-
->  arch/arm/mach-davinci/include/mach/memory.h  |    3 +--
->  arch/arm/mach-h720x/include/mach/memory.h    |    3 +--
->  arch/arm/mach-ixp4xx/include/mach/memory.h   |    3 +--
->  arch/arm/mach-pxa/include/mach/memory.h      |    3 +--
->  arch/arm/mach-realview/include/mach/memory.h |    3 +--
->  arch/arm/mach-sa1100/include/mach/memory.h   |    3 +--
->  arch/arm/mach-shark/include/mach/memory.h    |    3 +--
->  9 files changed, 13 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/dma.h b/arch/arm/include/asm/dma.h
-> index ca51143..4200554 100644
-> --- a/arch/arm/include/asm/dma.h
-> +++ b/arch/arm/include/asm/dma.h
-> @@ -6,8 +6,10 @@
->  /*
->   * This is the maximum virtual address which can be DMA'd from.
->   */
-> -#ifndef MAX_DMA_ADDRESS
-> +#ifndef ARM_DMA_ZONE_SIZE
->  #define MAX_DMA_ADDRESS	0xffffffff
-> +#else
-> +#define MAX_DMA_ADDRESS	(PAGE_OFFSET + ARM_DMA_ZONE_SIZE)
->  #endif
->  
->  #ifdef CONFIG_ISA_DMA_API
-> diff --git a/arch/arm/include/asm/memory.h b/arch/arm/include/asm/memory.h
-> index 431077c..ee5ff41 100644
-> --- a/arch/arm/include/asm/memory.h
-> +++ b/arch/arm/include/asm/memory.h
-> @@ -209,8 +209,10 @@ static inline unsigned long __phys_to_virt(unsigned long x)
->   * allocations.  This must be the smallest DMA mask in the system,
->   * so a successful GFP_DMA allocation will always satisfy this.
->   */
-> -#ifndef ISA_DMA_THRESHOLD
-> +#ifndef ARM_DMA_ZONE_SIZE
->  #define ISA_DMA_THRESHOLD	(0xffffffffULL)
-> +#else
-> +#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + ARM_DMA_ZONE_SIZE - 1)
->  #endif
->  
->  #ifndef arch_adjust_zones
-> diff --git a/arch/arm/mach-davinci/include/mach/memory.h b/arch/arm/mach-davinci/include/mach/memory.h
-> index 7882272..8d27246 100644
-> --- a/arch/arm/mach-davinci/include/mach/memory.h
-> +++ b/arch/arm/mach-davinci/include/mach/memory.h
-> @@ -59,8 +59,7 @@ __arch_adjust_zones(unsigned long *size, unsigned long *holes)
->  #define arch_adjust_zones(zone_size, holes) \
->          if ((meminfo.bank[0].size >> 20) > 128) __arch_adjust_zones(zone_size, holes)
->  
-> -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + (128<<20) - 1)
-> -#define MAX_DMA_ADDRESS		(PAGE_OFFSET + (128<<20))
-> +#define ARM_DMA_ZONE_SIZE	SZ_128M
->  
->  #endif
->  
-> diff --git a/arch/arm/mach-h720x/include/mach/memory.h b/arch/arm/mach-h720x/include/mach/memory.h
-> index 9d36876..b0b3bae 100644
-> --- a/arch/arm/mach-h720x/include/mach/memory.h
-> +++ b/arch/arm/mach-h720x/include/mach/memory.h
-> @@ -13,7 +13,6 @@
->   * There should not be more than (0xd0000000 - 0xc0000000)
->   * bytes of RAM.
->   */
-> -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
-> -#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
-> +#define ARM_DMA_ZONE_SIZE	SZ_256M
->  
->  #endif
-> diff --git a/arch/arm/mach-ixp4xx/include/mach/memory.h b/arch/arm/mach-ixp4xx/include/mach/memory.h
-> index 6d388c9..a5c26f8 100644
-> --- a/arch/arm/mach-ixp4xx/include/mach/memory.h
-> +++ b/arch/arm/mach-ixp4xx/include/mach/memory.h
-> @@ -21,8 +21,7 @@ void ixp4xx_adjust_zones(unsigned long *size, unsigned long *holes);
->  #define arch_adjust_zones(size, holes) \
->  	ixp4xx_adjust_zones(size, holes)
->  
-> -#define ISA_DMA_THRESHOLD (SZ_64M - 1)
-> -#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_64M)
-> +#define ARM_DMA_ZONE_SIZE	SZ_64M
->  
->  #endif
->  
-> diff --git a/arch/arm/mach-pxa/include/mach/memory.h b/arch/arm/mach-pxa/include/mach/memory.h
-> index 7f68724..57a0b68 100644
-> --- a/arch/arm/mach-pxa/include/mach/memory.h
-> +++ b/arch/arm/mach-pxa/include/mach/memory.h
-> @@ -23,8 +23,7 @@ void cmx2xx_pci_adjust_zones(unsigned long *size, unsigned long *holes);
->  #define arch_adjust_zones(size, holes) \
->  	cmx2xx_pci_adjust_zones(size, holes)
->  
-> -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_64M - 1)
-> -#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_64M)
-> +#define ARM_DMA_ZONE_SIZE	SZ_64M
->  #endif
->  
->  #endif
-> diff --git a/arch/arm/mach-realview/include/mach/memory.h b/arch/arm/mach-realview/include/mach/memory.h
-> index e05fc2c..973428d 100644
-> --- a/arch/arm/mach-realview/include/mach/memory.h
-> +++ b/arch/arm/mach-realview/include/mach/memory.h
-> @@ -34,8 +34,7 @@ extern void realview_adjust_zones(unsigned long *size, unsigned long *hole);
->  #define arch_adjust_zones(size, hole) \
->  	realview_adjust_zones(size, hole)
->  
-> -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_256M - 1)
-> -#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_256M)
-> +#define ARM_DMA_ZONE_SIZE	SZ_256M
->  #endif
->  
->  #ifdef CONFIG_SPARSEMEM
-> diff --git a/arch/arm/mach-sa1100/include/mach/memory.h b/arch/arm/mach-sa1100/include/mach/memory.h
-> index a44da6a..090b829 100644
-> --- a/arch/arm/mach-sa1100/include/mach/memory.h
-> +++ b/arch/arm/mach-sa1100/include/mach/memory.h
-> @@ -22,8 +22,7 @@ void sa1111_adjust_zones(unsigned long *size, unsigned long *holes);
->  #define arch_adjust_zones(size, holes) \
->  	sa1111_adjust_zones(size, holes)
->  
-> -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_1M - 1)
-> -#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_1M)
-> +#define ARM_DMA_ZONE_SIZE	SZ_1M
->  
->  #endif
->  #endif
-> diff --git a/arch/arm/mach-shark/include/mach/memory.h b/arch/arm/mach-shark/include/mach/memory.h
-> index 9afb170..48fe84b 100644
-> --- a/arch/arm/mach-shark/include/mach/memory.h
-> +++ b/arch/arm/mach-shark/include/mach/memory.h
-> @@ -32,8 +32,7 @@ static inline void __arch_adjust_zones(unsigned long *zone_size, unsigned long *
->  #define arch_adjust_zones(size, holes) \
->  	__arch_adjust_zones(size, holes)
->  
-> -#define ISA_DMA_THRESHOLD	(PHYS_OFFSET + SZ_4M - 1)
-> -#define MAX_DMA_ADDRESS		(PAGE_OFFSET + SZ_4M)
-> +#define ARM_DMA_ZONE_SIZE	SZ_4M
->  
->  #endif
->  
-> -- 
-> 1.7.4.4
-> 
+Jean-Christophe already posted a V2 patch (on lakml and linux-usb):
+"[PATCH V2] usb/gadget: at91sam9g20 fix end point max packet size"
+
+with proper comment and my "Acked-by".
+
+Is it ok for you?
+
+Best regards,
+-- 
+Nicolas Ferre
