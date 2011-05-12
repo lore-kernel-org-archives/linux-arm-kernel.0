@@ -1,31 +1,22 @@
-From: kees.cook@canonical.com (Kees Cook)
-Date: Thu, 12 May 2011 02:24:24 -0700
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <20110512074850.GA9937@elte.hu>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-Message-ID: <20110512092424.GO28888@outflux.net>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Thu, 12 May 2011 17:26:59 +0800
+Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface
+	(ISI)support
+In-Reply-To: <20110512074725.GA1356@n2100.arm.linux.org.uk>
+References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
+	<20110512074725.GA1356@n2100.arm.linux.org.uk>
+Message-ID: <4C79549CB6F772498162A641D92D532801AC28CD@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi, Russell
 
-On Thu, May 12, 2011 at 09:48:50AM +0200, Ingo Molnar wrote:
-> 1) We already have a specific ABI for this: you can set filters for events via 
->    an event fd.
-> 
->    Why not extend that mechanism instead and improve *both* your sandboxing
->    bits and the events code? This new seccomp code has a lot more
->    to do with trace event filters than the minimal old seccomp code ...
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] Sent: Thursday, May 12, 2011 3:47 PM
+> On Thu, May 12, 2011 at 03:42:18PM +0800, Josh Wu wrote:
+>> +err_alloc_isi:
+>> +	clk_disable(pclk);
+> clk_put() ?
+Ok, will be fixed in V2 patch. Thanks.
 
-Would this require privileges to get the event fd to start with? If so,
-I would prefer to avoid that, since using prctl() as shown in the patch
-set won't require any privs.
-
--Kees
-
--- 
-Kees Cook
-Ubuntu Security Team
+Best Regards,
+Josh Wu
