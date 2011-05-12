@@ -1,24 +1,33 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 12 May 2011 14:08:55 +0530
-Subject: [PATCH 2/7] ASoC: Remove to support sound for S5PC100
-In-Reply-To: <03fa01cc1079$c2583670$4708a350$%kim@samsung.com>
-References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<1305162674-25860-3-git-send-email-kgene.kim@samsung.com>
-	<BANLkTinqyFCwp3FCOyW=gVhotd1p8DnDyw@mail.gmail.com>
-	<03fa01cc1079$c2583670$4708a350$%kim@samsung.com>
-Message-ID: <BANLkTimZnzfWuKB+J0z7YT-0ZT_B5_OvBQ@mail.gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 12 May 2011 13:58:56 +0530
+Subject: [PATCH] dmaengine: at_hdmac: pause: no need to wait for FIFO empty
+In-Reply-To: <1304957497-22814-1-git-send-email-nicolas.ferre@atmel.com>
+References: <be7d19459501aaa604aebe91daa9e9e59bb41c86.1304704588.git.nicolas.ferre@atmel.com>
+	<1304957497-22814-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <1305188936.28926.66.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 1:23 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+On Mon, 2011-05-09 at 18:11 +0200, Nicolas Ferre wrote:
+> The addition of the pause feature to atc_control an active wait was introduced
+> to check the FIFO empty event. This event was not always happening and
+> a timout contition was needed.
+> But, in some cases, this event depend on the peripheral connected to the
+> channel that is paused: FIFO becomes empty if the peripheral consumes data.
+> The timeout is pretty difficult to evaluate. Moreover, this check is not
+> needed.
+> In conclusion, it seems sensible to entirely remove the checking of
+> "FIFO empty" status when pausing.
+> 
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> ---
+> Vinod,
+> 
+> This additional patch goes on top of your current "next" branch. It is a
+> removing of some code added to the pause/resume patch sent earlier and can be
+> folded into this one if you want to.
+> 
+Applied with edit in commit msg, Thanks
 
->> You might also want to remove smdkc100 support from
->> ?sound/soc/samsung/smdk_wm9713.c
->> ?sound/soc/samsung/smdk_wm8580.c
->> And three other references to smdkc100 in sound/soc/samsung/Kconfig
->
-> I found something for smdkc100 in smdk_wm8580.c but I'm not sure which should be removed in smdk_wm9713.c.
->
-
-Just the comment about jumper settings on smdkc100
-otherwise it gives wrong impression that the board is supported.
+-- 
+~Vinod
