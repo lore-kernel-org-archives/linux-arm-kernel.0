@@ -1,104 +1,119 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 12 May 2011 09:49:19 +0200
-Subject: [RFC 3/3] ARM:Tegra: Device Tree Support: Initialize from wm8903
-	the device tree
-In-Reply-To: <20110511232711.10362.53256.stgit@riker>
-References: <20110511231905.10362.12844.stgit@riker>
-	<20110511232711.10362.53256.stgit@riker>
-Message-ID: <20110512074917.GA16250@opensource.wolfsonmicro.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Thu, 12 May 2011 09:48:50 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <1305169376-2363-1-git-send-email-wad@chromium.org>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+Message-ID: <20110512074850.GA9937@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 04:27:18PM -0700, John Bonesio wrote:
-> This patch makes it so the wm8903 is initialized from it's device tree node.
-> 
-> Signed-off-by: John Bonesio<bones@secretlab.ca>
-> ---
-> 
->  arch/arm/boot/dts/tegra-harmony.dts |   17 ++++++
->  sound/soc/codecs/wm8903.c           |   93 +++++++++++++++++++++++++++++++++--
 
-This needs to be sent separately to the relevant mailing lists and
-maintainers.  You can't go making substantial changes to drivers without
-even telling the maintainers about it - this will apply to any device
-tree work you're doing.  In this case one of the maintainers happens to
-be me, but even so.
+Ok, i like the direction here, but i think the ABI should be done differently.
 
-> +			interrupts = < 347 >;
-> +			irq-active-low = <0>;
-> +			micdet-cfg = <0>;
-> +			micdet-delay = <100>;
+In this patch the ftrace event filter mechanism is used:
 
-Some of this looks like chip default, why is it being configured?
+* Will Drewry <wad@chromium.org> wrote:
 
-> +                       gpio-controller;
-> +                       #gpio-cells = <2>;
-
-The fact that this device is a GPIO controller is a physical property of
-the device, we shouldn't need to be putting it into the device tree.
-
-> +			gpio-num-cfg = < 5 >;
-
-Similarly here, the device has a fixed number of GPIOs.
-
-> +			/* #define WM8903_GPIO_NO_CONFIG 0x8000 */
-> +			gpio-cfg = < 0x8000 0x8000 0 0x8000 0x8000 >;
-
-This doesn't seem great for usability.  I'd suggest key/value pairs
-rather than an array.
-
-> -	if (pdata && pdata->gpio_base)
-> +	wm8903->gpio_chip.base = -1;
-> +	if (pdata && pdata->gpio_base) {
->  		wm8903->gpio_chip.base = pdata->gpio_base;
-> -	else
-> -		wm8903->gpio_chip.base = -1;
-> +	} else if (codec->dev->of_node) {
-> +		prop = of_get_property(codec->dev->of_node, "gpio-base", NULL);
-> +		if (prop)
-> +			wm8903->gpio_chip.base = be32_to_cpup(prop);
+> +static struct seccomp_filter *alloc_seccomp_filter(int syscall_nr,
+> +						   const char *filter_string)
+> +{
+> +	int err = -ENOMEM;
+> +	struct seccomp_filter *filter = kzalloc(sizeof(struct seccomp_filter),
+> +						GFP_KERNEL);
+> +	if (!filter)
+> +		goto fail;
+> +
+> +	INIT_HLIST_NODE(&filter->node);
+> +	filter->syscall_nr = syscall_nr;
+> +	filter->data = syscall_nr_to_meta(syscall_nr);
+> +
+> +	/* Treat a filter of SECCOMP_WILDCARD_FILTER as a wildcard and skip
+> +	 * using a predicate at all.
+> +	 */
+> +	if (!strcmp(SECCOMP_WILDCARD_FILTER, filter_string))
+> +		goto out;
+> +
+> +	/* Argument-based filtering only works on ftrace-hooked syscalls. */
+> +	if (!filter->data) {
+> +		err = -ENOSYS;
+> +		goto fail;
 > +	}
-
-We have to do manual endianness conversions to read from the device
-tree?  Oh, well.
-
 > +
-> +		prop = of_get_property(codec->dev->of_node, "interrupts", NULL);
-> +		if (prop)
-> +			wm8903->irq = be32_to_cpup(prop);
+> +#ifdef CONFIG_FTRACE_SYSCALLS
+> +	err = ftrace_parse_filter(&filter->event_filter,
+> +				  filter->data->enter_event->event.type,
+> +				  filter_string);
+> +	if (err)
+> +		goto fail;
+> +#endif
 > +
-
-We have a standard way of passing the IRQ number to I2C devices, surely
-we should make sure that works at the bus level rather than having to
-replicate this code everywhere?
-
-> +		prop = of_get_property(codec->dev->of_node, "micdet-cfg", NULL);
-> +		if (prop)
-> +			micdet_cfg = be32_to_cpup(prop);
+> +out:
+> +	return filter;
 > +
-> +		snd_soc_write(codec, WM8903_MIC_BIAS_CONTROL_0, micdet_cfg);
-> +
-> +		if (micdet_cfg)
-> +			snd_soc_update_bits(codec, WM8903_WRITE_SEQUENCER_0,
-> +					    WM8903_WSEQ_ENA, WM8903_WSEQ_ENA);
-> +		
-> +		/* If microphone detection is enabled in device tree but
-> +		 * detected via IRQ then interrupts can be lost before
-> +		 * the machine driver has set up microphone detection
-> +		 * IRQs as the IRQs are clear on read.  The detection
-> +		 * will be enabled when the machine driver configures.
-> +		 */
-> +		WARN_ON(!mic_gpio && (micdet_cfg & WM8903_MICDET_ENA));
-> +
+> +fail:
+> +	kfree(filter);
+> +	return ERR_PTR(err);
+> +}
 
-There's an awful lot of cut'n'paste code for the parsing code from the
-platform data code.
+Via a prctl() ABI:
 
->  config SND_TEGRA_SOC_HARMONY
->  	tristate "SoC Audio support for Tegra Harmony reference board"
-> -	depends on SND_TEGRA_SOC && MACH_HARMONY && I2C
-> +	depends on SND_TEGRA_SOC && (MACH_HARMONY || MACH_TEGRA_DT) && I2C
+> --- a/kernel/sys.c
+> +++ b/kernel/sys.c
+> @@ -1698,12 +1698,23 @@ SYSCALL_DEFINE5(prctl, int, option, unsigned long, arg2, unsigned long, arg3,
+>  		case PR_SET_ENDIAN:
+>  			error = SET_ENDIAN(me, arg2);
+>  			break;
+> -
+>  		case PR_GET_SECCOMP:
+>  			error = prctl_get_seccomp();
+>  			break;
+>  		case PR_SET_SECCOMP:
+> -			error = prctl_set_seccomp(arg2);
+> +			error = prctl_set_seccomp(arg2, arg3);
+> +			break;
+> +		case PR_SET_SECCOMP_FILTER:
+> +			error = prctl_set_seccomp_filter(arg2,
+> +							 (char __user *) arg3);
+> +			break;
+> +		case PR_CLEAR_SECCOMP_FILTER:
+> +			error = prctl_clear_seccomp_filter(arg2);
+> +			break;
+> +		case PR_GET_SECCOMP_FILTER:
+> +			error = prctl_get_seccomp_filter(arg2,
+> +							 (char __user *) arg3,
+> +							 arg4);
 
-You've not added anything to the device tree to register the platform
-device for the machine and I rather fear this won't apply to current
-code.  You should develop against -next.
+To restrict execution to system calls.
+
+Two observations:
+
+1) We already have a specific ABI for this: you can set filters for events via 
+   an event fd.
+
+   Why not extend that mechanism instead and improve *both* your sandboxing
+   bits and the events code? This new seccomp code has a lot more
+   to do with trace event filters than the minimal old seccomp code ...
+
+   kernel/trace/trace_event_filter.c is 2000 lines of tricky code that
+   interprets the ASCII filter expressions. kernel/seccomp.c is 86 lines of
+   mostly trivial code.
+
+2) Why should this concept not be made available wider, to allow the 
+   restriction of not just system calls but other security relevant components 
+   of the kernel as well?
+
+   This too, if you approach the problem via the events code, will be a natural 
+   end result, while if you approach it from the seccomp prctl angle it will be
+   a limited hack only.
+
+Note, the end result will be the same - just using a different ABI.
+
+So i really think the ABI itself should be closer related to the event code. 
+What this "seccomp" code does is that it uses specific syscall events to 
+restrict execution of certain event generating codepaths, such as system calls.
+
+Thanks,
+
+	Ingo
