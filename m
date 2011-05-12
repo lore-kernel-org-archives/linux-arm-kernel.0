@@ -1,202 +1,110 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 12 May 2011 14:51:41 +0100
-Subject: [PATCH 15/13] clocksource: ARM sp804: obtain sp804 timer rate via clks
-In-Reply-To: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-Message-ID: <20110512135141.GC6098@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 12 May 2011 16:02:35 +0200
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <20110512074421.GA2429@pengutronix.de>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+	<20110512074421.GA2429@pengutronix.de>
+Message-ID: <BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows platforms to specify the rate of the SP804 clocksource via
-the clk subsystem.  While ARM boards clock these at 1MHz, BCMRing also
-has SP804 timers but are clocked at different rates.
+2011/5/12 Sascha Hauer <s.hauer@pengutronix.de>:
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/common/timer-sp.c               |   24 +++++++++++++++++++++++-
- arch/arm/mach-integrator/integrator_cp.c |    7 +++++++
- arch/arm/mach-realview/core.c            |    9 ++++++++-
- arch/arm/mach-versatile/core.c           |    9 ++++++++-
- arch/arm/mach-vexpress/ct-ca9x4.c        |    8 ++++++++
- arch/arm/mach-vexpress/v2m.c             |    8 ++++++++
- 6 files changed, 62 insertions(+), 3 deletions(-)
+> What I'm missing though is a generic way a single pad/mux mode
+> combination can be described. Let me take a look around how the
+> different subarchs do this:
+>
+> omap:
+>
+> ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA21, 91,
+> ? ? ? ? ? ? ? ?"dss_data21", NULL, "mcspi3_cs0", "dss_data3",
+> ? ? ? ? ? ? ? ?"gpio_91", NULL, NULL, "safe_mode"),
+> ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA22, 92,
+> ? ? ? ? ? ? ? ?"dss_data22", NULL, "mcspi3_cs1", "dss_data4",
+> ? ? ? ? ? ? ? ?"gpio_92", NULL, NULL, "safe_mode"),
+>
+> pxa:
+>
+> #define GPIO16_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO16, AF3, DRIVE_HIGH)
+> #define GPIO37_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO37, AF3, DRIVE_HIGH)
+> #define GPIO39_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO39, AF2, DRIVE_HIGH)
+> #define GPIO83_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO83, AF2, DRIVE_HIGH)
+> #define GPIO99_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO99, AF3, DRIVE_HIGH)
+>
+> i.MX:
+>
+> #define _MX51_PAD_UART3_RXD__CSI1_D0 ? ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
+> #define _MX51_PAD_UART3_RXD__GPIO1_22 ? ? ? ? ? IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
+> #define _MX51_PAD_UART3_RXD__UART1_DTR ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
+> #define _MX51_PAD_UART3_RXD__UART3_RXD ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 1, 0x09f4, 4, 0)
+> #define _MX51_PAD_UART3_TXD__CSI1_D1 ? ? ? ? ? ?IOMUX_PAD(0x634, 0x244, 2, 0x0000, 0, 0)
+>
+> These all basically describe the same thing: put pad x into one of modes
+> a, b, c and apply certain flags like drive strength on this.
+>
+> the other class of pin muxing I know of is that a whole group of pads
+> can be switched to a particular mode using a mux register like I think
+> is used used in your ux300 driver.
+>
+> I'd like to have a unified way to describe this.
 
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index f6b9011..e201941 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -18,8 +18,10 @@
-  * along with this program; if not, write to the Free Software
-  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-  */
-+#include <linux/clk.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
-+#include <linux/err.h>
- #include <linux/interrupt.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-@@ -34,6 +36,26 @@
- 
- void __init sp804_clocksource_init(void __iomem *base, const char *name)
- {
-+	unsigned long rate;
-+	struct clk *clk;
-+	int err;
-+
-+	clk = clk_get_sys("sp804", name);
-+	if (IS_ERR(clk)) {
-+		pr_err("sp804: %s clock not found: %d\n", name,
-+			(int)PTR_ERR(clk));
-+		return;
-+	}
-+
-+	err = clk_enable(clk);
-+	if (err) {
-+		pr_err("sp804: %s clock failed to enable: %d\n", name, err);
-+		clk_put(clk);
-+		return;
-+	}
-+
-+	rate = clk_get_rate(clk);
-+
- 	/* setup timer 0 as free-running clocksource */
- 	writel(0, base + TIMER_CTRL);
- 	writel(0xffffffff, base + TIMER_LOAD);
-@@ -42,7 +64,7 @@ void __init sp804_clocksource_init(void __iomem *base, const char *name)
- 		base + TIMER_CTRL);
- 
- 	clocksource_mmio_init(base + TIMER_VALUE, name,
--		TIMER_FREQ_KHZ * 1000, 200, 32, clocksource_mmio_readl_down);
-+		rate, 200, 32, clocksource_mmio_readl_down);
- }
- 
- 
-diff --git a/arch/arm/mach-integrator/integrator_cp.c b/arch/arm/mach-integrator/integrator_cp.c
-index 46fb7f5..8fb8afb 100644
---- a/arch/arm/mach-integrator/integrator_cp.c
-+++ b/arch/arm/mach-integrator/integrator_cp.c
-@@ -229,10 +229,17 @@ static struct clk cp_auxclk = {
- 	.vcoreg	= CM_AUXOSC,
- };
- 
-+static struct clk sp804_clk = {
-+	.rate	= 1000000,
-+};
-+
- static struct clk_lookup cp_lookups[] = {
- 	{	/* CLCD */
- 		.dev_id		= "mb:c0",
- 		.clk		= &cp_auxclk,
-+	}, {	/* SP804 timers */
-+		.dev_id		= "sp804",
-+		.clk		= &sp804_clk,
- 	},
- };
- 
-diff --git a/arch/arm/mach-realview/core.c b/arch/arm/mach-realview/core.c
-index 6356b5e..6a9cd1e 100644
---- a/arch/arm/mach-realview/core.c
-+++ b/arch/arm/mach-realview/core.c
-@@ -315,6 +315,10 @@ static struct clk ref24_clk = {
- 	.rate	= 24000000,
- };
- 
-+static struct clk sp804_clk = {
-+	.rate	= 1000000,
-+};
-+
- static struct clk dummy_apb_pclk;
- 
- static struct clk_lookup lookups[] = {
-@@ -357,7 +361,10 @@ static struct clk_lookup lookups[] = {
- 	}, {	/* SSP */
- 		.dev_id		= "dev:ssp0",
- 		.clk		= &ref24_clk,
--	}
-+	}, {	/* SP804 timers */
-+		.dev_id		= "sp804",
-+		.clk		= &sp804_clk,
-+	},
- };
- 
- void __init realview_init_early(void)
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index aad6d39..b0b7de6 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -375,6 +375,10 @@ static struct clk ref24_clk = {
- 	.rate	= 24000000,
- };
- 
-+static struct clk sp804_clk = {
-+	.rate	= 1000000,
-+};
-+
- static struct clk dummy_apb_pclk;
- 
- static struct clk_lookup lookups[] = {
-@@ -411,7 +415,10 @@ static struct clk_lookup lookups[] = {
- 	}, {	/* CLCD */
- 		.dev_id		= "dev:20",
- 		.clk		= &osc4_clk,
--	}
-+	}, {	/* SP804 timers */
-+		.dev_id		= "sp804",
-+		.clk		= &sp804_clk,
-+	},
- };
- 
- /*
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index c833fd9..6004f06 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -141,10 +141,18 @@ static struct clk osc1_clk = {
- 	.rate	= 24000000,
- };
- 
-+static struct clk ct_sp804_clk = {
-+	.rate	= 1000000,
-+};
-+
- static struct clk_lookup lookups[] = {
- 	{	/* CLCD */
- 		.dev_id		= "ct:clcd",
- 		.clk		= &osc1_clk,
-+	}, {	/* SP804 timers */
-+		.dev_id		= "sp804",
-+		.con_id		= "ct-timer1",
-+		.clk		= &ct_sp804_clk,
- 	},
- };
- 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index ccf1f89..77d5db3 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -333,6 +333,10 @@ static struct clk osc2_clk = {
- 	.rate	= 24000000,
- };
- 
-+static struct clk v2m_sp804_clk = {
-+	.rate	= 1000000,
-+};
-+
- static struct clk dummy_apb_pclk;
- 
- static struct clk_lookup v2m_lookups[] = {
-@@ -363,6 +367,10 @@ static struct clk_lookup v2m_lookups[] = {
- 	}, {	/* CLCD */
- 		.dev_id		= "mb:clcd",
- 		.clk		= &osc1_clk,
-+	}, {	/* SP804 timers */
-+		.dev_id		= "sp804",
-+		.con_id		= "v2m-timer1",
-+		.clk		= &v2m_sp804_clk,
- 	},
- };
- 
--- 
-1.7.4.4
+Hm, so some of the structure I currently have inside the specific U300 driver
+need to become generic, in such way that say by activating 8 different
+padmux functions at the same, this can boil down to a single register
+write instead of 8 different register writes?
+
+> Do you think it's possible to do some consolidation on this level
+> aswell? It would really bring different SoCs more together.
+
+I am thinking on the abstract level, now we would have:
+
+Board:
+static struct pinmux_map pmx_map[] = {
+        PINMUX_MAP("foo0", "foo0-1"),
+        PINMUX_MAP("bar0", "bar0-1"),
+};
+pinmux_register_mappings(pmx_map, ARRAY_SIZE(pmx_map));
+
+Driver:
+pmx = pinmux_get("foo0", NULL);
+pinmux_enable(pmx);
+
+For each of the mux functions. Now we need a grouping of
+these functions.
+
+So if I invent say pinmux function groups and add an argument
+to pinmux_register_mappings() so it takes an optional groupname
+arg, you can add several mappings and group them:
+
+pinmux_register_mappings("foogrp", pmx_map1, ARRAY_SIZE(pmx_map1));
+pinmux_register_mappings("bargrp", pmx_map2, ARRAY_SIZE(pmx_map2));
+
+The pinmux core remember this association and add a
+new API:
+
+struct pinmux_group *pmxgrp = pinmux_group_get("foogrp");
+pinmux_group_enable(pmxgrp);
+pinmux_group_control(pmxgrp, N, N);
+pinmux_group_disable(pmxgrp);
+pinmux_group_put(pmxgrp);
+
+If then the driver API adds an optional hook like this:
+int (*enable_group) (struct pinmux_dev *pmxdev, unsigned *selector,
+unsigned num_selectors);
+void (*disable_group) (struct pinmux_dev *pmxdev, unsigned *selector,
+unsigned num_selectors);
+
+This way the driver can provide each muxing individually, the core keep
+track of any grouping and making sure group sets does not clash,
+and the driver can implement optional enable/disable calls that write entire
+groups of pins at once and the driver knows how to combine these into a
+few single register writes.
+
+Would this work?
+
+I see it as a clear, backwards-compatible superset to the current
+patchset, so can go in a separate add-on if the current stuff go in first,
+so we don't try to drink the entire ocean at once.
+
+Yours,
+Linus Walleij
