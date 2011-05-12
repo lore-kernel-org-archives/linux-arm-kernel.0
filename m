@@ -1,66 +1,37 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 12 May 2011 20:35:08 +0200
-Subject: [RFC PATCH v3] Consolidate SRAM support
-In-Reply-To: <20110512174546.GB8633@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<20110512174546.GB8633@n2100.arm.linux.org.uk>
-Message-ID: <20110512183508.GJ18952@game.jcrosoft.org>
+Date: Thu, 12 May 2011 20:38:39 +0200
+Subject: [PATCH] usb/gadget: at91sam9g20 fix end point max packet size
+In-Reply-To: <20110512150800.GE30910@kroah.com>
+References: <20110510155038.GJ18791@game.jcrosoft.org>
+	<20110510170500.GB15675@kroah.com>
+	<20110510235324.GD18929@game.jcrosoft.org>
+	<20110511015829.GB6840@kroah.com>
+	<20110511031854.GF18929@game.jcrosoft.org>
+	<20110511135041.GC12717@kroah.com>
+	<20110512013038.GA24270@game.jcrosoft.org>
+	<20110512044731.GA24746@kroah.com> <4DCBD11A.8060906@ru.mvista.com>
+	<20110512150800.GE30910@kroah.com>
+Message-ID: <20110512183839.GK18952@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:45 Thu 12 May     , Russell King - ARM Linux wrote:
-> On Fri, Apr 15, 2011 at 02:06:07PM +0100, Russell King - ARM Linux wrote:
-> This is work in progress.
+On 08:08 Thu 12 May     , Greg KH wrote:
+> On Thu, May 12, 2011 at 04:22:50PM +0400, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 12-05-2011 8:47, Greg KH wrote:
+> > 
+> > >No, I can't apply it because of the comments above Sergei.  Please fix
+> > >that and get his approval and then I will be able to apply it.
+> > 
+> >    I'm OK with applying the patch to 2.6.39 actually. If I
+> > understood correctly, the code will be reworked to get rid of
+> > cpu_is_*() for 2.6.40+...
 > 
-> We have two SoCs using SRAM, both with their own allocation systems,
-> and both with their own ways of copying functions into the SRAM.
-> 
-> Let's unify this before we have additional SoCs re-implementing this
-> obviously common functionality themselves.
-> 
-> Unfortunately, we end up with code growth through doing this, but that
-> will become a win when we have another SoC using this (which I know
-> there's at least one in the pipeline).
-> 
-> One of the considerations here is that we can easily convert sram-pool.c
-> to hook into device tree stuff, which can tell the sram allocator:
-> 	- physical address of sram
-> 	- size of sram
-> 	- allocation granularity
-> and then we just need to ensure that it is appropriately mapped.
-> 
-> This uses the physical address, and unlike Davinci's dma address usage,
-> it always wants to have the physical address, and will always return
-> the corresponding physical address when passed that pointer.
-> 
-> OMAP could probably do with some more work to make the omapfb and other
-> allocations use the sram allocator, rather than hooking in before the
-> sram allocator is initialized - and then further cleanups so that we
-> have an initialization function which just does
-> 
-> sram_create(phys, size)
-> 	virt = map sram(phys, size)
-> 	create sram pool(virt, phys, size, min_alloc_order)
-> 
-> Another question is whether we should allow multiple SRAM pools or not -
-> this code does allow multiple pools, but so far we only have one pool
-> per SoC.  Overdesign?  Maybe, but it prevents SoCs wanting to duplicate
-> it if they want to partition the SRAM, or have peripheral-local SRAMs.
-> 
-> Lastly, uio_pruss should probably take the SRAM pool pointer via
-> platform data so that it doesn't have to include Davinci specific
-> includes.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
-> 
-> This version fixes the davinci pm free, and adds updates for the
-> davinci pcm driver.  As I don't know what's happening with Jean's
-> patch tweaking the genpool allocator, I've kept my version.
-> 
-> This still suffers from the "only one region per pvpool" problem
-> which I believe Jean's patch doesn't suffer.
-yes excatly and on at91sam9263 I need this :(
+> It's too late for .39, sorry.
+can we have it for the stable kernel at least
+
+all the kernel from the .26 suffer this issue
 
 Best Regards,
 J.
