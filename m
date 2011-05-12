@@ -1,70 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2011 03:38:27 -0700
-Subject: [PATCH V2 15/16] OMAP: hsmmc: add platform data for eMMC
-	hardware reset gpio
-In-Reply-To: <1304673255-31634-16-git-send-email-adrian.hunter@nokia.com>
-References: <1304673255-31634-1-git-send-email-adrian.hunter@nokia.com>
-	<1304673255-31634-16-git-send-email-adrian.hunter@nokia.com>
-Message-ID: <20110512103827.GK31483@atomide.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Thu, 12 May 2011 13:40:40 +0300
+Subject: [PATCH 13/14] [dove] Remove mpp.[ch]. They are not used.
+In-Reply-To: <20110508171918.GC4071@lunn.ch>
+References: <1304864141-1121-1-git-send-email-andrew@lunn.ch>
+	<1304864141-1121-14-git-send-email-andrew@lunn.ch>
+	<BANLkTi=mLaj0wa0PA9uokZ5ekuNbSEPthQ@mail.gmail.com>
+	<20110508171918.GC4071@lunn.ch>
+Message-ID: <BANLkTikrZuNbxp0uPnARXpoQWoALBo8EnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Adrian Hunter <adrian.hunter@nokia.com> [110506 02:11]:
-> eMMC may have a hardware reset line connected to a gpio,
-> so pass it to the driver.
-> 
-> Signed-off-by: Adrian Hunter <adrian.hunter@nokia.com>
-
-This looks safe to merge via MMC list:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-> ---
->  arch/arm/mach-omap2/hsmmc.c           |    5 +++++
->  arch/arm/mach-omap2/hsmmc.h           |    1 +
->  arch/arm/plat-omap/include/plat/mmc.h |    1 +
->  3 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index c37ba4f..a8078c1 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -472,6 +472,11 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
->  	mmc->slots[0].switch_pin = c->gpio_cd;
->  	mmc->slots[0].gpio_wp = c->gpio_wp;
->  
-> +	if (c->gpio_hw_reset)
-> +		mmc->slots[0].gpio_hw_reset = c->gpio_hw_reset;
-> +	else
-> +		mmc->slots[0].gpio_hw_reset = -EINVAL;
-> +
->  	mmc->slots[0].remux = c->remux;
->  	mmc->slots[0].init_card = c->init_card;
->  
-> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-> index 0f2a87e..b78ed41 100644
-> --- a/arch/arm/mach-omap2/hsmmc.h
-> +++ b/arch/arm/mach-omap2/hsmmc.h
-> @@ -22,6 +22,7 @@ struct omap2_hsmmc_info {
->  	bool    nomux;          /* No default muxing for this slot */
->  	int	gpio_cd;	/* or -EINVAL */
->  	int	gpio_wp;	/* or -EINVAL */
-> +	int     gpio_hw_reset;  /* hardware reset */
->  	char	*name;		/* or NULL for default */
->  	struct device *dev;	/* returned: pointer to mmc adapter */
->  	int	ocr_mask;	/* temporary HACK */
-> diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-> index e3c9b20..9b69b7e 100644
-> --- a/arch/arm/plat-omap/include/plat/mmc.h
-> +++ b/arch/arm/plat-omap/include/plat/mmc.h
-> @@ -119,6 +119,7 @@ struct omap_mmc_platform_data {
->  
->  		int switch_pin;			/* gpio (card detect) */
->  		int gpio_wp;			/* gpio (write protect) */
-> +		int gpio_hw_reset;              /* gpio (hardware reset) */
->  
->  		int (*set_bus_mode)(struct device *dev, int slot, int bus_mode);
->  		int (*set_power)(struct device *dev, int slot,
-> -- 
-> 1.7.0.4
-> 
+On Sun, May 8, 2011 at 8:19 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Sun, May 08, 2011 at 05:39:08PM +0300, saeed bishara wrote:
+>> On Sun, May 8, 2011 at 5:15 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+>> > ---
+>> > ??arch/arm/mach-dove/Makefile | ?? ??2 +-
+>> > ??arch/arm/mach-dove/mpp.c ?? ??| ??209 ----------------------------------------
+>> > ??arch/arm/mach-dove/mpp.h ?? ??| ??220 -------------------------------------------
+>> > ??3 files changed, 1 insertions(+), 430 deletions(-)
+>> > ??delete mode 100644 arch/arm/mach-dove/mpp.c
+>> > ??delete mode 100644 arch/arm/mach-dove/mpp.h
+>> No, it currently not used, by we for sure will use at some point. we
+>> are planning to prepare such patches for the next release. so please
+>> keep it.
+>
+> O.K. I can drop this patch.
+>
+> I don't have a datasheet for the Dove. Do you think it is possible to
+> merge the dove mpp setup code with the kirkwood and mv78xx0?
+I think that low mpps (0-23) can be configured using this common code.
+> ? ? ?Thanks
+> ? ? ? ?Andrew
+>
