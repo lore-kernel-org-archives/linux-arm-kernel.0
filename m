@@ -1,35 +1,27 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Fri, 13 May 2011 09:29:18 +1200
-Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface (ISI)
-	support
-In-Reply-To: <Pine.LNX.4.64.1105121413220.24486@axis700.grange>
-References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>	<20110512114530.GE18952@game.jcrosoft.org>
-	<Pine.LNX.4.64.1105121413220.24486@axis700.grange>
-Message-ID: <4DCC512E.1000603@bluewatersys.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 12 May 2011 13:26:32 -0700
+Subject: [GIT PULL 1/3] ARM: tegra: trimslice: register i2c busses and
+	devices
+In-Reply-To: <afc96d35d332d0293dfb5baf3e1b53045627f6a1.1305105580.git.mike@compulab.co.il>
+References: <cover.1305105580.git.mike@compulab.co.il>
+	<afc96d35d332d0293dfb5baf3e1b53045627f6a1.1305105580.git.mike@compulab.co.il>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04986AA405@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2011 12:14 AM, Guennadi Liakhovetski wrote:
-> On Thu, 12 May 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> [snip]
-> 
->>> +	if (0 == *nbuffers)
->> please invert the test
-> 
-> Don't think this is required by CodingStyle or anything like that. If it 
-> were, you'd have to revamp half of the kernel.
+Mike Rapoport wrote at Wednesday, May 11, 2011 5:08 AM:
+> Signed-off-by: Mike Rapoport <mike@compulab.co.il>
+> ---
+>  arch/arm/mach-tegra/board-trimslice.c |   39 +++++++++++++++++++++++++++++++++
+>  1 files changed, 39 insertions(+), 0 deletions(-)
 
-It should at least be consistent within a file, which it is not true in
-this case. I think the preferred style is to have the variable on the left.
+I think you also need the following change to board-trimslice-pinmux.c:
 
-~Ryan
+-	{TEGRA_PINGROUP_CDEV1, TEGRA_MUX_OSC,           TEGRA_PUPD_NORMAL,      TEGRA_TRI_NORMAL},
++	{TEGRA_PINGROUP_CDEV1, TEGRA_MUX_PLLA_OUT,      TEGRA_PUPD_NORMAL,      TEGRA_TRI_NORMAL},
+
+Assuming that the CDEV1 clock output from Tegra is used as the codec's
+master clock.
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+nvpublic
