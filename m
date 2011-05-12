@@ -1,124 +1,33 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 12 May 2011 10:11:11 +0900
-Subject: [PATCH 4/7] mtd: OneNAND: Remove to support onenand for S5PC100
+Date: Thu, 12 May 2011 10:11:09 +0900
+Subject: [PATCH 2/7] ASoC: Remove to support sound for S5PC100
 In-Reply-To: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
 References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1305162674-25860-5-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1305162674-25860-3-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 According to removing ARCH_S5PC100, we don't need to support
-onenand for S5PC100.
+sound for S5PC100.
 
-Cc: Kyungmin Park <kyungmin.park@samsung.com>
-Cc: David Woodhouse <dwmw2@infradead.org>
+Cc: Jassi Brar <jassisinghbrar@gmail.com>
+Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- drivers/mtd/onenand/Kconfig   |    4 ++--
- drivers/mtd/onenand/samsung.c |   25 +------------------------
- 2 files changed, 3 insertions(+), 26 deletions(-)
+ sound/soc/samsung/Kconfig |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mtd/onenand/Kconfig b/drivers/mtd/onenand/Kconfig
-index 4f42619..f32679f 100644
---- a/drivers/mtd/onenand/Kconfig
-+++ b/drivers/mtd/onenand/Kconfig
-@@ -32,10 +32,10 @@ config MTD_ONENAND_OMAP2
- 
- config MTD_ONENAND_SAMSUNG
-         tristate "OneNAND on Samsung SOC controller support"
--        depends on ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_EXYNOS4
-+        depends on ARCH_S3C64XX || ARCH_S5PV210 || ARCH_EXYNOS4
-         help
-           Support for a OneNAND flash device connected to an Samsung SOC.
--          S3C64XX/S5PC100 use command mapping method.
-+          S3C64XX use command mapping method.
-           S5PC110/S5PC210 use generic OneNAND method.
- 
- config MTD_ONENAND_OTP
-diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
-index a4c74a9..3117838 100644
---- a/drivers/mtd/onenand/samsung.c
-+++ b/drivers/mtd/onenand/samsung.c
-@@ -10,7 +10,7 @@
-  * published by the Free Software Foundation.
-  *
-  * Implementation:
-- *	S3C64XX and S5PC100: emulate the pseudo BufferRAM
-+ *	S3C64XX: emulate the pseudo BufferRAM
-  *	S5PC110: use DMA
-  */
- 
-@@ -32,7 +32,6 @@
- enum soc_type {
- 	TYPE_S3C6400,
- 	TYPE_S3C6410,
--	TYPE_S5PC100,
- 	TYPE_S5PC110,
- };
- 
-@@ -59,7 +58,6 @@ enum soc_type {
- #define MAP_11				(0x3)
- 
- #define S3C64XX_CMD_MAP_SHIFT		24
--#define S5PC100_CMD_MAP_SHIFT		26
- 
- #define S3C6400_FBA_SHIFT		10
- #define S3C6400_FPA_SHIFT		4
-@@ -69,10 +67,6 @@ enum soc_type {
- #define S3C6410_FPA_SHIFT		6
- #define S3C6410_FSA_SHIFT		4
- 
--#define S5PC100_FBA_SHIFT		13
--#define S5PC100_FPA_SHIFT		7
--#define S5PC100_FSA_SHIFT		5
--
- /* S5PC110 specific definitions */
- #define S5PC110_DMA_SRC_ADDR		0x400
- #define S5PC110_DMA_SRC_CFG		0x404
-@@ -202,11 +196,6 @@ static unsigned int s3c64xx_cmd_map(unsigned type, unsigned val)
- 	return (type << S3C64XX_CMD_MAP_SHIFT) | val;
- }
- 
--static unsigned int s5pc1xx_cmd_map(unsigned type, unsigned val)
--{
--	return (type << S5PC100_CMD_MAP_SHIFT) | val;
--}
--
- static unsigned int s3c6400_mem_addr(int fba, int fpa, int fsa)
- {
- 	return (fba << S3C6400_FBA_SHIFT) | (fpa << S3C6400_FPA_SHIFT) |
-@@ -219,12 +208,6 @@ static unsigned int s3c6410_mem_addr(int fba, int fpa, int fsa)
- 		(fsa << S3C6410_FSA_SHIFT);
- }
- 
--static unsigned int s5pc100_mem_addr(int fba, int fpa, int fsa)
--{
--	return (fba << S5PC100_FBA_SHIFT) | (fpa << S5PC100_FPA_SHIFT) |
--		(fsa << S5PC100_FSA_SHIFT);
--}
--
- static void s3c_onenand_reset(void)
- {
- 	unsigned long timeout = 0x10000;
-@@ -842,9 +825,6 @@ static void s3c_onenand_setup(struct mtd_info *mtd)
- 	} else if (onenand->type == TYPE_S3C6410) {
- 		onenand->mem_addr = s3c6410_mem_addr;
- 		onenand->cmd_map = s3c64xx_cmd_map;
--	} else if (onenand->type == TYPE_S5PC100) {
--		onenand->mem_addr = s5pc100_mem_addr;
--		onenand->cmd_map = s5pc1xx_cmd_map;
- 	} else if (onenand->type == TYPE_S5PC110) {
- 		/* Use generic onenand functions */
- 		this->read_bufferram = s5pc110_read_bufferram;
-@@ -1127,9 +1107,6 @@ static struct platform_device_id s3c_onenand_driver_ids[] = {
- 		.name		= "s3c6410-onenand",
- 		.driver_data	= TYPE_S3C6410,
- 	}, {
--		.name		= "s5pc100-onenand",
--		.driver_data	= TYPE_S5PC100,
--	}, {
- 		.name		= "s5pc110-onenand",
- 		.driver_data	= TYPE_S5PC110,
- 	}, { },
+diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+index a3fdfb6..9ed5d11 100644
+--- a/sound/soc/samsung/Kconfig
++++ b/sound/soc/samsung/Kconfig
+@@ -1,6 +1,6 @@
+ config SND_SOC_SAMSUNG
+ 	tristate "ASoC support for Samsung"
+-	depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PC100 || ARCH_S5PV210 || ARCH_S5P64X0 || ARCH_S5P6442 || ARCH_EXYNOS4
++	depends on ARCH_S3C2410 || ARCH_S3C64XX || ARCH_S5PV210 || ARCH_S5P64X0 || ARCH_S5P6442 || ARCH_EXYNOS4
+ 	select S3C64XX_DMA if ARCH_S3C64XX
+ 	select S3C2410_DMA if ARCH_S3C2410
+ 	help
 -- 
 1.7.1
