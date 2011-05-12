@@ -1,41 +1,40 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Thu, 12 May 2011 12:37:28 -0500
-Subject: [PATCH V3] OMAP3+: SR Layer Cleanup
-In-Reply-To: <87fwokcknl.fsf@ti.com>
-References: <1305105166-26109-1-git-send-email-shweta.gulati@ti.com>
-	<BANLkTimem2qc8_8pHOHMiW_hAeUdtg3PBw@mail.gmail.com>
-	<87fwokcknl.fsf@ti.com>
-Message-ID: <BANLkTimmFdbLfS9wxXkKXAVwY9BFmkDs7Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 12 May 2011 18:38:32 +0100
+Subject: [PATCH V2] genalloc: add support to specify the physical address
+In-Reply-To: <20110428081535.GI17290@n2100.arm.linux.org.uk>
+References: <1303282455-26649-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110428081535.GI17290@n2100.arm.linux.org.uk>
+Message-ID: <20110512173832.GA8633@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 04:50, Kevin Hilman <khilman@ti.com> wrote:
-> "Menon, Nishanth" <nm@ti.com> writes:
->
->> On Wed, May 11, 2011 at 04:12, Shweta Gulati <shweta.gulati@ti.com> wrote:
->>> To set sr ntarget values ?for all volt_domain,
->>> volt_table is retrieved by doing a look_up of 'vdd_name'
->>> field from omap_hwmod but voltage domain pointer does not
->>> belong to omap_hwmod and is not used anywhere else.
->>> As a part of voltage layer and SR Layer clean up volt
->>> pointer is removed from omap_hwmod and added in dev
->>> attributes of SR.
->>>
->>> Tested on OMAP3630 SDP and OMAP4430 SDP Board
->>>
->>> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
->>> Cc: Nishanth Menon <nm@ti.com>
->>> ---
->>> V3:
->>> ? Changed the Subject and Rephrased Commit log as reviewed
->>> ? by Nishanth Menon.
->>> ?V2:
->>> ? Rebased on latest 'pm-wip/voltdm_a' branch.
->> thanks.. actually it applies on voltdm_c branch as well :)
->
-> Can this be taken as an Ack? ?if so, Shweta please add an Acked-by from
-> Nishanth in your updated patch. ?Thanks.
-yep - will merge the next rev and do a dry run as well..
+On Thu, Apr 28, 2011 at 09:15:35AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Apr 20, 2011 at 08:54:15AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > so we specify the virtual address as base of the pool chunk and then
+> > get the physical address for hardware IP
+> > 
+> > as example on at91 we will use on spi, uart or macb
+> > 
+> > Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+> > Cc: Patrice VILCHEZ <patrice.vilchez@atmel.com>
+> > Cc: Andrew Morton <akpm@linux-foundation.org>
+> > ---
+> > Hi Andrew,
+> > 	I integrate the documentation fix
+> > 	could replace the previous one with this one
+> > 
+> > V2:
+> > 	update documentation
+> > 	use phys_addr_t for physical addr
+> > Best Regards,
+> 
+> I notice no comments on this - maybe it needs to be Cc'd to linux-mm too?
+> 
+> Andrew - do you have any views on this?
 
-Regards,
-Nishanth Menon
+Still haven't heard anything.  What's the status?
+
+If this isn't going into mainline, I'll queue up my work consolidating
+the existing ARM sram allocators instead, and when this hits we can see
+about moving stuff over to it then.
