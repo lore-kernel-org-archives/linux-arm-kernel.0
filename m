@@ -1,20 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 May 2011 00:46:24 -0700
-Subject: [PATCH 13/13] clocksource: convert OMAP1 to 32-bit down
-	counting clocksource
-In-Reply-To: <E1QJhSX-0000zA-0E@rmk-PC.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-	<E1QJhSX-0000zA-0E@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110512074624.GG31483@atomide.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 12 May 2011 09:47:20 +0200 (CEST)
+Subject: [PATCH v6 0/5] Basic ARM devicetree support
+In-Reply-To: <20110511211438.GM5315@n2100.arm.linux.org.uk>
+References: <BANLkTi=yCmxgv1fQKRJSZK3FkkRwjS2r=Q@mail.gmail.com>
+	<20110511211438.GM5315@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1105120940490.28229@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110510 00:30]:
-> Convert the OMAP1 32-bit down counting clocksource to the generic
-> clocksource infrastructure.
-> 
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Wed, 11 May 2011, Russell King - ARM Linux wrote:
 
-Tested-by: Tony Lindgren <tony@atomide.com>
+> On Wed, May 11, 2011 at 10:44:49PM +0200, Grant Likely wrote:
+> > Right now it merges cleanly with linux-next and the resulting tree
+> > builds and boots at least on qemu.  Unless you really object, I'm
+> > going to ask Stephen to add the following branch to the /end/ of the
+> > list of trees for linux-next so it can easily be dropped it if it
+> > causes any problems.
+> 
+> As far as the set of five patches looks fine to me, I don't have any
+> objections against them.  So I think we can merge them for .40.
+> 
+> What I've always worried about is the platform stuff, and that's
+> something I'm going to continue worrying about because I don't think
+> we have sufficient review capacity to ensure that we don't end up
+> with lots of stupidities.
+
+DT is certainly not a silver bullet.  Good judgement will be needed as 
+to what is put in DT and how it is represented.  I don't think that it 
+would make things worse than they are now though.
+
+I also do have some concerns about some aspects of DT which I've 
+expressed several times in the past.  However I don't think holding back 
+those patches any longer is a solution though.
+
+So consider this as a ACK from my part to merge those patches now.  This 
+will get the ball rolling.
+
+
+Nicolas
