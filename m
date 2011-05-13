@@ -1,43 +1,40 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Fri, 13 May 2011 15:19:16 +0300
-Subject: Updated mach-types update
-In-Reply-To: <20110513115406.GQ31483@atomide.com>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-	<20110320114137.GD16646@n2100.arm.linux.org.uk>
-	<20110324175945.GV2811@atomide.com>
-	<20110513115406.GQ31483@atomide.com>
-Message-ID: <20110513151916.77eba011.jhnikula@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 13 May 2011 14:21:22 +0200
+Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
+	preprocessor.
+In-Reply-To: <20110513113013.GP31483@atomide.com> (Tony Lindgren's message of
+	"Fri, 13 May 2011 04:30:13 -0700")
+References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
+	<20110513113013.GP31483@atomide.com>
+Message-ID: <87r582g5a5.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 May 2011 04:54:07 -0700
-Tony Lindgren <tony@atomide.com> wrote:
+Tony Lindgren <tony@atomide.com> writes:
 
-> * Tony Lindgren <tony@atomide.com> [110324 10:57]:
-> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [110320 04:39]:
-> > > On Sun, Mar 20, 2011 at 11:03:22AM +0000, Russell King - ARM Linux wrote:
-> > > 
-> > > Note that OMAP references machine_is_omap2evm() yet this has never been
-> > > merged.
-> > > 
-> > > arch/arm/plat-omap/include/plat/uncompress.h:
-> > > 
-> > >                 DEBUG_LL_OMAP2(1, omap2evm);
-> > > 
-> > > so this entry needs to be removed.
-> > 
-> > Hmm looks like we have LCD support and ASoC support for it, but no
-> > board :)
-> > 
-> > Anybody working with this board?
-> > 
-> > If so, please send patches for the related board-*.c support ASAP.
-> > Otherwise let's plan on deleting the related support.
-> 
-> No patches, so let's remove it. Here's the patch to do that,
-> I'm planning to add this to my devel-cleanup branch.
-> 
-Remove also from sound/soc/omap/Kconfig as well. You could put my
-ack for sound/soc/omap part but remember cc also Mark and Liam.
+> * Vladimir Zapolskiy <vzapolskiy@gmail.com> [110512 17:35]:
+>> This mass change reduces homogeneous data chunks along clock
+>> definitions. No semantical difference is added to the change,
+>> and still it could be introduced easily.
+>> 
+>> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+>> ---
+>>  arch/arm/mach-omap2/clock44xx_data.c | 3313 +++++++++-------------------------
+>>  1 files changed, 848 insertions(+), 2465 deletions(-)
+>
+> Hehehe, the diffstat certainly looks good :)
+>
+> This would be best done for all of them using some
+> perl/sed/python script. And could be done for the hwmod data
+> too. Do you already have something like that available?
+>
+> Paul and & Benoit, what's your take on doing something like
+> this? I'd assume updating your data generation scripts would
+> be trivial?
 
-Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+Can this be reposted to the list?  I didn't receive the original, and
+don't see it in the l-o or l-a-k archives.
+
+Thanks,
+
+Kevin
