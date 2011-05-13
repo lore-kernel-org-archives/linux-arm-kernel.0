@@ -1,80 +1,127 @@
-From: eparis@redhat.com (Eric Paris)
-Date: Fri, 13 May 2011 11:55:34 -0400
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <1305300181.2466.72.camel@twins>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu>
-	<1305299455.2076.26.camel@localhost.localdomain>
-	<1305300181.2466.72.camel@twins>
-Message-ID: <1305302141.2076.56.camel@localhost.localdomain>
+From: matthieu.castet@parrot.com (Matthieu CASTET)
+Date: Fri, 13 May 2011 18:03:08 +0200
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <BANLkTinMxzrPS1GsTV1+poNGTxBpUFyBiw@mail.gmail.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>	<20110512074421.GA2429@pengutronix.de>	<BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>	<F5C24FC168F95048BB6B9E0B13EB33152BA6F5307A@DIAMANT.xi-lite.lan>
+	<BANLkTinMxzrPS1GsTV1+poNGTxBpUFyBiw@mail.gmail.com>
+Message-ID: <4DCD563C.8040508@parrot.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-05-13 at 17:23 +0200, Peter Zijlstra wrote:
-> On Fri, 2011-05-13 at 11:10 -0400, Eric Paris wrote:
-> > Then again, I certainly don't see a
-> > reason that this syscall hardening patch should be held up while a whole
-> > new concept in computer security is contemplated... 
+Linus Walleij a ?crit :
+> 2011/5/12 Matthieu Castet <matthieu.castet@parrot.com>:
 > 
-> Which makes me wonder why this syscall hardening stuff is done outside
-> of LSM? Why isn't is part of the LSM so that say SELinux can have a
-> syscall bitmask per security context?
+>> Enumerating all possible case will be impossible because of the number of possible cases
+>> (and hardware guys can be very creative).
+> 
+> As mentioned in the document the subsystem is not about discrete
+> mathematics, i.e
+> we have no intent on enumerating every possible mux setting, only the ones that
+> are relevant for your electronics at hand.
+> 
+>> If spi can be in  { A8, A7, A6, A5 } and
+>> { G4, G3, G2, G1 }, Then you can output the spi on :
+>> - { A8, A7, A6, A5 }
+>> - { A8, A7, A6, G1 }
+>> - { A8, A7, G2, A5 }
+>> [...]
+>> - { G4, G3, G2, A5 }
+>> - { G4, G3, G2, G1 }
+>> You have 2^4 = 16 cases
+> 
+> Do you use all of them in practice?
+Of course not all, but more than the 2 { A8, A7, A6, A5 } or { G4, G3, G2, G1 }.
 
-I could do that, but I like Will's approach better.  From the PoV of
-meeting security goals of information flow, data confidentiality,
-integrity, least priv, etc limiting on the syscall boundary doesn't make
-a lot of sense.  You just don't know enough there to enforce these
-things.  These are the types of goals that SELinux and other LSMs have
-previously tried to enforce.  From the PoV of making the kernel more
-resistant to attacks and making a process more resistant to misbehavior
-I think that the syscall boundary is appropriate.  Although I could do
-it in SELinux it don't really want to do it there.
+Also when we doing the bsp for a processor, it is better to allow flexibility
+for future board.
 
-In case people are interested or confused let me give my definition of
-two words I've used a bit in these conversations: discretionary and
-mandatory.  Any time I talk about a 'discretionary' security decision it
-is a security decisions that a process imposed upon itself.  Aka the
-choice to use seccomp is discretionary.  The choice to mark our own file
-u-wx is discretionary.  This isn't the best definition but it's one that
-works well in this discussion.  Mandatory security is one enforce by a
-global policy.  It's what selinux is all about.  SELinux doesn't give
-hoot what a process wants to do, it enforces a global policy from the
-top down.  You take over a process, well, too bad, you still have no
-choice but to follow the mandatory policy.
+So with your pin mux how to you handle the fact that on spi you can have some
+signal not connected ?
+For { A8, A7, A6, A5 } spi, some board want all 4 spi wire, other want 3 (CS,
+MOSI, CLK) or (MISO, CS, CLK), other want 2.
 
-The LSM does NOT enforce a mandatory access control model, it's just how
-it's been used in the past.  Ingo appears to me (please correct me if
-I'm wrong) to really be a fan of exposing the flexibility of the LSM to
-a discretionary access control model.  That doesn't seem like a bad
-idea.  And maybe using the filter engine to define the language to do
-this isn't a bad idea either.  But I think that's a 'down the road'
-project, not something to hold up a better seccomp.
+This is board specific not package specific.
 
-> Making it part of the LSM also avoids having to add this prctl().
+And that's doesn't apply only to spi. That's the same problem for uart (no
+rts/cts), sdcard (one data vs 4 data), ...
 
-Well, it would mean exposing some new language construct to every LSM
-(instead of a single prctl construct) and it would mean anyone wanting
-to use the interface would have to rely on the LSM implementing those
-hooks the way they need it.  Honestly chrome can already get all of the
-benefits of this patch (given a perfectly coded kernel) and a whole lot
-more using SELinux, but (surprise surprise) not everyone uses SELinux.
-I think it's a good idea to expose a simple interface which will be
-widely enough adopted that many userspace applications can rely on it
-for hardening.
 
-The existence of the LSM and the fact that there exists multiple
-security modules that may or may not be enabled really leads application
-developers to be unable to rely on LSM for security.  If linux had a
-single security model which everyone could rely on we wouldn't really
-have as big of an issue but that's not possible.  So I'm advocating for
-this series which will provide a single useful change which applications
-can rely upon across distros and platforms to enhance the properties and
-abilities of the linux kernel.
 
--Eric
+> 
+>> Pin muxing is really board specific  and shouldn't be in a "generic" driver.
+> 
+> It is rather package (PGA/BGA etc) specific than board specific. The board
+> is about what of the packaging options you actually use. As
+> mentioned in previous discussions you can pass in the actual configuration
+> of the mux settings from platform data, if we have device tree we can let the
+> board file dts inherit a package descriptor. All of this outside the
+> kernel tree.
+> 
+> So we define the function groups for the package that will actually be used
+> by the devices in the board files that we have.
+> 
+> And my first assumption is that those really aren't that many, and my second
+> assumption is that you would still have to have board-specific code to handle
+> every individual pin somewhere under mach-xxxx and this is what we're
+> currently trying to get away from.
+> 
+>> But what you could abstract is a way to select a configuration of a pin,
+>> not a group of pin for the board files.
+> 
+> The groups of pins are used when you're muxing devices, usually these use
+> more than one pin. And that is why we connect them to the devices
+> themselves with a mapping.
+I believe there should be 2 different things :
+- something for select pin. Omap stuff is nice : omap3_mux_init,
+omap_mux_init_gpio, omap_mux_init_signal, ...
+- something for grouping pins, but the board can add new group of pin if it
+doesn't exist.
+
+
+Also what i don't like in your system is the naming :
+> +static unsigned int spi0_0_pins[] = { 0, 8, 16, 24 };
+> +static unsigned int i2c0_pins[] = { 24, 25 };
+> +static unsigned int spi0_1_pins[] = { 38, 46, 54, 62 };
+What's 0, 8, 16, .... It should be define.
+
+> +static struct foo_pmx_func myfuncs[] = {
+> +       {
+> +               .name = "spi0-0",
+> +               .pins = spi0_0_pins,
+> +               .num_pins = ARRAY_SIZE(spi0_1_pins),
+> +       },
+> +       {
+> +               .name = "i2c0",
+> +               .pins = i2c0_pins,
+> +               .num_pins = ARRAY_SIZE(i2c0_pins),
+> +       },
+> +       {
+> +               .name = "spi0-1",
+> +               .pins = spi0_1_pins,
+> +               .num_pins = ARRAY_SIZE(spi0_1_pins),
+> +       },
+> +};
+How I am supposed to know what's spi0-0, i2c0, spi0-1 without reading the code ?
+
+> +foo_probe()
+> +{
+> +       /* Allocate a state holder named "state" etc */
+> +       struct pinmux pmx;
+> +
+> +       pmx = pinmux_get(&device, NULL);
+> +       if IS_ERR(pmx)
+> +               return PTR_ERR(pmx);
+> +       pinmux_enable(pmx);
+> +
+> +       state->pmx = pmx;
+> +}
+> +If you want a specific mux setting and not just the first one found for this
+> +device you can specify a specific mux setting, for example in the above example
+> +the second i2c0 setting: pinmux_get(&device, "spi0-2");
+
+How a driver that is generic for example sdchi, mmci, ... is supposed to know
+the pinmux name ?
+How this work if the board want a special mux ? I have to modify also the driver ?
+
+
+Matthieu
