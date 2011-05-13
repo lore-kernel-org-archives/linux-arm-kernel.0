@@ -1,92 +1,96 @@
-From: ccross@android.com (Colin Cross)
-Date: Fri, 13 May 2011 14:24:10 -0700
-Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
-In-Reply-To: <alpine.LFD.2.02.1105131138460.2831@ionos>
-References: <1290060899-9786-1-git-send-email-ccross@android.com>
-	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
-	<4D70BE9D.4000507@stericsson.com>
-	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
-	<4D714C17.7080102@gmail.com>
-	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
-	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
-	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
-	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
-	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
-	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
-	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
-	<alpine.LFD.2.02.1105131138460.2831@ionos>
-Message-ID: <BANLkTimxkY4MvQ+-qiOwdwbo7jPUAQ1vxw@mail.gmail.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Fri, 13 May 2011 14:29:24 -0700
+Subject: [PATCH] drivers: create a pinmux subsystem v2
+In-Reply-To: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
+References: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04986AA6A2@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 3:02 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> Does the following work for you ?
-Not if the comments are accurate.
+I'd like to step back and take a look at the data model.
 
-> Thanks,
->
-> ? ? ? ?tglx
->
-> ---------->
-> Subject: clock-ev-reconf.patch
-> From: Thomas Gleixner <tglx@linutronix.de>
-> Date: Fri, 13 May 2011 10:53:13 +0200
->
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> ---
-> ?include/linux/clockchips.h | ? ?2 ++
-> ?kernel/time/clockevents.c ?| ? 24 ++++++++++++++++++++++++
-> ?2 files changed, 26 insertions(+)
->
-> Index: linux-2.6/include/linux/clockchips.h
-> ===================================================================
-> --- linux-2.6.orig/include/linux/clockchips.h
-> +++ linux-2.6/include/linux/clockchips.h
-> @@ -132,6 +132,8 @@ extern int clockevents_program_event(str
->
-> ?extern void clockevents_handle_noop(struct clock_event_device *dev);
->
-> +extern int clockevents_reconfigure(struct clock_event_device *ce, u32 freq, u32 minsec);
-> +
-> ?static inline void
-> ?clockevents_calc_mult_shift(struct clock_event_device *ce, u32 freq, u32 minsec)
-> ?{
-> Index: linux-2.6/kernel/time/clockevents.c
-> ===================================================================
-> --- linux-2.6.orig/kernel/time/clockevents.c
-> +++ linux-2.6/kernel/time/clockevents.c
-> @@ -133,6 +133,30 @@ int clockevents_program_event(struct clo
-> ?}
->
-> ?/**
-> + * clockevents_reconfigure - Reconfigure and reprogram a clock event device.
-> + * @dev: ? ? ? device to modify
-> + * @freq: ? ? ?new device frequency
-> + * @secr: ? ? ?guaranteed runtime conversion range in seconds
-> + *
-> + * Reconfigure and reprogram a clock event device in oneshot
-> + * mode. Must only be called from low level idle code where
-> + * interaction with hrtimers/nohz code etc. is not possible and
-> + * guaranteed not to conflict. Must be called with interrupts
-> + * disabled!
-> + * Returns 0 on success, -ETIME when the event is in the past or
-> + * -EINVAL when called with invalid parameters.
-> + */
-We need to call this from a cpufreq notifier with interrupts disabled,
-not from idle.
+As I understand it, the data model is that the SoC's pinmux driver defines
+every possible set of pins that could be used for all groups of signals
+(SSP, I2C, ...) that's affected by the pinmux. Each combination of pins
+is a FUNCTION in the documentation in the patch. The set of FUNCTIONS must
+include all options for: muxing a given controller's signals out of
+different sets of pins, different bit-widths of ports, etc. The SoC pinmux
+ driver must expose every single possible option so that boards can pick
+whichever one they want. This is particular important e.g. if devicetree
+comes into play, where people will expect to pick the correct FUNCTION in
+their devicetree file without having to add a definition of that FUNCTION
+to the kernel. Even with new boards, it'd be best if the SoC pinmux driver
+already contained the definitions that arbitrary boards might use.
 
-> +int clockevents_reconfigure(struct clock_event_device *dev, u32 freq, u32 secr)
-> +{
-> + ? ? ? if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
-> + ? ? ? ? ? ? ? return -EINVAL;
-> +
-> + ? ? ? clockevents_calc_mult_shift(dev, freq, secr ? secr : 1);
-> +
-> + ? ? ? return clockevents_program_event(dev, dev->next_event, ktime_get());
-> +}
-> +
-> +/**
-> ?* clockevents_register_notifier - register a clock events change listener
-> ?*/
-> ?int clockevents_register_notifier(struct notifier_block *nb)
->
+It's then up to the board to define which particular SoC-defined FUNCTION
+is used by each driver on the given board. For each driver, a single
+FUNCTION can be selected at a time (although there is the option to
+associate multiple FUNCTIONs to a single driver, those are alternatives
+rather than aggregateable options).
+
+Consider Tegra's keyboard controller: For rows, the controller can use
+KB_ROW[2:0], perhaps also KB_ROW[6:3], and perhaps also KB_ROW[15:7]. For
+columns, the controller can use KB_COL[1:0], perhaps also KB_COL[6:2],
+perhaps also KB_COL[7]. Thus, the pinmux driver must expose FUNCTIONs for
+all combinations of rows (3) cross-product all combinations of columns
+(3) so 3*3==9.
+
+That's all assuming that for each of those sets of pins, there's only one
+set of physical pads they can be routed out to. While Tegra's pinmux
+doesn't support this for the keyboard controller signals, let's assume
+for flexibility that KB_ROW[2:0] could be routed out pins X0/X1/X2 or
+Y0/Y1/Y2, and similarly for KB_COL[1:0] to two other sets of pins. That
+then means the SoC pinmux driver would have to define 9 * 2 * 2 == 36
+different FUNCTIONs.
+
+That's just catering for a pretty simple keyboard controller. I believe
+this quickly grows unmanageable.
+
+Instead, what if the SoC pinmux driver just defined groups of pins. For
+each group, there would be a list of the physical pins that was part of
+the group, and a list of functions (SD1, SD2, I2S1, I2S2, ...) that could
+be assigned to that group. For many SoCs, there would be a single pin per
+group. At least Tegra would have many groups containing more than one pin.
+
+Now, the SoC's pinmux driver's list of configurations would be just roughly
+number_of_groups * average_number_of_functions_supported_per_group. I think
+this would be much lower than the number of FUNCTIONs in the existing
+proposed model.
+
+Of course, this approach would mean the SoC pinmux driver would define a
+little less information about the SoC. We'd have to shift more data into
+the board/machine definition.
+
+Specifically, the current pinmux API defines that for each driver, there
+is a single FUNCTION active at a time. To make my proposed data model
+work, we'd have to expand that from a 1:1 to a 1:n mapping, such that for
+each driver, we define a set of possible configurations, and for each
+configuration, we define a set of (group, function) used, rather than just
+a single FUNCTION.
+
+This would shift all the burden of defining whether e.g. "the keyboard
+controller uses 1, 2, or 3 of the column groups of pins" into the board/
+machine driver, and eventually perhaps into devicetree. Arguably, that's
+where all the complexity should be.
+
+The core pinmux driver still would have enough information to know for
+each group whether any (and which) function was assigned, and so could
+still implement all the exclusion/sharing logic. Equally, the mapping
+from the data exported by the SoC pinmux driver (list of groups, and
+supported functions for each) would probably map much better to actual
+register writes; For Tegra, there'd probably be a 1:1 mapping for each
+group rather than a 1:N mapping for each FUNCTION. Other SoC pinmux
+drivers would probably be roughly unchanged, i.e. have a 1:1 mapping
+between group and pin configuration register.
+
+So, what are people's thoughts on this?
+
+Thanks for reading so far!
+
+ (I'll have to go away and read up on some of the issues Colin Cross
+mentioned, namely that the auxiliary configuration such as drive strength,
+pullup, etc. was also configured in groups, but the pins associated with
+those groups are not aligned with the groupings used for the pinmux)
+
+-- 
+nvpublic
