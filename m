@@ -1,48 +1,38 @@
-From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
-Date: Fri, 13 May 2011 15:08:59 +0300
-Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
-	preprocessor.
-In-Reply-To: <20110513113013.GP31483@atomide.com>
-References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
-	<20110513113013.GP31483@atomide.com>
-Message-ID: <BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Fri, 13 May 2011 17:40:42 +0530
+Subject: [PATCH v4 08/11] tty: add pruss SUART driver
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CE6600F@dbde02.ent.ti.com>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<1303474109-6212-9-git-send-email-subhasish@mistralsolutions.com>
+	<20110425212056.GA29313@kroah.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CAE36A6@dbde02.ent.ti.com>
+	<20110426124519.GC5977@suse.de>
+	<35F38DB5B5C4408EA80AF0DB8A6FA178@subhasishg>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CBA9959@dbde02.ent.ti.com>
+	<0B813DC0439B438BBB2B66A88B1A5F7F@subhasishg>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CE6600F@dbde02.ent.ti.com>
+Message-ID: <7C637C15A1AB48869F938B97BBDF22D8@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 2:30 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Vladimir Zapolskiy <vzapolskiy@gmail.com> [110512 17:35]:
->> This mass change reduces homogeneous data chunks along clock
->> definitions. No semantical difference is added to the change,
->> and still it could be introduced easily.
->>
->> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
->> ---
->> ?arch/arm/mach-omap2/clock44xx_data.c | 3313 +++++++++-------------------------
->> ?1 files changed, 848 insertions(+), 2465 deletions(-)
->
-> Hehehe, the diffstat certainly looks good :)
->
-> This would be best done for all of them using some
-> perl/sed/python script. And could be done for the hwmod data
-> too. Do you already have something like that available?
->
-Unfortunately I don't have an automated tool, but that would be great
-to have such a script. For this time I've checked the correctness of the
-change comparing the preprocessed output.
+>> 
+>> Say, if the driver is loaded as a module.
+>> If I allocate the sram in the platform code, how to I
+>> free it when the driver is unloaded. 
+> 
+> This is what I said in my last e-mail. What is
+> the issue you see with this approach?
+> 
+> | Thanks for the clarification. In this case, the driver
+> | should use platform callbacks to get/put fast fifo
+> | space. In case this callback is not populated by the
+> | platform or returns an error, the driver should fall
+> | back to allocating from DDR.
+> 
 
-In fact if nobody has serious objections about the nature of the change
-itself, then I'd like to continue with similar modifications for other OMAP
-specific massive data files, hopefully there is a lot of redundant data to
-eliminate :)
-
-I can try to do that starting from writing the script for automation,
-though I don't have a strong feeling that it's a straightforward task,
-and preprocessed code check and/or runtime check might be preferable.
-
-> Paul and & Benoit, what's your take on doing something like
-> this? I'd assume updating your data generation scripts would
-> be trivial?
->
-
-With best wishes,
-Vladimir
+ok, so what you are suggesting is that I implement some
+callbacks (like .fifo_alloc, .fifo_dealloc) which can allocate
+memory using sram_alloc.
+My doubt is, if already such API's are there (by Russel) or you
+are suggesting to implement them.
+ 
