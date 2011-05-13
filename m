@@ -1,8 +1,12 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 May 2011 22:15:12 +0100
+From: ccross@android.com (Colin Cross)
+Date: Fri, 13 May 2011 14:22:15 -0700
 Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
 In-Reply-To: <BANLkTikY9VBXuT78k3GFkeG+q=ppMsz3iQ@mail.gmail.com>
-References: <4D714C17.7080102@gmail.com>
+References: <1290060899-9786-1-git-send-email-ccross@android.com>
+	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
+	<4D70BE9D.4000507@stericsson.com>
+	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
+	<4D714C17.7080102@gmail.com>
 	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
 	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
 	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
@@ -12,15 +16,25 @@ References: <4D714C17.7080102@gmail.com>
 	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
 	<alpine.LFD.2.02.1105131138460.2831@ionos>
 	<BANLkTikY9VBXuT78k3GFkeG+q=ppMsz3iQ@mail.gmail.com>
-Message-ID: <20110513211512.GA30539@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTikBvHDsVEBdEYq618sPsbh=8V9L=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 12:59:20PM +0200, Linus Walleij wrote:
+On Fri, May 13, 2011 at 3:59 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 2011/5/13 Thomas Gleixner <tglx@linutronix.de>:
+>
+>> Does the following work for you ?
+>
 > This patch is interesting because it uses calc_mult_shift() and the current
 > localtimer driver for TWD (arch/arm/kernel/smp_twd.c) still uses hardcoded
 > mult+shift.
+>
+> So this patch in combination with TGLX add-on in the CPUfreq path would
+> eliminate the need of using the prescaler at all, which is a more appealing
+> solution to me for one, since it results in less code.
+>
+> Colin, do you think it will work? Or was there some specific reason to use
+> a dynamic prescaler instead of doing things like this?
 
-I don't think there's any reason it uses a hard coded shift, just
-that's what was the norm when the code was originally written.  It
-(and many other clock event code) probably could do with an update.
+This sounds much better than the dynamic prescaler.  Using the
+prescaler causes issues with accuracy and resolution that this avoids.
