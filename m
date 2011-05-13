@@ -1,43 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 13 May 2011 15:09:52 +0200 (CEST)
-Subject: [PATCH] ARM: Make sure appended device tree data won't overlap
-	kernel BSS
-In-Reply-To: <20110513112120.GO31483@atomide.com>
-References: <20110429102623.GX3755@atomide.com>
-	<alpine.LFD.2.00.1104290909310.24613@xanadu.home>
-	<20110429135334.GR5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104291509540.24613@xanadu.home>
-	<20110504072317.GU2092@atomide.com>
-	<alpine.LFD.2.00.1105040936040.24613@xanadu.home>
-	<20110509111929.GA11410@atomide.com>
-	<20110509144949.GE30958@atomide.com>
-	<20110512125952.GN31483@atomide.com>
-	<alpine.LFD.2.00.1105130930330.2762@xanadu.home>
-	<20110513112120.GO31483@atomide.com>
-Message-ID: <alpine.LFD.2.00.1105131507150.5787@xanadu.home>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 13 May 2011 15:16:10 +0200
+Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
+	preprocessor.
+In-Reply-To: <20110513130441.GH5323@atomide.com> (Tony Lindgren's message of
+	"Fri, 13 May 2011 16:04:43 +0300")
+References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
+	<20110513113013.GP31483@atomide.com>
+	<BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
+	<4DCD2260.4090806@ti.com> <20110513130441.GH5323@atomide.com>
+Message-ID: <87aaeq3fmt.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 May 2011, Tony Lindgren wrote:
+Tony Lindgren <tony@atomide.com> writes:
 
-> * Nicolas Pitre <nico@fluxnic.net> [110513 00:35]:
-> > On Thu, 12 May 2011, Tony Lindgren wrote:
-> > >
-> > > +		str	r1, [sp, #0]		@ save offset into stack
-> > 
-> > This is actually outside the stack area if you want to be strictly 
-> > correct.  Should be "str r1, [sp, #-4]!".
-> 
-> Thanks, yes we should use it like stack now. Updated patch below.
->  
-> > Anyway, both this patch tand the DT append patch won't apply or work 
-> > correctly anymore due to my latest cleanup series without minor 
-> > adjustments.
-> 
-> OK, no problem. Got those cleanup patches available somewhere?
+> * Cousson, Benoit <b-cousson@ti.com> [110513 15:18]:
+>> >>>Signed-off-by: Vladimir Zapolskiy<vzapolskiy@gmail.com>
+>> >>
+>> >Unfortunately I don't have an automated tool, but that would be great
+>> >to have such a script. For this time I've checked the correctness of the
+>> >change comparing the preprocessed output.
+>> 
+>> In fact these files are already generated automatically, as written
+>> in the header file. So changing the output format should
+>> straightforward. At least for OMAP4... OMAP2 and OMAP3 were done
+>> manually some time ago.
+>
+> Sounds like the important thing to consider here is how these macros
+> should be set up considering the upcoming generic clock framework
+> and device tree changes.
+>
+> So let's wait a few days for comments from Benoit and Paul on the
+> format for the macros so we don't need to redo them again later.
+> Of course there might be other things to consider too..
 
-They,re available in branch 'zImage_fixes' of git://git.linaro.org/people/nico/linux
-and in RMK's devel-stable branch as well.
+... like readability.
 
+After seeing the patch (thanks Benoit), I think this is bad tradeoff
+between readability and lines-of-code.
 
-Nicolas
+Personally, I don't think we should be trading readability for diffstat
+goodness.  I have a strong dislike for these multi-line macros, but
+it's up to Paul/Benoit to decide how this should look.
+
+Kevin
