@@ -1,45 +1,126 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 May 2011 08:54:03 +0200
-Subject: [QUERY] Behavior of spi slave memories w.r.t chip select signal.
-In-Reply-To: <4DCCAB19.2020302@st.com>
-References: <4DCA0B77.8060700@st.com>
-	<4DCCAB19.2020302@st.com>
-Message-ID: <BANLkTik2OxGdQ7z1JBAsE+=gc5UCgx3wEA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 13 May 2011 11:59:09 +0200
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+	<20110512074421.GA2429@pengutronix.de>
+	<BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>
+Message-ID: <20110513095909.GB2429@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/13 viresh kumar <viresh.kumar@st.com>:
-> On 05/11/2011 09:37 AM, viresh kumar wrote:
->>
->> Hello,
->>
->> Following is what i understood after reading m25p80 driver and spi master
->> drivers in drivers/spi folder.
->>
->> "chip_select signal controls start and end of transfer. For ex: if we have to read
->> status reg of spi memory, then we use write_and_then_read() routine. which writes
->> 0x9F in one spi transfer and writes dummy bytes and reads rx reg in other transfer.
->> And these two transfers are part of single spi_message.
->>
->> Now, it is controllable to handle cs, and if we send cs_change == 0, then chip select
->> is activated at start of message and deactivated at end of message, instead at end
->> of every transfer.
->>
->> Which means, even if there is a delay between command and dummy bytes received at
->> spi memory, current transfer will not be terminated by memory as cs is low."
->>
->> Is this correct??
->>
->> Actually i am seeing a different behavior by some of the spi memories, like m25p10.
->> If there is a delay between read_sts_reg command and dummy bytes, then 0xFFFFFF is
->> returned in response. If there is no delay then transfer always passes.
->>
->
-> Linus, Jamie,
->
-> Have you ever seen this kind of issue? Which spi slave memories did you used for testing?
-> I am using standard pl0022 and m25p80 driver. Tried in all modes: polling, interrupt, dma.
+On Thu, May 12, 2011 at 04:02:35PM +0200, Linus Walleij wrote:
+> 2011/5/12 Sascha Hauer <s.hauer@pengutronix.de>:
+> 
+> > What I'm missing though is a generic way a single pad/mux mode
+> > combination can be described. Let me take a look around how the
+> > different subarchs do this:
+> >
+> > omap:
+> >
+> > ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA21, 91,
+> > ? ? ? ? ? ? ? ?"dss_data21", NULL, "mcspi3_cs0", "dss_data3",
+> > ? ? ? ? ? ? ? ?"gpio_91", NULL, NULL, "safe_mode"),
+> > ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA22, 92,
+> > ? ? ? ? ? ? ? ?"dss_data22", NULL, "mcspi3_cs1", "dss_data4",
+> > ? ? ? ? ? ? ? ?"gpio_92", NULL, NULL, "safe_mode"),
+> >
+> > pxa:
+> >
+> > #define GPIO16_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO16, AF3, DRIVE_HIGH)
+> > #define GPIO37_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO37, AF3, DRIVE_HIGH)
+> > #define GPIO39_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO39, AF2, DRIVE_HIGH)
+> > #define GPIO83_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO83, AF2, DRIVE_HIGH)
+> > #define GPIO99_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO99, AF3, DRIVE_HIGH)
+> >
+> > i.MX:
+> >
+> > #define _MX51_PAD_UART3_RXD__CSI1_D0 ? ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
+> > #define _MX51_PAD_UART3_RXD__GPIO1_22 ? ? ? ? ? IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
+> > #define _MX51_PAD_UART3_RXD__UART1_DTR ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
+> > #define _MX51_PAD_UART3_RXD__UART3_RXD ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 1, 0x09f4, 4, 0)
+> > #define _MX51_PAD_UART3_TXD__CSI1_D1 ? ? ? ? ? ?IOMUX_PAD(0x634, 0x244, 2, 0x0000, 0, 0)
+> >
+> > These all basically describe the same thing: put pad x into one of modes
+> > a, b, c and apply certain flags like drive strength on this.
+> >
+> > the other class of pin muxing I know of is that a whole group of pads
+> > can be switched to a particular mode using a mux register like I think
+> > is used used in your ux300 driver.
+> >
+> > I'd like to have a unified way to describe this.
+> 
+> Hm, so some of the structure I currently have inside the specific U300 driver
+> need to become generic, in such way that say by activating 8 different
+> padmux functions at the same, this can boil down to a single register
+> write instead of 8 different register writes?
+> 
+> > Do you think it's possible to do some consolidation on this level
+> > aswell? It would really bring different SoCs more together.
+> 
+> I am thinking on the abstract level, now we would have:
+> 
+> Board:
+> static struct pinmux_map pmx_map[] = {
+>         PINMUX_MAP("foo0", "foo0-1"),
+>         PINMUX_MAP("bar0", "bar0-1"),
+> };
+> pinmux_register_mappings(pmx_map, ARRAY_SIZE(pmx_map));
+> 
+> Driver:
+> pmx = pinmux_get("foo0", NULL);
+> pinmux_enable(pmx);
+> 
+> For each of the mux functions. Now we need a grouping of
+> these functions.
 
-Not really. I'll throw in a few people on CC and see if they have some hints.
+No, the driver API is fine. pinmux_enable can enable multiple pins in
+the background and in fact it already does in your U300 example since
+the hardware does not allow handling single pins.
 
-Linus Walleij
+What I'm asking for is to get rid of the differing definitions for
+pin muxing. That is more an extension to your patches rather than
+a change to your patches.
+
+What omap/i.MX/pxa.. need is something like this:
+
+/* describe all functions of a single pad, SoC or package specific */
+struct padmux {
+	int padno;
+	const char *function; /* "uart1-txd", "spi3-mosi", "gpio127" */
+	int num_functions;
+};
+
+/* select a particular function and additional settings */
+struct function_selector {
+	int padno;
+	int function;	/* function to select from struct padmux above
+			 * (could be const char * to match the function name
+			 * instead of the number.
+			 */
+	unsigned long flags; /* drive strength, open drain, ... */
+};
+
+/*
+ * map multiple pads to a device. Can be passed by the board or
+ * filled from device tree.
+ */
+struct padgroup {
+	const char *devname; /* imxspi.0, atmeluart.1,... */
+	struct function_selector *functions;
+	int num_functions;
+};
+
+(I don't know whether we can agree on a common set of flags, at least I
+hope so)
+
+I hope that we can agree on this or a similar set of structs to share
+between different architectures.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
