@@ -1,32 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 May 2011 16:51:17 +0200
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <0D753D10438DA54287A00B027084269764D26C443E@AUSP01VMBX24.collaborationhost.net>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-	<0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
-	<BANLkTikc7B5J0Z_aiS5kXCxMSxcFrfSRxw@mail.gmail.com>
-	<0D753D10438DA54287A00B027084269764D26C443E@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <BANLkTimSCK1Mc4L7OS=dkijuyNb1uFTtew@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 13 May 2011 17:53:54 +0300
+Subject: Updated mach-types update
+In-Reply-To: <20110513115406.GQ31483@atomide.com>
+References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
+	<20110320114137.GD16646@n2100.arm.linux.org.uk>
+	<20110324175945.GV2811@atomide.com>
+	<20110513115406.GQ31483@atomide.com>
+Message-ID: <1305298434.2268.53.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/4/28 H Hartley Sweeten <hartleys@visionengravers.com>:
-> On Thursday, April 28, 2011 12:08 AM, Linus Walleij wrote:
->> 2011/4/27 H Hartley Sweeten <hartleys@visionengravers.com>:
->>> The Makefile should probably be reordered, either alphabetically
->>> or grouped by type (arch/mmio/i2c/spi/pci/etc) and then
->>> alphabetically in order to reduce merge conflicts.
->>
->> Yes, but if I do that in my patchset I will screw up Grants GPIO tree
->> completely, so I prefer that Grant do this. And maybe after pulling
->> in my GPIO consolidation tree to his in that case, so we don't get
->> undesired collisions. So leaving this for the GPIO maintainer.
->
-> This comment was intended for the GPIO maintainer. ?Sorry for any
-> confusion.
+On Fri, 2011-05-13 at 04:54 -0700, Tony Lindgren wrote:
+> * Tony Lindgren <tony@atomide.com> [110324 10:57]:
+> > * Russell King - ARM Linux <linux@arm.linux.org.uk> [110320 04:39]:
+> > > On Sun, Mar 20, 2011 at 11:03:22AM +0000, Russell King - ARM Linux wrote:
+> > > 
+> > > Note that OMAP references machine_is_omap2evm() yet this has never been
+> > > merged.
+> > > 
+> > > arch/arm/plat-omap/include/plat/uncompress.h:
+> > > 
+> > >                 DEBUG_LL_OMAP2(1, omap2evm);
+> > > 
+> > > so this entry needs to be removed.
+> > 
+> > Hmm looks like we have LCD support and ASoC support for it, but no
+> > board :)
+> > 
+> > Anybody working with this board?
+> > 
+> > If so, please send patches for the related board-*.c support ASAP.
+> > Otherwise let's plan on deleting the related support.
+> 
+> No patches, so let's remove it. Here's the patch to do that,
+> I'm planning to add this to my devel-cleanup branch.
 
-Nop problem, I actually made a fix for it that I think Grant can take in
-for 2.6.40.
+For removing the lcd driver:
 
-Yours,
-Linus Walleij
+Acked-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+
+ Tomi
