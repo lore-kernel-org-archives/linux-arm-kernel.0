@@ -1,28 +1,25 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 13 May 2011 10:04:03 +0100
-Subject: [QUERY] Behavior of spi slave memories w.r.t chip select signal.
-In-Reply-To: <4DCCAB19.2020302@st.com>
-References: <4DCA0B77.8060700@st.com>
- <4DCCAB19.2020302@st.com>
-Message-ID: <20110513090403.GK8718@pulham.picochip.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 May 2011 10:11:23 +0100
+Subject: [RFC PATCH v3] Consolidate SRAM support
+In-Reply-To: <BANLkTimmCuxUUY46B+aY5C0KxnY4_Dvucg@mail.gmail.com>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<20110512174546.GB8633@n2100.arm.linux.org.uk>
+	<BANLkTimmCuxUUY46B+aY5C0KxnY4_Dvucg@mail.gmail.com>
+Message-ID: <20110513091123.GA20941@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 09:22:57AM +0530, viresh kumar wrote:
-> On 05/11/2011 09:37 AM, viresh kumar wrote:
-> > Actually i am seeing a different behavior by some of the spi 
-> > memories, like m25p10.
-> > If there is a delay between read_sts_reg command and dummy bytes, then 0xFFFFFF is
-> > returned in response. If there is no delay then transfer always passes.
-> > 
+On Fri, May 13, 2011 at 09:30:14AM +0200, Jean Pihet wrote:
+> On Thu, May 12, 2011 at 7:45 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> >    This version fixes the davinci pm free, and adds updates for the
+> >    davinci pcm driver.  As I don't know what's happening with Jean's
+> >    patch tweaking the genpool allocator, I've kept my version.
 > 
-> Linus, Jamie,
-> 
-> Have you ever seen this kind of issue? Which spi slave memories did you used for testing?
-> I am using standard pl0022 and m25p80 driver. Tried in all modes: polling, interrupt, dma.
+> Sorry I do not get the question. The latest changes I submitted have
+> been merged in mainline as 'ARM: 6649/1: omap: use fncpy to copy the
+> PM code functions to SRAM' [1] . Thanks for that!
+> This change is only about the simple linear SRAM allocator, not the
+> genpool allocator.
 
-No, not that exact issue.  I've seen with the Synopsys DesignWare 
-controller that the fifo emptying causing cs to drop can result in all 
-0's being read back from a m25p80, but not all 1's.
-
-Jamie
+The wrong Jean!  I meant Jean-Christophe PLAGNIOL-VILLARD.
