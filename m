@@ -1,68 +1,68 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Fri, 13 May 2011 15:18:00 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <1305292132.2466.26.camel@twins>
-References: <alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu> <1305289146.2466.8.camel@twins>
-	<20110513122646.GA3924@elte.hu> <1305290370.2466.14.camel@twins>
-	<1305290612.2466.17.camel@twins> <20110513125452.GD3924@elte.hu>
-	<1305292132.2466.26.camel@twins>
-Message-ID: <20110513131800.GA7883@elte.hu>
+From: viresh.linux@gmail.com (viresh kumar)
+Date: Fri, 13 May 2011 18:49:39 +0530
+Subject: [PATCH] spi/amba-pl022: work in polling or interrupt mode if
+	pl022_dma_probe fails
+In-Reply-To: <a105605733caadfea25034ce0b8af73eb907fd33.1305287569.git.viresh.kumar@st.com>
+References: <a105605733caadfea25034ce0b8af73eb907fd33.1305287569.git.viresh.kumar@st.com>
+Message-ID: <BANLkTi=V7Y1boyEVn5feSzUiZbUL5RhJyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 5/13/11, Viresh Kumar <viresh.kumar@st.com> wrote:
+> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+> index 08de58e..82b98b8 100644
+> --- a/drivers/spi/amba-pl022.c
+> +++ b/drivers/spi/amba-pl022.c
+> @@ -1063,7 +1063,7 @@ static int __init pl022_dma_probe(struct pl022 *pl022)
+>  					    pl022->master_info->dma_filter,
+>  					    pl022->master_info->dma_rx_param);
+>  	if (!pl022->dma_rx_channel) {
+> -		dev_err(&pl022->adev->dev, "no RX DMA channel!\n");
+> +		dev_warn(&pl022->adev->dev, "no RX DMA channel!\n");
 
-* Peter Zijlstra <peterz@infradead.org> wrote:
+Sorry, this must be dev_dbg
 
-> On Fri, 2011-05-13 at 14:54 +0200, Ingo Molnar wrote:
-> > I think the sanest semantics is to run all active callbacks as well.
-> > 
-> > For example if this is used for three stacked security policies - as if 3 LSM 
-> > modules were stacked at once. We'd call all three, and we'd determine that at 
-> > least one failed - and we'd return a failure. 
-> 
-> But that only works for boolean functions where you can return the
-> multi-bit-or of the result. What if you need to return the specific
-> error code.
+>  		goto err_no_rxchan;
+>  	}
+>
+> @@ -1071,13 +1071,13 @@ static int __init pl022_dma_probe(struct pl022
+> *pl022)
+>  					    pl022->master_info->dma_filter,
+>  					    pl022->master_info->dma_tx_param);
+>  	if (!pl022->dma_tx_channel) {
+> -		dev_err(&pl022->adev->dev, "no TX DMA channel!\n");
+> +		dev_warn(&pl022->adev->dev, "no TX DMA channel!\n");
 
-Do you mean that one filter returns -EINVAL while the other -EACCES?
+                dev_dbg
 
-Seems like a non-problem to me, we'd return the first nonzero value.
+>  		goto err_no_txchan;
+>  	}
+>
+>  	pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
+>  	if (!pl022->dummypage) {
+> -		dev_err(&pl022->adev->dev, "no DMA dummypage!\n");
+> +		dev_warn(&pl022->adev->dev, "no DMA dummypage!\n");
 
-> Also, there's bound to be other cases where people will want to employ
-> this, look at all the various notifier chain muck we've got, it already
-> deals with much of this -- simply because users need it.
+                dev_dbg
 
-Do you mean it would be easy to abuse it? What kind of abuse are you most 
-worried about?
+>  		goto err_no_dummypage;
+>  	}
+>
+> @@ -1093,6 +1093,8 @@ err_no_txchan:
+>  	dma_release_channel(pl022->dma_rx_channel);
+>  	pl022->dma_rx_channel = NULL;
+>  err_no_rxchan:
+> +	dev_warn(&pl022->adev->dev,
 
-> Then there's the whole indirection argument, if you don't need
-> indirection, its often better to not use it, I myself much prefer code
-> to look like:
-> 
->    foo1(bar);
->    foo2(bar);
->    foo3(bar);
-> 
-> Than:
-> 
->    foo_notifier(bar);
-> 
-> Simply because its much clearer who all are involved without me having
-> to grep around to see who registers for foo_notifier and wth they do
-> with it. It also makes it much harder to sneak in another user, whereas
-> its nearly impossible to find new notifier users.
-> 
-> Its also much faster, no extra memory accesses, no indirect function
-> calls, no other muck.
+        dev_err
 
-But i suspect this question has been settled, given the fact that even pure 
-observer events need and already process a chain of events? Am i missing 
-something about your argument?
+> +			"Failed to work in dma mode, work without dma!\n");
+>  	return -ENODEV;
+>  }
+>
 
-Thanks,
+Will resend patch on Monday. Till that time, please see if this patch
+with mentioned changes is acceptable or not.
 
-	Ingo
+--
+viresh
