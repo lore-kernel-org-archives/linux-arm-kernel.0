@@ -1,33 +1,38 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 May 2011 04:30:13 -0700
-Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
-	preprocessor.
-In-Reply-To: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
-References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <20110513113013.GP31483@atomide.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 13 May 2011 15:43:54 +0400
+Subject: [PATCH] ARM: S5PV210: Fix possible null pointer dereference.
+In-Reply-To: <1305270186-7722-1-git-send-email-kgene.kim@samsung.com>
+References: <1305270186-7722-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <4DCD197A.9020900@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Vladimir Zapolskiy <vzapolskiy@gmail.com> [110512 17:35]:
-> This mass change reduces homogeneous data chunks along clock
-> definitions. No semantical difference is added to the change,
-> and still it could be introduced easily.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+Hello.
+
+On 13-05-2011 11:03, Kukjin Kim wrote:
+
+> From: Jonghwan Choi<jhbird.choi@samsung.com>
+
+> Signed-off-by: Jonghwan Choi<jhbird.choi@samsung.com>
+> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
 > ---
->  arch/arm/mach-omap2/clock44xx_data.c | 3313 +++++++++-------------------------
->  1 files changed, 848 insertions(+), 2465 deletions(-)
+>   arch/arm/mach-s5pv210/cpufreq.c |    4 +++-
+>   1 files changed, 3 insertions(+), 1 deletions(-)
 
-Hehehe, the diffstat certainly looks good :)
+> diff --git a/arch/arm/mach-s5pv210/cpufreq.c b/arch/arm/mach-s5pv210/cpufreq.c
+> index 22046e2..58340ee 100644
+> --- a/arch/arm/mach-s5pv210/cpufreq.c
+> +++ b/arch/arm/mach-s5pv210/cpufreq.c
+> @@ -105,8 +105,10 @@ static void s5pv210_set_refresh(enum s5pv210_dmc_port ch, unsigned long freq)
+>   		reg = (S5P_VA_DMC0 + 0x30);
+>   	else if (ch == DMC1)
+>   		reg = (S5P_VA_DMC1 + 0x30);
+> -	else
+> +	else {
+>   		printk(KERN_ERR "Cannot find DMC port\n");
+> +		return;
+> +	}
 
-This would be best done for all of them using some
-perl/sed/python script. And could be done for the hwmod data
-too. Do you already have something like that available?
+    According to CodingStyle, other branches should now have {} too.
 
-Paul and & Benoit, what's your take on doing something like
-this? I'd assume updating your data generation scripts would
-be trivial?
-
-Regards,
-
-Tony
+WBR, Sergei
