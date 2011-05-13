@@ -1,26 +1,34 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 13 May 2011 14:50:37 +0530
-Subject: [QUERY] Behavior of spi slave memories w.r.t chip select signal.
-In-Reply-To: <BANLkTik2OxGdQ7z1JBAsE+=gc5UCgx3wEA@mail.gmail.com>
-References: <4DCA0B77.8060700@st.com>	<4DCCAB19.2020302@st.com>
-	<BANLkTik2OxGdQ7z1JBAsE+=gc5UCgx3wEA@mail.gmail.com>
-Message-ID: <4DCCF7E5.2090009@st.com>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Fri, 13 May 2011 11:25:30 +0200
+Subject: [RFC PATCH v3] Consolidate SRAM support
+In-Reply-To: <20110513091123.GA20941@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<20110512174546.GB8633@n2100.arm.linux.org.uk>
+	<BANLkTimmCuxUUY46B+aY5C0KxnY4_Dvucg@mail.gmail.com>
+	<20110513091123.GA20941@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTi=0-dFd2XG7U7=eAy2XS_sakqmekA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/2011 12:24 PM, Linus Walleij wrote:
-> 2011/5/13 viresh kumar <viresh.kumar@st.com>:
->> Linus, Jamie,
+On Fri, May 13, 2011 at 11:11 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, May 13, 2011 at 09:30:14AM +0200, Jean Pihet wrote:
+>> On Thu, May 12, 2011 at 7:45 PM, Russell King - ARM Linux
+>> <linux@arm.linux.org.uk> wrote:
+>> > ? ?This version fixes the davinci pm free, and adds updates for the
+>> > ? ?davinci pcm driver. ?As I don't know what's happening with Jean's
+>> > ? ?patch tweaking the genpool allocator, I've kept my version.
 >>
->> Have you ever seen this kind of issue? Which spi slave memories did you used for testing?
->> I am using standard pl0022 and m25p80 driver. Tried in all modes: polling, interrupt, dma.
-> 
-> Not really. I'll throw in a few people on CC and see if they have some hints.
-> 
+>> Sorry I do not get the question. The latest changes I submitted have
+>> been merged in mainline as 'ARM: 6649/1: omap: use fncpy to copy the
+>> PM code functions to SRAM' [1] . Thanks for that!
+>> This change is only about the simple linear SRAM allocator, not the
+>> genpool allocator.
+>
+> The wrong Jean! ?I meant Jean-Christophe PLAGNIOL-VILLARD.
+Ok, sorry about that!
 
-Thanks guys.
+Regards,
+Jean
 
-Issue is solved now, data must be latched on Rising Edge and i have passed phase as falling edge.
-
---
-viresh
+>
