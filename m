@@ -1,31 +1,45 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 13 May 2011 08:59:03 +0200
-Subject: [PATCH v4 1/2] ARM: ELF: Define new core note type for VFP
-	registers
-In-Reply-To: <20110512091400.GC1356@n2100.arm.linux.org.uk>
-References: <1302688597-2969-1-git-send-email-dave.martin@linaro.org>
-	<1302688597-2969-2-git-send-email-dave.martin@linaro.org>
-	<20110428184925.GM17290@n2100.arm.linux.org.uk>
-	<20110503093659.GA2503@arm.com>
-	<20110512091400.GC1356@n2100.arm.linux.org.uk>
-Message-ID: <20110513065902.GA2867@localhost>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 May 2011 08:54:03 +0200
+Subject: [QUERY] Behavior of spi slave memories w.r.t chip select signal.
+In-Reply-To: <4DCCAB19.2020302@st.com>
+References: <4DCA0B77.8060700@st.com>
+	<4DCCAB19.2020302@st.com>
+Message-ID: <BANLkTik2OxGdQ7z1JBAsE+=gc5UCgx3wEA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 10:14:00AM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 03, 2011 at 10:36:59AM +0100, Dave Martin wrote:
-> > On Thu, Apr 28, 2011 at 07:49:25PM +0100, Russell King - ARM Linux wrote:
-> > > On Wed, Apr 13, 2011 at 10:56:36AM +0100, Dave Martin wrote:
-> > > > The VFP registers are not currently included in coredumps,
-> > > > and there's no existing note type where they can sensibly be
-> > > > included, so this patch defines a dedicated note type for them.
-> > > 
-> > > This probably wants to be copied to LKML (added).
-> > 
-> > Good point-- thanks.
-> 
-> What news on this?
+2011/5/13 viresh kumar <viresh.kumar@st.com>:
+> On 05/11/2011 09:37 AM, viresh kumar wrote:
+>>
+>> Hello,
+>>
+>> Following is what i understood after reading m25p80 driver and spi master
+>> drivers in drivers/spi folder.
+>>
+>> "chip_select signal controls start and end of transfer. For ex: if we have to read
+>> status reg of spi memory, then we use write_and_then_read() routine. which writes
+>> 0x9F in one spi transfer and writes dummy bytes and reads rx reg in other transfer.
+>> And these two transfers are part of single spi_message.
+>>
+>> Now, it is controllable to handle cs, and if we send cs_change == 0, then chip select
+>> is activated at start of message and deactivated at end of message, instead at end
+>> of every transfer.
+>>
+>> Which means, even if there is a delay between command and dummy bytes received at
+>> spi memory, current transfer will not be terminated by memory as cs is low."
+>>
+>> Is this correct??
+>>
+>> Actually i am seeing a different behavior by some of the spi memories, like m25p10.
+>> If there is a delay between read_sts_reg command and dummy bytes, then 0xFFFFFF is
+>> returned in response. If there is no delay then transfer always passes.
+>>
+>
+> Linus, Jamie,
+>
+> Have you ever seen this kind of issue? Which spi slave memories did you used for testing?
+> I am using standard pl0022 and m25p80 driver. Tried in all modes: polling, interrupt, dma.
 
-None whatsoever.  Do you think I need to push harder for feedback?
+Not really. I'll throw in a few people on CC and see if they have some hints.
 
----Dave
+Linus Walleij
