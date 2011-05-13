@@ -1,126 +1,102 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 13 May 2011 11:59:09 +0200
-Subject: [PATCH 0/4] Pinmux subsystem
-In-Reply-To: <BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>
-References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
-	<20110512074421.GA2429@pengutronix.de>
-	<BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>
-Message-ID: <20110513095909.GB2429@pengutronix.de>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 13 May 2011 12:02:13 +0200 (CEST)
+Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
+In-Reply-To: <BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
+References: <1290060899-9786-1-git-send-email-ccross@android.com>
+	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
+	<4D70BE9D.4000507@stericsson.com>
+	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
+	<4D714C17.7080102@gmail.com>
+	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
+	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
+	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
+	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
+	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
+	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
+	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1105131138460.2831@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 04:02:35PM +0200, Linus Walleij wrote:
-> 2011/5/12 Sascha Hauer <s.hauer@pengutronix.de>:
+On Thu, 12 May 2011, Linus Walleij wrote:
+
+> 2011/3/6 Linus Walleij <linus.walleij@linaro.org>:
+> > On Sun, Mar 6, 2011 at 6:42 PM, Colin Cross <ccross@android.com> wrote:
+> >
+> >> Is there any way
+> >> for a clockevent to invalidate the current event and ask for it to be
+> >> reprogrammed?
+> >
+> > TGLX will know for sure... Thomas?
+> >
+> > (This is inside a CPUfreq hook for a localtimer for the record.)
 > 
-> > What I'm missing though is a generic way a single pad/mux mode
-> > combination can be described. Let me take a look around how the
-> > different subarchs do this:
-> >
-> > omap:
-> >
-> > ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA21, 91,
-> > ? ? ? ? ? ? ? ?"dss_data21", NULL, "mcspi3_cs0", "dss_data3",
-> > ? ? ? ? ? ? ? ?"gpio_91", NULL, NULL, "safe_mode"),
-> > ? ? ? ?_OMAP3_MUXENTRY(DSS_DATA22, 92,
-> > ? ? ? ? ? ? ? ?"dss_data22", NULL, "mcspi3_cs1", "dss_data4",
-> > ? ? ? ? ? ? ? ?"gpio_92", NULL, NULL, "safe_mode"),
-> >
-> > pxa:
-> >
-> > #define GPIO16_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO16, AF3, DRIVE_HIGH)
-> > #define GPIO37_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO37, AF3, DRIVE_HIGH)
-> > #define GPIO39_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO39, AF2, DRIVE_HIGH)
-> > #define GPIO83_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO83, AF2, DRIVE_HIGH)
-> > #define GPIO99_FFUART_TXD ? ? ? MFP_CFG_OUT(GPIO99, AF3, DRIVE_HIGH)
-> >
-> > i.MX:
-> >
-> > #define _MX51_PAD_UART3_RXD__CSI1_D0 ? ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 2, 0x0000, 0, 0)
-> > #define _MX51_PAD_UART3_RXD__GPIO1_22 ? ? ? ? ? IOMUX_PAD(0x630, 0x240, 3, 0x0000, 0, 0)
-> > #define _MX51_PAD_UART3_RXD__UART1_DTR ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 0, 0x0000, 0, 0)
-> > #define _MX51_PAD_UART3_RXD__UART3_RXD ? ? ? ? ?IOMUX_PAD(0x630, 0x240, 1, 0x09f4, 4, 0)
-> > #define _MX51_PAD_UART3_TXD__CSI1_D1 ? ? ? ? ? ?IOMUX_PAD(0x634, 0x244, 2, 0x0000, 0, 0)
-> >
-> > These all basically describe the same thing: put pad x into one of modes
-> > a, b, c and apply certain flags like drive strength on this.
-> >
-> > the other class of pin muxing I know of is that a whole group of pads
-> > can be switched to a particular mode using a mux register like I think
-> > is used used in your ux300 driver.
-> >
-> > I'd like to have a unified way to describe this.
-> 
-> Hm, so some of the structure I currently have inside the specific U300 driver
-> need to become generic, in such way that say by activating 8 different
-> padmux functions at the same, this can boil down to a single register
-> write instead of 8 different register writes?
-> 
-> > Do you think it's possible to do some consolidation on this level
-> > aswell? It would really bring different SoCs more together.
-> 
-> I am thinking on the abstract level, now we would have:
-> 
-> Board:
-> static struct pinmux_map pmx_map[] = {
->         PINMUX_MAP("foo0", "foo0-1"),
->         PINMUX_MAP("bar0", "bar0-1"),
-> };
-> pinmux_register_mappings(pmx_map, ARRAY_SIZE(pmx_map));
-> 
-> Driver:
-> pmx = pinmux_get("foo0", NULL);
-> pinmux_enable(pmx);
-> 
-> For each of the mux functions. Now we need a grouping of
-> these functions.
+> I discussed this briefly with TGLX at the UDS here and he's confident
+> we could add some nifty feature to reprogram an event. I dare not
+> try to guess where the code would sit or how it'd look...
 
-No, the driver API is fine. pinmux_enable can enable multiple pins in
-the background and in fact it already does in your U300 example since
-the hardware does not allow handling single pins.
+Does the following work for you ?
 
-What I'm asking for is to get rid of the differing definitions for
-pin muxing. That is more an extension to your patches rather than
-a change to your patches.
+Thanks,
 
-What omap/i.MX/pxa.. need is something like this:
+	tglx
 
-/* describe all functions of a single pad, SoC or package specific */
-struct padmux {
-	int padno;
-	const char *function; /* "uart1-txd", "spi3-mosi", "gpio127" */
-	int num_functions;
-};
+---------->
+Subject: clock-ev-reconf.patch
+From: Thomas Gleixner <tglx@linutronix.de>
+Date: Fri, 13 May 2011 10:53:13 +0200
 
-/* select a particular function and additional settings */
-struct function_selector {
-	int padno;
-	int function;	/* function to select from struct padmux above
-			 * (could be const char * to match the function name
-			 * instead of the number.
-			 */
-	unsigned long flags; /* drive strength, open drain, ... */
-};
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+---
+ include/linux/clockchips.h |    2 ++
+ kernel/time/clockevents.c  |   24 ++++++++++++++++++++++++
+ 2 files changed, 26 insertions(+)
 
-/*
- * map multiple pads to a device. Can be passed by the board or
- * filled from device tree.
- */
-struct padgroup {
-	const char *devname; /* imxspi.0, atmeluart.1,... */
-	struct function_selector *functions;
-	int num_functions;
-};
-
-(I don't know whether we can agree on a common set of flags, at least I
-hope so)
-
-I hope that we can agree on this or a similar set of structs to share
-between different architectures.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Index: linux-2.6/include/linux/clockchips.h
+===================================================================
+--- linux-2.6.orig/include/linux/clockchips.h
++++ linux-2.6/include/linux/clockchips.h
+@@ -132,6 +132,8 @@ extern int clockevents_program_event(str
+ 
+ extern void clockevents_handle_noop(struct clock_event_device *dev);
+ 
++extern int clockevents_reconfigure(struct clock_event_device *ce, u32 freq, u32 minsec);
++
+ static inline void
+ clockevents_calc_mult_shift(struct clock_event_device *ce, u32 freq, u32 minsec)
+ {
+Index: linux-2.6/kernel/time/clockevents.c
+===================================================================
+--- linux-2.6.orig/kernel/time/clockevents.c
++++ linux-2.6/kernel/time/clockevents.c
+@@ -133,6 +133,30 @@ int clockevents_program_event(struct clo
+ }
+ 
+ /**
++ * clockevents_reconfigure - Reconfigure and reprogram a clock event device.
++ * @dev:	device to modify
++ * @freq:	new device frequency
++ * @secr:	guaranteed runtime conversion range in seconds
++ *
++ * Reconfigure and reprogram a clock event device in oneshot
++ * mode. Must only be called from low level idle code where
++ * interaction with hrtimers/nohz code etc. is not possible and
++ * guaranteed not to conflict. Must be called with interrupts
++ * disabled!
++ * Returns 0 on success, -ETIME when the event is in the past or
++ * -EINVAL when called with invalid parameters.
++ */
++int clockevents_reconfigure(struct clock_event_device *dev, u32 freq, u32 secr)
++{
++	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
++		return -EINVAL;
++
++	clockevents_calc_mult_shift(dev, freq, secr ? secr : 1);
++
++	return clockevents_program_event(dev, dev->next_event, ktime_get());
++}
++
++/**
+  * clockevents_register_notifier - register a clock events change listener
+  */
+ int clockevents_register_notifier(struct notifier_block *nb)
