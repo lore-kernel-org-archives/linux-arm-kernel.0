@@ -1,27 +1,29 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 13 May 2011 17:27:23 +0200
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Fri, 13 May 2011 16:29:27 +0100
 Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
-	call filtering
-In-Reply-To: <20110513145737.GC32688@elte.hu>
-References: <alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu> <1305289146.2466.8.camel@twins>
-	<20110513122646.GA3924@elte.hu> <1305290370.2466.14.camel@twins>
-	<1305290612.2466.17.camel@twins> <20110513125452.GD3924@elte.hu>
-	<1305292132.2466.26.camel@twins> <20110513131800.GA7883@elte.hu>
-	<1305294935.2466.64.camel@twins>  <20110513145737.GC32688@elte.hu>
-Message-ID: <1305300443.2466.77.camel@twins>
+	callfiltering
+In-Reply-To: <1305299880.2076.31.camel@localhost.localdomain>
+Message-ID: <AE90C24D6B3A694183C094C60CF0A2F6D8AD37@saturn3.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-05-13 at 16:57 +0200, Ingo Molnar wrote:
-> this is a security mechanism
+> ... If you can be completely stateless its easier, but there's
+> a reason that stacking security modules is hard.  Serge has tried in
+the
+> past and both dhowells and casey schaufler are working on it right
+now.
+> Stacking is never as easy as it sounds   :)
 
-Who says? and why would you want to unify two separate concepts only to
-them limit it to security that just doesn't make sense.
+For a bad example of trying to allow alternate security models
+look at NetBSD's kauth code :-)
 
-Either you provide a full on replacement for notifier chain like things
-or you don't, only extending trace events in this fashion for security
-is like way weird.
+NetBSD also had issues where some 'system call trace' code
+was being used to (try to) apply security - unfortunately
+it worked by looking at the user-space buffers on system
+call entry - and a multithreaded program can easily arrange
+to update them after the initial check!
+For trace/event type activities this wouldn't really matter,
+for security policy it does.
+(I've not looked directly at these event points in linux)
 
-Plus see the arguments Eric made about stacking stuff, not only security
-schemes will have those problems.
+	David
