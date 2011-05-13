@@ -1,47 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 May 2011 20:44:38 +0200
-Subject: [RESEND PATCH 2/4] omap: igep0020: minor refactoring
-In-Reply-To: <91dd03e6af514a628fc4d797066f3ef0d971b802.1305235542.git.mike@compulab.co.il>
-References: <cover.1305235542.git.mike@compulab.co.il>
-	<91dd03e6af514a628fc4d797066f3ef0d971b802.1305235542.git.mike@compulab.co.il>
-Message-ID: <201105132044.39163.arnd@arndb.de>
+Date: Fri, 13 May 2011 21:35:34 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <1305169376-2363-1-git-send-email-wad@chromium.org>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+Message-ID: <201105132135.34741.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 May 2011, Mike Rapoport wrote:
-> @@ -299,17 +299,14 @@ static struct omap2_hsmmc_info mmc[] = {
->  static struct gpio_led igep_gpio_leds[] = {
->         [0] = {
->                 .name                   = "gpio-led:red:d0",
-> -               .gpio                   = IGEP2_GPIO_LED0_RED,
->                 .default_trigger        = "default-off"
->         },
->         [1] = {
->                 .name                   = "gpio-led:green:d0",
-> -               .gpio                   = IGEP2_GPIO_LED0_GREEN,
->                 .default_trigger        = "default-off",
->         },
->         [2] = {
->                 .name                   = "gpio-led:red:d1",
-> -               .gpio                   = IGEP2_GPIO_LED1_RED,
->                 .default_trigger        = "default-off",
->         },
->         [3] = {
-> @@ -335,6 +332,10 @@ static struct platform_device igep_led_device = {
->  
->  static void __init igep_leds_init(void)
->  {
-> +       igep_gpio_leds[0].gpio = IGEP2_GPIO_LED0_RED;
-> +       igep_gpio_leds[1].gpio = IGEP2_GPIO_LED0_GREEN;
-> +       igep_gpio_leds[2].gpio = IGEP2_GPIO_LED1_RED;
-> +
->         platform_device_register(&igep_led_device);
->  }
+On Thursday 12 May 2011, Will Drewry wrote:
+> This change adds a new seccomp mode based on the work by
+> agl at chromium.org in [1]. This new mode, "filter mode", provides a hash
+> table of seccomp_filter objects.  When in the new mode (2), all system
+> calls are checked against the filters - first by system call number,
+> then by a filter string.  If an entry exists for a given system call and
+> all filter predicates evaluate to true, then the task may proceed.
+> Otherwise, the task is killed (as per seccomp_mode == 1).
 
-Hi Mike,
-
-Overall, the series looks great, but I'm somewhat worried by the fact that you
-have to replace data structures with code in order to get there. Are there any
-other options to do this?
+I've got a question about this: Do you expect the typical usage to disallow
+ioctl()? Given that ioctl alone is responsible for a huge number of exploits
+in various drivers, while certain ioctls are immensely useful (FIONREAD,
+FIOASYNC, ...), do you expect to extend the mechanism to filter specific
+ioctl commands in the future?
 
 	Arnd
