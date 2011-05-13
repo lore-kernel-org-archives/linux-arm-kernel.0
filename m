@@ -1,25 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 May 2011 19:14:57 +0100
-Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
-In-Reply-To: <20110513101348.GA18716@rainbow>
-References: <E1QHn5f-0004Rb-6j@outmx07.plus.net>
-	<20110513101348.GA18716@rainbow>
-Message-ID: <20110513181456.GD19733@n2100.arm.linux.org.uk>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Fri, 13 May 2011 14:32:55 +0400
+Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
+In-Reply-To: <E1QKFPN-0003xV-Sf@outmx07.plus.net>
+References: <E1QKFPN-0003xV-Sf@outmx07.plus.net>
+Message-ID: <20110513103255.GB18716@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 02:13:49PM +0400, Dmitry Artamonow wrote:
-> Not sure if it's right to allow only POWER button to wake the device.
-> In both Windows CE and handhelds.org 2.6.21 kernel any button can wake
-> device, and even start corresponding action (i.e. run some app) after wakeup.
+On 19:49 Wed 11 May     , Paul Parsons wrote:
+> 
+> Driver-specific bugs still remain. In particular the mmc driver does not resume properly after returning from sleep mode, thus preventing sleep mode from being entered a second time.
 
-Ah, I'm glad you mentioned that.
+Sorry, no comments about your patch, just wanted to say about mmc
+driver. Some time ago when I tried to look at suspend on hx4700,
+this patch helped me to survive suspend-wakeup cycle with root on MMC:
 
-This 'feature' is really annoying, as it keeps resulting in my iPAQ
-battery being drained completely.  My iPAQ now lives plugged into its
-charger because that's the only way I can ensure that the programs and
-data on it stay there.  If I put it anywhere else, a button will get
-pressed unnoticed and then I'll have to reload everything back on to it.
+diff --git a/drivers/mfd/asic3.c b/drivers/mfd/asic3.c
+index 4896a3c..4c686d9 100644
+--- a/drivers/mfd/asic3.c
++++ b/drivers/mfd/asic3.c
+@@ -895,6 +895,8 @@ static struct mfd_cell asic3_cell_mmc = {
+ 	.name          = "tmio-mmc",
+ 	.enable        = asic3_mmc_enable,
+ 	.disable       = asic3_mmc_disable,
++	.suspend	= asic3_mmc_disable,
++	.resume		= asic3_mmc_enable,
+ 	.driver_data   = &asic3_mmc_data,
+ 	.num_resources = ARRAY_SIZE(asic3_mmc_resources),
+ 	.resources     = asic3_mmc_resources,
 
-So really, whether a non-power button wakes up or not should be ultimately
-end-user configurable.  Wish it was in wince.
+That was around 2.6.37. Not sure if it still helps and I have no possibility
+to check - tmio_mmc on ASIC3 seems to be totally borken in 2.6.39-rcX - it
+doesn't even detect card on my hx4700 :( And that's pity, as I mainly use
+SD for rootfs.
+
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
