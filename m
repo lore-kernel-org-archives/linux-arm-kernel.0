@@ -1,28 +1,33 @@
-From: jdzheng@broadcom.com (JD (Jiandong) Zheng)
-Date: Thu, 12 May 2011 17:19:51 -0700
-Subject: [PATCH] bcmring: fix dma.c build error
-Message-ID: <8628FE4E7912BF47A96AE7DD7BAC0AADE080FD2484@SJEXCHCCR02.corp.ad.broadcom.com>
+From: jmorris@namei.org (James Morris)
+Date: Fri, 13 May 2011 10:18:52 +1000 (EST)
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <20110512130104.GA2912@elte.hu>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+Message-ID: <alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a missing header file to dma.c.
+On Thu, 12 May 2011, Ingo Molnar wrote:
+> Funnily enough, back then you wrote this:
+> 
+>   " I'm concerned that we're seeing yet another security scheme being designed on 
+>     the fly, without a well-formed threat model, and without taking into account 
+>     lessons learned from the seemingly endless parade of similar, failed schemes. "
+> 
+> so when and how did your opinion of this scheme turn from it being an "endless 
+> parade of failed schemes" to it being a "well-defined and readily 
+> understandable feature"? :-)
 
-Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
----
- arch/arm/mach-bcmring/dma.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+When it was defined in a way which limited its purpose to reducing the 
+attack surface of the sycall interface.
 
-diff --git a/arch/arm/mach-bcmring/dma.c b/arch/arm/mach-bcmring/dma.c
-index d87ad30..58d237d 100644
---- a/arch/arm/mach-bcmring/dma.c
-+++ b/arch/arm/mach-bcmring/dma.c
-@@ -29,6 +29,7 @@
- #include <linux/irqreturn.h>
- #include <linux/proc_fs.h>
- #include <linux/slab.h>
-+#include <linux/sched.h>
- 
- #include <mach/timer.h>
- 
+
+- James
 -- 
-1.7.4.1
+James Morris
+<jmorris@namei.org>
