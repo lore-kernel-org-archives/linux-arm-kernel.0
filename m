@@ -1,81 +1,85 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Fri, 13 May 2011 18:46:10 +0200
-Subject: [PATCH] arch/arm/mach-omap1/dma.c: Invert calls to
-	platform_device_put and platform_device_del
-Message-ID: <1305305170-16922-1-git-send-email-julia@diku.dk>
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Fri, 13 May 2011 19:48:51 +0300
+Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
+	preprocessor.
+In-Reply-To: <4DCD3F02.50104@ti.com>
+References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
+	<20110513113013.GP31483@atomide.com>
+	<BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
+	<4DCD2260.4090806@ti.com> <20110513130441.GH5323@atomide.com>
+	<87aaeq3fmt.fsf@ti.com> <4DCD3F02.50104@ti.com>
+Message-ID: <BANLkTin+G305L5XBbp2vFd_gY02S=9sPXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+On Fri, May 13, 2011 at 5:24 PM, Cousson, Benoit <b-cousson@ti.com> wrote:
+> On 5/13/2011 3:16 PM, Hilman, Kevin wrote:
+>>
+>> Tony Lindgren<tony@atomide.com> ?writes:
+>>
+>>> * Cousson, Benoit<b-cousson@ti.com> ?[110513 15:18]:
+>>>>>>>
+>>>>>>> Signed-off-by: Vladimir Zapolskiy<vzapolskiy@gmail.com>
+>>>>>>
+>>>>> Unfortunately I don't have an automated tool, but that would be great
+>>>>> to have such a script. For this time I've checked the correctness of
+>>>>> the
+>>>>> change comparing the preprocessed output.
+>>>>
+>>>> In fact these files are already generated automatically, as written
+>>>> in the header file. So changing the output format should
+>>>> straightforward. At least for OMAP4... OMAP2 and OMAP3 were done
+>>>> manually some time ago.
+>>>
+>>> Sounds like the important thing to consider here is how these macros
+>>> should be set up considering the upcoming generic clock framework
+>>> and device tree changes.
+>>>
+>>> So let's wait a few days for comments from Benoit and Paul on the
+>>> format for the macros so we don't need to redo them again later.
+>>> Of course there might be other things to consider too..
+>>
+>> ... like readability.
+>>
+>> After seeing the patch (thanks Benoit), I think this is bad tradeoff
+>> between readability and lines-of-code.
+>>
+>> Personally, I don't think we should be trading readability for diffstat
+>> goodness. ?I have a strong dislike for these multi-line macros, but
+>> it's up to Paul/Benoit to decide how this should look.
+>
+> I'm sharing the same concern and after seeing the patch, I do thing as well
+> that the readability is badly impacted.
+There always shall be a price, from my side I've tried to lessen it as much as
+possible.
 
-Platform_device_del should be called before platform_device_put, as
-platform_device_put can delete the structure.
+> My other concern is that these macros are too low level and does not bring a
+> real abstraction of clock nodes.
+> Any change to the clock structure we will have to do in the near future with
+> the common clock fmwk will probably have an impact on this file.
+Right, but without this change the impact won't be less. In the best case later
+for structural changes it might be simpler and less error-prone to modify one
+macro definition instead of hundreds LOCs.
 
-Additionally, improve the error handling code for the call to ioremap, so
-that it calls platform_device_put.
+>
+> So if we want to reduce the file size using that kind of approach, we'd
+> better provide improved macros that will help hiding some implementation
+> details. It will ease the transition to the common clock fmwk.
+Certainly I'd be glad to get any recommendations about potential improvement
+in the change, but for that case I've found quite efficient to exploit C
+preprocessor for potential removing thousands LOCs without a semantic loss
+or even change.
 
-The semantic match that finds this problem is:
-(http://coccinelle.lip6.fr/)
+A word about my motivation, I'm just willing to reduce arch/arm/* overall size
+to approach productive ARM/Linux development and integration again. At the
+moment `du -sb arch/arm/* | sort -n | tail -n1` gives me mach-omap2 as the
+best candidate to spend some free time with. And that change was such an
+attempt, hopefully not completely fruitless and not the last one :)
 
-// <smpl>
-@@
-expression e1,e2;
-@@
+>
+> Last but not least, since we do want to move this file to DT ASAP, is it
+> worth it?
+>
 
-*platform_device_put(e1);
-... when != e1 = e2
-*platform_device_del(e1);
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
-Is an ioremap needed also?  Not clear, because dma_base i a global variable.
-
- arch/arm/mach-omap1/dma.c |   11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
-index d855934..f5a5220 100644
---- a/arch/arm/mach-omap1/dma.c
-+++ b/arch/arm/mach-omap1/dma.c
-@@ -284,14 +284,15 @@ static int __init omap1_system_dma_init(void)
- 	dma_base = ioremap(res[0].start, resource_size(&res[0]));
- 	if (!dma_base) {
- 		pr_err("%s: Unable to ioremap\n", __func__);
--		return -ENODEV;
-+		ret = -ENODEV;
-+		goto exit_device_put;
- 	}
- 
- 	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
- 	if (ret) {
- 		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
- 			__func__, pdev->name, pdev->id);
--		goto exit_device_del;
-+		goto exit_device_put;
- 	}
- 
- 	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
-@@ -299,7 +300,7 @@ static int __init omap1_system_dma_init(void)
- 		dev_err(&pdev->dev, "%s: Unable to allocate 'p' for %s\n",
- 			__func__, pdev->name);
- 		ret = -ENOMEM;
--		goto exit_device_put;
-+		goto exit_device_del;
- 	}
- 
- 	d = kzalloc(sizeof(struct omap_dma_dev_attr), GFP_KERNEL);
-@@ -380,10 +381,10 @@ exit_release_d:
- 	kfree(d);
- exit_release_p:
- 	kfree(p);
--exit_device_put:
--	platform_device_put(pdev);
- exit_device_del:
- 	platform_device_del(pdev);
-+exit_device_put:
-+	platform_device_put(pdev);
- 
- 	return ret;
- }
+With best wishes,
+Vladimir
