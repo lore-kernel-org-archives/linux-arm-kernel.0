@@ -1,49 +1,26 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 13 May 2011 22:43:08 +0200 (CEST)
-Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface (ISI)
-	support
-In-Reply-To: <4DCD960E.3020504@gmail.com>
-References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
-	<Pine.LNX.4.64.1105130956090.26356@axis700.grange>
-	<4DCD960E.3020504@gmail.com>
-Message-ID: <Pine.LNX.4.64.1105132242380.29954@axis700.grange>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 May 2011 22:15:12 +0100
+Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
+In-Reply-To: <BANLkTikY9VBXuT78k3GFkeG+q=ppMsz3iQ@mail.gmail.com>
+References: <4D714C17.7080102@gmail.com>
+	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
+	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
+	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
+	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
+	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
+	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
+	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
+	<alpine.LFD.2.02.1105131138460.2831@ionos>
+	<BANLkTikY9VBXuT78k3GFkeG+q=ppMsz3iQ@mail.gmail.com>
+Message-ID: <20110513211512.GA30539@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 May 2011, Sylwester Nawrocki wrote:
+On Fri, May 13, 2011 at 12:59:20PM +0200, Linus Walleij wrote:
+> This patch is interesting because it uses calc_mult_shift() and the current
+> localtimer driver for TWD (arch/arm/kernel/smp_twd.c) still uses hardcoded
+> mult+shift.
 
-> On 05/13/2011 03:50 PM, Guennadi Liakhovetski wrote:
-> > On Thu, 12 May 2011, Josh Wu wrote:
-> > 
-> >> This patch is to enable Atmel Image Sensor Interface (ISI) driver support.
-> >> - Using soc-camera framework with videobuf2 dma-contig allocator
-> >> - Supporting video streaming of YUV packed format
-> >> - Tested on AT91SAM9M10G45-EK with OV2640
-> >>
-> >> Signed-off-by: Josh Wu<josh.wu@atmel.com>
-> >> ---
-> ...
-> >> diff --git a/drivers/media/video/Makefile b/drivers/media/video/Makefile
-> >> index a10e4c3..f734a65 100644
-> >> --- a/drivers/media/video/Makefile
-> >> +++ b/drivers/media/video/Makefile
-> >> @@ -166,6 +166,7 @@ obj-$(CONFIG_VIDEO_SH_MOBILE_CSI2)	+= sh_mobile_csi2.o
-> >>   obj-$(CONFIG_VIDEO_SH_MOBILE_CEU)	+= sh_mobile_ceu_camera.o
-> >>   obj-$(CONFIG_VIDEO_OMAP1)		+= omap1_camera.o
-> >>   obj-$(CONFIG_VIDEO_SAMSUNG_S5P_FIMC) 	+= s5p-fimc/
-> > 
-> > [OT] hm, wow, who has decided to put a generic V4L driver (set) in the
-> > Makefile together with other soc-camera drivers? It has to be converted now;)
-> 
-> In fact I've already converted that driver, but soc-camera wasn't unfortunately
-> my choice, just the media controller ;-) I'll probably move the entry when 
-> preparing upstream patches, it just doesn't feel safe here;)
-
-Yeah, you're right - it's a boilerplate here, nothing like safe;)
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+I don't think there's any reason it uses a hard coded shift, just
+that's what was the norm when the code was originally written.  It
+(and many other clock event code) probably could do with an update.
