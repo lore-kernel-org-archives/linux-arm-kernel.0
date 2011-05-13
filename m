@@ -1,27 +1,94 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 13 May 2011 17:08:38 +0200
-Subject: [PATCH 0/6] use AMBA periphid for hardcoding
-In-Reply-To: <1300874614-14675-1-git-send-email-linus.walleij@stericsson.com>
-References: <1300874614-14675-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <BANLkTim8Pw_YXX0eQPkoju9or7NDGOuZrA@mail.gmail.com>
+From: eparis@redhat.com (Eric Paris)
+Date: Fri, 13 May 2011 11:10:49 -0400
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <20110513121034.GG21022@elte.hu>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu>
+Message-ID: <1305299455.2076.26.camel@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/3/23 Linus Walleij <linus.walleij@stericsson.com>:
+[dropping microblaze and roland]
 
-> These patches swithches the semantics of the optional AMBA periphid
-> field from fallback (when hardware ID is not found) to hardcoding
-> (overriding hardware ID) when used in platform data.
+lOn Fri, 2011-05-13 at 14:10 +0200, Ingo Molnar wrote:
+> * James Morris <jmorris@namei.org> wrote:
 
-Russell have you had a chance to look at this?
+> It is a simple and sensible security feature, agreed? It allows most code to 
+> run well and link to countless libraries - but no access to other files is 
+> allowed.
 
-I think 6827/1 and 6828/1 are just normal clean-up, whereas
-6829/1 thru 6832/1 is the controversial part, but I'd like to stress
-that it's solving a major issue for us, and I know for sure that the
-silicon will not be re-spun to solve the issue :-(
+It's simple enough and sounds reasonable, but you can read all the
+discussion about AppArmour why many people don't really think it's the
+best.  Still, I'll agree it's a lot better than nothing.
 
-I *have* contacted the hardware RTL engineers about it and kindly
-asked them to keep periphids in sync in the future.
+> But if i had a VFS event at the fs/namei.c::getname() level, i would have 
+> access to a central point where the VFS string becomes stable to the kernel and 
+> can be checked (and denied if necessary).
+> 
+> A sidenote, and not surprisingly, the audit subsystem already has an event 
+> callback there:
+> 
+>         audit_getname(result);
+> 
+> Unfortunately this audit callback cannot be used for my purposes, because the 
+> event is single-purpose for auditd and because it allows no feedback (no 
+> deny/accept discretion for the security policy).
+> 
+> But if had this simple event there:
+> 
+> 	err = event_vfs_getname(result);
 
-Yours,
-Linus Walleij
+Wow it sounds so easy.  Now lets keep extending your train of thought
+until we can actually provide the security provided by SELinux.  What do
+we end up with?  We end up with an event hook right next to every LSM
+hook.  You know, the LSM hooks were placed where they are for a reason.
+Because those were the locations inside the kernel where you actually
+have information about the task doing an operation and the objects
+(files, sockets, directories, other tasks, etc) they are doing an
+operation on.
+
+Honestly all you are talking about it remaking the LSM with 2 sets of
+hooks instead if 1.  Why?  It seems much easier that if you want the
+language of the filter engine you would just make a new LSM that uses
+the filter engine for it's policy language rather than the language
+created by SELinux or SMACK or name your LSM implementation.
+
+>  - unprivileged:  application-definable, allowing the embedding of security 
+>                   policy in *apps* as well, not just the system
+> 
+>  - flexible:      can be added/removed runtime unprivileged, and cheaply so
+> 
+>  - transparent:   does not impact executing code that meets the policy
+> 
+>  - nestable:      it is inherited by child tasks and is fundamentally stackable,
+>                   multiple policies will have the combined effect and they
+>                   are transparent to each other. So if a child task within a
+>                   sandbox adds *more* checks then those add to the already
+>                   existing set of checks. We only narrow permissions, never
+>                   extend them.
+> 
+>  - generic:       allowing observation and (safe) control of security relevant
+>                   parameters not just at the system call boundary but at other
+>                   relevant places of kernel execution as well: which 
+>                   points/callbacks could also be used for other types of event 
+>                   extraction such as perf. It could even be shared with audit ...
+
+I'm not arguing that any of these things are bad things.  What you
+describe is a new LSM that uses a discretionary access control model but
+with the granularity and flexibility that has traditionally only existed
+in the mandatory access control security modules previously implemented
+in the kernel.
+
+I won't argue that's a bad idea, there's no reason in my mind that a
+process shouldn't be allowed to control it's own access decisions in a
+more flexible way than rwx bits.  Then again, I certainly don't see a
+reason that this syscall hardening patch should be held up while a whole
+new concept in computer security is contemplated...
+
+-Eric
