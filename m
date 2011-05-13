@@ -1,30 +1,34 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 May 2011 15:30:14 +0100
-Subject: [PATCH 08/13 v2] clocksource: convert ARM 32-bit down counting
-	clocksources
-In-Reply-To: <20110512124710.GE1356@n2100.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-	<E1QJhPM-0000yq-ED@rmk-PC.arm.linux.org.uk>
-	<20110512124710.GE1356@n2100.arm.linux.org.uk>
-Message-ID: <1305297014.31204.113.camel@e102109-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 May 2011 16:31:04 +0200
+Subject: [QUERY] amba/pl022: DMA channel allocation always fail.
+In-Reply-To: <4DCD1D80.7060409@st.com>
+References: <4DCD1D80.7060409@st.com>
+Message-ID: <BANLkTinMH9TpTTzqoMPS7JZUBRss3pScWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-12 at 13:47 +0100, Russell King - ARM Linux wrote:
-> Convert SP804, MXC, Nomadik and Orion 32-bit down-counting clocksources
-> to generic mmio clocksource infrastructure.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
-> Cc: Alessandro Rubini <rubini@unipv.it>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Cc: Lennert Buytenhek <kernel@wantstofly.org>
-> Acked-by: Nicolas Pitre <nico@fluxnic.net>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-...
-> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-> index 6ef3342..445b05e 100644
-> --- a/arch/arm/common/timer-sp.c
-> +++ b/arch/arm/common/timer-sp.c
+2011/5/13 viresh kumar <viresh.kumar@st.com>:
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> amba/pl022 and my dma driver dw_dmac.c, both have registered init() routines
+> with subsys_initcall(). Now at bootup, spi boots up before DMA and so DMA
+> channels are never available at spi probe.
+>
+> What should be done to solve this issue?
+
+If you check drivers/dma/ste_dma40.c you can see that our solution was to
+simply move the DMA engine to arch_initcall().
+
+Which sort of makes sense for a DMA engine.
+
+Does this work for dw_dmac.c?
+
+> One idea is allocate DMA channel as and when required, instead of allocating them
+> at probe. But in that case too i am not sure, that this issue will be solved.
+
+For the serial port I've added a real funny tweak to queue the ports
+and add DMA later since these are initialized very early.
+
+Check in drivers/tty/serial/amba-pl011.c
+
+Hope this helps,
+Linus Walleij
