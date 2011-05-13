@@ -1,57 +1,44 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Fri, 13 May 2011 14:49:50 +0530
-Subject: [RFC PATCH v3] Consolidate SRAM support
-In-Reply-To: <20110512174546.GB8633@n2100.arm.linux.org.uk>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<20110512174546.GB8633@n2100.arm.linux.org.uk>
-Message-ID: <4DCCF7B6.8020305@ti.com>
+From: eballetbo@gmail.com (=?UTF-8?Q?Enric_Balletb=C3=B2_i_Serra?=)
+Date: Fri, 13 May 2011 09:27:18 +0200
+Subject: [RESEND PATCH 0/4] omap: merge IGEP v2 and v3
+In-Reply-To: <cover.1305235542.git.mike@compulab.co.il>
+References: <cover.1305235542.git.mike@compulab.co.il>
+Message-ID: <BANLkTi=UpaA6vqxepUCMdi-BVWZxwTuRxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi Mike,
 
-On 5/12/2011 11:15 PM, Russell King - ARM Linux wrote:
-> On Fri, Apr 15, 2011 at 02:06:07PM +0100, Russell King - ARM Linux wrote:
-> This is work in progress.
+2011/5/12 Mike Rapoport <mike@compulab.co.il>:
+> Hi Tony,
 >
+> I'm resending this with the correct arm-linux mailing list cc'ed..
+> Just discard the first set, sorry for the noise...
+>
+> This is yet another attempt to reduce code duplication in the board files :)
+> Only build tested, since I don't have the hardware, so I belive an Ack from
+> Enric is required.
 
-Tried this patch on OMAP and found couple of issues.
+Against which tree is based your work ?
 
-1. Compilation break. Below is the fix for the same.
+Cheers,
+  Enric
 
-diff --git a/arch/arm/plat-omap/sram.c b/arch/arm/plat-omap/sram.c
-index 68f57ff..78d1af4 100644
---- a/arch/arm/plat-omap/sram.c
-+++ b/arch/arm/plat-omap/sram.c
-@@ -75,6 +75,7 @@
-  static unsigned long omap_sram_start;
-  static unsigned long omap_sram_base;
-  static unsigned long omap_sram_size;
-+static unsigned long omap_sram_ceil;
-
-  /*
-   * Depending on the target RAMFS firewall setup, the public usable 
-amount of
--- 
-1.6.0.4
-
-
-2. The boot takes data abort while allocating memory for
-struct pv_pool. Here is the back-trace.
-I haven't debugged it further though.
-
--000|NSR:0xFFFF0010(asm)
-  -->|exception
--001|kmem_cache_alloc_trace(size = 0x0C, cachep = 0x0, flags = 0x80D0)
--002|pv_pool_create(addr = 0xFE400000, phys = 0x40200000, len = 
-0x00010000, min_alloc_order = 0x3)
--003|omap_sram_init()
--004|paging_init(?)
--005|setup_arch(cmdline_p = 0xC058BFE4)
--006|start_kernel()
--007|NSR:0x8000803C(asm)
-  ---|end of frame
-     |
-
-Regards
-Santosh
+>
+> Mike Rapoport (4):
+> ?omap: igep0020: name refactoring for future merge with IGEP3
+> ?omap: igep0020: minor refactoring
+> ?omap: igep0020: add support for IGEP3
+> ?omap: drop board-igep0030.c
+>
+> ?arch/arm/mach-omap2/Kconfig ? ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-omap2/Makefile ? ? ? ? | ? ?2 -
+> ?arch/arm/mach-omap2/board-igep0020.c | ?286 +++++++++++++---------
+> ?arch/arm/mach-omap2/board-igep0030.c | ?438 ----------------------------------
+> ?4 files changed, 174 insertions(+), 553 deletions(-)
+> ?delete mode 100644 arch/arm/mach-omap2/board-igep0030.c
+>
+> --
+> 1.7.3.1
+>
+>
