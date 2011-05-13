@@ -1,39 +1,27 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 13 May 2011 17:03:02 +0200
-Subject: [PATCH V2] usb/gadget: at91sam9g20 fix end point max packet size
-In-Reply-To: <1305042888-19401-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1305042888-19401-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1305298982-5789-1-git-send-email-plagnioj@jcrosoft.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 13 May 2011 15:55:36 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
+	call filtering
+In-Reply-To: <20110513124902.GC3924@elte.hu>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu> <1305289146.2466.8.camel@twins>
+	<20110513122646.GA3924@elte.hu> <1305290370.2466.14.camel@twins>
+	<20110513124902.GC3924@elte.hu>
+Message-ID: <1305294936.2466.65.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-on 9g20 they are the same as the 9260
+On Fri, 2011-05-13 at 14:49 +0200, Ingo Molnar wrote:
+> 
+> So given that by your own admission it makes sense to share the facilities at 
+> the low level, i also argue that it makes sense to share as high up as 
+> possible. 
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Resent upon Greg's request.
-Based on current linux-next.
-Applies cleanly on current linus' tree (2.6.39-rc7+)
-
-BTW, can we imagine it going to mainline before .39-final in a "fixes" pull
-request to Linus from a at91 tree?
-
- drivers/usb/gadget/at91_udc.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index 9b7cdb1..41dc093 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -1767,7 +1767,7 @@ static int __init at91udc_probe(struct platform_device *pdev)
- 	}
- 
- 	/* newer chips have more FIFO memory than rm9200 */
--	if (cpu_is_at91sam9260()) {
-+	if (cpu_is_at91sam9260() || cpu_is_at91sam9g20()) {
- 		udc->ep[0].maxpacket = 64;
- 		udc->ep[3].maxpacket = 64;
- 		udc->ep[4].maxpacket = 512;
--- 
-1.7.3
+I'm not saying any such thing, I'm saying that it might make sense to
+observe active objects and auto-create these observation points. That
+doesn't make them similar or make them share anything.
