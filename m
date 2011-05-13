@@ -1,20 +1,55 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 13 May 2011 16:01:32 +0100
-Subject: [PATCH 15/13] clocksource: ARM sp804: obtain sp804 timer rate
-	via	clks
-In-Reply-To: <20110512135141.GC6098@n2100.arm.linux.org.uk>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-	<20110512135141.GC6098@n2100.arm.linux.org.uk>
-Message-ID: <1305298892.31204.117.camel@e102109-lin.cambridge.arm.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Fri, 13 May 2011 17:02:15 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <1305294936.2466.65.camel@twins>
+References: <20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu> <1305289146.2466.8.camel@twins>
+	<20110513122646.GA3924@elte.hu> <1305290370.2466.14.camel@twins>
+	<20110513124902.GC3924@elte.hu> <1305294936.2466.65.camel@twins>
+Message-ID: <20110513150215.GD32688@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-12 at 14:51 +0100, Russell King - ARM Linux wrote:
-> This allows platforms to specify the rate of the SP804 clocksource via
-> the clk subsystem.  While ARM boards clock these at 1MHz, BCMRing also
-> has SP804 timers but are clocked at different rates.
-> 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+* Peter Zijlstra <peterz@infradead.org> wrote:
+
+> On Fri, 2011-05-13 at 14:49 +0200, Ingo Molnar wrote:
+> > 
+> > So given that by your own admission it makes sense to share the facilities at 
+> > the low level, i also argue that it makes sense to share as high up as 
+> > possible. 
+> 
+> I'm not saying any such thing, I'm saying that it might make sense to
+> observe active objects and auto-create these observation points. That
+> doesn't make them similar or make them share anything.
+
+Well, they would share the lowest level call site:
+
+	result = check_event_vfs_getname(result);
+
+You call it 'auto-generated call site', i call it a shared (single line) call 
+site. The same thing as far as the lowest level goes.
+
+Now (the way i understood it) you'd want to stop the sharing right after that. 
+I argue that it should go all the way up.
+
+Note: i fully agree that there should be events where filters can have no 
+effect whatsoever. For example if this was written as:
+
+	check_event_vfs_getname(result);
+
+Then it would have no effect. This is decided by the subsystem developers, 
+obviously. So whether an event is 'active' or 'passive' can be enforced at the 
+subsystem level as well.
+
+As far as the event facilities go, 'no effect observation' is a special-case of 
+'active observation' - just like read-only files are a special case of 
+read-write files.
+
+Thanks,
+
+	Ingo
