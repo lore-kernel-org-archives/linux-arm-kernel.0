@@ -1,25 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 May 2011 10:11:23 +0100
-Subject: [RFC PATCH v3] Consolidate SRAM support
-In-Reply-To: <BANLkTimmCuxUUY46B+aY5C0KxnY4_Dvucg@mail.gmail.com>
-References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
-	<20110512174546.GB8633@n2100.arm.linux.org.uk>
-	<BANLkTimmCuxUUY46B+aY5C0KxnY4_Dvucg@mail.gmail.com>
-Message-ID: <20110513091123.GA20941@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 13 May 2011 09:29:50 +0200 (CEST)
+Subject: [PATCH v4 1/2] ARM: ELF: Define new core note type for VFP
+	registers
+In-Reply-To: <20110513065902.GA2867@localhost>
+References: <1302688597-2969-1-git-send-email-dave.martin@linaro.org>
+	<1302688597-2969-2-git-send-email-dave.martin@linaro.org>
+	<20110428184925.GM17290@n2100.arm.linux.org.uk>
+	<20110503093659.GA2503@arm.com>
+	<20110512091400.GC1356@n2100.arm.linux.org.uk>
+	<20110513065902.GA2867@localhost>
+Message-ID: <alpine.LFD.2.00.1105130926180.2762@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 09:30:14AM +0200, Jean Pihet wrote:
-> On Thu, May 12, 2011 at 7:45 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> >    This version fixes the davinci pm free, and adds updates for the
-> >    davinci pcm driver.  As I don't know what's happening with Jean's
-> >    patch tweaking the genpool allocator, I've kept my version.
-> 
-> Sorry I do not get the question. The latest changes I submitted have
-> been merged in mainline as 'ARM: 6649/1: omap: use fncpy to copy the
-> PM code functions to SRAM' [1] . Thanks for that!
-> This change is only about the simple linear SRAM allocator, not the
-> genpool allocator.
+On Fri, 13 May 2011, Dave Martin wrote:
 
-The wrong Jean!  I meant Jean-Christophe PLAGNIOL-VILLARD.
+> On Thu, May 12, 2011 at 10:14:00AM +0100, Russell King - ARM Linux wrote:
+> > On Tue, May 03, 2011 at 10:36:59AM +0100, Dave Martin wrote:
+> > > On Thu, Apr 28, 2011 at 07:49:25PM +0100, Russell King - ARM Linux wrote:
+> > > > On Wed, Apr 13, 2011 at 10:56:36AM +0100, Dave Martin wrote:
+> > > > > The VFP registers are not currently included in coredumps,
+> > > > > and there's no existing note type where they can sensibly be
+> > > > > included, so this patch defines a dedicated note type for them.
+> > > > 
+> > > > This probably wants to be copied to LKML (added).
+> > > 
+> > > Good point-- thanks.
+> > 
+> > What news on this?
+> 
+> None whatsoever.  Do you think I need to push harder for feedback?
+
+I think that the patch should just be merged.  If someone had a problem 
+with this, we would have heard about it by now.
+
+
+Nicolas
