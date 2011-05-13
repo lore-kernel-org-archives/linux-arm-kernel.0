@@ -1,102 +1,80 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 13 May 2011 12:02:13 +0200 (CEST)
-Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
-In-Reply-To: <BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
-References: <1290060899-9786-1-git-send-email-ccross@android.com>
-	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
-	<4D70BE9D.4000507@stericsson.com>
-	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
-	<4D714C17.7080102@gmail.com>
-	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
-	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
-	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
-	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
-	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
-	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
-	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1105131138460.2831@ionos>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Fri, 13 May 2011 14:13:49 +0400
+Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
+In-Reply-To: <E1QHn5f-0004Rb-6j@outmx07.plus.net>
+References: <E1QHn5f-0004Rb-6j@outmx07.plus.net>
+Message-ID: <20110513101348.GA18716@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 May 2011, Linus Walleij wrote:
-
-> 2011/3/6 Linus Walleij <linus.walleij@linaro.org>:
-> > On Sun, Mar 6, 2011 at 6:42 PM, Colin Cross <ccross@android.com> wrote:
-> >
-> >> Is there any way
-> >> for a clockevent to invalidate the current event and ask for it to be
-> >> reprogrammed?
-> >
-> > TGLX will know for sure... Thomas?
-> >
-> > (This is inside a CPUfreq hook for a localtimer for the record.)
+On 01:10 Thu 05 May     , Paul Parsons wrote:
+> Resuming a suspended hx4700 results in Unbalanced IRQ warnings:
 > 
-> I discussed this briefly with TGLX at the UDS here and he's confident
-> we could add some nifty feature to reprogram an event. I dare not
-> try to guess where the code would sit or how it'd look...
+> WARNING: at kernel/irq/manage.c:507 irq_set_irq_wake+0xe0/0xec()
+> Unbalanced IRQ 246 wake disable
+> ..
+> 
+> Likewise for IRQ 241 and IRQ 243. The 3 ASIC3 GPIO buttons - RECORD/CALENDAR/HOME - each fail in a call to enable_irq_wake() in gpio_keys_suspend() because of an absent irq_set_wake() handler in the asic3_gpio_irq_chip structure. Matching calls to disable_irq_wake() in gpio_keys_resume() then print the warnings. Since we should never need to resume via the 3 ASIC3 GPIO buttons, nor 2 of the 3 builtin GPIO buttons - MAIL/CONTACTS, the simplest remedy for the warnings is to enable irq wakeup on the POWER button only.
 
-Does the following work for you ?
+Not sure if it's right to allow only POWER button to wake the device.
+In both Windows CE and handhelds.org 2.6.21 kernel any button can wake
+device, and even start corresponding action (i.e. run some app) after wakeup.
+I think we should just disable wakeup on ASIC3 button for now, and/or think
+about how to implement .set_wake in ASIC3.
 
-Thanks,
+For first part I mean something like this (not sure if it still applies,
+but you should get the idea):
 
-	tglx
+Date: Sat, 31 Jul 2010 11:55:25 +0400
+Subject: [PATCH 17/47] pxa/hx4700: don't wake on ASIC3 buttons
 
----------->
-Subject: clock-ev-reconf.patch
-From: Thomas Gleixner <tglx@linutronix.de>
-Date: Fri, 13 May 2011 10:53:13 +0200
+Currently ASIC3 driver doesn't support set_wake on its GPIOs,
+which leads to "Unbalanced IRQ ### wake disable" warnings on wakeup.
+Workaround this by simply not using buttons connected to ASIC3
+gpios as wakeup sources.
 
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 ---
- include/linux/clockchips.h |    2 ++
- kernel/time/clockevents.c  |   24 ++++++++++++++++++++++++
- 2 files changed, 26 insertions(+)
+ arch/arm/mach-pxa/hx4700.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-Index: linux-2.6/include/linux/clockchips.h
-===================================================================
---- linux-2.6.orig/include/linux/clockchips.h
-+++ linux-2.6/include/linux/clockchips.h
-@@ -132,6 +132,8 @@ extern int clockevents_program_event(str
- 
- extern void clockevents_handle_noop(struct clock_event_device *dev);
- 
-+extern int clockevents_reconfigure(struct clock_event_device *ce, u32 freq, u32 minsec);
-+
- static inline void
- clockevents_calc_mult_shift(struct clock_event_device *ce, u32 freq, u32 minsec)
- {
-Index: linux-2.6/kernel/time/clockevents.c
-===================================================================
---- linux-2.6.orig/kernel/time/clockevents.c
-+++ linux-2.6/kernel/time/clockevents.c
-@@ -133,6 +133,30 @@ int clockevents_program_event(struct clo
- }
- 
- /**
-+ * clockevents_reconfigure - Reconfigure and reprogram a clock event device.
-+ * @dev:	device to modify
-+ * @freq:	new device frequency
-+ * @secr:	guaranteed runtime conversion range in seconds
-+ *
-+ * Reconfigure and reprogram a clock event device in oneshot
-+ * mode. Must only be called from low level idle code where
-+ * interaction with hrtimers/nohz code etc. is not possible and
-+ * guaranteed not to conflict. Must be called with interrupts
-+ * disabled!
-+ * Returns 0 on success, -ETIME when the event is in the past or
-+ * -EINVAL when called with invalid parameters.
-+ */
-+int clockevents_reconfigure(struct clock_event_device *dev, u32 freq, u32 secr)
-+{
-+	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
-+		return -EINVAL;
-+
-+	clockevents_calc_mult_shift(dev, freq, secr ? secr : 1);
-+
-+	return clockevents_program_event(dev, dev->next_event, ktime_get());
-+}
-+
-+/**
-  * clockevents_register_notifier - register a clock events change listener
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index fa33fef..6c78f93 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -202,23 +202,23 @@ static struct pxaficp_platform_data ficp_info = {
+  * GPIO Keys
   */
- int clockevents_register_notifier(struct notifier_block *nb)
+ 
+-#define INIT_KEY(_code, _gpio, _active_low, _desc)	\
++#define INIT_KEY(_code, _gpio, _active_low, _wake, _desc)	\
+ 	{						\
+ 		.code       = KEY_##_code,		\
+ 		.gpio       = _gpio,			\
+ 		.active_low = _active_low,		\
+ 		.desc       = _desc,			\
+ 		.type       = EV_KEY,			\
+-		.wakeup     = 1,			\
++		.wakeup     = _wake,			\
+ 	}
+ 
+ static struct gpio_keys_button gpio_keys_buttons[] = {
+-	INIT_KEY(POWER,       GPIO0_HX4700_nKEY_POWER,   1, "Power button"),
+-	INIT_KEY(MAIL,        GPIO94_HX4700_KEY_MAIL,    0, "Mail button"),
+-	INIT_KEY(ADDRESSBOOK, GPIO99_HX4700_KEY_CONTACTS,0, "Contacts button"),
+-	INIT_KEY(RECORD,      GPIOD6_nKEY_RECORD,        1, "Record button"),
+-	INIT_KEY(CALENDAR,    GPIOD1_nKEY_CALENDAR,      1, "Calendar button"),
+-	INIT_KEY(HOMEPAGE,    GPIOD3_nKEY_HOME,          1, "Home button"),
++	INIT_KEY(POWER,       GPIO0_HX4700_nKEY_POWER,   1, 1, "Power button"),
++	INIT_KEY(MAIL,        GPIO94_HX4700_KEY_MAIL,    0, 1, "Mail button"),
++	INIT_KEY(ADDRESSBOOK, GPIO99_HX4700_KEY_CONTACTS,0, 1, "Contacts button"),
++	INIT_KEY(RECORD,      GPIOD6_nKEY_RECORD,        1, 0, "Record button"),
++	INIT_KEY(CALENDAR,    GPIOD1_nKEY_CALENDAR,      1, 0, "Calendar button"),
++	INIT_KEY(HOMEPAGE,    GPIOD3_nKEY_HOME,          1, 0, "Home button"),
+ };
+ 
+ static struct gpio_keys_platform_data gpio_keys_data = {
+
+-- 
+Best regards,
+Dmitry "MAD" Artamonow
