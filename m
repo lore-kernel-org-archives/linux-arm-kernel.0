@@ -1,46 +1,46 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 13 May 2011 14:21:52 +0200
-Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
-	preprocessor.
-In-Reply-To: <BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
-References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>	<20110513113013.GP31483@atomide.com>
-	<BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
-Message-ID: <4DCD2260.4090806@ti.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Fri, 13 May 2011 14:26:46 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <1305289146.2466.8.camel@twins>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu> <1305289146.2466.8.camel@twins>
+Message-ID: <20110513122646.GA3924@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
 
-Could you please re-send your original patch?
+* Peter Zijlstra <peterz@infradead.org> wrote:
 
-For some reason I cannot find it in any mailing list so far.
-Maybe it is due to its size.
+> On Fri, 2011-05-13 at 14:10 +0200, Ingo Molnar wrote:
+> >         err = event_vfs_getname(result);
+> 
+> I really think we should not do this. Events like we have them should be 
+> inactive, totally passive entities, only observe but not affect execution 
+> (other than the bare minimal time delay introduced by observance).
 
-On 5/13/2011 2:08 PM, Vladimir Zapolskiy wrote:
-> On Fri, May 13, 2011 at 2:30 PM, Tony Lindgren<tony@atomide.com>  wrote:
->> * Vladimir Zapolskiy<vzapolskiy@gmail.com>  [110512 17:35]:
->>> This mass change reduces homogeneous data chunks along clock
->>> definitions. No semantical difference is added to the change,
->>> and still it could be introduced easily.
->>>
->>> Signed-off-by: Vladimir Zapolskiy<vzapolskiy@gmail.com>
->>> ---
->>>   arch/arm/mach-omap2/clock44xx_data.c | 3313 +++++++++-------------------------
->>>   1 files changed, 848 insertions(+), 2465 deletions(-)
->>
->> Hehehe, the diffstat certainly looks good :)
->>
->> This would be best done for all of them using some
->> perl/sed/python script. And could be done for the hwmod data
->> too. Do you already have something like that available?
->>
-> Unfortunately I don't have an automated tool, but that would be great
-> to have such a script. For this time I've checked the correctness of the
-> change comparing the preprocessed output.
+Well, this patchset already demonstrates that we can use a single event 
+callback for a rather useful purpose.
 
-In fact these files are already generated automatically, as written in 
-the header file. So changing the output format should straightforward. 
-At least for OMAP4... OMAP2 and OMAP3 were done manually some time ago.
+Either it makes sense to do, in which case we should share facilities as much 
+as possible, or it makes no sense, in which case we should not merge it at all.
 
-Regards,
-Benoit
+> If you want another entity that is more active, please invent a new name for 
+> it and create a new subsystem for them, now you could have these active 
+> entities also have an (automatic) passive event side, but that's some detail.
+
+Why should we have two callbacks next to each other:
+
+	event_vfs_getname(result);
+	result = check_event_vfs_getname(result);
+
+if one could do it all?
+
+Thanks,
+
+	Ingo
