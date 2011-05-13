@@ -1,132 +1,88 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Thu, 12 May 2011 18:24:53 -0700
-Subject: [PATCH] arm: Add unwinding support for division functions
-Message-ID: <1305249893-3427-1-git-send-email-lauraa@codeaurora.org>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 13 May 2011 03:25:20 +0200
+Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface (ISI)
+	support
+In-Reply-To: <4DCC5040.6050300@bluewatersys.com>
+References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
+	<4DCC5040.6050300@bluewatersys.com>
+Message-ID: <20110513012520.GL18952@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The software division functions never had unwinding annotations
-added. Currently, when a division by zero occurs the backtrace shown
-will stop at Ldiv0 or some completely unrelated function. Add
-unwinding annotations in hopes of getting a more useful backtrace
-when a division by zero occurs.
+> > +
+> > +/* Constants for RGB_CFG(ISI_V2) */
+> > +#define ISI_V2_RGB_CFG_DEFAULT			0
+> > +#define ISI_V2_RGB_CFG_MODE_1			1
+> > +#define ISI_V2_RGB_CFG_MODE_2			2
+> > +#define ISI_V2_RGB_CFG_MODE_3			3
+> > +
+> > +/* Bit manipulation macros */
+> > +#define ISI_BIT(name)					\
+> > +	(1 << ISI_##name##_OFFSET)
+> > +#define ISI_BF(name, value)				\
+> > +	(((value) & ((1 << ISI_##name##_SIZE) - 1))	\
+> > +	 << ISI_##name##_OFFSET)
+> > +#define ISI_BFEXT(name, value)				\
+> > +	(((value) >> ISI_##name##_OFFSET)		\
+> > +	 & ((1 << ISI_##name##_SIZE) - 1))
+> > +#define ISI_BFINS(name, value, old)			\
+> > +	(((old) & ~(((1 << ISI_##name##_SIZE) - 1)	\
+> > +		    << ISI_##name##_OFFSET))\
+> > +	 | ISI_BF(name, value))
+> 
+> I really dislike this kind of register access magic. Not sure how others
+> feel about it. These macros are really ugly.
+> 
+> > +/* Register access macros */
+> > +#define isi_readl(port, reg)				\
+> > +	__raw_readl((port)->regs + ISI_##reg)
+> > +#define isi_writel(port, reg, value)			\
+> > +	__raw_writel((value), (port)->regs + ISI_##reg)
+> 
+> If the token pasting stuff gets dropped then these can be static inline
+> functions which is preferred.
+Sorry this make the C code much readable
+and this can not be done as a inline
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/lib/lib1funcs.S |   27 +++++++++++++++++++++------
- 1 files changed, 21 insertions(+), 6 deletions(-)
+so please keep it as is
+> 
+> > +
+> > +#define ATMEL_V4L2_VID_FLAGS (V4L2_CAP_VIDEO_OUTPUT)
+> > +
+> > +struct atmel_isi;
+> > +
+> > +enum atmel_isi_pixfmt {
+> > +	ATMEL_ISI_PIXFMT_GREY,		/* Greyscale */
 
-diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
-index 6dc0648..63b75df 100644
---- a/arch/arm/lib/lib1funcs.S
-+++ b/arch/arm/lib/lib1funcs.S
-@@ -35,7 +35,7 @@ Boston, MA 02111-1307, USA.  */
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
--
-+#include <asm/unwind.h>
- 
- .macro ARM_DIV_BODY dividend, divisor, result, curbit
- 
-@@ -207,6 +207,7 @@ Boston, MA 02111-1307, USA.  */
- 
- ENTRY(__udivsi3)
- ENTRY(__aeabi_uidiv)
-+UNWIND(.fnstart)
- 
- 	subs	r2, r1, #1
- 	moveq	pc, lr
-@@ -230,10 +231,12 @@ ENTRY(__aeabi_uidiv)
- 	mov	r0, r0, lsr r2
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__udivsi3)
- ENDPROC(__aeabi_uidiv)
- 
- ENTRY(__umodsi3)
-+UNWIND(.fnstart)
- 
- 	subs	r2, r1, #1			@ compare divisor with 1
- 	bcc	Ldiv0
-@@ -247,10 +250,12 @@ ENTRY(__umodsi3)
- 
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__umodsi3)
- 
- ENTRY(__divsi3)
- ENTRY(__aeabi_idiv)
-+UNWIND(.fnstart)
- 
- 	cmp	r1, #0
- 	eor	ip, r0, r1			@ save the sign of the result.
-@@ -287,10 +292,12 @@ ENTRY(__aeabi_idiv)
- 	rsbmi	r0, r0, #0
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__divsi3)
- ENDPROC(__aeabi_idiv)
- 
- ENTRY(__modsi3)
-+UNWIND(.fnstart)
- 
- 	cmp	r1, #0
- 	beq	Ldiv0
-@@ -310,11 +317,14 @@ ENTRY(__modsi3)
- 	rsbmi	r0, r0, #0
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__modsi3)
- 
- #ifdef CONFIG_AEABI
- 
- ENTRY(__aeabi_uidivmod)
-+UNWIND(.fnstart)
-+UNWIND(.save {r0, r1, ip, lr}	)
- 
- 	stmfd	sp!, {r0, r1, ip, lr}
- 	bl	__aeabi_uidiv
-@@ -323,10 +333,12 @@ ENTRY(__aeabi_uidivmod)
- 	sub	r1, r1, r3
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__aeabi_uidivmod)
- 
- ENTRY(__aeabi_idivmod)
--
-+UNWIND(.fnstart)
-+UNWIND(.save {r0, r1, ip, lr}	)
- 	stmfd	sp!, {r0, r1, ip, lr}
- 	bl	__aeabi_idiv
- 	ldmfd	sp!, {r1, r2, ip, lr}
-@@ -334,15 +346,18 @@ ENTRY(__aeabi_idivmod)
- 	sub	r1, r1, r3
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__aeabi_idivmod)
- 
- #endif
- 
--Ldiv0:
--
-+ENTRY(Ldiv0)
-+UNWIND(.fnstart)
-+UNWIND(.pad #4)
-+UNWIND(.save {lr})
- 	str	lr, [sp, #-8]!
- 	bl	__div0
- 	mov	r0, #0			@ About as wrong as it could be.
- 	ldr	pc, [sp], #8
--
--
-+UNWIND(.fnend)
-+ENDPROC(Ldiv0)
--- 
-1.7.3.3
+> > +		dev_info(&pdev->dev,
+> > +			"No config available using default values\n");
+> > +		pdata = &isi_default_data;
+> > +	}
+> > +
+> > +	isi->pdata = pdata;
+> > +	isi->platform_flags = pdata->flags;
+> > +	if (isi->platform_flags == 0)
+> > +		isi->platform_flags = ISI_DATAWIDTH_8;
+> 
+> We could be mean here an require that people get the flags correct, e.g.
+> 
+> 	if (!((isi->platform_flags & ISI_DATA_WIDTH_8) ||
+> 	      (isi->platform_flags & ISI_DATA_WIDTH_8))) {
+> 		dev_err(&pdev->dev, "No data width specified\n");
+> 		err = -ENOMEM;
+> 		goto fail;
+> 	}
+> 
+> Which discourages sloppy coding in the board files.
+if this means default configuration so not need to have all board to set it
+> 
+> > +
+> > +	isi_writel(isi, V2_CTRL, ISI_BIT(V2_DIS));
+> > +	/* Check if module disable */
+> > +	while (isi_readl(isi, V2_STATUS) & ISI_BIT(V2_DIS))
+> > +		cpu_relax();
+> > +
+> > +	irq = platform_get_irq(pdev, 0);
+
+Best Regards,
+J.
