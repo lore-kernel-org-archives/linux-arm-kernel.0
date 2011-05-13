@@ -1,31 +1,21 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 May 2011 17:06:28 +0300
-Subject: [PATCH] OMAP3: set the core dpll clk rate in its set_rate
-	function.
-In-Reply-To: <alpine.DEB.2.00.1105122015550.26192@utopia.booyaka.com>
-References: <1304944180-20443-1-git-send-email-avinashhm@ti.com>
-	<alpine.DEB.2.00.1105122015550.26192@utopia.booyaka.com>
-Message-ID: <20110513140625.GL5323@atomide.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 May 2011 16:22:13 +0200
+Subject: [PATCH] spi/amba-pl022: work in polling or interrupt mode if
+	pl022_dma_probe fails
+In-Reply-To: <a105605733caadfea25034ce0b8af73eb907fd33.1305287569.git.viresh.kumar@st.com>
+References: <a105605733caadfea25034ce0b8af73eb907fd33.1305287569.git.viresh.kumar@st.com>
+Message-ID: <BANLkTik0RJTA8EVMEOnBS=M4t+KHH+MJRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Paul Walmsley <paul@pwsan.com> [110513 05:13]:
-> On Mon, 9 May 2011, Avinash.H.M wrote:
-> 
-> > The debug l3_ick/rate is not displaying the actual rate of the clock in
-> > hardware. This is because, the core dpll set_rate function doesn't update the
-> > clk.rate. After fixing, the l3_ick/rate is displaying proper values.
-> > 
-> > Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
-> > Signed-off-by: Avinash.H.M <avinashhm@ti.com>
-> > Cc: Rajendra Nayak <rnayak@ti.com>
-> > Cc: Paul Wamsley <paul@pwsan.com>
-> 
-> Acked-by: Paul Walmsley <paul@pwsan.com>
-> 
-> Thanks, let's see if we can get this into an -rc.
+2011/5/13 Viresh Kumar <viresh.kumar@st.com>:
 
-Might be out of time as we still should have this sit in
-for-next too. Anyways, adding into devel-fixes.
+> If pl022_dma_probe fails, we can try to transfer data in polling or interrupt
+> mode. Also, set platform_info->enable_dma to 0, so that no other code tries to
+> use dma.
 
-Tony
+Sure why not!
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
