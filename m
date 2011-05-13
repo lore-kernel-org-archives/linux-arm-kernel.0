@@ -1,36 +1,51 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 13 May 2011 16:04:43 +0300
-Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
-	preprocessor.
-In-Reply-To: <4DCD2260.4090806@ti.com>
-References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
-	<20110513113013.GP31483@atomide.com>
-	<BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
-	<4DCD2260.4090806@ti.com>
-Message-ID: <20110513130441.GH5323@atomide.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 13 May 2011 15:08:52 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
+	call filtering
+In-Reply-To: <20110513125452.GD3924@elte.hu>
+References: <1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu> <1305289146.2466.8.camel@twins>
+	<20110513122646.GA3924@elte.hu> <1305290370.2466.14.camel@twins>
+	<1305290612.2466.17.camel@twins>  <20110513125452.GD3924@elte.hu>
+Message-ID: <1305292132.2466.26.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Cousson, Benoit <b-cousson@ti.com> [110513 15:18]:
-> >>>Signed-off-by: Vladimir Zapolskiy<vzapolskiy@gmail.com>
-> >>
-> >Unfortunately I don't have an automated tool, but that would be great
-> >to have such a script. For this time I've checked the correctness of the
-> >change comparing the preprocessed output.
+On Fri, 2011-05-13 at 14:54 +0200, Ingo Molnar wrote:
+> I think the sanest semantics is to run all active callbacks as well.
 > 
-> In fact these files are already generated automatically, as written
-> in the header file. So changing the output format should
-> straightforward. At least for OMAP4... OMAP2 and OMAP3 were done
-> manually some time ago.
+> For example if this is used for three stacked security policies - as if 3 LSM 
+> modules were stacked at once. We'd call all three, and we'd determine that at 
+> least one failed - and we'd return a failure. 
 
-Sounds like the important thing to consider here is how these macros
-should be set up considering the upcoming generic clock framework
-and device tree changes.
+But that only works for boolean functions where you can return the
+multi-bit-or of the result. What if you need to return the specific
+error code.
 
-So let's wait a few days for comments from Benoit and Paul on the
-format for the macros so we don't need to redo them again later.
-Of course there might be other things to consider too..
+Also, there's bound to be other cases where people will want to employ
+this, look at all the various notifier chain muck we've got, it already
+deals with much of this -- simply because users need it.
 
-Regards,
+Then there's the whole indirection argument, if you don't need
+indirection, its often better to not use it, I myself much prefer code
+to look like:
 
-Tony
+   foo1(bar);
+   foo2(bar);
+   foo3(bar);
+
+Than:
+
+   foo_notifier(bar);
+
+Simply because its much clearer who all are involved without me having
+to grep around to see who registers for foo_notifier and wth they do
+with it. It also makes it much harder to sneak in another user, whereas
+its nearly impossible to find new notifier users.
+
+Its also much faster, no extra memory accesses, no indirect function
+calls, no other muck.
