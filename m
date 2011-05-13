@@ -1,59 +1,55 @@
-From: green@linuxhacker.ru (Oleg Drokin)
-Date: Thu, 12 May 2011 23:52:08 -0400
-Subject: [PATCH 1/2] Initial B&N Nook Color (encore) support.
-In-Reply-To: <4DC791C9.9040709@compulab.co.il>
-References: <1304891407-29364-1-git-send-email-green@linuxhacker.ru>
-	<1304891407-29364-2-git-send-email-green@linuxhacker.ru>
-	<4DC791C9.9040709@compulab.co.il>
-Message-ID: <8D96E746-8C8F-44B1-9AFE-8A71F8AF082D@linuxhacker.ru>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Fri, 13 May 2011 12:57:20 +0800
+Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface
+	(ISI)support
+In-Reply-To: <20110512093433.GD1356@n2100.arm.linux.org.uk>
+References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
+	<20110512093433.GD1356@n2100.arm.linux.org.uk>
+Message-ID: <4C79549CB6F772498162A641D92D532801B188BF@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+On Thursday, May 12, 2011 5:35 PM, Russell King wrote:
 
-On May 9, 2011, at 3:03 AM, Igor Grinberg wrote:
+> A few more points...
 
->> Bare-bones board file, comes with serial console, gpio keys,
->> MMC/SDCard and USB support.
->> 
->> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
->> ---
-> 
-> In general, here you should write the version history of your patch...
+>> +static int __init atmel_isi_probe(struct platform_device *pdev)
 
-umm, ok.
-Do you think the history of the changes is important in this case, though?
-I mean it's mostly the case of "kill unneeded includes, fix style, fix incorrect mux package type" and so on.
-Nothing of real interest to anybody.
-
->> +static void __init omap_encore_init(void)
+> Should be __devinit otherwise you'll have section errors.
+Ok, will be fixed in V2 patch.
 >> +{
->> +	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
-> 
-> You select CBP package in Kconfig, but pass CBB here?
+>> +	unsigned int irq;
+>> +	struct atmel_isi *isi;
+>> +	struct clk *pclk;
+>> +	struct resource *regs;
+>> +	int ret;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct isi_platform_data *pdata;
+>> +	struct soc_camera_host *soc_host;
+>> +
+>> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	if (!regs)
+>> +		return -ENXIO;
+>> +
+>> +	pclk = clk_get(&pdev->dev, "isi_clk");
+>> +	if (IS_ERR(pclk))
+>> +		return PTR_ERR(pclk);
+>> +
+>> +	clk_enable(pclk);
 
-Ah, indeed, thanks for catching this.
+> Return value of clk_enable() should be checked.
+Yes. I will add code to check the return value in V2 patch. 
+>> +
+>> +	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
+>> +	if (!isi) {
+>> +		ret = -ENOMEM;
+>> [...]
+>> +	isi_writel(isi, V2_CTRL, ISI_BIT(V2_DIS));
+>> +	/* Check if module disable */
+>> +	while (isi_readl(isi, V2_STATUS) & ISI_BIT(V2_DIS))
+>> +		cpu_relax();
+>> +
+>> +	irq = platform_get_irq(pdev, 0);
 
->> -nookcolor		MACH_NOOKCOLOR		NOOKCOLOR		3284
->> +encore			MACH_ENCORE		ENCORE			3284
->> hkdkc100		MACH_HKDKC100		HKDKC100		3285
->> ts42xx			MACH_TS42XX		TS42XX			3286
->> aebl			MACH_AEBL		AEBL			3287
-> 
-> You should contact Russell for this kind of stuff.
-
-Yes, I already did.
-I am carrying it as part of the patch so that it's actually buildable while
-awaiting for the decision.
-
-> I don't think you should be patching it directly...
-> If you want to tell us that your patch should be applied with this
-> change to mach-types, then it would be better to make a separate
-> patch for it and describe it in your cover letter.
-
-Hm, ok.
-
-Thanks for the feedback.
-
-Bye,
-    Oleg
+> This should also be checked.
+Ditto, thank you.
