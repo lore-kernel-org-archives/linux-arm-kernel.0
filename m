@@ -1,159 +1,53 @@
-From: lost.distance@yahoo.com (Paul Parsons)
-Date: Fri, 13 May 2011 11:53:07 +0100 (BST)
-Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
-In-Reply-To: <20110513101348.GA18716@rainbow>
-Message-ID: <266912.5357.qm@web29010.mail.ird.yahoo.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Fri, 13 May 2011 16:25:56 +0530
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <201105112203.54838.arnd@arndb.de>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105102344.58598.arnd@arndb.de>
+	<82D549BB195345A1A189D569952B387C@subhasishg>
+	<201105112203.54838.arnd@arndb.de>
+Message-ID: <EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+>>
+>> Ok, thanks for the clarification.
+>> Instead of passing the device name, will it be ok to pass the mfd_id.
+>> The benefit will be that I can use the ID directly as an array
+>> index for the mfd_cell entries.
+>
+> I think a device name would be clearer here, especially in order
+> to avoid conflicts when the list gets extended in different ways
+> depending on which kernel runs.
+>
+> We had a little discussion at the Linaro Developer Summit about your
+> driver and mfd drivers in general. There was a general feeling among
+> some people (including me) that by the point you dynamically create
+> the subdevices, MFD is probably not the right abstraction any more,
+> as it does not provide any service that you need.
+>
+> Instead, maybe you can simply call platform_device_register
+> at that stage to create the children and not use MFD at all.
+>
+> Samuel, can you comment on this as well? Do you still see pruss
+> as an MFD driver when the uses are completely dynamic and determined
+> by the firmware loaded into it?
+>
 
-I tried your patch and found that the MAIL and CONTACTS buttons did not resume the unit. The same is true of the handhelds.org 2.6.21-hh20 kernel. I don't have WinCE any more so am unable to test that.
+Hi Arnd,
 
-The reason appears to be that neither GPIO94 (MAIL) nor GPIO99 (CONTACTS) can be enabled as a wake-up source in the PWER register.
+But in that case, where do I fit my driver.
+It's a microcontroller inside of a processor, guess that's unique for Linux.
+Will a misc device be a better choice.
 
-Regards,
-Paul
+In that case I can remove the MFD cell from the board_file and add an array
+of platform_device for the UART & CAN.
 
---- On Fri, 13/5/11, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+Regarding device register, I will have to implement something similar to
+mfd_add_devices and mark the dev->parent.
 
-> From: Dmitry Artamonow <mad_soft@inbox.ru>
-> Subject: Re: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
-> To: "Paul Parsons" <lost.distance@yahoo.com>
-> Cc: linux-arm-kernel at lists.infradead.org, eric.y.miao at gmail.com, philipp.zabel at gmail.com
-> Date: Friday, 13 May, 2011, 11:13
-> On 01:10 Thu 05 May?
-> ???, Paul Parsons wrote:
-> > Resuming a suspended hx4700 results in Unbalanced IRQ
-> warnings:
-> > 
-> > WARNING: at kernel/irq/manage.c:507
-> irq_set_irq_wake+0xe0/0xec()
-> > Unbalanced IRQ 246 wake disable
-> > ..
-> > 
-> > Likewise for IRQ 241 and IRQ 243. The 3 ASIC3 GPIO
-> buttons - RECORD/CALENDAR/HOME - each fail in a call to
-> enable_irq_wake() in gpio_keys_suspend() because of an
-> absent irq_set_wake() handler in the asic3_gpio_irq_chip
-> structure. Matching calls to disable_irq_wake() in
-> gpio_keys_resume() then print the warnings. Since we should
-> never need to resume via the 3 ASIC3 GPIO buttons, nor 2 of
-> the 3 builtin GPIO buttons - MAIL/CONTACTS, the simplest
-> remedy for the warnings is to enable irq wakeup on the POWER
-> button only.
-> 
-> Not sure if it's right to allow only POWER button to wake
-> the device.
-> In both Windows CE and handhelds.org 2.6.21 kernel any
-> button can wake
-> device, and even start corresponding action (i.e. run some
-> app) after wakeup.
-> I think we should just disable wakeup on ASIC3 button for
-> now, and/or think
-> about how to implement .set_wake in ASIC3.
-> 
-> For first part I mean something like this (not sure if it
-> still applies,
-> but you should get the idea):
-> 
-> Date: Sat, 31 Jul 2010 11:55:25 +0400
-> Subject: [PATCH 17/47] pxa/hx4700: don't wake on ASIC3
-> buttons
-> 
-> Currently ASIC3 driver doesn't support set_wake on its
-> GPIOs,
-> which leads to "Unbalanced IRQ ### wake disable" warnings
-> on wakeup.
-> Workaround this by simply not using buttons connected to
-> ASIC3
-> gpios as wakeup sources.
-> 
-> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
-> ---
->  arch/arm/mach-pxa/hx4700.c |???16
-> ++++++++--------
->  1 files changed, 8 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm/mach-pxa/hx4700.c
-> b/arch/arm/mach-pxa/hx4700.c
-> index fa33fef..6c78f93 100644
-> --- a/arch/arm/mach-pxa/hx4700.c
-> +++ b/arch/arm/mach-pxa/hx4700.c
-> @@ -202,23 +202,23 @@ static struct pxaficp_platform_data
-> ficp_info = {
-> ? * GPIO Keys
-> ? */
->  
-> -#define INIT_KEY(_code, _gpio, _active_low,
-> _desc)??? \
-> +#define INIT_KEY(_code, _gpio, _active_low, _wake,
-> _desc)??? \
->  ??? {??? ???
-> ??? ??? ???
-> ??? \
->  ??? ??? .code? ?
-> ???= KEY_##_code,???
-> ??? \
->  ??? ??? .gpio? ?
-> ???= _gpio,???
-> ??? ??? \
->  ??? ??? .active_low =
-> _active_low,??? ??? \
->  ??? ??? .desc? ?
-> ???= _desc,???
-> ??? ??? \
->  ??? ??? .type? ?
-> ???= EV_KEY,???
-> ??? ??? \
-> -??? ??? .wakeup?
-> ???= 1,??? ???
-> ??? \
-> +??? ??? .wakeup?
-> ???= _wake,???
-> ??? ??? \
->  ??? }
->  
->  static struct gpio_keys_button gpio_keys_buttons[] = {
-> -??? INIT_KEY(POWER,? ?
-> ???GPIO0_HX4700_nKEY_POWER,???1,
-> "Power button"),
-> -??? INIT_KEY(MAIL,? ? ?
-> ? GPIO94_HX4700_KEY_MAIL,? ? 0, "Mail
-> button"),
-> -??? INIT_KEY(ADDRESSBOOK,
-> GPIO99_HX4700_KEY_CONTACTS,0, "Contacts button"),
-> -??? INIT_KEY(RECORD,? ? ?
-> GPIOD6_nKEY_RECORD,? ? ? ? 1, "Record
-> button"),
-> -??? INIT_KEY(CALENDAR,? ?
-> GPIOD1_nKEY_CALENDAR,? ? ? 1, "Calendar
-> button"),
-> -??? INIT_KEY(HOMEPAGE,? ?
-> GPIOD3_nKEY_HOME,? ? ? ? ? 1, "Home
-> button"),
-> +??? INIT_KEY(POWER,? ?
-> ???GPIO0_HX4700_nKEY_POWER,???1,
-> 1, "Power button"),
-> +??? INIT_KEY(MAIL,? ? ?
-> ? GPIO94_HX4700_KEY_MAIL,? ? 0, 1, "Mail
-> button"),
-> +??? INIT_KEY(ADDRESSBOOK,
-> GPIO99_HX4700_KEY_CONTACTS,0, 1, "Contacts button"),
-> +??? INIT_KEY(RECORD,? ? ?
-> GPIOD6_nKEY_RECORD,? ? ? ? 1, 0, "Record
-> button"),
-> +??? INIT_KEY(CALENDAR,? ?
-> GPIOD1_nKEY_CALENDAR,? ? ? 1, 0, "Calendar
-> button"),
-> +??? INIT_KEY(HOMEPAGE,? ?
-> GPIOD3_nKEY_HOME,? ? ? ? ? 1, 0,
-> "Home button"),
->  };
->  
->  static struct gpio_keys_platform_data gpio_keys_data = {
-> 
-> -- 
-> Best regards,
-> Dmitry "MAD" Artamonow
-> 
+Did I miss something or will that be fine.
+
+
+
+ 
