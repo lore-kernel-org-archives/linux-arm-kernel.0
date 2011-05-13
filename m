@@ -1,22 +1,48 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 13 May 2011 17:31:04 +0530
-Subject: [QUERY] amba/pl022: DMA channel allocation always fail.
-Message-ID: <4DCD1D80.7060409@st.com>
+From: vzapolskiy@gmail.com (Vladimir Zapolskiy)
+Date: Fri, 13 May 2011 15:08:59 +0300
+Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
+	preprocessor.
+In-Reply-To: <20110513113013.GP31483@atomide.com>
+References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
+	<20110513113013.GP31483@atomide.com>
+Message-ID: <BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+On Fri, May 13, 2011 at 2:30 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Vladimir Zapolskiy <vzapolskiy@gmail.com> [110512 17:35]:
+>> This mass change reduces homogeneous data chunks along clock
+>> definitions. No semantical difference is added to the change,
+>> and still it could be introduced easily.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+>> ---
+>> ?arch/arm/mach-omap2/clock44xx_data.c | 3313 +++++++++-------------------------
+>> ?1 files changed, 848 insertions(+), 2465 deletions(-)
+>
+> Hehehe, the diffstat certainly looks good :)
+>
+> This would be best done for all of them using some
+> perl/sed/python script. And could be done for the hwmod data
+> too. Do you already have something like that available?
+>
+Unfortunately I don't have an automated tool, but that would be great
+to have such a script. For this time I've checked the correctness of the
+change comparing the preprocessed output.
 
-amba/pl022 and my dma driver dw_dmac.c, both have registered init() routines
-with subsys_initcall(). Now at bootup, spi boots up before DMA and so DMA
-channels are never available at spi probe.
+In fact if nobody has serious objections about the nature of the change
+itself, then I'd like to continue with similar modifications for other OMAP
+specific massive data files, hopefully there is a lot of redundant data to
+eliminate :)
 
-What should be done to solve this issue?
+I can try to do that starting from writing the script for automation,
+though I don't have a strong feeling that it's a straightforward task,
+and preprocessed code check and/or runtime check might be preferable.
 
-One idea is allocate DMA channel as and when required, instead of allocating them
-at probe. But in that case too i am not sure, that this issue will be solved.
-As, if spi slave device is added from board file, then it will also try to transfer
-data as soon as spi driver is up. So that too may be called before dma_probe().
+> Paul and & Benoit, what's your take on doing something like
+> this? I'd assume updating your data generation scripts would
+> be trivial?
+>
 
--- 
-viresh
+With best wishes,
+Vladimir
