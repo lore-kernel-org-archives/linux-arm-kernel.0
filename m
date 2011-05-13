@@ -1,40 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 May 2011 21:24:10 +0200
-Subject: [PATCH v4 1/2] ARM: ELF: Define new core note type for VFP
-	registers
-In-Reply-To: <alpine.LFD.2.00.1105130926180.2762@xanadu.home>
-References: <1302688597-2969-1-git-send-email-dave.martin@linaro.org>
-	<20110513065902.GA2867@localhost>
-	<alpine.LFD.2.00.1105130926180.2762@xanadu.home>
-Message-ID: <201105132124.11176.arnd@arndb.de>
+Date: Fri, 13 May 2011 20:44:38 +0200
+Subject: [RESEND PATCH 2/4] omap: igep0020: minor refactoring
+In-Reply-To: <91dd03e6af514a628fc4d797066f3ef0d971b802.1305235542.git.mike@compulab.co.il>
+References: <cover.1305235542.git.mike@compulab.co.il>
+	<91dd03e6af514a628fc4d797066f3ef0d971b802.1305235542.git.mike@compulab.co.il>
+Message-ID: <201105132044.39163.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 May 2011, Nicolas Pitre wrote:
-> On Fri, 13 May 2011, Dave Martin wrote:
-> 
-> > On Thu, May 12, 2011 at 10:14:00AM +0100, Russell King - ARM Linux wrote:
-> > > On Tue, May 03, 2011 at 10:36:59AM +0100, Dave Martin wrote:
-> > > > On Thu, Apr 28, 2011 at 07:49:25PM +0100, Russell King - ARM Linux wrote:
-> > > > > On Wed, Apr 13, 2011 at 10:56:36AM +0100, Dave Martin wrote:
-> > > > > > The VFP registers are not currently included in coredumps,
-> > > > > > and there's no existing note type where they can sensibly be
-> > > > > > included, so this patch defines a dedicated note type for them.
-> > > > > 
-> > > > > This probably wants to be copied to LKML (added).
-> > > > 
-> > > > Good point-- thanks.
-> > > 
-> > > What news on this?
-> > 
-> > None whatsoever.  Do you think I need to push harder for feedback?
-> 
-> I think that the patch should just be merged.  If someone had a problem 
-> with this, we would have heard about it by now.
-> 
+On Thursday 12 May 2011, Mike Rapoport wrote:
+> @@ -299,17 +299,14 @@ static struct omap2_hsmmc_info mmc[] = {
+>  static struct gpio_led igep_gpio_leds[] = {
+>         [0] = {
+>                 .name                   = "gpio-led:red:d0",
+> -               .gpio                   = IGEP2_GPIO_LED0_RED,
+>                 .default_trigger        = "default-off"
+>         },
+>         [1] = {
+>                 .name                   = "gpio-led:green:d0",
+> -               .gpio                   = IGEP2_GPIO_LED0_GREEN,
+>                 .default_trigger        = "default-off",
+>         },
+>         [2] = {
+>                 .name                   = "gpio-led:red:d1",
+> -               .gpio                   = IGEP2_GPIO_LED1_RED,
+>                 .default_trigger        = "default-off",
+>         },
+>         [3] = {
+> @@ -335,6 +332,10 @@ static struct platform_device igep_led_device = {
+>  
+>  static void __init igep_leds_init(void)
+>  {
+> +       igep_gpio_leds[0].gpio = IGEP2_GPIO_LED0_RED;
+> +       igep_gpio_leds[1].gpio = IGEP2_GPIO_LED0_GREEN;
+> +       igep_gpio_leds[2].gpio = IGEP2_GPIO_LED1_RED;
+> +
+>         platform_device_register(&igep_led_device);
+>  }
 
-Agreed. Uli and other toolchain people are waiting for this to get merged,
-so we can put the ABI into gdb releases. It's definitely useful, and I couldn't
-find anything wrong with it (but don't have much experience with ptrace).
+Hi Mike,
+
+Overall, the series looks great, but I'm somewhat worried by the fact that you
+have to replace data structures with code in order to get there. Are there any
+other options to do this?
 
 	Arnd
