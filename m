@@ -1,53 +1,38 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Fri, 13 May 2011 16:25:56 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201105112203.54838.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105102344.58598.arnd@arndb.de>
-	<82D549BB195345A1A189D569952B387C@subhasishg>
-	<201105112203.54838.arnd@arndb.de>
-Message-ID: <EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 May 2011 12:59:20 +0200
+Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
+In-Reply-To: <alpine.LFD.2.02.1105131138460.2831@ionos>
+References: <1290060899-9786-1-git-send-email-ccross@android.com>
+	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
+	<4D70BE9D.4000507@stericsson.com>
+	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
+	<4D714C17.7080102@gmail.com>
+	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
+	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
+	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
+	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
+	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
+	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
+	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
+	<alpine.LFD.2.02.1105131138460.2831@ionos>
+Message-ID: <BANLkTikY9VBXuT78k3GFkeG+q=ppMsz3iQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> Ok, thanks for the clarification.
->> Instead of passing the device name, will it be ok to pass the mfd_id.
->> The benefit will be that I can use the ID directly as an array
->> index for the mfd_cell entries.
->
-> I think a device name would be clearer here, especially in order
-> to avoid conflicts when the list gets extended in different ways
-> depending on which kernel runs.
->
-> We had a little discussion at the Linaro Developer Summit about your
-> driver and mfd drivers in general. There was a general feeling among
-> some people (including me) that by the point you dynamically create
-> the subdevices, MFD is probably not the right abstraction any more,
-> as it does not provide any service that you need.
->
-> Instead, maybe you can simply call platform_device_register
-> at that stage to create the children and not use MFD at all.
->
-> Samuel, can you comment on this as well? Do you still see pruss
-> as an MFD driver when the uses are completely dynamic and determined
-> by the firmware loaded into it?
->
+2011/5/13 Thomas Gleixner <tglx@linutronix.de>:
 
-Hi Arnd,
+> Does the following work for you ?
 
-But in that case, where do I fit my driver.
-It's a microcontroller inside of a processor, guess that's unique for Linux.
-Will a misc device be a better choice.
+This patch is interesting because it uses calc_mult_shift() and the current
+localtimer driver for TWD (arch/arm/kernel/smp_twd.c) still uses hardcoded
+mult+shift.
 
-In that case I can remove the MFD cell from the board_file and add an array
-of platform_device for the UART & CAN.
+So this patch in combination with TGLX add-on in the CPUfreq path would
+eliminate the need of using the prescaler at all, which is a more appealing
+solution to me for one, since it results in less code.
 
-Regarding device register, I will have to implement something similar to
-mfd_add_devices and mark the dev->parent.
+Colin, do you think it will work? Or was there some specific reason to use
+a dynamic prescaler instead of doing things like this?
 
-Did I miss something or will that be fine.
-
-
-
- 
+Yours,
+Linus Walleij
