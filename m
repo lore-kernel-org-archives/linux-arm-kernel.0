@@ -1,9 +1,11 @@
-From: vbendeb@chromium.org (Vadim Bendebury)
-Date: Wed, 11 May 2011 17:31:40 -0700
-Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation in thumb mode.
-Message-ID: <mailman.230.1305315309.1530.linux-arm-kernel@lists.infradead.org>
+From: vbendeb@google.com (Vadim Bendebury)
+Date: Fri, 13 May 2011 12:53:16 -0700 (PDT)
+Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation in
+	thumb mode.
+Message-ID: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
 
 This is a cosmetic change, adding a '_thumb' prefix to the
 'Hardware' line in /proc/cpuinfo. Tested as follows:
