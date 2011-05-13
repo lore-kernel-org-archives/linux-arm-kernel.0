@@ -1,33 +1,132 @@
-From: jmorris@namei.org (James Morris)
-Date: Fri, 13 May 2011 10:18:52 +1000 (EST)
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <20110512130104.GA2912@elte.hu>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-Message-ID: <alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Thu, 12 May 2011 18:24:53 -0700
+Subject: [PATCH] arm: Add unwinding support for division functions
+Message-ID: <1305249893-3427-1-git-send-email-lauraa@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 May 2011, Ingo Molnar wrote:
-> Funnily enough, back then you wrote this:
-> 
->   " I'm concerned that we're seeing yet another security scheme being designed on 
->     the fly, without a well-formed threat model, and without taking into account 
->     lessons learned from the seemingly endless parade of similar, failed schemes. "
-> 
-> so when and how did your opinion of this scheme turn from it being an "endless 
-> parade of failed schemes" to it being a "well-defined and readily 
-> understandable feature"? :-)
+The software division functions never had unwinding annotations
+added. Currently, when a division by zero occurs the backtrace shown
+will stop at Ldiv0 or some completely unrelated function. Add
+unwinding annotations in hopes of getting a more useful backtrace
+when a division by zero occurs.
 
-When it was defined in a way which limited its purpose to reducing the 
-attack surface of the sycall interface.
+Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+---
+ arch/arm/lib/lib1funcs.S |   27 +++++++++++++++++++++------
+ 1 files changed, 21 insertions(+), 6 deletions(-)
 
-
-- James
+diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
+index 6dc0648..63b75df 100644
+--- a/arch/arm/lib/lib1funcs.S
++++ b/arch/arm/lib/lib1funcs.S
+@@ -35,7 +35,7 @@ Boston, MA 02111-1307, USA.  */
+ 
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+-
++#include <asm/unwind.h>
+ 
+ .macro ARM_DIV_BODY dividend, divisor, result, curbit
+ 
+@@ -207,6 +207,7 @@ Boston, MA 02111-1307, USA.  */
+ 
+ ENTRY(__udivsi3)
+ ENTRY(__aeabi_uidiv)
++UNWIND(.fnstart)
+ 
+ 	subs	r2, r1, #1
+ 	moveq	pc, lr
+@@ -230,10 +231,12 @@ ENTRY(__aeabi_uidiv)
+ 	mov	r0, r0, lsr r2
+ 	mov	pc, lr
+ 
++UNWIND(.fnend)
+ ENDPROC(__udivsi3)
+ ENDPROC(__aeabi_uidiv)
+ 
+ ENTRY(__umodsi3)
++UNWIND(.fnstart)
+ 
+ 	subs	r2, r1, #1			@ compare divisor with 1
+ 	bcc	Ldiv0
+@@ -247,10 +250,12 @@ ENTRY(__umodsi3)
+ 
+ 	mov	pc, lr
+ 
++UNWIND(.fnend)
+ ENDPROC(__umodsi3)
+ 
+ ENTRY(__divsi3)
+ ENTRY(__aeabi_idiv)
++UNWIND(.fnstart)
+ 
+ 	cmp	r1, #0
+ 	eor	ip, r0, r1			@ save the sign of the result.
+@@ -287,10 +292,12 @@ ENTRY(__aeabi_idiv)
+ 	rsbmi	r0, r0, #0
+ 	mov	pc, lr
+ 
++UNWIND(.fnend)
+ ENDPROC(__divsi3)
+ ENDPROC(__aeabi_idiv)
+ 
+ ENTRY(__modsi3)
++UNWIND(.fnstart)
+ 
+ 	cmp	r1, #0
+ 	beq	Ldiv0
+@@ -310,11 +317,14 @@ ENTRY(__modsi3)
+ 	rsbmi	r0, r0, #0
+ 	mov	pc, lr
+ 
++UNWIND(.fnend)
+ ENDPROC(__modsi3)
+ 
+ #ifdef CONFIG_AEABI
+ 
+ ENTRY(__aeabi_uidivmod)
++UNWIND(.fnstart)
++UNWIND(.save {r0, r1, ip, lr}	)
+ 
+ 	stmfd	sp!, {r0, r1, ip, lr}
+ 	bl	__aeabi_uidiv
+@@ -323,10 +333,12 @@ ENTRY(__aeabi_uidivmod)
+ 	sub	r1, r1, r3
+ 	mov	pc, lr
+ 
++UNWIND(.fnend)
+ ENDPROC(__aeabi_uidivmod)
+ 
+ ENTRY(__aeabi_idivmod)
+-
++UNWIND(.fnstart)
++UNWIND(.save {r0, r1, ip, lr}	)
+ 	stmfd	sp!, {r0, r1, ip, lr}
+ 	bl	__aeabi_idiv
+ 	ldmfd	sp!, {r1, r2, ip, lr}
+@@ -334,15 +346,18 @@ ENTRY(__aeabi_idivmod)
+ 	sub	r1, r1, r3
+ 	mov	pc, lr
+ 
++UNWIND(.fnend)
+ ENDPROC(__aeabi_idivmod)
+ 
+ #endif
+ 
+-Ldiv0:
+-
++ENTRY(Ldiv0)
++UNWIND(.fnstart)
++UNWIND(.pad #4)
++UNWIND(.save {lr})
+ 	str	lr, [sp, #-8]!
+ 	bl	__div0
+ 	mov	r0, #0			@ About as wrong as it could be.
+ 	ldr	pc, [sp], #8
+-
+-
++UNWIND(.fnend)
++ENDPROC(Ldiv0)
 -- 
-James Morris
-<jmorris@namei.org>
+1.7.3.3
