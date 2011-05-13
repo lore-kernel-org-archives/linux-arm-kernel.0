@@ -1,70 +1,32 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Fri, 13 May 2011 20:18:05 +0530
-Subject: [PATCH] [RFC] OMAP4: clock: shrink clock data utilizing
-	preprocessor.
-In-Reply-To: <87aaeq3fmt.fsf@ti.com>
-References: <1305247077-15927-1-git-send-email-vzapolskiy@gmail.com>
-	<20110513113013.GP31483@atomide.com>
-	<BANLkTinNVbViwjAcrOqfR+-ZJ+i1DF9Hdw@mail.gmail.com>
-	<4DCD2260.4090806@ti.com> <20110513130441.GH5323@atomide.com>
-	<87aaeq3fmt.fsf@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CF132DC@dbde02.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 13 May 2011 16:51:17 +0200
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <0D753D10438DA54287A00B027084269764D26C443E@AUSP01VMBX24.collaborationhost.net>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+	<0D753D10438DA54287A00B027084269764D2650215@AUSP01VMBX24.collaborationhost.net>
+	<BANLkTikc7B5J0Z_aiS5kXCxMSxcFrfSRxw@mail.gmail.com>
+	<0D753D10438DA54287A00B027084269764D26C443E@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <BANLkTimSCK1Mc4L7OS=dkijuyNb1uFTtew@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Hilman, Kevin
-> Sent: Friday, May 13, 2011 6:46 PM
-> To: Tony Lindgren
-> Cc: Cousson, Benoit; Vladimir Zapolskiy; Paul Walmsley; 
-> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] [RFC] OMAP4: clock: shrink clock data 
-> utilizing preprocessor.
-> 
-> Tony Lindgren <tony@atomide.com> writes:
-> 
-> > * Cousson, Benoit <b-cousson@ti.com> [110513 15:18]:
-> >> >>>Signed-off-by: Vladimir Zapolskiy<vzapolskiy@gmail.com>
-> >> >>
-> >> >Unfortunately I don't have an automated tool, but that 
-> would be great
-> >> >to have such a script. For this time I've checked the 
-> correctness of the
-> >> >change comparing the preprocessed output.
-> >> 
-> >> In fact these files are already generated automatically, as written
-> >> in the header file. So changing the output format should
-> >> straightforward. At least for OMAP4... OMAP2 and OMAP3 were done
-> >> manually some time ago.
-> >
-> > Sounds like the important thing to consider here is how these macros
-> > should be set up considering the upcoming generic clock framework
-> > and device tree changes.
-> >
-> > So let's wait a few days for comments from Benoit and Paul on the
-> > format for the macros so we don't need to redo them again later.
-> > Of course there might be other things to consider too..
-> 
-> ... like readability.
-> 
-> After seeing the patch (thanks Benoit), I think this is bad tradeoff
-> between readability and lines-of-code.
-> 
-> Personally, I don't think we should be trading readability 
-> for diffstat
-> goodness.  I have a strong dislike for these multi-line macros, but
-> it's up to Paul/Benoit to decide how this should look.
+2011/4/28 H Hartley Sweeten <hartleys@visionengravers.com>:
+> On Thursday, April 28, 2011 12:08 AM, Linus Walleij wrote:
+>> 2011/4/27 H Hartley Sweeten <hartleys@visionengravers.com>:
+>>> The Makefile should probably be reordered, either alphabetically
+>>> or grouped by type (arch/mmio/i2c/spi/pci/etc) and then
+>>> alphabetically in order to reduce merge conflicts.
+>>
+>> Yes, but if I do that in my patchset I will screw up Grants GPIO tree
+>> completely, so I prefer that Grant do this. And maybe after pulling
+>> in my GPIO consolidation tree to his in that case, so we don't get
+>> undesired collisions. So leaving this for the GPIO maintainer.
+>
+> This comment was intended for the GPIO maintainer. ?Sorry for any
+> confusion.
 
-[sp] Was the patch posted again?
+Nop problem, I actually made a fix for it that I think Grant can take in
+for 2.6.40.
 
-> 
-> Kevin
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Yours,
+Linus Walleij
