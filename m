@@ -1,103 +1,159 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 13 May 2011 09:39:39 +0200 (CEST)
-Subject: [PATCH] ARM: Make sure appended device tree data won't overlap
-	kernel BSS
-In-Reply-To: <20110512125952.GN31483@atomide.com>
-References: <alpine.LFD.2.00.1104271036520.24613@xanadu.home>
-	<20110427144335.GK3755@atomide.com> <20110429102623.GX3755@atomide.com>
-	<alpine.LFD.2.00.1104290909310.24613@xanadu.home>
-	<20110429135334.GR5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104291509540.24613@xanadu.home>
-	<20110504072317.GU2092@atomide.com>
-	<alpine.LFD.2.00.1105040936040.24613@xanadu.home>
-	<20110509111929.GA11410@atomide.com>
-	<20110509144949.GE30958@atomide.com>
-	<20110512125952.GN31483@atomide.com>
-Message-ID: <alpine.LFD.2.00.1105130930330.2762@xanadu.home>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Fri, 13 May 2011 11:53:07 +0100 (BST)
+Subject: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
+In-Reply-To: <20110513101348.GA18716@rainbow>
+Message-ID: <266912.5357.qm@web29010.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 May 2011, Tony Lindgren wrote:
+Hi Dmitry,
 
-> * Tony Lindgren <tony@atomide.com> [110509 07:47]:
-> > * Tony Lindgren <tony@atomide.com> [110509 14:16]:
-> > > Do this before relocating the compressed kernel + device tree data.
-> > > Otherwise we would have to split the copying into two parts, or copy
-> > > the device tree data twice.
-> > > 
-> > > As we only have one register available, pass the size of kernel BSS
-> > > via linker and do the following calculation using r1.
+I tried your patch and found that the MAIL and CONTACTS buttons did not resume the unit. The same is true of the handhelds.org 2.6.21-hh20 kernel. I don't have WinCE any more so am unable to test that.
+
+The reason appears to be that neither GPIO94 (MAIL) nor GPIO99 (CONTACTS) can be enabled as a wake-up source in the PWER register.
+
+Regards,
+Paul
+
+--- On Fri, 13/5/11, Dmitry Artamonow <mad_soft@inbox.ru> wrote:
+
+> From: Dmitry Artamonow <mad_soft@inbox.ru>
+> Subject: Re: [PATCH] pxa/hx4700: Avoid unbalanced irq wakeup enables/disables
+> To: "Paul Parsons" <lost.distance@yahoo.com>
+> Cc: linux-arm-kernel at lists.infradead.org, eric.y.miao at gmail.com, philipp.zabel at gmail.com
+> Date: Friday, 13 May, 2011, 11:13
+> On 01:10 Thu 05 May?
+> ???, Paul Parsons wrote:
+> > Resuming a suspended hx4700 results in Unbalanced IRQ
+> warnings:
 > > 
-> > Blah, this still needs a bit more work.. The calculation is wrong
-> > and we can get multiple relocations now.
+> > WARNING: at kernel/irq/manage.c:507
+> irq_set_irq_wake+0xe0/0xec()
+> > Unbalanced IRQ 246 wake disable
+> > ..
+> > 
+> > Likewise for IRQ 241 and IRQ 243. The 3 ASIC3 GPIO
+> buttons - RECORD/CALENDAR/HOME - each fail in a call to
+> enable_irq_wake() in gpio_keys_suspend() because of an
+> absent irq_set_wake() handler in the asic3_gpio_irq_chip
+> structure. Matching calls to disable_irq_wake() in
+> gpio_keys_resume() then print the warnings. Since we should
+> never need to resume via the 3 ASIC3 GPIO buttons, nor 2 of
+> the 3 builtin GPIO buttons - MAIL/CONTACTS, the simplest
+> remedy for the warnings is to enable irq wakeup on the POWER
+> button only.
 > 
-> Here's a better version that also makes the stack usable early.
-> That might become handy for further changes.
+> Not sure if it's right to allow only POWER button to wake
+> the device.
+> In both Windows CE and handhelds.org 2.6.21 kernel any
+> button can wake
+> device, and even start corresponding action (i.e. run some
+> app) after wakeup.
+> I think we should just disable wakeup on ASIC3 button for
+> now, and/or think
+> about how to implement .set_wake in ASIC3.
 > 
-> Will still do a bit more testing on this on Friday.
+> For first part I mean something like this (not sure if it
+> still applies,
+> but you should get the idea):
 > 
-> Tony
+> Date: Sat, 31 Jul 2010 11:55:25 +0400
+> Subject: [PATCH 17/47] pxa/hx4700: don't wake on ASIC3
+> buttons
 > 
+> Currently ASIC3 driver doesn't support set_wake on its
+> GPIOs,
+> which leads to "Unbalanced IRQ ### wake disable" warnings
+> on wakeup.
+> Workaround this by simply not using buttons connected to
+> ASIC3
+> gpios as wakeup sources.
 > 
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Thu, 12 May 2011 05:29:49 -0700
-> Subject: [PATCH] ARM: Make sure appended device tree data won't overlap kernel BSS
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+> ---
+>  arch/arm/mach-pxa/hx4700.c |???16
+> ++++++++--------
+>  1 files changed, 8 insertions(+), 8 deletions(-)
 > 
-> Do this before relocating the compressed kernel + device tree data.
-> Otherwise we would have to split the copying into two parts, or copy
-> the device tree data twice.
-> 
-> As we only have one register available, pass the size of kernel BSS
-> via linker and do the calculation using r1, then save it to the stack.
-> 
-> Note that this patch now makes the stack also usable earlier for
-> CONFIG_ARM_APPENDED_DTB.
-> 
-> Not-Yet-Signed-off-by: Tony Lindgren <tony@atomide.com>
-> 
-> --- a/arch/arm/boot/compressed/Makefile
-> +++ b/arch/arm/boot/compressed/Makefile
-> @@ -98,6 +98,9 @@ endif
->  ccflags-y := -fpic -fno-builtin
->  asflags-y := -Wa,-march=all
+> diff --git a/arch/arm/mach-pxa/hx4700.c
+> b/arch/arm/mach-pxa/hx4700.c
+> index fa33fef..6c78f93 100644
+> --- a/arch/arm/mach-pxa/hx4700.c
+> +++ b/arch/arm/mach-pxa/hx4700.c
+> @@ -202,23 +202,23 @@ static struct pxaficp_platform_data
+> ficp_info = {
+> ? * GPIO Keys
+> ? */
 >  
-> +# Supply kernel BSS size to the decompressor via a linker symbol.
-> +KBSS_SZ = $(shell size $(obj)/../../../../vmlinux | awk 'END{print $$3}')
-> +LDFLAGS_vmlinux = --defsym _kbss_sz=$(KBSS_SZ)
->  # Supply ZRELADDR to the decompressor via a linker symbol.
->  ifneq ($(CONFIG_AUTO_ZRELADDR),y)
->  LDFLAGS_vmlinux += --defsym zreladdr=$(ZRELADDR)
-> --- a/arch/arm/boot/compressed/head.S
-> +++ b/arch/arm/boot/compressed/head.S
-> @@ -266,6 +266,25 @@ restart:	adr	r0, LC0
->  		add	lr, lr, #7
->  		bic	lr, lr, #7
+> -#define INIT_KEY(_code, _gpio, _active_low,
+> _desc)??? \
+> +#define INIT_KEY(_code, _gpio, _active_low, _wake,
+> _desc)??? \
+>  ??? {??? ???
+> ??? ??? ???
+> ??? \
+>  ??? ??? .code? ?
+> ???= KEY_##_code,???
+> ??? \
+>  ??? ??? .gpio? ?
+> ???= _gpio,???
+> ??? ??? \
+>  ??? ??? .active_low =
+> _active_low,??? ??? \
+>  ??? ??? .desc? ?
+> ???= _desc,???
+> ??? ??? \
+>  ??? ??? .type? ?
+> ???= EV_KEY,???
+> ??? ??? \
+> -??? ??? .wakeup?
+> ???= 1,??? ???
+> ??? \
+> +??? ??? .wakeup?
+> ???= _wake,???
+> ??? ??? \
+>  ??? }
 >  
-> +		/*
-> +		 * Compensate for the appended device tree and make stack
-> +		 * usable. Note if the linker script changes so the stack is
-> +		 * not after the bss section, this code will be wrong.
-> +		 */
-> +		add	sp, sp, lr
-> +
-> +		/*
-> +		 * Calculate and save the offset between kernel BSS end and
-> +		 * device tree data start for later use to check they won't
-> +		 * overlap.
-> +		 */
-> +		adr	r1, kbss_sz
-> +		ldr	r1, [r1, #0]		@ kernel BSS size
-> +		add	r1, r1, r4		@ add inflated kernel start
-> +		add	r1, r1, r9		@ add inflated kernel size
-> +		sub	r1, r1, r6		@ kbss end - dt start
-> +		str	r1, [sp, #0]		@ save offset into stack
-
-This is actually outside the stack area if you want to be strictly 
-correct.  Should be "str r1, [sp, #-4]!".
-
-Anyway, both this patch tand the DT append patch won't apply or work 
-correctly anymore due to my latest cleanup series without minor 
-adjustments.
-
-
-Nicolas
+>  static struct gpio_keys_button gpio_keys_buttons[] = {
+> -??? INIT_KEY(POWER,? ?
+> ???GPIO0_HX4700_nKEY_POWER,???1,
+> "Power button"),
+> -??? INIT_KEY(MAIL,? ? ?
+> ? GPIO94_HX4700_KEY_MAIL,? ? 0, "Mail
+> button"),
+> -??? INIT_KEY(ADDRESSBOOK,
+> GPIO99_HX4700_KEY_CONTACTS,0, "Contacts button"),
+> -??? INIT_KEY(RECORD,? ? ?
+> GPIOD6_nKEY_RECORD,? ? ? ? 1, "Record
+> button"),
+> -??? INIT_KEY(CALENDAR,? ?
+> GPIOD1_nKEY_CALENDAR,? ? ? 1, "Calendar
+> button"),
+> -??? INIT_KEY(HOMEPAGE,? ?
+> GPIOD3_nKEY_HOME,? ? ? ? ? 1, "Home
+> button"),
+> +??? INIT_KEY(POWER,? ?
+> ???GPIO0_HX4700_nKEY_POWER,???1,
+> 1, "Power button"),
+> +??? INIT_KEY(MAIL,? ? ?
+> ? GPIO94_HX4700_KEY_MAIL,? ? 0, 1, "Mail
+> button"),
+> +??? INIT_KEY(ADDRESSBOOK,
+> GPIO99_HX4700_KEY_CONTACTS,0, 1, "Contacts button"),
+> +??? INIT_KEY(RECORD,? ? ?
+> GPIOD6_nKEY_RECORD,? ? ? ? 1, 0, "Record
+> button"),
+> +??? INIT_KEY(CALENDAR,? ?
+> GPIOD1_nKEY_CALENDAR,? ? ? 1, 0, "Calendar
+> button"),
+> +??? INIT_KEY(HOMEPAGE,? ?
+> GPIOD3_nKEY_HOME,? ? ? ? ? 1, 0,
+> "Home button"),
+>  };
+>  
+>  static struct gpio_keys_platform_data gpio_keys_data = {
+> 
+> -- 
+> Best regards,
+> Dmitry "MAD" Artamonow
+> 
