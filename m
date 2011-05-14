@@ -1,28 +1,31 @@
-From: rabin@rab.in (Rabin Vincent)
-Date: Sat, 14 May 2011 13:48:17 +0530
+From: tom.leiming@gmail.com (Ming Lei)
+Date: Sat, 14 May 2011 16:48:52 +0800
 Subject: [patch v4 3/3] arm: omap4: support pmu
-In-Reply-To: <1299598729-27974-4-git-send-email-tom.leiming@gmail.com>
+In-Reply-To: <BANLkTi=u8Lv=MR+gW_KmsOJn99Vv2sNkmg@mail.gmail.com>
 References: <1299598729-27974-1-git-send-email-tom.leiming@gmail.com>
 	<1299598729-27974-4-git-send-email-tom.leiming@gmail.com>
-Message-ID: <BANLkTi=u8Lv=MR+gW_KmsOJn99Vv2sNkmg@mail.gmail.com>
+	<BANLkTi=u8Lv=MR+gW_KmsOJn99Vv2sNkmg@mail.gmail.com>
+Message-ID: <BANLkTimkrf8-+-JTQy-gWK9t9grj-n0Ftw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Mar 8, 2011 at 21:08,  <tom.leiming@gmail.com> wrote:
-> From: Ming Lei <tom.leiming@gmail.com>
->
-> This patch supports pmu irq routed from CTI, so
-> make pmu/perf working on OMAP4.
->
-> The idea is from Woodruff Richard in the disscussion
-> about "Oprofile on Pandaboard / Omap4" on pandaboard at googlegroups.com.
->
-> Acked-by: Jean Pihet <j-pihet@ti.com>
-> Acked-by: Tony Lindgren <tony@atomide.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Woodruff Richard <r-woodruff2@ti.com>
-> Cc: linux-omap at vger.kernel.org
-> Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+Hi Rabin,
 
-What happened to this patch?  It is neither in mainline nor in
-linux-next.
+2011/5/14 Rabin Vincent <rabin@rab.in>:
+> What happened to this patch? ?It is neither in mainline nor in
+> linux-next.
+>
+
+This patch depends on the two with titles:
+
+      introduce cross trigger interface helpers
+      pmu: allow platform specific irq enable/disable handling
+
+and the above patches have been submitted to RMK's patch system
+as 6839/1 and 6840/1, but not been pushed to -next or mainline by rmk,
+so I can't ask omap guys to merge this one into their tree now.
+
+
+thanks,
+-- 
+Ming Lei
