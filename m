@@ -1,48 +1,38 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Sat, 14 May 2011 17:51:21 +0200 (CEST)
-Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
-In-Reply-To: <BANLkTimxkY4MvQ+-qiOwdwbo7jPUAQ1vxw@mail.gmail.com>
-References: <1290060899-9786-1-git-send-email-ccross@android.com>
-	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
-	<4D70BE9D.4000507@stericsson.com>
-	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
-	<4D714C17.7080102@gmail.com>
-	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
-	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
-	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
-	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
-	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
-	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
-	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
-	<alpine.LFD.2.02.1105131138460.2831@ionos>
-	<BANLkTimxkY4MvQ+-qiOwdwbo7jPUAQ1vxw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1105141749510.3078@ionos>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 14 May 2011 18:01:27 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105102344.58598.arnd@arndb.de>
+	<82D549BB195345A1A189D569952B387C@subhasishg>
+	<201105112203.54838.arnd@arndb.de>
+	<EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
+Message-ID: <20110514160126.GA2791@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 May 2011, Colin Cross wrote:
-> On Fri, May 13, 2011 at 3:02 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> > ?/**
-> > + * clockevents_reconfigure - Reconfigure and reprogram a clock event device.
-> > + * @dev: ? ? ? device to modify
-> > + * @freq: ? ? ?new device frequency
-> > + * @secr: ? ? ?guaranteed runtime conversion range in seconds
-> > + *
-> > + * Reconfigure and reprogram a clock event device in oneshot
-> > + * mode. Must only be called from low level idle code where
-> > + * interaction with hrtimers/nohz code etc. is not possible and
-> > + * guaranteed not to conflict. Must be called with interrupts
-> > + * disabled!
-> > + * Returns 0 on success, -ETIME when the event is in the past or
-> > + * -EINVAL when called with invalid parameters.
-> > + */
-> We need to call this from a cpufreq notifier with interrupts disabled,
-> not from idle.
+On Fri, May 13, 2011 at 04:25:56PM +0530, Subhasish Ghosh wrote:
 
-That works as well. Comments needs update. The important thing is that
-neither a timer interrupt nor a hrtimer function should interfere on
-that very cpu.
+> >Instead, maybe you can simply call platform_device_register
+> >at that stage to create the children and not use MFD at all.
 
-Thanks,
+> >Samuel, can you comment on this as well? Do you still see pruss
+> >as an MFD driver when the uses are completely dynamic and determined
+> >by the firmware loaded into it?
 
-	tglx
+> But in that case, where do I fit my driver.
+> It's a microcontroller inside of a processor, guess that's unique for Linux.
+
+It's not that unusual in hardware terms, really.  There's an awful lot
+of this going on in the audio area especially at the minute so there's
+going to be some effort around providing some framework support for this
+which should have some general usability but that's not there yet.
+
+> Will a misc device be a better choice.
+
+> In that case I can remove the MFD cell from the board_file and add an array
+> of platform_device for the UART & CAN.
+
+I think that for me so long as it can simultaneously do two unrelated
+functions which need to be arbitrated between there's probably a place
+for it in MFD, certainly at the minute.
