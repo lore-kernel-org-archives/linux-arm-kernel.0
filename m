@@ -1,34 +1,60 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 14 May 2011 15:23:57 -0700
-Subject: [PATCH 06/14] mfd: pxa-w1: MFD driver for PXA 1wire control +
-	DS1WM chip
-In-Reply-To: <20110514194017.GF30539@n2100.arm.linux.org.uk>
-References: <1303135451-26362-7-git-send-email-haojian.zhuang@marvell.com>
-	<20110426094836.GD2659@sortiz-mobl>
-	<BANLkTinpFBfOEOR6Ox1ufEHZo3qwRq8zhA@mail.gmail.com>
-	<20110514194017.GF30539@n2100.arm.linux.org.uk>
-Message-ID: <20110514222356.GC21792@opensource.wolfsonmicro.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Sat, 14 May 2011 23:32:10 +0100 (BST)
+Subject: [PATCH] pxa/hx4700: Fix basic suspend/resume
+In-Reply-To: <20110514201824.GA16305@rainbow>
+Message-ID: <319615.71439.qm@web29015.mail.ird.yahoo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 14, 2011 at 08:40:17PM +0100, Russell King - ARM Linux wrote:
+Hi Dmitry,
 
-> As I also said, this issue was talked about in a session at the Linaro
-> conference, and it will be interesting to hear what the result of that
-> session was.  At the moment, I'm entirely out of the loop on many things
-> that were discussed there (except for a message from tglx.)
+> Erm, do you have some special 2.6.39-rc7? :) I can't see in
+> mine
+> any .suspend/.resume callbacks defined in asic3.c for
+> tmio_mmc cell.
 
-Everything should have had some live noted minutes linked off this site:
+Now neither can I. Strange. Maybe I noticed that the functions asic3_mmc_enable and asic3_mmc_disable were already in the table and looked no further. Or maybe I applied the patch and forgot, or thought it had failed. Whatever the reason, I just applied it for real and it works; mmc now behaves itself after suspend/resume. Someone needs to submit that patch.
 
-   http://summit.ubuntu.com/uds-o/
+> Ah, so mmc works for you in 2.6.39-rc7?? Nice to hear!
+> Wonder why it
+> doesn't work for me. I suspect this may be connected to the
+> fact that
+> I boot from WinCE using HaRET - probably Windows leaves
+> controller in
+> some inconsistent state and driver doesn't reset hardware
+> properly.
 
-probably everything interesting is on this page:
+Maybe. I'm using the SDG bootloader v1.2.5 and have long since dumped WinCE. In fact I patched the bootloader to change the flash partitions and free up the 0.5Mb of flash (between 0.5Mb and 1.0Mb) used for the WinCE registry or something. Thus I can no longer use WinCE even if I wanted to.
 
-   http://summit.ubuntu.com/uds-o/track/linaro-kernel/
+> As for "Spurious irq, disabling!" messages, I'm seeing them
+> for a long
+> time - since pr_debug was turned into pr_warning in commit
+> 311f3ac768
+> ("mmc: add DMA support to tmio_mmc driver, when used on
+> SuperH")
+> So I suspect this issue (if it's issue at all) has always
+> been there, just
+> unseen before that commit. Not sure what causes those
+> spurious interrupts -
+> maybe it's some specific of TMIO hardware in ASIC3?
 
-(in etherpad, you want the icon that looks a bit like a notepad on the
-left of the box in the talk).  They won't always be accurate as they
-were done live and not 100% reviewed but might be helpful.
+Today I found what causes the spurious interrupts. It's a race condition caused by the interrupt handler looping in a while loop.
 
-Several people had actions to bring things to the list so I'd expect to
-see some more digested mails hitting in the next week or two.
+At the end of a multiple read operation the handler clears the final RXRDY status bit in one iteration and then clears the DATAEND status bit in the next iteration. However the DATAEND interrupt is still queued in the system somewhere and can't be delivered until the handler has returned. So whether the handler detects spurious interrupts depends on how quickly the DATAEND follows the final RXRDY. Similarly for multiple writes.
+
+Try this quick hack:
+
+--- clean-2.6.39-rc7/drivers/mmc/host/tmio_mmc_pio.c	2011-05-11 00:54:17.651289833 +0100
++++ linux-2.6.39-rc7/drivers/mmc/host/tmio_mmc_pio.c	2011-05-14 22:51:30.661074153 +0100
+@@ -603,7 +603,7 @@ static irqreturn_t tmio_mmc_irq(int irq,
+ 		goto out;
+ 	}
+ 
+-	while (ireg) {
++	if (ireg) {
+ 		/* Card insert / remove attempts */
+ 		if (ireg & (TMIO_STAT_CARD_INSERT | TMIO_STAT_CARD_REMOVE)) {
+ 			tmio_mmc_ack_mmc_irqs(host, TMIO_STAT_CARD_INSERT |
+
+Regards,
+Paul
