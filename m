@@ -1,188 +1,145 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sat, 14 May 2011 22:43:53 +0200
-Subject: Kernel oops with undefined instruction when accessing memory
-	on an	AT91 custom system
-In-Reply-To: <4DCEADB5.9010905@usask.ca>
-References: <4DCEADB5.9010905@usask.ca>
-Message-ID: <4DCEE989.4000401@atmel.com>
+From: wad@chromium.org (Will Drewry)
+Date: Sat, 14 May 2011 15:57:55 -0500
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <20110514073015.GB9307@elte.hu>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu>
+	<1305299455.2076.26.camel@localhost.localdomain>
+	<20110514073015.GB9307@elte.hu>
+Message-ID: <BANLkTi=1CBKevjg3+fYFZF9zWtQVw-W9hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nicholas Kinar a ?crit :
-> Hello,
-> 
-> I've recently designed an embedded system with an AT91SAM9RL processor. 
-> This is an ARM9 processor.  The hardware of the embedded system is 
-> similar to the AT91SAM9RL-EK evaluation kit with board support already 
-> in the Linux kernel 
-> (linux-kernel/linux-2.6.37/arch/arm/mach-at91/board-sam9rlek.c). There 
-> is 64 MB of physical memory.  I've used AT91bootstrap to bypass the 
-> crystals and I've provided an external clock signal (12.0 MHz) as the 
-> main input clock.  The external clock signal is fine, and is the same 
-> frequency as the crystal on the AT91SAM9RL-EK board.
-> 
-> I've downloaded and built the memtest suite found here 
-> (http://www.arm.linux.org.uk/developer/stresstests.php).  I've been 
-> building both the Linux kernel (linux-2.6.37) and the memtest suite 
-> using the arm-linux-gcc compiler shipped with buildroot.2011.02.  The 
-> specs of this particular compiler can be found below:
-> 
-> arm-linux-gcc -v
-> Using built-in specs.
-> Target: arm-unknown-linux-uclibcgnueabi
-> Configured with: 
-> /media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/toolchain/gcc-4.3.5/configure 
-> --prefix=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
-> --build=x86_64-unknown-linux-gnu --host=x86_64-unknown-linux-gnu 
-> --target=arm-unknown-linux-uclibcgnueabi --enable-languages=c,c++ 
-> --with-sysroot=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/sysroot 
-> --with-build-time-tools=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/bin 
-> --disable-__cxa_atexit --enable-target-optspace --with-gnu-ld 
-> --disable-libssp --disable-multilib --disable-tls --disable-shared 
-> --with-gmp=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
-> --with-mpfr=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
-> --enable-threads --disable-decimal-float --with-float=soft 
-> --with-abi=aapcs-linux --with-arch=armv5te --with-tune=arm926ej-s 
-> --with-pkgversion='Buildroot 2011.02' 
-> --with-bugurl=http://bugs.buildroot.net/ : (reconfigured) 
-> /media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/toolchain/gcc-4.3.5/configure 
-> --prefix=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
-> --build=x86_64-unknown-linux-gnu --host=x86_64-unknown-linux-gnu 
-> --target=arm-unknown-linux-uclibcgnueabi --enable-languages=c,c++ 
-> --with-sysroot=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/sysroot 
-> --with-build-time-tools=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/bin 
-> --disable-__cxa_atexit --enable-target-optspace --with-gnu-ld 
-> --disable-libssp --disable-multilib --disable-tls --disable-shared 
-> --with-gmp=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
-> --with-mpfr=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
-> --enable-threads --disable-decimal-float --with-float=soft 
-> --with-abi=aapcs-linux --with-arch=armv5te --with-tune=arm926ej-s 
-> --with-pkgversion='Buildroot 2011.02' 
-> --with-bugurl=http://bugs.buildroot.net/
-> Thread model: posix
-> gcc version 4.3.5 (Buildroot 2011.02)
-> 
-> 
-> When running the memtest program on the embedded ARM system, I receive 
-> the following kernel oops that complains about an undefined 
-> instruction.  I've tested SDRAM memory using "bare-metal" non-Linux 
-> programs loaded over JTAG, and it seems that I can successfully write 
-> and read any values into all memory addresses.
-> 
-> I've had a number of random kernel oops when trying to use the AT91 mmc 
-> driver with an SD card, but when running the memtest program, I receive 
-> the following undefined instruction (that often repeats in a similar and 
-> continuous fashion):
-> 
-> # ./mtest
-> Starting test run with 8 megabyte heap.
-> Setting up 2048 4096kB pages for test...Internal error: Oops - undefined 
-> instruction: 0 [#1]
-> last sysfs file: /sys/devices/virtual/vc/vcsa1/dev
-> Modules linked in:
-> CPU: 0    Not tainted  (2.6.37 #15)
-> PC is at v5tj_early_abort+0x0/0x38
-> LR is at __dabt_usr+0x38/0x60
-> pc : [<c0028d20>]    lr : [<c0021c58>]    psr: 00000093
-> sp : c3ae5fb0  ip : 00012008  fp : 00011664
-> r10: 00011638  r9 : 00011630  r8 : 00011644
-> r7 : 00011634  r6 : 00011678  r5 : 00011670  r4 : ffffffff
-> r3 : 80000010  r2 : 00008e78  r1 : 4019a008  r0 : 00053177
-> Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> Control: 0005317f  Table: 23090000  DAC: 00000015
-> Process mtest (pid: 873, stack limit = 0xc3ae4270)
-> Stack: (0xc3ae5fb0 to 0xc3ae6000)
-> 5fa0:                                     4019a008 000002a8 002a8000 
-> 00001000
-> 5fc0: 0001166c 00011670 00011678 00011634 00011644 00011630 00011638 
-> 00011664
-> 5fe0: 00012008 bec59d10 40178a64 00008e78 80000010 ffffffff 238633c4 
-> 94cc31cc
-> [<c0028d20>] (v5tj_early_abort+0x0/0x38) from [<00011664>] (0x11664)
-> Code: 00000000 00000000 00000000 00000000 (ee150000)
-> ---[ end trace 88c1fe1db84a9172 ]---
-> 
-> Here is my attempt at deciphering the oops file:
-> 
-> nkinar at matilda:/media/RESEARCH/DEVICE-CODE/oops-reports$ ksymoops -k 
-> ./kallsyms -l ./modules --no-object -m ./System.map < oops.txt
-> ksymoops 2.4.11 on x86_64 2.6.32-31-generic.  Options used
->      -V (default)
->      -k ./kallsyms (specified)
->      -l ./modules (specified)
->      -O (specified)
->      -m ./System.map (specified)
-> 
-> Warning (read_ksyms): no kernel symbols in ksyms, is ./kallsyms a valid 
-> ksyms file?
-> No ksyms, skipping lsmod
-> CPU: 0    Not tainted  (2.6.37 #15)
-> pc : [<c0028d20>]    lr : [<c0021c58>]    psr: 00000093
-> Using defaults from ksymoops -t elf64-x86-64 -a i386:x86-64
-> sp : c3ae5fb0  ip : 00012008  fp : 00011664
-> r10: 00011638  r9 : 00011630  r8 : 00011644
-> r7 : 00011634  r6 : 00011678  r5 : 00011670  r4 : ffffffff
-> r3 : 80000010  r2 : 00008e78  r1 : 4019a008  r0 : 00053177
-> Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> Control: 0005317f  Table: 23090000  DAC: 00000015
-> Stack: (0xc3ae5fb0 to 0xc3ae6000)
-> 5fa0:                                     4019a008 000002a8 002a8000 
-> 00001000
-> 5fc0: 0001166c 00011670 00011678 00011634 00011644 00011630 00011638 
-> 00011664
-> 5fe0: 00012008 bec59d10 40178a64 00008e78 80000010 ffffffff 238633c4 
-> 94cc31cc
-> [<c0028d20>] (v5tj_early_abort+0x0/0x38) from [<00011664>] (0x11664)
-> Code: 00000000 00000000 00000000 00000000 (ee150000)
-> 
-> 
->  >>LR;  00000000c0021c58 <__dabt_usr+38/60>
-> 
->  >>RIP; 00000000c0028d20 <v5tj_early_abort+0/38> <=====
-> 
-> Code;  00000000c0028d10 <do_alignment_ldmstm+228/238>
-> 0000000000000000 <_RIP>:
-> Code;  00000000c0028d20 <v5tj_early_abort+0/38> <=====
->   10:   00 00                     add    %al,(%rax) <=====
-> Code;  00000000c0028d22 <v5tj_early_abort+2/38>
->   12:   15 ee 00 00 00            adc    $0xee,%eax
-> 
-> 
-> 1 warning issued.  Results may not be reliable.
-> 
-> 
-> Looking at the source code of the mtest program, it appears that the 
-> oops occurs around lines 134-135 of memtest.c when safe_malloc() is called.
-> 
-> What could be the problem here, and is there anything that I can do to 
-> rectify it?  Is there a possibility of changing anything in the Linux 
-> kernel config to stop (or at least minimize) the problem from 
-> occurring?  Alternately, is there a "known-good" configuration that I 
-> can use to rectify what is happening?
+On Sat, May 14, 2011 at 2:30 AM, Ingo Molnar <mingo@elte.hu> wrote:
+>
+> * Eric Paris <eparis@redhat.com> wrote:
+>
+>> [dropping microblaze and roland]
+>>
+>> lOn Fri, 2011-05-13 at 14:10 +0200, Ingo Molnar wrote:
+>> > * James Morris <jmorris@namei.org> wrote:
+>>
+>> > It is a simple and sensible security feature, agreed? It allows most code to
+>> > run well and link to countless libraries - but no access to other files is
+>> > allowed.
+>>
+>> It's simple enough and sounds reasonable, but you can read all the discussion
+>> about AppArmour why many people don't really think it's the best. [...]
+>
+> I have to say most of the participants of the AppArmour flamefests were dead
+> wrong, and it wasnt the AppArmour folks who were wrong ...
+>
+> The straight ASCII VFS namespace *makes sense*, and yes, the raw physical
+> objects space that SELinux uses makes sense as well.
+>
+> And no, i do not subscribe to the dogma that it is not possible to secure the
+> ASCII VFS namespace: it evidently is possible, if you know and handle the
+> ambiguitites. It is also obviously true that the ASCII VFS namespaces we use
+> every day are a *lot* more intuitive than the labeled physical objects space
+> ...
+>
+> What all the security flamewars missed is the simple fact that being intuitive
+> matters a *lot* not just to not annoy users, but also to broaden the effective
+> number of security-conscious developers ...
+>
+>> > Unfortunately this audit callback cannot be used for my purposes, because
+>> > the event is single-purpose for auditd and because it allows no feedback
+>> > (no deny/accept discretion for the security policy).
+>> >
+>> > But if had this simple event there:
+>> >
+>> > ? ? err = event_vfs_getname(result);
+>>
+>> Wow it sounds so easy. ?Now lets keep extending your train of thought
+>> until we can actually provide the security provided by SELinux. ?What do
+>> we end up with? ?We end up with an event hook right next to every LSM
+>> hook. ?You know, the LSM hooks were placed where they are for a reason.
+>> Because those were the locations inside the kernel where you actually
+>> have information about the task doing an operation and the objects
+>> (files, sockets, directories, other tasks, etc) they are doing an
+>> operation on.
+>>
+>> Honestly all you are talking about it remaking the LSM with 2 sets of
+>> hooks instead if 1. ?Why? [...]
+>
+> Not at all. I am taking about using *one* set of events, to keep the intrusion
+> at the lowest possible level.
+>
+> LSM could make use of them as well.
+>
+> Obviously for pragmatic reasons that might not be feasible initially.
+>
+>> [...] ?It seems much easier that if you want the language of the filter
+>> engine you would just make a new LSM that uses the filter engine for it's
+>> policy language rather than the language created by SELinux or SMACK or name
+>> your LSM implementation.
+>
+> Correct, that is what i suggested.
+>
+> Note that performance is a primary concern, so if certain filters are very
+> popular then in practice this would come with support for a couple of 'built
+> in' (pre-optimized) filters that the kernel can accelerate directly, so that we
+> do not incure the cost of executing the filter preds for really common-sense
+> security policies that almost everyone is using.
+>
+> I.e. in the end we'd *roughly* end up with the same performance and security as
+> we are today (i mean, SELinux and the other LSMs did a nice job of collecting
+> the things that apps should be careful about), but the crutial difference isnt
+> just the advantages i menioned, but the fact that the *development model* of
+> security modules would be a *lot* more extensible.
+>
+> So security efforts could move to a whole different level: they could move into
+> key apps and they could integrate with the general mind-set of developers.
+>
+> At least Will as an application framework developer cares, so that hope is
+> justified i think.
+>
+>> > ?- unprivileged: ?application-definable, allowing the embedding of security
+>> > ? ? ? ? ? ? ? ? ? policy in *apps* as well, not just the system
+>> >
+>> > ?- flexible: ? ? ?can be added/removed runtime unprivileged, and cheaply so
+>> >
+>> > ?- transparent: ? does not impact executing code that meets the policy
+>> >
+>> > ?- nestable: ? ? ?it is inherited by child tasks and is fundamentally stackable,
+>> > ? ? ? ? ? ? ? ? ? multiple policies will have the combined effect and they
+>> > ? ? ? ? ? ? ? ? ? are transparent to each other. So if a child task within a
+>> > ? ? ? ? ? ? ? ? ? sandbox adds *more* checks then those add to the already
+>> > ? ? ? ? ? ? ? ? ? existing set of checks. We only narrow permissions, never
+>> > ? ? ? ? ? ? ? ? ? extend them.
+>> >
+>> > ?- generic: ? ? ? allowing observation and (safe) control of security relevant
+>> > ? ? ? ? ? ? ? ? ? parameters not just at the system call boundary but at other
+>> > ? ? ? ? ? ? ? ? ? relevant places of kernel execution as well: which
+>> > ? ? ? ? ? ? ? ? ? points/callbacks could also be used for other types of event
+>> > ? ? ? ? ? ? ? ? ? extraction such as perf. It could even be shared with audit ...
+>>
+>> I'm not arguing that any of these things are bad things. ?What you describe
+>> is a new LSM that uses a discretionary access control model but with the
+>> granularity and flexibility that has traditionally only existed in the
+>> mandatory access control security modules previously implemented in the
+>> kernel.
+>>
+>> I won't argue that's a bad idea, there's no reason in my mind that a process
+>> shouldn't be allowed to control it's own access decisions in a more flexible
+>> way than rwx bits. ?Then again, I certainly don't see a reason that this
+>> syscall hardening patch should be held up while a whole new concept in
+>> computer security is contemplated...
+>
+> Note, i'm not actually asking for the moon, a pony and more.
+>
+> I fully submit that we are yet far away from being able to do a full LSM via
+> this mechanism.
+>
+> What i'm asking for is that because the syscall point steps taken by Will look
+> very promising so it would be nice to do *that* in a slightly more flexible
+> scheme that does not condemn it to be limited to the syscall boundary and such
+> ...
 
-Just a piece of advice about the hardware :
-
-0/ can you tell us if the very same kernel revision and memtest goes 
-smoothly on an Atmel at91sam9rl-ek board (the Evaluation Kit): if you 
-have one...
-1/ try to test the same condition with another hardware. If you built 
-several of your custom hardware, running on another chip / board can 
-give clues
-2/ try the same test with caches disabled (kernel configuration option). 
-That can also give you an idea about the software/hardware location of 
-the issue: be aware that a cache enabled ARM9 does more demanding 
-accesses to the external SDRAM: that can highlight some routing / noise 
-issues.
-
-> I've tried a number of different kernels, including linux-2.6.39-rc6 and 
-> the official ARM kernel pulled from git.  I've also tried building with 
-> the arm-none-linux-gnueabi-gcc from CodeSourcery, but similar problems 
-> still arise.
-
-You can test a proven kernel going to www.linux4sam.org: but you will 
-need the at91sam9rl-ek to use the binary provided there (sources 
-available also of course).
-
-Best regards,
--- 
-Nicolas Ferre
+What do you suggest here?
