@@ -1,55 +1,33 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Sun, 15 May 2011 00:23:32 +0200
-Subject: [PATCH .39-final] avr32: add some more at91 to cpu.h definition
-In-Reply-To: <4DC3EA35.5030709@atmel.com>
-References: <4DC3EA35.5030709@atmel.com>
-Message-ID: <1305411812-25508-1-git-send-email-nicolas.ferre@atmel.com>
+From: dv@vollmann.ch (Detlef Vollmann)
+Date: Sat, 14 May 2011 23:41:46 +0200
+Subject: Kernel oops with undefined instruction when accessing memory
+	on an	AT91 custom system
+In-Reply-To: <4DCEADB5.9010905@usask.ca>
+References: <4DCEADB5.9010905@usask.ca>
+Message-ID: <4DCEF71A.9050405@vollmann.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Somme common drivers will need those at91 cpu_is_xxx() definitions.
-Those definitions are already in Linus' tree so if we want to use them
-in common drivers, we will need them in AVR32 cpu.h file.
+On 05/14/11 18:28, Nicholas Kinar wrote:
+> I've had a number of random kernel oops when trying to use the AT91 mmc
+> driver with an SD card,
+I'm not sure if this is related, but we also get oopses with SDcard,
+with both, at91_mci.c and atmel-mci.c.
+But we only get it with debugging turned on (CONFIG_DEBUG_BUGVERBOSE=y
+and CONFIG_DEBUG_VM=y).
+This is the interesting part of the oops:
+kernel BUG at include/linux/mm.h:636
+[<c0026450>] (__bug+0x18/0x24) from [<c0029d30>] 
+(flush_dcache_page+0x28/0x144)
+[<c0029d30>] (flush_dcache_page+0x28/0x144) from [<c01b5240>] 
+(atmci_interrupt+0x1f4/0x6ec)
+[<c01b5240>] (atmci_interrupt+0x1f4/0x6ec) from [<c00567f4>] 
+(handle_IRQ_event+0x3c/0x10c)
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
----
-Linus,
+This is for a 2.6.32 kernel, but I also tested 2.6.39-rc4.
+The interesting thing is that this only happens with SDcard, with
+an original MMC card everything is fine.
+I haven't had the time yet to hunt this down, but I propose you
+turn on DEBUG_VM and BUG and see whether you get more consistent oopses.
 
-AVR32 and AT91 were waiting for more fixes to add to a pull request for you.
-But it seems that we do not have more patches that can go to .39-final.
-So, maybe you can take this trivial patch. It shall allow all definitions to be
-available for both architectures into the same kernel revision.
-
-Thanks, best regards.
-
- arch/avr32/mach-at32ap/include/mach/cpu.h |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
-
-diff --git a/arch/avr32/mach-at32ap/include/mach/cpu.h b/arch/avr32/mach-at32ap/include/mach/cpu.h
-index 9c96a13..8181293 100644
---- a/arch/avr32/mach-at32ap/include/mach/cpu.h
-+++ b/arch/avr32/mach-at32ap/include/mach/cpu.h
-@@ -31,8 +31,20 @@
- #define cpu_is_at91sam9263()	(0)
- #define cpu_is_at91sam9rl()	(0)
- #define cpu_is_at91cap9()	(0)
-+#define cpu_is_at91cap9_revB()	(0)
-+#define cpu_is_at91cap9_revC()	(0)
- #define cpu_is_at91sam9g10()	(0)
-+#define cpu_is_at91sam9g20()	(0)
- #define cpu_is_at91sam9g45()	(0)
- #define cpu_is_at91sam9g45es()	(0)
-+#define cpu_is_at91sam9m10()	(0)
-+#define cpu_is_at91sam9g46()	(0)
-+#define cpu_is_at91sam9m11()	(0)
-+#define cpu_is_at91sam9x5()	(0)
-+#define cpu_is_at91sam9g15()	(0)
-+#define cpu_is_at91sam9g35()	(0)
-+#define cpu_is_at91sam9x35()	(0)
-+#define cpu_is_at91sam9g25()	(0)
-+#define cpu_is_at91sam9x25()	(0)
- 
- #endif /* __ASM_ARCH_CPU_H */
--- 
-1.7.3
+   Detlef
