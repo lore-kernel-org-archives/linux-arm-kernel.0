@@ -1,23 +1,55 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 14 May 2011 05:32:24 +0200
-Subject: your mail
-In-Reply-To: <20110513193502.2BBAF40CD1@eskimo.mtv.corp.google.com>
-References: <20110513193502.2BBAF40CD1@eskimo.mtv.corp.google.com>
-Message-ID: <20110514033224.GA14136@game.jcrosoft.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 14 May 2011 06:14:24 +0200
+Subject: [PATCH v6 0/5] Basic ARM devicetree support
+In-Reply-To: <alpine.LFD.2.00.1105120940490.28229@xanadu.home>
+References: <BANLkTi=yCmxgv1fQKRJSZK3FkkRwjS2r=Q@mail.gmail.com>
+	<20110511211438.GM5315@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1105120940490.28229@xanadu.home>
+Message-ID: <BANLkTi=V337ojovBwiTA9Lnt0OMj0SGTRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12:35 Fri 13 May     , Vadim Bendebury wrote:
-> >From 8ed0ea5fcf5552ca3307611b685b4518794eca41 Mon Sep 17 00:00:00 2001
-> From: Vadim Bendebury <vbendeb@chromium.org>
-> Date: Wed, 11 May 2011 17:31:40 -0700
-> Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation in thumb mode.
-> 
-> This is a cosmetic change, adding a '_thumb' prefix to the
-> 'Hardware' line in /proc/cpuinfo. Tested as follows:
-I do think is the right place or right way to do so
+On Thu, May 12, 2011 at 9:47 AM, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Wed, 11 May 2011, Russell King - ARM Linux wrote:
+>
+>> On Wed, May 11, 2011 at 10:44:49PM +0200, Grant Likely wrote:
+>> > Right now it merges cleanly with linux-next and the resulting tree
+>> > builds and boots at least on qemu. ?Unless you really object, I'm
+>> > going to ask Stephen to add the following branch to the /end/ of the
+>> > list of trees for linux-next so it can easily be dropped it if it
+>> > causes any problems.
+>>
+>> As far as the set of five patches looks fine to me, I don't have any
+>> objections against them. ?So I think we can merge them for .40.
 
-I think we need to create a sysfs entry to allow machine to more information
+Yay!  Thanks Russell!
 
-Best Regards,
-J.
+>> What I've always worried about is the platform stuff, and that's
+>> something I'm going to continue worrying about because I don't think
+>> we have sufficient review capacity to ensure that we don't end up
+>> with lots of stupidities.
+
+Understood, and I agree to a point, but I'm cautiously optimistic that
+the review process we talked about heavily this week will be able to
+push back on bad bindings to prevent a lot of these problems.  It also
+helps that we we can cut over to device tree in board ports in stages
+without needing a change-everything-flag-day.  Devices can be
+converted one by one, which will limit the volume of stuff that needs
+to be reviewed at one time.
+
+> DT is certainly not a silver bullet. ?Good judgement will be needed as
+> to what is put in DT and how it is represented. ?I don't think that it
+> would make things worse than they are now though.
+
++1
+
+> I also do have some concerns about some aspects of DT which I've
+> expressed several times in the past. ?However I don't think holding back
+> those patches any longer is a solution though.
+>
+> So consider this as a ACK from my part to merge those patches now. ?This
+> will get the ball rolling.
+
+Thanks Nicolas.
+
+g.
