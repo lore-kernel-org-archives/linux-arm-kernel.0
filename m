@@ -1,38 +1,45 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 14 May 2011 18:01:27 +0200
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105102344.58598.arnd@arndb.de>
-	<82D549BB195345A1A189D569952B387C@subhasishg>
-	<201105112203.54838.arnd@arndb.de>
-	<EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
-Message-ID: <20110514160126.GA2791@opensource.wolfsonmicro.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 14 May 2011 17:12:30 +0100
+Subject: [RFC PATCH v2 00/12] Consolidating GIC per-cpu interrupts
+In-Reply-To: <4DCD64FC.4090703@ti.com>
+References: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
+	<4DCD64FC.4090703@ti.com>
+Message-ID: <20110514171230.2a5ba0c0@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 04:25:56PM +0530, Subhasish Ghosh wrote:
+On Fri, 13 May 2011 22:36:04 +0530
+Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
 
-> >Instead, maybe you can simply call platform_device_register
-> >at that stage to create the children and not use MFD at all.
+Hi Santosh,
 
-> >Samuel, can you comment on this as well? Do you still see pruss
-> >as an MFD driver when the uses are completely dynamic and determined
-> >by the firmware loaded into it?
+> Looks like, this series breaks system wide supsend. Please
+> check.
+> 
+> Regards
+> Santosh
+> 
+> -------
+> # echo mem > /sys/power/state
+> [   37.503112] PM: Syncing filesystems ... done.
+> [   37.552032] Freezing user space processes ... (elapsed 0.01 seconds) 
+> done.
+> [   37.577545] Freezing remaining freezable tasks ... (elapsed 0.02 
+> seconds) done.
+> [   37.616210] PM: suspend of devices complete after 5.187 msecs
+> [   37.623657] PM: late suspend of devices complete after 1.403 msecs
+> [   37.630187] Disabling non-boot CPUs ...
+> [   37.731964] CPU1: shutdown
+> [   38.285888] Enabling non-boot CPUs ...
+> [   38.291137] CPU1: Booted secondary processor
+> [   38.291168] CPU1: Unknown IPI message 0x1
+> [   38.291168] local_timer: can't register interrupt 413 on cpu 1 (-16)
 
-> But in that case, where do I fit my driver.
-> It's a microcontroller inside of a processor, guess that's unique for Linux.
+Blah... We obviously don't stop the timer on secondary CPUs, and then
+try to request the interrupt again. I'll have a look on Monday.
 
-It's not that unusual in hardware terms, really.  There's an awful lot
-of this going on in the audio area especially at the minute so there's
-going to be some effort around providing some framework support for this
-which should have some general usability but that's not there yet.
+Thanks for pointing this out.
 
-> Will a misc device be a better choice.
-
-> In that case I can remove the MFD cell from the board_file and add an array
-> of platform_device for the UART & CAN.
-
-I think that for me so long as it can simultaneously do two unrelated
-functions which need to be arbitrated between there's probably a place
-for it in MFD, certainly at the minute.
+	M.
+-- 
+I'm the slime oozin' out from your TV set...
