@@ -1,45 +1,165 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 14 May 2011 17:12:30 +0100
-Subject: [RFC PATCH v2 00/12] Consolidating GIC per-cpu interrupts
-In-Reply-To: <4DCD64FC.4090703@ti.com>
-References: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
-	<4DCD64FC.4090703@ti.com>
-Message-ID: <20110514171230.2a5ba0c0@taxman.wild-wind.fr.eu.org>
+From: n.kinar@usask.ca (Nicholas Kinar)
+Date: Sat, 14 May 2011 10:28:37 -0600
+Subject: Kernel oops with undefined instruction when accessing memory on an
+	AT91 custom system
+Message-ID: <4DCEADB5.9010905@usask.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 May 2011 22:36:04 +0530
-Santosh Shilimkar <santosh.shilimkar@ti.com> wrote:
+Hello,
 
-Hi Santosh,
+I've recently designed an embedded system with an AT91SAM9RL processor. 
+This is an ARM9 processor.  The hardware of the embedded system is 
+similar to the AT91SAM9RL-EK evaluation kit with board support already 
+in the Linux kernel 
+(linux-kernel/linux-2.6.37/arch/arm/mach-at91/board-sam9rlek.c). There 
+is 64 MB of physical memory.  I've used AT91bootstrap to bypass the 
+crystals and I've provided an external clock signal (12.0 MHz) as the 
+main input clock.  The external clock signal is fine, and is the same 
+frequency as the crystal on the AT91SAM9RL-EK board.
 
-> Looks like, this series breaks system wide supsend. Please
-> check.
-> 
-> Regards
-> Santosh
-> 
-> -------
-> # echo mem > /sys/power/state
-> [   37.503112] PM: Syncing filesystems ... done.
-> [   37.552032] Freezing user space processes ... (elapsed 0.01 seconds) 
-> done.
-> [   37.577545] Freezing remaining freezable tasks ... (elapsed 0.02 
-> seconds) done.
-> [   37.616210] PM: suspend of devices complete after 5.187 msecs
-> [   37.623657] PM: late suspend of devices complete after 1.403 msecs
-> [   37.630187] Disabling non-boot CPUs ...
-> [   37.731964] CPU1: shutdown
-> [   38.285888] Enabling non-boot CPUs ...
-> [   38.291137] CPU1: Booted secondary processor
-> [   38.291168] CPU1: Unknown IPI message 0x1
-> [   38.291168] local_timer: can't register interrupt 413 on cpu 1 (-16)
+I've downloaded and built the memtest suite found here 
+(http://www.arm.linux.org.uk/developer/stresstests.php).  I've been 
+building both the Linux kernel (linux-2.6.37) and the memtest suite 
+using the arm-linux-gcc compiler shipped with buildroot.2011.02.  The 
+specs of this particular compiler can be found below:
 
-Blah... We obviously don't stop the timer on secondary CPUs, and then
-try to request the interrupt again. I'll have a look on Monday.
+arm-linux-gcc -v
+Using built-in specs.
+Target: arm-unknown-linux-uclibcgnueabi
+Configured with: 
+/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/toolchain/gcc-4.3.5/configure 
+--prefix=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
+--build=x86_64-unknown-linux-gnu --host=x86_64-unknown-linux-gnu 
+--target=arm-unknown-linux-uclibcgnueabi --enable-languages=c,c++ 
+--with-sysroot=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/sysroot 
+--with-build-time-tools=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/bin 
+--disable-__cxa_atexit --enable-target-optspace --with-gnu-ld 
+--disable-libssp --disable-multilib --disable-tls --disable-shared 
+--with-gmp=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
+--with-mpfr=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
+--enable-threads --disable-decimal-float --with-float=soft 
+--with-abi=aapcs-linux --with-arch=armv5te --with-tune=arm926ej-s 
+--with-pkgversion='Buildroot 2011.02' 
+--with-bugurl=http://bugs.buildroot.net/ : (reconfigured) 
+/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/toolchain/gcc-4.3.5/configure 
+--prefix=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
+--build=x86_64-unknown-linux-gnu --host=x86_64-unknown-linux-gnu 
+--target=arm-unknown-linux-uclibcgnueabi --enable-languages=c,c++ 
+--with-sysroot=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/sysroot 
+--with-build-time-tools=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr/arm-unknown-linux-uclibcgnueabi/bin 
+--disable-__cxa_atexit --enable-target-optspace --with-gnu-ld 
+--disable-libssp --disable-multilib --disable-tls --disable-shared 
+--with-gmp=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
+--with-mpfr=/media/RESEARCH/DEVICE-CODE/buildroot-heat-probe/buildroot-2011.02/output/host/usr 
+--enable-threads --disable-decimal-float --with-float=soft 
+--with-abi=aapcs-linux --with-arch=armv5te --with-tune=arm926ej-s 
+--with-pkgversion='Buildroot 2011.02' 
+--with-bugurl=http://bugs.buildroot.net/
+Thread model: posix
+gcc version 4.3.5 (Buildroot 2011.02)
 
-Thanks for pointing this out.
 
-	M.
--- 
-I'm the slime oozin' out from your TV set...
+When running the memtest program on the embedded ARM system, I receive 
+the following kernel oops that complains about an undefined 
+instruction.  I've tested SDRAM memory using "bare-metal" non-Linux 
+programs loaded over JTAG, and it seems that I can successfully write 
+and read any values into all memory addresses.
+
+I've had a number of random kernel oops when trying to use the AT91 mmc 
+driver with an SD card, but when running the memtest program, I receive 
+the following undefined instruction (that often repeats in a similar and 
+continuous fashion):
+
+# ./mtest
+Starting test run with 8 megabyte heap.
+Setting up 2048 4096kB pages for test...Internal error: Oops - undefined 
+instruction: 0 [#1]
+last sysfs file: /sys/devices/virtual/vc/vcsa1/dev
+Modules linked in:
+CPU: 0    Not tainted  (2.6.37 #15)
+PC is at v5tj_early_abort+0x0/0x38
+LR is at __dabt_usr+0x38/0x60
+pc : [<c0028d20>]    lr : [<c0021c58>]    psr: 00000093
+sp : c3ae5fb0  ip : 00012008  fp : 00011664
+r10: 00011638  r9 : 00011630  r8 : 00011644
+r7 : 00011634  r6 : 00011678  r5 : 00011670  r4 : ffffffff
+r3 : 80000010  r2 : 00008e78  r1 : 4019a008  r0 : 00053177
+Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 0005317f  Table: 23090000  DAC: 00000015
+Process mtest (pid: 873, stack limit = 0xc3ae4270)
+Stack: (0xc3ae5fb0 to 0xc3ae6000)
+5fa0:                                     4019a008 000002a8 002a8000 
+00001000
+5fc0: 0001166c 00011670 00011678 00011634 00011644 00011630 00011638 
+00011664
+5fe0: 00012008 bec59d10 40178a64 00008e78 80000010 ffffffff 238633c4 
+94cc31cc
+[<c0028d20>] (v5tj_early_abort+0x0/0x38) from [<00011664>] (0x11664)
+Code: 00000000 00000000 00000000 00000000 (ee150000)
+---[ end trace 88c1fe1db84a9172 ]---
+
+Here is my attempt at deciphering the oops file:
+
+nkinar at matilda:/media/RESEARCH/DEVICE-CODE/oops-reports$ ksymoops -k 
+./kallsyms -l ./modules --no-object -m ./System.map < oops.txt
+ksymoops 2.4.11 on x86_64 2.6.32-31-generic.  Options used
+      -V (default)
+      -k ./kallsyms (specified)
+      -l ./modules (specified)
+      -O (specified)
+      -m ./System.map (specified)
+
+Warning (read_ksyms): no kernel symbols in ksyms, is ./kallsyms a valid 
+ksyms file?
+No ksyms, skipping lsmod
+CPU: 0    Not tainted  (2.6.37 #15)
+pc : [<c0028d20>]    lr : [<c0021c58>]    psr: 00000093
+Using defaults from ksymoops -t elf64-x86-64 -a i386:x86-64
+sp : c3ae5fb0  ip : 00012008  fp : 00011664
+r10: 00011638  r9 : 00011630  r8 : 00011644
+r7 : 00011634  r6 : 00011678  r5 : 00011670  r4 : ffffffff
+r3 : 80000010  r2 : 00008e78  r1 : 4019a008  r0 : 00053177
+Flags: nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 0005317f  Table: 23090000  DAC: 00000015
+Stack: (0xc3ae5fb0 to 0xc3ae6000)
+5fa0:                                     4019a008 000002a8 002a8000 
+00001000
+5fc0: 0001166c 00011670 00011678 00011634 00011644 00011630 00011638 
+00011664
+5fe0: 00012008 bec59d10 40178a64 00008e78 80000010 ffffffff 238633c4 
+94cc31cc
+[<c0028d20>] (v5tj_early_abort+0x0/0x38) from [<00011664>] (0x11664)
+Code: 00000000 00000000 00000000 00000000 (ee150000)
+
+
+ >>LR;  00000000c0021c58 <__dabt_usr+38/60>
+
+ >>RIP; 00000000c0028d20 <v5tj_early_abort+0/38> <=====
+
+Code;  00000000c0028d10 <do_alignment_ldmstm+228/238>
+0000000000000000 <_RIP>:
+Code;  00000000c0028d20 <v5tj_early_abort+0/38> <=====
+   10:   00 00                     add    %al,(%rax) <=====
+Code;  00000000c0028d22 <v5tj_early_abort+2/38>
+   12:   15 ee 00 00 00            adc    $0xee,%eax
+
+
+1 warning issued.  Results may not be reliable.
+
+
+Looking at the source code of the mtest program, it appears that the 
+oops occurs around lines 134-135 of memtest.c when safe_malloc() is called.
+
+What could be the problem here, and is there anything that I can do to 
+rectify it?  Is there a possibility of changing anything in the Linux 
+kernel config to stop (or at least minimize) the problem from 
+occurring?  Alternately, is there a "known-good" configuration that I 
+can use to rectify what is happening?
+
+I've tried a number of different kernels, including linux-2.6.39-rc6 and 
+the official ARM kernel pulled from git.  I've also tried building with 
+the arm-none-linux-gnueabi-gcc from CodeSourcery, but similar problems 
+still arise.
+
+Nicholas
