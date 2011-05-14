@@ -1,165 +1,163 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Sat, 14 May 2011 09:30:15 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <1305299455.2076.26.camel@localhost.localdomain>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu>
-	<1305299455.2076.26.camel@localhost.localdomain>
-Message-ID: <20110514073015.GB9307@elte.hu>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 14 May 2011 09:57:35 +0200
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <4DCD563C.8040508@parrot.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+	<20110512074421.GA2429@pengutronix.de>
+	<BANLkTi=N8VNh3tPxYH8dQ0UtGpN=xSzKng@mail.gmail.com>
+	<F5C24FC168F95048BB6B9E0B13EB33152BA6F5307A@DIAMANT.xi-lite.lan>
+	<BANLkTinMxzrPS1GsTV1+poNGTxBpUFyBiw@mail.gmail.com>
+	<4DCD563C.8040508@parrot.com>
+Message-ID: <BANLkTi=SKJFHPgBzi9WdeiPhkkmgs8JGMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2011/5/13 Matthieu CASTET <matthieu.castet@parrot.com>:
+> Linus Walleij a ?crit :
+>> 2011/5/12 Matthieu Castet <matthieu.castet@parrot.com>:
+>>> You have 2^4 = 16 cases
+>>
+>> Do you use all of them in practice?
+> Of course not all, but more than the 2 { A8, A7, A6, A5 } or { G4, G3, G2, G1 }.
+>
+> Also when we doing the bsp for a processor, it is better to allow flexibility
+> for future board.
 
-* Eric Paris <eparis@redhat.com> wrote:
+Sorry I'm not following, what is inflexible in this case?
 
-> [dropping microblaze and roland]
-> 
-> lOn Fri, 2011-05-13 at 14:10 +0200, Ingo Molnar wrote:
-> > * James Morris <jmorris@namei.org> wrote:
-> 
-> > It is a simple and sensible security feature, agreed? It allows most code to 
-> > run well and link to countless libraries - but no access to other files is 
-> > allowed.
-> 
-> It's simple enough and sounds reasonable, but you can read all the discussion 
-> about AppArmour why many people don't really think it's the best. [...]
+> So with your pin mux how to you handle the fact that on spi you can have some
+> signal not connected ?
+> For { A8, A7, A6, A5 } spi, some board want all 4 spi wire, other want 3 (CS,
+> MOSI, CLK) or (MISO, CS, CLK), other want 2.
 
-I have to say most of the participants of the AppArmour flamefests were dead 
-wrong, and it wasnt the AppArmour folks who were wrong ...
+It's what I define as different functions from the pinmux:
 
-The straight ASCII VFS namespace *makes sense*, and yes, the raw physical 
-objects space that SELinux uses makes sense as well.
+Say if this is SPI0 that can use either 4, 3 or 2 wires you *can* call these
+just "spi0-4wire", "spi0-3wire", "spi0-2wire". The only thing the pinmux
+subsystem deals with it groups of pins, this is what is called functions.
 
-And no, i do not subscribe to the dogma that it is not possible to secure the 
-ASCII VFS namespace: it evidently is possible, if you know and handle the 
-ambiguitites. It is also obviously true that the ASCII VFS namespaces we use 
-every day are a *lot* more intuitive than the labeled physical objects space 
-...
+It does not assume anything about how these functions are defined and
+used, it just makes sure they do not overlap.
 
-What all the security flamewars missed is the simple fact that being intuitive 
-matters a *lot* not just to not annoy users, but also to broaden the effective 
-number of security-conscious developers ...
+So with pinmux you can activate function "spi0-2wire" and then use the
+two remaining pins as GPIO, no problem, it won't conflict since the
+two free pins aren't part of that function.
 
-> > Unfortunately this audit callback cannot be used for my purposes, because 
-> > the event is single-purpose for auditd and because it allows no feedback 
-> > (no deny/accept discretion for the security policy).
-> > 
-> > But if had this simple event there:
-> > 
-> > 	err = event_vfs_getname(result);
-> 
-> Wow it sounds so easy.  Now lets keep extending your train of thought
-> until we can actually provide the security provided by SELinux.  What do
-> we end up with?  We end up with an event hook right next to every LSM
-> hook.  You know, the LSM hooks were placed where they are for a reason.
-> Because those were the locations inside the kernel where you actually
-> have information about the task doing an operation and the objects
-> (files, sockets, directories, other tasks, etc) they are doing an
-> operation on.
-> 
-> Honestly all you are talking about it remaking the LSM with 2 sets of
-> hooks instead if 1.  Why? [...]
+> This is board specific not package specific.
 
-Not at all. I am taking about using *one* set of events, to keep the intrusion 
-at the lowest possible level.
+It relates to how the stuff is connected to the packages I think, and whether
+you call that package or board specific is no big issue. What I can say for
+sure is if the package didn't have 4 wires wherof you could use only
+two, you couldn't do any of this.
 
-LSM could make use of them as well.
+> And that's doesn't apply only to spi. That's the same problem for uart (no
+> rts/cts), sdcard (one data vs 4 data), ...
 
-Obviously for pragmatic reasons that might not be feasible initially.
+No problem at all. You can define the functions you want.
 
-> [...]  It seems much easier that if you want the language of the filter 
-> engine you would just make a new LSM that uses the filter engine for it's 
-> policy language rather than the language created by SELinux or SMACK or name 
-> your LSM implementation.
+>> The groups of pins are used when you're muxing devices, usually these use
+>> more than one pin. And that is why we connect them to the devices
+>> themselves with a mapping.
+>
+> I believe there should be 2 different things :
+> - something for select pin. Omap stuff is nice : omap3_mux_init,
+> omap_mux_init_gpio, omap_mux_init_signal, ...
+> - something for grouping pins, but the board can add new group of pin if it
+> doesn't exist.
 
-Correct, that is what i suggested.
+Now, the framework does not deal with how the groups of pins, i.e. the
+functions, are defined. Currently that is done by the drivers. The only
+thing it deals with is handling conflicts among pins, and selecting
+such groups.
 
-Note that performance is a primary concern, so if certain filters are very 
-popular then in practice this would come with support for a couple of 'built 
-in' (pre-optimized) filters that the kernel can accelerate directly, so that we 
-do not incure the cost of executing the filter preds for really common-sense 
-security policies that almost everyone is using.
+If you want to create these groups from board data (what I call package
+data) or say device tree, that is perfectly fine.
 
-I.e. in the end we'd *roughly* end up with the same performance and security as 
-we are today (i mean, SELinux and the other LSMs did a nice job of collecting 
-the things that apps should be careful about), but the crutial difference isnt 
-just the advantages i menioned, but the fact that the *development model* of 
-security modules would be a *lot* more extensible.
+> Also what i don't like in your system is the naming :
+>> +static unsigned int spi0_0_pins[] = { 0, 8, 16, 24 };
+>> +static unsigned int i2c0_pins[] = { 24, 25 };
+>> +static unsigned int spi0_1_pins[] = { 38, 46, 54, 62 };
+> What's 0, 8, 16, .... It should be define.
 
-So security efforts could move to a whole different level: they could move into 
-key apps and they could integrate with the general mind-set of developers.
+Again this is an example of a simple driver, it's entirely up to your
+driver to do. There are many similar example in Documentation/*
+where we don't use #define to simplify examples.
 
-At least Will as an application framework developer cares, so that hope is 
-justified i think.
+>> +static struct foo_pmx_func myfuncs[] = {
+>> + ? ? ? {
+>> + ? ? ? ? ? ? ? .name = "spi0-0",
+>> + ? ? ? ? ? ? ? .pins = spi0_0_pins,
+>> + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(spi0_1_pins),
+>> + ? ? ? },
+>> + ? ? ? {
+>> + ? ? ? ? ? ? ? .name = "i2c0",
+>> + ? ? ? ? ? ? ? .pins = i2c0_pins,
+>> + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(i2c0_pins),
+>> + ? ? ? },
+>> + ? ? ? {
+>> + ? ? ? ? ? ? ? .name = "spi0-1",
+>> + ? ? ? ? ? ? ? .pins = spi0_1_pins,
+>> + ? ? ? ? ? ? ? .num_pins = ARRAY_SIZE(spi0_1_pins),
+>> + ? ? ? },
+>> +};
+>
+> How I am supposed to know what's spi0-0, i2c0, spi0-1 without reading the code ?
 
-> >  - unprivileged:  application-definable, allowing the embedding of security 
-> >                   policy in *apps* as well, not just the system
-> > 
-> >  - flexible:      can be added/removed runtime unprivileged, and cheaply so
-> > 
-> >  - transparent:   does not impact executing code that meets the policy
-> > 
-> >  - nestable:      it is inherited by child tasks and is fundamentally stackable,
-> >                   multiple policies will have the combined effect and they
-> >                   are transparent to each other. So if a child task within a
-> >                   sandbox adds *more* checks then those add to the already
-> >                   existing set of checks. We only narrow permissions, never
-> >                   extend them.
-> > 
-> >  - generic:       allowing observation and (safe) control of security relevant
-> >                   parameters not just at the system call boundary but at other
-> >                   relevant places of kernel execution as well: which 
-> >                   points/callbacks could also be used for other types of event 
-> >                   extraction such as perf. It could even be shared with audit ...
-> 
-> I'm not arguing that any of these things are bad things.  What you describe 
-> is a new LSM that uses a discretionary access control model but with the 
-> granularity and flexibility that has traditionally only existed in the 
-> mandatory access control security modules previously implemented in the 
-> kernel.
-> 
-> I won't argue that's a bad idea, there's no reason in my mind that a process 
-> shouldn't be allowed to control it's own access decisions in a more flexible 
-> way than rwx bits.  Then again, I certainly don't see a reason that this 
-> syscall hardening patch should be held up while a whole new concept in 
-> computer security is contemplated...
+Again this is an example. If this data came from the device tree for
+example, or from arch/arm/mach-foo/package-db3350.c  in some
+struct db3350_pin_platform_data{} that I come up with does not
+matter to the framework.
 
-Note, i'm not actually asking for the moon, a pony and more.
+It's no different from how say your MMC driver knows how to handle
+which GPIO pin is card detect, you have to tell it what pin it is, likewise
+you can tell your pinmux driver what pins to handle.
 
-I fully submit that we are yet far away from being able to do a full LSM via 
-this mechanism.
+>> +foo_probe()
+>> +{
+>> + ? ? ? /* Allocate a state holder named "state" etc */
+>> + ? ? ? struct pinmux pmx;
+>> +
+>> + ? ? ? pmx = pinmux_get(&device, NULL);
+>> + ? ? ? if IS_ERR(pmx)
+>> + ? ? ? ? ? ? ? return PTR_ERR(pmx);
+>> + ? ? ? pinmux_enable(pmx);
+>> +
+>> + ? ? ? state->pmx = pmx;
+>> +}
+>> +If you want a specific mux setting and not just the first one found for this
+>> +device you can specify a specific mux setting, for example in the above example
+>> +the second i2c0 setting: pinmux_get(&device, "spi0-2");
+>
+> How a driver that is generic for example sdchi, mmci, ... is supposed to know
+> the pinmux name ?
 
-What i'm asking for is that because the syscall point steps taken by Will look 
-very promising so it would be nice to do *that* in a slightly more flexible 
-scheme that does not condemn it to be limited to the syscall boundary and such 
-...
+Since the board define function mappings such as:
 
-Also, to answer you, do you say that by my argument someone should have stood 
-up and said 'no' to the LSM mess that was introduced a couple of years ago and 
-which caused so many problems:
+PINMUX_MAP("sdi0-my-group", "sdi0.0"),
 
- - kernel inefficiencies and user-space overhead
+The driver can reference that one association:
 
- - stalled security efforts
+pinmux_get(dev, NULL);
 
- - infighting
+If you have different muxings you can also use an optional function
+name. This is no different to how you get clocks with clk_get(dev, NULL)
+or regulators.
 
- - friction, fragmentation, overmodularization
+> How this work if the board want a special mux ? I have to modify also the driver ?
 
- - non-stackability
+No I don't think so. If you mean specify new functions, you write your driver
+so that your platform data/package data/device tree/etc can pass muxes in to
+it. Don't lock on to the fact that the example driver does all that inside the
+driver, it is an example only.
 
- - security annoyances on the Linux desktop
+Imagine the same question for regulators. No different, just that the regulator
+framework has some standard structure for how to pass in platform data
+and I have not defined that. The clk framework has no such standard (yet)
+and is comparable, if you had you clock driver in drivers/clk/foo.c you would
+have the same problem.
 
- - probably *less* Linux security
+If what you mean is that you want another muxing device, that is fully
+supported in the same manner as we support several gpio_chip:s.
 
-and should have asked them to do something better designed instead?
-
-Thanks,
-
-	Ingo
+Yours,
+Linus Walleij
