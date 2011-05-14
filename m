@@ -1,25 +1,30 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 14 May 2011 09:30:39 -0700
-Subject: [PATCH] omap: Remove support for omap2evm (Re: Updated
-	mach-types update)
-In-Reply-To: <20110513144031.GV31483@atomide.com>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-	<20110320114137.GD16646@n2100.arm.linux.org.uk>
-	<20110324175945.GV2811@atomide.com>
-	<20110513115406.GQ31483@atomide.com>
-	<20110513151916.77eba011.jhnikula@gmail.com>
-	<20110513144031.GV31483@atomide.com>
-Message-ID: <20110514163038.GH2791@opensource.wolfsonmicro.com>
+Date: Sat, 14 May 2011 09:51:26 -0700
+Subject: [PATCH] ARM: SAMSUNG: Depend on IRQ_GENERIC_CHIP
+Message-ID: <1305391886-20963-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 07:40:32AM -0700, Tony Lindgren wrote:
+The generic chip infrastructure has had a Kconfig symbol added so we need
+to select that for the kernel to link now we're using the generic IRQ
+chip infrastructure.
 
-> Date: Fri, 13 May 2011 04:41:32 -0700
-> Subject: [PATCH] omap: Remove support for omap2evm
-> 
-> The board support has never been merged for it as noticed
-> by Russell King <linux@arm.linux.org.uk>. So let's remove the
-> related dead code.
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ arch/arm/plat-samsung/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
+index be72100..4d79519 100644
+--- a/arch/arm/plat-samsung/Kconfig
++++ b/arch/arm/plat-samsung/Kconfig
+@@ -8,6 +8,7 @@ config PLAT_SAMSUNG
+ 	bool
+ 	depends on PLAT_S3C24XX || ARCH_S3C64XX || PLAT_S5P
+ 	select NO_IOPORT
++	select GENERIC_IRQ_CHIP
+ 	default y
+ 	help
+ 	  Base platform code for all Samsung SoC based systems
+-- 
+1.7.5.1
