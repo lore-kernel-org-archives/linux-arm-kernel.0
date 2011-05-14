@@ -1,34 +1,34 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 14 May 2011 15:14:46 -0700
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201105142233.53659.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
-	<20110514160126.GA2791@opensource.wolfsonmicro.com>
-	<201105142233.53659.arnd@arndb.de>
-Message-ID: <20110514221445.GB21792@opensource.wolfsonmicro.com>
+Date: Sat, 14 May 2011 15:23:57 -0700
+Subject: [PATCH 06/14] mfd: pxa-w1: MFD driver for PXA 1wire control +
+	DS1WM chip
+In-Reply-To: <20110514194017.GF30539@n2100.arm.linux.org.uk>
+References: <1303135451-26362-7-git-send-email-haojian.zhuang@marvell.com>
+	<20110426094836.GD2659@sortiz-mobl>
+	<BANLkTinpFBfOEOR6Ox1ufEHZo3qwRq8zhA@mail.gmail.com>
+	<20110514194017.GF30539@n2100.arm.linux.org.uk>
+Message-ID: <20110514222356.GC21792@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 14, 2011 at 10:33:53PM +0200, Arnd Bergmann wrote:
+On Sat, May 14, 2011 at 08:40:17PM +0100, Russell King - ARM Linux wrote:
 
-> I guess drivers/mfd would be a better place than drivers/misc, but it might not
-> need to be an mfd driver in the sense that it registers mfd cells.
+> As I also said, this issue was talked about in a session at the Linaro
+> conference, and it will be interesting to hear what the result of that
+> session was.  At the moment, I'm entirely out of the loop on many things
+> that were discussed there (except for a message from tglx.)
 
-Yes, it might be more sensible to just open code.  OTOH mfd_cell is
-marginally easier to use.
+Everything should have had some live noted minutes linked off this site:
 
-> The more important point is to remove the device registration from the board
-> file. You definitely should not have the cells in the board file, but replacing
-> them with platform devices in the board file makes it no better.
+   http://summit.ubuntu.com/uds-o/
 
-Agreed entirely, it should be something higher level than that.
+probably everything interesting is on this page:
 
-> My whole point has been that you register them from the main pruss driver
-> based on run-time data instead of compile-time pre-configured stuff in the
-> board file.
+   http://summit.ubuntu.com/uds-o/track/linaro-kernel/
 
-I'm not so sure - if the usage is fixed as a result of the pins on the
-device being wired a CAN bus then it seems reasonable to tell the system
-about that so it'll stop the user trying to run SPI or something against
-it at runtime.
+(in etherpad, you want the icon that looks a bit like a notepad on the
+left of the box in the talk).  They won't always be accurate as they
+were done live and not 100% reviewed but might be helpful.
+
+Several people had actions to bring things to the list so I'd expect to
+see some more digested mails hitting in the next week or two.
