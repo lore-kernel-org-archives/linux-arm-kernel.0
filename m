@@ -1,145 +1,66 @@
 From: wad@chromium.org (Will Drewry)
-Date: Sat, 14 May 2011 15:57:55 -0500
+Date: Sat, 14 May 2011 15:58:00 -0500
 Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
 	filtering
-In-Reply-To: <20110514073015.GB9307@elte.hu>
+In-Reply-To: <201105132135.34741.arnd@arndb.de>
 References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
 	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu>
-	<1305299455.2076.26.camel@localhost.localdomain>
-	<20110514073015.GB9307@elte.hu>
-Message-ID: <BANLkTi=1CBKevjg3+fYFZF9zWtQVw-W9hQ@mail.gmail.com>
+	<201105132135.34741.arnd@arndb.de>
+Message-ID: <BANLkTinukLesDoXzXKdtdRwgHtJkthXK0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 14, 2011 at 2:30 AM, Ingo Molnar <mingo@elte.hu> wrote:
+On Fri, May 13, 2011 at 2:35 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 12 May 2011, Will Drewry wrote:
+>> This change adds a new seccomp mode based on the work by
+>> agl at chromium.org in [1]. This new mode, "filter mode", provides a hash
+>> table of seccomp_filter objects. ?When in the new mode (2), all system
+>> calls are checked against the filters - first by system call number,
+>> then by a filter string. ?If an entry exists for a given system call and
+>> all filter predicates evaluate to true, then the task may proceed.
+>> Otherwise, the task is killed (as per seccomp_mode == 1).
 >
-> * Eric Paris <eparis@redhat.com> wrote:
->
->> [dropping microblaze and roland]
->>
->> lOn Fri, 2011-05-13 at 14:10 +0200, Ingo Molnar wrote:
->> > * James Morris <jmorris@namei.org> wrote:
->>
->> > It is a simple and sensible security feature, agreed? It allows most code to
->> > run well and link to countless libraries - but no access to other files is
->> > allowed.
->>
->> It's simple enough and sounds reasonable, but you can read all the discussion
->> about AppArmour why many people don't really think it's the best. [...]
->
-> I have to say most of the participants of the AppArmour flamefests were dead
-> wrong, and it wasnt the AppArmour folks who were wrong ...
->
-> The straight ASCII VFS namespace *makes sense*, and yes, the raw physical
-> objects space that SELinux uses makes sense as well.
->
-> And no, i do not subscribe to the dogma that it is not possible to secure the
-> ASCII VFS namespace: it evidently is possible, if you know and handle the
-> ambiguitites. It is also obviously true that the ASCII VFS namespaces we use
-> every day are a *lot* more intuitive than the labeled physical objects space
-> ...
->
-> What all the security flamewars missed is the simple fact that being intuitive
-> matters a *lot* not just to not annoy users, but also to broaden the effective
-> number of security-conscious developers ...
->
->> > Unfortunately this audit callback cannot be used for my purposes, because
->> > the event is single-purpose for auditd and because it allows no feedback
->> > (no deny/accept discretion for the security policy).
->> >
->> > But if had this simple event there:
->> >
->> > ? ? err = event_vfs_getname(result);
->>
->> Wow it sounds so easy. ?Now lets keep extending your train of thought
->> until we can actually provide the security provided by SELinux. ?What do
->> we end up with? ?We end up with an event hook right next to every LSM
->> hook. ?You know, the LSM hooks were placed where they are for a reason.
->> Because those were the locations inside the kernel where you actually
->> have information about the task doing an operation and the objects
->> (files, sockets, directories, other tasks, etc) they are doing an
->> operation on.
->>
->> Honestly all you are talking about it remaking the LSM with 2 sets of
->> hooks instead if 1. ?Why? [...]
->
-> Not at all. I am taking about using *one* set of events, to keep the intrusion
-> at the lowest possible level.
->
-> LSM could make use of them as well.
->
-> Obviously for pragmatic reasons that might not be feasible initially.
->
->> [...] ?It seems much easier that if you want the language of the filter
->> engine you would just make a new LSM that uses the filter engine for it's
->> policy language rather than the language created by SELinux or SMACK or name
->> your LSM implementation.
->
-> Correct, that is what i suggested.
->
-> Note that performance is a primary concern, so if certain filters are very
-> popular then in practice this would come with support for a couple of 'built
-> in' (pre-optimized) filters that the kernel can accelerate directly, so that we
-> do not incure the cost of executing the filter preds for really common-sense
-> security policies that almost everyone is using.
->
-> I.e. in the end we'd *roughly* end up with the same performance and security as
-> we are today (i mean, SELinux and the other LSMs did a nice job of collecting
-> the things that apps should be careful about), but the crutial difference isnt
-> just the advantages i menioned, but the fact that the *development model* of
-> security modules would be a *lot* more extensible.
->
-> So security efforts could move to a whole different level: they could move into
-> key apps and they could integrate with the general mind-set of developers.
->
-> At least Will as an application framework developer cares, so that hope is
-> justified i think.
->
->> > ?- unprivileged: ?application-definable, allowing the embedding of security
->> > ? ? ? ? ? ? ? ? ? policy in *apps* as well, not just the system
->> >
->> > ?- flexible: ? ? ?can be added/removed runtime unprivileged, and cheaply so
->> >
->> > ?- transparent: ? does not impact executing code that meets the policy
->> >
->> > ?- nestable: ? ? ?it is inherited by child tasks and is fundamentally stackable,
->> > ? ? ? ? ? ? ? ? ? multiple policies will have the combined effect and they
->> > ? ? ? ? ? ? ? ? ? are transparent to each other. So if a child task within a
->> > ? ? ? ? ? ? ? ? ? sandbox adds *more* checks then those add to the already
->> > ? ? ? ? ? ? ? ? ? existing set of checks. We only narrow permissions, never
->> > ? ? ? ? ? ? ? ? ? extend them.
->> >
->> > ?- generic: ? ? ? allowing observation and (safe) control of security relevant
->> > ? ? ? ? ? ? ? ? ? parameters not just at the system call boundary but at other
->> > ? ? ? ? ? ? ? ? ? relevant places of kernel execution as well: which
->> > ? ? ? ? ? ? ? ? ? points/callbacks could also be used for other types of event
->> > ? ? ? ? ? ? ? ? ? extraction such as perf. It could even be shared with audit ...
->>
->> I'm not arguing that any of these things are bad things. ?What you describe
->> is a new LSM that uses a discretionary access control model but with the
->> granularity and flexibility that has traditionally only existed in the
->> mandatory access control security modules previously implemented in the
->> kernel.
->>
->> I won't argue that's a bad idea, there's no reason in my mind that a process
->> shouldn't be allowed to control it's own access decisions in a more flexible
->> way than rwx bits. ?Then again, I certainly don't see a reason that this
->> syscall hardening patch should be held up while a whole new concept in
->> computer security is contemplated...
->
-> Note, i'm not actually asking for the moon, a pony and more.
->
-> I fully submit that we are yet far away from being able to do a full LSM via
-> this mechanism.
->
-> What i'm asking for is that because the syscall point steps taken by Will look
-> very promising so it would be nice to do *that* in a slightly more flexible
-> scheme that does not condemn it to be limited to the syscall boundary and such
-> ...
+> I've got a question about this: Do you expect the typical usage to disallow
+> ioctl()? Given that ioctl alone is responsible for a huge number of exploits
+> in various drivers, while certain ioctls are immensely useful (FIONREAD,
+> FIOASYNC, ...), do you expect to extend the mechanism to filter specific
+> ioctl commands in the future?
 
-What do you suggest here?
+In many cases, I do expect ioctl's to be dropped, but it's totally up
+to whoever is setting the filters.
+
+As is, it can already help out: [even though an LSM, if available,
+would be appropriate to define a fine-grained policy]
+
+ioctl() is hooked by the ftrace syscalls infrastructure (via SYSCALL_DEFINE3):
+
+  SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned
+long, arg)
+
+This means you can do:
+  sprintf(filter, "cmd == %u || cmd == %u", FIOASYNC, FIONREAD);
+  prctl(PR_SET_SECCOMP_FILTER, __NR_ioctl, filter);
+  ...
+  prctl(PR_SET_SECCOMP, 2, 0);
+and then you'll be able to call ioctl on any fd with any argument but
+limited to only the FIOASYNC and FIONREAD commands.
+
+Depending on integration, it could even be limited to ioctl commands
+that are appropriate to a known fd if the fd is opened prior to
+entering seccomp mode 2. Alternatively, __NR__ioctl could be allowed
+with a filter of "1" then narrowed through a later addition of
+something like "(fd == %u && (cmd == %u || cmd == %u))" or something
+along those lines.
+
+Does that make sense?
+
+In general, this interface won't need specific extensions for most
+system call oriented filtering events.  ftrace events may be expanded
+(to include more system calls), but that's behind the scenes.  Only
+arguments subject to time-of-check-time-of-use attacks (data living in
+userspace passed in by pointer) are not safe to use via this
+interface.  In theory, that limitation could also be lifted in the
+implementation without changing the ABI.
+
+Thanks!
+will
