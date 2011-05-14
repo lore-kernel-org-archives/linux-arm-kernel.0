@@ -1,33 +1,34 @@
-From: dv@vollmann.ch (Detlef Vollmann)
-Date: Sat, 14 May 2011 23:41:46 +0200
-Subject: Kernel oops with undefined instruction when accessing memory
-	on an	AT91 custom system
-In-Reply-To: <4DCEADB5.9010905@usask.ca>
-References: <4DCEADB5.9010905@usask.ca>
-Message-ID: <4DCEF71A.9050405@vollmann.ch>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 14 May 2011 15:14:46 -0700
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <201105142233.53659.arnd@arndb.de>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
+	<20110514160126.GA2791@opensource.wolfsonmicro.com>
+	<201105142233.53659.arnd@arndb.de>
+Message-ID: <20110514221445.GB21792@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/14/11 18:28, Nicholas Kinar wrote:
-> I've had a number of random kernel oops when trying to use the AT91 mmc
-> driver with an SD card,
-I'm not sure if this is related, but we also get oopses with SDcard,
-with both, at91_mci.c and atmel-mci.c.
-But we only get it with debugging turned on (CONFIG_DEBUG_BUGVERBOSE=y
-and CONFIG_DEBUG_VM=y).
-This is the interesting part of the oops:
-kernel BUG at include/linux/mm.h:636
-[<c0026450>] (__bug+0x18/0x24) from [<c0029d30>] 
-(flush_dcache_page+0x28/0x144)
-[<c0029d30>] (flush_dcache_page+0x28/0x144) from [<c01b5240>] 
-(atmci_interrupt+0x1f4/0x6ec)
-[<c01b5240>] (atmci_interrupt+0x1f4/0x6ec) from [<c00567f4>] 
-(handle_IRQ_event+0x3c/0x10c)
+On Sat, May 14, 2011 at 10:33:53PM +0200, Arnd Bergmann wrote:
 
-This is for a 2.6.32 kernel, but I also tested 2.6.39-rc4.
-The interesting thing is that this only happens with SDcard, with
-an original MMC card everything is fine.
-I haven't had the time yet to hunt this down, but I propose you
-turn on DEBUG_VM and BUG and see whether you get more consistent oopses.
+> I guess drivers/mfd would be a better place than drivers/misc, but it might not
+> need to be an mfd driver in the sense that it registers mfd cells.
 
-   Detlef
+Yes, it might be more sensible to just open code.  OTOH mfd_cell is
+marginally easier to use.
+
+> The more important point is to remove the device registration from the board
+> file. You definitely should not have the cells in the board file, but replacing
+> them with platform devices in the board file makes it no better.
+
+Agreed entirely, it should be something higher level than that.
+
+> My whole point has been that you register them from the main pruss driver
+> based on run-time data instead of compile-time pre-configured stuff in the
+> board file.
+
+I'm not so sure - if the usage is fixed as a result of the pins on the
+device being wired a CAN bus then it seems reasonable to tell the system
+about that so it'll stop the user trying to run SPI or something against
+it at runtime.
