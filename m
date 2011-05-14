@@ -1,30 +1,33 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Sat, 14 May 2011 09:51:26 -0700
-Subject: [PATCH] ARM: SAMSUNG: Depend on IRQ_GENERIC_CHIP
-Message-ID: <1305391886-20963-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 14 May 2011 20:40:17 +0100
+Subject: [PATCH 06/14] mfd: pxa-w1: MFD driver for PXA 1wire control +
+	DS1WM chip
+In-Reply-To: <BANLkTinpFBfOEOR6Ox1ufEHZo3qwRq8zhA@mail.gmail.com>
+References: <1303135451-26362-7-git-send-email-haojian.zhuang@marvell.com>
+	<20110426094836.GD2659@sortiz-mobl>
+	<BANLkTinpFBfOEOR6Ox1ufEHZo3qwRq8zhA@mail.gmail.com>
+Message-ID: <20110514194017.GF30539@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The generic chip infrastructure has had a Kconfig symbol added so we need
-to select that for the kernel to link now we're using the generic IRQ
-chip infrastructure.
+On Sat, May 14, 2011 at 10:21:25PM +0800, Haojian Zhuang wrote:
+> But the key issue is that there's no common structure for clkdev. Now
+> clkdev is only designed for deeply machine depend.
+> 
+> >From my view is that we need a common structure for clkdev.
 
-Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
----
- arch/arm/plat-samsung/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+You mean struct clk.
 
-diff --git a/arch/arm/plat-samsung/Kconfig b/arch/arm/plat-samsung/Kconfig
-index be72100..4d79519 100644
---- a/arch/arm/plat-samsung/Kconfig
-+++ b/arch/arm/plat-samsung/Kconfig
-@@ -8,6 +8,7 @@ config PLAT_SAMSUNG
- 	bool
- 	depends on PLAT_S3C24XX || ARCH_S3C64XX || PLAT_S5P
- 	select NO_IOPORT
-+	select GENERIC_IRQ_CHIP
- 	default y
- 	help
- 	  Base platform code for all Samsung SoC based systems
--- 
-1.7.5.1
+As I said on our call on Thursday, everyone knows this, and it's
+something that has been worked on for the last year.  Concensus had
+been reached and everyone had settled on a proposal, and just when
+we were almost ready to merge it, the concensus fell apart again.
+
+As a result of that, a common struct clk has been delayed - it's not
+going to be in place for 2.6.40 (three months) but maybe we can reach
+concensus again for the .41 merge window.
+
+As I also said, this issue was talked about in a session at the Linaro
+conference, and it will be interesting to hear what the result of that
+session was.  At the moment, I'm entirely out of the loop on many things
+that were discussed there (except for a message from tglx.)
