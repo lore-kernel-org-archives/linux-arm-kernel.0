@@ -1,25 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 15 May 2011 08:41:51 +0100
-Subject: [PATCH v4 1/7] MTD: Add integrator-flash feature to physmap
-In-Reply-To: <1300367028-3916-2-git-send-email-marc.zyngier@arm.com>
-References: <1300367028-3916-1-git-send-email-marc.zyngier@arm.com>
-	<1300367028-3916-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110515074150.GA22975@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 15 May 2011 11:33:23 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <20110514221445.GB21792@opensource.wolfsonmicro.com>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105142233.53659.arnd@arndb.de>
+	<20110514221445.GB21792@opensource.wolfsonmicro.com>
+Message-ID: <201105151133.23870.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Mar 17, 2011 at 01:03:42PM +0000, Marc Zyngier wrote:
-> diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
-> index bcfd9f7..d37cca0 100644
-> --- a/include/linux/mtd/physmap.h
-> +++ b/include/linux/mtd/physmap.h
-> @@ -22,6 +22,8 @@ struct map_info;
->  
->  struct physmap_flash_data {
->  	unsigned int		width;
-> +	int			(*init)(struct platform_device *);
-> +	void			(*exit)(struct platform_device *);
->  	void			(*set_vpp)(struct map_info *, int);
+On Sunday 15 May 2011, Mark Brown wrote:
+> > My whole point has been that you register them from the main pruss driver
+> > based on run-time data instead of compile-time pre-configured stuff in the
+> > board file.
+> 
+> I'm not so sure - if the usage is fixed as a result of the pins on the
+> device being wired a CAN bus then it seems reasonable to tell the system
+> about that so it'll stop the user trying to run SPI or something against
+> it at runtime.
 
-Does anything use the map_info argument to set_vpp?  If not, passing a
-platform_device pointer would be more consistent and useful here.
+I'm mostly worried about the case where the pins are not hardwired for
+some specific function -- Subhasish was mentioning that these may be
+implemented using a pluggable extension board and I want to make sure
+that you are not required to recompile the kernel when changing the
+extension board.
+
+However, you made a good point that in many cases it will be hardwired
+so it may be valuable to preconfigure this in a way that does not require
+scripts to set up variables in sysfs when you already know what is there.
+
+Note that my suggestion to put the device name into the firmware file
+covers this case, because you can then simply ship a firmware blob that
+matches the hardware configuration. Thinking about the future device
+tree setup, you can even put the firmware blob itself into a property
+in the device tree file.
+
+	Arnd
