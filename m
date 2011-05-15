@@ -1,26 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 May 2011 08:42:07 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <BANLkTinukLesDoXzXKdtdRwgHtJkthXK0A@mail.gmail.com>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<201105132135.34741.arnd@arndb.de>
-	<BANLkTinukLesDoXzXKdtdRwgHtJkthXK0A@mail.gmail.com>
-Message-ID: <201105150842.07816.arnd@arndb.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Sun, 15 May 2011 10:25:05 +0300
+Subject: [PATCH 1/2] Initial B&N Nook Color (encore) support.
+In-Reply-To: <8D96E746-8C8F-44B1-9AFE-8A71F8AF082D@linuxhacker.ru>
+References: <1304891407-29364-1-git-send-email-green@linuxhacker.ru>
+	<1304891407-29364-2-git-send-email-green@linuxhacker.ru>
+	<4DC791C9.9040709@compulab.co.il>
+	<8D96E746-8C8F-44B1-9AFE-8A71F8AF082D@linuxhacker.ru>
+Message-ID: <4DCF7FD1.6090209@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 14 May 2011, Will Drewry wrote:
-> Depending on integration, it could even be limited to ioctl commands
-> that are appropriate to a known fd if the fd is opened prior to
-> entering seccomp mode 2. Alternatively, __NR__ioctl could be allowed
-> with a filter of "1" then narrowed through a later addition of
-> something like "(fd == %u && (cmd == %u || cmd == %u))" or something
-> along those lines.
-> 
-> Does that make sense?
+On 05/13/11 06:52, Oleg Drokin wrote:
 
-Thanks for the explanation. This sounds like it's already doing all
-we need.
+> Hello!
+>
+> On May 9, 2011, at 3:03 AM, Igor Grinberg wrote:
+>
+>>> Bare-bones board file, comes with serial console, gpio keys,
+>>> MMC/SDCard and USB support.
+>>>
+>>> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+>>> ---
+>> In general, here you should write the version history of your patch...
+> umm, ok.
+> Do you think the history of the changes is important in this case, though?
+> I mean it's mostly the case of "kill unneeded includes, fix style, fix incorrect mux package type" and so on.
+> Nothing of real interest to anybody.
 
-	Arnd
+It can help everybody (also yourself), for example, the fact that you
+already contacted Russell regarding mach-types (though the better place
+for it is cover letter) could help me to not wonder why do you have this
+stuff here.
+
+
+-- 
+Regards,
+Igor.
