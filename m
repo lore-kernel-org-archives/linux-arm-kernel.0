@@ -1,38 +1,24 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Sun, 15 May 2011 10:25:05 +0300
-Subject: [PATCH 1/2] Initial B&N Nook Color (encore) support.
-In-Reply-To: <8D96E746-8C8F-44B1-9AFE-8A71F8AF082D@linuxhacker.ru>
-References: <1304891407-29364-1-git-send-email-green@linuxhacker.ru>
-	<1304891407-29364-2-git-send-email-green@linuxhacker.ru>
-	<4DC791C9.9040709@compulab.co.il>
-	<8D96E746-8C8F-44B1-9AFE-8A71F8AF082D@linuxhacker.ru>
-Message-ID: <4DCF7FD1.6090209@compulab.co.il>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 15 May 2011 08:33:26 +0100
+Subject: Kernel oops with undefined instruction when accessing memory
+	on an AT91 custom system
+In-Reply-To: <4DCF4CF8.3020209@usask.ca>
+References: <4DCEADB5.9010905@usask.ca> <4DCEE989.4000401@atmel.com>
+	<4DCF4CF8.3020209@usask.ca>
+Message-ID: <20110515073326.GG30539@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/13/11 06:52, Oleg Drokin wrote:
+On Sat, May 14, 2011 at 09:48:08PM -0600, Nicholas Kinar wrote:
+> 0/  I do not own an Atmel at91sam9rl-ek board (I wish that I did), but I  
+> would hope to obtain one of these in the near future.
+> 1/  I am building this hardware for a research project, so I've only  
+> created only one PCB.  Eventually, I intend to make many more copies of  
+> this design.
+> 2/  I've tried the same test with all of the caches disabled, and the  
+> system runs very slowly (and consumes more power).  However, I still  
+> receive a kernel oops when running the mtest program (the SD card was  
+> not mounted and the caches were off):
 
-> Hello!
->
-> On May 9, 2011, at 3:03 AM, Igor Grinberg wrote:
->
->>> Bare-bones board file, comes with serial console, gpio keys,
->>> MMC/SDCard and USB support.
->>>
->>> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
->>> ---
->> In general, here you should write the version history of your patch...
-> umm, ok.
-> Do you think the history of the changes is important in this case, though?
-> I mean it's mostly the case of "kill unneeded includes, fix style, fix incorrect mux package type" and so on.
-> Nothing of real interest to anybody.
-
-It can help everybody (also yourself), for example, the fact that you
-already contacted Russell regarding mach-types (though the better place
-for it is cover letter) could help me to not wonder why do you have this
-stuff here.
-
-
--- 
-Regards,
-Igor.
+This all looks like either noisy SDRAM signals or power problems for
+the CPU itself causing corruption.
