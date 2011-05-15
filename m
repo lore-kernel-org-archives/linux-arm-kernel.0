@@ -1,38 +1,106 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 May 2011 11:33:23 +0200
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <20110514221445.GB21792@opensource.wolfsonmicro.com>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105142233.53659.arnd@arndb.de>
-	<20110514221445.GB21792@opensource.wolfsonmicro.com>
-Message-ID: <201105151133.23870.arnd@arndb.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Sun, 15 May 2011 13:32:42 +0200
+Subject: [PATCHv2 03/15] [orion] Consolidate the creation of the RTC platform
+	data.
+In-Reply-To: <1305459174-25517-1-git-send-email-andrew@lunn.ch>
+References: <1305459174-25517-1-git-send-email-andrew@lunn.ch>
+Message-ID: <1305459174-25517-4-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 May 2011, Mark Brown wrote:
-> > My whole point has been that you register them from the main pruss driver
-> > based on run-time data instead of compile-time pre-configured stuff in the
-> > board file.
-> 
-> I'm not so sure - if the usage is fixed as a result of the pins on the
-> device being wired a CAN bus then it seems reasonable to tell the system
-> about that so it'll stop the user trying to run SPI or something against
-> it at runtime.
+Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+---
+ arch/arm/mach-dove/common.c               |   13 +------------
+ arch/arm/mach-kirkwood/common.c           |    8 +-------
+ arch/arm/plat-orion/common.c              |   18 ++++++++++++++++++
+ arch/arm/plat-orion/include/plat/common.h |    3 +++
+ 4 files changed, 23 insertions(+), 19 deletions(-)
 
-I'm mostly worried about the case where the pins are not hardwired for
-some specific function -- Subhasish was mentioning that these may be
-implemented using a pluggable extension board and I want to make sure
-that you are not required to recompile the kernel when changing the
-extension board.
-
-However, you made a good point that in many cases it will be hardwired
-so it may be valuable to preconfigure this in a way that does not require
-scripts to set up variables in sysfs when you already know what is there.
-
-Note that my suggestion to put the device name into the firmware file
-covers this case, because you can then simply ship a firmware blob that
-matches the hardware configuration. Thinking about the future device
-tree setup, you can even put the firmware blob itself into a property
-in the device tree file.
-
-	Arnd
+diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
+index fffa92e..8a414cb 100644
+--- a/arch/arm/mach-dove/common.c
++++ b/arch/arm/mach-dove/common.c
+@@ -205,20 +205,9 @@ void __init dove_ge00_init(struct mv643xx_eth_platform_data *eth_data)
+ /*****************************************************************************
+  * SoC RTC
+  ****************************************************************************/
+-static struct resource dove_rtc_resource[] = {
+-	{
+-		.start	= DOVE_RTC_PHYS_BASE,
+-		.end	= DOVE_RTC_PHYS_BASE + 32 - 1,
+-		.flags	= IORESOURCE_MEM,
+-	}, {
+-		.start	= IRQ_DOVE_RTC,
+-		.flags	= IORESOURCE_IRQ,
+-	}
+-};
+-
+ void __init dove_rtc_init(void)
+ {
+-	platform_device_register_simple("rtc-mv", -1, dove_rtc_resource, 2);
++	orion_rtc_init(DOVE_RTC_PHYS_BASE, IRQ_DOVE_RTC);
+ }
+ 
+ /*****************************************************************************
+diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
+index 8cdf9f9..b77050e 100644
+--- a/arch/arm/mach-kirkwood/common.c
++++ b/arch/arm/mach-kirkwood/common.c
+@@ -326,15 +326,9 @@ void __init kirkwood_nand_init_rnb(struct mtd_partition *parts, int nr_parts,
+ /*****************************************************************************
+  * SoC RTC
+  ****************************************************************************/
+-static struct resource kirkwood_rtc_resource = {
+-	.start	= RTC_PHYS_BASE,
+-	.end	= RTC_PHYS_BASE + SZ_16 - 1,
+-	.flags	= IORESOURCE_MEM,
+-};
+-
+ static void __init kirkwood_rtc_init(void)
+ {
+-	platform_device_register_simple("rtc-mv", -1, &kirkwood_rtc_resource, 1);
++	orion_rtc_init(RTC_PHYS_BASE, NO_IRQ);
+ }
+ 
+ 
+diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
+index 4eac532..d065591 100644
+--- a/arch/arm/plat-orion/common.c
++++ b/arch/arm/plat-orion/common.c
+@@ -169,3 +169,21 @@ void __init orion_uart3_init(unsigned int membase,
+ 	uart_complete(&orion_uart3, orion_uart3_data, orion_uart3_resources,
+ 		      membase, mapbase, irq, uartclk);
+ }
++
++/*****************************************************************************
++ * SoC RTC
++ ****************************************************************************/
++static struct resource orion_rtc_resource[2];
++
++void __init orion_rtc_init(unsigned long mapbase,
++			   unsigned long irq)
++{
++	orion_rtc_resource[0].start = mapbase;
++	orion_rtc_resource[0].end = mapbase + SZ_32 - 1;
++	orion_rtc_resource[0].flags = IORESOURCE_MEM;
++	orion_rtc_resource[1].start = irq;
++	orion_rtc_resource[1].end = irq;
++	orion_rtc_resource[1].flags = IORESOURCE_IRQ;
++
++	platform_device_register_simple("rtc-mv", -1, orion_rtc_resource, 2);
++}
+diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
+index d57e3bb..7cba5e8 100644
+--- a/arch/arm/plat-orion/include/plat/common.h
++++ b/arch/arm/plat-orion/include/plat/common.h
+@@ -30,5 +30,8 @@ void __init orion_uart3_init(unsigned int membase,
+ 			     resource_size_t mapbase,
+ 			     unsigned int irq,
+ 			     unsigned int uartclk);
++
++void __init orion_rtc_init(unsigned long mapbase,
++			   unsigned long irq);
+ #endif
+ 
+-- 
+1.7.4.4
