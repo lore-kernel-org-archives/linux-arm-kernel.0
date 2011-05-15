@@ -1,24 +1,38 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Sun, 15 May 2011 16:31:41 +0200
-Subject: Zaurus CF tests -- ok
-In-Reply-To: <201105151426.50230.marek.vasut@gmail.com>
-References: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
-	<20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
-	<20110416074134.GA26440@ucw.cz>
-	<201105151426.50230.marek.vasut@gmail.com>
-Message-ID: <20110515143141.GA7913@atrey.karlin.mff.cuni.cz>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Sun, 15 May 2011 17:48:24 +0300
+Subject: [PATCH 1/2] ARM: remove unneeded check of the
+	cache_is_vipt_nonaliasing()
+In-Reply-To: <1305225183-15521-1-git-send-email-saeed@marvell.com>
+References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
+Message-ID: <BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-> Backtrace from QEMU ... I think this is what Cyril observed. But heck, it 
-> happens in QEMU too ;-)
+On Thu, May 12, 2011 at 9:33 PM, Saeed Bishara <saeed@marvell.com> wrote:
+>
+> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+> ---
+> ?arch/arm/mm/flush.c | ? ?4 ++--
+> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index 2b269c9..f1b7998 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -253,8 +253,8 @@ void __sync_icache_dcache(pte_t pteval)
+>
+> ? ? ? ?if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+> ? ? ? ? ? ? ? ?__flush_dcache_page(mapping, page);
+> - ? ? ? /* pte_exec() already checked above for non-aliasing VIPT cache */
+> - ? ? ? if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
+> +
+> + ? ? ? if (pte_exec(pteval))
+> ? ? ? ? ? ? ? ?__flush_icache_all();
+> ?}
+> ?#endif
+can you have I a look at this patch?
+the __sync_icache_dcache() returns if (cache_is_vipt_nonaliasing() &&
+!pte_exec(pteval)), so later, the if (cache_is_vipt_nonaliasing() ||
+pte_exec(pteval)) should be equivalent to  if (pte_exec(pteval))
 
-Yes, that is pretty much it.
-
-It happens randomly, eg. adding printk() line into kernel code (somewhere in
-mmc stack). Or sometimes crashes in the pccard initalization when two cards are
-inserted at the boot time.
-
--- 
-metan
+saeed
