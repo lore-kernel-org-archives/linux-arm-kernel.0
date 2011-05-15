@@ -1,41 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Sun, 15 May 2011 15:16:00 +0100
-Subject: [patch v4 3/3] arm: omap4: support pmu
-In-Reply-To: <BANLkTimkrf8-+-JTQy-gWK9t9grj-n0Ftw@mail.gmail.com>
-References: <1299598729-27974-1-git-send-email-tom.leiming@gmail.com>
-	<1299598729-27974-4-git-send-email-tom.leiming@gmail.com>
-	<BANLkTi=u8Lv=MR+gW_KmsOJn99Vv2sNkmg@mail.gmail.com>
-	<BANLkTimkrf8-+-JTQy-gWK9t9grj-n0Ftw@mail.gmail.com>
-Message-ID: <1305468960.2848.2.camel@jazzbox>
+From: n.kinar@usask.ca (Nicholas Kinar)
+Date: Sun, 15 May 2011 08:24:36 -0600
+Subject: Kernel oops with undefined instruction when accessing memory on an
+	AT91 custom system
+In-Reply-To: <20110515073326.GG30539@n2100.arm.linux.org.uk>
+References: <4DCEADB5.9010905@usask.ca> <4DCEE989.4000401@atmel.com>
+	<4DCF4CF8.3020209@usask.ca>
+	<20110515073326.GG30539@n2100.arm.linux.org.uk>
+Message-ID: <4DCFE224.4040506@usask.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Adding Avik],
+Russell King - ARM Linux wrote:
+> On Sat, May 14, 2011 at 09:48:08PM -0600, Nicholas Kinar wrote:
+>> 0/  I do not own an Atmel at91sam9rl-ek board (I wish that I did), but I
+>> would hope to obtain one of these in the near future.
+>> 1/  I am building this hardware for a research project, so I've only
+>> created only one PCB.  Eventually, I intend to make many more copies of
+>> this design.
+>> 2/  I've tried the same test with all of the caches disabled, and the
+>> system runs very slowly (and consumes more power).  However, I still
+>> receive a kernel oops when running the mtest program (the SD card was
+>> not mounted and the caches were off):
+> This all looks like either noisy SDRAM signals or power problems for
+> the CPU itself causing corruption.
+>
 
+Thanks for your response, Russell; this is greatly appreciated.  Is 
+there anything that can be done in the kernel code to work around this 
+problem?  I've checked the power supplies to the CPU, and these seem to 
+be stable.  For dealing with noisy SDRAM signals, is there a way to slow 
+down the bus accesses so this problem becomes less apparent?
 
-On Sat, 2011-05-14 at 09:48 +0100, Ming Lei wrote:
-> Hi Rabin,
-> 
-> 2011/5/14 Rabin Vincent <rabin@rab.in>:
-> > What happened to this patch?  It is neither in mainline nor in
-> > linux-next.
-> >
-> 
-> This patch depends on the two with titles:
-> 
->       introduce cross trigger interface helpers
->       pmu: allow platform specific irq enable/disable handling
-> 
-> and the above patches have been submitted to RMK's patch system
-> as 6839/1 and 6840/1, but not been pushed to -next or mainline by rmk,
-> so I can't ask omap guys to merge this one into their tree now.
-
-I don't think that Avik's problem with this patch has been fully
-addressed yet:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/046899.html
-
-So regardless of the state of -next, I think there's still some more
-work to do on this code before it can go upstream.
-
-Will
+Nicholas
