@@ -1,24 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 15 May 2011 22:27:59 +0200
-Subject: [RESEND PATCH 2/4] omap: igep0020: minor refactoring
-In-Reply-To: <20110515185043.GA24785@gentoodev.compulab.local>
-References: <cover.1305235542.git.mike@compulab.co.il>
-	<201105132044.39163.arnd@arndb.de>
-	<20110515185043.GA24785@gentoodev.compulab.local>
-Message-ID: <201105152228.00408.arnd@arndb.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 15 May 2011 22:11:44 +0100
+Subject: [PATCH 1/2] ARM: remove unneeded check of the
+	cache_is_vipt_nonaliasing()
+In-Reply-To: <BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
+References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
+	<BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
+Message-ID: <BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 May 2011, mike at compulab.co.il wrote:
-> We can keep all the data structures that differ between IGEP2 and IGEP3.
-> However, this significantly reduces the benifit of the series.
-> There's already code in the IGEP2 that differentiates between HW
-> revisions, so anyway the board support will require some work for
-> devicetree transition. Eventually, when devicetree will be usable on
-> OMAPs, most of the code currently found in arch/arm/mach-omap2/board*
-> will require some work and I hardly believe that the transition can be
-> automated...
+On 15 May 2011 15:48, saeed bishara <saeed.bishara@gmail.com> wrote:
+> On Thu, May 12, 2011 at 9:33 PM, Saeed Bishara <saeed@marvell.com> wrote:
+>>
+>> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+>> ---
+>> ?arch/arm/mm/flush.c | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+>> index 2b269c9..f1b7998 100644
+>> --- a/arch/arm/mm/flush.c
+>> +++ b/arch/arm/mm/flush.c
+>> @@ -253,8 +253,8 @@ void __sync_icache_dcache(pte_t pteval)
+>>
+>> ? ? ? ?if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+>> ? ? ? ? ? ? ? ?__flush_dcache_page(mapping, page);
+>> - ? ? ? /* pte_exec() already checked above for non-aliasing VIPT cache */
+>> - ? ? ? if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
+>> +
+>> + ? ? ? if (pte_exec(pteval))
+>> ? ? ? ? ? ? ? ?__flush_icache_all();
+>> ?}
+>> ?#endif
+> can you have I a look at this patch?
+> the __sync_icache_dcache() returns if (cache_is_vipt_nonaliasing() &&
+> !pte_exec(pteval)), so later, the if (cache_is_vipt_nonaliasing() ||
+> pte_exec(pteval)) should be equivalent to ?if (pte_exec(pteval))
 
-True. Let's just use the version you posted then.
+Your patch looks fine - when cache_is_vipt_nonaliasing(), we always
+have pte_exec() true at the end of this function, so no need for the
+additional check.
 
-	Arnd
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
