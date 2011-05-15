@@ -1,24 +1,28 @@
-From: n.kinar@usask.ca (Nicholas Kinar)
-Date: Sun, 15 May 2011 09:15:35 -0600
-Subject: Kernel oops with undefined instruction when accessing memory on an
-	AT91 custom system
-In-Reply-To: <4DCFEC76.9050504@vollmann.ch>
-References: <4DCEADB5.9010905@usask.ca> <4DCEF71A.9050405@vollmann.ch>
-	<4DCF4DF5.8020004@usask.ca> <4DCFEC76.9050504@vollmann.ch>
-Message-ID: <4DCFEE17.60508@usask.ca>
+From: marek.vasut.n900@gmail.com (Marek Vasut)
+Date: Sun, 15 May 2011 17:51:25 +0200
+Subject: Zaurus CF tests -- ok
+In-Reply-To: <20110515143141.GA7913@atrey.karlin.mff.cuni.cz>
+References: <20110415211822.GB21111@atrey.karlin.mff.cuni.cz>
+	<20110415213817.GC4420@atrey.karlin.mff.cuni.cz>
+	<20110416074134.GA26440@ucw.cz>
+	<201105151426.50230.marek.vasut@gmail.com>
+	<20110515143141.GA7913@atrey.karlin.mff.cuni.cz>
+Message-ID: <1305474685.17656.2.camel@konomi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Detlef Vollmann wrote:
-> My point was not that you should turn on debugging in a production
-> system, my point was that you should turn on debugging features for
-> debugging the problem.
-> Turning on debugging features will quite probably not introduce new
-> problems -- it will just show you problems much earlier and much
-> nearer to the original cause, so it's much easier to find that original
-> cause.
+> Hi!
+> > Backtrace from QEMU ... I think this is what Cyril observed. But heck,
+> > it?  happens in QEMU too ;-)
+> 
+> Yes, that is pretty much it.
+> 
+> It happens randomly, eg. adding printk() line into kernel code
+> (somewhere in mmc stack). Or sometimes crashes in the pccard
+> initalization when two cards are inserted at the boot time.
 >
 
-Yes, that makes a lot of sense, Detlef; thank you for pointing this out.
-
-Nicholas
+It happens randomly in qemu too.
+ 
+> -- 
+> metan
