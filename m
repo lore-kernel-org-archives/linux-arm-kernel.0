@@ -1,345 +1,170 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 15 May 2011 13:32:45 +0200
-Subject: [PATCHv2 06/15] [orion] Consolidate I2C initialization.
+Date: Sun, 15 May 2011 13:32:51 +0200
+Subject: [PATCHv2 12/15] [orion] Consolidate setup of the crypto engine.
 In-Reply-To: <1305459174-25517-1-git-send-email-andrew@lunn.ch>
 References: <1305459174-25517-1-git-send-email-andrew@lunn.ch>
-Message-ID: <1305459174-25517-7-git-send-email-andrew@lunn.ch>
+Message-ID: <1305459174-25517-13-git-send-email-andrew@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 ---
- arch/arm/mach-dove/common.c               |   33 +-------------
- arch/arm/mach-kirkwood/common.c           |   31 +------------
- arch/arm/mach-mv78xx0/common.c            |   70 +---------------------------
- arch/arm/mach-orion5x/common.c            |   31 +------------
- arch/arm/plat-orion/common.c              |   54 ++++++++++++++++++++++
- arch/arm/plat-orion/include/plat/common.h |    6 +++
- 6 files changed, 67 insertions(+), 158 deletions(-)
+ arch/arm/mach-kirkwood/common.c           |   30 +----------------------
+ arch/arm/mach-orion5x/common.c            |   36 +++++-----------------------
+ arch/arm/plat-orion/common.c              |   31 +++++++++++++++++++++++++
+ arch/arm/plat-orion/include/plat/common.h |    5 ++++
+ 4 files changed, 45 insertions(+), 57 deletions(-)
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index 1d878ce..198760b 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -16,7 +16,6 @@
- #include <linux/serial_8250.h>
- #include <linux/clk.h>
- #include <linux/mbus.h>
--#include <linux/mv643xx_i2c.h>
- #include <linux/ata_platform.h>
- #include <linux/serial_8250.h>
- #include <linux/spi/orion_spi.h>
-@@ -305,39 +304,9 @@ void __init dove_spi1_init(void)
- /*****************************************************************************
-  * I2C
-  ****************************************************************************/
--static struct mv64xxx_i2c_pdata dove_i2c_data = {
--	.freq_m		= 10, /* assumes 166 MHz TCLK gets 94.3kHz */
--	.freq_n		= 3,
--	.timeout	= 1000, /* Default timeout of 1 second */
--};
--
--static struct resource dove_i2c_resources[] = {
--	{
--		.name	= "i2c base",
--		.start	= DOVE_I2C_PHYS_BASE,
--		.end	= DOVE_I2C_PHYS_BASE + 0x20 - 1,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.name	= "i2c irq",
--		.start	= IRQ_DOVE_I2C,
--		.end	= IRQ_DOVE_I2C,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device dove_i2c = {
--	.name		= MV64XXX_I2C_CTLR_NAME,
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(dove_i2c_resources),
--	.resource	= dove_i2c_resources,
--	.dev		= {
--		.platform_data = &dove_i2c_data,
--	},
--};
--
- void __init dove_i2c_init(void)
- {
--	platform_device_register(&dove_i2c);
-+	orion_i2c_init(DOVE_I2C_PHYS_BASE, IRQ_DOVE_I2C, 10);
- }
- 
- /*****************************************************************************
 diff --git a/arch/arm/mach-kirkwood/common.c b/arch/arm/mach-kirkwood/common.c
-index 485f3b9..fc86a80 100644
+index e96ec4e..f3248cf 100644
 --- a/arch/arm/mach-kirkwood/common.c
 +++ b/arch/arm/mach-kirkwood/common.c
-@@ -13,7 +13,6 @@
- #include <linux/platform_device.h>
- #include <linux/serial_8250.h>
- #include <linux/mbus.h>
--#include <linux/mv643xx_i2c.h>
- #include <linux/ata_platform.h>
- #include <linux/mtd/nand.h>
- #include <linux/spi/orion_spi.h>
-@@ -324,37 +323,9 @@ void __init kirkwood_spi_init()
+@@ -270,37 +270,11 @@ void __init kirkwood_uart1_init(void)
  /*****************************************************************************
-  * I2C
-  ****************************************************************************/
--static struct mv64xxx_i2c_pdata kirkwood_i2c_pdata = {
--	.freq_m		= 8, /* assumes 166 MHz TCLK */
--	.freq_n		= 3,
--	.timeout	= 1000, /* Default timeout of 1 second */
--};
--
--static struct resource kirkwood_i2c_resources[] = {
--	{
--		.start	= I2C_PHYS_BASE,
--		.end	= I2C_PHYS_BASE + 0x1f,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_KIRKWOOD_TWSI,
--		.end	= IRQ_KIRKWOOD_TWSI,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device kirkwood_i2c = {
--	.name		= MV64XXX_I2C_CTLR_NAME,
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(kirkwood_i2c_resources),
--	.resource	= kirkwood_i2c_resources,
--	.dev		= {
--		.platform_data	= &kirkwood_i2c_pdata,
--	},
--};
--
- void __init kirkwood_i2c_init(void)
- {
--	platform_device_register(&kirkwood_i2c);
-+	orion_i2c_init(I2C_PHYS_BASE, IRQ_KIRKWOOD_TWSI, 8);
- }
- 
- 
-diff --git a/arch/arm/mach-mv78xx0/common.c b/arch/arm/mach-mv78xx0/common.c
-index 0fd9a83..aa27c15 100644
---- a/arch/arm/mach-mv78xx0/common.c
-+++ b/arch/arm/mach-mv78xx0/common.c
-@@ -13,7 +13,6 @@
- #include <linux/platform_device.h>
- #include <linux/serial_8250.h>
- #include <linux/mbus.h>
--#include <linux/mv643xx_i2c.h>
- #include <linux/ata_platform.h>
- #include <linux/ethtool.h>
- #include <asm/mach/map.h>
-@@ -346,75 +345,12 @@ void __init mv78xx0_ge11_init(struct mv643xx_eth_platform_data *eth_data)
- }
- 
- /*****************************************************************************
-- * I2C bus 0
-+ * I2C
+  * Cryptographic Engines and Security Accelerator (CESA)
   ****************************************************************************/
 -
--static struct mv64xxx_i2c_pdata mv78xx0_i2c_0_pdata = {
--	.freq_m		= 8, /* assumes 166 MHz TCLK */
--	.freq_n		= 3,
--	.timeout	= 1000, /* Default timeout of 1 second */
--};
--
--static struct resource mv78xx0_i2c_0_resources[] = {
+-static struct resource kirkwood_crypto_res[] = {
 -	{
--		.start  = I2C_0_PHYS_BASE,
--		.end    = I2C_0_PHYS_BASE + 0x1f,
+-		.name   = "regs",
+-		.start  = CRYPTO_PHYS_BASE,
+-		.end    = CRYPTO_PHYS_BASE + 0xffff,
 -		.flags  = IORESOURCE_MEM,
 -	}, {
--		.start  = IRQ_MV78XX0_I2C_0,
--		.end    = IRQ_MV78XX0_I2C_0,
+-		.name   = "sram",
+-		.start  = KIRKWOOD_SRAM_PHYS_BASE,
+-		.end    = KIRKWOOD_SRAM_PHYS_BASE + KIRKWOOD_SRAM_SIZE - 1,
+-		.flags  = IORESOURCE_MEM,
+-	}, {
+-		.name   = "crypto interrupt",
+-		.start  = IRQ_KIRKWOOD_CRYPTO,
+-		.end    = IRQ_KIRKWOOD_CRYPTO,
 -		.flags  = IORESOURCE_IRQ,
 -	},
 -};
 -
--
--static struct platform_device mv78xx0_i2c_0 = {
--	.name		= MV64XXX_I2C_CTLR_NAME,
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(mv78xx0_i2c_0_resources),
--	.resource	= mv78xx0_i2c_0_resources,
--	.dev		= {
--		.platform_data	= &mv78xx0_i2c_0_pdata,
--	},
+-static struct platform_device kirkwood_crypto_device = {
+-	.name           = "mv_crypto",
+-	.id             = -1,
+-	.num_resources  = ARRAY_SIZE(kirkwood_crypto_res),
+-	.resource       = kirkwood_crypto_res,
 -};
 -
--/*****************************************************************************
-- * I2C bus 1
-- ****************************************************************************/
--
--static struct mv64xxx_i2c_pdata mv78xx0_i2c_1_pdata = {
--	.freq_m		= 8, /* assumes 166 MHz TCLK */
--	.freq_n		= 3,
--	.timeout	= 1000, /* Default timeout of 1 second */
--};
--
--static struct resource mv78xx0_i2c_1_resources[] = {
--	{
--		.start  = I2C_1_PHYS_BASE,
--		.end    = I2C_1_PHYS_BASE + 0x1f,
--		.flags  = IORESOURCE_MEM,
--	}, {
--		.start  = IRQ_MV78XX0_I2C_1,
--		.end    = IRQ_MV78XX0_I2C_1,
--		.flags  = IORESOURCE_IRQ,
--	},
--};
--
--
--static struct platform_device mv78xx0_i2c_1 = {
--	.name		= MV64XXX_I2C_CTLR_NAME,
--	.id		= 1,
--	.num_resources	= ARRAY_SIZE(mv78xx0_i2c_1_resources),
--	.resource	= mv78xx0_i2c_1_resources,
--	.dev		= {
--		.platform_data	= &mv78xx0_i2c_1_pdata,
--	},
--};
--
- void __init mv78xx0_i2c_init(void)
+ void __init kirkwood_crypto_init(void)
  {
--	platform_device_register(&mv78xx0_i2c_0);
--	platform_device_register(&mv78xx0_i2c_1);
-+	orion_i2c_init(I2C_0_PHYS_BASE, IRQ_MV78XX0_I2C_0, 8);
-+	orion_i2c_1_init(I2C_1_PHYS_BASE, IRQ_MV78XX0_I2C_1, 8);
+ 	kirkwood_clk_ctrl |= CGC_CRYPTO;
+-	platform_device_register(&kirkwood_crypto_device);
++	orion_crypto_init(CRYPTO_PHYS_BASE, KIRKWOOD_SRAM_PHYS_BASE,
++			  KIRKWOOD_SRAM_SIZE, IRQ_KIRKWOOD_CRYPTO);
  }
  
- /*****************************************************************************
+ 
 diff --git a/arch/arm/mach-orion5x/common.c b/arch/arm/mach-orion5x/common.c
-index 0a1c760..9af0b88 100644
+index 8bbf497c..0ab531d 100644
 --- a/arch/arm/mach-orion5x/common.c
 +++ b/arch/arm/mach-orion5x/common.c
-@@ -169,37 +169,10 @@ void __init orion5x_eth_switch_init(struct dsa_platform_data *d, int irq)
- /*****************************************************************************
-  * I2C
-  ****************************************************************************/
--static struct mv64xxx_i2c_pdata orion5x_i2c_pdata = {
--	.freq_m		= 8, /* assumes 166 MHz TCLK */
--	.freq_n		= 3,
--	.timeout	= 1000, /* Default timeout of 1 second */
--};
--
--static struct resource orion5x_i2c_resources[] = {
--	{
--		.start	= I2C_PHYS_BASE,
--		.end	= I2C_PHYS_BASE + 0x1f,
--		.flags	= IORESOURCE_MEM,
--	}, {
--		.start	= IRQ_ORION5X_I2C,
--		.end	= IRQ_ORION5X_I2C,
--		.flags	= IORESOURCE_IRQ,
--	},
--};
--
--static struct platform_device orion5x_i2c = {
--	.name		= MV64XXX_I2C_CTLR_NAME,
--	.id		= 0,
--	.num_resources	= ARRAY_SIZE(orion5x_i2c_resources),
--	.resource	= orion5x_i2c_resources,
--	.dev		= {
--		.platform_data	= &orion5x_i2c_pdata,
--	},
--};
--
- void __init orion5x_i2c_init(void)
- {
--	platform_device_register(&orion5x_i2c);
-+	orion_i2c_init(I2C_PHYS_BASE, IRQ_ORION5X_I2C, 8);
-+
+@@ -164,41 +164,19 @@ void __init orion5x_xor_init(void)
+ 			IRQ_ORION5X_XOR0, IRQ_ORION5X_XOR1);
  }
  
+-static struct resource orion5x_crypto_res[] = {
+-	{
+-		.name   = "regs",
+-		.start  = ORION5X_CRYPTO_PHYS_BASE,
+-		.end    = ORION5X_CRYPTO_PHYS_BASE + 0xffff,
+-		.flags  = IORESOURCE_MEM,
+-	}, {
+-		.name   = "sram",
+-		.start  = ORION5X_SRAM_PHYS_BASE,
+-		.end    = ORION5X_SRAM_PHYS_BASE + SZ_8K - 1,
+-		.flags  = IORESOURCE_MEM,
+-	}, {
+-		.name   = "crypto interrupt",
+-		.start  = IRQ_ORION5X_CESA,
+-		.end    = IRQ_ORION5X_CESA,
+-		.flags  = IORESOURCE_IRQ,
+-	},
+-};
+-
+-static struct platform_device orion5x_crypto_device = {
+-	.name           = "mv_crypto",
+-	.id             = -1,
+-	.num_resources  = ARRAY_SIZE(orion5x_crypto_res),
+-	.resource       = orion5x_crypto_res,
+-};
+-
+-static int __init orion5x_crypto_init(void)
++/*****************************************************************************
++ * Cryptographic Engines and Security Accelerator (CESA)
++ ****************************************************************************/
++static void __init orion5x_crypto_init(void)
+ {
+ 	int ret;
  
+ 	ret = orion5x_setup_sram_win();
+ 	if (ret)
+-		return ret;
++		return;
+ 
+-	return platform_device_register(&orion5x_crypto_device);
++	orion_crypto_init(ORION5X_CRYPTO_PHYS_BASE, ORION5X_SRAM_PHYS_BASE,
++			  SZ_8K, IRQ_ORION5X_CESA);
+ }
+ 
+ /*****************************************************************************
 diff --git a/arch/arm/plat-orion/common.c b/arch/arm/plat-orion/common.c
-index 15c3f35..bcc1734 100644
+index d1cf7c3..9e5451b 100644
 --- a/arch/arm/plat-orion/common.c
 +++ b/arch/arm/plat-orion/common.c
-@@ -15,6 +15,7 @@
- #include <linux/serial_8250.h>
- #include <linux/mbus.h>
- #include <linux/mv643xx_eth.h>
-+#include <linux/mv643xx_i2c.h>
- #include <net/dsa.h>
- 
- /* Fill in the resources structure and link it into the platform
-@@ -463,3 +464,56 @@ void __init orion_ge00_switch_init(struct dsa_platform_data *d, int irq)
- 
- 	platform_device_register(&orion_switch_device);
+@@ -923,4 +923,35 @@ void __init orion_sata_init(struct mv_sata_platform_data *sata_data,
+ 	platform_device_register(&orion_sata);
  }
-+
+ 
 +/*****************************************************************************
-+ * I2C
++ * Cryptographic Engines and Security Accelerator (CESA)
 + ****************************************************************************/
-+static struct mv64xxx_i2c_pdata orion_i2c_pdata = {
-+	.freq_n		= 3,
-+	.timeout	= 1000, /* Default timeout of 1 second */
-+};
-+
-+static struct resource orion_i2c_resources[2];
-+
-+static struct platform_device orion_i2c = {
-+	.name		= MV64XXX_I2C_CTLR_NAME,
-+	.id		= 0,
-+	.dev		= {
-+		.platform_data	= &orion_i2c_pdata,
++static struct resource orion_crypto_resources[] = {
++	{
++		.name   = "regs",
++	}, {
++		.name   = "crypto interrupt",
++	}, {
++		.name   = "sram",
++		.flags  = IORESOURCE_MEM,
 +	},
 +};
-+
-+static struct mv64xxx_i2c_pdata orion_i2c_1_pdata = {
-+	.freq_n		= 3,
-+	.timeout	= 1000, /* Default timeout of 1 second */
+ 
++static struct platform_device orion_crypto = {
++	.name           = "mv_crypto",
++	.id             = -1,
 +};
 +
-+static struct resource orion_i2c_1_resources[2];
-+
-+static struct platform_device orion_i2c_1 = {
-+	.name		= MV64XXX_I2C_CTLR_NAME,
-+	.id		= 1,
-+	.dev		= {
-+		.platform_data	= &orion_i2c_1_pdata,
-+	},
-+};
-+
-+void __init orion_i2c_init(unsigned long mapbase,
-+			   unsigned long irq,
-+			   unsigned long freq_m)
++void __init orion_crypto_init(unsigned long mapbase,
++			      unsigned long srambase,
++			      unsigned long sram_size,
++			      unsigned long irq)
 +{
-+	orion_i2c_pdata.freq_m = freq_m;
-+	fill_resources(&orion_i2c, orion_i2c_resources, mapbase,
-+		       SZ_32 - 1, irq);
-+	platform_device_register(&orion_i2c);
-+}
++	fill_resources(&orion_crypto, orion_crypto_resources,
++		       mapbase, 0xffff, irq);
++	orion_crypto.num_resources = 3;
++	orion_crypto_resources[2].start = srambase;
++	orion_crypto_resources[2].end = srambase + sram_size - 1;
 +
-+void __init orion_i2c_1_init(unsigned long mapbase,
-+			     unsigned long irq,
-+			     unsigned long freq_m)
-+{
-+	orion_i2c_1_pdata.freq_m = freq_m;
-+	fill_resources(&orion_i2c_1, orion_i2c_1_resources, mapbase,
-+		       SZ_32 - 1, irq);
-+	platform_device_register(&orion_i2c_1);
++	platform_device_register(&orion_crypto);
 +}
 diff --git a/arch/arm/plat-orion/include/plat/common.h b/arch/arm/plat-orion/include/plat/common.h
-index 3f23258..d107c62 100644
+index 0ec6b66..a63c357 100644
 --- a/arch/arm/plat-orion/include/plat/common.h
 +++ b/arch/arm/plat-orion/include/plat/common.h
-@@ -66,5 +66,11 @@ void __init orion_ge11_init(struct mv643xx_eth_platform_data *eth_data,
- 
- void __init orion_ge00_switch_init(struct dsa_platform_data *d,
- 				   int irq);
-+void __init orion_i2c_init(unsigned long mapbase,
-+			   unsigned long irq,
-+			   unsigned long freq_m);
- 
-+void __init orion_i2c_1_init(unsigned long mapbase,
-+			     unsigned long irq,
-+			     unsigned long freq_m);
+@@ -109,4 +109,9 @@ void __init orion_sata_init(struct mv_sata_platform_data *sata_data,
+ 			    struct mbus_dram_target_info *mbus_dram_info,
+ 			    unsigned long mapbase,
+ 			    unsigned long irq);
++
++void __init orion_crypto_init(unsigned long mapbase,
++			      unsigned long srambase,
++			      unsigned long sram_size,
++			      unsigned long irq);
  #endif
 -- 
 1.7.4.4
