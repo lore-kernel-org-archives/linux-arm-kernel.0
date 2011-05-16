@@ -1,45 +1,44 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 16 May 2011 12:58:20 +0530
-Subject: [PATCH 2/7] ASoC: Remove to support sound for S5PC100
-In-Reply-To: <002201cc1399$8c39bd20$a4ad3760$%kim@samsung.com>
-References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<1305162674-25860-3-git-send-email-kgene.kim@samsung.com>
-	<BANLkTinqyFCwp3FCOyW=gVhotd1p8DnDyw@mail.gmail.com>
-	<03fa01cc1079$c2583670$4708a350$%kim@samsung.com>
-	<BANLkTimZnzfWuKB+J0z7YT-0ZT_B5_OvBQ@mail.gmail.com>
-	<002201cc1399$8c39bd20$a4ad3760$%kim@samsung.com>
-Message-ID: <BANLkTikhD6XhsjzfwDKkDtqjrZfSgq1y0A@mail.gmail.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Mon, 16 May 2011 10:39:10 +0300
+Subject: [PATCH 1/2] ARM: remove unneeded check of the
+	cache_is_vipt_nonaliasing()
+In-Reply-To: <BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
+References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
+	<BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
+	<BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
+Message-ID: <BANLkTikWJzdYOrk4=gte8zOHDVioGAOhhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 12:49 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
-
->> > I found something for smdkc100 in smdk_wm8580.c but I'm not sure which
->> should be removed in smdk_wm9713.c.
->> >
->>
->> Just the comment about jumper settings on smdkc100
->> otherwise it gives wrong impression that the board is supported.
+>>> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+>>> ---
+>>> ?arch/arm/mm/flush.c | ? ?4 ++--
+>>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+>>> index 2b269c9..f1b7998 100644
+>>> --- a/arch/arm/mm/flush.c
+>>> +++ b/arch/arm/mm/flush.c
+>>> @@ -253,8 +253,8 @@ void __sync_icache_dcache(pte_t pteval)
+>>>
+>>> ? ? ? ?if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+>>> ? ? ? ? ? ? ? ?__flush_dcache_page(mapping, page);
+>>> - ? ? ? /* pte_exec() already checked above for non-aliasing VIPT cache */
+>>> - ? ? ? if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
+>>> +
+>>> + ? ? ? if (pte_exec(pteval))
+>>> ? ? ? ? ? ? ? ?__flush_icache_all();
+>>> ?}
+>>> ?#endif
+>> can you have I a look at this patch?
+>> the __sync_icache_dcache() returns if (cache_is_vipt_nonaliasing() &&
+>> !pte_exec(pteval)), so later, the if (cache_is_vipt_nonaliasing() ||
+>> pte_exec(pteval)) should be equivalent to ?if (pte_exec(pteval))
 >
-> Ok, I agree.
+> Your patch looks fine - when cache_is_vipt_nonaliasing(), we always
+> have pte_exec() true at the end of this function, so no need for the
+> additional check.
 >
-> But I'm not sure what is required for it.
-> Could you please let me know about it after discussion of removing C100?
-
-Simply doing this ....
-
-diff --git a/sound/soc/samsung/smdk_wm9713.c b/sound/soc/samsung/smdk_wm9713.c
-index ae5fed6..04ed8e4 100644
---- a/sound/soc/samsung/smdk_wm9713.c
-+++ b/sound/soc/samsung/smdk_wm9713.c
-@@ -24,7 +24,6 @@ static struct snd_soc_card smdk;
-  * Default CFG switch settings to use this driver:
-  *
-  *   SMDK6410: Set CFG1 1-3 On, CFG2 1-4 Off
-- *   SMDKC100: Set CFG6 1-3 On, CFG7 1   On
-  *   SMDKC110: Set CFGB10 1-2 Off, CFGB12 1-3 On
-  *   SMDKV210: Set CFGB10 1-2 Off, CFGB12 1-3 On
-  *   SMDKV310: Set CFG2 1-2 Off, CFG4 All On, CFG7 All Off, CFG8 1-On
-
-
-Thanks.
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+thanks, can you please merge it to your tree.
+saeed
