@@ -1,97 +1,41 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Mon, 16 May 2011 15:08:21 -0400
-Subject: [PATCH 1/1] davinci: changed SRAM allocator to shared ram.
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024C0082E3@dbde02.ent.ti.com>
-References: <1297434088-27995-1-git-send-email-subhasish@mistralsolutions.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BE49175@dbde02.ent.ti.com>
-	<886E26C48DE446C3937D89ECF86030B2@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024BE49711@dbde02.ent.ti.com>
-	<25DBF349769A4CF7B883D6D7FF01AD70@subhasishg>
-	<B85A65D85D7EB246BE421B3FB0FBB593024C0082E3@dbde02.ent.ti.com>
-Message-ID: <BANLkTimDw3T2CFAw6te-smj2q07F=+_wbA@mail.gmail.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 16 May 2011 21:19:00 +0100
+Subject: [PATCH v2] regulator: mc13892: Fix voltage unit in test case.
+In-Reply-To: <1305554067-20643-1-git-send-email-fabio.estevam@freescale.com>
+References: <1305554067-20643-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1305577140.3156.13.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Subhasish and Sekhar,
-
-Subhashish, I was testing your patch here while investigating
-davinci-pcm ping-pong buffers on da850.
-
-On Fri, Feb 11, 2011 at 9:21 AM, Subhasish Ghosh
-<subhasish@mistralsolutions.com> wrote:
-> This patch modifies the sram allocator to allocate memory
-> from the DA8XX shared RAM.
->
-> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+On Mon, 2011-05-16 at 10:54 -0300, Fabio Estevam wrote:
+> Voltage values should be expressed in microvolts, not in milivolts.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 > ---
-> ?arch/arm/mach-davinci/da850.c ? ? ? ? ? ? ?| ? ?6 +++---
-> ?arch/arm/mach-davinci/include/mach/da8xx.h | ? ?1 +
+> Changes since v1:
+> 
+> - Rebase it on top of Liam's regulator for-next tree.
+>  
+>  drivers/regulator/mc13892-regulator.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/regulator/mc13892-regulator.c b/drivers/regulator/mc13892-regulator.c
+> index 73347c8..6fffe67 100644
+> --- a/drivers/regulator/mc13892-regulator.c
+> +++ b/drivers/regulator/mc13892-regulator.c
+> @@ -453,9 +453,9 @@ static int mc13892_sw_regulator_set_voltage(struct regulator_dev *rdev,
+>  	if (ret)
+>  		goto err;
+>  
+> -	if (value > 1375)
+> +	if (value > 1375000)
+>  		hi = 1;
+> -	else if (value < 1100)
+> +	else if (value < 1100000)
+>  		hi = 0;
+>  	else
+>  		hi = valread & MC13892_SWITCHERS0_SWxHI;
 
-Since this changes only the da850 behaviour, a subject prefix of da850
-might be more appropriate than 'davinci'.
-
-> ?2 files changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 3443d97..8a4de97 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -711,7 +711,7 @@ static struct map_desc da850_io_desc[] = {
-> ? ? ? ?},
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.virtual ? ? ? ?= SRAM_VIRT,
-> - ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(DA8XX_ARM_RAM_BASE),
-> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(DA8XX_SHARED_RAM_BASE),
-> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_8K,
-
-Assigning only 8K to this iomap will result in a fault for the first
-victim to access SRAM_VIRT+0x2000. This will happen for example with
-mcasp ping-pong buffers totalling more than 8K on the da850.
-
-Unfortunately SZ_128K cannot be used here since it will cause a panic
-on boot. SZ_64K works though.
-
-> ? ? ? ? ? ? ? ?.type ? ? ? ? ? = MT_DEVICE
-> ? ? ? ?},
-> @@ -1083,8 +1083,8 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
-> ? ? ? ?.gpio_irq ? ? ? ? ? ? ? = IRQ_DA8XX_GPIO0,
-> ? ? ? ?.serial_dev ? ? ? ? ? ? = &da8xx_serial_device,
-> ? ? ? ?.emac_pdata ? ? ? ? ? ? = &da8xx_emac_pdata,
-> - ? ? ? .sram_dma ? ? ? ? ? ? ? = DA8XX_ARM_RAM_BASE,
-> - ? ? ? .sram_len ? ? ? ? ? ? ? = SZ_8K,
-> + ? ? ? .sram_dma ? ? ? ? ? ? ? = DA8XX_SHARED_RAM_BASE,
-> + ? ? ? .sram_len ? ? ? ? ? ? ? = SZ_128K,
-
-This should probably be set to match whatever is reported in the map
-entry above -- or an ioremap could be issued later but before the sram
-init?
-
-On Wed, Mar 2, 2011 at 12:12 PM, Nori, Sekhar <nsekhar@ti.com> wrote:
-> [...]
->> root at arago:~# rtcwake -d /dev/rtc0 -s 20 -m mem
->> wakeup from "mem" at Tue Apr 21 14:31:13 2009
->> PM: Syncing filesystems ... done.
->> Freezing user space processes ... (elapsed 0.01 seconds) done.
->> Freezing remaining freezable tasks ... (elapsed 0.01 seconds) done.
->> Suspending console(s) (use no_console_suspend to debug)
->>
->> From the Kconfig I had enabled RTC_DRV_OMAP, CONFIG_PM, CONFIG_SUSPEND.
->
-> Nothing stands out from these logs. One thing to
-> verify is if the RTC Alarm interrupt is really
-> working by using the test program present in the
-> Documentation/ folder.
->
-> Anyway, the easiest way for you to move quickly is
-> to use ramdisk so you can bypass all driver specific
-> issues.
-
-I tested suspend here with the patch applied on top of 2.6.39-rc7
-using "rtcwake -d /dev/rtc0 -s 20 -m mem" and it works.
-
-Best Regards,
-Ben Gardiner
-
----
-Nanometrics Inc.
-http://www.nanometrics.ca
+Applied.
