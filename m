@@ -1,49 +1,81 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 16 May 2011 16:44:06 +0200 (CEST)
-Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
-In-Reply-To: <4DD10814.1010103@ti.com>
-References: <1290060899-9786-1-git-send-email-ccross@android.com>
-	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
-	<4D70BE9D.4000507@stericsson.com>
-	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
-	<4D714C17.7080102@gmail.com>
-	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
-	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
-	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
-	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
-	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
-	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
-	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
-	<alpine.LFD.2.02.1105131138460.2831@ionos>
-	<BANLkTimxkY4MvQ+-qiOwdwbo7jPUAQ1vxw@mail.gmail.com>
-	<alpine.LFD.2.02.1105141749510.3078@ionos> <4DD10814.1010103@ti.com>
-Message-ID: <alpine.LFD.2.02.1105161642250.3078@ionos>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 May 2011 15:59:30 +0100
+Subject: [PATCH v5 1/8] MTD: Add integrator-flash feature to physmap
+In-Reply-To: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
+References: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1305557977-16871-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 May 2011, Santosh Shilimkar wrote:
-> On 5/14/2011 9:21 PM, Thomas Gleixner wrote:
-> Just for my understanding, the clockevents_reconfigure() needs to
-> be called with interrupts disabled on that CPU as part of
-> the CPUFREQ notifiers. I assume the right place is do it
-> in POST notifier after the CPU clock and hence TWD clock is
-> updated. Is that right ?
+In the process of moving platforms away from integrator-flash
+(aka armflash), add to physmap the few features that make
+armflash unique:
 
-Yes.
+- optionnal probing for the AFS partition type
+- init() and exit() methods, used by Integrator to control
+  write access to the various onboard programmable components
+
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Cc: David Woodhouse <dwmw2@infradead.org>
+---
+ drivers/mtd/maps/physmap.c  |   16 +++++++++++++++-
+ include/linux/mtd/physmap.h |    2 ++
+ 2 files changed, 17 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mtd/maps/physmap.c b/drivers/mtd/maps/physmap.c
+index 7522df4..49676b7 100644
+--- a/drivers/mtd/maps/physmap.c
++++ b/drivers/mtd/maps/physmap.c
+@@ -67,6 +67,10 @@ static int physmap_flash_remove(struct platform_device *dev)
+ 		if (info->mtd[i] != NULL)
+ 			map_destroy(info->mtd[i]);
+ 	}
++
++	if (physmap_data->exit)
++		physmap_data->exit(dev);
++
+ 	return 0;
+ }
  
-> Since there is need to call this API in interrupt
-> disable context, does it make sense to take care of it
-> inside the API itself instead of relying on caller fn ?
-
-Hmm, no strong opinion
+@@ -77,7 +81,11 @@ static const char *rom_probe_types[] = {
+ 					"map_rom",
+ 					NULL };
+ #ifdef CONFIG_MTD_PARTITIONS
+-static const char *part_probe_types[] = { "cmdlinepart", "RedBoot", NULL };
++static const char *part_probe_types[] = { "cmdlinepart", "RedBoot",
++#ifdef CONFIG_MTD_AFS_PARTS
++					  "afs",
++#endif
++					  NULL };
+ #endif
  
-> The arch's where the per CPU TWD's share clock, per-cpu
-> clock-events should be reconfigured on all CPUs, whenever
-> the parent(CPU) clock has changed using some thing like
-> smp_call_function_any() etc. Is that right understanding?
-
-Yes. If that's a common requirement we should move that to core code.
+ static int physmap_flash_probe(struct platform_device *dev)
+@@ -100,6 +108,12 @@ static int physmap_flash_probe(struct platform_device *dev)
+ 		goto err_out;
+ 	}
  
-Thanks,
-
-	tglx
++	if (physmap_data->init) {
++		err = physmap_data->init(dev);
++		if (err)
++			goto err_out;
++	}
++
+ 	platform_set_drvdata(dev, info);
+ 
+ 	for (i = 0; i < dev->num_resources; i++) {
+diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
+index bcfd9f7..d37cca0 100644
+--- a/include/linux/mtd/physmap.h
++++ b/include/linux/mtd/physmap.h
+@@ -22,6 +22,8 @@ struct map_info;
+ 
+ struct physmap_flash_data {
+ 	unsigned int		width;
++	int			(*init)(struct platform_device *);
++	void			(*exit)(struct platform_device *);
+ 	void			(*set_vpp)(struct map_info *, int);
+ 	unsigned int		nr_parts;
+ 	unsigned int		pfow_base;
+-- 
+1.7.0.4
