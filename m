@@ -1,24 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 10:26:51 +0100
-Subject: [PATCH 1/1] ARM: thumb: Fix thumb mode compilation problems.
-In-Reply-To: <20110513195858.3C00140CD1@eskimo.mtv.corp.google.com>
-References: <20110513195858.3C00140CD1@eskimo.mtv.corp.google.com>
-Message-ID: <20110516092651.GM30539@n2100.arm.linux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 May 2011 10:27:40 +0100
+Subject: [PATCH] ARM: perf: remove erroneous check on active_events
+In-Reply-To: <20110428161242.GE3052@pulham.picochip.com>
+References: <1303898236-14263-1-git-send-email-mark.rutland@arm.com>
+	<20110428154108.GV17290@n2100.arm.linux.org.uk>
+	<20110428161242.GE3052@pulham.picochip.com>
+Message-ID: <000001cc13ab$81236e60$836a4b20$@rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 12:58:58PM -0700, Vadim Bendebury wrote:
-> @@ -99,15 +99,24 @@ void __naked set_fiq_regs(struct pt_regs *regs)
->  	register unsigned long tmp;
->  	asm volatile (
->  	"mov	ip, sp\n\
-> -	stmfd	sp!, {fp, ip, lr, pc}\n\
-> +	sub	sp, sp, #8\n\
-> +	stmfd	sp!, {fp, ip}\n\
-> +	str	lr, [sp, #8]\n\
-> +	str	pc, [sp, #12]\n\
+> Yup, I messed up there.  How about the patch below that eliminates the
+> atomic_t's entirely?  This means that we always lock the mutex in event
+> destruction rather than just for the last one but that seems acceptable
+> to me.
 
-This breaks the ARM mode backtracing.  ARM mode stack frames must be created
-using the three instructions given in the original.
+Whilst this solves the race condition, it still leaves behind some of the
+problems caused by having the counter in the first place:
 
-Do we really have any Thumb-2 capable CPUs using FIQ support?
+- Events which can't actually be armed on the hardware will be initialised,
+  but still take a slot that could otherwise be used.
+
+- Events which can be armed on the hardware may be blocked by the above, or
+  other events which are currently context-switched out (and are essentially
+  independent).
+
+- The maximum number of events we can initialise it that which can be
+  supported by one core. As the number of cores scale upwards, we're going
+to
+  waste the majority of the hardware counters.
+
+By removing the counter, we lazily deny events we cannot allocate in the
+worst
+case. We can still guarantee schedulability of groups if users are sensible
+with them.
+
+By having the counter, we aggressively (possibly erroneously) deny events.
+As
+we cannot check the possibility of arming single events until they hit the
+hardware, this can only be considered a heuristic (and not a great one).
+
+> The MIPS perf events code is based on this so could do with the same 
+> change.
+
+Agreed. Deleting 4 lines is an easy patch to port. I'll post the ARM changes
+to Russell's patch system.
+
+Mark.
