@@ -1,46 +1,32 @@
-From: R00091@freescale.com (Nguyen Dinh-R00091)
-Date: Mon, 16 May 2011 20:56:45 +0000
-Subject: USB issue on Freescale's i.MX35 3-stack board
-In-Reply-To: <Pine.LNX.4.44L0.1105161647420.2013-100000@iolanthe.rowland.org>
-References: <56132A77AB93C141BF06E6B96CA6CFEA23CF08@039-SN1MPN1-004.039d.mgd.msft.net>
-	<Pine.LNX.4.44L0.1105161647420.2013-100000@iolanthe.rowland.org>
-Message-ID: <56132A77AB93C141BF06E6B96CA6CFEA23EDEA@039-SN1MPN1-004.039d.mgd.msft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 May 2011 21:56:44 +0100
+Subject: [PATCH v5 8/8] MTD: physmap: let set_vpp() pass a
+	platform_device instead of a map_info
+In-Reply-To: <BANLkTi=-Lcg5Wk7yuipTTzrSxs0nNmpMaw@mail.gmail.com>
+References: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
+	<1305557977-16871-9-git-send-email-marc.zyngier@arm.com>
+	<BANLkTi=-Lcg5Wk7yuipTTzrSxs0nNmpMaw@mail.gmail.com>
+Message-ID: <20110516205644.GG13659@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alan,
+On Mon, May 16, 2011 at 11:06:10PM +0800, Eric Miao wrote:
+> On Mon, May 16, 2011 at 10:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > The set_vpp() method provided by physmap passes a map_info back to
+> > the platform code, which has little relevance as far as the platform
+> > is concerned (this parameter is completely unused).
+> >
+> > Instead, pass the platform_device, which can be used in the pismo
+> > driver to retrieve some important information in a nicer way, instead
+> > of the hack that was in place.
+> 
+> Not really sure if a 'struct device' would be more generic here, though this
+> case is simply a 'struct platform_device'.
 
->-----Original Message-----
->From: Alan Stern [mailto:stern at rowland.harvard.edu]
->Sent: Monday, May 16, 2011 3:49 PM
->To: Nguyen Dinh-R00091
->Cc: linux-usb at vger.kernel.org; linux-arm-kernel at lists.infradead.org; daniel at caiaq.de;
->grant.likely at secretlab.ca; u.kleine-koenig at pengutronix.de; s.hauer at pengutronix.de; Mahadevan Mahesh-
->R9AADQ
->Subject: Re: USB issue on Freescale's i.MX35 3-stack board
->
->On Mon, 16 May 2011, Nguyen Dinh-R00091 wrote:
->
->> Hi,
->>
->> On the Freescale i.MX35 3DS board, there is a total of 256MB of DDR2 and the configuration is 128MB
->on Chip-select 0 and 128MB on chip-select 1. So physically, the memory is not contiguous, so we boot
->up the system with these mem= parameters(mem=128M at 0x80000000 mem=128M at 0x90000000). The system seems to
->be operating fine and passes stress testing using memtester and oprofile, except for USB.
->>
->> Running a USB copy stress test on USB mass storage between a USB HDD and an SD/MMC card causes the
->system to hang. The hang can occur at any time between 10 minutes to 2 hours. The hang is much harder
->to re-create if logs or delays are introduced.
->
->Your test involves both the USB and MMC subsystems.  How can you tell
->which one is responsible for the hang?
->
->Have you tried testing these subsystems one at a time?
+As it's a platform device driver (at the moment), passing the platform
+device seems logical.
 
-Yes, I've stress tested on USB alone and MMC alone. The issue doesn't seem to appear with a MMC test, but appears when I am moving files between 2 USB HDDs. I apologize for not adding that additional data point on my original email.
-
-Dinh
-
->
->Alan Stern
->
+If it becomes an DT based device driver, then we need some other way of
+describing the set_vpp etc functionality as we can't describe function
+pointers in DT (the same problem goes for a lot of platform device
+drivers.)
