@@ -1,95 +1,35 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 16 May 2011 23:16:10 +0800
-Subject: [PATCH 12/13] clocksource: convert MXS timrotv2 to 32-bit down
-	counting clocksource
-In-Reply-To: <20110516143124.GA24880@S2100-06.ap.freescale.net>
-References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
-	<E1QJhSC-0000z6-H6@rmk-PC.arm.linux.org.uk>
-	<20110516143124.GA24880@S2100-06.ap.freescale.net>
-Message-ID: <20110516151609.GB24880@S2100-06.ap.freescale.net>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 May 2011 16:14:56 +0100
+Subject: [PATCH v5 8/8] MTD: physmap: let set_vpp() pass a
+	platform_device instead of a map_info
+In-Reply-To: <BANLkTi=-Lcg5Wk7yuipTTzrSxs0nNmpMaw@mail.gmail.com>
+References: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
+	<1305557977-16871-9-git-send-email-marc.zyngier@arm.com>
+	<BANLkTi=-Lcg5Wk7yuipTTzrSxs0nNmpMaw@mail.gmail.com>
+Message-ID: <1305558896.30788.15.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 10:31:25PM +0800, Shawn Guo wrote:
-> On Tue, May 10, 2011 at 08:34:00AM +0100, Russell King - ARM Linux wrote:
-> > Convert the MXS timrotv2 32-bit down counting clocksource to the
-> > generic clocksource infrastructure.
-> > 
-> > Cc: Sascha Hauer <kernel@pengutronix.de>
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > ---
-> >  arch/arm/Kconfig          |    1 +
-> >  arch/arm/mach-mxs/timer.c |   20 +++++++-------------
-> >  2 files changed, 8 insertions(+), 13 deletions(-)
-> > 
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index cbc27fb..43f003a 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -376,6 +376,7 @@ config ARCH_MXS
-> >  	select GENERIC_CLOCKEVENTS
-> >  	select ARCH_REQUIRE_GPIOLIB
-> >  	select CLKDEV_LOOKUP
-> > +	select CLKSRC_MMIO
-> >  	help
-> >  	  Support for Freescale MXS-based family of processors
-> >  
-> > diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
-> > index 13647f3..27bebf2 100644
-> > --- a/arch/arm/mach-mxs/timer.c
-> > +++ b/arch/arm/mach-mxs/timer.c
-> > @@ -101,11 +101,6 @@ static cycle_t timrotv1_get_cycles(struct clocksource *cs)
-> >  			& 0xffff0000) >> 16);
-> >  }
-> >  
-> > -static cycle_t timrotv2_get_cycles(struct clocksource *cs)
-> > -{
-> > -	return ~__raw_readl(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1));
-> > -}
-> > -
-> >  static int timrotv1_set_next_event(unsigned long evt,
-> >  					struct clock_event_device *dev)
-> >  {
-> > @@ -230,8 +225,8 @@ static int __init mxs_clockevent_init(struct clk *timer_clk)
-> >  static struct clocksource clocksource_mxs = {
-> >  	.name		= "mxs_timer",
-> >  	.rating		= 200,
-> > -	.read		= timrotv2_get_cycles,
-> > -	.mask		= CLOCKSOURCE_MASK(32),
-> > +	.read		= timrotv1_get_cycles,
-> > +	.mask		= CLOCKSOURCE_MASK(16),
-> >  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-> >  };
-> >  
-> > @@ -239,12 +234,11 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
-> >  {
-> >  	unsigned int c = clk_get_rate(timer_clk);
-> >  
-> > -	if (timrot_is_v1()) {
-> > -		clocksource_mxs.read = timrotv1_get_cycles;
-> > -		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
-> > -	}
-> > -
-> > -	clocksource_register_hz(&clocksource_mxs, c);
-> > +	if (timrot_is_v1())
-> > +		clocksource_register_hz(&clocksource_mxs, c);
-> > +	else
-> > +		clocksource_mmio_init(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1)),
->                                                                                    ^
-> Mismatched parenthesis
+On Mon, 2011-05-16 at 23:06 +0800, Eric Miao wrote:
+> On Mon, May 16, 2011 at 10:59 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > The set_vpp() method provided by physmap passes a map_info back to
+> > the platform code, which has little relevance as far as the platform
+> > is concerned (this parameter is completely unused).
+> >
+> > Instead, pass the platform_device, which can be used in the pismo
+> > driver to retrieve some important information in a nicer way, instead
+> > of the hack that was in place.
 > 
-Other than that,
+> Not really sure if a 'struct device' would be more generic here, though this
+> case is simply a 'struct platform_device'.
 
-Acked-by: Shawn Guo <shawn.guo@freescale.com>
+While I agree that 'struct device' is more generic, physmap only knows
+about platform_devices. Should another device type be added to physmap,
+this would make sense. But at the moment I'd like to limit the code
+churn to what is strictly necessary.
 
-Tested on both i.MX23 and i.MX28.
+Cheers,
 
-> > +			"mxs_timer", c, 200, 32, clocksource_mmio_readl_down);
-> >  
-> >  	return 0;
-> >  }
-> 
-
+	M.
 -- 
-Regards,
-Shawn
+Reality is an implementation detail.
