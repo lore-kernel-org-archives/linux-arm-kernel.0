@@ -1,52 +1,75 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Mon, 16 May 2011 09:28:02 +0800
-Subject: [patch v4 3/3] arm: omap4: support pmu
-In-Reply-To: <1305468960.2848.2.camel@jazzbox>
-References: <1299598729-27974-1-git-send-email-tom.leiming@gmail.com>
-	<1299598729-27974-4-git-send-email-tom.leiming@gmail.com>
-	<BANLkTi=u8Lv=MR+gW_KmsOJn99Vv2sNkmg@mail.gmail.com>
-	<BANLkTimkrf8-+-JTQy-gWK9t9grj-n0Ftw@mail.gmail.com>
-	<1305468960.2848.2.camel@jazzbox>
-Message-ID: <BANLkTi==6gmitMOFuRP2DV7XB6MeippCyA@mail.gmail.com>
+From: viresh.kumar@st.com (Viresh Kumar)
+Date: Mon, 16 May 2011 09:40:10 +0530
+Subject: [PATCH resend] spi/amba-pl022: work in polling or interrupt mode if
+	pl022_dma_probe fails
+Message-ID: <052261410dd8d224fc199518e646abf80bfa7d4c.1305518921.git.viresh.kumar@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+If pl022_dma_probe fails, we can try to transfer data in polling or interrupt
+mode. Also, set platform_info->enable_dma to 0, so that no other code tries to
+use dma.
 
-2011/5/15 Will Deacon <will.deacon@arm.com>:
-> [Adding Avik],
->
->
-> On Sat, 2011-05-14 at 09:48 +0100, Ming Lei wrote:
->> Hi Rabin,
->>
->> 2011/5/14 Rabin Vincent <rabin@rab.in>:
->> > What happened to this patch? ?It is neither in mainline nor in
->> > linux-next.
->> >
->>
->> This patch depends on the two with titles:
->>
->> ? ? ? introduce cross trigger interface helpers
->> ? ? ? pmu: allow platform specific irq enable/disable handling
->>
->> and the above patches have been submitted to RMK's patch system
->> as 6839/1 and 6840/1, but not been pushed to -next or mainline by rmk,
->> so I can't ask omap guys to merge this one into their tree now.
->
-> I don't think that Avik's problem with this patch has been fully
-> addressed yet:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-April/046899.html
->
-> So regardless of the state of -next, I think there's still some more
-> work to do on this code before it can go upstream.
+Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/spi/amba-pl022.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-I remembered that Avik reported his issue on linaro kernel, instead of mainline.
-If Avik can reproduce this issue on mainline plus pandaboard, we can help to
-do it. In fact, this issue is not reproduced at all in mainline on my
-pandaboard.
-
-thanks,
+diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
+index dae886e..77f90de 100644
+--- a/drivers/spi/amba-pl022.c
++++ b/drivers/spi/amba-pl022.c
+@@ -1068,7 +1068,7 @@ static int __init pl022_dma_probe(struct pl022 *pl022)
+ 					    pl022->master_info->dma_filter,
+ 					    pl022->master_info->dma_rx_param);
+ 	if (!pl022->dma_rx_channel) {
+-		dev_err(&pl022->adev->dev, "no RX DMA channel!\n");
++		dev_dbg(&pl022->adev->dev, "no RX DMA channel!\n");
+ 		goto err_no_rxchan;
+ 	}
+ 
+@@ -1076,13 +1076,13 @@ static int __init pl022_dma_probe(struct pl022 *pl022)
+ 					    pl022->master_info->dma_filter,
+ 					    pl022->master_info->dma_tx_param);
+ 	if (!pl022->dma_tx_channel) {
+-		dev_err(&pl022->adev->dev, "no TX DMA channel!\n");
++		dev_dbg(&pl022->adev->dev, "no TX DMA channel!\n");
+ 		goto err_no_txchan;
+ 	}
+ 
+ 	pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
+ 	if (!pl022->dummypage) {
+-		dev_err(&pl022->adev->dev, "no DMA dummypage!\n");
++		dev_dbg(&pl022->adev->dev, "no DMA dummypage!\n");
+ 		goto err_no_dummypage;
+ 	}
+ 
+@@ -1098,6 +1098,8 @@ err_no_txchan:
+ 	dma_release_channel(pl022->dma_rx_channel);
+ 	pl022->dma_rx_channel = NULL;
+ err_no_rxchan:
++	dev_err(&pl022->adev->dev,
++			"Failed to work in dma mode, work without dma!\n");
+ 	return -ENODEV;
+ }
+ 
+@@ -2111,7 +2113,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+ 	if (platform_info->enable_dma) {
+ 		status = pl022_dma_probe(pl022);
+ 		if (status != 0)
+-			goto err_no_dma;
++			platform_info->enable_dma = 0;
+ 	}
+ 
+ 	/* Initialize and start queue */
+@@ -2143,7 +2145,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
+  err_init_queue:
+ 	destroy_queue(pl022);
+ 	pl022_dma_remove(pl022);
+- err_no_dma:
+ 	free_irq(adev->irq[0], pl022);
+  err_no_irq:
+ 	clk_put(pl022->clk);
 -- 
-Ming Lei
+1.7.2.2
