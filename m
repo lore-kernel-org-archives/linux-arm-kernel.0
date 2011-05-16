@@ -1,41 +1,32 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 16 May 2011 21:19:00 +0100
-Subject: [PATCH v2] regulator: mc13892: Fix voltage unit in test case.
-In-Reply-To: <1305554067-20643-1-git-send-email-fabio.estevam@freescale.com>
-References: <1305554067-20643-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <1305577140.3156.13.camel@odin>
+From: mike@compulab.co.il (Mike Rapoport)
+Date: Mon, 16 May 2011 23:22:33 +0300
+Subject: [GIT PULL v2 0/3] TrimSlice updates for 2.6.40
+Message-ID: <cover.1305576864.git.mike@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-16 at 10:54 -0300, Fabio Estevam wrote:
-> Voltage values should be expressed in microvolts, not in milivolts.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Signed-off-by: Ranjani Vaidyanathan <ra5478@freescale.com>
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
-> Changes since v1:
-> 
-> - Rebase it on top of Liam's regulator for-next tree.
->  
->  drivers/regulator/mc13892-regulator.c |    4 ++--
->  1 files changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/regulator/mc13892-regulator.c b/drivers/regulator/mc13892-regulator.c
-> index 73347c8..6fffe67 100644
-> --- a/drivers/regulator/mc13892-regulator.c
-> +++ b/drivers/regulator/mc13892-regulator.c
-> @@ -453,9 +453,9 @@ static int mc13892_sw_regulator_set_voltage(struct regulator_dev *rdev,
->  	if (ret)
->  		goto err;
->  
-> -	if (value > 1375)
-> +	if (value > 1375000)
->  		hi = 1;
-> -	else if (value < 1100)
-> +	else if (value < 1100000)
->  		hi = 0;
->  	else
->  		hi = valread & MC13892_SWITCHERS0_SWxHI;
+Hi Colin,
+Please consider pulling TrimSlice updates for 2.6.40 merge window.
+These patches add registration of i2c, audio and USB devices.
 
-Applied.
+v2 changes:
+- update CDEV1 pinmux as per Stephen suggestion
+- use GPIO table for USB-related GPIOs
+
+The following changes since commit eed631e0d741d1a1067cfc6d709fdf2363126f9c:
+
+  Merge git://git.kernel.org/pub/scm/linux/kernel/git/mason/btrfs-unstable (2011-05-15 10:22:10 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/rppt/linux-tegra.git trimslice/upstream
+
+Mike Rapoport (3):
+      ARM: tegra: trimslice: register i2c busses and devices
+      ARM: tegra: trimslice: add audio devices and clocks
+      ARM: tegra: trimslice: enable USB ports
+
+ arch/arm/mach-tegra/board-trimslice-pinmux.c |    7 ++-
+ arch/arm/mach-tegra/board-trimslice.c        |   91 ++++++++++++++++++++++++++
+ arch/arm/mach-tegra/board-trimslice.h        |    3 +
+ 3 files changed, 99 insertions(+), 2 deletions(-)
