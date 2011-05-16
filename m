@@ -1,42 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 16 May 2011 18:48:38 +0200
-Subject: [PATCH 0/7] ARM: Removing ARCH_S5PC100
-In-Reply-To: <201105131555.42860.anarsoul@gmail.com>
-References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<201105131555.42860.anarsoul@gmail.com>
-Message-ID: <000901cc13e9$1a9a2880$4fce7980$%szyprowski@samsung.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Mon, 16 May 2011 18:52:49 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <1305563026.5456.19.camel@gandalf.stny.rr.com>
+References: <1305289146.2466.8.camel@twins> <20110513122646.GA3924@elte.hu>
+	<1305290370.2466.14.camel@twins> <1305290612.2466.17.camel@twins>
+	<20110513125452.GD3924@elte.hu> <1305292132.2466.26.camel@twins>
+	<20110513131800.GA7883@elte.hu> <1305294935.2466.64.camel@twins>
+	<20110513145737.GC32688@elte.hu>
+	<1305563026.5456.19.camel@gandalf.stny.rr.com>
+Message-ID: <20110516165249.GB10929@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On Friday, May 13, 2011 2:56 PM Vasily Khoruzhick wrote:
+* Steven Rostedt <rostedt@goodmis.org> wrote:
 
-> On Thursday 12 May 2011 04:11:07 Kukjin Kim wrote:
-> > This patch remvoes mach-s5pc100 directory for ARCH_S5PC100 in arch/arm.
+> I'm a bit nervous about the 'active' role of (trace_)events, because of the 
+> way multiple callbacks can be registered. How would:
 > 
-> Hm, what's the point of removing this code?
+> 	err = event_x();
+> 	if (err == -EACCESS) {
+> 
+> be handled? [...]
 
-May I also ask the same? What's the point in removing WORKING support for
-the whole SoC series? There are some S5PC100 based boards available on the
-market and they are still being used for embedded Linux development.
+The default behavior would be something obvious: to trigger all callbacks and 
+use the first non-zero return value.
 
-The issues with ARM kernel tree is not about the number of supported
-SoCs/sub-platform but the fact that a lots of code is somehow duplicated
-between different arm sub-architecture. The goal is to identify such code
-and unify it. There have been a lot of discussion about this on Linaro
-Meeting in Budapest. For more information please take a look at etherpad
-notes available here:
+> [...] Would we need a way to prioritize which call back gets the return 
+> value? One way I guess would be to add a check_event option, where you pass 
+> in an ENUM of the event you want:
+> 
+> 	event_x();
+> 	err = check_event_x(MYEVENT);
+> 
+> If something registered itself as "MYEVENT" to event_x, then you get the 
+> return code of MYEVENT. If the MYEVENT was not registered, a -ENODEV or 
+> something could be returned. I'm sure we could even optimize it such a way if 
+> no active events have been registered to event_x, that check_event_x() will 
+> return -ENODEV without any branches.
 
-http://summit.ubuntu.com/uds-o/track/linaro-kernel/
+I would keep it simple and extensible - that way we can complicate it when the 
+need arises! :)
 
-(etherpad links for each session are available via 'notepad' image near
-the session title).
+Thanks,
 
-I recommend to read all the notes from all five 'Arm Linus Interface'
-sessions. 
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+	Ingo
