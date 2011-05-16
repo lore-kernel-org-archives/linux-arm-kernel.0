@@ -1,26 +1,37 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 16 May 2011 16:56:59 +0530
-Subject: [PATCH resend] spi/amba-pl022: work in polling or interrupt	mode
-	if pl022_dma_probe fails
-In-Reply-To: <20110516110438.GP30539@n2100.arm.linux.org.uk>
-References: <052261410dd8d224fc199518e646abf80bfa7d4c.1305518921.git.viresh.kumar@st.com>
-	<20110516110438.GP30539@n2100.arm.linux.org.uk>
-Message-ID: <4DD10A03.2090204@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 May 2011 04:43:19 -0700
+Subject: [GIT PULL] Two omap fixes for v2.6.39-rc7
+Message-ID: <20110516114318.GB1780@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2011 04:34 PM, Russell King - ARM Linux wrote:
-> On Mon, May 16, 2011 at 09:40:10AM +0530, Viresh Kumar wrote:
->> > If pl022_dma_probe fails, we can try to transfer data in polling or interrupt
->> > mode. Also, set platform_info->enable_dma to 0, so that no other code tries to
->> > use dma.
->> > 
->> > Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
->> > Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Shouldn't this go via the SPI people rather than my tree?
+Hi Linus,
 
-This can, but i have seen amba drivers patches going through your
-drivers branch, so sent to tracker. Should i get them through spi-devel??
+Please pull two omap fixes from:
 
--- 
-viresh
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+This contains one iommu regression fix and one clock fix.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 693d92a1bbc9e42681c42ed190bd42b636ca876f:
+  Linus Torvalds (1):
+        Linux 2.6.39-rc7
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-fixes-for-linus
+
+Avinash H.M (1):
+      OMAP3: set the core dpll clk rate in its set_rate function
+
+Laurent Pinchart (1):
+      omap: iommu: Return IRQ_HANDLED in fault handler when no fault occured
+
+ arch/arm/mach-omap2/clkt34xx_dpll3m2.c |    1 +
+ arch/arm/plat-omap/iommu.c             |    2 ++
+ 2 files changed, 3 insertions(+), 0 deletions(-)
