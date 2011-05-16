@@ -1,62 +1,54 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Mon, 16 May 2011 13:00:37 +0300
-Subject: [PATCH 1/2] ARM: remove unneeded check of the
-	cache_is_vipt_nonaliasing()
-In-Reply-To: <BANLkTimFst-+LEuN9cDpAtRiF4aDOipAKA@mail.gmail.com>
-References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
-	<BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
-	<BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
-	<BANLkTikWJzdYOrk4=gte8zOHDVioGAOhhg@mail.gmail.com>
-	<BANLkTimFst-+LEuN9cDpAtRiF4aDOipAKA@mail.gmail.com>
-Message-ID: <BANLkTi=cf47Axm1rXEa-gX7oK0h2aGq0nA@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 16 May 2011 11:38:35 +0100
+Subject: [PATCH 0/1] ARM: thumb: Fix thumb mode compilation problems.
+In-Reply-To: <20110513195845.2FFE540CD1@eskimo.mtv.corp.google.com>
+References: <20110513195845.2FFE540CD1@eskimo.mtv.corp.google.com>
+Message-ID: <20110516103835.GA6955@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 11:38 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On 16 May 2011 08:39, saeed bishara <saeed.bishara@gmail.com> wrote:
->>>>> Signed-off-by: Saeed Bishara <saeed@marvell.com>
->>>>> ---
->>>>> ?arch/arm/mm/flush.c | ? ?4 ++--
->>>>> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
->>>>> index 2b269c9..f1b7998 100644
->>>>> --- a/arch/arm/mm/flush.c
->>>>> +++ b/arch/arm/mm/flush.c
->>>>> @@ -253,8 +253,8 @@ void __sync_icache_dcache(pte_t pteval)
->>>>>
->>>>> ? ? ? ?if (!test_and_set_bit(PG_dcache_clean, &page->flags))
->>>>> ? ? ? ? ? ? ? ?__flush_dcache_page(mapping, page);
->>>>> - ? ? ? /* pte_exec() already checked above for non-aliasing VIPT cache */
->>>>> - ? ? ? if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
->>>>> +
->>>>> + ? ? ? if (pte_exec(pteval))
->>>>> ? ? ? ? ? ? ? ?__flush_icache_all();
->>>>> ?}
->>>>> ?#endif
->>>> can you have I a look at this patch?
->>>> the __sync_icache_dcache() returns if (cache_is_vipt_nonaliasing() &&
->>>> !pte_exec(pteval)), so later, the if (cache_is_vipt_nonaliasing() ||
->>>> pte_exec(pteval)) should be equivalent to ?if (pte_exec(pteval))
->>>
->>> Your patch looks fine - when cache_is_vipt_nonaliasing(), we always
->>> have pte_exec() true at the end of this function, so no need for the
->>> additional check.
->>>
->>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>
->> thanks, can you please merge it to your tree.
->
-> I could but it may be better for you to just upload it to Russell's
-> patch system (I'm not planning to send any pull requests to Russell,
-> apart from LPAE).
-ok.
-BTW, there is something concerns me about ARM11MP core, this system
-doesn't support cache maintenance broadcasting, but when looking at
-do_cache_op(), it doesn't seem to flush the cache of other cpus, so if
-we have a multithreaded applications like java that uses self
-modifying code, how can you make sure that all cpus will have their I
-cache flushed when one cpu requests to do do_cache_op?
+On Fri, May 13, 2011 at 12:58:45PM -0700, Vadim Bendebury wrote:
+> 
+> This patch won't necessarily apply as it has not been verified on
+> a real hardware, so this is more of an RFC.
+> 
+> Vadim Bendebury (1):
+>   ARM: thumb: Fix thumb mode compilation problems.
+> 
+>  arch/arm/kernel/fiq.c         |   34 ++++++++++++++++++++++++++--------
+>  arch/arm/mach-tegra/headsmp.S |    3 ++-
+>  2 files changed, 28 insertions(+), 9 deletions(-)
+> 
+> -- 
+> 1.7.3.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
-saeed
+A different patch for this has already been discussed:
+
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/112864
+
+It's a bit stalled on my side because I don't have a suitable platform
+to test it on.  As some have suggested, in my case (imx51) the inclusion
+of code was inherited from from an older subarch tree and is no longer
+appropriate -- so my problem is actually solved just by not building
+this code.
+
+If the code is really used in your kernel (not just built) it would
+be really useful if you could test this patch.
+
+However you should definitely check whether the code is really used at
+all on tegra.
+
+There's a fair chance that it's not used: FIQ is not much used by linux
+on armv7 and above: unless you make use of cache+TLB lockdown / SRAM etc.,
+FIQ is unlikely to be significantly faster than IRQ on recent CPUs.  FIQ
+may also get reserved for use by TrustZone on some platforms, complicating
+the picture further. 
+
+Cheers
+---Dave
