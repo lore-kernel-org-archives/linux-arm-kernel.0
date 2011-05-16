@@ -1,32 +1,40 @@
-From: mike@compulab.co.il (Mike Rapoport)
-Date: Mon, 16 May 2011 23:22:33 +0300
-Subject: [GIT PULL v2 0/3] TrimSlice updates for 2.6.40
-Message-ID: <cover.1305576864.git.mike@compulab.co.il>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 16 May 2011 16:31:49 -0400 (EDT)
+Subject: [PATCHv2 00/15] Consolidate Orion platform information setup.
+In-Reply-To: <1305459174-25517-1-git-send-email-andrew@lunn.ch>
+References: <1305459174-25517-1-git-send-email-andrew@lunn.ch>
+Message-ID: <alpine.LFD.2.00.1105161608340.14430@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
-Please consider pulling TrimSlice updates for 2.6.40 merge window.
-These patches add registration of i2c, audio and USB devices.
+On Sun, 15 May 2011, Andrew Lunn wrote:
 
-v2 changes:
-- update CDEV1 pinmux as per Stephen suggestion
-- use GPIO table for USB-related GPIOs
+> This patchset consolidates some of the code used for creating
+> platform data for various orion based SoC, namely Dove, Loki, Kirkwood,
+> mv78xx0 and Orion5x. Where possible, this code has been put into the
+> orion platform, with the mach-*/common.c calling the common platform
+> code.
+> 
+> Additionally the setup of the multi purpose pins has been consolidated.
+> Kirkwood and mv78xx0 had identical code, which has been generalized and
+> put into the platform. Orion5x and Dove mpp code has been re-written to 
+> use the consolidated method.
+> 
+> Tested on a Kirkwood device, otherwise compile tested.
+> 
+> Changes since last version:
+> 
+>  - Typos found by Saeed Bishara fixed
+>  - All ethernets reserve the same size
+>  - Add Kirkwood RTC interrupt as a seperate patch
+>  - Rather than drop the dove mpp code, refactor to use the platform code.
 
-The following changes since commit eed631e0d741d1a1067cfc6d709fdf2363126f9c:
+This looks great. Thanks for this work. That will certainly make any 
+transition to device tree much simpler.
 
-  Merge git://git.kernel.org/pub/scm/linux/kernel/git/mason/btrfs-unstable (2011-05-15 10:22:10 -0700)
+Some further consolidation could be achieved by dynamically allocating 
+the platform device structures as needed and having a single function 
+for each class of devices.  But that can be done in a subsequent series.
 
-are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/rppt/linux-tegra.git trimslice/upstream
-
-Mike Rapoport (3):
-      ARM: tegra: trimslice: register i2c busses and devices
-      ARM: tegra: trimslice: add audio devices and clocks
-      ARM: tegra: trimslice: enable USB ports
-
- arch/arm/mach-tegra/board-trimslice-pinmux.c |    7 ++-
- arch/arm/mach-tegra/board-trimslice.c        |   91 ++++++++++++++++++++++++++
- arch/arm/mach-tegra/board-trimslice.h        |    3 +
- 3 files changed, 99 insertions(+), 2 deletions(-)
+Nicolas
