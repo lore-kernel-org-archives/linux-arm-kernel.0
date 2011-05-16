@@ -1,90 +1,88 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Tue, 17 May 2011 01:03:22 +0400
-Subject: [PATCH v2 0/3] ASoC: add support for audio on iPaq hx4700
-Message-ID: <1305579805-15617-1-git-send-email-mad_soft@inbox.ru>
+Date: Tue, 17 May 2011 01:03:25 +0400
+Subject: [PATCH v2 3/3] pxa/hx4700: add I2C board info for AK4641 codec
+In-Reply-To: <1305579805-15617-1-git-send-email-mad_soft@inbox.ru>
+References: <1305579805-15617-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1305579805-15617-4-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, here's patches adding audio support for good ole iPAQ hx4700: ak4641
-codec, hx4700 machine sound driver and some glue platform code.
-It took quite longer to make v2 than I expected, but it's finally here.
-Sorry for such late submission in this release cycle, but if it's not ready
-yet, no big deal - it certainly can wait for 2.6.41.
+From: Philipp Zabel <philipp.zabel@gmail.com>
 
-v1 of these patches can be found here:
-http://lkml.org/lkml/2010/11/20/50
+From: Philipp Zabel <philipp.zabel@gmail.com>
 
-Current patchset is based on next-20110513 (it also can be applied to
-2.6.39-rc7 after slight adjustment of Kconfig/Makefile chunks)
+Also rename AK4641 power GPIOs to document the codec chip.
 
-Latest version of these patches were only slightly tested on top of 2.6.39-rc7
-(-next is tested compile-only, as it doesn't boot due to some unrelated bugs),
-but all basic operations like playback, recording, EQ, Speaker, Mic Sidetone
-seem to work.
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+---
+ arch/arm/mach-pxa/hx4700.c              |   18 ++++++++++++++++++
+ arch/arm/mach-pxa/include/mach/hx4700.h |    4 ++--
+ 2 files changed, 20 insertions(+), 2 deletions(-)
 
-Changes from v1:
-
-AK4641 codec:
-
-* '-codec' is removed from 'ak4641-codec' platform device name
-* SNDRV_PCM_RATE_8000_48000 macro now used instead of explicit freqs listing
-* Unneeded ifdef's on CONFIG_I2C are removed
-* Missing "Volume" added to names of volume controls, ditto for switches
-* TLV information is added to various volume controls
-* Enum control doesn't use indexed array of strings anymore
-* Enum controls like 'Mic Boost +20dB/0dB' are turned into volume controls
-* Deemphasis control is converted from enum to switch with automatic
-  detection of optimal deemphasis value depending on current playback frequency
-* Check for wrong fs value is added to hw_params for HiFi DAI
-  (that actually uncovered bug in hx4700 machine driver - it never set
-  sysclk for the codec. Sound worked properly this way due to strange
-  coincidence: both default fs in codec driver and divider in PXA i2s hardware
-  were equal 256)
-* empty hw_params() function for Voice DAI is removed. Looks like that
-  samplerate of Voice ADC/DAC can't be controlled by software at all, only
-  format of samples. This Voice DAC/ADC are designed to be connected to
-  Bluetooth chip, so I suspect codec gets sampling frequency directly
-  from it.
-* Names of mic sidetone controls are adjusted
-* 'Left/Right Out Enable' DAPM controls are turned into ordinary ones
-* Mute code readability is slightly improved (based on Axel Lin's patch
-  for ak4535 - commit cca67a3668)
-* My copyright is added to file, so people won't blame Harald for all the
-  bugs I added during multicomponent conversion and other cleanup :)
-* Power/reset GPIOs are now handled in set_bias_level(), so codec is
-  powered only when needed.
-
-HX4700 sound:
-
-* Setting of codec's sysclk is added to hw_params()
-
-HX4700 platform:
-
-* No changes
-
-
-Dmitry Artamonow (2):
-  ASoC: Asahi Kasei AK4641 codec driver
-  ASoC: add iPAQ hx4700 machine driver
-
-Philipp Zabel (1):
-  pxa/hx4700: add I2C board info for AK4641 codec
-
- arch/arm/mach-pxa/hx4700.c              |   18 +
- arch/arm/mach-pxa/include/mach/hx4700.h |    4 +-
- include/sound/ak4641.h                  |   26 ++
- sound/soc/codecs/Kconfig                |    4 +
- sound/soc/codecs/Makefile               |    2 +
- sound/soc/codecs/ak4641.c               |  687 +++++++++++++++++++++++++++++++
- sound/soc/codecs/ak4641.h               |   47 +++
- sound/soc/pxa/Kconfig                   |    9 +
- sound/soc/pxa/Makefile                  |    2 +
- sound/soc/pxa/hx4700.c                  |  260 ++++++++++++
- 10 files changed, 1057 insertions(+), 2 deletions(-)
- create mode 100644 include/sound/ak4641.h
- create mode 100644 sound/soc/codecs/ak4641.c
- create mode 100644 sound/soc/codecs/ak4641.h
- create mode 100644 sound/soc/pxa/hx4700.c
-
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index 9cdcca5..71c9e80 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -45,6 +45,7 @@
+ #include <mach/hx4700.h>
+ #include <mach/irda.h>
+ 
++#include <sound/ak4641.h>
+ #include <video/platform_lcd.h>
+ #include <video/w100fb.h>
+ 
+@@ -801,6 +802,22 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
+ };
+ 
+ /*
++ * Asahi Kasei AK4641 on I2C
++ */
++
++static struct ak4641_platform_data ak4641_info = {
++	.gpio_power = GPIO27_HX4700_AK4641_POWER,
++	.gpio_npdn  = GPIO109_HX4700_AK4641_nPDN,
++};
++
++static struct i2c_board_info i2c_board_info[] __initdata = {
++	{
++		I2C_BOARD_INFO("ak4641", 0x12),
++		.platform_data = &ak4641_info,
++	},
++};
++
++/*
+  * PCMCIA
+  */
+ 
+@@ -859,6 +876,7 @@ static void __init hx4700_init(void)
+ 	pxa_set_ficp_info(&ficp_info);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_i2c_info(NULL);
++	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
+ 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
+ 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
+ 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
+diff --git a/arch/arm/mach-pxa/include/mach/hx4700.h b/arch/arm/mach-pxa/include/mach/hx4700.h
+index 3740844..73cd586 100644
+--- a/arch/arm/mach-pxa/include/mach/hx4700.h
++++ b/arch/arm/mach-pxa/include/mach/hx4700.h
+@@ -29,7 +29,7 @@
+ #define GPIO14_HX4700_nWLAN_IRQ			14
+ #define GPIO18_HX4700_RDY			18
+ #define GPIO22_HX4700_LCD_RL			22
+-#define GPIO27_HX4700_CODEC_ON			27
++#define GPIO27_HX4700_AK4641_POWER		27
+ #define GPIO32_HX4700_RS232_ON			32
+ #define GPIO52_HX4700_CPU_nBATT_FAULT		52
+ #define GPIO58_HX4700_TSC2046_nPENIRQ		58
+@@ -67,7 +67,7 @@
+ #define GPIO105_HX4700_nIR_ON			105
+ #define GPIO106_HX4700_CPU_BT_nRESET		106
+ #define GPIO107_HX4700_SPK_nSD			107
+-#define GPIO109_HX4700_CODEC_nPDN		109
++#define GPIO109_HX4700_AK4641_nPDN		109
+ #define GPIO110_HX4700_LCD_LVDD_3V3_ON		110
+ #define GPIO111_HX4700_LCD_AVDD_3V3_ON		111
+ #define GPIO112_HX4700_LCD_N2V7_7V3_ON		112
 -- 
 1.7.4.rc1
