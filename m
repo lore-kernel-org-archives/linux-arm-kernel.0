@@ -1,91 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 18:29:55 +0100
-Subject: [PATCH 13/19] clocksource: convert OMAP1 to 32-bit down counting
-	clocksource
-In-Reply-To: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-Message-ID: <E1QM1cB-0003E5-Qm@rmk-PC.arm.linux.org.uk>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Mon, 16 May 2011 20:10:55 +0200
+Subject: [PATCH 1/4] ARM: tegra: paz00: whitespace cleanup
+In-Reply-To: <1305569458-4821-1-git-send-email-marvin24@gmx.de>
+References: <1305569458-4821-1-git-send-email-marvin24@gmx.de>
+Message-ID: <1305569458-4821-2-git-send-email-marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP1 32-bit down counting clocksource to the generic
-clocksource infrastructure.
 
-Tested-by: Tony Lindgren <tony@atomide.com>
-Cc: linux-omap at vger.kernel.org
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Marc Dietrich <marvin24@gmx.de>
 ---
- arch/arm/mach-omap1/time.c |   23 ++++++-----------------
- arch/arm/plat-omap/Kconfig |    1 +
- 2 files changed, 7 insertions(+), 17 deletions(-)
+ arch/arm/mach-tegra/board-paz00-pinmux.c |   12 ++++++------
+ arch/arm/mach-tegra/board-paz00.h        |   12 ++++++------
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/time.c b/arch/arm/mach-omap1/time.c
-index e7ab616..03e1e10 100644
---- a/arch/arm/mach-omap1/time.c
-+++ b/arch/arm/mach-omap1/time.c
-@@ -190,24 +190,11 @@ static __init void omap_init_mpu_timer(unsigned long rate)
-  * ---------------------------------------------------------------------------
-  */
+diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
+index 2643d1b..d2faa50 100644
+--- a/arch/arm/mach-tegra/board-paz00-pinmux.c
++++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
+@@ -141,12 +141,12 @@ static struct tegra_pingroup_config paz00_pinmux[] = {
+ };
  
--static cycle_t mpu_read(struct clocksource *cs)
--{
--	return ~omap_mpu_timer_read(1);
--}
--
--static struct clocksource clocksource_mpu = {
--	.name		= "mpu_timer2",
--	.rating		= 300,
--	.read		= mpu_read,
--	.mask		= CLOCKSOURCE_MASK(32),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
- static DEFINE_CLOCK_DATA(cd);
+ static struct tegra_gpio_table gpio_table[] = {
+-	{ .gpio = TEGRA_GPIO_SD1_CD,	.enable = true	},
+-	{ .gpio = TEGRA_GPIO_SD1_WP,	.enable = true	},
+-	{ .gpio = TEGRA_GPIO_SD1_POWER,	.enable = true	},
+-	{ .gpio = TEGRA_GPIO_SD4_CD,	.enable = true	},
+-	{ .gpio = TEGRA_GPIO_SD4_WP,	.enable = true	},
+-	{ .gpio = TEGRA_GPIO_SD4_POWER,	.enable = true	},
++	{ .gpio = TEGRA_GPIO_SD1_CD,	.enable = true },
++	{ .gpio = TEGRA_GPIO_SD1_WP,	.enable = true },
++	{ .gpio = TEGRA_GPIO_SD1_POWER,	.enable = true },
++	{ .gpio = TEGRA_GPIO_SD4_CD,	.enable = true },
++	{ .gpio = TEGRA_GPIO_SD4_WP,	.enable = true },
++	{ .gpio = TEGRA_GPIO_SD4_POWER,	.enable = true },
+ };
  
- static inline unsigned long long notrace _omap_mpu_sched_clock(void)
- {
--	u32 cyc = mpu_read(&clocksource_mpu);
-+	u32 cyc = ~omap_mpu_timer_read(1);
- 	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
- }
+ void paz00_pinmux_init(void)
+diff --git a/arch/arm/mach-tegra/board-paz00.h b/arch/arm/mach-tegra/board-paz00.h
+index da193ca7..221ce9c 100644
+--- a/arch/arm/mach-tegra/board-paz00.h
++++ b/arch/arm/mach-tegra/board-paz00.h
+@@ -17,12 +17,12 @@
+ #ifndef _MACH_TEGRA_BOARD_PAZ00_H
+ #define _MACH_TEGRA_BOARD_PAZ00_H
  
-@@ -225,20 +212,22 @@ static unsigned long long notrace omap_mpu_sched_clock(void)
+-#define TEGRA_GPIO_SD1_CD               TEGRA_GPIO_PV5
+-#define TEGRA_GPIO_SD1_WP               TEGRA_GPIO_PH1
+-#define TEGRA_GPIO_SD1_POWER            TEGRA_GPIO_PT3
+-#define TEGRA_GPIO_SD4_CD               TEGRA_GPIO_PH2
+-#define TEGRA_GPIO_SD4_WP               TEGRA_GPIO_PH3
+-#define TEGRA_GPIO_SD4_POWER            TEGRA_GPIO_PI6
++#define TEGRA_GPIO_SD1_CD		TEGRA_GPIO_PV5
++#define TEGRA_GPIO_SD1_WP		TEGRA_GPIO_PH1
++#define TEGRA_GPIO_SD1_POWER		TEGRA_GPIO_PT3
++#define TEGRA_GPIO_SD4_CD		TEGRA_GPIO_PH2
++#define TEGRA_GPIO_SD4_WP		TEGRA_GPIO_PH3
++#define TEGRA_GPIO_SD4_POWER		TEGRA_GPIO_PI6
  
- static void notrace mpu_update_sched_clock(void)
- {
--	u32 cyc = mpu_read(&clocksource_mpu);
-+	u32 cyc = ~omap_mpu_timer_read(1);
- 	update_sched_clock(&cd, cyc, (u32)~0);
- }
- 
- static void __init omap_init_clocksource(unsigned long rate)
- {
-+	omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(1);
- 	static char err[] __initdata = KERN_ERR
- 			"%s: can't register clocksource!\n";
- 
- 	omap_mpu_timer_start(1, ~0, 1);
- 	init_sched_clock(&cd, mpu_update_sched_clock, 32, rate);
- 
--	if (clocksource_register_hz(&clocksource_mpu, rate))
--		printk(err, clocksource_mpu.name);
-+	if (clocksource_mmio_init(&timer->read_tim, "mpu_timer2", rate,
-+			300, 32, clocksource_mmio_readl_down))
-+		printk(err, "mpu_timer2");
- }
- 
- static void __init omap_mpu_timer_init(void)
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index cd5f993..e9c0efc 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -12,6 +12,7 @@ choice
- config ARCH_OMAP1
- 	bool "TI OMAP1"
- 	select CLKDEV_LOOKUP
-+	select CLKSRC_MMIO
- 	help
- 	  "Systems based on omap7xx, omap15xx or omap16xx"
+ void paz00_pinmux_init(void);
  
 -- 
-1.7.4.4
+1.7.4.2
