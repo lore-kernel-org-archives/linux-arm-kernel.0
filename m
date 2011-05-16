@@ -1,82 +1,55 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 16 May 2011 13:56:37 +0900
-Subject: [PATCH] ARM: S5PV210: Fix possible null pointer dereference.
-In-Reply-To: <4DCD197A.9020900@ru.mvista.com>
-References: <1305270186-7722-1-git-send-email-kgene.kim@samsung.com>
-	<4DCD197A.9020900@ru.mvista.com>
-Message-ID: <000c01cc1385$a60782f0$f21688d0$%kim@samsung.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Mon, 16 May 2011 11:36:28 +0530
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <201105151133.23870.arnd@arndb.de>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105142233.53659.arnd@arndb.de>
+	<20110514221445.GB21792@opensource.wolfsonmicro.com>
+	<201105151133.23870.arnd@arndb.de>
+Message-ID: <B876E8072D52496DB747D5CCCF64826D@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sergei Shtylyov wrote:
-> 
-> Hello.
-> 
-Hi ;)
+Hi!,
 
-> On 13-05-2011 11:03, Kukjin Kim wrote:
-> 
-> > From: Jonghwan Choi<jhbird.choi@samsung.com>
-> 
-> > Signed-off-by: Jonghwan Choi<jhbird.choi@samsung.com>
-> > Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> > ---
-> >   arch/arm/mach-s5pv210/cpufreq.c |    4 +++-
-> >   1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> > diff --git a/arch/arm/mach-s5pv210/cpufreq.c b/arch/arm/mach-
-> s5pv210/cpufreq.c
-> > index 22046e2..58340ee 100644
-> > --- a/arch/arm/mach-s5pv210/cpufreq.c
-> > +++ b/arch/arm/mach-s5pv210/cpufreq.c
-> > @@ -105,8 +105,10 @@ static void s5pv210_set_refresh(enum
-> s5pv210_dmc_port ch, unsigned long freq)
-> >   		reg = (S5P_VA_DMC0 + 0x30);
-> >   	else if (ch == DMC1)
-> >   		reg = (S5P_VA_DMC1 + 0x30);
-> > -	else
-> > +	else {
-> >   		printk(KERN_ERR "Cannot find DMC port\n");
-> > +		return;
-> > +	}
-> 
->     According to CodingStyle, other branches should now have {} too.
-> 
-Yes, you're right.
+>> > My whole point has been that you register them from the main pruss 
+>> > driver
+>> > based on run-time data instead of compile-time pre-configured stuff in 
+>> > the
+>> > board file.
+>>
+>> I'm not so sure - if the usage is fixed as a result of the pins on the
+>> device being wired a CAN bus then it seems reasonable to tell the system
+>> about that so it'll stop the user trying to run SPI or something against
+>> it at runtime.
+>
+> I'm mostly worried about the case where the pins are not hardwired for
+> some specific function -- Subhasish was mentioning that these may be
+> implemented using a pluggable extension board and I want to make sure
+> that you are not required to recompile the kernel when changing the
+> extension board.
+>
+> However, you made a good point that in many cases it will be hardwired
+> so it may be valuable to preconfigure this in a way that does not require
+> scripts to set up variables in sysfs when you already know what is there.
+>
+> Note that my suggestion to put the device name into the firmware file
+> covers this case, because you can then simply ship a firmware blob that
+> matches the hardware configuration. Thinking about the future device
+> tree setup, you can even put the firmware blob itself into a property
+> in the device tree file.
+>
 
-I updated its commit in my tree like following.
+I earlier had an implementation where I used a pruss_devices structure
+in the board file.
 
----
-diff --git a/arch/arm/mach-s5pv210/cpufreq.c
-b/arch/arm/mach-s5pv210/cpufreq.c
-index 22046e2..153af8b 100644
---- a/arch/arm/mach-s5pv210/cpufreq.c
-+++ b/arch/arm/mach-s5pv210/cpufreq.c
-@@ -101,12 +101,14 @@ static void s5pv210_set_refresh(enum s5pv210_dmc_port
-ch, unsigned long freq)
-        unsigned long tmp, tmp1;
-        void __iomem *reg = NULL;
+http://linux.omap.com/pipermail/davinci-linux-open-source/
+2011-March/022339.html.
 
--       if (ch == DMC0)
-+       if (ch == DMC0) {
-                reg = (S5P_VA_DMC0 + 0x30);
--       else if (ch == DMC1)
-+       } else if (ch == DMC1) {
-                reg = (S5P_VA_DMC1 + 0x30);
--       else
-+       } else {
-                printk(KERN_ERR "Cannot find DMC port\n");
-+               return;
-+       }
+We can use this implementation along with the sysfs to load the devices
+runtime. The configs that I have in the board_file for the devices 
+structure,
+are fixed for a board. To swap the boards, we do not need to re-compile
+the kernel.
 
-        /* Find current DRAM frequency */
-        tmp = s5pv210_dram_conf[ch].freq;
----
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+ 
