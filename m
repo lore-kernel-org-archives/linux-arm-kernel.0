@@ -1,40 +1,85 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 16 May 2011 16:08:44 +0100
-Subject: [PATCH 0/1] ARM: thumb: Fix thumb mode compilation problems.
-In-Reply-To: <20110513195845.2FFE540CD1@eskimo.mtv.corp.google.com>
-References: <20110513195845.2FFE540CD1@eskimo.mtv.corp.google.com>
-Message-ID: <20110516150828.GA22931@arm.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Mon, 16 May 2011 17:08:37 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu>
+	<alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
+Message-ID: <20110516150837.GA513@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 13, 2011 at 12:58:45PM -0700, Vadim Bendebury wrote:
+
+* James Morris <jmorris@namei.org> wrote:
+
+> On Fri, 13 May 2011, Ingo Molnar wrote:
 > 
-> This patch won't necessarily apply as it has not been verified on
-> a real hardware, so this is more of an RFC.
+> > Say i'm a user-space sandbox developer who wants to enforce that sandboxed 
+> > code should only be allowed to open files in /home/sandbox/, /lib/ and 
+> > /usr/lib/.
+> > 
+> > It is a simple and sensible security feature, agreed? It allows most code 
+> > to run well and link to countless libraries - but no access to other files 
+> > is allowed.
 > 
-> Vadim Bendebury (1):
->   ARM: thumb: Fix thumb mode compilation problems.
+> Not really.
 > 
->  arch/arm/kernel/fiq.c         |   34 ++++++++++++++++++++++++++--------
->  arch/arm/mach-tegra/headsmp.S |    3 ++-
->  2 files changed, 28 insertions(+), 9 deletions(-)
+> Firstly, what is the security goal of these restrictions? [...]
+
+To do what i described above? Namely:
+
+ " Sandboxed code should only be allowed to open files in /home/sandbox/, /lib/
+   and /usr/lib/ "
+
+> [...]  Then, are the restrictions complete and unbypassable?
+
+If only the system calls i mentioned are allowed, and if the sandboxed VFS 
+namespace itself is isolated from the rest of the system (no bind mounts, no 
+hard links outside the sandbox, etc.) then its goal is to not be bypassable - 
+what use is a sandbox if the sandbox can be bypassed by the sandboxed code?
+
+There's a few ways how to alter (and thus bypass) VFS namespace lookups: 
+symlinks, chdir, chroot, rename, etc., which (as i mentioned) have to be 
+excluded by default or filtered as well.
+
+> How do you reason about the behavior of the system as a whole?
+
+For some usecases i mainly want to reason about what the sandboxed code can do 
+and can not do, within a fairly static and limited VFS namespace environment.
+
+I might not want to have a full-blown 'physical barrier' for all objects 
+labeled as inaccessible to sandboxed code (or labeled as accessible to 
+sandboxed code).
+
+Especially as manipulating file labels is not also slow (affects all files) but 
+is also often an exclusively privileged operation even for owned files, for no 
+good reason. For things like /lib/ and /usr/lib/ it also *has* to be a 
+privileged operation.
+
+> > I argue that this is the LSM and audit subsystems designed right: in the 
+> > long run it could allow everything that LSM does at the moment - and so 
+> > much more ...
 > 
+> Now you're proposing a redesign of the security subsystem.  That's a 
+> significant undertaking.
 
-As a side note, I'm happy to be CC'd if you have Thumb-2 kernel problems
-since I've been working on this recently, and would like to get it working
-across the broadest range of platforms possible.
+It certainly is.
 
-I'm definitely interested if you hit any non-platform-specific issues, since
-I'm not too familiar with tegra.
+> In the meantime, we have a simple, well-defined enhancement to seccomp which 
+> will be very useful to current users in reducing their kernel attack surface.
+> 
+> We should merge that, and the security subsystem discussion can carry on 
+> separately.
 
-So far, omap was the most "interesting" target: if you have problems, the
-following commits for omap may contain examples of things you need to fix:
+Is that the development and merge process along which the LSM subsystem got 
+into its current state?
 
-git log -i --grep=thumb -- arch/arm/mach-omap2 arch/arm/plat-omap
+Thanks,
 
-dd31394 ARM: omap3: Thumb-2 compatibility for sleep34xx.S
-ef7a87d ARM: omap3: Thumb-2 compatibility for sram34xx.S
-76d5001 ARM: omap3: Remove hand-encoded SMC instructions
-f96bdfa ARM: omap4: Convert END() to ENDPROC() for correct linkage with CONFIG_THUMB2_KERNEL
-85243a7 ARM: omap4: Provide do_wfi() for Thumb-2
-b6338bd ARM: 6649/1: omap: use fncpy to copy the PM code functions to SRAM
+	Ingo
