@@ -1,81 +1,73 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 16 May 2011 18:04:33 -0400 (EDT)
-Subject: Git pull request: consolidation of orion alike platforms
-Message-ID: <alpine.LFD.2.00.1105161800240.14430@xanadu.home>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 16 May 2011 17:18:21 -0500
+Subject: [PATCH 15/19] clocksource: ARM sp804: obtain sp804 timer rate
+	via clks
+In-Reply-To: <E1QM1cq-0003ED-2X@rmk-PC.arm.linux.org.uk>
+References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
+	<E1QM1cq-0003ED-2X@rmk-PC.arm.linux.org.uk>
+Message-ID: <4DD1A2AD.4040004@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell, please pull the following:
+On 05/16/2011 12:30 PM, Russell King - ARM Linux wrote:
+> This allows platforms to specify the rate of the SP804 clocksource via
+> the clk subsystem.  While ARM boards clock these at 1MHz, BCMRing also
+> has SP804 timers but are clocked at different rates.
+>
+> Acked-by: Catalin Marinas<catalin.marinas@arm.com>
+> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+> ---
+>   arch/arm/common/timer-sp.c               |   39 +++++++++++++++++++++++++++++-
+>   arch/arm/mach-integrator/integrator_cp.c |    7 +++++
+>   arch/arm/mach-realview/core.c            |    9 ++++++-
+>   arch/arm/mach-versatile/core.c           |    9 ++++++-
+>   arch/arm/mach-vexpress/ct-ca9x4.c        |    8 ++++++
+>   arch/arm/mach-vexpress/v2m.c             |    8 ++++++
+>   6 files changed, 77 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
+> index f6b9011..45a5eb8 100644
+> --- a/arch/arm/common/timer-sp.c
+> +++ b/arch/arm/common/timer-sp.c
+> @@ -18,8 +18,10 @@
+>    * along with this program; if not, write to the Free Software
+>    * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+>    */
+> +#include<linux/clk.h>
+>   #include<linux/clocksource.h>
+>   #include<linux/clockchips.h>
+> +#include<linux/err.h>
+>   #include<linux/interrupt.h>
+>   #include<linux/irq.h>
+>   #include<linux/io.h>
+> @@ -32,8 +34,43 @@
+>   #define TIMER_FREQ_KHZ	(1000)
+>   #define TIMER_RELOAD	(TIMER_FREQ_KHZ * 1000 / HZ)
+>
+> +static long __init sp804_get_clock_rate(const char *name)
+> +{
+> +	struct clk *clk;
+> +	long rate;
+> +	int err;
+> +
+> +	clk = clk_get_sys("sp804", name);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("sp804: %s clock not found: %d\n", name,
+> +			(int)PTR_ERR(clk));
+> +		return PTR_ERR(clk);
+> +	}
+> +
+> +	err = clk_enable(clk);
+> +	if (err) {
+> +		pr_err("sp804: %s clock failed to enable: %d\n", name, err);
+> +		clk_put(clk);
+> +		return err;
+> +	}
+> +
+> +	rate = clk_get_rate(clk);
+> +	if (rate<  0) {
+> +		pr_err("sp804: %s clock failed to get rate: %ld\n", name, err);
 
-	git://git.kernel.org/pub/scm/linux/kernel/git/nico/orion.git
+err should be rate.
 
-This contains consolidation work to be merged for the next merge window.
-It is based on commit cfefd21 "genirq: Add chip suspend and resume
-callbacks" from Thomas which appears to be in your devel-stable branch.
-
-Net amount of lines removed is 1302.
-
-Andrew Lunn (15):
-      ARM: orion: Rename some constants to macros to make code more identical
-      ARM: orion: Consolidate the creation of the uart platform data.
-      ARM: orion: Consolidate the creation of the RTC platform data.
-      ARM: kirkwood: Add support for RTC interrupts which allows RTC alarms.
-      ARM: orion: Consolidate ethernet platform data
-      ARM: orion: Consolidate I2C initialization.
-      ARM: orion: Consolidate SPI initialization.
-      ARM: orion: Consolidate the platform data setup for the watchdog.
-      ARM: orion: Consolidate the XOR platform setup code.
-      ARM: orion: Consolidate USB platform setup code.
-      ARM: orion: Consolidate SATA platform setup.
-      ARM: orion: Consolidate setup of the crypto engine.
-      ARM: orion: Refactor the MPP code common in the orion platform
-      ARM: orion5x: Refactor mpp code to use common orion platform mpp.
-      ARM: dove: Consolidate mpp code with platform mpp.
-
-Thomas Gleixner (1):
-      arm: orion: Use generic irq chip
-
- arch/arm/mach-dove/common.c                    |  616 +-----------
- arch/arm/mach-dove/mpp.c                       |  134 +--
- arch/arm/mach-dove/mpp.h                       |  362 +++----
- arch/arm/mach-kirkwood/common.c                |  601 +-----------
- arch/arm/mach-kirkwood/include/mach/irqs.h     |    1 +
- arch/arm/mach-kirkwood/mpp.c                   |   58 +-
- arch/arm/mach-kirkwood/mpp.h                   |    6 -
- arch/arm/mach-loki/common.c                    |  190 +----
- arch/arm/mach-mv78xx0/common.c                 |  570 +----------
- arch/arm/mach-mv78xx0/mpp.c                    |   58 +-
- arch/arm/mach-mv78xx0/mpp.h                    |    6 -
- arch/arm/mach-orion5x/common.c                 |  478 +--------
- arch/arm/mach-orion5x/d2net-setup.c            |   44 +-
- arch/arm/mach-orion5x/db88f5281-setup.c        |   44 +-
- arch/arm/mach-orion5x/dns323-setup.c           |  132 ++--
- arch/arm/mach-orion5x/edmini_v2-setup.c        |   44 +-
- arch/arm/mach-orion5x/kurobox_pro-setup.c      |   44 +-
- arch/arm/mach-orion5x/ls-chl-setup.c           |   44 +-
- arch/arm/mach-orion5x/ls_hgl-setup.c           |   44 +-
- arch/arm/mach-orion5x/lsmini-setup.c           |   44 +-
- arch/arm/mach-orion5x/mpp.c                    |  150 +---
- arch/arm/mach-orion5x/mpp.h                    |  191 +++--
- arch/arm/mach-orion5x/mss2-setup.c             |   44 +-
- arch/arm/mach-orion5x/mv2120-setup.c           |   44 +-
- arch/arm/mach-orion5x/net2big-setup.c          |   44 +-
- arch/arm/mach-orion5x/rd88f5181l-fxo-setup.c   |   44 +-
- arch/arm/mach-orion5x/rd88f5181l-ge-setup.c    |   44 +-
- arch/arm/mach-orion5x/rd88f5182-setup.c        |   44 +-
- arch/arm/mach-orion5x/rd88f6183ap-ge-setup.c   |    1 -
- arch/arm/mach-orion5x/terastation_pro2-setup.c |   44 +-
- arch/arm/mach-orion5x/ts209-setup.c            |   44 +-
- arch/arm/mach-orion5x/ts409-setup.c            |   44 +-
- arch/arm/mach-orion5x/ts78xx-setup.c           |   44 +-
- arch/arm/mach-orion5x/wnr854t-setup.c          |   44 +-
- arch/arm/mach-orion5x/wrt350n-v2-setup.c       |   44 +-
- arch/arm/plat-orion/Makefile                   |    2 +-
- arch/arm/plat-orion/common.c                   |  957 ++++++++++++++++++
- arch/arm/plat-orion/gpio.c                     |  112 +--
- arch/arm/plat-orion/include/plat/common.h      |  117 +++
- arch/arm/plat-orion/include/plat/gpio.h        |    1 -
- arch/arm/plat-orion/include/plat/mpp.h         |   34 +
- arch/arm/plat-orion/irq.c                      |   49 +-
- arch/arm/plat-orion/mpp.c                      |   78 ++
- 43 files changed, 2219 insertions(+), 3521 deletions(-)
+Rob
