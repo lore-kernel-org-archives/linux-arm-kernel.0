@@ -1,21 +1,51 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 22:34:34 +0100
-Subject: [PATCH 17/19] clockevents: ARM sp804: obtain sp804 timer rate
-	via clks
-In-Reply-To: <4DD1960B.5000603@gmail.com>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-	<E1QM1dU-0003EL-9p@rmk-PC.arm.linux.org.uk>
-	<4DD1960B.5000603@gmail.com>
-Message-ID: <20110516213434.GK13659@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 16 May 2011 22:35:51 +0100
+Subject: [alsa-devel] [PATCH v2 2/3] ASoC: add iPAQ hx4700 machine driver
+In-Reply-To: <1305579805-15617-3-git-send-email-mad_soft@inbox.ru>
+References: <1305579805-15617-1-git-send-email-mad_soft@inbox.ru>
+	<1305579805-15617-3-git-send-email-mad_soft@inbox.ru>
+Message-ID: <20110516213551.GB2570@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 04:24:27PM -0500, Rob Herring wrote:
-> On 05/16/2011 12:31 PM, Russell King - ARM Linux wrote:
->> -	evt->mult = div_sc(TIMER_FREQ_KHZ, NSEC_PER_MSEC, evt->shift);
->> +	evt->mult = div_sc(rate, SEC_PER_MSEC, evt->shift);
->
-> This doesn't compile or make sense. Should be NSEC_PER_SEC.
+On Tue, May 17, 2011 at 01:03:24AM +0400, Dmitry Artamonow wrote:
+> AK4641 connected via I2S and I2C, jack detection via GPIO.
+> 
+> Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+> Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
 
-Grr.  Fixed too.  No idea how that crap happened, but thanks for catching
-it all.
+Same thing here - pretty good but a bit out of date.
+
+> +	/* Add hx4700 specific widgets */
+> +	snd_soc_dapm_new_controls(dapm, ak4641_dapm_widgets,
+> +				  ARRAY_SIZE(ak4641_dapm_widgets));
+> +
+> +	/* Set up hx4700 specific audio path interconnects */
+> +	snd_soc_dapm_add_routes(dapm, audio_map, ARRAY_SIZE(audio_map));
+> +
+> +	snd_soc_dapm_sync(dapm);
+
+Data based init for these too please.
+
+> +static int __init hx4700_init(void)
+> +{
+> +	int ret;
+> +
+> +	if (!machine_is_h4700())
+> +		return -ENODEV;
+> +
+> +	ret = gpio_request(GPIO107_HX4700_SPK_nSD, "SPK_POWER");
+> +	if (ret)
+> +		goto err_request_spk;
+> +	ret = gpio_request(GPIO92_HX4700_HP_DRIVER, "EP_POWER");
+> +	if (ret)
+> +		goto err_request_ep;
+> +
+> +	gpio_direction_output(GPIO107_HX4700_SPK_nSD, 1);
+> +	gpio_direction_output(GPIO92_HX4700_HP_DRIVER, 0);
+> +
+> +	hx4700_snd_device = platform_device_alloc("soc-audio", -1);
+> +	if (!hx4700_snd_device) {
+
+Use a regular platform device to register the machine and call
+snd_soc_register_card() to instantiate please.
