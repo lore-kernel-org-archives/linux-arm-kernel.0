@@ -1,43 +1,64 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Mon, 16 May 2011 15:13:33 +0300
-Subject: [PATCH 1/2] ARM: remove unneeded check of the
-	cache_is_vipt_nonaliasing()
-In-Reply-To: <1305547130.19230.42.camel@e102109-lin.cambridge.arm.com>
-References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
-	<BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
-	<BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
-	<BANLkTikWJzdYOrk4=gte8zOHDVioGAOhhg@mail.gmail.com>
-	<BANLkTimFst-+LEuN9cDpAtRiF4aDOipAKA@mail.gmail.com>
-	<BANLkTi=cf47Axm1rXEa-gX7oK0h2aGq0nA@mail.gmail.com>
-	<1305547130.19230.42.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <FCBE654890C0334289D0AD3AF4EF009F01162C92016E@IL-MB01.marvell.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 16 May 2011 05:15:41 -0700
+Subject: genirq: Generic irq chip available in git
+In-Reply-To: <20110511180323.GJ5315@n2100.arm.linux.org.uk>
+References: <alpine.LFD.2.02.1104231805321.3323@ionos>
+	<20110427212542.GD17290@n2100.arm.linux.org.uk>
+	<20110508082222.GA27807@n2100.arm.linux.org.uk>
+	<20110508133530.GA13815@opensource.wolfsonmicro.com>
+	<20110508140023.GK27807@n2100.arm.linux.org.uk>
+	<20110508140344.GC15968@opensource.wolfsonmicro.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024CE66709@dbde02.ent.ti.com>
+	<20110511175522.GI5315@n2100.arm.linux.org.uk>
+	<20110511175837.GA21150@opensource.wolfsonmicro.com>
+	<20110511180323.GJ5315@n2100.arm.linux.org.uk>
+Message-ID: <20110516121541.GC1780@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110511 11:00]:
+> On Wed, May 11, 2011 at 07:58:37PM +0200, Mark Brown wrote:
+> > On Wed, May 11, 2011 at 06:55:22PM +0100, Russell King - ARM Linux wrote:
+> > > On Wed, May 11, 2011 at 11:15:57PM +0530, Nori, Sekhar wrote:
+> > 
+> > > > I have included Thomas's davinci platform update with the relevant
+> > > > acks in the following pull request. There was also a checkpatch
+> > > > error that I fixed up locally. Hope this helps.
+> > 
+> > > Thanks, pulled this.
+> > 
+> > FWIW I sent a similar pull request to Kukjin a few days ago for Samsung:
+> 
+> I've not noticed it turning up in linux-next - in fact the linux-next stats
+> still looks poorly in respect of what I'd expect it to be given the amount
+> of stuff discussed since the last merge window.  So...
+
+I got the omap2/3 genriq change available at:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-genirq
+
+If you want to pull pull that too. I got it also merged into omap for-next
+branch as I'm still planning to rebase some init_early related clean-up on
+top of that. The commit is 667a11facee70c0bd15cf07946fba71236490e07.
+
+Regards,
+
+Tony
+
+
+
  
-
->> BTW, there is something concerns me about ARM11MP core, this system
->> doesn't support cache maintenance broadcasting, but when looking at
->> do_cache_op(), it doesn't seem to flush the cache of other 
->cpus, so if
->> we have a multithreaded applications like java that uses self
->> modifying code, how can you make sure that all cpus will have their I
->> cache flushed when one cpu requests to do do_cache_op?
->
->We don't :). If you are unlucky enough, your thread may migrate to
->another CPU between the moment it wrote the data and the do_cache_op()
->call so you'll miss the D-cache flushing.
->
->I had a simple fix for a while, see below (I posted it in the past in a
->slightly different form, maybe I should post it again).
-Well, this patch seems to handle the case were the thread migrated to another CPU.
-But what about this case:
-1. Thread 0 runs on CPU0
-2. Thread 1 runs on CPU1 and run a code from A.
-3. Thread 0 modifies the code at A
-4. Thread 0 calls do_cache_op()
-5. Thread 1 tries to run new code from A.
-I'm assuming that thread 1 continued to run on CPU1 and no context switch occurred on that CPU.
-
-
-saeed
+> > The following changes since commit cfefd21e693dca791bf9ecfc9dd3794facad533c:
+> > 
+> >   genirq: Add chip suspend and resume callbacks (2011-04-23 15:56:24 +0200)
+> > 
+> > are available in the git repository at:
+> >   git://git.kernel.org/pub/scm/linux/kernel/git/broonie/misc-2.6.git samsung-irq
+> 
+> I've pulled this too in an attempt to improve the stats.  It doesn't
+> matter whether or not Kukjin has pulled this too.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
