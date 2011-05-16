@@ -1,195 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 18:31:36 +0100
-Subject: [PATCH 18/19] ARM: bcmring: convert to sp804 clocksource
-In-Reply-To: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-Message-ID: <E1QM1do-0003EP-DQ@rmk-PC.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 May 2011 18:28:37 +0100
+Subject: [PATCH v5 03/19] ARM: LPAE: Use unsigned long for
+	__phys_to_virt and __virt_to_phys
+In-Reply-To: <20110508214437.GP27807@n2100.arm.linux.org.uk>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<1304859098-10760-4-git-send-email-catalin.marinas@arm.com>
+	<20110508214437.GP27807@n2100.arm.linux.org.uk>
+Message-ID: <1305566917.19230.158.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bcmring has a set of four sp804 timers incorporated, yet it has its
-own copy of the sp804 code.  Convert its clocksource implementation
-to the standard sp804 support code.
+On Sun, 2011-05-08 at 22:44 +0100, Russell King - ARM Linux wrote:
+> On Sun, May 08, 2011 at 01:51:22PM +0100, Catalin Marinas wrote:
+> > The !CONFIG_ARM_PATCH_PHYS_VIRT case uses macros for __phys_to_virt and
+> > __virt_to_phys but does not use any type casting. This causes issues
+> 
+> It might be a good idea to include the compiler warning message in the
+> commit log, so that the 'issues' being addressed are readily known.
 
-Cc: Jiandong Zheng <jdzheng@broadcom.com>
-Cc: Scott Branden <sbranden@broadcom.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/Kconfig             |    1 +
- arch/arm/mach-bcmring/core.c |  108 +++++++++++++++++-------------------------
- 2 files changed, 45 insertions(+), 64 deletions(-)
+Here's the new log:
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 43f003a..903c9c4 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -297,6 +297,7 @@ config ARCH_BCMRING
- 	depends on MMU
- 	select CPU_V6
- 	select ARM_AMBA
-+	select ARM_TIMER_SP804
- 	select CLKDEV_LOOKUP
- 	select GENERIC_CLOCKEVENTS
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
-diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
-index 8fc2035..0ea33ff 100644
---- a/arch/arm/mach-bcmring/core.c
-+++ b/arch/arm/mach-bcmring/core.c
-@@ -37,6 +37,7 @@
- #include <linux/io.h>
- #include <asm/irq.h>
- #include <asm/hardware/arm_timer.h>
-+#include <asm/hardware/timer-sp.h>
- #include <asm/mach-types.h>
- 
- #include <asm/mach/arch.h>
-@@ -97,6 +98,35 @@ static struct clk dummy_apb_pclk = {
- 	.mode = CLK_MODE_XTAL,
- };
- 
-+/* Timer 0 - 25 MHz, Timer3 at bus clock rate, typically  150-166 MHz */
-+#if defined(CONFIG_ARCH_FPGA11107)
-+/* fpga cpu/bus are currently 30 times slower so scale frequency as well to */
-+/* slow down Linux's sense of time */
-+#define TIMER0_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
-+#define TIMER1_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
-+#define TIMER3_FREQUENCY_MHZ  (tmrHw_HIGH_FREQUENCY_MHZ * 30)
-+#define TIMER3_FREQUENCY_KHZ   (tmrHw_HIGH_FREQUENCY_HZ / 1000 * 30)
-+#else
-+#define TIMER0_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
-+#define TIMER1_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
-+#define TIMER3_FREQUENCY_MHZ  tmrHw_HIGH_FREQUENCY_MHZ
-+#define TIMER3_FREQUENCY_KHZ  (tmrHw_HIGH_FREQUENCY_HZ / 1000)
-+#endif
-+
-+static struct clk sp804_timer1_clk = {
-+	.name = "sp804-timer-1",
-+	.type = CLK_TYPE_PRIMARY,
-+	.mode = CLK_MODE_XTAL,
-+	.rate_hz = TIMER1_FREQUENCY_MHZ * 1000000,
-+};
-+
-+static struct clk sp804_timer3_clk = {
-+	.name = "sp804-timer-3",
-+	.type = CLK_TYPE_PRIMARY,
-+	.mode = CLK_MODE_XTAL,
-+	.rate_hz = TIMER3_FREQUENCY_KHZ * 1000,
-+};
-+
- static struct clk_lookup lookups[] = {
- 	{			/* Bus clock */
- 		.con_id = "apb_pclk",
-@@ -107,6 +137,14 @@ static struct clk_lookup lookups[] = {
- 	}, {			/* UART1 */
- 		.dev_id = "uartb",
- 		.clk = &uart_clk,
-+	}, {			/* SP804 timer 1 */
-+		.dev_id = "sp804",
-+		.con_id = "timer1",
-+		.clk = &sp804_timer1_clk,
-+	}, {			/* SP804 timer 3 */
-+		.dev_id = "sp804",
-+		.con_id = "timer3",
-+		.clk = &sp804_timer3_clk,
- 	}
- };
- 
-@@ -162,25 +200,10 @@ void __init bcmring_amba_init(void)
- /*
-  * Where is the timer (VA)?
-  */
--#define TIMER0_VA_BASE		 MM_IO_BASE_TMR
--#define TIMER1_VA_BASE		(MM_IO_BASE_TMR + 0x20)
--#define TIMER2_VA_BASE		(MM_IO_BASE_TMR + 0x40)
--#define TIMER3_VA_BASE          (MM_IO_BASE_TMR + 0x60)
--
--/* Timer 0 - 25 MHz, Timer3 at bus clock rate, typically  150-166 MHz */
--#if defined(CONFIG_ARCH_FPGA11107)
--/* fpga cpu/bus are currently 30 times slower so scale frequency as well to */
--/* slow down Linux's sense of time */
--#define TIMER0_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
--#define TIMER1_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
--#define TIMER3_FREQUENCY_MHZ  (tmrHw_HIGH_FREQUENCY_MHZ * 30)
--#define TIMER3_FREQUENCY_KHZ   (tmrHw_HIGH_FREQUENCY_HZ / 1000 * 30)
--#else
--#define TIMER0_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
--#define TIMER1_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
--#define TIMER3_FREQUENCY_MHZ  tmrHw_HIGH_FREQUENCY_MHZ
--#define TIMER3_FREQUENCY_KHZ  (tmrHw_HIGH_FREQUENCY_HZ / 1000)
--#endif
-+#define TIMER0_VA_BASE		((void __iomem *)MM_IO_BASE_TMR)
-+#define TIMER1_VA_BASE		((void __iomem *)(MM_IO_BASE_TMR + 0x20))
-+#define TIMER2_VA_BASE		((void __iomem *)(MM_IO_BASE_TMR + 0x40))
-+#define TIMER3_VA_BASE          ((void __iomem *)(MM_IO_BASE_TMR + 0x60))
- 
- #define TICKS_PER_uSEC     TIMER0_FREQUENCY_MHZ
- 
-@@ -189,10 +212,7 @@ void __init bcmring_amba_init(void)
-  *
-  */
- #define mSEC_1                          1000
--#define mSEC_5                          (mSEC_1 * 5)
- #define mSEC_10                         (mSEC_1 * 10)
--#define mSEC_25                         (mSEC_1 * 25)
--#define SEC_1                           (mSEC_1 * 1000)
- 
- /*
-  * How long is the timer interval?
-@@ -279,53 +299,13 @@ static struct irqaction bcmring_timer_irq = {
- 	.handler = bcmring_timer_interrupt,
- };
- 
--static cycle_t bcmring_get_cycles_timer1(struct clocksource *cs)
--{
--	return ~readl(TIMER1_VA_BASE + TIMER_VALUE);
--}
--
--static cycle_t bcmring_get_cycles_timer3(struct clocksource *cs)
--{
--	return ~readl(TIMER3_VA_BASE + TIMER_VALUE);
--}
--
--static struct clocksource clocksource_bcmring_timer1 = {
--	.name = "timer1",
--	.rating = 200,
--	.read = bcmring_get_cycles_timer1,
--	.mask = CLOCKSOURCE_MASK(32),
--	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
--static struct clocksource clocksource_bcmring_timer3 = {
--	.name = "timer3",
--	.rating = 100,
--	.read = bcmring_get_cycles_timer3,
--	.mask = CLOCKSOURCE_MASK(32),
--	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
- static int __init bcmring_clocksource_init(void)
- {
- 	/* setup timer1 as free-running clocksource */
--	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
--	writel(0xffffffff, TIMER1_VA_BASE + TIMER_LOAD);
--	writel(0xffffffff, TIMER1_VA_BASE + TIMER_VALUE);
--	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
--	       TIMER1_VA_BASE + TIMER_CTRL);
--
--	clocksource_register_khz(&clocksource_bcmring_timer1,
--				 TIMER1_FREQUENCY_MHZ * 1000);
-+	sp804_clocksource_init(TIMER1_VA_BASE, "timer1");
- 
- 	/* setup timer3 as free-running clocksource */
--	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
--	writel(0xffffffff, TIMER3_VA_BASE + TIMER_LOAD);
--	writel(0xffffffff, TIMER3_VA_BASE + TIMER_VALUE);
--	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
--	       TIMER3_VA_BASE + TIMER_CTRL);
--
--	clocksource_register_khz(&clocksource_bcmring_timer3,
--				 TIMER3_FREQUENCY_KHZ);
-+	sp804_clocksource_init(TIMER3_VA_BASE, "timer3");
- 
- 	return 0;
- }
+    ARM: LPAE: Use unsigned long for __phys_to_virt and __virt_to_phys
+    
+    The !CONFIG_ARM_PATCH_PHYS_VIRT case uses macros for __phys_to_virt and
+    __virt_to_phys but does not use any type casting. This causes compiler
+    warnings with LPAE where the phys_addr_t and dma_addr_t are 64-bit:
+    
+      CC      arch/arm/mm/dma-mapping.o
+    In file included from /work/Linux/linux-marc/include/linux/dma-mapping.h:93:0,
+                     from /work/Linux/linux-marc/arch/arm/mm/dma-mapping.c:19:
+    /work/Linux/linux-marc/arch/arm/include/asm/dma-mapping.h: In function 'dma_to_virt':
+    /work/Linux/linux-marc/arch/arm/include/asm/dma-mapping.h:35:9: warning:
+            cast to pointer from integer of different size
+    
+    Note that these macros are only valid for lowmem physical addresses
+    where the range is within 32-bit address range.
+    
+    Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+
 -- 
-1.7.4.4
+Catalin
