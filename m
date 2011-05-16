@@ -1,55 +1,61 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Mon, 16 May 2011 11:36:28 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201105151133.23870.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105142233.53659.arnd@arndb.de>
-	<20110514221445.GB21792@opensource.wolfsonmicro.com>
-	<201105151133.23870.arnd@arndb.de>
-Message-ID: <B876E8072D52496DB747D5CCCF64826D@subhasishg>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Mon, 16 May 2011 12:23:01 +0530
+Subject: [PATCHv2 2/2] [RFC] OMAP4: clock data: shrink more clock data.
+In-Reply-To: <1305495958-2236-3-git-send-email-vzapolskiy@gmail.com>
+References: <1305495958-2236-1-git-send-email-vzapolskiy@gmail.com>
+	<1305495958-2236-3-git-send-email-vzapolskiy@gmail.com>
+Message-ID: <20110516065301.GA12703@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!,
+On Mon, May 16, 2011 at 12:45:58AM +0300, Vladimir Zapolskiy wrote:
+> This mass change continues the reduction of homogeneous data chunks
+> along clock definitions. No semantical difference is added in the
+> change.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
+> ---
 
->> > My whole point has been that you register them from the main pruss 
->> > driver
->> > based on run-time data instead of compile-time pre-configured stuff in 
->> > the
->> > board file.
->>
->> I'm not so sure - if the usage is fixed as a result of the pins on the
->> device being wired a CAN bus then it seems reasonable to tell the system
->> about that so it'll stop the user trying to run SPI or something against
->> it at runtime.
->
-> I'm mostly worried about the case where the pins are not hardwired for
-> some specific function -- Subhasish was mentioning that these may be
-> implemented using a pluggable extension board and I want to make sure
-> that you are not required to recompile the kernel when changing the
-> extension board.
->
-> However, you made a good point that in many cases it will be hardwired
-> so it may be valuable to preconfigure this in a way that does not require
-> scripts to set up variables in sysfs when you already know what is there.
->
-> Note that my suggestion to put the device name into the firmware file
-> covers this case, because you can then simply ship a firmware blob that
-> matches the hardware configuration. Thinking about the future device
-> tree setup, you can even put the firmware blob itself into a property
-> in the device tree file.
->
+[ ... ]
 
-I earlier had an implementation where I used a pruss_devices structure
-in the board file.
+> +DEFINE_CLOCK_DM(gpu_fck, dpll_core_m7x2_ck, l3_gfx_clkdm,
+> +		CLOCK_OPS_DFLT_SW(CM_GFX_GFX),
+> +		CLOCK_CLKSEL0(sgx_clk_mux_sel,
+> +			      CM_GFX_GFX_CLKCTRL, CLKSEL_SGX_FCLK));
+>  
 
-http://linux.omap.com/pipermail/davinci-linux-open-source/
-2011-March/022339.html.
+Hi Vladimir ,
 
-We can use this implementation along with the sysfs to load the devices
-runtime. The configs that I have in the board_file for the devices 
-structure,
-are fixed for a board. To swap the boards, we do not need to re-compile
-the kernel.
+With this the rate wouldn't get initialised and it throws a warning at
+boot.
 
+[    0.000000] ------------[ cut here ]------------
+[    0.000000] WARNING: at arch/arm/mach-omap2/clkt_clksel.c:194 omap2_clksel_recalc+0xd4/0xe4()
+[    0.000000] clock: Could not find fieldval 1 for clock gpu_fck parent dpll_core_m7x2_ck
+[    0.000000] Modules linked in:
+[    0.000000] [<c005fd5c>] (unwind_backtrace+0x0/0xe4) from [<c00921b4>] (warn_slowpath_common+0x4c/0x64)
+[    0.000000] [<c00921b4>] (warn_slowpath_common+0x4c/0x64) from [<c009224c>] (warn_slowpath_fmt+0x2c/0x3c)
+[    0.000000] [<c009224c>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0072594>] (omap2_clksel_recalc+0xd4/0xe4)
+[    0.000000] [<c0072594>] (omap2_clksel_recalc+0xd4/0xe4) from [<c007712c>] (propagate_rate+0x24/0x50)
+[    0.000000] [<c007712c>] (propagate_rate+0x24/0x50) from [<c0077138>] (propagate_rate+0x30/0x50)
+[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
+
+Will be fixed with this change below :
+
+-		CLOCK_CLKSEL0(sgx_clk_mux_sel,
++		CLOCK_CLKSEL_INIT(sgx_clk_mux_sel,
+
+May be CLOCK_CLKSEL0 is not required altogether. I see it used only to
+initialise gpu_fck. May be can remove this.
+
+I boot tested it on 4430 sdp. FWIW , you can add 
+Tested-by: Avinash.H.M. <avinashhm@ti.com>
+
+thanks,
+
+- Avinash
  
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
