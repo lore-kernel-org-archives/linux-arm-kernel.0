@@ -1,75 +1,31 @@
-From: viresh.kumar@st.com (Viresh Kumar)
-Date: Mon, 16 May 2011 09:40:10 +0530
-Subject: [PATCH resend] spi/amba-pl022: work in polling or interrupt mode if
-	pl022_dma_probe fails
-Message-ID: <052261410dd8d224fc199518e646abf80bfa7d4c.1305518921.git.viresh.kumar@st.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Mon, 16 May 2011 13:28:34 +0900
+Subject: [PATCH] shmobile: fix map_io init usage
+In-Reply-To: <20110513015653.GM18952@game.jcrosoft.org>
+References: <1304267322-19022-1-git-send-email-plagnioj@jcrosoft.com>
+	<20110513015653.GM18952@game.jcrosoft.org>
+Message-ID: <BANLkTikorWv-9VnRG51v30YFQksRMxVS5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If pl022_dma_probe fails, we can try to transfer data in polling or interrupt
-mode. Also, set platform_info->enable_dma to 0, so that no other code tries to
-use dma.
+On Fri, May 13, 2011 at 10:56 AM, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 18:28 Sun 01 May ? ? , Jean-Christophe PLAGNIOL-VILLARD wrote:
+>> switch early init to init_early and introduce soc map_io
+>>
+>> with this Patch we will not do any more early device setup during the map io
+>>
+>> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+>> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+>> Cc: Paul Mundt <lethal@linux-sh.org>
+>> Cc: Magnus Damm <magnus.damm@gmail.com>
+> ping
 
-Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/spi/amba-pl022.c |   11 ++++++-----
- 1 files changed, 6 insertions(+), 5 deletions(-)
+Why? The device init order is changed by this patch to setup the
+serial console later. I fail to see the benefit. Basically, the serial
+console setup is delayed to happen in ->init_early() instead of
+->map_io(). In practice this means that we restrict ourselves to not
+be able to output debug messages on the serial console from a bunch of
+calls in setup_arch().
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index dae886e..77f90de 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -1068,7 +1068,7 @@ static int __init pl022_dma_probe(struct pl022 *pl022)
- 					    pl022->master_info->dma_filter,
- 					    pl022->master_info->dma_rx_param);
- 	if (!pl022->dma_rx_channel) {
--		dev_err(&pl022->adev->dev, "no RX DMA channel!\n");
-+		dev_dbg(&pl022->adev->dev, "no RX DMA channel!\n");
- 		goto err_no_rxchan;
- 	}
- 
-@@ -1076,13 +1076,13 @@ static int __init pl022_dma_probe(struct pl022 *pl022)
- 					    pl022->master_info->dma_filter,
- 					    pl022->master_info->dma_tx_param);
- 	if (!pl022->dma_tx_channel) {
--		dev_err(&pl022->adev->dev, "no TX DMA channel!\n");
-+		dev_dbg(&pl022->adev->dev, "no TX DMA channel!\n");
- 		goto err_no_txchan;
- 	}
- 
- 	pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
- 	if (!pl022->dummypage) {
--		dev_err(&pl022->adev->dev, "no DMA dummypage!\n");
-+		dev_dbg(&pl022->adev->dev, "no DMA dummypage!\n");
- 		goto err_no_dummypage;
- 	}
- 
-@@ -1098,6 +1098,8 @@ err_no_txchan:
- 	dma_release_channel(pl022->dma_rx_channel);
- 	pl022->dma_rx_channel = NULL;
- err_no_rxchan:
-+	dev_err(&pl022->adev->dev,
-+			"Failed to work in dma mode, work without dma!\n");
- 	return -ENODEV;
- }
- 
-@@ -2111,7 +2113,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
- 	if (platform_info->enable_dma) {
- 		status = pl022_dma_probe(pl022);
- 		if (status != 0)
--			goto err_no_dma;
-+			platform_info->enable_dma = 0;
- 	}
- 
- 	/* Initialize and start queue */
-@@ -2143,7 +2145,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
-  err_init_queue:
- 	destroy_queue(pl022);
- 	pl022_dma_remove(pl022);
-- err_no_dma:
- 	free_irq(adev->irq[0], pl022);
-  err_no_irq:
- 	clk_put(pl022->clk);
--- 
-1.7.2.2
+/ magnus
