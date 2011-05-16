@@ -1,57 +1,83 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 16 May 2011 10:32:16 -0400 (EDT)
-Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
-	in thumb mode.
-In-Reply-To: <20110516121657.GA7715@arm.com>
-References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
-	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
-	<20110514100232.GC30539@n2100.arm.linux.org.uk>
-	<20110516121657.GA7715@arm.com>
-Message-ID: <alpine.LFD.2.00.1105161008320.14430@xanadu.home>
+From: wad@chromium.org (Will Drewry)
+Date: Mon, 16 May 2011 09:42:07 -0500
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <20110516125505.GE7128@elte.hu>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<BANLkTin74OSAi94jbcYf_tj04L247O4GOg@mail.gmail.com>
+	<20110516125505.GE7128@elte.hu>
+Message-ID: <BANLkTimg5KsPA-JYS__hdnXZWg57fmvZnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 May 2011, Dave Martin wrote:
+On Mon, May 16, 2011 at 7:55 AM, Ingo Molnar <mingo@elte.hu> wrote:
+>
+> * Will Drewry <wad@chromium.org> wrote:
+>
+>> I agree with you on many of these points! ?However, I don't think that the
+>> views around LSMs, perf/ftrace infrastructure, or the current seccomp
+>> filtering implementation are necessarily in conflict. ?Here is my
+>> understanding of how the different worlds fit together and where I see this
+>> patchset living, along with where I could see future work going. ?Perhaps I'm
+>> being a trifle naive, but here goes anyway:
+>>
+>> 1. LSMs provide a global mechanism for hooking "security relevant"
+>> events at a point where all the incoming user-sourced data has been
+>> preprocessed and moved into userspace. ?The hooks are called every
+>> time one of those boundaries are crossed.
+>
+>> 2. Perf and the ftrace infrastructure provide global function tracing
+>> and system call hooks with direct access to the caller's registers
+>> (and memory).
+>
+> No, perf events are not just global but per task as well. Nor are events
+> limited to 'tracing' (generating a flow of events into a trace buffer) - they
+> can just be themselves as well and count and generate callbacks.
 
-> On Sat, May 14, 2011 at 11:02:32AM +0100, Russell King - ARM Linux wrote:
-> > On Sat, May 14, 2011 at 10:59:14AM +0100, Catalin Marinas wrote:
-> > > On 13 May 2011 20:53, Vadim Bendebury <vbendeb@google.com> wrote:
-> > > > This is a cosmetic change, adding a '_thumb' prefix to the
-> > > > 'Hardware' line in /proc/cpuinfo. Tested as follows:
-> > > >
-> > > > localhost ~ # dmesg | grep thumb
-> > > > [ ? ?0.000000] Machine: kaen_thumb
-> > > > localhost ~ # grep '^Hardware' /proc/cpuinfo
-> > > > Hardware ? ? ? ?: kaen_thumb
-> > > > localhost ~ #
-> > > 
-> > > Would this break any script parsing this file?
-> > > 
-> > > BTW, why do you need it? You could include the .config into the kernel
-> > > and read it via /proc.
-> > 
-> > Whether the kernel is built T2 or ARM doesn't change the userland API
-> > either, so there's no real need for userland to know how the kernel
-> > was built.
-> > 
-> > The only thing which is affected by it are kernel modules, but then we
-> > have an established way to sort out incompatible kernel modules already.
-> 
-> One corollary to that is that _if_ there's any reason why userland needs to 
-> know what instruction set the kernel was built with, then we're probably
-> doing something wrong somewhere...
-> 
-> In any case, shoehorning this information into the hardware platform name
-> seems a bit strange since this is really nothing to do with the hardware.
-> 
-> Vadim, can you explain why you think this information is needed?  If the
-> need is real, perhaps there's a better way to address it.
+I was looking at the perf_sysenter_enable() call, but clearly there is
+more going on :)
 
-I think this can be useful to know how the kernel was compiled for bug 
-tracking purposes, just like we record the Git commit ID of the checked 
-out source tree, the gcc version, the build date, etc.  Which pretty 
-much indicates that the thumbness of the kernel should probably be 
-stored in the kernel banner not the platform name.
+> The generic NMI watchdog uses that kind of event model for example, see
+> kernel/watchdog.c and how it makes use of struct perf_event abstractions to do
+> per CPU events (with no buffrs), or how kernel/hw_breakpoint.c uses it for per
+> task events and integrates it with the ptrace hw-breakpoints code.
+>
+> Ideally Peter's one particular suggestion is right IMO and we'd want to be able
+> for a perf_event to just be a list of callbacks, attached to a task and barely
+> more than a discoverable, named notifier chain in its slimmest form.
+>
+> In practice it's fatter than that right now, but we should definitely factor
+> out that aspect of it more clearly, both code-wise and API-wise.
+> kernel/watchdog.c and kernel/hw_breakpoint.c shows that such factoring out is
+> possible and desirable.
+>
+>> 3. seccomp (as it exists today) provides a global system call entry
+>> hook point with a binary per-process decision about whether to provide
+>> "secure computing" behavior.
+>>
+>> When I boil that down to abstractions, I see:
+>> A. Globally scoped: LSMs, ftrace/perf
+>> B. Locally/process scoped: seccomp
+>
+> Ok, i see where you got the idea that you needed to cut your surface of
+> abstraction at the filter engine / syscall enumeration level - i think you were
+> thinking of it in the ftrace model of tracepoints, not in the perf model of
+> events.
+>
+> No, events are generic and as such per task as well, not just global.
+>
+> I've replied to your other mail with more specific suggestions of how we could
+> provide your feature using abstractions that share code more widely. Talking
+> specifics will i hope help move the discussion forward! :-)
 
+Agreed.  I'll digest both the watchdog code as well as your other
+comments and follow up when I have a fuller picture in my head.
 
-Nicolas
+(I have a few initial comments I'll post in response to your other mail.)
+
+Thanks!
+will
