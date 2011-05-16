@@ -1,85 +1,95 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Mon, 16 May 2011 17:08:37 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu>
-	<alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
-Message-ID: <20110516150837.GA513@elte.hu>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 16 May 2011 23:16:10 +0800
+Subject: [PATCH 12/13] clocksource: convert MXS timrotv2 to 32-bit down
+	counting clocksource
+In-Reply-To: <20110516143124.GA24880@S2100-06.ap.freescale.net>
+References: <20110510072700.GA29869@n2100.arm.linux.org.uk>
+	<E1QJhSC-0000z6-H6@rmk-PC.arm.linux.org.uk>
+	<20110516143124.GA24880@S2100-06.ap.freescale.net>
+Message-ID: <20110516151609.GB24880@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-* James Morris <jmorris@namei.org> wrote:
-
-> On Fri, 13 May 2011, Ingo Molnar wrote:
-> 
-> > Say i'm a user-space sandbox developer who wants to enforce that sandboxed 
-> > code should only be allowed to open files in /home/sandbox/, /lib/ and 
-> > /usr/lib/.
+On Mon, May 16, 2011 at 10:31:25PM +0800, Shawn Guo wrote:
+> On Tue, May 10, 2011 at 08:34:00AM +0100, Russell King - ARM Linux wrote:
+> > Convert the MXS timrotv2 32-bit down counting clocksource to the
+> > generic clocksource infrastructure.
 > > 
-> > It is a simple and sensible security feature, agreed? It allows most code 
-> > to run well and link to countless libraries - but no access to other files 
-> > is allowed.
+> > Cc: Sascha Hauer <kernel@pengutronix.de>
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/Kconfig          |    1 +
+> >  arch/arm/mach-mxs/timer.c |   20 +++++++-------------
+> >  2 files changed, 8 insertions(+), 13 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index cbc27fb..43f003a 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -376,6 +376,7 @@ config ARCH_MXS
+> >  	select GENERIC_CLOCKEVENTS
+> >  	select ARCH_REQUIRE_GPIOLIB
+> >  	select CLKDEV_LOOKUP
+> > +	select CLKSRC_MMIO
+> >  	help
+> >  	  Support for Freescale MXS-based family of processors
+> >  
+> > diff --git a/arch/arm/mach-mxs/timer.c b/arch/arm/mach-mxs/timer.c
+> > index 13647f3..27bebf2 100644
+> > --- a/arch/arm/mach-mxs/timer.c
+> > +++ b/arch/arm/mach-mxs/timer.c
+> > @@ -101,11 +101,6 @@ static cycle_t timrotv1_get_cycles(struct clocksource *cs)
+> >  			& 0xffff0000) >> 16);
+> >  }
+> >  
+> > -static cycle_t timrotv2_get_cycles(struct clocksource *cs)
+> > -{
+> > -	return ~__raw_readl(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1));
+> > -}
+> > -
+> >  static int timrotv1_set_next_event(unsigned long evt,
+> >  					struct clock_event_device *dev)
+> >  {
+> > @@ -230,8 +225,8 @@ static int __init mxs_clockevent_init(struct clk *timer_clk)
+> >  static struct clocksource clocksource_mxs = {
+> >  	.name		= "mxs_timer",
+> >  	.rating		= 200,
+> > -	.read		= timrotv2_get_cycles,
+> > -	.mask		= CLOCKSOURCE_MASK(32),
+> > +	.read		= timrotv1_get_cycles,
+> > +	.mask		= CLOCKSOURCE_MASK(16),
+> >  	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
+> >  };
+> >  
+> > @@ -239,12 +234,11 @@ static int __init mxs_clocksource_init(struct clk *timer_clk)
+> >  {
+> >  	unsigned int c = clk_get_rate(timer_clk);
+> >  
+> > -	if (timrot_is_v1()) {
+> > -		clocksource_mxs.read = timrotv1_get_cycles;
+> > -		clocksource_mxs.mask = CLOCKSOURCE_MASK(16);
+> > -	}
+> > -
+> > -	clocksource_register_hz(&clocksource_mxs, c);
+> > +	if (timrot_is_v1())
+> > +		clocksource_register_hz(&clocksource_mxs, c);
+> > +	else
+> > +		clocksource_mmio_init(mxs_timrot_base + HW_TIMROT_RUNNING_COUNTn(1)),
+>                                                                                    ^
+> Mismatched parenthesis
 > 
-> Not really.
+Other than that,
+
+Acked-by: Shawn Guo <shawn.guo@freescale.com>
+
+Tested on both i.MX23 and i.MX28.
+
+> > +			"mxs_timer", c, 200, 32, clocksource_mmio_readl_down);
+> >  
+> >  	return 0;
+> >  }
 > 
-> Firstly, what is the security goal of these restrictions? [...]
 
-To do what i described above? Namely:
-
- " Sandboxed code should only be allowed to open files in /home/sandbox/, /lib/
-   and /usr/lib/ "
-
-> [...]  Then, are the restrictions complete and unbypassable?
-
-If only the system calls i mentioned are allowed, and if the sandboxed VFS 
-namespace itself is isolated from the rest of the system (no bind mounts, no 
-hard links outside the sandbox, etc.) then its goal is to not be bypassable - 
-what use is a sandbox if the sandbox can be bypassed by the sandboxed code?
-
-There's a few ways how to alter (and thus bypass) VFS namespace lookups: 
-symlinks, chdir, chroot, rename, etc., which (as i mentioned) have to be 
-excluded by default or filtered as well.
-
-> How do you reason about the behavior of the system as a whole?
-
-For some usecases i mainly want to reason about what the sandboxed code can do 
-and can not do, within a fairly static and limited VFS namespace environment.
-
-I might not want to have a full-blown 'physical barrier' for all objects 
-labeled as inaccessible to sandboxed code (or labeled as accessible to 
-sandboxed code).
-
-Especially as manipulating file labels is not also slow (affects all files) but 
-is also often an exclusively privileged operation even for owned files, for no 
-good reason. For things like /lib/ and /usr/lib/ it also *has* to be a 
-privileged operation.
-
-> > I argue that this is the LSM and audit subsystems designed right: in the 
-> > long run it could allow everything that LSM does at the moment - and so 
-> > much more ...
-> 
-> Now you're proposing a redesign of the security subsystem.  That's a 
-> significant undertaking.
-
-It certainly is.
-
-> In the meantime, we have a simple, well-defined enhancement to seccomp which 
-> will be very useful to current users in reducing their kernel attack surface.
-> 
-> We should merge that, and the security subsystem discussion can carry on 
-> separately.
-
-Is that the development and merge process along which the LSM subsystem got 
-into its current state?
-
-Thanks,
-
-	Ingo
+-- 
+Regards,
+Shawn
