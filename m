@@ -1,44 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 08:49:28 +0100
-Subject: [PATCH] shmobile: fix map_io init usage
-In-Reply-To: <BANLkTikorWv-9VnRG51v30YFQksRMxVS5Q@mail.gmail.com>
-References: <1304267322-19022-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110513015653.GM18952@game.jcrosoft.org>
-	<BANLkTikorWv-9VnRG51v30YFQksRMxVS5Q@mail.gmail.com>
-Message-ID: <20110516074928.GJ30539@n2100.arm.linux.org.uk>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Mon, 16 May 2011 10:51:27 +0300
+Subject: [PATCH 2/2] ARM: fix the note about dcache lazy flushing for SMP
+	systems
+In-Reply-To: <1305225183-15521-2-git-send-email-saeed@marvell.com>
+References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
+	<1305225183-15521-2-git-send-email-saeed@marvell.com>
+Message-ID: <BANLkTi=j=ebKkc22pyFWBYtqmy5WNBc+_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 01:28:34PM +0900, Magnus Damm wrote:
-> On Fri, May 13, 2011 at 10:56 AM, Jean-Christophe PLAGNIOL-VILLARD
-> <plagnioj@jcrosoft.com> wrote:
-> > On 18:28 Sun 01 May ? ? , Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >> switch early init to init_early and introduce soc map_io
-> >>
-> >> with this Patch we will not do any more early device setup during the map io
-> >>
-> >> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> >> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
-> >> Cc: Paul Mundt <lethal@linux-sh.org>
-> >> Cc: Magnus Damm <magnus.damm@gmail.com>
-> > ping
-> 
-> Why? The device init order is changed by this patch to setup the
-> serial console later. I fail to see the benefit. Basically, the serial
-> console setup is delayed to happen in ->init_early() instead of
-> ->map_io(). In practice this means that we restrict ourselves to not
-> be able to output debug messages on the serial console from a bunch of
-> calls in setup_arch().
+On Thu, May 12, 2011 at 9:33 PM, Saeed Bishara <saeed@marvell.com> wrote:
+>
+> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+> ---
+> ?arch/arm/mm/flush.c | ? ?3 ++-
+> ?1 files changed, 2 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+> index f1b7998..e632363 100644
+> --- a/arch/arm/mm/flush.c
+> +++ b/arch/arm/mm/flush.c
+> @@ -275,7 +275,8 @@ void __sync_icache_dcache(pte_t pteval)
+> ?* ?kernel cache lines for later. ?Otherwise, we assume we have
+> ?* ?aliasing mappings.
+> ?*
+> - * Note that we disable the lazy flush for SMP.
+> + * Note that we disable the lazy flush for SMP configurations where
+> + * the cache maintenance operations are not automatically broadcasted
+> ?*/
+> ?void flush_dcache_page(struct page *page)
+> ?{
+can you please review this one?
+also, the rest of this function documentation is not coherent with the
+code itself any more, for example, this function flushes the dcache to
+prevent I cache incoherency.
+can you please updated the comments to reflect what this function actually does?
 
-Because that's how its supposed to work.  map_io is for setting up the
-device mappings.  Those mappings need flushing out to RAM on some CPUs
-to be visible, and that's taken care of _after_ map_io has returned.
-
-If the page table entries haven't found their way to RAM, accessing
-devices in map_io will cause a fault, and produce a silently non-booting
-kernel.  With a write-alloc writeback cache policy, this becomes more
-likely than the default policy of a read-alloc writeback cache.
-
-Platforms should not do their own cache and TLB maintainence in their
-map_io callback to make it work either - should we need to change
-things that means going through all platforms.
+saeed
