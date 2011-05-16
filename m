@@ -1,61 +1,27 @@
-From: avinashhm@ti.com (Avinash.H.M.)
-Date: Mon, 16 May 2011 12:23:01 +0530
-Subject: [PATCHv2 2/2] [RFC] OMAP4: clock data: shrink more clock data.
-In-Reply-To: <1305495958-2236-3-git-send-email-vzapolskiy@gmail.com>
-References: <1305495958-2236-1-git-send-email-vzapolskiy@gmail.com>
-	<1305495958-2236-3-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <20110516065301.GA12703@avinash-laptop>
+From: Hiroshi.DOYU@nokia.com (Hiroshi DOYU)
+Date: Mon, 16 May 2011 10:11:57 +0300 (EEST)
+Subject: [PATCH] omap: iommu: fix pte attributes for super section
+In-Reply-To: <BANLkTinqPkftv7KmghCCBpEdULh0cNivHg@mail.gmail.com>
+References: <BANLkTinqPkftv7KmghCCBpEdULh0cNivHg@mail.gmail.com>
+Message-ID: <20110516.101157.344277473342871979.Hiroshi.DOYU@nokia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 12:45:58AM +0300, Vladimir Zapolskiy wrote:
-> This mass change continues the reduction of homogeneous data chunks
-> along clock definitions. No semantical difference is added in the
-> change.
+From: "ext Anna, Suman" <s-anna@ti.com>
+Subject: [PATCH] omap: iommu: fix pte attributes for super section
+Date: Tue, 10 May 2011 10:25:17 -0700
+
+> From 5796d8d8a0ea5aee342b78ca6ead229971cff6c5 Mon Sep 17 00:00:00 2001
+> From: Suman Anna <s-anna@ti.com>
+> Date: Wed, 4 May 2011 17:45:37 -0500
+> Subject: [PATCH] omap: iommu: fix pte attributes for super section
 > 
-> Signed-off-by: Vladimir Zapolskiy <vzapolskiy@gmail.com>
-> ---
+> The PTE programming causes a 16MB entry to be interpreted
+> as a 4K entry because of the bitwise check, and therefore does
+> not set the attributes properly in the first-level descriptor
+> table. The bitwise check has been replaced appropriately.
+> 
+> Signed-off-by: Suman Anna <s-anna@ti.com>
+Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-[ ... ]
-
-> +DEFINE_CLOCK_DM(gpu_fck, dpll_core_m7x2_ck, l3_gfx_clkdm,
-> +		CLOCK_OPS_DFLT_SW(CM_GFX_GFX),
-> +		CLOCK_CLKSEL0(sgx_clk_mux_sel,
-> +			      CM_GFX_GFX_CLKCTRL, CLKSEL_SGX_FCLK));
->  
-
-Hi Vladimir ,
-
-With this the rate wouldn't get initialised and it throws a warning at
-boot.
-
-[    0.000000] ------------[ cut here ]------------
-[    0.000000] WARNING: at arch/arm/mach-omap2/clkt_clksel.c:194 omap2_clksel_recalc+0xd4/0xe4()
-[    0.000000] clock: Could not find fieldval 1 for clock gpu_fck parent dpll_core_m7x2_ck
-[    0.000000] Modules linked in:
-[    0.000000] [<c005fd5c>] (unwind_backtrace+0x0/0xe4) from [<c00921b4>] (warn_slowpath_common+0x4c/0x64)
-[    0.000000] [<c00921b4>] (warn_slowpath_common+0x4c/0x64) from [<c009224c>] (warn_slowpath_fmt+0x2c/0x3c)
-[    0.000000] [<c009224c>] (warn_slowpath_fmt+0x2c/0x3c) from [<c0072594>] (omap2_clksel_recalc+0xd4/0xe4)
-[    0.000000] [<c0072594>] (omap2_clksel_recalc+0xd4/0xe4) from [<c007712c>] (propagate_rate+0x24/0x50)
-[    0.000000] [<c007712c>] (propagate_rate+0x24/0x50) from [<c0077138>] (propagate_rate+0x30/0x50)
-[    0.000000] ---[ end trace 1b75b31a2719ed1c ]---
-
-Will be fixed with this change below :
-
--		CLOCK_CLKSEL0(sgx_clk_mux_sel,
-+		CLOCK_CLKSEL_INIT(sgx_clk_mux_sel,
-
-May be CLOCK_CLKSEL0 is not required altogether. I see it used only to
-initialise gpu_fck. May be can remove this.
-
-I boot tested it on 4430 sdp. FWIW , you can add 
-Tested-by: Avinash.H.M. <avinashhm@ti.com>
-
-thanks,
-
-- Avinash
- 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Thanks, checked with OMAP2/3 TRM.
