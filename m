@@ -1,26 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 14:42:51 +0100
-Subject: [PATCH 1/2] ARM: remove unneeded check of the
-	cache_is_vipt_nonaliasing()
-In-Reply-To: <FCBE654890C0334289D0AD3AF4EF009F01162C9200EB@IL-MB01.marvell.com>
-References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
-	<BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
-	<BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
-	<BANLkTikWJzdYOrk4=gte8zOHDVioGAOhhg@mail.gmail.com>
-	<BANLkTimFst-+LEuN9cDpAtRiF4aDOipAKA@mail.gmail.com>
-	<20110516110032.GO30539@n2100.arm.linux.org.uk>
-	<FCBE654890C0334289D0AD3AF4EF009F01162C9200E2@IL-MB01.marvell.com>
-	<1305544307.19230.8.camel@e102109-lin.cambridge.arm.com>
-	<FCBE654890C0334289D0AD3AF4EF009F01162C9200EB@IL-MB01.marvell.com>
-Message-ID: <20110516134251.GS30539@n2100.arm.linux.org.uk>
+From: lrg@ti.com (Liam Girdwood)
+Date: Mon, 16 May 2011 14:45:29 +0100
+Subject: [PATCH] omap: Remove support for omap2evm (Re: Updated mach-types
+	update)
+In-Reply-To: <20110513144031.GV31483@atomide.com>
+References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
+	<20110320114137.GD16646@n2100.arm.linux.org.uk>
+	<20110324175945.GV2811@atomide.com>
+	<20110513115406.GQ31483@atomide.com>
+	<20110513151916.77eba011.jhnikula@gmail.com>
+	<20110513144031.GV31483@atomide.com>
+Message-ID: <4DD12A79.3090303@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 02:15:35PM +0300, Saeed Bishara wrote:
-> >Please add your Signed-off-by as well.
-> Sure.
-> Russle, I submitted the previous patch to patch system, how should
-> change its status to discarded then upload new one?
+On 13/05/11 15:40, Tony Lindgren wrote:
+> * Jarkko Nikula <jhnikula@gmail.com> [110513 05:15]:
+>> On Fri, 13 May 2011 04:54:07 -0700
+>> Tony Lindgren <tony@atomide.com> wrote:
+>>
+>>> * Tony Lindgren <tony@atomide.com> [110324 10:57]:
+>>>> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110320 04:39]:
+>>>>> On Sun, Mar 20, 2011 at 11:03:22AM +0000, Russell King - ARM Linux wrote:
+>>>>>
+>>>>> Note that OMAP references machine_is_omap2evm() yet this has never been
+>>>>> merged.
+>>>>>
+>>>>> arch/arm/plat-omap/include/plat/uncompress.h:
+>>>>>
+>>>>>                 DEBUG_LL_OMAP2(1, omap2evm);
+>>>>>
+>>>>> so this entry needs to be removed.
+>>>>
+>>>> Hmm looks like we have LCD support and ASoC support for it, but no
+>>>> board :)
+>>>>
+>>>> Anybody working with this board?
+>>>>
+>>>> If so, please send patches for the related board-*.c support ASAP.
+>>>> Otherwise let's plan on deleting the related support.
+>>>
+>>> No patches, so let's remove it. Here's the patch to do that,
+>>> I'm planning to add this to my devel-cleanup branch.
+>>>
+>> Remove also from sound/soc/omap/Kconfig as well. You could put my
+>> ack for sound/soc/omap part but remember cc also Mark and Liam.
+> 
+> Thanks, here's the updated patch.
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Fri, 13 May 2011 04:41:32 -0700
+> Subject: [PATCH] omap: Remove support for omap2evm
+> 
+> The board support has never been merged for it as noticed
+> by Russell King <linux@arm.linux.org.uk>. So let's remove the
+> related dead code.
+> 
+> Cc: linux-fbdev at vger.kernel.org
+> Cc: alsa-devel at alsa-project.org
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> Cc: Liam Girdwood <lrg@ti.com>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Tomi Valkeinen <tomi.valkeinen@ti.com>
+> Acked-by: Jarkko Nikula <jhnikula@gmail.com>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> 
 
-Submit the new one in the standard way.  I'll sort out the old one once
-I see the new appear.
+Acked-by: Liam Girdwood <lrg@ti.com>
