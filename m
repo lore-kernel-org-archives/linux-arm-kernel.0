@@ -1,79 +1,90 @@
-From: dongas86@gmail.com (Dong Aisheng)
-Date: Tue, 17 May 2011 00:16:46 +0800
-Subject: [PATCH V2 1/1] ARM: dmabounce: fix dmabounce may cause crash issue
-In-Reply-To: <1301291632-11353-1-git-send-email-b29396@freescale.com>
-References: <1301291632-11353-1-git-send-email-b29396@freescale.com>
-Message-ID: <BANLkTimZnmFbg7fKw7CY_wpK2Eq3x_do_w@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 16 May 2011 12:23:46 -0400
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
+	call filtering
+In-Reply-To: <20110513145737.GC32688@elte.hu>
+References: <alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu> <1305289146.2466.8.camel@twins>
+	<20110513122646.GA3924@elte.hu> <1305290370.2466.14.camel@twins>
+	<1305290612.2466.17.camel@twins> <20110513125452.GD3924@elte.hu>
+	<1305292132.2466.26.camel@twins> <20110513131800.GA7883@elte.hu>
+	<1305294935.2466.64.camel@twins>  <20110513145737.GC32688@elte.hu>
+Message-ID: <1305563026.5456.19.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/3/28 Aisheng.Dong <b29396@freescale.com>:
-> The map_single does not check if dev is NULL which may cause kernel panic
-> like follows:
-> Unable to handle kernel NULL pointer dereference at virtual address 000000bc
-> pgd = 80004000
-> [000000bc] *pgd=00000000
-> Internal error: Oops: 5 [#1] PREEMPT
-> last sysfs file:
-> Modules linked in:
-> CPU: 0 ? ?Not tainted ?(2.6.35.3-00845-g204c152-dirty #112)
-> PC is at dma_map_single+0x2c/0x2a0
-> LR is at fec_enet_interrupt+0x1d4/0x450
-> pc : [<8003cf04>] ? ?lr : [<802936b8>] ? ?psr: 60000193
-> sp : 80809ec8 ?ip : 00000080 ?fp : 99308040
-> r10: 99308040 ?r9 : 00000002 ?r8 : 99074f00
-> r7 : fa0a5000 ?r6 : 00000000 ?r5 : 00000060 ?r4 : 992e4000
-> r3 : 00000002 ?r2 : 8080cac0 ?r1 : 99308040 ?r0 : 00000000
->
-> The patch checks the dev to avoid this issue and align with the
-> original dma_map_single to allow dev is NULL.
->
-> Signed-off-by: Aisheng.Dong <b29396@freescale.com>
-> Signed-off-by: Jason.Liu <r64343@freescale.com>
->
-> ---
-> Changes for v2:
-> ?Address the comments from Mikael:
-> ?-Fix device_info may be used uninitialized.
-> ---
-> ?arch/arm/common/dmabounce.c | ? ?7 +++++--
-> ?1 files changed, 5 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/common/dmabounce.c b/arch/arm/common/dmabounce.c
-> index e568163..789e84a 100644
-> --- a/arch/arm/common/dmabounce.c
-> +++ b/arch/arm/common/dmabounce.c
-> @@ -222,16 +222,19 @@ static struct safe_buffer *find_safe_buffer_dev(struct device *dev,
-> ?static inline dma_addr_t map_single(struct device *dev, void *ptr, size_t size,
-> ? ? ? ? ? ? ? ?enum dma_data_direction dir)
-> ?{
-> - ? ? ? struct dmabounce_device_info *device_info = dev->archdata.dmabounce;
-> + ? ? ? struct dmabounce_device_info *device_info = NULL;
-> ? ? ? ?dma_addr_t dma_addr;
-> ? ? ? ?int needs_bounce = 0;
->
-> + ? ? ? if (dev)
-> + ? ? ? ? ? ? ? device_info = dev->archdata.dmabounce;
-> +
-> ? ? ? ?if (device_info)
-> ? ? ? ? ? ? ? ?DO_STATS ( device_info->map_op_count++ );
->
-> ? ? ? ?dma_addr = virt_to_dma(dev, ptr);
->
-> - ? ? ? if (dev->dma_mask) {
-> + ? ? ? if (dev && dev->dma_mask) {
-> ? ? ? ? ? ? ? ?unsigned long mask = *dev->dma_mask;
-> ? ? ? ? ? ? ? ?unsigned long limit;
->
-> --
-> 1.7.0.4
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+On Fri, 2011-05-13 at 16:57 +0200, Ingo Molnar wrote:
 
-PING...
+> > > > Then there's the whole indirection argument, if you don't need
+> > > > indirection, its often better to not use it, I myself much prefer code
+> > > > to look like:
+> > > > 
+> > > >    foo1(bar);
+> > > >    foo2(bar);
+> > > >    foo3(bar);
+> > > > 
+> > > > Than:
+> > > > 
+> > > >    foo_notifier(bar);
+> > > > 
+> > > > Simply because its much clearer who all are involved without me having
+> > > > to grep around to see who registers for foo_notifier and wth they do
+> > > > with it. It also makes it much harder to sneak in another user, whereas
+> > > > its nearly impossible to find new notifier users.
+> > > > 
+> > > > Its also much faster, no extra memory accesses, no indirect function
+> > > > calls, no other muck.
+> > > 
+> > > But i suspect this question has been settled, given the fact that even pure 
+> > > observer events need and already process a chain of events? Am i missing 
+> > > something about your argument?
+> > 
+> > I'm saying that there's reasons to not use notifiers passive or active.
+> > 
+> > Mostly the whole notifier/indirection muck comes up once you want
+> > modules to make use of the thing, because then you need dynamic
+> > management of the callback list.
+> 
+> But your argument assumes that we'd have a chain of functions to call, like 
+> regular notifiers.
+> 
+> While the natural model here would be to have a list of registered event 
+> structs for that point, with different filters but basically the same callback 
+> mechanism (a call into the filter engine in essence).
+> 
+> Also note that the common case would be no event registered - and we'd 
+> automatically optimize that case via the existing jump labels optimization.
+
+I agree that I prefer the "notifier" type over having direct function
+calls. Yes, it's easier to read and figure out what functions are
+called, but notifiers can be optimized for the default case where
+nothing is called (jump-label nop).
+
+> 
+> > (Then again, I'm fairly glad we don't have explicit callbacks in kernel/cpu.c 
+> > for all the cpu-hotplug callbacks :-)
+> > 
+> > Anyway, I oppose for the existing events to gain an active role.
+> 
+> Why if 'being active' is optional and useful?
+
+I'm a bit nervous about the 'active' role of (trace_)events, because of
+the way multiple callbacks can be registered. How would:
+
+	err = event_x();
+	if (err == -EACCESS) {
+
+be handled? Would we need a way to prioritize which call back gets the
+return value? One way I guess would be to add a check_event option,
+where you pass in an ENUM of the event you want:
+
+	event_x();
+	err = check_event_x(MYEVENT);
+
+If something registered itself as "MYEVENT" to event_x, then you get the
+return code of MYEVENT. If the MYEVENT was not registered, a -ENODEV or
+something could be returned. I'm sure we could even optimize it such a
+way if no active events have been registered to event_x, that
+check_event_x() will return -ENODEV without any branches.
+
+-- Steve
