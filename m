@@ -1,10 +1,10 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 May 2011 15:59:33 +0100
-Subject: [PATCH v5 4/8] ARM: VExpress: Use physmap driver instead of
+Date: Mon, 16 May 2011 15:59:34 +0100
+Subject: [PATCH v5 5/8] ARM: Integrator/AP: Use physmap driver instead of
 	integrator-flash
 In-Reply-To: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
 References: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1305557977-16871-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1305557977-16871-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,64 +12,73 @@ Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Cc: David Woodhouse <dwmw2@infradead.org>
 ---
- arch/arm/mach-vexpress/v2m.c |   22 ++++------------------
- 1 files changed, 4 insertions(+), 18 deletions(-)
+ arch/arm/mach-integrator/integrator_ap.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index ba46e8e..e326815 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -13,11 +13,11 @@
- #include <linux/sysdev.h>
- #include <linux/usb/isp1760.h>
- #include <linux/clkdev.h>
+diff --git a/arch/arm/mach-integrator/integrator_ap.c b/arch/arm/mach-integrator/integrator_ap.c
+index 980803f..11bd49e 100644
+--- a/arch/arm/mach-integrator/integrator_ap.c
++++ b/arch/arm/mach-integrator/integrator_ap.c
+@@ -31,6 +31,7 @@
+ #include <linux/clockchips.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
 +#include <linux/mtd/physmap.h>
  
- #include <asm/mach-types.h>
- #include <asm/sizes.h>
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+@@ -43,7 +44,6 @@
+ #include <mach/lm.h>
+ 
  #include <asm/mach/arch.h>
 -#include <asm/mach/flash.h>
+ #include <asm/mach/irq.h>
  #include <asm/mach/map.h>
  #include <asm/mach/time.h>
- #include <asm/hardware/arm_timer.h>
-@@ -206,27 +206,13 @@ static struct platform_device v2m_usb_device = {
- 	.dev.platform_data = &v2m_usb_config,
- };
+@@ -230,7 +230,7 @@ device_initcall(irq_init_sysfs);
+ #define EBI_CSR1 (VA_EBI_BASE + INTEGRATOR_EBI_CSR1_OFFSET)
+ #define EBI_LOCK (VA_EBI_BASE + INTEGRATOR_EBI_LOCK_OFFSET)
  
--static int v2m_flash_init(void)
--{
--	writel(0, MMIO_P2V(V2M_SYS_FLASH));
--	return 0;
--}
--
--static void v2m_flash_exit(void)
--{
--	writel(0, MMIO_P2V(V2M_SYS_FLASH));
--}
--
--static void v2m_flash_set_vpp(int on)
-+static void v2m_flash_set_vpp(struct map_info *map, int on)
+-static int ap_flash_init(void)
++static int ap_flash_init(struct platform_device *dev)
  {
- 	writel(on != 0, MMIO_P2V(V2M_SYS_FLASH));
+ 	u32 tmp;
+ 
+@@ -247,7 +247,7 @@ static int ap_flash_init(void)
+ 	return 0;
  }
  
--static struct flash_platform_data v2m_flash_data = {
+-static void ap_flash_exit(void)
++static void ap_flash_exit(struct platform_device *dev)
+ {
+ 	u32 tmp;
+ 
+@@ -263,15 +263,14 @@ static void ap_flash_exit(void)
+ 	}
+ }
+ 
+-static void ap_flash_set_vpp(int on)
++static void ap_flash_set_vpp(struct map_info *map, int on)
+ {
+ 	void __iomem *reg = on ? SC_CTRLS : SC_CTRLC;
+ 
+ 	writel(INTEGRATOR_SC_CTRL_nFLVPPEN, reg);
+ }
+ 
+-static struct flash_platform_data ap_flash_data = {
 -	.map_name	= "cfi_probe",
-+static struct physmap_flash_data v2m_flash_data = {
++static struct physmap_flash_data ap_flash_data = {
  	.width		= 4,
--	.init		= v2m_flash_init,
--	.exit		= v2m_flash_exit,
- 	.set_vpp	= v2m_flash_set_vpp,
+ 	.init		= ap_flash_init,
+ 	.exit		= ap_flash_exit,
+@@ -285,7 +284,7 @@ static struct resource cfi_flash_resource = {
  };
  
-@@ -243,7 +229,7 @@ static struct resource v2m_flash_resources[] = {
- };
- 
- static struct platform_device v2m_flash_device = {
+ static struct platform_device cfi_flash_device = {
 -	.name		= "armflash",
 +	.name		= "physmap-flash",
- 	.id		= -1,
- 	.resource	= v2m_flash_resources,
- 	.num_resources	= ARRAY_SIZE(v2m_flash_resources),
+ 	.id		= 0,
+ 	.dev		= {
+ 		.platform_data	= &ap_flash_data,
 -- 
 1.7.0.4
