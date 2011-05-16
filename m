@@ -1,84 +1,42 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 16 May 2011 22:13:19 +0530
-Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
-In-Reply-To: <BANLkTimMSPmqD+kyz1EJUrH9sS=qWRZymw@mail.gmail.com>
-References: <1290060899-9786-1-git-send-email-ccross@android.com>	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>	<4D70BE9D.4000507@stericsson.com>	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>	<4D714C17.7080102@gmail.com>	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>	<alpine.LFD.2.02.1105131138460.2831@ionos>	<BANLkTimxkY4MvQ+-qiOwdwbo7jPUAQ1vxw@mail.gmail.com>	<alpine.LFD.2.02.1105141749510.3078@ionos>	<4DD10814.1010103@ti.com>	<alpine.LFD.2.02.1105161642250.3078@ionos>
-	<BANLkTimMSPmqD+kyz1EJUrH9sS=qWRZymw@mail.gmail.com>
-Message-ID: <4DD15427.7080506@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 16 May 2011 18:48:38 +0200
+Subject: [PATCH 0/7] ARM: Removing ARCH_S5PC100
+In-Reply-To: <201105131555.42860.anarsoul@gmail.com>
+References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
+	<201105131555.42860.anarsoul@gmail.com>
+Message-ID: <000901cc13e9$1a9a2880$4fce7980$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/16/2011 9:59 PM, Colin Cross wrote:
-> On Mon, May 16, 2011 at 7:44 AM, Thomas Gleixner<tglx@linutronix.de>  wrote:
->> On Mon, 16 May 2011, Santosh Shilimkar wrote:
->>> On 5/14/2011 9:21 PM, Thomas Gleixner wrote:
->>> Just for my understanding, the clockevents_reconfigure() needs to
->>> be called with interrupts disabled on that CPU as part of
->>> the CPUFREQ notifiers. I assume the right place is do it
->>> in POST notifier after the CPU clock and hence TWD clock is
->>> updated. Is that right ?
->>
->> Yes.
->
-> Is it safe to only call it in POST?  If the frequency is increasing,
-> and the TWD is not updated until after the CPU frequency has changed,
-> it is possible for a clockevent to fire too early.  Will that cause
-> problems, or does the clockevent code check against a clocksource to
-> ensure the desired time has been reached?  If that is OK, it
-> drastically simplifies the code, because the driver only needs to know
-> the current TWD frequency, not predict a future TWD frequency.
->
-This was the exact reason I asked this question. As discussed
-earlier on this thread, we observed drift in ticks especially
-at lowest and highest clock-points. But they way I understood
-is clockevents_reconfigure() will block those additional
-ticks at least during the reconfiguration of the clock-event.
+Hello,
 
+On Friday, May 13, 2011 2:56 PM Vasily Khoruzhick wrote:
 
->>> Since there is need to call this API in interrupt
->>> disable context, does it make sense to take care of it
->>> inside the API itself instead of relying on caller fn ?
->>
->> Hmm, no strong opinion
->
-> For SMP TWD, the caller will always be in interrupt disabled mode,
-> because the cpufreq notifier will get called on a random cpu, so
-> smp_call_function_single will be used to transition to the correct
-> cpu, which disables interrupts.
->
-Ok. So it's indirectly taken care then.
+> On Thursday 12 May 2011 04:11:07 Kukjin Kim wrote:
+> > This patch remvoes mach-s5pc100 directory for ARCH_S5PC100 in arch/arm.
+> 
+> Hm, what's the point of removing this code?
 
->>> The arch's where the per CPU TWD's share clock, per-cpu
->>> clock-events should be reconfigured on all CPUs, whenever
->>> the parent(CPU) clock has changed using some thing like
->>> smp_call_function_any() etc. Is that right understanding?
->>
->> Yes. If that's a common requirement we should move that to core code.
->
-> Santosh, are you suggesting the TWD be updated from the clock
-> framework instead of the cpufreq notifier?
->
-That's where I was kind of leaning to. Basically doing this in common
-core code at one place and possibly outside the ARM TWD library. You
-might get same requirement on other arch's in future.
+May I also ask the same? What's the point in removing WORKING support for
+the whole SoC series? There are some S5PC100 based boards available on the
+market and they are still being used for embedded Linux development.
 
-> I believe ARMv7 requires all CPUs to run at the same frequency, so it
-> would be possible to do this in the core code somewhere, but A15 has
-> fixed frequency counters, and all SMP Cortex-A9s I've seen use the SMP
-> TWD driver, so in practice this may end up being the only user.
->
-Yes but the code managing the architectural timer(A15) and TWD(A9) is
-different. But I understand your point about the usage and it
-might be limited to CA9 at this point of time.
+The issues with ARM kernel tree is not about the number of supported
+SoCs/sub-platform but the fact that a lots of code is somehow duplicated
+between different arm sub-architecture. The goal is to identify such code
+and unify it. There have been a lot of discussion about this on Linaro
+Meeting in Budapest. For more information please take a look at etherpad
+notes available here:
 
-> It would be possible for the clockevent to have a flag
-> CLOCKEVENT_EVT_FEAT_SCALES_WITH_CPU, which registers a cpufreq
-> notifier, if there were any other users.
- >
-Something like this is better to get better clarity on the
-hardware behavior. O.w we will have piece of code in TWD
-library which needs proper documentation about the
-usage of likes of smp_call_function_single().
+http://summit.ubuntu.com/uds-o/track/linaro-kernel/
 
-Regards
-Santosh
+(etherpad links for each session are available via 'notepad' image near
+the session title).
+
+I recommend to read all the notes from all five 'Arm Linus Interface'
+sessions. 
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
