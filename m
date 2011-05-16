@@ -1,29 +1,54 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 18:18:34 +0100
-Subject: [PATCH] clocksource: use the correct base address to setup timer 0
-In-Reply-To: <0D753D10438DA54287A00B027084269764D2E0E732@AUSP01VMBX24.collaborationhost.net>
-References: <201105161008.30604.hartleys@visionengravers.com>
-	<20110516171618.GA13659@n2100.arm.linux.org.uk>
-	<0D753D10438DA54287A00B027084269764D2E0E732@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20110516171834.GC13659@n2100.arm.linux.org.uk>
+Date: Mon, 16 May 2011 18:23:34 +0100
+Subject: [PATCH v2 00/19] Consolidate simple ARM MMIO clock sources
+Message-ID: <20110516172334.GD13659@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 12:17:44PM -0500, H Hartley Sweeten wrote:
-> On Monday, May 16, 2011 10:16 AM, Russell King wrote:
-> > On Mon, May 16, 2011 at 10:08:30AM -0700, H Hartley Sweeten wrote:
-> >> The static variable clksrc_base was removed by:
-> >> 
-> >> commit 3f3808c30612334e38e0641024d2c020c0eda7d4
-> >> 
-> >> Use the base address passed to sp804_clocksource_init() when
-> >> doing the setup for timer 0.
-> >> 
-> >> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> >> Cc: Russell King <linux@arm.linux.org.uk>
-> >
-> > This has already been fixed.
-> 
-> Ok. Thanks for the info.
+This is a re-posting of the clocksource patches, which includes some
+other updates.  This includes bcmring in the update.
 
-I'm about to repost the entire series.
+In a similar light to the i8253 series, this consolidates 17 ARM
+MMIO counter clocksources into a single common implementation.  This
+common implementation caters for 32-bit and 16-bit register access
+sizes, up and down counters, and various bit sizes of those counters.
+
+Patch 1 is already in John Stultz tree, but is included for
+completeness and to get rid of a build warning.
+
+ arch/arm/Kconfig                         |   15 ++
+ arch/arm/common/timer-sp.c               |   80 +++++++----
+ arch/arm/include/asm/hardware/timer-sp.h |    4 +-
+ arch/arm/mach-bcmring/core.c             |  220 +++++++-----------------------
+ arch/arm/mach-integrator/Kconfig         |    1 +
+ arch/arm/mach-integrator/integrator_ap.c |   21 +---
+ arch/arm/mach-integrator/integrator_cp.c |   11 ++-
+ arch/arm/mach-ixp4xx/common.c            |   16 +--
+ arch/arm/mach-lpc32xx/timer.c            |   17 +--
+ arch/arm/mach-mxs/timer.c                |   20 +--
+ arch/arm/mach-netx/time.c                |   16 +--
+ arch/arm/mach-omap1/time.c               |   69 +++-------
+ arch/arm/mach-pxa/time.c                 |   17 +--
+ arch/arm/mach-realview/core.c            |   13 ++-
+ arch/arm/mach-sa1100/time.c              |   24 +---
+ arch/arm/mach-tcc8k/time.c               |   16 +--
+ arch/arm/mach-tegra/timer.c              |   16 +--
+ arch/arm/mach-u300/timer.c               |   18 +--
+ arch/arm/mach-versatile/core.c           |   13 ++-
+ arch/arm/mach-vexpress/ct-ca9x4.c        |   17 ++-
+ arch/arm/mach-vexpress/v2m.c             |   17 ++-
+ arch/arm/mach-w90x900/time.c             |   17 +--
+ arch/arm/plat-mxc/epit.c                 |   18 +--
+ arch/arm/plat-mxc/time.c                 |   38 +----
+ arch/arm/plat-nomadik/Kconfig            |    1 +
+ arch/arm/plat-nomadik/timer.c            |   31 +----
+ arch/arm/plat-omap/Kconfig               |    1 +
+ arch/arm/plat-orion/time.c               |   21 +---
+ arch/arm/plat-s5p/s5p-time.c             |   58 +++------
+ arch/arm/plat-spear/time.c               |   16 +--
+ drivers/Kconfig                          |    3 +
+ drivers/clocksource/Kconfig              |    2 +
+ drivers/clocksource/Makefile             |    1 +
+ drivers/clocksource/mmio.c               |   73 ++++++++++
+ include/linux/clocksource.h              |   10 ++-
+ 35 files changed, 354 insertions(+), 577 deletions(-)
