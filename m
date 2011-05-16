@@ -1,37 +1,60 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Mon, 16 May 2011 17:43:07 +0300
-Subject: [PATCH 1/2] ARM: remove unneeded check of the
-	cache_is_vipt_nonaliasing()
-In-Reply-To: <20110516134251.GS30539@n2100.arm.linux.org.uk>
-References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
-	<BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
-	<BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
-	<BANLkTikWJzdYOrk4=gte8zOHDVioGAOhhg@mail.gmail.com>
-	<BANLkTimFst-+LEuN9cDpAtRiF4aDOipAKA@mail.gmail.com>
-	<20110516110032.GO30539@n2100.arm.linux.org.uk>
-	<FCBE654890C0334289D0AD3AF4EF009F01162C9200E2@IL-MB01.marvell.com>
-	<1305544307.19230.8.camel@e102109-lin.cambridge.arm.com>
-	<FCBE654890C0334289D0AD3AF4EF009F01162C9200EB@IL-MB01.marvell.com>
-	<20110516134251.GS30539@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=iZdmxn8cWxoFTju=ejSXV3__J2w@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 16 May 2011 15:43:11 +0100
+Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
+	in thumb mode.
+In-Reply-To: <alpine.LFD.2.00.1105161008320.14430@xanadu.home>
+References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
+	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
+	<20110514100232.GC30539@n2100.arm.linux.org.uk>
+	<20110516121657.GA7715@arm.com>
+	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
+Message-ID: <20110516144311.GC7715@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 4:42 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, May 16, 2011 at 02:15:35PM +0300, Saeed Bishara wrote:
->> >Please add your Signed-off-by as well.
->> Sure.
->> Russle, I submitted the previous patch to patch system, how should
->> change its status to discarded then upload new one?
->
-> Submit the new one in the standard way. ?I'll sort out the old one once
-> I see the new appear.
-done.
-btw, the first attempt fail with the following error:
-Your request to update the patch failed because:
+On Mon, May 16, 2011 at 10:32:16AM -0400, Nicolas Pitre wrote:
+> On Mon, 16 May 2011, Dave Martin wrote:
+> 
+> > On Sat, May 14, 2011 at 11:02:32AM +0100, Russell King - ARM Linux wrote:
+> > > On Sat, May 14, 2011 at 10:59:14AM +0100, Catalin Marinas wrote:
+> > > > On 13 May 2011 20:53, Vadim Bendebury <vbendeb@google.com> wrote:
+> > > > > This is a cosmetic change, adding a '_thumb' prefix to the
+> > > > > 'Hardware' line in /proc/cpuinfo. Tested as follows:
+> > > > >
+> > > > > localhost ~ # dmesg | grep thumb
+> > > > > [ ? ?0.000000] Machine: kaen_thumb
+> > > > > localhost ~ # grep '^Hardware' /proc/cpuinfo
+> > > > > Hardware ? ? ? ?: kaen_thumb
+> > > > > localhost ~ #
+> > > > 
+> > > > Would this break any script parsing this file?
+> > > > 
+> > > > BTW, why do you need it? You could include the .config into the kernel
+> > > > and read it via /proc.
+> > > 
+> > > Whether the kernel is built T2 or ARM doesn't change the userland API
+> > > either, so there's no real need for userland to know how the kernel
+> > > was built.
+> > > 
+> > > The only thing which is affected by it are kernel modules, but then we
+> > > have an established way to sort out incompatible kernel modules already.
+> > 
+> > One corollary to that is that _if_ there's any reason why userland needs to 
+> > know what instruction set the kernel was built with, then we're probably
+> > doing something wrong somewhere...
+> > 
+> > In any case, shoehorning this information into the hardware platform name
+> > seems a bit strange since this is really nothing to do with the hardware.
+> > 
+> > Vadim, can you explain why you think this information is needed?  If the
+> > need is real, perhaps there's a better way to address it.
+> 
+> I think this can be useful to know how the kernel was compiled for bug 
+> tracking purposes, just like we record the Git commit ID of the checked 
+> out source tree, the gcc version, the build date, etc.  Which pretty 
+> much indicates that the thumbness of the kernel should probably be 
+> stored in the kernel banner not the platform name.
 
-    An internal state error was detected.
+That seems a reasonable approach to me.
 
-the second attempt succeeded.
-saeed
+---Dave
