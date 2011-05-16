@@ -1,106 +1,195 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 May 2011 18:31:16 +0100
-Subject: [PATCH 17/19] clockevents: ARM sp804: obtain sp804 timer rate via clks
+Date: Mon, 16 May 2011 18:31:36 +0100
+Subject: [PATCH 18/19] ARM: bcmring: convert to sp804 clocksource
 In-Reply-To: <20110516172334.GD13659@n2100.arm.linux.org.uk>
 References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-Message-ID: <E1QM1dU-0003EL-9p@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QM1do-0003EP-DQ@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows platforms to specify the rate of the SP804 clockevent via
-the clk subsystem.  While ARM boards clock these at 1MHz, BCMRing also
-has SP804 timers but are clocked at different rates.
+bcmring has a set of four sp804 timers incorporated, yet it has its
+own copy of the sp804 code.  Convert its clocksource implementation
+to the standard sp804 support code.
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Jiandong Zheng <jdzheng@broadcom.com>
+Cc: Scott Branden <sbranden@broadcom.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/common/timer-sp.c        |   16 ++++++++--------
- arch/arm/mach-vexpress/ct-ca9x4.c |    4 ++++
- arch/arm/mach-vexpress/v2m.c      |    4 ++++
- 3 files changed, 16 insertions(+), 8 deletions(-)
+ arch/arm/Kconfig             |    1 +
+ arch/arm/mach-bcmring/core.c |  108 +++++++++++++++++-------------------------
+ 2 files changed, 45 insertions(+), 64 deletions(-)
 
-diff --git a/arch/arm/common/timer-sp.c b/arch/arm/common/timer-sp.c
-index bf92afe..1707c92 100644
---- a/arch/arm/common/timer-sp.c
-+++ b/arch/arm/common/timer-sp.c
-@@ -28,12 +28,6 @@
- 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 43f003a..903c9c4 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -297,6 +297,7 @@ config ARCH_BCMRING
+ 	depends on MMU
+ 	select CPU_V6
+ 	select ARM_AMBA
++	select ARM_TIMER_SP804
+ 	select CLKDEV_LOOKUP
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index 8fc2035..0ea33ff 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -37,6 +37,7 @@
+ #include <linux/io.h>
+ #include <asm/irq.h>
  #include <asm/hardware/arm_timer.h>
++#include <asm/hardware/timer-sp.h>
+ #include <asm/mach-types.h>
  
--/*
-- * These timers are currently always setup to be clocked at 1MHz.
-- */
--#define TIMER_FREQ_KHZ	(1000)
--#define TIMER_RELOAD	(TIMER_FREQ_KHZ * 1000 / HZ)
+ #include <asm/mach/arch.h>
+@@ -97,6 +98,35 @@ static struct clk dummy_apb_pclk = {
+ 	.mode = CLK_MODE_XTAL,
+ };
+ 
++/* Timer 0 - 25 MHz, Timer3 at bus clock rate, typically  150-166 MHz */
++#if defined(CONFIG_ARCH_FPGA11107)
++/* fpga cpu/bus are currently 30 times slower so scale frequency as well to */
++/* slow down Linux's sense of time */
++#define TIMER0_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
++#define TIMER1_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
++#define TIMER3_FREQUENCY_MHZ  (tmrHw_HIGH_FREQUENCY_MHZ * 30)
++#define TIMER3_FREQUENCY_KHZ   (tmrHw_HIGH_FREQUENCY_HZ / 1000 * 30)
++#else
++#define TIMER0_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
++#define TIMER1_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
++#define TIMER3_FREQUENCY_MHZ  tmrHw_HIGH_FREQUENCY_MHZ
++#define TIMER3_FREQUENCY_KHZ  (tmrHw_HIGH_FREQUENCY_HZ / 1000)
++#endif
++
++static struct clk sp804_timer1_clk = {
++	.name = "sp804-timer-1",
++	.type = CLK_TYPE_PRIMARY,
++	.mode = CLK_MODE_XTAL,
++	.rate_hz = TIMER1_FREQUENCY_MHZ * 1000000,
++};
++
++static struct clk sp804_timer3_clk = {
++	.name = "sp804-timer-3",
++	.type = CLK_TYPE_PRIMARY,
++	.mode = CLK_MODE_XTAL,
++	.rate_hz = TIMER3_FREQUENCY_KHZ * 1000,
++};
++
+ static struct clk_lookup lookups[] = {
+ 	{			/* Bus clock */
+ 		.con_id = "apb_pclk",
+@@ -107,6 +137,14 @@ static struct clk_lookup lookups[] = {
+ 	}, {			/* UART1 */
+ 		.dev_id = "uartb",
+ 		.clk = &uart_clk,
++	}, {			/* SP804 timer 1 */
++		.dev_id = "sp804",
++		.con_id = "timer1",
++		.clk = &sp804_timer1_clk,
++	}, {			/* SP804 timer 3 */
++		.dev_id = "sp804",
++		.con_id = "timer3",
++		.clk = &sp804_timer3_clk,
+ 	}
+ };
+ 
+@@ -162,25 +200,10 @@ void __init bcmring_amba_init(void)
+ /*
+  * Where is the timer (VA)?
+  */
+-#define TIMER0_VA_BASE		 MM_IO_BASE_TMR
+-#define TIMER1_VA_BASE		(MM_IO_BASE_TMR + 0x20)
+-#define TIMER2_VA_BASE		(MM_IO_BASE_TMR + 0x40)
+-#define TIMER3_VA_BASE          (MM_IO_BASE_TMR + 0x60)
 -
- static long __init sp804_get_clock_rate(const char *name)
- {
- 	struct clk *clk;
-@@ -84,6 +78,7 @@ void __init sp804_clocksource_init(void __iomem *base, const char *name)
+-/* Timer 0 - 25 MHz, Timer3 at bus clock rate, typically  150-166 MHz */
+-#if defined(CONFIG_ARCH_FPGA11107)
+-/* fpga cpu/bus are currently 30 times slower so scale frequency as well to */
+-/* slow down Linux's sense of time */
+-#define TIMER0_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
+-#define TIMER1_FREQUENCY_MHZ  (tmrHw_LOW_FREQUENCY_MHZ * 30)
+-#define TIMER3_FREQUENCY_MHZ  (tmrHw_HIGH_FREQUENCY_MHZ * 30)
+-#define TIMER3_FREQUENCY_KHZ   (tmrHw_HIGH_FREQUENCY_HZ / 1000 * 30)
+-#else
+-#define TIMER0_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
+-#define TIMER1_FREQUENCY_MHZ  tmrHw_LOW_FREQUENCY_MHZ
+-#define TIMER3_FREQUENCY_MHZ  tmrHw_HIGH_FREQUENCY_MHZ
+-#define TIMER3_FREQUENCY_KHZ  (tmrHw_HIGH_FREQUENCY_HZ / 1000)
+-#endif
++#define TIMER0_VA_BASE		((void __iomem *)MM_IO_BASE_TMR)
++#define TIMER1_VA_BASE		((void __iomem *)(MM_IO_BASE_TMR + 0x20))
++#define TIMER2_VA_BASE		((void __iomem *)(MM_IO_BASE_TMR + 0x40))
++#define TIMER3_VA_BASE          ((void __iomem *)(MM_IO_BASE_TMR + 0x60))
  
+ #define TICKS_PER_uSEC     TIMER0_FREQUENCY_MHZ
  
- static void __iomem *clkevt_base;
-+static unsigned long clkevt_reload;
+@@ -189,10 +212,7 @@ void __init bcmring_amba_init(void)
+  *
+  */
+ #define mSEC_1                          1000
+-#define mSEC_5                          (mSEC_1 * 5)
+ #define mSEC_10                         (mSEC_1 * 10)
+-#define mSEC_25                         (mSEC_1 * 25)
+-#define SEC_1                           (mSEC_1 * 1000)
  
  /*
-  * IRQ handler for the timer
-@@ -109,7 +104,7 @@ static void sp804_set_mode(enum clock_event_mode mode,
+  * How long is the timer interval?
+@@ -279,53 +299,13 @@ static struct irqaction bcmring_timer_irq = {
+ 	.handler = bcmring_timer_interrupt,
+ };
  
- 	switch (mode) {
- 	case CLOCK_EVT_MODE_PERIODIC:
--		writel(TIMER_RELOAD, clkevt_base + TIMER_LOAD);
-+		writel(clkevt_reload, clkevt_base + TIMER_LOAD);
- 		ctrl |= TIMER_CTRL_PERIODIC | TIMER_CTRL_ENABLE;
- 		break;
- 
-@@ -158,12 +153,17 @@ void __init sp804_clockevents_init(void __iomem *base, unsigned int irq,
- 	const char *name)
+-static cycle_t bcmring_get_cycles_timer1(struct clocksource *cs)
+-{
+-	return ~readl(TIMER1_VA_BASE + TIMER_VALUE);
+-}
+-
+-static cycle_t bcmring_get_cycles_timer3(struct clocksource *cs)
+-{
+-	return ~readl(TIMER3_VA_BASE + TIMER_VALUE);
+-}
+-
+-static struct clocksource clocksource_bcmring_timer1 = {
+-	.name = "timer1",
+-	.rating = 200,
+-	.read = bcmring_get_cycles_timer1,
+-	.mask = CLOCKSOURCE_MASK(32),
+-	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+-static struct clocksource clocksource_bcmring_timer3 = {
+-	.name = "timer3",
+-	.rating = 100,
+-	.read = bcmring_get_cycles_timer3,
+-	.mask = CLOCKSOURCE_MASK(32),
+-	.flags = CLOCK_SOURCE_IS_CONTINUOUS,
+-};
+-
+ static int __init bcmring_clocksource_init(void)
  {
- 	struct clock_event_device *evt = &sp804_clockevent;
-+	long rate = sp804_get_clock_rate(name);
-+
-+	if (rate < 0)
-+		return;
+ 	/* setup timer1 as free-running clocksource */
+-	writel(0, TIMER1_VA_BASE + TIMER_CTRL);
+-	writel(0xffffffff, TIMER1_VA_BASE + TIMER_LOAD);
+-	writel(0xffffffff, TIMER1_VA_BASE + TIMER_VALUE);
+-	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+-	       TIMER1_VA_BASE + TIMER_CTRL);
+-
+-	clocksource_register_khz(&clocksource_bcmring_timer1,
+-				 TIMER1_FREQUENCY_MHZ * 1000);
++	sp804_clocksource_init(TIMER1_VA_BASE, "timer1");
  
- 	clkevt_base = base;
-+	clkevt_reload = DIV_ROUND_CLOSEST(rate, HZ);
+ 	/* setup timer3 as free-running clocksource */
+-	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
+-	writel(0xffffffff, TIMER3_VA_BASE + TIMER_LOAD);
+-	writel(0xffffffff, TIMER3_VA_BASE + TIMER_VALUE);
+-	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
+-	       TIMER3_VA_BASE + TIMER_CTRL);
+-
+-	clocksource_register_khz(&clocksource_bcmring_timer3,
+-				 TIMER3_FREQUENCY_KHZ);
++	sp804_clocksource_init(TIMER3_VA_BASE, "timer3");
  
- 	evt->name = name;
- 	evt->irq = irq;
--	evt->mult = div_sc(TIMER_FREQ_KHZ, NSEC_PER_MSEC, evt->shift);
-+	evt->mult = div_sc(rate, SEC_PER_MSEC, evt->shift);
- 	evt->max_delta_ns = clockevent_delta2ns(0xffffffff, evt);
- 	evt->min_delta_ns = clockevent_delta2ns(0xf, evt);
- 
-diff --git a/arch/arm/mach-vexpress/ct-ca9x4.c b/arch/arm/mach-vexpress/ct-ca9x4.c
-index 2712133..2023a9e 100644
---- a/arch/arm/mach-vexpress/ct-ca9x4.c
-+++ b/arch/arm/mach-vexpress/ct-ca9x4.c
-@@ -152,6 +152,10 @@ static struct clk_lookup lookups[] = {
- 		.clk		= &osc1_clk,
- 	}, {	/* SP804 timers */
- 		.dev_id		= "sp804",
-+		.con_id		= "ct-timer0",
-+		.clk		= &ct_sp804_clk,
-+	}, {	/* SP804 timers */
-+		.dev_id		= "sp804",
- 		.con_id		= "ct-timer1",
- 		.clk		= &ct_sp804_clk,
- 	},
-diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-index f6fecdd..9d9d4af 100644
---- a/arch/arm/mach-vexpress/v2m.c
-+++ b/arch/arm/mach-vexpress/v2m.c
-@@ -370,6 +370,10 @@ static struct clk_lookup v2m_lookups[] = {
- 		.clk		= &osc1_clk,
- 	}, {	/* SP804 timers */
- 		.dev_id		= "sp804",
-+		.con_id		= "v2m-timer0",
-+		.clk		= &v2m_sp804_clk,
-+	}, {	/* SP804 timers */
-+		.dev_id		= "sp804",
- 		.con_id		= "v2m-timer1",
- 		.clk		= &v2m_sp804_clk,
- 	},
+ 	return 0;
+ }
 -- 
 1.7.4.4
