@@ -1,69 +1,51 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 16 May 2011 17:31:26 +0100
-Subject: [PATCH 0/1] ARM: thumb: Fix thumb mode compilation problems.
-In-Reply-To: <BANLkTi=k4UWY-K+gG8gBnvvEE3QOTZaaKQ@mail.gmail.com>
-References: <20110513195845.2FFE540CD1@eskimo.mtv.corp.google.com>
-	<20110516103835.GA6955@arm.com>
-	<BANLkTi=k4UWY-K+gG8gBnvvEE3QOTZaaKQ@mail.gmail.com>
-Message-ID: <20110516163126.GB22931@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Mon, 16 May 2011 18:33:11 +0200 (CEST)
+Subject: [PATCH] ARM: twd: Adjust localtimer frequency withcpufreqnotifiers
+In-Reply-To: <BANLkTimMSPmqD+kyz1EJUrH9sS=qWRZymw@mail.gmail.com>
+References: <1290060899-9786-1-git-send-email-ccross@android.com>
+	<AANLkTimCuV5N0jr8c949uONEvieQ5MDZ9KHDXtneG5AT@mail.gmail.com>
+	<4D70BE9D.4000507@stericsson.com>
+	<AANLkTin7ZXYALOy_jk1uR3SbZA51nSnU-ncSjG+n_RPn@mail.gmail.com>
+	<4D714C17.7080102@gmail.com>
+	<AANLkTims4e7o0sPxVnN0D1mNWDH7uC9q=pBQrBoad2os@mail.gmail.com>
+	<eea425c066cc69c30f118fb102fff43e@mail.gmail.com>
+	<AANLkTi=KcmqmghVxhwGvv79heRU3C+TC-v2VnWSWt7bU@mail.gmail.com>
+	<7e9fafa016bfe536ccc373fc2cc7ba61@mail.gmail.com>
+	<AANLkTinRNG4nTjh15a2tuJt_iDboHUtomxemSjY+6DcD@mail.gmail.com>
+	<AANLkTikkcYw66MiJO9Bpm+De=XD2-1MFxm-CUPp6sMqL@mail.gmail.com>
+	<BANLkTi=-T6P0KrsQ8+Ot_inq1JabY62LvA@mail.gmail.com>
+	<alpine.LFD.2.02.1105131138460.2831@ionos>
+	<BANLkTimxkY4MvQ+-qiOwdwbo7jPUAQ1vxw@mail.gmail.com>
+	<alpine.LFD.2.02.1105141749510.3078@ionos> <4DD10814.1010103@ti.com>
+	<alpine.LFD.2.02.1105161642250.3078@ionos>
+	<BANLkTimMSPmqD+kyz1EJUrH9sS=qWRZymw@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1105161831440.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 09:06:26AM -0700, Colin Cross wrote:
-> On Mon, May 16, 2011 at 3:38 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> > On Fri, May 13, 2011 at 12:58:45PM -0700, Vadim Bendebury wrote:
-> >>
-> >> This patch won't necessarily apply as it has not been verified on
-> >> a real hardware, so this is more of an RFC.
-> >>
-> >> Vadim Bendebury (1):
-> >> ? ARM: thumb: Fix thumb mode compilation problems.
-> >>
-> >> ?arch/arm/kernel/fiq.c ? ? ? ? | ? 34 ++++++++++++++++++++++++++--------
-> >> ?arch/arm/mach-tegra/headsmp.S | ? ?3 ++-
-> >> ?2 files changed, 28 insertions(+), 9 deletions(-)
-> >>
-> >> --
-> >> 1.7.3.1
-> >>
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+On Mon, 16 May 2011, Colin Cross wrote:
+> On Mon, May 16, 2011 at 7:44 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
+> > On Mon, 16 May 2011, Santosh Shilimkar wrote:
+> >> On 5/14/2011 9:21 PM, Thomas Gleixner wrote:
+> >> Just for my understanding, the clockevents_reconfigure() needs to
+> >> be called with interrupts disabled on that CPU as part of
+> >> the CPUFREQ notifiers. I assume the right place is do it
+> >> in POST notifier after the CPU clock and hence TWD clock is
+> >> updated. Is that right ?
 > >
-> > A different patch for this has already been discussed:
-> >
-> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/112864
-> >
-> > It's a bit stalled on my side because I don't have a suitable platform
-> > to test it on. ?As some have suggested, in my case (imx51) the inclusion
-> > of code was inherited from from an older subarch tree and is no longer
-> > appropriate -- so my problem is actually solved just by not building
-> > this code.
-> >
-> > If the code is really used in your kernel (not just built) it would
-> > be really useful if you could test this patch.
-> >
-> > However you should definitely check whether the code is really used at
-> > all on tegra.
-> >
-> > There's a fair chance that it's not used: FIQ is not much used by linux
-> > on armv7 and above: unless you make use of cache+TLB lockdown / SRAM etc.,
-> > FIQ is unlikely to be significantly faster than IRQ on recent CPUs. ?FIQ
-> > may also get reserved for use by TrustZone on some platforms, complicating
-> > the picture further.
+> > Yes.
 > 
-> Most Android kernels, including on Tegra, use the FIQ handler for a
-> simple debugger on the serial console.   Sending a break will enter
-> debugger mode, which can dump backtraces from FIQ context, even if the
-> CPU is stuck in an IRQ, or with IRQs off.
-> 
-> We've never used a Thumb2 kernel though.
+> Is it safe to only call it in POST?  If the frequency is increasing,
+> and the TWD is not updated until after the CPU frequency has changed,
+> it is possible for a clockevent to fire too early.  Will that cause
+> problems, or does the clockevent code check against a clocksource to
+> ensure the desired time has been reached?  If that is OK, it
+> drastically simplifies the code, because the driver only needs to know
+> the current TWD frequency, not predict a future TWD frequency.
 
-Fair enough -- in that case I guess it may be needed.
+Yes, the hrtimer code checks against current time, so if it fires too
+early it rearms the timer.
+ 
+Thanks,
 
-Sounds like entering the debugger will help in testing this; I don't have
-the board myself though.
-
----Dave
+	tglx
