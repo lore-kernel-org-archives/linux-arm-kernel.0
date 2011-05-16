@@ -1,51 +1,62 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 May 2011 14:11:22 +0100
-Subject: [PATCH v4 1/7] MTD: Add integrator-flash feature to physmap
-In-Reply-To: <20110516130023.GR30539@n2100.arm.linux.org.uk>
-References: <1300367028-3916-1-git-send-email-marc.zyngier@arm.com>
-	<1300367028-3916-2-git-send-email-marc.zyngier@arm.com>
-	<20110515074150.GA22975@n2100.arm.linux.org.uk>
-	<1305550364.30788.6.camel@e102391-lin.cambridge.arm.com>
-	<20110516130023.GR30539@n2100.arm.linux.org.uk>
-Message-ID: <1305551482.30788.9.camel@e102391-lin.cambridge.arm.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 16 May 2011 16:36:45 +0300
+Subject: [PATCH] arm: omap3: cm-t3517: fix section mismatch warning
+In-Reply-To: <4DCA3CC2.8080006@compulab.co.il>
+References: <1303850474-25106-1-git-send-email-grinberg@compulab.co.il>
+	<4DC01FB2.9060806@compulab.co.il> <4DCA3CC2.8080006@compulab.co.il>
+Message-ID: <4DD1286D.10403@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-16 at 14:00 +0100, Russell King - ARM Linux wrote:
-> On Mon, May 16, 2011 at 01:52:44PM +0100, Marc Zyngier wrote:
-> > On Sun, 2011-05-15 at 08:41 +0100, Russell King - ARM Linux wrote:
-> > > On Thu, Mar 17, 2011 at 01:03:42PM +0000, Marc Zyngier wrote:
-> > > > diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
-> > > > index bcfd9f7..d37cca0 100644
-> > > > --- a/include/linux/mtd/physmap.h
-> > > > +++ b/include/linux/mtd/physmap.h
-> > > > @@ -22,6 +22,8 @@ struct map_info;
-> > > >  
-> > > >  struct physmap_flash_data {
-> > > >  	unsigned int		width;
-> > > > +	int			(*init)(struct platform_device *);
-> > > > +	void			(*exit)(struct platform_device *);
-> > > >  	void			(*set_vpp)(struct map_info *, int);
-> > > 
-> > > Does anything use the map_info argument to set_vpp?  If not, passing a
-> > > platform_device pointer would be more consistent and useful here.
-> > 
-> > Good point. How about the following (untested) patch (on top of this
-> > serie)? It helps getting rid of a bit of code in the pismo driver.
-> 
-> Yup.
-> 
-> Now, I'd like to have acks from folk for the series - especially the mtd
-> folk who apparantly haven't yet done anything with this series.  I'm
-> happy to take it through my tree if they are.
-> 
-> This patch should get acks from the relevant platform people too.
+ping x3
 
-Right. I'll repost the whole serie rebased on 2.6.39-rc7, CC-ing the
-maintainers and the MTD mailing list.
 
-Thanks,
+It has been 3 weeks already...
 
-	M.
+
+On 05/11/11 10:37, Igor Grinberg wrote:
+
+> ping x2
+>
+>
+> Can this one get into .39?
+>
+>
+> On 05/03/11 18:30, Igor Grinberg wrote:
+>
+>> ping!
+>>
+>> Just to make sure you haven't missed this one liner ;)
+>>
+>>
+>> On 04/26/11 23:41, Igor Grinberg wrote:
+>>> WARNING: arch/arm/mach-omap2/built-in.o(.text+0x11014): Section mismatch
+>>> in reference from the function cm_t3517_init_usbh() to the (unknown
+>>> reference) .init.data:(unknown)
+>>> The function cm_t3517_init_usbh() references
+>>> the (unknown reference) __initdata (unknown).
+>>> This is often because cm_t3517_init_usbh lacks a __initdata
+>>> annotation or the annotation of (unknown) is wrong.
+>>>
+>>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+>>> ---
+>>>  arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
+>>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+>>> index a27e3ee..802cb60 100644
+>>> --- a/arch/arm/mach-omap2/board-cm-t3517.c
+>>> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
+>>> @@ -178,7 +178,7 @@ static struct usbhs_omap_board_data cm_t3517_ehci_pdata __initdata = {
+>>>  	.reset_gpio_port[2]  = -EINVAL,
+>>>  };
+>>>  
+>>> -static int cm_t3517_init_usbh(void)
+>>> +static int __init cm_t3517_init_usbh(void)
+>>>  {
+>>>  	int err;
+>>>  
+
 -- 
-Reality is an implementation detail.
+Regards,
+Igor.
