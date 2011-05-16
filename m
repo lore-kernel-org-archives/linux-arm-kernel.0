@@ -1,39 +1,53 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 16 May 2011 09:56:18 +0200
-Subject: [PATCHv2 0/2] [RFC] Shrink clock data utilizing preprocessor
-In-Reply-To: <1305495958-2236-1-git-send-email-vzapolskiy@gmail.com>
-References: <1305495958-2236-1-git-send-email-vzapolskiy@gmail.com>
-Message-ID: <20110516075618.GC2429@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 May 2011 09:38:00 +0100
+Subject: [PATCH 1/2] ARM: remove unneeded check of the
+	cache_is_vipt_nonaliasing()
+In-Reply-To: <BANLkTikWJzdYOrk4=gte8zOHDVioGAOhhg@mail.gmail.com>
+References: <1305225183-15521-1-git-send-email-saeed@marvell.com>
+	<BANLkTim=dmHg_vyfYN6m73z6SQXiVzM7vg@mail.gmail.com>
+	<BANLkTikUphZ4azqK50YBZa4uTyU4EystLA@mail.gmail.com>
+	<BANLkTikWJzdYOrk4=gte8zOHDVioGAOhhg@mail.gmail.com>
+Message-ID: <BANLkTimFst-+LEuN9cDpAtRiF4aDOipAKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vladimir,
+On 16 May 2011 08:39, saeed bishara <saeed.bishara@gmail.com> wrote:
+>>>> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+>>>> ---
+>>>> ?arch/arm/mm/flush.c | ? ?4 ++--
+>>>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+>>>> index 2b269c9..f1b7998 100644
+>>>> --- a/arch/arm/mm/flush.c
+>>>> +++ b/arch/arm/mm/flush.c
+>>>> @@ -253,8 +253,8 @@ void __sync_icache_dcache(pte_t pteval)
+>>>>
+>>>> ? ? ? ?if (!test_and_set_bit(PG_dcache_clean, &page->flags))
+>>>> ? ? ? ? ? ? ? ?__flush_dcache_page(mapping, page);
+>>>> - ? ? ? /* pte_exec() already checked above for non-aliasing VIPT cache */
+>>>> - ? ? ? if (cache_is_vipt_nonaliasing() || pte_exec(pteval))
+>>>> +
+>>>> + ? ? ? if (pte_exec(pteval))
+>>>> ? ? ? ? ? ? ? ?__flush_icache_all();
+>>>> ?}
+>>>> ?#endif
+>>> can you have I a look at this patch?
+>>> the __sync_icache_dcache() returns if (cache_is_vipt_nonaliasing() &&
+>>> !pte_exec(pteval)), so later, the if (cache_is_vipt_nonaliasing() ||
+>>> pte_exec(pteval)) should be equivalent to ?if (pte_exec(pteval))
+>>
+>> Your patch looks fine - when cache_is_vipt_nonaliasing(), we always
+>> have pte_exec() true at the end of this function, so no need for the
+>> additional check.
+>>
+>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+>
+> thanks, can you please merge it to your tree.
 
-On Mon, May 16, 2011 at 12:45:56AM +0300, Vladimir Zapolskiy wrote:
-> This change shows a possibility to utilize C preprocessor to remove
-> redundant data from clock definitions for OMAP4 architecture.
-> 
-> If the change is evaluated as a positive one, the same approach could
-> be applied in reducing LOCs from other files, which contain monotonous
-> data enumeration.
-> 
-> Vladimir Zapolskiy (2):
->   OMAP4: clock data: shrink clock data utilizing preprocessor.
->   OMAP4: clock data: shrink more clock data.
-> 
->  arch/arm/mach-omap2/clock44xx_data.c | 3313 +++++++++-------------------------
->  1 files changed, 848 insertions(+), 2465 deletions(-)
-
-While the diffstat shows a huge saving in loc I suggest to delay this
-until we have common clock code merged so that we don't have to
-completely rework these files again in the near future.
-
-This has been said before, I just wanted to add my +1 on this opinion.
-
-Sascha
+I could but it may be better for you to just upload it to Russell's
+patch system (I'm not planning to send any pull requests to Russell,
+apart from LPAE).
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
