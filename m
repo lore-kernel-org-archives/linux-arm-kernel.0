@@ -1,52 +1,41 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 17 May 2011 10:06:07 -0700
-Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
-In-Reply-To: <4DD27F7D.2070305@ti.com>
-References: <1305588114-23728-1-git-send-email-ccross@android.com>
-	<4DD27F7D.2070305@ti.com>
-Message-ID: <BANLkTinUxn_szHVHSKOZ1WJAckmo9mSudA@mail.gmail.com>
+From: ivan.nazarenko@gmail.com (Ivan Nazarenko)
+Date: Tue, 17 May 2011 14:14:33 -0300
+Subject: [PATCH 1/2] mt9p031: Add mt9p031 sensor driver.
+In-Reply-To: <BANLkTinR3g7DcXLqOngw8kkNc-LLysFX=w@mail.gmail.com>
+References: <1305624528-5595-1-git-send-email-javier.martin@vista-silicon.com>
+	<Pine.LNX.4.64.1105171345580.5582@axis700.grange>
+	<BANLkTinR3g7DcXLqOngw8kkNc-LLysFX=w@mail.gmail.com>
+Message-ID: <201105171414.34179.ivan.nazarenko@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2011 at 7:00 AM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> Colin,
->
-> On 5/17/2011 4:51 AM, Colin Cross wrote:
->>
->> The localtimer's clock changes with the cpu clock. ?After a
->> cpufreq transition, update the clockevent's frequency and
->> reprogram the next clock event.
->>
->> Adds a clock called "smp_twd" that is used to determine the
->> twd frequency, which can also be used at init time to
->> avoid calibrating the twd frequency.
->>
->> Signed-off-by: Colin Cross<ccross@android.com>
->> Cc: Thomas Gleixner<tglx@linutronix.de>
->> Cc: Russell King<linux@arm.linux.org.uk>
->> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> Cc: Rob Herring<robherring2@gmail.com>
->> ---
->> ?arch/arm/kernel/smp_twd.c | ? 69
->> +++++++++++++++++++++++++++++++++++++++++++--
->> ?1 files changed, 66 insertions(+), 3 deletions(-)
->>
->> This patch depends on Thomas Gleixner's patch to add
->> clockevents_reconfigure
->> See: https://lkml.org/lkml/2011/5/13/122
->>
->> This patch adds a clock that can be used to skip calibration as well
->> as update the frequency. ?A later patch (or a later version of this patch)
->> will drop twd_calibrate_rate once all platforms provide the necessary
->> smp_twd clock.
->>
->
-> Since the "smp_twd" clock node will not have a clk_set_rate()
-> associated with it, will the clk_get_rate() gives you real
-> rate. May be we can associate this node as a child of
-> CPU clock node and use the fixed divider based on peripheral
-> ratio. Is that the idea here to realize it ?
+Javier,
 
-Yes, the idea is that it will be a fixed divider off the cpu clock,
-which will have been updated by cpufreq.
+I have been using the aptina patch (https://github.com/Aptina/BeagleBoard-xM) on beagleboard while waiting linux-media solve this mt9p031 issue. Now that you have something working, I would like to try it - but I would like to know what is the clock rate you actually drove the sensor.
+
+Reviewing your path, I suppose it is 54MHz, so you would be achieving some 10 full 5MPix frames/s from the sensor. Is that correct? (the aptina patch delivers less than 4 fps).
+
+Regards,
+
+Ivan
+
+On Tuesday, May 17, 2011 08:59:04 javier Martin wrote:
+> On 17 May 2011 13:47, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
+> > Hi Laurent
+> >
+> > Thanks for your review! Javier, if you like, you can wait a couple of days
+> > until I find some time to review the driver, or you can submit a version,
+> > addressing Laurent's points, but be prepared to have to do another one;)
+> >
+> > Thanks
+> > Guennadi
+> > ---
+> > Guennadi Liakhovetski, Ph.D.
+> > Freelance Open-Source Software Developer
+> > http://www.open-technology.de/
+> >
+> 
+> OK, I think I'll wait to have Guennadi's review too.
+> Thank you both.
+> 
+> 
