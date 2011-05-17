@@ -1,115 +1,37 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 17 May 2011 10:57:11 +0900
-Subject: [PATCH 0/4] Pinmux subsystem
-In-Reply-To: <BANLkTi=O_mZEqMhOS_Fz0vAYCQ-XpyG4UA@mail.gmail.com>
-References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
-	<20110503172712.GE6538@lunn.ch>
-	<BANLkTi=ncV3M1q5SXNdUaXmtfkZ8Wn9dmw@mail.gmail.com>
-	<20110515133312.GM4071@lunn.ch>
-	<BANLkTi=O_mZEqMhOS_Fz0vAYCQ-XpyG4UA@mail.gmail.com>
-Message-ID: <BANLkTi=TDiAziQU0fYBiK_Npk0x50av7tA@mail.gmail.com>
+From: jmorris@namei.org (James Morris)
+Date: Tue, 17 May 2011 12:24:34 +1000 (EST)
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <20110516150837.GA513@elte.hu>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu>
+	<alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
+	<20110516150837.GA513@elte.hu>
+Message-ID: <alpine.LRH.2.00.1105171214330.31710@tundra.namei.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 16 May 2011, Ingo Molnar wrote:
 
-In real scenario, we can set the full pins at once, but sometimes it
-needs to set the function only one,
+> > Not really.
+> > 
+> > Firstly, what is the security goal of these restrictions? [...]
+> 
+> To do what i described above? Namely:
+> 
+>  " Sandboxed code should only be allowed to open files in /home/sandbox/, /lib/
+>    and /usr/lib/ "
 
-e.g.,
-
-static void __init goni_radio_init(void)
-{
-        int gpio;
-
-        gpio = S5PV210_GPJ2(4);                 /* XMSMDATA_4 */
-        gpio_request(gpio, "FM_INT");
-        s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-        i2c1_devs[0].irq = gpio_to_irq(gpio);
-
-        gpio = S5PV210_GPJ2(5);                 /* XMSMDATA_5 */
-        gpio_request(gpio, "FM_RST");
-        gpio_direction_output(gpio, 1);
-}
-
-In this case we only need to set the function at interrupt by like
-s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-So pinmux function provides this feature also.
-
-How do you think?
-
-Thank you,
-Kyungmin Park
+These are access rules, they don't really describe a high-level security 
+goal.  How do you know it's ok to open everything in these directories?
 
 
-On Mon, May 16, 2011 at 2:50 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 2011/5/15 Andrew Lunn <andrew@lunn.ch>:
->
->> With a bit of scripting, came to the following results. Each line is
->> on pinmux function description what would be needed in the driver. The
->> number at the front says how many boards would use it. In total there
->> are 33 descriptions needed. Of these, 18 are used only once. This to
->> me suggests the board needs to be able to specify a pin description
->> when there is no reuse with other boards.
->
-> As indicated elsewhere in this thread, a pinmux driver can pass in
-> platform/package/board/system data just like any other platform
-> driver in the kernel tree can.
->
-> You will have to specify it somehow in a custom header file, just
-> like with any other platform driver.
->
-> Example from:
-> arch/arm/mach-orion5x/ls-chl-setup.c:
->
-> static struct gpio_led lschl_led_pins[] = {
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.name = "alarm:red",
-> ? ? ? ? ? ? ? ?.gpio = LSCHL_GPIO_LED_ALARM,
-> ? ? ? ? ? ? ? ?.active_low = 1,
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name = "info:amber",
-> ? ? ? ? ? ? ? ?.gpio = LSCHL_GPIO_LED_INFO,
-> ? ? ? ? ? ? ? ?.active_low = 1,
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name = "func:blue:top",
-> ? ? ? ? ? ? ? ?.gpio = LSCHL_GPIO_LED_FUNC,
-> ? ? ? ? ? ? ? ?.active_low = 1,
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.name = "power:blue:bottom",
-> ? ? ? ? ? ? ? ?.gpio = LSCHL_GPIO_LED_PWR,
-> ? ? ? ?},
-> };
->
-> static struct gpio_led_platform_data lschl_led_data = {
-> ? ? ? ?.leds = lschl_led_pins,
-> ? ? ? ?.num_leds = ARRAY_SIZE(lschl_led_pins),
-> };
->
-> static struct platform_device lschl_leds = {
-> ? ? ? ?.name = "leds-gpio",
-> ? ? ? ?.id = -1,
-> ? ? ? ?.dev = {
-> ? ? ? ? ? ? ? ?.platform_data = &lschl_led_data,
-> ? ? ? ?},
-> };
->
-> Still, the driver for these LEDs is in
-> drivers/leds/leds-gpio.c and the above structure is
-> described in include/linux/leds.h
->
-> There is no difference between this and letting
-> drivers/pinmux/pinmux-orion.c have a header file in
-> include/linux/pinmux/orion.h and pass in necessary board
-> data that way.
->
-> Are we now in agreement that this will work just fine?
->
-> Yours,
-> Linus Walleij
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at ?http://www.tux.org/lkml/
->
+- James
+-- 
+James Morris
+<jmorris@namei.org>
