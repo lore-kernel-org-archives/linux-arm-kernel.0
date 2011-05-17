@@ -1,34 +1,26 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 17 May 2011 17:09:36 +0200
-Subject: [RFC 0/2] add rtc device to mach-mcs
-Message-ID: <1305644978-19155-1-git-send-email-w.sang@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 May 2011 16:26:31 +0100
+Subject: [PATCH] arm: Use arch_spin_lock for unwind to avoid lockdep
+	deadlock
+In-Reply-To: <alpine.LFD.2.02.1105171605080.3078@ionos>
+References: <alpine.LFD.2.02.1105171605080.3078@ionos>
+Message-ID: <BANLkTikFcwxq7Wp42=MDMrH4dz7NARXWgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is intentionally just a RFC, so people can play with the STMP->MXS
-conversion patches for the RTC-driver. When the conversion of the driver itself
-is approved, I will resend these patches with proper updates and request for
-inclusion. Still, if you have comments about these patches, too, let me know.
+On 17 May 2011 15:11, Thomas Gleixner <tglx@linutronix.de> wrote:
+> When lockdep traces a lock taken in a module the arm unwinder takes
+> unwind_lock which causes a recursive lockdep call deadlocking itself
+> on the unwind_lock.
+>
+> Make unwind_lock an arch_spin_lock to avoid the lockdep call and use
+> the raw_local_irq_save/restore() variants to avoid irq tracing as
+> well.
+>
+> Reported-and-tested-by: Torben Hohn <torbenh@linutronix.de>
+> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: stable at kernel.org
 
-Thanks,
+Looks fine to me (as the author of this code):
 
-   Wolfram
-
-Wolfram Sang (2):
-  arm: mach-mxs: add device for rtc
-  arm: mach-mxs: add rtc to all boards
-
- arch/arm/mach-mxs/Kconfig                         |    3 +
- arch/arm/mach-mxs/devices-mx23.h                  |    2 +
- arch/arm/mach-mxs/devices-mx28.h                  |    2 +
- arch/arm/mach-mxs/devices/Kconfig                 |    3 +
- arch/arm/mach-mxs/devices/Makefile                |    1 +
- arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c |   59 +++++++++++++++++++++
- arch/arm/mach-mxs/mach-mx23evk.c                  |    2 +
- arch/arm/mach-mxs/mach-mx28evk.c                  |    2 +
- arch/arm/mach-mxs/mach-tx28.c                     |    2 +
- 9 files changed, 76 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-rtc-stmp3xxx.c
-
--- 
-1.7.2.5
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
