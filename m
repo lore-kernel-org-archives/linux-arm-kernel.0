@@ -1,39 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 May 2011 23:41:34 +0100
-Subject: device_tree binding for "amba bus"
-In-Reply-To: <f9ae780a-2747-427f-826a-e0b510ca8afb@VA3EHSMHS001.ehs.local>
-References: <f9ae780a-2747-427f-826a-e0b510ca8afb@VA3EHSMHS001.ehs.local>
-Message-ID: <20110517224134.GC2266@n2100.arm.linux.org.uk>
+Date: Tue, 17 May 2011 23:50:20 +0100
+Subject: [PATCH] ftrace: recordmcount: avoid STT_FUNC symbols as base
+	on ARM
+In-Reply-To: <1305648629.5456.744.camel@gandalf.stny.rr.com>
+References: <1305134631-31617-1-git-send-email-rabin@rab.in>
+	<1305648629.5456.744.camel@gandalf.stny.rr.com>
+Message-ID: <20110517225020.GD2266@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2011 at 01:28:33PM -0700, Stephen Neuendorffer wrote:
-> None of this seems terribly interesting enough to justify a bus that has
-> a small number of users:
+On Tue, May 17, 2011 at 12:10:29PM -0400, Steven Rostedt wrote:
+> On Wed, 2011-05-11 at 22:53 +0530, Rabin Vincent wrote:
+> > While find_secsym_ndx often finds the unamed local STT_SECTION, if a
+> > section has only one function in it, the ARM toolchain generates the
+> > STT_FUNC symbol before the STT_SECTION, and recordmcount finds this
+> > instead.
+> > 
+> > This is problematic on ARM because in ARM ELFs, "if a [STT_FUNC] symbol
+> > addresses a Thumb instruction, its value is the address of the
+> > instruction with bit zero set (in a relocatable object, the section
+> > offset with bit zero set)".  This leads to incorrect mcount addresses
+> > being recorded.
+> > 
+> > Fix this by not using STT_FUNC symbols as the base on ARM.
+> 
+> Hi Russell,
+> 
+> Can you give me an Acked-by on this patch?
 
-However, without this infrastructure, drivers have to start doing those
-three points you bring up themselves, manually, with additional code,
-which makes for additional bugs.  No thanks.  Let's keep the bus
-abstraction there as it serves to ensure that the right things happen
-at the right time.
-
-> And at the very least the hardcoded nature of the names seems, well...
-> hardcoded.
-
-What hardcoded names?  Driver names no matter what bus are part of the
-_userspace_ API - remember that almost everything in the device model
-is exported to userspace and is therefore part of the kernel's userspace
-API.  So logically the driver names do want to be stable.
-
-> Any thoughts about how to abstract this in a device tree?
-> (My thoughts: devices need to reference a clock, devices need to
-> reference a regulator,
-> and it seems to me that the register check could be pulled out into a
-> single call that the
-> devices that care about it can do themselves during probe() )
-
-And another during their remove callback - and where do they store the
-data associated with that?  Will the drivers need to have a certain
-base driver_data structure?
-
-This all sounds like getting rather icky and prone to bugs.
+It would be better for someone who knows the ELF format for ARM and
+its weirdnesses to ack this patch.  I'm afraid my ARM ELF format
+knowledge was been superseded when EABI came along and introduced
+all sorts of new stuff.
