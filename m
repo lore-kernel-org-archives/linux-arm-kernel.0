@@ -1,82 +1,116 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Tue, 17 May 2011 20:34:59 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <alpine.LRH.2.00.1105172317060.5404@tundra.namei.org>
-References: <20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu>
-	<alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
-	<20110516150837.GA513@elte.hu>
-	<alpine.LRH.2.00.1105171214330.31710@tundra.namei.org>
-	<20110517131058.GE21441@elte.hu>
-	<alpine.LRH.2.00.1105172317060.5404@tundra.namei.org>
-Message-ID: <20110517183459.GB16689@elte.hu>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Tue, 17 May 2011 19:56:04 +0100 (BST)
+Subject: Question on Thumb2 assembly, conditionals
+In-Reply-To: <20110517114455.GA27656@arm.com>
+References: <20110517110911.GA27546@arm.com> <20110517114455.GA27656@arm.com>
+Message-ID: <alpine.DEB.2.00.1105171327260.7161@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-* James Morris <jmorris@namei.org> wrote:
 
-> On Tue, 17 May 2011, Ingo Molnar wrote:
-> 
-> > I'm not sure i get your point.
-> 
-> Your example was not complete as described.  After an apparently simple 
-> specification, you've since added several qualifiers and assumptions, [...]
+On Tue, 17 May 2011, Dave Martin wrote:
 
-I havent added any qualifiers really (i added examples/description), the opt-in 
-method i mentioned in my first mail should be pretty robust:
+> On Mon, May 16, 2011 at 08:00:24PM +0100, Frank Hofmann wrote:
+>> On Mon, 16 May 2011, Dave Martin wrote:
+>>
+>>> Hi,
+>>>
+>>> On Mon, May 16, 2011 at 5:34 PM, Frank Hofmann <frank.hofmann@tomtom.com> wrote:
+>>>
+>>> [...]
+>>>
+>>>> since you're the "Thumb2 kernel man", maybe you've got a quick / simple
+>>>> answer.
+>>>
+>>> (What a reputation... ;)
+>>>
+>> [ ... ]
+>>> Most likely, you are missing ".syntax unified" -- note that the kernel
+>>> build automatically prepends that directive to the assembler input
+>>> when building a Thumb-2 kernel, which is why you won't usually see it
+>>> in the sources.
+>>
+>> I've tried that in userland; have no working thumb-2 kernel here,
+>> our env is Froyo-based and both the kernel and default toolchain too
+>> old to compile successfully for thumb2.
+>>
+>> I'm trying to get my hibernation support code (the page copy loop in
+>> swsusp_arch_resume) to be thumb-2 clean; but since it clones
+>> copy_page.S which uses conditional ldm I've thought it might be a
+>> good idea to be explicit. The reason why this isn't simply branching
+>> is because it always does a load + branch pair, i.e.
+>
+> Can you reuse the copy_page.S without copying it?  Copy-pasting code can
+> lead to fragmentation and maintenance problems further down the line.
+>
+> There already seems to be a arch/arm/lib/copy_template.S to provide a
+> common core for optimised memcpy operations; maybe that could be used.
 
- | Firstly, using the filter code i deny the various link creation syscalls so 
- | that sandboxed code cannot escape for example by creating a symlink to 
- | outside the permitted VFS namespace. (Note: we opt-in to syscalls, that way 
- | new syscalls added by new kernels are denied by defalt. The current symlink 
- | creation syscalls are not opted in to.)
+swsusp_arch_resume() has the constraint that, as part of its normal 
+operation, it overwrites kernel data - including the stack of the current 
+thread. That's by design / intent.
 
-> [...] and I still doubt that it's complete.
+Hence, no stack accesses (i.e. no function calls) - till the copy loop is 
+done.
 
-I could too claim that i doubt that the SELinux kernel implementation is 
-secure!
+For this specific one, claim "special case" ;-)
 
-So how about we both come up with specific examples about how it's not secure, 
-instead of going down the fear-uncertainty-and-doubt road? ;-)
 
-> A higher level goal would look like
-> 
-> "Allow a sandbox app access only to approved resources, to contain the 
-> effects of flaws in the app", or similar.
+But anyway, I've finally found a way to actually perform the assembler 
+page copy loop using C-with-inline-asm:
 
-I see what you mean.
 
-I really think that "restricting sandboxed code to only open files within a 
-given VFS namespace boundary" is the most useful highlevel description here - 
-which is really a subset of a "allow a sandbox app access only to an easily 
-approved set of files" highlevel concept.
+ 	extern struct pbe *restore_pblist;
 
-There's no "to contain ..." bit here: *all* of the sandboxed app code is 
-untrusted, so there's no 'remote attacker' and we do not limit our threat to 
-flaws in the app. We want to contain apps to within a small subset of Linux 
-functionality, and we want to do that within regular apps (without having to be 
-superuser), full stop.
+ 	u8 swsusp_resume_stack[PAGE_SIZE]
+ 		__attribute__((aligned(PAGE_SIZE))) __nosavedata;
 
-> Note that this includes a threat model (remote attacker taking control of the 
-> app) and a general and fully stated strategy for dealing with it.
+ 	int __naked swsusp_arch_resume(void)
+ 	{
+ 	        register struct pbe *pbe;
+ 		register void *sp asm("sp") =
+ 			swsusp_resume_stack + PAGE_SIZE - 8;
 
-Attacker does not have to be remote - most sandboxing concepts protect against 
-locally installed plugins/apps/applets. In sandboxing the whole app is 
-considered untrusted - not just some flaw in it, abused remotely.
+ 	        __asm__ __volatile__("" : "+r"(sp));
 
-> From there, you can start to analyze how to implement the goal, at which 
-> point you'd start thinking about configuration, assumptions, filesystem 
-> access, namespaces, indirect access (e.g. via sockets, rpc, ipc, shared 
-> memory, invocation).
+ 	        for (pbe = restore_pblist; pbe; pbe = pbe->next)
+ 	                copy_page(pbe->orig_address, pbe->address);
 
-Sandboxed code generally does not have access to anything fancy like that - if 
-it is added then all possible side effects have to be examined.
+ 		// inline asm block for SoC core state restore
 
-Thanks,
+ 	        return 0;
+ 	}
 
-	Ingo
+
+This seems to do the trick - bounce it over a temporary stack which is not 
+being touched by the copy loop, and there's no longer a need for a copy 
+loop in assembly. 
+I'm not counting cycles, seems "fast enough", that one function call per 
+page copied might be measurable but is not subjectively noticeable. From 
+my point of view at least, this wins.
+
+
+Note: I'm not advising anyone to try the above _elsewhere_. 
+swsusp_arch_resume is, apart from schedulers and trap handlers, probably 
+the only place in the system whose business it is to meddle with 
+stackpointers.
+
+
+[ ... ]
+>>> Note that that for new code, it's better to use the suffixed condition
+>>> codes (i.e., ldmiaeq instead of ldmeqia) since the kernel now only
+>>> supports being built with binutils versions which in any case are new
+>>> enough to support this syntax.
+>>
+>> Yes, again, if you're on a sufficiently recent kernel :-D
+>
+> Of course, it depends on your precise circumstances.
+
+I've found a way to at least compile my env for THUMB2.
+Thanks for all your help with this !
+
+
+
+
+FrankH.
