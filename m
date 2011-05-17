@@ -1,39 +1,55 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 17 May 2011 21:31:06 +0200 (CEST)
-Subject: [PATCH] arm: Use arch_spin_lock for unwind to avoid lockdep
-	deadlock
-In-Reply-To: <alpine.LFD.2.02.1105171737260.3078@ionos>
-References: <alpine.LFD.2.02.1105171605080.3078@ionos>
-	<1305642021.2466.5799.camel@twins>
-	<alpine.LFD.2.02.1105171737260.3078@ionos>
-Message-ID: <alpine.LFD.2.02.1105172115560.3078@ionos>
+From: stephen.neuendorffer@xilinx.com (Stephen Neuendorffer)
+Date: Tue, 17 May 2011 13:28:33 -0700
+Subject: device_tree binding for "amba bus"
+Message-ID: <f9ae780a-2747-427f-826a-e0b510ca8afb@VA3EHSMHS001.ehs.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 May 2011, Thomas Gleixner wrote:
+Grant,
 
-> On Tue, 17 May 2011, Peter Zijlstra wrote:
-> 
-> > On Tue, 2011-05-17 at 16:11 +0200, Thomas Gleixner wrote:
-> > > When lockdep traces a lock taken in a module the arm unwinder takes
-> > > unwind_lock which causes a recursive lockdep call deadlocking itself
-> > > on the unwind_lock.
-> > > 
-> > > Make unwind_lock an arch_spin_lock to avoid the lockdep call and use
-> > > the raw_local_irq_save/restore() variants to avoid irq tracing as
-> > > well. 
-> > 
-> > That doesn't parse, lockdep has recursion protection, this shouldn't
-> > happen.
-> 
-> Gah, misread the splat. The problem is 
-> 
->      unwind() -> lock() -> lock_acquired() -> unwind() -> lock()
+I've taken a quick look at the arm trace buffer driver
+(arch/arm/kernel/etm.c).
+This driver uses the amba bus driver (drivers/amba/bus.c).
+It appears that this driver does three things:
 
-Grmpf, no. That does not make sense as the stack trace is taken in
-lock_aquire() which happens before lock(). Ignore that for now until I
-have it reproduced.
+1) ensures that the clock named "apb_pclk" is running.
+2) ensures that the regulator named "vcore" is on.
+3) queries the core to verify that a hardcoded register has the correct
+value.
 
-Thanks,
+None of this seems terribly interesting enough to justify a bus that has
+a
+small number of users:
 
-	tglx
+drivers/tty/serial/amba-pl010.c, line 788
+drivers/tty/serial/amba-pl011.c, line 1477
+drivers/input/serio/ambakmi.c, line 197
+drivers/watchdog/sp805_wdt.c, line 359
+drivers/rtc/rtc-pl031.c, line 478
+drivers/rtc/rtc-pl030.c, line 183
+drivers/char/hw_random/nomadik-rng.c, line 97
+drivers/mmc/host/mmci.c, line 1049
+drivers/video/amba-clcd.c, line 538
+drivers/gpio/pl061.c, line 344
+drivers/spi/amba-pl022.c, line 2284
+drivers/dma/amba-pl08x.c, line 2062
+drivers/dma/pl330.c, line 841
+sound/arm/aaci.c, line 1125
+arch/arm/kernel/etm.c:
+line 421
+line 625
+
+And at the very least the hardcoded nature of the names seems, well...
+hardcoded.
+
+Any thoughts about how to abstract this in a device tree?
+(My thoughts: devices need to reference a clock, devices need to
+reference a regulator,
+and it seems to me that the register check could be pulled out into a
+single call that the
+devices that care about it can do themselves during probe() )
+
+Steve
+
+
+This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
