@@ -1,91 +1,68 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Tue, 17 May 2011 17:41:57 -0400
-Subject: [PATCH 1/9] davinci: pm: fix compiler errors and kernel panics from
-	sram consolidation
+Date: Tue, 17 May 2011 17:41:58 -0400
+Subject: [PATCH 2/9] davinci: sram: ioremap the davinci_soc_info specified
+	sram regions
 In-Reply-To: <cover.1305668470.git.bengardiner@nanometrics.ca>
 References: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
 	<cover.1305668470.git.bengardiner@nanometrics.ca>
-Message-ID: <467c7cc853555213b2560ebe1f188c09440284c1.1305668470.git.bengardiner@nanometrics.ca>
+Message-ID: <80c0c2ff5a39baf6140c08460c2691b178c038c0.1305668470.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nori, Sekhar <nsekhar@ti.com>
+The current davinci init sets up SRAM in iotables. There has been an observed
+failure to boot a da850 with 128K specified in the iotable.
 
-Hi Russell,
+Make the davinci sram allocator -- now based on RMK's consolidated SRAM
+support -- do an ioremap of the region specified by the entries in
+davinci_soc_info before registering with pv_pool_create().
 
-On Thu, May 12, 2011 at 23:15:46, Russell King - ARM Linux wrote:
+This commit breaks runtime of davinci boards since the regions that
+the sram init is now trying to ioremap have been iomapped by their
+iotable entries. The iotable entries will be removed in the patches
+to come.
 
-> diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
-> index 1bd73a0..c2f9767 100644
-> --- a/arch/arm/mach-davinci/pm.c
-> +++ b/arch/arm/mach-davinci/pm.c
-
-[...]
-
-> @@ -123,14 +118,14 @@ static int __init davinci_pm_probe(struct platform_device *pdev)
->  		return -ENOENT;
->  	}
->
-> -	davinci_sram_suspend = sram_alloc(davinci_cpu_suspend_sz, NULL);
-> -	if (!davinci_sram_suspend) {
-> +	davinci_sram_suspend_mem = pv_pool_alloc(davinci_pv_pool,
-> +				davinci_cpu_suspend_sz, NULL);
-> +	if (!davinci_sram_suspend_mem) {
->  		dev_err(&pdev->dev, "cannot allocate SRAM memory\n");
->  		return -ENOMEM;
->  	}
-> -
-> -	davinci_sram_push(davinci_sram_suspend, davinci_cpu_suspend,
-> -						davinci_cpu_suspend_sz);
-> +	davinci_sram_suspend = fncpy(davinci_sram_suspend_mem,
-> +				davinci_cpu_suspend, davinci_cpu_suspend_sz);
-
-This gave these build errors:
-
-arch/arm/mach-davinci/pm.c: In function 'davinci_pm_probe':
-arch/arm/mach-davinci/pm.c:127: error: lvalue required in asm statement
-arch/arm/mach-davinci/pm.c:127: error: invalid lvalue in asm output 0
-make[1]: *** [arch/arm/mach-davinci/pm.o] Error 1
-
-Replacing davinci_cpu_suspend with &davinci_cpu_suspend fixed the issue.
-
-With that change done, tested suspend-to-RAM on DA850 platform.
-Also tested audio driver on DM365 platform with IRAM buffers enabled.
-
-Can you also fold the following patch in? Without this the
-kernel panics when suspend-to-RAM is enabled.
-
-Thanks,
-Sekhar
+Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
 ---
- arch/arm/mach-davinci/pm.c    |    2 +-
- arch/arm/mach-davinci/sleep.S |    1 +
- 2 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-davinci/sram.c |   12 ++++++++++--
+ 1 files changed, 10 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
-index c2f9767..5255223 100644
---- a/arch/arm/mach-davinci/pm.c
-+++ b/arch/arm/mach-davinci/pm.c
-@@ -125,7 +125,7 @@ static int __init davinci_pm_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
+index 219d4c5..96026df 100644
+--- a/arch/arm/mach-davinci/sram.c
++++ b/arch/arm/mach-davinci/sram.c
+@@ -8,6 +8,7 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
++#include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <asm/pv-pool.h>
+@@ -26,16 +27,23 @@ EXPORT_SYMBOL_GPL(davinci_pv_pool);
+  */
+ static int __init sram_init(void)
+ {
++	void *addr;
+ 	unsigned len = davinci_soc_info.sram_len;
+ 	int status = 0;
+ 
+ 	if (len) {
+ 		len = min_t(unsigned, len, SRAM_SIZE);
+-		davinci_pv_pool = pv_pool_create((void *)SRAM_VIRT,
++		addr = ioremap(davinci_soc_info.sram_phys, len);
++		if (!addr)
++			return -EIO;
++
++		davinci_pv_pool = pv_pool_create(addr,
+ 					davinci_soc_info.sram_phys, len,
+ 					ilog2(SRAM_GRANULARITY));
+-		if (!davinci_pv_pool)
++		if (!davinci_pv_pool) {
++			iounmap(addr);
+ 			status = -ENOMEM;
++		}
  	}
- 	davinci_sram_suspend = fncpy(davinci_sram_suspend_mem,
--				davinci_cpu_suspend, davinci_cpu_suspend_sz);
-+				&davinci_cpu_suspend, davinci_cpu_suspend_sz);
- 
- 	suspend_set_ops(&davinci_pm_ops);
- 
-diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
-index fb5e72b..2cef533 100644
---- a/arch/arm/mach-davinci/sleep.S
-+++ b/arch/arm/mach-davinci/sleep.S
-@@ -37,6 +37,7 @@
- #define DEEPSLEEP_SLEEPENABLE_BIT	BIT(31)
- 
- 	.text
-+	.align 3
- /*
-  * Move DaVinci into deep sleep state
-  *
+ 	return status;
+ }
 -- 
 1.7.4.1
