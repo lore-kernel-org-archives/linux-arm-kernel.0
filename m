@@ -1,89 +1,27 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 17 May 2011 09:30:27 +0530
-Subject: [PATCH resend] spi/amba-pl022: work in polling or interrupt mode
-	if pl022_dma_probe fails
-In-Reply-To: <052261410dd8d224fc199518e646abf80bfa7d4c.1305518921.git.viresh.kumar@st.com>
-References: <052261410dd8d224fc199518e646abf80bfa7d4c.1305518921.git.viresh.kumar@st.com>
-Message-ID: <4DD1F2DB.9020308@st.com>
+From: mad_soft@inbox.ru (Dmitry Artamonow)
+Date: Tue, 17 May 2011 08:26:44 +0400
+Subject: [alsa-devel] [PATCH v2 1/3] ASoC: Asahi Kasei AK4641 codec driver
+In-Reply-To: <20110516212533.GA2570@sirena.org.uk>
+References: <1305579805-15617-1-git-send-email-mad_soft@inbox.ru>
+	<1305579805-15617-2-git-send-email-mad_soft@inbox.ru>
+	<20110516212533.GA2570@sirena.org.uk>
+Message-ID: <20110517042644.GA19254@rainbow>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/16/2011 09:40 AM, Viresh KUMAR wrote:
-> If pl022_dma_probe fails, we can try to transfer data in polling or interrupt
-> mode. Also, set platform_info->enable_dma to 0, so that no other code tries to
-> use dma.
+On 22:25 Mon 16 May     , Mark Brown wrote:
+> On Tue, May 17, 2011 at 01:03:23AM +0400, Dmitry Artamonow wrote:
+> > A driver for the AK4641 codec used in iPAQ hx4700 and Glofiish M800
+> > among others.
 > 
-> Signed-off-by: Viresh Kumar <viresh.kumar@st.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/spi/amba-pl022.c |   11 ++++++-----
->  1 files changed, 6 insertions(+), 5 deletions(-)
+> This looks pretty good - a few small issues realting to the use of old
+> APIs and coding standards below but nothing serious.
 > 
 
-David,
-
-Sorry for missing you earlier in "to" list. Can you please push this
-through spi-devel tree.
-
---
-viresh
-
-> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-> index dae886e..77f90de 100644
-> --- a/drivers/spi/amba-pl022.c
-> +++ b/drivers/spi/amba-pl022.c
-> @@ -1068,7 +1068,7 @@ static int __init pl022_dma_probe(struct pl022 *pl022)
->  					    pl022->master_info->dma_filter,
->  					    pl022->master_info->dma_rx_param);
->  	if (!pl022->dma_rx_channel) {
-> -		dev_err(&pl022->adev->dev, "no RX DMA channel!\n");
-> +		dev_dbg(&pl022->adev->dev, "no RX DMA channel!\n");
->  		goto err_no_rxchan;
->  	}
->  
-> @@ -1076,13 +1076,13 @@ static int __init pl022_dma_probe(struct pl022 *pl022)
->  					    pl022->master_info->dma_filter,
->  					    pl022->master_info->dma_tx_param);
->  	if (!pl022->dma_tx_channel) {
-> -		dev_err(&pl022->adev->dev, "no TX DMA channel!\n");
-> +		dev_dbg(&pl022->adev->dev, "no TX DMA channel!\n");
->  		goto err_no_txchan;
->  	}
->  
->  	pl022->dummypage = kmalloc(PAGE_SIZE, GFP_KERNEL);
->  	if (!pl022->dummypage) {
-> -		dev_err(&pl022->adev->dev, "no DMA dummypage!\n");
-> +		dev_dbg(&pl022->adev->dev, "no DMA dummypage!\n");
->  		goto err_no_dummypage;
->  	}
->  
-> @@ -1098,6 +1098,8 @@ err_no_txchan:
->  	dma_release_channel(pl022->dma_rx_channel);
->  	pl022->dma_rx_channel = NULL;
->  err_no_rxchan:
-> +	dev_err(&pl022->adev->dev,
-> +			"Failed to work in dma mode, work without dma!\n");
->  	return -ENODEV;
->  }
->  
-> @@ -2111,7 +2113,7 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->  	if (platform_info->enable_dma) {
->  		status = pl022_dma_probe(pl022);
->  		if (status != 0)
-> -			goto err_no_dma;
-> +			platform_info->enable_dma = 0;
->  	}
->  
->  	/* Initialize and start queue */
-> @@ -2143,7 +2145,6 @@ pl022_probe(struct amba_device *adev, const struct amba_id *id)
->   err_init_queue:
->  	destroy_queue(pl022);
->  	pl022_dma_remove(pl022);
-> - err_no_dma:
->  	free_irq(adev->irq[0], pl022);
->   err_no_irq:
->  	clk_put(pl022->clk);
-
+Hi, Mark! Thanks for review - your comments are really valuable.
+It seems that ASoC APIs change faster than I adapt this driver to them, but
+I hope that preparing v3 will take less time than v1->v2 took :)
 
 -- 
-viresh
+Best regards,
+Dmitry "MAD" Artamonow
