@@ -1,34 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 May 2011 23:50:20 +0100
-Subject: [PATCH] ftrace: recordmcount: avoid STT_FUNC symbols as base
-	on ARM
-In-Reply-To: <1305648629.5456.744.camel@gandalf.stny.rr.com>
-References: <1305134631-31617-1-git-send-email-rabin@rab.in>
-	<1305648629.5456.744.camel@gandalf.stny.rr.com>
-Message-ID: <20110517225020.GD2266@n2100.arm.linux.org.uk>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Tue, 17 May 2011 16:04:34 -0700
+Subject: [PATCH] ARM: bcmring: fix patches to convert to sp804
+ clockevents
+In-Reply-To: <E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
+References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
+	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
+Message-ID: <4DD2FF02.1020508@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2011 at 12:10:29PM -0400, Steven Rostedt wrote:
-> On Wed, 2011-05-11 at 22:53 +0530, Rabin Vincent wrote:
-> > While find_secsym_ndx often finds the unamed local STT_SECTION, if a
-> > section has only one function in it, the ARM toolchain generates the
-> > STT_FUNC symbol before the STT_SECTION, and recordmcount finds this
-> > instead.
-> > 
-> > This is problematic on ARM because in ARM ELFs, "if a [STT_FUNC] symbol
-> > addresses a Thumb instruction, its value is the address of the
-> > instruction with bit zero set (in a relocatable object, the section
-> > offset with bit zero set)".  This leads to incorrect mcount addresses
-> > being recorded.
-> > 
-> > Fix this by not using STT_FUNC symbols as the base on ARM.
-> 
-> Hi Russell,
-> 
-> Can you give me an Acked-by on this patch?
+Fix build and boot problem with original patches to convert bcmring
+to use sp804 clockevents.
 
-It would be better for someone who knows the ELF format for ARM and
-its weirdnesses to ack this patch.  I'm afraid my ARM ELF format
-knowledge was been superseded when EABI came along and introduced
-all sorts of new stuff.
+Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
+---
+  arch/arm/mach-bcmring/core.c |    6 +++---
+  1 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
+index c323ae9..299c275 100644
+--- a/arch/arm/mach-bcmring/core.c
++++ b/arch/arm/mach-bcmring/core.c
+@@ -191,8 +191,6 @@ void __init bcmring_amba_init(void)
+
+  	chipcHw_busInterfaceClockEnable(bus_clock);
+
+-	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
+-
+  	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
+  		struct amba_device *d = amba_devs[i];
+  		amba_device_register(d, &iomem_resource);
+@@ -232,12 +230,14 @@ void __init bcmring_init_timer(void)
+  	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
+  	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
+
++	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
++
+  	/*
+  	 * Make irqs happen for the system timer
+  	 */
+  	bcmring_clocksource_init();
+
+-	sp804_clockevents_register(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
++	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
+  }
+
+  struct sys_timer bcmring_timer = {
+-- 
+1.7.4.1
