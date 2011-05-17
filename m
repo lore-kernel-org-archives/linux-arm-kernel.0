@@ -1,95 +1,78 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Tue, 17 May 2011 21:17:38 +0530
-Subject: [PATCHv2 0/2] [RFC] Shrink clock data utilizing preprocessor
-In-Reply-To: <87r57x4gt8.fsf@ti.com>
-References: <1305495958-2236-1-git-send-email-vzapolskiy@gmail.com>
-	<87r57x4gt8.fsf@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CF13F57@dbde02.ent.ti.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 17 May 2011 12:10:29 -0400
+Subject: [PATCH] ftrace: recordmcount: avoid STT_FUNC symbols as base
+	on ARM
+In-Reply-To: <1305134631-31617-1-git-send-email-rabin@rab.in>
+References: <1305134631-31617-1-git-send-email-rabin@rab.in>
+Message-ID: <1305648629.5456.744.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Hilman, Kevin
-> Sent: Tuesday, May 17, 2011 6:37 PM
-> To: Vladimir Zapolskiy
-> Cc: Tony Lindgren; Cousson, Benoit; 
-> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCHv2 0/2] [RFC] Shrink clock data utilizing 
-> preprocessor
+On Wed, 2011-05-11 at 22:53 +0530, Rabin Vincent wrote:
+> While find_secsym_ndx often finds the unamed local STT_SECTION, if a
+> section has only one function in it, the ARM toolchain generates the
+> STT_FUNC symbol before the STT_SECTION, and recordmcount finds this
+> instead.
 > 
-> Vladimir Zapolskiy <vzapolskiy@gmail.com> writes:
+> This is problematic on ARM because in ARM ELFs, "if a [STT_FUNC] symbol
+> addresses a Thumb instruction, its value is the address of the
+> instruction with bit zero set (in a relocatable object, the section
+> offset with bit zero set)".  This leads to incorrect mcount addresses
+> being recorded.
 > 
-> > This change shows a possibility to utilize C preprocessor to remove
-> > redundant data from clock definitions for OMAP4 architecture.
-> >
-> > If the change is evaluated as a positive one, the same 
-> approach could
-> > be applied in reducing LOCs from other files, which contain 
-> monotonous
-> > data enumeration.
-> 
-> Now that I can apply these patches and look at the result, I 
-> still have
-> the same opinion.  For me, this results in a major loss of 
-> readability.
+> Fix this by not using STT_FUNC symbols as the base on ARM.
 
-[sp] I agree here. __VA_ARGS__ in most of the macros make it difficult
-     to undertsand the containment relation.
+Hi Russell,
 
-     Multiple inclusion of macros within another makes it difficult
-     to follow the chain/ sequence.
+Can you give me an Acked-by on this patch?
 
-     Using a set of changes to illustrate issue with scalability of
-     the macros as well:
+Thanks,
 
--static const struct clksel dpll_core_m2_div[] = {
--	{ .parent = &dpll_core_ck, .rates = div31_1to31_rates },
--	{ .parent = NULL },
--};
-+DEFINE_CLKSEL(dpll_core_m2_div, dpll_core_ck, div31_1to31_rates);
-...
-... many lines below...
-...
--static const struct clksel iva_hsd_byp_clk_mux_sel[] = {
--	{ .parent = &sys_clkin_ck, .rates = div_1_0_rates },
--	{ .parent = &div_iva_hs_clk, .rates = div_1_1_rates },
--	{ .parent = NULL },
--};
-+DEFINE_CLKSEL2(iva_hsd_byp_clk_mux_sel, sys_clkin_ck, div_iva_hs_clk);
-
-    In DEFINE_CLKSEL() we need to pass the "rate" as argument
-    and in DEFINE_CLKSEL2() it isn't because we they are hardcoded
-    for current implementation.
-
-    But then,
-
-+#define DEFINE_CLKSEL3(_name, _parent0, _parent1, _parent2)		\
-+	static const struct clksel _name[] = {				\
-+		{ .parent = &_parent0, .rates = div_1_0_rates },	\
-+		{ .parent = &_parent1, .rates = div_1_1_rates },	\
-+		{ .parent = &_parent2, .rates = div_1_2_rates },	\
-+		{ .parent = NULL },					\
-+	}
- 
-    All these definitions don't scale well.
-
-~sanjeev
+-- Steve
 
 > 
-> Changes just to make nice diffstats are fine, but not when it impacts
-> readability, etc.  Especially since this data will likely be 
-> eventually
-> moved to device tree, I'd rather see consolidation efforts focused
-> elsewhere.
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  scripts/recordmcount.h |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
 > 
-> Kevin
-> 
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe 
-> linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
+> index baf187b..0e2944a 100644
+> --- a/scripts/recordmcount.h
+> +++ b/scripts/recordmcount.h
+> @@ -39,6 +39,7 @@
+>  #undef ELF_R_INFO
+>  #undef Elf_r_info
+>  #undef ELF_ST_BIND
+> +#undef ELF_ST_TYPE
+>  #undef fn_ELF_R_SYM
+>  #undef fn_ELF_R_INFO
+>  #undef uint_t
+> @@ -68,6 +69,7 @@
+>  # define ELF_R_INFO		ELF64_R_INFO
+>  # define Elf_r_info		Elf64_r_info
+>  # define ELF_ST_BIND		ELF64_ST_BIND
+> +# define ELF_ST_TYPE		ELF64_ST_TYPE
+>  # define fn_ELF_R_SYM		fn_ELF64_R_SYM
+>  # define fn_ELF_R_INFO		fn_ELF64_R_INFO
+>  # define uint_t			uint64_t
+> @@ -96,6 +98,7 @@
+>  # define ELF_R_INFO		ELF32_R_INFO
+>  # define Elf_r_info		Elf32_r_info
+>  # define ELF_ST_BIND		ELF32_ST_BIND
+> +# define ELF_ST_TYPE		ELF32_ST_TYPE
+>  # define fn_ELF_R_SYM		fn_ELF32_R_SYM
+>  # define fn_ELF_R_INFO		fn_ELF32_R_INFO
+>  # define uint_t			uint32_t
+> @@ -333,6 +336,11 @@ static unsigned find_secsym_ndx(unsigned const txtndx,
+>  		if (txtndx == w2(symp->st_shndx)
+>  			/* avoid STB_WEAK */
+>  		    && (STB_LOCAL == st_bind || STB_GLOBAL == st_bind)) {
+> +			/* function symbols on ARM have quirks, avoid them */
+> +			if (w2(ehdr->e_machine) == EM_ARM
+> +			    && ELF_ST_TYPE(symp->st_info) == STT_FUNC)
+> +				continue;
+> +
+>  			*recvalp = _w(symp->st_value);
+>  			return symp - sym0;
+>  		}
