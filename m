@@ -1,78 +1,48 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 17 May 2011 12:10:29 -0400
-Subject: [PATCH] ftrace: recordmcount: avoid STT_FUNC symbols as base
-	on ARM
-In-Reply-To: <1305134631-31617-1-git-send-email-rabin@rab.in>
-References: <1305134631-31617-1-git-send-email-rabin@rab.in>
-Message-ID: <1305648629.5456.744.camel@gandalf.stny.rr.com>
+From: max@stro.at (maximilian attems)
+Date: Tue, 17 May 2011 18:17:11 +0200
+Subject: [PATCH] [klibc] arm: no usage of ARM_VALID_IMM() anymore
+In-Reply-To: <1305649031-15622-1-git-send-email-max@stro.at>
+References: <1305649031-15622-1-git-send-email-max@stro.at>
+Message-ID: <1305649031-15622-2-git-send-email-max@stro.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-11 at 22:53 +0530, Rabin Vincent wrote:
-> While find_secsym_ndx often finds the unamed local STT_SECTION, if a
-> section has only one function in it, the ARM toolchain generates the
-> STT_FUNC symbol before the STT_SECTION, and recordmcount finds this
-> instead.
-> 
-> This is problematic on ARM because in ARM ELFs, "if a [STT_FUNC] symbol
-> addresses a Thumb instruction, its value is the address of the
-> instruction with bit zero set (in a relocatable object, the section
-> offset with bit zero set)".  This leads to incorrect mcount addresses
-> being recorded.
-> 
-> Fix this by not using STT_FUNC symbols as the base on ARM.
+Since bd56c54ae409a2c36d23e61d4075e2d1ffcd1a23 aka klibc 1.4.1
+the usage of that macro is gone, so just get rid of it.
 
-Hi Russell,
+Signed-off-by: maximilian attems <max@stro.at>
+---
+ usr/include/arch/arm/klibc/asmmacros.h |   20 --------------------
+ 1 files changed, 0 insertions(+), 20 deletions(-)
 
-Can you give me an Acked-by on this patch?
-
-Thanks,
-
--- Steve
-
-> 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  scripts/recordmcount.h |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
-> index baf187b..0e2944a 100644
-> --- a/scripts/recordmcount.h
-> +++ b/scripts/recordmcount.h
-> @@ -39,6 +39,7 @@
->  #undef ELF_R_INFO
->  #undef Elf_r_info
->  #undef ELF_ST_BIND
-> +#undef ELF_ST_TYPE
->  #undef fn_ELF_R_SYM
->  #undef fn_ELF_R_INFO
->  #undef uint_t
-> @@ -68,6 +69,7 @@
->  # define ELF_R_INFO		ELF64_R_INFO
->  # define Elf_r_info		Elf64_r_info
->  # define ELF_ST_BIND		ELF64_ST_BIND
-> +# define ELF_ST_TYPE		ELF64_ST_TYPE
->  # define fn_ELF_R_SYM		fn_ELF64_R_SYM
->  # define fn_ELF_R_INFO		fn_ELF64_R_INFO
->  # define uint_t			uint64_t
-> @@ -96,6 +98,7 @@
->  # define ELF_R_INFO		ELF32_R_INFO
->  # define Elf_r_info		Elf32_r_info
->  # define ELF_ST_BIND		ELF32_ST_BIND
-> +# define ELF_ST_TYPE		ELF32_ST_TYPE
->  # define fn_ELF_R_SYM		fn_ELF32_R_SYM
->  # define fn_ELF_R_INFO		fn_ELF32_R_INFO
->  # define uint_t			uint32_t
-> @@ -333,6 +336,11 @@ static unsigned find_secsym_ndx(unsigned const txtndx,
->  		if (txtndx == w2(symp->st_shndx)
->  			/* avoid STB_WEAK */
->  		    && (STB_LOCAL == st_bind || STB_GLOBAL == st_bind)) {
-> +			/* function symbols on ARM have quirks, avoid them */
-> +			if (w2(ehdr->e_machine) == EM_ARM
-> +			    && ELF_ST_TYPE(symp->st_info) == STT_FUNC)
-> +				continue;
-> +
->  			*recvalp = _w(symp->st_value);
->  			return symp - sym0;
->  		}
+diff --git a/usr/include/arch/arm/klibc/asmmacros.h b/usr/include/arch/arm/klibc/asmmacros.h
+index 8a21c94..b5bade2 100644
+--- a/usr/include/arch/arm/klibc/asmmacros.h
++++ b/usr/include/arch/arm/klibc/asmmacros.h
+@@ -7,24 +7,4 @@
+ #ifndef _KLIBC_ASMMACROS_H
+ #define _KLIBC_ASMMACROS_H
+ 
+-/* An immediate in ARM can be any 8-bit value rotated by an even number of bits */
+-
+-#define ARM_VALID_IMM(x)	\
+-	((((x) & ~0x000000ff) == 0) || \
+-	 (((x) & ~0x000003fc) == 0) || \
+-	 (((x) & ~0x00000ff0) == 0) || \
+-	 (((x) & ~0x00003fc0) == 0) || \
+-	 (((x) & ~0x0000ff00) == 0) || \
+-	 (((x) & ~0x0003fc00) == 0) || \
+-	 (((x) & ~0x000ff000) == 0) || \
+-	 (((x) & ~0x003fc000) == 0) || \
+-	 (((x) & ~0x00ff0000) == 0) || \
+-	 (((x) & ~0x03fc0000) == 0) || \
+-	 (((x) & ~0x0ff00000) == 0) || \
+-	 (((x) & ~0x3fc00000) == 0) || \
+-	 (((x) & ~0xff000000) == 0) || \
+-	 (((x) & ~0xfc000003) == 0) || \
+-	 (((x) & ~0xf000000f) == 0) || \
+-	 (((x) & ~0xc000003f) == 0))
+-
+ #endif /* _KLIBC_ASMMACROS_H */
+-- 
+1.7.4.4
