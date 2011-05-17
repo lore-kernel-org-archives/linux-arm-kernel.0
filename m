@@ -1,50 +1,36 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Tue, 17 May 2011 16:04:34 -0700
-Subject: [PATCH] ARM: bcmring: fix patches to convert to sp804
- clockevents
-In-Reply-To: <E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
-Message-ID: <4DD2FF02.1020508@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 May 2011 00:08:21 +0100
+Subject: [PATCH 2/2] OMAP3BEAGLE: Add support for mt9p031 sensor
+	(LI-5M03 module).
+In-Reply-To: <1305624528-5595-3-git-send-email-javier.martin@vista-silicon.com>
+References: <1305624528-5595-1-git-send-email-javier.martin@vista-silicon.com>
+	<1305624528-5595-3-git-send-email-javier.martin@vista-silicon.com>
+Message-ID: <20110517230821.GA5913@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix build and boot problem with original patches to convert bcmring
-to use sp804 clockevents.
+On Tue, May 17, 2011 at 11:28:48AM +0200, Javier Martin wrote:
+> +#include "devices.h"
+> +#include "../../../drivers/media/video/omap3isp/isp.h"
+> +#include "../../../drivers/media/video/omap3isp/ispreg.h"
 
-Signed-off-by: Jiandong Zheng <jdzheng@broadcom.com>
----
-  arch/arm/mach-bcmring/core.c |    6 +++---
-  1 files changed, 3 insertions(+), 3 deletions(-)
+This suggests that there's something very wrong with what's going on;
+it suggests that you're trying to access driver internals which should
+be handled via some better means.  And it looks like it's this:
 
-diff --git a/arch/arm/mach-bcmring/core.c b/arch/arm/mach-bcmring/core.c
-index c323ae9..299c275 100644
---- a/arch/arm/mach-bcmring/core.c
-+++ b/arch/arm/mach-bcmring/core.c
-@@ -191,8 +191,6 @@ void __init bcmring_amba_init(void)
+> @@ -654,6 +715,62 @@ static void __init beagle_opp_init(void)
+>  	return;
+>  }
+>  
+> +extern struct platform_device omap3isp_device;
+> +
+> +static int beagle_cam_set_xclk(struct v4l2_subdev *subdev, int hz)
+> +{
+> +	struct isp_device *isp = platform_get_drvdata(&omap3isp_device);
+> +	int ret;
+> +
+> +	ret = isp->platform_cb.set_xclk(isp, hz, MT9P031_XCLK);
+> +	return 0;
+> +}
 
-  	chipcHw_busInterfaceClockEnable(bus_clock);
-
--	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
--
-  	for (i = 0; i < ARRAY_SIZE(amba_devs); i++) {
-  		struct amba_device *d = amba_devs[i];
-  		amba_device_register(d, &iomem_resource);
-@@ -232,12 +230,14 @@ void __init bcmring_init_timer(void)
-  	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
-  	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
-
-+	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
-+
-  	/*
-  	 * Make irqs happen for the system timer
-  	 */
-  	bcmring_clocksource_init();
-
--	sp804_clockevents_register(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
-+	sp804_clockevents_init(TIMER0_VA_BASE, IRQ_TIMER0, "timer0");
-  }
-
-  struct sys_timer bcmring_timer = {
--- 
-1.7.4.1
+That really needs fixing in a different way.
