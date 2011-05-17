@@ -1,35 +1,46 @@
-From: jmorris@namei.org (James Morris)
-Date: Tue, 17 May 2011 23:29:36 +1000 (EST)
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <20110517131058.GE21441@elte.hu>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu>
-	<alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
-	<20110516150837.GA513@elte.hu>
-	<alpine.LRH.2.00.1105171214330.31710@tundra.namei.org>
-	<20110517131058.GE21441@elte.hu>
-Message-ID: <alpine.LRH.2.00.1105172317060.5404@tundra.namei.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 17 May 2011 19:30:29 +0530
+Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
+In-Reply-To: <1305588114-23728-1-git-send-email-ccross@android.com>
+References: <1305588114-23728-1-git-send-email-ccross@android.com>
+Message-ID: <4DD27F7D.2070305@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 May 2011, Ingo Molnar wrote:
+Colin,
 
-> I'm not sure i get your point.
+On 5/17/2011 4:51 AM, Colin Cross wrote:
+> The localtimer's clock changes with the cpu clock.  After a
+> cpufreq transition, update the clockevent's frequency and
+> reprogram the next clock event.
+>
+> Adds a clock called "smp_twd" that is used to determine the
+> twd frequency, which can also be used at init time to
+> avoid calibrating the twd frequency.
+>
+> Signed-off-by: Colin Cross<ccross@android.com>
+> Cc: Thomas Gleixner<tglx@linutronix.de>
+> Cc: Russell King<linux@arm.linux.org.uk>
+> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> Cc: Rob Herring<robherring2@gmail.com>
+> ---
+>   arch/arm/kernel/smp_twd.c |   69 +++++++++++++++++++++++++++++++++++++++++++--
+>   1 files changed, 66 insertions(+), 3 deletions(-)
+>
+> This patch depends on Thomas Gleixner's patch to add clockevents_reconfigure
+> See: https://lkml.org/lkml/2011/5/13/122
+>
+> This patch adds a clock that can be used to skip calibration as well
+> as update the frequency.  A later patch (or a later version of this patch)
+> will drop twd_calibrate_rate once all platforms provide the necessary
+> smp_twd clock.
+>
 
-Your example was not complete as described.  After an apparently simple 
-specification, you've since added several qualifiers and assumptions, and 
-I still doubt that it's complete.
+Since the "smp_twd" clock node will not have a clk_set_rate()
+associated with it, will the clk_get_rate() gives you real
+rate. May be we can associate this node as a child of
+CPU clock node and use the fixed divider based on peripheral
+ratio. Is that the idea here to realize it ?
 
-A higher level goal would look like
-
-"Allow a sandbox app access only to approved resources, to contain the 
-effects of flaws in the app", or similar.
-
-Note that this includes a threat model (remote attacker taking control of 
-the app) and a general and fully stated strategy for dealing with it.
+Regards,
+Santosh
