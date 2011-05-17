@@ -1,50 +1,43 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 17 May 2011 15:34:14 +0300
-Subject: [PATCH 1/4] arm: pxa3xx: cm-x300: fix V3020 RTC functionality
-In-Reply-To: <1304941309-13288-1-git-send-email-grinberg@compulab.co.il>
-References: <1304941309-13288-1-git-send-email-grinberg@compulab.co.il>
-Message-ID: <4DD26B46.4000908@compulab.co.il>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Tue, 17 May 2011 14:42:12 +0200
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <1305565422.5456.21.camel@gandalf.stny.rr.com>
+References: <1305290370.2466.14.camel@twins> <1305290612.2466.17.camel@twins>
+	<20110513125452.GD3924@elte.hu> <1305292132.2466.26.camel@twins>
+	<20110513131800.GA7883@elte.hu> <1305294935.2466.64.camel@twins>
+	<20110513145737.GC32688@elte.hu>
+	<1305563026.5456.19.camel@gandalf.stny.rr.com>
+	<20110516165249.GB10929@elte.hu>
+	<1305565422.5456.21.camel@gandalf.stny.rr.com>
+Message-ID: <20110517124212.GB21441@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric,
 
+* Steven Rostedt <rostedt@goodmis.org> wrote:
 
-Can this go into .39?
-I'd like it to...
+> On Mon, 2011-05-16 at 18:52 +0200, Ingo Molnar wrote:
+> > * Steven Rostedt <rostedt@goodmis.org> wrote:
+> > 
+> > > I'm a bit nervous about the 'active' role of (trace_)events, because of the 
+> > > way multiple callbacks can be registered. How would:
+> > > 
+> > > 	err = event_x();
+> > > 	if (err == -EACCESS) {
+> > > 
+> > > be handled? [...]
+> > 
+> > The default behavior would be something obvious: to trigger all callbacks and 
+> > use the first non-zero return value.
+> 
+> But how do we know which callback that was from? There's no ordering of what 
+> callbacks are called first.
 
+We do not have to know that - nor do the calling sites care in general. Do you 
+have some specific usecase in mind where the identity of the callback that 
+generates a match matters?
 
-On 05/09/11 14:41, Igor Grinberg wrote:
+Thanks,
 
-> While in sleep mode the CS# and other V3020 RTC GPIOs must be driven
-> high, otherwise V3020 RTC fails to keep the right time in sleep mode.
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> Cc: stable at kernel.org
-> ---
->  arch/arm/mach-pxa/cm-x300.c |    8 ++++----
->  1 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-> index b2248e7..8a03487 100644
-> --- a/arch/arm/mach-pxa/cm-x300.c
-> +++ b/arch/arm/mach-pxa/cm-x300.c
-> @@ -161,10 +161,10 @@ static mfp_cfg_t cm_x3xx_mfp_cfg[] __initdata = {
->  	GPIO99_GPIO,			/* Ethernet IRQ */
->  
->  	/* RTC GPIOs */
-> -	GPIO95_GPIO,			/* RTC CS */
-> -	GPIO96_GPIO,			/* RTC WR */
-> -	GPIO97_GPIO,			/* RTC RD */
-> -	GPIO98_GPIO,			/* RTC IO */
-> +	GPIO95_GPIO | MFP_LPM_DRIVE_HIGH,	/* RTC CS */
-> +	GPIO96_GPIO | MFP_LPM_DRIVE_HIGH,	/* RTC WR */
-> +	GPIO97_GPIO | MFP_LPM_DRIVE_HIGH,	/* RTC RD */
-> +	GPIO98_GPIO,				/* RTC IO */
->  
->  	/* Standard I2C */
->  	GPIO21_I2C_SCL,
-
--- 
-Regards,
-Igor.
+	Ingo
