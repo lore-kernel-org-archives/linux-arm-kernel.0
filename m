@@ -1,63 +1,69 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 17 May 2011 09:05:28 -0400
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
-	call filtering
-In-Reply-To: <20110517124212.GB21441@elte.hu>
-References: <1305290370.2466.14.camel@twins>
-	<1305290612.2466.17.camel@twins> <20110513125452.GD3924@elte.hu>
-	<1305292132.2466.26.camel@twins> <20110513131800.GA7883@elte.hu>
-	<1305294935.2466.64.camel@twins> <20110513145737.GC32688@elte.hu>
-	<1305563026.5456.19.camel@gandalf.stny.rr.com>
-	<20110516165249.GB10929@elte.hu>
-	<1305565422.5456.21.camel@gandalf.stny.rr.com>
-	<20110517124212.GB21441@elte.hu>
-Message-ID: <1305637528.5456.723.camel@gandalf.stny.rr.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 17 May 2011 18:36:33 +0530
+Subject: [RFC PATCH v3] Consolidate SRAM support
+In-Reply-To: <20110512174546.GB8633@n2100.arm.linux.org.uk>
+References: <20110415130607.GM1611@n2100.arm.linux.org.uk>
+	<20110512174546.GB8633@n2100.arm.linux.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-05-17 at 14:42 +0200, Ingo Molnar wrote:
-> * Steven Rostedt <rostedt@goodmis.org> wrote:
-> 
-> > On Mon, 2011-05-16 at 18:52 +0200, Ingo Molnar wrote:
-> > > * Steven Rostedt <rostedt@goodmis.org> wrote:
-> > > 
-> > > > I'm a bit nervous about the 'active' role of (trace_)events, because of the 
-> > > > way multiple callbacks can be registered. How would:
-> > > > 
-> > > > 	err = event_x();
-> > > > 	if (err == -EACCESS) {
-> > > > 
-> > > > be handled? [...]
-> > > 
-> > > The default behavior would be something obvious: to trigger all callbacks and 
-> > > use the first non-zero return value.
-> > 
-> > But how do we know which callback that was from? There's no ordering of what 
-> > callbacks are called first.
-> 
-> We do not have to know that - nor do the calling sites care in general. Do you 
-> have some specific usecase in mind where the identity of the callback that 
-> generates a match matters?
+Hi Russell,
 
-Maybe I'm confused. I was thinking that these event_*() are what we
-currently call trace_*(), but the event_*(), I assume, can return a
-value if a call back returns one.
+On Thu, May 12, 2011 at 23:15:46, Russell King - ARM Linux wrote:
 
-Thus, we now have the ability to dynamically attach function calls to
-arbitrary points in the kernel that can have an affect on the code that
-called it. Right now, we only have the ability to attach function calls
-to these locations that have passive affects (tracing/profiling).
+> diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
+> index 1bd73a0..c2f9767 100644
+> --- a/arch/arm/mach-davinci/pm.c
+> +++ b/arch/arm/mach-davinci/pm.c
 
-But you say, "nor do the calling sites care in general". Then what do
-these calling sites do with the return code? Are we limiting these
-actions to security only? Or can we have some other feature. I can
-envision that we can make the Linux kernel quite dynamic here with "self
-modifying code". That is, anywhere we have "hooks", perhaps we could
-replace them with dynamic switches (jump labels). Maybe events would not
-be the best use, but they could be a generic one.
+[...]
 
-Knowing what callback returned the result would be beneficial. Right
-now, you are saying if the call back return anything, just abort the
-call, not knowing what callback was called.
+> @@ -123,14 +118,14 @@ static int __init davinci_pm_probe(struct platform_device *pdev)
+>  		return -ENOENT;
+>  	}
+>  
+> -	davinci_sram_suspend = sram_alloc(davinci_cpu_suspend_sz, NULL);
+> -	if (!davinci_sram_suspend) {
+> +	davinci_sram_suspend_mem = pv_pool_alloc(davinci_pv_pool,
+> +				davinci_cpu_suspend_sz, NULL);
+> +	if (!davinci_sram_suspend_mem) {
+>  		dev_err(&pdev->dev, "cannot allocate SRAM memory\n");
+>  		return -ENOMEM;
+>  	}
+> -
+> -	davinci_sram_push(davinci_sram_suspend, davinci_cpu_suspend,
+> -						davinci_cpu_suspend_sz);
+> +	davinci_sram_suspend = fncpy(davinci_sram_suspend_mem,
+> +				davinci_cpu_suspend, davinci_cpu_suspend_sz);
 
--- Steve
+This gave these build errors:
+
+arch/arm/mach-davinci/pm.c: In function 'davinci_pm_probe':
+arch/arm/mach-davinci/pm.c:127: error: lvalue required in asm statement
+arch/arm/mach-davinci/pm.c:127: error: invalid lvalue in asm output 0
+make[1]: *** [arch/arm/mach-davinci/pm.o] Error 1
+
+Replacing davinci_cpu_suspend with &davinci_cpu_suspend fixed the issue.
+
+With that change done, tested suspend-to-RAM on DA850 platform.
+Also tested audio driver on DM365 platform with IRAM buffers enabled.
+
+Can you also fold the following patch in? Without this the
+kernel panics when suspend-to-RAM is enabled. 
+
+diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
+index fb5e72b..2cef533 100644
+--- a/arch/arm/mach-davinci/sleep.S
++++ b/arch/arm/mach-davinci/sleep.S
+@@ -37,6 +37,7 @@
+ #define DEEPSLEEP_SLEEPENABLE_BIT      BIT(31)
+
+        .text
++       .align 3
+ /*
+  * Move DaVinci into deep sleep state
+  *
+
+Thanks,
+Sekhar
