@@ -1,199 +1,55 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 18 May 2011 08:58:00 +1200
-Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface (ISI)
-	support
-In-Reply-To: <4C79549CB6F772498162A641D92D532801B80D21@penmb01.corp.atmel.com>
-References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>	<4DCC5040.6050300@bluewatersys.com>
-	<4C79549CB6F772498162A641D92D532801B80D21@penmb01.corp.atmel.com>
-Message-ID: <4DD2E158.7050300@bluewatersys.com>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Tue, 17 May 2011 17:41:56 -0400
+Subject: [PATCH 0/9] 
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
+Message-ID: <cover.1305668470.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/2011 08:59 PM, Wu, Josh wrote:
-> 
-> On Friday, May 13, 2011 5:25 AM, Ryan Mallon wrote 
-> 
->> On 05/12/2011 07:42 PM, Josh Wu wrote:
->>> This patch is to enable Atmel Image Sensor Interface (ISI) driver support. 
->>> - Using soc-camera framework with videobuf2 dma-contig allocator
->>> - Supporting video streaming of YUV packed format
->>> - Tested on AT91SAM9M10G45-EK with OV2640
-> 
->> Hi Josh,
-> 
->> Thansk for doing this. Overall the patch looks really good. A few
->> comments below.
-> Hi, Ryan
-> 
-> Thank you for the comments.
-> 
->>>
->>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
->>> ---
->>> base on branch staging/for_v2.6.40
->>>
->>>  arch/arm/mach-at91/include/mach/at91_isi.h |  454 ++++++++++++
->>>  drivers/media/video/Kconfig                |   10 +
->>>  drivers/media/video/Makefile               |    1 +
->>>  drivers/media/video/atmel-isi.c            | 1089 ++++++++++++++++++++++++++++
->>>  4 files changed, 1554 insertions(+), 0 deletions(-)
->>>  create mode 100644 arch/arm/mach-at91/include/mach/at91_isi.h
->>>  create mode 100644 drivers/media/video/atmel-isi.c
-> 
->>> [snip]
->>> +
->>> +/* Bit manipulation macros */
->>> +#define ISI_BIT(name)					\
->>> +	(1 << ISI_##name##_OFFSET)
->>> +#define ISI_BF(name, value)				\
->>> +	(((value) & ((1 << ISI_##name##_SIZE) - 1))	\
->>> +	 << ISI_##name##_OFFSET)
->>> +#define ISI_BFEXT(name, value)				\
->>> +	(((value) >> ISI_##name##_OFFSET)		\
->>> +	 & ((1 << ISI_##name##_SIZE) - 1))
->>> +#define ISI_BFINS(name, value, old)			\
->>> +	(((old) & ~(((1 << ISI_##name##_SIZE) - 1)	\
->>> +		    << ISI_##name##_OFFSET))\
->>> +	 | ISI_BF(name, value))
-> 
->> I really dislike this kind of register access magic. Not sure how others
->> feel about it. These macros are really ugly.
-> I understand this. So I will try to find a better way (static inline function) to solve this. :)
+The davinci platforms are mapping their io regions using iotables. This patch
+series converts them to mapping using ioremap. 
 
->>> +/* Register access macros */
->>> +#define isi_readl(port, reg)				\
->>> +	__raw_readl((port)->regs + ISI_##reg)
->>> +#define isi_writel(port, reg, value)			\
->>> +	__raw_writel((value), (port)->regs + ISI_##reg)
+This series is based on-top-of '[RFC PATCH v3] Consolidate SRAM support' from
+Russell King.
 
->> If the token pasting stuff gets dropped then these can be static inline
->> functions which is preferred.
-> sure, I'll try.
+The first patch in the series is a squash of the neccessary changes as
+reported by Sekhar Nori in that thread.
 
-Something like this is pretty common (should be moved into the .c file):
+The davinci sram init is first changed to ioremap the regions specified by 
+each of the soc_infos; then the iotables are each removed; then the SRAM_VIRT
+definition is removed. Finally, the da850's sram region is changed from 
+the ARM local RAM region to the Shared RAM region. This change is needed
+to support mcasp ping-pong buffers on da850. Suspend was tested with rtcwake
+and was found to work.
 
-static inline unsigned atmel_isi_readl(struct atmel_isi *isi,
-					 unsigned reg)
-{
-	return readl(isi->regs + reg);
-}
+Ben Gardiner (7):
+  davinci: sram: ioremap the davinci_soc_info specified sram regions
+  davinci: da850: remove the SRAM_VIRT iotable entry
+  davinci: dm355: remove the SRAM_VIRT iotable entry
+  davinci: dm365: remove the SRAM_VIRT iotable entry
+  davinci: dm644x: remove the SRAM_VIRT iotable entry
+  davinci: dm646x: remove the SRAM_VIRT iotable entry
+  davinci: remove definition of SRAM_VIRT
 
-static inline void atmel_isi_writel(struct atmel_isi *isi,
-				 	unsigned reg, unsigned val)
-{
-	writel(val, isi->regs + reg);
-}
+Nori, Sekhar (1):
+  davinci: pm: fix compiler errors and kernel panics from sram
+    consolidation
 
-Then for single bit values you can just do:
+Subhasish Ghosh (1):
+  davinci: da850: changed SRAM allocator to shared ram.
 
-#define ISI_REG_CR		0x0000
-#define ISI_CR_GRAYSCALE	(1 << 13)
-
-cr = isi_readl(isi, ISI_REG_CR);
-cr |= ISI_CR_GRAYSCALE;
-isi_writel(isi, ISI_REG_CR, cr);
-
-For bit-fields you could do something like:
-
-static void atmel_isi_set_bitfield(struct atmel_isi *isi, unsigned reg,
-					unsigned offset, unsigned mask,
-					unsigned val)
-{
-	unsigned tmp;
-
-	tmp = atmel_isi_readl(isi, reg);
-	tmp &= ~(mask << offset);
-	tmp |= (val & mask) << offset;
-	atmel_isi_writel(isi, reg, tmp);
-}
-
-#define ISI_V2_VCC_SWAP_OFFSET		28
-#define ISI_V2_VCC_SWAP_MASK		0x3
-
-atmel_isi_set_bitfield(isi, ISI_REG_CR, ISI_V2_VCC_SWAP_OFFSET,
-			ISI_V2_SWAP_MASK, 2);
-
-There are only a handful of bit-field accesses in the driver so I don't
-think this will make the driver much more verbose and it will remove a
-number of _SIZE definitions for the single bit values.
-
-<snip>
-
->>> diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
->>> index d61414e..eae6005 100644
->>> --- a/drivers/media/video/Kconfig
->>> +++ b/drivers/media/video/Kconfig
->>> @@ -80,6 +80,16 @@ menuconfig VIDEO_CAPTURE_DRIVERS
->>>  	  Some of those devices also supports FM radio.
->>>  
->>>  if VIDEO_CAPTURE_DRIVERS && VIDEO_V4L2
->>> +config VIDEO_ATMEL_ISI
->>> +	tristate "ATMEL Image Sensor Interface (ISI) support"
->>> +	depends on VIDEO_DEV && SOC_CAMERA
-> 
->> Depends on AT91/AVR32?
-> I think I will use AT91
-
-Somebody else suggested leaving out the AT91 dependency to allow better
-build coverage. The reason for having the AT91 dependency is so that it
-doesn't show up in menuconfig for people on other platforms and
-architectures who cannot use the driver. I've always made SoC drivers
-depend on their architecture. Not sure what the correct answer is here?
-
->>> [snip]
->>> +
->>> +#include <media/videobuf2-dma-contig.h>
->>> +#include <media/soc_camera.h>
->>> +#include <media/soc_mediabus.h>
->>> +
->>> +#define ATMEL_ISI_VERSION	KERNEL_VERSION(1, 0, 0)
-> 
->> Do we really need this version?
-> Since we need set a version for v4l2_capability.version in function isi_camera_querycap(). So we use this macro.
-> How about this?
-> 	static int isi_camera_querycap(struct soc_camera_host *ici,
-> 			       struct v4l2_capability *cap)
-> 	{
-> 		strcpy(cap->driver, "atmel-isi");
-> 		strcpy(cap->card, "Atmel Image Sensor Interface");
-> 		cap->version = KERNEL_VERSION(1, 0, 0);
-> 		cap->capabilities = (V4L2_CAP_VIDEO_CAPTURE |
-> 				V4L2_CAP_STREAMING);
-> 		return 0;
-> 	}
-
-Not sure. Is cap->version meant to be a KERNEL_VERSION value or is it
-arbitrary? If nothing from user-space cares then it could just be left
-as zero?
-
-<snip>
-
->>> +static int atmel_isi_init(struct atmel_isi *isi)
->>> +{
->>> +	/*
->>> +	 * The reset will only succeed if we have a
->>> +	 * pixel clock from the camera.
->>> +	 */
->>> +	isi_writel(isi, V2_CTRL, ISI_BIT(V2_SRST));
->>> +	isi_writel(isi, V2_INTDIS, ~0UL);
-> 
->> Don't you need to wait for the reset bit to clear? Other implementations
->> I have used of the Atmel ISI driver do a wait_for_completition and have
->> the interrupt handler set a reset_complete flag.
-> You are right. I just remove the reset_complete waiting part in this version.
-> Actually I am thinking whether I need add such code again.
-
-The driver should do the check since the reset can fail, and the caller
-should be notified. This function should probably be called
-atmel_isi_reset rather than atmel_isi_init to better reflect what it does.
-
-~Ryan
+ arch/arm/mach-davinci/da850.c               |   10 ++--------
+ arch/arm/mach-davinci/dm355.c               |    6 ------
+ arch/arm/mach-davinci/dm365.c               |    6 ------
+ arch/arm/mach-davinci/dm644x.c              |    6 ------
+ arch/arm/mach-davinci/dm646x.c              |    6 ------
+ arch/arm/mach-davinci/include/mach/common.h |    2 --
+ arch/arm/mach-davinci/include/mach/da8xx.h  |    1 +
+ arch/arm/mach-davinci/pm.c                  |    2 +-
+ arch/arm/mach-davinci/sleep.S               |    1 +
+ arch/arm/mach-davinci/sram.c                |   12 ++++++++++--
+ 10 files changed, 15 insertions(+), 37 deletions(-)
 
 -- 
-Bluewater Systems Ltd - ARM Technology Solution Centre
-
-Ryan Mallon         		5 Amuri Park, 404 Barbadoes St
-ryan at bluewatersys.com         	PO Box 13 889, Christchurch 8013
-http://www.bluewatersys.com	New Zealand
-Phone: +64 3 3779127		Freecall: Australia 1800 148 751
-Fax:   +64 3 3779135			  USA 1800 261 2934
+1.7.4.1
