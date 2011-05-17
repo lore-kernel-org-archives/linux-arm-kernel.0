@@ -1,66 +1,35 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 17 May 2011 21:22:26 +0800
-Subject: [PATCH 3/4] arm: pxa3xx: cm-x300: minor style cleanup
-In-Reply-To: <1304941309-13288-3-git-send-email-grinberg@compulab.co.il>
-References: <1304941309-13288-1-git-send-email-grinberg@compulab.co.il>
-	<1304941309-13288-3-git-send-email-grinberg@compulab.co.il>
-Message-ID: <BANLkTik_2feSaKbBODZ5tB279eQ9kH2X6w@mail.gmail.com>
+From: jmorris@namei.org (James Morris)
+Date: Tue, 17 May 2011 23:29:36 +1000 (EST)
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <20110517131058.GE21441@elte.hu>
+References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
+	<1305169376-2363-1-git-send-email-wad@chromium.org>
+	<20110512074850.GA9937@elte.hu>
+	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
+	<20110512130104.GA2912@elte.hu>
+	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
+	<20110513121034.GG21022@elte.hu>
+	<alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
+	<20110516150837.GA513@elte.hu>
+	<alpine.LRH.2.00.1105171214330.31710@tundra.namei.org>
+	<20110517131058.GE21441@elte.hu>
+Message-ID: <alpine.LRH.2.00.1105172317060.5404@tundra.namei.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 9, 2011 at 7:41 PM, Igor Grinberg <grinberg@compulab.co.il> wrote:
-> introduce pr_fmt, so the pr_* calls will be cleaner
->
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+On Tue, 17 May 2011, Ingo Molnar wrote:
 
-Applied.
+> I'm not sure i get your point.
 
-> ---
-> ?arch/arm/mach-pxa/cm-x300.c | ? ?9 ++++-----
-> ?1 files changed, 4 insertions(+), 5 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/cm-x300.c b/arch/arm/mach-pxa/cm-x300.c
-> index 880df33..b199596 100644
-> --- a/arch/arm/mach-pxa/cm-x300.c
-> +++ b/arch/arm/mach-pxa/cm-x300.c
-> @@ -12,6 +12,7 @@
-> ?* it under the terms of the GNU General Public License version 2 as
-> ?* published by the Free Software Foundation.
-> ?*/
-> +#define pr_fmt(fmt) "%s: " fmt, __func__
->
-> ?#include <linux/module.h>
-> ?#include <linux/kernel.h>
-> @@ -487,8 +488,7 @@ static int cm_x300_ulpi_phy_reset(void)
-> ? ? ? ?err = gpio_request_one(GPIO_ULPI_PHY_RST, GPIOF_OUT_INIT_LOW,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "ulpi reset");
-> ? ? ? ?if (err) {
-> - ? ? ? ? ? ? ? pr_err("%s: failed to request ULPI reset GPIO: %d\n",
-> - ? ? ? ? ? ? ? ? ? ? ?__func__, err);
-> + ? ? ? ? ? ? ? pr_err("failed to request ULPI reset GPIO: %d\n", err);
-> ? ? ? ? ? ? ? ?return err;
-> ? ? ? ?}
->
-> @@ -510,8 +510,7 @@ static inline int cm_x300_u2d_init(struct device *dev)
-> ? ? ? ? ? ? ? ?pout_clk = clk_get(NULL, "CLK_POUT");
-> ? ? ? ? ? ? ? ?if (IS_ERR(pout_clk)) {
-> ? ? ? ? ? ? ? ? ? ? ? ?err = PTR_ERR(pout_clk);
-> - ? ? ? ? ? ? ? ? ? ? ? pr_err("%s: failed to get CLK_POUT: %d\n",
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, err);
-> + ? ? ? ? ? ? ? ? ? ? ? pr_err("failed to get CLK_POUT: %d\n", err);
-> ? ? ? ? ? ? ? ? ? ? ? ?return err;
-> ? ? ? ? ? ? ? ?}
-> ? ? ? ? ? ? ? ?clk_enable(pout_clk);
-> @@ -787,7 +786,7 @@ static void __init cm_x300_init_wi2wi(void)
-> ? ? ? ?/* Libertas and CSR reset */
-> ? ? ? ?err = gpio_request_array(ARRAY_AND_SIZE(cm_x300_wi2wi_gpios));
-> ? ? ? ?if (err) {
-> - ? ? ? ? ? ? ? pr_err("CM-X300: failed to request wifi/bt gpios: %d\n", err);
-> + ? ? ? ? ? ? ? pr_err("failed to request wifi/bt gpios: %d\n", err);
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
->
-> --
-> 1.7.3.4
->
->
+Your example was not complete as described.  After an apparently simple 
+specification, you've since added several qualifiers and assumptions, and 
+I still doubt that it's complete.
+
+A higher level goal would look like
+
+"Allow a sandbox app access only to approved resources, to contain the 
+effects of flaws in the app", or similar.
+
+Note that this includes a threat model (remote attacker taking control of 
+the app) and a general and fully stated strategy for dealing with it.
