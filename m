@@ -1,55 +1,91 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Tue, 17 May 2011 17:41:56 -0400
-Subject: [PATCH 0/9] 
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
+Date: Tue, 17 May 2011 17:41:57 -0400
+Subject: [PATCH 1/9] davinci: pm: fix compiler errors and kernel panics from
+	sram consolidation
+In-Reply-To: <cover.1305668470.git.bengardiner@nanometrics.ca>
 References: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
-Message-ID: <cover.1305668470.git.bengardiner@nanometrics.ca>
+	<cover.1305668470.git.bengardiner@nanometrics.ca>
+Message-ID: <467c7cc853555213b2560ebe1f188c09440284c1.1305668470.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The davinci platforms are mapping their io regions using iotables. This patch
-series converts them to mapping using ioremap. 
+From: Nori, Sekhar <nsekhar@ti.com>
 
-This series is based on-top-of '[RFC PATCH v3] Consolidate SRAM support' from
-Russell King.
+Hi Russell,
 
-The first patch in the series is a squash of the neccessary changes as
-reported by Sekhar Nori in that thread.
+On Thu, May 12, 2011 at 23:15:46, Russell King - ARM Linux wrote:
 
-The davinci sram init is first changed to ioremap the regions specified by 
-each of the soc_infos; then the iotables are each removed; then the SRAM_VIRT
-definition is removed. Finally, the da850's sram region is changed from 
-the ARM local RAM region to the Shared RAM region. This change is needed
-to support mcasp ping-pong buffers on da850. Suspend was tested with rtcwake
-and was found to work.
+> diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
+> index 1bd73a0..c2f9767 100644
+> --- a/arch/arm/mach-davinci/pm.c
+> +++ b/arch/arm/mach-davinci/pm.c
 
-Ben Gardiner (7):
-  davinci: sram: ioremap the davinci_soc_info specified sram regions
-  davinci: da850: remove the SRAM_VIRT iotable entry
-  davinci: dm355: remove the SRAM_VIRT iotable entry
-  davinci: dm365: remove the SRAM_VIRT iotable entry
-  davinci: dm644x: remove the SRAM_VIRT iotable entry
-  davinci: dm646x: remove the SRAM_VIRT iotable entry
-  davinci: remove definition of SRAM_VIRT
+[...]
 
-Nori, Sekhar (1):
-  davinci: pm: fix compiler errors and kernel panics from sram
-    consolidation
+> @@ -123,14 +118,14 @@ static int __init davinci_pm_probe(struct platform_device *pdev)
+>  		return -ENOENT;
+>  	}
+>
+> -	davinci_sram_suspend = sram_alloc(davinci_cpu_suspend_sz, NULL);
+> -	if (!davinci_sram_suspend) {
+> +	davinci_sram_suspend_mem = pv_pool_alloc(davinci_pv_pool,
+> +				davinci_cpu_suspend_sz, NULL);
+> +	if (!davinci_sram_suspend_mem) {
+>  		dev_err(&pdev->dev, "cannot allocate SRAM memory\n");
+>  		return -ENOMEM;
+>  	}
+> -
+> -	davinci_sram_push(davinci_sram_suspend, davinci_cpu_suspend,
+> -						davinci_cpu_suspend_sz);
+> +	davinci_sram_suspend = fncpy(davinci_sram_suspend_mem,
+> +				davinci_cpu_suspend, davinci_cpu_suspend_sz);
 
-Subhasish Ghosh (1):
-  davinci: da850: changed SRAM allocator to shared ram.
+This gave these build errors:
 
- arch/arm/mach-davinci/da850.c               |   10 ++--------
- arch/arm/mach-davinci/dm355.c               |    6 ------
- arch/arm/mach-davinci/dm365.c               |    6 ------
- arch/arm/mach-davinci/dm644x.c              |    6 ------
- arch/arm/mach-davinci/dm646x.c              |    6 ------
- arch/arm/mach-davinci/include/mach/common.h |    2 --
- arch/arm/mach-davinci/include/mach/da8xx.h  |    1 +
- arch/arm/mach-davinci/pm.c                  |    2 +-
- arch/arm/mach-davinci/sleep.S               |    1 +
- arch/arm/mach-davinci/sram.c                |   12 ++++++++++--
- 10 files changed, 15 insertions(+), 37 deletions(-)
+arch/arm/mach-davinci/pm.c: In function 'davinci_pm_probe':
+arch/arm/mach-davinci/pm.c:127: error: lvalue required in asm statement
+arch/arm/mach-davinci/pm.c:127: error: invalid lvalue in asm output 0
+make[1]: *** [arch/arm/mach-davinci/pm.o] Error 1
 
+Replacing davinci_cpu_suspend with &davinci_cpu_suspend fixed the issue.
+
+With that change done, tested suspend-to-RAM on DA850 platform.
+Also tested audio driver on DM365 platform with IRAM buffers enabled.
+
+Can you also fold the following patch in? Without this the
+kernel panics when suspend-to-RAM is enabled.
+
+Thanks,
+Sekhar
+---
+ arch/arm/mach-davinci/pm.c    |    2 +-
+ arch/arm/mach-davinci/sleep.S |    1 +
+ 2 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/pm.c b/arch/arm/mach-davinci/pm.c
+index c2f9767..5255223 100644
+--- a/arch/arm/mach-davinci/pm.c
++++ b/arch/arm/mach-davinci/pm.c
+@@ -125,7 +125,7 @@ static int __init davinci_pm_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 	davinci_sram_suspend = fncpy(davinci_sram_suspend_mem,
+-				davinci_cpu_suspend, davinci_cpu_suspend_sz);
++				&davinci_cpu_suspend, davinci_cpu_suspend_sz);
+ 
+ 	suspend_set_ops(&davinci_pm_ops);
+ 
+diff --git a/arch/arm/mach-davinci/sleep.S b/arch/arm/mach-davinci/sleep.S
+index fb5e72b..2cef533 100644
+--- a/arch/arm/mach-davinci/sleep.S
++++ b/arch/arm/mach-davinci/sleep.S
+@@ -37,6 +37,7 @@
+ #define DEEPSLEEP_SLEEPENABLE_BIT	BIT(31)
+ 
+ 	.text
++	.align 3
+ /*
+  * Move DaVinci into deep sleep state
+  *
 -- 
 1.7.4.1
