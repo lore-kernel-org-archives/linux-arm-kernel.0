@@ -1,46 +1,83 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 17 May 2011 19:30:29 +0530
-Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
-In-Reply-To: <1305588114-23728-1-git-send-email-ccross@android.com>
-References: <1305588114-23728-1-git-send-email-ccross@android.com>
-Message-ID: <4DD27F7D.2070305@ti.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 17 May 2011 16:11:17 +0200 (CEST)
+Subject: [PATCH] arm: Use arch_spin_lock for unwind to avoid lockdep deadlock
+Message-ID: <alpine.LFD.2.02.1105171605080.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin,
+When lockdep traces a lock taken in a module the arm unwinder takes
+unwind_lock which causes a recursive lockdep call deadlocking itself
+on the unwind_lock.
 
-On 5/17/2011 4:51 AM, Colin Cross wrote:
-> The localtimer's clock changes with the cpu clock.  After a
-> cpufreq transition, update the clockevent's frequency and
-> reprogram the next clock event.
->
-> Adds a clock called "smp_twd" that is used to determine the
-> twd frequency, which can also be used at init time to
-> avoid calibrating the twd frequency.
->
-> Signed-off-by: Colin Cross<ccross@android.com>
-> Cc: Thomas Gleixner<tglx@linutronix.de>
-> Cc: Russell King<linux@arm.linux.org.uk>
-> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
-> Cc: Rob Herring<robherring2@gmail.com>
-> ---
->   arch/arm/kernel/smp_twd.c |   69 +++++++++++++++++++++++++++++++++++++++++++--
->   1 files changed, 66 insertions(+), 3 deletions(-)
->
-> This patch depends on Thomas Gleixner's patch to add clockevents_reconfigure
-> See: https://lkml.org/lkml/2011/5/13/122
->
-> This patch adds a clock that can be used to skip calibration as well
-> as update the frequency.  A later patch (or a later version of this patch)
-> will drop twd_calibrate_rate once all platforms provide the necessary
-> smp_twd clock.
->
+Make unwind_lock an arch_spin_lock to avoid the lockdep call and use
+the raw_local_irq_save/restore() variants to avoid irq tracing as
+well.
 
-Since the "smp_twd" clock node will not have a clk_set_rate()
-associated with it, will the clk_get_rate() gives you real
-rate. May be we can associate this node as a child of
-CPU clock node and use the fixed divider based on peripheral
-ratio. Is that the idea here to realize it ?
+Reported-and-tested-by: Torben Hohn <torbenh@linutronix.de>
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Cc: stable at kernel.org
+---
+ arch/arm/kernel/unwind.c |   20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-Regards,
-Santosh
+Index: linux-2.6/arch/arm/kernel/unwind.c
+===================================================================
+--- linux-2.6.orig/arch/arm/kernel/unwind.c
++++ linux-2.6/arch/arm/kernel/unwind.c
+@@ -86,7 +86,7 @@ enum regs {
+ extern struct unwind_idx __start_unwind_idx[];
+ extern struct unwind_idx __stop_unwind_idx[];
+ 
+-static DEFINE_SPINLOCK(unwind_lock);
++static arch_spinlock_t unwind_lock = (arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
+ static LIST_HEAD(unwind_tables);
+ 
+ /* Convert a prel31 symbol to an absolute address */
+@@ -140,7 +140,8 @@ static struct unwind_idx *unwind_find_id
+ 		/* module unwind tables */
+ 		struct unwind_table *table;
+ 
+-		spin_lock_irqsave(&unwind_lock, flags);
++		raw_local_irq_save(flags);
++		arch_spin_lock(&unwind_lock);
+ 		list_for_each_entry(table, &unwind_tables, list) {
+ 			if (addr >= table->begin_addr &&
+ 			    addr < table->end_addr) {
+@@ -151,7 +152,8 @@ static struct unwind_idx *unwind_find_id
+ 				break;
+ 			}
+ 		}
+-		spin_unlock_irqrestore(&unwind_lock, flags);
++		arch_spin_unlock(&unwind_lock);
++		raw_local_irq_restore(flags);
+ 	}
+ 
+ 	pr_debug("%s: idx = %p\n", __func__, idx);
+@@ -417,9 +419,11 @@ struct unwind_table *unwind_table_add(un
+ 	for (idx = tab->start; idx < tab->stop; idx++)
+ 		idx->addr = prel31_to_addr(&idx->addr);
+ 
+-	spin_lock_irqsave(&unwind_lock, flags);
++	raw_local_irq_save(flags);
++	arch_spin_lock(&unwind_lock);
+ 	list_add_tail(&tab->list, &unwind_tables);
+-	spin_unlock_irqrestore(&unwind_lock, flags);
++	arch_spin_unlock(&unwind_lock);
++	raw_local_irq_restore(flags);
+ 
+ 	return tab;
+ }
+@@ -431,9 +435,11 @@ void unwind_table_del(struct unwind_tabl
+ 	if (!tab)
+ 		return;
+ 
+-	spin_lock_irqsave(&unwind_lock, flags);
++	raw_local_irq_save(flags);
++	arch_spin_lock(&unwind_lock);
+ 	list_del(&tab->list);
+-	spin_unlock_irqrestore(&unwind_lock, flags);
++	arch_spin_unlock(&unwind_lock);
++	raw_local_irq_restore(flags);
+ 
+ 	kfree(tab);
+ }
