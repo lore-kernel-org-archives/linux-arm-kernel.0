@@ -1,68 +1,40 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Tue, 17 May 2011 17:41:58 -0400
-Subject: [PATCH 2/9] davinci: sram: ioremap the davinci_soc_info specified
-	sram regions
+Date: Tue, 17 May 2011 17:42:00 -0400
+Subject: [PATCH 4/9] davinci: dm355: remove the SRAM_VIRT iotable entry
 In-Reply-To: <cover.1305668470.git.bengardiner@nanometrics.ca>
 References: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
 	<cover.1305668470.git.bengardiner@nanometrics.ca>
-Message-ID: <80c0c2ff5a39baf6140c08460c2691b178c038c0.1305668470.git.bengardiner@nanometrics.ca>
+Message-ID: <5bdebaf5036b59a247604b72f83e6cb1c35db4c2.1305668470.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current davinci init sets up SRAM in iotables. There has been an observed
-failure to boot a da850 with 128K specified in the iotable.
+The sram region defined for dm355 in the iotable entry removed is also
+defined in its davinci_soc_info, davinci_soc_info_dm355 in dm355.c.
 
-Make the davinci sram allocator -- now based on RMK's consolidated SRAM
-support -- do an ioremap of the region specified by the entries in
-davinci_soc_info before registering with pv_pool_create().
-
-This commit breaks runtime of davinci boards since the regions that
-the sram init is now trying to ioremap have been iomapped by their
-iotable entries. The iotable entries will be removed in the patches
-to come.
+Remove this duplicate information which is now uneccessary since sram
+init will ioremap the region defined by davinci_soc_info_dm355.
 
 Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
 ---
- arch/arm/mach-davinci/sram.c |   12 ++++++++++--
- 1 files changed, 10 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/dm355.c |    6 ------
+ 1 files changed, 0 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
-index 219d4c5..96026df 100644
---- a/arch/arm/mach-davinci/sram.c
-+++ b/arch/arm/mach-davinci/sram.c
-@@ -8,6 +8,7 @@
-  * the Free Software Foundation; either version 2 of the License, or
-  * (at your option) any later version.
-  */
-+#include <linux/io.h>
- #include <linux/module.h>
- #include <linux/init.h>
- #include <asm/pv-pool.h>
-@@ -26,16 +27,23 @@ EXPORT_SYMBOL_GPL(davinci_pv_pool);
-  */
- static int __init sram_init(void)
- {
-+	void *addr;
- 	unsigned len = davinci_soc_info.sram_len;
- 	int status = 0;
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 9bda687..94f44d3 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -757,12 +757,6 @@ static struct map_desc dm355_io_desc[] = {
+ 		.length		= IO_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+-	{
+-		.virtual	= SRAM_VIRT,
+-		.pfn		= __phys_to_pfn(0x00010000),
+-		.length		= SZ_32K,
+-		.type		= MT_MEMORY_NONCACHED,
+-	},
+ };
  
- 	if (len) {
- 		len = min_t(unsigned, len, SRAM_SIZE);
--		davinci_pv_pool = pv_pool_create((void *)SRAM_VIRT,
-+		addr = ioremap(davinci_soc_info.sram_phys, len);
-+		if (!addr)
-+			return -EIO;
-+
-+		davinci_pv_pool = pv_pool_create(addr,
- 					davinci_soc_info.sram_phys, len,
- 					ilog2(SRAM_GRANULARITY));
--		if (!davinci_pv_pool)
-+		if (!davinci_pv_pool) {
-+			iounmap(addr);
- 			status = -ENOMEM;
-+		}
- 	}
- 	return status;
- }
+ /* Contents of JTAG ID register used to identify exact cpu type */
 -- 
 1.7.4.1
