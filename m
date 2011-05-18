@@ -1,43 +1,61 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Wed, 18 May 2011 08:33:57 -0400
-Subject: [PATCH 9/9] davinci: da850: changed SRAM allocator to shared ram.
-In-Reply-To: <4DD39F8B.3060209@mvista.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
-	<cover.1305668470.git.bengardiner@nanometrics.ca>
-	<e6e7b13ce98f0216bbd714fb6a4f11effcbc721d.1305668470.git.bengardiner@nanometrics.ca>
-	<4DD39F8B.3060209@mvista.com>
-Message-ID: <BANLkTi=29RYRADz+DhFpAcJEL5q3L-FvXw@mail.gmail.com>
+From: mpallaka@codeaurora.org (Mohan Pallaka)
+Date: Wed, 18 May 2011 18:30:52 +0530
+Subject: [PATCH 1/2] pwm: Add stubs for pwm operations
+Message-ID: <1305723652-22737-1-git-send-email-mpallaka@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+Chip drivers that support both pwm and non-pwm modes
+would encounter compilation errors if the platform doesn't
+have support for pwm, even though the chip is programmed
+to work in non-pwm mode. Add stubs for pwm functions to
+avoid compilation errors in these scenarios.
 
-Thank you for the reviews.
-
-On Wed, May 18, 2011 at 6:29 AM, Sergei Shtylyov <sshtylyov@mvista.com> wrote:
-
-[...]
-
->> diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h
->> b/arch/arm/mach-davinci/include/mach/da8xx.h
->> index e4fc1af..09b8ddb 100644
->> --- a/arch/arm/mach-davinci/include/mach/da8xx.h
->> +++ b/arch/arm/mach-davinci/include/mach/da8xx.h
->> @@ -72,6 +72,7 @@ extern unsigned int da850_max_speed;
->> ?#define DA8XX_AEMIF_CTL_BASE ?0x68000000
->> ?#define DA8XX_DDR2_CTL_BASE ? 0xb0000000
->> ?#define DA8XX_ARM_RAM_BASE ? ?0xffff0000
->> +#define DA8XX_SHARED_RAM_BASE ?0x80000000
->
-> ? Please keep this list sorted.
-
-Will do so in V2. I am currently imagining that the v2 series will be
-based on Russell's next SRAM consolidation patch based on
-Jean-Christophe's genpool patch.
-
-Best Regards,
-Ben Gardiner
-
+Change-Id: Iec4c55fce253bda809947672be82a7bd14bcd663
+Signed-off-by: Mohan Pallaka <mpallaka@codeaurora.org>
 ---
-Nanometrics Inc.
-http://www.nanometrics.ca
+ include/linux/pwm.h |   24 ++++++++++++++++++++++++
+ 1 files changed, 24 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 7c77575..a3cb33f 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -3,6 +3,7 @@
+ 
+ struct pwm_device;
+ 
++#if defined(CONFIG_HAVE_PWM)
+ /*
+  * pwm_request - request a PWM device
+  */
+@@ -28,4 +29,27 @@ int pwm_enable(struct pwm_device *pwm);
+  */
+ void pwm_disable(struct pwm_device *pwm);
+ 
++#else
++
++struct pwm_device *pwm_request(int pwm_id, const char *label)
++{
++	return NULL;
++}
++
++void pwm_free(struct pwm_device *pwm) { }
++
++int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++{
++	return -EINVAL;
++}
++
++int pwm_enable(struct pwm_device *pwm)
++{
++	return -EINVAL;
++}
++
++void pwm_disable(struct pwm_device *pwm) { }
++
++
++#endif /* CONFIG_PWM */
+ #endif /* __LINUX_PWM_H */
+-- 
+1.7.1.1
