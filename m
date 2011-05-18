@@ -1,44 +1,41 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 May 2011 17:44:03 +0900
-Subject: [PATCH 0/7] ARM: Removing ARCH_S5PC100
-In-Reply-To: <20110517121948.GE2737@game.jcrosoft.org>
-References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<20110517121948.GE2737@game.jcrosoft.org>
-Message-ID: <001201cc1537$bfb24e20$3f16ea60$%kim@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 May 2011 09:47:33 +0100
+Subject: [PATCH] ARM: fix mistaken dependency for CPU_HAS_PMU
+In-Reply-To: <1305686080-13182-1-git-send-email-tom.leiming@gmail.com>
+References: <1305686080-13182-1-git-send-email-tom.leiming@gmail.com>
+Message-ID: <000001cc1538$3ae8a9e0$b0b9fda0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jean-Christophe PLAGNIOL-VILLARD wrote:
-> 
-> HI,
-> 
 Hi,
 
-> 	why do you remove it?
+> From: Ming Lei <tom.leiming@gmail.com>
 > 
-Thanks for your concerns :)
+> Obviously it is mistake for CPU_HAS_PMU to depend on
+> (!ARCH_OMAP3 || OMAP3_EMU).
 
-I think it's rather premature to decide it at this time.
-So this is dropped at this moment...but as a note, I will implement this
-into other samsung stuff next time :)
+It's not that obvious!
+ 
+> No mattery it is omap3 or not, we can build pmu.o into
+> kernel safely. In fact, arm-v7 of omap3 has pmu inside
+> also.
 
-Thanks.
+Yes, but the PMU on Omap3 doesn't work unless you enable the emu clk, which
+is done in kernel/etm.c. Rather than duplicate that code (which only seems
+to be needed for Omap anyway) I decided to add a dependency on OMAP3_EMU so
+the clock gets enabled in etb_probe.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+> So fix it that we can build pmu into kernel to support perf
+> for some valid config(such as enable both omap4 and omap3,
+> but OMAP3_EMU).
 
-> On 10:11 Thu 12 May     , Kukjin Kim wrote:
-> > This patch remvoes mach-s5pc100 directory for ARCH_S5PC100 in arch/arm.
-> >
-> > If any problems, please let me know immediately.
-> >
-> > [PATCH 1/7] ARM: S5PC100: Removing ARCH_S5PC100
-> > [PATCH 2/7] ASoC: Remove to support sound for S5PC100
-> > [PATCH 3/7] [media] s5p-fimc: Remove to support fimc for S5PC100
-> > [PATCH 4/7] mtd: OneNAND: Remove to support onenand for S5PC100
-> > [PATCH 5/7] tty: Remove to support serial for S5PC100
-> > [PATCH 6/7] video: s3c-fb: Remove to support fb for S5PC100
-> > [PATCH 7/7] libata: Remove to support pata for S5PC100
+No, I don't like this. The reason I don't like it is because it will lead to
+lots of bug reports that perf doesn't work on Omap3 because they haven't got
+the emu clock ticking. It was this scenario that led to the dependency being
+introduced in the first place:
+
+8954bb0d ("OMAP3: pmu: make CPU_HAS_PMU dependent on OMAP3_EMU")
+
+Is there a problem building the etm support for Omap4?
+
+Will
