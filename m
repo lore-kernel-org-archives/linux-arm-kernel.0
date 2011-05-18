@@ -1,36 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 May 2011 23:57:49 +0100
-Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate
-	operation in thumb mode.
-In-Reply-To: <alpine.LFD.2.00.1105181845540.14430@xanadu.home>
-References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
-	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
-	<20110514100232.GC30539@n2100.arm.linux.org.uk>
-	<20110516121657.GA7715@arm.com>
-	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
-	<20110516144311.GC7715@arm.com>
-	<BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
-	<alpine.LFD.2.00.1105181803090.14430@xanadu.home>
-	<20110518223319.GB21384@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1105181845540.14430@xanadu.home>
-Message-ID: <20110518225749.GF21384@n2100.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Wed, 18 May 2011 16:06:26 -0700
+Subject: [PATCH 5/7] msm: gpiomux: Move public API to public header
+In-Reply-To: <0D753D10438DA54287A00B027084269764D2F7405A@AUSP01VMBX24.collaborationhost.net>
+	(H. Hartley Sweeten's message of "Wed, 18 May 2011 17:44:39 -0500")
+References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+	<1305755453-31112-6-git-send-email-davidb@codeaurora.org>
+	<0D753D10438DA54287A00B027084269764D2F7405A@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <8yay623libx.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 06:49:16PM -0400, Nicolas Pitre wrote:
-> On Wed, 18 May 2011, Russell King - ARM Linux wrote:
-> > We already have a way of adding stuff for bug tracking purposes.  The
-> > "Internal error" line is perpended with 'PREEMPT' or 'SMP' depending
-> > on what build options were enabled.  We just need to do the same with
-> > T2.  IOW, something like this:
-> [...]
-> 
-> This is indeed useful if the kernel oopses.  However this doesn't help 
-> for those cases where the kernel doesn't crash but still exhibits 
-> unexpected behaviors.  Having the thumbness of the kernel also displayed 
-> in dmesg and uname -a would also be good to have.
+On Wed, May 18 2011, H Hartley Sweeten wrote:
 
-In which case I think we'll have to talk to kbuild people to get
-mkcompile_h modified.  Also maybe asking what other architectures
-do for this kind of problem may be a good idea - especially before
-we start abusing and hacking stuff like the hardware name.
+> On Wednesday, May 18, 2011 2:51 PM, David Brown wrote:
+>>
+>> The gpiomux.h header contains some SOC ifdefs.  However, the API that
+>> is actually used by the GPIO driver only uses two functions that are
+>> general.  Move these general definitions into a public header file.
+>>
+>> Signed-off-by: David Brown <davidb@codeaurora.org>
+>> ---
+>>  arch/arm/mach-msm/gpio.c    |    2 +-
+>>  arch/arm/mach-msm/gpiomux.h |   17 +----------------
+>>  include/linux/msm_gpiomux.h |   38 ++++++++++++++++++++++++++++++++++++++
+>>  3 files changed, 40 insertions(+), 17 deletions(-)
+>>  create mode 100644 include/linux/msm_gpiomux.h
+>
+> The msm_gpiomux.h header appears to be very "msm" specific, especially
+> with the #ifdef CONFIG_MSM_GPIOMUX in it.  Wouldn't it be cleaner to
+> just move it to arch/arm/mach-msm/include/mach/msm_gpiomux.h?
+>
+> I don't see a reason why this header needs/should be available for
+> the general public in /include/linux.
+
+Agreed.
+
+David
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
