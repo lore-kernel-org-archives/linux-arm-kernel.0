@@ -1,42 +1,66 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 18 May 2011 16:06:26 -0700
-Subject: [PATCH 5/7] msm: gpiomux: Move public API to public header
-In-Reply-To: <0D753D10438DA54287A00B027084269764D2F7405A@AUSP01VMBX24.collaborationhost.net>
-	(H. Hartley Sweeten's message of "Wed, 18 May 2011 17:44:39 -0500")
-References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
-	<1305755453-31112-6-git-send-email-davidb@codeaurora.org>
-	<0D753D10438DA54287A00B027084269764D2F7405A@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <8yay623libx.fsf@huya.qualcomm.com>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Wed, 18 May 2011 16:38:18 -0700
+Subject: [PATCH] ARM: bcmring: Add clkdev table in init_early
+In-Reply-To: <20110518225214.GE21384@n2100.arm.linux.org.uk>
+References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
+	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
+	<4DD2FF02.1020508@broadcom.com>
+	<20110517232015.GC5913@n2100.arm.linux.org.uk>
+	<4DD307E2.7010302@broadcom.com>
+	<20110518154641.GK5913@n2100.arm.linux.org.uk>
+	<4DD40965.9020202@broadcom.com>
+	<20110518204242.GA21384@n2100.arm.linux.org.uk>
+	<20110518223700.GC21384@n2100.arm.linux.org.uk>
+	<4DD44C0C.1090907@broadcom.com>
+	<20110518225214.GE21384@n2100.arm.linux.org.uk>
+Message-ID: <4DD4586A.7000805@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18 2011, H Hartley Sweeten wrote:
-
-> On Wednesday, May 18, 2011 2:51 PM, David Brown wrote:
+On 5/18/2011 3:52 PM, Russell King - ARM Linux wrote:
+> On Wed, May 18, 2011 at 03:45:32PM -0700, Jiandong Zheng wrote:
+>> On 5/18/2011 3:37 PM, Russell King - ARM Linux wrote:
+>>> On Wed, May 18, 2011 at 09:42:42PM +0100, Russell King - ARM Linux wrote:
+>>>> On Wed, May 18, 2011 at 11:01:09AM -0700, Jiandong Zheng wrote:
+>>>>> ARM: bcmring: Move adding clkdev to init_early to make sure clkevent
+>>>>> based on sp804 is initialized properly.
+>>>>
+>>>> Great, can you submit this to the patch system please?  Thanks.
+>>>
+>>> Erm, actually this patch is against your previous patch (as is the one
+>>> which you submitted to the patch system) so it won't apply as-is.  It
+>>> needs to be one which wil apply directly to mainline in this case please.
+>>>
+>> Hi Russell,
 >>
->> The gpiomux.h header contains some SOC ifdefs.  However, the API that
->> is actually used by the GPIO driver only uses two functions that are
->> general.  Move these general definitions into a public header file.
->>
->> Signed-off-by: David Brown <davidb@codeaurora.org>
->> ---
->>  arch/arm/mach-msm/gpio.c    |    2 +-
->>  arch/arm/mach-msm/gpiomux.h |   17 +----------------
->>  include/linux/msm_gpiomux.h |   38 ++++++++++++++++++++++++++++++++++++++
->>  3 files changed, 40 insertions(+), 17 deletions(-)
->>  create mode 100644 include/linux/msm_gpiomux.h
+>> And my previous patch is based on your set of patches to do common sp804
+>> clock source. How should I submit mine?
 >
-> The msm_gpiomux.h header appears to be very "msm" specific, especially
-> with the #ifdef CONFIG_MSM_GPIOMUX in it.  Wouldn't it be cleaner to
-> just move it to arch/arm/mach-msm/include/mach/msm_gpiomux.h?
+> Can you provide a patch against mainline which moves the clkdev
+> initialization to the init_early callback - and I'll then deal with
+> fixing up my patches for that by placing it before my two bcmring
+> patches.
+
+Done.
+
 >
-> I don't see a reason why this header needs/should be available for
-> the general public in /include/linux.
-
-Agreed.
-
-David
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>> Since I haven't had much experience with submitting patch so far, please
+>> allow me to ask a question which may be asked many times: when should I
+>> use patch system?
+>
+> When the patch has been reviewed and acked by people.  Note that things
+> in this area will be changing because in the long run you should end
+> up talking to the sub-arch group of people.
+>
+>> For example, I sent a couple of unrelated patches last week and seems no
+>> one has problem with them since I don't see comments regarding them.
+>> Should I submit them again through patch system or they will picked up
+>> "automatically"?
+>
+> The debug-macros.S one seemed trivial enough, but the downside is that
+> it impacts on our goal of showing a significant reduction of arch/arm...
+> Since I'm fairly desperate to show as much of a reduction as possible
+> this goes counter to my current direction.
+>
+> I think the other one was a build fix (?), and that should be fine.
+>
