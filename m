@@ -1,196 +1,86 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 18 May 2011 12:47:53 -0600
-Subject: [RFC PATCH] drivers/amba: probe via device tree reworked
-In-Reply-To: <1305742487-28325-1-git-send-email-robherring2@gmail.com>
-References: <1305742487-28325-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20110518184753.GB25861@ponder.secretlab.ca>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 18 May 2011 11:50:46 -0700
+Subject: [GIT PULL v2 0/3] TrimSlice updates for 2.6.40
+In-Reply-To: <20110518161230.GA3029@gentoodev.compulab.local>
+References: <cover.1305576864.git.mike@compulab.co.il>
+	<74CDBE0F657A3D45AFBB94109FB122FF04986AAB1E@HQMAIL01.nvidia.com>
+	<20110518161230.GA3029@gentoodev.compulab.local>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0498A47A69@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 01:14:47PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
+mike at compulab.co.il wrote at Wednesday, May 18, 2011 10:13 AM:
+> Hi Stephen,
 > 
-> This reworks the original amba bus device tree probing to be more inline with
-> how platform bus probing via device tree is done using a match table.
-
-You should also mention that this patch builds on the code currently
-in devicetree/test on git://git.secretlab.ca/git/linux-2.6.  Otherwise
-people will be very confused about what this applies to.
-
-> The amba bus code doesn't support creation of parent devices, so a flat tree
-> is created even if the device tree contains a heirarchy of devices.
-
-Hmmm, why do you say this?  The code doesn't currently set the parent
-pointer, but nothing prevents a caller of amba_device_register() from
-setting the parent pointer before it is registered.  I also don't see
-anything in the amba bus code that assume it must all be flat in the
-driver model.  What bit am I missing?
-
-> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  drivers/amba/bus.c       |   84 +++++++++++++++++++++++++++++++++++++++++-----
->  include/linux/amba/bus.h |    4 ++-
->  2 files changed, 78 insertions(+), 10 deletions(-)
+> On Tue, May 17, 2011 at 01:41:56PM -0700, Stephen Warren wrote:
+> > Mike Rapoport wrote at Monday, May 16, 2011 2:23 PM:
+> > > Hi Colin,
+> > > Please consider pulling TrimSlice updates for 2.6.40 merge window.
+> > > These patches add registration of i2c, audio and USB devices.
+> >
+> > Second, I tried to test this, but failed. I hit two issues:
+> >
+> > 1) USB didn't seem to work for me; the following prints continuously:
+> >
+> > [   93.952248] usb 3-1: new high speed USB device number 126 using tegra-ehci
+> > [   94.022291] hub 3-0:1.0: unable to enumerate USB device on port 1
+> >
+> > This means I can't use the built-in SSD as the root filesystem.
+> >
+> > I see this problem irrespective of whether I tell U-Boot to initialize
+> > USB before booting or not.
 > 
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index ed5c49d..4e46b54 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -7,6 +7,7 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->   */
-> +#define DEBUG
+> Yeah, this is caused by issue with USB1 port reset. Greg already took
+> the patch that fixes it (1).
+> [1] http://www.mail-archive.com/linux-tegra at vger.kernel.org/msg00581.html
 
-I assume this was left in by accident.
+OK, I applied that, and USB appears to work; I could mount the SSD OK.
 
->  #include <linux/module.h>
->  #include <linux/init.h>
->  #include <linux/device.h>
-> @@ -797,7 +798,7 @@ EXPORT_SYMBOL(amba_request_regions);
->  EXPORT_SYMBOL(amba_release_regions);
->  
->  #ifdef CONFIG_OF
-> -static int of_amba_device_create(struct device_node *node,struct device *parent)
-> +static struct amba_device *of_amba_device_create(struct device_node *node,struct device *parent)
->  {
->  	struct amba_device *dev;
->  	const void *prop;
-> @@ -805,7 +806,7 @@ static int of_amba_device_create(struct device_node *node,struct device *parent)
->  
->  	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->  	if (!dev)
-> -		return -ENOMEM;
-> +		return NULL;
->  
->  	/* setup generic device info */
->  	dev->dev.coherent_dma_mask = ~0;
-> @@ -839,22 +840,87 @@ static int of_amba_device_create(struct device_node *node,struct device *parent)
->  				    "probed value (0x%08x) don't agree.",
->  				    of_read_ulong(prop, 1), dev->periphid);
->  
-> -	return 0;
-> +	return dev;
->  
->  err_free:
->  	kfree(dev);
-> -	return ret;
-> +	return NULL;
-> +}
-> +
-> +/**
-> + * of_amba_bus_create() - Create a device for a node and its children.
-> + * @bus: device node of the bus to instantiate
-> + * @matches: match table for bus nodes
-> + * disallow recursive creation of child buses
-> + * @parent: parent for new device, or NULL for top level.
-> + *
-> + * Recursively create devices for all the child nodes.
-> + */
-> +static int of_amba_bus_create(struct device_node *bus,
-> +				  const struct of_device_id *matches,
-> +				  struct device *parent, bool strict)
-> +{
-> +	struct device_node *child;
-> +	struct amba_device *dev = NULL;
-> +	int rc = 0;
-> +
-> +	/* Make sure it has a compatible property */
-> +	if (strict && (!of_get_property(bus, "compatible", NULL))) {
-> +		pr_debug("%s() - skipping %s, no compatible prop\n",
-> +			 __func__, bus->full_name);
-> +		return 0;
-> +	}
+I found a way to get around aplay/speaker-test crashing (which happens
+both with the ChromeOS filesystem or the Ubuntu filesystem shipped with
+the Trimslice). If you specify which ALSA PCM device to use ("-D hw:0,0")
+then they both work OK.
 
-The whole 'strict' thing was to work around some poor ideas originally
-implemented in the powerpc version.  Don't duplicate that logic, just
-assume strict is always true...`
+That said, I do still see some issues. Specifically, when I play audio,
+USB and/or MMC IO appear to go south, and then recovers when audio
+playback terminates:
 
-> +
-> +	if (of_device_is_compatible(bus, "arm,amba-device"))
-> +		dev = of_amba_device_create(bus, parent);
+chronos at localhost ~ $ aplay -D hw:0,0 /home/abba-dq-48000-stereo.wav 
+Playing WAVE '/home/abba-dq-48000-stereo.wav' : Signed 16 bit Little Endian, Rate 48000 Hz, Stereo
+[   90.434741] usb 3-1: USB disconnect, device number 2
+[   90.722342] hub 3-0:1.0: unable to enumerate USB device on port 1
+<repeats about every 300mS>
+^C Aborted by signal Interrupt...
+chronos at localhost ~ $ [   97.262302] usb 3-1: new high speed USB device number 27 using tegra-ehci
+[   97.684058] usb 3-1: New USB device found, idVendor=05e3, idProduct=0718
+[   97.690758] usb 3-1: New USB device strings: Mfr=0, Product=1, SerialNumber=2
+[   97.698354] usb 3-1: Product: USB Storage
+[   97.702511] usb 3-1: SerialNumber: 000000000033
+[   97.710500] scsi1 : usb-storage 3-1:1.0
+[   99.492400] scsi 1:0:0:0: Direct-Access     SanDisk  SSD P4 8GB       0015 PQ: 0 ANSI: 0
+[   99.502508] sd 1:0:0:0: [sda] 15649196 512-byte logical blocks: (8.01 GB/7.46 GiB)
+[   99.522376] sd 1:0:0:0: [sda] Write Protect is off
+[   99.527169] sd 1:0:0:0: [sda] Assuming drive cache: write through
+[   99.572658] sd 1:0:0:0: [sda] Assuming drive cache: write through
+[   99.592671]  sda: sda1
+[   99.597539] sd 1:0:0:0: [sda] Assuming drive cache: write through
+[   99.604184] sd 1:0:0:0: [sda] Attached SCSI disk
 
-The AMBA bus itself should be a platform_device, and should be the
-parent for all the child nodes.
+Sometimes this affects mmcblk0 too.
 
-> +	else if (!of_match_node(matches, bus))
-> +		return 0;
-> +
-> +	for_each_child_of_node(bus, child) {
-> +		pr_debug("   create child: %s\n", child->full_name);
-> +		rc = of_amba_bus_create(child, matches, parent, strict);
-> +		if (rc) {
-> +			of_node_put(child);
-> +			break;
-> +		}
-> +	}
-> +	return rc;
->  }
->  
-> -void of_amba_bus_populate(struct device_node *node, struct device *parent)
-> +/**
-> + * of_amba_bus_probe() - Probe the device-tree for amba buses
-> + * @root: parent of the first level to probe or NULL for the root of the tree
-> + * @matches: match table for bus nodes
-> + * @parent: parent to hook devices from, NULL for toplevel
-> + *
-> + * Note that children of the provided root are not instantiated as devices
-> + * unless the specified root itself matches the bus list and is not NULL.
-> + */
-> +int of_amba_bus_probe(struct device_node *root,
-> +		       const struct of_device_id *matches,
-> +		       struct device *parent)
+This happens irrespective of whether my root filesystem is on USB (with
+no SD card plugged in) or on SD card.
 
-Don't follow the of_platform_bus_probe() pattern.  It's subtly broken
-(or at least confusing).  Follow the of_platform_populate()
-pattern instead (in devicetree/test, and has been posted to the list).
+That said, I think these issues are some pre-existing condition that was
+simply exposed because this patchset now enables USB and audio. Hence,
+not a problem with the changes in the patch set itself.
 
->  {
-> +	int rc = 0;
->  	struct device_node *child;
->  
-> -	for_each_child_of_node(node, child) {
-> -		if (of_device_is_compatible(child, "arm,amba-device"))
-> -			of_amba_device_create(child, parent);
-> +	root = root ? of_node_get(root) : of_find_node_by_path("/");
-> +	if (!root)
-> +		return -EINVAL;
-> +
-> +	/* Do a self check of bus type, if there's a match, create children */
-> +	if (of_match_node(matches, root)) {
-> +		rc = of_amba_bus_create(root, matches, parent, false);
-> +	} else for_each_child_of_node(root, child) {
-> +		if (!of_match_node(matches, child))
-> +			continue;
-> +		rc = of_amba_bus_create(child, matches, parent, false);
-> +		if (rc)
-> +			break;
->  	}
-> +
-> +	of_node_put(root);
-> +	return rc;
->  }
-> -EXPORT_SYMBOL(of_amba_bus_populate);
-> +EXPORT_SYMBOL(of_amba_bus_probe);
->  
->  #endif /* CONFIG_OF */
-> diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-> index cb17dfd..6df9535 100644
-> --- a/include/linux/amba/bus.h
-> +++ b/include/linux/amba/bus.h
-> @@ -96,7 +96,9 @@ void amba_release_regions(struct amba_device *);
->  
->  #ifdef CONFIG_OF
->  struct device_node;
-> -void of_amba_bus_populate(struct device_node *node, struct device *parent);
-> +int of_amba_bus_probe(struct device_node *root,
-> +		      const struct of_device_id *matches,
-> +		      struct device *parent);
->  #endif
->  
->  #endif
-> -- 
-> 1.7.4.1
-> 
+Do you have a kernel branch that's been tested with the Ubuntu build
+that shipped on the TrimSlice's SSD that I could test with? Alternatively,
+how did you create the filesystem you're testing with, so I could test
+with that instead?
+
+Thanks.
+
+-- 
+nvpublic
