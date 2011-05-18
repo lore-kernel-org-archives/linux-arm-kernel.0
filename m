@@ -1,38 +1,62 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 May 2011 23:47:15 +0100
-Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
-In-Reply-To: <1305740214.1526.2.camel@konomi>
-References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
-	<20110518152935.GJ5913@n2100.arm.linux.org.uk>
-	<1305740214.1526.2.camel@konomi>
-Message-ID: <20110518224715.GD21384@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 18 May 2011 18:49:16 -0400 (EDT)
+Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
+	in thumb mode.
+In-Reply-To: <20110518223319.GB21384@n2100.arm.linux.org.uk>
+References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
+	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
+	<20110514100232.GC30539@n2100.arm.linux.org.uk>
+	<20110516121657.GA7715@arm.com>
+	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
+	<20110516144311.GC7715@arm.com>
+	<BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
+	<alpine.LFD.2.00.1105181803090.14430@xanadu.home>
+	<20110518223319.GB21384@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1105181845540.14430@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 07:36:54PM +0200, Marek Vasut wrote:
-> > On Wed, May 18, 2011 at 05:18:38PM +0200, Pavel Herrmann wrote:
-> > > spi_sync call uses its spi_message parameter to keep completion
-> > > information, having this structure static is not thread-safe,
-> > > potentially causing one thread having pointers to memory on or above
-> > > other threads stack. use per-call spi_message on stack to fix this
+On Wed, 18 May 2011, Russell King - ARM Linux wrote:
+
+> On Wed, May 18, 2011 at 06:27:56PM -0400, Nicolas Pitre wrote:
+> > On Wed, 18 May 2011, Vadim Bendebury (??) wrote:
 > > 
-> > I assume this has not been tested with DMA debugging enabled.
+> > > On Mon, May 16, 2011 at 7:43 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> > > >On Mon, May 16, 2011 at 10:32:16AM -0400, Nicolas Pitre wrote:
+> > > >> I think this can be useful to know how the kernel was compiled for bug
+> > > >> tracking purposes, just like we record the Git commit ID of the checked
+> > > >> out source tree, the gcc version, the build date, etc. ?Which pretty
+> > > >> much indicates that the thumbness of the kernel should probably be
+> > > >> stored in the kernel banner not the platform name.
+> > > >
+> > > > That seems a reasonable approach to me.
+> > > >
+> > > 
+> > > guys, thank you for your comments. Indeed, this is meant to be just a
+> > > convenience to allow to quickly tell what kind of kernel a system is
+> > > running, comes handy when there are many systems around with
+> > > differently compiled kernels.
+> > > 
+> > > So, would it be acceptable if I move this information into the kernel
+> > > banner (namely, add it to the machine hardware name part of the output
+> > > included in 'uname -m' and 'uname -a')?
 > > 
-> > The DMA API does not like mapping memory from the stack, which is what
-> > you're potentially doing with this:
+> > Yes, I think that would be the most sensible place.  Looking at 
+> > scripts/mkcompile_h which is used to create include/generated/compile.h, 
+> > it appears that $CONFIG_FLAGS would be the most appropriate place for 
+> > this, however it is not currently set up to allow architecture specific 
+> > flags to be passed in.
 > 
-> Yikes, good catch, but kmallocing this and kfreeing it again is not
-> something I'd like to see either.
+> We already have a way of adding stuff for bug tracking purposes.  The
+> "Internal error" line is perpended with 'PREEMPT' or 'SMP' depending
+> on what build options were enabled.  We just need to do the same with
+> T2.  IOW, something like this:
+[...]
 
-You could use a semaphore to protect against other threads.
+This is indeed useful if the kernel oopses.  However this doesn't help 
+for those cases where the kernel doesn't crash but still exhibits 
+unexpected behaviors.  Having the thumbness of the kernel also displayed 
+in dmesg and uname -a would also be good to have.
 
-However, this driver just gives us yet more problems, as it overlaps
-the DMA'd data with the DMA metadata (spi message/spi transfer
-structures.)  And yes we do get bug reports on that too...
 
-I think its about time driver and subsystem authors got a clue about
-DMA incoherent architectures, and these things called 'cache lines'
-which have a direct impact on whether code is buggy or not.  Sharing
-cache lines between DMA buffers and other data is Really Bad News for
-data integrity - even sharing a cache line between two DMA buffers
-can be a problem.
+Nicolas
