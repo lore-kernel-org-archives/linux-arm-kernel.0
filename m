@@ -1,62 +1,60 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 18 May 2011 18:49:16 -0400 (EDT)
-Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
-	in thumb mode.
-In-Reply-To: <20110518223319.GB21384@n2100.arm.linux.org.uk>
-References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
-	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
-	<20110514100232.GC30539@n2100.arm.linux.org.uk>
-	<20110516121657.GA7715@arm.com>
-	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
-	<20110516144311.GC7715@arm.com>
-	<BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
-	<alpine.LFD.2.00.1105181803090.14430@xanadu.home>
-	<20110518223319.GB21384@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1105181845540.14430@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 May 2011 23:52:14 +0100
+Subject: [PATCH] ARM: bcmring: Add clkdev table in init_early
+In-Reply-To: <4DD44C0C.1090907@broadcom.com>
+References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
+	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
+	<4DD2FF02.1020508@broadcom.com>
+	<20110517232015.GC5913@n2100.arm.linux.org.uk>
+	<4DD307E2.7010302@broadcom.com>
+	<20110518154641.GK5913@n2100.arm.linux.org.uk>
+	<4DD40965.9020202@broadcom.com>
+	<20110518204242.GA21384@n2100.arm.linux.org.uk>
+	<20110518223700.GC21384@n2100.arm.linux.org.uk>
+	<4DD44C0C.1090907@broadcom.com>
+Message-ID: <20110518225214.GE21384@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 May 2011, Russell King - ARM Linux wrote:
+On Wed, May 18, 2011 at 03:45:32PM -0700, Jiandong Zheng wrote:
+> On 5/18/2011 3:37 PM, Russell King - ARM Linux wrote:
+>> On Wed, May 18, 2011 at 09:42:42PM +0100, Russell King - ARM Linux wrote:
+>>> On Wed, May 18, 2011 at 11:01:09AM -0700, Jiandong Zheng wrote:
+>>>> ARM: bcmring: Move adding clkdev to init_early to make sure clkevent
+>>>> based on sp804 is initialized properly.
+>>>
+>>> Great, can you submit this to the patch system please?  Thanks.
+>>
+>> Erm, actually this patch is against your previous patch (as is the one
+>> which you submitted to the patch system) so it won't apply as-is.  It
+>> needs to be one which wil apply directly to mainline in this case please.
+>>
+> Hi Russell,
+>
+> And my previous patch is based on your set of patches to do common sp804  
+> clock source. How should I submit mine?
 
-> On Wed, May 18, 2011 at 06:27:56PM -0400, Nicolas Pitre wrote:
-> > On Wed, 18 May 2011, Vadim Bendebury (??) wrote:
-> > 
-> > > On Mon, May 16, 2011 at 7:43 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> > > >On Mon, May 16, 2011 at 10:32:16AM -0400, Nicolas Pitre wrote:
-> > > >> I think this can be useful to know how the kernel was compiled for bug
-> > > >> tracking purposes, just like we record the Git commit ID of the checked
-> > > >> out source tree, the gcc version, the build date, etc. ?Which pretty
-> > > >> much indicates that the thumbness of the kernel should probably be
-> > > >> stored in the kernel banner not the platform name.
-> > > >
-> > > > That seems a reasonable approach to me.
-> > > >
-> > > 
-> > > guys, thank you for your comments. Indeed, this is meant to be just a
-> > > convenience to allow to quickly tell what kind of kernel a system is
-> > > running, comes handy when there are many systems around with
-> > > differently compiled kernels.
-> > > 
-> > > So, would it be acceptable if I move this information into the kernel
-> > > banner (namely, add it to the machine hardware name part of the output
-> > > included in 'uname -m' and 'uname -a')?
-> > 
-> > Yes, I think that would be the most sensible place.  Looking at 
-> > scripts/mkcompile_h which is used to create include/generated/compile.h, 
-> > it appears that $CONFIG_FLAGS would be the most appropriate place for 
-> > this, however it is not currently set up to allow architecture specific 
-> > flags to be passed in.
-> 
-> We already have a way of adding stuff for bug tracking purposes.  The
-> "Internal error" line is perpended with 'PREEMPT' or 'SMP' depending
-> on what build options were enabled.  We just need to do the same with
-> T2.  IOW, something like this:
-[...]
+Can you provide a patch against mainline which moves the clkdev
+initialization to the init_early callback - and I'll then deal with
+fixing up my patches for that by placing it before my two bcmring
+patches.
 
-This is indeed useful if the kernel oopses.  However this doesn't help 
-for those cases where the kernel doesn't crash but still exhibits 
-unexpected behaviors.  Having the thumbness of the kernel also displayed 
-in dmesg and uname -a would also be good to have.
+> Since I haven't had much experience with submitting patch so far, please  
+> allow me to ask a question which may be asked many times: when should I  
+> use patch system?
 
+When the patch has been reviewed and acked by people.  Note that things
+in this area will be changing because in the long run you should end
+up talking to the sub-arch group of people.
 
-Nicolas
+> For example, I sent a couple of unrelated patches last week and seems no  
+> one has problem with them since I don't see comments regarding them.  
+> Should I submit them again through patch system or they will picked up  
+> "automatically"?
+
+The debug-macros.S one seemed trivial enough, but the downside is that
+it impacts on our goal of showing a significant reduction of arch/arm...
+Since I'm fairly desperate to show as much of a reduction as possible
+this goes counter to my current direction.
+
+I think the other one was a build fix (?), and that should be fine.
