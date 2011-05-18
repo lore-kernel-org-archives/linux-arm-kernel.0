@@ -1,44 +1,48 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 18 May 2011 22:02:47 +0200
-Subject: [PATCH 0/4] Pinmux subsystem
-In-Reply-To: <BANLkTi=TDiAziQU0fYBiK_Npk0x50av7tA@mail.gmail.com>
-References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
-	<20110503172712.GE6538@lunn.ch>
-	<BANLkTi=ncV3M1q5SXNdUaXmtfkZ8Wn9dmw@mail.gmail.com>
-	<20110515133312.GM4071@lunn.ch>
-	<BANLkTi=O_mZEqMhOS_Fz0vAYCQ-XpyG4UA@mail.gmail.com>
-	<BANLkTi=TDiAziQU0fYBiK_Npk0x50av7tA@mail.gmail.com>
-Message-ID: <BANLkTikUbxHQH-sAP+uOy7bnpZcyN_GHxQ@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 18 May 2011 14:22:45 -0600
+Subject: [RFC PATCH] drivers/amba: probe via device tree reworked
+In-Reply-To: <4DD4205E.9040705@gmail.com>
+References: <1305742487-28325-1-git-send-email-robherring2@gmail.com>
+	<20110518184753.GB25861@ponder.secretlab.ca>
+	<4DD4205E.9040705@gmail.com>
+Message-ID: <20110518202245.GC25861@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/17 Kyungmin Park <kmpark@infradead.org>:
+On Wed, May 18, 2011 at 02:39:10PM -0500, Rob Herring wrote:
+> On 05/18/2011 01:47 PM, Grant Likely wrote:
+> >On Wed, May 18, 2011 at 01:14:47PM -0500, Rob Herring wrote:
+> >>From: Rob Herring<rob.herring@calxeda.com>
+> >>
+> >>This reworks the original amba bus device tree probing to be more inline with
+> >>how platform bus probing via device tree is done using a match table.
+> >
+> >You should also mention that this patch builds on the code currently
+> >in devicetree/test on git://git.secretlab.ca/git/linux-2.6.  Otherwise
+> >people will be very confused about what this applies to.
+> >
+> 
+> Yeah. I was ultimately expecting to squash this one into the first
+> amba bus patch assuming you agree with the general direction. Would
+> you rather me combine it and send that out instead of an incremental
+> patch?
 
-> In this case we only need to set the function at interrupt by like
-> s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-> So pinmux function provides this feature also.
+yes.
 
-This function:
-s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+> 
+> >>The amba bus code doesn't support creation of parent devices, so a flat tree
+> >>is created even if the device tree contains a heirarchy of devices.
+> >
+> >Hmmm, why do you say this?  The code doesn't currently set the parent
+> >pointer, but nothing prevents a caller of amba_device_register() from
+> >setting the parent pointer before it is registered.  I also don't see
+> >anything in the amba bus code that assume it must all be flat in the
+> >driver model.  What bit am I missing?
+> 
+> The problem is not setting a parent pointer. That can be passed in.
+> The problem I had was creating an amba_device for the bus, but your
+> comment below to use a platform device clarifies that issue.
 
-Isn't part of the gpiolib I can see, I am discussing with Grant
-how to handle custom GPIO configuration. Looking in
-archa/arm/plat-samsung/include/plat/gpio-core.h
-it looks like you have your own reimplementation of the
-entire gpiolib in order to get these special configuration
-functions... (So hopefully if I can add custom GPIO
-configs to gpiolib, all of this can move to drivers/gpio/*)
+okay, good.
 
-So I don't know exactly what this means, if it means that you want to
-mux pin 0xf to become GPIO, then yes, in the pinmux framework
-you would:
-
-pinmux_request_gpio(pinno, gpiono);
-
-(As you see pins and GPIOs are now in different address spaces
-and that is why two number have to be given, but if you manage
-it the number space it can basically be the same number if
-the platform so permits.)
-
-Yours,
-Linus Walleij
+g.
