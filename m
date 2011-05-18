@@ -1,47 +1,54 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 18 May 2011 16:40:43 +0200
-Subject: [PATCH] OMAP3: pm: Boot message is not an error, remove it
-In-Reply-To: <1305710080-2647-1-git-send-email-premi@ti.com> (Sanjeev Premi's
-	message of "Wed, 18 May 2011 14:44:40 +0530")
-References: <1305710080-2647-1-git-send-email-premi@ti.com>
-Message-ID: <87wrhors0k.fsf@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 May 2011 15:53:27 +0100
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <201105181047.17309.arnd@arndb.de>
+References: <201105181047.17309.arnd@arndb.de>
+Message-ID: <BANLkTi=xzrLhHTBynWf4huA9EusfaDwPbA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sanjeev,
+Arnd,
 
-Sanjeev Premi <premi@ti.com> writes:
+On 18 May 2011 09:47, Arnd Bergmann <arnd@arndb.de> wrote:
+> This is the draft plan for maintaining the ARM subarchitectures in a common
+> tree, as a way to help coordinate the upstream merging of the
+> arch/arm/{plat,mach}-* changes into Linus' tree.
 
-> It shows up on the console despite using "silent"
-> in the bootargs.
->
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
-> Cc: jhnikula at gmail.com
+For clarification - the aim of this subarchitecture group is not only
+to coordinate the upstream merging but also take an active (primary)
+role in consolidating the existing code across various
+subarchitectures under arch/arm/.
 
-Thanks!  Adding to queue for 2.6.40 (branch: for_2.6.40/pm-cleanup)
+> We are also open to nominations for
+> further people outside of Linaro to join us as committers. Marc Zyngier from
+> ARM ltd is one of the candidates that has been suggested and I would also
+> like to see someone from Google.
 
-Kevin
+This looks fine to me.
 
-> ---
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 8fce5e6..942d052 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -630,6 +630,17 @@ S: Maintained
+> ?F: ? ? drivers/amba/
+> ?F: ? ? include/linux/amba/bus.h
 >
->  v2: Changed the subject.
->      Removed the print altogether
->
->  v1: Convert printk to pr_info
->
->  arch/arm/mach-omap2/pm34xx.c |    2 --
->  1 files changed, 0 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 343027f..ba6c524 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -901,8 +901,6 @@ static int __init omap3_pm_init(void)
->  
->  	pm_errata_configure();
->  
-> -	printk(KERN_ERR "Power Management for TI OMAP3.\n");
-> -
->  	/* XXX prcm_setup_regs needs to be before enabling hw
->  	 * supervised mode for powerdomains */
->  	prcm_setup_regs();
+> +ARM SUBARCHITECTURES
+> +M: ? ? Arnd Bergmann <arnd@arndb.de>
+> +M: ? ? Nicolas Pitre <nico@fluxnic.net>
+> +M: ? ? Thomas Gleixner <tglx@linutronix.de>
+> +M: ? ? arm at kernel.org
+
+With this additional line on ARM Ltd's behalf:
+
++M:     Marc Zyngier <marc.zyngier@arm.com>
+
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+(as co-maintainer of the RealView boards and major contributor to the
+ARM architecture support code, though the latter isn't covered by this
+group)
+
+Thanks,
+
+Catalin
