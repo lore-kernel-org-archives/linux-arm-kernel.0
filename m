@@ -1,60 +1,45 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 18 May 2011 20:55:36 +0900
-Subject: [PATCH] Exynos4: Move GPIO drivers to drivers/gpio
-Message-ID: <20110518115536.GA31059@july>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 18 May 2011 15:57:46 +0400
+Subject: [PATCH] mioa701: move gpio-pullup functionality to gpio-vbus
+Message-ID: <1305719866-9811-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+gpio-vbus can (and should?) handle D+ pullup gpio for us. Move gpio-pullup handling
+to gpio-vbus and stop providing udc_info as it's empty now.
 
-Samsung Exynos4 gpio driver moved to drivers/gpio.
-
-Cc: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
-diff --git a/arch/arm/mach-exynos4/gpiolib.c b/drivers/gpio/exynos4-gpio.c
-similarity index 100%
-rename from arch/arm/mach-exynos4/gpiolib.c
-rename to drivers/gpio/exynos4-gpio.c
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 9be104f..3bb3f57 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -13,7 +13,7 @@ obj-				:=
- # Core support for EXYNOS4 system
+ arch/arm/mach-pxa/mioa701.c |    7 +------
+ 1 files changed, 1 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index 05f9efb..239d81e 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -402,14 +402,10 @@ static void gsm_exit(void)
+ /*
+  * USB UDC
+  */
+-static struct pxa2xx_udc_mach_info mioa701_udc_info = {
+-	.gpio_pullup	  = GPIO22_USB_ENABLE,
+-};
+-
+ struct gpio_vbus_mach_info gpio_vbus_data = {
+ 	.gpio_vbus = GPIO13_nUSB_DETECT,
+ 	.gpio_vbus_inverted = 1,
+-	.gpio_pullup = -1,
++	.gpio_pullup = GPIO22_USB_ENABLE,
+ };
  
- obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
--obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o gpiolib.o irq-eint.o dma.o
-+obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
- obj-$(CONFIG_PM)		+= pm.o sleep.o
- obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index d3b2953..7938449 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -75,6 +75,12 @@ config GPIO_BASIC_MMIO
- 	help
- 	  Say yes here to support basic memory-mapped GPIO controllers.
- 
-+config GPIO_EXYNOS4
-+	bool "Samsung Exynos4 GPIO support"
-+	depends on CPU_EXYNOS4210
-+	help
-+	  Say yes here to support Samsung Exynos4 GPIO controllers.
-+
- config GPIO_IT8761E
- 	tristate "IT8761E GPIO support"
- 	depends on GPIOLIB
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index becef59..f2373d0 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -11,6 +11,7 @@ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
- obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
- obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
- obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
-+obj-$(CONFIG_GPIO_EXYNOS4)	+= exynos4-gpio.o
- obj-$(CONFIG_GPIO_LANGWELL)	+= langwell_gpio.o
- obj-$(CONFIG_GPIO_MAX730X)	+= max730x.o
- obj-$(CONFIG_GPIO_MAX7300)	+= max7300.o
+ /*
+@@ -797,7 +793,6 @@ static void __init mioa701_machine_init(void)
+ 	pxa_set_fb_info(NULL, &mioa701_pxafb_info);
+ 	pxa_set_mci_info(&mioa701_mci_info);
+ 	pxa_set_keypad_info(&mioa701_keypad_info);
+-	pxa_set_udc_info(&mioa701_udc_info);
+ 	pxa_set_ac97_info(&mioa701_ac97_info);
+ 	pm_power_off = mioa701_poweroff;
+ 	arm_pm_restart = mioa701_restart;
+-- 
+1.7.4.4
