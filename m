@@ -1,82 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 May 2011 17:05:11 +0100
-Subject: [PATCH] ARM: sparsemem: fix highmem detection when using SPARSEMEM
-Message-ID: <1305734711-6710-1-git-send-email-will.deacon@arm.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Wed, 18 May 2011 17:06:58 +0100 (BST)
+Subject: Question on ARM inline assembly - stackframes, sp/fp usage,
+	__naked
+In-Reply-To: <alpine.DEB.2.00.1105181505080.2374@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1105181505080.2374@localhost6.localdomain6>
+Message-ID: <alpine.DEB.2.00.1105181658010.2374@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sanity_check_meminfo walks over the registered memory banks and attempts
-to split banks across lowmem and highmem when they would otherwise
-overlap with the vmalloc space.
+Hi,
 
-When SPARSEMEM is used, there are two potential problems that occur
-when the virtual address of the start of a bank is equal to vmalloc_min.
 
- 1.) The end of lowmem is calculated as __pa(vmalloc_min - 1) + 1.
-     In the above scenario, this will give the end address of the
-     previous bank, rather than the actual bank we are interested in.
-     This value is later used as the memblock limit and artificially
-     restricts the total amount of available memory.
+I've found that the key difference to code generation in this case seems 
+to be the use of the register clobber list. While gcc targeting armv7 / 
+omap3 looks to be pretty happy about that matching reality (it still 
+allocates local vars to registers alright - i.e. it recoginzes that the 
+clobber happens after), that's not the case for armv6 / s5p6450. On those, 
+seeing the r0-r15 clobber list, gcc insists on having "one tiny reg, just 
+one little teeny tinsy reg for itself", with FP as last resort ... and the 
+shown consequences for code generation if one lets fp through.
 
- 2.) The checks to determine whether or not a bank belongs to highmem
-     or not only check if __va(bank->start) is greater or less than
-     vmalloc_min. In the case that it is equal, the bank is incorrectly
-     treated as lowmem, which hoses the vmalloc area.
 
-This patch fixes these two problems by checking whether the virtual
-start address of a bank is >= vmalloc_min and then calculating
-lowmem_end by finding the virtual end address of the highest lowmem
-bank.
+Now since the inline asm statement is finalizing the function anyway, 
+there's no real harm in not specifying a clobber list at all
+there's never anything after it that could depend on saved state.
+Doing so makes the generated armv6 code use the same regs as the armv7 
+does.
 
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+Is it, for the sake of fooling gcc under all circumstances, necessary to 
+go via the naked trampoline ?
 
-Russell - I hit this problem on a RealView-PBX board when trying to use
-the full 1GB of memory with a 3:1 split configuration.
 
- arch/arm/mm/mmu.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 6cf76b3..9d8f0c8 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -765,15 +765,12 @@ static void __init sanity_check_meminfo(void)
- {
- 	int i, j, highmem = 0;
- 
--	lowmem_limit = __pa(vmalloc_min - 1) + 1;
--	memblock_set_current_limit(lowmem_limit);
--
- 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
- 		struct membank *bank = &meminfo.bank[j];
- 		*bank = meminfo.bank[i];
- 
- #ifdef CONFIG_HIGHMEM
--		if (__va(bank->start) > vmalloc_min ||
-+		if (__va(bank->start) >= vmalloc_min ||
- 		    __va(bank->start) < (void *)PAGE_OFFSET)
- 			highmem = 1;
- 
-@@ -831,6 +828,9 @@ static void __init sanity_check_meminfo(void)
- 			bank->size = newsize;
- 		}
- #endif
-+		if (!bank->highmem && bank->start + bank->size > lowmem_limit)
-+			lowmem_limit = bank->start + bank->size;
-+
- 		j++;
- 	}
- #ifdef CONFIG_HIGHMEM
-@@ -854,6 +854,7 @@ static void __init sanity_check_meminfo(void)
- 	}
- #endif
- 	meminfo.nr_banks = j;
-+	memblock_set_current_limit(lowmem_limit);
- }
- 
- static inline void prepare_page_table(void)
--- 
-1.7.0.4
+FrankH.
