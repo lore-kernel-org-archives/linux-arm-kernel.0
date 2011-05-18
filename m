@@ -1,45 +1,38 @@
-From: jdzheng@broadcom.com (Jiandong Zheng)
-Date: Wed, 18 May 2011 15:45:32 -0700
-Subject: [PATCH] ARM: bcmring: Add clkdev table in init_early
-In-Reply-To: <20110518223700.GC21384@n2100.arm.linux.org.uk>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
-	<4DD2FF02.1020508@broadcom.com>
-	<20110517232015.GC5913@n2100.arm.linux.org.uk>
-	<4DD307E2.7010302@broadcom.com>
-	<20110518154641.GK5913@n2100.arm.linux.org.uk>
-	<4DD40965.9020202@broadcom.com>
-	<20110518204242.GA21384@n2100.arm.linux.org.uk>
-	<20110518223700.GC21384@n2100.arm.linux.org.uk>
-Message-ID: <4DD44C0C.1090907@broadcom.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 May 2011 23:47:15 +0100
+Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+In-Reply-To: <1305740214.1526.2.camel@konomi>
+References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110518152935.GJ5913@n2100.arm.linux.org.uk>
+	<1305740214.1526.2.camel@konomi>
+Message-ID: <20110518224715.GD21384@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/18/2011 3:37 PM, Russell King - ARM Linux wrote:
-> On Wed, May 18, 2011 at 09:42:42PM +0100, Russell King - ARM Linux wrote:
->> On Wed, May 18, 2011 at 11:01:09AM -0700, Jiandong Zheng wrote:
->>> ARM: bcmring: Move adding clkdev to init_early to make sure clkevent
->>> based on sp804 is initialized properly.
->>
->> Great, can you submit this to the patch system please?  Thanks.
->
-> Erm, actually this patch is against your previous patch (as is the one
-> which you submitted to the patch system) so it won't apply as-is.  It
-> needs to be one which wil apply directly to mainline in this case please.
->
-Hi Russell,
+On Wed, May 18, 2011 at 07:36:54PM +0200, Marek Vasut wrote:
+> > On Wed, May 18, 2011 at 05:18:38PM +0200, Pavel Herrmann wrote:
+> > > spi_sync call uses its spi_message parameter to keep completion
+> > > information, having this structure static is not thread-safe,
+> > > potentially causing one thread having pointers to memory on or above
+> > > other threads stack. use per-call spi_message on stack to fix this
+> > 
+> > I assume this has not been tested with DMA debugging enabled.
+> > 
+> > The DMA API does not like mapping memory from the stack, which is what
+> > you're potentially doing with this:
+> 
+> Yikes, good catch, but kmallocing this and kfreeing it again is not
+> something I'd like to see either.
 
-And my previous patch is based on your set of patches to do common sp804 
-clock source. How should I submit mine?
+You could use a semaphore to protect against other threads.
 
-Since I haven't had much experience with submitting patch so far, please 
-allow me to ask a question which may be asked many times: when should I 
-use patch system?
+However, this driver just gives us yet more problems, as it overlaps
+the DMA'd data with the DMA metadata (spi message/spi transfer
+structures.)  And yes we do get bug reports on that too...
 
-For example, I sent a couple of unrelated patches last week and seems no 
-one has problem with them since I don't see comments regarding them. 
-Should I submit them again through patch system or they will picked up 
-"automatically"?
-
-Thanks,
-JD
+I think its about time driver and subsystem authors got a clue about
+DMA incoherent architectures, and these things called 'cache lines'
+which have a direct impact on whether code is buggy or not.  Sharing
+cache lines between DMA buffers and other data is Really Bad News for
+data integrity - even sharing a cache line between two DMA buffers
+can be a problem.
