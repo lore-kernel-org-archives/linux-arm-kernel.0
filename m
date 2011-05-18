@@ -1,33 +1,52 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 May 2011 17:53:22 +0900
+Date: Wed, 18 May 2011 17:56:32 +0900
 Subject: [PATCH 0/7] ARM: Removing ARCH_S5PC100
-In-Reply-To: <9ffr5a$esl6ci@out1.ip06ir2.opaltelecom.net>
+In-Reply-To: <000901cc13e9$1a9a2880$4fce7980$%szyprowski@samsung.com>
 References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<9ffr5a$esl6ci@out1.ip06ir2.opaltelecom.net>
-Message-ID: <001401cc1539$0c267d70$24737850$%kim@samsung.com>
+	<201105131555.42860.anarsoul@gmail.com>
+	<000901cc13e9$1a9a2880$4fce7980$%szyprowski@samsung.com>
+Message-ID: <001501cc1539$7d663070$78329150$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Nick Pelling wrote:
+Marek Szyprowski wrote:
 > 
-> At 10:11 12/05/2011 +0900, Kukjin Kim wrote:
-> >This patch remvoes mach-s5pc100 directory for ARCH_S5PC100 in arch/arm.
-> >If any problems, please let me know immediately.
+> Hello,
 > 
-> Yes, this is a *big* problem for me as I'm actively working on
-mach-s5pc100.
-> 
-> Unless you happen to know differently, the S5PC100 is still in mass
-> production, and the security cameras my company make all use the
-> S5PC100. There are also a number of other embedded modules currently
-> in production based on the S5PC100.
-> 
-> What reason would you have for removing mach-s5pc100 from Linux?
+Hi :)
 
-Thanks for your opinion :)
+> On Friday, May 13, 2011 2:56 PM Vasily Khoruzhick wrote:
+> 
+> > On Thursday 12 May 2011 04:11:07 Kukjin Kim wrote:
+> > > This patch remvoes mach-s5pc100 directory for ARCH_S5PC100 in
+arch/arm.
+> >
+> > Hm, what's the point of removing this code?
+> 
+> May I also ask the same? What's the point in removing WORKING support for
+> the whole SoC series? There are some S5PC100 based boards available on the
+> market and they are still being used for embedded Linux development.
+> 
+> The issues with ARM kernel tree is not about the number of supported
+> SoCs/sub-platform but the fact that a lots of code is somehow duplicated
+> between different arm sub-architecture. The goal is to identify such code
+> and unify it. There have been a lot of discussion about this on Linaro
+> Meeting in Budapest. For more information please take a look at etherpad
+> notes available here:
+> 
+> http://summit.ubuntu.com/uds-o/track/linaro-kernel/
+> 
+> (etherpad links for each session are available via 'notepad' image near
+> the session title).
+> 
+> I recommend to read all the notes from all five 'Arm Linus Interface'
+> sessions.
+> 
 
-Yes, I think it's rather premature to decide it at this time.
-So this is dropped now and will merge with other samsung stuff next time ;)
+I think, we already discussed about this :)
+Hope please refer other my reply on this thread.
+
+Ok, will check about discussion result in last UDS.
 
 Thanks.
 
