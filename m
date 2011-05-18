@@ -1,133 +1,49 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 18 May 2011 10:33:26 -0700
-Subject: [PATCH v2] arm: Add unwinding support for division functions
-In-Reply-To: <f16b4b8d7735148b133e23547a7963b3.squirrel@www.codeaurora.org>
-References: <f16b4b8d7735148b133e23547a7963b3.squirrel@www.codeaurora.org>
-Message-ID: <1305740006-11389-2-git-send-email-lauraa@codeaurora.org>
+From: marek.vasut.n900@gmail.com (Marek Vasut)
+Date: Wed, 18 May 2011 19:36:54 +0200
+Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+In-Reply-To: <20110518152935.GJ5913@n2100.arm.linux.org.uk>
+References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110518152935.GJ5913@n2100.arm.linux.org.uk>
+Message-ID: <1305740214.1526.2.camel@konomi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The software division functions never had unwinding annotations
-added. Currently, when a division by zero occurs the backtrace shown
-will stop at Ldiv0 or some completely unrelated function. Add
-unwinding annotations in hopes of getting a more useful backtrace
-when a division by zero occurs.
+> On Wed, May 18, 2011 at 05:18:38PM +0200, Pavel Herrmann wrote:
+> > spi_sync call uses its spi_message parameter to keep completion
+> > information, having this structure static is not thread-safe,
+> > potentially causing one thread having pointers to memory on or above
+> > other threads stack. use per-call spi_message on stack to fix this
+> 
+> I assume this has not been tested with DMA debugging enabled.
+> 
+> The DMA API does not like mapping memory from the stack, which is what
+> you're potentially doing with this:
 
-Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
----
- arch/arm/lib/lib1funcs.S |   25 ++++++++++++++++++++-----
- 1 files changed, 20 insertions(+), 5 deletions(-)
+Yikes, good catch, but kmallocing this and kfreeing it again is not something I'd like to see either.
 
-diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
-index 6dc0648..c562f64 100644
---- a/arch/arm/lib/lib1funcs.S
-+++ b/arch/arm/lib/lib1funcs.S
-@@ -35,7 +35,7 @@ Boston, MA 02111-1307, USA.  */
- 
- #include <linux/linkage.h>
- #include <asm/assembler.h>
--
-+#include <asm/unwind.h>
- 
- .macro ARM_DIV_BODY dividend, divisor, result, curbit
- 
-@@ -207,6 +207,7 @@ Boston, MA 02111-1307, USA.  */
- 
- ENTRY(__udivsi3)
- ENTRY(__aeabi_uidiv)
-+UNWIND(.fnstart)
- 
- 	subs	r2, r1, #1
- 	moveq	pc, lr
-@@ -230,10 +231,12 @@ ENTRY(__aeabi_uidiv)
- 	mov	r0, r0, lsr r2
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__udivsi3)
- ENDPROC(__aeabi_uidiv)
- 
- ENTRY(__umodsi3)
-+UNWIND(.fnstart)
- 
- 	subs	r2, r1, #1			@ compare divisor with 1
- 	bcc	Ldiv0
-@@ -247,10 +250,12 @@ ENTRY(__umodsi3)
- 
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__umodsi3)
- 
- ENTRY(__divsi3)
- ENTRY(__aeabi_idiv)
-+UNWIND(.fnstart)
- 
- 	cmp	r1, #0
- 	eor	ip, r0, r1			@ save the sign of the result.
-@@ -287,10 +292,12 @@ ENTRY(__aeabi_idiv)
- 	rsbmi	r0, r0, #0
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__divsi3)
- ENDPROC(__aeabi_idiv)
- 
- ENTRY(__modsi3)
-+UNWIND(.fnstart)
- 
- 	cmp	r1, #0
- 	beq	Ldiv0
-@@ -310,11 +317,14 @@ ENTRY(__modsi3)
- 	rsbmi	r0, r0, #0
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__modsi3)
- 
- #ifdef CONFIG_AEABI
- 
- ENTRY(__aeabi_uidivmod)
-+UNWIND(.fnstart)
-+UNWIND(.save {r0, r1, ip, lr}	)
- 
- 	stmfd	sp!, {r0, r1, ip, lr}
- 	bl	__aeabi_uidiv
-@@ -323,10 +333,12 @@ ENTRY(__aeabi_uidivmod)
- 	sub	r1, r1, r3
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__aeabi_uidivmod)
- 
- ENTRY(__aeabi_idivmod)
--
-+UNWIND(.fnstart)
-+UNWIND(.save {r0, r1, ip, lr}	)
- 	stmfd	sp!, {r0, r1, ip, lr}
- 	bl	__aeabi_idiv
- 	ldmfd	sp!, {r1, r2, ip, lr}
-@@ -334,15 +346,18 @@ ENTRY(__aeabi_idivmod)
- 	sub	r1, r1, r3
- 	mov	pc, lr
- 
-+UNWIND(.fnend)
- ENDPROC(__aeabi_idivmod)
- 
- #endif
- 
- Ldiv0:
--
-+UNWIND(.fnstart)
-+UNWIND(.pad #4)
-+UNWIND(.save {lr})
- 	str	lr, [sp, #-8]!
- 	bl	__div0
- 	mov	r0, #0			@ About as wrong as it could be.
- 	ldr	pc, [sp], #8
--
--
-+UNWIND(.fnend)
-+ENDPROC(Ldiv0)
--- 
-1.7.3.3
+What other options do you suggest?
+
+Btw note, this isn't the only driver doing this, maybe we have a horde of patches on the way?
+
+> 
+> > +??? uint8_t rx_buf[2] = {0, 0};
+> > +??? uint8_t tx_buf = (channel << MAX1111_CTRL_SEL_SH) |
+> > +??? ??? ??? MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
+> > +??? ??? ??? MAX1111_CTRL_SGL | MAX1111_CTRL_UNI |
+> > +??? ??? ??? MAX1111_CTRL_STR;
+> > +
+> > +??? spi_message_init(&m);
+> > +??? memset(t, 0, sizeof(t));
+> > +
+> > +??? t[0].tx_buf = &tx_buf;
+> > +??? t[0].len = 1;
+> > +??? spi_message_add_tail(&t[0], &m);
+> > +
+> > +??? t[1].rx_buf = rx_buf;
+> > +??? t[1].len = 2;
+> > +??? spi_message_add_tail(&t[1], &m);
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
