@@ -1,74 +1,47 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 18 May 2011 16:38:04 +0200
-Subject: [PATCH v3 0/4] OMAP: cpuidle code clean-up
-In-Reply-To: <1304935336-6308-1-git-send-email-j-pihet@ti.com> (jean pihet's
-	message of "Mon, 9 May 2011 12:02:12 +0200")
-References: <1304935336-6308-1-git-send-email-j-pihet@ti.com>
-Message-ID: <871uzwt6pf.fsf@ti.com>
+Date: Wed, 18 May 2011 16:40:43 +0200
+Subject: [PATCH] OMAP3: pm: Boot message is not an error, remove it
+In-Reply-To: <1305710080-2647-1-git-send-email-premi@ti.com> (Sanjeev Premi's
+	message of "Wed, 18 May 2011 14:44:40 +0530")
+References: <1305710080-2647-1-git-send-email-premi@ti.com>
+Message-ID: <87wrhors0k.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-jean.pihet at newoldbits.com writes:
+Hi Sanjeev,
 
-> From: Jean Pihet <j-pihet@ti.com>
+Sanjeev Premi <premi@ti.com> writes:
+
+> It shows up on the console despite using "silent"
+> in the bootargs.
 >
-> Rework of the OMAP2+ cpuidle code
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> Cc: jhnikula at gmail.com
 
-Excellent work!  Thanks.
-
-Queuing for 2.6.40 (branch: for_2.6.40/pm-cleanup)
+Thanks!  Adding to queue for 2.6.40 (branch: for_2.6.40/pm-cleanup)
 
 Kevin
 
-> v3: rework after comments on linux-omap ML:
-> - renamed the C-state driver data variables as 'cx',
-> - retain C1 as the only always valid state and safe state,
-> - rework of the C-states definition.
+> ---
 >
-> v2: rework after comments on linux-omap ML:
-> - remove useless macros,
-> - replace the C-state common data fill-in helper macro by an inline
->    function, for better readability,
-> - update commits description.
+>  v2: Changed the subject.
+>      Removed the print altogether
 >
-> v1:
-> - optimize the cpuidle C-states data registration and storage,
-> - change the interaction with the debugfs 'enable_off_mode' knob
->  and the use of the C-states 'valid' internal field,
-> - remove dead code,
-> - improve code readability.
+>  v1: Convert printk to pr_info
 >
-> Tested on Beagleboard B5 with cpuidle in RET and OFF modes.
+>  arch/arm/mach-omap2/pm34xx.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
 >
-> Another 151 lines of OMAP code gone ;p
->
-> Notes:
-> 1) the debugfs 'enable_off_mode' knob will be deprecated by the use
->  of the devices constraints framework to restrict the power domains
->  power modes.
-> 2) the MPU and CORE power domains low power modes are controlled
->  by cpuidle, based on the allowed overall sleep+wake-up latencies
->  and the wake-up latency constraints on the MPU. This is incorrect.
->  The devices constraints framework shall be used instead to control
->  all power domains.
->
-> ToDo:
-> - integrate cpuidle with the devices constraints framework, when merged in,
-> - refine the latency figures and express them in term of available data
->  from other frameworks (OMAP PM, constaints framework, omap_devices,
->  new VC/VP voltage and DVFS code ...),
->
-> Rebased on khilman's for_2.6.40/pm-cleanup branch
->
->
-> Jean Pihet (4):
->   OMAP3: clean-up mach specific cpuidle data structures
->   OMAP3: cpuidle: re-organize the C-states data
->   OMAP3: cpuidle: code rework for improved readability
->   OMAP3: cpuidle: change the power domains modes determination logic
->
->  arch/arm/mach-omap2/board-rx51.c  |   18 +-
->  arch/arm/mach-omap2/cpuidle34xx.c |  436 +++++++++++++------------------------
->  arch/arm/mach-omap2/pm.h          |   17 +-
->  arch/arm/mach-omap2/pm34xx.c      |   12 -
->  4 files changed, 166 insertions(+), 317 deletions(-)
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 343027f..ba6c524 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -901,8 +901,6 @@ static int __init omap3_pm_init(void)
+>  
+>  	pm_errata_configure();
+>  
+> -	printk(KERN_ERR "Power Management for TI OMAP3.\n");
+> -
+>  	/* XXX prcm_setup_regs needs to be before enabling hw
+>  	 * supervised mode for powerdomains */
+>  	prcm_setup_regs();
