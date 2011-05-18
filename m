@@ -1,76 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 May 2011 10:47:16 +0200
-Subject: [RFC] ARM Subarchitecture group maintainership
-Message-ID: <201105181047.17309.arnd@arndb.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 18 May 2011 17:53:22 +0900
+Subject: [PATCH 0/7] ARM: Removing ARCH_S5PC100
+In-Reply-To: <9ffr5a$esl6ci@out1.ip06ir2.opaltelecom.net>
+References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
+	<9ffr5a$esl6ci@out1.ip06ir2.opaltelecom.net>
+Message-ID: <001401cc1539$0c267d70$24737850$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the draft plan for maintaining the ARM subarchitectures in a common
-tree, as a way to help coordinate the upstream merging of the
-arch/arm/{plat,mach}-* changes into Linus' tree.
+Nick Pelling wrote:
+> 
+> At 10:11 12/05/2011 +0900, Kukjin Kim wrote:
+> >This patch remvoes mach-s5pc100 directory for ARCH_S5PC100 in arch/arm.
+> >If any problems, please let me know immediately.
+> 
+> Yes, this is a *big* problem for me as I'm actively working on
+mach-s5pc100.
+> 
+> Unless you happen to know differently, the S5PC100 is still in mass
+> production, and the security cameras my company make all use the
+> S5PC100. There are also a number of other embedded modules currently
+> in production based on the S5PC100.
+> 
+> What reason would you have for removing mach-s5pc100 from Linux?
 
-This was discussed in great length at the Linaro Developer Summit in Budapest
-last week where we worked out an initial plan. We are modeling the maintainance
-after how the linux-tip tree is used for the x86 architecture, with a set
-of developers that have commit access to one tree on kernel.org and
-have mutual trust in one another. Nicolas Pitre and me are funded
-by Linaro to do the bulk of the work, while Thomas Gleixner will help
-us part-time with his long time architecture maintainance experience.
-Despite the funding by Linaro, this is not a Linaro project and all
-ARM subarchitectures are welcome to go through our tree.
+Thanks for your opinion :)
 
-Russell King's role as ARM maintainer is of course unchanged by this, but
-he has the same commit access to the new tree as the other maintainers and
-is welcome to work in the same tree. We are also open to nominations for
-further people outside of Linaro to join us as committers. Marc Zyngier from
-ARM ltd is one of the candidates that has been suggested and I would also
-like to see someone from Google. We have to find the right balance with the
-number of committers so we get all the work done without stepping on each
-other's toes.
+Yes, I think it's rather premature to decide it at this time.
+So this is dropped now and will merge with other samsung stuff next time ;)
 
-Our tree will be strictly organized in topic brances so we can feed them
-upstream in the bitesized chunks that Linus likes. The master branch
-is an integration branch that pulls all other branches that are scheduled
-for the next merge window and itself gets integrated into linux-next.
+Thanks.
 
-We will probably not be fully functional during the 2.6.40 merge window,
-but we are trying our best to be useful. For 2.6.41, my hope is that
-we can merge the bulk of the ARM subarchitecture changes through this
-tree. Once Linus is happy with the way that the process works, we can
-mandate that all ARM subarchitecture changes go through our tree, until
-then it stays voluntary.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Cc: Nicolas Pitre <nico@fluxnic.net>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-
----
-
-Maintainers: If you are happy with the layout of the process,
-please ack this patch, otherwise please comment.
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 8fce5e6..942d052 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -630,6 +630,17 @@ S:	Maintained
- F:	drivers/amba/
- F:	include/linux/amba/bus.h
- 
-+ARM SUBARCHITECTURES
-+M:	Arnd Bergmann <arnd@arndb.de>
-+M:	Nicolas Pitre <nico@fluxnic.net>
-+M:	Thomas Gleixner <tglx@linutronix.de>
-+M:	arm at kernel.org
-+L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-+S:	MAINTAINED
-+F:	arch/arm/mach-*/
-+F:	arch/arm/plat-*/
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-subarch.git
-+
- ARM/ADI ROADRUNNER MACHINE SUPPORT
- M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
