@@ -1,33 +1,45 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 18 May 2011 17:44:39 -0500
-Subject: [PATCH 5/7] msm: gpiomux: Move public API to public header
-In-Reply-To: <1305755453-31112-6-git-send-email-davidb@codeaurora.org>
-References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
-	<1305755453-31112-6-git-send-email-davidb@codeaurora.org>
-Message-ID: <0D753D10438DA54287A00B027084269764D2F7405A@AUSP01VMBX24.collaborationhost.net>
+From: jdzheng@broadcom.com (Jiandong Zheng)
+Date: Wed, 18 May 2011 15:45:32 -0700
+Subject: [PATCH] ARM: bcmring: Add clkdev table in init_early
+In-Reply-To: <20110518223700.GC21384@n2100.arm.linux.org.uk>
+References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
+	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
+	<4DD2FF02.1020508@broadcom.com>
+	<20110517232015.GC5913@n2100.arm.linux.org.uk>
+	<4DD307E2.7010302@broadcom.com>
+	<20110518154641.GK5913@n2100.arm.linux.org.uk>
+	<4DD40965.9020202@broadcom.com>
+	<20110518204242.GA21384@n2100.arm.linux.org.uk>
+	<20110518223700.GC21384@n2100.arm.linux.org.uk>
+Message-ID: <4DD44C0C.1090907@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, May 18, 2011 2:51 PM, David Brown wrote:
+On 5/18/2011 3:37 PM, Russell King - ARM Linux wrote:
+> On Wed, May 18, 2011 at 09:42:42PM +0100, Russell King - ARM Linux wrote:
+>> On Wed, May 18, 2011 at 11:01:09AM -0700, Jiandong Zheng wrote:
+>>> ARM: bcmring: Move adding clkdev to init_early to make sure clkevent
+>>> based on sp804 is initialized properly.
+>>
+>> Great, can you submit this to the patch system please?  Thanks.
 >
-> The gpiomux.h header contains some SOC ifdefs.  However, the API that
-> is actually used by the GPIO driver only uses two functions that are
-> general.  Move these general definitions into a public header file.
+> Erm, actually this patch is against your previous patch (as is the one
+> which you submitted to the patch system) so it won't apply as-is.  It
+> needs to be one which wil apply directly to mainline in this case please.
 >
-> Signed-off-by: David Brown <davidb@codeaurora.org>
-> ---
->  arch/arm/mach-msm/gpio.c    |    2 +-
->  arch/arm/mach-msm/gpiomux.h |   17 +----------------
->  include/linux/msm_gpiomux.h |   38 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 40 insertions(+), 17 deletions(-)
->  create mode 100644 include/linux/msm_gpiomux.h
+Hi Russell,
 
-The msm_gpiomux.h header appears to be very "msm" specific, especially
-with the #ifdef CONFIG_MSM_GPIOMUX in it.  Wouldn't it be cleaner to
-just move it to arch/arm/mach-msm/include/mach/msm_gpiomux.h?
+And my previous patch is based on your set of patches to do common sp804 
+clock source. How should I submit mine?
 
-I don't see a reason why this header needs/should be available for
-the general public in /include/linux.
+Since I haven't had much experience with submitting patch so far, please 
+allow me to ask a question which may be asked many times: when should I 
+use patch system?
 
-Regards,
-Hartley
+For example, I sent a couple of unrelated patches last week and seems no 
+one has problem with them since I don't see comments regarding them. 
+Should I submit them again through patch system or they will picked up 
+"automatically"?
+
+Thanks,
+JD
