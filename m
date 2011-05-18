@@ -1,48 +1,20 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 18 May 2011 14:22:45 -0600
-Subject: [RFC PATCH] drivers/amba: probe via device tree reworked
-In-Reply-To: <4DD4205E.9040705@gmail.com>
-References: <1305742487-28325-1-git-send-email-robherring2@gmail.com>
-	<20110518184753.GB25861@ponder.secretlab.ca>
-	<4DD4205E.9040705@gmail.com>
-Message-ID: <20110518202245.GC25861@ponder.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 18 May 2011 21:42:42 +0100
+Subject: [PATCH] ARM: bcmring: Add clkdev table in init_early
+In-Reply-To: <4DD40965.9020202@broadcom.com>
+References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
+	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
+	<4DD2FF02.1020508@broadcom.com>
+	<20110517232015.GC5913@n2100.arm.linux.org.uk>
+	<4DD307E2.7010302@broadcom.com>
+	<20110518154641.GK5913@n2100.arm.linux.org.uk>
+	<4DD40965.9020202@broadcom.com>
+Message-ID: <20110518204242.GA21384@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 02:39:10PM -0500, Rob Herring wrote:
-> On 05/18/2011 01:47 PM, Grant Likely wrote:
-> >On Wed, May 18, 2011 at 01:14:47PM -0500, Rob Herring wrote:
-> >>From: Rob Herring<rob.herring@calxeda.com>
-> >>
-> >>This reworks the original amba bus device tree probing to be more inline with
-> >>how platform bus probing via device tree is done using a match table.
-> >
-> >You should also mention that this patch builds on the code currently
-> >in devicetree/test on git://git.secretlab.ca/git/linux-2.6.  Otherwise
-> >people will be very confused about what this applies to.
-> >
-> 
-> Yeah. I was ultimately expecting to squash this one into the first
-> amba bus patch assuming you agree with the general direction. Would
-> you rather me combine it and send that out instead of an incremental
-> patch?
+On Wed, May 18, 2011 at 11:01:09AM -0700, Jiandong Zheng wrote:
+> ARM: bcmring: Move adding clkdev to init_early to make sure clkevent  
+> based on sp804 is initialized properly.
 
-yes.
-
-> 
-> >>The amba bus code doesn't support creation of parent devices, so a flat tree
-> >>is created even if the device tree contains a heirarchy of devices.
-> >
-> >Hmmm, why do you say this?  The code doesn't currently set the parent
-> >pointer, but nothing prevents a caller of amba_device_register() from
-> >setting the parent pointer before it is registered.  I also don't see
-> >anything in the amba bus code that assume it must all be flat in the
-> >driver model.  What bit am I missing?
-> 
-> The problem is not setting a parent pointer. That can be passed in.
-> The problem I had was creating an amba_device for the bus, but your
-> comment below to use a platform device clarifies that issue.
-
-okay, good.
-
-g.
+Great, can you submit this to the patch system please?  Thanks.
