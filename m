@@ -1,38 +1,56 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 May 2011 22:21:55 +0100
-Subject: [PATCH 0/4] Pinmux subsystem
-In-Reply-To: <BANLkTikUbxHQH-sAP+uOy7bnpZcyN_GHxQ@mail.gmail.com>
-References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
-	<20110503172712.GE6538@lunn.ch>
-	<BANLkTi=ncV3M1q5SXNdUaXmtfkZ8Wn9dmw@mail.gmail.com>
-	<20110515133312.GM4071@lunn.ch>
-	<BANLkTi=O_mZEqMhOS_Fz0vAYCQ-XpyG4UA@mail.gmail.com>
-	<BANLkTi=TDiAziQU0fYBiK_Npk0x50av7tA@mail.gmail.com>
-	<BANLkTikUbxHQH-sAP+uOy7bnpZcyN_GHxQ@mail.gmail.com>
-Message-ID: <20110518212154.GA20909@sirena.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 18 May 2011 23:24:21 +0200 (CEST)
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <20110518155615.GJ15292@game.jcrosoft.org>
+References: <201105181047.17309.arnd@arndb.de>
+	<20110518155615.GJ15292@game.jcrosoft.org>
+Message-ID: <alpine.LFD.2.02.1105182313060.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 10:02:47PM +0200, Linus Walleij wrote:
-> 2011/5/17 Kyungmin Park <kmpark@infradead.org>:
+On Wed, 18 May 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 10:47 Wed 18 May     , Arnd Bergmann wrote:
+> > We will probably not be fully functional during the 2.6.40 merge window,
+> > but we are trying our best to be useful. For 2.6.41, my hope is that
+> > we can merge the bulk of the ARM subarchitecture changes through this
+> > tree. Once Linus is happy with the way that the process works, we can
+> > mandate that all ARM subarchitecture changes go through our tree, until
+> > then it stays voluntary.
+> How do you plan to manage with already sub arch maintainers?
 
-> > In this case we only need to set the function at interrupt by like
-> > s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
-> > So pinmux function provides this feature also.
+The sub arch maintainers are not replaced by this.
+ 
+> In my ming such tree could be good to organise cross arch drivers
 
-> This function:
-> s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+This is not about drivers. drivers need to move out of arch/arm into
+the proper drivers/subsystem where consolidation makes really sense
+even across architectures. We have already multiple drivers for the
+same stupid IP block in tree just because they were glued into
+different SoCs (ARM, x86, ....). That's not an ARM specific problem,
+it's all across the board, but on ARM it is very visible.
 
-> Isn't part of the gpiolib I can see, I am discussing with Grant
-> how to handle custom GPIO configuration. Looking in
-> archa/arm/plat-samsung/include/plat/gpio-core.h
+> but for real arch specific the current workflow is good
 
-> it looks like you have your own reimplementation of the
-> entire gpiolib in order to get these special configuration
-> functions... (So hopefully if I can add custom GPIO
-> configs to gpiolib, all of this can move to drivers/gpio/*)
+There is a difference between arch specific code - i.e. core ARM
+architecture code - and SoC specific code which goes into
+arch/arm/[mach|plat]-*. The core code was never and issue and we are
+not touching it as Russell is handling it perfectly. The real issue is
+the code in [mach|plat]-* which flows rather randomly into mainline
+today. That results in lack of review, push back and makes
+consolidation as hard as it gets.
 
-This API predates the generic GPIO API - it's a reimplementation because
-at that time the various platforms all had their own custom APIs.  The
-Samsung specific API is pretty much only used for the pin mux and mode
-configuration these days.
+> If we add a new stage it will be difficult to follow for people
+
+What is difficult about that? How does it matter whether you ask A or
+B to pull and propagate your subarch code?
+ 
+> I'd like to have scenario example where such workflow will give a significant
+> advantage compare to the current workflow. And please real example.
+
+See above. It's not about examples, it's about solving issues like
+lack of review, lack of central places to do consolidation work and
+lack of push-back when stuff goes into the wrong direction.
+
+Thanks,
+
+	tglx
