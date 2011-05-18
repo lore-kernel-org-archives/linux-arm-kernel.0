@@ -1,56 +1,100 @@
 From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Wed, 18 May 2011 19:25:08 +0400
-Subject: [PATCH v3 0/3] ASoC: add support for audio on iPaq hx4700
-Message-ID: <1305732311-17639-1-git-send-email-mad_soft@inbox.ru>
+Date: Wed, 18 May 2011 19:25:11 +0400
+Subject: [PATCH v3 3/3] pxa/hx4700: add platform device and I2C info for
+	AK4641 codec
+In-Reply-To: <1305732311-17639-1-git-send-email-mad_soft@inbox.ru>
+References: <1305732311-17639-1-git-send-email-mad_soft@inbox.ru>
+Message-ID: <1305732311-17639-4-git-send-email-mad_soft@inbox.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok, here's another version of patches adding audio support for good ole
-iPAQ hx4700. It took a bit faster to make v3 than I expected, so here is it.
+Also rename AK4641 power GPIOs to document the codec chip.
 
-Previous versions can be found here:
-https://lkml.org/lkml/2010/11/20/50 (v1)
-https://lkml.org/lkml/2011/5/16/462 (v2)
+Signed-off-by: Philipp Zabel <philipp.zabel@gmail.com>
+Signed-off-by: Dmitry Artamonow <mad_soft@inbox.ru>
+---
+ arch/arm/mach-pxa/hx4700.c              |   25 +++++++++++++++++++++++++
+ arch/arm/mach-pxa/include/mach/hx4700.h |    4 ++--
+ 2 files changed, 27 insertions(+), 2 deletions(-)
 
-This patchset is based on 'for-next' branch of Mark's ASoC git tree
-(fetched today), also applies cleanly on linux-next-20110518.
-Lightly tested on real hardware - playback/recording/mixer seem to work
-without any glitches.
-
-Changes v2 -> v3
-
-* data based init is now used in codec and machine audio driver
-  for DAPM and controls
-* machine audio driver now is a proper platform driver, instantiating
-  sound card with snd_soc_register_card()
-* platform code registers corresponding platform_device for machine audio driver
-* ak4641_sync() is dropped in favour of snd_soc_cache_sync()
-* snd_soc_update_bits() is used instead of snd_soc_read()/update/snd_soc_write()
-  sequences. Also return value of snd_soc_update_bits is propagated further
-  for catching errors (previously result of snd_soc_write wasn't checked)
-* gpio_request_array is used now in machine audio driver
-* some other minor cleanup in the couple of places
-
-Dmitry Artamonow (3):
-  ASoC: Asahi Kasei AK4641 codec driver
-  ASoC: add iPAQ hx4700 machine driver
-  pxa/hx4700: add platform device and I2C info for AK4641 codec
-
- arch/arm/mach-pxa/hx4700.c              |   25 ++
- arch/arm/mach-pxa/include/mach/hx4700.h |    4 +-
- include/sound/ak4641.h                  |   26 ++
- sound/soc/codecs/Kconfig                |    4 +
- sound/soc/codecs/Makefile               |    2 +
- sound/soc/codecs/ak4641.c               |  664 +++++++++++++++++++++++++++++++
- sound/soc/codecs/ak4641.h               |   47 +++
- sound/soc/pxa/Kconfig                   |    9 +
- sound/soc/pxa/Makefile                  |    2 +
- sound/soc/pxa/hx4700.c                  |  255 ++++++++++++
- 10 files changed, 1036 insertions(+), 2 deletions(-)
- create mode 100644 include/sound/ak4641.h
- create mode 100644 sound/soc/codecs/ak4641.c
- create mode 100644 sound/soc/codecs/ak4641.h
- create mode 100644 sound/soc/pxa/hx4700.c
-
+diff --git a/arch/arm/mach-pxa/hx4700.c b/arch/arm/mach-pxa/hx4700.c
+index 6de0ad0..4a569f7 100644
+--- a/arch/arm/mach-pxa/hx4700.c
++++ b/arch/arm/mach-pxa/hx4700.c
+@@ -45,6 +45,7 @@
+ #include <mach/hx4700.h>
+ #include <mach/irda.h>
+ 
++#include <sound/ak4641.h>
+ #include <video/platform_lcd.h>
+ #include <video/w100fb.h>
+ 
+@@ -801,6 +802,28 @@ static struct i2c_board_info __initdata pi2c_board_info[] = {
+ };
+ 
+ /*
++ * Asahi Kasei AK4641 on I2C
++ */
++
++static struct ak4641_platform_data ak4641_info = {
++	.gpio_power = GPIO27_HX4700_AK4641_POWER,
++	.gpio_npdn  = GPIO109_HX4700_AK4641_nPDN,
++};
++
++static struct i2c_board_info i2c_board_info[] __initdata = {
++	{
++		I2C_BOARD_INFO("ak4641", 0x12),
++		.platform_data = &ak4641_info,
++	},
++};
++
++static struct platform_device audio = {
++	.name	= "hx4700-audio",
++	.id	= -1,
++};
++
++
++/*
+  * PCMCIA
+  */
+ 
+@@ -826,6 +849,7 @@ static struct platform_device *devices[] __initdata = {
+ 	&gpio_vbus,
+ 	&power_supply,
+ 	&strataflash,
++	&audio,
+ 	&pcmcia,
+ };
+ 
+@@ -859,6 +883,7 @@ static void __init hx4700_init(void)
+ 	pxa_set_ficp_info(&ficp_info);
+ 	pxa27x_set_i2c_power_info(NULL);
+ 	pxa_set_i2c_info(NULL);
++	i2c_register_board_info(0, ARRAY_AND_SIZE(i2c_board_info));
+ 	i2c_register_board_info(1, ARRAY_AND_SIZE(pi2c_board_info));
+ 	pxa2xx_set_spi_info(2, &pxa_ssp2_master_info);
+ 	spi_register_board_info(ARRAY_AND_SIZE(tsc2046_board_info));
+diff --git a/arch/arm/mach-pxa/include/mach/hx4700.h b/arch/arm/mach-pxa/include/mach/hx4700.h
+index 3740844..73cd586 100644
+--- a/arch/arm/mach-pxa/include/mach/hx4700.h
++++ b/arch/arm/mach-pxa/include/mach/hx4700.h
+@@ -29,7 +29,7 @@
+ #define GPIO14_HX4700_nWLAN_IRQ			14
+ #define GPIO18_HX4700_RDY			18
+ #define GPIO22_HX4700_LCD_RL			22
+-#define GPIO27_HX4700_CODEC_ON			27
++#define GPIO27_HX4700_AK4641_POWER		27
+ #define GPIO32_HX4700_RS232_ON			32
+ #define GPIO52_HX4700_CPU_nBATT_FAULT		52
+ #define GPIO58_HX4700_TSC2046_nPENIRQ		58
+@@ -67,7 +67,7 @@
+ #define GPIO105_HX4700_nIR_ON			105
+ #define GPIO106_HX4700_CPU_BT_nRESET		106
+ #define GPIO107_HX4700_SPK_nSD			107
+-#define GPIO109_HX4700_CODEC_nPDN		109
++#define GPIO109_HX4700_AK4641_nPDN		109
+ #define GPIO110_HX4700_LCD_LVDD_3V3_ON		110
+ #define GPIO111_HX4700_LCD_AVDD_3V3_ON		111
+ #define GPIO112_HX4700_LCD_N2V7_7V3_ON		112
 -- 
 1.7.4.rc3
