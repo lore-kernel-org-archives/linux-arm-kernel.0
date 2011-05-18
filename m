@@ -1,47 +1,42 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 18 May 2011 01:24:42 +0100
-Subject: device_tree binding for "amba bus"
-In-Reply-To: <64ff6672-0ce3-475b-b1c7-dc18bf2c2658@VA3EHSMHS005.ehs.local>
-References: <f9ae780a-2747-427f-826a-e0b510ca8afb@VA3EHSMHS001.ehs.local>
-	<20110517224134.GC2266@n2100.arm.linux.org.uk>
-	<64ff6672-0ce3-475b-b1c7-dc18bf2c2658@VA3EHSMHS005.ehs.local>
-Message-ID: <20110518002442.GB30588@sirena.org.uk>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 17 May 2011 20:27:15 -0400
+Subject: [PATCH] ftrace: recordmcount: avoid STT_FUNC symbols as base
+	on ARM
+In-Reply-To: <20110517225020.GD2266@n2100.arm.linux.org.uk>
+References: <1305134631-31617-1-git-send-email-rabin@rab.in>
+	<1305648629.5456.744.camel@gandalf.stny.rr.com>
+	<20110517225020.GD2266@n2100.arm.linux.org.uk>
+Message-ID: <1305678435.26849.0.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2011 at 05:05:12PM -0700, Stephen Neuendorffer wrote:
+On Tue, 2011-05-17 at 23:50 +0100, Russell King - ARM Linux wrote:
+> On Tue, May 17, 2011 at 12:10:29PM -0400, Steven Rostedt wrote:
+> > On Wed, 2011-05-11 at 22:53 +0530, Rabin Vincent wrote:
+> > > While find_secsym_ndx often finds the unamed local STT_SECTION, if a
+> > > section has only one function in it, the ARM toolchain generates the
+> > > STT_FUNC symbol before the STT_SECTION, and recordmcount finds this
+> > > instead.
+> > > 
+> > > This is problematic on ARM because in ARM ELFs, "if a [STT_FUNC] symbol
+> > > addresses a Thumb instruction, its value is the address of the
+> > > instruction with bit zero set (in a relocatable object, the section
+> > > offset with bit zero set)".  This leads to incorrect mcount addresses
+> > > being recorded.
+> > > 
+> > > Fix this by not using STT_FUNC symbols as the base on ARM.
+> > 
+> > Hi Russell,
+> > 
+> > Can you give me an Acked-by on this patch?
+> 
+> It would be better for someone who knows the ELF format for ARM and
+> its weirdnesses to ack this patch.  I'm afraid my ARM ELF format
+> knowledge was been superseded when EABI came along and introduced
+> all sorts of new stuff.
 
-Please fix your mail client to word wrap properly.  You've got lines
-alternating 80 and ~20 columns which is really hard to read.
+OK, in that case, I'll just apply the patch.
 
-> So users of this bus have to have a clock and a regulator with those
-> exact names.
-> Is it your expectation that the clock/regulator names are standardized
-> across arch/arm?
+Thanks!
 
-For both clock and regulator APIs the names are defined in terms of the
-consumer of the driver.  Even if the consumer drivers wouild open code
-this each driver would the same for all platforms using the driver.
-
-> My thinking (at least with respect to these) was that clock sources and
-> regulators could
-> be represented by nodes in the device tree and if a device required a
-> particular clock
-> source to be enabled that it would declare that in the device tree.
-
-This is pretty much what happens already, it's just that the tables
-doing the mappings are defined in code.  Many systems are already doing
-the clock management as part of their runtime PM infrastructure for the
-basic clocks required to keep things operational and there's a
-generalisation of this just going into the core runtime PM code at the
-minute.
-
-> This could be handled automatically by a more general abstraction of the
-> clock dependencies
-> of an arbitrary driver.
-
-OTOH some clocks will need to be actively managed by drivers at runtime
-- they're not just basic "turn it on when I'm running" clocks.
-
-This is all pretty much orthogonal to device tree, I don't understand
-why you feel that it's related.
+-- Steve
