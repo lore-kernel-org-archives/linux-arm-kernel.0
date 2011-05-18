@@ -1,67 +1,36 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 18 May 2011 17:57:48 +0900
-Subject: [PATCH 3/7] [media] s5p-fimc: Remove to support fimc for S5PC100
-In-Reply-To: <4DD265C3.9040101@samsung.com>
-References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<1305162674-25860-4-git-send-email-kgene.kim@samsung.com>
-	<4DCBA717.3090307@samsung.com>
-	<002001cc1399$02964bb0$07c2e310$%kim@samsung.com>
-	<4DD265C3.9040101@samsung.com>
-Message-ID: <001601cc1539$aaae2380$000a6a80$%kim@samsung.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 18 May 2011 12:05:08 +0300
+Subject: [RESEND PATCH 1/4] omap: igep0020: name refactoring for future
+	merge with IGEP3
+In-Reply-To: <20110517103352.GB27250@atomide.com>
+References: <cover.1305235542.git.mike@compulab.co.il>	<d6dc9e334c729523f25993b7d610808e537ca74c.1305235542.git.mike@compulab.co.il>	<BANLkTikJaN=Q2RgrA7Hz-ye2BCOjNK42zA@mail.gmail.com>	<20110517075345.GQ5323@atomide.com>	<BANLkTikCgWxQoiYfS4O4+9jYCVBmcMAEOQ@mail.gmail.com>
+	<20110517103352.GB27250@atomide.com>
+Message-ID: <4DD38BC4.6080905@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sylwester Nawrocki wrote:
-> 
-> On 05/16/2011 09:15 AM, Kukjin Kim wrote:
-> > Sylwester Nawrocki wrote:
-> >
-> >> Shouldn't there be some deprecation period for whole s5pc100 support
-> > removal ?
-> >
-> > This is that. But I know, there is no time...
-> >
-> >> It looks a bit rude to me that suddenly whole support for the SoC is
-> > vanished.
-> >
-> > Hmm...what did you think about my previous comments: 'removing some
-> > "mach-s5pxxxx"s'?
-> 
-> I would expect one kernel release period of so notice for such a change.
-> But it doesn't have to be true in this specific case.
-> 
-> >
-> >> I know at least one active user of mainline FIMC driver @ s5pc100.
-> >
-> > Do you _really_ want to keep it in later mainline?
-> 
-> I don't personally have interest in maintaining this driver for s5pc100.
-> It just adds unnecessary complexity to my work and in fact I have limited
-> possibilities now to test the driver on s5pc100.
-> But if there are users and it really doesn't cost much to keep the support
-> for s5pc100 why bother to remove it?  Just to get rid of one mach-*
-directory ?
-> 
-> >
-> > I was not sure we should keep continually 6442 and C100 in mainline when
-I
-> > decided to removing 'mach-s5pxxxx'.
-> 
-> I really don't care about 6442, but what's the problem with s5pc100 ?
-> Is it being discontinued ? Or there is little users of it ?
-> 
-> I would much more like to see attempts to consolidate the code rather than
-> simply removing it.
-> 
-Hi Sylwester,
+On 05/17/11 13:33, Tony Lindgren wrote:
 
-Thanks for your opinion :)
-Please refer to my reply on this thread.
+> * Enric Balletb? i Serra <eballetbo@gmail.com> [110517 00:53]:
+>> Hi,
+>>
+>> 2011/5/17 Tony Lindgren <tony@atomide.com>:
+>>> * Enric Balletb? i Serra <eballetbo@gmail.com> [110516 10:11]:
+>>>> Hi Mike,
+>>>>
+>>>> The only comment I wanted to do is maybe I prefer rename the
+>>>> board-igep0020 to board-igep00x0 to be more generic. Apart from this
+>>>> these patch series looks good for me and has my ack. Thanks.
+>>> I suggest we do the rename separately later on. Otherwise it
+>>> easily gets classified as "crazy churn" type of patch, so best
+>>> to stick to just code coalescing and fixes for this merge window.
+>> Ok, so Mike you've my ack, thanks
+> Thanks, applying these to devel-cleanup for the upcoming merge
+> window.
 
-Thanks.
+You mean for-next? Or you've just forgot to update the devel-cleanup?
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+-- 
+Regards,
+Igor.
