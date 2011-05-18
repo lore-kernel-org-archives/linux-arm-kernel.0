@@ -1,30 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 May 2011 08:56:25 +0100
-Subject: [PATCH 04/19] ARM: omap1: convert to using readl/writel
-	instead of volatile struct
-In-Reply-To: <BANLkTinG0BmBJZTWr-FrBzANg-MbdsghkA@mail.gmail.com>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-	<E1QM1ZG-0003DV-PA@rmk-PC.arm.linux.org.uk>
-	<BANLkTinG0BmBJZTWr-FrBzANg-MbdsghkA@mail.gmail.com>
-Message-ID: <20110518075625.GA12302@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 18 May 2011 17:05:12 +0900
+Subject: [PATCH 0/3] ARM: Removing ARCH_S5P6442
+In-Reply-To: <20110517183518.GB933@localhost.ucw.cz>
+References: <1305162489-25499-1-git-send-email-kgene.kim@samsung.com>
+	<20110517183518.GB933@localhost.ucw.cz>
+Message-ID: <000e01cc1532$51ee1f90$f5ca5eb0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2011 at 10:59:28PM +0100, Catalin Marinas wrote:
-> On 16 May 2011 18:26, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > --- a/arch/arm/mach-omap1/time.c
-> > +++ b/arch/arm/mach-omap1/time.c
-> ...
-> > ?static inline unsigned long notrace omap_mpu_timer_read(int nr)
-> > ?{
-> > - ? ? ? volatile omap_mpu_timer_regs_t* timer = omap_mpu_timer_base(nr);
-> > - ? ? ? return timer->read_tim;
-> > + ? ? ? omap_mpu_timer_regs_t __iomem *timer = omap_mpu_timer_base(nr);
-> > + ? ? ? return readl(&timer->read_tim);
-> > ?}
+Pavel Machek wrote:
 > 
-> We should start using the *_relaxed() accessors a bit more to avoid
-> the barriers overhead in the standard I/O accessors.
+> On Thu 2011-05-12 10:08:06, Kukjin Kim wrote:
+> > This patch remvoes mach-s5p6442 directory for ARCH_S5P6442 in arch/arm.
+> 
+> Why remove it? No users? Broken? ...?
+> 
+Hmm...do you want to keep it in upcoming mainline?
 
-I thought about that, but when you look at patch 6, it'd change this.
-I wanted to use the same accessor here as it ends up with in patch 6.
+Actually, it works fine current mainline on smdk6442. Of course, every
+features/devices is not supported yet.
+
+I'm not sure how many developers/companies use it current mainline now but
+at least as I know, no one would do it soon.
+
+S5P6442 and S5PC100 were selected when I thought about removing
+mach-s5pxxxx.
+As you know, I got concerns about C100, but 6442 and I agree with their
+opinions.
+
+If S5P6442 is really required later, I think, we can implement it with other
+S5P64XX :)
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
