@@ -1,21 +1,57 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 18 May 2011 16:06:33 +0400
-Subject: PXA: Handling of UDC with no VBUS pins
-Message-ID: <20110518120633.GA9860@doriath.ww600.siemens.net>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 18 May 2011 17:41:56 +0530
+Subject: [PATCH 2/9] davinci: sram: ioremap the davinci_soc_info
+	specified sram regions
+In-Reply-To: <20110518045140.GE18699@game.jcrosoft.org>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024CF13ED4@dbde02.ent.ti.com>
+	<cover.1305668470.git.bengardiner@nanometrics.ca>
+	<80c0c2ff5a39baf6140c08460c2691b178c038c0.1305668470.git.bengardiner@nanometrics.ca>
+	<20110518045140.GE18699@game.jcrosoft.org>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CFDC9E6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello, colleagues,
+Hi Russell,
 
-There are several PXA platforms which on the UDC tranceiver part have
-a pullup pin to support connect/disconnect but no VBUS pin to detect
-host presense. Currently such platforms are supported through udc driver
-itself. I'd like to clean that part of pxa25x_udc/pxa27x_udc drivers and
-to move gpio pullup handling to tranceiver.
+On Wed, May 18, 2011 at 10:21:40, Jean-Christophe PLAGNIOL-VILLARD wrote:
 
-My question is what would be better: to extend gpio-vbus to work w/o
-VBUS pin or to write new transceiver driver only handling gpio-pullup?
+> On 17:41 Tue 17 May     , Ben Gardiner wrote:
 
--- 
-With best wishes
-Dmitry
+> > diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
+> > index 219d4c5..96026df 100644
+> > --- a/arch/arm/mach-davinci/sram.c
+> > +++ b/arch/arm/mach-davinci/sram.c
+> > @@ -8,6 +8,7 @@
+> >   * the Free Software Foundation; either version 2 of the License, or
+> >   * (at your option) any later version.
+> >   */
+> > +#include <linux/io.h>
+> >  #include <linux/module.h>
+> >  #include <linux/init.h>
+> >  #include <asm/pv-pool.h>
+> > @@ -26,16 +27,23 @@ EXPORT_SYMBOL_GPL(davinci_pv_pool);
+> >   */
+> >  static int __init sram_init(void)
+> >  {
+> > +	void *addr;
+> >  	unsigned len = davinci_soc_info.sram_len;
+> >  	int status = 0;
+> >  
+> >  	if (len) {
+> >  		len = min_t(unsigned, len, SRAM_SIZE);
+> > -		davinci_pv_pool = pv_pool_create((void *)SRAM_VIRT,
+> > +		addr = ioremap(davinci_soc_info.sram_phys, len);
+> > +		if (!addr)
+> > +			return -EIO;
+> > +
+> > +		davinci_pv_pool = pv_pool_create(addr,
+> >  					davinci_soc_info.sram_phys, len,
+> >  					ilog2(SRAM_GRANULARITY));
+> please use the gennalloc directly as discuss with Andrew and Russell my patch
+> will present in the .40
+
+With Jean-Christophe's patch getting merged, would you be dropping
+your PV pool patch?
+
+Thanks,
+Sekhar
