@@ -1,39 +1,128 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Wed, 18 May 2011 18:50:07 +0200
-Subject: Question on ARM inline assembly - stackframes, sp/fp usage,
-	__naked
-In-Reply-To: <alpine.DEB.2.00.1105181505080.2374@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1105181505080.2374@localhost6.localdomain6>
-Message-ID: <19923.63679.305921.452962@pilspetsen.it.uu.se>
+From: mgorman@suse.de (Mel Gorman)
+Date: Wed, 18 May 2011 17:59:10 +0100
+Subject: [PATCH] ARM: sparsemem: allow pfn_valid to be overridden when
+	using SPARSEMEM
+In-Reply-To: <1305734639-6561-1-git-send-email-will.deacon@arm.com>
+References: <1305734639-6561-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20110518165910.GS5279@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frank Hofmann writes:
- > with the work on the hibernation support code, I've managed to make it all 
- > C-with-inline-asm. This happens to work fine on OMAP3, but there's an 
- > issue when I build it for Samsung 64xx. It's about this code:
- > 
- > 
- > int __naked swsusp_arch_resume(void)
- > {
- >  	register struct pbe *pbe;
- >  	register void *sp asm("sp") = swsusp_resume_stack + PAGE_SIZE - 8;
- >  	register void *saved_ctx asm ("r0") = ctx;
- > 
- >  	__asm__ __volatile__("" : "+sp"(sp));		/* don't optimize away ! */
-...
- > This has the special requirement to run on a separate stack, because the 
- > copy loop will blot over whatever there is. Clobbering everything is part 
- > of the design/intent.
-...
- > I am wondering if there's a way to convince gcc to do the right thing 
- > here, __naked notwithstanding.
- > 
- > Is the use of a naked "bounce function" for this specific purpose (switch 
- > the stackpointer) acceptable, and guaranteed to create the correct code ?
- > 
- > 
- > It'd be nice not having to dump this piece into assembly...
+On Wed, May 18, 2011 at 05:03:59PM +0100, Will Deacon wrote:
+> In commit eb33575c ("[ARM] Double check memmap is actually valid with a
+> memmap has unexpected holes V2"), a new function, memmap_valid_within,
+> was introduced to mmzone.h so that holes in the memmap which pass
+> pfn_valid in SPARSEMEM configurations can be detected and avoided.
+> 
+> The fix to this problem checks that the pfn <-> page linkages are
+> correct by calculating the page for the pfn and then checking that
+> page_to_pfn on that page returns the original pfn. Unfortunately, in
+> SPARSEMEM configurations, this results in reading from the page flags to
+> determine the correct section. Since the memmap here has been freed,
+> junk is read from memory and the check is no longer robust.
+> 
+> In the best case, reading from /proc/pagetypeinfo will give you the
+> wrong answer. In the worst case, you get SEGVs, Kernel OOPses and hung
+> CPUs.
+> 
+> This patch allows architectures to provide their own pfn_valid function
+> instead of using the default implementation used by sparsemem. The
+> architecture-specific version is aware of the memmap state and will
+> return false when passed a pfn for a freed page within a valid section.
+> 
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Mel Gorman <mgorman@suse.de>
+> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Just write the stack switching fragment in proper assembly, and
-keep both sides of it in normal C.  End of problem.
+I don't have an ARM machine to test on and I'm not particularly
+sensitive to the requirements of ARM so I'm not the best reviewer. If
+this passes tests, I see little problem with it other than the
+architecture-specific pfn_valid is slower than the sparsemem equivalent
+and the cache footprint is probably higher as memblock_is_memory
+is searching a list of blocks. If this problem is exclusive to
+reading /proc/pagetypeinfo, you might want to consider only using
+memblock_is_memory in that case. Otherwise, functionally it looks like
+it should work.
+
+> ---
+>  arch/arm/Kconfig            |    3 +++
+>  arch/arm/include/asm/page.h |    2 +-
+>  arch/arm/mm/init.c          |    4 +++-
+>  include/linux/mmzone.h      |    2 ++
+>  4 files changed, 9 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 377a7a5..d6cfc9c 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1520,6 +1520,9 @@ config ARCH_SPARSEMEM_DEFAULT
+>  config ARCH_SELECT_MEMORY_MODEL
+>  	def_bool ARCH_SPARSEMEM_ENABLE
+>  
+> +config ARCH_PROVIDES_PFN_VALID
+> +	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
+> +
+>  config HIGHMEM
+>  	bool "High Memory Support (EXPERIMENTAL)"
+>  	depends on MMU && EXPERIMENTAL
+> diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+> index f51a695..8702233 100644
+> --- a/arch/arm/include/asm/page.h
+> +++ b/arch/arm/include/asm/page.h
+> @@ -197,7 +197,7 @@ typedef unsigned long pgprot_t;
+>  
+>  typedef struct page *pgtable_t;
+>  
+> -#ifndef CONFIG_SPARSEMEM
+> +#ifdef CONFIG_ARCH_PROVIDES_PFN_VALID
+>  extern int pfn_valid(unsigned long);
+>  #endif
+>  
+> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> index e591513..d425b36 100644
+> --- a/arch/arm/mm/init.c
+> +++ b/arch/arm/mm/init.c
+> @@ -252,13 +252,15 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
+>  	free_area_init_node(0, zone_size, min, zhole_size);
+>  }
+>  
+> -#ifndef CONFIG_SPARSEMEM
+> +#ifdef CONFIG_ARCH_PROVIDES_PFN_VALID
+>  int pfn_valid(unsigned long pfn)
+>  {
+>  	return memblock_is_memory(pfn << PAGE_SHIFT);
+>  }
+>  EXPORT_SYMBOL(pfn_valid);
+> +#endif
+>  
+> +#ifndef CONFIG_SPARSEMEM
+>  static void arm_memory_present(void)
+>  {
+>  }
+> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+> index e56f835..72225dd 100644
+> --- a/include/linux/mmzone.h
+> +++ b/include/linux/mmzone.h
+> @@ -1053,12 +1053,14 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
+>  	return __nr_to_section(pfn_to_section_nr(pfn));
+>  }
+>  
+> +#ifndef CONFIG_ARCH_PROVIDES_PFN_VALID
+>  static inline int pfn_valid(unsigned long pfn)
+>  {
+>  	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
+>  		return 0;
+>  	return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
+>  }
+> +#endif
+>  
+>  static inline int pfn_present(unsigned long pfn)
+>  {
+> -- 
+> 1.7.0.4
+> 
+
+-- 
+Mel Gorman
+SUSE Labs
