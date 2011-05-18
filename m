@@ -1,36 +1,121 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 18 May 2011 12:05:08 +0300
-Subject: [RESEND PATCH 1/4] omap: igep0020: name refactoring for future
-	merge with IGEP3
-In-Reply-To: <20110517103352.GB27250@atomide.com>
-References: <cover.1305235542.git.mike@compulab.co.il>	<d6dc9e334c729523f25993b7d610808e537ca74c.1305235542.git.mike@compulab.co.il>	<BANLkTikJaN=Q2RgrA7Hz-ye2BCOjNK42zA@mail.gmail.com>	<20110517075345.GQ5323@atomide.com>	<BANLkTikCgWxQoiYfS4O4+9jYCVBmcMAEOQ@mail.gmail.com>
-	<20110517103352.GB27250@atomide.com>
-Message-ID: <4DD38BC4.6080905@compulab.co.il>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 18 May 2011 11:10:03 +0200
+Subject: [PATCH 1/2] mt9p031: Add mt9p031 sensor driver.
+In-Reply-To: <201105171334.01607.laurent.pinchart@ideasonboard.com>
+References: <1305624528-5595-1-git-send-email-javier.martin@vista-silicon.com>
+	<1305624528-5595-2-git-send-email-javier.martin@vista-silicon.com>
+	<201105171334.01607.laurent.pinchart@ideasonboard.com>
+Message-ID: <BANLkTinArWj1VsX8_N7Knjyzw8NymQNYkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/17/11 13:33, Tony Lindgren wrote:
+Hi Laurent,
+I've already fixed almost every issue you pointed out.
+However, I still have got some doubts that I hope you can clarify.
 
-> * Enric Balletb? i Serra <eballetbo@gmail.com> [110517 00:53]:
->> Hi,
+On 17 May 2011 13:33, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Javier,
+>
+> Thanks for the patch.
+>
+> On Tuesday 17 May 2011 11:28:47 Javier Martin wrote:
+>> It has been tested in beagleboard xM, using LI-5M03 module.
 >>
->> 2011/5/17 Tony Lindgren <tony@atomide.com>:
->>> * Enric Balletb? i Serra <eballetbo@gmail.com> [110516 10:11]:
->>>> Hi Mike,
->>>>
->>>> The only comment I wanted to do is maybe I prefer rename the
->>>> board-igep0020 to board-igep00x0 to be more generic. Apart from this
->>>> these patch series looks good for me and has my ack. Thanks.
->>> I suggest we do the rename separately later on. Otherwise it
->>> easily gets classified as "crazy churn" type of patch, so best
->>> to stick to just code coalescing and fixes for this merge window.
->> Ok, so Mike you've my ack, thanks
-> Thanks, applying these to devel-cleanup for the upcoming merge
-> window.
+>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>>
+>> +
+>> +static int mt9p031_power_on(struct mt9p031 *mt9p031)
+>> +{
+>> +     int ret;
+>> +
+>> +     if (mt9p031->pdata->set_xclk)
+>> +             mt9p031->pdata->set_xclk(&mt9p031->subdev, 54000000);
+>> +     /* turn on VDD_IO */
+>> +     ret = regulator_enable(mt9p031->reg_2v8);
+>> +     if (ret) {
+>> +             pr_err("Failed to enable 2.8v regulator: %d\n", ret);
+>> +             return -1;
+>> +     }
+>
+>I would enable the regulator first. As a general rule, chips should be powered
+>up before their I/Os are actively driven.
+>
+>You need to restore registers here, otherwise all controls set by the user
+>will not be applied to the device.
 
-You mean for-next? Or you've just forgot to update the devel-cleanup?
+It's my mistake. This driver uses two regulators: 1,8 and 2,8 V
+respectively. 2,8V regulator powers analog part and I/O whereas 1,8V
+one powers the core. What I failed to do was keeping 1,8V regulator
+always powered on, so that register configuration was not lost, and
+power 2,8V regulator on and off as needed since it does not affect
+register values. However, I messed it all up.
 
+Ideally I would have to power 1,8V regulator on and off too. However,
+as you wisely pointed out, registers should be restored in that case.
+How am I supposed to keep track of register values? Are there any
+helper functions I can use for that purpose or must I create a custom
+register cache? Do you know any driver that uses this technique?
+
+> [snip]
+>> +static int mt9p031_set_params(struct i2c_client *client,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? struct v4l2_rect *rect, u16 xskip, u16 yskip)
+>
+> set_params should apply the parameters, not change them. They should have
+> already been validated by the callers.
+
+"mt9p031_set_params()" function is used by "mt9p031_set_crop()" and
+"mt9p031_set_format()", as you have correctly stated, these functions
+shouldn' apply parameters but only change them.
+I've checked mt9v032 driver and it is as you said. The question is,
+where should these parameters get applied then?
+
+>> +static int mt9p031_registered(struct v4l2_subdev *sd)
+>> +{
+>> + ? ? struct mt9p031 *mt9p031;
+>> + ? ? mt9p031 = container_of(sd, struct mt9p031, subdev);
+>> +
+>> + ? ? mt9p031_power_off(mt9p031);
+>
+> What's that for ?
+>
+>> + ? ? return 0;
+>> +}
+
+Since "mt9p031_power_off()" and "mt9p031_power_on()" functions
+disable/enable the 2,8V regulator which powers I/O, it must be powered
+on during probe and after registering, it can be safely powered off.
+
+>
+> You have a set_xclk callback to board code, so I assume the chip can be driven
+> by one of the OMAP3 ISP XCLK signals. To call back to the OMAP3 ISP from board
+> code, you need to get hold of the OMAP3 ISP device pointer. Your next patch
+> exports omap3isp_device, but I'm not sure that's the way to go. One option is
+>
+> struct isp_device *isp = v4l2_dev_to_isp_device(subdev->v4l2_dev);
+>
+> but that requires the subdev to be registered before the function can be
+> called. In that case you would need to move the probe code to the registered
+> subdev internal function.
+>
+
+Yes, I tried using that function but it didn't work because subdev
+hadn't been registeret yet.
+
+> A clean solution is needed in the long run, preferably not involving board
+> code at all. It would be nice if the OMAP3 ISP driver could export XCLKA/XCLKB
+> as generic clock objects.
+
+So, what should I do in order to submit the driver to mainline?
+ Do you want me to move the probe code to registered callback?
+
+Thank you.
 
 -- 
-Regards,
-Igor.
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
