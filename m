@@ -1,21 +1,21 @@
-From: pawel.moll@arm.com (Pawel Moll)
-Date: Wed, 18 May 2011 13:06:01 +0100
-Subject: [PATCH] arm: Add Cortex A5 proc_info
-In-Reply-To: <20110518105308.GA2544@arm.com>
-References: <1305650956-20997-1-git-send-email-pawel.moll@arm.com>
-	<1305712038.17656.41.camel@hornet.cambridge.arm.com>
-	<20110518105308.GA2544@arm.com>
-Message-ID: <1305720361.17656.44.camel@hornet.cambridge.arm.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 18 May 2011 16:06:33 +0400
+Subject: PXA: Handling of UDC with no VBUS pins
+Message-ID: <20110518120633.GA9860@doriath.ww600.siemens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> The simplest solution might be to use a macro to avoid duplication in
-> the source.  This would still create diffstat noise, but it's not
-> actually fragmentary, so it may be considered OK.
+Hello, colleagues,
 
-Yeah, I like this idea. Macro would do here probably, especially that it
-could be used in future by A15 proc_info as well. Will give it a try.
+There are several PXA platforms which on the UDC tranceiver part have
+a pullup pin to support connect/disconnect but no VBUS pin to detect
+host presense. Currently such platforms are supported through udc driver
+itself. I'd like to clean that part of pxa25x_udc/pxa27x_udc drivers and
+to move gpio pullup handling to tranceiver.
 
-Cheers!
+My question is what would be better: to extend gpio-vbus to work w/o
+VBUS pin or to write new transceiver driver only handling gpio-pullup?
 
-Pawe?
+-- 
+With best wishes
+Dmitry
