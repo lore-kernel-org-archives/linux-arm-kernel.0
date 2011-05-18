@@ -1,19 +1,46 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 May 2011 00:25:46 +0200
-Subject: [PATCH 0/7] Move Qualcomm gpio drivers into drivers dir
-In-Reply-To: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
-References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <BANLkTik9DuMG0veSiakyJoW+bv7gDgrCiA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 18 May 2011 18:27:56 -0400 (EDT)
+Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
+	in thumb mode.
+In-Reply-To: <BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
+References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
+	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
+	<20110514100232.GC30539@n2100.arm.linux.org.uk>
+	<20110516121657.GA7715@arm.com>
+	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
+	<20110516144311.GC7715@arm.com>
+	<BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1105181803090.14430@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/18 David Brown <davidb@codeaurora.org>:
+On Wed, 18 May 2011, Vadim Bendebury (??) wrote:
 
-> This patch series moves the Qualcomm MSM gpio device drivers into the
-> drivers/gpio directory.
+> On Mon, May 16, 2011 at 7:43 AM, Dave Martin <dave.martin@linaro.org> wrote:
+> >On Mon, May 16, 2011 at 10:32:16AM -0400, Nicolas Pitre wrote:
+> >> I think this can be useful to know how the kernel was compiled for bug
+> >> tracking purposes, just like we record the Git commit ID of the checked
+> >> out source tree, the gcc version, the build date, etc. ?Which pretty
+> >> much indicates that the thumbness of the kernel should probably be
+> >> stored in the kernel banner not the platform name.
+> >
+> > That seems a reasonable approach to me.
+> >
+> 
+> guys, thank you for your comments. Indeed, this is meant to be just a
+> convenience to allow to quickly tell what kind of kernel a system is
+> running, comes handy when there are many systems around with
+> differently compiled kernels.
+> 
+> So, would it be acceptable if I move this information into the kernel
+> banner (namely, add it to the machine hardware name part of the output
+> included in 'uname -m' and 'uname -a')?
 
-Looks like a very clean cut and simple drivers that judt do plain GPIO.
-FWIW Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Yes, I think that would be the most sensible place.  Looking at 
+scripts/mkcompile_h which is used to create include/generated/compile.h, 
+it appears that $CONFIG_FLAGS would be the most appropriate place for 
+this, however it is not currently set up to allow architecture specific 
+flags to be passed in.
 
-Yours,
-Linus Walleij
+
+Nicolas
