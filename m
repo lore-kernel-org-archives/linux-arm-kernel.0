@@ -1,42 +1,41 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 17 May 2011 20:27:15 -0400
-Subject: [PATCH] ftrace: recordmcount: avoid STT_FUNC symbols as base
-	on ARM
-In-Reply-To: <20110517225020.GD2266@n2100.arm.linux.org.uk>
-References: <1305134631-31617-1-git-send-email-rabin@rab.in>
-	<1305648629.5456.744.camel@gandalf.stny.rr.com>
-	<20110517225020.GD2266@n2100.arm.linux.org.uk>
-Message-ID: <1305678435.26849.0.camel@gandalf.stny.rr.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 18 May 2011 10:37:02 +0800
+Subject: [PATCH 0/6] drop IRQF_DISABLED from RTC, then convert stmp-rtc
+	to mach-mxs
+In-Reply-To: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
+References: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <20110518023701.GA25710@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-05-17 at 23:50 +0100, Russell King - ARM Linux wrote:
-> On Tue, May 17, 2011 at 12:10:29PM -0400, Steven Rostedt wrote:
-> > On Wed, 2011-05-11 at 22:53 +0530, Rabin Vincent wrote:
-> > > While find_secsym_ndx often finds the unamed local STT_SECTION, if a
-> > > section has only one function in it, the ARM toolchain generates the
-> > > STT_FUNC symbol before the STT_SECTION, and recordmcount finds this
-> > > instead.
-> > > 
-> > > This is problematic on ARM because in ARM ELFs, "if a [STT_FUNC] symbol
-> > > addresses a Thumb instruction, its value is the address of the
-> > > instruction with bit zero set (in a relocatable object, the section
-> > > offset with bit zero set)".  This leads to incorrect mcount addresses
-> > > being recorded.
-> > > 
-> > > Fix this by not using STT_FUNC symbols as the base on ARM.
-> > 
-> > Hi Russell,
-> > 
-> > Can you give me an Acked-by on this patch?
+On Thu, May 05, 2011 at 12:22:15PM +0200, Wolfram Sang wrote:
+> First, cleanup RTC to remove the deprecated IRQF_DISABLED which is a
+> nop these days.
 > 
-> It would be better for someone who knows the ELF format for ARM and
-> its weirdnesses to ack this patch.  I'm afraid my ARM ELF format
-> knowledge was been superseded when EABI came along and introduced
-> all sorts of new stuff.
+> Then, because plat-stmp is going to be removed and merged with mxs, this
+> patch series will convert the stmp-rtc driver for usage with mach-mxs.
+> Quite some platform-specific dependencies have been removed, so the
+> driver should be better reusable.
+> 
+> The driver has successfully been tested on an i.MX28-board and passed the RTC
+> test program.
+> 
+> Regards,
+> 
+>    Wolfram
+> 
+> Wolfram Sang (6):
+>   rtc: remove IRQF_DISABLED
+>   rtc: stmp3xxx: get rid of platform-specific register include
+>   rtc: stmp3xxx: port stmp-functions to mxs-equivalents
+>   rtc: stmp3xxx: fix crash on boot
+>   rtc: stmp3xxx: get rid of mach-specific accessors
+>   rtc: stmp3xxx: remove UIE handlers
+> 
+On i.MX23 and i.MX28
 
-OK, in that case, I'll just apply the patch.
+Tested-by: Shawn Guo <shawn.guo@freescale.com>
 
-Thanks!
-
--- Steve
+-- 
+Regards,
+Shawn
