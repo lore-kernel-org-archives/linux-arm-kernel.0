@@ -1,109 +1,82 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 May 2011 17:03:59 +0100
-Subject: [PATCH] ARM: sparsemem: allow pfn_valid to be overridden when using
-	SPARSEMEM
-Message-ID: <1305734639-6561-1-git-send-email-will.deacon@arm.com>
+Date: Wed, 18 May 2011 17:05:11 +0100
+Subject: [PATCH] ARM: sparsemem: fix highmem detection when using SPARSEMEM
+Message-ID: <1305734711-6710-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit eb33575c ("[ARM] Double check memmap is actually valid with a
-memmap has unexpected holes V2"), a new function, memmap_valid_within,
-was introduced to mmzone.h so that holes in the memmap which pass
-pfn_valid in SPARSEMEM configurations can be detected and avoided.
+sanity_check_meminfo walks over the registered memory banks and attempts
+to split banks across lowmem and highmem when they would otherwise
+overlap with the vmalloc space.
 
-The fix to this problem checks that the pfn <-> page linkages are
-correct by calculating the page for the pfn and then checking that
-page_to_pfn on that page returns the original pfn. Unfortunately, in
-SPARSEMEM configurations, this results in reading from the page flags to
-determine the correct section. Since the memmap here has been freed,
-junk is read from memory and the check is no longer robust.
+When SPARSEMEM is used, there are two potential problems that occur
+when the virtual address of the start of a bank is equal to vmalloc_min.
 
-In the best case, reading from /proc/pagetypeinfo will give you the
-wrong answer. In the worst case, you get SEGVs, Kernel OOPses and hung
-CPUs.
+ 1.) The end of lowmem is calculated as __pa(vmalloc_min - 1) + 1.
+     In the above scenario, this will give the end address of the
+     previous bank, rather than the actual bank we are interested in.
+     This value is later used as the memblock limit and artificially
+     restricts the total amount of available memory.
 
-This patch allows architectures to provide their own pfn_valid function
-instead of using the default implementation used by sparsemem. The
-architecture-specific version is aware of the memmap state and will
-return false when passed a pfn for a freed page within a valid section.
+ 2.) The checks to determine whether or not a bank belongs to highmem
+     or not only check if __va(bank->start) is greater or less than
+     vmalloc_min. In the case that it is equal, the bank is incorrectly
+     treated as lowmem, which hoses the vmalloc area.
+
+This patch fixes these two problems by checking whether the virtual
+start address of a bank is >= vmalloc_min and then calculating
+lowmem_end by finding the virtual end address of the highest lowmem
+bank.
 
 Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Mel Gorman <mgorman@suse.de>
 Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig            |    3 +++
- arch/arm/include/asm/page.h |    2 +-
- arch/arm/mm/init.c          |    4 +++-
- include/linux/mmzone.h      |    2 ++
- 4 files changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 377a7a5..d6cfc9c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1520,6 +1520,9 @@ config ARCH_SPARSEMEM_DEFAULT
- config ARCH_SELECT_MEMORY_MODEL
- 	def_bool ARCH_SPARSEMEM_ENABLE
+Russell - I hit this problem on a RealView-PBX board when trying to use
+the full 1GB of memory with a 3:1 split configuration.
+
+ arch/arm/mm/mmu.c |    9 +++++----
+ 1 files changed, 5 insertions(+), 4 deletions(-)
+
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 6cf76b3..9d8f0c8 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -765,15 +765,12 @@ static void __init sanity_check_meminfo(void)
+ {
+ 	int i, j, highmem = 0;
  
-+config ARCH_PROVIDES_PFN_VALID
-+	def_bool ARCH_HAS_HOLES_MEMORYMODEL || !SPARSEMEM
-+
- config HIGHMEM
- 	bool "High Memory Support (EXPERIMENTAL)"
- 	depends on MMU && EXPERIMENTAL
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index f51a695..8702233 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -197,7 +197,7 @@ typedef unsigned long pgprot_t;
+-	lowmem_limit = __pa(vmalloc_min - 1) + 1;
+-	memblock_set_current_limit(lowmem_limit);
+-
+ 	for (i = 0, j = 0; i < meminfo.nr_banks; i++) {
+ 		struct membank *bank = &meminfo.bank[j];
+ 		*bank = meminfo.bank[i];
  
- typedef struct page *pgtable_t;
+ #ifdef CONFIG_HIGHMEM
+-		if (__va(bank->start) > vmalloc_min ||
++		if (__va(bank->start) >= vmalloc_min ||
+ 		    __va(bank->start) < (void *)PAGE_OFFSET)
+ 			highmem = 1;
  
--#ifndef CONFIG_SPARSEMEM
-+#ifdef CONFIG_ARCH_PROVIDES_PFN_VALID
- extern int pfn_valid(unsigned long);
+@@ -831,6 +828,9 @@ static void __init sanity_check_meminfo(void)
+ 			bank->size = newsize;
+ 		}
  #endif
- 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index e591513..d425b36 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -252,13 +252,15 @@ static void __init arm_bootmem_free(unsigned long min, unsigned long max_low,
- 	free_area_init_node(0, zone_size, min, zhole_size);
++		if (!bank->highmem && bank->start + bank->size > lowmem_limit)
++			lowmem_limit = bank->start + bank->size;
++
+ 		j++;
+ 	}
+ #ifdef CONFIG_HIGHMEM
+@@ -854,6 +854,7 @@ static void __init sanity_check_meminfo(void)
+ 	}
+ #endif
+ 	meminfo.nr_banks = j;
++	memblock_set_current_limit(lowmem_limit);
  }
  
--#ifndef CONFIG_SPARSEMEM
-+#ifdef CONFIG_ARCH_PROVIDES_PFN_VALID
- int pfn_valid(unsigned long pfn)
- {
- 	return memblock_is_memory(pfn << PAGE_SHIFT);
- }
- EXPORT_SYMBOL(pfn_valid);
-+#endif
- 
-+#ifndef CONFIG_SPARSEMEM
- static void arm_memory_present(void)
- {
- }
-diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-index e56f835..72225dd 100644
---- a/include/linux/mmzone.h
-+++ b/include/linux/mmzone.h
-@@ -1053,12 +1053,14 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
- 	return __nr_to_section(pfn_to_section_nr(pfn));
- }
- 
-+#ifndef CONFIG_ARCH_PROVIDES_PFN_VALID
- static inline int pfn_valid(unsigned long pfn)
- {
- 	if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
- 		return 0;
- 	return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
- }
-+#endif
- 
- static inline int pfn_present(unsigned long pfn)
- {
+ static inline void prepare_page_table(void)
 -- 
 1.7.0.4
