@@ -1,41 +1,43 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 18 May 2011 10:37:02 +0800
-Subject: [PATCH 0/6] drop IRQF_DISABLED from RTC, then convert stmp-rtc
-	to mach-mxs
-In-Reply-To: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
-References: <1304590941-11813-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <20110518023701.GA25710@S2100-06.ap.freescale.net>
+From: tom.leiming@gmail.com (tom.leiming at gmail.com)
+Date: Wed, 18 May 2011 10:34:40 +0800
+Subject: [PATCH] ARM: fix mistaken dependency for CPU_HAS_PMU
+Message-ID: <1305686080-13182-1-git-send-email-tom.leiming@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 05, 2011 at 12:22:15PM +0200, Wolfram Sang wrote:
-> First, cleanup RTC to remove the deprecated IRQF_DISABLED which is a
-> nop these days.
-> 
-> Then, because plat-stmp is going to be removed and merged with mxs, this
-> patch series will convert the stmp-rtc driver for usage with mach-mxs.
-> Quite some platform-specific dependencies have been removed, so the
-> driver should be better reusable.
-> 
-> The driver has successfully been tested on an i.MX28-board and passed the RTC
-> test program.
-> 
-> Regards,
-> 
->    Wolfram
-> 
-> Wolfram Sang (6):
->   rtc: remove IRQF_DISABLED
->   rtc: stmp3xxx: get rid of platform-specific register include
->   rtc: stmp3xxx: port stmp-functions to mxs-equivalents
->   rtc: stmp3xxx: fix crash on boot
->   rtc: stmp3xxx: get rid of mach-specific accessors
->   rtc: stmp3xxx: remove UIE handlers
-> 
-On i.MX23 and i.MX28
+From: Ming Lei <tom.leiming@gmail.com>
 
-Tested-by: Shawn Guo <shawn.guo@freescale.com>
+Obviously it is mistake for CPU_HAS_PMU to depend on
+(!ARCH_OMAP3 || OMAP3_EMU).
 
+No mattery it is omap3 or not, we can build pmu.o into
+kernel safely. In fact, arm-v7 of omap3 has pmu inside
+also.
+
+So fix it that we can build pmu into kernel to support perf
+for some valid config(such as enable both omap4 and omap3,
+but OMAP3_EMU).
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: linux-omap at vger.kernel.org
+Signed-off-by: Ming Lei <tom.leiming@gmail.com>
+---
+ arch/arm/Kconfig |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 377a7a5..ba314d5 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1061,8 +1061,7 @@ config XSCALE_PMU
+ 	default y
+ 
+ config CPU_HAS_PMU
+-	depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
+-		   (!ARCH_OMAP3 || OMAP3_EMU)
++	depends on CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU
+ 	default y
+ 	bool
+ 
 -- 
-Regards,
-Shawn
+1.7.4.1
