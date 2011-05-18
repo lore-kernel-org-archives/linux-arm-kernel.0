@@ -1,184 +1,114 @@
-From: lauraa@codeaurora.org (Laura Abbott)
-Date: Wed, 18 May 2011 09:39:53 -0700 (PDT)
-Subject: [PATCH] arm: Add unwinding support for division functions
-In-Reply-To: <20110517150730.GB27656@arm.com>
-References: <1305249893-3427-1-git-send-email-lauraa@codeaurora.org>
-	<20110517150730.GB27656@arm.com>
-Message-ID: <f16b4b8d7735148b133e23547a7963b3.squirrel@www.codeaurora.org>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Wed, 18 May 2011 17:44:26 +0100
+Subject: [PATCH v2] arm: Add Cortex A5 proc info
+In-Reply-To: <1305720361.17656.44.camel@hornet.cambridge.arm.com>
+References: <1305720361.17656.44.camel@hornet.cambridge.arm.com>
+Message-ID: <1305737066-11900-1-git-send-email-pawel.moll@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch adds processor info for Cortex A5 (MPCore).
 
-On Tue, May 17, 2011 8:07 am, Dave Martin wrote:
-> On Thu, May 12, 2011 at 06:24:53PM -0700, Laura Abbott wrote:
->> The software division functions never had unwinding annotations
->> added. Currently, when a division by zero occurs the backtrace shown
->> will stop at Ldiv0 or some completely unrelated function. Add
->> unwinding annotations in hopes of getting a more useful backtrace
->> when a division by zero occurs.
->
-> Definitely a good idea.
->
->>
->> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
->> ---
->>  arch/arm/lib/lib1funcs.S |   27 +++++++++++++++++++++------
->>  1 files changed, 21 insertions(+), 6 deletions(-)
->>
->> diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
->> index 6dc0648..63b75df 100644
->> --- a/arch/arm/lib/lib1funcs.S
->> +++ b/arch/arm/lib/lib1funcs.S
->> @@ -35,7 +35,7 @@ Boston, MA 02111-1307, USA.  */
->>
->>  #include <linux/linkage.h>
->>  #include <asm/assembler.h>
->> -
->> +#include <asm/unwind.h>
->>
->>  .macro ARM_DIV_BODY dividend, divisor, result, curbit
->>
->> @@ -207,6 +207,7 @@ Boston, MA 02111-1307, USA.  */
->>
->>  ENTRY(__udivsi3)
->>  ENTRY(__aeabi_uidiv)
->> +UNWIND(.fnstart)
->>
->>  	subs	r2, r1, #1
->>  	moveq	pc, lr
->> @@ -230,10 +231,12 @@ ENTRY(__aeabi_uidiv)
->>  	mov	r0, r0, lsr r2
->>  	mov	pc, lr
->>
->> +UNWIND(.fnend)
->>  ENDPROC(__udivsi3)
->>  ENDPROC(__aeabi_uidiv)
->>
->>  ENTRY(__umodsi3)
->> +UNWIND(.fnstart)
->>
->>  	subs	r2, r1, #1			@ compare divisor with 1
->>  	bcc	Ldiv0
->> @@ -247,10 +250,12 @@ ENTRY(__umodsi3)
->>
->>  	mov	pc, lr
->>
->> +UNWIND(.fnend)
->>  ENDPROC(__umodsi3)
->>
->>  ENTRY(__divsi3)
->>  ENTRY(__aeabi_idiv)
->> +UNWIND(.fnstart)
->>
->>  	cmp	r1, #0
->>  	eor	ip, r0, r1			@ save the sign of the result.
->> @@ -287,10 +292,12 @@ ENTRY(__aeabi_idiv)
->>  	rsbmi	r0, r0, #0
->>  	mov	pc, lr
->>
->> +UNWIND(.fnend)
->>  ENDPROC(__divsi3)
->>  ENDPROC(__aeabi_idiv)
->>
->>  ENTRY(__modsi3)
->> +UNWIND(.fnstart)
->>
->>  	cmp	r1, #0
->>  	beq	Ldiv0
->> @@ -310,11 +317,14 @@ ENTRY(__modsi3)
->>  	rsbmi	r0, r0, #0
->>  	mov	pc, lr
->>
->> +UNWIND(.fnend)
->>  ENDPROC(__modsi3)
->>
->>  #ifdef CONFIG_AEABI
->>
->>  ENTRY(__aeabi_uidivmod)
->> +UNWIND(.fnstart)
->> +UNWIND(.save {r0, r1, ip, lr}	)
->>
->>  	stmfd	sp!, {r0, r1, ip, lr}
->>  	bl	__aeabi_uidiv
->> @@ -323,10 +333,12 @@ ENTRY(__aeabi_uidivmod)
->>  	sub	r1, r1, r3
->>  	mov	pc, lr
->>
->> +UNWIND(.fnend)
->>  ENDPROC(__aeabi_uidivmod)
->>
->>  ENTRY(__aeabi_idivmod)
->> -
->> +UNWIND(.fnstart)
->> +UNWIND(.save {r0, r1, ip, lr}	)
->>  	stmfd	sp!, {r0, r1, ip, lr}
->>  	bl	__aeabi_idiv
->>  	ldmfd	sp!, {r1, r2, ip, lr}
->> @@ -334,15 +346,18 @@ ENTRY(__aeabi_idivmod)
->>  	sub	r1, r1, r3
->>  	mov	pc, lr
->>
->> +UNWIND(.fnend)
->>  ENDPROC(__aeabi_idivmod)
->>
->>  #endif
->>
->> -Ldiv0:
->> -
->> +ENTRY(Ldiv0)
->
-> There's no reason to make Ldiv0 global and pollute the global namespace.
-> I suggest you remove ENTRY() here, but keep the ENDPROC() so that the
-> symbol type and size information is correct.
->
-> If CONFIG_KALLSYMS is enabled, local symbols are included in the
-> kallsyms table, so you still get a sensibly-named backtrace entry without
-> needing to make the symbol global.
->
-Okay, I'll get rid of the ENTRY annotation for Ldiv0.
+To reduce code duplicating it converts existing A9 proc info
+into a macro and uses it to define A5 and A9 cores, allowing
+new similar parts (requiring different init function and MMU
+flags) in future.
 
->> +UNWIND(.fnstart)
->> +UNWIND(.pad #4)
->> +UNWIND(.save {lr})
->>  	str	lr, [sp, #-8]!
->>  	bl	__div0
->>  	mov	r0, #0			@ About as wrong as it could be.
->>  	ldr	pc, [sp], #8
->> -
->> -
->> +UNWIND(.fnend)
->> +ENDPROC(Ldiv0)
->> --
->> 1.7.3.3
->
-> Otherwise, the patch looks sound to me.
->
-> With it, I get plausible backtraces, e.g.:
-> [ 1376.909088] Division by zero in kernel.
-> [ 1376.909149] [<c0073551>] (unwind_backtrace+0x1/0xa0) from [<c02b83a3>]
-> (Ldiv0+0x9/0x12)
-> [ 1376.909149] [<c02b83a3>] (Ldiv0+0x9/0x12) from [<bf88c033>]
-> (init+0x32/0x6f [div0])
-> [ 1376.909179] [<bf88c033>] (init+0x32/0x6f [div0]) from [<c006951b>]
-> (do_one_initcall+0x2b/0x11c)
-> [ 1376.909210] [<c006951b>] (do_one_initcall+0x2b/0x11c) from [<c00c8c4b>]
-> (sys_init_module+0xc7/0x144c)
-> [ 1376.909240] [<c00c8c4b>] (sys_init_module+0xc7/0x144c) from
-> [<c006df81>] (ret_fast_syscall+0x1/0x44)
->
-> (Tested using a trivial test module which just calls a function which
-> divides by zero from its init function.)
->
-> Tested-by: Dave Martin <dave.martin@linaro.org>
->
-> Cheers
-> ---Dave
->
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/mm/proc-v7.S |   69 ++++++++++++++++++++++++++++--------------------
+ 1 files changed, 40 insertions(+), 29 deletions(-)
 
-Thanks for reviewing and testing
-
-Laura
-
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index babfba0..01256fa 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -270,11 +270,15 @@ cpu_resume_l1_flags:
+  *	Harvard cache control instructions insead of the unified cache
+  *	control instructions.
+  *
+- *	This should be able to cover all ARMv7 cores.
++ *	This should be able to cover all ARMv7 cores. Some MPCore
++ *	implementations require additional code when SMP is to be
++ *	enabled to activate Snoop Control Unit - this is done prior
++ *	to the __v7_setup.
+  *
+  *	It is assumed that:
+  *	- cache type register is implemented
+  */
++__v7_ca5mp_setup:
+ __v7_ca9mp_setup:
+ #ifdef CONFIG_SMP
+ 	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
+@@ -436,34 +440,41 @@ cpu_elf_name:
+ 
+ 	.section ".proc.info.init", #alloc, #execinstr
+ 
+-	.type   __v7_ca9mp_proc_info, #object
+-__v7_ca9mp_proc_info:
+-	.long	0x410fc090		@ Required ID value
+-	.long	0xff0ffff0		@ Mask for ID
+-	ALT_SMP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_SMP)
+-	ALT_UP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_UP)
+-	.long   PMD_TYPE_SECT | \
+-		PMD_SECT_XN | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	W(b)	__v7_ca9mp_setup
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
+-	.long	cpu_v7_name
+-	.long	v7_processor_functions
+-	.long	v7wbi_tlb_fns
+-	.long	v6_user_fns
+-	.long	v7_cache_fns
+-	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
++	/*
++	 * ARM Ltd. Cortex cores
++	 */
++#define __V7_CORTEX_PROC_INFO(_part, _mm_mmuflags, _io_mmuflags, _initfunc) \
++	.type   __v7_ca##_part##mp_proc_info, #object; \
++__v7_ca##_part##mp_proc_info:; \
++	.long	0x410fc0##_part##0; \
++	.long	0xff0ffff0; \
++	ALT_SMP(.long	_mm_mmuflags | PMD_FLAGS_SMP); \
++	ALT_UP(.long	_mm_mmuflags | PMD_FLAGS_UP); \
++	.long	_io_mmuflags; \
++	W(b)	_initfunc; \
++	.long	cpu_arch_name; \
++	.long	cpu_elf_name; \
++	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS; \
++	.long	cpu_v7_name; \
++	.long	v7_processor_functions; \
++	.long	v7wbi_tlb_fns; \
++	.long	v6_user_fns; \
++	.long	v7_cache_fns; \
++	.size	__v7_ca##_part##mp_proc_info, . - __v7_ca##_part##mp_proc_info
++
++__V7_CORTEX_PROC_INFO(
++	5, /* Cortex A5 */
++	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
++	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
++	__v7_ca5mp_setup
++)
++
++__V7_CORTEX_PROC_INFO(
++	9, /* Cortex A9 */
++	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
++	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
++	__v7_ca9mp_setup
++)
+ 
+ 	/*
+ 	 * Match any ARMv7 processor core.
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.6.3.3
