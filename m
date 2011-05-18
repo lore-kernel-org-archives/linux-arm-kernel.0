@@ -1,79 +1,38 @@
-From: vbendeb@google.com (=?UTF-8?B?VmFkaW0gQmVuZGVidXJ5ICjQstCxKQ==?=)
-Date: Wed, 18 May 2011 13:59:22 -0700
-Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
-	in thumb mode.
-In-Reply-To: <20110516144311.GC7715@arm.com>
-References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
-	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
-	<20110514100232.GC30539@n2100.arm.linux.org.uk>
-	<20110516121657.GA7715@arm.com>
-	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
-	<20110516144311.GC7715@arm.com>
-Message-ID: <BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 18 May 2011 22:21:55 +0100
+Subject: [PATCH 0/4] Pinmux subsystem
+In-Reply-To: <BANLkTikUbxHQH-sAP+uOy7bnpZcyN_GHxQ@mail.gmail.com>
+References: <1304363768-30338-1-git-send-email-linus.walleij@stericsson.com>
+	<20110503172712.GE6538@lunn.ch>
+	<BANLkTi=ncV3M1q5SXNdUaXmtfkZ8Wn9dmw@mail.gmail.com>
+	<20110515133312.GM4071@lunn.ch>
+	<BANLkTi=O_mZEqMhOS_Fz0vAYCQ-XpyG4UA@mail.gmail.com>
+	<BANLkTi=TDiAziQU0fYBiK_Npk0x50av7tA@mail.gmail.com>
+	<BANLkTikUbxHQH-sAP+uOy7bnpZcyN_GHxQ@mail.gmail.com>
+Message-ID: <20110518212154.GA20909@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 7:43 AM, Dave Martin <dave.martin@linaro.org> wrote:
-> On Mon, May 16, 2011 at 10:32:16AM -0400, Nicolas Pitre wrote:
->> On Mon, 16 May 2011, Dave Martin wrote:
->>
->> > On Sat, May 14, 2011 at 11:02:32AM +0100, Russell King - ARM Linux wrote:
->> > > On Sat, May 14, 2011 at 10:59:14AM +0100, Catalin Marinas wrote:
->> > > > On 13 May 2011 20:53, Vadim Bendebury <vbendeb@google.com> wrote:
->> > > > > This is a cosmetic change, adding a '_thumb' prefix to the
->> > > > > 'Hardware' line in /proc/cpuinfo. Tested as follows:
->> > > > >
->> > > > > localhost ~ # dmesg | grep thumb
->> > > > > [ ? ?0.000000] Machine: kaen_thumb
->> > > > > localhost ~ # grep '^Hardware' /proc/cpuinfo
->> > > > > Hardware ? ? ? ?: kaen_thumb
->> > > > > localhost ~ #
->> > > >
->> > > > Would this break any script parsing this file?
->> > > >
->> > > > BTW, why do you need it? You could include the .config into the kernel
->> > > > and read it via /proc.
->> > >
->> > > Whether the kernel is built T2 or ARM doesn't change the userland API
->> > > either, so there's no real need for userland to know how the kernel
->> > > was built.
->> > >
->> > > The only thing which is affected by it are kernel modules, but then we
->> > > have an established way to sort out incompatible kernel modules already.
->> >
->> > One corollary to that is that _if_ there's any reason why userland needs to
->> > know what instruction set the kernel was built with, then we're probably
->> > doing something wrong somewhere...
->> >
->> > In any case, shoehorning this information into the hardware platform name
->> > seems a bit strange since this is really nothing to do with the hardware.
->> >
->> > Vadim, can you explain why you think this information is needed? ?If the
->> > need is real, perhaps there's a better way to address it.
->>
->> I think this can be useful to know how the kernel was compiled for bug
->> tracking purposes, just like we record the Git commit ID of the checked
->> out source tree, the gcc version, the build date, etc. ?Which pretty
->> much indicates that the thumbness of the kernel should probably be
->> stored in the kernel banner not the platform name.
->
-> That seems a reasonable approach to me.
->
+On Wed, May 18, 2011 at 10:02:47PM +0200, Linus Walleij wrote:
+> 2011/5/17 Kyungmin Park <kmpark@infradead.org>:
 
-guys, thank you for your comments. Indeed, this is meant to be just a
-convenience to allow to quickly tell what kind of kernel a system is
-running, comes handy when there are many systems around with
-differently compiled kernels.
+> > In this case we only need to set the function at interrupt by like
+> > s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+> > So pinmux function provides this feature also.
 
-So, would it be acceptable if I move this information into the kernel
-banner (namely, add it to the machine hardware name part of the output
-included in 'uname -m' and 'uname -a')?
+> This function:
+> s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
 
-cheers,
-/vb
+> Isn't part of the gpiolib I can see, I am discussing with Grant
+> how to handle custom GPIO configuration. Looking in
+> archa/arm/plat-samsung/include/plat/gpio-core.h
 
+> it looks like you have your own reimplementation of the
+> entire gpiolib in order to get these special configuration
+> functions... (So hopefully if I can add custom GPIO
+> configs to gpiolib, all of this can move to drivers/gpio/*)
 
-
-
-> ---Dave
->
+This API predates the generic GPIO API - it's a reimplementation because
+at that time the various platforms all had their own custom APIs.  The
+Samsung specific API is pretty much only used for the pin mux and mode
+configuration these days.
