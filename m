@@ -1,65 +1,57 @@
-From: mchehab@infradead.org (Mauro Carvalho Chehab)
-Date: Wed, 18 May 2011 08:04:43 -0300
-Subject: [PATCH 3/7] [media] s5p-fimc: Remove to support fimc for S5PC100
-In-Reply-To: <1305162674-25860-4-git-send-email-kgene.kim@samsung.com>
-References: <1305162674-25860-1-git-send-email-kgene.kim@samsung.com>
-	<1305162674-25860-4-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4DD3A7CB.6030408@infradead.org>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Wed, 18 May 2011 12:06:33 +0100
+Subject: [RFC PATCH v2 02/12] ARM: smp_twd: add support for remapped
+	PPI interrupts
+In-Reply-To: <4DCC2018.3030007@codeaurora.org>
+References: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>
+	<1304677997-26947-3-git-send-email-marc.zyngier@arm.com>
+	<4DCC2018.3030007@codeaurora.org>
+Message-ID: <1305716793.30788.75.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em 11-05-2011 22:11, Kukjin Kim escreveu:
-> According to removing ARCH_S5PC100, we don't need to support
-> fimc for S5PC100.
-
-NACK
-
-There's nothing mentioning the removal of ARCH_S5PC100 or the
-corresponding bits at feature-removal-schedule.txt:
-
-$ grep -i s5pc100 Documentation/feature-removal-schedule.txt 
-$ 
-
-Mauro.
-
+On Thu, 2011-05-12 at 10:59 -0700, Stephen Boyd wrote:
+> On 5/6/2011 3:33 AM, Marc Zyngier wrote:
+> > diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> > index f29b8a2..30201a0 100644
+> > --- a/arch/arm/kernel/smp.c
+> > +++ b/arch/arm/kernel/smp.c
+> > @@ -452,6 +452,18 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
+> >  	set_irq_regs(old_regs);
+> >  }
+> >  
+> > +irqreturn_t percpu_timer_handler(int irq, void *dev_id)
+> > +{
+> > +	struct clock_event_device *evt = dev_id;
+> > +
+> > +	if (local_timer_ack()) {
+> > +		evt->event_handler(evt);
+> > +		return IRQ_HANDLED;
+> > +	}
+> > +
+> > +	return IRQ_NONE;
+> > +}
+> > +
 > 
-> Cc: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> Cc: Kyungmin Park <kyungmin.park@samsung.com>
-> Cc: Mauro Carvalho Chehab <mchehab@infradead.org>
-> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
-> ---
->  drivers/media/video/s5p-fimc/fimc-core.c |   14 --------------
->  1 files changed, 0 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/media/video/s5p-fimc/fimc-core.c b/drivers/media/video/s5p-fimc/fimc-core.c
-> index dc91a85..89d59d6 100644
-> --- a/drivers/media/video/s5p-fimc/fimc-core.c
-> +++ b/drivers/media/video/s5p-fimc/fimc-core.c
-> @@ -1871,17 +1871,6 @@ static struct samsung_fimc_variant fimc2_variant_exynos4 = {
->  	.pix_limit	 = &s5p_pix_limit[3],
->  };
->  
-> -/* S5PC100 */
-> -static struct samsung_fimc_driverdata fimc_drvdata_s5p = {
-> -	.variant = {
-> -		[0] = &fimc0_variant_s5p,
-> -		[1] = &fimc0_variant_s5p,
-> -		[2] = &fimc2_variant_s5p,
-> -	},
-> -	.num_entities = 3,
-> -	.lclk_frequency = 133000000UL,
-> -};
-> -
->  /* S5PV210, S5PC110 */
->  static struct samsung_fimc_driverdata fimc_drvdata_s5pv210 = {
->  	.variant = {
-> @@ -1907,9 +1896,6 @@ static struct samsung_fimc_driverdata fimc_drvdata_exynos4 = {
->  
->  static struct platform_device_id fimc_driver_ids[] = {
->  	{
-> -		.name		= "s5p-fimc",
-> -		.driver_data	= (unsigned long)&fimc_drvdata_s5p,
-> -	}, {
->  		.name		= "s5pv210-fimc",
->  		.driver_data	= (unsigned long)&fimc_drvdata_s5pv210,
->  	}, {
+> MSM needs this second patch again. I suppose it's not titled correctly?
+> I'd rather not have MSM use this function at all though. Perhaps its
+> better to just hide this in smp_twd.c along with local_timer_ack()?
+
+I'd like to keep the handler in a separate file, as I have an additional
+patch set for the A15 timers that are using the same handler.
+
+> What is going on with mach-exynos4/mct.c? Their local_timer_ack() is a
+> return 0 and they do a setup_irq() in their local_timer_setup() path.
+> That all seems very broken and I would be surprised if hotplug and local
+> timer stats worked on that system.
+
+MCT is an odd case. They're using SPI, not PPI, and local_timer_ack() is
+only present to please the linker (never called).
+
+Could probably have them to converge as well.
+
+	M.
+-- 
+Reality is an implementation detail.
+-- 
+IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium.  Thank you.
