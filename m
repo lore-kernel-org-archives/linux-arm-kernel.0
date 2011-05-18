@@ -1,41 +1,33 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Wed, 18 May 2011 15:43:56 -0700
-Subject: [PATCH 7/7] gpio_msm: Move Qualcomm MSM v2 gpio driver into
-	drivers
-In-Reply-To: <4DD449BA.3090907@codeaurora.org> (Stephen Boyd's message of
-	"Wed, 18 May 2011 15:35:38 -0700")
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 18 May 2011 17:44:39 -0500
+Subject: [PATCH 5/7] msm: gpiomux: Move public API to public header
+In-Reply-To: <1305755453-31112-6-git-send-email-davidb@codeaurora.org>
 References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
-	<1305755453-31112-8-git-send-email-davidb@codeaurora.org>
-	<4DD449BA.3090907@codeaurora.org>
-Message-ID: <8ya39kbmxxv.fsf@huya.qualcomm.com>
+	<1305755453-31112-6-git-send-email-davidb@codeaurora.org>
+Message-ID: <0D753D10438DA54287A00B027084269764D2F7405A@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18 2011, Stephen Boyd wrote:
-
-> On 05/18/2011 02:50 PM, David Brown wrote:
->> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
->> index aa5a3f9..235b6c9 100644
->> --- a/drivers/gpio/Kconfig
->> +++ b/drivers/gpio/Kconfig
->> @@ -139,6 +139,14 @@ config GPIO_MSM_V1
->>  	  Qualcomm MSM chips.  Most of the pins on the MSM can be
->>  	  selected for GPIO, and are controlled by this driver.
->>  
->> +config GPIO_MSM_V2
->> +	tristate "Qualcomm MSM GPIO v2"
->> +	depends on GPIOLIB && ARCH_MSM
->> +	help
->> +	  Say yes here to support the GPIO interface on ARM many v7
+On Wednesday, May 18, 2011 2:51 PM, David Brown wrote:
 >
-> s/many// ?
+> The gpiomux.h header contains some SOC ifdefs.  However, the API that
+> is actually used by the GPIO driver only uses two functions that are
+> general.  Move these general definitions into a public header file.
+>
+> Signed-off-by: David Brown <davidb@codeaurora.org>
+> ---
+>  arch/arm/mach-msm/gpio.c    |    2 +-
+>  arch/arm/mach-msm/gpiomux.h |   17 +----------------
+>  include/linux/msm_gpiomux.h |   38 ++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 40 insertions(+), 17 deletions(-)
+>  create mode 100644 include/linux/msm_gpiomux.h
 
-My intent was 'on many ARM v7 based Qualcomm MSM chips'.  I suppose I
-can say just on 'v7' based chips, but the future is hard to predict.
-I'll just take out the many.
+The msm_gpiomux.h header appears to be very "msm" specific, especially
+with the #ifdef CONFIG_MSM_GPIOMUX in it.  Wouldn't it be cleaner to
+just move it to arch/arm/mach-msm/include/mach/msm_gpiomux.h?
 
-David
+I don't see a reason why this header needs/should be available for
+the general public in /include/linux.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Regards,
+Hartley
