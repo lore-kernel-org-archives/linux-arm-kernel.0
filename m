@@ -1,133 +1,65 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Wed, 18 May 2011 17:47:22 -0400
-Subject: [PATCH] mmc: fix handling NULL returned from regulator_get()
-In-Reply-To: <1305754664-2917-1-git-send-email-ospite@studenti.unina.it>
-	(Antonio Ospite's message of "Wed, 18 May 2011 23:37:44 +0200")
-References: <1305754664-2917-1-git-send-email-ospite@studenti.unina.it>
-Message-ID: <m3vcx7el5h.fsf@pullcord.laptop.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 18 May 2011 22:47:41 +0100
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <20110518155615.GJ15292@game.jcrosoft.org>
+References: <201105181047.17309.arnd@arndb.de>
+	<20110518155615.GJ15292@game.jcrosoft.org>
+Message-ID: <BANLkTi=LKYrhZkiAeLJH8VF4LkKnOr--zg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Antonio, thanks for doing this,
-
-On Wed, May 18 2011, Antonio Ospite wrote:
-> When regulator_get() is stubbed down it returns NULL, handle this case
-> when deciding whether the driver can use the regulator or not.
+On Wednesday, 18 May 2011, Jean-Christophe PLAGNIOL-VILLARD
+<plagnioj@jcrosoft.com> wrote:
+> On 10:47 Wed 18 May ? ? , Arnd Bergmann wrote:
+>> This is the draft plan for maintaining the ARM subarchitectures in a common
+>> tree, as a way to help coordinate the upstream merging of the
+>> arch/arm/{plat,mach}-* changes into Linus' tree.
 >
-> Remember: IS_ERR(NULL) is false, see also this discussion for more
-> insight: http://comments.gmane.org/gmane.linux.kernel.mmc/7934
+> How do you plan to manage with already sub arch maintainers?
 >
-> Now that regulator_get() is handled correctly, the ifdef on
-> CONFIG_REGULATOR in mmci.c can go away as well.
+> In my ming such tree could be good to organise cross arch drivers
+> but for real arch specific the current workflow is good
 >
-> Signed-off-by: Antonio Ospite <ospite@studenti.unina.it>
-> ---
+> If we add a new stage it will be difficult to follow for people
 >
->  drivers/mmc/host/dw_mmc.c     |    2 +-
->  drivers/mmc/host/mmci.c       |    4 +---
->  drivers/mmc/host/mxcmmc.c     |    2 +-
->  drivers/mmc/host/omap_hsmmc.c |    4 ++--
->  drivers/mmc/host/sdhci.c      |    2 +-
->  5 files changed, 6 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-> index 87e1f57..5be1325 100644
-> --- a/drivers/mmc/host/dw_mmc.c
-> +++ b/drivers/mmc/host/dw_mmc.c
-> @@ -1442,7 +1442,7 @@ static int __init dw_mci_init_slot(struct dw_mci *host, unsigned int id)
->  #endif /* CONFIG_MMC_DW_IDMAC */
->  
->  	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
-> -	if (IS_ERR(host->vmmc)) {
-> +	if (IS_ERR_OR_NULL(host->vmmc)) {
->  		printk(KERN_INFO "%s: no vmmc regulator found\n", mmc_hostname(mmc));
->  		host->vmmc = NULL;
->  	} else
-> diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
-> index b4a7e4f..6fac353 100644
-> --- a/drivers/mmc/host/mmci.c
-> +++ b/drivers/mmc/host/mmci.c
-> @@ -1058,10 +1058,9 @@ static int __devinit mmci_probe(struct amba_device *dev,
->  		mmc->f_max = min(host->mclk, fmax);
->  	dev_dbg(mmc_dev(mmc), "clocking block at %u Hz\n", mmc->f_max);
->  
-> -#ifdef CONFIG_REGULATOR
->  	/* If we're using the regulator framework, try to fetch a regulator */
->  	host->vcc = regulator_get(&dev->dev, "vmmc");
-> -	if (IS_ERR(host->vcc))
-> +	if (IS_ERR_OR_NULL(host->vcc))
->  		host->vcc = NULL;
->  	else {
->  		int mask = mmc_regulator_get_ocrmask(host->vcc);
-> @@ -1077,7 +1076,6 @@ static int __devinit mmci_probe(struct amba_device *dev,
->  				 "(using regulator instead)\n");
->  		}
->  	}
-> -#endif
->  	/* Fall back to platform data if no regulator is found */
->  	if (host->vcc == NULL)
->  		mmc->ocr_avail = plat->ocr_mask;
-> diff --git a/drivers/mmc/host/mxcmmc.c b/drivers/mmc/host/mxcmmc.c
-> index cc20e02..a9152da 100644
-> --- a/drivers/mmc/host/mxcmmc.c
-> +++ b/drivers/mmc/host/mxcmmc.c
-> @@ -155,7 +155,7 @@ static inline void mxcmci_init_ocr(struct mxcmci_host *host)
->  {
->  	host->vcc = regulator_get(mmc_dev(host->mmc), "vmmc");
->  
-> -	if (IS_ERR(host->vcc)) {
-> +	if (IS_ERR_OR_NULL(host->vcc)) {
->  		host->vcc = NULL;
->  	} else {
->  		host->mmc->ocr_avail = mmc_regulator_get_ocrmask(host->vcc);
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 259ece0..45fd4fe 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -405,7 +405,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
->  	}
->  
->  	reg = regulator_get(host->dev, "vmmc");
-> -	if (IS_ERR(reg)) {
-> +	if (IS_ERR_OR_NULL(reg)) {
->  		dev_dbg(host->dev, "vmmc regulator missing\n");
->  		/*
->  		* HACK: until fixed.c regulator is usable,
-> @@ -433,7 +433,7 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
->  
->  		/* Allow an aux regulator */
->  		reg = regulator_get(host->dev, "vmmc_aux");
-> -		host->vcc_aux = IS_ERR(reg) ? NULL : reg;
-> +		host->vcc_aux = IS_ERR_OR_NULL(reg) ? NULL : reg;
->  
->  		/*
->  		* UGLY HACK:  workaround regulator framework bugs.
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 5d20661..d3585d4 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -2004,7 +2004,7 @@ int sdhci_add_host(struct sdhci_host *host)
->  		goto untasklet;
->  
->  	host->vmmc = regulator_get(mmc_dev(mmc), "vmmc");
-> -	if (IS_ERR(host->vmmc)) {
-> +	if (IS_ERR_OR_NULL(host->vmmc)) {
->  		printk(KERN_INFO "%s: no vmmc regulator found\n", mmc_hostname(mmc));
->  		host->vmmc = NULL;
->  	} else {
+> I'd like to have scenario example where such workflow will give a significant
+> advantage compare to the current workflow. And please real example.
 
-I think I like this change for every driver *except* sdhci -- users who
-compile with CONFIG_REGULATOR=n (i.e. most distros) will start seeing
-"mmc0: no vmmc regulator found" when they boot their x86 laptops, and
-printing a cryptic regulator error message when regulator support isn't
-even compiled in seems uncalled for.
+I'll let Arnd and the other members of this group come up with real
+examples. In the meantime I'll give my view on this.
 
-So, I think my suggestion is to merge all but the last hunk of the
-patch.  How do others feel about it?
+The aim is not to hide existing sub-architecture patches behind
+another git tree so that people won't notice the conflicts. It's not
+just a workflow change, the Acked-by mechanism may have worked as
+well, though some people may skip it (even unintentionally).
 
-Thanks,
+There is a lot of code duplication between various sub-architectures
+under arch/arm/ and this group, together with the sub-arch
+maintainers, will try to consolidate this, move common code out into
+drivers/ so that it can be easily shared, start moving platforms to
+FDT etc. (they could give a roadmap but it's early stages now). This
+needs to be a coordinated effort and the group will ensure that the
+general direction of code reduction is followed by all the current and
+new sub-arch maintainers.
 
-- Chris.
+A lot of platform ports have been done just by copying existing code
+without any effort in exploiting the commonality. This could be
+spotted much easier with a dedicated group of people and guide the
+sub-arch maintainers in the write direction. It may be even quicker
+for them to get code merged into drivers/ where applicable.
+
+I expect the activity of this group to be reduced in the future, once
+the consolidation work is complete (but that's not a trivial task). At
+that point maybe one or two people would just keep an eye on what gets
+pushed into mainline in sub-arch directories and sub-arch maintainers
+would just work as before, sending pull requests to Linus directly.
+
+As the incentive for existing sub-arch maintainers to agree with this
+strategy - given Linus' recent comments on the ARM sub-arch trees, it
+is possible that he won't merge such trees pushed directly to him if
+they don't show a consistent direction towards code consolidation. I
+think this group and tree would actually make upstream pushing
+quicker.
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Catalin
