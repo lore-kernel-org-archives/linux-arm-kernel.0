@@ -1,43 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 18 May 2011 16:46:41 +0100
-Subject: [PATCH] ARM: bcmring: fix patches to convert to sp804 clockevents
-In-Reply-To: <4DD307E2.7010302@broadcom.com>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-	<E1QM1e8-0003ET-HK@rmk-PC.arm.linux.org.uk>
-	<4DD2FF02.1020508@broadcom.com>
-	<20110517232015.GC5913@n2100.arm.linux.org.uk>
-	<4DD307E2.7010302@broadcom.com>
-Message-ID: <20110518154641.GK5913@n2100.arm.linux.org.uk>
+From: rabin@rab.in (Rabin Vincent)
+Date: Wed, 18 May 2011 21:23:31 +0530
+Subject: [PATCH] OMAP4: fix return value of omap4_l3_init
+In-Reply-To: <1304787527-8314-1-git-send-email-rabin@rab.in>
+References: <1304787527-8314-1-git-send-email-rabin@rab.in>
+Message-ID: <BANLkTi=Rr0u5dyVAEQzwPRPMABmOQHF6tQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 17, 2011 at 04:42:26PM -0700, Jiandong Zheng wrote:
-> On 5/17/2011 4:20 PM, Russell King - ARM Linux wrote:
->> On Tue, May 17, 2011 at 04:04:34PM -0700, Jiandong Zheng wrote:
->>> @@ -232,12 +230,14 @@ void __init bcmring_init_timer(void)
->>>   	writel(0, TIMER2_VA_BASE + TIMER_CTRL);
->>>   	writel(0, TIMER3_VA_BASE + TIMER_CTRL);
->>>
->>> +	clkdev_add_table(lookups, ARRAY_SIZE(lookups));
->>> +
->>
->> As we have the init_early callback in the machine record, can this be
->> done at that point, rather than sticking it in the timer init callback?
->>
-> It should be OK as long as the table is added early enough but leave it  
-> here make it a little easier to understand the init order.
+On Sat, May 7, 2011 at 22:28, Rabin Vincent <rabin@rab.in> wrote:
+> Don't PTR_ERR() a non-error pointer:
 >
-> clkdev_add_table() was called by init_machine() which is too late while  
-> some other machines still do similar thing. Should we move  
-> clkdev_add_table() to init_early for all SoC using sp804?
+> ?initcall omap4_l3_init+0x0/0xdc returned -544980480 after 0 usecs
+> ?initcall omap4_l3_init+0x0/0xdc returned with error code -544980480
+>
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
 
-Yes please.  The order in which things are called is as the struct is
-layed out:
+Ping?
 
-fixup
-reserve
-map_io
-init_early
-init_irq
-timer->init
-init_machine
+(with some git blame'd people now on cc.)
+
+> ---
+> ?arch/arm/mach-omap2/devices.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 7b85585..5b8ca68 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -97,7 +97,7 @@ static int __init omap4_l3_init(void)
+>
+> ? ? ? ?WARN(IS_ERR(od), "could not build omap_device for %s\n", oh_name);
+>
+> - ? ? ? return PTR_ERR(od);
+> + ? ? ? return IS_ERR(od) ? PTR_ERR(od) : 0;
+> ?}
+> ?postcore_initcall(omap4_l3_init);
+>
+> --
+> 1.7.4.1
+>
+>
