@@ -1,81 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 19 May 2011 12:18:27 -0600
-Subject: [PATCH] gpio: remove some legacy comments in build files
-In-Reply-To: <1303975117-20651-1-git-send-email-linus.walleij@stericsson.com>
-References: <1303975117-20651-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110519181827.GC5109@ponder.secretlab.ca>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 19 May 2011 20:25:15 +0200
+Subject: atmel-mci causes kernel panic when CONFIG_DEBUG_VM is set
+In-Reply-To: <4DD4CC68.80408@atmel.com>
+References: <4DD4CC68.80408@atmel.com>
+Message-ID: <20110519182515.GC21172@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Apr 28, 2011 at 09:18:37AM +0200, Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
-> 
-> The build files for drivers/gpio has some wording and comments
-> about the directory being reserved exclusively for GPIO expanders
-> (according to the gpio.txt file these are on external busses) and
-> this has been false for some time. We already have PL061 and
-> Xilinx drivers which are in silicon and now I'm moving more
-> silicon drivers here, so delete this and reword it a bit.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+Hello,
 
-Applied, thanks.
-g.
+On Thu, May 19, 2011 at 09:53:12AM +0200, Ludovic Desroches wrote:
+> There is a bug with the atmel-mci driver when the debug feature
+> CONFIG_DEBUG_VM is set.
+for the new audience: the driver does the following:
 
-> ---
->  drivers/gpio/Kconfig  |    8 ++++----
->  drivers/gpio/Makefile |    6 +-----
->  2 files changed, 5 insertions(+), 9 deletions(-)
+	flush_dcache_page(sg_page(sg));
+
+with sg being a struct scatterlist * provided by the caller of the
+struct mmc_host_ops.request callback.
+
+> Into the atmci_read_data_pio function we use flush_dcache_page (do
+> we really need it?) which call the page_mapping function where we
+> can find VM_BUG_ON(PageSlab(Page)). Then a kernel panic happens.
 > 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index c23401f..b7fac15 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -1,5 +1,5 @@
->  #
-> -# platform-neutral GPIO infrastructure and expanders
-> +# GPIO infrastructure and drivers
->  #
->  
->  config ARCH_WANT_OPTIONAL_GPIOLIB
-> @@ -31,7 +31,7 @@ menuconfig GPIOLIB
->  	help
->  	  This enables GPIO support through the generic GPIO library.
->  	  You only need to enable this, if you also want to enable
-> -	  one or more of the GPIO expansion card drivers below.
-> +	  one or more of the GPIO drivers below.
->  
->  	  If unsure, say N.
->  
-> @@ -63,12 +63,12 @@ config GPIO_SYSFS
->  	  Kernel drivers may also request that a particular GPIO be
->  	  exported to userspace; this can be useful when debugging.
->  
-> -# put expanders in the right section, in alphabetical order
-> +# put drivers in the right section, in alphabetical order
->  
->  config GPIO_MAX730X
->  	tristate
->  
-> -comment "Memory mapped GPIO expanders:"
-> +comment "Memory mapped GPIO drivers:"
->  
->  config GPIO_BASIC_MMIO
->  	tristate "Basic memory-mapped GPIO controllers support"
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index e4851c5..cfbdef1 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -1,8 +1,4 @@
-> -# generic gpio support: dedicated expander chips, etc
-> -#
-> -# NOTE: platform-specific GPIO drivers don't belong in the
-> -# drivers/gpio directory; put them with other platform setup
-> -# code, IRQ controllers, board init, etc.
-> +# generic gpio support: platform drivers, dedicated expander chips, etc
->  
->  ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
->  
-> -- 
-> 1.7.3.2
-> 
+> I don't understand the purpose of the VM_BUG_ON(PageSlab(Page)) (the
+> page comes from a scatter list). How could I correct this problem?
+I discussed this problem with Steven and Peter on irc and Steven found
+two functions in the mmc code (mmc_send_cxd_data and mmc_send_bus_test)
+that use the following idiom:
+
+	struct scatterlist sg;
+	void *data_buf;
+
+	data_buf = kmalloc(len, GFP_KERNEL);
+
+	sg_init_one(&sg, data_buf, len);
+
+Is that allowed (i.e. pass  kmalloc'd memory to sg_init_one)? That might
+be the source of the slub page in the scatterlist, no?
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
