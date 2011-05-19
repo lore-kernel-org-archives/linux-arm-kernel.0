@@ -1,43 +1,27 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 19 May 2011 11:01:03 +0800
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <alpine.LFD.2.00.1105182234130.14430@xanadu.home>
-References: <201105181047.17309.arnd@arndb.de>
-	<BANLkTim_0eRvDkQwAYjTNQsOVQiHV+DdBQ@mail.gmail.com>
-	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>
-Message-ID: <BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
+From: benh@kernel.crashing.org (Benjamin Herrenschmidt)
+Date: Thu, 19 May 2011 13:32:07 +1000
+Subject: [PATCH] lib: Consolidate DEBUG_STACK_USAGE option
+In-Reply-To: <1304747831-2098-1-git-send-email-sboyd@codeaurora.org>
+References: <1304747831-2098-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1305775927.7481.31.camel@pasglop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
-Thanks for your reply.
+On Fri, 2011-05-06 at 22:57 -0700, Stephen Boyd wrote:
+> Most arches define CONFIG_DEBUG_STACK_USAGE exactly the same way.
+> Move it to lib/Kconfig.debug so each arch doesn't have to define
+> it. This obviously makes the option generic, but that's fine
+> because the config is already used in generic code.
+> 
+> It's not obvious to me that sysrq-P actually does anything
+> different with this option enabled, but I erred on the side of
+> caution by keeping the most inclusive wording.
 
-2011/5/19 Nicolas Pitre <nico@fluxnic.net>:
-> On Thu, 19 May 2011, Barry Song wrote:
->
->> does it mean if we want to add a new SoC plat/mach, we will send
->> patches againest this tree?
->
-> Yes. ?Or against latest mainline tree from Linus.
->
->> will this tree merge into rmk's tree? then rmk's tree will only manage
->> arm common codes?
->
-> Something like that. ?The exact details will be fleshed out as we go.
-> The idea is to give a round of review from a higher point of view to
-> make sure no opportunities for code reuse is missed, etc. ?The mechanics
-> of how this code transitions from this tree into mainline during the
-> merge window is secondary.
+Sorry for the delay...
 
-i asked this because we wanted to send the source codes of
-CSR(http://www.csr.com) to upstream as i have told you in LDS. it
-looks like we need to follow the below new changes to make our source
-codes acceptable?
-1. arm device tree
-2. new pinmux framework from Linus Walleij
-3. move GPIO from plat/mach to drivers/gpio?
+For powerpc:
 
->
->
-> Nicolas
--barry
+Acked-by: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+
+Cheers,
+Ben.
