@@ -1,38 +1,57 @@
 From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 19 May 2011 09:24:48 +0900
-Subject: [PATCH] ARM: Enable GIC support when TWD is selected
-Message-ID: <20110519002448.357.5477.sendpatchset@t400s>
+Date: Thu, 19 May 2011 09:35:58 +0900
+Subject: [PATCH] ARM: SMP build fix for entry-macro-multi.S
+Message-ID: <20110519003558.9353.56399.sendpatchset@t400s>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm@opensource.se>
 
-The TWD code in smp_twd.c has been calling gic_enable_ppi()
-since ac61d143ffe2a6db4d4bcf47c21a5159d6a1b644.
+The assembly code in entry-macro-multi.S does not build without
+the include asm/assembler.h in the case of CONFIG_SMP=y.
 
-Without this fix kernel configs with CONFIG_HAVE_ARM_TWD=y
-and CONFIG_ARM_GIC=n results in the following build error:
+Fixes the rather theoretical SMP build of mach-shmobile/entry-intc.c:
 
-arch/arm/kernel/built-in.o: In function `twd_timer_setup':
-io.c:(.cpuinit.text+0x580): undefined reference to `gic_enable_ppi'
-make: *** [.tmp_vmlinux1] Error 1
+arch/arm/include/asm/entry-macro-multi.S: Assembler messages:
+arch/arm/include/asm/entry-macro-multi.S:20: Error: bad instruction `alt_smp(test_for_ipi r0,r6,r5,lr)'
+arch/arm/include/asm/entry-macro-multi.S:20: Error: bad instruction `alt_up_b(9997f)'
+make[1]: *** [arch/arm/mach-shmobile/entry-intc.o] Error 1
+make: *** [arch/arm/mach-shmobile] Error 2
+make: *** Waiting for unfinished jobs....
 
 Signed-off-by: Magnus Damm <damm@opensource.se>
 ---
 
- Or perhaps mach-shmobile should always select ARM_GIC even
- though some SoC parts do not include GIC hardware?
+ This could also be fixed by adding the following line to entry-intc.c:
+ #include <asm/assembler.h>
+ But that would require all users of entry-macro-multi to do the same.
 
- arch/arm/Kconfig |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/asm/assembler.h         |    4 ++++
+ arch/arm/include/asm/entry-macro-multi.S |    2 ++
+ 2 files changed, 6 insertions(+)
 
---- 0001/arch/arm/Kconfig
-+++ work/arch/arm/Kconfig	2011-05-03 10:40:26.000000000 +0900
-@@ -1368,6 +1368,7 @@ config HAVE_ARM_TWD
- 	bool
- 	depends on SMP
- 	select TICK_ONESHOT
-+	select ARM_GIC
- 	help
- 	  This options enables support for the ARM timer and watchdog unit
- 
+--- 0001/arch/arm/include/asm/assembler.h
++++ work/arch/arm/include/asm/assembler.h	2011-05-19 08:57:17.000000000 +0900
+@@ -13,6 +13,9 @@
+  *  Do not include any C declarations in this file - it is included by
+  *  assembler source.
+  */
++#ifndef __ASM_ASSEMBLER_H__
++#define __ASM_ASSEMBLER_H__
++
+ #ifndef __ASSEMBLY__
+ #error "Only include this from assembly code"
+ #endif
+@@ -290,3 +293,4 @@
+ 	.macro	ldrusr, reg, ptr, inc, cond=al, rept=1, abort=9001f
+ 	usracc	ldr, \reg, \ptr, \inc, \cond, \rept, \abort
+ 	.endm
++#endif /* __ASM_ASSEMBLER_H__ */
+--- 0001/arch/arm/include/asm/entry-macro-multi.S
++++ work/arch/arm/include/asm/entry-macro-multi.S	2011-05-19 08:53:26.000000000 +0900
+@@ -1,3 +1,5 @@
++#include <asm/assembler.h>
++
+ /*
+  * Interrupt handling.  Preserves r7, r8, r9
+  */
