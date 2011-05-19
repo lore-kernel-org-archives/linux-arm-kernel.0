@@ -1,49 +1,42 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 19 May 2011 20:54:19 +0400
-Subject: [PATCH 7/8] ARM i.MX debug macro: use CONFIG_SOC_* instead of
-	CONFIG_ARCH_*
-In-Reply-To: <1305823648-2428-8-git-send-email-s.hauer@pengutronix.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<1305823648-2428-8-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <4DD54B3B.9030709@ru.mvista.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 May 2011 10:56:10 -0600
+Subject: [PATCH 2/2] spi/pl022: mark driver non-experimental
+In-Reply-To: <1305807199-11739-1-git-send-email-linus.walleij@stericsson.com>
+References: <1305807199-11739-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110519165610.GG3085@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, May 19, 2011 at 02:13:19PM +0200, Linus Walleij wrote:
+> This driver has no TODO, and is now used on several platforms:
+> ARM, U300, Ux500, SPEAr and more. So drop the EXPERIMENTAL
+> requirement.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
 
-Sascha Hauer wrote:
+Applied, thanks.
 
-> CONFIG_ARCH_* are deprecated, so remove one user.
+g.
 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 > ---
->  arch/arm/plat-mxc/include/mach/debug-macro.S |   10 +++++-----
->  1 files changed, 5 insertions(+), 5 deletions(-)
-
-> diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> index 8e8d175..75a8933 100644
-> --- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-> +++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> @@ -12,32 +12,32 @@
->   */
->  #include <mach/hardware.h>
+>  drivers/spi/Kconfig |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+> index fc14b8d..fbd96b2 100644
+> --- a/drivers/spi/Kconfig
+> +++ b/drivers/spi/Kconfig
+> @@ -271,8 +271,8 @@ config SPI_ORION
+>  	  This enables using the SPI master controller on the Orion chips.
 >  
-> -#ifdef CONFIG_ARCH_MX1
-> +#ifdef CONFIG_SOC_IMX1
->  #define UART_PADDR	MX1_UART1_BASE_ADDR
->  #endif
->  
-> -#ifdef CONFIG_ARCH_MX25
-> +#ifdef CONFIG_SOC_IMX25
->  #ifdef UART_PADDR
->  #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
->  #endif
->  #define UART_PADDR	MX25_UART1_BASE_ADDR
->  #endif
->  
-> -#ifdef CONFIG_ARCH_MX2
-> +#if defined CONFIG_SOC_IMX21 || defined CONFIG_SOC_IMX27
-
-    Hm, does defined work without ()? Didn't know it...
-
-WBR, Sergei
+>  config SPI_PL022
+> -	tristate "ARM AMBA PL022 SSP controller (EXPERIMENTAL)"
+> -	depends on ARM_AMBA && EXPERIMENTAL
+> +	tristate "ARM AMBA PL022 SSP controller"
+> +	depends on ARM_AMBA
+>  	default y if MACH_U300
+>  	default y if ARCH_REALVIEW
+>  	default y if INTEGRATOR_IMPD1
+> -- 
+> 1.7.3.2
+> 
