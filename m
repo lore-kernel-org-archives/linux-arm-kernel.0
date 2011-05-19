@@ -1,83 +1,34 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 19 May 2011 14:13:11 +0200
-Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer
-Message-ID: <1305807191-11704-1-git-send-email-linus.walleij@stericsson.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 May 2011 14:13:10 +0200
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <20110518152237.GA26055@S2100-06.ap.freescale.net>
+References: <201105181047.17309.arnd@arndb.de>
+	<20110518152237.GA26055@S2100-06.ap.freescale.net>
+Message-ID: <201105191413.10480.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Templing <magnus.templing@stericsson.com>
+On Wednesday 18 May 2011, Shawn Guo wrote:
+> On Wed, May 18, 2011 at 10:47:16AM +0200, Arnd Bergmann wrote:
+> [...]
+> > +ARM SUBARCHITECTURES
+> > +M:	Arnd Bergmann <arnd@arndb.de>
+> > +M:	Nicolas Pitre <nico@fluxnic.net>
+> > +M:	Thomas Gleixner <tglx@linutronix.de>
+> > +M:	arm at kernel.org
+> > +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +S:	MAINTAINED
+> > +F:	arch/arm/mach-*/
+> > +F:	arch/arm/plat-*/
+> > +T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-subarch.git
+> 
+> Is this repository ready for use yet?  It seems not for me.
 
-This adds the missing handling of polling timeouts and deletes
-our last todo.
+No, not yet. Once we are sure about the initial set of people in the group,
+we can set up the arm at kernel.org alias and the group that lets us write
+into the /pub/scm/linux/kernel/git/arm directory.
 
-Signed-off-by: Magnus Templing <magnus.templing@stericsson.com>
-Reviewed-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/spi/amba-pl022.c |   22 ++++++++++++++--------
- 1 files changed, 14 insertions(+), 8 deletions(-)
+Also, I wouldn't mind changing the name, if someone comes up with a better
+term than arm-subarch.git.
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 08de58e..1f84a8a 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -24,11 +24,6 @@
-  * GNU General Public License for more details.
-  */
- 
--/*
-- * TODO:
-- * - add timeout on polled transfers
-- */
--
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/device.h>
-@@ -287,6 +282,8 @@
- 
- #define CLEAR_ALL_INTERRUPTS  0x3
- 
-+#define SPI_POLLING_TIMEOUT 1000
-+
- 
- /*
-  * The type of reading going on on this chip
-@@ -1378,6 +1375,7 @@ static void do_polling_transfer(struct pl022 *pl022)
- 	struct spi_transfer *transfer = NULL;
- 	struct spi_transfer *previous = NULL;
- 	struct chip_data *chip;
-+	unsigned long timeout;
- 
- 	chip = pl022->cur_chip;
- 	message = pl022->cur_msg;
-@@ -1415,9 +1413,17 @@ static void do_polling_transfer(struct pl022 *pl022)
- 		       SSP_CR1(pl022->virtbase));
- 
- 		dev_dbg(&pl022->adev->dev, "polling transfer ongoing ...\n");
--		/* FIXME: insert a timeout so we don't hang here indefinitely */
--		while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end)
-+
-+		timeout = jiffies + msecs_to_jiffies(SPI_POLLING_TIMEOUT);
-+		while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end) {
-+			if (time_after(jiffies, timeout)) {
-+				dev_warn(&pl022->adev->dev,
-+				"%s: timeout!\n", __func__);
-+				message->state = STATE_ERROR;
-+				goto out;
-+			}
- 			readwriter(pl022);
-+		}
- 
- 		/* Update total byte transferred */
- 		message->actual_length += pl022->cur_transfer->len;
-@@ -1426,7 +1432,7 @@ static void do_polling_transfer(struct pl022 *pl022)
- 		/* Move to next transfer */
- 		message->state = next_transfer(pl022);
- 	}
--
-+out:
- 	/* Handle end of message */
- 	if (message->state == STATE_DONE)
- 		message->status = 0;
--- 
-1.7.3.2
+	Arnd
