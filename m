@@ -1,106 +1,43 @@
-From: mgorman@suse.de (Mel Gorman)
-Date: Thu, 19 May 2011 10:23:33 +0100
-Subject: [PATCH] ARM: sparsemem: allow pfn_valid to be overridden when
-	using SPARSEMEM
-In-Reply-To: <1305795317.29560.9.camel@e102144-lin.cambridge.arm.com>
-References: <1305734639-6561-1-git-send-email-will.deacon@arm.com>
-	<20110518165910.GS5279@suse.de>
-	<1305795317.29560.9.camel@e102144-lin.cambridge.arm.com>
-Message-ID: <20110519092333.GU5279@suse.de>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 19 May 2011 11:24:47 +0200
+Subject: atmel-mci causes kernel panic when CONFIG_DEBUG_VM is set
+In-Reply-To: <BANLkTinaPW5xcdrNewJC6OW9nqWHC_-TVw@mail.gmail.com>
+References: <4DD4CC68.80408@atmel.com>
+	<BANLkTinaPW5xcdrNewJC6OW9nqWHC_-TVw@mail.gmail.com>
+Message-ID: <4DD4E1DF.7030005@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 09:55:17AM +0100, Will Deacon wrote:
-> Hi Mel,
-> 
-> Thanks for looking at this.
-> 
-> On Wed, 2011-05-18 at 17:59 +0100, Mel Gorman wrote:
-> > On Wed, May 18, 2011 at 05:03:59PM +0100, Will Deacon wrote:
-> > > In commit eb33575c ("[ARM] Double check memmap is actually valid with a
-> > > memmap has unexpected holes V2"), a new function, memmap_valid_within,
-> > > was introduced to mmzone.h so that holes in the memmap which pass
-> > > pfn_valid in SPARSEMEM configurations can be detected and avoided.
-> > >
-> > > The fix to this problem checks that the pfn <-> page linkages are
-> > > correct by calculating the page for the pfn and then checking that
-> > > page_to_pfn on that page returns the original pfn. Unfortunately, in
-> > > SPARSEMEM configurations, this results in reading from the page flags to
-> > > determine the correct section. Since the memmap here has been freed,
-> > > junk is read from memory and the check is no longer robust.
-> > >
-> > > In the best case, reading from /proc/pagetypeinfo will give you the
-> > > wrong answer. In the worst case, you get SEGVs, Kernel OOPses and hung
-> > > CPUs.
-> > >
-> > > This patch allows architectures to provide their own pfn_valid function
-> > > instead of using the default implementation used by sparsemem. The
-> > > architecture-specific version is aware of the memmap state and will
-> > > return false when passed a pfn for a freed page within a valid section.
-> > >
-> > > Cc: Russell King <linux@arm.linux.org.uk>
-> > > Cc: Mel Gorman <mgorman@suse.de>
-> > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > 
-> > I don't have an ARM machine to test on and I'm not particularly
-> > sensitive to the requirements of ARM so I'm not the best reviewer. If
-> > this passes tests, I see little problem with it other than the
-> > architecture-specific pfn_valid is slower than the sparsemem equivalent
-> > and the cache footprint is probably higher as memblock_is_memory
-> > is searching a list of blocks. 
-> 
-> Yes, it is slower than just checking to see if the sparsemem section is
-> valid but that is the price you pay for partially populated sections. At
-> the end of the day, we're just falling back to the pfn_valid definition
-> that is used when !CONFIG_SPARSEMEM.
-> 
+On 5/19/2011 10:04 AM, Barry Song wrote:
+> 2011/5/19 Ludovic Desroches<ludovic.desroches@atmel.com>:
+>> Hello,
+>>
+>> There is a bug with the atmel-mci driver when the debug feature
+>> CONFIG_DEBUG_VM is set.
+>>
+>> Into the atmci_read_data_pio function we use flush_dcache_page (do we really
+>> need it?) which call the page_mapping function where we can find
+>> VM_BUG_ON(PageSlab(Page)). Then a kernel panic happens.
+>>
+>> I don't understand the purpose of the VM_BUG_ON(PageSlab(Page)) (the page
+>> comes from a scatter list). How could I correct this problem?
+> linux/include/linux/mmdebug.h:
+>
+> #ifdef CONFIG_DEBUG_VM
+> #define VM_BUG_ON(cond) BUG_ON(cond)
+> #else
+> #define VM_BUG_ON(cond) do { (void)(cond); } while (0)
+> #endif
+>
+> it is something like "assert" in kernel.
 
-Ok.
+Thanks for your answer but I know that. My question is more focused on 
+why there is this check.
 
-> > If this problem is exclusive to
-> > reading /proc/pagetypeinfo, you might want to consider only using
-> > memblock_is_memory in that case. Otherwise, functionally it looks like
-> > it should work.
-> 
-> I initially thought it was exclusive to that operation, but it turns out
-> the problem is more far-reaching as pfn_valid is used by things like the
-> ioremap code to ensure that we don't remap normal memory.
-> 
+Is flushing a page taken from a slab forbidden ? Is it risky ? Is it no 
+sense ?
 
-That would justify it. Might want to stick that into the changelog
-because we'll forget it and someone will "fix" it :)
 
-> > > diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-> > > index e56f835..72225dd 100644
-> > > --- a/include/linux/mmzone.h
-> > > +++ b/include/linux/mmzone.h
-> > > @@ -1053,12 +1053,14 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
-> > >       return __nr_to_section(pfn_to_section_nr(pfn));
-> > >  }
-> > > 
-> > > +#ifndef CONFIG_ARCH_PROVIDES_PFN_VALID
-> > >  static inline int pfn_valid(unsigned long pfn)
-> > >  {
-> > >       if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-> > >               return 0;
-> > >       return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
-> > >  }
-> > > +#endif
-> > > 
-> > >  static inline int pfn_present(unsigned long pfn)
-> > >  {
-> 
-> Can I add your Ack for the changes to mmzone.h please?
-> 
+Regards,
 
-Minor nit on the name but it'd be nice if it was simile to
-CONFIG_HAVE_ARCH_EARLY_PFN_TO_NID as they are both related to the
-memory model. Whether you do it or not in a v2, I'll ack the mmzone.h
-change;
-
-Acked-by: Mel Gorman <mgorman@suse.de>
-
--- 
-Mel Gorman
-SUSE Labs
+Ludovic
