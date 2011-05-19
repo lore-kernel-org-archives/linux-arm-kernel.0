@@ -1,52 +1,204 @@
-From: paulo@nlink.com.br (Paulo Fragoso)
-Date: Thu, 19 May 2011 17:13:31 -0300
-Subject: External serial 8250/16550
-In-Reply-To: <4DCB449C.8060808@nlink.com.br>
-References: <4DB44883.3000608@nlink.com.br>	<BANLkTinMrZvO_bNcAKXvaa_pXE+jOxO2uw@mail.gmail.com>	<4DC3F035.9030208@nlink.com.br>	<4DC8AFF9.9030508@nlink.com.br>
-	<4DCB449C.8060808@nlink.com.br>
-Message-ID: <4DD579EB.50609@nlink.com.br>
+From: wad@chromium.org (Will Drewry)
+Date: Thu, 19 May 2011 16:05:14 -0500
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
+	filtering
+In-Reply-To: <1305807728.11267.25.camel@gandalf.stny.rr.com>
+References: <20110513125452.GD3924@elte.hu> <1305292132.2466.26.camel@twins>
+	<20110513131800.GA7883@elte.hu> <1305294935.2466.64.camel@twins>
+	<20110513145737.GC32688@elte.hu>
+	<1305563026.5456.19.camel@gandalf.stny.rr.com>
+	<20110516165249.GB10929@elte.hu>
+	<1305565422.5456.21.camel@gandalf.stny.rr.com>
+	<20110517124212.GB21441@elte.hu>
+	<1305637528.5456.723.camel@gandalf.stny.rr.com>
+	<20110517131902.GF21441@elte.hu>
+	<BANLkTikBK3-KZ10eErQ6Eex_L6Qe2aZang@mail.gmail.com>
+	<1305807728.11267.25.camel@gandalf.stny.rr.com>
+Message-ID: <BANLkTiki8aQJbFkKOFC+s6xAEiuVyMM5MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em 11/05/2011 23:23, Paulo Fragoso escreveu:
-> On 10-05-2011 00:24, Paulo Fragoso wrote:
-> I have one doubt about new-style UART initialization, how can I
-> initialize a board using AT91sam9 with two internal USART and two
-> external 8250 UART at same time?
+On Thu, May 19, 2011 at 7:22 AM, Steven Rostedt <rostedt@goodmis.org> wrote:
+> On Wed, 2011-05-18 at 21:07 -0700, Will Drewry wrote:
 >
-> For example:
+>> Do event_* that return non-void exist in the tree at all now? ?I've
+>> looked at the various tracepoint macros as well as some of the other
+>> handlers (trace_function, perf_tp_event, etc) and I'm not seeing any
+>> places where a return value is honored nor could be. ?At best, the
+>> perf_tp_event can be short-circuited it in the hlist_for_each, but
+>> it'd still need a way to bubble up a failure and result in not calling
+>> the trace/event that the hook precedes.
 >
-> /* DGBU on ttyS0. (Rx & Tx only) */
-> at91_register_uart(0, 0, 0);
->
-> /* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
-> at91_register_uart(AT91SAM9G45_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
->
-> /* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
-> at91_register_uart(AT91SAM9G45_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
->
-> If I wish to put two more 8250 external serial in sequence (ttyS3 and
-> ttyS4) which ID will be used at at91_register_uart function?
->
-> Looking at91_register_uart function all structs pdev are defined
-> internaly, how I will define serila8250 platform_device and pass at
-> at91_register_uart function?
+> No, none of the current trace hooks have return values. That was what I
+> was talking about how to implement in my previous emails.
 
-I discovered NCS1 is always on level 0 (selected) and NCS2 is always on 
-level 1, those lines never change its state after boot, and they were 
-configured correctly:
+Led on by complete ignorance, I think I'm finally beginning to untwist
+the different pieces of the tracing infrastructure.  Unfortunately,
+that means I took a few wrong turns along the way...
 
-     sam9_smc_configure(1, &tms_uart_smc_config);
-     sam9_smc_configure(2, &tms_uart_smc_config);
+I think function tracing looks something like this:
 
-Entire file is here: 
-http://users.nlink.com.br/~paulo/TMS/20110519/board-sweda_tms2.c
+ftrace_call has been injected into at a specific callsite.  Upon hit:
+1. ftrace_call triggers
+2. does some checks then calls ftrace_trace_function (via mcount instrs)
+3. ftrace_trace_function may be a single func or a list. For a list it
+will be: ftrace_list_func
+4. ftrace_list_func calls each registered hook for that function in a
+while loop ignoring return values
+5. registered hook funcs may then track the call, farm it out to
+specific sub-handlers, etc.
 
-This explain constant output on COMA from TL16C2550 and COMB is detected 
-at boot time but doesn't work.
+This seems to be a red herring for my use case :/ though this helped
+me understand your back and forth (Ingo & Steve) regarding dynamic
+versus explicit events.
 
-I will research what can be happening but what can be wrong with NCS1 
-and NCS2?
 
-Thanks,
-Paulo.
+System call tracing is done via kernel/tracepoint.c events fed in via
+arch/[arch]/kernel/ptrace.c where it calls trace_sys_enter.  This
+yields direct sys_enter and sys_exit event sources (and an event class
+to hook up per-system call events).  This means that
+ftrace_syscall_enter() does the event prep prior to doing a filter
+check comparing the ftrace_event object for the given syscall_nr to
+the event data.  perf_sysenter_enter() is similar but it pushes the
+info over to perf_tp_event to be matched not against the global
+syscall event entry, but against any sub-event in the linked list on
+that syscall's event.
+
+Is that roughly an accurate representation of the two?  I wish I
+hadn't gotten distracted along the function path, but at least I
+learned something (and it is relevant to the larger scope of this
+thread's discussion).
+
+
+After doing that digging, it looks like providing hook call
+pre-emption and return value propagation will be a unique and fun task
+for each tracer and event subsystem.  If I look solely at tracepoints,
+a generic change would be to make the trace_##subsys function return
+an int (which I think was the event_vfs_getname proposal?).  The other
+option is to change the trace_sys_enter proto to include a 'int
+*retcode'.
+
+That change would allow the propagation of some sort of policy
+information.  To put it to use, seccomp mode 1 could be implemented on
+top of trace_syscalls.  The following changes would need to happen:
+1. dummy metadata should be inserted for all unhooked system calls
+2. perf_trace_buf_submit would need to return an int or a new
+TRACE_REG_SECCOMP_REGISTER handler would need to be setup in
+syscall_enter_register.
+3. If perf is abused, a "kill/fail_on_discard" bit would be added to
+event->attrs.
+4. perf_trace_buf_submit/perf_tp_event will return 0 for no matches,
+'n' for the number of event matches, and -EACCES/? if a
+'fail_on_discard' event is seen.
+5. perf_syscall_enter would set *retcode = perf_trace_buf_submit()'s retcode
+6. trace_sys_enter() would need to be moved to be the first entry
+arch/../kernel/ptrace.c for incoming syscalls
+7. if trace_sys_enter() yields a negative return code, then
+do_exit(SIGKILL) the process and return.
+
+Entering into seccomp mode 1 would require adding a  "0" filter for
+every system call number (which is why we need a dummy event call for
+them since failing to check the bitmask can't be flagged
+fail_on_discard) with the fail_on_discard bit.  For the three calls
+that are allowed, a '1' filter would be set.
+
+That would roughly implement seccomp mode 1.  It's pretty ugly and the
+fact that every system call that's disallowed has to be blacklisted is
+not ideal.  An alternate model would be to just use the seccomp mode
+as we do today and let secure_computing() handle the return code of "#
+of matches".  If it the # of matches is 0, it terminates. A
+'fail_on_discard' bit then would only be good to stop further
+tracepoint callback evaluation.  This approach would also *almost* nix
+the need to provide dummy syscall hooks.  (Since sigreturn isn't
+hooked on x86 because it uses ptregs fixup, a dummy would still be
+needed to apply a "1" filter to.)
+
+Even with that tweak to move to a whitelist model, the perf event
+evaluation and tracepoint callback ordering is still not guaranteed.
+Without changing tracepoint itself, all other TPs will still execute.
+And for perf events, it'll be first-come-first-serve until a
+fail_on_discard is hit.
+
+After using seccomp mode=1 as the sample case to reduce scope, it's
+possible to ignore it for now :) and look at the seccomp-filter/mode=2
+case.  The same mechanism could be used to inject more expressive
+filters.  This would be done over the sys_perf_event_open() interface
+assuming the new attr is added to stop perf event list enumeration.
+Assuming a whitelist model, a call to prctl(PR_SET_SECCOMP, 2) would
+be needed (maybe with the ON_EXEC flag option too to mirror the
+event->attr on-exec bit). That would yield the ability to register
+perf events for system calls then use ioctl() to SET_FILTER on them.
+
+Reducing the privileges of the filters after installation could be
+done with another attribute bit like 'set_filter_ands'.  If that is
+also set on the event, and a filter is installed to ensure that
+sys_perf_event_open is blocked, then it should be reasonably sane.
+
+I'd need to add a PERF_EVENT_IOC_GET_FILTER handler to allow
+extracting the settings.
+
+Clearly, I haven't written the code for that yet, though making the
+change for a single platform shouldn't be too much code.
+
+So that leaves me with some questions:
+- Is this the type of reuse that was being encouraged?
+- Does it really make sense to cram this through the perf interface
+and events?  While the changed attributes are innocuous and
+potentially reusable, it seems that a large amount of the perf
+facilities are exposed that could have weird side effects, but I'm
+sure I still don't fully grok the perf infrastructure.
+- Does extending one tracepoint to provide return values via a pointer
+make sense? I'd hesitate to make all tracepoint hooks return an int by
+default.
+- If all tracepoints returned an int, what would the standard value
+look like - or would it need to be per tracepoint impl?
+- How is ambiguity resolved if multiple perf_events are registered for
+a syscall with different filters?  Maybe a 'stop_on_match'? though
+ordering is still a problem then.
+- Is there a way to affect a task-wide change without a seccomp flag
+(or new task_struct entry) via the existing sys_perf_event_open
+syscall?  I considered suggesting a attr bit call 'secure_computing'
+that when an event with the bit is enabled, it automagically forces
+the task into seccomp enforcement mode, but that, again, seemed
+hackish.
+
+While I like the idea of sharing the tracepoints infrastructure and
+the trace_syscalls hooks as well as using a pre-existing interface
+with very minor changes, I'm worried that the complexity of the
+interface and of the infrastructure might undermine the ability to
+continue meeting the desired security goals.  I had originally stayed
+very close to the seccomp world because of how trivial it is to review
+the code and verify its accuracy/effectiveness.  This approach leaves
+a lot of gaps for kernel code to seep through and a fair amount of
+ambiguity in what locked down syscall filters might look like.
+
+To me, the best part of the above is that it shows that even if we go
+with a prctl SET_SECCOMP_FILTER-style interface, it is completely
+certain that if a perf/ftrace-based security infrastructure is on our
+future, it will be entirely compatible -- even if the prctl()
+interface is just the "simpler" interface at that point somewhere down
+the road.
+
+
+Regardless, I'll hack up a proof of concept based on the outline
+above. Perhaps something more elegant will emerge once I start
+tweaking the source, but I'm still seeing too many gaps to be
+comfortable so far.
+
+
+[[There is a whole other approach to this too. We could continue with
+the prctl() interface and mirror the trace_sys_enter model for
+secure_computing().   Instead of keeping a seccomp_t-based hlist of
+events, they could be stored in a new hlist for seccomp_events in
+struct ftrace_event_call.  The ftrace filters would be installed there
+and the seccomp_syscall_enter() function could do the checks and pass
+up some state data on the task's seccomp_t that indicates it needs to
+do_exit().  That would likely reduce the amount of code in
+seccomp_filter.c pretty seriously (though not entirely
+beneficially).]]
+
+
+Thanks again for all the feedback and insights! I really hope we can
+come to an agreeable approach for implementing kernel attack surface
+reduction.
+will
