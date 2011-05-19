@@ -1,40 +1,29 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 19 May 2011 15:31:34 -0400 (EDT)
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <20110519192817.GB7445@n2100.arm.linux.org.uk>
-References: <201105181047.17309.arnd@arndb.de>
-	<BANLkTim_0eRvDkQwAYjTNQsOVQiHV+DdBQ@mail.gmail.com>
-	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>
-	<BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
-	<BANLkTi=OdvDT6MEk-RxiTNnX-rbwTOqrrw@mail.gmail.com>
-	<20110519192817.GB7445@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1105191531170.14430@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 19 May 2011 15:34:44 -0400 (EDT)
+Subject: [PATCH 0/7] Move Qualcomm gpio drivers into drivers dir
+In-Reply-To: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1105191533250.14430@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 May 2011, Russell King - ARM Linux wrote:
+On Wed, 18 May 2011, David Brown wrote:
 
-> On Thu, May 19, 2011 at 03:31:42PM +0200, Linus Walleij wrote:
-> > On Thu, May 19, 2011 at 5:01 AM, Barry Song <21cnbao@gmail.com> wrote:
-> > 
-> > > i asked this because we wanted to send the source codes of
-> > > CSR(http://www.csr.com) to upstream as i have told you in LDS. it
-> > > looks like we need to follow the below new changes to make our source
-> > > codes acceptable?
-> > > 1. arm device tree
-> > > 2. new pinmux framework from Linus Walleij
-> > 
-> > I'm working on that to post a new v3 of this patch set ASAP, if the
-> > ARM subarch tree maintainers are interested I can send them a
-> > pull request after that.
+> This patch series moves the Qualcomm MSM gpio device drivers into the
+> drivers/gpio directory.
 > 
-> As my tree currently contains a large proportion of the consolidation work
-> so far, it probably makes sense for this stuff to continue coming through
-> my tree so that we can sort out any merge conflicts there, rather than
-> starting on a new tree... It probably makes sense for the subarch tree to
-> get going after this merge window has closed.
+> The MSM's have two flavors of gpio driver.  The one for the newer
+> v7-based chips is a bit cleaner, and can just be moved.  The one for
+> the older v6-based chips took some cleanup to get rid of numerous
+> ifdefs based on the particular machine.  Both drivers can now be
+> selected and will be used on appropriate targets.
+> 
+> There is still a minor entanglement with the MSM-specific gpiomux
+> code.  This will be cleaned up as MSM moves to use pinmux.
 
-Agreed.
+Looks good.
+
+Acked-by: Nicolas Pitre <nicolas.pitre@l;inaro.org>
 
 
 Nicolas
