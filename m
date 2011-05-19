@@ -1,89 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 May 2011 09:55:17 +0100
-Subject: [PATCH] ARM: sparsemem: allow pfn_valid to be overridden when
-	using SPARSEMEM
-In-Reply-To: <20110518165910.GS5279@suse.de>
-References: <1305734639-6561-1-git-send-email-will.deacon@arm.com>
-	<20110518165910.GS5279@suse.de>
-Message-ID: <1305795317.29560.9.camel@e102144-lin.cambridge.arm.com>
+Date: Thu, 19 May 2011 09:56:21 +0100
+Subject: [PATCH] ARM: sparsemem: fix highmem detection when using SPARSEMEM
+In-Reply-To: <alpine.LFD.2.00.1105181341320.14430@xanadu.home>
+References: <1305734711-6710-1-git-send-email-will.deacon@arm.com>
+	<alpine.LFD.2.00.1105181341320.14430@xanadu.home>
+Message-ID: <1305795381.29560.10.camel@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mel,
-
-Thanks for looking at this.
-
-On Wed, 2011-05-18 at 17:59 +0100, Mel Gorman wrote:
-> On Wed, May 18, 2011 at 05:03:59PM +0100, Will Deacon wrote:
-> > In commit eb33575c ("[ARM] Double check memmap is actually valid with a
-> > memmap has unexpected holes V2"), a new function, memmap_valid_within,
-> > was introduced to mmzone.h so that holes in the memmap which pass
-> > pfn_valid in SPARSEMEM configurations can be detected and avoided.
+On Wed, 2011-05-18 at 18:42 +0100, Nicolas Pitre wrote:
+> On Wed, 18 May 2011, Will Deacon wrote:
+> 
+> > sanity_check_meminfo walks over the registered memory banks and attempts
+> > to split banks across lowmem and highmem when they would otherwise
+> > overlap with the vmalloc space.
 > >
-> > The fix to this problem checks that the pfn <-> page linkages are
-> > correct by calculating the page for the pfn and then checking that
-> > page_to_pfn on that page returns the original pfn. Unfortunately, in
-> > SPARSEMEM configurations, this results in reading from the page flags to
-> > determine the correct section. Since the memmap here has been freed,
-> > junk is read from memory and the check is no longer robust.
+> > When SPARSEMEM is used, there are two potential problems that occur
+> > when the virtual address of the start of a bank is equal to vmalloc_min.
 > >
-> > In the best case, reading from /proc/pagetypeinfo will give you the
-> > wrong answer. In the worst case, you get SEGVs, Kernel OOPses and hung
-> > CPUs.
+> >  1.) The end of lowmem is calculated as __pa(vmalloc_min - 1) + 1.
+> >      In the above scenario, this will give the end address of the
+> >      previous bank, rather than the actual bank we are interested in.
+> >      This value is later used as the memblock limit and artificially
+> >      restricts the total amount of available memory.
 > >
-> > This patch allows architectures to provide their own pfn_valid function
-> > instead of using the default implementation used by sparsemem. The
-> > architecture-specific version is aware of the memmap state and will
-> > return false when passed a pfn for a freed page within a valid section.
+> >  2.) The checks to determine whether or not a bank belongs to highmem
+> >      or not only check if __va(bank->start) is greater or less than
+> >      vmalloc_min. In the case that it is equal, the bank is incorrectly
+> >      treated as lowmem, which hoses the vmalloc area.
+> >
+> > This patch fixes these two problems by checking whether the virtual
+> > start address of a bank is >= vmalloc_min and then calculating
+> > lowmem_end by finding the virtual end address of the highest lowmem
+> > bank.
 > >
 > > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Mel Gorman <mgorman@suse.de>
 > > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 > > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> I don't have an ARM machine to test on and I'm not particularly
-> sensitive to the requirements of ARM so I'm not the best reviewer. If
-> this passes tests, I see little problem with it other than the
-> architecture-specific pfn_valid is slower than the sparsemem equivalent
-> and the cache footprint is probably higher as memblock_is_memory
-> is searching a list of blocks. 
+> Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-Yes, it is slower than just checking to see if the sparsemem section is
-valid but that is the price you pay for partially populated sections. At
-the end of the day, we're just falling back to the pfn_valid definition
-that is used when !CONFIG_SPARSEMEM.
-
-> If this problem is exclusive to
-> reading /proc/pagetypeinfo, you might want to consider only using
-> memblock_is_memory in that case. Otherwise, functionally it looks like
-> it should work.
-
-I initially thought it was exclusive to that operation, but it turns out
-the problem is more far-reaching as pfn_valid is used by things like the
-ioremap code to ensure that we don't remap normal memory.
-
-> > diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-> > index e56f835..72225dd 100644
-> > --- a/include/linux/mmzone.h
-> > +++ b/include/linux/mmzone.h
-> > @@ -1053,12 +1053,14 @@ static inline struct mem_section *__pfn_to_section(unsigned long pfn)
-> >       return __nr_to_section(pfn_to_section_nr(pfn));
-> >  }
-> > 
-> > +#ifndef CONFIG_ARCH_PROVIDES_PFN_VALID
-> >  static inline int pfn_valid(unsigned long pfn)
-> >  {
-> >       if (pfn_to_section_nr(pfn) >= NR_MEM_SECTIONS)
-> >               return 0;
-> >       return valid_section(__nr_to_section(pfn_to_section_nr(pfn)));
-> >  }
-> > +#endif
-> > 
-> >  static inline int pfn_present(unsigned long pfn)
-> >  {
-
-Can I add your Ack for the changes to mmzone.h please?
-
-Thanks,
+Thanks Nicolas!
 
 Will
