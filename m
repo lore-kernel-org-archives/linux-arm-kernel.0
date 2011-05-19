@@ -1,51 +1,63 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 May 2011 18:47:20 +0200
-Subject: i.MX consolidation patches
-Message-ID: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+Date: Thu, 19 May 2011 18:47:21 +0200
+Subject: [PATCH 1/8] ARM i.MX: fix last user of iomux.h and remove it
+In-Reply-To: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1305823648-2428-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following series cleans up some ifdeffery and in the end
-allows to compile all armv4 and armv5 based i.MXs together in a
-single kernel. The corresponding defconfigs are merged into one.
-
-This series breaks XIP support for these i.MXs. It should be possible
-to keep it, but it would require another level of Kconfig indirection
-which I wanted to avoid.
-
-Sascha
-
-Sascha Hauer (7):
-      ARM i.MX: fix last user of iomux.h and remove it
-      ARM i.MX: define CLOCK_TICK_RATE to bogus value
-      ARM i.MX: remove SoC defines around header includes
-      ARM i.MX: dmav1: kill SoC ifdefs
-      ARM i.MX Allow to compile together i.MX1/21/25/27
-      ARM i.MX mxc.h: use CONFIG_SOC_* instead of CONFIG_ARCH_*
-      ARM i.MX debug macro: use CONFIG_SOC_* instead of CONFIG_ARCH_*
-
-Uwe Kleine-K?nig (1):
-      ARM: mxc: update defconfigs
-
- .../{mx27_defconfig => imx_armv4_armv5_defconfig}  |   59 ++++++++++--
- arch/arm/configs/mx1_defconfig                     |   91 ------------------
- arch/arm/configs/mx21_defconfig                    |   97 --------------------
- arch/arm/configs/mx3_defconfig                     |   43 +++++++--
- arch/arm/configs/mx51_defconfig                    |   55 +++++++++--
- arch/arm/mach-imx/Kconfig                          |   51 ++++-------
- arch/arm/mach-imx/Makefile                         |   10 +-
- arch/arm/mach-imx/Makefile.boot                    |   16 ---
- arch/arm/mach-imx/dma-v1.c                         |   25 +-----
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |    2 +-
- arch/arm/plat-mxc/Kconfig                          |   18 +---
- arch/arm/plat-mxc/devices/platform-imx-dma.c       |    2 +-
- arch/arm/plat-mxc/include/mach/debug-macro.S       |   10 +-
- arch/arm/plat-mxc/include/mach/hardware.h          |   28 +-----
- arch/arm/plat-mxc/include/mach/iomux.h             |   26 -----
- arch/arm/plat-mxc/include/mach/mxc.h               |    8 +-
- arch/arm/plat-mxc/include/mach/timex.h             |   13 +--
- 17 files changed, 177 insertions(+), 377 deletions(-)
- rename arch/arm/configs/{mx27_defconfig => imx_armv4_armv5_defconfig} (72%)
- delete mode 100644 arch/arm/configs/mx1_defconfig
- delete mode 100644 arch/arm/configs/mx21_defconfig
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c |    2 +-
+ arch/arm/plat-mxc/include/mach/iomux.h      |   26 --------------------------
+ 2 files changed, 1 insertions(+), 27 deletions(-)
  delete mode 100644 arch/arm/plat-mxc/include/mach/iomux.h
+
+diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+index 7ae43b1..6864496 100644
+--- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
++++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
+@@ -34,7 +34,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/time.h>
+ #include <mach/common.h>
+-#include <mach/iomux.h>
++#include <mach/iomux-mx27.h>
+ 
+ #include "devices-imx27.h"
+ 
+diff --git a/arch/arm/plat-mxc/include/mach/iomux.h b/arch/arm/plat-mxc/include/mach/iomux.h
+deleted file mode 100644
+index 3d226d7..0000000
+--- a/arch/arm/plat-mxc/include/mach/iomux.h
++++ /dev/null
+@@ -1,26 +0,0 @@
+-/*
+- * Copyright (C) 2010 Uwe Kleine-Koenig, Pengutronix
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms of the GNU General Public License version 2 as published by
+- * the Free Software Foundation.
+- */
+-#ifndef __MACH_IOMUX_H__
+-#define __MACH_IOMUX_H__
+-
+-/* This file will go away, please include mach/iomux-mx... directly */
+-
+-#ifdef CONFIG_ARCH_MX1
+-#include <mach/iomux-mx1.h>
+-#endif
+-#ifdef CONFIG_ARCH_MX2
+-#include <mach/iomux-mx2x.h>
+-#ifdef CONFIG_MACH_MX21
+-#include <mach/iomux-mx21.h>
+-#endif
+-#ifdef CONFIG_MACH_MX27
+-#include <mach/iomux-mx27.h>
+-#endif
+-#endif
+-
+-#endif /* __MACH_IOMUX_H__ */
+-- 
+1.7.4.1
