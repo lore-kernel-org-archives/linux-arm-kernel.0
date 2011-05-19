@@ -1,35 +1,39 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 19 May 2011 13:53:34 +0100
-Subject: [PATCH v6 0/8] Switch ARM platforms from integrator-flash to
-	physmap
-In-Reply-To: <1305803946.2630.69.camel@localhost>
-References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>
-	<1305803946.2630.69.camel@localhost>
-Message-ID: <1305809614.27474.41.camel@e102391-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 May 2011 15:17:35 +0200
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <BANLkTim2rv9QHDd2zjBfyVqG9dSGCM=PAw@mail.gmail.com>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTi=poU17RqAzp28CPjWHrN_+aFiyag@mail.gmail.com>
+	<BANLkTindee6UMez8HyBUwd2H6mN-DknzPw@mail.gmail.com>
+	<BANLkTik7BnJKWCsm2L3-GJPTaaiXFNSgaA@mail.gmail.com>
+	<BANLkTim2rv9QHDd2zjBfyVqG9dSGCM=PAw@mail.gmail.com>
+Message-ID: <BANLkTinABWucqESqSRYJV+-frm6vDmpxFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-19 at 14:19 +0300, Artem Bityutskiy wrote:
-> On Tue, 2011-05-17 at 14:11 +0100, Marc Zyngier wrote:
-> > As the integrator-flash driver is mostly a duplicate of physmap,
-> > move all users of this driver to physmap and get rid of the
-> > then unused driver.
-> > 
-> > Also change the set_vpp() method in physmap to pass the
-> > platform_device instead of the map_info. This allows for a substantial
-> > cleanup in drivers/mtd/maps/pismo.c
-> > 
-> > This patch set has been ok'ed by RMK, who is willing to take it
-> > through his tree. This requires an ACK from the MTD maintainers. David
-> > Woodhouse cc-ed on the whole patch set in case he'd prefer to merge it
-> > via the MTD tree.
-> 
-> I assume the whole series will go in via some subsystem arm tree?
-> 
+On Thu, May 19, 2011 at 2:35 PM, Barry Song <21cnbao@gmail.com> wrote:
+> 2011/5/19 Linus Walleij <linus.walleij@linaro.org>:
+>> On Thu, May 19, 2011 at 1:38 PM, Barry Song <21cnbao@gmail.com> wrote:
+>>>
+>>> looks like the driver can't be a real module, is the module_exit
+>>> suitable? it looks strange module_exit plays together with
+>>> arch_initcall.
+>>
+>> It's a rather common design pattern in the kernel for early
+>> platform drivers. Either the dependencies are resolved by the
+>> different initlevels or they are resolved in probe order with
+>> loadable modules. Module load will call all initlevels in order.
+>>
+>> It is not elegant but it is common.
+>
+> Linus, thanks for your reply. module_exit and related functions are
+> really useless codes. but people have done that before, then we have
+> no way except following.
+> u300_gpio_exit never gets chance to run and when we disassemble
+> vmlinux, u300_gpio_exit() ?function should be not in the final binary
+> at all, just a symbol name is left.
 
-Yes, it's been merged by Russell into his tree yesterday, after David's
-ack.
+I know. I can make the Kconfig options tristate if it makes you feel
+better...
 
-	M.
--- 
-Reality is an implementation detail.
+Linus Walleij
