@@ -1,57 +1,52 @@
-From: mad_soft@inbox.ru (Dmitry Artamonow)
-Date: Fri, 20 May 2011 00:06:11 +0400
-Subject: [PATCH 6/6] ARM: tegra: paz00: enable wifi card
-In-Reply-To: <1305806910-3903-7-git-send-email-marvin24@gmx.de>
-References: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
-	<1305806910-3903-7-git-send-email-marvin24@gmx.de>
-Message-ID: <20110519200611.GA20596@rainbow>
+From: paulo@nlink.com.br (Paulo Fragoso)
+Date: Thu, 19 May 2011 17:13:31 -0300
+Subject: External serial 8250/16550
+In-Reply-To: <4DCB449C.8060808@nlink.com.br>
+References: <4DB44883.3000608@nlink.com.br>	<BANLkTinMrZvO_bNcAKXvaa_pXE+jOxO2uw@mail.gmail.com>	<4DC3F035.9030208@nlink.com.br>	<4DC8AFF9.9030508@nlink.com.br>
+	<4DCB449C.8060808@nlink.com.br>
+Message-ID: <4DD579EB.50609@nlink.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:08 Thu 19 May     , Marc Dietrich wrote:
-> The Wifi card attached to one usb port needs to be unkilled. The
-> corresponding gpio and also the gpio for the LED are exported to be
-> controlled by userspace later on.
-> 
-> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
+Em 11/05/2011 23:23, Paulo Fragoso escreveu:
+> On 10-05-2011 00:24, Paulo Fragoso wrote:
+> I have one doubt about new-style UART initialization, how can I
+> initialize a board using AT91sam9 with two internal USART and two
+> external 8250 UART at same time?
+>
+> For example:
+>
+> /* DGBU on ttyS0. (Rx & Tx only) */
+> at91_register_uart(0, 0, 0);
+>
+> /* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
+> at91_register_uart(AT91SAM9G45_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
+>
+> /* USART1 on ttyS2. (Rx, Tx, RTS, CTS) */
+> at91_register_uart(AT91SAM9G45_ID_US1, 2, ATMEL_UART_CTS | ATMEL_UART_RTS);
+>
+> If I wish to put two more 8250 external serial in sequence (ttyS3 and
+> ttyS4) which ID will be used at at91_register_uart function?
+>
+> Looking at91_register_uart function all structs pdev are defined
+> internaly, how I will define serila8250 platform_device and pass at
+> at91_register_uart function?
 
-[snip]
+I discovered NCS1 is always on level 0 (selected) and NCS2 is always on 
+level 1, those lines never change its state after boot, and they were 
+configured correctly:
 
-> +static void __init paz00_wifi_init(void)
-> +{
-> +	int ret;
-> +
-> +	/* unlock hw rfkill */
-> +	ret = gpio_request_one(TEGRA_WIFI_PWRN, GPIOF_OUT_INIT_HIGH,
-> +			"wifi_pwrn");
-> +	if(ret) {
-> +		pr_warning("WIFI: could not request PWRN gpio!\n");
-> +		return;
-> +	}
-> +	gpio_export(TEGRA_WIFI_PWRN, 0);
+     sam9_smc_configure(1, &tms_uart_smc_config);
+     sam9_smc_configure(2, &tms_uart_smc_config);
 
-Although enabling wifi on boot may be OK for now, I think in long term
-it would be better and more proper to use rfkill infrastructure for this
-instead of just exporting gpio to userspace. There were some patches for
-gpio-based rfkill switch floating around lately. This is one the versions:
-https://lkml.org/lkml/2011/5/6/372
-Not sure about their status and if they are directly suitable for PAZ00, but
-you may have a look. Btw, there's also another mostly generic gpio-rfkill
-driver in the tree I'm aware of - see arch/arm/mach-pxa/tosa-bt.c
+Entire file is here: 
+http://users.nlink.com.br/~paulo/TMS/20110519/board-sweda_tms2.c
 
-> +
-> +	/* export wifi led */
-> +	ret = gpio_request_one(TEGRA_WIFI_LED, GPIOF_OUT_INIT_HIGH,
-> +			"wifi_led");
-> +	if(ret)
-> +		pr_warning("WIFI: could not request LED gpio!\n");
-> +	gpio_export(TEGRA_WIFI_LED, 0);
-For LED I think it's better to register gpio-leds platform device with
-something like 'rfkill.0' or 'wifi-rx' or whatever as a default trigger
-(not sure about exact names of triggers - you'll need to look up them).
-That way you will get a wide choice of led triggers for free, and still
-retain possibility of manual driving leds from userspace.
+This explain constant output on COMA from TL16C2550 and COMB is detected 
+at boot time but doesn't work.
 
--- 
-Best regards,
-Dmitry "MAD" Artamonow
+I will research what can be happening but what can be wrong with NCS1 
+and NCS2?
+
+Thanks,
+Paulo.
