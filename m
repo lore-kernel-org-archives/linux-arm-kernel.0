@@ -1,45 +1,33 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 19 May 2011 13:28:23 -0500
-Subject: [PATCH 1/2] dt: check for devices already created fron DT scan
-In-Reply-To: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1305829704-11774-2-git-send-email-robherring2@gmail.com>
+Date: Thu, 19 May 2011 13:28:22 -0500
+Subject: [PATCH v2 0/2] amba bus device tree probing
+Message-ID: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-of_platform_bus_create may create duplicate devices if already
-added when scanning other buses like amba bus.
+Grant,
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- drivers/of/platform.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+Here's updated patches for amba bus probing. I folded my changes into Jeremy's
+original patch.
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 9b785be..7bf74fb 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -234,6 +234,13 @@ static int of_platform_bus_create(struct device_node *bus,
- 		return 0;
- 	}
- 
-+	/* Has the device already been registered? */
-+	if (of_find_device_by_node(bus)) {
-+		pr_debug("%s() - skipping %s, already registered\n",
-+			 __func__, bus->full_name);
-+		return 0;
-+	}
-+
- 	dev = of_platform_device_create(bus, NULL, parent);
- 	if (!dev || !of_match_node(matches, bus))
- 		return 0;
-@@ -326,4 +333,5 @@ int of_platform_populate(struct device_node *root,
- 	of_node_put(root);
- 	return rc;
- }
-+EXPORT_SYMBOL(of_platform_populate);
- #endif /* !CONFIG_SPARC */
+The 1st patch works around an problem where you get multiple parent devices
+created for the amba bus node. My fix seems like a lot of overhead, so perhaps
+you have a better way to suggest.
+
+Applies to devicetree/next on git://git.secretlab.ca/git/linux-2.6
+
+Rob
+
+Rob Herring (2):
+  dt: check for devices already created fron DT scan
+  drivers/amba: probe via device tree
+
+ drivers/amba/bus.c       |  133 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/of/platform.c    |    8 +++
+ include/linux/amba/bus.h |    7 +++
+ 3 files changed, 148 insertions(+), 0 deletions(-)
+
 -- 
 1.7.4.1
