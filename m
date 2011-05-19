@@ -1,49 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 May 2011 21:50:27 +0200
-Subject: [PATCH 5/8] ARM i.MX Allow to compile together i.MX1/21/25/27
-In-Reply-To: <alpine.LFD.2.00.1105191542350.14430@xanadu.home>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<1305823648-2428-6-git-send-email-s.hauer@pengutronix.de>
-	<20110519180456.GA21172@pengutronix.de>
-	<20110519190352.GS30963@pengutronix.de>
-	<alpine.LFD.2.00.1105191542350.14430@xanadu.home>
-Message-ID: <20110519195027.GU30963@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 May 2011 13:54:13 -0600
+Subject: [PATCH 1/2] dt: check for devices already created fron DT scan
+In-Reply-To: <1305829704-11774-2-git-send-email-robherring2@gmail.com>
+References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
+	<1305829704-11774-2-git-send-email-robherring2@gmail.com>
+Message-ID: <20110519195413.GV5109@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 03:44:13PM -0400, Nicolas Pitre wrote:
-> On Thu, 19 May 2011, Sascha Hauer wrote:
+On Thu, May 19, 2011 at 01:28:23PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> > On Thu, May 19, 2011 at 08:04:56PM +0200, Uwe Kleine-K?nig wrote:
-> > > On Thu, May 19, 2011 at 06:47:25PM +0200, Sascha Hauer wrote:
-> > > > index a5353fc..0202ca0 100644
-> > > > --- a/arch/arm/plat-mxc/Kconfig
-> > > > +++ b/arch/arm/plat-mxc/Kconfig
-> > > > @@ -14,20 +14,12 @@ choice
-> > > >  	prompt "Freescale CPU family:"
-> > > >  	default ARCH_MX3
-> > > >  
-> > > > -config ARCH_MX1
-> > > > -	bool "MX1-based"
-> > > > +config ARCH_IMX_V4_V5
-> > > > +	select ARM_PATCH_PHYS_VIRT
-> > > > +	select AUTO_ZRELADDR
-> > > select EXPERIMENTAL
-> > 
-> > Hm, yes. Though I would really prefer removing the depency on
-> > EXPERIMENTAL.
+> of_platform_bus_create may create duplicate devices if already
+> added when scanning other buses like amba bus.
 > 
-> If those features are actually used, relied upon, and therefore 
-> obviously tested, I think the experimental dependency doesn't make sense 
-> anymore.
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  drivers/of/platform.c |    8 ++++++++
+>  1 files changed, 8 insertions(+), 0 deletions(-)
+> 
+> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> index 9b785be..7bf74fb 100644
+> --- a/drivers/of/platform.c
+> +++ b/drivers/of/platform.c
+> @@ -234,6 +234,13 @@ static int of_platform_bus_create(struct device_node *bus,
+>  		return 0;
+>  	}
+>  
+> +	/* Has the device already been registered? */
+> +	if (of_find_device_by_node(bus)) {
+> +		pr_debug("%s() - skipping %s, already registered\n",
+> +			 __func__, bus->full_name);
+> +		return 0;
+> +	}
+> +
 
-I'll add a patch for this to this series.
+Intriguing, I hadn't though about doing it this way, and it would
+hugely simplify the of_platform_prepare() logic that I posted a few
+weeks back.  I need to think about this...
 
-Sascha
+However, there is a potential race condition with static device
+registrations that also use of_platform_prepare().  If there every
+exists a multi-threaded device registration scenario, then it could be
+possible for this check to pass, the other thread register a
+conflicting device, and then this finishes creating it.  However,
+since device registration is pretty much always a single threaded
+affair, I'm probably just being paranoid.
 
+Also, of_find_device_by_node() casts a rather wide net.  There are a
+few small use-cases where multiple devices will have the same node
+pointer.  It would be better to restrict it to devices with the same
+parent, or devices on the same bus type.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>  	dev = of_platform_device_create(bus, NULL, parent);
+>  	if (!dev || !of_match_node(matches, bus))
+>  		return 0;
+> @@ -326,4 +333,5 @@ int of_platform_populate(struct device_node *root,
+>  	of_node_put(root);
+>  	return rc;
+>  }
+> +EXPORT_SYMBOL(of_platform_populate);
+
+This is an unrelated change.  Does it belong in this patch?
+
+>  #endif /* !CONFIG_SPARC */
+> -- 
+> 1.7.4.1
+> 
