@@ -1,43 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 19 May 2011 14:44:54 +0200
-Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer
-In-Reply-To: <1305807191-11704-1-git-send-email-linus.walleij@stericsson.com>
-References: <1305807191-11704-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110519124454.GC2219@pengutronix.de>
+From: morpheus.ibis@gmail.com (Pavel Herrmann)
+Date: Thu, 19 May 2011 14:51:40 +0200
+Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+In-Reply-To: <20110519123507.GA4950@elf.ucw.cz>
+References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110518152935.GJ5913@n2100.arm.linux.org.uk>
+	<20110519123507.GA4950@elf.ucw.cz>
+Message-ID: <201105191451.40416.morpheus.ibis@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi
 
-> -		/* FIXME: insert a timeout so we don't hang here indefinitely */
-> -		while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end)
-> +
-> +		timeout = jiffies + msecs_to_jiffies(SPI_POLLING_TIMEOUT);
+On Thursday, May 19, 2011 02:35:08 PM Pavel Machek wrote:
+> > you're potentially doing with this:
+> In some other mail, you said "just add the locking". Pavel H.
+> actually produced patch doing so...
 
-Won't you miss the transfer if you get interrupted here longer than
-SPI_POLLING_TIMEOUT?
+yes, that was the original version of the patch. while I agree with Marek on 
+locks not being the right way, I was going send a cleaner version of the 
+original locking patch today (locking in probe is not really necessary), you 
+just beat me to it.
 
-> +		while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end) {
-> +			if (time_after(jiffies, timeout)) {
-> +				dev_warn(&pl022->adev->dev,
-> +				"%s: timeout!\n", __func__);
-> +				message->state = STATE_ERROR;
-> +				goto out;
-> +			}
->  			readwriter(pl022);
-> +		}
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Pavel Herrmann
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/d5c2ab71/attachment.sig>
+Name: 0001-Fix-NULL-pointer-exception-in-max1111.patch
+Type: text/x-patch
+Size: 2110 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/db197747/attachment.bin>
