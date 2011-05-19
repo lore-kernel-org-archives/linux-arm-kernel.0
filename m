@@ -1,26 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 May 2011 19:38:22 +0200
-Subject: [PATCH] drivers: create a pinmux subsystem v2
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF0498A47BF9@HQMAIL01.nvidia.com>
-References: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
-	<74CDBE0F657A3D45AFBB94109FB122FF0498A478E6@HQMAIL01.nvidia.com>
-	<BANLkTimMHjUFN8NqAxoF5h_eXgmJP+znSg@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0498A47BF9@HQMAIL01.nvidia.com>
-Message-ID: <BANLkTikeY5QVpEa8uXckcFGvUf7Lg1PviA@mail.gmail.com>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Thu, 19 May 2011 19:40:30 +0200
+Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer v2
+In-Reply-To: <BANLkTi=mQbPt9rcqEVyMLy3rkF2D7FMh=g@mail.gmail.com>
+References: <1305821134-26147-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTi=s4nzi=5f+Vvh3ABuspnKXQVUfLw@mail.gmail.com>
+	<BANLkTi=mQbPt9rcqEVyMLy3rkF2D7FMh=g@mail.gmail.com>
+Message-ID: <BANLkTi=COt5Te4bF1M30A+R4Vqnz=kWiJA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/19 Stephen Warren <swarren@nvidia.com>:
+On Thu, May 19, 2011 at 7:36 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>
+>> just out of curiosity: is it a busy wait? Looks like it is...
+>
+> Yep that's the polling mode part. IRQ and DMA mode should
+> be the norm I guess.
+>
+> Magnus: do you have a specific use case for this thing?
 
-> Still, if I was writing the patches, and I agreed with the above change,
-> I think I'd want to put it into the first patchset (or at least before
-> other people started implementing their pinmux drivers on top of the code)
-> since it'd avoid everyone else (or me) having to refactor all their
-> drivers almost immediately after writing them, plus it looks like a very
-> simple change to the current pinmux patchset.
+Well, adding cpu_relax() somewhere in the loop might be not a bad idea...
 
-You're right and Sascha said the same thing, so I will includ it
-in v3. I expect an Acked-by: in return ;-)
-
-Yours,
-Linus Walleij
+Thanks,
+   Vitaly
