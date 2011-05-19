@@ -1,88 +1,53 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 19 May 2011 17:16:43 +0200
-Subject: atmel-mci causes kernel panic when CONFIG_DEBUG_VM is set
-In-Reply-To: <4DD50A72.2050501@atmel.com>
-References: <4DD4CC68.80408@atmel.com>	<BANLkTinaPW5xcdrNewJC6OW9nqWHC_-TVw@mail.gmail.com>
-	<4DD4E1DF.7030005@atmel.com> <4DD50A72.2050501@atmel.com>
-Message-ID: <4DD5345B.8010305@atmel.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Thu, 19 May 2011 16:25:50 +0100 (BST)
+Subject: Question on ARM inline assembly - stackframes, sp/fp usage,
+	__naked
+In-Reply-To: <20110519094753.GB2431@arm.com>
+References: <alpine.DEB.2.00.1105181505080.2374@localhost6.localdomain6>
+	<20110518174531.GA28300@arm.com>
+	<alpine.DEB.2.00.1105190858320.2374@localhost6.localdomain6>
+	<20110519094753.GB2431@arm.com>
+Message-ID: <alpine.DEB.2.00.1105191547480.28998@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As suggested I forward the question to Christoph Lameter and linux-mm.
+On Thu, 19 May 2011, Dave Martin wrote:
 
-Thanks for your help.
-
-Regards
-
-Ludovic Desroches
-
-On 5/19/2011 2:17 PM, Ludovic Desroches wrote:
-> On 5/19/2011 11:24 AM, Ludovic Desroches wrote:
->> On 5/19/2011 10:04 AM, Barry Song wrote:
->>> 2011/5/19 Ludovic Desroches<ludovic.desroches@atmel.com>:
->>>> Hello,
->>>>
->>>> There is a bug with the atmel-mci driver when the debug feature
->>>> CONFIG_DEBUG_VM is set.
->>>>
->>>> Into the atmci_read_data_pio function we use flush_dcache_page (do 
->>>> we really
->>>> need it?) which call the page_mapping function where we can find
->>>> VM_BUG_ON(PageSlab(Page)). Then a kernel panic happens.
->>>>
->>>> I don't understand the purpose of the VM_BUG_ON(PageSlab(Page)) 
->>>> (the page
->>>> comes from a scatter list). How could I correct this problem?
->>> linux/include/linux/mmdebug.h:
->>>
->>> #ifdef CONFIG_DEBUG_VM
->>> #define VM_BUG_ON(cond) BUG_ON(cond)
->>> #else
->>> #define VM_BUG_ON(cond) do { (void)(cond); } while (0)
->>> #endif
->>>
->>> it is something like "assert" in kernel.
+> On Thu, May 19, 2011 at 09:46:30AM +0100, Frank Hofmann wrote:
 >>
->> Thanks for your answer but I know that. My question is more focused 
->> on why there is this check.
-> This the reason:
->
-> commit b5fab14e5d87df4d94161ae5f5e0c8625f9ffda2
-> Author: Christoph Lameter <clameter@sgi.com>
-> Date:   Tue Jul 17 04:03:33 2007 -0700
->
->     Add VM_BUG_ON in case someone uses page_mapping on a slab page
->
->     Detect slab objects being passed to the page oriented functions of 
-> the VM.
->
->     It is not sufficient to simply return NULL because the functions 
-> calling
->     page_mapping may depend on other items of the page_struct also to 
-> be setup
->     properly.  Moreover slab object may not be properly aligned.  The 
-> page
->     oriented functions of the VM expect to operate on page aligned, 
-> page sized
->     objects.  Operations on object straddling page boundaries may only 
-> affect the
->     objects partially which may lead to surprising results.
->
->     It is better to detect eventually remaining uses and eliminate them.
->
->
->> Is flushing a page taken from a slab forbidden ? Is it risky ? Is it 
->> no sense ?
 >>
-> Other drivers do a flush_dcache_page on a page coming from a scatter 
-> list. So I think they will also have an assert when CONFIG_DEBUG_VM is 
-> set.
+>> On Wed, 18 May 2011, Dave Martin wrote:
+>>
+>>> On Wed, May 18, 2011 at 04:25:15PM +0100, Frank Hofmann wrote:
+>>>> Hi,
+[ ... ]
 >
-> What is the proper way to do this flush (if needed) ?
+> As I said, it may work, today.  It just feels more complex and
+> failure-prone, because it reiles on details of the compiler behaviour.
+> If doing this provided a real benefit, like better maintainability or
+> performance, then it would be worth trying.  But I feel we don't get
+> any real advantages in this case.
 >
+> That's just my opinion, but I know from experience how hard it is to get
+> compiler guys on your side when this kind of hack goes wrong...
+
+That bit of _experience_ is what I'm still building up, on ARM ... a great 
+thanks to you, M?ns and Mikael for providing that.
+
+GCC is capricious wrt. to inline assembly, I understand now.
+
+[ ... ]
+> For totally arch-specific parts like saving/restoring the processor
+> state, at least some assembler is unavoidable...
+
+I'll keep the two files (one for the pure assembly, one for C only 
+parts) for now.
+
+Best wishes,
+FrankH.
+
 >
-> Regards,
->
-> Ludovic
+> Cheers
+> ---Dave
 >
 >
