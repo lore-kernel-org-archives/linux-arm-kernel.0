@@ -1,59 +1,124 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 19 May 2011 22:05:25 +0800
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <BANLkTinABWucqESqSRYJV+-frm6vDmpxFQ@mail.gmail.com>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTi=poU17RqAzp28CPjWHrN_+aFiyag@mail.gmail.com>
-	<BANLkTindee6UMez8HyBUwd2H6mN-DknzPw@mail.gmail.com>
-	<BANLkTik7BnJKWCsm2L3-GJPTaaiXFNSgaA@mail.gmail.com>
-	<BANLkTim2rv9QHDd2zjBfyVqG9dSGCM=PAw@mail.gmail.com>
-	<BANLkTinABWucqESqSRYJV+-frm6vDmpxFQ@mail.gmail.com>
-Message-ID: <BANLkTim=iwHY2NhWuK6qmhAdez-5AiJDBw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 19 May 2011 15:10:02 +0100
+Subject: [PATCH v2] arm: Add Cortex A5 proc info
+In-Reply-To: <1305737066-11900-1-git-send-email-pawel.moll@arm.com>
+References: <1305720361.17656.44.camel@hornet.cambridge.arm.com>
+	<1305737066-11900-1-git-send-email-pawel.moll@arm.com>
+Message-ID: <000d01cc162e$723081b0$56918510$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/19 Linus Walleij <linus.walleij@linaro.org>:
-> On Thu, May 19, 2011 at 2:35 PM, Barry Song <21cnbao@gmail.com> wrote:
->> 2011/5/19 Linus Walleij <linus.walleij@linaro.org>:
->>> On Thu, May 19, 2011 at 1:38 PM, Barry Song <21cnbao@gmail.com> wrote:
->>>>
->>>> looks like the driver can't be a real module, is the module_exit
->>>> suitable? it looks strange module_exit plays together with
->>>> arch_initcall.
->>>
->>> It's a rather common design pattern in the kernel for early
->>> platform drivers. Either the dependencies are resolved by the
->>> different initlevels or they are resolved in probe order with
->>> loadable modules. Module load will call all initlevels in order.
->>>
->>> It is not elegant but it is common.
->>
->> Linus, thanks for your reply. module_exit and related functions are
->> really useless codes. but people have done that before, then we have
->> no way except following.
->> u300_gpio_exit never gets chance to run and when we disassemble
->> vmlinux, u300_gpio_exit() ?function should be not in the final binary
->> at all, just a symbol name is left.
->
-> I know. I can make the Kconfig options tristate if it makes you feel
-> better...
-what i feel headache is that it is really difficult and unpredicted
-for an internal gpio driver to be removable in lots of read products
-because gpio is probably the last bottom module other drivers need.
-even it can be called in arch/arm/plat(mach).
+Hi Pawel,
 
-i am not sure whether  i am thinking right. gpio and pinmux are more
-things of bottom level APIs like dma/clock tree but not like device
-drivers.  but i really think you have sent a great pinmux core
-framework.
+> This patch adds processor info for Cortex A5 (MPCore).
+> 
+> To reduce code duplicating it converts existing A9 proc info
+> into a macro and uses it to define A5 and A9 cores, allowing
+> new similar parts (requiring different init function and MMU
+> flags) in future.
+> 
+> Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  arch/arm/mm/proc-v7.S |   69 ++++++++++++++++++++++++++++--------------------
+>  1 files changed, 40 insertions(+), 29 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index babfba0..01256fa 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -270,11 +270,15 @@ cpu_resume_l1_flags:
+>   *	Harvard cache control instructions insead of the unified cache
+>   *	control instructions.
+>   *
+> - *	This should be able to cover all ARMv7 cores.
+> + *	This should be able to cover all ARMv7 cores. Some MPCore
+> + *	implementations require additional code when SMP is to be
+> + *	enabled to activate Snoop Control Unit - this is done prior
+> + *	to the __v7_setup.
+>   *
+>   *	It is assumed that:
+>   *	- cache type register is implemented
+>   */
+> +__v7_ca5mp_setup:
+>  __v7_ca9mp_setup:
+>  #ifdef CONFIG_SMP
+>  	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
+> @@ -436,34 +440,41 @@ cpu_elf_name:
+> 
+>  	.section ".proc.info.init", #alloc, #execinstr
+> 
+> -	.type   __v7_ca9mp_proc_info, #object
+> -__v7_ca9mp_proc_info:
+> -	.long	0x410fc090		@ Required ID value
+> -	.long	0xff0ffff0		@ Mask for ID
+> -	ALT_SMP(.long \
+> -		PMD_TYPE_SECT | \
+> -		PMD_SECT_AP_WRITE | \
+> -		PMD_SECT_AP_READ | \
+> -		PMD_FLAGS_SMP)
+> -	ALT_UP(.long \
+> -		PMD_TYPE_SECT | \
+> -		PMD_SECT_AP_WRITE | \
+> -		PMD_SECT_AP_READ | \
+> -		PMD_FLAGS_UP)
+> -	.long   PMD_TYPE_SECT | \
+> -		PMD_SECT_XN | \
+> -		PMD_SECT_AP_WRITE | \
+> -		PMD_SECT_AP_READ
+> -	W(b)	__v7_ca9mp_setup
+> -	.long	cpu_arch_name
+> -	.long	cpu_elf_name
+> -	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
+> -	.long	cpu_v7_name
+> -	.long	v7_processor_functions
+> -	.long	v7wbi_tlb_fns
+> -	.long	v6_user_fns
+> -	.long	v7_cache_fns
+> -	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+> +	/*
+> +	 * ARM Ltd. Cortex cores
+> +	 */
+> +#define __V7_CORTEX_PROC_INFO(_part, _mm_mmuflags, _io_mmuflags, _initfunc) \
+> +	.type   __v7_ca##_part##mp_proc_info, #object; \
+> +__v7_ca##_part##mp_proc_info:; \
+> +	.long	0x410fc0##_part##0; \
+> +	.long	0xff0ffff0; \
+> +	ALT_SMP(.long	_mm_mmuflags | PMD_FLAGS_SMP); \
+> +	ALT_UP(.long	_mm_mmuflags | PMD_FLAGS_UP); \
+> +	.long	_io_mmuflags; \
+> +	W(b)	_initfunc; \
+> +	.long	cpu_arch_name; \
+> +	.long	cpu_elf_name; \
+> +	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS; \
+> +	.long	cpu_v7_name; \
+> +	.long	v7_processor_functions; \
+> +	.long	v7wbi_tlb_fns; \
+> +	.long	v6_user_fns; \
+> +	.long	v7_cache_fns; \
+> +	.size	__v7_ca##_part##mp_proc_info, . - __v7_ca##_part##mp_proc_info
+> +
+> +__V7_CORTEX_PROC_INFO(
+> +	5, /* Cortex A5 */
+> +	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
+> +	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
+> +	__v7_ca5mp_setup
+> +)
+> +
+> +__V7_CORTEX_PROC_INFO(
+> +	9, /* Cortex A9 */
+> +	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
+> +	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ,
+> +	__v7_ca9mp_setup
+> +)
+> 
+>  	/*
+>  	 * Match any ARMv7 processor core.
 
-we once thought we could have a plat-common above all
-plat-xxx/mach-xxx, and let the plat-common provide the cores of dma,
-clk, gpio, pinmux(pinmux core from you), for example, all common API
-and abstract level codes like gpio_request can be there, and SoCs just
-implement some hardware-related callbacks required by plat-common in
-themselves plat-xxx .
+Please can you do the same for the __v7_proc_info struct? On top of that, I
+think you should take optional, additional HWCAPs as arguments to the macro
+which get ORd with the base v7 HWCAPs. This might be useful for A15 where we
+have integer division.
 
->
-> Linus Walleij
->
+Cheers,
+
+Will
