@@ -1,33 +1,46 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 19 May 2011 08:22:08 -0400
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
-	call filtering
-In-Reply-To: <BANLkTikBK3-KZ10eErQ6Eex_L6Qe2aZang@mail.gmail.com>
-References: <20110513125452.GD3924@elte.hu> <1305292132.2466.26.camel@twins>
-	<20110513131800.GA7883@elte.hu> <1305294935.2466.64.camel@twins>
-	<20110513145737.GC32688@elte.hu>
-	<1305563026.5456.19.camel@gandalf.stny.rr.com>
-	<20110516165249.GB10929@elte.hu>
-	<1305565422.5456.21.camel@gandalf.stny.rr.com>
-	<20110517124212.GB21441@elte.hu>
-	<1305637528.5456.723.camel@gandalf.stny.rr.com>
-	<20110517131902.GF21441@elte.hu>
-	<BANLkTikBK3-KZ10eErQ6Eex_L6Qe2aZang@mail.gmail.com>
-Message-ID: <1305807728.11267.25.camel@gandalf.stny.rr.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 May 2011 14:25:47 +0200
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <BANLkTindee6UMez8HyBUwd2H6mN-DknzPw@mail.gmail.com>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTi=poU17RqAzp28CPjWHrN_+aFiyag@mail.gmail.com>
+	<BANLkTindee6UMez8HyBUwd2H6mN-DknzPw@mail.gmail.com>
+Message-ID: <BANLkTik7BnJKWCsm2L3-GJPTaaiXFNSgaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-18 at 21:07 -0700, Will Drewry wrote:
+On Thu, May 19, 2011 at 1:38 PM, Barry Song <21cnbao@gmail.com> wrote:
 
-> Do event_* that return non-void exist in the tree at all now?  I've
-> looked at the various tracepoint macros as well as some of the other
-> handlers (trace_function, perf_tp_event, etc) and I'm not seeing any
-> places where a return value is honored nor could be.  At best, the
-> perf_tp_event can be short-circuited it in the hlist_for_each, but
-> it'd still need a way to bubble up a failure and result in not calling
-> the trace/event that the hook precedes.
+>> -arch_initcall(u300_gpio_init);
+>> -module_exit(u300_gpio_exit);
+>>
+> looks like the driver can't be a real module, is the module_exit
+> suitable? it looks strange module_exit plays together with
+> arch_initcall.
 
-No, none of the current trace hooks have return values. That was what I
-was talking about how to implement in my previous emails.
+It's a rather common design pattern in the kernel for early
+platform drivers. Either the dependencies are resolved by the
+different initlevels or they are resolved in probe order with
+loadable modules. Module load will call all initlevels in order.
 
--- Steve
+It is not elegant but it is common.
+
+> guess symbol u300_gpio_exit will finally lose in the last vmlinux
+> since it is in exit section and built-in kernel.
+
+Yes. And if you one day, to do some testing, compile and load it
+as module and unload it, it is handy.
+
+I have other drivers where I simply don't have an exit function
+but this one I have actually used.
+
+> another problem i see is after moving gpio/pinmux to drivers as
+> platform device, codes in arch/arm/plat(mach) can't ?call gpio/pinmux
+> api before the related platform devices registerred. that will
+> required these platform devices enter system earlier.
+
+This is exactly the reason why the u300 gpio driver needs to
+be initialized in an arch_initcall().
+
+Yours,
+Linus Walleij
