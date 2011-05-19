@@ -1,34 +1,21 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 19 May 2011 14:10:13 +0900
-Subject: [PATCH] ARM: mach-shmobile: headsmp.S build fix
-Message-ID: <20110519051013.9061.94877.sendpatchset@t400s>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 May 2011 22:05:44 -0700
+Subject: [PATCH 1/4] ARM: tegra: paz00: whitespace cleanup
+In-Reply-To: <1305569458-4821-2-git-send-email-marvin24@gmx.de>
+References: <1305569458-4821-1-git-send-email-marvin24@gmx.de>
+	<1305569458-4821-2-git-send-email-marvin24@gmx.de>
+Message-ID: <20110519050544.GA5495@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm@opensource.se>
+On Mon, May 16, 2011 at 08:10:55PM +0200, Marc Dietrich wrote:
+> 
+> Signed-off-by: Marc Dietrich <marvin24@gmx.de>
 
-Git commit f4117ac9e237b74afdf5e001d5ea26a4d15e9847
-introduced PLAT_PHYS_OFFSET, but headsmp.S was left
-unchanged which results in a compile error:
+Please provide a simple changelog, not just a topic. I know, there isn't
+much to write home about on this one but it's good habit.
 
-  AS      arch/arm/mach-shmobile/headsmp.o
-arch/arm/mach-shmobile/headsmp.S: Assembler messages:
-arch/arm/mach-shmobile/headsmp.S:27: Error: undefined symbol `secondary_startup' in operation
-arch/arm/mach-shmobile/headsmp.S:27: Error: undefined symbol `PHYS_OFFSET' in operation
-make[1]: *** [arch/arm/mach-shmobile/headsmp.o] Error 1
-make[1]: *** Waiting for unfinished jobs....
+Same applies to patch 2 and 3 in this series.
 
-Signed-off-by: Magnus Damm <damm@opensource.se>
----
 
- arch/arm/mach-shmobile/headsmp.S |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- 0001/arch/arm/mach-shmobile/headsmp.S
-+++ work/arch/arm/mach-shmobile/headsmp.S	2011-05-03 10:33:20.000000000 +0900
-@@ -24,4 +24,4 @@
- 	.align  12
- ENTRY(shmobile_secondary_vector)
- 	ldr     pc, 1f
--1:	.long   secondary_startup - PAGE_OFFSET + PHYS_OFFSET
-+1:	.long   secondary_startup - PAGE_OFFSET + PLAT_PHYS_OFFSET
+-Olof
