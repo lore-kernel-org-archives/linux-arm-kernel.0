@@ -1,85 +1,69 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 19 May 2011 18:05:34 +0200
-Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer v2
-Message-ID: <1305821134-26147-1-git-send-email-linus.walleij@stericsson.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 19 May 2011 17:08:19 +0100
+Subject: [PATCH v2] arm: Add Cortex A5 proc info
+In-Reply-To: <1305819084.17656.63.camel@hornet.cambridge.arm.com>
+References: <1305720361.17656.44.camel@hornet.cambridge.arm.com>
+	<1305737066-11900-1-git-send-email-pawel.moll@arm.com>
+	<000d01cc162e$723081b0$56918510$@deacon@arm.com>
+	<1305819084.17656.63.camel@hornet.cambridge.arm.com>
+Message-ID: <20110519160819.GD2431@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Templing <magnus.templing@stericsson.com>
+On Thu, May 19, 2011 at 04:31:24PM +0100, Pawel Moll wrote:
+> > Please can you do the same for the __v7_proc_info struct? 
+> 
+> Yeah, I could if we want to... The thing is that the macro will have to
+> take full ID and mask value then. And a name for the structure. So extra
+> 3 parameters. Not a big deal I suppose.
 
-This adds the missing handling of polling timeouts and deletes
-our last todo.
+Optionally, you could just omit the label and mask/match words from the
+macro.  Those are always at the start, so we don't need to cunningly
+insert them in the middle of the macro expansion.
 
-Signed-off-by: Magnus Templing <magnus.templing@stericsson.com>
-Reviewed-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-[Fixups from review by Wolfram Sang]
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/spi/amba-pl022.c |   23 +++++++++++++++--------
- 1 files changed, 15 insertions(+), 8 deletions(-)
+By definition, they will be different per expansion, too.  So it makes
+less sense to have these in the macro definition itself.
 
-diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-index 08de58e..18667de 100644
---- a/drivers/spi/amba-pl022.c
-+++ b/drivers/spi/amba-pl022.c
-@@ -24,11 +24,6 @@
-  * GNU General Public License for more details.
-  */
- 
--/*
-- * TODO:
-- * - add timeout on polled transfers
-- */
--
- #include <linux/init.h>
- #include <linux/module.h>
- #include <linux/device.h>
-@@ -287,6 +282,8 @@
- 
- #define CLEAR_ALL_INTERRUPTS  0x3
- 
-+#define SPI_POLLING_TIMEOUT 1000
-+
- 
- /*
-  * The type of reading going on on this chip
-@@ -1378,6 +1375,7 @@ static void do_polling_transfer(struct pl022 *pl022)
- 	struct spi_transfer *transfer = NULL;
- 	struct spi_transfer *previous = NULL;
- 	struct chip_data *chip;
-+	unsigned long time, timeout;
- 
- 	chip = pl022->cur_chip;
- 	message = pl022->cur_msg;
-@@ -1415,9 +1413,18 @@ static void do_polling_transfer(struct pl022 *pl022)
- 		       SSP_CR1(pl022->virtbase));
- 
- 		dev_dbg(&pl022->adev->dev, "polling transfer ongoing ...\n");
--		/* FIXME: insert a timeout so we don't hang here indefinitely */
--		while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end)
-+
-+		timeout = jiffies + msecs_to_jiffies(SPI_POLLING_TIMEOUT);
-+		while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end) {
-+			time = jiffies;
- 			readwriter(pl022);
-+			if (time_after(time, timeout)) {
-+				dev_warn(&pl022->adev->dev,
-+				"%s: timeout!\n", __func__);
-+				message->state = STATE_ERROR;
-+				goto out;
-+			}
-+		}
- 
- 		/* Update total byte transferred */
- 		message->actual_length += pl022->cur_transfer->len;
-@@ -1426,7 +1433,7 @@ static void do_polling_transfer(struct pl022 *pl022)
- 		/* Move to next transfer */
- 		message->state = next_transfer(pl022);
- 	}
--
-+out:
- 	/* Handle end of message */
- 	if (message->state == STATE_DONE)
- 		message->status = 0;
--- 
-1.7.3.2
+Similarly, you could just leave the .size directive out of the macro
+to avoid having to generlise it -- after all, it's not generalised
+for the other proc_info definitions so this makes the situation no
+worse.
+
+> 
+> > On top of that, I think you should take optional, additional HWCAPs as
+> > arguments to the macro which get ORd with the base v7 HWCAPs. 
+> 
+> Em, the "optional" bit here is a problem. I can't just do
+> 
+> #define INFO(_a, _extra_hwcaps...) \
+> 	.long HWCAP | _extra_hwcaps;
+> 
+> 
+> Because the output would be ".long HWCAP | ;" when no _extra_hwcaps are
+> given... Unless I'm missing some preprocessor trick? :-)
+
+You could use an assembler macro instead.
+
+.macro blarg insert_hwcaps=0
+	/* blah */
+	.long HWCAP_ALICE | HWCAP_BOB | HWCAP_CHARLIE | ( \insert_hwcaps )
+	/* blah */
+.endm
+
+As an added bonus, this could substantially reduce the diffstat, because
+assembler macro definitions can have multiple lines, so you don't need
+all that awful semicolon-backslash line continuation stuff.
+
+Not everyone likes assembler macros, though...
+
+> 
+> > This might be useful for A15 where we have integer division.
+> 
+> What HWCAP would this be? I've checked Catalin's repo and the only
+> difference I've spotted between A9 and A15 proc info were the mmu
+> flags...
+
+You could invent one, if none is defined yet.  You probably want to
+check with Catalin or Will.
+
+---Dave
