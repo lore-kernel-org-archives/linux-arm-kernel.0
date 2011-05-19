@@ -1,113 +1,56 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Wed, 18 May 2011 17:57:35 -0700
-Subject: [patch 2/7] clocksource: Get rid of the hardcoded 5 seconds
-	sleep time limit
-In-Reply-To: <20110518210136.109811585@linutronix.de>
-References: <20110518205713.947614271@linutronix.de>
-	<20110518210136.109811585@linutronix.de>
-Message-ID: <1305766655.2915.187.camel@work-vm>
+From: hjk@hansjkoch.de (Hans J. Koch)
+Date: Thu, 19 May 2011 03:24:42 +0200
+Subject: [PATCH 01/19] Make clocksource name const
+In-Reply-To: <E1QM1YI-0003DJ-BQ@rmk-PC.arm.linux.org.uk>
+References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
+	<E1QM1YI-0003DJ-BQ@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110519012442.GA2728@local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-18 at 21:33 +0000, Thomas Gleixner wrote:
-> plain text document attachment
-> (clocksource-make-shift-mult-calc-more-clever.patch)
-> Slow clocksources can have a way longer sleep time than 5 seconds and
-> even fast ones can easily cope with 600 seconds and still maintain
-> proper accuracy.
+On Mon, May 16, 2011 at 06:25:54PM +0100, Russell King - ARM Linux wrote:
+> As nothing should be writing to the clocksource name string, make the
+> clocksource name pointer const.  Build-tested on ARM Versatile Express.
 > 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Alessandro Rubini <rubini@unipv.it>
+> Cc: Colin Cross <ccross@android.com>
+> Cc: Eric Miao <eric.y.miao@gmail.com>
+> Cc: Erik Gilling <konkers@android.com>
+> Cc: "Hans J. Koch" <hjk@hansjkoch.de>
+> Cc: Imre Kaloz <kaloz@openwrt.org>
+> Cc: Krzysztof Halasa <khc@pm.waw.pl>
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Cc: Lennert Buytenhek <kernel@wantstofly.org>
+> Cc: Linus Walleij <linus.walleij@stericsson.com>
+> Cc: linux-omap at vger.kernel.org
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Viresh Kumar <viresh.kumar@st.com>
+> Cc: Wan ZongShun <mcuos.com@gmail.com>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Acked-by: "Hans J. Koch" <hjk@hansjkoch.de>
+
 > ---
->  kernel/time/clocksource.c |   38 +++++++++++++++++++-------------------
->  1 file changed, 19 insertions(+), 19 deletions(-)
+>  include/linux/clocksource.h |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-> Index: linux-2.6-tip/kernel/time/clocksource.c
-> ===================================================================
-> --- linux-2.6-tip.orig/kernel/time/clocksource.c
-> +++ linux-2.6-tip/kernel/time/clocksource.c
-> @@ -626,19 +626,6 @@ static void clocksource_enqueue(struct c
->  	list_add(&cs->list, entry);
->  }
-> 
-> -
-> -/*
-> - * Maximum time we expect to go between ticks. This includes idle
-> - * tickless time. It provides the trade off between selecting a
-> - * mult/shift pair that is very precise but can only handle a short
-> - * period of time, vs. a mult/shift pair that can handle long periods
-> - * of time but isn't as precise.
-> - *
-> - * This is a subsystem constant, and actual hardware limitations
-> - * may override it (ie: clocksources that wrap every 3 seconds).
-> - */
-> -#define MAX_UPDATE_LENGTH 5 /* Seconds */
-> -
->  /**
->   * __clocksource_updatefreq_scale - Used update clocksource with new freq
->   * @t:		clocksource to be registered
-> @@ -652,15 +639,28 @@ static void clocksource_enqueue(struct c
->   */
->  void __clocksource_updatefreq_scale(struct clocksource *cs, u32 scale, u32 freq)
->  {
-> +	unsigned long sec;
-> +
+> diff --git a/include/linux/clocksource.h b/include/linux/clocksource.h
+> index c37b21a..94c1f38 100644
+> --- a/include/linux/clocksource.h
+> +++ b/include/linux/clocksource.h
+> @@ -161,7 +161,7 @@ struct clocksource {
 >  	/*
-> -	 * Ideally we want to use  some of the limits used in
-> -	 * clocksource_max_deferment, to provide a more informed
-> -	 * MAX_UPDATE_LENGTH. But for now this just gets the
-> -	 * register interface working properly.
-> +	 * Calc the maximum number of seconds which we can run before
-> +	 * wrapping around. For clocksources which have a mask > 32bit
-> +	 * we need to limit the max sleep time to have a good
-> +	 * conversion precision. 10 minutes is still a reasonable
-> +	 * amount. That results in a shift value of 24 for a
-> +	 * clocksource with mask >= 40bit and f >= 4GHz. That maps to
-> +	 * ~ 0.06ppm granularity for NTP. We apply the same 12.5%
-> +	 * margin as we do in clocksource_max_deferment()
+>  	 * First part of structure is read mostly
 >  	 */
-
-So, its not clear to me that the 12.5% margin really needed, since we
-take it out when we calculate clocksource_max_deferment(). Although with
-or without the margin I get the same mult/shift/max_idle_ns values for
-the hardware I'm testing.
-
-Another nice detail from the change: It doesn't affect clocksources that
-normally wrap quickly:
-
-Without your patch:
---------------
-JDB: hpet mult: 2684354560 shift: 26 max_idle: 83214991360
-JDB: acpi_pm mult: 2343484437 shift: 23 max_idle: 4540500826
-JDB: tsc mult: 1342183991 shift: 31 max_idle: 2600481483
-
-With your patch:
----------------
-JDB: hpet mult: 2684354560 shift: 26 max_idle: 83214991360
-JDB: acpi_pm mult: 2343484437 shift: 23 max_idle: 4540500826
-JDB: tsc mult: 10485812 shift: 24 max_idle: 332861616128
-
-Although interestingly 332 secs calculated for the max idle is more then
-12% off of 600.
-
-> +	sec = (cs->mask - (cs->mask >> 5));
-> +	do_div(sec, freq);
-> +	do_div(sec, scale);
-> +	if (!sec)
-> +		sec = 1;
-> +	else if (sec > 600 && cs->mask > UINT_MAX)
-> +		sec = 600;
-> +
->  	clocks_calc_mult_shift(&cs->mult, &cs->shift, freq,
-> -				      NSEC_PER_SEC/scale,
-> -				      MAX_UPDATE_LENGTH*scale);
-> +			       NSEC_PER_SEC / scale, sec * scale);
->  	cs->max_idle_ns = clocksource_max_deferment(cs);
->  }
->  EXPORT_SYMBOL_GPL(__clocksource_updatefreq_scale);
-
-Overall it looks good. I'm doing some NTP testing with the TSC shift
-change to make sure we don't get any odd side effects. I'll let you know
-how those go.
-
-thanks
--john
+> -	char *name;
+> +	const char *name;
+>  	struct list_head list;
+>  	int rating;
+>  	cycle_t (*read)(struct clocksource *cs);
+> -- 
+> 1.7.4.4
+> 
+> 
