@@ -1,118 +1,142 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Thu, 19 May 2011 12:08:17 +0100
-Subject: Question on ARM inline assembly - stackframes, sp/fp usage,
-	__naked
-References: <alpine.DEB.2.00.1105181505080.2374@localhost6.localdomain6>
-	<20110518174531.GA28300@arm.com>
-	<alpine.DEB.2.00.1105190858320.2374@localhost6.localdomain6>
-Message-ID: <yw1x4o4rx80u.fsf@unicorn.mansr.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 19 May 2011 12:10:43 +0100
+Subject: [PATCH v2] arm: Add unwinding support for division functions
+In-Reply-To: <1305740006-11389-2-git-send-email-lauraa@codeaurora.org>
+References: <f16b4b8d7735148b133e23547a7963b3.squirrel@www.codeaurora.org>
+	<1305740006-11389-2-git-send-email-lauraa@codeaurora.org>
+Message-ID: <20110519111043.GC2431@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Frank Hofmann <frank.hofmann@tomtom.com> writes:
+On Wed, May 18, 2011 at 10:33:26AM -0700, Laura Abbott wrote:
+> The software division functions never had unwinding annotations
+> added. Currently, when a division by zero occurs the backtrace shown
+> will stop at Ldiv0 or some completely unrelated function. Add
+> unwinding annotations in hopes of getting a more useful backtrace
+> when a division by zero occurs.
+> 
+> Signed-off-by: Laura Abbott <lauraa@codeaurora.org>
+> ---
+>  arch/arm/lib/lib1funcs.S |   25 ++++++++++++++++++++-----
+>  1 files changed, 20 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/lib/lib1funcs.S b/arch/arm/lib/lib1funcs.S
+> index 6dc0648..c562f64 100644
+> --- a/arch/arm/lib/lib1funcs.S
+> +++ b/arch/arm/lib/lib1funcs.S
+> @@ -35,7 +35,7 @@ Boston, MA 02111-1307, USA.  */
+>  
+>  #include <linux/linkage.h>
+>  #include <asm/assembler.h>
+> -
+> +#include <asm/unwind.h>
+>  
+>  .macro ARM_DIV_BODY dividend, divisor, result, curbit
+>  
+> @@ -207,6 +207,7 @@ Boston, MA 02111-1307, USA.  */
+>  
+>  ENTRY(__udivsi3)
+>  ENTRY(__aeabi_uidiv)
+> +UNWIND(.fnstart)
+>  
+>  	subs	r2, r1, #1
+>  	moveq	pc, lr
+> @@ -230,10 +231,12 @@ ENTRY(__aeabi_uidiv)
+>  	mov	r0, r0, lsr r2
+>  	mov	pc, lr
+>  
+> +UNWIND(.fnend)
+>  ENDPROC(__udivsi3)
+>  ENDPROC(__aeabi_uidiv)
+>  
+>  ENTRY(__umodsi3)
+> +UNWIND(.fnstart)
+>  
+>  	subs	r2, r1, #1			@ compare divisor with 1
+>  	bcc	Ldiv0
+> @@ -247,10 +250,12 @@ ENTRY(__umodsi3)
+>  
+>  	mov	pc, lr
+>  
+> +UNWIND(.fnend)
+>  ENDPROC(__umodsi3)
+>  
+>  ENTRY(__divsi3)
+>  ENTRY(__aeabi_idiv)
+> +UNWIND(.fnstart)
+>  
+>  	cmp	r1, #0
+>  	eor	ip, r0, r1			@ save the sign of the result.
+> @@ -287,10 +292,12 @@ ENTRY(__aeabi_idiv)
+>  	rsbmi	r0, r0, #0
+>  	mov	pc, lr
+>  
+> +UNWIND(.fnend)
+>  ENDPROC(__divsi3)
+>  ENDPROC(__aeabi_idiv)
+>  
+>  ENTRY(__modsi3)
+> +UNWIND(.fnstart)
+>  
+>  	cmp	r1, #0
+>  	beq	Ldiv0
+> @@ -310,11 +317,14 @@ ENTRY(__modsi3)
+>  	rsbmi	r0, r0, #0
+>  	mov	pc, lr
+>  
+> +UNWIND(.fnend)
+>  ENDPROC(__modsi3)
+>  
+>  #ifdef CONFIG_AEABI
+>  
+>  ENTRY(__aeabi_uidivmod)
+> +UNWIND(.fnstart)
+> +UNWIND(.save {r0, r1, ip, lr}	)
+>  
+>  	stmfd	sp!, {r0, r1, ip, lr}
+>  	bl	__aeabi_uidiv
+> @@ -323,10 +333,12 @@ ENTRY(__aeabi_uidivmod)
+>  	sub	r1, r1, r3
+>  	mov	pc, lr
+>  
+> +UNWIND(.fnend)
+>  ENDPROC(__aeabi_uidivmod)
+>  
+>  ENTRY(__aeabi_idivmod)
+> -
+> +UNWIND(.fnstart)
+> +UNWIND(.save {r0, r1, ip, lr}	)
+>  	stmfd	sp!, {r0, r1, ip, lr}
+>  	bl	__aeabi_idiv
+>  	ldmfd	sp!, {r1, r2, ip, lr}
+> @@ -334,15 +346,18 @@ ENTRY(__aeabi_idivmod)
+>  	sub	r1, r1, r3
+>  	mov	pc, lr
+>  
+> +UNWIND(.fnend)
+>  ENDPROC(__aeabi_idivmod)
+>  
+>  #endif
+>  
+>  Ldiv0:
+> -
+> +UNWIND(.fnstart)
+> +UNWIND(.pad #4)
+> +UNWIND(.save {lr})
+>  	str	lr, [sp, #-8]!
+>  	bl	__div0
+>  	mov	r0, #0			@ About as wrong as it could be.
+>  	ldr	pc, [sp], #8
+> -
+> -
+> +UNWIND(.fnend)
+> +ENDPROC(Ldiv0)
+> -- 
+> 1.7.3.3
+> 
 
->>> 	register void *saved_ctx asm ("r0") = ctx;
->>>
->>> 	__asm__ __volatile__("" : "+sp"(sp));		/* don't optimize away ! */
->>
->> Is this an attempt to force gcc to change sp before the subsequent loop?
->
-> That's exactly what it does.
->
->> I think you don't mean "+sp".  Something like "+r" might be appropriate.
->>
->> This feels subtle and fragile to me.
->
-> Looked this up; again you're right the direct use of "rXX" (or the
-> higher reg names) for gcc ARM inline assembly input/output constraints
-> is undocumented, but the "Extended ASM" section in the manual,
->
-> 	http://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html
->
-> states that the way to force a variable into a specific register is:
->
-> 	register <type> variable asm("register") = ...;
->
-> and then to make sure it happens, to create an
-> empty-asm-with-constraint that forces a register write,
->
-> 	asm volatile("" : "+r"(variable));
+OK, that looks good to me.
 
-This is not how gcc inline asm works.  A variable declared with an
-asm("rXX") tag will be placed in that register when used as a parameter
-of an asm code statement.  Outside that statement no promises are made.
-It is possible, and it does happen, that gcc moves the value to the
-requested register immediately before asm statement and moves it back
-where it came from immediately after.
+Tested with CONFIG_THUMB2_KERNEL on omap4.
 
-> For the paranoid, one could do:
->
-> 	asm volatile("mov sp, %0\n\t" : "+r"(variable) : : "sp");
->
-> which is, unlike the use of "sp" as input/output register, actually
-> documented explicitly in the "Extended ASM" section of gcc's manual,
-> quote:
->
-> 	If you refer to a particular hardware register from the
-> 	assembler code, you will probably have to list the register
-> 	after the third colon to tell the compiler the register's
-> 	value is modified. In some assemblers, the register names
-> 	begin with `%'; to produce one `%' in the assembler code,
-> 	you must write `%%' in the input.
->
-> (That's the only place where the doc acknowledges gcc's inline
-> assembler's knowledge of machine register names as constraints - in
-> the clobber list)
-
-The clobber list enumerates all explicitly named registers (not from
-parameters) used in the code section, and the compiler will assume these
-contain garbage after the asm statement, reloading them from memory or
-otherwise repopulating them with good values.  Whatever values they were
-given in the asm statement are lost.
-
->>> Is the use of a naked "bounce function" for this specific purpose
->>> (switch the stackpointer) acceptable, and guaranteed to create the
->>> correct code ?
->>>
->>>
->>> It'd be nice not having to dump this piece into assembly...
->>
->> Using out-of-line assembler avoids the ABI issues, and is often
->> more readable IMHO.
->>
->> On Wed, May 18, 2011 at 06:50:07PM +0200, Mikael Pettersson wrote:
->> [...]
->>> Just write the stack switching fragment in proper assembly, and
->>> keep both sides of it in normal C.  End of problem.
->>
->> Indeed, though there is only a little section of C, in the middle
->> of some assembler which is not implementable in C.
->
-> The stack switching segment isn't the problem ... it's the C bit, as
-> long as it lives in the same func.
-
-A stack switching trampoline in pure asm seems to me the cleaner
-solution by far.
-
-> Yow, morale of the exercise, I guess: It's possible to shoehorn GCC
-> into doing what I want, but the shoe isn't a good fit ;-)
->
-> I'm still not convinced why:
->
-> void __naked swsusp_arch_resume(void)
-> {
-> 	register void *sp asm("sp") = ...;
-> 	asm volatile("" : "+r"(sp));
-> 	__swsusp_arch_resume_copy_pages();
-> 	__swsusp_arch_resume_cpu();
-> }
->
-> with two explicit "noinline" funcs wouldn't be ok.
-
-I'm not convinced it _would_ be OK.  Messing with the stack pointer from
-inline asm usually causes all kinds of bad things to happen.  Been
-there, done that.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+Acked-by: Dave Martin <dave.martin@linaro.org>
