@@ -1,116 +1,161 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Thu, 19 May 2011 18:31:28 +0100 (BST)
-Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
-In-Reply-To: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
-References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
-Message-ID: <alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 19 May 2011 19:32:22 +0200
+Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
+In-Reply-To: <1305588114-23728-1-git-send-email-ccross@android.com>
+References: <1305588114-23728-1-git-send-email-ccross@android.com>
+Message-ID: <BANLkTim4U-CJ_D3VSNzwd23XL3fDXT7onQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2011/5/17 Colin Cross <ccross@android.com>:
 
-/me again ...
+> This patch depends on Thomas Gleixner's patch to add clockevents_reconfigure
+> See: https://lkml.org/lkml/2011/5/13/122
 
-Sorry that this took a little ... holidays. And work. And distractions...
+Patch set has evolved, see below.
+Also note that you more or less reimplement Rob Herrings patch:
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6802/1
+(no big deal I guess, give him a nod)
 
-Anyway, here we go again, basic code to enable hibernation 
-(suspend-to-disk) on ARM platforms.
+To work with Thomas full changeset just create a fresh branch and:
+git pull git://git.kernel.org/pub/scm/linux/kernel/git/x86/linux-2.6-tip.git
+timers/clockevents
 
-Any comments highly welcome.
+Pls change subject from ARM: to clockevents: and merge through
+Thomas tree (IMHO).
+
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 60636f4..dbf58d4 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -10,21 +10,29 @@
+> ?*/
+> ?#include <linux/init.h>
+> ?#include <linux/kernel.h>
+> +#include <linux/clk.h>
+> +#include <linux/cpufreq.h>
+> ?#include <linux/delay.h>
+> ?#include <linux/device.h>
+> +#include <linux/err.h>
+> ?#include <linux/smp.h>
+> ?#include <linux/jiffies.h>
+> ?#include <linux/clockchips.h>
+> ?#include <linux/irq.h>
+> ?#include <linux/io.h>
+> +#include <linux/percpu.h>
+>
+> ?#include <asm/smp_twd.h>
+> ?#include <asm/hardware/gic.h>
+>
+> +#define TWD_MIN_RANGE 4
+> +
+
+Loose this. Let the framework decide using the function below.
+
+> ?/* set up by the platform code */
+> ?void __iomem *twd_base;
+>
+> +static struct clk *twd_clk;
+> ?static unsigned long twd_timer_rate;
+> +static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
+>
+> ?static void twd_set_mode(enum clock_event_mode mode,
+> ? ? ? ? ? ? ? ? ? ? ? ?struct clock_event_device *clk)
+> @@ -80,6 +88,49 @@ int twd_timer_ack(void)
+> ? ? ? ?return 0;
+> ?}
+>
+> +/*
+> + * Updates clockevent frequency when the cpu frequency changes.
+> + * Called on the cpu that is changing frequency with interrupts disabled.
+> + */
+> +static void twd_update_frequency(void *data)
+> +{
+> + ? ? ? twd_timer_rate = clk_get_rate(twd_clk);
+> +
+> + ? ? ? clockevents_reconfigure(__get_cpu_var(twd_ce), twd_timer_rate,
+> + ? ? ? ? ? ? ? ? ? ? ? TWD_MIN_RANGE);
+
+Changed name to clockevents_update_freq(), dropped range argument.
+
+> +}
+> +
+> +static int twd_cpufreq_transition(struct notifier_block *nb,
+> + ? ? ? unsigned long state, void *data)
+> +{
+> + ? ? ? struct cpufreq_freqs *freqs = data;
+> +
+> + ? ? ? /*
+> + ? ? ? ?* The twd clock events must be reprogrammed to account for the new
+> + ? ? ? ?* frequency. ?The timer is local to a cpu, so cross-call to the
+> + ? ? ? ?* changing cpu.
+> + ? ? ? ?*/
+> + ? ? ? if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
+> + ? ? ? ? ? ? ? smp_call_function_single(freqs->cpu, twd_update_frequency,
+> + ? ? ? ? ? ? ? ? ? ? ? NULL, 1);
+> +
+> + ? ? ? return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block twd_cpufreq_nb = {
+> + ? ? ? .notifier_call = twd_cpufreq_transition,
+> +};
+> +
+> +static int twd_cpufreq_init(void)
+> +{
+> + ? ? ? if (!IS_ERR_OR_NULL(twd_clk))
+> + ? ? ? ? ? ? ? return cpufreq_register_notifier(&twd_cpufreq_nb,
+> + ? ? ? ? ? ? ? ? ? ? ? CPUFREQ_TRANSITION_NOTIFIER);
+> +
+> + ? ? ? return 0;
+> +}
+> +core_initcall(twd_cpufreq_init);
+> +
+> ?static void __cpuinit twd_calibrate_rate(void)
+> ?{
+> ? ? ? ?unsigned long count;
+> @@ -124,7 +175,16 @@ static void __cpuinit twd_calibrate_rate(void)
+> ?*/
+> ?void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+> ?{
+> - ? ? ? twd_calibrate_rate();
+> + ? ? ? if (twd_clk == NULL) {
+> + ? ? ? ? ? ? ? twd_clk = clk_get_sys("smp_twd", NULL);
+> + ? ? ? ? ? ? ? if (IS_ERR_OR_NULL(twd_clk))
+> + ? ? ? ? ? ? ? ? ? ? ? pr_warn("%s: no clock found\n", __func__);
+> + ? ? ? }
+> +
+> + ? ? ? if (!IS_ERR_OR_NULL(twd_clk))
+> + ? ? ? ? ? ? ? twd_timer_rate = clk_get_rate(twd_clk);
+> + ? ? ? else
+> + ? ? ? ? ? ? ? twd_calibrate_rate();
+>
+> ? ? ? ?clk->name = "local_timer";
+> ? ? ? ?clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+> @@ -132,13 +192,16 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+> ? ? ? ?clk->rating = 350;
+> ? ? ? ?clk->set_mode = twd_set_mode;
+> ? ? ? ?clk->set_next_event = twd_set_next_event;
+> - ? ? ? clk->shift = 20;
+> - ? ? ? clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
+> +
+> + ? ? ? clockevents_calc_mult_shift(clk, twd_timer_rate, TWD_MIN_RANGE);
+> +
+> ? ? ? ?clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
+> ? ? ? ?clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
+
+Get rid of everything between clk->shift ... and here and replace it with:
+
+clockevents_config_and_register(clk, twd_timer_rate,
+                                       0xf, 0xffffffff);
+
+> ? ? ? ?/* Make sure our local interrupt controller has this enabled */
+> ? ? ? ?gic_enable_ppi(clk->irq);
+>
+> + ? ? ? __get_cpu_var(twd_ce) = clk;
+> +
+> ? ? ? ?clockevents_register_device(clk);
+> ?}
 
 
-
-To use this, you need sleep.S modifications for your SoC type (to get 
-__save/__restore_processor_state hooks). I've sent some of those for 
-illustration earlier, they haven't changed, I've not included them here, 
-so pick these changes up from:
-
-http://68.183.106.108/lists/linux-pm/msg24020.html
-
-The patch below only contains the _generic_ code.
-
-
-This is tested on S5P6450 and OMAP3, with the sleep...S changes just 
-mentioned - check the archives for those. Works both with normal swsusp and 
-tuxonice (again, check the archives for the TOI modification needed).
-
-
-
-Previously, I've reported OMAP3 video issues, after resume-from-disk. That 
-isn't fully solved (it's a driver issue) but I've found a workaround: 
-Trigger the resume from initramfs, after loading a logo image into the 
-framebuffer and switching it on. That gets everything back without 
-corruptions / wrong LCD reinitialization.
-
-The OMAP video seems a bit of a diva; I've got one board type on which 
-suspend/resume work perfectly but the omapdss driver spits out thousands 
-of error interrupts during system startup (before the image is loaded), 
-and the other board where all that is fine but the restore somehow garbles 
-the LCD clocking (but the driver's sysfs files claim it's the same).
-
-
-In short: This stuff really works now, for all I can say. And adding 
-support for new type of ARM SoC doesn't touch the basic / generic code at 
-all anymore either.
-
-
-
-
-Anyway ...
-About the patch, changes vs. all previous suggestions:
-
-* Made the assembly sources as small as I responsibly could ;-)
-   They compile for thumb2 (but I haven't tested that yet) as well.
-
-* The page copy loop is now a C function. That also has the advantage
-   that one can use cpu_switch_mm() - a macro - there for swapper_pg_dir,
-   which makes resume via uswsusp ioctl or /sys/power/tuxonice/do_resume
-   possible (only tested the latter, though).
-
-* The SoC state save/restore is made to (re-)use the existing code in
-   sleep....S  for the particular chip.
-   OMAP3 and S5P64xx are provided as examples of that.
-
-* The save/restore_processor_state() hooks are now used in the same way
-   as e.g. existing powerpc code uses them (to trigger lazy saves before
-   and perform cache flushes after).
-
-
-Things that probably aren't perfect yet:
-
-* The code currently reserves a full page for the saved "core" state.
-   This is more than absolutely necessary; anyone think it's a problem ?
-
-* it sets aside another half a page of __nosavedata page for use as
-   temporary stack during the image copy (so that funcs can be called).
-
-   Right now on ARM, that's not an issue because even with TuxOnIce in,
-   there's less than 20 bytes of nosave stuff, so can as well put the
-   rest of that page to good use ;-)
-
-* I'd love to get rid of the include/asm-generic/vmlinux.lds.h change,
-   as it seems that's not necessary in other architectures.
-   Without that, the code gives a link error when building vmlinux
-   though, and I'm unsure how to address that.
-
-* The "integration" with the CPU sleep code is rather "backdoorish".
-   While the hooks into ..._cpu_suspend aren't massive, and there's no
-   code duplication, it'd be nicer to eventually have a cleaner way.
-
-* An OMAPDSS restore troubleshooting HOWTO would be helpful ;-)
-
-
-* The patch needs to be rebaselined against a current kernel;
-   any preferences which tree to base this on ?
-
-
-
-Thanks for all help with the little nits !
-FrankH.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: hibernate-19May2011.patch
-Type: text/x-diff
-Size: 7512 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/1d69d23c/attachment.bin>
+Or just smack in this patch on top:
