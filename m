@@ -1,60 +1,45 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 19 May 2011 16:23:23 +0200
-Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer
-In-Reply-To: <BANLkTinrk-FjMy1trDnsxwT_NTgQ5x_8Rg@mail.gmail.com>
-References: <1305807191-11704-1-git-send-email-linus.walleij@stericsson.com>
-	<20110519124454.GC2219@pengutronix.de>
-	<BANLkTinrk-FjMy1trDnsxwT_NTgQ5x_8Rg@mail.gmail.com>
-Message-ID: <20110519142323.GD2219@pengutronix.de>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 19 May 2011 22:23:43 +0800
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <201105191550.20129.arnd@arndb.de>
+References: <201105181047.17309.arnd@arndb.de>
+	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>
+	<BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
+	<201105191550.20129.arnd@arndb.de>
+Message-ID: <BANLkTikKhZu_H_QT+Uds22sepk1OnEeDNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2011/5/19 Arnd Bergmann <arnd@arndb.de>:
+> On Thursday 19 May 2011, Barry Song wrote:
+>> 2011/5/19 Nicolas Pitre <nico@fluxnic.net>:
+>> > On Thu, 19 May 2011, Barry Song wrote:
+>> > Something like that. ?The exact details will be fleshed out as we go.
+>> > The idea is to give a round of review from a higher point of view to
+>> > make sure no opportunities for code reuse is missed, etc. ?The mechanics
+>> > of how this code transitions from this tree into mainline during the
+>> > merge window is secondary.
+>>
+>> i asked this because we wanted to send the source codes of
+>> CSR(http://www.csr.com) to upstream as i have told you in LDS. it
+>> looks like we need to follow the below new changes to make our source
+>> codes acceptable?
+>> 1. arm device tree
+>> 2. new pinmux framework from Linus Walleij
+>> 3. move GPIO from plat/mach to drivers/gpio?
+>
+> I would count at least the last two as mandatory, for the device tree,
+> it depends on how much work it would be for you to do the conversion
+> and at what time you submit the series. The longer you wait before
+> submitting the series, the stricter the requirements will get.
+>
+> Do you have a diffstat or a git tree with your work available?
 
-> >> + ? ? ? ? ? ? while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end) {
-> >> + ? ? ? ? ? ? ? ? ? ? if (time_after(jiffies, timeout)) {
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(&pl022->adev->dev,
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%s: timeout!\n", __func__);
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? message->state = STATE_ERROR;
-> >> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
-> >> + ? ? ? ? ? ? ? ? ? ? }
-> >> ? ? ? ? ? ? ? ? ? ? ? readwriter(pl022);
-> >> + ? ? ? ? ? ? }
-> 
-> What about we move readerwriter() above if (time_after...) then it atleast
-> gets one chance to run even if we're preempted for 10 seconds.
+not yet by now. it should be coming in the middle of next month. we
+have workable codes but need a lot of refinations before sending
+patches for review. it is more like a new begin from scratch, so
+arm/arch changes should be things we can catch.
 
-This will fix the initial problem, but still exit early if e.g. the
-preemption came on a subsequent iteration of the while loop, say during
-readwriter().
-
-> 
-> Any other design patterns that'd be better?
-
-A bit better might be:
-
-	while (...) {
-		time = jiffies;
-		readwriter();
-		if (time_after(time, timeout)...)
-			...
-	}
-
-So you continue triggering transfers as long as the last one was in the
-valid timespan. In case of an preemption, you made sure you tried the
-whole timespan (+ the jitter) which is probably better than stop trying
-too early.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/af841886/attachment.sig>
+>
+> ? ? ? ?Arnd
+>
