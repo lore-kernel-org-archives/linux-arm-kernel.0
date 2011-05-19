@@ -1,39 +1,42 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 19 May 2011 10:05:12 +0100
-Subject: [PATCH] ARM: sparsemem: allow pfn_valid to be overridden when
-	using	SPARSEMEM
-In-Reply-To: <0D753D10438DA54287A00B027084269764D2F73AC4@AUSP01VMBX24.collaborationhost.net>
-References: <1305734639-6561-1-git-send-email-will.deacon@arm.com>
-	<0D753D10438DA54287A00B027084269764D2F73AC4@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <1305795912.29560.19.camel@e102144-lin.cambridge.arm.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Thu, 19 May 2011 11:08:49 +0200
+Subject: [patch 4/7] clockevents: Provide combined configure and register
+	function
+In-Reply-To: <20110518210136.331975870@linutronix.de>
+References: <20110518205713.947614271@linutronix.de>
+	<20110518210136.331975870@linutronix.de>
+Message-ID: <20110519090849.GA6251@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-18 at 19:53 +0100, H Hartley Sweeten wrote:
-> On Wednesday, May 18, 2011 9:04 AM, Will Deacon wrote:
-> >
-> > In commit eb33575c ("[ARM] Double check memmap is actually valid with a
-> > memmap has unexpected holes V2"), a new function, memmap_valid_within,
-> > was introduced to mmzone.h so that holes in the memmap which pass
-> > pfn_valid in SPARSEMEM configurations can be detected and avoided.
 
-[...]
+* Thomas Gleixner <tglx@linutronix.de> wrote:
 
-> I tested this on an EP93xx based system which uses ARCH_HAS_HOLES_MEMORYMODEL.
-> The EP9307A has 64MB of memory that appears as two 32MB blocks at addresses
-> 0xc0000000 and 0xc4000000.  Currently the EP93xx uses a Flat Memory model and
-> the hole used to cause a Kernel OOPs before commit e80d6a24 ("[ARM] Skip memory
-> holes in FLATMEM when reading /proc/pagetypeinfo"), which is where I think this
-> all started.
-> 
-[...]
+> +extern void clockevents_config_and_register(struct clock_event_device *dev,
+> +					    u32 freq, unsigned long min_delta,
+> +					    unsigned long max_delta);
 
-> I'm not sure what the output "should" be, but the patch does not seem to
-> cause any issues.  So feel free to add:
-> 
-> Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+might be worth collecting these fields into a clocksource_params structure:
 
-Thanks for that. It's good to know that this patch doesn't break
-non-sparsemem platforms with whacky flatmem configurations :)
+struct clocksource_params {
+	u32		freq;
+	unsigned long	min_delta;
+	unsigned long	max_delta;
+};
 
-Will
+That way the initialization API looks even more streamlined:
+
+extern void
+clockevents_config_and_register(struct clock_event_device *dev,
+				struct clocksource_params params);
+
+and could be extended in the future, without having to update every single 
+clocksource driver again.
+
+But a good first step in any case:
+
+Reviewed-by: Ingo Molnar <mingo@elte.hu>
+
+Thanks,
+
+	Ingo
