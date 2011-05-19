@@ -1,102 +1,47 @@
-From: morpheus.ibis@gmail.com (Pavel Herrmann)
-Date: Fri, 20 May 2011 00:13:20 +0200
-Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
-In-Reply-To: <20110519193121.GC7445@n2100.arm.linux.org.uk>
-References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
-	<201105191451.40416.morpheus.ibis@gmail.com>
-	<20110519193121.GC7445@n2100.arm.linux.org.uk>
-Message-ID: <201105200013.20380.morpheus.ibis@gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 20 May 2011 00:25:41 +0200
+Subject: PXA3xx NAND controller support broken in 2.6.39
+Message-ID: <BANLkTimos3-Ds4Y8FDfDZegqAhH7nSS4PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 19, 2011 09:31:21 PM Russell King - ARM Linux wrote:
-> I'm not sure that this is right.  Taking the lock around spi_sync() ensures
-> that two concurrent spi_sync()s can't happen in parallel, but with this you
-> could end up with another happening as soon as this lock is released -
-> before you've accessed the data which was transferred.
-> 
-> I think you want to hold the mutex at the point you setup the data to be
-> transferred, do the transfer, and then release the mutex once you've read
-> the results of the transfer.
+Hi,
 
-oh no, not again...
-this was the earliest version, not the cleaned-up one (notice the lock in 
-setup-transfer, which I said was unnecessary)
-here is the cleaner (newest) version:
+Somewhere between 2.6.38 and 2.6.39, support for PXA3xx NAND
+controller was broken. I bisected it down, and the relevant commits
+appear to be
+
+  4332c11 mtd: pxa3xx_nand: clean the keep configure code
+  401e67e mtd: pxa3xx_nand: mtd scan id process could be defined by
+driver itself
+  4eb2da8 mtd: pxa3xx_nand: unify prepare command
+  38caf7f mtd: pxa3xx_nand: discard wait_for_event,write_cmd,__readid function
+  f8155a4 mtd: pxa3xx_nand: rework irq logic
+  e353a20 mtd: pxa3xx_nand: make scan procedure more clear
+  52d039f mtd: pxa3xx_nand: NULL dereference in pxa3xx_nand_probe
+  9d8b104 mtd: pxa3xx_nand: set oob length in the runtime
+  18c81b1 mtd: pxa3xx_nand: remove the flash info in driver structure
+  227a886 mtd: pxa3xx_nand: introduce default timing to reduce read id times
+  c1f8247 mtd: pxa3xx_nand: condense the flash definition
+  99d3896 mtd: pxa3xx: fix build error when CONFIG_MTD_PARTITIONS is not defined
+
+Unfortunately, this series does not consist of atomic commits and is
+hence not bisectable by itself, so I can't name a specific commit
+which breaks it.
+
+On a raumfeld board (which has its board support code in mainline),
+the effect is:
+
+[    1.803796] Wait time out!!!
+[    2.003795] Wait time out!!!
+[    2.203780] Wait time out!!!
+[    2.403779] Wait time out!!!
+[    2.406643] No NAND device found.
+[    2.409939] pxa3xx-nand pxa3xx-nand: failed to scan nand
+[    2.418850] UBI error: ubi_init: UBI error: cannot initialize UBI, error -19
 
 
->From bd55d6b18fa4fcb884980825b43b43df01767149 Mon Sep 17 00:00:00 2001
-From: Pavel Herrmann <morpheus.ibis@gmail.com>
-Date: Mon, 16 May 2011 14:18:18 +0200
-Subject: [PATCH] MAX1111: Fix Race condition causing NULL pointer exception
+With the code in 2.6.38, it works just fine. Any detailed debug output
+you want me to provide in order to fix it?
 
-spi_sync call uses its spi_message parameter to keep completion information,
-having this structure static is not thread-safe, potentially causing one
-thread having pointers to memory on or above other threads stack. use mutex
-to prevent multiple access
-
-Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
----
- drivers/hwmon/max1111.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
-index 12a54aa..d872f57 100644
---- a/drivers/hwmon/max1111.c
-+++ b/drivers/hwmon/max1111.c
-@@ -40,6 +40,7 @@ struct max1111_data {
- 	struct spi_transfer	xfer[2];
- 	uint8_t *tx_buf;
- 	uint8_t *rx_buf;
-+	struct mutex		msg_lock_mutex;
- };
- 
- static int max1111_read(struct device *dev, int channel)
-@@ -48,6 +49,11 @@ static int max1111_read(struct device *dev, int channel)
- 	uint8_t v1, v2;
- 	int err;
- 
-+	/* spi_sync requires data not to be freed before function returns
-+	 * for static data, any access is dangerous, use locks
-+	 */
-+	mutex_lock(&data->msg_lock_mutex);
-+
- 	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
- 		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
- 		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
-@@ -55,12 +61,15 @@ static int max1111_read(struct device *dev, int channel)
- 	err = spi_sync(data->spi, &data->msg);
- 	if (err < 0) {
- 		dev_err(dev, "spi_sync failed with %d\n", err);
-+		mutex_unlock(&data->msg_lock_mutex);
- 		return err;
- 	}
- 
- 	v1 = data->rx_buf[0];
- 	v2 = data->rx_buf[1];
- 
-+	mutex_unlock(&data->msg_lock_mutex);
-+
- 	if ((v1 & 0xc0) || (v2 & 0x3f))
- 		return -EINVAL;
- 
-@@ -176,6 +185,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
- 	if (err)
- 		goto err_free_data;
- 
-+	mutex_init(&data->msg_lock_mutex);
-+
- 	data->spi = spi;
- 	spi_set_drvdata(spi, data);
- 
-@@ -213,6 +224,7 @@ static int __devexit max1111_remove(struct spi_device 
-*spi)
- 
- 	hwmon_device_unregister(data->hwmon_dev);
- 	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
-+	mutex_destroy(data->msg_lock_mutex);
- 	kfree(data->rx_buf);
- 	kfree(data->tx_buf);
- 	kfree(data);
--- 
-1.7.5.rc3
+Daniel
