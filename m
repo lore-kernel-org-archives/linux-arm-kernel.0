@@ -1,36 +1,29 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 19 May 2011 15:50:19 +0200
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
-References: <201105181047.17309.arnd@arndb.de>
-	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>
-	<BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
-Message-ID: <201105191550.20129.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 19 May 2011 21:56:32 +0800
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <BANLkTinD9rAipfwNnh6QpgbcogckdtQ=OQ@mail.gmail.com>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+	<20110519085638.GA26816@S2100-06.ap.freescale.net>
+	<BANLkTinD9rAipfwNnh6QpgbcogckdtQ=OQ@mail.gmail.com>
+Message-ID: <20110519135631.GB26816@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 May 2011, Barry Song wrote:
-> 2011/5/19 Nicolas Pitre <nico@fluxnic.net>:
-> > On Thu, 19 May 2011, Barry Song wrote:
-> > Something like that.  The exact details will be fleshed out as we go.
-> > The idea is to give a round of review from a higher point of view to
-> > make sure no opportunities for code reuse is missed, etc.  The mechanics
-> > of how this code transitions from this tree into mainline during the
-> > merge window is secondary.
+On Thu, May 19, 2011 at 02:21:27PM +0200, Linus Walleij wrote:
+> On Thu, May 19, 2011 at 10:56 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
 > 
-> i asked this because we wanted to send the source codes of
-> CSR(http://www.csr.com) to upstream as i have told you in LDS. it
-> looks like we need to follow the below new changes to make our source
-> codes acceptable?
-> 1. arm device tree
-> 2. new pinmux framework from Linus Walleij
-> 3. move GPIO from plat/mach to drivers/gpio?
+> > I start working on moving mxs gpio (arch/arm/mach-mxs/gpio.c) into
+> > driver/gpio, and I see the possibility to go a different approach
+> > from U300 one posted here.
+> 
+> I've tried to figure out what relation the mail has to the U300 driver
+> but cannot find any, more than that it's moving a driver... Please
+> start a new mail thread.
+> 
+I will post mxs-gpio driver once I get it done.  Then please review
+the code and see the difference between mxs-gpio and u300-gpio,
+though these hardwares have something in common.
 
-I would count at least the last two as mandatory, for the device tree,
-it depends on how much work it would be for you to do the conversion
-and at what time you submit the series. The longer you wait before
-submitting the series, the stricter the requirements will get.
-
-Do you have a diffstat or a git tree with your work available?
-
-	Arnd
+-- 
+Regards,
+Shawn
