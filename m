@@ -1,87 +1,98 @@
 From: marvin24@gmx.de (Marc Dietrich)
-Date: Thu, 19 May 2011 14:08:28 +0200
-Subject: [PATCH 4/6] ARM: tegra: paz00: cleanup sdhci ports
+Date: Thu, 19 May 2011 14:08:30 +0200
+Subject: [PATCH 6/6] ARM: tegra: paz00: enable wifi card
 In-Reply-To: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
 References: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
-Message-ID: <1305806910-3903-5-git-send-email-marvin24@gmx.de>
+Message-ID: <1305806910-3903-7-git-send-email-marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The internal storage has no gpios connected to. Also the second
-port is not connected at all, so remove it from the board file.
+The Wifi card attached to one usb port needs to be unkilled. The
+corresponding gpio and also the gpio for the LED are exported to be
+controlled by userspace later on.
 
 Signed-off-by: Marc Dietrich <marvin24@gmx.de>
 ---
- arch/arm/mach-tegra/board-paz00-pinmux.c |    3 ---
- arch/arm/mach-tegra/board-paz00.c        |   10 +---------
- arch/arm/mach-tegra/board-paz00.h        |    3 ---
- 3 files changed, 1 insertions(+), 15 deletions(-)
+ arch/arm/mach-tegra/board-paz00-pinmux.c |    2 ++
+ arch/arm/mach-tegra/board-paz00.c        |   22 ++++++++++++++++++++++
+ arch/arm/mach-tegra/board-paz00.h        |    7 +++++++
+ 3 files changed, 31 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
-index acee62e..bdd2627 100644
+index bdd2627..41a6304 100644
 --- a/arch/arm/mach-tegra/board-paz00-pinmux.c
 +++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
-@@ -144,9 +144,6 @@ static struct tegra_gpio_table gpio_table[] = {
- 	{ .gpio = TEGRA_GPIO_SD1_CD,	.enable = true },
+@@ -145,6 +145,8 @@ static struct tegra_gpio_table gpio_table[] = {
  	{ .gpio = TEGRA_GPIO_SD1_WP,	.enable = true },
  	{ .gpio = TEGRA_GPIO_SD1_POWER,	.enable = true },
--	{ .gpio = TEGRA_GPIO_SD4_CD,	.enable = true },
--	{ .gpio = TEGRA_GPIO_SD4_WP,	.enable = true },
--	{ .gpio = TEGRA_GPIO_SD4_POWER,	.enable = true },
  	{ .gpio = TEGRA_ULPI_RST,	.enable = true },
++	{ .gpio = TEGRA_WIFI_PWRN,	.enable = true },
++	{ .gpio = TEGRA_WIFI_LED,	.enable = true },
  };
  
+ void paz00_pinmux_init(void)
 diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
-index e1e1959..7fdc409 100644
+index 1b076f6..c78ef4c 100644
 --- a/arch/arm/mach-tegra/board-paz00.c
 +++ b/arch/arm/mach-tegra/board-paz00.c
-@@ -71,7 +71,6 @@ static struct platform_device debug_uart = {
- static struct platform_device *paz00_devices[] __initdata = {
- 	&debug_uart,
- 	&tegra_sdhci_device1,
--	&tegra_sdhci_device2,
- 	&tegra_sdhci_device4,
- };
+@@ -135,6 +135,27 @@ static void __init tegra_paz00_fixup(struct machine_desc *desc,
+ 	mi->bank[0].size = 448 * SZ_1M;
+ }
  
-@@ -148,16 +147,10 @@ static struct tegra_sdhci_platform_data sdhci_pdata1 = {
- 	.power_gpio	= TEGRA_GPIO_SD1_POWER,
- };
++static void __init paz00_wifi_init(void)
++{
++	int ret;
++
++	/* unlock hw rfkill */
++	ret = gpio_request_one(TEGRA_WIFI_PWRN, GPIOF_OUT_INIT_HIGH,
++			"wifi_pwrn");
++	if(ret) {
++		pr_warning("WIFI: could not request PWRN gpio!\n");
++		return;
++	}
++	gpio_export(TEGRA_WIFI_PWRN, 0);
++
++	/* export wifi led */
++	ret = gpio_request_one(TEGRA_WIFI_LED, GPIOF_OUT_INIT_HIGH,
++			"wifi_led");
++	if(ret)
++		pr_warning("WIFI: could not request LED gpio!\n");
++	gpio_export(TEGRA_WIFI_LED, 0);
++}
++
+ static __initdata struct tegra_clk_init_table paz00_clk_init_table[] = {
+ 	/* name		parent		rate		enabled */
+ 	{ "uartd",	"pll_p",	216000000,	true },
+@@ -167,6 +188,7 @@ static void __init tegra_paz00_init(void)
  
--static struct tegra_sdhci_platform_data sdhci_pdata2 = {
-+static struct tegra_sdhci_platform_data sdhci_pdata4 = {
- 	.cd_gpio	= -1,
- 	.wp_gpio	= -1,
- 	.power_gpio	= -1,
--};
--
--static struct tegra_sdhci_platform_data sdhci_pdata4 = {
--	.cd_gpio	= TEGRA_GPIO_SD4_CD,
--	.wp_gpio	= TEGRA_GPIO_SD4_WP,
--	.power_gpio	= TEGRA_GPIO_SD4_POWER,
- 	.is_8bit	= 1,
- };
+ 	paz00_i2c_init();
+ 	paz00_usb_init();
++	paz00_wifi_init();
+ }
  
-@@ -168,7 +161,6 @@ static void __init tegra_paz00_init(void)
- 	paz00_pinmux_init();
- 
- 	tegra_sdhci_device1.dev.platform_data = &sdhci_pdata1;
--	tegra_sdhci_device2.dev.platform_data = &sdhci_pdata2;
- 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
- 
- 	platform_add_devices(paz00_devices, ARRAY_SIZE(paz00_devices));
+ MACHINE_START(PAZ00, "Toshiba AC100 / Dynabook AZ")
 diff --git a/arch/arm/mach-tegra/board-paz00.h b/arch/arm/mach-tegra/board-paz00.h
-index 6b0b733..d4ff39d 100644
+index d4ff39d..a49543a 100644
 --- a/arch/arm/mach-tegra/board-paz00.h
 +++ b/arch/arm/mach-tegra/board-paz00.h
-@@ -20,9 +20,6 @@
+@@ -17,11 +17,18 @@
+ #ifndef _MACH_TEGRA_BOARD_PAZ00_H
+ #define _MACH_TEGRA_BOARD_PAZ00_H
+ 
++/* SDMMC */
  #define TEGRA_GPIO_SD1_CD		TEGRA_GPIO_PV5
  #define TEGRA_GPIO_SD1_WP		TEGRA_GPIO_PH1
  #define TEGRA_GPIO_SD1_POWER		TEGRA_GPIO_PT3
--#define TEGRA_GPIO_SD4_CD		TEGRA_GPIO_PH2
--#define TEGRA_GPIO_SD4_WP		TEGRA_GPIO_PH3
--#define TEGRA_GPIO_SD4_POWER		TEGRA_GPIO_PI6
++
++/* ULPI */
  #define TEGRA_ULPI_RST			TEGRA_GPIO_PV0
  
++/* Wifi */
++#define TEGRA_WIFI_LED			TEGRA_GPIO_PD0
++#define TEGRA_WIFI_PWRN			TEGRA_GPIO_PK5
++
  void paz00_pinmux_init(void);
+ 
+ #endif
 -- 
 1.7.4.2
