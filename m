@@ -1,23 +1,30 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 19 May 2011 19:38:27 +0800
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <BANLkTi=poU17RqAzp28CPjWHrN_+aFiyag@mail.gmail.com>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTi=poU17RqAzp28CPjWHrN_+aFiyag@mail.gmail.com>
-Message-ID: <BANLkTindee6UMez8HyBUwd2H6mN-DknzPw@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Thu, 19 May 2011 15:50:08 +0400
+Subject: [PATCH] ARM: mach-shmobile: sh73a0 twd_base fix
+In-Reply-To: <20110519062620.27921.52669.sendpatchset@t400s>
+References: <20110519062620.27921.52669.sendpatchset@t400s>
+Message-ID: <4DD503F0.4050201@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -arch_initcall(u300_gpio_init);
-> -module_exit(u300_gpio_exit);
->
-looks like the driver can't be a real module, is the module_exit
-suitable? it looks strange module_exit plays together with
-arch_initcall.
-guess symbol u300_gpio_exit will finally lose in the last vmlinux
-since it is in exit section and built-in kernel.
+Hello.
 
-another problem i see is after moving gpio/pinmux to drivers as
-platform device, codes in arch/arm/plat(mach) can't  call gpio/pinmux
-api before the related platform devices registerred. that will
-required these platform devices enter system earlier.
+On 19-05-2011 10:26, Magnus Damm wrote:
+
+> From: Magnus Damm<damm@opensource.se>
+
+> Fix the case of too late twd_base initialization for SMP
+> on sh73a0 which bas been broken because sh73a0 specific
+> smp_prepare_cpu() and percpu_timer_setup() changed order
+> in the commits:
+
+> 05c74a6cbcfb416286a947668ba32f63d99fe74a
+> c413521eb4e2d7ffd5ce432a144708d479054bd3
+
+    Please also specify those commits' summaries -- for the human readers.
+
+> Without this fix the sh73a0 SMP kernel panics on boot.
+
+> Signed-off-by: Magnus Damm<damm@opensource.se>
+
+WBR, Sergei
