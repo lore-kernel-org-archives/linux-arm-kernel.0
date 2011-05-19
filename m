@@ -1,82 +1,42 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Thu, 19 May 2011 19:04:29 +0200
-Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer v2
-In-Reply-To: <1305821134-26147-1-git-send-email-linus.walleij@stericsson.com>
-References: <1305821134-26147-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <BANLkTi=s4nzi=5f+Vvh3ABuspnKXQVUfLw@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 19 May 2011 19:05:48 +0200
+Subject: [PATCH v2 0/7] Consolidate sdhci pltfm & OF drivers and get them
+	self registered
+In-Reply-To: <20110519160901.GC26816@S2100-06.ap.freescale.net>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+	<20110519094046.GA2219@pengutronix.de>
+	<20110519160901.GC26816@S2100-06.ap.freescale.net>
+Message-ID: <20110519170548.GA1075@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Shawn,
 
-On Thu, May 19, 2011 at 6:05 PM, Linus Walleij
-<linus.walleij@stericsson.com> wrote:
-> From: Magnus Templing <magnus.templing@stericsson.com>
->
-> This adds the missing handling of polling timeouts and deletes
-> our last todo.
->
-> Signed-off-by: Magnus Templing <magnus.templing@stericsson.com>
-> Reviewed-by: Srinidhi Kasagar <srinidhi.kasagar@stericsson.com>
-> [Fixups from review by Wolfram Sang]
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ?drivers/spi/amba-pl022.c | ? 23 +++++++++++++++--------
-> ?1 files changed, 15 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/spi/amba-pl022.c b/drivers/spi/amba-pl022.c
-> index 08de58e..18667de 100644
-> --- a/drivers/spi/amba-pl022.c
-> +++ b/drivers/spi/amba-pl022.c
-> @@ -24,11 +24,6 @@
-> ?* GNU General Public License for more details.
-> ?*/
->
-> -/*
-> - * TODO:
-> - * - add timeout on polled transfers
-> - */
-> -
-> ?#include <linux/init.h>
-> ?#include <linux/module.h>
-> ?#include <linux/device.h>
-> @@ -287,6 +282,8 @@
->
-> ?#define CLEAR_ALL_INTERRUPTS ?0x3
->
-> +#define SPI_POLLING_TIMEOUT 1000
-> +
->
-> ?/*
-> ?* The type of reading going on on this chip
-> @@ -1378,6 +1375,7 @@ static void do_polling_transfer(struct pl022 *pl022)
-> ? ? ? ?struct spi_transfer *transfer = NULL;
-> ? ? ? ?struct spi_transfer *previous = NULL;
-> ? ? ? ?struct chip_data *chip;
-> + ? ? ? unsigned long time, timeout;
->
-> ? ? ? ?chip = pl022->cur_chip;
-> ? ? ? ?message = pl022->cur_msg;
-> @@ -1415,9 +1413,18 @@ static void do_polling_transfer(struct pl022 *pl022)
-> ? ? ? ? ? ? ? ? ? ? ? SSP_CR1(pl022->virtbase));
->
-> ? ? ? ? ? ? ? ?dev_dbg(&pl022->adev->dev, "polling transfer ongoing ...\n");
-> - ? ? ? ? ? ? ? /* FIXME: insert a timeout so we don't hang here indefinitely */
-> - ? ? ? ? ? ? ? while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end)
-> +
-> + ? ? ? ? ? ? ? timeout = jiffies + msecs_to_jiffies(SPI_POLLING_TIMEOUT);
-> + ? ? ? ? ? ? ? while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end) {
-> + ? ? ? ? ? ? ? ? ? ? ? time = jiffies;
-> ? ? ? ? ? ? ? ? ? ? ? ?readwriter(pl022);
-> + ? ? ? ? ? ? ? ? ? ? ? if (time_after(time, timeout)) {
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(&pl022->adev->dev,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%s: timeout!\n", __func__);
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? message->state = STATE_ERROR;
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
-> + ? ? ? ? ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? }
+> Should I go for v3 right now to address the patch applying problems
+> and that ESDHC_IMX build issue, or hold for a while to see if you
+> have more comments on v2?
 
-just out of curiosity: is it a busy wait? Looks like it is...
+Please wait a little bit more.
 
-Thanks,
-   Vitaly
+> And what is your position on patch #5 which merges esdhc imx and mpc
+> support into one?  As Anton has voted a NO there, I would probably
+> drop the patch if there is another person has strong opinion to get
+> imx and mpc stay separated.
+
+This was the other main issue I spotted so far. I wanted to have another look
+tomorrow, yet the tendency is that I agree with Anton.
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/06e7724f/attachment-0001.sig>
