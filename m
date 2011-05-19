@@ -1,71 +1,116 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Thu, 19 May 2011 10:19:35 -0700
-Subject: [PATCH] drivers: create a pinmux subsystem v2
-In-Reply-To: <BANLkTimMHjUFN8NqAxoF5h_eXgmJP+znSg@mail.gmail.com>
-References: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
-	<74CDBE0F657A3D45AFBB94109FB122FF0498A478E6@HQMAIL01.nvidia.com>
-	<BANLkTimMHjUFN8NqAxoF5h_eXgmJP+znSg@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0498A47BF9@HQMAIL01.nvidia.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Thu, 19 May 2011 18:31:28 +0100 (BST)
+Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+Message-ID: <alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Tuesday, May 17, 2011 11:57 PM:
-> 2011/5/18 Stephen Warren <swarren@nvidia.com>:
-> 
-> >> +static struct foo_pmx_func myfuncs[] = {
-> >> + ? ? {
-> >> + ? ? ? ? ? ? .name = "spi0-0",
-> >> + ? ? ? ? ? ? .pins = spi0_0_pins,
-> >> + ? ? ? ? ? ? .num_pins = ARRAY_SIZE(spi0_1_pins),
-> >> + ? ? },
-> >> ...
-> >
-> > Rather than defining a custom type (foo_pmx_func) for this array inside
-> > each driver, and then having to implement _list, _get_fname, _get_pins
-> > below, how about:
-> >
-> > * pinmux core defines a basic structure containing all the information
-> > ?that the core needs from the specific implementation.
-> >
-> > ...
-> > static struct foo_pmx_func spi0_0_func = {
-> > ? ? ? ?FOO_REG_PMX_A,
-> > ? ? ? ?0x30,
-> > ? ? ? ?0x10,
-> > };
-> > ...
-> > static struct pinmux_function myfuncs[] = {
-> > ? ? ? ?{
-> > ? ? ? ? ? ? ? ?.name = "spi0-0",
-> > ? ? ? ? ? ? ? ?.pins = spi0_0_pins,
-> > ? ? ? ? ? ? ? ?.num_pins = ARRAY_SIZE(spi0_1_pins),
-> > ? ? ? ? ? ? ? ?.driver_data = &spi0_0_func,
-> > ? ? ? ?},
-> > ...
-> >
-> > This would remove some boiler-plate code from the SoC drivers,
-> > although it might be considered a bad breaking of abstraction barriers?
-> 
-> Yes it does, however I didn't want to make the initial submission
-> feature creepy. So I would like this to go in as is, then refactor
-> drivers to get help from the framework later on, if we see that
-> it is needed. (So the solution would evolve gradually rather
-> than being too much designed-in from the beginning.)
-> 
-> Do you think the driver support functions are needed from start?
-> I could do it I think...
+Hi,
 
-Sorry for the slow responses.
+/me again ...
 
-I think this suggestion of mine isn't a big deal, so I'd basically be
-OK going either way initially.
+Sorry that this took a little ... holidays. And work. And distractions...
 
-Still, if I was writing the patches, and I agreed with the above change,
-I think I'd want to put it into the first patchset (or at least before
-other people started implementing their pinmux drivers on top of the code)
-since it'd avoid everyone else (or me) having to refactor all their
-drivers almost immediately after writing them, plus it looks like a very
-simple change to the current pinmux patchset.
+Anyway, here we go again, basic code to enable hibernation 
+(suspend-to-disk) on ARM platforms.
 
--- 
-nvpublic
+Any comments highly welcome.
+
+
+
+To use this, you need sleep.S modifications for your SoC type (to get 
+__save/__restore_processor_state hooks). I've sent some of those for 
+illustration earlier, they haven't changed, I've not included them here, 
+so pick these changes up from:
+
+http://68.183.106.108/lists/linux-pm/msg24020.html
+
+The patch below only contains the _generic_ code.
+
+
+This is tested on S5P6450 and OMAP3, with the sleep...S changes just 
+mentioned - check the archives for those. Works both with normal swsusp and 
+tuxonice (again, check the archives for the TOI modification needed).
+
+
+
+Previously, I've reported OMAP3 video issues, after resume-from-disk. That 
+isn't fully solved (it's a driver issue) but I've found a workaround: 
+Trigger the resume from initramfs, after loading a logo image into the 
+framebuffer and switching it on. That gets everything back without 
+corruptions / wrong LCD reinitialization.
+
+The OMAP video seems a bit of a diva; I've got one board type on which 
+suspend/resume work perfectly but the omapdss driver spits out thousands 
+of error interrupts during system startup (before the image is loaded), 
+and the other board where all that is fine but the restore somehow garbles 
+the LCD clocking (but the driver's sysfs files claim it's the same).
+
+
+In short: This stuff really works now, for all I can say. And adding 
+support for new type of ARM SoC doesn't touch the basic / generic code at 
+all anymore either.
+
+
+
+
+Anyway ...
+About the patch, changes vs. all previous suggestions:
+
+* Made the assembly sources as small as I responsibly could ;-)
+   They compile for thumb2 (but I haven't tested that yet) as well.
+
+* The page copy loop is now a C function. That also has the advantage
+   that one can use cpu_switch_mm() - a macro - there for swapper_pg_dir,
+   which makes resume via uswsusp ioctl or /sys/power/tuxonice/do_resume
+   possible (only tested the latter, though).
+
+* The SoC state save/restore is made to (re-)use the existing code in
+   sleep....S  for the particular chip.
+   OMAP3 and S5P64xx are provided as examples of that.
+
+* The save/restore_processor_state() hooks are now used in the same way
+   as e.g. existing powerpc code uses them (to trigger lazy saves before
+   and perform cache flushes after).
+
+
+Things that probably aren't perfect yet:
+
+* The code currently reserves a full page for the saved "core" state.
+   This is more than absolutely necessary; anyone think it's a problem ?
+
+* it sets aside another half a page of __nosavedata page for use as
+   temporary stack during the image copy (so that funcs can be called).
+
+   Right now on ARM, that's not an issue because even with TuxOnIce in,
+   there's less than 20 bytes of nosave stuff, so can as well put the
+   rest of that page to good use ;-)
+
+* I'd love to get rid of the include/asm-generic/vmlinux.lds.h change,
+   as it seems that's not necessary in other architectures.
+   Without that, the code gives a link error when building vmlinux
+   though, and I'm unsure how to address that.
+
+* The "integration" with the CPU sleep code is rather "backdoorish".
+   While the hooks into ..._cpu_suspend aren't massive, and there's no
+   code duplication, it'd be nicer to eventually have a cleaner way.
+
+* An OMAPDSS restore troubleshooting HOWTO would be helpful ;-)
+
+
+* The patch needs to be rebaselined against a current kernel;
+   any preferences which tree to base this on ?
+
+
+
+Thanks for all help with the little nits !
+FrankH.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: hibernate-19May2011.patch
+Type: text/x-diff
+Size: 7512 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/1d69d23c/attachment.bin>
