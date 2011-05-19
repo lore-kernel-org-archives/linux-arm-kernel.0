@@ -1,77 +1,127 @@
-From: tglx@linutronix.de (tip-bot for Thomas Gleixner)
-Date: Thu, 19 May 2011 12:30:04 GMT
-Subject: [tip:timers/clockevents] clockevents: Provide interface to
-	reconfigure an active clock event device
-Message-ID: <tip-80b816b736cfa5b9582279127099b20a479ab7d9@git.kernel.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 19 May 2011 14:35:08 +0200
+Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+In-Reply-To: <20110518152935.GJ5913@n2100.arm.linux.org.uk>
+References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110518152935.GJ5913@n2100.arm.linux.org.uk>
+Message-ID: <20110519123507.GA4950@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit-ID:  80b816b736cfa5b9582279127099b20a479ab7d9
-Gitweb:     http://git.kernel.org/tip/80b816b736cfa5b9582279127099b20a479ab7d9
-Author:     Thomas Gleixner <tglx@linutronix.de>
-AuthorDate: Wed, 18 May 2011 21:33:42 +0000
-Committer:  Thomas Gleixner <tglx@linutronix.de>
-CommitDate: Thu, 19 May 2011 14:24:16 +0200
+Hi!
 
-clockevents: Provide interface to reconfigure an active clock event device
+On Wed 2011-05-18 16:29:35, Russell King - ARM Linux wrote:
+> On Wed, May 18, 2011 at 05:18:38PM +0200, Pavel Herrmann wrote:
+> > spi_sync call uses its spi_message parameter to keep completion information,
+> > having this structure static is not thread-safe, potentially causing one
+> > thread having pointers to memory on or above other threads stack. use
+> > per-call spi_message on stack to fix this
+> 
+> I assume this has not been tested with DMA debugging enabled.
+> 
+> The DMA API does not like mapping memory from the stack, which is what
+> you're potentially doing with this:
 
-Some ARM SoCs have clock event devices which have their frequency
-modified due to frequency scaling. Provide an interface which allows
-to reconfigure an active device. After reconfiguration reprogram the
-current pending event.
+In some other mail, you said "just add the locking". Pavel H.
+actually produced patch doing so...
 
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Cc: LAK <linux-arm-kernel@lists.infradead.org>
-Cc: John Stultz <john.stultz@linaro.org>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Reviewed-by: Ingo Molnar <mingo@elte.hu>
-Link: http://lkml.kernel.org/r/%3C20110518210136.437459958%40linutronix.de%3E
+
+From: Pavel Herrmann <morpheus.ibis@gmail.com>
+To: Marek Vasut <marek.vasut@gmail.com>
+
+>From 14063b017123233a8b56d6706a9ff046a791eaf4 Mon Sep 17 00:00:00 2001
+From: Pavel Herrmann <morpheus.ibis@gmail.com>
+Date: Mon, 16 May 2011 14:18:18 +0200
+Subject: [PATCH] Fix NULL pointer exception in max1111
+
+Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
 ---
- include/linux/clockchips.h |    2 ++
- kernel/time/clockevents.c  |   20 ++++++++++++++++++++
- 2 files changed, 22 insertions(+), 0 deletions(-)
+ drivers/hwmon/max1111.c |   16 ++++++++++++++++
+ 1 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/include/linux/clockchips.h b/include/linux/clockchips.h
-index 80acc79e..d6733e2 100644
---- a/include/linux/clockchips.h
-+++ b/include/linux/clockchips.h
-@@ -132,6 +132,8 @@ extern void clockevents_config_and_register(struct clock_event_device *dev,
- 					    u32 freq, unsigned long min_delta,
- 					    unsigned long max_delta);
+diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
+index 12a54aa..7be50e5 100644
+--- a/drivers/hwmon/max1111.c
++++ b/drivers/hwmon/max1111.c
+@@ -40,6 +40,7 @@ struct max1111_data {
+ 	struct spi_transfer	xfer[2];
+ 	uint8_t *tx_buf;
+ 	uint8_t *rx_buf;
++	struct mutex		msg_lock_mutex;
+ };
  
-+extern int clockevents_update_freq(struct clock_event_device *ce, u32 freq);
+ static int max1111_read(struct device *dev, int channel)
+@@ -48,6 +49,11 @@ static int max1111_read(struct device *dev, int channel)
+ 	uint8_t v1, v2;
+ 	int err;
+ 
++	/* spi_sync requires data not to be freed before function returns
++	 * for static data, any access is dangerous, use locks
++	 */
++	mutex_lock(&data->msg_lock_mutex);
 +
- extern void clockevents_exchange_device(struct clock_event_device *old,
- 					struct clock_event_device *new);
- extern void clockevents_set_mode(struct clock_event_device *dev,
-diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-index c69e88c..22a9da9 100644
---- a/kernel/time/clockevents.c
-+++ b/kernel/time/clockevents.c
-@@ -238,6 +238,26 @@ void clockevents_config_and_register(struct clock_event_device *dev,
- 	clockevents_register_device(dev);
+ 	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
+ 		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
+ 		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
+@@ -55,12 +61,15 @@ static int max1111_read(struct device *dev, int channel)
+ 	err = spi_sync(data->spi, &data->msg);
+ 	if (err < 0) {
+ 		dev_err(dev, "spi_sync failed with %d\n", err);
++		mutex_unlock(&data->msg_lock_mutex);
+ 		return err;
+ 	}
+ 
+ 	v1 = data->rx_buf[0];
+ 	v2 = data->rx_buf[1];
+ 
++	mutex_unlock(&data->msg_lock_mutex);
++
+ 	if ((v1 & 0xc0) || (v2 & 0x3f))
+ 		return -EINVAL;
+ 
+@@ -138,6 +147,8 @@ static int setup_transfer(struct max1111_data *data)
+ 		return -ENOMEM;
+ 	}
+ 
++	mutex_lock(&data->msg_lock_mutex);
++
+ 	m = &data->msg;
+ 	x = &data->xfer[0];
+ 
+@@ -152,6 +163,8 @@ static int setup_transfer(struct max1111_data *data)
+ 	x->len = 2;
+ 	spi_message_add_tail(x, m);
+ 
++	mutex_unlock(&data->msg_lock_mutex);
++
+ 	return 0;
  }
  
-+/**
-+ * clockevents_update_freq - Update frequency and reprogram a clock event device.
-+ * @dev:	device to modify
-+ * @freq:	new device frequency
-+ *
-+ * Reconfigure and reprogram a clock event device in oneshot
-+ * mode. Must be called on the cpu for which the device delivers per
-+ * cpu timer events with interrupts disabled!  Returns 0 on success,
-+ * -ETIME when the event is in the past.
-+ */
-+int clockevents_update_freq(struct clock_event_device *dev, u32 freq)
-+{
-+	clockevents_config(dev, freq);
+@@ -172,6 +185,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
+ 		return -ENOMEM;
+ 	}
+ 
++	mutex_init(&data->msg_lock_mutex);
 +
-+	if (dev->mode != CLOCK_EVT_MODE_ONESHOT)
-+		return 0;
-+
-+	return clockevents_program_event(dev, dev->next_event, ktime_get());
-+}
-+
- /*
-  * Noop handler when we shut down an event device
-  */
+ 	err = setup_transfer(data);
+ 	if (err)
+ 		goto err_free_data;
+@@ -213,6 +228,7 @@ static int __devexit max1111_remove(struct spi_device *spi)
+ 
+ 	hwmon_device_unregister(data->hwmon_dev);
+ 	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
++	mutex_destroy(data->msg_lock_mutex);
+ 	kfree(data->rx_buf);
+ 	kfree(data->tx_buf);
+ 	kfree(data);
+-- 
+1.7.5.rc1
+
+
+
+----- End forwarded message -----
+
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
