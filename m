@@ -1,73 +1,56 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 19 May 2011 13:05:22 -0600
-Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
-In-Reply-To: <BANLkTikiUB4=y0sZtUSedcPveMsBSLJgpQ@mail.gmail.com>
-References: <20110419062633.GA15620@atomide.com> <87r58w4gq3.fsf@ti.com>
-	<20110421054221.GF5918@atomide.com>
-	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
-	<20110426072941.GA3755@atomide.com>
-	<BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com>
-	<87y62ng3f8.fsf@ti.com>
-	<BANLkTimW1PTavvxjPujVMEV38vzMvja9mw@mail.gmail.com>
-	<20110504061905.GD27860@atomide.com>
-	<BANLkTikiUB4=y0sZtUSedcPveMsBSLJgpQ@mail.gmail.com>
-Message-ID: <20110519190522.GI5109@ponder.secretlab.ca>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 19 May 2011 21:07:43 +0200
+Subject: [PATCH 7/8] ARM i.MX debug macro: use CONFIG_SOC_* instead of
+	CONFIG_ARCH_*
+In-Reply-To: <4DD54B3B.9030709@ru.mvista.com>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<1305823648-2428-8-git-send-email-s.hauer@pengutronix.de>
+	<4DD54B3B.9030709@ru.mvista.com>
+Message-ID: <20110519190743.GT30963@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 12, 2011 at 02:57:04AM +0200, Linus Walleij wrote:
-> 2011/5/4 Tony Lindgren <tony@atomide.com>:
-> > * Linus Walleij <linus.walleij@linaro.org> [110504 00:37]:
-> >> 2011/5/3 Kevin Hilman <khilman@ti.com>:
-> >>
-> >> > Are you OK with a move of the current OMAP GPIO drivers (rather ugly)
-> >> > into drivers/gpio first, followed by the cleanup/restructure patches?
-> >>
-> >> In my case I actually did some cleanup after moving the driver for
-> >> U300, but I think this is a question to the GPIO maintainer who
-> >> I want to ACK this stuff in the end.
-> >>
-> >> Grant?
-> >>
-> >> You can always squash it later ...
-> >
-> > Personally I would prefer absolutely minimal clean-up of current
-> > code before moving to drivers/gpio to cut down the "crazy churn" in
-> > arch/arm/. Also then further changes are easier for the GPIO
-> > maintainers to review.
-> >
-> > Of course I understand that this might cause extra load for the
-> > GPIO maintainers, so it's up to the GPIO maintainers to set the
-> > required standards before accepting the code into drivers/gpio.
+On Thu, May 19, 2011 at 08:54:19PM +0400, Sergei Shtylyov wrote:
+> Hello.
 > 
-> After discussion with Grant (in person) here at UDS I am informed
-> that he will not be able to review my GPIO consolidation patches in
-> time to make adjustments needed for this merge window, so we're
-> aiming at early 2.6.41 for these.
+> Sascha Hauer wrote:
 > 
-> He has indicated that he has problems with the chosen config
-> mechanism and that we may need to back a few technical
-> assumptions out, and we need some more time for that.
+> >CONFIG_ARCH_* are deprecated, so remove one user.
 > 
-> For example we may need to refer to configurations by a string
-> or indeed export the struct gpio_chip accessor function
-> gpio_to_chip() and use custom functions for special stuff,
-> as was the first idea.
+> >Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> >---
+> > arch/arm/plat-mxc/include/mach/debug-macro.S |   10 +++++-----
+> > 1 files changed, 5 insertions(+), 5 deletions(-)
 > 
-> I will do the refactoring once I have a clear indication from the
-> maintainer where he wants this to end up, so my GPIO
-> consolidation patches will need to rest for a while.
+> >diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> >index 8e8d175..75a8933 100644
+> >--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
+> >+++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
+> >@@ -12,32 +12,32 @@
+> >  */
+> > #include <mach/hardware.h>
+> >-#ifdef CONFIG_ARCH_MX1
+> >+#ifdef CONFIG_SOC_IMX1
+> > #define UART_PADDR	MX1_UART1_BASE_ADDR
+> > #endif
+> >-#ifdef CONFIG_ARCH_MX25
+> >+#ifdef CONFIG_SOC_IMX25
+> > #ifdef UART_PADDR
+> > #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
+> > #endif
+> > #define UART_PADDR	MX25_UART1_BASE_ADDR
+> > #endif
+> >-#ifdef CONFIG_ARCH_MX2
+> >+#if defined CONFIG_SOC_IMX21 || defined CONFIG_SOC_IMX27
 > 
-> For TI I guess this currently means you simply cannot work
-> on GPIO stuff until you know where to go with it unless you
-> allow the OMAP GPIO authors to keep churning in arch/arm/*...
-> 
-> That's unless Grant is OK with us moving stuff into
-> drivers/gpio that does *not* use gpiolib and utilize singletons to
-> get at the gpio_chip addresses (i.e. current form) and keep it
-> churning like that until it can be refactored.
+>    Hm, does defined work without ()? Didn't know it...
 
-I'm okay with non-gpiolib drivers being moved in before they are
-cleaned up.
+Me neither, it was an accident. Maybe better to add the braces.
 
-g.
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
