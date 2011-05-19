@@ -1,53 +1,38 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Thu, 19 May 2011 16:25:50 +0100 (BST)
-Subject: Question on ARM inline assembly - stackframes, sp/fp usage,
-	__naked
-In-Reply-To: <20110519094753.GB2431@arm.com>
-References: <alpine.DEB.2.00.1105181505080.2374@localhost6.localdomain6>
-	<20110518174531.GA28300@arm.com>
-	<alpine.DEB.2.00.1105190858320.2374@localhost6.localdomain6>
-	<20110519094753.GB2431@arm.com>
-Message-ID: <alpine.DEB.2.00.1105191547480.28998@localhost6.localdomain6>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Thu, 19 May 2011 16:31:24 +0100
+Subject: [PATCH v2] arm: Add Cortex A5 proc info
+In-Reply-To: <000d01cc162e$723081b0$56918510$@deacon@arm.com>
+References: <1305720361.17656.44.camel@hornet.cambridge.arm.com>
+	<1305737066-11900-1-git-send-email-pawel.moll@arm.com>
+	<000d01cc162e$723081b0$56918510$@deacon@arm.com>
+Message-ID: <1305819084.17656.63.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 19 May 2011, Dave Martin wrote:
+> Please can you do the same for the __v7_proc_info struct? 
 
-> On Thu, May 19, 2011 at 09:46:30AM +0100, Frank Hofmann wrote:
->>
->>
->> On Wed, 18 May 2011, Dave Martin wrote:
->>
->>> On Wed, May 18, 2011 at 04:25:15PM +0100, Frank Hofmann wrote:
->>>> Hi,
-[ ... ]
->
-> As I said, it may work, today.  It just feels more complex and
-> failure-prone, because it reiles on details of the compiler behaviour.
-> If doing this provided a real benefit, like better maintainability or
-> performance, then it would be worth trying.  But I feel we don't get
-> any real advantages in this case.
->
-> That's just my opinion, but I know from experience how hard it is to get
-> compiler guys on your side when this kind of hack goes wrong...
+Yeah, I could if we want to... The thing is that the macro will have to
+take full ID and mask value then. And a name for the structure. So extra
+3 parameters. Not a big deal I suppose.
 
-That bit of _experience_ is what I'm still building up, on ARM ... a great 
-thanks to you, M?ns and Mikael for providing that.
+> On top of that, I think you should take optional, additional HWCAPs as
+> arguments to the macro which get ORd with the base v7 HWCAPs. 
 
-GCC is capricious wrt. to inline assembly, I understand now.
+Em, the "optional" bit here is a problem. I can't just do
 
-[ ... ]
-> For totally arch-specific parts like saving/restoring the processor
-> state, at least some assembler is unavoidable...
+#define INFO(_a, _extra_hwcaps...) \
+	.long HWCAP | _extra_hwcaps;
 
-I'll keep the two files (one for the pure assembly, one for C only 
-parts) for now.
 
-Best wishes,
-FrankH.
+Because the output would be ".long HWCAP | ;" when no _extra_hwcaps are
+given... Unless I'm missing some preprocessor trick? :-)
 
->
-> Cheers
-> ---Dave
->
->
+> This might be useful for A15 where we have integer division.
+
+What HWCAP would this be? I've checked Catalin's repo and the only
+difference I've spotted between A9 and A15 proc info were the mmu
+flags...
+
+Cheers!
+
+Pawe?
