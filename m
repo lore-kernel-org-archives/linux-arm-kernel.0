@@ -1,69 +1,131 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 19 May 2011 13:54:13 -0600
-Subject: [PATCH 1/2] dt: check for devices already created fron DT scan
-In-Reply-To: <1305829704-11774-2-git-send-email-robherring2@gmail.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-	<1305829704-11774-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20110519195413.GV5109@ponder.secretlab.ca>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Thu, 19 May 2011 21:59:35 +0200
+Subject: [PATCH] gpio: rename VIA local config struct
+Message-ID: <1305835175-31351-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 01:28:23PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> of_platform_bus_create may create duplicate devices if already
-> added when scanning other buses like amba bus.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  drivers/of/platform.c |    8 ++++++++
->  1 files changed, 8 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 9b785be..7bf74fb 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -234,6 +234,13 @@ static int of_platform_bus_create(struct device_node *bus,
->  		return 0;
->  	}
->  
-> +	/* Has the device already been registered? */
-> +	if (of_find_device_by_node(bus)) {
-> +		pr_debug("%s() - skipping %s, already registered\n",
-> +			 __func__, bus->full_name);
-> +		return 0;
-> +	}
-> +
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Intriguing, I hadn't though about doing it this way, and it would
-hugely simplify the of_platform_prepare() logic that I posted a few
-weeks back.  I need to think about this...
+The local VIA GPIO config struct "gpio_config" collides with my
+extension to the gpio_chip struct, so rename it to
+viafb_gpio_config so we don't get this clash.
 
-However, there is a potential race condition with static device
-registrations that also use of_platform_prepare().  If there every
-exists a multi-threaded device registration scenario, then it could be
-possible for this check to pass, the other thread register a
-conflicting device, and then this finishes creating it.  However,
-since device registration is pretty much always a single threaded
-affair, I'm probably just being paranoid.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/video/via/via-gpio.c |   49 +++++++++++++++++++++--------------------
+ 1 files changed, 25 insertions(+), 24 deletions(-)
 
-Also, of_find_device_by_node() casts a rather wide net.  There are a
-few small use-cases where multiple devices will have the same node
-pointer.  It would be better to restrict it to devices with the same
-parent, or devices on the same bus type.
-
->  	dev = of_platform_device_create(bus, NULL, parent);
->  	if (!dev || !of_match_node(matches, bus))
->  		return 0;
-> @@ -326,4 +333,5 @@ int of_platform_populate(struct device_node *root,
->  	of_node_put(root);
->  	return rc;
->  }
-> +EXPORT_SYMBOL(of_platform_populate);
-
-This is an unrelated change.  Does it belong in this patch?
-
->  #endif /* !CONFIG_SPARC */
-> -- 
-> 1.7.4.1
-> 
+diff --git a/drivers/video/via/via-gpio.c b/drivers/video/via/via-gpio.c
+index c2a0a1c..ab53418 100644
+--- a/drivers/video/via/via-gpio.c
++++ b/drivers/video/via/via-gpio.c
+@@ -145,7 +145,7 @@ static int via_gpio_get(struct gpio_chip *chip, unsigned int nr)
+ }
+ 
+ 
+-static struct viafb_gpio_cfg gpio_config = {
++static struct viafb_gpio_cfg viafb_gpio_config = {
+ 	.gpio_chip = {
+ 		.label = "VIAFB onboard GPIO",
+ 		.owner = THIS_MODULE,
+@@ -183,8 +183,8 @@ static int viafb_gpio_resume(void *private)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < gpio_config.gpio_chip.ngpio; i += 2)
+-		viafb_gpio_enable(gpio_config.active_gpios[i]);
++	for (i = 0; i < viafb_gpio_config.gpio_chip.ngpio; i += 2)
++		viafb_gpio_enable(viafb_gpio_config.active_gpios[i]);
+ 	return 0;
+ }
+ 
+@@ -201,9 +201,9 @@ int viafb_gpio_lookup(const char *name)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < gpio_config.gpio_chip.ngpio; i++)
+-		if (!strcmp(name, gpio_config.active_gpios[i]->vg_name))
+-			return gpio_config.gpio_chip.base + i;
++	for (i = 0; i < viafb_gpio_config.gpio_chip.ngpio; i++)
++		if (!strcmp(name, viafb_gpio_config.active_gpios[i]->vg_name))
++			return viafb_gpio_config.gpio_chip.base + i;
+ 	return -1;
+ }
+ EXPORT_SYMBOL_GPL(viafb_gpio_lookup);
+@@ -229,14 +229,15 @@ static __devinit int viafb_gpio_probe(struct platform_device *platdev)
+ 		for (gpio = viafb_all_gpios;
+ 		     gpio < viafb_all_gpios + VIAFB_NUM_GPIOS; gpio++)
+ 			if (gpio->vg_port_index == port_cfg[i].ioport_index) {
+-				gpio_config.active_gpios[ngpio] = gpio;
+-				gpio_config.gpio_names[ngpio] = gpio->vg_name;
++				viafb_gpio_config.active_gpios[ngpio] = gpio;
++				viafb_gpio_config.gpio_names[ngpio] =
++					gpio->vg_name;
+ 				ngpio++;
+ 			}
+ 	}
+-	gpio_config.gpio_chip.ngpio = ngpio;
+-	gpio_config.gpio_chip.names = gpio_config.gpio_names;
+-	gpio_config.vdev = vdev;
++	viafb_gpio_config.gpio_chip.ngpio = ngpio;
++	viafb_gpio_config.gpio_chip.names = viafb_gpio_config.gpio_names;
++	viafb_gpio_config.vdev = vdev;
+ 	if (ngpio == 0) {
+ 		printk(KERN_INFO "viafb: no GPIOs configured\n");
+ 		return 0;
+@@ -245,18 +246,18 @@ static __devinit int viafb_gpio_probe(struct platform_device *platdev)
+ 	 * Enable the ports.  They come in pairs, with a single
+ 	 * enable bit for both.
+ 	 */
+-	spin_lock_irqsave(&gpio_config.vdev->reg_lock, flags);
++	spin_lock_irqsave(&viafb_gpio_config.vdev->reg_lock, flags);
+ 	for (i = 0; i < ngpio; i += 2)
+-		viafb_gpio_enable(gpio_config.active_gpios[i]);
+-	spin_unlock_irqrestore(&gpio_config.vdev->reg_lock, flags);
++		viafb_gpio_enable(viafb_gpio_config.active_gpios[i]);
++	spin_unlock_irqrestore(&viafb_gpio_config.vdev->reg_lock, flags);
+ 	/*
+ 	 * Get registered.
+ 	 */
+-	gpio_config.gpio_chip.base = -1;  /* Dynamic */
+-	ret = gpiochip_add(&gpio_config.gpio_chip);
++	viafb_gpio_config.gpio_chip.base = -1;  /* Dynamic */
++	ret = gpiochip_add(&viafb_gpio_config.gpio_chip);
+ 	if (ret) {
+ 		printk(KERN_ERR "viafb: failed to add gpios (%d)\n", ret);
+-		gpio_config.gpio_chip.ngpio = 0;
++		viafb_gpio_config.gpio_chip.ngpio = 0;
+ 	}
+ #ifdef CONFIG_PM
+ 	viafb_pm_register(&viafb_gpio_pm_hooks);
+@@ -277,8 +278,8 @@ static int viafb_gpio_remove(struct platform_device *platdev)
+ 	/*
+ 	 * Get unregistered.
+ 	 */
+-	if (gpio_config.gpio_chip.ngpio > 0) {
+-		ret = gpiochip_remove(&gpio_config.gpio_chip);
++	if (viafb_gpio_config.gpio_chip.ngpio > 0) {
++		ret = gpiochip_remove(&viafb_gpio_config.gpio_chip);
+ 		if (ret) { /* Somebody still using it? */
+ 			printk(KERN_ERR "Viafb: GPIO remove failed\n");
+ 			return ret;
+@@ -287,11 +288,11 @@ static int viafb_gpio_remove(struct platform_device *platdev)
+ 	/*
+ 	 * Disable the ports.
+ 	 */
+-	spin_lock_irqsave(&gpio_config.vdev->reg_lock, flags);
+-	for (i = 0; i < gpio_config.gpio_chip.ngpio; i += 2)
+-		viafb_gpio_disable(gpio_config.active_gpios[i]);
+-	gpio_config.gpio_chip.ngpio = 0;
+-	spin_unlock_irqrestore(&gpio_config.vdev->reg_lock, flags);
++	spin_lock_irqsave(&viafb_gpio_config.vdev->reg_lock, flags);
++	for (i = 0; i < viafb_gpio_config.gpio_chip.ngpio; i += 2)
++		viafb_gpio_disable(viafb_gpio_config.active_gpios[i]);
++	viafb_gpio_config.gpio_chip.ngpio = 0;
++	spin_unlock_irqrestore(&viafb_gpio_config.vdev->reg_lock, flags);
+ 	return ret;
+ }
+ 
+-- 
+1.7.3.2
