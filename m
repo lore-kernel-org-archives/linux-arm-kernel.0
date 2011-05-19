@@ -1,145 +1,49 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 19 May 2011 19:04:18 +0300
-Subject: [PATCH 4/4] arm: pxa3xx: cm-x300: update cm_x300_defconfig
-In-Reply-To: <1304941309-13288-4-git-send-email-grinberg@compulab.co.il>
-References: <1304941309-13288-1-git-send-email-grinberg@compulab.co.il>
-	<1304941309-13288-4-git-send-email-grinberg@compulab.co.il>
-Message-ID: <4DD53F82.6050304@compulab.co.il>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 20 May 2011 00:09:02 +0800
+Subject: [PATCH v2 0/7] Consolidate sdhci pltfm & OF drivers and get them
+	self registered
+In-Reply-To: <20110519094046.GA2219@pengutronix.de>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+	<20110519094046.GA2219@pengutronix.de>
+Message-ID: <20110519160901.GC26816@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric,
+Hi Wolfram,
 
+On Thu, May 19, 2011 at 11:40:46AM +0200, Wolfram Sang wrote:
+> Hi Shawn,
+> 
+> > Changes since v1:
+> >  * Rebase on cjb's mmc-next tree
+> 
+> Is it maybe possible that you get access to
+> http://opensource.freescale.com/git or another machine? A branch to pull
+> from would be more convenient, because the series does not apply to
+> mmc-next anymore, so an extra step to go "back in time" is needed.
+> 
+> (minor) When applying I got:
+> 
+> Applying: mmc: sdhci: make sdhci-pltfm device drivers self registered
+> /home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:384: trailing whitespace.
+> /home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:817: space before tab in indent.
+>  	struct tegra_sdhci_platform_data *plat;
+> /home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:867: trailing whitespace.
+> 
+> Applying: sdhci: rename sdhci-esdhc-imx.c to sdhci-esdhc.c
+> /home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:780: trailing whitespace.
+> 
+> See later comments for further issues.
+> 
+Should I go for v3 right now to address the patch applying problems
+and that ESDHC_IMX build issue, or hold for a while to see if you
+have more comments on v2?
 
-What about this one?
-
-It fixes the BT issue and also removes 10 more lines :)
-
-
-
-On 05/09/11 14:41, Igor Grinberg wrote:
-
-> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> ---
->  arch/arm/configs/cm_x300_defconfig |   18 ++++--------------
->  1 files changed, 4 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm/configs/cm_x300_defconfig b/arch/arm/configs/cm_x300_defconfig
-> index 921e56a..f4b7672 100644
-> --- a/arch/arm/configs/cm_x300_defconfig
-> +++ b/arch/arm/configs/cm_x300_defconfig
-> @@ -5,7 +5,6 @@ CONFIG_SYSVIPC=y
->  CONFIG_IKCONFIG=y
->  CONFIG_IKCONFIG_PROC=y
->  CONFIG_LOG_BUF_SHIFT=18
-> -CONFIG_SYSFS_DEPRECATED_V2=y
->  CONFIG_BLK_DEV_INITRD=y
->  # CONFIG_CC_OPTIMIZE_FOR_SIZE is not set
->  CONFIG_MODULES=y
-> @@ -13,6 +12,7 @@ CONFIG_MODULE_UNLOAD=y
->  CONFIG_MODULE_FORCE_UNLOAD=y
->  # CONFIG_BLK_DEV_BSG is not set
->  CONFIG_ARCH_PXA=y
-> +CONFIG_GPIO_PCA953X=y
->  CONFIG_MACH_CM_X300=y
->  CONFIG_NO_HZ=y
->  CONFIG_AEABI=y
-> @@ -23,7 +23,6 @@ CONFIG_CMDLINE="root=/dev/mtdblock5 rootfstype=ubifs console=ttyS2,38400"
->  CONFIG_CPU_FREQ=y
->  CONFIG_CPU_FREQ_GOV_USERSPACE=y
->  CONFIG_FPE_NWFPE=y
-> -CONFIG_PM=y
->  CONFIG_APM_EMULATION=y
->  CONFIG_NET=y
->  CONFIG_PACKET=y
-> @@ -40,8 +39,8 @@ CONFIG_IP_PNP_RARP=y
->  # CONFIG_INET_DIAG is not set
->  # CONFIG_IPV6 is not set
->  CONFIG_BT=m
-> -CONFIG_BT_L2CAP=m
-> -CONFIG_BT_SCO=m
-> +CONFIG_BT_L2CAP=y
-> +CONFIG_BT_SCO=y
->  CONFIG_BT_RFCOMM=m
->  CONFIG_BT_RFCOMM_TTY=y
->  CONFIG_BT_BNEP=m
-> @@ -60,7 +59,6 @@ CONFIG_MTD_NAND_PXA3xx=y
->  CONFIG_MTD_UBI=y
->  CONFIG_BLK_DEV_LOOP=y
->  CONFIG_BLK_DEV_RAM=y
-> -# CONFIG_MISC_DEVICES is not set
->  CONFIG_SCSI=y
->  CONFIG_BLK_DEV_SD=y
->  CONFIG_NETDEVICES=y
-> @@ -81,16 +79,15 @@ CONFIG_TOUCHSCREEN_WM97XX=m
->  # CONFIG_TOUCHSCREEN_WM9705 is not set
->  # CONFIG_TOUCHSCREEN_WM9713 is not set
->  # CONFIG_SERIO is not set
-> +# CONFIG_LEGACY_PTYS is not set
->  CONFIG_SERIAL_PXA=y
->  CONFIG_SERIAL_PXA_CONSOLE=y
-> -# CONFIG_LEGACY_PTYS is not set
->  # CONFIG_HW_RANDOM is not set
->  CONFIG_I2C=y
->  CONFIG_I2C_PXA=y
->  CONFIG_SPI=y
->  CONFIG_SPI_GPIO=y
->  CONFIG_GPIO_SYSFS=y
-> -CONFIG_GPIO_PCA953X=y
->  # CONFIG_HWMON is not set
->  CONFIG_PMIC_DA903X=y
->  CONFIG_REGULATOR=y
-> @@ -102,7 +99,6 @@ CONFIG_LCD_CLASS_DEVICE=y
->  CONFIG_LCD_TDO24M=y
->  # CONFIG_BACKLIGHT_GENERIC is not set
->  CONFIG_BACKLIGHT_DA903X=m
-> -# CONFIG_VGA_CONSOLE is not set
->  CONFIG_FRAMEBUFFER_CONSOLE=y
->  CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
->  CONFIG_FONTS=y
-> @@ -131,7 +127,6 @@ CONFIG_HID_GREENASIA=y
->  CONFIG_HID_SMARTJOYPLUS=y
->  CONFIG_HID_TOPSEED=y
->  CONFIG_HID_THRUSTMASTER=y
-> -CONFIG_HID_WACOM=m
->  CONFIG_HID_ZEROPLUS=y
->  CONFIG_USB=y
->  CONFIG_USB_DEVICEFS=y
-> @@ -152,7 +147,6 @@ CONFIG_RTC_DRV_PXA=y
->  CONFIG_EXT2_FS=y
->  CONFIG_EXT3_FS=y
->  # CONFIG_EXT3_FS_XATTR is not set
-> -CONFIG_INOTIFY=y
->  CONFIG_MSDOS_FS=m
->  CONFIG_VFAT_FS=m
->  CONFIG_TMPFS=y
-> @@ -164,7 +158,6 @@ CONFIG_NFS_V3=y
->  CONFIG_NFS_V3_ACL=y
->  CONFIG_NFS_V4=y
->  CONFIG_ROOT_NFS=y
-> -CONFIG_SMB_FS=m
->  CONFIG_CIFS=m
->  CONFIG_CIFS_WEAK_PW_HASH=y
->  CONFIG_PARTITION_ADVANCED=y
-> @@ -172,9 +165,7 @@ CONFIG_NLS_CODEPAGE_437=m
->  CONFIG_NLS_ISO8859_1=m
->  CONFIG_DEBUG_FS=y
->  CONFIG_DEBUG_KERNEL=y
-> -# CONFIG_DETECT_SOFTLOCKUP is not set
->  # CONFIG_SCHED_DEBUG is not set
-> -# CONFIG_RCU_CPU_STALL_DETECTOR is not set
->  CONFIG_SYSCTL_SYSCALL_CHECK=y
->  # CONFIG_FTRACE is not set
->  CONFIG_DEBUG_USER=y
-> @@ -182,7 +173,6 @@ CONFIG_DEBUG_LL=y
->  CONFIG_CRYPTO_ECB=m
->  CONFIG_CRYPTO_MICHAEL_MIC=m
->  CONFIG_CRYPTO_AES=m
-> -CONFIG_CRYPTO_ARC4=m
->  # CONFIG_CRYPTO_ANSI_CPRNG is not set
->  # CONFIG_CRYPTO_HW is not set
->  CONFIG_CRC_T10DIF=y
+And what is your position on patch #5 which merges esdhc imx and mpc
+support into one?  As Anton has voted a NO there, I would probably
+drop the patch if there is another person has strong opinion to get
+imx and mpc stay separated.
 
 -- 
 Regards,
-Igor.
+Shawn
