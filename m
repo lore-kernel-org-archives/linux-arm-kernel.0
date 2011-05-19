@@ -1,30 +1,45 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 19 May 2011 15:50:08 +0400
-Subject: [PATCH] ARM: mach-shmobile: sh73a0 twd_base fix
-In-Reply-To: <20110519062620.27921.52669.sendpatchset@t400s>
-References: <20110519062620.27921.52669.sendpatchset@t400s>
-Message-ID: <4DD503F0.4050201@ru.mvista.com>
+From: marvin24@gmx.de (Marc Dietrich)
+Date: Thu, 19 May 2011 14:08:24 +0200
+Subject: [PATCH 0/6 V2] ARM: tegra: paz00 patches for 2.6.40
+Message-ID: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Collin, Olof,
 
-On 19-05-2011 10:26, Magnus Damm wrote:
+the following patches are intended for 2.6.40 merge. They are mostly similar
+to the TrimSlice patches sent by Mike a few days ago.
 
-> From: Magnus Damm<damm@opensource.se>
+We are still stuggling with the sound codec (alc5632) and the nvec, so there
+is nothing to connect to the i2c yet. On the other hand, I'm wondering what's
+up with the atd7461 included in most (all?) boards. It's compatible with lm90,
+but the driver will never register because of the wrong name.
 
-> Fix the case of too late twd_base initialization for SMP
-> on sh73a0 which bas been broken because sh73a0 specific
-> smp_prepare_cpu() and percpu_timer_setup() changed order
-> in the commits:
+May I ask if there is some timeline for framebuffer integration? A netbook
+without display is of not much use (ok, same holds for keyboard/mouse).
 
-> 05c74a6cbcfb416286a947668ba32f63d99fe74a
-> c413521eb4e2d7ffd5ce432a144708d479054bd3
+Thanks!
 
-    Please also specify those commits' summaries -- for the human readers.
+Marc
 
-> Without this fix the sh73a0 SMP kernel panics on boot.
+Changes in V2:
+    - add some more blurb to the commit messages
+    - change the machine to some neater name (patch 5)
+    - enable the wifi board during boot (patch 6)
 
-> Signed-off-by: Magnus Damm<damm@opensource.se>
 
-WBR, Sergei
+Marc Dietrich (6):
+  ARM: tegra: paz00: whitespace cleanup
+  ARM: tegra: paz00: register i2c busses
+  ARM: tegra: paz00: enable usb ports
+  ARM: tegra: paz00: cleanup sdhci ports
+  ARM: tegra: paz00: change the machine name
+  ARM: tegra: paz00: enable wifi card
+
+ arch/arm/mach-tegra/board-paz00-pinmux.c |   12 ++--
+ arch/arm/mach-tegra/board-paz00.c        |   96 ++++++++++++++++++++++++++----
+ arch/arm/mach-tegra/board-paz00.h        |   17 ++++--
+ 3 files changed, 102 insertions(+), 23 deletions(-)
+
+-- 
+1.7.4.2
