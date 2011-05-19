@@ -1,24 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 May 2011 09:26:14 +0200
-Subject: [patch 5/7] clockevents: Provide interface to reconfigure an
-	active clock event device
-In-Reply-To: <20110518210136.437459958@linutronix.de>
-References: <20110518205713.947614271@linutronix.de>
-	<20110518210136.437459958@linutronix.de>
-Message-ID: <BANLkTimhg6WAErYPSaSagZUc0mRZdNREvw@mail.gmail.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Thu, 19 May 2011 09:53:12 +0200
+Subject: atmel-mci causes kernel panic when CONFIG_DEBUG_VM is set
+Message-ID: <4DD4CC68.80408@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/18 Thomas Gleixner <tglx@linutronix.de>:
+Hello,
 
-> Some ARM SoCs have clock event devices which have their frequency
-> modified due to frequency scaling. Provide an interface which allows
-> to reconfigure an active device. After reconfiguration reprogram the
-> current pending event.
->
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+There is a bug with the atmel-mci driver when the debug feature 
+CONFIG_DEBUG_VM is set.
 
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Into the atmci_read_data_pio function we use flush_dcache_page (do we 
+really need it?) which call the page_mapping function where we can find 
+VM_BUG_ON(PageSlab(Page)). Then a kernel panic happens.
 
-Thanks for fixing this much needed function Thomas!
-Linus Walleij
+I don't understand the purpose of the VM_BUG_ON(PageSlab(Page)) (the 
+page comes from a scatter list). How could I correct this problem?
+
+Thanks for your help
+
+Regards,
+
+Ludovic
