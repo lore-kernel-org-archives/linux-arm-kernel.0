@@ -1,56 +1,58 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 May 2011 21:07:43 +0200
-Subject: [PATCH 7/8] ARM i.MX debug macro: use CONFIG_SOC_* instead of
-	CONFIG_ARCH_*
-In-Reply-To: <4DD54B3B.9030709@ru.mvista.com>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<1305823648-2428-8-git-send-email-s.hauer@pengutronix.de>
-	<4DD54B3B.9030709@ru.mvista.com>
-Message-ID: <20110519190743.GT30963@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 May 2011 13:08:41 -0600
+Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
+In-Reply-To: <87mxiscl0w.fsf@ti.com>
+References: <87r58w4gq3.fsf@ti.com> <20110421054221.GF5918@atomide.com>
+	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
+	<20110426072941.GA3755@atomide.com>
+	<BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com>
+	<87y62ng3f8.fsf@ti.com>
+	<BANLkTimW1PTavvxjPujVMEV38vzMvja9mw@mail.gmail.com>
+	<20110504061905.GD27860@atomide.com>
+	<BANLkTikiUB4=y0sZtUSedcPveMsBSLJgpQ@mail.gmail.com>
+	<87mxiscl0w.fsf@ti.com>
+Message-ID: <20110519190841.GJ5109@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 08:54:19PM +0400, Sergei Shtylyov wrote:
-> Hello.
+On Thu, May 12, 2011 at 11:42:39AM +0200, Kevin Hilman wrote:
+> Linus Walleij <linus.walleij@linaro.org> writes:
 > 
-> Sascha Hauer wrote:
+> [...]
 > 
-> >CONFIG_ARCH_* are deprecated, so remove one user.
+> > For TI I guess this currently means you simply cannot work
+> > on GPIO stuff until you know where to go with it unless you
+> > allow the OMAP GPIO authors to keep churning in arch/arm/*...
+> >
+> > That's unless Grant is OK with us moving stuff into
+> > drivers/gpio that does *not* use gpiolib and utilize singletons to
+> > get at the gpio_chip addresses (i.e. current form) and keep it
+> > churning like that until it can be refactored.
 > 
-> >Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> >---
-> > arch/arm/plat-mxc/include/mach/debug-macro.S |   10 +++++-----
-> > 1 files changed, 5 insertions(+), 5 deletions(-)
+> The churn will happen one way or another.  the only question is whether
+> it happens in drivers/gpio or arch/arm/*.
 > 
-> >diff --git a/arch/arm/plat-mxc/include/mach/debug-macro.S b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> >index 8e8d175..75a8933 100644
-> >--- a/arch/arm/plat-mxc/include/mach/debug-macro.S
-> >+++ b/arch/arm/plat-mxc/include/mach/debug-macro.S
-> >@@ -12,32 +12,32 @@
-> >  */
-> > #include <mach/hardware.h>
-> >-#ifdef CONFIG_ARCH_MX1
-> >+#ifdef CONFIG_SOC_IMX1
-> > #define UART_PADDR	MX1_UART1_BASE_ADDR
-> > #endif
-> >-#ifdef CONFIG_ARCH_MX25
-> >+#ifdef CONFIG_SOC_IMX25
-> > #ifdef UART_PADDR
-> > #error "CONFIG_DEBUG_LL is incompatible with multiple archs"
-> > #endif
-> > #define UART_PADDR	MX25_UART1_BASE_ADDR
-> > #endif
-> >-#ifdef CONFIG_ARCH_MX2
-> >+#if defined CONFIG_SOC_IMX21 || defined CONFIG_SOC_IMX27
+> Grant, what's your feeling here.  How much ugliness are you willing to
+> tolerate in a bulk move to drivers/gpio.  At least for OMAP, I am
+> personally be working on the cleanup/move so I can work either way,
+> although I know Tony has an obvious preference for moving it to
+> drivers/gpio. :)
 > 
->    Hm, does defined work without ()? Didn't know it...
+> The OMAP driver is already using gpiolib.  The main ugliness in the OMAP
+> driver is the awful ifdeffery used to handle the differences across the
+> various SoCs in the OMAP family.  I've already got most of that cleaned
+> up[1].
 
-Me neither, it was an accident. Maybe better to add the braces.
+Go ahead and move stuff.  I may as well have the junk in my tree.
 
-Sascha
+I request however to have at least some semblance of organization.
+I'd like each driver filename to be named something like gpio_*.c, and
+put things into the Makefile/Kconfig in alphabetical order as much as
+possible.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Also, for an awful lot of these SoC gpio controllers there is almost
+zero value in having a user visible Kconfig entry for it because they
+are so tiny.  I'd rather see on-chip gpio controllers configured in
+automatically without any user selectable options.
+
+g.
