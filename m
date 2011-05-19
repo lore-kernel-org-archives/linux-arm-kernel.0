@@ -1,45 +1,63 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 19 May 2011 09:36:58 +0100
-Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
-	in thumb mode.
-In-Reply-To: <20110518223319.GB21384@n2100.arm.linux.org.uk>
-References: <20110513195316.9AD0940CD1@eskimo.mtv.corp.google.com>
-	<BANLkTikhRuk2ZfYjriTcP7oFdbr7h1oP5g@mail.gmail.com>
-	<20110514100232.GC30539@n2100.arm.linux.org.uk>
-	<20110516121657.GA7715@arm.com>
-	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
-	<20110516144311.GC7715@arm.com>
-	<BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
-	<alpine.LFD.2.00.1105181803090.14430@xanadu.home>
-	<20110518223319.GB21384@n2100.arm.linux.org.uk>
-Message-ID: <20110519083658.GA2431@arm.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 19 May 2011 10:43:24 +0200 (CEST)
+Subject: [patch 2/7] clocksource: Get rid of the hardcoded 5 seconds
+	sleep time limit
+In-Reply-To: <1305766655.2915.187.camel@work-vm>
+References: <20110518205713.947614271@linutronix.de>
+	<20110518210136.109811585@linutronix.de>
+	<1305766655.2915.187.camel@work-vm>
+Message-ID: <alpine.LFD.2.02.1105191041030.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 11:33:19PM +0100, Russell King - ARM Linux wrote:
-
-[...]
-
-> We already have a way of adding stuff for bug tracking purposes.  The
-> "Internal error" line is perpended with 'PREEMPT' or 'SMP' depending
-> on what build options were enabled.  We just need to do the same with
-> T2.  IOW, something like this:
+On Wed, 18 May 2011, John Stultz wrote:
+> On Wed, 2011-05-18 at 21:33 +0000, Thomas Gleixner wrote:
+> > -	 * Ideally we want to use  some of the limits used in
+> > -	 * clocksource_max_deferment, to provide a more informed
+> > -	 * MAX_UPDATE_LENGTH. But for now this just gets the
+> > -	 * register interface working properly.
+> > +	 * Calc the maximum number of seconds which we can run before
+> > +	 * wrapping around. For clocksources which have a mask > 32bit
+> > +	 * we need to limit the max sleep time to have a good
+> > +	 * conversion precision. 10 minutes is still a reasonable
+> > +	 * amount. That results in a shift value of 24 for a
+> > +	 * clocksource with mask >= 40bit and f >= 4GHz. That maps to
+> > +	 * ~ 0.06ppm granularity for NTP. We apply the same 12.5%
+> > +	 * margin as we do in clocksource_max_deferment()
+> >  	 */
 > 
-> diff --git a/arch/arm/kernel/traps.c b/arch/arm/kernel/traps.c
-> index 3b54ad1..78d7714 100644
-> --- a/arch/arm/kernel/traps.c
-> +++ b/arch/arm/kernel/traps.c
-> @@ -225,6 +225,11 @@ void show_stack(struct task_struct *tsk, unsigned long *sp)
->  #else
->  #define S_SMP ""
->  #endif
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +#define S_ISA " T2"
+> So, its not clear to me that the 12.5% margin really needed, since we
+> take it out when we calculate clocksource_max_deferment(). Although with
+> or without the margin I get the same mult/shift/max_idle_ns values for
+> the hardware I'm testing.
+> 
+> Another nice detail from the change: It doesn't affect clocksources that
+> normally wrap quickly:
+> 
+> Without your patch:
+> --------------
+> JDB: hpet mult: 2684354560 shift: 26 max_idle: 83214991360
+> JDB: acpi_pm mult: 2343484437 shift: 23 max_idle: 4540500826
+> JDB: tsc mult: 1342183991 shift: 31 max_idle: 2600481483
+> 
+> With your patch:
+> ---------------
+> JDB: hpet mult: 2684354560 shift: 26 max_idle: 83214991360
+> JDB: acpi_pm mult: 2343484437 shift: 23 max_idle: 4540500826
+> JDB: tsc mult: 10485812 shift: 24 max_idle: 332861616128
+> 
+> Although interestingly 332 secs calculated for the max idle is more then
+> 12% off of 600.
 
-Just for consistency, can I suggest that if this is implemented, we
-make the string " thumb2"? (upper case optional)  This matches what
-we now put in MODULE_ARCH_VERMAGIC, as well as being closer to the
-CONFIG_ name.
+We probably need to look at the math of clocksource_max_deferment()
+again.
+ 
+> Overall it looks good. I'm doing some NTP testing with the TSC shift
+> change to make sure we don't get any odd side effects. I'll let you know
+> how those go.
 
-Cheers
----Dave
+Ok.
+
+Thanks,
+
+	tglx
