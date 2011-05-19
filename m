@@ -1,42 +1,71 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 19 May 2011 19:05:48 +0200
-Subject: [PATCH v2 0/7] Consolidate sdhci pltfm & OF drivers and get them
-	self registered
-In-Reply-To: <20110519160901.GC26816@S2100-06.ap.freescale.net>
-References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
-	<20110519094046.GA2219@pengutronix.de>
-	<20110519160901.GC26816@S2100-06.ap.freescale.net>
-Message-ID: <20110519170548.GA1075@pengutronix.de>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 19 May 2011 10:19:35 -0700
+Subject: [PATCH] drivers: create a pinmux subsystem v2
+In-Reply-To: <BANLkTimMHjUFN8NqAxoF5h_eXgmJP+znSg@mail.gmail.com>
+References: <1305070783-23193-1-git-send-email-linus.walleij@linaro.org>
+	<74CDBE0F657A3D45AFBB94109FB122FF0498A478E6@HQMAIL01.nvidia.com>
+	<BANLkTimMHjUFN8NqAxoF5h_eXgmJP+znSg@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0498A47BF9@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Linus Walleij wrote at Tuesday, May 17, 2011 11:57 PM:
+> 2011/5/18 Stephen Warren <swarren@nvidia.com>:
+> 
+> >> +static struct foo_pmx_func myfuncs[] = {
+> >> + ? ? {
+> >> + ? ? ? ? ? ? .name = "spi0-0",
+> >> + ? ? ? ? ? ? .pins = spi0_0_pins,
+> >> + ? ? ? ? ? ? .num_pins = ARRAY_SIZE(spi0_1_pins),
+> >> + ? ? },
+> >> ...
+> >
+> > Rather than defining a custom type (foo_pmx_func) for this array inside
+> > each driver, and then having to implement _list, _get_fname, _get_pins
+> > below, how about:
+> >
+> > * pinmux core defines a basic structure containing all the information
+> > ?that the core needs from the specific implementation.
+> >
+> > ...
+> > static struct foo_pmx_func spi0_0_func = {
+> > ? ? ? ?FOO_REG_PMX_A,
+> > ? ? ? ?0x30,
+> > ? ? ? ?0x10,
+> > };
+> > ...
+> > static struct pinmux_function myfuncs[] = {
+> > ? ? ? ?{
+> > ? ? ? ? ? ? ? ?.name = "spi0-0",
+> > ? ? ? ? ? ? ? ?.pins = spi0_0_pins,
+> > ? ? ? ? ? ? ? ?.num_pins = ARRAY_SIZE(spi0_1_pins),
+> > ? ? ? ? ? ? ? ?.driver_data = &spi0_0_func,
+> > ? ? ? ?},
+> > ...
+> >
+> > This would remove some boiler-plate code from the SoC drivers,
+> > although it might be considered a bad breaking of abstraction barriers?
+> 
+> Yes it does, however I didn't want to make the initial submission
+> feature creepy. So I would like this to go in as is, then refactor
+> drivers to get help from the framework later on, if we see that
+> it is needed. (So the solution would evolve gradually rather
+> than being too much designed-in from the beginning.)
+> 
+> Do you think the driver support functions are needed from start?
+> I could do it I think...
 
-> Should I go for v3 right now to address the patch applying problems
-> and that ESDHC_IMX build issue, or hold for a while to see if you
-> have more comments on v2?
+Sorry for the slow responses.
 
-Please wait a little bit more.
+I think this suggestion of mine isn't a big deal, so I'd basically be
+OK going either way initially.
 
-> And what is your position on patch #5 which merges esdhc imx and mpc
-> support into one?  As Anton has voted a NO there, I would probably
-> drop the patch if there is another person has strong opinion to get
-> imx and mpc stay separated.
-
-This was the other main issue I spotted so far. I wanted to have another look
-tomorrow, yet the tendency is that I agree with Anton.
-
-Regards,
-
-   Wolfram
+Still, if I was writing the patches, and I agreed with the above change,
+I think I'd want to put it into the first patchset (or at least before
+other people started implementing their pinmux drivers on top of the code)
+since it'd avoid everyone else (or me) having to refactor all their
+drivers almost immediately after writing them, plus it looks like a very
+simple change to the current pinmux patchset.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/06e7724f/attachment-0001.sig>
+nvpublic
