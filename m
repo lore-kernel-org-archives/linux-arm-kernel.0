@@ -1,66 +1,77 @@
 From: marvin24@gmx.de (Marc Dietrich)
-Date: Thu, 19 May 2011 14:08:25 +0200
-Subject: [PATCH 1/6] ARM: tegra: paz00: whitespace cleanup
+Date: Thu, 19 May 2011 14:08:26 +0200
+Subject: [PATCH 2/6] ARM: tegra: paz00: register i2c busses
 In-Reply-To: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
 References: <1305806910-3903-1-git-send-email-marvin24@gmx.de>
-Message-ID: <1305806910-3903-2-git-send-email-marvin24@gmx.de>
+Message-ID: <1305806910-3903-3-git-send-email-marvin24@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces long sequences of spaces by tabs and tabs by
-spaces were appropriate.
+This adds support for the i2c busses on paz00. The 3rd bus is
+reserved for the nvec, which acts as master and i2c-tegra has
+not yet support for this kind of operation.
+The sound codec (alc5632) is connected to the first bus and will
+be added once the codec and glue driver is upstream.
+The thermal sensor (atd7461) is connected to dvc as usual, but will
+not be added now because i2c-tegra still misses probe support
+(needs I2C_FUNC_SMBUS_EMUL).
 
 Signed-off-by: Marc Dietrich <marvin24@gmx.de>
 ---
- arch/arm/mach-tegra/board-paz00-pinmux.c |   12 ++++++------
- arch/arm/mach-tegra/board-paz00.h        |   12 ++++++------
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/mach-tegra/board-paz00.c |   27 +++++++++++++++++++++++++++
+ 1 files changed, 27 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/board-paz00-pinmux.c b/arch/arm/mach-tegra/board-paz00-pinmux.c
-index 2643d1b..d2faa50 100644
---- a/arch/arm/mach-tegra/board-paz00-pinmux.c
-+++ b/arch/arm/mach-tegra/board-paz00-pinmux.c
-@@ -141,12 +141,12 @@ static struct tegra_pingroup_config paz00_pinmux[] = {
+diff --git a/arch/arm/mach-tegra/board-paz00.c b/arch/arm/mach-tegra/board-paz00.c
+index 57e50a8..5f1c110 100644
+--- a/arch/arm/mach-tegra/board-paz00.c
++++ b/arch/arm/mach-tegra/board-paz00.c
+@@ -25,6 +25,8 @@
+ #include <linux/dma-mapping.h>
+ #include <linux/pda_power.h>
+ #include <linux/io.h>
++#include <linux/i2c.h>
++#include <linux/i2c-tegra.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -70,6 +72,29 @@ static struct platform_device *paz00_devices[] __initdata = {
+ 	&tegra_sdhci_device4,
  };
  
- static struct tegra_gpio_table gpio_table[] = {
--	{ .gpio = TEGRA_GPIO_SD1_CD,	.enable = true	},
--	{ .gpio = TEGRA_GPIO_SD1_WP,	.enable = true	},
--	{ .gpio = TEGRA_GPIO_SD1_POWER,	.enable = true	},
--	{ .gpio = TEGRA_GPIO_SD4_CD,	.enable = true	},
--	{ .gpio = TEGRA_GPIO_SD4_WP,	.enable = true	},
--	{ .gpio = TEGRA_GPIO_SD4_POWER,	.enable = true	},
-+	{ .gpio = TEGRA_GPIO_SD1_CD,	.enable = true },
-+	{ .gpio = TEGRA_GPIO_SD1_WP,	.enable = true },
-+	{ .gpio = TEGRA_GPIO_SD1_POWER,	.enable = true },
-+	{ .gpio = TEGRA_GPIO_SD4_CD,	.enable = true },
-+	{ .gpio = TEGRA_GPIO_SD4_WP,	.enable = true },
-+	{ .gpio = TEGRA_GPIO_SD4_POWER,	.enable = true },
- };
++static struct tegra_i2c_platform_data paz00_i2c1_platform_data = {
++	.bus_clk_rate   = 400000,
++};
++
++static struct tegra_i2c_platform_data paz00_i2c2_platform_data = {
++	.bus_clk_rate   = 400000,
++};
++
++static struct tegra_i2c_platform_data paz00_dvc_platform_data = {
++	.bus_clk_rate   = 400000,
++};
++
++static void paz00_i2c_init(void)
++{
++	tegra_i2c_device1.dev.platform_data = &paz00_i2c1_platform_data;
++	tegra_i2c_device2.dev.platform_data = &paz00_i2c2_platform_data;
++	tegra_i2c_device4.dev.platform_data = &paz00_dvc_platform_data;
++
++	platform_device_register(&tegra_i2c_device1);
++	platform_device_register(&tegra_i2c_device2);
++	platform_device_register(&tegra_i2c_device4);
++}
++
+ static void __init tegra_paz00_fixup(struct machine_desc *desc,
+ 	struct tag *tags, char **cmdline, struct meminfo *mi)
+ {
+@@ -115,6 +140,8 @@ static void __init tegra_paz00_init(void)
+ 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
  
- void paz00_pinmux_init(void)
-diff --git a/arch/arm/mach-tegra/board-paz00.h b/arch/arm/mach-tegra/board-paz00.h
-index da193ca7..221ce9c 100644
---- a/arch/arm/mach-tegra/board-paz00.h
-+++ b/arch/arm/mach-tegra/board-paz00.h
-@@ -17,12 +17,12 @@
- #ifndef _MACH_TEGRA_BOARD_PAZ00_H
- #define _MACH_TEGRA_BOARD_PAZ00_H
+ 	platform_add_devices(paz00_devices, ARRAY_SIZE(paz00_devices));
++
++	paz00_i2c_init();
+ }
  
--#define TEGRA_GPIO_SD1_CD               TEGRA_GPIO_PV5
--#define TEGRA_GPIO_SD1_WP               TEGRA_GPIO_PH1
--#define TEGRA_GPIO_SD1_POWER            TEGRA_GPIO_PT3
--#define TEGRA_GPIO_SD4_CD               TEGRA_GPIO_PH2
--#define TEGRA_GPIO_SD4_WP               TEGRA_GPIO_PH3
--#define TEGRA_GPIO_SD4_POWER            TEGRA_GPIO_PI6
-+#define TEGRA_GPIO_SD1_CD		TEGRA_GPIO_PV5
-+#define TEGRA_GPIO_SD1_WP		TEGRA_GPIO_PH1
-+#define TEGRA_GPIO_SD1_POWER		TEGRA_GPIO_PT3
-+#define TEGRA_GPIO_SD4_CD		TEGRA_GPIO_PH2
-+#define TEGRA_GPIO_SD4_WP		TEGRA_GPIO_PH3
-+#define TEGRA_GPIO_SD4_POWER		TEGRA_GPIO_PI6
- 
- void paz00_pinmux_init(void);
- 
+ MACHINE_START(PAZ00, "paz00")
 -- 
 1.7.4.2
