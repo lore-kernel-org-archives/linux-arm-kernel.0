@@ -1,39 +1,41 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 May 2011 15:17:35 +0200
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <BANLkTim2rv9QHDd2zjBfyVqG9dSGCM=PAw@mail.gmail.com>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTi=poU17RqAzp28CPjWHrN_+aFiyag@mail.gmail.com>
-	<BANLkTindee6UMez8HyBUwd2H6mN-DknzPw@mail.gmail.com>
-	<BANLkTik7BnJKWCsm2L3-GJPTaaiXFNSgaA@mail.gmail.com>
-	<BANLkTim2rv9QHDd2zjBfyVqG9dSGCM=PAw@mail.gmail.com>
-Message-ID: <BANLkTinABWucqESqSRYJV+-frm6vDmpxFQ@mail.gmail.com>
+Date: Thu, 19 May 2011 15:23:24 +0200
+Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer
+In-Reply-To: <20110519124454.GC2219@pengutronix.de>
+References: <1305807191-11704-1-git-send-email-linus.walleij@stericsson.com>
+	<20110519124454.GC2219@pengutronix.de>
+Message-ID: <BANLkTinrk-FjMy1trDnsxwT_NTgQ5x_8Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 2:35 PM, Barry Song <21cnbao@gmail.com> wrote:
-> 2011/5/19 Linus Walleij <linus.walleij@linaro.org>:
->> On Thu, May 19, 2011 at 1:38 PM, Barry Song <21cnbao@gmail.com> wrote:
->>>
->>> looks like the driver can't be a real module, is the module_exit
->>> suitable? it looks strange module_exit plays together with
->>> arch_initcall.
->>
->> It's a rather common design pattern in the kernel for early
->> platform drivers. Either the dependencies are resolved by the
->> different initlevels or they are resolved in probe order with
->> loadable modules. Module load will call all initlevels in order.
->>
->> It is not elegant but it is common.
+On Thu, May 19, 2011 at 2:44 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+
+> Hi,
 >
-> Linus, thanks for your reply. module_exit and related functions are
-> really useless codes. but people have done that before, then we have
-> no way except following.
-> u300_gpio_exit never gets chance to run and when we disassemble
-> vmlinux, u300_gpio_exit() ?function should be not in the final binary
-> at all, just a symbol name is left.
+>> - ? ? ? ? ? ? /* FIXME: insert a timeout so we don't hang here indefinitely */
+>> - ? ? ? ? ? ? while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end)
+>> +
+>> + ? ? ? ? ? ? timeout = jiffies + msecs_to_jiffies(SPI_POLLING_TIMEOUT);
+>
+> Won't you miss the transfer if you get interrupted here longer than
+> SPI_POLLING_TIMEOUT?
 
-I know. I can make the Kconfig options tristate if it makes you feel
-better...
+Yeah... preempted for a second hm.
 
+>> + ? ? ? ? ? ? while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end) {
+>> + ? ? ? ? ? ? ? ? ? ? if (time_after(jiffies, timeout)) {
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(&pl022->adev->dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%s: timeout!\n", __func__);
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? message->state = STATE_ERROR;
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
+>> + ? ? ? ? ? ? ? ? ? ? }
+>> ? ? ? ? ? ? ? ? ? ? ? readwriter(pl022);
+>> + ? ? ? ? ? ? }
+
+What about we move readerwriter() above if (time_after...) then it atleast
+gets one chance to run even if we're preempted for 10 seconds.
+
+Any other design patterns that'd be better?
+
+Yours,
 Linus Walleij
