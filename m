@@ -1,32 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 May 2011 20:06:32 +0200
-Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer v2
-In-Reply-To: <BANLkTi=COt5Te4bF1M30A+R4Vqnz=kWiJA@mail.gmail.com>
-References: <1305821134-26147-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTi=s4nzi=5f+Vvh3ABuspnKXQVUfLw@mail.gmail.com>
-	<BANLkTi=mQbPt9rcqEVyMLy3rkF2D7FMh=g@mail.gmail.com>
-	<BANLkTi=COt5Te4bF1M30A+R4Vqnz=kWiJA@mail.gmail.com>
-Message-ID: <BANLkTikR7A1Y4sumjZXS5ou3ex7PJOi1CA@mail.gmail.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Thu, 19 May 2011 20:10:22 +0200
+Subject: [patch 4/7] clockevents: Provide combined configure and register
+	function
+In-Reply-To: <alpine.LFD.2.02.1105191155170.3078@ionos>
+References: <20110518205713.947614271@linutronix.de>
+	<20110518210136.331975870@linutronix.de>
+	<20110519090849.GA6251@elte.hu>
+	<alpine.LFD.2.02.1105191155170.3078@ionos>
+Message-ID: <20110519181022.GE6139@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/19 Vitaly Wool <vitalywool@gmail.com>:
-> On Thu, May 19, 2011 at 7:36 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>>
->>> just out of curiosity: is it a busy wait? Looks like it is...
->>
->> Yep that's the polling mode part. IRQ and DMA mode should
->> be the norm I guess.
->>
->> Magnus: do you have a specific use case for this thing?
->
-> Well, adding cpu_relax() somewhere in the loop might be not a bad idea...
+* Thomas Gleixner <tglx@linutronix.de> wrote:
 
-OK sent a patch for it, and Grant applied it within something like
-30 seconds :-)
+> On Thu, 19 May 2011, Ingo Molnar wrote:
+> 
+> > 
+> > * Thomas Gleixner <tglx@linutronix.de> wrote:
+> > 
+> > > +extern void clockevents_config_and_register(struct clock_event_device *dev,
+> > > +					    u32 freq, unsigned long min_delta,
+> > > +					    unsigned long max_delta);
+> > 
+> > might be worth collecting these fields into a clocksource_params structure:
+> > 
+> > struct clocksource_params {
+> > 	u32		freq;
+> > 	unsigned long	min_delta;
+> > 	unsigned long	max_delta;
+> > };
+> > 
+> > That way the initialization API looks even more streamlined:
+> > 
+> > extern void
+> > clockevents_config_and_register(struct clock_event_device *dev,
+> > 				struct clocksource_params params);
+> > 
+> > and could be extended in the future, without having to update every single 
+> > clocksource driver again.
+> 
+> Though it's unlikely that we have more params int the foreseeable
+> future and it's more code in the clock events registration sites as
+> you have to do:
+> 
+>     struct param par;
+> 
+>     par.freq = f;
+>     par.min_delta = x;
+>     par.max_delta = y;
+>     clockevents_config_and_register(&dev, &p);
+> 
+> instead of having a single line.
 
-I think on ARM that just boils down to a barrier() so it
-basically injects air in the pipeline when busywaiting, I never
-understood what that is good for, but it's a good marker anyway.
+Indeed that looks uglish.
 
-Linus Walleij
+> When the need arises we still can do
+> 
+> __clockevents_config_and_register(struct clock_event_device *dev,
+>    	                          struct clocksource_params params);
+> 
+> and have the current function as a wrapper around it.
+
+Okay, you are right.
+
+Thanks,
+
+	Ingo
