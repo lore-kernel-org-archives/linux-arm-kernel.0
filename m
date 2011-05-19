@@ -1,28 +1,23 @@
-From: marvin24@gmx.de (Marvin)
-Date: Thu, 19 May 2011 12:48:43 +0200
-Subject: [PATCH 1/4] ARM: tegra: paz00: whitespace cleanup
-In-Reply-To: <20110519050544.GA5495@quad.lixom.net>
-References: <1305569458-4821-1-git-send-email-marvin24@gmx.de>
-	<1305569458-4821-2-git-send-email-marvin24@gmx.de>
-	<20110519050544.GA5495@quad.lixom.net>
-Message-ID: <201105191248.43659.marvin24@gmx.de>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 19 May 2011 16:26:08 +0530
+Subject: [PATCH 0/2] Consolidate zone adjustment
+In-Reply-To: <20110511162450.GF5315@n2100.arm.linux.org.uk>
+References: <20110511162450.GF5315@n2100.arm.linux.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024CFDCF12@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+On Wed, May 11, 2011 at 21:54:50, Russell King - ARM Linux wrote:
+> This patch mini-series consolidates the adjustment to system zones
+> which some of our platforms require.  Rather than having each
+> platform/machine class specify ISA_DMA_THRESHOLD, MAX_DMA_ADDRESS
+> and an arch_adjust_zones function, they really only need to provide
+> a single sizing definition, which in this series will be called
+> ARM_DMA_ZONE_SIZE.
 
-> On Mon, May 16, 2011 at 08:10:55PM +0200, Marc Dietrich wrote:
-> > Signed-off-by: Marc Dietrich <marvin24@gmx.de>
-> 
-> Please provide a simple changelog, not just a topic. I know, there isn't
-> much to write home about on this one but it's good habit.
-> 
-> Same applies to patch 2 and 3 in this series.
+Boot tested this series on DaVinci DA850.
 
-arrr - again.
+Tested-by: Sekhar Nori <nsekhar@ti.com>
 
-Sorry, will resubmit (with two more changes).
-
-Thanks
-
-Marc
+Thanks,
+Sekhar
