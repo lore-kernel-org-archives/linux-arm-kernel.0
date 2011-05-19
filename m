@@ -1,91 +1,55 @@
 From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 19 May 2011 09:27:27 +0800
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <201105181047.17309.arnd@arndb.de>
-References: <201105181047.17309.arnd@arndb.de>
-Message-ID: <BANLkTim_0eRvDkQwAYjTNQsOVQiHV+DdBQ@mail.gmail.com>
+Date: Thu, 19 May 2011 09:40:55 +0800
+Subject: [PATCH v4] ARM: vfp: Always save VFP state in vfp_pm_suspend
+In-Reply-To: <1304975791-8175-1-git-send-email-21cnbao@gmail.com>
+References: <1304975791-8175-1-git-send-email-21cnbao@gmail.com>
+Message-ID: <BANLkTikPd5AVJa-n1V1eyqh-HBACOi-ggQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/18 Arnd Bergmann <arnd@arndb.de>:
-> This is the draft plan for maintaining the ARM subarchitectures in a common
-> tree, as a way to help coordinate the upstream merging of the
-> arch/arm/{plat,mach}-* changes into Linus' tree.
+Any update for this?
+
+2011/5/10 Barry Song <21cnbao@gmail.com>:
+> From: Colin Cross <ccross@android.com>
 >
-> This was discussed in great length at the Linaro Developer Summit in Budapest
-> last week where we worked out an initial plan. We are modeling the maintainance
-> after how the linux-tip tree is used for the x86 architecture, with a set
-> of developers that have commit access to one tree on kernel.org and
-> have mutual trust in one another. Nicolas Pitre and me are funded
-> by Linaro to do the bulk of the work, while Thomas Gleixner will help
-> us part-time with his long time architecture maintainance experience.
-> Despite the funding by Linaro, this is not a Linaro project and all
-> ARM subarchitectures are welcome to go through our tree.
+> vfp_pm_suspend should save the VFP state any time there is
+> a last_VFP_context. ?If it only saves when the VFP is enabled,
+> the state can get lost when, on a UP system:
+> ? Thread 1 uses the VFP
+> ? Context switch occurs to thread 2, VFP is disabled but the
+> ? ? ?VFP context is not saved to allow lazy save and restore
+> ? Thread 2 initiates suspend
+> ? vfp_pm_suspend is called with the VFP disabled, but the
+> ? ? ?context has not been saved.
 >
-> Russell King's role as ARM maintainer is of course unchanged by this, but
-> he has the same commit access to the new tree as the other maintainers and
-> is welcome to work in the same tree. We are also open to nominations for
-> further people outside of Linaro to join us as committers. Marc Zyngier from
-> ARM ltd is one of the candidates that has been suggested and I would also
-> like to see someone from Google. We have to find the right balance with the
-> number of committers so we get all the work done without stepping on each
-> other's toes.
+> Modify vfp_pm_suspend to save the VFP context whenever
+> last_VFP_context is set.
 >
-> Our tree will be strictly organized in topic brances so we can feed them
-> upstream in the bitesized chunks that Linus likes. The master branch
-> is an integration branch that pulls all other branches that are scheduled
-> for the next merge window and itself gets integrated into linux-next.
->
-> We will probably not be fully functional during the 2.6.40 merge window,
-> but we are trying our best to be useful. For 2.6.41, my hope is that
-> we can merge the bulk of the ARM subarchitecture changes through this
-> tree. Once Linus is happy with the way that the process works, we can
-> mandate that all ARM subarchitecture changes go through our tree, until
-> then it stays voluntary.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
->
+> Signed-off-by: Colin Cross <ccross@android.com>
+> Cc: Binghua Duan <binghua.duan@csr.com>
+> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
+> Signed-off-by: Barry Song <21cnbao@gmail.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
 > ---
+> ?arch/arm/vfp/vfpmodule.c | ? ?4 ++++
+> ?1 files changed, 4 insertions(+), 0 deletions(-)
 >
-> Maintainers: If you are happy with the layout of the process,
-> please ack this patch, otherwise please comment.
+> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+> index f746950..e6fe6ae 100644
+> --- a/arch/arm/vfp/vfpmodule.c
+> +++ b/arch/arm/vfp/vfpmodule.c
+> @@ -412,6 +412,10 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
 >
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 8fce5e6..942d052 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -630,6 +630,17 @@ S: Maintained
-> ?F: ? ? drivers/amba/
-> ?F: ? ? include/linux/amba/bus.h
+> ? ? ? ? ? ? ? ?/* disable, just in case */
+> ? ? ? ? ? ? ? ?fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
+> + ? ? ? } else if (last_VFP_context[ti->cpu]) {
+> + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc | FPEXC_EN);
+> + ? ? ? ? ? ? ? vfp_save_state(last_VFP_context[ti->cpu], fpexc);
+> + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc);
+> ? ? ? ?}
 >
-> +ARM SUBARCHITECTURES
-> +M: ? ? Arnd Bergmann <arnd@arndb.de>
-> +M: ? ? Nicolas Pitre <nico@fluxnic.net>
-> +M: ? ? Thomas Gleixner <tglx@linutronix.de>
-> +M: ? ? arm at kernel.org
-> +L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S: ? ? MAINTAINEDftp.arm.linux.org.uk Git - linux-2.6-arm.git/summary
-> +F: ? ? arch/arm/mach-*/
-> +F: ? ? arch/arm/plat-*/
-> +T: ? ? git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-subarch.git
-> +
-
-does it mean if we want to add a new SoC plat/mach, we will send
-patches againest this tree?
-will this tree merge into rmk's tree? then rmk's tree will only manage
-arm common codes?
-
-> ?ARM/ADI ROADRUNNER MACHINE SUPPORT
-> ?M: ? ? Lennert Buytenhek <kernel@wantstofly.org>
-> ?L: ? ? linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> ? ? ? ?/* clear any information we had about last context state */
+> --
+> 1.6.0.4
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
