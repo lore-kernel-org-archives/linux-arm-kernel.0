@@ -1,68 +1,81 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Thu, 19 May 2011 20:10:22 +0200
-Subject: [patch 4/7] clockevents: Provide combined configure and register
-	function
-In-Reply-To: <alpine.LFD.2.02.1105191155170.3078@ionos>
-References: <20110518205713.947614271@linutronix.de>
-	<20110518210136.331975870@linutronix.de>
-	<20110519090849.GA6251@elte.hu>
-	<alpine.LFD.2.02.1105191155170.3078@ionos>
-Message-ID: <20110519181022.GE6139@elte.hu>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 19 May 2011 12:18:27 -0600
+Subject: [PATCH] gpio: remove some legacy comments in build files
+In-Reply-To: <1303975117-20651-1-git-send-email-linus.walleij@stericsson.com>
+References: <1303975117-20651-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110519181827.GC5109@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Thomas Gleixner <tglx@linutronix.de> wrote:
+On Thu, Apr 28, 2011 at 09:18:37AM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The build files for drivers/gpio has some wording and comments
+> about the directory being reserved exclusively for GPIO expanders
+> (according to the gpio.txt file these are on external busses) and
+> this has been false for some time. We already have PL061 and
+> Xilinx drivers which are in silicon and now I'm moving more
+> silicon drivers here, so delete this and reword it a bit.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-> On Thu, 19 May 2011, Ingo Molnar wrote:
-> 
-> > 
-> > * Thomas Gleixner <tglx@linutronix.de> wrote:
-> > 
-> > > +extern void clockevents_config_and_register(struct clock_event_device *dev,
-> > > +					    u32 freq, unsigned long min_delta,
-> > > +					    unsigned long max_delta);
-> > 
-> > might be worth collecting these fields into a clocksource_params structure:
-> > 
-> > struct clocksource_params {
-> > 	u32		freq;
-> > 	unsigned long	min_delta;
-> > 	unsigned long	max_delta;
-> > };
-> > 
-> > That way the initialization API looks even more streamlined:
-> > 
-> > extern void
-> > clockevents_config_and_register(struct clock_event_device *dev,
-> > 				struct clocksource_params params);
-> > 
-> > and could be extended in the future, without having to update every single 
-> > clocksource driver again.
-> 
-> Though it's unlikely that we have more params int the foreseeable
-> future and it's more code in the clock events registration sites as
-> you have to do:
-> 
->     struct param par;
-> 
->     par.freq = f;
->     par.min_delta = x;
->     par.max_delta = y;
->     clockevents_config_and_register(&dev, &p);
-> 
-> instead of having a single line.
+Applied, thanks.
+g.
 
-Indeed that looks uglish.
-
-> When the need arises we still can do
+> ---
+>  drivers/gpio/Kconfig  |    8 ++++----
+>  drivers/gpio/Makefile |    6 +-----
+>  2 files changed, 5 insertions(+), 9 deletions(-)
 > 
-> __clockevents_config_and_register(struct clock_event_device *dev,
->    	                          struct clocksource_params params);
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index c23401f..b7fac15 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -1,5 +1,5 @@
+>  #
+> -# platform-neutral GPIO infrastructure and expanders
+> +# GPIO infrastructure and drivers
+>  #
+>  
+>  config ARCH_WANT_OPTIONAL_GPIOLIB
+> @@ -31,7 +31,7 @@ menuconfig GPIOLIB
+>  	help
+>  	  This enables GPIO support through the generic GPIO library.
+>  	  You only need to enable this, if you also want to enable
+> -	  one or more of the GPIO expansion card drivers below.
+> +	  one or more of the GPIO drivers below.
+>  
+>  	  If unsure, say N.
+>  
+> @@ -63,12 +63,12 @@ config GPIO_SYSFS
+>  	  Kernel drivers may also request that a particular GPIO be
+>  	  exported to userspace; this can be useful when debugging.
+>  
+> -# put expanders in the right section, in alphabetical order
+> +# put drivers in the right section, in alphabetical order
+>  
+>  config GPIO_MAX730X
+>  	tristate
+>  
+> -comment "Memory mapped GPIO expanders:"
+> +comment "Memory mapped GPIO drivers:"
+>  
+>  config GPIO_BASIC_MMIO
+>  	tristate "Basic memory-mapped GPIO controllers support"
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index e4851c5..cfbdef1 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -1,8 +1,4 @@
+> -# generic gpio support: dedicated expander chips, etc
+> -#
+> -# NOTE: platform-specific GPIO drivers don't belong in the
+> -# drivers/gpio directory; put them with other platform setup
+> -# code, IRQ controllers, board init, etc.
+> +# generic gpio support: platform drivers, dedicated expander chips, etc
+>  
+>  ccflags-$(CONFIG_DEBUG_GPIO)	+= -DDEBUG
+>  
+> -- 
+> 1.7.3.2
 > 
-> and have the current function as a wrapper around it.
-
-Okay, you are right.
-
-Thanks,
-
-	Ingo
