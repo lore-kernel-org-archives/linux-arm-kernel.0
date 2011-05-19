@@ -1,46 +1,32 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 19 May 2011 20:25:52 +0100
-Subject: [PATCH v5 1/8] MTD: Add integrator-flash feature to physmap
-In-Reply-To: <1305803618.2630.63.camel@localhost>
-References: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
-	<1305557977-16871-2-git-send-email-marc.zyngier@arm.com>
-	<1305610643.2630.15.camel@localhost>
-	<1305611178.2630.21.camel@localhost>
-	<20110517074348.GA26669@n2100.arm.linux.org.uk>
-	<1305619989.2630.31.camel@localhost>
-	<1305622141.30788.30.camel@e102391-lin.cambridge.arm.com>
-	<1305803618.2630.63.camel@localhost>
-Message-ID: <20110519192551.GA7445@n2100.arm.linux.org.uk>
+Date: Thu, 19 May 2011 20:28:17 +0100
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <BANLkTi=OdvDT6MEk-RxiTNnX-rbwTOqrrw@mail.gmail.com>
+References: <201105181047.17309.arnd@arndb.de>
+	<BANLkTim_0eRvDkQwAYjTNQsOVQiHV+DdBQ@mail.gmail.com>
+	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>
+	<BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
+	<BANLkTi=OdvDT6MEk-RxiTNnX-rbwTOqrrw@mail.gmail.com>
+Message-ID: <20110519192817.GB7445@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 02:13:38PM +0300, Artem Bityutskiy wrote:
-> On Tue, 2011-05-17 at 09:49 +0100, Marc Zyngier wrote:
-> > On Tue, 2011-05-17 at 11:13 +0300, Artem Bityutskiy wrote:
-> > > On Tue, 2011-05-17 at 08:43 +0100, Russell King - ARM Linux wrote:
-> > > > On Tue, May 17, 2011 at 08:46:18AM +0300, Artem Bityutskiy wrote:
-> > > > > On Tue, 2011-05-17 at 08:37 +0300, Artem Bityutskiy wrote:
-> > > > > > Sorry if this sounds like an attack, it is not. I just think that we
-> > > > > > carry crap for too long and should start forcing people to clean it up
-> > > > > > by not accepting changes :-)
-> > > > > 
-> > > > > Sorry, I forgot to note that I do not insist that you have to re-work
-> > > > > MTD partitions support - you already do a very good thing by killing a
-> > > > > redundant driver, and delaying this would be counter-productive. But I
-> > > > > anyway wanted to express my thoughts.
-> > > > 
-> > > > So, what's happening with this patch set?  I'd like to have an ack from
-> > > > the MTD people for the set.
-> > > 
-> > > David should answer, but from my POW the patches are OK. The "#ifdef
-> > > CONFIG_MTD_AFS_PARTS" is ugly. I think it can be just killed, it just
-> > > needs an additional patch to silence the kernel (completely untested,
-> > > Marc, could you please check it?):
-> > 
-> > Looks OK to me, as long as people don't miss the information (could make
-> > the "where's my partition gone?" question harder to answer...).
+On Thu, May 19, 2011 at 03:31:42PM +0200, Linus Walleij wrote:
+> On Thu, May 19, 2011 at 5:01 AM, Barry Song <21cnbao@gmail.com> wrote:
 > 
-> I've pushed my patch to my l2-mtd-2.6.git tree, if dwmw2 accepts it
-> it'll go upstream.
+> > i asked this because we wanted to send the source codes of
+> > CSR(http://www.csr.com) to upstream as i have told you in LDS. it
+> > looks like we need to follow the below new changes to make our source
+> > codes acceptable?
+> > 1. arm device tree
+> > 2. new pinmux framework from Linus Walleij
+> 
+> I'm working on that to post a new v3 of this patch set ASAP, if the
+> ARM subarch tree maintainers are interested I can send them a
+> pull request after that.
 
-I've also committed them to my tree too.
+As my tree currently contains a large proportion of the consolidation work
+so far, it probably makes sense for this stuff to continue coming through
+my tree so that we can sort out any merge conflicts there, rather than
+starting on a new tree... It probably makes sense for the subarch tree to
+get going after this merge window has closed.
