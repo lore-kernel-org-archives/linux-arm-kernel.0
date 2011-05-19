@@ -1,134 +1,228 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 19 May 2011 18:47:24 +0200
-Subject: [PATCH 4/8] ARM i.MX: dmav1: kill SoC ifdefs
+Date: Thu, 19 May 2011 18:47:25 +0200
+Subject: [PATCH 5/8] ARM i.MX Allow to compile together i.MX1/21/25/27
 In-Reply-To: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
 References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1305823648-2428-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1305823648-2428-6-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-since we now can include all soc specific headers at once we do not
-need the ifdeffery anymore.
+This allows for all armv4 and armv5 based i.MX systems to be compiled
+together in one kernel. To accomplish this we need ARM_PATCH_PHYS_VIRT
+and AUTO_ZRELADDR which is selected in Kconfig. This breaks execute
+in place support. It would be possible to keep XIP support, but the
+needed Kconfig magix is just too ugly.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/dma-v1.c |   25 +++----------------------
- 1 files changed, 3 insertions(+), 22 deletions(-)
+ arch/arm/mach-imx/Kconfig                    |   51 +++++++++-----------------
+ arch/arm/mach-imx/Makefile                   |   10 +++---
+ arch/arm/mach-imx/Makefile.boot              |   16 --------
+ arch/arm/plat-mxc/Kconfig                    |   18 +++-------
+ arch/arm/plat-mxc/devices/platform-imx-dma.c |    2 +-
+ 5 files changed, 29 insertions(+), 68 deletions(-)
 
-diff --git a/arch/arm/mach-imx/dma-v1.c b/arch/arm/mach-imx/dma-v1.c
-index 236f149..4d76f67 100644
---- a/arch/arm/mach-imx/dma-v1.c
-+++ b/arch/arm/mach-imx/dma-v1.c
-@@ -475,7 +475,6 @@ void imx_dma_enable(int channel)
- 	imx_dmav1_writel(imx_dmav1_readl(DMA_CCR(channel)) | CCR_CEN |
- 		CCR_ACRPT, DMA_CCR(channel));
+diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
+index 59c97a3..90550bc 100644
+--- a/arch/arm/mach-imx/Kconfig
++++ b/arch/arm/mach-imx/Kconfig
+@@ -11,8 +11,21 @@ config ARCH_MX31
+ config ARCH_MX35
+ 	bool
  
--#ifdef CONFIG_ARCH_MX2
- 	if ((cpu_is_mx21() || cpu_is_mx27()) &&
- 			imxdma->sg && imx_dma_hw_chain(imxdma)) {
- 		imxdma->sg = sg_next(imxdma->sg);
-@@ -487,7 +486,6 @@ void imx_dma_enable(int channel)
- 				DMA_CCR(channel));
- 		}
- 	}
--#endif
- 	imxdma->in_use = 1;
- 
- 	local_irq_restore(flags);
-@@ -518,7 +516,6 @@ void imx_dma_disable(int channel)
- }
- EXPORT_SYMBOL(imx_dma_disable);
- 
--#ifdef CONFIG_ARCH_MX2
- static void imx_dma_watchdog(unsigned long chno)
- {
- 	struct imx_dma_channel *imxdma = &imx_dma_channels[chno];
-@@ -530,7 +527,6 @@ static void imx_dma_watchdog(unsigned long chno)
- 	if (imxdma->err_handler)
- 		imxdma->err_handler(chno, imxdma->data, IMX_DMA_ERR_TIMEOUT);
- }
--#endif
- 
- static irqreturn_t dma_err_handler(int irq, void *dev_id)
- {
-@@ -654,10 +650,8 @@ static irqreturn_t dma_irq_handler(int irq, void *dev_id)
- {
- 	int i, disr;
- 
--#ifdef CONFIG_ARCH_MX2
- 	if (cpu_is_mx21() || cpu_is_mx27())
- 		dma_err_handler(irq, dev_id);
--#endif
- 
- 	disr = imx_dmav1_readl(DMA_DISR);
- 
-@@ -703,7 +697,6 @@ int imx_dma_request(int channel, const char *name)
- 	imxdma->name = name;
- 	local_irq_restore(flags); /* request_irq() can block */
- 
--#ifdef CONFIG_ARCH_MX2
- 	if (cpu_is_mx21() || cpu_is_mx27()) {
- 		ret = request_irq(MX2x_INT_DMACH0 + channel,
- 				dma_irq_handler, 0, "DMA", NULL);
-@@ -717,7 +710,6 @@ int imx_dma_request(int channel, const char *name)
- 		imxdma->watchdog.function = &imx_dma_watchdog;
- 		imxdma->watchdog.data = channel;
- 	}
--#endif
- 
- 	return ret;
- }
-@@ -744,10 +736,8 @@ void imx_dma_free(int channel)
- 	imx_dma_disable(channel);
- 	imxdma->name = NULL;
- 
--#ifdef CONFIG_ARCH_MX2
- 	if (cpu_is_mx21() || cpu_is_mx27())
- 		free_irq(MX2x_INT_DMACH0 + channel, NULL);
--#endif
- 
- 	local_irq_restore(flags);
- }
-@@ -803,21 +793,13 @@ static int __init imx_dma_init(void)
- 	int ret = 0;
- 	int i;
- 
--#ifdef CONFIG_ARCH_MX1
- 	if (cpu_is_mx1())
- 		imx_dmav1_baseaddr = MX1_IO_ADDRESS(MX1_DMA_BASE_ADDR);
--	else
--#endif
--#ifdef CONFIG_MACH_MX21
--	if (cpu_is_mx21())
-+	else if (cpu_is_mx21())
- 		imx_dmav1_baseaddr = MX21_IO_ADDRESS(MX21_DMA_BASE_ADDR);
--	else
--#endif
--#ifdef CONFIG_MACH_MX27
--	if (cpu_is_mx27())
-+	else if (cpu_is_mx27())
- 		imx_dmav1_baseaddr = MX27_IO_ADDRESS(MX27_DMA_BASE_ADDR);
- 	else
--#endif
- 		return 0;
- 
- 	dma_clk = clk_get(NULL, "dma");
-@@ -828,7 +810,6 @@ static int __init imx_dma_init(void)
- 	/* reset DMA module */
- 	imx_dmav1_writel(DCR_DRST, DMA_DCR);
- 
--#ifdef CONFIG_ARCH_MX1
- 	if (cpu_is_mx1()) {
- 		ret = request_irq(MX1_DMA_INT, dma_irq_handler, 0, "DMA", NULL);
- 		if (ret) {
-@@ -843,7 +824,7 @@ static int __init imx_dma_init(void)
- 			return ret;
- 		}
- 	}
--#endif
++config ARCH_MX1
++	bool
 +
- 	/* enable DMA module */
- 	imx_dmav1_writel(DCR_DEN, DMA_DCR);
++config ARCH_MX2
++	bool
++
++config ARCH_MX25
++	bool
++
++config MACH_MX27
++	bool
++
+ config SOC_IMX1
+ 	bool
++	select ARCH_MX1
+ 	select CPU_ARM920T
+ 	select IMX_HAVE_DMA_V1
+ 	select IMX_HAVE_IOMUX_V1
+@@ -20,6 +33,7 @@ config SOC_IMX1
  
+ config SOC_IMX21
+ 	bool
++	select ARCH_MX2
+ 	select CPU_ARM926T
+ 	select ARCH_MXC_AUDMUX_V1
+ 	select IMX_HAVE_DMA_V1
+@@ -28,6 +42,7 @@ config SOC_IMX21
+ 
+ config SOC_IMX25
+ 	bool
++	select ARCH_MX25
+ 	select CPU_ARM926T
+ 	select ARCH_MXC_AUDMUX_V2
+ 	select ARCH_MXC_IOMUX_V3
+@@ -35,6 +50,8 @@ config SOC_IMX25
+ 
+ config SOC_IMX27
+ 	bool
++	select MACH_MX27
++	select ARCH_MX2
+ 	select CPU_ARM926T
+ 	select ARCH_MXC_AUDMUX_V1
+ 	select IMX_HAVE_DMA_V1
+@@ -59,7 +76,7 @@ config SOC_IMX35
+ 	select MXC_AVIC
+ 
+ 
+-if ARCH_MX1
++if ARCH_IMX_V4_V5
+ 
+ comment "MX1 platforms:"
+ config MACH_MXLADS
+@@ -87,30 +104,6 @@ config MACH_APF9328
+ 	help
+ 	  Say Yes here if you are using the Armadeus APF9328 development board
+ 
+-endif
+-
+-if ARCH_MX2
+-
+-choice
+-	prompt "CPUs:"
+-	default MACH_MX21
+-
+-config MACH_MX21
+-	bool "i.MX21 support"
+-	help
+-	  This enables support for Freescale's MX2 based i.MX21 processor.
+-
+-config MACH_MX27
+-	bool "i.MX27 support"
+-	help
+-	  This enables support for Freescale's MX2 based i.MX27 processor.
+-
+-endchoice
+-
+-endif
+-
+-if MACH_MX21
+-
+ comment "MX21 platforms:"
+ 
+ config MACH_MX21ADS
+@@ -124,10 +117,6 @@ config MACH_MX21ADS
+ 	  Include support for MX21ADS platform. This includes specific
+ 	  configurations for the board and its peripherals.
+ 
+-endif
+-
+-if ARCH_MX25
+-
+ comment "MX25 platforms:"
+ 
+ config MACH_MX25_3DS
+@@ -173,10 +162,6 @@ config MACH_EUKREA_MBIMXSD25_BASEBOARD
+ 
+ endchoice
+ 
+-endif
+-
+-if MACH_MX27
+-
+ comment "MX27 platforms:"
+ 
+ config MACH_MX27ADS
+diff --git a/arch/arm/mach-imx/Makefile b/arch/arm/mach-imx/Makefile
+index e9eb36d..db6394a 100644
+--- a/arch/arm/mach-imx/Makefile
++++ b/arch/arm/mach-imx/Makefile
+@@ -1,12 +1,12 @@
+ obj-$(CONFIG_IMX_HAVE_DMA_V1) += dma-v1.o
+ 
+-obj-$(CONFIG_ARCH_MX1) += clock-imx1.o mm-imx1.o
+-obj-$(CONFIG_MACH_MX21) += clock-imx21.o mm-imx21.o
++obj-$(CONFIG_SOC_IMX1) += clock-imx1.o mm-imx1.o
++obj-$(CONFIG_SOC_IMX21) += clock-imx21.o mm-imx21.o
+ 
+-obj-$(CONFIG_ARCH_MX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
++obj-$(CONFIG_SOC_IMX25) += clock-imx25.o mm-imx25.o ehci-imx25.o
+ 
+-obj-$(CONFIG_MACH_MX27) += cpu-imx27.o pm-imx27.o
+-obj-$(CONFIG_MACH_MX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
++obj-$(CONFIG_SOC_IMX27) += cpu-imx27.o pm-imx27.o
++obj-$(CONFIG_SOC_IMX27) += clock-imx27.o mm-imx27.o ehci-imx27.o
+ 
+ obj-$(CONFIG_SOC_IMX31) += mm-imx31.o cpu-imx31.o clock-imx31.o iomux-imx31.o ehci-imx31.o
+ obj-$(CONFIG_SOC_IMX35) += mm-imx35.o cpu-imx35.o clock-imx35.o ehci-imx35.o
+diff --git a/arch/arm/mach-imx/Makefile.boot b/arch/arm/mach-imx/Makefile.boot
+index ebee18b..cdfe20f 100644
+--- a/arch/arm/mach-imx/Makefile.boot
++++ b/arch/arm/mach-imx/Makefile.boot
+@@ -1,19 +1,3 @@
+-zreladdr-$(CONFIG_ARCH_MX1)	:= 0x08008000
+-params_phys-$(CONFIG_ARCH_MX1)	:= 0x08000100
+-initrd_phys-$(CONFIG_ARCH_MX1)	:= 0x08800000
+-
+-zreladdr-$(CONFIG_MACH_MX21)	:= 0xC0008000
+-params_phys-$(CONFIG_MACH_MX21)	:= 0xC0000100
+-initrd_phys-$(CONFIG_MACH_MX21)	:= 0xC0800000
+-
+-zreladdr-$(CONFIG_ARCH_MX25)	:= 0x80008000
+-params_phys-$(CONFIG_ARCH_MX25)	:= 0x80000100
+-initrd_phys-$(CONFIG_ARCH_MX25)	:= 0x80800000
+-
+-zreladdr-$(CONFIG_MACH_MX27)	:= 0xA0008000
+-params_phys-$(CONFIG_MACH_MX27)	:= 0xA0000100
+-initrd_phys-$(CONFIG_MACH_MX27)	:= 0xA0800000
+-
+ zreladdr-$(CONFIG_ARCH_MX3)	:= 0x80008000
+ params_phys-$(CONFIG_ARCH_MX3)	:= 0x80000100
+ initrd_phys-$(CONFIG_ARCH_MX3)	:= 0x80800000
+diff --git a/arch/arm/plat-mxc/Kconfig b/arch/arm/plat-mxc/Kconfig
+index a5353fc..0202ca0 100644
+--- a/arch/arm/plat-mxc/Kconfig
++++ b/arch/arm/plat-mxc/Kconfig
+@@ -14,20 +14,12 @@ choice
+ 	prompt "Freescale CPU family:"
+ 	default ARCH_MX3
+ 
+-config ARCH_MX1
+-	bool "MX1-based"
++config ARCH_IMX_V4_V5
++	select ARM_PATCH_PHYS_VIRT
++	select AUTO_ZRELADDR
++	bool "i.MX1, i.MX21, i.MX25, i.MX27"
+ 	help
+-	  This enables support for systems based on the Freescale i.MX1 family
+-
+-config ARCH_MX2
+-	bool "MX2-based"
+-	help
+-	  This enables support for systems based on the Freescale i.MX2 family
+-
+-config ARCH_MX25
+-	bool "MX25-based"
+-	help
+-	  This enables support for systems based on the Freescale i.MX25 family
++	  This enables support for armv4 and armv5 based i.MX systems
+ 
+ config ARCH_MX3
+ 	bool "MX3-based"
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+index 3538b85..735b81d 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+@@ -76,7 +76,7 @@ static struct platform_device __init __maybe_unused *imx_add_imx_dma(void)
+ 	return imx_add_platform_device("imx-dma", -1, NULL, 0, NULL, 0);
+ }
+ 
+-#ifdef CONFIG_ARCH_MX25
++#ifdef CONFIG_SOC_IMX25
+ static struct sdma_script_start_addrs addr_imx25_to1 = {
+ 	.ap_2_ap_addr = 729,
+ 	.uart_2_mcu_addr = 904,
 -- 
 1.7.4.1
