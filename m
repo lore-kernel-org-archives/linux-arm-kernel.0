@@ -1,75 +1,50 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Thu, 19 May 2011 14:17:54 +0200
-Subject: atmel-mci causes kernel panic when CONFIG_DEBUG_VM is set
-In-Reply-To: <4DD4E1DF.7030005@atmel.com>
-References: <4DD4CC68.80408@atmel.com>	<BANLkTinaPW5xcdrNewJC6OW9nqWHC_-TVw@mail.gmail.com>
-	<4DD4E1DF.7030005@atmel.com>
-Message-ID: <4DD50A72.2050501@atmel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 19 May 2011 14:20:33 +0200
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <BANLkTim_0eRvDkQwAYjTNQsOVQiHV+DdBQ@mail.gmail.com>
+References: <201105181047.17309.arnd@arndb.de>
+	<BANLkTim_0eRvDkQwAYjTNQsOVQiHV+DdBQ@mail.gmail.com>
+Message-ID: <201105191420.33269.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/19/2011 11:24 AM, Ludovic Desroches wrote:
-> On 5/19/2011 10:04 AM, Barry Song wrote:
->> 2011/5/19 Ludovic Desroches<ludovic.desroches@atmel.com>:
->>> Hello,
->>>
->>> There is a bug with the atmel-mci driver when the debug feature
->>> CONFIG_DEBUG_VM is set.
->>>
->>> Into the atmci_read_data_pio function we use flush_dcache_page (do 
->>> we really
->>> need it?) which call the page_mapping function where we can find
->>> VM_BUG_ON(PageSlab(Page)). Then a kernel panic happens.
->>>
->>> I don't understand the purpose of the VM_BUG_ON(PageSlab(Page)) (the 
->>> page
->>> comes from a scatter list). How could I correct this problem?
->> linux/include/linux/mmdebug.h:
->>
->> #ifdef CONFIG_DEBUG_VM
->> #define VM_BUG_ON(cond) BUG_ON(cond)
->> #else
->> #define VM_BUG_ON(cond) do { (void)(cond); } while (0)
->> #endif
->>
->> it is something like "assert" in kernel.
->
-> Thanks for your answer but I know that. My question is more focused on 
-> why there is this check.
-This the reason:
+On Thursday 19 May 2011, Barry Song wrote:
+> > diff --git a/MAINTAINERS b/MAINTAINERS
+> > index 8fce5e6..942d052 100644
+> > --- a/MAINTAINERS
+> > +++ b/MAINTAINERS
+> > @@ -630,6 +630,17 @@ S: Maintained
+> >  F:     drivers/amba/
+> >  F:     include/linux/amba/bus.h
+> >
+> > +ARM SUBARCHITECTURES
+> > +M:     Arnd Bergmann <arnd@arndb.de>
+> > +M:     Nicolas Pitre <nico@fluxnic.net>
+> > +M:     Thomas Gleixner <tglx@linutronix.de>
+> > +M:     arm at kernel.org
+> > +L:     linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+> > +S:     MAINTAINEDftp.arm.linux.org.uk Git - linux-2.6-arm.git/summary
+> > +F:     arch/arm/mach-*/
+> > +F:     arch/arm/plat-*/
+> > +T:     git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-subarch.git
+> > +
+> 
+> does it mean if we want to add a new SoC plat/mach, we will send
+> patches againest this tree?
 
-commit b5fab14e5d87df4d94161ae5f5e0c8625f9ffda2
-Author: Christoph Lameter <clameter@sgi.com>
-Date:   Tue Jul 17 04:03:33 2007 -0700
+You should submit it for inclusion into this tree, but as a new branch
+(or multiple branches) forked off from the mainline tree. We will make sure
+it cleanly merges with the other subarchitectures.
 
-     Add VM_BUG_ON in case someone uses page_mapping on a slab page
+> will this tree merge into rmk's tree? then rmk's tree will only manage
+> arm common codes?
 
-     Detect slab objects being passed to the page oriented functions of 
-the VM.
+We'll see. My current idea is that we will push all subarchitecture branches
+upstream to Linus directly, while Russell pushes the core branch(es) upstream
+in parallel, but the master branch of the subarch tree could end up pulling
+in the core tree as well, in order to make life easier for Stephen's
+linux-next tree that needs both. This depends to some degree on whether
+Russell wants to keep some subarchitectures in his own tree, or we put all
+of them in the new subarch tree.
 
-     It is not sufficient to simply return NULL because the functions 
-calling
-     page_mapping may depend on other items of the page_struct also to 
-be setup
-     properly.  Moreover slab object may not be properly aligned.  The page
-     oriented functions of the VM expect to operate on page aligned, 
-page sized
-     objects.  Operations on object straddling page boundaries may only 
-affect the
-     objects partially which may lead to surprising results.
-
-     It is better to detect eventually remaining uses and eliminate them.
-
-
-> Is flushing a page taken from a slab forbidden ? Is it risky ? Is it 
-> no sense ?
->
-Other drivers do a flush_dcache_page on a page coming from a scatter 
-list. So I think they will also have an assert when CONFIG_DEBUG_VM is set.
-
-What is the proper way to do this flush (if needed) ?
-
-
-Regards,
-
-Ludovic
+	Arnd
