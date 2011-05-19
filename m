@@ -1,41 +1,27 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 19 May 2011 15:23:24 +0200
-Subject: [PATCH 1/2] spi/pl022: timeout on polled transfer
-In-Reply-To: <20110519124454.GC2219@pengutronix.de>
-References: <1305807191-11704-1-git-send-email-linus.walleij@stericsson.com>
-	<20110519124454.GC2219@pengutronix.de>
-Message-ID: <BANLkTinrk-FjMy1trDnsxwT_NTgQ5x_8Rg@mail.gmail.com>
+Date: Thu, 19 May 2011 15:31:42 +0200
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
+References: <201105181047.17309.arnd@arndb.de>
+	<BANLkTim_0eRvDkQwAYjTNQsOVQiHV+DdBQ@mail.gmail.com>
+	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>
+	<BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
+Message-ID: <BANLkTi=OdvDT6MEk-RxiTNnX-rbwTOqrrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 2:44 PM, Wolfram Sang <w.sang@pengutronix.de> wrote:
+On Thu, May 19, 2011 at 5:01 AM, Barry Song <21cnbao@gmail.com> wrote:
 
-> Hi,
->
->> - ? ? ? ? ? ? /* FIXME: insert a timeout so we don't hang here indefinitely */
->> - ? ? ? ? ? ? while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end)
->> +
->> + ? ? ? ? ? ? timeout = jiffies + msecs_to_jiffies(SPI_POLLING_TIMEOUT);
->
-> Won't you miss the transfer if you get interrupted here longer than
-> SPI_POLLING_TIMEOUT?
+> i asked this because we wanted to send the source codes of
+> CSR(http://www.csr.com) to upstream as i have told you in LDS. it
+> looks like we need to follow the below new changes to make our source
+> codes acceptable?
+> 1. arm device tree
+> 2. new pinmux framework from Linus Walleij
 
-Yeah... preempted for a second hm.
-
->> + ? ? ? ? ? ? while (pl022->tx < pl022->tx_end || pl022->rx < pl022->rx_end) {
->> + ? ? ? ? ? ? ? ? ? ? if (time_after(jiffies, timeout)) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? dev_warn(&pl022->adev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? "%s: timeout!\n", __func__);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? message->state = STATE_ERROR;
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto out;
->> + ? ? ? ? ? ? ? ? ? ? }
->> ? ? ? ? ? ? ? ? ? ? ? readwriter(pl022);
->> + ? ? ? ? ? ? }
-
-What about we move readerwriter() above if (time_after...) then it atleast
-gets one chance to run even if we're preempted for 10 seconds.
-
-Any other design patterns that'd be better?
+I'm working on that to post a new v3 of this patch set ASAP, if the
+ARM subarch tree maintainers are interested I can send them a
+pull request after that.
 
 Yours,
 Linus Walleij
