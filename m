@@ -1,47 +1,47 @@
-From: shweta.gulati@ti.com (Gulati, Shweta)
-Date: Thu, 19 May 2011 15:09:33 +0530
-Subject: [PATCH V4] OMAP3+: SR Layer Cleanup
-In-Reply-To: <87wrhn9ic2.fsf@ti.com>
-References: <1305268062-20046-1-git-send-email-shweta.gulati@ti.com>
-	<87wrhn9ic2.fsf@ti.com>
-Message-ID: <BANLkTi=BryM-eEsTNcV5E51SnkuZaKsF9Q@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 19 May 2011 11:40:46 +0200
+Subject: [PATCH v2 0/7] Consolidate sdhci pltfm & OF drivers and get
+	them self registered
+In-Reply-To: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110519094046.GA2219@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Shawn,
 
-On Thu, May 19, 2011 at 2:29 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Shweta Gulati <shweta.gulati@ti.com> writes:
->
->> To set sr ntarget values ?for all volt_domain,
->> volt_table is retrieved by doing a look_up of 'vdd_name'
->> field from omap_hwmod but voltage domain pointer does not
->> belong to omap_hwmod and is not used anywhere else.
->> As a part of voltage layer and SR Layer clean up volt
->> pointer is removed from omap_hwmod and added in dev
->> attributes of SR.
->>
->> Tested on OMAP3630 SDP and OMAP4430 SDP Board
->>
->> Signed-off-by: Shweta Gulati <shweta.gulati@ti.com>
->> Acked by: Nishanth Menon <nm@ti.com>
->> Cc: Benoit Cousson <b-cousson@ti.com>
->> Cc: Paul <paul@pwsan.com>
->
-> As this isn't a consolidation/cleanup, I'm not going to push for 2.6.40,
-> but with an ack from Benoit, I'll queue for 2.6.40+.
->
-> Also it has some minor conflicts with some other SR cleanups I have
-> queued for 2.6.40+. ?Please rebase on to my for_2.6.40/pm-misc branch.
-Ok, I will rebase it to 2.6.40/pm-misc branch.
-> Thanks,
->
-> Kevin
->
+> Changes since v1:
+>  * Rebase on cjb's mmc-next tree
 
+Is it maybe possible that you get access to
+http://opensource.freescale.com/git or another machine? A branch to pull
+from would be more convenient, because the series does not apply to
+mmc-next anymore, so an extra step to go "back in time" is needed.
 
+(minor) When applying I got:
+
+Applying: mmc: sdhci: make sdhci-pltfm device drivers self registered
+/home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:384: trailing whitespace.
+/home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:817: space before tab in indent.
+ 	struct tegra_sdhci_platform_data *plat;
+/home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:867: trailing whitespace.
+
+Applying: sdhci: rename sdhci-esdhc-imx.c to sdhci-esdhc.c
+/home/wsa/Kernel/linux-2.6/.git/rebase-apply/patch:780: trailing whitespace.
+
+See later comments for further issues.
+
+Thanks,
+
+   Wolfram
 
 -- 
-Thanks,
-Regards,
-Shweta
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110519/0ecfafb4/attachment.sig>
