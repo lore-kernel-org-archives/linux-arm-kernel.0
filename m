@@ -1,69 +1,57 @@
-From: abhilash.kv@ti.com (Koyamangalath, Abhilash)
-Date: Thu, 19 May 2011 18:05:21 +0530
-Subject: [PATCH v3] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
-In-Reply-To: <20110518162542.GB3026@avinash-laptop>
-References: <1304328111-15999-1-git-send-email-avinashhm@ti.com>
-	<alpine.DEB.2.00.1105051548210.30136@utopia.booyaka.com>
-	<20110509124842.GA25211@avinash-laptop>
-	<alpine.DEB.2.00.1105181021590.4550@utopia.booyaka.com>,
-	<20110518162542.GB3026@avinash-laptop>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870370A4D887@dbde02.ent.ti.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 19 May 2011 20:35:59 +0800
+Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
+In-Reply-To: <BANLkTik7BnJKWCsm2L3-GJPTaaiXFNSgaA@mail.gmail.com>
+References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTi=poU17RqAzp28CPjWHrN_+aFiyag@mail.gmail.com>
+	<BANLkTindee6UMez8HyBUwd2H6mN-DknzPw@mail.gmail.com>
+	<BANLkTik7BnJKWCsm2L3-GJPTaaiXFNSgaA@mail.gmail.com>
+Message-ID: <BANLkTim2rv9QHDd2zjBfyVqG9dSGCM=PAw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On Wed, May 18, 2011 at 10:22:28AM -0600, Paul Walmsley wrote:
-> > On Mon, 9 May 2011, Avinash.H.M. wrote:
-> >
-> > > On Thu, May 05, 2011 at 03:58:56PM -0600, Paul Walmsley wrote:
-> > >
-> > > > >
-> > > > > The patch is based on
-> > > > >  * git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
-> > > > >  * master branch.
-> > > > >  * 9be20f0 commit. ( Linux-omap rebuilt: Updated to -rc5 )
-> > > >
-> > > > Please base all your patches against mainline commits.  I suggest using
-> > > > v2.6.39-rc6.
-> > >
-> > > OK Paul. I will rebase against mainline, -rc6.
-> >
-> > Ping.  Any progress?
+2011/5/19 Linus Walleij <linus.walleij@linaro.org>:
+> On Thu, May 19, 2011 at 1:38 PM, Barry Song <21cnbao@gmail.com> wrote:
 >
-> Hi Paul ,
+>>> -arch_initcall(u300_gpio_init);
+>>> -module_exit(u300_gpio_exit);
+>>>
+>> looks like the driver can't be a real module, is the module_exit
+>> suitable? it looks strange module_exit plays together with
+>> arch_initcall.
 >
-> I am having the patch ready. Haven't had a chance to test. I will test
-> and send by tomorrow.
+> It's a rather common design pattern in the kernel for early
+> platform drivers. Either the dependencies are resolved by the
+> different initlevels or they are resolved in probe order with
+> loadable modules. Module load will call all initlevels in order.
+>
+> It is not elegant but it is common.
 
-> thanks ,
+Linus, thanks for your reply. module_exit and related functions are
+really useless codes. but people have done that before, then we have
+no way except following.
+u300_gpio_exit never gets chance to run and when we disassemble
+vmlinux, u300_gpio_exit()  function should be not in the final binary
+at all, just a symbol name is left.
 
-> - Avinash
-I have tried the patch on am37x evm and the i2c soft-reset time-out issue doesn't
-seem to go off for me. Previously I used to get a log  : 
-
-[    0.000000] omap_hwmod: i2c1: softreset failed (waited 10000 usec)                                                                                                            
-[    0.000000] omap_hwmod: i2c2: softreset failed (waited 10000 usec)                                                                                                            
-[    0.000000] omap_hwmod: i2c3: softreset failed (waited 10000 usec) 
-
-And now I get :
-[    0.000000] omap_i2c_reset: i2c1: softreset failed (waited 10000 usec)
-[    0.000000] omap_i2c_reset: i2c2: softreset failed (waited 10000 usec)
-[    0.000000] omap_i2c_reset: i2c3: softreset failed (waited 10000 usec)
-
-So the function where this failure happens seems to be the only thing that has changed.
-I've tried this patch on top of the recent PSP 04.02.00.07 release. 
-What am I missing?
-
-thanks,
-Abhilash
-
-
-
-> >
-> >
-> > - Paul
---
-To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-the body of a message to majordomo at vger.kernel.org
-More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+>> guess symbol u300_gpio_exit will finally lose in the last vmlinux
+>> since it is in exit section and built-in kernel.
+>
+> Yes. And if you one day, to do some testing, compile and load it
+> as module and unload it, it is handy.
+>
+> I have other drivers where I simply don't have an exit function
+> but this one I have actually used.
+>
+>> another problem i see is after moving gpio/pinmux to drivers as
+>> platform device, codes in arch/arm/plat(mach) can't ?call gpio/pinmux
+>> api before the related platform devices registerred. that will
+>> required these platform devices enter system earlier.
+>
+> This is exactly the reason why the u300 gpio driver needs to
+> be initialized in an arch_initcall().
+>
+> Yours,
+> Linus Walleij
+>
