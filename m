@@ -1,45 +1,169 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Thu, 19 May 2011 22:23:43 +0800
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <201105191550.20129.arnd@arndb.de>
-References: <201105181047.17309.arnd@arndb.de>
-	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>
-	<BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
-	<201105191550.20129.arnd@arndb.de>
-Message-ID: <BANLkTikKhZu_H_QT+Uds22sepk1OnEeDNA@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 19 May 2011 15:46:42 +0100
+Subject: [RFC PATCH] ARM: kuser helpers: comment cleanup
+Message-ID: <1305816402-9036-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/19 Arnd Bergmann <arnd@arndb.de>:
-> On Thursday 19 May 2011, Barry Song wrote:
->> 2011/5/19 Nicolas Pitre <nico@fluxnic.net>:
->> > On Thu, 19 May 2011, Barry Song wrote:
->> > Something like that. ?The exact details will be fleshed out as we go.
->> > The idea is to give a round of review from a higher point of view to
->> > make sure no opportunities for code reuse is missed, etc. ?The mechanics
->> > of how this code transitions from this tree into mainline during the
->> > merge window is secondary.
->>
->> i asked this because we wanted to send the source codes of
->> CSR(http://www.csr.com) to upstream as i have told you in LDS. it
->> looks like we need to follow the below new changes to make our source
->> codes acceptable?
->> 1. arm device tree
->> 2. new pinmux framework from Linus Walleij
->> 3. move GPIO from plat/mach to drivers/gpio?
->
-> I would count at least the last two as mandatory, for the device tree,
-> it depends on how much work it would be for you to do the conversion
-> and at what time you submit the series. The longer you wait before
-> submitting the series, the stricter the requirements will get.
->
-> Do you have a diffstat or a git tree with your work available?
+The comments accompanying the kuser helpers contain assembler code
+which is no longer really needed, since the compiler will do a
+decent job of calling the helpers if the suggested C declarations
+are used.
 
-not yet by now. it should be coming in the middle of next month. we
-have workable codes but need a lot of refinations before sending
-patches for review. it is more like a new begin from scratch, so
-arm/arch changes should be things we can catch.
+Also, the existing code uses old?style calling techniquies which do
+not interwork properly if used in Thumb code, and which are likely
+to be suboptimally branch?predicted on recent CPUs.  Letting the
+compiler generate the appropriate function call boilerplate avoids
+these problems without needing to write multiple versions of the
+code.
 
->
-> ? ? ? ?Arnd
->
+For these reasons, this patch removes those example assembler code
+snippets.
+
+Similarly, there?s no real reason why the example of how to
+implement atomic add needs to be assembler, so I have replaced it
+with a simpler C version.
+
+Comments have also been added clarifying how and when
+__kernel_helper_version should be checked.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
+
+Note that this is just an RFC: In particular, I haven't tested
+the C atomic_add example yet -- it just shows the kind of thing
+we _could_ document.
+
+Instead of (or in addition to) this patch, we could also:
+
+ * Put the kuser helper C declarations in an actual header file:
+   this would mean that people writing userspace code could just
+   use the helpers directly via C instead of having to write their
+   own assembler wrappers.
+
+ * Move the explanatory test into Documentation/arm/
+
+The proposed comments on checking __kernel_helper_version may be
+overkill, particularly for the helpers which have always been
+there.  On the other hand, encouraging people into good habits of
+always checking seems harmless at worst, and beneficial at best,
+particularly if we add more helpers over time, such as the 64-bit
+cpmxchg helper which has been mooted.
+
+Any views on this?
+
+Cheers
+---Dave
+
+ arch/arm/kernel/entry-armv.S |   55 ++++++++++++++++++++---------------------
+ 1 files changed, 27 insertions(+), 28 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index e8d8856..5d444b5 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -779,6 +779,11 @@ ENDPROC(__switch_to)
+  * earlier processors just for the sake of not using these kernel helpers
+  * if your compiled code is not going to use the new instructions for other
+  * purpose.
++ *
++ * New helpers may be added over time, so an older kernel may be missing
++ * some helpers present in a newer kernel.  For this reason, programs
++ * must check the value of __kernel_helper_version (see below) before
++ * assuming that it is safe to call any particular helper.
+  */
+  THUMB(	.arm	)
+ 
+@@ -819,11 +824,7 @@ __kuser_helper_start:
+  * Apply any needed memory barrier to preserve consistency with data modified
+  * manually and __kuser_cmpxchg usage.
+  *
+- * This could be used as follows:
+- *
+- * #define __kernel_dmb() \
+- *         asm volatile ( "mov r0, #0xffff0fff; mov lr, pc; sub pc, r0, #95" \
+- *	        : : : "r0", "lr","cc" )
++ * Do not attempt to call this function unless __kernel_helper_version >= 3.
+  */
+ 
+ __kuser_memory_barrier:				@ 0xffff0fa0
+@@ -855,7 +856,8 @@ __kuser_memory_barrier:				@ 0xffff0fa0
+  *
+  * Definition and user space usage example:
+  *
+- *	typedef int (__kernel_cmpxchg_t)(int oldval, int newval, int *ptr);
++ *	typedef int (__kernel_cmpxchg_t)(int oldval, int newval,
++ *					 int volatile *ptr);
+  *	#define __kernel_cmpxchg (*(__kernel_cmpxchg_t *)0xffff0fc0)
+  *
+  * Atomically store newval in *ptr if *ptr is equal to oldval for user space.
+@@ -863,27 +865,25 @@ __kuser_memory_barrier:				@ 0xffff0fa0
+  * The C flag is also set if *ptr was changed to allow for assembly
+  * optimization in the calling code.
+  *
++ * Do not attempt to call this function unless __kernel_helper_version >= 2.
++ *
+  * Notes:
+  *
+  *    - This routine already includes memory barriers as needed.
+  *
+  * For example, a user space atomic_add implementation could look like this:
+  *
+- * #define atomic_add(ptr, val) \
+- *	({ register unsigned int *__ptr asm("r2") = (ptr); \
+- *	   register unsigned int __result asm("r1"); \
+- *	   asm volatile ( \
+- *	       "1: @ atomic_add\n\t" \
+- *	       "ldr	r0, [r2]\n\t" \
+- *	       "mov	r3, #0xffff0fff\n\t" \
+- *	       "add	lr, pc, #4\n\t" \
+- *	       "add	r1, r0, %2\n\t" \
+- *	       "add	pc, r3, #(0xffff0fc0 - 0xffff0fff)\n\t" \
+- *	       "bcc	1b" \
+- *	       : "=&r" (__result) \
+- *	       : "r" (__ptr), "rIL" (val) \
+- *	       : "r0","r3","ip","lr","cc","memory" ); \
+- *	   __result; })
++ * int atomic_add(int volatile *ptr, int val)
++ * {
++ *	int newval;
++ *	do {
++ *		int oldval = *ptr;
++ *
++ *		newval = oldval + val;
++ *	while(__kernel_cmpxchg(oldval, newval, ptr));
++ *
++ *	return newval;
++ * }
+  */
+ 
+ __kuser_cmpxchg:				@ 0xffff0fc0
+@@ -983,13 +983,7 @@ kuser_cmpxchg_fixup:
+  *
+  * Get the TLS value as previously set via the __ARM_NR_set_tls syscall.
+  *
+- * This could be used as follows:
+- *
+- * #define __kernel_get_tls() \
+- *	({ register unsigned int __val asm("r0"); \
+- *         asm( "mov r0, #0xffff0fff; mov lr, pc; sub pc, r0, #31" \
+- *	        : "=r" (__val) : : "lr","cc" ); \
+- *	   __val; })
++ * Do not attempt to call this function unless __kernel_helper_version >= 1.
+  */
+ 
+ __kuser_get_tls:				@ 0xffff0fe0
+@@ -1011,6 +1005,11 @@ __kuser_get_tls:				@ 0xffff0fe0
+  *
+  * User space may read this to determine the curent number of helpers
+  * available.
++ *
++ * User space may assume that the value of this field never changes
++ * during the lifetime of any single process.  This means that this
++ * field can be read once during the initialisation of a library or
++ * startup phase of a program.
+  */
+ 
+ __kuser_helper_version:				@ 0xffff0ffc
+-- 
+1.7.4.1
