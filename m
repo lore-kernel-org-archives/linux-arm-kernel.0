@@ -1,29 +1,28 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 19 May 2011 21:56:32 +0800
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <BANLkTinD9rAipfwNnh6QpgbcogckdtQ=OQ@mail.gmail.com>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-	<20110519085638.GA26816@S2100-06.ap.freescale.net>
-	<BANLkTinD9rAipfwNnh6QpgbcogckdtQ=OQ@mail.gmail.com>
-Message-ID: <20110519135631.GB26816@S2100-06.ap.freescale.net>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 19 May 2011 15:55:10 +0200
+Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+In-Reply-To: <201105191451.40416.morpheus.ibis@gmail.com>
+References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110519123507.GA4950@elf.ucw.cz>
+	<201105191451.40416.morpheus.ibis@gmail.com>
+Message-ID: <201105191555.10301.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 02:21:27PM +0200, Linus Walleij wrote:
-> On Thu, May 19, 2011 at 10:56 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+On Thursday, May 19, 2011 02:51:40 PM Pavel Herrmann wrote:
+> Hi
 > 
-> > I start working on moving mxs gpio (arch/arm/mach-mxs/gpio.c) into
-> > driver/gpio, and I see the possibility to go a different approach
-> > from U300 one posted here.
+> On Thursday, May 19, 2011 02:35:08 PM Pavel Machek wrote:
+> > > you're potentially doing with this:
+> > In some other mail, you said "just add the locking". Pavel H.
+> > actually produced patch doing so...
 > 
-> I've tried to figure out what relation the mail has to the U300 driver
-> but cannot find any, more than that it's moving a driver... Please
-> start a new mail thread.
-> 
-I will post mxs-gpio driver once I get it done.  Then please review
-the code and see the difference between mxs-gpio and u300-gpio,
-though these hardwares have something in common.
+> yes, that was the original version of the patch. while I agree with Marek
+> on locks not being the right way, I was going send a cleaner version of
+> the original locking patch today (locking in probe is not really
+> necessary), you just beat me to it.
 
--- 
-Regards,
-Shawn
+Please send the patch inline next time ;-)
+
+> 
+> Pavel Herrmann
