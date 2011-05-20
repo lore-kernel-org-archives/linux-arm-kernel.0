@@ -1,28 +1,55 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 20 May 2011 19:36:49 +0200
-Subject: [PATCH] mioa701: move gpio-pullup functionality to gpio-vbus
-In-Reply-To: <1305719866-9811-1-git-send-email-dbaryshkov@gmail.com>
-References: <1305719866-9811-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <4DD6A6B1.9010209@free.fr>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 20 May 2011 13:53:42 -0400 (EDT)
+Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <20110520150348.GB3141@arm.com>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
+	<20110520113758.GA3141@arm.com>
+	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
+	<20110520150348.GB3141@arm.com>
+Message-ID: <alpine.LFD.2.00.1105201330590.14430@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2011 01:57 PM, Dmitry Eremin-Solenikov wrote:
-> gpio-vbus can (and should?) handle D+ pullup gpio for us. Move gpio-pullup handling
-> to gpio-vbus and stop providing udc_info as it's empty now.
-No sorry, NAK.
+On Fri, 20 May 2011, Dave Martin wrote:
 
-As a matter of fact, even if gpio-vbus driver handles correctly the VBUS 
-sensing and D+ line powering, it still lacks the suspend / resume 
-handling to "disconnect the D+ line" on suspend and reconnect it on 
-"resume". That's the reason I nack this patch, as for me, gpio-vbus and 
-pxa27x-udc are not yet iso functional.
+> On Fri, May 20, 2011 at 01:39:37PM +0100, Frank Hofmann wrote:
+> > I've simply done there what the "setmode" macro from
+> > <asm/assembler.h> is doing, have chosen not to include that file
+> > because it overrides "push" on a global scale for no good reason and
+> > that sort of thing makes me cringe.
+> 
+> Actually, I guess you should be using that header, from a general
+> standardisation point of view.  In particular, it would be nicer to
+> use setmode than to copy it.
 
-If I was provided proof that this is innoccuous (ie. there is no power 
-draw possible in suspend, or that the resume procedure still works with 
-gpio-vbus), then I'll ack the patch.
+Absolutely.  If there are issues with the generic infrastructure 
+provided to you, by all means let's find a way to fix them instead of 
+locally sidestepping them.
 
-Cheers.
+> The setmode macro itself could be improved to use cps for Thumb-2,
+> but that would be a separate (and low-priority) patch.
+> 
+> Re the push/pop macros, I'm not sure of the history for those.
 
---
-Robert
+I'm responsible for those, from many years ago (November 2005 according 
+to Git) when push didn't even exist as an official ARM mnemonic.  BTW 
+the converse macro is pull not pop.  Those are used to write endian 
+independent assembly string copy routines.
+
+> In the kernel, it seems customary to write stmfd sp!, / ldmfd sp!,
+> instead of push / pop, so you could always use those mnemonics instead.
+> They're equivalent.
+
+Yes, and more importantly they're backward compatible with older 
+binutils version with no knowledge of the latest "unified" syntax.  We 
+preferably don't want to break compilation with those older tools, which 
+is why we stick to ldmfd/stmfd.
+
+> > >>+	stm	r0!, {r4-r12,lr}	/* nonvolatile regs */
+
+This asks to be written as "stmia r0!, ..." as well for the same 
+reasons.
+
+
+Nicolas
