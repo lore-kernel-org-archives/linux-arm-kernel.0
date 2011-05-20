@@ -1,34 +1,50 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 20 May 2011 17:57:26 +0800
-Subject: [PATCH 3/3] ARM: mxs: select GPIO_MXS for i.MX23 and i.MX28
-In-Reply-To: <1305885446-27404-1-git-send-email-shawn.guo@linaro.org>
-References: <1305885446-27404-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1305885446-27404-4-git-send-email-shawn.guo@linaro.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 20 May 2011 12:02:42 +0200
+Subject: [PATCH 0/4] add gpio driver gpio-mxs
+In-Reply-To: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
+References: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110520100242.GA10403@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Hi Shawn,
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 21de5d5..afb1b44 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -8,11 +8,13 @@ config MXS_OCOTP
- config SOC_IMX23
- 	bool
- 	select CPU_ARM926T
-+	select GPIO_MXS
- 	select HAVE_PWM
- 
- config SOC_IMX28
- 	bool
- 	select CPU_ARM926T
-+	select GPIO_MXS
- 	select HAVE_PWM
- 
- comment "MXS platforms:"
+On Fri, May 20, 2011 at 05:51:25PM +0800, Shawn Guo wrote:
+> The patch set is to move Freescale MXS gpio driver from mach-mxs
+> into drivers/gpio.  Different from u300 gpio driver that all gpio
+> ports are registered as one device, gpio-mxs expects every single
+> port is a gpio device.
+> 
+> The first 3 patches are just to ease review and can be squashed into
+> the last one.
+> 
+> Shawn Guo (4):
+>       gpio: gpio-mxs: add file gpio-mxs.c
+>       gpio: gpio-mxs: drop mach-specific accessors
+>       gpio: gpio-mxs: remove gpio port definition and registration
+>       gpio: gpio-mxs: add gpio driver for Freescale MXS architecture
+
+Your series should be bisectible. So please either:
+
+- Add the driver the way you want it (no need to modify a new file in
+  four steps)
+- atomically switch to the new driver
+- remove old driver
+
+or:
+
+- work on old file until it's suitable for drivers/gpio
+- move old file to drivers/gpio and adjust the makefiles in one step.
+
+
+There may be different variations on this depending on the actual code,
+but whatever you do, each step should be able to compile and working.
+
+
+Sascha
+
 -- 
-1.7.4.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
