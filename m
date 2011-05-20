@@ -1,55 +1,25 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Fri, 20 May 2011 13:53:42 -0400 (EDT)
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 May 2011 19:05:10 +0100
 Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
-In-Reply-To: <20110520150348.GB3141@arm.com>
+In-Reply-To: <20110520113758.GA3141@arm.com>
 References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
 	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
 	<20110520113758.GA3141@arm.com>
-	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
-	<20110520150348.GB3141@arm.com>
-Message-ID: <alpine.LFD.2.00.1105201330590.14430@xanadu.home>
+Message-ID: <20110520180510.GE7445@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 May 2011, Dave Martin wrote:
+On Fri, May 20, 2011 at 12:37:58PM +0100, Dave Martin wrote:
+> Where do we save/restore r8_FIQ..r13_FIQ, r13_IRQ, r13_UND and r13_ABT?
+> (I'm assuming there's no reason to save/restore r14 or SPSR for any
+> exception mode, since we presumably aren't going to suspend/resume
+> from inside an exception handler (?))
 
-> On Fri, May 20, 2011 at 01:39:37PM +0100, Frank Hofmann wrote:
-> > I've simply done there what the "setmode" macro from
-> > <asm/assembler.h> is doing, have chosen not to include that file
-> > because it overrides "push" on a global scale for no good reason and
-> > that sort of thing makes me cringe.
-> 
-> Actually, I guess you should be using that header, from a general
-> standardisation point of view.  In particular, it would be nicer to
-> use setmode than to copy it.
+There is absolutely no need to save r13 for _any_ of the abort modes.  As
+we have to set them up at boot time to fixed values, we keep that code
+around, and in the resume paths we re-execute that initialization code.
+cpu_init().
 
-Absolutely.  If there are issues with the generic infrastructure 
-provided to you, by all means let's find a way to fix them instead of 
-locally sidestepping them.
-
-> The setmode macro itself could be improved to use cps for Thumb-2,
-> but that would be a separate (and low-priority) patch.
-> 
-> Re the push/pop macros, I'm not sure of the history for those.
-
-I'm responsible for those, from many years ago (November 2005 according 
-to Git) when push didn't even exist as an official ARM mnemonic.  BTW 
-the converse macro is pull not pop.  Those are used to write endian 
-independent assembly string copy routines.
-
-> In the kernel, it seems customary to write stmfd sp!, / ldmfd sp!,
-> instead of push / pop, so you could always use those mnemonics instead.
-> They're equivalent.
-
-Yes, and more importantly they're backward compatible with older 
-binutils version with no knowledge of the latest "unified" syntax.  We 
-preferably don't want to break compilation with those older tools, which 
-is why we stick to ldmfd/stmfd.
-
-> > >>+	stm	r0!, {r4-r12,lr}	/* nonvolatile regs */
-
-This asks to be written as "stmia r0!, ..." as well for the same 
-reasons.
-
-
-Nicolas
+Out of the list you mention above, the only thing which isn't saved are the
+FIQ registers, and that's a problem for S2RAM too, and should be done by
+arch/arm/kernel/fiq.c hooking into the suspend paths.
