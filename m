@@ -1,49 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 15:07:21 +0200
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <alpine.LFD.2.02.1105201451160.3078@ionos>
-References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-	<1305878365-827-3-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1105201451160.3078@ionos>
-Message-ID: <20110520130721.GD10403@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 May 2011 12:19:59 +0100
+Subject: [PATCH 5/5] ARM: mm: allow ASID 0 to be allocated to tasks
+In-Reply-To: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1305890399-29075-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 02:52:28PM +0200, Thomas Gleixner wrote:
-> On Fri, 20 May 2011, Sascha Hauer wrote:
-> > @@ -500,7 +500,17 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
-> >  
-> >  	mutex_init(&wm8350->irq_lock);
-> >  	wm8350->chip_irq = irq;
-> > -	wm8350->irq_base = pdata->irq_base;
-> 
-> Keeping this line would save you the else path :)
+Now that ASID 0 is no longer used as a reserved value, allow it to be
+allocated to tasks.
 
-Right.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/context.c |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-> 
-> > +
-> > +	if (!pdata->irq_base) {
-> > +		wm8350->irq_base = irq_alloc_descs(-1, 0, ARRAY_SIZE(wm8350_irqs), 0);
-> > +		if (wm8350->irq_base < 0) {
-> > +			dev_warn(wm8350->dev, "Allocating irqs failed with %d\n",
-> > +				wm8350->irq_base);
-> > +			return 0;
-> 
->   Hmm, return 0 on failure ?
-
-This function does this elsewhere aswell. The driver continues without
-interrupt support in this case.
-
-Looking at the driver again I wonder that it does not call
-irq_set_chained_handler but request_threaded_irq for its chained
-handler. Is it ok to do so or even prefered?
-
-Sascha
-
-
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index 55041c1..2352395 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -94,7 +94,7 @@ static void reset_context(void *info)
+ 		return;
+ 
+ 	smp_rmb();
+-	asid = cpu_last_asid + cpu + 1;
++	asid = cpu_last_asid + cpu;
+ 
+ 	flush_context();
+ 	set_mm_context(mm, asid);
+@@ -143,13 +143,13 @@ void __new_context(struct mm_struct *mm)
+ 	 * to start a new version and flush the TLB.
+ 	 */
+ 	if (unlikely((asid & ~ASID_MASK) == 0)) {
+-		asid = cpu_last_asid + smp_processor_id() + 1;
++		asid = cpu_last_asid + smp_processor_id();
+ 		flush_context();
+ #ifdef CONFIG_SMP
+ 		smp_wmb();
+ 		smp_call_function(reset_context, NULL, 1);
+ #endif
+-		cpu_last_asid += NR_CPUS;
++		cpu_last_asid += NR_CPUS - 1;
+ 	}
+ 
+ 	set_mm_context(mm, asid);
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.4
