@@ -1,55 +1,173 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 May 2011 12:19:55 +0100
-Subject: [PATCH 1/5] ARM: cache: ensure MVA is cacheline aligned in
-	flush_kern_dcache_area
-In-Reply-To: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
-References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1305890399-29075-2-git-send-email-will.deacon@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 20 May 2011 13:24:55 +0200
+Subject: [PATCH 4/4] gpio: gpio-mxs: add gpio driver for Freescale MXS
+	architecture
+In-Reply-To: <1305885089-27343-5-git-send-email-shawn.guo@linaro.org>
+References: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
+	<1305885089-27343-5-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110520112455.GB10403@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The v6 and v7 implementations of flush_kern_dcache_area do not align
-the passed MVA to the size of a cacheline in the data cache. If a
-misaligned address is used, only a subset of the requested area will
-be flushed. This has been observed to cause failures in SMP boot where
-the secondary_data initialised by the primary CPU is not cacheline
-aligned, causing the secondary CPUs to read incorrect values for their
-pgd and stack pointers.
+On Fri, May 20, 2011 at 05:51:29PM +0800, Shawn Guo wrote:
+> Add gpio-mxs driver by moving arch/arm/mach-mxs/gpio.c into
+> drivers/gpio.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/gpio/Kconfig    |    3 +
+>  drivers/gpio/Makefile   |    1 +
+>  drivers/gpio/gpio-mxs.c |  168 ++++++++++++++++++++++++++++++++++-------------
+>  3 files changed, 125 insertions(+), 47 deletions(-)
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index d3b2953..ccca658 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -81,6 +81,9 @@ config GPIO_IT8761E
+>  	help
+>  	  Say yes here to support GPIO functionality of IT8761E super I/O chip.
+>  
+> +config GPIO_MXS
+> +	bool
+> +
+>  config GPIO_PL061
+>  	bool "PrimeCell PL061 GPIO support"
+>  	depends on ARM_AMBA
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index becef59..b06a335 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -18,6 +18,7 @@ obj-$(CONFIG_GPIO_MAX7301)	+= max7301.o
+>  obj-$(CONFIG_GPIO_MAX732X)	+= max732x.o
+>  obj-$(CONFIG_GPIO_MC33880)	+= mc33880.o
+>  obj-$(CONFIG_GPIO_MCP23S08)	+= mcp23s08.o
+> +obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
+>  obj-$(CONFIG_GPIO_74X164)	+= 74x164.o
+>  obj-$(CONFIG_GPIO_PCA953X)	+= pca953x.o
+>  obj-$(CONFIG_GPIO_PCF857X)	+= pcf857x.o
+> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+> index 6a59bf2..b33b2bc 100644
+> --- a/drivers/gpio/gpio-mxs.c
+> +++ b/drivers/gpio/gpio-mxs.c
+> @@ -25,14 +25,18 @@
+>  #include <linux/io.h>
+>  #include <linux/irq.h>
+>  #include <linux/gpio.h>
+> -#include <mach/mx23.h>
+> -#include <mach/mx28.h>
+> -#include <asm-generic/bug.h>
+> -
+> -#include "gpio.h"
+> -
+> -static struct mxs_gpio_port *mxs_gpio_ports;
+> -static int gpio_table_size;
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <mach/mxs.h>
+> +
+> +struct mxs_gpio_port {
+> +	void __iomem *base;
+> +	int id;
+> +	int irq;
+> +	int irq_high;
+> +	int virtual_irq_start;
+> +	struct gpio_chip chip;
+> +};
+>  
+>  #define MXS_SET		0x4
+>  #define MXS_CLR		0x8
+> @@ -76,20 +80,23 @@ static void set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
+>  
+>  static void mxs_gpio_ack_irq(struct irq_data *d)
+>  {
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	u32 gpio = irq_to_gpio(d->irq);
+> -	clear_gpio_irqstatus(&mxs_gpio_ports[gpio / 32], gpio & 0x1f);
+> +	clear_gpio_irqstatus(port, gpio & 0x1f);
+>  }
+>  
+>  static void mxs_gpio_mask_irq(struct irq_data *d)
+>  {
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	u32 gpio = irq_to_gpio(d->irq);
+> -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 0);
+> +	set_gpio_irqenable(port, gpio & 0x1f, 0);
+>  }
+>  
+>  static void mxs_gpio_unmask_irq(struct irq_data *d)
+>  {
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	u32 gpio = irq_to_gpio(d->irq);
+> -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 1);
+> +	set_gpio_irqenable(port, gpio & 0x1f, 1);
+>  }
+>  
+>  static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
+> @@ -98,7 +105,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+>  {
+>  	u32 gpio = irq_to_gpio(d->irq);
+>  	u32 pin_mask = 1 << (gpio & 31);
+> -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	void __iomem *pin_addr;
+>  	int edge;
+>  
+> @@ -142,7 +149,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+>  static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>  {
+>  	u32 irq_stat;
+> -	struct mxs_gpio_port *port = (struct mxs_gpio_port *)irq_get_handler_data(irq);
+> +	struct mxs_gpio_port *port = irq_get_handler_data(irq);
+>  	u32 gpio_irq_no_base = port->virtual_irq_start;
+>  
+>  	desc->irq_data.chip->irq_ack(&desc->irq_data);
+> @@ -170,7 +177,7 @@ static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
+>  {
+>  	u32 gpio = irq_to_gpio(d->irq);
+>  	u32 gpio_idx = gpio & 0x1f;
+> -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  
+>  	if (enable) {
+>  		if (port->irq_high && (gpio_idx >= 16))
+> @@ -251,47 +258,114 @@ static int mxs_gpio_direction_output(struct gpio_chip *chip,
+>  	return 0;
+>  }
+>  
+> -int __init mxs_gpio_init(struct mxs_gpio_port *port, int cnt)
+> +static int __devinit mxs_gpio_probe(struct platform_device *pdev)
+>  {
+> -	int i, j;
+> +	static void __iomem *base;
+> +	struct mxs_gpio_port *port;
+> +	struct resource *iores = NULL;
+> +	int err, i;
+> +
+> +	port = kzalloc(sizeof(struct mxs_gpio_port), GFP_KERNEL);
+> +	if (!port)
+> +		return -ENOMEM;
+> +
+> +	port->id = pdev->id;
+> +	port->virtual_irq_start = MXS_GPIO_IRQ_START + port->id * 32;
+> +
+> +	/*
+> +	 * map memory region only once, as all the gpio ports
+> +	 * share the same one
+> +	 */
+> +	if (!base) {
 
-This patch ensures that the base address is cacheline aligned before
-flushing the d-cache.
+If the different ports share the same address and can't be seperated I
+wonder whether it's better to register only one platform device for all
+ports.
+(classic) i.MX has a similar problem where one single interrupt is
+shared by all gpio ports. Ok, this could be worked around with another
+chained handler which dispatches the single interrupt to each port.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/cache-v6.S |    1 +
- arch/arm/mm/cache-v7.S |    2 ++
- 2 files changed, 3 insertions(+), 0 deletions(-)
+Sascha
 
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index c96fa1b..73b4a8b 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -176,6 +176,7 @@ ENDPROC(v6_coherent_kern_range)
-  */
- ENTRY(v6_flush_kern_dcache_area)
- 	add	r1, r0, r1
-+	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
- 1:
- #ifdef HARVARD_CACHE
- 	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
-diff --git a/arch/arm/mm/cache-v7.S b/arch/arm/mm/cache-v7.S
-index dc18d81..d32f02b 100644
---- a/arch/arm/mm/cache-v7.S
-+++ b/arch/arm/mm/cache-v7.S
-@@ -221,6 +221,8 @@ ENDPROC(v7_coherent_user_range)
- ENTRY(v7_flush_kern_dcache_area)
- 	dcache_line_size r2, r3
- 	add	r1, r0, r1
-+	sub	r3, r2, #1
-+	bic	r0, r0, r3
- 1:
- 	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line / unified line
- 	add	r0, r0, r2
 -- 
-1.7.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
