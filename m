@@ -1,115 +1,59 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Fri, 20 May 2011 17:24:05 +0100 (BST)
-Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
-In-Reply-To: <20110520150348.GB3141@arm.com>
-References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
-	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
-	<20110520113758.GA3141@arm.com>
-	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
-	<20110520150348.GB3141@arm.com>
-Message-ID: <alpine.DEB.2.00.1105201703260.8018@localhost6.localdomain6>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Fri, 20 May 2011 18:46:57 +0200 (CEST)
+Subject: [PATCH 8/9] dma IPU: rework irq handling
+In-Reply-To: <20110520133022.GE10403@pengutronix.de>
+References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
+	<1305878365-827-10-git-send-email-s.hauer@pengutronix.de>
+	<alpine.LFD.2.02.1105201507250.3078@ionos>
+	<20110520133022.GE10403@pengutronix.de>
+Message-ID: <alpine.LFD.2.02.1105201823050.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 May 2011, Dave Martin wrote:
+On Fri, 20 May 2011, Sascha Hauer wrote:
 
-[ ... ]
->> I've simply done there what the "setmode" macro from
->> <asm/assembler.h> is doing, have chosen not to include that file
->> because it overrides "push" on a global scale for no good reason and
->> that sort of thing makes me cringe.
->
-> Actually, I guess you should be using that header, from a general
-> standardisation point of view.  In particular, it would be nicer to
-> use setmode than to copy it.
->
-> The setmode macro itself could be improved to use cps for Thumb-2,
-> but that would be a separate (and low-priority) patch.
->
->
-> Re the push/pop macros, I'm not sure of the history for those.
+> On Fri, May 20, 2011 at 03:16:42PM +0200, Thomas Gleixner wrote:
+> > On Fri, 20 May 2011, Sascha Hauer wrote:
+> > > @@ -354,48 +139,41 @@ static struct irq_chip ipu_irq_chip = {
+> > >  /* Install the IRQ handler */
+> > >  int __init ipu_irq_attach_irq(struct ipu *ipu, struct platform_device *dev)
+> > >  {
+> > > -	struct ipu_platform_data *pdata = dev->dev.platform_data;
+> > > -	unsigned int irq, irq_base, i;
+> > > +	unsigned int irq, irq_base;
+> > >  
+> > > -	irq_base = pdata->irq_base;
+> > > +	irq_base = irq_alloc_descs(-1, 0, IPU_IRQ_NR_BANKS * 32, 0);
+> > 
+> >   	IPU_NUM_IRQS perhaps ?
+> > 
+> > > +	if (irq_base < 0)
+> > > +		return irq_base;
+> >   
+> > So this allocates 160 interrupts. How many of them are actually going
+> > to be used ?
+> 
+> One for the framebuffer and another one for the camera...
+> 
+> BTW often enough it's the same for the gpio interrupts. I have plenty of
+> boards ending up with a single gpio interrupt out of 160 used for a
+> external network controller.
 
-arch/arm/lib are the only users.
+We could actually be more clever about that by doing:
 
->
-> In the kernel, it seems customary to write stmfd sp!, / ldmfd sp!,
-> instead of push / pop, so you could always use those mnemonics instead.
-> They're equivalent.
+   irq_prealloc_irqs(from, cnt, setup_callback);
 
-The "customary" seems largely a consequence of having the #define in 
-<asm/assembler.h> as you get a compile error if you use push/pop as 
-instruction.
+Which would return you the base nr of a linear range and at
+request_irq() time we would detect the missing irq descriptor,
+allocate it and call the setup_callback, which would fill in chip,
+handler, data etc. That would make the few lines of init code for the
+descriptor non __init, but we could avoid allocating 159 irq
+descriptors for nothing.
 
-I've made the change to "setmode" and stmfd/ldmfd, ok.
+The demux interrupt could still call generic_handle_irq() as we have a
+sanity in place there now and a return value to let the demux irq know
+that shite happened.
 
-[ ... ]
-> I think I agree.  Few drivers use FIQ, and if there are drivers
-> which use FIQ but don't implement suspend/resume hooks, that sounds
-> like a driver bug.
->
-> Assuming nobody disagrees with that conclusion, it would be a good
-> idea to stick a comment somewhere explaining that policy.
+Thanks,
 
-<speak up or remain silent forever> ;-)
-
-Since the change which moved get/set_fiq_regs() to pure assembly has just 
-gone in, would a simple comment update in the header file along those 
-lines be sufficient ?
-
-I.e. state "do not assume persistence of these registers over power mgmt 
-transitions - if that's what you require, implement suspend / resume 
-hooks" ?
-
->
->>
->> See also Russell's mails about that, for previous attempts a year
->> and half a year ago to get "something for ARM hibernation" in:
->>
->> https://lists.linux-foundation.org/pipermail/linux-pm/2010-July/027571.html
->> https://lists.linux-foundation.org/pipermail/linux-pm/2010-December/029665.html
->
-> Relying on drivers to save/restore the FIQ state if necessary seems
-> to correspond to what Russell is saying in his second mail.
-
-Agreed, and largely why I haven't bothered touching FIQ.
-
->
->>
->> The kernel doesn't do IRQ/FIQ/ABT/UND save / restore for
->> suspend-to-ram either. CPU hotplug support (re)initializes those. I
->> believe we're fine.
->
-> OK, just wanted to make sure I understood that right.
-
-By and large, "if suspend-to-ram works, suspend-to-disk should too" seems 
-a good idea; if the former doesn't (need to) save/restore such state even 
-though it's not off-mode-persistent, then the latter doesn't need either.
-
-That said, I've seen (out-of-tree) SoC-specific *suspend() code that 
-simply blotted everything out. Seems the most trivial way to go, but not 
-necessarily the best.
-
->
-> I'll leave it to others to comment on the actual SoC-specific routines,
-> but thanks for the illustration.
-
-To make this clear, I'm not personally considering these parts optimal as 
-the attached patch is doing them.
-
-That's why preferrably, only the "enabler" code should go in first.
-
-I do wonder, though, whether the machine maintainers are willing to make 
-the change to these low-level suspend parts that'd split chip state 
-save/restore from the actual power transition. That'd allow to turn this 
-from a "backdoor" into a proper use of the interface.
-
-Russell has made the change to pass the context buffer as argument, but 
-not split the power transition off; things are getting there, eventually 
-:)
-
->
-> Cheers
-> ---Dave
-
-Thanks again,
-FrankH.
+	tglx
