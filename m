@@ -1,173 +1,41 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 13:24:55 +0200
-Subject: [PATCH 4/4] gpio: gpio-mxs: add gpio driver for Freescale MXS
-	architecture
-In-Reply-To: <1305885089-27343-5-git-send-email-shawn.guo@linaro.org>
-References: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
-	<1305885089-27343-5-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110520112455.GB10403@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 May 2011 12:19:54 +0100
+Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
+Message-ID: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 05:51:29PM +0800, Shawn Guo wrote:
-> Add gpio-mxs driver by moving arch/arm/mach-mxs/gpio.c into
-> drivers/gpio.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  drivers/gpio/Kconfig    |    3 +
->  drivers/gpio/Makefile   |    1 +
->  drivers/gpio/gpio-mxs.c |  168 ++++++++++++++++++++++++++++++++++-------------
->  3 files changed, 125 insertions(+), 47 deletions(-)
-> 
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index d3b2953..ccca658 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -81,6 +81,9 @@ config GPIO_IT8761E
->  	help
->  	  Say yes here to support GPIO functionality of IT8761E super I/O chip.
->  
-> +config GPIO_MXS
-> +	bool
-> +
->  config GPIO_PL061
->  	bool "PrimeCell PL061 GPIO support"
->  	depends on ARM_AMBA
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index becef59..b06a335 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -18,6 +18,7 @@ obj-$(CONFIG_GPIO_MAX7301)	+= max7301.o
->  obj-$(CONFIG_GPIO_MAX732X)	+= max732x.o
->  obj-$(CONFIG_GPIO_MC33880)	+= mc33880.o
->  obj-$(CONFIG_GPIO_MCP23S08)	+= mcp23s08.o
-> +obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
->  obj-$(CONFIG_GPIO_74X164)	+= 74x164.o
->  obj-$(CONFIG_GPIO_PCA953X)	+= pca953x.o
->  obj-$(CONFIG_GPIO_PCF857X)	+= pcf857x.o
-> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-> index 6a59bf2..b33b2bc 100644
-> --- a/drivers/gpio/gpio-mxs.c
-> +++ b/drivers/gpio/gpio-mxs.c
-> @@ -25,14 +25,18 @@
->  #include <linux/io.h>
->  #include <linux/irq.h>
->  #include <linux/gpio.h>
-> -#include <mach/mx23.h>
-> -#include <mach/mx28.h>
-> -#include <asm-generic/bug.h>
-> -
-> -#include "gpio.h"
-> -
-> -static struct mxs_gpio_port *mxs_gpio_ports;
-> -static int gpio_table_size;
-> +#include <linux/platform_device.h>
-> +#include <linux/slab.h>
-> +#include <mach/mxs.h>
-> +
-> +struct mxs_gpio_port {
-> +	void __iomem *base;
-> +	int id;
-> +	int irq;
-> +	int irq_high;
-> +	int virtual_irq_start;
-> +	struct gpio_chip chip;
-> +};
->  
->  #define MXS_SET		0x4
->  #define MXS_CLR		0x8
-> @@ -76,20 +80,23 @@ static void set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
->  
->  static void mxs_gpio_ack_irq(struct irq_data *d)
->  {
-> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
->  	u32 gpio = irq_to_gpio(d->irq);
-> -	clear_gpio_irqstatus(&mxs_gpio_ports[gpio / 32], gpio & 0x1f);
-> +	clear_gpio_irqstatus(port, gpio & 0x1f);
->  }
->  
->  static void mxs_gpio_mask_irq(struct irq_data *d)
->  {
-> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
->  	u32 gpio = irq_to_gpio(d->irq);
-> -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 0);
-> +	set_gpio_irqenable(port, gpio & 0x1f, 0);
->  }
->  
->  static void mxs_gpio_unmask_irq(struct irq_data *d)
->  {
-> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
->  	u32 gpio = irq_to_gpio(d->irq);
-> -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 1);
-> +	set_gpio_irqenable(port, gpio & 0x1f, 1);
->  }
->  
->  static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
-> @@ -98,7 +105,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
->  {
->  	u32 gpio = irq_to_gpio(d->irq);
->  	u32 pin_mask = 1 << (gpio & 31);
-> -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
-> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
->  	void __iomem *pin_addr;
->  	int edge;
->  
-> @@ -142,7 +149,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
->  static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
->  {
->  	u32 irq_stat;
-> -	struct mxs_gpio_port *port = (struct mxs_gpio_port *)irq_get_handler_data(irq);
-> +	struct mxs_gpio_port *port = irq_get_handler_data(irq);
->  	u32 gpio_irq_no_base = port->virtual_irq_start;
->  
->  	desc->irq_data.chip->irq_ack(&desc->irq_data);
-> @@ -170,7 +177,7 @@ static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
->  {
->  	u32 gpio = irq_to_gpio(d->irq);
->  	u32 gpio_idx = gpio & 0x1f;
-> -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
-> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
->  
->  	if (enable) {
->  		if (port->irq_high && (gpio_idx >= 16))
-> @@ -251,47 +258,114 @@ static int mxs_gpio_direction_output(struct gpio_chip *chip,
->  	return 0;
->  }
->  
-> -int __init mxs_gpio_init(struct mxs_gpio_port *port, int cnt)
-> +static int __devinit mxs_gpio_probe(struct platform_device *pdev)
->  {
-> -	int i, j;
-> +	static void __iomem *base;
-> +	struct mxs_gpio_port *port;
-> +	struct resource *iores = NULL;
-> +	int err, i;
-> +
-> +	port = kzalloc(sizeof(struct mxs_gpio_port), GFP_KERNEL);
-> +	if (!port)
-> +		return -ENOMEM;
-> +
-> +	port->id = pdev->id;
-> +	port->virtual_irq_start = MXS_GPIO_IRQ_START + port->id * 32;
-> +
-> +	/*
-> +	 * map memory region only once, as all the gpio ports
-> +	 * share the same one
-> +	 */
-> +	if (!base) {
+Hello,
 
-If the different ports share the same address and can't be seperated I
-wonder whether it's better to register only one platform device for all
-ports.
-(classic) i.MX has a similar problem where one single interrupt is
-shared by all gpio ports. Ok, this could be worked around with another
-chained handler which dispatches the single interrupt to each port.
+There are a few issues with ASID handling and cache flushing on v6/v7
+CPUs that have been identified when running Linux on the Cortex-A15.
 
-Sascha
+These patches solve the problems for the classic page tables. Additional
+LPAE changes will be posted separately.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Tested on a Realview-PBX platform with a dual-core Cortex-A9.
+
+Thanks,
+
+Will
+
+
+Catalin Marinas (1):
+  ARM: mm: make TTBR1 always point to swapper_pg_dir on ARMv6/7
+
+Will Deacon (4):
+  ARM: cache: ensure MVA is cacheline aligned in flush_kern_dcache_area
+  ARM: mm: use TTBR1 instead of reserved context ID
+  ARM: mm: fix racy ASID rollover broadcast on SMP platforms
+  ARM: mm: allow ASID 0 to be allocated to tasks
+
+ arch/arm/include/asm/proc-fns.h |   14 ++++++++++++++
+ arch/arm/include/asm/smp.h      |    1 +
+ arch/arm/kernel/head.S          |    7 +++++--
+ arch/arm/kernel/smp.c           |    1 +
+ arch/arm/mm/cache-v6.S          |    1 +
+ arch/arm/mm/cache-v7.S          |    2 ++
+ arch/arm/mm/context.c           |   20 ++++++++++----------
+ arch/arm/mm/proc-v6.S           |    4 +++-
+ arch/arm/mm/proc-v7.S           |   14 +++++++-------
+ 9 files changed, 44 insertions(+), 20 deletions(-)
