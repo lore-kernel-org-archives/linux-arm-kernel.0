@@ -1,75 +1,72 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 20 May 2011 17:14:49 +0200
-Subject: [PATCH 06/14] GPIO: OMAP: remove get_gpio_bank()
+Date: Fri, 20 May 2011 17:14:47 +0200
+Subject: [PATCH 04/14] GPIO: OMAP: _get_gpio_irqbank_mask: replace hard-coded
+	mask with bank->width
 In-Reply-To: <1305904497-26013-1-git-send-email-khilman@ti.com>
 References: <1305904497-26013-1-git-send-email-khilman@ti.com>
-Message-ID: <1305904497-26013-7-git-send-email-khilman@ti.com>
+Message-ID: <1305904497-26013-5-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
+Replace hard-coded mask values with bank->width which is already coming
+from platform_data.
 
-use chip info to get the pointer to the struct gpio_bank for a
-given GPIO bank and remove get_gpio_bank().
-
-Signed-off-by: Charulatha V <charu@ti.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/gpio/gpio_omap.c |   29 ++---------------------------
- 1 files changed, 2 insertions(+), 27 deletions(-)
+ drivers/gpio/gpio_omap.c |    8 +-------
+ 1 files changed, 1 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-index a7767a4..0fdfb84 100644
+index 4691ed8..1b7896e 100644
 --- a/drivers/gpio/gpio_omap.c
 +++ b/drivers/gpio/gpio_omap.c
-@@ -86,31 +86,6 @@ int gpio_bank_count;
- #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
- #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
+@@ -718,46 +718,40 @@ static u32 _get_gpio_irqbank_mask(struct gpio_bank *bank)
+ 	void __iomem *reg = bank->base;
+ 	int inv = 0;
+ 	u32 l;
+-	u32 mask;
++	u32 mask = (1 << bank->width) - 1;
  
--static inline struct gpio_bank *get_gpio_bank(int gpio)
--{
--	if (cpu_is_omap15xx()) {
--		if (OMAP_GPIO_IS_MPUIO(gpio))
--			return &gpio_bank[0];
--		return &gpio_bank[1];
--	}
--	if (cpu_is_omap16xx()) {
--		if (OMAP_GPIO_IS_MPUIO(gpio))
--			return &gpio_bank[0];
--		return &gpio_bank[1 + (gpio >> 4)];
--	}
--	if (cpu_is_omap7xx()) {
--		if (OMAP_GPIO_IS_MPUIO(gpio))
--			return &gpio_bank[0];
--		return &gpio_bank[1 + (gpio >> 5)];
--	}
--	if (cpu_is_omap24xx())
--		return &gpio_bank[gpio >> 5];
--	if (cpu_is_omap34xx() || cpu_is_omap44xx())
--		return &gpio_bank[gpio >> 5];
--	BUG();
--	return NULL;
--}
--
- static inline int gpio_valid(int gpio)
- {
- 	if (gpio < 0)
-@@ -1266,7 +1241,7 @@ static struct platform_device omap_mpuio_device = {
- 
- static inline void mpuio_init(void)
- {
--	struct gpio_bank *bank = get_gpio_bank(OMAP_MPUIO(0));
-+	struct gpio_bank *bank = &gpio_bank[0];
- 	platform_set_drvdata(&omap_mpuio_device, bank);
- 
- 	if (platform_driver_register(&omap_mpuio_driver) == 0)
-@@ -1342,7 +1317,7 @@ static int gpio_get(struct gpio_chip *chip, unsigned offset)
- 	u32 mask;
- 
- 	gpio = chip->base + offset;
--	bank = get_gpio_bank(gpio);
-+	bank = container_of(chip, struct gpio_bank, chip);
- 	reg = bank->base;
- 	mask = GPIO_BIT(bank, gpio);
- 
+ 	switch (bank->method) {
+ #ifdef CONFIG_ARCH_OMAP1
+ 	case METHOD_MPUIO:
+ 		reg += OMAP_MPUIO_GPIO_MASKIT / bank->stride;
+-		mask = 0xffff;
+ 		inv = 1;
+ 		break;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP15XX
+ 	case METHOD_GPIO_1510:
+ 		reg += OMAP1510_GPIO_INT_MASK;
+-		mask = 0xffff;
+ 		inv = 1;
+ 		break;
+ #endif
+ #ifdef CONFIG_ARCH_OMAP16XX
+ 	case METHOD_GPIO_1610:
+ 		reg += OMAP1610_GPIO_IRQENABLE1;
+-		mask = 0xffff;
+ 		break;
+ #endif
+ #if defined(CONFIG_ARCH_OMAP730) || defined(CONFIG_ARCH_OMAP850)
+ 	case METHOD_GPIO_7XX:
+ 		reg += OMAP7XX_GPIO_INT_MASK;
+-		mask = 0xffffffff;
+ 		inv = 1;
+ 		break;
+ #endif
+ #if defined(CONFIG_ARCH_OMAP2) || defined(CONFIG_ARCH_OMAP3)
+ 	case METHOD_GPIO_24XX:
+ 		reg += OMAP24XX_GPIO_IRQENABLE1;
+-		mask = 0xffffffff;
+ 		break;
+ #endif
+ #if defined(CONFIG_ARCH_OMAP4)
+ 	case METHOD_GPIO_44XX:
+ 		reg += OMAP4_GPIO_IRQSTATUSSET0;
+-		mask = 0xffffffff;
+ 		break;
+ #endif
+ 	default:
 -- 
 1.7.3.4
