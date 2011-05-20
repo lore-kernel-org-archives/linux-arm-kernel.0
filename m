@@ -1,41 +1,90 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 20 May 2011 12:19:54 +0100
-Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
-Message-ID: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 20 May 2011 12:19:57 +0100
+Subject: [PATCH 3/5] ARM: mm: use TTBR1 instead of reserved context ID
+In-Reply-To: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1305890399-29075-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On ARMv7 CPUs that cache first level page table entries (like the
+Cortex-A15), using a reserved ASID while changing the TTBR or flushing
+the TLB is unsafe.
 
-There are a few issues with ASID handling and cache flushing on v6/v7
-CPUs that have been identified when running Linux on the Cortex-A15.
+This is because the CPU may cache the first level entry as the result of
+a speculative memory access while the reserved ASID is assigned. After
+the process owning the page tables dies, the memory will be reallocated
+and may be written with junk values which can be interpreted as global,
+valid PTEs by the processor. This will result in the TLB being populated
+with bogus global entries.
 
-These patches solve the problems for the classic page tables. Additional
-LPAE changes will be posted separately.
+This patch avoids the use of a reserved context ID in the v7 switch_mm
+and ASID rollover code by temporarily using the swapper_pg_dir pointed
+at by TTBR1, which contains only global entries that are not tagged
+with ASIDs.
 
-Tested on a Realview-PBX platform with a dual-core Cortex-A9.
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/mm/context.c |   11 ++++++-----
+ arch/arm/mm/proc-v7.S |   10 ++++------
+ 2 files changed, 10 insertions(+), 11 deletions(-)
 
-Thanks,
-
-Will
-
-
-Catalin Marinas (1):
-  ARM: mm: make TTBR1 always point to swapper_pg_dir on ARMv6/7
-
-Will Deacon (4):
-  ARM: cache: ensure MVA is cacheline aligned in flush_kern_dcache_area
-  ARM: mm: use TTBR1 instead of reserved context ID
-  ARM: mm: fix racy ASID rollover broadcast on SMP platforms
-  ARM: mm: allow ASID 0 to be allocated to tasks
-
- arch/arm/include/asm/proc-fns.h |   14 ++++++++++++++
- arch/arm/include/asm/smp.h      |    1 +
- arch/arm/kernel/head.S          |    7 +++++--
- arch/arm/kernel/smp.c           |    1 +
- arch/arm/mm/cache-v6.S          |    1 +
- arch/arm/mm/cache-v7.S          |    2 ++
- arch/arm/mm/context.c           |   20 ++++++++++----------
- arch/arm/mm/proc-v6.S           |    4 +++-
- arch/arm/mm/proc-v7.S           |   14 +++++++-------
- 9 files changed, 44 insertions(+), 20 deletions(-)
+diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
+index b0ee9ba..0d86298 100644
+--- a/arch/arm/mm/context.c
++++ b/arch/arm/mm/context.c
+@@ -24,9 +24,7 @@ DEFINE_PER_CPU(struct mm_struct *, current_mm);
+ 
+ /*
+  * We fork()ed a process, and we need a new context for the child
+- * to run in.  We reserve version 0 for initial tasks so we will
+- * always allocate an ASID. The ASID 0 is reserved for the TTBR
+- * register changing sequence.
++ * to run in.
+  */
+ void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+ {
+@@ -36,8 +34,11 @@ void __init_new_context(struct task_struct *tsk, struct mm_struct *mm)
+ 
+ static void flush_context(void)
+ {
+-	/* set the reserved ASID before flushing the TLB */
+-	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (0));
++	u32 ttb;
++	/* Copy TTBR1 into TTBR0 */
++	asm volatile("mrc	p15, 0, %0, c2, c0, 1\n"
++		     "mcr	p15, 0, %0, c2, c0, 0"
++		     : "=r" (ttb));
+ 	isb();
+ 	local_flush_tlb_all();
+ 	if (icache_is_vivt_asid_tagged()) {
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3c38678..b3b566e 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -108,18 +108,16 @@ ENTRY(cpu_v7_switch_mm)
+ #ifdef CONFIG_ARM_ERRATA_430973
+ 	mcr	p15, 0, r2, c7, c5, 6		@ flush BTAC/BTB
+ #endif
+-#ifdef CONFIG_ARM_ERRATA_754322
+-	dsb
+-#endif
+-	mcr	p15, 0, r2, c13, c0, 1		@ set reserved context ID
+-	isb
+-1:	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
++	mrc	p15, 0, r2, c2, c0, 1		@ load TTB 1
++	mcr	p15, 0, r2, c2, c0, 0		@ into TTB 0
+ 	isb
+ #ifdef CONFIG_ARM_ERRATA_754322
+ 	dsb
+ #endif
+ 	mcr	p15, 0, r1, c13, c0, 1		@ set context ID
+ 	isb
++	mcr	p15, 0, r0, c2, c0, 0		@ set TTB 0
++	isb
+ #endif
+ 	mov	pc, lr
+ ENDPROC(cpu_v7_switch_mm)
+-- 
+1.7.0.4
