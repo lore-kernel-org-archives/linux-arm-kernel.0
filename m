@@ -1,42 +1,47 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 May 2011 16:21:03 +0200
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <4DD66B8A.5040404@gmail.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-	<20110519233958.GB18181@ponder.secretlab.ca>
-	<4DD66B8A.5040404@gmail.com>
-Message-ID: <201105201621.03801.arnd@arndb.de>
+Date: Fri, 20 May 2011 16:23:40 +0200
+Subject: [PATCH 2/3] ARM: mxs: add gpio-mxs platform devices
+In-Reply-To: <20110520140316.GA27551@S2100-06.ap.freescale.net>
+References: <1305885446-27404-1-git-send-email-shawn.guo@linaro.org>
+	<201105201223.00427.arnd@arndb.de>
+	<20110520140316.GA27551@S2100-06.ap.freescale.net>
+Message-ID: <201105201623.40990.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 May 2011 15:24:26 Rob Herring wrote:
-> Maybe we are looking this in the wrong way.
+On Friday 20 May 2011 16:03:17 Shawn Guo wrote:
+> On Fri, May 20, 2011 at 12:23:00PM +0200, Arnd Bergmann wrote:
+> > 
+> > I know it's tempting to use macros for these, but I think it obscures
+> > the code a lot, especially when you use them to concatenate identifier
+> > names. Why not just do:
+> > 
+> The pattern is being widely used in mxc/mxs platform device codes.
+> If you are not extremely unhappy about this, I would leave it as it
+> is to keep consistency.
+
+I think it's a real pain to do it like this, and we need to start
+at some point cleaning up the mess. Why not start now?
+
+> > > +
+> > > +	return mxs_add_platform_device("mxs-gpio", data->id,
+> > > +					res, ARRAY_SIZE(res), NULL, 0);
+> > > +}
+> > 
+> > mxs_add_platform_device doesn't set the parent pointer correctly, I think you
+> > should either fix that or open-code the platform device creation to do it
+> > right.
+> > 
+> I see the following in drivers/base/platform.c, function
+> platform_device_add():
 > 
-> AMBA is not really the bus, but certain types of devices on the bus. 
-> Granted, it may actually be an AMBA bus vs. vendor bus (i.MX AIPS), but 
-> that is really transparent to s/w. Separating AMBA devices in the 
-> devicetree is really Linux requirements defining the devicetree 
-> structure. It is certainly conceivable that an OS could make no 
-> distinction. In my case, there is a mixture of regular platform devices 
-> and AMBA(Primecell really) devices all interleaved on the same bus.
+>         if (!pdev->dev.parent)
+>                 pdev->dev.parent = &platform_bus;
+> 
+> So we are fine?
 
-I don't see how that would work. If the bus is AMBA, it should
-only have AMBA devices on it, otherwise how would they be connected?
-
-Whether software is supposed to know care about this is a different
-question. The device tree should generally reflect the block
-diagram of the hardware, and I would expect the AMBA devices be
-on a different level from the rest there.
-
-> Based on this, I think of_platform_populate should always just match 
-> against "simple-bus" and make the matches parameter define the device 
-> creation hook rather than the bus type. Or you could have both 
-> bus_matches and dev_matches parameters.
-
-I think it would be much better to only look at the parent bus for
-device to add, never at the device itself. 
-
-If the bus is AMBA, add all devices as amba_device, if it's simple-bus,
-add all devices as platform_device.
+No, this would put all gpio devices below the top-level /sys/devices/platform
+directory, where they certainly don't belong. Please find a proper
+place and put them there.
 
 	Arnd
