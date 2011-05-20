@@ -1,53 +1,64 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Fri, 20 May 2011 20:05:34 +0530
-Subject: [PATCH] Fix: ZOOM: QUART: Request reset GPIO
-Message-ID: <1305902134-22760-1-git-send-email-tarun.kanti@ti.com>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Fri, 20 May 2011 20:32:17 +0530
+Subject: [PATCH v3] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
+In-Reply-To: <20110518162542.GB3026@avinash-laptop>
+References: <1304328111-15999-1-git-send-email-avinashhm@ti.com>
+	<alpine.DEB.2.00.1105051548210.30136@utopia.booyaka.com>
+	<20110509124842.GA25211@avinash-laptop>
+	<alpine.DEB.2.00.1105181021590.4550@utopia.booyaka.com>
+	<20110518162542.GB3026@avinash-laptop>
+Message-ID: <20110520150216.GA11915@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
+On Wed, May 18, 2011 at 09:55:42PM +0530, Avinash.H.M. wrote:
+> On Wed, May 18, 2011 at 10:22:28AM -0600, Paul Walmsley wrote:
+> > On Mon, 9 May 2011, Avinash.H.M. wrote:
+> > 
+> > > On Thu, May 05, 2011 at 03:58:56PM -0600, Paul Walmsley wrote:
+> > > 
+> > > > > 
+> > > > > The patch is based on
+> > > > >  * git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+> > > > >  * master branch.
+> > > > >  * 9be20f0 commit. ( Linux-omap rebuilt: Updated to -rc5 )
+> > > > 
+> > > > Please base all your patches against mainline commits.  I suggest using 
+> > > > v2.6.39-rc6.
+> > > 
+> > > OK Paul. I will rebase against mainline, -rc6.
+> > 
+> > Ping.  Any progress?
+> 
+> Hi Paul ,
+> 
+> I am having the patch ready. Haven't had a chance to test. I will test
+> and send by tomorrow.
 
-Reset GPIO (OMAP_GPIO_152) for QUART in zoom2/zoom3 debug-board is
-not requested at all. This would lead to problems if this GPIO is
-wrongly requested. Hence request OMAP GPIO 152 for QUART RESET but
-do not apply a reset pulse as it would reset QUART and
-disturb the QUART settings.
+Hi Paul ,
 
-Signed-off-by: Charulatha V <charu@ti.com>
-Acked-by: Kevin Hilman <khilman@ti.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Cc: Kevin Hilman <khilman@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
----
- arch/arm/mach-omap2/board-zoom-debugboard.c |    9 +++++++++
- 1 files changed, 9 insertions(+), 0 deletions(-)
+I tested the patch on 3430 sdp today with the patch against 2.6.39-rc7.
 
-diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
-index 007ebdc..a5f62f8 100644
---- a/arch/arm/mach-omap2/board-zoom-debugboard.c
-+++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
-@@ -22,6 +22,7 @@
- #define ZOOM_SMSC911X_GPIO	158
- #define ZOOM_QUADUART_CS	3
- #define ZOOM_QUADUART_GPIO	102
-+#define ZOOM_QUADUART_RST_GPIO	152
- #define QUART_CLK		1843200
- #define DEBUG_BASE		0x08000000
- #define ZOOM_ETHR_START	DEBUG_BASE
-@@ -110,6 +111,14 @@ static inline void __init zoom_init_quaduart(void)
- 	unsigned long cs_mem_base;
- 	int quart_gpio = 0;
- 
-+	if (gpio_request_one(ZOOM_QUADUART_RST_GPIO,
-+				GPIOF_OUT_INIT_LOW,
-+				"TL16CP754C GPIO") < 0) {
-+		pr_err("Failed to request GPIO%d for TL16CP754C\n",
-+			ZOOM_QUADUART_RST_GPIO);
-+		return;
-+	}
-+
- 	quart_cs = ZOOM_QUADUART_CS;
- 
- 	if (gpmc_cs_request(quart_cs, SZ_1M, &cs_mem_base) < 0) {
--- 
-1.6.0.4
+I am seeing that the timeout is there during bootup event with this
+patch. Tried with the previous version (v3 , which was tested against
+the older commit and was confirmed to be working). With this also, i am
+seeing that the reset timeouts are still present. 
+
+So, looks like there is something broken. First glance, i suspect that
+the register access may not be proper. Need to debug more. I ll debug
+this and send the fix together.
+
+Incase, if you want me to send this patch now and then send a seperate
+patch for the recent problem, do let me know.
+
+thanks ,
+
+- Avinash
+
+> thanks ,
+> 
+> - Avinash
+> 
+> > 
+> > 
+> > - Paul
