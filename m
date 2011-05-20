@@ -1,150 +1,160 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 09:59:19 +0200
-Subject: [PATCH 3/9] ARM i.MX: get rid of wrong MXC_INTERNAL_IRQ usage
+Date: Fri, 20 May 2011 09:59:22 +0200
+Subject: [PATCH 6/9] ARM i.MX 3ds debugboard: allocate irqs dynamically
 In-Reply-To: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
 References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1305878365-827-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1305878365-827-8-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are several occurences where MXC_INTERNAL_IRQ is
-assumed to be the start of the gpio interrupts. It was never
-meant this way. Replace these with gpio_to_irq.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/mach-imx/mach-mx27_3ds.c            |    2 +-
- arch/arm/mach-imx/mach-mx35_3ds.c            |    2 +-
- arch/arm/mach-mx5/board-cpuimx51.c           |   12 ++++--------
- arch/arm/mach-mx5/board-mx51_3ds.c           |    2 +-
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |    3 +--
- arch/arm/plat-mxc/include/mach/iomux-v1.h    |    3 ---
- 6 files changed, 8 insertions(+), 16 deletions(-)
+ arch/arm/plat-mxc/3ds_debugboard.c |   53 ++++++++++++++++++++---------------
+ 1 files changed, 30 insertions(+), 23 deletions(-)
 
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 6e1accf..fcbac6e 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -45,7 +45,7 @@
- #define SD1_EN_GPIO (GPIO_PORTB + 25)
- #define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
- #define SPI2_SS0 (GPIO_PORTD + 21)
--#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTC + 28)
-+#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(3, 28))
+diff --git a/arch/arm/plat-mxc/3ds_debugboard.c b/arch/arm/plat-mxc/3ds_debugboard.c
+index f0ba072..e644cd9 100644
+--- a/arch/arm/plat-mxc/3ds_debugboard.c
++++ b/arch/arm/plat-mxc/3ds_debugboard.c
+@@ -46,18 +46,14 @@
+ /* CPU ID and Personality ID */
+ #define MCU_BOARD_ID_REG	0x68
  
- static const int mx27pdk_pins[] __initconst = {
- 	/* UART1 */
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 882880a..c10221d 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -43,7 +43,7 @@
- 
- #include "devices-imx35.h"
- 
--#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 1)
-+#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
- 
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
-diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-index 4efa02e..7fbfd06 100644
---- a/arch/arm/mach-mx5/board-cpuimx51.c
-+++ b/arch/arm/mach-mx5/board-cpuimx51.c
-@@ -43,10 +43,6 @@
- #define CPUIMX51_QUARTB_GPIO	IMX_GPIO_NR(3, 25)
- #define CPUIMX51_QUARTC_GPIO	IMX_GPIO_NR(3, 26)
- #define CPUIMX51_QUARTD_GPIO	IMX_GPIO_NR(3, 27)
--#define CPUIMX51_QUARTA_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTA_GPIO)
--#define CPUIMX51_QUARTB_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTB_GPIO)
--#define CPUIMX51_QUARTC_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTC_GPIO)
--#define CPUIMX51_QUARTD_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTD_GPIO)
- #define CPUIMX51_QUART_XTAL	14745600
- #define CPUIMX51_QUART_REGSHIFT	17
- 
-@@ -61,7 +57,7 @@
- static struct plat_serial8250_port serial_platform_data[] = {
- 	{
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x400000),
--		.irq = CPUIMX51_QUARTA_IRQ,
-+		.irq = gpio_to_irq(CPUIMX51_QUARTA_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-@@ -69,7 +65,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x800000),
--		.irq = CPUIMX51_QUARTB_IRQ,
-+		.irq = gpio_to_irq(CPUIMX51_QUARTB_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-@@ -77,7 +73,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x1000000),
--		.irq = CPUIMX51_QUARTC_IRQ,
-+		.irq = gpio_to_irq(CPUIMX51_QUARTC_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-@@ -85,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
--		.irq = CPUIMX51_QUARTD_IRQ,
-+		.irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index 63dfbea..288965d 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -26,7 +26,7 @@
- #include "devices-imx51.h"
- #include "devices.h"
- 
--#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
-+#define EXPIO_PARENT_INT	gpio_to_irq((IMX_GPIO_NR(1, 6))
- #define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
- 
- static iomux_v3_cfg_t mx51_3ds_pads[] = {
-diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-index 97292d2..66d24ea 100644
---- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-+++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-@@ -31,7 +31,6 @@
- #include "devices.h"
- 
- #define MBIMX51_TSC2007_GPIO	IMX_GPIO_NR(3, 30)
--#define MBIMX51_TSC2007_IRQ	(MXC_INTERNAL_IRQS + MBIMX51_TSC2007_GPIO)
- #define MBIMX51_LED0		IMX_GPIO_NR(3, 5)
- #define MBIMX51_LED1		IMX_GPIO_NR(3, 6)
- #define MBIMX51_LED2		IMX_GPIO_NR(3, 7)
-@@ -173,7 +172,7 @@ struct tsc2007_platform_data tsc2007_data = {
- static struct i2c_board_info mbimx51_i2c_devices[] = {
- 	{
- 		I2C_BOARD_INFO("tsc2007", 0x49),
--		.irq  = MBIMX51_TSC2007_IRQ,
-+		.irq  = gpio_to_irq(MBIMX51_TSC2007_GPIO),
- 		.platform_data = &tsc2007_data,
- 	}, {
- 		I2C_BOARD_INFO("tlv320aic23", 0x1a),
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v1.h b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-index c07d302..a7fc51e 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v1.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-@@ -85,9 +85,6 @@
- #define GPIO_BOUT_0	(2 << GPIO_BOUT_SHIFT)
- #define GPIO_BOUT_1	(3 << GPIO_BOUT_SHIFT)
- 
--/* decode irq number to use with IMR(x), ISR(x) and friends */
--#define IRQ_TO_REG(irq) ((irq - MXC_INTERNAL_IRQS) >> 5)
+-#define MXC_IRQ_TO_EXPIO(irq)   ((irq) - MXC_BOARD_IRQ_START)
+-#define MXC_IRQ_TO_GPIO(irq)	((irq) - MXC_INTERNAL_IRQS)
 -
- #define IRQ_GPIOA(x)  (MXC_GPIO_IRQ_START + x)
- #define IRQ_GPIOB(x)  (IRQ_GPIOA(32) + x)
- #define IRQ_GPIOC(x)  (IRQ_GPIOB(32) + x)
+-#define MXC_EXP_IO_BASE		(MXC_BOARD_IRQ_START)
+ #define MXC_MAX_EXP_IO_LINES	16
+ 
+ /* interrupts like external uart , external ethernet etc*/
+-#define EXPIO_INT_ENET		(MXC_BOARD_IRQ_START + 0)
+-#define EXPIO_INT_XUART_A	(MXC_BOARD_IRQ_START + 1)
+-#define EXPIO_INT_XUART_B	(MXC_BOARD_IRQ_START + 2)
+-#define EXPIO_INT_BUTTON_A	(MXC_BOARD_IRQ_START + 3)
+-#define EXPIO_INT_BUTTON_B	(MXC_BOARD_IRQ_START + 4)
++#define EXPIO_INT_ENET		0
++#define EXPIO_INT_XUART_A	1
++#define EXPIO_INT_XUART_B	2
++#define EXPIO_INT_BUTTON_A	3
++#define EXPIO_INT_BUTTON_B	4
+ 
+ static void __iomem *brd_io;
+ 
+@@ -65,8 +61,6 @@ static struct resource smsc911x_resources[] = {
+ 	{
+ 		.flags = IORESOURCE_MEM,
+ 	} , {
+-		.start = EXPIO_INT_ENET,
+-		.end = EXPIO_INT_ENET,
+ 		.flags = IORESOURCE_IRQ,
+ 	},
+ };
+@@ -86,6 +80,8 @@ static struct platform_device smsc_lan9217_device = {
+ 	.resource = smsc911x_resources,
+ };
+ 
++static int mxc_expio_base_irq;
++
+ static void mxc_expio_irq_handler(u32 irq, struct irq_desc *desc)
+ {
+ 	u32 imr_val;
+@@ -98,7 +94,7 @@ static void mxc_expio_irq_handler(u32 irq, struct irq_desc *desc)
+ 	imr_val = __raw_readw(brd_io + INTR_MASK_REG);
+ 	int_valid = __raw_readw(brd_io + INTR_STATUS_REG) & ~imr_val;
+ 
+-	expio_irq = MXC_BOARD_IRQ_START;
++	expio_irq = mxc_expio_base_irq;
+ 	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
+ 		if ((int_valid & 1) == 0)
+ 			continue;
+@@ -116,7 +112,7 @@ static void mxc_expio_irq_handler(u32 irq, struct irq_desc *desc)
+ static void expio_mask_irq(struct irq_data *d)
+ {
+ 	u16 reg;
+-	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
++	u32 expio = d->irq - mxc_expio_base_irq;
+ 
+ 	reg = __raw_readw(brd_io + INTR_MASK_REG);
+ 	reg |= (1 << expio);
+@@ -125,7 +121,7 @@ static void expio_mask_irq(struct irq_data *d)
+ 
+ static void expio_ack_irq(struct irq_data *d)
+ {
+-	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
++	u32 expio = d->irq - mxc_expio_base_irq;
+ 
+ 	__raw_writew(1 << expio, brd_io + INTR_RESET_REG);
+ 	__raw_writew(0, brd_io + INTR_RESET_REG);
+@@ -135,7 +131,7 @@ static void expio_ack_irq(struct irq_data *d)
+ static void expio_unmask_irq(struct irq_data *d)
+ {
+ 	u16 reg;
+-	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
++	u32 expio = d->irq - mxc_expio_base_irq;
+ 
+ 	reg = __raw_readw(brd_io + INTR_MASK_REG);
+ 	reg &= ~(1 << expio);
+@@ -150,7 +146,7 @@ static struct irq_chip expio_irq_chip = {
+ 
+ int __init mxc_expio_init(u32 base, u32 p_irq)
+ {
+-	int i;
++	int ret, i;
+ 
+ 	brd_io = ioremap(BOARD_IO_ADDR(base), SZ_4K);
+ 	if (brd_io == NULL)
+@@ -160,9 +156,8 @@ int __init mxc_expio_init(u32 base, u32 p_irq)
+ 	    (__raw_readw(brd_io + MAGIC_NUMBER2_REG) != 0x5555) ||
+ 	    (__raw_readw(brd_io + MAGIC_NUMBER3_REG) != 0xCAFE)) {
+ 		pr_info("3-Stack Debug board not detected\n");
+-		iounmap(brd_io);
+-		brd_io = NULL;
+-		return -ENODEV;
++		ret = -ENODEV;
++		goto out;
+ 	}
+ 
+ 	pr_info("3-Stack Debug board detected, rev = 0x%04X\n",
+@@ -171,16 +166,23 @@ int __init mxc_expio_init(u32 base, u32 p_irq)
+ 	/*
+ 	 * Configure INT line as GPIO input
+ 	 */
+-	gpio_request(MXC_IRQ_TO_GPIO(p_irq), "expio_pirq");
+-	gpio_direction_input(MXC_IRQ_TO_GPIO(p_irq));
++	gpio_request(irq_to_gpio(p_irq), "expio_pirq");
++	gpio_direction_input(irq_to_gpio(p_irq));
+ 
+ 	/* disable the interrupt and clear the status */
+ 	__raw_writew(0, brd_io + INTR_MASK_REG);
+ 	__raw_writew(0xFFFF, brd_io + INTR_RESET_REG);
+ 	__raw_writew(0, brd_io + INTR_RESET_REG);
+ 	__raw_writew(0x1F, brd_io + INTR_MASK_REG);
+-	for (i = MXC_EXP_IO_BASE;
+-	     i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES); i++) {
++
++	mxc_expio_base_irq = irq_alloc_descs(-1, 0, MXC_MAX_EXP_IO_LINES, 0);
++	if (mxc_expio_base_irq < 0) {
++		ret = mxc_expio_base_irq;
++		goto out;
++	}
++
++	for (i = mxc_expio_base_irq;
++	     i < mxc_expio_base_irq + MXC_MAX_EXP_IO_LINES; i++) {
+ 		irq_set_chip_and_handler(i, &expio_irq_chip, handle_level_irq);
+ 		set_irq_flags(i, IRQF_VALID);
+ 	}
+@@ -190,7 +192,12 @@ int __init mxc_expio_init(u32 base, u32 p_irq)
+ 	/* Register Lan device on the debugboard */
+ 	smsc911x_resources[0].start = LAN9217_BASE_ADDR(base);
+ 	smsc911x_resources[0].end = LAN9217_BASE_ADDR(base) + 0x100 - 1;
++	smsc911x_resources[1].start = mxc_expio_base_irq + EXPIO_INT_ENET;
++	smsc911x_resources[1].end = mxc_expio_base_irq + EXPIO_INT_ENET;
+ 	platform_device_register(&smsc_lan9217_device);
+ 
+ 	return 0;
++out:
++	iounmap(brd_io);
++	return ret;
+ }
 -- 
 1.7.4.1
