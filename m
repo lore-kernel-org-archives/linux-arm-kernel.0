@@ -1,53 +1,40 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 09:59:17 +0200
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
+Date: Fri, 20 May 2011 09:59:16 +0200
+Subject: [PATCH 1/9] ARM i.MX tzic: do not depend on MXC_INTERNAL_IRQS
 In-Reply-To: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
 References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1305878365-827-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1305878365-827-2-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows boards to leave the irq_base field unitialized and
-prevents them having to reserve irqs in the platform.
+This becomes meaningless in subsequent patches.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mfd/wm8350-irq.c |   16 +++++++++++++---
- 1 files changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/plat-mxc/tzic.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/drivers/mfd/wm8350-irq.c b/drivers/mfd/wm8350-irq.c
-index ed4b22a..04408a5 100644
---- a/drivers/mfd/wm8350-irq.c
-+++ b/drivers/mfd/wm8350-irq.c
-@@ -479,8 +479,8 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
- 		return 0;
- 	}
+diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+index 57f9395..710f2e7 100644
+--- a/arch/arm/plat-mxc/tzic.c
++++ b/arch/arm/plat-mxc/tzic.c
+@@ -49,6 +49,8 @@
  
--	if (!pdata || !pdata->irq_base) {
--		dev_warn(wm8350->dev, "No interrupt support, no IRQ base\n");
-+	if (!pdata) {
-+		dev_warn(wm8350->dev, "No interrupt support, no platform data\n");
- 		return 0;
- 	}
+ void __iomem *tzic_base; /* Used as irq controller base in entry-macro.S */
  
-@@ -500,7 +500,17 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
- 
- 	mutex_init(&wm8350->irq_lock);
- 	wm8350->chip_irq = irq;
--	wm8350->irq_base = pdata->irq_base;
++#define TZIC_NUM_IRQS 128
 +
-+	if (!pdata->irq_base) {
-+		wm8350->irq_base = irq_alloc_descs(-1, 0, ARRAY_SIZE(wm8350_irqs), 0);
-+		if (wm8350->irq_base < 0) {
-+			dev_warn(wm8350->dev, "Allocating irqs failed with %d\n",
-+				wm8350->irq_base);
-+			return 0;
-+		}
-+	} else {
-+		wm8350->irq_base = pdata->irq_base;
-+	}
+ #ifdef CONFIG_FIQ
+ static int tzic_set_irq_fiq(unsigned int irq, unsigned int type)
+ {
+@@ -166,7 +168,7 @@ void __init tzic_init_irq(void __iomem *irqbase)
  
- 	if (pdata->irq_high) {
- 		flags |= IRQF_TRIGGER_HIGH;
+ 	/* all IRQ no FIQ Warning :: No selection */
+ 
+-	for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
++	for (i = 0; i < TZIC_NUM_IRQS; i++) {
+ 		irq_set_chip_and_handler(i, &mxc_tzic_chip.base,
+ 					 handle_level_irq);
+ 		set_irq_flags(i, IRQF_VALID);
 -- 
 1.7.4.1
