@@ -1,177 +1,64 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 20 May 2011 00:31:28 -0600
-Subject: [PATCH 0/4] Samsung: Move Samsung SoCs GPIO drivers to
-	drivers/gpio
-In-Reply-To: <20110520054441.GA9952@july>
-References: <20110520054441.GA9952@july>
-Message-ID: <20110520063128.GA21285@ponder.secretlab.ca>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 20 May 2011 08:38:46 +0200
+Subject: PXA3xx NAND controller support broken in 2.6.39
+In-Reply-To: <BANLkTim+Ndafbs6Cram6FpHUcJ1yxtXuRw@mail.gmail.com>
+References: <BANLkTimos3-Ds4Y8FDfDZegqAhH7nSS4PA@mail.gmail.com>
+	<BANLkTim+Ndafbs6Cram6FpHUcJ1yxtXuRw@mail.gmail.com>
+Message-ID: <BANLkTinU277aSu4_p61qEBskHSTyfYYCfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 02:44:41PM +0900, Kyungmin Park wrote:
-> The following changes since commit 61c4f2c81c61f73549928dfd9f3e8f26aa36a8cf:
-> 
->   Linux 2.6.39 (2011-05-18 21:06:34 -0700)
-> 
-> Kyungmin Park (4):
->       Move to Samsung common GPIO library to drivers/gpio
->       Move the exynos4 GPIO to drivers/gpio
->       Move the s5pv210 GPIO to drivers/gpio
->       Move the s5pc100 GPIO to drivers/gpio
-> 
->  arch/arm/mach-exynos4/Makefile                     |    2 +-
->  arch/arm/mach-s5pc100/Makefile                     |    2 +-
->  arch/arm/mach-s5pv210/Makefile                     |    2 +-
->  arch/arm/plat-samsung/Makefile                     |    1 -
->  drivers/gpio/Kconfig                               |   24 ++++++++++++++++++++
->  drivers/gpio/Makefile                              |    4 +++
->  .../gpiolib.c => drivers/gpio/exynos4-gpio.c       |    0
->  .../gpiolib.c => drivers/gpio/s5pc100-gpio.c       |    0
->  .../gpiolib.c => drivers/gpio/s5pv210-gpio.c       |    0
->  .../gpiolib.c => drivers/gpio/samsung-gpiolib.c    |    3 +-
+Hi Lei,
 
-drivers/gpio/gpio-*.c please.  I'm starting to enforce some level of
-naming convention.
+On Fri, May 20, 2011 at 6:21 AM, Lei Wen <adrian.wenl@gmail.com> wrote:
+>> On a raumfeld board (which has its board support code in mainline),
+>> the effect is:
+>>
+>> [ ? ?1.803796] Wait time out!!!
+>> [ ? ?2.003795] Wait time out!!!
+>> [ ? ?2.203780] Wait time out!!!
+>> [ ? ?2.403779] Wait time out!!!
+>> [ ? ?2.406643] No NAND device found.
+>> [ ? ?2.409939] pxa3xx-nand pxa3xx-nand: failed to scan nand
+>> [ ? ?2.418850] UBI error: ubi_init: UBI error: cannot initialize UBI, error -19
+>>
+>>
+>> With the code in 2.6.38, it works just fine. Any detailed debug output
+>> you want me to provide in order to fix it?
+>>
+> Please try the patch I just send out.
+> MTD: pxa3xx_nand: fix nand detection issue
 
->  10 files changed, 33 insertions(+), 5 deletions(-)
->  rename arch/arm/mach-exynos4/gpiolib.c => drivers/gpio/exynos4-gpio.c (100%)
->  rename arch/arm/mach-s5pc100/gpiolib.c => drivers/gpio/s5pc100-gpio.c (100%)
->  rename arch/arm/mach-s5pv210/gpiolib.c => drivers/gpio/s5pv210-gpio.c (100%)
->  rename arch/arm/plat-samsung/gpiolib.c => drivers/gpio/samsung-gpiolib.c (99%)
-> 
-> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-> index 9be104f..3bb3f57 100644
-> --- a/arch/arm/mach-exynos4/Makefile
-> +++ b/arch/arm/mach-exynos4/Makefile
-> @@ -13,7 +13,7 @@ obj-				:=
->  # Core support for EXYNOS4 system
->  
->  obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
-> -obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o gpiolib.o irq-eint.o dma.o
-> +obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
->  obj-$(CONFIG_PM)		+= pm.o sleep.o
->  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
->  
-> diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
-> index eecab57..a5e6e60 100644
-> --- a/arch/arm/mach-s5pc100/Makefile
-> +++ b/arch/arm/mach-s5pc100/Makefile
-> @@ -11,7 +11,7 @@ obj-				:=
->  
->  # Core support for S5PC100 system
->  
-> -obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o gpiolib.o
-> +obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o
->  obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
->  obj-$(CONFIG_CPU_S5PC100)	+= dma.o
->  
-> diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
-> index 11f1790..50907ac 100644
-> --- a/arch/arm/mach-s5pv210/Makefile
-> +++ b/arch/arm/mach-s5pv210/Makefile
-> @@ -12,7 +12,7 @@ obj-				:=
->  
->  # Core support for S5PV210 system
->  
-> -obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o gpiolib.o
-> +obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o
->  obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
->  obj-$(CONFIG_S5PV210_PM)	+= pm.o sleep.o
->  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
-> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
-> index e9de58a..53eb15b 100644
-> --- a/arch/arm/plat-samsung/Makefile
-> +++ b/arch/arm/plat-samsung/Makefile
-> @@ -19,7 +19,6 @@ obj-y				+= gpio.o
->  obj-y				+= gpio-config.o
->  obj-y				+= dev-asocdma.o
->  
-> -obj-$(CONFIG_SAMSUNG_GPIOLIB_4BIT)	+= gpiolib.o
->  obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
->  
->  obj-$(CONFIG_SAMSUNG_IRQ_UART)	+= irq-uart.o
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index d3b2953..d838f5b 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -75,6 +75,30 @@ config GPIO_BASIC_MMIO
->  	help
->  	  Say yes here to support basic memory-mapped GPIO controllers.
->  
-> +config GPIO_EXYNOS4
-> +	bool "Samsung Exynos4 GPIO library support"
-> +	default y if CPU_EXYNOS4210
-> +	help
-> +	  Say yes here to support Samsung Exynos4 series SoCs GPIO library
-> +
-> +config GPIO_SAMSUNG
-> +	bool "Samsung SoCs GPIO library support"
-> +	default y if SAMSUNG_GPIOLIB_4BIT
-> +	help
-> +	  Say yes here to support Samsung SoCs GPIO library
-> +
-> +config GPIO_S5PC100
-> +	bool "Samsung S5PC100 GPIO library support"
-> +	default y if CPU_S5PC100
-> +	help
-> +	  Say yes here to support Samsung S5PC100 SoC GPIO library
-> +
-> +config GPIO_S5PV210
-> +	bool "Samsung S5PV210/S5PC110 GPIO library support"
-> +	default y if CPU_S5PV210
-> +	help
-> +	  Say yes here to support Samsung S5PV210/S5PC110 SoC GPIO library
-> +
+Thank for the quick response. Your patch fixes the detection, but read
+operations won't succeed now:
 
-Is there any scenario where these drivers should be user selected?  My
-feel is that the right thing to do with gpio controllers is to just
-build them in when the platform is selected.  We can always add
-Kconfig entries later if this assumption changes.
+[    1.602733] NAND device: Manufacturer ID: 0x20, Chip ID: 0xa1 (ST
+Micro NAND 128MiB 1,8V 8-bit)
+[    1.611426] Scanning device for bad blocks
+[    1.870669] Creating 4 MTD partitions on "pxa3xx_nand-0":
+[    1.876099] 0x000000000000-0x0000000a0000 : "Bootloader"
+[    1.885350] 0x0000000a0000-0x0000000c0000 : "BootloaderEnvironment"
+[    1.895608] 0x0000000c0000-0x000000120000 : "BootloaderSplashScreen"
+[    1.905996] 0x000000120000-0x000008000000 : "UBI"
+[    1.916999] UBI: attaching mtd3 to ubi0
+[    1.920835] UBI: physical eraseblock size:   131072 bytes (128 KiB)
+[    1.927165] UBI: logical eraseblock size:    126976 bytes
+[    1.932553] UBI: smallest flash I/O unit:    2048
+[    1.937227] UBI: VID header offset:          2048 (aligned 2048)
+[    1.943215] UBI: data offset:                4096
+[    1.950080] UBI error: ubi_io_read: error -74 (ECC error) while
+reading 2048 bytes from PEB 0:2048, read 2048 bytes
+[    2.041030] UBI error: ubi_io_read: error -74 (ECC error) while
+reading 126976 bytes from PEB 0:4096, read 126976 bytes
+[    2.053445] UBI error: ubi_io_read: error -74 (ECC error) while
+reading 2048 bytes from PEB 1:2048, read 2048 bytes
+[    2.144350] UBI error: ubi_io_read: error -74 (ECC error) while
+reading 126976 bytes from PEB 1:4096, read 126976 bytes
 
->  config GPIO_IT8761E
->  	tristate "IT8761E GPIO support"
->  	depends on GPIOLIB
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index becef59..738386f 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -11,6 +11,10 @@ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
->  obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
->  obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
->  obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
-> +obj-$(CONFIG_GPIO_EXYNOS4)	+= exynos4-gpio.o
-> +obj-$(CONFIG_GPIO_SAMSUNG)	+= samsung-gpiolib.o
-> +obj-$(CONFIG_GPIO_S5PC100)	+= s5pc100-gpio.o
-> +obj-$(CONFIG_GPIO_S5PV210)	+= s5pv210-gpio.o
->  obj-$(CONFIG_GPIO_LANGWELL)	+= langwell_gpio.o
->  obj-$(CONFIG_GPIO_MAX730X)	+= max730x.o
->  obj-$(CONFIG_GPIO_MAX7300)	+= max7300.o
-> diff --git a/arch/arm/mach-exynos4/gpiolib.c b/drivers/gpio/exynos4-gpio.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos4/gpiolib.c
-> rename to drivers/gpio/exynos4-gpio.c
-> diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/drivers/gpio/s5pc100-gpio.c
-> similarity index 100%
-> rename from arch/arm/mach-s5pc100/gpiolib.c
-> rename to drivers/gpio/s5pc100-gpio.c
-> diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/drivers/gpio/s5pv210-gpio.c
-> similarity index 100%
-> rename from arch/arm/mach-s5pv210/gpiolib.c
-> rename to drivers/gpio/s5pv210-gpio.c
-> diff --git a/arch/arm/plat-samsung/gpiolib.c b/drivers/gpio/samsung-gpiolib.c
-> similarity index 99%
-> rename from arch/arm/plat-samsung/gpiolib.c
-> rename to drivers/gpio/samsung-gpiolib.c
-> index ea37c04..925b66e 100644
-> --- a/arch/arm/plat-samsung/gpiolib.c
-> +++ b/drivers/gpio/samsung-gpiolib.c
-> @@ -1,4 +1,5 @@
-> -/* arch/arm/plat-samsung/gpiolib.c
-> +/*
-> + * drivers/gpio/samsung-gpiolib.c
+(continues forever)
 
-My preference is to just drop the filename from the header entirely.
-A better thing here would be a single line description of what this
-file actually does.
+The same NAND content is readable just fine with 2.6.38. Is there a
+similar bug for the timing parameters maybe?
 
-g.
+
+Daniel
