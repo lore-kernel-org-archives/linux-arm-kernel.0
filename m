@@ -1,95 +1,91 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 20 May 2011 17:14:55 +0200
-Subject: [PATCH 12/14] GPIO: OMAP: cleanup _set_gpio_wakeup(), remove ifdefs
+Date: Fri, 20 May 2011 17:14:56 +0200
+Subject: [PATCH 13/14] GPIO: OMAP: debounce remove SoC specific registers,
+	use pdata
 In-Reply-To: <1305904497-26013-1-git-send-email-khilman@ti.com>
 References: <1305904497-26013-1-git-send-email-khilman@ti.com>
-Message-ID: <1305904497-26013-13-git-send-email-khilman@ti.com>
+Message-ID: <1305904497-26013-14-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make _set_gpio_wakeup() generic by removing ifdefs.  Code for the
-various SoCs/bank-methods was already the same, except for the
-non-wakeup GPIO checking.  But that flag is set on a per-SoC basis, so
-can be used for all SoCs.
-
-While here, use dev_err() and remove GPIO bank calculation assumption
-based on subtracting bank pointers.
+Use register offsets passed in from pdata for accessing debounce registers.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/gpio/gpio_omap.c |   50 ++++++++++++++-------------------------------
- 1 files changed, 16 insertions(+), 34 deletions(-)
+ arch/arm/mach-omap2/gpio.c             |    4 ++++
+ arch/arm/plat-omap/include/plat/gpio.h |    2 ++
+ drivers/gpio/gpio_omap.c               |   15 +++------------
+ 3 files changed, 9 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index cc26677..316d930 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -81,6 +81,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->irqenable = OMAP24XX_GPIO_IRQENABLE1;
+ 		pdata->regs->set_irqenable = OMAP24XX_GPIO_SETIRQENABLE1;
+ 		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
++		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
++		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
+ 		break;
+ 	case 2:
+ 		pdata->bank_type = METHOD_GPIO_44XX;
+@@ -94,6 +96,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->irqenable = OMAP4_GPIO_IRQSTATUSSET0;
+ 		pdata->regs->set_irqenable = OMAP4_GPIO_IRQSTATUSSET0;
+ 		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
++		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
++		pdata->regs->debounce_en = OMAP4_GPIO_DEBOUNCENABLE;
+ 		break;
+ 	default:
+ 		WARN(1, "Invalid gpio bank_type\n");
+diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+index c7e3a56..7a3f067 100644
+--- a/arch/arm/plat-omap/include/plat/gpio.h
++++ b/arch/arm/plat-omap/include/plat/gpio.h
+@@ -185,6 +185,8 @@ struct omap_gpio_reg_offs {
+ 	u16 irqenable;
+ 	u16 set_irqenable;
+ 	u16 clr_irqenable;
++	u16 debounce;
++	u16 debounce_en;
+ 
+ 	bool irqenable_inv;
+ };
 diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-index 8f4ae55..b5e2e94 100644
+index b5e2e94..072d568 100644
 --- a/drivers/gpio/gpio_omap.c
 +++ b/drivers/gpio/gpio_omap.c
-@@ -533,42 +533,24 @@ static inline void _set_gpio_irqenable(struct gpio_bank *bank, int gpio, int ena
-  */
- static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+@@ -168,7 +168,7 @@ do {	\
+ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
+ 		unsigned debounce)
  {
--	unsigned long uninitialized_var(flags);
-+	u32 gpio_bit = GPIO_BIT(bank, gpio);
-+	unsigned long flags;
+-	void __iomem		*reg = bank->base;
++	void __iomem		*reg;
+ 	u32			val;
+ 	u32			l;
  
--	switch (bank->method) {
--#ifdef CONFIG_ARCH_OMAP16XX
--	case METHOD_MPUIO:
--	case METHOD_GPIO_1610:
--		spin_lock_irqsave(&bank->lock, flags);
--		if (enable)
--			bank->suspend_wakeup |= (1 << gpio);
--		else
--			bank->suspend_wakeup &= ~(1 << gpio);
--		spin_unlock_irqrestore(&bank->lock, flags);
--		return 0;
--#endif
--#ifdef CONFIG_ARCH_OMAP2PLUS
--	case METHOD_GPIO_24XX:
--	case METHOD_GPIO_44XX:
--		if (bank->non_wakeup_gpios & (1 << gpio)) {
--			printk(KERN_ERR "Unable to modify wakeup on "
--					"non-wakeup GPIO%d\n",
--			       (bank - gpio_bank) * bank->width + gpio);
--			return -EINVAL;
--		}
--		spin_lock_irqsave(&bank->lock, flags);
--		if (enable)
--			bank->suspend_wakeup |= (1 << gpio);
--		else
--			bank->suspend_wakeup &= ~(1 << gpio);
--		spin_unlock_irqrestore(&bank->lock, flags);
--		return 0;
--#endif
--	default:
--		printk(KERN_ERR "Can't enable GPIO wakeup for method %i\n",
--		       bank->method);
-+	if (bank->non_wakeup_gpios & gpio_bit) {
-+		dev_err(bank->dev, 
-+			"Unable to modify wakeup on non-wakeup GPIO%d\n", gpio);
- 		return -EINVAL;
- 	}
-+
-+	spin_lock_irqsave(&bank->lock, flags);
-+	if (enable)
-+		bank->suspend_wakeup |= gpio_bit;
-+	else
-+		bank->suspend_wakeup &= ~gpio_bit;
-+
-+	spin_unlock_irqrestore(&bank->lock, flags);
-+
-+	return 0;
- }
+@@ -184,19 +184,10 @@ static void _set_gpio_debounce(struct gpio_bank *bank, unsigned gpio,
  
- static void _reset_gpio(struct gpio_bank *bank, int gpio)
-@@ -587,7 +569,7 @@ static int gpio_wake_enable(struct irq_data *d, unsigned int enable)
- 	int retval;
+ 	l = GPIO_BIT(bank, gpio);
  
- 	bank = irq_data_get_irq_chip_data(d);
--	retval = _set_gpio_wakeup(bank, GPIO_INDEX(bank, gpio), enable);
-+	retval = _set_gpio_wakeup(bank, gpio, enable);
+-	if (bank->method == METHOD_GPIO_44XX)
+-		reg += OMAP4_GPIO_DEBOUNCINGTIME;
+-	else
+-		reg += OMAP24XX_GPIO_DEBOUNCE_VAL;
+-
++	reg = bank->base + bank->regs->debounce;
+ 	__raw_writel(debounce, reg);
  
- 	return retval;
- }
+-	reg = bank->base;
+-	if (bank->method == METHOD_GPIO_44XX)
+-		reg += OMAP4_GPIO_DEBOUNCENABLE;
+-	else
+-		reg += OMAP24XX_GPIO_DEBOUNCE_EN;
+-
++	reg = bank->base + bank->regs->debounce_en;
+ 	val = __raw_readl(reg);
+ 
+ 	if (debounce) {
 -- 
 1.7.3.4
