@@ -1,156 +1,66 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 20 May 2011 17:14:57 +0200
-Subject: [PATCH 14/14] GPIO: OMAP: cleanup show revision, remove cpu_is checks,
-	display only once
-In-Reply-To: <1305904497-26013-1-git-send-email-khilman@ti.com>
-References: <1305904497-26013-1-git-send-email-khilman@ti.com>
-Message-ID: <1305904497-26013-15-git-send-email-khilman@ti.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 20 May 2011 10:17:40 -0500
+Subject: [PATCH 2/2] drivers/amba: probe via device tree
+In-Reply-To: <201105201621.03801.arnd@arndb.de>
+References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
+	<20110519233958.GB18181@ponder.secretlab.ca>
+	<4DD66B8A.5040404@gmail.com> <201105201621.03801.arnd@arndb.de>
+Message-ID: <4DD68614.6090209@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove cpu_is_* checks from gpio_show_revision() by passing in the
-revision address offset from platform data.  SoCs with no revision
-register (15xx, 7xx, and all MPUIOs) use -1 (actually, USHRT_MAX) to
-signify no register.
+Arnd,
 
-While here, all GPIO banks are assumed to be the same revision, so fix
-show_revision() to only show the revision for the first bank it finds.
-This removes duplicate GPIO revision prints during boot.
+On 05/20/2011 09:21 AM, Arnd Bergmann wrote:
+> On Friday 20 May 2011 15:24:26 Rob Herring wrote:
+>> Maybe we are looking this in the wrong way.
+>>
+>> AMBA is not really the bus, but certain types of devices on the bus.
+>> Granted, it may actually be an AMBA bus vs. vendor bus (i.MX AIPS), but
+>> that is really transparent to s/w. Separating AMBA devices in the
+>> devicetree is really Linux requirements defining the devicetree
+>> structure. It is certainly conceivable that an OS could make no
+>> distinction. In my case, there is a mixture of regular platform devices
+>> and AMBA(Primecell really) devices all interleaved on the same bus.
+>
+> I don't see how that would work. If the bus is AMBA, it should
+> only have AMBA devices on it, otherwise how would they be connected?
+>
+The ARM definition of AMBA encompasses a lot of things. It is the 
+definition of the AXI, AHB and APB buses. It also has the definition of 
+the peripheral ID register definitions which primarily only ARM Ltd 
+peripherals implement. You can have those bus types yet not have any 
+peripherals with the ID registers. The Linux amba bus primarily deals 
+with just the peripheral ID for probe matching. There is also bus clock 
+handling, but that's not really unique to an AMBA bus. Arguably the 
+platform bus could have bus clock handling as well.
 
-Thanks to Charulatha V <charu@ti.com> for finding/fixing a few -1s
-that were missed in the original patch.
+> Whether software is supposed to know care about this is a different
+> question. The device tree should generally reflect the block
+> diagram of the hardware,
 
-Signed-off-by: Kevin Hilman <khilman@ti.com>
----
- arch/arm/mach-omap1/gpio15xx.c         |    2 ++
- arch/arm/mach-omap1/gpio16xx.c         |    2 ++
- arch/arm/mach-omap1/gpio7xx.c          |    2 ++
- arch/arm/mach-omap2/gpio.c             |    2 ++
- arch/arm/plat-omap/include/plat/gpio.h |    1 +
- drivers/gpio/gpio_omap.c               |   14 ++++++--------
- 6 files changed, 15 insertions(+), 8 deletions(-)
+Agreed.
 
-diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-index 9175624..f79c6ae 100644
---- a/arch/arm/mach-omap1/gpio15xx.c
-+++ b/arch/arm/mach-omap1/gpio15xx.c
-@@ -35,6 +35,7 @@ static struct __initdata resource omap15xx_mpu_gpio_resources[] = {
- };
- 
- static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
-+	.revision       = USHRT_MAX,
- 	.direction	= OMAP_MPUIO_IO_CNTL,
- 	.datain		= OMAP_MPUIO_INPUT_LATCH,
- 	.dataout	= OMAP_MPUIO_OUTPUT,
-@@ -75,6 +76,7 @@ static struct __initdata resource omap15xx_gpio_resources[] = {
- };
- 
- static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
-+	.revision	= USHRT_MAX,
- 	.direction	= OMAP1510_GPIO_DIR_CONTROL,
- 	.datain		= OMAP1510_GPIO_DATA_INPUT,
- 	.dataout	= OMAP1510_GPIO_DATA_OUTPUT,
-diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-index a6d4a71..c69b3b1 100644
---- a/arch/arm/mach-omap1/gpio16xx.c
-+++ b/arch/arm/mach-omap1/gpio16xx.c
-@@ -38,6 +38,7 @@ static struct __initdata resource omap16xx_mpu_gpio_resources[] = {
- };
- 
- static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
-+	.revision       = USHRT_MAX,
- 	.direction	= OMAP_MPUIO_IO_CNTL,
- 	.datain		= OMAP_MPUIO_INPUT_LATCH,
- 	.dataout	= OMAP_MPUIO_OUTPUT,
-@@ -78,6 +79,7 @@ static struct __initdata resource omap16xx_gpio1_resources[] = {
- };
- 
- static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
-+	.revision       = OMAP1610_GPIO_REVISION,
- 	.direction	= OMAP1610_GPIO_DIRECTION,
- 	.set_dataout	= OMAP1610_GPIO_SET_DATAOUT,
- 	.clr_dataout	= OMAP1610_GPIO_CLEAR_DATAOUT,
-diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
-index 12bcd9f..d7f2ad3 100644
---- a/arch/arm/mach-omap1/gpio7xx.c
-+++ b/arch/arm/mach-omap1/gpio7xx.c
-@@ -40,6 +40,7 @@ static struct __initdata resource omap7xx_mpu_gpio_resources[] = {
- };
- 
- static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
-+	.revision	= USHRT_MAX,
- 	.direction	= OMAP_MPUIO_IO_CNTL / 2,
- 	.datain		= OMAP_MPUIO_INPUT_LATCH / 2,
- 	.dataout	= OMAP_MPUIO_OUTPUT / 2,
-@@ -80,6 +81,7 @@ static struct __initdata resource omap7xx_gpio1_resources[] = {
- };
- 
- static struct omap_gpio_reg_offs omap7xx_gpio_regs = {
-+	.revision	= USHRT_MAX,
- 	.direction	= OMAP7XX_GPIO_DIR_CONTROL,
- 	.datain		= OMAP7XX_GPIO_DATA_INPUT,
- 	.dataout	= OMAP7XX_GPIO_DATA_OUTPUT,
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 316d930..9a46d77 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -71,6 +71,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 	case 0:
- 	case 1:
- 		pdata->bank_type = METHOD_GPIO_24XX;
-+		pdata->regs->revision = OMAP24XX_GPIO_REVISION;
- 		pdata->regs->direction = OMAP24XX_GPIO_OE;
- 		pdata->regs->datain = OMAP24XX_GPIO_DATAIN;
- 		pdata->regs->dataout = OMAP24XX_GPIO_DATAOUT;
-@@ -86,6 +87,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		break;
- 	case 2:
- 		pdata->bank_type = METHOD_GPIO_44XX;
-+		pdata->regs->revision = OMAP4_GPIO_REVISION;
- 		pdata->regs->direction = OMAP4_GPIO_OE;
- 		pdata->regs->datain = OMAP4_GPIO_DATAIN;
- 		pdata->regs->dataout = OMAP4_GPIO_DATAOUT;
-diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index 7a3f067..91e8de3 100644
---- a/arch/arm/plat-omap/include/plat/gpio.h
-+++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -175,6 +175,7 @@ struct omap_gpio_dev_attr {
- };
- 
- struct omap_gpio_reg_offs {
-+	u16 revision;
- 	u16 direction;
- 	u16 datain;
- 	u16 dataout;
-diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-index 072d568..a490cb1 100644
---- a/drivers/gpio/gpio_omap.c
-+++ b/drivers/gpio/gpio_omap.c
-@@ -984,19 +984,17 @@ static int gpio_2irq(struct gpio_chip *chip, unsigned offset)
- 
- static void __init omap_gpio_show_rev(struct gpio_bank *bank)
- {
-+	static bool called;
- 	u32 rev;
- 
--	if (cpu_is_omap16xx() && !(bank->method != METHOD_MPUIO))
--		rev = __raw_readw(bank->base + OMAP1610_GPIO_REVISION);
--	else if (cpu_is_omap24xx() || cpu_is_omap34xx())
--		rev = __raw_readl(bank->base + OMAP24XX_GPIO_REVISION);
--	else if (cpu_is_omap44xx())
--		rev = __raw_readl(bank->base + OMAP4_GPIO_REVISION);
--	else
-+	if (called || bank->regs->revision == USHRT_MAX)
- 		return;
- 
--	printk(KERN_INFO "OMAP GPIO hardware version %d.%d\n",
-+	rev = __raw_readw(bank->base + bank->regs->revision);
-+	pr_info("OMAP GPIO hardware version %d.%d\n",
- 		(rev >> 4) & 0x0f, rev & 0x0f);
-+
-+	called = true;
- }
- 
- /* This lock class tells lockdep that GPIO irqs are in a different
--- 
-1.7.3.4
+> and I would expect the AMBA devices be
+> on a different level from the rest there.
+>
+But this part is not true.
+
+>> Based on this, I think of_platform_populate should always just match
+>> against "simple-bus" and make the matches parameter define the device
+>> creation hook rather than the bus type. Or you could have both
+>> bus_matches and dev_matches parameters.
+>
+> I think it would be much better to only look at the parent bus for
+> device to add, never at the device itself.
+>
+> If the bus is AMBA, add all devices as amba_device, if it's simple-bus,
+> add all devices as platform_device.
+>
+That is how it is currently, but the reality is that I only have 1 bus 
+with both ARM Primecell peripherals and other peripherals which are 
+standard platform bus devices. i2c-designware is one example. It is on 
+the APB just like the pl011 uart. So do you propose I create a amba 
+driver for it? It has no peripheral ID registers, so that may not even work.
+
+Rob
