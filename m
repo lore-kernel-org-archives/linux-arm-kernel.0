@@ -1,58 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 13:25:25 +0200
-Subject: [PATCH 0/4] add gpio driver gpio-mxs
-In-Reply-To: <20110520102410.GD27251@S2100-06.ap.freescale.net>
-References: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
-	<20110520100242.GA10403@pengutronix.de>
-	<20110520102410.GD27251@S2100-06.ap.freescale.net>
-Message-ID: <20110520112524.GC10403@pengutronix.de>
+From: pawel.moll@arm.com (Pawel Moll)
+Date: Fri, 20 May 2011 12:51:52 +0100
+Subject: [PATCH v2] arm: Add Cortex A5 proc info
+In-Reply-To: <20110519160819.GD2431@arm.com>
+References: <1305720361.17656.44.camel@hornet.cambridge.arm.com>
+	<1305737066-11900-1-git-send-email-pawel.moll@arm.com>
+	<000d01cc162e$723081b0$56918510$@deacon@arm.com>
+	<1305819084.17656.63.camel@hornet.cambridge.arm.com>
+	<20110519160819.GD2431@arm.com>
+Message-ID: <1305892312.17656.72.camel@hornet.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 06:24:11PM +0800, Shawn Guo wrote:
-> On Fri, May 20, 2011 at 12:02:42PM +0200, Sascha Hauer wrote:
-> > Hi Shawn,
-> > 
-> Hi Sascha,
+> You could use an assembler macro instead.
 > 
-> > On Fri, May 20, 2011 at 05:51:25PM +0800, Shawn Guo wrote:
-> > > The patch set is to move Freescale MXS gpio driver from mach-mxs
-> > > into drivers/gpio.  Different from u300 gpio driver that all gpio
-> > > ports are registered as one device, gpio-mxs expects every single
-> > > port is a gpio device.
-> > > 
-> > > The first 3 patches are just to ease review and can be squashed into
-> > > the last one.
-> > > 
-> > > Shawn Guo (4):
-> > >       gpio: gpio-mxs: add file gpio-mxs.c
-> > >       gpio: gpio-mxs: drop mach-specific accessors
-> > >       gpio: gpio-mxs: remove gpio port definition and registration
-> > >       gpio: gpio-mxs: add gpio driver for Freescale MXS architecture
-> > 
-> > Your series should be bisectible. So please either:
-> > 
-> > - Add the driver the way you want it (no need to modify a new file in
-> >   four steps)
-> 
-> As I said above, I split it into 4 patches just to ease the review,
-> and they can be squashed into one when applying.
-> 
-> > - atomically switch to the new driver
-> > - remove old driver
-> > 
-> These two steps happened in the patch set '[PATCH 0/3] remove mach-mxs
-> gpio driver'.  The patch order should be reworked though.
-> 
-> BTW, are you looking at moving plat-mxc/gpio.c, or I can give a hand
-> there?
+> macro blarg insert_hwcaps=0
 
-I'm not working on this, go ahead.
+Awesome, I didn't know that assembler macro can take default values for
+parameters (every day we learn something new :-)
 
-Sascha
+It's sorted then, v3 to follow in a jiffy.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Cheers!
+
+Pawe?
