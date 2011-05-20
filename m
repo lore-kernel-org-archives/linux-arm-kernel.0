@@ -1,53 +1,67 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 09:59:20 +0200
-Subject: [PATCH 4/9] mfd wm8350: allocate irq descs dynamically
+Date: Fri, 20 May 2011 09:59:18 +0200
+Subject: [PATCH 2/9] ARM i.MX avic: do not depend on MXC_INTERNAL_IRQS
 In-Reply-To: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
 References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1305878365-827-6-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1305878365-827-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This allows boards to leave the irq_base field unitialized and
-prevents them having to reserve irqs in the platform.
+This becomes meaningless in subsequent patches.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/mfd/wm8350-irq.c |   16 +++++++++++++---
- 1 files changed, 13 insertions(+), 3 deletions(-)
+ arch/arm/plat-mxc/avic.c |   12 +++++++-----
+ 1 files changed, 7 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/mfd/wm8350-irq.c b/drivers/mfd/wm8350-irq.c
-index ed4b22a..04408a5 100644
---- a/drivers/mfd/wm8350-irq.c
-+++ b/drivers/mfd/wm8350-irq.c
-@@ -479,8 +479,8 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
- 		return 0;
- 	}
+diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
+index 09e2bd0..55d2534 100644
+--- a/arch/arm/plat-mxc/avic.c
++++ b/arch/arm/plat-mxc/avic.c
+@@ -46,6 +46,8 @@
+ #define AVIC_FIPNDH		0x60	/* fast int pending high */
+ #define AVIC_FIPNDL		0x64	/* fast int pending low */
  
--	if (!pdata || !pdata->irq_base) {
--		dev_warn(wm8350->dev, "No interrupt support, no IRQ base\n");
-+	if (!pdata) {
-+		dev_warn(wm8350->dev, "No interrupt support, no platform data\n");
- 		return 0;
- 	}
- 
-@@ -500,7 +500,17 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
- 
- 	mutex_init(&wm8350->irq_lock);
- 	wm8350->chip_irq = irq;
--	wm8350->irq_base = pdata->irq_base;
++#define AVIC_NUM_IRQS 64
 +
-+	if (!pdata->irq_base) {
-+		wm8350->irq_base = irq_alloc_descs(-1, 0, ARRAY_SIZE(wm8350_irqs), 0);
-+		if (wm8350->irq_base < 0) {
-+			dev_warn(wm8350->dev, "Allocating irqs failed with %d\n",
-+				wm8350->irq_base);
-+			return 0;
-+		}
-+	} else {
-+		wm8350->irq_base = pdata->irq_base;
-+	}
+ void __iomem *avic_base;
  
- 	if (pdata->irq_high) {
- 		flags |= IRQF_TRIGGER_HIGH;
+ #ifdef CONFIG_MXC_IRQ_PRIOR
+@@ -54,7 +56,7 @@ static int avic_irq_set_priority(unsigned char irq, unsigned char prio)
+ 	unsigned int temp;
+ 	unsigned int mask = 0x0F << irq % 8 * 4;
+ 
+-	if (irq >= MXC_INTERNAL_IRQS)
++	if (irq >= AVIC_NUM_IRQS)
+ 		return -EINVAL;;
+ 
+ 	temp = __raw_readl(avic_base + AVIC_NIPRIORITY(irq / 8));
+@@ -72,14 +74,14 @@ static int avic_set_irq_fiq(unsigned int irq, unsigned int type)
+ {
+ 	unsigned int irqt;
+ 
+-	if (irq >= MXC_INTERNAL_IRQS)
++	if (irq >= AVIC_NUM_IRQS)
+ 		return -EINVAL;
+ 
+-	if (irq < MXC_INTERNAL_IRQS / 2) {
++	if (irq < AVIC_NUM_IRQS / 2) {
+ 		irqt = __raw_readl(avic_base + AVIC_INTTYPEL) & ~(1 << irq);
+ 		__raw_writel(irqt | (!!type << irq), avic_base + AVIC_INTTYPEL);
+ 	} else {
+-		irq -= MXC_INTERNAL_IRQS / 2;
++		irq -= AVIC_NUM_IRQS / 2;
+ 		irqt = __raw_readl(avic_base + AVIC_INTTYPEH) & ~(1 << irq);
+ 		__raw_writel(irqt | (!!type << irq), avic_base + AVIC_INTTYPEH);
+ 	}
+@@ -138,7 +140,7 @@ void __init mxc_init_irq(void __iomem *irqbase)
+ 	/* all IRQ no FIQ */
+ 	__raw_writel(0, avic_base + AVIC_INTTYPEH);
+ 	__raw_writel(0, avic_base + AVIC_INTTYPEL);
+-	for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
++	for (i = 0; i < AVIC_NUM_IRQS; i++) {
+ 		irq_set_chip_and_handler(i, &mxc_avic_chip.base,
+ 					 handle_level_irq);
+ 		set_irq_flags(i, IRQF_VALID);
 -- 
 1.7.4.1
