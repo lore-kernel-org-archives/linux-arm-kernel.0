@@ -1,97 +1,49 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 20 May 2011 17:17:27 +0200
-Subject: [PATCH v5 15/19] ARM: LPAE: Add support for
-	cpu_v7_do_(suspend|resume)
-In-Reply-To: <1305897667.2788.98.camel@e102109-lin.cambridge.arm.com>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<1304859098-10760-16-git-send-email-catalin.marinas@arm.com>
-	<20110518072737.GC6815@atomide.com>
-	<1305897667.2788.98.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <20110520151727.GW15292@game.jcrosoft.org>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Fri, 20 May 2011 19:35:23 +0400
+Subject: [PATCH 4/4] davinci: create new common platform header for davinci
+In-Reply-To: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
+References: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
+Message-ID: <4DD68A3B.7040800@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:21 Fri 20 May     , Catalin Marinas wrote:
-> Tony,
-> 
-> On Wed, 2011-05-18 at 08:27 +0100, Tony Lindgren wrote:
-> > * Catalin Marinas <catalin.marinas@arm.com> [110508 15:52]:
-> > > --- a/arch/arm/mm/proc-v7.S
-> > > +++ b/arch/arm/mm/proc-v7.S
-> > > @@ -260,19 +260,32 @@ cpu_v7_name:
-> > > 
-> > >  /* Suspend/resume support: derived from arch/arm/mach-s5pv210/sleep.S */
-> > >  .globl       cpu_v7_suspend_size
-> > > +#ifdef CONFIG_ARM_LPAE
-> > > +.equ cpu_v7_suspend_size, 4 * 10
-> > > +#else
-> > >  .equ cpu_v7_suspend_size, 4 * 8
-> > > +#endif
-> > >  #ifdef CONFIG_PM_SLEEP
-> > >  ENTRY(cpu_v7_do_suspend)
-> > >       stmfd   sp!, {r4 - r11, lr}
-> > >       mrc     p15, 0, r4, c13, c0, 0  @ FCSE/PID
-> > >       mrc     p15, 0, r5, c13, c0, 1  @ Context ID
-> > >       mrc     p15, 0, r6, c3, c0, 0   @ Domain ID
-> > > +#ifdef CONFIG_ARM_LPAE
-> > > +     mrrc    p15, 0, r7, r8, c2      @ TTB 0
-> > > +     mrrc    p15, 1, r2, r3, c2      @ TTB 1
-> > > +#else
-> > >       mrc     p15, 0, r7, c2, c0, 0   @ TTB 0
-> > >       mrc     p15, 0, r8, c2, c0, 1   @ TTB 1
-> > > +#endif
-> > >       mrc     p15, 0, r9, c1, c0, 0   @ Control register
-> > >       mrc     p15, 0, r10, c1, c0, 1  @ Auxiliary control register
-> > >       mrc     p15, 0, r11, c1, c0, 2  @ Co-processor access control
-> > > +#ifdef CONFIG_ARM_LPAE
-> > > +     stmia   r0, {r2 - r11}
-> > > +#else
-> > >       stmia   r0, {r4 - r11}
-> > > +#endif
-> > >       ldmfd   sp!, {r4 - r11, pc}
-> > >  ENDPROC(cpu_v7_do_suspend)
-> > > 
-> > > @@ -280,12 +293,21 @@ ENTRY(cpu_v7_do_resume)
-> > >       mov     ip, #0
-> > >       mcr     p15, 0, ip, c8, c7, 0   @ invalidate TLBs
-> > >       mcr     p15, 0, ip, c7, c5, 0   @ invalidate I cache
-> > > +#ifdef CONFIG_ARM_LPAE
-> > > +     ldmia   r0, {r2 - r11}
-> > > +#else
-> > >       ldmia   r0, {r4 - r11}
-> > > +#endif
-> > >       mcr     p15, 0, r4, c13, c0, 0  @ FCSE/PID
-> > >       mcr     p15, 0, r5, c13, c0, 1  @ Context ID
-> > >       mcr     p15, 0, r6, c3, c0, 0   @ Domain ID
-> > > +#ifdef CONFIG_ARM_LPAE
-> > > +     mcrr    p15, 0, r7, r8, c2      @ TTB 0
-> > > +     mcrr    p15, 1, r2, r3, c2      @ TTB 1
-> > > +#else
-> > >       mcr     p15, 0, r7, c2, c0, 0   @ TTB 0
-> > >       mcr     p15, 0, r8, c2, c0, 1   @ TTB 1
-> > > +#endif
-> > >       mcr     p15, 0, ip, c2, c0, 2   @ TTB control register
-> > >       mcr     p15, 0, r10, c1, c0, 1  @ Auxiliary control register
-> > >       mcr     p15, 0, r11, c1, c0, 2  @ Co-processor access control
-> > 
-> > Do we really need all this ifdef else throughout this series?
-> > 
-> > I think we already have things in place to do this dynamically
-> > like we already do for thumb, smp_on_up, v6 vs v7 and so on.
-> 
-> By dynamically, do you mean at run-time? We won't be able to compile
-> both classic and LPAE in the same kernel, there is just too much
-> difference between them (2 vs 3 levels of page tables - LPAE is an
-> entirely new format).
-> 
-> If you mean some simpler macros like what we have for ARM/THUMB to
-> reduce the number of lines, I'm fine with it though we don't always have
-> a 1:1 mapping between LPAE and non-LPAE instructions.
-create the same macro as done do arm/thumb is good will make the code more
-readable
-> 
-> Alternatively, I'm happy to create a separate proc-v7lpae.S file.
-maybe a good idea
+Hello.
 
-Best Regards,
-J.
+Manjunath Hadli wrote:
+
+> remove the code from individual platform header files for
+> dm365, dm355, dm644x and dm646x and consolidate it into a
+> single and common header file dmx.h.
+> Include the new header file in individual platform header
+> files as a pre-cursor for deleting these headers in follow
+> up patches.
+
+> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> ---
+>  arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
+>  arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
+>  arch/arm/mach-davinci/board-dm365-evm.c     |    6 ++-
+>  arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
+>  arch/arm/mach-davinci/board-dm646x-evm.c    |    5 ++-
+>  arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
+>  arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
+>  arch/arm/mach-davinci/dm355.c               |    2 +-
+>  arch/arm/mach-davinci/dm365.c               |    2 +-
+>  arch/arm/mach-davinci/dm644x.c              |    2 +-
+>  arch/arm/mach-davinci/dm646x.c              |    2 +-
+>  arch/arm/mach-davinci/include/mach/dm355.h  |   32 -----------
+>  arch/arm/mach-davinci/include/mach/dm365.h  |   40 --------------
+>  arch/arm/mach-davinci/include/mach/dm644x.h |   40 --------------
+>  arch/arm/mach-davinci/include/mach/dmx.h    |   77 +++++++++++++++++++++++++++
+>  drivers/media/video/davinci/vpif.h          |    2 +-
+>  drivers/media/video/davinci/vpif_capture.h  |    1 +
+>  drivers/media/video/davinci/vpif_display.c  |    2 +-
+>  18 files changed, 98 insertions(+), 125 deletions(-)
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
+>  delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
+>  create mode 100644 arch/arm/mach-davinci/include/mach/dmx.h
+
+    BTW, you forgot to remove <mach/dm646x.h>...
+
+WBR, Sergei
