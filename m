@@ -1,41 +1,78 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 20 May 2011 17:14:45 +0200
-Subject: [PATCH 02/14] GPIO: OMAP: remove MPUIO handling from
-	_clear_gpio_irqbank()
+Date: Fri, 20 May 2011 17:14:46 +0200
+Subject: [PATCH 03/14] GPIO: OMAP: move bank width into struct gpio_bank
 In-Reply-To: <1305904497-26013-1-git-send-email-khilman@ti.com>
 References: <1305904497-26013-1-git-send-email-khilman@ti.com>
-Message-ID: <1305904497-26013-3-git-send-email-khilman@ti.com>
+Message-ID: <1305904497-26013-4-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the OMAP1 #ifdef and MPUIO special case for _clear_gpio_irqbank()
-
-The MPUIOs do not need a register access to ack/clear the IRQ status,
-since reading the IRQ status clears it.  In addition, the MPUIO
-irq_chip has an empty ack method, so _clear_gpio_irqbank() is never
-used for MPUIOs.
+Rather than having a file-global bank_width variable, move it into
+struct gpio_bank so it can be bank-specific.   Note the bank width
+is already passed per-bank via platform_data, so current code would
+be incorrect if any banks had different width.
 
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/gpio/gpio_omap.c |    6 ------
- 1 files changed, 0 insertions(+), 6 deletions(-)
+ drivers/gpio/gpio_omap.c |   13 ++++++-------
+ 1 files changed, 6 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-index b414644..6fcee66 100644
+index 6fcee66..4691ed8 100644
 --- a/drivers/gpio/gpio_omap.c
 +++ b/drivers/gpio/gpio_omap.c
-@@ -665,12 +665,6 @@ static void _clear_gpio_irqbank(struct gpio_bank *bank, int gpio_mask)
- 	void __iomem *reg = bank->base;
+@@ -54,6 +54,7 @@ struct gpio_bank {
+ 	struct device *dev;
+ 	bool dbck_flag;
+ 	int stride;
++	u32 width;
+ };
  
- 	switch (bank->method) {
--#ifdef CONFIG_ARCH_OMAP1
--	case METHOD_MPUIO:
--		/* MPUIO irqstatus is reset by reading the status register,
--		 * so do nothing here */
--		return;
--#endif
- #ifdef CONFIG_ARCH_OMAP15XX
- 	case METHOD_GPIO_1510:
- 		reg += OMAP1510_GPIO_INT_STATUS;
+ #ifdef CONFIG_ARCH_OMAP3
+@@ -79,8 +80,6 @@ static struct omap3_gpio_regs gpio_context[OMAP34XX_NR_GPIOS];
+  */
+ static struct gpio_bank *gpio_bank;
+ 
+-static int bank_width;
+-
+ /* TODO: Analyze removing gpio_bank_count usage from driver code */
+ int gpio_bank_count;
+ 
+@@ -878,7 +877,7 @@ static int _set_gpio_wakeup(struct gpio_bank *bank, int gpio, int enable)
+ 		if (bank->non_wakeup_gpios & (1 << gpio)) {
+ 			printk(KERN_ERR "Unable to modify wakeup on "
+ 					"non-wakeup GPIO%d\n",
+-					(bank - gpio_bank) * 32 + gpio);
++			       (bank - gpio_bank) * bank->width + gpio);
+ 			return -EINVAL;
+ 		}
+ 		spin_lock_irqsave(&bank->lock, flags);
+@@ -1545,14 +1544,14 @@ static void __init omap_gpio_chip_init(struct gpio_bank *bank)
+ 	} else {
+ 		bank->chip.label = "gpio";
+ 		bank->chip.base = gpio;
+-		gpio += bank_width;
++		gpio += bank->width;
+ 	}
+-	bank->chip.ngpio = bank_width;
++	bank->chip.ngpio = bank->width;
+ 
+ 	gpiochip_add(&bank->chip);
+ 
+ 	for (j = bank->virtual_irq_start;
+-		     j < bank->virtual_irq_start + bank_width; j++) {
++		     j < bank->virtual_irq_start + bank->width; j++) {
+ 		irq_set_lockdep_class(j, &gpio_lock_class);
+ 		irq_set_chip_data(j, bank);
+ 		if (bank_is_mpuio(bank))
+@@ -1602,7 +1601,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
+ 	bank->dev = &pdev->dev;
+ 	bank->dbck_flag = pdata->dbck_flag;
+ 	bank->stride = pdata->bank_stride;
+-	bank_width = pdata->bank_width;
++	bank->width = pdata->bank_width;
+ 
+ 	spin_lock_init(&bank->lock);
+ 
 -- 
 1.7.3.4
