@@ -1,48 +1,61 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Fri, 20 May 2011 11:18:18 +0800
-Subject: [PATCH 02/10] mach-u300: rewrite gpio driver, move to drivers/gpio
-In-Reply-To: <alpine.LFD.2.00.1105191527440.14430@xanadu.home>
-References: <1303910002-3333-1-git-send-email-linus.walleij@stericsson.com>
-	<20110519085638.GA26816@S2100-06.ap.freescale.net>
-	<BANLkTinD9rAipfwNnh6QpgbcogckdtQ=OQ@mail.gmail.com>
-	<20110519135631.GB26816@S2100-06.ap.freescale.net>
-	<20110519191156.GE2429@pengutronix.de>
-	<alpine.LFD.2.00.1105191527440.14430@xanadu.home>
-Message-ID: <20110520031818.GB27251@S2100-06.ap.freescale.net>
+Date: Fri, 20 May 2011 11:34:17 +0800
+Subject: [v2 0/7] OMAP: GPIO: Use PM runtime framework
+In-Reply-To: <20110519190841.GJ5109@ponder.secretlab.ca>
+References: <20110421054221.GF5918@atomide.com>
+	<BANLkTi=s=KzeZfvoq7Efg2=Ceahz_fQxMA@mail.gmail.com>
+	<20110426072941.GA3755@atomide.com>
+	<BANLkTimGU+kODvL0dC2x7UNSz0TReKveXQ@mail.gmail.com>
+	<87y62ng3f8.fsf@ti.com>
+	<BANLkTimW1PTavvxjPujVMEV38vzMvja9mw@mail.gmail.com>
+	<20110504061905.GD27860@atomide.com>
+	<BANLkTikiUB4=y0sZtUSedcPveMsBSLJgpQ@mail.gmail.com>
+	<87mxiscl0w.fsf@ti.com> <20110519190841.GJ5109@ponder.secretlab.ca>
+Message-ID: <20110520033416.GC27251@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 03:30:36PM -0400, Nicolas Pitre wrote:
-> On Thu, 19 May 2011, Sascha Hauer wrote:
-> 
-> > On Thu, May 19, 2011 at 09:56:32PM +0800, Shawn Guo wrote:
-> > > On Thu, May 19, 2011 at 02:21:27PM +0200, Linus Walleij wrote:
-> > > > On Thu, May 19, 2011 at 10:56 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> > > > 
-> > > > > I start working on moving mxs gpio (arch/arm/mach-mxs/gpio.c) into
-> > > > > driver/gpio, and I see the possibility to go a different approach
-> > > > > from U300 one posted here.
-> > > > 
-> > > > I've tried to figure out what relation the mail has to the U300 driver
-> > > > but cannot find any, more than that it's moving a driver... Please
-> > > > start a new mail thread.
-> > > > 
-> > > I will post mxs-gpio driver once I get it done.  Then please review
-> > > the code and see the difference between mxs-gpio and u300-gpio,
-> > > though these hardwares have something in common.
+On Thu, May 19, 2011 at 01:08:41PM -0600, Grant Likely wrote:
+> On Thu, May 12, 2011 at 11:42:39AM +0200, Kevin Hilman wrote:
+> > Linus Walleij <linus.walleij@linaro.org> writes:
 > > 
-> > I'm pretty sure they have something in common and even more that *all*
-> > gpio drivers have something in common. I wonder if it really makes sense
-> > to move the gpio driver to drivers/gpio without creating a common
-> > mmio_gpio_chip beforehand. This can't be very hard.
+> > [...]
+> > 
+> > > For TI I guess this currently means you simply cannot work
+> > > on GPIO stuff until you know where to go with it unless you
+> > > allow the OMAP GPIO authors to keep churning in arch/arm/*...
+> > >
+> > > That's unless Grant is OK with us moving stuff into
+> > > drivers/gpio that does *not* use gpiolib and utilize singletons to
+> > > get at the gpio_chip addresses (i.e. current form) and keep it
+> > > churning like that until it can be refactored.
+> > 
+> > The churn will happen one way or another.  the only question is whether
+> > it happens in drivers/gpio or arch/arm/*.
+> > 
+> > Grant, what's your feeling here.  How much ugliness are you willing to
+> > tolerate in a bulk move to drivers/gpio.  At least for OMAP, I am
+> > personally be working on the cleanup/move so I can work either way,
+> > although I know Tony has an obvious preference for moving it to
+> > drivers/gpio. :)
+> > 
+> > The OMAP driver is already using gpiolib.  The main ugliness in the OMAP
+> > driver is the awful ifdeffery used to handle the differences across the
+> > various SoCs in the OMAP family.  I've already got most of that cleaned
+> > up[1].
 > 
-> I do think that performing the move first will make a subsequent 
-> conversion easier.  And since a move is a no-op from a functional point 
-> of view, it is the safest thing to do first.
+> Go ahead and move stuff.  I may as well have the junk in my tree.
 > 
-That's also what I heard on UDS week.  Move stuff into driver/gpio
-first, then try to find the pattern in those drivers and come up with
-some framework.
+> I request however to have at least some semblance of organization.
+> I'd like each driver filename to be named something like gpio_*.c, and
+
+Just confirm that you really mean gpio_*.c than *_gpio.c, because I
+see there have been several *_gpio.c but none gpio_*.c under
+drivers/gpio.
+
+> put things into the Makefile/Kconfig in alphabetical order as much as
+> possible.
+> 
 
 -- 
 Regards,
