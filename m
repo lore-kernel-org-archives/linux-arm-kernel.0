@@ -1,178 +1,174 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 19 May 2011 17:39:58 -0600
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <4DD5A80F.5020807@gmail.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-	<1305829704-11774-3-git-send-email-robherring2@gmail.com>
-	<20110519200158.GW5109@ponder.secretlab.ca>
-	<4DD5A80F.5020807@gmail.com>
-Message-ID: <20110519233958.GB18181@ponder.secretlab.ca>
+From: ccross@android.com (Colin Cross)
+Date: Thu, 19 May 2011 17:24:51 -0700
+Subject: [PATCH v2] ARM: smp_twd: Reconfigure clockevents after cpufreq change
+Message-ID: <1305851091-10096-1-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 06:30:23PM -0500, Rob Herring wrote:
-> Grant,
-> 
-> On 05/19/2011 03:01 PM, Grant Likely wrote:
-> >On Thu, May 19, 2011 at 01:28:24PM -0500, Rob Herring wrote:
-> >>From: Rob Herring<rob.herring@calxeda.com>
-> >>
-> >>Add functions to parse the AMBA bus through the device tree.
-> >>
-> >>Based on the original version by Jeremy Kerr. This reworks the original amba
-> >>bus device tree probing to be more inline with how platform bus probing via
-> >>device tree is done using a match table.
-> >>
-> >>Cc: Jeremy Kerr<jeremy.kerr@canonical.com>
-> >>Cc: Grant Likely<grant.likely@secretlab.ca>
-> >>Signed-off-by: Rob Herring<rob.herring@calxeda.com>
-> >>---
-> >>  drivers/amba/bus.c       |  133 ++++++++++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/amba/bus.h |    7 +++
-> >>  2 files changed, 140 insertions(+), 0 deletions(-)
-> >>
-> >>diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> >>index 7025593..8e55754 100644
-> >>--- a/drivers/amba/bus.c
-> >>+++ b/drivers/amba/bus.c
-> >>@@ -13,6 +13,11 @@
-> >>  #include<linux/string.h>
-> >>  #include<linux/slab.h>
-> >>  #include<linux/io.h>
-> >>+#include<linux/of.h>
-> >>+#include<linux/of_irq.h>
-> >>+#include<linux/of_address.h>
-> >>+#include<linux/of_device.h>
-> >>+#include<linux/of_platform.h>
-> >>  #include<linux/pm.h>
-> >>  #include<linux/pm_runtime.h>
-> >>  #include<linux/amba/bus.h>
-> >>@@ -780,3 +785,131 @@ EXPORT_SYMBOL(amba_device_unregister);
-> >>  EXPORT_SYMBOL(amba_find_device);
-> >>  EXPORT_SYMBOL(amba_request_regions);
-> >>  EXPORT_SYMBOL(amba_release_regions);
-> >>+
-> >>+#ifdef CONFIG_OF
-> >>+int of_amba_device_create(struct device_node *node,struct device *parent)
-> >>+{
-> >>+	struct amba_device *dev;
-> >>+	const void *prop;
-> >>+	int i, ret;
-> >>+
-> >>+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-> >>+	if (!dev)
-> >>+		return -ENOMEM;
-> >>+
-> >>+	/* setup generic device info */
-> >>+	dev->dev.coherent_dma_mask = ~0;
-> >>+	dev->dev.of_node = node;
-> >>+	dev->dev.parent = parent;
-> >>+	of_device_make_bus_id(&dev->dev);
-> >>+
-> >>+	/* setup amba-specific device info */
-> >>+	dev->dma_mask = ~0;
-> >>+
-> >>+	/* Decode the IRQs and address ranges */
-> >>+	for (i = 0; i<  AMBA_NR_IRQS; i++)
-> >>+		dev->irq[i] = irq_of_parse_and_map(node, i);
-> >>+
-> >>+	ret = of_address_to_resource(node, 0,&dev->res);
-> >>+	if (ret)
-> >>+		goto err_free;
-> >>+
-> >>+	ret = amba_device_register(dev,&iomem_resource);
-> >>+	if (ret)
-> >>+		goto err_free;
-> >>+
-> >>+	/* Sanity check the arm,amba-deviceid value */
-> >>+	prop = of_get_property(node, "arm,amba-deviceid", NULL);
-> >>+	if (!prop)
-> >>+		dev_warn(&dev->dev, "arm,amba-deviceid property missing; "
-> >>+				    "probe gives 0x%08x.\n", dev->periphid);
-> >>+
-> >>+	if (prop&&  (dev->periphid != of_read_ulong(prop, 1)))
-> >>+		dev_warn(&dev->dev, "arm,amba-deviceid value (0x%08lx) and "
-> >>+				    "probed value (0x%08x) don't agree.",
-> >>+				    of_read_ulong(prop, 1), dev->periphid);
-> >>+
-> >>+	return 0;
-> >>+
-> >>+err_free:
-> >>+	kfree(dev);
-> >>+	return ret;
-> >>+}
-> >>+
-> >>+/**
-> >>+ * of_amba_bus_create() - Create a device for a node and its children.
-> >>+ * @bus: device node of the bus to instantiate
-> >>+ * @matches: match table for bus nodes
-> >>+ * disallow recursive creation of child buses
-> >>+ * @parent: parent for new device, or NULL for top level.
-> >>+ *
-> >>+ * Recursively create devices for all the child nodes.
-> >>+ */
-> >>+static int of_amba_bus_create(struct device_node *bus,
-> >>+			      const struct of_device_id *matches,
-> >>+			      struct device *parent)
-> >>+{
-> >>+	struct of_platform_prepare_data *prep;
-> >>+	struct device_node *child;
-> >>+	struct platform_device *dev;
-> >>+	int rc = 0;
-> >>+
-> >>+	/* Make sure it has a compatible property */
-> >>+	if (!of_get_property(bus, "compatible", NULL)) {
-> >>+		pr_debug("%s() - skipping %s, no compatible prop\n",
-> >>+			 __func__, bus->full_name);
-> >>+		return 0;
-> >>+	}
-> >>+
-> >>+	if (!of_match_node(matches, bus))
-> >>+		return 0;
-> >>+
-> >>+	dev = of_platform_device_create(bus, NULL, parent);
-> >>+	if (!dev)
-> >>+		return 0;
-> >
-> >Hahaha, I think I see where we're getting our models crossed.
-> >
-> >The use-case of of_amba_bus_populate should be that the device
-> >representing the amba bus (which will be a platform device) should
-> >have already been created before calling of_amba_bus_populate().
-> >of_amba_bus_populate should then be responsible for creating all the
-> >child devices that are on the AMBA bus.
-> >
-> 
-> That was one option I had thought about. I happened to put amba call
-> first so I hit the issue. It's a bit fragile to require a certain
-> calling order.
+The localtimer's clock changes with the cpu clock.  After a
+cpufreq transition, update the clockevent's frequency and
+reprogram the next clock event.
 
-Yes, so the goal is not to require a calling order.
+Adds a clock called "smp_twd" that is used to determine the
+twd frequency, which can also be used at init time to
+avoid calibrating the twd frequency.
 
-> 
-> >of_platform_populate does the same thing, except it has some added and
-> >*optional* helper logic that allows the populate code to dive deeper
-> >into the device hierarchy for any nodes that match the passed in
-> >device table.
-> >
-> That's a bit of an orthogonal problem. In my case, all devices are
-> created from the DT. This issue is scanning the devicetree multiple
-> times.
-> 
-> >I'd actually like to be able to integrate AMBA population in
-> >of_platform_populate() when it encounters an AMBA bus, but I'm not
-> >sure the result will be pretty.  I haven't had a chance to try it.
-> >
-> 
-> That seems like a bad idea to me. It's fine with 1 other bus type,
-> but if you had 10 others it would get messy.
-> 
-> Perhaps scanning the tree for buses first and then scanning for
-> devices is a better solution.
+Clock changes are based on Rob Herring's work.
 
-However, it would all work with one call if the match table passed
-into of_platform_populate() also included a populate hook for each bus
-type.  That way it still is up to the platform as to which bus types
-to probe.  Or a default list of bus types could be provided too.
+Change-Id: I413b5cd07fb2b79bc9fad8b4bf257332d1da7bcd
+Signed-off-by: Colin Cross <ccross@android.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Rob Herring <robherring2@gmail.com>
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/kernel/smp_twd.c |   86 +++++++++++++++++++++++++++++++++++++++++---
+ 1 files changed, 80 insertions(+), 6 deletions(-)
 
-g.
+This patch depends on Thomas Gleixner's patch to add clockevents_update_freq
+
+v2: Squash in changes from Linus Wallej, enable smp_twd clock during init
+
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+index 60636f4..b5bd303 100644
+--- a/arch/arm/kernel/smp_twd.c
++++ b/arch/arm/kernel/smp_twd.c
+@@ -10,13 +10,17 @@
+  */
+ #include <linux/init.h>
+ #include <linux/kernel.h>
++#include <linux/clk.h>
++#include <linux/cpufreq.h>
+ #include <linux/delay.h>
+ #include <linux/device.h>
++#include <linux/err.h>
+ #include <linux/smp.h>
+ #include <linux/jiffies.h>
+ #include <linux/clockchips.h>
+ #include <linux/irq.h>
+ #include <linux/io.h>
++#include <linux/percpu.h>
+ 
+ #include <asm/smp_twd.h>
+ #include <asm/hardware/gic.h>
+@@ -24,7 +28,9 @@
+ /* set up by the platform code */
+ void __iomem *twd_base;
+ 
++static struct clk *twd_clk;
+ static unsigned long twd_timer_rate;
++static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
+ 
+ static void twd_set_mode(enum clock_event_mode mode,
+ 			struct clock_event_device *clk)
+@@ -80,6 +86,48 @@ int twd_timer_ack(void)
+ 	return 0;
+ }
+ 
++/*
++ * Updates clockevent frequency when the cpu frequency changes.
++ * Called on the cpu that is changing frequency with interrupts disabled.
++ */
++static void twd_update_frequency(void *data)
++{
++	twd_timer_rate = clk_get_rate(twd_clk);
++
++	clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
++}
++
++static int twd_cpufreq_transition(struct notifier_block *nb,
++	unsigned long state, void *data)
++{
++	struct cpufreq_freqs *freqs = data;
++
++	/*
++	 * The twd clock events must be reprogrammed to account for the new
++	 * frequency.  The timer is local to a cpu, so cross-call to the
++	 * changing cpu.
++	 */
++	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
++		smp_call_function_single(freqs->cpu, twd_update_frequency,
++			NULL, 1);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block twd_cpufreq_nb = {
++	.notifier_call = twd_cpufreq_transition,
++};
++
++static int twd_cpufreq_init(void)
++{
++	if (!IS_ERR_OR_NULL(twd_clk))
++		return cpufreq_register_notifier(&twd_cpufreq_nb,
++			CPUFREQ_TRANSITION_NOTIFIER);
++
++	return 0;
++}
++core_initcall(twd_cpufreq_init);
++
+ static void __cpuinit twd_calibrate_rate(void)
+ {
+ 	unsigned long count;
+@@ -119,12 +167,39 @@ static void __cpuinit twd_calibrate_rate(void)
+ 	}
+ }
+ 
++static struct clk *twd_get_clock(void)
++{
++	struct clk *clk;
++	int err;
++
++	clk = clk_get_sys("smp_twd", NULL);
++	if (IS_ERR(clk)) {
++		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
++		return clk;
++	}
++
++	err = clk_enable(clk);
++	if (err) {
++		pr_err("smp_twd: clock failed to enable: %d\n", err);
++		clk_put(clk);
++		return ERR_PTR(err);
++	}
++
++	return clk;
++}
++
+ /*
+  * Setup the local clock events for a CPU.
+  */
+ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ {
+-	twd_calibrate_rate();
++	if (!twd_clk)
++		twd_clk = twd_get_clock();
++
++	if (!IS_ERR_OR_NULL(twd_clk))
++		twd_timer_rate = clk_get_rate(twd_clk);
++	else
++		twd_calibrate_rate();
+ 
+ 	clk->name = "local_timer";
+ 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+@@ -132,13 +207,12 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ 	clk->rating = 350;
+ 	clk->set_mode = twd_set_mode;
+ 	clk->set_next_event = twd_set_next_event;
+-	clk->shift = 20;
+-	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
+-	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
+-	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
+ 
+ 	/* Make sure our local interrupt controller has this enabled */
+ 	gic_enable_ppi(clk->irq);
+ 
+-	clockevents_register_device(clk);
++	__get_cpu_var(twd_ce) = clk;
++
++	clockevents_config_and_register(clk, twd_timer_rate,
++					0xf, 0xffffffff);
+ }
+-- 
+1.7.4.1
