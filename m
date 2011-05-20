@@ -1,208 +1,159 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 09:59:23 +0200
-Subject: [PATCH 7/9] ARM i.MX: use sparse irqs
+Date: Fri, 20 May 2011 09:59:21 +0200
+Subject: [PATCH 5/9] ARM i.MX mx31ads: allocate irqs for expio dynamically
 In-Reply-To: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
 References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1305878365-827-9-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1305878365-827-7-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This switches the whole i.MX architecture to use sparse irqs.
-It helps us getting rid of some ifdeffery in irqs.h and allows
-us to be more flexible with chained interrupt handlers.
-
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/Kconfig                      |    1 +
- arch/arm/mach-imx/mm-imx31.c          |    8 ++++-
- arch/arm/mach-imx/mm-imx35.c          |    7 ++++
- arch/arm/plat-mxc/avic.c              |    6 +++-
- arch/arm/plat-mxc/gpio.c              |    6 +++-
- arch/arm/plat-mxc/include/mach/irqs.h |   54 +++++---------------------------
- 6 files changed, 34 insertions(+), 48 deletions(-)
+ arch/arm/mach-imx/mach-mx31ads.c |   45 +++++++++++++++++++------------------
+ 1 files changed, 23 insertions(+), 22 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 377a7a5..cebed1e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -367,6 +367,7 @@ config ARCH_MXC
- 	select ARCH_REQUIRE_GPIOLIB
- 	select CLKDEV_LOOKUP
- 	select HAVE_SCHED_CLOCK
-+	select SPARSE_IRQ
- 	help
- 	  Support for Freescale MXC/iMX-based family of processors
+diff --git a/arch/arm/mach-imx/mach-mx31ads.c b/arch/arm/mach-imx/mach-mx31ads.c
+index f4dee02..d183592 100644
+--- a/arch/arm/mach-imx/mach-mx31ads.c
++++ b/arch/arm/mach-imx/mach-mx31ads.c
+@@ -62,11 +62,6 @@
+ #define PBC_INTMASK_CLEAR_REG	(PBC_INTMASK_CLEAR + PBC_BASE_ADDRESS)
+ #define EXPIO_PARENT_INT	IOMUX_TO_IRQ(MX31_PIN_GPIO1_4)
  
-diff --git a/arch/arm/mach-imx/mm-imx31.c b/arch/arm/mach-imx/mm-imx31.c
-index 86b9b45..e055ef0 100644
---- a/arch/arm/mach-imx/mm-imx31.c
-+++ b/arch/arm/mach-imx/mm-imx31.c
-@@ -19,7 +19,7 @@
- #include <linux/mm.h>
- #include <linux/init.h>
- #include <linux/err.h>
+-#define MXC_IRQ_TO_EXPIO(irq)	((irq) - MXC_EXP_IO_BASE)
 -
-+#include <linux/irq.h>
- #include <asm/pgtable.h>
- #include <asm/mach/map.h>
+-#define EXPIO_INT_XUART_INTA	(MXC_EXP_IO_BASE + 10)
+-#define EXPIO_INT_XUART_INTB	(MXC_EXP_IO_BASE + 11)
+-
+ #define MXC_MAX_EXP_IO_LINES	16
  
-@@ -61,6 +61,12 @@ static struct mxc_gpio_port imx31_gpio_ports[] = {
+ /*
+@@ -76,7 +71,6 @@ static struct plat_serial8250_port serial_platform_data[] = {
+ 	{
+ 		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTA),
+ 		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTA),
+-		.irq      = EXPIO_INT_XUART_INTA,
+ 		.uartclk  = 14745600,
+ 		.regshift = 0,
+ 		.iotype   = UPIO_MEM,
+@@ -84,7 +78,6 @@ static struct plat_serial8250_port serial_platform_data[] = {
+ 	}, {
+ 		.membase  = (void *)(PBC_BASE_ADDRESS + PBC_SC16C652_UARTB),
+ 		.mapbase  = (unsigned long)(MX31_CS4_BASE_ADDR + PBC_SC16C652_UARTB),
+-		.irq      = EXPIO_INT_XUART_INTB,
+ 		.uartclk  = 14745600,
+ 		.regshift = 0,
+ 		.iotype   = UPIO_MEM,
+@@ -101,11 +94,6 @@ static struct platform_device serial_device = {
+ 	},
+ };
  
- void __init mx31_init_irq(void)
- {
-+	int ret;
-+
- 	mxc_init_irq(MX31_IO_ADDRESS(MX31_AVIC_BASE_ADDR));
- 	mxc_gpio_init(imx31_gpio_ports,	ARRAY_SIZE(imx31_gpio_ports));
-+
-+	/* The ipu driver should handle this */
-+	ret = irq_alloc_descs(MXC_IPU_IRQ_START, MXC_IPU_IRQ_START, 160, 0);
-+	BUG_ON(ret != MXC_IPU_IRQ_START);
+-static int __init mxc_init_extuart(void)
+-{
+-	return platform_device_register(&serial_device);
+-}
+-
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
+ };
+@@ -123,6 +111,8 @@ static inline void mxc_init_imx_uart(void)
+ 	imx31_add_imx_uart0(&uart_pdata);
  }
-diff --git a/arch/arm/mach-imx/mm-imx35.c b/arch/arm/mach-imx/mm-imx35.c
-index c880e6d..abe908b 100644
---- a/arch/arm/mach-imx/mm-imx35.c
-+++ b/arch/arm/mach-imx/mm-imx35.c
-@@ -19,6 +19,7 @@
- #include <linux/mm.h>
- #include <linux/init.h>
- #include <linux/err.h>
-+#include <linux/irq.h>
  
- #include <asm/pgtable.h>
- #include <asm/mach/map.h>
-@@ -58,6 +59,12 @@ static struct mxc_gpio_port imx35_gpio_ports[] = {
- 
- void __init mx35_init_irq(void)
++static int expio_base_irq;
++
+ static void mx31ads_expio_irq_handler(u32 irq, struct irq_desc *desc)
  {
-+	int ret;
+ 	u32 imr_val;
+@@ -132,7 +122,7 @@ static void mx31ads_expio_irq_handler(u32 irq, struct irq_desc *desc)
+ 	imr_val = __raw_readw(PBC_INTMASK_SET_REG);
+ 	int_valid = __raw_readw(PBC_INTSTATUS_REG) & imr_val;
+ 
+-	expio_irq = MXC_EXP_IO_BASE;
++	expio_irq = expio_base_irq;
+ 	for (; int_valid != 0; int_valid >>= 1, expio_irq++) {
+ 		if ((int_valid & 1) == 0)
+ 			continue;
+@@ -147,8 +137,8 @@ static void mx31ads_expio_irq_handler(u32 irq, struct irq_desc *desc)
+  */
+ static void expio_mask_irq(struct irq_data *d)
+ {
+-	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
+-	/* mask the interrupt */
++	u32 expio = d->irq - expio_base_irq;
 +
- 	mxc_init_irq(MX35_IO_ADDRESS(MX35_AVIC_BASE_ADDR));
- 	mxc_gpio_init(imx35_gpio_ports,	ARRAY_SIZE(imx35_gpio_ports));
-+
-+	/* The ipu driver should handle this */
-+	ret = irq_alloc_descs(MXC_IPU_IRQ_START, MXC_IPU_IRQ_START, 160, 0);
-+	BUG_ON(ret != MXC_IPU_IRQ_START);
+ 	__raw_writew(1 << expio, PBC_INTMASK_CLEAR_REG);
+ 	__raw_readw(PBC_INTMASK_CLEAR_REG);
  }
-diff --git a/arch/arm/plat-mxc/avic.c b/arch/arm/plat-mxc/avic.c
-index 55d2534..1a4f00c 100644
---- a/arch/arm/plat-mxc/avic.c
-+++ b/arch/arm/plat-mxc/avic.c
-@@ -123,7 +123,7 @@ static struct mxc_irq_chip mxc_avic_chip = {
+@@ -159,8 +149,8 @@ static void expio_mask_irq(struct irq_data *d)
   */
- void __init mxc_init_irq(void __iomem *irqbase)
+ static void expio_ack_irq(struct irq_data *d)
  {
--	int i;
-+	int ret, i;
- 
- 	avic_base = irqbase;
- 
-@@ -140,6 +140,10 @@ void __init mxc_init_irq(void __iomem *irqbase)
- 	/* all IRQ no FIQ */
- 	__raw_writel(0, avic_base + AVIC_INTTYPEH);
- 	__raw_writel(0, avic_base + AVIC_INTTYPEL);
+-	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
+-	/* clear the interrupt status */
++	u32 expio = d->irq - expio_base_irq;
 +
-+	ret = irq_alloc_descs(0, 0, AVIC_NUM_IRQS, 0);
-+	BUG_ON(ret);
-+
- 	for (i = 0; i < AVIC_NUM_IRQS; i++) {
- 		irq_set_chip_and_handler(i, &mxc_avic_chip.base,
- 					 handle_level_irq);
-diff --git a/arch/arm/plat-mxc/gpio.c b/arch/arm/plat-mxc/gpio.c
-index 6cd6d7f..8352264 100644
---- a/arch/arm/plat-mxc/gpio.c
-+++ b/arch/arm/plat-mxc/gpio.c
-@@ -303,7 +303,7 @@ static struct lock_class_key gpio_lock_class;
+ 	__raw_writew(1 << expio, PBC_INTSTATUS_REG);
+ }
  
- int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- {
--	int i, j;
-+	int i, j, ret;
- 
- 	/* save for local usage */
- 	mxc_gpio_ports = port;
-@@ -311,6 +311,10 @@ int __init mxc_gpio_init(struct mxc_gpio_port *port, int cnt)
- 
- 	printk(KERN_INFO "MXC GPIO hardware\n");
- 
-+	ret = irq_alloc_descs(MXC_GPIO_IRQ_START, MXC_GPIO_IRQ_START,
-+		cnt * 32, 0);
-+	BUG_ON(ret != MXC_GPIO_IRQ_START);
-+
- 	for (i = 0; i < cnt; i++) {
- 		/* disable the interrupt and clear the status */
- 		__raw_writel(0, port[i].base + GPIO_IMR);
-diff --git a/arch/arm/plat-mxc/include/mach/irqs.h b/arch/arm/plat-mxc/include/mach/irqs.h
-index 35c89bc..8253463 100644
---- a/arch/arm/plat-mxc/include/mach/irqs.h
-+++ b/arch/arm/plat-mxc/include/mach/irqs.h
-@@ -11,58 +11,22 @@
- #ifndef __ASM_ARCH_MXC_IRQS_H__
- #define __ASM_ARCH_MXC_IRQS_H__
- 
--/*
-- * SoCs with TZIC interrupt controller have 128 IRQs, those with AVIC have 64
-+/* This should go away. Currently the serial driver uses this
-+ * (and it shouldn't)
+@@ -170,8 +160,8 @@ static void expio_ack_irq(struct irq_data *d)
   */
--#ifdef CONFIG_MXC_TZIC
- #define MXC_INTERNAL_IRQS	128
--#else
--#define MXC_INTERNAL_IRQS	64
--#endif
+ static void expio_unmask_irq(struct irq_data *d)
+ {
+-	u32 expio = MXC_IRQ_TO_EXPIO(d->irq);
+-	/* unmask the interrupt */
++	u32 expio = d->irq - expio_base_irq;
++
+ 	__raw_writew(1 << expio, PBC_INTMASK_SET_REG);
+ }
  
-+/* Right after maximum number of internal irqs */
- #define MXC_GPIO_IRQ_START	MXC_INTERNAL_IRQS
+@@ -188,6 +178,13 @@ static void __init mx31ads_init_expio(void)
  
--/* these are ordered by size to support multi-SoC kernels */
--#if defined CONFIG_SOC_IMX53
--#define MXC_GPIO_IRQS		(32 * 7)
--#elif defined CONFIG_ARCH_MX2
--#define MXC_GPIO_IRQS		(32 * 6)
--#elif defined CONFIG_SOC_IMX50
--#define MXC_GPIO_IRQS		(32 * 6)
--#elif defined CONFIG_ARCH_MX1
--#define MXC_GPIO_IRQS		(32 * 4)
--#elif defined CONFIG_ARCH_MX25
--#define MXC_GPIO_IRQS		(32 * 4)
--#elif defined CONFIG_SOC_IMX51
--#define MXC_GPIO_IRQS		(32 * 4)
--#elif defined CONFIG_ARCH_MX3
--#define MXC_GPIO_IRQS		(32 * 3)
--#endif
--
--/*
-- * The next 16 interrupts are for board specific purposes.  Since
-- * the kernel can only run on one machine@a time, we can re-use
-- * these.  If you need more, increase MXC_BOARD_IRQS, but keep it
-- * within sensible limits.
-- */
--#define MXC_BOARD_IRQ_START	(MXC_INTERNAL_IRQS + MXC_GPIO_IRQS)
--
--#ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
--#define MXC_BOARD_IRQS  80
--#else
--#define MXC_BOARD_IRQS	16
--#endif
--
--#define MXC_IPU_IRQ_START	(MXC_BOARD_IRQ_START + MXC_BOARD_IRQS)
-+/* one board (mx31ads) still depends on this. Do not add new dependencies */
-+#define MXC_BOARD_IRQ_START	512
+ 	printk(KERN_INFO "MX31ADS EXPIO(CPLD) hardware\n");
  
--#ifdef CONFIG_MX3_IPU_IRQS
--#define MX3_IPU_IRQS CONFIG_MX3_IPU_IRQS
--#else
--#define MX3_IPU_IRQS 0
--#endif
--/* REVISIT: Add IPU irqs on IMX51 */
-+/* should go away once the ipu uses dynamically allocated irqs */
-+#define MXC_IPU_IRQ_START	1024
++	/* Currently we rely on the exact irq number as this must be hardcoded
++	 * into the cs89x0 driver
++	 */
++	expio_base_irq = irq_alloc_descs(-1, MXC_EXP_IO_BASE, MXC_MAX_EXP_IO_LINES, 0);
++	if (expio_base_irq != MXC_EXP_IO_BASE)
++		return;
++
+ 	/*
+ 	 * Configure INT line as GPIO input
+ 	 */
+@@ -196,13 +193,18 @@ static void __init mx31ads_init_expio(void)
+ 	/* disable the interrupt and clear the status */
+ 	__raw_writew(0xFFFF, PBC_INTMASK_CLEAR_REG);
+ 	__raw_writew(0xFFFF, PBC_INTSTATUS_REG);
+-	for (i = MXC_EXP_IO_BASE; i < (MXC_EXP_IO_BASE + MXC_MAX_EXP_IO_LINES);
++	for (i = expio_base_irq; i < (expio_base_irq + MXC_MAX_EXP_IO_LINES);
+ 	     i++) {
+ 		irq_set_chip_and_handler(i, &expio_irq_chip, handle_level_irq);
+ 		set_irq_flags(i, IRQF_VALID);
+ 	}
+ 	irq_set_irq_type(EXPIO_PARENT_INT, IRQ_TYPE_LEVEL_HIGH);
+ 	irq_set_chained_handler(EXPIO_PARENT_INT, mx31ads_expio_irq_handler);
++
++	serial_platform_data[0].irq = expio_base_irq + 10;
++	serial_platform_data[1].irq = expio_base_irq + 11;
++
++	platform_device_register(&serial_device);
+ }
  
--#define NR_IRQS			(MXC_IPU_IRQ_START + MX3_IPU_IRQS)
-+/* All irqs dynamically allocated */
-+#define NR_IRQS			0
+ #ifdef CONFIG_MACH_MX31ADS_WM1133_EV1
+@@ -511,12 +513,11 @@ static void __init mx31ads_map_io(void)
+ static void __init mx31ads_init_irq(void)
+ {
+ 	mx31_init_irq();
+-	mx31ads_init_expio();
+ }
  
- extern int imx_irq_set_priority(unsigned char irq, unsigned char prio);
- 
+ static void __init mx31ads_init(void)
+ {
+-	mxc_init_extuart();
++	mx31ads_init_expio();
+ 	mxc_init_imx_uart();
+ 	mxc_init_i2c();
+ 	mxc_init_audio();
 -- 
 1.7.4.1
