@@ -1,17 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 May 2011 22:28:37 +0100
-Subject: [PATCH v6 0/8] Switch ARM platforms from integrator-flash to
-	physmap
-In-Reply-To: <1305809614.27474.41.camel@e102391-lin.cambridge.arm.com>
-References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>
-	<1305803946.2630.69.camel@localhost>
-	<1305809614.27474.41.camel@e102391-lin.cambridge.arm.com>
-Message-ID: <20110520212837.GB30675@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 May 2011 23:50:45 +0200
+Subject: [PATCH v2] ARM: smp_twd: Reconfigure clockevents after cpufreq
+	change
+In-Reply-To: <1305851091-10096-1-git-send-email-ccross@android.com>
+References: <1305851091-10096-1-git-send-email-ccross@android.com>
+Message-ID: <BANLkTikzhC68w1AD59Vqw2vopDwu=YjOEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 01:53:34PM +0100, Marc Zyngier wrote:
-> Yes, it's been merged by Russell into his tree yesterday, after David's
-> ack.
+On Fri, May 20, 2011 at 2:24 AM, Colin Cross <ccross@android.com> wrote:
 
-... and I've just added the new acks we've had today.
+> The localtimer's clock changes with the cpu clock. ?After a
+> cpufreq transition, update the clockevent's frequency and
+> reprogram the next clock event.
+>
+> Adds a clock called "smp_twd" that is used to determine the
+> twd frequency, which can also be used at init time to
+> avoid calibrating the twd frequency.
+>
+> Clock changes are based on Rob Herring's work.
+>
+> Change-Id: I413b5cd07fb2b79bc9fad8b4bf257332d1da7bcd
+> Signed-off-by: Colin Cross <ccross@android.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> Cc: Rob Herring <robherring2@gmail.com>
+> Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+OK Thomas can you take this in through the clock/timer
+branch? Works fine for me and Colin and solves many problems
+apart from making the code look neat.
+
+Yours,
+Linus Walleij
