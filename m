@@ -1,27 +1,18 @@
-From: joe@perches.com (Joe Perches)
-Date: Fri, 20 May 2011 13:59:45 -0700
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <201105181047.17309.arnd@arndb.de>
-References: <201105181047.17309.arnd@arndb.de>
-Message-ID: <1305925185.4209.86.camel@Joe-Laptop>
+From: carmille_burns72@gmail.com (Carmille.Burns)
+Date: Fri, 20 May 2011 16:07:53 -0500
+Subject: Hello Would You Like To Earn
+Message-ID: <E1QNWvJ-004Egh-8k@host113.kvchosting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-18 at 10:47 +0200, Arnd Bergmann wrote:
-> otherwise please comment.
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> @@ -630,6 +630,17 @@ S:	Maintained
->  F:	drivers/amba/
->  F:	include/linux/amba/bus.h
->  
-> +ARM SUBARCHITECTURES
-> +M:	Arnd Bergmann <arnd@arndb.de>
-> +M:	Nicolas Pitre <nico@fluxnic.net>
-> +M:	Thomas Gleixner <tglx@linutronix.de>
-> +M:	arm at kernel.org
-> +L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> +S:	MAINTAINED
+Hello linux-arm-kernel
 
-Trivial.  Please use:
+Would you like to earn an extra $200 everyday?, for just 45 minutes work? You could quit your job and make double the money at home working for yourself.
 
-S:	Maintained
+visit->http:tinyurl.com/42e38u9
+
+Regards,
+
+Carmille Burns
+
+Survey Human Resources Dept.
