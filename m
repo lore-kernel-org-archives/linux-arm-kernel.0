@@ -1,42 +1,160 @@
-From: sjg@chromium.org (Simon Glass)
-Date: Thu, 19 May 2011 22:24:31 -0700
-Subject: [PATCH v4] ARM: Use generic BUG() handler
-In-Reply-To: <20110426014741.GB28721@quad.lixom.net>
-References: <1302822031-6752-1-git-send-email-sjg@chromium.org>
-	<4DA7A914.5020804@codeaurora.org>
-	<BANLkTikcY-xzjd0W77UfWWoO8ibjKNXQGg@mail.gmail.com>
-	<BANLkTin_TpzdQS96SPKUNye6vb2b55Qc4A@mail.gmail.com>
-	<143ea9b1bb96e613d534caa7cb3a1e2d.squirrel@www.codeaurora.org>
-	<20110426014741.GB28721@quad.lixom.net>
-Message-ID: <BANLkTikHT2E=76jMLbzmQm_CiUw8rA3cCA@mail.gmail.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 20 May 2011 14:44:41 +0900
+Subject: [PATCH 0/4] Samsung: Move Samsung SoCs GPIO drivers to drivers/gpio
+Message-ID: <20110520054441.GA9952@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Apr 25, 2011 at 6:47 PM, Olof Johansson <olof@lixom.net> wrote:
-> On Wed, Apr 20, 2011 at 11:01:59AM -0700, Stephen Boyd wrote:
->
->> It's here:
->> http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6885/1
->>
->> I imagine it will be added when/if Russell picks it up. Sadly it
->> increases the LOC in ARM so Simon might need to really
->> sell it to get it merged.
->
-> It's core code though, and the concern today is not with ARM core code
-> as much as with the various platforms that are growing seemingly without
-> upper bounds.
+The following changes since commit 61c4f2c81c61f73549928dfd9f3e8f26aa36a8cf:
 
-Hi,
+  Linux 2.6.39 (2011-05-18 21:06:34 -0700)
 
-Can anyone advise please what happens next with this patch? So far I
-have posted it to the list, it has been reviewed on the list and I
-have put it into the patch system. What is the next step please to get
-this into the kernel?
+Kyungmin Park (4):
+      Move to Samsung common GPIO library to drivers/gpio
+      Move the exynos4 GPIO to drivers/gpio
+      Move the s5pv210 GPIO to drivers/gpio
+      Move the s5pc100 GPIO to drivers/gpio
 
-Regards,
-Simon
+ arch/arm/mach-exynos4/Makefile                     |    2 +-
+ arch/arm/mach-s5pc100/Makefile                     |    2 +-
+ arch/arm/mach-s5pv210/Makefile                     |    2 +-
+ arch/arm/plat-samsung/Makefile                     |    1 -
+ drivers/gpio/Kconfig                               |   24 ++++++++++++++++++++
+ drivers/gpio/Makefile                              |    4 +++
+ .../gpiolib.c => drivers/gpio/exynos4-gpio.c       |    0
+ .../gpiolib.c => drivers/gpio/s5pc100-gpio.c       |    0
+ .../gpiolib.c => drivers/gpio/s5pv210-gpio.c       |    0
+ .../gpiolib.c => drivers/gpio/samsung-gpiolib.c    |    3 +-
+ 10 files changed, 33 insertions(+), 5 deletions(-)
+ rename arch/arm/mach-exynos4/gpiolib.c => drivers/gpio/exynos4-gpio.c (100%)
+ rename arch/arm/mach-s5pc100/gpiolib.c => drivers/gpio/s5pc100-gpio.c (100%)
+ rename arch/arm/mach-s5pv210/gpiolib.c => drivers/gpio/s5pv210-gpio.c (100%)
+ rename arch/arm/plat-samsung/gpiolib.c => drivers/gpio/samsung-gpiolib.c (99%)
 
->
->
-> -Olof
->
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index 9be104f..3bb3f57 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -13,7 +13,7 @@ obj-				:=
+ # Core support for EXYNOS4 system
+ 
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
+-obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o gpiolib.o irq-eint.o dma.o
++obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
+ obj-$(CONFIG_PM)		+= pm.o sleep.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ 
+diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
+index eecab57..a5e6e60 100644
+--- a/arch/arm/mach-s5pc100/Makefile
++++ b/arch/arm/mach-s5pc100/Makefile
+@@ -11,7 +11,7 @@ obj-				:=
+ 
+ # Core support for S5PC100 system
+ 
+-obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o gpiolib.o
++obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o
+ obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
+ obj-$(CONFIG_CPU_S5PC100)	+= dma.o
+ 
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 11f1790..50907ac 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -12,7 +12,7 @@ obj-				:=
+ 
+ # Core support for S5PV210 system
+ 
+-obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o gpiolib.o
++obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o
+ obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
+ obj-$(CONFIG_S5PV210_PM)	+= pm.o sleep.o
+ obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+index e9de58a..53eb15b 100644
+--- a/arch/arm/plat-samsung/Makefile
++++ b/arch/arm/plat-samsung/Makefile
+@@ -19,7 +19,6 @@ obj-y				+= gpio.o
+ obj-y				+= gpio-config.o
+ obj-y				+= dev-asocdma.o
+ 
+-obj-$(CONFIG_SAMSUNG_GPIOLIB_4BIT)	+= gpiolib.o
+ obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
+ 
+ obj-$(CONFIG_SAMSUNG_IRQ_UART)	+= irq-uart.o
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d3b2953..d838f5b 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -75,6 +75,30 @@ config GPIO_BASIC_MMIO
+ 	help
+ 	  Say yes here to support basic memory-mapped GPIO controllers.
+ 
++config GPIO_EXYNOS4
++	bool "Samsung Exynos4 GPIO library support"
++	default y if CPU_EXYNOS4210
++	help
++	  Say yes here to support Samsung Exynos4 series SoCs GPIO library
++
++config GPIO_SAMSUNG
++	bool "Samsung SoCs GPIO library support"
++	default y if SAMSUNG_GPIOLIB_4BIT
++	help
++	  Say yes here to support Samsung SoCs GPIO library
++
++config GPIO_S5PC100
++	bool "Samsung S5PC100 GPIO library support"
++	default y if CPU_S5PC100
++	help
++	  Say yes here to support Samsung S5PC100 SoC GPIO library
++
++config GPIO_S5PV210
++	bool "Samsung S5PV210/S5PC110 GPIO library support"
++	default y if CPU_S5PV210
++	help
++	  Say yes here to support Samsung S5PV210/S5PC110 SoC GPIO library
++
+ config GPIO_IT8761E
+ 	tristate "IT8761E GPIO support"
+ 	depends on GPIOLIB
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index becef59..738386f 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -11,6 +11,10 @@ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
+ obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
+ obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
+ obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
++obj-$(CONFIG_GPIO_EXYNOS4)	+= exynos4-gpio.o
++obj-$(CONFIG_GPIO_SAMSUNG)	+= samsung-gpiolib.o
++obj-$(CONFIG_GPIO_S5PC100)	+= s5pc100-gpio.o
++obj-$(CONFIG_GPIO_S5PV210)	+= s5pv210-gpio.o
+ obj-$(CONFIG_GPIO_LANGWELL)	+= langwell_gpio.o
+ obj-$(CONFIG_GPIO_MAX730X)	+= max730x.o
+ obj-$(CONFIG_GPIO_MAX7300)	+= max7300.o
+diff --git a/arch/arm/mach-exynos4/gpiolib.c b/drivers/gpio/exynos4-gpio.c
+similarity index 100%
+rename from arch/arm/mach-exynos4/gpiolib.c
+rename to drivers/gpio/exynos4-gpio.c
+diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/drivers/gpio/s5pc100-gpio.c
+similarity index 100%
+rename from arch/arm/mach-s5pc100/gpiolib.c
+rename to drivers/gpio/s5pc100-gpio.c
+diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/drivers/gpio/s5pv210-gpio.c
+similarity index 100%
+rename from arch/arm/mach-s5pv210/gpiolib.c
+rename to drivers/gpio/s5pv210-gpio.c
+diff --git a/arch/arm/plat-samsung/gpiolib.c b/drivers/gpio/samsung-gpiolib.c
+similarity index 99%
+rename from arch/arm/plat-samsung/gpiolib.c
+rename to drivers/gpio/samsung-gpiolib.c
+index ea37c04..925b66e 100644
+--- a/arch/arm/plat-samsung/gpiolib.c
++++ b/drivers/gpio/samsung-gpiolib.c
+@@ -1,4 +1,5 @@
+-/* arch/arm/plat-samsung/gpiolib.c
++/*
++ * drivers/gpio/samsung-gpiolib.c
+  *
+  * Copyright 2008 Openmoko, Inc.
+  * Copyright 2008 Simtec Electronics
