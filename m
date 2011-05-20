@@ -1,50 +1,65 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 12:02:42 +0200
-Subject: [PATCH 0/4] add gpio driver gpio-mxs
-In-Reply-To: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
-References: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110520100242.GA10403@pengutronix.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 20 May 2011 12:04:48 +0200
+Subject: On __raw_readl readl_relaxed and readl nocheinmal
+Message-ID: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+Now I get thes questions about I/O accessors from all over the
+place where I'm working. It seems some public clarification is needed...
 
-On Fri, May 20, 2011 at 05:51:25PM +0800, Shawn Guo wrote:
-> The patch set is to move Freescale MXS gpio driver from mach-mxs
-> into drivers/gpio.  Different from u300 gpio driver that all gpio
-> ports are registered as one device, gpio-mxs expects every single
-> port is a gpio device.
-> 
-> The first 3 patches are just to ease review and can be squashed into
-> the last one.
-> 
-> Shawn Guo (4):
->       gpio: gpio-mxs: add file gpio-mxs.c
->       gpio: gpio-mxs: drop mach-specific accessors
->       gpio: gpio-mxs: remove gpio port definition and registration
->       gpio: gpio-mxs: add gpio driver for Freescale MXS architecture
+My current understanding:
 
-Your series should be bisectible. So please either:
+__raw_writel(a, reg1);
+__raw_writel(b, reg2);
 
-- Add the driver the way you want it (no need to modify a new file in
-  four steps)
-- atomically switch to the new driver
-- remove old driver
+This does not guarantee that the write of b into reg2 is even done
+after writing a into reg1 due to instruction reeordering.
 
-or:
+writel_relaxed(a, reg1);
+writel_relaxed(b, reg2);
 
-- work on old file until it's suitable for drivers/gpio
-- move old file to drivers/gpio and adjust the makefiles in one step.
+This will insert a barrier() so we know that the CPU will execute the
+write of a before the write of b. However it does not mandate that
+reg2 is written with b before reg1 is written with a at the hardware
+register level.
 
+writel(a, reg1);
+writel(b, reg2);
 
-There may be different variations on this depending on the actual code,
-but whatever you do, each step should be able to compile and working.
+This actually pushes the value all the way through so that you know
+that the values has landed in the hardware after each statement.
 
+What we would like to know is the effect of things like this:
 
-Sascha
+__raw_writel(a, reg1);
+__raw_writel(b, reg1);
+__raw_writel(c, reg1);
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+writel_relaxed(a, reg1);
+writel_relaxed(b, reg1);
+writel_relaxed(c, reg1);
+
+My *guess* is that in the first case the pipeline may even remove
+the write if a and b to reg1 since it's only caring about the end
+result (insert the volatile story in
+Documentation/volatile_considered_harmful.txt here)
+
+The second case (writel_relaxed() to the same register) would
+make sure that the writes actually happens in sequence,
+but after the last statement it may take a while before the
+actual hardware write happens.
+
+And what about this:
+
+writel_relaxed(a, reg1);
+writel_relaxed(b, reg1);
+writel(c, reg1);
+
+I *think* this means that the writes will be done in sequence,
+and after the last statement you know all writes have commenced.
+
+So beat me up now.
+
+Yours,
+Linus Walleij
