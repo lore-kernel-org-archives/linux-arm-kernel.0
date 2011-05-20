@@ -1,119 +1,115 @@
-From: stephen.neuendorffer@xilinx.com (Stephen Neuendorffer)
-Date: Fri, 20 May 2011 09:08:17 -0700
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <4DD68614.6090209@gmail.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com><20110519233958.GB18181@ponder.secretlab.ca><4DD66B8A.5040404@gmail.com>
-	<201105201621.03801.arnd@arndb.de> <4DD68614.6090209@gmail.com>
-Message-ID: <a42f0c27-2811-4b68-bedf-7dfaa7bff6ff@VA3EHSMHS025.ehs.local>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Fri, 20 May 2011 17:24:05 +0100 (BST)
+Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <20110520150348.GB3141@arm.com>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
+	<20110520113758.GA3141@arm.com>
+	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
+	<20110520150348.GB3141@arm.com>
+Message-ID: <alpine.DEB.2.00.1105201703260.8018@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, 20 May 2011, Dave Martin wrote:
 
+[ ... ]
+>> I've simply done there what the "setmode" macro from
+>> <asm/assembler.h> is doing, have chosen not to include that file
+>> because it overrides "push" on a global scale for no good reason and
+>> that sort of thing makes me cringe.
+>
+> Actually, I guess you should be using that header, from a general
+> standardisation point of view.  In particular, it would be nicer to
+> use setmode than to copy it.
+>
+> The setmode macro itself could be improved to use cps for Thumb-2,
+> but that would be a separate (and low-priority) patch.
+>
+>
+> Re the push/pop macros, I'm not sure of the history for those.
 
-> -----Original Message-----
-> From:
-devicetree-discuss-bounces+stephen.neuendorffer=xilinx.com at lists.ozlabs.
-org [mailto:devicetree-
-> discuss-bounces+stephen.neuendorffer=xilinx.com at lists.ozlabs.org] On
-Behalf Of Rob Herring
-> Sent: Friday, May 20, 2011 8:18 AM
-> To: Arnd Bergmann
-> Cc: devicetree-discuss at lists.ozlabs.org; Jeremy Kerr;
-linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH 2/2] drivers/amba: probe via device tree
-> 
-> Arnd,
-> 
-> On 05/20/2011 09:21 AM, Arnd Bergmann wrote:
-> > On Friday 20 May 2011 15:24:26 Rob Herring wrote:
-> >> Maybe we are looking this in the wrong way.
-> >>
-> >> AMBA is not really the bus, but certain types of devices on the
-bus.
-> >> Granted, it may actually be an AMBA bus vs. vendor bus (i.MX AIPS),
-but
-> >> that is really transparent to s/w. Separating AMBA devices in the
-> >> devicetree is really Linux requirements defining the devicetree
-> >> structure. It is certainly conceivable that an OS could make no
-> >> distinction. In my case, there is a mixture of regular platform
-devices
-> >> and AMBA(Primecell really) devices all interleaved on the same bus.
-> >
-> > I don't see how that would work. If the bus is AMBA, it should
-> > only have AMBA devices on it, otherwise how would they be connected?
-> >
-> The ARM definition of AMBA encompasses a lot of things. It is the
-> definition of the AXI, AHB and APB buses. It also has the definition
-of
-> the peripheral ID register definitions which primarily only ARM Ltd
-> peripherals implement. You can have those bus types yet not have any
-> peripherals with the ID registers. The Linux amba bus primarily deals
-> with just the peripheral ID for probe matching. There is also bus
-clock
-> handling, but that's not really unique to an AMBA bus. Arguably the
-> platform bus could have bus clock handling as well.
+arch/arm/lib are the only users.
 
-I tried to bring up exactly this issue, but I don't think I got my point
-across
-effectively.  (probably because I started off with "why the hell does
-this exist???")
-(face palm)  The amba_bus driver really deals with a bunch of issues
-that
-are specific to a very small number of platforms and the style of cores
-from ARM.
+>
+> In the kernel, it seems customary to write stmfd sp!, / ldmfd sp!,
+> instead of push / pop, so you could always use those mnemonics instead.
+> They're equivalent.
 
-> > Whether software is supposed to know care about this is a different
-> > question. The device tree should generally reflect the block
-> > diagram of the hardware,
-> 
-> Agreed.
-> 
-> > and I would expect the AMBA devices be
-> > on a different level from the rest there.
-> >
-> But this part is not true.
-> 
-> >> Based on this, I think of_platform_populate should always just
-match
-> >> against "simple-bus" and make the matches parameter define the
-device
-> >> creation hook rather than the bus type. Or you could have both
-> >> bus_matches and dev_matches parameters.
-> >
-> > I think it would be much better to only look at the parent bus for
-> > device to add, never at the device itself.
-> >
-> > If the bus is AMBA, add all devices as amba_device, if it's
-simple-bus,
-> > add all devices as platform_device.
-> >
-> That is how it is currently, but the reality is that I only have 1 bus
-> with both ARM Primecell peripherals and other peripherals which are
-> standard platform bus devices. i2c-designware is one example. It is on
-> the APB just like the pl011 uart. So do you propose I create a amba
-> driver for it? It has no peripheral ID registers, so that may not even
-work.
+The "customary" seems largely a consequence of having the #define in 
+<asm/assembler.h> as you get a compile error if you use push/pop as 
+instruction.
 
-Same here.  I don't know what the right solution for it is, but I find
-amba_bus
-solution to get in the way more than help.  I had to hack the etm/etb
-driver
-and the amba_bus to shreds to get it to work for me at all.
-I think most of what amba_bus does could be better handled by:
-1) generic support in platform bus for clock enabling/power domains.
-These are system concerns that most drivers shouldn't really know/care
-about, and
-will likely vary between SOCs.
-2) helper functions for drivers for primecell devices that does the
-peripheral id checking.
+I've made the change to "setmode" and stmfd/ldmfd, ok.
 
-I realize that this is to some extent, jumping to a solution (which got
-me into trouble
-the first time around), but if someone has a better suggestion for a
-better way to do it,
-then I'm all ears.
+[ ... ]
+> I think I agree.  Few drivers use FIQ, and if there are drivers
+> which use FIQ but don't implement suspend/resume hooks, that sounds
+> like a driver bug.
+>
+> Assuming nobody disagrees with that conclusion, it would be a good
+> idea to stick a comment somewhere explaining that policy.
 
-Steve
+<speak up or remain silent forever> ;-)
 
+Since the change which moved get/set_fiq_regs() to pure assembly has just 
+gone in, would a simple comment update in the header file along those 
+lines be sufficient ?
 
-This email and any attachments are intended for the sole use of the named recipient(s) and contain(s) confidential information that may be proprietary, privileged or copyrighted under applicable law. If you are not the intended recipient, do not read, copy, or forward this email message or any attachments. Delete this email message and any attachments immediately.
+I.e. state "do not assume persistence of these registers over power mgmt 
+transitions - if that's what you require, implement suspend / resume 
+hooks" ?
+
+>
+>>
+>> See also Russell's mails about that, for previous attempts a year
+>> and half a year ago to get "something for ARM hibernation" in:
+>>
+>> https://lists.linux-foundation.org/pipermail/linux-pm/2010-July/027571.html
+>> https://lists.linux-foundation.org/pipermail/linux-pm/2010-December/029665.html
+>
+> Relying on drivers to save/restore the FIQ state if necessary seems
+> to correspond to what Russell is saying in his second mail.
+
+Agreed, and largely why I haven't bothered touching FIQ.
+
+>
+>>
+>> The kernel doesn't do IRQ/FIQ/ABT/UND save / restore for
+>> suspend-to-ram either. CPU hotplug support (re)initializes those. I
+>> believe we're fine.
+>
+> OK, just wanted to make sure I understood that right.
+
+By and large, "if suspend-to-ram works, suspend-to-disk should too" seems 
+a good idea; if the former doesn't (need to) save/restore such state even 
+though it's not off-mode-persistent, then the latter doesn't need either.
+
+That said, I've seen (out-of-tree) SoC-specific *suspend() code that 
+simply blotted everything out. Seems the most trivial way to go, but not 
+necessarily the best.
+
+>
+> I'll leave it to others to comment on the actual SoC-specific routines,
+> but thanks for the illustration.
+
+To make this clear, I'm not personally considering these parts optimal as 
+the attached patch is doing them.
+
+That's why preferrably, only the "enabler" code should go in first.
+
+I do wonder, though, whether the machine maintainers are willing to make 
+the change to these low-level suspend parts that'd split chip state 
+save/restore from the actual power transition. That'd allow to turn this 
+from a "backdoor" into a proper use of the interface.
+
+Russell has made the change to pass the context buffer as argument, but 
+not split the power transition off; things are getting there, eventually 
+:)
+
+>
+> Cheers
+> ---Dave
+
+Thanks again,
+FrankH.
