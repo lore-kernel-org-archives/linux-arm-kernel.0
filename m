@@ -1,788 +1,177 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 20 May 2011 14:45:06 +0900
-Subject: [PATCH 4/4] Move the s5pc100 GPIO to drivers/gpio
-Message-ID: <20110520054506.GA9970@july>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 20 May 2011 00:31:28 -0600
+Subject: [PATCH 0/4] Samsung: Move Samsung SoCs GPIO drivers to
+	drivers/gpio
+In-Reply-To: <20110520054441.GA9952@july>
+References: <20110520054441.GA9952@july>
+Message-ID: <20110520063128.GA21285@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kyungmin Park <kyungmin.park@samsung.com>
+On Fri, May 20, 2011 at 02:44:41PM +0900, Kyungmin Park wrote:
+> The following changes since commit 61c4f2c81c61f73549928dfd9f3e8f26aa36a8cf:
+> 
+>   Linux 2.6.39 (2011-05-18 21:06:34 -0700)
+> 
+> Kyungmin Park (4):
+>       Move to Samsung common GPIO library to drivers/gpio
+>       Move the exynos4 GPIO to drivers/gpio
+>       Move the s5pv210 GPIO to drivers/gpio
+>       Move the s5pc100 GPIO to drivers/gpio
+> 
+>  arch/arm/mach-exynos4/Makefile                     |    2 +-
+>  arch/arm/mach-s5pc100/Makefile                     |    2 +-
+>  arch/arm/mach-s5pv210/Makefile                     |    2 +-
+>  arch/arm/plat-samsung/Makefile                     |    1 -
+>  drivers/gpio/Kconfig                               |   24 ++++++++++++++++++++
+>  drivers/gpio/Makefile                              |    4 +++
+>  .../gpiolib.c => drivers/gpio/exynos4-gpio.c       |    0
+>  .../gpiolib.c => drivers/gpio/s5pc100-gpio.c       |    0
+>  .../gpiolib.c => drivers/gpio/s5pv210-gpio.c       |    0
+>  .../gpiolib.c => drivers/gpio/samsung-gpiolib.c    |    3 +-
 
-Move the Samsung s5pc100 SoC GPIO driver to drivers/gpio
+drivers/gpio/gpio-*.c please.  I'm starting to enforce some level of
+naming convention.
 
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pc100/Makefile  |    2 +-
- arch/arm/mach-s5pc100/gpiolib.c |  355 ---------------------------------------
- drivers/gpio/Kconfig            |    6 +
- drivers/gpio/Makefile           |    1 +
- drivers/gpio/s5pc100-gpio.c     |  355 +++++++++++++++++++++++++++++++++++++++
- 5 files changed, 363 insertions(+), 356 deletions(-)
- delete mode 100644 arch/arm/mach-s5pc100/gpiolib.c
- create mode 100644 drivers/gpio/s5pc100-gpio.c
+>  10 files changed, 33 insertions(+), 5 deletions(-)
+>  rename arch/arm/mach-exynos4/gpiolib.c => drivers/gpio/exynos4-gpio.c (100%)
+>  rename arch/arm/mach-s5pc100/gpiolib.c => drivers/gpio/s5pc100-gpio.c (100%)
+>  rename arch/arm/mach-s5pv210/gpiolib.c => drivers/gpio/s5pv210-gpio.c (100%)
+>  rename arch/arm/plat-samsung/gpiolib.c => drivers/gpio/samsung-gpiolib.c (99%)
+> 
+> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+> index 9be104f..3bb3f57 100644
+> --- a/arch/arm/mach-exynos4/Makefile
+> +++ b/arch/arm/mach-exynos4/Makefile
+> @@ -13,7 +13,7 @@ obj-				:=
+>  # Core support for EXYNOS4 system
+>  
+>  obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
+> -obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o gpiolib.o irq-eint.o dma.o
+> +obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
+>  obj-$(CONFIG_PM)		+= pm.o sleep.o
+>  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+>  
+> diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
+> index eecab57..a5e6e60 100644
+> --- a/arch/arm/mach-s5pc100/Makefile
+> +++ b/arch/arm/mach-s5pc100/Makefile
+> @@ -11,7 +11,7 @@ obj-				:=
+>  
+>  # Core support for S5PC100 system
+>  
+> -obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o gpiolib.o
+> +obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o
+>  obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
+>  obj-$(CONFIG_CPU_S5PC100)	+= dma.o
+>  
+> diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+> index 11f1790..50907ac 100644
+> --- a/arch/arm/mach-s5pv210/Makefile
+> +++ b/arch/arm/mach-s5pv210/Makefile
+> @@ -12,7 +12,7 @@ obj-				:=
+>  
+>  # Core support for S5PV210 system
+>  
+> -obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o gpiolib.o
+> +obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o
+>  obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
+>  obj-$(CONFIG_S5PV210_PM)	+= pm.o sleep.o
+>  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+> diff --git a/arch/arm/plat-samsung/Makefile b/arch/arm/plat-samsung/Makefile
+> index e9de58a..53eb15b 100644
+> --- a/arch/arm/plat-samsung/Makefile
+> +++ b/arch/arm/plat-samsung/Makefile
+> @@ -19,7 +19,6 @@ obj-y				+= gpio.o
+>  obj-y				+= gpio-config.o
+>  obj-y				+= dev-asocdma.o
+>  
+> -obj-$(CONFIG_SAMSUNG_GPIOLIB_4BIT)	+= gpiolib.o
+>  obj-$(CONFIG_SAMSUNG_CLKSRC)	+= clock-clksrc.o
+>  
+>  obj-$(CONFIG_SAMSUNG_IRQ_UART)	+= irq-uart.o
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index d3b2953..d838f5b 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -75,6 +75,30 @@ config GPIO_BASIC_MMIO
+>  	help
+>  	  Say yes here to support basic memory-mapped GPIO controllers.
+>  
+> +config GPIO_EXYNOS4
+> +	bool "Samsung Exynos4 GPIO library support"
+> +	default y if CPU_EXYNOS4210
+> +	help
+> +	  Say yes here to support Samsung Exynos4 series SoCs GPIO library
+> +
+> +config GPIO_SAMSUNG
+> +	bool "Samsung SoCs GPIO library support"
+> +	default y if SAMSUNG_GPIOLIB_4BIT
+> +	help
+> +	  Say yes here to support Samsung SoCs GPIO library
+> +
+> +config GPIO_S5PC100
+> +	bool "Samsung S5PC100 GPIO library support"
+> +	default y if CPU_S5PC100
+> +	help
+> +	  Say yes here to support Samsung S5PC100 SoC GPIO library
+> +
+> +config GPIO_S5PV210
+> +	bool "Samsung S5PV210/S5PC110 GPIO library support"
+> +	default y if CPU_S5PV210
+> +	help
+> +	  Say yes here to support Samsung S5PV210/S5PC110 SoC GPIO library
+> +
 
-diff --git a/arch/arm/mach-s5pc100/Makefile b/arch/arm/mach-s5pc100/Makefile
-index eecab57..a5e6e60 100644
---- a/arch/arm/mach-s5pc100/Makefile
-+++ b/arch/arm/mach-s5pc100/Makefile
-@@ -11,7 +11,7 @@ obj-				:=
- 
- # Core support for S5PC100 system
- 
--obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o gpiolib.o
-+obj-$(CONFIG_CPU_S5PC100)	+= cpu.o init.o clock.o
- obj-$(CONFIG_CPU_S5PC100)	+= setup-i2c0.o
- obj-$(CONFIG_CPU_S5PC100)	+= dma.o
- 
-diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/arch/arm/mach-s5pc100/gpiolib.c
-deleted file mode 100644
-index 2842394..0000000
---- a/arch/arm/mach-s5pc100/gpiolib.c
-+++ /dev/null
-@@ -1,355 +0,0 @@
--/* linux/arch/arm/mach-s5pc100/gpiolib.c
-- *
-- * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- *  Copyright 2009 Samsung Electronics Co
-- *  Kyungmin Park <kyungmin.park@samsung.com>
-- *
-- * S5PC100 - GPIOlib support
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/kernel.h>
--#include <linux/irq.h>
--#include <linux/io.h>
--#include <linux/gpio.h>
--
--#include <mach/map.h>
--#include <mach/regs-gpio.h>
--
--#include <plat/gpio-core.h>
--#include <plat/gpio-cfg.h>
--#include <plat/gpio-cfg-helpers.h>
--
--/* S5PC100 GPIO bank summary:
-- *
-- * Bank	GPIOs	Style	INT Type
-- * A0	8	4Bit	GPIO_INT0
-- * A1	5	4Bit	GPIO_INT1
-- * B	8	4Bit	GPIO_INT2
-- * C	5	4Bit	GPIO_INT3
-- * D	7	4Bit	GPIO_INT4
-- * E0	8	4Bit	GPIO_INT5
-- * E1	6	4Bit	GPIO_INT6
-- * F0	8	4Bit	GPIO_INT7
-- * F1	8	4Bit	GPIO_INT8
-- * F2	8	4Bit	GPIO_INT9
-- * F3	4	4Bit	GPIO_INT10
-- * G0	8	4Bit	GPIO_INT11
-- * G1	3	4Bit	GPIO_INT12
-- * G2	7	4Bit	GPIO_INT13
-- * G3	7	4Bit	GPIO_INT14
-- * H0	8	4Bit	WKUP_INT
-- * H1	8	4Bit	WKUP_INT
-- * H2	8	4Bit	WKUP_INT
-- * H3	8	4Bit	WKUP_INT
-- * I	8	4Bit	GPIO_INT15
-- * J0	8	4Bit	GPIO_INT16
-- * J1	5	4Bit	GPIO_INT17
-- * J2	8	4Bit	GPIO_INT18
-- * J3	8	4Bit	GPIO_INT19
-- * J4	4	4Bit	GPIO_INT20
-- * K0	8	4Bit	None
-- * K1	6	4Bit	None
-- * K2	8	4Bit	None
-- * K3	8	4Bit	None
-- * L0	8	4Bit	None
-- * L1	8	4Bit	None
-- * L2	8	4Bit	None
-- * L3	8	4Bit	None
-- */
--
--static struct s3c_gpio_cfg gpio_cfg = {
--	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
--	.set_pull	= s3c_gpio_setpull_updown,
--	.get_pull	= s3c_gpio_getpull_updown,
--};
--
--static struct s3c_gpio_cfg gpio_cfg_eint = {
--	.cfg_eint	= 0xf,
--	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
--	.set_pull	= s3c_gpio_setpull_updown,
--	.get_pull	= s3c_gpio_getpull_updown,
--};
--
--static struct s3c_gpio_cfg gpio_cfg_noint = {
--	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
--	.set_pull	= s3c_gpio_setpull_updown,
--	.get_pull	= s3c_gpio_getpull_updown,
--};
--
--/*
-- * GPIO bank's base address given the index of the bank in the
-- * list of all gpio banks.
-- */
--#define S5PC100_BANK_BASE(bank_nr)	(S5P_VA_GPIO + ((bank_nr) * 0x20))
--
--/*
-- * Following are the gpio banks in S5PC100.
-- *
-- * The 'config' member when left to NULL, is initialized to the default
-- * structure gpio_cfg in the init function below.
-- *
-- * The 'base' member is also initialized in the init function below.
-- * Note: The initialization of 'base' member of s3c_gpio_chip structure
-- * uses the above macro and depends on the banks being listed in order here.
-- */
--static struct s3c_gpio_chip s5pc100_gpio_chips[] = {
--	{
--		.chip	= {
--			.base	= S5PC100_GPA0(0),
--			.ngpio	= S5PC100_GPIO_A0_NR,
--			.label	= "GPA0",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPA1(0),
--			.ngpio	= S5PC100_GPIO_A1_NR,
--			.label	= "GPA1",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPB(0),
--			.ngpio	= S5PC100_GPIO_B_NR,
--			.label	= "GPB",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPC(0),
--			.ngpio	= S5PC100_GPIO_C_NR,
--			.label	= "GPC",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPD(0),
--			.ngpio	= S5PC100_GPIO_D_NR,
--			.label	= "GPD",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPE0(0),
--			.ngpio	= S5PC100_GPIO_E0_NR,
--			.label	= "GPE0",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPE1(0),
--			.ngpio	= S5PC100_GPIO_E1_NR,
--			.label	= "GPE1",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPF0(0),
--			.ngpio	= S5PC100_GPIO_F0_NR,
--			.label	= "GPF0",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPF1(0),
--			.ngpio	= S5PC100_GPIO_F1_NR,
--			.label	= "GPF1",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPF2(0),
--			.ngpio	= S5PC100_GPIO_F2_NR,
--			.label	= "GPF2",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPF3(0),
--			.ngpio	= S5PC100_GPIO_F3_NR,
--			.label	= "GPF3",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPG0(0),
--			.ngpio	= S5PC100_GPIO_G0_NR,
--			.label	= "GPG0",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPG1(0),
--			.ngpio	= S5PC100_GPIO_G1_NR,
--			.label	= "GPG1",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPG2(0),
--			.ngpio	= S5PC100_GPIO_G2_NR,
--			.label	= "GPG2",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPG3(0),
--			.ngpio	= S5PC100_GPIO_G3_NR,
--			.label	= "GPG3",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPI(0),
--			.ngpio	= S5PC100_GPIO_I_NR,
--			.label	= "GPI",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPJ0(0),
--			.ngpio	= S5PC100_GPIO_J0_NR,
--			.label	= "GPJ0",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPJ1(0),
--			.ngpio	= S5PC100_GPIO_J1_NR,
--			.label	= "GPJ1",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPJ2(0),
--			.ngpio	= S5PC100_GPIO_J2_NR,
--			.label	= "GPJ2",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPJ3(0),
--			.ngpio	= S5PC100_GPIO_J3_NR,
--			.label	= "GPJ3",
--		},
--	}, {
--		.chip	= {
--			.base	= S5PC100_GPJ4(0),
--			.ngpio	= S5PC100_GPIO_J4_NR,
--			.label	= "GPJ4",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPK0(0),
--			.ngpio	= S5PC100_GPIO_K0_NR,
--			.label	= "GPK0",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPK1(0),
--			.ngpio	= S5PC100_GPIO_K1_NR,
--			.label	= "GPK1",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPK2(0),
--			.ngpio	= S5PC100_GPIO_K2_NR,
--			.label	= "GPK2",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPK3(0),
--			.ngpio	= S5PC100_GPIO_K3_NR,
--			.label	= "GPK3",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPL0(0),
--			.ngpio	= S5PC100_GPIO_L0_NR,
--			.label	= "GPL0",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPL1(0),
--			.ngpio	= S5PC100_GPIO_L1_NR,
--			.label	= "GPL1",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPL2(0),
--			.ngpio	= S5PC100_GPIO_L2_NR,
--			.label	= "GPL2",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPL3(0),
--			.ngpio	= S5PC100_GPIO_L3_NR,
--			.label	= "GPL3",
--		},
--	}, {
--		.config	= &gpio_cfg_noint,
--		.chip	= {
--			.base	= S5PC100_GPL4(0),
--			.ngpio	= S5PC100_GPIO_L4_NR,
--			.label	= "GPL4",
--		},
--	}, {
--		.base	= (S5P_VA_GPIO + 0xC00),
--		.config	= &gpio_cfg_eint,
--		.irq_base = IRQ_EINT(0),
--		.chip	= {
--			.base	= S5PC100_GPH0(0),
--			.ngpio	= S5PC100_GPIO_H0_NR,
--			.label	= "GPH0",
--			.to_irq = samsung_gpiolib_to_irq,
--		},
--	}, {
--		.base	= (S5P_VA_GPIO + 0xC20),
--		.config	= &gpio_cfg_eint,
--		.irq_base = IRQ_EINT(8),
--		.chip	= {
--			.base	= S5PC100_GPH1(0),
--			.ngpio	= S5PC100_GPIO_H1_NR,
--			.label	= "GPH1",
--			.to_irq = samsung_gpiolib_to_irq,
--		},
--	}, {
--		.base	= (S5P_VA_GPIO + 0xC40),
--		.config	= &gpio_cfg_eint,
--		.irq_base = IRQ_EINT(16),
--		.chip	= {
--			.base	= S5PC100_GPH2(0),
--			.ngpio	= S5PC100_GPIO_H2_NR,
--			.label	= "GPH2",
--			.to_irq = samsung_gpiolib_to_irq,
--		},
--	}, {
--		.base	= (S5P_VA_GPIO + 0xC60),
--		.config	= &gpio_cfg_eint,
--		.irq_base = IRQ_EINT(24),
--		.chip	= {
--			.base	= S5PC100_GPH3(0),
--			.ngpio	= S5PC100_GPIO_H3_NR,
--			.label	= "GPH3",
--			.to_irq = samsung_gpiolib_to_irq,
--		},
--	},
--};
--
--static __init int s5pc100_gpiolib_init(void)
--{
--	struct s3c_gpio_chip *chip = s5pc100_gpio_chips;
--	int nr_chips = ARRAY_SIZE(s5pc100_gpio_chips);
--	int gpioint_group = 0;
--	int i;
--
--	for (i = 0; i < nr_chips; i++, chip++) {
--		if (chip->config == NULL) {
--			chip->config = &gpio_cfg;
--			chip->group = gpioint_group++;
--		}
--		if (chip->base == NULL)
--			chip->base = S5PC100_BANK_BASE(i);
--	}
--
--	samsung_gpiolib_add_4bit_chips(s5pc100_gpio_chips, nr_chips);
--	s5p_register_gpioint_bank(IRQ_GPIOINT, 0, S5P_GPIOINT_GROUP_MAXNR);
--
--	return 0;
--}
--core_initcall(s5pc100_gpiolib_init);
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 5da12fc..d838f5b 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -87,6 +87,12 @@ config GPIO_SAMSUNG
- 	help
- 	  Say yes here to support Samsung SoCs GPIO library
- 
-+config GPIO_S5PC100
-+	bool "Samsung S5PC100 GPIO library support"
-+	default y if CPU_S5PC100
-+	help
-+	  Say yes here to support Samsung S5PC100 SoC GPIO library
-+
- config GPIO_S5PV210
- 	bool "Samsung S5PV210/S5PC110 GPIO library support"
- 	default y if CPU_S5PV210
-diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-index d738a31..738386f 100644
---- a/drivers/gpio/Makefile
-+++ b/drivers/gpio/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
- obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
- obj-$(CONFIG_GPIO_EXYNOS4)	+= exynos4-gpio.o
- obj-$(CONFIG_GPIO_SAMSUNG)	+= samsung-gpiolib.o
-+obj-$(CONFIG_GPIO_S5PC100)	+= s5pc100-gpio.o
- obj-$(CONFIG_GPIO_S5PV210)	+= s5pv210-gpio.o
- obj-$(CONFIG_GPIO_LANGWELL)	+= langwell_gpio.o
- obj-$(CONFIG_GPIO_MAX730X)	+= max730x.o
-diff --git a/drivers/gpio/s5pc100-gpio.c b/drivers/gpio/s5pc100-gpio.c
-new file mode 100644
-index 0000000..2842394
---- /dev/null
-+++ b/drivers/gpio/s5pc100-gpio.c
-@@ -0,0 +1,355 @@
-+/* linux/arch/arm/mach-s5pc100/gpiolib.c
-+ *
-+ * Copyright (c) 2010 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ *  Copyright 2009 Samsung Electronics Co
-+ *  Kyungmin Park <kyungmin.park@samsung.com>
-+ *
-+ * S5PC100 - GPIOlib support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/kernel.h>
-+#include <linux/irq.h>
-+#include <linux/io.h>
-+#include <linux/gpio.h>
-+
-+#include <mach/map.h>
-+#include <mach/regs-gpio.h>
-+
-+#include <plat/gpio-core.h>
-+#include <plat/gpio-cfg.h>
-+#include <plat/gpio-cfg-helpers.h>
-+
-+/* S5PC100 GPIO bank summary:
-+ *
-+ * Bank	GPIOs	Style	INT Type
-+ * A0	8	4Bit	GPIO_INT0
-+ * A1	5	4Bit	GPIO_INT1
-+ * B	8	4Bit	GPIO_INT2
-+ * C	5	4Bit	GPIO_INT3
-+ * D	7	4Bit	GPIO_INT4
-+ * E0	8	4Bit	GPIO_INT5
-+ * E1	6	4Bit	GPIO_INT6
-+ * F0	8	4Bit	GPIO_INT7
-+ * F1	8	4Bit	GPIO_INT8
-+ * F2	8	4Bit	GPIO_INT9
-+ * F3	4	4Bit	GPIO_INT10
-+ * G0	8	4Bit	GPIO_INT11
-+ * G1	3	4Bit	GPIO_INT12
-+ * G2	7	4Bit	GPIO_INT13
-+ * G3	7	4Bit	GPIO_INT14
-+ * H0	8	4Bit	WKUP_INT
-+ * H1	8	4Bit	WKUP_INT
-+ * H2	8	4Bit	WKUP_INT
-+ * H3	8	4Bit	WKUP_INT
-+ * I	8	4Bit	GPIO_INT15
-+ * J0	8	4Bit	GPIO_INT16
-+ * J1	5	4Bit	GPIO_INT17
-+ * J2	8	4Bit	GPIO_INT18
-+ * J3	8	4Bit	GPIO_INT19
-+ * J4	4	4Bit	GPIO_INT20
-+ * K0	8	4Bit	None
-+ * K1	6	4Bit	None
-+ * K2	8	4Bit	None
-+ * K3	8	4Bit	None
-+ * L0	8	4Bit	None
-+ * L1	8	4Bit	None
-+ * L2	8	4Bit	None
-+ * L3	8	4Bit	None
-+ */
-+
-+static struct s3c_gpio_cfg gpio_cfg = {
-+	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-+	.set_pull	= s3c_gpio_setpull_updown,
-+	.get_pull	= s3c_gpio_getpull_updown,
-+};
-+
-+static struct s3c_gpio_cfg gpio_cfg_eint = {
-+	.cfg_eint	= 0xf,
-+	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-+	.set_pull	= s3c_gpio_setpull_updown,
-+	.get_pull	= s3c_gpio_getpull_updown,
-+};
-+
-+static struct s3c_gpio_cfg gpio_cfg_noint = {
-+	.set_config	= s3c_gpio_setcfg_s3c64xx_4bit,
-+	.set_pull	= s3c_gpio_setpull_updown,
-+	.get_pull	= s3c_gpio_getpull_updown,
-+};
-+
-+/*
-+ * GPIO bank's base address given the index of the bank in the
-+ * list of all gpio banks.
-+ */
-+#define S5PC100_BANK_BASE(bank_nr)	(S5P_VA_GPIO + ((bank_nr) * 0x20))
-+
-+/*
-+ * Following are the gpio banks in S5PC100.
-+ *
-+ * The 'config' member when left to NULL, is initialized to the default
-+ * structure gpio_cfg in the init function below.
-+ *
-+ * The 'base' member is also initialized in the init function below.
-+ * Note: The initialization of 'base' member of s3c_gpio_chip structure
-+ * uses the above macro and depends on the banks being listed in order here.
-+ */
-+static struct s3c_gpio_chip s5pc100_gpio_chips[] = {
-+	{
-+		.chip	= {
-+			.base	= S5PC100_GPA0(0),
-+			.ngpio	= S5PC100_GPIO_A0_NR,
-+			.label	= "GPA0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPA1(0),
-+			.ngpio	= S5PC100_GPIO_A1_NR,
-+			.label	= "GPA1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPB(0),
-+			.ngpio	= S5PC100_GPIO_B_NR,
-+			.label	= "GPB",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPC(0),
-+			.ngpio	= S5PC100_GPIO_C_NR,
-+			.label	= "GPC",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPD(0),
-+			.ngpio	= S5PC100_GPIO_D_NR,
-+			.label	= "GPD",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPE0(0),
-+			.ngpio	= S5PC100_GPIO_E0_NR,
-+			.label	= "GPE0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPE1(0),
-+			.ngpio	= S5PC100_GPIO_E1_NR,
-+			.label	= "GPE1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPF0(0),
-+			.ngpio	= S5PC100_GPIO_F0_NR,
-+			.label	= "GPF0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPF1(0),
-+			.ngpio	= S5PC100_GPIO_F1_NR,
-+			.label	= "GPF1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPF2(0),
-+			.ngpio	= S5PC100_GPIO_F2_NR,
-+			.label	= "GPF2",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPF3(0),
-+			.ngpio	= S5PC100_GPIO_F3_NR,
-+			.label	= "GPF3",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPG0(0),
-+			.ngpio	= S5PC100_GPIO_G0_NR,
-+			.label	= "GPG0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPG1(0),
-+			.ngpio	= S5PC100_GPIO_G1_NR,
-+			.label	= "GPG1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPG2(0),
-+			.ngpio	= S5PC100_GPIO_G2_NR,
-+			.label	= "GPG2",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPG3(0),
-+			.ngpio	= S5PC100_GPIO_G3_NR,
-+			.label	= "GPG3",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPI(0),
-+			.ngpio	= S5PC100_GPIO_I_NR,
-+			.label	= "GPI",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPJ0(0),
-+			.ngpio	= S5PC100_GPIO_J0_NR,
-+			.label	= "GPJ0",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPJ1(0),
-+			.ngpio	= S5PC100_GPIO_J1_NR,
-+			.label	= "GPJ1",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPJ2(0),
-+			.ngpio	= S5PC100_GPIO_J2_NR,
-+			.label	= "GPJ2",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPJ3(0),
-+			.ngpio	= S5PC100_GPIO_J3_NR,
-+			.label	= "GPJ3",
-+		},
-+	}, {
-+		.chip	= {
-+			.base	= S5PC100_GPJ4(0),
-+			.ngpio	= S5PC100_GPIO_J4_NR,
-+			.label	= "GPJ4",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPK0(0),
-+			.ngpio	= S5PC100_GPIO_K0_NR,
-+			.label	= "GPK0",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPK1(0),
-+			.ngpio	= S5PC100_GPIO_K1_NR,
-+			.label	= "GPK1",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPK2(0),
-+			.ngpio	= S5PC100_GPIO_K2_NR,
-+			.label	= "GPK2",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPK3(0),
-+			.ngpio	= S5PC100_GPIO_K3_NR,
-+			.label	= "GPK3",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPL0(0),
-+			.ngpio	= S5PC100_GPIO_L0_NR,
-+			.label	= "GPL0",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPL1(0),
-+			.ngpio	= S5PC100_GPIO_L1_NR,
-+			.label	= "GPL1",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPL2(0),
-+			.ngpio	= S5PC100_GPIO_L2_NR,
-+			.label	= "GPL2",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPL3(0),
-+			.ngpio	= S5PC100_GPIO_L3_NR,
-+			.label	= "GPL3",
-+		},
-+	}, {
-+		.config	= &gpio_cfg_noint,
-+		.chip	= {
-+			.base	= S5PC100_GPL4(0),
-+			.ngpio	= S5PC100_GPIO_L4_NR,
-+			.label	= "GPL4",
-+		},
-+	}, {
-+		.base	= (S5P_VA_GPIO + 0xC00),
-+		.config	= &gpio_cfg_eint,
-+		.irq_base = IRQ_EINT(0),
-+		.chip	= {
-+			.base	= S5PC100_GPH0(0),
-+			.ngpio	= S5PC100_GPIO_H0_NR,
-+			.label	= "GPH0",
-+			.to_irq = samsung_gpiolib_to_irq,
-+		},
-+	}, {
-+		.base	= (S5P_VA_GPIO + 0xC20),
-+		.config	= &gpio_cfg_eint,
-+		.irq_base = IRQ_EINT(8),
-+		.chip	= {
-+			.base	= S5PC100_GPH1(0),
-+			.ngpio	= S5PC100_GPIO_H1_NR,
-+			.label	= "GPH1",
-+			.to_irq = samsung_gpiolib_to_irq,
-+		},
-+	}, {
-+		.base	= (S5P_VA_GPIO + 0xC40),
-+		.config	= &gpio_cfg_eint,
-+		.irq_base = IRQ_EINT(16),
-+		.chip	= {
-+			.base	= S5PC100_GPH2(0),
-+			.ngpio	= S5PC100_GPIO_H2_NR,
-+			.label	= "GPH2",
-+			.to_irq = samsung_gpiolib_to_irq,
-+		},
-+	}, {
-+		.base	= (S5P_VA_GPIO + 0xC60),
-+		.config	= &gpio_cfg_eint,
-+		.irq_base = IRQ_EINT(24),
-+		.chip	= {
-+			.base	= S5PC100_GPH3(0),
-+			.ngpio	= S5PC100_GPIO_H3_NR,
-+			.label	= "GPH3",
-+			.to_irq = samsung_gpiolib_to_irq,
-+		},
-+	},
-+};
-+
-+static __init int s5pc100_gpiolib_init(void)
-+{
-+	struct s3c_gpio_chip *chip = s5pc100_gpio_chips;
-+	int nr_chips = ARRAY_SIZE(s5pc100_gpio_chips);
-+	int gpioint_group = 0;
-+	int i;
-+
-+	for (i = 0; i < nr_chips; i++, chip++) {
-+		if (chip->config == NULL) {
-+			chip->config = &gpio_cfg;
-+			chip->group = gpioint_group++;
-+		}
-+		if (chip->base == NULL)
-+			chip->base = S5PC100_BANK_BASE(i);
-+	}
-+
-+	samsung_gpiolib_add_4bit_chips(s5pc100_gpio_chips, nr_chips);
-+	s5p_register_gpioint_bank(IRQ_GPIOINT, 0, S5P_GPIOINT_GROUP_MAXNR);
-+
-+	return 0;
-+}
-+core_initcall(s5pc100_gpiolib_init);
--- 
-1.7.5.1.300.gc565c
+Is there any scenario where these drivers should be user selected?  My
+feel is that the right thing to do with gpio controllers is to just
+build them in when the platform is selected.  We can always add
+Kconfig entries later if this assumption changes.
+
+>  config GPIO_IT8761E
+>  	tristate "IT8761E GPIO support"
+>  	depends on GPIOLIB
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index becef59..738386f 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -11,6 +11,10 @@ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
+>  obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
+>  obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
+>  obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
+> +obj-$(CONFIG_GPIO_EXYNOS4)	+= exynos4-gpio.o
+> +obj-$(CONFIG_GPIO_SAMSUNG)	+= samsung-gpiolib.o
+> +obj-$(CONFIG_GPIO_S5PC100)	+= s5pc100-gpio.o
+> +obj-$(CONFIG_GPIO_S5PV210)	+= s5pv210-gpio.o
+>  obj-$(CONFIG_GPIO_LANGWELL)	+= langwell_gpio.o
+>  obj-$(CONFIG_GPIO_MAX730X)	+= max730x.o
+>  obj-$(CONFIG_GPIO_MAX7300)	+= max7300.o
+> diff --git a/arch/arm/mach-exynos4/gpiolib.c b/drivers/gpio/exynos4-gpio.c
+> similarity index 100%
+> rename from arch/arm/mach-exynos4/gpiolib.c
+> rename to drivers/gpio/exynos4-gpio.c
+> diff --git a/arch/arm/mach-s5pc100/gpiolib.c b/drivers/gpio/s5pc100-gpio.c
+> similarity index 100%
+> rename from arch/arm/mach-s5pc100/gpiolib.c
+> rename to drivers/gpio/s5pc100-gpio.c
+> diff --git a/arch/arm/mach-s5pv210/gpiolib.c b/drivers/gpio/s5pv210-gpio.c
+> similarity index 100%
+> rename from arch/arm/mach-s5pv210/gpiolib.c
+> rename to drivers/gpio/s5pv210-gpio.c
+> diff --git a/arch/arm/plat-samsung/gpiolib.c b/drivers/gpio/samsung-gpiolib.c
+> similarity index 99%
+> rename from arch/arm/plat-samsung/gpiolib.c
+> rename to drivers/gpio/samsung-gpiolib.c
+> index ea37c04..925b66e 100644
+> --- a/arch/arm/plat-samsung/gpiolib.c
+> +++ b/drivers/gpio/samsung-gpiolib.c
+> @@ -1,4 +1,5 @@
+> -/* arch/arm/plat-samsung/gpiolib.c
+> +/*
+> + * drivers/gpio/samsung-gpiolib.c
+
+My preference is to just drop the filename from the header entirely.
+A better thing here would be a single line description of what this
+file actually does.
+
+g.
