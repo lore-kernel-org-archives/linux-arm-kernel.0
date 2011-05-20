@@ -1,70 +1,39 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 20 May 2011 19:18:35 +0400
-Subject: [PATCH 4/4] davinci: create new common platform header for davinci
-In-Reply-To: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
-References: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4DD6864B.6040305@mvista.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 20 May 2011 17:25:24 +0200
+Subject: [GIT PULL] OMAP PM cleanups for 2.6.40
+Message-ID: <87liy15r8b.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Tony,
 
-Manjunath Hadli wrote:
+Please pull the following OMAP PM related cleanups for 2.6.40.
 
-> remove the code from individual platform header files for
-> dm365, dm355, dm644x and dm646x and consolidate it into a
-> single and common header file dmx.h.
+Thanks,
 
-    Could we call it davinci.h instead?
+Kevin
 
-> Include the new header file in individual platform header
-> files as a pre-cursor for deleting these headers in follow
-> up patches.
 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-[...]
+The following changes since commit 61c4f2c81c61f73549928dfd9f3e8f26aa36a8cf:
 
-> diff --git a/arch/arm/mach-davinci/board-dm365-evm.c b/arch/arm/mach-davinci/board-dm365-evm.c
-> index c67f684..7be75b2 100644
-> --- a/arch/arm/mach-davinci/board-dm365-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm365-evm.c
-[...]
-> @@ -143,6 +143,10 @@ static struct davinci_nand_pdata davinci_nand_data = {
->  	.ecc_bits		= 4,
->  };
->  
-> +#define DM365_ASYNC_EMIF_CONTROL_BASE	0x01D10000
-> +#define DM365_ASYNC_EMIF_DATA_CE0_BASE	0x02000000
-> +#define DM365_ASYNC_EMIF_DATA_CE1_BASE	0x04000000
+  Linux 2.6.39 (2011-05-18 21:06:34 -0700)
 
-    No, we don't want to duplicate those in every future DM365 board file. Leave 
-them in the header please.
+are available in the git repository at:
+  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.40/pm-cleanup
 
-> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-> index f6ac9ba..73497a6 100644
-> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-> @@ -91,6 +91,9 @@ static struct davinci_nand_pdata davinci_nand_data = {
->  	.options		= 0,
->  };
->  
-> +#define DM646X_ASYNC_EMIF_CONTROL_BASE	0x20008000
-> +#define DM646X_ASYNC_EMIF_CS2_SPACE_BASE 0x42000000
-> +
+Jean Pihet (5):
+      OMAP3 cpuidle: remove useless SDP specific timings
+      OMAP3: clean-up mach specific cpuidle data structures
+      OMAP3: cpuidle: re-organize the C-states data
+      OMAP3: cpuidle: code rework for improved readability
+      OMAP3: cpuidle: change the power domains modes determination logic
 
-    No, we don't want to duplicate those in every future DM646x board file. 
-Leave them in the header please.
+Sanjeev Premi (1):
+      OMAP3: PM: Boot message is not an error, and not helpful, remove it
 
-> diff --git a/drivers/media/video/davinci/vpif_capture.h b/drivers/media/video/davinci/vpif_capture.h
-> index fa50b6b..cafa762 100644
-> --- a/drivers/media/video/davinci/vpif_capture.h
-> +++ b/drivers/media/video/davinci/vpif_capture.h
-> @@ -28,6 +28,7 @@
->  #include <media/v4l2-device.h>
->  #include <media/videobuf-core.h>
->  #include <media/videobuf-dma-contig.h>
-> +#include <mach/dmx.h>
-
-    Why, if it didn't #include any of the deleted headers before?
-
-WBR, Sergei
+ arch/arm/mach-omap2/board-3430sdp.c |   19 --
+ arch/arm/mach-omap2/board-rx51.c    |   18 +-
+ arch/arm/mach-omap2/cpuidle34xx.c   |  436 ++++++++++++-----------------------
+ arch/arm/mach-omap2/pm.h            |   17 +-
+ arch/arm/mach-omap2/pm34xx.c        |   14 --
+ 5 files changed, 166 insertions(+), 338 deletions(-)
