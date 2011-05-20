@@ -1,87 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 May 2011 11:42:57 +0100
-Subject: On __raw_readl readl_relaxed and readl nocheinmal
-In-Reply-To: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
-References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
-Message-ID: <20110520104257.GD7445@n2100.arm.linux.org.uk>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 20 May 2011 13:25:25 +0200
+Subject: [PATCH 0/4] add gpio driver gpio-mxs
+In-Reply-To: <20110520102410.GD27251@S2100-06.ap.freescale.net>
+References: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
+	<20110520100242.GA10403@pengutronix.de>
+	<20110520102410.GD27251@S2100-06.ap.freescale.net>
+Message-ID: <20110520112524.GC10403@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 12:04:48PM +0200, Linus Walleij wrote:
-> My current understanding:
+On Fri, May 20, 2011 at 06:24:11PM +0800, Shawn Guo wrote:
+> On Fri, May 20, 2011 at 12:02:42PM +0200, Sascha Hauer wrote:
+> > Hi Shawn,
+> > 
+> Hi Sascha,
 > 
-> __raw_writel(a, reg1);
-> __raw_writel(b, reg2);
+> > On Fri, May 20, 2011 at 05:51:25PM +0800, Shawn Guo wrote:
+> > > The patch set is to move Freescale MXS gpio driver from mach-mxs
+> > > into drivers/gpio.  Different from u300 gpio driver that all gpio
+> > > ports are registered as one device, gpio-mxs expects every single
+> > > port is a gpio device.
+> > > 
+> > > The first 3 patches are just to ease review and can be squashed into
+> > > the last one.
+> > > 
+> > > Shawn Guo (4):
+> > >       gpio: gpio-mxs: add file gpio-mxs.c
+> > >       gpio: gpio-mxs: drop mach-specific accessors
+> > >       gpio: gpio-mxs: remove gpio port definition and registration
+> > >       gpio: gpio-mxs: add gpio driver for Freescale MXS architecture
+> > 
+> > Your series should be bisectible. So please either:
+> > 
+> > - Add the driver the way you want it (no need to modify a new file in
+> >   four steps)
 > 
-> This does not guarantee that the write of b into reg2 is even done
-> after writing a into reg1 due to instruction reeordering.
-
-No.  It's not about instruction re-ordering.  The instruction stream will
-show a write to reg1 followed by a write to reg2.
-
-The writes are performed using the CPUs current endianness.  The CPU and
-buses are free to re-order this if they so wish, and the CPU is free to
-re-order them with respect to other types of access (iow, memory and
-strongly ordered.)
-
-> writel_relaxed(a, reg1);
-> writel_relaxed(b, reg2);
+> As I said above, I split it into 4 patches just to ease the review,
+> and they can be squashed into one when applying.
 > 
-> This will insert a barrier() so we know that the CPU will execute the
-> write of a before the write of b. However it does not mandate that
-> reg2 is written with b before reg1 is written with a at the hardware
-> register level.
-
-These writes are performed using little endian byte order.  The CPU and
-buses are free to re-order this if they so wish, and the CPU is free to
-re-order them with respect to other types of access.
-
-> writel(a, reg1);
-> writel(b, reg2);
+> > - atomically switch to the new driver
+> > - remove old driver
+> > 
+> These two steps happened in the patch set '[PATCH 0/3] remove mach-mxs
+> gpio driver'.  The patch order should be reworked though.
 > 
-> This actually pushes the value all the way through so that you know
-> that the values has landed in the hardware after each statement.
+> BTW, are you looking at moving plat-mxc/gpio.c, or I can give a hand
+> there?
 
-These writes are again performed using little endian byte order.  We
-insert barriers to ensure that the CPU does not re-order these with
-respect to other accesses, including memory accesses.  However, downstream
-bus hardware may still delay the writes, which may result in the write to
-reg2 arriving before reg1, especially if they're on different buses.
+I'm not working on this, go ahead.
 
-> What we would like to know is the effect of things like this:
-> 
-> __raw_writel(a, reg1);
-> __raw_writel(b, reg1);
-> __raw_writel(c, reg1);
-> 
-> writel_relaxed(a, reg1);
-> writel_relaxed(b, reg1);
-> writel_relaxed(c, reg1);
-> 
-> My *guess* is that in the first case the pipeline may even remove
-> the write if a and b to reg1 since it's only caring about the end
-> result (insert the volatile story in
-> Documentation/volatile_considered_harmful.txt here)
+Sascha
 
-No.  The compiler can't optimize the volatile accesses like that.  The
-volatile document is written from the point of making driver writers
-use the accessor functions.
-
-In both cases, because the write is to the same register, and as I've
-said above, they won't be re-ordered in the instruction stream, plus
-if reg1 is _device_ memory, they will appear in-order on the destination
-bus.
-
-> make sure that the writes actually happens in sequence,
-> but after the last statement it may take a while before the
-> actual hardware write happens.
-> 
-> And what about this:
-> 
-> writel_relaxed(a, reg1);
-> writel_relaxed(b, reg1);
-> writel(c, reg1);
-
-The same. But a and b may arrive at the device before previous writes to
-memory have completed, whereas c will only arrive after all of a, b and
-previous memory writes have completed.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
