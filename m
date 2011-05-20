@@ -1,102 +1,87 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 May 2011 12:23:00 +0200
-Subject: [PATCH 2/3] ARM: mxs: add gpio-mxs platform devices
-In-Reply-To: <1305885446-27404-3-git-send-email-shawn.guo@linaro.org>
-References: <1305885446-27404-1-git-send-email-shawn.guo@linaro.org>
-	<1305885446-27404-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <201105201223.00427.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 20 May 2011 11:42:57 +0100
+Subject: On __raw_readl readl_relaxed and readl nocheinmal
+In-Reply-To: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
+References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
+Message-ID: <20110520104257.GD7445@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 May 2011 11:57:25 Shawn Guo wrote:
+On Fri, May 20, 2011 at 12:04:48PM +0200, Linus Walleij wrote:
+> My current understanding:
+> 
+> __raw_writel(a, reg1);
+> __raw_writel(b, reg2);
+> 
+> This does not guarantee that the write of b into reg2 is even done
+> after writing a into reg1 due to instruction reeordering.
 
-> --- /dev/null
-> +++ b/arch/arm/mach-mxs/devices/platform-gpio-mxs.c
-> @@ -0,0 +1,92 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
+No.  It's not about instruction re-ordering.  The instruction stream will
+show a write to reg1 followed by a write to reg2.
 
-Hmm, I forgot to discuss this in Budapest, but I'm still not convinced about
-the code ownership here, I think it should be Copyright Linaro Ltd when a
-Linaro assignee writes it, not the member company that you work for.
+The writes are performed using the CPUs current endianness.  The CPU and
+buses are free to re-order this if they so wish, and the CPU is free to
+re-order them with respect to other types of access (iow, memory and
+strongly ordered.)
 
-If your manager thinks it should be copyright Freescale, I would suggest
-we discuss it on the Linaro private mailing list so we can find a solution
-that everyone is happy with. No need to bother the public with this.
+> writel_relaxed(a, reg1);
+> writel_relaxed(b, reg2);
+> 
+> This will insert a barrier() so we know that the CPU will execute the
+> write of a before the write of b. However it does not mandate that
+> reg2 is written with b before reg1 is written with a at the hardware
+> register level.
 
-> +#include <linux/compiler.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +
-> +#include <mach/mx23.h>
-> +#include <mach/mx28.h>
-> +#include <mach/devices-common.h>
-> +
-> +struct mxs_gpio_data {
-> +	int id;
-> +	resource_size_t iobase;
-> +	resource_size_t iosize;
-> +	resource_size_t irq;
-> +};
+These writes are performed using little endian byte order.  The CPU and
+buses are free to re-order this if they so wish, and the CPU is free to
+re-order them with respect to other types of access.
 
-You don't use iosize anywhere.
+> writel(a, reg1);
+> writel(b, reg2);
+> 
+> This actually pushes the value all the way through so that you know
+> that the values has landed in the hardware after each statement.
 
-> +#define mxs_gpio_data_entry_single(soc, _id)				\
-> +	{								\
-> +		.id = _id,						\
-> +		.iobase = soc ## _PINCTRL ## _BASE_ADDR,		\
-> +		.irq = soc ## _INT_GPIO ## _id,				\
-> +	}
-> +
-> +#define mxs_gpio_data_entry(soc, _id)					\
-> +	[_id] = mxs_gpio_data_entry_single(soc, _id)
-> +
-> +#ifdef CONFIG_SOC_IMX23
-> +const struct mxs_gpio_data mx23_gpio_data[] __initconst = {
-> +#define mx23_gpio_data_entry(_id)					\
-> +	mxs_gpio_data_entry(MX23, _id)
+These writes are again performed using little endian byte order.  We
+insert barriers to ensure that the CPU does not re-order these with
+respect to other accesses, including memory accesses.  However, downstream
+bus hardware may still delay the writes, which may result in the write to
+reg2 arriving before reg1, especially if they're on different buses.
 
-I know it's tempting to use macros for these, but I think it obscures
-the code a lot, especially when you use them to concatenate identifier
-names. Why not just do:
+> What we would like to know is the effect of things like this:
+> 
+> __raw_writel(a, reg1);
+> __raw_writel(b, reg1);
+> __raw_writel(c, reg1);
+> 
+> writel_relaxed(a, reg1);
+> writel_relaxed(b, reg1);
+> writel_relaxed(c, reg1);
+> 
+> My *guess* is that in the first case the pipeline may even remove
+> the write if a and b to reg1 since it's only caring about the end
+> result (insert the volatile story in
+> Documentation/volatile_considered_harmful.txt here)
 
-	struct platform_device *gpios;
-	gpios = platform_device_register_simple(mxs_host_bus, "mxs-gpio-master", 0, NULL, 0);
+No.  The compiler can't optimize the volatile accesses like that.  The
+volatile document is written from the point of making driver writers
+use the accessor functions.
 
-	mxs_register_gpio(gpios, 0, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO_0);
-	mxs_register_gpio(gpios, 1, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO_1);
-	mxs_register_gpio(gpios, 2, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO_2);
-	mxs_register_gpio(gpios, 3, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO_3);
+In both cases, because the write is to the same register, and as I've
+said above, they won't be re-ordered in the instruction stream, plus
+if reg1 is _device_ memory, they will appear in-order on the destination
+bus.
 
-This is actually shorter and it makes it possible to grep for the
-macros you use.
+> make sure that the writes actually happens in sequence,
+> but after the last statement it may take a while before the
+> actual hardware write happens.
+> 
+> And what about this:
+> 
+> writel_relaxed(a, reg1);
+> writel_relaxed(b, reg1);
+> writel(c, reg1);
 
-> +struct platform_device *__init mxs_add_gpio(
-> +		const struct mxs_gpio_data *data)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = data->iobase,
-> +			.end = data->iobase + SZ_8K - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = data->irq,
-> +			.end = data->irq,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +
-> +	return mxs_add_platform_device("mxs-gpio", data->id,
-> +					res, ARRAY_SIZE(res), NULL, 0);
-> +}
-
-mxs_add_platform_device doesn't set the parent pointer correctly, I think you
-should either fix that or open-code the platform device creation to do it
-right.
-
-	Arnd
+The same. But a and b may arrive at the device before previous writes to
+memory have completed, whereas c will only arrive after all of a, b and
+previous memory writes have completed.
