@@ -1,21 +1,53 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 20 May 2011 16:24:01 +0200
-Subject: [PATCH 3/4] davinci: dm646x: remove the macros from the header
-	to move to c file
-In-Reply-To: <1305900721-3890-1-git-send-email-manjunath.hadli@ti.com>
-References: <1305900721-3890-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <20110520142401.GV15292@game.jcrosoft.org>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Fri, 20 May 2011 20:05:34 +0530
+Subject: [PATCH] Fix: ZOOM: QUART: Request reset GPIO
+Message-ID: <1305902134-22760-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19:42 Fri 20 May     , Manjunath Hadli wrote:
-> move the register base addresses and offsets used only by dm646x
-> platform file from platform header dm646x.h to dm646x.c as they
-> are used only in the c file.
-> 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-I do not think it's a good idea to put the register mapping in the c file
-evenif they are used only today in dm646x
+From: Charulatha V <charu@ti.com>
 
-Best Regards,
-J.
+Reset GPIO (OMAP_GPIO_152) for QUART in zoom2/zoom3 debug-board is
+not requested at all. This would lead to problems if this GPIO is
+wrongly requested. Hence request OMAP GPIO 152 for QUART RESET but
+do not apply a reset pulse as it would reset QUART and
+disturb the QUART settings.
+
+Signed-off-by: Charulatha V <charu@ti.com>
+Acked-by: Kevin Hilman <khilman@ti.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+Cc: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/board-zoom-debugboard.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-zoom-debugboard.c b/arch/arm/mach-omap2/board-zoom-debugboard.c
+index 007ebdc..a5f62f8 100644
+--- a/arch/arm/mach-omap2/board-zoom-debugboard.c
++++ b/arch/arm/mach-omap2/board-zoom-debugboard.c
+@@ -22,6 +22,7 @@
+ #define ZOOM_SMSC911X_GPIO	158
+ #define ZOOM_QUADUART_CS	3
+ #define ZOOM_QUADUART_GPIO	102
++#define ZOOM_QUADUART_RST_GPIO	152
+ #define QUART_CLK		1843200
+ #define DEBUG_BASE		0x08000000
+ #define ZOOM_ETHR_START	DEBUG_BASE
+@@ -110,6 +111,14 @@ static inline void __init zoom_init_quaduart(void)
+ 	unsigned long cs_mem_base;
+ 	int quart_gpio = 0;
+ 
++	if (gpio_request_one(ZOOM_QUADUART_RST_GPIO,
++				GPIOF_OUT_INIT_LOW,
++				"TL16CP754C GPIO") < 0) {
++		pr_err("Failed to request GPIO%d for TL16CP754C\n",
++			ZOOM_QUADUART_RST_GPIO);
++		return;
++	}
++
+ 	quart_cs = ZOOM_QUADUART_CS;
+ 
+ 	if (gpmc_cs_request(quart_cs, SZ_1M, &cs_mem_base) < 0) {
+-- 
+1.6.0.4
