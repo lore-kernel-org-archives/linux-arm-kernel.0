@@ -1,68 +1,60 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Thu, 19 May 2011 21:20:07 -0700
-Subject: [PATCH] MTD: pxa3xx_nand: fix nand detection issue
-In-Reply-To: <BANLkTimos3-Ds4Y8FDfDZegqAhH7nSS4PA@mail.gmail.com>
-References: <BANLkTimos3-Ds4Y8FDfDZegqAhH7nSS4PA@mail.gmail.com>
-Message-ID: <1305865207-7869-1-git-send-email-leiwen@marvell.com>
+From: mpallaka@codeaurora.org (Mohan Pallaka)
+Date: Fri, 20 May 2011 10:29:44 +0530
+Subject: [PATCH 1/2] pwm: Add stubs for pwm operations
+Message-ID: <1305867584-31929-1-git-send-email-mpallaka@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When keep_config is set, the detection would goes different routine.
-That the driver would read out the setting which is set previously
-by bootloader. While most bootloader keep the irq mask as off, and
-current driver need all irq default open, keep_config behavior would
-lead to no irq at all.
+Chip drivers that support both pwm and non-pwm modes
+would encounter compilation errors if the platform doesn't
+have support for pwm, even though the chip is programmed
+to work in non-pwm mode. Add stubs for pwm functions to
+avoid compilation errors in these scenarios.
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
+Signed-off-by: Mohan Pallaka <mpallaka@codeaurora.org>
 ---
- drivers/mtd/nand/pxa3xx_nand.c |   12 +++++++-----
- 1 files changed, 7 insertions(+), 5 deletions(-)
+ include/linux/pwm.h |   23 +++++++++++++++++++++++
+ 1 files changed, 23 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-index ff07012..9896aef 100644
---- a/drivers/mtd/nand/pxa3xx_nand.c
-+++ b/drivers/mtd/nand/pxa3xx_nand.c
-@@ -813,7 +813,7 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
- 	info->page_size = ndcr & NDCR_PAGE_SZ ? 2048 : 512;
- 	/* set info fields needed to read id */
- 	info->read_id_bytes = (info->page_size == 2048) ? 4 : 2;
--	info->reg_ndcr = ndcr;
-+	info->reg_ndcr = ndcr & ~NDCR_INT_MASK;
- 	info->cmdset = &default_cmdset;
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 7c77575..54877f6 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -3,6 +3,7 @@
  
- 	info->ndtr0cs0 = nand_readl(info, NDTR0CS0);
-@@ -882,7 +882,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	struct pxa3xx_nand_info *info = mtd->priv;
- 	struct platform_device *pdev = info->pdev;
- 	struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
--	struct nand_flash_dev pxa3xx_flash_ids[2] = { {NULL,}, {NULL,} };
-+	struct nand_flash_dev pxa3xx_flash_ids[2], *def = NULL;
- 	const struct pxa3xx_nand_flash *f = NULL;
- 	struct nand_chip *chip = mtd->priv;
- 	uint32_t id = -1;
-@@ -942,8 +942,10 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
- 	pxa3xx_flash_ids[0].erasesize = f->page_size * f->page_per_block;
- 	if (f->flash_width == 16)
- 		pxa3xx_flash_ids[0].options = NAND_BUSWIDTH_16;
-+	pxa3xx_flash_ids[1].name = NULL;
-+	def = pxa3xx_flash_ids;
- KEEP_CONFIG:
--	if (nand_scan_ident(mtd, 1, pxa3xx_flash_ids))
-+	if (nand_scan_ident(mtd, 1, def))
- 		return -ENODEV;
- 	/* calculate addressing information */
- 	info->col_addr_cycles = (mtd->writesize >= 2048) ? 2 : 1;
-@@ -954,9 +956,9 @@ KEEP_CONFIG:
- 		info->row_addr_cycles = 2;
- 	mtd->name = mtd_names[0];
- 	chip->ecc.mode = NAND_ECC_HW;
--	chip->ecc.size = f->page_size;
-+	chip->ecc.size = info->page_size;
+ struct pwm_device;
  
--	chip->options = (f->flash_width == 16) ? NAND_BUSWIDTH_16 : 0;
-+	chip->options = (info->reg_ndcr & NDCR_DWIDTH_M) ? NAND_BUSWIDTH_16 : 0;
- 	chip->options |= NAND_NO_AUTOINCR;
- 	chip->options |= NAND_NO_READRDY;
++#if defined(CONFIG_HAVE_PWM)
+ /*
+  * pwm_request - request a PWM device
+  */
+@@ -28,4 +29,26 @@ int pwm_enable(struct pwm_device *pwm);
+  */
+ void pwm_disable(struct pwm_device *pwm);
  
--- 
-1.7.0.4
++#else
++
++struct pwm_device *pwm_request(int pwm_id, const char *label)
++{
++	return NULL;
++}
++
++void pwm_free(struct pwm_device *pwm) { }
++
++int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
++{
++	return -EINVAL;
++}
++
++int pwm_enable(struct pwm_device *pwm)
++{
++	return -EINVAL;
++}
++
++void pwm_disable(struct pwm_device *pwm) { }
++
++#endif /* CONFIG_HAVE_PWM */
+ #endif /* __LINUX_PWM_H */
+--
+Sent by a consultant of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
