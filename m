@@ -1,47 +1,189 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 May 2011 16:23:40 +0200
-Subject: [PATCH 2/3] ARM: mxs: add gpio-mxs platform devices
-In-Reply-To: <20110520140316.GA27551@S2100-06.ap.freescale.net>
-References: <1305885446-27404-1-git-send-email-shawn.guo@linaro.org>
-	<201105201223.00427.arnd@arndb.de>
-	<20110520140316.GA27551@S2100-06.ap.freescale.net>
-Message-ID: <201105201623.40990.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 20 May 2011 22:31:38 +0800
+Subject: [PATCH 4/4] gpio: gpio-mxs: add gpio driver for Freescale MXS
+	architecture
+In-Reply-To: <20110520112455.GB10403@pengutronix.de>
+References: <1305885089-27343-1-git-send-email-shawn.guo@linaro.org>
+	<1305885089-27343-5-git-send-email-shawn.guo@linaro.org>
+	<20110520112455.GB10403@pengutronix.de>
+Message-ID: <20110520143137.GB27551@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 May 2011 16:03:17 Shawn Guo wrote:
-> On Fri, May 20, 2011 at 12:23:00PM +0200, Arnd Bergmann wrote:
+On Fri, May 20, 2011 at 01:24:55PM +0200, Sascha Hauer wrote:
+> On Fri, May 20, 2011 at 05:51:29PM +0800, Shawn Guo wrote:
+> > Add gpio-mxs driver by moving arch/arm/mach-mxs/gpio.c into
+> > drivers/gpio.
 > > 
-> > I know it's tempting to use macros for these, but I think it obscures
-> > the code a lot, especially when you use them to concatenate identifier
-> > names. Why not just do:
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  drivers/gpio/Kconfig    |    3 +
+> >  drivers/gpio/Makefile   |    1 +
+> >  drivers/gpio/gpio-mxs.c |  168 ++++++++++++++++++++++++++++++++++-------------
+> >  3 files changed, 125 insertions(+), 47 deletions(-)
 > > 
-> The pattern is being widely used in mxc/mxs platform device codes.
-> If you are not extremely unhappy about this, I would leave it as it
-> is to keep consistency.
-
-I think it's a real pain to do it like this, and we need to start
-at some point cleaning up the mess. Why not start now?
-
-> > > +
-> > > +	return mxs_add_platform_device("mxs-gpio", data->id,
-> > > +					res, ARRAY_SIZE(res), NULL, 0);
-> > > +}
-> > 
-> > mxs_add_platform_device doesn't set the parent pointer correctly, I think you
-> > should either fix that or open-code the platform device creation to do it
-> > right.
-> > 
-> I see the following in drivers/base/platform.c, function
-> platform_device_add():
+> > diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> > index d3b2953..ccca658 100644
+> > --- a/drivers/gpio/Kconfig
+> > +++ b/drivers/gpio/Kconfig
+> > @@ -81,6 +81,9 @@ config GPIO_IT8761E
+> >  	help
+> >  	  Say yes here to support GPIO functionality of IT8761E super I/O chip.
+> >  
+> > +config GPIO_MXS
+> > +	bool
+> > +
+> >  config GPIO_PL061
+> >  	bool "PrimeCell PL061 GPIO support"
+> >  	depends on ARM_AMBA
+> > diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> > index becef59..b06a335 100644
+> > --- a/drivers/gpio/Makefile
+> > +++ b/drivers/gpio/Makefile
+> > @@ -18,6 +18,7 @@ obj-$(CONFIG_GPIO_MAX7301)	+= max7301.o
+> >  obj-$(CONFIG_GPIO_MAX732X)	+= max732x.o
+> >  obj-$(CONFIG_GPIO_MC33880)	+= mc33880.o
+> >  obj-$(CONFIG_GPIO_MCP23S08)	+= mcp23s08.o
+> > +obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
+> >  obj-$(CONFIG_GPIO_74X164)	+= 74x164.o
+> >  obj-$(CONFIG_GPIO_PCA953X)	+= pca953x.o
+> >  obj-$(CONFIG_GPIO_PCF857X)	+= pcf857x.o
+> > diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+> > index 6a59bf2..b33b2bc 100644
+> > --- a/drivers/gpio/gpio-mxs.c
+> > +++ b/drivers/gpio/gpio-mxs.c
+> > @@ -25,14 +25,18 @@
+> >  #include <linux/io.h>
+> >  #include <linux/irq.h>
+> >  #include <linux/gpio.h>
+> > -#include <mach/mx23.h>
+> > -#include <mach/mx28.h>
+> > -#include <asm-generic/bug.h>
+> > -
+> > -#include "gpio.h"
+> > -
+> > -static struct mxs_gpio_port *mxs_gpio_ports;
+> > -static int gpio_table_size;
+> > +#include <linux/platform_device.h>
+> > +#include <linux/slab.h>
+> > +#include <mach/mxs.h>
+> > +
+> > +struct mxs_gpio_port {
+> > +	void __iomem *base;
+> > +	int id;
+> > +	int irq;
+> > +	int irq_high;
+> > +	int virtual_irq_start;
+> > +	struct gpio_chip chip;
+> > +};
+> >  
+> >  #define MXS_SET		0x4
+> >  #define MXS_CLR		0x8
+> > @@ -76,20 +80,23 @@ static void set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
+> >  
+> >  static void mxs_gpio_ack_irq(struct irq_data *d)
+> >  {
+> > +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+> >  	u32 gpio = irq_to_gpio(d->irq);
+> > -	clear_gpio_irqstatus(&mxs_gpio_ports[gpio / 32], gpio & 0x1f);
+> > +	clear_gpio_irqstatus(port, gpio & 0x1f);
+> >  }
+> >  
+> >  static void mxs_gpio_mask_irq(struct irq_data *d)
+> >  {
+> > +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+> >  	u32 gpio = irq_to_gpio(d->irq);
+> > -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 0);
+> > +	set_gpio_irqenable(port, gpio & 0x1f, 0);
+> >  }
+> >  
+> >  static void mxs_gpio_unmask_irq(struct irq_data *d)
+> >  {
+> > +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+> >  	u32 gpio = irq_to_gpio(d->irq);
+> > -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 1);
+> > +	set_gpio_irqenable(port, gpio & 0x1f, 1);
+> >  }
+> >  
+> >  static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
+> > @@ -98,7 +105,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+> >  {
+> >  	u32 gpio = irq_to_gpio(d->irq);
+> >  	u32 pin_mask = 1 << (gpio & 31);
+> > -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+> > +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+> >  	void __iomem *pin_addr;
+> >  	int edge;
+> >  
+> > @@ -142,7 +149,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+> >  static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+> >  {
+> >  	u32 irq_stat;
+> > -	struct mxs_gpio_port *port = (struct mxs_gpio_port *)irq_get_handler_data(irq);
+> > +	struct mxs_gpio_port *port = irq_get_handler_data(irq);
+> >  	u32 gpio_irq_no_base = port->virtual_irq_start;
+> >  
+> >  	desc->irq_data.chip->irq_ack(&desc->irq_data);
+> > @@ -170,7 +177,7 @@ static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
+> >  {
+> >  	u32 gpio = irq_to_gpio(d->irq);
+> >  	u32 gpio_idx = gpio & 0x1f;
+> > -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+> > +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+> >  
+> >  	if (enable) {
+> >  		if (port->irq_high && (gpio_idx >= 16))
+> > @@ -251,47 +258,114 @@ static int mxs_gpio_direction_output(struct gpio_chip *chip,
+> >  	return 0;
+> >  }
+> >  
+> > -int __init mxs_gpio_init(struct mxs_gpio_port *port, int cnt)
+> > +static int __devinit mxs_gpio_probe(struct platform_device *pdev)
+> >  {
+> > -	int i, j;
+> > +	static void __iomem *base;
+> > +	struct mxs_gpio_port *port;
+> > +	struct resource *iores = NULL;
+> > +	int err, i;
+> > +
+> > +	port = kzalloc(sizeof(struct mxs_gpio_port), GFP_KERNEL);
+> > +	if (!port)
+> > +		return -ENOMEM;
+> > +
+> > +	port->id = pdev->id;
+> > +	port->virtual_irq_start = MXS_GPIO_IRQ_START + port->id * 32;
+> > +
+> > +	/*
+> > +	 * map memory region only once, as all the gpio ports
+> > +	 * share the same one
+> > +	 */
+> > +	if (!base) {
 > 
->         if (!pdev->dev.parent)
->                 pdev->dev.parent = &platform_bus;
+> If the different ports share the same address and can't be seperated I
+> wonder whether it's better to register only one platform device for all
+> ports.
+
+gpio-u300 is one example that register one platform device for all
+ports.  Comparing to it, the gpio-mxs driver looks simpler and
+cleaner, and there is no platform data.
+
+We may agree that every single port should register its own platform
+device, if the ports are all independent to each other with their own
+base address.  Then same base address could be special case of
+different base address, so that we can make driver implementation
+a little common for both cases.
+
+If people think these two cases (sharing ports vs. independent ports)
+will be sorted into two different patterns, yes, gpio-mxs should go
+the way that gpio-u300 is going.
+
+So please comment, people (Grant? :)
+
+> (classic) i.MX has a similar problem where one single interrupt is
+> shared by all gpio ports. Ok, this could be worked around with another
+> chained handler which dispatches the single interrupt to each port.
 > 
-> So we are fine?
 
-No, this would put all gpio devices below the top-level /sys/devices/platform
-directory, where they certainly don't belong. Please find a proper
-place and put them there.
-
-	Arnd
+-- 
+Regards,
+Shawn
