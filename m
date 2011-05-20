@@ -1,54 +1,56 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 20 May 2011 15:19:44 +0200 (CEST)
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <20110520130721.GD10403@pengutronix.de>
-References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-	<1305878365-827-3-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1105201451160.3078@ionos>
-	<20110520130721.GD10403@pengutronix.de>
-Message-ID: <alpine.LFD.2.02.1105201518030.3078@ionos>
+From: nm@ti.com (Menon, Nishanth)
+Date: Fri, 20 May 2011 08:23:02 -0500
+Subject: [PATCH V4] OMAP3+: SR Layer Cleanup
+In-Reply-To: <1305268062-20046-1-git-send-email-shweta.gulati@ti.com>
+References: <1305268062-20046-1-git-send-email-shweta.gulati@ti.com>
+Message-ID: <BANLkTi=sLwrdaOanRNDM+NsnBGjxn5G6nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 May 2011, Sascha Hauer wrote:
+On Fri, May 13, 2011 at 01:27, Shweta Gulati <shweta.gulati@ti.com> wrote:
+[...]
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> index 3cd91ac..b1b11de 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+> @@ -29,6 +29,7 @@
+>
+> ?#include "omap_hwmod_common_data.h"
+>
+> +#include "smartreflex.h"
+> ?#include "prm-regbits-34xx.h"
+> ?#include "cm-regbits-34xx.h"
+> ?#include "wd_timer.h"
+> @@ -2904,6 +2905,10 @@ static struct omap_hwmod_class omap36xx_smartreflex_hwmod_class = {
+> ?};
+>
+> ?/* SR1 */
+> +static struct omap_smartreflex_dev_attr sr1_dev_attr = {
+> + ? ? ? .sensor_voltdm_name ? = "mpu_iva",
+> +};
 
-> On Fri, May 20, 2011 at 02:52:28PM +0200, Thomas Gleixner wrote:
-> > On Fri, 20 May 2011, Sascha Hauer wrote:
-> > > @@ -500,7 +500,17 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
-> > >  
-> > >  	mutex_init(&wm8350->irq_lock);
-> > >  	wm8350->chip_irq = irq;
-> > > -	wm8350->irq_base = pdata->irq_base;
-> > 
-> > Keeping this line would save you the else path :)
-> 
-> Right.
-> 
-> > 
-> > > +
-> > > +	if (!pdata->irq_base) {
-> > > +		wm8350->irq_base = irq_alloc_descs(-1, 0, ARRAY_SIZE(wm8350_irqs), 0);
-> > > +		if (wm8350->irq_base < 0) {
-> > > +			dev_warn(wm8350->dev, "Allocating irqs failed with %d\n",
-> > > +				wm8350->irq_base);
-> > > +			return 0;
-> > 
-> >   Hmm, return 0 on failure ?
-> 
-> This function does this elsewhere aswell. The driver continues without
-> interrupt support in this case.
+[...]
+> diff --git a/arch/arm/mach-omap2/smartreflex.h b/arch/arm/mach-omap2/smartreflex.h
+> index 5f35b9e..aeeec5f 100644
+> --- a/arch/arm/mach-omap2/smartreflex.h
+> +++ b/arch/arm/mach-omap2/smartreflex.h
+> @@ -197,6 +197,16 @@ struct omap_sr_nvalue_table {
+> ?};
+>
+> ?/**
+> + * struct omap_smartreflex_dev_attr - Smartreflex Device attribute.
+> + *
+> + * @sensor_voltdm_name: ? ? ? Name of voltdomain of SR instance
+> + */
+> +
+> +struct omap_smartreflex_dev_attr {
+> + ? ? ? const char ? ? ?*sensor_voltdm_name;
+> +};
+> +
 
-Fair enough.
- 
-> Looking at the driver again I wonder that it does not call
-> irq_set_chained_handler but request_threaded_irq for its chained
-> handler. Is it ok to do so or even prefered?
+This structure is in #ifdef CONFIG_SMART_REFLEX and breaks
+hwmod_data.c when built without SR.
+please move it out of the #ifdef in your next rev.
 
-It's ok and done on purpose. See the comment above the interrupt
-handler function:
-
-* This is a threaded IRQ handler so can access I2C/SPI. ...
-
-Thanks,
-
-	tglx
+Regards,
+Nishanth Menon
