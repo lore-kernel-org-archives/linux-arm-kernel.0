@@ -1,49 +1,82 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 20 May 2011 19:35:23 +0400
-Subject: [PATCH 4/4] davinci: create new common platform header for davinci
-In-Reply-To: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
-References: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <4DD68A3B.7040800@mvista.com>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Fri, 20 May 2011 21:08:15 +0530
+Subject: [PATCH v3] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
+In-Reply-To: <20110520150216.GA11915@avinash-laptop>
+References: <1304328111-15999-1-git-send-email-avinashhm@ti.com>
+	<alpine.DEB.2.00.1105051548210.30136@utopia.booyaka.com>
+	<20110509124842.GA25211@avinash-laptop>
+	<alpine.DEB.2.00.1105181021590.4550@utopia.booyaka.com>
+	<20110518162542.GB3026@avinash-laptop>
+	<20110520150216.GA11915@avinash-laptop>
+Message-ID: <20110520153815.GB11915@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Fri, May 20, 2011 at 08:32:17PM +0530, Avinash.H.M. wrote:
+> On Wed, May 18, 2011 at 09:55:42PM +0530, Avinash.H.M. wrote:
+> > On Wed, May 18, 2011 at 10:22:28AM -0600, Paul Walmsley wrote:
+> > > On Mon, 9 May 2011, Avinash.H.M. wrote:
+> > > 
+> > > > On Thu, May 05, 2011 at 03:58:56PM -0600, Paul Walmsley wrote:
+> > > > 
+> > > > > > 
+> > > > > > The patch is based on
+> > > > > >  * git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git
+> > > > > >  * master branch.
+> > > > > >  * 9be20f0 commit. ( Linux-omap rebuilt: Updated to -rc5 )
+> > > > > 
+> > > > > Please base all your patches against mainline commits.  I suggest using 
+> > > > > v2.6.39-rc6.
+> > > > 
+> > > > OK Paul. I will rebase against mainline, -rc6.
+> > > 
+> > > Ping.  Any progress?
+> > 
+> > Hi Paul ,
+> > 
+> > I am having the patch ready. Haven't had a chance to test. I will test
+> > and send by tomorrow.
+> 
+> Hi Paul ,
+> 
+> I tested the patch on 3430 sdp today with the patch against 2.6.39-rc7.
+> 
+> I am seeing that the timeout is there during bootup event with this
+> patch. Tried with the previous version (v3 , which was tested against
+> the older commit and was confirmed to be working). With this also, i am
+> seeing that the reset timeouts are still present. 
+> 
+> So, looks like there is something broken. First glance, i suspect that
+> the register access may not be proper. Need to debug more. I ll debug
 
-Manjunath Hadli wrote:
+Hi Paul ,
 
-> remove the code from individual platform header files for
-> dm365, dm355, dm644x and dm646x and consolidate it into a
-> single and common header file dmx.h.
-> Include the new header file in individual platform header
-> files as a pre-cursor for deleting these headers in follow
-> up patches.
+This turned out to be the issue. The register access weren't proper. I2C
+needs 16bit access. We need a flag 'HWMOD_16BIT_REG' added to i2c1,2,3
+hwmods.
 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
-> ---
->  arch/arm/mach-davinci/board-dm355-evm.c     |    2 +-
->  arch/arm/mach-davinci/board-dm355-leopard.c |    2 +-
->  arch/arm/mach-davinci/board-dm365-evm.c     |    6 ++-
->  arch/arm/mach-davinci/board-dm644x-evm.c    |    2 +-
->  arch/arm/mach-davinci/board-dm646x-evm.c    |    5 ++-
->  arch/arm/mach-davinci/board-neuros-osd2.c   |    2 +-
->  arch/arm/mach-davinci/board-sffsdr.c        |    2 +-
->  arch/arm/mach-davinci/dm355.c               |    2 +-
->  arch/arm/mach-davinci/dm365.c               |    2 +-
->  arch/arm/mach-davinci/dm644x.c              |    2 +-
->  arch/arm/mach-davinci/dm646x.c              |    2 +-
->  arch/arm/mach-davinci/include/mach/dm355.h  |   32 -----------
->  arch/arm/mach-davinci/include/mach/dm365.h  |   40 --------------
->  arch/arm/mach-davinci/include/mach/dm644x.h |   40 --------------
->  arch/arm/mach-davinci/include/mach/dmx.h    |   77 +++++++++++++++++++++++++++
->  drivers/media/video/davinci/vpif.h          |    2 +-
->  drivers/media/video/davinci/vpif_capture.h  |    1 +
->  drivers/media/video/davinci/vpif_display.c  |    2 +-
->  18 files changed, 98 insertions(+), 125 deletions(-)
->  delete mode 100644 arch/arm/mach-davinci/include/mach/dm355.h
->  delete mode 100644 arch/arm/mach-davinci/include/mach/dm365.h
->  delete mode 100644 arch/arm/mach-davinci/include/mach/dm644x.h
->  create mode 100644 arch/arm/mach-davinci/include/mach/dmx.h
+Andy Green has already submitted a patch for this and looks like it is
+not merged. After adding this patch, now no more timeouts are seen. I ll
+mention this dependency and submit v4.
 
-    BTW, you forgot to remove <mach/dm646x.h>...
+thanks ,
 
-WBR, Sergei
+- Avinash
+
+
+> this and send the fix together.
+> 
+> Incase, if you want me to send this patch now and then send a seperate
+> patch for the recent problem, do let me know.
+> 
+> thanks ,
+> 
+> - Avinash
+> 
+> > thanks ,
+> > 
+> > - Avinash
+> > 
+> > > 
+> > > 
+> > > - Paul
