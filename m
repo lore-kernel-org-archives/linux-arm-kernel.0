@@ -1,39 +1,46 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Fri, 20 May 2011 20:12:23 +0200
-Subject: PXA: Handling of UDC with no VBUS pins
-In-Reply-To: <20110518120633.GA9860@doriath.ww600.siemens.net>
-References: <20110518120633.GA9860@doriath.ww600.siemens.net>
-Message-ID: <4DD6AF07.9060306@free.fr>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 20 May 2011 23:44:10 +0530
+Subject: [PATCH 4/4] davinci: create new common platform header for davinci
+In-Reply-To: <201105201927.22386.arnd@arndb.de>
+References: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
+	<201105201927.22386.arnd@arndb.de>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D09AD34@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/18/2011 02:06 PM, Dmitry Eremin-Solenikov wrote:
-> Hello, colleagues,
->
-> There are several PXA platforms which on the UDC tranceiver part have
-> a pullup pin to support connect/disconnect but no VBUS pin to detect
-> host presense. Currently such platforms are supported through udc driver
-> itself. I'd like to clean that part of pxa25x_udc/pxa27x_udc drivers and
-> to move gpio pullup handling to tranceiver.
-So, you want to concentrate USB pullup handling, right ?
-> My question is what would be better: to extend gpio-vbus to work w/o
-> VBUS pin or to write new transceiver driver only handling gpio-pullup?
-My personnal feeling is neither, let them be. The generic pullup would 
-have to ask itself :
-   - should the pullup be applied on D+ (on USB 2.0 and 3.0 devices) ?
-   - should the pullup be applied on D- (on USB 1.1 devices) ?
-The common driver will have to handle the suspend/resume in an 
-homogenous way.
-If the gadget driver is removed, the pullup should be pulled low.
+Hi Arnd,
 
-All of this work for only 2 drivers looks overkill to me.
+On Fri, May 20, 2011 at 22:57:22, Arnd Bergmann wrote:
+> On Friday 20 May 2011 16:14:01 Manjunath Hadli wrote:
+> > remove the code from individual platform header files for
+> > dm365, dm355, dm644x and dm646x and consolidate it into a
+> > single and common header file dmx.h.
+> > Include the new header file in individual platform header
+> > files as a pre-cursor for deleting these headers in follow
+> > up patches.
+> > 
+> > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> 
+> I probably missed the discussion that led to this patch, but
+> please explain the motivation behind the change in the changelog.
+> 
+> Your current changelog reads like this is pointless churn,
+> which may or may not be the case. The diffstat shows 27 lines
+> being removed in total, which is roughly the amount of copyright
+> headers.
 
-And if you want to gather it in a driver, "gpio-vbus" purpose was to 
-handle VBUS sensing, ie. power presence on +5V/Gnd lines. The D+ 
-handling was not part of its duties, and you'll probably end up with a 
-new driver, which is ... overkill IMHO.
+Well, it started with the need to get rid of using IO_ADDRESS()
+on "system module" which is a bunch of SoC specific registers
+found on dm365, dm355, dm644x and dm646x SoCs (all at the same
+base address, but having different SoC specific register content).
 
-Cheers.
+Please see the previous discussion here:
 
---
-Robert
+http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2011-April/022523.html
+
+We could have probably avoided the churn by sticking DAVINCI_SYSMODULE_VIRT()
+into yet another (unrelated or new) header file, but it made sense to have a 
+single header file containing platform private stuff for all these SoCs.
+
+Thanks,
+Sekhar
