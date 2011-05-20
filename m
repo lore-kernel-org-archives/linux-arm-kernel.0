@@ -1,28 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 20 May 2011 19:27:22 +0200
-Subject: [PATCH 4/4] davinci: create new common platform header for davinci
-In-Reply-To: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
-References: <1305900841-4020-1-git-send-email-manjunath.hadli@ti.com>
-Message-ID: <201105201927.22386.arnd@arndb.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Fri, 20 May 2011 19:36:49 +0200
+Subject: [PATCH] mioa701: move gpio-pullup functionality to gpio-vbus
+In-Reply-To: <1305719866-9811-1-git-send-email-dbaryshkov@gmail.com>
+References: <1305719866-9811-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <4DD6A6B1.9010209@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 20 May 2011 16:14:01 Manjunath Hadli wrote:
-> remove the code from individual platform header files for
-> dm365, dm355, dm644x and dm646x and consolidate it into a
-> single and common header file dmx.h.
-> Include the new header file in individual platform header
-> files as a pre-cursor for deleting these headers in follow
-> up patches.
-> 
-> Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+On 05/18/2011 01:57 PM, Dmitry Eremin-Solenikov wrote:
+> gpio-vbus can (and should?) handle D+ pullup gpio for us. Move gpio-pullup handling
+> to gpio-vbus and stop providing udc_info as it's empty now.
+No sorry, NAK.
 
-I probably missed the discussion that led to this patch, but
-please explain the motivation behind the change in the changelog.
+As a matter of fact, even if gpio-vbus driver handles correctly the VBUS 
+sensing and D+ line powering, it still lacks the suspend / resume 
+handling to "disconnect the D+ line" on suspend and reconnect it on 
+"resume". That's the reason I nack this patch, as for me, gpio-vbus and 
+pxa27x-udc are not yet iso functional.
 
-Your current changelog reads like this is pointless churn,
-which may or may not be the case. The diffstat shows 27 lines
-being removed in total, which is roughly the amount of copyright
-headers.
+If I was provided proof that this is innoccuous (ie. there is no power 
+draw possible in suspend, or that the resume procedure still works with 
+gpio-vbus), then I'll ack the patch.
 
-	Arnd
+Cheers.
+
+--
+Robert
