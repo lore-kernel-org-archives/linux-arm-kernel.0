@@ -1,73 +1,111 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 15:36:08 +0200
-Subject: [PATCH 1/4] clk: Add a generic clock infrastructure
-In-Reply-To: <alpine.LFD.2.02.1105201521560.3078@ionos>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<1305876469.326305.518470530485.1.gpush@pororo>
-	<20110520115936.GA10931@pengutronix.de>
-	<alpine.LFD.2.02.1105201521560.3078@ionos>
-Message-ID: <20110520133608.GF10403@pengutronix.de>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 20 May 2011 11:55:54 +0100
+Subject: On __raw_readl readl_relaxed and readl nocheinmal
+In-Reply-To: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
+References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
+Message-ID: <BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 03:25:24PM +0200, Thomas Gleixner wrote:
-> On Fri, 20 May 2011, Sascha Hauer wrote:
-> 
-> > Hi Jeremy,
-> > 
-> > Nice to see progress in this area :)
-> > 
-> > On Fri, May 20, 2011 at 03:27:49PM +0800, Jeremy Kerr wrote:
-> > > +
-> > > +struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
-> > > +		const char *name)
-> > > +{
-> > > +	struct clk *clk;
-> > > +
-> > > +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> > > +	if (!clk)
-> > > +		return NULL;
-> > > +
-> > > +	clk->name = name;
-> > > +	clk->ops = ops;
-> > > +	clk->hw = hw;
-> > > +	hw->clk = clk;
-> > 
-> > is it worth to add a CLK_REGISTERED flag here? Up to now clocks do not
-> > have to be registered at all and the registering might be forgotten for
-> > some clocks. I suppose funny things can happen when we operate on
-> > unregistered clocks.
-> 
-> No, because not registered clocks are not accessible :)
+Linus,
 
-D'oh :)
+On 20 May 2011 11:04, Linus Walleij <linus.walleij@linaro.org> wrote:
+> Now I get thes questions about I/O accessors from all over the
+> place where I'm working. It seems some public clarification is needed...
 
-> 
->  > +
-> > > +	/* Query the hardware for parent and initial rate */
-> > > +
-> > > +	if (clk->ops->get_parent)
-> > > +		/* We don't to lock against prepare/enable here, as
-> > > +		 * the clock is not yet accessible from anywhere */
-> > > +		clk->parent = clk->ops->get_parent(clk->hw);
-> > > +
-> > > +	if (clk->ops->recalc_rate)
-> > > +		clk->rate = clk->ops->recalc_rate(clk->hw);
-> > 
-> > This implicitely requires that we never register a clock before its
-> > parent is registered. This makes perfect sense but I think we should
-> > catch it here when the user tries to register a clock with a not yet
-> > registered parent.
-> 
-> We can agree on that, but we can make it more clever than that.
+There's not a simple answer as other architectures do something else.
+For ARM I can answer below.
 
-Great.
+> My current understanding:
+>
+> __raw_writel(a, reg1);
+> __raw_writel(b, reg2);
+>
+> This does not guarantee that the write of b into reg2 is even done
+> after writing a into reg1 due to instruction reeordering.
 
-Sascha
+The compile should not reorder them as they are volatile accesses.
 
+On ARM it is guaranteed that the writes are issued in program order
+and they arrive to the same device in program order (the definition of
+the device is still debatable). Arriving at different devices in
+program order is not guaranteed (depends on the bus configuration).
+They also don't do any endianess conversions.
+
+On other architectures like PPC I think they are completely out of order.
+
+> writel_relaxed(a, reg1);
+> writel_relaxed(b, reg2);
+>
+> This will insert a barrier() so we know that the CPU will execute the
+> write of a before the write of b. However it does not mandate that
+> reg2 is written with b before reg1 is written with a at the hardware
+> register level.
+
+These are as the __raw_* variants, only that they do endianess
+conversion (to/from little endian).
+
+> writel(a, reg1);
+> writel(b, reg2);
+>
+> This actually pushes the value all the way through so that you know
+> that the values has landed in the hardware after each statement.
+
+writel_relaxed() with barrier before (DSB + outer cache sync). This is
+to ensure ordering with accesses to coherent DMA buffers (Normal
+Non-cacheable memory). For accesses to the same device we don't
+actually need any barriers on ARM as this is guaranteed by the
+architecture.
+
+> What we would like to know is the effect of things like this:
+>
+> __raw_writel(a, reg1);
+> __raw_writel(b, reg1);
+> __raw_writel(c, reg1);
+>
+> writel_relaxed(a, reg1);
+> writel_relaxed(b, reg1);
+> writel_relaxed(c, reg1);
+>
+> My *guess* is that in the first case the pipeline may even remove
+> the write if a and b to reg1 since it's only caring about the end
+> result (insert the volatile story in
+> Documentation/volatile_considered_harmful.txt here)
+
+I think it should be ok with a well-behaved compiler.
+
+But I would like is to convert the __raw_* accessors to inline asm but
+Russell objected in the past. There are other reasons for this - the
+current volatile access can generate post-indexed accesses which are
+more expensive to emulate by a hypervisor (on Cortex-A15).
+
+> The second case (writel_relaxed() to the same register) would
+> make sure that the writes actually happens in sequence,
+> but after the last statement it may take a while before the
+> actual hardware write happens.
+
+No difference from the __raw_* ones.
+
+With all of them, even writel(), you don't know when the actual
+hardware write happens. You can issue a DSB after to ensure write
+completion (I think defined as the device begins to change its state
+as a result of the write) but you can't tell whether the device
+finished changing its state. For that you would need other means like
+reading back from the device.
+
+> And what about this:
+>
+> writel_relaxed(a, reg1);
+> writel_relaxed(b, reg1);
+> writel(c, reg1);
+>
+> I *think* this means that the writes will be done in sequence,
+> and after the last statement you know all writes have commenced.
+
+Here, because we use a DSB at the beginning of writel(), you now that
+the previous writel_relaxed() calls completed but not the final
+writel(). And anyway, the DSB in that was meant for DMA buffer
+accesses and not previous I/O accesses.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Catalin
