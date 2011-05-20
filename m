@@ -1,68 +1,107 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 20 May 2011 13:59:36 +0200
-Subject: [PATCH 1/4] clk: Add a generic clock infrastructure
-In-Reply-To: <1305876469.326305.518470530485.1.gpush@pororo>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<1305876469.326305.518470530485.1.gpush@pororo>
-Message-ID: <20110520115936.GA10931@pengutronix.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 20 May 2011 12:19:56 +0100
+Subject: [PATCH 2/5] ARM: mm: make TTBR1 always point to swapper_pg_dir on
+	ARMv6/7
+In-Reply-To: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1305890399-29075-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+From: Catalin Marinas <catalin.marinas@arm.com>
 
-Nice to see progress in this area :)
+This patch makes TTBR1 point to swapper_pg_dir so that global, kernel
+mappings can be used exclusively on v6 and v7 cores where they are
+needed.
 
-On Fri, May 20, 2011 at 03:27:49PM +0800, Jeremy Kerr wrote:
-> +
-> +struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
-> +		const char *name)
-> +{
-> +	struct clk *clk;
-> +
-> +	clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> +	if (!clk)
-> +		return NULL;
-> +
-> +	clk->name = name;
-> +	clk->ops = ops;
-> +	clk->hw = hw;
-> +	hw->clk = clk;
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/smp.h |    1 +
+ arch/arm/kernel/head.S     |    7 +++++--
+ arch/arm/kernel/smp.c      |    1 +
+ arch/arm/mm/proc-v6.S      |    4 +++-
+ arch/arm/mm/proc-v7.S      |    4 +++-
+ 5 files changed, 13 insertions(+), 4 deletions(-)
 
-is it worth to add a CLK_REGISTERED flag here? Up to now clocks do not
-have to be registered at all and the registering might be forgotten for
-some clocks. I suppose funny things can happen when we operate on
-unregistered clocks.
-
-> +
-> +	/* Query the hardware for parent and initial rate */
-> +
-> +	if (clk->ops->get_parent)
-> +		/* We don't to lock against prepare/enable here, as
-> +		 * the clock is not yet accessible from anywhere */
-> +		clk->parent = clk->ops->get_parent(clk->hw);
-> +
-> +	if (clk->ops->recalc_rate)
-> +		clk->rate = clk->ops->recalc_rate(clk->hw);
-
-This implicitely requires that we never register a clock before its
-parent is registered. This makes perfect sense but I think we should
-catch it here when the user tries to register a clock with a not yet
-registered parent.
-
-> +
-> +
-> +	return clk;
-> +}
-> +EXPORT_SYMBOL_GPL(clk_register);
-
-BTW we planned to let the linker do the job of registering static
-clocks, but this is only convenience and can be added later.
-
-
-Sascha
-
+diff --git a/arch/arm/include/asm/smp.h b/arch/arm/include/asm/smp.h
+index 96ed521..be4b588 100644
+--- a/arch/arm/include/asm/smp.h
++++ b/arch/arm/include/asm/smp.h
+@@ -78,6 +78,7 @@ extern void platform_smp_prepare_cpus(unsigned int);
+  */
+ struct secondary_data {
+ 	unsigned long pgdir;
++	unsigned long swapper_pg_dir;
+ 	void *stack;
+ };
+ extern struct secondary_data secondary_data;
+diff --git a/arch/arm/kernel/head.S b/arch/arm/kernel/head.S
+index c9173cf..8224b1d 100644
+--- a/arch/arm/kernel/head.S
++++ b/arch/arm/kernel/head.S
+@@ -113,6 +113,7 @@ ENTRY(stext)
+ 	ldr	r13, =__mmap_switched		@ address to jump to after
+ 						@ mmu has been enabled
+ 	adr	lr, BSYM(1f)			@ return (PIC) address
++	mov	r8, r4				@ set TTBR1 to swapper_pg_dir
+  ARM(	add	pc, r10, #PROCINFO_INITFUNC	)
+  THUMB(	add	r12, r10, #PROCINFO_INITFUNC	)
+  THUMB(	mov	pc, r12				)
+@@ -302,8 +303,10 @@ ENTRY(secondary_startup)
+ 	 */
+ 	adr	r4, __secondary_data
+ 	ldmia	r4, {r5, r7, r12}		@ address to jump to after
+-	sub	r4, r4, r5			@ mmu has been enabled
+-	ldr	r4, [r7, r4]			@ get secondary_data.pgdir
++	sub	lr, r4, r5			@ mmu has been enabled
++	ldr	r4, [r7, lr]			@ get secondary_data.pgdir
++	add	r7, r7, #4
++	ldr	r8, [r7, lr]			@ get secondary_data.swapper_pg_dir
+ 	adr	lr, BSYM(__enable_mmu)		@ return address
+ 	mov	r13, r12			@ __secondary_switched address
+  ARM(	add	pc, r10, #PROCINFO_INITFUNC	) @ initialise processor
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index f29b8a2..10b5d55 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -105,6 +105,7 @@ int __cpuinit __cpu_up(unsigned int cpu)
+ 	 */
+ 	secondary_data.stack = task_stack_page(idle) + THREAD_START_SP;
+ 	secondary_data.pgdir = virt_to_phys(pgd);
++	secondary_data.swapper_pg_dir = virt_to_phys(swapper_pg_dir);
+ 	__cpuc_flush_dcache_area(&secondary_data, sizeof(secondary_data));
+ 	outer_clean_range(__pa(&secondary_data), __pa(&secondary_data + 1));
+ 
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 7c99cb4..55ca716 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -218,7 +218,9 @@ __v6_setup:
+ 	mcr	p15, 0, r0, c2, c0, 2		@ TTB control register
+ 	ALT_SMP(orr	r4, r4, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	r4, r4, #TTB_FLAGS_UP)
+-	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
++	ALT_SMP(orr	r8, r8, #TTB_FLAGS_SMP)
++	ALT_UP(orr	r8, r8, #TTB_FLAGS_UP)
++	mcr	p15, 0, r8, c2, c0, 1		@ load TTB1
+ #endif /* CONFIG_MMU */
+ 	adr	r5, v6_crval
+ 	ldmia	r5, {r5, r6}
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index babfba0..3c38678 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -368,7 +368,9 @@ __v7_setup:
+ 	mcr	p15, 0, r10, c2, c0, 2		@ TTB control register
+ 	ALT_SMP(orr	r4, r4, #TTB_FLAGS_SMP)
+ 	ALT_UP(orr	r4, r4, #TTB_FLAGS_UP)
+-	mcr	p15, 0, r4, c2, c0, 1		@ load TTB1
++	ALT_SMP(orr	r8, r8, #TTB_FLAGS_SMP)
++	ALT_UP(orr	r8, r8, #TTB_FLAGS_UP)
++	mcr	p15, 0, r8, c2, c0, 1		@ load TTB1
+ 	ldr	r5, =PRRR			@ PRRR
+ 	ldr	r6, =NMRR			@ NMRR
+ 	mcr	p15, 0, r5, c10, c2, 0		@ write PRRR
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.4
