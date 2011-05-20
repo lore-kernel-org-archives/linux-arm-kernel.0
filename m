@@ -1,94 +1,17 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 20 May 2011 22:20:05 +0100
-Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
-In-Reply-To: <201105200013.20380.morpheus.ibis@gmail.com>
-References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
-	<201105191451.40416.morpheus.ibis@gmail.com>
-	<20110519193121.GC7445@n2100.arm.linux.org.uk>
-	<201105200013.20380.morpheus.ibis@gmail.com>
-Message-ID: <20110520212005.GA30675@n2100.arm.linux.org.uk>
+Date: Fri, 20 May 2011 22:28:37 +0100
+Subject: [PATCH v6 0/8] Switch ARM platforms from integrator-flash to
+	physmap
+In-Reply-To: <1305809614.27474.41.camel@e102391-lin.cambridge.arm.com>
+References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>
+	<1305803946.2630.69.camel@localhost>
+	<1305809614.27474.41.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <20110520212837.GB30675@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 12:13:20AM +0200, Pavel Herrmann wrote:
-> From bd55d6b18fa4fcb884980825b43b43df01767149 Mon Sep 17 00:00:00 2001
-> From: Pavel Herrmann <morpheus.ibis@gmail.com>
-> Date: Mon, 16 May 2011 14:18:18 +0200
-> Subject: [PATCH] MAX1111: Fix Race condition causing NULL pointer exception
-> 
-> spi_sync call uses its spi_message parameter to keep completion information,
-> having this structure static is not thread-safe, potentially causing one
-> thread having pointers to memory on or above other threads stack. use mutex
-> to prevent multiple access
-> 
-> Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
+On Thu, May 19, 2011 at 01:53:34PM +0100, Marc Zyngier wrote:
+> Yes, it's been merged by Russell into his tree yesterday, after David's
+> ack.
 
-Looks good, thanks.
-
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-> ---
->  drivers/hwmon/max1111.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/hwmon/max1111.c b/drivers/hwmon/max1111.c
-> index 12a54aa..d872f57 100644
-> --- a/drivers/hwmon/max1111.c
-> +++ b/drivers/hwmon/max1111.c
-> @@ -40,6 +40,7 @@ struct max1111_data {
->  	struct spi_transfer	xfer[2];
->  	uint8_t *tx_buf;
->  	uint8_t *rx_buf;
-> +	struct mutex		msg_lock_mutex;
->  };
->  
->  static int max1111_read(struct device *dev, int channel)
-> @@ -48,6 +49,11 @@ static int max1111_read(struct device *dev, int channel)
->  	uint8_t v1, v2;
->  	int err;
->  
-> +	/* spi_sync requires data not to be freed before function returns
-> +	 * for static data, any access is dangerous, use locks
-> +	 */
-> +	mutex_lock(&data->msg_lock_mutex);
-> +
->  	data->tx_buf[0] = (channel << MAX1111_CTRL_SEL_SH) |
->  		MAX1111_CTRL_PD0 | MAX1111_CTRL_PD1 |
->  		MAX1111_CTRL_SGL | MAX1111_CTRL_UNI | MAX1111_CTRL_STR;
-> @@ -55,12 +61,15 @@ static int max1111_read(struct device *dev, int channel)
->  	err = spi_sync(data->spi, &data->msg);
->  	if (err < 0) {
->  		dev_err(dev, "spi_sync failed with %d\n", err);
-> +		mutex_unlock(&data->msg_lock_mutex);
->  		return err;
->  	}
->  
->  	v1 = data->rx_buf[0];
->  	v2 = data->rx_buf[1];
->  
-> +	mutex_unlock(&data->msg_lock_mutex);
-> +
->  	if ((v1 & 0xc0) || (v2 & 0x3f))
->  		return -EINVAL;
->  
-> @@ -176,6 +185,8 @@ static int __devinit max1111_probe(struct spi_device *spi)
->  	if (err)
->  		goto err_free_data;
->  
-> +	mutex_init(&data->msg_lock_mutex);
-> +
->  	data->spi = spi;
->  	spi_set_drvdata(spi, data);
->  
-> @@ -213,6 +224,7 @@ static int __devexit max1111_remove(struct spi_device 
-> *spi)
->  
->  	hwmon_device_unregister(data->hwmon_dev);
->  	sysfs_remove_group(&spi->dev.kobj, &max1111_attr_group);
-> +	mutex_destroy(data->msg_lock_mutex);
->  	kfree(data->rx_buf);
->  	kfree(data->tx_buf);
->  	kfree(data);
-> -- 
-> 1.7.5.rc3
-> 
+... and I've just added the new acks we've had today.
