@@ -1,919 +1,462 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Sat, 21 May 2011 17:29:18 +0200 (CEST)
-Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
-In-Reply-To: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
-References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
-Message-ID: <Pine.LNX.4.64.1105211334260.25424@axis700.grange>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 21 May 2011 19:01:29 +0200
+Subject: [Zaurus-devel] spitz pm: add power monitoring driver
+In-Reply-To: <20110521125511.GA10653@elf.ucw.cz>
+References: <20110521125511.GA10653@elf.ucw.cz>
+Message-ID: <20110521170128.GA3017@elf.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 20 May 2011, Javier Martin wrote:
+This adds battery/charge monitoring driver for spitz.
+  
+This is version I'd like to see merged.
+  
+Is it ok for Marek to merge this?
+  
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-> This driver adds basic support for Aptina mt9p031 sensor.
-> 
-> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> ---
->  drivers/media/video/Kconfig   |    8 +
->  drivers/media/video/Makefile  |    1 +
->  drivers/media/video/mt9p031.c |  751 +++++++++++++++++++++++++++++++++++++++++
->  include/media/mt9p031.h       |   11 +
->  4 files changed, 771 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/media/video/mt9p031.c
->  create mode 100644 include/media/mt9p031.h
-> 
-> diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
-> index 00f51dd..5c96b89 100644
-> --- a/drivers/media/video/Kconfig
-> +++ b/drivers/media/video/Kconfig
-> @@ -329,6 +329,14 @@ config VIDEO_OV7670
->  	  OV7670 VGA camera.  It currently only works with the M88ALP01
->  	  controller.
->  
-> +config VIDEO_MT9P031
-> +	tristate "Aptina MT9P031 support"
-> +	depends on I2C && VIDEO_V4L2
-> +	---help---
-> +	  This driver supports MT9P031 cameras from Micron
-> +	  This is a Video4Linux2 sensor-level driver for the Micron
-> +	  mt0p031 5 Mpixel camera.
+diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+index 785880f..513588c 100644
+--- a/arch/arm/mach-pxa/sharpsl_pm.c
++++ b/arch/arm/mach-pxa/sharpsl_pm.c
+@@ -68,6 +51,7 @@ static void sharpsl_battery_thread(struct work_struct *private_);
+  * Variables
+  */
+ struct sharpsl_pm_status sharpsl_pm;
++EXPORT_SYMBOL(sharpsl_pm);
+ static DECLARE_DELAYED_WORK(toggle_charger, sharpsl_charge_toggle);
+ static DECLARE_DELAYED_WORK(sharpsl_bat, sharpsl_battery_thread);
+ DEFINE_LED_TRIGGER(sharpsl_charge_led_trigger);
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 01c5769..ddb1b24 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -920,6 +920,25 @@ static void __init spitz_i2c_init(void)
+ static inline void spitz_i2c_init(void) {}
+ #endif
+ 
++
++/******************************************************************************
++ * Battery
++ ******************************************************************************/
++
++#if defined(CONFIG_BATTERY_SPITZ) || defined(CONFIG_BATTERY_SPITZ_MODULE)
++static struct platform_device spitz_battery_device = {
++	.name	= "spitz-battery",
++	.id	= -1,
++};
++
++static void __init spitz_battery_init(void)
++{
++	platform_device_register(&spitz_battery_device);	
++}
++#else
++static void __init spitz_battery_init(void) {}
++#endif
++
+ /******************************************************************************
+  * Machine init
+  ******************************************************************************/
+@@ -968,6 +987,7 @@ static void __init spitz_init(void)
+ 	spitz_nor_init();
+ 	spitz_nand_init();
+ 	spitz_i2c_init();
++	spitz_battery_init();
+ }
+ 
+ static void __init spitz_fixup(struct machine_desc *desc,
+diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+index 52a462f..df54d70 100644
+--- a/drivers/power/Kconfig
++++ b/drivers/power/Kconfig
+@@ -102,6 +102,12 @@ config BATTERY_COLLIE
+ 	  Say Y to enable support for the battery on the Sharp Zaurus
+ 	  SL-5500 (collie) models.
+ 
++config BATTERY_SPITZ
++	tristate "Sharp SL-3000C (spitz) battery"
++	help
++	  Say Y to enable support for the battery on the Sharp Zaurus
++	  SL-3000C (spitz) models.
++
+ config BATTERY_WM97XX
+ 	bool "WM97xx generic battery driver"
+ 	depends on TOUCHSCREEN_WM97XX=y
+diff --git a/drivers/power/Makefile b/drivers/power/Makefile
+index 8385bfa..7a82c1e 100644
+--- a/drivers/power/Makefile
++++ b/drivers/power/Makefile
+@@ -20,6 +20,7 @@ obj-$(CONFIG_BATTERY_PMU)	+= pmu_battery.o
+ obj-$(CONFIG_BATTERY_OLPC)	+= olpc_battery.o
+ obj-$(CONFIG_BATTERY_TOSA)	+= tosa_battery.o
+ obj-$(CONFIG_BATTERY_COLLIE)	+= collie_battery.o
++obj-$(CONFIG_BATTERY_SPITZ)	+= spitz_battery.o
+ obj-$(CONFIG_BATTERY_WM97XX)	+= wm97xx_battery.o
+ obj-$(CONFIG_BATTERY_BQ20Z75)	+= bq20z75.o
+ obj-$(CONFIG_BATTERY_BQ27x00)	+= bq27x00_battery.o
+diff --git a/drivers/power/spitz_battery.c b/drivers/power/spitz_battery.c
+new file mode 100644
+index 0000000..5981f58
+--- /dev/null
++++ b/drivers/power/spitz_battery.c
+@@ -0,0 +1,355 @@
++/*
++ * Battery and Power Management code for the Sharp SL-3000c
++ *
++ * Copyright (c) 2009 Pavel Machek <pavel@ucw.cz>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
++#include <linux/platform_device.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/power_supply.h>
++#include <linux/delay.h>
++#include <linux/spinlock.h>
++#include <linux/interrupt.h>
++#include <linux/gpio.h>
++
++#include <asm/mach-types.h>
++#include <mach/spitz.h>
++#include <mach/sharpsl_pm.h>
++
++extern struct sharpsl_pm_status sharpsl_pm;
++
++struct spitz_bat {
++	struct power_supply psy;
++
++	bool (*is_present)(struct spitz_bat *bat);
++};
++
++struct battery_thresh sharpsl_battery_levels[] = {
++	{ 3980, 100 },
++	{ 3900, 95 },
++	{ 3860, 90 },
++	{ 3800, 85 },
++	{ 3760, 80 },
++	{ 3720, 74 },
++	{ 3680, 69 },
++	{ 3620, 65 },
++	{ 3570, 59 },
++	{ 3560, 55 },
++	{ 3550, 48 },
++	{ 3530, 45 },
++	{ 3510, 39 },
++	{ 3490, 33 },
++	{ 3470, 29 },
++	{ 3450, 23 },
++	{ 3410, 16 },
++	{    0, 0 },
++};
++
++static struct spitz_bat spitz_bat_main, spitz_ac;
++
++extern int sharpsl_pm_pxa_read_max1111(int channel);
++
++typedef int milliamp_t;
++typedef int milliohm_t;
++typedef int millivolt_t;
++typedef int microvolt_t;
++
++milliamp_t basic_current = 125;
++milliohm_t battery_resistance = 100;
++
++/* 422 seems to be suitable for very old, 1Ah battery.
++   2Ah battery probably has better resistance */
++
++/* Unfortunately, resistance depends on state of charge, current
++ * direction and temperature.
++ *
++ * Ouch, and dependency is actually _not_ too simple. It is lowest
++ * at 3.55V, very slowly rises at 4V (approximately linear dependency),
++ * and quickly rises towards 3.2V (in something exponential-looking).
++ *
++ * It is about same at 25Celsius and 40Celsius, and about 2.5x the value
++ * on 0Celsius, rising _very_ sharply.
++ *
++ * Li-ion should only be charged between 0 and 45 Celsius, and discharged
++ * between -20 and 60 celsius.
++ */
++
++extern int backlight_current;
++
++/* Positive values: current drawn from battery */
++milliamp_t battery_current(void)
++{
++	int bl_status = sharpsl_pm.machinfo->backlight_get_status ? sharpsl_pm.machinfo->backlight_get_status() : 0;
++
++	printk("bl_status: %d\n", bl_status);
++
++	if (sharpsl_pm.charge_mode == CHRG_ON)
++		return 0;
++
++	/* FIXME: take backlight into account */
++	return basic_current;
++}
++
++millivolt_t liion_internal_voltage(millivolt_t voltage, milliamp_t current_ma)
++{
++	return voltage + (battery_resistance * current_ma / 1000);
++}
++
++
++static microvolt_t get_battery(void)
++{
++	/* Thanks to Stanislav B. ADC has 3.3V as reference,
++	   is connected to battery over 47kOhm,
++	   and to ground over 100kOhm. */
++	int adc = sharpsl_pm.machinfo->read_devdata(SHARPSL_BATT_VOLT);
++	return (adc * 1470 * 3300)/256;
++}
++
++static int get_percentage(void)
++{
++	int i = sharpsl_pm.machinfo->bat_levels - 1;
++	struct battery_thresh *thresh;
++	millivolt_t voltage = get_battery()/1000;
++
++	thresh = sharpsl_battery_levels;
++
++	while (i > 0 && (voltage > thresh[i].voltage))
++		i--;
++
++	return thresh[i].percentage;
++}
++
++static int get_status(union power_supply_propval *val)
++{
++	if (gpio_get_value(SPITZ_GPIO_CHRG_ON) == 0)
++		printk("Charge on. ");
++	if (gpio_get_value(SPITZ_GPIO_JK_B) == 0)
++		printk("Slow charge. ");
++
++	val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
++
++	if (!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_ACIN))
++		val->intval = POWER_SUPPLY_STATUS_DISCHARGING;
++	else {
++		if (gpio_get_value(SPITZ_GPIO_CHRG_ON) == 0)
++			val->intval = POWER_SUPPLY_STATUS_CHARGING;
++		if (sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_CHRGFULL))
++			val->intval = POWER_SUPPLY_STATUS_FULL;
++	}
++
++	printk("ACIN: %d ", !!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_ACIN));
++	printk("Full: %d ", !!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_CHRGFULL));
++	printk("Fatal: %d ", !!sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_FATAL));
++	printk("Percent: %d\n", get_percentage());
++
++	return 0;
++}
++
++static int spitz_bat_get_property(struct power_supply *psy,
++			    enum power_supply_property psp,
++			    union power_supply_propval *val)
++{
++	val->intval = 0;
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_HEALTH:
++		/* POWER_SUPPLY_HEALTH_OVERHEAT , POWER_SUPPLY_HEALTH_COLD,
++		   POWER_SUPPLY_HEALTH_OVERVOLTAGE, POWER_SUPPLY_HEALTH_UNSPEC_FAILURE, POWER_SUPPLY_HEALTH_GOOD
++		 */
++		return 0;
++	case POWER_SUPPLY_PROP_CHARGE_TYPE:
++		val->intval = POWER_SUPPLY_CHARGE_TYPE_NONE;
++	  	if (gpio_get_value(SPITZ_GPIO_CHRG_ON) == 0) {
++			if (gpio_get_value(SPITZ_GPIO_JK_B) == 1)
++				val->intval = POWER_SUPPLY_CHARGE_TYPE_FAST;
++			else
++				val->intval = POWER_SUPPLY_CHARGE_TYPE_TRICKLE;
++		}
++		return 0;
++	case POWER_SUPPLY_PROP_STATUS:
++		return get_status(val);
++	case POWER_SUPPLY_PROP_TECHNOLOGY:
++		val->intval = POWER_SUPPLY_TECHNOLOGY_LION;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		val->intval = get_battery();
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
++		val->intval = 4200000;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
++		val->intval = 3400000;
++		return 0;
++	case POWER_SUPPLY_PROP_TEMP:
++		mdelay(SHARPSL_CHECK_BATTERY_WAIT_TIME_TEMP);
++		sharpsl_pm.machinfo->measure_temp(1);
++		mdelay(SHARPSL_CHECK_BATTERY_WAIT_TIME_TEMP);
++		val->intval = sharpsl_pm.machinfo->read_devdata(SHARPSL_BATT_TEMP);
++		sharpsl_pm.machinfo->measure_temp(0);
++		return 0;
++	case POWER_SUPPLY_PROP_MODEL_NAME:
++		val->strval = "spitz-battery";
++		return 0;
++	case POWER_SUPPLY_PROP_PRESENT:
++		val->intval = 1;
++		return 0;
++	case POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN:
++		val->intval = 2000000;
++		return 0;
++	case POWER_SUPPLY_PROP_CAPACITY:
++		val->intval = get_percentage();
++		return 0;
++	default:
++		return -EINVAL;
++	}
++	return -EINVAL;
++}
++
++static int spitz_ac_get_property(struct power_supply *psy,
++			    enum power_supply_property psp,
++			    union power_supply_propval *val)
++{
++	val->intval = 0;
++
++	switch (psp) {
++	case POWER_SUPPLY_PROP_STATUS:
++		val->intval = POWER_SUPPLY_STATUS_UNKNOWN;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_NOW:
++		/* Thanks to Stanislav B. ADC has 3.3V as reference,
++		   is connected to acin over 2kOhm,
++		   and to ground over 1kOhm. */
++		val->intval = (sharpsl_pm.machinfo->read_devdata(SHARPSL_ACIN_VOLT) * 3000 * 3300)/256;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN:
++		val->intval = 5250000;
++		return 0;
++	case POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN:
++		val->intval = 4750000;
++		return 0;
++	case POWER_SUPPLY_PROP_MODEL_NAME:
++		val->strval = "spitz-power-supply";
++		return 0;
++	case POWER_SUPPLY_PROP_PRESENT:
++		val->intval = sharpsl_pm.machinfo->read_devdata(SHARPSL_STATUS_ACIN);
++		return 0;
++	default:
++		return -EINVAL;
++	}
++	return -EINVAL;
++}
++
++static void spitz_bat_external_power_changed(struct power_supply *psy)
++{
++}
++
++static enum power_supply_property spitz_bat_main_props[] = {
++	POWER_SUPPLY_PROP_STATUS,
++	POWER_SUPPLY_PROP_TECHNOLOGY,
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
++	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
++	POWER_SUPPLY_PROP_TEMP,
++	POWER_SUPPLY_PROP_PRESENT,
++	POWER_SUPPLY_PROP_CHARGE_TYPE,
++	POWER_SUPPLY_PROP_HEALTH,
++	POWER_SUPPLY_PROP_CHARGE_FULL_DESIGN,
++};
++
++static struct spitz_bat spitz_bat_main = {
++	.psy = {
++		.name		= "main-battery",
++		.type		= POWER_SUPPLY_TYPE_BATTERY,
++		.properties	= spitz_bat_main_props,
++		.num_properties	= ARRAY_SIZE(spitz_bat_main_props),
++		.get_property	= spitz_bat_get_property,
++		.external_power_changed = spitz_bat_external_power_changed,
++		.use_for_apm	= 1,
++	},
++};
++
++static enum power_supply_property spitz_ac_props[] = {
++	POWER_SUPPLY_PROP_STATUS,
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_VOLTAGE_MAX_DESIGN,
++	POWER_SUPPLY_PROP_VOLTAGE_MIN_DESIGN,
++	POWER_SUPPLY_PROP_PRESENT,
++};
++
++static struct spitz_bat spitz_ac = {
++	.psy = {
++		.name		= "ac",
++		.type		= POWER_SUPPLY_TYPE_MAINS,
++		.properties	= spitz_ac_props,
++		.num_properties	= ARRAY_SIZE(spitz_ac_props),
++		.get_property	= spitz_ac_get_property,
++	},
++};
++
++#ifdef CONFIG_PM
++static int spitz_bat_suspend(struct platform_device *dev, pm_message_t state)
++{
++	return 0;
++}
++
++static int spitz_bat_resume(struct platform_device *dev)
++{
++	return 0;
++}
++#else
++#define spitz_bat_suspend NULL
++#define spitz_bat_resume NULL
++#endif
++
++
++
++static int __devinit spitz_bat_probe(struct platform_device *dev)
++{
++	if (!machine_is_spitz())
++		return -ENODEV;
++
++	printk("spitz_bat_probe: register\n");
++	power_supply_register(&dev->dev, &spitz_bat_main.psy);
++	power_supply_register(&dev->dev, &spitz_ac.psy);
++	return 0;
++}
++
++static int __devexit spitz_bat_remove(struct platform_device *dev)
++{
++	power_supply_unregister(&spitz_bat_main.psy);
++	power_supply_unregister(&spitz_ac.psy);
++	return 0;
++}
++
++
++static struct platform_driver spitz_bat_driver = {
++	.driver.name	= "spitz-battery",
++	.driver.owner	= THIS_MODULE,
++	.probe		= spitz_bat_probe,
++	.remove		= __devexit_p(spitz_bat_remove),
++	.suspend	= spitz_bat_suspend,
++	.resume		= spitz_bat_resume,
++};
++
++static int __init spitz_bat_init(void)
++{
++	return platform_driver_register(&spitz_bat_driver);
++}
++
++static void __exit spitz_bat_exit(void)
++{
++	platform_driver_unregister(&spitz_bat_driver);
++}
++
++module_init(spitz_bat_init);
++module_exit(spitz_bat_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Pavel Machek");
++MODULE_DESCRIPTION("Spitz battery driver");
++MODULE_ALIAS("platform:spitz-battery");
 
-Two sentences seem to repeat the same with other words, and it's better to 
-stay consistent: just use Aptina everywhere, maybe put Micron in brackets 
-at one location.
 
-> +
->  config VIDEO_MT9V011
->  	tristate "Micron mt9v011 sensor support"
->  	depends on I2C && VIDEO_V4L2
-> diff --git a/drivers/media/video/Makefile b/drivers/media/video/Makefile
-> index ace5d8b..912b29b 100644
-> --- a/drivers/media/video/Makefile
-> +++ b/drivers/media/video/Makefile
-> @@ -65,6 +65,7 @@ obj-$(CONFIG_VIDEO_UPD64083) += upd64083.o
->  obj-$(CONFIG_VIDEO_OV7670) 	+= ov7670.o
->  obj-$(CONFIG_VIDEO_TCM825X) += tcm825x.o
->  obj-$(CONFIG_VIDEO_TVEEPROM) += tveeprom.o
-> +obj-$(CONFIG_VIDEO_MT9P031) += mt9p031.o
->  obj-$(CONFIG_VIDEO_MT9V011) += mt9v011.o
->  obj-$(CONFIG_VIDEO_SR030PC30)	+= sr030pc30.o
->  obj-$(CONFIG_VIDEO_NOON010PC30)	+= noon010pc30.o
-> diff --git a/drivers/media/video/mt9p031.c b/drivers/media/video/mt9p031.c
-> new file mode 100644
-> index 0000000..e406b64
-> --- /dev/null
-> +++ b/drivers/media/video/mt9p031.c
-> @@ -0,0 +1,751 @@
-> +/*
-> + * Driver for MT9P031 CMOS Image Sensor from Aptina
-> + *
-> + * Copyright (C) 2011, Javier Martin <javier.martin@vista-silicon.com>
-> + *
-> + * Copyright (C) 2011, Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> + *
-> + * Based on the MT9V032 driver and Bastian Hecht's code.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/i2c.h>
-> +#include <linux/log2.h>
-> +#include <linux/pm.h>
-> +#include <linux/regulator/consumer.h>
-> +#include <linux/slab.h>
-> +#include <media/v4l2-subdev.h>
-> +#include <linux/videodev2.h>
-> +
-> +#include <media/mt9p031.h>
-> +#include <media/v4l2-chip-ident.h>
-> +#include <media/v4l2-subdev.h>
-> +#include <media/v4l2-device.h>
-> +
-> +/* mt9p031 selected register addresses */
-> +#define MT9P031_CHIP_VERSION			0x00
-> +#define		MT9P031_CHIP_VERSION_VALUE	0x1801
-> +#define MT9P031_ROW_START			0x01
-
-Don't mix spaces and TABs between "#define" and the macro - just use one 
-space everywhere.
-
-> +#define		MT9P031_ROW_START_SKIP		54
-> +#define MT9P031_COLUMN_START			0x02
-> +#define		MT9P031_COLUMN_START_SKIP	16
-> +#define MT9P031_WINDOW_HEIGHT			0x03
-> +#define MT9P031_WINDOW_WIDTH			0x04
-> +#define MT9P031_H_BLANKING			0x05
-> +#define		MT9P031_H_BLANKING_VALUE	0
-> +#define MT9P031_V_BLANKING			0x06
-> +#define		MT9P031_V_BLANKING_VALUE	25
-> +#define MT9P031_OUTPUT_CONTROL			0x07
-> +#define		MT9P031_OUTPUT_CONTROL_CEN	2
-> +#define		MT9P031_OUTPUT_CONTROL_SYN	1
-> +#define MT9P031_SHUTTER_WIDTH_UPPER		0x08
-> +#define MT9P031_SHUTTER_WIDTH			0x09
-> +#define MT9P031_PIXEL_CLOCK_CONTROL		0x0a
-> +#define MT9P031_FRAME_RESTART			0x0b
-> +#define MT9P031_SHUTTER_DELAY			0x0c
-> +#define MT9P031_RST				0x0d
-> +#define		MT9P031_RST_ENABLE		1
-> +#define		MT9P031_RST_DISABLE		0
-> +#define MT9P031_READ_MODE_1			0x1e
-> +#define MT9P031_READ_MODE_2			0x20
-> +#define		MT9P031_READ_MODE_2_ROW_MIR	0x8000
-> +#define		MT9P031_READ_MODE_2_COL_MIR	0x4000
-> +#define MT9P031_ROW_ADDRESS_MODE		0x22
-> +#define MT9P031_COLUMN_ADDRESS_MODE		0x23
-> +#define MT9P031_GLOBAL_GAIN			0x35
-> +
-> +#define MT9P031_MAX_HEIGHT			1944
-> +#define MT9P031_MAX_WIDTH			2592
-> +#define MT9P031_MIN_HEIGHT			2
-> +#define MT9P031_MIN_WIDTH			18
-> +
-> +struct mt9p031 {
-> +	struct v4l2_subdev subdev;
-> +	struct media_pad pad;
-> +	struct v4l2_rect rect;	/* Sensor window */
-> +	struct v4l2_mbus_framefmt format;
-> +	struct mt9p031_platform_data *pdata;
-> +	struct mutex power_lock;
-
-Don't locks _always_ have to be documented? And this one: you only protect 
-set_power() with it, Laurent, is this correct?
-
-> +	int power_count;
-> +	u16 xskip;
-> +	u16 yskip;
-> +	u16 output_control;
-> +	struct regulator *reg_1v8;
-> +	struct regulator *reg_2v8;
-> +};
-> +
-> +static struct mt9p031 *to_mt9p031(const struct i2c_client *client)
-> +{
-> +	return container_of(i2c_get_clientdata(client), struct mt9p031, subdev);
-> +}
-> +
-> +static int reg_read(struct i2c_client *client, const u8 reg)
-> +{
-> +	s32 data = i2c_smbus_read_word_data(client, reg);
-> +	return data < 0 ? data : swab16(data);
-> +}
-> +	
-> +static int reg_write(struct i2c_client *client, const u8 reg,
-> +			const u16 data)
-> +{
-> +	return i2c_smbus_write_word_data(client, reg, swab16(data));
-> +}
-> +
-> +static int mt9p031_set_output_control(struct mt9p031 *mt9p031, u16 clear,
-> +				      u16 set)
-> +{
-> +	struct i2c_client *client = v4l2_get_subdevdata(&mt9p031->subdev);
-> +	u16 value = (mt9p031->output_control & ~clear) | set;
-> +	int ret;
-> +
-> +	ret = reg_write(client, MT9P031_OUTPUT_CONTROL, value);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	mt9p031->output_control = value;
-> +	return 0;
-> +}
-> +
-> +static int mt9p031_reset(struct i2c_client *client)
-> +{
-> +	struct mt9p031 *mt9p031 = to_mt9p031(client);
-> +	int ret;
-> +
-> +	/* Disable chip output, synchronous option update */
-> +	ret = reg_write(client, MT9P031_RST, MT9P031_RST_ENABLE);
-> +	if (ret < 0)
-> +		return -EIO;
-> +	ret = reg_write(client, MT9P031_RST, MT9P031_RST_DISABLE);
-> +	if (ret < 0)
-> +		return -EIO;
-> +	ret = mt9p031_set_output_control(mt9p031, MT9P031_OUTPUT_CONTROL_CEN, 0);
-> +	if (ret < 0)
-> +		return -EIO;
-> +	return 0;
-
-
-I think, a sequence like
-
-	ret = fn();
-	if (!ret)
-		ret = fn();
-	if (!ret)
-		ret = fn();
-	return ret;
-
-is a better way to achieve the same.
-
-> +}
-> +
-> +static int mt9p031_power_on(struct mt9p031 *mt9p031)
-> +{
-> +	int ret;
-> +
-> +	/* turn on VDD_IO */
-> +	ret = regulator_enable(mt9p031->reg_2v8);
-> +	if (ret) {
-> +		pr_err("Failed to enable 2.8v regulator: %d\n", ret);
-
-dev_err()
-
-> +		return ret;
-> +	}
-> +	if (mt9p031->pdata->set_xclk)
-> +		mt9p031->pdata->set_xclk(&mt9p031->subdev, 54000000);
-> +
-> +	return 0;
-> +}
-> +
-> +static void mt9p031_power_off(struct mt9p031 *mt9p031)
-> +{
-> +	if (mt9p031->pdata->set_xclk)
-> +		mt9p031->pdata->set_xclk(&mt9p031->subdev, 0);
-> +	regulator_disable(mt9p031->reg_2v8);
-> +}
-> +
-> +static int mt9p031_enum_mbus_code(struct v4l2_subdev *sd,
-> +				struct v4l2_subdev_fh *fh,
-> +				struct v4l2_subdev_mbus_code_enum *code)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +
-> +	if (code->pad || code->index)
-> +		return -EINVAL;
-> +
-> +	code->code = mt9p031->format.code;
-> +
-> +	return 0;
-> +}
-> +
-> +static struct v4l2_mbus_framefmt *mt9p031_get_pad_format(
-> +			struct mt9p031 *mt9p031,
-> +			struct v4l2_subdev_fh *fh,
-> +			unsigned int pad, u32 which)
-> +{
-> +	switch (which) {
-> +	case V4L2_SUBDEV_FORMAT_TRY:
-> +		return v4l2_subdev_get_try_format(fh, pad);
-> +	case V4L2_SUBDEV_FORMAT_ACTIVE:
-> +		return &mt9p031->format;
-> +	default:
-> +		return NULL;
-> +	}
-> +}
-> +
-> +static struct v4l2_rect *mt9p031_get_pad_crop(struct mt9p031 *mt9p031,
-> +			struct v4l2_subdev_fh *fh, unsigned int pad, u32 which)
-> +{
-> +	switch (which) {
-> +	case V4L2_SUBDEV_FORMAT_TRY:
-> +		return v4l2_subdev_get_try_crop(fh, pad);
-> +	case V4L2_SUBDEV_FORMAT_ACTIVE:
-> +		return &mt9p031->rect;
-> +	default:
-> +		return NULL;
-> +	}
-> +}
-> +
-> +static int mt9p031_get_crop(struct v4l2_subdev *sd,
-> +				struct v4l2_subdev_fh *fh,
-> +				struct v4l2_subdev_crop *crop)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +	struct v4l2_rect *rect = mt9p031_get_pad_crop(mt9p031, fh, crop->pad,
-> +							crop->which);
-> +	if (!rect)
-> +		return -EINVAL;
-> +
-> +	crop->rect = *rect;
-> +
-> +	return 0;
-> +}
-> +
-> +static u16 mt9p031_skip_for_crop(s32 source, s32 *target, s32 max_skip)
-> +{
-> +	unsigned int skip;
-> +
-> +	if (source - source / 4 < *target) {
-> +		*target = source;
-> +		return 1;
-> +	}
-> +
-> +	skip = DIV_ROUND_CLOSEST(source, *target);
-> +	if (skip > max_skip)
-> +		skip = max_skip;
-> +	*target = 2 * DIV_ROUND_UP(source, 2 * skip);
-> +
-> +	return skip;
-> +}
-> +
-> +static int mt9p031_set_params(struct i2c_client *client,
-> +			      struct v4l2_rect *rect, u16 xskip, u16 yskip)
-> +{
-> +	struct mt9p031 *mt9p031 = to_mt9p031(client);
-> +	int ret;
-> +	u16 xbin, ybin;
-> +	const u16 hblank = MT9P031_H_BLANKING_VALUE,
-> +		vblank = MT9P031_V_BLANKING_VALUE;
-> +	/*
-> +	 * TODO: Attention! When implementing horizontal flipping, adjust
-> +	 * alignment according to R2 "Column Start" description in the datasheet
-> +	 */
-> +	if (xskip & 1) {
-> +		xbin = 1;
-> +		rect->left &= ~3;
-> +	} else if (xskip & 2) {
-> +		xbin = 2;
-> +		rect->left &= ~7;
-> +	} else {
-> +		xbin = 4;
-> +		rect->left &= ~15;
-> +	}
-> +
-> +	ybin = min(yskip, (u16)4);
-> +
-> +	rect->top &= ~1;
-> +
-> +	/* Disable register update, reconfigure atomically */
-> +	ret = mt9p031_set_output_control(mt9p031, 0, MT9P031_OUTPUT_CONTROL_SYN);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	dev_dbg(&client->dev, "skip %u:%u, rect %ux%u@%u:%u\n",
-> +		xskip, yskip, rect->width, rect->height, rect->left, rect->top);
-> +
-> +	/* Blanking and start values - default... */
-> +	ret = reg_write(client, MT9P031_H_BLANKING, hblank);
-> +	if (ret < 0)
-> +		return ret;
-> +	ret = reg_write(client, MT9P031_V_BLANKING, vblank);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	ret = reg_write(client, MT9P031_COLUMN_ADDRESS_MODE,
-> +				((xbin - 1) << 4) | (xskip - 1));
-> +	if (ret < 0)
-> +		return ret;
-> +	ret = reg_write(client, MT9P031_ROW_ADDRESS_MODE,
-> +				((ybin - 1) << 4) | (yskip - 1));
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	dev_dbg(&client->dev, "new physical left %u, top %u\n",
-> +		rect->left, rect->top);
-> +
-> +	ret = reg_write(client, MT9P031_COLUMN_START,
-> +				rect->left + MT9P031_COLUMN_START_SKIP);
-> +	if (ret < 0)
-> +		return ret;
-> +	ret = reg_write(client, MT9P031_ROW_START,
-> +				rect->top + MT9P031_ROW_START_SKIP);
-> +	if (ret < 0)
-> +		return ret;
-> +	ret = reg_write(client, MT9P031_WINDOW_WIDTH,
-> +				rect->width - 1);
-> +	if (ret < 0)
-> +		return ret;
-> +	ret = reg_write(client, MT9P031_WINDOW_HEIGHT,
-> +				rect->height - 1);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	/* Re-enable register update, commit all changes */
-> +	ret = mt9p031_set_output_control(mt9p031, MT9P031_OUTPUT_CONTROL_SYN, 0);
-> +	if (ret < 0)
-> +		return ret;
-> +
-
-Ditto with "ret = fn();"
-
-> +	mt9p031->xskip = xskip;
-> +	mt9p031->yskip = yskip;
-> +	return ret;
-> +}
-> +
-> +static int mt9p031_set_crop(struct v4l2_subdev *sd,
-> +				struct v4l2_subdev_fh *fh,
-> +				struct v4l2_subdev_crop *crop)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +	struct v4l2_mbus_framefmt *f;
-> +	struct v4l2_rect *c;
-> +	struct v4l2_rect rect;
-> +	u16 xskip, yskip;
-> +	s32 width, height;
-> +
-> +	pr_info("%s(%ux%u@%u:%u : %u)\n", __func__,
-> +			crop->rect.width, crop->rect.height,
-> +			crop->rect.left, crop->rect.top, crop->which);
-
-dev_dbg()
-
-> +
-> +	/*
-> +	 * Clamp the crop rectangle boundaries and align them to a multiple of 2
-> +	 * pixels.
-> +	 */
-> +	rect.width = ALIGN(clamp(crop->rect.width,
-> +				 MT9P031_MIN_WIDTH, MT9P031_MAX_WIDTH), 2);
-> +	rect.height = ALIGN(clamp(crop->rect.height,
-> +				  MT9P031_MIN_HEIGHT, MT9P031_MAX_HEIGHT), 2);
-> +	rect.left = ALIGN(clamp(crop->rect.left,
-> +				0, MT9P031_MAX_WIDTH - rect.width), 2);
-> +	rect.top = ALIGN(clamp(crop->rect.top,
-> +			       0, MT9P031_MAX_HEIGHT - rect.height), 2);
-> +
-> +	c = mt9p031_get_pad_crop(mt9p031, fh, crop->pad, crop->which);
-> +
-> +	if (rect.width != c->width || rect.height != c->height) {
-> +		/*
-> +		 * Reset the output image size if the crop rectangle size has
-> +		 * been modified.
-> +		 */
-> +		f = mt9p031_get_pad_format(mt9p031, fh, crop->pad,
-> +						    crop->which);
-> +		width = f->width;
-> +		height = f->height;
-> +
-> +		xskip = mt9p031_skip_for_crop(rect.width, &width, 7);
-> +		yskip = mt9p031_skip_for_crop(rect.height, &height, 8);
-> +	} else {
-> +		xskip = mt9p031->xskip;
-> +		yskip = mt9p031->yskip;
-> +		f = NULL;
-> +	}
-
-Hm, looks like something is missing here: you dropped
-
-	if (crop->which == V4L2_SUBDEV_FORMAT_ACTIVE) {
-		ret = mt9p031_set_params(client, &rect, xskip, yskip);
-		if (ret < 0)
-			return ret;
-	}
-
-from my version, without which no cropping is actually taking place. Or 
-have you also switched to the convention of only configuring the hardware 
-on set_stream(1)?
-
-> +	if (f) {
-> +		f->width = width;
-> +		f->height = height;
-> +	}
-> +
-> +	*c = rect;
-> +	crop->rect = rect;
-> +
-> +	mt9p031->xskip = xskip;
-> +	mt9p031->yskip = yskip;
-> +	mt9p031->rect = *c;
-> +	return 0;
-> +}
-> +
-> +static int mt9p031_get_format(struct v4l2_subdev *sd,
-> +				struct v4l2_subdev_fh *fh,
-> +				struct v4l2_subdev_format *fmt)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +
-> +	fmt->format =
-> +		*mt9p031_get_pad_format(mt9p031, fh, fmt->pad, fmt->which);
-> +	return 0;
-> +}
-> +
-> +static u16 mt9p031_skip_for_scale(s32 *source, s32 target,
-> +					s32 max_skip, s32 max)
-> +{
-> +	unsigned int skip;
-> +
-> +	if (*source - *source / 4 < target) {
-> +		*source = target;
-> +		return 1;
-> +	}
-> +
-> +	skip = min(max, *source + target / 2) / target;
-> +	if (skip > max_skip)
-> +		skip = max_skip;
-> +	*source = target * skip;
-> +
-> +	return skip;
-> +}
-> +
-> +static int mt9p031_fmt_validate(struct v4l2_subdev *sd,
-> +				struct v4l2_subdev_format *fmt)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +	struct v4l2_mbus_framefmt *format = &fmt->format;
-> +
-> +	if (format->code != mt9p031->format.code || fmt->pad)
-> +		return -EINVAL;
-> +
-> +	format->colorspace = V4L2_COLORSPACE_SRGB;
-> +	format->width = clamp_t(int, ALIGN(format->width, 2), 2,
-> +						MT9P031_MAX_WIDTH);
-> +	format->height = clamp_t(int, ALIGN(format->height, 2), 2,
-> +						MT9P031_MAX_HEIGHT);
-> +	format->field = V4L2_FIELD_NONE;
-> +
-> +	return 0;
-> +}
-> +
-> +static int mt9p031_set_format(struct v4l2_subdev *sd,
-> +				struct v4l2_subdev_fh *fh,
-> +				struct v4l2_subdev_format *fmt)
-> +{
-> +	struct v4l2_subdev_format sdf = *fmt;
-> +	struct v4l2_mbus_framefmt *f, *format = &sdf.format;
-> +	struct v4l2_rect *c, rect;
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +	u16 xskip, yskip;
-> +	int ret;
-> +
-> +	ret = mt9p031_fmt_validate(sd, &sdf);
-> +	if (ret < 0)
-> +		return ret;
-> +
-> +	f = mt9p031_get_pad_format(mt9p031, fh, fmt->pad, fmt->which);
-> +
-> +	if (f->width == format->width && f->height == format->height)
-> +		return 0;
-> +
-> +
-
-One empty line is usually enough, especially inside a function.
-
-> +	c = mt9p031_get_pad_crop(mt9p031, fh, fmt->pad, fmt->which);
-> +
-> +	rect.width = c->width;
-> +	rect.height = c->height;
-> +
-> +	xskip = mt9p031_skip_for_scale(&rect.width, format->width, 7,
-> +				       MT9P031_MAX_WIDTH);
-> +	if (rect.width + c->left > MT9P031_MAX_WIDTH)
-> +		rect.left = (MT9P031_MAX_WIDTH - rect.width) / 2;
-> +	else
-> +		rect.left = c->left;
-> +	yskip = mt9p031_skip_for_scale(&rect.height, format->height, 8,
-> +				       MT9P031_MAX_HEIGHT);
-> +	if (rect.height + c->top > MT9P031_MAX_HEIGHT)
-> +		rect.top = (MT9P031_MAX_HEIGHT - rect.height) / 2;
-> +	else
-> +		rect.top = c->top;
-> +
-> +
-> +	pr_info("%s(%ux%u : %u)\n", __func__,
-> +		format->width, format->height, fmt->which);
-
-dev_dbg()
-
-> +	if (c)
-> +		*c = rect;
-> +
-> +	*f = *format;
-> +	fmt->format = *format;
-> +
-> +	mt9p031->xskip = xskip;
-> +	mt9p031->yskip = yskip;
-> +	mt9p031->rect = *c;
-> +	return 0;
-> +}
-> +
-> +static int mt9p031_s_stream(struct v4l2_subdev *sd, int enable)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +	struct i2c_client *client = v4l2_get_subdevdata(&mt9p031->subdev);
-> +	struct v4l2_rect rect = mt9p031->rect;
-> +	u16 xskip = mt9p031->xskip;
-> +	u16 yskip = mt9p031->yskip;
-> +	int ret;
-> +
-> +	if (enable) {
-> +		ret = mt9p031_set_params(client, &rect, xskip, yskip);
-> +		if (ret < 0)
-> +			return ret;
-> +		/* Switch to master "normal" mode */
-> +		ret = mt9p031_set_output_control(mt9p031, 0, MT9P031_OUTPUT_CONTROL_CEN);
-> +	} else {
-> +		/* Stop sensor readout */
-> +		ret = mt9p031_set_output_control(mt9p031, MT9P031_OUTPUT_CONTROL_CEN, 0);
-> +	}
-> +	if (ret < 0)
-> +		return -EIO;
-> +
-> +	return 0;
-> +}
-> +
-> +/*
-> + * Interface active, can use i2c. If it fails, it can indeed mean, that
-> + * this wasn't our capture interface, so, we wait for the right one
-> + */
-> +static int mt9p031_video_probe(struct i2c_client *client)
-> +{
-> +	s32 data;
-> +	int ret;
-> +
-> +	/* Read out the chip version register */
-> +	data = reg_read(client, MT9P031_CHIP_VERSION);
-> +	if (data != MT9P031_CHIP_VERSION_VALUE) {
-> +		dev_err(&client->dev,
-> +			"No MT9P031 chip detected, register read %x\n", data);
-> +		return -ENODEV;
-> +	}
-> +
-> +	dev_info(&client->dev, "Detected a MT9P031 chip ID %x\n", data);
-> +
-> +	ret = mt9p031_reset(client);
-> +	if (ret < 0)
-> +		dev_err(&client->dev, "Failed to initialise the camera\n");
-> +
-> +	return ret;
-> +}
-> +
-> +static int mt9p031_set_power(struct v4l2_subdev *sd, int on)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +	int ret = 0;
-> +
-> +	mutex_lock(&mt9p031->power_lock);
-> +
-> +	/* If the power count is modified from 0 to != 0 or from != 0 to 0,
-> +	 * update the power state.
-> +	 */
-
-Multi-line comment style
-
-> +	if (mt9p031->power_count == !on) {
-> +		if (on) {
-> +			ret = mt9p031_power_on(mt9p031);
-> +			if (ret) {
-> +				pr_err("Failed to enable 2.8v regulator: %d\n", ret);
-
-dev_err
-
-> +				goto out;
-> +			}
-> +		} else {
-> +			mt9p031_power_off(mt9p031);
-> +		}
-> +	}
-> +
-> +	/* Update the power count. */
-> +	mt9p031->power_count +=on ? 1: -1;
-> +	WARN_ON(mt9p031->power_count < 0);
-> +
-> +out:
-> +	mutex_unlock(&mt9p031->power_lock);
-> +	return ret;
-> +}
-> +
-> +static int mt9p031_registered(struct v4l2_subdev *sd)
-> +{
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +	struct i2c_client *client = v4l2_get_subdevdata(&mt9p031->subdev);
-> +	int ret;
-> +
-> +	ret = mt9p031_set_power(&mt9p031->subdev, 1);
-> +	if (ret) {
-> +		pr_err("Failed to power on device: %d\n", ret);
-
-dev_err()
-
-> +		goto pwron;
-> +	}
-> +	if (mt9p031->pdata->reset)
-> +		mt9p031->pdata->reset(&mt9p031->subdev, 1);
-> +	msleep(50);
-> +	if (mt9p031->pdata->reset)
-> +		mt9p031->pdata->reset(&mt9p031->subdev, 0);
-> +	msleep(50);
-> +
-> +	ret = mt9p031_video_probe(client);
-> +	if (ret)
-> +		goto evprobe;
-> +
-> +	mt9p031->pad.flags = MEDIA_PAD_FL_SOURCE;
-> +	ret = media_entity_init(&mt9p031->subdev.entity, 1, &mt9p031->pad, 0);
-> +	if (ret)
-> +		goto evprobe;
-> +
-> +	mt9p031->subdev.flags |= V4L2_SUBDEV_FL_HAS_DEVNODE;
-> +	mt9p031_set_power(&mt9p031->subdev, 0);
-> +
-> +	return 0;
-> +evprobe:
-> +	mt9p031_set_power(&mt9p031->subdev, 0);
-> +pwron:
-> +	return ret;
-> +}
-> +
-> +static int mt9p031_open(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-> +{
-> +	struct mt9p031 *mt9p031;
-> +	mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +
-> +	return mt9p031_set_power(sd, 1);
-
-Is open() called only for the first open, or for each one? If for each, 
-you'll want to reference count yourself. Besides, isn't 
-core_ops::s_power() called anyway, maybe you don't need these open() / 
-close() at all?
-
-> +}
-> +
-> +static int mt9p031_close(struct v4l2_subdev *sd, struct v4l2_subdev_fh *fh)
-> +{
-> +	struct mt9p031 *mt9p031;
-> +
-> +	mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +
-> +	mt9p031_set_power(sd, 0);
-> +	return 0;
-> +}
-> +
-> +static struct v4l2_subdev_core_ops mt9p031_subdev_core_ops = {
-> +	.s_power	= mt9p031_set_power,
-> +};
-> +
-> +static struct v4l2_subdev_video_ops mt9p031_subdev_video_ops = {
-> +	.s_stream	= mt9p031_s_stream,
-> +};
-> +
-> +static struct v4l2_subdev_pad_ops mt9p031_subdev_pad_ops = {
-> +	.enum_mbus_code = mt9p031_enum_mbus_code,
-> +	.get_fmt = mt9p031_get_format,
-> +	.set_fmt = mt9p031_set_format,
-> +	.get_crop = mt9p031_get_crop,
-> +	.set_crop = mt9p031_set_crop,
-> +};
-> +
-> +static struct v4l2_subdev_ops mt9p031_subdev_ops = {
-> +	.core	= &mt9p031_subdev_core_ops,
-> +	.video	= &mt9p031_subdev_video_ops,
-> +	.pad	= &mt9p031_subdev_pad_ops,
-> +};
-> +
-> +static const struct v4l2_subdev_internal_ops mt9p031_subdev_internal_ops = {
-> +	.registered = mt9p031_registered,
-> +	.open = mt9p031_open,
-> +	.close = mt9p031_close,
-> +};
-> +
-> +static int mt9p031_probe(struct i2c_client *client,
-> +			 const struct i2c_device_id *did)
-> +{
-> +	struct mt9p031 *mt9p031;
-> +	struct mt9p031_platform_data *pdata = client->dev.platform_data;
-> +	struct i2c_adapter *adapter = to_i2c_adapter(client->dev.parent);
-> +	int ret;
-> +
-> +	if (!i2c_check_functionality(adapter, I2C_FUNC_SMBUS_WORD_DATA)) {
-> +		dev_warn(&adapter->dev,
-> +			 "I2C-Adapter doesn't support I2C_FUNC_SMBUS_WORD\n");
-> +		return -EIO;
-> +	}
-> +
-> +	mt9p031 = kzalloc(sizeof(struct mt9p031), GFP_KERNEL);
-> +	if (!mt9p031)
-> +		return -ENOMEM;
-> +
-> +	mutex_init(&mt9p031->power_lock);
-> +	v4l2_i2c_subdev_init(&mt9p031->subdev, client, &mt9p031_subdev_ops);
-> +	mt9p031->subdev.internal_ops = &mt9p031_subdev_internal_ops;
-> +
-> +	mt9p031->pdata		= pdata;
-> +	mt9p031->rect.left	= 0;
-> +	mt9p031->rect.top	= 0;
-
-No need - kzalloc() has nullified it for you.
-
-> +	mt9p031->rect.width	= MT9P031_MAX_WIDTH;
-> +	mt9p031->rect.height	= MT9P031_MAX_HEIGHT;
-> +
-> +	mt9p031->format.code = V4L2_MBUS_FMT_SGRBG12_1X12;
-> +
-> +	mt9p031->format.width = MT9P031_MAX_WIDTH;
-> +	mt9p031->format.height = MT9P031_MAX_HEIGHT;
-> +	mt9p031->format.field = V4L2_FIELD_NONE;
-> +	mt9p031->format.colorspace = V4L2_COLORSPACE_SRGB;
-> +
-> +	mt9p031->xskip = 1;
-> +	mt9p031->yskip = 1;
-> +
-> +	mt9p031->reg_1v8 = regulator_get(NULL, "cam_1v8");
-> +	if (IS_ERR(mt9p031->reg_1v8)) {
-> +		ret = PTR_ERR(mt9p031->reg_1v8);
-> +		pr_err("Failed 1.8v regulator: %d\n", ret);
-
-dev_err()
-
-> +		goto e1v8;
-> +	}
-> +
-> +	mt9p031->reg_2v8 = regulator_get(NULL, "cam_2v8");
-> +	if (IS_ERR(mt9p031->reg_2v8)) {
-> +		ret = PTR_ERR(mt9p031->reg_2v8);
-> +		pr_err("Failed 2.8v regulator: %d\n", ret);
-
-ditto
-
-> +		goto e2v8;
-> +	}
-> +	/* turn on core */
-> +	ret = regulator_enable(mt9p031->reg_1v8);
-> +	if (ret) {
-> +		pr_err("Failed to enable 1.8v regulator: %d\n", ret);
-
-ditto
-
-> +		goto e1v8en;
-> +	}
-> +	return 0;
-> +e1v8en:
-> +	regulator_put(mt9p031->reg_2v8);
-> +e2v8:
-> +	regulator_put(mt9p031->reg_1v8);
-> +e1v8:
-> +	kfree(mt9p031);
-> +	return ret;
-> +}
-> +
-> +static int mt9p031_remove(struct i2c_client *client)
-> +{
-> +	struct v4l2_subdev *sd = i2c_get_clientdata(client);
-> +	struct mt9p031 *mt9p031 = container_of(sd, struct mt9p031, subdev);
-> +
-> +	v4l2_device_unregister_subdev(sd);
-> +	media_entity_cleanup(&sd->entity);
-> +	regulator_disable(mt9p031->reg_1v8);
-> +	regulator_put(mt9p031->reg_2v8);
-> +	regulator_put(mt9p031->reg_1v8);
-> +	kfree(mt9p031);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct i2c_device_id mt9p031_id[] = {
-> +	{ "mt9p031", 0 },
-> +	{ }
-> +};
-> +MODULE_DEVICE_TABLE(i2c, mt9p031_id);
-> +
-> +static struct i2c_driver mt9p031_i2c_driver = {
-> +	.driver = {
-> +		.name = "mt9p031",
-> +	},
-> +	.probe		= mt9p031_probe,
-> +	.remove		= mt9p031_remove,
-> +	.id_table	= mt9p031_id,
-> +};
-> +
-> +static int __init mt9p031_mod_init(void)
-> +{
-> +	return i2c_add_driver(&mt9p031_i2c_driver);
-> +}
-> +
-> +static void __exit mt9p031_mod_exit(void)
-> +{
-> +	i2c_del_driver(&mt9p031_i2c_driver);
-> +}
-> +
-> +module_init(mt9p031_mod_init);
-> +module_exit(mt9p031_mod_exit);
-> +
-> +MODULE_DESCRIPTION("Aptina MT9P031 Camera driver");
-> +MODULE_AUTHOR("Bastian Hecht <hechtb@gmail.com>");
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/include/media/mt9p031.h b/include/media/mt9p031.h
-> new file mode 100644
-> index 0000000..ad37eb3
-> --- /dev/null
-> +++ b/include/media/mt9p031.h
-> @@ -0,0 +1,11 @@
-> +#ifndef MT9P031_H
-> +#define MT9P031_H
-> +
-> +struct v4l2_subdev;
-> +
-> +struct mt9p031_platform_data {
-> +	int (*set_xclk)(struct v4l2_subdev *subdev, int hz);
-> +	int (*reset)(struct v4l2_subdev *subdev, int active);
-> +};
-> +
-> +#endif
-> -- 
-> 1.7.0.4
-> 
-
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
