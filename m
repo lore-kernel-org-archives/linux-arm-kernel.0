@@ -1,60 +1,22 @@
-From: jayakumar.lkml@gmail.com (Jaya Kumar)
-Date: Sat, 21 May 2011 18:26:44 +0800
-Subject: 2.6.39-rc7 and pxa168 MMC using sdhci-pxa
-Message-ID: <BANLkTi=HnZZMJqqdg5L=RwbBJjOujRgk8g@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 21 May 2011 12:21:02 +0100
+Subject: [PATCH 0/4] Samsung: Move Samsung SoCs GPIO drivers to
+	drivers/gpio
+In-Reply-To: <20110520063128.GA21285@ponder.secretlab.ca>
+References: <20110520054441.GA9952@july>
+	<20110520063128.GA21285@ponder.secretlab.ca>
+Message-ID: <20110521112102.GA11887@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Zhangfei, Philip, arm/mmc friends,
+On Fri, May 20, 2011 at 12:31:28AM -0600, Grant Likely wrote:
+> On Fri, May 20, 2011 at 02:44:41PM +0900, Kyungmin Park wrote:
+> >  .../gpiolib.c => drivers/gpio/s5pc100-gpio.c       |    0
+> >  .../gpiolib.c => drivers/gpio/s5pv210-gpio.c       |    0
+> >  .../gpiolib.c => drivers/gpio/samsung-gpiolib.c    |    3 +-
 
-I have a quick question. I am using a pxa168 board that currently runs
-2.6.28. Like several other people, I am having performance problems
-with the MMC support on this. [1] That is, I was getting "pxa-sdh
-pxa-sdh.0: DATA Line Error(status: 0x0010)!" every time that I read
-more than an MB or so of data off the MMC card.
+> drivers/gpio/gpio-*.c please.  I'm starting to enforce some level of
+> naming convention.
 
-Since it is embarrassing to mention I'm using 2.6.28, I felt I should
-try to bringup mainline on this board. I pulled down 2.6.39-rc7. First
-thing that I noticed is that none of the pxa168 boards in
-arch/arm/mach-mmp/ such as aspenite, avlite, zylonite seem to
-implement MMC support. pxa168.h doesn't have any device entries for
-sdh. Am I right in thinking that's a bit weird given that this
-platform is quite old? Anyway, so I added the PXA168_DEVICE entries,
-APMU_CLK, CLKREG for sdh0,1,2,3 to pxa168.c/h. I assume that the
-appropriate driver to use is sdhci-pxa and not pxamci. Did that, and
-then tried to boot, and I get:
-
-[    0.543587] mmc0: SDHCI controller on MMC [sdhci-pxa.0] using DMA
-[    0.665327] mmc0: new SD card at address df08
-[    0.670686] mmcblk0: mmc0:df08 SU02G 1.84 GiB (ro)
-[   10.686427] mmc0: Timeout waiting for hardware interrupt.
-[   10.692391] mmcblk0: retrying using single block read
-[   10.701043]  mmcblk0: p1 p2 p3
-[   10.706259] VFS: Cannot open root device "mmcblk0p3" or unknown-block(179,3)
-[   10.706484] Please append a correct "root=" boot option; here are
-the available partitions:
-[   10.722024] b300         1931264 mmcblk0  driver: mmcblk
-[   10.725923]   b301          521885 mmcblk0p1
-00000000-0000-0000-0000-000000000mmcblk0p1
-[   10.727453]   b302            9455 mmcblk0p2
-00000000-0000-0000-0000-000000000mmcblk0p2
-[   10.743379]   b303           73749 mmcblk0p3
-00000000-0000-0000-0000-000000000mmcblk0p3
-
-The MMC card is fine, the same card boots fine when I switch the
-kernel back to 2.6.28. I suspect "timeout waiting for hw interrupt"
-above is where I should start debugging.
-
-Quick check shows the irqs as:
-arch/arm/mach-mmp/include/mach/irqs.h:#define IRQ_PXA168_SDH1			39
-arch/arm/mach-mmp/include/mach/irqs.h:#define IRQ_PXA168_SDH2			40
-
-Definitions look correct to me. Could you let me know if I've gone
-down a wrong path here, did I miss why none of the other pxa168 boards
-seem to have sdh setup? I would welcome any advice or suggestions
-that'll help me get mainline up and running on this.
-
-Thanks,
-jaya
-
-[1] http://plugcomputer.org/plugforum/index.php?topic=5088.0;wap2
+Hrm, looking at the current mainline drivers the existing tendency seems
+to be mostly towards gpio/*-gpio.c...
