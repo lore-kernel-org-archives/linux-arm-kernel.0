@@ -1,73 +1,179 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 20 May 2011 17:19:56 -0500
-Subject: [PATCH 4/4] clk: Add simple gated clock
-In-Reply-To: <1305876469.327589.409938867568.4.gpush@pororo>
-References: <1305876469.327589.409938867568.4.gpush@pororo>
-Message-ID: <4DD6E90C.9030109@gmail.com>
+Date: Fri, 20 May 2011 22:33:51 -0500
+Subject: [PATCH v2] ARM: smp_twd: Reconfigure clockevents after cpufreq
+	change
+In-Reply-To: <1305851091-10096-1-git-send-email-ccross@android.com>
+References: <1305851091-10096-1-git-send-email-ccross@android.com>
+Message-ID: <4DD7329F.80900@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2011 02:27 AM, Jeremy Kerr wrote:
-> Signed-off-by: Jeremy Kerr<jeremy.kerr@canonical.com>
+On 05/19/2011 07:24 PM, Colin Cross wrote:
+> The localtimer's clock changes with the cpu clock.  After a
+> cpufreq transition, update the clockevent's frequency and
+> reprogram the next clock event.
 >
+> Adds a clock called "smp_twd" that is used to determine the
+> twd frequency, which can also be used at init time to
+> avoid calibrating the twd frequency.
+>
+> Clock changes are based on Rob Herring's work.
+>
+> Change-Id: I413b5cd07fb2b79bc9fad8b4bf257332d1da7bcd
+> Signed-off-by: Colin Cross<ccross@android.com>
+> Cc: Thomas Gleixner<tglx@linutronix.de>
+> Cc: Russell King<linux@arm.linux.org.uk>
+> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> Cc: Rob Herring<robherring2@gmail.com>
+> Tested-by: Linus Walleij<linus.walleij@linaro.org>
+
+Acked-by: Rob Herring <rob.herring@calxeda.com>
+
 > ---
->   drivers/clk/Kconfig    |    4 ++++
->   drivers/clk/Makefile   |    1 +
->   drivers/clk/clk-gate.c |   41 +++++++++++++++++++++++++++++++++++++++++
->   include/linux/clk.h    |   13 +++++++++++++
->   4 files changed, 59 insertions(+)
+>   arch/arm/kernel/smp_twd.c |   86 +++++++++++++++++++++++++++++++++++++++++---
+>   1 files changed, 80 insertions(+), 6 deletions(-)
 >
-> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-> index 0a27963..75d2902 100644
-> --- a/drivers/clk/Kconfig
-> +++ b/drivers/clk/Kconfig
-> @@ -9,3 +9,7 @@ config GENERIC_CLK
->   config GENERIC_CLK_FIXED
->   	bool
->   	depends on GENERIC_CLK
-> +
-> +config GENERIC_CLK_GATE
-> +	bool
-> +	depends on GENERIC_CLK
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index 9a3325a..d186446 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -2,3 +2,4 @@
->   obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
->   obj-$(CONFIG_GENERIC_CLK)	+= clk.o
->   obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
-> +obj-$(CONFIG_GENERIC_CLK_GATE)	+= clk-gate.o
-> diff --git a/drivers/clk/clk-gate.c b/drivers/clk/clk-gate.c
-> new file mode 100644
-> index 0000000..833e0da
-> --- /dev/null
-> +++ b/drivers/clk/clk-gate.c
-> @@ -0,0 +1,41 @@
-> +
+> This patch depends on Thomas Gleixner's patch to add clockevents_update_freq
+>
+> v2: Squash in changes from Linus Wallej, enable smp_twd clock during init
+>
+> diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+> index 60636f4..b5bd303 100644
+> --- a/arch/arm/kernel/smp_twd.c
+> +++ b/arch/arm/kernel/smp_twd.c
+> @@ -10,13 +10,17 @@
+>    */
+>   #include<linux/init.h>
+>   #include<linux/kernel.h>
 > +#include<linux/clk.h>
-> +#include<linux/module.h>
-> +#include<asm/io.h>
-> +
-> +#define to_clk_gate(clk) container_of(clk, struct clk_gate, hw)
-> +
-> +static unsigned long clk_gate_get_rate(struct clk_hw *clk)
+> +#include<linux/cpufreq.h>
+>   #include<linux/delay.h>
+>   #include<linux/device.h>
+> +#include<linux/err.h>
+>   #include<linux/smp.h>
+>   #include<linux/jiffies.h>
+>   #include<linux/clockchips.h>
+>   #include<linux/irq.h>
+>   #include<linux/io.h>
+> +#include<linux/percpu.h>
+>
+>   #include<asm/smp_twd.h>
+>   #include<asm/hardware/gic.h>
+> @@ -24,7 +28,9 @@
+>   /* set up by the platform code */
+>   void __iomem *twd_base;
+>
+> +static struct clk *twd_clk;
+>   static unsigned long twd_timer_rate;
+> +static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
+>
+>   static void twd_set_mode(enum clock_event_mode mode,
+>   			struct clock_event_device *clk)
+> @@ -80,6 +86,48 @@ int twd_timer_ack(void)
+>   	return 0;
+>   }
+>
+> +/*
+> + * Updates clockevent frequency when the cpu frequency changes.
+> + * Called on the cpu that is changing frequency with interrupts disabled.
+> + */
+> +static void twd_update_frequency(void *data)
 > +{
-> +	return clk_get_rate(clk_get_parent(clk->clk));
+> +	twd_timer_rate = clk_get_rate(twd_clk);
+> +
+> +	clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
 > +}
 > +
-> +static int clk_gate_enable(struct clk_hw *clk)
+> +static int twd_cpufreq_transition(struct notifier_block *nb,
+> +	unsigned long state, void *data)
 > +{
-> +	struct clk_gate *gate = to_clk_gate(clk);
-> +	u32 reg;
+> +	struct cpufreq_freqs *freqs = data;
 > +
-> +	reg = __raw_readl(gate->reg);
-> +	reg |= 1<<  gate->bit_idx;
-> +	__raw_writel(reg, gate->reg);
-
-This should be protected with a spinlock for h/w access. You could have 
-a mixture of enable bits with divider fields in one register, so the 
-enable lock won't help here. However, you would have to find a way to 
-have a common spinlock for all accesses to the h/w.
-
-Rob
+> +	/*
+> +	 * The twd clock events must be reprogrammed to account for the new
+> +	 * frequency.  The timer is local to a cpu, so cross-call to the
+> +	 * changing cpu.
+> +	 */
+> +	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
+> +		smp_call_function_single(freqs->cpu, twd_update_frequency,
+> +			NULL, 1);
+> +
+> +	return NOTIFY_OK;
+> +}
+> +
+> +static struct notifier_block twd_cpufreq_nb = {
+> +	.notifier_call = twd_cpufreq_transition,
+> +};
+> +
+> +static int twd_cpufreq_init(void)
+> +{
+> +	if (!IS_ERR_OR_NULL(twd_clk))
+> +		return cpufreq_register_notifier(&twd_cpufreq_nb,
+> +			CPUFREQ_TRANSITION_NOTIFIER);
+> +
+> +	return 0;
+> +}
+> +core_initcall(twd_cpufreq_init);
+> +
+>   static void __cpuinit twd_calibrate_rate(void)
+>   {
+>   	unsigned long count;
+> @@ -119,12 +167,39 @@ static void __cpuinit twd_calibrate_rate(void)
+>   	}
+>   }
+>
+> +static struct clk *twd_get_clock(void)
+> +{
+> +	struct clk *clk;
+> +	int err;
+> +
+> +	clk = clk_get_sys("smp_twd", NULL);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
+> +		return clk;
+> +	}
+> +
+> +	err = clk_enable(clk);
+> +	if (err) {
+> +		pr_err("smp_twd: clock failed to enable: %d\n", err);
+> +		clk_put(clk);
+> +		return ERR_PTR(err);
+> +	}
+> +
+> +	return clk;
+> +}
+> +
+>   /*
+>    * Setup the local clock events for a CPU.
+>    */
+>   void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+>   {
+> -	twd_calibrate_rate();
+> +	if (!twd_clk)
+> +		twd_clk = twd_get_clock();
+> +
+> +	if (!IS_ERR_OR_NULL(twd_clk))
+> +		twd_timer_rate = clk_get_rate(twd_clk);
+> +	else
+> +		twd_calibrate_rate();
+>
+>   	clk->name = "local_timer";
+>   	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+> @@ -132,13 +207,12 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+>   	clk->rating = 350;
+>   	clk->set_mode = twd_set_mode;
+>   	clk->set_next_event = twd_set_next_event;
+> -	clk->shift = 20;
+> -	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
+> -	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
+> -	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
+>
+>   	/* Make sure our local interrupt controller has this enabled */
+>   	gic_enable_ppi(clk->irq);
+>
+> -	clockevents_register_device(clk);
+> +	__get_cpu_var(twd_ce) = clk;
+> +
+> +	clockevents_config_and_register(clk, twd_timer_rate,
+> +					0xf, 0xffffffff);
+>   }
