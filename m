@@ -1,55 +1,36 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 21 May 2011 22:35:12 +0400
-Subject: PXA: Handling of UDC with no VBUS pins
-In-Reply-To: <4DD6AF07.9060306@free.fr>
-References: <20110518120633.GA9860@doriath.ww600.siemens.net>
-	<4DD6AF07.9060306@free.fr>
-Message-ID: <BANLkTi=Yjf3oopLLikbRQC4uBkmQgHdS2Q@mail.gmail.com>
+Date: Sat, 21 May 2011 22:39:46 +0400
+Subject: [PATCH] mioa701: move gpio-pullup functionality to gpio-vbus
+In-Reply-To: <4DD6A6B1.9010209@free.fr>
+References: <1305719866-9811-1-git-send-email-dbaryshkov@gmail.com>
+	<4DD6A6B1.9010209@free.fr>
+Message-ID: <BANLkTikJE4gRY=Si5Z1i939j0_B41AWARQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 5/20/11, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> On 05/18/2011 02:06 PM, Dmitry Eremin-Solenikov wrote:
->> Hello, colleagues,
->>
->> There are several PXA platforms which on the UDC tranceiver part have
->> a pullup pin to support connect/disconnect but no VBUS pin to detect
->> host presense. Currently such platforms are supported through udc driver
->> itself. I'd like to clean that part of pxa25x_udc/pxa27x_udc drivers and
->> to move gpio pullup handling to tranceiver.
-> So, you want to concentrate USB pullup handling, right ?
-
-Basically I'd like to cleanup this part of pxa udc drivers.
-
->> My question is what would be better: to extend gpio-vbus to work w/o
->> VBUS pin or to write new transceiver driver only handling gpio-pullup?
+> On 05/18/2011 01:57 PM, Dmitry Eremin-Solenikov wrote:
+>> gpio-vbus can (and should?) handle D+ pullup gpio for us. Move gpio-pullup
+>> handling
+>> to gpio-vbus and stop providing udc_info as it's empty now.
+> No sorry, NAK.
 >
-> My personnal feeling is neither, let them be. The generic pullup would
-> have to ask itself :
->    - should the pullup be applied on D+ (on USB 2.0 and 3.0 devices) ?
->    - should the pullup be applied on D- (on USB 1.1 devices) ?
+> As a matter of fact, even if gpio-vbus driver handles correctly the VBUS
+> sensing and D+ line powering, it still lacks the suspend / resume
+> handling to "disconnect the D+ line" on suspend and reconnect it on
+> "resume". That's the reason I nack this patch, as for me, gpio-vbus and
+> pxa27x-udc are not yet iso functional.
 
-gpio-vbus driver doesn't do this. It simply handles D+ pullup. I think I'd
-start with simple D+ pullup driver and the one may add D- functionality
-if required.
+gpio-vbus handles D+ line. It doesn't handle suspend.
+BTW: do you mean system suspend (via pm->suspend), or USB suspend (via
+USB SUSPEND interrupt)
 
-> The common driver will have to handle the suspend/resume in an
-> homogenous way.
+> If I was provided proof that this is innoccuous (ie. there is no power
+> draw possible in suspend, or that the resume procedure still works with
+> gpio-vbus), then I'll ack the patch.
 
-Do pxa25x_udc/pxa27x_udc handle pullup during suspend/resume?
-
-> If the gadget driver is removed, the pullup should be pulled low.
->
-> All of this work for only 2 drivers looks overkill to me.
-
-3 boards only from PXA. I don't know about other platforms/soc-families.
-
-> And if you want to gather it in a driver, "gpio-vbus" purpose was to
-> handle VBUS sensing, ie. power presence on +5V/Gnd lines. The D+
-> handling was not part of its duties, and you'll probably end up with a
-> new driver, which is ... overkill IMHO.
-
-gpio-vbus handles D+ already (except suspend/resume).
+Hmm. I'll think about suspend issue (if you give me more info), but only you
+can test the resume. Could you please test it?
 
 -- 
 With best wishes
