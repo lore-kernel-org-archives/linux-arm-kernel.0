@@ -1,34 +1,56 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 21 May 2011 11:43:38 -0600
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <ad5605c2a3d4b36f63f36f52afe89cfd@kernel.crashing.org>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-	<20110519233958.GB18181@ponder.secretlab.ca>
-	<4DD66B8A.5040404@gmail.com>
-	<201105201621.03801.arnd@arndb.de> <4DD68614.6090209@gmail.com>
-	<80f20ac921a33e9f0bf3e249f539a8ef@kernel.crashing.org>
-	<4DD7D24D.2070604@gmail.com>
-	<ad5605c2a3d4b36f63f36f52afe89cfd@kernel.crashing.org>
-Message-ID: <BANLkTikJ0QhEFs=3nFbxd4PcfGAb6_jDjg@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sat, 21 May 2011 22:35:12 +0400
+Subject: PXA: Handling of UDC with no VBUS pins
+In-Reply-To: <4DD6AF07.9060306@free.fr>
+References: <20110518120633.GA9860@doriath.ww600.siemens.net>
+	<4DD6AF07.9060306@free.fr>
+Message-ID: <BANLkTi=Yjf3oopLLikbRQC4uBkmQgHdS2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 21, 2011 at 9:18 AM, Segher Boessenkool
-<segher@kernel.crashing.org> wrote:
->> Identifying actual AMBA devices is already done. The question is how to
->> scan the tree for them and how that relates to regular platform devices. The
->> AMBA devices have a binding like this:
+On 5/20/11, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> On 05/18/2011 02:06 PM, Dmitry Eremin-Solenikov wrote:
+>> Hello, colleagues,
 >>
->> compatible = "arm,pl011", "arm,amba-device";
->> arm,amba-deviceid = <0x00341011>;
+>> There are several PXA platforms which on the UDC tranceiver part have
+>> a pullup pin to support connect/disconnect but no VBUS pin to detect
+>> host presense. Currently such platforms are supported through udc driver
+>> itself. I'd like to clean that part of pxa25x_udc/pxa27x_udc drivers and
+>> to move gpio pullup handling to tranceiver.
+> So, you want to concentrate USB pullup handling, right ?
+
+Basically I'd like to cleanup this part of pxa udc drivers.
+
+>> My question is what would be better: to extend gpio-vbus to work w/o
+>> VBUS pin or to write new transceiver driver only handling gpio-pullup?
 >
-> Excellent -- so you just find all devices with compatible "arm,amba-device".
-> How that relates to legacy platform devices, I have no idea. ?But you got
-> a workable device binding :-) ?Does this sit on a proper (AMBA-type) bus as
-> well?
+> My personnal feeling is neither, let them be. The generic pullup would
+> have to ask itself :
+>    - should the pullup be applied on D+ (on USB 2.0 and 3.0 devices) ?
+>    - should the pullup be applied on D- (on USB 1.1 devices) ?
 
-Actually, this is little more than a proposed binding.  I'm not
-willing to lock it down quite yet until we've experimented a bit more
-with it... but that does need to happen soon.
+gpio-vbus driver doesn't do this. It simply handles D+ pullup. I think I'd
+start with simple D+ pullup driver and the one may add D- functionality
+if required.
 
-g.
+> The common driver will have to handle the suspend/resume in an
+> homogenous way.
+
+Do pxa25x_udc/pxa27x_udc handle pullup during suspend/resume?
+
+> If the gadget driver is removed, the pullup should be pulled low.
+>
+> All of this work for only 2 drivers looks overkill to me.
+
+3 boards only from PXA. I don't know about other platforms/soc-families.
+
+> And if you want to gather it in a driver, "gpio-vbus" purpose was to
+> handle VBUS sensing, ie. power presence on +5V/Gnd lines. The D+
+> handling was not part of its duties, and you'll probably end up with a
+> new driver, which is ... overkill IMHO.
+
+gpio-vbus handles D+ already (except suspend/resume).
+
+-- 
+With best wishes
+Dmitry
