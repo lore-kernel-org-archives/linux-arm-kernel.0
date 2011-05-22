@@ -1,28 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 May 2011 00:47:25 +0100
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-	<20110519233958.GB18181@ponder.secretlab.ca>
-	<4DD66B8A.5040404@gmail.com> <201105201621.03801.arnd@arndb.de>
-	<4DD68614.6090209@gmail.com>
-	<a42f0c27-2811-4b68-bedf-7dfaa7bff6ff@VA3EHSMHS025.ehs.local>
-	<BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
-Message-ID: <20110521234725.GB17672@n2100.arm.linux.org.uk>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 22 May 2011 08:28:53 +0200
+Subject: [PATCH 00/14] GPIO: OMAP: first round of cleanup
+In-Reply-To: <1305904497-26013-1-git-send-email-khilman@ti.com>
+References: <1305904497-26013-1-git-send-email-khilman@ti.com>
+Message-ID: <20110522062853.GA15292@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, May 21, 2011 at 11:42:34AM -0600, Grant Likely wrote:
-> Russell, it seems to me that the primary behaviour that amba_bus has
-> over platform_bus is the clock management, and secondarily
-> verification of the type of device by the device id.  Am I correct, or
-> am I missing something?
+On 17:14 Fri 20 May     , Kevin Hilman wrote:
+> Start moving SoC-specific register handling out of the driver by passing
+> in register offsets in via platform data.
+> 
+> Also, move OMAP1 MPUIO IRQ handling over to genric IRQ chip.
+> 
+> Applies on top of Tony's for-next branch (which include's the generic
+> IRQ chip work from tglx) and the OMAP GPIO driver move to
+> drivers/gpio.
+> 
+> Charulatha V (1):
+>   GPIO: OMAP: remove get_gpio_bank()
+> 
+> Kevin Hilman (13):
+>   GPIO: OMAP: _clear_gpio_irqbank: fix flushing of posted write
+>   GPIO: OMAP: remove MPUIO handling from _clear_gpio_irqbank()
+>   GPIO: OMAP: move bank width into struct gpio_bank
+>   GPIO: OMAP: _get_gpio_irqbank_mask: replace hard-coded mask with
+>     bank->width
+>   GPIO: OMAP: replace get_gpio_index() by using bank width
+>   GPIO: OMAP: consolidate direction, input, output, remove #ifdefs
+>   GPIO: OMAP: consolidate IRQ status handling, remove #ifdefs
+>   GPIO: OMAP: conslidate enable/disable of GPIO IRQs, remove ifdefs
+>   GPIO: OMAP: convert MPUIO IRQ over to generic irq_chip
+>   GPIO: OMAP: remove useless gpio_valid() & check_gpio() checks
+>   GPIO: OMAP: cleanup _set_gpio_wakeup(), remove ifdefs
+>   GPIO: OMAP: debounce remove SoC specific registers, use pdata
+>   GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only
+>     once
+looks good
 
-It matches by vendor/device ID just like PCI does, and does the bus
-clock management and power management in a really nice way, which I
-doubt platform devices will ever do.
-
-The way this discussion is going, I'm going to suggest that we also
-convert PCI stuff to being platform devices too.  I don't see the
-point of PCI existing for all the same reasons being given in this
-thread.
+Best Regards,
+J.
