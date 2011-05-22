@@ -1,59 +1,72 @@
-From: Frank.Hofmann@tomtom.com (Frank Hofmann)
-Date: Sun, 22 May 2011 09:01:14 +0200
-Subject: [linux-pm] [RFC PATCH] ARM hibernation / suspend-to-disk support
-	code
-References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
-	<20110520113758.GA3141@arm.com>
-	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
-	<201105210027.17159.rjw@sisk.pl>
-Message-ID: <2C577202CB5719438D4E9608C565CB2C01B69D7B@NL-EXC-07.intra.local>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Sun, 22 May 2011 09:20:09 +0200
+Subject: [PATCH] [RFC] USB: fsl_udc_core: fix build-failure for ARM
+In-Reply-To: <20110511162902.GG5315@n2100.arm.linux.org.uk>
+References: <20110505135029.0c068b8e@wker>
+	<1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<20110511063954.GJ29089@pengutronix.de>
+	<20110511155446.GA20920@suse.de>
+	<20110511162902.GG5315@n2100.arm.linux.org.uk>
+Message-ID: <20110522072009.GA9774@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> [ ... ]
-> > > r8_FIQ..r12_FIQ can store arbitrary state used by the FIQ handler,
-> > > if FIQ is in use.  Can we expect any driver using FIQ to save/restore
-> > > this state itself, rather than doing it globally?  This may be
-> > > reasonable.
+On Wed, May 11, 2011 at 05:29:02PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 11, 2011 at 08:54:46AM -0700, Greg KH wrote:
+> > On Wed, May 11, 2011 at 08:39:54AM +0200, Uwe Kleine-K?nig wrote:
+> > > Hello Greg,
+> > > 
+> > > On Fri, May 06, 2011 at 11:00:05AM +0200, Uwe Kleine-K?nig wrote:
+> > > > Commit
+> > > > 
+> > > > 	09ba0de (USB: fsl_udc_core: prepare for SoCs with BE registers and descriptors)
+> > > > 
+> > > > introduced two function pointers _fsl_readl and _fsl_writel in an #ifdef
+> > > > CONFIG_PPC32 block and used then unconditionally in fsl_udc_probe.
+> > > > To make the driver compile again this use has to be protected by
+> > > > an #ifdef, too. Moreover ARM doesn't have flush_dcache_range so this
+> > > > is #ifdefed out, too.
+> > > > 
+> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> > > > ---
+> > > > Hello,
+> > > > 
+> > > > I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
+> > > > a flush ARM probably does, too, no?
+> > > > If so, what it the right thing to do? Implement flush_dcache_range for
+> > > > ARM (just wrapping flush_dcache_page?)?
+> > > As Russell seem to be OK with the #ifdef, can you please take this
+> > > patch?
 > > 
-> > We don't need to save/restore those, because at the time the snapshot is 
-> > taken interrupts are off and we cannot be in any trap handler either. On 
-> > resume, the kernel that has been loaded has initialized them properly 
-> > already.
+> > Ick, no.
 > 
-> I'm not sure if this is a safe assumption in general.  We may decide to
-> switch to loading hibernate images from boot loaders, for example, and
-> it may not hold any more.  Generally, please don't assume _anything_ has
-> been properly initialized during resume, before the image is loaded.
-> This has already beaten us a couple of times.
+> I never said I was OK with the #ifdef...
+Ah, right, sorry.
+
+> > Come on, we don't have ifdefs in .c files for a reason, surely there is
+> > a better fix for this some other way?
 > 
-> Thanks,
-> Rafael
+> I suggested ways to fix it, which apparantly got ignored.  To repeat myself,
+> what I said was:
+> 
+> "Well, the folk introducing it should have added it to cachetlb.txt so
+> that other folk know what the intentions of it are.  At the moment it
+> seems to be an unofficial extension with unknown semantics.  Maybe the
+> PPC folk can clear it up and fix other arches if they wish to make it
+> an official arch cachetlb extension."
+So what should we do? The fsl_udc_core driver currently fails to build
+because it uses flush_dcache_range unconditionally. So the obvious ways
+to fix it are:
 
-Hi Rafael,
-
-regarding "cannot rely on any state", if that is so then it seems quite unnecessary to save/restore _any_ ARM non-#SYSTEM_MODE state - it'd better be reinitialized by calling cpu_init() after the "core restore" callback. The archives were quite a bit helpful in this context:
-
-http://www.mail-archive.com/linux-omap at vger.kernel.org/msg12671.html
-
-that's the same situation isn't it ?
-
-Regarding FIQ: I agree with Russell and others who previously stated that a driver using FIQ is responsible for implementing suspend/resume hooks itself. But what could be done is to disable/enable it for the snapshot, just in case.
-
-I've also found out that the vmlinux.lds changes don't seem to be necessary - they've been the last remnant of the "old" ARM hibernation patch, but just leaving those out looks to make no difference (the nosave data still ends up in the same place, with the same elf section attributes).
-
-With all this in mind, the core part of the patch becomes somewhat simpler. See attached.
+ 1) define flush_dcache_range
+   a) in arch/arm
+   b) in the driver
+ 2) make the driver not use flush_dcache_range
+   a) #ifdef 
+   b) revert 09ba0de (and probably some commits that depend on it)
+   c) use a different function to flush the cache
 
 
-I'll test this on Monday.
-FrankH.
--------------- next part --------------
-An HTML attachment was scrubbed...
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110522/71096fef/attachment.html>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: hibernation-core-22May2011.patch
-Type: text/x-patch
-Size: 5391 bytes
-Desc: hibernation-core-22May2011.patch
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110522/71096fef/attachment.bin>
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
