@@ -1,78 +1,91 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 22 May 2011 11:04:40 +0200
-Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
-In-Reply-To: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1306055080-30420-2-git-send-email-plagnioj@jcrosoft.com>
+Date: Sun, 22 May 2011 11:04:39 +0200
+Subject: [RFC PATCH 1/2] arm: introduce arch_ioremap and arch_iounmap function
+	pointer
+Message-ID: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+today we define it at runtime via __arch_ioremap and __arch_iounmap
+
+this PATH will allow to overwrite the default ioremap at runtime
+to be able to compile multiple soc in the same kernel
+
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 ---
- arch/arm/mach-omap1/io.c             |    3 +++
- arch/arm/mach-omap2/io.c             |    4 ++++
- arch/arm/plat-omap/include/plat/io.h |    2 ++
- arch/arm/plat-omap/io.c              |    6 ++++++
- 4 files changed, 15 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/io.h |    3 +++
+ arch/arm/mm/ioremap.c     |   16 +++++++++++++++-
+ arch/arm/mm/nommu.c       |    4 ++++
+ 3 files changed, 22 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/io.c b/arch/arm/mach-omap1/io.c
-index 870886a..ca80286 100644
---- a/arch/arm/mach-omap1/io.c
-+++ b/arch/arm/mach-omap1/io.c
-@@ -99,6 +99,9 @@ void __init omap1_map_common_io(void)
- 	local_flush_tlb_all();
- 	flush_cache_all();
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index d66605d..0c0cfe0 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -246,6 +246,9 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ #define __arch_iounmap			__iounmap
+ #endif
  
-+	/* we set the arch_ioremap and arch_iounmap */
-+	omap_set_ioremap();
++extern void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
++extern void (*arch_iounmap)(volatile void __iomem *addr);
 +
- 	/* We want to check CPU revision early for cpu_is_omapxxxx() macros.
- 	 * IO space mapping must be initialized before we can do that.
- 	 */
-diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-index 441e79d..a178f9d 100644
---- a/arch/arm/mach-omap2/io.c
-+++ b/arch/arm/mach-omap2/io.c
-@@ -249,6 +249,10 @@ static void __init _omap2_map_common_io(void)
- 	flush_cache_all();
+ #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
+ #define ioremap_nocache(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE)
+ #define ioremap_cached(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index ab50627..40ef390 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -281,9 +281,15 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
+ }
+ EXPORT_SYMBOL(__arm_ioremap_pfn);
  
- 	omap2_check_revision();
++void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
++void (*arch_iounmap)(volatile void __iomem *addr);
 +
-+	/* we set the arch_ioremap and arch_iounmap */
-+	omap_set_ioremap();
+ void __iomem *
+ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+ {
++	if (arch_ioremap)
++		return arch_ioremap(phys_addr, size, mtype);
 +
- 	omap_sram_init();
+ 	return __arm_ioremap_caller(phys_addr, size, mtype,
+ 			__builtin_return_address(0));
+ }
+@@ -291,10 +297,18 @@ EXPORT_SYMBOL(__arm_ioremap);
+ 
+ void __iounmap(volatile void __iomem *io_addr)
+ {
+-	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
++	void *addr;
+ #ifndef CONFIG_SMP
+ 	struct vm_struct **p, *tmp;
++#endif
+ 
++	if (arch_iounmap) {
++		arch_iounmap(io_addr);
++		return;
++	}
++
++	addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
++#ifndef CONFIG_SMP
+ 	/*
+ 	 * If this is a section based mapping we need to handle it
+ 	 * specially as the VM subsystem does not know how to handle
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 687d023..561f19f 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -73,6 +73,10 @@ void __iomem *__arm_ioremap_pfn_caller(unsigned long pfn, unsigned long offset,
+ 	return __arm_ioremap_pfn(pfn, offset, size, mtype);
  }
  
-diff --git a/arch/arm/plat-omap/include/plat/io.h b/arch/arm/plat-omap/include/plat/io.h
-index d72ec85..75c7a68 100644
---- a/arch/arm/plat-omap/include/plat/io.h
-+++ b/arch/arm/plat-omap/include/plat/io.h
-@@ -309,6 +309,8 @@ extern void omap2_init_common_devices(struct omap_sdrc_params *sdrc_cs0,
- void __iomem *omap_ioremap(unsigned long phys, size_t size, unsigned int type);
- void omap_iounmap(volatile void __iomem *addr);
- 
-+void __init omap_set_ioremap(void);
++/* declare to just avoid the ifdef in nommu case */
++void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
++void (*arch_iounmap)(volatile void __iomem *addr);
 +
- #endif
- 
- #endif
-diff --git a/arch/arm/plat-omap/io.c b/arch/arm/plat-omap/io.c
-index f1ecfa9..285a0d4 100644
---- a/arch/arm/plat-omap/io.c
-+++ b/arch/arm/plat-omap/io.c
-@@ -23,6 +23,12 @@
- #define BETWEEN(p,st,sz)	((p) >= (st) && (p) < ((st) + (sz)))
- #define XLATE(p,pst,vst)	((void __iomem *)((p) - (pst) + (vst)))
- 
-+void __init omap_set_ioremap(void)
-+{
-+	arch_ioremap = omap_ioremap;
-+	arch_iounmap = omap_iounmap;
-+}
-+
- /*
-  * Intercept ioremap() requests for addresses in our fixed mapping regions.
-  */
+ void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
+ 			    unsigned int mtype)
+ {
 -- 
 1.7.4.1
