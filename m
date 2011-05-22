@@ -1,47 +1,43 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Sun, 22 May 2011 22:24:06 +0200
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201105142233.53659.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<EAA964D5CCD94B4A9544B294E0CF5099@subhasishg>
-	<20110514160126.GA2791@opensource.wolfsonmicro.com>
-	<201105142233.53659.arnd@arndb.de>
-Message-ID: <20110522202405.GF18610@sortiz-mobl>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Sun, 22 May 2011 22:41:04 +0200
+Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
+In-Reply-To: <4DD7B630.2080504@redhat.com>
+References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
+	<4DD7B630.2080504@redhat.com>
+Message-ID: <201105222241.04385.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hi Mauro,
 
-On Sat, May 14, 2011 at 10:33:53PM +0200, Arnd Bergmann wrote:
-> On Saturday 14 May 2011, Mark Brown wrote:
-> > > Will a misc device be a better choice.
-> > 
-> > > In that case I can remove the MFD cell from the board_file and add an array
-> > > of platform_device for the UART & CAN.
-> > 
-> > I think that for me so long as it can simultaneously do two unrelated
-> > functions which need to be arbitrated between there's probably a place
-> > for it in MFD, certainly at the minute.
+On Saturday 21 May 2011 14:55:12 Mauro Carvalho Chehab wrote:
+> Hi Laurent,
 > 
-> I guess drivers/mfd would be a better place than drivers/misc, but it might not
-> need to be an mfd driver in the sense that it registers mfd cells.
-> 
-I agree with that. Although if it makes it to drivers/mfd/, I'd prefer to see
-it using the MF API.
+> Despite all those changes at Nokia side, I'm still assuming that you're
+> handling the omap3 patches.
 
+That's correct. I maintain (with Sakari) the OMAP3 ISP driver. For practical 
+reason I'm the one who sends the pull requests.
 
-> The more important point is to remove the device registration from the board
-> file. You definitely should not have the cells in the board file, but replacing
-> them with platform devices in the board file makes it no better.
-> 
-> My whole point has been that you register them from the main pruss driver
-> based on run-time data instead of compile-time pre-configured stuff in the
-> board file.
-That's certainly right.
+> So, I'm just marking those two patches as RFC until I receive a pull request
+> from you.
 
-Cheers,
-Samuel.
+Note that this patch is not strictly tied to the OMAP3 ISP, as it adds support 
+for a sensor that can be used with any media controller-enabled ISP. In 
+practice we don't have many of such ISPs :-) I'll thus take the patch in my 
+tree.
+
+> Anyway, in this specific case, Koen made some comments, so we should wait
+> for Javier answer before moving ahead.
+
+Guennadi also sent comments. I'll wait for the next version of the patch.
+
+Please note that I will probably apply patch 1/2 only at first, as we still 
+have no proper solution to support sensors on pluggable expansion modules in a 
+modular way. More work is needed in that area before patch 2/2 (or rather a 
+patch set that will provide the same functionality) can be applied.
 
 -- 
-Intel Open Source Technology Centre
-http://oss.intel.com/
+Regards,
+
+Laurent Pinchart
