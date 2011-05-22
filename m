@@ -1,32 +1,30 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 22 May 2011 10:46:03 -0500
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <20110521234725.GB17672@n2100.arm.linux.org.uk>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>	<20110519233958.GB18181@ponder.secretlab.ca>	<4DD66B8A.5040404@gmail.com>
-	<201105201621.03801.arnd@arndb.de>	<4DD68614.6090209@gmail.com>	<a42f0c27-2811-4b68-bedf-7dfaa7bff6ff@VA3EHSMHS025.ehs.local>	<BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
-	<20110521234725.GB17672@n2100.arm.linux.org.uk>
-Message-ID: <4DD92FBB.2050601@gmail.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Sun, 22 May 2011 17:52:57 +0200
+Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+In-Reply-To: <201105212245.02561.morpheus.ibis@gmail.com>
+References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110521202806.GA3518@elf.ucw.cz>
+	<201105212245.02561.morpheus.ibis@gmail.com>
+Message-ID: <201105221752.57784.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/21/2011 06:47 PM, Russell King - ARM Linux wrote:
-> On Sat, May 21, 2011 at 11:42:34AM -0600, Grant Likely wrote:
->> Russell, it seems to me that the primary behaviour that amba_bus has
->> over platform_bus is the clock management, and secondarily
->> verification of the type of device by the device id.  Am I correct, or
->> am I missing something?
->
-> It matches by vendor/device ID just like PCI does, and does the bus
-> clock management and power management in a really nice way, which I
-> doubt platform devices will ever do.
->
+On Saturday, May 21, 2011 10:45:02 PM Pavel Herrmann wrote:
+> On Saturday, May 21, 2011 10:28:07 PM Pavel Machek wrote:
+> > Unfortunately that one does not apply, due to
+> > 
+> > > @@ -213,6 +224,7 @@ static int __devexit max1111_remove(struct
+> > > spi_device *spi)
+> > 
+> > Whitespace damage. (but if you just delete this extra newline, its
+> > fine).
+> 
+> sorry for that one, I followed Mareks advice on sending the pach inline,
+> and my mail client does automatic text reflow (defaults to 78 columns). I
+> still have to find the correct formating settings to send these patches.
+> 
+> thanks for the ACK and testing
+> 
+> Pavel
 
-Matching by ID is just one aspect of PCI. AMBA devices require defining 
-the base address and irq just like platform devices. Having the ID is 
-optional on AMBA buses. In PCI the bus and devices are probe-able. For 
-AMBA, the bus is not probe-able, only the devices (or maybe not).
-
-I believe OMAP is doing clock and power mgt at the bus level for 
-platform devices.
-
-Rob
+Use git send-email, I recall telling you this ;-)
