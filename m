@@ -1,91 +1,72 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 22 May 2011 11:04:39 +0200
-Subject: [RFC PATCH 1/2] arm: introduce arch_ioremap and arch_iounmap function
-	pointer
-Message-ID: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Sun, 22 May 2011 13:20:14 +0400
+Subject: PXA: Handling of UDC with no VBUS pins
+In-Reply-To: <4DD8CEAA.2010601@free.fr>
+References: <20110518120633.GA9860@doriath.ww600.siemens.net>
+	<4DD6AF07.9060306@free.fr>
+	<BANLkTi=Yjf3oopLLikbRQC4uBkmQgHdS2Q@mail.gmail.com>
+	<4DD8CEAA.2010601@free.fr>
+Message-ID: <BANLkTimfe8x=UDp3tw94q0UPX=Zonqa6dg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-today we define it at runtime via __arch_ioremap and __arch_iounmap
+On Sun, May 22, 2011 at 12:51 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
+> On 05/21/2011 08:35 PM, Dmitry Eremin-Solenikov wrote:
+>>
+>> My question is what would be better: to extend gpio-vbus to work w/o
+>>>>
+>>>> VBUS pin or to write new transceiver driver only handling gpio-pullup?
+>>>
+>>> My personnal feeling is neither, let them be. The generic pullup would
+>>> have to ask itself :
+>>> ? ?- should the pullup be applied on D+ (on USB 2.0 and 3.0 devices) ?
+>>> ? ?- should the pullup be applied on D- (on USB 1.1 devices) ?
+>>
+>> gpio-vbus driver doesn't do this. It simply handles D+ pullup. I think I'd
+>> start with simple D+ pullup driver and the one may add D- functionality
+>> if required.
+>
+> OK, as long as you don't touch the code in pxa27x_udc.c.
 
-this PATH will allow to overwrite the default ioremap at runtime
-to be able to compile multiple soc in the same kernel
+Let's do it step by step. My plan would be to drop all non-tranceiver code
+for handling pullup and VBUS from both pxa25x_udc and pxa27x_udc.
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
----
- arch/arm/include/asm/io.h |    3 +++
- arch/arm/mm/ioremap.c     |   16 +++++++++++++++-
- arch/arm/mm/nommu.c       |    4 ++++
- 3 files changed, 22 insertions(+), 1 deletions(-)
+>>>
+>>> The common driver will have to handle the suspend/resume in an
+>>> homogenous way.
+>>
+>> Do pxa25x_udc/pxa27x_udc handle pullup during suspend/resume?
+>
+> At least pxa27x_udc does, on suspend to RAM (you should look at
+> pxa_udc_suspend()).
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index d66605d..0c0cfe0 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -246,6 +246,9 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
- #define __arch_iounmap			__iounmap
- #endif
- 
-+extern void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
-+extern void (*arch_iounmap)(volatile void __iomem *addr);
-+
- #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
- #define ioremap_nocache(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE)
- #define ioremap_cached(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index ab50627..40ef390 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -281,9 +281,15 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
- }
- EXPORT_SYMBOL(__arm_ioremap_pfn);
- 
-+void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
-+void (*arch_iounmap)(volatile void __iomem *addr);
-+
- void __iomem *
- __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
- {
-+	if (arch_ioremap)
-+		return arch_ioremap(phys_addr, size, mtype);
-+
- 	return __arm_ioremap_caller(phys_addr, size, mtype,
- 			__builtin_return_address(0));
- }
-@@ -291,10 +297,18 @@ EXPORT_SYMBOL(__arm_ioremap);
- 
- void __iounmap(volatile void __iomem *io_addr)
- {
--	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-+	void *addr;
- #ifndef CONFIG_SMP
- 	struct vm_struct **p, *tmp;
-+#endif
- 
-+	if (arch_iounmap) {
-+		arch_iounmap(io_addr);
-+		return;
-+	}
-+
-+	addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-+#ifndef CONFIG_SMP
- 	/*
- 	 * If this is a section based mapping we need to handle it
- 	 * specially as the VM subsystem does not know how to handle
-diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
-index 687d023..561f19f 100644
---- a/arch/arm/mm/nommu.c
-+++ b/arch/arm/mm/nommu.c
-@@ -73,6 +73,10 @@ void __iomem *__arm_ioremap_pfn_caller(unsigned long pfn, unsigned long offset,
- 	return __arm_ioremap_pfn(pfn, offset, size, mtype);
- }
- 
-+/* declare to just avoid the ifdef in nommu case */
-+void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
-+void (*arch_iounmap)(volatile void __iomem *addr);
-+
- void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
- 			    unsigned int mtype)
- {
+I see... Thanks for pointing to it.
+
+>>>
+>>> If the gadget driver is removed, the pullup should be pulled low.
+>>>
+>>> All of this work for only 2 drivers looks overkill to me.
+>>
+>> 3 boards only from PXA. I don't know about other platforms/soc-families.
+>
+> One other point I've forgotten is that pxa27x_udc in its current state only
+> supports gpio pullup/pulldown (ie. an external transciever handles D+
+> stimulation). But the PXA sillicon has an internal transciever which can be
+> handled directly by pxa27x_udc (register UP2OCR).
+>
+> Now, nobody uses it. If a board manufacturer is crazy enough to use it, the
+> pullup can only be done from inside the pxa27x_udc driver (IO mappings
+> driving).
+
+Actually I've thought about this. At least several boards use UP2OCR
+handling (balloon3, collibri, cm-x300, em-x270, spitz, stargate, voipac, zeus).
+
+> I still think this driver is a bad idea. But if you wish to do it, go ahead.
+> The only thing I'll block is removing the existing pullup code from
+> pxa27x_udc.c.
+
+Even if I provide full replacement (from the pulldown-on-suspend POV)?
+
 -- 
-1.7.4.1
+With best wishes
+Dmitry
