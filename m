@@ -1,66 +1,46 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 May 2011 11:03:42 +0100
-Subject: [RFC PATCH 1/2] arm: introduce arch_ioremap and arch_iounmap
-	function pointer
-In-Reply-To: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <20110522100342.GD17672@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 May 2011 12:30:56 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DCBF1B6.6000104@hartkopp.net>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<4DCB88A4.2010901@grandegger.com> <4DCBF1B6.6000104@hartkopp.net>
+Message-ID: <201105221230.56243.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 22, 2011 at 11:04:39AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> today we define it at runtime via __arch_ioremap and __arch_iounmap
+On Thursday 12 May 2011 16:41:58 Oliver Hartkopp wrote:
+> E.g. assume you need the CAN-IDs 0x100, 0x200 and 0x300 in your application
+> and for that reason you configure these IDs in the pruss CAN driver.
 > 
-> this PATH will allow to overwrite the default ioremap at runtime
-> to be able to compile multiple soc in the same kernel
+> What if someone generates a 100% CAN busload exactly on CAN-ID 0x100 then?
+> 
+> Worst case (1MBit/s, DLC=0) you would need to handle about 21.000 irqs/s for
+> the correctly received CAN frames with the filtered CAN-ID 0x100 ...
 
-This is buggy.
+Then I guess the main thing that a "smart" CAN implementation like pruss
+should do is interrupt mitigation. When you have a constant flow of
+packets coming in, the hardware should be able to DMA a lot of
+them into kernel memory before the driver is required to pick them up,
+and only get into interrupt driven mode when the kernel has managed
+to process all outstanding packets.
 
-> diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> index ab50627..40ef390 100644
-> --- a/arch/arm/mm/ioremap.c
-> +++ b/arch/arm/mm/ioremap.c
-> @@ -281,9 +281,15 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
->  }
->  EXPORT_SYMBOL(__arm_ioremap_pfn);
->  
-> +void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
-> +void (*arch_iounmap)(volatile void __iomem *addr);
-> +
->  void __iomem *
->  __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
->  {
-> +	if (arch_ioremap)
-> +		return arch_ioremap(phys_addr, size, mtype);
-> +
+> This all depends heavily on Linux networking (skb handling, caching, etc) and
+> is pretty fast and optimized!! That was also the reason why it ran on the old
+> PowerPC that smoothly. The mostly seen effect if anything drops is when the
+> application (holding the socket) was not fast enough to handle the incoming
+> data. NB: For that reason we implemented a CAN content filter (CAN_BCM) that
+> is able to do content filtering and timeout monitoring in Kernelspace - all
+> performed in the SoftIRQ.
 
-Some SoCs call __arm_ioremap() from their ioremap() implementation, so
-making this hook results in infinite function recursion if you try to
-set this to their ioremap() implementation.
+Right, dropping packets that no process is waiting for should be done as
+early as possible. In pruss-can, the idea was to do it in hardware, which
+doesn't really work all that well for the reasons discussed before.
+Dropping the frames in the NAPI poll function (softirq time) seems like a
+logical choice.
 
->  void __iounmap(volatile void __iomem *io_addr)
->  {
-> -	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-> +	void *addr;
->  #ifndef CONFIG_SMP
->  	struct vm_struct **p, *tmp;
-> +#endif
->  
-> +	if (arch_iounmap) {
-> +		arch_iounmap(io_addr);
-> +		return;
-> +	}
+> Having 'Mailboxes' bound to CAN-IDs is something that's useful for 8/16 bit
+> CPUs where an application is tightly bound to the embedded ECUs functionality.
 
-And on OMAP, for similar reasons, this will also be infinite function
-recursion:
+Makes sense.
 
-void omap_iounmap(volatile void __iomem *addr)
-{
-        unsigned long virt = (unsigned long)addr;
-
-        if (virt >= VMALLOC_START && virt < VMALLOC_END)
-                __iounmap(addr);
-}
-
-So you'll end up with a call to iounmap() calling __iounmap() which then
-calls omap_iounmap(), which then calls __iounmap()...
+	Arnd
