@@ -1,72 +1,40 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 22 May 2011 13:20:14 +0400
-Subject: PXA: Handling of UDC with no VBUS pins
-In-Reply-To: <4DD8CEAA.2010601@free.fr>
-References: <20110518120633.GA9860@doriath.ww600.siemens.net>
-	<4DD6AF07.9060306@free.fr>
-	<BANLkTi=Yjf3oopLLikbRQC4uBkmQgHdS2Q@mail.gmail.com>
-	<4DD8CEAA.2010601@free.fr>
-Message-ID: <BANLkTimfe8x=UDp3tw94q0UPX=Zonqa6dg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 May 2011 11:54:28 +0200
+Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
+In-Reply-To: <1306055080-30420-2-git-send-email-plagnioj@jcrosoft.com>
+References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
+	<1306055080-30420-2-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <201105221154.28211.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 22, 2011 at 12:51 PM, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> On 05/21/2011 08:35 PM, Dmitry Eremin-Solenikov wrote:
->>
->> My question is what would be better: to extend gpio-vbus to work w/o
->>>>
->>>> VBUS pin or to write new transceiver driver only handling gpio-pullup?
->>>
->>> My personnal feeling is neither, let them be. The generic pullup would
->>> have to ask itself :
->>> ? ?- should the pullup be applied on D+ (on USB 2.0 and 3.0 devices) ?
->>> ? ?- should the pullup be applied on D- (on USB 1.1 devices) ?
->>
->> gpio-vbus driver doesn't do this. It simply handles D+ pullup. I think I'd
->> start with simple D+ pullup driver and the one may add D- functionality
->> if required.
->
-> OK, as long as you don't touch the code in pxa27x_udc.c.
+On Sunday 22 May 2011 11:04:40 Jean-Christophe PLAGNIOL-VILLARD wrote:
+> 
+> --- a/arch/arm/plat-omap/io.c
+> +++ b/arch/arm/plat-omap/io.c
+> @@ -23,6 +23,12 @@
+>  #define BETWEEN(p,st,sz)       ((p) >= (st) && (p) < ((st) + (sz)))
+>  #define XLATE(p,pst,vst)       ((void __iomem *)((p) - (pst) + (vst)))
+>  
+> +void __init omap_set_ioremap(void)
+> +{
+> +       arch_ioremap = omap_ioremap;
+> +       arch_iounmap = omap_iounmap;
+> +}
+> +
+>  /*
+>   * Intercept ioremap() requests for addresses in our fixed mapping regions.
 
-Let's do it step by step. My plan would be to drop all non-tranceiver code
-for handling pullup and VBUS from both pxa25x_udc and pxa27x_udc.
+The only thing that the ioremap functions for omap do as a special case
+is to handle the fixed mappings. Maybe a better approach would be to
+make handling this in omap (and others) unnecessary, using one of
+two approaches:
 
->>>
->>> The common driver will have to handle the suspend/resume in an
->>> homogenous way.
->>
->> Do pxa25x_udc/pxa27x_udc handle pullup during suspend/resume?
->
-> At least pxa27x_udc does, on suspend to RAM (you should look at
-> pxa_udc_suspend()).
+* Remove all fixed mappings that are also ioremapped, and rely on every
+  user calling ioremap correctly. I don't see why we would want to allow
+  both methods anyway.
 
-I see... Thanks for pointing to it.
+* Handle the fixed mappings in the generic ioremap code. They all go through
+  create_mapping(), so we can save a list to walk there.
 
->>>
->>> If the gadget driver is removed, the pullup should be pulled low.
->>>
->>> All of this work for only 2 drivers looks overkill to me.
->>
->> 3 boards only from PXA. I don't know about other platforms/soc-families.
->
-> One other point I've forgotten is that pxa27x_udc in its current state only
-> supports gpio pullup/pulldown (ie. an external transciever handles D+
-> stimulation). But the PXA sillicon has an internal transciever which can be
-> handled directly by pxa27x_udc (register UP2OCR).
->
-> Now, nobody uses it. If a board manufacturer is crazy enough to use it, the
-> pullup can only be done from inside the pxa27x_udc driver (IO mappings
-> driving).
-
-Actually I've thought about this. At least several boards use UP2OCR
-handling (balloon3, collibri, cm-x300, em-x270, spitz, stargate, voipac, zeus).
-
-> I still think this driver is a bad idea. But if you wish to do it, go ahead.
-> The only thing I'll block is removing the existing pullup code from
-> pxa27x_udc.c.
-
-Even if I provide full replacement (from the pulldown-on-suspend POV)?
-
--- 
-With best wishes
-Dmitry
+	Arnd
