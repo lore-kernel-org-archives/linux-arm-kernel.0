@@ -1,81 +1,104 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 22 May 2011 13:05:43 +0200
-Subject: [RFC PATCH 1/2] arm: introduce arch_ioremap and arch_iounmap
-	function pointer
-In-Reply-To: <20110522100342.GD17672@n2100.arm.linux.org.uk>
-References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110522100342.GD17672@n2100.arm.linux.org.uk>
-Message-ID: <20110522110543.GB15292@game.jcrosoft.org>
+Date: Sun, 22 May 2011 15:52:39 +0800
+Subject: [PATCH] arm: introduce arch_ioremap and arch_iounmap function pointer
+Message-ID: <mailman.0.1306063052.23796.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11:03 Sun 22 May     , Russell King - ARM Linux wrote:
-> On Sun, May 22, 2011 at 11:04:39AM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > today we define it at runtime via __arch_ioremap and __arch_iounmap
-> > 
-> > this PATH will allow to overwrite the default ioremap at runtime
-> > to be able to compile multiple soc in the same kernel
-> 
-> This is buggy.
-> 
-> > diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-> > index ab50627..40ef390 100644
-> > --- a/arch/arm/mm/ioremap.c
-> > +++ b/arch/arm/mm/ioremap.c
-> > @@ -281,9 +281,15 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
-> >  }
-> >  EXPORT_SYMBOL(__arm_ioremap_pfn);
-> >  
-> > +void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
-> > +void (*arch_iounmap)(volatile void __iomem *addr);
-> > +
-> >  void __iomem *
-> >  __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
-> >  {
-> > +	if (arch_ioremap)
-> > +		return arch_ioremap(phys_addr, size, mtype);
-> > +
-> 
-> Some SoCs call __arm_ioremap() from their ioremap() implementation, so
-> making this hook results in infinite function recursion if you try to
-> set this to their ioremap() implementation.
-> 
-> >  void __iounmap(volatile void __iomem *io_addr)
-> >  {
-> > -	void *addr = (void *)(PAGE_MASK & (unsigned long)io_addr);
-> > +	void *addr;
-> >  #ifndef CONFIG_SMP
-> >  	struct vm_struct **p, *tmp;
-> > +#endif
-> >  
-> > +	if (arch_iounmap) {
-> > +		arch_iounmap(io_addr);
-> > +		return;
-> > +	}
-> 
-> And on OMAP, for similar reasons, this will also be infinite function
-> recursion:
-> 
-> void omap_iounmap(volatile void __iomem *addr)
-> {
->         unsigned long virt = (unsigned long)addr;
-> 
->         if (virt >= VMALLOC_START && virt < VMALLOC_END)
->                 __iounmap(addr);
-> }
-> 
-> So you'll end up with a call to iounmap() calling __iounmap() which then
-> calls omap_iounmap(), which then calls __iounmap()...
-did see that and I should I did it on at91 too
+today we define it at runtime via __arch_ioremap and __arch_iounmap
 
-so how about introduce a new ioreamap/iouremap functiom
+this PATH will allow to overwrite the default ioremap at runtime
+to be able to compile multiple soc in the same kernel
 
-as to be able to compile more than one soc we need to be able to specifcy the
-custom ioremap at runtime
-Do you agree on this?
+Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+---
+ arch/arm/include/asm/io.h |   12 ++++++++++--
+ arch/arm/mm/ioremap.c     |   22 ++++++++++++++++++++++
+ arch/arm/mm/nommu.c       |    4 ++++
+ 3 files changed, 36 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
+index d66605d..3067f00 100644
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -242,10 +242,13 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+  *
+  */
+ #ifndef __arch_ioremap
+-#define __arch_ioremap			__arm_ioremap
+-#define __arch_iounmap			__iounmap
++#define __arch_ioremap			arm_ioremap
++#define __arch_iounmap			arm_iounmap
+ #endif
+ 
++extern void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
++extern void (*arch_iounmap)(volatile void __iomem *addr);
++
+ #define ioremap(cookie,size)		__arch_ioremap((cookie), (size), MT_DEVICE)
+ #define ioremap_nocache(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE)
+ #define ioremap_cached(cookie,size)	__arch_ioremap((cookie), (size), MT_DEVICE_CACHED)
+@@ -274,6 +277,11 @@ extern void _memset_io(volatile void __iomem *, int, size_t);
+ 
+ extern void __iomem *ioport_map(unsigned long port, unsigned int nr);
+ extern void ioport_unmap(void __iomem *addr);
++
++extern void __iomem *
++arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype);
++extern void arm_iounmap(volatile void __iomem *io_addr);
++
+ #endif
+ 
+ struct pci_dev;
+diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
+index ab50627..ee53d08 100644
+--- a/arch/arm/mm/ioremap.c
++++ b/arch/arm/mm/ioremap.c
+@@ -281,6 +281,28 @@ __arm_ioremap_pfn(unsigned long pfn, unsigned long offset, size_t size,
+ }
+ EXPORT_SYMBOL(__arm_ioremap_pfn);
+ 
++void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
++void (*arch_iounmap)(volatile void __iomem *addr);
++
++void __iomem *
++arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
++{
++	if (arch_ioremap)
++		return arch_ioremap(phys_addr, size, mtype);
++	else
++		return __arm_ioremap(phys_addr, size, mtype);
++}
++EXPORT_SYMBOL(arm_ioremap);
++
++void arm_iounmap(volatile void __iomem *io_addr)
++{
++	if (arch_iounmap) {
++		arch_iounmap(io_addr);
++	else
++		__iounmap(io_addr);
++}
++EXPORT_SYMBOL(arm_iounmap);
++
+ void __iomem *
+ __arm_ioremap(unsigned long phys_addr, size_t size, unsigned int mtype)
+ {
+diff --git a/arch/arm/mm/nommu.c b/arch/arm/mm/nommu.c
+index 687d023..561f19f 100644
+--- a/arch/arm/mm/nommu.c
++++ b/arch/arm/mm/nommu.c
+@@ -73,6 +73,10 @@ void __iomem *__arm_ioremap_pfn_caller(unsigned long pfn, unsigned long offset,
+ 	return __arm_ioremap_pfn(pfn, offset, size, mtype);
+ }
+ 
++/* declare to just avoid the ifdef in nommu case */
++void __iomem* (*arch_ioremap)(unsigned long p, size_t size, unsigned int type);
++void (*arch_iounmap)(volatile void __iomem *addr);
++
+ void __iomem *__arm_ioremap(unsigned long phys_addr, size_t size,
+ 			    unsigned int mtype)
+ {
+-- 
+1.7.4.1
 
 
-like this patch
-
-Best Regards,
-J.
+--LpQ9ahxlCli8rRTG--
