@@ -1,72 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sun, 22 May 2011 09:20:09 +0200
-Subject: [PATCH] [RFC] USB: fsl_udc_core: fix build-failure for ARM
-In-Reply-To: <20110511162902.GG5315@n2100.arm.linux.org.uk>
-References: <20110505135029.0c068b8e@wker>
-	<1304672405-1102-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<20110511063954.GJ29089@pengutronix.de>
-	<20110511155446.GA20920@suse.de>
-	<20110511162902.GG5315@n2100.arm.linux.org.uk>
-Message-ID: <20110522072009.GA9774@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 22 May 2011 10:51:54 +0200
+Subject: PXA: Handling of UDC with no VBUS pins
+In-Reply-To: <BANLkTi=Yjf3oopLLikbRQC4uBkmQgHdS2Q@mail.gmail.com>
+References: <20110518120633.GA9860@doriath.ww600.siemens.net>	<4DD6AF07.9060306@free.fr>
+	<BANLkTi=Yjf3oopLLikbRQC4uBkmQgHdS2Q@mail.gmail.com>
+Message-ID: <4DD8CEAA.2010601@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 11, 2011 at 05:29:02PM +0100, Russell King - ARM Linux wrote:
-> On Wed, May 11, 2011 at 08:54:46AM -0700, Greg KH wrote:
-> > On Wed, May 11, 2011 at 08:39:54AM +0200, Uwe Kleine-K?nig wrote:
-> > > Hello Greg,
-> > > 
-> > > On Fri, May 06, 2011 at 11:00:05AM +0200, Uwe Kleine-K?nig wrote:
-> > > > Commit
-> > > > 
-> > > > 	09ba0de (USB: fsl_udc_core: prepare for SoCs with BE registers and descriptors)
-> > > > 
-> > > > introduced two function pointers _fsl_readl and _fsl_writel in an #ifdef
-> > > > CONFIG_PPC32 block and used then unconditionally in fsl_udc_probe.
-> > > > To make the driver compile again this use has to be protected by
-> > > > an #ifdef, too. Moreover ARM doesn't have flush_dcache_range so this
-> > > > is #ifdefed out, too.
-> > > > 
-> > > > Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> > > > ---
-> > > > Hello,
-> > > > 
-> > > > I'm unsure about getting rid of the flush_dcache_range. If powerpc needs
-> > > > a flush ARM probably does, too, no?
-> > > > If so, what it the right thing to do? Implement flush_dcache_range for
-> > > > ARM (just wrapping flush_dcache_page?)?
-> > > As Russell seem to be OK with the #ifdef, can you please take this
-> > > patch?
-> > 
-> > Ick, no.
-> 
-> I never said I was OK with the #ifdef...
-Ah, right, sorry.
+On 05/21/2011 08:35 PM, Dmitry Eremin-Solenikov wrote:
+> My question is what would be better: to extend gpio-vbus to work w/o
+>>> VBUS pin or to write new transceiver driver only handling gpio-pullup?
+>> My personnal feeling is neither, let them be. The generic pullup would
+>> have to ask itself :
+>>     - should the pullup be applied on D+ (on USB 2.0 and 3.0 devices) ?
+>>     - should the pullup be applied on D- (on USB 1.1 devices) ?
+> gpio-vbus driver doesn't do this. It simply handles D+ pullup. I think I'd
+> start with simple D+ pullup driver and the one may add D- functionality
+> if required.
+OK, as long as you don't touch the code in pxa27x_udc.c.
+>> The common driver will have to handle the suspend/resume in an
+>> homogenous way.
+> Do pxa25x_udc/pxa27x_udc handle pullup during suspend/resume?
+At least pxa27x_udc does, on suspend to RAM (you should look at 
+pxa_udc_suspend()).
+>> If the gadget driver is removed, the pullup should be pulled low.
+>>
+>> All of this work for only 2 drivers looks overkill to me.
+> 3 boards only from PXA. I don't know about other platforms/soc-families.
 
-> > Come on, we don't have ifdefs in .c files for a reason, surely there is
-> > a better fix for this some other way?
-> 
-> I suggested ways to fix it, which apparantly got ignored.  To repeat myself,
-> what I said was:
-> 
-> "Well, the folk introducing it should have added it to cachetlb.txt so
-> that other folk know what the intentions of it are.  At the moment it
-> seems to be an unofficial extension with unknown semantics.  Maybe the
-> PPC folk can clear it up and fix other arches if they wish to make it
-> an official arch cachetlb extension."
-So what should we do? The fsl_udc_core driver currently fails to build
-because it uses flush_dcache_range unconditionally. So the obvious ways
-to fix it are:
+One other point I've forgotten is that pxa27x_udc in its current state 
+only supports gpio pullup/pulldown (ie. an external transciever handles 
+D+ stimulation). But the PXA sillicon has an internal transciever which 
+can be handled directly by pxa27x_udc (register UP2OCR).
 
- 1) define flush_dcache_range
-   a) in arch/arm
-   b) in the driver
- 2) make the driver not use flush_dcache_range
-   a) #ifdef 
-   b) revert 09ba0de (and probably some commits that depend on it)
-   c) use a different function to flush the cache
+Now, nobody uses it. If a board manufacturer is crazy enough to use it, 
+the pullup can only be done from inside the pxa27x_udc driver (IO 
+mappings driving).
 
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+I still think this driver is a bad idea. But if you wish to do it, go 
+ahead. The only thing I'll block is removing the existing pullup code 
+from pxa27x_udc.c.
+
+Cheers.
+
+--
+Robert
