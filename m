@@ -1,51 +1,47 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Sun, 22 May 2011 16:50:23 +0530
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Sun, 22 May 2011 13:13:24 +0200
 Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
 In-Reply-To: <201105221154.28211.arnd@arndb.de>
-References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>	<1306055080-30420-2-git-send-email-plagnioj@jcrosoft.com>
+References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
+	<1306055080-30420-2-git-send-email-plagnioj@jcrosoft.com>
 	<201105221154.28211.arnd@arndb.de>
-Message-ID: <4DD8F177.9020809@ti.com>
+Message-ID: <20110522111324.GC15292@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/22/2011 3:24 PM, Arnd Bergmann wrote:
+On 11:54 Sun 22 May     , Arnd Bergmann wrote:
 > On Sunday 22 May 2011 11:04:40 Jean-Christophe PLAGNIOL-VILLARD wrote:
->>
->> --- a/arch/arm/plat-omap/io.c
->> +++ b/arch/arm/plat-omap/io.c
->> @@ -23,6 +23,12 @@
->>   #define BETWEEN(p,st,sz)       ((p)>= (st)&&  (p)<  ((st) + (sz)))
->>   #define XLATE(p,pst,vst)       ((void __iomem *)((p) - (pst) + (vst)))
->>
->> +void __init omap_set_ioremap(void)
->> +{
->> +       arch_ioremap = omap_ioremap;
->> +       arch_iounmap = omap_iounmap;
->> +}
->> +
->>   /*
->>    * Intercept ioremap() requests for addresses in our fixed mapping regions.
->
+> > 
+> > --- a/arch/arm/plat-omap/io.c
+> > +++ b/arch/arm/plat-omap/io.c
+> > @@ -23,6 +23,12 @@
+> >  #define BETWEEN(p,st,sz)       ((p) >= (st) && (p) < ((st) + (sz)))
+> >  #define XLATE(p,pst,vst)       ((void __iomem *)((p) - (pst) + (vst)))
+> >  
+> > +void __init omap_set_ioremap(void)
+> > +{
+> > +       arch_ioremap = omap_ioremap;
+> > +       arch_iounmap = omap_iounmap;
+> > +}
+> > +
+> >  /*
+> >   * Intercept ioremap() requests for addresses in our fixed mapping regions.
+> 
 > The only thing that the ioremap functions for omap do as a special case
 > is to handle the fixed mappings. Maybe a better approach would be to
 > make handling this in omap (and others) unnecessary, using one of
 > two approaches:
->
+> 
 > * Remove all fixed mappings that are also ioremapped, and rely on every
->    user calling ioremap correctly. I don't see why we would want to allow
->    both methods anyway.
->
-What do you mean by "Remove all fixed mappings that are also
-ioremapped" ?
-Why will you ioremap() it again if the fixed mapping is already
-registered through iotable_init()
-
+>   user calling ioremap correctly. I don't see why we would want to allow
+>   both methods anyway.
+> 
 > * Handle the fixed mappings in the generic ioremap code. They all go through
->    create_mapping(), so we can save a list to walk there.
->
-This seems good approach in case we are ok to create and save the IO
-list. This will also help to avoid un-necessary dual mappings which
-can happen today if the mapping is outside the fixed mapping.
+>   create_mapping(), so we can save a list to walk there.
+not sure we can do so as imx do do so, they check on mx3 the memmory region
+and fix the remapping type
 
-Regards
-Santosh
+Not sure it's the right to do either
+
+Best Regards,
+J.
