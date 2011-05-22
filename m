@@ -1,41 +1,34 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 22 May 2011 16:42:30 +0400
-Subject: spitz pm: adjust messages
-In-Reply-To: <20110521122450.GA6954@elf.ucw.cz>
-References: <20110521122450.GA6954@elf.ucw.cz>
-Message-ID: <4DD904B6.4010700@ru.mvista.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 May 2011 14:56:45 +0200
+Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
+In-Reply-To: <4DD8F77C.9050206@ti.com>
+References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
+	<201105221335.03688.arnd@arndb.de> <4DD8F77C.9050206@ti.com>
+Message-ID: <201105221456.45486.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Sunday 22 May 2011 13:46:04 Santosh Shilimkar wrote:
+> At least on OMAP, the fixed mappings used are mainly the interconnect,
+> infrastructure, memory controller and most of these are not associated
+> with any driver.
+> 
+> On OMAP, the fixed mappings are handled directly so nothing fishy there.
+> 
+> Attributes are already provided via io descriptor for fixed mapping
+> and that should remain fixed. O.w there is no meaning for the fixed
+> mapping.
+> 
+> For dynamic mapping, different attributes work as usual via
+> __ioremap().
+> 
+> So I don't see why you will have conflicting mapping at all?
 
-On 21-05-2011 16:24, Pavel Machek wrote:
+Ok, great!
 
-> Charger error is something that should be reported to the syslog; do
-> it. If temperature reading fails, we do not want to charge the
-> battery, anyway.
+If that's the case, then you don't need omap_ioremap at all
+and you can simply remove it. I assume that when we make the
+other platforms do the same as omap, we also won't need a
+per-platform ioremap function pointer.
 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-> diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-> index 785880f..513588c 100644
-> --- a/arch/arm/mach-pxa/sharpsl_pm.c
-> +++ b/arch/arm/mach-pxa/sharpsl_pm.c
-[...]
-> @@ -513,8 +500,10 @@ static int sharpsl_check_battery_temp(void)
->   	val = get_select_val(buff);
->
->   	dev_dbg(sharpsl_pm.dev, "Temperature: %d\n", val);
-> -	if (val>  sharpsl_pm.machinfo->charge_on_temp) {
-> -		printk(KERN_WARNING "Not charging: temperature out of limits.\n");
-> +	/* FIXME: this should catch battery read errors, but we should
-> +	   probably avoid charging in<0C temperatures, too. */
-
-    The preferred style of the multi-line comments is this:
-
-/*
-  * bla
-  * bla
-  */
-
-WBR, Sergei
+	Arnd
