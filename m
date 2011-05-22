@@ -1,40 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 May 2011 11:54:28 +0200
-Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
-In-Reply-To: <1306055080-30420-2-git-send-email-plagnioj@jcrosoft.com>
-References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-	<1306055080-30420-2-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <201105221154.28211.arnd@arndb.de>
+From: rjw@sisk.pl (Rafael J. Wysocki)
+Date: Sun, 22 May 2011 11:54:52 +0200
+Subject: [linux-pm] [RFC PATCH] ARM hibernation / suspend-to-disk support
+	code
+In-Reply-To: <2C577202CB5719438D4E9608C565CB2C01B69D7B@NL-EXC-07.intra.local>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<201105210027.17159.rjw@sisk.pl>
+	<2C577202CB5719438D4E9608C565CB2C01B69D7B@NL-EXC-07.intra.local>
+Message-ID: <201105221154.52829.rjw@sisk.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 May 2011 11:04:40 Jean-Christophe PLAGNIOL-VILLARD wrote:
+On Sunday, May 22, 2011, Frank Hofmann wrote:
+> > [ ... ]
+> > > > r8_FIQ..r12_FIQ can store arbitrary state used by the FIQ handler,
+> > > > if FIQ is in use.  Can we expect any driver using FIQ to save/restore
+> > > > this state itself, rather than doing it globally?  This may be
+> > > > reasonable.
+> > > 
+> > > We don't need to save/restore those, because at the time the snapshot is 
+> > > taken interrupts are off and we cannot be in any trap handler either. On 
+> > > resume, the kernel that has been loaded has initialized them properly 
+> > > already.
+> > 
+> > I'm not sure if this is a safe assumption in general.  We may decide to
+> > switch to loading hibernate images from boot loaders, for example, and
+> > it may not hold any more.  Generally, please don't assume _anything_ has
+> > been properly initialized during resume, before the image is loaded.
+> > This has already beaten us a couple of times.
+> > 
+> > Thanks,
+> > Rafael
 > 
-> --- a/arch/arm/plat-omap/io.c
-> +++ b/arch/arm/plat-omap/io.c
-> @@ -23,6 +23,12 @@
->  #define BETWEEN(p,st,sz)       ((p) >= (st) && (p) < ((st) + (sz)))
->  #define XLATE(p,pst,vst)       ((void __iomem *)((p) - (pst) + (vst)))
->  
-> +void __init omap_set_ioremap(void)
-> +{
-> +       arch_ioremap = omap_ioremap;
-> +       arch_iounmap = omap_iounmap;
-> +}
-> +
->  /*
->   * Intercept ioremap() requests for addresses in our fixed mapping regions.
+> Hi Rafael,
+> 
+> regarding "cannot rely on any state", if that is so then it seems quite
+> unnecessary to save/restore _any_ ARM non-#SYSTEM_MODE state - it'd better
+> be reinitialized by calling cpu_init() after the "core restore" callback.
 
-The only thing that the ioremap functions for omap do as a special case
-is to handle the fixed mappings. Maybe a better approach would be to
-make handling this in omap (and others) unnecessary, using one of
-two approaches:
+If they are always initialized in the same way and if you can do the CPU
+initialization at this point, I agree.
 
-* Remove all fixed mappings that are also ioremapped, and rely on every
-  user calling ioremap correctly. I don't see why we would want to allow
-  both methods anyway.
+> The archives were quite a bit helpful in this context:
+> 
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg12671.html
+> 
+> that's the same situation isn't it ?
 
-* Handle the fixed mappings in the generic ioremap code. They all go through
-  create_mapping(), so we can save a list to walk there.
+I'm not sure, I'm not an ARM expert, but it seems so.
 
-	Arnd
+> Regarding FIQ: I agree with Russell and others who previously stated that
+> a driver using FIQ is responsible for implementing suspend/resume hooks itself.
+
+I agree with that too.
+
+> But what could be done is to disable/enable it for the snapshot, just in case.
+
+OK
+
+> I've also found out that the vmlinux.lds changes don't seem to be necessary
+> - they've been the last remnant of the "old" ARM hibernation patch, but just
+> leaving those out looks to make no difference (the nosave data still ends up
+> in the same place, with the same elf section attributes).
+> 
+> With all this in mind, the core part of the patch becomes somewhat simpler.
+> See attached.
+
+It looks reasonable, but it slightly concerns me that you seem to assume
+that swapper_pg_dir will be the same in both the boot and the target kernel.
+We used to make this assumption on x86 too, but it started to cause
+problems to happen at one point.  To address those problems we had to create
+temporary page tables using page frames that are guaranteed not to be
+overwritten in the last phase of restore (that would be the for () loop in
+your __swsusp_arch_restore_image()).
+
+Thanks,
+Rafael
