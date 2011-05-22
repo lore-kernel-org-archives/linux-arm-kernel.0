@@ -1,57 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 May 2011 14:19:58 +0100
-Subject: [RFC PATCH 1/2] arm: introduce arch_ioremap and arch_iounmap
-	function pointer
-In-Reply-To: <20110522110543.GB15292@game.jcrosoft.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Sun, 22 May 2011 18:50:29 +0530
+Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
+In-Reply-To: <201105221456.45486.arnd@arndb.de>
 References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-	<20110522100342.GD17672@n2100.arm.linux.org.uk>
-	<20110522110543.GB15292@game.jcrosoft.org>
-Message-ID: <20110522131958.GF17672@n2100.arm.linux.org.uk>
+	<201105221335.03688.arnd@arndb.de> <4DD8F77C.9050206@ti.com>
+	<201105221456.45486.arnd@arndb.de>
+Message-ID: <4DD90D9D.1070502@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 22, 2011 at 01:05:43PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> did see that and I should I did it on at91 too
-> 
-> so how about introduce a new ioreamap/iouremap functiom
+On 5/22/2011 6:26 PM, Arnd Bergmann wrote:
+> On Sunday 22 May 2011 13:46:04 Santosh Shilimkar wrote:
+>> At least on OMAP, the fixed mappings used are mainly the interconnect,
+>> infrastructure, memory controller and most of these are not associated
+>> with any driver.
+>>
+>> On OMAP, the fixed mappings are handled directly so nothing fishy there.
+>>
+>> Attributes are already provided via io descriptor for fixed mapping
+>> and that should remain fixed. O.w there is no meaning for the fixed
+>> mapping.
+>>
+>> For dynamic mapping, different attributes work as usual via
+>> __ioremap().
+>>
+>> So I don't see why you will have conflicting mapping at all?
+>
+> Ok, great!
+>
+> If that's the case, then you don't need omap_ioremap at all
+> and you can simply remove it. I assume that when we make the
+> other platforms do the same as omap, we also won't need a
+> per-platform ioremap function pointer.
+>
+I didn't say that. Because if you want to get a VA for an IO
+space from fixed map, ioremap() platform hook is useful.
 
-How about not.  How about we intercept all the ioremap() calls at a better
-place like at the beginning of __arm_ioremap_pfn_caller() - iow, something
-like this:
+The existing interface allows, platforms to add additional
+logic for fixed mappings and still use the generic interface'
+for dynamic mappings with single exported interface.
 
-void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
-        unsigned long offset, size_t size, unsigned int mtype, void *caller)
-{
-        const struct mem_type *type;
-        int err;
-        unsigned long addr;
-        struct vm_struct * area;
-
-        /*
-         * High mappings must be supersection aligned
-         */
-        if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
-                return NULL;
-
-        /*
-         * Don't allow RAM to be mapped - this causes problems with ARMv6+
-         */
-        if (WARN_ON(pfn_valid(pfn)))
-                return NULL;
-
-        type = get_mem_type(mtype);
-        if (!type)
-                return NULL;
-
-        /*
-         * Page align the mapping size, taking account of any offset.
-         */
-        size = PAGE_ALIGN(offset + size);
-
-+	addr = __arch_ioremap(pfn, size);
-+	if (addr)
-+		return (void __iomem *) (offset + addr);
-	...
-
-and then we can have __arch_ioremap() do whatever checking of static
-mappings we desire.
+Regards
+Santosh
