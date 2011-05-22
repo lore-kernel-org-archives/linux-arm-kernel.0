@@ -1,30 +1,54 @@
-From: marek.vasut@gmail.com (Marek Vasut)
-Date: Sun, 22 May 2011 17:52:57 +0200
-Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
-In-Reply-To: <201105212245.02561.morpheus.ibis@gmail.com>
-References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
-	<20110521202806.GA3518@elf.ucw.cz>
-	<201105212245.02561.morpheus.ibis@gmail.com>
-Message-ID: <201105221752.57784.marek.vasut@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 22 May 2011 18:40:54 +0200
+Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
+In-Reply-To: <20110522130955.GE17672@n2100.arm.linux.org.uk>
+References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
+	<201105221335.03688.arnd@arndb.de>
+	<20110522130955.GE17672@n2100.arm.linux.org.uk>
+Message-ID: <201105221840.54528.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday, May 21, 2011 10:45:02 PM Pavel Herrmann wrote:
-> On Saturday, May 21, 2011 10:28:07 PM Pavel Machek wrote:
-> > Unfortunately that one does not apply, due to
-> > 
-> > > @@ -213,6 +224,7 @@ static int __devexit max1111_remove(struct
-> > > spi_device *spi)
-> > 
-> > Whitespace damage. (but if you just delete this extra newline, its
-> > fine).
+On Sunday 22 May 2011 15:09:55 Russell King - ARM Linux wrote:
+> On Sun, May 22, 2011 at 01:35:03PM +0200, Arnd Bergmann wrote:
+> > I mean don't call iotable_init() for regions that is ioremapped
+> > into a device driver. Having both iotable_init and ioremap
+> > on the same area is a bit fishy anyway,
 > 
-> sorry for that one, I followed Mareks advice on sending the pach inline,
-> and my mail client does automatic text reflow (defaults to 78 columns). I
-> still have to find the correct formating settings to send these patches.
-> 
-> thanks for the ACK and testing
-> 
-> Pavel
+> That's how things used to be done.  What your proposal causes is people
+> defining virtual address constants in platform header files, and using
+> those constants directly in drivers.
 
-Use git send-email, I recall telling you this ;-)
+My first proposal was to remove the fixed mapping in the cases where a
+driver uses ioremap, not the other way round. The other proposal was
+to handle the static mappings in the common ioremap code.
+
+> Does it make sense to individually ioremap(), where each ioremap() creates
+> 16 page table entries and therefore potentially consumes up to 16 TLB
+> entries, resulting in 256 TLB entries to cover all 16 devices, or does it
+> make sense to map the entire region as one section at boot time, thereby
+> only consuming one TLB entry for the entire lot?
+> 
+> I believe TI have done some testing in this area, and have showed that
+> this kind of optimization is reflected in the performance figures.
+
+Ok, good to know. Can anyone point to the specific results? TLB pressure
+is the obvious concern, but I didn't expect it to be measurable in this
+scenario.
+ 
+> Given that people are worrying about 0.2% performance gains through
+> _elimination_ of the list prefetching due to TLB misses (see the linux-arch
+> thread, and the proposed removal of prefetching from the list macros) I
+> don't think anyone can justify avoiding the above kind of optimization.
+
+The main reason the TLB miss for the list walk hurts so much is that it's
+in the hot path for important workloads and that certain CPUs fail to install
+an invalid TLB entry, so the pointless page walk gets exectuted all the time.
+
+For the device mappings, I would assume that the accesses are typically
+going to the most active devices, which consequently are still present in
+the TLB. My na?ve expectation would be that there is more to gain from
+using large pages ioremap (which we don't do AFAICT) whenever we map more
+than a page than by pre-mapping some of the devices using large pages.
+
+	Arnd
