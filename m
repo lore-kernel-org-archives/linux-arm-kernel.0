@@ -1,54 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 22 May 2011 18:40:54 +0200
-Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
-In-Reply-To: <20110522130955.GE17672@n2100.arm.linux.org.uk>
-References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-	<201105221335.03688.arnd@arndb.de>
-	<20110522130955.GE17672@n2100.arm.linux.org.uk>
-Message-ID: <201105221840.54528.arnd@arndb.de>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 22 May 2011 20:03:03 +0300
+Subject: [PATCH 0/5] ep93xx DMA patches
+Message-ID: <cover.1306082097.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 May 2011 15:09:55 Russell King - ARM Linux wrote:
-> On Sun, May 22, 2011 at 01:35:03PM +0200, Arnd Bergmann wrote:
-> > I mean don't call iotable_init() for regions that is ioremapped
-> > into a device driver. Having both iotable_init and ioremap
-> > on the same area is a bit fishy anyway,
-> 
-> That's how things used to be done.  What your proposal causes is people
-> defining virtual address constants in platform header files, and using
-> those constants directly in drivers.
+Hello all,
 
-My first proposal was to remove the fixed mapping in the cases where a
-driver uses ioremap, not the other way round. The other proposal was
-to handle the static mappings in the common ioremap code.
+Motivation of this series was to add DMA support for the ep93xx SPI driver.
+However, current platform DMA code didn't support the M2M channels which were
+required for SPI (and IDE) peripherals.
 
-> Does it make sense to individually ioremap(), where each ioremap() creates
-> 16 page table entries and therefore potentially consumes up to 16 TLB
-> entries, resulting in 256 TLB entries to cover all 16 devices, or does it
-> make sense to map the entire region as one section at boot time, thereby
-> only consuming one TLB entry for the entire lot?
-> 
-> I believe TI have done some testing in this area, and have showed that
-> this kind of optimization is reflected in the performance figures.
+Ryan Mallon suggested that maybe we should integrate both M2M and M2P code
+under the dmaengine API. The purpose of this series is to do just that and
+convert all the existing users to use that new API.
 
-Ok, good to know. Can anyone point to the specific results? TLB pressure
-is the obvious concern, but I didn't expect it to be measurable in this
-scenario.
- 
-> Given that people are worrying about 0.2% performance gains through
-> _elimination_ of the list prefetching due to TLB misses (see the linux-arch
-> thread, and the proposed removal of prefetching from the list macros) I
-> don't think anyone can justify avoiding the above kind of optimization.
+Patches 1-4 add dmaengine driver and convert the existing users to dmaengine
+API. The last patch adds DMA support for the SPI driver.
 
-The main reason the TLB miss for the list walk hurts so much is that it's
-in the hot path for important workloads and that certain CPUs fail to install
-an invalid TLB entry, so the pointless page walk gets exectuted all the time.
+I've been testing these on TS-7260 (ep9302) connected to SPI EEPROM, and
+Sim.One (ep9307) with mmc_spi and AC'97 audio.
 
-For the device mappings, I would assume that the accesses are typically
-going to the most active devices, which consequently are still present in
-the TLB. My na?ve expectation would be that there is more to gain from
-using large pages ioremap (which we don't do AFAICT) whenever we map more
-than a page than by pre-mapping some of the devices using large pages.
+memcpy() testing has been done by running drivers/dma/dmatest.ko.
 
-	Arnd
+Regards,
+MW
+
+Mika Westerberg (5):
+  dmaengine: add ep93xx DMA support
+  ep93xx: add dmaengine platform code
+  ASoC: ep93xx: convert to use the DMA engine API
+  ep93xx: remove the old M2P DMA code
+  spi/ep93xx: add DMA support
+
+ Documentation/spi/ep93xx_spi                   |   10 +
+ arch/arm/mach-ep93xx/Makefile                  |    2 +-
+ arch/arm/mach-ep93xx/core.c                    |    6 +-
+ arch/arm/mach-ep93xx/dma-m2p.c                 |  411 -------
+ arch/arm/mach-ep93xx/dma.c                     |  108 ++
+ arch/arm/mach-ep93xx/include/mach/dma.h        |  190 ++---
+ arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h |    2 +
+ drivers/dma/Kconfig                            |    7 +
+ drivers/dma/Makefile                           |    1 +
+ drivers/dma/ep93xx_dma.c                       | 1356 ++++++++++++++++++++++++
+ drivers/spi/ep93xx_spi.c                       |  303 +++++-
+ sound/soc/ep93xx/ep93xx-ac97.c                 |    4 +-
+ sound/soc/ep93xx/ep93xx-i2s.c                  |    4 +-
+ sound/soc/ep93xx/ep93xx-pcm.c                  |  137 ++--
+ 14 files changed, 1929 insertions(+), 612 deletions(-)
+ delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
+ create mode 100644 arch/arm/mach-ep93xx/dma.c
+ create mode 100644 drivers/dma/ep93xx_dma.c
+
+-- 
+1.7.4.4
