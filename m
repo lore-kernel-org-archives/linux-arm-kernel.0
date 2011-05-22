@@ -1,40 +1,57 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 22 May 2011 14:09:55 +0100
-Subject: [RFC PATCH 2/2] omap: switch to ioremap function pointer
-In-Reply-To: <201105221335.03688.arnd@arndb.de>
+Date: Sun, 22 May 2011 14:19:58 +0100
+Subject: [RFC PATCH 1/2] arm: introduce arch_ioremap and arch_iounmap
+	function pointer
+In-Reply-To: <20110522110543.GB15292@game.jcrosoft.org>
 References: <1306055080-30420-1-git-send-email-plagnioj@jcrosoft.com>
-	<201105221154.28211.arnd@arndb.de> <4DD8F177.9020809@ti.com>
-	<201105221335.03688.arnd@arndb.de>
-Message-ID: <20110522130955.GE17672@n2100.arm.linux.org.uk>
+	<20110522100342.GD17672@n2100.arm.linux.org.uk>
+	<20110522110543.GB15292@game.jcrosoft.org>
+Message-ID: <20110522131958.GF17672@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 22, 2011 at 01:35:03PM +0200, Arnd Bergmann wrote:
-> I mean don't call iotable_init() for regions that is ioremapped
-> into a device driver. Having both iotable_init and ioremap
-> on the same area is a bit fishy anyway,
+On Sun, May 22, 2011 at 01:05:43PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> did see that and I should I did it on at91 too
+> 
+> so how about introduce a new ioreamap/iouremap functiom
 
-That's how things used to be done.  What your proposal causes is people
-defining virtual address constants in platform header files, and using
-those constants directly in drivers.
+How about not.  How about we intercept all the ioremap() calls at a better
+place like at the beginning of __arm_ioremap_pfn_caller() - iow, something
+like this:
 
-_Thankfully_ we've moved on from that and are now having SoCs intercept
-at the ioremap() level to eliminate that junk.
+void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
+        unsigned long offset, size_t size, unsigned int mtype, void *caller)
+{
+        const struct mem_type *type;
+        int err;
+        unsigned long addr;
+        struct vm_struct * area;
 
-Consider an SoC where you have a block of devices known at boot time
-to be, lets say at 0x10000000 to 0x10100000.  Lets say there's 16 devices
-in there, each occupying 64K for simplicity.
+        /*
+         * High mappings must be supersection aligned
+         */
+        if (pfn >= 0x100000 && (__pfn_to_phys(pfn) & ~SUPERSECTION_MASK))
+                return NULL;
 
-Does it make sense to individually ioremap(), where each ioremap() creates
-16 page table entries and therefore potentially consumes up to 16 TLB
-entries, resulting in 256 TLB entries to cover all 16 devices, or does it
-make sense to map the entire region as one section at boot time, thereby
-only consuming one TLB entry for the entire lot?
+        /*
+         * Don't allow RAM to be mapped - this causes problems with ARMv6+
+         */
+        if (WARN_ON(pfn_valid(pfn)))
+                return NULL;
 
-I believe TI have done some testing in this area, and have showed that
-this kind of optimization is reflected in the performance figures.
+        type = get_mem_type(mtype);
+        if (!type)
+                return NULL;
 
-Given that people are worrying about 0.2% performance gains through
-_elimination_ of the list prefetching due to TLB misses (see the linux-arch
-thread, and the proposed removal of prefetching from the list macros) I
-don't think anyone can justify avoiding the above kind of optimization.
+        /*
+         * Page align the mapping size, taking account of any offset.
+         */
+        size = PAGE_ALIGN(offset + size);
+
++	addr = __arch_ioremap(pfn, size);
++	if (addr)
++		return (void __iomem *) (offset + addr);
+	...
+
+and then we can have __arch_ioremap() do whatever checking of static
+mappings we desire.
