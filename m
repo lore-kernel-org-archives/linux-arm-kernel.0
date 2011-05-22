@@ -1,34 +1,41 @@
 From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 22 May 2011 16:32:06 +0400
-Subject: PXA: Handling of UDC with no VBUS pins
-In-Reply-To: <4DD6AF07.9060306@free.fr>
-References: <20110518120633.GA9860@doriath.ww600.siemens.net>
-	<4DD6AF07.9060306@free.fr>
-Message-ID: <4DD90246.9070803@ru.mvista.com>
+Date: Sun, 22 May 2011 16:42:30 +0400
+Subject: spitz pm: adjust messages
+In-Reply-To: <20110521122450.GA6954@elf.ucw.cz>
+References: <20110521122450.GA6954@elf.ucw.cz>
+Message-ID: <4DD904B6.4010700@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello.
 
-On 20-05-2011 22:12, Robert Jarzmik wrote:
+On 21-05-2011 16:24, Pavel Machek wrote:
 
->> There are several PXA platforms which on the UDC tranceiver part have
->> a pullup pin to support connect/disconnect but no VBUS pin to detect
->> host presense. Currently such platforms are supported through udc driver
->> itself. I'd like to clean that part of pxa25x_udc/pxa27x_udc drivers and
->> to move gpio pullup handling to tranceiver.
+> Charger error is something that should be reported to the syslog; do
+> it. If temperature reading fails, we do not want to charge the
+> battery, anyway.
 
-> So, you want to concentrate USB pullup handling, right ?
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
->> My question is what would be better: to extend gpio-vbus to work w/o
->> VBUS pin or to write new transceiver driver only handling gpio-pullup?
+> diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+> index 785880f..513588c 100644
+> --- a/arch/arm/mach-pxa/sharpsl_pm.c
+> +++ b/arch/arm/mach-pxa/sharpsl_pm.c
+[...]
+> @@ -513,8 +500,10 @@ static int sharpsl_check_battery_temp(void)
+>   	val = get_select_val(buff);
+>
+>   	dev_dbg(sharpsl_pm.dev, "Temperature: %d\n", val);
+> -	if (val>  sharpsl_pm.machinfo->charge_on_temp) {
+> -		printk(KERN_WARNING "Not charging: temperature out of limits.\n");
+> +	/* FIXME: this should catch battery read errors, but we should
+> +	   probably avoid charging in<0C temperatures, too. */
 
-> My personnal feeling is neither, let them be. The generic pullup would have to
-> ask itself :
-> - should the pullup be applied on D+ (on USB 2.0 and 3.0 devices) ?
-> - should the pullup be applied on D- (on USB 1.1 devices) ?
+    The preferred style of the multi-line comments is this:
 
-    Pullup on D- is only used on low speed devices, not all USB 1.1 devices. 
-That's how they get detected.
+/*
+  * bla
+  * bla
+  */
 
 WBR, Sergei
