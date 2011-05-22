@@ -1,35 +1,34 @@
 From: green@linuxhacker.ru (green at linuxhacker.ru)
-Date: Sun, 22 May 2011 17:04:33 -0400
-Subject: Initial B&N Nook Color support, take four
-Message-ID: <1306098276-21112-1-git-send-email-green@linuxhacker.ru>
+Date: Sun, 22 May 2011 17:04:36 -0400
+Subject: [PATCH 3/3] Update Nook Color machine 3284 to common Encore name.
+In-Reply-To: <1306098276-21112-1-git-send-email-green@linuxhacker.ru>
+References: <1306098276-21112-1-git-send-email-green@linuxhacker.ru>
+Message-ID: <1306098276-21112-4-git-send-email-green@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+From: Oleg Drokin <green@linuxhacker.ru>
 
-  Next attempt at B&N Nook Color board file submission.
-  USB peripheral mode is fully operational as is serial console and
-  MMC/SDCard.
+Nachine database already updated:
+http://www.arm.linux.org.uk/developer/machines/list.php?id=3284
 
-  Changes
-  since v3:
-  Separated mach-types change into a separate patch (already got RMK approval)
-  Dramatically cut number of includes in the board file again.
-  No longer set voltage regulator dev, just device name in the supply.
-  Style fixes
-  Serial in uncompress.h sorted by name
-  Corrected MUX package to CBP in board file.
-  omap_i2c_init now has no return since it's unused anyway.
-  Fixed keypad definition.
+Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+---
+ arch/arm/tools/mach-types |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-  since v2:
-  rebased on devel-cleanup branch
-
-  since v1:
-  Threw away all the android stuff as suggested 
-  Cleaned up voltage regulators and removed the ones our twl chip actually
-    does not have
-  Changed the split of the patches to board file + twl update
-
-Bye,
-   Oleg
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index 7ca41f0..2f0db3e 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -962,7 +962,7 @@ omapl138_case_a3	MACH_OMAPL138_CASE_A3	OMAPL138_CASE_A3	3280
+ uemd			MACH_UEMD		UEMD			3281
+ ccwmx51mut		MACH_CCWMX51MUT		CCWMX51MUT		3282
+ rockhopper		MACH_ROCKHOPPER		ROCKHOPPER		3283
+-nookcolor		MACH_NOOKCOLOR		NOOKCOLOR		3284
++encore			MACH_ENCORE		ENCORE			3284
+ hkdkc100		MACH_HKDKC100		HKDKC100		3285
+ ts42xx			MACH_TS42XX		TS42XX			3286
+ aebl			MACH_AEBL		AEBL			3287
+-- 
+1.7.4.4
