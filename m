@@ -1,32 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2011 17:54:12 +0100
-Subject: [PATCH v5 00/19] ARM: Add support for the Large Physical
-	Address Extensions
-In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20110523165412.GF15138@n2100.arm.linux.org.uk>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 23 May 2011 20:03:46 +0300
+Subject: [PATCH v2 2/2] OMAP3BEAGLE: Add support for mt9p031 sensor driver.
+In-Reply-To: <201105230947.15775.laurent.pinchart@ideasonboard.com>
+References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
+	<4DD9146B.2050408@compulab.co.il>
+	<BANLkTi=sqZpAKFxeCbwqpU_7+WZABGa4=w@mail.gmail.com>
+	<201105230947.15775.laurent.pinchart@ideasonboard.com>
+Message-ID: <4DDA9372.5060200@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 08, 2011 at 01:51:19PM +0100, Catalin Marinas wrote:
-> This set of patches adds support for the Large Physical Extensions on
-> the ARM architecture (available with the Cortex-A15 processor). LPAE
-> comes with a 3-level page table format (compared to 2-level for the
-> classic one), allowing up to 40-bit physical address space.
-> 
-> The ARM LPAE documentation is available from (free registration needed):
-> 
-> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
-> 
-> The full set of patches on top of linux-next (LPAE, support for an
-> emulated Versatile Express with Cortex-A15 tile and generic timers) is
-> available on this branch:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae-next
+On 05/23/11 10:47, Laurent Pinchart wrote:
+> Hi Javier,
+>
+> On Monday 23 May 2011 09:25:01 javier Martin wrote:
+>> On 22 May 2011 15:49, Igor Grinberg <grinberg@compulab.co.il> wrote:
+> [snip]
+>
+>>>> @@ -309,6 +357,15 @@ static int beagle_twl_gpio_setup(struct device
+>>>> *dev, pr_err("%s: unable to configure EHCI_nOC\n", __func__); }
+>>>>
+>>>> +     if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+>>>> +             /*
+>>>> +              * Power on camera interface - only on pre-production, not
+>>>> +              * needed on production boards
+>>>> +              */
+>>>> +             gpio_request(gpio + 2, "CAM_EN");
+>>>> +             gpio_direction_output(gpio + 2, 1);
+>>> Why not gpio_request_one()?
+>> Just to follow the same approach as in the rest of the code.
+>> Maybe a further patch could change all "gpio_request()" uses to
+>> "gpio_request_one()".
+> Please do it the other way around. Replace calls to gpio_request() + 
+> gpio_direction_output() with a call to gpio_request_one(), and then modify 
+> this patch to use gpio_request_one().
 
-FYI, I'm going to drop the pgt patch because the warnings are still there
-and I _still_ don't feel happy about pushing that into mainline and then
-being endlessly bugged about it.
+Well, this is done already, you need to follow Tony's linux-next branch...
+So, just changing this patch would do...
+Also, good practice is to base patches on maintainer's appropriate branch,
+so it would be easier to apply.
 
-So I'll drop it from my tree again and re-merge that branch after this
-window has closed.
+
+
+-- 
+Regards,
+Igor.
