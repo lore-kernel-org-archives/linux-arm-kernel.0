@@ -1,28 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2011 16:33:26 +0100
-Subject: Updated mach-types update
-In-Reply-To: <20110523151051.GB6489@sirena.org.uk>
-References: <201105231652.28497.arnd@arndb.de>
-	<20110523145914.GC14131@n2100.arm.linux.org.uk>
-	<20110523151051.GB6489@sirena.org.uk>
-Message-ID: <20110523153326.GB15153@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 May 2011 16:35:53 +0100
+Subject: [PATCH/NEXT] ARM: exynos4: fix typo in platsmp.c
+Message-ID: <1306164953-31593-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 04:10:51PM +0100, Mark Brown wrote:
-> On Mon, May 23, 2011 at 03:59:14PM +0100, Russell King - ARM Linux wrote:
-> 
-> > Given my discussion with Linus over merging what's in my tree yesterday,
-> > the indication is that Linus is _only_ going to take git trees which
-> > remove code or "don't add tons of new lines", in other words only small
-> > growth is acceptable.
-> 
-> Is this only for this merge window?
+Commit e2a083dc0da9aa6437e14811198379b18cdfa7f8 (ARM: consolidate
+SMP cross call implementation) introduced a typo which leads
+to a compilation error. Just fix it.
 
-Let me turn this around.  Given that Linus has complained about the 60k LOC
-growth of ARM at every merge window, and at this window we've been able to
-achieve a net reduction of 15k LOC, what do you think the chances of adding
-another 60k LOC at the next merge window are?
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-exynos4/platsmp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Don't get me wrong - 15k LOC removal is a good start, but it's just that,
-a start.  It's well below what I was hoping for.
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index 8403dd2..c5e65a0 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -22,7 +22,7 @@
+ #include <linux/io.h>
+ 
+ #include <asm/cacheflush.h>
+-#include <asm/hardare/gic.h>
++#include <asm/hardware/gic.h>
+ #include <asm/smp_scu.h>
+ #include <asm/unified.h>
+ 
+-- 
+1.7.0.4
