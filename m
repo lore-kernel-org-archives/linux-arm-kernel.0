@@ -1,26 +1,124 @@
-From: lrg@slimlogic.co.uk (Liam Girdwood)
-Date: Mon, 23 May 2011 10:38:51 +0100
-Subject: [PATCH 3/5] ASoC: ep93xx: convert to use the DMA engine API
-In-Reply-To: <20110523051102.GA10683@opensource.wolfsonmicro.com>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<9f8dd1eb40a6cb44d8207c84f244345a98bb9c0f.1306082097.git.mika.westerberg@iki.fi>
-	<20110523051102.GA10683@opensource.wolfsonmicro.com>
-Message-ID: <1306143537.3290.0.camel@odin>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 23 May 2011 10:42:30 +0100
+Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <alpine.DEB.2.00.1105201703260.8018@localhost6.localdomain6>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
+	<20110520113758.GA3141@arm.com>
+	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
+	<20110520150348.GB3141@arm.com>
+	<alpine.DEB.2.00.1105201703260.8018@localhost6.localdomain6>
+Message-ID: <20110523094230.GA2370@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-23 at 13:11 +0800, Mark Brown wrote:
-> On Sun, May 22, 2011 at 08:03:06PM +0300, Mika Westerberg wrote:
-> > Now that we have the EP93xx DMA engine driver in place, we convert the ASoC
-> > drivers (I2S, AC97 and PCM) to take advantage of this new API. There are no
-> > functional changes.
+On Fri, May 20, 2011 at 05:24:05PM +0100, Frank Hofmann wrote:
+> On Fri, 20 May 2011, Dave Martin wrote:
 > 
-> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> [ ... ]
+> >>I've simply done there what the "setmode" macro from
+> >><asm/assembler.h> is doing, have chosen not to include that file
+> >>because it overrides "push" on a global scale for no good reason and
+> >>that sort of thing makes me cringe.
+> >
+> >Actually, I guess you should be using that header, from a general
+> >standardisation point of view.  In particular, it would be nicer to
+> >use setmode than to copy it.
+> >
+> >The setmode macro itself could be improved to use cps for Thumb-2,
+> >but that would be a separate (and low-priority) patch.
+> >
+> >
+> >Re the push/pop macros, I'm not sure of the history for those.
 > 
-> Given that dmaengine is a standard API I'm wondering if we'll be able to
-> make some sort of generic dmaengine DMA driver for ASoC that could be
-> shared more widely.
+> arch/arm/lib are the only users.
+> 
+> >
+> >In the kernel, it seems customary to write stmfd sp!, / ldmfd sp!,
+> >instead of push / pop, so you could always use those mnemonics instead.
+> >They're equivalent.
+> 
+> The "customary" seems largely a consequence of having the #define in
+> <asm/assembler.h> as you get a compile error if you use push/pop as
+> instruction.
+> 
+> I've made the change to "setmode" and stmfd/ldmfd, ok.
+> 
+> [ ... ]
+> >I think I agree.  Few drivers use FIQ, and if there are drivers
+> >which use FIQ but don't implement suspend/resume hooks, that sounds
+> >like a driver bug.
+> >
+> >Assuming nobody disagrees with that conclusion, it would be a good
+> >idea to stick a comment somewhere explaining that policy.
+> 
+> <speak up or remain silent forever> ;-)
+> 
+> Since the change which moved get/set_fiq_regs() to pure assembly has
+> just gone in, would a simple comment update in the header file along
+> those lines be sufficient ?
 
-Agreed and 
+Gone in where?
 
-Acked-by: Liam Girdwood <lrg@ti.com>
+I haven't submitted my patch to Russell's patch system yet, but it
+takes into account earlier discussions and there have been no major
+disagreements, so I will submit it if it is not superseded.
+
+> I.e. state "do not assume persistence of these registers over power
+> mgmt transitions - if that's what you require, implement suspend /
+> resume hooks" ?
+> 
+> >
+> >>
+> >>See also Russell's mails about that, for previous attempts a year
+> >>and half a year ago to get "something for ARM hibernation" in:
+> >>
+> >>https://lists.linux-foundation.org/pipermail/linux-pm/2010-July/027571.html
+> >>https://lists.linux-foundation.org/pipermail/linux-pm/2010-December/029665.html
+> >
+> >Relying on drivers to save/restore the FIQ state if necessary seems
+> >to correspond to what Russell is saying in his second mail.
+> 
+> Agreed, and largely why I haven't bothered touching FIQ.
+> 
+> >
+> >>
+> >>The kernel doesn't do IRQ/FIQ/ABT/UND save / restore for
+> >>suspend-to-ram either. CPU hotplug support (re)initializes those. I
+> >>believe we're fine.
+> >
+> >OK, just wanted to make sure I understood that right.
+> 
+> By and large, "if suspend-to-ram works, suspend-to-disk should too"
+> seems a good idea; if the former doesn't (need to) save/restore such
+> state even though it's not off-mode-persistent, then the latter
+> doesn't need either.
+> 
+> That said, I've seen (out-of-tree) SoC-specific *suspend() code that
+> simply blotted everything out. Seems the most trivial way to go, but
+> not necessarily the best.
+> 
+> >
+> >I'll leave it to others to comment on the actual SoC-specific routines,
+> >but thanks for the illustration.
+> 
+> To make this clear, I'm not personally considering these parts
+> optimal as the attached patch is doing them.
+> 
+> That's why preferrably, only the "enabler" code should go in first.
+> 
+> I do wonder, though, whether the machine maintainers are willing to
+> make the change to these low-level suspend parts that'd split chip
+> state save/restore from the actual power transition. That'd allow to
+> turn this from a "backdoor" into a proper use of the interface.
+> 
+> Russell has made the change to pass the context buffer as argument,
+> but not split the power transition off; things are getting there,
+> eventually :)
+> 
+> >
+> >Cheers
+> >---Dave
+> 
+> Thanks again,
+> FrankH.
