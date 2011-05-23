@@ -1,67 +1,32 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 May 2011 17:49:44 +0100
-Subject: [PATCH] ARM: fix missing 'cpu_relax()' declaration
-In-Reply-To: <20110523164508.GE15138@n2100.arm.linux.org.uk>
-References: <1306157607-18406-1-git-send-email-marc.zyngier@arm.com>
-	<20110523160944.GA15138@n2100.arm.linux.org.uk>
-	<20110523162339.GC15138@n2100.arm.linux.org.uk>
-	<1306168473.27474.88.camel@e102391-lin.cambridge.arm.com>
-	<20110523164123.GD15138@n2100.arm.linux.org.uk>
-	<20110523164508.GE15138@n2100.arm.linux.org.uk>
-Message-ID: <1306169384.27474.95.camel@e102391-lin.cambridge.arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 May 2011 17:54:12 +0100
+Subject: [PATCH v5 00/19] ARM: Add support for the Large Physical
+	Address Extensions
+In-Reply-To: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <20110523165412.GF15138@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-23 at 17:45 +0100, Russell King - ARM Linux wrote:
-> On Mon, May 23, 2011 at 05:41:23PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, May 23, 2011 at 05:34:33PM +0100, Marc Zyngier wrote:
-> > > Odd... It seems to build just fine here with UP:
-> > > 
-> > > $ grep SMP .config
-> > > CONFIG_BROKEN_ON_SMP=y
-> > > # CONFIG_SMP is not set
-> > > $ time make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- -j4 all
-> > >   CHK     include/linux/version.h
-> > >   HOSTCC  scripts/basic/fixdep
-> > >   HOSTCC  scripts/basic/docproc
-> > >   HOSTCC  scripts/kallsyms
-> > >   HOSTCC  scripts/conmakehash
-> > >   CC      scripts/mod/empty.o
-> > >   HOSTCC  scripts/mod/mk_elfconfig
-> > >   MKELF   scripts/mod/elfconfig.h
-> > >   HOSTCC  scripts/mod/file2alias.o
-> > >   HOSTCC  scripts/mod/modpost.o
-> > >   HOSTCC  scripts/mod/sumversion.o
-> > >   HOSTLD  scripts/mod/modpost
-> > >   CHK     include/generated/utsrelease.h
-> > > make[1]: `include/generated/mach-types.h' is up to date.
-> > >   CC      kernel/bounds.s
-> > >   GEN     include/generated/bounds.h
-> > >   CC      arch/arm/kernel/asm-offsets.s
-> > >   GEN     include/generated/asm-offsets.h
-> > >   CALL    scripts/checksyscalls.sh
-> > > <stdin>:1554: warning: #warning syscall sendmmsg not implemented
-> > >   CC      init/main.o
-> > >   CHK     include/generated/compile.h
-> > >   HOSTCC  usr/gen_init_cpio
-> > > [...]
-> > 
-> > For what platform?  I've tried a few and getting the same error message.
+On Sun, May 08, 2011 at 01:51:19PM +0100, Catalin Marinas wrote:
+> This set of patches adds support for the Large Physical Extensions on
+> the ARM architecture (available with the Cortex-A15 processor). LPAE
+> comes with a 3-level page table format (compared to 2-level for the
+> classic one), allowing up to 40-bit physical address space.
 > 
-> Found it, my for-next tree has the prefetching change but not this:
+> The ARM LPAE documentation is available from (free registration needed):
 > 
-> commit d974d905cbfc1039a73ba0c7eea3f4d4e13c0624
-> Author: Stephen Rothwell <sfr@canb.auug.org.au>
-> Date:   Fri May 20 15:48:17 2011 +1000
+> http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
 > 
->     spinlock_up.h: include asm/processor.h in for cpu_relax
+> The full set of patches on top of linux-next (LPAE, support for an
+> emulated Versatile Express with Cortex-A15 tile and generic timers) is
+> available on this branch:
 > 
-> which fixes the UP build problem.
-> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae-next
 
-Makes sense. Thanks for solving the mystery!
+FYI, I'm going to drop the pgt patch because the warnings are still there
+and I _still_ don't feel happy about pushing that into mainline and then
+being endlessly bugged about it.
 
-	M.
-
--- 
-Reality is an implementation detail.
+So I'll drop it from my tree again and re-merge that branch after this
+window has closed.
