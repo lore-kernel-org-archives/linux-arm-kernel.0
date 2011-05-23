@@ -1,23 +1,57 @@
-From: n.kinar@usask.ca (Nicholas Kinar)
-Date: Mon, 23 May 2011 14:53:27 -0600
-Subject: LCDVSYNC not set up in Atmel AT91SAM9RL device code
-Message-ID: <4DDAC947.7040705@usask.ca>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 24 May 2011 06:41:00 +0800
+Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
+In-Reply-To: <20110523164601.GG20715@pengutronix.de>
+References: <1305878365-827-3-git-send-email-s.hauer@pengutronix.de>
+	<alpine.LFD.2.02.1105201451160.3078@ionos>
+	<20110520130721.GD10403@pengutronix.de>
+	<alpine.LFD.2.02.1105201518030.3078@ionos>
+	<20110521112947.GB11887@sirena.org.uk>
+	<20110523062501.GA20715@pengutronix.de>
+	<20110523104409.GA15635@opensource.wolfsonmicro.com>
+	<20110523144126.GF20715@pengutronix.de>
+	<20110523152248.GC6489@sirena.org.uk>
+	<20110523164601.GG20715@pengutronix.de>
+Message-ID: <20110523224045.GA19533@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, May 23, 2011 at 06:46:01PM +0200, Sascha Hauer wrote:
+> On Mon, May 23, 2011 at 04:22:48PM +0100, Mark Brown wrote:
 
-I've been setting up an LCD display interfaced to the Atmel AT91SAM9RL 
-processor, and I noticed that in the 
-/arch/arm/mach-at91/at91sam9rl_devices.c file, the GPIO pin AT91_PIN_PC4 
-is not switched over to the LCD peripheral.
+> > With platform data it has a default value, and indeed when the chip
+> > powers on it has a default.
 
-To make the LCD display peripheral operate properly, I had to add the 
-following line to the at91_add_device_lcdc() function:
+> Ok, what should be the default for irq_high then if we do not have
+> platform data?
 
-at91_set_A_periph(AT91_PIN_PC4, 0);    /* LCDVSYNC */
+Off - the default value for platform data is all zeros.
 
-Perhaps this could be patched?  I do not know if a similar issue also 
-occurs in other device setup files.
+> > You're missing my point here.  The platform not only has to allocate the
+> > base number, it also has to do the allocation of the descriptors.  That
+> > seems less than ideal as it means that any platform using the driver
+> > has to replicate the code for allocating the IRQ range that was
+> > assigned.
 
-Nicholas
+> We can do the irq_alloc_descs unconditionally then. If irq_base is
+> not given, we are happy with any irq irq_alloc_descs returns. If
+> irq_base is given, we check the return value of irq_alloc_descs for
+> exactly irq_base.
+
+That's what I'm suggesting, but like I say I'm not convinced that's
+actually going to do the right thing currently on non-sparse systems or
+on systems that do actually have the IRQ range allocated for some other
+reason.
+
+> > We normally instantiate drivers following the control bus heirachy, not
+> > the interrupt controller heirachy...
+
+> I assumed that drivers using the irqs from the wm8350 are usually
+> children of the wm8350, like the watchdog, rtc, regulator drivers already are.
+> This may not be true for the gpio interrupts, but you can calculate the
+> irq from the gpio number.
+
+You can only do that if the device is using the GPIO as a GPIO as well
+as using it as an interrupt.  If the device is just using the GPIO on
+the PMIC as an interrupt then it doesn't help as the driver isn't using
+the GPIO API at all.
