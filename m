@@ -1,49 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2011 14:25:13 +0100
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <yw1x8vtxr43w.fsf@unicorn.mansr.com>
-References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
-	<yw1x8vtxr43w.fsf@unicorn.mansr.com>
-Message-ID: <20110523132513.GJ17672@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 May 2011 14:33:27 +0100
+Subject: [PATCH] ARM: fix missing 'cpu_relax()' declaration
+Message-ID: <1306157607-18406-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 01:30:43PM +0100, M?ns Rullg?rd wrote:
-> Catalin Marinas <catalin.marinas@arm.com> writes:
-> 
-> > Newer versions of gcc generate unaligned accesses by default, causing
-> > kernel panics when CONFIG_ALIGNMENT_TRAP is enabled. This patch adds the
-> > -mno-unaligned-access option to gcc.
-> 
-> Wouldn't it make more sense to disable strict alignment checking in
-> kernel mode regardless of this option.  I can't imagine why it would
-> ever be desirable.  IMO the usermode default should also be changed to
-> allow unaligned accesses on ARMv6 and up.
+ARM build fails with the following symptom:
 
-We do disable strict alignment checking but only at alignment fault
-handler init time:
+  CC      arch/arm/kernel/asm-offsets.s
+In file included from include/linux/seqlock.h:29,
+                 from include/linux/time.h:8,
+                 from include/linux/timex.h:56,
+                 from include/linux/sched.h:57,
+                 from arch/arm/kernel/asm-offsets.c:13:
+include/linux/spinlock.h: In function 'spin_unlock_wait':
+include/linux/spinlock.h:360: error: implicit declaration of function 'cpu_relax'
+make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
 
-        /*
-         * ARMv6 and later CPUs can perform unaligned accesses for
-         * most single load and store instructions up to word size.
-         * LDM, STM, LDRD and STRD still need to be handled.
-         *
-         * Ignoring the alignment fault is not an option on these
-         * CPUs since we spin re-faulting the instruction without
-         * making any progress.
-         */
-        if (cpu_architecture() >= CPU_ARCH_ARMv6 && (cr_alignment & CR_U)) {
-                cr_alignment &= ~CR_A;
-                cr_no_alignment &= ~CR_A;
-                set_cr(cr_alignment);
-                ai_usermode = UM_FIXUP;
-        }
+Fix it by including <asm/processor.h>.
 
-If we need that CR bit disabled earlier, then that's what we need to do,
-not bodge around it in silly ways which only _partially_ address the
-issue.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/spinlock.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-I also believe the commit message to be entirely misleading and wrong.
-Until we have the information on what this patch is _trying_ to address
-I don't think there's much more that can be said about it.
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index fdd3820..65fa3c8 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -5,6 +5,8 @@
+ #error SMP not supported on pre-ARMv6 CPUs
+ #endif
+ 
++#include <asm/processor.h>
++
+ /*
+  * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
+  * extensions, so when running on UP, we have to patch these instructions away.
+-- 
+1.7.0.4
