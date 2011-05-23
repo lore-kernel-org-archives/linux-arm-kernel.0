@@ -1,41 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 May 2011 17:13:48 +0200
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <20110522202129.GE18610@sortiz-mobl>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105112203.54838.arnd@arndb.de>
-	<20110522202129.GE18610@sortiz-mobl>
-Message-ID: <201105231713.49067.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 23 May 2011 08:20:03 -0700
+Subject: [PATCH] Fix generic irq chip
+In-Reply-To: <20110523150120.GA15153@n2100.arm.linux.org.uk> (Russell King's
+	message of "Mon, 23 May 2011 16:01:20 +0100")
+References: <20110520220510.GC30675@n2100.arm.linux.org.uk>
+	<87lixx34ue.fsf@ti.com>
+	<20110523150120.GA15153@n2100.arm.linux.org.uk>
+Message-ID: <877h9h30m4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Samuel,
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-On Sunday 22 May 2011, Samuel Ortiz wrote:
-> On Wed, May 11, 2011 at 10:03:54PM +0200, Arnd Bergmann wrote:
-> > On Wednesday 11 May 2011, Subhasish Ghosh wrote:
-> > We had a little discussion at the Linaro Developer Summit about your
-> > driver and mfd drivers in general. There was a general feeling among
-> > some people (including me) that by the point you dynamically create
-> > the subdevices, MFD is probably not the right abstraction any more,
-> > as it does not provide any service that you need.
-> I agree it's not what it's been designed for.
-> 
-> 
-> > Instead, maybe you can simply call platform_device_register
-> > at that stage to create the children and not use MFD at all.
-> The MFD APIs are slightly easier to use though, imho.
-> 
-> 
-> > Samuel, can you comment on this as well? Do you still see pruss
-> > as an MFD driver when the uses are completely dynamic and determined
-> > by the firmware loaded into it?
-> Even though that is definitely not a typical MFD use case, I wouldn't object
-> strongly against it. Right now mfd is probably the least worst choice for this
-> kind of drivers, which still doesn't make it an ideal situation.
+> On Mon, May 23, 2011 at 06:48:41AM -0700, Kevin Hilman wrote:
+>> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+>> 
+>> > As a result of c42321c (genirq: Make generic irq chip depend on
+>> > CONFIG_GENERIC_IRQ_CHIP), we now need those platforms using this in
+>> > my tree to select this symbol.
+>> >
+>> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+>> > --
+>> > Please send acks ASAP.  Thanks to Mark for pointing this out with a patch
+>> > for Samsung.
+>> 
+>> Acked-by: Kevin Hilman <khilman@ti.com>
+>
+> Thanks, but does that cover Davinci or OMAP?
 
-Thanks for your input! When you say that MFD APIs are easier to use than
-platform_device APIs, is that something we should fix with platform devices
-to make them easier to use?
+Both, but since Sekhar (DaVinci co-maintainer) ack'd already for
+davinci, I was mainly adding my ack for OMAP.
 
-	Arnd
+Kevin
