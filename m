@@ -1,54 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 May 2011 18:39:56 +0200
-Subject: Updated mach-types update
-In-Reply-To: <20110523153326.GB15153@n2100.arm.linux.org.uk>
-References: <201105231652.28497.arnd@arndb.de>
-	<20110523151051.GB6489@sirena.org.uk>
-	<20110523153326.GB15153@n2100.arm.linux.org.uk>
-Message-ID: <201105231839.57083.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 May 2011 17:41:23 +0100
+Subject: [PATCH] ARM: fix missing 'cpu_relax()' declaration
+In-Reply-To: <1306168473.27474.88.camel@e102391-lin.cambridge.arm.com>
+References: <1306157607-18406-1-git-send-email-marc.zyngier@arm.com>
+	<20110523160944.GA15138@n2100.arm.linux.org.uk>
+	<20110523162339.GC15138@n2100.arm.linux.org.uk>
+	<1306168473.27474.88.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <20110523164123.GD15138@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 23 May 2011, Russell King - ARM Linux wrote:
-> Let me turn this around.  Given that Linus has complained about the 60k LOC
-> growth of ARM at every merge window, and at this window we've been able to
-> achieve a net reduction of 15k LOC, what do you think the chances of adding
-> another 60k LOC at the next merge window are?
+On Mon, May 23, 2011 at 05:34:33PM +0100, Marc Zyngier wrote:
+> On Mon, 2011-05-23 at 17:23 +0100, Russell King - ARM Linux wrote:
+> > Hmm, this doesn't fix the problem:
+> > 
+> >   CC      arch/arm/kernel/asm-offsets.s
+> > In file included from include/linux/seqlock.h:29,
+> >                  from include/linux/time.h:8,
+> >                  from include/linux/timex.h:56,
+> >                  from include/linux/sched.h:57,
+> >                  from arch/arm/kernel/asm-offsets.c:13:
+> > include/linux/spinlock.h: In function ?spin_unlock_wait?:
+> > include/linux/spinlock.h:360: error: implicit declaration of function ?cpu_relax?
+> > 
+> > My guess is that it does for you because you're building SMP, but the above
+> > also happens with UP.  So, I don't think this is the right fix.
+> > 
+> > I think its time to use git bisect to try and find what broke this and why.
 > 
-> Don't get me wrong - 15k LOC removal is a good start, but it's just that,
-> a start.  It's well below what I was hoping for.
+> Odd... It seems to build just fine here with UP:
+> 
+> $ grep SMP .config
+> CONFIG_BROKEN_ON_SMP=y
+> # CONFIG_SMP is not set
+> $ time make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- -j4 all
+>   CHK     include/linux/version.h
+>   HOSTCC  scripts/basic/fixdep
+>   HOSTCC  scripts/basic/docproc
+>   HOSTCC  scripts/kallsyms
+>   HOSTCC  scripts/conmakehash
+>   CC      scripts/mod/empty.o
+>   HOSTCC  scripts/mod/mk_elfconfig
+>   MKELF   scripts/mod/elfconfig.h
+>   HOSTCC  scripts/mod/file2alias.o
+>   HOSTCC  scripts/mod/modpost.o
+>   HOSTCC  scripts/mod/sumversion.o
+>   HOSTLD  scripts/mod/modpost
+>   CHK     include/generated/utsrelease.h
+> make[1]: `include/generated/mach-types.h' is up to date.
+>   CC      kernel/bounds.s
+>   GEN     include/generated/bounds.h
+>   CC      arch/arm/kernel/asm-offsets.s
+>   GEN     include/generated/asm-offsets.h
+>   CALL    scripts/checksyscalls.sh
+> <stdin>:1554: warning: #warning syscall sendmmsg not implemented
+>   CC      init/main.o
+>   CHK     include/generated/compile.h
+>   HOSTCC  usr/gen_init_cpio
+> [...]
 
-Agreed. The 15k LOC were also partially just the low-hanging fruit, so
-we won't be able to do much larger reductions without doing more
-groundwork first, like the stuff that is going in now (clkdev, irq,
-clksource, device tree, ...).
-
-We need to do more of those before we see significant reductions from
-being able to remove a lot of the existing board files. At the same
-time, a number of people obviously have new boards that they want to
-see supported. The tactical answer that I'd give to them is that they
-can still add board files, provided that they also help do the work
-that is required to remove them later (depends the specific capabilities
-of the people and the complexity of the code they want to add).
-
-Only after we have dealt with board-level code and moved that over
-to device tree probing within a given subarchitecture, we can really
-start addressing the issue across SoCs inside of the same subarchitecture.
-Similarly, I would not try to keep out new SoCs from getting merged
-until then (as long as they don't try to add code that is worse than
-the existing SoCs) but instead ask the people that are interested
-in merging them to help the consolidation on that level. The reason
-for doing cross-soc stuff after cross-board stuff is that it's
-more work to do that in the device tree and that there is less
-to gain.
-
-Another area where I think we will see initial growth is the
-device tree source files -- as we discussed, we want to put them
-into the kernel at first, until the dust has settled down a bit and
-they stop changing. At that point, we will start a new source code
-repo that is OS independent and just contains all the device trees
-so we can delete them again. My hope is that we get Linus to agree
-to this because it's a useful step in the right direction and only
-adds code that we are planning to remove later.
-
-	Arnd
+For what platform?  I've tried a few and getting the same error message.
