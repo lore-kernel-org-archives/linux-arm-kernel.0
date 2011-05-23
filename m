@@ -1,22 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 May 2011 11:56:33 +0100
-Subject: [PATCH 17/19] clockevents: ARM sp804: obtain sp804 timer rate
-	via clks
-In-Reply-To: <E1QM1dU-0003EL-9p@rmk-PC.arm.linux.org.uk>
-References: <20110516172334.GD13659@n2100.arm.linux.org.uk>
-	<E1QM1dU-0003EL-9p@rmk-PC.arm.linux.org.uk>
-Message-ID: <1306148193.7196.4.camel@e102109-lin.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 23 May 2011 12:16:31 +0100
+Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <20110523101220.GH17672@n2100.arm.linux.org.uk>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
+	<20110520113758.GA3141@arm.com>
+	<20110520180510.GE7445@n2100.arm.linux.org.uk>
+	<20110523100132.GC2370@arm.com>
+	<20110523101220.GH17672@n2100.arm.linux.org.uk>
+Message-ID: <20110523111631.GD3769@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-16 at 18:31 +0100, Russell King - ARM Linux wrote:
-> This allows platforms to specify the rate of the SP804 clockevent via
-> the clk subsystem.  While ARM boards clock these at 1MHz, BCMRing also
-> has SP804 timers but are clocked at different rates.
+On Mon, May 23, 2011 at 11:12:20AM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 23, 2011 at 11:01:32AM +0100, Dave Martin wrote:
+> > On Fri, May 20, 2011 at 07:05:10PM +0100, Russell King - ARM Linux wrote:
+> > > Out of the list you mention above, the only thing which isn't saved are the
+> > > FIQ registers, and that's a problem for S2RAM too, and should be done by
+> > > arch/arm/kernel/fiq.c hooking into the suspend paths.
+> > 
+> > The alternative view is that the driver using FIQ owns the state in the FIQ
+> > mode registers and is therefore responsible for saving and restoring it
+> > across suspend/resume.  If so, then any additional globally implemented
+> > state save/restore of the FIQ mode state is unnecessary.
 > 
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> This seems to be most sensible - if the FIQ is being used as a software-DMA,
+> then the hardware side of that needs to be cleanly shutdown (eg, waiting for
+> the DMA to complete before proceeding) to ensure no loss of data.  That
+> can't happen from within the FIQ code.
 
-After you fixed Rob's comments:
+OK.  Frank suggested putting comments to this effect in <asm/fiq.h>.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+I think something along these lines might be appropriate:
+
+/*
+ * The FIQ mode registers are not magically preserved across suspend/resume.
+ *
+ * Drivers which require these registers to be preserved across power
+ * management operations must implement appropriate suspend/resume handlers
+ * to save and restore them.
+ */
+
+Is the header file a good place for this, or is there some other better
+place to put it?
+
+> I also wonder about issues of secure/non-secure stuff here too - what
+> that means is that if we have a driver using FIQ mode, then we have
+> FIQ state to save, but if not there's probably no point (or even any
+> way) to save that state ourselves anyway.
+
+That argument may apply to a ton of state in the Secure World, not just
+the FIQ registers
+
+The likely model there is that the Secure World must hook somewhere into
+Linux suspend/resume too, so that its hooks can be called at the
+appropriate times.  This could involve a driver which saves/restores the
+state of the Secure World, or low-level hooks which get called from
+the platform power management code.
+
+Either way, Linux doesn't need to be doing anything special except for
+calling those hooks, just as for any other driver.
+
+Cheers
+---Dave
