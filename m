@@ -1,40 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2011 10:58:29 +0100
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <4DDA2AC0.1060406@gaisler.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
-	<20110519233958.GB18181@ponder.secretlab.ca>
-	<4DD66B8A.5040404@gmail.com> <201105201621.03801.arnd@arndb.de>
-	<4DD68614.6090209@gmail.com>
-	<a42f0c27-2811-4b68-bedf-7dfaa7bff6ff@VA3EHSMHS025.ehs.local>
-	<BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
-	<4DDA2AC0.1060406@gaisler.com>
-Message-ID: <20110523095829.GG17672@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 23 May 2011 11:01:32 +0100
+Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <20110520180510.GE7445@n2100.arm.linux.org.uk>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
+	<20110520113758.GA3141@arm.com>
+	<20110520180510.GE7445@n2100.arm.linux.org.uk>
+Message-ID: <20110523100132.GC2370@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 11:37:04AM +0200, Kristoffer Glembo wrote:
-> Grant Likely wrote:
-> > In the case we're talking about the bus really is an AMBA bus, and all
-> > the devices on it are in some sense real amba devices.  The problem is
-> > that not all of the devices on the bus implement peripheral ID
-> > registers or other mechanisms that good upstanding AMBA devices are
-> > expected to have.  
+On Fri, May 20, 2011 at 07:05:10PM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 20, 2011 at 12:37:58PM +0100, Dave Martin wrote:
+> > Where do we save/restore r8_FIQ..r13_FIQ, r13_IRQ, r13_UND and r13_ABT?
+> > (I'm assuming there's no reason to save/restore r14 or SPSR for any
+> > exception mode, since we presumably aren't going to suspend/resume
+> > from inside an exception handler (?))
 > 
-> Before we go hardware bashing of non primecell AMBA devices I would just
-> want to point out that the primecell stuff is not part of the AMBA
-> specification.
+> There is absolutely no need to save r13 for _any_ of the abort modes.  As
+> we have to set them up at boot time to fixed values, we keep that code
+> around, and in the resume paths we re-execute that initialization code.
+> cpu_init().
 
-And before we go down that route, let me point out that the 'amba bus'
-stuff in the kernel is there to support primecells, rather than all
-devices which the AMBA specification covers.
+That seemed a sensible possibility, but I'm still not familiar with some
+of the details.  It was, as I suspected, a dumb question from me...
 
-The reason it's called 'amba' is because back in 2001 or so when the
-first primecell drivers were created, there was little information
-available as to what AMBA, AHB, or APB even covered.  All I had to go
-on were the primecell documents themselves.  The higher level documents
-were not available to me.
+> Out of the list you mention above, the only thing which isn't saved are the
+> FIQ registers, and that's a problem for S2RAM too, and should be done by
+> arch/arm/kernel/fiq.c hooking into the suspend paths.
 
-So, despite it being called 'amba', it really is just for primecells
-and if we didn't have the exposure to userspace, I'd have renamed it to
-'apb' or similar instead.
+The alternative view is that the driver using FIQ owns the state in the FIQ
+mode registers and is therefore responsible for saving and restoring it
+across suspend/resume.  If so, then any additional globally implemented
+state save/restore of the FIQ mode state is unnecessary.
+
+Do you have an opinion on which is the better model?
+
+Requiring the driver to take responsibility might encourage the driver
+writers to think about all the implications of save/restore on their
+driver: saving/restoring the FIQ mode registers is unlikely to be enough
+by itself.  Depending on the state of the driver, it might also be
+unnecessary (though it's only a few words of state, so not necessarily
+worth optimising).
+
+Cheers
+---Dave
