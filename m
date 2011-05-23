@@ -1,51 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 23 May 2011 16:52:28 +0200
-Subject: Updated mach-types update
-In-Reply-To: <20110522091136.GC17672@n2100.arm.linux.org.uk>
-References: <20110320110322.GC16646@n2100.arm.linux.org.uk>
-	<BANLkTi=buKPmceOhF=SU6kkYRPxsJMn6hA@mail.gmail.com>
-	<20110522091136.GC17672@n2100.arm.linux.org.uk>
-Message-ID: <201105231652.28497.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 23 May 2011 15:52:51 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <yw1xzkmdpjnm.fsf@unicorn.mansr.com>
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>
+	<1306158690.7196.15.camel@e102109-lin.cambridge.arm.com>
+	<yw1xzkmdpjnm.fsf@unicorn.mansr.com>
+Message-ID: <20110523145251.GB14131@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 22 May 2011, Russell King - ARM Linux wrote:
-> On Sat, May 21, 2011 at 09:35:29AM +0800, Jaya Kumar wrote:
-> > On Sun, Mar 20, 2011 at 7:03 PM, Russell King - ARM Linux
-> > <linux@arm.linux.org.uk> wrote:
-> > >
-> > > What this means is that any platform in the machine database which has not
-> > > been submitted to mainline for 12 months since it was registered will be
-> > > automatically dropped from the file, and the platform maintainer will need
-> > > to either talk to me to get it reinstated before submission, or update the
-> > > entry in some way to 'freshen' it.
-> >
-> > Apologies, I just realized this patch removed an entry for a board I
-> > am working with. Could you reinstate the following entry:
-> > 
-> > 2363          WAYLAND         wayland         Ofer Zaarur
-> > 
-> > I plan to submit support for this board as soon as I can.
+On Mon, May 23, 2011 at 03:37:49PM +0100, M?ns Rullg?rd wrote:
+> Catalin Marinas <catalin.marinas@arm.com> writes:
 > 
-> I'm not sure how that squares with Linus' complaint during the last merge
-> window - I'm currently nervous about sending Linus updates to mach-types
-> as it is.  Maybe our new sub-architecture people can comment on their
-> perception of the situation with new board support.
+> > On Mon, 2011-05-23 at 14:21 +0100, Russell King - ARM Linux wrote:
+> >> On Mon, May 23, 2011 at 12:16:48PM +0100, Catalin Marinas wrote:
+> >> > Newer versions of gcc generate unaligned accesses by default, causing
+> >> > kernel panics when CONFIG_ALIGNMENT_TRAP is enabled. This patch adds the
+> >> > -mno-unaligned-access option to gcc.
+> >> 
+> >> This description doesn't make sense.  If we have alignment traps enabled,
+> >> then we _expect_ to fix up unaligned loads and stores.
+> >> 
+> >> Therefore there should be no panic if CONFIG_ALIGNMENT_TRAP is enabled.
+> >> 
+> >> So what's the _actual_ problem that this is trying to address?  What's
+> >> the panic/oops look like?  And that information should be in the commit
+> >> description _anyway_.
+> >
+> > OK, not clear from my commit log. See below for details (I'll add them
+> > to the log):
+> >
+> > http://www.codesourcery.com/archives/arm-gnu/msg04202.html
+> >
+> > Basically the fault happens before we call alignment_init(). There are
+> > other ways to fix this issue (like initialising the alignment handler
+> > earlier).
+> 
+> The reset value of SCTLR.A is 0 on ARMv7.  Something must be setting it
+> to 1 early, before the alignment trap handler is initialised.  This
+> something is what needs to be changed.
 
-We discussed this in Budapest and basically agreed that we wouldn't stop
-new board numbers and board files from being added until there is
-enough infrastructure present to add new boards with the device tree
-only. I would certainly not stop anyone from adding new boards in the
-current merge window, or probably the next one.
+Yes it is, and it is being set by the common CPU-independent initialization
+code.  For ARMv6 and above, it is then cleared when the trap handler is
+in place.  That is so we don't miss any misaligned traps which may cause
+silent errors if the A bit isn't set for ARMv5 and below.
 
-However, for each subarchitecture that has gains support for device
-tree probing, I would no longer add any new boards, and also not add
-new subarchitectures that require board files.
-
-Since we are not planning to enforce removal of board files any time
-soon, I think we should also keep maintaining the mach-types for
-now, including updates. If you are worried about Linus complaining
-about it, I guess we can add arch/arm/tools/ to the files that we
-maintain along with mach-* and plat-*.
-
-	Arnd
+The resolutions to this is to either introduce yet more crappy ifdefs into
+head.S or move crappy the A-bit ifdefs into every proc-*.S file for CPUs
+pre-dating ARMv6 - of which there is a _lot_ of them.  Neither of these
+options looks anywhere near appealing.
