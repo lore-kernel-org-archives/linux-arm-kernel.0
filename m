@@ -1,83 +1,68 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 May 2011 17:34:33 +0100
-Subject: [PATCH] ARM: fix missing 'cpu_relax()' declaration
-In-Reply-To: <20110523162339.GC15138@n2100.arm.linux.org.uk>
-References: <1306157607-18406-1-git-send-email-marc.zyngier@arm.com>
-	<20110523160944.GA15138@n2100.arm.linux.org.uk>
-	<20110523162339.GC15138@n2100.arm.linux.org.uk>
-Message-ID: <1306168473.27474.88.camel@e102391-lin.cambridge.arm.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 23 May 2011 17:38:07 +0100
+Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <20110523161149.GB15138@n2100.arm.linux.org.uk>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
+	<20110520113758.GA3141@arm.com>
+	<20110520180510.GE7445@n2100.arm.linux.org.uk>
+	<20110523100132.GC2370@arm.com>
+	<20110523101220.GH17672@n2100.arm.linux.org.uk>
+	<20110523111631.GD3769@arm.com>
+	<20110523161149.GB15138@n2100.arm.linux.org.uk>
+Message-ID: <20110523163758.GA2442@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-23 at 17:23 +0100, Russell King - ARM Linux wrote:
-> On Mon, May 23, 2011 at 05:09:44PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, May 23, 2011 at 02:33:27PM +0100, Marc Zyngier wrote:
-> > > ARM build fails with the following symptom:
+On Mon, May 23, 2011 at 05:11:49PM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 23, 2011 at 12:16:31PM +0100, Dave Martin wrote:
+> > On Mon, May 23, 2011 at 11:12:20AM +0100, Russell King - ARM Linux wrote:
+> > > On Mon, May 23, 2011 at 11:01:32AM +0100, Dave Martin wrote:
+> > > > On Fri, May 20, 2011 at 07:05:10PM +0100, Russell King - ARM Linux wrote:
+> > > > > Out of the list you mention above, the only thing which isn't saved are the
+> > > > > FIQ registers, and that's a problem for S2RAM too, and should be done by
+> > > > > arch/arm/kernel/fiq.c hooking into the suspend paths.
+> > > > 
+> > > > The alternative view is that the driver using FIQ owns the state in the FIQ
+> > > > mode registers and is therefore responsible for saving and restoring it
+> > > > across suspend/resume.  If so, then any additional globally implemented
+> > > > state save/restore of the FIQ mode state is unnecessary.
 > > > 
-> > >   CC      arch/arm/kernel/asm-offsets.s
-> > > In file included from include/linux/seqlock.h:29,
-> > >                  from include/linux/time.h:8,
-> > >                  from include/linux/timex.h:56,
-> > >                  from include/linux/sched.h:57,
-> > >                  from arch/arm/kernel/asm-offsets.c:13:
-> > > include/linux/spinlock.h: In function 'spin_unlock_wait':
-> > > include/linux/spinlock.h:360: error: implicit declaration of function 'cpu_relax'
-> > > make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
-> > > 
-> > > Fix it by including <asm/processor.h>.
-> > > 
-> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > This seems to be most sensible - if the FIQ is being used as a software-DMA,
+> > > then the hardware side of that needs to be cleanly shutdown (eg, waiting for
+> > > the DMA to complete before proceeding) to ensure no loss of data.  That
+> > > can't happen from within the FIQ code.
 > > 
-> > Wonder why we haven't see this before.  Could you send this to the patch
-> > system please?
+> > OK.  Frank suggested putting comments to this effect in <asm/fiq.h>.
+> > 
+> > I think something along these lines might be appropriate:
+> > 
+> > /*
+> >  * The FIQ mode registers are not magically preserved across suspend/resume.
+> >  *
+> >  * Drivers which require these registers to be preserved across power
+> >  * management operations must implement appropriate suspend/resume handlers
+> >  * to save and restore them.
+> >  */
+> > 
+> > Is the header file a good place for this, or is there some other better
+> > place to put it?
 > 
-> Hmm, this doesn't fix the problem:
-> 
->   CC      arch/arm/kernel/asm-offsets.s
-> In file included from include/linux/seqlock.h:29,
->                  from include/linux/time.h:8,
->                  from include/linux/timex.h:56,
->                  from include/linux/sched.h:57,
->                  from arch/arm/kernel/asm-offsets.c:13:
-> include/linux/spinlock.h: In function ?spin_unlock_wait?:
-> include/linux/spinlock.h:360: error: implicit declaration of function ?cpu_relax?
-> 
-> My guess is that it does for you because you're building SMP, but the above
-> also happens with UP.  So, I don't think this is the right fix.
-> 
-> I think its time to use git bisect to try and find what broke this and why.
+> I tend to suggest that the header file is the right place, because that's
+> where the interface is defined.  Other people argue that its more likely
+> to be seen in the implementation (fiq.c).  So I'm tempted to say both,
+> but lets go with fiq.h for the time being.
 
-Odd... It seems to build just fine here with UP:
+OK -- the {get,set}_fiq_regs patch is currently in your patch system.
 
-$ grep SMP .config
-CONFIG_BROKEN_ON_SMP=y
-# CONFIG_SMP is not set
-$ time make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- -j4 all
-  CHK     include/linux/version.h
-  HOSTCC  scripts/basic/fixdep
-  HOSTCC  scripts/basic/docproc
-  HOSTCC  scripts/kallsyms
-  HOSTCC  scripts/conmakehash
-  CC      scripts/mod/empty.o
-  HOSTCC  scripts/mod/mk_elfconfig
-  MKELF   scripts/mod/elfconfig.h
-  HOSTCC  scripts/mod/file2alias.o
-  HOSTCC  scripts/mod/modpost.o
-  HOSTCC  scripts/mod/sumversion.o
-  HOSTLD  scripts/mod/modpost
-  CHK     include/generated/utsrelease.h
-make[1]: `include/generated/mach-types.h' is up to date.
-  CC      kernel/bounds.s
-  GEN     include/generated/bounds.h
-  CC      arch/arm/kernel/asm-offsets.s
-  GEN     include/generated/asm-offsets.h
-  CALL    scripts/checksyscalls.sh
-<stdin>:1554: warning: #warning syscall sendmmsg not implemented
-  CC      init/main.o
-  CHK     include/generated/compile.h
-  HOSTCC  usr/gen_init_cpio
-[...]
+If you have no objection, I'll submit a patch adding the above text to apply
+on top of the other patch (or, if possible, orthogonally).
 
-	M.
--- 
-Reality is an implementation detail.
+---Dave
+
+> 
+> > That argument may apply to a ton of state in the Secure World, not just
+> > the FIQ registers
+> 
+> It very much does, and I know OMAP has some kind of SMC call to handle
+> this.
