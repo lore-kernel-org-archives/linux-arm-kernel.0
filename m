@@ -1,47 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 23 May 2011 18:22:34 +0100
-Subject: [PATCH v5 00/19] ARM: Add support for the Large Physical
-	Address Extensions
-In-Reply-To: <20110523165412.GF15138@n2100.arm.linux.org.uk>
-References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
-	<20110523165412.GF15138@n2100.arm.linux.org.uk>
-Message-ID: <1306171354.7196.30.camel@e102109-lin.cambridge.arm.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 23 May 2011 12:34:28 -0500
+Subject: [PATCH 0/5] ep93xx DMA patches
+In-Reply-To: <cover.1306082097.git.mika.westerberg@iki.fi>
+References: <cover.1306082097.git.mika.westerberg@iki.fi>
+Message-ID: <0D753D10438DA54287A00B027084269764D315F675@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2011-05-23 at 17:54 +0100, Russell King - ARM Linux wrote:
-> On Sun, May 08, 2011 at 01:51:19PM +0100, Catalin Marinas wrote:
-> > This set of patches adds support for the Large Physical Extensions on
-> > the ARM architecture (available with the Cortex-A15 processor). LPAE
-> > comes with a 3-level page table format (compared to 2-level for the
-> > classic one), allowing up to 40-bit physical address space.
-> >
-> > The ARM LPAE documentation is available from (free registration needed):
-> >
-> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
-> >
-> > The full set of patches on top of linux-next (LPAE, support for an
-> > emulated Versatile Express with Cortex-A15 tile and generic timers) is
-> > available on this branch:
-> >
-> > git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae-next
-> 
-> FYI, I'm going to drop the pgt patch because the warnings are still there
-> and I _still_ don't feel happy about pushing that into mainline and then
-> being endlessly bugged about it.
+On Sunday, May 22, 2011 10:03 AM, Mika Westerberg wrote:
+>
+> Hello all,
+>
+> Motivation of this series was to add DMA support for the ep93xx SPI driver.
+> However, current platform DMA code didn't support the M2M channels which were
+> required for SPI (and IDE) peripherals.
+>
+> Ryan Mallon suggested that maybe we should integrate both M2M and M2P code
+> under the dmaengine API. The purpose of this series is to do just that and
+> convert all the existing users to use that new API.
+>
+> Patches 1-4 add dmaengine driver and convert the existing users to dmaengine
+> API. The last patch adds DMA support for the SPI driver.
+>
+> I've been testing these on TS-7260 (ep9302) connected to SPI EEPROM, and
+> Sim.One (ep9307) with mmc_spi and AC'97 audio.
+>
+> memcpy() testing has been done by running drivers/dma/dmatest.ko.
+>
+> Regards,
+> MW
+>
+> Mika Westerberg (5):
+>   dmaengine: add ep93xx DMA support
+>   ep93xx: add dmaengine platform code
+>   ASoC: ep93xx: convert to use the DMA engine API
+>   ep93xx: remove the old M2P DMA code
+>   spi/ep93xx: add DMA support
+>
+>  Documentation/spi/ep93xx_spi                   |   10 +
+>  arch/arm/mach-ep93xx/Makefile                  |    2 +-
+>  arch/arm/mach-ep93xx/core.c                    |    6 +-
+>  arch/arm/mach-ep93xx/dma-m2p.c                 |  411 -------
+>  arch/arm/mach-ep93xx/dma.c                     |  108 ++
+>  arch/arm/mach-ep93xx/include/mach/dma.h        |  190 ++---
+>  arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h |    2 +
+>  drivers/dma/Kconfig                            |    7 +
+>  drivers/dma/Makefile                           |    1 +
+>  drivers/dma/ep93xx_dma.c                       | 1356 ++++++++++++++++++++++++
+>  drivers/spi/ep93xx_spi.c                       |  303 +++++-
+>  sound/soc/ep93xx/ep93xx-ac97.c                 |    4 +-
+>  sound/soc/ep93xx/ep93xx-i2s.c                  |    4 +-
+>  sound/soc/ep93xx/ep93xx-pcm.c                  |  137 ++--
+>  14 files changed, 1929 insertions(+), 612 deletions(-)
+>  delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
+>  create mode 100644 arch/arm/mach-ep93xx/dma.c
+>  create mode 100644 drivers/dma/ep93xx_dma.c
 
-I haven't seen the warnings but probably because I applied the LPAE
-patches on top. I'll have a look as well.
+Mika,
 
-> So I'll drop it from my tree again and re-merge that branch after this
-> window has closed.
+Thanks for posting this.  I'll try to do some testing and feedback later this
+week.
 
-OK. In the meantime I'll cherry-pick it into my LPAE branch based on
-mainline. As we discussed, after -rc1 I plan to push the LPAE patches to
--next. Your patch would come from two different sources but I'm not sure
-whether git can cope with it (given that I rename files like pgtable.h).
-The alternative would be to base my patches on your branch as long as
-you don't rebase it.
+One positive, it looks like this will result in a small reduction in the LOC
+for arch/arm/mach-ep93xx.  That might help in getting this merged.  ;-)
 
--- 
-Catalin
+Regards,
+Hartley
