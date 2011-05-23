@@ -1,143 +1,54 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Mon, 23 May 2011 10:48:36 +0200 (CEST)
-Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
-In-Reply-To: <BANLkTinjNUVH4pvxsKos=wTd0fCB-2zz2A@mail.gmail.com>
+From: koen@beagleboard.org (Koen Kooi)
+Date: Mon, 23 May 2011 10:55:53 +0200
+Subject: [beagleboard] [PATCH v2 2/2] OMAP3BEAGLE: Add support for mt9p031
+	sensor driver.
+In-Reply-To: <201105231000.32194.laurent.pinchart@ideasonboard.com>
 References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
-	<Pine.LNX.4.64.1105211334260.25424@axis700.grange>
-	<BANLkTinjNUVH4pvxsKos=wTd0fCB-2zz2A@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1105231027150.30305@axis700.grange>
+	<DDCBBAA2-C49C-4952-9D1B-519D8A3AB41E@beagleboard.org>
+	<BANLkTi=ZHyk1+otf2i0qp47Zvvo4nfYk6A@mail.gmail.com>
+	<201105231000.32194.laurent.pinchart@ideasonboard.com>
+Message-ID: <5C643F76-F34A-4921-A406-B5123CC391A3@beagleboard.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 May 2011, javier Martin wrote:
 
-> On 21 May 2011 17:29, Guennadi Liakhovetski <g.liakhovetski@gmx.de> wrote:
-> > On Fri, 20 May 2011, Javier Martin wrote:
-> >
-> >> This driver adds basic support for Aptina mt9p031 sensor.
-> >>
-> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> >> ---
-> >> ?drivers/media/video/Kconfig ? | ? ?8 +
-> >> ?drivers/media/video/Makefile ?| ? ?1 +
-> >> ?drivers/media/video/mt9p031.c | ?751 +++++++++++++++++++++++++++++++++++++++++
-> >> ?include/media/mt9p031.h ? ? ? | ? 11 +
-> >> ?4 files changed, 771 insertions(+), 0 deletions(-)
-> >> ?create mode 100644 drivers/media/video/mt9p031.c
-> >> ?create mode 100644 include/media/mt9p031.h
-> >>
-> >> diff --git a/drivers/media/video/mt9p031.c b/drivers/media/video/mt9p031.c
-> >> new file mode 100644
-> >> index 0000000..e406b64
-> >> --- /dev/null
-> >> +++ b/drivers/media/video/mt9p031.c
-> >> @@ -0,0 +1,751 @@
-> >> +/*
-> >> + * Driver for MT9P031 CMOS Image Sensor from Aptina
-> >> + *
-> >> + * Copyright (C) 2011, Javier Martin <javier.martin@vista-silicon.com>
-> >> + *
-> >> + * Copyright (C) 2011, Guennadi Liakhovetski <g.liakhovetski@gmx.de>
-> >> + *
-> >> + * Based on the MT9V032 driver and Bastian Hecht's code.
-> >> + *
-> >> + * This program is free software; you can redistribute it and/or modify
-> >> + * it under the terms of the GNU General Public License version 2 as
-> >> + * published by the Free Software Foundation.
-> >> + */
-> >> +
-> >> +#include <linux/delay.h>
-> >> +#include <linux/device.h>
-> >> +#include <linux/i2c.h>
-> >> +#include <linux/log2.h>
-> >> +#include <linux/pm.h>
-> >> +#include <linux/regulator/consumer.h>
-> >> +#include <linux/slab.h>
-> >> +#include <media/v4l2-subdev.h>
-> >> +#include <linux/videodev2.h>
-> >> +
-> >> +#include <media/mt9p031.h>
-> >> +#include <media/v4l2-chip-ident.h>
-> >> +#include <media/v4l2-subdev.h>
-> >> +#include <media/v4l2-device.h>
-> >> +
-> >> +/* mt9p031 selected register addresses */
-> >> +#define MT9P031_CHIP_VERSION ? ? ? ? ? ? ? ? 0x00
-> >> +#define ? ? ? ? ? ? ?MT9P031_CHIP_VERSION_VALUE ? ? ?0x1801
-> >> +#define MT9P031_ROW_START ? ? ? ? ? ? ? ? ? ?0x01
-> >
-> > Don't mix spaces and TABs between "#define" and the macro - just use one
-> > space everywhere.
-> >
+Op 23 mei 2011, om 10:00 heeft Laurent Pinchart het volgende geschreven:
+
+> Hi Javier,
 > 
-> I've done this in order to follow Laurent's directions. He does the
-> same in mt9v032 driver.
-> So, unless Laurent and you agree I think I won't change it.
-
-Ah, so, you use a space for registers and TABs for their values, ok then.
-
-> >> +struct mt9p031 {
-> >> + ? ? struct v4l2_subdev subdev;
-> >> + ? ? struct media_pad pad;
-> >> + ? ? struct v4l2_rect rect; ?/* Sensor window */
-> >> + ? ? struct v4l2_mbus_framefmt format;
-> >> + ? ? struct mt9p031_platform_data *pdata;
-> >> + ? ? struct mutex power_lock;
-> >
-> > Don't locks _always_ have to be documented? And this one: you only protect
-> > set_power() with it, Laurent, is this correct?
-> >
+> On Monday 23 May 2011 09:01:07 javier Martin wrote:
+>> On 20 May 2011 17:57, Koen Kooi <koen@beagleboard.org> wrote:
+>>> In previous patch sets we put that in a seperate file
+>>> (omap3beagle-camera.c) so we don't clutter up the board file with all
+>>> the different sensor drivers. Would it make sense to do the same with
+>>> the current patches? It looks like MCF cuts down a lot on the
+>>> boilerplace needed already.
+>> 
+>> I sent my first patch using that approach but I was told to move it to
+>> the board code.
+>> Please, don't make undo the changes. Or at least, let's discuss this
+>> seriously so that we all agree on what is the best way of doing it and
+>> I don't have to change it every time.
 > 
-> Just following the model Laurent applies in mt9v032. Let's see what he
-> has to say about this.
+> What we really need here is a modular way to support sensors on pluggable 
+> expansion boards. Not all Beagleboard users will have an MT9P031 connected to 
+> the OMAP3 ISP, so that must not be hardcoded in board code. As the sensor 
+> boards are not runtime detectable
 
-Try running scripts/checkpatch.pl on your patch. I think, it will complain 
-about this. And in general it's a good idea to run it before submission;)
+Well, they are runtime detectable, you just need to read the ID register on the sensor and they all share the same I2C address. Once you have the sensor ID you can (re)setup the I2C. But doing that in linux seems to be impossible with the current I2C infrastructure.
 
-> >> +static int mt9p031_reset(struct i2c_client *client)
-> >> +{
-> >> + ? ? struct mt9p031 *mt9p031 = to_mt9p031(client);
-> >> + ? ? int ret;
-> >> +
-> >> + ? ? /* Disable chip output, synchronous option update */
-> >> + ? ? ret = reg_write(client, MT9P031_RST, MT9P031_RST_ENABLE);
-> >> + ? ? if (ret < 0)
-> >> + ? ? ? ? ? ? return -EIO;
-> >> + ? ? ret = reg_write(client, MT9P031_RST, MT9P031_RST_DISABLE);
-> >> + ? ? if (ret < 0)
-> >> + ? ? ? ? ? ? return -EIO;
-> >> + ? ? ret = mt9p031_set_output_control(mt9p031, MT9P031_OUTPUT_CONTROL_CEN, 0);
-> >> + ? ? if (ret < 0)
-> >> + ? ? ? ? ? ? return -EIO;
-> >> + ? ? return 0;
-> >
-> >
-> > I think, a sequence like
-> >
-> > ? ? ? ?ret = fn();
-> > ? ? ? ?if (!ret)
-> > ? ? ? ? ? ? ? ?ret = fn();
-> > ? ? ? ?if (!ret)
-> > ? ? ? ? ? ? ? ?ret = fn();
-> > ? ? ? ?return ret;
-> >
-> > is a better way to achieve the same.
-> >
-> 
-> Sorry, but I have to disagree. I understand what you want to achieve
-> but this seems quite tricky to me.
-> I explicitly changed parts of the code that were written using that
-> style because I think It was better understandable.
+What we (beagleboard.org) are doing now:
 
-Well, that was my opinion. Since Laurent will be taking this patch via his 
-tree, his decision will be final, of course. But I think, he'll agree, 
-that at least you have to be consistent across the driver. And at least 
-you'd want to propagate your error code up to the caller instead of 
-replacing it with "-EIO."
+1) set a bootarg in uboot e.g. camera=llbcm5mp
+2) read bootarg in linux boardfile and setup i2c
 
-Thanks
-Guennadi
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+What we are going to do medium term:
+
+1) read ID in uboot, set bootarg
+2) read bootarg in linux boardfile
+
+Long term 1) will probably do some devicetree magic. The goal is to plug in a sensor and boot, no manual modprobing, it just works.
+
+regards,
+
+Koen
