@@ -1,54 +1,43 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 23 May 2011 16:22:48 +0100
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <20110523144126.GF20715@pengutronix.de>
-References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-	<1305878365-827-3-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1105201451160.3078@ionos>
-	<20110520130721.GD10403@pengutronix.de>
-	<alpine.LFD.2.02.1105201518030.3078@ionos>
-	<20110521112947.GB11887@sirena.org.uk>
-	<20110523062501.GA20715@pengutronix.de>
-	<20110523104409.GA15635@opensource.wolfsonmicro.com>
-	<20110523144126.GF20715@pengutronix.de>
-Message-ID: <20110523152248.GC6489@sirena.org.uk>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 23 May 2011 09:23:54 -0600
+Subject: [PATCH 2/2] drivers/amba: probe via device tree
+In-Reply-To: <20110521234725.GB17672@n2100.arm.linux.org.uk>
+References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
+	<20110519233958.GB18181@ponder.secretlab.ca>
+	<4DD66B8A.5040404@gmail.com>
+	<201105201621.03801.arnd@arndb.de> <4DD68614.6090209@gmail.com>
+	<a42f0c27-2811-4b68-bedf-7dfaa7bff6ff@VA3EHSMHS025.ehs.local>
+	<BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
+	<20110521234725.GB17672@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTi=3vQHoUaUmaDsrton_DrckDcHJ4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 04:41:26PM +0200, Sascha Hauer wrote:
+On Sat, May 21, 2011 at 5:47 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Sat, May 21, 2011 at 11:42:34AM -0600, Grant Likely wrote:
+>> Russell, it seems to me that the primary behaviour that amba_bus has
+>> over platform_bus is the clock management, and secondarily
+>> verification of the type of device by the device id. ?Am I correct, or
+>> am I missing something?
+>
+> It matches by vendor/device ID just like PCI does, and does the bus
+> clock management and power management in a really nice way, which I
+> doubt platform devices will ever do.
+>
+> The way this discussion is going, I'm going to suggest that we also
+> convert PCI stuff to being platform devices too. ?I don't see the
+> point of PCI existing for all the same reasons being given in this
+> thread.
 
-> > This isn't terribly good, the only reason we're checking pdata here is
-> > because we can't dereference it to look up irq_base if it's not there.
+I certainly don't see that as being the direction this discussion is going.
 
-> I'm not sure what you mean here. Are you suggesting that we should
-> default to dynamically requested irqs without platform data?
+I see a serious question about how best to model AMBA primecell
+devices in the device tree, and a similarly serious question about
+whether to instantiate them as platform_devices or amba_devices.
+Modelled behaviour in this case (clock/power management) is
+particularly important, and you're right, platform_devices will never
+implement that behaviour in the core code (this issue has already been
+pushed back on; see discussions about omap_device).
 
-Yes, exactly.
-
-> I did it this way because without platform data pdata->irq_high is
-> unknown.
-
-With platform data it has a default value, and indeed when the chip
-powers on it has a default.
-
-> > One other thing - it doesn't seem to be 100% desirable to making the
-> > allocation of the IRQ descriptors depend on not specifying a base - for
-> > many situations we're likely to want to know what the numbers we end up
-> > with are (eg, for passing to another device) but if we don't call
-> > irq_alloc_decs() the platform still has to arrange for the descriptors
-> > to be there in advance.  It feels like the code should always use
-> > irq_alloc_descs(), though obviously that's not going to work right now.
-
-> If that's the case the platform still can provide irq_base and then it
-> does know in advance. Also, shouldn't this other device be instantiated
-
-You're missing my point here.  The platform not only has to allocate the
-base number, it also has to do the allocation of the descriptors.  That
-seems less than ideal as it means that any platform using the driver
-has to replicate the code for allocating the IRQ range that was
-assigned.
-
-> from the wm8350 driver?
-
-We normally instantiate drivers following the control bus heirachy, not
-the interrupt controller heirachy...
+g.
