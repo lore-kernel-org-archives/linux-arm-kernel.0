@@ -1,27 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2011 15:32:17 +0100
-Subject: [linux-pm] [RFC PATCH] ARM hibernation / suspend-to-disk
-	support code
-In-Reply-To: <alpine.DEB.2.00.1105231239270.8018@localhost6.localdomain6>
-References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
-	<20110520113758.GA3141@arm.com>
-	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
-	<201105210027.17159.rjw@sisk.pl> <20110523095232.GB2370@arm.com>
-	<alpine.DEB.2.00.1105231239270.8018@localhost6.localdomain6>
-Message-ID: <20110523143216.GA14131@n2100.arm.linux.org.uk>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 23 May 2011 15:37:49 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>
+	<1306158690.7196.15.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <yw1xzkmdpjnm.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 02:37:19PM +0100, Frank Hofmann wrote:
-> What I've found necessary to save/restore via swsusp_arch_suspend/resume  
-> are the SYSTEM_MODE and SVC_MODE registers.
-> Yesterday, I had thought that cpu_init() resets SVC_MODE sufficiently but 
-> that doesn't seem to be the case, if I leave that out, resume-from-disk  
-> doesn't work anymore.
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-You will be running in SVC mode, so the SVC mode registers are your
-current register set.  At some point you need to do an effective
-"context switch" between the kernel doing the resume and the kernel
-which was running.  That involves restoring the saved register state.
+> On Mon, 2011-05-23 at 14:21 +0100, Russell King - ARM Linux wrote:
+>> On Mon, May 23, 2011 at 12:16:48PM +0100, Catalin Marinas wrote:
+>> > Newer versions of gcc generate unaligned accesses by default, causing
+>> > kernel panics when CONFIG_ALIGNMENT_TRAP is enabled. This patch adds the
+>> > -mno-unaligned-access option to gcc.
+>> 
+>> This description doesn't make sense.  If we have alignment traps enabled,
+>> then we _expect_ to fix up unaligned loads and stores.
+>> 
+>> Therefore there should be no panic if CONFIG_ALIGNMENT_TRAP is enabled.
+>> 
+>> So what's the _actual_ problem that this is trying to address?  What's
+>> the panic/oops look like?  And that information should be in the commit
+>> description _anyway_.
+>
+> OK, not clear from my commit log. See below for details (I'll add them
+> to the log):
+>
+> http://www.codesourcery.com/archives/arm-gnu/msg04202.html
+>
+> Basically the fault happens before we call alignment_init(). There are
+> other ways to fix this issue (like initialising the alignment handler
+> earlier).
 
-System mode on the other hand is unused by the kernel.
+The reset value of SCTLR.A is 0 on ARMv7.  Something must be setting it
+to 1 early, before the alignment trap handler is initialised.  This
+something is what needs to be changed.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
