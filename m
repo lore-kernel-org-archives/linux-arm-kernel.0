@@ -1,36 +1,26 @@
-From: kristoffer@gaisler.com (Kristoffer Glembo)
-Date: Mon, 23 May 2011 11:37:04 +0200
-Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
-References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>	<20110519233958.GB18181@ponder.secretlab.ca>	<4DD66B8A.5040404@gmail.com>	<201105201621.03801.arnd@arndb.de>
-	<4DD68614.6090209@gmail.com>	<a42f0c27-2811-4b68-bedf-7dfaa7bff6ff@VA3EHSMHS025.ehs.local>
-	<BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
-Message-ID: <4DDA2AC0.1060406@gaisler.com>
+From: lrg@slimlogic.co.uk (Liam Girdwood)
+Date: Mon, 23 May 2011 10:38:51 +0100
+Subject: [PATCH 3/5] ASoC: ep93xx: convert to use the DMA engine API
+In-Reply-To: <20110523051102.GA10683@opensource.wolfsonmicro.com>
+References: <cover.1306082097.git.mika.westerberg@iki.fi>
+	<9f8dd1eb40a6cb44d8207c84f244345a98bb9c0f.1306082097.git.mika.westerberg@iki.fi>
+	<20110523051102.GA10683@opensource.wolfsonmicro.com>
+Message-ID: <1306143537.3290.0.camel@odin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2011-05-23 at 13:11 +0800, Mark Brown wrote:
+> On Sun, May 22, 2011 at 08:03:06PM +0300, Mika Westerberg wrote:
+> > Now that we have the EP93xx DMA engine driver in place, we convert the ASoC
+> > drivers (I2S, AC97 and PCM) to take advantage of this new API. There are no
+> > functional changes.
+> 
+> Acked-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> 
+> Given that dmaengine is a standard API I'm wondering if we'll be able to
+> make some sort of generic dmaengine DMA driver for ASoC that could be
+> shared more widely.
 
-Grant Likely wrote:
-> In the case we're talking about the bus really is an AMBA bus, and all
-> the devices on it are in some sense real amba devices.  The problem is
-> that not all of the devices on the bus implement peripheral ID
-> registers or other mechanisms that good upstanding AMBA devices are
-> expected to have.  
+Agreed and 
 
-
-Before we go hardware bashing of non primecell AMBA devices I would just
-want to point out that the primecell stuff is not part of the AMBA specification.
-
-So the "amba bus" should really have a way of marking which devices are primecell
-devices instead of assuming this.
-
-We (Aeroflex Gaisler) use an AMBA bus on our LEON SPARC chips but don't have any primecells 
-devices. We went the of_platform_driver route after concluding that the AMBA bus in Linux is 
-really not an AMBA bus at all. Our bus is fully probable though as all information about the 
-present devices are memory mapped in a "plug and play" area.
-
-On the other hand, there is not much point of an AMBA bus driver which does nothing more than
-the platform driver. But AMBA is really a misnomer in this case.
-
-/Kristoffer
+Acked-by: Liam Girdwood <lrg@ti.com>
