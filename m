@@ -1,41 +1,31 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 23 May 2011 14:33:27 +0100
-Subject: [PATCH] ARM: fix missing 'cpu_relax()' declaration
-Message-ID: <1306157607-18406-1-git-send-email-marc.zyngier@arm.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 23 May 2011 19:04:28 +0530
+Subject: [PATCH 3/4] davinci: dm646x: remove the macros from the header
+	to move to c file
+In-Reply-To: <20110520142401.GV15292@game.jcrosoft.org>
+References: <1305900721-3890-1-git-send-email-manjunath.hadli@ti.com>
+	<20110520142401.GV15292@game.jcrosoft.org>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D09B3A7@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM build fails with the following symptom:
 
-  CC      arch/arm/kernel/asm-offsets.s
-In file included from include/linux/seqlock.h:29,
-                 from include/linux/time.h:8,
-                 from include/linux/timex.h:56,
-                 from include/linux/sched.h:57,
-                 from arch/arm/kernel/asm-offsets.c:13:
-include/linux/spinlock.h: In function 'spin_unlock_wait':
-include/linux/spinlock.h:360: error: implicit declaration of function 'cpu_relax'
-make[1]: *** [arch/arm/kernel/asm-offsets.s] Error 1
+Hi Jean-Christophe,
 
-Fix it by including <asm/processor.h>.
+On Fri, May 20, 2011 at 19:54:01, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 19:42 Fri 20 May     , Manjunath Hadli wrote:
+> > move the register base addresses and offsets used only by dm646x
+> > platform file from platform header dm646x.h to dm646x.c as they
+> > are used only in the c file.
+> > 
+> > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> I do not think it's a good idea to put the register mapping in the c file
+> evenif they are used only today in dm646x
+> 
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/spinlock.h |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+Unless a definition is used across C files, it would be better to
+keep it local to the C file. Why treat base addresses and register
+offsets differently?
 
-diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
-index fdd3820..65fa3c8 100644
---- a/arch/arm/include/asm/spinlock.h
-+++ b/arch/arm/include/asm/spinlock.h
-@@ -5,6 +5,8 @@
- #error SMP not supported on pre-ARMv6 CPUs
- #endif
- 
-+#include <asm/processor.h>
-+
- /*
-  * sev and wfe are ARMv6K extensions.  Uniprocessor ARMv6 may not have the K
-  * extensions, so when running on UP, we have to patch these instructions away.
--- 
-1.7.0.4
+Thanks,
+Sekhar
