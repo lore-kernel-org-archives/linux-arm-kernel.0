@@ -1,53 +1,65 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 23 May 2011 09:50:15 -0600
-Subject: [git pull] ARM Device tree support
-Message-ID: <BANLkTiknh4nCviohecbcJEiWnSW-JdMxDw@mail.gmail.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Mon, 23 May 2011 16:57:24 +0100 (BST)
+Subject: [RFC PATCH v2] ARM hibernation / suspend-to-disk support code
+In-Reply-To: <20110523143216.GA14131@n2100.arm.linux.org.uk>
+References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
+	<20110520113758.GA3141@arm.com>
+	<alpine.DEB.2.00.1105201255260.8018@localhost6.localdomain6>
+	<201105210027.17159.rjw@sisk.pl> <20110523095232.GB2370@arm.com>
+	<alpine.DEB.2.00.1105231239270.8018@localhost6.localdomain6>
+	<20110523143216.GA14131@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1105231603070.8018@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, 23 May 2011, Russell King - ARM Linux wrote:
 
-How do you want to handle merging the ARM DT support?  Do you want to
-pull it into your tree, or would you like me to ask Linus to pull
-directly?  As you can see, It does include a couple of pre-requisite
-cross-arch cleanups that I normally push to Linus directly.
+> On Mon, May 23, 2011 at 02:37:19PM +0100, Frank Hofmann wrote:
+>> What I've found necessary to save/restore via swsusp_arch_suspend/resume
+>> are the SYSTEM_MODE and SVC_MODE registers.
+>> Yesterday, I had thought that cpu_init() resets SVC_MODE sufficiently but
+>> that doesn't seem to be the case, if I leave that out, resume-from-disk
+>> doesn't work anymore.
+>
+> You will be running in SVC mode, so the SVC mode registers are your
+> current register set.  At some point you need to do an effective
+> "context switch" between the kernel doing the resume and the kernel
+> which was running.  That involves restoring the saved register state.
+>
+> System mode on the other hand is unused by the kernel.
+>
 
-The following changes since commit 61c4f2c81c61f73549928dfd9f3e8f26aa36a8cf:
+Ah, and I had it the other way round ... that's why. Thanks !
 
-  Linux 2.6.39 (2011-05-18 21:06:34 -0700)
+I've tried that, saving/restoring just CPSR/SPSR and the reg set - and 
+that seems sufficient, works fine !
 
-are available in the git repository at:
-  git://git.secretlab.ca/git/linux-2.6 devicetree/arm-next
 
-Andres Salomon (1):
-      of/flattree: minor cleanups
+All this means that the basic code has again become smaller.
+Attached is a new version, integrating all the feedback so far:
 
-Grant Likely (6):
-      dt/flattree: explicitly pass command line pointer to
-early_init_dt_scan_chosen
-      arm/dt: Make __vet_atags also accept a dtb image
-      arm/dt: Allow CONFIG_OF on ARM
-      arm/dt: consolidate atags setup into setup_machine_atags
-      arm/dt: probe for platforms via the device tree
-      dt: add documentation of ARM dt boot interface
+* save/restore only those parts of the register set that the kernel cannot
+   reinitialize from scratch
 
- Documentation/arm/Booting                       |   33 +++++-
- Documentation/devicetree/booting-without-of.txt |   48 +++++++-
- arch/arm/Kconfig                                |    7 +
- arch/arm/include/asm/mach/arch.h                |    9 ++
- arch/arm/include/asm/prom.h                     |   37 ++++++
- arch/arm/include/asm/setup.h                    |    4 +
- arch/arm/kernel/Makefile                        |    1 +
- arch/arm/kernel/devtree.c                       |  145 +++++++++++++++++++++++
- arch/arm/kernel/head-common.S                   |   24 +++-
- arch/arm/kernel/head.S                          |    8 +-
- arch/arm/kernel/setup.c                         |   90 +++++++++-----
- arch/arm/mm/init.c                              |   11 ++
- arch/microblaze/kernel/prom.c                   |    2 +-
- arch/mips/include/asm/prom.h                    |    3 -
- arch/mips/kernel/prom.c                         |    3 +-
- arch/powerpc/kernel/prom.c                      |    2 +-
- drivers/of/fdt.c                                |    8 +-
- 17 files changed, 375 insertions(+), 60 deletions(-)
- create mode 100644 arch/arm/include/asm/prom.h
- create mode 100644 arch/arm/kernel/devtree.c
+* take care of FIQ disable/enable bracketing
+
+* use traditional stmfd/ldmfd instead of push/pop
+
+* don't rely on thread state, current->active_mm, but use global &init_mm
+
+* dump arch_prepare_suspend (skipping ahead of Rafael's suggested fix)
+
+* ditch the vmlinux.lds changes as they're not needed
+
+
+What other outstanding things are there to address for this ?
+
+All the best,
+FrankH.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: hibernation-core-23May2011.patch
+Type: text/x-diff
+Size: 5761 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110523/a8962381/attachment.bin>
