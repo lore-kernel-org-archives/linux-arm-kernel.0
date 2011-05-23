@@ -1,25 +1,25 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 23 May 2011 16:01:20 +0100
-Subject: [PATCH] Fix generic irq chip
-In-Reply-To: <87lixx34ue.fsf@ti.com>
-References: <20110520220510.GC30675@n2100.arm.linux.org.uk>
-	<87lixx34ue.fsf@ti.com>
-Message-ID: <20110523150120.GA15153@n2100.arm.linux.org.uk>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Mon, 23 May 2011 18:01:01 +0300
+Subject: [PATCH v6 0/8] Switch ARM platforms from integrator-flash to
+	physmap
+In-Reply-To: <20110520212837.GB30675@n2100.arm.linux.org.uk>
+References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>
+	<1305803946.2630.69.camel@localhost>
+	<1305809614.27474.41.camel@e102391-lin.cambridge.arm.com>
+	<20110520212837.GB30675@n2100.arm.linux.org.uk>
+Message-ID: <1306162861.2785.31.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 06:48:41AM -0700, Kevin Hilman wrote:
-> Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+On Fri, 2011-05-20 at 22:28 +0100, Russell King - ARM Linux wrote:
+> On Thu, May 19, 2011 at 01:53:34PM +0100, Marc Zyngier wrote:
+> > Yes, it's been merged by Russell into his tree yesterday, after David's
+> > ack.
 > 
-> > As a result of c42321c (genirq: Make generic irq chip depend on
-> > CONFIG_GENERIC_IRQ_CHIP), we now need those platforms using this in
-> > my tree to select this symbol.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> > --
-> > Please send acks ASAP.  Thanks to Mark for pointing this out with a patch
-> > for Samsung.
-> 
-> Acked-by: Kevin Hilman <khilman@ti.com>
+> ... and I've just added the new acks we've had today.
 
-Thanks, but does that cover Davinci or OMAP?
+Thank you!
+
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
