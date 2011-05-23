@@ -1,79 +1,67 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 May 2011 18:46:01 +0200
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <20110523152248.GC6489@sirena.org.uk>
-References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-	<1305878365-827-3-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1105201451160.3078@ionos>
-	<20110520130721.GD10403@pengutronix.de>
-	<alpine.LFD.2.02.1105201518030.3078@ionos>
-	<20110521112947.GB11887@sirena.org.uk>
-	<20110523062501.GA20715@pengutronix.de>
-	<20110523104409.GA15635@opensource.wolfsonmicro.com>
-	<20110523144126.GF20715@pengutronix.de>
-	<20110523152248.GC6489@sirena.org.uk>
-Message-ID: <20110523164601.GG20715@pengutronix.de>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Mon, 23 May 2011 17:49:44 +0100
+Subject: [PATCH] ARM: fix missing 'cpu_relax()' declaration
+In-Reply-To: <20110523164508.GE15138@n2100.arm.linux.org.uk>
+References: <1306157607-18406-1-git-send-email-marc.zyngier@arm.com>
+	<20110523160944.GA15138@n2100.arm.linux.org.uk>
+	<20110523162339.GC15138@n2100.arm.linux.org.uk>
+	<1306168473.27474.88.camel@e102391-lin.cambridge.arm.com>
+	<20110523164123.GD15138@n2100.arm.linux.org.uk>
+	<20110523164508.GE15138@n2100.arm.linux.org.uk>
+Message-ID: <1306169384.27474.95.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 04:22:48PM +0100, Mark Brown wrote:
-> On Mon, May 23, 2011 at 04:41:26PM +0200, Sascha Hauer wrote:
+On Mon, 2011-05-23 at 17:45 +0100, Russell King - ARM Linux wrote:
+> On Mon, May 23, 2011 at 05:41:23PM +0100, Russell King - ARM Linux wrote:
+> > On Mon, May 23, 2011 at 05:34:33PM +0100, Marc Zyngier wrote:
+> > > Odd... It seems to build just fine here with UP:
+> > > 
+> > > $ grep SMP .config
+> > > CONFIG_BROKEN_ON_SMP=y
+> > > # CONFIG_SMP is not set
+> > > $ time make ARCH=arm CROSS_COMPILE=arm-none-linux-gnueabi- -j4 all
+> > >   CHK     include/linux/version.h
+> > >   HOSTCC  scripts/basic/fixdep
+> > >   HOSTCC  scripts/basic/docproc
+> > >   HOSTCC  scripts/kallsyms
+> > >   HOSTCC  scripts/conmakehash
+> > >   CC      scripts/mod/empty.o
+> > >   HOSTCC  scripts/mod/mk_elfconfig
+> > >   MKELF   scripts/mod/elfconfig.h
+> > >   HOSTCC  scripts/mod/file2alias.o
+> > >   HOSTCC  scripts/mod/modpost.o
+> > >   HOSTCC  scripts/mod/sumversion.o
+> > >   HOSTLD  scripts/mod/modpost
+> > >   CHK     include/generated/utsrelease.h
+> > > make[1]: `include/generated/mach-types.h' is up to date.
+> > >   CC      kernel/bounds.s
+> > >   GEN     include/generated/bounds.h
+> > >   CC      arch/arm/kernel/asm-offsets.s
+> > >   GEN     include/generated/asm-offsets.h
+> > >   CALL    scripts/checksyscalls.sh
+> > > <stdin>:1554: warning: #warning syscall sendmmsg not implemented
+> > >   CC      init/main.o
+> > >   CHK     include/generated/compile.h
+> > >   HOSTCC  usr/gen_init_cpio
+> > > [...]
+> > 
+> > For what platform?  I've tried a few and getting the same error message.
 > 
-> > > This isn't terribly good, the only reason we're checking pdata here is
-> > > because we can't dereference it to look up irq_base if it's not there.
+> Found it, my for-next tree has the prefetching change but not this:
 > 
-> > I'm not sure what you mean here. Are you suggesting that we should
-> > default to dynamically requested irqs without platform data?
+> commit d974d905cbfc1039a73ba0c7eea3f4d4e13c0624
+> Author: Stephen Rothwell <sfr@canb.auug.org.au>
+> Date:   Fri May 20 15:48:17 2011 +1000
 > 
-> Yes, exactly.
+>     spinlock_up.h: include asm/processor.h in for cpu_relax
 > 
-> > I did it this way because without platform data pdata->irq_high is
-> > unknown.
+> which fixes the UP build problem.
 > 
-> With platform data it has a default value, and indeed when the chip
-> powers on it has a default.
 
-Ok, what should be the default for irq_high then if we do not have
-platform data?
+Makes sense. Thanks for solving the mystery!
 
-> 
-> > > One other thing - it doesn't seem to be 100% desirable to making the
-> > > allocation of the IRQ descriptors depend on not specifying a base - for
-> > > many situations we're likely to want to know what the numbers we end up
-> > > with are (eg, for passing to another device) but if we don't call
-> > > irq_alloc_decs() the platform still has to arrange for the descriptors
-> > > to be there in advance.  It feels like the code should always use
-> > > irq_alloc_descs(), though obviously that's not going to work right now.
-> 
-> > If that's the case the platform still can provide irq_base and then it
-> > does know in advance. Also, shouldn't this other device be instantiated
-> 
-> You're missing my point here.  The platform not only has to allocate the
-> base number, it also has to do the allocation of the descriptors.  That
-> seems less than ideal as it means that any platform using the driver
-> has to replicate the code for allocating the IRQ range that was
-> assigned.
-
-We can do the irq_alloc_descs unconditionally then. If irq_base is
-not given, we are happy with any irq irq_alloc_descs returns. If
-irq_base is given, we check the return value of irq_alloc_descs for
-exactly irq_base.
-
-> 
-> > from the wm8350 driver?
-> 
-> We normally instantiate drivers following the control bus heirachy, not
-> the interrupt controller heirachy...
-
-I assumed that drivers using the irqs from the wm8350 are usually
-children of the wm8350, like the watchdog, rtc, regulator drivers already are.
-This may not be true for the gpio interrupts, but you can calculate the
-irq from the gpio number.
-
-Sascha
+	M.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Reality is an implementation detail.
