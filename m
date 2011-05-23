@@ -1,39 +1,47 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 23 May 2011 08:25:01 +0200
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <20110521112947.GB11887@sirena.org.uk>
-References: <1305878365-827-1-git-send-email-s.hauer@pengutronix.de>
-	<1305878365-827-3-git-send-email-s.hauer@pengutronix.de>
-	<alpine.LFD.2.02.1105201451160.3078@ionos>
-	<20110520130721.GD10403@pengutronix.de>
-	<alpine.LFD.2.02.1105201518030.3078@ionos>
-	<20110521112947.GB11887@sirena.org.uk>
-Message-ID: <20110523062501.GA20715@pengutronix.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 23 May 2011 12:20:46 +0530
+Subject: [PATCH v2] ARM: smp_twd: Reconfigure clockevents after cpufreq
+	change
+In-Reply-To: <BANLkTikyGFVKTst1xJTGzHuwY_2GoG6NOw@mail.gmail.com>
+References: <1305851091-10096-1-git-send-email-ccross@android.com>	<4DD75BC9.8040004@ti.com>
+	<BANLkTikyGFVKTst1xJTGzHuwY_2GoG6NOw@mail.gmail.com>
+Message-ID: <4DDA03C6.6050806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark,
+On 5/23/2011 10:48 AM, Colin Cross wrote:
+> On Fri, May 20, 2011 at 11:29 PM, Santosh Shilimkar
+> <santosh.shilimkar@ti.com>  wrote:
+>> On 5/20/2011 5:54 AM, Colin Cross wrote:
+>>>
+>>> The localtimer's clock changes with the cpu clock.  After a
+>>> cpufreq transition, update the clockevent's frequency and
+>>> reprogram the next clock event.
+>>>
+>>> Adds a clock called "smp_twd" that is used to determine the
+>>> twd frequency, which can also be used at init time to
+>>> avoid calibrating the twd frequency.
+>>>
+>>> Clock changes are based on Rob Herring's work.
+>>>
+>>> Change-Id: I413b5cd07fb2b79bc9fad8b4bf257332d1da7bcd
+>>> Signed-off-by: Colin Cross<ccross@android.com>
+>>> Cc: Thomas Gleixner<tglx@linutronix.de>
+>>> Cc: Russell King<linux@arm.linux.org.uk>
+>>> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>> Cc: Rob Herring<robherring2@gmail.com>
+>>> Tested-by: Linus Walleij<linus.walleij@linaro.org>
+>>> ---
+>>
+>> Acked-by: Santosh Shilimkar<santosh.shilimkar@ti.com>
+>>
+>> What about the clock-node patches?
+>> Do you want those to get merged via sub-arch tree's once this
+>> patch + Thomas's new API gets merged ?
+>
+> The clock-node patches can be merged independently - twd scaling just
+> won't work until they are both merged.
+Yep. That should be ok.
 
-On Sat, May 21, 2011 at 12:29:47PM +0100, Mark Brown wrote:
-> On Fri, May 20, 2011 at 03:19:44PM +0200, Thomas Gleixner wrote:
-> > On Fri, 20 May 2011, Sascha Hauer wrote:
-> > 
-> > > On Fri, May 20, 2011 at 02:52:28PM +0200, Thomas Gleixner wrote:
-> > > > On Fri, 20 May 2011, Sascha Hauer wrote:
-> > > > > @@ -500,7 +500,17 @@ int wm8350_irq_init(struct wm8350 *wm8350, int irq,
-> 
-> Sascha, you should know to *always* CC maintainers on patches.  Don't
-> apply this patch, and please engage with the feedback I posted when you
-> sent an earlier version of this patch.
-
-Sorry for this, should have added you to the cc list of that indivual
-patch. I can't find your reply in my mail, could you send it again?
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards
+Santosh
