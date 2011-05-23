@@ -1,42 +1,69 @@
-From: ccross@android.com (Colin Cross)
-Date: Sun, 22 May 2011 22:18:01 -0700
-Subject: [PATCH v2] ARM: smp_twd: Reconfigure clockevents after cpufreq
-	change
-In-Reply-To: <4DD75BC9.8040004@ti.com>
-References: <1305851091-10096-1-git-send-email-ccross@android.com>
-	<4DD75BC9.8040004@ti.com>
-Message-ID: <BANLkTikyGFVKTst1xJTGzHuwY_2GoG6NOw@mail.gmail.com>
+From: socketcan@hartkopp.net (Oliver Hartkopp)
+Date: Mon, 23 May 2011 08:21:48 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <201105221230.56243.arnd@arndb.de>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>
+	<4DCB88A4.2010901@grandegger.com> <4DCBF1B6.6000104@hartkopp.net>
+	<201105221230.56243.arnd@arndb.de>
+Message-ID: <4DD9FCFC.10803@hartkopp.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 11:29 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On 5/20/2011 5:54 AM, Colin Cross wrote:
+On 22.05.2011 12:30, Arnd Bergmann wrote:
+> On Thursday 12 May 2011 16:41:58 Oliver Hartkopp wrote:
+>> E.g. assume you need the CAN-IDs 0x100, 0x200 and 0x300 in your application
+>> and for that reason you configure these IDs in the pruss CAN driver.
 >>
->> The localtimer's clock changes with the cpu clock. ?After a
->> cpufreq transition, update the clockevent's frequency and
->> reprogram the next clock event.
+>> What if someone generates a 100% CAN busload exactly on CAN-ID 0x100 then?
 >>
->> Adds a clock called "smp_twd" that is used to determine the
->> twd frequency, which can also be used at init time to
->> avoid calibrating the twd frequency.
->>
->> Clock changes are based on Rob Herring's work.
->>
->> Change-Id: I413b5cd07fb2b79bc9fad8b4bf257332d1da7bcd
->> Signed-off-by: Colin Cross<ccross@android.com>
->> Cc: Thomas Gleixner<tglx@linutronix.de>
->> Cc: Russell King<linux@arm.linux.org.uk>
->> Cc: Santosh Shilimkar<santosh.shilimkar@ti.com>
->> Cc: Rob Herring<robherring2@gmail.com>
->> Tested-by: Linus Walleij<linus.walleij@linaro.org>
->> ---
->
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
->
-> What about the clock-node patches?
-> Do you want those to get merged via sub-arch tree's once this
-> patch + Thomas's new API gets merged ?
+>> Worst case (1MBit/s, DLC=0) you would need to handle about 21.000 irqs/s for
+>> the correctly received CAN frames with the filtered CAN-ID 0x100 ...
+> 
+> Then I guess the main thing that a "smart" CAN implementation like pruss
+> should do is interrupt mitigation. When you have a constant flow of
+> packets coming in, the hardware should be able to DMA a lot of
+> them into kernel memory before the driver is required to pick them up,
+> and only get into interrupt driven mode when the kernel has managed
+> to process all outstanding packets.
+> 
+>> This all depends heavily on Linux networking (skb handling, caching, etc) and
+>> is pretty fast and optimized!! That was also the reason why it ran on the old
+>> PowerPC that smoothly. The mostly seen effect if anything drops is when the
+>> application (holding the socket) was not fast enough to handle the incoming
+>> data. NB: For that reason we implemented a CAN content filter (CAN_BCM) that
+>> is able to do content filtering and timeout monitoring in Kernelspace - all
+>> performed in the SoftIRQ.
+> 
+> Right, dropping packets that no process is waiting for should be done as
+> early as possible. In pruss-can, the idea was to do it in hardware, which
+> doesn't really work all that well for the reasons discussed before.
+> Dropping the frames in the NAPI poll function (softirq time) seems like a
+> logical choice.
 
-The clock-node patches can be merged independently - twd scaling just
-won't work until they are both merged.
+In 'real world' CAN setups you'll never see 21.000 CAN frames per second (and
+therefore 21.000 irqs/s) - you are usually designing CAN network traffic with
+less than 60% busload. So interrupt rates somewhere below 1000 irqs/s can be
+assumed.
+
+
+>From bogus@does.not.exist.com  Fri May 20 08:44:36 2011
+From: bogus@does.not.exist.com ()
+Date: Fri, 20 May 2011 12:44:36 -0000
+Subject: No subject
+Message-ID: <mailman.1.1306131711.23796.linux-arm-kernel@lists.infradead.org>
+
+@Marc/Wolfgang: Would this be also your recommendation for a CAN controller
+design that supports SocketCAN in the best way?
+
+As the Linux network stack supports hardware timestamps too, this could be an
+additional (optional!) feature.
+
+Regards,
+Oliver
+
+>> Having 'Mailboxes' bound to CAN-IDs is something that's useful for 8/16 bit
+>> CPUs where an application is tightly bound to the embedded ECUs functionality.
+> 
+> Makes sense.
+> 
+> 	Arnd
