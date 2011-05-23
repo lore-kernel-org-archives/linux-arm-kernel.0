@@ -1,45 +1,37 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 23 May 2011 09:47:15 +0200
-Subject: [PATCH v2 2/2] OMAP3BEAGLE: Add support for mt9p031 sensor driver.
-In-Reply-To: <BANLkTi=sqZpAKFxeCbwqpU_7+WZABGa4=w@mail.gmail.com>
+Date: Mon, 23 May 2011 10:00:31 +0200
+Subject: [beagleboard] [PATCH v2 2/2] OMAP3BEAGLE: Add support for mt9p031
+	sensor driver.
+In-Reply-To: <BANLkTi=ZHyk1+otf2i0qp47Zvvo4nfYk6A@mail.gmail.com>
 References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
-	<4DD9146B.2050408@compulab.co.il>
-	<BANLkTi=sqZpAKFxeCbwqpU_7+WZABGa4=w@mail.gmail.com>
-Message-ID: <201105230947.15775.laurent.pinchart@ideasonboard.com>
+	<DDCBBAA2-C49C-4952-9D1B-519D8A3AB41E@beagleboard.org>
+	<BANLkTi=ZHyk1+otf2i0qp47Zvvo4nfYk6A@mail.gmail.com>
+Message-ID: <201105231000.32194.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Javier,
 
-On Monday 23 May 2011 09:25:01 javier Martin wrote:
-> On 22 May 2011 15:49, Igor Grinberg <grinberg@compulab.co.il> wrote:
-
-[snip]
-
-> >> @@ -309,6 +357,15 @@ static int beagle_twl_gpio_setup(struct device
-> >> *dev, pr_err("%s: unable to configure EHCI_nOC\n", __func__); }
-> >> 
-> >> +     if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
-> >> +             /*
-> >> +              * Power on camera interface - only on pre-production, not
-> >> +              * needed on production boards
-> >> +              */
-> >> +             gpio_request(gpio + 2, "CAM_EN");
-> >> +             gpio_direction_output(gpio + 2, 1);
-> > 
-> > Why not gpio_request_one()?
+On Monday 23 May 2011 09:01:07 javier Martin wrote:
+> On 20 May 2011 17:57, Koen Kooi <koen@beagleboard.org> wrote:
+> > In previous patch sets we put that in a seperate file
+> > (omap3beagle-camera.c) so we don't clutter up the board file with all
+> > the different sensor drivers. Would it make sense to do the same with
+> > the current patches? It looks like MCF cuts down a lot on the
+> > boilerplace needed already.
 > 
-> Just to follow the same approach as in the rest of the code.
-> Maybe a further patch could change all "gpio_request()" uses to
-> "gpio_request_one()".
+> I sent my first patch using that approach but I was told to move it to
+> the board code.
+> Please, don't make undo the changes. Or at least, let's discuss this
+> seriously so that we all agree on what is the best way of doing it and
+> I don't have to change it every time.
 
-Please do it the other way around. Replace calls to gpio_request() + 
-gpio_direction_output() with a call to gpio_request_one(), and then modify 
-this patch to use gpio_request_one().
-
-If you want to learn how to use coccinelle (http://coccinelle.lip6.fr/), now 
-would be a good time. You could use it to replace gpio_request() + 
-gpio_direction_output() through the whole kernel.
+What we really need here is a modular way to support sensors on pluggable 
+expansion boards. Not all Beagleboard users will have an MT9P031 connected to 
+the OMAP3 ISP, so that must not be hardcoded in board code. As the sensor 
+boards are not runtime detectable, one solution would be to compile part of 
+the code as a module. Regulator definitions and I2C2 bus registration (and 
+possibly GPIO initialization) can be left in board code.
 
 -- 
 Regards,
