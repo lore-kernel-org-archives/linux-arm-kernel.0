@@ -1,68 +1,34 @@
-From: avinashhm@ti.com (Avinash.H.M.)
-Date: Wed, 25 May 2011 00:37:18 +0530
-Subject: [PATCH v3] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
-In-Reply-To: <FCCFB4CDC6E5564B9182F639FC3560870370A4D887@dbde02.ent.ti.com>
-References: <1304328111-15999-1-git-send-email-avinashhm@ti.com>
-	<alpine.DEB.2.00.1105051548210.30136@utopia.booyaka.com>
-	<20110509124842.GA25211@avinash-laptop>
-	<alpine.DEB.2.00.1105181021590.4550@utopia.booyaka.com>
-	<20110518162542.GB3026@avinash-laptop>
-	<FCCFB4CDC6E5564B9182F639FC3560870370A4D887@dbde02.ent.ti.com>
-Message-ID: <20110524190718.GA6899@avinash-laptop>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 24 May 2011 21:26:13 +0200
+Subject: [PATCH v2 2/7] mmc: sdhci: eliminate sdhci_of_host and
+	sdhci_of_data
+In-Reply-To: <1304601778-13837-3-git-send-email-shawn.guo@linaro.org>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+	<1304601778-13837-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110524192613.GA25727@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 19, 2011 at 06:05:21PM +0530, Koyamangalath, Abhilash wrote:
-
-> I have tried the patch on am37x evm and the i2c soft-reset time-out issue doesn't
-> seem to go off for me. Previously I used to get a log  : 
+On Thu, May 05, 2011 at 09:22:53PM +0800, Shawn Guo wrote:
+> The patch migrates the use of sdhci_of_host and sdhci_of_data to
+> sdhci_pltfm_host and sdhci_pltfm_data, so that the former pair can
+> be eliminated.
 > 
-> [    0.000000] omap_hwmod: i2c1: softreset failed (waited 10000 usec)                                                                                                            
-> [    0.000000] omap_hwmod: i2c2: softreset failed (waited 10000 usec)                                                                                                            
-> [    0.000000] omap_hwmod: i2c3: softreset failed (waited 10000 usec) 
-> 
-> And now I get :
-> [    0.000000] omap_i2c_reset: i2c1: softreset failed (waited 10000 usec)
-> [    0.000000] omap_i2c_reset: i2c2: softreset failed (waited 10000 usec)
-> [    0.000000] omap_i2c_reset: i2c3: softreset failed (waited 10000 usec)
-> 
-> So the function where this failure happens seems to be the only thing that has changed.
-> I've tried this patch on top of the recent PSP 04.02.00.07 release. 
-> What am I missing?
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Reviewed-by: Grant Likely <grant.likely@secretlab.ca>
 
-Abhilash ,
+We might be able to get rid of the migrated entries in sdhci-pltfm.h, but this
+is a task for later IMO.
 
-I am not sure what is PSP 04.02.00.07 release. But you should make sure
-that the hwmod structures in omap_hwmod_3xxx_data.c should have the
-16_bit flags. 
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
-Below is just a snippet in P.S.. There is already a patch submitted by
-andy green for this. Not sure, if it is merged.  
-
-With this and the posted v3 patch, you should not see timeouts. Or else
-you have some other problem.
-
-thanks ,
-
-- Avinash
-
-PS:
-
- static struct omap_hwmod omap3xxx_i2c1_hwmod = {
-        .name           = "i2c1",
-+       .flags          = HWMOD_16BIT_REG,
- 
-
-> 
-> thanks,
-> Abhilash
-> 
-> 
-> 
-> > >
-> > >
-> > > - Paul
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110524/8fee7548/attachment.sig>
