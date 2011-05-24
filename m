@@ -1,71 +1,91 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 24 May 2011 19:54:39 +0530
-Subject: [PATCH 00/15] OMAP: GPIO: Cleanup OMAP GPIO driver
-Message-ID: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
+Date: Tue, 24 May 2011 19:54:51 +0530
+Subject: [PATCH 12/15] OMAP: GPIO: Fix: use wake set/clear regs
+In-Reply-To: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
+References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1306247094-25372-13-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Do some more cleanup of OMAP GPIO driver and avoid usage of gpio_bank_count
-and gpio_bank pointer array by means of maintaining a list.
+From: Charulatha V <charu@ti.com>
 
-Patch series is on following commit of linux-omap-pm (branch: wip/gpio-cleanup):
-commit d04952091a3b9b4b47696cee48e92a9173fd9ffb
-GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
+In set_24xx_gpio_triggering(), for OMAP4, GPIO wakeup request
+is set for all type of GPIO triggers whereas as per TRM the GPIO
+wakeup request can only be generated on edge transitions. Fix this.
 
-Diff summary between RFC(prev version) and this version:
-*Patches 0012*-0015* are added to the series
-*Call gpio_save(restore)_context from OMAP GPIO driver instead
-of calling them from PM sepcific funcs
-	-For this, few more patches (patches 0004*-8*) are added
-		to the series
-*Move mpuio_init() from probe() to omap_gpio_mod_init()
-*Correctly add the wake set/clear/status regs offsets at omap16xx_gpio_regs
-*Remove usage of unnecessary variable "offset" locally inside prepare_for_idle()
-*wake_set/clear related access is done only after validity check
+In set_24xx_gpio_triggering(), OMAP4_GPIO_IRQWAKEN0 register
+is used for wakeup request and the GPIO set/clear wakeup registers
+are not used in OMAP4 but is handled without retaining it's old
+value. This would corrupt the contents of OMAP4_GPIO_IRQWAKEN0
+register by writing the value of the last requested GPIO pin in
+a given bank. This can be avoided by making use of GPIO set/clear
+wakeup registers.
 
-Links to previous version (RFC) of this series:
-https://patchwork.kernel.org/patch/787692/
-https://patchwork.kernel.org/patch/787742/
-https://patchwork.kernel.org/patch/787762/
-https://patchwork.kernel.org/patch/787722/
-https://patchwork.kernel.org/patch/787712/
-https://patchwork.kernel.org/patch/787732/
-http://permalink.gmane.org/gmane.linux.ports.arm.omap/57524
+Signed-off-by: Charulatha V <charu@ti.com>
+---
+ arch/arm/mach-omap2/gpio.c |    4 ++--
+ drivers/gpio/gpio_omap.c   |   32 ++++++++++----------------------
+ 2 files changed, 12 insertions(+), 24 deletions(-)
 
-Test Details:
-Compile tested for omap1_defconfig and omap2plus_defconfig.
-Bootup success on OMAP1710-H3.
-Functional testing success on OMAP2430-SDP, OMAP3430-SDP, OMAP4430-SDP.
-PM Testing success on OMAP3430-SDP: retention, off_mode, system_wide
-suspend and gpio wakeup.
-
-Charulatha V (12):
-  OMAP: GPIO: Avoid cpu_is checks during module ena/disable
-  OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-  OMAP: GPIO: Remove dependency on gpio_bank_count
-  OMAP2PLUS: GPIO: Use flag to identify wkup dmn GPIO
-  OMAP: GPIO: Make gpio_context part of gpio_bank structure
-  OMAP4: GPIO: Save/restore context
-  OMAP: GPIO: handle save/restore ctx in GPIO driver
-  OMAP2+: GPIO: make workaround_enabled bank specific
-  OMAP: GPIO: Fix: use wake set/clear regs
-  OMAP: GPIO: clean set_gpio_triggering function
-  OMAP: GPIO: Use memset for omap_gpio_reg_offs
-  OMAP: GPIO: clean omap_gpio_mod_init function
-
-Tarun Kanti DebBarma (3):
-  OMAP: GPIO: cleanup suspend and resume functions
-  OMAP: GPIO: cleanup prepare/resume idle functions
-  OMAP: GPIO: Remove hardcoded offsets in ctxt save/restore
-
- arch/arm/mach-omap1/gpio15xx.c             |   42 +-
- arch/arm/mach-omap1/gpio16xx.c             |   55 ++-
- arch/arm/mach-omap1/gpio7xx.c              |   42 +-
- arch/arm/mach-omap2/gpio.c                 |   53 ++-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- arch/arm/mach-omap2/pm34xx.c               |   22 +-
- arch/arm/plat-omap/include/plat/gpio.h     |   20 +-
- drivers/gpio/gpio_omap.c                   |  797 ++++++++++------------------
- 10 files changed, 438 insertions(+), 599 deletions(-)
+diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+index 5c888dd..fbedbbb 100644
+--- a/arch/arm/mach-omap2/gpio.c
++++ b/arch/arm/mach-omap2/gpio.c
+@@ -142,8 +142,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+ 		pdata->regs->risingdetect = OMAP4_GPIO_RISINGDETECT;
+ 		pdata->regs->fallingdetect = OMAP4_GPIO_FALLINGDETECT;
+ 		pdata->regs->wkupstatus = OMAP4_GPIO_IRQWAKEN0;
+-		pdata->regs->wkupclear = OMAP4_GPIO_IRQWAKEN0;
+-		pdata->regs->wkupset = OMAP4_GPIO_IRQWAKEN0;
++		pdata->regs->wkupclear = OMAP4_GPIO_CLEARWKUENA;
++		pdata->regs->wkupset = OMAP4_GPIO_SETWKUENA;
+ 		break;
+ 	default:
+ 		WARN(1, "Invalid gpio bank_type\n");
+diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
+index 05c2857..762d73c 100644
+--- a/drivers/gpio/gpio_omap.c
++++ b/drivers/gpio/gpio_omap.c
+@@ -229,30 +229,18 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
+ 		MOD_REG_BIT(OMAP24XX_GPIO_FALLINGDETECT, gpio_bit,
+ 			trigger & IRQ_TYPE_EDGE_FALLING);
+ 	}
++
+ 	if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
+-		if (cpu_is_omap44xx()) {
+-			if (trigger != 0)
+-				__raw_writel(1 << gpio, bank->base+
+-						OMAP4_GPIO_IRQWAKEN0);
+-			else {
+-				val = __raw_readl(bank->base +
+-							OMAP4_GPIO_IRQWAKEN0);
+-				__raw_writel(val & (~(1 << gpio)), bank->base +
+-							 OMAP4_GPIO_IRQWAKEN0);
+-			}
+-		} else {
+-			/*
+-			 * GPIO wakeup request can only be generated on edge
+-			 * transitions
+-			 */
+-			if (trigger & IRQ_TYPE_EDGE_BOTH)
+-				__raw_writel(1 << gpio, bank->base
+-					+ OMAP24XX_GPIO_SETWKUENA);
+-			else
+-				__raw_writel(1 << gpio, bank->base
+-					+ OMAP24XX_GPIO_CLEARWKUENA);
+-		}
++		/*
++		 * GPIO wakeup request can only be generated on edge
++		 * transitions
++		 */
++		if (trigger & IRQ_TYPE_EDGE_BOTH)
++			__raw_writel(1 << gpio, bank->wake_set);
++		else
++			__raw_writel(1 << gpio, bank->wake_clear);
+ 	}
++
+ 	/* This part needs to be executed always for OMAP34xx */
+ 	if (cpu_is_omap34xx() || (bank->non_wakeup_gpios & gpio_bit)) {
+ 		/*
+-- 
+1.6.0.4
