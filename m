@@ -1,98 +1,57 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 May 2011 22:39:10 +0100
-Subject: [PATCH v6 04/18] ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of
-	PGDIR_*
+Date: Tue, 24 May 2011 22:39:13 +0100
+Subject: [PATCH v6 07/18] ARM: LPAE: Use a mask for physical addresses in page
+	table entries
 In-Reply-To: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
 References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1306273164-18217-5-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1306273164-18217-8-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PGDIR_SHIFT and PMD_SHIFT for the classic 2-level page table format have
-the same value (21). This patch converts the PGDIR_* uses in the kernel
-to the PMD_* equivalent so that LPAE builds can reuse the same code.
+With LPAE, the physical address mask is 40-bit while the page table
+entry is 64-bit. This patch introduces PHYS_MASK for the 2-level page
+table format, defined as ~0UL.
 
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/kernel/module.c  |    2 +-
- arch/arm/mm/dma-mapping.c |    6 +++---
- arch/arm/mm/mmu.c         |   10 +++++-----
- 3 files changed, 9 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/pgtable-2level-hwdef.h |    2 ++
+ arch/arm/include/asm/pgtable.h              |    6 +++---
+ 2 files changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index fee7c36..116016d 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -33,7 +33,7 @@
-  * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
-  */
- #undef MODULES_VADDR
--#define MODULES_VADDR	(((unsigned long)_etext + ~PGDIR_MASK) & PGDIR_MASK)
-+#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
+diff --git a/arch/arm/include/asm/pgtable-2level-hwdef.h b/arch/arm/include/asm/pgtable-2level-hwdef.h
+index 2b52c40..5cfba15 100644
+--- a/arch/arm/include/asm/pgtable-2level-hwdef.h
++++ b/arch/arm/include/asm/pgtable-2level-hwdef.h
+@@ -88,4 +88,6 @@
+ #define PTE_SMALL_AP_URO_SRW	(_AT(pteval_t, 0xaa) << 4)
+ #define PTE_SMALL_AP_URW_SRW	(_AT(pteval_t, 0xff) << 4)
+ 
++#define PHYS_MASK		(~0UL)
++
  #endif
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 9618052..8f9e1dd 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -199,10 +199,10 @@ static inline pmd_t *pmd_offset(pud_t *pud, unsigned long addr)
  
- #ifdef CONFIG_MMU
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index 82a093c..334e9af 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -121,8 +121,8 @@ static void __dma_free_buffer(struct page *page, size_t size)
- #endif
- 
- #define CONSISTENT_OFFSET(x)	(((unsigned long)(x) - CONSISTENT_BASE) >> PAGE_SHIFT)
--#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PGDIR_SHIFT)
--#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PGDIR_SHIFT)
-+#define CONSISTENT_PTE_INDEX(x) (((unsigned long)(x) - CONSISTENT_BASE) >> PMD_SHIFT)
-+#define NUM_CONSISTENT_PTES (CONSISTENT_DMA_SIZE >> PMD_SHIFT)
- 
- /*
-  * These are the page tables (2MB each) covering uncached, DMA consistent allocations
-@@ -181,7 +181,7 @@ static int __init consistent_init(void)
- 		}
- 
- 		consistent_pte[i++] = pte;
--		base += (1 << PGDIR_SHIFT);
-+		base += (1 << PMD_SHIFT);
- 	} while (base < CONSISTENT_END);
- 
- 	return ret;
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 9d8f0c8..a69f8e4 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -865,14 +865,14 @@ static inline void prepare_page_table(void)
- 	/*
- 	 * Clear out all the mappings below the kernel image.
- 	 */
--	for (addr = 0; addr < MODULES_VADDR; addr += PGDIR_SIZE)
-+	for (addr = 0; addr < MODULES_VADDR; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
- 
- #ifdef CONFIG_XIP_KERNEL
- 	/* The XIP kernel is mapped in the module area -- skip over it */
--	addr = ((unsigned long)_etext + PGDIR_SIZE - 1) & PGDIR_MASK;
-+	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
- #endif
--	for ( ; addr < PAGE_OFFSET; addr += PGDIR_SIZE)
-+	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
- 
- 	/*
-@@ -887,7 +887,7 @@ static inline void prepare_page_table(void)
- 	 * memory bank, up to the end of the vmalloc region.
- 	 */
- 	for (addr = __phys_to_virt(end);
--	     addr < VMALLOC_END; addr += PGDIR_SIZE)
-+	     addr < VMALLOC_END; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
+ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ {
+-	return __va(pmd_val(pmd) & PAGE_MASK);
++	return __va(pmd_val(pmd) & PHYS_MASK & (s32)PAGE_MASK);
  }
  
-@@ -928,7 +928,7 @@ static void __init devicemaps_init(struct machine_desc *mdesc)
- 	 */
- 	vectors_page = early_alloc(PAGE_SIZE);
+-#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd)))
++#define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
  
--	for (addr = VMALLOC_END; addr; addr += PGDIR_SIZE)
-+	for (addr = VMALLOC_END; addr; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
+ /* we don't need complex calculations here as the pmd is folded into the pgd */
+ #define pmd_addr_end(addr,end)	(end)
+@@ -223,7 +223,7 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
+ #define pte_offset_map(pmd,addr)	(__pte_map(pmd) + pte_index(addr))
+ #define pte_unmap(pte)			__pte_unmap(pte)
  
- 	/*
+-#define pte_pfn(pte)		(pte_val(pte) >> PAGE_SHIFT)
++#define pte_pfn(pte)		((pte_val(pte) & PHYS_MASK) >> PAGE_SHIFT)
+ #define pfn_pte(pfn,prot)	__pte(__pfn_to_phys(pfn) | pgprot_val(prot))
+ 
+ #define pte_page(pte)		pfn_to_page(pte_pfn(pte))
