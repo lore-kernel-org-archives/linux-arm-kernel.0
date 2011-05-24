@@ -1,98 +1,40 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 24 May 2011 23:07:17 +0200
-Subject: [PATCH 4/4] gpio/nomadik: add function to read GPIO pull down status
-Message-ID: <1306271237-29044-1-git-send-email-linus.walleij@stericsson.com>
+From: a.p.zijlstra@chello.nl (Peter Zijlstra)
+Date: Tue, 24 May 2011 23:32:30 +0200
+Subject: [BUG]  "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <1306272750.2497.79.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rickard Andersson <rickard.andersson@stericsson.com>
+On Tue, 2011-05-24 at 19:13 +0100, Marc Zyngier wrote:
+> Peter,
+> 
+> I've experienced all kind of lock-ups on ARM SMP platforms recently, and
+> finally tracked it down to the following patch:
+> 
+> e4a52bcb9a18142d79e231b6733cabdbf2e67c1f [sched: Remove rq->lock from the first half of ttwu()].
+> 
+> Even on moderate load, the machine locks up, often silently, and
+> sometimes with a few messages like:
+> INFO: rcu_preempt_state detected stalls on CPUs/tasks: { 0} (detected by 1, t=12002 jiffies)
+> 
+> Another side effect of this patch is that the load average is always 0,
+> whatever load I throw at the system.
+> 
+> Reverting the sched changes up to that patch (included) gives me a
+> working system again, which happily survives parallel kernel
+> compilations without complaining.
+> 
+> My knowledge of the scheduler being rather limited, I haven't been able
+> to pinpoint the exact problem (though it probably have something to do
+> with __ARCH_WANT_INTERRUPTS_ON_CTXSW being defined on ARM). The enclosed
+> patch somehow papers over the load average problem, but the system ends
+> up locking up anyway:
 
-Signed-off-by: Rickard Andersson <rickard.andersson@stericsson.com>
-Reviewed-by: Martin Persson <martin.persson@stericsson.com>
-[Split off from larger patch]
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/plat-nomadik/include/plat/gpio.h |    2 +
- drivers/gpio/gpio-nomadik.c               |   34 +++++++++++++++++++++++++---
- 2 files changed, 32 insertions(+), 4 deletions(-)
+Hurm.. I'll try and make x86 use __ARCH_WANT_INTERRUPTS_ON_CTXSW, IIRC
+Ingo once said that that is possible and try to see if I can reproduce.
+No clear ideas atm.
 
-diff --git a/arch/arm/plat-nomadik/include/plat/gpio.h b/arch/arm/plat-nomadik/include/plat/gpio.h
-index 1b9f6f0..ea19a5b 100644
---- a/arch/arm/plat-nomadik/include/plat/gpio.h
-+++ b/arch/arm/plat-nomadik/include/plat/gpio.h
-@@ -78,6 +78,8 @@ extern int nmk_gpio_get_mode(int gpio);
- extern void nmk_gpio_wakeups_suspend(void);
- extern void nmk_gpio_wakeups_resume(void);
- 
-+extern void nmk_gpio_read_pull(int gpio_bank, u32 *pull_up);
-+
- /*
-  * Platform data to register a block: only the initial gpio/irq number.
-  */
-diff --git a/drivers/gpio/gpio-nomadik.c b/drivers/gpio/gpio-nomadik.c
-index 3802047..4961ef9 100644
---- a/drivers/gpio/gpio-nomadik.c
-+++ b/drivers/gpio/gpio-nomadik.c
-@@ -57,6 +57,7 @@ struct nmk_gpio_chip {
- 	u32 fwimsc;
- 	u32 slpm;
- 	u32 enabled;
-+	u32 pull_up;
- };
- 
- static struct nmk_gpio_chip *
-@@ -103,16 +104,22 @@ static void __nmk_gpio_set_pull(struct nmk_gpio_chip *nmk_chip,
- 	u32 pdis;
- 
- 	pdis = readl(nmk_chip->addr + NMK_GPIO_PDIS);
--	if (pull == NMK_GPIO_PULL_NONE)
-+	if (pull == NMK_GPIO_PULL_NONE) {
- 		pdis |= bit;
--	else
-+		nmk_chip->pull_up &= ~bit;
-+	} else {
- 		pdis &= ~bit;
-+	}
-+
- 	writel(pdis, nmk_chip->addr + NMK_GPIO_PDIS);
- 
--	if (pull == NMK_GPIO_PULL_UP)
-+	if (pull == NMK_GPIO_PULL_UP) {
-+		nmk_chip->pull_up |= bit;
- 		writel(bit, nmk_chip->addr + NMK_GPIO_DATS);
--	else if (pull == NMK_GPIO_PULL_DOWN)
-+	} else if (pull == NMK_GPIO_PULL_DOWN) {
-+		nmk_chip->pull_up &= ~bit;
- 		writel(bit, nmk_chip->addr + NMK_GPIO_DATC);
-+	}
- }
- 
- static void __nmk_gpio_make_input(struct nmk_gpio_chip *nmk_chip,
-@@ -921,6 +928,25 @@ void nmk_gpio_wakeups_resume(void)
- 	}
- }
- 
-+/*
-+ * Read the pull up/pull down status.
-+ * A bit set in 'pull_up' means that pull up
-+ * is selected if pull is enabled in PDIS register.
-+ * Note: only pull up/down set via this driver can
-+ * be detected due to HW limitations.
-+ */
-+void nmk_gpio_read_pull(int gpio_bank, u32 *pull_up)
-+{
-+	if (gpio_bank < NUM_BANKS) {
-+		struct nmk_gpio_chip *chip = nmk_gpio_chips[gpio_bank];
-+
-+		if (!chip)
-+			return;
-+
-+		*pull_up = chip->pull_up;
-+	}
-+}
-+
- static int __devinit nmk_gpio_probe(struct platform_device *dev)
- {
- 	struct nmk_gpio_platform_data *pdata = dev->dev.platform_data;
--- 
-1.7.3.2
+Thanks for reporting.
