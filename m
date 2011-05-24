@@ -1,79 +1,164 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 May 2011 10:09:36 +0200
-Subject: [PATCH 0/4] Add a generic struct clk
-In-Reply-To: <BANLkTimEoCaKwJtpbQTDSEDydNkZ1BkKog@mail.gmail.com>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<BANLkTik=EFayZW61TgfOni-XML+tRLOcqw@mail.gmail.com>
-	<20110524062620.GA22096@pengutronix.de>
-	<BANLkTimEoCaKwJtpbQTDSEDydNkZ1BkKog@mail.gmail.com>
-Message-ID: <20110524080936.GI20715@pengutronix.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Tue, 24 May 2011 10:31:46 +0200
+Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
+In-Reply-To: <201105231103.26775.laurent.pinchart@ideasonboard.com>
+References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
+	<Pine.LNX.4.64.1105211334260.25424@axis700.grange>
+	<201105231103.26775.laurent.pinchart@ideasonboard.com>
+Message-ID: <BANLkTinKgj-HmKwAWN-e6+8kj6ZRC4WJgg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 12:31:13AM -0700, Colin Cross wrote:
-> On Mon, May 23, 2011 at 11:26 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Mon, May 23, 2011 at 04:12:24PM -0700, Colin Cross wrote:
-> >> >
-> >> > ? tglx's plan is to create a separate struct clk_hwdata, which contains a
-> >> > ? union of base data structures for common clocks: div, mux, gate, etc. The
-> >> > ? ops callbacks are passed a clk_hw, plus a clk_hwdata, and most of the base
-> >> > ? hwdata fields are handled within the core clock code. This means less
-> >> > ? encapsulation of clock implementation logic, but more coverage of
-> >> > ? clock basics through the core code.
-> >>
-> >> I don't think they should be a union, I think there should be 3
-> >> separate private datas, and three sets of clock ops, for the three
-> >> different types of clock blocks: rate changers (dividers and plls),
-> >> muxes, and gates. ?These blocks are very often combined - a device
-> >> clock often has a mux and a divider, and clk_set_parent and
-> >> clk_set_rate on the same struct clk both need to work.
-> >
-> > The idea is to being able to propagate functions to the parent. It's
-> > very convenient for the implementation of clocks when they only
-> > implement either a divider, a mux or a gate. Combining all of these
-> > into a single clock leads to complicated clock trees and many different
-> > clocks where you can't factor out the common stuff.
-> 
-> That seems complicated.  You end up with lots of extra clocks (meaning
-> more boilerplate in the platform files) that have no meaning in the
-> system (what is the clock between the mux and the divider in Tegra's
-> i2c1 clock, it can never feed any devices), and you have to figure out
-> at the framework level when to propagate and when to error out.  I'm
-> not even sure you can always find the right place to stop propagating
-> - do you just keep going up until the set_parent callback succeeds, or
-> exists, or what?
+Hi, Laurent, Guennadi,
+thank you for your review. I've already fixed most of the issues.
 
-For the set_parent there would be no propagating at all. For set_rate I
-can imagine a flag in the generic clock which tells whether to propagate
-set_rate or not.
+On 23 May 2011 11:03, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Guennadi and Javier,
+>
+> On Saturday 21 May 2011 17:29:18 Guennadi Liakhovetski wrote:
+>> On Fri, 20 May 2011, Javier Martin wrote:
+>
+> [snip]
+>
+>> > diff --git a/drivers/media/video/mt9p031.c
+>> > b/drivers/media/video/mt9p031.c new file mode 100644
+>> > index 0000000..e406b64
+>> > --- /dev/null
+>> > +++ b/drivers/media/video/mt9p031.c
+>
+> [snip]
+>> > +}
+>> > +
+>> > +static int mt9p031_power_on(struct mt9p031 *mt9p031)
+>> > +{
+>> > + ? int ret;
+>> > +
+>> > + ? /* turn on VDD_IO */
+>> > + ? ret = regulator_enable(mt9p031->reg_2v8);
+>> > + ? if (ret) {
+>> > + ? ? ? ? ? pr_err("Failed to enable 2.8v regulator: %d\n", ret);
+>>
+>> dev_err()
+>>
+>> > + ? ? ? ? ? return ret;
+>> > + ? }
+>> > + ? if (mt9p031->pdata->set_xclk)
+>> > + ? ? ? ? ? mt9p031->pdata->set_xclk(&mt9p031->subdev, 54000000);
+>
+> Can you make 54000000 a #define at the beginning of the file ?
+>
+> You should soft-reset the chip here by calling mt9p031_reset().
+>
 
-> 
-> I think you can still factor out all the common code if you treat each
-> clock as a possible mux, divider, and gate combination.  Each part of
-> the clock is still just as abstractable as before - you can set the
-> rate_ops to be the generic single register divider implementation, and
-> the gate ops to be the generic single bit enable implementation.  The
-> idea of what a clock node is matches the HW design,
+If I do this, I would be force to cache some registers and restart
+them. I've tried to do this but I don't know what is failing that
+there are some artifacts consisting on horizontal black lines in the
+image.
+Please, let me push this to mainline without this feature as a first
+step, since I'll have to spend some assigned to another project.
 
-The hardware design consists of only discrete rate changers (plls,
-dividers), muxes and gates. These are the only building blocks
-*every* hardware design has. I believe that many of the problems
-the current implementations have are due to the multiple building
-blocks stuffed into one clock. If you haven't already take a look
-at my i.MX5 clock patches:
+[snip]
+>> > + */
+>> > +static int mt9p031_video_probe(struct i2c_client *client)
+>> > +{
+>> > + ? s32 data;
+>> > + ? int ret;
+>> > +
+>> > + ? /* Read out the chip version register */
+>> > + ? data = reg_read(client, MT9P031_CHIP_VERSION);
+>> > + ? if (data != MT9P031_CHIP_VERSION_VALUE) {
+>> > + ? ? ? ? ? dev_err(&client->dev,
+>> > + ? ? ? ? ? ? ? ? ? "No MT9P031 chip detected, register read %x\n", data);
+>> > + ? ? ? ? ? return -ENODEV;
+>> > + ? }
+>> > +
+>> > + ? dev_info(&client->dev, "Detected a MT9P031 chip ID %x\n", data);
+>> > +
+>> > + ? ret = mt9p031_reset(client);
+>> > + ? if (ret < 0)
+>> > + ? ? ? ? ? dev_err(&client->dev, "Failed to initialise the camera\n");
+>
+> If you move the soft-reset operation to mt9p031_power_on(), you don't need to
+> call it here.
+>
 
-http://thread.gmane.org/gmane.linux.ports.arm.kernel/113631
+The reason for this is the same as before. I haven't still been able
+to success on restarting registers and getting everything to work
+fine.
+It would be great if you allowed me to push this as it is as an
+intermediate step.
 
-They need changes to fit onto the current patches and the rate
-propagation problem is not solved there, but the resulting clock
-data files are really short and nice to read. Furthermore it's easy
-to implement. Just look at the diagrams in the datasheet and go through
-them.
+[snip]
+>
+>> > + ? mt9p031->rect.width ? ? = MT9P031_MAX_WIDTH;
+>> > + ? mt9p031->rect.height ? ?= MT9P031_MAX_HEIGHT;
+>> > +
+>> > + ? mt9p031->format.code = V4L2_MBUS_FMT_SGRBG12_1X12;
+>> > +
+>> > + ? mt9p031->format.width = MT9P031_MAX_WIDTH;
+>> > + ? mt9p031->format.height = MT9P031_MAX_HEIGHT;
+>> > + ? mt9p031->format.field = V4L2_FIELD_NONE;
+>> > + ? mt9p031->format.colorspace = V4L2_COLORSPACE_SRGB;
+>> > +
+>> > + ? mt9p031->xskip = 1;
+>> > + ? mt9p031->yskip = 1;
+>> > +
+>> > + ? mt9p031->reg_1v8 = regulator_get(NULL, "cam_1v8");
+>> > + ? if (IS_ERR(mt9p031->reg_1v8)) {
+>> > + ? ? ? ? ? ret = PTR_ERR(mt9p031->reg_1v8);
+>> > + ? ? ? ? ? pr_err("Failed 1.8v regulator: %d\n", ret);
+>>
+>> dev_err()
+>>
+>> > + ? ? ? ? ? goto e1v8;
+>> > + ? }
+>
+> The driver can be used with boards where either or both of the 1.8V and 2.8V
+> supplies are always on, thus not connected to any regulator. I'm not sure how
+> that's usually handled, if board code should define an "always-on" power
+> supply, or if the driver shouldn't fail when no regulator is present. In any
+> case, this must be handled.
+>
 
-Sascha
+I think board code should define an "always-on" power supply.
+
+>> > +
+>> > + ? mt9p031->reg_2v8 = regulator_get(NULL, "cam_2v8");
+>> > + ? if (IS_ERR(mt9p031->reg_2v8)) {
+>> > + ? ? ? ? ? ret = PTR_ERR(mt9p031->reg_2v8);
+>> > + ? ? ? ? ? pr_err("Failed 2.8v regulator: %d\n", ret);
+>>
+>> ditto
+>>
+>> > + ? ? ? ? ? goto e2v8;
+>> > + ? }
+>> > + ? /* turn on core */
+>> > + ? ret = regulator_enable(mt9p031->reg_1v8);
+>> > + ? if (ret) {
+>> > + ? ? ? ? ? pr_err("Failed to enable 1.8v regulator: %d\n", ret);
+>>
+>> ditto
+>>
+>> > + ? ? ? ? ? goto e1v8en;
+>> > + ? }
+>> > + ? return 0;
+>
+> Why do you leave core power on at the end of probe() ? You should only turn it
+> on when needed.
+>
+
+Just as I said, because restarting registers does not work yet.
+
+
+
+
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
