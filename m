@@ -1,97 +1,46 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Tue, 24 May 2011 17:34:17 +0530
-Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
-Message-ID: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 24 May 2011 14:40:34 +0200
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver
+In-Reply-To: <7E10264BABCB4C1788DCD9715461BDE8@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105231730.06564.arnd@arndb.de>
+	<7E10264BABCB4C1788DCD9715461BDE8@subhasishg>
+Message-ID: <201105241440.34854.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Vinod Koul <vinod.koul@intel.com>
+On Tuesday 24 May 2011, Subhasish Ghosh wrote:
+> Would it be a good approach to first get a basic sensible
+> driver into the tree and then work towards improving and
+> adjusting for future compatibilities.
 
-Signed-off-by: Vinod Koul <vinod.koul@intel.com>
----
- Documentation/dma-slave-api.txt |   74 +++++++++++++++++++++++++++++++++++++++
- 1 files changed, 74 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/dma-slave-api.txt
+The main problem with that is that you cannot really change
+user-visible interfaces after the driver is merged. Anything
+regarding sysfs attributes and firmware file contents needs
+to be fixed. You can however still change in-kernel interfaces
+at a later point without problems.
 
-diff --git a/Documentation/dma-slave-api.txt b/Documentation/dma-slave-api.txt
-new file mode 100644
-index 0000000..7498807
---- /dev/null
-+++ b/Documentation/dma-slave-api.txt
-@@ -0,0 +1,74 @@
-+		     Slave DMA API Guide
-+		     ===================
-+
-+		 Vinod Koul <vinod dot koul@intel.com>
-+
-+This is a guide to device driver writers on how to use the Slave-DMA API of the
-+DMA Engine. This is applicable only for slave DMA usage and not async tx. For
-+the async tx usage of DMA Engine please see
-+Documentation/crypto/async-tx-api.txt
-+
-+The slave DMA usage consists of following steps
-+1. Allocate a DMA slave channel
-+2. Set slave and controller specific parameters
-+3. Get a descriptor for transaction
-+4. Submit the transaction and wait for callback notification
-+
-+1. Allocate a DMA slave channel
-+Channel allocation is slightly different in the slave DMA context, client
-+drivers typically need a channel from a particular DMA controller only and even
-+in some cases a specific channel is desired. To request a channel
-+__dma_request_channel() API is used.
-+
-+Interface:
-+struct dma_chan *dma_request_channel(dma_cap_mask_t mask,
-+		dma_filter_fn filter_fn,
-+		void *filter_param);
-+where dma_filter_fn is defined as:
-+typedef bool (*dma_filter_fn)(struct dma_chan *chan, void *filter_param);
-+
-+When the optional 'filter_fn' parameter is set to NULL dma_request_channel
-+simply returns the first channel that satisfies the capability mask.  Otherwise,
-+when the mask parameter is insufficient for specifying the necessary channel,
-+the filter_fn routine can be used to disposition the available channels in the
-+system. The filter_fn routine is called once for each free channel in the
-+system.  Upon seeing a suitable channel filter_fn returns DMA_ACK which flags
-+that channel to be the return value from dma_request_channel.  A channel
-+allocated via this interface is exclusive to the caller, until
-+dma_release_channel() is called.
-+
-+2. Set slave and controller specific parameters
-+Next step is always to pass some specific information to the DMA driver. Most of
-+the generic information which a slave DMA can use is in struct dma_slave_config.
-+It allows the clients to specify DMA direction, DMA addresses, bus widths, DMA
-+burst lengths etc. If some DMA controllers have more parameters to be sent then
-+they should try to embed struct dma_slave_config in their controller specific
-+structure. That gives flexibility to client to pass more parameters, if
-+required.
-+
-+Interface:
-+struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_sg)(
-+		struct dma_chan *chan,
-+		struct scatterlist *dst_sg, unsigned int dst_nents,
-+		struct scatterlist *src_sg, unsigned int src_nents,
-+		unsigned long flags);
-+struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_cyclic)(
-+		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-+		size_t period_len, enum dma_data_direction direction);
-+
-+4. Submit the transaction(s) and wait for callback notification when slave API
-+is 3 above returns, the non NULL value would imply a "descriptor" for the
-+transaction. These transaction(s) would need to be submitted which pushes them
-+into queue in DMA driver. If DMA is idle then the first descriptor submit will
-+be pushed to DMA and subsequent ones will be queued. On completion of the DMA
-+operation the next in queue is submitted and a tasklet triggered. The tasklet
-+would then call the client driver completion callback routine for notification,
-+if set.
-+
-+Additional usage notes
-+1/ Although DMA engine specifies that completion callback routines cannot submit
-+any new operations, but typically for slave DMA subsequent transaction may not
-+be available for submit prior to callback routine being called. This requirement
-+|is not a requirement for DMA-slave devices. But they should take care to drop
-+the spin-lock they might be holding before calling the callback routine
-+
--- 
-1.7.0.4
+> That way we can gradually build towards the perfect driver
+> in steps, rather than digressing far too off suddenly.
+> That would be some source of motivation for me too.
+
+You can definitely add the driver to drivers/staging/pruss/,
+as the rules for staging drivers are different. I think that
+would indeed be helpful at this point. As soon as all
+interfaces have stabilized, you can then move the individual
+parts to their final location.
+
+Greg maintains the staging drivers, and he can surely point
+you to a document describing what is required for a driver.
+Mainly, this includes having a patch that adds a single
+directory with all the driver files under drivers/staging.
+The driver must be able to compile without errors and you need
+a TODO file listing the remaining issues that prevent you
+from having a non-staging driver.
+
+I think the list will be relatively short, given that you
+have made a lot of progress and the driver is now essentially
+ready, aside from a few details and the big question of
+how the firmware should be configured and loaded.
+
+	Arnd
