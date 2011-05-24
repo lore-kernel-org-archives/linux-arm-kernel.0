@@ -1,47 +1,32 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 May 2011 16:26:35 +0100
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <yw1xipt0p4i9.fsf@unicorn.mansr.com>
-References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
-	<20110523132124.GI17672@n2100.arm.linux.org.uk>
-	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
-	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
-Message-ID: <BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 24 May 2011 23:35:46 +0800
+Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
+In-Reply-To: <20110524115215.GD22096@pengutronix.de>
+References: <20110521112947.GB11887@sirena.org.uk>
+	<20110523062501.GA20715@pengutronix.de>
+	<20110523104409.GA15635@opensource.wolfsonmicro.com>
+	<20110523144126.GF20715@pengutronix.de>
+	<20110523152248.GC6489@sirena.org.uk>
+	<20110523164601.GG20715@pengutronix.de>
+	<20110523224045.GA19533@opensource.wolfsonmicro.com>
+	<20110524072814.GC22096@pengutronix.de>
+	<20110524094658.GA4005@opensource.wolfsonmicro.com>
+	<20110524115215.GD22096@pengutronix.de>
+Message-ID: <20110524153521.GH7945@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/24 M?ns Rullg?rd <mans@mansr.com>:
-> Catalin Marinas <catalin.marinas@arm.com> writes:
->
->> On Mon, 2011-05-23 at 14:21 +0100, Russell King - ARM Linux wrote:
->>> On Mon, May 23, 2011 at 12:16:48PM +0100, Catalin Marinas wrote:
->>> > Newer versions of gcc generate unaligned accesses by default, causing
->>> > kernel panics when CONFIG_ALIGNMENT_TRAP is enabled. This patch adds the
->>> > -mno-unaligned-access option to gcc.
->>>
->>> This description doesn't make sense. ?If we have alignment traps enabled,
->>> then we _expect_ to fix up unaligned loads and stores.
->>>
->>> Therefore there should be no panic if CONFIG_ALIGNMENT_TRAP is enabled.
->>>
->>> So what's the _actual_ problem that this is trying to address? ?What's
->>> the panic/oops look like? ?And that information should be in the commit
->>> description _anyway_.
->>
->> Does the patch below look better?
->>
->> We cannot move alignment_init() earlier as we don't know how early the
->> compiler would generate unaligned accesses. An alternative is some
->> #ifdef's in head.S. Please let me know which variant you prefer.
->
-> ifdefs may be ugly, but I don't see a better solution here. ?Crippling
-> the entire build to make a couple of lines slightly more aesthetically
-> pleasing doesn't seem right to me.
+On Tue, May 24, 2011 at 01:52:15PM +0200, Sascha Hauer wrote:
+> On Tue, May 24, 2011 at 05:46:59PM +0800, Mark Brown wrote:
 
-BTW, are we sure that the code generated with unaligned accesses is
-better? AFAIK, while processors support unaligned accesses, they may
-not always be optimal.
+> > Well, one obvious example is if someone's using the device with a sparse
+> > system already - they'll have had to arrange to allocate the IRQ range
+> > already.
 
--- 
-Catalin
+> There seems to be no user in the kernel. Anyway, sooner or later we'll
+> have the same problem with other mfd drivers. So what do yuo suggest?
+
+The other MFD drivers are exactly my issue here, obviously all these
+devices have pretty much the same code and we should be doing the same
+thing with all of them.  I've got a good idea about users for drivers I
+maintain but less so for others.
