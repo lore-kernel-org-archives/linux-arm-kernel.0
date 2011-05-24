@@ -1,57 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 24 May 2011 13:51:28 +0200
-Subject: Updated mach-types update
-In-Reply-To: <BANLkTi=esTs+gTxGqbZc+TJgcna5OtmWhA@mail.gmail.com>
-References: <201105231652.28497.arnd@arndb.de>
-	<201105231839.57083.arnd@arndb.de>
-	<BANLkTi=esTs+gTxGqbZc+TJgcna5OtmWhA@mail.gmail.com>
-Message-ID: <201105241351.28692.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 24 May 2011 13:52:15 +0200
+Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
+In-Reply-To: <20110524094658.GA4005@opensource.wolfsonmicro.com>
+References: <alpine.LFD.2.02.1105201518030.3078@ionos>
+	<20110521112947.GB11887@sirena.org.uk>
+	<20110523062501.GA20715@pengutronix.de>
+	<20110523104409.GA15635@opensource.wolfsonmicro.com>
+	<20110523144126.GF20715@pengutronix.de>
+	<20110523152248.GC6489@sirena.org.uk>
+	<20110523164601.GG20715@pengutronix.de>
+	<20110523224045.GA19533@opensource.wolfsonmicro.com>
+	<20110524072814.GC22096@pengutronix.de>
+	<20110524094658.GA4005@opensource.wolfsonmicro.com>
+Message-ID: <20110524115215.GD22096@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 24 May 2011, Jaya Kumar wrote:
+On Tue, May 24, 2011 at 05:46:59PM +0800, Mark Brown wrote:
+> On Tue, May 24, 2011 at 09:28:14AM +0200, Sascha Hauer wrote:
+> > On Tue, May 24, 2011 at 06:41:00AM +0800, Mark Brown wrote:
+> 
+> > > on systems that do actually have the IRQ range allocated for some other
+> > > reason.
+> 
+> > By 'some other reason' you mean an implementation bug? If the range is
+> > already allocated the wm8350 driver should better not use it.
+> 
+> Well, one obvious example is if someone's using the device with a sparse
+> system already - they'll have had to arrange to allocate the IRQ range
+> already.
 
-> Thanks for the feedback. I think this thread went from the specific
-> case of this 2363, Wayland board into a broader discussion. I
-> understand this is because of the arm subarch cleanup goals. To help
-> people like me who aren't familiar with the details, could you
-> elaborate on "can still add board files" and "the work that is
-> required to remove them later". Do you mean I could still submit a
-> patch like arch/arm/mach-mmp/wayland* and you'd be willing to take it,
-> but with the expectation that it would be removed at a later date? Is
-> the removal work to do with adding device tree support (I assume
-> that's a bootloader task as well as a subarch/board support task)? I'm
-> happy to help with what I can but I'm very slow. I'm even having
-> trouble just getting mainline to boot on the board. [1]
+There seems to be no user in the kernel. Anyway, sooner or later we'll
+have the same problem with other mfd drivers. So what do yuo suggest?
 
-Hi Jaya,
+Sascha
 
-Our long-term goal is to replace all board files that are today written
-in C with device tree files that describe a board independent of the kernel.
-
-This clearly isn't happening over night and we need a lot of people to help
-out with that. You can definitely submit a patch to add the board (if you
-haven't already) and then we review it with the goal of finding a solution
-that helps you get the board supported while at the same time making some
-progress towards removing board files. What exactly that solution is depends
-a lot on the contents of your board file and what the mmp maintainers think
-of it.
-
-I haven't seen the board code, so I could only guess that it will be one
-of these:
-
-* If your board is very simple, we can help make that board use
-  the device tree to describe all devices on your board, so you don't
-  need a board file, while other mmp boards still use it.
-
-* If there is something particularly ugly that is shared with other
-  mmp board files, I'd ask you to clean up the same wart in all mmp board
-  files but add yours without further changes.
-
-* If the new board file looks good but too complex to convert to
-  device tree right away, you could choose an area that stands in
-  the way of moving all mmp boards over to device tree, and create
-  a binding for that area. One such area might be describing the
-  mfp pin config in the device tree.
-
-	Arnd
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
