@@ -1,62 +1,54 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Tue, 24 May 2011 13:52:37 +0200
-Subject: [PATCH V4] OMAP3+: SR Layer Cleanup
-In-Reply-To: <BANLkTi=ufSmtnEkyRFKOpbTAJkcUW1dXYg@mail.gmail.com>
-References: <1305268062-20046-1-git-send-email-shweta.gulati@ti.com>	<4DD67155.1030705@ti.com>
-	<BANLkTi=ufSmtnEkyRFKOpbTAJkcUW1dXYg@mail.gmail.com>
-Message-ID: <4DDB9C05.4090705@ti.com>
+From: subhasish@mistralsolutions.com (Subhasish Ghosh)
+Date: Tue, 24 May 2011 17:47:32 +0530
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
+In-Reply-To: <201105231730.06564.arnd@arndb.de>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105151133.23870.arnd@arndb.de>
+	<B876E8072D52496DB747D5CCCF64826D@subhasishg>
+	<201105231730.06564.arnd@arndb.de>
+Message-ID: <7E10264BABCB4C1788DCD9715461BDE8@subhasishg>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/23/2011 6:40 AM, Gulati, Shweta wrote:
-> Benoit,
+Hi Arnd,
+
+>> http://linux.omap.com/pipermail/davinci-linux-open-source/
+>> 2011-March/022339.html.
+>>
+>> We can use this implementation along with the sysfs to load the devices
+>> runtime.
 >
-> On Fri, May 20, 2011 at 7:19 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
->> Hi Shweta,
->>
->> On 5/13/2011 8:27 AM, Gulati, Shweta wrote:
->>>
->>> To set sr ntarget values  for all volt_domain,
->>> volt_table is retrieved by doing a look_up of 'vdd_name'
->>> field from omap_hwmod but voltage domain pointer does not
->>> belong to omap_hwmod and is not used anywhere else.
->>> As a part of voltage layer and SR Layer clean up volt
->>> pointer is removed from omap_hwmod and added in dev
->>> attributes of SR.
->>>
->>> Tested on OMAP3630 SDP and OMAP4430 SDP Board
->>>
->>> Signed-off-by: Shweta Gulati<shweta.gulati@ti.com>
->>> Acked by: Nishanth Menon<nm@ti.com>
->>> Cc: Benoit Cousson<b-cousson@ti.com>
->>> Cc: Paul Walmsley<paul@pwsan.com>
->>> ---
->>>
->>> V4:
->>>    Fixed comments like checking for NULL pointers
->>>    and following conventions in naming the instances
->>>    recommended by Todd Poynor and Benoit Cousson.
->>
->> It looks like you missed at least two comments I did on the previous version
->> whereas you did agree to fix them.
-> You told me to move smartrefex_xxxx_dev_attr above
-> omap44xx_smartreflex_XXX_hwmod struct,
+> Possibly, but the actual data structures might end up differently
+> when they are built around a sysfs interface. If you have a sysfs
+> interface, it is more important to have that in a clean way than
+> the board file, so we should first discuss the set of sysfs
+> attributes that you are going to need, and then see how to
+> represent that in platform data for predefined boards.
+>
+>> The configs that I have in the board_file for the devices
+>> structure, are fixed for a board. To swap the boards, we do not need to 
+>> re-compile
+>> the kernel.
+>
+> The other point to consider is that we are definitely moving
+> towards the flattened device tree for these definitions now.
+> It's probably good to make the sysfs attributes directly correspond
+> to fdt device properties. I'm not sure if we also need to allow platform
+> data. The easiest way could be to just require the use of device tree
+> for predefined pruss devices.
+>
+> I'm sorry that this is moving in a different direction now, you
+> had an unfortunate timing here.
+>
+> Let's first discuss the exact properties that are really required
+> to define the differences between PRU backends, as those will
+> be required in any case. What do you need for PRU specific
+> data besides the firmware and the name of the device?
 
-Just before the struct which is not the case.
-
-> which is already in that order and the other thing you suggested was
-> to move .dev_attr before .slaves,
-> that I have not done explaining that, to follow the standard as in all
-> defined hwmod struct .dev_attr are placed after .slaves.
-
-Could you give some example in the OMAP4 data file?
-
-In the generic form, you should have opt_clk attribute then dev_attr 
-then .slaves.
-
-Anyway, do not say you will fix something if you decide not to fix them 
-after. Or in case of valid concern, please provide some explanation in 
-the cover letter.
-
-Regards,
-Benoit
+Would it be a good approach to first get a basic sensible
+driver into the tree and then work towards improving and
+adjusting for future compatibilities.
+That way we can gradually build towards the perfect driver
+in steps, rather than digressing far too off suddenly.
+That would be some source of motivation for me too.
+ 
