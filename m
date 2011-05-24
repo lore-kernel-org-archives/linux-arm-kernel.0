@@ -1,54 +1,97 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Tue, 24 May 2011 13:33:47 +0100 (BST)
-Subject: [RFC PATCH] ARM hibernation / suspend-to-disk support code
-In-Reply-To: <20110523163758.GA2442@arm.com>
-References: <3DCE2F529B282E4B8F53D4D8AA406A07014FFE@008-AM1MPN1-022.mgdnok.nokia.com>
-	<alpine.DEB.2.00.1105181257370.2374@localhost6.localdomain6>
-	<20110520113758.GA3141@arm.com>
-	<20110520180510.GE7445@n2100.arm.linux.org.uk>
-	<20110523100132.GC2370@arm.com>
-	<20110523101220.GH17672@n2100.arm.linux.org.uk>
-	<20110523111631.GD3769@arm.com>
-	<20110523161149.GB15138@n2100.arm.linux.org.uk>
-	<20110523163758.GA2442@arm.com>
-Message-ID: <alpine.DEB.2.00.1105241324190.10891@localhost6.localdomain6>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 24 May 2011 17:34:17 +0530
+Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
+Message-ID: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 23 May 2011, Dave Martin wrote:
+From: Vinod Koul <vinod.koul@intel.com>
 
-> On Mon, May 23, 2011 at 05:11:49PM +0100, Russell King - ARM Linux wrote:
-[ ... ]
->> I tend to suggest that the header file is the right place, because that's
->> where the interface is defined.  Other people argue that its more likely
->> to be seen in the implementation (fiq.c).  So I'm tempted to say both,
->> but lets go with fiq.h for the time being.
->
-> OK -- the {get,set}_fiq_regs patch is currently in your patch system.
->
-> If you have no objection, I'll submit a patch adding the above text to apply
-> on top of the other patch (or, if possible, orthogonally).
->
-> ---Dave
+Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+---
+ Documentation/dma-slave-api.txt |   74 +++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 74 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/dma-slave-api.txt
 
-Thanks a lot !
-
->
->>
->>> That argument may apply to a ton of state in the Secure World, not just
->>> the FIQ registers
->>
->> It very much does, and I know OMAP has some kind of SMC call to handle
->> this.
->
-
-Yes, _omap_sram_idle() does that bit, it gives a physical address to the 
-OMAP ROM code to save/restore the "secure state" in, triggered via smc.
-
-Anyway, architecturally it seems to be much cleaner to _allow_ device 
-drivers (or machine-specific hooks) to save/restore _more_ state than 
-whatever the "core suspend code" would do, instead of _forcing_ the core 
-suspend code to do everything-and-the-kitchen-sink.
-That's where things like FIQ or secure state would be.
-
-FrankH.
+diff --git a/Documentation/dma-slave-api.txt b/Documentation/dma-slave-api.txt
+new file mode 100644
+index 0000000..7498807
+--- /dev/null
++++ b/Documentation/dma-slave-api.txt
+@@ -0,0 +1,74 @@
++		     Slave DMA API Guide
++		     ===================
++
++		 Vinod Koul <vinod dot koul@intel.com>
++
++This is a guide to device driver writers on how to use the Slave-DMA API of the
++DMA Engine. This is applicable only for slave DMA usage and not async tx. For
++the async tx usage of DMA Engine please see
++Documentation/crypto/async-tx-api.txt
++
++The slave DMA usage consists of following steps
++1. Allocate a DMA slave channel
++2. Set slave and controller specific parameters
++3. Get a descriptor for transaction
++4. Submit the transaction and wait for callback notification
++
++1. Allocate a DMA slave channel
++Channel allocation is slightly different in the slave DMA context, client
++drivers typically need a channel from a particular DMA controller only and even
++in some cases a specific channel is desired. To request a channel
++__dma_request_channel() API is used.
++
++Interface:
++struct dma_chan *dma_request_channel(dma_cap_mask_t mask,
++		dma_filter_fn filter_fn,
++		void *filter_param);
++where dma_filter_fn is defined as:
++typedef bool (*dma_filter_fn)(struct dma_chan *chan, void *filter_param);
++
++When the optional 'filter_fn' parameter is set to NULL dma_request_channel
++simply returns the first channel that satisfies the capability mask.  Otherwise,
++when the mask parameter is insufficient for specifying the necessary channel,
++the filter_fn routine can be used to disposition the available channels in the
++system. The filter_fn routine is called once for each free channel in the
++system.  Upon seeing a suitable channel filter_fn returns DMA_ACK which flags
++that channel to be the return value from dma_request_channel.  A channel
++allocated via this interface is exclusive to the caller, until
++dma_release_channel() is called.
++
++2. Set slave and controller specific parameters
++Next step is always to pass some specific information to the DMA driver. Most of
++the generic information which a slave DMA can use is in struct dma_slave_config.
++It allows the clients to specify DMA direction, DMA addresses, bus widths, DMA
++burst lengths etc. If some DMA controllers have more parameters to be sent then
++they should try to embed struct dma_slave_config in their controller specific
++structure. That gives flexibility to client to pass more parameters, if
++required.
++
++Interface:
++struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_sg)(
++		struct dma_chan *chan,
++		struct scatterlist *dst_sg, unsigned int dst_nents,
++		struct scatterlist *src_sg, unsigned int src_nents,
++		unsigned long flags);
++struct dma_async_tx_descriptor *(*chan->device->device_prep_dma_cyclic)(
++		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
++		size_t period_len, enum dma_data_direction direction);
++
++4. Submit the transaction(s) and wait for callback notification when slave API
++is 3 above returns, the non NULL value would imply a "descriptor" for the
++transaction. These transaction(s) would need to be submitted which pushes them
++into queue in DMA driver. If DMA is idle then the first descriptor submit will
++be pushed to DMA and subsequent ones will be queued. On completion of the DMA
++operation the next in queue is submitted and a tasklet triggered. The tasklet
++would then call the client driver completion callback routine for notification,
++if set.
++
++Additional usage notes
++1/ Although DMA engine specifies that completion callback routines cannot submit
++any new operations, but typically for slave DMA subsequent transaction may not
++be available for submit prior to callback routine being called. This requirement
++|is not a requirement for DMA-slave devices. But they should take care to drop
++the spin-lock they might be holding before calling the callback routine
++
+-- 
+1.7.0.4
