@@ -1,46 +1,36 @@
-From: paulo@nlink.com.br (Paulo Fragoso)
-Date: Tue, 24 May 2011 01:31:05 -0300
-Subject: External serial 8250/16550
-In-Reply-To: <4DD579EB.50609@nlink.com.br>
-References: <4DB44883.3000608@nlink.com.br>	<BANLkTinMrZvO_bNcAKXvaa_pXE+jOxO2uw@mail.gmail.com>	<4DC3F035.9030208@nlink.com.br>	<4DC8AFF9.9030508@nlink.com.br>	<4DCB449C.8060808@nlink.com.br>
-	<4DD579EB.50609@nlink.com.br>
-Message-ID: <4DDB3489.2020809@nlink.com.br>
+From: vapier.adi@gmail.com (Mike Frysinger)
+Date: Tue, 24 May 2011 00:43:21 -0400
+Subject: [PATCH v5 1/8] MTD: Add integrator-flash feature to physmap
+In-Reply-To: <1305557977-16871-2-git-send-email-marc.zyngier@arm.com>
+References: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
+	<1305557977-16871-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <BANLkTi=sd-Xhm8yXXbHk_VfMWwdaez_LhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19-05-2011 17:13, Paulo Fragoso wrote:
+On Mon, May 16, 2011 at 10:59, Marc Zyngier wrote:
+> --- a/include/linux/mtd/physmap.h
+> +++ b/include/linux/mtd/physmap.h
+> @@ -22,6 +22,8 @@ struct map_info;
 >
-> This explain constant output on COMA from TL16C2550 and COMB is 
-> detected at boot time but doesn't work.
->
-> I will research what can be happening but what can be wrong with NCS1 
-> and NCS2?
+> ?struct physmap_flash_data {
+> ? ? ? ?unsigned int ? ? ? ? ? ?width;
+> + ? ? ? int ? ? ? ? ? ? ? ? ? ? (*init)(struct platform_device *);
+> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*exit)(struct platform_device *);
+> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*set_vpp)(struct map_info *, int);
+> ? ? ? ?unsigned int ? ? ? ? ? ?nr_parts;
+> ? ? ? ?unsigned int ? ? ? ? ? ?pfow_base;
 
-All is working at boot time and NCS1 was correctly programed in bootstrap.
+you use the platform_device structure but never include any header for
+it.  please add "struct platform_device;" to the top of this file
+after the #includes.
 
-But no data out at serial line I'm testing enabling getty in inittab.
-
-NCS1, NCS2, IOW and IOR are working how expected by the SMC config:
-
-static struct sam9_smc_config tms_uart_smc_config = {
-     .ncs_read_setup   = 0,
-     .nrd_setup        = 2,
-     .ncs_write_setup  = 0,
-     .nwe_setup        = 2,
-
-     .ncs_read_pulse   = 5,
-     .nrd_pulse        = 4,
-     .ncs_write_pulse  = 4,
-     .nwe_pulse        = 3,
-
-     .read_cycle       = 10,
-     .write_cycle      = 9,
-
-     .mode             = AT91_SMC_READMODE | AT91_SMC_WRITEMODE | 
-AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8 | AT91_SMC_BAT_WRITE,
-     .tdf_cycles       = 3,
-};
-
-Why isn't there any data on TX for COMA or COMB?
-
-Paulo.
+include/linux/mtd/physmap.h:25: warning: ?struct platform_device?
+declared inside parameter list
+include/linux/mtd/physmap.h:25: warning: its scope is only this
+definition or declaration, which is probably not what you want
+include/linux/mtd/physmap.h:26: warning: ?struct platform_device?
+declared inside parameter list
+include/linux/mtd/physmap.h:27: warning: ?struct platform_device?
+declared inside parameter list
+-mike
