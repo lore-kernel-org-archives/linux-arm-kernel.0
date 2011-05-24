@@ -1,30 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Tue, 24 May 2011 17:46:59 +0800
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <20110524072814.GC22096@pengutronix.de>
-References: <20110520130721.GD10403@pengutronix.de>
-	<alpine.LFD.2.02.1105201518030.3078@ionos>
-	<20110521112947.GB11887@sirena.org.uk>
-	<20110523062501.GA20715@pengutronix.de>
-	<20110523104409.GA15635@opensource.wolfsonmicro.com>
-	<20110523144126.GF20715@pengutronix.de>
-	<20110523152248.GC6489@sirena.org.uk>
-	<20110523164601.GG20715@pengutronix.de>
-	<20110523224045.GA19533@opensource.wolfsonmicro.com>
-	<20110524072814.GC22096@pengutronix.de>
-Message-ID: <20110524094658.GA4005@opensource.wolfsonmicro.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 May 2011 11:04:08 +0100
+Subject: [PATCH v5 00/19] ARM: Add support for the Large Physical
+	Address Extensions
+In-Reply-To: <20110523165412.GF15138@n2100.arm.linux.org.uk>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<20110523165412.GF15138@n2100.arm.linux.org.uk>
+Message-ID: <1306231448.19557.23.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 09:28:14AM +0200, Sascha Hauer wrote:
-> On Tue, May 24, 2011 at 06:41:00AM +0800, Mark Brown wrote:
+On Mon, 2011-05-23 at 17:54 +0100, Russell King - ARM Linux wrote:
+> On Sun, May 08, 2011 at 01:51:19PM +0100, Catalin Marinas wrote:
+> > This set of patches adds support for the Large Physical Extensions on
+> > the ARM architecture (available with the Cortex-A15 processor). LPAE
+> > comes with a 3-level page table format (compared to 2-level for the
+> > classic one), allowing up to 40-bit physical address space.
+> >
+> > The ARM LPAE documentation is available from (free registration needed):
+> >
+> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
+> >
+> > The full set of patches on top of linux-next (LPAE, support for an
+> > emulated Versatile Express with Cortex-A15 tile and generic timers) is
+> > available on this branch:
+> >
+> > git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae-next
+> 
+> FYI, I'm going to drop the pgt patch because the warnings are still there
 
-> > on systems that do actually have the IRQ range allocated for some other
-> > reason.
+What warnings are you seeing? Could you please post them?
 
-> By 'some other reason' you mean an implementation bug? If the range is
-> already allocated the wm8350 driver should better not use it.
+I tried with just your nopud patch on top of v2.6.39 and compiled for
+vexpress. I don't get any warnings and I tried STRICT_MM_TYPECHECKS as
+well.
 
-Well, one obvious example is if someone's using the device with a sparse
-system already - they'll have had to arrange to allocate the IRQ range
-already.
+-- 
+Catalin
