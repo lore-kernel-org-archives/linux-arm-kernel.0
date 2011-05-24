@@ -1,71 +1,41 @@
-From: chris@techworks.ie (Christian Gagneraud)
-Date: Tue, 24 May 2011 14:46:36 +0100
-Subject: External serial 8250/16550
-In-Reply-To: <4DDB3489.2020809@nlink.com.br>
-References: <4DB44883.3000608@nlink.com.br>	<BANLkTinMrZvO_bNcAKXvaa_pXE+jOxO2uw@mail.gmail.com>	<4DC3F035.9030208@nlink.com.br>	<4DC8AFF9.9030508@nlink.com.br>	<4DCB449C.8060808@nlink.com.br>	<4DD579EB.50609@nlink.com.br>
-	<4DDB3489.2020809@nlink.com.br>
-Message-ID: <4DDBB6BC.30509@techworks.ie>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 24 May 2011 15:17:18 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>
+	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <yw1xipt0p4i9.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/05/11 05:31, Paulo Fragoso wrote:
-> On 19-05-2011 17:13, Paulo Fragoso wrote:
->>
->> This explain constant output on COMA from TL16C2550 and COMB is
->> detected at boot time but doesn't work.
->>
->> I will research what can be happening but what can be wrong with NCS1
->> and NCS2?
->
-> All is working at boot time and NCS1 was correctly programed in bootstrap.
->
-> But no data out at serial line I'm testing enabling getty in inittab.
->
-> NCS1, NCS2, IOW and IOR are working how expected by the SMC config:
->
-> static struct sam9_smc_config tms_uart_smc_config = {
-> .ncs_read_setup = 0,
-> .nrd_setup = 2,
-> .ncs_write_setup = 0,
-> .nwe_setup = 2,
->
-> .ncs_read_pulse = 5,
-> .nrd_pulse = 4,
-> .ncs_write_pulse = 4,
-> .nwe_pulse = 3,
->
-> .read_cycle = 10,
-> .write_cycle = 9,
->
-> .mode = AT91_SMC_READMODE | AT91_SMC_WRITEMODE |
-> AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8 | AT91_SMC_BAT_WRITE,
-> .tdf_cycles = 3,
-> };
->
-> Why isn't there any data on TX for COMA or COMB?
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-Hi Paulo,
-
-I will have soon to do the same job on a SAM9G20 (but with a Quad UART). 
-Did you try to access the registers of the UART? (You can do that from 
-userspace: 
-ftp://ftp.embeddedarm.com/ts-arm-sbc/ts-7260-linux/sources/peekpoke.tar.gz). 
-I think The UART has a scratch register, you could test if you can write 
-and read back the data. Do you have any error messages in your logs?
-Have you try to use the stty program on your serial port, eg: stty -F 
-/dev/ttySXYZ raw -clocal.
-Perhaps your problem is on the transceiver side, have you try to tie Tx 
-and Rx together and then read write date to the serial port from your 
-embedded system?
-
-Chris
-
-
+> On Mon, 2011-05-23 at 14:21 +0100, Russell King - ARM Linux wrote:
+>> On Mon, May 23, 2011 at 12:16:48PM +0100, Catalin Marinas wrote:
+>> > Newer versions of gcc generate unaligned accesses by default, causing
+>> > kernel panics when CONFIG_ALIGNMENT_TRAP is enabled. This patch adds the
+>> > -mno-unaligned-access option to gcc.
+>> 
+>> This description doesn't make sense.  If we have alignment traps enabled,
+>> then we _expect_ to fix up unaligned loads and stores.
+>> 
+>> Therefore there should be no panic if CONFIG_ALIGNMENT_TRAP is enabled.
+>> 
+>> So what's the _actual_ problem that this is trying to address?  What's
+>> the panic/oops look like?  And that information should be in the commit
+>> description _anyway_.
 >
-> Paulo.
+> Does the patch below look better?
 >
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> We cannot move alignment_init() earlier as we don't know how early the
+> compiler would generate unaligned accesses. An alternative is some
+> #ifdef's in head.S. Please let me know which variant you prefer.
+
+ifdefs may be ugly, but I don't see a better solution here.  Crippling
+the entire build to make a couple of lines slightly more aesthetically
+pleasing doesn't seem right to me.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
