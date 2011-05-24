@@ -1,31 +1,49 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 May 2011 22:39:07 +0100
-Subject: [PATCH v6 01/18] ARM: LPAE: Use long long printk format for
-	displaying the pud
-In-Reply-To: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1306273164-18217-2-git-send-email-catalin.marinas@arm.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Tue, 24 May 2011 23:39:24 +0200
+Subject: [BUG]  "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <1306272750.2497.79.camel@laptop>
+References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+	<1306272750.2497.79.camel@laptop>
+Message-ID: <20110524213924.GO27634@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently using just long but this is not enough for the LPAE format
-(64-bit entries).
 
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/mm/fault.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+* Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
 
-diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
-index bc0e1d8..ee76923 100644
---- a/arch/arm/mm/fault.c
-+++ b/arch/arm/mm/fault.c
-@@ -94,7 +94,7 @@ void show_pte(struct mm_struct *mm, unsigned long addr)
- 
- 		pud = pud_offset(pgd, addr);
- 		if (PTRS_PER_PUD != 1)
--			printk(", *pud=%08lx", pud_val(*pud));
-+			printk(", *pud=%08llx", (long long)pud_val(*pud));
- 
- 		if (pud_none(*pud))
- 			break;
+> On Tue, 2011-05-24 at 19:13 +0100, Marc Zyngier wrote:
+> > Peter,
+> > 
+> > I've experienced all kind of lock-ups on ARM SMP platforms recently, and
+> > finally tracked it down to the following patch:
+> > 
+> > e4a52bcb9a18142d79e231b6733cabdbf2e67c1f [sched: Remove rq->lock from the first half of ttwu()].
+> > 
+> > Even on moderate load, the machine locks up, often silently, and
+> > sometimes with a few messages like:
+> > INFO: rcu_preempt_state detected stalls on CPUs/tasks: { 0} (detected by 1, t=12002 jiffies)
+> > 
+> > Another side effect of this patch is that the load average is always 0,
+> > whatever load I throw at the system.
+> > 
+> > Reverting the sched changes up to that patch (included) gives me a
+> > working system again, which happily survives parallel kernel
+> > compilations without complaining.
+> > 
+> > My knowledge of the scheduler being rather limited, I haven't been able
+> > to pinpoint the exact problem (though it probably have something to do
+> > with __ARCH_WANT_INTERRUPTS_ON_CTXSW being defined on ARM). The enclosed
+> > patch somehow papers over the load average problem, but the system ends
+> > up locking up anyway:
+> 
+> Hurm.. I'll try and make x86 use __ARCH_WANT_INTERRUPTS_ON_CTXSW, IIRC
+> Ingo once said that that is possible and try to see if I can reproduce.
+> No clear ideas atm.
+
+Yes, should be possible to just disable it on x86 - no further tricks needed. 
+It's been a long time since i tested that though.
+
+Thanks,
+
+	Ingo
