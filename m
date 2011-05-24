@@ -1,39 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 May 2011 00:19:16 +0100
-Subject: [GIT PULL] pxa: for next merge
-In-Reply-To: <BANLkTin8tX_kfG_R6To+ktNbOW+B93LiqQ@mail.gmail.com>
-References: <BANLkTin8tX_kfG_R6To+ktNbOW+B93LiqQ@mail.gmail.com>
-Message-ID: <20110524231916.GD4652@n2100.arm.linux.org.uk>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 24 May 2011 16:56:28 -0700
+Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical Address
+	Extensions
+In-Reply-To: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
+	(Catalin Marinas's message of "Tue, 24 May 2011 22:39:06 +0100")
+References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <8yapqn7fyab.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've just spotted this:
+On Tue, May 24 2011, Catalin Marinas wrote:
 
-+asmlinkage void __exception_irq_entry icip_handle_irq(struct pt_regs *regs)
-+{
-+       uint32_t icip, icmr, mask;
-+
-+       do {
-+               icip = __raw_readl(IRQ_BASE + ICIP);
-+               icmr = __raw_readl(IRQ_BASE + ICMR);
-+               mask = icip & icmr;
-+
-+               if (mask == 0)
-+                       break;
-+
-+               asm_do_IRQ(fls(mask) - 1, regs);
-+       } while (1);
-+}
+> This set of patches adds support for the Large Physical Extensions on
+> the ARM architecture (available with the Cortex-A15 processor). LPAE
+> comes with a 3-level page table format (compared to 2-level for the
+> classic one), allowing up to 40-bit physical address space.
 
-This is bad news.  A function marked as __exception is expected to be
-called from the assembly code.  The above is fine, but it then goes on
-to call asm_do_IRQ() which is also marked __exception.
+Do you expect non LPAE targets to be able to boot with these changes
+applied (and LPAE enabled)?  I am able to build this tree for the
+MSM8660 (with a minor patch below), but it fails to boot with LPAE
+enabled.  It seems to work fine with LPAE not enabled.
 
-This means the unwinder will attempt to dump the saved pt_regs register
-state for both asm_do_IRQ() and icip_handle_irq(), resulting in one of
-them being garbage.
+I did have to fix the msm timer code to get the branch you mentioned to
+compile.  The return type of the function changed back to 'void' without
+changing the returns:
 
-So I think this needs some thought.
+---
+ arch/arm/mach-msm/timer.c |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-Second point - can't the USB changes go via the USB people?  Have USB
-people seen the patch?
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 50cc0bc..6e659e4 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -268,7 +268,7 @@ static void __cpuinit msm_local_timer_setup(struct clock_event_device *evt)
+ 
+ 	/* Use existing clock_event for cpu 0 */
+ 	if (!smp_processor_id())
+-		return 0;
++		return;
+ 
+ 	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
+ 
+@@ -296,7 +296,8 @@ static void __cpuinit msm_local_timer_setup(struct clock_event_device *evt)
+ 	if (res) {
+ 		pr_err("local_timer_setup: request_irq failed for %s\n",
+ 		       clock->clockevent.name);
+-		return res;
++		/* TODO: How to handle this error. */
++		return;
+ 	}
+ 
+ 	clockevents_register_device(evt);
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
