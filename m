@@ -1,192 +1,71 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 24 May 2011 19:54:41 +0530
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
+Date: Tue, 24 May 2011 19:54:39 +0530
+Subject: [PATCH 00/15] OMAP: GPIO: Cleanup OMAP GPIO driver
+Message-ID: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Charulatha V <charu@ti.com>
+Do some more cleanup of OMAP GPIO driver and avoid usage of gpio_bank_count
+and gpio_bank pointer array by means of maintaining a list.
 
-Non-wakeup GPIOs are available only in OMAP2420 and OMAP3430. But
-the GPIO driver initializes the non-wakeup GPIO bits for OMAP24xx
-(bothe OMAP 2420 and 2430) & not for OMAP3 which is incorrect.
+Patch series is on following commit of linux-omap-pm (branch: wip/gpio-cleanup):
+commit d04952091a3b9b4b47696cee48e92a9173fd9ffb
+GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
 
-Fix the above by providing non-wakeup GPIO information through pdata
-specific to the SoC.
+Diff summary between RFC(prev version) and this version:
+*Patches 0012*-0015* are added to the series
+*Call gpio_save(restore)_context from OMAP GPIO driver instead
+of calling them from PM sepcific funcs
+	-For this, few more patches (patches 0004*-8*) are added
+		to the series
+*Move mpuio_init() from probe() to omap_gpio_mod_init()
+*Correctly add the wake set/clear/status regs offsets at omap16xx_gpio_regs
+*Remove usage of unnecessary variable "offset" locally inside prepare_for_idle()
+*wake_set/clear related access is done only after validity check
 
-The GPIO rev id provided in the hwmod database is the same for OMAP2420
-and OMAP2430. Change the GPIO rev ids in hwmod database as given below
-so that it can be used to identify OMAP2420 and OMAP2430.
-OMAP2420 - 0
-OMAP2430 - 1
-OMAP3    - 2
-OMAP4    - 3
+Links to previous version (RFC) of this series:
+https://patchwork.kernel.org/patch/787692/
+https://patchwork.kernel.org/patch/787742/
+https://patchwork.kernel.org/patch/787762/
+https://patchwork.kernel.org/patch/787722/
+https://patchwork.kernel.org/patch/787712/
+https://patchwork.kernel.org/patch/787732/
+http://permalink.gmane.org/gmane.linux.ports.arm.omap/57524
 
-Signed-off-by: Charulatha V <charu@ti.com>
-Cc: Cousson, Benoit <b-cousson@ti.com>
-Cc: Paul Walmsley <paul@pwsan.com>
----
- arch/arm/mach-omap2/gpio.c                 |   26 ++++++++++++++++++++++++--
+Test Details:
+Compile tested for omap1_defconfig and omap2plus_defconfig.
+Bootup success on OMAP1710-H3.
+Functional testing success on OMAP2430-SDP, OMAP3430-SDP, OMAP4430-SDP.
+PM Testing success on OMAP3430-SDP: retention, off_mode, system_wide
+suspend and gpio wakeup.
+
+Charulatha V (12):
+  OMAP: GPIO: Avoid cpu_is checks during module ena/disable
+  OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
+  OMAP: GPIO: Remove dependency on gpio_bank_count
+  OMAP2PLUS: GPIO: Use flag to identify wkup dmn GPIO
+  OMAP: GPIO: Make gpio_context part of gpio_bank structure
+  OMAP4: GPIO: Save/restore context
+  OMAP: GPIO: handle save/restore ctx in GPIO driver
+  OMAP2+: GPIO: make workaround_enabled bank specific
+  OMAP: GPIO: Fix: use wake set/clear regs
+  OMAP: GPIO: clean set_gpio_triggering function
+  OMAP: GPIO: Use memset for omap_gpio_reg_offs
+  OMAP: GPIO: clean omap_gpio_mod_init function
+
+Tarun Kanti DebBarma (3):
+  OMAP: GPIO: cleanup suspend and resume functions
+  OMAP: GPIO: cleanup prepare/resume idle functions
+  OMAP: GPIO: Remove hardcoded offsets in ctxt save/restore
+
+ arch/arm/mach-omap1/gpio15xx.c             |   42 +-
+ arch/arm/mach-omap1/gpio16xx.c             |   55 ++-
+ arch/arm/mach-omap1/gpio7xx.c              |   42 +-
+ arch/arm/mach-omap2/gpio.c                 |   53 ++-
  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +-
  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
- arch/arm/plat-omap/include/plat/gpio.h     |    1 +
- drivers/gpio/gpio_omap.c                   |   11 +++--------
- 6 files changed, 31 insertions(+), 13 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-index 0446bd1..6cd26b4 100644
---- a/arch/arm/mach-omap2/gpio.c
-+++ b/arch/arm/mach-omap2/gpio.c
-@@ -56,6 +56,28 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		return -ENOMEM;
- 	}
- 
-+	switch (oh->class->rev) {
-+	case 0:
-+		if (id == 1)
-+			/* non-wakeup GPIO pins for OMAP2420 Bank1 */
-+			pdata->non_wakeup_gpios = 0xe203ffc0;
-+		else if (id == 2)
-+			/* non-wakeup GPIO pins for OMAP2420 Bank2 */
-+			pdata->non_wakeup_gpios = 0x08700040;
-+		break;
-+	case 2:
-+		if (id == 2)
-+			/* non-wakeup GPIO pins for OMAP3 Bank2 */
-+			pdata->non_wakeup_gpios = 0x00000001;
-+		else if (id == 6)
-+			/* non-wakeup GPIO pins for OMAP3 Bank6 */
-+			pdata->non_wakeup_gpios = 0x08000000;
-+		break;
-+	default:
-+		/* No non-wakeup GPIO pins for other SoCs */
-+		break;
-+	}
-+
- 	dev_attr = (struct omap_gpio_dev_attr *)oh->dev_attr;
- 	pdata->bank_width = dev_attr->bank_width;
- 	pdata->dbck_flag = dev_attr->dbck_flag;
-@@ -70,6 +92,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 	switch (oh->class->rev) {
- 	case 0:
- 	case 1:
-+	case 2:
- 		pdata->bank_type = METHOD_GPIO_24XX;
- 		pdata->regs->revision = OMAP24XX_GPIO_REVISION;
- 		pdata->regs->direction = OMAP24XX_GPIO_OE;
-@@ -86,7 +109,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
- 		pdata->regs->ctrl = OMAP24XX_GPIO_CTRL;
- 		break;
--	case 2:
-+	case 3:
- 		pdata->bank_type = METHOD_GPIO_44XX;
- 		pdata->regs->revision = OMAP4_GPIO_REVISION;
- 		pdata->regs->direction = OMAP4_GPIO_OE;
-@@ -108,7 +131,6 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
- 		kfree(pdata);
- 		return -EINVAL;
- 	}
--
- 	od = omap_device_build(name, id - 1, oh, pdata,
- 				sizeof(*pdata),	omap_gpio_latency,
- 				ARRAY_SIZE(omap_gpio_latency),
-diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-index 9682dd5..ae702b5 100644
---- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
-@@ -1728,7 +1728,7 @@ static struct omap_hwmod_class_sysconfig omap243x_gpio_sysc = {
- static struct omap_hwmod_class omap243x_gpio_hwmod_class = {
- 	.name = "gpio",
- 	.sysc = &omap243x_gpio_sysc,
--	.rev = 0,
-+	.rev = 1,
- };
- 
- /* gpio1 */
-diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-index 909a84d..05e7005 100644
---- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
-@@ -2117,7 +2117,7 @@ static struct omap_hwmod_class_sysconfig omap3xxx_gpio_sysc = {
- static struct omap_hwmod_class omap3xxx_gpio_hwmod_class = {
- 	.name = "gpio",
- 	.sysc = &omap3xxx_gpio_sysc,
--	.rev = 1,
-+	.rev = 2,
- };
- 
- /* gpio_dev_attr*/
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index abc548a..ea30752 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -1703,7 +1703,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_gpio_sysc = {
- static struct omap_hwmod_class omap44xx_gpio_hwmod_class = {
- 	.name	= "gpio",
- 	.sysc	= &omap44xx_gpio_sysc,
--	.rev	= 2,
-+	.rev	= 3,
- };
- 
- /* gpio dev_attr */
-diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-index caf432c..8014a8a 100644
---- a/arch/arm/plat-omap/include/plat/gpio.h
-+++ b/arch/arm/plat-omap/include/plat/gpio.h
-@@ -199,6 +199,7 @@ struct omap_gpio_platform_data {
- 	int bank_width;		/* GPIO bank width */
- 	int bank_stride;	/* Only needed for omap1 MPUIO */
- 	bool dbck_flag;		/* dbck required or not - True for OMAP3&4 */
-+	u32 non_wakeup_gpios;
- 
- 	struct omap_gpio_reg_offs *regs;
- };
-diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-index dfdc45e..0ba4cdb 100644
---- a/drivers/gpio/gpio_omap.c
-+++ b/drivers/gpio/gpio_omap.c
-@@ -1008,7 +1008,7 @@ static inline int init_gpio_info(struct platform_device *pdev)
- }
- 
- /* TODO: Cleanup cpu_is_* checks */
--static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
-+static void omap_gpio_mod_init(struct gpio_bank *bank)
- {
- 	if (cpu_class_is_omap2()) {
- 		if (cpu_is_omap44xx()) {
-@@ -1028,12 +1028,6 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
- 
- 			/* Initialize interface clk ungated, module enabled */
- 			__raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
--		} else if (cpu_is_omap24xx()) {
--			static const u32 non_wakeup_gpios[] = {
--				0xe203ffc0, 0x08700040
--			};
--			if (id < ARRAY_SIZE(non_wakeup_gpios))
--				bank->non_wakeup_gpios = non_wakeup_gpios[id];
- 		}
- 	} else if (cpu_class_is_omap1()) {
- 		if (bank_is_mpuio(bank))
-@@ -1179,6 +1173,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	bank->dbck_flag = pdata->dbck_flag;
- 	bank->stride = pdata->bank_stride;
- 	bank->width = pdata->bank_width;
-+	bank->non_wakeup_gpios = pdata->non_wakeup_gpios;
- 
- 	bank->regs = pdata->regs;
- 
-@@ -1205,7 +1200,7 @@ static int __devinit omap_gpio_probe(struct platform_device *pdev)
- 	pm_runtime_enable(bank->dev);
- 	pm_runtime_get_sync(bank->dev);
- 
--	omap_gpio_mod_init(bank, id);
-+	omap_gpio_mod_init(bank);
- 	omap_gpio_chip_init(bank);
- 	omap_gpio_show_rev(bank);
- 
--- 
-1.6.0.4
+ arch/arm/mach-omap2/pm34xx.c               |   22 +-
+ arch/arm/plat-omap/include/plat/gpio.h     |   20 +-
+ drivers/gpio/gpio_omap.c                   |  797 ++++++++++------------------
+ 10 files changed, 438 insertions(+), 599 deletions(-)
