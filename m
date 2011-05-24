@@ -1,79 +1,85 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 May 2011 12:31:11 -0700
-Subject: [RFC PATCH v2 08/12] ARM: msm: use remapped PPI interrupts for
-	local timer
-In-Reply-To: <1305800121.27474.39.camel@e102391-lin.cambridge.arm.com>
-References: <1304677997-26947-1-git-send-email-marc.zyngier@arm.com>	
-	<1304677997-26947-9-git-send-email-marc.zyngier@arm.com>	
-	<4DCC41CB.3050802@codeaurora.org>
-	<1305800121.27474.39.camel@e102391-lin.cambridge.arm.com>
-Message-ID: <4DDC077F.6060901@codeaurora.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 24 May 2011 21:32:02 +0200
+Subject: [PATCH v2 3/7] mmc: sdhci: make sdhci-of device drivers self
+	registered
+In-Reply-To: <1304601778-13837-4-git-send-email-shawn.guo@linaro.org>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+	<1304601778-13837-4-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110524193202.GB25727@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/19/2011 03:15 AM, Marc Zyngier wrote:
-> On Thu, 2011-05-12 at 13:23 -0700, Stephen Boyd wrote:
->> On 5/6/2011 3:33 AM, Marc Zyngier wrote:
->>> diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
->>> index 38b95e9..f063860 100644
->>> --- a/arch/arm/mach-msm/timer.c
->>> +++ b/arch/arm/mach-msm/timer.c
->>> @@ -83,18 +85,7 @@ enum {
->>>  
->>>  
->>>  static struct msm_clock msm_clocks[];
->>> -static struct clock_event_device *local_clock_event;
->>> -
->>> -static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
->>> -{
->>> -	struct clock_event_device *evt = dev_id;
->>> -	if (smp_processor_id() != 0)
->>> -		evt = local_clock_event;
->>> -	if (evt->event_handler == NULL)
->>> -		return IRQ_HANDLED;
->> We just lost this important line. This prevents spurious interrupts from
->> crashing the system.
-> Is this something you actually see on a real system, or just a guard in
-> case something goes horribly wrong?
->
+On Thu, May 05, 2011 at 09:22:54PM +0800, Shawn Guo wrote:
+> The patch turns the sdhci-of-core common stuff into helper functions
+> added into sdhci-pltfm.c, and makes sdhci-of device drviers self
+> registered using the same pair of .probe and .remove used by
+> sdhci-pltfm device drivers.
+> 
+> As a result, sdhci-of-core.c and sdhci-of.h can be eliminated with
+> those common things merged into sdhci-pltfm.c and sdhci-pltfm.h
+> respectively.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-I believe a bootloader left a pending interrupt at some point and thus
-when we request the interrupt before registering the clockevent the
-interrupt handler will be called and evt->event_handler == NULL. Perhaps
-we could register the clockevent before registering the interrupt
-handler? I'm not sure that works. Otherwise we need to clear the
-interrupt in the GIC or something. Any suggestions?
+After taking care of Anton's comment and fixing this minor thingie...
 
-If it's any consolation, x86 seems to do the same thing presumably for
-the same reason.
+> +#ifdef CONFIG_OF
+> +static bool sdhci_of_wp_inverted(struct device_node *np)
+> +{
+> +	if (of_get_property(np, "sdhci,wp-inverted", NULL))
+> +		return true;
+> +
+> +	/* Old device trees don't have the wp-inverted property. */
+> +#ifdef CONFIG_PPC
+> +	return machine_is(mpc837x_rdb) || machine_is(mpc837x_mds);
+> +#else
+> +	return false;
+> +#endif
 
->>> -	evt->event_handler(evt);
->>> -	return IRQ_HANDLED;
->>> -}
->> I would prefer to keep the whole interrupt function because 1) MSM
->> doesn't have a local_timer_ack() to implement and 2) I want to put code
->> in here to stop the timer so that the timer doesn't wrap and cause
->> another interrupt (yes the patches haven't been sent yet).
-> I was thinking of reusing the local_timer_ack() for that, possibly
-> passing some useful parameters (evt, cpu...). I'd really like the
-> event_handler() call to become common code, and move everything else to
-> the local_timer_ack() method (with a possible empty default implemented
-> as a weak symbol).
->
+/* CONFIG_PPC */ after #endif
 
-Ok. So you're saying there is one interrupt handler that will call down
-to the hardware specific handler via local_timer_ack()? That sounds like
-one step backwards when you consider we want to compile many machines
-into one kernel.
+> +}
+> +
+> +void sdhci_get_of_property(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct sdhci_host *host = platform_get_drvdata(pdev);
+> +	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +	const __be32 *clk;
+> +	int size;
+> +
+> +	if (of_device_is_available(np)) {
+> +		if (of_get_property(np, "sdhci,auto-cmd12", NULL))
+> +			host->quirks |= SDHCI_QUIRK_MULTIBLOCK_READ_ACMD12;
+> +
+> +		if (of_get_property(np, "sdhci,1-bit-only", NULL))
+> +			host->quirks |= SDHCI_QUIRK_FORCE_1_BIT_DATA;
+> +
+> +		if (sdhci_of_wp_inverted(np))
+> +			host->quirks |= SDHCI_QUIRK_INVERTED_WRITE_PROTECT;
+> +
+> +		clk = of_get_property(np, "clock-frequency", &size);
+> +		if (clk && size == sizeof(*clk) && *clk)
+> +			pltfm_host->clock = be32_to_cpup(clk);
+> +	}
+> +}
+> +#else
+> +void sdhci_get_of_property(struct platform_device *pdev) {}
+> +#endif
 
-A generic interrupt handler for simple timers where there is nothing to
-do besides call the event handler is probably good consolidation. But if
-the hardware requires something else, it doesn't seem so bad to write
-your own.
+/* CONFIG_OF */
 
-What's the use of local_timer_ack() in the scheme of this patch series
-again? I was really hoping that function would go away.
+you can add
+
+Reviewed-by: Wolfram Sang <w.sang@pengutronix.de>
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110524/bd195ba8/attachment.sig>
