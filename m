@@ -1,156 +1,35 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 24 May 2011 10:58:33 +0200
-Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
-In-Reply-To: <BANLkTimFd2dcGooY5+FnuJ6inAmO0iBvJA@mail.gmail.com>
-References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
-	<201105241039.58428.laurent.pinchart@ideasonboard.com>
-	<BANLkTimFd2dcGooY5+FnuJ6inAmO0iBvJA@mail.gmail.com>
-Message-ID: <201105241058.33683.laurent.pinchart@ideasonboard.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 24 May 2011 09:59:58 +0100
+Subject: Linux ARM kernel on patchwork
+In-Reply-To: <20110524072310.GA13183@pengutronix.de>
+References: <1305824015.26710.76.camel@e102109-lin.cambridge.arm.com>
+	<20110524072310.GA13183@pengutronix.de>
+Message-ID: <1306227598.19557.11.camel@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
-
-On Tuesday 24 May 2011 10:56:22 javier Martin wrote:
-> On 24 May 2011 10:39, Laurent Pinchart wrote:
-> > On Tuesday 24 May 2011 10:31:46 javier Martin wrote:
-> >> On 23 May 2011 11:03, Laurent Pinchart wrote:
-> >> > On Saturday 21 May 2011 17:29:18 Guennadi Liakhovetski wrote:
-> >> >> On Fri, 20 May 2011, Javier Martin wrote:
-> >> > [snip]
-> >> > 
-> >> >> > diff --git a/drivers/media/video/mt9p031.c
-> >> >> > b/drivers/media/video/mt9p031.c new file mode 100644
-> >> >> > index 0000000..e406b64
-> >> >> > --- /dev/null
-> >> >> > +++ b/drivers/media/video/mt9p031.c
-> >> > 
-> >> > [snip]
-> >> > 
-> >> >> > +}
-> >> >> > +
-> >> >> > +static int mt9p031_power_on(struct mt9p031 *mt9p031)
-> >> >> > +{
-> >> >> > +   int ret;
-> >> >> > +
-> >> >> > +   /* turn on VDD_IO */
-> >> >> > +   ret = regulator_enable(mt9p031->reg_2v8);
-> >> >> > +   if (ret) {
-> >> >> > +           pr_err("Failed to enable 2.8v regulator: %d\n", ret);
-> >> >> 
-> >> >> dev_err()
-> >> >> 
-> >> >> > +           return ret;
-> >> >> > +   }
-> >> >> > +   if (mt9p031->pdata->set_xclk)
-> >> >> > +           mt9p031->pdata->set_xclk(&mt9p031->subdev, 54000000);
-> >> > 
-> >> > Can you make 54000000 a #define at the beginning of the file ?
-> >> > 
-> >> > You should soft-reset the chip here by calling mt9p031_reset().
-> >> 
-> >> If I do this, I would be force to cache some registers and restart
-> >> them. I've tried to do this but I don't know what is failing that
-> >> there are some artifacts consisting on horizontal black lines in the
-> >> image.
-> > 
-> > You need to cache registers anyway, as the chip will be reset to default
-> > values by the core power cycling. And as I'm writing those lines I
-> > realize that you don't power cycle reg_1v8. This needs to be done to
-> > save power.
-> > 
-> >> Please, let me push this to mainline without this feature as a first
-> >> step, since I'll have to spend some assigned to another project.
-> > 
-> > Power handling is an important feature. I don't think the driver is ready
-> > without it.
-> > 
-> >> [snip]
-> >> 
-> >> >> > + */
-> >> >> > +static int mt9p031_video_probe(struct i2c_client *client)
-> >> >> > +{
-> >> >> > +   s32 data;
-> >> >> > +   int ret;
-> >> >> > +
-> >> >> > +   /* Read out the chip version register */
-> >> >> > +   data = reg_read(client, MT9P031_CHIP_VERSION);
-> >> >> > +   if (data != MT9P031_CHIP_VERSION_VALUE) {
-> >> >> > +           dev_err(&client->dev,
-> >> >> > +                   "No MT9P031 chip detected, register read %x\n",
-> >> >> > data); +           return -ENODEV;
-> >> >> > +   }
-> >> >> > +
-> >> >> > +   dev_info(&client->dev, "Detected a MT9P031 chip ID %x\n",
-> >> >> > data); +
-> >> >> > +   ret = mt9p031_reset(client);
-> >> >> > +   if (ret < 0)
-> >> >> > +           dev_err(&client->dev, "Failed to initialise the
-> >> >> > camera\n");
-> >> > 
-> >> > If you move the soft-reset operation to mt9p031_power_on(), you don't
-> >> > need to call it here.
-> >> 
-> >> The reason for this is the same as before. I haven't still been able
-> >> to success on restarting registers and getting everything to work
-> >> fine.
-> >> It would be great if you allowed me to push this as it is as an
-> >> intermediate step.
-> > 
-> > Sorry, but I'd like to see power management properly implemented before
-> > the driver hits mainline. Other less important features (such as
-> > exposure/gain controls for instance) can be missing, but proper power
-> > management is important.
+On Tue, 2011-05-24 at 08:23 +0100, Uwe Kleine-K?nig wrote:
+> On Thu, May 19, 2011 at 05:53:35PM +0100, Catalin Marinas wrote:
+> > For those interested, the ARM Linux kernel patches are now visible
+> on
+> > patchwork as well (thanks to J.H.):
+> >
+> > https://patchwork.kernel.org/project/linux-arm-kernel/list/
 > 
-> OK, I'll focus on this feature from now on. However, I can't guarantee
-> that I won't be removed from the project in the process. If that
-> happens I will send my current patches to the community and someone
-> else will have to complete the job.
+> Does someone work with that, assign the patches to the corresponding
+> maintainers, mark them as applied or rejected or ...?
 
-I understand. I could take over but I don't have an MT9P031 hardware :-S
+No (at least not yet). Russell has his own patch system so I doubt he
+would use patchwork.
 
-> >> [snip]
-> >> 
-> >> >> > +   mt9p031->rect.width     = MT9P031_MAX_WIDTH;
-> >> >> > +   mt9p031->rect.height    = MT9P031_MAX_HEIGHT;
-> >> >> > +
-> >> >> > +   mt9p031->format.code = V4L2_MBUS_FMT_SGRBG12_1X12;
-> >> >> > +
-> >> >> > +   mt9p031->format.width = MT9P031_MAX_WIDTH;
-> >> >> > +   mt9p031->format.height = MT9P031_MAX_HEIGHT;
-> >> >> > +   mt9p031->format.field = V4L2_FIELD_NONE;
-> >> >> > +   mt9p031->format.colorspace = V4L2_COLORSPACE_SRGB;
-> >> >> > +
-> >> >> > +   mt9p031->xskip = 1;
-> >> >> > +   mt9p031->yskip = 1;
-> >> >> > +
-> >> >> > +   mt9p031->reg_1v8 = regulator_get(NULL, "cam_1v8");
-> >> >> > +   if (IS_ERR(mt9p031->reg_1v8)) {
-> >> >> > +           ret = PTR_ERR(mt9p031->reg_1v8);
-> >> >> > +           pr_err("Failed 1.8v regulator: %d\n", ret);
-> >> >> 
-> >> >> dev_err()
-> >> >> 
-> >> >> > +           goto e1v8;
-> >> >> > +   }
-> >> > 
-> >> > The driver can be used with boards where either or both of the 1.8V
-> >> > and 2.8V supplies are always on, thus not connected to any regulator.
-> >> > I'm not sure how that's usually handled, if board code should define
-> >> > an "always-on" power supply, or if the driver shouldn't fail when no
-> >> > regulator is present. In any case, this must be handled.
-> >> 
-> >> I think board code should define an "always-on" power supply.
-> > 
-> > Fine with me. How is that done BTW ?
-> 
-> You can use a fixed regulator for that purpose:
-> http://lxr.linux.no/#linux+v2.6.37.2/include/linux/regulator/fixed.h
+There is this new sub-arch consolidation group who may want to use
+patchwork but as the group is in the early days, I'm not sure they
+decided on a workflow yet.
 
-struct fixed_voltage_config is meant to be passed to drivers through platform 
-data. It doesn't declare an "always-on" regulator.
+> If not I think it doesn't has much value. (Then it's only a convenient
+> place to extract patches from.)
+
+That's useful as well.
 
 -- 
-Regards,
-
-Laurent Pinchart
+Catalin
