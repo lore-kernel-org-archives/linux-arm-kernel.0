@@ -1,31 +1,26 @@
-From: bill_carson@126.com (bill)
-Date: Tue, 24 May 2011 15:15:35 +0800 (CST)
-Subject: Query about ARM cache model
-Message-ID: <6bad69aa.1871b.13020dbd501.Coremail.bill_carson@126.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 24 May 2011 09:23:11 +0200
+Subject: Linux ARM kernel on patchwork
+In-Reply-To: <1305824015.26710.76.camel@e102109-lin.cambridge.arm.com>
+References: <1305824015.26710.76.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <20110524072310.GA13183@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russel:)
+On Thu, May 19, 2011 at 05:53:35PM +0100, Catalin Marinas wrote:
+> For those interested, the ARM Linux kernel patches are now visible on
+> patchwork as well (thanks to J.H.):
+> 
+> https://patchwork.kernel.org/project/linux-arm-kernel/list/
+Does someone work with that, assign the patches to the corresponding
+maintainers, mark them as applied or rejected or ...?
 
-May I ask one question about ARM cache model? 
-I have tried to understand it, but merely get part of it.
+If not I think it doesn't has much value. (Then it's only a convenient
+place to extract patches from.)
 
-Why use _CACHE and MULTI_CACHE to switch cache operations between cache-xxx.S and proc-xxx.S ?
-Take CPU_ARM920T for example,MULTI_CACHE is defined in cachflush.h, 
-so what's cache operations in cache-v4wt.S for ?
+Best regards
+Uwe
 
-
-
-Thanks for your time.
-
-bill
-
-
-
-
-
-
-
-
-
-        
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
