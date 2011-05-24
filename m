@@ -1,46 +1,110 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 24 May 2011 22:39:21 +0100
-Subject: [PATCH v6 15/18] ARM: LPAE: Use generic dma_addr_t type definition
+Date: Tue, 24 May 2011 22:39:20 +0100
+Subject: [PATCH v6 14/18] ARM: LPAE: Add identity mapping support for the
+	3-level page table format
 In-Reply-To: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
 References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <1306273164-18217-16-git-send-email-catalin.marinas@arm.com>
+Message-ID: <1306273164-18217-15-git-send-email-catalin.marinas@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Will Deacon <will.deacon@arm.com>
+With LPAE, the pgd is a separate page table with entries pointing to the
+pmd. The identity_mapping_add() function needs to ensure that the pgd is
+populated before populating the pmd level. The do..while blocks now loop
+over the pmd in order to have the same implementation for the two page
+table formats. The pmd_addr_end() definition has been removed and the
+generic one used instead. The pmd clean-up is done in the pgd_free()
+function.
 
-This patch uses the types.h implementation in asm-generic to define the
-dma_addr_t type as the same width as phys_addr_t.
-
-NOTE: this is a temporary patch until the corresponding patches unifying
-the dma_addr_t and removing the dma64_addr_t are merged into mainline.
-
-Signed-off-by: Will Deacon <will.deacon@arm.com>
 Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
 ---
- arch/arm/include/asm/types.h |   11 +----------
- 1 files changed, 1 insertions(+), 10 deletions(-)
+ arch/arm/include/asm/pgtable.h |    4 ----
+ arch/arm/mm/idmap.c            |   36 ++++++++++++++++++++++++++++++++++--
+ 2 files changed, 34 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/include/asm/types.h b/arch/arm/include/asm/types.h
-index 48192ac..dc1bdbb 100644
---- a/arch/arm/include/asm/types.h
-+++ b/arch/arm/include/asm/types.h
-@@ -1,17 +1,8 @@
- #ifndef __ASM_ARM_TYPES_H
- #define __ASM_ARM_TYPES_H
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 1db9ad6..9645e52 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -263,10 +263,6 @@ static inline pte_t *pmd_page_vaddr(pmd_t pmd)
  
--#include <asm-generic/int-ll64.h>
-+#include <asm-generic/types.h>
+ #define pmd_page(pmd)		pfn_to_page(__phys_to_pfn(pmd_val(pmd) & PHYS_MASK))
  
--#ifndef __ASSEMBLY__
+-/* we don't need complex calculations here as the pmd is folded into the pgd */
+-#define pmd_addr_end(addr,end)	(end)
 -
--typedef unsigned short umode_t;
 -
--#endif /* __ASSEMBLY__ */
--
--/*
-- * These aren't exported outside the kernel to avoid name space clashes
-- */
- #ifdef __KERNEL__
+ #ifndef CONFIG_HIGHPTE
+ #define __pte_map(pmd)		pmd_page_vaddr(*(pmd))
+ #define __pte_unmap(pte)	do { } while (0)
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 2be9139..24e0655 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -1,9 +1,36 @@
++#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
++
+ #include <linux/kernel.h>
  
- #define BITS_PER_LONG 32
+ #include <asm/cputype.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
+ 
++#ifdef CONFIG_ARM_LPAE
++static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
++	unsigned long prot)
++{
++	pmd_t *pmd;
++	unsigned long next;
++
++	if (pud_none_or_clear_bad(pud) || (pud_val(*pud) & L_PGD_SWAPPER)) {
++		pmd = pmd_alloc_one(NULL, addr);
++		if (!pmd) {
++			pr_warning("Failed to allocate identity pmd.\n");
++			return;
++		}
++		pud_populate(NULL, pud, pmd);
++		pmd += pmd_index(addr);
++	} else
++		pmd = pmd_offset(pud, addr);
++
++	do {
++		next = pmd_addr_end(addr, end);
++		*pmd = __pmd((addr & PMD_MASK) | prot);
++		flush_pmd_entry(pmd);
++	} while (pmd++, addr = next, addr != end);
++}
++#else	/* !CONFIG_ARM_LPAE */
+ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	unsigned long prot)
+ {
+@@ -15,6 +42,7 @@ static void idmap_add_pmd(pud_t *pud, unsigned long addr, unsigned long end,
+ 	pmd[1] = __pmd(addr);
+ 	flush_pmd_entry(pmd);
+ }
++#endif	/* CONFIG_ARM_LPAE */
+ 
+ static void idmap_add_pud(pgd_t *pgd, unsigned long addr, unsigned long end,
+ 	unsigned long prot)
+@@ -32,7 +60,7 @@ void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
+ {
+ 	unsigned long prot, next;
+ 
+-	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE;
++	prot = PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AF;
+ 	if (cpu_architecture() <= CPU_ARCH_ARMv5TEJ && !cpu_is_xscale())
+ 		prot |= PMD_BIT4;
+ 
+@@ -46,7 +74,11 @@ void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end)
+ #ifdef CONFIG_SMP
+ static void idmap_del_pmd(pud_t *pud, unsigned long addr, unsigned long end)
+ {
+-	pmd_t *pmd = pmd_offset(pud, addr);
++	pmd_t *pmd;
++
++	if (pud_none_or_clear_bad(pud))
++		return;
++	pmd = pmd_offset(pud, addr);
+ 	pmd_clear(pmd);
+ }
+ 
