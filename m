@@ -1,42 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 May 2011 13:52:15 +0200
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <20110524094658.GA4005@opensource.wolfsonmicro.com>
-References: <alpine.LFD.2.02.1105201518030.3078@ionos>
-	<20110521112947.GB11887@sirena.org.uk>
-	<20110523062501.GA20715@pengutronix.de>
-	<20110523104409.GA15635@opensource.wolfsonmicro.com>
-	<20110523144126.GF20715@pengutronix.de>
-	<20110523152248.GC6489@sirena.org.uk>
-	<20110523164601.GG20715@pengutronix.de>
-	<20110523224045.GA19533@opensource.wolfsonmicro.com>
-	<20110524072814.GC22096@pengutronix.de>
-	<20110524094658.GA4005@opensource.wolfsonmicro.com>
-Message-ID: <20110524115215.GD22096@pengutronix.de>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Tue, 24 May 2011 13:52:37 +0200
+Subject: [PATCH V4] OMAP3+: SR Layer Cleanup
+In-Reply-To: <BANLkTi=ufSmtnEkyRFKOpbTAJkcUW1dXYg@mail.gmail.com>
+References: <1305268062-20046-1-git-send-email-shweta.gulati@ti.com>	<4DD67155.1030705@ti.com>
+	<BANLkTi=ufSmtnEkyRFKOpbTAJkcUW1dXYg@mail.gmail.com>
+Message-ID: <4DDB9C05.4090705@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 05:46:59PM +0800, Mark Brown wrote:
-> On Tue, May 24, 2011 at 09:28:14AM +0200, Sascha Hauer wrote:
-> > On Tue, May 24, 2011 at 06:41:00AM +0800, Mark Brown wrote:
-> 
-> > > on systems that do actually have the IRQ range allocated for some other
-> > > reason.
-> 
-> > By 'some other reason' you mean an implementation bug? If the range is
-> > already allocated the wm8350 driver should better not use it.
-> 
-> Well, one obvious example is if someone's using the device with a sparse
-> system already - they'll have had to arrange to allocate the IRQ range
-> already.
+On 5/23/2011 6:40 AM, Gulati, Shweta wrote:
+> Benoit,
+>
+> On Fri, May 20, 2011 at 7:19 PM, Cousson, Benoit<b-cousson@ti.com>  wrote:
+>> Hi Shweta,
+>>
+>> On 5/13/2011 8:27 AM, Gulati, Shweta wrote:
+>>>
+>>> To set sr ntarget values  for all volt_domain,
+>>> volt_table is retrieved by doing a look_up of 'vdd_name'
+>>> field from omap_hwmod but voltage domain pointer does not
+>>> belong to omap_hwmod and is not used anywhere else.
+>>> As a part of voltage layer and SR Layer clean up volt
+>>> pointer is removed from omap_hwmod and added in dev
+>>> attributes of SR.
+>>>
+>>> Tested on OMAP3630 SDP and OMAP4430 SDP Board
+>>>
+>>> Signed-off-by: Shweta Gulati<shweta.gulati@ti.com>
+>>> Acked by: Nishanth Menon<nm@ti.com>
+>>> Cc: Benoit Cousson<b-cousson@ti.com>
+>>> Cc: Paul Walmsley<paul@pwsan.com>
+>>> ---
+>>>
+>>> V4:
+>>>    Fixed comments like checking for NULL pointers
+>>>    and following conventions in naming the instances
+>>>    recommended by Todd Poynor and Benoit Cousson.
+>>
+>> It looks like you missed at least two comments I did on the previous version
+>> whereas you did agree to fix them.
+> You told me to move smartrefex_xxxx_dev_attr above
+> omap44xx_smartreflex_XXX_hwmod struct,
 
-There seems to be no user in the kernel. Anyway, sooner or later we'll
-have the same problem with other mfd drivers. So what do yuo suggest?
+Just before the struct which is not the case.
 
-Sascha
+> which is already in that order and the other thing you suggested was
+> to move .dev_attr before .slaves,
+> that I have not done explaining that, to follow the standard as in all
+> defined hwmod struct .dev_attr are placed after .slaves.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Could you give some example in the OMAP4 data file?
+
+In the generic form, you should have opt_clk attribute then dev_attr 
+then .slaves.
+
+Anyway, do not say you will fix something if you decide not to fix them 
+after. Or in case of valid concern, please provide some explanation in 
+the cover letter.
+
+Regards,
+Benoit
