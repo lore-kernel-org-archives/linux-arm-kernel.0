@@ -1,26 +1,17 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 24 May 2011 14:59:53 -0700
-Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
-In-Reply-To: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
-References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
-Message-ID: <4DDC2A59.8030109@codeaurora.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 May 2011 00:05:46 +0100
+Subject: [PATCH 2/4] gpio: move Nomadik GPIO driver to drivers/gpio
+In-Reply-To: <1306271221-28978-1-git-send-email-linus.walleij@stericsson.com>
+References: <1306271221-28978-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110524230546.GC4652@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2011 04:19 AM, Will Deacon wrote:
-> Hello,
->
-> There are a few issues with ASID handling and cache flushing on v6/v7
-> CPUs that have been identified when running Linux on the Cortex-A15.
->
-> These patches solve the problems for the classic page tables. Additional
-> LPAE changes will be posted separately.
->
-> Tested on a Realview-PBX platform with a dual-core Cortex-A9.
+On Tue, May 24, 2011 at 11:07:01PM +0200, Linus Walleij wrote:
+> -config NOMADIK_GPIO
+> -	bool
+> -	help
+> -	  Support for the Nomadik GPIO controller.
+> -
 
-Should these patches be sent to the stable tree? Or do the problems only
-manifest on Cortex-A15?
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+What about the statements which select this config symbol?
