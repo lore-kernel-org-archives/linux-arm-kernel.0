@@ -1,54 +1,39 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Tue, 24 May 2011 17:47:32 +0530
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver.
-In-Reply-To: <201105231730.06564.arnd@arndb.de>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105151133.23870.arnd@arndb.de>
-	<B876E8072D52496DB747D5CCCF64826D@subhasishg>
-	<201105231730.06564.arnd@arndb.de>
-Message-ID: <7E10264BABCB4C1788DCD9715461BDE8@subhasishg>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 24 May 2011 14:13:43 +0200
+Subject: [PATCH 2/2] ARM: pxa: raumfeld: fix device name for codec ak4104
+In-Reply-To: <1306239223-8293-1-git-send-email-zonque@gmail.com>
+References: <1306239223-8293-1-git-send-email-zonque@gmail.com>
+Message-ID: <1306239223-8293-2-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+In commit f0fba2ad (ASoC: multi-component - ASoC Multi-Component
+Support), the name of the ak4104 codec driver was changed without
+amending the platform code which uses it as well.
 
->> http://linux.omap.com/pipermail/davinci-linux-open-source/
->> 2011-March/022339.html.
->>
->> We can use this implementation along with the sysfs to load the devices
->> runtime.
->
-> Possibly, but the actual data structures might end up differently
-> when they are built around a sysfs interface. If you have a sysfs
-> interface, it is more important to have that in a clean way than
-> the board file, so we should first discuss the set of sysfs
-> attributes that you are going to need, and then see how to
-> represent that in platform data for predefined boards.
->
->> The configs that I have in the board_file for the devices
->> structure, are fixed for a board. To swap the boards, we do not need to 
->> re-compile
->> the kernel.
->
-> The other point to consider is that we are definitely moving
-> towards the flattened device tree for these definitions now.
-> It's probably good to make the sysfs attributes directly correspond
-> to fdt device properties. I'm not sure if we also need to allow platform
-> data. The easiest way could be to just require the use of device tree
-> for predefined pruss devices.
->
-> I'm sorry that this is moving in a different direction now, you
-> had an unfortunate timing here.
->
-> Let's first discuss the exact properties that are really required
-> to define the differences between PRU backends, as those will
-> be required in any case. What do you need for PRU specific
-> data besides the firmware and the name of the device?
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ arch/arm/mach-pxa/raumfeld.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-Would it be a good approach to first get a basic sensible
-driver into the tree and then work towards improving and
-adjusting for future compatibilities.
-That way we can gradually build towards the perfect driver
-in steps, rather than digressing far too off suddenly.
-That would be some source of motivation for me too.
+diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+index b18b486..909f5df 100644
+--- a/arch/arm/mach-pxa/raumfeld.c
++++ b/arch/arm/mach-pxa/raumfeld.c
+@@ -661,10 +661,10 @@ static struct lis3lv02d_platform_data lis3_pdata = {
  
+ #define SPI_AK4104	\
+ {			\
+-	.modalias	= "ak4104",	\
+-	.max_speed_hz	= 10000,	\
+-	.bus_num	= 0,		\
+-	.chip_select	= 0,		\
++	.modalias	= "ak4104-codec",	\
++	.max_speed_hz	= 10000,		\
++	.bus_num	= 0,			\
++	.chip_select	= 0,			\
+ 	.controller_data = (void *) GPIO_SPDIF_CS,	\
+ }
+ 
+-- 
+1.7.5.1
