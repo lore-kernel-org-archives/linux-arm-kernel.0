@@ -1,59 +1,46 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 24 May 2011 09:48:12 +0530
-Subject: [PATCH 1/4] clk: Add a generic clock infrastructure
-In-Reply-To: <1305876469.326305.518470530485.1.gpush@pororo>
-References: <1305876469.326305.518470530485.1.gpush@pororo>
-Message-ID: <4DDB3184.2080301@st.com>
+From: paulo@nlink.com.br (Paulo Fragoso)
+Date: Tue, 24 May 2011 01:31:05 -0300
+Subject: External serial 8250/16550
+In-Reply-To: <4DD579EB.50609@nlink.com.br>
+References: <4DB44883.3000608@nlink.com.br>	<BANLkTinMrZvO_bNcAKXvaa_pXE+jOxO2uw@mail.gmail.com>	<4DC3F035.9030208@nlink.com.br>	<4DC8AFF9.9030508@nlink.com.br>	<4DCB449C.8060808@nlink.com.br>
+	<4DD579EB.50609@nlink.com.br>
+Message-ID: <4DDB3489.2020809@nlink.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/20/2011 12:57 PM, Jeremy Kerr wrote:
-> +static DEFINE_SPINLOCK(enable_lock);
-> +static DEFINE_MUTEX(prepare_lock);
+On 19-05-2011 17:13, Paulo Fragoso wrote:
+>
+> This explain constant output on COMA from TL16C2550 and COMB is 
+> detected at boot time but doesn't work.
+>
+> I will research what can be happening but what can be wrong with NCS1 
+> and NCS2?
 
-Probably all clocks can be handled separately, i.e. single lock for all
-of them will make system slower. Suppose i want to enable UART's clock
-then why should spi code be waiting for the lock.
-So, we should have per clk lock.
+All is working at boot time and NCS1 was correctly programed in bootstrap.
 
-<...>
+But no data out at serial line I'm testing enabling getty in inittab.
 
-> +struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
-> +               const char *name)
-> +{
-> +       struct clk *clk;
-> +
-> +       clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> +       if (!clk)
-> +               return NULL;
-> +
-> +       clk->name = name;
-> +       clk->ops = ops;
-> +       clk->hw = hw;
-> +       hw->clk = clk;
-> +
-> +       /* Query the hardware for parent and initial rate */
-> +
+NCS1, NCS2, IOW and IOR are working how expected by the SMC config:
 
-Can remove this blank line.
+static struct sam9_smc_config tms_uart_smc_config = {
+     .ncs_read_setup   = 0,
+     .nrd_setup        = 2,
+     .ncs_write_setup  = 0,
+     .nwe_setup        = 2,
 
-> +       if (clk->ops->get_parent)
-> +               /* We don't to lock against prepare/enable here, as
-> +                * the clock is not yet accessible from anywhere */
+     .ncs_read_pulse   = 5,
+     .nrd_pulse        = 4,
+     .ncs_write_pulse  = 4,
+     .nwe_pulse        = 3,
 
-Shouldn't we use following style for multi-line comments.
-/*
- * ....
- */
+     .read_cycle       = 10,
+     .write_cycle      = 9,
 
-> +               clk->parent = clk->ops->get_parent(clk->hw);
-> +
-> +       if (clk->ops->recalc_rate)
-> +               clk->rate = clk->ops->recalc_rate(clk->hw);
-> +
-> +
+     .mode             = AT91_SMC_READMODE | AT91_SMC_WRITEMODE | 
+AT91_SMC_EXNWMODE_DISABLE | AT91_SMC_DBW_8 | AT91_SMC_BAT_WRITE,
+     .tdf_cycles       = 3,
+};
 
-Can remove one of these blank lines.
+Why isn't there any data on TX for COMA or COMB?
 
--- 
-viresh
+Paulo.
