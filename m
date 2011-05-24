@@ -1,11 +1,9 @@
 From: mingo@elte.hu (Ingo Molnar)
-Date: Tue, 24 May 2011 22:08:15 +0200
+Date: Tue, 24 May 2011 22:10:53 +0200
 Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
 	filtering
-In-Reply-To: <BANLkTim9UyYAGhg06vCFLxkYPX18cPymEQ@mail.gmail.com>
-References: <1305563026.5456.19.camel@gandalf.stny.rr.com>
-	<20110516165249.GB10929@elte.hu>
-	<1305565422.5456.21.camel@gandalf.stny.rr.com>
+In-Reply-To: <20110524195435.GC27634@elte.hu>
+References: <1305565422.5456.21.camel@gandalf.stny.rr.com>
 	<20110517124212.GB21441@elte.hu>
 	<1305637528.5456.723.camel@gandalf.stny.rr.com>
 	<20110517131902.GF21441@elte.hu>
@@ -13,61 +11,43 @@ References: <1305563026.5456.19.camel@gandalf.stny.rr.com>
 	<1305807728.11267.25.camel@gandalf.stny.rr.com>
 	<BANLkTiki8aQJbFkKOFC+s6xAEiuVyMM5MQ@mail.gmail.com>
 	<BANLkTim9UyYAGhg06vCFLxkYPX18cPymEQ@mail.gmail.com>
-Message-ID: <20110524200815.GD27634@elte.hu>
+	<1306254027.18455.47.camel@twins> <20110524195435.GC27634@elte.hu>
+Message-ID: <20110524201053.GE27634@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-* Will Drewry <wad@chromium.org> wrote:
+* Ingo Molnar <mingo@elte.hu> wrote:
 
-> The change avoids defining a new trace call type or a huge number of internal 
-> changes and hides seccomp.mode=2 from ABI-exposure in prctl, but the attack 
-> surface is non-trivial to verify, and I'm not sure if this ABI change makes 
-> sense. It amounts to:
 > 
->  include/linux/ftrace_event.h  |    4 +-
->  include/linux/perf_event.h    |   10 +++++---
->  kernel/perf_event.c           |   49 +++++++++++++++++++++++++++++++++++++---
->  kernel/seccomp.c              |    8 ++++++
->  kernel/trace/trace_syscalls.c |   27 +++++++++++++++++-----
->  5 files changed, 82 insertions(+), 16 deletions(-)
+> * Peter Zijlstra <peterz@infradead.org> wrote:
 > 
-> And can be found here: http://static.dataspill.org/perf_secure/v1/
+> > On Tue, 2011-05-24 at 10:59 -0500, Will Drewry wrote:
+> > >  include/linux/ftrace_event.h  |    4 +-
+> > >  include/linux/perf_event.h    |   10 +++++---
+> > >  kernel/perf_event.c           |   49 +++++++++++++++++++++++++++++++++++++---
+> > >  kernel/seccomp.c              |    8 ++++++
+> > >  kernel/trace/trace_syscalls.c |   27 +++++++++++++++++-----
+> > >  5 files changed, 82 insertions(+), 16 deletions(-) 
+> > 
+> > I strongly oppose to the perf core being mixed with any sekurity voodoo
+> > (or any other active role for that matter).
+> 
+> I'd object to invisible side-effects as well, and vehemently so. But note how 
+> intelligently it's used here: it's explicit in the code, it's used explicitly 
+> in kernel/seccomp.c and the event generation place in 
+> kernel/trace/trace_syscalls.c.
+> 
+> So this is a really flexible solution IMO and does not extend events with 
+> some invisible 'active' role. It extends the *call site* with an open-coded 
+> active role - which active role btw. already pre-existed.
 
-Wow, i'm very impressed how few changes you needed to do to support this!
+Also see my other mail - i think this seccomp code is too tied in to the perf 
+core and ABI - but this is fixable IMO.
 
-So, firstly, i don't think we should change perf_tp_event() at all - the 
-'observer' codepaths should be unaffected.
-
-But there could be a perf_tp_event_ret() or perf_tp_event_check() entry that 
-code like seccomp which wants to use event results can use.
-
-Also, i'm not sure about the seccomp details and assumptions that were moved 
-into the perf core. How about passing in a helper function to 
-perf_tp_event_check(), where seccomp would define its seccomp specific helper 
-function?
-
-That looks sufficiently flexible. That helper function could be an 'extra 
-filter' kind of thing, right?
-
-Also, regarding the ABI and the attr.err_on_discard and attr.require_secure 
-bits, they look a bit too specific as well.
-
-attr.err_on_discard: with the filter helper function passed in this is probably 
-not needed anymore, right?
-
-attr.require_secure: this is basically used to *force* the creation of 
-security-controlling filters, right? It seems to me that this could be done via 
-a seccomp ABI extension as well, without adding this to the perf ABI. That 
-seccomp call could check whether the right events are created and move the task 
-to mode 2 only if that prereq is met - or something like that.
-
-> If there is any interest at all, I can post it properly to this giant
-> CC list. [...]
-
-I'd suggest to trim the Cc: list aggressively - anyone interested in the 
-discussion can pick it up on lkml - and i strongly suspect that most of the Cc: 
-participants would want to be off the Cc: :-)
+The fundamental notion that a generator subsystem of events can use filter 
+results as well (such as kernel/trace/trace_syscalls.c.) for its own purposes 
+is pretty robust though.
 
 Thanks,
 
