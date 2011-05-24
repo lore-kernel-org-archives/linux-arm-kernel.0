@@ -1,9 +1,11 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Tue, 24 May 2011 22:10:53 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <20110524195435.GC27634@elte.hu>
-References: <1305565422.5456.21.camel@gandalf.stny.rr.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 24 May 2011 16:14:22 -0400
+Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
+	call filtering
+In-Reply-To: <20110524200815.GD27634@elte.hu>
+References: <1305563026.5456.19.camel@gandalf.stny.rr.com>
+	<20110516165249.GB10929@elte.hu>
+	<1305565422.5456.21.camel@gandalf.stny.rr.com>
 	<20110517124212.GB21441@elte.hu>
 	<1305637528.5456.723.camel@gandalf.stny.rr.com>
 	<20110517131902.GF21441@elte.hu>
@@ -11,44 +13,20 @@ References: <1305565422.5456.21.camel@gandalf.stny.rr.com>
 	<1305807728.11267.25.camel@gandalf.stny.rr.com>
 	<BANLkTiki8aQJbFkKOFC+s6xAEiuVyMM5MQ@mail.gmail.com>
 	<BANLkTim9UyYAGhg06vCFLxkYPX18cPymEQ@mail.gmail.com>
-	<1306254027.18455.47.camel@twins> <20110524195435.GC27634@elte.hu>
-Message-ID: <20110524201053.GE27634@elte.hu>
+	<20110524200815.GD27634@elte.hu>
+Message-ID: <1306268062.1465.79.camel@gandalf.stny.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2011-05-24 at 22:08 +0200, Ingo Molnar wrote:
+> * Will Drewry <wad@chromium.org> wrote:
 
-* Ingo Molnar <mingo@elte.hu> wrote:
+> But there could be a perf_tp_event_ret() or perf_tp_event_check() entry that 
+> code like seccomp which wants to use event results can use.
 
-> 
-> * Peter Zijlstra <peterz@infradead.org> wrote:
-> 
-> > On Tue, 2011-05-24 at 10:59 -0500, Will Drewry wrote:
-> > >  include/linux/ftrace_event.h  |    4 +-
-> > >  include/linux/perf_event.h    |   10 +++++---
-> > >  kernel/perf_event.c           |   49 +++++++++++++++++++++++++++++++++++++---
-> > >  kernel/seccomp.c              |    8 ++++++
-> > >  kernel/trace/trace_syscalls.c |   27 +++++++++++++++++-----
-> > >  5 files changed, 82 insertions(+), 16 deletions(-) 
-> > 
-> > I strongly oppose to the perf core being mixed with any sekurity voodoo
-> > (or any other active role for that matter).
-> 
-> I'd object to invisible side-effects as well, and vehemently so. But note how 
-> intelligently it's used here: it's explicit in the code, it's used explicitly 
-> in kernel/seccomp.c and the event generation place in 
-> kernel/trace/trace_syscalls.c.
-> 
-> So this is a really flexible solution IMO and does not extend events with 
-> some invisible 'active' role. It extends the *call site* with an open-coded 
-> active role - which active role btw. already pre-existed.
+We should name it something else. The "perf_tp.." is a misnomer as it
+has nothing to do with performance monitoring. "dynamic_event_.." maybe,
+as it is dynamic to the affect that we can use jump labels to enable or
+disable it.
 
-Also see my other mail - i think this seccomp code is too tied in to the perf 
-core and ABI - but this is fixable IMO.
-
-The fundamental notion that a generator subsystem of events can use filter 
-results as well (such as kernel/trace/trace_syscalls.c.) for its own purposes 
-is pretty robust though.
-
-Thanks,
-
-	Ingo
+-- Steve
