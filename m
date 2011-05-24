@@ -1,229 +1,166 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 May 2011 10:38:04 +0200
-Subject: [PATCH 1/4] clk: Add a generic clock infrastructure
-In-Reply-To: <BANLkTinmRt_fv1oJwFuJQ34aAky_5SB4Rw@mail.gmail.com>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<1305876469.326305.518470530485.1.gpush@pororo>
-	<BANLkTin2Ho-Ce-4RurtHfAST7hqTLDrJ+g@mail.gmail.com>
-	<20110524070236.GB22096@pengutronix.de>
-	<BANLkTinmRt_fv1oJwFuJQ34aAky_5SB4Rw@mail.gmail.com>
-Message-ID: <20110524083804.GJ20715@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 24 May 2011 10:39:58 +0200
+Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
+In-Reply-To: <BANLkTinKgj-HmKwAWN-e6+8kj6ZRC4WJgg@mail.gmail.com>
+References: <1305899272-31839-1-git-send-email-javier.martin@vista-silicon.com>
+	<201105231103.26775.laurent.pinchart@ideasonboard.com>
+	<BANLkTinKgj-HmKwAWN-e6+8kj6ZRC4WJgg@mail.gmail.com>
+Message-ID: <201105241039.58428.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 12:51:10AM -0700, Colin Cross wrote:
-> On Tue, May 24, 2011 at 12:02 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Mon, May 23, 2011 at 04:55:15PM -0700, Colin Cross wrote:
-> >> On Fri, May 20, 2011 at 12:27 AM, Jeremy Kerr <jeremy.kerr@canonical.com> wrote:
-> >> >
-> >> > ?struct clk_hw_ops {
-> >> > ? ? ? ?int ? ? ? ? ? ? (*prepare)(struct clk_hw *);
-> >> > ? ? ? ?void ? ? ? ? ? ?(*unprepare)(struct clk_hw *);
-> >> > ? ? ? ?int ? ? ? ? ? ? (*enable)(struct clk_hw *);
-> >> > ? ? ? ?void ? ? ? ? ? ?(*disable)(struct clk_hw *);
-> >> > ? ? ? ?unsigned long ? (*recalc_rate)(struct clk_hw *);
-> >> > ? ? ? ?int ? ? ? ? ? ? (*set_rate)(struct clk_hw *,
-> >> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned long, unsigned long *);
-> >> > ? ? ? ?long ? ? ? ? ? ?(*round_rate)(struct clk_hw *, unsigned long);
-> >> > ? ? ? ?int ? ? ? ? ? ? (*set_parent)(struct clk_hw *, struct clk *);
-> >> > ? ? ? ?struct clk * ? ?(*get_parent)(struct clk_hw *);
-> >> > ?};
-> >>
-> >> You might want to split these into three separate structs, for mux
-> >> ops, rate ops, and gate ops. ?That way, multiple building blocks (a
-> >> gate and a divider, for example), can be easily combined into a single
-> >> clock node. ?Also, an init op that reads the clock tree state from the
-> >> hardware has been very useful on Tegra - there are often clocks that
-> >> you can't or won't change, and being able to view their state as
-> >> configured by the bootloader, and base other clocks off of them, is
-> >> helpful.
-> >
-> > The clock state is read initially from the hardware with the
-> > recalc_rate/get_parent ops. What do we need an additional init op for?
-> 
-> I see - I would rename them to make it clear they are for init, maybe
-> init_rate and init_parent, and not call them later - reading clock
-> state can be very expensive on some platforms, if not impossible -
-> Qualcomm requires RPCs to the modem to get clock state.  If every
-> clk_set_rate triggers state reads all the way through the descendants,
-> that could be a huge performance hit.  If you separate init and
-> recalculate, mux implementations can store their divider settings and
-> very easily recalculate their rate.
+Hi Javier,
 
-Even without additional hooks divider and muxes can decide to cache
-the actual register values.
-
-> 
-> >> It also allows you to turn off clocks that are enabled by
-> >> the bootloader, but never enabled by the kernel (enabled=1,
-> >> enable_count=0).
-> >
-> > The enable count indeed is a problem. I don't think an init hook
-> > would be the right solution for this though as this sounds platform
-> > specific. struct clk_hw_ops should be specific to the type of clock
-> > (mux, divider, gate) and should be present only once per type.
-> >
-> > For the enable count (and whether a clock should initially be enabled or
-> > not) I can think of something like this:
-> >
-> > - A platform/SoC registers all clocks.
-> > - It then calls clk_prepare/enable for all vital core clocks
-> > ?(SDRAM, CPU,...). At this time the enable counters are correct.
-> > - Then some hook in the generic clock layer is called. This hook
-> > ?iterates over the tree and disables all clocks in hardware which
-> > ?have a enable count of 0.
-> 
-> Is it always safe to disable a clock that is already disabled?
-
-I'm not aware of any clock where that's not the case, but your mileage
-may vary. At least the implementation should be able to determine
-whether a clock already is disabled and just skip another disable.
-
->  An
-> init_enable hook that set an enabled flag would let you only disable
-> clocks that were actually left on by the bootloader, and report to the
-> user which ones are actually being turned off (which has caught a lot
-> of problems on Tegra).
-> 
-> >> > +
-> >> > +struct clk {
-> >> > + ? ? ? const char ? ? ? ? ? ? ?*name;
-> >> > + ? ? ? struct clk_hw_ops ? ? ? *ops;
-> >> > + ? ? ? struct clk_hw ? ? ? ? ? *hw;
-> >> > + ? ? ? unsigned int ? ? ? ? ? ?enable_count;
-> >> > + ? ? ? unsigned int ? ? ? ? ? ?prepare_count;
-> >> > + ? ? ? struct clk ? ? ? ? ? ? ?*parent;
-> >>
-> >> Storing the list of possible parents at this level can help abstract
-> >> some common code from mux ops if you pass the index into the list of
-> >> the new parent into the op - most mux ops only need to know which of
-> >> their mux inputs needs to be enabled.
-> >
-> > Please don't. Only muxes have more than one possible parent, so this
-> > should be handled there.
-> 
-> The cost is one pointer per clock that is not actually a mux, and the
-> benefit is that you can move a very common search loop out of every
-> mux implementation into the framework.  It also lets you determine
-> which clocks are connected, which becomes necessary if you try to do
-> per-tree locking or sysfs controls for clocks.
-
-I agree that some sort of possible_parents iteration would be nice.
-
-> 
-> >>
-> >> > +
-> >> > + ? ? ? if (WARN_ON(clk->prepare_count == 0))
-> >> > + ? ? ? ? ? ? ? return;
-> >> > +
-> >> > + ? ? ? if (--clk->prepare_count > 0)
-> >> > + ? ? ? ? ? ? ? return;
-> >> > +
-> >> > + ? ? ? WARN_ON(clk->enable_count > 0);
-> >> > +
-> >> > + ? ? ? if (clk->ops->unprepare)
-> >> > + ? ? ? ? ? ? ? clk->ops->unprepare(clk->hw);
-> >> > +
-> >> > + ? ? ? __clk_unprepare(clk->parent);
+On Tuesday 24 May 2011 10:31:46 javier Martin wrote:
+> On 23 May 2011 11:03, Laurent Pinchart wrote:
+> > On Saturday 21 May 2011 17:29:18 Guennadi Liakhovetski wrote:
+> >> On Fri, 20 May 2011, Javier Martin wrote:
+> > [snip]
+> > 
+> >> > diff --git a/drivers/media/video/mt9p031.c
+> >> > b/drivers/media/video/mt9p031.c new file mode 100644
+> >> > index 0000000..e406b64
+> >> > --- /dev/null
+> >> > +++ b/drivers/media/video/mt9p031.c
+> > 
+> > [snip]
+> > 
 > >> > +}
-> >> Are there any cases where the unlocked versions of the clk calls need
-> >> to be exposed to the ops implementations? ?For example, a set_rate op
-> >> may want to call clk_set_parent on itself to change its parent to a
-> >> better source, and then set its rate. ?It would need to call
-> >> __clk_set_parent to avoid deadlocking on the prepare_lock.
-> >
-> > I hope we can avoid that. The decision of the best parent should be left
-> > up to the user. Doing this in the mux/divider implementation would
-> > torpedo attempts to implement generic building blocks.
-> 
-> I agree it would be nice, but it does push some knowledge of the clock
-> tree into device drivers.  For example, on Tegra the display driver
-> may need to change the source pll of the display clock to get the
-> required pclk, which requires passing all the possible parents of the
-> display clock into the display driver.  If this is a common usage
-> pattern, there needs to be a hook in the ops to allow the clock or
-> clock chip to make a more global decision.
-
-I think this is a common pattern. Another solution to this would be that
-the platform implements a clock whose only purpose is to build a bridge
-between the driver and the clock tree. There may be more constrains, for
-example in some cases you may need a clock which also runs in different
-sleep states whereas sometimes you may need a clock which is turned of
-when in sleep mode. I agree that this must be handled somewhere, but
-the clock framework is not the place to implement this stuff.
-
-> >>
-> >> I think you should hold the prepare mutex around calls to
-> >> clk_round_rate, which will allow some code simplification similar to
-> >> what Russell suggested in another thread. ?If you hold the mutex here,
-> >> as well as in clk_set_rate, and you call the round_rate op before the
-> >> set_rate op in clk_set_rate, op implementers can compute the rate in
-> >> their round_rate op, and save the register values needed to get that
-> >> rate in private temporary storage. ?The set_rate op can then assume
-> >> that those register values are correct, because the lock is still
-> >> held, and just write them. ?That moves all the computation to one
-> >> place, and it only needs to run once.
-> >
-> > This won't work in the case of cascaded dividers. These have to call
-> > clk_round_rate in their set_rate op for each possible divider value
-> > to get the best result. They can't do this when both set_rate and
-> > round_rate acquire the lock.
-> 
-> Then they call __clk_round_rate if they already have the lock?
-
-I think this is an implementation detail. As our idea of how a clock
-framework should work still is quite different we can discuss this later ;)
-
-> 
-> > [...]
-> >
-> >> > +struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
-> >> > + ? ? ? ? ? ? ? const char *name)
+> >> > +
+> >> > +static int mt9p031_power_on(struct mt9p031 *mt9p031)
 > >> > +{
-> >> > + ? ? ? struct clk *clk;
+> >> > +   int ret;
 > >> > +
-> >> > + ? ? ? clk = kzalloc(sizeof(*clk), GFP_KERNEL);
-> >> > + ? ? ? if (!clk)
-> >> > + ? ? ? ? ? ? ? return NULL;
-> >> > +
-> >> > + ? ? ? clk->name = name;
-> >> > + ? ? ? clk->ops = ops;
-> >> > + ? ? ? clk->hw = hw;
-> >> > + ? ? ? hw->clk = clk;
-> >> > +
-> >> > + ? ? ? /* Query the hardware for parent and initial rate */
-> >> > +
-> >> > + ? ? ? if (clk->ops->get_parent)
-> >> > + ? ? ? ? ? ? ? /* We don't to lock against prepare/enable here, as
-> >> > + ? ? ? ? ? ? ? ?* the clock is not yet accessible from anywhere */
-> >> > + ? ? ? ? ? ? ? clk->parent = clk->ops->get_parent(clk->hw);
-> >> > +
-> >> > + ? ? ? if (clk->ops->recalc_rate)
-> >> > + ? ? ? ? ? ? ? clk->rate = clk->ops->recalc_rate(clk->hw);
-> >> > +
-> >> > +
-> >> > + ? ? ? return clk;
-> >> > +}
-> >> > +EXPORT_SYMBOL_GPL(clk_register);
-> >>
-> >> If you are requiring clk's parents (or possible parents?) to be
-> >> registered before clk, you could put the clk_lookup struct inside the
-> >> clk struct and call clkdev_add from clk_register, saving some
-> >> boilerplate in the platforms.
-> >
-> > There can be multiple struct clk_lookup for each clock.
+> >> > +   /* turn on VDD_IO */
+> >> > +   ret = regulator_enable(mt9p031->reg_2v8);
+> >> > +   if (ret) {
+> >> > +           pr_err("Failed to enable 2.8v regulator: %d\n", ret);
+> >> 
+> >> dev_err()
+> >> 
+> >> > +           return ret;
+> >> > +   }
+> >> > +   if (mt9p031->pdata->set_xclk)
+> >> > +           mt9p031->pdata->set_xclk(&mt9p031->subdev, 54000000);
+> > 
+> > Can you make 54000000 a #define at the beginning of the file ?
+> > 
+> > You should soft-reset the chip here by calling mt9p031_reset().
 > 
-> Sure, and that could be handled by clk_register_alias.  Most of the
-> clocks have a single clk_lookup.
+> If I do this, I would be force to cache some registers and restart
+> them. I've tried to do this but I don't know what is failing that
+> there are some artifacts consisting on horizontal black lines in the
+> image.
 
-In my idea only few of the clocks have a clk_lookup (you mentioned a
-clock between the i2c divider and i2c gate elsewhere, this would never
-be passed to a device).
+You need to cache registers anyway, as the chip will be reset to default 
+values by the core power cycling. And as I'm writing those lines I realize 
+that you don't power cycle reg_1v8. This needs to be done to save power.
 
-Sascha
+> Please, let me push this to mainline without this feature as a first
+> step, since I'll have to spend some assigned to another project.
+
+Power handling is an important feature. I don't think the driver is ready 
+without it. 
+
+> [snip]
+> 
+> >> > + */
+> >> > +static int mt9p031_video_probe(struct i2c_client *client)
+> >> > +{
+> >> > +   s32 data;
+> >> > +   int ret;
+> >> > +
+> >> > +   /* Read out the chip version register */
+> >> > +   data = reg_read(client, MT9P031_CHIP_VERSION);
+> >> > +   if (data != MT9P031_CHIP_VERSION_VALUE) {
+> >> > +           dev_err(&client->dev,
+> >> > +                   "No MT9P031 chip detected, register read %x\n",
+> >> > data); +           return -ENODEV;
+> >> > +   }
+> >> > +
+> >> > +   dev_info(&client->dev, "Detected a MT9P031 chip ID %x\n", data);
+> >> > +
+> >> > +   ret = mt9p031_reset(client);
+> >> > +   if (ret < 0)
+> >> > +           dev_err(&client->dev, "Failed to initialise the
+> >> > camera\n");
+> > 
+> > If you move the soft-reset operation to mt9p031_power_on(), you don't
+> > need to call it here.
+> 
+> The reason for this is the same as before. I haven't still been able
+> to success on restarting registers and getting everything to work
+> fine.
+> It would be great if you allowed me to push this as it is as an
+> intermediate step.
+
+Sorry, but I'd like to see power management properly implemented before the 
+driver hits mainline. Other less important features (such as exposure/gain 
+controls for instance) can be missing, but proper power management is 
+important.
+
+> [snip]
+> 
+> >> > +   mt9p031->rect.width     = MT9P031_MAX_WIDTH;
+> >> > +   mt9p031->rect.height    = MT9P031_MAX_HEIGHT;
+> >> > +
+> >> > +   mt9p031->format.code = V4L2_MBUS_FMT_SGRBG12_1X12;
+> >> > +
+> >> > +   mt9p031->format.width = MT9P031_MAX_WIDTH;
+> >> > +   mt9p031->format.height = MT9P031_MAX_HEIGHT;
+> >> > +   mt9p031->format.field = V4L2_FIELD_NONE;
+> >> > +   mt9p031->format.colorspace = V4L2_COLORSPACE_SRGB;
+> >> > +
+> >> > +   mt9p031->xskip = 1;
+> >> > +   mt9p031->yskip = 1;
+> >> > +
+> >> > +   mt9p031->reg_1v8 = regulator_get(NULL, "cam_1v8");
+> >> > +   if (IS_ERR(mt9p031->reg_1v8)) {
+> >> > +           ret = PTR_ERR(mt9p031->reg_1v8);
+> >> > +           pr_err("Failed 1.8v regulator: %d\n", ret);
+> >> 
+> >> dev_err()
+> >> 
+> >> > +           goto e1v8;
+> >> > +   }
+> > 
+> > The driver can be used with boards where either or both of the 1.8V and
+> > 2.8V supplies are always on, thus not connected to any regulator. I'm
+> > not sure how that's usually handled, if board code should define an
+> > "always-on" power supply, or if the driver shouldn't fail when no
+> > regulator is present. In any case, this must be handled.
+> 
+> I think board code should define an "always-on" power supply.
+
+Fine with me. How is that done BTW ?
+
+> >> > +
+> >> > +   mt9p031->reg_2v8 = regulator_get(NULL, "cam_2v8");
+> >> > +   if (IS_ERR(mt9p031->reg_2v8)) {
+> >> > +           ret = PTR_ERR(mt9p031->reg_2v8);
+> >> > +           pr_err("Failed 2.8v regulator: %d\n", ret);
+> >> 
+> >> ditto
+> >> 
+> >> > +           goto e2v8;
+> >> > +   }
+> >> > +   /* turn on core */
+> >> > +   ret = regulator_enable(mt9p031->reg_1v8);
+> >> > +   if (ret) {
+> >> > +           pr_err("Failed to enable 1.8v regulator: %d\n", ret);
+> >> 
+> >> ditto
+> >> 
+> >> > +           goto e1v8en;
+> >> > +   }
+> >> > +   return 0;
+> > 
+> > Why do you leave core power on at the end of probe() ? You should only
+> > turn it on when needed.
+> 
+> Just as I said, because restarting registers does not work yet.
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Regards,
+
+Laurent Pinchart
