@@ -1,95 +1,179 @@
 From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 24 May 2011 19:54:47 +0530
-Subject: [PATCH 08/15] OMAP2+: GPIO: make workaround_enabled bank specific
+Date: Tue, 24 May 2011 19:54:45 +0530
+Subject: [PATCH 06/15] OMAP4: GPIO: Save/restore context
 In-Reply-To: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
 References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <1306247094-25372-9-git-send-email-tarun.kanti@ti.com>
+Message-ID: <1306247094-25372-7-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Charulatha V <charu@ti.com>
 
-Make workaround_enabled flag bank-specific instead of using a single
-flag for all the banks together. This would be helpful while making
-use of runtime framework in OMAP GPIO driver which would make the
-driver handle each GPIO bank independently.
-
-Also rename workaround_enabled flag to off_mode_wkup_wa_enabled
+Modify the omap_gpio_save/restore_context to support OMAP4
+architecture so that the OMAP GPIO driver need not be modified
+when OMAP4 off mode support is available.
 
 Signed-off-by: Charulatha V <charu@ti.com>
 ---
- drivers/gpio/gpio_omap.c |   15 +++++----------
- 1 files changed, 5 insertions(+), 10 deletions(-)
+ drivers/gpio/gpio_omap.c |  130 +++++++++++++++++++++++++++++++---------------
+ 1 files changed, 87 insertions(+), 43 deletions(-)
 
 diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-index bc02ec5..fcc60be 100644
+index 5673951..9d55b7d 100644
 --- a/drivers/gpio/gpio_omap.c
 +++ b/drivers/gpio/gpio_omap.c
-@@ -72,6 +72,7 @@ struct gpio_bank {
- 	struct device *dev;
- 	bool dbck_flag;
- 	bool loses_context;
-+	bool off_mode_wkup_wa_enabled;
- 	int stride;
- 	u32 width;
- 	u32 ctx_lost_cnt_before;
-@@ -1077,6 +1078,7 @@ static void __init omap_gpio_chip_init(struct gpio_bank *bank)
- 	static int gpio;
+@@ -1476,9 +1476,6 @@ void omap2_gpio_resume_after_idle(void)
  
- 	bank->mod_usage = 0;
-+	bank->off_mode_wkup_wa_enabled = false;
- 	/*
- 	 * REVISIT eventually switch from OMAP-specific gpio structs
- 	 * over to the generic ones
-@@ -1316,11 +1318,8 @@ static struct sys_device omap_gpio_device = {
- static void omap_gpio_save_context(struct gpio_bank *bank);
- static void omap_gpio_restore_context(struct gpio_bank *bank);
- 
--static int workaround_enabled;
--
- void omap2_gpio_prepare_for_idle(int off_mode)
- {
--	int c = 0;
- 	struct gpio_bank *bank;
- 
- 	list_for_each_entry(bank, &omap_gpio_list, node) {
-@@ -1378,7 +1377,7 @@ void omap2_gpio_prepare_for_idle(int off_mode)
- 			__raw_writel(l2, bank->base + OMAP4_GPIO_RISINGDETECT);
- 		}
- 
--		c++;
-+		bank->off_mode_wkup_wa_enabled = true;
- 
- save_gpio_ctx:
- 		pdev = to_platform_device(bank->dev);
-@@ -1386,11 +1385,6 @@ save_gpio_ctx:
- 				omap_device_get_context_loss_count(pdev);
- 		omap_gpio_save_context(bank);
- 	}
--	if (!c) {
--		workaround_enabled = 0;
--		return;
--	}
--	workaround_enabled = 1;
  }
  
- void omap2_gpio_resume_after_idle(void)
-@@ -1415,7 +1409,7 @@ void omap2_gpio_resume_after_idle(void)
- 		if (ctx_lost_cnt_after == bank->ctx_lost_cnt_before)
+-#endif
+-
+-#ifdef CONFIG_ARCH_OMAP3
+ void omap_gpio_save_context(void)
+ {
+ 	struct gpio_bank *bank;
+@@ -1488,26 +1485,49 @@ void omap_gpio_save_context(void)
+ 		if (!bank->loses_context)
  			continue;
  
--		if (!workaround_enabled)
-+		if (!bank->off_mode_wkup_wa_enabled)
- 			goto restore_gpio_ctx;
- 
- 		if (!(bank->enabled_non_wakeup_gpios))
-@@ -1495,6 +1489,7 @@ void omap2_gpio_resume_after_idle(void)
- 		}
- 
- restore_gpio_ctx:
-+		bank->off_mode_wkup_wa_enabled = false;
- 		omap_gpio_restore_context(bank);
+-		bank->context.irqenable1 =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE1);
+-		bank->context.irqenable2 =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_IRQENABLE2);
+-		bank->context.wake_en =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_WAKE_EN);
+-		bank->context.ctrl =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_CTRL);
+-		bank->context.oe =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_OE);
+-		bank->context.leveldetect0 =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT0);
+-		bank->context.leveldetect1 =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_LEVELDETECT1);
+-		bank->context.risingdetect =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_RISINGDETECT);
+-		bank->context.fallingdetect =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_FALLINGDETECT);
+-		bank->context.dataout =
+-			__raw_readl(bank->base + OMAP24XX_GPIO_DATAOUT);
++		if (bank->method == METHOD_GPIO_24XX) {
++			bank->context.irqenable1 = __raw_readl(
++					bank->base + OMAP24XX_GPIO_IRQENABLE1);
++			bank->context.irqenable2 = __raw_readl(
++					bank->base + OMAP24XX_GPIO_IRQENABLE2);
++			bank->context.wake_en = __raw_readl(
++					bank->base + OMAP24XX_GPIO_WAKE_EN);
++			bank->context.ctrl = __raw_readl(
++					bank->base + OMAP24XX_GPIO_CTRL);
++			bank->context.oe = __raw_readl(
++					bank->base + OMAP24XX_GPIO_OE);
++			bank->context.leveldetect0 = __raw_readl(bank->base +
++					OMAP24XX_GPIO_LEVELDETECT0);
++			bank->context.leveldetect1 = __raw_readl(bank->base +
++					OMAP24XX_GPIO_LEVELDETECT1);
++			bank->context.risingdetect = __raw_readl(bank->base +
++					OMAP24XX_GPIO_RISINGDETECT);
++			bank->context.fallingdetect = __raw_readl(bank->base +
++					OMAP24XX_GPIO_FALLINGDETECT);
++			bank->context.dataout = __raw_readl(
++					bank->base + OMAP24XX_GPIO_DATAOUT);
++		} else if (bank->method == METHOD_GPIO_44XX) {
++			bank->context.irqenable1 = __raw_readl(
++					bank->base + OMAP4_GPIO_IRQSTATUSSET0);
++			bank->context.irqenable2 = __raw_readl(
++					bank->base + OMAP4_GPIO_IRQSTATUSSET1);
++			bank->context.wake_en = __raw_readl(
++					bank->base + OMAP4_GPIO_IRQWAKEN0);
++			bank->context.ctrl = __raw_readl(
++					bank->base + OMAP4_GPIO_CTRL);
++			bank->context.oe = __raw_readl(
++					bank->base + OMAP24XX_GPIO_OE);
++			bank->context.leveldetect0 = __raw_readl(bank->base +
++					OMAP4_GPIO_LEVELDETECT0);
++			bank->context.leveldetect1 = __raw_readl(bank->base +
++					OMAP4_GPIO_LEVELDETECT1);
++			bank->context.risingdetect = __raw_readl(bank->base +
++					OMAP4_GPIO_RISINGDETECT);
++			bank->context.fallingdetect = __raw_readl(bank->base +
++					OMAP4_GPIO_FALLINGDETECT);
++			bank->context.dataout = __raw_readl(
++					bank->base + OMAP4_GPIO_DATAOUT);
++		}
  	}
+ }
  
+@@ -1520,28 +1540,52 @@ void omap_gpio_restore_context(void)
+ 		if (!bank->loses_context)
+ 			continue;
+ 
+-		__raw_writel(bank->context.irqenable1,
+-				bank->base + OMAP24XX_GPIO_IRQENABLE1);
+-		__raw_writel(bank->context.irqenable2,
+-				bank->base + OMAP24XX_GPIO_IRQENABLE2);
+-		__raw_writel(bank->context.wake_en,
+-				bank->base + OMAP24XX_GPIO_WAKE_EN);
+-		__raw_writel(bank->context.ctrl,
+-				bank->base + OMAP24XX_GPIO_CTRL);
+-		__raw_writel(bank->context.oe,
+-				bank->base + OMAP24XX_GPIO_OE);
+-		__raw_writel(bank->context.leveldetect0,
+-				bank->base + OMAP24XX_GPIO_LEVELDETECT0);
+-		__raw_writel(bank->context.leveldetect1,
+-				bank->base + OMAP24XX_GPIO_LEVELDETECT1);
+-		__raw_writel(bank->context.risingdetect,
+-				bank->base + OMAP24XX_GPIO_RISINGDETECT);
+-		__raw_writel(bank->context.fallingdetect,
+-				bank->base + OMAP24XX_GPIO_FALLINGDETECT);
+-		__raw_writel(bank->context.dataout,
+-				bank->base + OMAP24XX_GPIO_DATAOUT);
++		if (bank->method == METHOD_GPIO_24XX) {
++			__raw_writel(bank->context.irqenable1, bank->base +
++						OMAP24XX_GPIO_IRQENABLE1);
++			__raw_writel(bank->context.irqenable2, bank->base +
++						OMAP24XX_GPIO_IRQENABLE2);
++			__raw_writel(bank->context.wake_en, bank->base +
++						OMAP24XX_GPIO_WAKE_EN);
++			__raw_writel(bank->context.ctrl, bank->base +
++						OMAP24XX_GPIO_CTRL);
++			__raw_writel(bank->context.oe, bank->base +
++						OMAP24XX_GPIO_OE);
++			__raw_writel(bank->context.leveldetect0, bank->base +
++						OMAP24XX_GPIO_LEVELDETECT0);
++			__raw_writel(bank->context.leveldetect1, bank->base +
++						OMAP24XX_GPIO_LEVELDETECT1);
++			__raw_writel(bank->context.risingdetect, bank->base +
++						OMAP24XX_GPIO_RISINGDETECT);
++			__raw_writel(bank->context.fallingdetect, bank->base +
++						OMAP24XX_GPIO_FALLINGDETECT);
++			__raw_writel(bank->context.dataout, bank->base +
++						OMAP24XX_GPIO_DATAOUT);
++		} else if (bank->method == METHOD_GPIO_44XX) {
++			__raw_writel(bank->context.irqenable1, bank->base +
++						OMAP4_GPIO_IRQSTATUSSET0);
++			__raw_writel(bank->context.irqenable2, bank->base +
++						OMAP4_GPIO_IRQSTATUSSET1);
++			__raw_writel(bank->context.wake_en, bank->base +
++						OMAP4_GPIO_IRQWAKEN0);
++			__raw_writel(bank->context.ctrl, bank->base +
++						OMAP4_GPIO_CTRL);
++			__raw_writel(bank->context.oe, bank->base +
++						OMAP24XX_GPIO_OE);
++			__raw_writel(bank->context.leveldetect0, bank->base +
++						OMAP4_GPIO_LEVELDETECT0);
++			__raw_writel(bank->context.leveldetect1, bank->base +
++						OMAP4_GPIO_LEVELDETECT1);
++			__raw_writel(bank->context.risingdetect, bank->base +
++						OMAP4_GPIO_RISINGDETECT);
++			__raw_writel(bank->context.fallingdetect, bank->base +
++						OMAP4_GPIO_FALLINGDETECT);
++			__raw_writel(bank->context.dataout, bank->base +
++						OMAP4_GPIO_DATAOUT);
++		}
+ 	}
+ }
++
+ #endif
+ 
+ static struct platform_driver omap_gpio_driver = {
 -- 
 1.6.0.4
