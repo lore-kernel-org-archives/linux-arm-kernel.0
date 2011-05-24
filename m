@@ -1,36 +1,36 @@
-From: vapier.adi@gmail.com (Mike Frysinger)
-Date: Tue, 24 May 2011 00:43:21 -0400
-Subject: [PATCH v5 1/8] MTD: Add integrator-flash feature to physmap
-In-Reply-To: <1305557977-16871-2-git-send-email-marc.zyngier@arm.com>
-References: <1305557977-16871-1-git-send-email-marc.zyngier@arm.com>
-	<1305557977-16871-2-git-send-email-marc.zyngier@arm.com>
-Message-ID: <BANLkTi=sd-Xhm8yXXbHk_VfMWwdaez_LhQ@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Tue, 24 May 2011 07:32:20 +0200
+Subject: [PATCH 3/4] davinci: dm646x: remove the macros from the header
+	to move to c file
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D09B3A7@dbde02.ent.ti.com>
+References: <1305900721-3890-1-git-send-email-manjunath.hadli@ti.com>
+	<20110520142401.GV15292@game.jcrosoft.org>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D09B3A7@dbde02.ent.ti.com>
+Message-ID: <20110524053220.GD863@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 16, 2011 at 10:59, Marc Zyngier wrote:
-> --- a/include/linux/mtd/physmap.h
-> +++ b/include/linux/mtd/physmap.h
-> @@ -22,6 +22,8 @@ struct map_info;
->
-> ?struct physmap_flash_data {
-> ? ? ? ?unsigned int ? ? ? ? ? ?width;
-> + ? ? ? int ? ? ? ? ? ? ? ? ? ? (*init)(struct platform_device *);
-> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*exit)(struct platform_device *);
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*set_vpp)(struct map_info *, int);
-> ? ? ? ?unsigned int ? ? ? ? ? ?nr_parts;
-> ? ? ? ?unsigned int ? ? ? ? ? ?pfow_base;
+On 19:04 Mon 23 May     , Nori, Sekhar wrote:
+> 
+> Hi Jean-Christophe,
+> 
+> On Fri, May 20, 2011 at 19:54:01, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > On 19:42 Fri 20 May     , Manjunath Hadli wrote:
+> > > move the register base addresses and offsets used only by dm646x
+> > > platform file from platform header dm646x.h to dm646x.c as they
+> > > are used only in the c file.
+> > > 
+> > > Signed-off-by: Manjunath Hadli <manjunath.hadli@ti.com>
+> > I do not think it's a good idea to put the register mapping in the c file
+> > evenif they are used only today in dm646x
+> > 
+> 
+> Unless a definition is used across C files, it would be better to
+> keep it local to the C file. Why treat base addresses and register
+> offsets differently?
+no difference the macro are nearly every time put in header not in C code
 
-you use the platform_device structure but never include any header for
-it.  please add "struct platform_device;" to the top of this file
-after the #includes.
+ditto of ifdef
 
-include/linux/mtd/physmap.h:25: warning: ?struct platform_device?
-declared inside parameter list
-include/linux/mtd/physmap.h:25: warning: its scope is only this
-definition or declaration, which is probably not what you want
-include/linux/mtd/physmap.h:26: warning: ?struct platform_device?
-declared inside parameter list
-include/linux/mtd/physmap.h:27: warning: ?struct platform_device?
-declared inside parameter list
--mike
+Best Regards,
+J.
