@@ -1,42 +1,48 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 24 May 2011 18:25:28 +0200 (CEST)
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <1306254027.18455.47.camel@twins>
-References: <20110513125452.GD3924@elte.hu> <1305292132.2466.26.camel@twins>
-	<20110513131800.GA7883@elte.hu> <1305294935.2466.64.camel@twins>
-	<20110513145737.GC32688@elte.hu>
-	<1305563026.5456.19.camel@gandalf.stny.rr.com>
-	<20110516165249.GB10929@elte.hu>
-	<1305565422.5456.21.camel@gandalf.stny.rr.com>
-	<20110517124212.GB21441@elte.hu>
-	<1305637528.5456.723.camel@gandalf.stny.rr.com>
-	<20110517131902.GF21441@elte.hu>
-	<BANLkTikBK3-KZ10eErQ6Eex_L6Qe2aZang@mail.gmail.com>
-	<1305807728.11267.25.camel@gandalf.stny.rr.com>
-	<BANLkTiki8aQJbFkKOFC+s6xAEiuVyMM5MQ@mail.gmail.com>
-	<BANLkTim9UyYAGhg06vCFLxkYPX18cPymEQ@mail.gmail.com>
-	<1306254027.18455.47.camel@twins>
-Message-ID: <alpine.LFD.2.02.1105241823540.3078@ionos>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 24 May 2011 21:36:11 +0530
+Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
+In-Reply-To: <BANLkTikDPeEFWdsVQ=Ak8jXEXsC-+uoOaw@mail.gmail.com>
+References: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
+	<BANLkTikDPeEFWdsVQ=Ak8jXEXsC-+uoOaw@mail.gmail.com>
+Message-ID: <1306253171.30236.9.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 May 2011, Peter Zijlstra wrote:
-
-> On Tue, 2011-05-24 at 10:59 -0500, Will Drewry wrote:
-> >  include/linux/ftrace_event.h  |    4 +-
-> >  include/linux/perf_event.h    |   10 +++++---
-> >  kernel/perf_event.c           |   49 +++++++++++++++++++++++++++++++++++++---
-> >  kernel/seccomp.c              |    8 ++++++
-> >  kernel/trace/trace_syscalls.c |   27 +++++++++++++++++-----
-> >  5 files changed, 82 insertions(+), 16 deletions(-) 
+On Tue, 2011-05-24 at 17:40 +0200, Per Forlin wrote:
+> Hi Vinod,
 > 
-> I strongly oppose to the perf core being mixed with any sekurity voodoo
-> (or any other active role for that matter).
+> On Tue, May 24, 2011 at 2:04 PM, Koul, Vinod <vinod.koul@intel.com> wrote:
+> > From: Vinod Koul <vinod.koul@intel.com>
+> >
+> > Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+> > ---
+> >  Documentation/dma-slave-api.txt |   74 +++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 74 insertions(+), 0 deletions(-)
+> >  create mode 100644 Documentation/dma-slave-api.txt
+> I suggest putting this in subsection of dmaengine.txt instead.
+> dmaengine.txt would be the natural place to look at.
+Agreed, that would make it easier for people to find
 
-Amen. We have enough crap to cleanup in perf/ftrace already, so we
-really do not need security magic added to it.
+> > +4. Submit the transaction(s) and wait for callback notification when slave API
+> > +is 3 above returns, the non NULL value would imply a "descriptor" for the
+> > +transaction. These transaction(s) would need to be submitted which pushes them
+> > +into queue in DMA driver. If DMA is idle then the first descriptor submit will
+> > +be pushed to DMA and subsequent ones will be queued. On completion of the DMA
+> > +operation the next in queue is submitted and a tasklet triggered. The tasklet
+> > +would then call the client driver completion callback routine for notification,
+> > +if set.
+> > +
+> Does submit really start the transfer as well? My interpretation of
+> submit is that is only adds desc to a pending queue. When calling
+> issue_pending all these descs will be schedule for DMA transfer. Calls
+> to submit after this point will added to the pending queue again and
+> not be issued until calling issue_pending once more.
+For slave dma devices, submit() is used to start the transaction if the
+channel is idle. If its already doing a transaction then it will queue
+it up and submit once cureent excuting one is completed. It is not
+required to call issue_pending once more.
+I am not sure if this is true for non slave usage, Dan would that be
+correct for you as well?
 
-Thanks,
-
-	tglx
+-- 
+~Vinod
