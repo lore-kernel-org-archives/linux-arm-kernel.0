@@ -1,31 +1,28 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 24 May 2011 11:51:16 +0200
-Subject: [PATCH] ASoc: sam9g20_wm8731: use the proper SYSCKL value
-Message-ID: <1306230676-28688-1-git-send-email-nicolas.ferre@atmel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 24 May 2011 11:55:03 +0300
+Subject: [GIT PULL] OMAP PM cleanups for 2.6.40
+In-Reply-To: <87liy15r8b.fsf@ti.com>
+References: <87liy15r8b.fsf@ti.com>
+Message-ID: <20110524085502.GF30799@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-at91sam9g20 is providing master clock to wm8731: not using a crystal but an
-external MCLK. We can avoid conflict and save power using WM8731_SYSCLK_MCLK as
-we do not need oscillator to be powered.
+* Kevin Hilman <khilman@ti.com> [110520 18:21]:
+> Tony,
+> 
+> Please pull the following OMAP PM related cleanups for 2.6.40.
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- sound/soc/atmel/sam9g20_wm8731.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
-
-diff --git a/sound/soc/atmel/sam9g20_wm8731.c b/sound/soc/atmel/sam9g20_wm8731.c
-index 28afbbf..95572d2 100644
---- a/sound/soc/atmel/sam9g20_wm8731.c
-+++ b/sound/soc/atmel/sam9g20_wm8731.c
-@@ -146,7 +146,7 @@ static int at91sam9g20ek_wm8731_init(struct snd_soc_pcm_runtime *rtd)
- 			"at91sam9g20ek_wm8731 "
- 			": at91sam9g20ek_wm8731_init() called\n");
+Pulled into for-next for this merge window.
  
--	ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_XTAL,
-+	ret = snd_soc_dai_set_sysclk(codec_dai, WM8731_SYSCLK_MCLK,
- 		MCLK_RATE, SND_SOC_CLOCK_IN);
- 	if (ret < 0) {
- 		printk(KERN_ERR "Failed to set WM8731 SYSCLK: %d\n", ret);
--- 
-1.7.3
+>  arch/arm/mach-omap2/board-3430sdp.c |   19 --
+>  arch/arm/mach-omap2/board-rx51.c    |   18 +-
+>  arch/arm/mach-omap2/cpuidle34xx.c   |  436 ++++++++++++-----------------------
+>  arch/arm/mach-omap2/pm.h            |   17 +-
+>  arch/arm/mach-omap2/pm34xx.c        |   14 --
+>  5 files changed, 166 insertions(+), 338 deletions(-)
+
+Nice, more negative diffstat :)
+
+Regards,
+
+Tony
