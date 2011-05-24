@@ -1,48 +1,59 @@
-From: peter.chubb@nicta.com.au (Peter Chubb)
-Date: Tue, 24 May 2011 11:53:32 +1000
-Subject: Trivial patch to fix compilation for Armulator
-Message-ID: <w4zkmcamoz.wl%peter@chubb.wattle.id.au>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 24 May 2011 09:48:12 +0530
+Subject: [PATCH 1/4] clk: Add a generic clock infrastructure
+In-Reply-To: <1305876469.326305.518470530485.1.gpush@pororo>
+References: <1305876469.326305.518470530485.1.gpush@pororo>
+Message-ID: <4DDB3184.2080301@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-	In Linux 2.6.39 as updated today there's a typo in
-	arch/arm/mm/proc-arm7tdmi.S that prevents compilation with:
+On 05/20/2011 12:57 PM, Jeremy Kerr wrote:
+> +static DEFINE_SPINLOCK(enable_lock);
+> +static DEFINE_MUTEX(prepare_lock);
 
-   /tmp/ccPWiEKN.s: Error: .size expression for __arm7tdmi_proc_info
-	does not evaluate to a constant
+Probably all clocks can be handled separately, i.e. single lock for all
+of them will make system slower. Suppose i want to enable UART's clock
+then why should spi code be waiting for the lock.
+So, we should have per clk lock.
 
-Signed-off-by: Peter Chubb <peter.chubb@nicta.com.au>
+<...>
 
-Index: linux-2.6/arch/arm/mm/proc-arm7tdmi.S
-===================================================================
---- linux-2.6.orig/arch/arm/mm/proc-arm7tdmi.S	2011-05-24 11:48:03.828496126 +1000
-+++ linux-2.6/arch/arm/mm/proc-arm7tdmi.S	2011-05-24 11:48:19.724240476 +1000
-@@ -139,21 +139,21 @@ __arm7tdmi_proc_info:
- 		.long	0
- 		b	__arm7tdmi_setup
- 		.long	cpu_arch_name
- 		.long	cpu_elf_name
- 		.long	HWCAP_SWP | HWCAP_26BIT
- 		.long	cpu_arm7tdmi_name
- 		.long	arm7tdmi_processor_functions
- 		.long	0
- 		.long	0
- 		.long	v4_cache_fns
--		.size	__arm7tdmi_proc_info, . - __arm7dmi_proc_info
-+		.size	__arm7tdmi_proc_info, . - __arm7tdmi_proc_info
- 
- 		.type	__triscenda7_proc_info, #object
- __triscenda7_proc_info:
- 		.long	0x0001d2ff
- 		.long	0x0001ffff
- 		.long	0
- 		.long	0
- 		b	__arm7tdmi_setup
- 		.long	cpu_arch_name
- 		.long	cpu_elf_name
+> +struct clk *clk_register(struct clk_hw_ops *ops, struct clk_hw *hw,
+> +               const char *name)
+> +{
+> +       struct clk *clk;
+> +
+> +       clk = kzalloc(sizeof(*clk), GFP_KERNEL);
+> +       if (!clk)
+> +               return NULL;
+> +
+> +       clk->name = name;
+> +       clk->ops = ops;
+> +       clk->hw = hw;
+> +       hw->clk = clk;
+> +
+> +       /* Query the hardware for parent and initial rate */
+> +
 
+Can remove this blank line.
 
---
-Dr Peter Chubb  http://www.gelato.unsw.edu.au  peterc AT gelato.unsw.edu.au
-http://www.ertos.nicta.com.au           ERTOS within National ICT Australia
+> +       if (clk->ops->get_parent)
+> +               /* We don't to lock against prepare/enable here, as
+> +                * the clock is not yet accessible from anywhere */
+
+Shouldn't we use following style for multi-line comments.
+/*
+ * ....
+ */
+
+> +               clk->parent = clk->ops->get_parent(clk->hw);
+> +
+> +       if (clk->ops->recalc_rate)
+> +               clk->rate = clk->ops->recalc_rate(clk->hw);
+> +
+> +
+
+Can remove one of these blank lines.
+
+-- 
+viresh
