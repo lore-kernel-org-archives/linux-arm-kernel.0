@@ -1,40 +1,111 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 24 May 2011 08:26:20 +0200
-Subject: [PATCH 0/4] Add a generic struct clk
-In-Reply-To: <BANLkTik=EFayZW61TgfOni-XML+tRLOcqw@mail.gmail.com>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<1305876469.325655.313573683829.0.gpush@pororo>
-	<BANLkTik=EFayZW61TgfOni-XML+tRLOcqw@mail.gmail.com>
-Message-ID: <20110524062620.GA22096@pengutronix.de>
+From: francesco.virlinzi@st.com (Francesco VIRLINZI)
+Date: Tue, 24 May 2011 09:01:27 +0200
+Subject: [PATCH 3/4] clk: Add fixed-rate clock
+In-Reply-To: <1305876469.327290.592839707336.3.gpush@pororo>
+References: <1305876469.327290.592839707336.3.gpush@pororo>
+Message-ID: <4DDB57C7.5010007@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 04:12:24PM -0700, Colin Cross wrote:
-> >
-> > ? tglx's plan is to create a separate struct clk_hwdata, which contains a
-> > ? union of base data structures for common clocks: div, mux, gate, etc. The
-> > ? ops callbacks are passed a clk_hw, plus a clk_hwdata, and most of the base
-> > ? hwdata fields are handled within the core clock code. This means less
-> > ? encapsulation of clock implementation logic, but more coverage of
-> > ? clock basics through the core code.
-> 
-> I don't think they should be a union, I think there should be 3
-> separate private datas, and three sets of clock ops, for the three
-> different types of clock blocks: rate changers (dividers and plls),
-> muxes, and gates.  These blocks are very often combined - a device
-> clock often has a mux and a divider, and clk_set_parent and
-> clk_set_rate on the same struct clk both need to work.
+Hi Jeremy
 
-The idea is to being able to propagate functions to the parent. It's
-very convenient for the implementation of clocks when they only
-implement either a divider, a mux or a gate. Combining all of these
-into a single clock leads to complicated clock trees and many different
-clocks where you can't factor out the common stuff.
+Is this patch really required?
 
-Sascha
+If I have just a static clk with only a name and a rate;
+I can obtain the rate with the
+clk_get_rate(..)
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+and I don't need extra code/data to manage the fixed_clk (in my
+  view it's already fixed due to a null struct clk_hw_ops).
+
+Could you clarify what the would address?
+Thanks
+Regards
+  Francesco
+
+
+On 5/20/2011 9:27 AM, Jeremy Kerr wrote:
+> Signed-off-by: Jeremy Kerr<jeremy.kerr@canonical.com>
+>
+> ---
+>   drivers/clk/Kconfig     |    4 ++++
+>   drivers/clk/Makefile    |    1 +
+>   drivers/clk/clk-fixed.c |   17 +++++++++++++++++
+>   include/linux/clk.h     |   14 ++++++++++++++
+>   4 files changed, 36 insertions(+)
+>
+> diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+> index e611e34..0a27963 100644
+> --- a/drivers/clk/Kconfig
+> +++ b/drivers/clk/Kconfig
+> @@ -5,3 +5,7 @@ config CLKDEV_LOOKUP
+>
+>   config GENERIC_CLK
+>   	bool
+> +
+> +config GENERIC_CLK_FIXED
+> +	bool
+> +	depends on GENERIC_CLK
+> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> index 570d5b9..9a3325a 100644
+> --- a/drivers/clk/Makefile
+> +++ b/drivers/clk/Makefile
+> @@ -1,3 +1,4 @@
+>
+>   obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+>   obj-$(CONFIG_GENERIC_CLK)	+= clk.o
+> +obj-$(CONFIG_GENERIC_CLK_FIXED)	+= clk-fixed.o
+> diff --git a/drivers/clk/clk-fixed.c b/drivers/clk/clk-fixed.c
+> new file mode 100644
+> index 0000000..47a27f9
+> --- /dev/null
+> +++ b/drivers/clk/clk-fixed.c
+> @@ -0,0 +1,17 @@
+> +
+> +#include<linux/clk.h>
+> +#include<linux/module.h>
+> +
+> +#define to_clk_fixed(c) container_of(c, struct clk_hw_fixed, hw)
+> +
+> +static unsigned long clk_fixed_recalc_rate(struct clk_hw *hw)
+> +{
+> +	return to_clk_fixed(hw)->rate;
+> +}
+> +
+> +struct clk_hw_ops clk_fixed_ops = {
+> +	.recalc_rate = clk_fixed_recalc_rate,
+> +};
+> +EXPORT_SYMBOL_GPL(clk_fixed_ops);
+> +
+> +
+> diff --git a/include/linux/clk.h b/include/linux/clk.h
+> index e0969d2..fd62e86 100644
+> --- a/include/linux/clk.h
+> +++ b/include/linux/clk.h
+> @@ -110,6 +110,20 @@ int clk_prepare(struct clk *clk);
+>    */
+>   void clk_unprepare(struct clk *clk);
+>
+> +/* Base clock implementations. Platform clock implementations can use these
+> + * directly, or 'subclass' as approprate */
+> +
+> +#ifdef CONFIG_GENERIC_CLK_FIXED
+> +
+> +struct clk_hw_fixed {
+> +	struct clk_hw	hw;
+> +	unsigned long	rate;
+> +};
+> +
+> +extern struct clk_hw_ops clk_fixed_ops;
+> +
+> +#endif /* CONFIG_GENERIC_CLK_FIXED */
+> +
+>   #else /* !CONFIG_GENERIC_CLK */
+>
+>   /*
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
