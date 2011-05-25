@@ -1,33 +1,117 @@
 From: joe@perches.com (Joe Perches)
-Date: Wed, 25 May 2011 10:02:37 -0700
-Subject: [PATCH 0/4] printk: cleanups of direct includes
+Date: Wed, 25 May 2011 10:02:41 -0700
+Subject: [PATCH 4/4] treewide: Remove asmlinkage from printk
 In-Reply-To: <BANLkTimo30L7feKr9_Ec=fMoe1erw8Rnag@mail.gmail.com>
 References: <BANLkTimo30L7feKr9_Ec=fMoe1erw8Rnag@mail.gmail.com>
-Message-ID: <cover.1306342673.git.joe@perches.com>
+Message-ID: <2053d1648f4f33f99ed8e096346e2133b2328951.1306342673.git.joe@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-printk.h is a subfile of kernel.h, do not allow it to
-be included directly.
+Remove the now unnecessary asmlinkage attribute from the various
+printk prototypes and uses.
 
-Joe Perches (4):
-  treewide: Remove direct includes of printk.h
-  staging: Remove direct includes of printk.h
-  printk: Don't allow direct inclusion
-  treewide: Remove asmlinkage from printk
+Signed-off-by: Joe Perches <joe@perches.com>
+---
+ arch/arm/kernel/early_printk.c |    2 +-
+ arch/ia64/kvm/vmm.c            |    2 +-
+ arch/x86/kernel/early_printk.c |    2 +-
+ include/linux/printk.h         |    6 +++---
+ kernel/printk.c                |    6 +++---
+ 5 files changed, 9 insertions(+), 9 deletions(-)
 
- arch/arm/kernel/early_printk.c                |    2 +-
- arch/ia64/kvm/vmm.c                           |    2 +-
- arch/x86/kernel/early_printk.c                |    2 +-
- drivers/staging/brcm80211/brcmfmac/dhd_sdio.c |    1 -
- drivers/staging/brcm80211/util/bcmutils.c     |    1 -
- drivers/staging/usbip/usbip_common.h          |    2 +-
- fs/ext4/inode.c                               |    1 -
- include/linux/oprofile.h                      |    2 +-
- include/linux/printk.h                        |   10 +++++++---
- kernel/printk.c                               |    6 +++---
- kernel/sysctl.c                               |    3 +--
- 11 files changed, 16 insertions(+), 16 deletions(-)
-
+diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
+index 85aa2b2..46798d5 100644
+--- a/arch/arm/kernel/early_printk.c
++++ b/arch/arm/kernel/early_printk.c
+@@ -36,7 +36,7 @@ static struct console early_console = {
+ 	.index =	-1,
+ };
+ 
+-asmlinkage void early_printk(const char *fmt, ...)
++void early_printk(const char *fmt, ...)
+ {
+ 	char buf[512];
+ 	int n;
+diff --git a/arch/ia64/kvm/vmm.c b/arch/ia64/kvm/vmm.c
+index f0b9cac..40331ac 100644
+--- a/arch/ia64/kvm/vmm.c
++++ b/arch/ia64/kvm/vmm.c
+@@ -81,7 +81,7 @@ static void vcpu_debug_exit(struct kvm_vcpu *vcpu)
+ 	local_irq_restore(psr);
+ }
+ 
+-asmlinkage int printk(const char *fmt, ...)
++int printk(const char *fmt, ...)
+ {
+ 	struct kvm_vcpu *vcpu = current_vcpu;
+ 	va_list args;
+diff --git a/arch/x86/kernel/early_printk.c b/arch/x86/kernel/early_printk.c
+index cd28a35..b9b323a 100644
+--- a/arch/x86/kernel/early_printk.c
++++ b/arch/x86/kernel/early_printk.c
+@@ -173,7 +173,7 @@ static struct console early_serial_console = {
+ static struct console *early_console = &early_vga_console;
+ static int __initdata early_console_initialized;
+ 
+-asmlinkage void early_printk(const char *fmt, ...)
++void early_printk(const char *fmt, ...)
+ {
+ 	char buf[512];
+ 	int n;
+diff --git a/include/linux/printk.h b/include/linux/printk.h
+index 3736545..e52bc4b 100644
+--- a/include/linux/printk.h
++++ b/include/linux/printk.h
+@@ -90,16 +90,16 @@ int no_printk(const char *fmt, ...)
+ 	return 0;
+ }
+ 
+-extern asmlinkage __attribute__ ((format (printf, 1, 2)))
++extern __attribute__ ((format (printf, 1, 2)))
+ void early_printk(const char *fmt, ...);
+ 
+ extern int printk_needs_cpu(int cpu);
+ extern void printk_tick(void);
+ 
+ #ifdef CONFIG_PRINTK
+-asmlinkage __attribute__ ((format (printf, 1, 0)))
++__attribute__ ((format (printf, 1, 0)))
+ int vprintk(const char *fmt, va_list args);
+-asmlinkage __attribute__ ((format (printf, 1, 2))) __cold
++__attribute__ ((format (printf, 1, 2))) __cold
+ int printk(const char *fmt, ...);
+ 
+ /*
+diff --git a/kernel/printk.c b/kernel/printk.c
+index da8ca81..735056c 100644
+--- a/kernel/printk.c
++++ b/kernel/printk.c
+@@ -46,7 +46,7 @@
+ /*
+  * Architectures can override it:
+  */
+-void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
++void __attribute__((weak)) early_printk(const char *fmt, ...)
+ {
+ }
+ 
+@@ -704,7 +704,7 @@ static int have_callable_console(void)
+  * See the vsnprintf() documentation for format string extensions over C99.
+  */
+ 
+-asmlinkage int printk(const char *fmt, ...)
++int printk(const char *fmt, ...)
+ {
+ 	va_list args;
+ 	int r;
+@@ -794,7 +794,7 @@ static inline void printk_delay(void)
+ 	}
+ }
+ 
+-asmlinkage int vprintk(const char *fmt, va_list args)
++int vprintk(const char *fmt, va_list args)
+ {
+ 	int printed_len = 0;
+ 	int current_log_level = default_message_loglevel;
 -- 
 1.7.4.rc3
