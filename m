@@ -1,56 +1,66 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 25 May 2011 11:43:51 +0200
-Subject: [PATCH][RFC] Add mt9p031 sensor support.
-In-Reply-To: <BANLkTikvLEG55vqpLmNJJsvsvz1eLsGoHw@mail.gmail.com>
-References: <1306247443-2191-1-git-send-email-javier.martin@vista-silicon.com>
-	<201105251005.28691.laurent.pinchart@ideasonboard.com>
-	<BANLkTikvLEG55vqpLmNJJsvsvz1eLsGoHw@mail.gmail.com>
-Message-ID: <201105251143.52302.laurent.pinchart@ideasonboard.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 25 May 2011 11:47:45 +0200
+Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
+In-Reply-To: <1306312009.30236.110.camel@vkoul-udesk3>
+References: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
+	<BANLkTikDPeEFWdsVQ=Ak8jXEXsC-+uoOaw@mail.gmail.com>
+	<1306253171.30236.9.camel@vkoul-udesk3>
+	<BANLkTikjxECNAK5eS5hSu2bbEKpZX341Dw@mail.gmail.com>
+	<BANLkTikAm=D_YNFt0Regeas6AX8116L0-A@mail.gmail.com>
+	<1306312009.30236.110.camel@vkoul-udesk3>
+Message-ID: <BANLkTikn3BBeNyuUeZ9BhG5QLj-dmcGjTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Javier,
+On 25 May 2011 10:26, Koul, Vinod <vinod.koul@intel.com> wrote:
+> On Wed, 2011-05-25 at 09:47 +0200, Per Forlin wrote:
+>> On 24 May 2011 23:03, Dan Williams <dan.j.williams@intel.com> wrote:
+>
+>> >>> Does submit really start the transfer as well? My interpretation of
+>> >>> submit is that is only adds desc to a pending queue. When calling
+>> >>> issue_pending all these descs will be schedule for DMA transfer. Calls
+>> >>> to submit after this point will added to the pending queue again and
+>> >>> not be issued until calling issue_pending once more.
+>> >> For slave dma devices, submit() is used to start the transaction if the
+>> >> channel is idle. If its already doing a transaction then it will queue
+>> >> it up and submit once cureent excuting one is completed. It is not
+>> >> required to call issue_pending once more.
+>> >> I am not sure if this is true for non slave usage, Dan would that be
+>> >> correct for you as well?
+>> >
+>> > No, ->submit() is just an "add this descriptor to the chain"
+>> > operation, and ->issue_pending() is always required to make sure the
+>> > everything submitted previously is actively executing. ?This was a
+>> > holdover from the very first dmaengine implementation where, for
+>> > efficiency reasons, it could save mmio writes by batching the issuing
+>> > of requests.
+>> Thanks Dan for clarifying.
+>> Vinod, I propose that the submit and issue_pending works the same for
+>> SLAVE and none SLAVE channels. The API should have the same definition
+>> independent of DMA_CAP. Please enlighten me if there are things I have
+>> foreseen on this matter.
+> I am okay with making this same for the slave devices as well.
+>
+> That would also require to change few drivers which start the txn in
+> submit()
+Yes,
+The trivial part is to move enable from submit to issue_pending. I had
+a quick look and it looks like the following drivers need to be
+changed.
+mpc512x_dma.c
+imx-dma.c
+imx-sdma.c
+mxs-dma.c
 
-On Wednesday 25 May 2011 11:41:42 javier Martin wrote:
-> Hi,
-> thank you for the review, I agree with you on all the suggested
-> changes except on this one:
-> 
-> On 25 May 2011 10:05, Laurent Pinchart wrote:
-> > On Tuesday 24 May 2011 16:30:43 Javier Martin wrote:
-> >> This RFC includes a power management implementation that causes
-> >> the sensor to show images with horizontal artifacts (usually
-> >> monochrome lines that appear on the image randomly).
-> >> 
-> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> > 
-> > [snip]
-> > 
-> >> diff --git a/drivers/media/video/mt9p031.c
-> >> b/drivers/media/video/mt9p031.c new file mode 100644
-> >> index 0000000..04d8812
-> >> --- /dev/null
-> >> +++ b/drivers/media/video/mt9p031.c
-> > 
-> > [snip]
-> > 
-> >> +#define MT9P031_WINDOW_HEIGHT_MAX            1944
-> >> +#define MT9P031_WINDOW_WIDTH_MAX             2592
-> >> +#define MT9P031_WINDOW_HEIGHT_MIN            2
-> >> +#define MT9P031_WINDOW_WIDTH_MIN             18
-> > 
-> > Can you move those 4 constants right below MT9P031_WINDOW_HEIGHT and
-> > MT9P031_WINDOW_WIDTH ? The max values are not correct, according to the
-> > datasheet they should be 2005 and 2751.
-> 
-> In figure 4, it says active image size is 2592 x 1944
-> Why should I include active boundary and dark pixels?
+The other part is more complex. To make submit only add descs to a
+queue that will be pushed down to the DMA only after issue_pending. It
+is not as trivial to identify which of the drivers support this or
+not.
+I still think it make sense to fix the documentation first and then
+fix the drivers. Keep a list inside the dmaengine.txt of drivers that
+need to be fixed in order to comply with the API. Over time drivers
+will be fixed and removed from the list. When we have agreed upon the
+API (we may not be there yet) I am willingly to make a draft of such a
+list.
 
-Users might want to get the dark pixels for black level compensation purpose. 
-As the chip allows for that, it should be supported. The default should of 
-course be the active area of 2592 x 1944 pixels.
-
--- 
-Regards,
-
-Laurent Pinchart
+/Per
