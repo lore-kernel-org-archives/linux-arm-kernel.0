@@ -1,122 +1,64 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Wed, 25 May 2011 09:35:18 +0200
-Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
-Message-ID: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 25 May 2011 09:47:31 +0200
+Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
+In-Reply-To: <BANLkTikjxECNAK5eS5hSu2bbEKpZX341Dw@mail.gmail.com>
+References: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
+	<BANLkTikDPeEFWdsVQ=Ak8jXEXsC-+uoOaw@mail.gmail.com>
+	<1306253171.30236.9.camel@vkoul-udesk3>
+	<BANLkTikjxECNAK5eS5hSu2bbEKpZX341Dw@mail.gmail.com>
+Message-ID: <BANLkTikAm=D_YNFt0Regeas6AX8116L0-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On 24 May 2011 23:03, Dan Williams <dan.j.williams@intel.com> wrote:
+> On Tue, May 24, 2011 at 9:06 AM, Koul, Vinod <vinod.koul@intel.com> wrote:
+>> On Tue, 2011-05-24 at 17:40 +0200, Per Forlin wrote:
+>>> Hi Vinod,
+>>>
+>>> On Tue, May 24, 2011 at 2:04 PM, Koul, Vinod <vinod.koul@intel.com> wrote:
+>>> > From: Vinod Koul <vinod.koul@intel.com>
+>>> >
+>>> > Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+>>> > ---
+>>> > ?Documentation/dma-slave-api.txt | ? 74 +++++++++++++++++++++++++++++++++++++++
+>>> > ?1 files changed, 74 insertions(+), 0 deletions(-)
+>>> > ?create mode 100644 Documentation/dma-slave-api.txt
+>>> I suggest putting this in subsection of dmaengine.txt instead.
+>>> dmaengine.txt would be the natural place to look at.
+>> Agreed, that would make it easier for people to find
+>>
+>>> > +4. Submit the transaction(s) and wait for callback notification when slave API
+>>> > +is 3 above returns, the non NULL value would imply a "descriptor" for the
+>>> > +transaction. These transaction(s) would need to be submitted which pushes them
+>>> > +into queue in DMA driver. If DMA is idle then the first descriptor submit will
+>>> > +be pushed to DMA and subsequent ones will be queued. On completion of the DMA
+>>> > +operation the next in queue is submitted and a tasklet triggered. The tasklet
+>>> > +would then call the client driver completion callback routine for notification,
+>>> > +if set.
+>>> > +
+>>> Does submit really start the transfer as well? My interpretation of
+>>> submit is that is only adds desc to a pending queue. When calling
+>>> issue_pending all these descs will be schedule for DMA transfer. Calls
+>>> to submit after this point will added to the pending queue again and
+>>> not be issued until calling issue_pending once more.
+>> For slave dma devices, submit() is used to start the transaction if the
+>> channel is idle. If its already doing a transaction then it will queue
+>> it up and submit once cureent excuting one is completed. It is not
+>> required to call issue_pending once more.
+>> I am not sure if this is true for non slave usage, Dan would that be
+>> correct for you as well?
+>
+> No, ->submit() is just an "add this descriptor to the chain"
+> operation, and ->issue_pending() is always required to make sure the
+> everything submitted previously is actively executing. ?This was a
+> holdover from the very first dmaengine implementation where, for
+> efficiency reasons, it could save mmio writes by batching the issuing
+> of requests.
+Thanks Dan for clarifying.
+Vinod, I propose that the submit and issue_pending works the same for
+SLAVE and none SLAVE channels. The API should have the same definition
+independent of DMA_CAP. Please enlighten me if there are things I have
+foreseen on this matter.
 
-Folloing the discussion about the driver for IOMMU controller for
-Samsung Exynos4 platform and Arnd's suggestions I've decided to start
-working on redesign of dma-mapping implementation for ARM architecture.
-The goal is to add support for IOMMU in the way preffered by the
-community :)
-
-Some of the ideas about merging dma-mapping api and iommu api comes from
-the following threads:
-http://www.spinics.net/lists/linux-media/msg31453.html
-http://www.spinics.net/lists/arm-kernel/msg122552.html
-http://www.spinics.net/lists/arm-kernel/msg124416.html
-
-They were also discussed on Linaro memory management meeting at UDS
-(Budapest 9-12 May).
-
-I've finaly managed to clean up a bit my works and present the initial,
-very proof-of-concept version of patches that were ready just before
-Linaro meeting.
-
-What have been implemented: 
-
-1. Introduced arm_dma_ops
-
-dma_map_ops from include/linux/dma-mapping.h suffers from the following
-limitations:
-- lack of start address for sync operations
-- lack of write-combine methods
-- lack of mmap to user-space methods
-- lack of map_single method
-
-For the initial version I've decided to use custom arm_dma_ops.
-Extending common interface will take time, until that I wanted to have
-something already working.
-
-dma_{alloc,free,mmap}_{coherent,writecombine} have been consolidated
-into dma_{alloc,free,mmap}_attrib what have been suggested on Linaro
-meeting. New attribute for WRITE_COMBINE memory have been introduced.
-
-2. moved all inline ARM dma-mapping related operations to
-arch/arm/mm/dma-mapping.c and put them as methods in generic arm_dma_ops
-structure. The dma-mapping.c code deinitely needs cleanup, but this is
-just a first step.
-
-3. Added very initial IOMMU support. Right now it is limited only to
-dma_alloc_attrib, dma_free_attrib and dma_mmap_attrib. It have been
-tested with s5p-fimc driver on Samsung Exynos4 platform.
-
-4. Adapted Samsung Exynos4 IOMUU driver to make use of the introduced
-iommu_dma proposal.
-
-This patch series contains only patches for common dma-mapping part.
-There is also a patch that adds driver for Samsung IOMMU controller on
-Exynos4 platform. All required patches are available on:
-
-git://git.infradead.org/users/kmpark/linux-2.6-samsung dma-mapping branch
-
-Git web interface:
-http://git.infradead.org/users/kmpark/linux-2.6-samsung/shortlog/refs/heads/dma-mapping
-
-
-Future:
-
-1. Add all missing operations for IOMMU mappings (map_single/page/sg,
-sync_*)
-
-2. Move sync_* operations into separate function for better code sharing
-between iommu and non-iommu dma-mapping code
-
-3. Splitting out dma bounce code from non-bounce into separate set of
-dma methods. Right now dma-bounce code is compiled conditionally and
-spread over arch/arm/mm/dma-mapping.c and arch/arm/common/dmabounce.c.
-
-4. Merging dma_map_single with dma_map_page. I haven't investigated
-deeply why they have separate implementation on ARM. If this is a
-requirement then dma_map_ops need to be extended with another method.
-
-5. Fix dma_alloc to unmap from linear mapping.
-
-6. Convert IO address space management code from gen-alloc to some
-simpler bitmap based solution.
-
-7. resolve issues that might araise during discussion & comments
-
-Please note that this is very early version of patches, definitely NOT
-intended for merging. I just wanted to make sure that the direction is
-right and share the code with others that might want to cooperate on
-dma-mapping improvements.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
-
-
-
-Patch summary:
-
-Marek Szyprowski (2):
-  ARM: Move dma related inlines into arm_dma_ops methods
-  ARM: initial proof-of-concept IOMMU mapper for DMA-mapping
-
- arch/arm/Kconfig                   |    1 +
- arch/arm/include/asm/device.h      |    3 +
- arch/arm/include/asm/dma-iommu.h   |   30 ++
- arch/arm/include/asm/dma-mapping.h |  653 +++++++++++------------------
- arch/arm/mm/dma-mapping.c          |  817 +++++++++++++++++++++++++++++++++---
- arch/arm/mm/vmregion.h             |    2 +-
- include/linux/dma-attrs.h          |    1 +
- 7 files changed, 1033 insertions(+), 474 deletions(-)
- create mode 100644 arch/arm/include/asm/dma-iommu.h
-
--- 
-1.7.1.569.g6f426
+Thanks,
+Per
