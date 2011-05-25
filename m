@@ -1,57 +1,116 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 25 May 2011 12:05:45 -0700
-Subject: [RFC PATCH v3 00/13] Consolidating GIC per-cpu interrupts
-In-Reply-To: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
-References: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4DDD5309.9050505@codeaurora.org>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 25 May 2011 12:06:02 -0700
+Subject: [PATCH] ARM: exynos4: fix secondary CPU boot
+In-Reply-To: <1306346645.27474.182.camel@e102391-lin.cambridge.arm.com>
+References: <1305899190-16732-1-git-send-email-marc.zyngier@arm.com>	
+	<4DDD3C57.6020705@samsung.com>
+	<1306346645.27474.182.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <4DDD531A.50604@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/25/2011 09:49 AM, Marc Zyngier wrote:
-> The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
-> problems:
->
-> - They use a completely separate scheme to handle the interrupts,
->   mostly because the PPI concept doesn't really match the kernel view
->   of an interrupt.
-> - Some low-level code gets duplicated, as usual...
-> - At least one platform (msm) has started implementing its own
->   alternative scheme.
->
-> The proposed solution is to let the GIC code expose the PPIs as
-> something that the kernel can manage. Instead of having a single
-> interrupt number shared on all cores, make the interrupt number be
-> different on each CPU.
->
-> This enables the use of the normal kernel API (request_irq() and
-> friends) and the elimination of some low level code.
->
-> This patch set is based on 2.6.39+ as of May 24th. Tested on PB-11MP,
-> Pandaboard and SMDK-V310.
+On 05/25/11 11:04, Marc Zyngier wrote:
+> On Wed, 2011-05-25 at 10:28 -0700, Kukjin Kim wrote:
+>> On 05/20/11 06:46, Marc Zyngier wrote:
 
-Hmm. I still get problems when I apply patch 1 and patch 9:
+(snip)
 
-# echo 0 > /sys/devices/system/cpu/cpu1/online
-[  554.060000]_CPU1:_shutdown
-# echo 1 > /sys/devices/system/cpu/cpu1/online
-[  562.310000] CPU1: Booted secondary processor
-[  562.310000] CPU1: Unknown IPI message 0x1
-[  562.310000] BUG: sleeping function called from invalid context at kernel/mm/slub.c:847
-[  562.310000] in_atomic(): 1, irqs_disabled(): 0, pid: 0, name: swapper
-[  562.310000] no locks held by swapper/0.
-[  562.310000] [<c00424cc>] (unwind_backtrace+0x0/0x138) from [<c0233ba4>] (dump_stack+0x20/0x24)
-[  562.310000] [<c0233ba4>] (dump_stack+0x20/0x24) from [<c00538dc>] (__might_sleep+0x114/0x134)
-[  562.310000] [<c00538dc>] (__might_sleep+0x114/0x134) from [<c0114c80>] (kmem_cache_alloc_trace+0x54/0x2a8)
-[  562.310000] [<c0114c80>] (kmem_cache_alloc_trace+0x54/0x2a8) from [<c00aaca8>] (request_threaded_irq+0x8c/0x11c)
-[  562.310000] [<c00aaca8>] (request_threaded_irq+0x8c/0x11c) from [<c0230c28>](local_timer_setup+0x164/0x1bc)
-[  562.310000] [<c0230c28>] (local_timer_setup+0x164/0x1bc) from [<c0230528>] (percpu_timer_setup+0x4c/0xa0)
-[  562.310000] [<c0230528>] (percpu_timer_setup+0x4c/0xa0) from [<c0230678>] (secondary_start_kernel+0xfc/0x148)
-[  562.310000] [<c0230678>] (secondary_start_kernel+0xfc/0x148) from [<c004a76c>] (platform_cpu_die+0x24/0x6c)
-[  562.320000] Switched to NOHz mode on CPU #1
+> So that address has changed between two SoC revisions? That's
+> unfortunate, to say the least. I'm most probably using an early revision
+> of the hardware (EVT0?), as it doesn't even support MCT.
+>
+I'm afraid :( and I agree secondary CPU should work on all of 
+Exynos4210. But I'm still think about the method...
 
-Which seems to be due to how secondary_start_kernel() has disabled
-preemption.
+> What about the following patch?
+>
+Uhm...this is really hack but I'd like to use another normal way...?
+
+> 	M.
+>
+>> From c27e75b86e1ee181987a9364286a888421e76205 Mon Sep 17 00:00:00 2001
+> From: Marc Zyngier<marc.zyngier@arm.com>
+> Date: Fri, 20 May 2011 14:38:25 +0100
+> Subject: [PATCH] ARM: exynos4: fix secondary CPU boot on early SoC revisions
+>
+> It appears that the system-wide flags register that used to be at
+> 0x02025000 on the first revision of Exynos4 has moved to 0x02020000.
+>
+> The kernel has been updated accordingly, but this unfortunately leaves
+> early boards without SMP support (the secondary CPU spins endlessly
+> in BL0 waiting for an address to be written at that memory location).
+>
+> Try to solve the problem by poking both locations. This should be
+> safe as this is done early enough in the kernel boot process, and nobody
+> should be using the SRAM yet.
+>
+> Tested on a vintage SMDK-v310.
+
+vintage ;)
+
+>
+> Cc: Kukjin Kim<kgene.kim@samsung.com>
+> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
+> ---
+>   arch/arm/mach-exynos4/include/mach/map.h |    1 +
+>   arch/arm/mach-exynos4/platsmp.c          |   14 ++++++++++++++
+>   2 files changed, 15 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
+> index 0009e77..781e149 100644
+> --- a/arch/arm/mach-exynos4/include/mach/map.h
+> +++ b/arch/arm/mach-exynos4/include/mach/map.h
+> @@ -24,6 +24,7 @@
+>   #include<plat/map-s5p.h>
+>
+>   #define EXYNOS4_PA_SYSRAM		0x02020000
+> +#define EXYNOS4_PA_SYSRAM_EVT0		0x02025000
+>
+>   #define EXYNOS4_PA_FIMC0		0x11800000
+>   #define EXYNOS4_PA_FIMC1		0x11810000
+> diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+> index c5e65a0..f261c34 100644
+> --- a/arch/arm/mach-exynos4/platsmp.c
+> +++ b/arch/arm/mach-exynos4/platsmp.c
+> @@ -155,6 +155,7 @@ void __init smp_init_cpus(void)
+>   void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>   {
+>   	int i;
+> +	void __iomem *sysram_evt0;
+>
+>   	/*
+>   	 * Initialise the present map, which describes the set of CPUs
+> @@ -172,4 +173,17 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>   	 * secondary CPU branches to this address.
+>   	 */
+>   	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), S5P_VA_SYSRAM);
+> +
+> +	/*
+> +	 * EVT0 has the system-wide flags register at a different address.
+> +	 * Poke it as well, in case we're running on an old SoC revision.
+> +	 */
+> +	sysram_evt0 = ioremap(EXYNOS4_PA_SYSRAM_EVT0, SZ_4K);
+
+Hmm...first of all, need to check whether can ioremap the area on newer 
+one but I'm out off office now so will check it after backing.
+
+> +	if (!sysram_evt0) {
+> +		pr_err("Unable to remap EXYNOS4_PA_SYSRAM_EVT0\n");
+
+Do we really need 'pr_err' here?...
+
+> +		return;
+> +	}
+> +
+> +	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), sysram_evt0);
+> +	iounmap(sysram_evt0);
+>   }
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
