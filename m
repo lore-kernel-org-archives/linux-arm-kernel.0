@@ -1,73 +1,67 @@
-From: abhilash.kv@ti.com (Koyamangalath, Abhilash)
-Date: Wed, 25 May 2011 18:45:21 +0530
-Subject: [PATCH v3] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
-In-Reply-To: <20110524190718.GA6899@avinash-laptop>
-References: <1304328111-15999-1-git-send-email-avinashhm@ti.com>
-	<alpine.DEB.2.00.1105051548210.30136@utopia.booyaka.com>
-	<20110509124842.GA25211@avinash-laptop>
-	<alpine.DEB.2.00.1105181021590.4550@utopia.booyaka.com>
-	<20110518162542.GB3026@avinash-laptop>
-	<FCCFB4CDC6E5564B9182F639FC3560870370A4D887@dbde02.ent.ti.com>,
-	<20110524190718.GA6899@avinash-laptop>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC3560870370A4D88F@dbde02.ent.ti.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Wed, 25 May 2011 14:16:28 +0100 (BST)
+Subject: [RFC PATCH v3] ARM hibernation/suspend-to-disk support
+Message-ID: <alpine.DEB.2.00.1105251251330.4319@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
->On Thu, May 19, 2011 at 06:05:21PM +0530, Koyamangalath, Abhilash wrote:
->
-> > I have tried the patch on am37x evm and the i2c soft-reset time-out issue doesn't
-> > seem to go off for me. Previously I used to get a log  :
-> >
-> > [    0.000000] omap_hwmod: i2c1: softreset failed (waited 10000 usec)
-> > [    0.000000] omap_hwmod: i2c2: softreset failed (waited 10000 usec)
-> > [    0.000000] omap_hwmod: i2c3: softreset failed (waited 10000 usec)
-> >
-> > And now I get :
-> > [    0.000000] omap_i2c_reset: i2c1: softreset failed (waited 10000 usec)
-> > [    0.000000] omap_i2c_reset: i2c2: softreset failed (waited 10000 usec)
-> > [    0.000000] omap_i2c_reset: i2c3: softreset failed (waited 10000 usec)
-> >
-> > So the function where this failure happens seems to be the only thing that has changed.
-> > I've tried this patch on top of the recent PSP 04.02.00.07 release.
-> > What am I missing?
->
->Abhilash ,
->
->I am not sure what is PSP 04.02.00.07 release. But you should make sure
->that the hwmod structures in omap_hwmod_3xxx_data.c should have the
->16_bit flags.
->
->Below is just a snippet in P.S.. There is already a patch submitted by
->andy green for this. Not sure, if it is merged.
->
->With this and the posted v3 patch, you should not see timeouts. Or else
->you have some other problem.
->
->thanks ,
->
->- Avinash
->
->PS:
->
-> static struct omap_hwmod omap3xxx_i2c1_hwmod = {
->        .name           = "i2c1",
->+       .flags          = HWMOD_16BIT_REG,
+I've cleaned this up by the suggestions in the previous thread; this is 
+the result.
 
-Yes Avinash, that works , 
-thanks.
->
->
-> >
-> > thanks,
-> > Abhilash
-> >
-> >
-> >
-> > > >
-> > > >
-> > > > - Paul
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+- now baselined against rmk/devel-stable
+- didn't create the <asm/suspend.h> because Rafael is just removing
+   that everywhere anyway
+- Fixes re prev suggestion:
+ 	local_fiq_enable/disable bracketing
+ 	save only absolutely essential regs and let cpu_init do the rest
+ 	thumb2 clean assembly
+ 	allows mach hooks (but they're not defined by this code)
+
+- Also: uses the "generic suspend/resume support" code
+   (commit f6b0fa02e8b0708d17d631afce456524eadf87ff, rmk/devel-stable)
+
+Via the latter, the previously-used hooks into machine-dependent code, 
+__save/__restore_processor_state, have become unnecessary.
+
+This now simply calls the cpu_do_suspend/resume utilities provided by the 
+generic code.
+
+
+I'm still figuring out how to best test a recent devel-stable kernel ...
+
+
+Please let me know what you think,
+Thanks in advance,
+
+FrankH.
+
+
+==============================================================================
+Note on non-current kernels (older than 2.6.38):
+==============================================================================
+The use of generic CPU suspend/resume also ties the code to a 
+sufficiently-recent kernel - it requires the code from:
+
+http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=commitdiff;h=f6b0fa02e8b0708d17d631afce456524eadf87ff
+
+Which is, for many that (want to) use the feature, a hurdle...
+
+If you're using an older kernel (2.6.37 or below), try the "generic" part 
+posted via:
+
+https://patchwork.kernel.org/patch/809212/
+
+and add a __save/__restore_processor_state for your CPU type, as mentioned 
+here:
+
+http://lists.arm.linux.org.uk/lurker/message/20110520.123937.760c528f.en.html
+==============================================================================
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: hibernate-arm.patch
+Type: text/x-diff
+Size: 6606 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110525/5a6747ff/attachment-0001.bin>
