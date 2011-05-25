@@ -1,38 +1,61 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 25 May 2011 18:06:16 +0200 (CEST)
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 25 May 2011 11:19:59 -0500
 Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <20110525153459.GE27250@atomide.com>
+In-Reply-To: <20110525082344.GF22096@pengutronix.de>
 References: <201105181047.17309.arnd@arndb.de>
-	<BANLkTi=xzrLhHTBynWf4huA9EusfaDwPbA@mail.gmail.com>
-	<20110525075902.GH30799@atomide.com>
-	<alpine.LFD.2.00.1105251021550.3207@xanadu.home>
-	<20110525153459.GE27250@atomide.com>
-Message-ID: <alpine.LFD.2.02.1105251803120.3078@ionos>
+	<20110525082344.GF22096@pengutronix.de>
+Message-ID: <0D753D10438DA54287A00B027084269764D323A714@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 25 May 2011, Tony Lindgren wrote:
-> * Nicolas Pitre <nico@fluxnic.net> [110525 07:24]:
-> > 
-> > No.  We'll start merging stuff once this merge window is over.  In other 
-> > words, you are still on your own for the current one.
+On Wed, May 18, 2011 at 10:47:16AM +0200, Arnd Bergmann wrote:
+> This is the draft plan for maintaining the ARM subarchitectures in a common
+> tree, as a way to help coordinate the upstream merging of the
+> arch/arm/{plat,mach}-* changes into Linus' tree.
 > 
-> OK
->  
-> > Also, I want stuff merged in this subarch tree way before the next merge 
-> > window opens on a continuous basis, not in a big rush before it opens, 
-> > or worse, while it is already open.
+> This was discussed in great length at the Linaro Developer Summit in Budapest
+> last week where we worked out an initial plan. We are modeling the maintainance
+> after how the linux-tip tree is used for the x86 architecture, with a set
+> of developers that have commit access to one tree on kernel.org and
+> have mutual trust in one another. Nicolas Pitre and me are funded
+> by Linaro to do the bulk of the work, while Thomas Gleixner will help
+> us part-time with his long time architecture maintainance experience.
+> Despite the funding by Linaro, this is not a Linaro project and all
+> ARM subarchitectures are welcome to go through our tree.
 > 
-> OK that sounds good to me. There's at least one more thing to sort out
-> though:
+> Russell King's role as ARM maintainer is of course unchanged by this, but
+> he has the same commit access to the new tree as the other maintainers and
+> is welcome to work in the same tree. We are also open to nominations for
+> further people outside of Linaro to join us as committers. Marc Zyngier from
+> ARM ltd is one of the candidates that has been suggested and I would also
+> like to see someone from Google. We have to find the right balance with the
+> number of committers so we get all the work done without stepping on each
+> other's toes.
 > 
-> What do you want to do with with the various for-next branches?
+> Our tree will be strictly organized in topic brances so we can feed them
+> upstream in the bitesized chunks that Linus likes. The master branch
+> is an integration branch that pulls all other branches that are scheduled
+> for the next merge window and itself gets integrated into linux-next.
 > 
-> Do you want to queue things into your tree before hitting for-next?
+> We will probably not be fully functional during the 2.6.40 merge window,
+> but we are trying our best to be useful. For 2.6.41, my hope is that
+> we can merge the bulk of the ARM subarchitecture changes through this
+> tree. Once Linus is happy with the way that the process works, we can
+> mandate that all ARM subarchitecture changes go through our tree, until
+> then it stays voluntary.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> 
+> ---
+> 
+> Maintainers: If you are happy with the layout of the process,
+> please ack this patch, otherwise please comment.
 
-The stuff which gets pulled in from the various suppliers is
-aggregated in a separate for -next branch.
+As co-maintainer of ep93xx
 
-Thanks,
-
-	tglx
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
