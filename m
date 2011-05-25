@@ -1,36 +1,48 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 25 May 2011 17:23:17 +0800
-Subject: [PATCH] mfd wm8350: allocate irq descs dynamically
-In-Reply-To: <20110525081326.GK20715@pengutronix.de>
-References: <20110523104409.GA15635@opensource.wolfsonmicro.com>
-	<20110523144126.GF20715@pengutronix.de>
-	<20110523152248.GC6489@sirena.org.uk>
-	<20110523164601.GG20715@pengutronix.de>
-	<20110523224045.GA19533@opensource.wolfsonmicro.com>
-	<20110524072814.GC22096@pengutronix.de>
-	<20110524094658.GA4005@opensource.wolfsonmicro.com>
-	<20110524115215.GD22096@pengutronix.de>
-	<20110524153521.GH7945@opensource.wolfsonmicro.com>
-	<20110525081326.GK20715@pengutronix.de>
-Message-ID: <20110525092315.GA10526@opensource.wolfsonmicro.com>
+From: zhangfei.gao@marvell.com (Zhangfei Gao)
+Date: Wed, 25 May 2011 05:23:37 -0400
+Subject: [PATCH v2 3/3] ARM: mmp2: update mmp2 mmc resource
+Message-ID: <1306315417-16096-1-git-send-email-zhangfei.gao@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 10:13:26AM +0200, Sascha Hauer wrote:
+	mmp2 mmc driver name update to sdhci-mmp2 according with sdhci-mmp2.c
 
-> Ok, how about this?
+Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+---
+ arch/arm/mach-mmp/mmp2.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-> - Add a ALLOC_DESCS flag to platform data
-> - Without platform data are descs are dynamically allocated
-> - With platform data and ALLOC_DESCS not set: no dynamically
->   allocated descs, no change at all
-> - With ALLOC_DESCS set descs are dynamically allocated with:
->   - if irq_base is 0, the some range is allocated
->   - with irq_base != 0, exactly irq_base + num is allocated
-
-> I also wonder if we should spill out a warning when ALLOC_DESCS is not
-> set. It basically means that we may use some otherwise used resources.
-
-I dunno, that seems painful.  Perhaps we just accept that some boards
-will be broken if things go wrong - the whole ALLOC_DESCS thing seems
-more pain than it's worth.
+diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
+index 8e6c3ac..a7ba5cf 100644
+--- a/arch/arm/mach-mmp/mmp2.c
++++ b/arch/arm/mach-mmp/mmp2.c
+@@ -168,10 +168,10 @@ static struct clk_lookup mmp2_clkregs[] = {
+ 	INIT_CLKREG(&clk_twsi5, "pxa2xx-i2c.4", NULL),
+ 	INIT_CLKREG(&clk_twsi6, "pxa2xx-i2c.5", NULL),
+ 	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
+-	INIT_CLKREG(&clk_sdh0, "sdhci-pxa.0", "PXA-SDHCLK"),
+-	INIT_CLKREG(&clk_sdh1, "sdhci-pxa.1", "PXA-SDHCLK"),
+-	INIT_CLKREG(&clk_sdh2, "sdhci-pxa.2", "PXA-SDHCLK"),
+-	INIT_CLKREG(&clk_sdh3, "sdhci-pxa.3", "PXA-SDHCLK"),
++	INIT_CLKREG(&clk_sdh0, "sdhci-mmp2.0", "PXA-SDHCLK"),
++	INIT_CLKREG(&clk_sdh1, "sdhci-mmp2.1", "PXA-SDHCLK"),
++	INIT_CLKREG(&clk_sdh2, "sdhci-mmp2.2", "PXA-SDHCLK"),
++	INIT_CLKREG(&clk_sdh3, "sdhci-mmp2.3", "PXA-SDHCLK"),
+ };
+ 
+ static int __init mmp2_init(void)
+@@ -222,8 +222,8 @@ MMP2_DEVICE(twsi4, "pxa2xx-i2c", 3, TWSI4, 0xd4033000, 0x70);
+ MMP2_DEVICE(twsi5, "pxa2xx-i2c", 4, TWSI5, 0xd4033800, 0x70);
+ MMP2_DEVICE(twsi6, "pxa2xx-i2c", 5, TWSI6, 0xd4034000, 0x70);
+ MMP2_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x100, 28, 29);
+-MMP2_DEVICE(sdh0, "sdhci-pxa", 0, MMC, 0xd4280000, 0x120);
+-MMP2_DEVICE(sdh1, "sdhci-pxa", 1, MMC2, 0xd4280800, 0x120);
+-MMP2_DEVICE(sdh2, "sdhci-pxa", 2, MMC3, 0xd4281000, 0x120);
+-MMP2_DEVICE(sdh3, "sdhci-pxa", 3, MMC4, 0xd4281800, 0x120);
++MMP2_DEVICE(sdh0, "sdhci-mmp2", 0, MMC, 0xd4280000, 0x120);
++MMP2_DEVICE(sdh1, "sdhci-mmp2", 1, MMC2, 0xd4280800, 0x120);
++MMP2_DEVICE(sdh2, "sdhci-mmp2", 2, MMC3, 0xd4281000, 0x120);
++MMP2_DEVICE(sdh3, "sdhci-mmp2", 3, MMC4, 0xd4281800, 0x120);
+ 
+-- 
+1.7.0.4
