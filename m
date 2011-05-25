@@ -1,90 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 25 May 2011 13:43:56 +0200 (CEST)
-Subject: [PATCH 1/4] clk: Add a generic clock infrastructure
-In-Reply-To: <BANLkTinmRt_fv1oJwFuJQ34aAky_5SB4Rw@mail.gmail.com>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<1305876469.326305.518470530485.1.gpush@pororo>
-	<BANLkTin2Ho-Ce-4RurtHfAST7hqTLDrJ+g@mail.gmail.com>
-	<20110524070236.GB22096@pengutronix.de>
-	<BANLkTinmRt_fv1oJwFuJQ34aAky_5SB4Rw@mail.gmail.com>
-Message-ID: <alpine.LFD.2.02.1105251324500.3078@ionos>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 25 May 2011 13:45:19 +0200
+Subject: Self modifying code in ARM 11 architectures
+In-Reply-To: <BANLkTinrj-dkJShzTQuhYSOWkK4QSEnQgQ@mail.gmail.com>
+References: <BANLkTi=mVsYiubqtJO2BmWvExMvUFRg6dg@mail.gmail.com>
+	<BANLkTimyju7eEgtCpb_U6s8LNHk-_FGK4Q@mail.gmail.com>
+	<BANLkTinrj-dkJShzTQuhYSOWkK4QSEnQgQ@mail.gmail.com>
+Message-ID: <20110525114519.GC12200@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 24 May 2011, Colin Cross wrote:
-> On Tue, May 24, 2011 at 12:02 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> > + ? ? ? struct clk ? ? ? ? ? ? ?*parent;
-> >>
-> >> Storing the list of possible parents at this level can help abstract
-> >> some common code from mux ops if you pass the index into the list of
-> >> the new parent into the op - most mux ops only need to know which of
-> >> their mux inputs needs to be enabled.
+Hello,
+
+On Wed, May 25, 2011 at 01:18:37PM +0530, Vimal Singh wrote:
+> CC'ing correct ARM mailing list.
+> 
+> On Tue, May 24, 2011 at 3:48 PM, Ashok Babu <ashok3d@gmail.com> wrote:
+> > Hi All,
 > >
-> > Please don't. Only muxes have more than one possible parent, so this
-> > should be handled there.
-> 
-> The cost is one pointer per clock that is not actually a mux, and the
-> benefit is that you can move a very common search loop out of every
-> mux implementation into the framework.  It also lets you determine
-> which clocks are connected, which becomes necessary if you try to do
-> per-tree locking or sysfs controls for clocks.
+> > I am no success in booting up the ARM1176 processor with the
+> > linux-2.6.32 kernel.
+> > While googling about the ARM?Harvard?architecture, I came to know that
+> > we have to flush/invalidate the D-Cache and I-Cache
+> > when using the self modifying codes.
+> >
+> > So here my questions/doubts :
+> > 1) Is'nt it the kernel itself is self modifying code with lots of
+> > function pointers ?
+Code that uses function pointer isn't usually called self-modifying.
 
-We can be more clever than storing the world and some more in the
-internal implementation.
+> > ? ? If yes, how is synchronization b/w d-cache and i-cache handled in
+> > the kernel ?
+> > 2) Can this be the reason for the kernel not booting for me ?
+> > ? ? Because If i disable the I-Cache in the config, then the kernel
+> > boots up without any issues.
+> > Any pointers on this will be of great help.
+Does your bootloader correctly disables the I-Cache before giving control
+to Linux?
 
-struct clk should be just the basic data structure to hold the
-information which is shared by all clk types. The way I see it is:
+Best regards
+Uwe
 
-struct clk {
-       struct clk_ops *ops;
-       struct clk_data *data;
-       void *hwdata;
-       unsigned long flags;
-       ....
-};
-
-Now have
-
-struct clk_data {
-       union {
-       	     struct clk_divider_data;
-	     struct clk_mux_data;
-	     struct clk_pll_data;
-	     .....
-       };
-};
-
-Now on registration time you tell the core which type you are handing
-in. struct clk_mux_data would contain the list of possible parent
-clocks and clk_pll_data the possible multiplier values (linear or
-table based). Same for dividers. Now the core can do the evaluation of
-clock rate settings or parents and hand in the index or the linear
-range value into ops->set_rate/set_parent. And with the information
-available to the core you can do even complex settings which involve
-selecting the proper pll for your pixelclock example below.
-
-> > I hope we can avoid that. The decision of the best parent should be left
-> > up to the user. Doing this in the mux/divider implementation would
-> > torpedo attempts to implement generic building blocks.
-> 
-> I agree it would be nice, but it does push some knowledge of the clock
-> tree into device drivers.  For example, on Tegra the display driver
-> may need to change the source pll of the display clock to get the
-> required pclk, which requires passing all the possible parents of the
-> display clock into the display driver.  If this is a common usage
-> pattern, there needs to be a hook in the ops to allow the clock or
-> clock chip to make a more global decision.
-
-No, we really dont want to have that knowledge at the driver level. A
-driver should just say: Enable "pixelclk" at rate X.
-
-So then a mapper converts pixelclk to the particular clock on the SoC
-it's running on and the clk framework level needs to figure out how to
-achieve that by looking at the full chain down from the clk gate which
-feeds the pixelclk. We don't want drivers to be aware about that at
-all. They simply do not care and that's a preliminary for making
-drivers usable on different SoC incarnations.
- 
-Thanks,
-
-	tglx
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
