@@ -1,119 +1,216 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 25 May 2011 16:31:13 -0500
-Subject: [RFC PATCH v3 2/2] dt: add custom device creation to platform bus scan
-In-Reply-To: <1306359073-16274-1-git-send-email-robherring2@gmail.com>
-References: <1306359073-16274-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1306359073-16274-3-git-send-email-robherring2@gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 25 May 2011 14:19:56 -0700
+Subject: [PATCH 01/15] OMAP: GPIO: Avoid cpu_is checks during module
+	ena/disable
+In-Reply-To: <1306247094-25372-2-git-send-email-tarun.kanti@ti.com> (Tarun
+	Kanti DebBarma's message of "Tue, 24 May 2011 19:54:40 +0530")
+References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
+	<1306247094-25372-2-git-send-email-tarun.kanti@ti.com>
+Message-ID: <8762oytr43.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-Add support to the platform bus scanning to call custom device creation
-functions. This enables creation of non-platform devices like amba_bus.
+> From: Charulatha V <charu@ti.com>
+>
+> Remove cpu-is checks while enabling/disabling OMAP GPIO module
+> during a gpio request/free.
+>
+> Signed-off-by: Charulatha V <charu@ti.com>
 
-Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: linux at arm.linux.org.uk
-Cc: arnd at arndb.de
-Cc: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- drivers/of/platform.c       |   27 +++++++++++++++++++--------
- include/linux/of_platform.h |   11 ++++++++---
- 2 files changed, 27 insertions(+), 11 deletions(-)
+This looks mostly OK, but one nitpick about the usage of USHRT_MAX.
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 9b785be..8c0f43400 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -176,9 +176,9 @@ EXPORT_SYMBOL(of_device_alloc);
-  * Returns pointer to created platform device, or NULL if a device was not
-  * registered.  Unavailable devices will not get registered.
-  */
--struct platform_device *of_platform_device_create(struct device_node *np,
--					    const char *bus_id,
--					    struct device *parent)
-+struct device *of_platform_device_create(struct device_node *np,
-+					 const char *bus_id,
-+					 struct device *parent)
- {
- 	struct platform_device *dev;
- 
-@@ -205,7 +205,7 @@ struct platform_device *of_platform_device_create(struct device_node *np,
- 		return NULL;
- 	}
- 
--	return dev;
-+	return &dev->dev;
- }
- EXPORT_SYMBOL(of_platform_device_create);
- 
-@@ -224,7 +224,9 @@ static int of_platform_bus_create(struct device_node *bus,
- 				  struct device *parent, bool strict)
- {
- 	struct device_node *child;
--	struct platform_device *dev;
-+	struct device *dev;
-+	struct of_device_id *id;
-+	struct of_platform_match_data *mdata;
- 	int rc = 0;
- 
- 	/* Make sure it has a compatible property */
-@@ -234,13 +236,22 @@ static int of_platform_bus_create(struct device_node *bus,
- 		return 0;
- 	}
- 
--	dev = of_platform_device_create(bus, NULL, parent);
--	if (!dev || !of_match_node(matches, bus))
-+	id = of_match_node(matches, bus);
-+	if (!id)
-+		return 0;
-+
-+	/* Found a matching node, so create the device */
-+	mdata = id->data;
-+	if (mdata && mdata->dev_create)
-+		dev = mdata->dev_create(bus, parent);
-+	else
-+		dev = of_platform_device_create(bus, NULL, parent);
-+	if (!dev)
- 		return 0;
- 
- 	for_each_child_of_node(bus, child) {
- 		pr_debug("   create child: %s\n", child->full_name);
--		rc = of_platform_bus_create(child, matches, &dev->dev, strict);
-+		rc = of_platform_bus_create(child, matches, dev, strict);
- 		if (rc) {
- 			of_node_put(child);
- 			break;
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 43c723d..f59d25e 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -40,6 +40,11 @@ struct of_platform_driver
- #define	to_of_platform_driver(drv) \
- 	container_of(drv,struct of_platform_driver, driver)
- 
-+struct of_platform_match_data {
-+	struct device *	(*dev_create)(struct device_node *node,
-+				      struct device *parent);
-+};
-+
- /* Platform drivers register/unregister */
- extern struct platform_device *of_device_alloc(struct device_node *np,
- 					 const char *bus_id,
-@@ -48,9 +53,9 @@ extern struct platform_device *of_find_device_by_node(struct device_node *np);
- 
- #if !defined(CONFIG_SPARC) /* SPARC has its own device registration method */
- /* Platform devices and busses creation */
--extern struct platform_device *of_platform_device_create(struct device_node *np,
--						   const char *bus_id,
--						   struct device *parent);
-+extern struct device *of_platform_device_create(struct device_node *np,
-+						const char *bus_id,
-+						struct device *parent);
- 
- extern int of_platform_bus_probe(struct device_node *root,
- 				 const struct of_device_id *matches,
--- 
-1.7.4.1
+For most registers, you should just test for a non-zero register offset
+to determine if it's present or not instead of USHRT_MAX.  
+
+I used USHRT_MAX for the revision register because it is at offset zero
+on most SoCs, so testing for non-zero wouldn't work there.
+
+Other than that, the approach looks fine.
+
+Thanks,
+
+Kevin
+
+> ---
+>  arch/arm/mach-omap1/gpio15xx.c         |    2 +
+>  arch/arm/mach-omap1/gpio16xx.c         |    2 +
+>  arch/arm/mach-omap1/gpio7xx.c          |    2 +
+>  arch/arm/mach-omap2/gpio.c             |    2 +
+>  arch/arm/plat-omap/include/plat/gpio.h |    1 +
+>  drivers/gpio/gpio_omap.c               |   53 ++++++++++++++------------------
+>  6 files changed, 32 insertions(+), 30 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
+> index f79c6ae..6d83e0a 100644
+> --- a/arch/arm/mach-omap1/gpio15xx.c
+> +++ b/arch/arm/mach-omap1/gpio15xx.c
+> @@ -42,6 +42,7 @@ static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
+>  	.irqstatus	= OMAP_MPUIO_GPIO_INT,
+>  	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
+>  	.irqenable_inv	= true,
+> +	.ctrl		= USHRT_MAX,
+>  };
+>  
+>  static struct __initdata omap_gpio_platform_data omap15xx_mpu_gpio_config = {
+> @@ -83,6 +84,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
+>  	.irqstatus	= OMAP1510_GPIO_INT_STATUS,
+>  	.irqenable	= OMAP1510_GPIO_INT_MASK,
+>  	.irqenable_inv	= true,
+> +	.ctrl		= USHRT_MAX,
+>  };
+>  
+>  static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
+> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
+> index c69b3b1..6bba196 100644
+> --- a/arch/arm/mach-omap1/gpio16xx.c
+> +++ b/arch/arm/mach-omap1/gpio16xx.c
+> @@ -45,6 +45,7 @@ static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
+>  	.irqstatus	= OMAP_MPUIO_GPIO_INT,
+>  	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
+>  	.irqenable_inv	= true,
+> +	.ctrl		= USHRT_MAX,
+>  };
+>  
+>  static struct __initdata omap_gpio_platform_data omap16xx_mpu_gpio_config = {
+> @@ -89,6 +90,7 @@ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
+>  	.irqenable	= OMAP1610_GPIO_IRQENABLE1,
+>  	.set_irqenable	= OMAP1610_GPIO_SET_IRQENABLE1,
+>  	.clr_irqenable	= OMAP1610_GPIO_CLEAR_IRQENABLE1,
+> +	.ctrl		= USHRT_MAX,
+>  };
+>  
+>  static struct __initdata omap_gpio_platform_data omap16xx_gpio1_config = {
+> diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
+> index d7f2ad3..0fc2557 100644
+> --- a/arch/arm/mach-omap1/gpio7xx.c
+> +++ b/arch/arm/mach-omap1/gpio7xx.c
+> @@ -47,6 +47,7 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
+>  	.irqstatus	= OMAP_MPUIO_GPIO_INT / 2,
+>  	.irqenable	= OMAP_MPUIO_GPIO_MASKIT / 2,
+>  	.irqenable_inv	= true,
+> +	.ctrl		= USHRT_MAX,
+>  };
+>  
+>  static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
+> @@ -88,6 +89,7 @@ static struct omap_gpio_reg_offs omap7xx_gpio_regs = {
+>  	.irqstatus	= OMAP7XX_GPIO_INT_STATUS,
+>  	.irqenable	= OMAP7XX_GPIO_INT_MASK,
+>  	.irqenable_inv	= true,
+> +	.ctrl		= USHRT_MAX,
+>  };
+>  
+>  static struct __initdata omap_gpio_platform_data omap7xx_gpio1_config = {
+> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+> index 9a46d77..0446bd1 100644
+> --- a/arch/arm/mach-omap2/gpio.c
+> +++ b/arch/arm/mach-omap2/gpio.c
+> @@ -84,6 +84,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+>  		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
+>  		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
+>  		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
+> +		pdata->regs->ctrl = OMAP24XX_GPIO_CTRL;
+>  		break;
+>  	case 2:
+>  		pdata->bank_type = METHOD_GPIO_44XX;
+> @@ -100,6 +101,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+>  		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
+>  		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
+>  		pdata->regs->debounce_en = OMAP4_GPIO_DEBOUNCENABLE;
+> +		pdata->regs->ctrl = OMAP4_GPIO_CTRL;
+>  		break;
+>  	default:
+>  		WARN(1, "Invalid gpio bank_type\n");
+> diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
+> index 91e8de3..caf432c 100644
+> --- a/arch/arm/plat-omap/include/plat/gpio.h
+> +++ b/arch/arm/plat-omap/include/plat/gpio.h
+> @@ -188,6 +188,7 @@ struct omap_gpio_reg_offs {
+>  	u16 clr_irqenable;
+>  	u16 debounce;
+>  	u16 debounce_en;
+> +	u16 ctrl;
+>  
+>  	bool irqenable_inv;
+>  };
+> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
+> index a490cb1..dfdc45e 100644
+> --- a/drivers/gpio/gpio_omap.c
+> +++ b/drivers/gpio/gpio_omap.c
+> @@ -89,6 +89,7 @@ int gpio_bank_count;
+>  
+>  #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
+>  #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
+> +#define GPIO_MOD_CTRL_BIT	BIT(0)
+>  
+>  static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
+>  {
+> @@ -586,22 +587,18 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
+>  		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
+>  	}
+>  #endif
+> -	if (!cpu_class_is_omap1()) {
+> -		if (!bank->mod_usage) {
+> -			void __iomem *reg = bank->base;
+> -			u32 ctrl;
+> -
+> -			if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> -				reg += OMAP24XX_GPIO_CTRL;
+> -			else if (cpu_is_omap44xx())
+> -				reg += OMAP4_GPIO_CTRL;
+> -			ctrl = __raw_readl(reg);
+> -			/* Module is enabled, clocks are not gated */
+> -			ctrl &= 0xFFFFFFFE;
+> -			__raw_writel(ctrl, reg);
+> -		}
+> -		bank->mod_usage |= 1 << offset;
+> +	if ((bank->regs->ctrl != USHRT_MAX) && (!bank->mod_usage)) {
+> +		void __iomem *reg = bank->base + bank->regs->ctrl;
+> +		u32 ctrl;
+> +
+> +		ctrl = __raw_readl(reg);
+> +		/* Module is enabled, clocks are not gated */
+> +		ctrl &= ~GPIO_MOD_CTRL_BIT;
+> +		__raw_writel(ctrl, reg);
+>  	}
+> +
+> +	bank->mod_usage |= 1 << offset;
+> +
+>  	spin_unlock_irqrestore(&bank->lock, flags);
+>  
+>  	return 0;
+> @@ -634,22 +631,18 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
+>  		__raw_writel(1 << offset, reg);
+>  	}
+>  #endif
+> -	if (!cpu_class_is_omap1()) {
+> -		bank->mod_usage &= ~(1 << offset);
+> -		if (!bank->mod_usage) {
+> -			void __iomem *reg = bank->base;
+> -			u32 ctrl;
+> -
+> -			if (cpu_is_omap24xx() || cpu_is_omap34xx())
+> -				reg += OMAP24XX_GPIO_CTRL;
+> -			else if (cpu_is_omap44xx())
+> -				reg += OMAP4_GPIO_CTRL;
+> -			ctrl = __raw_readl(reg);
+> -			/* Module is disabled, clocks are gated */
+> -			ctrl |= 1;
+> -			__raw_writel(ctrl, reg);
+> -		}
+> +	bank->mod_usage &= ~(1 << offset);
+> +
+> +	if ((bank->regs->ctrl != USHRT_MAX) && (!bank->mod_usage)) {
+> +		void __iomem *reg = bank->base + bank->regs->ctrl;
+> +		u32 ctrl;
+> +
+> +		ctrl = __raw_readl(reg);
+> +		/* Module is disabled, clocks are gated */
+> +		ctrl |= GPIO_MOD_CTRL_BIT;
+> +		__raw_writel(ctrl, reg);
+>  	}
+> +
+>  	_reset_gpio(bank, bank->chip.base + offset);
+>  	spin_unlock_irqrestore(&bank->lock, flags);
+>  }
