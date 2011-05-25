@@ -1,55 +1,40 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 May 2011 12:14:08 +0100
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <20110524171331.GA2941@arm.com>
-References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
-	<20110523132124.GI17672@n2100.arm.linux.org.uk>
-	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
-	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
-	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
-	<20110524171331.GA2941@arm.com>
-Message-ID: <20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Wed, 25 May 2011 19:15:30 +0800
+Subject: [PATCH] ASoc: wm8731: fix wm8731_check_osc() connected condition
+In-Reply-To: <1306230657-28649-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1306230657-28649-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20110525111529.GC10797@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 06:13:31PM +0100, Dave Martin wrote:
-> On Tue, May 24, 2011 at 04:26:35PM +0100, Catalin Marinas wrote:
-> > BTW, are we sure that the code generated with unaligned accesses is
-> > better? AFAIK, while processors support unaligned accesses, they may
-> > not always be optimal.
+On Tue, May 24, 2011 at 11:50:57AM +0200, Nicolas Ferre wrote:
+> The crystal oscillator is only enabled if the WM8731_SYSCLK_XTAL master clock
+> is specified. Fix the connected() struct snd_soc_dapm_route function to take
+> this into account. Oscillator is not enabled on machine that need it otherwise.
 > 
-> The code gcc generates to synthesise an unaligned access using aligned
-> accesses is pretty simplistic:
-...
-> For code which natively needs to read unaligned fields from data structures,
-> I sincerely doubt that the CPU will not beat the above code for efficiency...
+> Machine drivers have to make sure that they use the proper SYSCLK value.
 > 
-> So if there's code doing unaligned access to data structures for a good
-> reason, building with unaligned access support turned on in the compiler
-> seems a good idea, if that code might performance-critical for anything.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
 
-gcc generates unaligned accesses in the the pcpu_dump_alloc_info()
-function. We have a local variable like below (9 bytes):
+Adding Liam - Nicolas, please remember to CC all maintainers on patches.
 
-	char empty_str[] = "--------";
-
-and it looks like other stack accesses are unaligned:
-
-c0082ba0 <pcpu_dump_alloc_info>:
-c0082ba0:   e92d4ff0    push    {r4, r5, r6, r7, r8, r9, sl, fp, lr}
-c0082ba4:   e3074118    movw    r4, #28952  ; 0x7118
-c0082ba8:   e24dd04c    sub sp, sp, #76 ; 0x4c
-c0082bac:   e34c402a    movt    r4, #49194  ; 0xc02a
-c0082bb0:   e58d1014    str r1, [sp, #20]
-c0082bb4:   e58d0020    str r0, [sp, #32]
-c0082bb8:   e8b40003    ldm r4!, {r0, r1}
-c0082bbc:   e58d003f    str r0, [sp, #63]   <----------- !!!!!
-c0082bc0:   e59d0014    ldr r0, [sp, #20]
-c0082bc4:   e5d43000    ldrb    r3, [r4]
-
-I haven't tried with -mno-unaligned-access, I suspect the variables on
-the stack would be aligned.
-
--- 
-Catalin
+> ---
+>  sound/soc/codecs/wm8731.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
+> index 6dec7ce..2dc964b 100644
+> --- a/sound/soc/codecs/wm8731.c
+> +++ b/sound/soc/codecs/wm8731.c
+> @@ -198,7 +198,7 @@ static int wm8731_check_osc(struct snd_soc_dapm_widget *source,
+>  {
+>  	struct wm8731_priv *wm8731 = snd_soc_codec_get_drvdata(source->codec);
+>  
+> -	return wm8731->sysclk_type == WM8731_SYSCLK_MCLK;
+> +	return wm8731->sysclk_type == WM8731_SYSCLK_XTAL;
+>  }
+>  
+>  static const struct snd_soc_dapm_route wm8731_intercon[] = {
+> -- 
+> 1.7.3
+> 
