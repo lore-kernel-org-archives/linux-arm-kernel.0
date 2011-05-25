@@ -1,48 +1,38 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 25 May 2011 14:06:37 +0800
-Subject: [PATCH v2 5/7] mmc: sdhci: consolidate sdhci-of-esdhc and
-	sdhci-esdhc-imx
-In-Reply-To: <20110524194054.GC25727@pengutronix.de>
-References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
-	<1304601778-13837-6-git-send-email-shawn.guo@linaro.org>
-	<20110524194054.GC25727@pengutronix.de>
-Message-ID: <20110525060637.GA30583@S2100-06.ap.freescale.net>
+From: Hong.Xu@atmel.com (Xu, Hong)
+Date: Wed, 25 May 2011 14:18:38 +0800
+Subject: LCDVSYNC not set up in Atmel AT91SAM9RL device code
+In-Reply-To: <4DDAC947.7040705@usask.ca>
+References: <4DDAC947.7040705@usask.ca>
+Message-ID: <4C79549CB6F772498162A641D92D532801C916AD@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 09:40:54PM +0200, Wolfram Sang wrote:
-> On Thu, May 05, 2011 at 09:22:56PM +0800, Shawn Guo wrote:
-> > This patch is to consolidate SDHCI driver for Freescale eSDHC
-> > controller found on both MPCxxx and i.MX platforms.  It merges
-> > sdhci-of-esdhc.c into sdhci-esdhc.c, so that the same pair of
-> > .probe/.remove hook works with eSDHC for two platforms.
-> > 
-> > As the results, sdhci-of-esdhc.c and sdhci-esdhc.h are removed, and
-> > header esdhc.h containing the definition of esdhc_platform_data is
-> > put into the public folder.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Hi Nicholas,
+> -----Original Message-----
+> From: linux-arm-kernel-bounces at lists.infradead.org
+> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+> Nicholas Kinar
+> Sent: Tuesday, May 24, 2011 4:53 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Subject: LCDVSYNC not set up in Atmel AT91SAM9RL device code
 > 
-> I agree with Anton about not merging the two...
+> Hello,
 > 
-> > +#ifndef CONFIG_MMC_SDHCI_ESDHC_IMX
-> > +#define cpu_is_mx25()	(0)
-> > +#define cpu_is_mx35()	(0)
-> > +#define cpu_is_mx51()	(0)
-> > +#define cpu_is_imx()	(0)
-> > +#else
-> > +#define cpu_is_imx()	(1)
-> > +#endif
+> I've been setting up an LCD display interfaced to the Atmel AT91SAM9RL
+> processor, and I noticed that in the
+> /arch/arm/mach-at91/at91sam9rl_devices.c file, the GPIO pin AT91_PIN_PC4
+> is not switched over to the LCD peripheral.
 > 
-> ... e.g. that looks a bit frightening.
+> To make the LCD display peripheral operate properly, I had to add the
+> following line to the at91_add_device_lcdc() function:
 > 
-Agree.
+> at91_set_A_periph(AT91_PIN_PC4, 0);    /* LCDVSYNC */
 
-The use of cpu_is_mx..() in the driver itself seems a churn to me
-even without this consolidation patch.  Is it possible for us to
-eliminate them by using pdata, and eventually device tree?  When we
-are there, I might want to revisit the consolidation again.
+You're right. Although the LCD panel on Atmel's AT91SAM9RL-EK does not need the VSYNC, you board needs. I just sent out a small patch about this and put you in the "Reported-by" line. Thanks.
 
--- 
-Regards,
-Shawn
+> Perhaps this could be patched?  I do not know if a similar issue also
+> occurs in other device setup files.
+AT91SAM9263-EK has the same issue as you specified, another patch will be sent out, thanks.
+
+BR,
+Eric
