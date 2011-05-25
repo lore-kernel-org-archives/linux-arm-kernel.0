@@ -1,50 +1,88 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 May 2011 22:47:14 +0200
-Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <20110525195413.GC2996@acer>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
-	<BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
-	<20110525195413.GC2996@acer>
-Message-ID: <BANLkTin8Trn-44Op+GbxrgocFrnPuXUZ2w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 May 2011 21:50:05 +0100
+Subject: [GIT PULL] Samsung S5P for 2.6.40 merge window
+In-Reply-To: <4DDD4659.5050602@samsung.com>
+References: <4DDD4659.5050602@samsung.com>
+Message-ID: <20110525205005.GC24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/25 Mika Westerberg <mika.westerberg@iki.fi>:
+On Wed, May 25, 2011 at 11:11:37AM -0700, Kukjin Kim wrote:
+> These things are for 2.6.40 and it includes removing ARCH_S5P6442.  
+> Actually there is no user now and if required will merge it into other  
+> ARCH like ARCH_S5P64X0 later.
 
-> I re-checked the specs and indeed, as discussed previously, it is clear that
-> Cirrus (or ARM) copied the interface from other. Even the wording in the
-> document is identical in many places. However, in ep93xx User's Guide, there
-> is no mention about SSP being AMBA PrimeCell peripheral. For UARTs it is
-> mentioned... go figure.
->
-> There are differences also, some of the bits in control registers are in
-> different places. Interrupt registers are completely different and there is no
-> DMA control register at all. The same things we discussed before.
+I have a merge conflict with this, and resolved it as below.  Please check
+whether this is correct.
 
-But it really does not matter. The amba-pl022.c driver has all the same
-deviations for things called "PL023" that are not pure PL022 either.
-I just made the driver a bit more flexible, supporting both.
-
-If the people doing drivers/usb/musb/* had done the same thing we
-would have had what, 5 drivers for similar hardware?
-
-> Back then, it wasn't known how the M2M DMA interface (the one used
-> by SSP and IDE) was going to be implemented.
-
-But I knew, having just written the needed extensions to dmaengine.
-And I said so. But I realize I'm maybe not considered an authoritative
-source on the subject, and I'm biased.
-
-> IMHO it is better to have ep93xx implementation on its own driver since it is
-> not a real AMBA PL022 peripheral but some weird hack made by Cirrus (although
-> my opinions are bit biased).
-
-I disagree because it's IMO at first sight no more deviant than our "PL023"
-variants that still use the same pl022 driver.
-
-Is there some inexepensive hardware with EP93xx I can get to fix this
-myself?
-
-Yours,
-Linus Walleij
+diff --cc arch/arm/Kconfig
+index 3bc1a58,e81c72c..f7cce8b
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@@ -2028,7 -1998,7 +2016,7 @@@ menu "Power management options
+  source "kernel/power/Kconfig"
+  
+  config ARCH_SUSPEND_POSSIBLE
+- 	depends on !ARCH_S5P64X0 && !ARCH_S5P6442 && !ARCH_S5PC100
+ -	depends on !ARCH_S5P64X0
+++	depends on !ARCH_S5P64X0 && !ARCH_S5PC100
+  	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
+  		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
+  	def_bool y
+diff --cc arch/arm/mach-exynos4/Kconfig
+index 8051962,11b57a4..b92c1e5
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@@ -169,9 -169,10 +169,11 @@@ config MACH_NUR
+  	select S3C_DEV_HSMMC2
+  	select S3C_DEV_HSMMC3
+  	select S3C_DEV_I2C1
++ 	select S3C_DEV_I2C3
+  	select S3C_DEV_I2C5
+ +	select S5P_DEV_USB_EHCI
+  	select EXYNOS4_SETUP_I2C1
++ 	select EXYNOS4_SETUP_I2C3
+  	select EXYNOS4_SETUP_I2C5
+  	select EXYNOS4_SETUP_SDHCI
+  	select SAMSUNG_DEV_PWM
+diff --cc arch/arm/mach-exynos4/mach-nuri.c
+index bb5d12f,d13c5e8..642702b
+--- a/arch/arm/mach-exynos4/mach-nuri.c
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@@ -30,8 -31,8 +31,10 @@@
+  #include <plat/cpu.h>
+  #include <plat/devs.h>
+  #include <plat/sdhci.h>
+ +#include <plat/ehci.h>
+ +#include <plat/clock.h>
++ #include <plat/gpio-cfg.h>
++ #include <plat/iic.h>
+  
+  #include <mach/map.h>
+  
+@@@ -282,7 -355,7 +367,8 @@@ static struct platform_device *nuri_dev
+  	&s3c_device_hsmmc3,
+  	&s3c_device_wdt,
+  	&s3c_device_timer[0],
+ +	&s5p_device_ehci,
++ 	&s3c_device_i2c3,
+  
+  	/* NURI Devices */
+  	&nuri_gpio_keys,
+@@@ -300,13 -373,13 +386,16 @@@ static void __init nuri_map_io(void
+  static void __init nuri_machine_init(void)
+  {
+  	nuri_sdhci_init();
++ 	nuri_tsp_init();
+  
+  	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
++ 	s3c_i2c3_set_platdata(&i2c3_data);
++ 	i2c_register_board_info(3, i2c3_devs, ARRAY_SIZE(i2c3_devs));
+  	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
+  
+ +	nuri_ehci_init();
+ +	clk_xusbxti.rate = 24000000;
+ +
+  	/* Last */
+  	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
+  }
