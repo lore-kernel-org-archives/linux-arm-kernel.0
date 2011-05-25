@@ -1,64 +1,44 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 25 May 2011 09:47:31 +0200
-Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
-In-Reply-To: <BANLkTikjxECNAK5eS5hSu2bbEKpZX341Dw@mail.gmail.com>
-References: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
-	<BANLkTikDPeEFWdsVQ=Ak8jXEXsC-+uoOaw@mail.gmail.com>
-	<1306253171.30236.9.camel@vkoul-udesk3>
-	<BANLkTikjxECNAK5eS5hSu2bbEKpZX341Dw@mail.gmail.com>
-Message-ID: <BANLkTikAm=D_YNFt0Regeas6AX8116L0-A@mail.gmail.com>
+From: vimal.newwork@gmail.com (Vimal Singh)
+Date: Wed, 25 May 2011 13:18:37 +0530
+Subject: Self modifying code in ARM 11 architectures
+In-Reply-To: <BANLkTimyju7eEgtCpb_U6s8LNHk-_FGK4Q@mail.gmail.com>
+References: <BANLkTi=mVsYiubqtJO2BmWvExMvUFRg6dg@mail.gmail.com>
+	<BANLkTimyju7eEgtCpb_U6s8LNHk-_FGK4Q@mail.gmail.com>
+Message-ID: <BANLkTinrj-dkJShzTQuhYSOWkK4QSEnQgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24 May 2011 23:03, Dan Williams <dan.j.williams@intel.com> wrote:
-> On Tue, May 24, 2011 at 9:06 AM, Koul, Vinod <vinod.koul@intel.com> wrote:
->> On Tue, 2011-05-24 at 17:40 +0200, Per Forlin wrote:
->>> Hi Vinod,
->>>
->>> On Tue, May 24, 2011 at 2:04 PM, Koul, Vinod <vinod.koul@intel.com> wrote:
->>> > From: Vinod Koul <vinod.koul@intel.com>
->>> >
->>> > Signed-off-by: Vinod Koul <vinod.koul@intel.com>
->>> > ---
->>> > ?Documentation/dma-slave-api.txt | ? 74 +++++++++++++++++++++++++++++++++++++++
->>> > ?1 files changed, 74 insertions(+), 0 deletions(-)
->>> > ?create mode 100644 Documentation/dma-slave-api.txt
->>> I suggest putting this in subsection of dmaengine.txt instead.
->>> dmaengine.txt would be the natural place to look at.
->> Agreed, that would make it easier for people to find
->>
->>> > +4. Submit the transaction(s) and wait for callback notification when slave API
->>> > +is 3 above returns, the non NULL value would imply a "descriptor" for the
->>> > +transaction. These transaction(s) would need to be submitted which pushes them
->>> > +into queue in DMA driver. If DMA is idle then the first descriptor submit will
->>> > +be pushed to DMA and subsequent ones will be queued. On completion of the DMA
->>> > +operation the next in queue is submitted and a tasklet triggered. The tasklet
->>> > +would then call the client driver completion callback routine for notification,
->>> > +if set.
->>> > +
->>> Does submit really start the transfer as well? My interpretation of
->>> submit is that is only adds desc to a pending queue. When calling
->>> issue_pending all these descs will be schedule for DMA transfer. Calls
->>> to submit after this point will added to the pending queue again and
->>> not be issued until calling issue_pending once more.
->> For slave dma devices, submit() is used to start the transaction if the
->> channel is idle. If its already doing a transaction then it will queue
->> it up and submit once cureent excuting one is completed. It is not
->> required to call issue_pending once more.
->> I am not sure if this is true for non slave usage, Dan would that be
->> correct for you as well?
->
-> No, ->submit() is just an "add this descriptor to the chain"
-> operation, and ->issue_pending() is always required to make sure the
-> everything submitted previously is actively executing. ?This was a
-> holdover from the very first dmaengine implementation where, for
-> efficiency reasons, it could save mmio writes by batching the issuing
-> of requests.
-Thanks Dan for clarifying.
-Vinod, I propose that the submit and issue_pending works the same for
-SLAVE and none SLAVE channels. The API should have the same definition
-independent of DMA_CAP. Please enlighten me if there are things I have
-foreseen on this matter.
+CC'ing correct ARM mailing list.
 
-Thanks,
-Per
+On Tue, May 24, 2011 at 3:48 PM, Ashok Babu <ashok3d@gmail.com> wrote:
+> Hi All,
+>
+> I am no success in booting up the ARM1176 processor with the
+> linux-2.6.32 kernel.
+> While googling about the ARM?Harvard?architecture, I came to know that
+> we have to flush/invalidate the D-Cache and I-Cache
+> when using the self modifying codes.
+>
+> So here my questions/doubts :
+> 1) Is'nt it the kernel itself is self modifying code with lots of
+> function pointers ?
+> ? ? If yes, how is synchronization b/w d-cache and i-cache handled in
+> the kernel ?
+> 2) Can this be the reason for the kernel not booting for me ?
+> ? ? Because If i disable the I-Cache in the config, then the kernel
+> boots up without any issues.
+> Any pointers on this will be of great help.
+>
+> Thanks & Best Regards
+> Ashok
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+
+
+
+-- 
+Regards,
+Vimal Singh
