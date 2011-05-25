@@ -1,37 +1,59 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 25 May 2011 11:34:57 +0200
-Subject: [PATCH] arm: mxs: include asm/processor.h for cpu_relax()
-Message-ID: <1306316097-27926-1-git-send-email-w.sang@pengutronix.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 25 May 2011 11:41:42 +0200
+Subject: [PATCH][RFC] Add mt9p031 sensor support.
+In-Reply-To: <201105251005.28691.laurent.pinchart@ideasonboard.com>
+References: <1306247443-2191-1-git-send-email-javier.martin@vista-silicon.com>
+	<201105251005.28691.laurent.pinchart@ideasonboard.com>
+Message-ID: <BANLkTikvLEG55vqpLmNJJsvsvz1eLsGoHw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I get this build error as of today:
+Hi,
+thank you for the review, I agree with you on all the suggested
+changes except on this one:
 
-arch/arm/mach-mxs/ocotp.c: In function 'mxs_get_ocotp':
-arch/arm/mach-mxs/ocotp.c:54: error: implicit declaration of function 'cpu_relax'
-make[2]: *** [arch/arm/mach-mxs/ocotp.o] Error 1
+On 25 May 2011 10:05, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> Hi Javier,
+>
+> Thanks for the patch. Here's a review of the power handling code.
+>
+> On Tuesday 24 May 2011 16:30:43 Javier Martin wrote:
+>> This RFC includes a power management implementation that causes
+>> the sensor to show images with horizontal artifacts (usually
+>> monochrome lines that appear on the image randomly).
+>>
+>> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+>
+> [snip]
+>
+>> diff --git a/drivers/media/video/mt9p031.c b/drivers/media/video/mt9p031.c
+>> new file mode 100644
+>> index 0000000..04d8812
+>> --- /dev/null
+>> +++ b/drivers/media/video/mt9p031.c
+>
+> [snip]
+>> +#define MT9P031_WINDOW_HEIGHT_MAX ? ? ? ? ? ?1944
+>> +#define MT9P031_WINDOW_WIDTH_MAX ? ? ? ? ? ? 2592
+>> +#define MT9P031_WINDOW_HEIGHT_MIN ? ? ? ? ? ?2
+>> +#define MT9P031_WINDOW_WIDTH_MIN ? ? ? ? ? ? 18
+>
+> Can you move those 4 constants right below MT9P031_WINDOW_HEIGHT and
+> MT9P031_WINDOW_WIDTH ? The max values are not correct, according to the
+> datasheet they should be 2005 and 2751.
 
-Looks like it has been indirectly included before which broke now.
-Include it directly.
+In figure 4, it says active image size is 2592 x 1944
+Why should I include active boundary and dark pixels?
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Shawn Guo <shawn.guo@freescale.com>
----
- arch/arm/mach-mxs/ocotp.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
-index 65157a3..54add60 100644
---- a/arch/arm/mach-mxs/ocotp.c
-+++ b/arch/arm/mach-mxs/ocotp.c
-@@ -16,6 +16,8 @@
- #include <linux/err.h>
- #include <linux/mutex.h>
- 
-+#include <asm/processor.h>	/* for cpu_relax() */
-+
- #include <mach/mxs.h>
- 
- #define OCOTP_WORD_OFFSET		0x20
+
+
 -- 
-1.7.2.5
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
