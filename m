@@ -1,88 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 May 2011 21:50:05 +0100
-Subject: [GIT PULL] Samsung S5P for 2.6.40 merge window
-In-Reply-To: <4DDD4659.5050602@samsung.com>
-References: <4DDD4659.5050602@samsung.com>
-Message-ID: <20110525205005.GC24876@n2100.arm.linux.org.uk>
+Date: Wed, 25 May 2011 21:38:56 +0100
+Subject: at91: pull request
+In-Reply-To: <20110525151325.GL863@game.jcrosoft.org>
+References: <20110525151325.GL863@game.jcrosoft.org>
+Message-ID: <20110525203856.GB24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 11:11:37AM -0700, Kukjin Kim wrote:
-> These things are for 2.6.40 and it includes removing ARCH_S5P6442.  
-> Actually there is no user now and if required will merge it into other  
-> ARCH like ARCH_S5P64X0 later.
+On Wed, May 25, 2011 at 05:13:25PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> Hi Russell,
+> 
+> 	It's the first pull request of consolidation on at91
+> 	86 files changed, 776 insertions(+), 2998 deletions(-)
+> 
+> 	for the tty we get the ack of alan
+> 
+> 	I'm preparing a second one for laster this week with more
+> 	consolidation but I need to test it on big range of boards first
+> 
+> Could you pull
+> The following changes since commit 4a7df24ddc7097cd789a7527187826552ea0765e:
+> 
+>   Merge branch 'for-linus/2640/i2c' of git://git.fluff.org/bjdooks/linux (2011-05-24 16:39:23 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git at github.com:at91linux/linux-2.6-at91.git for-rmk
 
-I have a merge conflict with this, and resolved it as below.  Please check
-whether this is correct.
+This doesn't look like an accessible URL to me.  Neither does it to git:
 
-diff --cc arch/arm/Kconfig
-index 3bc1a58,e81c72c..f7cce8b
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@@ -2028,7 -1998,7 +2016,7 @@@ menu "Power management options
-  source "kernel/power/Kconfig"
-  
-  config ARCH_SUSPEND_POSSIBLE
-- 	depends on !ARCH_S5P64X0 && !ARCH_S5P6442 && !ARCH_S5PC100
- -	depends on !ARCH_S5P64X0
-++	depends on !ARCH_S5P64X0 && !ARCH_S5PC100
-  	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
-  		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
-  	def_bool y
-diff --cc arch/arm/mach-exynos4/Kconfig
-index 8051962,11b57a4..b92c1e5
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@@ -169,9 -169,10 +169,11 @@@ config MACH_NUR
-  	select S3C_DEV_HSMMC2
-  	select S3C_DEV_HSMMC3
-  	select S3C_DEV_I2C1
-+ 	select S3C_DEV_I2C3
-  	select S3C_DEV_I2C5
- +	select S5P_DEV_USB_EHCI
-  	select EXYNOS4_SETUP_I2C1
-+ 	select EXYNOS4_SETUP_I2C3
-  	select EXYNOS4_SETUP_I2C5
-  	select EXYNOS4_SETUP_SDHCI
-  	select SAMSUNG_DEV_PWM
-diff --cc arch/arm/mach-exynos4/mach-nuri.c
-index bb5d12f,d13c5e8..642702b
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@@ -30,8 -31,8 +31,10 @@@
-  #include <plat/cpu.h>
-  #include <plat/devs.h>
-  #include <plat/sdhci.h>
- +#include <plat/ehci.h>
- +#include <plat/clock.h>
-+ #include <plat/gpio-cfg.h>
-+ #include <plat/iic.h>
-  
-  #include <mach/map.h>
-  
-@@@ -282,7 -355,7 +367,8 @@@ static struct platform_device *nuri_dev
-  	&s3c_device_hsmmc3,
-  	&s3c_device_wdt,
-  	&s3c_device_timer[0],
- +	&s5p_device_ehci,
-+ 	&s3c_device_i2c3,
-  
-  	/* NURI Devices */
-  	&nuri_gpio_keys,
-@@@ -300,13 -373,13 +386,16 @@@ static void __init nuri_map_io(void
-  static void __init nuri_machine_init(void)
-  {
-  	nuri_sdhci_init();
-+ 	nuri_tsp_init();
-  
-  	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
-+ 	s3c_i2c3_set_platdata(&i2c3_data);
-+ 	i2c_register_board_info(3, i2c3_devs, ARRAY_SIZE(i2c3_devs));
-  	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
-  
- +	nuri_ehci_init();
- +	clk_xusbxti.rate = 24000000;
- +
-  	/* Last */
-  	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
-  }
+$ git pull git at github.com:at91linux/linux-2.6-at91.git for-rmk
+Permission denied (publickey).
+fatal: The remote end hung up unexpectedly
