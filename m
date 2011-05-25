@@ -1,39 +1,49 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 May 2011 11:09:26 +0200
-Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <1306311593.30236.103.camel@vkoul-udesk3>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
-	<BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
-	<1306311593.30236.103.camel@vkoul-udesk3>
-Message-ID: <BANLkTi=X4XH0FL4HFXi4ZsJYy2O=mjnctg@mail.gmail.com>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Wed, 25 May 2011 17:15:53 +0800
+Subject: [PATCH] AT91: Add VSYNC pin definition for AT91SAM9263 silicon
+In-Reply-To: <20110525073933.GH863@game.jcrosoft.org>
+References: <1306305101-27285-1-git-send-email-hong.xu@atmel.com>
+	<20110525073933.GH863@game.jcrosoft.org>
+Message-ID: <4DDCC8C9.3080102@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/25 Koul, Vinod <vinod.koul@intel.com>:
-> On Wed, 2011-05-25 at 10:39 +0200, Linus Walleij wrote:
->> 2011/5/22 Mika Westerberg <mika.westerberg@iki.fi>:
+Hi,
+
+On 05/25/2011 03:39 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> On 14:31 Wed 25 May     , Hong Xu wrote:
+>> On Atmel's AT91SAM9263-EK board, the LCD panel does not need VSYNC
+>> signal. But this signal is useful for the boards from other
+>> vendors, as suggested by Nicholas Kinar.
 >>
->> > The ep93xx DMA controller has 10 independent memory to peripheral (M2P)
->> > channels, and 2 dedicated memory to memory (M2M) channels. M2M channels can
->> > also be used by SPI and IDE to perform DMA transfers to/from their memory
->> > mapped FIFOs.
+>> This small patch adds the VSYNC pin definition by default.
 >>
->> No so much a review comment as an observation: I opposed the merge of the
->> EP93xx SPI driver in drivers/spi/ep93xx_spi.c on the grounds that it was close
->> enough to amba-pl022.c that it could use that driver instead.
+>> Reported-by: Nicholas Kinar<n.kinar@usask.ca>
+>> Signed-off-by: Hong Xu<hong.xu@atmel.com>
+>> ---
+>>   arch/arm/mach-at91/at91sam9263_devices.c |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
 >>
->> One of the arguments against was that you were going to do custom DMA
->> and stuff. Now you're using the DMAengine, so can you please reconsider
->> refactoring amba-pl022.c to suit your needs and you'll get DMA support for
->> free mor or less.
+>> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+>> index fb5c23a..7dab33e 100644
+>> --- a/arch/arm/mach-at91/at91sam9263_devices.c
+>> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
+>> @@ -832,6 +832,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
+>>   	if (!data)
+>>   		return;
+>>
+>> +	at91_set_A_periph(AT91_PIN_PC0, 0);	/* LCDVSYNC */
+> this must be optionnal
 >
-> Linus is the dma IP same as existing ones?
-> In that case we shouldn't have a new driver for same IP.
+> we need to update this with somethink like done on avr32
+>
 
-Nope, not as far as I can tell. The fear of this IP being an amba-pl08x.c
-already hit med so I checked the register map, but it appears to be unique.
-I haven't compared it to amba-pl330.c though.
+hm.. PC0 in SAM9263 has only "A" function (LCD VSYNC). As long as this 
+pin is not used as GPIO, it's harmless to enable its peripheral function.
 
-Yours,
-Linus Walleij
+I just had a quick look at the AVR32 code without catching your 
+"something like on AVR32". In AVR32, all ATMEL_LCDC_*_*BIT has "VSYNC" 
+defined.
+
+BR,
+Eric
