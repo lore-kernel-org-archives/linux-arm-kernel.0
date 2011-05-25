@@ -1,67 +1,72 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Wed, 25 May 2011 14:16:28 +0100 (BST)
-Subject: [RFC PATCH v3] ARM hibernation/suspend-to-disk support
-Message-ID: <alpine.DEB.2.00.1105251251330.4319@localhost6.localdomain6>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 25 May 2011 14:32:13 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>
+	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
+	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
+	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
+	<20110524171331.GA2941@arm.com>
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+	<20110525124348.GA2340@arm.com>
+Message-ID: <yw1xaaeanbxe.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dave Martin <dave.martin@linaro.org> writes:
 
-I've cleaned this up by the suggestions in the previous thread; this is 
-the result.
+> On Wed, May 25, 2011 at 12:14:08PM +0100, Catalin Marinas wrote:
+>> On Tue, May 24, 2011 at 06:13:31PM +0100, Dave Martin wrote:
+>> > On Tue, May 24, 2011 at 04:26:35PM +0100, Catalin Marinas wrote:
+>> > > BTW, are we sure that the code generated with unaligned accesses is
+>> > > better? AFAIK, while processors support unaligned accesses, they may
+>> > > not always be optimal.
+>> > 
+>> > The code gcc generates to synthesise an unaligned access using aligned
+>> > accesses is pretty simplistic:
+>> ...
+>> > For code which natively needs to read unaligned fields from data structures,
+>> > I sincerely doubt that the CPU will not beat the above code for efficiency...
+>> > 
+>> > So if there's code doing unaligned access to data structures for a good
+>> > reason, building with unaligned access support turned on in the compiler
+>> > seems a good idea, if that code might performance-critical for anything.
+>> 
+>> gcc generates unaligned accesses in the the pcpu_dump_alloc_info()
+>> function. We have a local variable like below (9 bytes):
+>> 
+>> 	char empty_str[] = "--------";
+>> 
+>> and it looks like other stack accesses are unaligned:
+>> 
+>> c0082ba0 <pcpu_dump_alloc_info>:
+>> c0082ba0:   e92d4ff0    push    {r4, r5, r6, r7, r8, r9, sl, fp, lr}
+>> c0082ba4:   e3074118    movw    r4, #28952  ; 0x7118
+>> c0082ba8:   e24dd04c    sub sp, sp, #76 ; 0x4c
+>> c0082bac:   e34c402a    movt    r4, #49194  ; 0xc02a
+>> c0082bb0:   e58d1014    str r1, [sp, #20]
+>> c0082bb4:   e58d0020    str r0, [sp, #32]
+>> c0082bb8:   e8b40003    ldm r4!, {r0, r1}
+>> c0082bbc:   e58d003f    str r0, [sp, #63]   <----------- !!!!!
+>> c0082bc0:   e59d0014    ldr r0, [sp, #20]
+>> c0082bc4:   e5d43000    ldrb    r3, [r4]
+>> 
+>> I haven't tried with -mno-unaligned-access, I suspect the variables on
+>> the stack would be aligned.
+>
+> So, it looks like empty_str may be misaligned on the stack, and the compiler
+> is doing a misaligned store when initialising it.
 
-- now baselined against rmk/devel-stable
-- didn't create the <asm/suspend.h> because Rafael is just removing
-   that everywhere anyway
-- Fixes re prev suggestion:
- 	local_fiq_enable/disable bracketing
- 	save only absolutely essential regs and let cpu_init do the rest
- 	thumb2 clean assembly
- 	allows mach hooks (but they're not defined by this code)
+empty_str has type char[] so there are no alignment requirements.
 
-- Also: uses the "generic suspend/resume support" code
-   (commit f6b0fa02e8b0708d17d631afce456524eadf87ff, rmk/devel-stable)
+> Since the unaligned access support stuff is new, I'm suspicious of a
+> compiler bug here...  Can you follow up with your friendly neighbourhood
+> tools guys?
 
-Via the latter, the previously-used hooks into machine-dependent code, 
-__save/__restore_processor_state, have become unnecessary.
+The compiler might be doing something unintentional, but I see no
+violation of any rules here.
 
-This now simply calls the cpu_do_suspend/resume utilities provided by the 
-generic code.
-
-
-I'm still figuring out how to best test a recent devel-stable kernel ...
-
-
-Please let me know what you think,
-Thanks in advance,
-
-FrankH.
-
-
-==============================================================================
-Note on non-current kernels (older than 2.6.38):
-==============================================================================
-The use of generic CPU suspend/resume also ties the code to a 
-sufficiently-recent kernel - it requires the code from:
-
-http://ftp.arm.linux.org.uk/git/gitweb.cgi?p=linux-2.6-arm.git;a=commitdiff;h=f6b0fa02e8b0708d17d631afce456524eadf87ff
-
-Which is, for many that (want to) use the feature, a hurdle...
-
-If you're using an older kernel (2.6.37 or below), try the "generic" part 
-posted via:
-
-https://patchwork.kernel.org/patch/809212/
-
-and add a __save/__restore_processor_state for your CPU type, as mentioned 
-here:
-
-http://lists.arm.linux.org.uk/lurker/message/20110520.123937.760c528f.en.html
-==============================================================================
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: hibernate-arm.patch
-Type: text/x-diff
-Size: 6606 bytes
-Desc: 
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110525/5a6747ff/attachment-0001.bin>
+-- 
+M?ns Rullg?rd
+mans at mansr.com
