@@ -1,58 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 May 2011 12:22:15 +0100
-Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical
-	Address Extensions
-In-Reply-To: <201105251310.39609.arnd@arndb.de>
-References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-	<8yapqn7fyab.fsf@huya.qualcomm.com>
-	<alpine.LFD.2.00.1105242042340.3207@xanadu.home>
-	<201105251310.39609.arnd@arndb.de>
-Message-ID: <1306322535.31249.14.camel@e102109-lin.cambridge.arm.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 25 May 2011 16:25:23 +0530
+Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
+In-Reply-To: <BANLkTinbSAxozR6NivY6wddre1nRF5RmZA@mail.gmail.com>
+References: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
+	<BANLkTikDPeEFWdsVQ=Ak8jXEXsC-+uoOaw@mail.gmail.com>
+	<1306253171.30236.9.camel@vkoul-udesk3>
+	<BANLkTikjxECNAK5eS5hSu2bbEKpZX341Dw@mail.gmail.com>
+	<BANLkTikAm=D_YNFt0Regeas6AX8116L0-A@mail.gmail.com>
+	<1306312009.30236.110.camel@vkoul-udesk3>
+	<BANLkTikn3BBeNyuUeZ9BhG5QLj-dmcGjTg@mail.gmail.com>
+	<1306316082.30236.137.camel@vkoul-udesk3>
+	<BANLkTinbSAxozR6NivY6wddre1nRF5RmZA@mail.gmail.com>
+Message-ID: <1306320923.30236.158.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-25 at 12:10 +0100, Arnd Bergmann wrote:
-> On Wednesday 25 May 2011, Nicolas Pitre wrote:
-> > > Do you expect non LPAE targets to be able to boot with these changes
-> > > applied (and LPAE enabled)?  I am able to build this tree for the
-> > > MSM8660 (with a minor patch below), but it fails to boot with LPAE
-> > > enabled.  It seems to work fine with LPAE not enabled.
-> >
-> > I wouldn't expect a LPAE kernel to boot on non LPAE capable hardware.
-> >
-> > And I don't think we'll ever try to support both LPAE and non-LPAE modes
-> > in the same kernel binary either since this has implications all over
-> > the place in core kernel mm code.
+On Wed, 2011-05-25 at 16:21 +0530, Per Forlin wrote:
+> On 25 May 2011 11:34, Koul, Vinod <vinod.koul@intel.com> wrote:
+
+> I would like to ask a question on usage of DMA_CTRL_ACK while we're at it.
+> In ste_dma40 I added support to reuse descriptors if DMA_CTRL_ACK is
+> clear. The purpose of DMA_CTRL_ACK is to set up dependency but is it
+> also a valid to reuse it?
+> I mean submit the same descriptor again and again without having to
+> call prepare_slave_sg.
+> Example:
+> desc = prepare_slave_sg()
+> submit(desc)
+> issue_pending(desc)
 > 
-> Just for information and to complete the picture, what other of these
-> combinations are possible?
+> wait_for_callback()
 > 
-> * Non-LPAE kernel on LPAE-capable hardware
+> submit(desc)
+> issue_pending(desc)
+> 
+I think your question is answered in dmaengine.h. Quoting here:
+* @DMA_CTRL_ACK - if clear, the descriptor cannot be reused until the 
+* client acknowledges receipt, i.e. has has a chance to establish any
+* dependency chains
 
-Works fine. The LPAE-capable processors like A15 support the classic
-page table format as well, it's only a configuration bit to switch to
-LPAE.
+The DMA driver recycles the descriptors which it returns for the
+transfer APIs. The DMA_CTRL_ACK flag would tell driver explicitly not to
+reuse this descriptor until the client clears this flag.
+Since the descriptor is still valid after callback notification it can
+be reused by client in the way you described.
 
-> * LPAE kernel as KVM guest of LPAE kernel
+Again, Dan can you please confirm if my interpretation is correct.
 
-Should work when KVM for A15 becomes available
-
-> * non-LPAE kernel as KVM guest of LPAE kernel
-
-Same as above. KVM shouldn't care much about the underlying OS, it just
-sets up the IPA (Intermediate Physical Address) translations and you can
-have classic page tables on top.
-
-> * LPAE kernel as KVM guest of non-LPAE kernel
-
-No. KMV without LPAE uses a shadow page tables mechanism and I'm not
-aware of any plans to make it (guest) LPAE-aware.
-
-> * non-LPAE kernel as KVM guest of non-LPAE kernel on LPAE-enabled
-> hardware
-
-Would work as the current KVM implementation for ARMv7 with classic page
-tables (but I don't know what the status it).
 
 -- 
-Catalin
+~Vinod
