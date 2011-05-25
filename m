@@ -1,23 +1,55 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 25 May 2011 13:11:31 +0200
-Subject: [PATCH 1/2] ARM: pxa: raumfeld: follow upcoming hardware change
-In-Reply-To: <20110524175002.GB4652@n2100.arm.linux.org.uk>
-References: <1306239223-8293-1-git-send-email-zonque@gmail.com>
-	<20110524175002.GB4652@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikwkr8etp_fBnsUxiSq28VUyTbONQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 25 May 2011 12:14:08 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <20110524171331.GA2941@arm.com>
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>
+	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
+	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
+	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
+	<20110524171331.GA2941@arm.com>
+Message-ID: <20110525111405.GA12010@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 7:50 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, May 24, 2011 at 02:13:42PM +0200, Daniel Mack wrote:
->> The backlight control is going to change back to PWM in the
->> upcoming Raumfeld Controller hardware revision.
->
-> The commit comments doesn't say why the LCD timings have changed:
+On Tue, May 24, 2011 at 06:13:31PM +0100, Dave Martin wrote:
+> On Tue, May 24, 2011 at 04:26:35PM +0100, Catalin Marinas wrote:
+> > BTW, are we sure that the code generated with unaligned accesses is
+> > better? AFAIK, while processors support unaligned accesses, they may
+> > not always be optimal.
+> 
+> The code gcc generates to synthesise an unaligned access using aligned
+> accesses is pretty simplistic:
+...
+> For code which natively needs to read unaligned fields from data structures,
+> I sincerely doubt that the CPU will not beat the above code for efficiency...
+> 
+> So if there's code doing unaligned access to data structures for a good
+> reason, building with unaligned access support turned on in the compiler
+> seems a good idea, if that code might performance-critical for anything.
 
-Oh, yes. Seem something went wrong in the rebase process. I'll fix
-this and resubmit.
+gcc generates unaligned accesses in the the pcpu_dump_alloc_info()
+function. We have a local variable like below (9 bytes):
 
-Thanks,
-Daniel
+	char empty_str[] = "--------";
+
+and it looks like other stack accesses are unaligned:
+
+c0082ba0 <pcpu_dump_alloc_info>:
+c0082ba0:   e92d4ff0    push    {r4, r5, r6, r7, r8, r9, sl, fp, lr}
+c0082ba4:   e3074118    movw    r4, #28952  ; 0x7118
+c0082ba8:   e24dd04c    sub sp, sp, #76 ; 0x4c
+c0082bac:   e34c402a    movt    r4, #49194  ; 0xc02a
+c0082bb0:   e58d1014    str r1, [sp, #20]
+c0082bb4:   e58d0020    str r0, [sp, #32]
+c0082bb8:   e8b40003    ldm r4!, {r0, r1}
+c0082bbc:   e58d003f    str r0, [sp, #63]   <----------- !!!!!
+c0082bc0:   e59d0014    ldr r0, [sp, #20]
+c0082bc4:   e5d43000    ldrb    r3, [r4]
+
+I haven't tried with -mno-unaligned-access, I suspect the variables on
+the stack would be aligned.
+
+-- 
+Catalin
