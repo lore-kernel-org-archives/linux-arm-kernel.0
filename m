@@ -1,53 +1,67 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 25 May 2011 16:15:16 +0800
-Subject: [GIT PULL] pxa: for next merge
-In-Reply-To: <20110524231916.GD4652@n2100.arm.linux.org.uk>
-References: <BANLkTin8tX_kfG_R6To+ktNbOW+B93LiqQ@mail.gmail.com>
-	<20110524231916.GD4652@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikG_ySVXWRF5DN8HbBjsieY1pJaxA@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 May 2011 10:23:44 +0200
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <201105181047.17309.arnd@arndb.de>
+References: <201105181047.17309.arnd@arndb.de>
+Message-ID: <20110525082344.GF22096@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 7:19 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> I've just spotted this:
->
-> +asmlinkage void __exception_irq_entry icip_handle_irq(struct pt_regs *regs)
-> +{
-> + ? ? ? uint32_t icip, icmr, mask;
-> +
-> + ? ? ? do {
-> + ? ? ? ? ? ? ? icip = __raw_readl(IRQ_BASE + ICIP);
-> + ? ? ? ? ? ? ? icmr = __raw_readl(IRQ_BASE + ICMR);
-> + ? ? ? ? ? ? ? mask = icip & icmr;
-> +
-> + ? ? ? ? ? ? ? if (mask == 0)
-> + ? ? ? ? ? ? ? ? ? ? ? break;
-> +
-> + ? ? ? ? ? ? ? asm_do_IRQ(fls(mask) - 1, regs);
-> + ? ? ? } while (1);
-> +}
->
-> This is bad news. ?A function marked as __exception is expected to be
-> called from the assembly code. ?The above is fine, but it then goes on
-> to call asm_do_IRQ() which is also marked __exception.
->
-> This means the unwinder will attempt to dump the saved pt_regs register
-> state for both asm_do_IRQ() and icip_handle_irq(), resulting in one of
-> them being garbage.
->
-> So I think this needs some thought.
+On Wed, May 18, 2011 at 10:47:16AM +0200, Arnd Bergmann wrote:
+> This is the draft plan for maintaining the ARM subarchitectures in a common
+> tree, as a way to help coordinate the upstream merging of the
+> arch/arm/{plat,mach}-* changes into Linus' tree.
+> 
+> This was discussed in great length at the Linaro Developer Summit in Budapest
+> last week where we worked out an initial plan. We are modeling the maintainance
+> after how the linux-tip tree is used for the x86 architecture, with a set
+> of developers that have commit access to one tree on kernel.org and
+> have mutual trust in one another. Nicolas Pitre and me are funded
+> by Linaro to do the bulk of the work, while Thomas Gleixner will help
+> us part-time with his long time architecture maintainance experience.
+> Despite the funding by Linaro, this is not a Linaro project and all
+> ARM subarchitectures are welcome to go through our tree.
+> 
+> Russell King's role as ARM maintainer is of course unchanged by this, but
+> he has the same commit access to the new tree as the other maintainers and
+> is welcome to work in the same tree. We are also open to nominations for
+> further people outside of Linaro to join us as committers. Marc Zyngier from
+> ARM ltd is one of the candidates that has been suggested and I would also
+> like to see someone from Google. We have to find the right balance with the
+> number of committers so we get all the work done without stepping on each
+> other's toes.
+> 
+> Our tree will be strictly organized in topic brances so we can feed them
+> upstream in the bitesized chunks that Linus likes. The master branch
+> is an integration branch that pulls all other branches that are scheduled
+> for the next merge window and itself gets integrated into linux-next.
+> 
+> We will probably not be fully functional during the 2.6.40 merge window,
+> but we are trying our best to be useful. For 2.6.41, my hope is that
+> we can merge the bulk of the ARM subarchitecture changes through this
+> tree. Once Linus is happy with the way that the process works, we can
+> mandate that all ARM subarchitecture changes go through our tree, until
+> then it stays voluntary.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> 
+> ---
+> 
+> Maintainers: If you are happy with the layout of the process,
+> please ack this patch, otherwise please comment.
 
-Indeed. Do you have any suggestion? Or maybe we can merge this first,
-and get it fixed later. There is pxa955 irq handling code waiting for this
-feature though.
+As Freescale i.MX maintainer:
 
->
-> Second point - can't the USB changes go via the USB people? ?Have USB
-> people seen the patch?
->
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-I asked for Ack but actually no one cared.
 
-One change affects only the Lubbock boards, which is fine to go from
-my POV. The other though, indeed made a bit changes to pxa25x_udc.c.
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
