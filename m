@@ -1,46 +1,34 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 25 May 2011 11:03:28 +0200
+Date: Wed, 25 May 2011 11:07:18 +0200
 Subject: [PATCH 2/2] drivers/amba: probe via device tree
-In-Reply-To: <201105221203.03970.arnd@arndb.de>
+In-Reply-To: <4DDBC8C7.4000001@gmail.com>
 References: <1305829704-11774-1-git-send-email-robherring2@gmail.com>
+	<20110519233958.GB18181@ponder.secretlab.ca>
+	<4DD66B8A.5040404@gmail.com> <201105201621.03801.arnd@arndb.de>
+	<4DD68614.6090209@gmail.com>
 	<a42f0c27-2811-4b68-bedf-7dfaa7bff6ff@VA3EHSMHS025.ehs.local>
 	<BANLkTi=8vX1Cs_fzpQXZBuuDuLYLu1FGmg@mail.gmail.com>
-	<201105221203.03970.arnd@arndb.de>
-Message-ID: <BANLkTinrBgA8Zw03AzGFxAiY-84Hgxfcxg@mail.gmail.com>
+	<4DDA2AC0.1060406@gaisler.com>
+	<20110523095829.GG17672@n2100.arm.linux.org.uk>
+	<BANLkTink1rrC8F3Gjhqt84gYzOibX+AgDQ@mail.gmail.com>
+	<4DDBC8C7.4000001@gmail.com>
+Message-ID: <BANLkTin4xKHbxysxN8M-5AP2143VkoLG=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/22 Arnd Bergmann <arnd@arndb.de>:
-> On Saturday 21 May 2011 19:42:34 Grant Likely wrote:
->> 1) drop amba-bus entirely and use platform_device everywhere, similar
->> to what OMAP has done
->> 2) strictly create amba_devices for nodes compatible with "arm,amba-device"
->> 3) be intelligent about amba device creation; create an amba_device
->> only for devices we know are driven with amba_driver.
->
-> Or maybe
->
-> 4) Use amba_device for all devices on an amba bus (identified by
-> the compatible property of the bus), but mark the ones that do
-> not have primecell compatible registers so that the amba bus
-> does not try to look at them but instead takes the information
-> from the device tree.
+2011/5/24 Rob Herring <robherring2@gmail.com>:
 
-Currently the amba/primecell bus driver in drivers/amba/bus.c
-will have the hardware registers override any data provided
-from the board.
+> I think having "arm,amba-deviceid" is not needed. The current code does
+> nothing but warn if it doesn't match the h/w value. The drivers already have
+> a list of id's that they support and the amba bus only matches against the
+> h/w id value. The only use I can see is overriding a broken h/w value.
 
-There are pending patches to instead have the board potentially
-override the hardware, see:
+We have this usecase in the Ux500. See these patches:
 http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6829/1
+http://www.arm.linux.org.uk/developer/patches/viewpatch.php?id=6830/1
 
-The reason is that some of our hardware has newer revisions
-of the PrimeCells and still the hardware registers have not
-been updated properly. (Yes, the people involved have been
-informed.)
-
-So you also have a case where you may want to provide an ID
-and have it override the ID present in the hardware.
+Alas, it's not yet merged for the old boardfile world usecase, and
+causing us problems to drive our hardware already.
 
 Yours,
 Linus Walleij
