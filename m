@@ -1,54 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 25 May 2011 13:43:11 +0100
-Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical Address
-	Extensions
-In-Reply-To: <1306322535.31249.14.camel@e102109-lin.cambridge.arm.com>
-References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-	<8yapqn7fyab.fsf@huya.qualcomm.com>
-	<alpine.LFD.2.00.1105242042340.3207@xanadu.home>
-	<201105251310.39609.arnd@arndb.de>
-	<1306322535.31249.14.camel@e102109-lin.cambridge.arm.com>
-Message-ID: <BANLkTin_1Xu20rdjLR3HQTmr=ntwD85BdA@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 25 May 2011 13:43:49 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>
+	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
+	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
+	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
+	<20110524171331.GA2941@arm.com>
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+Message-ID: <20110525124348.GA2340@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2011 12:22, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Wed, 2011-05-25 at 12:10 +0100, Arnd Bergmann wrote:
->> On Wednesday 25 May 2011, Nicolas Pitre wrote:
->> > > Do you expect non LPAE targets to be able to boot with these changes
->> > > applied (and LPAE enabled)? ?I am able to build this tree for the
->> > > MSM8660 (with a minor patch below), but it fails to boot with LPAE
->> > > enabled. ?It seems to work fine with LPAE not enabled.
->> >
->> > I wouldn't expect a LPAE kernel to boot on non LPAE capable hardware.
->> >
->> > And I don't think we'll ever try to support both LPAE and non-LPAE modes
->> > in the same kernel binary either since this has implications all over
->> > the place in core kernel mm code.
->>
->> Just for information and to complete the picture, what other of these
->> combinations are possible?
->>
->> * Non-LPAE kernel on LPAE-capable hardware
->
-> Works fine. The LPAE-capable processors like A15 support the classic
-> page table format as well, it's only a configuration bit to switch to
-> LPAE.
->
->> * LPAE kernel as KVM guest of LPAE kernel
->
-> Should work when KVM for A15 becomes available
->
->> * non-LPAE kernel as KVM guest of LPAE kernel
->
-> Same as above. KVM shouldn't care much about the underlying OS, it just
-> sets up the IPA (Intermediate Physical Address) translations and you can
-> have classic page tables on top.
+On Wed, May 25, 2011 at 12:14:08PM +0100, Catalin Marinas wrote:
+> On Tue, May 24, 2011 at 06:13:31PM +0100, Dave Martin wrote:
+> > On Tue, May 24, 2011 at 04:26:35PM +0100, Catalin Marinas wrote:
+> > > BTW, are we sure that the code generated with unaligned accesses is
+> > > better? AFAIK, while processors support unaligned accesses, they may
+> > > not always be optimal.
+> > 
+> > The code gcc generates to synthesise an unaligned access using aligned
+> > accesses is pretty simplistic:
+> ...
+> > For code which natively needs to read unaligned fields from data structures,
+> > I sincerely doubt that the CPU will not beat the above code for efficiency...
+> > 
+> > So if there's code doing unaligned access to data structures for a good
+> > reason, building with unaligned access support turned on in the compiler
+> > seems a good idea, if that code might performance-critical for anything.
+> 
+> gcc generates unaligned accesses in the the pcpu_dump_alloc_info()
+> function. We have a local variable like below (9 bytes):
+> 
+> 	char empty_str[] = "--------";
+> 
+> and it looks like other stack accesses are unaligned:
+> 
+> c0082ba0 <pcpu_dump_alloc_info>:
+> c0082ba0:   e92d4ff0    push    {r4, r5, r6, r7, r8, r9, sl, fp, lr}
+> c0082ba4:   e3074118    movw    r4, #28952  ; 0x7118
+> c0082ba8:   e24dd04c    sub sp, sp, #76 ; 0x4c
+> c0082bac:   e34c402a    movt    r4, #49194  ; 0xc02a
+> c0082bb0:   e58d1014    str r1, [sp, #20]
+> c0082bb4:   e58d0020    str r0, [sp, #32]
+> c0082bb8:   e8b40003    ldm r4!, {r0, r1}
+> c0082bbc:   e58d003f    str r0, [sp, #63]   <----------- !!!!!
+> c0082bc0:   e59d0014    ldr r0, [sp, #20]
+> c0082bc4:   e5d43000    ldrb    r3, [r4]
+> 
+> I haven't tried with -mno-unaligned-access, I suspect the variables on
+> the stack would be aligned.
 
-Just a clarification here - KVM with support for LPAE also requires
-the virtualisation extensions (which are present in Cortex-A15). The
-virtualisation extensions require LPAE in hardware but I'm not sure
-the opposite is true.
+So, it looks like empty_str may be misaligned on the stack, and the compiler
+is doing a misaligned store when initialising it.
 
--- 
-Catalin
+Since the unaligned access support stuff is new, I'm suspicious of a
+compiler bug here...  Can you follow up with your friendly neighbourhood
+tools guys?
+
+Cheers
+---Dave
