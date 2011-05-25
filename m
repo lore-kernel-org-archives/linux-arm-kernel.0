@@ -1,76 +1,59 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 25 May 2011 23:15:28 +0200
-Subject: [BUG]  "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <1306343335.21578.65.camel@twins>
-References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
-	<1306272750.2497.79.camel@laptop>  <1306343335.21578.65.camel@twins>
-Message-ID: <1306358128.21578.107.camel@twins>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 25 May 2011 14:07:32 -0700
+Subject: [GIT PULL] Pull request for 2.6.40
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D09B89A@dbde02.ent.ti.com>
+	(Sekhar Nori's message of "Tue, 24 May 2011 15:51:53 +0530")
+References: <B85A65D85D7EB246BE421B3FB0FBB593024D09B89A@dbde02.ent.ti.com>
+Message-ID: <87boyqtror.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-25 at 19:08 +0200, Peter Zijlstra wrote:
-> Ooh, shiny, whilst typing this I got an NMI-watchdog error reporting me
-> that CPU1 got stuck in try_to_wake_up(), so it looks like I can indeed
-> reproduce some funnies.
-> 
-> /me goes dig in. 
+Hi Sekhar,
 
-Does the below make your ARM box happy again?
+"Nori, Sekhar" <nsekhar@ti.com> writes:
 
-It restores the old ttwu behaviour for this case and seems to not mess
-up my x86 with __ARCH_WANT_INTERRUPTS_ON_CTXSW.
+> Hi Russell,
+>
+> I have been tracking these four patches for inclusion in 2.6.40
+> can you please pull them?
+>
+> These are clean-up rather than consolidation patches and all
+> of them have zero or negative net diffstat.
+>
 
-Figuring out why the existing condition failed and writing a proper
-changelog requires a mind that is slightly less deprived of sleep and I
-shall attempt that tomorrow -- provided this does indeed work for you.
+The commits in this branch aren't quite right.   All except the last one
+are missing your signoff.  As you're on the delivery path, be sure to
+include your signoff on all the patches.
 
----
-diff --git a/kernel/sched.c b/kernel/sched.c
-index 2d12893..6976eac 100644
---- a/kernel/sched.c
-+++ b/kernel/sched.c
-@@ -2573,7 +2573,19 @@ static void ttwu_queue_remote(struct task_struct *p, int cpu)
- 	if (!next)
- 		smp_send_reschedule(cpu);
- }
--#endif
-+
-+#ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
-+static void ttwu_activate_remote(struct task_struct *p, int wake_flags)
-+{
-+	struct rq *rq = __task_rq_lock(p);
-+
-+	ttwu_activate(rq, p, ENQUEUE_WAKEUP | ENQUEUE_WAKING);
-+	ttwu_do_wakeup(rq, p, wake_flags);
-+
-+	__task_rq_unlock(rq);
-+}
-+#endif /* __ARCH_WANT_INTERRUPTS_ON_CTXSW */
-+#endif /* CONFIG_SMP */
- 
- static void ttwu_queue(struct task_struct *p, int cpu)
- {
-@@ -2630,18 +2642,11 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
- 	 */
- 	while (p->on_cpu) {
- #ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
--		/*
--		 * If called from interrupt context we could have landed in the
--		 * middle of schedule(), in this case we should take care not
--		 * to spin on ->on_cpu if p is current, since that would
--		 * deadlock.
--		 */
--		if (p == current) {
--			ttwu_queue(p, cpu);
--			goto stat;
--		}
--#endif
-+		ttwu_activate_remote(p, wake_flags);
-+		goto stat;
-+#else
- 		cpu_relax();
-+#endif
- 	}
- 	/*
- 	 * Pairs with the smp_wmb() in finish_lock_switch().
+Thanks,
+
+Kevin
+
+>
+> The following changes since commit 0ee5623f9a6e52df90a78bd21179f8ab370e102e:
+>   Linus Torvalds (1):
+>         Linux 2.6.39-rc6
+>
+> are available in the git repository at:
+>
+>   git://gitorious.org/linux-davinci/linux-davinci.git davinci-next
+>
+> Manjunath Hadli (1):
+>       davinci: move DM64XX_VDD3P3V_PWDN to devices.c
+>
+> Sergei Shtylyov (3):
+>       DA8xx: kill duplicate #define DA8XX_GPIO_BASE
+>       DA8xx: kill duplicate #define DA8XX_PLL1_BASE
+>       DA8xx: move base address #define's to their proper place
+>
+>  arch/arm/mach-davinci/da850.c                 |    2 +-
+>  arch/arm/mach-davinci/devices-da8xx.c         |   16 +++++++++-------
+>  arch/arm/mach-davinci/devices.c               |    3 +++
+>  arch/arm/mach-davinci/include/mach/da8xx.h    |    4 ----
+>  arch/arm/mach-davinci/include/mach/hardware.h |    3 ---
+>  5 files changed, 13 insertions(+), 15 deletions(-)
+>
+> _______________________________________________
+> Davinci-linux-open-source mailing list
+> Davinci-linux-open-source at linux.davincidsp.com
+> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
