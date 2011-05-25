@@ -1,59 +1,35 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 25 May 2011 14:07:32 -0700
-Subject: [GIT PULL] Pull request for 2.6.40
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D09B89A@dbde02.ent.ti.com>
-	(Sekhar Nori's message of "Tue, 24 May 2011 15:51:53 +0530")
-References: <B85A65D85D7EB246BE421B3FB0FBB593024D09B89A@dbde02.ent.ti.com>
-Message-ID: <87boyqtror.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 25 May 2011 21:52:49 +0100
+Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
+In-Reply-To: <4DDD464F.2010508@codeaurora.org>
+References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+	<4DDC2A59.8030109@codeaurora.org>
+	<002f01cc1ada$5e7ffaa0$1b7fefe0$@deacon@arm.com>
+	<4DDD464F.2010508@codeaurora.org>
+Message-ID: <20110525205249.GD24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sekhar,
+On Wed, May 25, 2011 at 11:11:27AM -0700, Stephen Boyd wrote:
+> On 05/25/2011 05:50 AM, Will Deacon wrote:
+> > I was planning to CC stable for patches 1 ("ARM: cache: ensure MVA is cacheline
+> > aligned in flush_kern_dcache_area") and 4 ("ARM: mm: fix racy ASID rollover
+> > broadcast on SMP platforms") as these affect existing v6 and v7 cores. The
+> > remainder of the patches, although nice to have, only kick in on A15 as far as
+> > I'm aware (due to aggressive caching of speculative level 1 entries).
+> 
+> Would it be appropriate to reorder the series then so patches 1 and 4
+> come first?
 
-"Nori, Sekhar" <nsekhar@ti.com> writes:
+I'm not entirely convinced (4) is the best solution yet, but that's
+mainly becaues I've not thought about it enough yet.  1-3 look fine
+though.
 
-> Hi Russell,
->
-> I have been tracking these four patches for inclusion in 2.6.40
-> can you please pull them?
->
-> These are clean-up rather than consolidation patches and all
-> of them have zero or negative net diffstat.
->
+> > I was hoping for some acks/tested-bys before then since these changes affect a
+> > lot of platforms and the code is fairly scary.
+> 
+> Yes the patches look scary. I could give it a test on MSM but I'm not
+> even sure that will help much. Why didn't you Cc Russell on these patches?
 
-The commits in this branch aren't quite right.   All except the last one
-are missing your signoff.  As you're on the delivery path, be sure to
-include your signoff on all the patches.
-
-Thanks,
-
-Kevin
-
->
-> The following changes since commit 0ee5623f9a6e52df90a78bd21179f8ab370e102e:
->   Linus Torvalds (1):
->         Linux 2.6.39-rc6
->
-> are available in the git repository at:
->
->   git://gitorious.org/linux-davinci/linux-davinci.git davinci-next
->
-> Manjunath Hadli (1):
->       davinci: move DM64XX_VDD3P3V_PWDN to devices.c
->
-> Sergei Shtylyov (3):
->       DA8xx: kill duplicate #define DA8XX_GPIO_BASE
->       DA8xx: kill duplicate #define DA8XX_PLL1_BASE
->       DA8xx: move base address #define's to their proper place
->
->  arch/arm/mach-davinci/da850.c                 |    2 +-
->  arch/arm/mach-davinci/devices-da8xx.c         |   16 +++++++++-------
->  arch/arm/mach-davinci/devices.c               |    3 +++
->  arch/arm/mach-davinci/include/mach/da8xx.h    |    4 ----
->  arch/arm/mach-davinci/include/mach/hardware.h |    3 ---
->  5 files changed, 13 insertions(+), 15 deletions(-)
->
-> _______________________________________________
-> Davinci-linux-open-source mailing list
-> Davinci-linux-open-source at linux.davincidsp.com
-> http://linux.davincidsp.com/mailman/listinfo/davinci-linux-open-source
+I do tend to read about 90% of linux-arm-kernel, whether its cc'd to
+me or not.  The cc doesn't really affect whether I read it or not.
