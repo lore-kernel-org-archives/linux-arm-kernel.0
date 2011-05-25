@@ -1,26 +1,53 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Wed, 25 May 2011 22:00:55 +0300
-Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <1306310403.30236.94.camel@vkoul-udesk3>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
-	<1306310403.30236.94.camel@vkoul-udesk3>
-Message-ID: <20110525190055.GB2996@acer>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 25 May 2011 21:03:47 +0200
+Subject: [PATCH 2/4] clk: Implement clk_set_rate
+In-Reply-To: <1305876469.326620.351525457111.2.gpush@pororo>
+References: <1305876469.325655.313573683829.0.gpush@pororo>
+	<1305876469.326620.351525457111.2.gpush@pororo>
+Message-ID: <20110525190347.GH22096@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 01:30:03PM +0530, Koul, Vinod wrote:
+Hi Jeremy,
+
+On Fri, May 20, 2011 at 03:27:49PM +0800, Jeremy Kerr wrote:
+> Implemenent clk_set_rate by adding a set_rate callback to clk_hw_ops,
+> and core code to handle propagation of rate changes up and down the
+> clock tree.
 > 
-> Which tree are these patches going thru?
+> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> 
+> +
+> +propagate:
+> +	ret = clk->ops->set_rate(clk->hw, new_rate, &parent_rate);
+> +
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	/* ops->set_rate may require the parent's rate to change (to
+> +	 * parent_rate), we need to propagate the set_rate call to the
+> +	 * parent.
+> +	 */
+> +	if (ret == CLK_SET_RATE_PROPAGATE) {
+> +		new_rate = parent_rate;
+> +		clk = clk->parent;
+> +		goto propagate;
+> +	}
 
-I was hoping that the dmaengine driver itself would go via dmaengine tree (is
-it you or Dan who maintain it?) and rest of the patches probably through their
-respective trees. However, since there are dependencies between the patches,
-I'm not entirely sure how to proceed with these. Any ideas appreciated :)
+I'm unsure about this one. Every clock should have the ability to stop
+or continue the rate propagation to the parent. This suggests to leave
+the decision whether or not to propagate to the core and not to the
+individual clocks.
+Right now each mux/div/gate needs an individual propagate flag. By
+adding the flag to the core the building block implementations could be
+simpler and the knowledge about propagatability might become handy for
+the core later.
 
-Fortunately arch/arm/configs/ep93xx_defconfig doesn't have audio nor SPI
-enabled by default so it shouldn't matter if the patches go out of order to
-the mainline.
+Sascha
 
-Thanks,
-MW
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
