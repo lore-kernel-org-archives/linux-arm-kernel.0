@@ -1,48 +1,48 @@
-From: zhangfei.gao@marvell.com (Zhangfei Gao)
-Date: Wed, 25 May 2011 05:23:37 -0400
-Subject: [PATCH v2 3/3] ARM: mmp2: update mmp2 mmc resource
-Message-ID: <1306315417-16096-1-git-send-email-zhangfei.gao@marvell.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 25 May 2011 17:36:02 +0800
+Subject: [PATCH v2 5/7] mmc: sdhci: consolidate sdhci-of-esdhc and
+	sdhci-esdhc-imx
+In-Reply-To: <20110525064619.GI9774@pengutronix.de>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+	<1304601778-13837-6-git-send-email-shawn.guo@linaro.org>
+	<20110524194054.GC25727@pengutronix.de>
+	<20110525060637.GA30583@S2100-06.ap.freescale.net>
+	<20110525064619.GI9774@pengutronix.de>
+Message-ID: <20110525093601.GA2070@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-	mmp2 mmc driver name update to sdhci-mmp2 according with sdhci-mmp2.c
+Hi Uwe,
 
-Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
----
- arch/arm/mach-mmp/mmp2.c |   16 ++++++++--------
- 1 files changed, 8 insertions(+), 8 deletions(-)
+On Wed, May 25, 2011 at 08:46:19AM +0200, Uwe Kleine-K?nig wrote:
+> Hello Shawn,
+> 
+> > > > +#ifndef CONFIG_MMC_SDHCI_ESDHC_IMX
+> > > > +#define cpu_is_mx25()	(0)
+> > > > +#define cpu_is_mx35()	(0)
+> > > > +#define cpu_is_mx51()	(0)
+> > > > +#define cpu_is_imx()	(0)
+> > > > +#else
+> > > > +#define cpu_is_imx()	(1)
+> > > > +#endif
+> > > 
+> > > ... e.g. that looks a bit frightening.
+> > > 
+> > Agree.
+> > 
+> > The use of cpu_is_mx..() in the driver itself seems a churn to me
+> > even without this consolidation patch.  Is it possible for us to
+> > eliminate them by using pdata, and eventually device tree?  When we
+> > are there, I might want to revisit the consolidation again.
+> An alternative that allows letting the logic in the driver and still
+> getting rid of the cpu_is_ stuff is using platform ids. See
+> drivers/spi/spi_imx.c for an example. Instead of an index into an array
+> (as it's for the imx-spi driver) driver_data can hold flags, too, which
+> should be enough most of the time.
+> 
+Yeah, this is definitely a solution I can try later.  But for now, I
+would drop the esdhc consolidation patch.
 
-diff --git a/arch/arm/mach-mmp/mmp2.c b/arch/arm/mach-mmp/mmp2.c
-index 8e6c3ac..a7ba5cf 100644
---- a/arch/arm/mach-mmp/mmp2.c
-+++ b/arch/arm/mach-mmp/mmp2.c
-@@ -168,10 +168,10 @@ static struct clk_lookup mmp2_clkregs[] = {
- 	INIT_CLKREG(&clk_twsi5, "pxa2xx-i2c.4", NULL),
- 	INIT_CLKREG(&clk_twsi6, "pxa2xx-i2c.5", NULL),
- 	INIT_CLKREG(&clk_nand, "pxa3xx-nand", NULL),
--	INIT_CLKREG(&clk_sdh0, "sdhci-pxa.0", "PXA-SDHCLK"),
--	INIT_CLKREG(&clk_sdh1, "sdhci-pxa.1", "PXA-SDHCLK"),
--	INIT_CLKREG(&clk_sdh2, "sdhci-pxa.2", "PXA-SDHCLK"),
--	INIT_CLKREG(&clk_sdh3, "sdhci-pxa.3", "PXA-SDHCLK"),
-+	INIT_CLKREG(&clk_sdh0, "sdhci-mmp2.0", "PXA-SDHCLK"),
-+	INIT_CLKREG(&clk_sdh1, "sdhci-mmp2.1", "PXA-SDHCLK"),
-+	INIT_CLKREG(&clk_sdh2, "sdhci-mmp2.2", "PXA-SDHCLK"),
-+	INIT_CLKREG(&clk_sdh3, "sdhci-mmp2.3", "PXA-SDHCLK"),
- };
- 
- static int __init mmp2_init(void)
-@@ -222,8 +222,8 @@ MMP2_DEVICE(twsi4, "pxa2xx-i2c", 3, TWSI4, 0xd4033000, 0x70);
- MMP2_DEVICE(twsi5, "pxa2xx-i2c", 4, TWSI5, 0xd4033800, 0x70);
- MMP2_DEVICE(twsi6, "pxa2xx-i2c", 5, TWSI6, 0xd4034000, 0x70);
- MMP2_DEVICE(nand, "pxa3xx-nand", -1, NAND, 0xd4283000, 0x100, 28, 29);
--MMP2_DEVICE(sdh0, "sdhci-pxa", 0, MMC, 0xd4280000, 0x120);
--MMP2_DEVICE(sdh1, "sdhci-pxa", 1, MMC2, 0xd4280800, 0x120);
--MMP2_DEVICE(sdh2, "sdhci-pxa", 2, MMC3, 0xd4281000, 0x120);
--MMP2_DEVICE(sdh3, "sdhci-pxa", 3, MMC4, 0xd4281800, 0x120);
-+MMP2_DEVICE(sdh0, "sdhci-mmp2", 0, MMC, 0xd4280000, 0x120);
-+MMP2_DEVICE(sdh1, "sdhci-mmp2", 1, MMC2, 0xd4280800, 0x120);
-+MMP2_DEVICE(sdh2, "sdhci-mmp2", 2, MMC3, 0xd4281000, 0x120);
-+MMP2_DEVICE(sdh3, "sdhci-mmp2", 3, MMC4, 0xd4281800, 0x120);
- 
 -- 
-1.7.0.4
+Regards,
+Shawn
