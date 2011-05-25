@@ -1,117 +1,43 @@
-From: joe@perches.com (Joe Perches)
-Date: Wed, 25 May 2011 10:02:41 -0700
-Subject: [PATCH 4/4] treewide: Remove asmlinkage from printk
-In-Reply-To: <BANLkTimo30L7feKr9_Ec=fMoe1erw8Rnag@mail.gmail.com>
-References: <BANLkTimo30L7feKr9_Ec=fMoe1erw8Rnag@mail.gmail.com>
-Message-ID: <2053d1648f4f33f99ed8e096346e2133b2328951.1306342673.git.joe@perches.com>
+From: n.kinar@usask.ca (Nicholas Kinar)
+Date: Wed, 25 May 2011 11:03:37 -0600
+Subject: LCDVSYNC not set up in Atmel AT91SAM9RL device code
+In-Reply-To: <4C79549CB6F772498162A641D92D532801C916AD@penmb01.corp.atmel.com>
+References: <4DDAC947.7040705@usask.ca>
+	<4C79549CB6F772498162A641D92D532801C916AD@penmb01.corp.atmel.com>
+Message-ID: <4DDD3669.2060505@usask.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the now unnecessary asmlinkage attribute from the various
-printk prototypes and uses.
+On 25/05/2011 12:18 AM, Xu, Hong wrote:
+> Hi Nicholas,
+>> -----Original Message-----
+>> From: linux-arm-kernel-bounces at lists.infradead.org
+>> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
+>> Nicholas Kinar
+>> Sent: Tuesday, May 24, 2011 4:53 AM
+>> To: linux-arm-kernel at lists.infradead.org
+>> Subject: LCDVSYNC not set up in Atmel AT91SAM9RL device code
+>>
+>> Hello,
+>>
+>> I've been setting up an LCD display interfaced to the Atmel AT91SAM9RL
+>> processor, and I noticed that in the
+>> /arch/arm/mach-at91/at91sam9rl_devices.c file, the GPIO pin AT91_PIN_PC4
+>> is not switched over to the LCD peripheral.
+>>
+>> To make the LCD display peripheral operate properly, I had to add the
+>> following line to the at91_add_device_lcdc() function:
+>>
+>> at91_set_A_periph(AT91_PIN_PC4, 0);    /* LCDVSYNC */
+> You're right. Although the LCD panel on Atmel's AT91SAM9RL-EK does not need the VSYNC, you board needs. I just sent out a small patch about this and put you in the "Reported-by" line. Thanks.
+>
+>> Perhaps this could be patched?  I do not know if a similar issue also
+>> occurs in other device setup files.
+> AT91SAM9263-EK has the same issue as you specified, another patch will be sent out, thanks.
+>
+> BR,
+> Eric
+>
+Thank you; this is very useful.
 
-Signed-off-by: Joe Perches <joe@perches.com>
----
- arch/arm/kernel/early_printk.c |    2 +-
- arch/ia64/kvm/vmm.c            |    2 +-
- arch/x86/kernel/early_printk.c |    2 +-
- include/linux/printk.h         |    6 +++---
- kernel/printk.c                |    6 +++---
- 5 files changed, 9 insertions(+), 9 deletions(-)
-
-diff --git a/arch/arm/kernel/early_printk.c b/arch/arm/kernel/early_printk.c
-index 85aa2b2..46798d5 100644
---- a/arch/arm/kernel/early_printk.c
-+++ b/arch/arm/kernel/early_printk.c
-@@ -36,7 +36,7 @@ static struct console early_console = {
- 	.index =	-1,
- };
- 
--asmlinkage void early_printk(const char *fmt, ...)
-+void early_printk(const char *fmt, ...)
- {
- 	char buf[512];
- 	int n;
-diff --git a/arch/ia64/kvm/vmm.c b/arch/ia64/kvm/vmm.c
-index f0b9cac..40331ac 100644
---- a/arch/ia64/kvm/vmm.c
-+++ b/arch/ia64/kvm/vmm.c
-@@ -81,7 +81,7 @@ static void vcpu_debug_exit(struct kvm_vcpu *vcpu)
- 	local_irq_restore(psr);
- }
- 
--asmlinkage int printk(const char *fmt, ...)
-+int printk(const char *fmt, ...)
- {
- 	struct kvm_vcpu *vcpu = current_vcpu;
- 	va_list args;
-diff --git a/arch/x86/kernel/early_printk.c b/arch/x86/kernel/early_printk.c
-index cd28a35..b9b323a 100644
---- a/arch/x86/kernel/early_printk.c
-+++ b/arch/x86/kernel/early_printk.c
-@@ -173,7 +173,7 @@ static struct console early_serial_console = {
- static struct console *early_console = &early_vga_console;
- static int __initdata early_console_initialized;
- 
--asmlinkage void early_printk(const char *fmt, ...)
-+void early_printk(const char *fmt, ...)
- {
- 	char buf[512];
- 	int n;
-diff --git a/include/linux/printk.h b/include/linux/printk.h
-index 3736545..e52bc4b 100644
---- a/include/linux/printk.h
-+++ b/include/linux/printk.h
-@@ -90,16 +90,16 @@ int no_printk(const char *fmt, ...)
- 	return 0;
- }
- 
--extern asmlinkage __attribute__ ((format (printf, 1, 2)))
-+extern __attribute__ ((format (printf, 1, 2)))
- void early_printk(const char *fmt, ...);
- 
- extern int printk_needs_cpu(int cpu);
- extern void printk_tick(void);
- 
- #ifdef CONFIG_PRINTK
--asmlinkage __attribute__ ((format (printf, 1, 0)))
-+__attribute__ ((format (printf, 1, 0)))
- int vprintk(const char *fmt, va_list args);
--asmlinkage __attribute__ ((format (printf, 1, 2))) __cold
-+__attribute__ ((format (printf, 1, 2))) __cold
- int printk(const char *fmt, ...);
- 
- /*
-diff --git a/kernel/printk.c b/kernel/printk.c
-index da8ca81..735056c 100644
---- a/kernel/printk.c
-+++ b/kernel/printk.c
-@@ -46,7 +46,7 @@
- /*
-  * Architectures can override it:
-  */
--void asmlinkage __attribute__((weak)) early_printk(const char *fmt, ...)
-+void __attribute__((weak)) early_printk(const char *fmt, ...)
- {
- }
- 
-@@ -704,7 +704,7 @@ static int have_callable_console(void)
-  * See the vsnprintf() documentation for format string extensions over C99.
-  */
- 
--asmlinkage int printk(const char *fmt, ...)
-+int printk(const char *fmt, ...)
- {
- 	va_list args;
- 	int r;
-@@ -794,7 +794,7 @@ static inline void printk_delay(void)
- 	}
- }
- 
--asmlinkage int vprintk(const char *fmt, va_list args)
-+int vprintk(const char *fmt, va_list args)
- {
- 	int printed_len = 0;
- 	int current_log_level = default_message_loglevel;
--- 
-1.7.4.rc3
+Nicholas
