@@ -1,267 +1,301 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 25 May 2011 15:33:51 -0700
-Subject: [PATCH 07/15] OMAP: GPIO: handle save/restore ctx in GPIO driver
-In-Reply-To: <1306247094-25372-8-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Tue, 24 May 2011 19:54:46 +0530")
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-8-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87ipsypfzk.fsf@ti.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 25 May 2011 23:57:33 +0200
+Subject: [PATCH v4 12/12] mmc: add handling for two parallel block requests in
+	issue_rw_rq
+In-Reply-To: <1306360653-6196-1-git-send-email-per.forlin@linaro.org>
+References: <1306360653-6196-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <1306360653-6196-13-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Change mmc_blk_issue_rw_rq() to become asynchronous.
+The execution flow looks like this:
+The mmc-queue calls issue_rw_rq(), which sends the request
+to the host and returns back to the mmc-queue. The mmc-queue calls
+issue_rw_rq() again with a new request. This new request is prepared,
+in isuue_rw_rq(), then it waits for the active request to complete before
+pushing it to the host. When to mmc-queue is empty it will call
+isuue_rw_rq() with req=NULL to finish off the active request
+without starting a new request.
 
-> From: Charulatha V <charu@ti.com>
->
-> Modify omap_gpio_prepare_for_idle() & omap_gpio_resume_after_idle()
-> functions to handle save context & restore context respectively in the
-> OMAP GPIO driver itself instead of calling these functions from pm specific
-> files. For this, in gpio_prepare_for_idle(), use
-> omap_device_get_context_loss_count() and in gpio_resume_after_idle()
-> call it again. If the count is different, do restore context.
->
-> context lost count is modified in omap_sram_idle() path when
-> pwrdm_post_transition() is called. But pwrdm_post_transition() is called
-> only after omap_gpio_resume_after_idle() is called. Hence correct this
-> so that context lost count is modified before calling
-> omap_gpio_resume_after_idle().
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+---
+ drivers/mmc/card/block.c |  118 ++++++++++++++++++++++++++++++++-------------
+ drivers/mmc/card/queue.c |   17 +++++--
+ drivers/mmc/card/queue.h |    1 +
+ 3 files changed, 97 insertions(+), 39 deletions(-)
 
-This change to modify where pwrdm_post_transition() is called should be
-separated out into a dedicated patch. 
-
-> omap_gpio_prepare_for_idle() & omap_gpio_resume_after_idle()
-> do nothing if none of the GPIOs in a bank is being used.
->
-> Also remove usage of cpu_is_* checks from the above mentioned
-> functions and fix the multi-line comment style
->
-> Signed-off-by: Charulatha V <charu@ti.com>
-> ---
->  arch/arm/mach-omap2/pm34xx.c           |   22 +----
->  arch/arm/plat-omap/include/plat/gpio.h |    2 -
->  drivers/gpio/gpio_omap.c               |  138 +++++++++++++++++---------------
->  3 files changed, 78 insertions(+), 84 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-> index 0c5e3a4..682d147 100644
-> --- a/arch/arm/mach-omap2/pm34xx.c
-> +++ b/arch/arm/mach-omap2/pm34xx.c
-> @@ -91,16 +91,6 @@ static struct powerdomain *mpu_pwrdm, *neon_pwrdm;
->  static struct powerdomain *core_pwrdm, *per_pwrdm;
->  static struct powerdomain *cam_pwrdm;
->  
-> -static inline void omap3_per_save_context(void)
-> -{
-> -	omap_gpio_save_context();
-> -}
-> -
-> -static inline void omap3_per_restore_context(void)
-> -{
-> -	omap_gpio_restore_context();
-> -}
-> -
->  static void omap3_enable_io_chain(void)
->  {
->  	int timeout = 0;
-> @@ -395,8 +385,10 @@ void omap_sram_idle(void)
->  	if (!is_suspending())
->  		if (per_next_state < PWRDM_POWER_ON ||
->  		    core_next_state < PWRDM_POWER_ON)
-> -			if (!console_trylock())
-> +			if (!console_trylock()) {
-> +				pwrdm_post_transition();
->  				goto console_still_active;
-> +			}
-
-Rather than having to add an extra post_transition call, I think i best
-to move the pre_transition call down to just before the following 
-/* PER */ block.
-
->  
->  	/* PER */
->  	if (per_next_state < PWRDM_POWER_ON) {
-> @@ -404,8 +396,6 @@ void omap_sram_idle(void)
->  		omap_uart_prepare_idle(2);
->  		omap_uart_prepare_idle(3);
->  		omap2_gpio_prepare_for_idle(per_going_off);
-> -		if (per_next_state == PWRDM_POWER_OFF)
-> -				omap3_per_save_context();
->  	}
->  
->  	/* CORE */
-> @@ -467,12 +457,12 @@ void omap_sram_idle(void)
->  	}
->  	omap3_intc_resume_idle();
->  
-> +	pwrdm_post_transition();
-> +
->  	/* PER */
->  	if (per_next_state < PWRDM_POWER_ON) {
->  		per_prev_state = pwrdm_read_prev_pwrst(per_pwrdm);
->  		omap2_gpio_resume_after_idle();
-> -		if (per_prev_state == PWRDM_POWER_OFF)
-> -			omap3_per_restore_context();
->  		omap_uart_resume_idle(2);
->  		omap_uart_resume_idle(3);
->  	}
-> @@ -490,8 +480,6 @@ console_still_active:
->  		omap3_disable_io_chain();
->  	}
->  
-> -	pwrdm_post_transition();
-> -
->  	clkdm_allow_idle(mpu_pwrdm->pwrdm_clkdms[0]);
->  }
->  
-> diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-> index 64b1ee7..5718a45 100644
-> --- a/arch/arm/plat-omap/include/plat/gpio.h
-> +++ b/arch/arm/plat-omap/include/plat/gpio.h
-> @@ -209,8 +209,6 @@ extern void omap2_gpio_prepare_for_idle(int off_mode);
->  extern void omap2_gpio_resume_after_idle(void);
->  extern void omap_set_gpio_debounce(int gpio, int enable);
->  extern void omap_set_gpio_debounce_time(int gpio, int enable);
-> -extern void omap_gpio_save_context(void);
-> -extern void omap_gpio_restore_context(void);
->  /*-------------------------------------------------------------------------*/
->  
->  /* Wrappers for "new style" GPIO calls, using the new infrastructure
-> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-> index 9d55b7d..bc02ec5 100644
-> --- a/drivers/gpio/gpio_omap.c
-> +++ b/drivers/gpio/gpio_omap.c
-> @@ -22,6 +22,8 @@
->  #include <linux/slab.h>
->  #include <linux/pm_runtime.h>
->  
-> +#include <plat/omap_device.h>
-> +
-
-Should not be needed.  More on this below.
-
->  #include <mach/hardware.h>
->  #include <asm/irq.h>
->  #include <mach/irqs.h>
-> @@ -72,6 +74,7 @@ struct gpio_bank {
->  	bool loses_context;
->  	int stride;
->  	u32 width;
-> +	u32 ctx_lost_cnt_before;
-
-Please call this ctx_loss_count.
-
->  	u16 id;
->  
->  	void (*set_dataout)(struct gpio_bank *bank, int gpio, int enable);
-> @@ -1310,6 +1313,9 @@ static struct sys_device omap_gpio_device = {
->  
->  #ifdef CONFIG_ARCH_OMAP2PLUS
->  
-> +static void omap_gpio_save_context(struct gpio_bank *bank);
-> +static void omap_gpio_restore_context(struct gpio_bank *bank);
-> +
->  static int workaround_enabled;
->  
->  void omap2_gpio_prepare_for_idle(int off_mode)
-> @@ -1318,6 +1324,7 @@ void omap2_gpio_prepare_for_idle(int off_mode)
->  	struct gpio_bank *bank;
->  
->  	list_for_each_entry(bank, &omap_gpio_list, node) {
-> +		struct platform_device *pdev;
->  		u32 l1 = 0, l2 = 0;
->  		int j;
->  
-> @@ -1334,7 +1341,7 @@ void omap2_gpio_prepare_for_idle(int off_mode)
->  		 * non-wakeup GPIOs.  Otherwise spurious IRQs will be
->  		 * generated.  See OMAP2420 Errata item 1.101. */
->  		if (!(bank->enabled_non_wakeup_gpios))
-> -			continue;
-> +			goto save_gpio_ctx;
->  
->  		if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
->  			bank->saved_datain = __raw_readl(bank->base +
-> @@ -1372,6 +1379,12 @@ void omap2_gpio_prepare_for_idle(int off_mode)
->  		}
->  
->  		c++;
-> +
-> +save_gpio_ctx:
-> +		pdev = to_platform_device(bank->dev);
-> +		bank->ctx_lost_cnt_before =
-> +				omap_device_get_context_loss_count(pdev);
-
-Drivers should not be directly calling omap_device APIs.  Instead,
-drivers should use a pdata function pointer to call device specific
-code for getting context loss.  See OMAP HSMMC driver for an example on
-how this is done.
-
-> +		omap_gpio_save_context(bank);
->  	}
->  	if (!c) {
->  		workaround_enabled = 0;
-> @@ -1385,6 +1398,8 @@ void omap2_gpio_resume_after_idle(void)
->  	struct gpio_bank *bank;
->  
->  	list_for_each_entry(bank, &omap_gpio_list, node) {
-> +		u32 ctx_lost_cnt_after;
-> +		struct platform_device *pdev;
->  		u32 l = 0, gen, gen0, gen1;
->  		int j;
->  
-> @@ -1394,11 +1409,17 @@ void omap2_gpio_resume_after_idle(void)
->  		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
->  			clk_enable(bank->dbck);
->  
-> -		if (!workaround_enabled)
-> +		pdev = to_platform_device(bank->dev);
-> +		ctx_lost_cnt_after = omap_device_get_context_loss_count(pdev);
-> +
-> +		if (ctx_lost_cnt_after == bank->ctx_lost_cnt_before)
->  			continue;
->  
-> +		if (!workaround_enabled)
-> +			goto restore_gpio_ctx;
-
-Now that these functions are all bank-specific, this
-'workaround_enabled' flag should be made per-bank.
-
-That being said, do we even need this flag?  I think that the
-combination of enabled_non_wakeup_gpios and whether or not context has
-been lost reflects the same condition.
-
->  		if (!(bank->enabled_non_wakeup_gpios))
-> -			continue;
-> +			goto restore_gpio_ctx;
->  
->  		if (cpu_is_omap24xx() || cpu_is_omap34xx()) {
->  			__raw_writel(bank->saved_fallingdetect,
-> @@ -1472,117 +1493,104 @@ void omap2_gpio_resume_after_idle(void)
->  						OMAP4_GPIO_LEVELDETECT1);
->  			}
->  		}
-> +
-> +restore_gpio_ctx:
-> +		omap_gpio_restore_context(bank);
-
-After considering the placement of the restore context here, I don't
-think it's quite right.  It is equivalent to current behavior, but I'm
-having a hard time understanding how current behavior is actually
-working.
-
-Consider the sequence
-
-- prepare for idle
-- remove triggering
-  - save edge-detect registers, then modify them to "workaround" values
-- save context (w/ "workaround" edge-detect register values
-- WFI, off-mode hit
-- wakeup, resume from idle
-- write "saved" values to edge-detect registers
-- restore context
-  - here the "workaround" values from the saved context are restored !!!
-    so the "saved" values are now lost.
-
-For this to be symmetric with the save, I think the restore context
-should come before handling the workaround/hack.
-
-Kevin
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 1c0b077..72f2362 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -81,6 +81,7 @@ static DEFINE_MUTEX(open_lock);
+ 
+ enum mmc_blk_status {
+ 	MMC_BLK_SUCCESS = 0,
++	MMC_BLK_PARTIAL,
+ 	MMC_BLK_RETRY,
+ 	MMC_BLK_DATA_ERR,
+ 	MMC_BLK_CMD_ERR,
+@@ -331,14 +332,16 @@ out:
+ 	return err ? 0 : 1;
+ }
+ 
+-static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+-					     struct request *req,
+-					     struct mmc_card *card,
+-					     struct mmc_blk_data *md)
++static int mmc_blk_err_check(struct mmc_card *card,
++			     struct mmc_async_req *areq)
+ {
+ 	struct mmc_command cmd;
+ 	u32 status = 0;
+ 	enum mmc_blk_status ret = MMC_BLK_SUCCESS;
++	struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
++						    mmc_active);
++	struct mmc_blk_request *brq = &mq_mrq->brq;
++	struct request *req = mq_mrq->req;
+ 
+ 	/*
+ 	 * Check for errors here, but don't jump to cmd_err
+@@ -422,9 +425,12 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+ 		else
+ 			ret = MMC_BLK_CMD_ERR;
+ 	}
++
++	if (ret == MMC_BLK_SUCCESS &&
++	    blk_rq_bytes(req) != brq->data.bytes_xfered)
++		ret = MMC_BLK_PARTIAL;
+  out:
+ 	return ret;
+-
+ }
+ 
+ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
+@@ -513,29 +519,62 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
+ 		brq->data.sg_len = i;
+ 	}
+ 
++	mqrq->mmc_active.mrq = &brq->mrq;
++	mqrq->mmc_active.err_check = mmc_blk_err_check;
++
+ 	mmc_queue_bounce_pre(mqrq);
+ }
+ 
+-static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
++static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
+ {
+ 	struct mmc_blk_data *md = mq->data;
+ 	struct mmc_card *card = md->queue.card;
+-	struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
+-	int ret = 1, disable_multi = 0;
++	struct mmc_blk_request *brq;
++	int ret = 1;
++	int disable_multi = 0;
+ 	enum mmc_blk_status status;
++	struct mmc_queue_req *mq_rq;
++	struct request *req;
++	struct mmc_async_req *areq;
+ 
+-	mmc_claim_host(card->host);
++	if (!rqc && !mq->mqrq_prev->req)
++		goto out;
++
++	if (rqc && !mq->mqrq_prev->req)
++		mmc_claim_host(card->host);
+ 
+ 	do {
+-		mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
+-		mmc_wait_for_req(card->host, &brq->mrq);
++		if (rqc) {
++			mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
++			areq = &mq->mqrq_cur->mmc_active;
++		} else
++			areq = NULL;
++		areq = mmc_start_req(card->host, areq, (int *) &status);
++		if (!areq)
++			goto out;
+ 
+-		mmc_queue_bounce_post(mq->mqrq_cur);
+-		status = mmc_blk_err_check(brq, req, card, md);
++		mq_rq = container_of(areq, struct mmc_queue_req, mmc_active);
++		brq = &mq_rq->brq;
++		req = mq_rq->req;
++		mmc_queue_bounce_post(mq_rq);
+ 
+ 		switch (status) {
+-		case MMC_BLK_CMD_ERR:
+-			goto cmd_err;
++		case MMC_BLK_SUCCESS:
++		case MMC_BLK_PARTIAL:
++			/*
++			 * A block was successfully transferred.
++			 */
++			spin_lock_irq(&md->lock);
++			ret = __blk_end_request(req, 0,
++						brq->data.bytes_xfered);
++			spin_unlock_irq(&md->lock);
++			if (status == MMC_BLK_SUCCESS && ret) {
++				/* If this happen it is a bug */
++				printk(KERN_ERR "%s BUG rq_tot %d d_xfer %d\n",
++				       __func__, blk_rq_bytes(req),
++				       brq->data.bytes_xfered);
++				goto cmd_err;
++			}
+ 			break;
+ 		case MMC_BLK_RETRY:
+ 			disable_multi = 1;
+@@ -548,38 +587,44 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
+ 			 * read a single sector.
+ 			 */
+ 			spin_lock_irq(&md->lock);
+-			ret = __blk_end_request(req, -EIO,
+-						brq->data.blksz);
++			ret = __blk_end_request(req, -EIO, brq->data.blksz);
+ 			spin_unlock_irq(&md->lock);
+-
++			if (!ret)
++				goto start_new_req;
+ 			break;
+-		case MMC_BLK_SUCCESS:
++		case MMC_BLK_CMD_ERR:
++			ret = 1;
++			goto cmd_err;
++			break;
++		}
++
++		if (ret) {
+ 			/*
+-			 * A block was successfully transferred.
++			 * In case of a none complete request
++			 * prepare it again and resend.
+ 			 */
+-			spin_lock_irq(&md->lock);
+-			ret = __blk_end_request(req, 0, brq->data.bytes_xfered);
+-			spin_unlock_irq(&md->lock);
+-			break;
++			mmc_blk_rw_rq_prep(mq_rq, card, disable_multi, mq);
++			mmc_start_req(card->host, &mq_rq->mmc_active, NULL);
+ 		}
+ 	} while (ret);
+ 
+-	mmc_release_host(card->host);
++	if (!rqc)
++		mmc_release_host(card->host);
+ 
+ 	return 1;
+-
++ out:
++	return 0;
+  cmd_err:
+- 	/*
+- 	 * If this is an SD card and we're writing, we can first
+- 	 * mark the known good sectors as ok.
+- 	 *
++	/*
++	 * If this is an SD card and we're writing, we can first
++	 * mark the known good sectors as ok.
++	 *
+ 	 * If the card is not SD, we can still ok written sectors
+ 	 * as reported by the controller (which might be less than
+ 	 * the real number of written sectors, but never more).
+ 	 */
+ 	if (mmc_card_sd(card)) {
+ 		u32 blocks;
+-
+ 		blocks = mmc_sd_num_wr_blocks(card);
+ 		if (blocks != (u32)-1) {
+ 			spin_lock_irq(&md->lock);
+@@ -592,19 +637,24 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
+ 		spin_unlock_irq(&md->lock);
+ 	}
+ 
+-	mmc_release_host(card->host);
+-
+ 	spin_lock_irq(&md->lock);
+ 	while (ret)
+ 		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
+ 	spin_unlock_irq(&md->lock);
+ 
++ start_new_req:
++	if (rqc) {
++		mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
++		mmc_start_req(card->host, &mq->mqrq_cur->mmc_active, NULL);
++	} else
++		mmc_release_host(card->host);
++
+ 	return 0;
+ }
+ 
+ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
+ {
+-	if (req->cmd_flags & REQ_DISCARD) {
++	if (req && req->cmd_flags & REQ_DISCARD) {
+ 		if (req->cmd_flags & REQ_SECURE)
+ 			return mmc_blk_issue_secdiscard_rq(mq, req);
+ 		else
+diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
+index eef3510..d4fffb7 100644
+--- a/drivers/mmc/card/queue.c
++++ b/drivers/mmc/card/queue.c
+@@ -52,6 +52,7 @@ static int mmc_queue_thread(void *d)
+ 	down(&mq->thread_sem);
+ 	do {
+ 		struct request *req = NULL;
++		struct mmc_queue_req *tmp;
+ 
+ 		spin_lock_irq(q->queue_lock);
+ 		set_current_state(TASK_INTERRUPTIBLE);
+@@ -59,7 +60,10 @@ static int mmc_queue_thread(void *d)
+ 		mq->mqrq_cur->req = req;
+ 		spin_unlock_irq(q->queue_lock);
+ 
+-		if (!req) {
++		if (req || mq->mqrq_prev->req) {
++			set_current_state(TASK_RUNNING);
++			mq->issue_fn(mq, req);
++		} else {
+ 			if (kthread_should_stop()) {
+ 				set_current_state(TASK_RUNNING);
+ 				break;
+@@ -67,11 +71,14 @@ static int mmc_queue_thread(void *d)
+ 			up(&mq->thread_sem);
+ 			schedule();
+ 			down(&mq->thread_sem);
+-			continue;
+ 		}
+-		set_current_state(TASK_RUNNING);
+ 
+-		mq->issue_fn(mq, req);
++		/* Current request becomes previous request and vice versa. */
++		mq->mqrq_prev->brq.mrq.data = NULL;
++		mq->mqrq_prev->req = NULL;
++		tmp = mq->mqrq_prev;
++		mq->mqrq_prev = mq->mqrq_cur;
++		mq->mqrq_cur = tmp;
+ 	} while (1);
+ 	up(&mq->thread_sem);
+ 
+@@ -97,7 +104,7 @@ static void mmc_request(struct request_queue *q)
+ 		return;
+ 	}
+ 
+-	if (!mq->mqrq_cur->req)
++	if (!mq->mqrq_cur->req && !mq->mqrq_prev->req)
+ 		wake_up_process(mq->thread);
+ }
+ 
+diff --git a/drivers/mmc/card/queue.h b/drivers/mmc/card/queue.h
+index 0e65807..62c27f8 100644
+--- a/drivers/mmc/card/queue.h
++++ b/drivers/mmc/card/queue.h
+@@ -18,6 +18,7 @@ struct mmc_queue_req {
+ 	char			*bounce_buf;
+ 	struct scatterlist	*bounce_sg;
+ 	unsigned int		bounce_sg_len;
++	struct mmc_async_req	mmc_active;
+ };
+ 
+ struct mmc_queue {
+-- 
+1.7.4.1
