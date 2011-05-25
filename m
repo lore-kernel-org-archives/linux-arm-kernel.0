@@ -1,67 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 May 2011 10:23:44 +0200
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <201105181047.17309.arnd@arndb.de>
-References: <201105181047.17309.arnd@arndb.de>
-Message-ID: <20110525082344.GF22096@pengutronix.de>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 25 May 2011 13:30:03 +0530
+Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
+References: <cover.1306082097.git.mika.westerberg@iki.fi>
+	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
+Message-ID: <1306310403.30236.94.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 10:47:16AM +0200, Arnd Bergmann wrote:
-> This is the draft plan for maintaining the ARM subarchitectures in a common
-> tree, as a way to help coordinate the upstream merging of the
-> arch/arm/{plat,mach}-* changes into Linus' tree.
+On Sun, 2011-05-22 at 20:03 +0300, Mika Westerberg wrote:
+> The ep93xx DMA controller has 10 independent memory to peripheral (M2P)
+> channels, and 2 dedicated memory to memory (M2M) channels. M2M channels can
+> also be used by SPI and IDE to perform DMA transfers to/from their memory
+> mapped FIFOs.
 > 
-> This was discussed in great length at the Linaro Developer Summit in Budapest
-> last week where we worked out an initial plan. We are modeling the maintainance
-> after how the linux-tip tree is used for the x86 architecture, with a set
-> of developers that have commit access to one tree on kernel.org and
-> have mutual trust in one another. Nicolas Pitre and me are funded
-> by Linaro to do the bulk of the work, while Thomas Gleixner will help
-> us part-time with his long time architecture maintainance experience.
-> Despite the funding by Linaro, this is not a Linaro project and all
-> ARM subarchitectures are welcome to go through our tree.
+> This driver supports both M2P and M2M channels with DMA_SLAVE, DMA_CYCLIC and
+> DMA_MEMCPY (M2M only) capabilities.
 > 
-> Russell King's role as ARM maintainer is of course unchanged by this, but
-> he has the same commit access to the new tree as the other maintainers and
-> is welcome to work in the same tree. We are also open to nominations for
-> further people outside of Linaro to join us as committers. Marc Zyngier from
-> ARM ltd is one of the candidates that has been suggested and I would also
-> like to see someone from Google. We have to find the right balance with the
-> number of committers so we get all the work done without stepping on each
-> other's toes.
-> 
-> Our tree will be strictly organized in topic brances so we can feed them
-> upstream in the bitesized chunks that Linus likes. The master branch
-> is an integration branch that pulls all other branches that are scheduled
-> for the next merge window and itself gets integrated into linux-next.
-> 
-> We will probably not be fully functional during the 2.6.40 merge window,
-> but we are trying our best to be useful. For 2.6.41, my hope is that
-> we can merge the bulk of the ARM subarchitecture changes through this
-> tree. Once Linus is happy with the way that the process works, we can
-> mandate that all ARM subarchitecture changes go through our tree, until
-> then it stays voluntary.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> 
-> ---
-> 
-> Maintainers: If you are happy with the layout of the process,
-> please ack this patch, otherwise please comment.
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-As Freescale i.MX maintainer:
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
+Which tree are these patches going thru?
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+~Vinod
