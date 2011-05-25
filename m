@@ -1,142 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2011 08:51:03 +0200
-Subject: CSR ARM SoC Subarchitecture preview
-In-Reply-To: <BANLkTikfje67KyyD+7Pn0D=afTyEde0euw@mail.gmail.com>
-References: <BANLkTikfje67KyyD+7Pn0D=afTyEde0euw@mail.gmail.com>
-Message-ID: <201105250851.03665.arnd@arndb.de>
+From: javier.martin@vista-silicon.com (javier Martin)
+Date: Wed, 25 May 2011 09:00:21 +0200
+Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
+In-Reply-To: <551158.38796.qm@web112009.mail.gq1.yahoo.com>
+References: <551158.38796.qm@web112009.mail.gq1.yahoo.com>
+Message-ID: <BANLkTi=7mssSFd=HYwVReoKw6VEC_Qvs0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 May 2011 04:15:12 Barry Song wrote:
+Please, do not remove anyone from the CC list.
 
-> >>  mach-prima2/include/mach/system.h                            |    5
-> >>  mach-prima2/include/mach/timex.h                             |    5
-> >>  mach-prima2/include/mach/uncompress.h                        |   45
-> >>  mach-prima2/include/mach/vmalloc.h                           |   19
-> >>  mach-prima2/lcdinit.c                                        |  136
-> >>  mach-prima2/mach-prima2cb.c                                  |  226 +
-> >>  mach-prima2/padmode.c                                        |  139
-> >>  mach-prima2/prima2.c                                         |   81
-> >>  mach-prima2/prima2cb-keypad.c                                |  136
-> >>  mach-prima2/pwrc.c                                           |  286 +
-> >>  mach-prima2/tsc2100_dev.c                                    |  137
-> >
-> > Any drivers in here should get moved to a proper place in drivers/*/
-> > eventually, out of the subarchitecture code.
-> 
-> things related with driver framework/callbacks will be moved out.
-> platform_device data/hardware-related callbacks will be kept. but if
-> device tree supports platform_device data/callbacks good, i will take
-> a look whether we can delete as many as possible.
+On 25 May 2011 05:45, Chris Rodley <carlighting@yahoo.co.nz> wrote:
+> Hi,
+>
+> Have upgraded the driver to Javier's latest RFC driver.
+> Still having problems viewing output.
+>
+> Setting up with:
+> # media-ctl -r -l '"mt9p031 2-0048":0->"OMAP3 ISP CCDC":0[1], "OMAP3 ISP CCDC":1->"OMAP3 ISP CCDC output":0[1]'
+> Resetting all links to inactive
+> Setting up link 16:0 -> 5:0 [1]
+> Setting up link 5:1 -> 6:0 [1]
+>
+> # media-ctl -f '"mt9p031 2-0048":0[SGRBG12 320x240], "OMAP3 ISP CCDC":0[SGRBG8 320x240], "OMAP3 ISP CCDC":1[SGRBG8 320x240]'
+> Setting up format SGRBG12 320x240 on pad mt9p031 2-0048/0
+> Format set: SGRB
+> Setting up format SGRBG12 320x240 on pad OMAP3 ISP CCDC/0
+> Format set: SGRBG12 320x240
+> Setting up format SGRBG8 320x240 on pad OMAP3 ISP CCDC/0
+> Format set: SGRBG8 320x240
+> Setting up format SGRBG8 320x240 on pad OMAP3 ISP CCDC/1
+> Format set: SGRBG8 320x240
+>
+> Then:
+> # yavta -f SGRBG8 -s 320x240 -n 4 --capture=100 -F /dev/video2
+> Device /dev/video2 opened.
+> Device `OMAP3 ISP CCDC output' on `media' is a video capture device.
+> Video format set: width: 320 height: 240 buffer size: 76800
+> Video format: GRBG (47425247) 320x240
+> 4 buffers requested.
+> length: 76800 offset: 0
+> Buffer 0 mapped at address 0x4006c000.
+> length: 76800 offset: 77824
+> Buffer 1 mapped at address 0x40222000.
+> length: 76800 offset: 155648
+> Buffer 2 mapped at address 0x4025e000.
+> length: 76800 offset: 233472
+> Buffer 3 mapped at address 0x402f0000.
+>
+> After this it hangs and will exit on 'ctrl c':
+> omap3isp omap3isp: CCDC stop timeout!
+>
+> Any ideas what is causing this problem?
+>
 
-Regarding platform data, the ideal case would be to not pass any,
-and have the driver itself enquire the settings by looking at device
-tree properties. There may be a few cases where that is not possible,
-or where a callback into platform code ends up simplifying things
-significantly, but that should stay the exception.
+No idea,
+it works for me. Note you have to apply RFC + PATCH v2 2/2. Please,
+double check.
 
-> > It's not clear yet what will happen in the long run to the split between
-> > mach-* and plat-* directories. Ideally, we would not need them to be
-> > separate if we can completely abstract the SoCs within their broader
-> > families, but we might not get that far before you merge your platform.
-> 
-> before prima2 SoC, we have mach-atlas4,  mach-atlas5 and mach-prima.
-> after prima2, we will have mach-atlas6. many ip cores are shared
-> between these SoCs, then there is a plat.
-> but we will not maintain old mach-atlas4,  mach-atlas5 and mach-prima
-> for the current and future kernel. the new mach-atlas6 is the coming
-> SoC we will upstream after mach-prima2.
+Also, if you have problems with last RFC patch you should answer RFC
+mail. Not this one.
 
-Ok, makes sense. It may be possible that after you have done all the
-work to convert prima2 to device tree, it will become trivial to support
-the older SoCs as well, but starting with prima2 as you say makes a lot
-of sense.
+Thank you.
 
-> > What other mach-* do you expect to see in the future using plat-sirfsoc,
-> > and how similar are they to prima2?
-> 
-> plat-sirfsoc should be things shared by mach-prima2/mach-atlas6 and
-> other future SoCs.
-
-I see. Note that in the long run, we definitely want to have the option
-to build kernel binaries across different SoC families. It would be
-good to make sure you don't have arbitrary differences in the mach-*
-implementation that get in the way of that later. If prima2 and atlas6
-turn out very similar in the end, it may be best to fold all them together
-with plat-sirfsoc into a single directory. E.g. the TI omap2/3/4
-platforms have all been merged into mach-omap2, despite being
-rather different.
-
-> >> for drivers/:
-> >>  Kconfig                             |    2
-> >>  Makefile                            |    1
-> >>  char/sirfsoc_gps.c                  |  878 +++++++++++++
-> >>  char/sirfsoc_gpsdrv.h               |  134 +
-> >>  input/misc/gpio_event.c             |  253 +++
-> >
-> > A new user space interface is always hard to establish. If you want these
-> > to get in, you should start way ahead of the other drivers that simply
-> > implement an existing interface.
-> >
-> > If the gps driver is just a tty device like a serial port, it should
-> > now be moved into drivers/tty.
-> 
-> most GPS are /dev/ttySn to userspace, they are connected to SoC by
-> uart.  DSP is one of CSR's main product lines. An internal DSP in SoC
-> handles GPS and we use this driver to communicate with the DSP. i will
-> take a look whether we can have better framework than a simple char
-> device.
-
->From the little I know about GPS, the controllers have a fairly standardized
-serial port interface even across vendors. It would be good to be
-compatible with the existing ones there, e.g. bluetooth or serial GPS that
-all provide a tty interface. If your's is very different and has a
-high-level API, you might want to create a new drivers/gps/ subsystem
-with an architected user interface that works with both your own
-implementation and the serial ones.
-Turning a tty into a high-level interface is normally done using a new tty
-line discipline, similar to how PPP or CAN work over serial lines.
-
-> >>  nanddisk/Kconfig                    |   17
-> >>  nanddisk/Makefile                   |    5
-> >>  nanddisk/nand.c                     |  937 +++++++++++++
-> >>  nanddisk/nanddisk.h                 |  702 ++++++++++
-> >
-> > How does this relate to drivers/mtd?
-> 
-> that is a big issue to upstream. CSR built a NTFL supporting both
-> WINCE/Linux with good performance and proved reliable products. the
-> NTFL is a binary. NAND disk is a up level block driver to call API in
-> the NTFL binary.
-
-Ok, no need to forward port or submit that driver for inclusion then.
-
-> that makes the NAND related codes very difficult to be accepted since
-> it is completely not based on MTD. i hope we can also have a MTD based
-> driver and compare the performance of  UBI on MTD and current
-> solution.
-
-Right, an MTD driver would be required for anyone to build products
-with the mainline kernel, so that sounds like an important thing to
-do. Comparing performance is also always good, so if you find that
-UBI or the FTL in the kernel are lacking there, the MTD maintainers
-will definitely want to know about that.
-
-> >>  video/Kconfig                       |   24
-> >>  video/Makefile                      |    2
-> >>  video/backlight/Makefile            |    1
-> >>  video/sirfsoc_clcdc.h               |  269 ++++
-> >>  video/sirfsoc_fb.c                  | 2369 +++++++++++++++++++++++++++++++++++
-> >>  video/sirfsoc_vpp.c                 | 1166 +++++++++++++++++
-> >
-> > Have you considered doing a KMS device driver instead of an old-style
-> > frame buffer?
-> 
-> it depends on the whole schedule and resources of the related teams.
-> i'd like to see the stronger KMS driver.
-
-There is definitely a trend towards KMS drivers, but no clear mandate yet.
-If you wait long enough, you may not have the choice any more as soon
-as KMS becomes a requirement for new display drivers.
-
-	Arnd
+-- 
+Javier Martin
+Vista Silicon S.L.
+CDTUC - FASE C - Oficina S-345
+Avda de los Castros s/n
+39005- Santander. Cantabria. Spain
++34 942 25 32 60
+www.vista-silicon.com
