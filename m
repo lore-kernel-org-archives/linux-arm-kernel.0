@@ -1,51 +1,42 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 May 2011 13:23:19 +0100
-Subject: [BUG]  "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <20110524213924.GO27634@elte.hu>
-References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
-	<1306272750.2497.79.camel@laptop>  <20110524213924.GO27634@elte.hu>
-Message-ID: <1306326199.27474.153.camel@e102391-lin.cambridge.arm.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 25 May 2011 14:39:47 +0200
+Subject: [PATCH 2/2] dmaengine: add TODO items for future work on dma
+	drivers
+In-Reply-To: <1306323570-11133-3-git-send-email-vinod.koul@intel.com>
+References: <1306323570-11133-1-git-send-email-vinod.koul@intel.com>
+	<1306323570-11133-3-git-send-email-vinod.koul@intel.com>
+Message-ID: <BANLkTikV3qT7owEuLmsGu+ORMNv77DgXSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-05-24 at 23:39 +0200, Ingo Molnar wrote:
-> * Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
-> 
-> > On Tue, 2011-05-24 at 19:13 +0100, Marc Zyngier wrote:
-> > > Peter,
-> > > 
-> > > I've experienced all kind of lock-ups on ARM SMP platforms recently, and
-> > > finally tracked it down to the following patch:
-> > > 
-> > > e4a52bcb9a18142d79e231b6733cabdbf2e67c1f [sched: Remove rq->lock from the first half of ttwu()].
-> > > 
-> > > Even on moderate load, the machine locks up, often silently, and
-> > > sometimes with a few messages like:
-> > > INFO: rcu_preempt_state detected stalls on CPUs/tasks: { 0} (detected by 1, t=12002 jiffies)
-> > > 
-> > > Another side effect of this patch is that the load average is always 0,
-> > > whatever load I throw at the system.
-> > > 
-> > > Reverting the sched changes up to that patch (included) gives me a
-> > > working system again, which happily survives parallel kernel
-> > > compilations without complaining.
-> > > 
-> > > My knowledge of the scheduler being rather limited, I haven't been able
-> > > to pinpoint the exact problem (though it probably have something to do
-> > > with __ARCH_WANT_INTERRUPTS_ON_CTXSW being defined on ARM). The enclosed
-> > > patch somehow papers over the load average problem, but the system ends
-> > > up locking up anyway:
-> > 
-> > Hurm.. I'll try and make x86 use __ARCH_WANT_INTERRUPTS_ON_CTXSW, IIRC
-> > Ingo once said that that is possible and try to see if I can reproduce.
-> > No clear ideas atm.
-> 
-> Yes, should be possible to just disable it on x86 - no further tricks needed. 
-> It's been a long time since i tested that though.
+On 25 May 2011 13:39, Koul, Vinod <vinod.koul@intel.com> wrote:
+> From: Vinod Koul <vinod.koul@intel.com>
+>
+> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+> ---
+> ?drivers/dma/TODO | ? 12 ++++++++++++
+> ?1 files changed, 12 insertions(+), 0 deletions(-)
+> ?create mode 100644 drivers/dma/TODO
+>
+> diff --git a/drivers/dma/TODO b/drivers/dma/TODO
+> new file mode 100644
+> index 0000000..b67d184
+> --- /dev/null
+> +++ b/drivers/dma/TODO
+> @@ -0,0 +1,12 @@
+> +TODO for slave dma
+> +
+> +1. Move remaining drivers to use new slave interface
+> +2. Remove old slave pointer machansim
+> +3. Make issue_pending to start the transaction in below drivers
+> + ? ? ? - mpc512x_dma
+> + ? ? ? - imx-dma
+> + ? ? ? - imx-sdma
+> + ? ? ? - mxs-dma.c
+> + ? ? ? - dw_dmac
+> + ? ? ? - intel_mid_dma
+> + ? ? ? - ste_dma40
+ste_dma40 already does this. At least is does so in 2.6.39. I may not
+be up to date of what is merged for 2.6.40.
 
-I can confirm this is SMP only. UP is fine. SMP+nosmp locks up as well.
-
-	M.
--- 
-Reality is an implementation detail.
+/Per
