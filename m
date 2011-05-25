@@ -1,169 +1,33 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 25 May 2011 08:23:12 +0200
-Subject: [PATCH 0/4] Add a generic struct clk
-In-Reply-To: <BANLkTinVnFasvOmu0MWRDzv21P3vM8eM6g@mail.gmail.com>
-References: <1305876469.325655.313573683829.0.gpush@pororo>
-	<BANLkTik=EFayZW61TgfOni-XML+tRLOcqw@mail.gmail.com>
-	<20110524062620.GA22096@pengutronix.de>
-	<BANLkTimEoCaKwJtpbQTDSEDydNkZ1BkKog@mail.gmail.com>
-	<20110524080936.GI20715@pengutronix.de>
-	<BANLkTinVnFasvOmu0MWRDzv21P3vM8eM6g@mail.gmail.com>
-Message-ID: <20110525062312.GE22096@pengutronix.de>
+From: hong.xu@atmel.com (Hong Xu)
+Date: Wed, 25 May 2011 14:31:41 +0800
+Subject: [PATCH] AT91: Add VSYNC pin definition for AT91SAM9263 silicon
+Message-ID: <1306305101-27285-1-git-send-email-hong.xu@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 12:41:20PM -0700, Colin Cross wrote:
-> On Tue, May 24, 2011 at 1:09 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> > On Tue, May 24, 2011 at 12:31:13AM -0700, Colin Cross wrote:
-> >> On Mon, May 23, 2011 at 11:26 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> >> > On Mon, May 23, 2011 at 04:12:24PM -0700, Colin Cross wrote:
-> >> >> >
-> >> >> > ? tglx's plan is to create a separate struct clk_hwdata, which contains a
-> >> >> > ? union of base data structures for common clocks: div, mux, gate, etc. The
-> >> >> > ? ops callbacks are passed a clk_hw, plus a clk_hwdata, and most of the base
-> >> >> > ? hwdata fields are handled within the core clock code. This means less
-> >> >> > ? encapsulation of clock implementation logic, but more coverage of
-> >> >> > ? clock basics through the core code.
-> >> >>
-> >> >> I don't think they should be a union, I think there should be 3
-> >> >> separate private datas, and three sets of clock ops, for the three
-> >> >> different types of clock blocks: rate changers (dividers and plls),
-> >> >> muxes, and gates. ?These blocks are very often combined - a device
-> >> >> clock often has a mux and a divider, and clk_set_parent and
-> >> >> clk_set_rate on the same struct clk both need to work.
-> >> >
-> >> > The idea is to being able to propagate functions to the parent. It's
-> >> > very convenient for the implementation of clocks when they only
-> >> > implement either a divider, a mux or a gate. Combining all of these
-> >> > into a single clock leads to complicated clock trees and many different
-> >> > clocks where you can't factor out the common stuff.
-> >>
-> >> That seems complicated. ?You end up with lots of extra clocks (meaning
-> >> more boilerplate in the platform files) that have no meaning in the
-> >> system (what is the clock between the mux and the divider in Tegra's
-> >> i2c1 clock, it can never feed any devices), and you have to figure out
-> >> at the framework level when to propagate and when to error out. ?I'm
-> >> not even sure you can always find the right place to stop propagating
-> >> - do you just keep going up until the set_parent callback succeeds, or
-> >> exists, or what?
-> >
-> > For the set_parent there would be no propagating at all. For set_rate I
-> > can imagine a flag in the generic clock which tells whether to propagate
-> > set_rate or not.
-> >
-> >>
-> >> I think you can still factor out all the common code if you treat each
-> >> clock as a possible mux, divider, and gate combination. ?Each part of
-> >> the clock is still just as abstractable as before - you can set the
-> >> rate_ops to be the generic single register divider implementation, and
-> >> the gate ops to be the generic single bit enable implementation. ?The
-> >> idea of what a clock node is matches the HW design,
-> >
-> > The hardware design consists of only discrete rate changers (plls,
-> > dividers), muxes and gates. These are the only building blocks
-> > *every* hardware design has. I believe that many of the problems
-> > the current implementations have are due to the multiple building
-> > blocks stuffed into one clock. If you haven't already take a look
-> > at my i.MX5 clock patches:
-> >
-> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/113631
-> >
-> > They need changes to fit onto the current patches and the rate
-> > propagation problem is not solved there, but the resulting clock
-> > data files are really short and nice to read. Furthermore it's easy
-> > to implement. Just look at the diagrams in the datasheet and go through
-> > them.
-> 
-> Propagation is what I'm trying simplify, because it's impossible at
-> the framework level to determine the right time to propagate, and the
-> right time to return an error, and I don't like pushing it down to
-> each clock implementation either, because then you need a "propagating
-> clk gate" and a "non-propagating clk gate".
+On Atmel's AT91SAM9263-EK board, the LCD panel does not need VSYNC
+signal. But this signal is useful for the boards from other
+vendors, as suggested by Nicholas Kinar.
 
-Or a single flag on either the gate/mux/div or in the clock framework.
+This small patch adds the VSYNC pin definition by default.
 
-> 
-> Your building blocks implement every op - clk_gate_ops implements
-> set_rate as clk_parent_set_rate (won't that cause a deadlock on
-> prepare_lock when it calls clk_set_rate?).  I'm suggesting breaking
-> out the clock gate ops into a struct that only contains:
-> enable
-> disable
-> prepare
-> unprepare
-> And a rate ops struct that contains:
-> round_rate
-> set_rate
+Reported-by: Nicholas Kinar <n.kinar@usask.ca>
+Signed-off-by: Hong Xu <hong.xu@atmel.com>
+---
+ arch/arm/mach-at91/at91sam9263_devices.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-+ get_rate?
-
-> And a mux ops struct that contains
-> set_parent
-> 
-> For a single HW clock that has a mux, a gate, and a divider, the
-> existing implementation requires:
-> INIT_CLK(..., clk_mux_ops)
-> INIT_CLK(..., clk_div_ops)
-> INIT_CLK(..., clk_gate_ops)
-> which creates 3 clocks, and requires lots of propagation logic to
-> figure out how to call clk_set_rate on the single clock that is
-> exposed to the device, but not propagate it past the device clock if
-> the device clock doesn't have a divider (propagating it up to an
-> active pll feeding other devices results in disaster, at least on
-> Tegra).  This combination doesn't seem to be common in your MX code,
-> but _every_ Tegra device clock has these three parts.
-
-Lucky you. Maybe the Tegra hardware designers have better drugs or just
-take less of them...
-
-> 
-> With multiple smaller building blocks that can fit inside a clock, all
-> you need is:
-> INIT_CLK(..., clk_mux_ops, clk_div_ops, clk_gate_ops)
-> You have one struct clk, which is exposed to the device and matches
-> the datasheet.  If the clock has rate ops, clk_set_rate works with no
-> propagation.
-
-No, we have cascaded dividers and thus still need rate propagation.
-Also we have the situation where a device is not allowed to adjust the
-divider because other clocks are derived from the same divider. Still
-the driver needs the rate. Here's an example from the i.MX51
-(simplified):
-
--> PLL ----> divider -----> gate ---> MMC1
-                     \
-                      \
-                       ---> gate ---> MMC2
-
-Neither MMC1 nor MMC2 can be allowed to change the rate because it would
-change the rate of the other MMC. Both MMCs need the rate to adjust the
-card to the correct speed. In this case the platform code needs a
-possibility to adjust the rate initially to a value suitable for both
-MMC cores (50MHz). For this is needs access to the divider, preferably
-as a clock to be able to use standard clock functions.
-
-There are also many many dividers and muxes which are standalone
-somewhere in the clock tree, not directly associated with any device.
-With a clock which can be a mux and a divider together one is tempted
-to combine these into the least possible number of clocks leading to
-some random combination of clocks.
-
-
-> If it doesn't have a rate, clk_rate_ops is NULL, and the
-> framework deal with propagation only in the case where it is really
-> propagation - a child clock that requires changing a parent clock.
-> The block abstraction is still in place, there are just 3 slots for
-> blocks within each clock.
-> 
-> Using a flag to mark clocks as "non-propagatable" is also not correct
-> - propagatability is a feature of the parent, not the child.
-
-this flag could also be added to the parent if we wish to.
-
-Sascha
-
+diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+index fb5c23a..7dab33e 100644
+--- a/arch/arm/mach-at91/at91sam9263_devices.c
++++ b/arch/arm/mach-at91/at91sam9263_devices.c
+@@ -832,6 +832,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
+ 	if (!data)
+ 		return;
+ 
++	at91_set_A_periph(AT91_PIN_PC0, 0);	/* LCDVSYNC */
+ 	at91_set_A_periph(AT91_PIN_PC1, 0);	/* LCDHSYNC */
+ 	at91_set_A_periph(AT91_PIN_PC2, 0);	/* LCDDOTCK */
+ 	at91_set_A_periph(AT91_PIN_PC3, 0);	/* LCDDEN */
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.3.3
