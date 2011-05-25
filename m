@@ -1,22 +1,51 @@
-From: lrg@ti.com (Liam Girdwood)
-Date: Wed, 25 May 2011 13:21:39 +0100
-Subject: [PATCH] ASoc: sam9g20_wm8731: use the proper SYSCKL value
-In-Reply-To: <20110525111545.GD10797@opensource.wolfsonmicro.com>
-References: <1306230676-28688-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110525111545.GD10797@opensource.wolfsonmicro.com>
-Message-ID: <4DDCF453.3070805@ti.com>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 May 2011 13:23:19 +0100
+Subject: [BUG]  "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <20110524213924.GO27634@elte.hu>
+References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+	<1306272750.2497.79.camel@laptop>  <20110524213924.GO27634@elte.hu>
+Message-ID: <1306326199.27474.153.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/05/11 12:15, Mark Brown wrote:
-> On Tue, May 24, 2011 at 11:51:16AM +0200, Nicolas Ferre wrote:
->> at91sam9g20 is providing master clock to wm8731: not using a crystal but an
->> external MCLK. We can avoid conflict and save power using WM8731_SYSCLK_MCLK as
->> we do not need oscillator to be powered.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+On Tue, 2011-05-24 at 23:39 +0200, Ingo Molnar wrote:
+> * Peter Zijlstra <a.p.zijlstra@chello.nl> wrote:
 > 
-> Adding Liam.
+> > On Tue, 2011-05-24 at 19:13 +0100, Marc Zyngier wrote:
+> > > Peter,
+> > > 
+> > > I've experienced all kind of lock-ups on ARM SMP platforms recently, and
+> > > finally tracked it down to the following patch:
+> > > 
+> > > e4a52bcb9a18142d79e231b6733cabdbf2e67c1f [sched: Remove rq->lock from the first half of ttwu()].
+> > > 
+> > > Even on moderate load, the machine locks up, often silently, and
+> > > sometimes with a few messages like:
+> > > INFO: rcu_preempt_state detected stalls on CPUs/tasks: { 0} (detected by 1, t=12002 jiffies)
+> > > 
+> > > Another side effect of this patch is that the load average is always 0,
+> > > whatever load I throw at the system.
+> > > 
+> > > Reverting the sched changes up to that patch (included) gives me a
+> > > working system again, which happily survives parallel kernel
+> > > compilations without complaining.
+> > > 
+> > > My knowledge of the scheduler being rather limited, I haven't been able
+> > > to pinpoint the exact problem (though it probably have something to do
+> > > with __ARCH_WANT_INTERRUPTS_ON_CTXSW being defined on ARM). The enclosed
+> > > patch somehow papers over the load average problem, but the system ends
+> > > up locking up anyway:
+> > 
+> > Hurm.. I'll try and make x86 use __ARCH_WANT_INTERRUPTS_ON_CTXSW, IIRC
+> > Ingo once said that that is possible and try to see if I can reproduce.
+> > No clear ideas atm.
 > 
+> Yes, should be possible to just disable it on x86 - no further tricks needed. 
+> It's been a long time since i tested that though.
 
-Acked-by: Liam Girdwood <lrg@ti.com>
+I can confirm this is SMP only. UP is fine. SMP+nosmp locks up as well.
+
+	M.
+-- 
+Reality is an implementation detail.
