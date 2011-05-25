@@ -1,76 +1,47 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 25 May 2011 12:51:38 +0200
-Subject: [PATCH] dmaengine: Add API documentation for slave dma usage
-In-Reply-To: <1306316082.30236.137.camel@vkoul-udesk3>
-References: <1306238657-30089-1-git-send-email-vinod.koul@intel.com>
-	<BANLkTikDPeEFWdsVQ=Ak8jXEXsC-+uoOaw@mail.gmail.com>
-	<1306253171.30236.9.camel@vkoul-udesk3>
-	<BANLkTikjxECNAK5eS5hSu2bbEKpZX341Dw@mail.gmail.com>
-	<BANLkTikAm=D_YNFt0Regeas6AX8116L0-A@mail.gmail.com>
-	<1306312009.30236.110.camel@vkoul-udesk3>
-	<BANLkTikn3BBeNyuUeZ9BhG5QLj-dmcGjTg@mail.gmail.com>
-	<1306316082.30236.137.camel@vkoul-udesk3>
-Message-ID: <BANLkTinbSAxozR6NivY6wddre1nRF5RmZA@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 25 May 2011 12:56:48 +0200
+Subject: [PATCH V2 0/5] rtc: convert stmp3xxx from plat-stmp to mach-mxs
+Message-ID: <1306321013-28364-1-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 May 2011 11:34, Koul, Vinod <vinod.koul@intel.com> wrote:
-> On Wed, 2011-05-25 at 11:47 +0200, Per Forlin wrote:
->> On 25 May 2011 10:26, Koul, Vinod <vinod.koul@intel.com> wrote:
->> > I am okay with making this same for the slave devices as well.
->> >
->> > That would also require to change few drivers which start the txn in
->> > submit()
->> Yes,
->> The trivial part is to move enable from submit to issue_pending. I had
->> a quick look and it looks like the following drivers need to be
->> changed.
->> mpc512x_dma.c
->> imx-dma.c
->> imx-sdma.c
->> mxs-dma.c
->>
->> The other part is more complex. To make submit only add descs to a
->> queue that will be pushed down to the DMA only after issue_pending. It
->> is not as trivial to identify which of the drivers support this or
->> not.
->> I still think it make sense to fix the documentation first and then
->> fix the drivers. Keep a list inside the dmaengine.txt of drivers that
->> need to be fixed in order to comply with the API. Over time drivers
->> will be fixed and removed from the list. When we have agreed upon the
->> API (we may not be there yet) I am willingly to make a draft of such a
->> list.
-> Yes this sounds right, I will send updated version and now drivers would
-> need to call issue_pending.
->
-> I know dw_dmac, intel_mid_dma and ste_dma40 would need changes as well.
->
-I think ste_dma40 treats issue_pending and submit correctly but it may
-be other things not aligned. I need to double check this since it was
-a long time since I did any work in this driver. I can update
-ste_dma40 where it need changes.
+plat-stmp has now been removed and merged with mach-mxs, this patch
+series will convert the stmp-rtc driver for usage with mach-mxs, so the
+driver will become selectable and usable again (it broke twice after the
+UIE conversion, by the way). Quite some platform-specific dependencies
+have been removed, too.
 
-> Was thinking to add TODO in drivers/dma with these and any other changes
-> we feel are required moving forward.
-> We need dw_dmac to be moved to new slave interface and remove old slave
-> pointer mechanism when all are moved.
->
-I agree, TODO is a better place for it.
+The driver has successfully been tested by me on an MX28-board and
+passed the RTC test program. Shawn Guo tested it on his MX23 and
+MX28 boards.
 
-I would like to ask a question on usage of DMA_CTRL_ACK while we're at it.
-In ste_dma40 I added support to reuse descriptors if DMA_CTRL_ACK is
-clear. The purpose of DMA_CTRL_ACK is to set up dependency but is it
-also a valid to reuse it?
-I mean submit the same descriptor again and again without having to
-call prepare_slave_sg.
-Example:
-desc = prepare_slave_sg()
-submit(desc)
-issue_pending(desc)
+Change since V1:
 
-wait_for_callback()
+* dropped the patch removing IRQF_DISABLED from all other drivers; this
+  will be a seperate patch later. I did this for stmp3xxx, though.
 
-submit(desc)
-issue_pending(desc)
+* Updated the commit messages
 
-/Per
+* added Tested-by from Shawn (Thanks!)
+
+I am not sure who is interested in picking these up, Andrew or John? It
+is maybe too late for 2.6.40, but I wanted to be sure that plat-stmp is
+really removed before resending this series.
+
+Regards,
+
+   Wolfram
+
+Wolfram Sang (5):
+  rtc: stmp3xxx: get rid of platform-specific include for register names
+  rtc: stmp3xxx: port stmp-functions to mxs-equivalents
+  rtc: stmp3xxx: Initialize drvdata before registering device
+  rtc: stmp3xxx: get rid of mach-specific accessors
+  rtc: stmp3xxx: remove UIE handlers
+
+ drivers/rtc/Kconfig        |    6 +-
+ drivers/rtc/rtc-stmp3xxx.c |  152 ++++++++++++++++++++++---------------------
+ 2 files changed, 81 insertions(+), 77 deletions(-)
+
+-- 
+1.7.2.5
