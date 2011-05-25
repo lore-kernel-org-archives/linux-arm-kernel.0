@@ -1,208 +1,75 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 25 May 2011 12:56:52 +0200
-Subject: [PATCH V2 4/5] rtc: stmp3xxx: get rid of mach-specific accessors
-In-Reply-To: <1306321013-28364-1-git-send-email-w.sang@pengutronix.de>
-References: <1306321013-28364-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <1306321013-28364-5-git-send-email-w.sang@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 25 May 2011 19:01:50 +0800
+Subject: [PATCH v3 0/4] Consolidate sdhci pltfm & OF drivers and get them self
+	registered
+Message-ID: <1306321314-2493-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the accessors with standard readl/writel to remove their
-platform-dependency. Also, drop __raw_(read|write)l-accessors while we
-are here.
+Here are what the patch set does.
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Tested-by: Shawn Guo <shawn.guo@freescale.com>
----
- drivers/rtc/rtc-stmp3xxx.c |   62 ++++++++++++++++++++++++--------------------
- 1 files changed, 34 insertions(+), 28 deletions(-)
+* Remove .probe and .remove hooks from sdhci-pltfm.c and make it be
+  a pure common helper function providers.
+* Add .probe and .remove hooks for sdhci pltfm drivers sdhci-cns3xxx,
+  sdhci-dove, sdhci-tegra, and sdhci-esdhc-imx to make them self
+  registered with calling helper functions created above.
+* Migrate the use of sdhci_of_host and sdhci_of_data to
+  sdhci_pltfm_host and sdhci_pltfm_data, so that OF version host and
+  data structure works can be saved, and pltfm version works for both
+  cases.
+* Add OF common helper stuff into sdhci-pltfm.c, and make OF version
+  sdhci drivers sdhci-of-esdhc and sdhci-of-hlwd become self
+  registered as well, so that sdhci-of-core.c and sdhci-of.h can be
+  removed.
+* Eliminate include/linux/mmc/sdhci-pltfm.h with moving stuff into
+  drivers/mmc/host/sdhci-pltfm.h.
 
-diff --git a/drivers/rtc/rtc-stmp3xxx.c b/drivers/rtc/rtc-stmp3xxx.c
-index fae563a..50f065a 100644
---- a/drivers/rtc/rtc-stmp3xxx.c
-+++ b/drivers/rtc/rtc-stmp3xxx.c
-@@ -18,6 +18,7 @@
-  */
- #include <linux/kernel.h>
- #include <linux/module.h>
-+#include <linux/io.h>
- #include <linux/init.h>
- #include <linux/platform_device.h>
- #include <linux/interrupt.h>
-@@ -25,9 +26,10 @@
- #include <linux/slab.h>
- 
- #include <mach/common.h>
--#include <mach/mxs.h>
- 
- #define STMP3XXX_RTC_CTRL		0x0
-+#define STMP3XXX_RTC_CTRL_SET		0x4
-+#define STMP3XXX_RTC_CTRL_CLR		0x8
- #define STMP3XXX_RTC_CTRL_ALARM_IRQ_EN		0x00000001
- #define STMP3XXX_RTC_CTRL_ONEMSEC_IRQ_EN	0x00000002
- #define STMP3XXX_RTC_CTRL_ALARM_IRQ		0x00000004
-@@ -42,6 +44,8 @@
- #define STMP3XXX_RTC_ALARM		0x40
- 
- #define STMP3XXX_RTC_PERSISTENT0	0x60
-+#define STMP3XXX_RTC_PERSISTENT0_SET	0x64
-+#define STMP3XXX_RTC_PERSISTENT0_CLR	0x68
- #define STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN	0x00000002
- #define STMP3XXX_RTC_PERSISTENT0_ALARM_EN	0x00000004
- #define STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE	0x00000080
-@@ -60,7 +64,7 @@ static void stmp3xxx_wait_time(struct stmp3xxx_rtc_data *rtc_data)
- 	 * NEW_REGS/STALE_REGS bitfields go. In fact it's 0x1=P0,
- 	 * 0x2=P1, .., 0x20=P5, 0x40=ALARM, 0x80=SECONDS
- 	 */
--	while (__raw_readl(rtc_data->io + STMP3XXX_RTC_STAT) &
-+	while (readl(rtc_data->io + STMP3XXX_RTC_STAT) &
- 			(0x80 << STMP3XXX_RTC_STAT_STALE_SHIFT))
- 		cpu_relax();
- }
-@@ -71,7 +75,7 @@ static int stmp3xxx_rtc_gettime(struct device *dev, struct rtc_time *rtc_tm)
- 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
- 
- 	stmp3xxx_wait_time(rtc_data);
--	rtc_time_to_tm(__raw_readl(rtc_data->io + STMP3XXX_RTC_SECONDS), rtc_tm);
-+	rtc_time_to_tm(readl(rtc_data->io + STMP3XXX_RTC_SECONDS), rtc_tm);
- 	return 0;
- }
- 
-@@ -79,7 +83,7 @@ static int stmp3xxx_rtc_set_mmss(struct device *dev, unsigned long t)
- {
- 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
- 
--	__raw_writel(t, rtc_data->io + STMP3XXX_RTC_SECONDS);
-+	writel(t, rtc_data->io + STMP3XXX_RTC_SECONDS);
- 	stmp3xxx_wait_time(rtc_data);
- 	return 0;
- }
-@@ -91,18 +95,18 @@ static irqreturn_t stmp3xxx_rtc_interrupt(int irq, void *dev_id)
- 	u32 status;
- 	u32 events = 0;
- 
--	status = __raw_readl(rtc_data->io + STMP3XXX_RTC_CTRL) &
-+	status = readl(rtc_data->io + STMP3XXX_RTC_CTRL) &
- 			(STMP3XXX_RTC_CTRL_ALARM_IRQ | STMP3XXX_RTC_CTRL_ONEMSEC_IRQ);
- 
- 	if (status & STMP3XXX_RTC_CTRL_ALARM_IRQ) {
--		__mxs_clrl(STMP3XXX_RTC_CTRL_ALARM_IRQ,
--				rtc_data->io + STMP3XXX_RTC_CTRL);
-+		writel(STMP3XXX_RTC_CTRL_ALARM_IRQ,
-+				rtc_data->io + STMP3XXX_RTC_CTRL_CLR);
- 		events |= RTC_AF | RTC_IRQF;
- 	}
- 
- 	if (status & STMP3XXX_RTC_CTRL_ONEMSEC_IRQ) {
--		__mxs_clrl(STMP3XXX_RTC_CTRL_ONEMSEC_IRQ,
--				rtc_data->io + STMP3XXX_RTC_CTRL);
-+		writel(STMP3XXX_RTC_CTRL_ONEMSEC_IRQ,
-+				rtc_data->io + STMP3XXX_RTC_CTRL_CLR);
- 		if (++rtc_data->irq_count % 1000 == 0) {
- 			events |= RTC_UF | RTC_IRQF;
- 			rtc_data->irq_count = 0;
-@@ -118,17 +122,19 @@ static irqreturn_t stmp3xxx_rtc_interrupt(int irq, void *dev_id)
- static int stmp3xxx_alarm_irq_enable(struct device *dev, unsigned int enabled)
- {
- 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
--	void __iomem *p = rtc_data->io + STMP3XXX_RTC_PERSISTENT0,
--		     *ctl = rtc_data->io + STMP3XXX_RTC_CTRL;
- 
- 	if (enabled) {
--		__mxs_setl(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
--			      STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN, p);
--		__mxs_setl(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN, ctl);
-+		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
-+				STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN,
-+				rtc_data->io + STMP3XXX_RTC_PERSISTENT0_SET);
-+		writel(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
-+				rtc_data->io + STMP3XXX_RTC_CTRL_SET);
- 	} else {
--		__mxs_clrl(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
--			      STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN, p);
--		__mxs_clrl(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN, ctl);
-+		writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
-+				STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN,
-+				rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
-+		writel(STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
-+				rtc_data->io + STMP3XXX_RTC_CTRL_CLR);
- 	}
- 	return 0;
- }
-@@ -137,7 +143,7 @@ static int stmp3xxx_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alm)
- {
- 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
- 
--	rtc_time_to_tm(__raw_readl(rtc_data->io + STMP3XXX_RTC_ALARM), &alm->time);
-+	rtc_time_to_tm(readl(rtc_data->io + STMP3XXX_RTC_ALARM), &alm->time);
- 	return 0;
- }
- 
-@@ -147,7 +153,7 @@ static int stmp3xxx_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
- 	struct stmp3xxx_rtc_data *rtc_data = dev_get_drvdata(dev);
- 
- 	rtc_tm_to_time(&alm->time, &t);
--	__raw_writel(t, rtc_data->io + STMP3XXX_RTC_ALARM);
-+	writel(t, rtc_data->io + STMP3XXX_RTC_ALARM);
- 	return 0;
- }
- 
-@@ -167,8 +173,8 @@ static int stmp3xxx_rtc_remove(struct platform_device *pdev)
- 	if (!rtc_data)
- 		return 0;
- 
--	__mxs_clrl(STMP3XXX_RTC_CTRL_ONEMSEC_IRQ_EN | STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
--			rtc_data->io + STMP3XXX_RTC_CTRL);
-+	writel(STMP3XXX_RTC_CTRL_ONEMSEC_IRQ_EN | STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
-+			rtc_data->io + STMP3XXX_RTC_CTRL_CLR);
- 	free_irq(rtc_data->irq_alarm, &pdev->dev);
- 	free_irq(rtc_data->irq_1msec, &pdev->dev);
- 	rtc_device_unregister(rtc_data->rtc);
-@@ -206,7 +212,7 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
- 	rtc_data->irq_alarm = platform_get_irq(pdev, 0);
- 	rtc_data->irq_1msec = platform_get_irq(pdev, 1);
- 
--	if (!(__raw_readl(STMP3XXX_RTC_STAT + rtc_data->io) &
-+	if (!(readl(STMP3XXX_RTC_STAT + rtc_data->io) &
- 			STMP3XXX_RTC_STAT_RTC_PRESENT)) {
- 		dev_err(&pdev->dev, "no device onboard\n");
- 		err = -ENODEV;
-@@ -216,10 +222,10 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, rtc_data);
- 
- 	mxs_reset_block(rtc_data->io);
--	__mxs_clrl(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
-+	writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE,
--			rtc_data->io + STMP3XXX_RTC_PERSISTENT0);
-+			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
- 
- 	rtc_data->rtc = rtc_device_register(pdev->name, &pdev->dev,
- 				&stmp3xxx_rtc_ops, THIS_MODULE);
-@@ -249,8 +255,8 @@ static int stmp3xxx_rtc_probe(struct platform_device *pdev)
- out_irq1:
- 	free_irq(rtc_data->irq_alarm, &pdev->dev);
- out_irq_alarm:
--	__mxs_clrl(STMP3XXX_RTC_CTRL_ONEMSEC_IRQ_EN | STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
--			rtc_data->io + STMP3XXX_RTC_CTRL);
-+	writel(STMP3XXX_RTC_CTRL_ONEMSEC_IRQ_EN | STMP3XXX_RTC_CTRL_ALARM_IRQ_EN,
-+			rtc_data->io + STMP3XXX_RTC_CTRL_CLR);
- 	rtc_device_unregister(rtc_data->rtc);
- out_remap:
- 	platform_set_drvdata(pdev, NULL);
-@@ -271,10 +277,10 @@ static int stmp3xxx_rtc_resume(struct platform_device *dev)
- 	struct stmp3xxx_rtc_data *rtc_data = platform_get_drvdata(dev);
- 
- 	mxs_reset_block(rtc_data->io);
--	__mxs_clrl(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
-+	writel(STMP3XXX_RTC_PERSISTENT0_ALARM_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE_EN |
- 			STMP3XXX_RTC_PERSISTENT0_ALARM_WAKE,
--			rtc_data->io + STMP3XXX_RTC_PERSISTENT0);
-+			rtc_data->io + STMP3XXX_RTC_PERSISTENT0_CLR);
- 	return 0;
- }
- #else
--- 
-1.7.2.5
+And the benefits we gain from the changes are:
+
+* Get the sdhci device driver follow the Linux trend that driver
+  makes the registration by its own.
+* sdhci-pltfm.c becomes simple and clean as it only has common helper
+  stuff there now.
+* All sdhci device specific things are going back its own driver.
+* The dt and non-dt drivers are consolidated to use the same pair of
+  .probe and .remove hooks.
+
+Changes since v2:
+* Drop imx mpc esdhc consolidation
+* Fix checkpatch errors
+* Add sdhci-of-core.c copyright into sdhci-pltfm.c
+
+Changes since v1:
+* Rebase on cjb's mmc-next tree
+* Introduce helper function pair sdhci_pltfm_register and
+  sdhci_pltfm_unregister
+* Eliminate variable 'scratch' in .remove hook to make the code
+  look simple
+* Return ERR_PTR in sdhci_pltfm_init and use IS_ERR/PTR_ERR to check
+  return value in .probe hooks
+* Correct MODULE_AUTHOR statement
+* Split esdhc conlidation patch to ease reviewing
+
+Shawn Guo (4):
+      mmc: sdhci: make sdhci-pltfm device drivers self registered
+      mmc: sdhci: eliminate sdhci_of_host and sdhci_of_data
+      mmc: sdhci: make sdhci-of device drivers self registered
+      mmc: sdhci: merge two sdhci-pltfm.h into one
+
+ drivers/mmc/host/Kconfig           |   47 +++----
+ drivers/mmc/host/Makefile          |   18 +--
+ drivers/mmc/host/sdhci-cns3xxx.c   |   43 ++++++-
+ drivers/mmc/host/sdhci-dove.c      |   42 ++++++-
+ drivers/mmc/host/sdhci-esdhc-imx.c |  114 +++++++++++-----
+ drivers/mmc/host/sdhci-of-core.c   |  250 ---------------------------------
+ drivers/mmc/host/sdhci-of-esdhc.c  |   85 +++++++++---
+ drivers/mmc/host/sdhci-of-hlwd.c   |   66 ++++++++--
+ drivers/mmc/host/sdhci-of.h        |   42 ------
+ drivers/mmc/host/sdhci-pltfm.c     |  266 ++++++++++++++++++++----------------
+ drivers/mmc/host/sdhci-pltfm.h     |   39 +++++-
+ drivers/mmc/host/sdhci-tegra.c     |  116 +++++++++++-----
+ include/linux/mmc/sdhci-pltfm.h    |   35 -----
+ 13 files changed, 578 insertions(+), 585 deletions(-)
+
+Regards,
+Shawn
