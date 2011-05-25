@@ -1,151 +1,137 @@
-From: mcuos.com@gmail.com (Wan ZongShun)
-Date: Wed, 25 May 2011 10:05:01 +0800
-Subject: [PATCH] nuc900: add new mfp implement
-Message-ID: <BANLkTikmS2RQYkxc4+5CFQPbhe01QSfXRg@mail.gmail.com>
+From: linuxzsc@gmail.com (Richard Zhao)
+Date: Wed, 25 May 2011 10:32:09 +0800
+Subject: [PATCH 0/4] Add a generic struct clk
+In-Reply-To: <BANLkTinVnFasvOmu0MWRDzv21P3vM8eM6g@mail.gmail.com>
+References: <1305876469.325655.313573683829.0.gpush@pororo>
+	<BANLkTik=EFayZW61TgfOni-XML+tRLOcqw@mail.gmail.com>
+	<20110524062620.GA22096@pengutronix.de>
+	<BANLkTimEoCaKwJtpbQTDSEDydNkZ1BkKog@mail.gmail.com>
+	<20110524080936.GI20715@pengutronix.de>
+	<BANLkTinVnFasvOmu0MWRDzv21P3vM8eM6g@mail.gmail.com>
+Message-ID: <20110525023209.GA2535@b20223-02.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russell.
+On Tue, May 24, 2011 at 12:41:20PM -0700, Colin Cross wrote:
+> On Tue, May 24, 2011 at 1:09 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> > On Tue, May 24, 2011 at 12:31:13AM -0700, Colin Cross wrote:
+> >> On Mon, May 23, 2011 at 11:26 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> >> > On Mon, May 23, 2011 at 04:12:24PM -0700, Colin Cross wrote:
+> >> >> >
+> >> >> > ? tglx's plan is to create a separate struct clk_hwdata, which contains a
+> >> >> > ? union of base data structures for common clocks: div, mux, gate, etc. The
+> >> >> > ? ops callbacks are passed a clk_hw, plus a clk_hwdata, and most of the base
+> >> >> > ? hwdata fields are handled within the core clock code. This means less
+> >> >> > ? encapsulation of clock implementation logic, but more coverage of
+> >> >> > ? clock basics through the core code.
+> >> >>
+> >> >> I don't think they should be a union, I think there should be 3
+> >> >> separate private datas, and three sets of clock ops, for the three
+> >> >> different types of clock blocks: rate changers (dividers and plls),
+> >> >> muxes, and gates. ?These blocks are very often combined - a device
+> >> >> clock often has a mux and a divider, and clk_set_parent and
+> >> >> clk_set_rate on the same struct clk both need to work.
+> >> >
+> >> > The idea is to being able to propagate functions to the parent. It's
+> >> > very convenient for the implementation of clocks when they only
+> >> > implement either a divider, a mux or a gate. Combining all of these
+> >> > into a single clock leads to complicated clock trees and many different
+> >> > clocks where you can't factor out the common stuff.
+> >>
+> >> That seems complicated. ?You end up with lots of extra clocks (meaning
+> >> more boilerplate in the platform files) that have no meaning in the
+> >> system (what is the clock between the mux and the divider in Tegra's
+> >> i2c1 clock, it can never feed any devices), and you have to figure out
+> >> at the framework level when to propagate and when to error out. ?I'm
+> >> not even sure you can always find the right place to stop propagating
+> >> - do you just keep going up until the set_parent callback succeeds, or
+> >> exists, or what?
+> >
+> > For the set_parent there would be no propagating at all. For set_rate I
+> > can imagine a flag in the generic clock which tells whether to propagate
+> > set_rate or not.
+> >
+> >>
+> >> I think you can still factor out all the common code if you treat each
+> >> clock as a possible mux, divider, and gate combination. ?Each part of
+> >> the clock is still just as abstractable as before - you can set the
+> >> rate_ops to be the generic single register divider implementation, and
+> >> the gate ops to be the generic single bit enable implementation. ?The
+> >> idea of what a clock node is matches the HW design,
+> >
+> > The hardware design consists of only discrete rate changers (plls,
+> > dividers), muxes and gates. These are the only building blocks
+> > *every* hardware design has. I believe that many of the problems
+> > the current implementations have are due to the multiple building
+> > blocks stuffed into one clock. If you haven't already take a look
+> > at my i.MX5 clock patches:
+> >
+> > http://thread.gmane.org/gmane.linux.ports.arm.kernel/113631
+> >
+> > They need changes to fit onto the current patches and the rate
+> > propagation problem is not solved there, but the resulting clock
+> > data files are really short and nice to read. Furthermore it's easy
+> > to implement. Just look at the diagrams in the datasheet and go through
+> > them.
+> 
+> Propagation is what I'm trying simplify, because it's impossible at
+> the framework level to determine the right time to propagate, and the
+> right time to return an error, and I don't like pushing it down to
+> each clock implementation either, because then you need a "propagating
+> clk gate" and a "non-propagating clk gate".
+> 
+> Your building blocks implement every op - clk_gate_ops implements
+> set_rate as clk_parent_set_rate (won't that cause a deadlock on
+> prepare_lock when it calls clk_set_rate?).  I'm suggesting breaking
+> out the clock gate ops into a struct that only contains:
+> enable
+> disable
+> prepare
+> unprepare
+> And a rate ops struct that contains:
+> round_rate
+> set_rate
+> And a mux ops struct that contains
+> set_parent
+> 
+> For a single HW clock that has a mux, a gate, and a divider, the
+> existing implementation requires:
+> INIT_CLK(..., clk_mux_ops)
+> INIT_CLK(..., clk_div_ops)
+> INIT_CLK(..., clk_gate_ops)
+Not all clocks are like:
+pll -> [mux] -> [gate] -> [divider] -> clk A
+Some imx233 clocks are like:
+pll -> [divider] -> -----------\
+                              [mux] -> clk B
+xtal -> [gate] -> [divider] -> /
 
-The nuc900 mmc driver requires new mfp implement, so add this patch.
-
-Signed-off-by: Wan ZongShun <mcuos.com@gmail.com>
----
- arch/arm/mach-w90x900/include/mach/mfp.h        |    3 +-
- arch/arm/mach-w90x900/include/mach/nuc900_spi.h |    2 +-
- arch/arm/mach-w90x900/mfp.c                     |   49 ++++++++++++++++++++---
- 3 files changed, 46 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm/mach-w90x900/include/mach/mfp.h
-b/arch/arm/mach-w90x900/include/mach/mfp.h
-index 94c0e71..23ef1f5 100644
---- a/arch/arm/mach-w90x900/include/mach/mfp.h
-+++ b/arch/arm/mach-w90x900/include/mach/mfp.h
-@@ -19,6 +19,7 @@
- extern void mfp_set_groupf(struct device *dev);
- extern void mfp_set_groupc(struct device *dev);
- extern void mfp_set_groupi(struct device *dev);
--extern void mfp_set_groupg(struct device *dev);
-+extern void mfp_set_groupg(struct device *dev, const char *subname);
-+extern void mfp_set_groupd(struct device *dev, const char *subname);
-
- #endif /* __ASM_ARCH_MFP_H */
-diff --git a/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-b/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-index bd94819..2c4e0c1 100644
---- a/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-+++ b/arch/arm/mach-w90x900/include/mach/nuc900_spi.h
-@@ -14,7 +14,7 @@
- #ifndef __ASM_ARCH_SPI_H
- #define __ASM_ARCH_SPI_H
-
--extern void mfp_set_groupg(struct device *dev);
-+extern void mfp_set_groupg(struct device *dev, const char *subname);
-
- struct nuc900_spi_info {
- 	unsigned int num_cs;
-diff --git a/arch/arm/mach-w90x900/mfp.c b/arch/arm/mach-w90x900/mfp.c
-index fb7fb62..435aa8b 100644
---- a/arch/arm/mach-w90x900/mfp.c
-+++ b/arch/arm/mach-w90x900/mfp.c
-@@ -26,10 +26,8 @@
- #define REG_MFSEL	(W90X900_VA_GCR + 0xC)
-
- #define GPSELF		(0x01 << 1)
--
- #define GPSELC		(0x03 << 2)
--#define ENKPI		(0x02 << 2)
--#define ENNAND		(0x01 << 2)
-+#define GPSELD		(0x0f << 4)
-
- #define GPSELEI0	(0x01 << 26)
- #define GPSELEI1	(0x01 << 27)
-@@ -37,11 +35,16 @@
- #define GPIOG0TO1	(0x03 << 14)
- #define GPIOG2TO3	(0x03 << 16)
- #define GPIOG22TO23	(0x03 << 22)
-+#define GPIOG18TO20	(0x07 << 18)
-
- #define ENSPI		(0x0a << 14)
- #define ENI2C0		(0x01 << 14)
- #define ENI2C1		(0x01 << 16)
- #define ENAC97		(0x02 << 22)
-+#define ENSD1		(0x02 << 18)
-+#define ENSD0		(0x0a << 4)
-+#define ENKPI		(0x02 << 2)
-+#define ENNAND		(0x01 << 2)
-
- static DEFINE_MUTEX(mfp_mutex);
-
-@@ -127,16 +130,19 @@ void mfp_set_groupi(struct device *dev)
- }
- EXPORT_SYMBOL(mfp_set_groupi);
-
--void mfp_set_groupg(struct device *dev)
-+void mfp_set_groupg(struct device *dev, const char *subname)
- {
- 	unsigned long mfpen;
- 	const char *dev_id;
-
--	BUG_ON(!dev);
-+	BUG_ON((!dev) && (!subname));
-
- 	mutex_lock(&mfp_mutex);
-
--	dev_id = dev_name(dev);
-+	if (subname != NULL)
-+		dev_id = subname;
-+	else
-+		dev_id = dev_name(dev);
-
- 	mfpen = __raw_readl(REG_MFSEL);
-
-@@ -152,6 +158,9 @@ void mfp_set_groupg(struct device *dev)
- 	} else if (strcmp(dev_id, "nuc900-audio") == 0) {
- 		mfpen &= ~(GPIOG22TO23);
- 		mfpen |= ENAC97;/*enable AC97*/
-+	} else if (strcmp(dev_id, "nuc900-mmc-port1") == 0) {
-+		mfpen &= ~(GPIOG18TO20);
-+		mfpen |= (ENSD1 | 0x01);/*enable sd1*/
- 	} else {
- 		mfpen &= ~(GPIOG0TO1 | GPIOG2TO3);/*GPIOG[3:0]*/
- 	}
-@@ -162,3 +171,31 @@ void mfp_set_groupg(struct device *dev)
- }
- EXPORT_SYMBOL(mfp_set_groupg);
-
-+void mfp_set_groupd(struct device *dev, const char *subname)
-+{
-+	unsigned long mfpen;
-+	const char *dev_id;
-+
-+	BUG_ON((!dev) && (!subname));
-+
-+	mutex_lock(&mfp_mutex);
-+
-+	if (subname != NULL)
-+		dev_id = subname;
-+	else
-+		dev_id = dev_name(dev);
-+
-+	mfpen = __raw_readl(REG_MFSEL);
-+
-+	if (strcmp(dev_id, "nuc900-mmc-port0") == 0) {
-+		mfpen &= ~GPSELD;/*enable sd0*/
-+		mfpen |= ENSD0;
-+	} else
-+		mfpen &= (~GPSELD);
-+
-+	__raw_writel(mfpen, REG_MFSEL);
-+
-+	mutex_unlock(&mfp_mutex);
-+}
-+EXPORT_SYMBOL(mfp_set_groupd);
-+
--- 
-1.6.3.3
-
-
--- 
-Wan ZongShun.
-www.mcuos.com
+Thanks
+Richard
+> which creates 3 clocks, and requires lots of propagation logic to
+> figure out how to call clk_set_rate on the single clock that is
+> exposed to the device, but not propagate it past the device clock if
+> the device clock doesn't have a divider (propagating it up to an
+> active pll feeding other devices results in disaster, at least on
+> Tegra).  This combination doesn't seem to be common in your MX code,
+> but _every_ Tegra device clock has these three parts.
+> 
+> With multiple smaller building blocks that can fit inside a clock, all
+> you need is:
+> INIT_CLK(..., clk_mux_ops, clk_div_ops, clk_gate_ops)
+> You have one struct clk, which is exposed to the device and matches
+> the datasheet.  If the clock has rate ops, clk_set_rate works with no
+> propagation.  If it doesn't have a rate, clk_rate_ops is NULL, and the
+> framework deal with propagation only in the case where it is really
+> propagation - a child clock that requires changing a parent clock.
+> The block abstraction is still in place, there are just 3 slots for
+> blocks within each clock.
+> 
+> Using a flag to mark clocks as "non-propagatable" is also not correct
+> - propagatability is a feature of the parent, not the child.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
