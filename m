@@ -1,216 +1,106 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 25 May 2011 14:19:56 -0700
-Subject: [PATCH 01/15] OMAP: GPIO: Avoid cpu_is checks during module
-	ena/disable
-In-Reply-To: <1306247094-25372-2-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Tue, 24 May 2011 19:54:40 +0530")
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-2-git-send-email-tarun.kanti@ti.com>
-Message-ID: <8762oytr43.fsf@ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 25 May 2011 14:22:41 -0700
+Subject: [GIT PULL] Samsung S5P for 2.6.40 merge window
+In-Reply-To: <20110525205005.GC24876@n2100.arm.linux.org.uk>
+References: <4DDD4659.5050602@samsung.com>
+	<20110525205005.GC24876@n2100.arm.linux.org.uk>
+Message-ID: <4DDD7321.80607@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
-
-> From: Charulatha V <charu@ti.com>
+On 05/25/11 13:50, Russell King - ARM Linux wrote:
+> On Wed, May 25, 2011 at 11:11:37AM -0700, Kukjin Kim wrote:
+>> These things are for 2.6.40 and it includes removing ARCH_S5P6442.
+>> Actually there is no user now and if required will merge it into other
+>> ARCH like ARCH_S5P64X0 later.
 >
-> Remove cpu-is checks while enabling/disabling OMAP GPIO module
-> during a gpio request/free.
+> I have a merge conflict with this, and resolved it as below.  Please check
+> whether this is correct.
 >
-> Signed-off-by: Charulatha V <charu@ti.com>
+Hi Russell,
 
-This looks mostly OK, but one nitpick about the usage of USHRT_MAX.
+It's correct :)
 
-For most registers, you should just test for a non-zero register offset
-to determine if it's present or not instead of USHRT_MAX.  
+Thanks.
 
-I used USHRT_MAX for the revision register because it is at offset zero
-on most SoCs, so testing for non-zero wouldn't work there.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
 
-Other than that, the approach looks fine.
-
-Thanks,
-
-Kevin
-
-> ---
->  arch/arm/mach-omap1/gpio15xx.c         |    2 +
->  arch/arm/mach-omap1/gpio16xx.c         |    2 +
->  arch/arm/mach-omap1/gpio7xx.c          |    2 +
->  arch/arm/mach-omap2/gpio.c             |    2 +
->  arch/arm/plat-omap/include/plat/gpio.h |    1 +
->  drivers/gpio/gpio_omap.c               |   53 ++++++++++++++------------------
->  6 files changed, 32 insertions(+), 30 deletions(-)
+> diff --cc arch/arm/Kconfig
+> index 3bc1a58,e81c72c..f7cce8b
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@@ -2028,7 -1998,7 +2016,7 @@@ menu "Power management options
+>    source "kernel/power/Kconfig"
 >
-> diff --git a/arch/arm/mach-omap1/gpio15xx.c b/arch/arm/mach-omap1/gpio15xx.c
-> index f79c6ae..6d83e0a 100644
-> --- a/arch/arm/mach-omap1/gpio15xx.c
-> +++ b/arch/arm/mach-omap1/gpio15xx.c
-> @@ -42,6 +42,7 @@ static struct omap_gpio_reg_offs omap15xx_mpuio_regs = {
->  	.irqstatus	= OMAP_MPUIO_GPIO_INT,
->  	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
->  	.irqenable_inv	= true,
-> +	.ctrl		= USHRT_MAX,
->  };
->  
->  static struct __initdata omap_gpio_platform_data omap15xx_mpu_gpio_config = {
-> @@ -83,6 +84,7 @@ static struct omap_gpio_reg_offs omap15xx_gpio_regs = {
->  	.irqstatus	= OMAP1510_GPIO_INT_STATUS,
->  	.irqenable	= OMAP1510_GPIO_INT_MASK,
->  	.irqenable_inv	= true,
-> +	.ctrl		= USHRT_MAX,
->  };
->  
->  static struct __initdata omap_gpio_platform_data omap15xx_gpio_config = {
-> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
-> index c69b3b1..6bba196 100644
-> --- a/arch/arm/mach-omap1/gpio16xx.c
-> +++ b/arch/arm/mach-omap1/gpio16xx.c
-> @@ -45,6 +45,7 @@ static struct omap_gpio_reg_offs omap16xx_mpuio_regs = {
->  	.irqstatus	= OMAP_MPUIO_GPIO_INT,
->  	.irqenable	= OMAP_MPUIO_GPIO_MASKIT,
->  	.irqenable_inv	= true,
-> +	.ctrl		= USHRT_MAX,
->  };
->  
->  static struct __initdata omap_gpio_platform_data omap16xx_mpu_gpio_config = {
-> @@ -89,6 +90,7 @@ static struct omap_gpio_reg_offs omap16xx_gpio_regs = {
->  	.irqenable	= OMAP1610_GPIO_IRQENABLE1,
->  	.set_irqenable	= OMAP1610_GPIO_SET_IRQENABLE1,
->  	.clr_irqenable	= OMAP1610_GPIO_CLEAR_IRQENABLE1,
-> +	.ctrl		= USHRT_MAX,
->  };
->  
->  static struct __initdata omap_gpio_platform_data omap16xx_gpio1_config = {
-> diff --git a/arch/arm/mach-omap1/gpio7xx.c b/arch/arm/mach-omap1/gpio7xx.c
-> index d7f2ad3..0fc2557 100644
-> --- a/arch/arm/mach-omap1/gpio7xx.c
-> +++ b/arch/arm/mach-omap1/gpio7xx.c
-> @@ -47,6 +47,7 @@ static struct omap_gpio_reg_offs omap7xx_mpuio_regs = {
->  	.irqstatus	= OMAP_MPUIO_GPIO_INT / 2,
->  	.irqenable	= OMAP_MPUIO_GPIO_MASKIT / 2,
->  	.irqenable_inv	= true,
-> +	.ctrl		= USHRT_MAX,
->  };
->  
->  static struct __initdata omap_gpio_platform_data omap7xx_mpu_gpio_config = {
-> @@ -88,6 +89,7 @@ static struct omap_gpio_reg_offs omap7xx_gpio_regs = {
->  	.irqstatus	= OMAP7XX_GPIO_INT_STATUS,
->  	.irqenable	= OMAP7XX_GPIO_INT_MASK,
->  	.irqenable_inv	= true,
-> +	.ctrl		= USHRT_MAX,
->  };
->  
->  static struct __initdata omap_gpio_platform_data omap7xx_gpio1_config = {
-> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-> index 9a46d77..0446bd1 100644
-> --- a/arch/arm/mach-omap2/gpio.c
-> +++ b/arch/arm/mach-omap2/gpio.c
-> @@ -84,6 +84,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
->  		pdata->regs->clr_irqenable = OMAP24XX_GPIO_CLEARIRQENABLE1;
->  		pdata->regs->debounce = OMAP24XX_GPIO_DEBOUNCE_VAL;
->  		pdata->regs->debounce_en = OMAP24XX_GPIO_DEBOUNCE_EN;
-> +		pdata->regs->ctrl = OMAP24XX_GPIO_CTRL;
->  		break;
->  	case 2:
->  		pdata->bank_type = METHOD_GPIO_44XX;
-> @@ -100,6 +101,7 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
->  		pdata->regs->clr_irqenable = OMAP4_GPIO_IRQSTATUSCLR0;
->  		pdata->regs->debounce = OMAP4_GPIO_DEBOUNCINGTIME;
->  		pdata->regs->debounce_en = OMAP4_GPIO_DEBOUNCENABLE;
-> +		pdata->regs->ctrl = OMAP4_GPIO_CTRL;
->  		break;
->  	default:
->  		WARN(1, "Invalid gpio bank_type\n");
-> diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
-> index 91e8de3..caf432c 100644
-> --- a/arch/arm/plat-omap/include/plat/gpio.h
-> +++ b/arch/arm/plat-omap/include/plat/gpio.h
-> @@ -188,6 +188,7 @@ struct omap_gpio_reg_offs {
->  	u16 clr_irqenable;
->  	u16 debounce;
->  	u16 debounce_en;
-> +	u16 ctrl;
->  
->  	bool irqenable_inv;
->  };
-> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-> index a490cb1..dfdc45e 100644
-> --- a/drivers/gpio/gpio_omap.c
-> +++ b/drivers/gpio/gpio_omap.c
-> @@ -89,6 +89,7 @@ int gpio_bank_count;
->  
->  #define GPIO_INDEX(bank, gpio) (gpio % bank->width)
->  #define GPIO_BIT(bank, gpio) (1 << GPIO_INDEX(bank, gpio))
-> +#define GPIO_MOD_CTRL_BIT	BIT(0)
->  
->  static void _set_gpio_direction(struct gpio_bank *bank, int gpio, int is_input)
->  {
-> @@ -586,22 +587,18 @@ static int omap_gpio_request(struct gpio_chip *chip, unsigned offset)
->  		__raw_writel(__raw_readl(reg) | (1 << offset), reg);
->  	}
->  #endif
-> -	if (!cpu_class_is_omap1()) {
-> -		if (!bank->mod_usage) {
-> -			void __iomem *reg = bank->base;
-> -			u32 ctrl;
-> -
-> -			if (cpu_is_omap24xx() || cpu_is_omap34xx())
-> -				reg += OMAP24XX_GPIO_CTRL;
-> -			else if (cpu_is_omap44xx())
-> -				reg += OMAP4_GPIO_CTRL;
-> -			ctrl = __raw_readl(reg);
-> -			/* Module is enabled, clocks are not gated */
-> -			ctrl &= 0xFFFFFFFE;
-> -			__raw_writel(ctrl, reg);
-> -		}
-> -		bank->mod_usage |= 1 << offset;
-> +	if ((bank->regs->ctrl != USHRT_MAX) && (!bank->mod_usage)) {
-> +		void __iomem *reg = bank->base + bank->regs->ctrl;
-> +		u32 ctrl;
-> +
-> +		ctrl = __raw_readl(reg);
-> +		/* Module is enabled, clocks are not gated */
-> +		ctrl &= ~GPIO_MOD_CTRL_BIT;
-> +		__raw_writel(ctrl, reg);
->  	}
-> +
-> +	bank->mod_usage |= 1 << offset;
-> +
->  	spin_unlock_irqrestore(&bank->lock, flags);
->  
->  	return 0;
-> @@ -634,22 +631,18 @@ static void omap_gpio_free(struct gpio_chip *chip, unsigned offset)
->  		__raw_writel(1 << offset, reg);
->  	}
->  #endif
-> -	if (!cpu_class_is_omap1()) {
-> -		bank->mod_usage &= ~(1 << offset);
-> -		if (!bank->mod_usage) {
-> -			void __iomem *reg = bank->base;
-> -			u32 ctrl;
-> -
-> -			if (cpu_is_omap24xx() || cpu_is_omap34xx())
-> -				reg += OMAP24XX_GPIO_CTRL;
-> -			else if (cpu_is_omap44xx())
-> -				reg += OMAP4_GPIO_CTRL;
-> -			ctrl = __raw_readl(reg);
-> -			/* Module is disabled, clocks are gated */
-> -			ctrl |= 1;
-> -			__raw_writel(ctrl, reg);
-> -		}
-> +	bank->mod_usage &= ~(1 << offset);
-> +
-> +	if ((bank->regs->ctrl != USHRT_MAX) && (!bank->mod_usage)) {
-> +		void __iomem *reg = bank->base + bank->regs->ctrl;
-> +		u32 ctrl;
-> +
-> +		ctrl = __raw_readl(reg);
-> +		/* Module is disabled, clocks are gated */
-> +		ctrl |= GPIO_MOD_CTRL_BIT;
-> +		__raw_writel(ctrl, reg);
->  	}
-> +
->  	_reset_gpio(bank, bank->chip.base + offset);
->  	spin_unlock_irqrestore(&bank->lock, flags);
->  }
+>    config ARCH_SUSPEND_POSSIBLE
+> - 	depends on !ARCH_S5P64X0&&  !ARCH_S5P6442&&  !ARCH_S5PC100
+>   -	depends on !ARCH_S5P64X0
+> ++	depends on !ARCH_S5P64X0&&  !ARCH_S5PC100
+>    	depends on CPU_ARM920T || CPU_ARM926T || CPU_SA1100 || \
+>    		CPU_V6 || CPU_V6K || CPU_V7 || CPU_XSC3 || CPU_XSCALE
+>    	def_bool y
+> diff --cc arch/arm/mach-exynos4/Kconfig
+> index 8051962,11b57a4..b92c1e5
+> --- a/arch/arm/mach-exynos4/Kconfig
+> +++ b/arch/arm/mach-exynos4/Kconfig
+> @@@ -169,9 -169,10 +169,11 @@@ config MACH_NUR
+>    	select S3C_DEV_HSMMC2
+>    	select S3C_DEV_HSMMC3
+>    	select S3C_DEV_I2C1
+> + 	select S3C_DEV_I2C3
+>    	select S3C_DEV_I2C5
+>   +	select S5P_DEV_USB_EHCI
+>    	select EXYNOS4_SETUP_I2C1
+> + 	select EXYNOS4_SETUP_I2C3
+>    	select EXYNOS4_SETUP_I2C5
+>    	select EXYNOS4_SETUP_SDHCI
+>    	select SAMSUNG_DEV_PWM
+> diff --cc arch/arm/mach-exynos4/mach-nuri.c
+> index bb5d12f,d13c5e8..642702b
+> --- a/arch/arm/mach-exynos4/mach-nuri.c
+> +++ b/arch/arm/mach-exynos4/mach-nuri.c
+> @@@ -30,8 -31,8 +31,10 @@@
+>    #include<plat/cpu.h>
+>    #include<plat/devs.h>
+>    #include<plat/sdhci.h>
+>   +#include<plat/ehci.h>
+>   +#include<plat/clock.h>
+> + #include<plat/gpio-cfg.h>
+> + #include<plat/iic.h>
+>
+>    #include<mach/map.h>
+>
+> @@@ -282,7 -355,7 +367,8 @@@ static struct platform_device *nuri_dev
+>    	&s3c_device_hsmmc3,
+>    	&s3c_device_wdt,
+>    	&s3c_device_timer[0],
+>   +	&s5p_device_ehci,
+> + 	&s3c_device_i2c3,
+>
+>    	/* NURI Devices */
+>    	&nuri_gpio_keys,
+> @@@ -300,13 -373,13 +386,16 @@@ static void __init nuri_map_io(void
+>    static void __init nuri_machine_init(void)
+>    {
+>    	nuri_sdhci_init();
+> + 	nuri_tsp_init();
+>
+>    	i2c_register_board_info(1, i2c1_devs, ARRAY_SIZE(i2c1_devs));
+> + 	s3c_i2c3_set_platdata(&i2c3_data);
+> + 	i2c_register_board_info(3, i2c3_devs, ARRAY_SIZE(i2c3_devs));
+>    	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
+>
+>   +	nuri_ehci_init();
+>   +	clk_xusbxti.rate = 24000000;
+>   +
+>    	/* Last */
+>    	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
+>    }
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
