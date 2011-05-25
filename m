@@ -1,102 +1,166 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 25 May 2011 16:14:06 -0700
-Subject: [PATCH 12/15] OMAP: GPIO: Fix: use wake set/clear regs
-In-Reply-To: <1306247094-25372-13-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Tue, 24 May 2011 19:54:51 +0530")
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-13-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87zkmal6f5.fsf@ti.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 25 May 2011 21:44:03 +0200
+Subject: [PATCH] imx: mach-bug: add sdio platform data
+In-Reply-To: <1306351943-7963-1-git-send-email-GNUtoo@no-log.org>
+References: <1306351943-7963-1-git-send-email-GNUtoo@no-log.org>
+Message-ID: <20110525194403.GD22361@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Hello Denis,
 
-> From: Charulatha V <charu@ti.com>
->
-> In set_24xx_gpio_triggering(), for OMAP4, GPIO wakeup request
-> is set for all type of GPIO triggers whereas as per TRM the GPIO
-> wakeup request can only be generated on edge transitions. Fix this.
-
-OK.  Please make a dedicated patch for this part.
-
-Subject: GPIO: OMAP: IRQ triggering: use wake set/clear regs
-
-> In set_24xx_gpio_triggering(), OMAP4_GPIO_IRQWAKEN0 register
-> is used for wakeup request and the GPIO set/clear wakeup registers
-> are not used in OMAP4 but is handled without retaining it's old
-> value. This would corrupt the contents of OMAP4_GPIO_IRQWAKEN0
-> register by writing the value of the last requested GPIO pin in
-> a given bank. This can be avoided by making use of GPIO set/clear
-> wakeup registers.
-
-And this should be a separate patch too, or probably folded into PATCH
-09/15 with an updated changelog of course.
-
-Kevin
-
-> Signed-off-by: Charulatha V <charu@ti.com>
+On Wed, May 25, 2011 at 09:32:23PM +0200, Denis 'GNUtoo' Carikli wrote:
+> Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
 > ---
->  arch/arm/mach-omap2/gpio.c |    4 ++--
->  drivers/gpio/gpio_omap.c   |   32 ++++++++++----------------------
->  2 files changed, 12 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-> index 5c888dd..fbedbbb 100644
-> --- a/arch/arm/mach-omap2/gpio.c
-> +++ b/arch/arm/mach-omap2/gpio.c
-> @@ -142,8 +142,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
->  		pdata->regs->risingdetect = OMAP4_GPIO_RISINGDETECT;
->  		pdata->regs->fallingdetect = OMAP4_GPIO_FALLINGDETECT;
->  		pdata->regs->wkupstatus = OMAP4_GPIO_IRQWAKEN0;
-> -		pdata->regs->wkupclear = OMAP4_GPIO_IRQWAKEN0;
-> -		pdata->regs->wkupset = OMAP4_GPIO_IRQWAKEN0;
-> +		pdata->regs->wkupclear = OMAP4_GPIO_CLEARWKUENA;
-> +		pdata->regs->wkupset = OMAP4_GPIO_SETWKUENA;
->  		break;
->  	default:
->  		WARN(1, "Invalid gpio bank_type\n");
-> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
-> index 05c2857..762d73c 100644
-> --- a/drivers/gpio/gpio_omap.c
-> +++ b/drivers/gpio/gpio_omap.c
-> @@ -229,30 +229,18 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
->  		MOD_REG_BIT(OMAP24XX_GPIO_FALLINGDETECT, gpio_bit,
->  			trigger & IRQ_TYPE_EDGE_FALLING);
->  	}
+>  arch/arm/mach-imx/mach-bug.c |  106 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 106 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-bug.c b/arch/arm/mach-imx/mach-bug.c
+> index 42e4f07..b0d1536 100644
+> --- a/arch/arm/mach-imx/mach-bug.c
+> +++ b/arch/arm/mach-imx/mach-bug.c
+> @@ -22,6 +22,8 @@
+>  #include <mach/iomux-mx3.h>
+>  #include <mach/hardware.h>
+>  #include <mach/common.h>
+> +#include <mach/gpio.h>
+> +#include <mach/mx31.h>
+>  
+>  #include <asm/mach/time.h>
+>  #include <asm/mach/arch.h>
+> @@ -40,11 +42,115 @@ static const unsigned int bug_pins[] __initconst = {
+>  	MX31_PIN_PC_BVD1__RXD5,
+>  };
+>  
+> +static int sdhc1_pins[] = {
+> +	MX31_PIN_SD1_DATA3__SD1_DATA3,
+> +	MX31_PIN_SD1_DATA2__SD1_DATA2,
+> +	MX31_PIN_SD1_DATA1__SD1_DATA1,
+> +	MX31_PIN_SD1_DATA0__SD1_DATA0,
+> +	MX31_PIN_SD1_CLK__SD1_CLK,
+> +	MX31_PIN_SD1_CMD__SD1_CMD,
+> +};
 > +
->  	if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
-> -		if (cpu_is_omap44xx()) {
-> -			if (trigger != 0)
-> -				__raw_writel(1 << gpio, bank->base+
-> -						OMAP4_GPIO_IRQWAKEN0);
-> -			else {
-> -				val = __raw_readl(bank->base +
-> -							OMAP4_GPIO_IRQWAKEN0);
-> -				__raw_writel(val & (~(1 << gpio)), bank->base +
-> -							 OMAP4_GPIO_IRQWAKEN0);
-> -			}
-> -		} else {
-> -			/*
-> -			 * GPIO wakeup request can only be generated on edge
-> -			 * transitions
-> -			 */
-> -			if (trigger & IRQ_TYPE_EDGE_BOTH)
-> -				__raw_writel(1 << gpio, bank->base
-> -					+ OMAP24XX_GPIO_SETWKUENA);
-> -			else
-> -				__raw_writel(1 << gpio, bank->base
-> -					+ OMAP24XX_GPIO_CLEARWKUENA);
-> -		}
-> +		/*
-> +		 * GPIO wakeup request can only be generated on edge
-> +		 * transitions
-> +		 */
-> +		if (trigger & IRQ_TYPE_EDGE_BOTH)
-> +			__raw_writel(1 << gpio, bank->wake_set);
-> +		else
-> +			__raw_writel(1 << gpio, bank->wake_clear);
->  	}
+> +static int sdhc2_pins[] = {
+> +	MX31_PIN_PC_PWRON__SD2_DATA3,
+> +	MX31_PIN_PC_VS1__SD2_DATA2,
+> +	MX31_PIN_PC_READY__SD2_DATA1,
+> +	MX31_PIN_PC_WAIT_B__SD2_DATA0,
+> +	MX31_PIN_PC_CD2_B__SD2_CLK,
+> +	MX31_PIN_PC_CD1_B__SD2_CMD,
+> +};
 > +
->  	/* This part needs to be executed always for OMAP34xx */
->  	if (cpu_is_omap34xx() || (bank->non_wakeup_gpios & gpio_bit)) {
->  		/*
+> +static int mxc_bug_sdhc1_init(struct device *dev, irq_handler_t h, void *data)
+> +{
+> +	return mxc_iomux_setup_multiple_pins(sdhc1_pins, ARRAY_SIZE(sdhc1_pins),
+> +					     "sdhc-1");
+Why not adding these to the static list and just make init and exit
+empty?
+
+> +}
+> +
+> +static void mxc_bug_sdhc1_exit(struct device *dev, void *data)
+> +{
+> +	mxc_iomux_release_multiple_pins(sdhc1_pins, ARRAY_SIZE(sdhc1_pins));
+> +}
+> +
+> +static int mxc_bug_sdhc2_init(struct device *dev, irq_handler_t h, void *data)
+> +{
+> +	return mxc_iomux_setup_multiple_pins(sdhc2_pins, ARRAY_SIZE(sdhc2_pins),
+> +					     "sdhc-2");
+> +}
+> +
+> +static void mxc_bug_sdhc2_exit(struct device *dev, void *data)
+> +{
+> +	mxc_iomux_release_multiple_pins(sdhc2_pins, ARRAY_SIZE(sdhc2_pins));
+> +}
+> +
+> +/* No card and rw detection at the moment */
+> +static struct imxmmc_platform_data sdhc1_pdata = {
+> +	.init = mxc_bug_sdhc1_init,
+> +	.exit = mxc_bug_sdhc1_exit,
+> +	.ocr_avail = MMC_VDD_27_28 | MMC_VDD_28_29 | MMC_VDD_29_30 |
+> +	MMC_VDD_32_33 | MMC_VDD_33_34,
+Please indent this line a bit further.  Should be const and __initconst.
+
+> +};
+> +
+> +static struct imxmmc_platform_data sdhc2_pdata = {
+> +	.init = mxc_bug_sdhc2_init,
+> +	.exit = mxc_bug_sdhc2_exit,
+> +};
+const and __initconst
+
+> +
+> +
+one nl is enough.
+
+> +static struct resource mxcsdhc0_resources[] = {
+> +	{
+> +		.start = MX31_SDHC1_BASE_ADDR,
+> +		.end = MX31_SDHC1_BASE_ADDR + SZ_16K - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	}, {
+> +		.start = MX31_INT_SDHC1,
+> +		.end = MX31_INT_SDHC1,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +static struct resource mxcsdhc1_resources[] = {
+> +	{
+> +		.start = MX31_SDHC2_BASE_ADDR,
+> +		.end = MX31_SDHC2_BASE_ADDR + SZ_16K - 1,
+> +		.flags = IORESOURCE_MEM,
+> +	}, {
+> +		.start = MX31_INT_SDHC2,
+> +		.end = MX31_INT_SDHC2,
+> +		.flags = IORESOURCE_IRQ,
+> +	},
+> +};
+> +
+> +struct platform_device mxcsdhc_device0 = {
+> +	.name = "mxc-mmc",
+> +	.id = 0,
+> +	.num_resources = ARRAY_SIZE(mxcsdhc0_resources),
+> +	.resource = mxcsdhc0_resources,
+> +};
+> +
+> +struct platform_device mxcsdhc_device1 = {
+> +	.name = "mxc-mmc",
+> +	.id = 1,
+> +	.num_resources = ARRAY_SIZE(mxcsdhc1_resources),
+> +	.resource = mxcsdhc1_resources,
+> +};
+Nooooooooooooooooooooooooooooooooooooooo ...
+
+> +
+>  static void __init bug_board_init(void)
+>  {
+>  	mxc_iomux_setup_multiple_pins(bug_pins,
+>  				      ARRAY_SIZE(bug_pins), "uart-4");
+>  	imx31_add_imx_uart4(&uart_pdata);
+> +
+> +	/* Turn off Wifi by default */
+> +	if ( !mxc_iomux_alloc_pin(
+> +		IOMUX_MODE(MX31_PIN_USB_BYP, IOMUX_CONFIG_GPIO), "bug-wifi")
+> +		){
+> +		if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_USB_BYP),
+> +				   "bug-wifi"))
+> +			gpio_direction_output(IOMUX_TO_GPIO(
+> +						      MX31_PIN_USB_BYP), 0);
+> +	}
+> +	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
+imx31_add_mxc_mmc(0, &sdhc1_pdata); please
+> +	mxc_register_device(&mxcsdhc_device1, &sdhc2_pdata);
+>  }
+>  
+>  static void __init bug_timer_init(void)
+> -- 
+> 1.7.1
+> 
+> 
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
