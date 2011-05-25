@@ -1,28 +1,35 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 25 May 2011 15:39:03 -0700
-Subject: [PATCH 08/15] OMAP2+: GPIO: make workaround_enabled bank specific
-In-Reply-To: <1306247094-25372-9-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Tue, 24 May 2011 19:54:47 +0530")
+Date: Wed, 25 May 2011 15:36:30 -0700
+Subject: [PATCH 07/15] OMAP: GPIO: handle save/restore ctx in GPIO driver
+In-Reply-To: <87ipsypfzk.fsf@ti.com> (Kevin Hilman's message of "Wed, 25 May
+	2011 15:33:51 -0700")
 References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-9-git-send-email-tarun.kanti@ti.com>
-Message-ID: <874o4ipfqw.fsf@ti.com>
+	<1306247094-25372-8-git-send-email-tarun.kanti@ti.com>
+	<87ipsypfzk.fsf@ti.com>
+Message-ID: <87boyqpfv5.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+Kevin Hilman <khilman@ti.com> writes:
 
-> From: Charulatha V <charu@ti.com>
+[...]
+>> @@ -1394,11 +1409,17 @@ void omap2_gpio_resume_after_idle(void)
+>>  		for (j = 0; j < hweight_long(bank->dbck_enable_mask); j++)
+>>  			clk_enable(bank->dbck);
+>>  
+>> -		if (!workaround_enabled)
+>> +		pdev = to_platform_device(bank->dev);
+>> +		ctx_lost_cnt_after = omap_device_get_context_loss_count(pdev);
+>> +
+>> +		if (ctx_lost_cnt_after == bank->ctx_lost_cnt_before)
+>>  			continue;
+>>  
+>> +		if (!workaround_enabled)
+>> +			goto restore_gpio_ctx;
 >
-> Make workaround_enabled flag bank-specific instead of using a single
-> flag for all the banks together. This would be helpful while making
-> use of runtime framework in OMAP GPIO driver which would make the
-> driver handle each GPIO bank independently.
->
-> Also rename workaround_enabled flag to off_mode_wkup_wa_enabled
+> Now that these functions are all bank-specific, this
+> 'workaround_enabled' flag should be made per-bank.
 
-Do we even need a dedicated flag for this?
-
-I seems that the combination of enabled_non_wakeup_gpios and whether or
-not context has been lost could be used to check this condition.
+Oops, ignore this comment... I see it's done in the next patch.
 
 Kevin
