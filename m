@@ -1,36 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 25 May 2011 13:50:47 +0100
-Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
-In-Reply-To: <4DDC2A59.8030109@codeaurora.org>
-References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
-	<4DDC2A59.8030109@codeaurora.org>
-Message-ID: <002f01cc1ada$5e7ffaa0$1b7fefe0$@deacon@arm.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 25 May 2011 14:54:06 +0200
+Subject: [PATCH 2/2] dmaengine: add TODO items for future work on dma
+	drivers
+In-Reply-To: <BANLkTikV3qT7owEuLmsGu+ORMNv77DgXSQ@mail.gmail.com>
+References: <1306323570-11133-1-git-send-email-vinod.koul@intel.com>
+	<1306323570-11133-3-git-send-email-vinod.koul@intel.com>
+	<BANLkTikV3qT7owEuLmsGu+ORMNv77DgXSQ@mail.gmail.com>
+Message-ID: <BANLkTi=g9VAEhKJ3RhakRtUk8cqY+PpgEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen,
+On 25 May 2011 14:39, Per Forlin <per.forlin@linaro.org> wrote:
+> On 25 May 2011 13:39, Koul, Vinod <vinod.koul@intel.com> wrote:
+>> From: Vinod Koul <vinod.koul@intel.com>
+>>
+>> Signed-off-by: Vinod Koul <vinod.koul@intel.com>
+>> ---
+>> ?drivers/dma/TODO | ? 12 ++++++++++++
+>> ?1 files changed, 12 insertions(+), 0 deletions(-)
+>> ?create mode 100644 drivers/dma/TODO
+>>
+>> diff --git a/drivers/dma/TODO b/drivers/dma/TODO
+>> new file mode 100644
+>> index 0000000..b67d184
+>> --- /dev/null
+>> +++ b/drivers/dma/TODO
+>> @@ -0,0 +1,12 @@
+>> +TODO for slave dma
+>> +
+>> +1. Move remaining drivers to use new slave interface
+>> +2. Remove old slave pointer machansim
+>> +3. Make issue_pending to start the transaction in below drivers
+>> + ? ? ? - mpc512x_dma
+>> + ? ? ? - imx-dma
+>> + ? ? ? - imx-sdma
+>> + ? ? ? - mxs-dma.c
+>> + ? ? ? - dw_dmac
+>> + ? ? ? - intel_mid_dma
+>> + ? ? ? - ste_dma40
+> ste_dma40 already does this. At least is does so in 2.6.39. I may not
+> be up to date of what is merged for 2.6.40.
+>
+I looked at the code once more and ste_dam40 should be on this list :)
+ste_dm40 only treats issue_pending accordingly if the DMA driver is in
+idle. If the dma is active the desc:s submitted from submit() will be
+started later on from dma-irq-function. The dma-irq-function simply
+checks if there are pending desc are start them if any. I will fix a
+patch for this.
 
-> On 05/20/2011 04:19 AM, Will Deacon wrote:
-> > Hello,
-> >
-> > There are a few issues with ASID handling and cache flushing on v6/v7
-> > CPUs that have been identified when running Linux on the Cortex-A15.
-> >
-> > These patches solve the problems for the classic page tables. Additional
-> > LPAE changes will be posted separately.
-> >
-> > Tested on a Realview-PBX platform with a dual-core Cortex-A9.
-> 
-> Should these patches be sent to the stable tree? Or do the problems only
-> manifest on Cortex-A15?
-
-I was planning to CC stable for patches 1 ("ARM: cache: ensure MVA is cacheline
-aligned in flush_kern_dcache_area") and 4 ("ARM: mm: fix racy ASID rollover
-broadcast on SMP platforms") as these affect existing v6 and v7 cores. The
-remainder of the patches, although nice to have, only kick in on A15 as far as
-I'm aware (due to aggressive caching of speculative level 1 entries).
-
-I was hoping for some acks/tested-bys before then since these changes affect a
-lot of platforms and the code is fairly scary.
-
-Will
+/Per
