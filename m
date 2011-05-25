@@ -1,61 +1,96 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 25 May 2011 11:19:59 -0500
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <20110525082344.GF22096@pengutronix.de>
-References: <201105181047.17309.arnd@arndb.de>
-	<20110525082344.GF22096@pengutronix.de>
-Message-ID: <0D753D10438DA54287A00B027084269764D323A714@AUSP01VMBX24.collaborationhost.net>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 25 May 2011 17:49:55 +0100
+Subject: [RFC PATCH v3 00/13] Consolidating GIC per-cpu interrupts
+Message-ID: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 10:47:16AM +0200, Arnd Bergmann wrote:
-> This is the draft plan for maintaining the ARM subarchitectures in a common
-> tree, as a way to help coordinate the upstream merging of the
-> arch/arm/{plat,mach}-* changes into Linus' tree.
-> 
-> This was discussed in great length at the Linaro Developer Summit in Budapest
-> last week where we worked out an initial plan. We are modeling the maintainance
-> after how the linux-tip tree is used for the x86 architecture, with a set
-> of developers that have commit access to one tree on kernel.org and
-> have mutual trust in one another. Nicolas Pitre and me are funded
-> by Linaro to do the bulk of the work, while Thomas Gleixner will help
-> us part-time with his long time architecture maintainance experience.
-> Despite the funding by Linaro, this is not a Linaro project and all
-> ARM subarchitectures are welcome to go through our tree.
-> 
-> Russell King's role as ARM maintainer is of course unchanged by this, but
-> he has the same commit access to the new tree as the other maintainers and
-> is welcome to work in the same tree. We are also open to nominations for
-> further people outside of Linaro to join us as committers. Marc Zyngier from
-> ARM ltd is one of the candidates that has been suggested and I would also
-> like to see someone from Google. We have to find the right balance with the
-> number of committers so we get all the work done without stepping on each
-> other's toes.
-> 
-> Our tree will be strictly organized in topic brances so we can feed them
-> upstream in the bitesized chunks that Linus likes. The master branch
-> is an integration branch that pulls all other branches that are scheduled
-> for the next merge window and itself gets integrated into linux-next.
-> 
-> We will probably not be fully functional during the 2.6.40 merge window,
-> but we are trying our best to be useful. For 2.6.41, my hope is that
-> we can merge the bulk of the ARM subarchitecture changes through this
-> tree. Once Linus is happy with the way that the process works, we can
-> mandate that all ARM subarchitecture changes go through our tree, until
-> then it stays voluntary.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Cc: Nicolas Pitre <nico@fluxnic.net>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> 
-> ---
-> 
-> Maintainers: If you are happy with the layout of the process,
-> please ack this patch, otherwise please comment.
+The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+problems:
 
-As co-maintainer of ep93xx
+- They use a completely separate scheme to handle the interrupts,
+  mostly because the PPI concept doesn't really match the kernel view
+  of an interrupt.
+- Some low-level code gets duplicated, as usual...
+- At least one platform (msm) has started implementing its own
+  alternative scheme.
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+The proposed solution is to let the GIC code expose the PPIs as
+something that the kernel can manage. Instead of having a single
+interrupt number shared on all cores, make the interrupt number be
+different on each CPU.
+
+This enables the use of the normal kernel API (request_irq() and
+friends) and the elimination of some low level code.
+
+This patch set is based on 2.6.39+ as of May 24th. Tested on PB-11MP,
+Pandaboard and SMDK-V310.
+
+
+>From bogus@does.not.exist.com  Wed May 25 10:48:51 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 25 May 2011 14:48:51 -0000
+Subject: No subject
+Message-ID: <mailman.0.1306342205.12414.linux-arm-kernel@lists.infradead.org>
+
+- More MSM fixes
+- Dropped MSM interrupt handler removal, as this requires more discussion,
+  and will be addressed in a separate series.
+- Moved introduction of percpu_timer_handler to a separate patch
+
+
+>From bogus@does.not.exist.com  Wed May 25 10:48:51 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 25 May 2011 14:48:51 -0000
+Subject: No subject
+Message-ID: <mailman.1.1306342205.12414.linux-arm-kernel@lists.infradead.org>
+
+- Fix crash while hotpluging a CPU
+- Use handle_percpu_irq() instead of handle_fasteoi_irq()
+- MSM fixes courtesy of Stephen Boyd
+- MSM switched to percpu_timer_handler()
+- Remove local timer interrupt accounting
+- Restructure patches #1 and #2
+
+Marc Zyngier (13):
+  ARM: gic: add per-cpu interrupt multiplexer
+  ARM: smp: add interrupt handler for local timers
+  ARM: smp_twd: add support for remapped PPI interrupts
+  ARM: omap4: use remapped PPI interrupts for local timer
+  ARM: versatile: use remapped PPI interrupts for local timer
+  ARM: shmobile: use remapped PPI interrupts for local timer
+  ARM: ux500: use remapped PPI interrupts for local timer
+  ARM: tegra: use remapped PPI interrupts for local timer
+  ARM: msm: use remapped PPI interrupts for local timer
+  ARM: exynos4: use remapped PPI interrupts for local timer
+  ARM: gic: remove previous local timer interrupt handling
+  ARM: gic: add compute_irqnr macro for exynos4
+  ARM: SMP: automatically select ARM_GIC_VPPI
+
+ arch/arm/Kconfig                                  |    1 +
+ arch/arm/common/Kconfig                           |    5 +
+ arch/arm/common/gic.c                             |  143 +++++++++++++++++=
+++--
+ arch/arm/include/asm/entry-macro-multi.S          |    7 -
+ arch/arm/include/asm/hardirq.h                    |    3 -
+ arch/arm/include/asm/hardware/entry-macro-gic.S   |   31 ++---
+ arch/arm/include/asm/hardware/gic.h               |   12 ++-
+ arch/arm/include/asm/localtimer.h                 |    7 +-
+ arch/arm/include/asm/smp.h                        |    5 -
+ arch/arm/kernel/irq.c                             |   11 +-
+ arch/arm/kernel/smp.c                             |   27 +---
+ arch/arm/kernel/smp_twd.c                         |   17 ++-
+ arch/arm/mach-exynos4/include/mach/entry-macro.S  |   70 +----------
+ arch/arm/mach-exynos4/localtimer.c                |    3 +-
+ arch/arm/mach-msm/board-msm8x60.c                 |   11 --
+ arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +-----------
+ arch/arm/mach-msm/timer.c                         |   51 ++++----
+ arch/arm/mach-omap2/include/mach/entry-macro.S    |   14 +--
+ arch/arm/mach-omap2/timer-mpu.c                   |    3 +-
+ arch/arm/mach-shmobile/entry-intc.S               |    3 -
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 -
+ arch/arm/mach-shmobile/localtimer.c               |    3 +-
+ arch/arm/mach-tegra/localtimer.c                  |    3 +-
+ arch/arm/mach-ux500/localtimer.c                  |    3 +-
+ arch/arm/plat-versatile/localtimer.c              |    3 +-
+ 25 files changed, 233 insertions(+), 279 deletions(-)
