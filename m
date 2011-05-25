@@ -1,35 +1,50 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 25 May 2011 21:52:49 +0100
-Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
-In-Reply-To: <4DDD464F.2010508@codeaurora.org>
-References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
-	<4DDC2A59.8030109@codeaurora.org>
-	<002f01cc1ada$5e7ffaa0$1b7fefe0$@deacon@arm.com>
-	<4DDD464F.2010508@codeaurora.org>
-Message-ID: <20110525205249.GD24876@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 25 May 2011 22:47:14 +0200
+Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <20110525195413.GC2996@acer>
+References: <cover.1306082097.git.mika.westerberg@iki.fi>
+	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
+	<BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
+	<20110525195413.GC2996@acer>
+Message-ID: <BANLkTin8Trn-44Op+GbxrgocFrnPuXUZ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 11:11:27AM -0700, Stephen Boyd wrote:
-> On 05/25/2011 05:50 AM, Will Deacon wrote:
-> > I was planning to CC stable for patches 1 ("ARM: cache: ensure MVA is cacheline
-> > aligned in flush_kern_dcache_area") and 4 ("ARM: mm: fix racy ASID rollover
-> > broadcast on SMP platforms") as these affect existing v6 and v7 cores. The
-> > remainder of the patches, although nice to have, only kick in on A15 as far as
-> > I'm aware (due to aggressive caching of speculative level 1 entries).
-> 
-> Would it be appropriate to reorder the series then so patches 1 and 4
-> come first?
+2011/5/25 Mika Westerberg <mika.westerberg@iki.fi>:
 
-I'm not entirely convinced (4) is the best solution yet, but that's
-mainly becaues I've not thought about it enough yet.  1-3 look fine
-though.
+> I re-checked the specs and indeed, as discussed previously, it is clear that
+> Cirrus (or ARM) copied the interface from other. Even the wording in the
+> document is identical in many places. However, in ep93xx User's Guide, there
+> is no mention about SSP being AMBA PrimeCell peripheral. For UARTs it is
+> mentioned... go figure.
+>
+> There are differences also, some of the bits in control registers are in
+> different places. Interrupt registers are completely different and there is no
+> DMA control register at all. The same things we discussed before.
 
-> > I was hoping for some acks/tested-bys before then since these changes affect a
-> > lot of platforms and the code is fairly scary.
-> 
-> Yes the patches look scary. I could give it a test on MSM but I'm not
-> even sure that will help much. Why didn't you Cc Russell on these patches?
+But it really does not matter. The amba-pl022.c driver has all the same
+deviations for things called "PL023" that are not pure PL022 either.
+I just made the driver a bit more flexible, supporting both.
 
-I do tend to read about 90% of linux-arm-kernel, whether its cc'd to
-me or not.  The cc doesn't really affect whether I read it or not.
+If the people doing drivers/usb/musb/* had done the same thing we
+would have had what, 5 drivers for similar hardware?
+
+> Back then, it wasn't known how the M2M DMA interface (the one used
+> by SSP and IDE) was going to be implemented.
+
+But I knew, having just written the needed extensions to dmaengine.
+And I said so. But I realize I'm maybe not considered an authoritative
+source on the subject, and I'm biased.
+
+> IMHO it is better to have ep93xx implementation on its own driver since it is
+> not a real AMBA PL022 peripheral but some weird hack made by Cirrus (although
+> my opinions are bit biased).
+
+I disagree because it's IMO at first sight no more deviant than our "PL023"
+variants that still use the same pl022 driver.
+
+Is there some inexepensive hardware with EP93xx I can get to fix this
+myself?
+
+Yours,
+Linus Walleij
