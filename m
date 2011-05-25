@@ -1,44 +1,143 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Wed, 25 May 2011 22:54:13 +0300
-Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
-	<BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
-Message-ID: <20110525195413.GC2996@acer>
+From: GNUtoo@no-log.org (Denis 'GNUtoo' Carikli)
+Date: Wed, 25 May 2011 21:32:23 +0200
+Subject: [PATCH] imx: mach-bug: add sdio platform data
+Message-ID: <1306351943-7963-1-git-send-email-GNUtoo@no-log.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 10:39:52AM +0200, Linus Walleij wrote:
-> 
-> No so much a review comment as an observation: I opposed the merge of the
-> EP93xx SPI driver in drivers/spi/ep93xx_spi.c on the grounds that it was close
-> enough to amba-pl022.c that it could use that driver instead.
+Signed-off-by: Denis 'GNUtoo' Carikli <GNUtoo@no-log.org>
+---
+ arch/arm/mach-imx/mach-bug.c |  106 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 106 insertions(+), 0 deletions(-)
 
-I re-checked the specs and indeed, as discussed previously, it is clear that
-Cirrus (or ARM) copied the interface from other. Even the wording in the
-document is identical in many places. However, in ep93xx User's Guide, there
-is no mention about SSP being AMBA PrimeCell peripheral. For UARTs it is
-mentioned... go figure.
-
-There are differences also, some of the bits in control registers are in
-different places. Interrupt registers are completely different and there is no
-DMA control register at all. The same things we discussed before.
-
-> One of the arguments against was that you were going to do custom DMA
-> and stuff. Now you're using the DMAengine, so can you please reconsider
-> refactoring amba-pl022.c to suit your needs and you'll get DMA support for
-> free mor or less.
-
-Back then, it wasn't known how the M2M DMA interface (the one used by SSP and
-IDE) was going to be implemented. Now that the dmaengine has become de facto
-API, it is clear that any "new" DMA implementations should implement that
-instead of some home grown API. Initially my M2M DMA experiments were just
-like their M2P counterparts but Ryan suggested dmaengine approach.
-
-IMHO it is better to have ep93xx implementation on its own driver since it is
-not a real AMBA PL022 peripheral but some weird hack made by Cirrus (although
-my opinions are bit biased).
-
-Thanks,
-MW
+diff --git a/arch/arm/mach-imx/mach-bug.c b/arch/arm/mach-imx/mach-bug.c
+index 42e4f07..b0d1536 100644
+--- a/arch/arm/mach-imx/mach-bug.c
++++ b/arch/arm/mach-imx/mach-bug.c
+@@ -22,6 +22,8 @@
+ #include <mach/iomux-mx3.h>
+ #include <mach/hardware.h>
+ #include <mach/common.h>
++#include <mach/gpio.h>
++#include <mach/mx31.h>
+ 
+ #include <asm/mach/time.h>
+ #include <asm/mach/arch.h>
+@@ -40,11 +42,115 @@ static const unsigned int bug_pins[] __initconst = {
+ 	MX31_PIN_PC_BVD1__RXD5,
+ };
+ 
++static int sdhc1_pins[] = {
++	MX31_PIN_SD1_DATA3__SD1_DATA3,
++	MX31_PIN_SD1_DATA2__SD1_DATA2,
++	MX31_PIN_SD1_DATA1__SD1_DATA1,
++	MX31_PIN_SD1_DATA0__SD1_DATA0,
++	MX31_PIN_SD1_CLK__SD1_CLK,
++	MX31_PIN_SD1_CMD__SD1_CMD,
++};
++
++static int sdhc2_pins[] = {
++	MX31_PIN_PC_PWRON__SD2_DATA3,
++	MX31_PIN_PC_VS1__SD2_DATA2,
++	MX31_PIN_PC_READY__SD2_DATA1,
++	MX31_PIN_PC_WAIT_B__SD2_DATA0,
++	MX31_PIN_PC_CD2_B__SD2_CLK,
++	MX31_PIN_PC_CD1_B__SD2_CMD,
++};
++
++static int mxc_bug_sdhc1_init(struct device *dev, irq_handler_t h, void *data)
++{
++	return mxc_iomux_setup_multiple_pins(sdhc1_pins, ARRAY_SIZE(sdhc1_pins),
++					     "sdhc-1");
++}
++
++static void mxc_bug_sdhc1_exit(struct device *dev, void *data)
++{
++	mxc_iomux_release_multiple_pins(sdhc1_pins, ARRAY_SIZE(sdhc1_pins));
++}
++
++static int mxc_bug_sdhc2_init(struct device *dev, irq_handler_t h, void *data)
++{
++	return mxc_iomux_setup_multiple_pins(sdhc2_pins, ARRAY_SIZE(sdhc2_pins),
++					     "sdhc-2");
++}
++
++static void mxc_bug_sdhc2_exit(struct device *dev, void *data)
++{
++	mxc_iomux_release_multiple_pins(sdhc2_pins, ARRAY_SIZE(sdhc2_pins));
++}
++
++/* No card and rw detection at the moment */
++static struct imxmmc_platform_data sdhc1_pdata = {
++	.init = mxc_bug_sdhc1_init,
++	.exit = mxc_bug_sdhc1_exit,
++	.ocr_avail = MMC_VDD_27_28 | MMC_VDD_28_29 | MMC_VDD_29_30 |
++	MMC_VDD_32_33 | MMC_VDD_33_34,
++};
++
++static struct imxmmc_platform_data sdhc2_pdata = {
++	.init = mxc_bug_sdhc2_init,
++	.exit = mxc_bug_sdhc2_exit,
++};
++
++
++static struct resource mxcsdhc0_resources[] = {
++	{
++		.start = MX31_SDHC1_BASE_ADDR,
++		.end = MX31_SDHC1_BASE_ADDR + SZ_16K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = MX31_INT_SDHC1,
++		.end = MX31_INT_SDHC1,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++static struct resource mxcsdhc1_resources[] = {
++	{
++		.start = MX31_SDHC2_BASE_ADDR,
++		.end = MX31_SDHC2_BASE_ADDR + SZ_16K - 1,
++		.flags = IORESOURCE_MEM,
++	}, {
++		.start = MX31_INT_SDHC2,
++		.end = MX31_INT_SDHC2,
++		.flags = IORESOURCE_IRQ,
++	},
++};
++
++struct platform_device mxcsdhc_device0 = {
++	.name = "mxc-mmc",
++	.id = 0,
++	.num_resources = ARRAY_SIZE(mxcsdhc0_resources),
++	.resource = mxcsdhc0_resources,
++};
++
++struct platform_device mxcsdhc_device1 = {
++	.name = "mxc-mmc",
++	.id = 1,
++	.num_resources = ARRAY_SIZE(mxcsdhc1_resources),
++	.resource = mxcsdhc1_resources,
++};
++
+ static void __init bug_board_init(void)
+ {
+ 	mxc_iomux_setup_multiple_pins(bug_pins,
+ 				      ARRAY_SIZE(bug_pins), "uart-4");
+ 	imx31_add_imx_uart4(&uart_pdata);
++
++	/* Turn off Wifi by default */
++	if ( !mxc_iomux_alloc_pin(
++		IOMUX_MODE(MX31_PIN_USB_BYP, IOMUX_CONFIG_GPIO), "bug-wifi")
++		){
++		if (!gpio_request(IOMUX_TO_GPIO(MX31_PIN_USB_BYP),
++				   "bug-wifi"))
++			gpio_direction_output(IOMUX_TO_GPIO(
++						      MX31_PIN_USB_BYP), 0);
++	}
++	mxc_register_device(&mxcsdhc_device0, &sdhc1_pdata);
++	mxc_register_device(&mxcsdhc_device1, &sdhc2_pdata);
+ }
+ 
+ static void __init bug_timer_init(void)
+-- 
+1.7.1
