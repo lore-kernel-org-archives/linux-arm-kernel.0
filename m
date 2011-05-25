@@ -1,38 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 25 May 2011 13:10:39 +0200
-Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical Address
-	Extensions
-In-Reply-To: <alpine.LFD.2.00.1105242042340.3207@xanadu.home>
-References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-	<8yapqn7fyab.fsf@huya.qualcomm.com>
-	<alpine.LFD.2.00.1105242042340.3207@xanadu.home>
-Message-ID: <201105251310.39609.arnd@arndb.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Wed, 25 May 2011 13:11:31 +0200
+Subject: [PATCH 1/2] ARM: pxa: raumfeld: follow upcoming hardware change
+In-Reply-To: <20110524175002.GB4652@n2100.arm.linux.org.uk>
+References: <1306239223-8293-1-git-send-email-zonque@gmail.com>
+	<20110524175002.GB4652@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTikwkr8etp_fBnsUxiSq28VUyTbONQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 25 May 2011, Nicolas Pitre wrote:
-> > Do you expect non LPAE targets to be able to boot with these changes
-> > applied (and LPAE enabled)?  I am able to build this tree for the
-> > MSM8660 (with a minor patch below), but it fails to boot with LPAE
-> > enabled.  It seems to work fine with LPAE not enabled.
-> 
-> I wouldn't expect a LPAE kernel to boot on non LPAE capable hardware.
-> 
-> And I don't think we'll ever try to support both LPAE and non-LPAE modes 
-> in the same kernel binary either since this has implications all over 
-> the place in core kernel mm code.
+On Tue, May 24, 2011 at 7:50 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, May 24, 2011 at 02:13:42PM +0200, Daniel Mack wrote:
+>> The backlight control is going to change back to PWM in the
+>> upcoming Raumfeld Controller hardware revision.
+>
+> The commit comments doesn't say why the LCD timings have changed:
 
-Just for information and to complete the picture, what other of these
-combinations are possible?
+Oh, yes. Seem something went wrong in the rebase process. I'll fix
+this and resubmit.
 
-* Non-LPAE kernel on LPAE-capable hardware
-
-* LPAE kernel as KVM guest of LPAE kernel
-
-* non-LPAE kernel as KVM guest of LPAE kernel
-
-* LPAE kernel as KVM guest of non-LPAE kernel
-
-* non-LPAE kernel as KVM guest of non-LPAE kernel on LPAE-enabled hardware
-
-	Arnd
+Thanks,
+Daniel
