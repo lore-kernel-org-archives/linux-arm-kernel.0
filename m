@@ -1,72 +1,122 @@
-From: javier.martin@vista-silicon.com (javier Martin)
-Date: Wed, 25 May 2011 09:00:21 +0200
-Subject: [PATCH v2 1/2] MT9P031: Add support for Aptina mt9p031 sensor.
-In-Reply-To: <551158.38796.qm@web112009.mail.gq1.yahoo.com>
-References: <551158.38796.qm@web112009.mail.gq1.yahoo.com>
-Message-ID: <BANLkTi=7mssSFd=HYwVReoKw6VEC_Qvs0Q@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 25 May 2011 09:35:18 +0200
+Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
+Message-ID: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please, do not remove anyone from the CC list.
+Hello,
 
-On 25 May 2011 05:45, Chris Rodley <carlighting@yahoo.co.nz> wrote:
-> Hi,
->
-> Have upgraded the driver to Javier's latest RFC driver.
-> Still having problems viewing output.
->
-> Setting up with:
-> # media-ctl -r -l '"mt9p031 2-0048":0->"OMAP3 ISP CCDC":0[1], "OMAP3 ISP CCDC":1->"OMAP3 ISP CCDC output":0[1]'
-> Resetting all links to inactive
-> Setting up link 16:0 -> 5:0 [1]
-> Setting up link 5:1 -> 6:0 [1]
->
-> # media-ctl -f '"mt9p031 2-0048":0[SGRBG12 320x240], "OMAP3 ISP CCDC":0[SGRBG8 320x240], "OMAP3 ISP CCDC":1[SGRBG8 320x240]'
-> Setting up format SGRBG12 320x240 on pad mt9p031 2-0048/0
-> Format set: SGRB
-> Setting up format SGRBG12 320x240 on pad OMAP3 ISP CCDC/0
-> Format set: SGRBG12 320x240
-> Setting up format SGRBG8 320x240 on pad OMAP3 ISP CCDC/0
-> Format set: SGRBG8 320x240
-> Setting up format SGRBG8 320x240 on pad OMAP3 ISP CCDC/1
-> Format set: SGRBG8 320x240
->
-> Then:
-> # yavta -f SGRBG8 -s 320x240 -n 4 --capture=100 -F /dev/video2
-> Device /dev/video2 opened.
-> Device `OMAP3 ISP CCDC output' on `media' is a video capture device.
-> Video format set: width: 320 height: 240 buffer size: 76800
-> Video format: GRBG (47425247) 320x240
-> 4 buffers requested.
-> length: 76800 offset: 0
-> Buffer 0 mapped at address 0x4006c000.
-> length: 76800 offset: 77824
-> Buffer 1 mapped at address 0x40222000.
-> length: 76800 offset: 155648
-> Buffer 2 mapped at address 0x4025e000.
-> length: 76800 offset: 233472
-> Buffer 3 mapped at address 0x402f0000.
->
-> After this it hangs and will exit on 'ctrl c':
-> omap3isp omap3isp: CCDC stop timeout!
->
-> Any ideas what is causing this problem?
->
+Folloing the discussion about the driver for IOMMU controller for
+Samsung Exynos4 platform and Arnd's suggestions I've decided to start
+working on redesign of dma-mapping implementation for ARM architecture.
+The goal is to add support for IOMMU in the way preffered by the
+community :)
 
-No idea,
-it works for me. Note you have to apply RFC + PATCH v2 2/2. Please,
-double check.
+Some of the ideas about merging dma-mapping api and iommu api comes from
+the following threads:
+http://www.spinics.net/lists/linux-media/msg31453.html
+http://www.spinics.net/lists/arm-kernel/msg122552.html
+http://www.spinics.net/lists/arm-kernel/msg124416.html
 
-Also, if you have problems with last RFC patch you should answer RFC
-mail. Not this one.
+They were also discussed on Linaro memory management meeting at UDS
+(Budapest 9-12 May).
 
-Thank you.
+I've finaly managed to clean up a bit my works and present the initial,
+very proof-of-concept version of patches that were ready just before
+Linaro meeting.
+
+What have been implemented: 
+
+1. Introduced arm_dma_ops
+
+dma_map_ops from include/linux/dma-mapping.h suffers from the following
+limitations:
+- lack of start address for sync operations
+- lack of write-combine methods
+- lack of mmap to user-space methods
+- lack of map_single method
+
+For the initial version I've decided to use custom arm_dma_ops.
+Extending common interface will take time, until that I wanted to have
+something already working.
+
+dma_{alloc,free,mmap}_{coherent,writecombine} have been consolidated
+into dma_{alloc,free,mmap}_attrib what have been suggested on Linaro
+meeting. New attribute for WRITE_COMBINE memory have been introduced.
+
+2. moved all inline ARM dma-mapping related operations to
+arch/arm/mm/dma-mapping.c and put them as methods in generic arm_dma_ops
+structure. The dma-mapping.c code deinitely needs cleanup, but this is
+just a first step.
+
+3. Added very initial IOMMU support. Right now it is limited only to
+dma_alloc_attrib, dma_free_attrib and dma_mmap_attrib. It have been
+tested with s5p-fimc driver on Samsung Exynos4 platform.
+
+4. Adapted Samsung Exynos4 IOMUU driver to make use of the introduced
+iommu_dma proposal.
+
+This patch series contains only patches for common dma-mapping part.
+There is also a patch that adds driver for Samsung IOMMU controller on
+Exynos4 platform. All required patches are available on:
+
+git://git.infradead.org/users/kmpark/linux-2.6-samsung dma-mapping branch
+
+Git web interface:
+http://git.infradead.org/users/kmpark/linux-2.6-samsung/shortlog/refs/heads/dma-mapping
+
+
+Future:
+
+1. Add all missing operations for IOMMU mappings (map_single/page/sg,
+sync_*)
+
+2. Move sync_* operations into separate function for better code sharing
+between iommu and non-iommu dma-mapping code
+
+3. Splitting out dma bounce code from non-bounce into separate set of
+dma methods. Right now dma-bounce code is compiled conditionally and
+spread over arch/arm/mm/dma-mapping.c and arch/arm/common/dmabounce.c.
+
+4. Merging dma_map_single with dma_map_page. I haven't investigated
+deeply why they have separate implementation on ARM. If this is a
+requirement then dma_map_ops need to be extended with another method.
+
+5. Fix dma_alloc to unmap from linear mapping.
+
+6. Convert IO address space management code from gen-alloc to some
+simpler bitmap based solution.
+
+7. resolve issues that might araise during discussion & comments
+
+Please note that this is very early version of patches, definitely NOT
+intended for merging. I just wanted to make sure that the direction is
+right and share the code with others that might want to cooperate on
+dma-mapping improvements.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
+
+
+
+Patch summary:
+
+Marek Szyprowski (2):
+  ARM: Move dma related inlines into arm_dma_ops methods
+  ARM: initial proof-of-concept IOMMU mapper for DMA-mapping
+
+ arch/arm/Kconfig                   |    1 +
+ arch/arm/include/asm/device.h      |    3 +
+ arch/arm/include/asm/dma-iommu.h   |   30 ++
+ arch/arm/include/asm/dma-mapping.h |  653 +++++++++++------------------
+ arch/arm/mm/dma-mapping.c          |  817 +++++++++++++++++++++++++++++++++---
+ arch/arm/mm/vmregion.h             |    2 +-
+ include/linux/dma-attrs.h          |    1 +
+ 7 files changed, 1033 insertions(+), 474 deletions(-)
+ create mode 100644 arch/arm/include/asm/dma-iommu.h
 
 -- 
-Javier Martin
-Vista Silicon S.L.
-CDTUC - FASE C - Oficina S-345
-Avda de los Castros s/n
-39005- Santander. Cantabria. Spain
-+34 942 25 32 60
-www.vista-silicon.com
+1.7.1.569.g6f426
