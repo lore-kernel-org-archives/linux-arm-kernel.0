@@ -1,33 +1,48 @@
-From: hong.xu@atmel.com (Hong Xu)
-Date: Wed, 25 May 2011 14:03:27 +0800
-Subject: [PATCH] AT91: Add VSYNC pin definition for AT91SAM9RL silicon
-Message-ID: <1306303407-23659-1-git-send-email-hong.xu@atmel.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 25 May 2011 14:06:37 +0800
+Subject: [PATCH v2 5/7] mmc: sdhci: consolidate sdhci-of-esdhc and
+	sdhci-esdhc-imx
+In-Reply-To: <20110524194054.GC25727@pengutronix.de>
+References: <1304601778-13837-1-git-send-email-shawn.guo@linaro.org>
+	<1304601778-13837-6-git-send-email-shawn.guo@linaro.org>
+	<20110524194054.GC25727@pengutronix.de>
+Message-ID: <20110525060637.GA30583@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Atmel's AT91SAM9RL-EK board, the LCD panel does not need VSYNC
-signal. But this signal is useful for the boards from other
-vendors, as reported by Nicholas Kinar.
-This small patch adds the VSYNC pin definition by default.
+On Tue, May 24, 2011 at 09:40:54PM +0200, Wolfram Sang wrote:
+> On Thu, May 05, 2011 at 09:22:56PM +0800, Shawn Guo wrote:
+> > This patch is to consolidate SDHCI driver for Freescale eSDHC
+> > controller found on both MPCxxx and i.MX platforms.  It merges
+> > sdhci-of-esdhc.c into sdhci-esdhc.c, so that the same pair of
+> > .probe/.remove hook works with eSDHC for two platforms.
+> > 
+> > As the results, sdhci-of-esdhc.c and sdhci-esdhc.h are removed, and
+> > header esdhc.h containing the definition of esdhc_platform_data is
+> > put into the public folder.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> I agree with Anton about not merging the two...
+> 
+> > +#ifndef CONFIG_MMC_SDHCI_ESDHC_IMX
+> > +#define cpu_is_mx25()	(0)
+> > +#define cpu_is_mx35()	(0)
+> > +#define cpu_is_mx51()	(0)
+> > +#define cpu_is_imx()	(0)
+> > +#else
+> > +#define cpu_is_imx()	(1)
+> > +#endif
+> 
+> ... e.g. that looks a bit frightening.
+> 
+Agree.
 
-Reported-by: Nicholas Kinar <n.kinar@usask.ca>
-Signed-off-by: Hong Xu <hong.xu@atmel.com>
----
+The use of cpu_is_mx..() in the driver itself seems a churn to me
+even without this consolidation patch.  Is it possible for us to
+eliminate them by using pdata, and eventually device tree?  When we
+are there, I might want to revisit the consolidation again.
 
- arch/arm/mach-at91/at91sam9rl_devices.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-at91/at91sam9rl_devices.c b/arch/arm/mach-at91/at91sam9rl_devices.c
-index c49262b..87a49d9 100644
---- a/arch/arm/mach-at91/at91sam9rl_devices.c
-+++ b/arch/arm/mach-at91/at91sam9rl_devices.c
-@@ -538,6 +538,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
- 	}
- 
- 	at91_set_B_periph(AT91_PIN_PC1, 0);	/* LCDPWR */
-+	at91_set_A_periph(AT91_PIN_PC4, 0);	/* LCDVSYNC */
- 	at91_set_A_periph(AT91_PIN_PC5, 0);	/* LCDHSYNC */
- 	at91_set_A_periph(AT91_PIN_PC6, 0);	/* LCDDOTCK */
- 	at91_set_A_periph(AT91_PIN_PC7, 0);	/* LCDDEN */
 -- 
-1.7.3.3
+Regards,
+Shawn
