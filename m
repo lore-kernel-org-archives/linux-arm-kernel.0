@@ -1,77 +1,42 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 May 2011 17:49:59 +0100
-Subject: [RFC PATCH v3 04/13] ARM: omap4: use remapped PPI interrupts for
+Date: Wed, 25 May 2011 17:50:03 +0100
+Subject: [RFC PATCH v3 08/13] ARM: tegra: use remapped PPI interrupts for
 	local timer
 In-Reply-To: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
 References: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306342208-32754-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1306342208-32754-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the normal interrupt scheme for the local timers by using
 a remapped PPI interrupt.
 
-Tested on a Pandaboard.
-
-Cc: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Colin Cross <ccross@android.com>
+Cc: Erik Gilling <konkers@android.com>
+Cc: Olof Johansson <olof@lixom.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/Kconfig                    |    1 +
- arch/arm/mach-omap2/include/mach/entry-macro.S |   14 +-------------
- arch/arm/mach-omap2/timer-mpu.c                |    3 ++-
- 3 files changed, 4 insertions(+), 14 deletions(-)
+ arch/arm/mach-tegra/Kconfig      |    1 +
+ arch/arm/mach-tegra/localtimer.c |    3 ++-
+ 2 files changed, 3 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index b997a35..8282921 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
+diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
+index 5ec1846..eabdd90 100644
+--- a/arch/arm/mach-tegra/Kconfig
++++ b/arch/arm/mach-tegra/Kconfig
+@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
+ 	bool "Tegra 2 family"
  	select CPU_V7
  	select ARM_GIC
 +	select ARM_GIC_VPPI
- 	select LOCAL_TIMERS if SMP
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
-diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
-index a48690b..22d86ef 100644
---- a/arch/arm/mach-omap2/include/mach/entry-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
-@@ -78,7 +78,7 @@
- 4401:		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
- 		ldr     \tmp, =1021
- 		bic     \irqnr, \irqstat, #0x1c00
--		cmp     \irqnr, #29
-+		cmp     \irqnr, #15
- 		cmpcc   \irqnr, \irqnr
- 		cmpne   \irqnr, \tmp
- 		cmpcs   \irqnr, \irqnr
-@@ -101,18 +101,6 @@
- 		it	cs
- 		cmpcs	\irqnr, \irqnr
- 		.endm
--
--		/* As above, this assumes that irqstat and base are preserved */
--
--		.macro test_for_ltirq, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		mov 	\tmp, #0
--		cmp	\irqnr, #29
--		itt	eq
--		moveq	\tmp, #1
--		streq	\irqstat, [\base, #GIC_CPU_EOI]
--		cmp	\tmp, #0
--		.endm
- #endif	/* CONFIG_SMP */
- 
- #else	/* MULTI_OMAP2 */
-diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
-index 31c0ac4..1fd5ca5 100644
---- a/arch/arm/mach-omap2/timer-mpu.c
-+++ b/arch/arm/mach-omap2/timer-mpu.c
-@@ -22,6 +22,7 @@
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select USB_ULPI if USB_SUPPORT
+diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
+index e91d681..97cd0a9 100644
+--- a/arch/arm/mach-tegra/localtimer.c
++++ b/arch/arm/mach-tegra/localtimer.c
+@@ -14,13 +14,14 @@
  #include <asm/irq.h>
  #include <asm/smp_twd.h>
  #include <asm/localtimer.h>
@@ -79,12 +44,11 @@ index 31c0ac4..1fd5ca5 100644
  
  /*
   * Setup the local clock events for a CPU.
-@@ -32,7 +33,7 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
- 		return -ENXIO;
- 
--	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_to_vppi(OMAP44XX_IRQ_LOCALTIMER);
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
+-	evt->irq = IRQ_LOCALTIMER;
++	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
  	twd_timer_setup(evt);
  	return 0;
  }
