@@ -1,56 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 25 May 2011 17:50:03 +0100
-Subject: [RFC PATCH v3 08/13] ARM: tegra: use remapped PPI interrupts for
-	local timer
+Date: Wed, 25 May 2011 17:49:57 +0100
+Subject: [RFC PATCH v3 02/13] ARM: smp: add interrupt handler for local timers
 In-Reply-To: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
 References: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306342208-32754-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1306342208-32754-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the normal interrupt scheme for the local timers by using
-a remapped PPI interrupt.
+Provide a "normal" interrupt handler for local timers.
+It is expected that most timer implementations will use this
+handler unless they have more specific requirements.
 
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/Kconfig      |    1 +
- arch/arm/mach-tegra/localtimer.c |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/localtimer.h |    6 ++++++
+ arch/arm/kernel/smp.c             |   12 ++++++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 5ec1846..eabdd90 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
- 	select CPU_V7
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
-index e91d681..97cd0a9 100644
---- a/arch/arm/mach-tegra/localtimer.c
-+++ b/arch/arm/mach-tegra/localtimer.c
-@@ -14,13 +14,14 @@
- #include <asm/irq.h>
- #include <asm/smp_twd.h>
- #include <asm/localtimer.h>
-+#include <asm/hardware/gic.h>
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index 080d74f..bef44b3 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -10,6 +10,8 @@
+ #ifndef __ASM_ARM_LOCALTIMER_H
+ #define __ASM_ARM_LOCALTIMER_H
+ 
++#include <linux/interrupt.h>
++
+ struct clock_event_device;
  
  /*
-  * Setup the local clock events for a CPU.
+@@ -22,6 +24,10 @@ void percpu_timer_setup(void);
   */
- int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
--	evt->irq = IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
- 	twd_timer_setup(evt);
- 	return 0;
+ asmlinkage void do_local_timer(struct pt_regs *);
+ 
++/*
++ * Per-cpu timer IRQ handler
++ */
++irqreturn_t percpu_timer_handler(int irq, void *dev_id);
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index d439a8f..2c85941 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -459,6 +459,18 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
+ 	set_irq_regs(old_regs);
  }
+ 
++irqreturn_t percpu_timer_handler(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	if (local_timer_ack()) {
++		evt->event_handler(evt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
+ void show_local_irqs(struct seq_file *p, int prec)
+ {
+ 	unsigned int cpu;
 -- 
 1.7.0.4
