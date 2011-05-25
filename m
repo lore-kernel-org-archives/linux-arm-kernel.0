@@ -1,37 +1,51 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 25 May 2011 09:39:33 +0200
-Subject: [PATCH] AT91: Add VSYNC pin definition for AT91SAM9263 silicon
-In-Reply-To: <1306305101-27285-1-git-send-email-hong.xu@atmel.com>
-References: <1306305101-27285-1-git-send-email-hong.xu@atmel.com>
-Message-ID: <20110525073933.GH863@game.jcrosoft.org>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 25 May 2011 09:51:54 +0200 (CEST)
+Subject: [PATCH 0/4] Add a generic struct clk
+In-Reply-To: <BANLkTinVnFasvOmu0MWRDzv21P3vM8eM6g@mail.gmail.com>
+References: <1305876469.325655.313573683829.0.gpush@pororo>
+	<BANLkTik=EFayZW61TgfOni-XML+tRLOcqw@mail.gmail.com>
+	<20110524062620.GA22096@pengutronix.de>
+	<BANLkTimEoCaKwJtpbQTDSEDydNkZ1BkKog@mail.gmail.com>
+	<20110524080936.GI20715@pengutronix.de>
+	<BANLkTinVnFasvOmu0MWRDzv21P3vM8eM6g@mail.gmail.com>
+Message-ID: <alpine.LFD.2.02.1105250911220.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14:31 Wed 25 May     , Hong Xu wrote:
-> On Atmel's AT91SAM9263-EK board, the LCD panel does not need VSYNC
-> signal. But this signal is useful for the boards from other
-> vendors, as suggested by Nicholas Kinar.
-> 
-> This small patch adds the VSYNC pin definition by default.
-> 
-> Reported-by: Nicholas Kinar <n.kinar@usask.ca>
-> Signed-off-by: Hong Xu <hong.xu@atmel.com>
-> ---
->  arch/arm/mach-at91/at91sam9263_devices.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> index fb5c23a..7dab33e 100644
-> --- a/arch/arm/mach-at91/at91sam9263_devices.c
-> +++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> @@ -832,6 +832,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
->  	if (!data)
->  		return;
->  
-> +	at91_set_A_periph(AT91_PIN_PC0, 0);	/* LCDVSYNC */
-this must be optionnal
+On Tue, 24 May 2011, Colin Cross wrote:
+> With multiple smaller building blocks that can fit inside a clock, all
+> you need is:
+> INIT_CLK(..., clk_mux_ops, clk_div_ops, clk_gate_ops)
+> You have one struct clk, which is exposed to the device and matches
+> the datasheet.  If the clock has rate ops, clk_set_rate works with no
 
-we need to update this with somethink like done on avr32
+It matches what the datasheet shows you, but it's still separate
+building blocks in silicon. Creating uberclocks will fall flat in no
+time.
 
-Best Regards,
-J.
+Simply expand your example to:
+
+    mux -> divider1 -> gate1
+    	|
+	---divider2--> gate2
+
+That's not doable with a combo clock and you end up with a mux and two
+combos of divider/gates.
+
+Having a straight simple building blocks view is way more easier to
+handle and allows arbitrary combinations and ordering at the tree
+level instead of moving the ordering decision into the hardware
+implementation level. We want the lowlevel ops implementation to be as
+simple and stupid as it gets and want to have as much complexity as
+necessary at the core code level.
+
+And it's not that complex. We can propagate set_rate from gateN down
+to the divider and it's not rocket science to make the divider consult
+the mux for a better suiting frequency, which implies that the mux
+decision checks and verifies the resulting damage for the other
+child. And this wants to be done at the core level not in the low
+level implementations.
+
+Thanks,
+
+	tglx
