@@ -1,34 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 May 2011 14:38:58 +0100
-Subject: [PATCH 2/2] dmaengine: add TODO items for future work on dma
-	drivers
-In-Reply-To: <1306412730.2230.0.camel@vkoul-udesk3>
-References: <1306323570-11133-1-git-send-email-vinod.koul@intel.com>
-	<1306323570-11133-3-git-send-email-vinod.koul@intel.com>
-	<20110526073620.GF24876@n2100.arm.linux.org.uk>
-	<1306412730.2230.0.camel@vkoul-udesk3>
-Message-ID: <20110526133858.GI24876@n2100.arm.linux.org.uk>
+From: bj@mhlabs.com (B.J. Buchalter)
+Date: Thu, 26 May 2011 09:38:23 -0400
+Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
+In-Reply-To: <4DDE4BB0.7010809@ti.com>
+References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
+	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D177FCC@dbde02.ent.ti.com>
+	<4DDE2745.3030307@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D178110@dbde02.ent.ti.com>
+	<4DDE435C.8060506@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D17815E@dbde02.ent.ti.com>
+	<4DDE4BB0.7010809@ti.com>
+Message-ID: <AB90A028-5926-4DBB-BAD9-7C0EF6E0FD05@mhlabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 05:55:30PM +0530, Koul, Vinod wrote:
-> > I'd suggest adding some more to this:
-> > 
-> > 4. Remove dma_slave_config's dma direction.
-> > 
-> > It's pointless that dma_slave_config carries the DMA direction (to/from
-> > device) and the prepare function does too.  It leads to DMA engine drivers
-> > having to verify that the two match, and DMA engine users having to issue
-> > two calls every time they change direction.
-> > 
-> > Instead, lets specify that dma_slave_config carries the _device_ side
-> > parameters, which are selected according to the direction given to the
-> > prepare function.  The memory-side parameters should be selected by the
-> > DMA engine driver according to its knowledge of the system.
-> > 
-> > This is sensible as M2M transfers don't allow configuration and therefore
-> > already have to select these parameters internally.
-> Sure, I am adding this as well and applying both patches
+Why not do the following:
 
-Thanks.  In which case I'll mention that I already have patches to make
-the PL08x driver do this.
+       #define OMAP_GPIO_REV_0	0
+       #define OMAP_GPIO_REV_1	1
+       #define OMAP_GPIO_REV_2	2
+       #define OMAP_GPIO_REV_3	3
+/*
+	OMAP_GPIO_REV_0:	OMAP2420
+	OMAP_GPIO_REV_1:	OMAP2430
+	OMAP_GPIO_REV_2:	OMAP3, DMxxx
+	OMAP_GPIO_REV_3:	OMAP4, OMAP5, DM816x
+*/
+
+  +	switch (oh->class->rev) {     ## This is auto-generated.
+  +	case 0:				## But this is our code.
+
+      I am recommending this to read as:
+
+  +	switch (oh->class->rev) {     ## This is auto-generated.
+  +	case OMAP_GPIO_REV_0:		## More readable.
+
+That approach solves both issues -- Revision -> Chip mapping in comment, no magic numbers in the code, and no implied restriction of the rev number to a specific SoC. Using the defines makes it easier to search the code for a specific revision, since you would no longer get false positives for all the other '0' and '1' constants that appear in the code. It also makes it indexible by tools like LXR.
+
+B.J. Buchalter
+Metric Halo 
+http://www.mhlabs.com
+	
