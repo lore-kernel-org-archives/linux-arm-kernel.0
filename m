@@ -1,120 +1,113 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Thu, 26 May 2011 14:53:10 +0530
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
+From: charu@ti.com (Varadarajan, Charulatha)
+Date: Thu, 26 May 2011 15:06:47 +0530
+Subject: [PATCH 12/15] OMAP: GPIO: Fix: use wake set/clear regs
+In-Reply-To: <87zkmal6f5.fsf@ti.com>
 References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D177FCC@dbde02.ent.ti.com>
+	<1306247094-25372-13-git-send-email-tarun.kanti@ti.com>
+	<87zkmal6f5.fsf@ti.com>
+Message-ID: <BANLkTikbUDJ1MY+eGODZm2QM-_GM1v2X6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- 
+On Thu, May 26, 2011 at 04:44, Kevin Hilman <khilman@ti.com> wrote:
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>
+>> From: Charulatha V <charu@ti.com>
+>>
+>> In set_24xx_gpio_triggering(), for OMAP4, GPIO wakeup request
+>> is set for all type of GPIO triggers whereas as per TRM the GPIO
+>> wakeup request can only be generated on edge transitions. Fix this.
+>
+> OK. ?Please make a dedicated patch for this part.
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of 
-> DebBarma, Tarun Kanti
-> Sent: Tuesday, May 24, 2011 7:55 PM
-> To: linux-omap at vger.kernel.org
-> Cc: Hilman, Kevin; Shilimkar, Santosh; tony at atomide.com; 
-> linux-arm-kernel at lists.infradead.org; Varadarajan, 
-> Charulatha; Cousson, Benoit; Paul Walmsley
-> Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO 
-> and rev_ids
-> 
-> From: Charulatha V <charu@ti.com>
-> 
-> Non-wakeup GPIOs are available only in OMAP2420 and OMAP3430. But
-> the GPIO driver initializes the non-wakeup GPIO bits for OMAP24xx
-> (bothe OMAP 2420 and 2430) & not for OMAP3 which is incorrect.
-> 
-> Fix the above by providing non-wakeup GPIO information through pdata
-> specific to the SoC.
-> 
-> The GPIO rev id provided in the hwmod database is the same 
-> for OMAP2420
-> and OMAP2430. Change the GPIO rev ids in hwmod database as given below
-> so that it can be used to identify OMAP2420 and OMAP2430.
-> OMAP2420 - 0
-> OMAP2430 - 1
-> OMAP3    - 2
-> OMAP4    - 3
+Okay.
 
-[sp] Magic numbers should be avoided.
-     Suggest using something like:
-     #define GPIO_REV_2420	0
-     #define GPIO_REV_2430	1
-     #define GPIO_REV_34XX	2
-     #define GPIO_REV_44xx	3
+>
+> Subject: GPIO: OMAP: IRQ triggering: use wake set/clear regs
 
-     We don't have to refer back to this comment while reading the code.
-     I also believed that HWMODs were auto generated.
-     Can the changes to structures in this patch recreated using current
-     scripts?
+Okay.
 
-~sanjeev
+>
+>> In set_24xx_gpio_triggering(), OMAP4_GPIO_IRQWAKEN0 register
+>> is used for wakeup request and the GPIO set/clear wakeup registers
+>> are not used in OMAP4 but is handled without retaining it's old
+>> value. This would corrupt the contents of OMAP4_GPIO_IRQWAKEN0
+>> register by writing the value of the last requested GPIO pin in
+>> a given bank. This can be avoided by making use of GPIO set/clear
+>> wakeup registers.
+>
+> And this should be a separate patch too, or probably folded into PATCH
+> 09/15 with an updated changelog of course.
 
-> 
-> Signed-off-by: Charulatha V <charu@ti.com>
-> Cc: Cousson, Benoit <b-cousson@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> ---
->  arch/arm/mach-omap2/gpio.c                 |   26 
-> ++++++++++++++++++++++++--
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    2 +-
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    2 +-
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    2 +-
->  arch/arm/plat-omap/include/plat/gpio.h     |    1 +
->  drivers/gpio/gpio_omap.c                   |   11 +++--------
->  6 files changed, 31 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
-> index 0446bd1..6cd26b4 100644
-> --- a/arch/arm/mach-omap2/gpio.c
-> +++ b/arch/arm/mach-omap2/gpio.c
-> @@ -56,6 +56,28 @@ static int omap2_gpio_dev_init(struct 
-> omap_hwmod *oh, void *unused)
->  		return -ENOMEM;
->  	}
->  
-> +	switch (oh->class->rev) {
-> +	case 0:
-> +		if (id == 1)
-> +			/* non-wakeup GPIO pins for OMAP2420 Bank1 */
-> +			pdata->non_wakeup_gpios = 0xe203ffc0;
-> +		else if (id == 2)
-> +			/* non-wakeup GPIO pins for OMAP2420 Bank2 */
-> +			pdata->non_wakeup_gpios = 0x08700040;
-> +		break;
-> +	case 2:
-> +		if (id == 2)
-> +			/* non-wakeup GPIO pins for OMAP3 Bank2 */
-> +			pdata->non_wakeup_gpios = 0x00000001;
-> +		else if (id == 6)
-> +			/* non-wakeup GPIO pins for OMAP3 Bank6 */
-> +			pdata->non_wakeup_gpios = 0x08000000;
-> +		break;
+Okay.
 
-[sp] Where is the description on non-wakeup GPIOs in OMAP3?
-     Here is text from AM37x TRM:
-     [quote ...only relevant text]
-     Each GPIO module provides 32 dedicated general-purpose pins with input
-     and output capabilities; .... These pins can be configured for the
-     following applications:
-     - Data input (capture)/output (drive)
-     - Keyboard interface with a debounce cell
-     - Interrupt generation in ....
-     - Wake-up request generation in idle mode
-     [/quote]
-     Otherwise, what are the GPIO2_WAKEUPENABLE (0x4905 0020) and
-     GPIO6_WAKEUPENABLE (0x4905 8020) meant for?
-
-> +	default:
-> +		/* No non-wakeup GPIO pins for other SoCs */
-> +		break;
-> +	}
-> +
-
-~sanjeev
-
-[snip]...[snip]
+>
+> Kevin
+>
+>> Signed-off-by: Charulatha V <charu@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/gpio.c | ? ?4 ++--
+>> ?drivers/gpio/gpio_omap.c ? | ? 32 ++++++++++----------------------
+>> ?2 files changed, 12 insertions(+), 24 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+>> index 5c888dd..fbedbbb 100644
+>> --- a/arch/arm/mach-omap2/gpio.c
+>> +++ b/arch/arm/mach-omap2/gpio.c
+>> @@ -142,8 +142,8 @@ static int omap2_gpio_dev_init(struct omap_hwmod *oh, void *unused)
+>> ? ? ? ? ? ? ? pdata->regs->risingdetect = OMAP4_GPIO_RISINGDETECT;
+>> ? ? ? ? ? ? ? pdata->regs->fallingdetect = OMAP4_GPIO_FALLINGDETECT;
+>> ? ? ? ? ? ? ? pdata->regs->wkupstatus = OMAP4_GPIO_IRQWAKEN0;
+>> - ? ? ? ? ? ? pdata->regs->wkupclear = OMAP4_GPIO_IRQWAKEN0;
+>> - ? ? ? ? ? ? pdata->regs->wkupset = OMAP4_GPIO_IRQWAKEN0;
+>> + ? ? ? ? ? ? pdata->regs->wkupclear = OMAP4_GPIO_CLEARWKUENA;
+>> + ? ? ? ? ? ? pdata->regs->wkupset = OMAP4_GPIO_SETWKUENA;
+>> ? ? ? ? ? ? ? break;
+>> ? ? ? default:
+>> ? ? ? ? ? ? ? WARN(1, "Invalid gpio bank_type\n");
+>> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
+>> index 05c2857..762d73c 100644
+>> --- a/drivers/gpio/gpio_omap.c
+>> +++ b/drivers/gpio/gpio_omap.c
+>> @@ -229,30 +229,18 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
+>> ? ? ? ? ? ? ? MOD_REG_BIT(OMAP24XX_GPIO_FALLINGDETECT, gpio_bit,
+>> ? ? ? ? ? ? ? ? ? ? ? trigger & IRQ_TYPE_EDGE_FALLING);
+>> ? ? ? }
+>> +
+>> ? ? ? if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
+>> - ? ? ? ? ? ? if (cpu_is_omap44xx()) {
+>> - ? ? ? ? ? ? ? ? ? ? if (trigger != 0)
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(1 << gpio, bank->base+
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_IRQWAKEN0);
+>> - ? ? ? ? ? ? ? ? ? ? else {
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? val = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_IRQWAKEN0);
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(val & (~(1 << gpio)), bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_GPIO_IRQWAKEN0);
+>> - ? ? ? ? ? ? ? ? ? ? }
+>> - ? ? ? ? ? ? } else {
+>> - ? ? ? ? ? ? ? ? ? ? /*
+>> - ? ? ? ? ? ? ? ? ? ? ?* GPIO wakeup request can only be generated on edge
+>> - ? ? ? ? ? ? ? ? ? ? ?* transitions
+>> - ? ? ? ? ? ? ? ? ? ? ?*/
+>> - ? ? ? ? ? ? ? ? ? ? if (trigger & IRQ_TYPE_EDGE_BOTH)
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(1 << gpio, bank->base
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP24XX_GPIO_SETWKUENA);
+>> - ? ? ? ? ? ? ? ? ? ? else
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(1 << gpio, bank->base
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? + OMAP24XX_GPIO_CLEARWKUENA);
+>> - ? ? ? ? ? ? }
+>> + ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ?* GPIO wakeup request can only be generated on edge
+>> + ? ? ? ? ? ? ?* transitions
+>> + ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? if (trigger & IRQ_TYPE_EDGE_BOTH)
+>> + ? ? ? ? ? ? ? ? ? ? __raw_writel(1 << gpio, bank->wake_set);
+>> + ? ? ? ? ? ? else
+>> + ? ? ? ? ? ? ? ? ? ? __raw_writel(1 << gpio, bank->wake_clear);
+>> ? ? ? }
+>> +
+>> ? ? ? /* This part needs to be executed always for OMAP34xx */
+>> ? ? ? if (cpu_is_omap34xx() || (bank->non_wakeup_gpios & gpio_bit)) {
+>> ? ? ? ? ? ? ? /*
+>
