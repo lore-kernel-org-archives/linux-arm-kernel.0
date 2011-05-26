@@ -1,39 +1,66 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 26 May 2011 19:45:04 +0300
-Subject: [PATCH 0/3] Some omap_device/hwmod/pwrdomain patches
-Message-ID: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
+Date: Thu, 26 May 2011 19:45:06 +0300
+Subject: [PATCH 2/3] OMAP: add omap_device_reset()
+In-Reply-To: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
+References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1306428307-1360-3-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I came up with these patches while implementing pm runtime adaptation for DSS
-driver. I'm not quite sure on who's turf they belong, or do they even belong
-together, but here they are anyway.
+Add omap_device_reset() function which can be used to reset the hwmods
+associated with the given platform device.
 
-get_context_loss_count patch was discussed on l-o with Kevin.
+Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
+---
+ arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+ arch/arm/plat-omap/omap_device.c              |   23 +++++++++++++++++++++++
+ 2 files changed, 24 insertions(+), 0 deletions(-)
 
-The omap_device_reset patch I made as some parts of DSS currently presume that
-the HW module is reset when it is enabled, and the reset is better handled in
-hwmod code.
-
-can_ever_lose_context code I didn't strictly need, but as there's such a
-function I added that to the context save code in DSS while rewriting the code.
-
- Tomi
-
-Tomi Valkeinen (3):
-  OMAP: change get_context_loss_count ret value to int
-  OMAP: add omap_device_reset()
-  OMAP: Add (omap_device|omap_hwmod)_can_ever_lose_context functions
-
- arch/arm/mach-omap2/omap_hwmod.c              |   24 ++++++++++++-
- arch/arm/mach-omap2/powerdomain.c             |   14 +++++--
- arch/arm/mach-omap2/powerdomain.h             |    2 +-
- arch/arm/plat-omap/include/plat/omap-pm.h     |    4 +-
- arch/arm/plat-omap/include/plat/omap_device.h |    4 ++-
- arch/arm/plat-omap/include/plat/omap_hwmod.h  |    3 +-
- arch/arm/plat-omap/omap-pm-noop.c             |   24 +++++++++----
- arch/arm/plat-omap/omap_device.c              |   48 ++++++++++++++++++++++++-
- 8 files changed, 105 insertions(+), 18 deletions(-)
-
+diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
+index 70d31d0..bcf1b35 100644
+--- a/arch/arm/plat-omap/include/plat/omap_device.h
++++ b/arch/arm/plat-omap/include/plat/omap_device.h
+@@ -108,6 +108,7 @@ int omap_device_align_pm_lat(struct platform_device *pdev,
+ 			     u32 new_wakeup_lat_limit);
+ struct powerdomain *omap_device_get_pwrdm(struct omap_device *od);
+ int omap_device_get_context_loss_count(struct platform_device *pdev);
++int omap_device_reset(struct platform_device *pdev);
+ 
+ /* Other */
+ 
+diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
+index 9753f71..4e6fc1b 100644
+--- a/arch/arm/plat-omap/omap_device.c
++++ b/arch/arm/plat-omap/omap_device.c
+@@ -324,6 +324,29 @@ int omap_device_get_context_loss_count(struct platform_device *pdev)
+ }
+ 
+ /**
++ * omap_device_reset - reset hwmods of given device
++ * @pdev: struct platform_device *
++ *
++ * Reset all hwmods associated with the given device. If a reset of a hwmod
++ * fails the rest of the hwmods are skipped and the error is returned.
++ */
++int omap_device_reset(struct platform_device *pdev)
++{
++	struct omap_device *od;
++	int i, r;
++
++	od = _find_by_pdev(pdev);
++
++	for (i = 0; i < od->hwmods_cnt; i++) {
++		r = omap_hwmod_reset(od->hwmods[i]);
++		if (r)
++			return r;
++	}
++
++	return 0;
++}
++
++/**
+  * omap_device_count_resources - count number of struct resource entries needed
+  * @od: struct omap_device *
+  *
 -- 
 1.7.4.1
