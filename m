@@ -1,5 +1,5 @@
 From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 26 May 2011 17:20:23 +0100
+Date: Thu, 26 May 2011 17:22:28 +0100
 Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
 	locks up on ARM
 In-Reply-To: <1306426148.2497.83.camel@laptop>
@@ -12,7 +12,7 @@ References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
 	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
 	<20110526154508.GA13788@redhat.com> <1306425584.2497.81.camel@laptop>
 	<1306426148.2497.83.camel@laptop>
-Message-ID: <1306426823.27474.241.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <1306426948.27474.243.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -32,11 +32,20 @@ On Thu, 2011-05-26 at 18:09 +0200, Peter Zijlstra wrote:
 > 
 > The below seems to run all-right so far, I'll let it run for a while.
 
-Doesn't look very good here. The serial console basically locks up as
-soon as the system gets busy, even if the kernel compilation seem to
-progress at a decent pace.
+Just got the following:
+
+INFO: task kjournald:904 blocked for more than 120 seconds.
+"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+kjournald       D c0284c88     0   904      2 0x00000000
+[<c0284c88>] (schedule+0x54c/0x620) from [<c0284dd8>] (io_schedule+0x7c/0xac)
+[<c0284dd8>] (io_schedule+0x7c/0xac) from [<c00dc1c0>] (sleep_on_buffer+0x8/0x10)
+[<c00dc1c0>] (sleep_on_buffer+0x8/0x10) from [<c02854ac>] (__wait_on_bit+0x54/0x9c)
+[<c02854ac>] (__wait_on_bit+0x54/0x9c) from [<c028556c>] (out_of_line_wait_on_bit+0x78/0x84)
+[<c028556c>] (out_of_line_wait_on_bit+0x78/0x84) from [<c014bc4c>] (journal_commit_transaction+0x734/0x13f4)
+[<c014bc4c>] (journal_commit_transaction+0x734/0x13f4) from [<c014f598>] (kjournald+0xb8/0x210)
+[<c014f598>] (kjournald+0xb8/0x210) from [<c0066320>] (kthread+0x80/0x88)
+[<c0066320>] (kthread+0x80/0x88) from [<c002ea14>] (kernel_thread_exit+0x0/0x8)
 
 	M.
-
 -- 
 Reality is an implementation detail.
