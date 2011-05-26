@@ -1,38 +1,234 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Thu, 26 May 2011 11:35:08 +0200 (CEST)
-Subject: [PATCH][Trivial] ARM: remove duplicate include from
-	arch/arm/mach-dove/common.c
-Message-ID: <alpine.LNX.2.00.1105261130190.17400@swampdragon.chaosbits.net>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Thu, 26 May 2011 15:12:49 +0530
+Subject: [PATCH 11/15] OMAP: GPIO: Remove hardcoded offsets in ctxt
+	save/restore
+In-Reply-To: <1306247094-25372-12-git-send-email-tarun.kanti@ti.com>
+References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
+	<1306247094-25372-12-git-send-email-tarun.kanti@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D177FF4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove duplicate linux/serial_8250.h include from 
-arch/arm/mach-dove/common.c that was introduced by commit 
-5c60255149eece2a36ec9f5c99817b85f96fe8ec .
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of 
+> DebBarma, Tarun Kanti
+> Sent: Tuesday, May 24, 2011 7:55 PM
+> To: linux-omap at vger.kernel.org
+> Cc: Hilman, Kevin; Shilimkar, Santosh; tony at atomide.com; 
+> linux-arm-kernel at lists.infradead.org; DebBarma, Tarun Kanti; 
+> Varadarajan, Charulatha
+> Subject: [PATCH 11/15] OMAP: GPIO: Remove hardcoded offsets 
+> in ctxt save/restore
+> 
+> It is not required to use hard-coded offsets any more in context
+> save and restore functions and instead use the generic offsets
+> which have been correctly initialized during device registration.
+> 
+> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
+> Signed-off-by: Charulatha V <charu@ti.com>
+> ---
+>  arch/arm/mach-omap2/gpio.c             |    2 +
+>  arch/arm/plat-omap/include/plat/gpio.h |    1 +
+>  drivers/gpio/gpio_omap.c               |  123 
+> ++++++++++----------------------
+>  3 files changed, 40 insertions(+), 86 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
+> index 0f8782f..5c888dd 100644
 
-Signed-off-by: Jesper Juhl <jj@chaosbits.net>
----
- common.c |    1 -
- 1 file changed, 1 deletion(-)
+[snip]...[snip]
+> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
+> index 28390a9..05c2857 100644
+> --- a/drivers/gpio/gpio_omap.c
+> +++ b/drivers/gpio/gpio_omap.c
+> @@ -1395,96 +1395,47 @@ restore_gpio_ctx:
+>  
+>  void omap_gpio_save_context(struct gpio_bank *bank)
+>  {
 
- note: untested patch since I have no way to really build arm stuff.
-       patch is against Linus' tree.
+[sp] The [PATCH 06/15] OMAP4: GPIO: Save/restore context
+     seems to be doing exactly opposite:
+     It introduces the checks for
+[quote]
+ +		if (bank->method == METHOD_GPIO_24XX) {
+...
+...
+ +		} else if (bank->method == METHOD_GPIO_44XX) {
+[/quote]
 
-diff --git a/arch/arm/mach-dove/common.c b/arch/arm/mach-dove/common.c
-index 5ed51b8..b6c3d6b 100644
---- a/arch/arm/mach-dove/common.c
-+++ b/arch/arm/mach-dove/common.c
-@@ -17,7 +17,6 @@
- #include <linux/clk.h>
- #include <linux/mbus.h>
- #include <linux/ata_platform.h>
--#include <linux/serial_8250.h>
- #include <linux/gpio.h>
- #include <asm/page.h>
- #include <asm/setup.h>
+and this patch removes the same checks.
+
+Am I missing something?
+
+~sanjeev
 
 
--- 
-Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
-Don't top-post http://www.catb.org/jargon/html/T/top-post.html
-Plain text mails only, please.
+> -	if (bank->method == METHOD_GPIO_24XX) {
+> -		bank->context.irqenable1 = __raw_readl(
+> -					bank->base + 
+> OMAP24XX_GPIO_IRQENABLE1);
+> -		bank->context.irqenable2 = __raw_readl(
+> -					bank->base + 
+> OMAP24XX_GPIO_IRQENABLE2);
+> -		bank->context.wake_en = __raw_readl(
+> -					bank->base + 
+> OMAP24XX_GPIO_WAKE_EN);
+> -		bank->context.ctrl = __raw_readl(
+> -					bank->base + 
+> OMAP24XX_GPIO_CTRL);
+> -		bank->context.oe = __raw_readl(
+> -					bank->base + OMAP24XX_GPIO_OE);
+> -		bank->context.leveldetect0 = __raw_readl(bank->base +
+> -					OMAP24XX_GPIO_LEVELDETECT0);
+> -		bank->context.leveldetect1 = __raw_readl(bank->base +
+> -					OMAP24XX_GPIO_LEVELDETECT1);
+> -		bank->context.risingdetect = __raw_readl(bank->base +
+> -					OMAP24XX_GPIO_RISINGDETECT);
+> -		bank->context.fallingdetect = __raw_readl(bank->base +
+> -					OMAP24XX_GPIO_FALLINGDETECT);
+> -		bank->context.dataout = __raw_readl(
+> -					bank->base + 
+> OMAP24XX_GPIO_DATAOUT);
+> -	} else if (bank->method == METHOD_GPIO_44XX) {
+> -		bank->context.irqenable1 = __raw_readl(
+> -					bank->base + 
+> OMAP4_GPIO_IRQSTATUSSET0);
+> -		bank->context.irqenable2 = __raw_readl(
+> -					bank->base + 
+> OMAP4_GPIO_IRQSTATUSSET1);
+> -		bank->context.wake_en = __raw_readl(
+> -					bank->base + 
+> OMAP4_GPIO_IRQWAKEN0);
+> -		bank->context.ctrl = __raw_readl(
+> -					bank->base + OMAP4_GPIO_CTRL);
+> -		bank->context.oe = __raw_readl(
+> -					bank->base + OMAP24XX_GPIO_OE);
+> -		bank->context.leveldetect0 = __raw_readl(bank->base +
+> -					OMAP4_GPIO_LEVELDETECT0);
+> -		bank->context.leveldetect1 = __raw_readl(bank->base +
+> -					OMAP4_GPIO_LEVELDETECT1);
+> -		bank->context.risingdetect = __raw_readl(bank->base +
+> -					OMAP4_GPIO_RISINGDETECT);
+> -		bank->context.fallingdetect = __raw_readl(bank->base +
+> -					OMAP4_GPIO_FALLINGDETECT);
+> -		bank->context.dataout = __raw_readl(
+> -					bank->base + 
+> OMAP4_GPIO_DATAOUT);
+> -	}
+> +	bank->context.irqenable1 =
+> +			__raw_readl(bank->base + bank->regs->irqenable);
+> +	bank->context.irqenable2 =
+> +			__raw_readl(bank->base + 
+> bank->regs->irqenable2);
+> +	bank->context.wake_en =
+> +			__raw_readl(bank->base + 
+> bank->regs->wkupstatus);
+> +	bank->context.ctrl = __raw_readl(bank->base + bank->regs->ctrl);
+> +	bank->context.oe = __raw_readl(bank->base + 
+> bank->regs->direction);
+> +	bank->context.leveldetect0 =
+> +			__raw_readl(bank->base + 
+> bank->regs->leveldetect0);
+> +	bank->context.leveldetect1 =
+> +			__raw_readl(bank->base + 
+> bank->regs->leveldetect1);
+> +	bank->context.risingdetect =
+> +			__raw_readl(bank->base + 
+> bank->regs->risingdetect);
+> +	bank->context.fallingdetect =
+> +			__raw_readl(bank->base + 
+> bank->regs->fallingdetect);
+> +	bank->context.dataout = __raw_readl(bank->base + 
+> bank->regs->dataout);
+>  }
+>  
+>  void omap_gpio_restore_context(struct gpio_bank *bank)
+>  {
+> -	if (bank->method == METHOD_GPIO_24XX) {
+> -		__raw_writel(bank->context.irqenable1, bank->base +
+> -						
+> OMAP24XX_GPIO_IRQENABLE1);
+> -		__raw_writel(bank->context.irqenable2, bank->base +
+> -						
+> OMAP24XX_GPIO_IRQENABLE2);
+> -		__raw_writel(bank->context.wake_en, bank->base +
+> -						OMAP24XX_GPIO_WAKE_EN);
+> -		__raw_writel(bank->context.ctrl, bank->base +
+> -						OMAP24XX_GPIO_CTRL);
+> -		__raw_writel(bank->context.oe, bank->base +
+> -						OMAP24XX_GPIO_OE);
+> -		__raw_writel(bank->context.leveldetect0, bank->base +
+> -						
+> OMAP24XX_GPIO_LEVELDETECT0);
+> -		__raw_writel(bank->context.leveldetect1, bank->base +
+> -						
+> OMAP24XX_GPIO_LEVELDETECT1);
+> -		__raw_writel(bank->context.risingdetect, bank->base +
+> -						
+> OMAP24XX_GPIO_RISINGDETECT);
+> -		__raw_writel(bank->context.fallingdetect, bank->base +
+> -						
+> OMAP24XX_GPIO_FALLINGDETECT);
+> -		__raw_writel(bank->context.dataout, bank->base +
+> -						OMAP24XX_GPIO_DATAOUT);
+> -	} else if (bank->method == METHOD_GPIO_44XX) {
+> -		__raw_writel(bank->context.irqenable1, bank->base +
+> -						
+> OMAP4_GPIO_IRQSTATUSSET0);
+> -		__raw_writel(bank->context.irqenable2, bank->base +
+> -						
+> OMAP4_GPIO_IRQSTATUSSET1);
+> -		__raw_writel(bank->context.wake_en, bank->base +
+> -						OMAP4_GPIO_IRQWAKEN0);
+> -		__raw_writel(bank->context.ctrl, bank->base +
+> -						OMAP4_GPIO_CTRL);
+> -		__raw_writel(bank->context.oe, bank->base +
+> -						OMAP24XX_GPIO_OE);
+> -		__raw_writel(bank->context.leveldetect0, bank->base +
+> -						
+> OMAP4_GPIO_LEVELDETECT0);
+> -		__raw_writel(bank->context.leveldetect1, bank->base +
+> -						
+> OMAP4_GPIO_LEVELDETECT1);
+> -		__raw_writel(bank->context.risingdetect, bank->base +
+> -						
+> OMAP4_GPIO_RISINGDETECT);
+> -		__raw_writel(bank->context.fallingdetect, bank->base +
+> -						
+> OMAP4_GPIO_FALLINGDETECT);
+> -		__raw_writel(bank->context.dataout, bank->base +
+> -						OMAP4_GPIO_DATAOUT);
+> -	}
+> +	__raw_writel(bank->context.irqenable1,
+> +				bank->base + bank->regs->irqenable);
+> +	__raw_writel(bank->context.irqenable2,
+> +				bank->base + bank->regs->irqenable2);
+> +	__raw_writel(bank->context.wake_en,
+> +				bank->base + bank->regs->wkupstatus);
+> +	__raw_writel(bank->context.ctrl,
+> +				bank->base + bank->regs->ctrl);
+> +	__raw_writel(bank->context.oe,
+> +				bank->base + bank->regs->direction);
+> +	__raw_writel(bank->context.leveldetect0,
+> +				bank->base + bank->regs->leveldetect0);
+> +	__raw_writel(bank->context.leveldetect1,
+> +				bank->base + bank->regs->leveldetect1);
+> +	__raw_writel(bank->context.risingdetect,
+> +				bank->base + bank->regs->risingdetect);
+> +	__raw_writel(bank->context.fallingdetect,
+> +				bank->base + bank->regs->fallingdetect);
+> +	__raw_writel(bank->context.dataout,
+> +				bank->base + bank->regs->dataout);
+>  }
+>  
+>  #endif
+> -- 
+> 1.6.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe 
+> linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
