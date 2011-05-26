@@ -1,38 +1,37 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 26 May 2011 11:00:17 +0530
-Subject: [GIT PULL] Pull request for 2.6.40
-In-Reply-To: <87boyqtror.fsf@ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024D09B89A@dbde02.ent.ti.com>
-	<87boyqtror.fsf@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D177DED@dbde02.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 26 May 2011 14:26:43 +0800
+Subject: [PATCH] ARM: mxs_defconfig: Remove locking debug config options
+In-Reply-To: <20110525141624.GE2408@S2100-06.ap.freescale.net>
+References: <20110525141624.GE2408@S2100-06.ap.freescale.net>
+Message-ID: <1306391203-29338-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+The amba-pl011 driver assumes that clk_enable/disable are atomic, but
+currently it's not the case on mxs.  There are lock debug warnings
+seen when serial console does power management.
 
-On Thu, May 26, 2011 at 02:37:32, Hilman, Kevin wrote:
-> Hi Sekhar,
-> 
-> "Nori, Sekhar" <nsekhar@ti.com> writes:
-> 
-> > Hi Russell,
-> >
-> > I have been tracking these four patches for inclusion in 2.6.40
-> > can you please pull them?
-> >
-> > These are clean-up rather than consolidation patches and all
-> > of them have zero or negative net diffstat.
-> >
-> 
-> The commits in this branch aren't quite right.   All except the last one
-> are missing your signoff.  As you're on the delivery path, be sure to
-> include your signoff on all the patches.
+The patch removes locking debug config options to get rid of the
+warnings.  They can be turned on later when new clock framework sorts
+the locking thing out.
 
-Thanks for pointing out. I have fixed that now. The same branch
-has been updated. Will take care next time on.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/configs/mxs_defconfig |    2 --
+ 1 files changed, 0 insertions(+), 2 deletions(-)
 
-Unfortunately the commit times have been updated as well, so they
-like recent commits now.
-
-Regards,
-Sekhar
+diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
+index db2cb7d..f9a54a6 100644
+--- a/arch/arm/configs/mxs_defconfig
++++ b/arch/arm/configs/mxs_defconfig
+@@ -116,8 +116,6 @@ CONFIG_DEBUG_KERNEL=y
+ CONFIG_LOCKUP_DETECTOR=y
+ CONFIG_DETECT_HUNG_TASK=y
+ CONFIG_TIMER_STATS=y
+-CONFIG_PROVE_LOCKING=y
+-CONFIG_DEBUG_SPINLOCK_SLEEP=y
+ CONFIG_DEBUG_INFO=y
+ CONFIG_SYSCTL_SYSCALL_CHECK=y
+ CONFIG_BLK_DEV_IO_TRACE=y
+-- 
+1.7.4.1
