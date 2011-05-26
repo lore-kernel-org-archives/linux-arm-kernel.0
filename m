@@ -1,30 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 May 2011 23:25:12 +0100
-Subject: [PATCH] ARM: Xilinx: Adding zynq platform support
-In-Reply-To: <BANLkTin40KK-SahXEP3c1EH1+fWgB54aFw@mail.gmail.com>
-References: <BANLkTiknh4nCviohecbcJEiWnSW-JdMxDw@mail.gmail.com>
-	<alpine.LFD.2.00.1105241435550.3207@xanadu.home>
-	<BANLkTi=hCpCbNzi1ZiKmGnbhmCG2Ce=EkA@mail.gmail.com>
-	<201105261559.41993.arnd@arndb.de>
-	<20110526150655.GA26661@ponder.secretlab.ca>
-	<20110526220120.GN24876@n2100.arm.linux.org.uk>
-	<BANLkTi=mL=J4UeKgFEa9y3C==8f9eKkboA@mail.gmail.com>
-	<BANLkTin40KK-SahXEP3c1EH1+fWgB54aFw@mail.gmail.com>
-Message-ID: <20110526222512.GO24876@n2100.arm.linux.org.uk>
+From: ak@linux.intel.com (Andi Kleen)
+Date: Thu, 26 May 2011 15:29:34 -0700
+Subject: [PATCH] ARM: Do not allow unaligned accesses
+	when	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <20110526215101.GL24876@n2100.arm.linux.org.uk>
+References: <1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
+	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
+	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
+	<20110524171331.GA2941@arm.com>
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+	<20110525124348.GA2340@arm.com>
+	<yw1xaaeanbxe.fsf@unicorn.mansr.com>
+	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
+	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
+	<20110526215101.GL24876@n2100.arm.linux.org.uk>
+Message-ID: <4DDED44E.9070402@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 04:16:10PM -0600, Grant Likely wrote:
-> Will you pick up the zynq patch also?
 
-It's about 1000 new lines, and I'm not sure Linus will take that
-level of addition - certainly not without explanation.
+> Catalin said in his mail "I haven't tried with -mno-unaligned-access, I
+> suspect the variables on the stack would be aligned.".  So I don't think
+> we know enough to say whether -mno-unaligned-access avoids the stack
+> packing.
 
-Also, if we adhere to the policy that we don't introduce new code
-which should be using the consolidated code which we've already
-introduced, this would need to be updated to use the mmio
-clocksource stuff at the very least.
+It won't, the arm gcc code just checks flag_conserve_stack.
+IMHO it's just a gcc bug. You should report it to 
+http://gcc.gnu.org/bugzilla
 
-I'm also not convinced that this platform would have the ICST PLL
-chips on it, so why it needs to select ICST I'm not sure (as well
-as having the PLL parameters in its struct clk.)
+As a temporary workaround you can disable it in the kernel too, but as soon
+as the compiler it's fixed I would recommend considering to reenable it.
+
+-Andi
