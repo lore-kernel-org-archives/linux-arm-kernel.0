@@ -1,235 +1,30 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 26 May 2011 12:37:23 -0600 (MDT)
-Subject: [PATCH 1/3] OMAP: change get_context_loss_count ret value to int
-In-Reply-To: <1306428307-1360-2-git-send-email-tomi.valkeinen@ti.com>
-References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
-	<1306428307-1360-2-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <alpine.DEB.2.00.1105261234130.27782@utopia.booyaka.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 26 May 2011 21:15:24 +0300
+Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <1306384690.30236.202.camel@vkoul-udesk3>
+References: <cover.1306082097.git.mika.westerberg@iki.fi>
+	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
+	<1306310403.30236.94.camel@vkoul-udesk3>
+	<20110525190055.GB2996@acer>
+	<1306384690.30236.202.camel@vkoul-udesk3>
+Message-ID: <20110526181524.GD2957@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tomi, Kevin,
+On Thu, May 26, 2011 at 10:08:10AM +0530, Koul, Vinod wrote:
+> On Thu, 2011-05-26 at 00:30 +0530, Mika Westerberg wrote:
+> > On Wed, May 25, 2011 at 01:30:03PM +0530, Koul, Vinod wrote:
+> > > 
+> > > Which tree are these patches going thru?
+> > 
+> > I was hoping that the dmaengine driver itself would go via dmaengine tree (is
+> > it you or Dan who maintain it?) and rest of the patches probably through their
+> > respective trees. However, since there are dependencies between the patches,
+> > I'm not entirely sure how to proceed with these. Any ideas appreciated :)
+> Okay, I can take the DMA one only. 
+> It stoo late for .40, I can take it for .41 or whatever that turns out to be 
 
-On Thu, 26 May 2011, Tomi Valkeinen wrote:
+Great, thanks.
 
-> get_context_loss_count functions return context loss count as u32, and
-> zero means an error. However, zero is also returned when context has
-> never been lost and could also be returned when the context loss count
-> has wrapped and goes to zero.
-> 
-> Change the functions to return an int, with negative value meaning an
-> error.
-> 
-> OMAP HSMMC code uses omap_pm_get_dev_context_loss_count(), but as the
-> hsmmc code handles the returned value as an int, with negative value
-> meaning an error, this patch actually fixes hsmmc code also.
-
-Thanks, I agree this makes more sense than the previous arrangement.
-
-One minor comment:
-
-> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
-> ---
->  arch/arm/mach-omap2/omap_hwmod.c              |    2 +-
->  arch/arm/mach-omap2/powerdomain.c             |   14 ++++++++++----
->  arch/arm/mach-omap2/powerdomain.h             |    2 +-
->  arch/arm/plat-omap/include/plat/omap-pm.h     |    4 ++--
->  arch/arm/plat-omap/include/plat/omap_device.h |    2 +-
->  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    2 +-
->  arch/arm/plat-omap/omap-pm-noop.c             |   24 +++++++++++++++++-------
->  arch/arm/plat-omap/omap_device.c              |    2 +-
->  8 files changed, 34 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-> index e034294..4f0d554 100644
-> --- a/arch/arm/mach-omap2/omap_hwmod.c
-> +++ b/arch/arm/mach-omap2/omap_hwmod.c
-> @@ -2332,7 +2332,7 @@ ohsps_unlock:
->   * Returns the context loss count of the powerdomain assocated with @oh
->   * upon success, or zero if no powerdomain exists for @oh.
->   */
-> -u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
-> +int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh)
->  {
->  	struct powerdomain *pwrdm;
->  	int ret = 0;
-> diff --git a/arch/arm/mach-omap2/powerdomain.c b/arch/arm/mach-omap2/powerdomain.c
-> index 9af0847..9281481 100644
-> --- a/arch/arm/mach-omap2/powerdomain.c
-> +++ b/arch/arm/mach-omap2/powerdomain.c
-> @@ -935,16 +935,16 @@ int pwrdm_post_transition(void)
->   * @pwrdm: struct powerdomain * to wait for
->   *
->   * Context loss count is the sum of powerdomain off-mode counter, the
-> - * logic off counter and the per-bank memory off counter.  Returns 0
-> + * logic off counter and the per-bank memory off counter.  Returns negative
->   * (and WARNs) upon error, otherwise, returns the context loss count.
->   */
-> -u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
-> +int pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
->  {
->  	int i, count;
->  
->  	if (!pwrdm) {
->  		WARN(1, "powerdomain: %s: pwrdm is null\n", __func__);
-> -		return 0;
-> +		return -ENODEV;
->  	}
->  
->  	count = pwrdm->state_counter[PWRDM_POWER_OFF];
-> @@ -953,7 +953,13 @@ u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm)
->  	for (i = 0; i < pwrdm->banks; i++)
->  		count += pwrdm->ret_mem_off_counter[i];
->  
-> -	pr_debug("powerdomain: %s: context loss count = %u\n",
-> +	/*
-> +	 * Context loss count has to be a non-negative value. Clear the sign
-> +	 * bit to get a value range from 0 to INT_MAX.
-> +	 */
-> +	count &= ~(1 << 31);
-
-Could you use INT_MAX here?  It seems best not to have the implicit 
-dependency on 32-bit ints, if it is not too inconvenient.
-
-> +
-> +	pr_debug("powerdomain: %s: context loss count = %d\n",
->  		 pwrdm->name, count);
->  
->  	return count;
-> diff --git a/arch/arm/mach-omap2/powerdomain.h b/arch/arm/mach-omap2/powerdomain.h
-> index d23d979..012827f 100644
-> --- a/arch/arm/mach-omap2/powerdomain.h
-> +++ b/arch/arm/mach-omap2/powerdomain.h
-> @@ -207,7 +207,7 @@ int pwrdm_clkdm_state_switch(struct clockdomain *clkdm);
->  int pwrdm_pre_transition(void);
->  int pwrdm_post_transition(void);
->  int pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm);
-> -u32 pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
-> +int pwrdm_get_context_loss_count(struct powerdomain *pwrdm);
->  bool pwrdm_can_ever_lose_context(struct powerdomain *pwrdm);
->  
->  extern void omap2xxx_powerdomains_init(void);
-> diff --git a/arch/arm/plat-omap/include/plat/omap-pm.h b/arch/arm/plat-omap/include/plat/omap-pm.h
-> index c0a7520..68df031 100644
-> --- a/arch/arm/plat-omap/include/plat/omap-pm.h
-> +++ b/arch/arm/plat-omap/include/plat/omap-pm.h
-> @@ -350,9 +350,9 @@ unsigned long omap_pm_cpu_get_freq(void);
->   * driver must restore device context.   If the number of context losses
->   * exceeds the maximum positive integer, the function will wrap to 0 and
->   * continue counting.  Returns the number of context losses for this device,
-> - * or zero upon error.
-> + * or negative value upon error.
->   */
-> -u32 omap_pm_get_dev_context_loss_count(struct device *dev);
-> +int omap_pm_get_dev_context_loss_count(struct device *dev);
->  
->  void omap_pm_enable_off_mode(void);
->  void omap_pm_disable_off_mode(void);
-> diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-> index e4c349f..70d31d0 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_device.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_device.h
-> @@ -107,7 +107,7 @@ void __iomem *omap_device_get_rt_va(struct omap_device *od);
->  int omap_device_align_pm_lat(struct platform_device *pdev,
->  			     u32 new_wakeup_lat_limit);
->  struct powerdomain *omap_device_get_pwrdm(struct omap_device *od);
-> -u32 omap_device_get_context_loss_count(struct platform_device *pdev);
-> +int omap_device_get_context_loss_count(struct platform_device *pdev);
->  
->  /* Other */
->  
-> diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> index 1adea9c..8658e2d 100644
-> --- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> +++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-> @@ -598,7 +598,7 @@ int omap_hwmod_for_each_by_class(const char *classname,
->  				 void *user);
->  
->  int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
-> -u32 omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
-> +int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
->  
->  int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
->  
-> diff --git a/arch/arm/plat-omap/omap-pm-noop.c b/arch/arm/plat-omap/omap-pm-noop.c
-> index b0471bb2..477e3aa 100644
-> --- a/arch/arm/plat-omap/omap-pm-noop.c
-> +++ b/arch/arm/plat-omap/omap-pm-noop.c
-> @@ -27,7 +27,7 @@
->  #include <plat/omap_device.h>
->  
->  static bool off_mode_enabled;
-> -static u32 dummy_context_loss_counter;
-> +static int dummy_context_loss_counter;
->  
->  /*
->   * Device-driver-originated constraints (via board-*.c files)
-> @@ -311,22 +311,32 @@ void omap_pm_disable_off_mode(void)
->  
->  #ifdef CONFIG_ARCH_OMAP2PLUS
->  
-> -u32 omap_pm_get_dev_context_loss_count(struct device *dev)
-> +int omap_pm_get_dev_context_loss_count(struct device *dev)
->  {
->  	struct platform_device *pdev = to_platform_device(dev);
-> -	u32 count;
-> +	int count;
->  
->  	if (WARN_ON(!dev))
-> -		return 0;
-> +		return -ENODEV;
->  
->  	if (dev->parent == &omap_device_parent) {
->  		count = omap_device_get_context_loss_count(pdev);
->  	} else {
->  		WARN_ONCE(off_mode_enabled, "omap_pm: using dummy context loss counter; device %s should be converted to omap_device",
->  			  dev_name(dev));
-> -		if (off_mode_enabled)
-> -			dummy_context_loss_counter++;
-> +
->  		count = dummy_context_loss_counter;
-> +
-> +		if (off_mode_enabled) {
-> +			count++;
-> +			/*
-> +			 * Context loss count has to be a non-negative value.
-> +			 * Clear the sign bit to get a value range from 0 to
-> +			 * INT_MAX.
-> +			 */
-> +			count &= ~(1 << 31);
-
-And likewise here.
-
-> +			dummy_context_loss_counter = count;
-> +		}
->  	}
->  
->  	pr_debug("OMAP PM: context loss count for dev %s = %d\n",
-> @@ -337,7 +347,7 @@ u32 omap_pm_get_dev_context_loss_count(struct device *dev)
->  
->  #else
->  
-> -u32 omap_pm_get_dev_context_loss_count(struct device *dev)
-> +int omap_pm_get_dev_context_loss_count(struct device *dev)
->  {
->  	return dummy_context_loss_counter;
->  }
-> diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-> index 9bbda9a..9753f71 100644
-> --- a/arch/arm/plat-omap/omap_device.c
-> +++ b/arch/arm/plat-omap/omap_device.c
-> @@ -310,7 +310,7 @@ static void _add_optional_clock_clkdev(struct omap_device *od,
->   * return the context loss counter for that hwmod, otherwise return
->   * zero.
->   */
-> -u32 omap_device_get_context_loss_count(struct platform_device *pdev)
-> +int omap_device_get_context_loss_count(struct platform_device *pdev)
->  {
->  	struct omap_device *od;
->  	u32 ret = 0;
-> -- 
-> 1.7.4.1
-> 
-
-
-- Paul
+I'll send updated version of the patches soon where I have gathered all the acks
+and updated Ryan's email address.
