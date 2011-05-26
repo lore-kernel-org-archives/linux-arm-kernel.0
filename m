@@ -1,37 +1,112 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 26 May 2011 13:42:38 -0500
-Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <20110526181524.GD2957@acer>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
-	<1306310403.30236.94.camel@vkoul-udesk3> <20110525190055.GB2996@acer>
-	<1306384690.30236.202.camel@vkoul-udesk3> <20110526181524.GD2957@acer>
-Message-ID: <0D753D10438DA54287A00B027084269764D3319E9D@AUSP01VMBX24.collaborationhost.net>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 26 May 2011 13:43:22 -0500
+Subject: [RFC PATCH v3 2/2] dt: add custom device creation to platform
+	bus scan
+In-Reply-To: <201105261511.23659.arnd@arndb.de>
+References: <1306359073-16274-1-git-send-email-robherring2@gmail.com>
+	<1306359073-16274-3-git-send-email-robherring2@gmail.com>
+	<201105261511.23659.arnd@arndb.de>
+Message-ID: <4DDE9F4A.5050507@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, May 26, 2011 11:15 AM, Mika Westerberg wrote:
-> On Thu, May 26, 2011 at 10:08:10AM +0530, Koul, Vinod wrote:
->> On Thu, 2011-05-26 at 00:30 +0530, Mika Westerberg wrote:
->>> On Wed, May 25, 2011 at 01:30:03PM +0530, Koul, Vinod wrote:
->>>> 
->>>> Which tree are these patches going thru?
->>> 
->>> I was hoping that the dmaengine driver itself would go via dmaengine tree (is
->>> it you or Dan who maintain it?) and rest of the patches probably through their
->>> respective trees. However, since there are dependencies between the patches,
->>> I'm not entirely sure how to proceed with these. Any ideas appreciated :)
->> Okay, I can take the DMA one only. 
->> It stoo late for .40, I can take it for .41 or whatever that turns out to be 
+Arnd,
+
+On 05/26/2011 08:11 AM, Arnd Bergmann wrote:
+> On Wednesday 25 May 2011, Rob Herring wrote:
+>>
+>> From: Rob Herring<rob.herring@calxeda.com>
+>>
+>> Add support to the platform bus scanning to call custom device creation
+>> functions. This enables creation of non-platform devices like amba_bus.
+>>
+>> Cc: Jeremy Kerr<jeremy.kerr@canonical.com>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Cc: linux at arm.linux.org.uk
+>> Cc: arnd at arndb.de
+>> Cc: Linus Walleij<linus.walleij@linaro.org>
+>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
 >
-> Great, thanks.
+> This creates a confusing mix of match table entries: Normally,
+> all entries in the match table are meant to identify child buses,
+> but if I read your patch correctly, you now also need to match
+> on the amba devices themselves, including the creation of
+> platform devices for each child device node under an amba
+> device.
 >
-> I'll send updated version of the patches soon where I have gathered all the acks
-> and updated Ryan's email address.
+We should only create devices for each matching bus and the immediate 
+children of each bus. A child device of an amba device would be 
+something like an i2c bus which we don't want to create devices for. Or 
+am I missing something?
 
-Mika,
+> I don't think that was the intention. Maybe we need to pass
+> two match tables into of_platform_bus_probe() instead:
+> one to identify the buses, and another one that is used
+> to create the actual devices.
+>
+That was my original thinking too, but some reason I had concluded 1 
+could get by with just 1 table. After more thought, I think you are 
+right. In fact, I broke platform device creation with this patch. I need 
+to be able to tell if no match means create a platform device (child of 
+bus) or not (child of a device).
 
-I'll try to test the patches on my setup today.
+Here's an updated version with just the interesting hunk. I've tested it 
+with a made up bus structure that looks something like this:
 
-Regards,
-Hartley
+soc bus
+  -plat dev
+  -amba dev
+  -sub-bus
+    -plat dev
+    -amba dev
+  -plat dev
+
+As of_platform_bus_probe is not recommended to be used by Grant, I only 
+plan to add 2 match tables to of_platform_bus_populate.
+
+@@ -234,18 +237,32 @@ static int of_platform_bus_create(struct 
+device_node *bus,
+  		return 0;
+  	}
+
+-	dev = of_platform_device_create(bus, NULL, parent);
+-	if (!dev || !of_match_node(matches, bus))
+-		return 0;
+-
+-	for_each_child_of_node(bus, child) {
+-		pr_debug("   create child: %s\n", child->full_name);
+-		rc = of_platform_bus_create(child, matches, &dev->dev, strict);
+-		if (rc) {
+-			of_node_put(child);
+-			break;
++	id = of_match_node(bus_matches, bus);
++	if (id) {
++		dev = of_platform_device_create(bus, NULL, parent);
++		if (!dev)
++			return 0;
++		for_each_child_of_node(bus, child) {
++			pr_debug("   create child: %s\n", child->full_name);
++			rc = of_platform_bus_create(child, bus_matches,
++						    dev_matches, dev, strict);
++			if (rc) {
++				of_node_put(child);
++				break;
++			}
+  		}
++		return rc;
+  	}
++
++	id = of_match_node(dev_matches, bus);
++	mdata = id ? id->data : NULL;
++	if (id && mdata && mdata->dev_create)
++		dev = mdata->dev_create(bus, parent);
++	else
++		dev = of_platform_device_create(bus, NULL, parent);
++	if (!dev)
++		return 0;
++
+  	return rc;
+  }
+
+
+Rob
