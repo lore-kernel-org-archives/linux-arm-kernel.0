@@ -1,55 +1,67 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 26 May 2011 10:30:34 -0700
-Subject: [PATCH 0/3] Some omap_device/hwmod/pwrdomain patches
-In-Reply-To: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com> (Tomi
-	Valkeinen's message of "Thu, 26 May 2011 19:45:04 +0300")
-References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <87ipsxfjyd.fsf@ti.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 26 May 2011 14:32:03 -0600
+Subject: [PATCH] Exynos4: Move GPIO drivers to drivers/gpio
+In-Reply-To: <20110518115536.GA31059@july>
+References: <20110518115536.GA31059@july>
+Message-ID: <20110526203203.GF29060@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tomi Valkeinen <tomi.valkeinen@ti.com> writes:
+On Wed, May 18, 2011 at 08:55:36PM +0900, Kyungmin Park wrote:
+> From: Kyungmin Park <kyungmin.park@samsung.com>
+> 
+> Samsung Exynos4 gpio driver moved to drivers/gpio.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-> I came up with these patches while implementing pm runtime adaptation for DSS
-> driver. I'm not quite sure on who's turf they belong, or do they even belong
-> together, but here they are anyway.
->
-> get_context_loss_count patch was discussed on l-o with Kevin.
->
-> The omap_device_reset patch I made as some parts of DSS currently presume that
-> the HW module is reset when it is enabled, and the reset is better handled in
-> hwmod code.
->
-> can_ever_lose_context code I didn't strictly need, but as there's such a
-> function I added that to the context save code in DSS while rewriting the code.
+Applied, thanks
+g.
 
-Are any of the DSS blocks in power domains that can't lose context
-(WKUP?)
-
-This isn't something in general that drivers should be aware of, so I'd
-rather not see this exposed to drivers (unless there's a real need.)
-
-As soon as I finish the move to device power domains (hopefully for
-2.6.41), the driver's callbacks will only be called if the device has
-lost context, so checking for context loss will not be needed at all at
-the driver level.
-
-Kevin
-
->
->  Tomi
->
-> Tomi Valkeinen (3):
->   OMAP: change get_context_loss_count ret value to int
->   OMAP: add omap_device_reset()
->   OMAP: Add (omap_device|omap_hwmod)_can_ever_lose_context functions
->
->  arch/arm/mach-omap2/omap_hwmod.c              |   24 ++++++++++++-
->  arch/arm/mach-omap2/powerdomain.c             |   14 +++++--
->  arch/arm/mach-omap2/powerdomain.h             |    2 +-
->  arch/arm/plat-omap/include/plat/omap-pm.h     |    4 +-
->  arch/arm/plat-omap/include/plat/omap_device.h |    4 ++-
->  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    3 +-
->  arch/arm/plat-omap/omap-pm-noop.c             |   24 +++++++++----
->  arch/arm/plat-omap/omap_device.c              |   48 ++++++++++++++++++++++++-
->  8 files changed, 105 insertions(+), 18 deletions(-)
+> ---
+> diff --git a/arch/arm/mach-exynos4/gpiolib.c b/drivers/gpio/exynos4-gpio.c
+> similarity index 100%
+> rename from arch/arm/mach-exynos4/gpiolib.c
+> rename to drivers/gpio/exynos4-gpio.c
+> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+> index 9be104f..3bb3f57 100644
+> --- a/arch/arm/mach-exynos4/Makefile
+> +++ b/arch/arm/mach-exynos4/Makefile
+> @@ -13,7 +13,7 @@ obj-				:=
+>  # Core support for EXYNOS4 system
+>  
+>  obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
+> -obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o gpiolib.o irq-eint.o dma.o
+> +obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
+>  obj-$(CONFIG_PM)		+= pm.o sleep.o
+>  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+>  
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index d3b2953..7938449 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -75,6 +75,12 @@ config GPIO_BASIC_MMIO
+>  	help
+>  	  Say yes here to support basic memory-mapped GPIO controllers.
+>  
+> +config GPIO_EXYNOS4
+> +	bool "Samsung Exynos4 GPIO support"
+> +	depends on CPU_EXYNOS4210
+> +	help
+> +	  Say yes here to support Samsung Exynos4 GPIO controllers.
+> +
+>  config GPIO_IT8761E
+>  	tristate "IT8761E GPIO support"
+>  	depends on GPIOLIB
+> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+> index becef59..f2373d0 100644
+> --- a/drivers/gpio/Makefile
+> +++ b/drivers/gpio/Makefile
+> @@ -11,6 +11,7 @@ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
+>  obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
+>  obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
+>  obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
+> +obj-$(CONFIG_GPIO_EXYNOS4)	+= exynos4-gpio.o
+>  obj-$(CONFIG_GPIO_LANGWELL)	+= langwell_gpio.o
+>  obj-$(CONFIG_GPIO_MAX730X)	+= max730x.o
+>  obj-$(CONFIG_GPIO_MAX7300)	+= max7300.o
