@@ -1,51 +1,55 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 26 May 2011 17:22:28 +0100
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <1306426148.2497.83.camel@laptop>
-References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
-	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
-	<1306358128.21578.107.camel@twins>
-	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-	<1306405979.1200.63.camel@twins>
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526154508.GA13788@redhat.com> <1306425584.2497.81.camel@laptop>
-	<1306426148.2497.83.camel@laptop>
-Message-ID: <1306426948.27474.243.camel@e102391-lin.cambridge.arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 May 2011 10:30:34 -0700
+Subject: [PATCH 0/3] Some omap_device/hwmod/pwrdomain patches
+In-Reply-To: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com> (Tomi
+	Valkeinen's message of "Thu, 26 May 2011 19:45:04 +0300")
+References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <87ipsxfjyd.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-26 at 18:09 +0200, Peter Zijlstra wrote:
-> On Thu, 2011-05-26 at 17:59 +0200, Peter Zijlstra wrote:
-> > On Thu, 2011-05-26 at 17:45 +0200, Oleg Nesterov wrote:
-> > > Stupid question. Can't we fix this problem if we do
-> > > 
-> > >         -       if (p == current)
-> > >         +       if (cpu == raw_smp_processor_id())
-> > > 
-> > > ?
-> > > 
-> > > I forgot the rules... but iirc task_cpu(p) can't be changed under us?
-> > 
-> > Easy enough to test.. brain gave out again,. hold on ;-)
-> 
-> The below seems to run all-right so far, I'll let it run for a while.
+Tomi Valkeinen <tomi.valkeinen@ti.com> writes:
 
-Just got the following:
+> I came up with these patches while implementing pm runtime adaptation for DSS
+> driver. I'm not quite sure on who's turf they belong, or do they even belong
+> together, but here they are anyway.
+>
+> get_context_loss_count patch was discussed on l-o with Kevin.
+>
+> The omap_device_reset patch I made as some parts of DSS currently presume that
+> the HW module is reset when it is enabled, and the reset is better handled in
+> hwmod code.
+>
+> can_ever_lose_context code I didn't strictly need, but as there's such a
+> function I added that to the context save code in DSS while rewriting the code.
 
-INFO: task kjournald:904 blocked for more than 120 seconds.
-"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
-kjournald       D c0284c88     0   904      2 0x00000000
-[<c0284c88>] (schedule+0x54c/0x620) from [<c0284dd8>] (io_schedule+0x7c/0xac)
-[<c0284dd8>] (io_schedule+0x7c/0xac) from [<c00dc1c0>] (sleep_on_buffer+0x8/0x10)
-[<c00dc1c0>] (sleep_on_buffer+0x8/0x10) from [<c02854ac>] (__wait_on_bit+0x54/0x9c)
-[<c02854ac>] (__wait_on_bit+0x54/0x9c) from [<c028556c>] (out_of_line_wait_on_bit+0x78/0x84)
-[<c028556c>] (out_of_line_wait_on_bit+0x78/0x84) from [<c014bc4c>] (journal_commit_transaction+0x734/0x13f4)
-[<c014bc4c>] (journal_commit_transaction+0x734/0x13f4) from [<c014f598>] (kjournald+0xb8/0x210)
-[<c014f598>] (kjournald+0xb8/0x210) from [<c0066320>] (kthread+0x80/0x88)
-[<c0066320>] (kthread+0x80/0x88) from [<c002ea14>] (kernel_thread_exit+0x0/0x8)
+Are any of the DSS blocks in power domains that can't lose context
+(WKUP?)
 
-	M.
--- 
-Reality is an implementation detail.
+This isn't something in general that drivers should be aware of, so I'd
+rather not see this exposed to drivers (unless there's a real need.)
+
+As soon as I finish the move to device power domains (hopefully for
+2.6.41), the driver's callbacks will only be called if the device has
+lost context, so checking for context loss will not be needed at all at
+the driver level.
+
+Kevin
+
+>
+>  Tomi
+>
+> Tomi Valkeinen (3):
+>   OMAP: change get_context_loss_count ret value to int
+>   OMAP: add omap_device_reset()
+>   OMAP: Add (omap_device|omap_hwmod)_can_ever_lose_context functions
+>
+>  arch/arm/mach-omap2/omap_hwmod.c              |   24 ++++++++++++-
+>  arch/arm/mach-omap2/powerdomain.c             |   14 +++++--
+>  arch/arm/mach-omap2/powerdomain.h             |    2 +-
+>  arch/arm/plat-omap/include/plat/omap-pm.h     |    4 +-
+>  arch/arm/plat-omap/include/plat/omap_device.h |    4 ++-
+>  arch/arm/plat-omap/include/plat/omap_hwmod.h  |    3 +-
+>  arch/arm/plat-omap/omap-pm-noop.c             |   24 +++++++++----
+>  arch/arm/plat-omap/omap_device.c              |   48 ++++++++++++++++++++++++-
+>  8 files changed, 105 insertions(+), 18 deletions(-)
