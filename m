@@ -1,22 +1,36 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Thu, 26 May 2011 18:06:01 +0200
-Subject: [GIT PULL] omap updates for 2.6.40
-In-Reply-To: <20110526113905.GG27250@atomide.com>
-References: <20110526113905.GG27250@atomide.com>
-Message-ID: <9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 May 2011 09:14:42 -0700
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <201105181047.17309.arnd@arndb.de> (Arnd Bergmann's message of
+	"Wed, 18 May 2011 10:47:16 +0200")
+References: <201105181047.17309.arnd@arndb.de>
+Message-ID: <87k4ddiglp.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Op 26 mei 2011, om 13:39 heeft Tony Lindgren het volgende geschreven:
+> This is the draft plan for maintaining the ARM subarchitectures in a common
+> tree, as a way to help coordinate the upstream merging of the
+> arch/arm/{plat,mach}-* changes into Linus' tree.
 
-> Hi Linus,
-> 
-> Please pull omap updates for this merge window from:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-for-linus
-> 
-> This contains clean-up to shrink down omap specific code a bit. Also included
-> are some fixes. But basically no new code at this point.
+[...]
 
-What about updates to board files? Like adding support for the xM rev C to board-omap3beagle.c.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Cc: Nicolas Pitre <nico@fluxnic.net>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+>
+> ---
+>
+> Maintainers: If you are happy with the layout of the process,
+> please ack this patch, otherwise please comment.
+
+Acked-by: Kevin Hilman <khilman@ti.com>
+
+for davinci and OMAP stuff I maintain.
+
+Kevin
