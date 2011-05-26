@@ -1,132 +1,185 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 26 May 2011 16:11:50 +0100
-Subject: [PATCH] ARM: exynos4: fix secondary CPU boot
-In-Reply-To: <4DDD531A.50604@samsung.com>
-References: <1305899190-16732-1-git-send-email-marc.zyngier@arm.com>
-	<4DDD3C57.6020705@samsung.com>
-	<1306346645.27474.182.camel@e102391-lin.cambridge.arm.com>
-	<4DDD531A.50604@samsung.com>
-Message-ID: <1306422710.27474.237.camel@e102391-lin.cambridge.arm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 26 May 2011 23:17:52 +0800
+Subject: CSR ARM SoC Subarchitecture preview
+In-Reply-To: <201105250851.03665.arnd@arndb.de>
+References: <BANLkTikfje67KyyD+7Pn0D=afTyEde0euw@mail.gmail.com>
+	<201105250851.03665.arnd@arndb.de>
+Message-ID: <BANLkTikOyo9g1GD_dOxb5As2Yr0rBc+hyA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-05-25 at 12:06 -0700, Kukjin Kim wrote:
-> On 05/25/11 11:04, Marc Zyngier wrote:
-> > On Wed, 2011-05-25 at 10:28 -0700, Kukjin Kim wrote:
-> >> On 05/20/11 06:46, Marc Zyngier wrote:
-> 
-> (snip)
-> 
-> > So that address has changed between two SoC revisions? That's
-> > unfortunate, to say the least. I'm most probably using an early revision
-> > of the hardware (EVT0?), as it doesn't even support MCT.
-> >
-> I'm afraid :( and I agree secondary CPU should work on all of 
-> Exynos4210. But I'm still think about the method...
-> 
-> > What about the following patch?
-> >
-> Uhm...this is really hack but I'd like to use another normal way...?
+Hi Arnd,
 
-Oh, no question about the hack status. The trouble is, unless there is a
-sure way to tell which SoC revision we're running on, there's little
-else we can do than poke both locations and pray.
+2011/5/25 Arnd Bergmann <arnd@arndb.de>:
+> On Wednesday 25 May 2011 04:15:12 Barry Song wrote:
+>
+>> >> ?mach-prima2/include/mach/system.h ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?5
+>> >> ?mach-prima2/include/mach/timex.h ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?5
+>> >> ?mach-prima2/include/mach/uncompress.h ? ? ? ? ? ? ? ? ? ? ? ?| ? 45
+>> >> ?mach-prima2/include/mach/vmalloc.h ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 19
+>> >> ?mach-prima2/lcdinit.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?136
+>> >> ?mach-prima2/mach-prima2cb.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?226 +
+>> >> ?mach-prima2/padmode.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?139
+>> >> ?mach-prima2/prima2.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 81
+>> >> ?mach-prima2/prima2cb-keypad.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?136
+>> >> ?mach-prima2/pwrc.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ?286 +
+>> >> ?mach-prima2/tsc2100_dev.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ?137
+>> >
+>> > Any drivers in here should get moved to a proper place in drivers/*/
+>> > eventually, out of the subarchitecture code.
+>>
+>> things related with driver framework/callbacks will be moved out.
+>> platform_device data/hardware-related callbacks will be kept. but if
+>> device tree supports platform_device data/callbacks good, i will take
+>> a look whether we can delete as many as possible.
+>
+> Regarding platform data, the ideal case would be to not pass any,
+> and have the driver itself enquire the settings by looking at device
+> tree properties. There may be a few cases where that is not possible,
+> or where a callback into platform code ends up simplifying things
+> significantly, but that should stay the exception.
+really. some hardware-related callbacks are now in arch and make
+driver codes simpler and better to cross platform without considering
+trivial hardware details.
+if they are moved to drivers, the drivers will be very ugly with things like:
+#ifdef BOARD_X
+....
+#elif defined(BOARD_Y)
+...
+#endif
+that is not what people want.
 
-Is there such a way to identify the SoC revision?
+so a temp way is maybe providing funtions in arch as exported symbols
+which will be called by drivers. different boards implement them in
+different codes.
 
-> >> From c27e75b86e1ee181987a9364286a888421e76205 Mon Sep 17 00:00:00 2001
-> > From: Marc Zyngier<marc.zyngier@arm.com>
-> > Date: Fri, 20 May 2011 14:38:25 +0100
-> > Subject: [PATCH] ARM: exynos4: fix secondary CPU boot on early SoC revisions
-> >
-> > It appears that the system-wide flags register that used to be at
-> > 0x02025000 on the first revision of Exynos4 has moved to 0x02020000.
-> >
-> > The kernel has been updated accordingly, but this unfortunately leaves
-> > early boards without SMP support (the secondary CPU spins endlessly
-> > in BL0 waiting for an address to be written at that memory location).
-> >
-> > Try to solve the problem by poking both locations. This should be
-> > safe as this is done early enough in the kernel boot process, and nobody
-> > should be using the SRAM yet.
-> >
-> > Tested on a vintage SMDK-v310.
-> 
-> vintage ;)
+>
+>> > It's not clear yet what will happen in the long run to the split between
+>> > mach-* and plat-* directories. Ideally, we would not need them to be
+>> > separate if we can completely abstract the SoCs within their broader
+>> > families, but we might not get that far before you merge your platform.
+>>
+>> before prima2 SoC, we have mach-atlas4, ?mach-atlas5 and mach-prima.
+>> after prima2, we will have mach-atlas6. many ip cores are shared
+>> between these SoCs, then there is a plat.
+>> but we will not maintain old mach-atlas4, ?mach-atlas5 and mach-prima
+>> for the current and future kernel. the new mach-atlas6 is the coming
+>> SoC we will upstream after mach-prima2.
+>
+> Ok, makes sense. It may be possible that after you have done all the
+> work to convert prima2 to device tree, it will become trivial to support
+> the older SoCs as well, but starting with prima2 as you say makes a lot
+> of sense.
 
-Well, I thought I was the uber-cool guy in the office because of that
-shiny blue board on my desk, only to discover that it's sooo last
-year... ;-)
+debugging device tree in prima2 now.
 
-> >
-> > Cc: Kukjin Kim<kgene.kim@samsung.com>
-> > Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
-> > ---
-> >   arch/arm/mach-exynos4/include/mach/map.h |    1 +
-> >   arch/arm/mach-exynos4/platsmp.c          |   14 ++++++++++++++
-> >   2 files changed, 15 insertions(+), 0 deletions(-)
-> >
-> > diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
-> > index 0009e77..781e149 100644
-> > --- a/arch/arm/mach-exynos4/include/mach/map.h
-> > +++ b/arch/arm/mach-exynos4/include/mach/map.h
-> > @@ -24,6 +24,7 @@
-> >   #include<plat/map-s5p.h>
-> >
-> >   #define EXYNOS4_PA_SYSRAM		0x02020000
-> > +#define EXYNOS4_PA_SYSRAM_EVT0		0x02025000
-> >
-> >   #define EXYNOS4_PA_FIMC0		0x11800000
-> >   #define EXYNOS4_PA_FIMC1		0x11810000
-> > diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-> > index c5e65a0..f261c34 100644
-> > --- a/arch/arm/mach-exynos4/platsmp.c
-> > +++ b/arch/arm/mach-exynos4/platsmp.c
-> > @@ -155,6 +155,7 @@ void __init smp_init_cpus(void)
-> >   void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-> >   {
-> >   	int i;
-> > +	void __iomem *sysram_evt0;
-> >
-> >   	/*
-> >   	 * Initialise the present map, which describes the set of CPUs
-> > @@ -172,4 +173,17 @@ void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-> >   	 * secondary CPU branches to this address.
-> >   	 */
-> >   	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), S5P_VA_SYSRAM);
-> > +
-> > +	/*
-> > +	 * EVT0 has the system-wide flags register at a different address.
-> > +	 * Poke it as well, in case we're running on an old SoC revision.
-> > +	 */
-> > +	sysram_evt0 = ioremap(EXYNOS4_PA_SYSRAM_EVT0, SZ_4K);
-> 
-> Hmm...first of all, need to check whether can ioremap the area on newer 
-> one but I'm out off office now so will check it after backing.
+>
+>> > What other mach-* do you expect to see in the future using plat-sirfsoc,
+>> > and how similar are they to prima2?
+>>
+>> plat-sirfsoc should be things shared by mach-prima2/mach-atlas6 and
+>> other future SoCs.
+>
+> I see. Note that in the long run, we definitely want to have the option
+> to build kernel binaries across different SoC families. It would be
+> good to make sure you don't have arbitrary differences in the mach-*
+> implementation that get in the way of that later. If prima2 and atlas6
+> turn out very similar in the end, it may be best to fold all them together
+> with plat-sirfsoc into a single directory. E.g. the TI omap2/3/4
+> platforms have all been merged into mach-omap2, despite being
+> rather different.
 
-The only documentation I have access to refers to the iRAM (SRAM) being
-mapped between 0x02020000 and 0x02040000. Unless the HW guys have gone
-completely wild and changed this range as well, I think we're pretty
-safe.
+most components of prima2 and atlas6 are similar. i agree we can begin
+by a mach-prima2 dir to cover both and delete plat-sirfsoc. looking
+whether some day we need a plat-sirfsoc.
 
-> > +	if (!sysram_evt0) {
-> > +		pr_err("Unable to remap EXYNOS4_PA_SYSRAM_EVT0\n");
-> 
-> Do we really need 'pr_err' here?...
+>
+>> >> for drivers/:
+>> >> ?Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2
+>> >> ?Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1
+>> >> ?char/sirfsoc_gps.c ? ? ? ? ? ? ? ? ?| ?878 +++++++++++++
+>> >> ?char/sirfsoc_gpsdrv.h ? ? ? ? ? ? ? | ?134 +
+>> >> ?input/misc/gpio_event.c ? ? ? ? ? ? | ?253 +++
+>> >
+>> > A new user space interface is always hard to establish. If you want these
+>> > to get in, you should start way ahead of the other drivers that simply
+>> > implement an existing interface.
+>> >
+>> > If the gps driver is just a tty device like a serial port, it should
+>> > now be moved into drivers/tty.
+>>
+>> most GPS are /dev/ttySn to userspace, they are connected to SoC by
+>> uart. ?DSP is one of CSR's main product lines. An internal DSP in SoC
+>> handles GPS and we use this driver to communicate with the DSP. i will
+>> take a look whether we can have better framework than a simple char
+>> device.
+>
+> From the little I know about GPS, the controllers have a fairly standardized
+> serial port interface even across vendors. It would be good to be
+> compatible with the existing ones there, e.g. bluetooth or serial GPS that
+> all provide a tty interface. If your's is very different and has a
+> high-level API, you might want to create a new drivers/gps/ subsystem
+> with an architected user interface that works with both your own
+> implementation and the serial ones.
+> Turning a tty into a high-level interface is normally done using a new tty
+> line discipline, similar to how PPP or CAN work over serial lines.
 
-No. Anything will do. Though not being able to ioremap() that region may
-indicate further trouble down the road.
+yes. gps generally is an external module connected to SoC's uart.
+actually, the char device we are talking is more like firmware inside
+a common gps module. it is in lower level than an external interface.
+anyway, csr is a company with gps technology. i'd like to figure out
+whether we can provide a generic framework.
 
-> > +		return;
-> > +	}
-> > +
-> > +	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), sysram_evt0);
-> > +	iounmap(sysram_evt0);
-> >   }
-> 
+>
+>> >> ?nanddisk/Kconfig ? ? ? ? ? ? ? ? ? ?| ? 17
+>> >> ?nanddisk/Makefile ? ? ? ? ? ? ? ? ? | ? ?5
+>> >> ?nanddisk/nand.c ? ? ? ? ? ? ? ? ? ? | ?937 +++++++++++++
+>> >> ?nanddisk/nanddisk.h ? ? ? ? ? ? ? ? | ?702 ++++++++++
+>> >
+>> > How does this relate to drivers/mtd?
+>>
+>> that is a big issue to upstream. CSR built a NTFL supporting both
+>> WINCE/Linux with good performance and proved reliable products. the
+>> NTFL is a binary. NAND disk is a up level block driver to call API in
+>> the NTFL binary.
+>
+> Ok, no need to forward port or submit that driver for inclusion then.
+>
+>> that makes the NAND related codes very difficult to be accepted since
+>> it is completely not based on MTD. i hope we can also have a MTD based
+>> driver and compare the performance of ?UBI on MTD and current
+>> solution.
+>
+> Right, an MTD driver would be required for anyone to build products
+> with the mainline kernel, so that sounds like an important thing to
+> do. Comparing performance is also always good, so if you find that
+> UBI or the FTL in the kernel are lacking there, the MTD maintainers
+> will definitely want to know about that.
 
-Cheers,
+sure.
 
-	M.
--- 
-Reality is an implementation detail.
+>
+>> >> ?video/Kconfig ? ? ? ? ? ? ? ? ? ? ? | ? 24
+>> >> ?video/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?2
+>> >> ?video/backlight/Makefile ? ? ? ? ? ?| ? ?1
+>> >> ?video/sirfsoc_clcdc.h ? ? ? ? ? ? ? | ?269 ++++
+>> >> ?video/sirfsoc_fb.c ? ? ? ? ? ? ? ? ?| 2369 +++++++++++++++++++++++++++++++++++
+>> >> ?video/sirfsoc_vpp.c ? ? ? ? ? ? ? ? | 1166 +++++++++++++++++
+>> >
+>> > Have you considered doing a KMS device driver instead of an old-style
+>> > frame buffer?
+>>
+>> it depends on the whole schedule and resources of the related teams.
+>> i'd like to see the stronger KMS driver.
+>
+> There is definitely a trend towards KMS drivers, but no clear mandate yet.
+> If you wait long enough, you may not have the choice any more as soon
+> as KMS becomes a requirement for new display drivers.
+
+thanks!  definitely that's what we want to follow.
+
+>
+> ? ? ? ?Arnd
+>
+
+-barry
