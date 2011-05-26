@@ -1,29 +1,31 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 26 May 2011 13:44:10 +0200
-Subject: [PATCH 1/3] sound/atmel-pcm: trivial: typo in debug comment
-In-Reply-To: <1306410252-31534-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1306410252-31534-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <ff83ef6ea865da7cb32921154711e672293a7d83.1306409927.git.nicolas.ferre@atmel.com>
+From: vaibhav.bedia@ti.com (Vaibhav Bedia)
+Date: Thu, 26 May 2011 16:08:10 +0530
+Subject: [PATCH] OMAP: clockdomain: Remove redundant call to
+	pwrdm_wait_transition()
+Message-ID: <1306406290-25055-1-git-send-email-vaibhav.bedia@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
- sound/soc/atmel/atmel-pcm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+The call to pwrdm_wait_transition() in clkdm_clk_enable()
+is redundant since the function pwrdm_clkdm_state_switch()
+which is called next also does the same thing.
 
-diff --git a/sound/soc/atmel/atmel-pcm.c b/sound/soc/atmel/atmel-pcm.c
-index d0e7532..51dde4e 100644
---- a/sound/soc/atmel/atmel-pcm.c
-+++ b/sound/soc/atmel/atmel-pcm.c
-@@ -382,7 +382,7 @@ static int atmel_pcm_new(struct snd_card *card,
- 	}
+Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
+---
+ arch/arm/mach-omap2/clockdomain.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
+index 6cb6c03..4fbbbfc 100644
+--- a/arch/arm/mach-omap2/clockdomain.c
++++ b/arch/arm/mach-omap2/clockdomain.c
+@@ -834,7 +834,6 @@ int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
+ 		 clk->name);
  
- 	if (dai->driver->capture.channels_min) {
--		pr_debug("at32-pcm:"
-+		pr_debug("atmel-pcm:"
- 				"Allocating PCM capture DMA buffer\n");
- 		ret = atmel_pcm_preallocate_dma_buffer(pcm,
- 			SNDRV_PCM_STREAM_CAPTURE);
+ 	arch_clkdm->clkdm_clk_enable(clkdm);
+-	pwrdm_wait_transition(clkdm->pwrdm.ptr);
+ 	pwrdm_clkdm_state_switch(clkdm);
+ 
+ 	return 0;
 -- 
-1.7.3
+1.6.2.4
