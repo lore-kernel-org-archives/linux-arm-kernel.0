@@ -1,98 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 May 2011 18:10:54 +0100
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
-References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
-	<20110523132124.GI17672@n2100.arm.linux.org.uk>
-	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
-	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
-	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
-	<20110524171331.GA2941@arm.com>
-	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
-	<20110525124348.GA2340@arm.com>	<yw1xaaeanbxe.fsf@unicorn.mansr.com>
-	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
-Message-ID: <1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 26 May 2011 19:23:53 +0200
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <1306430264.2497.88.camel@laptop>
+References: <1306343335.21578.65.camel@twins>
+	<1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526154508.GA13788@redhat.com> <1306425584.2497.81.camel@laptop>
+	<1306426148.2497.83.camel@laptop> <20110526170422.GA18413@redhat.com>
+	<1306430264.2497.88.camel@laptop>
+Message-ID: <1306430633.2497.91.camel@laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Right... [adding bunch of people to CC],
-
-
-On Wed, 2011-05-25 at 15:50 +0100, Catalin Marinas wrote:
-> 2011/5/25 M?ns Rullg?rd <mans@mansr.com>:
-> > Dave Martin <dave.martin@linaro.org> writes:
-> >
-> >> On Wed, May 25, 2011 at 12:14:08PM +0100, Catalin Marinas wrote:
-> >>> On Tue, May 24, 2011 at 06:13:31PM +0100, Dave Martin wrote:
-> >>> > On Tue, May 24, 2011 at 04:26:35PM +0100, Catalin Marinas wrote:
-> >>> > > BTW, are we sure that the code generated with unaligned accesses is
-> >>> > > better? AFAIK, while processors support unaligned accesses, they may
-> >>> > > not always be optimal.
-> >>> >
-> >>> > The code gcc generates to synthesise an unaligned access using aligned
-> >>> > accesses is pretty simplistic:
-> >>> ...
-> >>> > For code which natively needs to read unaligned fields from data structures,
-> >>> > I sincerely doubt that the CPU will not beat the above code for efficiency...
-> >>> >
-> >>> > So if there's code doing unaligned access to data structures for a good
-> >>> > reason, building with unaligned access support turned on in the compiler
-> >>> > seems a good idea, if that code might performance-critical for anything.
-> >>>
-> >>> gcc generates unaligned accesses in the the pcpu_dump_alloc_info()
-> >>> function. We have a local variable like below (9 bytes):
-> >>>
-> >>>      char empty_str[] = "--------";
-> >>>
-> >>> and it looks like other stack accesses are unaligned:
-> >>>
-> >>> c0082ba0 <pcpu_dump_alloc_info>:
-> >>> c0082ba0:   e92d4ff0    push    {r4, r5, r6, r7, r8, r9, sl, fp, lr}
-> >>> c0082ba4:   e3074118    movw    r4, #28952  ; 0x7118
-> >>> c0082ba8:   e24dd04c    sub sp, sp, #76 ; 0x4c
-> >>> c0082bac:   e34c402a    movt    r4, #49194  ; 0xc02a
-> >>> c0082bb0:   e58d1014    str r1, [sp, #20]
-> >>> c0082bb4:   e58d0020    str r0, [sp, #32]
-> >>> c0082bb8:   e8b40003    ldm r4!, {r0, r1}
-> >>> c0082bbc:   e58d003f    str r0, [sp, #63]   <----------- !!!!!
-> >>> c0082bc0:   e59d0014    ldr r0, [sp, #20]
-> >>> c0082bc4:   e5d43000    ldrb    r3, [r4]
-> >>>
-> >>> I haven't tried with -mno-unaligned-access, I suspect the variables on
-> >>> the stack would be aligned.
-> >>
-> >> So, it looks like empty_str may be misaligned on the stack, and the compiler
-> >> is doing a misaligned store when initialising it.
-> >
-> > empty_str has type char[] so there are no alignment requirements.
+On Thu, 2011-05-26 at 19:17 +0200, Peter Zijlstra wrote:
+> On Thu, 2011-05-26 at 19:04 +0200, Oleg Nesterov wrote:
+> > On 05/26, Peter Zijlstra wrote:
+> > >
+> > > @@ -2636,7 +2636,8 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
+> > >  		 * to spin on ->on_cpu if p is current, since that would
+> > >  		 * deadlock.
+> > >  		 */
+> > > -		if (p == current) {
+> > > +		if (cpu == smp_processor_id()) {
+> > > +			p->sched_contributes_to_load = 0;
+> > >  			ttwu_queue(p, cpu);
+> > 
+> > Btw. I do not pretend I really understand se->vruntime, but in this
+> > case we are doing enqueue_task() without ->task_waking(), however we
+> > pass ENQUEUE_WAKING. Is it correct?
 > 
-> I think the local variables after char empty_str[] are unaligned (int
-> alloc). Changing the array size to 16 solves the issue.
-> 
-> The gcc guys here in ARM will have a look and I'll get back to you.
+> No its not, that's the thing that I got wrong the first time and caused
+> these pauses.
 
-This issue seems to be caused by passing -fconserve-stack to GCC. This
-was added in 8f7f5c9f ("kbuild: set -fconserve-stack option for gcc
-4.5") and as you can see from the archive:
+We'd end up with something like the below, which isn't too different
+from what I've now got queued.
 
-http://lkml.org/lkml/2009/9/20/39
+It has the extra cpu == smp_processor_id() check, but I'm not sure this
+whole case is worth the trouble. I could go stick some counters in to
+verify how often all this happens I guess.
 
-it was thought to only have an impact on inlining decisions. Looking at
-the documentation for GCC 4.6:
+---
+ arch/x86/include/asm/system.h |    2 ++
+ kernel/sched.c                |   14 +++++++++++---
+ kernel/sched_debug.c          |    7 +++++++
+ 3 files changed, 20 insertions(+), 3 deletions(-)
 
--fconserve-stack
-          Attempt to minimize stack usage. The compiler will attempt to
-use less stack space, even if that makes the program slower. This option
-implies setting the ?large-stack-frame? parameter to 100 and the
-?large-stack-frame-growth? parameter to 400.
-
-So it sounds like we might not want to enable this blindly across all
-architectures. Indeed, on ARM, it encourages the compiler to pack
-variables on the stack which leads to the weird and wonderful alignment
-situation that has been encountered in this thread.
-
-Can we remove -fconserve-stack from the top-level Makefile (or at least
-make it conditional by architecture)?
-
-Will
+diff --git a/arch/x86/include/asm/system.h b/arch/x86/include/asm/system.h
+index c2ff2a1..2c597e8 100644
+--- a/arch/x86/include/asm/system.h
++++ b/arch/x86/include/asm/system.h
+@@ -10,6 +10,8 @@
+ #include <linux/kernel.h>
+ #include <linux/irqflags.h>
+ 
++#define __ARCH_WANT_INTERRUPTS_ON_CTXSW
++
+ /* entries in ARCH_DLINFO: */
+ #if defined(CONFIG_IA32_EMULATION) || !defined(CONFIG_X86_64)
+ # define AT_VECTOR_SIZE_ARCH 2
+diff --git a/kernel/sched.c b/kernel/sched.c
+index 2d12893..e4f7a9f 100644
+--- a/kernel/sched.c
++++ b/kernel/sched.c
+@@ -2636,9 +2636,17 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
+ 		 * to spin on ->on_cpu if p is current, since that would
+ 		 * deadlock.
+ 		 */
+-		if (p == current) {
+-			ttwu_queue(p, cpu);
+-			goto stat;
++		if (cpu == smp_processor_id()) {
++			struct rq *rq;
++
++			rq = __task_rq_lock(p);
++			if (p->on_cpu) {
++				ttwu_activate(rq, p, ENQUEUE_WAKEUP);
++				ttwu_do_wakeup(rq, p, wake_flags);
++				__task_rq_unlock(rq);
++				goto stat;
++			}
++			__task_rq_unlock(rq);
+ 		}
+ #endif
+ 		cpu_relax();
+diff --git a/kernel/sched_debug.c b/kernel/sched_debug.c
+index a6710a1..f0ff1de 100644
+--- a/kernel/sched_debug.c
++++ b/kernel/sched_debug.c
+@@ -332,6 +332,13 @@ static int sched_debug_show(struct seq_file *m, void *v)
+ 		(int)strcspn(init_utsname()->version, " "),
+ 		init_utsname()->version);
+ 
++#ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
++	SEQ_printf(m, "__ARCH_WANT_INTERRUPTS_ON_CTXSW\n");
++#endif
++#ifdef __ARCH_WANT_UNLOCKED_CTXSW
++	SEQ_printf(m, "__ARCH_WANT_UNLOCKED_CTXSW\n");                                  
++#endif
++
+ #define P(x) \
+ 	SEQ_printf(m, "%-40s: %Ld\n", #x, (long long)(x))
+ #define PN(x) \
