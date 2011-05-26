@@ -1,31 +1,50 @@
-From: vaibhav.bedia@ti.com (Vaibhav Bedia)
-Date: Thu, 26 May 2011 16:08:10 +0530
-Subject: [PATCH] OMAP: clockdomain: Remove redundant call to
-	pwrdm_wait_transition()
-Message-ID: <1306406290-25055-1-git-send-email-vaibhav.bedia@ti.com>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Thu, 26 May 2011 12:02:39 +0100
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <1306405979.1200.63.camel@twins>
+References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
+	<1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+Message-ID: <1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The call to pwrdm_wait_transition() in clkdm_clk_enable()
-is redundant since the function pwrdm_clkdm_state_switch()
-which is called next also does the same thing.
+On Thu, 2011-05-26 at 12:32 +0200, Peter Zijlstra wrote:
+> On Thu, 2011-05-26 at 15:29 +0800, Yong Zhang wrote:
+> > > Figuring out why the existing condition failed
+> > 
+> > Seems  'current' will change before/after switch_to since it's derived from
+> > sp register.
+> > So that means if interrupt come before we switch sp, 'p == current' will
+> > catch it, but if interrupt comes after we switch sp, we will lose a wake up.
+> 
+> Well, loosing a wakeup isn't the problem here (although it would be a
+> problem), the immediate problem is that we're getting stuck
+> (life-locked) in that while (p->on_cpu) loop.
+> 
+> But yes, I think that explains it, if the interrupts hits
+> context_switch() after current was changed but before clearing
+> p->on_cpu, we would life-lock in interrupt context.
+> 
+> Now we could of course go add in_interrupt() checks there, but that
+> would make this already fragile path more interesting, so I think I'll
+> stick with the proposed patch -- again provided it actually works.
+> 
+> Marc, any word on that?
 
-Signed-off-by: Vaibhav Bedia <vaibhav.bedia@ti.com>
----
- arch/arm/mach-omap2/clockdomain.c |    1 -
- 1 files changed, 0 insertions(+), 1 deletions(-)
+The box is currently building kernels in a loop (using -j64...). So far,
+so good. Oh, and that fixed the load-average thing as well.
 
-diff --git a/arch/arm/mach-omap2/clockdomain.c b/arch/arm/mach-omap2/clockdomain.c
-index 6cb6c03..4fbbbfc 100644
---- a/arch/arm/mach-omap2/clockdomain.c
-+++ b/arch/arm/mach-omap2/clockdomain.c
-@@ -834,7 +834,6 @@ int clkdm_clk_enable(struct clockdomain *clkdm, struct clk *clk)
- 		 clk->name);
- 
- 	arch_clkdm->clkdm_clk_enable(clkdm);
--	pwrdm_wait_transition(clkdm->pwrdm.ptr);
- 	pwrdm_clkdm_state_switch(clkdm);
- 
- 	return 0;
+Oh wait (my turn...):
+INFO: task gcc:10030 blocked for more than 120 seconds.
+"echo 0 > /proc/sys/kernel/hung_task_timeout_secs" disables this message.
+
+One of my ssh sessions is locking up periodically, and it generally
+feels a bit sluggish.
+
+	M.
 -- 
-1.6.2.4
+Reality is an implementation detail.
