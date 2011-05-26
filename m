@@ -1,5 +1,5 @@
 From: mingo@elte.hu (Ingo Molnar)
-Date: Thu, 26 May 2011 10:43:41 +0200
+Date: Thu, 26 May 2011 11:15:18 +0200
 Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
 	filtering
 In-Reply-To: <alpine.LFD.2.02.1105251836030.3078@ionos>
@@ -12,67 +12,92 @@ References: <20110517131902.GF21441@elte.hu>
 	<alpine.LFD.2.02.1105242239230.3078@ionos>
 	<20110525150153.GE29179@elte.hu>
 	<alpine.LFD.2.02.1105251836030.3078@ionos>
-Message-ID: <20110526084341.GD26775@elte.hu>
+Message-ID: <20110526091518.GE26775@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 * Thomas Gleixner <tglx@linutronix.de> wrote:
 
-> > > We do _NOT_ make any decision based on the trace point so 
-> > > what's the "pre-existing" active role in the syscall entry 
-> > > code?
-> > 
-> > The seccomp code we are discussing in this thread.
+> > If anything then that should tell you something that events and 
+> > seccomp are not just casually related ...
 > 
-> That's proposed code and has absolutely nothing to do with the 
-> existing trace point semantics.
+> They happen to have the hook at the same point in the source and 
+> for pure coincidence it works because the problem to solve is 
+> extremly simplistic. And that's why the diffstat is minimalistic, 
+> but that does not prove anything.
 
-So because it's proposed code it does not exist?
+Here are the diffstats of the various versions of this proposed 
+security feature:
 
-If the feature is accepted (and given Linus's opinion it's not clear 
-at all it's accepted in any form) then it's obviously a very 
-legitimate technical concern whether we do:
+       bitmask (2009):  6 files changed,  194 insertions(+), 22 deletions(-)
+ filter engine (2010): 18 files changed, 1100 insertions(+), 21 deletions(-)
+ event filters (2011):  5 files changed,   82 insertions(+), 16 deletions(-)
 
-	ret = seccomp_check_syscall_event(p1, p2, p3, p4, p5);
-	if (ret)
-		return -EACCES;
+The third variant, 'event filters', is actually the most 
+sophisticated one of all and it is not simplistic at all.
 
-	... random code ...
+The main reason why the diffstat is small is because it reuses over 
+ten thousand lines of pre-existing kernel code intelligently. Are you 
+interpreting that as some sort of failure of the patch? I think it's 
+a very good thing.
 
-	trace_syscall_event(p1, p2, p3, p4, p5);
+To demonstrate the non-simplicity of the feature:
 
-Where seccomp_check_syscall_event() duplicates much of the machinery 
-that is behind trace_syscall_event().
+ - These security rules/filters can be sophisticated like:
 
-Or we do the more intelligent:
+   sys_close() rule protecting against the closing of 
+   stdin/stdout/stderr:
 
-	ret = check_syscall_event(p1, p2, p3, p4, p5);
-	if (ret)
-		return -EACCES;
+                  "fd == 0 || fd == 1 || fd == 2"
 
-Where we have the happy side effects of:
+   sys_ioperm() rule allowing port 0x80 access but nothing else:
 
-  - less code at the call site
+                  "from != 128 || num != 1"
 
-  - (a lot of!) shared infrastructure between the proposed seccomp 
-    code and event filters.
+   sys_listen() rule limiting the max accept() backlog to 16 entries:
 
-  - we'd also be able to trace at security check boundaries - which
-    has obvious bug analysis advantages.
+                  "backlog > 16"
 
-In fact i do not see *any* advantages in keeping this needlessly 
-bloaty and needlessly inconsistently sampled form of instrumentation:
+   sys_mprotect(), sys_mmap[2](), sys_unmap() and sys_mremap() rule
+   protecting the first 1 MB NULL pointer guard range:
 
-	ret = seccomp_check_syscall_event(p1, p2, p3, p4, p5);
-	if (ret)
-		return -EACCES;
+                  "addr < 0x00100000"
 
-	... random code ...
+   sys_setscheduler() rule protecting against the switch to 
+   non-SCHED_OTHER scheduler policies:
 
-	trace_syscall_event(p1, p2, p3, p4, p5);
+                  "policy != 0"
 
-Do you?
+   Most of these examples are finegrained access restrictions that 
+   AFAIK are not possible with any of the LSM based security measures 
+   that Linux offers today.
+
+ - These security rules/filters can be safely used and installed by 
+   unprivileged userspace, allowing arbitrary end user apps to define 
+   their own, flexible security policies.
+
+ - These security rules/filters get automatically inherited into child 
+   tasks and child tasks cannot mess with them - they cannot even 
+   query/observe that these filters *exist*.
+
+ - These security rules/filters nest on each other in basically 
+   arbitrary depth, giving us a working, implemented, stackable LSM
+   concept.
+
+ - These security rules/filters can be extended to arbitrary more 
+   object lifetime events in the future, without changing the ABI.
+
+ - These security rules/filters, unlike most LSM rules, can execute
+   not just within hardirqs but also within deeply atomic contexts
+   such as NMI contexts, putting far less restrictions on what can
+   be security/access checked.
+
+ - Access permission violations can be set up to generate events of
+   the violations into a scalable ring-buffer, providing unprivileged
+   security-auditing functionality to the managing task(s).
+
+I'd call that anything but 'simplistic'.
 
 Thanks,
 
