@@ -1,34 +1,30 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 26 May 2011 12:32:59 +0200
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
-	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
-	<1306358128.21578.107.camel@twins>
-	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-Message-ID: <1306405979.1200.63.camel@twins>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 26 May 2011 13:44:11 +0200
+Subject: [PATCH 2/3] sound/atmel-pcm: trivial: typo in atmel_pcm_dma_params
+	strucutre comment
+In-Reply-To: <1306410252-31534-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1306410252-31534-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <4690ba475772c4edd963009ad570394df5745a96.1306409927.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-26 at 15:29 +0800, Yong Zhang wrote:
-> > Figuring out why the existing condition failed
-> 
-> Seems  'current' will change before/after switch_to since it's derived from
-> sp register.
-> So that means if interrupt come before we switch sp, 'p == current' will
-> catch it, but if interrupt comes after we switch sp, we will lose a wake up.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ sound/soc/atmel/atmel-pcm.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Well, loosing a wakeup isn't the problem here (although it would be a
-problem), the immediate problem is that we're getting stuck
-(life-locked) in that while (p->on_cpu) loop.
-
-But yes, I think that explains it, if the interrupts hits
-context_switch() after current was changed but before clearing
-p->on_cpu, we would life-lock in interrupt context.
-
-Now we could of course go add in_interrupt() checks there, but that
-would make this already fragile path more interesting, so I think I'll
-stick with the proposed patch -- again provided it actually works.
-
-Marc, any word on that?
+diff --git a/sound/soc/atmel/atmel-pcm.h b/sound/soc/atmel/atmel-pcm.h
+index 2597329..5e0a95e 100644
+--- a/sound/soc/atmel/atmel-pcm.h
++++ b/sound/soc/atmel/atmel-pcm.h
+@@ -60,7 +60,7 @@ struct atmel_ssc_mask {
+  * This structure, shared between the PCM driver and the interface,
+  * contains all information required by the PCM driver to perform the
+  * PDC DMA operation.  All fields except dma_intr_handler() are initialized
+- * by the interface.  The dms_intr_handler() pointer is set by the PCM
++ * by the interface.  The dma_intr_handler() pointer is set by the PCM
+  * driver and called by the interface SSC interrupt handler if it is
+  * non-NULL.
+  */
+-- 
+1.7.3
