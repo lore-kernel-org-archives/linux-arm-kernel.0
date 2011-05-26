@@ -1,67 +1,62 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 26 May 2011 14:32:03 -0600
-Subject: [PATCH] Exynos4: Move GPIO drivers to drivers/gpio
-In-Reply-To: <20110518115536.GA31059@july>
-References: <20110518115536.GA31059@july>
-Message-ID: <20110526203203.GF29060@ponder.secretlab.ca>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Thu, 26 May 2011 17:03:39 -0400 (EDT)
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>
+	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
+	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
+	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
+	<20110524171331.GA2941@arm.com>
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+	<20110525124348.GA2340@arm.com> <yw1xaaeanbxe.fsf@unicorn.mansr.com>
+	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
+	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <alpine.LFD.2.00.1105261650330.3207@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 18, 2011 at 08:55:36PM +0900, Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Samsung Exynos4 gpio driver moved to drivers/gpio.
-> 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Thu, 26 May 2011, Will Deacon wrote:
 
-Applied, thanks
-g.
+> This issue seems to be caused by passing -fconserve-stack to GCC. This
+> was added in 8f7f5c9f ("kbuild: set -fconserve-stack option for gcc
+> 4.5") and as you can see from the archive:
+> 
+> http://lkml.org/lkml/2009/9/20/39
+> 
+> it was thought to only have an impact on inlining decisions. Looking at
+> the documentation for GCC 4.6:
+> 
+> -fconserve-stack
+>           Attempt to minimize stack usage. The compiler will attempt to
+> use less stack space, even if that makes the program slower. This option
+> implies setting the ?large-stack-frame? parameter to 100 and the
+> ?large-stack-frame-growth? parameter to 400.
+> 
+> So it sounds like we might not want to enable this blindly across all
+> architectures. Indeed, on ARM, it encourages the compiler to pack
+> variables on the stack which leads to the weird and wonderful alignment
+> situation that has been encountered in this thread.
+> 
+> Can we remove -fconserve-stack from the top-level Makefile (or at least
+> make it conditional by architecture)?
 
-> ---
-> diff --git a/arch/arm/mach-exynos4/gpiolib.c b/drivers/gpio/exynos4-gpio.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos4/gpiolib.c
-> rename to drivers/gpio/exynos4-gpio.c
-> diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-> index 9be104f..3bb3f57 100644
-> --- a/arch/arm/mach-exynos4/Makefile
-> +++ b/arch/arm/mach-exynos4/Makefile
-> @@ -13,7 +13,7 @@ obj-				:=
->  # Core support for EXYNOS4 system
->  
->  obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
-> -obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o gpiolib.o irq-eint.o dma.o
-> +obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
->  obj-$(CONFIG_PM)		+= pm.o sleep.o
->  obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
->  
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index d3b2953..7938449 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -75,6 +75,12 @@ config GPIO_BASIC_MMIO
->  	help
->  	  Say yes here to support basic memory-mapped GPIO controllers.
->  
-> +config GPIO_EXYNOS4
-> +	bool "Samsung Exynos4 GPIO support"
-> +	depends on CPU_EXYNOS4210
-> +	help
-> +	  Say yes here to support Samsung Exynos4 GPIO controllers.
-> +
->  config GPIO_IT8761E
->  	tristate "IT8761E GPIO support"
->  	depends on GPIOLIB
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index becef59..f2373d0 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -11,6 +11,7 @@ obj-$(CONFIG_GPIOLIB)		+= gpiolib.o
->  obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
->  obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
->  obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
-> +obj-$(CONFIG_GPIO_EXYNOS4)	+= exynos4-gpio.o
->  obj-$(CONFIG_GPIO_LANGWELL)	+= langwell_gpio.o
->  obj-$(CONFIG_GPIO_MAX730X)	+= max730x.o
->  obj-$(CONFIG_GPIO_MAX7300)	+= max7300.o
+I think this is an orthogonal issue.
+
+My opinion is that we should use -mno-unaligned-access by default on 
+ARM.  The reason is that we've been expecting the compiler not to cause 
+unaligned accesses for ages, and letting the compiler, for whatever 
+reasons including things like -fconserve-stack, produce unaligned 
+accesses behind our back is a change in behavior we might not always be 
+prepared for.  Unaligned accesses in the kernel should be rare anyway, 
+and allowing the compiler to generate them can be allowed for selected 
+files when proven beneficial.
+
+It is possible that -fconserve-stack is still valuable on ARM given that 
+it is also used with -mno-unaligned-access for other things than 
+structure packing on the stack, and therefore its merits can be debated 
+independently from the alignment issue at hand.
+
+
+Nicolas
