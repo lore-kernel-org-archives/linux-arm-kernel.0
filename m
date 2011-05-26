@@ -1,70 +1,47 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 27 May 2011 00:58:19 +0200
-Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <0D753D10438DA54287A00B027084269764D3319EC4@AUSP01VMBX24.collaborationhost.net>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
-	<BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
-	<20110525195413.GC2996@acer>
-	<BANLkTin8Trn-44Op+GbxrgocFrnPuXUZ2w@mail.gmail.com>
-	<20110526043344.GA2749@acer>
-	<BANLkTikzrXRmdnv_v_nmJw7Nvsr6TY-5RQ@mail.gmail.com>
-	<20110526183800.GE2957@acer>
-	<0D753D10438DA54287A00B027084269764D3319EC4@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <BANLkTimry2+rdp=9FA-fuhJLNfkcP3Db4w@mail.gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 26 May 2011 17:25:18 -0600
+Subject: [PATCH 0/4] Move U300 and Nomadik GPIO drivers v2
+In-Reply-To: <1306271192-28911-1-git-send-email-linus.walleij@stericsson.com>
+References: <1306271192-28911-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110526232518.GA1384@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/26 H Hartley Sweeten <hartleys@visionengravers.com>:
+On Tue, May 24, 2011 at 11:06:32PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This is a rebase of the earlier patch set, due to updates
+> pulled in to Torvalds tree conflicting with earlier movement
+> patches.
+> 
+> I also used -M so we can see what is happening, yay!
 
-> I think the biggest hurdle with using the amba-pl022 driver is that the ep93xx
-> spi peripheral does not have the registers with the pid and cid id's. ?Without
-> those I don't think the amba bus driver will be able to match the device to
-> the driver.
+Applied whole series, plus the kconfig fixup.  Thanks.
 
-This is not a problem. We have this code to dynamically create and
-register a device with a specific periphid on ux500. It worked even
-before my recent patches to amba's bus.c if you have only
-zeroes in these registers:
+g.
 
-struct amba_device *
-dbx500_add_amba_device(const char *name, resource_size_t base,
-                       int irq, void *pdata, unsigned int periphid)
-{
-        struct amba_device *dev;
-        int ret;
-
-        dev = kzalloc(sizeof *dev, GFP_KERNEL);
-        if (!dev)
-                return ERR_PTR(-ENOMEM);
-
-        dev->dev.init_name = name;
-
-        dev->res.start = base;
-        dev->res.end = base + SZ_4K - 1;
-        dev->res.flags = IORESOURCE_MEM;
-
-        dev->dma_mask = DMA_BIT_MASK(32);
-        dev->dev.coherent_dma_mask = DMA_BIT_MASK(32);
-
-        dev->irq[0] = irq;
-        dev->irq[1] = NO_IRQ;
-
-        dev->periphid = periphid;
-
-        dev->dev.platform_data = pdata;
-
-        ret = amba_device_register(dev, &iomem_resource);
-        if (ret) {
-                kfree(dev);
-                return ERR_PTR(ret);
-        }
-
-        return dev;
-}
-
-I'd recommend coming up with some clever numbering scheme
-with invented vendor ID.
-
-Yours,
-Linus Walleij
+> 
+> Linus Walleij (2):
+>   gpio: move U300 GPIO driver to drivers/gpio
+>   gpio: move Nomadik GPIO driver to drivers/gpio
+> 
+> Rabin Vincent (1):
+>   gpio/nomadik: show all pins in debug
+> 
+> Rickard Andersson (1):
+>   gpio/nomadik: add function to read GPIO pull down status
+> 
+>  arch/arm/mach-u300/Makefile                        |    2 +-
+>  arch/arm/plat-nomadik/Kconfig                      |    5 --
+>  arch/arm/plat-nomadik/Makefile                     |    1 -
+>  arch/arm/plat-nomadik/include/plat/gpio.h          |    2 +
+>  drivers/gpio/Makefile                              |    2 +
+>  .../gpio.c => drivers/gpio/gpio-nomadik.c          |   65 +++++++++++++++++---
+>  .../mach-u300/gpio.c => drivers/gpio/gpio-u300.c   |    0
+>  7 files changed, 62 insertions(+), 15 deletions(-)
+>  rename arch/arm/plat-nomadik/gpio.c => drivers/gpio/gpio-nomadik.c (95%)
+>  rename arch/arm/mach-u300/gpio.c => drivers/gpio/gpio-u300.c (100%)
+> 
+> -- 
+> 1.7.3.2
+> 
