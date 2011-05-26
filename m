@@ -1,29 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 May 2011 22:51:01 +0100
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <alpine.LFD.2.00.1105261650330.3207@xanadu.home>
-References: <1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
-	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
-	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
-	<20110524171331.GA2941@arm.com>
-	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
-	<20110525124348.GA2340@arm.com>
-	<yw1xaaeanbxe.fsf@unicorn.mansr.com>
-	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
-	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
-Message-ID: <20110526215101.GL24876@n2100.arm.linux.org.uk>
+Date: Thu, 26 May 2011 22:53:49 +0100
+Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
+In-Reply-To: <0D753D10438DA54287A00B027084269764D3319EC4@AUSP01VMBX24.collaborationhost.net>
+References: <cover.1306082097.git.mika.westerberg@iki.fi>
+	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
+	<BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
+	<20110525195413.GC2996@acer>
+	<BANLkTin8Trn-44Op+GbxrgocFrnPuXUZ2w@mail.gmail.com>
+	<20110526043344.GA2749@acer>
+	<BANLkTikzrXRmdnv_v_nmJw7Nvsr6TY-5RQ@mail.gmail.com>
+	<20110526183800.GE2957@acer>
+	<0D753D10438DA54287A00B027084269764D3319EC4@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20110526215349.GM24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 05:03:39PM -0400, Nicolas Pitre wrote:
-> It is possible that -fconserve-stack is still valuable on ARM given that 
-> it is also used with -mno-unaligned-access for other things than 
-> structure packing on the stack, and therefore its merits can be debated 
-> independently from the alignment issue at hand.
+On Thu, May 26, 2011 at 01:48:12PM -0500, H Hartley Sweeten wrote:
+> I think the biggest hurdle with using the amba-pl022 driver is that the ep93xx
+> spi peripheral does not have the registers with the pid and cid id's.  Without
+> those I don't think the amba bus driver will be able to match the device to
+> the driver.
 
-Catalin said in his mail "I haven't tried with -mno-unaligned-access, I
-suspect the variables on the stack would be aligned.".  So I don't think
-we know enough to say whether -mno-unaligned-access avoids the stack
-packing.
+I've just committed Linus' patches to allow a provided ID to override
+what the bus code finds.
