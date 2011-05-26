@@ -1,34 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 May 2011 12:13:46 +0200
-Subject: [RFC] ARM Subarchitecture group maintainership
-In-Reply-To: <20110526095919.GA31268@opensource.wolfsonmicro.com>
-References: <201105181047.17309.arnd@arndb.de>
-	<alpine.LFD.2.02.1105261030560.3078@ionos>
-	<20110526095919.GA31268@opensource.wolfsonmicro.com>
-Message-ID: <201105261213.46804.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 26 May 2011 11:15:09 +0100
+Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
+In-Reply-To: <20110525205249.GD24876@n2100.arm.linux.org.uk>
+References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
+	<4DDC2A59.8030109@codeaurora.org>
+	<002f01cc1ada$5e7ffaa0$1b7fefe0$@deacon@arm.com>
+	<4DDD464F.2010508@codeaurora.org>
+	<20110525205249.GD24876@n2100.arm.linux.org.uk>
+Message-ID: <003301cc1b8d$cb154810$613fd830$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 May 2011, Mark Brown wrote:
-> 
-> On Thu, May 26, 2011 at 10:33:55AM +0200, Thomas Gleixner wrote:
-> > On Thu, 26 May 2011, Mark Brown wrote:
-> 
-> > > I think the question is about the existing -next branches people already
-> > > have - should they contain code that hasn't yet gone to you guys?  We're
-> > > doing that for audio at the minute (having subtrees in -next directly)
-> > > and it's pretty helpful for miniising hassle for the maintainers of the
-> > > core tree.
-> 
-> > We obviously talk about arch/arm/[mach|plat]* stuff, drivers/ sound/
-> > etc. should go through the relevant maintainer trees.
-> 
-> Right, but the question is what to do with the subtrees that are in
-> -next currently.  I'm mentioning sound as an example of a tree with
-> subtrees in -next directly.
+Hi Russell,
 
-I think all the subarch maintainers should basically stop having their
-stuff included directly in linux-next, but instead have it pulled into
-our tree, which has one aggregate -next branch that gets included there.
+> On Wed, May 25, 2011 at 11:11:27AM -0700, Stephen Boyd wrote:
+> > On 05/25/2011 05:50 AM, Will Deacon wrote:
+> > > I was planning to CC stable for patches 1 ("ARM: cache: ensure MVA is cacheline
+> > > aligned in flush_kern_dcache_area") and 4 ("ARM: mm: fix racy ASID rollover
+> > > broadcast on SMP platforms") as these affect existing v6 and v7 cores. The
+> > > remainder of the patches, although nice to have, only kick in on A15 as far as
+> > > I'm aware (due to aggressive caching of speculative level 1 entries).
+> >
+> > Would it be appropriate to reorder the series then so patches 1 and 4
+> > come first?
+> 
+> I'm not entirely convinced (4) is the best solution yet, but that's
+> mainly becaues I've not thought about it enough yet.  1-3 look fine
+> though.
 
-	Arnd
+Ok, thanks for looking at those. I'll put 1-3 and 5 into the patch system
+since these can be applied irrespective of the other guy. Once you've had
+a think about 4, I'd be happy to discuss it on the list if you can think
+of a better way to solve the problem.
+ 
+> > > I was hoping for some acks/tested-bys before then since these changes affect a
+> > > lot of platforms and the code is fairly scary.
+> >
+> > Yes the patches look scary. I could give it a test on MSM but I'm not
+> > even sure that will help much. Why didn't you Cc Russell on these patches?
+> 
+> I do tend to read about 90% of linux-arm-kernel, whether its cc'd to
+> me or not.  The cc doesn't really affect whether I read it or not.
+
+I figured as much and it saves me having to remember to remove the CC
+line when I send to the patch system.
+
+Cheers,
+
+Will
