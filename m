@@ -1,58 +1,86 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 26 May 2011 13:49:32 +0000
-Subject: spitz pm: adjust messages
-In-Reply-To: <20110521122450.GA6954@elf.ucw.cz>
-References: <20110521122450.GA6954@elf.ucw.cz>
-Message-ID: <20110526134931.GA16958@localhost.ucw.cz>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 May 2011 14:55:33 +0100
+Subject: [PATCH] ARM: OMAP: Get rid of section mismatch warnings
+In-Reply-To: <20110526133732.GD11352@atomide.com>
+References: <1306414838-4330-1-git-send-email-silesh@ti.com>
+	<4DDE4EEF.8070108@ti.com> <20110526133732.GD11352@atomide.com>
+Message-ID: <20110526135533.GA25841@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eric, it should probably be you merging this and surrounding
-patches... Any comments? Merge?
-							Pavel
-
-On Sat 2011-05-21 14:24:50, Pavel Machek wrote:
-> Charger error is something that should be reported to the syslog; do
-> it. If temperature reading fails, we do not want to charge the
-> battery, anyway.
+On Thu, May 26, 2011 at 06:37:32AM -0700, Tony Lindgren wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110526 05:56]:
+> > On 5/26/2011 6:30 PM, Silesh C V wrote:
+> > >Get rid of the following and 8 other similar section mismatch
+> > >warnings
+> > >
+> > I send this [1] patch a month back. It's still not considered
+> > though even after reminder.
+> > 
+> > [1] https://patchwork.kernel.org/patch/684831/
 > 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
-> 
-> diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
-> index 785880f..513588c 100644
-> --- a/arch/arm/mach-pxa/sharpsl_pm.c
-> +++ b/arch/arm/mach-pxa/sharpsl_pm.c
-> @@ -317,6 +302,8 @@ static void sharpsl_charge_off(void)
->  
->  static void sharpsl_charge_error(void)
->  {
-> +	dev_warn(sharpsl_pm.dev, "Charger Error\n");
-> +
->  	sharpsl_pm_led(SHARPSL_LED_ERROR);
->  	sharpsl_pm.machinfo->charge(0);
->  	sharpsl_pm.charge_mode = CHRG_ERROR;
-> @@ -513,8 +500,10 @@ static int sharpsl_check_battery_temp(void)
->  	val = get_select_val(buff);
->  
->  	dev_dbg(sharpsl_pm.dev, "Temperature: %d\n", val);
-> -	if (val > sharpsl_pm.machinfo->charge_on_temp) {
-> -		printk(KERN_WARNING "Not charging: temperature out of limits.\n");
-> +	/* FIXME: this should catch battery read errors, but we should
-> +	   probably avoid charging in <0C temperatures, too. */
-> +	if ((val < 0) || (val > sharpsl_pm.machinfo->charge_on_temp)) {
-> +		dev_warn(sharpsl_pm.dev, "Not charging: temperature %d out of limits.\n", val);
->  		return -1;
->  	}
->  
-> -- 
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> Applying now into devel-fixes with additional fixes from Silesh.
+> Updated patch below.
 
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+I also have this from a while back.  There's also some nastyness in
+twl4030-power.c which requires basically s/__init/__devinit/ to almost
+the entire file.
+
+8<--------
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+
+Fix various section mismatch warnings:
+
+WARNING: arch/arm/plat-omap/built-in.o(.devinit.text+0x46c): Section mismatch in reference from the function omap_gpio_probe() to the function .init.text:omap_gpio_chip_init()
+The function __devinit omap_gpio_probe() references
+a function __init omap_gpio_chip_init().
+If omap_gpio_chip_init is only used by omap_gpio_probe then
+annotate omap_gpio_chip_init with a matching annotation.
+
+WARNING: arch/arm/mach-omap2/built-in.o(.text+0x423c): Section mismatch in reference from the function pm_dbg_regset_init() to the function .init.text:pm_dbg_init()
+The function pm_dbg_regset_init() references
+the function __init pm_dbg_init().
+This is often because pm_dbg_regset_init lacks a __init
+annotation or the annotation of pm_dbg_init is wrong.
+
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+--
+ arch/arm/mach-omap2/pm-debug.c |    4 ++--
+ arch/arm/plat-omap/gpio.c      |    2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+index 971d186..3800ee0 100644
+--- a/arch/arm/plat-omap/gpio.c
++++ b/arch/arm/plat-omap/gpio.c
+@@ -1629,7 +1629,7 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
+ 	}
+ }
+ 
+-static void __init omap_gpio_chip_init(struct gpio_bank *bank)
++static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+ {
+ 	int j;
+ 	static int gpio;
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index 125f565..169e930 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -189,7 +189,7 @@ static struct dentry *pm_dbg_dir;
+ 
+ static int pm_dbg_init_done;
+ 
+-static int __init pm_dbg_init(void);
++static int pm_dbg_init(void);
+ 
+ enum {
+ 	DEBUG_FILE_COUNTERS = 0,
+@@ -595,7 +595,7 @@ static int option_set(void *data, u64 val)
+ 
+ DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
+ 
+-static int __init pm_dbg_init(void)
++static int pm_dbg_init(void)
+ {
+ 	int i;
+ 	struct dentry *d;
