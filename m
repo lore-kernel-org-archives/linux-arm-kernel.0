@@ -1,146 +1,41 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 26 May 2011 14:46:40 +0200
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D17815E@dbde02.ent.ti.com>
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D177FCC@dbde02.ent.ti.com>
-	<4DDE2745.3030307@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D178110@dbde02.ent.ti.com>
-	<4DDE435C.8060506@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D17815E@dbde02.ent.ti.com>
-Message-ID: <4DDE4BB0.7010809@ti.com>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Thu, 26 May 2011 14:50:07 +0200
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <20110526123137.GG24876@n2100.arm.linux.org.uk>
+References: <1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
+	<1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+Message-ID: <20110526125007.GA27083@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/26/2011 2:38 PM, Premi, Sanjeev wrote:
->> -----Original Message-----
->> From: Cousson, Benoit
->> Sent: Thursday, May 26, 2011 5:41 PM
->> To: Premi, Sanjeev
->> Cc: DebBarma, Tarun Kanti; linux-omap at vger.kernel.org;
->> Hilman, Kevin; Shilimkar, Santosh; tony at atomide.com;
->> linux-arm-kernel at lists.infradead.org; Varadarajan,
->> Charulatha; Paul Walmsley
->> Subject: Re: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup
->> GPIO and rev_ids
->>
->> On 5/26/2011 1:47 PM, Premi, Sanjeev wrote:
->>>> -----Original Message-----
->>>> From: Cousson, Benoit
->>>> Sent: Thursday, May 26, 2011 3:41 PM
->>>> To: Premi, Sanjeev
->>>> Cc: DebBarma, Tarun Kanti; linux-omap at vger.kernel.org;
->>>> Hilman, Kevin; Shilimkar, Santosh; tony at atomide.com;
->>>> linux-arm-kernel at lists.infradead.org; Varadarajan,
->>>> Charulatha; Paul Walmsley
->>>> Subject: Re: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup
->>>> GPIO and rev_ids
->>>>
->>>> On 5/26/2011 11:23 AM, Premi, Sanjeev wrote:
->>>>>> From: linux-omap-owner at vger.kernel.org
->>>>>> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
->>>>>> DebBarma, Tarun Kanti
->>>>>> Sent: Tuesday, May 24, 2011 7:55 PM
->>>>>>
->>>>>> From: Charulatha V<charu@ti.com>
->>>>>>
->>>>>> Non-wakeup GPIOs are available only in OMAP2420 and OMAP3430. But
->>>>>> the GPIO driver initializes the non-wakeup GPIO bits for OMAP24xx
->>>>>> (bothe OMAP 2420 and 2430)&    not for OMAP3 which is incorrect.
->>>>>>
->>>>>> Fix the above by providing non-wakeup GPIO information
->>>> through pdata
->>>>>> specific to the SoC.
->>>>>>
->>>>>> The GPIO rev id provided in the hwmod database is the same
->>>>>> for OMAP2420
->>>>>> and OMAP2430. Change the GPIO rev ids in hwmod database as
->>>> given below
->>>>>> so that it can be used to identify OMAP2420 and OMAP2430.
->>>>>> OMAP2420 - 0
->>>>>> OMAP2430 - 1
->>>>>> OMAP3    - 2
->>>>>> OMAP4    - 3
->>>>>
->>>>> [sp] Magic numbers should be avoided.
->>>>>         Suggest using something like:
->>>>>         #define GPIO_REV_2420	0
->>>>>         #define GPIO_REV_2430	1
->>>>>         #define GPIO_REV_34XX	2
->>>>>         #define GPIO_REV_44xx	3
->>>>
->>>> Well, it is not a magic number, it is a revision id that is
->>>> incremented
->>>> each time there is a difference in the IP.
->>>> The OMAP version ->   IP version link is done at hwmod level.
->>>> The driver
->>>> does not have to know it is an OMAP3 or OMAP4. In that case we did
->>>> change the IP version for every revisions, but OMAP5 will use
->>>> the OMAP4
->>>> revision.
->>>> I'm not even considering all the Davinci variants that are
->> not named
->>>> OMAP but do use OMAP IPs... as you already know...
->>>> That can provide a rather confusing information for my
->> point of view.
->>>>
->>>> Whereas a comment like that will give you the exhaustive
->> information.
->>>>
->>>> 0: OMAP2420
->>>> 1: OMAP2430
->>>> 2: OMAP3, DMxxx
->>>> 3: OMAP4, OMAP5, DM816x
->>>>
->>>> That being said, some drivers already did that, so I'm not
->> opposed to
->>>> such change. I just think it is not the best approach.
->>>> At least it gives a pointer to the TRM that contains the IP doc.
->>>
->>> [sp] Benoit, your are right from generation perspectove where the
->>>        it is easier to increment numbers but when we use comparison
->>
->> This is not even related to generation. A version number is a number.
->> If OMAP2 is using GPIO v1.6 and OMAP3 the version v2.2, only that IP
->> version is relevant for the driver.
->> For the documentation point of view, since we do not have a
->> per IP TRM,
->> then it can make sense to know where that IP is documented. But as I
->> said a comment is enough and will allow a much more relevant level of
->> details information than a define.
->>
->>>        code - as in this patch, comparison against a number isn't
->>>        readable.
->>>
->>>        As example:
->>>
->>>    +	switch (oh->class->rev) {     ## This is auto-generated.
->>>    +	case 0:				## But this is our code.
->>>
->>>        I am recommending this to read as:
->>>
->>>    +	switch (oh->class->rev) {     ## This is auto-generated.
->>>    +	case GPIO_REV_2420:		## More readable.
->>
->> More readable, maybe, but not necessarily relevant nor
->> accurate if the
->> same IP version is used in another chip or revision.
->>
->> What IP version is used in a DM816x? GPIO_REV_3430, GPIO_REV_4430?
->
-> How is value 0 accurate?
 
-0 is just the revision number that can give you the exact list of Soc 
-that does use that IP. Thanks to an exhaustive comment.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-0: OMAP2420
-1: OMAP2430
-2: OMAP3, DMxxx
-3: OMAP4, OMAP5, DM816x
+> On Thu, May 26, 2011 at 02:26:23PM +0200, Ingo Molnar wrote:
+> > 
+> > * Peter Zijlstra <peterz@infradead.org> wrote:
+> > 
+> > > Sort this by reverting to the old behaviour for this situation 
+> > > and perform a full remote wake-up.
+> > 
+> > Btw., ARM should consider switching most of its subarchitectures 
+> > to !__ARCH_WANT_INTERRUPTS_ON_CTXSW - enabling irqs during 
+> > context switches is silly and now expensive as well.
+> 
+> Not going to happen.  The reason we do it is because most of the 
+> CPUs have to (slowly) flush their caches during switch_mm(), and to 
+> have IRQs off over the cache flush means that we lose IRQs.
 
+How much time does that take on contemporary ARM hardware, typically 
+(and worst-case)?
 
-BTW, I'm still waiting the answer for previous question...
+Thanks,
 
-Regards,
-Benoit
+	Ingo
