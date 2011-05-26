@@ -1,32 +1,35 @@
 From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 26 May 2011 15:07:07 +0530
-Subject: [PATCH 08/15] OMAP2+: GPIO: make workaround_enabled bank specific
-In-Reply-To: <874o4ipfqw.fsf@ti.com>
+Date: Thu, 26 May 2011 15:07:40 +0530
+Subject: [PATCH 06/15] OMAP4: GPIO: Save/restore context
+In-Reply-To: <8739k2sbg0.fsf@ti.com>
 References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-9-git-send-email-tarun.kanti@ti.com>
-	<874o4ipfqw.fsf@ti.com>
-Message-ID: <BANLkTi=sw1Dc5hP+VqGu1f9aci4WhXfz=g@mail.gmail.com>
+	<1306247094-25372-7-git-send-email-tarun.kanti@ti.com>
+	<8739k2sbg0.fsf@ti.com>
+Message-ID: <BANLkTi=xAUpL9tfnY_JScjoBK2eZf2tYsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 04:09, Kevin Hilman <khilman@ti.com> wrote:
+Kevin,
+
+Thanks for the comments on this series.
+
+On Thu, May 26, 2011 at 03:13, Kevin Hilman <khilman@ti.com> wrote:
 > Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 >
 >> From: Charulatha V <charu@ti.com>
 >>
->> Make workaround_enabled flag bank-specific instead of using a single
->> flag for all the banks together. This would be helpful while making
->> use of runtime framework in OMAP GPIO driver which would make the
->> driver handle each GPIO bank independently.
+>> Modify the omap_gpio_save/restore_context to support OMAP4
+>> architecture so that the OMAP GPIO driver need not be modified
+>> when OMAP4 off mode support is available.
 >>
->> Also rename workaround_enabled flag to off_mode_wkup_wa_enabled
+>> Signed-off-by: Charulatha V <charu@ti.com>
 >
-> Do we even need a dedicated flag for this?
+> I don't think this patch is needed.
 >
-> I seems that the combination of enabled_non_wakeup_gpios and whether or
-> not context has been lost could be used to check this condition.
+> PATCH 11/15 removes everything added in this patch when it moves to
+> using the register offsets.
 
-Okay, will check and do the needful.
+Okay.
 
 >
 > Kevin
