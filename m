@@ -1,42 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 26 May 2011 06:27:52 +0000
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system
-	call filtering
-In-Reply-To: <alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
-References: <1304017638.18763.205.camel@gandalf.stny.rr.com>
-	<1305169376-2363-1-git-send-email-wad@chromium.org>
-	<20110512074850.GA9937@elte.hu>
-	<alpine.LRH.2.00.1105122133500.31507@tundra.namei.org>
-	<20110512130104.GA2912@elte.hu>
-	<alpine.LRH.2.00.1105131018040.3047@tundra.namei.org>
-	<20110513121034.GG21022@elte.hu>
-	<alpine.LRH.2.00.1105161006340.21749@tundra.namei.org>
-Message-ID: <20110526062752.GA14622@localhost.ucw.cz>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 26 May 2011 08:54:29 +0200
+Subject: [PATCH 2/4] clk: Implement clk_set_rate
+In-Reply-To: <1306373867.2875.162.camel@pororo>
+References: <1305876469.325655.313573683829.0.gpush@pororo>
+	<1305876469.326620.351525457111.2.gpush@pororo>
+	<20110525190347.GH22096@pengutronix.de>
+	<1306373867.2875.162.camel@pororo>
+Message-ID: <20110526065429.GL20715@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  On Mon 2011-05-16 10:36:05, James Morris wrote:
-> On Fri, 13 May 2011, Ingo Molnar wrote:
-> How do you reason about the behavior of the system as a whole?
-> 
-> 
-> > I argue that this is the LSM and audit subsystems designed right: in the long 
-> > run it could allow everything that LSM does at the moment - and so much more 
-> > ...
-> 
-> Now you're proposing a redesign of the security subsystem.  That's a 
-> significant undertaking.
-> 
-> In the meantime, we have a simple, well-defined enhancement to seccomp 
-> which will be very useful to current users in reducing their kernel attack 
-> surface.
+[put the lists back on cc]
 
-Well, you can do the same with subterfugue, even without kernel
-changes. But that's ptrace -- slow. (And it already shows that syscall
-based filters are extremely tricky to configure).
+On Thu, May 26, 2011 at 09:37:47AM +0800, Jeremy Kerr wrote:
+> Hi Sascha,
+> 
+> > > +
+> > > +propagate:
+> > > +	ret = clk->ops->set_rate(clk->hw, new_rate, &parent_rate);
+> > > +
+> > > +	if (ret < 0)
+> > > +		return ret;
+> > > +
+> > > +	/* ops->set_rate may require the parent's rate to change (to
+> > > +	 * parent_rate), we need to propagate the set_rate call to the
+> > > +	 * parent.
+> > > +	 */
+> > > +	if (ret == CLK_SET_RATE_PROPAGATE) {
+> > > +		new_rate = parent_rate;
+> > > +		clk = clk->parent;
+> > > +		goto propagate;
+> > > +	}
+> > 
+> > I'm unsure about this one. Every clock should have the ability to stop
+> > or continue the rate propagation to the parent. This suggests to leave
+> > the decision whether or not to propagate to the core and not to the
+> > individual clocks.
+> 
+> Maybe I'm not understanding you correctly, but that's exactly what this
+> code does. The decision to propagate is left up to the
+> implementation-specific set_rate callback - if it returns
+> CLK_SET_RATE_PROPAGATE (and populate the parent_rate argument with the
+> requested parent rate), then we propagate the rate change to the parent.
 
-If yu want speed, seccomp+server for non-permitted operations seems like reasonable way.
+I understood how the code is meant to work. It's just that IMO the place
+where the propagation flag is stored is the wrong one, given that it's a
+flag that all clocks (can) have.
+
+> 
+> > Right now each mux/div/gate needs an individual propagate flag. By
+> > adding the flag to the core the building block implementations could be
+> > simpler and the knowledge about propagatability might become handy for
+> > the core later.
+> 
+> We could do this with a flag too, yes. But then there's no way of
+> altering the rate (which we need to do with a divider) as we propagate
+> it upwards. The current set_rate code lets us do that.
+
+Hm, the core could pass a NULL pointer as the third argument to
+set_rate to indicate that the parent rate is not allowed to change.
+Then we could initialize &parent_rate to zero before calling set_rate.
+If the set_rate function does not change it, we don't have to propagate,
+otherwise yes. Or instead we could just use the CLK_SET_RATE_PROPAGATE
+return value like we do in the current version.
+
+Sascha
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
