@@ -1,86 +1,64 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 26 May 2011 14:55:33 +0100
-Subject: [PATCH] ARM: OMAP: Get rid of section mismatch warnings
-In-Reply-To: <20110526133732.GD11352@atomide.com>
-References: <1306414838-4330-1-git-send-email-silesh@ti.com>
-	<4DDE4EEF.8070108@ti.com> <20110526133732.GD11352@atomide.com>
-Message-ID: <20110526135533.GA25841@n2100.arm.linux.org.uk>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 26 May 2011 14:56:04 +0100
+Subject: [PATCH 1/1] ARM: thumb: Have the machine name indicate operation
+	in thumb mode.
+In-Reply-To: <20110526130104.GA5762@n2100.arm.linux.org.uk>
+References: <20110516121657.GA7715@arm.com>
+	<alpine.LFD.2.00.1105161008320.14430@xanadu.home>
+	<20110516144311.GC7715@arm.com>
+	<BANLkTik0LL+dFCo_H-YhF+BUOXyP7MAKzA@mail.gmail.com>
+	<alpine.LFD.2.00.1105181803090.14430@xanadu.home>
+	<20110518223319.GB21384@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1105181845540.14430@xanadu.home>
+	<20110518225749.GF21384@n2100.arm.linux.org.uk>
+	<BANLkTinS4XR-QrCsmhStROxkJEy1-PwCTA@mail.gmail.com>
+	<20110526130104.GA5762@n2100.arm.linux.org.uk>
+Message-ID: <20110526135604.GA2119@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 06:37:32AM -0700, Tony Lindgren wrote:
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110526 05:56]:
-> > On 5/26/2011 6:30 PM, Silesh C V wrote:
-> > >Get rid of the following and 8 other similar section mismatch
-> > >warnings
-> > >
-> > I send this [1] patch a month back. It's still not considered
-> > though even after reminder.
+On Thu, May 26, 2011 at 02:01:04PM +0100, Russell King - ARM Linux wrote:
+> On Wed, May 25, 2011 at 03:08:05PM -0700, Vadim Bendebury (??) wrote:
+> > On Wed, May 18, 2011 at 3:57 PM, Russell King - ARM Linux <
+> > linux at arm.linux.org.uk> wrote:
+> > > In which case I think we'll have to talk to kbuild people to get
+> > > mkcompile_h modified.  Also maybe asking what other architectures
+> > > do for this kind of problem may be a good idea - especially before
+> > > we start abusing and hacking stuff like the hardware name.
 > > 
-> > [1] https://patchwork.kernel.org/patch/684831/
+> > So, what would be an equivalent in other architectures to ask about - it
+> > seems that the ability to run in Thumb/ARM mode is fairly unique for ARM.
 > 
-> Applying now into devel-fixes with additional fixes from Silesh.
-> Updated patch below.
+> What about 32-bit vs 64-bit x86 ?
 
-I also have this from a while back.  There's also some nastyness in
-twl4030-power.c which requires basically s/__init/__devinit/ to almost
-the entire file.
+Thumb seems different because is is irrelevant to the kernel/user ABI
+(or, if it's not irrelevant, we have a bug somewhere...)
 
-8<--------
-From: Russell King <rmk+kernel@arm.linux.org.uk>
+Documenting what ISA the kernel was built with is therefore similar to
+documenting what optimisation options were used -- i.e., it's interesting
+and occasionally useful for humans, but not something software should
+normally be querying or care about in any way.
 
-Fix various section mismatch warnings:
+> > Consulting /boot/config file is not reliable: in my own setup I can netboot
+> > either thumb or ARM kernel without changing the root file system contents. I
+> > agree though that changing the hardware name is not the best way to do this
+> > either.
+> > 
+> > I could look into adding 'thumb' to any element of the uname output, or as a
+> > watered down version - just add a line to dmesg output?
+> 
+> The thing that I worry about is that userspace will start using this
+> information inappropriately.  Whether the kernel is built as T2 or ARM
+> is really only a matter for the kernel itself (and people debugging the
+> kernel), rather than random userspace programs.
 
-WARNING: arch/arm/plat-omap/built-in.o(.devinit.text+0x46c): Section mismatch in reference from the function omap_gpio_probe() to the function .init.text:omap_gpio_chip_init()
-The function __devinit omap_gpio_probe() references
-a function __init omap_gpio_chip_init().
-If omap_gpio_chip_init is only used by omap_gpio_probe then
-annotate omap_gpio_chip_init with a matching annotation.
+Agreed
 
-WARNING: arch/arm/mach-omap2/built-in.o(.text+0x423c): Section mismatch in reference from the function pm_dbg_regset_init() to the function .init.text:pm_dbg_init()
-The function pm_dbg_regset_init() references
-the function __init pm_dbg_init().
-This is often because pm_dbg_regset_init lacks a __init
-annotation or the annotation of pm_dbg_init is wrong.
-
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
---
- arch/arm/mach-omap2/pm-debug.c |    4 ++--
- arch/arm/plat-omap/gpio.c      |    2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-index 971d186..3800ee0 100644
---- a/arch/arm/plat-omap/gpio.c
-+++ b/arch/arm/plat-omap/gpio.c
-@@ -1629,7 +1629,7 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
- 	}
- }
- 
--static void __init omap_gpio_chip_init(struct gpio_bank *bank)
-+static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
- {
- 	int j;
- 	static int gpio;
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index 125f565..169e930 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -189,7 +189,7 @@ static struct dentry *pm_dbg_dir;
- 
- static int pm_dbg_init_done;
- 
--static int __init pm_dbg_init(void);
-+static int pm_dbg_init(void);
- 
- enum {
- 	DEBUG_FILE_COUNTERS = 0,
-@@ -595,7 +595,7 @@ static int option_set(void *data, u64 val)
- 
- DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
- 
--static int __init pm_dbg_init(void)
-+static int pm_dbg_init(void)
- {
- 	int i;
- 	struct dentry *d;
+> 
+> Maybe a way forward would be to produce a patch for mkcompile_h, post it
+> to here, kbuild people and LKML and see what response is forthcoming.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
