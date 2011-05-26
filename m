@@ -1,41 +1,31 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Thu, 26 May 2011 14:50:07 +0200
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <20110526123137.GG24876@n2100.arm.linux.org.uk>
-References: <1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
-	<1306358128.21578.107.camel@twins>
-	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-	<1306405979.1200.63.camel@twins>
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526122623.GA11875@elte.hu>
-	<20110526123137.GG24876@n2100.arm.linux.org.uk>
-Message-ID: <20110526125007.GA27083@elte.hu>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 26 May 2011 15:52:20 +0300
+Subject: [GIT PULL] omap updates for 2.6.40
+In-Reply-To: <20110526122412.GB11352@atomide.com>
+References: <20110526113905.GG27250@atomide.com>
+	<4DDE441C.2080808@compulab.co.il>
+	<20110526122412.GB11352@atomide.com>
+Message-ID: <4DDE4D04.5070404@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 05/26/11 15:24, Tony Lindgren wrote:
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> * Igor Grinberg <grinberg@compulab.co.il> [110526 05:10]:
+>> What about this one: [PATCH v2] arm: omap2plus: move NAND_BLOCK_SIZE out of boards
+>>
+>> Why not include it? It is no new code, just generalize stuff and 11 lines off... not much but still.
+> Sorry I must have missed it.. Let's see if we can queue it
+> during the merge window as it's a trivial patch removing
+> duplicate defines.
 
-> On Thu, May 26, 2011 at 02:26:23PM +0200, Ingo Molnar wrote:
-> > 
-> > * Peter Zijlstra <peterz@infradead.org> wrote:
-> > 
-> > > Sort this by reverting to the old behaviour for this situation 
-> > > and perform a full remote wake-up.
-> > 
-> > Btw., ARM should consider switching most of its subarchitectures 
-> > to !__ARCH_WANT_INTERRUPTS_ON_CTXSW - enabling irqs during 
-> > context switches is silly and now expensive as well.
-> 
-> Not going to happen.  The reason we do it is because most of the 
-> CPUs have to (slowly) flush their caches during switch_mm(), and to 
-> have IRQs off over the cache flush means that we lose IRQs.
+I'm failing to understand what do you mean by that...
+According to Linus ("probably Sunday - I'll be on airplanes next Monday"),
+the merge window will be closed soon.
 
-How much time does that take on contemporary ARM hardware, typically 
-(and worst-case)?
+Do you mean, you will send an updated pull request?
 
-Thanks,
 
-	Ingo
+-- 
+Regards,
+Igor.
