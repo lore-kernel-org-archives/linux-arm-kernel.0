@@ -1,51 +1,28 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 26 May 2011 11:32:39 -0700
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <BANLkTikgD-EFGcJSh+EMQTwgTfBE15HkeQ@mail.gmail.com> (Charulatha
-	Varadarajan's message of "Thu, 26 May 2011 12:39:53 -0500")
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
-	<87sjs2sbvy.fsf@ti.com>
-	<BANLkTik2=da94cZh23gwx1hzZQK6H_hy2Q@mail.gmail.com>
-	<8762oxgz8h.fsf@ti.com>
-	<BANLkTikgD-EFGcJSh+EMQTwgTfBE15HkeQ@mail.gmail.com>
-Message-ID: <8762oxcny0.fsf@ti.com>
+Date: Thu, 26 May 2011 10:23:33 -0700
+Subject: [PATCH 1/3] OMAP: change get_context_loss_count ret value to int
+In-Reply-To: <1306428307-1360-2-git-send-email-tomi.valkeinen@ti.com> (Tomi
+	Valkeinen's message of "Thu, 26 May 2011 19:45:05 +0300")
+References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
+	<1306428307-1360-2-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <871uzlgyui.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Varadarajan, Charulatha" <charu@ti.com> writes:
+Tomi Valkeinen <tomi.valkeinen@ti.com> writes:
 
-> Kevin,
+> get_context_loss_count functions return context loss count as u32, and
+> zero means an error. However, zero is also returned when context has
+> never been lost and could also be returned when the context loss count
+> has wrapped and goes to zero.
 >
-> On Thu, May 26, 2011 at 12:15, Kevin Hilman <khilman@ti.com> wrote:
->> "Varadarajan, Charulatha" <charu@ti.com> writes:
->>
->>> On Thu, May 26, 2011 at 03:04, Kevin Hilman <khilman@ti.com> wrote:
->>>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->>>>
->>>>> From: Charulatha V <charu@ti.com>
->>>>>
->>>>> Non-wakeup GPIOs are available only in OMAP2420 and OMAP3430. But
->>>>> the GPIO driver initializes the non-wakeup GPIO bits for OMAP24xx
->>>>> (bothe OMAP 2420 and 2430) & not for OMAP3 which is incorrect.
->>>>
->>>> Can you cite the documentation you're using for the OMAP3 non-wakeup
->>>> GPIOs?
->>>
->>> I am referring to Table 25-5. GPIO Channel Description at page no 3354
->>> OMAP3430 public TRM Version P.
->>>
->>
->> Based on how I understand that, those non-wakeup GPIOs are non-wakeup
->> because they're not actually mapped anywhere, and not available on
->> external pins. ?Therefore, they should not need any special case
->> handling for this triggering workaround.
+> Change the functions to return an int, with negative value meaning an
+> error.
 >
-> Okay. Thanks for clarifying. I will not  do this for OMAP3. The special case
-> would be only for OMAP2420 against the current code which is handling
-> for OMAP24xx.
+> OMAP HSMMC code uses omap_pm_get_dev_context_loss_count(), but as the
+> hsmmc code handles the returned value as an int, with negative value
+> meaning an error, this patch actually fixes hsmmc code also.
 >
+> Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 
-Great, thanks.
-
-Kevin
+Acked-by: Kevin Hilman <khilman@ti.com>
