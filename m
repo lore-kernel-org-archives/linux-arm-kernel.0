@@ -1,50 +1,34 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 26 May 2011 11:15:09 +0100
-Subject: [PATCH 0/5] ARMv6 and ARMv7 mm fixes
-In-Reply-To: <20110525205249.GD24876@n2100.arm.linux.org.uk>
-References: <1305890399-29075-1-git-send-email-will.deacon@arm.com>
-	<4DDC2A59.8030109@codeaurora.org>
-	<002f01cc1ada$5e7ffaa0$1b7fefe0$@deacon@arm.com>
-	<4DDD464F.2010508@codeaurora.org>
-	<20110525205249.GD24876@n2100.arm.linux.org.uk>
-Message-ID: <003301cc1b8d$cb154810$613fd830$@deacon@arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Thu, 26 May 2011 12:32:59 +0200
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
+	<1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+Message-ID: <1306405979.1200.63.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-> On Wed, May 25, 2011 at 11:11:27AM -0700, Stephen Boyd wrote:
-> > On 05/25/2011 05:50 AM, Will Deacon wrote:
-> > > I was planning to CC stable for patches 1 ("ARM: cache: ensure MVA is cacheline
-> > > aligned in flush_kern_dcache_area") and 4 ("ARM: mm: fix racy ASID rollover
-> > > broadcast on SMP platforms") as these affect existing v6 and v7 cores. The
-> > > remainder of the patches, although nice to have, only kick in on A15 as far as
-> > > I'm aware (due to aggressive caching of speculative level 1 entries).
-> >
-> > Would it be appropriate to reorder the series then so patches 1 and 4
-> > come first?
+On Thu, 2011-05-26 at 15:29 +0800, Yong Zhang wrote:
+> > Figuring out why the existing condition failed
 > 
-> I'm not entirely convinced (4) is the best solution yet, but that's
-> mainly becaues I've not thought about it enough yet.  1-3 look fine
-> though.
+> Seems  'current' will change before/after switch_to since it's derived from
+> sp register.
+> So that means if interrupt come before we switch sp, 'p == current' will
+> catch it, but if interrupt comes after we switch sp, we will lose a wake up.
 
-Ok, thanks for looking at those. I'll put 1-3 and 5 into the patch system
-since these can be applied irrespective of the other guy. Once you've had
-a think about 4, I'd be happy to discuss it on the list if you can think
-of a better way to solve the problem.
- 
-> > > I was hoping for some acks/tested-bys before then since these changes affect a
-> > > lot of platforms and the code is fairly scary.
-> >
-> > Yes the patches look scary. I could give it a test on MSM but I'm not
-> > even sure that will help much. Why didn't you Cc Russell on these patches?
-> 
-> I do tend to read about 90% of linux-arm-kernel, whether its cc'd to
-> me or not.  The cc doesn't really affect whether I read it or not.
+Well, loosing a wakeup isn't the problem here (although it would be a
+problem), the immediate problem is that we're getting stuck
+(life-locked) in that while (p->on_cpu) loop.
 
-I figured as much and it saves me having to remember to remove the CC
-line when I send to the patch system.
+But yes, I think that explains it, if the interrupts hits
+context_switch() after current was changed but before clearing
+p->on_cpu, we would life-lock in interrupt context.
 
-Cheers,
+Now we could of course go add in_interrupt() checks there, but that
+would make this already fragile path more interesting, so I think I'll
+stick with the proposed patch -- again provided it actually works.
 
-Will
+Marc, any word on that?
