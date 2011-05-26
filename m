@@ -1,37 +1,57 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 26 May 2011 14:26:43 +0800
-Subject: [PATCH] ARM: mxs_defconfig: Remove locking debug config options
-In-Reply-To: <20110525141624.GE2408@S2100-06.ap.freescale.net>
-References: <20110525141624.GE2408@S2100-06.ap.freescale.net>
-Message-ID: <1306391203-29338-1-git-send-email-shawn.guo@linaro.org>
+Date: Thu, 26 May 2011 14:31:31 +0800
+Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
+Message-ID: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The amba-pl011 driver assumes that clk_enable/disable are atomic, but
-currently it's not the case on mxs.  There are lock debug warnings
-seen when serial console does power management.
-
-The patch removes locking debug config options to get rid of the
-warnings.  They can be turned on later when new clock framework sorts
-the locking thing out.
+Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+max_segment_number into device_dma_parameters and creates the
+corresponding dmaengine API dma_set(get)_max_seg_number for it.
 
 Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
- arch/arm/configs/mxs_defconfig |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
+ include/linux/device.h      |    1 +
+ include/linux/dma-mapping.h |   15 +++++++++++++++
+ 2 files changed, 16 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/configs/mxs_defconfig b/arch/arm/configs/mxs_defconfig
-index db2cb7d..f9a54a6 100644
---- a/arch/arm/configs/mxs_defconfig
-+++ b/arch/arm/configs/mxs_defconfig
-@@ -116,8 +116,6 @@ CONFIG_DEBUG_KERNEL=y
- CONFIG_LOCKUP_DETECTOR=y
- CONFIG_DETECT_HUNG_TASK=y
- CONFIG_TIMER_STATS=y
--CONFIG_PROVE_LOCKING=y
--CONFIG_DEBUG_SPINLOCK_SLEEP=y
- CONFIG_DEBUG_INFO=y
- CONFIG_SYSCTL_SYSCALL_CHECK=y
- CONFIG_BLK_DEV_IO_TRACE=y
+diff --git a/include/linux/device.h b/include/linux/device.h
+index c66111a..44cb2528 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -487,6 +487,7 @@ struct device_dma_parameters {
+ 	 * sg limitations.
+ 	 */
+ 	unsigned int max_segment_size;
++	unsigned int max_segment_number;
+ 	unsigned long segment_boundary_mask;
+ };
+ 
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index ba8319a..fd314f4 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -131,6 +131,21 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+ 		return -EIO;
+ }
+ 
++static inline unsigned int dma_get_max_seg_number(struct device *dev)
++{
++	return dev->dma_parms ? dev->dma_parms->max_segment_number : 1;
++}
++
++static inline unsigned int dma_set_max_seg_number(struct device *dev,
++						  unsigned int number)
++{
++	if (dev->dma_parms) {
++		dev->dma_parms->max_segment_number = number;
++		return 0;
++	} else
++		return -EIO;
++}
++
+ static inline unsigned long dma_get_seg_boundary(struct device *dev)
+ {
+ 	return dev->dma_parms ?
 -- 
 1.7.4.1
