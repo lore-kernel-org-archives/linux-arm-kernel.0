@@ -1,111 +1,51 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 26 May 2011 19:45:07 +0300
-Subject: [PATCH 3/3] OMAP: Add (omap_device|omap_hwmod)_can_ever_lose_context
-	functions
-In-Reply-To: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1306428307-1360-4-git-send-email-tomi.valkeinen@ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 26 May 2011 11:32:39 -0700
+Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
+In-Reply-To: <BANLkTikgD-EFGcJSh+EMQTwgTfBE15HkeQ@mail.gmail.com> (Charulatha
+	Varadarajan's message of "Thu, 26 May 2011 12:39:53 -0500")
+References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
+	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
+	<87sjs2sbvy.fsf@ti.com>
+	<BANLkTik2=da94cZh23gwx1hzZQK6H_hy2Q@mail.gmail.com>
+	<8762oxgz8h.fsf@ti.com>
+	<BANLkTikgD-EFGcJSh+EMQTwgTfBE15HkeQ@mail.gmail.com>
+Message-ID: <8762oxcny0.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add hwmod and omap_device versions of can_ever_lose_context functions
-so that drivers are able to use it.
+"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/mach-omap2/omap_hwmod.c              |   22 ++++++++++++++++++++++
- arch/arm/plat-omap/include/plat/omap_device.h |    1 +
- arch/arm/plat-omap/include/plat/omap_hwmod.h  |    1 +
- arch/arm/plat-omap/omap_device.c              |   23 +++++++++++++++++++++++
- 4 files changed, 47 insertions(+), 0 deletions(-)
+> Kevin,
+>
+> On Thu, May 26, 2011 at 12:15, Kevin Hilman <khilman@ti.com> wrote:
+>> "Varadarajan, Charulatha" <charu@ti.com> writes:
+>>
+>>> On Thu, May 26, 2011 at 03:04, Kevin Hilman <khilman@ti.com> wrote:
+>>>> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+>>>>
+>>>>> From: Charulatha V <charu@ti.com>
+>>>>>
+>>>>> Non-wakeup GPIOs are available only in OMAP2420 and OMAP3430. But
+>>>>> the GPIO driver initializes the non-wakeup GPIO bits for OMAP24xx
+>>>>> (bothe OMAP 2420 and 2430) & not for OMAP3 which is incorrect.
+>>>>
+>>>> Can you cite the documentation you're using for the OMAP3 non-wakeup
+>>>> GPIOs?
+>>>
+>>> I am referring to Table 25-5. GPIO Channel Description at page no 3354
+>>> OMAP3430 public TRM Version P.
+>>>
+>>
+>> Based on how I understand that, those non-wakeup GPIOs are non-wakeup
+>> because they're not actually mapped anywhere, and not available on
+>> external pins. ?Therefore, they should not need any special case
+>> handling for this triggering workaround.
+>
+> Okay. Thanks for clarifying. I will not  do this for OMAP3. The special case
+> would be only for OMAP2420 against the current code which is handling
+> for OMAP24xx.
+>
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index 4f0d554..210280e 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -2369,3 +2369,25 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
- 
- 	return 0;
- }
-+
-+/**
-+ * omap_hwmod_can_ever_lose_context - can this hwmod ever lose context?
-+ * @oh: struct omap_hwmod *
-+ *
-+ * Finds the powerdomain associated with the given hwmod, and calls
-+ * pwrdm_can_ever_lose_context for the powerdomain.
-+ *
-+ * Returns the return value from pwrdm_can_ever_lose_context, or true if no
-+ * powerdomain is associated with the hwmod.
-+ */
-+bool omap_hwmod_can_ever_lose_context(struct omap_hwmod *oh)
-+{
-+	struct powerdomain *pwrdm;
-+	int ret = true;
-+
-+	pwrdm = omap_hwmod_get_pwrdm(oh);
-+	if (pwrdm)
-+		ret = pwrdm_can_ever_lose_context(pwrdm);
-+
-+	return ret;
-+}
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index bcf1b35..640c2eb 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -109,6 +109,7 @@ int omap_device_align_pm_lat(struct platform_device *pdev,
- struct powerdomain *omap_device_get_pwrdm(struct omap_device *od);
- int omap_device_get_context_loss_count(struct platform_device *pdev);
- int omap_device_reset(struct platform_device *pdev);
-+bool omap_device_can_ever_lose_context(struct platform_device *pdev);
- 
- /* Other */
- 
-diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-index 8658e2d..0d7435e 100644
---- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
-+++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
-@@ -601,6 +601,7 @@ int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
- int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
- 
- int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
-+bool omap_hwmod_can_ever_lose_context(struct omap_hwmod *oh);
- 
- /*
-  * Chip variant-specific hwmod init routines - XXX should be converted
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 4e6fc1b..bcee8d3 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -347,6 +347,29 @@ int omap_device_reset(struct platform_device *pdev)
- }
- 
- /**
-+ * omap_device_can_ever_lose_context - can this device ever lose context?
-+ * @pdev: struct platform_device *
-+ *
-+ * Calls omap_hwmod_can_ever_lose_context for all hwmods associated with the
-+ * given device, and returns true if one of the hwmods returns true. Otherwise
-+ * returns false.
-+ */
-+bool omap_device_can_ever_lose_context(struct platform_device *pdev)
-+{
-+	struct omap_device *od;
-+	int i;
-+
-+	od = _find_by_pdev(pdev);
-+
-+	for (i = 0; i < od->hwmods_cnt; i++) {
-+		if (omap_hwmod_can_ever_lose_context(od->hwmods[i]))
-+			return true;
-+	}
-+
-+	return false;
-+}
-+
-+/**
-  * omap_device_count_resources - count number of struct resource entries needed
-  * @od: struct omap_device *
-  *
--- 
-1.7.4.1
+Great, thanks.
+
+Kevin
