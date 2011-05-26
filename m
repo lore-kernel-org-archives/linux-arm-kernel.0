@@ -1,33 +1,41 @@
-From: ak@linux.intel.com (Andi Kleen)
-Date: Thu, 26 May 2011 14:10:24 -0700
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <alpine.LFD.2.00.1105261650330.3207@xanadu.home>
-References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>
-	<20110523132124.GI17672@n2100.arm.linux.org.uk>
-	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>
-	<yw1xipt0p4i9.fsf@unicorn.mansr.com>
-	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
-	<20110524171331.GA2941@arm.com>
-	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
-	<20110525124348.GA2340@arm.com>
-	<yw1xaaeanbxe.fsf@unicorn.mansr.com>
-	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
-	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
-Message-ID: <4DDEC1C0.20807@linux.intel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 May 2011 22:15:49 +0100
+Subject: [PATCH v5 00/19] ARM: Add support for the Large Physical Address
+	Extensions
+In-Reply-To: <1306231448.19557.23.camel@e102109-lin.cambridge.arm.com>
+References: <1304859098-10760-1-git-send-email-catalin.marinas@arm.com>
+	<20110523165412.GF15138@n2100.arm.linux.org.uk>
+	<1306231448.19557.23.camel@e102109-lin.cambridge.arm.com>
+Message-ID: <BANLkTikjBm3tn4Q4T1r9qyB2ma88YydDZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 24 May 2011 11:04, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Mon, 2011-05-23 at 17:54 +0100, Russell King - ARM Linux wrote:
+>> On Sun, May 08, 2011 at 01:51:19PM +0100, Catalin Marinas wrote:
+>> > This set of patches adds support for the Large Physical Extensions on
+>> > the ARM architecture (available with the Cortex-A15 processor). LPAE
+>> > comes with a 3-level page table format (compared to 2-level for the
+>> > classic one), allowing up to 40-bit physical address space.
+>> >
+>> > The ARM LPAE documentation is available from (free registration needed):
+>> >
+>> > http://infocenter.arm.com/help/topic/com.arm.doc.ddi0406b_virtualization_extns/index.html
+>> >
+>> > The full set of patches on top of linux-next (LPAE, support for an
+>> > emulated Versatile Express with Cortex-A15 tile and generic timers) is
+>> > available on this branch:
+>> >
+>> > git://git.kernel.org/pub/scm/linux/kernel/git/cmarinas/linux-2.6-cm.git arm-lpae-next
+>>
+>> FYI, I'm going to drop the pgt patch because the warnings are still there
+>
+> What warnings are you seeing? Could you please post them?
 
-> It is possible that -fconserve-stack is still valuable on ARM given that
-> it is also used with -mno-unaligned-access for other things than
-> structure packing on the stack, and therefore its merits can be debated
-> independently from the alignment issue at hand.
+Ping?
 
-The big advantage of -fconserve-stack is that it throttles the inliner 
-if the inlining
-would cause too much stack growth. This is something you likely want
-on ARM too, especially as code gets more and more complex.
+I'd like to fix those warning but I can't reproduce them (maybe
+different compiler versions?).
 
--Andi
+-- 
+Catalin
