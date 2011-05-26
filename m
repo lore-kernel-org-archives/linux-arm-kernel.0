@@ -1,43 +1,58 @@
-From: bj@mhlabs.com (B.J. Buchalter)
-Date: Thu, 26 May 2011 09:38:23 -0400
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <4DDE4BB0.7010809@ti.com>
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D177FCC@dbde02.ent.ti.com>
-	<4DDE2745.3030307@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D178110@dbde02.ent.ti.com>
-	<4DDE435C.8060506@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D17815E@dbde02.ent.ti.com>
-	<4DDE4BB0.7010809@ti.com>
-Message-ID: <AB90A028-5926-4DBB-BAD9-7C0EF6E0FD05@mhlabs.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 26 May 2011 13:49:32 +0000
+Subject: spitz pm: adjust messages
+In-Reply-To: <20110521122450.GA6954@elf.ucw.cz>
+References: <20110521122450.GA6954@elf.ucw.cz>
+Message-ID: <20110526134931.GA16958@localhost.ucw.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Why not do the following:
+Eric, it should probably be you merging this and surrounding
+patches... Any comments? Merge?
+							Pavel
 
-       #define OMAP_GPIO_REV_0	0
-       #define OMAP_GPIO_REV_1	1
-       #define OMAP_GPIO_REV_2	2
-       #define OMAP_GPIO_REV_3	3
-/*
-	OMAP_GPIO_REV_0:	OMAP2420
-	OMAP_GPIO_REV_1:	OMAP2430
-	OMAP_GPIO_REV_2:	OMAP3, DMxxx
-	OMAP_GPIO_REV_3:	OMAP4, OMAP5, DM816x
-*/
+On Sat 2011-05-21 14:24:50, Pavel Machek wrote:
+> Charger error is something that should be reported to the syslog; do
+> it. If temperature reading fails, we do not want to charge the
+> battery, anyway.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> diff --git a/arch/arm/mach-pxa/sharpsl_pm.c b/arch/arm/mach-pxa/sharpsl_pm.c
+> index 785880f..513588c 100644
+> --- a/arch/arm/mach-pxa/sharpsl_pm.c
+> +++ b/arch/arm/mach-pxa/sharpsl_pm.c
+> @@ -317,6 +302,8 @@ static void sharpsl_charge_off(void)
+>  
+>  static void sharpsl_charge_error(void)
+>  {
+> +	dev_warn(sharpsl_pm.dev, "Charger Error\n");
+> +
+>  	sharpsl_pm_led(SHARPSL_LED_ERROR);
+>  	sharpsl_pm.machinfo->charge(0);
+>  	sharpsl_pm.charge_mode = CHRG_ERROR;
+> @@ -513,8 +500,10 @@ static int sharpsl_check_battery_temp(void)
+>  	val = get_select_val(buff);
+>  
+>  	dev_dbg(sharpsl_pm.dev, "Temperature: %d\n", val);
+> -	if (val > sharpsl_pm.machinfo->charge_on_temp) {
+> -		printk(KERN_WARNING "Not charging: temperature out of limits.\n");
+> +	/* FIXME: this should catch battery read errors, but we should
+> +	   probably avoid charging in <0C temperatures, too. */
+> +	if ((val < 0) || (val > sharpsl_pm.machinfo->charge_on_temp)) {
+> +		dev_warn(sharpsl_pm.dev, "Not charging: temperature %d out of limits.\n", val);
+>  		return -1;
+>  	}
+>  
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
 
-  +	switch (oh->class->rev) {     ## This is auto-generated.
-  +	case 0:				## But this is our code.
-
-      I am recommending this to read as:
-
-  +	switch (oh->class->rev) {     ## This is auto-generated.
-  +	case OMAP_GPIO_REV_0:		## More readable.
-
-That approach solves both issues -- Revision -> Chip mapping in comment, no magic numbers in the code, and no implied restriction of the rev number to a specific SoC. Using the defines makes it easier to search the code for a specific revision, since you would no longer get false positives for all the other '0' and '1' constants that appear in the code. It also makes it indexible by tools like LXR.
-
-B.J. Buchalter
-Metric Halo 
-http://www.mhlabs.com
-	
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
