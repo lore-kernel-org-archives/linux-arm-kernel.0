@@ -1,61 +1,106 @@
 From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 26 May 2011 19:45:06 +0300
-Subject: [PATCH 2/3] OMAP: add omap_device_reset()
+Date: Thu, 26 May 2011 19:45:07 +0300
+Subject: [PATCH 3/3] OMAP: Add (omap_device|omap_hwmod)_can_ever_lose_context
+	functions
 In-Reply-To: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
 References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1306428307-1360-3-git-send-email-tomi.valkeinen@ti.com>
+Message-ID: <1306428307-1360-4-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap_device_reset() function which can be used to reset the hwmods
-associated with the given platform device.
+Add hwmod and omap_device versions of can_ever_lose_context functions
+so that drivers are able to use it.
 
 Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
 ---
+ arch/arm/mach-omap2/omap_hwmod.c              |   22 ++++++++++++++++++++++
  arch/arm/plat-omap/include/plat/omap_device.h |    1 +
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    1 +
  arch/arm/plat-omap/omap_device.c              |   23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+), 0 deletions(-)
+ 4 files changed, 47 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 4f0d554..210280e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -2369,3 +2369,25 @@ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh)
+ 
+ 	return 0;
+ }
++
++/**
++ * omap_hwmod_can_ever_lose_context - can this hwmod ever lose context?
++ * @oh: struct omap_hwmod *
++ *
++ * Finds the powerdomain associated with the given hwmod, and calls
++ * pwrdm_can_ever_lose_context for the powerdomain.
++ *
++ * Returns the return value from pwrdm_can_ever_lose_context, or true if no
++ * powerdomain is associated with the hwmod.
++ */
++bool omap_hwmod_can_ever_lose_context(struct omap_hwmod *oh)
++{
++	struct powerdomain *pwrdm;
++	int ret = true;
++
++	pwrdm = omap_hwmod_get_pwrdm(oh);
++	if (pwrdm)
++		ret = pwrdm_can_ever_lose_context(pwrdm);
++
++	return ret;
++}
 diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 70d31d0..bcf1b35 100644
+index bcf1b35..640c2eb 100644
 --- a/arch/arm/plat-omap/include/plat/omap_device.h
 +++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -108,6 +108,7 @@ int omap_device_align_pm_lat(struct platform_device *pdev,
- 			     u32 new_wakeup_lat_limit);
+@@ -109,6 +109,7 @@ int omap_device_align_pm_lat(struct platform_device *pdev,
  struct powerdomain *omap_device_get_pwrdm(struct omap_device *od);
  int omap_device_get_context_loss_count(struct platform_device *pdev);
-+int omap_device_reset(struct platform_device *pdev);
+ int omap_device_reset(struct platform_device *pdev);
++bool omap_device_can_ever_lose_context(struct platform_device *pdev);
  
  /* Other */
  
+diff --git a/arch/arm/plat-omap/include/plat/omap_hwmod.h b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+index 8658e2d..0d7435e 100644
+--- a/arch/arm/plat-omap/include/plat/omap_hwmod.h
++++ b/arch/arm/plat-omap/include/plat/omap_hwmod.h
+@@ -601,6 +601,7 @@ int omap_hwmod_set_postsetup_state(struct omap_hwmod *oh, u8 state);
+ int omap_hwmod_get_context_loss_count(struct omap_hwmod *oh);
+ 
+ int omap_hwmod_no_setup_reset(struct omap_hwmod *oh);
++bool omap_hwmod_can_ever_lose_context(struct omap_hwmod *oh);
+ 
+ /*
+  * Chip variant-specific hwmod init routines - XXX should be converted
 diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 9753f71..4e6fc1b 100644
+index 4e6fc1b..bcee8d3 100644
 --- a/arch/arm/plat-omap/omap_device.c
 +++ b/arch/arm/plat-omap/omap_device.c
-@@ -324,6 +324,29 @@ int omap_device_get_context_loss_count(struct platform_device *pdev)
+@@ -347,6 +347,29 @@ int omap_device_reset(struct platform_device *pdev)
  }
  
  /**
-+ * omap_device_reset - reset hwmods of given device
++ * omap_device_can_ever_lose_context - can this device ever lose context?
 + * @pdev: struct platform_device *
 + *
-+ * Reset all hwmods associated with the given device. If a reset of a hwmod
-+ * fails the rest of the hwmods are skipped and the error is returned.
++ * Calls omap_hwmod_can_ever_lose_context for all hwmods associated with the
++ * given device, and returns true if one of the hwmods returns true. Otherwise
++ * returns false.
 + */
-+int omap_device_reset(struct platform_device *pdev)
++bool omap_device_can_ever_lose_context(struct platform_device *pdev)
 +{
 +	struct omap_device *od;
-+	int i, r;
++	int i;
 +
 +	od = _find_by_pdev(pdev);
 +
 +	for (i = 0; i < od->hwmods_cnt; i++) {
-+		r = omap_hwmod_reset(od->hwmods[i]);
-+		if (r)
-+			return r;
++		if (omap_hwmod_can_ever_lose_context(od->hwmods[i]))
++			return true;
 +	}
 +
-+	return 0;
++	return false;
 +}
 +
 +/**
