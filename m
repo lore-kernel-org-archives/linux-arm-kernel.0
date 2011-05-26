@@ -1,83 +1,22 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 26 May 2011 18:09:08 +0200
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <1306425584.2497.81.camel@laptop>
-References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
-	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
-	<1306358128.21578.107.camel@twins>
-	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-	<1306405979.1200.63.camel@twins>
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526154508.GA13788@redhat.com> <1306425584.2497.81.camel@laptop>
-Message-ID: <1306426148.2497.83.camel@laptop>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Thu, 26 May 2011 18:06:01 +0200
+Subject: [GIT PULL] omap updates for 2.6.40
+In-Reply-To: <20110526113905.GG27250@atomide.com>
+References: <20110526113905.GG27250@atomide.com>
+Message-ID: <9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-26 at 17:59 +0200, Peter Zijlstra wrote:
-> On Thu, 2011-05-26 at 17:45 +0200, Oleg Nesterov wrote:
-> > Stupid question. Can't we fix this problem if we do
-> > 
-> >         -       if (p == current)
-> >         +       if (cpu == raw_smp_processor_id())
-> > 
-> > ?
-> > 
-> > I forgot the rules... but iirc task_cpu(p) can't be changed under us?
+
+Op 26 mei 2011, om 13:39 heeft Tony Lindgren het volgende geschreven:
+
+> Hi Linus,
 > 
-> Easy enough to test.. brain gave out again,. hold on ;-)
+> Please pull omap updates for this merge window from:
+> 
+> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-for-linus
+> 
+> This contains clean-up to shrink down omap specific code a bit. Also included
+> are some fixes. But basically no new code at this point.
 
-The below seems to run all-right so far, I'll let it run for a while.
-
----
- arch/x86/include/asm/system.h |    2 ++
- kernel/sched.c                |    3 ++-
- kernel/sched_debug.c          |    7 +++++++
- 3 files changed, 11 insertions(+), 1 deletions(-)
-
-diff --git a/arch/x86/include/asm/system.h b/arch/x86/include/asm/system.h
-index c2ff2a1..2c597e8 100644
---- a/arch/x86/include/asm/system.h
-+++ b/arch/x86/include/asm/system.h
-@@ -10,6 +10,8 @@
- #include <linux/kernel.h>
- #include <linux/irqflags.h>
- 
-+#define __ARCH_WANT_INTERRUPTS_ON_CTXSW
-+
- /* entries in ARCH_DLINFO: */
- #if defined(CONFIG_IA32_EMULATION) || !defined(CONFIG_X86_64)
- # define AT_VECTOR_SIZE_ARCH 2
-diff --git a/kernel/sched.c b/kernel/sched.c
-index 2d12893..f3627e5 100644
---- a/kernel/sched.c
-+++ b/kernel/sched.c
-@@ -2636,7 +2636,8 @@ try_to_wake_up(struct task_struct *p, unsigned int state, int wake_flags)
- 		 * to spin on ->on_cpu if p is current, since that would
- 		 * deadlock.
- 		 */
--		if (p == current) {
-+		if (cpu == smp_processor_id()) {
-+			p->sched_contributes_to_load = 0;
- 			ttwu_queue(p, cpu);
- 			goto stat;
- 		}
-diff --git a/kernel/sched_debug.c b/kernel/sched_debug.c
-index a6710a1..f0ff1de 100644
---- a/kernel/sched_debug.c
-+++ b/kernel/sched_debug.c
-@@ -332,6 +332,13 @@ static int sched_debug_show(struct seq_file *m, void *v)
- 		(int)strcspn(init_utsname()->version, " "),
- 		init_utsname()->version);
- 
-+#ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
-+	SEQ_printf(m, "__ARCH_WANT_INTERRUPTS_ON_CTXSW\n");
-+#endif
-+#ifdef __ARCH_WANT_UNLOCKED_CTXSW
-+	SEQ_printf(m, "__ARCH_WANT_UNLOCKED_CTXSW\n");                                  
-+#endif
-+
- #define P(x) \
- 	SEQ_printf(m, "%-40s: %Ld\n", #x, (long long)(x))
- #define PN(x) \
+What about updates to board files? Like adding support for the xM rev C to board-omap3beagle.c.
