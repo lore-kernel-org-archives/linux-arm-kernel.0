@@ -1,31 +1,68 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 26 May 2011 21:38:01 +0300
-Subject: [PATCH 1/5] dmaengine: add ep93xx DMA support
-In-Reply-To: <BANLkTikzrXRmdnv_v_nmJw7Nvsr6TY-5RQ@mail.gmail.com>
-References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<e6777eb9f7228ee1dadec1f0c9f16c3afc44c307.1306082097.git.mika.westerberg@iki.fi>
-	<BANLkTi=3z3kO5VEe2up8Mfm+bNXkY3baUw@mail.gmail.com>
-	<20110525195413.GC2996@acer>
-	<BANLkTin8Trn-44Op+GbxrgocFrnPuXUZ2w@mail.gmail.com>
-	<20110526043344.GA2749@acer>
-	<BANLkTikzrXRmdnv_v_nmJw7Nvsr6TY-5RQ@mail.gmail.com>
-Message-ID: <20110526183800.GE2957@acer>
+From: zonque@gmail.com (Daniel Mack)
+Date: Thu, 26 May 2011 20:24:13 +0200
+Subject: [PATCH 1/3] ARM: pxa: raumfeld: adapt to upcoming hardware change
+In-Reply-To: <1306323453-6371-1-git-send-email-zonque@gmail.com>
+References: <BANLkTikwkr8etp_fBnsUxiSq28VUyTbONQ@mail.gmail.com>
+	<1306323453-6371-1-git-send-email-zonque@gmail.com>
+Message-ID: <BANLkTiky3faK1pzaC+C9g34gTCd+CvwMmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 09:15:25AM +0200, Linus Walleij wrote:
-> On Thu, May 26, 2011 at 6:33 AM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> 
-> > Do you think that we can go forward with this patch series if I drop the last
-> > patch (spi/ep93xx: add DMA support)? This way we will have dmaengine
-> > implementation in place, whatever SPI driver we choose to use with ep93xx.
-> 
-> Yes and you don't have to drop any DMA support for the existing driver
-> for me alone, now that it's in the tree it should be maintained. I only
-> wanted to raise the issue of code duplication, not block any patches.
+Hi Eric,
 
-Ok, so I'll keep the last patch for now.
+In case there aren't any objections, can you queue up these three patches?
 
-BTW: if we get amba-pl022 driver to work with ep93xx, do you have any ideas
-how to proceed from there? I mean, should we convert existing users to use
-that driver instead and finally remove the ep93xx_spi driver?
+It doesn't matter whether they make it into the next release, I just
+to make sure they're not forgotten.
+
+
+Thanks,
+Daniel
+
+
+On Wed, May 25, 2011 at 1:37 PM, Daniel Mack <zonque@gmail.com> wrote:
+> From: Sven Neumann <s.neumann@raumfeld.com>
+>
+> The backlight control is going to change back to PWM in the
+> upcoming Raumfeld Controller hardware revision.
+>
+> Signed-off-by: Sven Neumann <s.neumann@raumfeld.com>
+> Acked-by: Daniel Mack <zonque@gmail.com>
+> ---
+> ?arch/arm/mach-pxa/raumfeld.c | ? 11 ++++++-----
+> ?1 files changed, 6 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/mach-pxa/raumfeld.c b/arch/arm/mach-pxa/raumfeld.c
+> index 15bca98..8b2ace5 100644
+> --- a/arch/arm/mach-pxa/raumfeld.c
+> +++ b/arch/arm/mach-pxa/raumfeld.c
+> @@ -599,14 +599,15 @@ static void __init raumfeld_lcd_init(void)
+>
+> ? ? ? ?pxa_set_fb_info(NULL, &raumfeld_sharp_lcd_info);
+>
+> - ? ? ? /* Earlier devices had the backlight regulator controlled
+> - ? ? ? ?* via PWM, later versions use another controller for that */
+> - ? ? ? if ((system_rev & 0xff) < 2) {
+> + ? ? ? /* Hardware revision 2 has the backlight regulator controlled
+> + ? ? ? ?* by an LT3593, earlier and later devices use PWM for that. */
+> + ? ? ? if ((system_rev & 0xff) == 2) {
+> + ? ? ? ? ? ? ? platform_device_register(&raumfeld_lt3593_device);
+> + ? ? ? } else {
+> ? ? ? ? ? ? ? ?mfp_cfg_t raumfeld_pwm_pin_config = GPIO17_PWM0_OUT;
+> ? ? ? ? ? ? ? ?pxa3xx_mfp_config(&raumfeld_pwm_pin_config, 1);
+> ? ? ? ? ? ? ? ?platform_device_register(&raumfeld_pwm_backlight_device);
+> - ? ? ? } else
+> - ? ? ? ? ? ? ? platform_device_register(&raumfeld_lt3593_device);
+> + ? ? ? }
+>
+> ? ? ? ?ret = gpio_request(GPIO_TFT_VA_EN, "display VA enable");
+> ? ? ? ?if (ret < 0)
+> --
+> 1.7.5.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
