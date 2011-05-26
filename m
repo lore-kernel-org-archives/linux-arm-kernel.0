@@ -1,21 +1,18 @@
 From: charu@ti.com (Varadarajan, Charulatha)
-Date: Thu, 26 May 2011 15:13:22 +0530
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D177FCC@dbde02.ent.ti.com>
+Date: Thu, 26 May 2011 15:18:28 +0530
+Subject: [PATCH 11/15] OMAP: GPIO: Remove hardcoded offsets in ctxt
+	save/restore
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D177FF4@dbde02.ent.ti.com>
 References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D177FCC@dbde02.ent.ti.com>
-Message-ID: <BANLkTinP+79pEzkkD_dTU5SKDq=kAgdoNw@mail.gmail.com>
+	<1306247094-25372-12-git-send-email-tarun.kanti@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D177FF4@dbde02.ent.ti.com>
+Message-ID: <BANLkTikA63fLpGFspPg3h3fx3juUy7X60w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Sanjeev,
 
-Thanks for the comments.
-
-On Thu, May 26, 2011 at 14:53, Premi, Sanjeev <premi@ti.com> wrote:
->
->
+On Thu, May 26, 2011 at 15:12, Premi, Sanjeev <premi@ti.com> wrote:
 >> -----Original Message-----
 >> From: linux-omap-owner at vger.kernel.org
 >> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of
@@ -23,117 +20,230 @@ On Thu, May 26, 2011 at 14:53, Premi, Sanjeev <premi@ti.com> wrote:
 >> Sent: Tuesday, May 24, 2011 7:55 PM
 >> To: linux-omap at vger.kernel.org
 >> Cc: Hilman, Kevin; Shilimkar, Santosh; tony at atomide.com;
->> linux-arm-kernel at lists.infradead.org; Varadarajan,
->> Charulatha; Cousson, Benoit; Paul Walmsley
->> Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO
->> and rev_ids
+>> linux-arm-kernel at lists.infradead.org; DebBarma, Tarun Kanti;
+>> Varadarajan, Charulatha
+>> Subject: [PATCH 11/15] OMAP: GPIO: Remove hardcoded offsets
+>> in ctxt save/restore
 >>
->> From: Charulatha V <charu@ti.com>
+>> It is not required to use hard-coded offsets any more in context
+>> save and restore functions and instead use the generic offsets
+>> which have been correctly initialized during device registration.
 >>
->> Non-wakeup GPIOs are available only in OMAP2420 and OMAP3430. But
->> the GPIO driver initializes the non-wakeup GPIO bits for OMAP24xx
->> (bothe OMAP 2420 and 2430) & not for OMAP3 which is incorrect.
->>
->> Fix the above by providing non-wakeup GPIO information through pdata
->> specific to the SoC.
->>
->> The GPIO rev id provided in the hwmod database is the same
->> for OMAP2420
->> and OMAP2430. Change the GPIO rev ids in hwmod database as given below
->> so that it can be used to identify OMAP2420 and OMAP2430.
->> OMAP2420 - 0
->> OMAP2430 - 1
->> OMAP3 ? ?- 2
->> OMAP4 ? ?- 3
-
->
-> [sp] Magic numbers should be avoided.
-> ? ? Suggest using something like:
-> ? ? #define GPIO_REV_2420 ? ? ?0
-> ? ? #define GPIO_REV_2430 ? ? ?1
-> ? ? #define GPIO_REV_34XX ? ? ?2
-> ? ? #define GPIO_REV_44xx ? ? ?3
->
-> ? ? We don't have to refer back to this comment while reading the code.
-
-Okay.
-
-> ? ? I also believed that HWMODs were auto generated.
-> ? ? Can the changes to structures in this patch recreated using current
-> ? ? scripts?
-
-Benoit's and Paul's ack is required for this change.
-
->
-> ~sanjeev
->
->>
+>> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
 >> Signed-off-by: Charulatha V <charu@ti.com>
->> Cc: Cousson, Benoit <b-cousson@ti.com>
->> Cc: Paul Walmsley <paul@pwsan.com>
 >> ---
->> ?arch/arm/mach-omap2/gpio.c ? ? ? ? ? ? ? ? | ? 26
->> ++++++++++++++++++++++++--
->> ?arch/arm/mach-omap2/omap_hwmod_2430_data.c | ? ?2 +-
->> ?arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | ? ?2 +-
->> ?arch/arm/mach-omap2/omap_hwmod_44xx_data.c | ? ?2 +-
->> ?arch/arm/plat-omap/include/plat/gpio.h ? ? | ? ?1 +
->> ?drivers/gpio/gpio_omap.c ? ? ? ? ? ? ? ? ? | ? 11 +++--------
->> ?6 files changed, 31 insertions(+), 13 deletions(-)
+>> ?arch/arm/mach-omap2/gpio.c ? ? ? ? ? ? | ? ?2 +
+>> ?arch/arm/plat-omap/include/plat/gpio.h | ? ?1 +
+>> ?drivers/gpio/gpio_omap.c ? ? ? ? ? ? ? | ?123
+>> ++++++++++----------------------
+>> ?3 files changed, 40 insertions(+), 86 deletions(-)
 >>
 >> diff --git a/arch/arm/mach-omap2/gpio.c b/arch/arm/mach-omap2/gpio.c
->> index 0446bd1..6cd26b4 100644
->> --- a/arch/arm/mach-omap2/gpio.c
->> +++ b/arch/arm/mach-omap2/gpio.c
->> @@ -56,6 +56,28 @@ static int omap2_gpio_dev_init(struct
->> omap_hwmod *oh, void *unused)
->> ? ? ? ? ? ? ? return -ENOMEM;
->> ? ? ? }
+>> index 0f8782f..5c888dd 100644
+>
+> [snip]...[snip]
+>> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
+>> index 28390a9..05c2857 100644
+>> --- a/drivers/gpio/gpio_omap.c
+>> +++ b/drivers/gpio/gpio_omap.c
+>> @@ -1395,96 +1395,47 @@ restore_gpio_ctx:
 >>
->> + ? ? switch (oh->class->rev) {
->> + ? ? case 0:
->> + ? ? ? ? ? ? if (id == 1)
->> + ? ? ? ? ? ? ? ? ? ? /* non-wakeup GPIO pins for OMAP2420 Bank1 */
->> + ? ? ? ? ? ? ? ? ? ? pdata->non_wakeup_gpios = 0xe203ffc0;
->> + ? ? ? ? ? ? else if (id == 2)
->> + ? ? ? ? ? ? ? ? ? ? /* non-wakeup GPIO pins for OMAP2420 Bank2 */
->> + ? ? ? ? ? ? ? ? ? ? pdata->non_wakeup_gpios = 0x08700040;
->> + ? ? ? ? ? ? break;
->> + ? ? case 2:
->> + ? ? ? ? ? ? if (id == 2)
->> + ? ? ? ? ? ? ? ? ? ? /* non-wakeup GPIO pins for OMAP3 Bank2 */
->> + ? ? ? ? ? ? ? ? ? ? pdata->non_wakeup_gpios = 0x00000001;
->> + ? ? ? ? ? ? else if (id == 6)
->> + ? ? ? ? ? ? ? ? ? ? /* non-wakeup GPIO pins for OMAP3 Bank6 */
->> + ? ? ? ? ? ? ? ? ? ? pdata->non_wakeup_gpios = 0x08000000;
->> + ? ? ? ? ? ? break;
+>> ?void omap_gpio_save_context(struct gpio_bank *bank)
+>> ?{
 >
-> [sp] Where is the description on non-wakeup GPIOs in OMAP3?
-
-As mentioned in other reply, I am referring to
-Table 25-5. GPIO Channel Description at page no 3354
-OMAP3430 public TRM Version P. Please correct me if I am wrong.
-
-> ? ? Here is text from AM37x TRM:
-> ? ? [quote ...only relevant text]
-> ? ? Each GPIO module provides 32 dedicated general-purpose pins with input
-> ? ? and output capabilities; .... These pins can be configured for the
-> ? ? following applications:
-> ? ? - Data input (capture)/output (drive)
-> ? ? - Keyboard interface with a debounce cell
-> ? ? - Interrupt generation in ....
-> ? ? - Wake-up request generation in idle mode
-> ? ? [/quote]
-> ? ? Otherwise, what are the GPIO2_WAKEUPENABLE (0x4905 0020) and
-> ? ? GPIO6_WAKEUPENABLE (0x4905 8020) meant for?
+> [sp] The [PATCH 06/15] OMAP4: GPIO: Save/restore context
+> ? ? seems to be doing exactly opposite:
+> ? ? It introduces the checks for
+> [quote]
+> ?+ ? ? ? ? ? ? ?if (bank->method == METHOD_GPIO_24XX) {
+> ...
+> ...
+> ?+ ? ? ? ? ? ? ?} else if (bank->method == METHOD_GPIO_44XX) {
+> [/quote]
 >
->> + ? ? default:
->> + ? ? ? ? ? ? /* No non-wakeup GPIO pins for other SoCs */
->> + ? ? ? ? ? ? break;
->> + ? ? }
->> +
+> and this patch removes the same checks.
+>
+> Am I missing something?
+
+Patch 6 introduces the save/restore context code for OMAP4 and this patch
+tries to replace all the macro usage with the reg offset values which is nothing
+but cleanup.
+
+Based on your comments and Kevin's I understand that I should make cleanups
+first and then any fixes/functionality changes to avoid confusions.
+Will do that and send a revised series next week.
+
+-V Charulatha
+
 >
 > ~sanjeev
 >
-> [snip]...[snip]
 >
+>> - ? ? if (bank->method == METHOD_GPIO_24XX) {
+>> - ? ? ? ? ? ? bank->context.irqenable1 = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP24XX_GPIO_IRQENABLE1);
+>> - ? ? ? ? ? ? bank->context.irqenable2 = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP24XX_GPIO_IRQENABLE2);
+>> - ? ? ? ? ? ? bank->context.wake_en = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP24XX_GPIO_WAKE_EN);
+>> - ? ? ? ? ? ? bank->context.ctrl = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP24XX_GPIO_CTRL);
+>> - ? ? ? ? ? ? bank->context.oe = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + OMAP24XX_GPIO_OE);
+>> - ? ? ? ? ? ? bank->context.leveldetect0 = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_LEVELDETECT0);
+>> - ? ? ? ? ? ? bank->context.leveldetect1 = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_LEVELDETECT1);
+>> - ? ? ? ? ? ? bank->context.risingdetect = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_RISINGDETECT);
+>> - ? ? ? ? ? ? bank->context.fallingdetect = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_FALLINGDETECT);
+>> - ? ? ? ? ? ? bank->context.dataout = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP24XX_GPIO_DATAOUT);
+>> - ? ? } else if (bank->method == METHOD_GPIO_44XX) {
+>> - ? ? ? ? ? ? bank->context.irqenable1 = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP4_GPIO_IRQSTATUSSET0);
+>> - ? ? ? ? ? ? bank->context.irqenable2 = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP4_GPIO_IRQSTATUSSET1);
+>> - ? ? ? ? ? ? bank->context.wake_en = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP4_GPIO_IRQWAKEN0);
+>> - ? ? ? ? ? ? bank->context.ctrl = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + OMAP4_GPIO_CTRL);
+>> - ? ? ? ? ? ? bank->context.oe = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + OMAP24XX_GPIO_OE);
+>> - ? ? ? ? ? ? bank->context.leveldetect0 = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_LEVELDETECT0);
+>> - ? ? ? ? ? ? bank->context.leveldetect1 = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_LEVELDETECT1);
+>> - ? ? ? ? ? ? bank->context.risingdetect = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_RISINGDETECT);
+>> - ? ? ? ? ? ? bank->context.fallingdetect = __raw_readl(bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_FALLINGDETECT);
+>> - ? ? ? ? ? ? bank->context.dataout = __raw_readl(
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base +
+>> OMAP4_GPIO_DATAOUT);
+>> - ? ? }
+>> + ? ? bank->context.irqenable1 =
+>> + ? ? ? ? ? ? ? ? ? ? __raw_readl(bank->base + bank->regs->irqenable);
+>> + ? ? bank->context.irqenable2 =
+>> + ? ? ? ? ? ? ? ? ? ? __raw_readl(bank->base +
+>> bank->regs->irqenable2);
+>> + ? ? bank->context.wake_en =
+>> + ? ? ? ? ? ? ? ? ? ? __raw_readl(bank->base +
+>> bank->regs->wkupstatus);
+>> + ? ? bank->context.ctrl = __raw_readl(bank->base + bank->regs->ctrl);
+>> + ? ? bank->context.oe = __raw_readl(bank->base +
+>> bank->regs->direction);
+>> + ? ? bank->context.leveldetect0 =
+>> + ? ? ? ? ? ? ? ? ? ? __raw_readl(bank->base +
+>> bank->regs->leveldetect0);
+>> + ? ? bank->context.leveldetect1 =
+>> + ? ? ? ? ? ? ? ? ? ? __raw_readl(bank->base +
+>> bank->regs->leveldetect1);
+>> + ? ? bank->context.risingdetect =
+>> + ? ? ? ? ? ? ? ? ? ? __raw_readl(bank->base +
+>> bank->regs->risingdetect);
+>> + ? ? bank->context.fallingdetect =
+>> + ? ? ? ? ? ? ? ? ? ? __raw_readl(bank->base +
+>> bank->regs->fallingdetect);
+>> + ? ? bank->context.dataout = __raw_readl(bank->base +
+>> bank->regs->dataout);
+>> ?}
+>>
+>> ?void omap_gpio_restore_context(struct gpio_bank *bank)
+>> ?{
+>> - ? ? if (bank->method == METHOD_GPIO_24XX) {
+>> - ? ? ? ? ? ? __raw_writel(bank->context.irqenable1, bank->base +
+>> -
+>> OMAP24XX_GPIO_IRQENABLE1);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.irqenable2, bank->base +
+>> -
+>> OMAP24XX_GPIO_IRQENABLE2);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.wake_en, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_WAKE_EN);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.ctrl, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_CTRL);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.oe, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_OE);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.leveldetect0, bank->base +
+>> -
+>> OMAP24XX_GPIO_LEVELDETECT0);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.leveldetect1, bank->base +
+>> -
+>> OMAP24XX_GPIO_LEVELDETECT1);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.risingdetect, bank->base +
+>> -
+>> OMAP24XX_GPIO_RISINGDETECT);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.fallingdetect, bank->base +
+>> -
+>> OMAP24XX_GPIO_FALLINGDETECT);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.dataout, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_DATAOUT);
+>> - ? ? } else if (bank->method == METHOD_GPIO_44XX) {
+>> - ? ? ? ? ? ? __raw_writel(bank->context.irqenable1, bank->base +
+>> -
+>> OMAP4_GPIO_IRQSTATUSSET0);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.irqenable2, bank->base +
+>> -
+>> OMAP4_GPIO_IRQSTATUSSET1);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.wake_en, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_IRQWAKEN0);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.ctrl, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_CTRL);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.oe, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_OE);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.leveldetect0, bank->base +
+>> -
+>> OMAP4_GPIO_LEVELDETECT0);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.leveldetect1, bank->base +
+>> -
+>> OMAP4_GPIO_LEVELDETECT1);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.risingdetect, bank->base +
+>> -
+>> OMAP4_GPIO_RISINGDETECT);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.fallingdetect, bank->base +
+>> -
+>> OMAP4_GPIO_FALLINGDETECT);
+>> - ? ? ? ? ? ? __raw_writel(bank->context.dataout, bank->base +
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_DATAOUT);
+>> - ? ? }
+>> + ? ? __raw_writel(bank->context.irqenable1,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->irqenable);
+>> + ? ? __raw_writel(bank->context.irqenable2,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->irqenable2);
+>> + ? ? __raw_writel(bank->context.wake_en,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->wkupstatus);
+>> + ? ? __raw_writel(bank->context.ctrl,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->ctrl);
+>> + ? ? __raw_writel(bank->context.oe,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->direction);
+>> + ? ? __raw_writel(bank->context.leveldetect0,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->leveldetect0);
+>> + ? ? __raw_writel(bank->context.leveldetect1,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->leveldetect1);
+>> + ? ? __raw_writel(bank->context.risingdetect,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->risingdetect);
+>> + ? ? __raw_writel(bank->context.fallingdetect,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->fallingdetect);
+>> + ? ? __raw_writel(bank->context.dataout,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + bank->regs->dataout);
+>> ?}
+>>
+>> ?#endif
+>> --
+>> 1.6.0.4
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe
+>> linux-omap" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>>
