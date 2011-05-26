@@ -1,7 +1,7 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 26 May 2011 16:16:10 -0600
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 26 May 2011 23:25:12 +0100
 Subject: [PATCH] ARM: Xilinx: Adding zynq platform support
-In-Reply-To: <BANLkTi=mL=J4UeKgFEa9y3C==8f9eKkboA@mail.gmail.com>
+In-Reply-To: <BANLkTin40KK-SahXEP3c1EH1+fWgB54aFw@mail.gmail.com>
 References: <BANLkTiknh4nCviohecbcJEiWnSW-JdMxDw@mail.gmail.com>
 	<alpine.LFD.2.00.1105241435550.3207@xanadu.home>
 	<BANLkTi=hCpCbNzi1ZiKmGnbhmCG2Ce=EkA@mail.gmail.com>
@@ -9,44 +9,22 @@ References: <BANLkTiknh4nCviohecbcJEiWnSW-JdMxDw@mail.gmail.com>
 	<20110526150655.GA26661@ponder.secretlab.ca>
 	<20110526220120.GN24876@n2100.arm.linux.org.uk>
 	<BANLkTi=mL=J4UeKgFEa9y3C==8f9eKkboA@mail.gmail.com>
-Message-ID: <BANLkTin40KK-SahXEP3c1EH1+fWgB54aFw@mail.gmail.com>
+	<BANLkTin40KK-SahXEP3c1EH1+fWgB54aFw@mail.gmail.com>
+Message-ID: <20110526222512.GO24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 4:13 PM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Thu, May 26, 2011 at 4:01 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Thu, May 26, 2011 at 09:06:55AM -0600, Grant Likely wrote:
->>> On Thu, May 26, 2011 at 03:59:41PM +0200, Arnd Bergmann wrote:
->>> > On Wednesday 25 May 2011, Grant Likely wrote:
->>> > >
->>> > > As per discussion attached below. ?Please pull this tree adding device
->>> > > tree support to ARM, plus some other minor device tree changes.
->>> >
->>> > Hi Grant and Linus,
->>> >
->>> > There is also the new Xilinx zynq subarchitecture pending that depends
->>> > on this, see below. Should we also include that right away, in order
->>> > to have an example for other platforms? I think the code is clean
->>> > enough and it would be good to have.
->>> >
->>> > ? ? Arnd
->>>
->>> Yes, this one definitely should (as we discussed in Budapest 2 weeks back).
->>> Its been in linux-next for a while now too.
->>>
->>> I've picked it up into devicetree/arm-next and run through a few build
->>> tests before I push it out and update the pull request.
->>
->> Note that I've pulled the dt stuff into my tree a few days ago already.
->
-> Even better. ?Thanks.
+On Thu, May 26, 2011 at 04:16:10PM -0600, Grant Likely wrote:
+> Will you pick up the zynq patch also?
 
-Will you pick up the zynq patch also?
+It's about 1000 new lines, and I'm not sure Linus will take that
+level of addition - certainly not without explanation.
 
-g.
+Also, if we adhere to the policy that we don't introduce new code
+which should be using the consolidated code which we've already
+introduced, this would need to be updated to use the mmio
+clocksource stuff at the very least.
 
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+I'm also not convinced that this platform would have the ICST PLL
+chips on it, so why it needs to select ICST I'm not sure (as well
+as having the PLL parameters in its struct clk.)
