@@ -1,37 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 26 May 2011 10:15:10 -0700
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <BANLkTik2=da94cZh23gwx1hzZQK6H_hy2Q@mail.gmail.com> (Charulatha
-	Varadarajan's message of "Thu, 26 May 2011 15:08:06 +0530")
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
-	<87sjs2sbvy.fsf@ti.com>
-	<BANLkTik2=da94cZh23gwx1hzZQK6H_hy2Q@mail.gmail.com>
-Message-ID: <8762oxgz8h.fsf@ti.com>
+From: ak@linux.intel.com (Andi Kleen)
+Date: Thu, 26 May 2011 12:58:40 -0700
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+References: <20110523111648.10474.78396.stgit@e102109-lin.cambridge.arm.com>	
+	<20110523132124.GI17672@n2100.arm.linux.org.uk>	
+	<1306229953.19557.14.camel@e102109-lin.cambridge.arm.com>	
+	<yw1xipt0p4i9.fsf@unicorn.mansr.com>	
+	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>	
+	<20110524171331.GA2941@arm.com>	
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>	
+	<20110525124348.GA2340@arm.com>	<yw1xaaeanbxe.fsf@unicorn.mansr.com>	
+	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
+	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+Message-ID: <4DDEB0F0.3010101@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Varadarajan, Charulatha" <charu@ti.com> writes:
 
-> On Thu, May 26, 2011 at 03:04, Kevin Hilman <khilman@ti.com> wrote:
->> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->>
->>> From: Charulatha V <charu@ti.com>
->>>
->>> Non-wakeup GPIOs are available only in OMAP2420 and OMAP3430. But
->>> the GPIO driver initializes the non-wakeup GPIO bits for OMAP24xx
->>> (bothe OMAP 2420 and 2430) & not for OMAP3 which is incorrect.
->>
->> Can you cite the documentation you're using for the OMAP3 non-wakeup
->> GPIOs?
->
-> I am referring to Table 25-5. GPIO Channel Description at page no 3354
-> OMAP3430 public TRM Version P.
->
+> So it sounds like we might not want to enable this blindly across all
+> architectures. Indeed, on ARM, it encourages the compiler to pack
+> variables on the stack which leads to the weird and wonderful alignment
+> situation that has been encountered in this thread.
 
-Based on how I understand that, those non-wakeup GPIOs are non-wakeup
-because they're not actually mapped anywhere, and not available on
-external pins.  Therefore, they should not need any special case
-handling for this triggering workaround.
+Interesting. I'm pretty sure it didn't do that when I added the flag.
 
-Kevin
+Anyways making it a CONFIG is fine for me. Just don't set it on ARM. It 
+should be set on x86
+at least.
+
+-Andi
