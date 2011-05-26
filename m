@@ -1,62 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 26 May 2011 17:40:05 +0200
-Subject: CSR ARM SoC Subarchitecture preview
-In-Reply-To: <BANLkTikOyo9g1GD_dOxb5As2Yr0rBc+hyA@mail.gmail.com>
-References: <BANLkTikfje67KyyD+7Pn0D=afTyEde0euw@mail.gmail.com>
-	<201105250851.03665.arnd@arndb.de>
-	<BANLkTikOyo9g1GD_dOxb5As2Yr0rBc+hyA@mail.gmail.com>
-Message-ID: <201105261740.05985.arnd@arndb.de>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Thu, 26 May 2011 17:45:08 +0200
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <1306412511.1200.90.camel@twins>
+References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
+	<1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+Message-ID: <20110526154508.GA13788@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 26 May 2011, Barry Song wrote:
-> 2011/5/25 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday 25 May 2011 04:15:12 Barry Song wrote:
-> >
-> > Regarding platform data, the ideal case would be to not pass any,
-> > and have the driver itself enquire the settings by looking at device
-> > tree properties. There may be a few cases where that is not possible,
-> > or where a callback into platform code ends up simplifying things
-> > significantly, but that should stay the exception.
-> really. some hardware-related callbacks are now in arch and make
-> driver codes simpler and better to cross platform without considering
-> trivial hardware details.
-> if they are moved to drivers, the drivers will be very ugly with things like:
-> #ifdef BOARD_X
-> ....
-> #elif defined(BOARD_Y)
-> ...
-> #endif
-> that is not what people want.
-> 
-> so a temp way is maybe providing funtions in arch as exported symbols
-> which will be called by drivers. different boards implement them in
-> different codes.
+On 05/26, Peter Zijlstra wrote:
+>
+>  static void ttwu_queue(struct task_struct *p, int cpu)
+>  {
+> @@ -2631,17 +2650,17 @@ try_to_wake_up(struct task_struct *p, un
+>  	while (p->on_cpu) {
+>  #ifdef __ARCH_WANT_INTERRUPTS_ON_CTXSW
+>  		/*
+> -		 * If called from interrupt context we could have landed in the
+> -		 * middle of schedule(), in this case we should take care not
+> -		 * to spin on ->on_cpu if p is current, since that would
+> -		 * deadlock.
+> +		 * In case the architecture enables interrupts in
+> +		 * context_switch(), we cannot busy wait, since that
+> +		 * would lead to live-locks when an interrupt hits and
+> +		 * tries to wake up @prev. So bail and do a complete
+> +		 * remote wakeup.
+>  		 */
+> -		if (p == current) {
+> -			ttwu_queue(p, cpu);
+> +		if (ttwu_activate_remote(p, wake_flags))
 
-We really need to look at this case-by-case. The #ifdef mess you cited
-is of course not acceptable, but that my feeling is that in most cases
-we can find a much nicer solution. It depends of course on what code
-gets run in the board specific fixup.
+Stupid question. Can't we fix this problem if we do
 
-> > From the little I know about GPS, the controllers have a fairly standardized
-> > serial port interface even across vendors. It would be good to be
-> > compatible with the existing ones there, e.g. bluetooth or serial GPS that
-> > all provide a tty interface. If your's is very different and has a
-> > high-level API, you might want to create a new drivers/gps/ subsystem
-> > with an architected user interface that works with both your own
-> > implementation and the serial ones.
-> > Turning a tty into a high-level interface is normally done using a new tty
-> > line discipline, similar to how PPP or CAN work over serial lines.
-> 
-> yes. gps generally is an external module connected to SoC's uart.
-> actually, the char device we are talking is more like firmware inside
-> a common gps module. it is in lower level than an external interface.
-> anyway, csr is a company with gps technology. i'd like to figure out
-> whether we can provide a generic framework.
+	-	if (p == current)
+	+	if (cpu == raw_smp_processor_id())
 
-Great! I think many people would appreciate that.
+?
 
-This may actually be as easy as providing a new line discipline with
-very simple ioctls (e.g. GPSIO_GET_CURRENT_POSSITION).
+I forgot the rules... but iirc task_cpu(p) can't be changed under us?
 
-	Arnd
+Oleg.
