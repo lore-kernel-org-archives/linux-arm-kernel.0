@@ -1,47 +1,52 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Thu, 26 May 2011 16:12:32 +0200
-Subject: [PATCH 02/15] OMAP2PLUS: GPIO: Fix non-wakeup GPIO and rev_ids
-In-Reply-To: <AB90A028-5926-4DBB-BAD9-7C0EF6E0FD05@mhlabs.com>
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-3-git-send-email-tarun.kanti@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D177FCC@dbde02.ent.ti.com>
-	<4DDE2745.3030307@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D178110@dbde02.ent.ti.com>
-	<4DDE435C.8060506@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D17815E@dbde02.ent.ti.com>
-	<4DDE4BB0.7010809@ti.com>
-	<AB90A028-5926-4DBB-BAD9-7C0EF6E0FD05@mhlabs.com>
-Message-ID: <4DDE5FD0.9050309@ti.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 26 May 2011 15:45:39 +0100
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <20110526125007.GA27083@elte.hu>
+References: <1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
+	<1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+Message-ID: <BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/26/2011 3:38 PM, B.J. Buchalter wrote:
-> Why not do the following:
+On 26 May 2011 13:50, Ingo Molnar <mingo@elte.hu> wrote:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 >
->         #define OMAP_GPIO_REV_0	0
->         #define OMAP_GPIO_REV_1	1
->         #define OMAP_GPIO_REV_2	2
->         #define OMAP_GPIO_REV_3	3
-> /*
-> 	OMAP_GPIO_REV_0:	OMAP2420
-> 	OMAP_GPIO_REV_1:	OMAP2430
-> 	OMAP_GPIO_REV_2:	OMAP3, DMxxx
-> 	OMAP_GPIO_REV_3:	OMAP4, OMAP5, DM816x
-> */
+>> On Thu, May 26, 2011 at 02:26:23PM +0200, Ingo Molnar wrote:
+>> >
+>> > * Peter Zijlstra <peterz@infradead.org> wrote:
+>> >
+>> > > Sort this by reverting to the old behaviour for this situation
+>> > > and perform a full remote wake-up.
+>> >
+>> > Btw., ARM should consider switching most of its subarchitectures
+>> > to !__ARCH_WANT_INTERRUPTS_ON_CTXSW - enabling irqs during
+>> > context switches is silly and now expensive as well.
+>>
+>> Not going to happen. ?The reason we do it is because most of the
+>> CPUs have to (slowly) flush their caches during switch_mm(), and to
+>> have IRQs off over the cache flush means that we lose IRQs.
 >
->    +	switch (oh->class->rev) {     ## This is auto-generated.
->    +	case 0:				## But this is our code.
->
->        I am recommending this to read as:
->
->    +	switch (oh->class->rev) {     ## This is auto-generated.
->    +	case OMAP_GPIO_REV_0:		## More readable.
->
-> That approach solves both issues -- Revision ->  Chip mapping in comment, no magic numbers in the code, and no implied restriction of the rev number to a specific SoC. Using the defines makes it easier to search the code for a specific revision, since you would no longer get false positives for all the other '0' and '1' constants that appear in the code. It also makes it indexible by tools like LXR.
+> How much time does that take on contemporary ARM hardware, typically
+> (and worst-case)?
 
-This is indeed what was done for I2C recently.
-The point is that this kind of define does not bring a lot of semantic. 
-But on the other hand it will definitively help the search aspect.
+On newer ARMv6 and ARMv7 hardware, we no longer flush the caches at
+context switch as we got VIPT (or PIPT-like) caches.
 
-Thanks,
-Benoit
+But modern ARM processors use something called ASID to tag the TLB
+entries and we are limited to 256. The switch_mm() code checks for
+whether we ran out of them to restart the counting. This ASID
+roll-over event needs to be broadcast to the other CPUs and issuing
+IPIs with the IRQs disabled isn't always safe. Of course, we could
+briefly re-enable them at the ASID roll-over time but I'm not sure
+what the expectations of the code calling switch_mm() are.
+
+-- 
+Catalin
