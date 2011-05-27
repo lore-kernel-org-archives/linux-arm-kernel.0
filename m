@@ -1,61 +1,70 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 May 2011 17:27:48 +0100
-Subject: [RFC PATCH v4 10/13] ARM: exynos4: use remapped PPI interrupts for
+Date: Fri, 27 May 2011 17:27:44 +0100
+Subject: [RFC PATCH v4 06/13] ARM: shmobile: use remapped PPI interrupts for
 	local timer
 In-Reply-To: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
 References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306513671-12206-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1306513671-12206-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the normal interrupt scheme for the local timers by using
 a remapped PPI interrupt.
 
-Tested on a SMDK-S5PV310 board.
-
-Cc: Ben Dooks <ben-linux@fluff.org>
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-exynos4/include/mach/entry-macro.S |   12 +-----------
- arch/arm/mach-exynos4/localtimer.c               |    3 ++-
- arch/arm/plat-s5p/Kconfig                        |    1 +
- 3 files changed, 4 insertions(+), 12 deletions(-)
+ arch/arm/mach-shmobile/Kconfig                    |    1 +
+ arch/arm/mach-shmobile/entry-intc.S               |    3 ---
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 ---
+ arch/arm/mach-shmobile/localtimer.c               |    3 ++-
+ 4 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-index d8f38c2..f007168 100644
---- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
-+++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-@@ -50,7 +50,7 @@
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0c8f6cf..ddcf28c 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -26,6 +26,7 @@ config ARCH_SH73A0
+ 	select SH_CLK_CPG
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
  
- 		bic     \irqnr, \irqstat, #0x1c00
+ comment "SH-Mobile Board Type"
  
--		cmp     \irqnr, #29
-+		cmp     \irqnr, #15
- 		cmpcc	\irqnr, \irqnr
- 		cmpne	\irqnr, \tmp
- 		cmpcs	\irqnr, \irqnr
-@@ -72,13 +72,3 @@
- 		cmpcs	\irqnr, \irqnr
- 		.endm
+diff --git a/arch/arm/mach-shmobile/entry-intc.S b/arch/arm/mach-shmobile/entry-intc.S
+index cac0a7a..1a1c00c 100644
+--- a/arch/arm/mach-shmobile/entry-intc.S
++++ b/arch/arm/mach-shmobile/entry-intc.S
+@@ -51,7 +51,4 @@
+ 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+ 	.endm
  
--		/* As above, this assumes that irqstat and base are preserved.. */
+-	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
+-	.endm
 -
--		.macro test_for_ltirq, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		mov	\tmp, #0
--		cmp	\irqnr, #29
--		moveq	\tmp, #1
--		streq	\irqstat, [\base, #GIC_CPU_EOI]
--		cmp	\tmp, #0
--		.endm
-diff --git a/arch/arm/mach-exynos4/localtimer.c b/arch/arm/mach-exynos4/localtimer.c
-index 6bf3d0a..315de6f 100644
---- a/arch/arm/mach-exynos4/localtimer.c
-+++ b/arch/arm/mach-exynos4/localtimer.c
-@@ -14,13 +14,14 @@
+ 	arch_irq_handler shmobile_handle_irq_intc
+diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+index d791f10..8d4a416 100644
+--- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
++++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+@@ -27,8 +27,5 @@
+ 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+ 	.endm
  
- #include <asm/irq.h>
+-	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
+-	.endm
+-
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
+diff --git a/arch/arm/mach-shmobile/localtimer.c b/arch/arm/mach-shmobile/localtimer.c
+index ad9ccc9..8a67b1c 100644
+--- a/arch/arm/mach-shmobile/localtimer.c
++++ b/arch/arm/mach-shmobile/localtimer.c
+@@ -14,13 +14,14 @@
+ #include <linux/clockchips.h>
+ #include <asm/smp_twd.h>
  #include <asm/localtimer.h>
 +#include <asm/hardware/gic.h>
  
@@ -64,22 +73,10 @@ index 6bf3d0a..315de6f 100644
   */
  int __cpuinit local_timer_setup(struct clock_event_device *evt)
  {
--	evt->irq = IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
+-	evt->irq = 29;
++	evt->irq = gic_ppi_to_vppi(29);
  	twd_timer_setup(evt);
  	return 0;
  }
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 6751bcf..0e30e25 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -11,6 +11,7 @@ config PLAT_S5P
- 	default y
- 	select ARM_VIC if !ARCH_EXYNOS4
- 	select ARM_GIC if ARCH_EXYNOS4
-+	select ARM_GIC_VPPI if ARCH_EXYNOS4
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select S3C_GPIO_TRACK
 -- 
 1.7.0.4
