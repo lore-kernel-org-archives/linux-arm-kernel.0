@@ -1,68 +1,60 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 May 2011 17:27:40 +0100
-Subject: [RFC PATCH v4 02/13] ARM: smp: add interrupt handler for local timers
-In-Reply-To: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
-References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306513671-12206-3-git-send-email-marc.zyngier@arm.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 27 May 2011 09:35:40 -0700
+Subject: [PATCH 0/7] Move Qualcomm gpio drivers into drivers dir
+In-Reply-To: <8yad3j46r97.fsf@huya.qualcomm.com> (David Brown's message of
+	"Fri, 27 May 2011 09:29:56 -0700")
+References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+	<20110527031319.GH5032@ponder.secretlab.ca>
+	<8yad3j46r97.fsf@huya.qualcomm.com>
+Message-ID: <8ya8vts6qzn.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Provide a "normal" interrupt handler for local timers.
-It is expected that most timer implementations will use this
-handler unless they have more specific requirements.
+On Fri, May 27 2011, David Brown wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/localtimer.h |    6 ++++++
- arch/arm/kernel/smp.c             |   12 ++++++++++++
- 2 files changed, 18 insertions(+), 0 deletions(-)
+> On Thu, May 26 2011, Grant Likely wrote:
+>
+>> On Wed, May 18, 2011 at 02:50:46PM -0700, David Brown wrote:
+>>> This patch series moves the Qualcomm MSM gpio device drivers into the
+>>> drivers/gpio directory.
+>>> 
+>>> The MSM's have two flavors of gpio driver.  The one for the newer
+>>> v7-based chips is a bit cleaner, and can just be moved.  The one for
+>>> the older v6-based chips took some cleanup to get rid of numerous
+>>> ifdefs based on the particular machine.  Both drivers can now be
+>>> selected and will be used on appropriate targets.
+>>> 
+>>> There is still a minor entanglement with the MSM-specific gpiomux
+>>> code.  This will be cleaned up as MSM moves to use pinmux.
+>>> 
+>>> David Brown (7):
+>>>   msm: gpio: Remove unsupported devices
+>>>   msm: Remove chip-ifdefs for GPIO io mappings
+>>>   msm: gpio: Remove chip-specific register definitions
+>>>   msm: gpio: Remove ifdefs on gpio chip registers
+>>>   msm: gpiomux: Move public API to public header
+>>>   gpio_msm: Move Qualcomm v6 MSM driver into drivers
+>>>   gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
+>>
+>> What's the status of this series.  I only got cc'd on the last two
+>> patches; did you want me to pick up the whole lot, or is it being
+>> merged via the msm tree?
+>
+> Let me send out an update, incorporating the suggestions.  I need to
+> rebase these changes off of the current MSM code, since the msm-next
+> tree contains changes that aren't going into the merge window because of
+> extra ARM scrutiny.
+>
+>> Alternately, if there is a git branch with these patches in it, then I
+>> can merge that instead of applying individually.
+>
+> I'll send you a pull request after I send out the updates.
 
-diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
-index 080d74f..bef44b3 100644
---- a/arch/arm/include/asm/localtimer.h
-+++ b/arch/arm/include/asm/localtimer.h
-@@ -10,6 +10,8 @@
- #ifndef __ASM_ARM_LOCALTIMER_H
- #define __ASM_ARM_LOCALTIMER_H
- 
-+#include <linux/interrupt.h>
-+
- struct clock_event_device;
- 
- /*
-@@ -22,6 +24,10 @@ void percpu_timer_setup(void);
-  */
- asmlinkage void do_local_timer(struct pt_regs *);
- 
-+/*
-+ * Per-cpu timer IRQ handler
-+ */
-+irqreturn_t percpu_timer_handler(int irq, void *dev_id);
- 
- #ifdef CONFIG_LOCAL_TIMERS
- 
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index d439a8f..2c85941 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -459,6 +459,18 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
- 	set_irq_regs(old_regs);
- }
- 
-+irqreturn_t percpu_timer_handler(int irq, void *dev_id)
-+{
-+	struct clock_event_device *evt = dev_id;
-+
-+	if (local_timer_ack()) {
-+		evt->event_handler(evt);
-+		return IRQ_HANDLED;
-+	}
-+
-+	return IRQ_NONE;
-+}
-+
- void show_local_irqs(struct seq_file *p, int prec)
- {
- 	unsigned int cpu;
+Oh, and in case it isn't clear, I wasn't expecting these to make it into
+this merge window.
+
+David
+
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
