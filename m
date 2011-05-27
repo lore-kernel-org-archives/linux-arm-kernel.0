@@ -1,44 +1,58 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 May 2011 09:01:35 +0100
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <1306427537.2497.86.camel@laptop>
-References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
-	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
-	<1306358128.21578.107.camel@twins>
-	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-	<1306405979.1200.63.camel@twins>
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526154508.GA13788@redhat.com> <1306425584.2497.81.camel@laptop>
-	<1306426148.2497.83.camel@laptop>
-	<1306426823.27474.241.camel@e102391-lin.cambridge.arm.com>
-	<1306427537.2497.86.camel@laptop>
-Message-ID: <1306483295.27474.248.camel@e102391-lin.cambridge.arm.com>
+From: dg77.kim@samsung.com (Donggeun Kim)
+Date: Fri, 27 May 2011 17:04:49 +0900
+Subject: [PATCH] CPUFREQ/S5PV210, EXYNOS4: Add Kconfig options for S5PV210 and
+	EXYNOS4 CPUfreq drivers
+In-Reply-To: <1306476428-24808-1-git-send-email-dg77.kim@samsung.com>
+References: <1306476428-24808-1-git-send-email-dg77.kim@samsung.com>
+Message-ID: <1306483489-10432-1-git-send-email-dg77.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-26 at 18:32 +0200, Peter Zijlstra wrote:
-> On Thu, 2011-05-26 at 17:20 +0100, Marc Zyngier wrote:
-> > 
-> > Doesn't look very good here. The serial console basically locks up as
-> > soon as the system gets busy, even if the kernel compilation seem to
-> > progress at a decent pace. 
-> 
-> 
-> OK, I'll leave the one that worked queued up for this release. If we can
-> come up with a better alternative we can try for the next release, that
-> should give us ample time to test things and get us a working kernel
-> now ;-)
+This patch adds CONFIG_CPU_FREQ_S5PV210 and CONFIG_CPU_FREQ_EXYNOS4
+to the machine Kconfig files.
 
-Agreed. The board has been compiling kernels for over 15 hours now, and
-doesn't show any sign of deadlock. Yet ;-).
+Signed-off-by: Donggeun Kim <dg77.kim@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/mach-exynos4/Kconfig |    7 +++++++
+ arch/arm/mach-s5pv210/Kconfig |    7 +++++++
+ 2 files changed, 14 insertions(+), 0 deletions(-)
 
-So until someone comes up with a much better approach, let's keep this
-one. I'm of course happy to continue testing stuff though.
-
-Cheers,
-
-	M.
+diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
+index e849f67..123e5e2 100644
+--- a/arch/arm/mach-exynos4/Kconfig
++++ b/arch/arm/mach-exynos4/Kconfig
+@@ -91,6 +91,13 @@ config EXYNOS4_SETUP_FIMC
+ 	help
+ 	  Common setup code for the camera interfaces.
+ 
++config CPU_FREQ_EXYNOS4
++	bool
++	depends on CPU_FREQ && ARCH_EXYNOS4
++	default y
++	help
++	  This enabls the CPUfreq driver for EXYNOS4.
++
+ # machine support
+ 
+ menu "EXYNOS4 Machines"
+diff --git a/arch/arm/mach-s5pv210/Kconfig b/arch/arm/mach-s5pv210/Kconfig
+index 37b5a97..376e824 100644
+--- a/arch/arm/mach-s5pv210/Kconfig
++++ b/arch/arm/mach-s5pv210/Kconfig
+@@ -59,6 +59,13 @@ config S5PV210_SETUP_FIMC
+ 	help
+ 	  Common setup code for the camera interfaces.
+ 
++config CPU_FREQ_S5PV210
++	bool
++	depends on CPU_FREQ && CPU_S5PV210
++	default y
++	help
++	  This enabls the CPUfreq driver for S5PV210.
++
+ menu "S5PC110 Machines"
+ 
+ config MACH_AQUILA
 -- 
-Reality is an implementation detail.
+1.7.4.1
