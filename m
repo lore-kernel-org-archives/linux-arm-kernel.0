@@ -1,130 +1,93 @@
 From: ankita@in.ibm.com (Ankita Garg)
-Date: Fri, 27 May 2011 18:01:35 +0530
-Subject: [PATCH 07/10] mm: Modify vmstat
+Date: Fri, 27 May 2011 18:01:38 +0530
+Subject: [PATCH 10/10] mm: Create memory regions at boot-up
 In-Reply-To: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
 References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-Message-ID: <1306499498-14263-8-git-send-email-ankita@in.ibm.com>
+Message-ID: <1306499498-14263-11-git-send-email-ankita@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change the way vmstats are collected. Since the zones are now present inside
-regions, scan through all the regions to obtain zone specific statistics.
+Memory regions are created at boot up time, from the information obtained
+from the firmware. This patchset was developed on ARM platform, on which at
+present u-boot bootloader does not export information about memory units that
+can be independently power managed. For the purpose of demonstration, 2 hard
+coded memory regions are created, of 256MB each on the Panda board with 512MB
+RAM.
 
 Signed-off-by: Ankita Garg <ankita@in.ibm.com>
 ---
- include/linux/vmstat.h |   22 +++++++++++++++-------
- mm/vmstat.c            |   48 ++++++++++++++++++++++++++++--------------------
- 2 files changed, 43 insertions(+), 27 deletions(-)
+ include/linux/mmzone.h |    8 +++-----
+ mm/page_alloc.c        |   29 +++++++++++++++++++++++++++++
+ 2 files changed, 32 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/vmstat.h b/include/linux/vmstat.h
-index 2b3831b..296b9ad 100644
---- a/include/linux/vmstat.h
-+++ b/include/linux/vmstat.h
-@@ -211,20 +211,28 @@ extern unsigned long zone_reclaimable_pages(struct zone *zone);
- static inline unsigned long node_page_state(int node,
- 				 enum zone_stat_item item)
- {
--	struct zone *zones = NODE_DATA(node)->node_zones;
-+	int i;
-+	unsigned long page_state = 0;
-+
-+	for_each_mem_region_in_nid(i, node) {
-+		mr_data_t *mrdat = &(NODE_DATA(node)->mem_regions[i]);
-+		struct zone *zones = mrdat->zones;
-+		
-+		page_state = 
+diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
+index bc3e3fd..5dbe1e1 100644
+--- a/include/linux/mmzone.h
++++ b/include/linux/mmzone.h
+@@ -627,14 +627,12 @@ typedef struct mem_region_list_data {
+  */
+ struct bootmem_data;
+ typedef struct pglist_data {
+-/*	The linkage to node_zones is now removed. The new hierarchy introduced
+- *	is pg_data_t -> mem_region -> zones
+- * 	struct zone node_zones[MAX_NR_ZONES];
+- */
+ 	struct zonelist node_zonelists[MAX_ZONELISTS];
+ 	int nr_zones;
+ #ifdef CONFIG_FLAT_NODE_MEM_MAP	/* means !SPARSEMEM */
+-	struct page *node_mem_map;
++	strs pg_data_t -> mem_region -> zones
++ *      struct zone node_zones[MAX_NR_ZONES];
++ */uct page *node_mem_map;
+ #ifdef CONFIG_CGROUP_MEM_RES_CTLR
+ 	struct page_cgroup *node_page_cgroup;
+ #endif
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index da8b045..3d994e8 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -4285,6 +4285,34 @@ static inline int pageblock_default_order(unsigned int order)
  
--	return
- #ifdef CONFIG_ZONE_DMA
--		zone_page_state(&zones[ZONE_DMA], item) +
-+			zone_page_state(&zones[ZONE_DMA], item) +
- #endif
- #ifdef CONFIG_ZONE_DMA32
--		zone_page_state(&zones[ZONE_DMA32], item) +
-+			zone_page_state(&zones[ZONE_DMA32], item) +
- #endif
- #ifdef CONFIG_HIGHMEM
--		zone_page_state(&zones[ZONE_HIGHMEM], item) +
-+			zone_page_state(&zones[ZONE_HIGHMEM], item) +
- #endif
--		zone_page_state(&zones[ZONE_NORMAL], item) +
--		zone_page_state(&zones[ZONE_MOVABLE], item);
-+			zone_page_state(&zones[ZONE_NORMAL], item) +
-+			zone_page_state(&zones[ZONE_MOVABLE], item);
+ #endif /* CONFIG_HUGETLB_PAGE_SIZE_VARIABLE */
+ 
++#define REGIONS_SIZE   (512 << 20) >> PAGE_SHIFT
++
++static void init_node_memory_regions(struct pglist_data *pgdat)
++{
++	int cnt = 0;
++	unsigned long i;
++	unsigned long start_pfn = pgdat->node_start_pfn;
++	unsigned long spanned_pages = pgdat->node_spanned_pages;
++	unsigned long total = 0;
++
++	for (i = start_pfn; i < start_pfn + spanned_pages; i+= REGIONS_SIZE) {
++		mem_region_t *mem_region = &pgdat->mem_regions[cnt];
++
++		mem_region->start_pfn = i;
++		if ((spanned_pages - total) <= REGIONS_SIZE) {
++			mem_region->spanned_pages = spanned_pages - total;
++		}
++		else
++			mem_region->spanned_pages = REGIONS_SIZE;
++
++		mem_region->node = pgdat->node_id;
++		mem_region->region = cnt;
++		pgdat->nr_mem_regions++;
++		total += mem_region->spanned_pages;
++		cnt++;
 +	}
-+	return page_state;
- }
- 
- extern void zone_statistics(struct zone *, struct zone *, gfp_t gfp);
-diff --git a/mm/vmstat.c b/mm/vmstat.c
-index 897ea9e..542f8b6 100644
---- a/mm/vmstat.c
-+++ b/mm/vmstat.c
-@@ -191,17 +191,21 @@ void set_pgdat_percpu_threshold(pg_data_t *pgdat,
- 	struct zone *zone;
- 	int cpu;
- 	int threshold;
--	int i;
-+	int i, p;
- 
- 	for (i = 0; i < pgdat->nr_zones; i++) {
--		zone = &pgdat->node_zones[i];
--		if (!zone->percpu_drift_mark)
--			continue;
--
--		threshold = (*calculate_pressure)(zone);
--		for_each_possible_cpu(cpu)
--			per_cpu_ptr(zone->pageset, cpu)->stat_threshold
--							= threshold;
-+		for_each_mem_region_in_nid(p, pgdat->node_id) {
-+			mem_region_t *mem_region = &pgdat->mem_regions[p];
-+			struct zone *zone = mem_region->zones + i;
-+		
-+			if (!zone->percpu_drift_mark)
-+				continue;
++}
 +
-+			threshold = (*calculate_pressure)(zone);
-+			for_each_possible_cpu(cpu)
-+				per_cpu_ptr(zone->pageset, cpu)->stat_threshold
-+								= threshold;
-+		}
- 	}
- }
- 
-@@ -642,19 +646,23 @@ static void frag_stop(struct seq_file *m, void *arg)
- 
- /* Walk all the zones in a node and print using a callback */
- static void walk_zones_in_node(struct seq_file *m, pg_data_t *pgdat,
--		void (*print)(struct seq_file *m, pg_data_t *, struct zone *))
-+		void (*print)(struct seq_file *m, pg_data_t *,
-+					mem_region_t *, struct zone *))
- {
--	struct zone *zone;
--	struct zone *node_zones = pgdat->node_zones;
- 	unsigned long flags;
--
--	for (zone = node_zones; zone - node_zones < MAX_NR_ZONES; ++zone) {
--		if (!populated_zone(zone))
--			continue;
--
--		spin_lock_irqsave(&zone->lock, flags);
--		print(m, pgdat, zone);
--		spin_unlock_irqrestore(&zone->lock, flags);
-+	int i, j;
-+
-+	for (i = 0; i < MAX_NR_ZONES; ++i) {
-+		for_each_mem_region_in_nid(j, pgdat->node_id) {
-+			mem_region_t *mem_region = &pgdat->mem_regions[j];
-+			struct zone *zone = mem_region->zones + i;
-+			if (!populated_zone(zone))
-+				continue;
-+
-+			spin_lock_irqsave(&zone->lock, flags);
-+			print(m, pgdat, mem_region, zone);
-+			spin_unlock_irqrestore(&zone->lock, flags);
-+		}
- 	}
- }
+ /*
+  * Set up the zone data structures:
+  *   - mark all pages reserved
+@@ -4447,6 +4475,7 @@ void __paginginit free_area_init_node(int nid, unsigned long *zones_size,
+ 		(unsigned long)pgdat->node_mem_map);
  #endif
+ 
++	init_node_memory_regions(pgdat);
+ 	free_area_init_core(pgdat, zones_size, zholes_size);
+ }
+ 
 -- 
 1.7.4
