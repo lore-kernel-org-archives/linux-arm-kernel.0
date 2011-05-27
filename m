@@ -1,65 +1,50 @@
-From: wg@grandegger.com (Wolfgang Grandegger)
-Date: Fri, 27 May 2011 10:31:10 +0200
-Subject: [PATCH v4 1/1] can: add pruss CAN driver.
-In-Reply-To: <4DD9FCFC.10803@hartkopp.net>
-References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<4DCB88A4.2010901@grandegger.com>
-	<4DCBF1B6.6000104@hartkopp.net>	<201105221230.56243.arnd@arndb.de>
-	<4DD9FCFC.10803@hartkopp.net>
-Message-ID: <4DDF614E.7090905@grandegger.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 May 2011 09:38:08 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <20110526215101.GL24876@n2100.arm.linux.org.uk>
+References: <yw1xipt0p4i9.fsf@unicorn.mansr.com>
+	<BANLkTi=xLE9gP5YOdr9dR0DfsY1Ymzxu+w@mail.gmail.com>
+	<20110524171331.GA2941@arm.com>
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+	<20110525124348.GA2340@arm.com>
+	<yw1xaaeanbxe.fsf@unicorn.mansr.com>
+	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
+	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
+	<20110526215101.GL24876@n2100.arm.linux.org.uk>
+Message-ID: <20110527083806.GA21100@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oliver,
-
-sorry for the late answer.
-
-On 05/23/2011 08:21 AM, Oliver Hartkopp wrote:
-> On 22.05.2011 12:30, Arnd Bergmann wrote:
->> On Thursday 12 May 2011 16:41:58 Oliver Hartkopp wrote:
->>> E.g. assume you need the CAN-IDs 0x100, 0x200 and 0x300 in your application
->>> and for that reason you configure these IDs in the pruss CAN driver.
->>>
->>> What if someone generates a 100% CAN busload exactly on CAN-ID 0x100 then?
->>>
->>> Worst case (1MBit/s, DLC=0) you would need to handle about 21.000 irqs/s for
->>> the correctly received CAN frames with the filtered CAN-ID 0x100 ...
->>
->> Then I guess the main thing that a "smart" CAN implementation like pruss
->> should do is interrupt mitigation. When you have a constant flow of
->> packets coming in, the hardware should be able to DMA a lot of
->> them into kernel memory before the driver is required to pick them up,
->> and only get into interrupt driven mode when the kernel has managed
->> to process all outstanding packets.
->>
->>> This all depends heavily on Linux networking (skb handling, caching, etc) and
->>> is pretty fast and optimized!! That was also the reason why it ran on the old
->>> PowerPC that smoothly. The mostly seen effect if anything drops is when the
->>> application (holding the socket) was not fast enough to handle the incoming
->>> data. NB: For that reason we implemented a CAN content filter (CAN_BCM) that
->>> is able to do content filtering and timeout monitoring in Kernelspace - all
->>> performed in the SoftIRQ.
->>
->> Right, dropping packets that no process is waiting for should be done as
->> early as possible. In pruss-can, the idea was to do it in hardware, which
->> doesn't really work all that well for the reasons discussed before.
->> Dropping the frames in the NAPI poll function (softirq time) seems like a
->> logical choice.
+On Thu, May 26, 2011 at 10:51:01PM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 26, 2011 at 05:03:39PM -0400, Nicolas Pitre wrote:
+> > It is possible that -fconserve-stack is still valuable on ARM given that
+> > it is also used with -mno-unaligned-access for other things than
+> > structure packing on the stack, and therefore its merits can be debated
+> > independently from the alignment issue at hand.
 > 
-> In 'real world' CAN setups you'll never see 21.000 CAN frames per second (and
-> therefore 21.000 irqs/s) - you are usually designing CAN network traffic with
-> less than 60% busload. So interrupt rates somewhere below 1000 irqs/s can be
-> assumed.
-> 
->>From what i've seen so far a 3-4 messages rx FIFO and NAPI support just make it.
+> Catalin said in his mail "I haven't tried with -mno-unaligned-access, I
+> suspect the variables on the stack would be aligned.".  So I don't think
+> we know enough to say whether -mno-unaligned-access avoids the stack
+> packing.
 
-I think you speak about the SJA100 which is able to buffer 64 byte
-corresponding to up to 4 messages. There are CAN controllers able to
-queue more or just one message and then NAPI adds overhead.
+OK, I tried this now:
 
-> @Marc/Wolfgang: Would this be also your recommendation for a CAN controller
-> design that supports SocketCAN in the best way?
+-fconserve-stack: we get unaligned accesses on the stack because the
+newer versions of gcc turned unaligned accesses on by default.
 
-Anyway, NAPI *always* useful as it helps with the infamous interrupt
-flooding.
+-fconserve-stack -mno-unaligned-access: the stack variables are aligned.
+We probably get the benefit of -fconserve-stack as well.
 
-Wolfgang.
+So as per the initial post in this thread, we could have
+-mno-unaligned-access on ARM always on (when CONFIG_ALIGNMENT_TRAP). As
+Nicolas suggested, we could compile some files with -munaligned-access
+(and maybe -fno-conserve-stack).
+
+I raised this with the gcc guys so they are looking into it. But it
+really doesn't look like a gcc bug as long as -mno-unaligned-access is
+taken into account.
+
+-- 
+Catalin
