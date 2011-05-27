@@ -1,35 +1,42 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 May 2011 13:54:59 +0300
-Subject: [PATCH] ARM: OMAP: Get rid of section mismatch warnings
-In-Reply-To: <4DDE5F26.6040700@compulab.co.il>
-References: <1306414838-4330-1-git-send-email-silesh@ti.com>
-	<4DDE4EEF.8070108@ti.com> <20110526133732.GD11352@atomide.com>
-	<4DDE5F26.6040700@compulab.co.il>
-Message-ID: <20110527105456.GF27962@atomide.com>
+Date: Fri, 27 May 2011 14:04:19 +0300
+Subject: [GIT PULL] omap updates for 2.6.40
+In-Reply-To: <20110527063304.GA27962@atomide.com>
+References: <20110526113905.GG27250@atomide.com>
+	<9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
+	<20110527063304.GA27962@atomide.com>
+Message-ID: <20110527110416.GG27962@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [110526 17:05]:
-> On 05/26/11 16:37, Tony Lindgren wrote:
+* Tony Lindgren <tony@atomide.com> [110527 09:29]:
+> * Koen Kooi <koen@dominion.thruhere.net> [110526 19:02]:
+> > 
+> > Op 26 mei 2011, om 13:39 heeft Tony Lindgren het volgende geschreven:
+> > 
+> > > Hi Linus,
+> > > 
+> > > Please pull omap updates for this merge window from:
+> > > 
+> > > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-for-linus
+> > > 
+> > > This contains clean-up to shrink down omap specific code a bit. Also included
+> > > are some fixes. But basically no new code at this point.
+> > 
+> > What about updates to board files? Like adding support for the xM rev C to board-omap3beagle.c.
 > 
-> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110526 05:56]:
-> >> On 5/26/2011 6:30 PM, Silesh C V wrote:
-> >>> Get rid of the following and 8 other similar section mismatch
-> >>> warnings
-> >>>
-> >> I send this [1] patch a month back. It's still not considered
-> >> though even after reminder.
-> >>
-> >> [1] https://patchwork.kernel.org/patch/684831/
-> > Applying now into devel-fixes with additional fixes from Silesh.
-> > Updated patch below.
+> Sorry we're doing only code coalescing and fixes for this merge window as
+> discussed on LAKML. Otherwise it's hard to see the code coalescing in the
+> diffstats, so new code will need to wait a bit.
 > 
-> Can this [1] also be applied to the devel-fixes, please? It is a month old today...
+> I'll take a look and see if we can justify some fix like trivial patches
+> like the revision detection patches during the -rc cycle.
 
-Applying thanks.
+Koen, the patch above needs to be refreshed to apply to current mainline
+kernel. It also seems to contain some whitespace errors.
 
-Regards,
+Care to refresh it and repost?
+
+Thanks,
 
 Tony
- 
-> [1] https://patchwork.kernel.org/patch/733531/
