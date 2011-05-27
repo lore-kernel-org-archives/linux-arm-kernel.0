@@ -1,46 +1,74 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 27 May 2011 17:38:29 +0100
-Subject: On __raw_readl readl_relaxed and readl nocheinmal
-In-Reply-To: <201105271816.10191.arnd@arndb.de>
-References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
-	<C832F8F5D375BD43BFA11E82E0FE9FE00AFDABA5E2@EXDCVYMBSTM005.EQ1STM.local>
-	<20110527150242.GB14035@e102109-lin.cambridge.arm.com>
-	<201105271816.10191.arnd@arndb.de>
-Message-ID: <20110527163827.GF14035@e102109-lin.cambridge.arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 27 May 2011 19:40:27 +0300
+Subject: [PATCHv2 2/2] OMAP: add omap_device_reset()
+In-Reply-To: <4DDFB8AF.1080800@ti.com>
+References: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
+	<1306481908-7386-3-git-send-email-tomi.valkeinen@ti.com>
+	<4DDF9B5D.7060408@ti.com> <1306500367.1905.18.camel@deskari>
+	<4DDFB8AF.1080800@ti.com>
+Message-ID: <1306514427.1905.27.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2011 at 05:16:09PM +0100, Arnd Bergmann wrote:
-> On Friday 27 May 2011, Catalin Marinas wrote:
-> > > Here we have another problem.  Since it's a cryptographic device
-> > > some registers on the hardware are write-only, and some registers
-> > > are actually implemented as a stack in the hardware itself. If you
-> > > write a value to a register it will be pushed onto a stack in the
-> > > hardware and if you read the same register you pop the value from
-> > > the stack in the hardware.
+On Fri, 2011-05-27 at 16:43 +0200, Cousson, Benoit wrote:
+> On 5/27/2011 2:46 PM, Valkeinen, Tomi wrote:
+> > On Fri, 2011-05-27 at 14:38 +0200, Cousson, Benoit wrote:
+> >> Hi Tomi,
+> >>
+> >> On 5/27/2011 9:38 AM, Valkeinen, Tomi wrote:
+> >>> Add omap_device_reset() function which can be used to reset the hwmods
+> >>> associated with the given platform device.
+> >>
+> >> We've never exposed it because we are trying to avoid that any driver
+> >> play with asynchronous HW reset. That can lead to undefined HW behavior :-(
+> >>
+> >> Do you have some strong need for that?
 > >
-> > As I said above, you don't need to do this. The read back is usually
-> > needed for things like clearing an error state at the device and
-> > then enabling the IRQ for that device at the GIC level (though this
-> > particular case isn't that simple).
+> > DSS driver has been designed so that it resets the HW before it begins
+> > programming it. That way we get the HW into known state. Otherwise we
+> > need to be extra careful to program all possible registers to a sane
+> > value. Not impossible, of course, but requires extra work.
+> >
+> > I noticed the problem with DSI driver, it didn't work anymore if I
+> > didn't reset it.
+> >
+> > Why does it lead to undefined HW behaviour? Isn't it much better to
+> > reset the HW before starting to use it to be 100% sure it's in known and
+> > valid state?
 > 
-> To give yet another example: consider a device that has a register to
-> enable level triggered interrupts. You may want to disable the
-> interrupt by writing to the register during the interrupt handler.
-> When you return from the interrupt handler, the CPU's IRQ mask is
-> opened while the write may be still in flight. The only way to avoid
-> that is to read back the interrupt mask from the device to flush out
-> the write and make sure it's actually disabled before you reopen the
-> irqs at the CPU.
+> In theory, but since your are resetting only the DSS IP, it can leads to 
+> side effect at SoC level. Especially wrt to clock management.
 
-As I said above, that's not a simple case and you could still get a
-spurious interrupt. Based on feedback from the hw people, even if you
-lower the interrupt level at the device (by writing and reading back
-from the device), there is a delay in the signal propagation and
-enabling the interrupts at the CPU level (or interrupt controller level)
-could still trigger the interrupt. You can add extra delay to reduce the
-chances but that's SoC specific. Anyway, reading back from the device
-makes the likelihood much smaller.
+Out of interest, can you tell more what problems it could cause? Can
+they be solved in the hwmod reset code?
 
--- 
-Catalin
+Also one thing to note, VENC needs a softreset after changing certain
+configurations, as per TRM. However, VENC doesn't use the standard
+syscontrol mechanism, so that cannot be done via omap_device interface
+anyway.
+
+> > Especially in error situations it may be difficult (even impossible) to
+> > recover without reset. DISPC has been known to froze in some sync lost
+> > situations, and, if I recall right, if DSI transfer is aborted the only
+> > way to recover is to reset the DSI block (on OMAP3).
+> 
+> In case of recovery error it makes sense. What we did with hardreset is 
+> to re-assert the reset upon disable of the module and then the next 
+> enable will de-assert it. Softreset does not do that today.
+> 
+> My only concern is that people might start abusing that kind of API to 
+> use that for funtionnal purpose instead of error recovery.
+
+Why do you see it's abusing? I think it's a good driver design to reset
+the HW before starting operation. Perhaps it's true that in some cases
+reset could hide (or fix, in a way) a bug in the driver, but in the end
+what we want is a driver that works in every situation. And doing a HW
+reset sounds a good way to make the driver more robust.
+
+> This other issue is that it will add another OMAP specific IP to the driver.
+
+I presume IP == API. And that is true. But isn't reset functionality
+present in most HW blocks, and thus would it make a good addition to the
+generic API?
+
+ Tomi
