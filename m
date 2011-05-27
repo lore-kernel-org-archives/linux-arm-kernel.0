@@ -1,50 +1,60 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 27 May 2011 12:30:22 -0700
-Subject: [RFC PATCH v4 11/13] ARM: gic: remove previous local timer
-	interrupt handling
-In-Reply-To: <1306513671-12206-12-git-send-email-marc.zyngier@arm.com>
-References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
-	<1306513671-12206-12-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4DDFFBCE.8020908@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Fri, 27 May 2011 15:31:47 -0400 (EDT)
+Subject: [PATCH 0/7] Move Qualcomm gpio drivers into drivers dir
+In-Reply-To: <8ya8vts6qzn.fsf@huya.qualcomm.com>
+References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+	<20110527031319.GH5032@ponder.secretlab.ca>
+	<8yad3j46r97.fsf@huya.qualcomm.com> <8ya8vts6qzn.fsf@huya.qualcomm.com>
+Message-ID: <alpine.LFD.2.00.1105271531200.3207@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/27/2011 09:27 AM, Marc Zyngier wrote:
-> Now that all users of local timers are using CONFIG_ARM_GIC_VPPI,
-> the now unused local timer infrastructure can be safely removed.
->
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->
+On Fri, 27 May 2011, David Brown wrote:
 
-Can you also remove local_timer_ack() from MSM in this patch? If you do,
-feel free to add an
+> On Fri, May 27 2011, David Brown wrote:
+> 
+> > On Thu, May 26 2011, Grant Likely wrote:
+> >
+> >> On Wed, May 18, 2011 at 02:50:46PM -0700, David Brown wrote:
+> >>> This patch series moves the Qualcomm MSM gpio device drivers into the
+> >>> drivers/gpio directory.
+> >>> 
+> >>> The MSM's have two flavors of gpio driver.  The one for the newer
+> >>> v7-based chips is a bit cleaner, and can just be moved.  The one for
+> >>> the older v6-based chips took some cleanup to get rid of numerous
+> >>> ifdefs based on the particular machine.  Both drivers can now be
+> >>> selected and will be used on appropriate targets.
+> >>> 
+> >>> There is still a minor entanglement with the MSM-specific gpiomux
+> >>> code.  This will be cleaned up as MSM moves to use pinmux.
+> >>> 
+> >>> David Brown (7):
+> >>>   msm: gpio: Remove unsupported devices
+> >>>   msm: Remove chip-ifdefs for GPIO io mappings
+> >>>   msm: gpio: Remove chip-specific register definitions
+> >>>   msm: gpio: Remove ifdefs on gpio chip registers
+> >>>   msm: gpiomux: Move public API to public header
+> >>>   gpio_msm: Move Qualcomm v6 MSM driver into drivers
+> >>>   gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
+> >>
+> >> What's the status of this series.  I only got cc'd on the last two
+> >> patches; did you want me to pick up the whole lot, or is it being
+> >> merged via the msm tree?
+> >
+> > Let me send out an update, incorporating the suggestions.  I need to
+> > rebase these changes off of the current MSM code, since the msm-next
+> > tree contains changes that aren't going into the merge window because of
+> > extra ARM scrutiny.
+> >
+> >> Alternately, if there is a git branch with these patches in it, then I
+> >> can merge that instead of applying individually.
+> >
+> > I'll send you a pull request after I send out the updates.
+> 
+> Oh, and in case it isn't clear, I wasn't expecting these to make it into
+> this merge window.
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-
-to this patch.
-
----8<----
-
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 186abdf..9c08b1c 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -298,12 +298,6 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
-        clockevents_register_device(evt);
-        return 0;
- }
--
--inline int local_timer_ack(void)
--{
--       return 1;
--}
--
- #endif
- 
- struct sys_timer msm_timer = {
+Why not?
 
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Nicolas
