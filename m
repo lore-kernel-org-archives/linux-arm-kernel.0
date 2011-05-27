@@ -1,66 +1,54 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 27 May 2011 10:38:28 +0300
-Subject: [PATCHv2 2/2] OMAP: add omap_device_reset()
-In-Reply-To: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
-References: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
-Message-ID: <1306481908-7386-3-git-send-email-tomi.valkeinen@ti.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 27 May 2011 09:27:45 +0200
+Subject: [PATCH] AT91: Add VSYNC pin definition for AT91SAM9263 silicon
+In-Reply-To: <4DDCC8C9.3080102@atmel.com>
+References: <1306305101-27285-1-git-send-email-hong.xu@atmel.com>
+	<20110525073933.GH863@game.jcrosoft.org>
+	<4DDCC8C9.3080102@atmel.com>
+Message-ID: <20110527072745.GC19723@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add omap_device_reset() function which can be used to reset the hwmods
-associated with the given platform device.
+On 17:15 Wed 25 May     , Hong Xu wrote:
+> Hi,
+> 
+> On 05/25/2011 03:39 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> >On 14:31 Wed 25 May     , Hong Xu wrote:
+> >>On Atmel's AT91SAM9263-EK board, the LCD panel does not need VSYNC
+> >>signal. But this signal is useful for the boards from other
+> >>vendors, as suggested by Nicholas Kinar.
+> >>
+> >>This small patch adds the VSYNC pin definition by default.
+> >>
+> >>Reported-by: Nicholas Kinar<n.kinar@usask.ca>
+> >>Signed-off-by: Hong Xu<hong.xu@atmel.com>
+> >>---
+> >>  arch/arm/mach-at91/at91sam9263_devices.c |    1 +
+> >>  1 files changed, 1 insertions(+), 0 deletions(-)
+> >>
+> >>diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
+> >>index fb5c23a..7dab33e 100644
+> >>--- a/arch/arm/mach-at91/at91sam9263_devices.c
+> >>+++ b/arch/arm/mach-at91/at91sam9263_devices.c
+> >>@@ -832,6 +832,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
+> >>  	if (!data)
+> >>  		return;
+> >>
+> >>+	at91_set_A_periph(AT91_PIN_PC0, 0);	/* LCDVSYNC */
+> >this must be optionnal
+> >
+> >we need to update this with somethink like done on avr32
+> >
+> 
+> hm.. PC0 in SAM9263 has only "A" function (LCD VSYNC). As long as
+> this pin is not used as GPIO, it's harmless to enable its peripheral
+> function.
+> 
+> I just had a quick look at the AVR32 code without catching your
+> "something like on AVR32". In AVR32, all ATMEL_LCDC_*_*BIT has
+> "VSYNC" defined.
+my key point is not here, my key point is to make it optional
+just take a look how did the avr32
 
-Signed-off-by: Tomi Valkeinen <tomi.valkeinen@ti.com>
----
- arch/arm/plat-omap/include/plat/omap_device.h |    1 +
- arch/arm/plat-omap/omap_device.c              |   23 +++++++++++++++++++++++
- 2 files changed, 24 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/include/plat/omap_device.h b/arch/arm/plat-omap/include/plat/omap_device.h
-index 70d31d0..bcf1b35 100644
---- a/arch/arm/plat-omap/include/plat/omap_device.h
-+++ b/arch/arm/plat-omap/include/plat/omap_device.h
-@@ -108,6 +108,7 @@ int omap_device_align_pm_lat(struct platform_device *pdev,
- 			     u32 new_wakeup_lat_limit);
- struct powerdomain *omap_device_get_pwrdm(struct omap_device *od);
- int omap_device_get_context_loss_count(struct platform_device *pdev);
-+int omap_device_reset(struct platform_device *pdev);
- 
- /* Other */
- 
-diff --git a/arch/arm/plat-omap/omap_device.c b/arch/arm/plat-omap/omap_device.c
-index 9753f71..4e6fc1b 100644
---- a/arch/arm/plat-omap/omap_device.c
-+++ b/arch/arm/plat-omap/omap_device.c
-@@ -324,6 +324,29 @@ int omap_device_get_context_loss_count(struct platform_device *pdev)
- }
- 
- /**
-+ * omap_device_reset - reset hwmods of given device
-+ * @pdev: struct platform_device *
-+ *
-+ * Reset all hwmods associated with the given device. If a reset of a hwmod
-+ * fails the rest of the hwmods are skipped and the error is returned.
-+ */
-+int omap_device_reset(struct platform_device *pdev)
-+{
-+	struct omap_device *od;
-+	int i, r;
-+
-+	od = _find_by_pdev(pdev);
-+
-+	for (i = 0; i < od->hwmods_cnt; i++) {
-+		r = omap_hwmod_reset(od->hwmods[i]);
-+		if (r)
-+			return r;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-  * omap_device_count_resources - count number of struct resource entries needed
-  * @od: struct omap_device *
-  *
--- 
-1.7.4.1
+Best Regards,
+J.
