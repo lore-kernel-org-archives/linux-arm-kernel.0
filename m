@@ -1,152 +1,89 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 May 2011 17:27:51 +0100
-Subject: [RFC PATCH v4 13/13] ARM: SMP: automatically select ARM_GIC_VPPI
-In-Reply-To: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
-References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306513671-12206-14-git-send-email-marc.zyngier@arm.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 27 May 2011 09:29:56 -0700
+Subject: [PATCH 0/7] Move Qualcomm gpio drivers into drivers dir
+In-Reply-To: <20110527031319.GH5032@ponder.secretlab.ca> (Grant Likely's
+	message of "Thu, 26 May 2011 21:13:19 -0600")
+References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+	<20110527031319.GH5032@ponder.secretlab.ca>
+Message-ID: <8yad3j46r97.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All SMP platforms are selecting ARM_GIC_VPPI.
-Instead, make SMP select ARM_GIC_VPPI and remove select statements
-from the platform code.
+On Thu, May 26 2011, Grant Likely wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/Kconfig               |    1 +
- arch/arm/mach-msm/Kconfig      |    2 --
- arch/arm/mach-omap2/Kconfig    |    1 -
- arch/arm/mach-realview/Kconfig |    2 --
- arch/arm/mach-shmobile/Kconfig |    1 -
- arch/arm/mach-tegra/Kconfig    |    1 -
- arch/arm/mach-ux500/Kconfig    |    1 -
- arch/arm/mach-vexpress/Kconfig |    1 -
- arch/arm/plat-s5p/Kconfig      |    1 -
- 9 files changed, 1 insertions(+), 10 deletions(-)
+> On Wed, May 18, 2011 at 02:50:46PM -0700, David Brown wrote:
+>> This patch series moves the Qualcomm MSM gpio device drivers into the
+>> drivers/gpio directory.
+>> 
+>> The MSM's have two flavors of gpio driver.  The one for the newer
+>> v7-based chips is a bit cleaner, and can just be moved.  The one for
+>> the older v6-based chips took some cleanup to get rid of numerous
+>> ifdefs based on the particular machine.  Both drivers can now be
+>> selected and will be used on appropriate targets.
+>> 
+>> There is still a minor entanglement with the MSM-specific gpiomux
+>> code.  This will be cleaned up as MSM moves to use pinmux.
+>> 
+>> David Brown (7):
+>>   msm: gpio: Remove unsupported devices
+>>   msm: Remove chip-ifdefs for GPIO io mappings
+>>   msm: gpio: Remove chip-specific register definitions
+>>   msm: gpio: Remove ifdefs on gpio chip registers
+>>   msm: gpiomux: Move public API to public header
+>>   gpio_msm: Move Qualcomm v6 MSM driver into drivers
+>>   gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
+>
+> What's the status of this series.  I only got cc'd on the last two
+> patches; did you want me to pick up the whole lot, or is it being
+> merged via the msm tree?
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 7275009..4780a71 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1323,6 +1323,7 @@ config SMP
- 		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
- 		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
- 	select USE_GENERIC_SMP_HELPERS
-+	select ARM_GIC_VPPI
- 	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
- 	help
- 	  This enables support for systems with more than one CPU. If you have
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 1ea7d6f..1516896 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -42,7 +42,6 @@ config ARCH_MSM8X60
- 				  && !MACH_MSM8X60_FFA)
- 	select ARCH_MSM_SCORPIONMP
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select CPU_V7
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
-@@ -53,7 +52,6 @@ config ARCH_MSM8960
- 	select ARCH_MSM_SCORPIONMP
- 	select MACH_MSM8960_SIM if (!MACH_MSM8960_RUMI3)
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select CPU_V7
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 284694c..19d5891 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,7 +44,6 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
- 	select CPU_V7
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select LOCAL_TIMERS if SMP
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index 12c7c56..b9a9805 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -38,7 +38,6 @@ config MACH_REALVIEW_PB11MP
- 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
- 	select CPU_V6K
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_HAS_BARRIERS if SMP
- 	help
-@@ -77,7 +76,6 @@ config MACH_REALVIEW_PBA8
- config MACH_REALVIEW_PBX
- 	bool "Support RealView(R) Platform Baseboard Explore"
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
- 	select ZONE_DMA if SPARSEMEM
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index ddcf28c..0c8f6cf 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -26,7 +26,6 @@ config ARCH_SH73A0
- 	select SH_CLK_CPG
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 
- comment "SH-Mobile Board Type"
- 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index eabdd90..5ec1846 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,7 +9,6 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
- 	select CPU_V7
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
-index 545c4bc..54429d0 100644
---- a/arch/arm/mach-ux500/Kconfig
-+++ b/arch/arm/mach-ux500/Kconfig
-@@ -4,7 +4,6 @@ config UX500_SOC_COMMON
- 	bool
- 	default y
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select HAS_MTU
- 	select NOMADIK_GPIO
- 	select ARM_ERRATA_753970
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 07a53aa..9311484 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -5,7 +5,6 @@ config ARCH_VEXPRESS_CA9X4
- 	bool "Versatile Express Cortex-A9x4 tile"
- 	select CPU_V7
- 	select ARM_GIC
--	select ARM_GIC_VPPI
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_751472
- 	select ARM_ERRATA_753970
-diff --git a/arch/arm/plat-s5p/Kconfig b/arch/arm/plat-s5p/Kconfig
-index 0e30e25..6751bcf 100644
---- a/arch/arm/plat-s5p/Kconfig
-+++ b/arch/arm/plat-s5p/Kconfig
-@@ -11,7 +11,6 @@ config PLAT_S5P
- 	default y
- 	select ARM_VIC if !ARCH_EXYNOS4
- 	select ARM_GIC if ARCH_EXYNOS4
--	select ARM_GIC_VPPI if ARCH_EXYNOS4
- 	select NO_IOPORT
- 	select ARCH_REQUIRE_GPIOLIB
- 	select S3C_GPIO_TRACK
+Let me send out an update, incorporating the suggestions.  I need to
+rebase these changes off of the current MSM code, since the msm-next
+tree contains changes that aren't going into the merge window because of
+extra ARM scrutiny.
+
+> Alternately, if there is a git branch with these patches in it, then I
+> can merge that instead of applying individually.
+
+I'll send you a pull request after I send out the updates.
+
+Thanks,
+David
+
+> g.
+>
+>> 
+>>  arch/arm/mach-msm/Kconfig                       |    4 +
+>>  arch/arm/mach-msm/Makefile                      |    8 -
+>>  arch/arm/mach-msm/gpio-v2.c                     |  427 -----------------------
+>>  arch/arm/mach-msm/gpio.c                        |  376 --------------------
+>>  arch/arm/mach-msm/gpio_hw.h                     |  278 ---------------
+>>  arch/arm/mach-msm/gpiomux.h                     |   17 +-
+>>  arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |   10 +-
+>>  arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |   10 +-
+>>  arch/arm/mach-msm/include/mach/msm_iomap-8x50.h |   10 +-
+>>  arch/arm/mach-msm/include/mach/msm_iomap.h      |    2 +
+>>  arch/arm/mach-msm/io.c                          |   12 +-
+>>  drivers/gpio/Kconfig                            |   16 +
+>>  drivers/gpio/Makefile                           |    2 +
+>>  drivers/gpio/msm_v1.c                           |  387 ++++++++++++++++++++
+>>  drivers/gpio/msm_v1.h                           |  271 ++++++++++++++
+>>  drivers/gpio/msm_v2.c                           |  427 +++++++++++++++++++++++
+>>  include/linux/msm_gpiomux.h                     |   38 ++
+>>  17 files changed, 1166 insertions(+), 1129 deletions(-)
+>>  delete mode 100644 arch/arm/mach-msm/gpio-v2.c
+>>  delete mode 100644 arch/arm/mach-msm/gpio.c
+>>  delete mode 100644 arch/arm/mach-msm/gpio_hw.h
+>>  create mode 100644 drivers/gpio/msm_v1.c
+>>  create mode 100644 drivers/gpio/msm_v1.h
+>>  create mode 100644 drivers/gpio/msm_v2.c
+>>  create mode 100644 include/linux/msm_gpiomux.h
+>> 
+>> -- 
+>> Sent by an employee of the Qualcomm Innovation Center, Inc.
+>> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>> 
+
 -- 
-1.7.0.4
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
