@@ -1,37 +1,26 @@
-From: Josh.wu@atmel.com (Wu, Josh)
-Date: Fri, 27 May 2011 20:06:26 +0800
-Subject: [PATCH] [media] at91: add Atmel Image Sensor Interface
-	(ISI)support
-In-Reply-To: <Pine.LNX.4.64.1105121131040.24486@axis700.grange>
-References: <1305186138-5656-1-git-send-email-josh.wu@atmel.com>
-	<20110512074725.GA1356@n2100.arm.linux.org.uk>
-	<4C79549CB6F772498162A641D92D532801AC28CD@penmb01.corp.atmel.com>
-	<Pine.LNX.4.64.1105121131040.24486@axis700.grange>
-Message-ID: <4C79549CB6F772498162A641D92D532801CE4A21@penmb01.corp.atmel.com>
+From: jamie@shareable.org (Jamie Lokier)
+Date: Fri, 27 May 2011 13:07:26 +0100
+Subject: On __raw_readl readl_relaxed and readl nocheinmal
+In-Reply-To: <BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
+References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
+	<BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
+Message-ID: <20110527120725.GV969@shareable.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Guennadi
+Catalin Marinas wrote:
+> With all of them, even writel(), you don't know when the actual
+> hardware write happens. You can issue a DSB after to ensure write
+> completion (I think defined as the device begins to change its state
+> as a result of the write) but you can't tell whether the device
+> finished changing its state. For that you would need other means like
+> reading back from the device.
 
-Sorry to answer the question so later, 
+With PCI on x86, writel() may not reach the hardware immediately (PCI
+queues the writes), so I believe you need readl() to some register on
+the same device to ensure the write has been acknowledged by the
+device.
 
-From: Guennadi Liakhovetski Sent: Thursday, May 12, 2011 5:32 PM
-> On Thu, 12 May 2011, Wu, Josh wrote:
+Does DSB on ARM replace the need for that readl()?
 
->> Hi, Russell
->> 
->> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] Sent: Thursday, May 12, 2011 3:47 PM
->> > On Thu, May 12, 2011 at 03:42:18PM +0800, Josh Wu wrote:
->> >> +err_alloc_isi:
->> >> +	clk_disable(pclk);
->> > clk_put() ?
->> Ok, will be fixed in V2 patch. Thanks.
-
-> You might wait with v2 until I find time to review your patch. Will take a 
-> couple of days, I think. A general question, though: how compatible is 
-> this driver with the AVR32?
-Now from the information I got from AVR team, The AVR32 is not compatible with  ISI driver patch v2. Since AVR32 use the previous version of ISI IP core. (AT91SAM9M10 using ISI_V2 IP, which has different hardware registers from V1 IP core, such like dma control, etc)
-But I think in future we will add ISI V1 IP support since AT91SAM9263 also using ISI V1 IP core.
-
-Best Regards,
-Josh Wu
+-- Jamie
