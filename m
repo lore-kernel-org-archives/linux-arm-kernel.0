@@ -1,42 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 27 May 2011 14:04:19 +0300
-Subject: [GIT PULL] omap updates for 2.6.40
-In-Reply-To: <20110527063304.GA27962@atomide.com>
-References: <20110526113905.GG27250@atomide.com>
-	<9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
-	<20110527063304.GA27962@atomide.com>
-Message-ID: <20110527110416.GG27962@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 May 2011 13:10:18 +0200
+Subject: [PATCH 2/3] ARM: mxs: add gpio-mxs platform devices
+In-Reply-To: <20110527091158.GD30146@S2100-06.ap.freescale.net>
+References: <1305885446-27404-1-git-send-email-shawn.guo@linaro.org>
+	<201105201623.40990.arnd@arndb.de>
+	<20110527091158.GD30146@S2100-06.ap.freescale.net>
+Message-ID: <201105271310.18450.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [110527 09:29]:
-> * Koen Kooi <koen@dominion.thruhere.net> [110526 19:02]:
+On Friday 27 May 2011, Shawn Guo wrote:
+> On Fri, May 20, 2011 at 04:23:40PM +0200, Arnd Bergmann wrote:
+> [...]
+> > No, this would put all gpio devices below the top-level /sys/devices/platform
+> > directory, where they certainly don't belong. Please find a proper
+> > place and put them there.
 > > 
-> > Op 26 mei 2011, om 13:39 heeft Tony Lindgren het volgende geschreven:
-> > 
-> > > Hi Linus,
-> > > 
-> > > Please pull omap updates for this merge window from:
-> > > 
-> > > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-for-linus
-> > > 
-> > > This contains clean-up to shrink down omap specific code a bit. Also included
-> > > are some fixes. But basically no new code at this point.
-> > 
-> > What about updates to board files? Like adding support for the xM rev C to board-omap3beagle.c.
+> To make it clear, which one is the best to have all gpio devices below?
 > 
-> Sorry we're doing only code coalescing and fixes for this merge window as
-> discussed on LAKML. Otherwise it's hard to see the code coalescing in the
-> diffstats, so new code will need to wait a bit.
-> 
-> I'll take a look and see if we can justify some fix like trivial patches
-> like the revision detection patches during the -rc cycle.
+>  * /sys/devices/platform/gpio-mxs
+>  * /sys/devices/platform/mxs
+>  * /sys/devices/platform/mxs/gpio
 
-Koen, the patch above needs to be refreshed to apply to current mainline
-kernel. It also seems to contain some whitespace errors.
+I would say the third one is closes to how it should be.
 
-Care to refresh it and repost?
+The (sysfs) device tree, like the of device tree, should ideally be
+modeled after the high-level block diagram of the machine.
 
-Thanks,
+In case of i.MX23, that could look like
 
-Tony
+/sys/devices/system \
+  /ahb
+    /apbh
+       /gpio0
+       /gpio1
+       /gpmi
+    /usb0
+    /apbx
+       /i2c
+       /uart0
+       /pwm
+       /spi
+          /mmc
+          /ethernet
+       /usb
+       /rtc
+       /...
+
+
+You can argue on whether it makes sense to include the top level, or if you
+also want to model the various levels of ahb buses, so there is some freedom
+here.
+
+	Arnd
