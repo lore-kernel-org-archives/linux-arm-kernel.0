@@ -1,39 +1,65 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 27 May 2011 10:26:40 +0200
-Subject: [PATCH 0/4] ARM: smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
-In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-Message-ID: <20110527082640.GC16394@infomag.iguana.be>
+From: wg@grandegger.com (Wolfgang Grandegger)
+Date: Fri, 27 May 2011 10:31:10 +0200
+Subject: [PATCH v4 1/1] can: add pruss CAN driver.
+In-Reply-To: <4DD9FCFC.10803@hartkopp.net>
+References: <1303474267-6344-1-git-send-email-subhasish@mistralsolutions.com>	<4DCB88A4.2010901@grandegger.com>
+	<4DCBF1B6.6000104@hartkopp.net>	<201105221230.56243.arnd@arndb.de>
+	<4DD9FCFC.10803@hartkopp.net>
+Message-ID: <4DDF614E.7090905@grandegger.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vitaly,
+Hi Oliver,
 
-> From: Vitaly Kuzmichev <vkuzmichev@mvista.com>
-> 
-> The series of patches fixes various bugs in ARM MPCORE watchdog setup.
-> They also introduce some changes in common SMP_TWD timer setup code.
-> The PATCH 1/4 adds an exported function to obtain calibrated timer rate
-> in mpcore_wdt. However, this solution might be unacceptable, so we may
-> discuss another 2 variants:
->  1) use clock framework
->    This may require to fix all MPCORE boards clock implementations.
->  2) copy calibration loop to mpcore_wdt
->    However, this increases boot time.
-> 
-> 
-> Vitaly Kuzmichev (4):
->   ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
->   ARM: smp_twd: Fix typo in twd_timer_rate printout
->   ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
->   ARM: mpcore_wdt: Fix timer mode setup
-> 
->  arch/arm/include/asm/smp_twd.h |    7 +++++++
->  arch/arm/kernel/smp_twd.c      |    8 +++++++-
->  drivers/watchdog/mpcore_wdt.c  |   29 +++++++++++++++++++++--------
->  3 files changed, 35 insertions(+), 9 deletions(-)
+sorry for the late answer.
 
-What's the status on this? I don't recall having seen any answers from ARM community.
+On 05/23/2011 08:21 AM, Oliver Hartkopp wrote:
+> On 22.05.2011 12:30, Arnd Bergmann wrote:
+>> On Thursday 12 May 2011 16:41:58 Oliver Hartkopp wrote:
+>>> E.g. assume you need the CAN-IDs 0x100, 0x200 and 0x300 in your application
+>>> and for that reason you configure these IDs in the pruss CAN driver.
+>>>
+>>> What if someone generates a 100% CAN busload exactly on CAN-ID 0x100 then?
+>>>
+>>> Worst case (1MBit/s, DLC=0) you would need to handle about 21.000 irqs/s for
+>>> the correctly received CAN frames with the filtered CAN-ID 0x100 ...
+>>
+>> Then I guess the main thing that a "smart" CAN implementation like pruss
+>> should do is interrupt mitigation. When you have a constant flow of
+>> packets coming in, the hardware should be able to DMA a lot of
+>> them into kernel memory before the driver is required to pick them up,
+>> and only get into interrupt driven mode when the kernel has managed
+>> to process all outstanding packets.
+>>
+>>> This all depends heavily on Linux networking (skb handling, caching, etc) and
+>>> is pretty fast and optimized!! That was also the reason why it ran on the old
+>>> PowerPC that smoothly. The mostly seen effect if anything drops is when the
+>>> application (holding the socket) was not fast enough to handle the incoming
+>>> data. NB: For that reason we implemented a CAN content filter (CAN_BCM) that
+>>> is able to do content filtering and timeout monitoring in Kernelspace - all
+>>> performed in the SoftIRQ.
+>>
+>> Right, dropping packets that no process is waiting for should be done as
+>> early as possible. In pruss-can, the idea was to do it in hardware, which
+>> doesn't really work all that well for the reasons discussed before.
+>> Dropping the frames in the NAPI poll function (softirq time) seems like a
+>> logical choice.
+> 
+> In 'real world' CAN setups you'll never see 21.000 CAN frames per second (and
+> therefore 21.000 irqs/s) - you are usually designing CAN network traffic with
+> less than 60% busload. So interrupt rates somewhere below 1000 irqs/s can be
+> assumed.
+> 
+>>From what i've seen so far a 3-4 messages rx FIFO and NAPI support just make it.
 
-Kind regards,
-Wim.
+I think you speak about the SJA100 which is able to buffer 64 byte
+corresponding to up to 4 messages. There are CAN controllers able to
+queue more or just one message and then NAPI adds overhead.
+
+> @Marc/Wolfgang: Would this be also your recommendation for a CAN controller
+> design that supports SocketCAN in the best way?
+
+Anyway, NAPI *always* useful as it helps with the infamous interrupt
+flooding.
+
+Wolfgang.
