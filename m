@@ -1,71 +1,21 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 27 May 2011 15:35:12 +0200
-Subject: [PATCH v2] OMAP3: beagle: add support for beagleboard xM revision
-	C
-In-Reply-To: <4DDFA537.1060207@compulab.co.il>
-References: <1306500018-19685-1-git-send-email-koen@dominion.thruhere.net>
-	<4DDFA537.1060207@compulab.co.il>
-Message-ID: <28E99BA9-8AF5-45C8-B1F8-B2E1AF69CD6F@dominion.thruhere.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 27 May 2011 15:49:45 +0200
+Subject: [PATCH v2] [media] at91: add Atmel Image Sensor Interface (ISI)
+	support
+In-Reply-To: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
+References: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <201105271549.46099.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Friday 27 May 2011, Josh Wu wrote:
+> This patch is to enable Atmel Image Sensor Interface (ISI) driver support.
+> - Using soc-camera framework with videobuf2 dma-contig allocator
+> - Supporting video streaming of YUV packed format
+> - Tested on AT91SAM9M10G45-EK with OV2640
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Op 27 mei 2011, om 15:20 heeft Igor Grinberg het volgende geschreven:
+Looks good to me now.
 
-> Hi Koen,
-> 
-> 
-> Please CC LAKML for patches like this,
-> 
-> otherwise Tony, will have to post all of them before pull requesting.
-> 
-> 
-> 
-> On 05/27/11 15:40, Koen Kooi wrote:
-> 
->> The USB enable GPIO has been inverted again and the USER button moved.
->> 
->> Future revisions will now fall back to xM rev C instead of unknown.
->> 
->> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
->> ---
->> 
->> Changes since v1:
->> 	* updated against mainline to take Igors gpio cleanup into account
->> 	* removed xM rev B checks, no boards with that ID were ever produced, rev B boards show up as rev A
->> 	* double checked whitespace:
->> 
->> 		total: 0 errors, 0 warnings, 89 lines checked
->> 		patches/0001-OMAP3-beagle-add-support-for-beagleboard-xM-revision.patch has no obvious style problems and is ready for submission.
->> 
->> arch/arm/mach-omap2/board-omap3beagle.c |   31 +++++++++++++++++++++++--------
->> 1 files changed, 23 insertions(+), 8 deletions(-)
->> 
->> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
->> index be71426..177769b 100644
->> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> 
-> [...]
-> 
->> @@ -565,6 +576,10 @@ static void __init omap3_beagle_init(void)
->> 	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
->> 	omap3_beagle_init_rev();
->> 	omap3_beagle_i2c_init();
->> +
->> +	if (cpu_is_omap3630())
->> +			gpio_buttons[0].gpio = 4;
-> 
-> Don't get me wrong, I want this patch in mainline as soon as possible.
-> Just curious, what the hell happened to indentation here? :)
-
-Thanks for spotting that! Copy/paste with a non tab aware terminal.
-
-> checkpatch.pl does not spot things like this... interesting...
-> If you want to leave this as is, go ahead, I don't mind, just curious.
-
-I sent a new one, but screwed up the subject, I'll see if someone objects to that and resend as needed.
-
-regards,
-
-Koen
+Acked-by: Arnd Bergmann <arnd@arndb.de>
