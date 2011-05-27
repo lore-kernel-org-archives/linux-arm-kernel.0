@@ -1,86 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 May 2011 18:16:09 +0200
-Subject: On __raw_readl readl_relaxed and readl nocheinmal
-In-Reply-To: <20110527150242.GB14035@e102109-lin.cambridge.arm.com>
-References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
-	<C832F8F5D375BD43BFA11E82E0FE9FE00AFDABA5E2@EXDCVYMBSTM005.EQ1STM.local>
-	<20110527150242.GB14035@e102109-lin.cambridge.arm.com>
-Message-ID: <201105271816.10191.arnd@arndb.de>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 May 2011 17:20:30 +0100
+Subject: [RFC PATCH v3 00/13] Consolidating GIC per-cpu interrupts
+In-Reply-To: <4DDD5309.9050505@codeaurora.org>
+References: <1306342208-32754-1-git-send-email-marc.zyngier@arm.com>
+	<4DDD5309.9050505@codeaurora.org>
+Message-ID: <1306513230.27474.286.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 May 2011, Catalin Marinas wrote:
-
-> I think Arnd's point was that the writel_relaxed() variant may be even
-> more relaxed on other architectures than it is on ARM. I can't talk
-> about them.
-
-Right. In general, you should write device drivers as portable as
-possible, so don't rely on architecture specific behavior.
- 
-> > In my particular setup I'm writing a driver that is talking to a crypto
-> > hardware and the architecture is ARM. The hardware is mapped as io-mapped
-> > memory in our driver. Our main problem is to program the hardware, by
-> > writing to certain registers in order and when the hardware is ready to
-> > accept input, we will write the bulk-data to the same register over and over
-> > again until there is no more data. I.e. in principle we do like this (a bit
-> > simplified).
-> > 
-> > write(a, reg1); // Setup hardware
-> > write(a, reg2); // Setup hardware
-> > write(a, reg3); // Write bulk data
-> > write(a, reg3); // Write bulk data ...
-> > 
-> > Some of you wrote that the only way to be sure that the data has been
-> > written is to read the value after writing it.
+On Wed, 2011-05-25 at 12:05 -0700, Stephen Boyd wrote:
+> On 05/25/2011 09:49 AM, Marc Zyngier wrote:
+> > The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+> > problems:
+> >
+> > - They use a completely separate scheme to handle the interrupts,
+> >   mostly because the PPI concept doesn't really match the kernel view
+> >   of an interrupt.
+> > - Some low-level code gets duplicated, as usual...
+> > - At least one platform (msm) has started implementing its own
+> >   alternative scheme.
+> >
+> > The proposed solution is to let the GIC code expose the PPIs as
+> > something that the kernel can manage. Instead of having a single
+> > interrupt number shared on all cores, make the interrupt number be
+> > different on each CPU.
+> >
+> > This enables the use of the normal kernel API (request_irq() and
+> > friends) and the elimination of some low level code.
+> >
+> > This patch set is based on 2.6.39+ as of May 24th. Tested on PB-11MP,
+> > Pandaboard and SMDK-V310.
 > 
-> The question is - why do you need to make sure that the data has been
-> written? To me it looks like you only care about register access
-> ordering.
+> Hmm. I still get problems when I apply patch 1 and patch 9:
 > 
-> Writing the device registers will always be done in program order, so
-> your data in reg3 will be written after you set up the hardware via reg1
-> and reg2. The reading back isn't needed and you could even use the
-> relaxed accessors.
-
-... as long as it is the same device. But that seems to be the case
-here. Only if the registers are in two separate areas of MMIO space,
-e.g the same device attached to two buses, ordering may not
-be what you expect by the time the data arrives at the device.
-
-> > Here we have another problem.
-> > Since it's a cryptographic device some registers on the hardware are
-> > write-only, and some registers are actually implemented as a stack in the
-> > hardware itself. If you write a value to a register it will be pushed onto a
-> > stack in the hardware and if you read the same register you pop the value
-> > from the stack in the hardware.
+> # echo 0 > /sys/devices/system/cpu/cpu1/online
+> [  554.060000]_CPU1:_shutdown
+> # echo 1 > /sys/devices/system/cpu/cpu1/online
+> [  562.310000] CPU1: Booted secondary processor
+> [  562.310000] CPU1: Unknown IPI message 0x1
+> [  562.310000] BUG: sleeping function called from invalid context at kernel/mm/slub.c:847
+> [  562.310000] in_atomic(): 1, irqs_disabled(): 0, pid: 0, name: swapper
+> [  562.310000] no locks held by swapper/0.
+> [  562.310000] [<c00424cc>] (unwind_backtrace+0x0/0x138) from [<c0233ba4>] (dump_stack+0x20/0x24)
+> [  562.310000] [<c0233ba4>] (dump_stack+0x20/0x24) from [<c00538dc>] (__might_sleep+0x114/0x134)
+> [  562.310000] [<c00538dc>] (__might_sleep+0x114/0x134) from [<c0114c80>] (kmem_cache_alloc_trace+0x54/0x2a8)
+> [  562.310000] [<c0114c80>] (kmem_cache_alloc_trace+0x54/0x2a8) from [<c00aaca8>] (request_threaded_irq+0x8c/0x11c)
+> [  562.310000] [<c00aaca8>] (request_threaded_irq+0x8c/0x11c) from [<c0230c28>](local_timer_setup+0x164/0x1bc)
+> [  562.310000] [<c0230c28>] (local_timer_setup+0x164/0x1bc) from [<c0230528>] (percpu_timer_setup+0x4c/0xa0)
+> [  562.310000] [<c0230528>] (percpu_timer_setup+0x4c/0xa0) from [<c0230678>] (secondary_start_kernel+0xfc/0x148)
+> [  562.310000] [<c0230678>] (secondary_start_kernel+0xfc/0x148) from [<c004a76c>] (platform_cpu_die+0x24/0x6c)
+> [  562.320000] Switched to NOHz mode on CPU #1
 > 
-> As I said above, you don't need to do this. The read back is usually
-> needed for things like clearing an error state at the device and then
-> enabling the IRQ for that device at the GIC level (though this
-> particular case isn't that simple).
+> Which seems to be due to how secondary_start_kernel() has disabled
+> preemption.
 
-To give yet another example: consider a device that has a register to
-enable level triggered interrupts. You may want to disable the
-interrupt by writing to the register during the interrupt handler.
-When you return from the interrupt handler, the CPU's IRQ mask
-is opened while the write may be still in flight. The only way
-to avoid that is to read back the interrupt mask from the device
-to flush out the write and make sure it's actually disabled before
-you reopen the irqs at the CPU.
+Indeed. request_irq() does a memory allocation, which is frowned upon
+with preemption disabled. The only reason it doesn't scream at boot time
+is because __might_sleep() is quite forgiving when the system is not
+fully booted...
 
-> > Do you understand my problems and do you have any suggestions for me how to
-> > handle it? The initial problem, looking at using __raw_writel, was actually
-> > to improve performance. I noticed about 50% better throughput when I was
-> > using __raw_writel/readl instead writel/readl, but Linus warned me about the
-> > problems he mentioned in the initial message in this thread.
-> 
-> I would say just use the writel_relaxed/readl_relaxed variants unless
-> you have DMA transfers (but it looks more like PIO from your example).
+One possibility is to simply do a request_irq() at boot time, and then
+using disable_irq()/enable_irq() the rest of the time.
 
-When you use the *_relaxed variants, you also need to add explicit
-barriers (wmb() and rmb()) to make synchronize with spinlocks. Otherwise,
-an out-of-order CPU might move the MMIO access outside of the critical
-section.
+New patch series following...
 
-	Arnd
+	M.
+-- 
+Reality is an implementation detail.
