@@ -1,60 +1,32 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 27 May 2011 15:31:47 -0400 (EDT)
-Subject: [PATCH 0/7] Move Qualcomm gpio drivers into drivers dir
-In-Reply-To: <8ya8vts6qzn.fsf@huya.qualcomm.com>
-References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
-	<20110527031319.GH5032@ponder.secretlab.ca>
-	<8yad3j46r97.fsf@huya.qualcomm.com> <8ya8vts6qzn.fsf@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1105271531200.3207@xanadu.home>
+Date: Fri, 27 May 2011 15:41:49 -0400 (EDT)
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()" locks
+	up on ARM
+In-Reply-To: <20110527120629.GA32617@elte.hu>
+References: <1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+Message-ID: <alpine.LFD.2.00.1105271532060.3207@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 May 2011, David Brown wrote:
+On Fri, 27 May 2011, Ingo Molnar wrote:
 
-> On Fri, May 27 2011, David Brown wrote:
-> 
-> > On Thu, May 26 2011, Grant Likely wrote:
-> >
-> >> On Wed, May 18, 2011 at 02:50:46PM -0700, David Brown wrote:
-> >>> This patch series moves the Qualcomm MSM gpio device drivers into the
-> >>> drivers/gpio directory.
-> >>> 
-> >>> The MSM's have two flavors of gpio driver.  The one for the newer
-> >>> v7-based chips is a bit cleaner, and can just be moved.  The one for
-> >>> the older v6-based chips took some cleanup to get rid of numerous
-> >>> ifdefs based on the particular machine.  Both drivers can now be
-> >>> selected and will be used on appropriate targets.
-> >>> 
-> >>> There is still a minor entanglement with the MSM-specific gpiomux
-> >>> code.  This will be cleaned up as MSM moves to use pinmux.
-> >>> 
-> >>> David Brown (7):
-> >>>   msm: gpio: Remove unsupported devices
-> >>>   msm: Remove chip-ifdefs for GPIO io mappings
-> >>>   msm: gpio: Remove chip-specific register definitions
-> >>>   msm: gpio: Remove ifdefs on gpio chip registers
-> >>>   msm: gpiomux: Move public API to public header
-> >>>   gpio_msm: Move Qualcomm v6 MSM driver into drivers
-> >>>   gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
-> >>
-> >> What's the status of this series.  I only got cc'd on the last two
-> >> patches; did you want me to pick up the whole lot, or is it being
-> >> merged via the msm tree?
-> >
-> > Let me send out an update, incorporating the suggestions.  I need to
-> > rebase these changes off of the current MSM code, since the msm-next
-> > tree contains changes that aren't going into the merge window because of
-> > extra ARM scrutiny.
-> >
-> >> Alternately, if there is a git branch with these patches in it, then I
-> >> can merge that instead of applying individually.
-> >
-> > I'll send you a pull request after I send out the updates.
-> 
-> Oh, and in case it isn't clear, I wasn't expecting these to make it into
-> this merge window.
+> I'd suggest doing this once modern ARM chips get so widespread that 
+> you can realistically induce a ~700 usecs irqs-off delays on old, 
+> virtual-cache ARM chips. Old chips would likely use old kernels 
+> anyway, right?
 
-Why not?
+Those "old" ARM chips are still largely produced and fitted in new 
+designs, and using latest kernels.  They are unlikely to fade away 
+before a couple years.
 
 
 Nicolas
