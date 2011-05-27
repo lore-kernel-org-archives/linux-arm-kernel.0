@@ -1,41 +1,92 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 27 May 2011 15:46:07 +0300
-Subject: [PATCHv2 2/2] OMAP: add omap_device_reset()
-In-Reply-To: <4DDF9B5D.7060408@ti.com>
-References: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
-	<1306481908-7386-3-git-send-email-tomi.valkeinen@ti.com>
-	<4DDF9B5D.7060408@ti.com>
-Message-ID: <1306500367.1905.18.camel@deskari>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Fri, 27 May 2011 13:46:38 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <20110527095111.GC21100@e102109-lin.cambridge.arm.com> (Catalin
+	Marinas's message of "Fri, 27 May 2011 10:51:11 +0100")
+References: <20110524171331.GA2941@arm.com>
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+	<20110525124348.GA2340@arm.com> <yw1xaaeanbxe.fsf@unicorn.mansr.com>
+	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
+	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
+	<20110526215101.GL24876@n2100.arm.linux.org.uk>
+	<20110527083806.GA21100@e102109-lin.cambridge.arm.com>
+	<20110527085414.GP24876@n2100.arm.linux.org.uk>
+	<20110527095111.GC21100@e102109-lin.cambridge.arm.com>
+Message-ID: <yw1xlixse2fl.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-05-27 at 14:38 +0200, Cousson, Benoit wrote:
-> Hi Tomi,
-> 
-> On 5/27/2011 9:38 AM, Valkeinen, Tomi wrote:
-> > Add omap_device_reset() function which can be used to reset the hwmods
-> > associated with the given platform device.
-> 
-> We've never exposed it because we are trying to avoid that any driver 
-> play with asynchronous HW reset. That can lead to undefined HW behavior :-(
-> 
-> Do you have some strong need for that?
+Catalin Marinas <catalin.marinas@arm.com> writes:
 
-DSS driver has been designed so that it resets the HW before it begins
-programming it. That way we get the HW into known state. Otherwise we
-need to be extra careful to program all possible registers to a sane
-value. Not impossible, of course, but requires extra work.
+> On Fri, May 27, 2011 at 09:54:14AM +0100, Russell King - ARM Linux wrote:
+>> 
+>> Ok, we need to check one last thing, and that's what the behaviour is
+>> with -mno-unaligned-access and packed structures (such as the ethernet
+>> header).  If it makes no difference, then I suggest we always build
+>> with -mno-unaligned-access.
+>
+> I tried some simple code below:
+>
+> struct test {
+> 	unsigned char a[6];
+> 	unsigned long b;
+> } __attribute__((packed));
+>
+> void set(struct test *t, unsigned long v)
+> {
+> 	t->b = v;
+> }
+>
+> int main(void)
+> {
+> 	struct test t;
+> 	
+> 	set(&t, 10);
+>
+> 	return 0;
+> }
+>
+> With -mno-unaligned-access in newer toolchains, the set() function looks
+> like this (compiled with -march=armv7):
+>
+> 00000000 <set>:
+>    0:   e7e7c451        ubfx    ip, r1, #8, #8
+>    4:   e7e72851        ubfx    r2, r1, #16, #8
+>    8:   e1a03c21        lsr     r3, r1, #24
+>    c:   e5c01006        strb    r1, [r0, #6]
+>   10:   e5c0c007        strb    ip, [r0, #7]
+>   14:   e5c02008        strb    r2, [r0, #8]
+>   18:   e5c03009        strb    r3, [r0, #9]
+>   1c:   e12fff1e        bx      lr
+>
+> If I don't pass -mno-unaligned-access later toolchains use unaligned
+> accesses by default and the set() function is more efficient:
+>
+> 00000000 <set>:
+>    0:   e5801006        str     r1, [r0, #6]
+>    4:   e12fff1e        bx      lr
 
-I noticed the problem with DSI driver, it didn't work anymore if I
-didn't reset it.
+This is certainly something we should want.  Although some people
+expressed concerns over introducing unaligned accesses where there were
+previously none, I don't see how this could pose a problem as long as we
+make sure strict alignment checking is off.  Some basic testing of code
+paths known to use unaligned accesses should suffice IMO.
 
-Why does it lead to undefined HW behaviour? Isn't it much better to
-reset the HW before starting to use it to be 100% sure it's in known and
-valid state?
+> The problem is that in addition to that we also get unaligned stack
+> variables which are not really efficient. Either way we have a drawback
+> somewhere. We could argue that -fconserve-stack is badly implemented on
+> ARM.
 
-Especially in error situations it may be difficult (even impossible) to
-recover without reset. DISPC has been known to froze in some sync lost
-situations, and, if I recall right, if DSI transfer is aborted the only
-way to recover is to reset the DSI block (on OMAP3).
+Unless someone can demonstrate a clear win from -fconserve-stack, I
+think it's pretty obvious that this flag does more harm than good on
+ARM, especially in conjunction with unaligned accesses being allowed.
 
- Tomi
+If the stack packing could be disabled while retaining the other
+(presumably beneficial) effects of -fconserve-stack, it might be
+reconsidered.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
