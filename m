@@ -1,48 +1,115 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Fri, 27 May 2011 14:22:02 +0200
-Subject: [GIT PULL] omap updates for 2.6.40
-In-Reply-To: <20110527110416.GG27962@atomide.com>
-References: <20110526113905.GG27250@atomide.com>
-	<9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
-	<20110527063304.GA27962@atomide.com>
-	<20110527110416.GG27962@atomide.com>
-Message-ID: <F1227659-7B2E-4DAE-A160-9B64CE275FE6@dominion.thruhere.net>
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Fri, 27 May 2011 18:01:34 +0530
+Subject: [PATCH 06/10] mm: Verify zonelists
+In-Reply-To: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+Message-ID: <1306499498-14263-7-git-send-email-ankita@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Verify that the zonelists were created appropriately. Below is the output in
+the dmesg for the verification of creation of zonelists. 4 regions, each of
+size 512MB were created on the Samsung Orion/Exynos board (board has 2G RAM).
 
-Op 27 mei 2011, om 13:04 heeft Tony Lindgren het volgende geschreven:
+The regions were created as follows:
 
-> * Tony Lindgren <tony@atomide.com> [110527 09:29]:
->> * Koen Kooi <koen@dominion.thruhere.net> [110526 19:02]:
->>> 
->>> Op 26 mei 2011, om 13:39 heeft Tony Lindgren het volgende geschreven:
->>> 
->>>> Hi Linus,
->>>> 
->>>> Please pull omap updates for this merge window from:
->>>> 
->>>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-for-linus
->>>> 
->>>> This contains clean-up to shrink down omap specific code a bit. Also included
->>>> are some fixes. But basically no new code at this point.
->>> 
->>> What about updates to board files? Like adding support for the xM rev C to board-omap3beagle.c.
->> 
->> Sorry we're doing only code coalescing and fixes for this merge window as
->> discussed on LAKML. Otherwise it's hard to see the code coalescing in the
->> diffstats, so new code will need to wait a bit.
->> 
->> I'll take a look and see if we can justify some fix like trivial patches
->> like the revision detection patches during the -rc cycle.
-> 
-> Koen, the patch above needs to be refreshed to apply to current mainline
-> kernel. It also seems to contain some whitespace errors.
-> 
-> Care to refresh it and repost?
+created region 0 in nid 0 start pfn 262144 spanned pages 131072
+created region 1 in nid 0 start pfn 393216 spanned pages 131072
+created region 2 in nid 0 start pfn 524288 spanned pages 131072
+created region 3 in nid 0 start pfn 655360 spanned pages 57344
 
-I'm refreshing it right now and will after testing.
+mminit::zonelist general 0:Normal = 0:Normal 0:Normal 0:Normal 0:Normal
+mminit::zonelist general 0:Normal = 0:Normal 0:Normal 0:Normal 0:Normal
+mminit::zonelist general 0:Normal = 0:Normal 0:Normal 0:Normal 0:Normal
+mminit::zonelist general 0:Normal = 0:Normal 0:Normal 0:Normal 0:Normal
 
-regards,
+Since now 4 zones are present inside a node, the above shows 4 zonelists
+being created.
 
-Koen
+Signed-off-by: Ankita Garg <ankita@in.ibm.com>
+---
+ mm/mm_init.c |   51 +++++++++++++++++++++++++++------------------------
+ 1 files changed, 27 insertions(+), 24 deletions(-)
+
+diff --git a/mm/mm_init.c b/mm/mm_init.c
+index 4e0e265..77468f8 100644
+--- a/mm/mm_init.c
++++ b/mm/mm_init.c
+@@ -21,44 +21,47 @@ int mminit_loglevel;
+ /* The zonelists are simply reported, validation is manual. */
+ void mminit_verify_zonelist(void)
+ {
+-	int nid;
++	int nid, p;
+ 
+ 	if (mminit_loglevel < MMINIT_VERIFY)
+ 		return;
+ 
+ 	for_each_online_node(nid) {
+ 		pg_data_t *pgdat = NODE_DATA(nid);
+-		struct zone *zone;
+-		struct zoneref *z;
+-		struct zonelist *zonelist;
+-		int i, listid, zoneid;
+-
+-		BUG_ON(MAX_ZONELISTS > 2);
+-		for (i = 0; i < MAX_ZONELISTS * MAX_NR_ZONES; i++) {
+-
+-			/* Identify the zone and nodelist */
+-			zoneid = i % MAX_NR_ZONES;
+-			listid = i / MAX_NR_ZONES;
+-			zonelist = &pgdat->node_zonelists[listid];
+-			zone = &pgdat->node_zones[zoneid];
+-			if (!populated_zone(zone))
+-				continue;
+-
+-			/* Print information about the zonelist */
+-			printk(KERN_DEBUG "mminit::zonelist %s %d:%s = ",
+-				listid > 0 ? "thisnode" : "general", nid,
+-				zone->name);
+-
+-			/* Iterate the zonelist */
+-			for_each_zone_zonelist(zone, z, zonelist, zoneid) {
++		for_each_mem_region_in_nid(p, nid) {
++			mem_region_t *mem_region = &(NODE_DATA(nid)->mem_regions[p]);
++			struct zone *zone;
++			struct zoneref *z;
++			struct zonelist *zonelist;
++			int i, listid, zoneid;
++
++			BUG_ON(MAX_ZONELISTS > 2);
++			for (i = 0; i < MAX_ZONELISTS * MAX_NR_ZONES; i++) {
++
++				/* Identify the zone and nodelist */
++				zoneid = i % MAX_NR_ZONES;
++				listid = i / MAX_NR_ZONES;
++				zonelist = &pgdat->node_zonelists[listid];
++				zone = &mem_region->zones[zoneid];
++				if (!populated_zone(zone))
++					continue;
++
++				/* Print information about the zonelist */
++				printk(KERN_DEBUG "mminit::zonelist %s %d:%s = ",
++					listid > 0 ? "thisnode" : "general", nid,
++					zone->name);
++
++				/* Iterate the zonelist */
++				for_each_zone_zonelist(zone, z, zonelist, zoneid) {
+ #ifdef CONFIG_NUMA
+-				printk(KERN_CONT "%d:%s ",
+-					zone->node, zone->name);
++					printk(KERN_CONT "%d:%s ",
++						zone->node, zone->name);
+ #else
+-				printk(KERN_CONT "0:%s ", zone->name);
++					printk(KERN_CONT "0:%s ", zone->name);
+ #endif /* CONFIG_NUMA */
++				}
++				printk(KERN_CONT "\n");
+ 			}
+-			printk(KERN_CONT "\n");
+ 		}
+ 	}
+ }
+-- 
+1.7.4
