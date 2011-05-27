@@ -1,98 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 May 2011 17:27:41 +0100
-Subject: [RFC PATCH v4 03/13] ARM: smp_twd: add support for remapped PPI
-	interrupts
+Date: Fri, 27 May 2011 17:27:43 +0100
+Subject: [RFC PATCH v4 05/13] ARM: versatile: use remapped PPI interrupts for
+	local timer
 In-Reply-To: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
 References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306513671-12206-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1306513671-12206-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM_GIC_VPPI is enabled, let smp_twd request interrupts
-the normal way (ie using request_irq()).
+Use the normal interrupt scheme for the local timers by using
+a remapped PPI interrupt.
 
-This involves letting PPIs go via the same code path as SPIs and
-having normal interrupt handler for the local timer code.
-
-The previous ad-hoc code is still supported when CONFIG_ARM_GIC_VPPI
-is not defined.
+Tested on VExpress and PB-11MP.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/smp_twd.c |   28 +++++++++++++++++++++++++++-
- 1 files changed, 27 insertions(+), 1 deletions(-)
+ arch/arm/mach-realview/Kconfig       |    2 ++
+ arch/arm/mach-vexpress/Kconfig       |    1 +
+ arch/arm/plat-versatile/localtimer.c |    3 ++-
+ 3 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 60636f4..773336e 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -15,16 +15,18 @@
- #include <linux/smp.h>
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
--#include <linux/irq.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index b9a9805..12c7c56 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -38,6 +38,7 @@ config MACH_REALVIEW_PB11MP
+ 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
+ 	select CPU_V6K
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_HAS_BARRIERS if SMP
+ 	help
+@@ -76,6 +77,7 @@ config MACH_REALVIEW_PBA8
+ config MACH_REALVIEW_PBX
+ 	bool "Support RealView(R) Platform Baseboard Explore"
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
+ 	select ZONE_DMA if SPARSEMEM
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 9311484..07a53aa 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -5,6 +5,7 @@ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
+ 	select CPU_V7
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_751472
+ 	select ARM_ERRATA_753970
+diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+index 0fb3961..a76daf4 100644
+--- a/arch/arm/plat-versatile/localtimer.c
++++ b/arch/arm/plat-versatile/localtimer.c
+@@ -14,6 +14,7 @@
  
  #include <asm/smp_twd.h>
-+#include <asm/localtimer.h>
- #include <asm/hardware/gic.h>
+ #include <asm/localtimer.h>
++#include <asm/hardware/gic.h>
+ #include <mach/irqs.h>
  
- /* set up by the platform code */
- void __iomem *twd_base;
- 
- static unsigned long twd_timer_rate;
-+static DEFINE_PER_CPU(bool, irq_reqd);
- 
- static void twd_set_mode(enum clock_event_mode mode,
- 			struct clock_event_device *clk)
-@@ -43,6 +45,10 @@ static void twd_set_mode(enum clock_event_mode mode,
- 		ctrl = TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT;
- 		break;
- 	case CLOCK_EVT_MODE_UNUSED:
-+#ifdef CONFIG_ARM_GIC_VPPI
-+		disable_irq(clk->irq);
-+		/* fall through */
-+#endif
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	default:
- 		ctrl = 0;
-@@ -124,6 +130,9 @@ static void __cpuinit twd_calibrate_rate(void)
+ /*
+@@ -21,7 +22,7 @@
   */
- void __cpuinit twd_timer_setup(struct clock_event_device *clk)
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
  {
-+	int err;
-+	bool *reqd;
-+
- 	twd_calibrate_rate();
- 
- 	clk->name = "local_timer";
-@@ -137,8 +146,25 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
- 	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
- 
-+#ifdef CONFIG_ARM_GIC_VPPI
-+	reqd = &__get_cpu_var(irq_reqd);
-+	if (!*reqd) {
-+		err = request_irq(clk->irq, percpu_timer_handler,
-+				  IRQF_PERCPU | IRQF_NOBALANCING | IRQF_TIMER,
-+				  clk->name, clk);
-+		if (err) {
-+			pr_err("%s: can't register interrupt %d on cpu %d (%d)\n",
-+			       clk->name, clk->irq, smp_processor_id(), err);
-+			return;
-+		}
-+
-+		*reqd = true;
-+	} else
-+		enable_irq(clk->irq);
-+#else
- 	/* Make sure our local interrupt controller has this enabled */
- 	gic_enable_ppi(clk->irq);
-+#endif
- 
- 	clockevents_register_device(clk);
+-	evt->irq = IRQ_LOCALTIMER;
++	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
+ 	twd_timer_setup(evt);
+ 	return 0;
  }
 -- 
 1.7.0.4
