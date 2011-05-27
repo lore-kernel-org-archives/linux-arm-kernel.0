@@ -1,26 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 27 May 2011 19:10:32 +0200
-Subject: On __raw_readl readl_relaxed and readl nocheinmal
-In-Reply-To: <20110527163827.GF14035@e102109-lin.cambridge.arm.com>
-References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
-	<201105271816.10191.arnd@arndb.de>
-	<20110527163827.GF14035@e102109-lin.cambridge.arm.com>
-Message-ID: <201105271910.32946.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 27 May 2011 18:55:00 +0100
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <20110527120629.GA32617@elte.hu>
+References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+Message-ID: <20110527175500.GQ24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 27 May 2011 18:38:29 Catalin Marinas wrote:
-> As I said above, that's not a simple case and you could still get a
-> spurious interrupt. Based on feedback from the hw people, even if you
-> lower the interrupt level at the device (by writing and reading back
-> from the device), there is a delay in the signal propagation and
-> enabling the interrupts at the CPU level (or interrupt controller level)
-> could still trigger the interrupt. You can add extra delay to reduce the
-> chances but that's SoC specific. Anyway, reading back from the device
-> makes the likelihood much smaller.
+On Fri, May 27, 2011 at 02:06:29PM +0200, Ingo Molnar wrote:
+> I'd suggest doing this once modern ARM chips get so widespread that 
+> you can realistically induce a ~700 usecs irqs-off delays on old, 
+> virtual-cache ARM chips. Old chips would likely use old kernels 
+> anyway, right?
 
-Ah, right. I was thinking of message signaled interrupts, but they
-are probably not so common on ARM. With MSI, the interrupt message
-would also get flushed by the readl().
+Not necessarily.  I have rather a lot of legacy hardware (it outweighs
+the more modern stuff) and that legacy hardware is _loads_ more useful
+than the modern stuff in that it can actually do stuff like run a network
+(such as running kerberos servers, httpd, mtas, etc).  Modern ARM
+machines typically don't have ways to attach mass storage to them which
+make them hellishly limited for such applications.
 
-	Arnd
+I'm planning to continue using my old machines, and continue to upgrade
+their kernels, especially in order to keep up to date with security
+issues.
