@@ -1,289 +1,179 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Fri, 27 May 2011 15:10:09 -0700
-Subject: [PATCH 1/2] ARM: S5P: Cleanup s5p-time for HRTimer
-Message-ID: <1306534210-32659-1-git-send-email-kgene.kim@samsung.com>
+Date: Fri, 27 May 2011 15:10:10 -0700
+Subject: [PATCH 2/2] ARM: S5P: Add 64bit PWM timer counter for sched_clock
+In-Reply-To: <1306534210-32659-1-git-send-email-kgene.kim@samsung.com>
+References: <1306534210-32659-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1306534210-32659-2-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Sangbeom Kim <sbkim73@samsung.com>
+
+Basically, PWM timer works with 33Mhz on S5P SoCs and counter
+overflow every 128 secs. So it is needed 64-bit counter for
+supporting proper sched_clock() by 32-bit timer. This patch
+handle overflow control and can solve the problem of suspend
+to resume
+
+Signed-off-by: Sangbeom Kim <sbkim73@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/plat-s5p/s5p-time.c |  217 ++++++++++++++++++------------------------
- 1 files changed, 93 insertions(+), 124 deletions(-)
+ arch/arm/plat-s5p/s5p-time.c |   80 +++++++++++++++++++++++++++++++++++++++--
+ 1 files changed, 76 insertions(+), 4 deletions(-)
 
 diff --git a/arch/arm/plat-s5p/s5p-time.c b/arch/arm/plat-s5p/s5p-time.c
-index 1f94d4a..6b26d80 100644
+index 6b26d80..ecc576f 100644
 --- a/arch/arm/plat-s5p/s5p-time.c
 +++ b/arch/arm/plat-s5p/s5p-time.c
-@@ -36,41 +36,6 @@ static struct clk *tdiv_source;
+@@ -36,6 +36,12 @@ static struct clk *tdiv_source;
  static struct clk *timerclk;
  static struct s5p_timer_source timer_source;
  static unsigned long clock_count_per_tick;
--static void s5p_timer_resume(void);
--
--static void s5p_time_stop(enum s5p_timer_mode mode)
--{
--	unsigned long tcon;
--
--	tcon = __raw_readl(S3C2410_TCON);
--
--	switch (mode) {
--	case S5P_PWM0:
--		tcon &= ~S3C2410_TCON_T0START;
--		break;
--
--	case S5P_PWM1:
--		tcon &= ~S3C2410_TCON_T1START;
--		break;
--
--	case S5P_PWM2:
--		tcon &= ~S3C2410_TCON_T2START;
--		break;
--
--	case S5P_PWM3:
--		tcon &= ~S3C2410_TCON_T3START;
--		break;
--
--	case S5P_PWM4:
--		tcon &= ~S3C2410_TCON_T4START;
--		break;
--
--	default:
--		printk(KERN_ERR "Invalid Timer %d\n", mode);
--		break;
--	}
--	__raw_writel(tcon, S3C2410_TCON);
--}
++static unsigned long long s5p_sched_timer_overflows;
++static unsigned long long time_stamps;
++static unsigned long long old_overflows;
++static cycle_t last_ticks;
++static unsigned int sched_timer_running;
++static unsigned int pending_irq;
  
  static void s5p_time_setup(enum s5p_timer_mode mode, unsigned long tcnt)
  {
-@@ -180,6 +145,75 @@ static void s5p_time_start(enum s5p_timer_mode mode, bool periodic)
- 	__raw_writel(tcon, S3C2410_TCON);
+@@ -188,6 +194,7 @@ static void s5p_timer_resume(void)
+ 	/* source timer restart */
+ 	s5p_time_setup(timer_source.source_id, TCNT_MAX);
+ 	s5p_time_start(timer_source.source_id, PERIODIC);
++	sched_timer_running = 1;
  }
  
-+static void s5p_time_stop(enum s5p_timer_mode mode)
+ static cycle_t s5p_timer_read(struct clocksource *cs)
+@@ -223,6 +230,15 @@ static int s5p_set_next_event(unsigned long cycles,
+ 	return 0;
+ }
+ 
++static void s5p_val_init(void)
 +{
-+	unsigned long tcon;
-+
-+	tcon = __raw_readl(S3C2410_TCON);
-+
-+	switch (mode) {
-+	case S5P_PWM0:
-+		tcon &= ~S3C2410_TCON_T0START;
-+		break;
-+
-+	case S5P_PWM1:
-+		tcon &= ~S3C2410_TCON_T1START;
-+		break;
-+
-+	case S5P_PWM2:
-+		tcon &= ~S3C2410_TCON_T2START;
-+		break;
-+
-+	case S5P_PWM3:
-+		tcon &= ~S3C2410_TCON_T3START;
-+		break;
-+
-+	case S5P_PWM4:
-+		tcon &= ~S3C2410_TCON_T4START;
-+		break;
-+
-+	default:
-+		printk(KERN_ERR "Invalid Timer %d\n", mode);
-+		break;
-+	}
-+	__raw_writel(tcon, S3C2410_TCON);
++	last_ticks = 0;
++	s5p_sched_timer_overflows = 0;
++	old_overflows = 0;
++	sched_timer_running = 0;
++	pending_irq = 0;
 +}
 +
-+static void s5p_timer_resume(void)
-+{
-+	/* event timer restart */
-+	s5p_time_setup(timer_source.event_id, clock_count_per_tick);
-+	s5p_time_start(timer_source.event_id, PERIODIC);
-+
-+	/* source timer restart */
-+	s5p_time_setup(timer_source.source_id, TCNT_MAX);
-+	s5p_time_start(timer_source.source_id, PERIODIC);
-+}
-+
-+static cycle_t s5p_timer_read(struct clocksource *cs)
-+{
-+	unsigned long offset = 0;
-+
-+	switch (timer_source.source_id) {
-+	case S5P_PWM0:
-+	case S5P_PWM1:
-+	case S5P_PWM2:
-+	case S5P_PWM3:
-+		offset = (timer_source.source_id * 0x0c) + 0x14;
-+		break;
-+
-+	case S5P_PWM4:
-+		offset = 0x40;
-+		break;
-+
-+	default:
-+		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
-+		return 0;
-+	}
-+
-+	return (cycle_t) ~__raw_readl(S3C_TIMERREG(offset));
-+}
-+
- static int s5p_set_next_event(unsigned long cycles,
+ static void s5p_set_mode(enum clock_event_mode mode,
  				struct clock_event_device *evt)
  {
-@@ -213,27 +247,6 @@ static void s5p_set_mode(enum clock_event_mode mode,
- 	}
- }
+@@ -239,6 +255,7 @@ static void s5p_set_mode(enum clock_event_mode mode,
  
--static void s5p_timer_resume(void)
--{
--	/* event timer restart */
--	s5p_time_setup(timer_source.event_id, clock_count_per_tick);
--	s5p_time_start(timer_source.event_id, PERIODIC);
--
--	/* source timer restart */
--	s5p_time_setup(timer_source.source_id, TCNT_MAX);
--	s5p_time_start(timer_source.source_id, PERIODIC);
--}
--
--void __init s5p_set_timer_source(enum s5p_timer_mode event,
--				 enum s5p_timer_mode source)
--{
--	s3c_device_timer[event].dev.bus = &platform_bus_type;
--	s3c_device_timer[source].dev.bus = &platform_bus_type;
--
--	timer_source.event_id = event;
--	timer_source.source_id = source;
--}
--
- static struct clock_event_device time_event_device = {
- 	.name		= "s5p_event_timer",
- 	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
-@@ -290,29 +303,13 @@ static void __init s5p_clockevent_init(void)
- 	setup_irq(irq_number, &s5p_clock_event_irq);
- }
+ 	case CLOCK_EVT_MODE_UNUSED:
+ 	case CLOCK_EVT_MODE_SHUTDOWN:
++		s5p_val_init();
+ 		break;
  
--static cycle_t s5p_timer_read(struct clocksource *cs)
--{
--	unsigned long offset = 0;
--
--	switch (timer_source.source_id) {
--	case S5P_PWM0:
--	case S5P_PWM1:
--	case S5P_PWM2:
--	case S5P_PWM3:
--		offset = (timer_source.source_id * 0x0c) + 0x14;
--		break;
--
--	case S5P_PWM4:
--		offset = 0x40;
--		break;
--
--	default:
--		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
--		return 0;
--	}
--
--	return (cycle_t) ~__raw_readl(S3C_TIMERREG(offset));
--}
-+struct clocksource time_clocksource = {
-+	.name		= "s5p_clocksource_timer",
-+	.rating		= 250,
-+	.read		= s5p_timer_read,
-+	.mask		= CLOCKSOURCE_MASK(32),
-+	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
-+};
- 
- /*
-  * Override the global weak sched_clock symbol with this
-@@ -325,63 +322,25 @@ static DEFINE_CLOCK_DATA(cd);
+ 	case CLOCK_EVT_MODE_RESUME:
+@@ -322,15 +339,41 @@ static DEFINE_CLOCK_DATA(cd);
  
  unsigned long long notrace sched_clock(void)
  {
--	u32 cyc;
--	unsigned long offset = 0;
-+	cycle_t cyc;
-+	unsigned long irq_flags;
+-	cycle_t cyc;
++	cycle_t ticks, elapsed_ticks = 0;
++	unsigned long long increment = 0;
++	unsigned int overflow_cnt = s5p_sched_timer_overflows - old_overflows;
+ 	unsigned long irq_flags;
  
--	switch (timer_source.source_id) {
--	case S5P_PWM0:
--	case S5P_PWM1:
--	case S5P_PWM2:
--	case S5P_PWM3:
--		offset = (timer_source.source_id * 0x0c) + 0x14;
--		break;
+ 	local_irq_save(irq_flags);
+-	cyc = s5p_timer_read(&time_clocksource);
 -
--	case S5P_PWM4:
--		offset = 0x40;
--		break;
-+	local_irq_save(irq_flags);
-+	cyc = s5p_timer_read(&time_clocksource);
++	ticks = s5p_timer_read(&time_clocksource);
++
++	if (likely(sched_timer_running)) {
++		if (overflow_cnt) {
++			increment = (overflow_cnt - 1)
++			  * (clocksource_cyc2ns(time_clocksource.read(&time_clocksource),
++			     time_clocksource.mult, time_clocksource.shift));
++			elapsed_ticks = time_clocksource.mask - last_ticks
++					+ ticks;
++		} else {
++			if (unlikely(last_ticks > ticks)) {
++				pending_irq = 1;
++				elapsed_ticks = time_clocksource.mask
++						- last_ticks + ticks;
++				s5p_sched_timer_overflows++;
++			} else {
++				elapsed_ticks = ticks - last_ticks;
++			}
++		}
++
++		time_stamps += clocksource_cyc2ns(elapsed_ticks,
++				time_clocksource.mult, time_clocksource.shift)
++				+ increment;
++		old_overflows = s5p_sched_timer_overflows;
++		last_ticks = ticks;
++	}
+ 	local_irq_restore(irq_flags);
  
--	default:
--		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
--		return 0;
--	}
-+	local_irq_restore(irq_flags);
- 
--	cyc = ~__raw_readl(S3C_TIMERREG(offset));
- 	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
+-	return cyc_to_sched_clock(&cd, cyc, (u32)~0);
++	return time_stamps;
  }
  
  static void notrace s5p_update_sched_clock(void)
- {
--	u32 cyc;
--	unsigned long offset = 0;
-+	cycle_t cyc;
- 
--	switch (timer_source.source_id) {
--	case S5P_PWM0:
--	case S5P_PWM1:
--	case S5P_PWM2:
--	case S5P_PWM3:
--		offset = (timer_source.source_id * 0x0c) + 0x14;
--		break;
--
--	case S5P_PWM4:
--		offset = 0x40;
--		break;
--
--	default:
--		printk(KERN_ERR "Invalid Timer %d\n", timer_source.source_id);
--	}
--
--	cyc = ~__raw_readl(S3C_TIMERREG(offset));
-+	cyc = s5p_timer_read(&time_clocksource);
+@@ -341,10 +384,32 @@ static void notrace s5p_update_sched_clock(void)
  	update_sched_clock(&cd, cyc, (u32)~0);
  }
  
--struct clocksource time_clocksource = {
--	.name		= "s5p_clocksource_timer",
--	.rating		= 250,
--	.read		= s5p_timer_read,
--	.mask		= CLOCKSOURCE_MASK(32),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
--};
--
++irqreturn_t s5p_clock_source_isr(int irq, void *dev_id)
++{
++	if (unlikely(pending_irq))
++		pending_irq = 0;
++	else
++		s5p_sched_timer_overflows++;
++
++	return IRQ_HANDLED;
++}
++
++static struct irqaction s5p_clock_source_irq = {
++	.name		= "s5p_source_irq",
++	.flags		= IRQF_DISABLED ,
++	.handler	= s5p_clock_source_isr,
++};
++
  static void __init s5p_clocksource_init(void)
  {
  	unsigned long pclk;
-@@ -436,6 +395,16 @@ static void __init s5p_timer_resources(void)
- 	clk_enable(tin_source);
+ 	unsigned long clock_rate;
++	unsigned int irq_number;
++	unsigned long cstat;
++
++	/* Clear each timer interrupt pending bit */
++	cstat = __raw_readl(S3C64XX_TINT_CSTAT);
++	__raw_writel(cstat, S3C64XX_TINT_CSTAT);
+ 
+ 	pclk = clk_get_rate(timerclk);
+ 
+@@ -355,11 +420,15 @@ static void __init s5p_clocksource_init(void)
+ 
+ 	s5p_time_setup(timer_source.source_id, TCNT_MAX);
+ 	s5p_time_start(timer_source.source_id, PERIODIC);
++	sched_timer_running = 1;
+ 
+ 	init_sched_clock(&cd, s5p_update_sched_clock, 32, clock_rate);
+ 
+ 	if (clocksource_register_hz(&time_clocksource, clock_rate))
+ 		panic("%s: can't register clocksource\n", time_clocksource.name);
++
++	irq_number = timer_source.source_id + IRQ_TIMER0;
++	setup_irq(irq_number, &s5p_clock_source_irq);
  }
  
-+void __init s5p_set_timer_source(enum s5p_timer_mode event,
-+				 enum s5p_timer_mode source)
-+{
-+	s3c_device_timer[event].dev.bus = &platform_bus_type;
-+	s3c_device_timer[source].dev.bus = &platform_bus_type;
+ static void __init s5p_timer_resources(void)
+@@ -368,6 +437,9 @@ static void __init s5p_timer_resources(void)
+ 	unsigned long event_id = timer_source.event_id;
+ 	unsigned long source_id = timer_source.source_id;
+ 
++	s5p_val_init();
++	time_stamps = 0;
 +
-+	timer_source.event_id = event;
-+	timer_source.source_id = source;
-+}
-+
- static void __init s5p_timer_init(void)
- {
- 	s5p_timer_resources();
+ 	timerclk = clk_get(NULL, "timers");
+ 	if (IS_ERR(timerclk))
+ 		panic("failed to get timers clock for timer");
 -- 
 1.7.4.4
