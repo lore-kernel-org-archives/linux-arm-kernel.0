@@ -1,150 +1,48 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 27 May 2011 14:06:29 +0200
-Subject: [PATCH v2] [media] at91: add Atmel Image Sensor Interface
-	(ISI) support
-In-Reply-To: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
-References: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
-Message-ID: <20110527120629.GA3603@game.jcrosoft.org>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Fri, 27 May 2011 14:22:02 +0200
+Subject: [GIT PULL] omap updates for 2.6.40
+In-Reply-To: <20110527110416.GG27962@atomide.com>
+References: <20110526113905.GG27250@atomide.com>
+	<9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
+	<20110527063304.GA27962@atomide.com>
+	<20110527110416.GG27962@atomide.com>
+Message-ID: <F1227659-7B2E-4DAE-A160-9B64CE275FE6@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +/* ISI interrupt service routine */
-> +static irqreturn_t isi_interrupt(int irq, void *dev_id)
-> +{
-> +	struct atmel_isi *isi = dev_id;
-> +	u32 status, mask, pending;
-> +	irqreturn_t ret = IRQ_NONE;
-> +
-> +	spin_lock(&isi->lock);
-> +
-> +	status = isi_readl(isi, ISI_STATUS);
-> +	mask = isi_readl(isi, ISI_INTMASK);
-> +	pending = status & mask;
-> +
-> +	if (pending & ISI_CTRL_SRST) {
-> +		complete(&isi->isi_complete);
-> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
-> +		ret = IRQ_HANDLED;
-> +	}
-> +	if (pending & ISI_CTRL_DIS) {
-> +		complete(&isi->isi_complete);
-> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
-> +		ret = IRQ_HANDLED;
-> +	}
-no else here?
-> +
-> +	if (pending & ISI_SR_VSYNC) {
-> +		switch (isi->state) {
-> +		case ISI_STATE_IDLE:
-> +			isi->state = ISI_STATE_READY;
-> +			wake_up_interruptible(&isi->capture_wq);
-> +			break;
-> +		}
-really switch here?
-> +	} else if (likely(pending & ISI_SR_CXFR_DONE)) {
-> +		ret = atmel_isi_handle_streaming(isi);
-> +	}
-> +
-> +	spin_unlock(&isi->lock);
-> +
-> +	return ret;
-> +}
-> +
-> +#define	WAIT_ISI_RESET		1
-> +#define	WAIT_ISI_DISABLE	0
-> +static int atmel_isi_wait_status(int wait_reset, struct atmel_isi *isi)
-I thinkhave teh atmel_isti first parameter is better
-> +{
-> +	unsigned long timeout;
-> +	/*
-> +	 * The reset or disable will only succeed if we have a
-> +	 * pixel clock from the camera.
-> +	 */
-> +	init_completion(&isi->isi_complete);
-> +
-> +	if (wait_reset) {
-> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
-> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
-> +	} else {
-> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
-> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
-> +	}
-> +
-> +	timeout = wait_for_completion_timeout(&isi->isi_complete,
-> +			msecs_to_jiffies(100));
-> +	if (timeout == 0)
-> +		return -ETIMEDOUT;
-> +
-> +	return 0;
-> +}
-> +
-> +/* ------------------------------------------------------------------
-> +	Videobuf operations
-> +   ------------------------------------------------------------------*/
-> +static int queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
-> +				unsigned int *nplanes, unsigned long sizes[],
-> +				void *alloc_ctxs[])
-> +{
-> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vq);
-> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
-> +	struct atmel_isi *isi = ici->priv;
-> +	unsigned long size;
-> +	int ret, bytes_per_line;
-> +
-> +	/* Reset ISI */
-> +	ret = atmel_isi_wait_status(WAIT_ISI_RESET, isi);
-> +	if (ret < 0) {
-> +		dev_err(icd->dev.parent, "Reset ISI timed out\n");
-> +		return ret;
-> +	}
-> +	/* Disable all interrupts */
-> +	isi_writel(isi, ISI_INTDIS, ~0UL);
-> +
-> +	bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
-> +						icd->current_fmt->host_fmt);
-> +
-> +	if (bytes_per_line < 0)
-> +		return bytes_per_line;
-> +
-> +	size = bytes_per_line * icd->user_height;
-> +
-> +	if (*nbuffers == 0)
-> +		*nbuffers = MAX_BUFFER_NUMS;
-> +	if (*nbuffers > MAX_BUFFER_NUMS)
-else here
-> +		*nbuffers = MAX_BUFFER_NUMS;
-> +
-> +	if (size * *nbuffers > VID_LIMIT_BYTES)
-> +		*nbuffers = VID_LIMIT_BYTES / size;
-> +
-> +	*nplanes = 1;
-> +	sizes[0] = size;
-> +	alloc_ctxs[0] = isi->alloc_ctx;
-> +
-> +	isi->sequence = 0;
-> +	isi->active = NULL;
-> +
-> +	dev_dbg(icd->dev.parent, "%s, count=%d, size=%ld\n", __func__,
-> +		*nbuffers, size);
-> +
-> +	return 0;
-> +}
-> +
-> +static int buffer_init(struct vb2_buffer *vb)
-> +{
-> +	struct frame_buffer *buf = container_of(vb, struct frame_buffer, vb);
-> +
-> +	buf->p_fb_desc = NULL;
-> +	buf->fb_desc_phys = 0;
-memset 0?
-> +	INIT_LIST_HEAD(&buf->list);
-> +
-> +	return 0;
-> +}
-> +
-otherwise the patch look good
-if you fix the upper issue
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Best Regards,
-J.
+Op 27 mei 2011, om 13:04 heeft Tony Lindgren het volgende geschreven:
+
+> * Tony Lindgren <tony@atomide.com> [110527 09:29]:
+>> * Koen Kooi <koen@dominion.thruhere.net> [110526 19:02]:
+>>> 
+>>> Op 26 mei 2011, om 13:39 heeft Tony Lindgren het volgende geschreven:
+>>> 
+>>>> Hi Linus,
+>>>> 
+>>>> Please pull omap updates for this merge window from:
+>>>> 
+>>>> git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-for-linus
+>>>> 
+>>>> This contains clean-up to shrink down omap specific code a bit. Also included
+>>>> are some fixes. But basically no new code at this point.
+>>> 
+>>> What about updates to board files? Like adding support for the xM rev C to board-omap3beagle.c.
+>> 
+>> Sorry we're doing only code coalescing and fixes for this merge window as
+>> discussed on LAKML. Otherwise it's hard to see the code coalescing in the
+>> diffstats, so new code will need to wait a bit.
+>> 
+>> I'll take a look and see if we can justify some fix like trivial patches
+>> like the revision detection patches during the -rc cycle.
+> 
+> Koen, the patch above needs to be refreshed to apply to current mainline
+> kernel. It also seems to contain some whitespace errors.
+> 
+> Care to refresh it and repost?
+
+I'm refreshing it right now and will after testing.
+
+regards,
+
+Koen
