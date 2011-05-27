@@ -1,59 +1,97 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Fri, 27 May 2011 11:44:38 +0100
-Subject: [PATCH 0/4] ARM: smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
-In-Reply-To: <20110527082640.GC16394@infomag.iguana.be>
-References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
-	<20110527082640.GC16394@infomag.iguana.be>
-Message-ID: <1306493078.27474.269.camel@e102391-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 27 May 2011 13:54:15 +0300
+Subject: [PATCH] ARM: OMAP: Get rid of section mismatch warnings
+In-Reply-To: <20110526135533.GA25841@n2100.arm.linux.org.uk>
+References: <1306414838-4330-1-git-send-email-silesh@ti.com>
+	<4DDE4EEF.8070108@ti.com> <20110526133732.GD11352@atomide.com>
+	<20110526135533.GA25841@n2100.arm.linux.org.uk>
+Message-ID: <20110527105414.GE27962@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-05-27 at 10:26 +0200, Wim Van Sebroeck wrote:
-> Hi Vitaly,
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110526 16:51]:
+> On Thu, May 26, 2011 at 06:37:32AM -0700, Tony Lindgren wrote:
+> > * Santosh Shilimkar <santosh.shilimkar@ti.com> [110526 05:56]:
+> > > On 5/26/2011 6:30 PM, Silesh C V wrote:
+> > > >Get rid of the following and 8 other similar section mismatch
+> > > >warnings
+> > > >
+> > > I send this [1] patch a month back. It's still not considered
+> > > though even after reminder.
+> > > 
+> > > [1] https://patchwork.kernel.org/patch/684831/
+> > 
+> > Applying now into devel-fixes with additional fixes from Silesh.
+> > Updated patch below.
 > 
-> > From: Vitaly Kuzmichev <vkuzmichev@mvista.com>
-> > 
-> > The series of patches fixes various bugs in ARM MPCORE watchdog setup.
-> > They also introduce some changes in common SMP_TWD timer setup code.
-> > The PATCH 1/4 adds an exported function to obtain calibrated timer rate
-> > in mpcore_wdt. However, this solution might be unacceptable, so we may
-> > discuss another 2 variants:
-> >  1) use clock framework
-> >    This may require to fix all MPCORE boards clock implementations.
-> >  2) copy calibration loop to mpcore_wdt
-> >    However, this increases boot time.
-> > 
-> > 
-> > Vitaly Kuzmichev (4):
-> >   ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
-> >   ARM: smp_twd: Fix typo in twd_timer_rate printout
-> >   ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
-> >   ARM: mpcore_wdt: Fix timer mode setup
-> > 
-> >  arch/arm/include/asm/smp_twd.h |    7 +++++++
-> >  arch/arm/kernel/smp_twd.c      |    8 +++++++-
-> >  drivers/watchdog/mpcore_wdt.c  |   29 +++++++++++++++++++++--------
-> >  3 files changed, 35 insertions(+), 9 deletions(-)
+> I also have this from a while back.  There's also some nastyness in
+> twl4030-power.c which requires basically s/__init/__devinit/ to almost
+> the entire file.
+
+OK thanks. Kevin, can you queue this fix? Assuming the move of omap
+gpio to drivers/gpio happens this merge window, this needs to be
+updated for the path.
+
+Regards,
+
+Tony
+ 
+> 8<--------
+> From: Russell King <rmk+kernel@arm.linux.org.uk>
 > 
-> What's the status on this? I don't recall having seen any answers from ARM community.
-
-Overall, I'm not too happy about patch #1. Exposing some "random"
-internal state of the timer doesn't seem the right thing to me.
-
-Furthermore, the internal rate of the TWD changes with the CPU
-frequency. Blindly trusting the calibrated value at boot time is a nice
-way to see the watchdog kicking in unexpectedly when frequency is
-increased.
-
-I suggest you have a look at this patch:
-https://patchwork.kernel.org/patch/801472/
-
-Together with a cpufreq notifier, this "smp_twd" clock looks like a much
-better option. Over time, all platform would be converted to that
-particular clock, and the problem would be solved in a much nicer way.
-
-Cheers,
-
-	M.
--- 
-Reality is an implementation detail.
+> Fix various section mismatch warnings:
+> 
+> WARNING: arch/arm/plat-omap/built-in.o(.devinit.text+0x46c): Section mismatch in reference from the function omap_gpio_probe() to the function .init.text:omap_gpio_chip_init()
+> The function __devinit omap_gpio_probe() references
+> a function __init omap_gpio_chip_init().
+> If omap_gpio_chip_init is only used by omap_gpio_probe then
+> annotate omap_gpio_chip_init with a matching annotation.
+> 
+> WARNING: arch/arm/mach-omap2/built-in.o(.text+0x423c): Section mismatch in reference from the function pm_dbg_regset_init() to the function .init.text:pm_dbg_init()
+> The function pm_dbg_regset_init() references
+> the function __init pm_dbg_init().
+> This is often because pm_dbg_regset_init lacks a __init
+> annotation or the annotation of pm_dbg_init is wrong.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> --
+>  arch/arm/mach-omap2/pm-debug.c |    4 ++--
+>  arch/arm/plat-omap/gpio.c      |    2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
+> index 971d186..3800ee0 100644
+> --- a/arch/arm/plat-omap/gpio.c
+> +++ b/arch/arm/plat-omap/gpio.c
+> @@ -1629,7 +1629,7 @@ static void omap_gpio_mod_init(struct gpio_bank *bank, int id)
+>  	}
+>  }
+>  
+> -static void __init omap_gpio_chip_init(struct gpio_bank *bank)
+> +static void __devinit omap_gpio_chip_init(struct gpio_bank *bank)
+>  {
+>  	int j;
+>  	static int gpio;
+> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+> index 125f565..169e930 100644
+> --- a/arch/arm/mach-omap2/pm-debug.c
+> +++ b/arch/arm/mach-omap2/pm-debug.c
+> @@ -189,7 +189,7 @@ static struct dentry *pm_dbg_dir;
+>  
+>  static int pm_dbg_init_done;
+>  
+> -static int __init pm_dbg_init(void);
+> +static int pm_dbg_init(void);
+>  
+>  enum {
+>  	DEBUG_FILE_COUNTERS = 0,
+> @@ -595,7 +595,7 @@ static int option_set(void *data, u64 val)
+>  
+>  DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
+>  
+> -static int __init pm_dbg_init(void)
+> +static int pm_dbg_init(void)
+>  {
+>  	int i;
+>  	struct dentry *d;
+> 
