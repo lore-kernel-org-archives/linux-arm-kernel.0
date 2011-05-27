@@ -1,116 +1,94 @@
-From: christian.riesch@omicron.at (Christian Riesch)
-Date: Fri, 27 May 2011 11:20:53 +0200
-Subject: [PATCH V2] davinci: da850: move input frequency to board specific
-	files
-In-Reply-To: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
-References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
-Message-ID: <1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Fri, 27 May 2011 11:48:26 +0200 (CEST)
+Subject: [PATCH][RFC] Add mt9p031 sensor support.
+In-Reply-To: <BANLkTi=O91DiPM3uMP=OqOs4XpPzUAmhJA@mail.gmail.com>
+References: <1306247443-2191-1-git-send-email-javier.martin@vista-silicon.com>
+	<201105251005.28691.laurent.pinchart@ideasonboard.com>
+	<BANLkTikvLEG55vqpLmNJJsvsvz1eLsGoHw@mail.gmail.com>
+	<201105251143.52302.laurent.pinchart@ideasonboard.com>
+	<BANLkTi=O91DiPM3uMP=OqOs4XpPzUAmhJA@mail.gmail.com>
+Message-ID: <Pine.LNX.4.64.1105271128240.25265@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+On Fri, 27 May 2011, javier Martin wrote:
 
-Currently the input frequency of the SoC is hardcoded in the SoC specific
-da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
-range from 12 to 50 MHz, boards with different oscillator/crystal
-frequencies may be built.
+> On 25 May 2011 11:43, Laurent Pinchart
+> <laurent.pinchart@ideasonboard.com> wrote:
+> > Hi Javier,
+> >
+> > On Wednesday 25 May 2011 11:41:42 javier Martin wrote:
+> >> Hi,
+> >> thank you for the review, I agree with you on all the suggested
+> >> changes except on this one:
+> >>
+> >> On 25 May 2011 10:05, Laurent Pinchart wrote:
+> >> > On Tuesday 24 May 2011 16:30:43 Javier Martin wrote:
+> >> >> This RFC includes a power management implementation that causes
+> >> >> the sensor to show images with horizontal artifacts (usually
+> >> >> monochrome lines that appear on the image randomly).
+> >> >>
+> >> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
+> >> >
+> >> > [snip]
+> >> >
+> >> >> diff --git a/drivers/media/video/mt9p031.c
+> >> >> b/drivers/media/video/mt9p031.c new file mode 100644
+> >> >> index 0000000..04d8812
+> >> >> --- /dev/null
+> >> >> +++ b/drivers/media/video/mt9p031.c
+> >> >
+> >> > [snip]
+> >> >
+> >> >> +#define MT9P031_WINDOW_HEIGHT_MAX ? ? ? ? ? ?1944
+> >> >> +#define MT9P031_WINDOW_WIDTH_MAX ? ? ? ? ? ? 2592
+> >> >> +#define MT9P031_WINDOW_HEIGHT_MIN ? ? ? ? ? ?2
+> >> >> +#define MT9P031_WINDOW_WIDTH_MIN ? ? ? ? ? ? 18
+> >> >
+> >> > Can you move those 4 constants right below MT9P031_WINDOW_HEIGHT and
+> >> > MT9P031_WINDOW_WIDTH ? The max values are not correct, according to the
+> >> > datasheet they should be 2005 and 2751.
+> >>
+> >> In figure 4, it says active image size is 2592 x 1944
+> >> Why should I include active boundary and dark pixels?
+> >
+> > Users might want to get the dark pixels for black level compensation purpose.
+> > As the chip allows for that, it should be supported. The default should of
+> > course be the active area of 2592 x 1944 pixels.
+> >
+> 
+> OK, that sounds reasonable. However, that would include black pixels
+> that are located at the beginning of the array (0,0) to (16, 54),
+> which means that users would have to specify a crop value of (15,54)
+> to eliminate those initial black level pixels. Which seems quite
+> unnatural to me.
+> Another option could be setting (16,54) as default values and allowing
+> to introduce negative cropping values. Is this possible?
+> And finally, the most sensible idea IMHO could be not letting the user
+> to see pixels from (0,0) to (15,54) (setting 15,54 as minimum and
+> default )and, for black level compensation, ending pixels could be
+> used (2608,1998) to (2751, 2003).
 
-This patch allows setting a different input frequency in the board
-specific files to support boards with oscillator/crystal frequencies other
-than 24 MHz.
+No, you set your crop bounds to (0,0)-... but your default rectangle to 
+(15,54)-... and that's also what you set if noone issues an S_CROP.
 
-Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
-Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+Thanks
+Guennadi
+
+> What do you think?
+> 
+> 
+> -- 
+> Javier Martin
+> Vista Silicon S.L.
+> CDTUC - FASE C - Oficina S-345
+> Avda de los Castros s/n
+> 39005- Santander. Cantabria. Spain
+> +34 942 25 32 60
+> www.vista-silicon.com
+> 
+
 ---
-
-Hi,
-in private email Bob Dunlop suggested to pass a pointer to a small 
-structure instead of the frequency value to allow future expansions, 
-e.g., for the OPP list. Therefore I submit his patch as V2.
-Christian
-
- arch/arm/mach-davinci/board-da850-evm.c     |    2 +-
- arch/arm/mach-davinci/board-mityomapl138.c  |    2 +-
- arch/arm/mach-davinci/board-omapl138-hawk.c |    2 +-
- arch/arm/mach-davinci/da850.c               |    5 ++++-
- arch/arm/mach-davinci/include/mach/da8xx.h  |    6 +++++-
- 5 files changed, 12 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index a7b41bf..231ff87 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -1252,7 +1252,7 @@ console_initcall(da850_evm_console_init);
- 
- static void __init da850_evm_map_io(void)
- {
--	da850_init();
-+	da850_init(NULL);
- }
- 
- MACHINE_START(DAVINCI_DA850_EVM, "DaVinci DA850/OMAP-L138/AM18x EVM")
-diff --git a/arch/arm/mach-davinci/board-mityomapl138.c b/arch/arm/mach-davinci/board-mityomapl138.c
-index 606a6f2..362770c 100644
---- a/arch/arm/mach-davinci/board-mityomapl138.c
-+++ b/arch/arm/mach-davinci/board-mityomapl138.c
-@@ -561,7 +561,7 @@ console_initcall(mityomapl138_console_init);
- 
- static void __init mityomapl138_map_io(void)
- {
--	da850_init();
-+	da850_init(NULL);
- }
- 
- MACHINE_START(MITYOMAPL138, "MityDSP-L138/MityARM-1808")
-diff --git a/arch/arm/mach-davinci/board-omapl138-hawk.c b/arch/arm/mach-davinci/board-omapl138-hawk.c
-index 67c38d0..c43a6c3 100644
---- a/arch/arm/mach-davinci/board-omapl138-hawk.c
-+++ b/arch/arm/mach-davinci/board-omapl138-hawk.c
-@@ -334,7 +334,7 @@ console_initcall(omapl138_hawk_console_init);
- 
- static void __init omapl138_hawk_map_io(void)
- {
--	da850_init();
-+	da850_init(NULL);
- }
- 
- MACHINE_START(OMAPL138_HAWKBOARD, "AM18x/OMAP-L138 Hawkboard")
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 133aac4..ebd0603 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1104,10 +1104,13 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
- 	.reset_device		= &da8xx_wdt_device,
- };
- 
--void __init da850_init(void)
-+void __init da850_init(struct da850_init_board_info *board)
- {
- 	unsigned int v;
- 
-+	if (board && board->ref_clk_rate)
-+		ref_clk.rate = board->ref_clk_rate;
-+
- 	davinci_common_init(&davinci_soc_info_da850);
- 
- 	da8xx_syscfg0_base = ioremap(DA8XX_SYSCFG0_BASE, SZ_4K);
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index ad64da7..66efc5d 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -69,8 +69,12 @@ extern unsigned int da850_max_speed;
- #define DA8XX_AEMIF_CTL_BASE	0x68000000
- #define DA8XX_ARM_RAM_BASE	0xffff0000
- 
-+struct da850_init_board_info {
-+	unsigned long ref_clk_rate;
-+};
-+
- void __init da830_init(void);
--void __init da850_init(void);
-+void __init da850_init(struct da850_init_board_info *board);
- 
- int da830_register_edma(struct edma_rsv_info *rsv);
- int da850_register_edma(struct edma_rsv_info *rsv[2]);
--- 
-1.7.0.4
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
