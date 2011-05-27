@@ -1,92 +1,62 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Fri, 27 May 2011 13:46:38 +0100
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <20110527095111.GC21100@e102109-lin.cambridge.arm.com> (Catalin
-	Marinas's message of "Fri, 27 May 2011 10:51:11 +0100")
-References: <20110524171331.GA2941@arm.com>
-	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
-	<20110525124348.GA2340@arm.com> <yw1xaaeanbxe.fsf@unicorn.mansr.com>
-	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
-	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
-	<20110526215101.GL24876@n2100.arm.linux.org.uk>
-	<20110527083806.GA21100@e102109-lin.cambridge.arm.com>
-	<20110527085414.GP24876@n2100.arm.linux.org.uk>
-	<20110527095111.GC21100@e102109-lin.cambridge.arm.com>
-Message-ID: <yw1xlixse2fl.fsf@unicorn.mansr.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Fri, 27 May 2011 16:20:55 +0300
+Subject: [PATCH v2] OMAP3: beagle: add support for beagleboard xM revision
+	C
+In-Reply-To: <1306500018-19685-1-git-send-email-koen@dominion.thruhere.net>
+References: <1306500018-19685-1-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <4DDFA537.1060207@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Catalin Marinas <catalin.marinas@arm.com> writes:
+Hi Koen,
 
-> On Fri, May 27, 2011 at 09:54:14AM +0100, Russell King - ARM Linux wrote:
->> 
->> Ok, we need to check one last thing, and that's what the behaviour is
->> with -mno-unaligned-access and packed structures (such as the ethernet
->> header).  If it makes no difference, then I suggest we always build
->> with -mno-unaligned-access.
->
-> I tried some simple code below:
->
-> struct test {
-> 	unsigned char a[6];
-> 	unsigned long b;
-> } __attribute__((packed));
->
-> void set(struct test *t, unsigned long v)
-> {
-> 	t->b = v;
-> }
->
-> int main(void)
-> {
-> 	struct test t;
-> 	
-> 	set(&t, 10);
->
-> 	return 0;
-> }
->
-> With -mno-unaligned-access in newer toolchains, the set() function looks
-> like this (compiled with -march=armv7):
->
-> 00000000 <set>:
->    0:   e7e7c451        ubfx    ip, r1, #8, #8
->    4:   e7e72851        ubfx    r2, r1, #16, #8
->    8:   e1a03c21        lsr     r3, r1, #24
->    c:   e5c01006        strb    r1, [r0, #6]
->   10:   e5c0c007        strb    ip, [r0, #7]
->   14:   e5c02008        strb    r2, [r0, #8]
->   18:   e5c03009        strb    r3, [r0, #9]
->   1c:   e12fff1e        bx      lr
->
-> If I don't pass -mno-unaligned-access later toolchains use unaligned
-> accesses by default and the set() function is more efficient:
->
-> 00000000 <set>:
->    0:   e5801006        str     r1, [r0, #6]
->    4:   e12fff1e        bx      lr
 
-This is certainly something we should want.  Although some people
-expressed concerns over introducing unaligned accesses where there were
-previously none, I don't see how this could pose a problem as long as we
-make sure strict alignment checking is off.  Some basic testing of code
-paths known to use unaligned accesses should suffice IMO.
+Please CC LAKML for patches like this,
 
-> The problem is that in addition to that we also get unaligned stack
-> variables which are not really efficient. Either way we have a drawback
-> somewhere. We could argue that -fconserve-stack is badly implemented on
-> ARM.
+otherwise Tony, will have to post all of them before pull requesting.
 
-Unless someone can demonstrate a clear win from -fconserve-stack, I
-think it's pretty obvious that this flag does more harm than good on
-ARM, especially in conjunction with unaligned accesses being allowed.
 
-If the stack packing could be disabled while retaining the other
-(presumably beneficial) effects of -fconserve-stack, it might be
-reconsidered.
+
+On 05/27/11 15:40, Koen Kooi wrote:
+
+> The USB enable GPIO has been inverted again and the USER button moved.
+>
+> Future revisions will now fall back to xM rev C instead of unknown.
+>
+> Signed-off-by: Koen Kooi <koen@dominion.thruhere.net>
+> ---
+>
+> Changes since v1:
+> 	* updated against mainline to take Igors gpio cleanup into account
+> 	* removed xM rev B checks, no boards with that ID were ever produced, rev B boards show up as rev A
+> 	* double checked whitespace:
+>
+> 		total: 0 errors, 0 warnings, 89 lines checked
+> 		patches/0001-OMAP3-beagle-add-support-for-beagleboard-xM-revision.patch has no obvious style problems and is ready for submission.
+>
+>  arch/arm/mach-omap2/board-omap3beagle.c |   31 +++++++++++++++++++++++--------
+>  1 files changed, 23 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+> index be71426..177769b 100644
+> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+
+[...]
+
+> @@ -565,6 +576,10 @@ static void __init omap3_beagle_init(void)
+>  	omap3_mux_init(board_mux, OMAP_PACKAGE_CBB);
+>  	omap3_beagle_init_rev();
+>  	omap3_beagle_i2c_init();
+> +
+> +	if (cpu_is_omap3630())
+> +			gpio_buttons[0].gpio = 4;
+
+Don't get me wrong, I want this patch in mainline as soon as possible.
+Just curious, what the hell happened to indentation here? :)
+checkpatch.pl does not spot things like this... interesting...
+If you want to leave this as is, go ahead, I don't mind, just curious.
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+Regards,
+Igor.
