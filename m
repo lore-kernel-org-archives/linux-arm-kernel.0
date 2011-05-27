@@ -1,20 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 27 May 2011 19:06:25 +0100
-Subject: On __raw_readl readl_relaxed and readl nocheinmal
-In-Reply-To: <20110527150242.GB14035@e102109-lin.cambridge.arm.com>
-References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
-	<BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
-	<C832F8F5D375BD43BFA11E82E0FE9FE00AFDABA5E2@EXDCVYMBSTM005.EQ1STM.local>
-	<20110527150242.GB14035@e102109-lin.cambridge.arm.com>
-Message-ID: <20110527180625.GS24876@n2100.arm.linux.org.uk>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 27 May 2011 13:10:14 -0500
+Subject: uncompress and ll debug uart consolidation
+Message-ID: <4DDFE906.9020101@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2011 at 04:02:42PM +0100, Catalin Marinas wrote:
-> I think Arnd's point was that the writel_relaxed() variant may be even
-> more relaxed on other architectures than it is on ARM. I can't talk
-> about them.
+I started looking at the 10 duplicate implementations of PL01x uart code 
+in various mach/uncompress.h. My first thought was just consolidate 
+those into 1 uncompress-pl01x.h header similar to debug-pl01x.S.
 
-Actually, writel_relaxed() doesn't exist outside ARM, it's not part of
-the IO specification.  That's why it shouldn't be used in generic drivers
-until it's become part of the IO specification _first_.
+However, the LL debug macros are basically doing the same thing and are 
+already used by compressed/head.S, so why not make the uncompress code 
+use them? The debug macros are already included when DEBUG is defined 
+for compressed/head.S. It's quite trivial to use putc from head.S in 
+misc.c instead of the C version. To take it a step further, why not just 
+use kernel/debug.S for the decompresser and replace much of the code in 
+compressed/head.S. This would get rid of 2 implementations of DCC, 
+SA1100 and S3C2410 code.
+
+Am I missing something?
+
+Rob
