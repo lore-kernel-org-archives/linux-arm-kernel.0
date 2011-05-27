@@ -1,33 +1,39 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 May 2011 02:25:33 -0600
-Subject: [PATCH 2/2] GPIO: OMAP: move to drivers/gpio
-In-Reply-To: <20110527073529.GF31953@ponder.secretlab.ca>
-References: <1305898868-9188-1-git-send-email-khilman@ti.com>
-	<1305898868-9188-3-git-send-email-khilman@ti.com>
-	<20110527073529.GF31953@ponder.secretlab.ca>
-Message-ID: <BANLkTinqEM-iDhgSMAnMB5uehkt=V1Qq+w@mail.gmail.com>
+From: wim@iguana.be (Wim Van Sebroeck)
+Date: Fri, 27 May 2011 10:26:40 +0200
+Subject: [PATCH 0/4] ARM: smp_twd: mpcore_wdt: Fix MPCORE watchdog setup
+In-Reply-To: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+References: <1286185540-19569-1-git-send-email-vkuzmichev@mvista.com>
+Message-ID: <20110527082640.GC16394@infomag.iguana.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2011 at 1:35 AM, Grant Likely <grant.likely@secretlab.ca> wrote:
-> On Fri, May 20, 2011 at 03:41:08PM +0200, Kevin Hilman wrote:
->> Move OMAP GPIO driver to drivers/gpio. ?Builds whenever
->> CONFIG_ARCH_OMAP=y.
->>
->> Signed-off-by: Kevin Hilman <khilman@ti.com>
->
-> Patch unfortunately doesn't apply cleanly to Linus' tree. ?There's
-> been some changes to gpio.c compared to the tree this patch was
-> prepared against.
->
-> Also, if you use the -M flag when preparing the patch, then I'll be
-> able to see what the changes are during the move, and fix things up
-> intelligently if anything breaks.
->
-> Can you respin and repost the series quickly?
+Hi Vitaly,
 
-While you're at it, can you name the moved file
-drivers/gpio/gpio-omap.c?  ('-' instead of '_'.  Why, yes, I am a
-nitpicker.)
+> From: Vitaly Kuzmichev <vkuzmichev@mvista.com>
+> 
+> The series of patches fixes various bugs in ARM MPCORE watchdog setup.
+> They also introduce some changes in common SMP_TWD timer setup code.
+> The PATCH 1/4 adds an exported function to obtain calibrated timer rate
+> in mpcore_wdt. However, this solution might be unacceptable, so we may
+> discuss another 2 variants:
+>  1) use clock framework
+>    This may require to fix all MPCORE boards clock implementations.
+>  2) copy calibration loop to mpcore_wdt
+>    However, this increases boot time.
+> 
+> 
+> Vitaly Kuzmichev (4):
+>   ARM: smp_twd: mpcore_wdt: Fix watchdog counter loading
+>   ARM: smp_twd: Fix typo in twd_timer_rate printout
+>   ARM: mpcore_wdt: Fix WDIOC_SETOPTIONS handling
+>   ARM: mpcore_wdt: Fix timer mode setup
+> 
+>  arch/arm/include/asm/smp_twd.h |    7 +++++++
+>  arch/arm/kernel/smp_twd.c      |    8 +++++++-
+>  drivers/watchdog/mpcore_wdt.c  |   29 +++++++++++++++++++++--------
+>  3 files changed, 35 insertions(+), 9 deletions(-)
 
-g.
+What's the status on this? I don't recall having seen any answers from ARM community.
+
+Kind regards,
+Wim.
