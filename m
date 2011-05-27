@@ -1,49 +1,150 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Fri, 27 May 2011 13:14:11 +0100 (BST)
-Subject: [PATCH] ARM: Do not allow unaligned accesses when
-	CONFIG_ALIGNMENT_TRAP
-In-Reply-To: <mailman.254.1306496353.1533.linux-arm-kernel@lists.infradead.org>
-References: <mailman.254.1306496353.1533.linux-arm-kernel@lists.infradead.org>
-Message-ID: <alpine.DEB.2.00.1105271304250.13602@localhost6.localdomain6>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 27 May 2011 14:06:29 +0200
+Subject: [PATCH v2] [media] at91: add Atmel Image Sensor Interface
+	(ISI) support
+In-Reply-To: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
+References: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <20110527120629.GA3603@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[ ... ]
-> Subject: Re: [PATCH] ARM: Do not allow unaligned accesses when
-> 	CONFIG_ALIGNMENT_TRAP
-> Message-ID: <1306490709.26257.4.camel@e102144-lin.cambridge.arm.com>
-> Content-Type: text/plain; charset="UTF-8"
->
-> Hi Andi,
->
-> On Thu, 2011-05-26 at 22:10 +0100, Andi Kleen wrote:
->>
->>> It is possible that -fconserve-stack is still valuable on ARM given that
->>> it is also used with -mno-unaligned-access for other things than
->>> structure packing on the stack, and therefore its merits can be debated
->>> independently from the alignment issue at hand.
->>
->> The big advantage of -fconserve-stack is that it throttles the inliner
->> if the inlining
->> would cause too much stack growth. This is something you likely want
->> on ARM too, especially as code gets more and more complex.
->
-> Do you have any concrete examples of -fconserve-stack giving an overall
-> win that isn't in the noise? The fact that the GCC documentation
-> explicitly states that enabling the option can lead to `making the
-> program slower' does make me question why we're enabling it in the first
-> place.
->
->> From private conversation, the GCC guys don't seem to think this is a
-> bug so I'm reluctant to open a bugzilla ticket.
->
-> Will
+> +/* ISI interrupt service routine */
+> +static irqreturn_t isi_interrupt(int irq, void *dev_id)
+> +{
+> +	struct atmel_isi *isi = dev_id;
+> +	u32 status, mask, pending;
+> +	irqreturn_t ret = IRQ_NONE;
+> +
+> +	spin_lock(&isi->lock);
+> +
+> +	status = isi_readl(isi, ISI_STATUS);
+> +	mask = isi_readl(isi, ISI_INTMASK);
+> +	pending = status & mask;
+> +
+> +	if (pending & ISI_CTRL_SRST) {
+> +		complete(&isi->isi_complete);
+> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
+> +		ret = IRQ_HANDLED;
+> +	}
+> +	if (pending & ISI_CTRL_DIS) {
+> +		complete(&isi->isi_complete);
+> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
+> +		ret = IRQ_HANDLED;
+> +	}
+no else here?
+> +
+> +	if (pending & ISI_SR_VSYNC) {
+> +		switch (isi->state) {
+> +		case ISI_STATE_IDLE:
+> +			isi->state = ISI_STATE_READY;
+> +			wake_up_interruptible(&isi->capture_wq);
+> +			break;
+> +		}
+really switch here?
+> +	} else if (likely(pending & ISI_SR_CXFR_DONE)) {
+> +		ret = atmel_isi_handle_streaming(isi);
+> +	}
+> +
+> +	spin_unlock(&isi->lock);
+> +
+> +	return ret;
+> +}
+> +
+> +#define	WAIT_ISI_RESET		1
+> +#define	WAIT_ISI_DISABLE	0
+> +static int atmel_isi_wait_status(int wait_reset, struct atmel_isi *isi)
+I thinkhave teh atmel_isti first parameter is better
+> +{
+> +	unsigned long timeout;
+> +	/*
+> +	 * The reset or disable will only succeed if we have a
+> +	 * pixel clock from the camera.
+> +	 */
+> +	init_completion(&isi->isi_complete);
+> +
+> +	if (wait_reset) {
+> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
+> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+> +	} else {
+> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
+> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> +	}
+> +
+> +	timeout = wait_for_completion_timeout(&isi->isi_complete,
+> +			msecs_to_jiffies(100));
+> +	if (timeout == 0)
+> +		return -ETIMEDOUT;
+> +
+> +	return 0;
+> +}
+> +
+> +/* ------------------------------------------------------------------
+> +	Videobuf operations
+> +   ------------------------------------------------------------------*/
+> +static int queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
+> +				unsigned int *nplanes, unsigned long sizes[],
+> +				void *alloc_ctxs[])
+> +{
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vq);
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	unsigned long size;
+> +	int ret, bytes_per_line;
+> +
+> +	/* Reset ISI */
+> +	ret = atmel_isi_wait_status(WAIT_ISI_RESET, isi);
+> +	if (ret < 0) {
+> +		dev_err(icd->dev.parent, "Reset ISI timed out\n");
+> +		return ret;
+> +	}
+> +	/* Disable all interrupts */
+> +	isi_writel(isi, ISI_INTDIS, ~0UL);
+> +
+> +	bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
+> +						icd->current_fmt->host_fmt);
+> +
+> +	if (bytes_per_line < 0)
+> +		return bytes_per_line;
+> +
+> +	size = bytes_per_line * icd->user_height;
+> +
+> +	if (*nbuffers == 0)
+> +		*nbuffers = MAX_BUFFER_NUMS;
+> +	if (*nbuffers > MAX_BUFFER_NUMS)
+else here
+> +		*nbuffers = MAX_BUFFER_NUMS;
+> +
+> +	if (size * *nbuffers > VID_LIMIT_BYTES)
+> +		*nbuffers = VID_LIMIT_BYTES / size;
+> +
+> +	*nplanes = 1;
+> +	sizes[0] = size;
+> +	alloc_ctxs[0] = isi->alloc_ctx;
+> +
+> +	isi->sequence = 0;
+> +	isi->active = NULL;
+> +
+> +	dev_dbg(icd->dev.parent, "%s, count=%d, size=%ld\n", __func__,
+> +		*nbuffers, size);
+> +
+> +	return 0;
+> +}
+> +
+> +static int buffer_init(struct vb2_buffer *vb)
+> +{
+> +	struct frame_buffer *buf = container_of(vb, struct frame_buffer, vb);
+> +
+> +	buf->p_fb_desc = NULL;
+> +	buf->fb_desc_phys = 0;
+memset 0?
+> +	INIT_LIST_HEAD(&buf->list);
+> +
+> +	return 0;
+> +}
+> +
+otherwise the patch look good
+if you fix the upper issue
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Isn't this again one of those orthogonalities ? If what is desirable is to 
-curb the inlining, then achieving that as one but not the only side effect 
-of limiting stack space usage is kind of missing the point.
-
-The GCC manual says -finline-limit does this based on function size; 
-haven't experimented, though.
-
-FrankH.
+Best Regards,
+J.
