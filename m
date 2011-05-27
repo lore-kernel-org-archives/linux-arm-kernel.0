@@ -1,26 +1,21 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 26 May 2011 20:42:38 -0500
-Subject: [PATCH 4/5] ep93xx: remove the old M2P DMA code
-In-Reply-To: <f4ecbf118a8478e4df2da7b8a5e9b4330892679b.1306082097.git.mika.westerberg@iki.fi>
+Date: Thu, 26 May 2011 20:43:34 -0500
+Subject: [PATCH 3/5] ASoC: ep93xx: convert to use the DMA engine API
+In-Reply-To: <9f8dd1eb40a6cb44d8207c84f244345a98bb9c0f.1306082097.git.mika.westerberg@iki.fi>
 References: <cover.1306082097.git.mika.westerberg@iki.fi>
-	<f4ecbf118a8478e4df2da7b8a5e9b4330892679b.1306082097.git.mika.westerberg@iki.fi>
-Message-ID: <0D753D10438DA54287A00B027084269764D331A4B4@AUSP01VMBX24.collaborationhost.net>
+	<9f8dd1eb40a6cb44d8207c84f244345a98bb9c0f.1306082097.git.mika.westerberg@iki.fi>
+Message-ID: <0D753D10438DA54287A00B027084269764D331A4B5@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Sunday, May 22, 2011 10:03 AM, Mika Westerberg wrote:
 >
-> Since we have converted all existing users of the old DMA API to use the DMA
-> engine API the old code can be dropped.
->
+> Now that we have the EP93xx DMA engine driver in place, we convert the ASoC
+> drivers (I2S, AC97 and PCM) to take advantage of this new API. There are no
+> functional changes.
+> 
 > Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
-> ---
->  arch/arm/mach-ep93xx/Makefile           |    2 +-
->  arch/arm/mach-ep93xx/dma-m2p.c          |  411 -------------------------------
->  arch/arm/mach-ep93xx/include/mach/dma.h |  143 -----------
->  3 files changed, 1 insertions(+), 555 deletions(-)
->  delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
-
-Other than my comment in patch 1/5 about the old driver being builtin...
+> Cc: Liam Girdwood <lrg@slimlogic.co.uk>
+> Cc: Mark Brown <broonie@opensource.wolfsonmicro.com>
 
 Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
