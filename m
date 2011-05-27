@@ -1,54 +1,44 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri, 27 May 2011 09:27:45 +0200
-Subject: [PATCH] AT91: Add VSYNC pin definition for AT91SAM9263 silicon
-In-Reply-To: <4DDCC8C9.3080102@atmel.com>
-References: <1306305101-27285-1-git-send-email-hong.xu@atmel.com>
-	<20110525073933.GH863@game.jcrosoft.org>
-	<4DDCC8C9.3080102@atmel.com>
-Message-ID: <20110527072745.GC19723@game.jcrosoft.org>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Fri, 27 May 2011 09:01:35 +0100
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <1306427537.2497.86.camel@laptop>
+References: <1306260792.27474.133.camel@e102391-lin.cambridge.arm.com>
+	<1306272750.2497.79.camel@laptop> <1306343335.21578.65.camel@twins>
+	<1306358128.21578.107.camel@twins>
+	<BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526154508.GA13788@redhat.com> <1306425584.2497.81.camel@laptop>
+	<1306426148.2497.83.camel@laptop>
+	<1306426823.27474.241.camel@e102391-lin.cambridge.arm.com>
+	<1306427537.2497.86.camel@laptop>
+Message-ID: <1306483295.27474.248.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17:15 Wed 25 May     , Hong Xu wrote:
-> Hi,
+On Thu, 2011-05-26 at 18:32 +0200, Peter Zijlstra wrote:
+> On Thu, 2011-05-26 at 17:20 +0100, Marc Zyngier wrote:
+> > 
+> > Doesn't look very good here. The serial console basically locks up as
+> > soon as the system gets busy, even if the kernel compilation seem to
+> > progress at a decent pace. 
 > 
-> On 05/25/2011 03:39 PM, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> >On 14:31 Wed 25 May     , Hong Xu wrote:
-> >>On Atmel's AT91SAM9263-EK board, the LCD panel does not need VSYNC
-> >>signal. But this signal is useful for the boards from other
-> >>vendors, as suggested by Nicholas Kinar.
-> >>
-> >>This small patch adds the VSYNC pin definition by default.
-> >>
-> >>Reported-by: Nicholas Kinar<n.kinar@usask.ca>
-> >>Signed-off-by: Hong Xu<hong.xu@atmel.com>
-> >>---
-> >>  arch/arm/mach-at91/at91sam9263_devices.c |    1 +
-> >>  1 files changed, 1 insertions(+), 0 deletions(-)
-> >>
-> >>diff --git a/arch/arm/mach-at91/at91sam9263_devices.c b/arch/arm/mach-at91/at91sam9263_devices.c
-> >>index fb5c23a..7dab33e 100644
-> >>--- a/arch/arm/mach-at91/at91sam9263_devices.c
-> >>+++ b/arch/arm/mach-at91/at91sam9263_devices.c
-> >>@@ -832,6 +832,7 @@ void __init at91_add_device_lcdc(struct atmel_lcdfb_info *data)
-> >>  	if (!data)
-> >>  		return;
-> >>
-> >>+	at91_set_A_periph(AT91_PIN_PC0, 0);	/* LCDVSYNC */
-> >this must be optionnal
-> >
-> >we need to update this with somethink like done on avr32
-> >
 > 
-> hm.. PC0 in SAM9263 has only "A" function (LCD VSYNC). As long as
-> this pin is not used as GPIO, it's harmless to enable its peripheral
-> function.
-> 
-> I just had a quick look at the AVR32 code without catching your
-> "something like on AVR32". In AVR32, all ATMEL_LCDC_*_*BIT has
-> "VSYNC" defined.
-my key point is not here, my key point is to make it optional
-just take a look how did the avr32
+> OK, I'll leave the one that worked queued up for this release. If we can
+> come up with a better alternative we can try for the next release, that
+> should give us ample time to test things and get us a working kernel
+> now ;-)
 
-Best Regards,
-J.
+Agreed. The board has been compiling kernels for over 15 hours now, and
+doesn't show any sign of deadlock. Yet ;-).
+
+So until someone comes up with a much better approach, let's keep this
+one. I'm of course happy to continue testing stuff though.
+
+Cheers,
+
+	M.
+-- 
+Reality is an implementation detail.
