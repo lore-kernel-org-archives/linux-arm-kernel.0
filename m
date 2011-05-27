@@ -1,202 +1,397 @@
 From: ankita@in.ibm.com (Ankita Garg)
-Date: Fri, 27 May 2011 18:01:28 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory Power
-	Management
-Message-ID: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+Date: Fri, 27 May 2011 18:01:36 +0530
+Subject: [PATCH 08/10] mm: Modify vmscan
+In-Reply-To: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+Message-ID: <1306499498-14263-9-git-send-email-ankita@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Modify vmscan to take into account the changed node-zone hierarchy.
 
-Modern systems offer higher CPU performance and large amount of memory in
-each generation in order to support application demands.  Memory subsystem has
-began to offer wide range of capabilities for managing power consumption,
-which is driving the need to relook at the way memory is managed by the
-operating system. Linux VM subsystem has sophisticated algorithms to
-optimally  manage the scarce resources for best overall system performance.
-Apart from the capacity and location of memory areas, the VM subsystem tracks
-special addressability restrictions in zones and relative distance from CPU as
-NUMA nodes if necessary. Power management capabilities in the memory subsystem
-and inclusion of different class of main memory like PCM, or non-volatile RAM,
-brings in new boundaries and attributes that needs to be tagged within the
-Linux VM subsystem for exploitation by the kernel and applications.
+Signed-off-by: Ankita Garg <ankita@in.ibm.com>
+---
+ mm/vmscan.c |  284 ++++++++++++++++++++++++++++++++---------------------------
+ 1 files changed, 153 insertions(+), 131 deletions(-)
 
-This patchset proposes a generic memory regions infrastructure that can be
-used to tag boundaries of memory blocks which belongs to a specific memory
-power management domain and further enable exploitation of platform memory
-power management capabilities.
-
-How can Linux VM help memory power savings?
-
-o Consolidate memory allocations and/or references such that they are
-not spread across the entire memory address space.  Basically area of memory
-that is not being referenced, can reside in low power state.
-
-o Support targeted memory reclaim, where certain areas of memory that can be
-easily freed can be offlined, allowing those areas of memory to be put into
-lower power states.
-
-What is a Memory Region ?
--------------------------
-
-Memory regions is a generic memory management framework that enables the
-virtual memory manager to consider memory characteristics when making memory
-allocation and deallocation decisions. It is a layer of abstraction under the
-real NUMA nodes, that encapsulate knowledge of the underlying memory hardware.
-This layer is created at boot time, with information from firmware regarding
-the granularity at which memory power can be managed on the platform. For
-example, on platforms with support for Partial Array Self-Refresh (PASR) [1],
-regions could be aligned to memory unit that can be independently put into
-self-refresh or turned off (content destructive power off). On the other hand,
-platforms with support for multiple memory controllers that control the power
-states of memory, one memory region could be created for all the memory under
-a single memory controller.
-
-The aim of the alignment is to ensure that memory allocations, deallocations
-and reclaim are performed within a defined hardware boundary. By creating
-zones under regions, the buddy allocator would operate at the level of
-regions. The proposed data structure is as shown in the Figure below:
-
-
-             -----------------------------
-             |N0 |N1 |N2 |N3 |.. |.. |Nn |   
-             -----------------------------   
-             / \ \
-            /   \  \
-           /     \   \
- ------------    |  ------------
- | Mem Rgn0 |    |  | Mem Rgn3 |             
- ------------    |  ------------             
-    |            |         |
-    |      ------------    | ---------
-    |      | Mem Rgn1 |    ->| zones |
-    |      ------------      ---------
-    |          |     ---------
-    |          ----->| zones |
-    | ---------      ---------
-    ->| zones |
-      ---------
-
-Memory regions enable the following :
-
-o Sequential allocation of memory in the order of memory regions, thus
-  ensuring that greater number of memory regions are devoid of allocations to
-  begin with
-o With time however, the memory allocations will tend to be spread across
-  different regions. But the notion of a region boundary and region level
-  memory statistics will enable specific regions to be evacuated using
-  targetted allocation and reclaim. 
-
-Lumpy reclaim and other memory compaction work by Mel Gorman, would further
-aid in consolidation of memory [4].
-
-Memory regions is just a base infrastructure that would enable the Linux VM to
-be aware of the physical memory hardware characterisitics, a pre-requisite to
-implementing other sophisticated algorithms and techniques to actually
-conserve power.
-
-Advantages
------------
-
-Memory regions framework works with existing memory management data
-structures and only adds one more layer of abstraction that is required to
-capture special boundaries and properties.  Most VM code paths work similar
-to current implementation with additional traversal of zone data structures
-in pre-defined order.
-
-Alternative Approach:
-
-There are other ways in which memory belonging to the same power domain could
-be grouped together. Fake NUMA nodes under a real NUMA node could encapsulate
-information about the memory hardware units that can be independently power
-managed. With minimal code changes, the same functionality as memory regions
-can be achieved. However, the fake NUMA nodes is a non-intuitive solution, 
-that breaks the NUMA semantics and is not generic in nature. It would present
-an incorrect view of the system to the administrator, by showing that it has a
-greater number of NUMA nodes than actually present.
-
-Challenges
-----------
-
-o Memory interleaving is typically used on all platforms to increase the
-  memory bandwidth and hence memory performance. However, in the presence of
-  interleaving, the amount of idle memory within the hardware domain reduces,
-  impacting power savings. For a given platform, it is important to select an
-  interleaving scheme that gives good performance with optimum power savings.
-
-This is a RFC patchset with minimal functionality to demonstrate the
-requirement and proposed implementation options. It has been tested on TI
-OMAP4 Panda board with 1Gb RAM and the Samsung Exynos 4210 board. The patch
-applies on kernel version 2.6.39-rc5, compiled with the default config files
-for the two platforms. I have turned off cgroup, memory hotplug and kexec to
-begin. Support to these framework can be easily extended. The u-boot
-bootloader does not yet export information regarding the physical memory bank
-boundaries and hence the regions are not correctly aligned to hardware and
-hence hard coded for test/demo purposes. Also, the code assumes that atleast
-one region is present in the node. Compile time exclusion of memory regions is
-a todo.
-
-Results
--------
-Ran pagetest, a simple C program that allocates and touches a required number
-of pages, on a Samsung Exynos 4210 board with ~2GB RAM, booted with 4 memory
-regions, each with ~512MB. The allocation size used was 512MB. Below is the
-free page statistics while running the benchmark:
-
-		---------------------------------------
-	 	|	   | start  | ~480MB |  512MB |	
-		---------------------------------------
-		| Region 0 | 124013 | 1129   | 484    |
-		| Region 1 | 131072 | 131072 | 130824 |
-		| Region 2 | 131072 | 131072 | 131072 |
-		| Region 3 | 57332  | 57332  | 57332  |
-		---------------------------------------
-
-(The total number of pages in Region 3 is 57332, as it contains all the
-remaining pages and hence the region size is not 512MB).
-
-Column 1 indicates the number of free pages in each region at the start of the
-benchmark, column 2 at about 480MB allocation and column 3 at 512MB
-allocation. The memory in regions 1,2 & 3 is free and only region0 is
-utilized. So if the regions are aligned to the hardware memory units, free
-regions could potentially be put either into low power state or turned off. It
-may be possible to allocate from lower address without regions, but once the
-page reclaim comes into play, the page allocations will tend to get spread
-around.
-
-References
-----------
-
-[1] Partial Array Self Refresh
-http://focus.ti.com/general/docs/wtbu/wtbudocumentcenter.tsp?templateId=6123&navigationId=12037
-[2] TI OMAP$ Panda board
-http://pandaboard.org/node/224/#manual
-[3] Memory Regions discussion at Ubuntu Development Summit, May 2011
-https://wiki.linaro.org/Specs/KernelGeneralPerformanceO?action=AttachFile&do=view&target=k81-memregions.odp
-[4] Memory compaction
-http://lwn.net/Articles/368869/
-
-Ankita Garg (10):
-  mm: Introduce the memory regions data structure
-  mm: Helper routines
-  mm: Init zones inside memory regions
-  mm: Refer to zones from memory regions
-  mm: Create zonelists
-  mm: Verify zonelists
-  mm: Modify vmstat
-  mm: Modify vmscan
-  mm: Reflect memory region changes in zoneinfo
-  mm: Create memory regions at boot-up
-
- include/linux/mm.h     |   25 +++-
- include/linux/mmzone.h |   58 +++++++--
- include/linux/vmstat.h |   22 ++-
- mm/mm_init.c           |   51 ++++---
- mm/mmzone.c            |   36 ++++-
- mm/page_alloc.c        |  368 +++++++++++++++++++++++++++++++-----------------
- mm/vmscan.c            |  284 ++++++++++++++++++++-----------------
- mm/vmstat.c            |   77 ++++++----
- 8 files changed, 581 insertions(+), 340 deletions(-)
-
+diff --git a/mm/vmscan.c b/mm/vmscan.c
+index 8bfd450..2e11974 100644
+--- a/mm/vmscan.c
++++ b/mm/vmscan.c
+@@ -2235,10 +2235,16 @@ static bool pgdat_balanced(pg_data_t *pgdat, unsigned long balanced_pages,
+ 						int classzone_idx)
+ {
+ 	unsigned long present_pages = 0;
+-	int i;
+-
+-	for (i = 0; i <= classzone_idx; i++)
+-		present_pages += pgdat->node_zones[i].present_pages;
++	int i, p;
++
++	for (i = 0; i <= classzone_idx; i++) {
++		for_each_mem_region_in_nid(p, pgdat->node_id) {
++			mem_region_t *mem_region = &pgdat->mem_regions[p];
++			struct zone *zone = mem_region->zones + i;
++	
++			present_pages += zone->present_pages;
++		}
++	}
+ 
+ 	return balanced_pages > (present_pages >> 2);
+ }
+@@ -2247,7 +2253,7 @@ static bool pgdat_balanced(pg_data_t *pgdat, unsigned long balanced_pages,
+ static bool sleeping_prematurely(pg_data_t *pgdat, int order, long remaining,
+ 					int classzone_idx)
+ {
+-	int i;
++	int i, j;
+ 	unsigned long balanced = 0;
+ 	bool all_zones_ok = true;
+ 
+@@ -2257,29 +2263,31 @@ static bool sleeping_prematurely(pg_data_t *pgdat, int order, long remaining,
+ 
+ 	/* Check the watermark levels */
+ 	for (i = 0; i < pgdat->nr_zones; i++) {
+-		struct zone *zone = pgdat->node_zones + i;
++		for_each_mem_region_in_nid(j, pgdat->node_id) {
++			mem_region_t *mem_region = &pgdat->mem_regions[j];
++			struct zone *zone = mem_region->zones + i;
+ 
+-		if (!populated_zone(zone))
+-			continue;
++			if (!populated_zone(zone))
++				continue;
+ 
+-		/*
+-		 * balance_pgdat() skips over all_unreclaimable after
+-		 * DEF_PRIORITY. Effectively, it considers them balanced so
+-		 * they must be considered balanced here as well if kswapd
+-		 * is to sleep
+-		 */
+-		if (zone->all_unreclaimable) {
+-			balanced += zone->present_pages;
+-			continue;
+-		}
++			/*
++			 * balance_pgdat() skips over all_unreclaimable after
++			 * DEF_PRIORITY. Effectively, it considers them balanced so
++			 * they must be considered balanced here as well if kswapd
++			 * is to sleep
++			 */
++			if (zone->all_unreclaimable) {
++				balanced += zone->present_pages;
++				continue;
++			}
+ 
+-		if (!zone_watermark_ok_safe(zone, order, high_wmark_pages(zone),
+-							classzone_idx, 0))
+-			all_zones_ok = false;
+-		else
+-			balanced += zone->present_pages;
++			if (!zone_watermark_ok_safe(zone, order, high_wmark_pages(zone),
++								classzone_idx, 0))
++				all_zones_ok = false;
++			else
++				balanced += zone->present_pages;
++		}
+ 	}
+-
+ 	/*
+ 	 * For high-order requests, the balanced zones must contain at least
+ 	 * 25% of the nodes pages for kswapd to sleep. For order-0, all zones
+@@ -2318,7 +2326,7 @@ static unsigned long balance_pgdat(pg_data_t *pgdat, int order,
+ 	int all_zones_ok;
+ 	unsigned long balanced;
+ 	int priority;
+-	int i;
++	int i, p;
+ 	int end_zone = 0;	/* Inclusive.  0 = ZONE_DMA */
+ 	unsigned long total_scanned;
+ 	struct reclaim_state *reclaim_state = current->reclaim_state;
+@@ -2357,36 +2365,42 @@ loop_again:
+ 		 * zone which needs scanning
+ 		 */
+ 		for (i = pgdat->nr_zones - 1; i >= 0; i--) {
+-			struct zone *zone = pgdat->node_zones + i;
++			for_each_mem_region_in_nid(p, pgdat->node_id) {
++				mem_region_t *mem_region = &pgdat->mem_regions[p];
++				struct zone *zone = mem_region->zones + i;
+ 
+-			if (!populated_zone(zone))
+-				continue;
++				if (!populated_zone(zone))
++					continue;
+ 
+-			if (zone->all_unreclaimable && priority != DEF_PRIORITY)
+-				continue;
++				if (zone->all_unreclaimable && priority != DEF_PRIORITY)
++					continue;
+ 
+-			/*
+-			 * Do some background aging of the anon list, to give
+-			 * pages a chance to be referenced before reclaiming.
+-			 */
+-			if (inactive_anon_is_low(zone, &sc))
+-				shrink_active_list(SWAP_CLUSTER_MAX, zone,
+-							&sc, priority, 0);
+-
+-			if (!zone_watermark_ok_safe(zone, order,
+-					high_wmark_pages(zone), 0, 0)) {
+-				end_zone = i;
+-				*classzone_idx = i;
+-				break;
++				/*
++				 * Do some background aging of the anon list, to give
++				 * pages a chance to be referenced before reclaiming.
++				 */
++				if (inactive_anon_is_low(zone, &sc))
++					shrink_active_list(SWAP_CLUSTER_MAX, zone,
++								&sc, priority, 0);
++
++				if (!zone_watermark_ok_safe(zone, order,
++						high_wmark_pages(zone), 0, 0)) {
++					end_zone = i;
++					*classzone_idx = i;
++					break;
++				}
+ 			}
+ 		}
+ 		if (i < 0)
+ 			goto out;
+ 
+ 		for (i = 0; i <= end_zone; i++) {
+-			struct zone *zone = pgdat->node_zones + i;
++			for_each_mem_region_in_nid(p, pgdat->node_id) {
++				mem_region_t *mem_region = &pgdat->mem_regions[p];
++				struct zone *zone = mem_region->zones + i;
+ 
+-			lru_pages += zone_reclaimable_pages(zone);
++				lru_pages += zone_reclaimable_pages(zone);
++			}
+ 		}
+ 
+ 		/*
+@@ -2399,84 +2413,86 @@ loop_again:
+ 		 * cause too much scanning of the lower zones.
+ 		 */
+ 		for (i = 0; i <= end_zone; i++) {
+-			struct zone *zone = pgdat->node_zones + i;
+-			int nr_slab;
+-			unsigned long balance_gap;
+-
+-			if (!populated_zone(zone))
+-				continue;
++			for_each_mem_region_in_nid(p, pgdat->node_id) {
++				mem_region_t *mem_region = &pgdat->mem_regions[p];
++				struct zone *zone = mem_region->zones + i;
++				int nr_slab;
++				unsigned long balance_gap;
+ 
+-			if (zone->all_unreclaimable && priority != DEF_PRIORITY)
+-				continue;
++				if (!populated_zone(zone))
++					continue;
+ 
+-			sc.nr_scanned = 0;
++				if (zone->all_unreclaimable && priority != DEF_PRIORITY)
++					continue;
+ 
+-			/*
+-			 * Call soft limit reclaim before calling shrink_zone.
+-			 * For now we ignore the return value
+-			 */
+-			mem_cgroup_soft_limit_reclaim(zone, order, sc.gfp_mask);
++				sc.nr_scanned = 0;
+ 
+-			/*
+-			 * We put equal pressure on every zone, unless
+-			 * one zone has way too many pages free
+-			 * already. The "too many pages" is defined
+-			 * as the high wmark plus a "gap" where the
+-			 * gap is either the low watermark or 1%
+-			 * of the zone, whichever is smaller.
+-			 */
+-			balance_gap = min(low_wmark_pages(zone),
+-				(zone->present_pages +
+-					KSWAPD_ZONE_BALANCE_GAP_RATIO-1) /
+-				KSWAPD_ZONE_BALANCE_GAP_RATIO);
+-			if (!zone_watermark_ok_safe(zone, order,
+-					high_wmark_pages(zone) + balance_gap,
+-					end_zone, 0))
+-				shrink_zone(priority, zone, &sc);
+-			reclaim_state->reclaimed_slab = 0;
+-			nr_slab = shrink_slab(sc.nr_scanned, GFP_KERNEL,
+-						lru_pages);
+-			sc.nr_reclaimed += reclaim_state->reclaimed_slab;
+-			total_scanned += sc.nr_scanned;
+-
+-			if (zone->all_unreclaimable)
+-				continue;
+-			if (nr_slab == 0 &&
+-			    !zone_reclaimable(zone))
+-				zone->all_unreclaimable = 1;
+-			/*
+-			 * If we've done a decent amount of scanning and
+-			 * the reclaim ratio is low, start doing writepage
+-			 * even in laptop mode
+-			 */
+-			if (total_scanned > SWAP_CLUSTER_MAX * 2 &&
+-			    total_scanned > sc.nr_reclaimed + sc.nr_reclaimed / 2)
+-				sc.may_writepage = 1;
++				/*
++				 * Call soft limit reclaim before calling shrink_zone.
++				 * For now we ignore the return value
++				 */
++				mem_cgroup_soft_limit_reclaim(zone, order, sc.gfp_mask);
+ 
+-			if (!zone_watermark_ok_safe(zone, order,
+-					high_wmark_pages(zone), end_zone, 0)) {
+-				all_zones_ok = 0;
+ 				/*
+-				 * We are still under min water mark.  This
+-				 * means that we have a GFP_ATOMIC allocation
+-				 * failure risk. Hurry up!
++				 * We put equal pressure on every zone, unless
++				 * one zone has way too many pages free
++				 * already. The "too many pages" is defined
++				 * as the high wmark plus a "gap" where the
++				 * gap is either the low watermark or 1%
++				 * of the zone, whichever is smaller.
+ 				 */
++				balance_gap = min(low_wmark_pages(zone),
++					(zone->present_pages +
++						KSWAPD_ZONE_BALANCE_GAP_RATIO-1) /
++					KSWAPD_ZONE_BALANCE_GAP_RATIO);
+ 				if (!zone_watermark_ok_safe(zone, order,
+-					    min_wmark_pages(zone), end_zone, 0))
+-					has_under_min_watermark_zone = 1;
+-			} else {
++						high_wmark_pages(zone) + balance_gap,
++						end_zone, 0))
++					shrink_zone(priority, zone, &sc);
++				reclaim_state->reclaimed_slab = 0;
++				nr_slab = shrink_slab(sc.nr_scanned, GFP_KERNEL,
++							lru_pages);
++				sc.nr_reclaimed += reclaim_state->reclaimed_slab;
++				total_scanned += sc.nr_scanned;
++
++				if (zone->all_unreclaimable)
++					continue;
++				if (nr_slab == 0 &&
++				    !zone_reclaimable(zone))
++					zone->all_unreclaimable = 1;
+ 				/*
+-				 * If a zone reaches its high watermark,
+-				 * consider it to be no longer congested. It's
+-				 * possible there are dirty pages backed by
+-				 * congested BDIs but as pressure is relieved,
+-				 * spectulatively avoid congestion waits
++				 * If we've done a decent amount of scanning and
++				 * the reclaim ratio is low, start doing writepage
++				 * even in laptop mode
+ 				 */
+-				zone_clear_flag(zone, ZONE_CONGESTED);
+-				if (i <= *classzone_idx)
+-					balanced += zone->present_pages;
+-			}
++				if (total_scanned > SWAP_CLUSTER_MAX * 2 &&
++				    total_scanned > sc.nr_reclaimed + sc.nr_reclaimed / 2)
++					sc.may_writepage = 1;
+ 
++				if (!zone_watermark_ok_safe(zone, order,
++						high_wmark_pages(zone), end_zone, 0)) {
++					all_zones_ok = 0;
++					/*
++					 * We are still under min water mark.  This
++					 * means that we have a GFP_ATOMIC allocation
++					 * failure risk. Hurry up!
++					 */
++					if (!zone_watermark_ok_safe(zone, order,
++						    min_wmark_pages(zone), end_zone, 0))
++						has_under_min_watermark_zone = 1;
++				} else {
++					/*
++					 * If a zone reaches its high watermark,
++					 * consider it to be no longer congested. It's
++					 * possible there are dirty pages backed by
++					 * congested BDIs but as pressure is relieved,
++					 * spectulatively avoid congestion waits
++					 */
++					zone_clear_flag(zone, ZONE_CONGESTED);
++					if (i <= *classzone_idx)
++						balanced += zone->present_pages;
++				}
++			}
+ 		}
+ 		if (all_zones_ok || (order && pgdat_balanced(pgdat, balanced, *classzone_idx)))
+ 			break;		/* kswapd: all done */
+@@ -2542,23 +2558,26 @@ out:
+ 	 */
+ 	if (order) {
+ 		for (i = 0; i <= end_zone; i++) {
+-			struct zone *zone = pgdat->node_zones + i;
++			for_each_mem_region_in_nid(p, pgdat->node_id) {
++				mem_region_t *mem_region = &pgdat->mem_regions[p];
++				struct zone *zone = mem_region->zones + i;
+ 
+-			if (!populated_zone(zone))
+-				continue;
++				if (!populated_zone(zone))
++					continue;
+ 
+-			if (zone->all_unreclaimable && priority != DEF_PRIORITY)
+-				continue;
++				if (zone->all_unreclaimable && priority != DEF_PRIORITY)
++					continue;
+ 
+-			/* Confirm the zone is balanced for order-0 */
+-			if (!zone_watermark_ok(zone, 0,
+-					high_wmark_pages(zone), 0, 0)) {
+-				order = sc.order = 0;
+-				goto loop_again;
+-			}
++				/* Confirm the zone is balanced for order-0 */
++				if (!zone_watermark_ok(zone, 0,
++						high_wmark_pages(zone), 0, 0)) {
++					order = sc.order = 0;
++					goto loop_again;
++				}
+ 
+-			/* If balanced, clear the congested flag */
+-			zone_clear_flag(zone, ZONE_CONGESTED);
++				/* If balanced, clear the congested flag */
++				zone_clear_flag(zone, ZONE_CONGESTED);
++			}
+ 		}
+ 	}
+ 
+@@ -3304,18 +3323,21 @@ static ssize_t write_scan_unevictable_node(struct sys_device *dev,
+ 					   struct sysdev_attribute *attr,
+ 					const char *buf, size_t count)
+ {
+-	struct zone *node_zones = NODE_DATA(dev->id)->node_zones;
+-	struct zone *zone;
+ 	unsigned long res;
++	int i,j;
+ 	unsigned long req = strict_strtoul(buf, 10, &res);
+ 
+ 	if (!req)
+ 		return 1;	/* zero is no-op */
+ 
+-	for (zone = node_zones; zone - node_zones < MAX_NR_ZONES; ++zone) {
+-		if (!populated_zone(zone))
+-			continue;
+-		scan_zone_unevictable_pages(zone);
++	for (j = 0; j < MAX_NR_ZONES; ++j) {
++		for_each_mem_region_in_nid(i, dev->id) {
++			mem_region_t *mem_region = &(NODE_DATA(dev->id)->mem_regions[i]);
++			struct zone *zone = mem_region->zones;
++			if (!populated_zone(zone))
++				continue;
++			scan_zone_unevictable_pages(zone);
++		}
+ 	}
+ 	return 1;
+ }
 -- 
 1.7.4
