@@ -1,32 +1,35 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 27 May 2011 11:45:49 +0530
-Subject: [PATCH V6 00/10] Adding SPEAr13xx support
-In-Reply-To: <cover.1298977719.git.viresh.kumar@st.com>
-References: <cover.1298977719.git.viresh.kumar@st.com>
-Message-ID: <4DDF4195.5080000@st.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 27 May 2011 09:33:07 +0300
+Subject: [GIT PULL] omap updates for 2.6.40
+In-Reply-To: <9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
+References: <20110526113905.GG27250@atomide.com>
+	<9741DC43-3197-4ECE-A377-FA865A3F6710@dominion.thruhere.net>
+Message-ID: <20110527063304.GA27962@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/01/2011 04:57 PM, Viresh KUMAR wrote:
-> This patchset adds support for SPEAr13xx machine family. Currently support
-> for to machines SPEAr1300 & SPEAr1310 are added.
+* Koen Kooi <koen@dominion.thruhere.net> [110526 19:02]:
 > 
-> Note: These patches were earlier sent as part of a larger patchset:
-> "Updating SPEAr Support"
+> Op 26 mei 2011, om 13:39 heeft Tony Lindgren het volgende geschreven:
 > 
-> Now it is divided into smaller patchsets. In order to apply these patches
-> cleanly following order of patchsets must be maintained.
-> - SPEAr3xx & SPEAr6xx Fixes
-> - SPEAr3xx & SPEAr6xx: Single Image solution and padmux updates
-> - Adding SPEAr13xx support
-> - Adding devices support for all spear machines
-> - Clock Framework & CPU Freq Updates
+> > Hi Linus,
+> > 
+> > Please pull omap updates for this merge window from:
+> > 
+> > git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git omap-for-linus
+> > 
+> > This contains clean-up to shrink down omap specific code a bit. Also included
+> > are some fixes. But basically no new code at this point.
 > 
+> What about updates to board files? Like adding support for the xM rev C to board-omap3beagle.c.
 
-Russell,
+Sorry we're doing only code coalescing and fixes for this merge window as
+discussed on LAKML. Otherwise it's hard to see the code coalescing in the
+diffstats, so new code will need to wait a bit.
 
-I am removing this patchset from your tracker as it can't be pushed as it is.
-Will submit new patches after updating stuff.
+I'll take a look and see if we can justify some fix like trivial patches
+like the revision detection patches during the -rc cycle.
 
--- 
-viresh
+Regards,
+
+Tony
