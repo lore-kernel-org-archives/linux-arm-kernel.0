@@ -1,33 +1,30 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 May 2011 14:28:35 -0600
-Subject: [PATCH 2/2] GPIO: OMAP: move to drivers/gpio
-In-Reply-To: <877h9c2kq2.fsf@ti.com>
-References: <1305898868-9188-1-git-send-email-khilman@ti.com>
-	<1305898868-9188-3-git-send-email-khilman@ti.com>
-	<20110527073529.GF31953@ponder.secretlab.ca>
-	<BANLkTinqEM-iDhgSMAnMB5uehkt=V1Qq+w@mail.gmail.com>
-	<87pqn4404t.fsf@ti.com> <877h9c2kq2.fsf@ti.com>
-Message-ID: <20110527202835.GE6645@ponder.secretlab.ca>
+Date: Fri, 27 May 2011 14:29:06 -0600
+Subject: [PATCH v3 0/4] Consolidate sdhci pltfm & OF drivers and get them
+	self registered
+In-Reply-To: <m3pqn4ruv9.fsf@pullcord.laptop.org>
+References: <1306321314-2493-1-git-send-email-shawn.guo@linaro.org>
+	<20110527072647.GE31953@ponder.secretlab.ca>
+	<m3pqn4ruv9.fsf@pullcord.laptop.org>
+Message-ID: <20110527202906.GF6645@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2011 at 09:04:37AM -0700, Kevin Hilman wrote:
-> Kevin Hilman <khilman@ti.com> writes:
+On Fri, May 27, 2011 at 12:06:18PM -0400, Chris Ball wrote:
+> Hi Grant,
 > 
-> [...]
+> On Fri, May 27 2011, Grant Likely wrote:
+> > Any chance we can get this series into $NEXT_KERNEL?
 > 
-> >
-> > OK, I rebased onto RMK's for-linus branch (already pulled by Linus),
-> > which contained some other changes touching gpio.c.    I also s/_/-/ in
-> > the filename.
-> >
-> > Below is pull request.
+> I think I'd rather not in this case, hope that's okay.  It hasn't seen
+> testing in linux-next yet, there's a reasonable chance of it breaking
+> sdhci-pltfm users in subtle ways -- we haven't had much testing from
+> the individual -pltfm driver maintainers yet -- and the mmc merge was
+> (relatively) huge already this cycle.
 > 
-> BTW, apologies for the ssh URL.  I used it because I just pushed it, and
-> wanted to be sure you didn't have to wait for the mirrors.
-> 
-> Kevin
+> I'll certainly push it to linux-next as soon as -rc1 is released,
+> though.  Sound okay?
 
-Merged, thanks.
+okay.
 
 g.
