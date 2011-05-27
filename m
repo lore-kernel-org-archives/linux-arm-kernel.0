@@ -1,72 +1,85 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Fri, 27 May 2011 17:00:10 +0200
-Subject: [PATCHv2 2/2] OMAP: add omap_device_reset()
-In-Reply-To: <4DDFBA6E.4070005@ti.com>
-References: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>	
-	<1306481908-7386-3-git-send-email-tomi.valkeinen@ti.com>	
-	<4DDF9B5D.7060408@ti.com> <1306500367.1905.18.camel@deskari>
-	<4DDFB8AF.1080800@ti.com> <4DDFBA6E.4070005@ti.com>
-Message-ID: <4DDFBC7A.6090501@ti.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Fri, 27 May 2011 16:01:13 +0100 (BST)
+Subject: [RFC PATCH v3] ARM hibernation/suspend-to-disk support
+In-Reply-To: <alpine.DEB.2.00.1105251251330.4319@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1105251251330.4319@localhost6.localdomain6>
+Message-ID: <alpine.DEB.2.00.1105271549220.6109@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/27/2011 4:51 PM, Shilimkar, Santosh wrote:
-> On 5/27/2011 8:13 PM, Cousson, Benoit wrote:
->> On 5/27/2011 2:46 PM, Valkeinen, Tomi wrote:
->>> On Fri, 2011-05-27 at 14:38 +0200, Cousson, Benoit wrote:
->>>> Hi Tomi,
->>>>
->>>> On 5/27/2011 9:38 AM, Valkeinen, Tomi wrote:
->>>>> Add omap_device_reset() function which can be used to reset the hwmods
->>>>> associated with the given platform device.
->>>>
->>>> We've never exposed it because we are trying to avoid that any driver
->>>> play with asynchronous HW reset. That can lead to undefined HW
->>>> behavior :-(
->>>>
->>>> Do you have some strong need for that?
->>>
->>> DSS driver has been designed so that it resets the HW before it begins
->>> programming it. That way we get the HW into known state. Otherwise we
->>> need to be extra careful to program all possible registers to a sane
->>> value. Not impossible, of course, but requires extra work.
->>>
->>> I noticed the problem with DSI driver, it didn't work anymore if I
->>> didn't reset it.
->>>
->>> Why does it lead to undefined HW behaviour? Isn't it much better to
->>> reset the HW before starting to use it to be 100% sure it's in known and
->>> valid state?
->>
->> In theory, but since your are resetting only the DSS IP, it can leads to
->> side effect at SoC level. Especially wrt to clock management.
->>
->>> Especially in error situations it may be difficult (even impossible) to
->>> recover without reset. DISPC has been known to froze in some sync lost
->>> situations, and, if I recall right, if DSI transfer is aborted the only
->>> way to recover is to reset the DSI block (on OMAP3).
->>
->> In case of recovery error it makes sense. What we did with hardreset is
->> to re-assert the reset upon disable of the module and then the next
->> enable will de-assert it. Softreset does not do that today.
->>
-> I didn't notice this patch but Paul reported an issue on beagle
-> which was making L3 error handling driver hang.
->
-> Later on after debugging we noticed, that DSS initiator
-> was throwing timeout error.
->
-> As a temporary fix, we removed the timeout error from
-> the handler since root-cause was not known. [1]
->
-> I am not sure but may be a proper DSS reset might fix
-> that issue as well.
+On Wed, 25 May 2011, Frank Hofmann wrote:
 
-Yeah, but this is the issue... people will start abusing that to fix any 
-kind of problems instead of finding the root cause.
+> Hi,
+>
+> I've cleaned this up by the suggestions in the previous thread; this is the 
+> result.
+>
+> - now baselined against rmk/devel-stable
+> - didn't create the <asm/suspend.h> because Rafael is just removing
+>  that everywhere anyway
+> - Fixes re prev suggestion:
+> 	local_fiq_enable/disable bracketing
+> 	save only absolutely essential regs and let cpu_init do the rest
+> 	thumb2 clean assembly
+> 	allows mach hooks (but they're not defined by this code)
+>
+> - Also: uses the "generic suspend/resume support" code
+>  (commit f6b0fa02e8b0708d17d631afce456524eadf87ff, rmk/devel-stable)
+>
+> Via the latter, the previously-used hooks into machine-dependent code, 
+> __save/__restore_processor_state, have become unnecessary.
+>
+> This now simply calls the cpu_do_suspend/resume utilities provided by the 
+> generic code.
+>
+>
+> I'm still figuring out how to best test a recent devel-stable kernel ...
 
-That should be use only to fix real HW issue that cannot be solve 
-properly by SW.
 
-Regards,
-Benoit
+Ok, I have figured out a way to test (on ARM1176, not yet Cortex-A8), by 
+bringing my kernel up to a recent-enough baseline.
+
+
+I've found that the cpu_resume_mmu call done at the end of cpu_do_resume 
+is reliant on having the MMU off at that point.
+
+If it's on (as is the case when coming through the hibernation resume 
+point) the TTBR table modification in cpu_resume_mmu crashes ... well, 
+it's a PA after all.
+
+
+I could make hibernation resume to work through the generic paths if I add 
+a "fast exit" case:
+
+
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 6398ead..d83123a 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -71,10 +71,13 @@ ENDPROC(cpu_suspend)
+  /*
+   * r0 = control register value
+   * r1 = v:p offset (preserved by cpu_do_resume)
++ *      if this is zero, do not reenable MMU (it's on)
+   * r2 = phys page table base
+   * r3 = L1 section flags
+   */
+  ENTRY(cpu_resume_mmu)
++       teq     r1, #0
++       moveq   pc, lr                  @ return if MMU already on
+         adr     r4, cpu_resume_turn_mmu_on
+         mov     r4, r4, lsr #20
+         orr     r3, r3, r4, lsl #20
+
+
+and "mov r1,#0" before calling cpu_do_suspend, from swsusp_arch_resume.
+
+
+It leaves an unsatisfying feeling about this not being "quite right" 
+though.
+
+I wonder; is there a proper/suggested way to switch MMU off (and not end 
+in binary nirvana), to have the reentry / reenable work ?
+
+
+FrankH.
