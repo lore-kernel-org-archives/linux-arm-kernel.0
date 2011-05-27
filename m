@@ -1,94 +1,91 @@
-From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
-Date: Fri, 27 May 2011 11:48:26 +0200 (CEST)
-Subject: [PATCH][RFC] Add mt9p031 sensor support.
-In-Reply-To: <BANLkTi=O91DiPM3uMP=OqOs4XpPzUAmhJA@mail.gmail.com>
-References: <1306247443-2191-1-git-send-email-javier.martin@vista-silicon.com>
-	<201105251005.28691.laurent.pinchart@ideasonboard.com>
-	<BANLkTikvLEG55vqpLmNJJsvsvz1eLsGoHw@mail.gmail.com>
-	<201105251143.52302.laurent.pinchart@ideasonboard.com>
-	<BANLkTi=O91DiPM3uMP=OqOs4XpPzUAmhJA@mail.gmail.com>
-Message-ID: <Pine.LNX.4.64.1105271128240.25265@axis700.grange>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 27 May 2011 10:51:11 +0100
+Subject: [PATCH] ARM: Do not allow unaligned accesses when
+	CONFIG_ALIGNMENT_TRAP
+In-Reply-To: <20110527085414.GP24876@n2100.arm.linux.org.uk>
+References: <20110524171331.GA2941@arm.com>
+	<20110525111405.GA12010@e102109-lin.cambridge.arm.com>
+	<20110525124348.GA2340@arm.com>
+	<yw1xaaeanbxe.fsf@unicorn.mansr.com>
+	<BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
+	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
+	<20110526215101.GL24876@n2100.arm.linux.org.uk>
+	<20110527083806.GA21100@e102109-lin.cambridge.arm.com>
+	<20110527085414.GP24876@n2100.arm.linux.org.uk>
+Message-ID: <20110527095111.GC21100@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 May 2011, javier Martin wrote:
-
-> On 25 May 2011 11:43, Laurent Pinchart
-> <laurent.pinchart@ideasonboard.com> wrote:
-> > Hi Javier,
+On Fri, May 27, 2011 at 09:54:14AM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 27, 2011 at 09:38:08AM +0100, Catalin Marinas wrote:
+> > OK, I tried this now:
 > >
-> > On Wednesday 25 May 2011 11:41:42 javier Martin wrote:
-> >> Hi,
-> >> thank you for the review, I agree with you on all the suggested
-> >> changes except on this one:
-> >>
-> >> On 25 May 2011 10:05, Laurent Pinchart wrote:
-> >> > On Tuesday 24 May 2011 16:30:43 Javier Martin wrote:
-> >> >> This RFC includes a power management implementation that causes
-> >> >> the sensor to show images with horizontal artifacts (usually
-> >> >> monochrome lines that appear on the image randomly).
-> >> >>
-> >> >> Signed-off-by: Javier Martin <javier.martin@vista-silicon.com>
-> >> >
-> >> > [snip]
-> >> >
-> >> >> diff --git a/drivers/media/video/mt9p031.c
-> >> >> b/drivers/media/video/mt9p031.c new file mode 100644
-> >> >> index 0000000..04d8812
-> >> >> --- /dev/null
-> >> >> +++ b/drivers/media/video/mt9p031.c
-> >> >
-> >> > [snip]
-> >> >
-> >> >> +#define MT9P031_WINDOW_HEIGHT_MAX ? ? ? ? ? ?1944
-> >> >> +#define MT9P031_WINDOW_WIDTH_MAX ? ? ? ? ? ? 2592
-> >> >> +#define MT9P031_WINDOW_HEIGHT_MIN ? ? ? ? ? ?2
-> >> >> +#define MT9P031_WINDOW_WIDTH_MIN ? ? ? ? ? ? 18
-> >> >
-> >> > Can you move those 4 constants right below MT9P031_WINDOW_HEIGHT and
-> >> > MT9P031_WINDOW_WIDTH ? The max values are not correct, according to the
-> >> > datasheet they should be 2005 and 2751.
-> >>
-> >> In figure 4, it says active image size is 2592 x 1944
-> >> Why should I include active boundary and dark pixels?
+> > -fconserve-stack: we get unaligned accesses on the stack because the
+> > newer versions of gcc turned unaligned accesses on by default.
 > >
-> > Users might want to get the dark pixels for black level compensation purpose.
-> > As the chip allows for that, it should be supported. The default should of
-> > course be the active area of 2592 x 1944 pixels.
+> > -fconserve-stack -mno-unaligned-access: the stack variables are aligned.
+> > We probably get the benefit of -fconserve-stack as well.
 > >
+> > So as per the initial post in this thread, we could have
+> > -mno-unaligned-access on ARM always on (when CONFIG_ALIGNMENT_TRAP). As
+> > Nicolas suggested, we could compile some files with -munaligned-access
+> > (and maybe -fno-conserve-stack).
+> >
+> > I raised this with the gcc guys so they are looking into it. But it
+> > really doesn't look like a gcc bug as long as -mno-unaligned-access is
+> > taken into account.
 > 
-> OK, that sounds reasonable. However, that would include black pixels
-> that are located at the beginning of the array (0,0) to (16, 54),
-> which means that users would have to specify a crop value of (15,54)
-> to eliminate those initial black level pixels. Which seems quite
-> unnatural to me.
-> Another option could be setting (16,54) as default values and allowing
-> to introduce negative cropping values. Is this possible?
-> And finally, the most sensible idea IMHO could be not letting the user
-> to see pixels from (0,0) to (15,54) (setting 15,54 as minimum and
-> default )and, for black level compensation, ending pixels could be
-> used (2608,1998) to (2751, 2003).
+> Ok, we need to check one last thing, and that's what the behaviour is
+> with -mno-unaligned-access and packed structures (such as the ethernet
+> header).  If it makes no difference, then I suggest we always build
+> with -mno-unaligned-access.
 
-No, you set your crop bounds to (0,0)-... but your default rectangle to 
-(15,54)-... and that's also what you set if noone issues an S_CROP.
+I tried some simple code below:
 
-Thanks
-Guennadi
+struct test {
+	unsigned char a[6];
+	unsigned long b;
+} __attribute__((packed));
 
-> What do you think?
-> 
-> 
-> -- 
-> Javier Martin
-> Vista Silicon S.L.
-> CDTUC - FASE C - Oficina S-345
-> Avda de los Castros s/n
-> 39005- Santander. Cantabria. Spain
-> +34 942 25 32 60
-> www.vista-silicon.com
-> 
+void set(struct test *t, unsigned long v)
+{
+	t->b = v;
+}
 
----
-Guennadi Liakhovetski, Ph.D.
-Freelance Open-Source Software Developer
-http://www.open-technology.de/
+int main(void)
+{
+	struct test t;
+	
+	set(&t, 10);
+
+	return 0;
+}
+
+With -mno-unaligned-access in newer toolchains, the set() function looks
+like this (compiled with -march=armv7):
+
+00000000 <set>:
+   0:   e7e7c451        ubfx    ip, r1, #8, #8
+   4:   e7e72851        ubfx    r2, r1, #16, #8
+   8:   e1a03c21        lsr     r3, r1, #24
+   c:   e5c01006        strb    r1, [r0, #6]
+  10:   e5c0c007        strb    ip, [r0, #7]
+  14:   e5c02008        strb    r2, [r0, #8]
+  18:   e5c03009        strb    r3, [r0, #9]
+  1c:   e12fff1e        bx      lr
+
+If I don't pass -mno-unaligned-access later toolchains use unaligned
+accesses by default and the set() function is more efficient:
+
+00000000 <set>:
+   0:   e5801006        str     r1, [r0, #6]
+   4:   e12fff1e        bx      lr
+
+The problem is that in addition to that we also get unaligned stack
+variables which are not really efficient. Either way we have a drawback
+somewhere. We could argue that -fconserve-stack is badly implemented on
+ARM.
+
+-- 
+Catalin
