@@ -1,23 +1,28 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 27 May 2011 13:10:14 -0500
-Subject: uncompress and ll debug uart consolidation
-Message-ID: <4DDFE906.9020101@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri, 27 May 2011 15:16:07 -0300
+Subject: [PATCH] ARM: imx/mach-apf9328: Simplify UART0 registration
+In-Reply-To: <20110510165802.04ed1b9b@trabucayre.com>
+References: <1305037260-31131-1-git-send-email-fabio.estevam@freescale.com>
+	<20110510165802.04ed1b9b@trabucayre.com>
+Message-ID: <BANLkTimi4XgDZiz-bXz0EQkSiEwnnjKtNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I started looking at the 10 duplicate implementations of PL01x uart code 
-in various mach/uncompress.h. My first thought was just consolidate 
-those into 1 uncompress-pl01x.h header similar to debug-pl01x.S.
+Hi Sascha,
 
-However, the LL debug macros are basically doing the same thing and are 
-already used by compressed/head.S, so why not make the uncompress code 
-use them? The debug macros are already included when DEBUG is defined 
-for compressed/head.S. It's quite trivial to use putc from head.S in 
-misc.c instead of the C version. To take it a step further, why not just 
-use kernel/debug.S for the decompresser and replace much of the code in 
-compressed/head.S. This would get rid of 2 implementations of DCC, 
-SA1100 and S3C2410 code.
+On Tue, May 10, 2011 at 11:58 AM, gwenhael.goavec
+<gwenhael.goavec-merou@armadeus.com> wrote:
+> On Tue, 10 May 2011 11:21:00 -0300
+> Fabio Estevam <fabio.estevam@freescale.com> wrote:
+>
+>> As no flag is passed into UART0 platform data, pass NULL argument
+>> when registering UART0.
+>>
+>> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> Acked-by: Gwenhael Goavec-Merou <gwenhael.goavec-merou@armadeus.com>
 
-Am I missing something?
+Ping?
 
-Rob
+Regards,
+
+Fabio Estevam
