@@ -1,55 +1,37 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 27 May 2011 08:31:06 +0300
-Subject: [PATCH 0/3] Some omap_device/hwmod/pwrdomain patches
-In-Reply-To: <87ipsxfjyd.fsf@ti.com>
-References: <1306428307-1360-1-git-send-email-tomi.valkeinen@ti.com>
-	<87ipsxfjyd.fsf@ti.com>
-Message-ID: <1306474266.1905.8.camel@deskari>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Fri, 27 May 2011 11:04:19 +0530
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <201105191550.20129.arnd@arndb.de>
+References: <201105181047.17309.arnd@arndb.de>	<alpine.LFD.2.00.1105182234130.14430@xanadu.home>	<BANLkTinXQvrG3LeSEO9Lnam3Bvq3dDKOsw@mail.gmail.com>
+	<201105191550.20129.arnd@arndb.de>
+Message-ID: <4DDF37DB.40606@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-26 at 10:30 -0700, Kevin Hilman wrote:
-> Tomi Valkeinen <tomi.valkeinen@ti.com> writes:
+On 05/19/2011 07:20 PM, Arnd Bergmann wrote:
+>> > i asked this because we wanted to send the source codes of
+>> > CSR(http://www.csr.com) to upstream as i have told you in LDS. it
+>> > looks like we need to follow the below new changes to make our source
+>> > codes acceptable?
+>> > 1. arm device tree
+>> > 2. new pinmux framework from Linus Walleij
+>> > 3. move GPIO from plat/mach to drivers/gpio?
+> I would count at least the last two as mandatory, for the device tree,
+> it depends on how much work it would be for you to do the conversion
+> and at what time you submit the series. The longer you wait before
+> submitting the series, the stricter the requirements will get.
 > 
-> > I came up with these patches while implementing pm runtime adaptation for DSS
-> > driver. I'm not quite sure on who's turf they belong, or do they even belong
-> > together, but here they are anyway.
-> >
-> > get_context_loss_count patch was discussed on l-o with Kevin.
-> >
-> > The omap_device_reset patch I made as some parts of DSS currently presume that
-> > the HW module is reset when it is enabled, and the reset is better handled in
-> > hwmod code.
-> >
-> > can_ever_lose_context code I didn't strictly need, but as there's such a
-> > function I added that to the context save code in DSS while rewriting the code.
-> 
-> Are any of the DSS blocks in power domains that can't lose context
-> (WKUP?)
 
-Probably not. I have to say I don't know when can_ever_lose_context
-returns false.
+Arnd,
 
-I had some old code in DSS's context save functions which disabled
-context saving for OMAP2. I don't remember why that was put there, but
-probably either 1) OMAP2's DSS can't ever lose context 2) OMAP2's DSS
-couldn't lose context at the time the code was written.
+We also have few patchsets for ST's SPEAr SOC family. They were already
+reviewed, but never got pushed.
 
-I guess 2) is more likely, but nevertheless when I noticed
-can_ever_lose_context I thought it'd be good to have that in the context
-save code.
+We will update all those pacthsets for point 2 & 3, and leave point 1 for now.
+Also we will update them with our latest changes for SPEAr and will circulate
+them ASAP.
 
-> This isn't something in general that drivers should be aware of, so I'd
-> rather not see this exposed to drivers (unless there's a real need.)
+Hope that's fine.
 
-Ok, I'll drop the patch. I don't think there's any need for this in DSS.
-
-> As soon as I finish the move to device power domains (hopefully for
-> 2.6.41), the driver's callbacks will only be called if the device has
-> lost context, so checking for context loss will not be needed at all at
-> the driver level.
-
-This sounds good. Runtime PM's suspend & resume callbacks or something
-else? 
-
- Tomi
+-- 
+viresh
