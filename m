@@ -1,18 +1,47 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 26 May 2011 17:34:52 -0600
-Subject: [PATCH v2 0/4] Samsung: Move Samsung SoCs GPIO drivers to
-	drivers/gpio
-In-Reply-To: <20110523082728.GA6192@july>
-References: <20110523082728.GA6192@july>
-Message-ID: <20110526233452.GB1384@ponder.secretlab.ca>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 27 May 2011 09:01:37 +0900
+Subject: [RFC] ARM Subarchitecture group maintainership
+In-Reply-To: <87k4ddiglp.fsf@ti.com>
+References: <201105181047.17309.arnd@arndb.de>
+	<87k4ddiglp.fsf@ti.com>
+Message-ID: <BANLkTinBZs_bQF-dYM8S=6HSr0o+aDsKKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 23, 2011 at 05:27:28PM +0900, Kyungmin Park wrote:
-> The following changes since commit dcb4a1f0e0367efb813907e5083998bbb98b0456:
-> 
->   Merge branch 'for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/ieee1394/linux1394-2.6 (2011-05-21 12:25:07 -0700)
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-Applied whole series, thanks.
+from Samsung Mobile & DMC codes
 
-g.
+On Fri, May 27, 2011 at 1:14 AM, Kevin Hilman <khilman@ti.com> wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+>
+>> This is the draft plan for maintaining the ARM subarchitectures in a common
+>> tree, as a way to help coordinate the upstream merging of the
+>> arch/arm/{plat,mach}-* changes into Linus' tree.
+>
+> [...]
+>
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Nicolas Pitre <nico@fluxnic.net>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> Cc: Russell King <linux@arm.linux.org.uk>
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>>
+>> ---
+>>
+>> Maintainers: If you are happy with the layout of the process,
+>> please ack this patch, otherwise please comment.
+>
+> Acked-by: Kevin Hilman <khilman@ti.com>
+>
+> for davinci and OMAP stuff I maintain.
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at ?http://www.tux.org/lkml/
+>
