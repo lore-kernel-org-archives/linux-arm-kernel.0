@@ -1,48 +1,32 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 27 May 2011 09:04:37 -0700
-Subject: [PATCH 2/2] GPIO: OMAP: move to drivers/gpio
-In-Reply-To: <87pqn4404t.fsf@ti.com> (Kevin Hilman's message of "Fri, 27 May
-	2011 08:46:26 -0700")
-References: <1305898868-9188-1-git-send-email-khilman@ti.com>
-	<1305898868-9188-3-git-send-email-khilman@ti.com>
-	<20110527073529.GF31953@ponder.secretlab.ca>
-	<BANLkTinqEM-iDhgSMAnMB5uehkt=V1Qq+w@mail.gmail.com>
-	<87pqn4404t.fsf@ti.com>
-Message-ID: <877h9c2kq2.fsf@ti.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Fri, 27 May 2011 12:06:18 -0400
+Subject: [PATCH v3 0/4] Consolidate sdhci pltfm & OF drivers and get them
+	self registered
+In-Reply-To: <20110527072647.GE31953@ponder.secretlab.ca> (Grant Likely's
+	message of "Fri, 27 May 2011 01:26:47 -0600")
+References: <1306321314-2493-1-git-send-email-shawn.guo@linaro.org>
+	<20110527072647.GE31953@ponder.secretlab.ca>
+Message-ID: <m3pqn4ruv9.fsf@pullcord.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin Hilman <khilman@ti.com> writes:
+Hi Grant,
 
-[...]
+On Fri, May 27 2011, Grant Likely wrote:
+> Any chance we can get this series into $NEXT_KERNEL?
 
->
-> OK, I rebased onto RMK's for-linus branch (already pulled by Linus),
-> which contained some other changes touching gpio.c.    I also s/_/-/ in
-> the filename.
->
-> Below is pull request.
+I think I'd rather not in this case, hope that's okay.  It hasn't seen
+testing in linux-next yet, there's a reasonable chance of it breaking
+sdhci-pltfm users in subtle ways -- we haven't had much testing from
+the individual -pltfm driver maintainers yet -- and the mmc merge was
+(relatively) huge already this cycle.
 
-BTW, apologies for the ssh URL.  I used it because I just pushed it, and
-wanted to be sure you didn't have to wait for the mirrors.
+I'll certainly push it to linux-next as soon as -rc1 is released,
+though.  Sound okay?
 
-Kevin
+Thanks,
 
-> The following changes since commit 9a55d9752d8abfc62f1ab05ccc790d22a0c8e7c0:
->
->   Merge branch 'devel-stable' into for-linus (2011-05-23 19:28:04 +0100)
->
-> are available in the git repository at:
->
->   ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_2.6.40/gpio-move
->
-> Kevin Hilman (2):
->       GPIO: OMAP: move register offset defines into <plat/gpio.h>
->       GPIO: OMAP: move to drivers/gpio
->
->  arch/arm/plat-omap/Makefile                        |    2 +-
->  arch/arm/plat-omap/include/plat/gpio.h             |  103 +++++++++++++++++++
->  drivers/gpio/Makefile                              |    1 +
->  .../plat-omap/gpio.c => drivers/gpio/gpio-omap.c   |  105 --------------------
->  4 files changed, 105 insertions(+), 106 deletions(-)
->  rename arch/arm/plat-omap/gpio.c => drivers/gpio/gpio-omap.c (93%)
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
