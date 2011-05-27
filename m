@@ -1,189 +1,136 @@
 From: ankita@in.ibm.com (Ankita Garg)
-Date: Fri, 27 May 2011 18:01:37 +0530
-Subject: [PATCH 09/10] mm: Reflect memory region changes in zoneinfo
+Date: Fri, 27 May 2011 18:01:33 +0530
+Subject: [PATCH 05/10] mm: Create zonelists
 In-Reply-To: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
 References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-Message-ID: <1306499498-14263-10-git-send-email-ankita@in.ibm.com>
+Message-ID: <1306499498-14263-6-git-send-email-ankita@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch modifies the output of /proc/zoneinfo to take the memory regions
-into into account. Below is the output on the Samsung board booted with 4
-regions, each of size 512MB.
-
-# cat /proc/zoneinfo
-Node 0, Region 0, zone   Normal
-  pages free     124570
-        min      388
-        low      485
-        high     582
-        scanned  0
-        spanned  131072
-        present  130048
-    nr_free_pages 124570
-    nr_inactive_anon 0
-    nr_active_anon 92
-    nr_inactive_file 454
-    nr_active_file 190
-    nr_unevictable 0
-    nr_mlock     0
-    nr_anon_pages 95
-    nr_mapped    290
-    nr_file_pages 647
-    nr_dirty     1
-    nr_writeback 0
-    nr_slab_reclaimable 33
-    nr_slab_unreclaimable 428
-    nr_page_table_pages 4
-    nr_kernel_stack 20
-    nr_unstable  0
-    nr_bounce    0
-    nr_vmscan_write 0
-    nr_writeback_temp 0
-    nr_isolated_anon 0
-    nr_isolated_file 0
-    nr_shmem     0
-    nr_dirtied   12
-    nr_written   11
-    nr_anon_transparent_hugepages 0
-        protection: (0, 0)
-  pagesets
-    cpu: 0
-              count: 48
-              high:  186
-              batch: 31
-  vm stats threshold: 6
-  all_unreclaimable: 0
-  start_pfn:         262144
-  inactive_ratio:    1
-Node 0, Region 1, zone   Normal
-  pages free     131072
-        min      388
-        low      485
-        high     582
-        scanned  0
-        spanned  131072
-        present  130048
-    nr_free_pages 131072
-.....
-Node 0, Region 2, zone   Normal
-  pages free     131072
-        min      388
-        low      485
-        high     582
-        scanned  0
-        spanned  131072
-        present  130048
-    nr_free_pages 131072
-.....
-Node 0, Region 3, zone   Normal
-  pages free     57332
-        min      170
-        low      212
-        high     255
-        scanned  0
-        spanned  57344
-        present  56896
-    nr_free_pages 57332
-.....
+The default zonelist that is node ordered contains all zones from within a
+node and then all zones from the next node and so on. By introducing memory
+regions, the primary aim is to group memory allocations to a given area of
+memory together. The modified zonelists thus contain all zones from one
+region, followed by all zones from the next region and so on. This ensures
+that all the memory in one region is allocated before going over to the next
+region, unless targetted memory allocations are performed.
 
 Signed-off-by: Ankita Garg <ankita@in.ibm.com>
 ---
- mm/vmstat.c |   29 +++++++++++++++++------------
- 1 files changed, 17 insertions(+), 12 deletions(-)
+ mm/page_alloc.c |   62 +++++++++++++++++++++++++++++++++---------------------
+ 1 files changed, 38 insertions(+), 24 deletions(-)
 
-diff --git a/mm/vmstat.c b/mm/vmstat.c
-index 542f8b6..153e25b 100644
---- a/mm/vmstat.c
-+++ b/mm/vmstat.c
-@@ -179,16 +179,18 @@ static void refresh_zone_stat_thresholds(void)
- 		 */
- 		tolerate_drift = low_wmark_pages(zone) - min_wmark_pages(zone);
- 		max_drift = num_online_cpus() * threshold;
--		if (max_drift > tolerate_drift)
-+		if (max_drift > tolerate_drift) {
- 			zone->percpu_drift_mark = high_wmark_pages(zone) +
- 					max_drift;
-+			printk("zone %s drift mark %lu \n", zone->name, 
-+						zone->percpu_drift_mark);
-+		}
+diff --git a/mm/page_alloc.c b/mm/page_alloc.c
+index 3c48635..da8b045 100644
+--- a/mm/page_alloc.c
++++ b/mm/page_alloc.c
+@@ -2668,20 +2668,26 @@ static int build_zonelists_node(pg_data_t *pgdat, struct zonelist *zonelist,
+ 				int nr_zones, enum zone_type zone_type)
+ {
+ 	struct zone *zone;
++	int nid = pgdat->node_id;
++	int i;
++	enum zone_type z_type = zone_type;
+ 
+ 	BUG_ON(zone_type >= MAX_NR_ZONES);
+ 	zone_type++;
+ 
+-	do {
+-		zone_type--;
+-		zone = pgdat->node_zones + zone_type;
+-		if (populated_zone(zone)) {
+-			zoneref_set_zone(zone,
+-				&zonelist->_zonerefs[nr_zones++]);
+-			check_highest_zone(zone_type);
+-		}
+-
+-	} while (zone_type);
++	for_each_mem_region_in_nid(i, nid) {
++		mem_region_t *mem_region = &pgdat->mem_regions[i];
++		do {
++			zone_type--;
++			zone = mem_region->zones + zone_type;
++			if (populated_zone(zone)) {
++				zoneref_set_zone(zone,
++					&zonelist->_zonerefs[nr_zones++]);
++				check_highest_zone(zone_type);
++			}
++		} while (zone_type);
++		zone_type = z_type + 1;
++	}
+ 	return nr_zones;
+ }
+ 
+@@ -2898,7 +2904,7 @@ static int node_order[MAX_NUMNODES];
+ 
+ static void build_zonelists_in_zone_order(pg_data_t *pgdat, int nr_nodes)
+ {
+-	int pos, j, node;
++	int pos, j, node, p;
+ 	int zone_type;		/* needs to be signed */
+ 	struct zone *z;
+ 	struct zonelist *zonelist;
+@@ -2922,7 +2928,7 @@ static void build_zonelists_in_zone_order(pg_data_t *pgdat, int nr_nodes)
+ 
+ static int default_zonelist_order(void)
+ {
+-	int nid, zone_type;
++	int nid, zone_type, i;
+ 	unsigned long low_kmem_size,total_size;
+ 	struct zone *z;
+ 	int average_size;
+@@ -2937,12 +2943,16 @@ static int default_zonelist_order(void)
+ 	total_size = 0;
+ 	for_each_online_node(nid) {
+ 		for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++) {
+-			z = &NODE_DATA(nid)->node_zones[zone_type];
+-			if (populated_zone(z)) {
+-				if (zone_type < ZONE_NORMAL)
+-					low_kmem_size += z->present_pages;
+-				total_size += z->present_pages;
+-			} else if (zone_type == ZONE_NORMAL) {
++			for_each_mem_region_in_nid(i, nid) {
++				mem_region_t *mem_region = &(NODE_DATA(nid)->mem_regions[i]);
++				z = &mem_region->zones[zone_type];
++				if (populated_zone(z)) {
++					if (zone_type < ZONE_NORMAL)
++						low_kmem_size +=
++							z->present_pages;
++
++					total_size += z->present_pages;
++				} else if (zone_type == ZONE_NORMAL) {
+ 				/*
+ 				 * If any node has only lowmem, then node order
+ 				 * is preferred to allow kernel allocations
+@@ -2950,7 +2960,8 @@ static int default_zonelist_order(void)
+ 				 * on other nodes when there is an abundance of
+ 				 * lowmem available to allocate from.
+ 				 */
+-				return ZONELIST_ORDER_NODE;
++					return ZONELIST_ORDER_NODE;
++				}
+ 			}
+ 		}
  	}
- }
- 
- void set_pgdat_percpu_threshold(pg_data_t *pgdat,
- 				int (*calculate_pressure)(struct zone *))
- {
--	struct zone *zone;
- 	int cpu;
- 	int threshold;
- 	int i, p;
-@@ -669,11 +671,12 @@ static void walk_zones_in_node(struct seq_file *m, pg_data_t *pgdat,
- 
- #ifdef CONFIG_PROC_FS
- static void frag_show_print(struct seq_file *m, pg_data_t *pgdat,
--						struct zone *zone)
-+					mem_region_t *mem_region, struct zone *zone)
- {
- 	int order;
- 
--	seq_printf(m, "Node %d, zone %8s ", pgdat->node_id, zone->name);
-+	seq_printf(m, "Node %d, REG %d, zone %8s ", pgdat->node_id,
-+						mem_region->region, zone->name);
- 	for (order = 0; order < MAX_ORDER; ++order)
- 		seq_printf(m, "%6lu ", zone->free_area[order].nr_free);
- 	seq_putc(m, '\n');
-@@ -689,14 +692,15 @@ static int frag_show(struct seq_file *m, void *arg)
- 	return 0;
- }
- 
--static void pagetypeinfo_showfree_print(struct seq_file *m,
--					pg_data_t *pgdat, struct zone *zone)
-+static void pagetypeinfo_showfree_print(struct seq_file *m, pg_data_t *pgdat,
-+						mem_region_t *mem_region, struct zone *zone)
- {
- 	int order, mtype;
- 
- 	for (mtype = 0; mtype < MIGRATE_TYPES; mtype++) {
--		seq_printf(m, "Node %4d, zone %8s, type %12s ",
-+		seq_printf(m, "Node %4d, Region %d, zone %8s, type %12s ",
- 					pgdat->node_id,
-+					mem_region->region,
- 					zone->name,
- 					migratetype_names[mtype]);
- 		for (order = 0; order < MAX_ORDER; ++order) {
-@@ -731,8 +735,8 @@ static int pagetypeinfo_showfree(struct seq_file *m, void *arg)
- 	return 0;
- }
- 
--static void pagetypeinfo_showblockcount_print(struct seq_file *m,
--					pg_data_t *pgdat, struct zone *zone)
-+static void pagetypeinfo_showblockcount_print(struct seq_file *m, pg_data_t *pgdat,
-+							mem_region_t *mem_region, struct zone *zone)
- {
- 	int mtype;
- 	unsigned long pfn;
-@@ -759,7 +763,7 @@ static void pagetypeinfo_showblockcount_print(struct seq_file *m,
- 	}
- 
- 	/* Print counts */
--	seq_printf(m, "Node %d, zone %8s ", pgdat->node_id, zone->name);
-+	seq_printf(m, "Node %d, Region %d, zone %8s ", pgdat->node_id, mem_region->region, zone->name);
- 	for (mtype = 0; mtype < MIGRATE_TYPES; mtype++)
- 		seq_printf(m, "%12lu ", count[mtype]);
- 	seq_putc(m, '\n');
-@@ -969,10 +973,11 @@ static const char * const vmstat_text[] = {
- };
- 
- static void zoneinfo_show_print(struct seq_file *m, pg_data_t *pgdat,
--							struct zone *zone)
-+					mem_region_t *mem_region, struct zone *zone)
- {
- 	int i;
--	seq_printf(m, "Node %d, zone %8s", pgdat->node_id, zone->name);
-+	seq_printf(m, "Node %d, Region %d, zone %8s", pgdat->node_id,
-+						mem_region->region, zone->name);
- 	seq_printf(m,
- 		   "\n  pages free     %lu"
- 		   "\n        min      %lu"
+@@ -2968,11 +2979,14 @@ static int default_zonelist_order(void)
+ 		low_kmem_size = 0;
+ 		total_size = 0;
+ 		for (zone_type = 0; zone_type < MAX_NR_ZONES; zone_type++) {
+-			z = &NODE_DATA(nid)->node_zones[zone_type];
+-			if (populated_zone(z)) {
+-				if (zone_type < ZONE_NORMAL)
+-					low_kmem_size += z->present_pages;
+-				total_size += z->present_pages;
++			for_each_mem_region_in_nid(i, nid) {
++				mem_region_t *mem_region = &(NODE_DATA(nid)->mem_regions[i]);
++				z = &mem_region->zones[zone_type];
++				if (populated_zone(z)) {
++					if (zone_type < ZONE_NORMAL)
++						low_kmem_size += z->present_pages;
++					total_size += z->present_pages;
++				}
+ 			}
+ 		}
+ 		if (low_kmem_size &&
 -- 
 1.7.4
