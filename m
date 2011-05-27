@@ -1,87 +1,39 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 27 May 2011 01:26:47 -0600
-Subject: [PATCH v3 0/4] Consolidate sdhci pltfm & OF drivers and get them
-	self registered
-In-Reply-To: <1306321314-2493-1-git-send-email-shawn.guo@linaro.org>
-References: <1306321314-2493-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110527072647.GE31953@ponder.secretlab.ca>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 27 May 2011 10:38:26 +0300
+Subject: [PATCHv2 0/2] Some omap_device/hwmod/pwrdomain patches
+Message-ID: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 07:01:50PM +0800, Shawn Guo wrote:
-> Here are what the patch set does.
-> 
-> * Remove .probe and .remove hooks from sdhci-pltfm.c and make it be
->   a pure common helper function providers.
-> * Add .probe and .remove hooks for sdhci pltfm drivers sdhci-cns3xxx,
->   sdhci-dove, sdhci-tegra, and sdhci-esdhc-imx to make them self
->   registered with calling helper functions created above.
-> * Migrate the use of sdhci_of_host and sdhci_of_data to
->   sdhci_pltfm_host and sdhci_pltfm_data, so that OF version host and
->   data structure works can be saved, and pltfm version works for both
->   cases.
-> * Add OF common helper stuff into sdhci-pltfm.c, and make OF version
->   sdhci drivers sdhci-of-esdhc and sdhci-of-hlwd become self
->   registered as well, so that sdhci-of-core.c and sdhci-of.h can be
->   removed.
-> * Eliminate include/linux/mmc/sdhci-pltfm.h with moving stuff into
->   drivers/mmc/host/sdhci-pltfm.h.
-> 
-> And the benefits we gain from the changes are:
-> 
-> * Get the sdhci device driver follow the Linux trend that driver
->   makes the registration by its own.
-> * sdhci-pltfm.c becomes simple and clean as it only has common helper
->   stuff there now.
-> * All sdhci device specific things are going back its own driver.
-> * The dt and non-dt drivers are consolidated to use the same pair of
->   .probe and .remove hooks.
+I came up with these patches while implementing pm runtime adaptation for DSS
+driver. I'm not quite sure on who's turf they belong, or do they even belong
+together, but here they are anyway.
 
-Hey Chris,
+get_context_loss_count patch was discussed on l-o with Kevin.
 
-Any chance we can get this series into $NEXT_KERNEL?
+The omap_device_reset patch I made as some parts of DSS currently presume that
+the HW module is reset when it is enabled, and the reset is better handled in
+hwmod code.
 
-Thanks,
-g.
+Changes in v2
+* Dropped can-ever-lose-context patch
+* Use INT_MAX instead of ~(1 << 31) when masking the ctx loss count
 
-> 
-> Changes since v2:
-> * Drop imx mpc esdhc consolidation
-> * Fix checkpatch errors
-> * Add sdhci-of-core.c copyright into sdhci-pltfm.c
-> 
-> Changes since v1:
-> * Rebase on cjb's mmc-next tree
-> * Introduce helper function pair sdhci_pltfm_register and
->   sdhci_pltfm_unregister
-> * Eliminate variable 'scratch' in .remove hook to make the code
->   look simple
-> * Return ERR_PTR in sdhci_pltfm_init and use IS_ERR/PTR_ERR to check
->   return value in .probe hooks
-> * Correct MODULE_AUTHOR statement
-> * Split esdhc conlidation patch to ease reviewing
-> 
-> Shawn Guo (4):
->       mmc: sdhci: make sdhci-pltfm device drivers self registered
->       mmc: sdhci: eliminate sdhci_of_host and sdhci_of_data
->       mmc: sdhci: make sdhci-of device drivers self registered
->       mmc: sdhci: merge two sdhci-pltfm.h into one
-> 
->  drivers/mmc/host/Kconfig           |   47 +++----
->  drivers/mmc/host/Makefile          |   18 +--
->  drivers/mmc/host/sdhci-cns3xxx.c   |   43 ++++++-
->  drivers/mmc/host/sdhci-dove.c      |   42 ++++++-
->  drivers/mmc/host/sdhci-esdhc-imx.c |  114 +++++++++++-----
->  drivers/mmc/host/sdhci-of-core.c   |  250 ---------------------------------
->  drivers/mmc/host/sdhci-of-esdhc.c  |   85 +++++++++---
->  drivers/mmc/host/sdhci-of-hlwd.c   |   66 ++++++++--
->  drivers/mmc/host/sdhci-of.h        |   42 ------
->  drivers/mmc/host/sdhci-pltfm.c     |  266 ++++++++++++++++++++----------------
->  drivers/mmc/host/sdhci-pltfm.h     |   39 +++++-
->  drivers/mmc/host/sdhci-tegra.c     |  116 +++++++++++-----
->  include/linux/mmc/sdhci-pltfm.h    |   35 -----
->  13 files changed, 578 insertions(+), 585 deletions(-)
-> 
-> Regards,
-> Shawn
-> 
+ Tomi
+
+Tomi Valkeinen (2):
+  OMAP: change get_context_loss_count ret value to int
+  OMAP: add omap_device_reset()
+
+ arch/arm/mach-omap2/omap_hwmod.c              |    2 +-
+ arch/arm/mach-omap2/powerdomain.c             |   14 ++++++++++----
+ arch/arm/mach-omap2/powerdomain.h             |    2 +-
+ arch/arm/plat-omap/include/plat/omap-pm.h     |    4 ++--
+ arch/arm/plat-omap/include/plat/omap_device.h |    3 ++-
+ arch/arm/plat-omap/include/plat/omap_hwmod.h  |    2 +-
+ arch/arm/plat-omap/omap-pm-noop.c             |   24 +++++++++++++++++-------
+ arch/arm/plat-omap/omap_device.c              |   25 ++++++++++++++++++++++++-
+ 8 files changed, 58 insertions(+), 18 deletions(-)
+
+-- 
+1.7.4.1
