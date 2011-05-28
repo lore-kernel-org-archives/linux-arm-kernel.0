@@ -1,7 +1,9 @@
 From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
-Date: Sat, 28 May 2011 21:05:01 +0200
-Subject: [PATCH 1/3] ARM: imx: convert to new leds-gpio registration helper
-Message-ID: <1306609503-31746-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Date: Sat, 28 May 2011 21:05:02 +0200
+Subject: [PATCH 2/3] ARM: mx5: convert to new leds-gpio registration helper
+In-Reply-To: <1306609503-31746-1-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1306609503-31746-1-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <1306609503-31746-2-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,125 +12,200 @@ to move the platform data and led definition to .init.rodata.
 
 Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
 ---
- arch/arm/mach-imx/Kconfig                      |    5 +++++
- arch/arm/mach-imx/eukrea_mbimx27-baseboard.c   |   23 ++++++-----------------
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |   15 ++++-----------
- arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |   13 +++----------
- arch/arm/mach-imx/mach-mx31moboard.c           |   14 +++-----------
- arch/arm/mach-imx/mx31lite-db.c                |   15 ++++-----------
- 6 files changed, 25 insertions(+), 60 deletions(-)
+ arch/arm/mach-mx5/Kconfig                    |    4 ++++
+ arch/arm/mach-mx5/board-mx51_efikamx.c       |   15 ++++-----------
+ arch/arm/mach-mx5/board-mx51_efikasb.c       |   16 ++++------------
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |   18 +++---------------
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |   19 ++++---------------
+ 5 files changed, 19 insertions(+), 53 deletions(-)
 
-diff --git a/arch/arm/mach-imx/Kconfig b/arch/arm/mach-imx/Kconfig
-index 59c97a3..e8dd22f 100644
---- a/arch/arm/mach-imx/Kconfig
-+++ b/arch/arm/mach-imx/Kconfig
-@@ -167,6 +167,7 @@ config MACH_EUKREA_MBIMXSD25_BASEBOARD
- 	bool "Eukrea MBIMXSD development board"
- 	select IMX_HAVE_PLATFORM_GPIO_KEYS
- 	select IMX_HAVE_PLATFORM_IMX_SSI
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 799fbc4..f25e9d7 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -109,6 +109,7 @@ config MACH_EUKREA_MBIMX51_BASEBOARD
+ 	bool
+ 	select IMX_HAVE_PLATFORM_IMX_KEYPAD
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
++	select LEDS_GPIO_REGISTER
+ 	help
+ 	  This adds board specific devices that can be found on Eukrea's
+ 	  MBIMX51 evaluation board.
+@@ -135,6 +136,7 @@ config MACH_EUKREA_MBIMXSD51_BASEBOARD
+ 	prompt "Eukrea MBIMXSD development board"
+ 	bool
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
 +	select LEDS_GPIO_REGISTER
  	help
  	  This adds board specific devices that can be found on Eukrea's
  	  MBIMXSD evaluation board.
-@@ -265,6 +266,7 @@ config MACH_EUKREA_MBIMX27_BASEBOARD
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_MXC_MMC
- 	select IMX_HAVE_PLATFORM_SPI_IMX
-+	select LEDS_GPIO_REGISTER
- 	help
- 	  This adds board specific devices that can be found on Eukrea's
- 	  MBIMX27 evaluation board.
-@@ -403,6 +405,7 @@ config MACH_MX31LITE
- 	select IMX_HAVE_PLATFORM_MXC_NAND
- 	select IMX_HAVE_PLATFORM_MXC_RTC
- 	select IMX_HAVE_PLATFORM_SPI_IMX
-+	select LEDS_GPIO_REGISTER
- 	help
- 	  Include support for MX31 LITEKIT platform. This includes specific
- 	  configurations for the board and its peripherals.
-@@ -471,6 +474,7 @@ config MACH_MX31MOBOARD
- 	select IMX_HAVE_PLATFORM_MXC_EHCI
- 	select IMX_HAVE_PLATFORM_MXC_MMC
- 	select IMX_HAVE_PLATFORM_SPI_IMX
-+	select LEDS_GPIO_REGISTER
- 	select MXC_ULPI if USB_ULPI
- 	help
- 	  Include support for mx31moboard platform. This includes specific
-@@ -577,6 +581,7 @@ config MACH_EUKREA_MBIMXSD35_BASEBOARD
- 	select IMX_HAVE_PLATFORM_GPIO_KEYS
- 	select IMX_HAVE_PLATFORM_IMX_SSI
- 	select IMX_HAVE_PLATFORM_IPU_CORE
-+	select LEDS_GPIO_REGISTER
- 	help
- 	  This adds board specific devices that can be found on Eukrea's
- 	  MBIMXSD evaluation board.
-diff --git a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-index 5911281..5db3e14 100644
---- a/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimx27-baseboard.c
-@@ -112,7 +112,7 @@ eukrea_mbimx27_keymap_data __initconst = {
- 	.keymap_size    = ARRAY_SIZE(eukrea_mbimx27_keymap),
- };
+@@ -151,6 +153,7 @@ config MX51_EFIKA_COMMON
  
--static struct gpio_led gpio_leds[] = {
-+static const struct gpio_led eukrea_mbimx27_gpio_leds[] __initconst = {
+ config MACH_MX51_EFIKAMX
+ 	bool "Support MX51 Genesi Efika MX nettop"
++	select LEDS_GPIO_REGISTER
+ 	select MX51_EFIKA_COMMON
+ 	help
+ 	  Include support for Genesi Efika MX nettop. This includes specific
+@@ -158,6 +161,7 @@ config MACH_MX51_EFIKAMX
+ 
+ config MACH_MX51_EFIKASB
+ 	bool "Support MX51 Genesi Efika Smartbook"
++	select LEDS_GPIO_REGISTER
+ 	select MX51_EFIKA_COMMON
+ 	help
+ 	  Include support for Genesi Efika Smartbook. This includes specific
+diff --git a/arch/arm/mach-mx5/board-mx51_efikamx.c b/arch/arm/mach-mx5/board-mx51_efikamx.c
+index 6e36231..f38fb63 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikamx.c
++++ b/arch/arm/mach-mx5/board-mx51_efikamx.c
+@@ -139,7 +139,7 @@ static void __init mx51_efikamx_board_id(void)
+ 	}
+ }
+ 
+-static struct gpio_led mx51_efikamx_leds[] = {
++static const struct gpio_led mx51_efikamx_leds[] __initconst = {
  	{
- 		.name			= "led1",
- 		.default_trigger	= "heartbeat",
-@@ -127,17 +127,10 @@ static struct gpio_led gpio_leds[] = {
+ 		.name = "efikamx:green",
+ 		.default_trigger = "default-on",
+@@ -157,19 +157,12 @@ static struct gpio_led mx51_efikamx_leds[] = {
  	},
  };
  
--static struct gpio_led_platform_data gpio_led_info = {
--	.leds		= gpio_leds,
--	.num_leds	= ARRAY_SIZE(gpio_leds),
+-static struct gpio_led_platform_data mx51_efikamx_leds_data = {
++static const struct gpio_led_platform_data
++		mx51_efikamx_leds_data __initconst = {
+ 	.leds = mx51_efikamx_leds,
+ 	.num_leds = ARRAY_SIZE(mx51_efikamx_leds),
+ };
+ 
+-static struct platform_device mx51_efikamx_leds_device = {
+-	.name = "leds-gpio",
+-	.id = -1,
+-	.dev = {
+-		.platform_data = &mx51_efikamx_leds_data,
+-	},
 -};
 -
--static struct platform_device leds_gpio = {
+ static struct gpio_keys_button mx51_efikamx_powerkey[] = {
+ 	{
+ 		.code = KEY_POWER,
+@@ -248,7 +241,7 @@ static void __init mx51_efikamx_init(void)
+ 		mx51_efikamx_leds[2].default_trigger = "mmc1";
+ 	}
+ 
+-	platform_device_register(&mx51_efikamx_leds_device);
++	gpio_leds_register_device(&mx51_efikamx_leds_data);
+ 	imx_add_gpio_keys(&mx51_efikamx_powerkey_data);
+ 
+ 	if (system_rev == 0x11) {
+diff --git a/arch/arm/mach-mx5/board-mx51_efikasb.c b/arch/arm/mach-mx5/board-mx51_efikasb.c
+index 474fc6e..dbf9d92 100644
+--- a/arch/arm/mach-mx5/board-mx51_efikasb.c
++++ b/arch/arm/mach-mx5/board-mx51_efikasb.c
+@@ -132,7 +132,7 @@ static void __init mx51_efikasb_usb(void)
+ 		mxc_register_device(&mxc_usbh2_device, &usbh2_config);
+ }
+ 
+-static struct gpio_led mx51_efikasb_leds[] = {
++static const struct gpio_led mx51_efikasb_leds[] __initconst = {
+ 	{
+ 		.name = "efikasb:green",
+ 		.default_trigger = "default-on",
+@@ -146,19 +146,12 @@ static struct gpio_led mx51_efikasb_leds[] = {
+ 	},
+ };
+ 
+-static struct gpio_led_platform_data mx51_efikasb_leds_data = {
++static const struct gpio_led_platform_data
++		mx51_efikasb_leds_data __initconst = {
+ 	.leds = mx51_efikasb_leds,
+ 	.num_leds = ARRAY_SIZE(mx51_efikasb_leds),
+ };
+ 
+-static struct platform_device mx51_efikasb_leds_device = {
+-	.name = "leds-gpio",
+-	.id = -1,
+-	.dev = {
+-		.platform_data = &mx51_efikasb_leds_data,
+-	},
+-};
+-
+ static struct gpio_keys_button mx51_efikasb_keys[] = {
+ 	{
+ 		.code = KEY_POWER,
+@@ -256,9 +249,8 @@ static void __init efikasb_board_init(void)
+ 	mx51_efikasb_usb();
+ 	imx51_add_sdhci_esdhc_imx(1, NULL);
+ 
+-	platform_device_register(&mx51_efikasb_leds_device);
++	gpio_leds_register_device(-1, &mx51_efikasb_leds_data);
+ 	imx_add_gpio_keys(&mx51_efikasb_keys_data);
+-
+ }
+ 
+ static void __init mx51_efikasb_timer_init(void)
+diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+index 97292d2..02ce720 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+@@ -37,7 +37,7 @@
+ #define MBIMX51_LED2		IMX_GPIO_NR(3, 7)
+ #define MBIMX51_LED3		IMX_GPIO_NR(3, 8)
+ 
+-static struct gpio_led mbimx51_leds[] = {
++static const struct gpio_led mbimx51_leds[] __initconst = {
+ 	{
+ 		.name			= "led0",
+ 		.default_trigger	= "heartbeat",
+@@ -64,23 +64,11 @@ static struct gpio_led mbimx51_leds[] = {
+ 	},
+ };
+ 
+-static struct gpio_led_platform_data mbimx51_leds_info = {
++static const struct gpio_led_platform_data mbimx51_leds_info __initconst = {
+ 	.leds		= mbimx51_leds,
+ 	.num_leds	= ARRAY_SIZE(mbimx51_leds),
+ };
+ 
+-static struct platform_device mbimx51_leds_gpio = {
 -	.name	= "leds-gpio",
 -	.id	= -1,
 -	.dev	= {
--		.platform_data	= &gpio_led_info,
+-		.platform_data	= &mbimx51_leds_info,
 -	},
-+static const struct gpio_led_platform_data
-+		eukrea_mbimx27_gpio_led_info __initconst = {
-+	.leds		= eukrea_mbimx27_gpio_leds,
-+	.num_leds	= ARRAY_SIZE(eukrea_mbimx27_gpio_leds),
- };
- 
- static struct imx_fb_videomode eukrea_mbimx27_modes[] = {
-@@ -293,10 +286,6 @@ static struct i2c_board_info eukrea_mbimx27_i2c_devices[] = {
- 	},
- };
- 
--static struct platform_device *platform_devices[] __initdata = {
--	&leds_gpio,
 -};
 -
- static const struct imxmmc_platform_data sdhc_pdata __initconst = {
- 	.dat3_card_detect = 1,
- };
-@@ -377,5 +366,5 @@ void __init eukrea_mbimx27_baseboard_init(void)
+-static struct platform_device *devices[] __initdata = {
+-	&mbimx51_leds_gpio,
+-};
+-
+ static iomux_v3_cfg_t mbimx51_pads[] = {
+ 	/* UART2 */
+ 	MX51_PAD_UART2_RXD__UART2_RXD,
+@@ -204,7 +192,7 @@ void __init eukrea_mbimx51_baseboard_init(void)
+ 	gpio_direction_output(MBIMX51_LED3, 1);
+ 	gpio_free(MBIMX51_LED3);
  
- 	imx27_add_imx_keypad(&eukrea_mbimx27_keymap_data);
+-	platform_add_devices(devices, ARRAY_SIZE(devices));
++	gpio_led_register_device(-1, &mbimx51_leds_info);
  
--	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+	gpio_led_register_device(-1, &eukrea_mbimx27_gpio_led_info);
- }
-diff --git a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
-index f9ef04a..01ebcb3 100644
---- a/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c
-@@ -173,7 +173,7 @@ static struct platform_device eukrea_mbimxsd_lcd_powerdev = {
- 	.dev.platform_data	= &eukrea_mbimxsd_lcd_power_data,
- };
+ 	imx51_add_imx_keypad(&mbimx51_map_data);
+ 
+diff --git a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+index 31c871e..2619239 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c
+@@ -74,7 +74,7 @@ static iomux_v3_cfg_t eukrea_mbimxsd_pads[] = {
+ #define GPIO_LED1	IMX_GPIO_NR(3, 30)
+ #define GPIO_SWITCH1	IMX_GPIO_NR(3, 31)
  
 -static struct gpio_led eukrea_mbimxsd_leds[] = {
 +static const struct gpio_led eukrea_mbimxsd_leds[] __initconst = {
  	{
  		.name			= "led1",
  		.default_trigger	= "heartbeat",
-@@ -182,19 +182,12 @@ static struct gpio_led eukrea_mbimxsd_leds[] = {
+@@ -83,19 +83,12 @@ static struct gpio_led eukrea_mbimxsd_leds[] = {
  	},
  };
  
@@ -150,154 +227,24 @@ index f9ef04a..01ebcb3 100644
  static struct gpio_keys_button eukrea_mbimxsd_gpio_buttons[] = {
  	{
  		.gpio		= GPIO_SWITCH1,
-@@ -212,7 +205,6 @@ static const struct gpio_keys_platform_data
+@@ -112,10 +105,6 @@ static const struct gpio_keys_platform_data
+ 	.nbuttons	= ARRAY_SIZE(eukrea_mbimxsd_gpio_buttons),
  };
  
- static struct platform_device *platform_devices[] __initdata = {
+-static struct platform_device *platform_devices[] __initdata = {
 -	&eukrea_mbimxsd_leds_gpio,
- 	&eukrea_mbimxsd_lcd_powerdev,
+-};
+-
+ static const struct imxuart_platform_data uart_pdata __initconst = {
+ 	.flags = IMXUART_HAVE_RTSCTS,
  };
- 
-@@ -287,5 +279,6 @@ void __init eukrea_mbimxsd25_baseboard_init(void)
+@@ -154,6 +143,6 @@ void __init eukrea_mbimxsd51_baseboard_init(void)
+ 	i2c_register_board_info(0, eukrea_mbimxsd_i2c_devices,
  				ARRAY_SIZE(eukrea_mbimxsd_i2c_devices));
  
- 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
+-	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
 +	gpio_led_register_device(-1, &eukrea_mbimxsd_led_info);
  	imx_add_gpio_keys(&eukrea_mbimxsd_button_data);
- }
-diff --git a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
-index 4909ea0..558eb52 100644
---- a/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
-+++ b/arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c
-@@ -193,19 +193,12 @@ static struct gpio_led eukrea_mbimxsd_leds[] = {
- 	},
- };
- 
--static struct gpio_led_platform_data eukrea_mbimxsd_led_info = {
-+static const struct gpio_led_platform_data
-+		eukrea_mbimxsd_led_info __initconst = {
- 	.leds		= eukrea_mbimxsd_leds,
- 	.num_leds	= ARRAY_SIZE(eukrea_mbimxsd_leds),
- };
- 
--static struct platform_device eukrea_mbimxsd_leds_gpio = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data	= &eukrea_mbimxsd_led_info,
--	},
--};
--
- static struct gpio_keys_button eukrea_mbimxsd_gpio_buttons[] = {
- 	{
- 		.gpio		= GPIO_SWITCH1,
-@@ -223,7 +216,6 @@ static const struct gpio_keys_platform_data
- };
- 
- static struct platform_device *platform_devices[] __initdata = {
--	&eukrea_mbimxsd_leds_gpio,
- 	&eukrea_mbimxsd_lcd_powerdev,
- };
- 
-@@ -299,5 +291,6 @@ void __init eukrea_mbimxsd35_baseboard_init(void)
- 				ARRAY_SIZE(eukrea_mbimxsd_i2c_devices));
- 
- 	platform_add_devices(platform_devices, ARRAY_SIZE(platform_devices));
-+	gpio_led_register_device(-1, &eukrea_mbimxsd_led_info);
- 	imx_add_gpio_keys(&eukrea_mbimxsd_button_data);
- }
-diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
-index eaa51e4..abe688b 100644
---- a/arch/arm/mach-imx/mach-mx31moboard.c
-+++ b/arch/arm/mach-imx/mach-mx31moboard.c
-@@ -425,7 +425,7 @@ static int __init moboard_usbh2_init(void)
- 	return 0;
- }
- 
--static struct gpio_led mx31moboard_leds[] = {
-+static const struct gpio_led mx31moboard_leds[] __initconst = {
- 	{
- 		.name	= "coreboard-led-0:red:running",
- 		.default_trigger = "heartbeat",
-@@ -442,26 +442,17 @@ static struct gpio_led mx31moboard_leds[] = {
- 	},
- };
- 
--static struct gpio_led_platform_data mx31moboard_led_pdata = {
-+static const struct gpio_led_platform_data mx31moboard_led_pdata __initconst = {
- 	.num_leds	= ARRAY_SIZE(mx31moboard_leds),
- 	.leds		= mx31moboard_leds,
- };
- 
--static struct platform_device mx31moboard_leds_device = {
--	.name	= "leds-gpio",
--	.id	= -1,
--	.dev	= {
--		.platform_data = &mx31moboard_led_pdata,
--	},
--};
--
- static const struct ipu_platform_data mx3_ipu_data __initconst = {
- 	.irq_base = MXC_IPU_IRQ_START,
- };
- 
- static struct platform_device *devices[] __initdata = {
- 	&mx31moboard_flash,
--	&mx31moboard_leds_device,
- };
- 
- static struct mx3_camera_pdata camera_pdata __initdata = {
-@@ -511,6 +502,7 @@ static void __init mx31moboard_init(void)
- 		"moboard");
- 
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
-+	gpio_led_register_device(-1, &mx31moboard_led_pdata);
- 
- 	imx31_add_imx_uart0(&uart0_pdata);
- 	imx31_add_imx_uart4(&uart4_pdata);
-diff --git a/arch/arm/mach-imx/mx31lite-db.c b/arch/arm/mach-imx/mx31lite-db.c
-index 5aa053e..bf0fb87 100644
---- a/arch/arm/mach-imx/mx31lite-db.c
-+++ b/arch/arm/mach-imx/mx31lite-db.c
-@@ -161,7 +161,7 @@ static const struct spi_imx_master spi0_pdata __initconst = {
- 
- /* GPIO LEDs */
- 
--static struct gpio_led litekit_leds[] = {
-+static const struct gpio_led litekit_leds[] __initconst = {
- 	{
- 		.name           = "GPIO0",
- 		.gpio           = IOMUX_TO_GPIO(MX31_PIN_COMPARE),
-@@ -176,19 +176,12 @@ static struct gpio_led litekit_leds[] = {
- 	}
- };
- 
--static struct gpio_led_platform_data litekit_led_platform_data = {
-+static const struct gpio_led_platform_data
-+		litekit_led_platform_data __initconst = {
- 	.leds           = litekit_leds,
- 	.num_leds       = ARRAY_SIZE(litekit_leds),
- };
- 
--static struct platform_device litekit_led_device = {
--	.name   = "leds-gpio",
--	.id     = -1,
--	.dev    = {
--		.platform_data = &litekit_led_platform_data,
--	},
--};
--
- void __init mx31lite_db_init(void)
- {
- 	mxc_iomux_setup_multiple_pins(litekit_db_board_pins,
-@@ -197,7 +190,7 @@ void __init mx31lite_db_init(void)
- 	imx31_add_imx_uart0(&uart_pdata);
- 	imx31_add_mxc_mmc(0, &mmc_pdata);
- 	imx31_add_spi_imx0(&spi0_pdata);
--	platform_device_register(&litekit_led_device);
-+	gpio_led_register_device(-1, &litekit_led_platform_data);
- 	imx31_add_imx2_wdt(NULL);
- 	imx31_add_mxc_rtc(NULL);
  }
 -- 
 1.7.2.5
