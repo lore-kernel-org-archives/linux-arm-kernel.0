@@ -1,62 +1,31 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sat, 28 May 2011 16:39:31 +0200
-Subject: [PATCH 10/10] mm: Create memory regions at boot-up
-In-Reply-To: <1306499498-14263-11-git-send-email-ankita@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<1306499498-14263-11-git-send-email-ankita@in.ibm.com>
-Message-ID: <20110528143931.GB3603@game.jcrosoft.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 28 May 2011 23:09:32 +0800
+Subject: [PATCH v2 0/2] Move Freescale MXS gpio driver into drivers/gpio
+Message-ID: <1306595374-25178-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18:01 Fri 27 May     , Ankita Garg wrote:
-> Memory regions are created at boot up time, from the information obtained
-> from the firmware. This patchset was developed on ARM platform, on which at
-> present u-boot bootloader does not export information about memory units that
-> can be independently power managed. For the purpose of demonstration, 2 hard
-> coded memory regions are created, of 256MB each on the Panda board with 512MB
-> RAM.
-> 
-> Signed-off-by: Ankita Garg <ankita@in.ibm.com>
-> ---
->  include/linux/mmzone.h |    8 +++-----
->  mm/page_alloc.c        |   29 +++++++++++++++++++++++++++++
->  2 files changed, 32 insertions(+), 5 deletions(-)
-> 
-> diff --git a/include/linux/mmzone.h b/include/linux/mmzone.h
-> index bc3e3fd..5dbe1e1 100644
-> --- a/include/linux/mmzone.h
-> +++ b/include/linux/mmzone.h
-> @@ -627,14 +627,12 @@ typedef struct mem_region_list_data {
->   */
->  struct bootmem_data;
->  typedef struct pglist_data {
-> -/*	The linkage to node_zones is now removed. The new hierarchy introduced
-> - *	is pg_data_t -> mem_region -> zones
-> - * 	struct zone node_zones[MAX_NR_ZONES];
-> - */
->  	struct zonelist node_zonelists[MAX_ZONELISTS];
->  	int nr_zones;
->  #ifdef CONFIG_FLAT_NODE_MEM_MAP	/* means !SPARSEMEM */
-> -	struct page *node_mem_map;
-> +	strs pg_data_t -> mem_region -> zones
-> + *      struct zone node_zones[MAX_NR_ZONES];
-> + */uct page *node_mem_map;
-what is time?
->  #ifdef CONFIG_CGROUP_MEM_RES_CTLR
->  	struct page_cgroup *node_page_cgroup;
->  #endif
-> diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-> index da8b045..3d994e8 100644
-> --- a/mm/page_alloc.c
-> +++ b/mm/page_alloc.c
-> @@ -4285,6 +4285,34 @@ static inline int pageblock_default_order(unsigned int order)
->  
->  #endif /* CONFIG_HUGETLB_PAGE_SIZE_VARIABLE */
->  
-> +#define REGIONS_SIZE   (512 << 20) >> PAGE_SHIFT
-fix a region size why?
-> +
-> +static void init_node_memory_regions(struct pglist_data *pgdat)
-> +{
-Best Regards,
-J.
+The patch set moves Freescale MXS gpio driver from mach-mxs into
+drivers/gpio.
+
+Changes since v1:
+ * Squash the 4 gpio-mxs patches into one
+ * Do not add new gpio Kconfig option and use ARCH_MXS directly
+ * Clean up platform-gpio-mxs.c per Arnd's comments
+ * Add device mxs_apbh_bus and set it as the parent of gpio devices
+
+Shawn Guo (2):
+      gpio: gpio-mxs: add gpio driver for Freescale MXS architecture
+      ARM: mxs: use gpio-mxs driver by adding platform device
+
+ arch/arm/mach-mxs/Makefile                         |    2 +-
+ arch/arm/mach-mxs/devices.c                        |   11 +
+ arch/arm/mach-mxs/devices/Makefile                 |    1 +
+ arch/arm/mach-mxs/devices/platform-gpio-mxs.c      |   53 +++++
+ arch/arm/mach-mxs/gpio.h                           |   34 ---
+ arch/arm/mach-mxs/include/mach/devices-common.h    |    2 +
+ arch/arm/mach-mxs/mach-mx28evk.c                   |    1 -
+ arch/arm/mach-mxs/mm-mx23.c                        |    1 -
+ arch/arm/mach-mxs/mm-mx28.c                        |    1 -
+ drivers/gpio/Makefile                              |    1 +
+ .../arm/mach-mxs/gpio.c => drivers/gpio/gpio-mxs.c |  228 ++++++++++++--------
