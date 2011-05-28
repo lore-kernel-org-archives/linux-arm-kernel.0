@@ -1,39 +1,41 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Sat, 28 May 2011 00:56:40 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-Message-ID: <20110528005640.9076c0b1.akpm@linux-foundation.org>
+From: greg@kroah.com (Greg KH)
+Date: Sat, 28 May 2011 17:39:04 +0800
+Subject: [PATCH] ARM: SAMSUNG: serial: Fix on handling of one clock
+	source for UART
+In-Reply-To: <1306548243-2526-1-git-send-email-kgene.kim@samsung.com>
+References: <1306548243-2526-1-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110528093904.GC21388@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 27 May 2011 18:01:28 +0530 Ankita Garg <ankita@in.ibm.com> wrote:
+On Fri, May 27, 2011 at 07:04:03PM -0700, Kukjin Kim wrote:
+> From: Boojin Kim <boojin.kim@samsung.com>
+> 
+> This patch fixes the way of comparison for handling of two or more
+> clock sources for UART.
+> 
+> For example, if just only one clock source is defined even though
+> there are two clock sources for UART, the serial driver does not
+> set proper clock up. Of course, it is problem.
+> 
+> So this patch changes the condition of comparison to avoid useless
+> setup clock and adds a flag 'NO_NEED_CHECK_CLKSRC' which means
+> selection of source clock is not required.
+> 
+> In addition, since the Exynos4210 has only one clock source for UART
+> this patch adds the flag into its common_init_uarts().
+> 
+> Signed-off-by: Boojin Kim <boojin.kim@samsung.com>
+> Cc: Greg Kroah-Hartman <greg@kroah.com>
+> Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/init.c                     |    1 +
+>  arch/arm/plat-samsung/include/plat/regs-serial.h |    2 ++
+>  drivers/tty/serial/s5pv210.c                     |    4 ++--
+>  3 files changed, 5 insertions(+), 2 deletions(-)
 
-> This patchset proposes a generic memory regions infrastructure that can be
-> used to tag boundaries of memory blocks which belongs to a specific memory
-> power management domain and further enable exploitation of platform memory
-> power management capabilities.
+Is this needed in older kernels as well (like .39)?
 
-A couple of quick thoughts...
+thanks,
 
-I'm seeing no estimate of how much energy we might save when this work
-is completed.  But saving energy is the entire point of the entire
-patchset!  So please spend some time thinking about that and update and
-maintain the [patch 0/n] description so others can get some idea of the
-benefit we might get from all of this.  That estimate should include an
-estimate of what proportion of machines are likely to have hardware
-which can use this feature and in what timeframe.
-
-IOW, if it saves one microwatt on 0.001% of machines, not interested ;)
-
-
-Also, all this code appears to be enabled on all machines?  So machines
-which don't have the requisite hardware still carry any additional
-overhead which is added here.  I can see that ifdeffing a feature like
-this would be ghastly but please also have a think about the
-implications of this and add that discussion also.  
-
-If possible, it would be good to think up some microbenchmarks which
-probe the worst-case performance impact and describe those and present
-the results.  So others can gain an understanding of the runtime costs.
+greg k-h
