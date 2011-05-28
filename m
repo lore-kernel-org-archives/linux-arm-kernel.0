@@ -1,66 +1,71 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Sat, 28 May 2011 18:46:06 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110528005640.9076c0b1.akpm@linux-foundation.org>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110528005640.9076c0b1.akpm@linux-foundation.org>
-Message-ID: <20110528131606.GA3416@in.ibm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat, 28 May 2011 10:54:35 -0300
+Subject: [PATCH v3 1/2] ARM: mx5/mx51_babbage: Move GPIO initialization for
+	USB PHY Reset line to common place
+Message-ID: <1306590876-20680-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+The USB PHY Reset GPIO can be configured in the same place as the other GPIOs.
 
-On Sat, May 28, 2011 at 12:56:40AM -0700, Andrew Morton wrote:
-> On Fri, 27 May 2011 18:01:28 +0530 Ankita Garg <ankita@in.ibm.com> wrote:
-> 
-> > This patchset proposes a generic memory regions infrastructure that can be
-> > used to tag boundaries of memory blocks which belongs to a specific memory
-> > power management domain and further enable exploitation of platform memory
-> > power management capabilities.
-> 
-> A couple of quick thoughts...
-> 
-> I'm seeing no estimate of how much energy we might save when this work
-> is completed.  But saving energy is the entire point of the entire
-> patchset!  So please spend some time thinking about that and update and
-> maintain the [patch 0/n] description so others can get some idea of the
-> benefit we might get from all of this.  That estimate should include an
-> estimate of what proportion of machines are likely to have hardware
-> which can use this feature and in what timeframe.
->
+While at it rename the pin as BABBAGE_USB_PHY_RESET to make clearer its purpose.
 
-This patchset is definitely not for inclusion. The intention of this RFC
-series is to convey the idea and demonstrate the intricacies of the VM
-design. Partial Array Self-Refresh (PASR) is an upcoming technology that
-is supported on some platforms today, but will be an important feature
-in future platforms to conserve idle power consumed by memory subsystem.
-Mobile devices that are predominantly in the standby state can exploit
-PASR feature to partially turn off areas of memory that are free.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+Changes since v2:
+- No changes
+No changes since v1. Only added a third patch to the series
 
-Unfortunately, at this point we are unable to provide an estimate of the
-power savings, as the hardware platforms do not yet export information
-about the underlying memory hardware topology. We are working on this
-and hope to have some estimations in a month or two. However, will
-evaluate the performance impact of the changes and share the same.
+ arch/arm/mach-mx5/board-mx51_babbage.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
-> IOW, if it saves one microwatt on 0.001% of machines, not interested ;)
-> 
-> 
-> Also, all this code appears to be enabled on all machines?  So machines
-> which don't have the requisite hardware still carry any additional
-> overhead which is added here.  I can see that ifdeffing a feature like
-> this would be ghastly but please also have a think about the
-> implications of this and add that discussion also.  
-> 
-> If possible, it would be good to think up some microbenchmarks which
-> probe the worst-case performance impact and describe those and present
-> the results.  So others can gain an understanding of the runtime costs.
-> 
-
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index c7b3fab..7b919bc 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -36,7 +36,7 @@
+ 
+ #define BABBAGE_USB_HUB_RESET	IMX_GPIO_NR(1, 7)
+ #define BABBAGE_USBH1_STP	IMX_GPIO_NR(1, 27)
+-#define BABBAGE_PHY_RESET	IMX_GPIO_NR(2, 5)
++#define BABBAGE_USB_PHY_RESET	IMX_GPIO_NR(2, 5)
+ #define BABBAGE_FEC_PHY_RESET	IMX_GPIO_NR(2, 14)
+ #define BABBAGE_POWER_KEY	IMX_GPIO_NR(2, 21)
+ #define BABBAGE_ECSPI1_CS0	IMX_GPIO_NR(4, 24)
+@@ -110,6 +110,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+ 	/* USB HUB reset line*/
+ 	MX51_PAD_GPIO1_7__GPIO1_7,
+ 
++	/* USB PHY reset line */
++	MX51_PAD_EIM_D21__GPIO2_5,
++
+ 	/* FEC */
+ 	MX51_PAD_EIM_EB2__FEC_MDIO,
+ 	MX51_PAD_EIM_EB3__FEC_RDATA1,
+@@ -172,7 +175,6 @@ static struct imxi2c_platform_data babbage_hsi2c_data = {
+ static int gpio_usbh1_active(void)
+ {
+ 	iomux_v3_cfg_t usbh1stp_gpio = MX51_PAD_USBH1_STP__GPIO1_27;
+-	iomux_v3_cfg_t phyreset_gpio = MX51_PAD_EIM_D21__GPIO2_5;
+ 	int ret;
+ 
+ 	/* Set USBH1_STP to GPIO and toggle it */
+@@ -189,14 +191,13 @@ static int gpio_usbh1_active(void)
+ 	gpio_free(BABBAGE_USBH1_STP);
+ 
+ 	/* De-assert USB PHY RESETB */
+-	mxc_iomux_v3_setup_pad(phyreset_gpio);
+-	ret = gpio_request(BABBAGE_PHY_RESET, "phy_reset");
++	ret = gpio_request(BABBAGE_USB_PHY_RESET, "phy_reset");
+ 
+ 	if (ret) {
+ 		pr_debug("failed to get MX51_PAD_EIM_D21__GPIO_2_5: %d\n", ret);
+ 		return ret;
+ 	}
+-	gpio_direction_output(BABBAGE_PHY_RESET, 1);
++	gpio_direction_output(BABBAGE_USB_PHY_RESET, 1);
+ 	return 0;
+ }
+ 
 -- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+1.6.0.4
