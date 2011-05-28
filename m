@@ -1,30 +1,20 @@
-From: sposelenov@emcraft.com (Sergei Poselenov)
-Date: Sat, 28 May 2011 14:59:25 +0400
-Subject: clone() for 2.6.33 Cortex-M3 kernel?
-Message-ID: <1306580365.749.1.camel@mehome>
+From: heechul@illinois.edu (heechul Yun)
+Date: Sat, 28 May 2011 06:59:10 -0500
+Subject: A page fault causes exiting from WFI mode for all idling cores?
+Message-ID: <BANLkTimzoNRS+MynARc3uBz8h6N06FGRQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello all,
+While I was investigating page fault handling performance on a quad
+core Cortex-A9 ARM processor,?I noticed that whenever there is a
+page fault, all idling cores?also?awakened---exiting from WFI instruction
+on the idle loop?(and go back to WFI again).
 
-I'm trying to implement the pthread support for a Cortex-M3
-Thumb target using the CodeSourcery uclibc toolchain.
+Since the page fault generating program is running on a?single core,
+it seems unnecessary to wake up?other idling cores (hence saving
+power) as well.
 
-I faced the following problem: a simple clone() test program
-crashes the system. As I found, the problem is that the 
-stack for the new clone process, which is passed to the clone()
-syscall, returns incorrectly for the new process (32 bytes higher)
-and the pointer to the clone function and argument, which are saved
-in the new clone stack, clobbered.
+Can anyone tell me if this, exiting from WFI on every page fault, is
+correct behavior??If so, why?
 
-Is it a known issue?
-
-In the kernel configuration, the CONFIG_CPU_V7M and CONFIG_ARM_THUMB
-are enabled.
-
-
-
-Thanks for any help.
-
-Regards,
-Sergei
+Heechul
