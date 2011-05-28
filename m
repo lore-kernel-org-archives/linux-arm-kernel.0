@@ -1,80 +1,66 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Sat, 28 May 2011 15:13:01 +0200
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <20110527205240.GT24876@n2100.arm.linux.org.uk>
-References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-	<1306405979.1200.63.camel@twins>
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526122623.GA11875@elte.hu>
-	<20110526123137.GG24876@n2100.arm.linux.org.uk>
-	<20110526125007.GA27083@elte.hu>
-	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
-	<20110527120629.GA32617@elte.hu>
-	<20110527205240.GT24876@n2100.arm.linux.org.uk>
-Message-ID: <1306588381.2497.481.camel@laptop>
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Sat, 28 May 2011 18:46:06 +0530
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110528005640.9076c0b1.akpm@linux-foundation.org>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110528005640.9076c0b1.akpm@linux-foundation.org>
+Message-ID: <20110528131606.GA3416@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-05-27 at 21:52 +0100, Russell King - ARM Linux wrote:
-> On Fri, May 27, 2011 at 02:06:29PM +0200, Ingo Molnar wrote:
-> > The expectations are to have irqs off (we are holding the runqueue 
-> > lock if !__ARCH_WANT_INTERRUPTS_ON_CTXSW), so that's not workable i 
-> > suspect.
-> 
-> Just a thought, but we _might_ be able to avoid a lot of this hastle if
-> we had a new arch hook in finish_task_switch(), after finish_lock_switch()
-> returns but before the old MM is dropped.
+Hi Andrew,
 
-I'd be more than willing to provide this.
+On Sat, May 28, 2011 at 12:56:40AM -0700, Andrew Morton wrote:
+> On Fri, 27 May 2011 18:01:28 +0530 Ankita Garg <ankita@in.ibm.com> wrote:
+> 
+> > This patchset proposes a generic memory regions infrastructure that can be
+> > used to tag boundaries of memory blocks which belongs to a specific memory
+> > power management domain and further enable exploitation of platform memory
+> > power management capabilities.
+> 
+> A couple of quick thoughts...
+> 
+> I'm seeing no estimate of how much energy we might save when this work
+> is completed.  But saving energy is the entire point of the entire
+> patchset!  So please spend some time thinking about that and update and
+> maintain the [patch 0/n] description so others can get some idea of the
+> benefit we might get from all of this.  That estimate should include an
+> estimate of what proportion of machines are likely to have hardware
+> which can use this feature and in what timeframe.
+>
 
-> For the new ASID-based switch_mm(), we currently do this:
-> 
-> 1. check ASID validity
-> 2. flush branch predictor
-> 3. set reserved ASID value
-> 4. set new page tables
-> 5. set new ASID value
-> 
-> This will be shortly changed to:
-> 
-> 1. check ASID validity
-> 2. flush branch predictor
-> 3. set swapper_pg_dir tables
-> 4. set new ASID value
-> 5. set new page tables
-> 
-> We could change switch_mm() to only do:
-> 
-> 1. flush branch predictor
-> 2. set swapper_pg_dir tables
-> 3. check ASID validity
-> 4. set new ASID value
-> 
-> At this point, we have no user mappings, and so nothing will be using the
-> ASID at this point.  Then in a new post-finish_lock_switch() arch hook:
-> 
-> 5. check whether we need to do flushing as a result of ASID change
-> 6. set new page tables
-> 
-> I think this may simplify the ASID code.  It needs prototyping out,
-> reviewing and testing, but I think it may work.
-> 
-> And I think it may also be workable with the CPUs which need to flush
-> the caches on context switches - we can postpone their page table
-> switch to this new arch hook too, which will mean we wouldn't require
-> __ARCH_WANT_INTERRUPTS_ON_CTXSW on ARM at all.
-> 
-> Any thoughts (if you've followed what I'm going on about) ?
+This patchset is definitely not for inclusion. The intention of this RFC
+series is to convey the idea and demonstrate the intricacies of the VM
+design. Partial Array Self-Refresh (PASR) is an upcoming technology that
+is supported on some platforms today, but will be an important feature
+in future platforms to conserve idle power consumed by memory subsystem.
+Mobile devices that are predominantly in the standby state can exploit
+PASR feature to partially turn off areas of memory that are free.
 
-Yeah, definitely worth a try, you mentioned on IRC the problem of
-detecting if switch_mm() happened in the new arch hook. Since
-switch_mm() gets a @next pointer we can set a TIF flag there and have
-the new arch hook test for that and conditionally perform the required
-work.
+Unfortunately, at this point we are unable to provide an estimate of the
+power savings, as the hardware platforms do not yet export information
+about the underlying memory hardware topology. We are working on this
+and hope to have some estimations in a month or two. However, will
+evaluate the performance impact of the changes and share the same.
 
-Now, supposing we can get ARM to not rely on
-__ARCH_WANT_INTERRUPTS_ON_CTXSW anymore, there's only microblaze left,
-Michal, would a similar scheme work for you? If so we can fully
-deprecate and remove this exception from the scheduler (yay!).
+> IOW, if it saves one microwatt on 0.001% of machines, not interested ;)
+> 
+> 
+> Also, all this code appears to be enabled on all machines?  So machines
+> which don't have the requisite hardware still carry any additional
+> overhead which is added here.  I can see that ifdeffing a feature like
+> this would be ghastly but please also have a think about the
+> implications of this and add that discussion also.  
+> 
+> If possible, it would be good to think up some microbenchmarks which
+> probe the worst-case performance impact and describe those and present
+> the results.  So others can gain an understanding of the runtime costs.
+> 
+
+-- 
+Regards,
+Ankita Garg (ankita at in.ibm.com)
+Linux Technology Center
+IBM India Systems & Technology Labs,
+Bangalore, India
