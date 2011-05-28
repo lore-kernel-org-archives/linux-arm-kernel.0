@@ -1,16 +1,14 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sun, 29 May 2011 00:57:01 +0400
-Subject: IrDA driver fails on PXA255
-Message-ID: <20110528205701.GA1788@doriath.ww600.siemens.net>
+Date: Sun, 29 May 2011 00:53:29 +0400
+Subject: [PATCH] pxa: don't ask for a buffer from DMA zone
+Message-ID: <mailman.3.1306616227.1530.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-Since a197b59ae6e8bee56fcef37ea2482dc08414e2ac (mm: fail GFP_DMA
-allocations when ZONE_DMA is not configured), pxaficp_ir.c driver fails
-to probe: pxa_irda_init_iobuf asks for a buffer with GFP_KERNEL |
-GFP_DMA flags, which fail nicely with the following trace:
+PXA don't have special DMA zone. And since
+197b59ae6e8bee56fcef37ea2482dc08414e2ac (mm: fail GFP_DMA allocations
+when ZONE_DMA is not configured) allocation with GFP_DMA set will fail
+with a trace like this:
 
 ------------[ cut here ]------------
 WARNING: at mm/page_alloc.c:2251
@@ -34,13 +32,26 @@ Modules linked in:
 [<c00083f4>] (kernel_init+0x94/0x140) from [<c00348d0>] (kernel_thread_exit+0x0/0x8)
 ---[ end trace 0b8bf08f70147098 ]---
 
-And then I get:
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/net/irda/pxaficp_ir.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-pxa2xx-ir: probe of pxa2xx-ir failed with error -12
-
-Of course one can ask for a buffer w/o GFP_DMA (see attachment), but I
-ain't sure that it's correct.
-
+diff --git a/drivers/net/irda/pxaficp_ir.c b/drivers/net/irda/pxaficp_ir.c
+index 001ed0a..a5ebaef 100644
+--- a/drivers/net/irda/pxaficp_ir.c
++++ b/drivers/net/irda/pxaficp_ir.c
+@@ -805,7 +805,7 @@ static int pxa_irda_resume(struct platform_device *_dev)
+ 
+ static int pxa_irda_init_iobuf(iobuff_t *io, int size)
+ {
+-	io->head = kmalloc(size, GFP_KERNEL | GFP_DMA);
++	io->head = kmalloc(size, GFP_KERNEL);
+ 	if (io->head != NULL) {
+ 		io->truesize = size;
+ 		io->in_frame = FALSE;
 -- 
-With best wishes
-Dmitry
+1.7.4.4
+
+
+--Qxx1br4bt0+wmkIi--
