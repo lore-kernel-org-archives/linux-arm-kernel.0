@@ -1,39 +1,76 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 28 May 2011 11:11:34 -0300
-Subject: [PATCH] mx51: Let USB Storage be built by default
-Message-ID: <1306591894-26306-1-git-send-email-festevam@gmail.com>
+Date: Sat, 28 May 2011 11:51:32 -0300
+Subject: [PATCH] ARM: mx5/mx53_loco: Add support for LED
+Message-ID: <1306594292-14375-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let USB Storage be built by default. 
-
-Also select NLS_ISO8859 so that the USB device can be mounted.
-
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/configs/mx51_defconfig |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-mx5/Kconfig           |    1 +
+ arch/arm/mach-mx5/board-mx53_loco.c |   17 ++++++++++++++++-
+ 2 files changed, 17 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/configs/mx51_defconfig b/arch/arm/configs/mx51_defconfig
-index 0ace16c..88c5802 100644
---- a/arch/arm/configs/mx51_defconfig
-+++ b/arch/arm/configs/mx51_defconfig
-@@ -106,6 +106,7 @@ CONFIG_GPIO_SYSFS=y
- CONFIG_USB=y
- CONFIG_USB_EHCI_HCD=y
- CONFIG_USB_EHCI_MXC=y
-+CONFIG_USB_STORAGE=y
- CONFIG_MMC=y
- CONFIG_MMC_BLOCK=m
- CONFIG_MMC_SDHCI=m
-@@ -145,7 +146,7 @@ CONFIG_ROOT_NFS=y
- CONFIG_NLS_DEFAULT="cp437"
- CONFIG_NLS_CODEPAGE_437=y
- CONFIG_NLS_ASCII=y
--CONFIG_NLS_ISO8859_1=m
-+CONFIG_NLS_ISO8859_1=y
- CONFIG_NLS_ISO8859_15=m
- CONFIG_NLS_UTF8=y
- CONFIG_MAGIC_SYSRQ=y
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 799fbc4..ab0e8d6 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -199,6 +199,7 @@ config MACH_MX53_LOCO
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	select IMX_HAVE_PLATFORM_GPIO_KEYS
++	select LEDS_GPIO_REGISTER
+ 	help
+ 	  Include support for MX53 LOCO platform. This includes specific
+ 	  configurations for the board and its peripherals.
+diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+index 1b947e8..3b3bf75 100644
+--- a/arch/arm/mach-mx5/board-mx53_loco.c
++++ b/arch/arm/mach-mx5/board-mx53_loco.c
+@@ -38,6 +38,7 @@
+ #define MX53_LOCO_UI1			IMX_GPIO_NR(2, 14)
+ #define MX53_LOCO_UI2			IMX_GPIO_NR(2, 15)
+ #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
++#define LOCO_LED			IMX_GPIO_NR(7, 7)
+ 
+ static iomux_v3_cfg_t mx53_loco_pads[] = {
+ 	/* FEC */
+@@ -163,7 +164,7 @@ static iomux_v3_cfg_t mx53_loco_pads[] = {
+ 	MX53_PAD_GPIO_7__SPDIF_PLOCK,
+ 	MX53_PAD_GPIO_17__SPDIF_OUT1,
+ 	/* GPIO */
+-	MX53_PAD_PATA_DA_1__GPIO7_7,
++	MX53_PAD_PATA_DA_1__GPIO7_7,		/* LED */
+ 	MX53_PAD_PATA_DA_2__GPIO7_8,
+ 	MX53_PAD_PATA_DATA5__GPIO2_5,
+ 	MX53_PAD_PATA_DATA6__GPIO2_6,
+@@ -225,6 +226,19 @@ static const struct imxi2c_platform_data mx53_loco_i2c_data __initconst = {
+ 	.bitrate = 100000,
+ };
+ 
++static const struct gpio_led mx53loco_leds[] __initconst = {
++	{
++		.name			= "green",
++		.default_trigger	= "heartbeat",
++		.gpio			= LOCO_LED,
++	},
++};
++
++static const struct gpio_led_platform_data mx53loco_leds_data __initconst = {
++	.leds		= mx53loco_leds,
++	.num_leds	= ARRAY_SIZE(mx53loco_leds),
++};
++
+ static void __init mx53_loco_board_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_loco_pads,
+@@ -238,6 +252,7 @@ static void __init mx53_loco_board_init(void)
+ 	imx53_add_sdhci_esdhc_imx(0, NULL);
+ 	imx53_add_sdhci_esdhc_imx(2, NULL);
+ 	imx_add_gpio_keys(&loco_button_data);
++	gpio_led_register_device(-1, &mx53loco_leds_data);
+ }
+ 
+ static void __init mx53_loco_timer_init(void)
 -- 
 1.6.0.4
