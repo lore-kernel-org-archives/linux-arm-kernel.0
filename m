@@ -1,40 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 29 May 2011 13:01:58 +0100
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <20110529102659.GY24876@n2100.arm.linux.org.uk>
-References: <1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526122623.GA11875@elte.hu>
-	<20110526123137.GG24876@n2100.arm.linux.org.uk>
-	<20110526125007.GA27083@elte.hu>
-	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
-	<20110527120629.GA32617@elte.hu>
-	<20110527205240.GT24876@n2100.arm.linux.org.uk>
-	<20110529102119.GC9489@e102109-lin.cambridge.arm.com>
-	<20110529102659.GY24876@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTin-5+jE6U-3RrPjPiFVRMGNhvwVEw@mail.gmail.com>
+From: LMP@talktalk.net (CLIPPINGs Central)
+Date: Sun, 29 May 2011 13:36:30 +0100
+Subject: An Invitation
+Message-ID: <045801cc1dfd$55662270$00326750$@net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, 29 May 2011, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Sun, May 29, 2011 at 11:21:19AM +0100, Catalin Marinas wrote:
->> To avoid extra per-thread flags, we could set a per-cpu variable in
->> switch_mm() so that we know what to switch the page tables to in the
->> post-switch hook.
->
-> Why do we need to add more per-cpu stuff when we already have easy access
-> to the thread flags?
 
-It could work, I was thinking that we only get an mm structure in the
-post-switch hook.
+ 
+ 
+Hi ,
+ 
+You are being invited to receive what is considered the most informed
+newsletter about Digital Signage in the industry, it's called CLIPPINGs
+ 
+Over 90 countries and 18,010 readers
+ 
+It is designed to be scanned yet inform you and not take up valuable time.
+Each headline is directly licked back to the original article.
+ 
+Have a look, if this is not for you then please send by return a REMOVE
+notice and it will be stopped.
+ 
+This email was manually sent by us with the sole purpose to introduce
+ourselves to you with no obligation on your part. 
 
-BTW, we currently have a per-cpu current_mm variable in context.c
-because switch_mm() is called before switch_to() and the CPU may
-receive an IPI to reset the ASID in this interval. But we can remove
-it entirely if we set the ASID in the post-switch hook and run the
-main switch code with interrupts disabled.
+Your email address was found while researching
+http://www.kernel.org/pub/linux/kernel/v2.6/ChangeLog-2.6.39and to be
+publicly available on this website. We consider this to be a polite way to
+contact you and apologize sincerely if you have been inconvenienced in any
+way. 
 
 
--- 
-Catalin
+ 
+Thanks for your time.
+ 
+  James van Etten
+Journalist and Broadcaster over 22 years
+ <http://www.leadresearch.co.uk/> 
+Also in affiliation with
+ <http://www.plattretailinstitute.org/> 
+
+
+ 
+ 
+ 
+-------------- next part --------------
+An HTML attachment was scrubbed...
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110529/39f51395/attachment-0001.html>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: image/jpeg
+Size: 2353 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110529/39f51395/attachment-0004.jpe>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: image/jpeg
+Size: 2748 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110529/39f51395/attachment-0005.jpe>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: image/jpeg
+Size: 16623 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110529/39f51395/attachment-0006.jpe>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: image/jpeg
+Size: 18766 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110529/39f51395/attachment-0007.jpe>
