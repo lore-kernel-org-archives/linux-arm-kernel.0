@@ -1,50 +1,69 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Sun, 29 May 2011 18:28:09 +0800
-Subject: [PATCH] pxa: don't ask for a buffer from DMA zone
-In-Reply-To: <20110529102456.GX24876@n2100.arm.linux.org.uk>
-References: <1306658575-17160-1-git-send-email-dbaryshkov@gmail.com>
-	<20110529102456.GX24876@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTim6eXD3NQs3LNKUwz345x-D1RdBDg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 29 May 2011 11:38:25 +0100
+Subject: [PATCH] net: ep93xx_eth: drop GFP_DMA from memory allocations
+In-Reply-To: <1306659837-23553-1-git-send-email-mika.westerberg@iki.fi>
+References: <1306659837-23553-1-git-send-email-mika.westerberg@iki.fi>
+Message-ID: <20110529103825.GZ24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 29, 2011 at 6:24 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, May 29, 2011 at 12:42:55PM +0400, Dmitry Eremin-Solenikov wrote:
->> PXA don't have special DMA zone. And since
->> 197b59ae6e8bee56fcef37ea2482dc08414e2ac (mm: fail GFP_DMA allocations
->> when ZONE_DMA is not configured) allocation with GFP_DMA set will fail
->> with a trace like this:
->
-> These buffers are never used with DMA, its only used with the PIO activity
-> when in SIR mode. ?When in FIR mode, and DMA is being used, we copy it to
-> a block of memory allocated by dma_coherent_alloc(). ?So the GFP_DMA
-> annotation here is redundant.
->
-> And that's probably more important to document in the changelog... its not
-> that PXA doesn't have a special DMA zone, it's that the driver doesn't do
-> DMA on these buffers so its pointless marking them with GFP_DMA.
->
+On Sun, May 29, 2011 at 12:03:57PM +0300, Mika Westerberg wrote:
+> diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
+> index 5a77001..e495f76 100644
+> --- a/drivers/net/arm/ep93xx_eth.c
+> +++ b/drivers/net/arm/ep93xx_eth.c
+> @@ -494,7 +494,7 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+>  	int i;
+>  
+>  	ep->descs = dma_alloc_coherent(NULL, sizeof(struct ep93xx_descs),
+> -				&ep->descs_dma_addr, GFP_KERNEL | GFP_DMA);
+> +				&ep->descs_dma_addr, GFP_KERNEL);
 
-Not really sure about the whole story, but further speaking, for
-architectures like
-PXA and most other ARM SoCs, where DMA can happen anywhere, does this
-mean we don't even need to put GFP_DMA flag when doing memory allocation?
+This one is correct anyway - whether the allocation comes from the DMA
+zone or not is something which should be controlled by the DMA mask and
+not the driver passing random GFP flags to dma_alloc_coherent.
 
+However, because it is passing a NULL device to dma_alloc_coherent(), it
+assumes that it is for an old ISA device, and so will continue to perform
+a GFP_DMA allocation.  The solution - pass a struct device and set the
+DMA masks correctly.
 
->> ?static int pxa_irda_init_iobuf(iobuff_t *io, int size)
->> ?{
->> - ? ? io->head = kmalloc(size, GFP_KERNEL | GFP_DMA);
->> + ? ? io->head = kmalloc(size, GFP_KERNEL);
->> ? ? ? if (io->head != NULL) {
->> ? ? ? ? ? ? ? io->truesize = size;
->> ? ? ? ? ? ? ? io->in_frame = FALSE;
->> --
->> 1.7.4.4
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+> @@ -525,7 +525,7 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+>  		void *page;
+>  		dma_addr_t d;
+>  
+> -		page = (void *)__get_free_page(GFP_KERNEL | GFP_DMA);
+> +		page = (void *)__get_free_page(GFP_KERNEL);
+>  		if (page == NULL)
+>  			goto err;
+>  
+
+Wow, just looked at what this driver is doing with the DMA buffer handling,
+and I'm wondering how come its soo broken.
+
+So, to summarize what its doing:
+
+1. It allocates buffers for rx and tx.
+2. It maps them with dma_map_single().
+	This transfers ownership of the buffer to the DMA device.
+3. In ep93xx_xmit,
+3a. It copies the data into the buffer with skb_copy_and_csum_dev()
+	This violates the DMA buffer ownership rules - the CPU should
+	not be writing to this buffer while it is (in principle) owned
+	by the DMA device.
+3b. It then calls dma_sync_single_for_cpu() for the buffer.
+	This transfers ownership of the buffer to the CPU, which surely
+	is the wrong direction.
+4. In ep93xx_rx,
+4a. It calls dma_sync_single_for_cpu() for the buffer.
+	This at least transfers the DMA buffer ownership to the CPU
+	before the CPU reads the buffer
+4b. It then uses skb_copy_to_linear_data() to copy the data out.
+	At no point does it transfer ownership back to the DMA device.
+5. When the driver is removed, it dma_unmap_single()'s the buffer.
+	This transfers ownership of the buffer to the CPU.
+6. It frees the buffer.
+
+While it may work on ep93xx, it's not respecting the DMA API rules,
+and with DMA debugging enabled it will probably encounter quite a few
+warnings.
