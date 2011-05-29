@@ -1,39 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 29 May 2011 12:27:42 +0100
-Subject: [PATCH] net: ep93xx_eth: drop GFP_DMA from memory allocations
-In-Reply-To: <20110529105946.GA2655@acer>
-References: <1306659837-23553-1-git-send-email-mika.westerberg@iki.fi>
-	<20110529103825.GZ24876@n2100.arm.linux.org.uk>
-	<20110529105946.GA2655@acer>
-Message-ID: <20110529112742.GA24876@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 29 May 2011 13:01:58 +0100
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <20110529102659.GY24876@n2100.arm.linux.org.uk>
+References: <1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+	<20110527205240.GT24876@n2100.arm.linux.org.uk>
+	<20110529102119.GC9489@e102109-lin.cambridge.arm.com>
+	<20110529102659.GY24876@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTin-5+jE6U-3RrPjPiFVRMGNhvwVEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 29, 2011 at 01:59:46PM +0300, Mika Westerberg wrote:
-> FYI, I just enabled DMA debugging and I've got:
-> 
-> [    1.980000] WARNING: at lib/dma-debug.c:911 check_sync+0x460/0x510()
-> [    1.980000] NULL NULL: DMA-API: device driver tries to sync DMA memory it has not allocated [device address=0x00000000c5a11800] [size=78 bytes]
+On Sunday, 29 May 2011, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Sun, May 29, 2011 at 11:21:19AM +0100, Catalin Marinas wrote:
+>> To avoid extra per-thread flags, we could set a per-cpu variable in
+>> switch_mm() so that we know what to switch the page tables to in the
+>> post-switch hook.
+>
+> Why do we need to add more per-cpu stuff when we already have easy access
+> to the thread flags?
 
-That's because of the 'allocate one buffer, map it once, then treat it
-as two buffers' thing.  DMA API debugging requires that the struct
-device, and device address match:
+It could work, I was thinking that we only get an mm structure in the
+post-switch hook.
 
-static struct dma_debug_entry *hash_bucket_find(struct hash_bucket *bucket,
-                                                struct dma_debug_entry *ref)
-{
-        struct dma_debug_entry *entry, *ret = NULL;
-        int matches = 0, match_lvl, last_lvl = 0;
+BTW, we currently have a per-cpu current_mm variable in context.c
+because switch_mm() is called before switch_to() and the CPU may
+receive an IPI to reset the ASID in this interval. But we can remove
+it entirely if we set the ASID in the post-switch hook and run the
+main switch code with interrupts disabled.
 
-        list_for_each_entry(entry, &bucket->list, list) {
-                if ((entry->dev_addr != ref->dev_addr) ||
-                    (entry->dev != ref->dev))
-                        continue;
 
-so the practice of using dma_sync_single_for_xxx() with partial buffers
-is prohibited by this code (which I've always believed to be the right
-answer.)  I've always believed that dma_sync_single_range_for_xxx() is
-the correct interface for doing this kind of thing.
-
-Others may have a different view, in which case _something_ needs to get
-fixed because their view is inconsistent with the debugging code!
+-- 
+Catalin
