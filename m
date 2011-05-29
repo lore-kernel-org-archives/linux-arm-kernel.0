@@ -1,41 +1,25 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Sun, 29 May 2011 22:17:13 +0200
-Subject: [PATCH 3/5] v2 seccomp_filters: Enable ftrace-based system call
-	filtering
-In-Reply-To: <1306345402.21578.100.camel@twins>
-References: <20110517131902.GF21441@elte.hu>
-	<BANLkTikBK3-KZ10eErQ6Eex_L6Qe2aZang@mail.gmail.com>
-	<1305807728.11267.25.camel@gandalf.stny.rr.com>
-	<BANLkTiki8aQJbFkKOFC+s6xAEiuVyMM5MQ@mail.gmail.com>
-	<BANLkTim9UyYAGhg06vCFLxkYPX18cPymEQ@mail.gmail.com>
-	<1306254027.18455.47.camel@twins> <20110524195435.GC27634@elte.hu>
-	<alpine.LFD.2.02.1105242239230.3078@ionos>
-	<20110525150153.GE29179@elte.hu> <1306345402.21578.100.camel@twins>
-Message-ID: <20110529201713.GA25789@elte.hu>
+From: rientjes@google.com (David Rientjes)
+Date: Sun, 29 May 2011 14:17:02 -0700 (PDT)
+Subject: IrDA driver fails on PXA255
+In-Reply-To: <BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
+References: <20110528205701.GA1788@doriath.ww600.siemens.net>
+	<alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
+	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
+Message-ID: <alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Sun, 29 May 2011, Dmitry Eremin-Solenikov wrote:
 
-* Peter Zijlstra <peterz@infradead.org> wrote:
+> What about changing your patch for less intrusive one (to emit a
+> WARN_ON) for at least one
+> or two major releases and only then changing it back to the current state?
+> 
 
-> But face it, you can argue until you're blue in the face,
-
-That is not a technical argument though - and i considered and 
-answered every valid technical argument made by you and Thomas.
-You were either not able to or not willing to counter them.
-
-> [...] but both tglx and I will NAK any and all patches that extend 
-> perf/ftrace beyond the passive observing role.
-
-The thing is, perf is *already* well beyond the 'passive observer' 
-role: we already generate lots of 'action' in response to events. We 
-generate notification signals, we write events - all of which can 
-(and does) modify program behavior.
-
-So what's your point? There's no "passive observer" role really - 
-it's apparently just that you dislike this use of instrumentation 
-while you approve of other uses.
-
-Thanks,
-
-	Ingo
+That would return memory that is not guaranteed to be within the first 
+16MB of address space, so a GFP_DMA allocation would succeed with memory 
+not from ZONE_DMA.  That's an invalid configuration, so users, including 
+you, should at least edit their .config by hand to enable CONFIG_ZONE_DMA 
+as a workaround.  Then, we should try to fix up the Kconfig entries for 
+drivers requiring DMA allocations to select CONFIG_ZONE_DMA or fix 
+defconfigs when DMA is known to be needed for a device.
