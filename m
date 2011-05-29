@@ -1,70 +1,33 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 29 May 2011 12:03:57 +0300
-Subject: [PATCH] net: ep93xx_eth: drop GFP_DMA from memory allocations
-Message-ID: <1306659837-23553-1-git-send-email-mika.westerberg@iki.fi>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Sun, 29 May 2011 10:24:32 +0100
+Subject: On __raw_readl readl_relaxed and readl nocheinmal
+In-Reply-To: <20110527180625.GS24876@n2100.arm.linux.org.uk>
+References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
+	<BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
+	<C832F8F5D375BD43BFA11E82E0FE9FE00AFDABA5E2@EXDCVYMBSTM005.EQ1STM.local>
+	<20110527150242.GB14035@e102109-lin.cambridge.arm.com>
+	<20110527180625.GS24876@n2100.arm.linux.org.uk>
+Message-ID: <20110529092429.GA9489@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a197b59ae6e8 (mm: fail GFP_DMA allocations when ZONE_DMA is not
-configured) made page allocator to return NULL if GFP_DMA is set but
-CONFIG_ZONE_DMA is disabled.
+On Fri, May 27, 2011 at 07:06:25PM +0100, Russell King - ARM Linux wrote:
+> On Fri, May 27, 2011 at 04:02:42PM +0100, Catalin Marinas wrote:
+> > I think Arnd's point was that the writel_relaxed() variant may be even
+> > more relaxed on other architectures than it is on ARM. I can't talk
+> > about them.
+> 
+> Actually, writel_relaxed() doesn't exist outside ARM, it's not part of
+> the IO specification.  That's why it shouldn't be used in generic drivers
+> until it's become part of the IO specification _first_.
 
-This causes ep93xx_eth to fail:
+The read*_relaxed is provided by many other architectures. The
+write*_relaxed seems to be provided by arm and sh only. But it is not
+part of the IO specification. It should become part as this was the
+suggested improvement during the barrier threads we had on linux-arch in
+the past.  I can write a few simple patches and post them on linux-arch
+for review.  I think the tricky part is getting an agreement with the
+other architectures on how relaxed they can be.
 
- WARNING: at mm/page_alloc.c:2251 __alloc_pages_nodemask+0x11c/0x638()
- Modules linked in:
- [<c0035498>] (unwind_backtrace+0x0/0xf4) from [<c0043da4>] (warn_slowpath_common+0x48/0x60)
- [<c0043da4>] (warn_slowpath_common+0x48/0x60) from [<c0043dd8>] (warn_slowpath_null+0x1c/0x24)
- [<c0043dd8>] (warn_slowpath_null+0x1c/0x24) from [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638)
- [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638) from [<c00366fc>] (__dma_alloc+0x8c/0x3ec)
- [<c00366fc>] (__dma_alloc+0x8c/0x3ec) from [<c0036adc>] (dma_alloc_coherent+0x54/0x60)
- [<c0036adc>] (dma_alloc_coherent+0x54/0x60) from [<c0227808>] (ep93xx_open+0x20/0x864)
- [<c0227808>] (ep93xx_open+0x20/0x864) from [<c0283144>] (__dev_open+0xb8/0x108)
- [<c0283144>] (__dev_open+0xb8/0x108) from [<c0280528>] (__dev_change_flags+0x70/0x128)
- [<c0280528>] (__dev_change_flags+0x70/0x128) from [<c0283054>] (dev_change_flags+0x10/0x48)
- [<c0283054>] (dev_change_flags+0x10/0x48) from [<c001a720>] (ip_auto_config+0x190/0xf68)
- [<c001a720>] (ip_auto_config+0x190/0xf68) from [<c00233b0>] (do_one_initcall+0x34/0x18c)
- [<c00233b0>] (do_one_initcall+0x34/0x18c) from [<c0008400>] (kernel_init+0x94/0x134)
- [<c0008400>] (kernel_init+0x94/0x134) from [<c0030858>] (kernel_thread_exit+0x0/0x8)
-
-Since there is no restrictions for DMA on ep93xx, we can fix this by just
-removing the GFP_DMA flag from the allocations.
-
-Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
----
- drivers/net/arm/ep93xx_eth.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
-index 5a77001..e495f76 100644
---- a/drivers/net/arm/ep93xx_eth.c
-+++ b/drivers/net/arm/ep93xx_eth.c
-@@ -494,7 +494,7 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
- 	int i;
- 
- 	ep->descs = dma_alloc_coherent(NULL, sizeof(struct ep93xx_descs),
--				&ep->descs_dma_addr, GFP_KERNEL | GFP_DMA);
-+				&ep->descs_dma_addr, GFP_KERNEL);
- 	if (ep->descs == NULL)
- 		return 1;
- 
-@@ -502,7 +502,7 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
- 		void *page;
- 		dma_addr_t d;
- 
--		page = (void *)__get_free_page(GFP_KERNEL | GFP_DMA);
-+		page = (void *)__get_free_page(GFP_KERNEL);
- 		if (page == NULL)
- 			goto err;
- 
-@@ -525,7 +525,7 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
- 		void *page;
- 		dma_addr_t d;
- 
--		page = (void *)__get_free_page(GFP_KERNEL | GFP_DMA);
-+		page = (void *)__get_free_page(GFP_KERNEL);
- 		if (page == NULL)
- 			goto err;
- 
 -- 
-1.7.4.4
+Catalin
