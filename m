@@ -1,33 +1,61 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 29 May 2011 10:24:32 +0100
-Subject: On __raw_readl readl_relaxed and readl nocheinmal
-In-Reply-To: <20110527180625.GS24876@n2100.arm.linux.org.uk>
-References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
-	<BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
-	<C832F8F5D375BD43BFA11E82E0FE9FE00AFDABA5E2@EXDCVYMBSTM005.EQ1STM.local>
-	<20110527150242.GB14035@e102109-lin.cambridge.arm.com>
-	<20110527180625.GS24876@n2100.arm.linux.org.uk>
-Message-ID: <20110529092429.GA9489@e102109-lin.cambridge.arm.com>
+Date: Sun, 29 May 2011 10:51:34 +0100
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <20110527120629.GA32617@elte.hu>
+References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+Message-ID: <20110529095134.GB9489@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2011 at 07:06:25PM +0100, Russell King - ARM Linux wrote:
-> On Fri, May 27, 2011 at 04:02:42PM +0100, Catalin Marinas wrote:
-> > I think Arnd's point was that the writel_relaxed() variant may be even
-> > more relaxed on other architectures than it is on ARM. I can't talk
-> > about them.
+On Fri, May 27, 2011 at 01:06:29PM +0100, Ingo Molnar wrote:
+> * Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > > How much time does that take on contemporary ARM hardware,
+> > > typically (and worst-case)?
+> >
+> > On newer ARMv6 and ARMv7 hardware, we no longer flush the caches at
+> > context switch as we got VIPT (or PIPT-like) caches.
+> >
+> > But modern ARM processors use something called ASID to tag the TLB
+> > entries and we are limited to 256. The switch_mm() code checks for
+> > whether we ran out of them to restart the counting. This ASID
+> > roll-over event needs to be broadcast to the other CPUs and issuing
+> > IPIs with the IRQs disabled isn't always safe. Of course, we could
+> > briefly re-enable them at the ASID roll-over time but I'm not sure
+> > what the expectations of the code calling switch_mm() are.
 > 
-> Actually, writel_relaxed() doesn't exist outside ARM, it's not part of
-> the IO specification.  That's why it shouldn't be used in generic drivers
-> until it's become part of the IO specification _first_.
+> The expectations are to have irqs off (we are holding the runqueue
+> lock if !__ARCH_WANT_INTERRUPTS_ON_CTXSW), so that's not workable i
+> suspect.
+> 
+> But in theory we could drop the rq lock and restart the scheduler
+> task-pick and balancing sequence when the ARM TLB tag rolls over. So
+> instead of this fragile and assymetric method we'd have a
+> straightforward retry-in-rare-cases method.
 
-The read*_relaxed is provided by many other architectures. The
-write*_relaxed seems to be provided by arm and sh only. But it is not
-part of the IO specification. It should become part as this was the
-suggested improvement during the barrier threads we had on linux-arch in
-the past.  I can write a few simple patches and post them on linux-arch
-for review.  I think the tricky part is getting an agreement with the
-other architectures on how relaxed they can be.
+During switch_mm(), we check whether the task being scheduled in has an
+old ASID and acquire a lock for a global ASID variable. If two CPUs do
+the context switching at the same time, one of them would get stuck on
+cpu_asid_lock. If on the other CPU we get an ASID roll-over, we have to
+broadcast it to the other CPUs via IPI. But one of the other CPUs is
+stuck on cpu_asid_lock with interrupts disabled and we get a deadlock.
+
+An option could be to drop cpu_asid_lock and use some atomic operations
+for the global ASID tracking variable but it needs some thinking. The
+ASID tag requirements are that it should be unique across all the CPUs
+in the system and two threads sharing the same mm must have the same
+ASID (hence the IPI to the other CPUs).
+
+Maybe Russell's idea to move the page table setting outside in some post
+task-switch hook would be easier to implement.
 
 -- 
 Catalin
