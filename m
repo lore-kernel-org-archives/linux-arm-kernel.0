@@ -1,66 +1,52 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Sun, 29 May 2011 15:06:44 +0200
-Subject: ep93xx: status/future of the sparsemem support
-Message-ID: <20110529130644.GI16318@ibawizard.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 29 May 2011 14:19:06 +0100
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <BANLkTin-5+jE6U-3RrPjPiFVRMGNhvwVEw@mail.gmail.com>
+References: <1306412511.1200.90.camel@twins> <20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+	<20110527205240.GT24876@n2100.arm.linux.org.uk>
+	<20110529102119.GC9489@e102109-lin.cambridge.arm.com>
+	<20110529102659.GY24876@n2100.arm.linux.org.uk>
+	<BANLkTin-5+jE6U-3RrPjPiFVRMGNhvwVEw@mail.gmail.com>
+Message-ID: <20110529131906.GB24876@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Sun, May 29, 2011 at 01:01:58PM +0100, Catalin Marinas wrote:
+> On Sunday, 29 May 2011, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > On Sun, May 29, 2011 at 11:21:19AM +0100, Catalin Marinas wrote:
+> >> To avoid extra per-thread flags, we could set a per-cpu variable in
+> >> switch_mm() so that we know what to switch the page tables to in the
+> >> post-switch hook.
+> >
+> > Why do we need to add more per-cpu stuff when we already have easy access
+> > to the thread flags?
+> 
+> It could work, I was thinking that we only get an mm structure in the
+> post-switch hook.
 
-I would like to ask about the status or plans for the sparsemem support on the
-ep93xx. I'm mainly talking about the ts72xx here as I don't have any other
-boards, but it seems, that sparsemem is the must for the boards with more then
-one memory bank. Or it's not true?
+No.  What we get is the mm structure for the _previous_ task which
+was running if the previous task was a lazy-tlb task.  Otherwise it
+will be NULL.
 
-For example, right now, I'm trying to get the recent kernel working on the
-ts-7300 with the 128MB RAM (two 64MB memory chips, 16 banks, 8MB each,
-first 8 at 0x0000000-0x7000000, second one at 0xe0000000-0e7000000) and as you
-might guess, it's unusable with flatmem (and it looks like the discontig mem
-is now gone for ARM if I'm not mistaken):
+What we do get is the 'next' task and 'next' thread by virtue of the
+fact that it has become the 'current' task - so current and
+current_thread_info() both point at what switch_mm() regarded as the
+'next' task/thread.
 
-	[..snip..]
+> BTW, we currently have a per-cpu current_mm variable in context.c
+> because switch_mm() is called before switch_to() and the CPU may
+> receive an IPI to reset the ASID in this interval. But we can remove
+> it entirely if we set the ASID in the post-switch hook and run the
+> main switch code with interrupts disabled.
 
-	Ignoring RAM at e0000000-e07fffff (vmalloc region overlap).
-	Ignoring RAM at e1000000-e17fffff (vmalloc region overlap).
-	Ignoring RAM at e2000000-e27fffff (vmalloc region overlap).
-	Ignoring RAM at e3000000-e37fffff (vmalloc region overlap).
-	Ignoring RAM at e4000000-e47fffff (vmalloc region overlap).
-	Ignoring RAM at e5000000-e57fffff (vmalloc region overlap).
-	Ignoring RAM at e6000000-e67fffff (vmalloc region overlap).
-	Ignoring RAM at e7000000-e77fffff (vmalloc region overlap).
-
-	[..snip..]
-
-	Memory: 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB = 128MB total
-	Memory: 62076k/62076k available, 3460k reserved, 0K highmem
-                ^
-                |__ note, just lower 64MB available
-
-	Virtual kernel memory layout:
-	    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-	    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-	    DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
-	    vmalloc : 0xc8000000 - 0xfe800000   ( 872 MB)
-	    lowmem  : 0xc0000000 - 0xc7800000   ( 120 MB)
-
-If I apply the sparsemem patch as suggested here[1] it seems to work (well it
-boots):
-
-	Memory: 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB 8MB = 128MB total
-	Memory: 127052k/127052k available, 4020k reserved, 0K highmem
-	Virtual kernel memory layout:
-	    vector  : 0xffff0000 - 0xffff1000   (   4 kB)
-	    fixmap  : 0xfff00000 - 0xfffe0000   ( 896 kB)
-	    DMA     : 0xffc00000 - 0xffe00000   (   2 MB)
-	    vmalloc : 0xd0000000 - 0xfe800000   ( 744 MB)
-	    lowmem  : 0xc0000000 - 0xcf800000   ( 248 MB)
-
-The question is, what's the problem with the sparsemem patch[1] for ep93xx,
-that it's not yet in the mainline? Nobody needed it yet? :-) If it's that the
-case, I could submit it, no problem. I don't follow this mailing list and
-development on the ep93xx regularly, so I might have missed some important
-detail. Thank you for any pointers.
-
-1. http://marc.info/?l=linux-arm&m=122754446724900
-
--- ynezz
+Unconvinced.  If we move the ASID update to the post-switch hook, then
+we have the opposite problem - an IPI can sneak in between the dropping
+of the IRQ disabling and the post-switch hook.  This could mean that
+we end up racing to update the hardware ASID value instead (we may
+have read the ASID value from the mm struct, interrupt occurs, changes
+the ASID value, returns, we program the old ASID value.)
