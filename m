@@ -1,61 +1,59 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Sun, 29 May 2011 10:51:34 +0100
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <20110527120629.GA32617@elte.hu>
-References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-	<1306405979.1200.63.camel@twins>
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526122623.GA11875@elte.hu>
-	<20110526123137.GG24876@n2100.arm.linux.org.uk>
-	<20110526125007.GA27083@elte.hu>
-	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
-	<20110527120629.GA32617@elte.hu>
-Message-ID: <20110529095134.GB9489@e102109-lin.cambridge.arm.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 29 May 2011 13:10:01 +0300
+Subject: [PATCH v2 0/5] ep93xx DMA patches
+Message-ID: <cover.1306662317.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 27, 2011 at 01:06:29PM +0100, Ingo Molnar wrote:
-> * Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > How much time does that take on contemporary ARM hardware,
-> > > typically (and worst-case)?
-> >
-> > On newer ARMv6 and ARMv7 hardware, we no longer flush the caches at
-> > context switch as we got VIPT (or PIPT-like) caches.
-> >
-> > But modern ARM processors use something called ASID to tag the TLB
-> > entries and we are limited to 256. The switch_mm() code checks for
-> > whether we ran out of them to restart the counting. This ASID
-> > roll-over event needs to be broadcast to the other CPUs and issuing
-> > IPIs with the IRQs disabled isn't always safe. Of course, we could
-> > briefly re-enable them at the ASID roll-over time but I'm not sure
-> > what the expectations of the code calling switch_mm() are.
-> 
-> The expectations are to have irqs off (we are holding the runqueue
-> lock if !__ARCH_WANT_INTERRUPTS_ON_CTXSW), so that's not workable i
-> suspect.
-> 
-> But in theory we could drop the rq lock and restart the scheduler
-> task-pick and balancing sequence when the ARM TLB tag rolls over. So
-> instead of this fragile and assymetric method we'd have a
-> straightforward retry-in-rare-cases method.
+This is an updated version of the ep93xx DMA patches. Previous version can be
+found here: https://lkml.org/lkml/2011/5/22/86.
 
-During switch_mm(), we check whether the task being scheduled in has an
-old ASID and acquire a lock for a global ASID variable. If two CPUs do
-the context switching at the same time, one of them would get stuck on
-cpu_asid_lock. If on the other CPU we get an ASID roll-over, we have to
-broadcast it to the other CPUs via IPI. But one of the other CPUs is
-stuck on cpu_asid_lock with interrupts disabled and we get a deadlock.
+Changes to v1:
+ * removed unnecessary header
+ * corrected SPI driver documentation
+ * DMA driver platform code is only compiled when CONFIG_EP93XX_DMA is
+   enabled
 
-An option could be to drop cpu_asid_lock and use some atomic operations
-for the global ASID tracking variable but it needs some thinking. The
-ASID tag requirements are that it should be unique across all the CPUs
-in the system and two threads sharing the same mm must have the same
-ASID (hence the IPI to the other CPUs).
+I tried to put all the acks in place, hope I got them right.
 
-Maybe Russell's idea to move the page table setting outside in some post
-task-switch hook would be easier to implement.
+There is a dependency between patch 1 and patch 4 which I'm not entirely sure
+how to solve. Basically it is required that we have patch 1 applied before
+patch 4 or merge conflict results.
+
+Otherwise it shouldn't matter in which order the patches arrive to the
+mainline.
+
+Unless someone has a better idea, I suggest that these patches will go through
+their respective subsystem trees. All the maintainers should be copied.
+
+Thanks,
+MW
+
+Mika Westerberg (5):
+  dmaengine: add ep93xx DMA support
+  ep93xx: add dmaengine platform code
+  ASoC: ep93xx: convert to use the DMA engine API
+  ep93xx: remove the old M2P DMA code
+  spi/ep93xx: add DMA support
+
+ Documentation/spi/ep93xx_spi                   |   10 +
+ arch/arm/mach-ep93xx/Makefile                  |    4 +-
+ arch/arm/mach-ep93xx/core.c                    |    6 +-
+ arch/arm/mach-ep93xx/dma-m2p.c                 |  411 -------
+ arch/arm/mach-ep93xx/dma.c                     |  108 ++
+ arch/arm/mach-ep93xx/include/mach/dma.h        |  190 ++---
+ arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h |    2 +
+ drivers/dma/Kconfig                            |    7 +
+ drivers/dma/Makefile                           |    1 +
+ drivers/dma/ep93xx_dma.c                       | 1355 ++++++++++++++++++++++++
+ drivers/spi/ep93xx_spi.c                       |  303 +++++-
+ sound/soc/ep93xx/ep93xx-ac97.c                 |    4 +-
+ sound/soc/ep93xx/ep93xx-i2s.c                  |    4 +-
+ sound/soc/ep93xx/ep93xx-pcm.c                  |  137 ++--
+ 14 files changed, 1930 insertions(+), 612 deletions(-)
+ delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
+ create mode 100644 arch/arm/mach-ep93xx/dma.c
+ create mode 100644 drivers/dma/ep93xx_dma.c
 
 -- 
-Catalin
+1.7.4.4
