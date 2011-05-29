@@ -1,29 +1,45 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Sun, 29 May 2011 10:01:48 +0200
-Subject: [PATCH] at91_udc: include linux/prefetch.h explicitly
-Message-ID: <1306656108-21992-1-git-send-email-plagnioj@jcrosoft.com>
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Sun, 29 May 2011 13:46:18 +0530
+Subject: [PATCH 01/10] mm: Introduce the memory regions data structure
+In-Reply-To: <1306531912.22505.84.camel@nimitz>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<1306499498-14263-2-git-send-email-ankita@in.ibm.com>
+	<1306510203.22505.69.camel@nimitz>
+	<20110527182041.GM5654@dirshya.in.ibm.com>
+	<1306531912.22505.84.camel@nimitz>
+Message-ID: <20110529081618.GC8333@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
----
- drivers/usb/gadget/at91_udc.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Hi Dave,
 
-diff --git a/drivers/usb/gadget/at91_udc.c b/drivers/usb/gadget/at91_udc.c
-index 41dc093..8e750e3 100644
---- a/drivers/usb/gadget/at91_udc.c
-+++ b/drivers/usb/gadget/at91_udc.c
-@@ -35,6 +35,7 @@
- #include <linux/list.h>
- #include <linux/interrupt.h>
- #include <linux/proc_fs.h>
-+#include <linux/prefetch.h>
- #include <linux/clk.h>
- #include <linux/usb/ch9.h>
- #include <linux/usb/gadget.h>
+On Fri, May 27, 2011 at 02:31:52PM -0700, Dave Hansen wrote:
+> On Fri, 2011-05-27 at 23:50 +0530, Vaidyanathan Srinivasan wrote:
+> > The overall idea is to have a VM data structure that can capture
+> > various boundaries of memory, and enable the allocations and reclaim
+> > logic to target certain areas based on the boundaries and properties
+> > required. 
+> 
+> It's worth noting that we already do targeted reclaim on boundaries
+> other than zones.  The lumpy reclaim and memory compaction logically do
+> the same thing.  So, it's at least possible to do this without having
+> the global LRU designed around the way you want to reclaim.
+>
+
+My understanding maybe incorrect, but doesn't both lumpy reclaim and
+memory compaction still work under zone boundary ? While trying to free
+up higher order pages, lumpy reclaim checks to ensure that pages that
+are selected do not cross zone boundary. Further, compaction walks
+through the pages in a zone and tries to re-arrange them.
+ 
+> Also, if you get _too_ dependent on the global LRU, what are you going
+> to do if our cgroup buddies manage to get cgroup'd pages off the global
+> LRU?  
+> 
+
 -- 
-1.7.4.1
+Regards,
+Ankita Garg (ankita at in.ibm.com)
+Linux Technology Center
+IBM India Systems & Technology Labs,
+Bangalore, India
