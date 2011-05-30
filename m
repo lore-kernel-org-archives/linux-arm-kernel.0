@@ -1,48 +1,27 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 30 May 2011 08:45:02 +0200
-Subject: [PATCH v2 0/2] Move Freescale MXS gpio driver into drivers/gpio
-In-Reply-To: <1306595374-25178-1-git-send-email-shawn.guo@linaro.org>
-References: <1306595374-25178-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110530064502.GC23771@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 30 May 2011 15:01:56 +0800
+Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
+	gpio's from the device tree.
+In-Reply-To: <4DE336A1.5040509@firmworks.com>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205721.21000.78599.stgit@riker>
+	<20110528012427.GB5971@opensource.wolfsonmicro.com>
+	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
+	<20110530033826.GE4130@opensource.wolfsonmicro.com>
+	<20110530061155.GC23517@ponder.secretlab.ca>
+	<4DE336A1.5040509@firmworks.com>
+Message-ID: <20110530070138.GA5036@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant,
+On Sun, May 29, 2011 at 08:18:09PM -1000, Mitch Bradley wrote:
 
-I suppose we should take this through the architecture tree. Can I have
-your Ack for this?
+> I'm currently dealing with an SoC that has over a hundred GPIOs.
+> Whatever we choose, I think it should be able to handle an insane
+> number of GPIOs without getting any more cumbersome that is
+> necessary.
 
-Sascha
-
-On Sat, May 28, 2011 at 11:09:32PM +0800, Shawn Guo wrote:
-> The patch set moves Freescale MXS gpio driver from mach-mxs into
-> drivers/gpio.
-> 
-> Changes since v1:
->  * Squash the 4 gpio-mxs patches into one
->  * Do not add new gpio Kconfig option and use ARCH_MXS directly
->  * Clean up platform-gpio-mxs.c per Arnd's comments
->  * Add device mxs_apbh_bus and set it as the parent of gpio devices
-> 
-> Shawn Guo (2):
->       gpio: gpio-mxs: add gpio driver for Freescale MXS architecture
->       ARM: mxs: use gpio-mxs driver by adding platform device
-> 
->  arch/arm/mach-mxs/Makefile                         |    2 +-
->  arch/arm/mach-mxs/devices.c                        |   11 +
->  arch/arm/mach-mxs/devices/Makefile                 |    1 +
->  arch/arm/mach-mxs/devices/platform-gpio-mxs.c      |   53 +++++
->  arch/arm/mach-mxs/gpio.h                           |   34 ---
->  arch/arm/mach-mxs/include/mach/devices-common.h    |    2 +
->  arch/arm/mach-mxs/mach-mx28evk.c                   |    1 -
->  arch/arm/mach-mxs/mm-mx23.c                        |    1 -
->  arch/arm/mach-mxs/mm-mx28.c                        |    1 -
->  drivers/gpio/Makefile                              |    1 +
->  .../arm/mach-mxs/gpio.c => drivers/gpio/gpio-mxs.c |  228 ++++++++++++--------
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+This is *consumer* side GPIOs, not bindings for the device providing the
+GPIOs.  If a single device needs to use hundreds of GPIOs I'd expect
+many of them will be block functions so you'd have a binding with an
+array for things like "databus" and "addrbus".
