@@ -1,87 +1,65 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 May 2011 09:45:43 +0200
-Subject: [PATCH 0/3] SPEAr320: Add pwm support
-In-Reply-To: <cover.1306739836.git.viresh.kumar@st.com>
-References: <cover.1306739836.git.viresh.kumar@st.com>
-Message-ID: <201105300945.43816.arnd@arndb.de>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 30 May 2011 15:57:45 +0800
+Subject: i.MX consolidation patches
+In-Reply-To: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110530075745.GA31492@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 May 2011 09:21:02 Viresh Kumar wrote:
->  MAINTAINERS                                   |    5 +
->  arch/arm/configs/spear3xx_defconfig           |    2 +
->  arch/arm/mach-spear3xx/include/mach/generic.h |    1 +
->  arch/arm/mach-spear3xx/spear320.c             |   16 +
->  arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
->  drivers/misc/Kconfig                          |    7 +
->  drivers/misc/Makefile                         |    1 +
->  drivers/misc/st_pwm.c                         |  486 +++++++++++++++++++++++++
->  8 files changed, 519 insertions(+), 0 deletions(-)
->  create mode 100644 drivers/misc/st_pwm.c
+Hi Sascha,
 
-No objection to your patch, but I think we need to have
-a long-term plan for pwm:
+I will shortly send move-mxc-gpio-to-drivers patch based on this
+series to save some CONFIG_SOC/ARCH_XXX.  Please let me know if you
+do not think this series is a good base to start with.
 
-arnd at wuerfel:~/linux-2.6$ git ls-files | grep pwm.c
-arch/arm/mach-exynos4/include/mach/pwm-clock.h
-arch/arm/mach-mxs/devices/platform-mxs-pwm.c
-arch/arm/mach-s3c64xx/include/mach/pwm-clock.h
-arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
-arch/arm/mach-s5pc100/include/mach/pwm-clock.h
-arch/arm/mach-s5pv210/include/mach/pwm-clock.h
-arch/arm/mach-vt8500/pwm.c
-arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-arch/arm/plat-mxc/pwm.c
-arch/arm/plat-pxa/pwm.c
-arch/arm/plat-s3c24xx/include/mach/pwm-clock.h
-arch/arm/plat-samsung/dev-pwm.c
-arch/arm/plat-samsung/pwm-clock.c
-arch/arm/plat-samsung/pwm.c
-arch/mips/jz4740/pwm.c
-arch/unicore32/kernel/pwm.c
-drivers/leds/leds-atmel-pwm.c
-drivers/leds/leds-pwm.c
-drivers/mfd/twl6030-pwm.c
-drivers/misc/ab8500-pwm.c
-drivers/misc/atmel_pwm.c
-drivers/misc/ep93xx_pwm.c
+-- 
+Regards,
+Shawn
 
-My rough feeling is that what this should look like is a new
-subsystem that exports a set of operations and has specific
-drivers, like:
-
-drivers/pwm/Kconfig
-drivers/pwm/pwm_core.c
-drivers/pwm/pwm_pxa.c
-drivers/pwm/pwm_unicore.c
-drivers/pwm/pwm_st.c
-drivers/pwm/pwm_...
-
-This is in the spirit of turning code that is organized by platform
-into code that is organized by subsystem, and factoring out the
-common bits.
-
-A real problem we are going to hit without this is the fact that each
-of these drivers exports the same symbols, which prevents you from
-building a multi-platform kernel. It will need to export the common
-set of symbols and pass through operations to the individual drivers
-then:
-
-arnd at wuerfel:~/linux-2.6$ git ls-files |  grep pwm.c | xargs grep EXPORT_SYMBOL -h | sort | uniq -c
-      1 EXPORT_SYMBOL(pwm_channel_alloc);
-      1 EXPORT_SYMBOL(pwm_channel_free);
-      1 EXPORT_SYMBOL(pwm_channel_handler);
-      1 EXPORT_SYMBOL(__pwm_channel_onoff);
-      1 EXPORT_SYMBOL(pwm_clk_alloc);
-      1 EXPORT_SYMBOL(pwm_clk_free);
-      7 EXPORT_SYMBOL(pwm_config);
-      7 EXPORT_SYMBOL(pwm_disable);
-      7 EXPORT_SYMBOL(pwm_enable);
-      7 EXPORT_SYMBOL(pwm_free);
-      7 EXPORT_SYMBOL(pwm_request);
-
-As you can see here, the one driver is the odd one out, it provides a completely
-different API. This is drivers/misc/atmel_pwm.c, and it should eventually get
-converted over.
-
-	Arnd
+On Thu, May 19, 2011 at 06:47:20PM +0200, Sascha Hauer wrote:
+> The following series cleans up some ifdeffery and in the end
+> allows to compile all armv4 and armv5 based i.MXs together in a
+> single kernel. The corresponding defconfigs are merged into one.
+> 
+> This series breaks XIP support for these i.MXs. It should be possible
+> to keep it, but it would require another level of Kconfig indirection
+> which I wanted to avoid.
+> 
+> Sascha
+> 
+> Sascha Hauer (7):
+>       ARM i.MX: fix last user of iomux.h and remove it
+>       ARM i.MX: define CLOCK_TICK_RATE to bogus value
+>       ARM i.MX: remove SoC defines around header includes
+>       ARM i.MX: dmav1: kill SoC ifdefs
+>       ARM i.MX Allow to compile together i.MX1/21/25/27
+>       ARM i.MX mxc.h: use CONFIG_SOC_* instead of CONFIG_ARCH_*
+>       ARM i.MX debug macro: use CONFIG_SOC_* instead of CONFIG_ARCH_*
+> 
+> Uwe Kleine-K?nig (1):
+>       ARM: mxc: update defconfigs
+> 
+>  .../{mx27_defconfig => imx_armv4_armv5_defconfig}  |   59 ++++++++++--
+>  arch/arm/configs/mx1_defconfig                     |   91 ------------------
+>  arch/arm/configs/mx21_defconfig                    |   97 --------------------
+>  arch/arm/configs/mx3_defconfig                     |   43 +++++++--
+>  arch/arm/configs/mx51_defconfig                    |   55 +++++++++--
+>  arch/arm/mach-imx/Kconfig                          |   51 ++++-------
+>  arch/arm/mach-imx/Makefile                         |   10 +-
+>  arch/arm/mach-imx/Makefile.boot                    |   16 ---
+>  arch/arm/mach-imx/dma-v1.c                         |   25 +-----
+>  arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |    2 +-
+>  arch/arm/plat-mxc/Kconfig                          |   18 +---
+>  arch/arm/plat-mxc/devices/platform-imx-dma.c       |    2 +-
+>  arch/arm/plat-mxc/include/mach/debug-macro.S       |   10 +-
+>  arch/arm/plat-mxc/include/mach/hardware.h          |   28 +-----
+>  arch/arm/plat-mxc/include/mach/iomux.h             |   26 -----
+>  arch/arm/plat-mxc/include/mach/mxc.h               |    8 +-
+>  arch/arm/plat-mxc/include/mach/timex.h             |   13 +--
+>  17 files changed, 177 insertions(+), 377 deletions(-)
+>  rename arch/arm/configs/{mx27_defconfig => imx_armv4_armv5_defconfig} (72%)
+>  delete mode 100644 arch/arm/configs/mx1_defconfig
+>  delete mode 100644 arch/arm/configs/mx21_defconfig
+>  delete mode 100644 arch/arm/plat-mxc/include/mach/iomux.h
+> 
