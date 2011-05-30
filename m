@@ -1,125 +1,87 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Mon, 30 May 2011 03:42:34 -0400
-Subject: [PATCH v2 1/3] mmc: support sdhci-mmp2
-In-Reply-To: <201105300911.54084.arnd@arndb.de>
-References: <1306315367-15602-1-git-send-email-zhangfei.gao@marvell.com>
-	<201105271746.04775.arnd@arndb.de>
-	<BANLkTi=S=Q+AdKECCHg2u6X=VWEOtEox_w@mail.gmail.com>
-	<201105300911.54084.arnd@arndb.de>
-Message-ID: <BANLkTinZgqzX3rvmUg0M=H_3RZhHyygO_g@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 May 2011 09:45:43 +0200
+Subject: [PATCH 0/3] SPEAr320: Add pwm support
+In-Reply-To: <cover.1306739836.git.viresh.kumar@st.com>
+References: <cover.1306739836.git.viresh.kumar@st.com>
+Message-ID: <201105300945.43816.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 3:11 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Monday 30 May 2011 07:42:04 zhangfei gao wrote:
->> On Fri, May 27, 2011 at 11:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Wednesday 25 May 2011, Zhangfei Gao wrote:
->> >> +static unsigned int mmp2_get_ro(struct sdhci_host *host)
->> >> +{
->> >> + ? ? /* Micro SD does not support write-protect feature */
->> >> + ? ? return 0;
->> >> +}
->> >
->> > You shouldn't need to provide an empty get_ro function, the
->> > default is that there is no write-protect.
->>
->> Thanks Arnd for review.
->> The reason to put get_ro here is some board use micro sd, while some
->> board design is general sd card.
->> The micro sd do not use write-protect, while SDHCI_WRITE_PROTECT will
->> return 1 in our controller, so it shows read only.
->> So add one call back for the board with micro sd card via flag.
->
-> Ok, I see.
->
->> >> + ? ? pxa = kzalloc(sizeof(struct sdhci_pxa), GFP_KERNEL);
->> >> + ? ? if (!pxa) {
->> >> + ? ? ? ? ? ? ret = -ENOMEM;
->> >> + ? ? ? ? ? ? goto out;
->> >> + ? ? }
->> >> + ? ? pxa->ops = kzalloc(sizeof(struct sdhci_ops), GFP_KERNEL);
->> >> + ? ? if (!pxa->ops) {
->> >> + ? ? ? ? ? ? ret = -ENOMEM;
->> >> + ? ? ? ? ? ? goto out;
->> >> + ? ? }
->> >
->> > I think you really shouldn't allocate the sdhci_ops dynamically.
->> > In fact, it would be much better if we were able to mark them
->> > as const in all drivers.
->>
->> We found some issues when supporting multi-slot, each slot may have
->> different ops.
->> So use the method of allocating the sdhci_ops dynamically instead of
->> using static ops.
->> For example, emmc has 74_clocks call back, while mmc and sdio slot
->> does not have such ops.
->> If not dynamically allocate sdhci_ops, all slot ops may become same,
->> and 74_clocks may be called for every slot.
->> Also, some board may have get_ro, while other board may not, so
->> transfer the ops via flags.
->>
->> Not sure whether it is worthy to add additional common files to share
->> probe and remove function.
->> Also the init the ops part are different.
->
-> IMHO, we should try much harder to keep the ops constant. For the
-> two examples you gave, I would probably put a flag into private data for
-> the get_ro operation to signify that it's never read-only, and provide
-> a second set of operations for emmc, so that in the probe function
-> you check the type of device and then set the appropriate one.
->
-> You could also do the same for all three cases:
->
-> ? ? ? ?if (emmc)
-> ? ? ? ? ? ? ? ?host->ops = &sdhci_mmp2_emmc_ops;
-> ? ? ? ?else if (!has_ro_switch)
-> ? ? ? ? ? ? ? ?host->ops = &sdhci_mmp2_rw_ops;
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?host->ops = &sdhci_mmp2_default_ops;
+On Monday 30 May 2011 09:21:02 Viresh Kumar wrote:
+>  MAINTAINERS                                   |    5 +
+>  arch/arm/configs/spear3xx_defconfig           |    2 +
+>  arch/arm/mach-spear3xx/include/mach/generic.h |    1 +
+>  arch/arm/mach-spear3xx/spear320.c             |   16 +
+>  arch/arm/mach-spear3xx/spear320_evb.c         |    1 +
+>  drivers/misc/Kconfig                          |    7 +
+>  drivers/misc/Makefile                         |    1 +
+>  drivers/misc/st_pwm.c                         |  486 +++++++++++++++++++++++++
+>  8 files changed, 519 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/misc/st_pwm.c
 
-Thanks, will take this method to make the ops constant.
+No objection to your patch, but I think we need to have
+a long-term plan for pwm:
 
->
->> >> +
->> >> +#ifdef CONFIG_PM
->> >> +static int sdhci_mmp2_suspend(struct platform_device *dev, pm_message_t state)
->> >> +{
->> >> + ? ? struct sdhci_host *host = platform_get_drvdata(dev);
->> >> +
->> >> + ? ? return sdhci_suspend_host(host, state);
->> >> +}
->> >> +
->> >> +static int sdhci_mmp2_resume(struct platform_device *dev)
->> >> +{
->> >> + ? ? struct sdhci_host *host = platform_get_drvdata(dev);
->> >> +
->> >> + ? ? return sdhci_resume_host(host);
->> >> +}
->> >> +#else
->> >> +#define sdhci_mmp2_suspend ? NULL
->> >> +#define sdhci_mmp2_resume ? ?NULL
->> >> +#endif
->> >
->> > Similarly, I think it would be good if sdhci-pltfm.c would simply
->> > export these functions so you could refer to them in your driver.
->> > There is no need to have identical copies in each variant.
->> >
->>
->> There are some additional code for suspend and resume, so
->> sdhci_pltfm_suspend may not enough.
->> For example, when enable wifi host sleep feature, additional register
->> have to be configured.
->
-> Well, not all drivers would have to use the common functions, but
-> right now there are a number of identical copies, so it's certainly
-> worth sharing.
+arnd at wuerfel:~/linux-2.6$ git ls-files | grep pwm.c
+arch/arm/mach-exynos4/include/mach/pwm-clock.h
+arch/arm/mach-mxs/devices/platform-mxs-pwm.c
+arch/arm/mach-s3c64xx/include/mach/pwm-clock.h
+arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
+arch/arm/mach-s5pc100/include/mach/pwm-clock.h
+arch/arm/mach-s5pv210/include/mach/pwm-clock.h
+arch/arm/mach-vt8500/pwm.c
+arch/arm/plat-mxc/devices/platform-mxc_pwm.c
+arch/arm/plat-mxc/pwm.c
+arch/arm/plat-pxa/pwm.c
+arch/arm/plat-s3c24xx/include/mach/pwm-clock.h
+arch/arm/plat-samsung/dev-pwm.c
+arch/arm/plat-samsung/pwm-clock.c
+arch/arm/plat-samsung/pwm.c
+arch/mips/jz4740/pwm.c
+arch/unicore32/kernel/pwm.c
+drivers/leds/leds-atmel-pwm.c
+drivers/leds/leds-pwm.c
+drivers/mfd/twl6030-pwm.c
+drivers/misc/ab8500-pwm.c
+drivers/misc/atmel_pwm.c
+drivers/misc/ep93xx_pwm.c
 
-Then we use sdhci_pltfm_suspend first, and change to private suspend &
-resume when supporting additional feature.
+My rough feeling is that what this should look like is a new
+subsystem that exports a set of operations and has specific
+drivers, like:
 
->
-> Note that this comment wasn't directed at your patch as much as at
-> the overall design of the sdhci sub-drivers.
->
-> ? ? ? ?Arnd
->
+drivers/pwm/Kconfig
+drivers/pwm/pwm_core.c
+drivers/pwm/pwm_pxa.c
+drivers/pwm/pwm_unicore.c
+drivers/pwm/pwm_st.c
+drivers/pwm/pwm_...
+
+This is in the spirit of turning code that is organized by platform
+into code that is organized by subsystem, and factoring out the
+common bits.
+
+A real problem we are going to hit without this is the fact that each
+of these drivers exports the same symbols, which prevents you from
+building a multi-platform kernel. It will need to export the common
+set of symbols and pass through operations to the individual drivers
+then:
+
+arnd at wuerfel:~/linux-2.6$ git ls-files |  grep pwm.c | xargs grep EXPORT_SYMBOL -h | sort | uniq -c
+      1 EXPORT_SYMBOL(pwm_channel_alloc);
+      1 EXPORT_SYMBOL(pwm_channel_free);
+      1 EXPORT_SYMBOL(pwm_channel_handler);
+      1 EXPORT_SYMBOL(__pwm_channel_onoff);
+      1 EXPORT_SYMBOL(pwm_clk_alloc);
+      1 EXPORT_SYMBOL(pwm_clk_free);
+      7 EXPORT_SYMBOL(pwm_config);
+      7 EXPORT_SYMBOL(pwm_disable);
+      7 EXPORT_SYMBOL(pwm_enable);
+      7 EXPORT_SYMBOL(pwm_free);
+      7 EXPORT_SYMBOL(pwm_request);
+
+As you can see here, the one driver is the odd one out, it provides a completely
+different API. This is drivers/misc/atmel_pwm.c, and it should eventually get
+converted over.
+
+	Arnd
