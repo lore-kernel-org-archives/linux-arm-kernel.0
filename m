@@ -1,44 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 30 May 2011 02:12:10 -0700
-Subject: [RFC PATCH v4 11/13] ARM: gic: remove previous local timer
-	interrupt handling
-In-Reply-To: <20110530092542.3ab5ad6a@taxman.wild-wind.fr.eu.org>
-References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>	<1306513671-12206-12-git-send-email-marc.zyngier@arm.com>	<4DDFFBCE.8020908@codeaurora.org>	<20110530090805.73937acd@taxman.wild-wind.fr.eu.org>
-	<20110530092542.3ab5ad6a@taxman.wild-wind.fr.eu.org>
-Message-ID: <4DE35F6A.5090200@codeaurora.org>
+From: inderpal.singh@linaro.org (Inderpal Singh)
+Date: Mon, 30 May 2011 14:43:01 +0530
+Subject: [PATCH] ARM: EXYNOS4: Fix secondary CPU boot after wake-up
+Message-ID: <1306746781-21511-1-git-send-email-inderpal.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/30/2011 1:25 AM, Marc Zyngier wrote:
-> On Mon, 30 May 2011 09:08:05 +0100
-> Marc Zyngier <marc.zyngier@arm.com> wrote:
->
->> On Fri, 27 May 2011 12:30:22 -0700
->> Stephen Boyd <sboyd@codeaurora.org> wrote:
->>
->>> On 05/27/2011 09:27 AM, Marc Zyngier wrote:
->>>> Now that all users of local timers are using CONFIG_ARM_GIC_VPPI,
->>>> the now unused local timer infrastructure can be safely removed.
->>>>
->>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>> ---
->>>>
->>> Can you also remove local_timer_ack() from MSM in this patch? If you do,
->>> feel free to add an
->>>
->>> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
->>>
->>> to this patch.
->> This patch breaks the kernel link when building for SMP.
->> I'll add a weak version of local_timer_ack() for the time being.
-> Actually, this is worse. Having a weak version of local_timer_ack() in
-> smp.c clashes badly with this symbol being a #define with TWD is
-> selected...
->
-> Let's drop that bit for now, and I'll address it in the timer series.
+1. After wake-up, the system-wide flags register loses its value.
+   Hence, write the address of secondary startup function to
+   successfully boot the secondary CPU.
 
-Sure. Let's punt for now. Feel free to add my Acked-by still.
+2. Fix to remove the "Unknown IPI message 0x1" message when
+   secondary CPU boots.
 
+Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
+---
+ arch/arm/mach-exynos4/platsmp.c |    8 +++++++-
+ 1 files changed, 7 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
+index 6d35878..11234c7 100644
+--- a/arch/arm/mach-exynos4/platsmp.c
++++ b/arch/arm/mach-exynos4/platsmp.c
+@@ -100,11 +100,17 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+ 	write_pen_release(cpu);
+ 
+ 	/*
++	 * After wake-up, the system-wide flags register loses its value.
++	 * Hence, write the address of secondary startup function again.
++	 */ 
++	 __raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), S5P_VA_SYSRAM);
++
++	/*
+ 	 * Send the secondary CPU a soft interrupt, thereby causing
+ 	 * the boot monitor to read the system wide flags register,
+ 	 * and branch to the address found there.
+ 	 */
+-	smp_cross_call(cpumask_of(cpu), 1);
++	smp_send_reschedule(cpu);
+ 
+ 	timeout = jiffies + (1 * HZ);
+ 	while (time_before(jiffies, timeout)) {
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.1
