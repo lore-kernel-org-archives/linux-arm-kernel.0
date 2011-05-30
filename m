@@ -1,69 +1,55 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 30 May 2011 00:22:49 -0600
-Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
-	gpio's from the device tree.
-In-Reply-To: <4DE336A1.5040509@firmworks.com>
-References: <20110527205444.21000.90209.stgit@riker>
-	<20110527205721.21000.78599.stgit@riker>
-	<20110528012427.GB5971@opensource.wolfsonmicro.com>
-	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
-	<20110530033826.GE4130@opensource.wolfsonmicro.com>
-	<20110530061155.GC23517@ponder.secretlab.ca>
-	<4DE336A1.5040509@firmworks.com>
-Message-ID: <BANLkTimTMdzWUX=xr7TyVXwM5FoVvRz2Zg@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Mon, 30 May 2011 09:38:10 +0300
+Subject: [PATCH v4] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
+In-Reply-To: <1305906384-22061-1-git-send-email-avinashhm@ti.com>
+References: <1305906384-22061-1-git-send-email-avinashhm@ti.com>
+Message-ID: <1306737490.2117.24.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 12:18 AM, Mitch Bradley <wmb@firmworks.com> wrote:
-> On 5/29/2011 8:11 PM, Grant Likely wrote:
->>
->> On Mon, May 30, 2011 at 11:38:27AM +0800, Mark Brown wrote:
->>>
->>> On Sun, May 29, 2011 at 08:11:34PM -0700, Olof Johansson wrote:
->>>>
->>>> On Fri, May 27, 2011 at 6:24 PM, Mark Brown
->>>
->>>>> This is a step back from the usability of the existing platform data -
->>>>> the platform data uses a series of individually named GPIOs while this
->>>>> uses an array of GPIO numbers with magic indexes. ?The fact that you
->>>>> need comments explaining what the functions of the array elements are
->>>>> is a bit of a red flag here.
->>>
->>>> Agreed, I had similar concerns with the sdhci bindings where it used a
->>>> 3-element array of gpios instead of the previous named ones. I was
->>>> told it's common practice to do it that way though? Seems like a step
->>>> backwards to me. :(
->>>
->>> Interesting... ?what was the reasoning behind this? ?It's a definite
->>> step backwards but it does explain my major concern with the new batch
->>> of device tree patches.
->>
->> The binding for gpios was defined a few years ago and it is in fairly
->> wide use within the powerpc sphere. ?The design followed the pattern
->> established for specifying irqs, and in that regard satisfied the
->> principle of least surprise.
->>
->> That said, it isn't a very large leap to go from a single 'gpios'
->> property to allowing multiple named gpios properties with meaningful
->> names, particularly if they are fully specified by the device
->> binding, and they follow exactly the same binding semantics as the
->> existing 'gpios' proprety (phandle + gpio specifier).
->>
->> Personally, I'm /cautious/ about saying okay to extending the binding,
->> simply because once the extension is in use it is really hard to go
->> back on it, but I cannot think of any reason why this particular case
->> wouldn't be a good idea. ?Anyone have thoughts on this? ?Ben? ?Mitch?
->
->
-> I'm currently dealing with an SoC that has over a hundred GPIOs. Whatever we
-> choose, I think it should be able to handle an insane number of GPIOs
-> without getting any more cumbersome that is necessary.
+On Fri, 2011-05-20 at 21:16 +0530, Avinash.H.M wrote:
+> The sequence of _ocp_softreset doesn't work for i2c. The i2c module has a
+> special sequence to reset the module. The sequence is
+>  - Disable the I2C.
+>  - Write to SOFTRESET bit.
+>  - Enable the I2C.
+>  - Poll on the RESETDONE bit.
+> The sequence is implemented as a function and the i2c_class is updated with
+> the correct 'reset' pointer.  omap_hwmod_softreset function is implemented
+> which triggers the softreset by writing into sysconfig register. On following
+> this sequence, i2c module resets properly and timeouts are not seen.
+> 
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Avinash.H.M <avinashhm@ti.com>
+> ---
 
-That's pretty common, and I don't think it will be a problem; either
-with the current binding, or the proposed extension.
+<snip>
 
-g.
+> diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/plat-omap/include/plat/i2c.h
+> index 878d632..3ffb94e 100644
+> --- a/arch/arm/plat-omap/include/plat/i2c.h
+> +++ b/arch/arm/plat-omap/include/plat/i2c.h
+> @@ -23,6 +23,8 @@
+>  
+>  #include <linux/i2c.h>
+>  
+> +#include <plat/omap_hwmod.h>
+> +
+>  #if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
+>  extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
+>  				 struct i2c_board_info const *info,
+> @@ -52,4 +54,6 @@ struct omap_i2c_dev_attr {
+>  void __init omap1_i2c_mux_pins(int bus_id);
+>  void __init omap2_i2c_mux_pins(int bus_id);
+>  
+> +int omap_i2c_reset(struct omap_hwmod *oh);
+> +
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+It's not necessary to include omap_hwmod.h, just declare
+
+struct omap_hwmod;
+
+ Tomi
