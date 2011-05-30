@@ -1,55 +1,46 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Mon, 30 May 2011 13:53:20 +0530
-Subject: [PATCH 0/3] SPEAr320: Add pwm support
-In-Reply-To: <201105300945.43816.arnd@arndb.de>
-References: <cover.1306739836.git.viresh.kumar@st.com>
-	<201105300945.43816.arnd@arndb.de>
-Message-ID: <4DE353F8.9040207@st.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 30 May 2011 09:25:42 +0100
+Subject: [RFC PATCH v4 11/13] ARM: gic: remove previous local timer
+	interrupt handling
+In-Reply-To: <20110530090805.73937acd@taxman.wild-wind.fr.eu.org>
+References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>
+	<1306513671-12206-12-git-send-email-marc.zyngier@arm.com>
+	<4DDFFBCE.8020908@codeaurora.org>
+	<20110530090805.73937acd@taxman.wild-wind.fr.eu.org>
+Message-ID: <20110530092542.3ab5ad6a@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/30/2011 01:15 PM, Arnd Bergmann wrote:
-> No objection to your patch, but I think we need to have
-> a long-term plan for pwm:
-> 
-> arnd at wuerfel:~/linux-2.6$ git ls-files | grep pwm.c
-> arch/arm/mach-exynos4/include/mach/pwm-clock.h
-> arch/arm/mach-mxs/devices/platform-mxs-pwm.c
-> arch/arm/mach-s3c64xx/include/mach/pwm-clock.h
-> arch/arm/mach-s5p64x0/include/mach/pwm-clock.h
-> arch/arm/mach-s5pc100/include/mach/pwm-clock.h
-> arch/arm/mach-s5pv210/include/mach/pwm-clock.h
-> arch/arm/mach-vt8500/pwm.c
-> arch/arm/plat-mxc/devices/platform-mxc_pwm.c
-> arch/arm/plat-mxc/pwm.c
-> arch/arm/plat-pxa/pwm.c
-> arch/arm/plat-s3c24xx/include/mach/pwm-clock.h
-> arch/arm/plat-samsung/dev-pwm.c
-> arch/arm/plat-samsung/pwm-clock.c
-> arch/arm/plat-samsung/pwm.c
-> arch/mips/jz4740/pwm.c
-> arch/unicore32/kernel/pwm.c
-> drivers/leds/leds-atmel-pwm.c
-> drivers/leds/leds-pwm.c
-> drivers/mfd/twl6030-pwm.c
-> drivers/misc/ab8500-pwm.c
-> drivers/misc/atmel_pwm.c
-> drivers/misc/ep93xx_pwm.c
-> 
-> My rough feeling is that what this should look like is a new
-> subsystem that exports a set of operations and has specific
-> drivers, like:
-> 
-> drivers/pwm/Kconfig
-> drivers/pwm/pwm_core.c
-> drivers/pwm/pwm_pxa.c
-> drivers/pwm/pwm_unicore.c
-> drivers/pwm/pwm_st.c
-> drivers/pwm/pwm_...
-> 
+On Mon, 30 May 2011 09:08:05 +0100
+Marc Zyngier <marc.zyngier@arm.com> wrote:
 
-Sascha sent a patchset for something similar earlier.
-But don't know what happened to it.
+> On Fri, 27 May 2011 12:30:22 -0700
+> Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> > On 05/27/2011 09:27 AM, Marc Zyngier wrote:
+> > > Now that all users of local timers are using CONFIG_ARM_GIC_VPPI,
+> > > the now unused local timer infrastructure can be safely removed.
+> > >
+> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > > ---
+> > >
+> > 
+> > Can you also remove local_timer_ack() from MSM in this patch? If you do,
+> > feel free to add an
+> > 
+> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> > 
+> > to this patch.
+> 
+> This patch breaks the kernel link when building for SMP.
+> I'll add a weak version of local_timer_ack() for the time being.
 
+Actually, this is worse. Having a weak version of local_timer_ack() in
+smp.c clashes badly with this symbol being a #define with TWD is
+selected...
+
+Let's drop that bit for now, and I'll address it in the timer series.
+
+	M.
 -- 
-viresh
+I'm the slime oozin' out from your TV set...
