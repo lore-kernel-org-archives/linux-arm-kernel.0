@@ -1,48 +1,41 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 30 May 2011 10:43:07 +0200
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-Message-ID: <20110530084307.GA28953@riccoc20.at.omicron.at>
+From: b-cousson@ti.com (Cousson, Benoit)
+Date: Mon, 30 May 2011 10:49:16 +0200
+Subject: [PATCHv2 2/2] OMAP: add omap_device_reset()
+In-Reply-To: <alpine.DEB.2.00.1105292006330.8973@utopia.booyaka.com>
+References: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
+	<1306481908-7386-3-git-send-email-tomi.valkeinen@ti.com>
+	<4DDF9B5D.7060408@ti.com> <1306500367.1905.18.camel@deskari>
+	<4DDFB8AF.1080800@ti.com> <1306514427.1905.27.camel@deskari>
+	<alpine.DEB.2.00.1105292006330.8973@utopia.booyaka.com>
+Message-ID: <4DE35A0C.6040301@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
+On 5/30/2011 4:15 AM, Paul Walmsley wrote:
+> On Fri, 27 May 2011, Tomi Valkeinen wrote:
+>
+>> However, VENC doesn't use the standard syscontrol mechanism, so that
+>> cannot be done via omap_device interface anyway.
+>
+> struct omap_hwmod_class has a .reset function pointer for this purpose.
+> It's already been necessary to deal with the I2C IP block:
+>
+>     https://patchwork.kernel.org/patch/804072/
+>
+> If all that's needed are the steps in 4430 TRM Rev. T Section 10.6.5.1.2.3
+> "Subsequence--Video Encoder Software Reset", then it should be possible to
+> handle this internal reset with hwmod code.
 
-   clocksource: convert ARM 32-bit up counting clocksources
+Mmm, but in that case, if this is purely handled inside the IP, it is up 
+to the driver to manage that.
 
-broke the build for ixp4xx and made big endian operation impossible.
-This commit restores the original behaviour.
+hwmod should not manage more than the SYSCONFIG ocpreset because this is 
+part of the PRCM/OCP wrapper and not really the IP.
 
-Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
----
- arch/arm/mach-ixp4xx/common.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+In the case of the VENC, the reset is part of the regular init sequence, 
+so the driver will take care of it.
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 74ed81a..0777257 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
- /*
-  * clocksource
-  */
-+
-+static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
-+{
-+	return *IXP4XX_OSTS;
-+}
-+
- unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
- EXPORT_SYMBOL(ixp4xx_timer_freq);
- static void __init ixp4xx_clocksource_init(void)
- {
- 	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
- 
--	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
--			clocksource_mmio_readl_up);
-+	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
-+			ixp4xx_clocksource_read);
- }
- 
- /*
--- 
-1.7.0.4
+Don't you think so?
+
+Regards,
+Benoit
