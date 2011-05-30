@@ -1,92 +1,125 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 May 2011 11:04:45 +0100
-Subject: [RFC PATCH v5 04/13] ARM: omap4: use remapped PPI interrupts for
-	local timer
-In-Reply-To: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
-References: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306749894-28749-5-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 30 May 2011 11:04:41 +0100
+Subject: [RFC PATCH v5 00/13] Consolidating GIC per-cpu interrupts
+Message-ID: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the normal interrupt scheme for the local timers by using
-a remapped PPI interrupt.
+The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
+problems:
 
-Tested on a Pandaboard.
+- They use a completely separate scheme to handle the interrupts,
+  mostly because the PPI concept doesn't really match the kernel view
+  of an interrupt.
+- Some low-level code gets duplicated, as usual...
+- PPIs can only be used by the timer code, unless we add more low-level
+  assembly code.
+- At least one platform (msm) has started implementing its own
+  alternative scheme.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-omap2/Kconfig                    |    1 +
- arch/arm/mach-omap2/include/mach/entry-macro.S |   14 +-------------
- arch/arm/mach-omap2/timer-mpu.c                |    3 ++-
- 3 files changed, 4 insertions(+), 14 deletions(-)
+The proposed solution is to let the GIC code expose the PPIs as
+something that the kernel can manage. Instead of having a single
+interrupt number shared on all cores, make the interrupt number be
+different on each CPU.
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 19d5891..284694c 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
- 	select CPU_V7
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
- 	select LOCAL_TIMERS if SMP
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
-diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
-index a48690b..22d86ef 100644
---- a/arch/arm/mach-omap2/include/mach/entry-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
-@@ -78,7 +78,7 @@
- 4401:		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
- 		ldr     \tmp, =1021
- 		bic     \irqnr, \irqstat, #0x1c00
--		cmp     \irqnr, #29
-+		cmp     \irqnr, #15
- 		cmpcc   \irqnr, \irqnr
- 		cmpne   \irqnr, \tmp
- 		cmpcs   \irqnr, \irqnr
-@@ -101,18 +101,6 @@
- 		it	cs
- 		cmpcs	\irqnr, \irqnr
- 		.endm
--
--		/* As above, this assumes that irqstat and base are preserved */
--
--		.macro test_for_ltirq, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		mov 	\tmp, #0
--		cmp	\irqnr, #29
--		itt	eq
--		moveq	\tmp, #1
--		streq	\irqstat, [\base, #GIC_CPU_EOI]
--		cmp	\tmp, #0
--		.endm
- #endif	/* CONFIG_SMP */
- 
- #else	/* MULTI_OMAP2 */
-diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
-index 31c0ac4..1fd5ca5 100644
---- a/arch/arm/mach-omap2/timer-mpu.c
-+++ b/arch/arm/mach-omap2/timer-mpu.c
-@@ -22,6 +22,7 @@
- #include <asm/irq.h>
- #include <asm/smp_twd.h>
- #include <asm/localtimer.h>
-+#include <asm/hardware/gic.h>
- 
- /*
-  * Setup the local clock events for a CPU.
-@@ -32,7 +33,7 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
- 		return -ENXIO;
- 
--	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_to_vppi(OMAP44XX_IRQ_LOCALTIMER);
- 	twd_timer_setup(evt);
- 	return 0;
- }
+This enables the use of the normal kernel API (request_irq() and
+friends) and the elimination of some low level code. On the other
+side, it causes quite a bit of churn in the timer code.
+
+This patch set is based on 3.0-rc1. Tested on PB-11MP, Pandaboard
+and SMDK-V310.
+
+
+>From bogus@does.not.exist.com  Wed May 25 18:46:03 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 25 May 2011 22:46:03 -0000
+Subject: No subject
+Message-ID: <mailman.4.1306750051.1530.linux-arm-kernel@lists.infradead.org>
+
+- Fix arch/arm/common/Kconfig indentation
+- Fix MSM warning when building UP.
+
+
+>From bogus@does.not.exist.com  Wed May 25 18:46:03 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 25 May 2011 22:46:03 -0000
+Subject: No subject
+Message-ID: <mailman.5.1306750051.1530.linux-arm-kernel@lists.infradead.org>
+
+- Fix yet another CPU_HOTPLUG problem: instead of calling free_irq()
+  on timer halt, just disable the interrupt. On timer restart, detect
+  that the interrupt has been requested already and just enable the
+  interrupt back. This avoid doing a request_irq() with preemption
+  disabled, which triggers an ugly warning. Reported by Stephen Boyd.
+
+
+>From bogus@does.not.exist.com  Wed May 25 18:46:03 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 25 May 2011 22:46:03 -0000
+Subject: No subject
+Message-ID: <mailman.6.1306750051.1530.linux-arm-kernel@lists.infradead.org>
+
+- More MSM fixes
+- Dropped MSM interrupt handler removal, as this requires more discussion,
+  and will be addressed in a separate series.
+- Moved introduction of percpu_timer_handler to a separate patch
+
+
+>From bogus@does.not.exist.com  Wed May 25 18:46:03 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 25 May 2011 22:46:03 -0000
+Subject: No subject
+Message-ID: <mailman.7.1306750051.1530.linux-arm-kernel@lists.infradead.org>
+
+- Fix crash while hotpluging a CPU
+- Use handle_percpu_irq() instead of handle_fasteoi_irq()
+- MSM fixes courtesy of Stephen Boyd
+- MSM switched to percpu_timer_handler()
+- Remove local timer interrupt accounting
+- Restructure patches #1 and #2
+
+
+Marc Zyngier (13):
+  ARM: gic: add per-cpu interrupt multiplexer
+  ARM: smp: add interrupt handler for local timers
+  ARM: smp_twd: add support for remapped PPI interrupts
+  ARM: omap4: use remapped PPI interrupts for local timer
+  ARM: versatile: use remapped PPI interrupts for local timer
+  ARM: shmobile: use remapped PPI interrupts for local timer
+  ARM: ux500: use remapped PPI interrupts for local timer
+  ARM: tegra: use remapped PPI interrupts for local timer
+  ARM: msm: use remapped PPI interrupts for local timer
+  ARM: exynos4: use remapped PPI interrupts for local timer
+  ARM: gic: remove previous local timer interrupt handling
+  ARM: gic: add compute_irqnr macro for exynos4
+  ARM: SMP: automatically select ARM_GIC_VPPI
+
+ arch/arm/Kconfig                                  |    1 +
+ arch/arm/common/Kconfig                           |    5 +
+ arch/arm/common/gic.c                             |  143 +++++++++++++++++++--
+ arch/arm/include/asm/entry-macro-multi.S          |    7 -
+ arch/arm/include/asm/hardirq.h                    |    3 -
+ arch/arm/include/asm/hardware/entry-macro-gic.S   |   31 ++---
+ arch/arm/include/asm/hardware/gic.h               |   12 ++-
+ arch/arm/include/asm/localtimer.h                 |    7 +-
+ arch/arm/include/asm/smp.h                        |    5 -
+ arch/arm/kernel/irq.c                             |   11 +-
+ arch/arm/kernel/smp.c                             |   27 +---
+ arch/arm/kernel/smp_twd.c                         |   25 +++-
+ arch/arm/mach-exynos4/include/mach/entry-macro.S  |   70 +----------
+ arch/arm/mach-exynos4/localtimer.c                |    3 +-
+ arch/arm/mach-msm/board-msm8x60.c                 |   11 --
+ arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +-----------
+ arch/arm/mach-msm/timer.c                         |   59 +++++----
+ arch/arm/mach-omap2/include/mach/entry-macro.S    |   14 +--
+ arch/arm/mach-omap2/timer-mpu.c                   |    3 +-
+ arch/arm/mach-shmobile/entry-intc.S               |    3 -
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 -
+ arch/arm/mach-shmobile/localtimer.c               |    3 +-
+ arch/arm/mach-tegra/localtimer.c                  |    3 +-
+ arch/arm/mach-ux500/localtimer.c                  |    3 +-
+ arch/arm/plat-versatile/localtimer.c              |    3 +-
+ 25 files changed, 246 insertions(+), 282 deletions(-)
+
 -- 
 1.7.5.2
