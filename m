@@ -1,86 +1,53 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Mon, 30 May 2011 09:11:54 -0500
-Subject: [PATCH] OMAP2/4: PM: Boot message is not an error/info, and not
-	helpful, remove it
-In-Reply-To: <4DE39F2B.3040506@ti.com>
-References: <1306751527-15929-1-git-send-email-santosh.shilimkar@ti.com>
-	<4DE39D40.2060500@ru.mvista.com> <4DE39F2B.3040506@ti.com>
-Message-ID: <BANLkTi=eZBj1BsRZ92zbo-8pUfrGwba-5Q@mail.gmail.com>
+From: acassis@gmail.com (Alan Carvalho de Assis)
+Date: Mon, 30 May 2011 11:24:49 -0300
+Subject: Freescale i.mx25 SDIO/Libertas issue
+In-Reply-To: <4DE2F84D.8080907@bluewatersys.com>
+References: <4DE2F84D.8080907@bluewatersys.com>
+Message-ID: <BANLkTi=GSw5HRdiqPB=JcgB9SyEhB1b79A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 08:44, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
-> On 5/30/2011 7:06 PM, Sergei Shtylyov wrote:
->>
->> Hello.
->>
->> Santosh Shilimkar wrote:
->>
->>> The commit '99aa18278e' removed the boot messege for OMAP3. Do the same
->>
->> Please specify that commit's summary in parens -- for the human readers.
->> Oh, and you don't need quotes around commit ID too.
->>
-> Yes I missed that. Updated patch below.
->
-> Regards
-> Santosh
->
-> From 53e986a2a43dc204146af99c2d7a906dba781ea0 Mon Sep 17 00:00:00 2001
-> From: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Date: Mon, 30 May 2011 15:52:01 +0530
-> Subject: [PATCH] OMAP2/4: PM: Boot message is not an error/info, and not
-> helpful, remove it
->
-> The commit 99aa18278e (OMAP3: PM: Boot message is not an error,
-> and not helpful, remove it), removed the boot message for OMAP3.
-> Do the same for OMAP2 and OMAP4 since it's really just noise in the
-> boot log and PM init is always called.
->
-> Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
+Hi Andre,
 
-Acked-by: Nishanth Menon <nm@ti.com>
-Regards,
-Nishanth Menon
+On 5/29/11, Andre Renaud <andre@bluewatersys.com> wrote:
+> Hello,
+> I am trying to use a Wi2Wi 802.11b/g (W2CBW009S) module attached to an
+> i.MX25 cpu, specifically the i.MX25 PDK from freescale, although I've
+> also tried it on a DeviceSolutions Topaz i.MX25. However it is unable to
+> fully load the driver, leaving me with the following in the logs:
+> [   30.149097] libertas_sdio mmc0:0001:1: (unregistered net_device):
+> command 0x00a9 timed out
+> [   30.153759] libertas_sdio mmc0:0001:1: (unregistered net_device):
+> Timeout submitting command 0x00a9
+> [   30.158843] libertas_sdio mmc0:0001:1: (unregistered net_device):
+> PREP_CMD: command 0x00a9 failed: -110
+> [   30.164126] libertas_sdio mmc0:0001:1: (unregistered net_device):
+> CMD_FUNC_INIT cmd failed
+> This wifi chip is based around the Marvell 8688 core.
+>
+> I have also tried using an 8686 device, and in that case it is unable to
+> even complete loading the firmware, failing with the following:
+> [   14.753132] libertas_sdio: Firmware req_size: 17
+> [   14.755713] libertas_sdio: failed to load firmware: -5
+> [   14.759272] libertas_sdio: probe of mmc0:0001:1 failed with error -5
+> Note: I added the 'req_size: ' debugging message in
+>
+> Has anyone successfully used the i.MX25 SDIO controller with anything
+> other than straight MMC cards (which seem to work fine in the setup that
+> I have)?
+>
 
+I used this Marvel WiFi 8686 in our previous product powered by i.MX51
+and it worked fine. You need to load the firmware before using it.
+Just put your binaries inside firmware directory on linux kernel and
+setup your kernel config:
 
-> ---
-> ?arch/arm/mach-omap2/pm24xx.c | ? ?1 -
-> ?arch/arm/mach-omap2/pm44xx.c | ? ?2 --
-> ?2 files changed, 0 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-> index df3ded6..5970759 100644
-> --- a/arch/arm/mach-omap2/pm24xx.c
-> +++ b/arch/arm/mach-omap2/pm24xx.c
-> @@ -442,7 +442,6 @@ static int __init omap2_pm_init(void)
-> ? ? ? ?if (!cpu_is_omap24xx())
-> ? ? ? ? ? ? ? ?return -ENODEV;
->
-> - ? ? ? printk(KERN_INFO "Power Management for OMAP2 initializing\n");
-> ? ? ? ?l = omap2_prm_read_mod_reg(OCP_MOD, OMAP2_PRCM_REVISION_OFFSET);
-> ? ? ? ?printk(KERN_INFO "PRCM revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
->
-> diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
-> index 59a870b..a6259d6 100644
-> --- a/arch/arm/mach-omap2/pm44xx.c
-> +++ b/arch/arm/mach-omap2/pm44xx.c
-> @@ -103,8 +103,6 @@ static int __init omap4_pm_init(void)
-> ? ? ? ?if (!cpu_is_omap44xx())
-> ? ? ? ? ? ? ? ?return -ENODEV;
->
-> - ? ? ? pr_err("Power Management for TI OMAP4.\n");
-> -
-> ? ? ? ?ret = pwrdm_for_each(pwrdms_setup, NULL);
-> ? ? ? ?if (ret) {
-> ? ? ? ? ? ? ? ?pr_err("Failed to setup powerdomains\n");
-> --
-> 1.6.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+ CONFIG_FW_LOADER=y
+ CONFIG_FIRMWARE_IN_KERNEL=y
+-CONFIG_EXTRA_FIRMWARE=""
++CONFIG_EXTRA_FIRMWARE="sd8686_helper.bin sd8686.bin"
++CONFIG_EXTRA_FIRMWARE_DIR="firmware"
+
+Best Regards,
+
+Alan
