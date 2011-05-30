@@ -1,36 +1,19 @@
-From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
-Date: Mon, 30 May 2011 23:44:01 +0200
-Subject: [PATCH 3.0-rc1] OMAP: fix compilation error
-Message-ID: <201105302344.01530.jkrzyszt@tis.icnet.pl>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 30 May 2011 22:51:32 +0100
+Subject: [PATCH 1/2] mach-u300: fix compilation error in timer
+In-Reply-To: <1306764491-28369-1-git-send-email-linus.walleij@stericsson.com>
+References: <1306764491-28369-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110530215132.GA21382@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include <linux/platform_device.h> from 
-arch/arm/plat-omap/include/plat/flash.h, otherwise compilation may break 
-with:
+On Mon, May 30, 2011 at 04:08:11PM +0200, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The introduction of the mmio timer accidentally referenced the
+> old clocksource struct which does not exist anymore. Fix this by
+> using a simple string instead. This also fixes a compilation
+> warning by casting the address to (void __iomem *).
 
-In file included from arch/arm/mach-omap1/flash.c:15:
-arch/arm/plat-omap/include/plat/flash.h:14: warning: 'struct platform_device' declared inside parameter list
-arch/arm/plat-omap/include/plat/flash.h:14: warning: its scope is only this definition or declaration, which is probably not what you want
-arch/arm/mach-omap1/flash.c:16: warning: 'struct platform_device' declared inside parameter list
-arch/arm/mach-omap1/flash.c:17: error: conflicting types for 'omap1_set_vpp'
-arch/arm/plat-omap/include/plat/flash.h:14: error: previous declaration of 'omap1_set_vpp' was here
-
-Detected and corrected while building for Amstrad Delta, confirmed with 
-omap1_defconfig.
-
-Signed-off-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
----
- arch/arm/plat-omap/include/plat/flash.h |    1 +
- 1 file changed, 1 insertion(+)
-
---- git/arch/arm/plat-omap/include/plat/flash.h.orig	2011-05-30 22:15:54.000000000 +0200
-+++ git/arch/arm/plat-omap/include/plat/flash.h	2011-05-30 22:38:15.000000000 +0200
-@@ -10,6 +10,7 @@
- #define __OMAP_FLASH_H
- 
- #include <linux/mtd/map.h>
-+#include <linux/platform_device.h>
- 
- extern void omap1_set_vpp(struct platform_device *pdev, int enable);
- 
+Please fix your #defines for IOMEM addresses instead of adding
+explicit casts where its used.
