@@ -1,43 +1,69 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 May 2011 11:04:49 +0100
-Subject: [RFC PATCH v5 08/13] ARM: tegra: use remapped PPI interrupts for
+Date: Mon, 30 May 2011 11:04:47 +0100
+Subject: [RFC PATCH v5 06/13] ARM: shmobile: use remapped PPI interrupts for
 	local timer
 In-Reply-To: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
 References: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306749894-28749-9-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1306749894-28749-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the normal interrupt scheme for the local timers by using
 a remapped PPI interrupt.
 
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/Kconfig      |    1 +
- arch/arm/mach-tegra/localtimer.c |    3 ++-
- 2 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-shmobile/Kconfig                    |    1 +
+ arch/arm/mach-shmobile/entry-intc.S               |    3 ---
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 ---
+ arch/arm/mach-shmobile/localtimer.c               |    3 ++-
+ 4 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 5ec1846..eabdd90 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,7 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
- 	select CPU_V7
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0c8f6cf..ddcf28c 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -26,6 +26,7 @@ config ARCH_SH73A0
+ 	select SH_CLK_CPG
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
  	select ARM_GIC
 +	select ARM_GIC_VPPI
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
-index e91d681..97cd0a9 100644
---- a/arch/arm/mach-tegra/localtimer.c
-+++ b/arch/arm/mach-tegra/localtimer.c
+ 
+ comment "SH-Mobile Board Type"
+ 
+diff --git a/arch/arm/mach-shmobile/entry-intc.S b/arch/arm/mach-shmobile/entry-intc.S
+index cac0a7a..1a1c00c 100644
+--- a/arch/arm/mach-shmobile/entry-intc.S
++++ b/arch/arm/mach-shmobile/entry-intc.S
+@@ -51,7 +51,4 @@
+ 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+ 	.endm
+ 
+-	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
+-	.endm
+-
+ 	arch_irq_handler shmobile_handle_irq_intc
+diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+index d791f10..8d4a416 100644
+--- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
++++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+@@ -27,8 +27,5 @@
+ 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+ 	.endm
+ 
+-	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
+-	.endm
+-
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
+diff --git a/arch/arm/mach-shmobile/localtimer.c b/arch/arm/mach-shmobile/localtimer.c
+index ad9ccc9..8a67b1c 100644
+--- a/arch/arm/mach-shmobile/localtimer.c
++++ b/arch/arm/mach-shmobile/localtimer.c
 @@ -14,13 +14,14 @@
- #include <asm/irq.h>
+ #include <linux/clockchips.h>
  #include <asm/smp_twd.h>
  #include <asm/localtimer.h>
 +#include <asm/hardware/gic.h>
@@ -47,8 +73,8 @@ index e91d681..97cd0a9 100644
   */
  int __cpuinit local_timer_setup(struct clock_event_device *evt)
  {
--	evt->irq = IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
+-	evt->irq = 29;
++	evt->irq = gic_ppi_to_vppi(29);
  	twd_timer_setup(evt);
  	return 0;
  }
