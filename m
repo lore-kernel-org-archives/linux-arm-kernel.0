@@ -1,77 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 30 May 2011 11:04:46 +0100
-Subject: [RFC PATCH v5 05/13] ARM: versatile: use remapped PPI interrupts for
-	local timer
+Date: Mon, 30 May 2011 11:04:43 +0100
+Subject: [RFC PATCH v5 02/13] ARM: smp: add interrupt handler for local timers
 In-Reply-To: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
 References: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1306749894-28749-6-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1306749894-28749-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the normal interrupt scheme for the local timers by using
-a remapped PPI interrupt.
-
-Tested on VExpress and PB-11MP.
+Provide a "normal" interrupt handler for local timers.
+It is expected that most timer implementations will use this
+handler unless they have more specific requirements.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-realview/Kconfig       |    2 ++
- arch/arm/mach-vexpress/Kconfig       |    1 +
- arch/arm/plat-versatile/localtimer.c |    3 ++-
- 3 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/include/asm/localtimer.h |    6 ++++++
+ arch/arm/kernel/smp.c             |   12 ++++++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index b9a9805..12c7c56 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -38,6 +38,7 @@ config MACH_REALVIEW_PB11MP
- 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
- 	select CPU_V6K
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_HAS_BARRIERS if SMP
- 	help
-@@ -76,6 +77,7 @@ config MACH_REALVIEW_PBA8
- config MACH_REALVIEW_PBX
- 	bool "Support RealView(R) Platform Baseboard Explore"
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
- 	select ZONE_DMA if SPARSEMEM
-diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
-index 9311484..07a53aa 100644
---- a/arch/arm/mach-vexpress/Kconfig
-+++ b/arch/arm/mach-vexpress/Kconfig
-@@ -5,6 +5,7 @@ config ARCH_VEXPRESS_CA9X4
- 	bool "Versatile Express Cortex-A9x4 tile"
- 	select CPU_V7
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
- 	select ARM_ERRATA_720789
- 	select ARM_ERRATA_751472
- 	select ARM_ERRATA_753970
-diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
-index 0fb3961..a76daf4 100644
---- a/arch/arm/plat-versatile/localtimer.c
-+++ b/arch/arm/plat-versatile/localtimer.c
-@@ -14,6 +14,7 @@
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index 080d74f..bef44b3 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -10,6 +10,8 @@
+ #ifndef __ASM_ARM_LOCALTIMER_H
+ #define __ASM_ARM_LOCALTIMER_H
  
- #include <asm/smp_twd.h>
- #include <asm/localtimer.h>
-+#include <asm/hardware/gic.h>
- #include <mach/irqs.h>
++#include <linux/interrupt.h>
++
+ struct clock_event_device;
  
  /*
-@@ -21,7 +22,7 @@
+@@ -22,6 +24,10 @@ void percpu_timer_setup(void);
   */
- int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
--	evt->irq = IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
- 	twd_timer_setup(evt);
- 	return 0;
+ asmlinkage void do_local_timer(struct pt_regs *);
+ 
++/*
++ * Per-cpu timer IRQ handler
++ */
++irqreturn_t percpu_timer_handler(int irq, void *dev_id);
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 344e52b..daa7088 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -460,6 +460,18 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
+ 	set_irq_regs(old_regs);
  }
+ 
++irqreturn_t percpu_timer_handler(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	if (local_timer_ack()) {
++		evt->event_handler(evt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
+ void show_local_irqs(struct seq_file *p, int prec)
+ {
+ 	unsigned int cpu;
 -- 
 1.7.5.2
