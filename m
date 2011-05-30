@@ -1,57 +1,59 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 30 May 2011 14:23:47 -0600
-Subject: [PATCH] ARM: Xilinx: Adding zynq platform support
-In-Reply-To: <BANLkTikjMYUCXgBN3UKjpzEg68qOqOHv5A@mail.gmail.com>
-References: <BANLkTiknh4nCviohecbcJEiWnSW-JdMxDw@mail.gmail.com>
-	<alpine.LFD.2.00.1105241435550.3207@xanadu.home>
-	<BANLkTi=hCpCbNzi1ZiKmGnbhmCG2Ce=EkA@mail.gmail.com>
-	<201105261559.41993.arnd@arndb.de>
-	<BANLkTikjMYUCXgBN3UKjpzEg68qOqOHv5A@mail.gmail.com>
-Message-ID: <20110530202347.GC32035@ponder.secretlab.ca>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Mon, 30 May 2011 22:34:35 +0200
+Subject: [PATCH] Fix compile failures by syscore_ops change on s3c2416
+Message-ID: <201105302234.35749.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 05:47:35PM +0800, Barry Song wrote:
-> 2011/5/26 Arnd Bergmann <arnd@arndb.de>:
-> > On Wednesday 25 May 2011, Grant Likely wrote:
-> >>
-> >> As per discussion attached below. ?Please pull this tree adding device
-> >> tree support to ARM, plus some other minor device tree changes.
-> >
-> > Hi Grant and Linus,
-> >
-> > There is also the new Xilinx zynq subarchitecture pending that depends
-> > on this, see below. Should we also include that right away, in order
-> > to have an example for other platforms? I think the code is clean
-> > enough and it would be good to have.
-> >
-> > ? ? ? ?Arnd
-> >
-> > 8<---------
-> > From: Grant Likely <grant.likely@secretlab.ca>
-> >
-> > The 1st board support is minimal to get a system up and running
-> > on the Xilinx platform.
-> >
-> > This platform reuses the clock implementation from plat-versatile, and
-> > it depends entirely on CONFIG_OF support. ?There is only one board
-> > support file which obtains all device information from a device tree
-> > dtb file which is passed to the kernel at boot time.
-> >
-> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> > [john.linn at xilinx.com: Reverted dependency on of_irq_domain patches]
-> > Signed-off-by: John Linn <john.linn@xilinx.com>
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> is there a whole complete tree for zynq? i'd like to refer. thanks! as
-> i am moving csr prima2 to device tree, we need to change so many
-> codes. i hope we can follow what the way zynq is doing.
+s3c24xx_irq_syscore_ops is only defined in mach-s3c2410/irq.c which is
+not used by s3c2416.
+Also s3c2410_dma_chan needs a struct prefix
+---
+It feels wrong to put a double of s3c24xx_irq_syscore_ops in another
+file, but I haven't found a better place for the whole thing yet.
+Might plat-s3c24xx/irq-pm.c be better suited to host
+s3c24xx_irq_syscore_ops for all s3c-socs?
 
-It is in linux-next.  Hopefully we'll get it merged into the arm
-subarch maintainer tree early in this cycle.
+ arch/arm/mach-s3c2416/irq.c |    6 ++++++
+ arch/arm/plat-s3c24xx/dma.c |    2 +-
+ 2 files changed, 7 insertions(+), 1 deletions(-)
 
-You can also look at arch/powerpc/platforms/* to see examples of how
-to work with the DT.  I'm also working on some howto documentation for
-doing DT work.
-
-g.
+diff --git a/arch/arm/mach-s3c2416/irq.c b/arch/arm/mach-s3c2416/irq.c
+index 28ad20d..a2c49fa 100644
+--- a/arch/arm/mach-s3c2416/irq.c
++++ b/arch/arm/mach-s3c2416/irq.c
+@@ -27,6 +27,7 @@
+ #include <linux/ioport.h>
+ #include <linux/sysdev.h>
+ #include <linux/io.h>
++#include <linux/syscore_ops.h>
+ 
+ #include <mach/hardware.h>
+ #include <asm/irq.h>
+@@ -238,6 +239,11 @@ static struct sysdev_driver s3c2416_irq_driver = {
+ 	.add		= s3c2416_irq_add,
+ };
+ 
++struct syscore_ops s3c24xx_irq_syscore_ops = {
++	.suspend	= s3c24xx_irq_suspend,
++	.resume		= s3c24xx_irq_resume,
++};
++
+ static int __init s3c2416_irq_init(void)
+ {
+ 	return sysdev_driver_register(&s3c2416_sysclass, &s3c2416_irq_driver);
+diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+index c10d10c..2abf966 100644
+--- a/arch/arm/plat-s3c24xx/dma.c
++++ b/arch/arm/plat-s3c24xx/dma.c
+@@ -1199,7 +1199,7 @@ EXPORT_SYMBOL(s3c2410_dma_getposition);
+ 
+ #ifdef CONFIG_PM
+ 
+-static void s3c2410_dma_suspend_chan(s3c2410_dma_chan *cp)
++static void s3c2410_dma_suspend_chan(struct s3c2410_dma_chan *cp)
+ {
+ 	printk(KERN_DEBUG "suspending dma channel %d\n", cp->number);
+ 
+-- 
+1.7.2.3
