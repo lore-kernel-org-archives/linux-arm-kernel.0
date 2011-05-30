@@ -1,34 +1,79 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 30 May 2011 10:22:59 -0600
-Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
-	gpio's from the device tree.
-In-Reply-To: <20110530070138.GA5036@opensource.wolfsonmicro.com>
-References: <20110527205444.21000.90209.stgit@riker>
-	<20110527205721.21000.78599.stgit@riker>
-	<20110528012427.GB5971@opensource.wolfsonmicro.com>
-	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
-	<20110530033826.GE4130@opensource.wolfsonmicro.com>
-	<20110530061155.GC23517@ponder.secretlab.ca>
-	<4DE336A1.5040509@firmworks.com>
-	<20110530070138.GA5036@opensource.wolfsonmicro.com>
-Message-ID: <BANLkTimuJE0Wc4hi_3cp7-2aQ00nHVpL+Q@mail.gmail.com>
+From: maxim.osipov@gmail.com (Maxim Osipov)
+Date: Mon, 30 May 2011 18:13:47 +0100
+Subject: [PATCH 1/1] AT91: flexibity: default leds to heartbeat
+Message-ID: <1306775627-6640-1-git-send-email-maxim.osipov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 1:01 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Sun, May 29, 2011 at 08:18:09PM -1000, Mitch Bradley wrote:
->
->> I'm currently dealing with an SoC that has over a hundred GPIOs.
->> Whatever we choose, I think it should be able to handle an insane
->> number of GPIOs without getting any more cumbersome that is
->> necessary.
->
-> This is *consumer* side GPIOs, not bindings for the device providing the
-> GPIOs. ?If a single device needs to use hundreds of GPIOs I'd expect
-> many of them will be block functions so you'd have a binding with an
-> array for things like "databus" and "addrbus".
+This patch changes default behavior of Flexibity board LEDs to blinking
+for boot diagnostic purpose.
 
-yes.
+Signed-off-by: Maxim Osipov <maxim.osipov@gmail.com>
+---
+ arch/arm/mach-at91/board-flexibity.c |   16 ++++++++--------
+ 1 files changed, 8 insertions(+), 8 deletions(-)
 
-g.
+diff --git a/arch/arm/mach-at91/board-flexibity.c b/arch/arm/mach-at91/board-flexibity.c
+index 4fdc96c..8cbec8a 100644
+--- a/arch/arm/mach-at91/board-flexibity.c
++++ b/arch/arm/mach-at91/board-flexibity.c
+@@ -96,49 +96,49 @@ static struct gpio_led flexibity_leds[] = {
+ 		.name			= "usb1:green",
+ 		.gpio			= AT91_PIN_PA12,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	},
+ 	{
+ 		.name			= "usb1:red",
+ 		.gpio			= AT91_PIN_PA13,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	},
+ 	{
+ 		.name			= "usb2:green",
+ 		.gpio			= AT91_PIN_PB26,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	},
+ 	{
+ 		.name			= "usb2:red",
+ 		.gpio			= AT91_PIN_PB27,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	},
+ 	{
+ 		.name			= "usb3:green",
+ 		.gpio			= AT91_PIN_PC8,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	},
+ 	{
+ 		.name			= "usb3:red",
+ 		.gpio			= AT91_PIN_PC6,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	},
+ 	{
+ 		.name			= "usb4:green",
+ 		.gpio			= AT91_PIN_PB4,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	},
+ 	{
+ 		.name			= "usb4:red",
+ 		.gpio			= AT91_PIN_PB5,
+ 		.active_low		= 1,
+-		.default_trigger	= "default-on",
++		.default_trigger	= "heartbeat",
+ 	}
+ };
+ 
+-- 
+1.7.4.1
