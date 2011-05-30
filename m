@@ -1,44 +1,29 @@
-From: inderpal.singh@linaro.org (Inderpal Singh)
-Date: Mon, 30 May 2011 14:43:01 +0530
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 30 May 2011 15:08:17 +0530
 Subject: [PATCH] ARM: EXYNOS4: Fix secondary CPU boot after wake-up
-Message-ID: <1306746781-21511-1-git-send-email-inderpal.s@samsung.com>
+In-Reply-To: <1306746781-21511-1-git-send-email-inderpal.s@samsung.com>
+References: <1306746781-21511-1-git-send-email-inderpal.s@samsung.com>
+Message-ID: <4DE36589.4080709@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. After wake-up, the system-wide flags register loses its value.
-   Hence, write the address of secondary startup function to
-   successfully boot the secondary CPU.
+On 5/30/2011 2:43 PM, Inderpal Singh wrote:
+[...]
 
-2. Fix to remove the "Unknown IPI message 0x1" message when
-   secondary CPU boots.
+> 2. Fix to remove the "Unknown IPI message 0x1" message when
+>     secondary CPU boots.
+>
+For this one you are avoiding a wakeup IPI and rather
+relying on schedule IPI. That just avoiding the issue.
 
-Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
----
- arch/arm/mach-exynos4/platsmp.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+This doesn't seems to be right. Refer below thread.
 
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index 6d35878..11234c7 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -100,11 +100,17 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	write_pen_release(cpu);
- 
- 	/*
-+	 * After wake-up, the system-wide flags register loses its value.
-+	 * Hence, write the address of secondary startup function again.
-+	 */ 
-+	 __raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), S5P_VA_SYSRAM);
-+
-+	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * the boot monitor to read the system wide flags register,
- 	 * and branch to the address found there.
- 	 */
--	smp_cross_call(cpumask_of(cpu), 1);
-+	smp_send_reschedule(cpu);
- 
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
--- 
-1.7.1
+http://www.spinics.net/lists/arm-kernel/msg110886.html
+
+Russell,
+When do you plan to fix the SGI usage as discussed
+in above thread. I thought SGI1 usage was ok for OMAP,
+realview/versatile and MSM.
+
+Regards
+Santosh
