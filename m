@@ -1,86 +1,38 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Mon, 30 May 2011 10:23:23 -0700
-Subject: [PATCH] ARM: SMDK6410: Convert to using REGULATOR_SUPPLY()
-In-Reply-To: <1306196879-22017-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <1306196879-22017-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <4DE3D28B.6080807@samsung.com>
+From: segher@kernel.crashing.org (Segher Boessenkool)
+Date: Mon, 30 May 2011 20:54:41 +0200
+Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
+	gpio's from the device tree.
+In-Reply-To: <20110530070138.GA5036@opensource.wolfsonmicro.com>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205721.21000.78599.stgit@riker>
+	<20110528012427.GB5971@opensource.wolfsonmicro.com>
+	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
+	<20110530033826.GE4130@opensource.wolfsonmicro.com>
+	<20110530061155.GC23517@ponder.secretlab.ca>
+	<4DE336A1.5040509@firmworks.com>
+	<20110530070138.GA5036@opensource.wolfsonmicro.com>
+Message-ID: <8d2515b13c817cc956b185d043bcef00@kernel.crashing.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/11 17:27, Mark Brown wrote:
-> Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
-> ---
->   arch/arm/mach-s3c64xx/mach-smdk6410.c |   26 ++++++--------------------
->   1 files changed, 6 insertions(+), 20 deletions(-)
+>> I'm currently dealing with an SoC that has over a hundred GPIOs.
+>> Whatever we choose, I think it should be able to handle an insane
+>> number of GPIOs without getting any more cumbersome that is
+>> necessary.
 >
-> diff --git a/arch/arm/mach-s3c64xx/mach-smdk6410.c b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> index b416294..8c318a3 100644
-> --- a/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> +++ b/arch/arm/mach-s3c64xx/mach-smdk6410.c
-> @@ -210,17 +210,9 @@ static struct platform_device smdk6410_smsc911x = {
->   };
->
->   #ifdef CONFIG_REGULATOR
-> -static struct regulator_consumer_supply smdk6410_b_pwr_5v_consumers[] = {
-> -	{
-> -		/* WM8580 */
-> -		.supply = "PVDD",
-> -		.dev_name = "0-001b",
-> -	},
-> -	{
-> -		/* WM8580 */
-> -		.supply = "AVDD",
-> -		.dev_name = "0-001b",
-> -	},
-> +static struct regulator_consumer_supply smdk6410_b_pwr_5v_consumers[] __initdata = {
-> +	REGULATOR_SUPPLY("PVDD", "0-001b"),
-> +	REGULATOR_SUPPLY("AVDD", "0-001b"),
->   };
->
->   static struct regulator_init_data smdk6410_b_pwr_5v_data = {
-> @@ -345,9 +337,7 @@ static struct platform_device *smdk6410_devices[] __initdata = {
->   #ifdef CONFIG_REGULATOR
->   /* ARM core */
->   static struct regulator_consumer_supply smdk6410_vddarm_consumers[] = {
-> -	{
-> -		.supply = "vddarm",
-> -	}
-> +	REGULATOR_SUPPLY("vddarm", NULL),
->   };
->
->   /* VDDARM, BUCK1 on J5 */
-> @@ -485,11 +475,7 @@ static struct regulator_init_data wm8350_dcdc3_data = {
->
->   /* USB, EXT, PCM, ADC/DAC, USB, MMC */
->   static struct regulator_consumer_supply wm8350_dcdc4_consumers[] = {
-> -	{
-> -		/* WM8580 */
-> -		.supply = "DVDD",
-> -		.dev_name = "0-001b",
-> -	},
-> +	REGULATOR_SUPPLY("DVDD", "0-001b"),
->   };
->
->   static struct regulator_init_data wm8350_dcdc4_data = {
-> @@ -603,7 +589,7 @@ static struct regulator_init_data wm1192_dcdc3 = {
->   };
->
->   static struct regulator_consumer_supply wm1192_ldo1_consumers[] = {
-> -	{ .supply = "DVDD", .dev_name = "0-001b", },   /* WM8580 */
-> +	REGULATOR_SUPPLY("DVDD", "0-001b"),   /* WM8580 */
->   };
->
->   static struct regulator_init_data wm1192_ldo1 = {
+> This is *consumer* side GPIOs, not bindings for the device providing 
+> the
+> GPIOs.  If a single device needs to use hundreds of GPIOs I'd expect
+> many of them will be block functions so you'd have a binding with an
+> array for things like "databus" and "addrbus".
 
-Sorry for late response :(
-Oops, I missed this...
+But please name them like "databus-gpio", so that it is obvious what it
+is.  Also have to think about how this will work with multiple GPIO
+controllers: do you require the GPIO controller node to be part of every
+GPIO description, or do you do some "gpio-parent" scheme as well, how
+does that interact with not having a single array of GPIOs?
 
-Looks ok, will apply :)
+Better write this down as a binding, before committing to it :-)
 
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Segher
