@@ -1,34 +1,29 @@
-From: subhasish@mistralsolutions.com (Subhasish Ghosh)
-Date: Mon, 30 May 2011 20:08:03 +0530
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 May 2011 16:43:35 +0200
 Subject: [PATCH v4 01/11] mfd: add pruss mfd driver
-In-Reply-To: <20110530140231.GA11831@kroah.com>
+In-Reply-To: <2AF43CEDFDB649AE946E8F9F98A5AE48@subhasishg>
 References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105231730.06564.arnd@arndb.de>
-	<7E10264BABCB4C1788DCD9715461BDE8@subhasishg>
-	<201105241440.34854.arnd@arndb.de>
-	<20110524134338.GA13491@kroah.com>
-	<45A0E7B350CB4DF685D18EFE6EB1CB76@subhasishg>
-	<20110530140231.GA11831@kroah.com>
-Message-ID: <98F790F0AABD4248A3DBFF4BA7D926B1@subhasishg>
+	<201105301604.38026.arnd@arndb.de>
+	<2AF43CEDFDB649AE946E8F9F98A5AE48@subhasishg>
+Message-ID: <201105301643.35997.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+On Monday 30 May 2011, Subhasish Ghosh wrote:
+> >
+> > During the time when the drivers are in staging, all files need to
+> > be in the same directory, including the header and the drivers using it.
+> > They can get moved at the time when the driver gets turned into
+> > a regular non-staging driver.
+> 
+> OK, so the UART implementation needs to be moved into staging as well ?
+> 
+> And what about the boardfile changes, array of mfd_cells implementation etc. 
 
->> >
->> How do I handle the headers. I have two header files in the
->> include/linux/mfd.
-> 
-> Why would they be in there for a single driver?
-> 
->> Should I submit them as a separate patch into mfd.
->> 
->> These headers are also used by pruss uart implementation.
-> 
-> Then put them in the staging directory for your driver, why would
-> anything outside of your driver need a .h file?
-> 
-There are two header files in the include/linux/mfd/pruss.h & pruss_core.h
+All of that, too.
 
-the file pruss.h is included by the pruss_suart_api.c (tty uart driver) for
-some data structures, defines and function prototypes. 
+Note that you are citing exactly the points that are the reason for the
+discussion we are having. The mfd_cells are the main concern for the cases
+where the information is not static.
+
+	Arnd
