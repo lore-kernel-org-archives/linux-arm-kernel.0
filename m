@@ -1,43 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 May 2011 12:29:21 +0200
-Subject: [PATCH] Consolidate the clkdev header files
-In-Reply-To: <20110530010416.GA24365@july>
-References: <20110530010416.GA24365@july>
-Message-ID: <201105301229.21973.arnd@arndb.de>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 30 May 2011 16:02:07 +0530
+Subject: [PATCH] OMAP2/4: PM: Boot message is not an error/info,
+	and not helpful, remove it
+Message-ID: <1306751527-15929-1-git-send-email-santosh.shilimkar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 May 2011, Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Now most of ARM machines has the alsmot same __clk_get/put() macro
-> 
-> So place it at the arch/arm/include/asm/clkdev.h and remove the reduntant header files
-> 
-> But some machines don't have the same form as above. It can use the machince specific clkdev file by HAVE_MACH_CLKDEV config
-> 
-> Now there are only 3 caese.
-> 
-> 1) define the clk structure with clkdev macro => Need to move clk structure to proper header file
-> 
-> arch/arm/mach-versatile/include/mach/clkdev.h
-> arch/arm/mach-realview/include/mach/clkdev.h
-> arch/arm/mach-vexpress/include/mach/clkdev.h
-> arch/arm/mach-integrator/include/mach/clkdev.h
-> 
-> 2) export the __clk_get/put function at clock.c
-> 
-> arch/arm/mach-shmobile/include/mach/clkdev.h
-> 
-> 3) demuxing the clk source
-> arch/arm/mach-u300/include/mach/clkdev.h
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+The commit '99aa18278e' removed the boot messege for OMAP3. Do the same
+for OMAP2 and OMAP4 since it's really just noise in the boot log
+and PM init is always called.
 
-This looks like a very useful simplification by itself, nice work!
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Kevin Hilman <khilman@ti.com>
+---
+Generated against mainline v3.0-rc1.
 
-You definitely need to coordinate this with the struct clk consolidation
-that Jeremy Kerr has just posted though. It seems that you are touching
-some of the same code lines.
+ arch/arm/mach-omap2/pm24xx.c |    1 -
+ arch/arm/mach-omap2/pm44xx.c |    2 --
+ 2 files changed, 0 insertions(+), 3 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+index df3ded6..5970759 100644
+--- a/arch/arm/mach-omap2/pm24xx.c
++++ b/arch/arm/mach-omap2/pm24xx.c
+@@ -442,7 +442,6 @@ static int __init omap2_pm_init(void)
+ 	if (!cpu_is_omap24xx())
+ 		return -ENODEV;
+ 
+-	printk(KERN_INFO "Power Management for OMAP2 initializing\n");
+ 	l = omap2_prm_read_mod_reg(OCP_MOD, OMAP2_PRCM_REVISION_OFFSET);
+ 	printk(KERN_INFO "PRCM revision %d.%d\n", (l >> 4) & 0x0f, l & 0x0f);
+ 
+diff --git a/arch/arm/mach-omap2/pm44xx.c b/arch/arm/mach-omap2/pm44xx.c
+index 59a870b..a6259d6 100644
+--- a/arch/arm/mach-omap2/pm44xx.c
++++ b/arch/arm/mach-omap2/pm44xx.c
+@@ -103,8 +103,6 @@ static int __init omap4_pm_init(void)
+ 	if (!cpu_is_omap44xx())
+ 		return -ENODEV;
+ 
+-	pr_err("Power Management for TI OMAP4.\n");
+-
+ 	ret = pwrdm_for_each(pwrdms_setup, NULL);
+ 	if (ret) {
+ 		pr_err("Failed to setup powerdomains\n");
+-- 
+1.6.0.4
