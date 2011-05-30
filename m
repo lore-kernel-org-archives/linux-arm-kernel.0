@@ -1,29 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 30 May 2011 16:43:35 +0200
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver
-In-Reply-To: <2AF43CEDFDB649AE946E8F9F98A5AE48@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105301604.38026.arnd@arndb.de>
-	<2AF43CEDFDB649AE946E8F9F98A5AE48@subhasishg>
-Message-ID: <201105301643.35997.arnd@arndb.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon, 30 May 2011 22:52:15 +0800
+Subject: [PATCH 0/4] Move plat-mxc gpio driver into drivers/gpio
+Message-ID: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 30 May 2011, Subhasish Ghosh wrote:
-> >
-> > During the time when the drivers are in staging, all files need to
-> > be in the same directory, including the header and the drivers using it.
-> > They can get moved at the time when the driver gets turned into
-> > a regular non-staging driver.
-> 
-> OK, so the UART implementation needs to be moved into staging as well ?
-> 
-> And what about the boardfile changes, array of mfd_cells implementation etc. 
+The patch set moves plat-mxc gpio driver into drivers/gpio.  It's
+based on the following tree, plus Sascha's i.MX consolidation
+patches.
 
-All of that, too.
+    git://git.pengutronix.de/git/imx/linux-2.6.git imx-for-3.0
 
-Note that you are citing exactly the points that are the reason for the
-discussion we are having. The mfd_cells are the main concern for the cases
-where the information is not static.
+Shawn Guo (4):
+      gpio: gpio-mxc: add gpio driver for Freescale MXC architecture
+      ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
+      ARM: mxc: migrate mach-imx gpio driver to gpio-mxc
+      ARM: mxc: remove plat-mxc/gpio driver
 
-	Arnd
+ arch/arm/mach-imx/mm-imx1.c                        |    9 -
+ arch/arm/mach-imx/mm-imx21.c                       |   11 -
+ arch/arm/mach-imx/mm-imx25.c                       |    9 -
+ arch/arm/mach-imx/mm-imx27.c                       |   11 -
+ arch/arm/mach-imx/mm-imx31.c                       |    8 -
+ arch/arm/mach-imx/mm-imx35.c                       |    8 -
+ arch/arm/mach-mx5/devices.c                        |   64 ------
+ arch/arm/mach-mx5/mm-mx50.c                        |   11 -
+ arch/arm/mach-mx5/mm.c                             |    6 -
+ arch/arm/plat-mxc/Makefile                         |    2 +-
+ arch/arm/plat-mxc/devices.c                        |   11 +
+ arch/arm/plat-mxc/devices/Makefile                 |    1 +
+ arch/arm/plat-mxc/devices/platform-gpio-mxc.c      |  113 ++++++++++
+ arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +
+ arch/arm/plat-mxc/include/mach/gpio.h              |   27 ---
+ drivers/gpio/Makefile                              |    1 +
+ .../arm/plat-mxc/gpio.c => drivers/gpio/gpio-mxc.c |  218 +++++++++++++-------
+ 17 files changed, 275 insertions(+), 237 deletions(-)
