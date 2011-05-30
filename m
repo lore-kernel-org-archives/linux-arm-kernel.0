@@ -1,55 +1,46 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Mon, 30 May 2011 19:55:33 +0530
-Subject: [PATCH 1/2] ARM: OMAP4: MMC: increase delay for pbias
-In-Reply-To: <1306765534-20103-1-git-send-email-balajitk@ti.com>
-References: <1306765534-20103-1-git-send-email-balajitk@ti.com>
-Message-ID: <1306765534-20103-2-git-send-email-balajitk@ti.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 30 May 2011 22:02:31 +0800
+Subject: [PATCH v4 01/11] mfd: add pruss mfd driver
+In-Reply-To: <45A0E7B350CB4DF685D18EFE6EB1CB76@subhasishg>
+References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
+	<201105231730.06564.arnd@arndb.de>
+	<7E10264BABCB4C1788DCD9715461BDE8@subhasishg>
+	<201105241440.34854.arnd@arndb.de>
+	<20110524134338.GA13491@kroah.com>
+	<45A0E7B350CB4DF685D18EFE6EB1CB76@subhasishg>
+Message-ID: <20110530140231.GA11831@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4 micro seconds is not enough for PBIAS if MMC regulator is
-enabled from MMC regulator OFF.
-Increase the delay for PBIAS to stabilize.
-Wait for PBIAS and timeout if not.
+On Mon, May 30, 2011 at 06:55:12PM +0530, Subhasish Ghosh wrote:
+> Greg,
+> 
+> >There really are only 3 rules:
+> >- proper license
+> >- self-contained in a drivers/staging/DRIVER_NAME/ directory
+> >- must properly build
+> >
+> >>Mainly, this includes having a patch that adds a single
+> >>directory with all the driver files under drivers/staging.
+> >>The driver must be able to compile without errors and you need
+> >>a TODO file listing the remaining issues that prevent you
+> >>from having a non-staging driver.
+> >
+> >Ah, forgot the TODO on the list of rules, I'll have to add that next
+> >time.
+> >
+> How do I handle the headers. I have two header files in the
+> include/linux/mfd.
 
-Resolves MMC/SD failure on OMAP4
-"Pbias Voltage is not same as LDO"
+Why would they be in there for a single driver?
 
-Signed-off-by: Balaji T K <balajitk@ti.com>
----
- arch/arm/mach-omap2/hsmmc.c |   13 ++++++++++---
- 1 files changed, 10 insertions(+), 3 deletions(-)
+> Should I submit them as a separate patch into mfd.
+> 
+> These headers are also used by pruss uart implementation.
 
-diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-index b2f30be..3f8dc16 100644
---- a/arch/arm/mach-omap2/hsmmc.c
-+++ b/arch/arm/mach-omap2/hsmmc.c
-@@ -145,6 +145,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 				 int power_on, int vdd)
- {
- 	u32 reg;
-+	unsigned long timeout;
- 
- 	if (power_on) {
- 		reg = omap4_ctrl_pad_readl(control_pbias_offset);
-@@ -157,9 +158,15 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
- 			OMAP4_MMC1_PWRDNZ_MASK |
- 			OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
- 		omap4_ctrl_pad_writel(reg, control_pbias_offset);
--		/* 4 microsec delay for comparator to generate an error*/
--		udelay(4);
--		reg = omap4_ctrl_pad_readl(control_pbias_offset);
-+
-+		timeout = jiffies + msecs_to_jiffies(5);
-+		do {
-+			reg = omap4_ctrl_pad_readl(control_pbias_offset);
-+			if (!(reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK))
-+				break;
-+			udelay(100);
-+		} while (!time_after(jiffies, timeout));
-+
- 		if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK) {
- 			pr_err("Pbias Voltage is not same as LDO\n");
- 			/* Caution : On VMODE_ERROR Power Down MMC IO */
--- 
-1.7.0.4
+Then put them in the staging directory for your driver, why would
+anything outside of your driver need a .h file?
+
+thanks,
+
+greg k-h
