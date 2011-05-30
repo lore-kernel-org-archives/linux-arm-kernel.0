@@ -1,41 +1,44 @@
-From: b-cousson@ti.com (Cousson, Benoit)
-Date: Mon, 30 May 2011 10:49:16 +0200
-Subject: [PATCHv2 2/2] OMAP: add omap_device_reset()
-In-Reply-To: <alpine.DEB.2.00.1105292006330.8973@utopia.booyaka.com>
-References: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
-	<1306481908-7386-3-git-send-email-tomi.valkeinen@ti.com>
-	<4DDF9B5D.7060408@ti.com> <1306500367.1905.18.camel@deskari>
-	<4DDFB8AF.1080800@ti.com> <1306514427.1905.27.camel@deskari>
-	<alpine.DEB.2.00.1105292006330.8973@utopia.booyaka.com>
-Message-ID: <4DE35A0C.6040301@ti.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 30 May 2011 02:12:10 -0700
+Subject: [RFC PATCH v4 11/13] ARM: gic: remove previous local timer
+	interrupt handling
+In-Reply-To: <20110530092542.3ab5ad6a@taxman.wild-wind.fr.eu.org>
+References: <1306513671-12206-1-git-send-email-marc.zyngier@arm.com>	<1306513671-12206-12-git-send-email-marc.zyngier@arm.com>	<4DDFFBCE.8020908@codeaurora.org>	<20110530090805.73937acd@taxman.wild-wind.fr.eu.org>
+	<20110530092542.3ab5ad6a@taxman.wild-wind.fr.eu.org>
+Message-ID: <4DE35F6A.5090200@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5/30/2011 4:15 AM, Paul Walmsley wrote:
-> On Fri, 27 May 2011, Tomi Valkeinen wrote:
+On 5/30/2011 1:25 AM, Marc Zyngier wrote:
+> On Mon, 30 May 2011 09:08:05 +0100
+> Marc Zyngier <marc.zyngier@arm.com> wrote:
 >
->> However, VENC doesn't use the standard syscontrol mechanism, so that
->> cannot be done via omap_device interface anyway.
+>> On Fri, 27 May 2011 12:30:22 -0700
+>> Stephen Boyd <sboyd@codeaurora.org> wrote:
+>>
+>>> On 05/27/2011 09:27 AM, Marc Zyngier wrote:
+>>>> Now that all users of local timers are using CONFIG_ARM_GIC_VPPI,
+>>>> the now unused local timer infrastructure can be safely removed.
+>>>>
+>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>>>> ---
+>>>>
+>>> Can you also remove local_timer_ack() from MSM in this patch? If you do,
+>>> feel free to add an
+>>>
+>>> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+>>>
+>>> to this patch.
+>> This patch breaks the kernel link when building for SMP.
+>> I'll add a weak version of local_timer_ack() for the time being.
+> Actually, this is worse. Having a weak version of local_timer_ack() in
+> smp.c clashes badly with this symbol being a #define with TWD is
+> selected...
 >
-> struct omap_hwmod_class has a .reset function pointer for this purpose.
-> It's already been necessary to deal with the I2C IP block:
->
->     https://patchwork.kernel.org/patch/804072/
->
-> If all that's needed are the steps in 4430 TRM Rev. T Section 10.6.5.1.2.3
-> "Subsequence--Video Encoder Software Reset", then it should be possible to
-> handle this internal reset with hwmod code.
+> Let's drop that bit for now, and I'll address it in the timer series.
 
-Mmm, but in that case, if this is purely handled inside the IP, it is up 
-to the driver to manage that.
+Sure. Let's punt for now. Feel free to add my Acked-by still.
 
-hwmod should not manage more than the SYSCONFIG ocpreset because this is 
-part of the PRCM/OCP wrapper and not really the IP.
-
-In the case of the VENC, the reset is part of the regular init sequence, 
-so the driver will take care of it.
-
-Don't you think so?
-
-Regards,
-Benoit
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
