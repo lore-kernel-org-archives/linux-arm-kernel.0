@@ -1,49 +1,55 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Sun, 29 May 2011 18:24:32 -0700
-Subject: [PATCH] ARM: SAMSUNG: serial: Fix on handling of one clock source
-	for UART
-In-Reply-To: <20110528093904.GC21388@kroah.com>
-References: <1306548243-2526-1-git-send-email-kgene.kim@samsung.com>
-	<20110528093904.GC21388@kroah.com>
-Message-ID: <4DE2F1D0.6030604@samsung.com>
+Date: Sun, 29 May 2011 18:45:17 -0700
+Subject: [PATCH 2/2] ARM: S5P: Add 64bit PWM timer counter for	sched_clock
+In-Reply-To: <20110528071710.GU24876@n2100.arm.linux.org.uk>
+References: <1306534210-32659-1-git-send-email-kgene.kim@samsung.com>
+	<1306534210-32659-2-git-send-email-kgene.kim@samsung.com>
+	<20110528071710.GU24876@n2100.arm.linux.org.uk>
+Message-ID: <4DE2F6AD.5000000@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/28/11 02:39, Greg KH wrote:
-> On Fri, May 27, 2011 at 07:04:03PM -0700, Kukjin Kim wrote:
->> From: Boojin Kim<boojin.kim@samsung.com>
+On 05/28/11 00:17, Russell King - ARM Linux wrote:
+> On Fri, May 27, 2011 at 03:10:10PM -0700, Kukjin Kim wrote:
+>> From: Sangbeom Kim<sbkim73@samsung.com>
 >>
->> This patch fixes the way of comparison for handling of two or more
->> clock sources for UART.
->>
->> For example, if just only one clock source is defined even though
->> there are two clock sources for UART, the serial driver does not
->> set proper clock up. Of course, it is problem.
->>
->> So this patch changes the condition of comparison to avoid useless
->> setup clock and adds a flag 'NO_NEED_CHECK_CLKSRC' which means
->> selection of source clock is not required.
->>
->> In addition, since the Exynos4210 has only one clock source for UART
->> this patch adds the flag into its common_init_uarts().
->>
->> Signed-off-by: Boojin Kim<boojin.kim@samsung.com>
->> Cc: Greg Kroah-Hartman<greg@kroah.com>
->> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
->> ---
->>   arch/arm/mach-exynos4/init.c                     |    1 +
->>   arch/arm/plat-samsung/include/plat/regs-serial.h |    2 ++
->>   drivers/tty/serial/s5pv210.c                     |    4 ++--
->>   3 files changed, 5 insertions(+), 2 deletions(-)
+>> Basically, PWM timer works with 33Mhz on S5P SoCs and counter
+>> overflow every 128 secs. So it is needed 64-bit counter for
+>> supporting proper sched_clock() by 32-bit timer. This patch
+>> handle overflow control and can solve the problem of suspend
+>> to resume
 >
-> Is this needed in older kernels as well (like .39)?
+> NAK.
 >
-Hi, Greg :)
+> This patch is a backwards step, and adds a hell of a lot of complexity
+> which should already be dealt with in generic code.
+>
+Yes, I agree :)
 
-Yes, we need this on 2.6.39 but don't need on .38 because the comparison 
-codes has been merged during 39 merge window.
+> What is "problem of suspend to resume" exactly?
+>
+Could you please check below?
 
-Could you please apply this on next .39 stable?
+<6>[   43.125215] request_suspend_state: sleep (0->3) ...(snip)...
+<6>[   43.385289] PM: Syncing filesystems ... done.
+<4>[   43.391553] Freezing user space processes ...(snip)...
+<4>[   43.408781] Freezing remaining freezable tasks ...(snip)...
+<6>[   43.558009] PM: suspend of devices complete ...(snip)...
+<6>[   43.558514] PM: late suspend of devices complete ...(snip)...
+
+<7>[  128.784602] S5P_WAKEUP_STAT 0x1
+<7>[  128.784602] EINT_PEND 0x6, 0x0, 0x60, 0x40
+
+<6>[    0.000319] PM: early resume of devices complete ...(snip)...
+<6>[    0.000595] wakeup wake lock: gpio_input
+<6>[    0.321657] PM: resume of devices complete ...(snip)...
+<4>[    0.321976] Restarting tasks ...
+<6>[    0.325617] request_suspend_state: wakeup (3->0) ...(snip)...
+<4>[    0.342688] done.
+<6>[    0.342917] suspend: exit suspend, ret = 0 ...(snip)...
+
+Yeah, the timestamp jumped back after a suspend/resume cycle.
+Do you have any idea about that?
 
 Thanks.
 
