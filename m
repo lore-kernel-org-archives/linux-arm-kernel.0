@@ -1,46 +1,73 @@
-From: greg@kroah.com (Greg KH)
-Date: Mon, 30 May 2011 22:02:31 +0800
-Subject: [PATCH v4 01/11] mfd: add pruss mfd driver
-In-Reply-To: <45A0E7B350CB4DF685D18EFE6EB1CB76@subhasishg>
-References: <1303474109-6212-1-git-send-email-subhasish@mistralsolutions.com>
-	<201105231730.06564.arnd@arndb.de>
-	<7E10264BABCB4C1788DCD9715461BDE8@subhasishg>
-	<201105241440.34854.arnd@arndb.de>
-	<20110524134338.GA13491@kroah.com>
-	<45A0E7B350CB4DF685D18EFE6EB1CB76@subhasishg>
-Message-ID: <20110530140231.GA11831@kroah.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 30 May 2011 07:34:11 -0700
+Subject: [PATCH] OMAP3: beagle: add support for beagleboard xM revision C
+In-Reply-To: <1306503133-31996-1-git-send-email-koen@dominion.thruhere.net>
+References: <1306503133-31996-1-git-send-email-koen@dominion.thruhere.net>
+Message-ID: <20110530143411.GG11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 06:55:12PM +0530, Subhasish Ghosh wrote:
-> Greg,
-> 
-> >There really are only 3 rules:
-> >- proper license
-> >- self-contained in a drivers/staging/DRIVER_NAME/ directory
-> >- must properly build
-> >
-> >>Mainly, this includes having a patch that adds a single
-> >>directory with all the driver files under drivers/staging.
-> >>The driver must be able to compile without errors and you need
-> >>a TODO file listing the remaining issues that prevent you
-> >>from having a non-staging driver.
-> >
-> >Ah, forgot the TODO on the list of rules, I'll have to add that next
-> >time.
-> >
-> How do I handle the headers. I have two header files in the
-> include/linux/mfd.
+Hi,
 
-Why would they be in there for a single driver?
+* Koen Kooi <koen@dominion.thruhere.net> [110527 06:28]:
+>
+> @@ -123,9 +126,13 @@ static void __init omap3_beagle_init_rev(void)
+>  		printk(KERN_INFO "OMAP3 Beagle Rev: xM\n");
+>  		omap3_beagle_version = OMAP3BEAGLE_BOARD_XM;
+>  		break;
+> +	case 2:
+> +		printk(KERN_INFO "OMAP3 Beagle Rev: xM\n");
+> +		omap3_beagle_version = OMAP3BEAGLE_BOARD_XMC;
+> +		break;
+>  	default:
+>  		printk(KERN_INFO "OMAP3 Beagle Rev: unknown %hd\n", beagle_rev);
+> -		omap3_beagle_version = OMAP3BEAGLE_BOARD_UNKN;
+> +		omap3_beagle_version = OMAP3BEAGLE_BOARD_XMC;
+>  	}
+>  }
 
-> Should I submit them as a separate patch into mfd.
-> 
-> These headers are also used by pruss uart implementation.
+Maybe just set up static struct omap3_beagle that contains the
+various things to initialize. Then initialize it in omap3_beagle_init_rev
+above.
 
-Then put them in the staging directory for your driver, why would
-anything outside of your driver need a .h file?
+Otherwise we'll end up adding more and more omap3_beagle_get_rev and
+cpu_is_omap tests to this file and it will become hard to maintain.
+  
+> @@ -253,7 +260,7 @@ static int beagle_twl_gpio_setup(struct device *dev,
+>  {
+>  	int r, usb_pwr_level;
+>  
+> -	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+> +	if (cpu_is_omap3630()) {
+>  		mmc[0].gpio_wp = -EINVAL;
+>  	} else if ((omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C1_3) ||
+>  		(omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C4)) {
 
-thanks,
+This would become:
 
-greg k-h
+	mmc[0].gpio_wp = beagle.gpio_wp;
+
+> @@ -275,11 +282,10 @@ static int beagle_twl_gpio_setup(struct device *dev,
+>  	 * high / others active low)
+>  	 * DVI reset GPIO is different between beagle revisions
+>  	 */
+> -	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
+> -		usb_pwr_level = GPIOF_OUT_INIT_HIGH;
+> +	if (cpu_is_omap3630()) {
+>  		beagle_dvi_device.reset_gpio = 129;
+>  		/*
+> -		 * gpio + 1 on Xm controls the TFP410's enable line (active low)
+> +		 * gpio + 1 on xM controls the TFP410's enable line (active low)
+>  		 * gpio + 2 control varies depending on the board rev as below:
+>  		 * P7/P8 revisions(prototype): Camera EN
+>  		 * A2+ revisions (production): LDO (DVI, serial, led blocks)
+
+This would be just:
+
+	usb_pwr_level = beagle.usb_pwr_level;
+
+And so on.
+
+Regards,
+
+Tony
