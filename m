@@ -1,52 +1,115 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 30 May 2011 15:10:33 +0800
-Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
-	gpio's from the device tree.
-In-Reply-To: <20110530061155.GC23517@ponder.secretlab.ca>
-References: <20110527205444.21000.90209.stgit@riker>
-	<20110527205721.21000.78599.stgit@riker>
-	<20110528012427.GB5971@opensource.wolfsonmicro.com>
-	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
-	<20110530033826.GE4130@opensource.wolfsonmicro.com>
-	<20110530061155.GC23517@ponder.secretlab.ca>
-Message-ID: <20110530071008.GA5055@opensource.wolfsonmicro.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 30 May 2011 09:11:53 +0200
+Subject: [PATCH v2 1/3] mmc: support sdhci-mmp2
+In-Reply-To: <BANLkTi=S=Q+AdKECCHg2u6X=VWEOtEox_w@mail.gmail.com>
+References: <1306315367-15602-1-git-send-email-zhangfei.gao@marvell.com>
+	<201105271746.04775.arnd@arndb.de>
+	<BANLkTi=S=Q+AdKECCHg2u6X=VWEOtEox_w@mail.gmail.com>
+Message-ID: <201105300911.54084.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 12:11:55AM -0600, Grant Likely wrote:
-> On Mon, May 30, 2011 at 11:38:27AM +0800, Mark Brown wrote:
+On Monday 30 May 2011 07:42:04 zhangfei gao wrote:
+> On Fri, May 27, 2011 at 11:46 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 25 May 2011, Zhangfei Gao wrote:
+> >> +static unsigned int mmp2_get_ro(struct sdhci_host *host)
+> >> +{
+> >> +     /* Micro SD does not support write-protect feature */
+> >> +     return 0;
+> >> +}
+> >
+> > You shouldn't need to provide an empty get_ro function, the
+> > default is that there is no write-protect.
+> 
+> Thanks Arnd for review.
+> The reason to put get_ro here is some board use micro sd, while some
+> board design is general sd card.
+> The micro sd do not use write-protect, while SDHCI_WRITE_PROTECT will
+> return 1 in our controller, so it shows read only.
+> So add one call back for the board with micro sd card via flag.
 
-> > Interesting...  what was the reasoning behind this?  It's a definite
-> > step backwards but it does explain my major concern with the new batch
-> > of device tree patches.
+Ok, I see.
+ 
+> >> +     pxa = kzalloc(sizeof(struct sdhci_pxa), GFP_KERNEL);
+> >> +     if (!pxa) {
+> >> +             ret = -ENOMEM;
+> >> +             goto out;
+> >> +     }
+> >> +     pxa->ops = kzalloc(sizeof(struct sdhci_ops), GFP_KERNEL);
+> >> +     if (!pxa->ops) {
+> >> +             ret = -ENOMEM;
+> >> +             goto out;
+> >> +     }
+> >
+> > I think you really shouldn't allocate the sdhci_ops dynamically.
+> > In fact, it would be much better if we were able to mark them
+> > as const in all drivers.
+> 
+> We found some issues when supporting multi-slot, each slot may have
+> different ops.
+> So use the method of allocating the sdhci_ops dynamically instead of
+> using static ops.
+> For example, emmc has 74_clocks call back, while mmc and sdio slot
+> does not have such ops.
+> If not dynamically allocate sdhci_ops, all slot ops may become same,
+> and 74_clocks may be called for every slot.
+> Also, some board may have get_ro, while other board may not, so
+> transfer the ops via flags.
+> 
+> Not sure whether it is worthy to add additional common files to share
+> probe and remove function.
+> Also the init the ops part are different.
 
-> The binding for gpios was defined a few years ago and it is in fairly
-> wide use within the powerpc sphere.  The design followed the pattern
-> established for specifying irqs, and in that regard satisfied the
-> principle of least surprise.
+IMHO, we should try much harder to keep the ops constant. For the
+two examples you gave, I would probably put a flag into private data for
+the get_ro operation to signify that it's never read-only, and provide
+a second set of operations for emmc, so that in the probe function
+you check the type of device and then set the appropriate one.
 
-GPIOs are rather different to IRQs in that one tends to have rather more
-of them, the typical case is that you only have a very small number of
-IRQs (usually only one).
+You could also do the same for all three cases:
 
-> That said, it isn't a very large leap to go from a single 'gpios'
-> property to allowing multiple named gpios properties with meaningful
-> names, particularly if they are fully specified by the device
-> binding, and they follow exactly the same binding semantics as the
-> existing 'gpios' proprety (phandle + gpio specifier).
+	if (emmc)
+		host->ops = &sdhci_mmp2_emmc_ops;
+	else if (!has_ro_switch)
+		host->ops = &sdhci_mmp2_rw_ops;
+	else
+		host->ops = &sdhci_mmp2_default_ops;
 
-This should definitely be specified, yes.
+> >> +
+> >> +#ifdef CONFIG_PM
+> >> +static int sdhci_mmp2_suspend(struct platform_device *dev, pm_message_t state)
+> >> +{
+> >> +     struct sdhci_host *host = platform_get_drvdata(dev);
+> >> +
+> >> +     return sdhci_suspend_host(host, state);
+> >> +}
+> >> +
+> >> +static int sdhci_mmp2_resume(struct platform_device *dev)
+> >> +{
+> >> +     struct sdhci_host *host = platform_get_drvdata(dev);
+> >> +
+> >> +     return sdhci_resume_host(host);
+> >> +}
+> >> +#else
+> >> +#define sdhci_mmp2_suspend   NULL
+> >> +#define sdhci_mmp2_resume    NULL
+> >> +#endif
+> >
+> > Similarly, I think it would be good if sdhci-pltfm.c would simply
+> > export these functions so you could refer to them in your driver.
+> > There is no need to have identical copies in each variant.
+> >
+> 
+> There are some additional code for suspend and resume, so
+> sdhci_pltfm_suspend may not enough.
+> For example, when enable wifi host sleep feature, additional register
+> have to be configured.
 
-> Personally, I'm /cautious/ about saying okay to extending the binding,
-> simply because once the extension is in use it is really hard to go
-> back on it, but I cannot think of any reason why this particular case
-> wouldn't be a good idea.  Anyone have thoughts on this?  Ben?  Mitch?
+Well, not all drivers would have to use the common functions, but
+right now there are a number of identical copies, so it's certainly
+worth sharing.
 
-I just can't see how it's sustainable to use an array here - for devices
-with many possible functions that could be connected to a GPIO on the
-CPU, most of which won't be in use on any given system (a typical part
-that I work with might have 20 or so GPIO functions but only be able to
-use a fraction of those at once), a flat array with magic indexes is
-just going to be error prone and illegible.  Speaking as someone who'll
-have to support users using affected drivers I'm entirely unenthusiastic
-about the idea.
+Note that this comment wasn't directed at your patch as much as at
+the overall design of the sdhci sub-drivers.
+
+	Arnd
