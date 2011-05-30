@@ -1,35 +1,38 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sun, 29 May 2011 20:24:54 -0600 (MDT)
-Subject: [PATCHv2 2/2] OMAP: add omap_device_reset()
-In-Reply-To: <1306500367.1905.18.camel@deskari>
-References: <1306481908-7386-1-git-send-email-tomi.valkeinen@ti.com>
-	<1306481908-7386-3-git-send-email-tomi.valkeinen@ti.com>
-	<4DDF9B5D.7060408@ti.com> <1306500367.1905.18.camel@deskari>
-Message-ID: <alpine.DEB.2.00.1105292022080.8973@utopia.booyaka.com>
+From: olofj@google.com (Olof Johansson)
+Date: Sun, 29 May 2011 20:11:34 -0700
+Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
+	gpio's from the device tree.
+In-Reply-To: <20110528012427.GB5971@opensource.wolfsonmicro.com>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205721.21000.78599.stgit@riker>
+	<20110528012427.GB5971@opensource.wolfsonmicro.com>
+Message-ID: <BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tomi,
+On Fri, May 27, 2011 at 6:24 PM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Fri, May 27, 2011 at 01:57:26PM -0700, John Bonesio wrote:
+>
+>> ? ? ? harmony_audio: audio_card {
+>> ? ? ? ? ? ? ? compatible = "nvidia,harmony-audio";
+>> +
+>> + ? ? ? ? ? ? gpios = <&codec 226 0>, /* spkr_en, gpio wm8903 #2 */
+>> + ? ? ? ? ? ? ? ? ? ? <&gpio 178 0>, /* hp_det, gpio PW2 */
+>> + ? ? ? ? ? ? ? ? ? ? <&gpio 184 0>, /* int_mic_en, gpio PX0 */
+>> + ? ? ? ? ? ? ? ? ? ? <&gpio 185 0>; /* ext_mic_en, gpio PX1 */
+>> +
+>
+> This is a step back from the usability of the existing platform data -
+> the platform data uses a series of individually named GPIOs while this
+> uses an array of GPIO numbers with magic indexes. ?The fact that you
+> need comments explaining what the functions of the array elements are
+> is a bit of a red flag here.
 
-On Fri, 27 May 2011, Tomi Valkeinen wrote:
-
-> DSS driver has been designed so that it resets the HW before it begins
-> programming it. That way we get the HW into known state. Otherwise we
-> need to be extra careful to program all possible registers to a sane
-> value. Not impossible, of course, but requires extra work.
-> 
-> I noticed the problem with DSI driver, it didn't work anymore if I
-> didn't reset it.
-
-One thing that I don't quite understand about this thread is that the 
-hwmod code should be resetting the DSS hwmods when the system boots.  Is 
-something not working with this process?
-
-That is a separate case from the error recovery case.  Sounds like we may 
-need to expose a reset function for that purpose as well.  Tomi, I don't 
-think your proposed patch is enough for this, though: we'd also need to 
-reset the hwmod internal state for that module, and reprogram the 
-SYSCONFIG bits, etc. as mach-omap2/omap_hwmod.c:_setup() does.
+Agreed, I had similar concerns with the sdhci bindings where it used a
+3-element array of gpios instead of the previous named ones. I was
+told it's common practice to do it that way though? Seems like a step
+backwards to me. :(
 
 
-- Paul
+-Olof
