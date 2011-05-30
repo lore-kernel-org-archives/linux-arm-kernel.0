@@ -1,72 +1,39 @@
-From: avinashhm@ti.com (Avinash.H.M.)
-Date: Tue, 31 May 2011 00:56:45 +0530
-Subject: [PATCH v4] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
-In-Reply-To: <1306737490.2117.24.camel@deskari>
-References: <1305906384-22061-1-git-send-email-avinashhm@ti.com>
-	<1306737490.2117.24.camel@deskari>
-Message-ID: <20110530192645.GB4959@avinash-laptop>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 30 May 2011 14:20:56 -0600
+Subject: [PATCH] ARM: Xilinx: Adding zynq platform support
+In-Reply-To: <20110526222512.GO24876@n2100.arm.linux.org.uk>
+References: <BANLkTiknh4nCviohecbcJEiWnSW-JdMxDw@mail.gmail.com>
+	<alpine.LFD.2.00.1105241435550.3207@xanadu.home>
+	<BANLkTi=hCpCbNzi1ZiKmGnbhmCG2Ce=EkA@mail.gmail.com>
+	<201105261559.41993.arnd@arndb.de>
+	<20110526150655.GA26661@ponder.secretlab.ca>
+	<20110526220120.GN24876@n2100.arm.linux.org.uk>
+	<BANLkTi=mL=J4UeKgFEa9y3C==8f9eKkboA@mail.gmail.com>
+	<BANLkTin40KK-SahXEP3c1EH1+fWgB54aFw@mail.gmail.com>
+	<20110526222512.GO24876@n2100.arm.linux.org.uk>
+Message-ID: <20110530202056.GB32035@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 09:38:10AM +0300, Tomi Valkeinen wrote:
-> On Fri, 2011-05-20 at 21:16 +0530, Avinash.H.M wrote:
-> > The sequence of _ocp_softreset doesn't work for i2c. The i2c module has a
-> > special sequence to reset the module. The sequence is
-> >  - Disable the I2C.
-> >  - Write to SOFTRESET bit.
-> >  - Enable the I2C.
-> >  - Poll on the RESETDONE bit.
-> > The sequence is implemented as a function and the i2c_class is updated with
-> > the correct 'reset' pointer.  omap_hwmod_softreset function is implemented
-> > which triggers the softreset by writing into sysconfig register. On following
-> > this sequence, i2c module resets properly and timeouts are not seen.
-> > 
-> > Cc: Rajendra Nayak <rnayak@ti.com>
-> > Cc: Paul Walmsley <paul@pwsan.com>
-> > Cc: Benoit Cousson <b-cousson@ti.com>
-> > Cc: Kevin Hilman <khilman@ti.com>
-> > Signed-off-by: Avinash.H.M <avinashhm@ti.com>
-> > ---
+On Thu, May 26, 2011 at 11:25:12PM +0100, Russell King - ARM Linux wrote:
+> On Thu, May 26, 2011 at 04:16:10PM -0600, Grant Likely wrote:
+> > Will you pick up the zynq patch also?
 > 
-> <snip>
+> It's about 1000 new lines, and I'm not sure Linus will take that
+> level of addition - certainly not without explanation.
 > 
-> > diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/plat-omap/include/plat/i2c.h
-> > index 878d632..3ffb94e 100644
-> > --- a/arch/arm/plat-omap/include/plat/i2c.h
-> > +++ b/arch/arm/plat-omap/include/plat/i2c.h
-> > @@ -23,6 +23,8 @@
-> >  
-> >  #include <linux/i2c.h>
-> >  
-> > +#include <plat/omap_hwmod.h>
-> > +
-> >  #if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
-> >  extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
-> >  				 struct i2c_board_info const *info,
-> > @@ -52,4 +54,6 @@ struct omap_i2c_dev_attr {
-> >  void __init omap1_i2c_mux_pins(int bus_id);
-> >  void __init omap2_i2c_mux_pins(int bus_id);
-> >  
-> > +int omap_i2c_reset(struct omap_hwmod *oh);
-> > +
+> Also, if we adhere to the policy that we don't introduce new code
+> which should be using the consolidated code which we've already
+> introduced, this would need to be updated to use the mmio
+> clocksource stuff at the very least.
 > 
-> It's not necessary to include omap_hwmod.h, just declare
-> 
-> struct omap_hwmod;
+> I'm also not convinced that this platform would have the ICST PLL
+> chips on it, so why it needs to select ICST I'm not sure (as well
+> as having the PLL parameters in its struct clk.)
 
-Hi Tomi ,
+This is because it is reusing some of the versatile struct clk
+implementation instead of cloning it's own set of plat-zynq stuff.  I
+recommended to John to not create a completely new struct clk, and
+that Versatile was probable the most generic of the lot.
 
-I agree to the comment, since it is a header file (i2c.h), no need to
-include hwmod.h.  
-
-I ll drop the file inclusion.  Thanks for reviewing.
-
-B R ,
-
-- Avinash
-
-
-> 
->  Tomi
-> 
-> 
+g.
