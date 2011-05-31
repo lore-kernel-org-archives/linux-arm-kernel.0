@@ -1,57 +1,25 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 31 May 2011 12:38:40 +0200 (CEST)
-Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
-In-Reply-To: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
-References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
-Message-ID: <alpine.LFD.2.02.1105311236250.3078@ionos>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 31 May 2011 12:42:38 +0530
+Subject: On __raw_readl readl_relaxed and readl nocheinmal
+In-Reply-To: <BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
+References: <BANLkTi=UiJ_SYOjcv+WuJ70LLQhvpQs2Wg@mail.gmail.com>
+	<BANLkTimoRbokF4pnfMOf5WkPK+TyrHWwDg@mail.gmail.com>
+Message-ID: <4DE494E6.6000504@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 May 2011, Mattias Wallin wrote:
-> +static cycle_t clksrc_db8500_prcmu_read(struct clocksource *cs)
-> +{
-> +	u32 count, count2;
-> +
-> +	do {
-> +		count = readl(PRCMU_TIMER_4_DOWNCOUNT);
-> +		count2 = readl(PRCMU_TIMER_4_DOWNCOUNT);
-> +	} while (count2 != count);
+Catalin,
 
-What's the point of this exercise ?
+On 05/20/2011 04:25 PM, Catalin Marinas wrote:
+> On ARM it is guaranteed that the writes are issued in program order
+> and they arrive to the same device in program order (the definition of
+> the device is still debatable). Arriving at different devices in
+> program order is not guaranteed (depends on the bus configuration).
+> They also don't do any endianess conversions.
 
-> +	clocksource_calc_mult_shift(&clocksource_db8500_prcmu,
-> +		RATE_32K, SCHED_CLOCK_MIN_WRAP);
-> +	clocksource_register(&clocksource_db8500_prcmu);
+Is this guaranteed in case of ARMV7 also, where we have two ports coming
+out of ARM ? As now there can be two access paths to devices, and so they
+might come out of order.
 
-Please use clocksource_register_hz()
-
-> diff --git a/include/linux/clksrc-db8500-prcmu.h b/include/linux/clksrc-db8500-prcmu.h
-> new file mode 100644
-> index 0000000..42b8587
-> --- /dev/null
-> +++ b/include/linux/clksrc-db8500-prcmu.h
-
-Huch, why needs this to be a separate head in include/linux ?
-
-> @@ -0,0 +1,17 @@
-> +/*
-> + * Copyright (C) ST-Ericsson SA 2011
-> + *
-> + * License Terms: GNU General Public License v2
-> + * Author: Mattias Wallin <mattias.wallin@stericsson.com>
-> + *
-> + */
-> +#ifndef __CLKSRC_DB8500_PRCMU_H
-> +#define __CLKSRC_DB8500_PRCMU_H
-> +
-> +#ifdef CONFIG_CLKSRC_DB8500_PRCMU
-> +void __init clksrc_db8500_prcmu_init(void);
-> +#else
-> +void __init clksrc_db8500_prcmu_init(void) {}
-> +#endif
-> +
-> +#endif
-> -- 
-> 1.7.4.3
-> 
-> 
+-- 
+viresh
