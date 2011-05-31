@@ -1,19 +1,31 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 30 May 2011 23:41:55 -0700
-Subject: [PATCH 3.0-rc1 v2] OMAP: fix compilation error
-In-Reply-To: <201105310044.31746.jkrzyszt@tis.icnet.pl>
-References: <201105302344.01530.jkrzyszt@tis.icnet.pl>
-	<20110530222107.GA21753@n2100.arm.linux.org.uk>
-	<201105310044.31746.jkrzyszt@tis.icnet.pl>
-Message-ID: <20110531064154.GJ11352@atomide.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 31 May 2011 09:04:59 +0200
+Subject: [PATCH] Fix typo in  mm/proc-arm7tdmi.S
+In-Reply-To: <w4aae3bv6m.wl%peter@chubb.wattle.id.au>
+References: <w4aae3bv6m.wl%peter@chubb.wattle.id.au>
+Message-ID: <20110531070459.GT9907@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [110530 15:43]:
+Hello Peter,
+
+On Tue, May 31, 2011 at 09:55:13AM +1000, Peter Chubb wrote:
+> There's a typo that prevents building for the arm7tdmi: you get an
+> error like `unknown size' from the assembler because symbol
+> __arm7dmi_proc_info is not defined.
 > 
-> Detected and corrected while building for Amstrad Delta, confirmed with 
-> omap1_defconfig.
+> Signed-off-by: Peter Chubb <peter.chubb@nicta.com.au>
+This was already fixed by Ben Hutchings[1] back in March, but didn't
+made it in. Ben's patch also fixed the same error in
+arch/arm/mm/proc-arm9tdmi.S.
 
-Thanks, will queue this fix.
+I will forward Ben's patch to Russell's patch system.
 
-Tony
+Best regards
+Uwe
+
+[1] http://article.gmane.org/gmane.linux.ports.arm.kernel/109743
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
