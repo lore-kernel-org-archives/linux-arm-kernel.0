@@ -1,44 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 May 2011 08:26:50 +0100
-Subject: IrDA driver fails on PXA255
-In-Reply-To: <alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
-References: <20110528205701.GA1788@doriath.ww600.siemens.net>
-	<alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
-	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
-	<alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
-	<20110529215656.GA5576@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
-Message-ID: <20110531072650.GC21382@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 31 May 2011 00:27:08 -0700
+Subject: [PATCH 2/2] omap: rx51: Don't power up speaker amplifier at bootup
+In-Reply-To: <1305199858-32643-2-git-send-email-jhnikula@gmail.com>
+References: <1305199858-32643-1-git-send-email-jhnikula@gmail.com>
+	<1305199858-32643-2-git-send-email-jhnikula@gmail.com>
+Message-ID: <20110531072708.GK11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 10:05:38PM -0700, David Rientjes wrote:
-> On Sun, 29 May 2011, Russell King - ARM Linux wrote:
-> > Again, no.  This change has caused a load of previously working drivers
-> > to suddenly start failing without _any_ explanation why or even warning
-> > about the change.  It needs to start off as a WARN_ON() so that stuff
-> > can be fixed, and then changed to a hard error.
-> > 
+* Jarkko Nikula <jhnikula@gmail.com> [110512 04:26]:
+> Speaker amplifier is accidentally powered up in early TWL gpio setup. This
+> causes a few mA of needless battery current consumption. Without this patch
+> the amplifier can be shutdown only by having one active audio playback and
+> shutdown cycle to speaker output.
 > 
-> I haven't seen a "load" of error reports where this is causing an issue, 
-> maybe it is much more popular on arm?
+> Thanks to Kalle Jokiniemi <kalle.jokiniemi@nokia.com> for noticing the issue.
 > 
-> This also isn't a hard error, admins should be able to enable 
-> CONFIG_ZONE_DMA and rebuild so that the driver being loaded can get the 
-> type of memory it is requesting.  Just putting a WARN_ON() doesn't provide 
-> any incentive to ever get this stuff fixed.
+> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+> Cc: Kalle Jokiniemi <kalle.jokiniemi@nokia.com>
+> ---
+>  arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> index 8242e99..0374562 100644
+> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
+> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
+> @@ -561,7 +561,7 @@ static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
+>  	gpio_request(gpio + 6, "backlight_pwm");
+>  	gpio_direction_output(gpio + 6, 0);
+>  	gpio_request(gpio + 7, "speaker_en");
+> -	gpio_direction_output(gpio + 7, 1);
+> +	gpio_direction_output(gpio + 7, 0);
+>  
+>  	return 0;
+>  }
 
-I completely and violently disagree with your approach on this, and I'll
-continue to state that I believe you are wrong until you change your
-position.
+Jarkko care to rebase this on current -rc1?
 
-Enabling CONFIG_ZONE_DMA is not a fix, it's making the problem vanish off
-the radar.  It will mean that the drivers using GFP_DMA will never get
-fixed up.
-
-I don't care whether you say "it's easy enough to audit the source code" -
-who's going to do that work?  If you make the problem go away the answer
-to that will be NO ONE.
-
-Change it to be a soft WARN_ON for one release.  Anything else will just
-result in the problem being IGNORED.
+Tony
