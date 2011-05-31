@@ -1,47 +1,76 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Tue, 31 May 2011 21:55:13 +0200
-Subject: [PATCH v3] ARM: ep93xx: use more reliable CPLD watchdog for
-	reset on ts72xx
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F381FC498E@AUSP01VMBX24.collaborationhost.net>
-References: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
-	<1306868578-3883-1-git-send-email-ynezz@true.cz>
-	<ADE657CA350FB648AAC2C43247A983F001F381FC498E@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20110531195513.GL16318@ibawizard.net>
+From: ak@linux.intel.com (Andi Kleen)
+Date: Tue, 31 May 2011 11:01:07 -0700
+Subject: [PATCH] Disable -fconserve-stack on ARM
+In-Reply-To: <20110531163026.GB771@e102109-lin.cambridge.arm.com>
+References: <BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
+	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
+	<20110526215101.GL24876@n2100.arm.linux.org.uk>
+	<20110527083806.GA21100@e102109-lin.cambridge.arm.com>
+	<20110527085414.GP24876@n2100.arm.linux.org.uk>
+	<20110527095111.GC21100@e102109-lin.cambridge.arm.com>
+	<yw1xlixse2fl.fsf@unicorn.mansr.com>
+	<20110528153417.GB25869@alboin.amr.corp.intel.com>
+	<20110531163026.GB771@e102109-lin.cambridge.arm.com>
+Message-ID: <20110531180107.GA9261@alboin.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-H Hartley Sweeten <hartleys@visionengravers.com> [2011-05-31 14:24:04]:
+> Didn't work, on the gcc command line we get -fno-conserve-stack followed
+> by -fconserve-stack from the top makefile and it seems that the latter
+> takes priority.
 
-> I pulled out the ts-7200 manual to verify the watchdog reset.  Your feeding
-> the watchdog then changing the timeout period to 250ms.  Without the "else"
-> the syscon would have tried to reset the board when the SWRST bit is toggled.
+Ah ok need to move it up then too in the top level Makefile.
+Like this.
 
-Yep, that missing "else" was a good catch, thanks.
+-Andi
 
-This feed first then set behaviour is "logic", but it's correct (250ms is the
-smallest possible value), from that manual:
+---
+Disable -fconserve-stack on ARM v2
 
-   In order to load the WDT Control register, the WDT must first be ?fed?, and
-   then within 30 uS, the WDT control register must be written. Writes to this
-   register without first doing a ?WDT feed?, have no affect.
+There are reports that -fconserve-stack misaligns variables on the stack.
+Disable it for ARM to work around this gcc bug.
 
-(Please don't laugh at that 30us constraint).
+v2: Move top level flags definition up
+Signed-off-by: Andi Kleen <ak@linux.intel.com>
 
-> I have no way of testing this patch (no ts boards) but as long as Ryan has no
-> objections you have my:
-
-I'm using it[1] since 2.6.19-rc6-git10 (maybe earlier). Funny, that I didn't
-forget to add that "else" in this old patch.
-
-And as I see it, you and few other guys really deserve some free TS boards for
-sure (at least the damn board as a thank you), but Lennert could probably tell
-you more about their "we only leech the work from the comunity, but don't give
-anything back" attitude...
-
-1. http://ynezz.ibawizard.net/ts72xx/ts72xx_cpld_wdt_reset.diff.gz
-
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
-Thanks.
-
--- ynezz
+diff --git a/Makefile b/Makefile
+index 529d93f..08d848f 100644
+--- a/Makefile
++++ b/Makefile
+@@ -564,6 +564,10 @@ else
+ KBUILD_CFLAGS	+= -O2
+ endif
+ 
++# conserve stack if available
++# do this early so that an architecture can override it.
++KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
++
+ include $(srctree)/arch/$(SRCARCH)/Makefile
+ 
+ ifneq ($(CONFIG_FRAME_WARN),0)
+@@ -629,9 +633,6 @@ KBUILD_CFLAGS += $(call cc-disable-warning, pointer-sign)
+ # disable invalid "can't wrap" optimizations for signed / pointers
+ KBUILD_CFLAGS	+= $(call cc-option,-fno-strict-overflow)
+ 
+-# conserve stack if available
+-KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
+-
+ # use the deterministic mode of AR if available
+ KBUILD_ARFLAGS := $(call ar-option,D)
+ 
+diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+index f5b2b39..902fec9 100644
+--- a/arch/arm/Makefile
++++ b/arch/arm/Makefile
+@@ -41,6 +41,10 @@ ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
+ KBUILD_CFLAGS	+=-fstack-protector
+ endif
+ 
++# ARM gcc developers unfortunately broke -fconserve-stack. It misaligns
++# variables on the stack
++KBUILD_CFLAGS += $(call cc-option,-fno-conserve-stack)
++
+ ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
+ KBUILD_CPPFLAGS	+= -mbig-endian
+ AS		+= -EB
