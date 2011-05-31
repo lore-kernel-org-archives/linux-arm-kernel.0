@@ -1,46 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 May 2011 06:45:03 -0700
-Subject: [PATCH 2/2] ARM: OMAP4: MMC: no regulator off during probe for
-	eMMC
-In-Reply-To: <BANLkTikhQ9esHA+WefbbfD=RUDWVsG9MbA@mail.gmail.com>
-References: <1306765534-20103-1-git-send-email-balajitk@ti.com>
-	<1306765534-20103-3-git-send-email-balajitk@ti.com>
-	<20110531132614.GR11352@atomide.com>
-	<BANLkTikhQ9esHA+WefbbfD=RUDWVsG9MbA@mail.gmail.com>
-Message-ID: <20110531134502.GT11352@atomide.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 31 May 2011 15:52:31 +0200
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <4DE4EF1B.80805@monstr.eu>
+References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+	<20110527205240.GT24876@n2100.arm.linux.org.uk>
+	<1306588381.2497.481.camel@laptop>  <4DE4CC33.7090404@petalogix.com>
+	<1306848137.2353.91.camel@twins>  <4DE4EF1B.80805@monstr.eu>
+Message-ID: <1306849951.2353.108.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* T Krishnamoorthy, Balaji <balajitk@ti.com> [110531 06:28]:
-> On Tue, May 31, 2011 at 6:56 PM, Tony Lindgren <tony@atomide.com> wrote:
-> > * Balaji T K <balajitk@ti.com> [110530 07:23]:
-> >> eMMC does not handle power off when not in sleep state,
-> >> Skip regulator disable during probe when eMMC is
-> >> not in known state - state left by bootloader.
-> >>
-> >> Resolves eMMC failure on OMAP4
-> >> mmc0: error -110 whilst initialising MMC card
-> >>
-> >> --- a/arch/arm/mach-omap2/hsmmc.h
-> >> +++ b/arch/arm/mach-omap2/hsmmc.h
-> >> @@ -18,6 +18,7 @@ struct omap2_hsmmc_info {
-> >> ? ? ? bool ? ?nonremovable; ? /* Nonremovable e.g. eMMC */
-> >> ? ? ? bool ? ?power_saving; ? /* Try to sleep or power off when possible */
-> >> ? ? ? bool ? ?no_off; ? ? ? ? /* power_saving and power is not to go off */
-> >> + ? ? bool ? ?no_off_init; ? ?/* no power off when not in MMC sleep state */
-> >> ? ? ? bool ? ?vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
-> >> ? ? ? int ? ? gpio_cd; ? ? ? ?/* or -EINVAL */
-> >> ? ? ? int ? ? gpio_wp; ? ? ? ?/* or -EINVAL */
-> >
-> > Can't you use no_off for this too?
-> 
-> no_off is used for devices which do not want to disable regulator at any time.
-> 
-> newly introduced no_off_init is to skip disable regulator only during probe
-> After eMMC is put in sleep state (while suspend), regulator for eMMC
-> (VAUX1) can be disabled.
+On Tue, 2011-05-31 at 15:37 +0200, Michal Simek wrote:
 
-OK I'll queue this as a fix too then. Anybody from the MMC list care
-to ack?
+> I briefly looked at it and it probably come from copy_thread function (process.c 
+> - line: childregs->msr |= MSR_IE;)
+> When context switch happen, childregs->msr value is loaded to MSR (machine 
+> status register) which caused that IE is enabled ( entry.S:~977 lwi	r12, r11, 
+> CC_MSR; 	mts	rmsr, r12)
+> 
+> NOTE: MSR stores flags for IE, i/d-cache ON/OFF, virtual memory/user mode etc.
+> 
+> This is no problem if context switch is done with irq on. But maybe there is 
+> another place which is causing some problems.
 
-Tony
+Ahh, no wonder I didn't find that ;-)
+
+> Where exactly should be IRQ reenable after context switch?
+
+the tail end of finish_lock_switch(), where it does:
+raw_spin_unlock_irq(&rq->lock).
+
+> I would like to also check some things.
+> 1. When schedule should be called from arch specific code?
+> Currently we are calling schedule after syscall/exception/interrupt happen.
+> Is there any place where schedule should/shouldn't be called?
+
+It should be called on the return to userspace path when
+TIF_NEED_RESCHED is set. It should not be called from non-preemptible
+contexts like non-zero preempt_count or IRQ-disabled.
+
+[ with the exception of CONFIG_PREEMPT which calls preempt_schedule()
+which checks both those things ]
+
+> 2. For syscall and exception handling - interrupt is ON but it is only masked.
+
+I'm having trouble understanding: on but masked.
+
+> When schedule is called from that any code has to enable IRQ if generic code 
+> doesn't do that. Not sure if it does.
+
+generic code isn't supposed to call schedule() with IRQs disabled (and
+doesn't afaik)
