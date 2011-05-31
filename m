@@ -1,72 +1,57 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 May 2011 03:36:29 -0700
-Subject: [PATCH] arm: omap3: cm-t3517: fix section mismatch warning
-In-Reply-To: <4DD1286D.10403@compulab.co.il>
-References: <1303850474-25106-1-git-send-email-grinberg@compulab.co.il>
-	<4DC01FB2.9060806@compulab.co.il> <4DCA3CC2.8080006@compulab.co.il>
-	<4DD1286D.10403@compulab.co.il>
-Message-ID: <20110531103629.GW11352@atomide.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 31 May 2011 12:38:40 +0200 (CEST)
+Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
+In-Reply-To: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
+References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
+Message-ID: <alpine.LFD.2.02.1105311236250.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [110516 06:32]:
-> ping x3
-> 
-> 
-> It has been 3 weeks already...
-> 
-> 
-> On 05/11/11 10:37, Igor Grinberg wrote:
-> 
-> > ping x2
-> >
-> >
-> > Can this one get into .39?
-> >
-> >
-> > On 05/03/11 18:30, Igor Grinberg wrote:
-> >
-> >> ping!
-> >>
-> >> Just to make sure you haven't missed this one liner ;)
+On Tue, 31 May 2011, Mattias Wallin wrote:
+> +static cycle_t clksrc_db8500_prcmu_read(struct clocksource *cs)
+> +{
+> +	u32 count, count2;
+> +
+> +	do {
+> +		count = readl(PRCMU_TIMER_4_DOWNCOUNT);
+> +		count2 = readl(PRCMU_TIMER_4_DOWNCOUNT);
+> +	} while (count2 != count);
 
-For the archives, applying into fixes finally.
+What's the point of this exercise ?
 
-Regards,
+> +	clocksource_calc_mult_shift(&clocksource_db8500_prcmu,
+> +		RATE_32K, SCHED_CLOCK_MIN_WRAP);
+> +	clocksource_register(&clocksource_db8500_prcmu);
 
-Tony
+Please use clocksource_register_hz()
 
-> >>
-> >>
-> >> On 04/26/11 23:41, Igor Grinberg wrote:
-> >>> WARNING: arch/arm/mach-omap2/built-in.o(.text+0x11014): Section mismatch
-> >>> in reference from the function cm_t3517_init_usbh() to the (unknown
-> >>> reference) .init.data:(unknown)
-> >>> The function cm_t3517_init_usbh() references
-> >>> the (unknown reference) __initdata (unknown).
-> >>> This is often because cm_t3517_init_usbh lacks a __initdata
-> >>> annotation or the annotation of (unknown) is wrong.
-> >>>
-> >>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-> >>> ---
-> >>>  arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
-> >>>  1 files changed, 1 insertions(+), 1 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
-> >>> index a27e3ee..802cb60 100644
-> >>> --- a/arch/arm/mach-omap2/board-cm-t3517.c
-> >>> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
-> >>> @@ -178,7 +178,7 @@ static struct usbhs_omap_board_data cm_t3517_ehci_pdata __initdata = {
-> >>>  	.reset_gpio_port[2]  = -EINVAL,
-> >>>  };
-> >>>  
-> >>> -static int cm_t3517_init_usbh(void)
-> >>> +static int __init cm_t3517_init_usbh(void)
-> >>>  {
-> >>>  	int err;
-> >>>  
-> 
+> diff --git a/include/linux/clksrc-db8500-prcmu.h b/include/linux/clksrc-db8500-prcmu.h
+> new file mode 100644
+> index 0000000..42b8587
+> --- /dev/null
+> +++ b/include/linux/clksrc-db8500-prcmu.h
+
+Huch, why needs this to be a separate head in include/linux ?
+
+> @@ -0,0 +1,17 @@
+> +/*
+> + * Copyright (C) ST-Ericsson SA 2011
+> + *
+> + * License Terms: GNU General Public License v2
+> + * Author: Mattias Wallin <mattias.wallin@stericsson.com>
+> + *
+> + */
+> +#ifndef __CLKSRC_DB8500_PRCMU_H
+> +#define __CLKSRC_DB8500_PRCMU_H
+> +
+> +#ifdef CONFIG_CLKSRC_DB8500_PRCMU
+> +void __init clksrc_db8500_prcmu_init(void);
+> +#else
+> +void __init clksrc_db8500_prcmu_init(void) {}
+> +#endif
+> +
+> +#endif
 > -- 
-> Regards,
-> Igor.
+> 1.7.4.3
+> 
 > 
