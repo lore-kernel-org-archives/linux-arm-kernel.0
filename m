@@ -1,20 +1,25 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 31 May 2011 15:41:44 +0400
-Subject: [PATCH] Fix compile failures by syscore_ops change on s3c2416
-In-Reply-To: <201105302234.35749.heiko@sntech.de>
-References: <201105302234.35749.heiko@sntech.de>
-Message-ID: <4DE4D3F8.1030406@ru.mvista.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 31 May 2011 04:49:35 -0700
+Subject: [PATCH] OMAP: don't trace functions called from sched_clock
+In-Reply-To: <BANLkTi=imJXEKriWdXOGE_wWWkQvdtLAHg@mail.gmail.com>
+References: <1304846514-15641-1-git-send-email-rabin@rab.in>
+	<BANLkTi=imJXEKriWdXOGE_wWWkQvdtLAHg@mail.gmail.com>
+Message-ID: <20110531114935.GY11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+* Rabin Vincent <rabin@rab.in> [110527 08:36]:
+> Tony,
+> 
+> On Sun, May 8, 2011 at 14:51, Rabin Vincent <rabin@rab.in> wrote:
+> > omap_readl() is used from the sched_clock() implementations and so must
+> > be marked notrace to avoid recursion in ftrace. ?Same thing with
+> > mpu_read() for OMAP1.
 
-On 31-05-2011 0:34, Heiko St?bner wrote:
+We should rather ioremap the 32KSYNCT_BASE in omap_init_clocksource_32k
+and then use __raw_readl. That allows us to get rid of omap_read usage
+here and simplifies the code.
 
-> s3c24xx_irq_syscore_ops is only defined in mach-s3c2410/irq.c which is
-> not used by s3c2416.
-> Also s3c2410_dma_chan needs a struct prefix
+Regards,
 
-    Saying "also" seems a good sign that you should do two patches instead.
-
-WBR, Sergei
+Tony
