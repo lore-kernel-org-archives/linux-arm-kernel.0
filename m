@@ -1,41 +1,22 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 31 May 2011 13:31:02 +0800
-Subject: [PATCH] pxa: correct icip irq handling
-In-Reply-To: <1306618093-6572-1-git-send-email-dbaryshkov@gmail.com>
-References: <1306618093-6572-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <BANLkTimG2bKvQ4u_Hq=dyJ56GL1Z4oBrug@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 31 May 2011 14:09:18 +0800
+Subject: [PATCH 3/3] ARM: mxs/tx28: convert to new leds-gpio registration
+	helper
+In-Reply-To: <1306609503-31746-3-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1306609503-31746-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1306609503-31746-3-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110531060918.GB32080@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, May 29, 2011 at 5:28 AM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> IRQ handling on PXA25x is broken if PXA_HAVE_ISA_IRQS is enabled (then
-> all PXA irqs are shifted to start from 16, but icip_handle_irq doesn't
-> work in this case. Use PXA_IRQ to correct IRQ numbers in icip_handle_irq.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+On Sat, May 28, 2011 at 09:05:03PM +0200, Uwe Kleine-K?nig wrote:
+> This allows to move the led definition to .init.rodata.
+> 
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> Cc: Shawn Guo <shawn.guo@linaro.org>
 
-Applied. Unfortunately, Russell didn't seem to have pulled, so we may need
-further address the issues he pointed out.
+Acked-by: Shawn Guo <shawn.guo@linaro.org>
 
-> ---
-> ?arch/arm/mach-pxa/irq.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/irq.c b/arch/arm/mach-pxa/irq.c
-> index 858e287..d9cab3b 100644
-> --- a/arch/arm/mach-pxa/irq.c
-> +++ b/arch/arm/mach-pxa/irq.c
-> @@ -141,7 +141,7 @@ asmlinkage void __exception_irq_entry icip_handle_irq(struct pt_regs *regs)
-> ? ? ? ? ? ? ? ?if (mask == 0)
-> ? ? ? ? ? ? ? ? ? ? ? ?break;
->
-> - ? ? ? ? ? ? ? asm_do_IRQ(fls(mask) - 1, regs);
-> + ? ? ? ? ? ? ? asm_do_IRQ(PXA_IRQ(fls(mask) - 1), regs);
-> ? ? ? ?} while (1);
-> ?}
->
-> --
-> 1.7.4.4
->
->
+-- 
+Regards,
+Shawn
