@@ -1,29 +1,40 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 May 2011 04:50:40 -0700
-Subject: [PATCH] OMAP: don't trace functions called from sched_clock
-In-Reply-To: <8762ovvf5f.fsf@ti.com>
-References: <1304846514-15641-1-git-send-email-rabin@rab.in>
-	<87hb8fyj2p.fsf@ti.com> <8762ovvf5f.fsf@ti.com>
-Message-ID: <20110531115039.GZ11352@atomide.com>
+Date: Tue, 31 May 2011 04:52:04 -0700
+Subject: [PATCH] OMAP4: fix return value of omap4_l3_init
+In-Reply-To: <1304787527-8314-1-git-send-email-rabin@rab.in>
+References: <1304787527-8314-1-git-send-email-rabin@rab.in>
+Message-ID: <20110531115204.GA11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [110527 17:28]:
-> Kevin Hilman <khilman@ti.com> writes:
+* Rabin Vincent <rabin@rab.in> [110507 09:54]:
+> Don't PTR_ERR() a non-error pointer:
 > 
-> > Rabin Vincent <rabin@rab.in> writes:
-> >
-> >> omap_readl() is used from the sched_clock() implementations and so must
-> >> be marked notrace to avoid recursion in ftrace.  Same thing with
-> >> mpu_read() for OMAP1.
-> >>
-> >> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> >
-> > Acked-by: Kevin Hilman <khilman@ti.com>
-> 
-> I also meant to suggest this should probably queue for .40-rc series.
+>  initcall omap4_l3_init+0x0/0xdc returned -544980480 after 0 usecs
+>  initcall omap4_l3_init+0x0/0xdc returned with error code -544980480
 
-Took a quick look and we should get rid of the omap_readl usage instead
-like I commented in another mail.
+Adding to fixes thanks.
 
 Tony
+ 
+> Signed-off-by: Rabin Vincent <rabin@rab.in>
+> ---
+>  arch/arm/mach-omap2/devices.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
+> index 7b85585..5b8ca68 100644
+> --- a/arch/arm/mach-omap2/devices.c
+> +++ b/arch/arm/mach-omap2/devices.c
+> @@ -97,7 +97,7 @@ static int __init omap4_l3_init(void)
+>  
+>  	WARN(IS_ERR(od), "could not build omap_device for %s\n", oh_name);
+>  
+> -	return PTR_ERR(od);
+> +	return IS_ERR(od) ? PTR_ERR(od) : 0;
+>  }
+>  postcore_initcall(omap4_l3_init);
+>  
+> -- 
+> 1.7.4.1
+> 
