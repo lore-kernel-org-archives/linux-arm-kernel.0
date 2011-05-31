@@ -1,40 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 31 May 2011 10:29:06 +0200
-Subject: [PATCH 0/3] SPEAr320: Add pwm support
-In-Reply-To: <4DE46617.2000505@st.com>
-References: <cover.1306739836.git.viresh.kumar@st.com>
-	<201105301453.40314.arnd@arndb.de> <4DE46617.2000505@st.com>
-Message-ID: <201105311029.06214.arnd@arndb.de>
+From: mattias.wallin@stericsson.com (Mattias Wallin)
+Date: Tue, 31 May 2011 10:29:45 +0200
+Subject: [PATCH 0/3] clocksource: add db8500 PRCMU timer
+Message-ID: <1306830585-9457-1-git-send-email-mattias.wallin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 31 May 2011, viresh kumar wrote:
-> On 05/30/2011 06:23 PM, Arnd Bergmann wrote:
-> >> > Obviously this can be done, but as it has already taken too long for that
-> >> > framework to get added in mainline, and still we don't know how much more
-> >> > time it will take. I would suggest to push this patchset now. And i
-> >> > will update this accordingly once that framework comes up.
-> > Ok, makes sense.
-> > 
-> > How about starting a drivers/pwm directory though? I think we have
-> > broad support for the idea of moving drivers into their subsystems,
-> > so even if you don't change the code, I think it would be a better
-> > place than drivers/misc.
-> 
-> Ya, i can easily do it. I didn't do it earlier, because i thought people
-> might ask me to provide framework with it too. New folder with only my driver
-> as part of it might not be accepted. If nobody have any issues with it
-> i can send patch with required changes.
-> 
-> One more thing: Who will push drivers/pwm now?
-> @Andrew: Will that be you??
+These patches makes it possible to use the PRCMU timer as clocksource
+for the db8500 chip. Previously the Multi Timer Unit (MTU) was used alone
+but the MTU block loose power during sleep states so an alternate
+clocksource is needed.
+These patches also adds a configuration option to use either the MTU or the PRCMU
+as the sched_clk.
 
-I can start a branch once we have a new tree for the subarchitectures,
-then I'll use the same branch to collect patches that move the other
-pwm drivers from arch/arm and from drivers/misc, as well as the
-new framework from Sascha.
+Mattias Wallin (3):
+  plat-nomadik: MTU sched_clock as an option
+  clocksource: add DB8500 PRCMU Timer support
+  mach-ux500: add support for clocksource DB8500 PRCMU
 
-Note that this doesn't make me maintainer of pwm, that position is
-still open ;-)
+ arch/arm/mach-ux500/cpu.c                 |    2 +
+ arch/arm/plat-nomadik/Kconfig             |    8 ++-
+ arch/arm/plat-nomadik/timer.c             |    4 +
+ drivers/clocksource/Kconfig               |   15 +++++
+ drivers/clocksource/Makefile              |    1 +
+ drivers/clocksource/clksrc-db8500-prcmu.c |   89 +++++++++++++++++++++++++++++
+ include/linux/clksrc-db8500-prcmu.h       |   17 ++++++
+ 7 files changed, 135 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/clocksource/clksrc-db8500-prcmu.c
+ create mode 100644 include/linux/clksrc-db8500-prcmu.h
 
-	Arnd
+-- 
+1.7.4.3
