@@ -1,101 +1,81 @@
-From: monstr@monstr.eu (Michal Simek)
-Date: Tue, 31 May 2011 16:08:45 +0200
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 31 May 2011 16:29:54 +0200
 Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
 	locks up on ARM
-In-Reply-To: <1306849951.2353.108.camel@twins>
-References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>	
-	<1306405979.1200.63.camel@twins>	
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>	
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>	
-	<20110526122623.GA11875@elte.hu>	
-	<20110526123137.GG24876@n2100.arm.linux.org.uk>	
-	<20110526125007.GA27083@elte.hu>	
-	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>	
-	<20110527120629.GA32617@elte.hu>	
-	<20110527205240.GT24876@n2100.arm.linux.org.uk>	
-	<1306588381.2497.481.camel@laptop>
-	<4DE4CC33.7090404@petalogix.com>	
-	<1306848137.2353.91.camel@twins> <4DE4EF1B.80805@monstr.eu>
-	<1306849951.2353.108.camel@twins>
-Message-ID: <4DE4F66D.9040101@monstr.eu>
+In-Reply-To: <4DE4F66D.9040101@monstr.eu>
+References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+	<20110527205240.GT24876@n2100.arm.linux.org.uk>
+	<1306588381.2497.481.camel@laptop>  <4DE4CC33.7090404@petalogix.com>
+	<1306848137.2353.91.camel@twins>  <4DE4EF1B.80805@monstr.eu>
+	<1306849951.2353.108.camel@twins>  <4DE4F66D.9040101@monstr.eu>
+Message-ID: <1306852194.2353.135.camel@twins>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Zijlstra wrote:
-> On Tue, 2011-05-31 at 15:37 +0200, Michal Simek wrote:
+On Tue, 2011-05-31 at 16:08 +0200, Michal Simek wrote:
+> Peter Zijlstra wrote:
+
+> >> I would like to also check some things.
+> >> 1. When schedule should be called from arch specific code?
+> >> Currently we are calling schedule after syscall/exception/interrupt happen.
+> >> Is there any place where schedule should/shouldn't be called?
+> > 
+> > It should be called on the return to userspace path when
+> > TIF_NEED_RESCHED is set. 
 > 
->> I briefly looked at it and it probably come from copy_thread function (process.c 
->> - line: childregs->msr |= MSR_IE;)
->> When context switch happen, childregs->msr value is loaded to MSR (machine 
->> status register) which caused that IE is enabled ( entry.S:~977 lwi	r12, r11, 
->> CC_MSR; 	mts	rmsr, r12)
->>
->> NOTE: MSR stores flags for IE, i/d-cache ON/OFF, virtual memory/user mode etc.
->>
->> This is no problem if context switch is done with irq on. But maybe there is 
->> another place which is causing some problems.
+> Yes, we do that. (PTO + PT_MODE stores if return is to kernel or user space)
 > 
-> Ahh, no wonder I didn't find that ;-)
-
-:-)
-
+> It should not be called from non-preemptible
+> > contexts like non-zero preempt_count or IRQ-disabled.
 > 
->> Where exactly should be IRQ reenable after context switch?
+> Is this even when the return is to userspace?
+
+Well, return to userspace should have preempt_count == 0 and IRQs
+enabled, right?
+
+> PREEMPT is not well tested feature but maybe it is right time to do so.
+> There is only small part of code (ifdef CONFIG_PREEMPT) when irq happen and 
+> there is return to the kernel. Is this correct?
+
+I think so, never looked too closely, Ingo?
+
+> > [ with the exception of CONFIG_PREEMPT which calls preempt_schedule()
+> > which checks both those things ]
 > 
-> the tail end of finish_lock_switch(), where it does:
-> raw_spin_unlock_irq(&rq->lock).
+> This is called only when IRQ happen right? We call preempt_schedule_irq because 
+> irq are off and IRQ is ON by rtid below IRQ_return label.
 
-ok - I see.
+Ah, there's also preempt_schedule_irq(), which can be called with
+IRQs-disabled, not sure about the rules there though, Ingo?
 
+> > 
+> >> 2. For syscall and exception handling - interrupt is ON but it is only masked.
+> > 
+> > I'm having trouble understanding: on but masked.
 > 
->> I would like to also check some things.
->> 1. When schedule should be called from arch specific code?
->> Currently we are calling schedule after syscall/exception/interrupt happen.
->> Is there any place where schedule should/shouldn't be called?
+> Interrupt can't happen because some masking bits are setup. If you call 
+> irgs_disabled() or others you will get that IRQ is ON but can't happen.
+
+Ah, we generally ignore that state and only rely on state modified by
+local_irq_enable/disable(), eg. your MSR_IE bit.
+
+> >> When schedule is called from that any code has to enable IRQ if generic code 
+> >> doesn't do that. Not sure if it does.
+> > 
+> > generic code isn't supposed to call schedule() with IRQs disabled (and
+> > doesn't afaik)
 > 
-> It should be called on the return to userspace path when
-> TIF_NEED_RESCHED is set. 
+> OK. Which means I have to disable IRQ before schedule is called. Is that correct?
 
-Yes, we do that. (PTO + PT_MODE stores if return is to kernel or user space)
+Hum, I might have mis-understood. No, schedule() assumes IRQs are
+enabled and will disable IRQs itself quite early:
 
-It should not be called from non-preemptible
-> contexts like non-zero preempt_count or IRQ-disabled.
-
-Is this even when the return is to userspace?
-
-PREEMPT is not well tested feature but maybe it is right time to do so.
-There is only small part of code (ifdef CONFIG_PREEMPT) when irq happen and 
-there is return to the kernel. Is this correct?
-
-> 
-> [ with the exception of CONFIG_PREEMPT which calls preempt_schedule()
-> which checks both those things ]
-
-This is called only when IRQ happen right? We call preempt_schedule_irq because 
-irq are off and IRQ is ON by rtid below IRQ_return label.
-
-
-> 
->> 2. For syscall and exception handling - interrupt is ON but it is only masked.
-> 
-> I'm having trouble understanding: on but masked.
-
-Interrupt can't happen because some masking bits are setup. If you call 
-irgs_disabled() or others you will get that IRQ is ON but can't happen.
-
-> 
->> When schedule is called from that any code has to enable IRQ if generic code 
->> doesn't do that. Not sure if it does.
-> 
-> generic code isn't supposed to call schedule() with IRQs disabled (and
-> doesn't afaik)
-
-OK. Which means I have to disable IRQ before schedule is called. Is that correct?
-
-Michal
-
--- 
-Michal Simek, Ing. (M.Eng)
-w: www.monstr.eu p: +42-0-721842854
-Maintainer of Linux kernel 2.6 Microblaze Linux - http://www.monstr.eu/fdt/
-Microblaze U-BOOT custodian
+        raw_spin_lock_irq(&rq->lock);
