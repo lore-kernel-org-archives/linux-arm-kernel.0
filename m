@@ -1,39 +1,37 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Tue, 31 May 2011 11:37:11 +0200
-Subject: [PATCH 4/4] ARM: ep93xx: use more reliable CPLD watchdog for
-	reset on ts72xx
-In-Reply-To: <4DE4AB3D.2010305@bluewatersys.com>
-References: <1306665346-26657-1-git-send-email-ynezz@true.cz>
-	<1306665346-26657-5-git-send-email-ynezz@true.cz>
-	<4DE4AB3D.2010305@bluewatersys.com>
-Message-ID: <20110531093711.GK16318@ibawizard.net>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Tue, 31 May 2011 09:44:24 +0100
+Subject: [PATCH 1/4] gpio: gpio-mxc: add gpio driver for Freescale MXC
+	architecture
+In-Reply-To: <1306767139-24763-2-git-send-email-shawn.guo@linaro.org>
+References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
+	<1306767139-24763-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110531084424.GA2266@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ryan Mallon <ryan@bluewatersys.com> [2011-05-31 18:47:57]:
+Hi Shawn,
 
-> > +#ifdef CONFIG_MACH_TS72XX
-> > +	/*
-> > +	 * It's more reliable to use CPLD watchdog to perform the reset
-> > +	 */
-> > +	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
-> > +	    board_is_ts7300() || board_is_ts7400()) {
-> > +		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
-> > +		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
-> > +	}
-> > +#else
-> >  	/*
-> >  	 * Set then clear the SWRST bit to initiate a software reset
-> >  	 */
-> >  	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-> >  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-> > +#endif
+On Mon, May 30, 2011 at 10:52:16PM +0800, Shawn Guo wrote:
+> Add gpio-mxc driver by copying arch/arm/plat-mxc/gpio.c into
+> drivers/gpio with the following changes.
 > 
-> Do we need the ifdef here? Isn't the if (board_is_xxx) test enough?
+>  * Use readl/writel to replace mach-specific accessors
+>    __raw_readl/__raw_writel
+> 
+>  * Migrate to platform driver by adding .probe function
+> 
+>  * Add a list to save all mx2 ports references, so that
+>    mx2_gpio_irq_handler can walk through all interrupt status
+>    registers
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
 
-Yes, sure, that the test is enough. The rationale behind that ifdef is, that I
-was just thinking, that it's not necessary to drag-in more code (althought
-very small) in the kernel for other ep93xx machines. If it's ok without, I'll
-make v2.
+Could you use the stuff in drivers/gpio/basic_mmio_gpio.c for 
+implementing the gpio_chip?  I had a go a little while ago [1] but since 
+then we've made it possible to embed the bgpio_chip in your own 
+structure which may be cleaner.
 
--- ynezz
+Jamie
+
+1. http://permalink.gmane.org/gmane.linux.ports.arm.kernel/113139
