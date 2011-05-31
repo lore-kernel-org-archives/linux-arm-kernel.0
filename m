@@ -1,38 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 31 May 2011 23:18:25 +0200
-Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
-In-Reply-To: <4DE51EB7.7010606@stericsson.com>
-References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
-	<alpine.LFD.2.02.1105311236250.3078@ionos>
-	<4DE51EB7.7010606@stericsson.com>
-Message-ID: <BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 May 2011 22:21:42 +0100
+Subject: [RFC PATCH v4] Consolidate SRAM support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D234457@dbde02.ent.ti.com>
+References: <20110512174546.GB8633@n2100.arm.linux.org.uk>
+	<1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D234457@dbde02.ent.ti.com>
+Message-ID: <20110531212142.GA6700@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2011 at 7:00 PM, Mattias Wallin
-<mattias.wallin@stericsson.com> wrote:
-> On 05/31/2011 12:38 PM, Thomas Gleixner wrote:
+On Tue, May 31, 2011 at 10:39:48PM +0530, Nori, Sekhar wrote:
+> I also found some check patch errors. Feel free to merge
+> the attached patch.
 
->>> +++ b/include/linux/clksrc-db8500-prcmu.h
+And this introduces another style issue...
 
->> Huch, why needs this to be a separate head in include/linux ?
->
-> I will move the header file to mach-ux500/include/mach/. Ok?
->
-> (I have long time ago been thought to avoid include mach headers from the
-> drivers. But if I understand it correct it is not true any more and in this
-> case it certainly makes no sense since I break that rule myself.)
+> diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
+> index 8279c47..aae5e35 100644
+> --- a/arch/arm/plat-mxc/include/mach/iram.h
+> +++ b/arch/arm/plat-mxc/include/mach/iram.h
+> @@ -31,7 +31,7 @@ static inline void *iram_alloc(size_t size, phys_addr_t *phys)
+>  
+>  	*phys = gen_pool_virt_to_phys(iram_pool, addr);
+>  
+> -	return (void*)addr;
+> +	return (void *) addr;
 
-Keeping it under include/linux is probably wise since we want drivers
-OUT of the ARM tree, but I don't know if there is much consensus on that?
-
-I was more understanding the question as why it was needed at all.
-
-Does it work to register the clocksource with say a core_initcall()
-and avoid the header altogether?
-
-Else a header is needed since we need to call out from the platform timer
-init function to this clocksource to register it.
-
-Thanks,
-Linus Walleij
+The style here is:
+	return (void *)addr;
