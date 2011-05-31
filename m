@@ -1,119 +1,56 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 31 May 2011 10:55:03 -0700
-Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
-	gpio's from the device tree.
-In-Reply-To: <4DE403C5.7060003@firmworks.com>
-References: <20110527205444.21000.90209.stgit@riker>
-	<20110527205721.21000.78599.stgit@riker>
-	<20110528012427.GB5971@opensource.wolfsonmicro.com>
-	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
-	<20110530033826.GE4130@opensource.wolfsonmicro.com>
-	<20110530061155.GC23517@ponder.secretlab.ca>
-	<4DE336A1.5040509@firmworks.com>
-	<20110530070138.GA5036@opensource.wolfsonmicro.com>
-	<8d2515b13c817cc956b185d043bcef00@kernel.crashing.org>
-	<BANLkTi=hkScxYpt449CQCky+bLU3UvkC_A@mail.gmail.com>
-	<4DE403C5.7060003@firmworks.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0498E1C22D@HQMAIL01.nvidia.com>
+From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
+Date: Tue, 31 May 2011 20:34:06 +0200
+Subject: [PATCH v2] ARM: ep93xx: use more reliable CPLD watchdog for reset on
+	ts72xx
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F381FC48C8@AUSP01VMBX24.collaborationhost.net>
+References: <ADE657CA350FB648AAC2C43247A983F001F381FC48C8@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <1306866846-3167-1-git-send-email-ynezz@true.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mitch Bradley wrote at Monday, May 30, 2011 2:53 PM:
-> ...
-> GPIOs share the need to "point across the tree to different nodes", but
-> it is unclear that there is a need for a entirely different hierarchy.
-> 
-> That suggests the possibility of using the device tree addressing
-> mechanism as much as possible.  Normal device tree addresses could be
-> used to specify GPIO numbers.
-> 
-> Suppose we have:
-> 
->     gpio-controller1: gpio-controller {
->         #address-cells = <2>;
->         #mode-cells = <2>;
->         gpio1: gpio at 12,0 {
->             reg = <12 0>;
->             mode = <55 66>;
->             usage = "Audio Codec chip select";  /* Optional */
->         }
->     };
->     gpio-controller2: gpio-controller {
->         #address-cells = <1>;
->         #mode-cells = <1>;
->         gpio2: gpio at 4 {
->             reg = <4>;
->             #mode-cells = <1>;
->         }
->     };
+On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
+available, so use this one to reset the board instead of the soft reset in
+CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
+while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
+so far.
 
-A quick note on the way that Tegra's devicetree files are broken up in
-Grant's devicetree/test branch:
+Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+---
+ arch/arm/mach-ep93xx/include/mach/system.h |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-* There's "tegra250.dtsi" which defines everything on the Tegra SoC
-  itself.
-* There's a per-board e.g. harmony.dts which includes tegra250.dtsi,
-  And additionally:
-  ** Defines all devices on the board
-  ** Hence, defines the usage of e.g. all the Tegra GPIOs for the
-     board.
-
-I like this model, because it shares the complete definition of the
-Tegra SoC in a single file, rather than duplicating it with cut/paste
-into every board file.
-
-As such, the code quoted above would be in tegra250.dtsi.
-
-This has two relevant implications here:
-
-1) The names "gpio1" and "gpio2" would be driven by the Tegra SoC's
-naming of those GPIO pins, and not any board-specific naming, e.g.
-"tegra_gpio_px1", "tegra_gpio_pb5". Equally, the usage comment would
-be at the client/reference site, not the GPIO definition site.
-
-2) The GPIO mode should be defined by the client/user of the GPIO, not
-the SoC's definition of that GPIO.
-
-Without those two conditions, we couldn't share anything through
-tegra250.dtsi.
-
-Re-iteration of these implications below.
-
->     [...]
->     chipsel-gpio =  <&gpio1>,
->         <&gpio-controller1 13 0 55 77>,
->         <0>, /* holes are permitted, means no GPIO 2 */
->         <&gpio2 88>,
->         <&gpio-controller2 5 1>;
-
-> A GPIO spec consist of:
-> 
-> 1) A reference to either a gpio-controller or a gpio device node.
-> 
-> 2) 0 or more address cells, according to the value of #address-cells in
-> the referenced node.  If the node has no #address-cells property, the
-> value is assumed to be 0.
-
-I'd expect address cells only if referencing a gpio-controller; if
-referencing a gpio device node, the address would be implicit.
-
-> 3) 0 or more mode cells, according to the value of #mode-cells in the
-> referenced node.
-
-Yes, I agree. Although, I think your (3) is inconsistent with the gpio
-controller definitions you wrote above, which include the mode
-definitions in the controller instead of the user.
-
-> In the example, the chipsel-gpio specs are interpreted as:
-> 
-> <&gpio1>  -  refers to a pre-bound gpio device node, in which the
-> address (12 0) and mode (55 66) are specified within that node.
-
-Just re-iterating: I'd prefer mode to be solely in the reference, and
-not in the gpio controller.
-
-Does this SoC/board segregation make sense to everyone? Obviously it
-does to me:-)
-
+diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
+index 6d661fe..8d31c4d 100644
+--- a/arch/arm/mach-ep93xx/include/mach/system.h
++++ b/arch/arm/mach-ep93xx/include/mach/system.h
+@@ -2,7 +2,10 @@
+  * arch/arm/mach-ep93xx/include/mach/system.h
+  */
+ 
++#include <linux/io.h>
++
+ #include <mach/hardware.h>
++#include <mach/ts72xx.h>
+ 
+ static inline void arch_idle(void)
+ {
+@@ -14,6 +17,15 @@ static inline void arch_reset(char mode, const char *cmd)
+ 	local_irq_disable();
+ 
+ 	/*
++	 * It's more reliable to use CPLD watchdog to perform the reset
++	 */
++	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
++	    board_is_ts7300() || board_is_ts7400()) {
++		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
++		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
++	}
++
++	/*
+ 	 * Set then clear the SWRST bit to initiate a software reset
+ 	 */
+ 	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
 -- 
-nvpublic
+1.7.1
