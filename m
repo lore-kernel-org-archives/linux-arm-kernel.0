@@ -1,50 +1,119 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Tue, 31 May 2011 10:34:20 -0700
-Subject: [PATCH 01/10] mm: Introduce the memory regions data structure
-In-Reply-To: <20110529081618.GC8333@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<1306499498-14263-2-git-send-email-ankita@in.ibm.com>
-	<1306510203.22505.69.camel@nimitz>
-	<20110527182041.GM5654@dirshya.in.ibm.com>
-	<1306531912.22505.84.camel@nimitz> <20110529081618.GC8333@in.ibm.com>
-Message-ID: <1306863260.15490.35.camel@nimitz>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Tue, 31 May 2011 10:55:03 -0700
+Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
+	gpio's from the device tree.
+In-Reply-To: <4DE403C5.7060003@firmworks.com>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205721.21000.78599.stgit@riker>
+	<20110528012427.GB5971@opensource.wolfsonmicro.com>
+	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
+	<20110530033826.GE4130@opensource.wolfsonmicro.com>
+	<20110530061155.GC23517@ponder.secretlab.ca>
+	<4DE336A1.5040509@firmworks.com>
+	<20110530070138.GA5036@opensource.wolfsonmicro.com>
+	<8d2515b13c817cc956b185d043bcef00@kernel.crashing.org>
+	<BANLkTi=hkScxYpt449CQCky+bLU3UvkC_A@mail.gmail.com>
+	<4DE403C5.7060003@firmworks.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0498E1C22D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-05-29 at 13:46 +0530, Ankita Garg wrote:
-> > It's worth noting that we already do targeted reclaim on boundaries
-> > other than zones.  The lumpy reclaim and memory compaction logically do
-> > the same thing.  So, it's at least possible to do this without having
-> > the global LRU designed around the way you want to reclaim.
-> >
-> My understanding maybe incorrect, but doesn't both lumpy reclaim and
-> memory compaction still work under zone boundary ? While trying to free
-> up higher order pages, lumpy reclaim checks to ensure that pages that
-> are selected do not cross zone boundary. Further, compaction walks
-> through the pages in a zone and tries to re-arrange them.
+Mitch Bradley wrote at Monday, May 30, 2011 2:53 PM:
+> ...
+> GPIOs share the need to "point across the tree to different nodes", but
+> it is unclear that there is a need for a entirely different hierarchy.
+> 
+> That suggests the possibility of using the device tree addressing
+> mechanism as much as possible.  Normal device tree addresses could be
+> used to specify GPIO numbers.
+> 
+> Suppose we have:
+> 
+>     gpio-controller1: gpio-controller {
+>         #address-cells = <2>;
+>         #mode-cells = <2>;
+>         gpio1: gpio at 12,0 {
+>             reg = <12 0>;
+>             mode = <55 66>;
+>             usage = "Audio Codec chip select";  /* Optional */
+>         }
+>     };
+>     gpio-controller2: gpio-controller {
+>         #address-cells = <1>;
+>         #mode-cells = <1>;
+>         gpio2: gpio at 4 {
+>             reg = <4>;
+>             #mode-cells = <1>;
+>         }
+>     };
 
-I'm asserting that we don't need memory regions in the
+A quick note on the way that Tegra's devicetree files are broken up in
+Grant's devicetree/test branch:
 
-	pgdat->regions[]->zones[]
+* There's "tegra250.dtsi" which defines everything on the Tegra SoC
+  itself.
+* There's a per-board e.g. harmony.dts which includes tegra250.dtsi,
+  And additionally:
+  ** Defines all devices on the board
+  ** Hence, defines the usage of e.g. all the Tegra GPIOs for the
+     board.
 
-layout to do what you're asking for.
+I like this model, because it shares the complete definition of the
+Tegra SoC in a single file, rather than duplicating it with cut/paste
+into every board file.
 
-Lumpy reclaim is limited to a zone because it's trying to satisfy and
-allocation request that came in for *THAT* *ZONE*.  It's useless to go
-clear out other zones.  In your case, you don't care about zone
-boundaries: you want to reclaim things regardless.
+As such, the code quoted above would be in tegra250.dtsi.
 
-There was a "cma: Contiguous Memory Allocator added" patch posted a bit
-ago to linux-mm at .  You might want to take a look at it for some
-inspiration.
+This has two relevant implications here:
 
-I think you also need to clearly establish here why any memory that
-you're going to want to power off can't use (or shouldn't use)
-ZONE_MOVABLE.  It seems a bit silly to have it there, and ignore it for
-such a similar use case.  Memory hot-remove and power-down are not
-horrifically different beasts.
+1) The names "gpio1" and "gpio2" would be driven by the Tegra SoC's
+naming of those GPIO pins, and not any board-specific naming, e.g.
+"tegra_gpio_px1", "tegra_gpio_pb5". Equally, the usage comment would
+be at the client/reference site, not the GPIO definition site.
 
-BTW, that's probably something else to add to your list: make sure
-mem_map[]s for memory in a region get allocated *in* that region. 
+2) The GPIO mode should be defined by the client/user of the GPIO, not
+the SoC's definition of that GPIO.
 
--- Dave
+Without those two conditions, we couldn't share anything through
+tegra250.dtsi.
+
+Re-iteration of these implications below.
+
+>     [...]
+>     chipsel-gpio =  <&gpio1>,
+>         <&gpio-controller1 13 0 55 77>,
+>         <0>, /* holes are permitted, means no GPIO 2 */
+>         <&gpio2 88>,
+>         <&gpio-controller2 5 1>;
+
+> A GPIO spec consist of:
+> 
+> 1) A reference to either a gpio-controller or a gpio device node.
+> 
+> 2) 0 or more address cells, according to the value of #address-cells in
+> the referenced node.  If the node has no #address-cells property, the
+> value is assumed to be 0.
+
+I'd expect address cells only if referencing a gpio-controller; if
+referencing a gpio device node, the address would be implicit.
+
+> 3) 0 or more mode cells, according to the value of #mode-cells in the
+> referenced node.
+
+Yes, I agree. Although, I think your (3) is inconsistent with the gpio
+controller definitions you wrote above, which include the mode
+definitions in the controller instead of the user.
+
+> In the example, the chipsel-gpio specs are interpreted as:
+> 
+> <&gpio1>  -  refers to a pre-bound gpio device node, in which the
+> address (12 0) and mode (55 66) are specified within that node.
+
+Just re-iterating: I'd prefer mode to be solely in the reference, and
+not in the gpio controller.
+
+Does this SoC/board segregation make sense to everyone? Obviously it
+does to me:-)
+
+-- 
+nvpublic
