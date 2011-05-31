@@ -1,63 +1,52 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 31 May 2011 09:35:16 +0800
-Subject: [PATCH 1/4] gpio: gpio-mxc: add gpio driver for Freescale MXC
-	architecture
-In-Reply-To: <20110531005315.GC3411@quad.lixom.net>
-References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
-	<1306767139-24763-2-git-send-email-shawn.guo@linaro.org>
-	<20110531005315.GC3411@quad.lixom.net>
-Message-ID: <20110531013515.GA31928@S2100-06.ap.freescale.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 30 May 2011 23:03:35 -0300
+Subject: Freescale i.mx25 SDIO/Libertas issue
+In-Reply-To: <BANLkTi=j3UXV6FMS6vkA+Vrpt3JjsNwMiA@mail.gmail.com>
+References: <4DE2F84D.8080907@bluewatersys.com>
+	<BANLkTi=j3UXV6FMS6vkA+Vrpt3JjsNwMiA@mail.gmail.com>
+Message-ID: <BANLkTika2NNTmWNBmLC60GVMLTzXUS5X+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Daniel,
 
-Thanks for the review.
+On Mon, May 30, 2011 at 6:50 AM, Daniel Mack <zonque@gmail.com> wrote:
+> On Mon, May 30, 2011 at 3:52 AM, Andre Renaud <andre@bluewatersys.com> wrote:
+>> Hello,
+>> I am trying to use a Wi2Wi 802.11b/g (W2CBW009S) module attached to an
+>> i.MX25 cpu, specifically the i.MX25 PDK from freescale, although I've
+>> also tried it on a DeviceSolutions Topaz i.MX25. However it is unable to
+>> fully load the driver, leaving me with the following in the logs:
+>> [ ? 30.149097] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>> command 0x00a9 timed out
+>> [ ? 30.153759] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>> Timeout submitting command 0x00a9
+>> [ ? 30.158843] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>> PREP_CMD: command 0x00a9 failed: -110
+>> [ ? 30.164126] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>> CMD_FUNC_INIT cmd failed
+>> This wifi chip is based around the Marvell 8688 core.
+>>
+>> I have also tried using an 8686 device, and in that case it is unable to
+>> even complete loading the firmware, failing with the following:
+>> [ ? 14.753132] libertas_sdio: Firmware req_size: 17
+>> [ ? 14.755713] libertas_sdio: failed to load firmware: -5
+>> [ ? 14.759272] libertas_sdio: probe of mmc0:0001:1 failed with error -5
+>> Note: I added the 'req_size: ' debugging message in
+>
+> I assume this error happens after the driver uploaded the helper
+> firmware and switched to multi-block transfers?
+>
+> Which kernel version are you working on? I'm asking because I fixed a
+> similar bug some months ago which I happend to see an a MX31 CPU with
+> a 8686 attach to the SDIO bus. The MX3 MMC controller has bug severe
+> bug in its CRC calculation code which causes multi-block transfers on
+> a 4-bit bus to fail, and hence the only solution was to switch to a
+> 1-bit bus. But I don't known whether this also affects MX25 cores.
 
-On Mon, May 30, 2011 at 05:53:15PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, May 30, 2011 at 10:52:16PM +0800, Shawn Guo wrote:
-> > Add gpio-mxc driver by copying arch/arm/plat-mxc/gpio.c into
-> > drivers/gpio with the following changes.
-> > 
-> >  * Use readl/writel to replace mach-specific accessors
-> >    __raw_readl/__raw_writel
-> > 
-> >  * Migrate to platform driver by adding .probe function
-> > 
-> >  * Add a list to save all mx2 ports references, so that
-> >    mx2_gpio_irq_handler can walk through all interrupt status
-> >    registers
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  arch/arm/plat-mxc/include/mach/gpio.h |    2 +
-> >  drivers/gpio/Makefile                 |    1 +
-> >  drivers/gpio/gpio-mxc.c               |  423 +++++++++++++++++++++++++++++++++
-> >  3 files changed, 426 insertions(+), 0 deletions(-)
-> >  create mode 100644 drivers/gpio/gpio-mxc.c
-> > 
-> > diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
-> > index a2747f1..87bd4ef 100644
-> > --- a/arch/arm/plat-mxc/include/mach/gpio.h
-> > +++ b/arch/arm/plat-mxc/include/mach/gpio.h
-> > @@ -37,7 +37,9 @@
-> >  #define irq_to_gpio(irq)	((irq) - MXC_GPIO_IRQ_START)
-> >  
-> >  struct mxc_gpio_port {
-> > +	struct list_head node;
-> >  	void __iomem *base;
-> > +	int id;
-> 
-> What's id for? You assign it based on pdev->id in the probe function but
-> never use it anywhere else.
-> 
-Yes, it is only used in probe function right now, and can be removed.
-I feel it will be needed someday when more cleanup and consolidation
-works happen, but we can add it back then.  So, yes, I will remove it
-for now.
+The MX25 has a different SD controller (eSDHC) than the one found on
+MX31 and such issue is not present.
 
--- 
 Regards,
-Shawn
+
+Fabio Estevam
