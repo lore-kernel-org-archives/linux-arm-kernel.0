@@ -1,41 +1,96 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 May 2011 00:27:08 -0700
-Subject: [PATCH 2/2] omap: rx51: Don't power up speaker amplifier at bootup
-In-Reply-To: <1305199858-32643-2-git-send-email-jhnikula@gmail.com>
-References: <1305199858-32643-1-git-send-email-jhnikula@gmail.com>
-	<1305199858-32643-2-git-send-email-jhnikula@gmail.com>
-Message-ID: <20110531072708.GK11352@atomide.com>
+Date: Tue, 31 May 2011 00:40:54 -0700
+Subject: [PATCH] arch/arm/mach-omap1/dma.c: Invert calls to
+	platform_device_put and platform_device_del
+In-Reply-To: <1305305170-16922-1-git-send-email-julia@diku.dk>
+References: <1305305170-16922-1-git-send-email-julia@diku.dk>
+Message-ID: <20110531074054.GL11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jhnikula@gmail.com> [110512 04:26]:
-> Speaker amplifier is accidentally powered up in early TWL gpio setup. This
-> causes a few mA of needless battery current consumption. Without this patch
-> the amplifier can be shutdown only by having one active audio playback and
-> shutdown cycle to speaker output.
+* Julia Lawall <julia@diku.dk> [110513 09:42]:
+> From: Julia Lawall <julia@diku.dk>
 > 
-> Thanks to Kalle Jokiniemi <kalle.jokiniemi@nokia.com> for noticing the issue.
+> Platform_device_del should be called before platform_device_put, as
+> platform_device_put can delete the structure.
 > 
-> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-> Cc: Kalle Jokiniemi <kalle.jokiniemi@nokia.com>
-> ---
->  arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
+> Additionally, improve the error handling code for the call to ioremap, so
+> that it calls platform_device_put.
 > 
-> diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-> index 8242e99..0374562 100644
-> --- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-> +++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-> @@ -561,7 +561,7 @@ static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
->  	gpio_request(gpio + 6, "backlight_pwm");
->  	gpio_direction_output(gpio + 6, 0);
->  	gpio_request(gpio + 7, "speaker_en");
-> -	gpio_direction_output(gpio + 7, 1);
-> +	gpio_direction_output(gpio + 7, 0);
->  
->  	return 0;
->  }
+> The semantic match that finds this problem is:
+> (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @@
+> expression e1,e2;
+> @@
+> 
+> *platform_device_put(e1);
+> ... when != e1 = e2
+> *platform_device_del(e1);
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <julia@diku.dk>
 
-Jarkko care to rebase this on current -rc1?
+Thanks, applying into fixes.
+
+> 
+> ---
+> Is an ioremap needed also?  Not clear, because dma_base i a global variable.
+
+I guess you mean iounmap instead of ioremap? In this case we have static
+mappings for ioremap, so iounmap is not doing anything. But should be done
+for correct handling.
+
+Regards,
 
 Tony
+ 
+>  arch/arm/mach-omap1/dma.c |   11 ++++++-----
+>  1 file changed, 6 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap1/dma.c b/arch/arm/mach-omap1/dma.c
+> index d855934..f5a5220 100644
+> --- a/arch/arm/mach-omap1/dma.c
+> +++ b/arch/arm/mach-omap1/dma.c
+> @@ -284,14 +284,15 @@ static int __init omap1_system_dma_init(void)
+>  	dma_base = ioremap(res[0].start, resource_size(&res[0]));
+>  	if (!dma_base) {
+>  		pr_err("%s: Unable to ioremap\n", __func__);
+> -		return -ENODEV;
+> +		ret = -ENODEV;
+> +		goto exit_device_put;
+>  	}
+>  
+>  	ret = platform_device_add_resources(pdev, res, ARRAY_SIZE(res));
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "%s: Unable to add resources for %s%d\n",
+>  			__func__, pdev->name, pdev->id);
+> -		goto exit_device_del;
+> +		goto exit_device_put;
+>  	}
+>  
+>  	p = kzalloc(sizeof(struct omap_system_dma_plat_info), GFP_KERNEL);
+> @@ -299,7 +300,7 @@ static int __init omap1_system_dma_init(void)
+>  		dev_err(&pdev->dev, "%s: Unable to allocate 'p' for %s\n",
+>  			__func__, pdev->name);
+>  		ret = -ENOMEM;
+> -		goto exit_device_put;
+> +		goto exit_device_del;
+>  	}
+>  
+>  	d = kzalloc(sizeof(struct omap_dma_dev_attr), GFP_KERNEL);
+> @@ -380,10 +381,10 @@ exit_release_d:
+>  	kfree(d);
+>  exit_release_p:
+>  	kfree(p);
+> -exit_device_put:
+> -	platform_device_put(pdev);
+>  exit_device_del:
+>  	platform_device_del(pdev);
+> +exit_device_put:
+> +	platform_device_put(pdev);
+>  
+>  	return ret;
+>  }
+> 
