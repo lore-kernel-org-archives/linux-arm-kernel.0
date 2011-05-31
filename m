@@ -1,106 +1,34 @@
-From: kishorek.kadiyala@gmail.com (Kishore Kadiyala)
-Date: Tue, 31 May 2011 20:11:48 +0530
-Subject: [PATCH 2/2] ARM: OMAP4: MMC: no regulator off during probe for
-	eMMC
-In-Reply-To: <1306765534-20103-3-git-send-email-balajitk@ti.com>
-References: <1306765534-20103-1-git-send-email-balajitk@ti.com>
-	<1306765534-20103-3-git-send-email-balajitk@ti.com>
-Message-ID: <BANLkTiks92tGJfaTVW2b7DTmU0SuQpbZ4g@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 31 May 2011 23:10:20 +0800
+Subject: [PATCH 2/4] ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
+In-Reply-To: <201105311328.18012.arnd@arndb.de>
+References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
+	<201105311026.11947.arnd@arndb.de>
+	<20110531103011.GB32096@S2100-06.ap.freescale.net>
+	<201105311328.18012.arnd@arndb.de>
+Message-ID: <20110531151019.GA32275@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 7:55 PM, Balaji T K <balajitk@ti.com> wrote:
-> eMMC does not handle power off when not in sleep state,
-> Skip regulator disable during probe when eMMC is
-> not in known state - state left by bootloader.
->
-> Resolves eMMC failure on OMAP4
-> mmc0: error -110 whilst initialising MMC card
->
-> Signed-off-by: Balaji T K <balajitk@ti.com>
+On Tue, May 31, 2011 at 01:28:17PM +0200, Arnd Bergmann wrote:
+> On Tuesday 31 May 2011, Shawn Guo wrote:
+> > > Just open-code the mxc_add_mxc_gpio() by moving the individual calls to
+> > > mxc_add_gpio() into the respective callers. Having a global
+> > > mxc_add_mxc_gpio() function that does something different for each
+> > > caller seems entirely pointless to me.
+> > > 
+> > Right now, mxc_add_mxc_gpio() is a postcore_initcall.  Moving
+> > individual mxc_add_gpio() call into irq_init function does not work.
+> > And I need to find a proper caller for each SoC to call mxc_add_gpio
+> > to register gpio devices.
+>  
+> Why not init_machine? That is an arch_initcall(), so it's probably close
+> enough.
+> 
+The init_machine is mostly a board specific function than SoC specific
+one.  That is to say we will call mxc_add_gpio() in every single board
+init function even for the same SoC.
 
-Tested-by:  Kishore Kadiyala <kishore.kadiyala@ti.com>
-Acked-by:  Kishore Kadiyala <kishore.kadiyala@ti.com>
-
-> ---
-> ?arch/arm/mach-omap2/board-4430sdp.c ? | ? ?1 +
-> ?arch/arm/mach-omap2/hsmmc.c ? ? ? ? ? | ? ?3 +++
-> ?arch/arm/mach-omap2/hsmmc.h ? ? ? ? ? | ? ?1 +
-> ?arch/arm/plat-omap/include/plat/mmc.h | ? ?3 +++
-> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? | ? ?3 +++
-> ?5 files changed, 11 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-> index 73fa90b..b324605 100644
-> --- a/arch/arm/mach-omap2/board-4430sdp.c
-> +++ b/arch/arm/mach-omap2/board-4430sdp.c
-> @@ -322,6 +322,7 @@ static struct omap2_hsmmc_info mmc[] = {
-> ? ? ? ? ? ? ? ?.gpio_wp ? ? ? ?= -EINVAL,
-> ? ? ? ? ? ? ? ?.nonremovable ? = true,
-> ? ? ? ? ? ? ? ?.ocr_mask ? ? ? = MMC_VDD_29_30,
-> + ? ? ? ? ? ? ? .no_off_init ? ?= true,
-> ? ? ? ?},
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.mmc ? ? ? ? ? ?= 1,
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index 3f8dc16..28ca144 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -338,6 +338,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
-> ? ? ? ?if (c->no_off)
-> ? ? ? ? ? ? ? ?mmc->slots[0].no_off = 1;
->
-> + ? ? ? if (c->no_off_init)
-> + ? ? ? ? ? ? ? mmc->slots[0].no_regulator_off_init = c->no_off_init;
-> +
-> ? ? ? ?if (c->vcc_aux_disable_is_sleep)
-> ? ? ? ? ? ? ? ?mmc->slots[0].vcc_aux_disable_is_sleep = 1;
->
-> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
-> index f119348..f757e78 100644
-> --- a/arch/arm/mach-omap2/hsmmc.h
-> +++ b/arch/arm/mach-omap2/hsmmc.h
-> @@ -18,6 +18,7 @@ struct omap2_hsmmc_info {
-> ? ? ? ?bool ? ?nonremovable; ? /* Nonremovable e.g. eMMC */
-> ? ? ? ?bool ? ?power_saving; ? /* Try to sleep or power off when possible */
-> ? ? ? ?bool ? ?no_off; ? ? ? ? /* power_saving and power is not to go off */
-> + ? ? ? bool ? ?no_off_init; ? ?/* no power off when not in MMC sleep state */
-> ? ? ? ?bool ? ?vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
-> ? ? ? ?int ? ? gpio_cd; ? ? ? ?/* or -EINVAL */
-> ? ? ? ?int ? ? gpio_wp; ? ? ? ?/* or -EINVAL */
-> diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
-> index f38fef9..c7b8741 100644
-> --- a/arch/arm/plat-omap/include/plat/mmc.h
-> +++ b/arch/arm/plat-omap/include/plat/mmc.h
-> @@ -101,6 +101,9 @@ struct omap_mmc_platform_data {
-> ? ? ? ? ? ? ? ?/* If using power_saving and the MMC power is not to go off */
-> ? ? ? ? ? ? ? ?unsigned no_off:1;
->
-> + ? ? ? ? ? ? ? /* eMMC does not handle power off when not in sleep state */
-> + ? ? ? ? ? ? ? unsigned no_regulator_off_init:1;
-> +
-> ? ? ? ? ? ? ? ?/* Regulator off remapped to sleep */
-> ? ? ? ? ? ? ? ?unsigned vcc_aux_disable_is_sleep:1;
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 259ece0..5b2e215 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -435,6 +435,9 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
-> ? ? ? ? ? ? ? ?reg = regulator_get(host->dev, "vmmc_aux");
-> ? ? ? ? ? ? ? ?host->vcc_aux = IS_ERR(reg) ? NULL : reg;
->
-> + ? ? ? ? ? ? ? /* For eMMC do not power off when not in sleep state */
-> + ? ? ? ? ? ? ? if (mmc_slot(host).no_regulator_off_init)
-> + ? ? ? ? ? ? ? ? ? ? ? return 0;
-> ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ?* UGLY HACK: ?workaround regulator framework bugs.
-> ? ? ? ? ? ? ? ?* When the bootloader leaves a supply active, it's
-> --
-> 1.7.0.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+Regards,
+Shawn
