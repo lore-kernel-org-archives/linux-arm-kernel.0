@@ -1,37 +1,107 @@
 From: chris@techworks.ie (Christian Gagneraud)
-Date: Tue, 31 May 2011 17:04:20 +0100
-Subject: [PATCH RFC 0/3] AT91: SPI: Add peripheral chip select decoding
-Message-ID: <1306857863-13424-1-git-send-email-chris@techworks.ie>
+Date: Tue, 31 May 2011 17:04:23 +0100
+Subject: [PATCH RFC 3/3] AT91: SPI: Add example of platform specific CS/GPIO
+	usage
+In-Reply-To: <1306857863-13424-1-git-send-email-chris@techworks.ie>
+References: <1306857863-13424-1-git-send-email-chris@techworks.ie>
+Message-ID: <1306857863-13424-4-git-send-email-chris@techworks.ie>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a RFC on adding support for CS decode on AT91 platforms.
-CS decode allow to control many SPI devices with few CS lines by simply coding
-the CS# on the lines, that is with 4 CS lines you can adress up to 15 SPI 
-devices. Of course this require a decoder on the slave side.
+As an example, I used this board to show how to use the CS decode feature.
 
-First of all, an atmel_spi_data structure have been added to describe which 
-GPIO they use as CS line and as well to enable or not the use of the CS decode 
-feature.
-Then the at91_add_device_spi() has been revamped, it is now used to add a SPI 
-*controller* device only. The boards need to register their SPI devices with 
-spi_register_board_info().
+Signed-off-by: Christian Gagneraud <chris@techworks.ie>
+---
+ arch/arm/mach-at91/board-stamp9g20.c |   62 ++++++++++++++++++++++++++++++++--
+ 1 files changed, 59 insertions(+), 3 deletions(-)
 
-All of this has been tested on a PortuxG20 board, as an example the last patch 
-show how to use it.
-
-As it is only an RFC for now, I didn't bother with other AT91 SoC than the 9G20.
-
-Christian Gagneraud (3):
-  AT91: SPI: Add CS decode support
-  AT91: SPI: Split SPI controller device and SPI device
-  AT91: SPI: Add example of platform specific CS/GPIO usage
-
- arch/arm/mach-at91/at91sam9260_devices.c |   60 ++++++-------
- arch/arm/mach-at91/board-stamp9g20.c     |   62 +++++++++++++-
- arch/arm/mach-at91/include/mach/board.h  |   11 ++-
- drivers/spi/atmel_spi.c                  |  137 ++++++++++++++++++++----------
- 4 files changed, 189 insertions(+), 81 deletions(-)
-
+diff --git a/arch/arm/mach-at91/board-stamp9g20.c b/arch/arm/mach-at91/board-stamp9g20.c
+index f8902b1..8278927 100644
+--- a/arch/arm/mach-at91/board-stamp9g20.c
++++ b/arch/arm/mach-at91/board-stamp9g20.c
+@@ -211,6 +211,25 @@ static struct gpio_led stamp9g20evb_leds[] = {
+ /*
+  * SPI devices
+  */
++static struct atmel_spi_data portuxg20_spi0_data = {
++	.bus_num	= 0,
++	.num_cs_pin	= 2
++};
++
++/* Use LEDs for demo purpose */
++static struct gpio portuxg20_spi1_cs_pins[] = {
++	{ .gpio = AT91_PIN_PC5  },
++	{ .gpio = AT91_PIN_PC4  },
++	{ .gpio = AT91_PIN_PC10 },
++};
++
++static struct atmel_spi_data portuxg20_spi1_data = {
++	.bus_num	= 1,
++	.num_cs_pin	= 3,
++	.cs_pins	= &portuxg20_spi1_cs_pins[0],
++	.flags		= ATMEL_SPI_CS_DEC
++};
++
+ static struct spi_board_info portuxg20_spi_devices[] = {
+ 	{
+ 		.modalias	= "spidev",
+@@ -219,7 +238,42 @@ static struct spi_board_info portuxg20_spi_devices[] = {
+ 		.bus_num	= 0,
+ 	}, {
+ 		.modalias	= "spidev",
+-		.chip_select	= 0,
++		.chip_select	= 1,
++		.max_speed_hz	= 1 * 1000 * 1000,
++		.bus_num	= 0,
++	}, {
++		.modalias	= "spidev",
++		.chip_select	= 0x0,
++		.max_speed_hz	= 1 * 1000 * 1000,
++		.bus_num	= 1,
++	}, {
++		.modalias	= "spidev",
++		.chip_select	= 0x1,
++		.max_speed_hz	= 1 * 1000 * 1000,
++		.bus_num	= 1,
++	}, {
++		.modalias	= "spidev",
++		.chip_select	= 0x2,
++		.max_speed_hz	= 1 * 1000 * 1000,
++		.bus_num	= 1,
++	}, {
++		.modalias	= "spidev",
++		.chip_select	= 0x3,
++		.max_speed_hz	= 1 * 1000 * 1000,
++		.bus_num	= 1,
++	}, {
++		.modalias	= "spidev",
++		.chip_select	= 0x4,
++		.max_speed_hz	= 1 * 1000 * 1000,
++		.bus_num	= 1,
++	}, {
++		.modalias	= "spidev",
++		.chip_select	= 0x5,
++		.max_speed_hz	= 1 * 1000 * 1000,
++		.bus_num	= 1,
++	}, {
++		.modalias	= "spidev",
++		.chip_select	= 0x6,
+ 		.max_speed_hz	= 1 * 1000 * 1000,
+ 		.bus_num	= 1,
+ 	},
+@@ -276,9 +330,11 @@ static void __init portuxg20_board_init(void)
+ 	/* I2C */
+ 	at91_add_device_i2c(NULL, 0);
+ 	/* SPI */
+-	at91_add_device_spi(portuxg20_spi_devices, ARRAY_SIZE(portuxg20_spi_devices));
++	at91_add_device_spi(&portuxg20_spi0_data);
++	at91_add_device_spi(&portuxg20_spi1_data);
++	spi_register_board_info(portuxg20_spi_devices, ARRAY_SIZE(portuxg20_spi_devices));
+ 	/* LEDs */
+-	at91_gpio_leds(portuxg20_leds, ARRAY_SIZE(portuxg20_leds));
++	/* at91_gpio_leds(portuxg20_leds, ARRAY_SIZE(portuxg20_leds)); */
+ }
+ 
+ static void __init stamp9g20evb_board_init(void)
 -- 
 1.7.4.1
