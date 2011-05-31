@@ -1,44 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 May 2011 22:00:27 +0100
-Subject: IrDA driver fails on PXA255
-In-Reply-To: <alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
-References: <20110528205701.GA1788@doriath.ww600.siemens.net>
-	<alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
-	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
-	<alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
-	<20110529215656.GA5576@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
-	<20110531072650.GC21382@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
-Message-ID: <20110531210027.GA3660@n2100.arm.linux.org.uk>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 31 May 2011 23:08:45 +0200
+Subject: [PATCH 1/3] mach-u300: fix compilation error in timer
+Message-ID: <1306876125-6711-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2011 at 01:03:03PM -0700, David Rientjes wrote:
-> The problem certainly isn't being ignored in this thread, or in the patch 
-> that I sent to fix Dmitry's issue by default, so that doesn't seem to be 
-> the case.  What would be ignored, though, is if it just emitted a 
-> WARN_ON() without failing the allocation so everything works perfectly.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-Sorry, you did not send a patch to fix it.  You sent a *bodge* to enable
-the DMA zone.  As long as you insist that's a valid fix, you're going
-to carry zero credibility with me.
+The introduction of the mmio timer accidentally referenced the
+old clocksource struct which does not exist anymore. Fix this by
+using a simple string instead.
 
-The fact is that this driver should not be using GFP_DMA to allocate
-things which aren't even DMA buffers, and its use of GFP_DMA should be
-removed.  But rather than look at that and work it out, and then produce
-a patch to sort that out, the only thing you can do is come up with
-bodge to enable the DMA zone, and continue to insist that's the right
-solution.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/mach-u300/timer.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
 
-I repeat, enabling the DMA zone for this driver is a pure and utter
-bodge, and the change to make these allocations fail _will_ and _has_
-caused regressions.
-
-Your whinge that we should re-enable the DMA zone which has been
-disabled for quite a long time now to work around this new restriction
-is extremely idiotic.
-
-Do the right thing.  Make allocations to GFP_DMA zones _warn_ first for
-a cycle so that affected drivers can be fixed.  Then for the next cycle,
-make it a hard failure.
+diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
+index 891cf44..18d7fa0 100644
+--- a/arch/arm/mach-u300/timer.c
++++ b/arch/arm/mach-u300/timer.c
+@@ -411,8 +411,7 @@ static void __init u300_timer_init(void)
+ 	/* Use general purpose timer 2 as clock source */
+ 	if (clocksource_mmio_init(U300_TIMER_APP_VBASE + U300_TIMER_APP_GPT2CC,
+ 			"GPT2", rate, 300, 32, clocksource_mmio_readl_up))
+-		printk(KERN_ERR "timer: failed to initialize clock "
+-		       "source %s\n", clocksource_u300_1mhz.name);
++		pr_err("timer: failed to initialize U300 clock source\n");
+ 
+ 	clockevents_calc_mult_shift(&clockevent_u300_1mhz,
+ 				    rate, APPTIMER_MIN_RANGE);
+-- 
+1.7.3.2
