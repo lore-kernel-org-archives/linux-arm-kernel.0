@@ -1,70 +1,59 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Tue, 31 May 2011 17:46:41 -0400
-Subject: [PATCH 1/3] [v2] davinci: sram: ioremap the davinci_soc_info
-	specified sram regions
+Date: Tue, 31 May 2011 17:46:43 -0400
+Subject: [PATCH 3/3] [v2] davinci: da850: changed SRAM allocator to shared ram.
 In-Reply-To: <cover.1306877621.git.bengardiner@nanometrics.ca>
 References: <cover.1306877621.git.bengardiner@nanometrics.ca>
-Message-ID: <3406118d1598e5e279108dd94c63ced1fa8d02bc.1306877621.git.bengardiner@nanometrics.ca>
+Message-ID: <4bae1323133ac01c9e19ceefb366aa9a46365840.1306877621.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current davinci init sets up SRAM in iotables. There has been an observed
-failure to boot a da850 with 128K specified in the iotable.
+From: Subhasish Ghosh <subhasish@mistralsolutions.com>
 
-Make the davinci sram allocator -- now based on RMK's consolidated SRAM
-support -- do an ioremap of the region specified by the entries in
-davinci_soc_info before registering with pv_pool_create().
+This patch modifies the sram allocator to allocate memory
+from the DA8XX shared RAM.
 
-This commit breaks runtime of davinci boards since the regions that
-the sram init is now trying to ioremap have been iomapped by their
-iotable entries. The iotable entries will be removed in the patches
-to come.
-
+Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+[rebased onto consolidated SRAM patches]
 Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
-CC: Sekhar Nori <nsekhar@ti.com>
+Reviewed-by: Sergei Shtylyov <sshtylyov@mvista.com>
 
 ---
 Changes since v1:
- * return -ENOMEM if ioremap fails (Sekhar Nori)
+ * re-sorted the new DA8XX_SHARED_RAM_BASE definition in  da8xx.h
+   to between DA8XX_AEMIF_CTL_BASE and DA8XX_ARM_RAM_BASE (Sergei
+   Shtylyov).
 
 ---
- arch/arm/mach-davinci/sram.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/da850.c              |    4 ++--
+ arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
-index 2c53db2..68b05d5 100644
---- a/arch/arm/mach-davinci/sram.c
-+++ b/arch/arm/mach-davinci/sram.c
-@@ -8,6 +8,7 @@
-  * the Free Software Foundation; either version 2 of the License, or
-  * (at your option) any later version.
-  */
-+#include <linux/io.h>
- #include <linux/module.h>
- #include <linux/init.h>
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 904ede9..4781230 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -1093,8 +1093,8 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
+ 	.gpio_irq		= IRQ_DA8XX_GPIO0,
+ 	.serial_dev		= &da8xx_serial_device,
+ 	.emac_pdata		= &da8xx_emac_pdata,
+-	.sram_phys		= DA8XX_ARM_RAM_BASE,
+-	.sram_len		= SZ_8K,
++	.sram_phys		= DA8XX_SHARED_RAM_BASE,
++	.sram_len		= SZ_128K,
+ 	.reset_device		= &da8xx_wdt_device,
+ };
  
-@@ -25,6 +26,7 @@ EXPORT_SYMBOL_GPL(davinci_gen_pool);
-  */
- static int __init sram_init(void)
- {
-+	void *addr;
- 	unsigned len = davinci_soc_info.sram_len;
+diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
+index ad64da7..b67499f 100644
+--- a/arch/arm/mach-davinci/include/mach/da8xx.h
++++ b/arch/arm/mach-davinci/include/mach/da8xx.h
+@@ -67,6 +67,7 @@ extern unsigned int da850_max_speed;
+ #define DA8XX_AEMIF_CS2_BASE	0x60000000
+ #define DA8XX_AEMIF_CS3_BASE	0x62000000
+ #define DA8XX_AEMIF_CTL_BASE	0x68000000
++#define DA8XX_SHARED_RAM_BASE	0x80000000
+ #define DA8XX_ARM_RAM_BASE	0xffff0000
  
- 	if (!len)
-@@ -36,8 +38,12 @@ static int __init sram_init(void)
- 	if (!davinci_gen_pool)
- 		return -ENOMEM;
- 
--	WARN_ON(gen_pool_add_virt(davinci_gen_pool, SRAM_VIRT,
--				  davinci_soc_info.sram_phys, len, -1));
-+	addr = ioremap(davinci_soc_info.sram_phys, len);
-+	if (!addr)
-+		return -ENOMEM;
-+	if (WARN_ON(gen_pool_add_virt(davinci_gen_pool, addr,
-+				  davinci_soc_info.sram_phys, len, -1)))
-+		iounmap(addr);
- 
- 	return 0;
- }
+ void __init da830_init(void);
 -- 
 1.7.4.1
