@@ -1,124 +1,35 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 31 May 2011 10:47:30 +0800
-Subject: [PATCH 2/4] ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
-In-Reply-To: <20110531001634.GB3411@quad.lixom.net>
-References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
-	<1306767139-24763-3-git-send-email-shawn.guo@linaro.org>
-	<20110531001634.GB3411@quad.lixom.net>
-Message-ID: <20110531024729.GB31928@S2100-06.ap.freescale.net>
+Date: Tue, 31 May 2011 11:00:23 +0800
+Subject: [PATCH 2/3] ARM: mx5: convert to new leds-gpio registration helper
+In-Reply-To: <1306609503-31746-2-git-send-email-u.kleine-koenig@pengutronix.de>
+References: <1306609503-31746-1-git-send-email-u.kleine-koenig@pengutronix.de>
+	<1306609503-31746-2-git-send-email-u.kleine-koenig@pengutronix.de>
+Message-ID: <20110531030022.GC31928@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 05:16:34PM -0700, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, May 30, 2011 at 10:52:17PM +0800, Shawn Guo wrote:
-> > It adds platform device for drivers/gpio/gpio-mxc, and migrates
-> > mx50/mx51/mx53 gpio driver to gpio-mxc.
-> > 
-> 
-> [...]
-> 
-> > diff --git a/arch/arm/plat-mxc/devices/platform-gpio-mxc.c b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
-> > new file mode 100644
-> > index 0000000..3b10da0
-> > --- /dev/null
-> > +++ b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
-> > @@ -0,0 +1,69 @@
-> > +/*
-> > + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> > + * Copyright 2011 Linaro Limited
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify it under
-> > + * the terms of the GNU General Public License version 2 as published by the
-> > + * Free Software Foundation.
-> > + */
-> > +#include <linux/compiler.h>
-> > +#include <linux/err.h>
-> > +#include <linux/init.h>
-> > +
-> > +#include <mach/hardware.h>
-> > +#include <mach/devices-common.h>
-> > +
-> > +static struct platform_device *__init mxc_add_gpio(int id,
-> > +	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high)
-> > +{
-> > +	struct resource res[] = {
-> > +		{
-> > +			.start = iobase,
-> > +			.end = iobase + iosize - 1,
-> > +			.flags = IORESOURCE_MEM,
-> > +		}, {
-> > +			.start = irq,
-> > +			.end = irq,
-> > +			.flags = IORESOURCE_IRQ,
-> > +		}, {
-> > +			.start = irq_high,
-> > +			.end = irq_high,
-> > +			.flags = IORESOURCE_IRQ,
-> > +		},
-> > +	};
-> > +
-> > +	return platform_device_register_resndata(&mxc_aips_bus,
-> > +			"gpio-mxc", id, res, ARRAY_SIZE(res), NULL, 0);
-> 
-> Why bother returning the value, it's never checked below?
-> 
-Please help me understand.  You are saying the return value should be
-checked below?
+Hi Uwe,
 
-> > +static int __init mxc_add_mxc_gpio(void)
+On Sat, May 28, 2011 at 09:05:02PM +0200, Uwe Kleine-K?nig wrote:
+> This gets rid of per machine struct platform_device definitions and allows
+> to move the platform data and led definition to .init.rodata.
 > 
-> Minor nits: Redundant mxcs? Also, 'gpios' would be more accurate naming.
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+>  arch/arm/mach-mx5/Kconfig                    |    4 ++++
+>  arch/arm/mach-mx5/board-mx51_efikamx.c       |   15 ++++-----------
+>  arch/arm/mach-mx5/board-mx51_efikasb.c       |   16 ++++------------
+>  arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |   18 +++---------------
+>  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |   19 ++++---------------
+>  5 files changed, 19 insertions(+), 53 deletions(-)
 > 
-The first one is the namespace of plat-mxc function, and the second
-one is to reflect gpio driver name 'mxc gpio'.
+I'm building Sascha's imx-for-3.0 tree where this patch got applied,
+and seeing the following.
 
-> > +{
-> > +	if (cpu_is_mx50()) {
-> > +		mxc_add_gpio(0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
-> > +		mxc_add_gpio(1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
-> > +		mxc_add_gpio(2, MX50_GPIO3_BASE_ADDR, SZ_16K, MX50_INT_GPIO3_LOW, MX50_INT_GPIO3_HIGH);
-> > +		mxc_add_gpio(3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
-> > +		mxc_add_gpio(4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
-> > +		mxc_add_gpio(5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
-> > +	}
-> > +
-> > +	if (cpu_is_mx51()) {
-> > +		mxc_add_gpio(0, MX51_GPIO1_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO1_LOW, MX51_MXC_INT_GPIO1_HIGH);
-> > +		mxc_add_gpio(1, MX51_GPIO2_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO2_LOW, MX51_MXC_INT_GPIO2_HIGH);
-> > +		mxc_add_gpio(2, MX51_GPIO3_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO3_LOW, MX51_MXC_INT_GPIO3_HIGH);
-> > +		mxc_add_gpio(3, MX51_GPIO4_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO4_LOW, MX51_MXC_INT_GPIO4_HIGH);
-> > +	}
-> > +
-> > +	if (cpu_is_mx53()) {
-> > +		mxc_add_gpio(0, MX53_GPIO1_BASE_ADDR, SZ_16K, MX53_INT_GPIO1_LOW, MX53_INT_GPIO1_HIGH);
-> > +		mxc_add_gpio(1, MX53_GPIO2_BASE_ADDR, SZ_16K, MX53_INT_GPIO2_LOW, MX53_INT_GPIO2_HIGH);
-> > +		mxc_add_gpio(2, MX53_GPIO3_BASE_ADDR, SZ_16K, MX53_INT_GPIO3_LOW, MX53_INT_GPIO3_HIGH);
-> > +		mxc_add_gpio(3, MX53_GPIO4_BASE_ADDR, SZ_16K, MX53_INT_GPIO4_LOW, MX53_INT_GPIO4_HIGH);
-> > +		mxc_add_gpio(4, MX53_GPIO5_BASE_ADDR, SZ_16K, MX53_INT_GPIO5_LOW, MX53_INT_GPIO5_HIGH);
-> > +		mxc_add_gpio(5, MX53_GPIO6_BASE_ADDR, SZ_16K, MX53_INT_GPIO6_LOW, MX53_INT_GPIO6_HIGH);
-> > +		mxc_add_gpio(6, MX53_GPIO7_BASE_ADDR, SZ_16K, MX53_INT_GPIO7_LOW, MX53_INT_GPIO7_HIGH);
-> > +	}
-> 
-> The above tables are pretty crazy, and they only get worse later in the series
-> when the other SoCs are added. Is it really worth it to have a common initcall
-> entry for the various SoCs here?
-> 
-This common initcall seems a good place to concentrate the gpio device
-registration.  It's easy to look at the common/different things among
-these SoCs.  The only problem you reminded me is the scanning of the
-long cpu_is_mx list.  It can be optimized a little bit by sorting the
-list from the latest (most used) SoC to the oldest (least used) one,
-and breaking out the scanning immediately when hitting one.
-
-> It'd seem cleaner to me to just call the registration function for the
-> family you're running from in per-family-init code such as where it was
-> removed above (irq init, which makes some sense since the gpios provide
-> interrupt sources as well).
-> 
-I just gave it a test, and it's not working at all.  (too early
-to register device in irq init?)
+  CC      arch/arm/mach-mx5/board-mx51_efikamx.o
+arch/arm/mach-mx5/board-mx51_efikamx.c: In function ?mx51_efikamx_init?:
+arch/arm/mach-mx5/board-mx51_efikamx.c:241:3: error: assignment of read-only location ?mx51_efikamx_leds[2]?
+arch/arm/mach-mx5/board-mx51_efikamx.c:244:2: error: implicit declaration of function ?gpio_leds_register_device?
 
 -- 
 Regards,
