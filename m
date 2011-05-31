@@ -1,61 +1,86 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 31 May 2011 17:37:08 -0500
-Subject: [PATCH] gpio: ep93xx: move driver to drivers/gpio
-In-Reply-To: <BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
-References: <201105311249.30372.hartleys@visionengravers.com>
-	<BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC4A77@AUSP01VMBX24.collaborationhost.net>
+Date: Tue, 31 May 2011 17:41:38 -0500
+Subject: [PATCH v3] ARM: ep93xx: use more reliable CPLD watchdog for
+	reset on ts72xx
+In-Reply-To: <4DE560D8.3080304@bluewatersys.com>
+References: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
+	<1306868578-3883-1-git-send-email-ynezz@true.cz>
+	<ADE657CA350FB648AAC2C43247A983F001F381FC498E@AUSP01VMBX24.collaborationhost.net>
+	<4DE560D8.3080304@bluewatersys.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC4A7E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 31, 2011 1:41 PM, Grant Likely wrote:
-> On Tue, May 31, 2011 at 1:49 PM, H Hartley Sweeten wrote:
->> The GPIO driver should reside in drivers/gpio.
->>
->> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->> Cc: Ryan Mallon <ryan@bluewatersys.com>
->> Cc: Grant Likely <grant.likely@secretlab.ca>
->>
->> ---
->>
->> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
->> index 342d634..7307302 100644
->> --- a/drivers/gpio/Kconfig
->> +++ b/drivers/gpio/Kconfig
->> @@ -86,6 +86,13 @@ config GPIO_IT8761E
->> ? ? ? ?help
->> ? ? ? ? ?Say yes here to support GPIO functionality of IT8761E super I/O chip.
->>
->> +config GPIO_EP93XX
->> + ? ? ? bool "Cirrus EP93xx GPIO support"
->> + ? ? ? depends on ARCH_EP93XX
->> + ? ? ? default y
->> + ? ? ? help
->> + ? ? ? ? Say yes here to support the Cirrus EP93xx GPIO peripheral.
->> +
+On Tuesday, May 31, 2011 2:43 PM, Ryan Mallon wrote:
+> On 01/06/11 05:24, H Hartley Sweeten wrote:
+>> On Tuesday, May 31, 2011 12:03 PM, Petr ?tetiar wrote:
+>>> On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
+>>> available, so use this one to reset the board instead of the soft reset in
+>>> CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
+>>> while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
+>>> so far.
+>>>
+>>> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+>>> Cc: Ryan Mallon <ryan@bluewatersys.com>
+>>> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+>>> ---
+>>>  arch/arm/mach-ep93xx/include/mach/system.h |   18 +++++++++++++-----
+>>>  1 files changed, 13 insertions(+), 5 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
+>>> index 6d661fe..2969786 100644
+>>> --- a/arch/arm/mach-ep93xx/include/mach/system.h
+>>> +++ b/arch/arm/mach-ep93xx/include/mach/system.h
+>>> @@ -2,7 +2,10 @@
+>>>   * arch/arm/mach-ep93xx/include/mach/system.h
+>>>   */
+>>>  
+>>> +#include <linux/io.h>
+>>> +
+>>>  #include <mach/hardware.h>
+>>> +#include <mach/ts72xx.h>
+>>>  
+>>>  static inline void arch_idle(void)
+>>>  {
+>>> @@ -13,11 +16,16 @@ static inline void arch_reset(char mode, const char *cmd)
+>>>  {
+>>>  	local_irq_disable();
+>>>  
+>>> -	/*
+>>> -	 * Set then clear the SWRST bit to initiate a software reset
+>>> -	 */
+>>> -	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+>>> -	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+>>> +	/* It's more reliable to use CPLD watchdog to perform the reset */
+>>> +	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
+>>> +	    board_is_ts7300() || board_is_ts7400()) {
+>>> +		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
+>>> +		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
+>>> +	} else {
+>>> +		/* Set then clear the SWRST bit to initiate a software reset */
+>>> +		ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+>>> +		ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+>>> +	}
+>>>  
+>>>  	while (1)
+>>>  		;
+>> 
+>> That looks better.
+>> 
+>> I pulled out the ts-7200 manual to verify the watchdog reset.  Your feeding
+>> the watchdog then changing the timeout period to 250ms.  Without the "else"
+>> the syscon would have tried to reset the board when the SWRST bit is toggled.
+>> 
+>> I have no way of testing this patch (no ts boards) but as long as Ryan has no
+>> objections you have my:
 >
-> Do you really want a user-visible Kconfig symbol here?  If it cannot
-> be built as a module, then I suspect that for most on-chip gpio
-> controllers they should just be enabled unconditionally on the SoC's
-> Kconfig symbol.
+> My only (nitpicky) complaint is to move the CPLD comment inside the if
+> block so that it is more clear that it relates to the ts7xxx boards.
+> Otherwise the patch is fine.
 
-Grant,
+Valid point.  The CPLD watchdog reset is a ts-xxxx specific thing.
 
-No, I a user-visible symbol is not needed.  Should I change this to:
+Petr, please move the comment as Ryan suggests.
 
-+config GPIO_EP93XX
-+ ? ? ? bool
-+ ? ? ? depends on ARCH_EP93XX
-+ ? ? ? default y
-
-Or like the Samsung drivers, without the visibility:
-
-+config GPIO_EP93XX
-+ ? ? ? bool
-+ ? ? ? depends on ARM
-+ ? ? ? default y if ARCH_EP93XX
-
-Also, should the help information remain with a hidden Kconfig symbol?
-
-Thanks,
+Regards,
 Hartley
