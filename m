@@ -1,30 +1,38 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 31 May 2011 15:14:06 -0600
-Subject: [PATCH 0/2] Tegra bugfixes for 3.0
-Message-ID: <1306876448-28147-1-git-send-email-swarren@nvidia.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 31 May 2011 23:18:25 +0200
+Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
+In-Reply-To: <4DE51EB7.7010606@stericsson.com>
+References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
+	<alpine.LFD.2.02.1105311236250.3078@ionos>
+	<4DE51EB7.7010606@stericsson.com>
+Message-ID: <BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Two fixes for Tegra boards:
+On Tue, May 31, 2011 at 7:00 PM, Mattias Wallin
+<mattias.wallin@stericsson.com> wrote:
+> On 05/31/2011 12:38 PM, Thomas Gleixner wrote:
 
-The first fixes a regression on board Harmony. Without this, some devices
-won't initialize correctly due to conflicting gpiolib base "addresses".
+>>> +++ b/include/linux/clksrc-db8500-prcmu.h
 
-The second could be considered a bugfix or a convenience. It's very
-useful, but less important than the Harmony fix if you need to merge
-just one:-)
+>> Huch, why needs this to be a separate head in include/linux ?
+>
+> I will move the header file to mach-ux500/include/mach/. Ok?
+>
+> (I have long time ago been thought to avoid include mach headers from the
+> drivers. But if I understand it correct it is not true any more and in this
+> case it certainly makes no sense since I break that rule myself.)
 
-Note: These were created against Linus's tree, a little after 3.0rc1, since
-the Tegra for-next is pretty stale. To be precise:
+Keeping it under include/linux is probably wise since we want drivers
+OUT of the ARM tree, but I don't know if there is much consensus on that?
 
-af0d6a0a3a30946f7df69c764791f1b0643f7cd6
-Merge branch 'x86-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/linux-2.6-tip
+I was more understanding the question as why it was needed at all.
 
-Stephen Warren (2):
-  ARM: Tegra: Harmony: Fix conflicting GPIO numbering
-  ARM: Tegra: Seaboard: Re-order sdhci device registration
+Does it work to register the clocksource with say a core_initcall()
+and avoid the header altogether?
 
- arch/arm/mach-tegra/board-harmony-power.c |    4 +++-
- arch/arm/mach-tegra/board-harmony.h       |    3 ++-
- arch/arm/mach-tegra/board-seaboard.c      |    4 ++--
- 3 files changed, 7 insertions(+), 4 deletions(-)
+Else a header is needed since we need to call out from the platform timer
+init function to this clocksource to register it.
+
+Thanks,
+Linus Walleij
