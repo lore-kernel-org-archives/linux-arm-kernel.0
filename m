@@ -1,110 +1,51 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 30 May 2011 17:16:34 -0700
-Subject: [PATCH 2/4] ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
-In-Reply-To: <1306767139-24763-3-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 30 May 2011 17:53:15 -0700
+Subject: [PATCH 1/4] gpio: gpio-mxc: add gpio driver for Freescale MXC
+	architecture
+In-Reply-To: <1306767139-24763-2-git-send-email-shawn.guo@linaro.org>
 References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
-	<1306767139-24763-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110531001634.GB3411@quad.lixom.net>
+	<1306767139-24763-2-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110531005315.GC3411@quad.lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, May 30, 2011 at 10:52:17PM +0800, Shawn Guo wrote:
-> It adds platform device for drivers/gpio/gpio-mxc, and migrates
-> mx50/mx51/mx53 gpio driver to gpio-mxc.
+On Mon, May 30, 2011 at 10:52:16PM +0800, Shawn Guo wrote:
+> Add gpio-mxc driver by copying arch/arm/plat-mxc/gpio.c into
+> drivers/gpio with the following changes.
 > 
+>  * Use readl/writel to replace mach-specific accessors
+>    __raw_readl/__raw_writel
+> 
+>  * Migrate to platform driver by adding .probe function
+> 
+>  * Add a list to save all mx2 ports references, so that
+>    mx2_gpio_irq_handler can walk through all interrupt status
+>    registers
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/plat-mxc/include/mach/gpio.h |    2 +
+>  drivers/gpio/Makefile                 |    1 +
+>  drivers/gpio/gpio-mxc.c               |  423 +++++++++++++++++++++++++++++++++
+>  3 files changed, 426 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/gpio/gpio-mxc.c
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/gpio.h b/arch/arm/plat-mxc/include/mach/gpio.h
+> index a2747f1..87bd4ef 100644
+> --- a/arch/arm/plat-mxc/include/mach/gpio.h
+> +++ b/arch/arm/plat-mxc/include/mach/gpio.h
+> @@ -37,7 +37,9 @@
+>  #define irq_to_gpio(irq)	((irq) - MXC_GPIO_IRQ_START)
+>  
+>  struct mxc_gpio_port {
+> +	struct list_head node;
+>  	void __iomem *base;
+> +	int id;
 
-[...]
-
-> diff --git a/arch/arm/plat-mxc/devices/platform-gpio-mxc.c b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
-> new file mode 100644
-> index 0000000..3b10da0
-> --- /dev/null
-> +++ b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
-> @@ -0,0 +1,69 @@
-> +/*
-> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-> + * Copyright 2011 Linaro Limited
-> + *
-> + * This program is free software; you can redistribute it and/or modify it under
-> + * the terms of the GNU General Public License version 2 as published by the
-> + * Free Software Foundation.
-> + */
-> +#include <linux/compiler.h>
-> +#include <linux/err.h>
-> +#include <linux/init.h>
-> +
-> +#include <mach/hardware.h>
-> +#include <mach/devices-common.h>
-> +
-> +static struct platform_device *__init mxc_add_gpio(int id,
-> +	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high)
-> +{
-> +	struct resource res[] = {
-> +		{
-> +			.start = iobase,
-> +			.end = iobase + iosize - 1,
-> +			.flags = IORESOURCE_MEM,
-> +		}, {
-> +			.start = irq,
-> +			.end = irq,
-> +			.flags = IORESOURCE_IRQ,
-> +		}, {
-> +			.start = irq_high,
-> +			.end = irq_high,
-> +			.flags = IORESOURCE_IRQ,
-> +		},
-> +	};
-> +
-> +	return platform_device_register_resndata(&mxc_aips_bus,
-> +			"gpio-mxc", id, res, ARRAY_SIZE(res), NULL, 0);
-
-Why bother returning the value, it's never checked below?
-
-> +static int __init mxc_add_mxc_gpio(void)
-
-Minor nits: Redundant mxcs? Also, 'gpios' would be more accurate naming.
-
-> +{
-> +	if (cpu_is_mx50()) {
-> +		mxc_add_gpio(0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
-> +		mxc_add_gpio(1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
-> +		mxc_add_gpio(2, MX50_GPIO3_BASE_ADDR, SZ_16K, MX50_INT_GPIO3_LOW, MX50_INT_GPIO3_HIGH);
-> +		mxc_add_gpio(3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
-> +		mxc_add_gpio(4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
-> +		mxc_add_gpio(5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
-> +	}
-> +
-> +	if (cpu_is_mx51()) {
-> +		mxc_add_gpio(0, MX51_GPIO1_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO1_LOW, MX51_MXC_INT_GPIO1_HIGH);
-> +		mxc_add_gpio(1, MX51_GPIO2_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO2_LOW, MX51_MXC_INT_GPIO2_HIGH);
-> +		mxc_add_gpio(2, MX51_GPIO3_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO3_LOW, MX51_MXC_INT_GPIO3_HIGH);
-> +		mxc_add_gpio(3, MX51_GPIO4_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO4_LOW, MX51_MXC_INT_GPIO4_HIGH);
-> +	}
-> +
-> +	if (cpu_is_mx53()) {
-> +		mxc_add_gpio(0, MX53_GPIO1_BASE_ADDR, SZ_16K, MX53_INT_GPIO1_LOW, MX53_INT_GPIO1_HIGH);
-> +		mxc_add_gpio(1, MX53_GPIO2_BASE_ADDR, SZ_16K, MX53_INT_GPIO2_LOW, MX53_INT_GPIO2_HIGH);
-> +		mxc_add_gpio(2, MX53_GPIO3_BASE_ADDR, SZ_16K, MX53_INT_GPIO3_LOW, MX53_INT_GPIO3_HIGH);
-> +		mxc_add_gpio(3, MX53_GPIO4_BASE_ADDR, SZ_16K, MX53_INT_GPIO4_LOW, MX53_INT_GPIO4_HIGH);
-> +		mxc_add_gpio(4, MX53_GPIO5_BASE_ADDR, SZ_16K, MX53_INT_GPIO5_LOW, MX53_INT_GPIO5_HIGH);
-> +		mxc_add_gpio(5, MX53_GPIO6_BASE_ADDR, SZ_16K, MX53_INT_GPIO6_LOW, MX53_INT_GPIO6_HIGH);
-> +		mxc_add_gpio(6, MX53_GPIO7_BASE_ADDR, SZ_16K, MX53_INT_GPIO7_LOW, MX53_INT_GPIO7_HIGH);
-> +	}
-
-The above tables are pretty crazy, and they only get worse later in the series
-when the other SoCs are added. Is it really worth it to have a common initcall
-entry for the various SoCs here?
-
-It'd seem cleaner to me to just call the registration function for the
-family you're running from in per-family-init code such as where it was
-removed above (irq init, which makes some sense since the gpios provide
-interrupt sources as well).
-
-It's different on OMAP since there it is data driven with a shared
-registration function, but here it's really just a hardcoded table
-(as code even, not as data) per SoC.
+What's id for? You assign it based on pdev->id in the probe function but
+never use it anywhere else.
 
 
 -Olof
