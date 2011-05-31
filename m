@@ -1,39 +1,40 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Tue, 31 May 2011 11:27:01 +0300
-Subject: [PATCHv2 2/2] omap: rx51: Don't power up speaker amplifier at bootup
-In-Reply-To: <1306830421-25727-1-git-send-email-jhnikula@gmail.com>
-References: <1306830421-25727-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <1306830421-25727-2-git-send-email-jhnikula@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 May 2011 10:29:06 +0200
+Subject: [PATCH 0/3] SPEAr320: Add pwm support
+In-Reply-To: <4DE46617.2000505@st.com>
+References: <cover.1306739836.git.viresh.kumar@st.com>
+	<201105301453.40314.arnd@arndb.de> <4DE46617.2000505@st.com>
+Message-ID: <201105311029.06214.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Speaker amplifier is accidentally powered up in early TWL gpio setup. This
-causes a few mA of needless battery current consumption. Without this patch
-the amplifier can be shutdown only by having one active audio playback and
-shutdown cycle to speaker output.
+On Tuesday 31 May 2011, viresh kumar wrote:
+> On 05/30/2011 06:23 PM, Arnd Bergmann wrote:
+> >> > Obviously this can be done, but as it has already taken too long for that
+> >> > framework to get added in mainline, and still we don't know how much more
+> >> > time it will take. I would suggest to push this patchset now. And i
+> >> > will update this accordingly once that framework comes up.
+> > Ok, makes sense.
+> > 
+> > How about starting a drivers/pwm directory though? I think we have
+> > broad support for the idea of moving drivers into their subsystems,
+> > so even if you don't change the code, I think it would be a better
+> > place than drivers/misc.
+> 
+> Ya, i can easily do it. I didn't do it earlier, because i thought people
+> might ask me to provide framework with it too. New folder with only my driver
+> as part of it might not be accepted. If nobody have any issues with it
+> i can send patch with required changes.
+> 
+> One more thing: Who will push drivers/pwm now?
+> @Andrew: Will that be you??
 
-Thanks to Kalle Jokiniemi <kalle.jokiniemi@nokia.com> for noticing the issue.
+I can start a branch once we have a new tree for the subarchitectures,
+then I'll use the same branch to collect patches that move the other
+pwm drivers from arch/arm and from drivers/misc, as well as the
+new framework from Sascha.
 
-Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
-Cc: Kalle Jokiniemi <kalle.jokiniemi@nokia.com>
----
-v2. Updated on top of commit bc593f5 ("arm: omap2plus: GPIO cleanup").
----
- arch/arm/mach-omap2/board-rx51-peripherals.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Note that this doesn't make me maintainer of pwm, that position is
+still open ;-)
 
-diff --git a/arch/arm/mach-omap2/board-rx51-peripherals.c b/arch/arm/mach-omap2/board-rx51-peripherals.c
-index 02a6587..9903667 100644
---- a/arch/arm/mach-omap2/board-rx51-peripherals.c
-+++ b/arch/arm/mach-omap2/board-rx51-peripherals.c
-@@ -583,7 +583,7 @@ static int rx51_twlgpio_setup(struct device *dev, unsigned gpio, unsigned n)
- {
- 	/* FIXME this gpio setup is just a placeholder for now */
- 	gpio_request_one(gpio + 6, GPIOF_OUT_INIT_LOW, "backlight_pwm");
--	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_HIGH, "speaker_en");
-+	gpio_request_one(gpio + 7, GPIOF_OUT_INIT_LOW, "speaker_en");
- 
- 	return 0;
- }
--- 
-1.7.4.4
+	Arnd
