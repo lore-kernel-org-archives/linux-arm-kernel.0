@@ -1,30 +1,26 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 31 May 2011 22:21:42 +0100
-Subject: [RFC PATCH v4] Consolidate SRAM support
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D234457@dbde02.ent.ti.com>
-References: <20110512174546.GB8633@n2100.arm.linux.org.uk>
-	<1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D234457@dbde02.ent.ti.com>
-Message-ID: <20110531212142.GA6700@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 31 May 2011 23:23:06 +0200 (CEST)
+Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
+In-Reply-To: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
+References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <alpine.LFD.2.02.1105312319530.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2011 at 10:39:48PM +0530, Nori, Sekhar wrote:
-> I also found some check patch errors. Feel free to merge
-> the attached patch.
+On Tue, 31 May 2011, Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> Use the new clockevents_config_and_register() function to register
+> the U300 clockevent, since that code requires ->cpumask to be set
+> we set this even on this UP system to please the framework.
 
-And this introduces another style issue...
+Hmm, how about whacking the framework maintainer on the head for that
+requirement?
 
-> diff --git a/arch/arm/plat-mxc/include/mach/iram.h b/arch/arm/plat-mxc/include/mach/iram.h
-> index 8279c47..aae5e35 100644
-> --- a/arch/arm/plat-mxc/include/mach/iram.h
-> +++ b/arch/arm/plat-mxc/include/mach/iram.h
-> @@ -31,7 +31,7 @@ static inline void *iram_alloc(size_t size, phys_addr_t *phys)
->  
->  	*phys = gen_pool_virt_to_phys(iram_pool, addr);
->  
-> -	return (void*)addr;
-> +	return (void *) addr;
+On UP this should be simply ignored and on SMP we can optimize that
+for all those architectures which come up with CPU0 in the first
+place.
 
-The style here is:
-	return (void *)addr;
+Thanks,
+
+	tglx
