@@ -1,64 +1,54 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Tue, 31 May 2011 18:47:57 +1000
-Subject: [PATCH 4/4] ARM: ep93xx: use more reliable CPLD watchdog for
-	reset on ts72xx
-In-Reply-To: <1306665346-26657-5-git-send-email-ynezz@true.cz>
-References: <1306665346-26657-1-git-send-email-ynezz@true.cz>
-	<1306665346-26657-5-git-send-email-ynezz@true.cz>
-Message-ID: <4DE4AB3D.2010305@bluewatersys.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 31 May 2011 10:52:48 +0200
+Subject: Freescale i.mx25 SDIO/Libertas issue
+In-Reply-To: <BANLkTika2NNTmWNBmLC60GVMLTzXUS5X+A@mail.gmail.com>
+References: <4DE2F84D.8080907@bluewatersys.com>
+	<BANLkTi=j3UXV6FMS6vkA+Vrpt3JjsNwMiA@mail.gmail.com>
+	<BANLkTika2NNTmWNBmLC60GVMLTzXUS5X+A@mail.gmail.com>
+Message-ID: <BANLkTinhWKj+QDrNjVnDNswYpiTkAijphw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/05/11 20:35, Petr ?tetiar wrote:
-> On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
-> available, so use this one to reset the board instead of the soft reset in
-> CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
-> while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
-> so far.
-> 
-> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
-> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
-> ---
->  arch/arm/mach-ep93xx/include/mach/system.h |   15 +++++++++++++++
->  1 files changed, 15 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
-> index 6d661fe..4d02ddd 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/system.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/system.h
-> @@ -3,6 +3,10 @@
->   */
->  
->  #include <mach/hardware.h>
-> +#ifdef CONFIG_MACH_TS72XX
-> +#include <linux/io.h>
-> +#include <mach/ts72xx.h>
-> +#endif
->  
->  static inline void arch_idle(void)
->  {
-> @@ -13,11 +17,22 @@ static inline void arch_reset(char mode, const char *cmd)
->  {
->  	local_irq_disable();
->  
-> +#ifdef CONFIG_MACH_TS72XX
-> +	/*
-> +	 * It's more reliable to use CPLD watchdog to perform the reset
-> +	 */
-> +	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
-> +	    board_is_ts7300() || board_is_ts7400()) {
-> +		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
-> +		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
-> +	}
-> +#else
->  	/*
->  	 * Set then clear the SWRST bit to initiate a software reset
->  	 */
->  	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
->  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-> +#endif
+On Tue, May 31, 2011 at 4:03 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Daniel,
+>
+> On Mon, May 30, 2011 at 6:50 AM, Daniel Mack <zonque@gmail.com> wrote:
+>> On Mon, May 30, 2011 at 3:52 AM, Andre Renaud <andre@bluewatersys.com> wrote:
+>>> Hello,
+>>> I am trying to use a Wi2Wi 802.11b/g (W2CBW009S) module attached to an
+>>> i.MX25 cpu, specifically the i.MX25 PDK from freescale, although I've
+>>> also tried it on a DeviceSolutions Topaz i.MX25. However it is unable to
+>>> fully load the driver, leaving me with the following in the logs:
+>>> [ ? 30.149097] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>>> command 0x00a9 timed out
+>>> [ ? 30.153759] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>>> Timeout submitting command 0x00a9
+>>> [ ? 30.158843] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>>> PREP_CMD: command 0x00a9 failed: -110
+>>> [ ? 30.164126] libertas_sdio mmc0:0001:1: (unregistered net_device):
+>>> CMD_FUNC_INIT cmd failed
+>>> This wifi chip is based around the Marvell 8688 core.
+>>>
+>>> I have also tried using an 8686 device, and in that case it is unable to
+>>> even complete loading the firmware, failing with the following:
+>>> [ ? 14.753132] libertas_sdio: Firmware req_size: 17
+>>> [ ? 14.755713] libertas_sdio: failed to load firmware: -5
+>>> [ ? 14.759272] libertas_sdio: probe of mmc0:0001:1 failed with error -5
+>>> Note: I added the 'req_size: ' debugging message in
+>>
+>> I assume this error happens after the driver uploaded the helper
+>> firmware and switched to multi-block transfers?
+>>
+>> Which kernel version are you working on? I'm asking because I fixed a
+>> similar bug some months ago which I happend to see an a MX31 CPU with
+>> a 8686 attach to the SDIO bus. The MX3 MMC controller has bug severe
+>> bug in its CRC calculation code which causes multi-block transfers on
+>> a 4-bit bus to fail, and hence the only solution was to switch to a
+>> 1-bit bus. But I don't known whether this also affects MX25 cores.
+>
+> The MX25 has a different SD controller (eSDHC) than the one found on
+> MX31 and such issue is not present.
 
-Do we need the ifdef here? Isn't the if (board_is_xxx) test enough?
+Ah ok. Thanks for the clarification.
 
-~Ryan
+Daniel
