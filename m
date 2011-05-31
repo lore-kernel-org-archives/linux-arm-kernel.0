@@ -1,81 +1,106 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Tue, 31 May 2011 16:29:54 +0200
-Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
-	locks up on ARM
-In-Reply-To: <4DE4F66D.9040101@monstr.eu>
-References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
-	<1306405979.1200.63.camel@twins>
-	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
-	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
-	<20110526122623.GA11875@elte.hu>
-	<20110526123137.GG24876@n2100.arm.linux.org.uk>
-	<20110526125007.GA27083@elte.hu>
-	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
-	<20110527120629.GA32617@elte.hu>
-	<20110527205240.GT24876@n2100.arm.linux.org.uk>
-	<1306588381.2497.481.camel@laptop>  <4DE4CC33.7090404@petalogix.com>
-	<1306848137.2353.91.camel@twins>  <4DE4EF1B.80805@monstr.eu>
-	<1306849951.2353.108.camel@twins>  <4DE4F66D.9040101@monstr.eu>
-Message-ID: <1306852194.2353.135.camel@twins>
+From: kishorek.kadiyala@gmail.com (Kishore Kadiyala)
+Date: Tue, 31 May 2011 20:11:48 +0530
+Subject: [PATCH 2/2] ARM: OMAP4: MMC: no regulator off during probe for
+	eMMC
+In-Reply-To: <1306765534-20103-3-git-send-email-balajitk@ti.com>
+References: <1306765534-20103-1-git-send-email-balajitk@ti.com>
+	<1306765534-20103-3-git-send-email-balajitk@ti.com>
+Message-ID: <BANLkTiks92tGJfaTVW2b7DTmU0SuQpbZ4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-05-31 at 16:08 +0200, Michal Simek wrote:
-> Peter Zijlstra wrote:
+On Mon, May 30, 2011 at 7:55 PM, Balaji T K <balajitk@ti.com> wrote:
+> eMMC does not handle power off when not in sleep state,
+> Skip regulator disable during probe when eMMC is
+> not in known state - state left by bootloader.
+>
+> Resolves eMMC failure on OMAP4
+> mmc0: error -110 whilst initialising MMC card
+>
+> Signed-off-by: Balaji T K <balajitk@ti.com>
 
-> >> I would like to also check some things.
-> >> 1. When schedule should be called from arch specific code?
-> >> Currently we are calling schedule after syscall/exception/interrupt happen.
-> >> Is there any place where schedule should/shouldn't be called?
-> > 
-> > It should be called on the return to userspace path when
-> > TIF_NEED_RESCHED is set. 
-> 
-> Yes, we do that. (PTO + PT_MODE stores if return is to kernel or user space)
-> 
-> It should not be called from non-preemptible
-> > contexts like non-zero preempt_count or IRQ-disabled.
-> 
-> Is this even when the return is to userspace?
+Tested-by:  Kishore Kadiyala <kishore.kadiyala@ti.com>
+Acked-by:  Kishore Kadiyala <kishore.kadiyala@ti.com>
 
-Well, return to userspace should have preempt_count == 0 and IRQs
-enabled, right?
-
-> PREEMPT is not well tested feature but maybe it is right time to do so.
-> There is only small part of code (ifdef CONFIG_PREEMPT) when irq happen and 
-> there is return to the kernel. Is this correct?
-
-I think so, never looked too closely, Ingo?
-
-> > [ with the exception of CONFIG_PREEMPT which calls preempt_schedule()
-> > which checks both those things ]
-> 
-> This is called only when IRQ happen right? We call preempt_schedule_irq because 
-> irq are off and IRQ is ON by rtid below IRQ_return label.
-
-Ah, there's also preempt_schedule_irq(), which can be called with
-IRQs-disabled, not sure about the rules there though, Ingo?
-
-> > 
-> >> 2. For syscall and exception handling - interrupt is ON but it is only masked.
-> > 
-> > I'm having trouble understanding: on but masked.
-> 
-> Interrupt can't happen because some masking bits are setup. If you call 
-> irgs_disabled() or others you will get that IRQ is ON but can't happen.
-
-Ah, we generally ignore that state and only rely on state modified by
-local_irq_enable/disable(), eg. your MSR_IE bit.
-
-> >> When schedule is called from that any code has to enable IRQ if generic code 
-> >> doesn't do that. Not sure if it does.
-> > 
-> > generic code isn't supposed to call schedule() with IRQs disabled (and
-> > doesn't afaik)
-> 
-> OK. Which means I have to disable IRQ before schedule is called. Is that correct?
-
-Hum, I might have mis-understood. No, schedule() assumes IRQs are
-enabled and will disable IRQs itself quite early:
-
-        raw_spin_lock_irq(&rq->lock);
+> ---
+> ?arch/arm/mach-omap2/board-4430sdp.c ? | ? ?1 +
+> ?arch/arm/mach-omap2/hsmmc.c ? ? ? ? ? | ? ?3 +++
+> ?arch/arm/mach-omap2/hsmmc.h ? ? ? ? ? | ? ?1 +
+> ?arch/arm/plat-omap/include/plat/mmc.h | ? ?3 +++
+> ?drivers/mmc/host/omap_hsmmc.c ? ? ? ? | ? ?3 +++
+> ?5 files changed, 11 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index 73fa90b..b324605 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -322,6 +322,7 @@ static struct omap2_hsmmc_info mmc[] = {
+> ? ? ? ? ? ? ? ?.gpio_wp ? ? ? ?= -EINVAL,
+> ? ? ? ? ? ? ? ?.nonremovable ? = true,
+> ? ? ? ? ? ? ? ?.ocr_mask ? ? ? = MMC_VDD_29_30,
+> + ? ? ? ? ? ? ? .no_off_init ? ?= true,
+> ? ? ? ?},
+> ? ? ? ?{
+> ? ? ? ? ? ? ? ?.mmc ? ? ? ? ? ?= 1,
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index 3f8dc16..28ca144 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -338,6 +338,9 @@ static int __init omap_hsmmc_pdata_init(struct omap2_hsmmc_info *c,
+> ? ? ? ?if (c->no_off)
+> ? ? ? ? ? ? ? ?mmc->slots[0].no_off = 1;
+>
+> + ? ? ? if (c->no_off_init)
+> + ? ? ? ? ? ? ? mmc->slots[0].no_regulator_off_init = c->no_off_init;
+> +
+> ? ? ? ?if (c->vcc_aux_disable_is_sleep)
+> ? ? ? ? ? ? ? ?mmc->slots[0].vcc_aux_disable_is_sleep = 1;
+>
+> diff --git a/arch/arm/mach-omap2/hsmmc.h b/arch/arm/mach-omap2/hsmmc.h
+> index f119348..f757e78 100644
+> --- a/arch/arm/mach-omap2/hsmmc.h
+> +++ b/arch/arm/mach-omap2/hsmmc.h
+> @@ -18,6 +18,7 @@ struct omap2_hsmmc_info {
+> ? ? ? ?bool ? ?nonremovable; ? /* Nonremovable e.g. eMMC */
+> ? ? ? ?bool ? ?power_saving; ? /* Try to sleep or power off when possible */
+> ? ? ? ?bool ? ?no_off; ? ? ? ? /* power_saving and power is not to go off */
+> + ? ? ? bool ? ?no_off_init; ? ?/* no power off when not in MMC sleep state */
+> ? ? ? ?bool ? ?vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
+> ? ? ? ?int ? ? gpio_cd; ? ? ? ?/* or -EINVAL */
+> ? ? ? ?int ? ? gpio_wp; ? ? ? ?/* or -EINVAL */
+> diff --git a/arch/arm/plat-omap/include/plat/mmc.h b/arch/arm/plat-omap/include/plat/mmc.h
+> index f38fef9..c7b8741 100644
+> --- a/arch/arm/plat-omap/include/plat/mmc.h
+> +++ b/arch/arm/plat-omap/include/plat/mmc.h
+> @@ -101,6 +101,9 @@ struct omap_mmc_platform_data {
+> ? ? ? ? ? ? ? ?/* If using power_saving and the MMC power is not to go off */
+> ? ? ? ? ? ? ? ?unsigned no_off:1;
+>
+> + ? ? ? ? ? ? ? /* eMMC does not handle power off when not in sleep state */
+> + ? ? ? ? ? ? ? unsigned no_regulator_off_init:1;
+> +
+> ? ? ? ? ? ? ? ?/* Regulator off remapped to sleep */
+> ? ? ? ? ? ? ? ?unsigned vcc_aux_disable_is_sleep:1;
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 259ece0..5b2e215 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -435,6 +435,9 @@ static int omap_hsmmc_reg_get(struct omap_hsmmc_host *host)
+> ? ? ? ? ? ? ? ?reg = regulator_get(host->dev, "vmmc_aux");
+> ? ? ? ? ? ? ? ?host->vcc_aux = IS_ERR(reg) ? NULL : reg;
+>
+> + ? ? ? ? ? ? ? /* For eMMC do not power off when not in sleep state */
+> + ? ? ? ? ? ? ? if (mmc_slot(host).no_regulator_off_init)
+> + ? ? ? ? ? ? ? ? ? ? ? return 0;
+> ? ? ? ? ? ? ? ?/*
+> ? ? ? ? ? ? ? ?* UGLY HACK: ?workaround regulator framework bugs.
+> ? ? ? ? ? ? ? ?* When the bootloader leaves a supply active, it's
+> --
+> 1.7.0.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
