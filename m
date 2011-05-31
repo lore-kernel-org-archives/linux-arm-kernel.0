@@ -1,104 +1,125 @@
-From: andre@bluewatersys.com (Andre Renaud)
-Date: Tue, 31 May 2011 14:14:46 +1200
-Subject: Freescale i.mx25 SDIO/Libertas issue
-In-Reply-To: <4DE2F84D.8080907@bluewatersys.com>
-References: <4DE2F84D.8080907@bluewatersys.com>
-Message-ID: <4DE44F16.8050407@bluewatersys.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 31 May 2011 10:47:30 +0800
+Subject: [PATCH 2/4] ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
+In-Reply-To: <20110531001634.GB3411@quad.lixom.net>
+References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
+	<1306767139-24763-3-git-send-email-shawn.guo@linaro.org>
+	<20110531001634.GB3411@quad.lixom.net>
+Message-ID: <20110531024729.GB31928@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/05/11 13:52, Andre Renaud wrote:
-> Hello,
-> I am trying to use a Wi2Wi 802.11b/g (W2CBW009S) module attached to an
-> i.MX25 cpu, specifically the i.MX25 PDK from freescale, although I've
-> also tried it on a DeviceSolutions Topaz i.MX25. However it is unable to
-> fully load the driver, leaving me with the following in the logs:
-> [   30.149097] libertas_sdio mmc0:0001:1: (unregistered net_device):
-> command 0x00a9 timed out
-> [   30.153759] libertas_sdio mmc0:0001:1: (unregistered net_device):
-> Timeout submitting command 0x00a9
-> [   30.158843] libertas_sdio mmc0:0001:1: (unregistered net_device):
-> PREP_CMD: command 0x00a9 failed: -110
-> [   30.164126] libertas_sdio mmc0:0001:1: (unregistered net_device):
-> CMD_FUNC_INIT cmd failed
-> This wifi chip is based around the Marvell 8688 core.
+On Mon, May 30, 2011 at 05:16:34PM -0700, Olof Johansson wrote:
+> Hi,
 > 
-> I have also tried using an 8686 device, and in that case it is unable to
-> even complete loading the firmware, failing with the following:
-> [   14.753132] libertas_sdio: Firmware req_size: 17
-> [   14.755713] libertas_sdio: failed to load firmware: -5
-> [   14.759272] libertas_sdio: probe of mmc0:0001:1 failed with error -5
-> Note: I added the 'req_size: ' debugging message in
+> On Mon, May 30, 2011 at 10:52:17PM +0800, Shawn Guo wrote:
+> > It adds platform device for drivers/gpio/gpio-mxc, and migrates
+> > mx50/mx51/mx53 gpio driver to gpio-mxc.
+> > 
 > 
-> Has anyone successfully used the i.MX25 SDIO controller with anything
-> other than straight MMC cards (which seem to work fine in the setup that
-> I have)?
+> [...]
+> 
+> > diff --git a/arch/arm/plat-mxc/devices/platform-gpio-mxc.c b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
+> > new file mode 100644
+> > index 0000000..3b10da0
+> > --- /dev/null
+> > +++ b/arch/arm/plat-mxc/devices/platform-gpio-mxc.c
+> > @@ -0,0 +1,69 @@
+> > +/*
+> > + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> > + * Copyright 2011 Linaro Limited
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify it under
+> > + * the terms of the GNU General Public License version 2 as published by the
+> > + * Free Software Foundation.
+> > + */
+> > +#include <linux/compiler.h>
+> > +#include <linux/err.h>
+> > +#include <linux/init.h>
+> > +
+> > +#include <mach/hardware.h>
+> > +#include <mach/devices-common.h>
+> > +
+> > +static struct platform_device *__init mxc_add_gpio(int id,
+> > +	resource_size_t iobase, resource_size_t iosize, int irq, int irq_high)
+> > +{
+> > +	struct resource res[] = {
+> > +		{
+> > +			.start = iobase,
+> > +			.end = iobase + iosize - 1,
+> > +			.flags = IORESOURCE_MEM,
+> > +		}, {
+> > +			.start = irq,
+> > +			.end = irq,
+> > +			.flags = IORESOURCE_IRQ,
+> > +		}, {
+> > +			.start = irq_high,
+> > +			.end = irq_high,
+> > +			.flags = IORESOURCE_IRQ,
+> > +		},
+> > +	};
+> > +
+> > +	return platform_device_register_resndata(&mxc_aips_bus,
+> > +			"gpio-mxc", id, res, ARRAY_SIZE(res), NULL, 0);
+> 
+> Why bother returning the value, it's never checked below?
+> 
+Please help me understand.  You are saying the return value should be
+checked below?
 
-If I enable the libertas debugging details, I get some more information:
+> > +static int __init mxc_add_mxc_gpio(void)
+> 
+> Minor nits: Redundant mxcs? Also, 'gpios' would be more accurate naming.
+> 
+The first one is the namespace of plat-mxc function, and the second
+one is to reflect gpio driver name 'mxc gpio'.
 
-libertas sdio: waiting for firmware to boot...
-mmc0: starting CMD52 arg 10008000 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001000 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008200 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001000 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008000 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001000 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008200 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001000 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008000 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001000 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008200 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001000 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008000 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 000010dc 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008200 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 000010fe 00000000 00000000 00000000
-libertas sdio: Firmware loaded
-mmc0: starting CMD52 arg 80022000 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001000 00000000 00000000 00000000
-mmc0: starting CMD52 arg 80022201 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001001 00000000 00000000 00000000
-mmc0: starting CMD52 arg 10008600 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001005 00000000 00000000 00000000
-mmc0: starting CMD52 arg 9000080f flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 0000100f 00000000 00000000 00000000
-libertas sdio: send function INIT command
-libertas cmd: DNLD_CMD: command 0x00a9, seq 1, size 8
-mmc0: starting CMD52 arg 10004000 flags 00000195
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000001
-mmc0: req done (CMD52): 0: 00001009 00000000 00000000 00000000
-mmc0: starting CMD53 arg 9200000c flags 000001b5
-mmc0:     blksz 12 blocks 1 flags 00000100 tsac 1000 ms nsac 0
-sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x0000000b
-mmc0: req done (CMD53): 0: 00002000 00000000 00000000 00000000
-mmc0:     12 bytes transferred: 0
-libertas_sdio mmc0:0001:1: (unregistered net_device): command 0x00a9
-timed out
-libertas_sdio mmc0:0001:1: (unregistered net_device): Timeout submitting
-command 0x00a9
-libertas_sdio mmc0:0001:1: (unregistered net_device): PREP_CMD: command
-0x00a9 failed: -110
-libertas_sdio mmc0:0001:1: (unregistered net_device): CMD_FUNC_INIT cmd
-failed
+> > +{
+> > +	if (cpu_is_mx50()) {
+> > +		mxc_add_gpio(0, MX50_GPIO1_BASE_ADDR, SZ_16K, MX50_INT_GPIO1_LOW, MX50_INT_GPIO1_HIGH);
+> > +		mxc_add_gpio(1, MX50_GPIO2_BASE_ADDR, SZ_16K, MX50_INT_GPIO2_LOW, MX50_INT_GPIO2_HIGH);
+> > +		mxc_add_gpio(2, MX50_GPIO3_BASE_ADDR, SZ_16K, MX50_INT_GPIO3_LOW, MX50_INT_GPIO3_HIGH);
+> > +		mxc_add_gpio(3, MX50_GPIO4_BASE_ADDR, SZ_16K, MX50_INT_GPIO4_LOW, MX50_INT_GPIO4_HIGH);
+> > +		mxc_add_gpio(4, MX50_GPIO5_BASE_ADDR, SZ_16K, MX50_INT_GPIO5_LOW, MX50_INT_GPIO5_HIGH);
+> > +		mxc_add_gpio(5, MX50_GPIO6_BASE_ADDR, SZ_16K, MX50_INT_GPIO6_LOW, MX50_INT_GPIO6_HIGH);
+> > +	}
+> > +
+> > +	if (cpu_is_mx51()) {
+> > +		mxc_add_gpio(0, MX51_GPIO1_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO1_LOW, MX51_MXC_INT_GPIO1_HIGH);
+> > +		mxc_add_gpio(1, MX51_GPIO2_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO2_LOW, MX51_MXC_INT_GPIO2_HIGH);
+> > +		mxc_add_gpio(2, MX51_GPIO3_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO3_LOW, MX51_MXC_INT_GPIO3_HIGH);
+> > +		mxc_add_gpio(3, MX51_GPIO4_BASE_ADDR, SZ_16K, MX51_MXC_INT_GPIO4_LOW, MX51_MXC_INT_GPIO4_HIGH);
+> > +	}
+> > +
+> > +	if (cpu_is_mx53()) {
+> > +		mxc_add_gpio(0, MX53_GPIO1_BASE_ADDR, SZ_16K, MX53_INT_GPIO1_LOW, MX53_INT_GPIO1_HIGH);
+> > +		mxc_add_gpio(1, MX53_GPIO2_BASE_ADDR, SZ_16K, MX53_INT_GPIO2_LOW, MX53_INT_GPIO2_HIGH);
+> > +		mxc_add_gpio(2, MX53_GPIO3_BASE_ADDR, SZ_16K, MX53_INT_GPIO3_LOW, MX53_INT_GPIO3_HIGH);
+> > +		mxc_add_gpio(3, MX53_GPIO4_BASE_ADDR, SZ_16K, MX53_INT_GPIO4_LOW, MX53_INT_GPIO4_HIGH);
+> > +		mxc_add_gpio(4, MX53_GPIO5_BASE_ADDR, SZ_16K, MX53_INT_GPIO5_LOW, MX53_INT_GPIO5_HIGH);
+> > +		mxc_add_gpio(5, MX53_GPIO6_BASE_ADDR, SZ_16K, MX53_INT_GPIO6_LOW, MX53_INT_GPIO6_HIGH);
+> > +		mxc_add_gpio(6, MX53_GPIO7_BASE_ADDR, SZ_16K, MX53_INT_GPIO7_LOW, MX53_INT_GPIO7_HIGH);
+> > +	}
+> 
+> The above tables are pretty crazy, and they only get worse later in the series
+> when the other SoCs are added. Is it really worth it to have a common initcall
+> entry for the various SoCs here?
+> 
+This common initcall seems a good place to concentrate the gpio device
+registration.  It's easy to look at the common/different things among
+these SoCs.  The only problem you reminded me is the scanning of the
+long cpu_is_mx list.  It can be optimized a little bit by sorting the
+list from the latest (most used) SoC to the oldest (least used) one,
+and breaking out the scanning immediately when hitting one.
 
-This seems to imply that the unit is correctly loading the firmware, and
-then when it determines that the firmware has loaded, and tries to issue
-the CMD_FUNC_INIT command, this times out.
+> It'd seem cleaner to me to just call the registration function for the
+> family you're running from in per-family-init code such as where it was
+> removed above (irq init, which makes some sense since the gpios provide
+> interrupt sources as well).
+> 
+I just gave it a test, and it's not working at all.  (too early
+to register device in irq init?)
 
-Can anyone explain how I can begin debugging this, or confirm if they've
-had this operate on the sdhci-esdhc-imx controller present in the i.MX25?
-
+-- 
 Regards,
-Andre
+Shawn
