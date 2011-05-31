@@ -1,60 +1,61 @@
-From: rientjes@google.com (David Rientjes)
-Date: Tue, 31 May 2011 15:11:40 -0700 (PDT)
-Subject: IrDA driver fails on PXA255
-In-Reply-To: <20110531210027.GA3660@n2100.arm.linux.org.uk>
-References: <20110528205701.GA1788@doriath.ww600.siemens.net>
-	<alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
-	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
-	<alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
-	<20110529215656.GA5576@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
-	<20110531072650.GC21382@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
-	<20110531210027.GA3660@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1105311501570.16259@chino.kir.corp.google.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 31 May 2011 17:37:08 -0500
+Subject: [PATCH] gpio: ep93xx: move driver to drivers/gpio
+In-Reply-To: <BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
+References: <201105311249.30372.hartleys@visionengravers.com>
+	<BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC4A77@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 May 2011, Russell King - ARM Linux wrote:
+On Tuesday, May 31, 2011 1:41 PM, Grant Likely wrote:
+> On Tue, May 31, 2011 at 1:49 PM, H Hartley Sweeten wrote:
+>> The GPIO driver should reside in drivers/gpio.
+>>
+>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>> Cc: Ryan Mallon <ryan@bluewatersys.com>
+>> Cc: Grant Likely <grant.likely@secretlab.ca>
+>>
+>> ---
+>>
+>> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+>> index 342d634..7307302 100644
+>> --- a/drivers/gpio/Kconfig
+>> +++ b/drivers/gpio/Kconfig
+>> @@ -86,6 +86,13 @@ config GPIO_IT8761E
+>> ? ? ? ?help
+>> ? ? ? ? ?Say yes here to support GPIO functionality of IT8761E super I/O chip.
+>>
+>> +config GPIO_EP93XX
+>> + ? ? ? bool "Cirrus EP93xx GPIO support"
+>> + ? ? ? depends on ARCH_EP93XX
+>> + ? ? ? default y
+>> + ? ? ? help
+>> + ? ? ? ? Say yes here to support the Cirrus EP93xx GPIO peripheral.
+>> +
+>
+> Do you really want a user-visible Kconfig symbol here?  If it cannot
+> be built as a module, then I suspect that for most on-chip gpio
+> controllers they should just be enabled unconditionally on the SoC's
+> Kconfig symbol.
 
-> > The problem certainly isn't being ignored in this thread, or in the patch 
-> > that I sent to fix Dmitry's issue by default, so that doesn't seem to be 
-> > the case.  What would be ignored, though, is if it just emitted a 
-> > WARN_ON() without failing the allocation so everything works perfectly.
-> 
-> Sorry, you did not send a patch to fix it.  You sent a *bodge* to enable
-> the DMA zone.  As long as you insist that's a valid fix, you're going
-> to carry zero credibility with me.
-> 
-> The fact is that this driver should not be using GFP_DMA to allocate
-> things which aren't even DMA buffers, and its use of GFP_DMA should be
-> removed.  But rather than look at that and work it out, and then produce
-> a patch to sort that out, the only thing you can do is come up with
-> bodge to enable the DMA zone, and continue to insist that's the right
-> solution.
-> 
+Grant,
 
-I'm not going to hack on an arm driver when I have no idea what its DMA 
-requirements are and have no ability to test the change.  I'll rely on the 
-authors or maintainers of that driver to figure it out.  In the meantime, 
-I suggested enabling CONFIG_ZONE_DMA for that driver because, in its 
-current state, it is using GFP_DMA and you haven't provided a single 
-reason why enabling CONFIG_ZONE_DMA is going to cause an issue.
+No, I a user-visible symbol is not needed.  Should I change this to:
 
-In other words, I cannot do your work for you: if GFP_DMA can be removed 
-from that driver, great, in the meantime it should enable CONFIG_ZONE_DMA 
-to fix the invalid configurations that are currently allowed.  It's 
-simple: if you're going to pass GFP_DMA to the page allocator, you need to 
-require CONFIG_ZONE_DMA for it to be useful.  Anything else is an invalid 
-configuration and is error prone.
++config GPIO_EP93XX
++ ? ? ? bool
++ ? ? ? depends on ARCH_EP93XX
++ ? ? ? default y
 
-> Your whinge that we should re-enable the DMA zone which has been
-> disabled for quite a long time now to work around this new restriction
-> is extremely idiotic.
-> 
+Or like the Samsung drivers, without the visibility:
 
-The restriction isn't new: GFP_DMA only makes sense with CONFIG_ZONE_DMA.  
-The fact that the page allocator completely ignored GFP_DMA in the past 
-for CONFIG_ZONE_DMA=n doesn't change that.  That's obviously error prone 
-since it will return memory from anywhere simply because of the fact that 
-it is an invalid configuration.
++config GPIO_EP93XX
++ ? ? ? bool
++ ? ? ? depends on ARM
++ ? ? ? default y if ARCH_EP93XX
+
+Also, should the help information remain with a hidden Kconfig symbol?
+
+Thanks,
+Hartley
