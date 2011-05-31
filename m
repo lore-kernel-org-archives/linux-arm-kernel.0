@@ -1,92 +1,26 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 May 2011 04:12:46 -0700
-Subject: [PATCH] arm: omap2plus: fix ads7846 pendown gpio request
-In-Reply-To: <4DDE5C8B.7030308@compulab.co.il>
-References: <1304521495-20578-1-git-send-email-grinberg@compulab.co.il>
-	<4DC18B64.2020903@gmail.com> <4DCA3C56.9020502@compulab.co.il>
-	<4DDE5C8B.7030308@compulab.co.il>
-Message-ID: <20110531111246.GX11352@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 May 2011 13:28:17 +0200
+Subject: [PATCH 2/4] ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
+In-Reply-To: <20110531103011.GB32096@S2100-06.ap.freescale.net>
+References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
+	<201105311026.11947.arnd@arndb.de>
+	<20110531103011.GB32096@S2100-06.ap.freescale.net>
+Message-ID: <201105311328.18012.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Igor Grinberg <grinberg@compulab.co.il> [110526 06:54]:
-> ping
-> 
-> On 05/11/11 10:35, Igor Grinberg wrote:
-> 
-> > Tony,
-> >
-> >
-> > You can fold this one to the original patch from Mike as well,
-> >
-> > or do you want it into the rc1?
+On Tuesday 31 May 2011, Shawn Guo wrote:
+> > Just open-code the mxc_add_mxc_gpio() by moving the individual calls to
+> > mxc_add_gpio() into the respective callers. Having a global
+> > mxc_add_mxc_gpio() function that does something different for each
+> > caller seems entirely pointless to me.
+> > 
+> Right now, mxc_add_mxc_gpio() is a postcore_initcall.  Moving
+> individual mxc_add_gpio() call into irq_init function does not work.
+> And I need to find a proper caller for each SoC to call mxc_add_gpio
+> to register gpio devices.
+ 
+Why not init_machine? That is an arch_initcall(), so it's probably close
+enough.
 
-Thanks adding to fixes.
-
-Tony
-
-> >
-> >
-> >
-> > On 05/04/11 20:22, Thomas Weber wrote:
-> >
-> >> Am 04.05.2011 17:04, schrieb Igor Grinberg:
-> >>> introduced by: 96974a24
-> >>> (omap: consolidate touch screen initialization among different boards)
-> >>>
-> >>> ads7846 driver can use either gpio_pendown or get_pendown_state()
-> >>> callback. In case of gpio_pendown, it requests the provided gpio_pendown
-> >>> thus resulting in double requesting that gpio:
-> >>>
-> >>> ads7846 spi1.0: failed to request pendown GPIO57
-> >>> ads7846: probe of spi1.0 failed with error -16
-> >>>
-> >>> Fix this by restricting the gpio request to the case of
-> >>> get_pendown_state() callback is used.
-> >>>
-> >>> Signed-off-by: Igor Grinberg<grinberg@compulab.co.il>
-> >>> ---
-> >>>   arch/arm/mach-omap2/common-board-devices.c |   20 ++++++++++----------
-> >>>   1 files changed, 10 insertions(+), 10 deletions(-)
-> >>>
-> >>> diff --git a/arch/arm/mach-omap2/common-board-devices.c b/arch/arm/mach-omap2/common-board-devices.c
-> >>> index d57c71d..61fee80 100644
-> >>> --- a/arch/arm/mach-omap2/common-board-devices.c
-> >>> +++ b/arch/arm/mach-omap2/common-board-devices.c
-> >>> @@ -83,17 +83,17 @@ void __init omap_ads7846_init(int bus_num, int gpio_pendown, int gpio_debounce,
-> >>>       struct spi_board_info *spi_bi =&ads7846_spi_board_info;
-> >>>       int err;
-> >>>
-> >>> -    err = gpio_request(gpio_pendown, "TS PenDown");
-> >>> -    if (err) {
-> >>> -        pr_err("Could not obtain gpio for TS PenDown: %d\n", err);
-> >>> -        return;
-> >>> -    }
-> >>> -
-> >>> -    gpio_direction_input(gpio_pendown);
-> >>> -    gpio_export(gpio_pendown, 0);
-> >>> +    if (board_pdata&&  board_pdata->get_pendown_state) {
-> >>> +        err = gpio_request_one(gpio_pendown, GPIOF_IN, "TSPenDown");
-> >>> +        if (err) {
-> >>> +            pr_err("Couldn't obtain gpio for TSPenDown: %d\n", err);
-> >>> +            return;
-> >>> +        }
-> >>> +        gpio_export(gpio_pendown, 0);
-> >>>
-> >>> -    if (gpio_debounce)
-> >>> -        gpio_set_debounce(gpio_pendown, gpio_debounce);
-> >>> +        if (gpio_debounce)
-> >>> +            gpio_set_debounce(gpio_pendown, gpio_debounce);
-> >>> +    }
-> >>>
-> >>>       ads7846_config.gpio_pendown = gpio_pendown;
-> >>>
-> >> Tested-by: Thomas Weber <weber@corscience.de>
-> >>
-> >> On Devkit8000.
-> >>
-> 
-> -- 
-> Regards,
-> Igor.
-> 
+	Arnd
