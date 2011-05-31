@@ -1,28 +1,33 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Tue, 31 May 2011 21:23:49 +0800
-Subject: [PATCH v2] ARM: OMAP2: Add missing include of linux/gpio.h
-In-Reply-To: <20110531131812.GP11352@atomide.com>
-References: <1306846544.30148.1.camel@phoenix>
-	<20110531131812.GP11352@atomide.com>
-Message-ID: <BANLkTi=JtnWtoWUOytjcqqvYsQde_SLr9w@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 31 May 2011 06:26:15 -0700
+Subject: [PATCH 2/2] ARM: OMAP4: MMC: no regulator off during probe for
+	eMMC
+In-Reply-To: <1306765534-20103-3-git-send-email-balajitk@ti.com>
+References: <1306765534-20103-1-git-send-email-balajitk@ti.com>
+	<1306765534-20103-3-git-send-email-balajitk@ti.com>
+Message-ID: <20110531132614.GR11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/31 Tony Lindgren <tony@atomide.com>:
-> * Axel Lin <axel.lin@gmail.com> [110531 05:51]:
->> I got some build error like below while executing "make omap2plus_defconfig".
->>
->> ? CC ? ? ?arch/arm/mach-omap2/board-2430sdp.o
->> arch/arm/mach-omap2/board-2430sdp.c: In function 'omap_2430sdp_init':
->> arch/arm/mach-omap2/board-2430sdp.c:247: error: 'GPIOF_OUT_INIT_LOW' undeclared (first use in this function)
->> arch/arm/mach-omap2/board-2430sdp.c:247: error: (Each undeclared identifier is reported only once
->> arch/arm/mach-omap2/board-2430sdp.c:247: error: for each function it appears in.)
->>
->> This patch fixes the build error by include linux/gpio.h instead of mach/gpio.h.
->
-> Does this happen with next?
-Yes, I build the kernel with today's linux-next tree.
->
-> Will queue as a fix anyways.
-Thanks,
-Axel
+* Balaji T K <balajitk@ti.com> [110530 07:23]:
+> eMMC does not handle power off when not in sleep state,
+> Skip regulator disable during probe when eMMC is
+> not in known state - state left by bootloader.
+> 
+> Resolves eMMC failure on OMAP4
+> mmc0: error -110 whilst initialising MMC card
+> 
+> --- a/arch/arm/mach-omap2/hsmmc.h
+> +++ b/arch/arm/mach-omap2/hsmmc.h
+> @@ -18,6 +18,7 @@ struct omap2_hsmmc_info {
+>  	bool	nonremovable;	/* Nonremovable e.g. eMMC */
+>  	bool	power_saving;	/* Try to sleep or power off when possible */
+>  	bool	no_off;		/* power_saving and power is not to go off */
+> +	bool	no_off_init;	/* no power off when not in MMC sleep state */
+>  	bool	vcc_aux_disable_is_sleep; /* Regulator off remapped to sleep */
+>  	int	gpio_cd;	/* or -EINVAL */
+>  	int	gpio_wp;	/* or -EINVAL */
+
+Can't you use no_off for this too?
+
+Tony
