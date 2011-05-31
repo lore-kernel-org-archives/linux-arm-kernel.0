@@ -1,76 +1,58 @@
-From: ak@linux.intel.com (Andi Kleen)
-Date: Tue, 31 May 2011 11:01:07 -0700
-Subject: [PATCH] Disable -fconserve-stack on ARM
-In-Reply-To: <20110531163026.GB771@e102109-lin.cambridge.arm.com>
-References: <BANLkTim2TOZgB-3Vkv5RcK572Qr07s3=CA@mail.gmail.com>
-	<1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
-	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
-	<20110526215101.GL24876@n2100.arm.linux.org.uk>
-	<20110527083806.GA21100@e102109-lin.cambridge.arm.com>
-	<20110527085414.GP24876@n2100.arm.linux.org.uk>
-	<20110527095111.GC21100@e102109-lin.cambridge.arm.com>
-	<yw1xlixse2fl.fsf@unicorn.mansr.com>
-	<20110528153417.GB25869@alboin.amr.corp.intel.com>
-	<20110531163026.GB771@e102109-lin.cambridge.arm.com>
-Message-ID: <20110531180107.GA9261@alboin.amr.corp.intel.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 31 May 2011 13:23:32 -0500
+Subject: ep93xx: status/future of the sparsemem support
+In-Reply-To: <20110529130644.GI16318@ibawizard.net>
+References: <20110529130644.GI16318@ibawizard.net>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC4934@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Didn't work, on the gcc command line we get -fno-conserve-stack followed
-> by -fconserve-stack from the top makefile and it seems that the latter
-> takes priority.
+On Sunday, May 29, 2011 6:07 AM, Petr ?tetiar wrote:
+> 
+> Hi all,
+> 
+> I would like to ask about the status or plans for the sparsemem support on the
+> ep93xx. I'm mainly talking about the ts72xx here as I don't have any other
+> boards, but it seems, that sparsemem is the must for the boards with more then
+> one memory bank. Or it's not true?
+> 
+> For example, right now, I'm trying to get the recent kernel working on the
+> ts-7300 with the 128MB RAM (two 64MB memory chips, 16 banks, 8MB each,
+> first 8 at 0x0000000-0x7000000, second one at 0xe0000000-0e7000000) and as you
+> might guess, it's unusable with flatmem (and it looks like the discontig mem
+> is now gone for ARM if I'm not mistaken):
 
-Ah ok need to move it up then too in the top level Makefile.
-Like this.
+[...]
 
--Andi
+> The question is, what's the problem with the sparsemem patch[1] for ep93xx,
+> that it's not yet in the mainline? Nobody needed it yet? :-) If it's that the
+> case, I could submit it, no problem. I don't follow this mailing list and
+> development on the ep93xx regularly, so I might have missed some important
+> detail. Thank you for any pointers.
+> 
+> 1. http://marc.info/?l=linux-arm&m=122754446724900
 
----
-Disable -fconserve-stack on ARM v2
+I don't think that patch covers all the possible configurations for the ep93xx.
 
-There are reports that -fconserve-stack misaligns variables on the stack.
-Disable it for ARM to work around this gcc bug.
+The ep39xx has four chip-selects that decode to these memory addresses:
 
-v2: Move top level flags definition up
-Signed-off-by: Andi Kleen <ak@linux.intel.com>
+nSDCS3  0x00000000-0x0fffffff  Boot option ASDO = 1
+nSDCS3  0xf0000000-0xffffffff  Boot option ASDO = 0
+nSDCS2  0xe0000000-0xefffffff
+nSDCS1  0xd0000000-0xdfffffff
+nSDCS0  0xc0000000-0xcfffffff
 
-diff --git a/Makefile b/Makefile
-index 529d93f..08d848f 100644
---- a/Makefile
-+++ b/Makefile
-@@ -564,6 +564,10 @@ else
- KBUILD_CFLAGS	+= -O2
- endif
- 
-+# conserve stack if available
-+# do this early so that an architecture can override it.
-+KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
-+
- include $(srctree)/arch/$(SRCARCH)/Makefile
- 
- ifneq ($(CONFIG_FRAME_WARN),0)
-@@ -629,9 +633,6 @@ KBUILD_CFLAGS += $(call cc-disable-warning, pointer-sign)
- # disable invalid "can't wrap" optimizations for signed / pointers
- KBUILD_CFLAGS	+= $(call cc-option,-fno-strict-overflow)
- 
--# conserve stack if available
--KBUILD_CFLAGS   += $(call cc-option,-fconserve-stack)
--
- # use the deterministic mode of AR if available
- KBUILD_ARFLAGS := $(call ar-option,D)
- 
-diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-index f5b2b39..902fec9 100644
---- a/arch/arm/Makefile
-+++ b/arch/arm/Makefile
-@@ -41,6 +41,10 @@ ifeq ($(CONFIG_CC_STACKPROTECTOR),y)
- KBUILD_CFLAGS	+=-fstack-protector
- endif
- 
-+# ARM gcc developers unfortunately broke -fconserve-stack. It misaligns
-+# variables on the stack
-+KBUILD_CFLAGS += $(call cc-option,-fno-conserve-stack)
-+
- ifeq ($(CONFIG_CPU_BIG_ENDIAN),y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- AS		+= -EB
+Then because of the way the ep93xx sdram controller uses the address bus, which
+is shared with the external memory (flash, etc.), the sdram memory gets broken
+up into banks of 2MB, 4MB, 8MB, 16MB, 32MB, or 128MB depending on the type of
+sdram used.  To make matters even more confusing, the sdram can operate with
+either a 16-bit or 32-bit wide data bus.  See [2] for the details.
+
+The patch above is optimized for the nSDCS3 (ASDO=1) and nSDCS2 configuration
+with 8MB banks.  In order for the ep93xx to support sparsemem I think it needs
+a bit of work to handle the other configurations.
+
+Regards,
+Hartley
+
+2. http://arm.cirrus.com/files/HOWTO/EP93xx%20SDRAM%20Address%20Ranges.pdf
