@@ -1,65 +1,30 @@
 From: swarren@nvidia.com (Stephen Warren)
-Date: Tue, 31 May 2011 15:14:07 -0600
-Subject: [PATCH 1/2] ARM: Tegra: Harmony: Fix conflicting GPIO numbering
-In-Reply-To: <1306876448-28147-1-git-send-email-swarren@nvidia.com>
-References: <1306876448-28147-1-git-send-email-swarren@nvidia.com>
-Message-ID: <1306876448-28147-2-git-send-email-swarren@nvidia.com>
+Date: Tue, 31 May 2011 15:14:06 -0600
+Subject: [PATCH 0/2] Tegra bugfixes for 3.0
+Message-ID: <1306876448-28147-1-git-send-email-swarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, both the WM8903 and TPS6586x chips attempt to register with
-gpiolib using the same GPIO numbers. This causes the audio driver to
-fail to initialize.
+Two fixes for Tegra boards:
 
-To solve this, add a define to board-harmony.h for the TPS6586x, and make
-board-harmony-power.c use this define, instead of directly referencing
-TEGRA_NR_GPIOS.
+The first fixes a regression on board Harmony. Without this, some devices
+won't initialize correctly due to conflicting gpiolib base "addresses".
 
-This fixes a regression introduced by commit
-6f168f2fa60f87e85e0df25e87e2372f22f5eb7c.
-ARM: tegra: harmony: initialize the TPS65862 PMIC
+The second could be considered a bugfix or a convenience. It's very
+useful, but less important than the Harmony fix if you need to merge
+just one:-)
 
-Signed-off-by: Stephen Warren <swarren@nvidia.com>
----
+Note: These were created against Linus's tree, a little after 3.0rc1, since
+the Tegra for-next is pretty stale. To be precise:
+
+af0d6a0a3a30946f7df69c764791f1b0643f7cd6
+Merge branch 'x86-urgent-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/tip/linux-2.6-tip
+
+Stephen Warren (2):
+  ARM: Tegra: Harmony: Fix conflicting GPIO numbering
+  ARM: Tegra: Seaboard: Re-order sdhci device registration
+
  arch/arm/mach-tegra/board-harmony-power.c |    4 +++-
  arch/arm/mach-tegra/board-harmony.h       |    3 ++-
- 2 files changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-tegra/board-harmony-power.c b/arch/arm/mach-tegra/board-harmony-power.c
-index c84442c..5ad8b2f 100644
---- a/arch/arm/mach-tegra/board-harmony-power.c
-+++ b/arch/arm/mach-tegra/board-harmony-power.c
-@@ -24,6 +24,8 @@
- 
- #include <mach/irqs.h>
- 
-+#include "board-harmony.h"
-+
- #define PMC_CTRL		0x0
- #define PMC_CTRL_INTR_LOW	(1 << 17)
- 
-@@ -98,7 +100,7 @@ static struct tps6586x_platform_data tps_platform = {
- 	.irq_base	= TEGRA_NR_IRQS,
- 	.num_subdevs	= ARRAY_SIZE(tps_devs),
- 	.subdevs	= tps_devs,
--	.gpio_base	= TEGRA_NR_GPIOS,
-+	.gpio_base	= HARMONY_GPIO_TPS6586X(0),
- };
- 
- static struct i2c_board_info __initdata harmony_regulators[] = {
-diff --git a/arch/arm/mach-tegra/board-harmony.h b/arch/arm/mach-tegra/board-harmony.h
-index 1e57b07..d85142e 100644
---- a/arch/arm/mach-tegra/board-harmony.h
-+++ b/arch/arm/mach-tegra/board-harmony.h
-@@ -17,7 +17,8 @@
- #ifndef _MACH_TEGRA_BOARD_HARMONY_H
- #define _MACH_TEGRA_BOARD_HARMONY_H
- 
--#define HARMONY_GPIO_WM8903(_x_)	(TEGRA_NR_GPIOS + (_x_))
-+#define HARMONY_GPIO_TPS6586X(_x_)	(TEGRA_NR_GPIOS + (_x_))
-+#define HARMONY_GPIO_WM8903(_x_)	(HARMONY_GPIO_TPS6586X(4) + (_x_))
- 
- #define TEGRA_GPIO_SD2_CD		TEGRA_GPIO_PI5
- #define TEGRA_GPIO_SD2_WP		TEGRA_GPIO_PH1
--- 
-1.7.0.4
+ arch/arm/mach-tegra/board-seaboard.c      |    4 ++--
+ 3 files changed, 7 insertions(+), 4 deletions(-)
