@@ -1,36 +1,33 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 31 May 2011 11:00:23 +0800
-Subject: [PATCH 2/3] ARM: mx5: convert to new leds-gpio registration helper
-In-Reply-To: <1306609503-31746-2-git-send-email-u.kleine-koenig@pengutronix.de>
-References: <1306609503-31746-1-git-send-email-u.kleine-koenig@pengutronix.de>
-	<1306609503-31746-2-git-send-email-u.kleine-koenig@pengutronix.de>
-Message-ID: <20110531030022.GC31928@S2100-06.ap.freescale.net>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 31 May 2011 09:22:55 +0530
+Subject: [PATCH 0/3] SPEAr320: Add pwm support
+In-Reply-To: <201105301453.40314.arnd@arndb.de>
+References: <cover.1306739836.git.viresh.kumar@st.com>
+	<201105301352.55570.arnd@arndb.de> <4DE38616.7050901@st.com>
+	<201105301453.40314.arnd@arndb.de>
+Message-ID: <4DE46617.2000505@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Uwe,
-
-On Sat, May 28, 2011 at 09:05:02PM +0200, Uwe Kleine-K?nig wrote:
-> This gets rid of per machine struct platform_device definitions and allows
-> to move the platform data and led definition to .init.rodata.
+On 05/30/2011 06:23 PM, Arnd Bergmann wrote:
+>> > Obviously this can be done, but as it has already taken too long for that
+>> > framework to get added in mainline, and still we don't know how much more
+>> > time it will take. I would suggest to push this patchset now. And i
+>> > will update this accordingly once that framework comes up.
+> Ok, makes sense.
 > 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
->  arch/arm/mach-mx5/Kconfig                    |    4 ++++
->  arch/arm/mach-mx5/board-mx51_efikamx.c       |   15 ++++-----------
->  arch/arm/mach-mx5/board-mx51_efikasb.c       |   16 ++++------------
->  arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |   18 +++---------------
->  arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c |   19 ++++---------------
->  5 files changed, 19 insertions(+), 53 deletions(-)
-> 
-I'm building Sascha's imx-for-3.0 tree where this patch got applied,
-and seeing the following.
+> How about starting a drivers/pwm directory though? I think we have
+> broad support for the idea of moving drivers into their subsystems,
+> so even if you don't change the code, I think it would be a better
+> place than drivers/misc.
 
-  CC      arch/arm/mach-mx5/board-mx51_efikamx.o
-arch/arm/mach-mx5/board-mx51_efikamx.c: In function ?mx51_efikamx_init?:
-arch/arm/mach-mx5/board-mx51_efikamx.c:241:3: error: assignment of read-only location ?mx51_efikamx_leds[2]?
-arch/arm/mach-mx5/board-mx51_efikamx.c:244:2: error: implicit declaration of function ?gpio_leds_register_device?
+Ya, i can easily do it. I didn't do it earlier, because i thought people
+might ask me to provide framework with it too. New folder with only my driver
+as part of it might not be accepted. If nobody have any issues with it
+i can send patch with required changes.
+
+One more thing: Who will push drivers/pwm now?
+@Andrew: Will that be you??
 
 -- 
-Regards,
-Shawn
+viresh
