@@ -1,47 +1,72 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 May 2011 03:29:03 -0700
-Subject: [PATCH] arm: omap3: beagle: Ensure msecure is mux'd to be able
-	to set the RTC
-In-Reply-To: <1302010808-3065-1-git-send-email-holler@ahsoftware.de>
-References: <4D9AEB76.2060509@ahsoftware.de>
-	<1302010808-3065-1-git-send-email-holler@ahsoftware.de>
-Message-ID: <20110531102903.GU11352@atomide.com>
+Date: Tue, 31 May 2011 03:36:29 -0700
+Subject: [PATCH] arm: omap3: cm-t3517: fix section mismatch warning
+In-Reply-To: <4DD1286D.10403@compulab.co.il>
+References: <1303850474-25106-1-git-send-email-grinberg@compulab.co.il>
+	<4DC01FB2.9060806@compulab.co.il> <4DCA3CC2.8080006@compulab.co.il>
+	<4DD1286D.10403@compulab.co.il>
+Message-ID: <20110531103629.GW11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alexander Holler <holler@ahsoftware.de> [110405 06:38]:
-> Without msecure beeing high it isn't possible to set (or start)
-> the RTC.
+* Igor Grinberg <grinberg@compulab.co.il> [110516 06:32]:
+> ping x3
 > 
-> Tested with a BeagleBoard C4.
+> 
+> It has been 3 weeks already...
+> 
+> 
+> On 05/11/11 10:37, Igor Grinberg wrote:
+> 
+> > ping x2
+> >
+> >
+> > Can this one get into .39?
+> >
+> >
+> > On 05/03/11 18:30, Igor Grinberg wrote:
+> >
+> >> ping!
+> >>
+> >> Just to make sure you haven't missed this one liner ;)
 
-Adding this into fixes.
+For the archives, applying into fixes finally.
+
+Regards,
 
 Tony
- 
-> Signed-off-by: Alexander Holler <holler@ahsoftware.de>
-> ---
->  arch/arm/mach-omap2/board-omap3beagle.c |    3 +++
->  1 files changed, 3 insertions(+), 0 deletions(-)
+
+> >>
+> >>
+> >> On 04/26/11 23:41, Igor Grinberg wrote:
+> >>> WARNING: arch/arm/mach-omap2/built-in.o(.text+0x11014): Section mismatch
+> >>> in reference from the function cm_t3517_init_usbh() to the (unknown
+> >>> reference) .init.data:(unknown)
+> >>> The function cm_t3517_init_usbh() references
+> >>> the (unknown reference) __initdata (unknown).
+> >>> This is often because cm_t3517_init_usbh lacks a __initdata
+> >>> annotation or the annotation of (unknown) is wrong.
+> >>>
+> >>> Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+> >>> ---
+> >>>  arch/arm/mach-omap2/board-cm-t3517.c |    2 +-
+> >>>  1 files changed, 1 insertions(+), 1 deletions(-)
+> >>>
+> >>> diff --git a/arch/arm/mach-omap2/board-cm-t3517.c b/arch/arm/mach-omap2/board-cm-t3517.c
+> >>> index a27e3ee..802cb60 100644
+> >>> --- a/arch/arm/mach-omap2/board-cm-t3517.c
+> >>> +++ b/arch/arm/mach-omap2/board-cm-t3517.c
+> >>> @@ -178,7 +178,7 @@ static struct usbhs_omap_board_data cm_t3517_ehci_pdata __initdata = {
+> >>>  	.reset_gpio_port[2]  = -EINVAL,
+> >>>  };
+> >>>  
+> >>> -static int cm_t3517_init_usbh(void)
+> >>> +static int __init cm_t3517_init_usbh(void)
+> >>>  {
+> >>>  	int err;
+> >>>  
 > 
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index 46d814a..ebe3a7e 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -628,6 +628,9 @@ static void __init omap3_beagle_init(void)
->  	usb_ehci_init(&ehci_pdata);
->  	omap3beagle_flash_init();
->  
-> +	/* Ensure msecure is mux'd to be able to set the RTC. */
-> +	omap_mux_init_signal("sys_drm_msecure", OMAP_PIN_OFF_OUTPUT_HIGH);
-> +
->  	/* Ensure SDRC pins are mux'd for self-refresh */
->  	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
->  	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
 > -- 
-> 1.7.3.4
+> Regards,
+> Igor.
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
