@@ -1,51 +1,43 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 31 May 2011 15:02:36 -0500
-Subject: [PATCH v3] ARM: ep93xx: use more reliable CPLD watchdog for
-	reset on ts72xx
-In-Reply-To: <20110531195513.GL16318@ibawizard.net>
-References: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
-	<1306868578-3883-1-git-send-email-ynezz@true.cz>
-	<ADE657CA350FB648AAC2C43247A983F001F381FC498E@AUSP01VMBX24.collaborationhost.net>
-	<20110531195513.GL16318@ibawizard.net>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC49CC@AUSP01VMBX24.collaborationhost.net>
+From: rientjes@google.com (David Rientjes)
+Date: Tue, 31 May 2011 13:03:03 -0700 (PDT)
+Subject: IrDA driver fails on PXA255
+In-Reply-To: <20110531072650.GC21382@n2100.arm.linux.org.uk>
+References: <20110528205701.GA1788@doriath.ww600.siemens.net>
+	<alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
+	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
+	<alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
+	<20110529215656.GA5576@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
+	<20110531072650.GC21382@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, May 31, 2011 12:55 PM, Petr ?tetiar wrote:
-> H Hartley Sweeten <hartleys@visionengravers.com> [2011-05-31 14:24:04]:
->
->> I pulled out the ts-7200 manual to verify the watchdog reset.  Your feeding
->> the watchdog then changing the timeout period to 250ms.  Without the "else"
->> the syscon would have tried to reset the board when the SWRST bit is toggled.
->
-> Yep, that missing "else" was a good catch, thanks.
->
-> This feed first then set behaviour is "logic", but it's correct (250ms is the
-> smallest possible value), from that manual:
->
->    In order to load the WDT Control register, the WDT must first be ?fed?, and
->    then within 30 uS, the WDT control register must be written. Writes to this
->    register without first doing a ?WDT feed?, have no affect.
->
-> (Please don't laugh at that 30us constraint).
+On Tue, 31 May 2011, Russell King - ARM Linux wrote:
 
-;-)
+> Enabling CONFIG_ZONE_DMA is not a fix, it's making the problem vanish off
+> the radar.  It will mean that the drivers using GFP_DMA will never get
+> fixed up.
+> 
 
->> I have no way of testing this patch (no ts boards) but as long as Ryan has no
->> objections you have my:
->
-> I'm using it[1] since 2.6.19-rc6-git10 (maybe earlier). Funny, that I didn't
-> forget to add that "else" in this old patch.
->
-> And as I see it, you and few other guys really deserve some free TS boards for
-> sure (at least the damn board as a thank you), but Lennert could probably tell
-> you more about their "we only leech the work from the comunity, but don't give
-> anything back" attitude...
+Disabling CONFIG_ZONE_DMA is an optimization, do you agree?  I asked 
+on Sunday what the downsides of enabling the option on arm are, and you 
+didn't mention any.  So what's the problem with my patch to enable it for 
+this driver since it is using GFP_DMA?  You claim that it'll never get 
+removed again to return to the _optimized_ case, yet my patch is 
+guaranteed to work for that driver in all configurations at the moment.  I 
+don't think we should be fighting for the optimized case where the 
+alternative has no downside.
 
-Yah, the ep93xx port has some bad history.  It's old history, lets move on...
+ [ Patching the page allocator to also emit a line to the dmesg to direct 
+   users directly to enabling CONFIG_ZONE_DMA wouldn't be a problem, 
+   either. ]
 
-If they want to give me one I'll be happy to take it.  I can even go pick it up,
-they are only 44 miles away from my on the other side of the valley....
+> Change it to be a soft WARN_ON for one release.  Anything else will just
+> result in the problem being IGNORED.
+> 
 
-Regards,
-Hartley
+The problem certainly isn't being ignored in this thread, or in the patch 
+that I sent to fix Dmitry's issue by default, so that doesn't seem to be 
+the case.  What would be ignored, though, is if it just emitted a 
+WARN_ON() without failing the allocation so everything works perfectly.
