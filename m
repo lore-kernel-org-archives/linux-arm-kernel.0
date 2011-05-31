@@ -1,47 +1,44 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Tue, 31 May 2011 09:21:00 +0100
-Subject: [RFC PATCH v5 13/13] ARM: SMP: automatically select ARM_GIC_VPPI
-In-Reply-To: <4DE4A100.8020009@codeaurora.org>
-References: <1306749894-28749-1-git-send-email-marc.zyngier@arm.com>
-	<1306749894-28749-14-git-send-email-marc.zyngier@arm.com>
-	<4DE4A100.8020009@codeaurora.org>
-Message-ID: <1306830060.27474.302.camel@e102391-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 31 May 2011 10:26:11 +0200
+Subject: [PATCH 2/4] ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
+In-Reply-To: <20110531024729.GB31928@S2100-06.ap.freescale.net>
+References: <1306767139-24763-1-git-send-email-shawn.guo@linaro.org>
+	<20110531001634.GB3411@quad.lixom.net>
+	<20110531024729.GB31928@S2100-06.ap.freescale.net>
+Message-ID: <201105311026.11947.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-05-31 at 01:04 -0700, Stephen Boyd wrote:
-> On 5/30/2011 3:04 AM, Marc Zyngier wrote:
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 9adc278..60942681 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1313,6 +1313,7 @@ config SMP
-> >  		 ARCH_EXYNOS4 || ARCH_TEGRA || ARCH_U8500 || ARCH_VEXPRESS_CA9X4 || \
-> >  		 ARCH_MSM_SCORPIONMP || ARCH_SHMOBILE
-> >  	select USE_GENERIC_SMP_HELPERS
-> > +	select ARM_GIC_VPPI
-> >  	select HAVE_ARM_SCU if !ARCH_MSM_SCORPIONMP
-> 
-> Would it be better to select GIC_VPPI only if GIC is selected as well? So
-> 
->     select ARM_GIC_VPPI if ARM_GIC
+On Tuesday 31 May 2011, Shawn Guo wrote:
+> > The above tables are pretty crazy, and they only get worse later in the series
+> > when the other SoCs are added. Is it really worth it to have a common initcall
+> > entry for the various SoCs here?
+> > 
+> This common initcall seems a good place to concentrate the gpio device
+> registration.  It's easy to look at the common/different things among
+> these SoCs.  The only problem you reminded me is the scanning of the
+> long cpu_is_mx list.  It can be optimized a little bit by sorting the
+> list from the latest (most used) SoC to the oldest (least used) one,
+> and breaking out the scanning immediately when hitting one.
 
-Possibly.
+No, better make them separate functions.
 
-> Or put this select under ARM_GIC and have it be
-> 
->     select ARM_GIC_VPPI if SMP
-> 
-> ?
+> > It'd seem cleaner to me to just call the registration function for the
+> > family you're running from in per-family-init code such as where it was
+> > removed above (irq init, which makes some sense since the gpios provide
+> > interrupt sources as well).
+> > 
+> I just gave it a test, and it's not working at all.  (too early
+> to register device in irq init?)
 
-No, I want to be able to select GIC_VPPI even on UP (A15x1 requires it,
-for exemple).
+Just open-code the mxc_add_mxc_gpio() by moving the individual calls to
+mxc_add_gpio() into the respective callers. Having a global
+mxc_add_mxc_gpio() function that does something different for each
+caller seems entirely pointless to me.
 
-But in the end, if everybody agrees this whole series is sensible, I'd
-rather get rid of the option and make it a permanent feature (patch #11
-removes gic_enable_ppi() anyway, making the use of naked PPIs tricky at
-best...).
+Best think of it from the point of view how it should look like when
+everything is converted to the device tree. In that case, you would
+have a function scanning the device tree that calls mxc_add_gpio
+for each entry.
 
-	M.
--- 
-Reality is an implementation detail.
+	Arnd
