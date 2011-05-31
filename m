@@ -1,42 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 31 May 2011 16:39:42 +0100
-Subject: [PATCH] ARM: mm: ensure TTBR0 is restored when changing ASID on
-	rollover
-Message-ID: <1306856382-26295-1-git-send-email-will.deacon@arm.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 31 May 2011 17:44:25 +0200
+Subject: is there the sample for how to use the tcm on userspace ?
+In-Reply-To: <BANLkTi=XY2pkENWGacj77wAFf2A0i0V=sg@mail.gmail.com>
+References: <BANLkTi=_1cXiQ6A6fCmfywyHHAOvB3DQpA@mail.gmail.com>	<4DE4A2AF.2040708@stericsson.com>	<BANLkTi=aDBjBsAx0XwL1HRKCnO1=2wHaVA@mail.gmail.com>	<4DE4A8D4.2090208@stericsson.com>
+	<BANLkTi=XY2pkENWGacj77wAFf2A0i0V=sg@mail.gmail.com>
+Message-ID: <4DE50CD9.3050506@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 52af9c6c ("ARM: 6943/1: mm: use TTBR1 instead of reserved context ID")
-I updated the ASID rollover code to use only the kernel page tables
-whilst updating the ASID.
+On 05/31/2011 11:35 AM, Jello huang wrote:
+> It is easy to define the interface .But
+> on ARM11 (ARM10?):
+>
+>     CPU
+>      |
+>     MMU
+>     / \
+> Cache TCM
+>  |
+> External memory interface
 
-Unfortunately, the code to restore the user page tables was part of a
-later patch which isn't yet in mainline, so this leaves the code
-quite broken.
+This is how all TCM works, it's behind the MMU but you can *also*
+move it in physical address space.
 
-This patch fixes the issue by calling cpu_switch_mm to change the ASID
-which has the side-effect of setting up TTBR0 to point to the user
-tables.
+> If we use TCM from userspace whether it directly use  TCM or it need 
+> through MMU
 
-Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/context.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
+You need to get hold of the memory somehow, but there is code in
+the kernel managing it as a memory pool, so you need a userspace
+interface to tcm_alloc() and tcm_free() and the resulting handles.
 
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 8bfae96..2352395 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -100,8 +100,7 @@ static void reset_context(void *info)
- 	set_mm_context(mm, asid);
- 
- 	/* set the new ASID */
--	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (mm->context.id));
--	isb();
-+	cpu_switch_mm(mm->pgd, mm);
- }
- 
- #else
--- 
-1.7.0.4
+> And how much benefit we can get when we use the SDRAM or TCM from 
+> usespace.
+
+Define benefit, plus this depends on the bus and cache topology and
+frequency of your system.
+
+Frank Rowand presented a very compelling case for using on-chip
+memory in the critical latency paths to avoid cache stalls on SMP
+systems:
+http://www.elinux.org/images/d/dd/Elc2011_rowand.pdf
+
+However my TCM interface is not yet SMP aware. I was planning
+to try to fix it for the PB11MPcore (which has per-cpu TCM!) someday
+as an interesting exercise. But that depend on time and planning etc.
+
+Yours,
+Linus Walleij
