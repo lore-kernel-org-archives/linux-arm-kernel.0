@@ -1,79 +1,51 @@
-From: koen@dominion.thruhere.net (Koen Kooi)
-Date: Tue, 31 May 2011 20:13:45 +0200
-Subject: [PATCH] OMAP3: beagle: add support for beagleboard xM revision C
-In-Reply-To: <20110530143411.GG11352@atomide.com>
-References: <1306503133-31996-1-git-send-email-koen@dominion.thruhere.net>
-	<20110530143411.GG11352@atomide.com>
-Message-ID: <12BBA6F3-601A-472B-AB24-FCEA7DCED29D@dominion.thruhere.net>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 31 May 2011 15:02:36 -0500
+Subject: [PATCH v3] ARM: ep93xx: use more reliable CPLD watchdog for
+	reset on ts72xx
+In-Reply-To: <20110531195513.GL16318@ibawizard.net>
+References: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
+	<1306868578-3883-1-git-send-email-ynezz@true.cz>
+	<ADE657CA350FB648AAC2C43247A983F001F381FC498E@AUSP01VMBX24.collaborationhost.net>
+	<20110531195513.GL16318@ibawizard.net>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC49CC@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday, May 31, 2011 12:55 PM, Petr ?tetiar wrote:
+> H Hartley Sweeten <hartleys@visionengravers.com> [2011-05-31 14:24:04]:
+>
+>> I pulled out the ts-7200 manual to verify the watchdog reset.  Your feeding
+>> the watchdog then changing the timeout period to 250ms.  Without the "else"
+>> the syscon would have tried to reset the board when the SWRST bit is toggled.
+>
+> Yep, that missing "else" was a good catch, thanks.
+>
+> This feed first then set behaviour is "logic", but it's correct (250ms is the
+> smallest possible value), from that manual:
+>
+>    In order to load the WDT Control register, the WDT must first be ?fed?, and
+>    then within 30 uS, the WDT control register must be written. Writes to this
+>    register without first doing a ?WDT feed?, have no affect.
+>
+> (Please don't laugh at that 30us constraint).
 
-Op 30 mei 2011, om 16:34 heeft Tony Lindgren het volgende geschreven:
+;-)
 
-> Hi,
-> 
-> * Koen Kooi <koen@dominion.thruhere.net> [110527 06:28]:
->> 
->> @@ -123,9 +126,13 @@ static void __init omap3_beagle_init_rev(void)
->> 		printk(KERN_INFO "OMAP3 Beagle Rev: xM\n");
->> 		omap3_beagle_version = OMAP3BEAGLE_BOARD_XM;
->> 		break;
->> +	case 2:
->> +		printk(KERN_INFO "OMAP3 Beagle Rev: xM\n");
->> +		omap3_beagle_version = OMAP3BEAGLE_BOARD_XMC;
->> +		break;
->> 	default:
->> 		printk(KERN_INFO "OMAP3 Beagle Rev: unknown %hd\n", beagle_rev);
->> -		omap3_beagle_version = OMAP3BEAGLE_BOARD_UNKN;
->> +		omap3_beagle_version = OMAP3BEAGLE_BOARD_XMC;
->> 	}
->> }
-> 
-> Maybe just set up static struct omap3_beagle that contains the
-> various things to initialize. Then initialize it in omap3_beagle_init_rev
-> above.
-> 
-> Otherwise we'll end up adding more and more omap3_beagle_get_rev and
-> cpu_is_omap tests to this file and it will become hard to maintain.
-> 
->> @@ -253,7 +260,7 @@ static int beagle_twl_gpio_setup(struct device *dev,
->> {
->> 	int r, usb_pwr_level;
->> 
->> -	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
->> +	if (cpu_is_omap3630()) {
->> 		mmc[0].gpio_wp = -EINVAL;
->> 	} else if ((omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C1_3) ||
->> 		(omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_C4)) {
-> 
-> This would become:
-> 
-> 	mmc[0].gpio_wp = beagle.gpio_wp;
-> 
->> @@ -275,11 +282,10 @@ static int beagle_twl_gpio_setup(struct device *dev,
->> 	 * high / others active low)
->> 	 * DVI reset GPIO is different between beagle revisions
->> 	 */
->> -	if (omap3_beagle_get_rev() == OMAP3BEAGLE_BOARD_XM) {
->> -		usb_pwr_level = GPIOF_OUT_INIT_HIGH;
->> +	if (cpu_is_omap3630()) {
->> 		beagle_dvi_device.reset_gpio = 129;
->> 		/*
->> -		 * gpio + 1 on Xm controls the TFP410's enable line (active low)
->> +		 * gpio + 1 on xM controls the TFP410's enable line (active low)
->> 		 * gpio + 2 control varies depending on the board rev as below:
->> 		 * P7/P8 revisions(prototype): Camera EN
->> 		 * A2+ revisions (production): LDO (DVI, serial, led blocks)
-> 
-> This would be just:
-> 
-> 	usb_pwr_level = beagle.usb_pwr_level;
-> 
-> And so on.
+>> I have no way of testing this patch (no ts boards) but as long as Ryan has no
+>> objections you have my:
+>
+> I'm using it[1] since 2.6.19-rc6-git10 (maybe earlier). Funny, that I didn't
+> forget to add that "else" in this old patch.
+>
+> And as I see it, you and few other guys really deserve some free TS boards for
+> sure (at least the damn board as a thank you), but Lennert could probably tell
+> you more about their "we only leech the work from the comunity, but don't give
+> anything back" attitude...
 
-Tony, thanks for the feedback! The change you want is a bit too much for my C knowledge, but Joel will but picking it up from here.
+Yah, the ep93xx port has some bad history.  It's old history, lets move on...
 
-regards,
+If they want to give me one I'll be happy to take it.  I can even go pick it up,
+they are only 44 miles away from my on the other side of the valley....
 
-Koen
+Regards,
+Hartley
