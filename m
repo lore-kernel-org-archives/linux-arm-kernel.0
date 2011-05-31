@@ -1,42 +1,62 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 31 May 2011 11:40:57 -0500
-Subject: [PATCH] Consolidate the clkdev header files
-In-Reply-To: <20110530010416.GA24365@july>
-References: <20110530010416.GA24365@july>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC48C2@AUSP01VMBX24.collaborationhost.net>
+Date: Tue, 31 May 2011 12:49:30 -0700
+Subject: [PATCH] gpio: ep93xx: move driver to drivers/gpio
+Message-ID: <201105311249.30372.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, May 29, 2011 6:04 PM, Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Now most of ARM machines has the alsmot same __clk_get/put() macro
-> 
-> So place it at the arch/arm/include/asm/clkdev.h and remove the reduntant header files
-> 
-> But some machines don't have the same form as above. It can use the machince specific clkdev file by HAVE_MACH_CLKDEV config
-> 
-> Now there are only 3 caese.
-> 
-> 1) define the clk structure with clkdev macro => Need to move clk structure to proper header file
-> 
-> arch/arm/mach-versatile/include/mach/clkdev.h
-> arch/arm/mach-realview/include/mach/clkdev.h
-> arch/arm/mach-vexpress/include/mach/clkdev.h
-> arch/arm/mach-integrator/include/mach/clkdev.h
-> 
-> 2) export the __clk_get/put function at clock.c
-> 
-> arch/arm/mach-shmobile/include/mach/clkdev.h
-> 
-> 3) demuxing the clk source
-> arch/arm/mach-u300/include/mach/clkdev.h
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/Kconfig                             |    6 ++++
->  arch/arm/include/asm/clkdev.h                |    5 ++++
+The GPIO driver should reside in drivers/gpio.
 
->  arch/arm/mach-ep93xx/include/mach/clkdev.h   |   11 --------
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+Cc: Grant Likely <grant.likely@secretlab.ca>
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+---
+
+diff --git a/arch/arm/mach-ep93xx/Makefile b/arch/arm/mach-ep93xx/Makefile
+index 33ee2c8..6b7c41d 100644
+--- a/arch/arm/mach-ep93xx/Makefile
++++ b/arch/arm/mach-ep93xx/Makefile
+@@ -1,7 +1,7 @@
+ #
+ # Makefile for the linux kernel.
+ #
+-obj-y			:= core.o clock.o dma-m2p.o gpio.o
++obj-y			:= core.o clock.o dma-m2p.o
+ obj-m			:=
+ obj-n			:=
+ obj-			:=
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 342d634..7307302 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -86,6 +86,13 @@ config GPIO_IT8761E
+ 	help
+ 	  Say yes here to support GPIO functionality of IT8761E super I/O chip.
+ 
++config GPIO_EP93XX
++	bool "Cirrus EP93xx GPIO support"
++	depends on ARCH_EP93XX
++	default y
++	help
++	  Say yes here to support the Cirrus EP93xx GPIO peripheral.
++
+ config GPIO_EXYNOS4
+ 	bool "Samsung Exynos4 GPIO library support"
+ 	default y if CPU_EXYNOS4210
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 4ac7cb3..c8faabe 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -8,6 +8,7 @@ obj-$(CONFIG_GPIO_ADP5520)	+= adp5520-gpio.o
+ obj-$(CONFIG_GPIO_ADP5588)	+= adp5588-gpio.o
+ obj-$(CONFIG_GPIO_BASIC_MMIO_CORE)	+= basic_mmio_gpio.o
+ obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
++obj-$(CONFIG_GPIO_EP93XX)	+= gpio-ep93xx.o
+ obj-$(CONFIG_GPIO_EXYNOS4)	+= gpio-exynos4.o
+ obj-$(CONFIG_GPIO_I801)		+= gpio-i801.o
+ obj-$(CONFIG_GPIO_PLAT_SAMSUNG)	+= gpio-plat-samsung.o
+diff --git a/arch/arm/mach-ep93xx/gpio.c b/drivers/gpio/gpio-ep93xx.c
+similarity index 100%
+rename from arch/arm/mach-ep93xx/gpio.c
+rename to drivers/gpio/gpio-ep93xx.c
