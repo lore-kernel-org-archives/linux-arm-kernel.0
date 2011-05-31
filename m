@@ -1,40 +1,25 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 31 May 2011 04:52:04 -0700
-Subject: [PATCH] OMAP4: fix return value of omap4_l3_init
-In-Reply-To: <1304787527-8314-1-git-send-email-rabin@rab.in>
-References: <1304787527-8314-1-git-send-email-rabin@rab.in>
-Message-ID: <20110531115204.GA11352@atomide.com>
+From: dc4meego@gmail.com (dc4 meego)
+Date: Tue, 31 May 2011 12:52:09 +0100
+Subject: Memory hotplug on ARM linux
+Message-ID: <BANLkTinf5t9zb=6Ha4emMmJZuLeT0t9Acg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Rabin Vincent <rabin@rab.in> [110507 09:54]:
-> Don't PTR_ERR() a non-error pointer:
-> 
->  initcall omap4_l3_init+0x0/0xdc returned -544980480 after 0 usecs
->  initcall omap4_l3_init+0x0/0xdc returned with error code -544980480
+I'm trying to get memory hotplug working on ARM linux.
 
-Adding to fixes thanks.
+I've enabled the options (ARCH_ENABLE_MEMORY_HOTPLUG,
+ARCH_ENABLE_MEMORY_HOTREMOVE, ARCH_MEMORY_PROBE) and can see the
+memory through the sysfs interface.
+However adding memory results in a "Unable to handle kernel paging
+request", and no memory is removable (e.g. "memory offlining 2000 to
+2400 failed")
 
-Tony
- 
-> Signed-off-by: Rabin Vincent <rabin@rab.in>
-> ---
->  arch/arm/mach-omap2/devices.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-> index 7b85585..5b8ca68 100644
-> --- a/arch/arm/mach-omap2/devices.c
-> +++ b/arch/arm/mach-omap2/devices.c
-> @@ -97,7 +97,7 @@ static int __init omap4_l3_init(void)
->  
->  	WARN(IS_ERR(od), "could not build omap_device for %s\n", oh_name);
->  
-> -	return PTR_ERR(od);
-> +	return IS_ERR(od) ? PTR_ERR(od) : 0;
->  }
->  postcore_initcall(omap4_l3_init);
->  
-> -- 
-> 1.7.4.1
-> 
+I'm guessing I need either start with all memory present, but some
+initialised as ZONE_MOVABLE, so I can later offline it.
+Or start with some memory missing, but add something to the
+arch_add_memory to make the memory available after onlining.
+
+(the reason for doing this is to share SDRAM between the ARM and a
+DSP, and to change the allocation whilst running)
+
+Anyone had this working on an ARM?
