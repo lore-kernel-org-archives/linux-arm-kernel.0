@@ -1,54 +1,44 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 31 May 2011 14:40:45 -0600
-Subject: [PATCH] gpio: ep93xx: move driver to drivers/gpio
-In-Reply-To: <201105311249.30372.hartleys@visionengravers.com>
-References: <201105311249.30372.hartleys@visionengravers.com>
-Message-ID: <BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 31 May 2011 22:00:27 +0100
+Subject: IrDA driver fails on PXA255
+In-Reply-To: <alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
+References: <20110528205701.GA1788@doriath.ww600.siemens.net>
+	<alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
+	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
+	<alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
+	<20110529215656.GA5576@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
+	<20110531072650.GC21382@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
+Message-ID: <20110531210027.GA3660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2011 at 1:49 PM, H Hartley Sweeten
-<hartleys@visionengravers.com> wrote:
-> The GPIO driver should reside in drivers/gpio.
->
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
->
-> ---
->
-> diff --git a/arch/arm/mach-ep93xx/Makefile b/arch/arm/mach-ep93xx/Makefile
-> index 33ee2c8..6b7c41d 100644
-> --- a/arch/arm/mach-ep93xx/Makefile
-> +++ b/arch/arm/mach-ep93xx/Makefile
-> @@ -1,7 +1,7 @@
-> ?#
-> ?# Makefile for the linux kernel.
-> ?#
-> -obj-y ? ? ? ? ? ? ? ? ?:= core.o clock.o dma-m2p.o gpio.o
-> +obj-y ? ? ? ? ? ? ? ? ?:= core.o clock.o dma-m2p.o
-> ?obj-m ? ? ? ? ? ? ? ? ?:=
-> ?obj-n ? ? ? ? ? ? ? ? ?:=
-> ?obj- ? ? ? ? ? ? ? ? ? :=
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index 342d634..7307302 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -86,6 +86,13 @@ config GPIO_IT8761E
-> ? ? ? ?help
-> ? ? ? ? ?Say yes here to support GPIO functionality of IT8761E super I/O chip.
->
-> +config GPIO_EP93XX
-> + ? ? ? bool "Cirrus EP93xx GPIO support"
-> + ? ? ? depends on ARCH_EP93XX
-> + ? ? ? default y
-> + ? ? ? help
-> + ? ? ? ? Say yes here to support the Cirrus EP93xx GPIO peripheral.
-> +
+On Tue, May 31, 2011 at 01:03:03PM -0700, David Rientjes wrote:
+> The problem certainly isn't being ignored in this thread, or in the patch 
+> that I sent to fix Dmitry's issue by default, so that doesn't seem to be 
+> the case.  What would be ignored, though, is if it just emitted a 
+> WARN_ON() without failing the allocation so everything works perfectly.
 
-Do you really want a user-visible Kconfig symbol here?  If it cannot
-be built as a module, then I suspect that for most on-chip gpio
-controllers they should just be enabled unconditionally on the SoC's
-Kconfig symbol.
+Sorry, you did not send a patch to fix it.  You sent a *bodge* to enable
+the DMA zone.  As long as you insist that's a valid fix, you're going
+to carry zero credibility with me.
 
-g.
+The fact is that this driver should not be using GFP_DMA to allocate
+things which aren't even DMA buffers, and its use of GFP_DMA should be
+removed.  But rather than look at that and work it out, and then produce
+a patch to sort that out, the only thing you can do is come up with
+bodge to enable the DMA zone, and continue to insist that's the right
+solution.
+
+I repeat, enabling the DMA zone for this driver is a pure and utter
+bodge, and the change to make these allocations fail _will_ and _has_
+caused regressions.
+
+Your whinge that we should re-enable the DMA zone which has been
+disabled for quite a long time now to work around this new restriction
+is extremely idiotic.
+
+Do the right thing.  Make allocations to GFP_DMA zones _warn_ first for
+a cycle so that affected drivers can be fixed.  Then for the next cycle,
+make it a hard failure.
