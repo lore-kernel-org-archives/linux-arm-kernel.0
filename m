@@ -1,104 +1,86 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Tue, 31 May 2011 23:08:53 +0200
-Subject: [PATCH 2/3] mach-u300: fix compilaton warning in IO accessors
-Message-ID: <1306876133-6744-1-git-send-email-linus.walleij@stericsson.com>
+Date: Tue, 31 May 2011 23:09:05 +0200
+Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
+Message-ID: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-The IO accessors for U300 were using u32 rather than the nominal
-void __iomem * type, rectify this by properly defining the
-virtual base for statically mapped peripherals to be
-void __iomem *. Requires fixing a field in struct clk as well.
+Use the new clockevents_config_and_register() function to register
+the U300 clockevent, since that code requires ->cpumask to be set
+we set this even on this UP system to please the framework.
 
+Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-u300/clock.h                  |    2 +-
- arch/arm/mach-u300/include/mach/u300-regs.h |   22 ++++++++++------------
- 2 files changed, 11 insertions(+), 13 deletions(-)
+ arch/arm/mach-u300/timer.c |   32 ++++++++++++--------------------
+ 1 files changed, 12 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-u300/clock.h b/arch/arm/mach-u300/clock.h
-index c34f3ea..4f50ca8 100644
---- a/arch/arm/mach-u300/clock.h
-+++ b/arch/arm/mach-u300/clock.h
-@@ -31,7 +31,7 @@ struct clk {
- 	bool reset;
- 	__u16 clk_val;
- 	__s8 usecount;
--	__u32 res_reg;
-+	void __iomem * res_reg;
- 	__u16 res_mask;
+diff --git a/arch/arm/mach-u300/timer.c b/arch/arm/mach-u300/timer.c
+index 18d7fa0..bd32dda 100644
+--- a/arch/arm/mach-u300/timer.c
++++ b/arch/arm/mach-u300/timer.c
+@@ -27,9 +27,6 @@
+ #include <asm/mach/time.h>
+ #include <asm/mach/irq.h>
  
- 	bool hw_ctrld;
-diff --git a/arch/arm/mach-u300/include/mach/u300-regs.h b/arch/arm/mach-u300/include/mach/u300-regs.h
-index 8b85df4..00fe620 100644
---- a/arch/arm/mach-u300/include/mach/u300-regs.h
-+++ b/arch/arm/mach-u300/include/mach/u300-regs.h
-@@ -18,6 +18,12 @@
-  * the defines are used for setting up the I/O memory mapping.
-  */
+-/* Be able to sleep for atleast 4 seconds (usually more) */
+-#define APPTIMER_MIN_RANGE 4
+-
+ /*
+  * APP side special timer registers
+  * This timer contains four timers which can fire an interrupt each.
+@@ -309,11 +306,11 @@ static int u300_set_next_event(unsigned long cycles,
  
-+#ifdef __ASSEMBLER__
-+#define IOADD(a) (a)
-+#else
-+#define IOADD(a) (void __iomem *) a
-+#endif
-+
- /* NAND Flash CS0 */
- #define U300_NAND_CS0_PHYS_BASE		0x80000000
+ /* Use general purpose timer 1 as clock event */
+ static struct clock_event_device clockevent_u300_1mhz = {
+-	.name           = "GPT1",
+-	.rating         = 300, /* Reasonably fast and accurate clock event */
+-	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
+-	.set_next_event = u300_set_next_event,
+-	.set_mode       = u300_set_mode,
++	.name		= "GPT1",
++	.rating		= 300, /* Reasonably fast and accurate clock event */
++	.features	= CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_next_event	= u300_set_next_event,
++	.set_mode	= u300_set_mode,
+ };
  
-@@ -48,13 +54,6 @@
- #endif
+ /* Clock event timer interrupt handler */
+@@ -328,9 +325,9 @@ static irqreturn_t u300_timer_interrupt(int irq, void *dev_id)
+ }
+ 
+ static struct irqaction u300_timer_irq = {
+-	.name           = "U300 Timer Tick",
+-	.flags          = IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
+-	.handler        = u300_timer_interrupt,
++	.name		= "U300 Timer Tick",
++	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
++	.handler	= u300_timer_interrupt,
+ };
  
  /*
-- * All the following peripherals are specified at their PHYSICAL address,
-- * so if you need to access them (in the kernel), you MUST use the macros
-- * defined in <asm/io.h> to map to the IO_ADDRESS_AHB() IO_ADDRESS_FAST()
-- * etc.
-- */
--
--/*
-  * AHB peripherals
-  */
+@@ -413,16 +410,11 @@ static void __init u300_timer_init(void)
+ 			"GPT2", rate, 300, 32, clocksource_mmio_readl_up))
+ 		pr_err("timer: failed to initialize U300 clock source\n");
  
-@@ -63,11 +62,11 @@
- 
- /* Vectored Interrupt Controller 0, servicing 32 interrupts */
- #define U300_INTCON0_BASE		(U300_AHB_PER_PHYS_BASE+0x1000)
--#define U300_INTCON0_VBASE		(U300_AHB_PER_VIRT_BASE+0x1000)
-+#define U300_INTCON0_VBASE		IOADD(U300_AHB_PER_VIRT_BASE+0x1000)
- 
- /* Vectored Interrupt Controller 1, servicing 32 interrupts */
- #define U300_INTCON1_BASE		(U300_AHB_PER_PHYS_BASE+0x2000)
--#define U300_INTCON1_VBASE		(U300_AHB_PER_VIRT_BASE+0x2000)
-+#define U300_INTCON1_VBASE		IOADD(U300_AHB_PER_VIRT_BASE+0x2000)
- 
- /* Memory Stick Pro (MSPRO) controller */
- #define U300_MSPRO_BASE			(U300_AHB_PER_PHYS_BASE+0x3000)
-@@ -115,7 +114,7 @@
- 
- /* SYSCON */
- #define U300_SYSCON_BASE		(U300_SLOW_PER_PHYS_BASE+0x1000)
--#define U300_SYSCON_VBASE		(U300_SLOW_PER_VIRT_BASE+0x1000)
-+#define U300_SYSCON_VBASE		IOADD(U300_SLOW_PER_VIRT_BASE+0x1000)
- 
- /* Watchdog */
- #define U300_WDOG_BASE			(U300_SLOW_PER_PHYS_BASE+0x2000)
-@@ -125,7 +124,7 @@
- 
- /* APP side special timer */
- #define U300_TIMER_APP_BASE		(U300_SLOW_PER_PHYS_BASE+0x4000)
--#define U300_TIMER_APP_VBASE		(U300_SLOW_PER_VIRT_BASE+0x4000)
-+#define U300_TIMER_APP_VBASE		IOADD(U300_SLOW_PER_VIRT_BASE+0x4000)
- 
- /* Keypad */
- #define U300_KEYPAD_BASE		(U300_SLOW_PER_PHYS_BASE+0x5000)
-@@ -181,5 +180,4 @@
-  * Virtual accessor macros for static devices
-  */
- 
--
- #endif
+-	clockevents_calc_mult_shift(&clockevent_u300_1mhz,
+-				    rate, APPTIMER_MIN_RANGE);
+-	/* 32bit counter, so 32bits delta is max */
+-	clockevent_u300_1mhz.max_delta_ns =
+-		clockevent_delta2ns(0xffffffff, &clockevent_u300_1mhz);
+-	/* This timer is slow enough to set for 1 cycle == 1 MHz */
+-	clockevent_u300_1mhz.min_delta_ns =
+-		clockevent_delta2ns(1, &clockevent_u300_1mhz);
++	/* Configure and register the clockevent */
+ 	clockevent_u300_1mhz.cpumask = cpumask_of(0);
+-	clockevents_register_device(&clockevent_u300_1mhz);
++	clockevents_config_and_register(&clockevent_u300_1mhz, rate,
++					1, 0xffffffff);
++
+ 	/*
+ 	 * TODO: init and register the rest of the timers too, they can be
+ 	 * used by hrtimers!
 -- 
 1.7.3.2
