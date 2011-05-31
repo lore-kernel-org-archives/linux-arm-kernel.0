@@ -1,50 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 31 May 2011 22:44:28 +0100
-Subject: [PATCH v6 1/8] MTD: Add integrator-flash feature to physmap
-In-Reply-To: <4DE53D52.4040508@ru.mvista.com>
-References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>
-	<1305637877-24436-2-git-send-email-marc.zyngier@arm.com>
-	<4DE53D52.4040508@ru.mvista.com>
-Message-ID: <20110531224428.6636e283@taxman.wild-wind.fr.eu.org>
+From: bengardiner@nanometrics.ca (Ben Gardiner)
+Date: Tue, 31 May 2011 17:46:41 -0400
+Subject: [PATCH 1/3] [v2] davinci: sram: ioremap the davinci_soc_info
+	specified sram regions
+In-Reply-To: <cover.1306877621.git.bengardiner@nanometrics.ca>
+References: <cover.1306877621.git.bengardiner@nanometrics.ca>
+Message-ID: <3406118d1598e5e279108dd94c63ced1fa8d02bc.1306877621.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 May 2011 23:11:14 +0400
-Sergei Shtylyov <sshtylyov@mvista.com> wrote:
+The current davinci init sets up SRAM in iotables. There has been an observed
+failure to boot a da850 with 128K specified in the iotable.
 
-> Hello.
-> 
-> Marc Zyngier wrote:
-> 
-> > In the process of moving platforms away from integrator-flash
-> > (aka armflash), add to physmap the few features that make
-> > armflash unique:
-> 
-> > - optionnal probing for the AFS partition type
-> > - init() and exit() methods, used by Integrator to control
-> >   write access to the various onboard programmable components
-> 
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: David Woodhouse <dwmw2@infradead.org>
-> [...]
-> 
-> > diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
-> > index bcfd9f7..d37cca0 100644
-> > --- a/include/linux/mtd/physmap.h
-> > +++ b/include/linux/mtd/physmap.h
-> > @@ -22,6 +22,8 @@ struct map_info;
-> >  
-> >  struct physmap_flash_data {
-> >  	unsigned int		width;
-> > +	int			(*init)(struct platform_device *);
-> > +	void			(*exit)(struct platform_device *);
-> 
->     How about a declaration for 'struct platform_device' beforehand? This breaks 
-> build on other platforms at least...
+Make the davinci sram allocator -- now based on RMK's consolidated SRAM
+support -- do an ioremap of the region specified by the entries in
+davinci_soc_info before registering with pv_pool_create().
 
-Sure. Please send a patch.
+This commit breaks runtime of davinci boards since the regions that
+the sram init is now trying to ioremap have been iomapped by their
+iotable entries. The iotable entries will be removed in the patches
+to come.
 
-	M.
+Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+CC: Sekhar Nori <nsekhar@ti.com>
+
+---
+Changes since v1:
+ * return -ENOMEM if ioremap fails (Sekhar Nori)
+
+---
+ arch/arm/mach-davinci/sram.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
+index 2c53db2..68b05d5 100644
+--- a/arch/arm/mach-davinci/sram.c
++++ b/arch/arm/mach-davinci/sram.c
+@@ -8,6 +8,7 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
++#include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ 
+@@ -25,6 +26,7 @@ EXPORT_SYMBOL_GPL(davinci_gen_pool);
+  */
+ static int __init sram_init(void)
+ {
++	void *addr;
+ 	unsigned len = davinci_soc_info.sram_len;
+ 
+ 	if (!len)
+@@ -36,8 +38,12 @@ static int __init sram_init(void)
+ 	if (!davinci_gen_pool)
+ 		return -ENOMEM;
+ 
+-	WARN_ON(gen_pool_add_virt(davinci_gen_pool, SRAM_VIRT,
+-				  davinci_soc_info.sram_phys, len, -1));
++	addr = ioremap(davinci_soc_info.sram_phys, len);
++	if (!addr)
++		return -ENOMEM;
++	if (WARN_ON(gen_pool_add_virt(davinci_gen_pool, addr,
++				  davinci_soc_info.sram_phys, len, -1)))
++		iounmap(addr);
+ 
+ 	return 0;
+ }
 -- 
-I'm the slime oozin' out from your TV set...
+1.7.4.1
