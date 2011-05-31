@@ -1,53 +1,65 @@
 From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Tue, 31 May 2011 11:55:31 -0500
-Subject: [PATCH 3/4] ARM: ep93xx: add model detection for ts-7300 and
-	ts-7400 boards
-In-Reply-To: <1306665346-26657-4-git-send-email-ynezz@true.cz>
-References: <1306665346-26657-1-git-send-email-ynezz@true.cz>
-	<1306665346-26657-4-git-send-email-ynezz@true.cz>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC48CF@AUSP01VMBX24.collaborationhost.net>
+Date: Tue, 31 May 2011 13:39:11 -0500
+Subject: [PATCH v2] ARM: ep93xx: use more reliable CPLD watchdog for
+	reset on ts72xx
+In-Reply-To: <1306866846-3167-1-git-send-email-ynezz@true.cz>
+References: <ADE657CA350FB648AAC2C43247A983F001F381FC48C8@AUSP01VMBX24.collaborationhost.net>
+	<1306866846-3167-1-git-send-email-ynezz@true.cz>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday, May 29, 2011 3:36 AM, Petr ?tetiar wrote:
-> Subject: [PATCH 3/4] ARM: ep93xx: add model detection for ts-7300 and ts-7400 boards
+On Tuesday, May 31, 2011 11:34 AM, Petr ?tetiar wrote:
+> On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
+> available, so use this one to reset the board instead of the soft reset in
+> CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
+> while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
+> so far.
 > 
-> Cc: Ryan Mallon <ryan@bluewatersys.com>
 > Cc: Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
 > Signed-off-by: Petr ?tetiar <ynezz@true.cz>
 > ---
->  arch/arm/mach-ep93xx/include/mach/ts72xx.h |   12 ++++++++++++
+>  arch/arm/mach-ep93xx/include/mach/system.h |   12 ++++++++++++
 >  1 files changed, 12 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/mach-ep93xx/include/mach/ts72xx.h b/arch/arm/mach-ep93xx/include/mach/ts72xx.h
-> index 0eabec6..ee7f875 100644
-> --- a/arch/arm/mach-ep93xx/include/mach/ts72xx.h
-> +++ b/arch/arm/mach-ep93xx/include/mach/ts72xx.h
-> @@ -20,6 +20,8 @@
->  #define TS72XX_MODEL_TS7200		0x00
->  #define TS72XX_MODEL_TS7250		0x01
->  #define TS72XX_MODEL_TS7260		0x02
-> +#define TS72XX_MODEL_TS7300		0x03
-> +#define TS72XX_MODEL_TS7400		0x04
+> diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
+> index 6d661fe..8d31c4d 100644
+> --- a/arch/arm/mach-ep93xx/include/mach/system.h
+> +++ b/arch/arm/mach-ep93xx/include/mach/system.h
+> @@ -2,7 +2,10 @@
+>   * arch/arm/mach-ep93xx/include/mach/system.h
+>   */
 >  
->  
->  #define TS72XX_OPTIONS_PHYS_BASE	0x22400000
-> @@ -66,6 +68,16 @@ static inline int board_is_ts7260(void)
->  	return __raw_readb(TS72XX_MODEL_VIRT_BASE) == TS72XX_MODEL_TS7260;
->  }
->  
-> +static inline int board_is_ts7300(void)
-> +{
-> +	return __raw_readb(TS72XX_MODEL_VIRT_BASE) == TS72XX_MODEL_TS7300;
-> +}
+> +#include <linux/io.h>
 > +
-> +static inline int board_is_ts7400(void)
-> +{
-> +	return __raw_readb(TS72XX_MODEL_VIRT_BASE) == TS72XX_MODEL_TS7400;
-> +}
-> +
->  static inline int is_max197_installed(void)
+>  #include <mach/hardware.h>
+> +#include <mach/ts72xx.h>
+>  
+>  static inline void arch_idle(void)
 >  {
->  	return !!(__raw_readb(TS72XX_OPTIONS_VIRT_BASE) &
+> @@ -14,6 +17,15 @@ static inline void arch_reset(char mode, const char *cmd)
+>  	local_irq_disable();
+>  
+>  	/*
+> +	 * It's more reliable to use CPLD watchdog to perform the reset
+> +	 */
+> +	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
+> +	    board_is_ts7300() || board_is_ts7400()) {
+> +		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
+> +		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
+> +	}
 
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Your missing the 'else' here.  Without it the ts-xxxx boards will fiddle with
+the CPLD watchdog to do the reset but the SWRST bit might still get toggled if
+the reset does not occur quick enough.  This might result in you still getting
+the "weird" lockup.
+
+> +
+> +	/*
+>  	 * Set then clear the SWRST bit to initiate a software reset
+>  	 */
+>  	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+
+Regards,
+Hartley
