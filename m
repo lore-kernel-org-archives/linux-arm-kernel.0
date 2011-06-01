@@ -1,33 +1,22 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 01 Jun 2011 14:43:43 +0300
-Subject: [PATCH 0/8] clean-up NAND / BBT code, flags
-In-Reply-To: <1306884687-1824-1-git-send-email-computersforpeace@gmail.com>
-References: <1306884687-1824-1-git-send-email-computersforpeace@gmail.com>
-Message-ID: <1306928623.4405.108.camel@localhost>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 1 Jun 2011 13:48:43 +0200
+Subject: [PATCH 0/3] Fixes for breakage resulting from syscore_ops patch on
+	s3c24xx
+Message-ID: <201106011348.47145.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-05-31 at 16:31 -0700, Brian Norris wrote:
-> Hello,
-> 
-> This patch series handles several issues with NAND chip flags and BBT
-> flags, especially those related to the nand_chip.options and
-> nand_bbt_descr.options fields. This topic was discussed and reviewed a
-> bit on the linux-mtd thread found here:
->     http://lists.infradead.org/pipermail/linux-mtd/2011-April/035146.html
-> 
-> These changes have affected many drivers in relatively small ways, so
-> I copied all the maintainers/contributors given by the
-> scripts/getmaintainer.pl scripts. FYI, this patch set is based on the
-> mtd-2.6.git repository from linux-mtd.
-> 
-> Also, the first patch:
->     mtd: nand: remove NAND_BBT_SCANBYTE1AND6 option
-> solves the regression issues discussed here:
->     http://lists.infradead.org/pipermail/linux-mtd/2011-May/035696.html
+The syscore_ops patch from Rafael J. Wysocki introduced some small
+glitches for the S3C24XX cpus resulting in compile errors.
 
-Looks good to me, thank you. Pushed to l2-mtd-2.6.git.
+Heiko Stuebner (3):
+  Fix missing struct for s3c2410_dma_chan in s3c2410_dma_suspend_chan
+  Move s3c24xx_irq_syscore_ops to plat-s3c24xx/irq.c
+  remove the now empty mach-s3c2410/irq.c
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+ arch/arm/mach-s3c2410/Makefile |    1 -
+ arch/arm/mach-s3c2410/irq.c    |   34 ----------------------------------
+ arch/arm/plat-s3c24xx/dma.c    |    2 +-
+ arch/arm/plat-s3c24xx/irq.c    |    6 ++++++
+ 4 files changed, 7 insertions(+), 36 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2410/irq.c
