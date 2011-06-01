@@ -1,18 +1,29 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Wed, 1 Jun 2011 09:57:15 +0200
-Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
-In-Reply-To: <BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
-References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>	<alpine.LFD.2.02.1105311236250.3078@ionos>	<4DE51EB7.7010606@stericsson.com>
-	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
-Message-ID: <4DE5F0DB.2050409@stericsson.com>
+From: avictor.za@gmail.com (Andrew Victor)
+Date: Wed, 1 Jun 2011 10:00:47 +0200
+Subject: [RFC] Consolidation: Replace all led drivers in arch/arm to leds
+	trigger drivers
+In-Reply-To: <BANLkTimRM=Uq6FUN-tvGrf3HLN3BUYqmOQ@mail.gmail.com>
+References: <BANLkTimRM=Uq6FUN-tvGrf3HLN3BUYqmOQ@mail.gmail.com>
+Message-ID: <BANLkTikZ4bo8_MO68SZSyAeFdZVLJkAnkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/31/2011 11:18 PM, Linus Walleij wrote:
-> Does it work to register the clocksource with say a core_initcall()
-> and avoid the header altogether?
-I wanted the init to be called from the struct sys_timer init call. 
-Mainly because it is really early and it seems to be what others do but 
-if we now want to move things out of the platform code it might make 
-sense to remove that dependency.
-I'll experiment with it during the day and see how it goes.
+hi Bryan,
+
+> arch/arm/mach-at91/leds.c
+
+That file also has common initialization & registration code for the
+"leds-gpio" and "leds-atmel-pwm" devices, but the old CONFIG_LEDS
+section can be dropped.
+
+
+> Or we can just delete some leds driver such as
+> arch/arm/mach-ks8695/leds.c, since nobody is using that driver in
+> ks8695.
+
+That file can be deleted, and also drop the ks8695_init_leds() from
+arch/arm/mach-ks8695/devices.c.
+
+
+Regards,
+  Andrew Victor
