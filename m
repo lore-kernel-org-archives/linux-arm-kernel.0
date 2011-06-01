@@ -1,46 +1,62 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 1 Jun 2011 10:46:00 -0600
-Subject: [PATCH] gpio: ep93xx: move driver to drivers/gpio
-In-Reply-To: <20110601082631.GC3660@n2100.arm.linux.org.uk>
-References: <201105311249.30372.hartleys@visionengravers.com>
-	<BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
-	<ADE657CA350FB648AAC2C43247A983F001F381FC4A77@AUSP01VMBX24.collaborationhost.net>
-	<BANLkTikp=Pbh+r3od7fKRP4A7wJrC-i25A@mail.gmail.com>
-	<20110601082631.GC3660@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=0_t6+=8Ww+a+jX4SR5ni9KQnYqA@mail.gmail.com>
+Date: Wed, 1 Jun 2011 10:47:06 -0600
+Subject: [RFC 1/2] ARM:Tegra: Device Tree Support: Initialize the audio
+	card from the device tree.
+In-Reply-To: <BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205706.21000.34832.stgit@riker>
+	<BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
+Message-ID: <BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2011 at 2:26 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, May 31, 2011 at 05:28:26PM -0600, Grant Likely wrote:
->> > [...]Should I change this to:
->> >
->> > +config GPIO_EP93XX
->> > + ? ? ? bool
->> > + ? ? ? depends on ARCH_EP93XX
->> > + ? ? ? default y
->> >
->> > Or like the Samsung drivers, without the visibility:
->> >
->> > +config GPIO_EP93XX
->> > + ? ? ? bool
->> > + ? ? ? depends on ARM
->> > + ? ? ? default y if ARCH_EP93XX
+On Wed, Jun 1, 2011 at 1:07 AM, Barry Song <21cnbao@gmail.com> wrote:
+> 2011/5/28 John Bonesio <bones@secretlab.ca>:
+>> This patch makes it so the top level audio card is initialized from the device
+>> tree. This is just the first step getting the audio complex of devices
+>> iniialized from device tree nodes.
 >>
->> I like the former.
+>> Signed-off-by: John Bonesio<bones@secretlab.ca>
+>> ---
+>>
+>> ?arch/arm/boot/dts/tegra-harmony.dts | ? ?4 +++
+>> ?arch/arm/mach-tegra/board-dt.c ? ? ?| ? ?3 ++
+>> ?sound/soc/tegra/harmony.c ? ? ? ? ? | ? 45 ++++++++++++++++++++++++++++++++---
+>> ?3 files changed, 48 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+>> index 05521a5..217a7f0 100644
+>> --- a/arch/arm/boot/dts/tegra-harmony.dts
+>> +++ b/arch/arm/boot/dts/tegra-harmony.dts
+>> @@ -53,6 +53,10 @@
+>> ? ? ? ? ? ? ? ?clock-frequency = <400000>;
+>> ? ? ? ?};
+>>
+>> + ? ? ? harmony_audio: audio_card {
+>> + ? ? ? ? ? ? ? compatible = "nvidia,harmony-audio";
+>> + ? ? ? };
+>> +
+>> ? ? ? ?serial at 70006300 {
+>> ? ? ? ? ? ? ? ?status = "ok";
+>> ? ? ? ? ? ? ? ?clock-frequency = < 216000000 >;
+>> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+>> index c498e84..a569ad9 100644
+>> --- a/arch/arm/mach-tegra/board-dt.c
+>> +++ b/arch/arm/mach-tegra/board-dt.c
+>> @@ -56,6 +56,9 @@ static struct platform_device *tegra250_devices[] __initdata = {
+>> ? ? ? ?&tegra_i2c_device2,
+>> ? ? ? ?&tegra_i2c_device3,
+>> ? ? ? ?&tegra_i2c_device4,
+>> + ? ? ? &tegra_i2s_device1,
+>> + ? ? ? &tegra_das_device,
+>> + ? ? ? &tegra_pcm_device,
 >
-> Even better is:
->
-> config GPIO_EP93XX
-> ? ? ? ?def_bool y
-> ? ? ? ?depends on ARCH_EP93XX
+> i am thinking whether platform_device should be created by
+> of_platform_device_create after scanning device tree, but not by
+> hard-code? looks like the two patches are only trying to let device
+> tree deliver gpio to drivers?
 
-Yup.
+Can you please restate your question?  I don't think I understand what
+you are trying to ask.
 
 g.
-
-
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
