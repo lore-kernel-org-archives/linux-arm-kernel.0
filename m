@@ -1,35 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2011 17:01:44 +0100
-Subject: [PATCH] arm: fix lockdep warning of "unannotated irqs-off"
-In-Reply-To: <20110601235221.5aab9182@tom-ThinkPad-T410>
-References: <20110601154259.12487694@tom-ThinkPad-T410>
-	<20110601093436.GF3660@n2100.arm.linux.org.uk>
-	<20110601211751.69b85eeb@tom-ThinkPad-T410>
-	<20110601132233.GG3660@n2100.arm.linux.org.uk>
-	<20110601222829.6eaad0e6@tom-ThinkPad-T410>
-	<20110601144630.GL3660@n2100.arm.linux.org.uk>
-	<20110601235221.5aab9182@tom-ThinkPad-T410>
-Message-ID: <20110601160144.GN3660@n2100.arm.linux.org.uk>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Wed, 01 Jun 2011 20:01:34 +0400
+Subject: [PATCH 1/3] Fix missing struct for s3c2410_dma_chan
+	in	s3c2410_dma_suspend_chan
+In-Reply-To: <201106011350.44375.heiko@sntech.de>
+References: <201106011348.47145.heiko@sntech.de>
+	<201106011350.44375.heiko@sntech.de>
+Message-ID: <4DE6625E.2070907@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 11:52:21PM +0800, Ming Lei wrote:
-> Except for tracing max time of irq disable, lock proving has to be
-> supported if user needs it. So we should introduces the changes below
-> into the patch:
+Hello.
 
-No, you've completely missed the point: when we are not doing latency
-analysis of IRQs-off regions, there is _no_ _point_ in telling the
-kernel that IRQs are on while userspace is running - userspace will not
-be taking any kernel locks itself.
+Heiko St?bner wrote:
 
-So, the way things are setup at the moment on ARM, we "optimize" the
-overhead of telling lockdep that IRQs are enabled while userspace is
-running away _provided_ we are not doing IRQs-off latency tracing.
-IOW, when CONFIG_IRQSOFF_TRACER is not set, we optimize away the
-trace_hardirq_on call when entering userspace, and the trace_hardirq_off
-call when leaving userspace.
+> s3c2410_dma_chan is not a type itself, so struct is required.
 
-I'm not sure why you're not grasping that, but I've explained it to you
-several times in telling you that when CONFIG_IRQSOFF_TRACER is not set,
-the kernel treats userspace as an IRQs-off region.
+    Your signoffs are missing, so your patches can't be applied...
+
+WBR, Sergei
