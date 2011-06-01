@@ -1,38 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2011 16:50:16 +0100
-Subject: IrDA driver fails on PXA255
-In-Reply-To: <20110601075420.GB3660@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
-	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
-	<alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
-	<20110529215656.GA5576@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
-	<20110531072650.GC21382@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
-	<20110531210027.GA3660@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105311501570.16259@chino.kir.corp.google.com>
-	<20110601075420.GB3660@n2100.arm.linux.org.uk>
-Message-ID: <20110601155016.GM3660@n2100.arm.linux.org.uk>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 1 Jun 2011 11:59:25 -0400 (EDT)
+Subject: [PATCH v2 0/2] sdio: add quirk for spurious SDIO IRQ
+In-Reply-To: <1306918113-23872-1-git-send-email-per.forlin@stericsson.com>
+References: <1306918113-23872-1-git-send-email-per.forlin@stericsson.com>
+Message-ID: <alpine.LFD.2.00.1106011157000.30544@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 08:54:20AM +0100, Russell King - ARM Linux wrote:
-> On Tue, May 31, 2011 at 03:11:40PM -0700, David Rientjes wrote:
-> > The restriction isn't new: GFP_DMA only makes sense with CONFIG_ZONE_DMA.  
-> > The fact that the page allocator completely ignored GFP_DMA in the past 
-> > for CONFIG_ZONE_DMA=n doesn't change that.  That's obviously error prone 
-> > since it will return memory from anywhere simply because of the fact that 
-> > it is an invalid configuration.
+On Wed, 1 Jun 2011, Per Forlin wrote:
+
+> From: Per Forlin <per.forlin@linaro.org>
 > 
-> Your approach to this is wrong.  Make it warn for one release.  Give
-> people a chance to fix things before they become a regression.  Then
-> make it a hard failure.
+> Daniel Drake reported an issue in the libertas sdio client that was
+> triggered by the sdio_single_irq functionality. His SDIO device seems to
+> raise an interrupt even though there are no bits set in the CCCR_INTx
+> register. This behaviour is not supported by the sdio_single_irq feature nor
+> the SDIO spec. The purpose of the sdio_single_irq feature is to avoid the
+> overhead of checking the CCCR_INTx registers, this result in no error
+> handling of the case if there is a pending IRQ with none CCCR_INTx bits set.
+> 
+> This patchset adds a quirk to support this spurious IRQ issue and also report
+> a warning if an SDIO interrupt is raised but none CCCR_INTx bits are set.
 
-And to prove that its not just this driver, I've now received a report
-that it fails with the CF PATA driver on Zaurus.  Should we make the
-PATA subsystem select CONFIG_ZONE_DMA too, or should we give people
-some grace period to fix the drivers as _everyone_ except you is
-suggesting.
+Given that the issue can be fixed locally to the libertas driver, I'd 
+suggest not merging this series until truly unfixable issues come up, as 
+Daniel said.
 
-Please do the sensible thing.  Make it warn for a release like everyone
-is telling you to.
+
+Nicolas
