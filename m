@@ -1,13 +1,14 @@
 From: julia@diku.dk (Julia Lawall)
-Date: Wed,  1 Jun 2011 19:10:12 +0200
-Subject: [PATCH 9/10] arch/arm/mach-omap2/clock.c: add missing clk_put
-Message-ID: <1306948213-20767-9-git-send-email-julia@diku.dk>
+Date: Wed,  1 Jun 2011 19:10:11 +0200
+Subject: [PATCH 8/10] drivers/video/imxfb.c: add missing clk_put
+Message-ID: <1306948213-20767-8-git-send-email-julia@diku.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Julia Lawall <julia@diku.dk>
 
-Add missing call to clk_put.
+Reorder the labels at the end of the function to correspond to the order in
+which the resources are allocated.
 
 A simplified version of the semantic match that finds this problem is as
 follows: (http://coccinelle.lip6.fr/)
@@ -31,18 +32,23 @@ if (...) { ... when != clk_put(e1)
 Signed-off-by: Julia Lawall <julia@diku.dk>
 
 ---
- arch/arm/mach-omap2/clock.c |    1 +
- 1 file changed, 1 insertion(+)
+ drivers/video/imxfb.c |    4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/clock.c b/arch/arm/mach-omap2/clock.c
-index 180299e..bf9c36c 100644
---- a/arch/arm/mach-omap2/clock.c
-+++ b/arch/arm/mach-omap2/clock.c
-@@ -453,6 +453,7 @@ int __init omap2_clk_switch_mpurate_at_boot(const char *mpurate_ck_name)
- 	if (IS_ERR_VALUE(r)) {
- 		WARN(1, "clock: %s: unable to set MPU rate to %d: %d\n",
- 		     mpurate_ck->name, mpurate, r);
-+		clk_put(mpurate_ck);
- 		return -EINVAL;
- 	}
- 
+diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+index d2ccfd6..f135dbe 100644
+--- a/drivers/video/imxfb.c
++++ b/drivers/video/imxfb.c
+@@ -856,10 +856,10 @@ failed_platform_init:
+ 		dma_free_writecombine(&pdev->dev,fbi->map_size,fbi->map_cpu,
+ 			fbi->map_dma);
+ failed_map:
+-	clk_put(fbi->clk);
+-failed_getclock:
+ 	iounmap(fbi->regs);
+ failed_ioremap:
++	clk_put(fbi->clk);
++failed_getclock:
+ 	release_mem_region(res->start, resource_size(res));
+ failed_req:
+ 	kfree(info->pseudo_palette);
