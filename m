@@ -1,138 +1,153 @@
-From: metan@ucw.cz (Cyril Hrubis)
-Date: Wed, 1 Jun 2011 17:41:54 +0200
-Subject: zaurus 3.0-rc1 Oops (fail GFP_DMA allocations when ZONE_DMA is not
-	configured)
-Message-ID: <20110601154154.GB26197@atrey.karlin.mff.cuni.cz>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Wed, 1 Jun 2011 23:52:21 +0800
+Subject: [PATCH] arm: fix lockdep warning of "unannotated irqs-off"
+In-Reply-To: <20110601144630.GL3660@n2100.arm.linux.org.uk>
+References: <20110601154259.12487694@tom-ThinkPad-T410>
+	<20110601093436.GF3660@n2100.arm.linux.org.uk>
+	<20110601211751.69b85eeb@tom-ThinkPad-T410>
+	<20110601132233.GG3660@n2100.arm.linux.org.uk>
+	<20110601222829.6eaad0e6@tom-ThinkPad-T410>
+	<20110601144630.GL3660@n2100.arm.linux.org.uk>
+Message-ID: <20110601235221.5aab9182@tom-ThinkPad-T410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-The 3.0-rc1 no longer boots on spitz see the attached Oops.
 
-The bisecting pointed to this commit, reverting it machine boots again.
+Hi,
 
-commit a197b59ae6e8bee56fcef37ea2482dc08414e2ac
-Author: David Rientjes <rientjes@google.com>
-Date:   Tue May 24 17:12:35 2011 -0700
+On Wed, 1 Jun 2011 15:46:30 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-    mm: fail GFP_DMA allocations when ZONE_DMA is not configured
-    
-    The page allocator will improperly return a page from ZONE_NORMAL even
-    when __GFP_DMA is passed if CONFIG_ZONE_DMA is disabled.  The caller
-    expects DMA memory, perhaps for ISA devices with 16-bit address registers,
-    and may get higher memory resulting in undefined behavior.
-    
-    This patch causes the page allocator to return NULL in such circumstances
-    with a warning emitted to the kernel log on the first occurrence.
-    
-    Signed-off-by: David Rientjes <rientjes@google.com>
-    Cc: Mel Gorman <mel@csn.ul.ie>
-    Cc: KOSAKI Motohiro <kosaki.motohiro@jp.fujitsu.com>
-    Cc: KAMEZAWA Hiroyuki <kamezawa.hiroyu@jp.fujitsu.com>
-    Cc: Rik van Riel <riel@redhat.com>
-    Signed-off-by: Andrew Morton <akpm@linux-foundation.org>
-    Signed-off-by: Linus Torvalds <torvalds@linux-foundation.org>
+> I still don't see what the problem is.  
 
-diff --git a/mm/page_alloc.c b/mm/page_alloc.c
-index 01e6b61..10a8c6d 100644
---- a/mm/page_alloc.c
-+++ b/mm/page_alloc.c
-@@ -2247,6 +2247,10 @@ __alloc_pages_nodemask(gfp_t gfp_mask, unsigned int order,
+Simply speaking, there are two usages which does need to trace irq
+disable and enable. One is to prove locking correctness in lockdep,
+such as a lock can't be held in hardirq enable state if the lock
+was held in hardirq context. Another is to trace the max time of
+irq disable, which is implemented in ftrace.
+
+If the former case is to be supported, CONFIG_PROVE_LOCKING should
+be selected. If the latter is to be supported, CONFIG_IRQSOFF_TRACER
+should be enabled. Both the two options will have to select
+CONFIG_TRACE_IRQFLAGS.
+
+If CONFIG_TRACE_IRQFLAGS is enabled, trace_hardirqs_off/on are surely
+to be defined, but the implementation will be different between
+CONFIG_PROVE_LOCKING case and non-CONFIG_PROVE_LOCKING case.
+So you will find there are different implementations of
+trace_hardirqs_off/on in kernel/lockdep.c and
+kernel/trace/trace_irqsoff.c.
+
+That is why the patch uses CONFIG_TRACE_IRQFLAGS as dependency.
+
+> If CONFIG_IRQSOFF_TRACER is
+> not set, then we do not tell the kernel that IRQs have been enabled
+> upon exit to user space, and we do not tell the kernel that IRQs have
+> been disabled upon entry to kernel space.
+> 
+> So your patch which makes us always report an IRQs off condition on
+> entry to __irq_usr makes no sense what so ever to me.
+
+Except for tracing max time of irq disable, lock proving has to be
+supported if user needs it. So we should introduces the changes below
+into the patch:
+
+diff --git a/arch/arm/kernel/entry-common.S
+b/arch/arm/kernel/entry-common.S index b2a27b6..9494792 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -69,7 +69,7 @@ ENTRY(ret_to_user_from_irq)
+ 	tst	r1, #_TIF_WORK_MASK
+ 	bne	work_pending
+ no_work_pending:
+-#if defined(CONFIG_IRQSOFF_TRACER)
++#if defined(CONFIG_TRACE_IRQFLAGS)
+ 	asm_trace_hardirqs_on
+ #endif
+ 	/* perform architecture specific actions before user return */
+
+In fact, the old dependency is wrong.
+
+> 
+> Please explain how we get to a situation where we're entering
+> __irq_usr in the CONFIG_IRQSOFF_TRACER unset case where the kernel
+> incorrectly believes that IRQs are unmasked.
+
+Above should explain this.
+
+> 
+> Once you've done that, now analyze the case where
+> CONFIG_IRQSOFF_TRACER is set.  There, we tell the kernel that IRQs
+> are enabled before returning to userspace, and that IRQs are disabled
+> when entering the kernel.  It is only _now_ that we're missing the
+> irq-off annotation on entry to the interrupt handler.
+
+I don't see there are any issue now.
+
+> Ergo, it should depend on CONFIG_IRQSOFF_TRACER, not
+> CONFIG_TRACE_IRQFLAGS.
+
+So how about v2 of the patch below?
+
+---
+ arch/arm/kernel/entry-armv.S   |    6 +++++-
+ arch/arm/kernel/entry-common.S |    4 +++-
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index e8d8856..7780dc9 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -435,6 +435,10 @@ __irq_usr:
+ 	usr_entry
+ 	kuser_cmpxchg_check
  
-        if (should_fail_alloc_page(gfp_mask, order))
-                return NULL;
-+#ifndef CONFIG_ZONE_DMA
-+       if (WARN_ON_ONCE(gfp_mask & __GFP_DMA))
-+               return NULL;
++#ifdef CONFIG_TRACE_IRQFLAGS
++	bl      trace_hardirqs_off
 +#endif
++
+ 	get_thread_info tsk
+ #ifdef CONFIG_PREEMPT
+ 	ldr	r8, [tsk, #TI_PREEMPT]		@ get preempt count
+@@ -453,7 +457,7 @@ __irq_usr:
+ #endif
  
-        /*
-         * Check the zones suitable for the gfp_mask contain at least one
-
+ 	mov	why, #0
+-	b	ret_to_user
++	b	ret_to_user_from_irq
+  UNWIND(.fnend		)
+ ENDPROC(__irq_usr)
+ 
+diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
+index 1e7b04a..9494792 100644
+--- a/arch/arm/kernel/entry-common.S
++++ b/arch/arm/kernel/entry-common.S
+@@ -64,17 +64,19 @@ work_resched:
+ ENTRY(ret_to_user)
+ ret_slow_syscall:
+ 	disable_irq				@ disable interrupts
++ENTRY(ret_to_user_from_irq)
+ 	ldr	r1, [tsk, #TI_FLAGS]
+ 	tst	r1, #_TIF_WORK_MASK
+ 	bne	work_pending
+ no_work_pending:
+-#if defined(CONFIG_IRQSOFF_TRACER)
++#if defined(CONFIG_TRACE_IRQFLAGS)
+ 	asm_trace_hardirqs_on
+ #endif
+ 	/* perform architecture specific actions before user return */
+ 	arch_ret_to_user r1, lr
+ 
+ 	restore_user_regs fast = 0, offset = 0
++ENDPROC(ret_to_user_from_irq)
+ ENDPROC(ret_to_user)
+ 
+ /*
 -- 
-metan
--------------- next part --------------
-pcmcia_socket pcmcia_socket1: pccard: PCMCIA card inserted into slot 1
-pcmcia 1.0: pcmcia: registering new device pcmcia1.0 (IRQ: 202)
-mmc0: new SD card at address 0002
-scsi0 : pata_pcmcia
-ata1: PATA max PIO0 cmd 0xc4840000 ctl 0xc484000e irq 202
-mmcblk0: mmc0:0002 00000 1.90 GiB
- mmcblk0: p1
-ata1.00: CFA: LEXAR ATA FLASH, 20051220, max MWDMA4
-ata1.00: 16128000 sectors, multi 0: LBA
-ata1.00: configured for PIO0
-scsi 0:0:0:0: Direct-Access     ATA      LEXAR ATA FLASH  2005 PQ: 0 ANSI: 5
-------------[ cut here ]------------
-WARNING: at mm/page_alloc.c:2251 __alloc_pages_nodemask+0x90/0x5a0()
-Modules linked in:
----[ end trace a76f77d0364258f5 ]---
-sd 0:0:0:0: [sda] READ CAPACITY(16) failed
-sd 0:0:0:0: [sda]  Result: hostbyte=0x00 driverbyte=0x04
-sd 0:0:0:0: [sda] Sense not available.
-sd 0:0:0:0: [sda] READ CAPACITY failed
-sd 0:0:0:0: [sda]  Result: hostbyte=0x00 driverbyte=0x04
-sd 0:0:0:0: [sda] Sense not available.
-sd 0:0:0:0: [sda] Write Protect is off
-sd 0:0:0:0: [sda] Asking for cache data failed
-sd 0:0:0:0: [sda] Assuming drive cache: write through
-wm8750-codec 0-001b: asoc: failed to add kcontrol Differential Mux
-sd 0:0:0:0: [sda] READ CAPACITY(16) failed
-sd 0:0:0:0: [sda]  Result: hostbyte=0x00 driverbyte=0x04
-wm8750-codec 0-001b: asoc: failed to add kcontrol Out3 Mux
-sd 0:0:0:0: [sda] Sense not available.
-wm8750-codec 0-001b: asoc: failed to add kcontrol Right Line Mux
-sd 0:0:0:0: [sda] READ CAPACITY failed
-sd 0:0:0:0: [sda]
-wm8750-codec 0-001b: asoc: failed to add kcontrol Left Line Mux
-Result: hostbyte=0x00 driverbyte=0x04
-sd 0:0:0:0: [sda] Sense not available.
-wm8750-codec 0-001b: asoc: failed to add kcontrol Right PGA Mux
-sd 0:0:0:0: [sda] Asking for cache data failed
-wm8750-codec 0-001b: asoc: failed to add kcontrol Left PGA Mux
-sd 0:0:0:0: [sda] Assuming drive cache: write through
-sd 0:0:0:0: [sda] Attached SCSI removable disk
-asoc: wm8750-hifi <-> pxa2xx-i2s mapping ok
-ALSA device list:
-  #0: Spitz
-TCP cubic registered
-NET: Registered protocol family 17
-NET: Registered protocol family 15
-XScale iWMMXt coprocessor detected.
-pxa-rtc pxa-rtc: setting system clock to 2011-06-01 10:31:14 UTC (1306924274)
-Waiting 1sec before mounting root device...
-Unable to handle kernel NULL pointer dereference at virtual address 000001d4
-pgd = c0004000
-[000001d4] *pgd=00000000
-Internal error: Oops: f5 [#1] PREEMPT
-Modules linked in:
-CPU: 0    Tainted: G        W    (3.0.0-rc1 #16)
-PC is at blkdev_get+0x31c/0x3bc
-LR is at blkdev_get+0x2f4/0x3bc
-pc : [<c00ccdac>]    lr : [<c00ccd84>]    psr: 60000013
-sp : c3831e30  ip : 9e370001  fp : c3831e44
-r10: c34041b0  r9 : 00000000  r8 : 00000083
-r7 : c03298b0  r6 : fffffffa  r5 : c34041a0  r4 : c3404340
-r3 : 00000000  r2 : 00000000  r1 : c3404364  r0 : c03ca188
-Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 0000397f  Table: a0004000  DAC: 00000017
-Process swapper (pid: 1, stack limit = 0xc3830278)
-Stack: (0xc3831e30 to 0xc3832000)
-1e20:                                     c34041a0 c3404364 c3831e44 00000000
-1e40: c3831ecc 00800001 00000000 00000001 c3831e68 c34041a0 00000083 c03298b0
-1e60: 00008000 c03298b0 c38ff820 00000000 00000000 c00ccf2c c380f6e0 00000083
-1e80: 00008000 c00a1aac ffffff9c c38147b8 00000000 c0341da8 c034246c 0000000a
-1ea0: c38ff840 000000d0 c380f750 c380f6e0 c03298b0 c03298b0 00008000 00000000
-1ec0: 00000000 c00f4414 c00f53e8 00008000 c38ff840 c00a0684 c03298b0 00008000
-1ee0: c380f6e0 c03298b0 c38ff840 c00baa34 c03298b0 c38ff820 00000000 c38ff840
-1f00: 00008000 c00baab0 00000000 00000020 c38ff840 00008000 00008000 c00bb214
-1f20: 0000000a c00827f4 00000000 0000000a c380f0a0 c3407100 c3826000 c02dd6bb
-1f40: 00000000 00008000 c02dd6bb 00000000 00000000 c00bb300 00000000 c02e7875
-1f60: c02e7a04 00000000 c38ff840 c38ff820 00008000 c3823000 c3823000 00008000
-1f80: c001cd7c c0008bb4 00000000 00000000 00000000 c0055f60 00000080 c0345d0c
-1fa0: c0023870 c3823000 c004187c c02dd6bb 00800001 c0336b60 c001cd91 c0023870
-1fc0: 00000013 00000000 00000000 c0008ee4 fffffffe 00002710 ffffff9c c0336b00
-1fe0: c001c564 c0008400 00000000 c0008300 c0023870 c0023870 00000000 00000000
-Code: e5933000 e3130002 0a000000 eb0677da (e59931d4)
----[ end trace a76f77d0364258f7 ]---
-Kernel panic - not syncing: Attempted to kill init!
+1.7.4.1
+
+
+
+thanks,
+--
+Ming Lei
