@@ -1,39 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 1 Jun 2011 19:59:53 +0200
-Subject: [PATCH 5/8 v2] ARM i.MX Allow to compile together i.MX1/21/25/27
-In-Reply-To: <20110601164731.GI23771@pengutronix.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<201106011724.26704.arnd@arndb.de>
-	<20110601164731.GI23771@pengutronix.de>
-Message-ID: <201106011959.53679.arnd@arndb.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 1 Jun 2011 20:16:03 +0200
+Subject: [PATCH] Fix build warning of the defconfigs
+In-Reply-To: <1306945763-6583-1-git-send-email-wanlong.gao@gmail.com>
+References: <1306945763-6583-1-git-send-email-wanlong.gao@gmail.com>
+Message-ID: <20110601181603.GA454@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 01 June 2011 18:47:31 Sascha Hauer wrote:
-> > 
-> > Are you sure that this is actually the minimum set that is required?
+On Thu, Jun 02, 2011 at 12:29:23AM +0800, Wanlong Gao wrote:
+> RTC_CLASS is changed to bool.
+> So value 'm' is invalid.
 > 
-> I'd love to remove some of these, but I think they are required.
-> SOC_SELECT_IMX1 and HAVE_SOC_IMX1 are only used to offer the right
-> Kconfig magic.
-> 
-> > 
-> > I assume that you have gone through all the uses of these symbols
-> > to check that there is no silent breakage if you enable more than
-> > one. The only ones that looks suspicious to me are
-> > arch/arm/plat-mxc/include/mach/timex.h
-> 
-> See An earlier patch in this series. The ifdefs are removed and
-> CLOCK_TICK_RATE is replaced with a bogus value. CLOCK_TICK_RATE
-> is unused but still required to compile the kernel.
-> 
-> > and
-> > arch/arm/plat-mxc/include/mach/debug-macro.S.
-> 
-> This can be used only when only one family is compiled in. Doing
-> otherwise should be catched with an error during comppilation.
-> 
+> Signed-off-by: Wanlong Gao <wanlong.gao@gmail.com>
+> ---
+>  arch/arm/configs/davinci_all_defconfig     |    2 +-
+>  arch/arm/configs/mxs_defconfig             |    2 +-
+>  arch/arm/configs/netx_defconfig            |    2 +-
+>  arch/arm/configs/viper_defconfig           |    2 +-
+>  arch/arm/configs/xcep_defconfig            |    2 +-
+>  arch/arm/configs/zeus_defconfig            |    2 +-
+>  arch/avr32/configs/atngw100_mrmt_defconfig |    2 +-
+>  arch/blackfin/configs/CM-BF548_defconfig   |    2 +-
+>  arch/mips/configs/mtx1_defconfig           |    2 +-
+>  arch/powerpc/configs/52xx/pcm030_defconfig |    2 +-
+>  arch/powerpc/configs/ps3_defconfig         |    2 +-
+>  arch/sh/configs/titan_defconfig            |    2 +-
+>  arch/unicore32/configs/debug_defconfig     |    2 +-
+>  13 files changed, 13 insertions(+), 13 deletions(-)
 
-Ok, thanks for the explanations.
+The mxs-part has already been sent by Shawn Guo (shouldn't harm).
 
-	Arnd
+Thanks for doing tree-wide:
+
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110601/fc43e2ff/attachment.sig>
