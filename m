@@ -1,48 +1,72 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Jun 2011 14:52:57 -0700
-Subject: [PATCH/NEXT] ARM: exynos4: fix typo in platsmp.c
-In-Reply-To: <1306164953-31593-1-git-send-email-marc.zyngier@arm.com>
-References: <1306164953-31593-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <4DE6B4B9.8040906@samsung.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Wed, 1 Jun 2011 14:54:46 -0700
+Subject: [PATCH] ep93xx: use gpio_led_register_device
+Message-ID: <201106011454.48049.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/23/11 08:35, Marc Zyngier wrote:
-> Commit e2a083dc0da9aa6437e14811198379b18cdfa7f8 (ARM: consolidate
-> SMP cross call implementation) introduced a typo which leads
-> to a compilation error. Just fix it.
->
-> Cc: Russell King<rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
-> ---
->   arch/arm/mach-exynos4/platsmp.c |    2 +-
->   1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-> index 8403dd2..c5e65a0 100644
-> --- a/arch/arm/mach-exynos4/platsmp.c
-> +++ b/arch/arm/mach-exynos4/platsmp.c
-> @@ -22,7 +22,7 @@
->   #include<linux/io.h>
->
->   #include<asm/cacheflush.h>
-> -#include<asm/hardare/gic.h>
-> +#include<asm/hardware/gic.h>
->   #include<asm/smp_scu.h>
->   #include<asm/unified.h>
->
+Use gpio_led_register_device() to register the leds.
 
-Hi Marc,
+This allows the platform data to live in init memory.
 
-Maybe, Russell fixed this when applied.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+Cc: Richard Purdie <rpurdie@rpsys.net>
 
-As a note, the commit is 0f7b332f9777819a39a3b325690379a7efef89d1
-(ARM: consolidate SMP cross call implementation) in mainline now.
+---
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9e76a75..386673c 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -358,6 +358,7 @@ config ARCH_EP93XX
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARCH_HAS_HOLES_MEMORYMODEL
+ 	select ARCH_USES_GETTIMEOFFSET
++	select LEDS_GPIO_REGISTER
+ 	help
+ 	  This enables support for the Cirrus EP93xx series of CPUs.
+ 
+diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+index 8207954..e294941 100644
+--- a/arch/arm/mach-ep93xx/core.c
++++ b/arch/arm/mach-ep93xx/core.c
+@@ -524,7 +524,7 @@ void __init ep93xx_register_spi(struct ep93xx_spi_info *info,
+ /*************************************************************************
+  * EP93xx LEDs
+  *************************************************************************/
+-static struct gpio_led ep93xx_led_pins[] = {
++static const struct gpio_led ep93xx_led_pins[] __initconst = {
+ 	{
+ 		.name	= "platform:grled",
+ 		.gpio	= EP93XX_GPIO_LINE_GRLED,
+@@ -534,20 +534,11 @@ static struct gpio_led ep93xx_led_pins[] = {
+ 	},
+ };
+ 
+-static struct gpio_led_platform_data ep93xx_led_data = {
++static const struct gpio_led_platform_data ep93xx_led_data __initconst = {
+ 	.num_leds	= ARRAY_SIZE(ep93xx_led_pins),
+ 	.leds		= ep93xx_led_pins,
+ };
+ 
+-static struct platform_device ep93xx_leds = {
+-	.name		= "leds-gpio",
+-	.id		= -1,
+-	.dev		= {
+-		.platform_data	= &ep93xx_led_data,
+-	},
+-};
+-
+-
+ /*************************************************************************
+  * EP93xx pwm peripheral handling
+  *************************************************************************/
+@@ -881,5 +872,6 @@ void __init ep93xx_init_devices(void)
+ 
+ 	platform_device_register(&ep93xx_rtc_device);
+ 	platform_device_register(&ep93xx_ohci_device);
+-	platform_device_register(&ep93xx_leds);
++
++	gpio_led_register_device(-1, &ep93xx_led_data);
+ }
