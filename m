@@ -1,113 +1,57 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Wed, 1 Jun 2011 15:42:59 +0800
-Subject: [PATCH] arm: fix lockdep warning of "unannotated irqs-off"
-Message-ID: <20110601154259.12487694@tom-ThinkPad-T410>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 01 Jun 2011 10:42:46 +0300
+Subject: [PATCH v6 1/8] MTD: Add integrator-flash feature to physmap
+In-Reply-To: <BANLkTim0xrx+33BeoSbXbQcu2Ab6Oin=Wg@mail.gmail.com>
+References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>
+	<1305637877-24436-2-git-send-email-marc.zyngier@arm.com>
+	<4DE53D52.4040508@ru.mvista.com>
+	<20110531224428.6636e283@taxman.wild-wind.fr.eu.org>
+	<BANLkTim0xrx+33BeoSbXbQcu2Ab6Oin=Wg@mail.gmail.com>
+Message-ID: <1306914166.4405.47.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2011-05-31 at 22:20 -0400, Mike Frysinger wrote:
+> On Tue, May 31, 2011 at 17:44, Marc Zyngier wrote:
+> > On Tue, 31 May 2011 23:11:14 +0400 Sergei Shtylyov wrote:
+> >> Marc Zyngier wrote:
+> >> > In the process of moving platforms away from integrator-flash
+> >> > (aka armflash), add to physmap the few features that make
+> >> > armflash unique:
+> >>
+> >> > - optionnal probing for the AFS partition type
+> >> > - init() and exit() methods, used by Integrator to control
+> >> >   write access to the various onboard programmable components
+> >>
+> >> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> > Cc: David Woodhouse <dwmw2@infradead.org>
+> >> [...]
+> >>
+> >> > diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
+> >> > index bcfd9f7..d37cca0 100644
+> >> > --- a/include/linux/mtd/physmap.h
+> >> > +++ b/include/linux/mtd/physmap.h
+> >> > @@ -22,6 +22,8 @@ struct map_info;
+> >> >
+> >> >  struct physmap_flash_data {
+> >> >     unsigned int            width;
+> >> > +   int                     (*init)(struct platform_device *);
+> >> > +   void                    (*exit)(struct platform_device *);
+> >>
+> >>     How about a declaration for 'struct platform_device' beforehand? This breaks
+> >> build on other platforms at least...
+> >
+> > Sure. Please send a patch.
+> 
+> uhh, what ?  you broke things, so you fix them.  i already pointed out
+> this breakage to you over a week ago.
+> -mike
 
->From ad88fff7aaa32b50f77b07dba239bac938fb56c1 Mon Sep 17 00:00:00 2001
-From: Ming Lei <ming.lei@canonical.com>
-Date: Wed, 1 Jun 2011 15:02:24 +0800
-Subject: [PATCH] arm: fix lockdep warning of "unannotated irqs-off"
+The change went in via Russell's tree, I sent him a fix. It looks like
+he did not merge it. Now I'm not sure who should merge this patch. I'll
+ping dwmw2.
 
-This patch fixes the lockdep warning of "unannotated irqs-off"[1].
-
-After entering __irq_usr, arm core will disable interrupt automatically,
-but __irq_usr does not annotate the irq disable, so lockdep may complain
-the warning if it has chance to check this in irq handler.
-
-This patch adds trace_hardirqs_off in __irq_usr before entering irq_handler
-to handle the irq, also calls ret_to_user_from_irq to avoid calling
-disable_irq again.
-
-[1], lockdep warning log of "unannotated irqs-off"
-
-[   13.804687] ------------[ cut here ]------------
-[   13.809570] WARNING: at kernel/lockdep.c:3335 check_flags+0x78/0x1d0()
-[   13.816467] Modules linked in:
-[   13.819732] Backtrace:
-[   13.822357] [<c01cb42c>] (dump_backtrace+0x0/0x100) from [<c06abb14>] (dump_stack+0x20/0x24)
-[   13.831268]  r6:c07d8c2c r5:00000d07 r4:00000000 r3:00000000
-[   13.837280] [<c06abaf4>] (dump_stack+0x0/0x24) from [<c01ffc04>] (warn_slowpath_common+0x5c/0x74)
-[   13.846649] [<c01ffba8>] (warn_slowpath_common+0x0/0x74) from [<c01ffc48>] (warn_slowpath_null+0x2c/0x34)
-[   13.856781]  r8:00000000 r7:00000000 r6:c18b8194 r5:60000093 r4:ef182000
-[   13.863708] r3:00000009
-[   13.866485] [<c01ffc1c>] (warn_slowpath_null+0x0/0x34) from [<c0237d84>] (check_flags+0x78/0x1d0)
-[   13.875823] [<c0237d0c>] (check_flags+0x0/0x1d0) from [<c023afc8>] (lock_acquire+0x4c/0x150)
-[   13.884704] [<c023af7c>] (lock_acquire+0x0/0x150) from [<c06af638>] (_raw_spin_lock+0x4c/0x84)
-[   13.893798] [<c06af5ec>] (_raw_spin_lock+0x0/0x84) from [<c01f9a44>] (sched_ttwu_pending+0x58/0x8c)
-[   13.903320]  r6:ef92d040 r5:00000003 r4:c18b8180
-[   13.908233] [<c01f99ec>] (sched_ttwu_pending+0x0/0x8c) from [<c01f9a90>] (scheduler_ipi+0x18/0x1c)
-[   13.917663]  r6:ef183fb0 r5:00000003 r4:00000000 r3:00000001
-[   13.923645] [<c01f9a78>] (scheduler_ipi+0x0/0x1c) from [<c01bc458>] (do_IPI+0x9c/0xfc)
-[   13.932006] [<c01bc3bc>] (do_IPI+0x0/0xfc) from [<c06b0888>] (__irq_usr+0x48/0xe0)
-[   13.939971] Exception stack(0xef183fb0 to 0xef183ff8)
-[   13.945281] 3fa0:                                     ffffffc3 0001500c 00000001 0001500c
-[   13.953948] 3fc0: 00000050 400b45f0 400d9000 00000000 00000001 400d9600 6474e552 bea05b3c
-[   13.962585] 3fe0: 400d96c0 bea059c0 400b6574 400b65d8 20000010 ffffffff
-[   13.969573]  r6:00000403 r5:fa240100 r4:ffffffff r3:20000010
-[   13.975585] ---[ end trace efc4896ab0fb62cb ]---
-[   13.980468] possible reason: unannotated irqs-off.
-[   13.985534] irq event stamp: 1610
-[   13.989044] hardirqs last  enabled at (1610): [<c01c703c>] no_work_pending+0x8/0x2c
-[   13.997131] hardirqs last disabled at (1609): [<c01c7024>] ret_slow_syscall+0xc/0x1c
-[   14.005371] softirqs last  enabled at (0): [<c01fe5e4>] copy_process+0x2cc/0xa24
-[   14.013183] softirqs last disabled at (0): [<  (null)>]   (null)
-
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
----
- arch/arm/kernel/entry-armv.S   |    6 +++++-
- arch/arm/kernel/entry-common.S |    2 ++
- 2 files changed, 7 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index e8d8856..7780dc9 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -435,6 +435,10 @@ __irq_usr:
- 	usr_entry
- 	kuser_cmpxchg_check
- 
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	bl      trace_hardirqs_off
-+#endif
-+
- 	get_thread_info tsk
- #ifdef CONFIG_PREEMPT
- 	ldr	r8, [tsk, #TI_PREEMPT]		@ get preempt count
-@@ -453,7 +457,7 @@ __irq_usr:
- #endif
- 
- 	mov	why, #0
--	b	ret_to_user
-+	b	ret_to_user_from_irq
-  UNWIND(.fnend		)
- ENDPROC(__irq_usr)
- 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 1e7b04a..b2a27b6 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -64,6 +64,7 @@ work_resched:
- ENTRY(ret_to_user)
- ret_slow_syscall:
- 	disable_irq				@ disable interrupts
-+ENTRY(ret_to_user_from_irq)
- 	ldr	r1, [tsk, #TI_FLAGS]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	work_pending
-@@ -75,6 +76,7 @@ no_work_pending:
- 	arch_ret_to_user r1, lr
- 
- 	restore_user_regs fast = 0, offset = 0
-+ENDPROC(ret_to_user_from_irq)
- ENDPROC(ret_to_user)
- 
- /*
 -- 
-1.7.4.1
-
-
---
-Ming Lei
+Best Regards,
+Artem Bityutskiy (????? ????????)
