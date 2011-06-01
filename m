@@ -1,37 +1,25 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2011 14:22:33 +0100
-Subject: [PATCH] arm: fix lockdep warning of "unannotated irqs-off"
-In-Reply-To: <20110601211751.69b85eeb@tom-ThinkPad-T410>
-References: <20110601154259.12487694@tom-ThinkPad-T410>
-	<20110601093436.GF3660@n2100.arm.linux.org.uk>
-	<20110601211751.69b85eeb@tom-ThinkPad-T410>
-Message-ID: <20110601132233.GG3660@n2100.arm.linux.org.uk>
+Date: Wed, 1 Jun 2011 14:25:33 +0100
+Subject: [PATCH 5/8 v2] ARM i.MX Allow to compile together i.MX1/21/25/27
+In-Reply-To: <20110601132206.GF23771@pengutronix.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<1305823648-2428-6-git-send-email-s.hauer@pengutronix.de>
+	<20110601132206.GF23771@pengutronix.de>
+Message-ID: <20110601132533.GH3660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 09:17:51PM +0800, Ming Lei wrote:
-> Hi,
-> 
-> On Wed, 1 Jun 2011 10:34:36 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Wed, Jun 01, 2011 at 03:42:59PM +0800, Ming Lei wrote:
-> > > @@ -435,6 +435,10 @@ __irq_usr:
-> > >  	usr_entry
-> > >  	kuser_cmpxchg_check
-> > >  
-> > > +#ifdef CONFIG_TRACE_IRQFLAGS
-> > 
-> > I think this wants to be CONFIG_IRQSOFF_TRACER.
-> 
-> IMO, this should be CONFIG_TRACE_IRQFLAGS because we
-> want to trace interrupt disable and enable here, but
-> enabling CONFIG_IRQSOFF_TRACER means interrupt-off
-> latency tracer will be switched on, see kernel/trace/Kconfig.
+On Wed, Jun 01, 2011 at 03:22:06PM +0200, Sascha Hauer wrote:
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9adc278..89c3f16 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -193,7 +193,6 @@ config VECTORS_BASE
+>  
+>  config ARM_PATCH_PHYS_VIRT
+>  	bool "Patch physical to virtual translations at runtime (EXPERIMENTAL)"
+> -	depends on EXPERIMENTAL
 
-If CONFIG_IRQSOFF_TRACER is not set, we don't bother telling the tracer
-that we've turned IRQs on for userspace when we exit from the kernel,
-and we don't bother telling the tracer that we've turned IRQs off when
-entering from userspace back into the kernel.
-
-So, making this depend on CONFIG_TRACE_IRQFLAGS looks wrong to me.
+Please make this a separate patch - which also removes the (EXPERIMENTAL)
+suffix as well.  Options which are experimental are supposed to have that
+tag in the text, options which aren't must not have the tag.
