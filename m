@@ -1,24 +1,49 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Wed, 1 Jun 2011 16:36:23 +0200
-Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
-In-Reply-To: <4DE64D5A.20206@stericsson.com>
-References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
-	<alpine.LFD.2.02.1105311236250.3078@ionos>
-	<4DE51EB7.7010606@stericsson.com>
-	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
-	<4DE5F0DB.2050409@stericsson.com> <4DE64B0E.8030008@stericsson.com>
-	<20110601142507.GK3660@n2100.arm.linux.org.uk>
-	<4DE64D5A.20206@stericsson.com>
-Message-ID: <4DE64E67.2020507@stericsson.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Jun 2011 15:46:30 +0100
+Subject: [PATCH] arm: fix lockdep warning of "unannotated irqs-off"
+In-Reply-To: <20110601222829.6eaad0e6@tom-ThinkPad-T410>
+References: <20110601154259.12487694@tom-ThinkPad-T410>
+	<20110601093436.GF3660@n2100.arm.linux.org.uk>
+	<20110601211751.69b85eeb@tom-ThinkPad-T410>
+	<20110601132233.GG3660@n2100.arm.linux.org.uk>
+	<20110601222829.6eaad0e6@tom-ThinkPad-T410>
+Message-ID: <20110601144630.GL3660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/2011 04:31 PM, Mattias Wallin wrote:
-> On 06/01/2011 04:25 PM, Russell King - ARM Linux wrote:
->> sched_clock is supposed to be setup and initialized really early.  Why
->> are you doing trying to move it soo late?
-> Linus idea was to remove the dependency from mach-ux500/cpu.c where I
-> originally called the init function by using core_initcall.
->
-> Should I use pure_initcall or solve it some other way?
-pure_initcall does not work either.
+On Wed, Jun 01, 2011 at 10:28:29PM +0800, Ming Lei wrote:
+> From lib/Kconfig.debug:
+> 
+> 	config PROVE_LOCKING
+> 		bool "Lock debugging: prove locking correctness"
+> 		......
+> 		select TRACE_IRQFLAGS
+> 
+> you can find locking prove does need to enable TRACE_IRQFLAGS. Meantime,
+> we may not enable irq off tracer via below:
+> 	
+> 	Kernel hacking  --->
+> 		Tracers  --->
+> 			[ ]   Interrupts-off Latency Tracer	
+> 
+> so making this depend on CONFIG_TRACE_IRQFLAGS is reasonable.
+
+I still don't see what the problem is.  If CONFIG_IRQSOFF_TRACER is not
+set, then we do not tell the kernel that IRQs have been enabled upon exit
+to user space, and we do not tell the kernel that IRQs have been disabled
+upon entry to kernel space.
+
+So your patch which makes us always report an IRQs off condition on entry
+to __irq_usr makes no sense what so ever to me.
+
+Please explain how we get to a situation where we're entering __irq_usr
+in the CONFIG_IRQSOFF_TRACER unset case where the kernel incorrectly
+believes that IRQs are unmasked.
+
+Once you've done that, now analyze the case where CONFIG_IRQSOFF_TRACER
+is set.  There, we tell the kernel that IRQs are enabled before returning
+to userspace, and that IRQs are disabled when entering the kernel.  It
+is only _now_ that we're missing the irq-off annotation on entry to the
+interrupt handler.
+
+Ergo, it should depend on CONFIG_IRQSOFF_TRACER, not CONFIG_TRACE_IRQFLAGS.
