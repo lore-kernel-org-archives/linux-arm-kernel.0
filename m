@@ -1,19 +1,38 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Jun 2011 10:43:14 +0100
-Subject: [PATCH 0/5] S3C64xx updates
-Message-ID: <20110601094313.GA23122@opensource.wolfsonmicro.com>
+Date: Wed,  1 Jun 2011 10:44:53 +0100
+Subject: [PATCH 5/5] ARM: S3C6410: Add some lower frequencies for 800MHz base
+	clock operation
+In-Reply-To: <1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
+	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1306921493-30911-5-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This set of patches has all been previously posted prior to the 3.0-rc1
-release, some of them are really quite old now.  Kukjin, I seem to
-recall you said were OK with several of these patches already?
+By extension from the 667MHz based clocks currently supported add 100MHz
+and 200MHz operating points. Due to a lack of documentation these have not
+been confirmed as supported but by extension from the existing frequencies
+they should be OK and there is less risk than with the previuus patch for
+800MHz operation.
 
-Ben Dooks (2):
-      ARM: SAMSUNG: Add support for pre-sleep/post-restore gpio control
-      ARM: S3C64XX: Ensure VIC based IRQs can be resumed from
+Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
+---
+ drivers/cpufreq/s3c64xx.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-Mark Brown (3):
-      CPUFREQ/S3C64xx: Move S3C64xx CPUfreq driver into drivers/cpufreq
-      ARM: S3C6410: Support 800MHz operation in cpufreq
-      ARM: S3C6410: Add some lower frequencies for 800MHz base clock operation
+diff --git a/drivers/cpufreq/s3c64xx.c b/drivers/cpufreq/s3c64xx.c
+index fc69178..c370935 100644
+--- a/drivers/cpufreq/s3c64xx.c
++++ b/drivers/cpufreq/s3c64xx.c
+@@ -36,7 +36,9 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
+ 
+ static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
+ 	{ 0,  66000 },
++	{ 0, 100000 },
+ 	{ 0, 133000 },
++	{ 1, 200000 },
+ 	{ 1, 222000 },
+ 	{ 1, 266000 },
+ 	{ 2, 333000 },
+-- 
+1.7.5.3
