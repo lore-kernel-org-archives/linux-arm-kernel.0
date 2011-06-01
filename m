@@ -1,63 +1,114 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 1 Jun 2011 18:47:31 +0200
-Subject: [PATCH 5/8 v2] ARM i.MX Allow to compile together i.MX1/21/25/27
-In-Reply-To: <201106011724.26704.arnd@arndb.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<1305823648-2428-6-git-send-email-s.hauer@pengutronix.de>
-	<20110601132206.GF23771@pengutronix.de>
-	<201106011724.26704.arnd@arndb.de>
-Message-ID: <20110601164731.GI23771@pengutronix.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 01 Jun 2011 11:52:09 -0500
+Subject: [RFC PATCH v3 2/2] dt: add custom device creation to platform
+	bus scan
+In-Reply-To: <201105271406.18841.arnd@arndb.de>
+References: <1306359073-16274-1-git-send-email-robherring2@gmail.com>
+	<201105261511.23659.arnd@arndb.de> <4DDE9F4A.5050507@gmail.com>
+	<201105271406.18841.arnd@arndb.de>
+Message-ID: <4DE66E39.2070300@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 05:24:26PM +0200, Arnd Bergmann wrote:
-> On Wednesday 01 June 2011, Sascha Hauer wrote:
-> > 
-> > This allows for all armv4 and armv5 based i.MX systems to be compiled
-> > together in one kernel. To accomplish this we need ARM_PATCH_PHYS_VIRT
-> > and AUTO_ZRELADDR which is selected in Kconfig.
-> > As compiling with ARM_PATCH_PHYS_VIRT breaks XIP support and different
-> > PHYS_OFFSETs break uImage support the old way to integrate only one
-> > of these SoCs is kept in place.
-> 
-> Great stuff!
-> 
-> My main concern is that it's really confusing to have so many symbols
-> with slightly different scopes:
-> 
-> * SOC_SELECT_IMX1  HAVE_SOC_IMX1  ARCH_MX1  SOC_IMX1
-> * SOC_SELECT_IMX21 HAVE_SOC_IMX21 ARCH_MX2  SOC_IMX21
+On 05/27/2011 07:06 AM, Arnd Bergmann wrote:
+> On Thursday 26 May 2011, Rob Herring wrote:
+>> On 05/26/2011 08:11 AM, Arnd Bergmann wrote:
+>>> On Wednesday 25 May 2011, Rob Herring wrote:
+>>> This creates a confusing mix of match table entries: Normally,
+>>> all entries in the match table are meant to identify child buses,
+>>> but if I read your patch correctly, you now also need to match
+>>> on the amba devices themselves, including the creation of
+>>> platform devices for each child device node under an amba
+>>> device.
+>>>
+>> We should only create devices for each matching bus and the immediate
+>> children of each bus. A child device of an amba device would be
+>> something like an i2c bus which we don't want to create devices for. Or
+>> am I missing something?
+>
+> Exactly, that was my point.
+>
+>>> I don't think that was the intention. Maybe we need to pass
+>>> two match tables into of_platform_bus_probe() instead:
+>>> one to identify the buses, and another one that is used
+>>> to create the actual devices.
+>>>
+>> That was my original thinking too, but some reason I had concluded 1
+>> could get by with just 1 table. After more thought, I think you are
+>> right. In fact, I broke platform device creation with this patch. I need
+>> to be able to tell if no match means create a platform device (child of
+>> bus) or not (child of a device).
+>
+> Ok.
+>
+>> @@ -234,18 +237,32 @@ static int of_platform_bus_create(struct
+>> device_node *bus,
+>>    		return 0;
+>>    	}
+>>
+>> -	dev = of_platform_device_create(bus, NULL, parent);
+>> -	if (!dev || !of_match_node(matches, bus))
+>> -		return 0;
+>> -
+>> -	for_each_child_of_node(bus, child) {
+>> -		pr_debug("   create child: %s\n", child->full_name);
+>> -		rc = of_platform_bus_create(child, matches,&dev->dev, strict);
+>> -		if (rc) {
+>> -			of_node_put(child);
+>> -			break;
+>> +	id = of_match_node(bus_matches, bus);
+>> +	if (id) {
+>> +		dev = of_platform_device_create(bus, NULL, parent);
+>> +		if (!dev)
+>> +			return 0;
+>> +		for_each_child_of_node(bus, child) {
+>> +			pr_debug("   create child: %s\n", child->full_name);
+>> +			rc = of_platform_bus_create(child, bus_matches,
+>> +						    dev_matches, dev, strict);
+>> +			if (rc) {
+>> +				of_node_put(child);
+>> +				break;
+>> +			}
+>>    		}
+>> +		return rc;
+>>    	}
+>> +
+>> +	id = of_match_node(dev_matches, bus);
+>> +	mdata = id ? id->data : NULL;
+>> +	if (id&&  mdata&&  mdata->dev_create)
+>> +		dev = mdata->dev_create(bus, parent);
+>> +	else
+>> +		dev = of_platform_device_create(bus, NULL, parent);
+>> +	if (!dev)
+>> +		return 0;
+>> +
+>
+> Yes, that looks like it should work.
+>
+> It still feels a bit strange, because it's not exactly how we normally
+> probe devices: In all other cases, we bind a device to a driver when we
+> find it, and that driver in turn scans it, and potentially creates
+> child devices that it finds.
+>
+> What we do here is to let the platform decide how to interpret the
+> data that is coming in. To make the probing more well-behaved, another
+> approach would be:
+>
+> * Bind a platform_driver to compatible="arm,amba" (or whatever we
+>    had in the binding).
+>
+> * In that driver, do nothing except register an amba_device as a child.
+>
+> This would create a somewhat deeper device hierarchy, but be still
+> completely logical: you have a device that cannot be probed (identified
+> simply by its register space), which can be probed internally because
+> the registers actually have a meaning.
 
-The ARCH_MX* macros should be removed, but some driver Kconfig entries
-still depend on them.
+Shouldn't the hierarchy in linux reflect the h/w? It seems a bit 
+pointless to me to create a device just to create another device. 
+amba_bus is already a bit strange in that it is not really a bus type, 
+but a certain class of peripherals.
 
-> 
-> Are you sure that this is actually the minimum set that is required?
+I'd like to hear Grant's thoughts on this.
 
-I'd love to remove some of these, but I think they are required.
-SOC_SELECT_IMX1 and HAVE_SOC_IMX1 are only used to offer the right
-Kconfig magic.
-
-> 
-> I assume that you have gone through all the uses of these symbols
-> to check that there is no silent breakage if you enable more than
-> one. The only ones that looks suspicious to me are
-> arch/arm/plat-mxc/include/mach/timex.h
-
-See An earlier patch in this series. The ifdefs are removed and
-CLOCK_TICK_RATE is replaced with a bogus value. CLOCK_TICK_RATE
-is unused but still required to compile the kernel.
-
-> and
-> arch/arm/plat-mxc/include/mach/debug-macro.S.
-
-This can be used only when only one family is compiled in. Doing
-otherwise should be catched with an error during comppilation.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Rob
