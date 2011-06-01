@@ -1,27 +1,58 @@
-From: linus.ml.walleij@gmail.com (Linus Walleij)
-Date: Thu, 2 Jun 2011 01:35:07 +0200
-Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
-In-Reply-To: <4DE64D5A.20206@stericsson.com>
-References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
-	<alpine.LFD.2.02.1105311236250.3078@ionos>
-	<4DE51EB7.7010606@stericsson.com>
-	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
-	<4DE5F0DB.2050409@stericsson.com> <4DE64B0E.8030008@stericsson.com>
-	<20110601142507.GK3660@n2100.arm.linux.org.uk>
-	<4DE64D5A.20206@stericsson.com>
-Message-ID: <BANLkTimex7pZPHZBH4m6hhTxVMeAkL3nUA@mail.gmail.com>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Thu, 2 Jun 2011 01:36:09 +0200
+Subject: [PATCH RFC] at91: Use "pclk" as con_id on at91cap9 and at91rm9200
+Message-ID: <BANLkTikDJhE6dbGmz5QAgEJeKRknp2jDpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/1 Mattias Wallin <mattias.wallin@stericsson.com>:
-> On 06/01/2011 04:25 PM, Russell King - ARM Linux wrote:
->>
->> sched_clock is supposed to be setup and initialized really early. ?Why
->> are you doing trying to move it soo late?
->
-> Linus idea was to remove the dependency from mach-ux500/cpu.c where I
-> originally called the init function by using core_initcall.
+Hello,
 
-OK we conclude the header is needed for now methinks.
+I am not 100% sure this is the right thing to do, but it makes the
+atmel-ssc driver happy on my at91rm9200 board.
 
-Linus Walleij
+
+
+This unifies the con_id across all at91 machines.
+
+The atmel-ssc driver expects the con_id to be "pclk" or it will fail probing.
+
+Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+---
+ arch/arm/mach-at91/at91cap9.c   |    4 ++--
+ arch/arm/mach-at91/at91rm9200.c |    6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-at91/at91cap9.c b/arch/arm/mach-at91/at91cap9.c
+index 17fae4a..de5d7cd 100644
+--- a/arch/arm/mach-at91/at91cap9.c
++++ b/arch/arm/mach-at91/at91cap9.c
+@@ -230,8 +230,8 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.0", &spi0_clk),
+ 	CLKDEV_CON_DEV_ID("spi_clk", "atmel_spi.1", &spi1_clk),
+ 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.0", &tcb_clk),
+-	CLKDEV_CON_DEV_ID("ssc", "ssc.0", &ssc0_clk),
+-	CLKDEV_CON_DEV_ID("ssc", "ssc.1", &ssc1_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
+ };
+
+ static struct clk_lookup usart_clocks_lookups[] = {
+diff --git a/arch/arm/mach-at91/at91rm9200.c b/arch/arm/mach-at91/at91rm9200.c
+index b228ce9..83a1a3f 100644
+--- a/arch/arm/mach-at91/at91rm9200.c
++++ b/arch/arm/mach-at91/at91rm9200.c
+@@ -199,9 +199,9 @@ static struct clk_lookup periph_clocks_lookups[] = {
+ 	CLKDEV_CON_DEV_ID("t0_clk", "atmel_tcb.1", &tc3_clk),
+ 	CLKDEV_CON_DEV_ID("t1_clk", "atmel_tcb.1", &tc4_clk),
+ 	CLKDEV_CON_DEV_ID("t2_clk", "atmel_tcb.1", &tc5_clk),
+-	CLKDEV_CON_DEV_ID("ssc", "ssc.0", &ssc0_clk),
+-	CLKDEV_CON_DEV_ID("ssc", "ssc.1", &ssc1_clk),
+-	CLKDEV_CON_DEV_ID("ssc", "ssc.2", &ssc2_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.0", &ssc0_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.1", &ssc1_clk),
++	CLKDEV_CON_DEV_ID("pclk", "ssc.2", &ssc2_clk),
+ };
+
+ static struct clk_lookup usart_clocks_lookups[] = {
+-- 
+1.7.5.2
