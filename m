@@ -1,23 +1,43 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2011 09:30:00 +0100
-Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
-In-Reply-To: <BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
-References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
-	<alpine.LFD.2.02.1105311236250.3078@ionos>
-	<4DE51EB7.7010606@stericsson.com>
-	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
-Message-ID: <20110601083000.GD3660@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 1 Jun 2011 10:33:36 +0200
+Subject: [RFC] Consolidation: Replace all led drivers in arch/arm to leds
+	trigger drivers
+In-Reply-To: <BANLkTimRM=Uq6FUN-tvGrf3HLN3BUYqmOQ@mail.gmail.com>
+References: <BANLkTimRM=Uq6FUN-tvGrf3HLN3BUYqmOQ@mail.gmail.com>
+Message-ID: <BANLkTi=YS0=6u6OOF-t7zSPzs4r=RqpqdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2011 at 11:18:25PM +0200, Linus Walleij wrote:
-> Keeping it under include/linux is probably wise since we want drivers
-> OUT of the ARM tree, but I don't know if there is much consensus on that?
+2011/6/1 Bryan Wu <bryan.wu@canonical.com>:
 
-Header files private to a driver should be alongside the driver.  Look
-at drivers/net or drivers/scsi for plenty of examples.
+> arch/arm/plat-versatile/leds.c
 
-Just because its a header file does not mean it must be in some directory
-with 'include' in its path.  The only reason to put it in include/linux
-is if it contains stuff which needs to be shared outside of the driver
-(eg, with arches).
+I converted this to use the LEDS_CLASS and LED triggers as you can
+see if you look inside it...
+
+The problem is rather with everything inside #ifdef CONFIG_LEDS in
+arch/arm/mach-realview/core.c, that uses arch/arm/kernel/leds.c.
+
+I proposed a patch to delete it, so we have only one LED implementation
+using triggers for all plat-versatile but hit the following snag:
+
+> Looks like these led drivers are mainly used in old ARM machines, I
+> think at that time there is no led trigger driver.
+> in arch/arm/kernel/leds.c, the led usages can be replaced to
+> led trigger default-on
+> led trigger heartbeat
+> led trigger ide-disk
+> led trigger timer
+
+There is a trigger usecase missing that Russell brought to
+my attention: using the LEDs to indicate which CPUs is online.
+For example on the PB11MPcore you can have one LED per
+CPU so you see if each of these is running.
+
+That is the purpose of the code in realview_leds_event().
+
+To cover that case a new kind of CPU indicator trigger needs
+to be added to the drivers/led/ subsystem.
+
+Yours,
+Linus Walleij
