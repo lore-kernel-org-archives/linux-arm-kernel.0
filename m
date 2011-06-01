@@ -1,72 +1,60 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 1 Jun 2011 14:54:46 -0700
-Subject: [PATCH] ep93xx: use gpio_led_register_device
-Message-ID: <201106011454.48049.hartleys@visionengravers.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed,  1 Jun 2011 15:30:34 -0700
+Subject: [PATCH] ARM: S5P: Should be S3C_VA_USB_HSPHY instead of S5P_VA_XX
+Message-ID: <1306967434-13562-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use gpio_led_register_device() to register the leds.
+Basically, other S3C SoCs and S5PC100 use 'S3C_VA_USB_HSPHY'
+commonly. It should be changed to 'S3C_VA_USB_HSPHY' for common
+usage and others. Now happens build error on S5PC100.
 
-This allows the platform data to live in init memory.
-
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Ryan Mallon <ryan@bluewatersys.com>
-Cc: Richard Purdie <rpurdie@rpsys.net>
-
+Cc: Greg Kroah-Hartman <gregkh@suse.de>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
+ arch/arm/mach-exynos4/cpu.c                       |    2 +-
+ arch/arm/mach-exynos4/include/mach/regs-usb-phy.h |    2 +-
+ arch/arm/plat-s5p/include/plat/map-s5p.h          |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9e76a75..386673c 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -358,6 +358,7 @@ config ARCH_EP93XX
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARCH_HAS_HOLES_MEMORYMODEL
- 	select ARCH_USES_GETTIMEOFFSET
-+	select LEDS_GPIO_REGISTER
- 	help
- 	  This enables support for the Cirrus EP93xx series of CPUs.
+diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
+index 08813a6..9babe447 100644
+--- a/arch/arm/mach-exynos4/cpu.c
++++ b/arch/arm/mach-exynos4/cpu.c
+@@ -98,7 +98,7 @@ static struct map_desc exynos4_iodesc[] __initdata = {
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+ 	}, {
+-		.virtual	= (unsigned long)S5P_VA_USB_HSPHY,
++		.virtual	= (unsigned long)S3C_VA_USB_HSPHY,
+ 		.pfn		= __phys_to_pfn(EXYNOS4_PA_HSPHY),
+ 		.length		= SZ_4K,
+ 		.type		= MT_DEVICE,
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h b/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
+index 703118d..c337cf3 100644
+--- a/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
++++ b/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
+@@ -11,7 +11,7 @@
+ #ifndef __PLAT_S5P_REGS_USB_PHY_H
+ #define __PLAT_S5P_REGS_USB_PHY_H
  
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 8207954..e294941 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -524,7 +524,7 @@ void __init ep93xx_register_spi(struct ep93xx_spi_info *info,
- /*************************************************************************
-  * EP93xx LEDs
-  *************************************************************************/
--static struct gpio_led ep93xx_led_pins[] = {
-+static const struct gpio_led ep93xx_led_pins[] __initconst = {
- 	{
- 		.name	= "platform:grled",
- 		.gpio	= EP93XX_GPIO_LINE_GRLED,
-@@ -534,20 +534,11 @@ static struct gpio_led ep93xx_led_pins[] = {
- 	},
- };
+-#define EXYNOS4_HSOTG_PHYREG(x)		((x) + S5P_VA_USB_HSPHY)
++#define EXYNOS4_HSOTG_PHYREG(x)		((x) + S3C_VA_USB_HSPHY)
  
--static struct gpio_led_platform_data ep93xx_led_data = {
-+static const struct gpio_led_platform_data ep93xx_led_data __initconst = {
- 	.num_leds	= ARRAY_SIZE(ep93xx_led_pins),
- 	.leds		= ep93xx_led_pins,
- };
+ #define EXYNOS4_PHYPWR			EXYNOS4_HSOTG_PHYREG(0x00)
+ #define PHY1_HSIC_NORMAL_MASK		(0xf << 9)
+diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
+index a6c3d32..d973d39 100644
+--- a/arch/arm/plat-s5p/include/plat/map-s5p.h
++++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
+@@ -39,7 +39,7 @@
+ #define S5P_VA_TWD		S5P_VA_COREPERI(0x600)
+ #define S5P_VA_GIC_DIST		S5P_VA_COREPERI(0x1000)
  
--static struct platform_device ep93xx_leds = {
--	.name		= "leds-gpio",
--	.id		= -1,
--	.dev		= {
--		.platform_data	= &ep93xx_led_data,
--	},
--};
--
--
- /*************************************************************************
-  * EP93xx pwm peripheral handling
-  *************************************************************************/
-@@ -881,5 +872,6 @@ void __init ep93xx_init_devices(void)
+-#define S5P_VA_USB_HSPHY	S3C_ADDR(0x02900000)
++#define S3C_VA_USB_HSPHY	S3C_ADDR(0x02900000)
  
- 	platform_device_register(&ep93xx_rtc_device);
- 	platform_device_register(&ep93xx_ohci_device);
--	platform_device_register(&ep93xx_leds);
-+
-+	gpio_led_register_device(-1, &ep93xx_led_data);
- }
+ #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
+ #define VA_VIC0			VA_VIC(0)
+-- 
+1.7.4.4
