@@ -1,18 +1,23 @@
-From: balajitk@ti.com (Balaji T K)
-Date: Wed, 1 Jun 2011 16:45:21 +0530
-Subject: [PATCH v2 0/2] ARM: OMAP4: fix MMC failure due to regulator
-	enable/disable ops
-Message-ID: <1306926923-3398-1-git-send-email-balajitk@ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 1 Jun 2011 13:23:55 +0200
+Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
+In-Reply-To: <alpine.LFD.2.02.1106011201530.3078@ionos>
+References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.02.1105312319530.3078@ionos>
+	<BANLkTi=UyypKZUQOCCL-KWyAbMQBKY4ccg@mail.gmail.com>
+	<alpine.LFD.2.02.1106011027360.3078@ionos>
+	<20110601092229.GE3660@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1106011201530.3078@ionos>
+Message-ID: <BANLkTinQvdQs6ATzrVh9gHt9BCdntw2kFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Balaji T K (2):
-  ARM: OMAP4: MMC: increase delay for pbias
-  ARM: OMAP4: MMC: no regulator off during probe for eMMC
+On Wed, Jun 1, 2011 at 12:03 PM, Thomas Gleixner <tglx@linutronix.de> wrote:
 
- arch/arm/mach-omap2/board-4430sdp.c   |    1 +
- arch/arm/mach-omap2/hsmmc.c           |   16 +++++++++++++---
- arch/arm/mach-omap2/hsmmc.h           |    1 +
- arch/arm/plat-omap/include/plat/mmc.h |    3 +++
- drivers/mmc/host/omap_hsmmc.c         |    3 +++
- 5 files changed, 21 insertions(+), 3 deletions(-)
+> Something like the below should work for both UP and SMP
+
+Works like a charm on U300
+Tested-by: Linus Walleij <linus.walleij@linaro.org>
+
+Thanks,
+Linus Walleij
