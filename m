@@ -1,116 +1,32 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Jun 2011 14:26:20 -0700
-Subject: [PATCH 5/10] arch/arm/mach-s5pv210/cpufreq.c: add missing clk_put
-In-Reply-To: <1306948213-20767-5-git-send-email-julia@diku.dk>
-References: <1306948213-20767-5-git-send-email-julia@diku.dk>
-Message-ID: <4DE6AE7C.6040404@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 1 Jun 2011 23:29:20 +0200
+Subject: [RFC PATCH v3 2/2] dt: add custom device creation to platform bus
+	scan
+In-Reply-To: <BANLkTimTdVKspjJ8GD4M90wiKCC0SzkgpA@mail.gmail.com>
+References: <1306359073-16274-1-git-send-email-robherring2@gmail.com>
+	<4DE66E39.2070300@gmail.com>
+	<BANLkTimTdVKspjJ8GD4M90wiKCC0SzkgpA@mail.gmail.com>
+Message-ID: <201106012329.20651.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/11 10:10, Julia Lawall wrote:
-> From: Julia Lawall<julia@diku.dk>
->
-> The successive calls to clk_get each call clk_put in the case of failure,
-> but this is not done for subsequent error handling code.  The calls to
-> clk_get are moved to the end of the function, and appropriate gotos are
-> added.
->
-> A simplified version of the semantic match that finds this problem is as
-> follows: (http://coccinelle.lip6.fr/)
->
-> //<smpl>
-> @r exists@
-> expression e1,e2;
-> statement S;
-> @@
->
-> e1 = clk_get at p1(...);
-> ... when != e1 = e2
->      when != clk_put(e1)
->      when any
-> if (...) { ... when != clk_put(e1)
->                 when != if (...) { ... clk_put(e1) ... }
-> * return at p3 ...;
->   } else S
-> //</smpl>
->
-> Signed-off-by: Julia Lawall<julia@diku.dk>
->
-> ---
->   arch/arm/mach-s5pv210/cpufreq.c |   25 +++++++++++++++++--------
->   1 file changed, 17 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/mach-s5pv210/cpufreq.c b/arch/arm/mach-s5pv210/cpufreq.c
-> index 22046e2..97a29e1 100644
-> --- a/arch/arm/mach-s5pv210/cpufreq.c
-> +++ b/arch/arm/mach-s5pv210/cpufreq.c
-> @@ -414,6 +414,7 @@ static int check_mem_type(void __iomem *dmc_reg)
->   static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
->   {
->   	unsigned long mem_type;
-> +	int ret;
->
->   	cpu_clk = clk_get(NULL, "armclk");
->   	if (IS_ERR(cpu_clk))
-> @@ -421,19 +422,20 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
->
->   	dmc0_clk = clk_get(NULL, "sclk_dmc0");
->   	if (IS_ERR(dmc0_clk)) {
-> -		clk_put(cpu_clk);
-> -		return PTR_ERR(dmc0_clk);
-> +		ret = PTR_ERR(dmc0_clk);
-> +		goto out_dmc0;
->   	}
->
->   	dmc1_clk = clk_get(NULL, "hclk_msys");
->   	if (IS_ERR(dmc1_clk)) {
-> -		clk_put(dmc0_clk);
-> -		clk_put(cpu_clk);
-> -		return PTR_ERR(dmc1_clk);
-> +		ret = PTR_ERR(dmc1_clk);
-> +		goto out_dmc1;
->   	}
->
-> -	if (policy->cpu != 0)
-> -		return -EINVAL;
-> +	if (policy->cpu != 0) {
-> +		ret = -EINVAL;
-> +		goto out_dmc1;
-> +	}
->
->   	/*
->   	 * check_mem_type : This driver only support LPDDR&  LPDDR2.
-> @@ -443,7 +445,8 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
->
->   	if ((mem_type != LPDDR)&&  (mem_type != LPDDR2)) {
->   		printk(KERN_ERR "CPUFreq doesn't support this memory type\n");
-> -		return -EINVAL;
-> +		ret = -EINVAL;
-> +		goto out_dmc1;
->   	}
->
->   	/* Find current refresh counter and frequency each DMC */
-> @@ -460,6 +463,12 @@ static int __init s5pv210_cpu_init(struct cpufreq_policy *policy)
->   	policy->cpuinfo.transition_latency = 40000;
->
->   	return cpufreq_frequency_table_cpuinfo(policy, s5pv210_freq_table);
-> +
-> +out_dmc1:
-> +	clk_put(dmc0_clk);
-> +out_dmc0:
-> +	clk_put(cpu_clk);
-> +	return ret;
->   }
->
->   static struct cpufreq_driver s5pv210_driver = {
->
->
+On Wednesday 01 June 2011, Grant Likely wrote:
+> >
+> > Shouldn't the hierarchy in linux reflect the h/w? It seems a bit pointless
+> > to me to create a device just to create another device. amba_bus is already
+> > a bit strange in that it is not really a bus type, but a certain class of
+> > peripherals.
+> >
+> > I'd like to hear Grant's thoughts on this.
+> 
+> AMBA and platform_devices are "special" in that they don't have
+> requirements on their parent device.  I see absolutely zero issue with
+> having platform_device and amba_device as siblings.
 
-Yeah, OK to me, will apply.
-Thanks.
+Hmm, if we accept that platform and AMBA devices are just different from
+all the others, maybe we can do a simpler solution and just hardcode that
+difference in the of_platform_bus_create function. It probably doesn't
+hurt if we grow a handful of these at most, as long as we wouldn't add
+code for a lot of different bus types to the common probing function.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+	Arnd
