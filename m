@@ -1,48 +1,136 @@
-From: wd@denx.de (Wolfgang Denk)
-Date: Wed, 01 Jun 2011 23:08:55 +0200
-Subject: i.MX consolidation patches
-In-Reply-To: <20110601141847.GG23771@pengutronix.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<20110530075745.GA31492@S2100-06.ap.freescale.net>
-	<20110601123522.GE23771@pengutronix.de>
-	<20110601134749.GI3660@n2100.arm.linux.org.uk>
-	<20110601141847.GG23771@pengutronix.de>
-Message-ID: <20110601210855.663A3CEFB4E@gemini.denx.de>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed,  1 Jun 2011 14:18:22 -0700
+Subject: [PATCH] [CPUFREQ] Move ARM Samsung cpufreq drivers to drivers/cpufreq/
+Message-ID: <1306963102-12830-1-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Sascha Hauer,
+According to discussion of the ARM arch subsystem migration,
+ARM cpufreq drivers move to drivers/cpufreq. So this patch
+adds Kconfig.arm for ARM like x86 and adds Samsung S5PV210
+and EXYNOS4210 cpufreq driver compile in there.
+As a note, otherw will be moved.
 
-In message <20110601141847.GG23771@pengutronix.de> you wrote:
->
-> > We probably should disable the uImage target when p2v patching is
-> > enabled to prevent people getting nasty surprises.
-> > 
-> 
-> Agreed. Here is a patch. I added Wolfgang Denk to Cc, maybe
-> he can prove me wrong.
-> 
-> 8<----------------------------------------------------------
-> ARM: do not allow to build uImages with ARM_PATCH_PHYS_VIRT
-> 
-> U-Boot uImages expect a load address and a entry point in
-> the image header. With CONFIG_ARM_PATCH_PHYS_VIRT these
-> become variable and thus can not be compiled into the uImage.
+Cc: Dave Jones <davej@redhat.com>
+Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
+---
+ arch/arm/mach-exynos4/Makefile                     |    1 -
+ arch/arm/mach-s5pv210/Makefile                     |    1 -
+ drivers/cpufreq/Kconfig                            |    5 ++++
+ drivers/cpufreq/Kconfig.arm                        |   23 ++++++++++++++++++++
+ drivers/cpufreq/Makefile                           |    2 +
+ .../cpufreq/exynos4210-cpufreq.c                   |    3 +-
+ .../cpufreq.c => drivers/cpufreq/s5pv210-cpufreq.c |    3 +-
+ 7 files changed, 32 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/cpufreq/Kconfig.arm
+ rename arch/arm/mach-exynos4/cpufreq.c => drivers/cpufreq/exynos4210-cpufreq.c (99%)
+ rename arch/arm/mach-s5pv210/cpufreq.c => drivers/cpufreq/s5pv210-cpufreq.c (99%)
 
-Would it help if we interpret, for example, the values for load
-address and entry point not as physical addresses, but instead as
-offsets relative to the start of physical RAM?
-
-This would still require that all systems supported by a single image
-use the same offsets.  Is this possible?
-
-Best regards,
-
-Wolfgang Denk
-
+diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
+index a9bb94f..0cebfa7 100644
+--- a/arch/arm/mach-exynos4/Makefile
++++ b/arch/arm/mach-exynos4/Makefile
+@@ -15,7 +15,6 @@ obj-				:=
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= cpu.o init.o clock.o irq-combiner.o
+ obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
+ obj-$(CONFIG_PM)		+= pm.o sleep.o
+-obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ 
+ obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
+diff --git a/arch/arm/mach-s5pv210/Makefile b/arch/arm/mach-s5pv210/Makefile
+index 50907ac..599a3c0 100644
+--- a/arch/arm/mach-s5pv210/Makefile
++++ b/arch/arm/mach-s5pv210/Makefile
+@@ -15,7 +15,6 @@ obj-				:=
+ obj-$(CONFIG_CPU_S5PV210)	+= cpu.o init.o clock.o dma.o
+ obj-$(CONFIG_CPU_S5PV210)	+= setup-i2c0.o
+ obj-$(CONFIG_S5PV210_PM)	+= pm.o sleep.o
+-obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
+ 
+ # machine support
+ 
+diff --git a/drivers/cpufreq/Kconfig b/drivers/cpufreq/Kconfig
+index 9fb8485..e898215 100644
+--- a/drivers/cpufreq/Kconfig
++++ b/drivers/cpufreq/Kconfig
+@@ -184,5 +184,10 @@ depends on X86
+ source "drivers/cpufreq/Kconfig.x86"
+ endmenu
+ 
++menu "ARM CPU frequency scaling drivers"
++depends on ARM
++source "drivers/cpufreq/Kconfig.arm"
++endmenu
++
+ endif
+ endmenu
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+new file mode 100644
+index 0000000..fafdbb8
+--- /dev/null
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -0,0 +1,23 @@
++#
++# ARM CPU Frequency scaling drivers
++#
++
++config ARM_S5PV210_CPUFREQ
++	bool "Samsung S5PV210 and S5PC110"
++	depends on CPU_S5PV210
++	default y
++	help
++	  This adds the CPUFreq driver for Samsung S5PV210 and
++	  S5PC110 SoCs.
++
++	  If in doubt, say N.
++
++config ARM_EXYNOS4210_CPUFREQ
++	bool "Samsung EXYNOS4210"
++	depends on CPU_EXYNOS4210
++	default y
++	help
++	  This adds the CPUFreq driver for Samsung EXYNOS4210
++	  SoC (S5PV310 or S5PC210).
++
++	  If in doubt, say N.
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index e2fc2d2..864a27c 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -41,3 +41,5 @@ obj-$(CONFIG_X86_CPUFREQ_NFORCE2)	+= cpufreq-nforce2.o
+ 
+ # ARM SoC drivers
+ obj-$(CONFIG_UX500_SOC_DB8500)		+= db8500-cpufreq.o
++obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
++obj-$(CONFIG_ARM_EXYNOS4210_CPUFREQ)	+= exynos4210-cpufreq.o
+diff --git a/arch/arm/mach-exynos4/cpufreq.c b/drivers/cpufreq/exynos4210-cpufreq.c
+similarity index 99%
+rename from arch/arm/mach-exynos4/cpufreq.c
+rename to drivers/cpufreq/exynos4210-cpufreq.c
+index a1bd258..54025fc 100644
+--- a/arch/arm/mach-exynos4/cpufreq.c
++++ b/drivers/cpufreq/exynos4210-cpufreq.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-exynos4/cpufreq.c
+- *
++/*
+  * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
+diff --git a/arch/arm/mach-s5pv210/cpufreq.c b/drivers/cpufreq/s5pv210-cpufreq.c
+similarity index 99%
+rename from arch/arm/mach-s5pv210/cpufreq.c
+rename to drivers/cpufreq/s5pv210-cpufreq.c
+index 22046e2..c482fc8 100644
+--- a/arch/arm/mach-s5pv210/cpufreq.c
++++ b/drivers/cpufreq/s5pv210-cpufreq.c
+@@ -1,5 +1,4 @@
+-/* linux/arch/arm/mach-s5pv210/cpufreq.c
+- *
++/*
+  * Copyright (c) 2010 Samsung Electronics Co., Ltd.
+  *		http://www.samsung.com
+  *
 -- 
-DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
-"You can have my Unix system when you  pry  it  from  my  cold,  dead
-fingers."                                                - Cal Keegan
+1.7.4.4
