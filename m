@@ -1,183 +1,66 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 1 Jun 2011 11:15:11 +0200
-Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
-Message-ID: <1306919711-30965-1-git-send-email-linus.walleij@stericsson.com>
+From: balajitk@ti.com (T Krishnamoorthy, Balaji)
+Date: Wed, 1 Jun 2011 14:48:33 +0530
+Subject: [PATCH 1/2] ARM: OMAP4: MMC: increase delay for pbias
+In-Reply-To: <20110601074134.GX11352@atomide.com>
+References: <1306765534-20103-1-git-send-email-balajitk@ti.com>
+	<1306765534-20103-2-git-send-email-balajitk@ti.com>
+	<20110601074134.GX11352@atomide.com>
+Message-ID: <BANLkTikZv7tTv357c+g494tq3stBrYmmgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Cross <ccross@android.com>
+On Wed, Jun 1, 2011 at 1:11 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Balaji T K <balajitk@ti.com> [110530 07:23]:
+>> 4 micro seconds is not enough for PBIAS if MMC regulator is
+>> enabled from MMC regulator OFF.
+>> Increase the delay for PBIAS to stabilize.
+>> Wait for PBIAS and timeout if not.
+>>
+>> Resolves MMC/SD failure on OMAP4
+>> "Pbias Voltage is not same as LDO"
+>>
+>> Signed-off-by: Balaji T K <balajitk@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/hsmmc.c | ? 13 ++++++++++---
+>> ?1 files changed, 10 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+>> index b2f30be..3f8dc16 100644
+>> --- a/arch/arm/mach-omap2/hsmmc.c
+>> +++ b/arch/arm/mach-omap2/hsmmc.c
+>> @@ -145,6 +145,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?int power_on, int vdd)
+>> ?{
+>> ? ? ? u32 reg;
+>> + ? ? unsigned long timeout;
+>>
+>> ? ? ? if (power_on) {
+>> ? ? ? ? ? ? ? reg = omap4_ctrl_pad_readl(control_pbias_offset);
+>> @@ -157,9 +158,15 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+>> ? ? ? ? ? ? ? ? ? ? ? OMAP4_MMC1_PWRDNZ_MASK |
+>> ? ? ? ? ? ? ? ? ? ? ? OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
+>> ? ? ? ? ? ? ? omap4_ctrl_pad_writel(reg, control_pbias_offset);
+>> - ? ? ? ? ? ? /* 4 microsec delay for comparator to generate an error*/
+>> - ? ? ? ? ? ? udelay(4);
+>> - ? ? ? ? ? ? reg = omap4_ctrl_pad_readl(control_pbias_offset);
+>> +
+>> + ? ? ? ? ? ? timeout = jiffies + msecs_to_jiffies(5);
+>> + ? ? ? ? ? ? do {
+>> + ? ? ? ? ? ? ? ? ? ? reg = omap4_ctrl_pad_readl(control_pbias_offset);
+>> + ? ? ? ? ? ? ? ? ? ? if (!(reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK))
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? break;
+>> + ? ? ? ? ? ? ? ? ? ? udelay(100);
+>> + ? ? ? ? ? ? } while (!time_after(jiffies, timeout));
+>> +
+>> ? ? ? ? ? ? ? if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK) {
+>> ? ? ? ? ? ? ? ? ? ? ? pr_err("Pbias Voltage is not same as LDO\n");
+>> ? ? ? ? ? ? ? ? ? ? ? /* Caution : On VMODE_ERROR Power Down MMC IO */
+>
+> Actually, can you check if you can use usleep_range here as recommended
+> by checkpatch.pl?
 
-The localtimer's clock changes with the cpu clock. After a
-cpufreq transition, update the clockevent's frequency and
-reprogram the next clock event.
+sure, fixing it in v2
 
-Adds a clock called "smp_twd" that is used to determine the
-twd frequency, which can also be used at init time to
-avoid calibrating the twd frequency.
-
-Clock changes are based on Rob Herring's work.
-
-Signed-off-by: Colin Cross <ccross@android.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Russell King <linux@arm.linux.org.uk>
-Acked-by: Rob Herring <rob.herring@calxeda.com>
-Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-[ifdef:ed CPUfreq stuff for non-cpufreq configs]
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
-I'm sending this as a pull request to Russells in this form,
-this nasty cpufreq bug which is making the system timeline
-jump back and forth on ux500 is *certainly* -rc material to me,
-but I'm leaving it for Russell to decide.
-
-Tested with and without CPUfreq support.
----
- arch/arm/kernel/smp_twd.c |   90 ++++++++++++++++++++++++++++++++++++++++++---
- 1 files changed, 84 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
-index 60636f4..5c8775d 100644
---- a/arch/arm/kernel/smp_twd.c
-+++ b/arch/arm/kernel/smp_twd.c
-@@ -10,13 +10,17 @@
-  */
- #include <linux/init.h>
- #include <linux/kernel.h>
-+#include <linux/clk.h>
-+#include <linux/cpufreq.h>
- #include <linux/delay.h>
- #include <linux/device.h>
-+#include <linux/err.h>
- #include <linux/smp.h>
- #include <linux/jiffies.h>
- #include <linux/clockchips.h>
- #include <linux/irq.h>
- #include <linux/io.h>
-+#include <linux/percpu.h>
- 
- #include <asm/smp_twd.h>
- #include <asm/hardware/gic.h>
-@@ -24,7 +28,9 @@
- /* set up by the platform code */
- void __iomem *twd_base;
- 
-+static struct clk *twd_clk;
- static unsigned long twd_timer_rate;
-+static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
- 
- static void twd_set_mode(enum clock_event_mode mode,
- 			struct clock_event_device *clk)
-@@ -80,6 +86,52 @@ int twd_timer_ack(void)
- 	return 0;
- }
- 
-+#ifdef CONFIG_CPU_FREQ
-+
-+/*
-+ * Updates clockevent frequency when the cpu frequency changes.
-+ * Called on the cpu that is changing frequency with interrupts disabled.
-+ */
-+static void twd_update_frequency(void *data)
-+{
-+	twd_timer_rate = clk_get_rate(twd_clk);
-+
-+	clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
-+}
-+
-+static int twd_cpufreq_transition(struct notifier_block *nb,
-+	unsigned long state, void *data)
-+{
-+	struct cpufreq_freqs *freqs = data;
-+
-+	/*
-+	 * The twd clock events must be reprogrammed to account for the new
-+	 * frequency.  The timer is local to a cpu, so cross-call to the
-+	 * changing cpu.
-+	 */
-+	if (state == CPUFREQ_POSTCHANGE || state == CPUFREQ_RESUMECHANGE)
-+		smp_call_function_single(freqs->cpu, twd_update_frequency,
-+			NULL, 1);
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block twd_cpufreq_nb = {
-+	.notifier_call = twd_cpufreq_transition,
-+};
-+
-+static int twd_cpufreq_init(void)
-+{
-+	if (!IS_ERR_OR_NULL(twd_clk))
-+		return cpufreq_register_notifier(&twd_cpufreq_nb,
-+			CPUFREQ_TRANSITION_NOTIFIER);
-+
-+	return 0;
-+}
-+core_initcall(twd_cpufreq_init);
-+
-+#endif
-+
- static void __cpuinit twd_calibrate_rate(void)
- {
- 	unsigned long count;
-@@ -119,12 +171,39 @@ static void __cpuinit twd_calibrate_rate(void)
- 	}
- }
- 
-+static struct clk *twd_get_clock(void)
-+{
-+	struct clk *clk;
-+	int err;
-+
-+	clk = clk_get_sys("smp_twd", NULL);
-+	if (IS_ERR(clk)) {
-+		pr_err("smp_twd: clock not found: %d\n", (int)PTR_ERR(clk));
-+		return clk;
-+	}
-+
-+	err = clk_enable(clk);
-+	if (err) {
-+		pr_err("smp_twd: clock failed to enable: %d\n", err);
-+		clk_put(clk);
-+		return ERR_PTR(err);
-+	}
-+
-+	return clk;
-+}
-+
- /*
-  * Setup the local clock events for a CPU.
-  */
- void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- {
--	twd_calibrate_rate();
-+	if (!twd_clk)
-+		twd_clk = twd_get_clock();
-+
-+	if (!IS_ERR_OR_NULL(twd_clk))
-+		twd_timer_rate = clk_get_rate(twd_clk);
-+	else
-+		twd_calibrate_rate();
- 
- 	clk->name = "local_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
-@@ -132,13 +211,12 @@ void __cpuinit twd_timer_setup(struct clock_event_device *clk)
- 	clk->rating = 350;
- 	clk->set_mode = twd_set_mode;
- 	clk->set_next_event = twd_set_next_event;
--	clk->shift = 20;
--	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
--	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
--	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
- 
- 	/* Make sure our local interrupt controller has this enabled */
- 	gic_enable_ppi(clk->irq);
- 
--	clockevents_register_device(clk);
-+	__get_cpu_var(twd_ce) = clk;
-+
-+	clockevents_config_and_register(clk, twd_timer_rate,
-+					0xf, 0xffffffff);
- }
--- 
-1.7.3.2
+>
+> Tony
+>
