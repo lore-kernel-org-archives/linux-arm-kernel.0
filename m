@@ -1,38 +1,99 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed,  1 Jun 2011 10:44:53 +0100
-Subject: [PATCH 5/5] ARM: S3C6410: Add some lower frequencies for 800MHz base
-	clock operation
+Date: Wed,  1 Jun 2011 10:44:50 +0100
+Subject: [PATCH 2/5] ARM: SAMSUNG: Add support for pre-sleep/post-restore gpio
+	control
 In-Reply-To: <1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
 References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
 	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <1306921493-30911-5-git-send-email-broonie@opensource.wolfsonmicro.com>
+Message-ID: <1306921493-30911-2-git-send-email-broonie@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By extension from the 667MHz based clocks currently supported add 100MHz
-and 200MHz operating points. Due to a lack of documentation these have not
-been confirmed as supported but by extension from the existing frequencies
-they should be OK and there is less risk than with the previuus patch for
-800MHz operation.
+From: Ben Dooks <ben-linux@fluff.org>
 
+Add a callback so that per-arch can do pre-sleep and post-resume
+gpio configuration so that for the S3C64XX, the GPIO configuration
+is restored before the sleep mode is cleared.
+
+For the S3C64XX case, it means that the GPIOs get set back to normal
+operation after the restore code puts the original configurations
+back in after the
+
+Signed-off-by: Ben Dooks <ben-linux@fluff.org>
 Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
 ---
- drivers/cpufreq/s3c64xx.c |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
+ arch/arm/mach-s3c2410/include/mach/pm-core.h |    3 +++
+ arch/arm/mach-s3c64xx/include/mach/pm-core.h |   17 +++++++++++++++++
+ arch/arm/mach-s5pv210/include/mach/pm-core.h |    3 +++
+ arch/arm/plat-samsung/pm.c                   |    2 ++
+ 4 files changed, 25 insertions(+), 0 deletions(-)
 
-diff --git a/drivers/cpufreq/s3c64xx.c b/drivers/cpufreq/s3c64xx.c
-index fc69178..c370935 100644
---- a/drivers/cpufreq/s3c64xx.c
-+++ b/drivers/cpufreq/s3c64xx.c
-@@ -36,7 +36,9 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
+diff --git a/arch/arm/mach-s3c2410/include/mach/pm-core.h b/arch/arm/mach-s3c2410/include/mach/pm-core.h
+index 70a83b2..45eea52 100644
+--- a/arch/arm/mach-s3c2410/include/mach/pm-core.h
++++ b/arch/arm/mach-s3c2410/include/mach/pm-core.h
+@@ -62,3 +62,6 @@ static inline void s3c_pm_arch_update_uart(void __iomem *regs,
+ 					   struct pm_uart_save *save)
+ {
+ }
++
++static inline void s3c_pm_restored_gpios(void) { }
++static inline void s3c_pm_saved_gpios(void) { }
+diff --git a/arch/arm/mach-s3c64xx/include/mach/pm-core.h b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
+index 1e9f20f..e4f1ce0 100644
+--- a/arch/arm/mach-s3c64xx/include/mach/pm-core.h
++++ b/arch/arm/mach-s3c64xx/include/mach/pm-core.h
+@@ -96,3 +96,20 @@ static inline void s3c_pm_arch_update_uart(void __iomem *regs,
+ 		save->ucon = new_ucon;
+ 	}
+ }
++
++static inline void s3c_pm_restored_gpios(void)
++{
++	/* ensure sleep mode has been cleared from the system */
++
++	__raw_writel(0, S3C64XX_SLPEN);
++}
++
++static inline void s3c_pm_saved_gpios(void)
++{
++	/* turn on the sleep mode and keep it there, as it seems that during
++	 * suspend the xCON registers get re-set and thus you can end up with
++	 * problems between going to sleep and resuming.
++	 */
++
++	__raw_writel(S3C64XX_SLPEN_USE_xSLP, S3C64XX_SLPEN);
++}
+diff --git a/arch/arm/mach-s5pv210/include/mach/pm-core.h b/arch/arm/mach-s5pv210/include/mach/pm-core.h
+index e8d394f..3e22109 100644
+--- a/arch/arm/mach-s5pv210/include/mach/pm-core.h
++++ b/arch/arm/mach-s5pv210/include/mach/pm-core.h
+@@ -41,3 +41,6 @@ static inline void s3c_pm_arch_update_uart(void __iomem *regs,
+ {
+ 	/* nothing here yet */
+ }
++
++static inline void s3c_pm_restored_gpios(void) { }
++static inline void s3c_pm_saved_gpios(void) { }
+diff --git a/arch/arm/plat-samsung/pm.c b/arch/arm/plat-samsung/pm.c
+index 5c0a440..4f9a951 100644
+--- a/arch/arm/plat-samsung/pm.c
++++ b/arch/arm/plat-samsung/pm.c
+@@ -268,6 +268,7 @@ static int s3c_pm_enter(suspend_state_t state)
+ 	/* save all necessary core registers not covered by the drivers */
  
- static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
- 	{ 0,  66000 },
-+	{ 0, 100000 },
- 	{ 0, 133000 },
-+	{ 1, 200000 },
- 	{ 1, 222000 },
- 	{ 1, 266000 },
- 	{ 2, 333000 },
+ 	s3c_pm_save_gpios();
++	s3c_pm_saved_gpios();
+ 	s3c_pm_save_uarts();
+ 	s3c_pm_save_core();
+ 
+@@ -309,6 +310,7 @@ static int s3c_pm_enter(suspend_state_t state)
+ 	s3c_pm_restore_core();
+ 	s3c_pm_restore_uarts();
+ 	s3c_pm_restore_gpios();
++	s3c_pm_restored_gpios();
+ 
+ 	s3c_pm_debug_init();
+ 
 -- 
 1.7.5.3
