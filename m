@@ -1,34 +1,26 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 1 Jun 2011 11:37:40 -0700
-Subject: [PATCH 1/3] ARM: pmu: add OF probing support
-In-Reply-To: <1306946270-18379-2-git-send-email-robherring2@gmail.com>
+Date: Wed, 1 Jun 2011 11:40:56 -0700
+Subject: [PATCH 3/3] ARM: l2x0: Add OF based initialization
+In-Reply-To: <1306946270-18379-4-git-send-email-robherring2@gmail.com>
 References: <1306946270-18379-1-git-send-email-robherring2@gmail.com>
-	<1306946270-18379-2-git-send-email-robherring2@gmail.com>
-Message-ID: <BANLkTikim3zwsvFK_UVqGmkyxRmfZETUsA@mail.gmail.com>
+	<1306946270-18379-4-git-send-email-robherring2@gmail.com>
+Message-ID: <BANLkTik86CVS0cWOnapnh7dn5F1EOCsmVw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Jun 1, 2011 at 9:37 AM, Rob Herring <robherring2@gmail.com> wrote:
 > From: Rob Herring <rob.herring@calxeda.com>
 >
-> Add OF match table to enable OF style driver binding. The dts entry is like
-> this:
+> This adds probing for pl310 cache controller via device tree. An example
+> binding looks like this:
 >
-> pmu {
-> ? ? ? ?compatible = "arm,cortex-a9-pmu";
-> ? ? ? ?interrupts = <100 101>;
-> };
->
-> The use of pdev->id as an index breaks with OF device binding, so set the type
-> based on the OF compatible string.
+> L2: l2-cache {
+> ? ? ? ?compatible = "arm,pl310-cache", "cache";
 
-Even though they're simple, new bindings like these need to be
-documented. Current location for that is
-Documentation/devicetree/bindings/.
+"cache" is too generic to be useful. "arm,pl2x0-cache" would be a more
+meaningful fallback, I think?
 
-Can you start an ARM directory there and add corresponding docs for the this?
-
-
-Thanks!
+(Same comment as for 1/3: The bindings need to be documented. Same
+applies to 2/3, obviousy).
 
 -Olof
