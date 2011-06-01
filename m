@@ -1,28 +1,18 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2011 08:54:20 +0100
-Subject: IrDA driver fails on PXA255
-In-Reply-To: <alpine.DEB.2.00.1105311501570.16259@chino.kir.corp.google.com>
-References: <20110528205701.GA1788@doriath.ww600.siemens.net>
-	<alpine.DEB.2.00.1105281628480.9934@chino.kir.corp.google.com>
-	<BANLkTim9YdhjY75CzMsSOCVKZWi-WKZ5wA@mail.gmail.com>
-	<alpine.DEB.2.00.1105291410450.9658@chino.kir.corp.google.com>
-	<20110529215656.GA5576@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105302202510.18793@chino.kir.corp.google.com>
-	<20110531072650.GC21382@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105311253510.5646@chino.kir.corp.google.com>
-	<20110531210027.GA3660@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1105311501570.16259@chino.kir.corp.google.com>
-Message-ID: <20110601075420.GB3660@n2100.arm.linux.org.uk>
+From: mattias.wallin@stericsson.com (Mattias Wallin)
+Date: Wed, 1 Jun 2011 09:57:15 +0200
+Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
+In-Reply-To: <BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
+References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>	<alpine.LFD.2.02.1105311236250.3078@ionos>	<4DE51EB7.7010606@stericsson.com>
+	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
+Message-ID: <4DE5F0DB.2050409@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2011 at 03:11:40PM -0700, David Rientjes wrote:
-> The restriction isn't new: GFP_DMA only makes sense with CONFIG_ZONE_DMA.  
-> The fact that the page allocator completely ignored GFP_DMA in the past 
-> for CONFIG_ZONE_DMA=n doesn't change that.  That's obviously error prone 
-> since it will return memory from anywhere simply because of the fact that 
-> it is an invalid configuration.
-
-Your approach to this is wrong.  Make it warn for one release.  Give
-people a chance to fix things before they become a regression.  Then
-make it a hard failure.
+On 05/31/2011 11:18 PM, Linus Walleij wrote:
+> Does it work to register the clocksource with say a core_initcall()
+> and avoid the header altogether?
+I wanted the init to be called from the struct sys_timer init call. 
+Mainly because it is really early and it seems to be what others do but 
+if we now want to move things out of the platform code it might make 
+sense to remove that dependency.
+I'll experiment with it during the day and see how it goes.
