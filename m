@@ -1,63 +1,50 @@
-From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Wed,  1 Jun 2011 11:03:25 -0400
-Subject: [PATCH 3/3] [v3] davinci: da850: changed SRAM allocator to shared ram.
-In-Reply-To: <cover.1306940448.git.bengardiner@nanometrics.ca>
-References: <20110601051753.GA5153@game.jcrosoft.org>
-	<cover.1306940448.git.bengardiner@nanometrics.ca>
-Message-ID: <9abf8b57b0b664ffc262af63bd0495e9d7c09230.1306940448.git.bengardiner@nanometrics.ca>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 01 Jun 2011 18:01:49 +0300
+Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
+In-Reply-To: <BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
+	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
+	<BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+Message-ID: <1306940509.4405.121.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Subhasish Ghosh <subhasish@mistralsolutions.com>
+On Wed, 2011-06-01 at 18:54 +0400, Dmitry Eremin-Solenikov wrote:
+> On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
+> > On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
+> >> Currently atmel_nand driver used by AT91 and AVR32 calls a special
+> >> callback
+> >> which return nand partition table and number of partitions. However in all
+> >> boards this callback returns just static data. So drop this callback and
+> >> make atmel_nand use partition table provided statically via platform_data.
+> >>
+> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >
+> > Thanks for this update, always nice seeing code being optimized. I
+> > really can't recall why it was made like this in the first place...
+> >
+> > For the AVR32 related parts:
+> >
+> > Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+> >
+> > <snipp diff>
+> >
+> > Will this go through the linux-mtd tree (since it spans two archs) or
+> > should it go through an arch tree?
+> 
+> On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
+> as I'd also like to submit several (a pile) patches cleaning up mtd
+> partitioning, which would depend on this.
+> 
+> OTOH, I think there will be a cleanup of AT91 platform, which would bring
+> lot's of conflicts with this patch, if it goes through linux-mtd.
 
-This patch modifies the sram allocator to allocate memory
-from the DA8XX shared RAM.
+Meanwhile, while you are thinking, I've put this patch to the l2-mtd-2.6
+tree. Please, let me know if you decide to take a non-mtd path - then
+I'll drop it.
 
-Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
-[rebased onto consolidated SRAM patches]
-Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
-Reviewed-by: Sergei Shtylyov <sshtylyov@mvista.com>
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+And if you want to see this in linux-next - ping dwmw2.
 
----
-Changes since v2:
- * Added Jean-Christophe PLAGNIOL-VILLARD's Ack
-Changes since v1:
- * re-sorted the new DA8XX_SHARED_RAM_BASE definition in  da8xx.h
-   to between DA8XX_AEMIF_CTL_BASE and DA8XX_DDR2_CTL_BASE (Sergei
-   Shtylyov).
-
----
- arch/arm/mach-davinci/da850.c              |    4 ++--
- arch/arm/mach-davinci/include/mach/da8xx.h |    1 +
- 2 files changed, 3 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 904ede9..4781230 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -1093,8 +1093,8 @@ static struct davinci_soc_info davinci_soc_info_da850 = {
- 	.gpio_irq		= IRQ_DA8XX_GPIO0,
- 	.serial_dev		= &da8xx_serial_device,
- 	.emac_pdata		= &da8xx_emac_pdata,
--	.sram_phys		= DA8XX_ARM_RAM_BASE,
--	.sram_len		= SZ_8K,
-+	.sram_phys		= DA8XX_SHARED_RAM_BASE,
-+	.sram_len		= SZ_128K,
- 	.reset_device		= &da8xx_wdt_device,
- };
- 
-diff --git a/arch/arm/mach-davinci/include/mach/da8xx.h b/arch/arm/mach-davinci/include/mach/da8xx.h
-index ad64da7..b67499f 100644
---- a/arch/arm/mach-davinci/include/mach/da8xx.h
-+++ b/arch/arm/mach-davinci/include/mach/da8xx.h
-@@ -67,6 +67,7 @@ extern unsigned int da850_max_speed;
- #define DA8XX_AEMIF_CS2_BASE	0x60000000
- #define DA8XX_AEMIF_CS3_BASE	0x62000000
- #define DA8XX_AEMIF_CTL_BASE	0x68000000
-+#define DA8XX_SHARED_RAM_BASE	0x80000000
- #define DA8XX_ARM_RAM_BASE	0xffff0000
- 
- void __init da830_init(void);
 -- 
-1.7.4.1
+Best Regards,
+Artem Bityutskiy (????? ????????)
