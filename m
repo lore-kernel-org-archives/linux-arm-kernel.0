@@ -1,51 +1,60 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 1 Jun 2011 09:39:09 +0200
-Subject: [PATCH 1/2] sdio: add function to enable and disable
-	sdio_single_irq optimization
-In-Reply-To: <BANLkTinUEq_tvCtXWjg3t6L589y80nPPog@mail.gmail.com>
-References: <1306874008-28867-1-git-send-email-per.forlin@linaro.org>
-	<1306874008-28867-2-git-send-email-per.forlin@linaro.org>
-	<BANLkTinUEq_tvCtXWjg3t6L589y80nPPog@mail.gmail.com>
-Message-ID: <BANLkTi=pa1hC_nm1HmWRLO+vw_set=py0g@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 1 Jun 2011 00:41:34 -0700
+Subject: [PATCH 1/2] ARM: OMAP4: MMC: increase delay for pbias
+In-Reply-To: <1306765534-20103-2-git-send-email-balajitk@ti.com>
+References: <1306765534-20103-1-git-send-email-balajitk@ti.com>
+	<1306765534-20103-2-git-send-email-balajitk@ti.com>
+Message-ID: <20110601074134.GX11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2011 09:30, Linus Walleij <linus.walleij@linaro.org> wrote:
-> 2011/5/31 Per Forlin <per.forlin@linaro.org>:
->
->> +/**
->> + * ? ? sdio_single_irq_enable - enable or disable SDIO single IRQ function
->> + * ? ? @card: card to enable SDIO single irq
->> + * ? ? @value: true to enable SDIO single irq function, false to disable
->> + *
->> + * ? ? If there is only 1 function interrupt registered and SDIO single IRQ
->> + * ? ? is enable, the irq handler is called directly without reading
->> + * ? ? the CCCR registers
->> + */
->> +void sdio_single_irq_enable(struct mmc_card *card, bool value)
->> +{
->> + ? ? ? card->sdio_single_irq_en = value;
->> +}
->> +EXPORT_SYMBOL_GPL(sdio_single_irq_enable);
->
-> Can we use a quirk for implementing this for the specific problematic
-> card instead?
->
-Yes, quirks is the thing I should use.
-I'll remove this function and replace it with a quirk. The default
-state could then be sdio_single_irq enable and for all none supported
-hardware (device ID) sdio_single_irq will be disable.
+* Balaji T K <balajitk@ti.com> [110530 07:23]:
+> 4 micro seconds is not enough for PBIAS if MMC regulator is
+> enabled from MMC regulator OFF.
+> Increase the delay for PBIAS to stabilize.
+> Wait for PBIAS and timeout if not.
+> 
+> Resolves MMC/SD failure on OMAP4
+> "Pbias Voltage is not same as LDO"
+> 
+> Signed-off-by: Balaji T K <balajitk@ti.com>
+> ---
+>  arch/arm/mach-omap2/hsmmc.c |   13 ++++++++++---
+>  1 files changed, 10 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index b2f30be..3f8dc16 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -145,6 +145,7 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+>  				 int power_on, int vdd)
+>  {
+>  	u32 reg;
+> +	unsigned long timeout;
+>  
+>  	if (power_on) {
+>  		reg = omap4_ctrl_pad_readl(control_pbias_offset);
+> @@ -157,9 +158,15 @@ static void omap4_hsmmc1_after_set_reg(struct device *dev, int slot,
+>  			OMAP4_MMC1_PWRDNZ_MASK |
+>  			OMAP4_USBC1_ICUSB_PWRDNZ_MASK);
+>  		omap4_ctrl_pad_writel(reg, control_pbias_offset);
+> -		/* 4 microsec delay for comparator to generate an error*/
+> -		udelay(4);
+> -		reg = omap4_ctrl_pad_readl(control_pbias_offset);
+> +
+> +		timeout = jiffies + msecs_to_jiffies(5);
+> +		do {
+> +			reg = omap4_ctrl_pad_readl(control_pbias_offset);
+> +			if (!(reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK))
+> +				break;
+> +			udelay(100);
+> +		} while (!time_after(jiffies, timeout));
+> +
+>  		if (reg & OMAP4_MMC1_PBIASLITE_VMODE_ERROR_MASK) {
+>  			pr_err("Pbias Voltage is not same as LDO\n");
+>  			/* Caution : On VMODE_ERROR Power Down MMC IO */
 
-> Daniel, do you have the vendor and device ID for the problematic
-> Libertas card you're working on so this can be quirked explicitly
-> in drivers/mmc/core/quirks.c?
->
-Even if Daniel fix this issue in libertas it is still good to have a
-sdio_single_irq quirk in place for other SDIO devices with the same
-hardware issue.
+Actually, can you check if you can use usleep_range here as recommended
+by checkpatch.pl?
 
-> Yours,
-> Linus Walleij
->
-Thanks,
-Per
+Tony
