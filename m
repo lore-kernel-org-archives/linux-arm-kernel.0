@@ -1,32 +1,25 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 1 Jun 2011 14:35:22 +0200
-Subject: i.MX consolidation patches
-In-Reply-To: <20110530075745.GA31492@S2100-06.ap.freescale.net>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<20110530075745.GA31492@S2100-06.ap.freescale.net>
-Message-ID: <20110601123522.GE23771@pengutronix.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 1 Jun 2011 14:45:55 +0200
+Subject: [PATCH 0/3] Fixes for breakage resulting from syscore_ops patch
+	=?iso-8859-1?q?on=09s3c24xx?=
+In-Reply-To: <4DE62CEF.80507@embtoolkit.org>
+References: <201106011348.47145.heiko@sntech.de>
+	<4DE62CEF.80507@embtoolkit.org>
+Message-ID: <201106011445.59798.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn,
-
-On Mon, May 30, 2011 at 03:57:45PM +0800, Shawn Guo wrote:
-> Hi Sascha,
+Am Mittwoch 01 Juni 2011 schrieb Abdoulaye Walsimou GAYE:
+> Heiko St?bner wrote:
+> > The syscore_ops patch from Rafael J. Wysocki introduced some small
+> > glitches for the S3C24XX cpus resulting in compile errors.
 > 
-> I will shortly send move-mxc-gpio-to-drivers patch based on this
-> series to save some CONFIG_SOC/ARCH_XXX.  Please let me know if you
-> do not think this series is a good base to start with.
+> I submitted same patches days ago [1],
+> [1]
+> http://thread.gmane.org/gmane.linux.ports.arm.kernel/117812/focus=117814
 
-This series should be orthogonal to yours. I will prepare an update to
-this series. In particular I'm not comfortable with breaking uImage
-support. I will follow Uwes recomendation and add an additional level
-of dependencies to compile the kernel without physoffset patching.
+irq-pm.c also was my initial target for s3c24xx_irq_syscore_ops, but it's only 
+compiled when CONFIG_PM is set, where s3c24xx_irq_syscore_ops is always needed 
+and its member-functions are set to null in pm.h when CONFIG_PM is not set
 
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Heiko
