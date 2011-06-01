@@ -1,38 +1,23 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2011 15:24:06 +0100
-Subject: i.MX consolidation patches
-In-Reply-To: <20110601141847.GG23771@pengutronix.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<20110530075745.GA31492@S2100-06.ap.freescale.net>
-	<20110601123522.GE23771@pengutronix.de>
-	<20110601134749.GI3660@n2100.arm.linux.org.uk>
-	<20110601141847.GG23771@pengutronix.de>
-Message-ID: <20110601142406.GJ3660@n2100.arm.linux.org.uk>
+Date: Wed, 1 Jun 2011 15:25:07 +0100
+Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
+In-Reply-To: <4DE64B0E.8030008@stericsson.com>
+References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
+	<alpine.LFD.2.02.1105311236250.3078@ionos>
+	<4DE51EB7.7010606@stericsson.com>
+	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
+	<4DE5F0DB.2050409@stericsson.com> <4DE64B0E.8030008@stericsson.com>
+Message-ID: <20110601142507.GK3660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 04:18:47PM +0200, Sascha Hauer wrote:
-> diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> index 9128fdd..e3b6f02 100644
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -59,6 +59,11 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
->  
->  endif
->  
-> +ifeq ($(CONFIG_ARM_PATCH_PHYS_VIRT),y)
-> +$(obj)/uImage: $(obj)/zImage FORCE
-> +	@echo 'building uImages is incompatible with CONFIG_ARM_PATCH_PHYS_VIRT'
-> +	@false
+On Wed, Jun 01, 2011 at 04:22:06PM +0200, Mattias Wallin wrote:
+> On 06/01/2011 09:57 AM, Mattias Wallin wrote:
+>> I'll experiment with it during the day and see how it goes.
+> It did not work to have the clocksource init as a core_initcall.
+> I got an null pointer oops in sched_clock_poll.
+> The lauterbach trace showed that the sched_clock_update_fn was null  
+> since the poll function was called before the init.
 
-It may be better to drop the zImage dependency too, so that folk don't get
-the message at the end of an otherwise successful kernel build - they may
-decide to turn p2v patching off which would result in a rebuild.
-
-Or it could suggest the mkimage command which should be run, but with
-<LOAD-ADDRESS> inserted into it at the appropriate point - iow something
-like:
-
-  mkimage -A arm -O linux -T kernel -C none \
-	-a <LOAD-ADDRESS> -e <START-ADDRESS> \
-	-n 'Linux-$(KERNELRELEASE)' -d arch/arm/boot/zImage uImage.<PLATFORM>
+sched_clock is supposed to be setup and initialized really early.  Why
+are you doing trying to move it soo late?
