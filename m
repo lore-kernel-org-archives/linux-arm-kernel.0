@@ -1,60 +1,96 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 1 Jun 2011 23:58:26 +0100
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-In-Reply-To: <20110530084307.GA28953@riccoc20.at.omicron.at>
-References: <20110530084307.GA28953@riccoc20.at.omicron.at>
-Message-ID: <20110601225826.GR3660@n2100.arm.linux.org.uk>
+From: matt@genesi-usa.com (Matt Sealey)
+Date: Wed, 1 Jun 2011 18:04:02 -0500
+Subject: i.MX consolidation patches
+In-Reply-To: <20110601210855.663A3CEFB4E@gemini.denx.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+	<20110601210855.663A3CEFB4E@gemini.denx.de>
+Message-ID: <BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, May 30, 2011 at 10:43:07AM +0200, Richard Cochran wrote:
-> Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
-> 
->    clocksource: convert ARM 32-bit up counting clocksources
-> 
-> broke the build for ixp4xx and made big endian operation impossible.
-> This commit restores the original behaviour.
+On Wed, Jun 1, 2011 at 4:08 PM, Wolfgang Denk <wd@denx.de> wrote:
+> Dear Sascha Hauer,
+>
+> In message <20110601141847.GG23771@pengutronix.de> you wrote:
+>>
+>> > We probably should disable the uImage target when p2v patching is
+>> > enabled to prevent people getting nasty surprises.
+>> >
+>>
+>> Agreed. Here is a patch. I added Wolfgang Denk to Cc, maybe
+>> he can prove me wrong.
+>>
+>> 8<----------------------------------------------------------
+>> ARM: do not allow to build uImages with ARM_PATCH_PHYS_VIRT
+>>
+>> U-Boot uImages expect a load address and a entry point in
+>> the image header. With CONFIG_ARM_PATCH_PHYS_VIRT these
+>> become variable and thus can not be compiled into the uImage.
+>
+> Would it help if we interpret, for example, the values for load
+> address and entry point not as physical addresses, but instead as
+> offsets relative to the start of physical RAM?
+>
+> This would still require that all systems supported by a single image
+> use the same offsets. ?Is this possible?
 
-I'm really not happy about using the MMIO clocksource stuff with random
-other read functions like this - it defeats the entire purpose of the
-MMIO clocksource stuff.  Maybe we should just undo the change for IXP4xx
-and treat it as "special" for the time being.
+Been having this discussion on and off with various parties and we
+determined that if U-Boot had a little
+extra logic when parsing a uImage header it could perfectly validly
+boot a zImage contained in a uImage
+header.
 
-Thomas - do you have any other views?
+In this case, just a load address in the uImage header of 0 (or some
+other totally-impossible value like 0xffffffff
+in case 0 is perfectly valid somewhere) and then just jump to the
+entry point by deriving the value from the
+header size - based on the fact that ARM images are PIC and the Linux
+kernel always puts the entry point
+at 0 offset - to the address of the uImage header + size of the uImage
+header (which U-Boot knows already
+from parsing the header).
 
-> 
-> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
-> ---
->  arch/arm/mach-ixp4xx/common.c |   10 ++++++++--
->  1 files changed, 8 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 74ed81a..0777257 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
->  /*
->   * clocksource
->   */
-> +
-> +static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
-> +{
-> +	return *IXP4XX_OSTS;
-> +}
-> +
->  unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
->  EXPORT_SYMBOL(ixp4xx_timer_freq);
->  static void __init ixp4xx_clocksource_init(void)
->  {
->  	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
->  
-> -	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
-> -			clocksource_mmio_readl_up);
-> +	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
-> +			ixp4xx_clocksource_read);
->  }
->  
->  /*
-> -- 
-> 1.7.0.4
-> 
+Example: on the MX51 the entry point is usually set to 0x90008000 -
+that's what Freescale put in their BSP
+U-Boots and everyone has copied it.. There's a variable in our U-Boots
+at least that is used in boot scripts to
+ext/fat/whateverload it to 0x90007FC0. That 0x90007FC0 address to load
+to is a nasty hack meant to match
+the header size of a legacy uImage (therefore the first byte of the
+payload will live at 0x90008000).
+
+We can't support anything but a legacy image right now because of
+that, and if we needed to support a new
+style uImage with FDT, then this load address and entry point magic
+would be totally wrong anyway requiring
+both userspace script and kernel changes.
+
+So the solution is
+
+* Assuming all ARM kernels are PIC (guaranteed, right?)
+* Assuming all ARM kernels start at entry point 0 (true for Image and zImage)
+* Assuming there is a globally invalid magic value you can set in the
+uImage header as load address (not sure)
+* Assuming you can make sure U-Boot only does this for ARM,
+kernel-type images and not ramdisks or so (true)
+
+Set that magic value, U-Boot magically derives the correct entry point
+as the first address of the payload,
+and jumps to it?
+
+I tested it.. works great but I don't have a wealth of ARM hardware to
+TRULY confirm all the above.
+
+Let's not kill off uImage generation just yet if we can just patch our
+firmwares once and for all and let Linux
+decide whether it sets the load address to a real address or a magic
+value? Then all variants of kernel will
+work for the boards, patching phys_to_virt or not.
+
+-- 
+Matt Sealey <matt@genesi-usa.com>
+Product Development Analyst, Genesi USA, Inc.
