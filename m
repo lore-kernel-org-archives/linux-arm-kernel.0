@@ -1,44 +1,74 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Wed,  1 Jun 2011 11:03:22 -0400
-Subject: [PATCH v3 0/3] davinci: ioremap SRAM instead of iotables
-In-Reply-To: <20110601051753.GA5153@game.jcrosoft.org>
+Date: Wed,  1 Jun 2011 11:03:23 -0400
+Subject: [PATCH 1/3] [v3] davinci: sram: ioremap the davinci_soc_info
+	specified sram regions
+In-Reply-To: <cover.1306940448.git.bengardiner@nanometrics.ca>
 References: <20110601051753.GA5153@game.jcrosoft.org>
-Message-ID: <cover.1306940448.git.bengardiner@nanometrics.ca>
+	<cover.1306940448.git.bengardiner@nanometrics.ca>
+Message-ID: <0787ab1fe2a1db4f18feb4b45f6ba44f90e9da59.1306940448.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The davinci platforms are mapping their io regions using iotables. This patch
-series converts them to mapping using ioremap.
+The current davinci init sets up SRAM in iotables. There has been an observed
+failure to boot a da850 with 128K specified in the iotable.
 
-This version of the series is based on-top-of '[RFC PATCH v4] Consolidate
-SRAM support' from Russell King and Jean-Christophe PLAGNIOL-VILLARD. V3 has
-a fix to the commit message of 1/3 as requested by Jean-Christophe PLAGNIOL-
-VILLARD and also his Acks added to the series.
+Make the davinci sram allocator -- now based on RMK's consolidated SRAM
+support -- do an ioremap of the region specified by the entries in
+davinci_soc_info before registering with gen_pool_add_virt().
 
-The davinci sram init is first changed to ioremap the regions specified by
-each of the soc_infos; then the iotables are each removed; then the SRAM_VIRT
-definition is removed. Finally, the da850's sram region is changed from
-the ARM local RAM region to the Shared RAM region. This change is needed
-to support mcasp ping-pong buffers on da850. Suspend was tested with rtcwake
-and was found to work.
+This commit breaks runtime of davinci boards since the regions that
+the sram init is now trying to ioremap have been iomapped by their
+iotable entries. The iotable entries will be removed in the patches
+to come.
 
-Ben Gardiner (2):
-  [v3] davinci: sram: ioremap the davinci_soc_info specified sram
-    regions
-  [v3] davinci: da850-dm646x: remove the SRAM_VIRT iotable entry
+Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
+CC: Sekhar Nori <nsekhar@ti.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-Subhasish Ghosh (1):
-  [v3] davinci: da850: changed SRAM allocator to shared ram.
+---
+Changes since v2:
+ * Added Jean-Christophe PLAGNIOL-VILLARD's Ack
+Changes since v1:
+ * return -ENOMEM if ioremap fails (Sekhar Nori)
 
- arch/arm/mach-davinci/da850.c               |   10 ++--------
- arch/arm/mach-davinci/dm355.c               |    6 ------
- arch/arm/mach-davinci/dm365.c               |    6 ------
- arch/arm/mach-davinci/dm644x.c              |    6 ------
- arch/arm/mach-davinci/dm646x.c              |    6 ------
- arch/arm/mach-davinci/include/mach/common.h |    2 --
- arch/arm/mach-davinci/include/mach/da8xx.h  |    1 +
- arch/arm/mach-davinci/sram.c                |   10 ++++++++--
- 8 files changed, 11 insertions(+), 36 deletions(-)
+---
+ arch/arm/mach-davinci/sram.c |   10 ++++++++--
+ 1 files changed, 8 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
+index 2c53db2..68b05d5 100644
+--- a/arch/arm/mach-davinci/sram.c
++++ b/arch/arm/mach-davinci/sram.c
+@@ -8,6 +8,7 @@
+  * the Free Software Foundation; either version 2 of the License, or
+  * (at your option) any later version.
+  */
++#include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ 
+@@ -25,6 +26,7 @@ EXPORT_SYMBOL_GPL(davinci_gen_pool);
+  */
+ static int __init sram_init(void)
+ {
++	void *addr;
+ 	unsigned len = davinci_soc_info.sram_len;
+ 
+ 	if (!len)
+@@ -36,8 +38,12 @@ static int __init sram_init(void)
+ 	if (!davinci_gen_pool)
+ 		return -ENOMEM;
+ 
+-	WARN_ON(gen_pool_add_virt(davinci_gen_pool, SRAM_VIRT,
+-				  davinci_soc_info.sram_phys, len, -1));
++	addr = ioremap(davinci_soc_info.sram_phys, len);
++	if (!addr)
++		return -ENOMEM;
++	if(WARN_ON(gen_pool_add_virt(davinci_gen_pool, addr,
++				  davinci_soc_info.sram_phys, len, -1)))
++		iounmap(addr);
+ 
+ 	return 0;
+ }
 -- 
 1.7.4.1
