@@ -1,68 +1,39 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 1 Jun 2011 19:49:15 +0200
-Subject: [PATCH 8/10] drivers/video/imxfb.c: add missing clk_put
-In-Reply-To: <1306948213-20767-8-git-send-email-julia@diku.dk>
-References: <1306948213-20767-8-git-send-email-julia@diku.dk>
-Message-ID: <20110601174915.GL23771@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 1 Jun 2011 19:59:53 +0200
+Subject: [PATCH 5/8 v2] ARM i.MX Allow to compile together i.MX1/21/25/27
+In-Reply-To: <20110601164731.GI23771@pengutronix.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<201106011724.26704.arnd@arndb.de>
+	<20110601164731.GI23771@pengutronix.de>
+Message-ID: <201106011959.53679.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 07:10:11PM +0200, Julia Lawall wrote:
-> From: Julia Lawall <julia@diku.dk>
+On Wednesday 01 June 2011 18:47:31 Sascha Hauer wrote:
+> > 
+> > Are you sure that this is actually the minimum set that is required?
 > 
-> Reorder the labels at the end of the function to correspond to the order in
-> which the resources are allocated.
+> I'd love to remove some of these, but I think they are required.
+> SOC_SELECT_IMX1 and HAVE_SOC_IMX1 are only used to offer the right
+> Kconfig magic.
 > 
-> A simplified version of the semantic match that finds this problem is as
-> follows: (http://coccinelle.lip6.fr/)
+> > 
+> > I assume that you have gone through all the uses of these symbols
+> > to check that there is no silent breakage if you enable more than
+> > one. The only ones that looks suspicious to me are
+> > arch/arm/plat-mxc/include/mach/timex.h
 > 
-> // <smpl>
-> @r exists@
-> expression e1,e2;
-> statement S;
-> @@
+> See An earlier patch in this series. The ifdefs are removed and
+> CLOCK_TICK_RATE is replaced with a bogus value. CLOCK_TICK_RATE
+> is unused but still required to compile the kernel.
 > 
-> e1 = clk_get at p1(...);
-> ... when != e1 = e2
->     when != clk_put(e1)
->     when any
-> if (...) { ... when != clk_put(e1)
->                when != if (...) { ... clk_put(e1) ... }
-> * return at p3 ...;
->  } else S
-> // </smpl>
+> > and
+> > arch/arm/plat-mxc/include/mach/debug-macro.S.
 > 
-> Signed-off-by: Julia Lawall <julia@diku.dk>
-
-Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
-
-> 
-> ---
->  drivers/video/imxfb.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-> index d2ccfd6..f135dbe 100644
-> --- a/drivers/video/imxfb.c
-> +++ b/drivers/video/imxfb.c
-> @@ -856,10 +856,10 @@ failed_platform_init:
->  		dma_free_writecombine(&pdev->dev,fbi->map_size,fbi->map_cpu,
->  			fbi->map_dma);
->  failed_map:
-> -	clk_put(fbi->clk);
-> -failed_getclock:
->  	iounmap(fbi->regs);
->  failed_ioremap:
-> +	clk_put(fbi->clk);
-> +failed_getclock:
->  	release_mem_region(res->start, resource_size(res));
->  failed_req:
->  	kfree(info->pseudo_palette);
-> 
+> This can be used only when only one family is compiled in. Doing
+> otherwise should be catched with an error during comppilation.
 > 
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Ok, thanks for the explanations.
+
+	Arnd
