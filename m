@@ -1,39 +1,21 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 1 Jun 2011 10:30:39 -0400 (EDT)
-Subject: [PATCH 2/2] sdio: report error if pending IRQ but none function
-	bits
-In-Reply-To: <1306874008-28867-3-git-send-email-per.forlin@linaro.org>
-References: <1306874008-28867-1-git-send-email-per.forlin@linaro.org>
-	<1306874008-28867-3-git-send-email-per.forlin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1106011029390.30544@xanadu.home>
+From: mattias.wallin@stericsson.com (Mattias Wallin)
+Date: Wed, 1 Jun 2011 16:31:54 +0200
+Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
+In-Reply-To: <20110601142507.GK3660@n2100.arm.linux.org.uk>
+References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
+	<alpine.LFD.2.02.1105311236250.3078@ionos>
+	<4DE51EB7.7010606@stericsson.com>
+	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
+	<4DE5F0DB.2050409@stericsson.com> <4DE64B0E.8030008@stericsson.com>
+	<20110601142507.GK3660@n2100.arm.linux.org.uk>
+Message-ID: <4DE64D5A.20206@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 31 May 2011, Per Forlin wrote:
+On 06/01/2011 04:25 PM, Russell King - ARM Linux wrote:
+> sched_clock is supposed to be setup and initialized really early.  Why
+> are you doing trying to move it soo late?
+Linus idea was to remove the dependency from mach-ux500/cpu.c where I 
+originally called the init function by using core_initcall.
 
-> Return error in case of pending IRQ but none functions bits
-> in CCCR_INTx is set.
-> 
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> ---
->  drivers/mmc/core/sdio_irq.c |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-> index 2f81ddc..8184b6e 100644
-> --- a/drivers/mmc/core/sdio_irq.c
-> +++ b/drivers/mmc/core/sdio_irq.c
-> @@ -50,6 +50,11 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
->  		return ret;
->  	}
->  
-> +	if (!pending) {
-> +		printk(KERN_WARNING "%s: pending IRQ but none function bits\n",
-> +		       mmc_card_id(card));
-> +		ret = -EINVAL;
-> +	}
-
-Nope, this won't work with the polled interrupt mode.
-
-
-Nicolas
+Should I use pure_initcall or solve it some other way?
