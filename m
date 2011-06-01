@@ -1,32 +1,62 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 1 Jun 2011 10:37:16 +0200
-Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
-In-Reply-To: <20110601083000.GD3660@n2100.arm.linux.org.uk>
-References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
-	<alpine.LFD.2.02.1105311236250.3078@ionos>
-	<4DE51EB7.7010606@stericsson.com>
-	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
-	<20110601083000.GD3660@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTimAOWNJNGJwJkCkwwDJ2BR__NCV+A@mail.gmail.com>
+From: per.forlin@stericsson.com (Per Forlin)
+Date: Wed, 1 Jun 2011 10:48:32 +0200
+Subject: [PATCH v2 1/2] sdio: add quirk to handle pending IRQ in case of none
+	CCCR_INTx bits
+In-Reply-To: <1306918113-23872-1-git-send-email-per.forlin@stericsson.com>
+References: <1306918113-23872-1-git-send-email-per.forlin@stericsson.com>
+Message-ID: <1306918113-23872-2-git-send-email-per.forlin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/1 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, May 31, 2011 at 11:18:25PM +0200, Linus Walleij wrote:
->> Keeping it under include/linux is probably wise since we want drivers
->> OUT of the ARM tree, but I don't know if there is much consensus on that?
->
-> Header files private to a driver should be alongside the driver. ?Look
-> at drivers/net or drivers/scsi for plenty of examples.
->
-> Just because its a header file does not mean it must be in some directory
-> with 'include' in its path. ?The only reason to put it in include/linux
-> is if it contains stuff which needs to be shared outside of the driver
-> (eg, with arches).
+From: Per Forlin <per.forlin@linaro.org>
 
-I agree. Right now I have a creepy feeling that many drivers are just
-putting headers in <mach/foo.h> out of habit, when plain "foo.h" in
-working dir or <linux/subsystem/foo.h> is what is really apropriate.
+Add quirk MMC_QUIRK_SDIO_IRQ_CCCR_INTX_0 to handle SDIO device that may
+have pending IRQ when none bits are set in CCCR_INTx.
 
-Yours,
-Linus Walleij
+This IRQ issue was identified in the libertas sdio driver where the
+SDIO device seems to raise an interrupt even if there were none function
+bits in CCCR_INTx set. SDIO single irq feature will call irq handler directly
+in case of only one interrupt registered. It will not check the CCCR_INTx
+register and miss if the register is 0 and call the irq handler anyway.
+This IRQ issue is not defined by the SDIO spec.
+Use this quirk to work around this SDIO IRQ issue for a specific device.
+
+Signed-off-by: Per Forlin <per.forlin@linaro.org>
+---
+ drivers/mmc/core/sdio_irq.c |    4 ++--
+ include/linux/mmc/card.h    |    1 +
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
+index 03ead02..df1e946 100644
+--- a/drivers/mmc/core/sdio_irq.c
++++ b/drivers/mmc/core/sdio_irq.c
+@@ -204,7 +204,8 @@ static void sdio_single_irq_set(struct mmc_card *card)
+ 	int i;
+ 
+ 	card->sdio_single_irq = NULL;
+-	if ((card->host->caps & MMC_CAP_SDIO_IRQ) &&
++	if (!(card->quirks & MMC_QUIRK_SDIO_IRQ_CCCR_INTX_0) &&
++	    (card->host->caps & MMC_CAP_SDIO_IRQ) &&
+ 	    card->host->sdio_irqs == 1)
+ 		for (i = 0; i < card->sdio_funcs; i++) {
+ 		       func = card->sdio_func[i];
+@@ -301,4 +302,3 @@ int sdio_release_irq(struct sdio_func *func)
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(sdio_release_irq);
+-
+diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+index 7b4fd7b..852021c 100644
+--- a/include/linux/mmc/card.h
++++ b/include/linux/mmc/card.h
+@@ -175,6 +175,7 @@ struct mmc_card {
+ #define MMC_QUIRK_DISABLE_CD	(1<<5)		/* disconnect CD/DAT[3] resistor */
+ #define MMC_QUIRK_INAND_CMD38	(1<<6)		/* iNAND devices have broken CMD38 */
+ #define MMC_QUIRK_BLK_NO_CMD23	(1<<7)		/* Avoid CMD23 for regular multiblock */
++#define MMC_QUIRK_SDIO_IRQ_CCCR_INTX_0 (1<<7)	/* SDIO card has IRQ even if CCCR_INTx is 0 */
+ 
+ 	unsigned int		erase_size;	/* erase size in sectors */
+  	unsigned int		erase_shift;	/* if erase unit is power 2 */
+-- 
+1.7.4.1
