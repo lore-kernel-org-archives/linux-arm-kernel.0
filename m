@@ -1,31 +1,69 @@
-From: hans-christian.egtvedt@atmel.com (Hans-Christian Egtvedt)
-Date: Wed, 01 Jun 2011 15:32:09 +0200
-Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
-In-Reply-To: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
-References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Jun 2011 14:43:38 +0100
+Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
+	limitation in IOMMU
+In-Reply-To: <1306935012-12406-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <20110601131744.GH11352@atomide.com>
+	<1306935012-12406-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <20110601134338.GB6700@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
-> Currently atmel_nand driver used by AT91 and AVR32 calls a special callback
-> which return nand partition table and number of partitions. However in all
-> boards this callback returns just static data. So drop this callback and
-> make atmel_nand use partition table provided statically via platform_data.
-> 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+On Wed, Jun 01, 2011 at 03:30:11PM +0200, Laurent Pinchart wrote:
+> sg_alloc_table can only allocate multi-page scatter-gather list tables
+> if the architecture supports scatter-gather lists chaining. ARM doesn't
+> fit in that category.
 
-Thanks for this update, always nice seeing code being optimized. I
-really can't recall why it was made like this in the first place...
+Let's fix this properly, as I've said countless times and so far no one
+has bothered to sort this out:
 
-For the AVR32 related parts:
+8<----
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+Subject: ARM: Allow SoCs to enable scatterlist chaining
 
-Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+Allow SoCs to enable the scatterlist chaining support, which allows
+scatterlist tables to be broken up into smaller allocations.
 
-<snipp diff>
+As support for this feature depends on the implementation details of
+the users of the scatterlists, we can't enable this globally without
+auditing all the users, which is a very big task.  Instead, let SoCs
+progressively switch over to using this.
 
-Will this go through the linux-mtd tree (since it spans two archs) or
-should it go through an arch tree?
+SoC drivers using scatterlists and SoC DMA implementations need
+auditing before this option can be enabled for the SoC.
 
--- 
-Hans-Christian Egtvedt
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/Kconfig                   |    3 +++
+ arch/arm/include/asm/scatterlist.h |    4 ++++
+ 2 files changed, 7 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..cc0dcbf 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -37,6 +37,9 @@ config ARM
+ 	  Europe.  There is an ARM Linux project with a web page at
+ 	  <http://www.arm.linux.org.uk/>.
+ 
++config ARM_HAS_SG_CHAIN
++	bool
++
+ config HAVE_PWM
+ 	bool
+ 
+diff --git a/arch/arm/include/asm/scatterlist.h b/arch/arm/include/asm/scatterlist.h
+index 2f87870..cefdb8f 100644
+--- a/arch/arm/include/asm/scatterlist.h
++++ b/arch/arm/include/asm/scatterlist.h
+@@ -1,6 +1,10 @@
+ #ifndef _ASMARM_SCATTERLIST_H
+ #define _ASMARM_SCATTERLIST_H
+ 
++#ifdef CONFIG_ARM_HAS_SG_CHAIN
++#define ARCH_HAS_SG_CHAIN
++#endif
++
+ #include <asm/memory.h>
+ #include <asm/types.h>
+ #include <asm-generic/scatterlist.h>
