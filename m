@@ -1,80 +1,68 @@
-From: ryan@bluewatersys.com (Ryan Mallon)
-Date: Wed, 01 Jun 2011 07:42:48 +1000
-Subject: [PATCH v3] ARM: ep93xx: use more reliable CPLD watchdog for reset
-	on ts72xx
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F381FC498E@AUSP01VMBX24.collaborationhost.net>
-References: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
-	<1306868578-3883-1-git-send-email-ynezz@true.cz>
-	<ADE657CA350FB648AAC2C43247A983F001F381FC498E@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <4DE560D8.3080304@bluewatersys.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 1 Jun 2011 10:33:57 +0800
+Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
+References: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110601023356.GA1501@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/06/11 05:24, H Hartley Sweeten wrote:
-> On Tuesday, May 31, 2011 12:03 PM, Petr ?tetiar wrote:
->> On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
->> available, so use this one to reset the board instead of the soft reset in
->> CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
->> while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
->> so far.
->>
->> Cc: Hartley Sweeten <hsweeten@visionengravers.com>
->> Cc: Ryan Mallon <ryan@bluewatersys.com>
->> Signed-off-by: Petr ?tetiar <ynezz@true.cz>
->> ---
->>  arch/arm/mach-ep93xx/include/mach/system.h |   18 +++++++++++++-----
->>  1 files changed, 13 insertions(+), 5 deletions(-)
->>
->> diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
->> index 6d661fe..2969786 100644
->> --- a/arch/arm/mach-ep93xx/include/mach/system.h
->> +++ b/arch/arm/mach-ep93xx/include/mach/system.h
->> @@ -2,7 +2,10 @@
->>   * arch/arm/mach-ep93xx/include/mach/system.h
->>   */
->>  
->> +#include <linux/io.h>
->> +
->>  #include <mach/hardware.h>
->> +#include <mach/ts72xx.h>
->>  
->>  static inline void arch_idle(void)
->>  {
->> @@ -13,11 +16,16 @@ static inline void arch_reset(char mode, const char *cmd)
->>  {
->>  	local_irq_disable();
->>  
->> -	/*
->> -	 * Set then clear the SWRST bit to initiate a software reset
->> -	 */
->> -	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
->> -	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
->> +	/* It's more reliable to use CPLD watchdog to perform the reset */
->> +	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
->> +	    board_is_ts7300() || board_is_ts7400()) {
->> +		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
->> +		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
->> +	} else {
->> +		/* Set then clear the SWRST bit to initiate a software reset */
->> +		ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
->> +		ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
->> +	}
->>  
->>  	while (1)
->>  		;
-> 
-> That looks better.
-> 
-> I pulled out the ts-7200 manual to verify the watchdog reset.  Your feeding
-> the watchdog then changing the timeout period to 250ms.  Without the "else"
-> the syscon would have tried to reset the board when the SWRST bit is toggled.
-> 
-> I have no way of testing this patch (no ts boards) but as long as Ryan has no
-> objections you have my:
+Hi Vinod,
 
-My only (nitpicky) complaint is to move the CPLD comment inside the if
-block so that it is more clear that it relates to the ts7xxx boards.
-Otherwise the patch is fine.
+Thoughts?
 
+-- 
+Regards,
+Shawn
+
+On Thu, May 26, 2011 at 02:31:31PM +0800, Shawn Guo wrote:
+> Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> max_segment_number into device_dma_parameters and creates the
+> corresponding dmaengine API dma_set(get)_max_seg_number for it.
 > 
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  include/linux/device.h      |    1 +
+>  include/linux/dma-mapping.h |   15 +++++++++++++++
+>  2 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index c66111a..44cb2528 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -487,6 +487,7 @@ struct device_dma_parameters {
+>  	 * sg limitations.
+>  	 */
+>  	unsigned int max_segment_size;
+> +	unsigned int max_segment_number;
+>  	unsigned long segment_boundary_mask;
+>  };
+>  
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index ba8319a..fd314f4 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -131,6 +131,21 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+>  		return -EIO;
+>  }
+>  
+> +static inline unsigned int dma_get_max_seg_number(struct device *dev)
+> +{
+> +	return dev->dma_parms ? dev->dma_parms->max_segment_number : 1;
+> +}
+> +
+> +static inline unsigned int dma_set_max_seg_number(struct device *dev,
+> +						  unsigned int number)
+> +{
+> +	if (dev->dma_parms) {
+> +		dev->dma_parms->max_segment_number = number;
+> +		return 0;
+> +	} else
+> +		return -EIO;
+> +}
+> +
+>  static inline unsigned long dma_get_seg_boundary(struct device *dev)
+>  {
+>  	return dev->dma_parms ?
+> -- 
+> 1.7.4.1
