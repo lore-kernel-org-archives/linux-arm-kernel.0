@@ -1,54 +1,27 @@
-From: julia@diku.dk (Julia Lawall)
-Date: Wed,  1 Jun 2011 19:10:11 +0200
-Subject: [PATCH 8/10] drivers/video/imxfb.c: add missing clk_put
-Message-ID: <1306948213-20767-8-git-send-email-julia@diku.dk>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 1 Jun 2011 22:45:00 +0530
+Subject: [PATCH V2] davinci: da850: move input frequency to board
+	specific files
+In-Reply-To: <1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
+References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
+	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D2D22C1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Julia Lawall <julia@diku.dk>
+On Fri, May 27, 2011 at 14:50:53, Christian Riesch wrote:
+> From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+> 
+> Currently the input frequency of the SoC is hardcoded in the SoC specific
+> da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
+> range from 12 to 50 MHz, boards with different oscillator/crystal
+> frequencies may be built.
 
-Reorder the labels at the end of the function to correspond to the order in
-which the resources are allocated.
+The same problem was fixed for dm6467/T EVMs with a different approach.
 
-A simplified version of the semantic match that finds this problem is as
-follows: (http://coccinelle.lip6.fr/)
+This solution is much better than what was done for dm6467/T.
+So I am working on converting the dm6467/T code to this approach
+and should be able to post the updated patchset by tomorrow.
 
-// <smpl>
-@r exists@
-expression e1,e2;
-statement S;
-@@
-
-e1 = clk_get at p1(...);
-... when != e1 = e2
-    when != clk_put(e1)
-    when any
-if (...) { ... when != clk_put(e1)
-               when != if (...) { ... clk_put(e1) ... }
-* return at p3 ...;
- } else S
-// </smpl>
-
-Signed-off-by: Julia Lawall <julia@diku.dk>
-
----
- drivers/video/imxfb.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
-index d2ccfd6..f135dbe 100644
---- a/drivers/video/imxfb.c
-+++ b/drivers/video/imxfb.c
-@@ -856,10 +856,10 @@ failed_platform_init:
- 		dma_free_writecombine(&pdev->dev,fbi->map_size,fbi->map_cpu,
- 			fbi->map_dma);
- failed_map:
--	clk_put(fbi->clk);
--failed_getclock:
- 	iounmap(fbi->regs);
- failed_ioremap:
-+	clk_put(fbi->clk);
-+failed_getclock:
- 	release_mem_region(res->start, resource_size(res));
- failed_req:
- 	kfree(info->pseudo_palette);
+Thanks,
+Sekhar
