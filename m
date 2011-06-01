@@ -1,62 +1,63 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 1 Jun 2011 10:47:06 -0600
-Subject: [RFC 1/2] ARM:Tegra: Device Tree Support: Initialize the audio
-	card from the device tree.
-In-Reply-To: <BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
-References: <20110527205444.21000.90209.stgit@riker>
-	<20110527205706.21000.34832.stgit@riker>
-	<BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
-Message-ID: <BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 1 Jun 2011 18:47:31 +0200
+Subject: [PATCH 5/8 v2] ARM i.MX Allow to compile together i.MX1/21/25/27
+In-Reply-To: <201106011724.26704.arnd@arndb.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<1305823648-2428-6-git-send-email-s.hauer@pengutronix.de>
+	<20110601132206.GF23771@pengutronix.de>
+	<201106011724.26704.arnd@arndb.de>
+Message-ID: <20110601164731.GI23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2011 at 1:07 AM, Barry Song <21cnbao@gmail.com> wrote:
-> 2011/5/28 John Bonesio <bones@secretlab.ca>:
->> This patch makes it so the top level audio card is initialized from the device
->> tree. This is just the first step getting the audio complex of devices
->> iniialized from device tree nodes.
->>
->> Signed-off-by: John Bonesio<bones@secretlab.ca>
->> ---
->>
->> ?arch/arm/boot/dts/tegra-harmony.dts | ? ?4 +++
->> ?arch/arm/mach-tegra/board-dt.c ? ? ?| ? ?3 ++
->> ?sound/soc/tegra/harmony.c ? ? ? ? ? | ? 45 ++++++++++++++++++++++++++++++++---
->> ?3 files changed, 48 insertions(+), 4 deletions(-)
->>
->> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
->> index 05521a5..217a7f0 100644
->> --- a/arch/arm/boot/dts/tegra-harmony.dts
->> +++ b/arch/arm/boot/dts/tegra-harmony.dts
->> @@ -53,6 +53,10 @@
->> ? ? ? ? ? ? ? ?clock-frequency = <400000>;
->> ? ? ? ?};
->>
->> + ? ? ? harmony_audio: audio_card {
->> + ? ? ? ? ? ? ? compatible = "nvidia,harmony-audio";
->> + ? ? ? };
->> +
->> ? ? ? ?serial at 70006300 {
->> ? ? ? ? ? ? ? ?status = "ok";
->> ? ? ? ? ? ? ? ?clock-frequency = < 216000000 >;
->> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
->> index c498e84..a569ad9 100644
->> --- a/arch/arm/mach-tegra/board-dt.c
->> +++ b/arch/arm/mach-tegra/board-dt.c
->> @@ -56,6 +56,9 @@ static struct platform_device *tegra250_devices[] __initdata = {
->> ? ? ? ?&tegra_i2c_device2,
->> ? ? ? ?&tegra_i2c_device3,
->> ? ? ? ?&tegra_i2c_device4,
->> + ? ? ? &tegra_i2s_device1,
->> + ? ? ? &tegra_das_device,
->> + ? ? ? &tegra_pcm_device,
->
-> i am thinking whether platform_device should be created by
-> of_platform_device_create after scanning device tree, but not by
-> hard-code? looks like the two patches are only trying to let device
-> tree deliver gpio to drivers?
+On Wed, Jun 01, 2011 at 05:24:26PM +0200, Arnd Bergmann wrote:
+> On Wednesday 01 June 2011, Sascha Hauer wrote:
+> > 
+> > This allows for all armv4 and armv5 based i.MX systems to be compiled
+> > together in one kernel. To accomplish this we need ARM_PATCH_PHYS_VIRT
+> > and AUTO_ZRELADDR which is selected in Kconfig.
+> > As compiling with ARM_PATCH_PHYS_VIRT breaks XIP support and different
+> > PHYS_OFFSETs break uImage support the old way to integrate only one
+> > of these SoCs is kept in place.
+> 
+> Great stuff!
+> 
+> My main concern is that it's really confusing to have so many symbols
+> with slightly different scopes:
+> 
+> * SOC_SELECT_IMX1  HAVE_SOC_IMX1  ARCH_MX1  SOC_IMX1
+> * SOC_SELECT_IMX21 HAVE_SOC_IMX21 ARCH_MX2  SOC_IMX21
 
-Can you please restate your question?  I don't think I understand what
-you are trying to ask.
+The ARCH_MX* macros should be removed, but some driver Kconfig entries
+still depend on them.
 
-g.
+> 
+> Are you sure that this is actually the minimum set that is required?
+
+I'd love to remove some of these, but I think they are required.
+SOC_SELECT_IMX1 and HAVE_SOC_IMX1 are only used to offer the right
+Kconfig magic.
+
+> 
+> I assume that you have gone through all the uses of these symbols
+> to check that there is no silent breakage if you enable more than
+> one. The only ones that looks suspicious to me are
+> arch/arm/plat-mxc/include/mach/timex.h
+
+See An earlier patch in this series. The ifdefs are removed and
+CLOCK_TICK_RATE is replaced with a bogus value. CLOCK_TICK_RATE
+is unused but still required to compile the kernel.
+
+> and
+> arch/arm/plat-mxc/include/mach/debug-macro.S.
+
+This can be used only when only one family is compiled in. Doing
+otherwise should be catched with an error during comppilation.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
