@@ -1,67 +1,23 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 1 Jun 2011 18:27:01 +0200
-Subject: [PATCH v2 3/3] remove the now empty mach-s3c2410/irq.c
-In-Reply-To: <201106011821.38091.heiko@sntech.de>
-References: <201106011821.38091.heiko@sntech.de>
-Message-ID: <201106011827.01598.heiko@sntech.de>
+Date: Wed, 1 Jun 2011 18:27:29 +0200
+Subject: [PATCH 1/3] Fix missing struct for s3c2410_dma_chan
+	=?iso-8859-1?q?in=09s3c2410=5Fdma=5Fsuspend=5Fchan?=
+In-Reply-To: <4DE6625E.2070907@ru.mvista.com>
+References: <201106011348.47145.heiko@sntech.de>
+	<201106011350.44375.heiko@sntech.de>
+	<4DE6625E.2070907@ru.mvista.com>
+Message-ID: <201106011827.29981.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am Mittwoch 01 Juni 2011, 18:01:34 schrieben Sie:
+> Hello.
+> 
+> Heiko St?bner wrote:
+> > s3c2410_dma_chan is not a type itself, so struct is required.
+> 
+>     Your signoffs are missing, so your patches can't be applied...
+*grml* ... I seem to have bad luck with my patches these days
+will resend 
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-
----
- arch/arm/mach-s3c2410/Makefile |    1 -
- arch/arm/mach-s3c2410/irq.c    |   29 -----------------------------
- 2 files changed, 0 insertions(+), 30 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/irq.c
-
-diff --git a/arch/arm/mach-s3c2410/Makefile b/arch/arm/mach-s3c2410/Makefile
-index 0d468e9..8169535 100644
---- a/arch/arm/mach-s3c2410/Makefile
-+++ b/arch/arm/mach-s3c2410/Makefile
-@@ -10,7 +10,6 @@ obj-n                         :=
- obj-                           :=
- 
- obj-$(CONFIG_CPU_S3C2410)      += s3c2410.o
--obj-$(CONFIG_CPU_S3C2410)      += irq.o
- obj-$(CONFIG_CPU_S3C2410_DMA)  += dma.o
- obj-$(CONFIG_CPU_S3C2410_DMA)  += dma.o
- obj-$(CONFIG_S3C2410_PM)       += pm.o sleep.o
-diff --git a/arch/arm/mach-s3c2410/irq.c b/arch/arm/mach-s3c2410/irq.c
-deleted file mode 100644
-index 4428695..0000000
---- a/arch/arm/mach-s3c2410/irq.c
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/* linux/arch/arm/mach-s3c2410/irq.c
-- *
-- * Copyright (c) 2006 Simtec Electronics
-- *     Ben Dooks <ben@simtec.co.uk>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- *
--*/
--
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/interrupt.h>
--#include <linux/ioport.h>
--#include <linux/syscore_ops.h>
--
--#include <plat/cpu.h>
--#include <plat/pm.h>
--- 
-1.7.1
+Heiko
