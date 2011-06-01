@@ -1,38 +1,66 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed, 1 Jun 2011 16:04:53 +0800
-Subject: [RFC] Consolidation: Replace all led drivers in arch/arm to leds
-	trigger drivers
-In-Reply-To: <BANLkTikZ4bo8_MO68SZSyAeFdZVLJkAnkw@mail.gmail.com>
-References: <BANLkTimRM=Uq6FUN-tvGrf3HLN3BUYqmOQ@mail.gmail.com>
-	<BANLkTikZ4bo8_MO68SZSyAeFdZVLJkAnkw@mail.gmail.com>
-Message-ID: <BANLkTinfRym4=sv-GtzcE1uE2Zhgib6bGw@mail.gmail.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 01 Jun 2011 13:12:24 +0530
+Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
+References: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1306914144.10976.4.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2011 at 4:00 PM, Andrew Victor <avictor.za@gmail.com> wrote:
-> hi Bryan,
->
->> arch/arm/mach-at91/leds.c
->
-> That file also has common initialization & registration code for the
-> "leds-gpio" and "leds-atmel-pwm" devices, but the old CONFIG_LEDS
-> section can be dropped.
->
->
->> Or we can just delete some leds driver such as
->> arch/arm/mach-ks8695/leds.c, since nobody is using that driver in
->> ks8695.
->
-> That file can be deleted, and also drop the ks8695_init_leds() from
-> arch/arm/mach-ks8695/devices.c.
->
->
+On Thu, 2011-05-26 at 14:31 +0800, Shawn Guo wrote:
+> Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> max_segment_number into device_dma_parameters and creates the
+> corresponding dmaengine API dma_set(get)_max_seg_number for it.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  include/linux/device.h      |    1 +
+>  include/linux/dma-mapping.h |   15 +++++++++++++++
+>  2 files changed, 16 insertions(+), 0 deletions(-)
+Can you explain me why this change is required, the patch description
+isn't helping for this.
 
-Thanks Andrew, I will provide 2 patches soon.
+If you satisfy me with above then I am okay with it, but I need ACK from
+Dan before applying...
 
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+~Vinod
+
+> 
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index c66111a..44cb2528 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -487,6 +487,7 @@ struct device_dma_parameters {
+>  	 * sg limitations.
+>  	 */
+>  	unsigned int max_segment_size;
+> +	unsigned int max_segment_number;
+>  	unsigned long segment_boundary_mask;
+>  };
+>  
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index ba8319a..fd314f4 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -131,6 +131,21 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+>  		return -EIO;
+>  }
+>  
+> +static inline unsigned int dma_get_max_seg_number(struct device *dev)
+> +{
+> +	return dev->dma_parms ? dev->dma_parms->max_segment_number : 1;
+> +}
+> +
+> +static inline unsigned int dma_set_max_seg_number(struct device *dev,
+> +						  unsigned int number)
+> +{
+> +	if (dev->dma_parms) {
+> +		dev->dma_parms->max_segment_number = number;
+> +		return 0;
+> +	} else
+> +		return -EIO;
+> +}
+> +
+>  static inline unsigned long dma_get_seg_boundary(struct device *dev)
+>  {
+>  	return dev->dma_parms ?
