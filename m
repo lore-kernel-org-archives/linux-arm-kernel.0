@@ -1,34 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 1 Jun 2011 09:37:49 +0200
-Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
-In-Reply-To: <alpine.LFD.2.02.1105312319530.3078@ionos>
-References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.02.1105312319530.3078@ionos>
-Message-ID: <BANLkTi=UyypKZUQOCCL-KWyAbMQBKY4ccg@mail.gmail.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 1 Jun 2011 09:39:09 +0200
+Subject: [PATCH 1/2] sdio: add function to enable and disable
+	sdio_single_irq optimization
+In-Reply-To: <BANLkTinUEq_tvCtXWjg3t6L589y80nPPog@mail.gmail.com>
+References: <1306874008-28867-1-git-send-email-per.forlin@linaro.org>
+	<1306874008-28867-2-git-send-email-per.forlin@linaro.org>
+	<BANLkTinUEq_tvCtXWjg3t6L589y80nPPog@mail.gmail.com>
+Message-ID: <BANLkTi=pa1hC_nm1HmWRLO+vw_set=py0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/5/31 Thomas Gleixner <tglx@linutronix.de>:
-> On Tue, 31 May 2011, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> Use the new clockevents_config_and_register() function to register
->> the U300 clockevent, since that code requires ->cpumask to be set
->> we set this even on this UP system to please the framework.
+On 1 June 2011 09:30, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 2011/5/31 Per Forlin <per.forlin@linaro.org>:
 >
-> Hmm, how about whacking the framework maintainer on the head for that
-> requirement?
+>> +/**
+>> + * ? ? sdio_single_irq_enable - enable or disable SDIO single IRQ function
+>> + * ? ? @card: card to enable SDIO single irq
+>> + * ? ? @value: true to enable SDIO single irq function, false to disable
+>> + *
+>> + * ? ? If there is only 1 function interrupt registered and SDIO single IRQ
+>> + * ? ? is enable, the irq handler is called directly without reading
+>> + * ? ? the CCCR registers
+>> + */
+>> +void sdio_single_irq_enable(struct mmc_card *card, bool value)
+>> +{
+>> + ? ? ? card->sdio_single_irq_en = value;
+>> +}
+>> +EXPORT_SYMBOL_GPL(sdio_single_irq_enable);
+>
+> Can we use a quirk for implementing this for the specific problematic
+> card instead?
+>
+Yes, quirks is the thing I should use.
+I'll remove this function and replace it with a quirk. The default
+state could then be sdio_single_irq enable and for all none supported
+hardware (device ID) sdio_single_irq will be disable.
 
-Yeah hm, I sort of figured it might be desirable to have this warning
-on SMP. This:
+> Daniel, do you have the vendor and device ID for the problematic
+> Libertas card you're working on so this can be quirked explicitly
+> in drivers/mmc/core/quirks.c?
+>
+Even if Daniel fix this issue in libertas it is still good to have a
+sdio_single_irq quirk in place for other SDIO devices with the same
+hardware issue.
 
-BUG_ON(!dev->cpumask);
-
-from clockevents.c is the culprit anyway. I dunno if it's best to
-#ifdef CONFIG_SMP that thing (technically I guess it shouldn't
-even be in the struct on UP but who cares) or if there is some
-more clever way to do it runtime, so whatever you prefer, I can
-patch it if you know what you want.
-
+> Yours,
+> Linus Walleij
+>
 Thanks,
-Linus Walleij
+Per
