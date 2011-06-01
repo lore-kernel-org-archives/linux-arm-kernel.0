@@ -1,32 +1,54 @@
 From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 1 Jun 2011 18:23:24 +0200
-Subject: [PATCH v2 1/3] Fix missing struct for s3c2410_dma_chan in
-	s3c2410_dma_suspend_chan
+Date: Wed, 1 Jun 2011 18:25:17 +0200
+Subject: [PATCH v2 2/3] Move s3c24xx_irq_syscore_ops to plat-s3c24xx/irq.c
 In-Reply-To: <201106011821.38091.heiko@sntech.de>
 References: <201106011821.38091.heiko@sntech.de>
-Message-ID: <201106011823.25052.heiko@sntech.de>
+Message-ID: <201106011825.18032.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c2410_dma_chan is not a type itself, so struct is required.
+s3c24xx_irq_syscore_ops was only defined for s3c2410 cpus leading
+to compile errors on for example 2412 and 2416.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/plat-s3c24xx/dma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-s3c2410/irq.c |    5 -----
+ arch/arm/plat-s3c24xx/irq.c |    6 ++++++
+ 2 files changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
-index c10d10c..2abf966 100644
---- a/arch/arm/plat-s3c24xx/dma.c
-+++ b/arch/arm/plat-s3c24xx/dma.c
-@@ -1199,7 +1199,7 @@ EXPORT_SYMBOL(s3c2410_dma_getposition);
+diff --git a/arch/arm/mach-s3c2410/irq.c b/arch/arm/mach-s3c2410/irq.c
+index 2854129..4428695 100644
+--- a/arch/arm/mach-s3c2410/irq.c
++++ b/arch/arm/mach-s3c2410/irq.c
+@@ -27,8 +27,3 @@
  
- #ifdef CONFIG_PM
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
+-
+-struct syscore_ops s3c24xx_irq_syscore_ops = {
+-       .suspend        = s3c24xx_irq_suspend,
+-       .resume         = s3c24xx_irq_resume,
+-};
+diff --git a/arch/arm/plat-s3c24xx/irq.c b/arch/arm/plat-s3c24xx/irq.c
+index 9aee7e1..fc8c5f8 100644
+--- a/arch/arm/plat-s3c24xx/irq.c
++++ b/arch/arm/plat-s3c24xx/irq.c
+@@ -23,6 +23,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/ioport.h>
+ #include <linux/sysdev.h>
++#include <linux/syscore_ops.h>
  
--static void s3c2410_dma_suspend_chan(s3c2410_dma_chan *cp)
-+static void s3c2410_dma_suspend_chan(struct s3c2410_dma_chan *cp)
- {
-        printk(KERN_DEBUG "suspending dma channel %d\n", cp->number);
+ #include <asm/irq.h>
+ #include <asm/mach/irq.h>
+@@ -668,3 +669,8 @@ void __init s3c24xx_init_irq(void)
  
+        irqdbf("s3c2410: registered interrupt handlers\n");
+ }
++
++struct syscore_ops s3c24xx_irq_syscore_ops = {
++       .suspend        = s3c24xx_irq_suspend,
++       .resume         = s3c24xx_irq_resume,
++};
 -- 
 1.7.1
