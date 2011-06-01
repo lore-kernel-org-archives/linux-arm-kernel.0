@@ -1,33 +1,68 @@
-From: davej@redhat.com (Dave Jones)
-Date: Wed, 1 Jun 2011 12:45:10 -0400
-Subject: [PATCH 1/5] CPUFREQ/S3C64xx: Move S3C64xx CPUfreq driver into
-	drivers/cpufreq
-In-Reply-To: <20110601095811.GB13591@opensource.wolfsonmicro.com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
-	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<BANLkTinR_WLjsgm5ogt_BbJwPFC0Kc1Dqg@mail.gmail.com>
-	<20110601095811.GB13591@opensource.wolfsonmicro.com>
-Message-ID: <20110601164510.GA21467@redhat.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 1 Jun 2011 19:49:15 +0200
+Subject: [PATCH 8/10] drivers/video/imxfb.c: add missing clk_put
+In-Reply-To: <1306948213-20767-8-git-send-email-julia@diku.dk>
+References: <1306948213-20767-8-git-send-email-julia@diku.dk>
+Message-ID: <20110601174915.GL23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 10:58:11AM +0100, Mark Brown wrote:
- > On Wed, Jun 01, 2011 at 06:55:05PM +0900, Kyungmin Park wrote:
- > 
- > > Instead of samsung tree, it should be handled at cpufreq tree.
- > > CCed the cpufreq maintainer.
- > 
- > Well, it's a something for both really as both trees are updated.  I
- > sent the orginal copy of this patch to both places but both sets of
- > maintainers just ignored it (I've never seen any response from the
- > cpufreq maintainers on this driver ever since I originally submitted
- > it).  
+On Wed, Jun 01, 2011 at 07:10:11PM +0200, Julia Lawall wrote:
+> From: Julia Lawall <julia@diku.dk>
+> 
+> Reorder the labels at the end of the function to correspond to the order in
+> which the resources are allocated.
+> 
+> A simplified version of the semantic match that finds this problem is as
+> follows: (http://coccinelle.lip6.fr/)
+> 
+> // <smpl>
+> @r exists@
+> expression e1,e2;
+> statement S;
+> @@
+> 
+> e1 = clk_get at p1(...);
+> ... when != e1 = e2
+>     when != clk_put(e1)
+>     when any
+> if (...) { ... when != clk_put(e1)
+>                when != if (...) { ... clk_put(e1) ... }
+> * return at p3 ...;
+>  } else S
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <julia@diku.dk>
 
-Sorry about that. It's actually in my 'to merge' mailbox, but I've been
-laggy at dealing with it recently.  I'll try and clear the backlog in
-the next day or two.
+Acked-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-thanks,
+> 
+> ---
+>  drivers/video/imxfb.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/video/imxfb.c b/drivers/video/imxfb.c
+> index d2ccfd6..f135dbe 100644
+> --- a/drivers/video/imxfb.c
+> +++ b/drivers/video/imxfb.c
+> @@ -856,10 +856,10 @@ failed_platform_init:
+>  		dma_free_writecombine(&pdev->dev,fbi->map_size,fbi->map_cpu,
+>  			fbi->map_dma);
+>  failed_map:
+> -	clk_put(fbi->clk);
+> -failed_getclock:
+>  	iounmap(fbi->regs);
+>  failed_ioremap:
+> +	clk_put(fbi->clk);
+> +failed_getclock:
+>  	release_mem_region(res->start, resource_size(res));
+>  failed_req:
+>  	kfree(info->pseudo_palette);
+> 
+> 
 
-	Dave
- 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
