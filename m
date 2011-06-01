@@ -1,147 +1,69 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Wed,  1 Jun 2011 16:23:57 +0800
-Subject: [PATCH] arm: ks8695: remove leds driver, since nobody use it
-Message-ID: <1306916637-25676-1-git-send-email-bryan.wu@canonical.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 1 Jun 2011 09:26:31 +0100
+Subject: [PATCH] gpio: ep93xx: move driver to drivers/gpio
+In-Reply-To: <BANLkTikp=Pbh+r3od7fKRP4A7wJrC-i25A@mail.gmail.com>
+References: <201105311249.30372.hartleys@visionengravers.com>
+	<BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
+	<ADE657CA350FB648AAC2C43247A983F001F381FC4A77@AUSP01VMBX24.collaborationhost.net>
+	<BANLkTikp=Pbh+r3od7fKRP4A7wJrC-i25A@mail.gmail.com>
+Message-ID: <20110601082631.GC3660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
----
- arch/arm/mach-ks8695/devices.c |   21 ---------
- arch/arm/mach-ks8695/leds.c    |   93 ----------------------------------------
- 2 files changed, 0 insertions(+), 114 deletions(-)
- delete mode 100644 arch/arm/mach-ks8695/leds.c
+On Tue, May 31, 2011 at 05:28:26PM -0600, Grant Likely wrote:
+> On Tue, May 31, 2011 at 4:37 PM, H Hartley Sweeten
+> <hartleys@visionengravers.com> wrote:
+> > On Tuesday, May 31, 2011 1:41 PM, Grant Likely wrote:
+> >> On Tue, May 31, 2011 at 1:49 PM, H Hartley Sweeten wrote:
+> >>> The GPIO driver should reside in drivers/gpio.
+> >>>
+> >>> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> >>> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> >>> Cc: Grant Likely <grant.likely@secretlab.ca>
+> >>>
+> >>> ---
+> >>>
+> >>> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> >>> index 342d634..7307302 100644
+> >>> --- a/drivers/gpio/Kconfig
+> >>> +++ b/drivers/gpio/Kconfig
+> >>> @@ -86,6 +86,13 @@ config GPIO_IT8761E
+> >>> ? ? ? ?help
+> >>> ? ? ? ? ?Say yes here to support GPIO functionality of IT8761E super I/O chip.
+> >>>
+> >>> +config GPIO_EP93XX
+> >>> + ? ? ? bool "Cirrus EP93xx GPIO support"
+> >>> + ? ? ? depends on ARCH_EP93XX
+> >>> + ? ? ? default y
+> >>> + ? ? ? help
+> >>> + ? ? ? ? Say yes here to support the Cirrus EP93xx GPIO peripheral.
+> >>> +
+> >>
+> >> Do you really want a user-visible Kconfig symbol here? ?If it cannot
+> >> be built as a module, then I suspect that for most on-chip gpio
+> >> controllers they should just be enabled unconditionally on the SoC's
+> >> Kconfig symbol.
+> >
+> > Grant,
+> >
+> > No, I a user-visible symbol is not needed. ?Should I change this to:
+> >
+> > +config GPIO_EP93XX
+> > + ? ? ? bool
+> > + ? ? ? depends on ARCH_EP93XX
+> > + ? ? ? default y
+> >
+> > Or like the Samsung drivers, without the visibility:
+> >
+> > +config GPIO_EP93XX
+> > + ? ? ? bool
+> > + ? ? ? depends on ARM
+> > + ? ? ? default y if ARCH_EP93XX
+> 
+> I like the former.
 
-diff --git a/arch/arm/mach-ks8695/devices.c b/arch/arm/mach-ks8695/devices.c
-index b89fb6d..5ebf45d 100644
---- a/arch/arm/mach-ks8695/devices.c
-+++ b/arch/arm/mach-ks8695/devices.c
-@@ -181,27 +181,6 @@ static void __init ks8695_add_device_watchdog(void)
- }
- 
- 
--/* --------------------------------------------------------------------
-- *  LEDs
-- * -------------------------------------------------------------------- */
--
--#if defined(CONFIG_LEDS)
--short ks8695_leds_cpu = -1;
--short ks8695_leds_timer = -1;
--
--void __init ks8695_init_leds(u8 cpu_led, u8 timer_led)
--{
--	/* Enable GPIO to access the LEDs */
--	gpio_direction_output(cpu_led, 1);
--	gpio_direction_output(timer_led, 1);
--
--	ks8695_leds_cpu	  = cpu_led;
--	ks8695_leds_timer = timer_led;
--}
--#else
--void __init ks8695_init_leds(u8 cpu_led, u8 timer_led) {}
--#endif
--
- /* -------------------------------------------------------------------- */
- 
- /*
-diff --git a/arch/arm/mach-ks8695/leds.c b/arch/arm/mach-ks8695/leds.c
-deleted file mode 100644
-index 184ef74..0000000
---- a/arch/arm/mach-ks8695/leds.c
-+++ /dev/null
-@@ -1,93 +0,0 @@
--/*
-- * LED driver for KS8695-based boards.
-- *
-- * Copyright (C) Andrew Victor
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/kernel.h>
--#include <linux/module.h>
--#include <linux/init.h>
--
--#include <asm/leds.h>
--#include <mach/devices.h>
--#include <mach/gpio.h>
--
--
--static inline void ks8695_led_on(unsigned int led)
--{
--	gpio_set_value(led, 0);
--}
--
--static inline void ks8695_led_off(unsigned int led)
--{
--	gpio_set_value(led, 1);
--}
--
--static inline void ks8695_led_toggle(unsigned int led)
--{
--	unsigned long is_off = gpio_get_value(led);
--	if (is_off)
--		ks8695_led_on(led);
--	else
--		ks8695_led_off(led);
--}
--
--
--/*
-- * Handle LED events.
-- */
--static void ks8695_leds_event(led_event_t evt)
--{
--	unsigned long flags;
--
--	local_irq_save(flags);
--
--	switch(evt) {
--	case led_start:		/* System startup */
--		ks8695_led_on(ks8695_leds_cpu);
--		break;
--
--	case led_stop:		/* System stop / suspend */
--		ks8695_led_off(ks8695_leds_cpu);
--		break;
--
--#ifdef CONFIG_LEDS_TIMER
--	case led_timer:		/* Every 50 timer ticks */
--		ks8695_led_toggle(ks8695_leds_timer);
--		break;
--#endif
--
--#ifdef CONFIG_LEDS_CPU
--	case led_idle_start:	/* Entering idle state */
--		ks8695_led_off(ks8695_leds_cpu);
--		break;
--
--	case led_idle_end:	/* Exit idle state */
--		ks8695_led_on(ks8695_leds_cpu);
--		break;
--#endif
--
--	default:
--		break;
--	}
--
--	local_irq_restore(flags);
--}
--
--
--static int __init leds_init(void)
--{
--	if ((ks8695_leds_timer == -1) || (ks8695_leds_cpu == -1))
--		return -ENODEV;
--
--	leds_event = ks8695_leds_event;
--
--	leds_event(led_start);
--	return 0;
--}
--
--__initcall(leds_init);
--- 
-1.7.5
+Even better is:
+
+config GPIO_EP93XX
+	def_bool y
+	depends on ARCH_EP93XX
