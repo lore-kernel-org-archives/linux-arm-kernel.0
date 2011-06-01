@@ -1,104 +1,33 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Wed, 1 Jun 2011 12:24:09 -0500
-Subject: [PATCH] gpio: ep93xx: move driver to drivers/gpio
-In-Reply-To: <BANLkTi=0_t6+=8Ww+a+jX4SR5ni9KQnYqA@mail.gmail.com>
-References: <201105311249.30372.hartleys@visionengravers.com>
-	<BANLkTimzWyhZ14ieo0SUfsn8SKp9cM_EBw@mail.gmail.com>
-	<ADE657CA350FB648AAC2C43247A983F001F381FC4A77@AUSP01VMBX24.collaborationhost.net>
-	<BANLkTikp=Pbh+r3od7fKRP4A7wJrC-i25A@mail.gmail.com>
-	<20110601082631.GC3660@n2100.arm.linux.org.uk>
-	<BANLkTi=0_t6+=8Ww+a+jX4SR5ni9KQnYqA@mail.gmail.com>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F381FC4C6F@AUSP01VMBX24.collaborationhost.net>
+From: davej@redhat.com (Dave Jones)
+Date: Wed, 1 Jun 2011 12:45:10 -0400
+Subject: [PATCH 1/5] CPUFREQ/S3C64xx: Move S3C64xx CPUfreq driver into
+	drivers/cpufreq
+In-Reply-To: <20110601095811.GB13591@opensource.wolfsonmicro.com>
+References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
+	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<BANLkTinR_WLjsgm5ogt_BbJwPFC0Kc1Dqg@mail.gmail.com>
+	<20110601095811.GB13591@opensource.wolfsonmicro.com>
+Message-ID: <20110601164510.GA21467@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 01, 2011 9:46 AM, Grant Likely wrote:
-> On Wed, Jun 1, 2011 at 2:26 AM, Russell King - ARM Linux wrote:
->> On Tue, May 31, 2011 at 05:28:26PM -0600, Grant Likely wrote:
->>>> [...]Should I change this to:
->>>>
->>>> +config GPIO_EP93XX
->>>> + ? ? ? bool
->>>> + ? ? ? depends on ARCH_EP93XX
->>>> + ? ? ? default y
->>>>
->>>> Or like the Samsung drivers, without the visibility:
->>>>
->>>> +config GPIO_EP93XX
->>>> + ? ? ? bool
->>>> + ? ? ? depends on ARM
->>>> + ? ? ? default y if ARCH_EP93XX
->>>
->>> I like the former.
->>
->> Even better is:
->>
->> config GPIO_EP93XX
->> ? ? ? ?def_bool y
->> ? ? ? ?depends on ARCH_EP93XX
->
-> Yup.
+On Wed, Jun 01, 2011 at 10:58:11AM +0100, Mark Brown wrote:
+ > On Wed, Jun 01, 2011 at 06:55:05PM +0900, Kyungmin Park wrote:
+ > 
+ > > Instead of samsung tree, it should be handled at cpufreq tree.
+ > > CCed the cpufreq maintainer.
+ > 
+ > Well, it's a something for both really as both trees are updated.  I
+ > sent the orginal copy of this patch to both places but both sets of
+ > maintainers just ignored it (I've never seen any response from the
+ > cpufreq maintainers on this driver ever since I originally submitted
+ > it).  
 
-Shouldn't the Samsung gpio drivers be handled the same way?
+Sorry about that. It's actually in my 'to merge' mailbox, but I've been
+laggy at dealing with it recently.  I'll try and clear the backlog in
+the next day or two.
 
-Also, the depends on ARM is redundant.  The other symbols are only
-available when ARM is defined.
+thanks,
 
-Something like this.
-
-
-gpio: Samsung: make Kconfig options def_bool
-
-The Samsung GPIO drivers are always built-in when the relevant
-platform is selected.  Change the Kconfig symbol to def_bool y
-dependant on the platform.
-
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
----
-
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 18c0b31..2e3cd11 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -87,32 +87,20 @@ config GPIO_IT8761E
- 	  Say yes here to support GPIO functionality of IT8761E super I/O chip.
+	Dave
  
- config GPIO_EXYNOS4
--	bool "Samsung Exynos4 GPIO library support"
--	default y
--	depends on ARM && CPU_EXYNOS4210
--	help
--	  Say yes here to support Samsung Exynos4 series SoCs GPIO library
-+	def_bool y
-+	depends on CPU_EXYNOS4210
- 
- config GPIO_PLAT_SAMSUNG
--	bool "Samsung SoCs GPIO library support"
--	default y
--	depends on ARM && SAMSUNG_GPIOLIB_4BIT
--	help
--	  Say yes here to support Samsung SoCs GPIO library
-+	def_bool y
-+	depends on SAMSUNG_GPIOLIB_4BIT
- 
- config GPIO_S5PC100
--	bool "Samsung S5PC100 GPIO library support"
--	default y
--	depends on ARM && CPU_S5PC100
--	help
--	  Say yes here to support Samsung S5PC100 SoCs GPIO library
-+	def_bool y
-+	depends on CPU_S5PC100
- 
- config GPIO_S5PV210
--	bool "Samsung S5PV210/S5PC110 GPIO library support"
--	default y
--	depends on ARM && CPU_S5PV210
--	help
--	  Say yes here to support Samsung S5PV210/S5PC110 SoCs GPIO library
-+	def_bool y
-+	depends on CPU_S5PV210
- 
- config GPIO_PL061
- 	bool "PrimeCell PL061 GPIO support"
