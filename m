@@ -1,19 +1,18 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 30 Jun 2011 23:56:47 -0700 (PDT)
-Subject: [PATCH net-next] net: am79c961a: Omit check for multicast bit
-	in netdev_for_each_mc_addr
-In-Reply-To: <1309349686-1506-1-git-send-email-tklauser@distanz.ch>
-References: <1309349686-1506-1-git-send-email-tklauser@distanz.ch>
-Message-ID: <20110630.235647.1768047465126096152.davem@davemloft.net>
+From: sharon_burns72@gmail.com (Sharon.Burns)
+Date: Wed, 01 Jun 2011 00:00:42 -0500
+Subject: Hello Would You Like To Earn
+Message-ID: <E1QRdXu-000w5l-GS@host113.kvchosting.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tobias Klauser <tklauser@distanz.ch>
-Date: Wed, 29 Jun 2011 14:14:46 +0200
+Hello linux-arm-kernel
 
-> There is no need to check for the address being a multicast address in
-> the netdev_for_each_mc_addr loop, so remove it.
-> 
-> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+Would you like to earn an extra $200 everyday?, for just 45 minutes work? You could quit your job and make double the money at home working for yourself.
 
-Applied.
+visit->http:tinyurl.com/3brnlpx
+
+Regards,
+
+Sharon Burns
+
+Survey Human Resources Dept.
