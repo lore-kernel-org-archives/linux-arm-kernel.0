@@ -1,86 +1,107 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 1 Jun 2011 15:50:50 +0200
-Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
-	limitation in IOMMU
-In-Reply-To: <20110601134338.GB6700@n2100.arm.linux.org.uk>
-References: <20110601131744.GH11352@atomide.com>
-	<1306935012-12406-1-git-send-email-laurent.pinchart@ideasonboard.com>
-	<20110601134338.GB6700@n2100.arm.linux.org.uk>
-Message-ID: <201106011550.50873.laurent.pinchart@ideasonboard.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  1 Jun 2011 15:03:26 +0100
+Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer running
+	early
+Message-ID: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Currently, the boot CPU has its local timer enabled long after
+the delay loop has been calibrated. This makes it impossible to
+boot a system that only uses local timers, like the A15.
 
-On Wednesday 01 June 2011 15:43:38 Russell King - ARM Linux wrote:
-> On Wed, Jun 01, 2011 at 03:30:11PM +0200, Laurent Pinchart wrote:
-> > sg_alloc_table can only allocate multi-page scatter-gather list tables
-> > if the architecture supports scatter-gather lists chaining. ARM doesn't
-> > fit in that category.
-> 
-> Let's fix this properly, as I've said countless times and so far no one
-> has bothered to sort this out:
-> 
-> 8<----
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> Subject: ARM: Allow SoCs to enable scatterlist chaining
-> 
-> Allow SoCs to enable the scatterlist chaining support, which allows
-> scatterlist tables to be broken up into smaller allocations.
-> 
-> As support for this feature depends on the implementation details of
-> the users of the scatterlists, we can't enable this globally without
-> auditing all the users, which is a very big task.  Instead, let SoCs
-> progressively switch over to using this.
-> 
-> SoC drivers using scatterlists and SoC DMA implementations need
-> auditing before this option can be enabled for the SoC.
+Use late_time_init hook to initialize the boot CPU local timer.
+Since shmobile is already using this hook, add an ARM specific
+arm_late_time_init hook that platforms can use instead.
 
-In the specific iovmm case, the driver uses the sglist API to build a list of 
-page-size sg entries, and then process it in software. Is that considered as 
-an abuse of the sglist API, or valid usage ?
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/mach/time.h |    1 +
+ arch/arm/kernel/smp.c            |    6 ------
+ arch/arm/kernel/time.c           |   14 ++++++++++++++
+ arch/arm/mach-shmobile/timer.c   |    2 +-
+ 4 files changed, 16 insertions(+), 7 deletions(-)
 
-Anyway, sglist chaining is not needed by iovmm. As iovmm just walks the sglist 
-manually, it's easier to allocate it in one go rather than using sglist 
-chaining. This of course doesn't make your patch unneeded or wrong.
-
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/Kconfig                   |    3 +++
->  arch/arm/include/asm/scatterlist.h |    4 ++++
->  2 files changed, 7 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 9adc278..cc0dcbf 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -37,6 +37,9 @@ config ARM
->  	  Europe.  There is an ARM Linux project with a web page at
->  	  <http://www.arm.linux.org.uk/>.
-> 
-> +config ARM_HAS_SG_CHAIN
-> +	bool
-> +
->  config HAVE_PWM
->  	bool
-> 
-> diff --git a/arch/arm/include/asm/scatterlist.h
-> b/arch/arm/include/asm/scatterlist.h index 2f87870..cefdb8f 100644
-> --- a/arch/arm/include/asm/scatterlist.h
-> +++ b/arch/arm/include/asm/scatterlist.h
-> @@ -1,6 +1,10 @@
->  #ifndef _ASMARM_SCATTERLIST_H
->  #define _ASMARM_SCATTERLIST_H
-> 
-> +#ifdef CONFIG_ARM_HAS_SG_CHAIN
-> +#define ARCH_HAS_SG_CHAIN
-> +#endif
-> +
->  #include <asm/memory.h>
->  #include <asm/types.h>
->  #include <asm-generic/scatterlist.h>
-
+diff --git a/arch/arm/include/asm/mach/time.h b/arch/arm/include/asm/mach/time.h
+index d5adaae..f46ca39 100644
+--- a/arch/arm/include/asm/mach/time.h
++++ b/arch/arm/include/asm/mach/time.h
+@@ -43,5 +43,6 @@ struct sys_timer {
+ };
+ 
+ extern void timer_tick(void);
++extern void (* __initdata arm_late_time_init)(void);
+ 
+ #endif
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 344e52b..70badae 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -364,12 +364,6 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ 
+ 	if (max_cpus > 1) {
+ 		/*
+-		 * Enable the local timer or broadcast device for the
+-		 * boot CPU, but only if we have more than one CPU.
+-		 */
+-		percpu_timer_setup();
+-
+-		/*
+ 		 * Initialise the SCU if there are more than one CPU
+ 		 * and let them know where to start.
+ 		 */
+diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+index cb634c3..ba85044 100644
+--- a/arch/arm/kernel/time.c
++++ b/arch/arm/kernel/time.c
+@@ -28,6 +28,7 @@
+ #include <linux/mc146818rtc.h>
+ 
+ #include <asm/leds.h>
++#include <asm/localtimer.h>
+ #include <asm/thread_info.h>
+ #include <asm/sched_clock.h>
+ #include <asm/stacktrace.h>
+@@ -147,6 +148,18 @@ static int __init timer_init_syscore_ops(void)
+ 
+ device_initcall(timer_init_syscore_ops);
+ 
++void (* __initdata arm_late_time_init)(void);
++
++static void __init __arm_late_time_init(void)
++{
++	if (arm_late_time_init)
++		arm_late_time_init();
++#ifdef CONFIG_LOCAL_TIMERS
++	/* Init the local timer on the boot CPU */
++	percpu_timer_setup();
++#endif
++}
++
+ void __init time_init(void)
+ {
+ 	system_timer = machine_desc->timer;
+@@ -154,5 +167,6 @@ void __init time_init(void)
+ #ifdef CONFIG_HAVE_SCHED_CLOCK
+ 	sched_clock_postinit();
+ #endif
++	late_time_init = __arm_late_time_init;
+ }
+ 
+diff --git a/arch/arm/mach-shmobile/timer.c b/arch/arm/mach-shmobile/timer.c
+index 895794b..835baa4 100644
+--- a/arch/arm/mach-shmobile/timer.c
++++ b/arch/arm/mach-shmobile/timer.c
+@@ -38,7 +38,7 @@ static void __init shmobile_late_time_init(void)
+ 
+ static void __init shmobile_timer_init(void)
+ {
+-	late_time_init = shmobile_late_time_init;
++	arm_late_time_init = shmobile_late_time_init;
+ }
+ 
+ struct sys_timer shmobile_timer = {
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.0.4
