@@ -1,79 +1,93 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed,  1 Jun 2011 11:37:48 -0500
-Subject: [PATCH 1/3] ARM: pmu: add OF probing support
+Date: Wed,  1 Jun 2011 11:37:49 -0500
+Subject: [PATCH 2/3] ARM: gic: add OF based initialization
 In-Reply-To: <1306946270-18379-1-git-send-email-robherring2@gmail.com>
 References: <1306946270-18379-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1306946270-18379-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1306946270-18379-3-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Add OF match table to enable OF style driver binding. The dts entry is like
-this:
+This adds gic initialization using device tree data. An example device tree
+binding looks like this:
 
-pmu {
-	compatible = "arm,cortex-a9-pmu";
-	interrupts = <100 101>;
+intc: interrupt-controller at fff11000 {
+        compatible = "arm,cortex-a9-gic";
+        #interrupt-cells = <1>;
+        interrupt-controller;
+        reg = <0xfff11000 0x1000>,
+              <0xfff10100 0x100>;
+        irq-start = <29>;
 };
-
-The use of pdev->id as an index breaks with OF device binding, so set the type
-based on the OF compatible string.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 ---
- arch/arm/kernel/pmu.c |   23 ++++++++++++++++++-----
- 1 files changed, 18 insertions(+), 5 deletions(-)
+ arch/arm/common/gic.c               |   35 +++++++++++++++++++++++++++++++++++
+ arch/arm/include/asm/hardware/gic.h |    1 +
+ 2 files changed, 36 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-index 2c79eec..41bc972 100644
---- a/arch/arm/kernel/pmu.c
-+++ b/arch/arm/kernel/pmu.c
-@@ -27,27 +27,40 @@ static struct platform_device *pmu_devices[ARM_NUM_PMU_DEVICES];
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 4ddd0a6..d44ca5b 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -28,6 +28,8 @@
+ #include <linux/smp.h>
+ #include <linux/cpumask.h>
+ #include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
  
- static int __devinit pmu_device_probe(struct platform_device *pdev)
- {
-+	enum arm_pmu_type type = pdev->id;
- 
--	if (pdev->id < 0 || pdev->id >= ARM_NUM_PMU_DEVICES) {
-+	if (pdev->dev.of_node)
-+		type = ARM_PMU_DEVICE_CPU;
-+
-+	if (type < 0 || type >= ARM_NUM_PMU_DEVICES) {
- 		pr_warning("received registration request for unknown "
- 				"device %d\n", pdev->id);
- 		return -EINVAL;
- 	}
- 
--	if (pmu_devices[pdev->id])
-+	if (pmu_devices[type])
- 		pr_warning("registering new PMU device type %d overwrites "
--				"previous registration!\n", pdev->id);
-+				"previous registration!\n", type);
- 	else
- 		pr_info("registered new PMU device of type %d\n",
--				pdev->id);
-+				type);
- 
--	pmu_devices[pdev->id] = pdev;
-+	pmu_devices[type] = pdev;
- 	return 0;
+ #include <asm/irq.h>
+ #include <asm/mach/irq.h>
+@@ -401,3 +403,36 @@ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
+ 	writel_relaxed(map << 16 | irq, gic_data[0].dist_base + GIC_DIST_SOFTINT);
  }
- 
-+static struct of_device_id pmu_device_ids[] = {
-+	{ .compatible = "arm,cortex-a9-pmu" },
-+	{ .compatible = "arm,cortex-a8-pmu" },
-+	{ .compatible = "arm,arm1136-pmu" },
-+	{ .compatible = "arm,arm1176-pmu" },
-+	{},
+ #endif
++
++#ifdef CONFIG_OF
++static struct of_device_id gic_ids[] __initdata = {
++	{ .compatible = "arm,cortex-a9-gic" },
 +};
 +
- static struct platform_driver pmu_driver = {
- 	.driver		= {
- 		.name	= "arm-pmu",
-+		.of_match_table = pmu_device_ids,
- 	},
- 	.probe		= pmu_device_probe,
- };
++void __init gic_of_init(void)
++{
++	struct device_node *np;
++	void __iomem *cpu_base;
++	void __iomem *dist_base;
++	__u32 irq_start = 16;
++	const __be32 *val;
++
++	np = of_find_matching_node(NULL, gic_ids);
++	if (!np)
++		panic("unable to find compatible gic node in dtb\n");
++
++	dist_base = of_iomap(np, 0);
++	if (!dist_base)
++		panic("unable to map gic dist registers\n");
++
++	cpu_base = of_iomap(np, 1);
++	if (!cpu_base)
++		panic("unable to map gic cpu registers\n");
++
++	if ((val = of_get_property(np, "irq-start", NULL)) != NULL)
++		irq_start = of_read_ulong(val, 1);
++	of_node_put(np);
++
++	gic_init(0, irq_start, dist_base, cpu_base);
++}
++#endif
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 0691f9d..954a08e 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -37,6 +37,7 @@ extern void __iomem *gic_cpu_base_addr;
+ extern struct irq_chip gic_arch_extn;
+ 
+ void gic_init(unsigned int, unsigned int, void __iomem *, void __iomem *);
++void gic_of_init(void);
+ void gic_secondary_init(unsigned int);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
 -- 
 1.7.4.1
