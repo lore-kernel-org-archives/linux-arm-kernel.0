@@ -1,29 +1,24 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Jun 2011 17:18:56 +0100
-Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
-	gpio's from the device tree.
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF0498E1C3F5@HQMAIL01.nvidia.com>
-References: <20110530033826.GE4130@opensource.wolfsonmicro.com>
-	<20110530061155.GC23517@ponder.secretlab.ca>
-	<4DE336A1.5040509@firmworks.com>
-	<20110530070138.GA5036@opensource.wolfsonmicro.com>
-	<8d2515b13c817cc956b185d043bcef00@kernel.crashing.org>
-	<BANLkTi=hkScxYpt449CQCky+bLU3UvkC_A@mail.gmail.com>
-	<4DE403C5.7060003@firmworks.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0498E1C22D@HQMAIL01.nvidia.com>
-	<4DE536AD.5080200@firmworks.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0498E1C3F5@HQMAIL01.nvidia.com>
-Message-ID: <20110601161856.GB15583@opensource.wolfsonmicro.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Wed, 1 Jun 2011 18:21:37 +0200
+Subject: [PATCH v2 0/3] Fixes for breakage resulting from syscore_ops patch on
+	s3c24xx
+Message-ID: <201106011821.38091.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 08:59:55AM -0700, Stephen Warren wrote:
+The syscore_ops patch from Rafael J. Wysocki introduced some small
+glitches for the S3C24XX cpus resulting in compile errors.
 
-> My perspective is that cut/pasting the entire SoC definition into a board
-> definition is the devicetree equivalent of having more than one driver
-> per chip, not sharing gpio/pinmux/... code, etc. in the kernel; the very
-> stuff that caused Linus to complain about the state of ARM Linux.
+Changes since v1: add missing Signed-off-by lines
 
-Very strongly agreed, we've had to do that in the past because of
-limitations in the device tree infrastructure but if we end up having to
-cut'n'paste that's not going to be great for maintainability.
+Heiko Stuebner (3):
+  Fix missing struct for s3c2410_dma_chan in s3c2410_dma_suspend_chan
+  Move s3c24xx_irq_syscore_ops to plat-s3c24xx/irq.c
+  remove the now empty mach-s3c2410/irq.c
+
+ arch/arm/mach-s3c2410/Makefile |    1 -
+ arch/arm/mach-s3c2410/irq.c    |   34 ----------------------------------
+ arch/arm/plat-s3c24xx/dma.c    |    2 +-
+ arch/arm/plat-s3c24xx/irq.c    |    6 ++++++
+ 4 files changed, 7 insertions(+), 36 deletions(-)
+ delete mode 100644 arch/arm/mach-s3c2410/irq.c
