@@ -1,66 +1,147 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Wed, 01 Jun 2011 13:12:24 +0530
-Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
-In-Reply-To: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
-References: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1306914144.10976.4.camel@vkoul-udesk3>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Wed,  1 Jun 2011 16:23:57 +0800
+Subject: [PATCH] arm: ks8695: remove leds driver, since nobody use it
+Message-ID: <1306916637-25676-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-05-26 at 14:31 +0800, Shawn Guo wrote:
-> Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
-> max_segment_number into device_dma_parameters and creates the
-> corresponding dmaengine API dma_set(get)_max_seg_number for it.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  include/linux/device.h      |    1 +
->  include/linux/dma-mapping.h |   15 +++++++++++++++
->  2 files changed, 16 insertions(+), 0 deletions(-)
-Can you explain me why this change is required, the patch description
-isn't helping for this.
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+---
+ arch/arm/mach-ks8695/devices.c |   21 ---------
+ arch/arm/mach-ks8695/leds.c    |   93 ----------------------------------------
+ 2 files changed, 0 insertions(+), 114 deletions(-)
+ delete mode 100644 arch/arm/mach-ks8695/leds.c
 
-If you satisfy me with above then I am okay with it, but I need ACK from
-Dan before applying...
-
-~Vinod
-
-> 
-> diff --git a/include/linux/device.h b/include/linux/device.h
-> index c66111a..44cb2528 100644
-> --- a/include/linux/device.h
-> +++ b/include/linux/device.h
-> @@ -487,6 +487,7 @@ struct device_dma_parameters {
->  	 * sg limitations.
->  	 */
->  	unsigned int max_segment_size;
-> +	unsigned int max_segment_number;
->  	unsigned long segment_boundary_mask;
->  };
->  
-> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-> index ba8319a..fd314f4 100644
-> --- a/include/linux/dma-mapping.h
-> +++ b/include/linux/dma-mapping.h
-> @@ -131,6 +131,21 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
->  		return -EIO;
->  }
->  
-> +static inline unsigned int dma_get_max_seg_number(struct device *dev)
-> +{
-> +	return dev->dma_parms ? dev->dma_parms->max_segment_number : 1;
-> +}
-> +
-> +static inline unsigned int dma_set_max_seg_number(struct device *dev,
-> +						  unsigned int number)
-> +{
-> +	if (dev->dma_parms) {
-> +		dev->dma_parms->max_segment_number = number;
-> +		return 0;
-> +	} else
-> +		return -EIO;
-> +}
-> +
->  static inline unsigned long dma_get_seg_boundary(struct device *dev)
->  {
->  	return dev->dma_parms ?
+diff --git a/arch/arm/mach-ks8695/devices.c b/arch/arm/mach-ks8695/devices.c
+index b89fb6d..5ebf45d 100644
+--- a/arch/arm/mach-ks8695/devices.c
++++ b/arch/arm/mach-ks8695/devices.c
+@@ -181,27 +181,6 @@ static void __init ks8695_add_device_watchdog(void)
+ }
+ 
+ 
+-/* --------------------------------------------------------------------
+- *  LEDs
+- * -------------------------------------------------------------------- */
+-
+-#if defined(CONFIG_LEDS)
+-short ks8695_leds_cpu = -1;
+-short ks8695_leds_timer = -1;
+-
+-void __init ks8695_init_leds(u8 cpu_led, u8 timer_led)
+-{
+-	/* Enable GPIO to access the LEDs */
+-	gpio_direction_output(cpu_led, 1);
+-	gpio_direction_output(timer_led, 1);
+-
+-	ks8695_leds_cpu	  = cpu_led;
+-	ks8695_leds_timer = timer_led;
+-}
+-#else
+-void __init ks8695_init_leds(u8 cpu_led, u8 timer_led) {}
+-#endif
+-
+ /* -------------------------------------------------------------------- */
+ 
+ /*
+diff --git a/arch/arm/mach-ks8695/leds.c b/arch/arm/mach-ks8695/leds.c
+deleted file mode 100644
+index 184ef74..0000000
+--- a/arch/arm/mach-ks8695/leds.c
++++ /dev/null
+@@ -1,93 +0,0 @@
+-/*
+- * LED driver for KS8695-based boards.
+- *
+- * Copyright (C) Andrew Victor
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/kernel.h>
+-#include <linux/module.h>
+-#include <linux/init.h>
+-
+-#include <asm/leds.h>
+-#include <mach/devices.h>
+-#include <mach/gpio.h>
+-
+-
+-static inline void ks8695_led_on(unsigned int led)
+-{
+-	gpio_set_value(led, 0);
+-}
+-
+-static inline void ks8695_led_off(unsigned int led)
+-{
+-	gpio_set_value(led, 1);
+-}
+-
+-static inline void ks8695_led_toggle(unsigned int led)
+-{
+-	unsigned long is_off = gpio_get_value(led);
+-	if (is_off)
+-		ks8695_led_on(led);
+-	else
+-		ks8695_led_off(led);
+-}
+-
+-
+-/*
+- * Handle LED events.
+- */
+-static void ks8695_leds_event(led_event_t evt)
+-{
+-	unsigned long flags;
+-
+-	local_irq_save(flags);
+-
+-	switch(evt) {
+-	case led_start:		/* System startup */
+-		ks8695_led_on(ks8695_leds_cpu);
+-		break;
+-
+-	case led_stop:		/* System stop / suspend */
+-		ks8695_led_off(ks8695_leds_cpu);
+-		break;
+-
+-#ifdef CONFIG_LEDS_TIMER
+-	case led_timer:		/* Every 50 timer ticks */
+-		ks8695_led_toggle(ks8695_leds_timer);
+-		break;
+-#endif
+-
+-#ifdef CONFIG_LEDS_CPU
+-	case led_idle_start:	/* Entering idle state */
+-		ks8695_led_off(ks8695_leds_cpu);
+-		break;
+-
+-	case led_idle_end:	/* Exit idle state */
+-		ks8695_led_on(ks8695_leds_cpu);
+-		break;
+-#endif
+-
+-	default:
+-		break;
+-	}
+-
+-	local_irq_restore(flags);
+-}
+-
+-
+-static int __init leds_init(void)
+-{
+-	if ((ks8695_leds_timer == -1) || (ks8695_leds_cpu == -1))
+-		return -ENODEV;
+-
+-	leds_event = ks8695_leds_event;
+-
+-	leds_event(led_start);
+-	return 0;
+-}
+-
+-__initcall(leds_init);
+-- 
+1.7.5
