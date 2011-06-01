@@ -1,55 +1,28 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 01 Jun 2011 20:32:23 +0400
-Subject: [PATCH v6 1/8] MTD: Add integrator-flash feature to physmap
-In-Reply-To: <1306914166.4405.47.camel@localhost>
-References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>	
-	<1305637877-24436-2-git-send-email-marc.zyngier@arm.com>	
-	<4DE53D52.4040508@ru.mvista.com>	
-	<20110531224428.6636e283@taxman.wild-wind.fr.eu.org>	
-	<BANLkTim0xrx+33BeoSbXbQcu2Ab6Oin=Wg@mail.gmail.com>
-	<1306914166.4405.47.camel@localhost>
-Message-ID: <4DE66997.1060808@ru.mvista.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed,  1 Jun 2011 11:37:47 -0500
+Subject: [PATCH 0/3] DT bindings Cortex A9 peripherals
+Message-ID: <1306946270-18379-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Rob Herring <rob.herring@calxeda.com>
 
-Artem Bityutskiy wrote:
+This series adds DT based initialization and bindings for the pmu, gic and l2x0
+found on Cortex-A9's.
 
->>>>> In the process of moving platforms away from integrator-flash
->>>>> (aka armflash), add to physmap the few features that make
->>>>> armflash unique:
->>>>> - optionnal probing for the AFS partition type
->>>>> - init() and exit() methods, used by Integrator to control
->>>>>   write access to the various onboard programmable components
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> Acked-by: Catalin Marinas <catalin.marinas@arm.com>
->>>>> Cc: David Woodhouse <dwmw2@infradead.org>
->>>> [...]
+Rob
 
->>>>> diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
->>>>> index bcfd9f7..d37cca0 100644
->>>>> --- a/include/linux/mtd/physmap.h
->>>>> +++ b/include/linux/mtd/physmap.h
->>>>> @@ -22,6 +22,8 @@ struct map_info;
->>>>>
->>>>>  struct physmap_flash_data {
->>>>>     unsigned int            width;
->>>>> +   int                     (*init)(struct platform_device *);
->>>>> +   void                    (*exit)(struct platform_device *);
->>>>     How about a declaration for 'struct platform_device' beforehand? This breaks
->>>> build on other platforms at least...
+Rob Herring (3):
+  ARM: pmu: add OF probing support
+  ARM: gic: add OF based initialization
+  ARM: l2x0: Add OF based initialization
 
->>> Sure. Please send a patch.
+ arch/arm/common/gic.c                      |   35 +++++++++++++++++++++++++++
+ arch/arm/include/asm/hardware/cache-l2x0.h |    1 +
+ arch/arm/include/asm/hardware/gic.h        |    1 +
+ arch/arm/kernel/pmu.c                      |   23 ++++++++++++++----
+ arch/arm/mm/cache-l2x0.c                   |   36 ++++++++++++++++++++++++++++
+ 5 files changed, 91 insertions(+), 5 deletions(-)
 
->> uhh, what ?  you broke things, so you fix them.  i already pointed out
->> this breakage to you over a week ago.
->> -mike
-
-> The change went in via Russell's tree, I sent him a fix. It looks like
-> he did not merge it.
-
-    Russell doesn't merge patches sent to him AFAIK, they need to be put into 
-his patch system first.
-
-WBR, Sergei
+-- 
+1.7.4.1
