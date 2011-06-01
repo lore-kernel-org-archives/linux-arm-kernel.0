@@ -1,33 +1,48 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 01 Jun 2011 13:30:32 -0700
-Subject: [PATCH 1/5] CPUFREQ/S3C64xx: Move S3C64xx CPUfreq driver into
-	drivers/cpufreq
-In-Reply-To: <20110601200146.GC12949@opensource.wolfsonmicro.com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>	<BANLkTinR_WLjsgm5ogt_BbJwPFC0Kc1Dqg@mail.gmail.com>	<20110601095811.GB13591@opensource.wolfsonmicro.com>	<4DE69A66.9090002@samsung.com>
-	<20110601200146.GC12949@opensource.wolfsonmicro.com>
-Message-ID: <4DE6A168.6090907@samsung.com>
+From: wd@denx.de (Wolfgang Denk)
+Date: Wed, 01 Jun 2011 23:08:55 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <20110601141847.GG23771@pengutronix.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+Message-ID: <20110601210855.663A3CEFB4E@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/01/11 13:01, Mark Brown wrote:
-> On Wed, Jun 01, 2011 at 01:00:38PM -0700, Kukjin Kim wrote:
+Dear Sascha Hauer,
+
+In message <20110601141847.GG23771@pengutronix.de> you wrote:
 >
->> As I remember, 800Mhz support on S3C6410 is ok and replied about that.
->> Then isn't there any progress in my side?...I'm outside of my office.
->
-> Yes, you replied and said it was OK but it's not appeared in -next yet.
+> > We probably should disable the uImage target when p2v patching is
+> > enabled to prevent people getting nasty surprises.
+> > 
+> 
+> Agreed. Here is a patch. I added Wolfgang Denk to Cc, maybe
+> he can prove me wrong.
+> 
+> 8<----------------------------------------------------------
+> ARM: do not allow to build uImages with ARM_PATCH_PHYS_VIRT
+> 
+> U-Boot uImages expect a load address and a entry point in
+> the image header. With CONFIG_ARM_PATCH_PHYS_VIRT these
+> become variable and thus can not be compiled into the uImage.
 
-Oops, sorry :(
+Would it help if we interpret, for example, the values for load
+address and entry point not as physical addresses, but instead as
+offsets relative to the start of physical RAM?
 
-Maybe I missed.
-Ok, will apply in my after checking others.
-
-Then if any updates, let you know.
-
-Thanks.
+This would still require that all systems supported by a single image
+use the same offsets.  Is this possible?
 
 Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+Wolfgang Denk
+
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+"You can have my Unix system when you  pry  it  from  my  cold,  dead
+fingers."                                                - Cal Keegan
