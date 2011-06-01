@@ -1,22 +1,37 @@
-From: vaibhav.bedia@ti.com (Bedia, Vaibhav)
-Date: Wed, 1 Jun 2011 12:48:51 +0530
-Subject: [PATCH] OMAP: clockdomain: Remove redundant call to
-	pwrdm_wait_transition()
-In-Reply-To: <1306406290-25055-1-git-send-email-vaibhav.bedia@ti.com>
-References: <1306406290-25055-1-git-send-email-vaibhav.bedia@ti.com>
-Message-ID: <FCCFB4CDC6E5564B9182F639FC35608703718FBAF9@dbde02.ent.ti.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 1 Jun 2011 09:30:58 +0200
+Subject: [PATCH 1/2] sdio: add function to enable and disable
+	sdio_single_irq optimization
+In-Reply-To: <1306874008-28867-2-git-send-email-per.forlin@linaro.org>
+References: <1306874008-28867-1-git-send-email-per.forlin@linaro.org>
+	<1306874008-28867-2-git-send-email-per.forlin@linaro.org>
+Message-ID: <BANLkTinUEq_tvCtXWjg3t6L589y80nPPog@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+2011/5/31 Per Forlin <per.forlin@linaro.org>:
 
-On Thursday, May 26, 2011 4:08 PM, Bedia, Vaibhav wrote:
-> The call to pwrdm_wait_transition() in clkdm_clk_enable() is
-> redundant since the function pwrdm_clkdm_state_switch() which
-> is called next also does the same thing.  
-> 
+> +/**
+> + * ? ? sdio_single_irq_enable - enable or disable SDIO single IRQ function
+> + * ? ? @card: card to enable SDIO single irq
+> + * ? ? @value: true to enable SDIO single irq function, false to disable
+> + *
+> + * ? ? If there is only 1 function interrupt registered and SDIO single IRQ
+> + * ? ? is enable, the irq handler is called directly without reading
+> + * ? ? the CCCR registers
+> + */
+> +void sdio_single_irq_enable(struct mmc_card *card, bool value)
+> +{
+> + ? ? ? card->sdio_single_irq_en = value;
+> +}
+> +EXPORT_SYMBOL_GPL(sdio_single_irq_enable);
 
-Any comments on this patch? Can it be merged?
+Can we use a quirk for implementing this for the specific problematic
+card instead?
 
-Regards,
-Vaibhav
+Daniel, do you have the vendor and device ID for the problematic
+Libertas card you're working on so this can be quirked explicitly
+in drivers/mmc/core/quirks.c?
+
+Yours,
+Linus Walleij
