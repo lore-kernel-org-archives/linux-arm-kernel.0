@@ -1,96 +1,43 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Wed, 1 Jun 2011 18:04:02 -0500
-Subject: i.MX consolidation patches
-In-Reply-To: <20110601210855.663A3CEFB4E@gemini.denx.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<20110530075745.GA31492@S2100-06.ap.freescale.net>
-	<20110601123522.GE23771@pengutronix.de>
-	<20110601134749.GI3660@n2100.arm.linux.org.uk>
-	<20110601141847.GG23771@pengutronix.de>
-	<20110601210855.663A3CEFB4E@gemini.denx.de>
-Message-ID: <BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 2 Jun 2011 01:09:59 +0200 (CEST)
+Subject: [PATCH] arm: fix regression in ixp4xx clocksource
+In-Reply-To: <20110601225826.GR3660@n2100.arm.linux.org.uk>
+References: <20110530084307.GA28953@riccoc20.at.omicron.at>
+	<20110601225826.GR3660@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.02.1106020100200.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2011 at 4:08 PM, Wolfgang Denk <wd@denx.de> wrote:
-> Dear Sascha Hauer,
->
-> In message <20110601141847.GG23771@pengutronix.de> you wrote:
->>
->> > We probably should disable the uImage target when p2v patching is
->> > enabled to prevent people getting nasty surprises.
->> >
->>
->> Agreed. Here is a patch. I added Wolfgang Denk to Cc, maybe
->> he can prove me wrong.
->>
->> 8<----------------------------------------------------------
->> ARM: do not allow to build uImages with ARM_PATCH_PHYS_VIRT
->>
->> U-Boot uImages expect a load address and a entry point in
->> the image header. With CONFIG_ARM_PATCH_PHYS_VIRT these
->> become variable and thus can not be compiled into the uImage.
->
-> Would it help if we interpret, for example, the values for load
-> address and entry point not as physical addresses, but instead as
-> offsets relative to the start of physical RAM?
->
-> This would still require that all systems supported by a single image
-> use the same offsets. ?Is this possible?
+Russell,
 
-Been having this discussion on and off with various parties and we
-determined that if U-Boot had a little
-extra logic when parsing a uImage header it could perfectly validly
-boot a zImage contained in a uImage
-header.
+On Wed, 1 Jun 2011, Russell King - ARM Linux wrote:
 
-In this case, just a load address in the uImage header of 0 (or some
-other totally-impossible value like 0xffffffff
-in case 0 is perfectly valid somewhere) and then just jump to the
-entry point by deriving the value from the
-header size - based on the fact that ARM images are PIC and the Linux
-kernel always puts the entry point
-at 0 offset - to the address of the uImage header + size of the uImage
-header (which U-Boot knows already
-from parsing the header).
+> On Mon, May 30, 2011 at 10:43:07AM +0200, Richard Cochran wrote:
+> > Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
+> > 
+> >    clocksource: convert ARM 32-bit up counting clocksources
+> > 
+> > broke the build for ixp4xx and made big endian operation impossible.
+> > This commit restores the original behaviour.
+> 
+> I'm really not happy about using the MMIO clocksource stuff with random
+> other read functions like this - it defeats the entire purpose of the
+> MMIO clocksource stuff.  Maybe we should just undo the change for IXP4xx
+> and treat it as "special" for the time being.
+> 
+> Thomas - do you have any other views?
 
-Example: on the MX51 the entry point is usually set to 0x90008000 -
-that's what Freescale put in their BSP
-U-Boots and everyone has copied it.. There's a variable in our U-Boots
-at least that is used in boot scripts to
-ext/fat/whateverload it to 0x90007FC0. That 0x90007FC0 address to load
-to is a nasty hack meant to match
-the header size of a legacy uImage (therefore the first byte of the
-payload will live at 0x90008000).
+I have no objections to have special cased read functions as long as
+all the other copied code is gone. We have the same problem with the
+generic irq chip and I did not come up with a good decision function
+where to draw the line. As for everything we come up with in the
+consolidation space we need to apply common sense and keep an eye on
+the real abusers.
 
-We can't support anything but a legacy image right now because of
-that, and if we needed to support a new
-style uImage with FDT, then this load address and entry point magic
-would be totally wrong anyway requiring
-both userspace script and kernel changes.
+Though in the mmio clocksource case we might ask the question whether
+read[l|w]() is really necessary in the generic implemetation or
+not. [too tired to answer that now ]
+ 
+Thanks,
 
-So the solution is
-
-* Assuming all ARM kernels are PIC (guaranteed, right?)
-* Assuming all ARM kernels start at entry point 0 (true for Image and zImage)
-* Assuming there is a globally invalid magic value you can set in the
-uImage header as load address (not sure)
-* Assuming you can make sure U-Boot only does this for ARM,
-kernel-type images and not ramdisks or so (true)
-
-Set that magic value, U-Boot magically derives the correct entry point
-as the first address of the payload,
-and jumps to it?
-
-I tested it.. works great but I don't have a wealth of ARM hardware to
-TRULY confirm all the above.
-
-Let's not kill off uImage generation just yet if we can just patch our
-firmwares once and for all and let Linux
-decide whether it sets the load address to a real address or a magic
-value? Then all variants of kernel will
-work for the boards, patching phys_to_virt or not.
-
--- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+	tglx
