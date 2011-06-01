@@ -1,45 +1,113 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 1 Jun 2011 11:40:42 +0100
-Subject: [PATCH 4/5] ARM: S3C6410: Support 800MHz operation in cpufreq
-In-Reply-To: <037201cc2046$f5cc53b0$e164fb10$@com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
-	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<037201cc2046$f5cc53b0$e164fb10$@com>
-Message-ID: <20110601104042.GA15387@opensource.wolfsonmicro.com>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Wed, 01 Jun 2011 08:49:06 +0100
+Subject: [PATCH v6 1/8] MTD: Add integrator-flash feature to physmap
+In-Reply-To: <BANLkTim0xrx+33BeoSbXbQcu2Ab6Oin=Wg@mail.gmail.com>
+References: <1305637877-24436-1-git-send-email-marc.zyngier@arm.com>
+	<1305637877-24436-2-git-send-email-marc.zyngier@arm.com>
+	<4DE53D52.4040508@ru.mvista.com>
+	<20110531224428.6636e283@taxman.wild-wind.fr.eu.org>
+	<BANLkTim0xrx+33BeoSbXbQcu2Ab6Oin=Wg@mail.gmail.com>
+Message-ID: <1306914546.27474.349.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 07:30:42PM +0900, Sangbeom Kim wrote:
-> Hi, Mark
+On Tue, 2011-05-31 at 22:20 -0400, Mike Frysinger wrote:
+> On Tue, May 31, 2011 at 17:44, Marc Zyngier wrote:
+> > On Tue, 31 May 2011 23:11:14 +0400 Sergei Shtylyov wrote:
+> >> Marc Zyngier wrote:
+> >> > In the process of moving platforms away from integrator-flash
+> >> > (aka armflash), add to physmap the few features that make
+> >> > armflash unique:
+> >>
+> >> > - optionnal probing for the AFS partition type
+> >> > - init() and exit() methods, used by Integrator to control
+> >> >   write access to the various onboard programmable components
+> >>
+> >> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> > Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+> >> > Cc: David Woodhouse <dwmw2@infradead.org>
+> >> [...]
+> >>
+> >> > diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
+> >> > index bcfd9f7..d37cca0 100644
+> >> > --- a/include/linux/mtd/physmap.h
+> >> > +++ b/include/linux/mtd/physmap.h
+> >> > @@ -22,6 +22,8 @@ struct map_info;
+> >> >
+> >> >  struct physmap_flash_data {
+> >> >     unsigned int            width;
+> >> > +   int                     (*init)(struct platform_device *);
+> >> > +   void                    (*exit)(struct platform_device *);
+> >>
+> >>     How about a declaration for 'struct platform_device' beforehand? This breaks
+> >> build on other platforms at least...
+> >
+> > Sure. Please send a patch.
+> 
+> uhh, what ?  you broke things, so you fix them.  i already pointed out
+> this breakage to you over a week ago.
 
-Don't top post.
+Mike,
 
-> 800Mhz S3C6410 is only supplied by customer request.
-> 800Mhz dvfs operation should be controlled carefully.
-> (Stable VDD_ARM should be supplied)
+Sorry I missed your earlier comment about this. My bad.
 
-The fact that the chip is only on limited distribution isn't really an
-issue for supporting it in mainline - many CPUs currently supported in
-Linux, including some Samsung ones, are only available to certain
-customers.
+Now, about my reply to Sergei:
+      * Sergei identified the problem, and proposed a valid fix. It's
+        only fair he gets credited for his work (yes, you did it before
+        he did, but I didn't know it). The SOB on a patch is the proper
+        way of managing the attribution.
+      * Posting a patch is the quickest way for the maintainer (in this
+        case David) to be able to push a fix to mainline.
+      * It also helps other folks reading the ML and facing the same
+        issue. They can grab the patch, apply it locally and go on with
+        their own stuff until the patch is merged.
+      * The person reporting the problem probably has a configuration
+        showing the problem. If any of my platforms had shown that
+        error, I would have fixed it long before it hit the mailing
+        list.
 
-Similarly, stable power supplies are a basic system design thing that
-we shouldn't be worrying about here.
+Now, to keep everyone happy, an untested patch. David, can you please
+apply it?
 
-> To optimize s3c6410 dvfs operation, not only ARMCLK
-> But also HCLK should do dvfs.
-> In other words, VDD_INT, as well as VDD_ARM should be controlled.
+Cheers,
 
-I don't have any access to documentation on this part here and in any
-case we've already got code in mainline which is doing DVFS on S3C6410
-without varying VDD_INT so that's a bit of a moot point.  We need to add
-the 800MHz support in order to have the existing code understand the
-state the device boots up in on the system I'm currently working with,
-never mind actually change anything at runtime.  
+	M.
 
-As things stand the system will boot and then immediately scale the
-voltage down to 400MHz as it's the only supported rate for 800MHz (we're
-only doing scaling by division of the ARM clock) so adding the operating
-point for 800MHz at least means that the performance governor will do
-the right thing.
+>From 1440a857e119b90df68e87cf9da87fce870c86cf Mon Sep 17 00:00:00 2001
+From: Marc Zyngier <marc.zyngier@arm.com>
+Date: Wed, 1 Jun 2011 08:37:28 +0100
+Subject: [PATCH] MTD: Fix physmap compilation error
+
+Commit b7281ca2a4 (MTD: Add integrator-flash feature to physmap)
+broke some platforms by using 'struct platform_device' without
+declaring it.
+
+Add a forward declaration to keep everyone happy.
+
+Fix proposed by both Mike Frysinger and Sergei Shtylyov.
+
+Reported-by: Mike Frysinger <vapier.adi@gmail.com>
+Reported-by: Sergei Shtylyov <sshtylyov@mvista.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ include/linux/mtd/physmap.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/include/linux/mtd/physmap.h b/include/linux/mtd/physmap.h
+index d40bfa1..e5f21d2 100644
+--- a/include/linux/mtd/physmap.h
++++ b/include/linux/mtd/physmap.h
+@@ -19,6 +19,7 @@
+ #include <linux/mtd/partitions.h>
+ 
+ struct map_info;
++struct platform_device;
+ 
+ struct physmap_flash_data {
+ 	unsigned int		width;
+-- 
+1.7.0.4
+
+
+-- 
+Reality is an implementation detail.
