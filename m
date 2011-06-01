@@ -1,60 +1,24 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 1 Jun 2011 16:36:04 +0200
-Subject: i.MX consolidation patches
-In-Reply-To: <20110601142406.GJ3660@n2100.arm.linux.org.uk>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<20110530075745.GA31492@S2100-06.ap.freescale.net>
-	<20110601123522.GE23771@pengutronix.de>
-	<20110601134749.GI3660@n2100.arm.linux.org.uk>
-	<20110601141847.GG23771@pengutronix.de>
-	<20110601142406.GJ3660@n2100.arm.linux.org.uk>
-Message-ID: <20110601143604.GH23771@pengutronix.de>
+From: mattias.wallin@stericsson.com (Mattias Wallin)
+Date: Wed, 1 Jun 2011 16:36:23 +0200
+Subject: [PATCH 2/3] clocksource: add DB8500 PRCMU Timer support
+In-Reply-To: <4DE64D5A.20206@stericsson.com>
+References: <1306830661-9546-1-git-send-email-mattias.wallin@stericsson.com>
+	<alpine.LFD.2.02.1105311236250.3078@ionos>
+	<4DE51EB7.7010606@stericsson.com>
+	<BANLkTinPKbUu40066+wr3cdFRc2di-Uv6g@mail.gmail.com>
+	<4DE5F0DB.2050409@stericsson.com> <4DE64B0E.8030008@stericsson.com>
+	<20110601142507.GK3660@n2100.arm.linux.org.uk>
+	<4DE64D5A.20206@stericsson.com>
+Message-ID: <4DE64E67.2020507@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 03:24:06PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 01, 2011 at 04:18:47PM +0200, Sascha Hauer wrote:
-> > diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
-> > index 9128fdd..e3b6f02 100644
-> > --- a/arch/arm/boot/Makefile
-> > +++ b/arch/arm/boot/Makefile
-> > @@ -59,6 +59,11 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
-> >  
-> >  endif
-> >  
-> > +ifeq ($(CONFIG_ARM_PATCH_PHYS_VIRT),y)
-> > +$(obj)/uImage: $(obj)/zImage FORCE
-> > +	@echo 'building uImages is incompatible with CONFIG_ARM_PATCH_PHYS_VIRT'
-> > +	@false
-> 
-> It may be better to drop the zImage dependency too, so that folk don't get
-> the message at the end of an otherwise successful kernel build - they may
-> decide to turn p2v patching off which would result in a rebuild.
-
-It's not that easy. We have this in arch/arm/Makefile:
-
-zImage Image xipImage bootpImage uImage: vmlinux
-	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
-
-So arch/arm/boot/Makefile gets evaluated after a successful build. We
-have to make the test in arch/arm/Makefile if we want to catch this
-earlier.
-
-> 
-> Or it could suggest the mkimage command which should be run, but with
-> <LOAD-ADDRESS> inserted into it at the appropriate point - iow something
-> like:
-> 
->   mkimage -A arm -O linux -T kernel -C none \
-> 	-a <LOAD-ADDRESS> -e <START-ADDRESS> \
-> 	-n 'Linux-$(KERNELRELEASE)' -d arch/arm/boot/zImage uImage.<PLATFORM>
-
-Ok, it's a good idea to give the user a hint what to do.
-
-Sascha
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+On 06/01/2011 04:31 PM, Mattias Wallin wrote:
+> On 06/01/2011 04:25 PM, Russell King - ARM Linux wrote:
+>> sched_clock is supposed to be setup and initialized really early.  Why
+>> are you doing trying to move it soo late?
+> Linus idea was to remove the dependency from mach-ux500/cpu.c where I
+> originally called the init function by using core_initcall.
+>
+> Should I use pure_initcall or solve it some other way?
+pure_initcall does not work either.
