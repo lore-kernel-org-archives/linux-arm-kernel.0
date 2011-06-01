@@ -1,21 +1,38 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 1 Jun 2011 10:53:06 +0200
-Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
-In-Reply-To: <alpine.LFD.2.02.1106011027360.3078@ionos>
-References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.02.1105312319530.3078@ionos>
-	<BANLkTi=UyypKZUQOCCL-KWyAbMQBKY4ccg@mail.gmail.com>
-	<alpine.LFD.2.02.1106011027360.3078@ionos>
-Message-ID: <BANLkTi=p_i0nsLWO_6Y06dw_UJyeo0ygxA@mail.gmail.com>
+Date: Wed, 1 Jun 2011 10:49:43 +0200
+Subject: [PATCH] clockevents: make register functions work on UP
+Message-ID: <mailman.0.1306918392.5904.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/1 Thomas Gleixner <tglx@linutronix.de>:
+On UP systems the clkevt->cpumask is not required, and so as to
+avoid ifdef:ing it out of the struct on UP, we remove the mask
+warning on UP and force the mask to CPU0 for consistency.
 
-> We need it even on UP for the &!^%$@ broadcast mechanism to avoid a
-> massive ifdef mess there :(
->
-> But yeah, we can make it conditional for SMP and simply set
-> cpumask_of(0) in the UP case.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ kernel/time/clockevents.c |    4 ++++
+ 1 files changed, 4 insertions(+), 0 deletions(-)
 
-Like this?
+diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+index c027d4f..aa664f4 100644
+--- a/kernel/time/clockevents.c
++++ b/kernel/time/clockevents.c
+@@ -182,7 +182,11 @@ void clockevents_register_device(struct
+clock_event_device *dev)
+ 	unsigned long flags;
+
+ 	BUG_ON(dev->mode != CLOCK_EVT_MODE_UNUSED);
++#ifdef CONFIG_SMP
+ 	BUG_ON(!dev->cpumask);
++#else
++	dev->cpumask = cpumask_of(0);
++#endif
+
+ 	raw_spin_lock_irqsave(&clockevents_lock, flags);
+
+-- 
+1.7.3.2
+
+Yours,
+Linus Walleij
