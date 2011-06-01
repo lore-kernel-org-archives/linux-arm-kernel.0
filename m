@@ -1,39 +1,21 @@
-From: per.forlin@stericsson.com (Per Forlin)
-Date: Wed, 1 Jun 2011 10:48:33 +0200
-Subject: [PATCH v2 2/2] sdio: report error if pending IRQ but none CCCR_INTx
-	bits
-In-Reply-To: <1306918113-23872-2-git-send-email-per.forlin@stericsson.com>
-References: <1306918113-23872-1-git-send-email-per.forlin@stericsson.com>
-	<1306918113-23872-2-git-send-email-per.forlin@stericsson.com>
-Message-ID: <1306918113-23872-3-git-send-email-per.forlin@stericsson.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 1 Jun 2011 10:53:06 +0200
+Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
+In-Reply-To: <alpine.LFD.2.02.1106011027360.3078@ionos>
+References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.02.1105312319530.3078@ionos>
+	<BANLkTi=UyypKZUQOCCL-KWyAbMQBKY4ccg@mail.gmail.com>
+	<alpine.LFD.2.02.1106011027360.3078@ionos>
+Message-ID: <BANLkTi=p_i0nsLWO_6Y06dw_UJyeo0ygxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Per Forlin <per.forlin@linaro.org>
+2011/6/1 Thomas Gleixner <tglx@linutronix.de>:
 
-Return error in case of pending IRQ but none functions bits
-in CCCR_INTx are set.
+> We need it even on UP for the &!^%$@ broadcast mechanism to avoid a
+> massive ifdef mess there :(
+>
+> But yeah, we can make it conditional for SMP and simply set
+> cpumask_of(0) in the UP case.
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- drivers/mmc/core/sdio_irq.c |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
-
-diff --git a/drivers/mmc/core/sdio_irq.c b/drivers/mmc/core/sdio_irq.c
-index df1e946..4288d92 100644
---- a/drivers/mmc/core/sdio_irq.c
-+++ b/drivers/mmc/core/sdio_irq.c
-@@ -50,6 +50,11 @@ static int process_sdio_pending_irqs(struct mmc_card *card)
- 		return ret;
- 	}
- 
-+	if (!pending) {
-+		printk(KERN_WARNING "%s: pending IRQ but none function bits\n",
-+		       mmc_card_id(card));
-+		ret = -EINVAL;
-+	}
- 	count = 0;
- 	for (i = 1; i <= 7; i++) {
- 		if (pending & (1 << i)) {
--- 
-1.7.4.1
+Like this?
