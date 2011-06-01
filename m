@@ -1,60 +1,58 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed,  1 Jun 2011 15:30:34 -0700
-Subject: [PATCH] ARM: S5P: Should be S3C_VA_USB_HSPHY instead of S5P_VA_XX
-Message-ID: <1306967434-13562-1-git-send-email-kgene.kim@samsung.com>
+From: andre@bluewatersys.com (Andre Renaud)
+Date: Thu, 02 Jun 2011 10:41:02 +1200
+Subject: [Solved] Re: Freescale i.mx25 SDIO/Libertas issue
+In-Reply-To: <4DE5E97D.90705@gmail.com>
+References: <4DE2F84D.8080907@bluewatersys.com>	<4DE44F16.8050407@bluewatersys.com>
+	<4DE5E97D.90705@gmail.com>
+Message-ID: <4DE6BFFE.6000101@bluewatersys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Basically, other S3C SoCs and S5PC100 use 'S3C_VA_USB_HSPHY'
-commonly. It should be changed to 'S3C_VA_USB_HSPHY' for common
-usage and others. Now happens build error on S5PC100.
+Hello Zamek,
 
-Cc: Greg Kroah-Hartman <gregkh@suse.de>
-Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
----
- arch/arm/mach-exynos4/cpu.c                       |    2 +-
- arch/arm/mach-exynos4/include/mach/regs-usb-phy.h |    2 +-
- arch/arm/plat-s5p/include/plat/map-s5p.h          |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+> 05/31/2011 04:14 AM keltez?ssel, Andre Renaud ?rta:
+>> If I enable the libertas debugging details, I get some more information:
+>>
+>> This seems to imply that the unit is correctly loading the firmware, and
+>> then when it determines that the firmware has loaded, and tries to issue
+>> the CMD_FUNC_INIT command, this times out.
+>>
+>> Can anyone explain how I can begin debugging this, or confirm if they've
+>> had this operate on the sdhci-esdhc-imx controller present in the i.MX25?
+>>
+> I got same errors with 2.6.31 kernel. As I suggested earlier use 2.6.35
+> from Freescale.
+> 
+> git clone http://opensource.freescale.com/pub/scm/imx/linux-2.6-imx.git
+> cd linux-2.6-imx
+> git checkout rel_imx_2.6.35_11.04.01
+> copy .config from your 2.6.31
+> make ARCH=arm oldconfig
+> make ARCH=arm menuconfig
+> 
+> It works for me well.
+> Is your wifi card hard wired or plugined?
+> 
 
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 08813a6..9babe447 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos4/cpu.c
-@@ -98,7 +98,7 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
- 	}, {
--		.virtual	= (unsigned long)S5P_VA_USB_HSPHY,
-+		.virtual	= (unsigned long)S3C_VA_USB_HSPHY,
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_HSPHY),
- 		.length		= SZ_4K,
- 		.type		= MT_DEVICE,
-diff --git a/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h b/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
-index 703118d..c337cf3 100644
---- a/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
-+++ b/arch/arm/mach-exynos4/include/mach/regs-usb-phy.h
-@@ -11,7 +11,7 @@
- #ifndef __PLAT_S5P_REGS_USB_PHY_H
- #define __PLAT_S5P_REGS_USB_PHY_H
- 
--#define EXYNOS4_HSOTG_PHYREG(x)		((x) + S5P_VA_USB_HSPHY)
-+#define EXYNOS4_HSOTG_PHYREG(x)		((x) + S3C_VA_USB_HSPHY)
- 
- #define EXYNOS4_PHYPWR			EXYNOS4_HSOTG_PHYREG(0x00)
- #define PHY1_HSIC_NORMAL_MASK		(0xf << 9)
-diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
-index a6c3d32..d973d39 100644
---- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-+++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-@@ -39,7 +39,7 @@
- #define S5P_VA_TWD		S5P_VA_COREPERI(0x600)
- #define S5P_VA_GIC_DIST		S5P_VA_COREPERI(0x1000)
- 
--#define S5P_VA_USB_HSPHY	S3C_ADDR(0x02900000)
-+#define S3C_VA_USB_HSPHY	S3C_ADDR(0x02900000)
- 
- #define VA_VIC(x)		(S3C_VA_IRQ + ((x) * 0x10000))
- #define VA_VIC0			VA_VIC(0)
+Thanks for that information - using that kernel branch I have had it all
+working properly, on both an 8686 and 8688 Marvell SDIO device. These
+are both external (plugged in).
+
+I was hoping to do a git bisect to determine where the fault lay,
+however it seems that the imx tree uses a completely different SDIO
+driver. I have validated the Libertas driver on a different CPU (atmel)
+from the same kernel, so I'm assuming at this stage that the fault lies
+in the SDIO driver in the current Linux mainline.
+
+Regards,
+Andre
+
 -- 
-1.7.4.4
+Bluewater Systems - An Aiotec Company
+
+Andre Renaud        		
+andre at bluewatersys.com          5 Amuri Park, 404 Barbadoes St
+www.bluewatersys.com            PO Box 13 889, Christchurch 8013
+www.aiotec.co.nz                New Zealand
+Phone: +64 3 3779127            Freecall: Australia 1800 148 751
+Fax:   +64 3 3779135            USA 1800 261 2934
