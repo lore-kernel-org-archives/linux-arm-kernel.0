@@ -1,64 +1,33 @@
-From: sbkim73@samsung.com (Sangbeom Kim)
-Date: Wed, 01 Jun 2011 19:30:42 +0900
-Subject: [PATCH 4/5] ARM: S3C6410: Support 800MHz operation in cpufreq
-In-Reply-To: <1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
-	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-Message-ID: <037201cc2046$f5cc53b0$e164fb10$@com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Wed, 01 Jun 2011 14:43:43 +0300
+Subject: [PATCH 0/8] clean-up NAND / BBT code, flags
+In-Reply-To: <1306884687-1824-1-git-send-email-computersforpeace@gmail.com>
+References: <1306884687-1824-1-git-send-email-computersforpeace@gmail.com>
+Message-ID: <1306928623.4405.108.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Mark
+On Tue, 2011-05-31 at 16:31 -0700, Brian Norris wrote:
+> Hello,
+> 
+> This patch series handles several issues with NAND chip flags and BBT
+> flags, especially those related to the nand_chip.options and
+> nand_bbt_descr.options fields. This topic was discussed and reviewed a
+> bit on the linux-mtd thread found here:
+>     http://lists.infradead.org/pipermail/linux-mtd/2011-April/035146.html
+> 
+> These changes have affected many drivers in relatively small ways, so
+> I copied all the maintainers/contributors given by the
+> scripts/getmaintainer.pl scripts. FYI, this patch set is based on the
+> mtd-2.6.git repository from linux-mtd.
+> 
+> Also, the first patch:
+>     mtd: nand: remove NAND_BBT_SCANBYTE1AND6 option
+> solves the regression issues discussed here:
+>     http://lists.infradead.org/pipermail/linux-mtd/2011-May/035696.html
 
-800Mhz S3C6410 is only supplied by customer request.
-800Mhz dvfs operation should be controlled carefully.
-(Stable VDD_ARM should be supplied)
-To optimize s3c6410 dvfs operation, not only ARMCLK
-But also HCLK should do dvfs.
-In other words, VDD_INT, as well as VDD_ARM should be controlled.
+Looks good to me, thank you. Pushed to l2-mtd-2.6.git.
 
-Thanks and regards,
-SB Kim
-
-On Wed, Jun 1, 2011 at 6:45 PM, Mark Brown
-> At least some newer S3C6410 silicon supports operation up to 800MHz rather
-> than just 667MHz. Unfortunately I don't have access to any of
-> documentation
-> of this other than some running systems, add a new cpufreq table entry for
-> this based on the behaviour of those systems.
-> 
-> Signed-off-by: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> ---
->  drivers/cpufreq/s3c64xx.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/s3c64xx.c b/drivers/cpufreq/s3c64xx.c
-> index fc3f180..fc69178 100644
-> --- a/drivers/cpufreq/s3c64xx.c
-> +++ b/drivers/cpufreq/s3c64xx.c
-> @@ -31,6 +31,7 @@ static struct s3c64xx_dvfs s3c64xx_dvfs_table[] = {
->  	[1] = { 1050000, 1150000 },
->  	[2] = { 1100000, 1150000 },
->  	[3] = { 1200000, 1350000 },
-> +	[4] = { 1300000, 1350000 },
->  };
-> 
->  static struct cpufreq_frequency_table s3c64xx_freq_table[] = {
-> @@ -43,6 +44,7 @@ static struct cpufreq_frequency_table
-> s3c64xx_freq_table[] = {
->  	{ 2, 532000 },
->  	{ 2, 533000 },
->  	{ 3, 667000 },
-> +	{ 4, 800000 },
->  	{ 0, CPUFREQ_TABLE_END },
->  };
->  #endif
-> --
-> 1.7.5.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
