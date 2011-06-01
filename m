@@ -1,22 +1,22 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Wed, 1 Jun 2011 13:48:43 +0200
-Subject: [PATCH 0/3] Fixes for breakage resulting from syscore_ops patch on
-	s3c24xx
-Message-ID: <201106011348.47145.heiko@sntech.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 1 Jun 2011 04:49:29 -0700
+Subject: [PATCH v2 1/2] ARM: OMAP4: MMC: increase delay for pbias
+In-Reply-To: <1306926923-3398-2-git-send-email-balajitk@ti.com>
+References: <1306926923-3398-1-git-send-email-balajitk@ti.com>
+	<1306926923-3398-2-git-send-email-balajitk@ti.com>
+Message-ID: <20110601114929.GB11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The syscore_ops patch from Rafael J. Wysocki introduced some small
-glitches for the S3C24XX cpus resulting in compile errors.
+* Balaji T K <balajitk@ti.com> [110601 04:13]:
+> 4 micro seconds is not enough for PBIAS if MMC regulator is
+> enabled from MMC regulator OFF.
+> Increase the delay for PBIAS to stabilize.
+> Wait for PBIAS and timeout if not.
+> 
+> Resolves MMC/SD failure on OMAP4
+> "Pbias Voltage is not same as LDO"
 
-Heiko Stuebner (3):
-  Fix missing struct for s3c2410_dma_chan in s3c2410_dma_suspend_chan
-  Move s3c24xx_irq_syscore_ops to plat-s3c24xx/irq.c
-  remove the now empty mach-s3c2410/irq.c
+Thanks for updating this, applying to devel-fixes.
 
- arch/arm/mach-s3c2410/Makefile |    1 -
- arch/arm/mach-s3c2410/irq.c    |   34 ----------------------------------
- arch/arm/plat-s3c24xx/dma.c    |    2 +-
- arch/arm/plat-s3c24xx/irq.c    |    6 ++++++
- 4 files changed, 7 insertions(+), 36 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/irq.c
+Tony
