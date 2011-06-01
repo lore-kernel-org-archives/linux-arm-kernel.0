@@ -1,42 +1,71 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 1 Jun 2011 18:54:30 +0400
-Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
-In-Reply-To: <1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
-References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
-	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
-Message-ID: <BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 1 Jun 2011 16:59:52 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <20110601143604.GH23771@pengutronix.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+	<20110601142406.GJ3660@n2100.arm.linux.org.uk>
+	<20110601143604.GH23771@pengutronix.de>
+Message-ID: <20110601145952.GA9907@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
-> On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
->> Currently atmel_nand driver used by AT91 and AVR32 calls a special
->> callback
->> which return nand partition table and number of partitions. However in all
->> boards this callback returns just static data. So drop this callback and
->> make atmel_nand use partition table provided statically via platform_data.
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->
-> Thanks for this update, always nice seeing code being optimized. I
-> really can't recall why it was made like this in the first place...
->
-> For the AVR32 related parts:
->
-> Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
->
-> <snipp diff>
->
-> Will this go through the linux-mtd tree (since it spans two archs) or
-> should it go through an arch tree?
+Hello,
 
-On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
-as I'd also like to submit several (a pile) patches cleaning up mtd
-partitioning, which would depend on this.
+On Wed, Jun 01, 2011 at 04:36:04PM +0200, Sascha Hauer wrote:
+> On Wed, Jun 01, 2011 at 03:24:06PM +0100, Russell King - ARM Linux wrote:
+> > On Wed, Jun 01, 2011 at 04:18:47PM +0200, Sascha Hauer wrote:
+> > > diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> > > index 9128fdd..e3b6f02 100644
+> > > --- a/arch/arm/boot/Makefile
+> > > +++ b/arch/arm/boot/Makefile
+> > > @@ -59,6 +59,11 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+> > >  
+> > >  endif
+> > >  
+> > > +ifeq ($(CONFIG_ARM_PATCH_PHYS_VIRT),y)
+> > > +$(obj)/uImage: $(obj)/zImage FORCE
+> > > +	@echo 'building uImages is incompatible with CONFIG_ARM_PATCH_PHYS_VIRT'
+> > > +	@false
+> > 
+> > It may be better to drop the zImage dependency too, so that folk don't get
+> > the message at the end of an otherwise successful kernel build - they may
+> > decide to turn p2v patching off which would result in a rebuild.
+> 
+> It's not that easy. We have this in arch/arm/Makefile:
+> 
+> zImage Image xipImage bootpImage uImage: vmlinux
+> 	$(Q)$(MAKE) $(build)=$(boot) MACHINE=$(MACHINE) $(boot)/$@
+> 
+> So arch/arm/boot/Makefile gets evaluated after a successful build. We
+> have to make the test in arch/arm/Makefile if we want to catch this
+> earlier.
+> 
+> > 
+> > Or it could suggest the mkimage command which should be run, but with
+> > <LOAD-ADDRESS> inserted into it at the appropriate point - iow something
+> > like:
+> > 
+> >   mkimage -A arm -O linux -T kernel -C none \
+> > 	-a <LOAD-ADDRESS> -e <START-ADDRESS> \
+> > 	-n 'Linux-$(KERNELRELEASE)' -d arch/arm/boot/zImage uImage.<PLATFORM>
+> 
+> Ok, it's a good idea to give the user a hint what to do.
+Back when I worked on RUNTIME_PHYSOFFSET I addressed that problem. My
+patch that you can find in the archives allowed to do:
 
-OTOH, I think there will be a cleanup of AT91 platform, which would bring
-lot's of conflicts with this patch, if it goes through linux-mtd.
+	make uImage LOAD_ADDRESS=...
+
+even with RUNTIME_PHYSOFFSET=y.
+
+I didn't try to find that patch, though.
+
+Best regards
+Uwe
 
 -- 
-With best wishes
-Dmitry
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
