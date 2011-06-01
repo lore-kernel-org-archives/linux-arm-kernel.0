@@ -1,74 +1,139 @@
 From: bengardiner@nanometrics.ca (Ben Gardiner)
-Date: Wed,  1 Jun 2011 11:03:23 -0400
-Subject: [PATCH 1/3] [v3] davinci: sram: ioremap the davinci_soc_info
-	specified sram regions
+Date: Wed,  1 Jun 2011 11:03:24 -0400
+Subject: [PATCH 2/3] [v3] davinci: da850-dm646x: remove the SRAM_VIRT iotable
+	entry
 In-Reply-To: <cover.1306940448.git.bengardiner@nanometrics.ca>
 References: <20110601051753.GA5153@game.jcrosoft.org>
 	<cover.1306940448.git.bengardiner@nanometrics.ca>
-Message-ID: <0787ab1fe2a1db4f18feb4b45f6ba44f90e9da59.1306940448.git.bengardiner@nanometrics.ca>
+Message-ID: <e7fec7e37a358b66d665d6c4ea41c5fa47685b8b.1306940448.git.bengardiner@nanometrics.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current davinci init sets up SRAM in iotables. There has been an observed
-failure to boot a da850 with 128K specified in the iotable.
+The sram regions defined for da850-dm646x in their iotable entries are also
+defined in their davinci_soc_info's.
 
-Make the davinci sram allocator -- now based on RMK's consolidated SRAM
-support -- do an ioremap of the region specified by the entries in
-davinci_soc_info before registering with gen_pool_add_virt().
+Remove this duplicate information which is now uneccessary since sram
+init will ioremap the regions defined by their davinci_soc_info's.
 
-This commit breaks runtime of davinci boards since the regions that
-the sram init is now trying to ioremap have been iomapped by their
-iotable entries. The iotable entries will be removed in the patches
-to come.
+Since this removal completely removes all uses of SRAM_VIRT, also remove
+the SRAM_VIRT definition.
 
 Signed-off-by: Ben Gardiner <bengardiner@nanometrics.ca>
-CC: Sekhar Nori <nsekhar@ti.com>
+Reviewed-by: Sergei Shtylyov <sshtylyov@mvista.com>
 Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
 ---
 Changes since v2:
  * Added Jean-Christophe PLAGNIOL-VILLARD's Ack
 Changes since v1:
- * return -ENOMEM if ioremap fails (Sekhar Nori)
+ * squashed patches 3-8 in v1 series into this patch (Sergei Shtylyov)
 
 ---
- arch/arm/mach-davinci/sram.c |   10 ++++++++--
- 1 files changed, 8 insertions(+), 2 deletions(-)
+ arch/arm/mach-davinci/da850.c               |    6 ------
+ arch/arm/mach-davinci/dm355.c               |    6 ------
+ arch/arm/mach-davinci/dm365.c               |    6 ------
+ arch/arm/mach-davinci/dm644x.c              |    6 ------
+ arch/arm/mach-davinci/dm646x.c              |    6 ------
+ arch/arm/mach-davinci/include/mach/common.h |    2 --
+ 6 files changed, 0 insertions(+), 32 deletions(-)
 
-diff --git a/arch/arm/mach-davinci/sram.c b/arch/arm/mach-davinci/sram.c
-index 2c53db2..68b05d5 100644
---- a/arch/arm/mach-davinci/sram.c
-+++ b/arch/arm/mach-davinci/sram.c
-@@ -8,6 +8,7 @@
-  * the Free Software Foundation; either version 2 of the License, or
-  * (at your option) any later version.
-  */
-+#include <linux/io.h>
- #include <linux/module.h>
- #include <linux/init.h>
+diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+index 5c2bf3b..904ede9 100644
+--- a/arch/arm/mach-davinci/da850.c
++++ b/arch/arm/mach-davinci/da850.c
+@@ -725,12 +725,6 @@ static struct map_desc da850_io_desc[] = {
+ 		.length		= DA8XX_CP_INTC_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+-	{
+-		.virtual	= SRAM_VIRT,
+-		.pfn		= __phys_to_pfn(DA8XX_ARM_RAM_BASE),
+-		.length		= SZ_8K,
+-		.type		= MT_DEVICE
+-	},
+ };
  
-@@ -25,6 +26,7 @@ EXPORT_SYMBOL_GPL(davinci_gen_pool);
-  */
- static int __init sram_init(void)
- {
-+	void *addr;
- 	unsigned len = davinci_soc_info.sram_len;
+ static u32 da850_psc_bases[] = { DA8XX_PSC0_BASE, DA8XX_PSC1_BASE };
+diff --git a/arch/arm/mach-davinci/dm355.c b/arch/arm/mach-davinci/dm355.c
+index 9bda687..94f44d3 100644
+--- a/arch/arm/mach-davinci/dm355.c
++++ b/arch/arm/mach-davinci/dm355.c
+@@ -757,12 +757,6 @@ static struct map_desc dm355_io_desc[] = {
+ 		.length		= IO_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+-	{
+-		.virtual	= SRAM_VIRT,
+-		.pfn		= __phys_to_pfn(0x00010000),
+-		.length		= SZ_32K,
+-		.type		= MT_MEMORY_NONCACHED,
+-	},
+ };
  
- 	if (!len)
-@@ -36,8 +38,12 @@ static int __init sram_init(void)
- 	if (!davinci_gen_pool)
- 		return -ENOMEM;
+ /* Contents of JTAG ID register used to identify exact cpu type */
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index d306034..58f5b0a 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -970,12 +970,6 @@ static struct map_desc dm365_io_desc[] = {
+ 		.length		= IO_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+-	{
+-		.virtual	= SRAM_VIRT,
+-		.pfn		= __phys_to_pfn(0x00010000),
+-		.length		= SZ_32K,
+-		.type		= MT_MEMORY_NONCACHED,
+-	},
+ };
  
--	WARN_ON(gen_pool_add_virt(davinci_gen_pool, SRAM_VIRT,
--				  davinci_soc_info.sram_phys, len, -1));
-+	addr = ioremap(davinci_soc_info.sram_phys, len);
-+	if (!addr)
-+		return -ENOMEM;
-+	if(WARN_ON(gen_pool_add_virt(davinci_gen_pool, addr,
-+				  davinci_soc_info.sram_phys, len, -1)))
-+		iounmap(addr);
+ static struct resource dm365_ks_resources[] = {
+diff --git a/arch/arm/mach-davinci/dm644x.c b/arch/arm/mach-davinci/dm644x.c
+index 3949ed7..11e6481 100644
+--- a/arch/arm/mach-davinci/dm644x.c
++++ b/arch/arm/mach-davinci/dm644x.c
+@@ -663,12 +663,6 @@ static struct map_desc dm644x_io_desc[] = {
+ 		.length		= IO_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+-	{
+-		.virtual	= SRAM_VIRT,
+-		.pfn		= __phys_to_pfn(0x00008000),
+-		.length		= SZ_16K,
+-		.type		= MT_MEMORY_NONCACHED,
+-	},
+ };
  
- 	return 0;
- }
+ /* Contents of JTAG ID register used to identify exact cpu type */
+diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
+index a4365f7..57d697e 100644
+--- a/arch/arm/mach-davinci/dm646x.c
++++ b/arch/arm/mach-davinci/dm646x.c
+@@ -747,12 +747,6 @@ static struct map_desc dm646x_io_desc[] = {
+ 		.length		= IO_SIZE,
+ 		.type		= MT_DEVICE
+ 	},
+-	{
+-		.virtual	= SRAM_VIRT,
+-		.pfn		= __phys_to_pfn(0x00010000),
+-		.length		= SZ_32K,
+-		.type		= MT_MEMORY_NONCACHED,
+-	},
+ };
+ 
+ /* Contents of JTAG ID register used to identify exact cpu type */
+diff --git a/arch/arm/mach-davinci/include/mach/common.h b/arch/arm/mach-davinci/include/mach/common.h
+index 665d049..16b5ec5 100644
+--- a/arch/arm/mach-davinci/include/mach/common.h
++++ b/arch/arm/mach-davinci/include/mach/common.h
+@@ -86,8 +86,6 @@ extern struct davinci_soc_info davinci_soc_info;
+ extern void davinci_common_init(struct davinci_soc_info *soc_info);
+ extern void davinci_init_ide(void);
+ 
+-/* standard place to map on-chip SRAMs; they *may* support DMA */
+-#define SRAM_VIRT	0xfffe0000
+ #define SRAM_SIZE	SZ_128K
+ 
+ #endif /* __ARCH_ARM_MACH_DAVINCI_COMMON_H */
 -- 
 1.7.4.1
