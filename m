@@ -1,144 +1,131 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu, 02 Jun 2011 19:07:07 +0100
-Subject: using identity_mapping_add & switching MMU state - how ?
-In-Reply-To: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
-Message-ID: <1307038027.28002.12.camel@e102568-lin.cambridge.arm.com>
+From: johnstul@us.ibm.com (john stultz)
+Date: Thu, 02 Jun 2011 11:47:35 -0700
+Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
+In-Reply-To: <4DE788B2.5060308@ti.com>
+References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
+	<20110602094622.GS3660@n2100.arm.linux.org.uk>
+	<4DE7637B.3060901@stericsson.com>
+	<20110602110137.GU3660@n2100.arm.linux.org.uk>
+	<4DE77D9A.6090301@stericsson.com>  <4DE788B2.5060308@ti.com>
+Message-ID: <1307040455.11492.52.camel@work-vm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+On Thu, 2011-06-02 at 18:27 +0530, Santosh Shilimkar wrote:
+> On 6/2/2011 5:40 PM, Mattias Wallin wrote:
+> > On 06/02/2011 01:01 PM, Russell King - ARM Linux wrote:
+> >> On Thu, Jun 02, 2011 at 12:18:35PM +0200, Mattias Wallin wrote:
+> >>> On 06/02/2011 11:46 AM, Russell King - ARM Linux wrote:
+> >>>> Why don't we just find a way of fixing sched_clock so that the value
+> >>>> doesn't reset over a suspend/resume cycle?
+> >>> Even if the value isn't reset during suspend/resume we want the
+> >>> clocksource to keep counting. Or is it ok to have the clocksource stop
+> >>> or freeze during suspend?
+> >>
+> >> kernel/time/timekeeping.c:timekeeping_suspend():
+> >>
+> >> timekeeping_forward_now();
+> >>
+> >> which does:
+> >> cycle_now = clock->read(clock);
+> >> cycle_delta = (cycle_now - clock->cycle_last)& clock->mask;
+> >> clock->cycle_last = cycle_now;
+> >>
+> >> So that updates the time with the current offset between cycle_last and
+> >> the current value.
+> >>
+> >> kernel/time/timekeeping.c:timekeeping_resume():
+> >> /* re-base the last cycle value */
+> >> timekeeper.clock->cycle_last = timekeeper.clock->read(timekeeper.clock);
+> >>
+> >> So this re-sets cycle_last to the current value of the clocksource. This
+> >> means that on resume, the clocksource can start counting from any
+> >> value it
+> >> likes.
+> >>
+> >> So, without any additional external inputs, time resumes incrementing at
+> >> the point where the suspend occurred without any jump backwards or
+> >> forwards.
+> >>
+> >> The code accounts for the sleep time by using read_persistent_clock()
+> >> read
+> >> a timer which continues running during sleep to calculate the delta
+> >> between
+> >> suspend and resume, and injects the delta between them to wind the time
+> >> forward.
+> >>
+> >>> Then we have cpuidle. Is it ok to stop/freeze the timer during cpuidle
+> >>> sleep states?
+> >>
+> >> During _idle_ (iow, no task running) sched_clock and the clocksource
+> >> should both continue to run - the scheduler needs to know how long the
+> >> system has been idle for, and the clocksource can't stop because we'll
+> >> lose track of time.
+> >>
+> >> Remember that the clockevent stuff is used as a trigger to the
+> >> timekeeping
+> >> code to read the clocksource, and update the current time. Time is moved
+> >> forward by the delta between a previous clocksource read and the current
+> >> clocksource read. So stopping or resetting the clocksource in unexpected
+> >> ways (other than over suspend/resume as mentioned above) will result in
+> >> time going weird.
+> >
+> > Hmm, I have missed the existence of the read_persistent_clock(). It
+> > sounds like I should keep the MTU as my clocksource / sched_clock and
+> > have the PRCMU Timer as a persistent_clock instead.
+> >
+> > Then one problem remains. The MTU will be powered during cstates:
+> > running, wfi, ApIdle (arm retenetion). The MTU will loose power during
+> > cstates ApSleep and ApDeepSleep. So I need to do a similar sync as
+> > suspend does against the persistent_clock but when leaving and enter the
+> > deeper cstates.
+> >
+> > Should I solve it in the clocksource framework with a flag telling which
+> > cstates the timer will stop/freeze and then inject time from the
+> > persistent_clock for those cstates? (I am thinking something like the
+> > CLOCK_EVT_FEAT_C3STOP flag)
+> >
+> > Am I on the wrong track here or how should I solve it?
+> >
+[snip]
+> John mentioned that because of frequent clock-source
+> switching, will affect the NTP correction badly to an
+> extent that NTP correction may not work.
+> 
+> Here is what John suggested to do but I got busy with
+> other stuff and this one got pushed out from my todo.
+> 
+> --------------------
+> John wrote ...
+> A different approach would be to create a meta-clocksource, that
+> utilizes the two underlying clocks to create a what looks like a unified
+> counter.
+> 
+> Basically you use the slow-always running counter as your long-term freq
+> adjusted clock, but supplement its low granularity with the highres
+> halting clock.
+> 
+> This works best if both counters are driven by the same crystal, so
+> there won't be much drift between them.
+> ----------------------
 
-On Thu, 2011-06-02 at 16:44 +0100, Frank Hofmann wrote:
-> Hi,
-> 
-> 
-> I'm trying to find a way to do an MMU off / on transition.
-> 
-> What I want to do is to call cpu_do_resume() from the hibernation restore 
-> codepath.
-> 
-> I've succeeded to make this work by adding a test whether the MMU is 
-> already on when cpu_resume_mmu() is called.
-> 
-> I'm not sure that sort of thing is proper; hence I've been trying to find 
-> a way to disable the MMU before calling cpu_do_resume().
-> 
-> Can't seem to get this to work though; even though I'm creating a separate 
-> MMU context that's given 1:1 mappings for all of kernel code/data, 
-> execution still hangs as soon as I enable the code section below that 
-> switches the MMU off.
-> 
-> 
-> What I have at the moment is code that looks like this:
-> 
-> ==============================================================================
-> [ ... ]
-> unsigned long notrace __swsusp_arch_restore_image(void)
-> {
->  	extern struct pbe *restore_pblist;
->  	struct pbe *pbe;
-> 
->  	/* __swsusp_pg_dir has been created using pgd_alloc(&init_mm); */
-> 
->  	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
-> 
->  	for (pbe = restore_pblist; pbe; pbe = pbe->next)
->  		copy_page(pbe->orig_address, pbe->address);
-> 
->  	flush_tlb_all();
->  	flush_cache_all();
-> 
->  	identity_mapping_add(__swsusp_pg_dir, __pa(_stext), __pa(_etext));
->  	identity_mapping_add(__swsusp_pg_dir, __pa(_sdata), __pa(_edata));
-> 
->  	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
-> 
->  	flush_tlb_all();
->  	flush_cache_all();
-> 
->  	cpu_proc_fin();		/* turns caches off */
-> 
->  	/* caller requires v:p offset to calculate physical addresses */
->  	return (unsigned long)(PHYS_OFFSET - PAGE_OFFSET);
-> }
-> 
-> [ ... ]
-> ENTRY(swsusp_arch_resume)
->  	mov	r2, #PSR_I_BIT | PSR_F_BIT | SVC_MODE
->  	msr	cpsr_c, r2
->  	/*
->  	 * Switch stack to a nosavedata region to make sure image restore
->  	 * doesn't clobber it underneath itself.
->  	 */
->  	ldr	sp, =(__swsusp_resume_stk + PAGE_SIZE / 2)
->  	bl	__swsusp_arch_restore_image
-> 
->  	/*
->  	 * Restore the CPU registers.
->  	 */
->  	mov	r1, r0
->  	ldr	r0, =(__swsusp_arch_ctx + (NREGS * 4))
-> /*
->   * This is what I'm trying to switch off; yet, doing so makes things hang
->   */
-> #if 0
->  	ldr	r2, =cpu_do_resume
->  	sub	r2, r1			@ __pa()
->  	ldr	r3, =.Lmmu_is_off
->  	sub	r3, r1			@ __pa()
->  	sub	r0, r1			@ __pa()
->  	ldr	lr, =.Lpost_mmu
->  	mrc	p15, 0, r1, c1, c0, 0
->  	bic	r1, #CR_M
->  	mcr	p15, 0, r1, c1, c0, 0	@ MMU OFF
+Yea. The basic idea is to interpolate between two counters to produce a
+a continuous clocksource for the timekeeping core.
 
-I know it is a silly question, but are you sure your pc is pointing
-to a 1:1 physical address here ? This might explain also why if you call
-cpu_do_resume straight off you have to skip the mmu resume code since it
-creates a temporary mapping based on the current program counter. if it
-is a virtual address it goes pop, methinks.
+As Russell pointed out, error is injected to the timekeeping code every
+time you switch between clocksources or the persistent clock. Doing this
+very frequently will provide very poor time.
 
-> 
->  	mrc	p15, 0, r1, c2, c0, 0	@ queue a dependency on CP15
->          sub     pc, r3, r1, lsr #32	@ to local label, phys addr
-> .ltorg
-> .align 5
-> .Lmmu_is_off:
->  	mov	pc, r2			@ jump to phys cpu_v6_do_resume
-> .Lpost_mmu:
-> #else
->  	bl	cpu_do_resume
-> #endif
->  	ldr	r0, =__swsusp_arch_ctx
->  	ldmia	r0!, {r1-r11,lr}	@ nonvolatile regs
->  	ldr	sp, [r0]		@ stack
->  	msr	cpsr, r1
->  	msr	spsr, r2
-> 
->  	mov	r0, #0
->  	stmfd	sp!, {r0, lr}
->  	bl	cpu_init		@ reinitialize other modes
->  	ldmfd	sp!, {r0, pc}
-> ENDPROC(swsusp_arch_resume)
-> ==============================================================================
-> 
-> I.e. it performs the steps:
-> 
->  	- flush all caches, tlbs
->  	- setup identity mappings for all kernel code & data
->  	- switch to a self-contained pagedir
->  	- flush again
->  	- finish cpu (disable caches)
->  	- switch MMU off, re-read config reg to force necessary wait,
->  	  and jump to physical address of "self".
-> 
-> 
-> As said, things work just fine if simply doing the "bl cpu_do_resume" and 
-> adding a "MMU already on" check to cpu_resume_mmu().
+So by using an interpolated clocksource, we would be able to maintain
+clock adjustments via ntp and provide accurate long term time, while
+still having fine-grained resolution (along with some short term error).
 
-See comment above, cpu_resume_mmu creates a 1:1 mapping based on the
-current PC (it uses adr), it should do no harm unless PC is running
-virtual.
+However, its all easier said then done. There are lots of gotchas and
+corner-cases with interpolation. That's the whole reason we moved from
+tick based timekeeping to continuous clocksource based timekeeping. I
+believe the KVM folks have used similar interpolation method for their
+kvm clocksource, and I know they had numerous issues. But it seems to
+work well enough, so I would take a peek at their code to start.
 
-Lorenzo
+thanks
+-john
