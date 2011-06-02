@@ -1,40 +1,26 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu,  2 Jun 2011 12:38:17 +0300
-Subject: [PATCH 5/5] ep93xx: set DMA masks for the ep93xx_eth
-In-Reply-To: <89df467f9811b4f869513de3ada90ce7de74c6d1.1307006502.git.mika.westerberg@iki.fi>
-References: <89df467f9811b4f869513de3ada90ce7de74c6d1.1307006502.git.mika.westerberg@iki.fi>
-Message-ID: <56828d7f2670b3782fea89cbc849d526ca3df8d7.1307006502.git.mika.westerberg@iki.fi>
+From: sbkim73@samsung.com (Sangbeom Kim)
+Date: Thu, 02 Jun 2011 18:41:05 +0900
+Subject: [PATCH 4/5] ARM: S3C6410: Support 800MHz operation in cpufreq
+In-Reply-To: <20110602082830.GA3085@opensource.wolfsonmicro.com>
+References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
+	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<037201cc2046$f5cc53b0$e164fb10$@com>
+	<20110601104042.GA15387@opensource.wolfsonmicro.com>
+	<038c01cc20b9$a55a5120$f00ef360$@com>
+	<20110602082830.GA3085@opensource.wolfsonmicro.com>
+Message-ID: <039601cc2109$319c9770$94d5c650$@com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the driver is now passing platform device to the DMA mapping functions,
-we should give it valid DMA masks.
+On Wed, Jun 2, 2011 at 9:11 AM, Mark Brown
+> 
+> It's really unfortunate that there's no software visible method I'm
+> aware of :/
+Unfortunately, There is no method to detect 800Mhz s3c6410 by software.
 
-Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
----
- arch/arm/mach-ep93xx/core.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 8207954..1d4b65f 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -402,11 +402,15 @@ static struct resource ep93xx_eth_resource[] = {
- 	}
- };
- 
-+static u64 ep93xx_eth_dma_mask = DMA_BIT_MASK(32);
-+
- static struct platform_device ep93xx_eth_device = {
- 	.name		= "ep93xx-eth",
- 	.id		= -1,
- 	.dev		= {
--		.platform_data	= &ep93xx_eth_data,
-+		.platform_data		= &ep93xx_eth_data,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+		.dma_mask		= &ep93xx_eth_dma_mask,
- 	},
- 	.num_resources	= ARRAY_SIZE(ep93xx_eth_resource),
- 	.resource	= ep93xx_eth_resource,
--- 
-1.7.4.4
+> I'm not sure it's a particular concern for the 800MHz part above others
+> simply because it's such a universal issue.
+Because Voltage margin(VDD_ARM) of s3c6410 800Mhz is particularly weak.
+Under 667Mhz, There is no issue for dvfs. 
