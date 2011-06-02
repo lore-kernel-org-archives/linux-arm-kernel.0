@@ -1,96 +1,51 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu,  2 Jun 2011 21:59:38 +0300
-Subject: [PATCH v2 5/5] net: ep93xx_eth: fix DMA API violations
-In-Reply-To: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-Message-ID: <a0d2d13698ea27f671a077c9f47b7ce855054a47.1307040443.git.mika.westerberg@iki.fi>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 02 Jun 2011 14:38:23 -0500
+Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
+	running early
+In-Reply-To: <1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
+References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>	<20110602163152.GH32751@game.jcrosoft.org>
+	<1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
+Message-ID: <4DE7E6AF.4020404@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King said:
+On 06/02/2011 11:56 AM, Marc Zyngier wrote:
+> On Thu, 2011-06-02 at 18:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
+> wrote:
+>> On 15:03 Wed 01 Jun     , Marc Zyngier wrote:
+>>> Currently, the boot CPU has its local timer enabled long after
+>>> the delay loop has been calibrated. This makes it impossible to
+>>> boot a system that only uses local timers, like the A15.
+>>>
+>>> Use late_time_init hook to initialize the boot CPU local timer.
+>>> Since shmobile is already using this hook, add an ARM specific
+>>> arm_late_time_init hook that platforms can use instead.
+>>>
+>>> Cc: Paul Mundt<lethal@linux-sh.org>
+>>> Cc: Magnus Damm<magnus.damm@gmail.com>
+>>> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
+>> I propose to switch to early platform devce and earlytimer
+>>
+>> this will avoid the arm_late_time_init hook
+>>
+>> and will make it cross arch
 >
-> So, to summarize what its doing:
+> I believe this is orthogonal. shmobile (the only ARM user of
+> late_time_init) is already doing some early_platform stuff for its
+> timers.
 >
-> 1. It allocates buffers for rx and tx.
-> 2. It maps them with dma_map_single().
->       This transfers ownership of the buffer to the DMA device.
-> 3. In ep93xx_xmit,
-> 3a. It copies the data into the buffer with skb_copy_and_csum_dev()
->       This violates the DMA buffer ownership rules - the CPU should
->       not be writing to this buffer while it is (in principle) owned
->       by the DMA device.
-> 3b. It then calls dma_sync_single_for_cpu() for the buffer.
->       This transfers ownership of the buffer to the CPU, which surely
->       is the wrong direction.
-> 4. In ep93xx_rx,
-> 4a. It calls dma_sync_single_for_cpu() for the buffer.
->       This at least transfers the DMA buffer ownership to the CPU
->       before the CPU reads the buffer
-> 4b. It then uses skb_copy_to_linear_data() to copy the data out.
->       At no point does it transfer ownership back to the DMA device.
-> 5. When the driver is removed, it dma_unmap_single()'s the buffer.
->       This transfers ownership of the buffer to the CPU.
-> 6. It frees the buffer.
+> What I'm trying to achieve here is to make sure the timer on CPU0 is
+> actually up, running and registered as a clock_event_device before we
+> hit the delay loop.
 >
-> While it may work on ep93xx, it's not respecting the DMA API rules,
-> and with DMA debugging enabled it will probably encounter quite a few
-> warnings.
+> Or maybe I've misunderstood what you're pointing me to?
+>
 
-This patch fixes these violations.
+I believe he is referring to this patch which generically enables the 
+shmobile code for ARM:
 
-Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/net/arm/ep93xx_eth.c |   19 +++++++++++++------
- 1 files changed, 13 insertions(+), 6 deletions(-)
+http://www.spinics.net/lists/arm-kernel/msg123736.html
 
-diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
-index 56b51a1..c2a7847 100644
---- a/drivers/net/arm/ep93xx_eth.c
-+++ b/drivers/net/arm/ep93xx_eth.c
-@@ -285,11 +285,14 @@ static int ep93xx_rx(struct net_device *dev, int processed, int budget)
- 
- 		skb = dev_alloc_skb(length + 2);
- 		if (likely(skb != NULL)) {
-+			struct ep93xx_rdesc *rxd = &ep->descs->rdesc[entry];
- 			skb_reserve(skb, 2);
--			dma_sync_single_for_cpu(ep->dma_dev,
--						ep->descs->rdesc[entry].buf_addr,
-+
-+			dma_sync_single_for_cpu(ep->dma_dev, rxd->buf_addr,
- 						length, DMA_FROM_DEVICE);
- 			skb_copy_to_linear_data(skb, ep->rx_buf[entry], length);
-+			dma_sync_single_for_device(ep->dma_dev, rxd->buf_addr,
-+						length, DMA_FROM_DEVICE);
- 			skb_put(skb, length);
- 			skb->protocol = eth_type_trans(skb, dev);
- 
-@@ -351,6 +354,7 @@ poll_some_more:
- static int ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
- {
- 	struct ep93xx_priv *ep = netdev_priv(dev);
-+	struct ep93xx_tdesc *txd;
- 	int entry;
- 
- 	if (unlikely(skb->len > MAX_PKT_SIZE)) {
-@@ -362,11 +366,14 @@ static int ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
- 	entry = ep->tx_pointer;
- 	ep->tx_pointer = (ep->tx_pointer + 1) & (TX_QUEUE_ENTRIES - 1);
- 
--	ep->descs->tdesc[entry].tdesc1 =
--		TDESC1_EOF | (entry << 16) | (skb->len & 0xfff);
-+	txd = &ep->descs->tdesc[entry];
-+
-+	txd->tdesc1 = TDESC1_EOF | (entry << 16) | (skb->len & 0xfff);
-+	dma_sync_single_for_cpu(ep->dma_dev, txd->buf_addr, skb->len,
-+				DMA_TO_DEVICE);
- 	skb_copy_and_csum_dev(skb, ep->tx_buf[entry]);
--	dma_sync_single_for_cpu(ep->dma_dev, ep->descs->tdesc[entry].buf_addr,
--				skb->len, DMA_TO_DEVICE);
-+	dma_sync_single_for_device(ep->dma_dev, txd->buf_addr, skb->len,
-+				   DMA_TO_DEVICE);
- 	dev_kfree_skb(skb);
- 
- 	spin_lock_irq(&ep->tx_pending_lock);
--- 
-1.7.4.4
+I don't think it has been pulled into mainline yet.
+
+Rob
