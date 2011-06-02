@@ -1,21 +1,32 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Thu, 2 Jun 2011 12:56:06 +0200
-Subject: [PATCH v3] ARM: ep93xx: use more reliable CPLD watchdog for
-	reset on ts72xx
-In-Reply-To: <20110602095455.GB2954@acer>
-References: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
-	<1306868578-3883-1-git-send-email-ynezz@true.cz>
-	<20110602095455.GB2954@acer>
-Message-ID: <20110602105606.GN16318@ibawizard.net>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 2 Jun 2011 12:56:39 +0200
+Subject: [PATCH v3 1/3] Fix missing struct for s3c2410_dma_chan in
+	s3c2410_dma_suspend_chan
+In-Reply-To: <201106021254.57644.heiko@sntech.de>
+References: <201106021254.57644.heiko@sntech.de>
+Message-ID: <201106021256.39665.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika Westerberg <mika.westerberg@iki.fi> [2011-06-02 12:54:55]:
+s3c2410_dma_chan is not a type itself, so struct is required.
 
-> Where can I find the whole series? I was going to test this on my TS-7260 but
-> I only found this patch from my inbox and it doesn't apply without the
-> previous one :-(
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/plat-s3c24xx/dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-I'll push that wip branch on github later today, and will give you the link. Thanks.
-
--- ynezz
+diff --git a/arch/arm/plat-s3c24xx/dma.c b/arch/arm/plat-s3c24xx/dma.c
+index c10d10c..2abf966 100644
+--- a/arch/arm/plat-s3c24xx/dma.c
++++ b/arch/arm/plat-s3c24xx/dma.c
+@@ -1199,7 +1199,7 @@ EXPORT_SYMBOL(s3c2410_dma_getposition);
+ 
+ #ifdef CONFIG_PM
+ 
+-static void s3c2410_dma_suspend_chan(s3c2410_dma_chan *cp)
++static void s3c2410_dma_suspend_chan(struct s3c2410_dma_chan *cp)
+ {
+ 	printk(KERN_DEBUG "suspending dma channel %d\n", cp->number);
+ 
+-- 
+1.7.1
