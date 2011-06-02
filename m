@@ -1,30 +1,59 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Thu, 2 Jun 2011 11:34:31 +0200
-Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
-Message-ID: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 2 Jun 2011 11:35:26 +0200 (CEST)
+Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
+In-Reply-To: <4DE6ECAF.9080409@codeaurora.org>
+References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.02.1105312319530.3078@ionos>
+	<BANLkTi=UyypKZUQOCCL-KWyAbMQBKY4ccg@mail.gmail.com>
+	<alpine.LFD.2.02.1106011027360.3078@ionos>
+	<20110601092229.GE3660@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1106011201530.3078@ionos>
+	<4DE6ECAF.9080409@codeaurora.org>
+Message-ID: <alpine.LFD.2.02.1106021134190.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Multi Timer Unit (MTU) is currently used as clocksource and sched_clk
-for the u8500 machine. The MTU block loose power during cpuidle sleep states
-so an alternate clocksource is needed and these patches adds the db8500 PRCMU
-timer.
+On Wed, 1 Jun 2011, Stephen Boyd wrote:
+> On 06/01/2011 03:03 AM, Thomas Gleixner wrote:
+> > Something like the below should work for both UP and SMP
+> >
+> > diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+> > index c027d4f..739801b 100644
+> > --- a/kernel/time/clockevents.c
+> > +++ b/kernel/time/clockevents.c
+> > @@ -173,6 +173,12 @@ static void clockevents_notify_released(void)
+> >  	}
+> >  }
+> >  
+> > +#ifdef CONFIG_SMP
+> > +# define CPU_MASK_CHECK(x)		WARN_ON(!x)
+> > +#else
+> > +# define CPU_MASK_CHECK(x)		(!x)
+> > +#endif
+> > +
+> >  /**
+> >   * clockevents_register_device - register a clock event device
+> >   * @dev:	device to register
+> > @@ -182,7 +188,8 @@ void clockevents_register_device(struct clock_event_device *dev)
+> >  	unsigned long flags;
+> >  
+> >  	BUG_ON(dev->mode != CLOCK_EVT_MODE_UNUSED);
+> > -	BUG_ON(!dev->cpumask);
+> > +	if (CPU_MASK_CHECK(dev->cpumask))
+> > +		dev->cpumask = cpumask_of(smp_processor_id());
+> >  
+> >  	raw_spin_lock_irqsave(&clockevents_lock, flags);
+> 
+> Won't this print a big WARNING on SMP_ON_UP=y and is_smp() == false
+> kernels? Is there a generic cross-architecture way to check for SMP at
 
-Mattias Wallin (3):
-  plat-nomadik: MTU sched_clock as a config option
-  clocksource: add DB8500 PRCMU Timer support
-  mach-ux500: Initialize the DB8500 PRCMU timer
+Need to check that.
 
- arch/arm/mach-ux500/cpu.c                 |    2 +
- arch/arm/plat-nomadik/Kconfig             |    8 ++-
- arch/arm/plat-nomadik/timer.c             |    4 +
- drivers/clocksource/Kconfig               |   15 +++++
- drivers/clocksource/Makefile              |    1 +
- drivers/clocksource/clksrc-db8500-prcmu.c |   90 +++++++++++++++++++++++++++++
- include/linux/clksrc-db8500-prcmu.h       |   17 ++++++
- 7 files changed, 136 insertions(+), 1 deletions(-)
- create mode 100644 drivers/clocksource/clksrc-db8500-prcmu.c
- create mode 100644 include/linux/clksrc-db8500-prcmu.h
+> runtime?
+> 
+> Also, I don't understand the original motivation for this change. The
+> assignment to cpumask was there in the u300 timer code already so the
+> commit text from Linus is a bit misleading/confusing.
 
--- 
-1.7.4.3
+The point is that we can remove these assignements for UP all over the
+place and just do it in the core code.
