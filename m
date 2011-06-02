@@ -1,46 +1,42 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 02 Jun 2011 17:56:55 +0100
-Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
-	running early
-In-Reply-To: <20110602163152.GH32751@game.jcrosoft.org>
-References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
-	<20110602163152.GH32751@game.jcrosoft.org>
-Message-ID: <1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 2 Jun 2011 22:41:15 +0530
+Subject: [PATCH 1/3] davinci: dm646x.h: include header files under mach/ after
+	those in linux/
+Message-ID: <1307034677-27236-1-git-send-email-nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-06-02 at 18:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
-wrote:
-> On 15:03 Wed 01 Jun     , Marc Zyngier wrote:
-> > Currently, the boot CPU has its local timer enabled long after
-> > the delay loop has been calibrated. This makes it impossible to
-> > boot a system that only uses local timers, like the A15.
-> > 
-> > Use late_time_init hook to initialize the boot CPU local timer.
-> > Since shmobile is already using this hook, add an ARM specific
-> > arm_late_time_init hook that platforms can use instead.
-> > 
-> > Cc: Paul Mundt <lethal@linux-sh.org>
-> > Cc: Magnus Damm <magnus.damm@gmail.com>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> I propose to switch to early platform devce and earlytimer
-> 
-> this will avoid the arm_late_time_init hook
-> 
-> and will make it cross arch
+The general header file inclusion order followed
+in the kernel is to include files under linux/
+first and then under mach/.
 
-I believe this is orthogonal. shmobile (the only ARM user of
-late_time_init) is already doing some early_platform stuff for its
-timers.
+The dm646x.h file has the opposite of this. Fix it.
 
-What I'm trying to achieve here is to make sure the timer on CPU0 is
-actually up, running and registered as a clock_event_device before we
-hit the delay loop.
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/include/mach/dm646x.h |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-Or maybe I've misunderstood what you're pointing me to?
-
-Cheers,
-
-	M.
+diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
+index 7a27f3f..5e95b02 100644
+--- a/arch/arm/mach-davinci/include/mach/dm646x.h
++++ b/arch/arm/mach-davinci/include/mach/dm646x.h
+@@ -11,13 +11,14 @@
+ #ifndef __ASM_ARCH_DM646X_H
+ #define __ASM_ARCH_DM646X_H
+ 
+-#include <mach/hardware.h>
+-#include <mach/asp.h>
+ #include <linux/i2c.h>
+ #include <linux/videodev2.h>
+ #include <linux/clk.h>
+ #include <linux/davinci_emac.h>
+ 
++#include <mach/hardware.h>
++#include <mach/asp.h>
++
+ #define DM646X_EMAC_BASE		(0x01C80000)
+ #define DM646X_EMAC_MDIO_BASE		(DM646X_EMAC_BASE + 0x4000)
+ #define DM646X_EMAC_CNTRL_OFFSET	(0x0000)
 -- 
-Reality is an implementation detail.
+1.7.3.2
