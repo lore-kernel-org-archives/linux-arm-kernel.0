@@ -1,18 +1,20 @@
-From: sharon_burns72@gmail.com (Sharon.Burns)
-Date: Wed, 01 Jun 2011 23:29:50 -0500
-Subject: Hello Would You Like To Earn
-Message-ID: <E1QRzXa-000CV8-KV@host113.kvchosting.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 1 Jun 2011 22:18:34 -0700
+Subject: [PATCH v2 2/4] ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
+In-Reply-To: <1306985632-18820-3-git-send-email-shawn.guo@linaro.org>
+References: <1306985632-18820-1-git-send-email-shawn.guo@linaro.org>
+	<1306985632-18820-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <BANLkTim--8JzeCK4V--wFxDm9PxcgNNM6Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello linux-arm-kernel
+On Wed, Jun 1, 2011 at 8:33 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> It registers platform device for drivers/gpio/gpio-mxc, and migrates
+> mx50/mx51/mx53 gpio driver to gpio-mxc.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Would you like to earn an extra $200 everyday?, for just 45 minutes work? You could quit your job and make double the money at home working for yourself.
+Acked-by: Olof Johansson <olof@lixom.net>
 
-visit->http:tinyurl.com/3brnlpx
 
-Regards,
-
-Sharon Burns
-
-Survey Human Resources Dept.
+-Olof
