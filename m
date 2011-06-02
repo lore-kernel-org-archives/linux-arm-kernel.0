@@ -1,31 +1,25 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 2 Jun 2011 15:20:56 +0530
-Subject: [PATCH 4/5] ARM: S3C6410: Support 800MHz operation in cpufreq
-In-Reply-To: <BANLkTimC=MrmjinzufrnOMSAgiQvVKdWhA@mail.gmail.com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
-	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<037201cc2046$f5cc53b0$e164fb10$@com>
-	<20110601104042.GA15387@opensource.wolfsonmicro.com>
-	<038c01cc20b9$a55a5120$f00ef360$@com>
-	<20110602082830.GA3085@opensource.wolfsonmicro.com>
-	<039601cc2109$319c9770$94d5c650$@com>
-	<BANLkTimC=MrmjinzufrnOMSAgiQvVKdWhA@mail.gmail.com>
-Message-ID: <BANLkTikpO9VR9tqJT_bROA_KfdxOBS7U0Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Jun 2011 10:52:24 +0100
+Subject: [PATCH 1/5] net: ep93xx_eth: pass struct device to DMA API
+	functions
+In-Reply-To: <89df467f9811b4f869513de3ada90ce7de74c6d1.1307006502.git.mika.westerberg@iki.fi>
+References: <89df467f9811b4f869513de3ada90ce7de74c6d1.1307006502.git.mika.westerberg@iki.fi>
+Message-ID: <20110602095224.GT3660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 2, 2011 at 3:14 PM, Kyungmin Park <kmpark@infradead.org> wrote:
->>>
->>> It's really unfortunate that there's no software visible method I'm
->>> aware of :/
->> Unfortunately, There is no method to detect 800Mhz s3c6410 by software.
->
-> Then how about to introduce the software flags. and set it at each
-> board. It can support the 800MHz.
-> Also this flags are handled at cpufreq drivers properly.
->
-> How do you think?
+On Thu, Jun 02, 2011 at 12:38:13PM +0300, Mika Westerberg wrote:
+> We shouldn't use NULL for any DMA API functions, unless we are dealing with
+> ISA or EISA device. So pass correct struct dev pointer to these functions.
 
-Two SMDKs may have different versions of s3c6410.
-Which file do we want to set the flags in ?
+Thanks for doing this - it certainly makes things more correct, even
+if the original problem has been resolved by the troublesome GFP_DMA
+commit having been reverted.  As such I think this patch series should
+still be applied.
+
+I think the series should be re-ordered so that patch 5 is first however,
+as you can do that with or without the remainder of the patches.
+
+For the entire series:
+
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
