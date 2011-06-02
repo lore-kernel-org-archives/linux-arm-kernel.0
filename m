@@ -1,124 +1,55 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu,  2 Jun 2011 12:38:13 +0300
-Subject: [PATCH 1/5] net: ep93xx_eth: pass struct device to DMA API functions
-Message-ID: <89df467f9811b4f869513de3ada90ce7de74c6d1.1307006502.git.mika.westerberg@iki.fi>
+Date: Thu,  2 Jun 2011 12:38:15 +0300
+Subject: [PATCH 3/5] net: ep93xx_eth: drop GFP_DMA from call to
+	dma_alloc_coherent()
+In-Reply-To: <89df467f9811b4f869513de3ada90ce7de74c6d1.1307006502.git.mika.westerberg@iki.fi>
+References: <89df467f9811b4f869513de3ada90ce7de74c6d1.1307006502.git.mika.westerberg@iki.fi>
+Message-ID: <f36dee062c55ef65e8aff8b6206479f1ba8091c6.1307006502.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We shouldn't use NULL for any DMA API functions, unless we are dealing with
-ISA or EISA device. So pass correct struct dev pointer to these functions.
+Commit a197b59ae6e8 (mm: fail GFP_DMA allocations when ZONE_DMA is not
+configured) made page allocator to return NULL if GFP_DMA is set but
+CONFIG_ZONE_DMA is disabled.
+
+This causes ep93xx_eth to fail:
+
+ WARNING: at mm/page_alloc.c:2251 __alloc_pages_nodemask+0x11c/0x638()
+ Modules linked in:
+ [<c0035498>] (unwind_backtrace+0x0/0xf4) from [<c0043da4>] (warn_slowpath_common+0x48/0x60)
+ [<c0043da4>] (warn_slowpath_common+0x48/0x60) from [<c0043dd8>] (warn_slowpath_null+0x1c/0x24)
+ [<c0043dd8>] (warn_slowpath_null+0x1c/0x24) from [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638)
+ [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638) from [<c00366fc>] (__dma_alloc+0x8c/0x3ec)
+ [<c00366fc>] (__dma_alloc+0x8c/0x3ec) from [<c0036adc>] (dma_alloc_coherent+0x54/0x60)
+ [<c0036adc>] (dma_alloc_coherent+0x54/0x60) from [<c0227808>] (ep93xx_open+0x20/0x864)
+ [<c0227808>] (ep93xx_open+0x20/0x864) from [<c0283144>] (__dev_open+0xb8/0x108)
+ [<c0283144>] (__dev_open+0xb8/0x108) from [<c0280528>] (__dev_change_flags+0x70/0x128)
+ [<c0280528>] (__dev_change_flags+0x70/0x128) from [<c0283054>] (dev_change_flags+0x10/0x48)
+ [<c0283054>] (dev_change_flags+0x10/0x48) from [<c001a720>] (ip_auto_config+0x190/0xf68)
+ [<c001a720>] (ip_auto_config+0x190/0xf68) from [<c00233b0>] (do_one_initcall+0x34/0x18c)
+ [<c00233b0>] (do_one_initcall+0x34/0x18c) from [<c0008400>] (kernel_init+0x94/0x134)
+ [<c0008400>] (kernel_init+0x94/0x134) from [<c0030858>] (kernel_thread_exit+0x0/0x8)
+
+Since there is no restrictions for DMA on ep93xx, we can fix this by just
+removing the GFP_DMA flag from the call.
 
 Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 ---
- drivers/net/arm/ep93xx_eth.c |   26 ++++++++++++++++----------
- 1 files changed, 16 insertions(+), 10 deletions(-)
+ drivers/net/arm/ep93xx_eth.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
-index 5a77001..8779d3b 100644
+index 0c9df11..56b51a1 100644
 --- a/drivers/net/arm/ep93xx_eth.c
 +++ b/drivers/net/arm/ep93xx_eth.c
-@@ -159,6 +159,8 @@ struct ep93xx_priv
- 	void __iomem		*base_addr;
- 	int			irq;
- 
-+	struct device		*dma_dev;
-+
- 	struct ep93xx_descs	*descs;
- 	dma_addr_t		descs_dma_addr;
- 
-@@ -284,7 +286,8 @@ static int ep93xx_rx(struct net_device *dev, int processed, int budget)
- 		skb = dev_alloc_skb(length + 2);
- 		if (likely(skb != NULL)) {
- 			skb_reserve(skb, 2);
--			dma_sync_single_for_cpu(NULL, ep->descs->rdesc[entry].buf_addr,
-+			dma_sync_single_for_cpu(ep->dma_dev,
-+						ep->descs->rdesc[entry].buf_addr,
- 						length, DMA_FROM_DEVICE);
- 			skb_copy_to_linear_data(skb, ep->rx_buf[entry], length);
- 			skb_put(skb, length);
-@@ -362,7 +365,7 @@ static int ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
- 	ep->descs->tdesc[entry].tdesc1 =
- 		TDESC1_EOF | (entry << 16) | (skb->len & 0xfff);
- 	skb_copy_and_csum_dev(skb, ep->tx_buf[entry]);
--	dma_sync_single_for_cpu(NULL, ep->descs->tdesc[entry].buf_addr,
-+	dma_sync_single_for_cpu(ep->dma_dev, ep->descs->tdesc[entry].buf_addr,
- 				skb->len, DMA_TO_DEVICE);
- 	dev_kfree_skb(skb);
- 
-@@ -457,6 +460,7 @@ static irqreturn_t ep93xx_irq(int irq, void *dev_id)
- 
- static void ep93xx_free_buffers(struct ep93xx_priv *ep)
- {
-+	struct device *dev = ep->dma_dev;
+@@ -495,7 +495,7 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
  	int i;
  
- 	for (i = 0; i < RX_QUEUE_ENTRIES; i += 2) {
-@@ -464,7 +468,7 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
- 
- 		d = ep->descs->rdesc[i].buf_addr;
- 		if (d)
--			dma_unmap_single(NULL, d, PAGE_SIZE, DMA_FROM_DEVICE);
-+			dma_unmap_single(dev, d, PAGE_SIZE, DMA_FROM_DEVICE);
- 
- 		if (ep->rx_buf[i] != NULL)
- 			free_page((unsigned long)ep->rx_buf[i]);
-@@ -475,13 +479,13 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
- 
- 		d = ep->descs->tdesc[i].buf_addr;
- 		if (d)
--			dma_unmap_single(NULL, d, PAGE_SIZE, DMA_TO_DEVICE);
-+			dma_unmap_single(dev, d, PAGE_SIZE, DMA_TO_DEVICE);
- 
- 		if (ep->tx_buf[i] != NULL)
- 			free_page((unsigned long)ep->tx_buf[i]);
- 	}
- 
--	dma_free_coherent(NULL, sizeof(struct ep93xx_descs), ep->descs,
-+	dma_free_coherent(dev, sizeof(struct ep93xx_descs), ep->descs,
- 							ep->descs_dma_addr);
- }
- 
-@@ -491,9 +495,10 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
-  */
- static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
- {
-+	struct device *dev = ep->dma_dev;
- 	int i;
- 
--	ep->descs = dma_alloc_coherent(NULL, sizeof(struct ep93xx_descs),
-+	ep->descs = dma_alloc_coherent(dev, sizeof(struct ep93xx_descs),
- 				&ep->descs_dma_addr, GFP_KERNEL | GFP_DMA);
+ 	ep->descs = dma_alloc_coherent(dev, sizeof(struct ep93xx_descs),
+-				&ep->descs_dma_addr, GFP_KERNEL | GFP_DMA);
++				&ep->descs_dma_addr, GFP_KERNEL);
  	if (ep->descs == NULL)
  		return 1;
-@@ -506,8 +511,8 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
- 		if (page == NULL)
- 			goto err;
  
--		d = dma_map_single(NULL, page, PAGE_SIZE, DMA_FROM_DEVICE);
--		if (dma_mapping_error(NULL, d)) {
-+		d = dma_map_single(dev, page, PAGE_SIZE, DMA_FROM_DEVICE);
-+		if (dma_mapping_error(dev, d)) {
- 			free_page((unsigned long)page);
- 			goto err;
- 		}
-@@ -529,8 +534,8 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
- 		if (page == NULL)
- 			goto err;
- 
--		d = dma_map_single(NULL, page, PAGE_SIZE, DMA_TO_DEVICE);
--		if (dma_mapping_error(NULL, d)) {
-+		d = dma_map_single(dev, page, PAGE_SIZE, DMA_TO_DEVICE);
-+		if (dma_mapping_error(dev, d)) {
- 			free_page((unsigned long)page);
- 			goto err;
- 		}
-@@ -829,6 +834,7 @@ static int ep93xx_eth_probe(struct platform_device *pdev)
- 	}
- 	ep = netdev_priv(dev);
- 	ep->dev = dev;
-+	ep->dma_dev = &pdev->dev;
- 	netif_napi_add(dev, &ep->napi, ep93xx_poll, 64);
- 
- 	platform_set_drvdata(pdev, dev);
 -- 
 1.7.4.4
