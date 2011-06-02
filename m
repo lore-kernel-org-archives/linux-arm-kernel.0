@@ -1,41 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Jun 2011 14:04:06 +0100
-Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
-In-Reply-To: <4DE788B2.5060308@ti.com>
-References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
-	<20110602094622.GS3660@n2100.arm.linux.org.uk>
-	<4DE7637B.3060901@stericsson.com>
-	<20110602110137.GU3660@n2100.arm.linux.org.uk>
-	<4DE77D9A.6090301@stericsson.com> <4DE788B2.5060308@ti.com>
-Message-ID: <20110602130406.GW3660@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 2 Jun 2011 14:08:17 +0100
+Subject: [PATCH] Disable -fconserve-stack on ARM
+In-Reply-To: <20110531180107.GA9261@alboin.amr.corp.intel.com>
+References: <1306429854.26735.9.camel@e102144-lin.cambridge.arm.com>
+	<alpine.LFD.2.00.1105261650330.3207@xanadu.home>
+	<20110526215101.GL24876@n2100.arm.linux.org.uk>
+	<20110527083806.GA21100@e102109-lin.cambridge.arm.com>
+	<20110527085414.GP24876@n2100.arm.linux.org.uk>
+	<20110527095111.GC21100@e102109-lin.cambridge.arm.com>
+	<yw1xlixse2fl.fsf@unicorn.mansr.com>
+	<20110528153417.GB25869@alboin.amr.corp.intel.com>
+	<20110531163026.GB771@e102109-lin.cambridge.arm.com>
+	<20110531180107.GA9261@alboin.amr.corp.intel.com>
+Message-ID: <20110602130816.GB8343@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2011 at 06:27:22PM +0530, Santosh Shilimkar wrote:
-> Earlier this year at ELC SFO, I had a discussion with
-> John and Thomas on how to have a high-resolution clock-source
-> and a low-resolution clock-source working together to cover
-> the low power scenario and still manage to get the highest
-> timer resolution.
-> The idea was to do dynamic switching of clock-source
-> which initially looked simple. Here the idea was to
-> have this working for suspend and as well as cupidle.
+On Tue, May 31, 2011 at 07:01:07PM +0100, Andi Kleen wrote:
+> Disable -fconserve-stack on ARM v2
+> 
+> There are reports that -fconserve-stack misaligns variables on the stack.
+> Disable it for ARM to work around this gcc bug.
+> 
+> v2: Move top level flags definition up
+> Signed-off-by: Andi Kleen <ak@linux.intel.com>
 
-I don't think you can do this, because you'll lose precision whenever you
-switch from the high resolution clocksource to the low resolution
-clocksource.
+It seems to disable the -fconserve-stack on ARM.
 
-While you can quickly update the current time of day from the highres one,
-the lowres may or may not be a long way from its next tick rollover.  So
-you lose the precision whenever you switch.
-
-However, over a suspend/resume cycle, the precision loss is normally very
-small compared to the time which you have been suspended, so the %age
-error also becomes very small.
-
-With cpuidle, it becomes a completely different matter.  Here, the %age
-error is much larger because of the smaller sleep periods, and chances
-are we can't wait for the low-res timer to change.
-
-So if you're using cpuidle, you really need a clocksource which runs
-continuously, even in whatever states cpuidle drops you into.
+Tested-by: Catalin Marinas <catalin.marinas@arm.com>
