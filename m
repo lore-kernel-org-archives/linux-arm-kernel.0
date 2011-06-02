@@ -1,133 +1,56 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu,  2 Jun 2011 21:59:36 +0300
-Subject: [PATCH v2 3/5] net: ep93xx_eth: allocate buffers using kmalloc()
+Date: Thu,  2 Jun 2011 21:59:37 +0300
+Subject: [PATCH v2 4/5] net: ep93xx_eth: drop GFP_DMA from call to
+	dma_alloc_coherent()
 In-Reply-To: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
 References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-Message-ID: <7b20107efa24e0a0c956663ddc70b2189f64c04b.1307040443.git.mika.westerberg@iki.fi>
+Message-ID: <c2142b13f03e2d183a4f28b9b2b8fc81b30530a8.1307040443.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We can use simply kmalloc() to allocate the buffers. This also simplifies the
-code and allows us to perform DMA sync operations more easily.
+Commit a197b59ae6e8 (mm: fail GFP_DMA allocations when ZONE_DMA is not
+configured) made page allocator to return NULL if GFP_DMA is set but
+CONFIG_ZONE_DMA is disabled.
 
-Memory is allocated with only GFP_KERNEL since there are no DMA allocation
-restrictions on this platform.
+This causes ep93xx_eth to fail:
+
+ WARNING: at mm/page_alloc.c:2251 __alloc_pages_nodemask+0x11c/0x638()
+ Modules linked in:
+ [<c0035498>] (unwind_backtrace+0x0/0xf4) from [<c0043da4>] (warn_slowpath_common+0x48/0x60)
+ [<c0043da4>] (warn_slowpath_common+0x48/0x60) from [<c0043dd8>] (warn_slowpath_null+0x1c/0x24)
+ [<c0043dd8>] (warn_slowpath_null+0x1c/0x24) from [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638)
+ [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638) from [<c00366fc>] (__dma_alloc+0x8c/0x3ec)
+ [<c00366fc>] (__dma_alloc+0x8c/0x3ec) from [<c0036adc>] (dma_alloc_coherent+0x54/0x60)
+ [<c0036adc>] (dma_alloc_coherent+0x54/0x60) from [<c0227808>] (ep93xx_open+0x20/0x864)
+ [<c0227808>] (ep93xx_open+0x20/0x864) from [<c0283144>] (__dev_open+0xb8/0x108)
+ [<c0283144>] (__dev_open+0xb8/0x108) from [<c0280528>] (__dev_change_flags+0x70/0x128)
+ [<c0280528>] (__dev_change_flags+0x70/0x128) from [<c0283054>] (dev_change_flags+0x10/0x48)
+ [<c0283054>] (dev_change_flags+0x10/0x48) from [<c001a720>] (ip_auto_config+0x190/0xf68)
+ [<c001a720>] (ip_auto_config+0x190/0xf68) from [<c00233b0>] (do_one_initcall+0x34/0x18c)
+ [<c00233b0>] (do_one_initcall+0x34/0x18c) from [<c0008400>] (kernel_init+0x94/0x134)
+ [<c0008400>] (kernel_init+0x94/0x134) from [<c0030858>] (kernel_thread_exit+0x0/0x8)
+
+Since there is no restrictions for DMA on ep93xx, we can fix this by just
+removing the GFP_DMA flag from the call.
 
 Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- drivers/net/arm/ep93xx_eth.c |   51 ++++++++++++++++-------------------------
- 1 files changed, 20 insertions(+), 31 deletions(-)
+ drivers/net/arm/ep93xx_eth.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
-index 8779d3b..0c9df11 100644
+index 0c9df11..56b51a1 100644
 --- a/drivers/net/arm/ep93xx_eth.c
 +++ b/drivers/net/arm/ep93xx_eth.c
-@@ -463,36 +463,32 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
- 	struct device *dev = ep->dma_dev;
+@@ -495,7 +495,7 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
  	int i;
  
--	for (i = 0; i < RX_QUEUE_ENTRIES; i += 2) {
-+	for (i = 0; i < RX_QUEUE_ENTRIES; i++) {
- 		dma_addr_t d;
- 
- 		d = ep->descs->rdesc[i].buf_addr;
- 		if (d)
--			dma_unmap_single(dev, d, PAGE_SIZE, DMA_FROM_DEVICE);
-+			dma_unmap_single(dev, d, PKT_BUF_SIZE, DMA_FROM_DEVICE);
- 
- 		if (ep->rx_buf[i] != NULL)
--			free_page((unsigned long)ep->rx_buf[i]);
-+			kfree(ep->rx_buf[i]);
- 	}
- 
--	for (i = 0; i < TX_QUEUE_ENTRIES; i += 2) {
-+	for (i = 0; i < TX_QUEUE_ENTRIES; i++) {
- 		dma_addr_t d;
- 
- 		d = ep->descs->tdesc[i].buf_addr;
- 		if (d)
--			dma_unmap_single(dev, d, PAGE_SIZE, DMA_TO_DEVICE);
-+			dma_unmap_single(dev, d, PKT_BUF_SIZE, DMA_TO_DEVICE);
- 
- 		if (ep->tx_buf[i] != NULL)
--			free_page((unsigned long)ep->tx_buf[i]);
-+			kfree(ep->tx_buf[i]);
- 	}
- 
- 	dma_free_coherent(dev, sizeof(struct ep93xx_descs), ep->descs,
- 							ep->descs_dma_addr);
- }
- 
--/*
-- * The hardware enforces a sub-2K maximum packet size, so we put
-- * two buffers on every hardware page.
-- */
- static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
- {
- 	struct device *dev = ep->dma_dev;
-@@ -503,48 +499,41 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+ 	ep->descs = dma_alloc_coherent(dev, sizeof(struct ep93xx_descs),
+-				&ep->descs_dma_addr, GFP_KERNEL | GFP_DMA);
++				&ep->descs_dma_addr, GFP_KERNEL);
  	if (ep->descs == NULL)
  		return 1;
  
--	for (i = 0; i < RX_QUEUE_ENTRIES; i += 2) {
--		void *page;
-+	for (i = 0; i < RX_QUEUE_ENTRIES; i++) {
-+		void *buf;
- 		dma_addr_t d;
- 
--		page = (void *)__get_free_page(GFP_KERNEL | GFP_DMA);
--		if (page == NULL)
-+		buf = kmalloc(PKT_BUF_SIZE, GFP_KERNEL);
-+		if (buf == NULL)
- 			goto err;
- 
--		d = dma_map_single(dev, page, PAGE_SIZE, DMA_FROM_DEVICE);
-+		d = dma_map_single(dev, buf, PKT_BUF_SIZE, DMA_FROM_DEVICE);
- 		if (dma_mapping_error(dev, d)) {
--			free_page((unsigned long)page);
-+			kfree(buf);
- 			goto err;
- 		}
- 
--		ep->rx_buf[i] = page;
-+		ep->rx_buf[i] = buf;
- 		ep->descs->rdesc[i].buf_addr = d;
- 		ep->descs->rdesc[i].rdesc1 = (i << 16) | PKT_BUF_SIZE;
--
--		ep->rx_buf[i + 1] = page + PKT_BUF_SIZE;
--		ep->descs->rdesc[i + 1].buf_addr = d + PKT_BUF_SIZE;
--		ep->descs->rdesc[i + 1].rdesc1 = ((i + 1) << 16) | PKT_BUF_SIZE;
- 	}
- 
--	for (i = 0; i < TX_QUEUE_ENTRIES; i += 2) {
--		void *page;
-+	for (i = 0; i < TX_QUEUE_ENTRIES; i++) {
-+		void *buf;
- 		dma_addr_t d;
- 
--		page = (void *)__get_free_page(GFP_KERNEL | GFP_DMA);
--		if (page == NULL)
-+		buf = kmalloc(PKT_BUF_SIZE, GFP_KERNEL);
-+		if (buf == NULL)
- 			goto err;
- 
--		d = dma_map_single(dev, page, PAGE_SIZE, DMA_TO_DEVICE);
-+		d = dma_map_single(dev, buf, PKT_BUF_SIZE, DMA_TO_DEVICE);
- 		if (dma_mapping_error(dev, d)) {
--			free_page((unsigned long)page);
-+			kfree(buf);
- 			goto err;
- 		}
- 
--		ep->tx_buf[i] = page;
-+		ep->tx_buf[i] = buf;
- 		ep->descs->tdesc[i].buf_addr = d;
--
--		ep->tx_buf[i + 1] = page + PKT_BUF_SIZE;
--		ep->descs->tdesc[i + 1].buf_addr = d + PKT_BUF_SIZE;
- 	}
- 
- 	return 0;
 -- 
 1.7.4.4
