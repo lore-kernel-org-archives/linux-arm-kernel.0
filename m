@@ -1,93 +1,95 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 2 Jun 2011 15:09:11 +0100
-Subject: [PATCH] arm: vexpress: move v2m clock init to init_early
-In-Reply-To: <1306362653-25668-1-git-send-email-robherring2@gmail.com>
-References: <1306362653-25668-1-git-send-email-robherring2@gmail.com>
-Message-ID: <20110602140904.GA2156@arm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 2 Jun 2011 08:59:10 -0600
+Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
+	gpio's from the device tree.
+In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF0498E1C22D@HQMAIL01.nvidia.com>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205721.21000.78599.stgit@riker>
+	<20110528012427.GB5971@opensource.wolfsonmicro.com>
+	<BANLkTinKLcYmStvBEGDcN84BapJXe5Y5bg@mail.gmail.com>
+	<20110530033826.GE4130@opensource.wolfsonmicro.com>
+	<20110530061155.GC23517@ponder.secretlab.ca>
+	<4DE336A1.5040509@firmworks.com>
+	<20110530070138.GA5036@opensource.wolfsonmicro.com>
+	<8d2515b13c817cc956b185d043bcef00@kernel.crashing.org>
+	<BANLkTi=hkScxYpt449CQCky+bLU3UvkC_A@mail.gmail.com>
+	<4DE403C5.7060003@firmworks.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF0498E1C22D@HQMAIL01.nvidia.com>
+Message-ID: <BANLkTi=vdMg+KbtyS+WiG44S4i34zzWwsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, May 25, 2011 at 05:30:53PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Commit 7ff550de99141cbd3be0129d563cc4554fdde9f6 breaks vexpress booting. The
-> v2m clock table needs to be setup in init_early before the timer
-> initialization occurs.
-> 
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  arch/arm/mach-vexpress/v2m.c |   15 +++++++--------
->  include/linux/libata.h       |    4 ++--
->  2 files changed, 9 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/mach-vexpress/v2m.c b/arch/arm/mach-vexpress/v2m.c
-> index 9d9d4af..cded33c 100644
-> --- a/arch/arm/mach-vexpress/v2m.c
-> +++ b/arch/arm/mach-vexpress/v2m.c
-> @@ -46,12 +46,6 @@ static struct map_desc v2m_io_desc[] __initdata = {
->  	},
->  };
->  
-> -static void __init v2m_init_early(void)
-> -{
-> -	ct_desc->init_early();
-> -	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
-> -}
-> -
->  static void __init v2m_timer_init(void)
->  {
->  	u32 scctrl;
-> @@ -379,6 +373,13 @@ static struct clk_lookup v2m_lookups[] = {
->  	},
->  };
->  
-> +static void __init v2m_init_early(void)
-> +{
-> +	ct_desc->init_early();
-> +	clkdev_add_table(v2m_lookups, ARRAY_SIZE(v2m_lookups));
-> +	versatile_sched_clock_init(MMIO_P2V(V2M_SYS_24MHZ), 24000000);
-> +}
-> +
->  static void v2m_power_off(void)
->  {
->  	if (v2m_cfg_write(SYS_CFG_SHUTDOWN | SYS_CFG_SITE_MB, 0))
-> @@ -432,8 +433,6 @@ static void __init v2m_init(void)
->  {
->  	int i;
->  
-> -	clkdev_add_table(v2m_lookups, ARRAY_SIZE(v2m_lookups));
-> -
->  	platform_device_register(&v2m_pcie_i2c_device);
->  	platform_device_register(&v2m_ddc_i2c_device);
->  	platform_device_register(&v2m_flash_device);
+On Tue, May 31, 2011 at 11:55 AM, Stephen Warren <swarren@nvidia.com> wrote:
+> Mitch Bradley wrote at Monday, May 30, 2011 2:53 PM:
+>> ...
+>> GPIOs share the need to "point across the tree to different nodes", but
+>> it is unclear that there is a need for a entirely different hierarchy.
+>>
+>> That suggests the possibility of using the device tree addressing
+>> mechanism as much as possible. ?Normal device tree addresses could be
+>> used to specify GPIO numbers.
+>>
+>> Suppose we have:
+>>
+>> ? ? gpio-controller1: gpio-controller {
+>> ? ? ? ? #address-cells = <2>;
+>> ? ? ? ? #mode-cells = <2>;
+>> ? ? ? ? gpio1: gpio at 12,0 {
+>> ? ? ? ? ? ? reg = <12 0>;
+>> ? ? ? ? ? ? mode = <55 66>;
+>> ? ? ? ? ? ? usage = "Audio Codec chip select"; ?/* Optional */
+>> ? ? ? ? }
+>> ? ? };
+>> ? ? gpio-controller2: gpio-controller {
+>> ? ? ? ? #address-cells = <1>;
+>> ? ? ? ? #mode-cells = <1>;
+>> ? ? ? ? gpio2: gpio at 4 {
+>> ? ? ? ? ? ? reg = <4>;
+>> ? ? ? ? ? ? #mode-cells = <1>;
+>> ? ? ? ? }
+>> ? ? };
+>
+> A quick note on the way that Tegra's devicetree files are broken up in
+> Grant's devicetree/test branch:
+>
+> * There's "tegra250.dtsi" which defines everything on the Tegra SoC
+> ?itself.
+> * There's a per-board e.g. harmony.dts which includes tegra250.dtsi,
+> ?And additionally:
+> ?** Defines all devices on the board
+> ?** Hence, defines the usage of e.g. all the Tegra GPIOs for the
+> ? ? board.
+>
+> I like this model, because it shares the complete definition of the
+> Tegra SoC in a single file, rather than duplicating it with cut/paste
+> into every board file.
+>
+> As such, the code quoted above would be in tegra250.dtsi.
+>
+> This has two relevant implications here:
+>
+> 1) The names "gpio1" and "gpio2" would be driven by the Tegra SoC's
+> naming of those GPIO pins, and not any board-specific naming, e.g.
+> "tegra_gpio_px1", "tegra_gpio_pb5". Equally, the usage comment would
+> be at the client/reference site, not the GPIO definition site.
+>
+> 2) The GPIO mode should be defined by the client/user of the GPIO, not
+> the SoC's definition of that GPIO.
+>
+> Without those two conditions, we couldn't share anything through
+> tegra250.dtsi.
 
-Disregarding the libata stuff, 
+It's worth noting that the board file can override anything in
+tegra250.dtsi, even in the SoC nodes, so if needed properties can be
+added or modified in the SoC's description of the gpio controller.
 
-Tested-by: Dave Martin <dave.martin@linaro.org>
+>
+> Just re-iterating: I'd prefer mode to be solely in the reference, and
+> not in the gpio controller.
+>
+> Does this SoC/board segregation make sense to everyone? Obviously it
+> does to me:-)
 
-Cheers
----Dave
+It certainly does to me.  :-)
 
-> diff --git a/include/linux/libata.h b/include/linux/libata.h
-> index 04f32a3..df6af22 100644
-> --- a/include/linux/libata.h
-> +++ b/include/linux/libata.h
-> @@ -53,8 +53,8 @@
->   * compile-time options: to be removed as soon as all the drivers are
->   * converted to the new debugging mechanism
->   */
-> -#undef ATA_DEBUG		/* debugging output */
-> -#undef ATA_VERBOSE_DEBUG	/* yet more debugging output */
-> +#define ATA_DEBUG		/* debugging output */
-> +#define ATA_VERBOSE_DEBUG	/* yet more debugging output */
->  #undef ATA_IRQ_TRAP		/* define to ack screaming irqs */
->  #undef ATA_NDEBUG		/* define to disable quick runtime checks */
->  
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+g.
