@@ -1,47 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Jun 2011 22:43:22 +0100
-Subject: [RFC 1/2] ARM:Tegra: Device Tree Support: Initialize the audio
-	card from the device tree.
-In-Reply-To: <BANLkTikGp_O-Wd3nMhbV+-RLeXZoWeB6eQ@mail.gmail.com>
-References: <20110527205444.21000.90209.stgit@riker>
-	<20110527205706.21000.34832.stgit@riker>
-	<BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
-	<BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
-	<BANLkTikWpiY_o27OF-Jxvq7iPeWzrAYOsQ@mail.gmail.com>
-	<20110602160445.GA8373@ponder.secretlab.ca>
-	<BANLkTikGp_O-Wd3nMhbV+-RLeXZoWeB6eQ@mail.gmail.com>
-Message-ID: <20110602214322.GC10532@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 3 Jun 2011 00:01:20 +0200
+Subject: [GIT PULL] scalable TWD localtimer
+Message-ID: <BANLkTik0TVpfax1Fe8c_6A9SFUNzfDbxyw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2011 at 12:21:50AM +0800, Barry Song wrote:
-> Arnd has required me to use device tree in our new SoC for the coming
-> upstream. so i am trying to define a property like clock = "uart" in
-> dts. then in drivers,
-> i get this  string by:
-> clk = of_get_property(np, "clock", NULL);
-> then request this clock by clk_get().
+Hi Russell,
 
-This is entirely wrong.  clk_get() takes two things.  It takes a struct
-device.  We should know what the struct device is (provided they're named
-in a stable manner.)
+please consider pulling this for the -rc series since I see this as a
+horrible bug that Thomas just fixed the infrastructure to properly
+counter the week before the merge window.
 
-The other parameter, the string, is up to the driver.  It's not a device
-property.  It's not a SoC-wide clock name.  It's a connection name for
-the clock on the device.  This won't change from one instance of the
-device to another instance of the device - it's effectively a constant.
+You probably know the story but basically there is one clockline
+into the ARM-supplied MPCore thing, and it inevitably also clocks
+the TWD. Sadly that includes the localtimer, which will make all
+clockevents scale in both directions, firing too late or too early
+as compared to desired wall-clock time (or system clocksource) as
+the clock speed of the core is changed. Right now there is no
+compensation whatsoever for this so to run the system reliably
+on v3.0-rc1, cpufreq has to be disabled.
 
-So there's no point in having the DT describe that name - that's out of
-its realm.
+Thomas and Colin did the grunt work, I added a scaling smp_twd
+clock reflecting the Ux500 cpufreq changes, and now it is rock solid
+as far as I can tell.
 
-One of the problems is that clk_get() hides the mapping of device+connection
-internally, which it has had to as we haven't had a device tree to look
-things up.
+I couldn't test this in next since it messes around in your tree,
+if you don't think this is -rc material please consider pulling into
+the devel branch so we get early testing of it in -next as an
+alternative route to mainline.
 
-In essence, clk_get() is looking up a property (the clock connection name)
-for the struct device.  When clks get converted to the device tree, the
-DT stuff should hook inside clk_get() to do a property lookup to discover
-which clock the driver wants.
+The following changes since commit 55922c9d1b84b89cb946c777fddccb3247e7df2c:
 
-Drivers should definitely not be looking up a property in the device tree
-and using that as a connection name into clk_get().
+  Linux 3.0-rc1 (2011-05-29 17:43:36 -0700)
+
+are available in the git repository at:
+ git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
+twd-clockevents
+
+Colin Cross (1):
+      ARM: smp_twd: Reconfigure clockevents after cpufreq change
+
+Linus Walleij (1):
+      mach-ux500: register a clock for the SMP TWD
+
+ arch/arm/kernel/smp_twd.c   |   90 ++++++++++++++++++++++++++++++++++++++++---
+ arch/arm/mach-ux500/clock.c |   48 +++++++++++++++++++++++
+ 2 files changed, 132 insertions(+), 6 deletions(-)
