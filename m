@@ -1,142 +1,65 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Thu, 2 Jun 2011 16:44:02 +0100 (BST)
-Subject: using identity_mapping_add & switching MMU state - how ?
-Message-ID: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
+From: wd@denx.de (Wolfgang Denk)
+Date: Thu, 02 Jun 2011 17:46:59 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+	<20110601210855.663A3CEFB4E@gemini.denx.de>
+	<BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com>
+Message-ID: <20110602154659.697EFD09481@gemini.denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Dear Matt,
 
+In message <BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com> you wrote:
+>
+> In this case, just a load address in the uImage header of 0 (or some
+> other totally-impossible value like 0xffffffff
+> in case 0 is perfectly valid somewhere) and then just jump to the
+> entry point by deriving the value from the
+> header size - based on the fact that ARM images are PIC and the Linux
+> kernel always puts the entry point
+> at 0 offset - to the address of the uImage header + size of the uImage
+> header (which U-Boot knows already
+> from parsing the header).
 
-I'm trying to find a way to do an MMU off / on transition.
+I'm not a friend of using magic values that are "totally-impossible".
+This is confusing, and here it is not needed.
 
-What I want to do is to call cpu_do_resume() from the hibernation restore 
-codepath.
+If we could agree to interpret load address and entry point as
+offsets, the only remaining problem is to find out if we can use a
+common offset.
 
-I've succeeded to make this work by adding a test whether the MMU is 
-already on when cpu_resume_mmu() is called.
+> So the solution is
+> 
+> * Assuming all ARM kernels are PIC (guaranteed, right?)
+> * Assuming all ARM kernels start at entry point 0 (true for Image and zImage)
 
-I'm not sure that sort of thing is proper; hence I've been trying to find 
-a way to disable the MMU before calling cpu_do_resume().
+You mean offset 0 to the start of the image here.
 
-Can't seem to get this to work though; even though I'm creating a separate 
-MMU context that's given 1:1 mappings for all of kernel code/data, 
-execution still hangs as soon as I enable the code section below that 
-switches the MMU off.
+> * Assuming there is a globally invalid magic value you can set in the
+> uImage header as load address (not sure)
 
+I dislike this.
 
-What I have at the moment is code that looks like this:
+> Set that magic value, U-Boot magically derives the correct entry point
+> as the first address of the payload,
+> and jumps to it?
 
-==============================================================================
-[ ... ]
-unsigned long notrace __swsusp_arch_restore_image(void)
-{
- 	extern struct pbe *restore_pblist;
- 	struct pbe *pbe;
+That means you would not want to encode a load address in the image,
+and always run from the current location, no matter where it is?
 
- 	/* __swsusp_pg_dir has been created using pgd_alloc(&init_mm); */
+Best regards,
 
- 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
+Wolfgang Denk
 
- 	for (pbe = restore_pblist; pbe; pbe = pbe->next)
- 		copy_page(pbe->orig_address, pbe->address);
-
- 	flush_tlb_all();
- 	flush_cache_all();
-
- 	identity_mapping_add(__swsusp_pg_dir, __pa(_stext), __pa(_etext));
- 	identity_mapping_add(__swsusp_pg_dir, __pa(_sdata), __pa(_edata));
-
- 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
-
- 	flush_tlb_all();
- 	flush_cache_all();
-
- 	cpu_proc_fin();		/* turns caches off */
-
- 	/* caller requires v:p offset to calculate physical addresses */
- 	return (unsigned long)(PHYS_OFFSET - PAGE_OFFSET);
-}
-
-[ ... ]
-ENTRY(swsusp_arch_resume)
- 	mov	r2, #PSR_I_BIT | PSR_F_BIT | SVC_MODE
- 	msr	cpsr_c, r2
- 	/*
- 	 * Switch stack to a nosavedata region to make sure image restore
- 	 * doesn't clobber it underneath itself.
- 	 */
- 	ldr	sp, =(__swsusp_resume_stk + PAGE_SIZE / 2)
- 	bl	__swsusp_arch_restore_image
-
- 	/*
- 	 * Restore the CPU registers.
- 	 */
- 	mov	r1, r0
- 	ldr	r0, =(__swsusp_arch_ctx + (NREGS * 4))
-/*
-  * This is what I'm trying to switch off; yet, doing so makes things hang
-  */
-#if 0
- 	ldr	r2, =cpu_do_resume
- 	sub	r2, r1			@ __pa()
- 	ldr	r3, =.Lmmu_is_off
- 	sub	r3, r1			@ __pa()
- 	sub	r0, r1			@ __pa()
- 	ldr	lr, =.Lpost_mmu
- 	mrc	p15, 0, r1, c1, c0, 0
- 	bic	r1, #CR_M
- 	mcr	p15, 0, r1, c1, c0, 0	@ MMU OFF
-
- 	mrc	p15, 0, r1, c2, c0, 0	@ queue a dependency on CP15
-         sub     pc, r3, r1, lsr #32	@ to local label, phys addr
-.ltorg
-.align 5
-.Lmmu_is_off:
- 	mov	pc, r2			@ jump to phys cpu_v6_do_resume
-.Lpost_mmu:
-#else
- 	bl	cpu_do_resume
-#endif
- 	ldr	r0, =__swsusp_arch_ctx
- 	ldmia	r0!, {r1-r11,lr}	@ nonvolatile regs
- 	ldr	sp, [r0]		@ stack
- 	msr	cpsr, r1
- 	msr	spsr, r2
-
- 	mov	r0, #0
- 	stmfd	sp!, {r0, lr}
- 	bl	cpu_init		@ reinitialize other modes
- 	ldmfd	sp!, {r0, pc}
-ENDPROC(swsusp_arch_resume)
-==============================================================================
-
-I.e. it performs the steps:
-
- 	- flush all caches, tlbs
- 	- setup identity mappings for all kernel code & data
- 	- switch to a self-contained pagedir
- 	- flush again
- 	- finish cpu (disable caches)
- 	- switch MMU off, re-read config reg to force necessary wait,
- 	  and jump to physical address of "self".
-
-
-As said, things work just fine if simply doing the "bl cpu_do_resume" and 
-adding a "MMU already on" check to cpu_resume_mmu().
-
-
-I must be missing something there; I've been reading the ARM kexec 
-postings,
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/020183.html
-
-for the basic idea, and used the style from smp.c (alloc a temporary 
-pagedir, create identity mappings there). Still, there's something not 
-quite right ...
-
-
-Any ideas what I'm missing ?
-Thanks,
-
-FrankH.
+-- 
+DENX Software Engineering GmbH,     MD: Wolfgang Denk & Detlev Zundel
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+Power is danger.
+	-- The Centurion, "Balance of Terror", stardate 1709.2
