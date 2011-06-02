@@ -1,58 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 2 Jun 2011 10:46:22 +0100
-Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
-In-Reply-To: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
-References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
-Message-ID: <20110602094622.GS3660@n2100.arm.linux.org.uk>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 2 Jun 2011 15:20:56 +0530
+Subject: [PATCH 4/5] ARM: S3C6410: Support 800MHz operation in cpufreq
+In-Reply-To: <BANLkTimC=MrmjinzufrnOMSAgiQvVKdWhA@mail.gmail.com>
+References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
+	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<037201cc2046$f5cc53b0$e164fb10$@com>
+	<20110601104042.GA15387@opensource.wolfsonmicro.com>
+	<038c01cc20b9$a55a5120$f00ef360$@com>
+	<20110602082830.GA3085@opensource.wolfsonmicro.com>
+	<039601cc2109$319c9770$94d5c650$@com>
+	<BANLkTimC=MrmjinzufrnOMSAgiQvVKdWhA@mail.gmail.com>
+Message-ID: <BANLkTikpO9VR9tqJT_bROA_KfdxOBS7U0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2011 at 11:34:31AM +0200, Mattias Wallin wrote:
-> The Multi Timer Unit (MTU) is currently used as clocksource and sched_clk
-> for the u8500 machine. The MTU block loose power during cpuidle sleep states
-> so an alternate clocksource is needed and these patches adds the db8500 PRCMU
-> timer.
+On Thu, Jun 2, 2011 at 3:14 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+>>>
+>>> It's really unfortunate that there's no software visible method I'm
+>>> aware of :/
+>> Unfortunately, There is no method to detect 800Mhz s3c6410 by software.
+>
+> Then how about to introduce the software flags. and set it at each
+> board. It can support the 800MHz.
+> Also this flags are handled at cpufreq drivers properly.
+>
+> How do you think?
 
-Why don't we just find a way of fixing sched_clock so that the value
-doesn't reset over a suspend/resume cycle?  IOW, lets fix the problem
-for _everyone_ rather than only fixing it for one platform at a time.
-
-Could you try this patch to check whether sched_clock() behaves better
-across a suspend/resume cycle please?
-
- arch/arm/kernel/sched_clock.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/sched_clock.c b/arch/arm/kernel/sched_clock.c
-index 9a46370..4be4019 100644
---- a/arch/arm/kernel/sched_clock.c
-+++ b/arch/arm/kernel/sched_clock.c
-@@ -10,6 +10,7 @@
- #include <linux/jiffies.h>
- #include <linux/kernel.h>
- #include <linux/sched.h>
-+#include <linux/syscore_ops.h>
- #include <linux/timer.h>
- 
- #include <asm/sched_clock.h>
-@@ -72,3 +73,20 @@ void __init sched_clock_postinit(void)
- {
- 	sched_clock_poll(sched_clock_timer.data);
- }
-+
-+static int sched_clock_suspend(void)
-+{
-+	sched_clock_poll(sched_clock_timer.data);
-+	return 0;
-+}
-+
-+static struct syscore_ops sched_clock_ops = {
-+	.suspend	= sched_clock_suspend,
-+};
-+
-+static int __init sched_clock_syscore_init(void)
-+{
-+	register_syscore_ops(&sched_clock_ops);
-+	return 0;
-+}
-+device_initcall(sched_clock_syscore_init);
+Two SMDKs may have different versions of s3c6410.
+Which file do we want to set the flags in ?
