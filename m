@@ -1,72 +1,41 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 2 Jun 2011 21:49:47 +0200
-Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
-Message-ID: <201106022149.47936.heiko@sntech.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Jun 2011 21:16:11 +0100
+Subject: using identity_mapping_add & switching MMU state - how ?
+In-Reply-To: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
+Message-ID: <20110602201611.GA10532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 02, 2011 at 04:44:02PM +0100, Frank Hofmann wrote:
+> I'm trying to find a way to do an MMU off / on transition.
+>
+> What I want to do is to call cpu_do_resume() from the hibernation restore 
+> codepath.
+>
+> I've succeeded to make this work by adding a test whether the MMU is  
+> already on when cpu_resume_mmu() is called.
 
-after upgrading my development kernel from 2.6.38 to 3.0rc1 I get flooded (i.e. 
-it never stops) by messages of the form:
+I think you're making things more complicated than they need to be.
 
-mmc1: Got data interrupt 0x00100000 even though no data operation was in 
-progress.
-  sdhci: =========== REGISTER DUMP (mmc1)===========
-  sdhci: Sys addr: 0x37b1b000 | Version:  0x00000401
-  sdhci: Blk size: 0x00007200 | Blk cnt:  0x00000000
-  sdhci: Argument: 0x00010000 | Trn mode: 0x00000033
-  sdhci: Present:  0x01e70002 | Host ctl: 0x00000012
-  sdhci: Power:    0x0000000a | Blk gap:  0x00000000
-  sdhci: Wake-up:  0x00000000 | Clock:    0x0000020f
-  sdhci: Timeout:  0x0000000e | Int stat: 0x00108000
-  sdhci: Int enab: 0x02ff000b | Sig enab: 0x02ff000b
-  sdhci: AC12 err: 0x00000000 | Slot int: 0x00000001
-  sdhci: Caps:     0x05e80080 | Caps_1:   0x00000000
-  sdhci: Cmd:      0x00000d1a | Max curr: 0x00000000
-  sdhci: Host ctl2: 0x00000000
-  sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x37846808
-  sdhci: ===========================================
+> I'm not sure that sort of thing is proper; hence I've been trying to find 
+> a way to disable the MMU before calling cpu_do_resume().
 
+Well, I don't really condone using cpu_do_resume() outside of its
+original context of arch/arm/kernel/sleep.S - the two were written
+to work together, and the processor specific bit is not really
+designed to be used separately.
 
-hardware: S3C2416 based board, mmc0 is an external micro-SD and mmc1 is a
-  mmc1: new high speed MMC card at address 0001
-  mmcblk1: mmc1:0001 HYNIX  1.88 GiB 
-  mmcblk1boot0: mmc1:0001 HYNIX  partition 1 256 KiB
-  mmcblk1boot1: mmc1:0001 HYNIX  partition 2 256 KiB
-   mmcblk1: p1 p2 p3
-   mmcblk1boot1: unknown partition table
-   mmcblk1boot0: unknown partition table
+> Can't seem to get this to work though; even though I'm creating a 
+> separate MMU context that's given 1:1 mappings for all of kernel 
+> code/data, execution still hangs as soon as I enable the code section 
+> below that switches the MMU off.
 
-it uses therefore the sdhci-s3c driver.
+I'm not surprised - cpu_do_resume() has some special entry requirements
+which are not obvious by way of the rest of the code in
+arch/arm/kernel/sleep.S.  As I say, cpu_do_resume is not designed to be
+used by other code other than what's in that file.
 
-
-I did some prodding in the code and found the following peculiarities:
-
-- When I remove Kyungmins AUTO_CMD12-quirk in sdhci-s3c it seems I get one 
-functional boot and have only the following messages in the kernel log
-
-  mmcblk1boot0: retrying using single block read
-  mmc1: ADMA error
-  mmcblk1boot0: error -5 transferring data, sector 448, nr 32, card status 
-0x900
-  end_request: I/O error, dev mmcblk1boot0, sector 448
-  Buffer I/O error on device mmcblk1boot0, logical block 56
-  mmcblk1boot1: retrying using single block read
-  mmc1: ADMA error
-  mmcblk1boot1: error -5 transferring data, sector 448, nr 32, card status 
-0x900
-  end_request: I/O error, dev mmcblk1boot1, sector 448
-
-But after a soft reset the irq message flood seems to return.
-
-- When I completely remove the boot partition registration in 
-mmc_blk_alloc_parts() in card/block.c it seems that everything return to 
-normal, i.e. no strange messages at all
-
-
-I'm not sure if this is a problem of only my board or if it happens on more 
-hardware.
-
-
-Heiko
+But... it requires the v:p offset in r1, and the _virtual_ address of
+the code to continue at in lr.  These are specifically saved for it by
+cpu_suspend in arch/arm/kernel/sleep.S.
