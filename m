@@ -1,19 +1,21 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed,  1 Jun 2011 17:19:29 -0700
-Subject: [PATCH v4 03/18] I2C: OMAP2+: Introduce I2C IP versioning constants
+Date: Wed,  1 Jun 2011 17:19:30 -0700
+Subject: [PATCH v4 04/18] I2C: OMAP2+: Tag all OMAP2+ hwmod defintions with
+	I2C IP revision
 In-Reply-To: <1306973984-15165-1-git-send-email-khilman@ti.com>
 References: <1306973984-15165-1-git-send-email-khilman@ti.com>
-Message-ID: <1306973984-15165-4-git-send-email-khilman@ti.com>
+Message-ID: <1306973984-15165-5-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Green <andy@warmcat.com>
 
-These represent the two kinds of (incompatible) OMAP I2C
-peripheral unit in use so far.
-
-The constants are in linux/i2c-omap.h so the omap i2c driver can have
-them too.
+Since we cannot trust (or even reliably find) the OMAP I2C
+peripheral unit's own revision register, we must inform the
+OMAP i2c driver of which IP version it is running on.  We
+do this by tagging the omap_hwmod_class for i2c on all the
+OMAP2+ platform / cpu specific hwmod init and passing it up
+to the driver (next patches).
 
 Cc: patches at linaro.org
 Cc: Ben Dooks <ben-linux@fluff.org>
@@ -22,44 +24,59 @@ Signed-off-by: Andy Green <andy.green@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/include/plat/i2c.h |    1 +
- include/linux/i2c-omap.h              |   12 ++++++++++++
- 2 files changed, 13 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |    1 +
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    1 +
+ 4 files changed, 4 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/include/plat/i2c.h b/arch/arm/plat-omap/include/plat/i2c.h
-index 878d632..a1d3d06 100644
---- a/arch/arm/plat-omap/include/plat/i2c.h
-+++ b/arch/arm/plat-omap/include/plat/i2c.h
-@@ -22,6 +22,7 @@
- #define __ASM__ARCH_OMAP_I2C_H
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2420_data.c b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+index c4d0ae8..2223c44 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2420_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2420_data.c
+@@ -1447,6 +1447,7 @@ static struct omap_hwmod_class_sysconfig i2c_sysc = {
+ static struct omap_hwmod_class i2c_class = {
+ 	.name		= "i2c",
+ 	.sysc		= &i2c_sysc,
++	.rev		= OMAP_I2C_IP_VERSION_1,
+ };
  
- #include <linux/i2c.h>
-+#include <linux/i2c-omap.h>
+ static struct omap_i2c_dev_attr i2c_dev_attr;
+diff --git a/arch/arm/mach-omap2/omap_hwmod_2430_data.c b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+index 0c272be..dbcc36e 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_2430_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_2430_data.c
+@@ -1524,6 +1524,7 @@ static struct omap_hwmod_class_sysconfig i2c_sysc = {
+ static struct omap_hwmod_class i2c_class = {
+ 	.name		= "i2c",
+ 	.sysc		= &i2c_sysc,
++	.rev		= OMAP_I2C_IP_VERSION_1,
+ };
  
- #if defined(CONFIG_I2C_OMAP) || defined(CONFIG_I2C_OMAP_MODULE)
- extern int omap_register_i2c_bus(int bus_id, u32 clkrate,
-diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
-index 7472449..701886d 100644
---- a/include/linux/i2c-omap.h
-+++ b/include/linux/i2c-omap.h
-@@ -3,6 +3,18 @@
+ static struct omap_i2c_dev_attr i2c_dev_attr = {
+diff --git a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+index 78efb59..80839b1 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_3xxx_data.c
+@@ -1460,6 +1460,7 @@ static struct omap_hwmod omap3xxx_uart4_hwmod = {
+ static struct omap_hwmod_class i2c_class = {
+ 	.name = "i2c",
+ 	.sysc = &i2c_sysc,
++	.rev  = OMAP_I2C_IP_VERSION_1,
+ };
  
- #include <linux/platform_device.h>
+ /*
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 5662097..a09ab66 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -2125,6 +2125,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_i2c_sysc = {
+ static struct omap_hwmod_class omap44xx_i2c_hwmod_class = {
+ 	.name	= "i2c",
+ 	.sysc	= &omap44xx_i2c_sysc,
++	.rev	= OMAP_I2C_IP_VERSION_2,
+ };
  
-+/*
-+ * Version 2 of the I2C peripheral unit has a different register
-+ * layout and extra registers.  The ID register in the V2 peripheral
-+ * unit on the OMAP4430 reports the same ID as the V1 peripheral
-+ * unit on the OMAP3530, so we must inform the driver which IP
-+ * version we know it is running on from platform / cpu-specific
-+ * code using these constants in the hwmod class definition.
-+ */
-+
-+#define OMAP_I2C_IP_VERSION_1 1
-+#define OMAP_I2C_IP_VERSION_2 2
-+
- struct omap_i2c_bus_platform_data {
- 	u32		clkrate;
- 	void		(*set_mpu_wkup_lat)(struct device *dev, long set);
+ /* i2c1 */
 -- 
 1.7.4
