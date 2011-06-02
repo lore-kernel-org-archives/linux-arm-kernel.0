@@ -1,36 +1,21 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 2 Jun 2011 10:56:57 +0100
-Subject: [PATCH 4/5] ARM: S3C6410: Support 800MHz operation in cpufreq
-In-Reply-To: <BANLkTikpO9VR9tqJT_bROA_KfdxOBS7U0Q@mail.gmail.com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
-	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<037201cc2046$f5cc53b0$e164fb10$@com>
-	<20110601104042.GA15387@opensource.wolfsonmicro.com>
-	<038c01cc20b9$a55a5120$f00ef360$@com>
-	<20110602082830.GA3085@opensource.wolfsonmicro.com>
-	<039601cc2109$319c9770$94d5c650$@com>
-	<BANLkTimC=MrmjinzufrnOMSAgiQvVKdWhA@mail.gmail.com>
-	<BANLkTikpO9VR9tqJT_bROA_KfdxOBS7U0Q@mail.gmail.com>
-Message-ID: <20110602095656.GC3085@opensource.wolfsonmicro.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 2 Jun 2011 12:54:55 +0300
+Subject: [PATCH v3] ARM: ep93xx: use more reliable CPLD watchdog for
+	reset on ts72xx
+In-Reply-To: <1306868578-3883-1-git-send-email-ynezz@true.cz>
+References: <ADE657CA350FB648AAC2C43247A983F001F381FC4955@AUSP01VMBX24.collaborationhost.net>
+	<1306868578-3883-1-git-send-email-ynezz@true.cz>
+Message-ID: <20110602095455.GB2954@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2011 at 03:20:56PM +0530, Jassi Brar wrote:
-> On Thu, Jun 2, 2011 at 3:14 PM, Kyungmin Park <kmpark@infradead.org> wrote:
+On Tue, May 31, 2011 at 09:02:58PM +0200, Petr ?tetiar wrote:
+> On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
+> available, so use this one to reset the board instead of the soft reset in
+> CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
+> while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
+> so far.
 
-> > Then how about to introduce the software flags. and set it at each
-> > board. It can support the 800MHz.
-> > Also this flags are handled at cpufreq drivers properly.
-
-> > How do you think?
-
-> Two SMDKs may have different versions of s3c6410.
-> Which file do we want to set the flags in ?
-
-In this case the board can effectively eliminate 800MHz operation
-through the regulation constraints as it requires 1.3V rather than 1.2V.
-
-IIRC the device always comes up at full speed so the boot state also
-constrains things with the current system - there's no code to reclock
-the PLLs so if we boot up at 667MHz then 800MHz is inaccessible.
+Where can I find the whole series? I was going to test this on my TS-7260 but
+I only found this patch from my inbox and it doesn't apply without the
+previous one :-(
