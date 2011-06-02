@@ -1,74 +1,95 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Thu, 02 Jun 2011 09:54:13 +0100
-Subject: [PATCH] ARM: exynos4: fix secondary CPU boot
-In-Reply-To: <BANLkTi=mvCgi_6Y57aVjpwrMhL58zPcUHw@mail.gmail.com>
-References: <1305899190-16732-1-git-send-email-marc.zyngier@arm.com>
-	<4DDD3C57.6020705@samsung.com>
-	<1306346645.27474.182.camel@e102391-lin.cambridge.arm.com>
-	<4DDD531A.50604@samsung.com>
-	<1306422710.27474.237.camel@e102391-lin.cambridge.arm.com>
-	<BANLkTi=fjq5ki8BGDhQxHVD3u-s7W-C1rw@mail.gmail.com>
-	<1307003689.31098.6.camel@e102391-lin.cambridge.arm.com>
-	<BANLkTi=mvCgi_6Y57aVjpwrMhL58zPcUHw@mail.gmail.com>
-Message-ID: <1307004853.31098.12.camel@e102391-lin.cambridge.arm.com>
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Thu, 2 Jun 2011 14:24:09 +0530
+Subject: [PATCH 01/10] mm: Introduce the memory regions data structure
+In-Reply-To: <1306863260.15490.35.camel@nimitz>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<1306499498-14263-2-git-send-email-ankita@in.ibm.com>
+	<1306510203.22505.69.camel@nimitz>
+	<20110527182041.GM5654@dirshya.in.ibm.com>
+	<1306531912.22505.84.camel@nimitz>
+	<20110529081618.GC8333@in.ibm.com>
+	<1306863260.15490.35.camel@nimitz>
+Message-ID: <20110602085409.GA28096@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-06-02 at 17:39 +0900, Kyungmin Park wrote:
-> On Thu, Jun 2, 2011 at 5:34 PM, Marc Zyngier <Marc.Zyngier@arm.com> wrote:
-> > On Thu, 2011-06-02 at 16:01 +0900, Kyungmin Park wrote:
-> >> On Fri, May 27, 2011 at 12:11 AM, Marc Zyngier <Marc.Zyngier@arm.com> wrote:
-> >> > On Wed, 2011-05-25 at 12:06 -0700, Kukjin Kim wrote:
-> >> >> On 05/25/11 11:04, Marc Zyngier wrote:
-> >> >> > On Wed, 2011-05-25 at 10:28 -0700, Kukjin Kim wrote:
-> >> >> >> On 05/20/11 06:46, Marc Zyngier wrote:
-> >> >>
-> >> >> (snip)
-> >> >>
-> >> >> > So that address has changed between two SoC revisions? That's
-> >> >> > unfortunate, to say the least. I'm most probably using an early revision
-> >> >> > of the hardware (EVT0?), as it doesn't even support MCT.
-> >> >> >
-> >> >> I'm afraid :( and I agree secondary CPU should work on all of
-> >> >> Exynos4210. But I'm still think about the method...
-> >> >>
-> >> >> > What about the following patch?
-> >> >> >
-> >> >> Uhm...this is really hack but I'd like to use another normal way...?
-> >> >
-> >> > Oh, no question about the hack status. The trouble is, unless there is a
-> >> > sure way to tell which SoC revision we're running on, there's little
-> >> > else we can do than poke both locations and pray.
-> >> >
-> >> > Is there such a way to identify the SoC revision?
-> >>
-> >> It's also required for OneNAND. as you know C210 EVT0 OneNAND DMA has
-> >> bug and need to workaround.
-> >>
-> >> platform codes should provide the these function. please see the OMAP
-> >> codes. how to handle it.
-> >
-> > So we know there's a need beyond the wish to see the second core up and
-> > running on my board.
-> >
-> > Now what is the proper method to detect the revision of the SOC?
-> > Handling it is no problem, once we have the information. Unfortunately
-> > the documentation I have is less than helpful on that subject.
+Hi Dave,
+
+On Tue, May 31, 2011 at 10:34:20AM -0700, Dave Hansen wrote:
+> On Sun, 2011-05-29 at 13:46 +0530, Ankita Garg wrote:
+> > > It's worth noting that we already do targeted reclaim on boundaries
+> > > other than zones.  The lumpy reclaim and memory compaction logically do
+> > > the same thing.  So, it's at least possible to do this without having
+> > > the global LRU designed around the way you want to reclaim.
+> > >
+> > My understanding maybe incorrect, but doesn't both lumpy reclaim and
+> > memory compaction still work under zone boundary ? While trying to free
+> > up higher order pages, lumpy reclaim checks to ensure that pages that
+> > are selected do not cross zone boundary. Further, compaction walks
+> > through the pages in a zone and tries to re-arrange them.
 > 
-> It can be distinguished by chip id. but there's no code to handle this one.
+> I'm asserting that we don't need memory regions in the
 > 
-> 0x4320 0200 EVT0
-> 0x4321 0210 EVT1
-> 0x4321 0211 EVT2
+> 	pgdat->regions[]->zones[]
+> 
+> layout to do what you're asking for.
+> 
+> Lumpy reclaim is limited to a zone because it's trying to satisfy and
+> allocation request that came in for *THAT* *ZONE*.  It's useless to go
+> clear out other zones.  In your case, you don't care about zone
+> boundaries: you want to reclaim things regardless.
+>
 
-Apparently, the low 8 bits can be overloaded by the efuse. Which makes
-telling EVT1 from EVT2 unreliable.
+Ok true. So I guess lumpy reclaim could be extended to just free up
+pages spanning the entire region and not just a particular zone.
+ 
+> There was a "cma: Contiguous Memory Allocator added" patch posted a bit
+> ago to linux-mm at .  You might want to take a look at it for some
+> inspiration.
+> 
 
-But at least this is a start. I'll see if I can come up with something
-minimal enough to be merged as a fix.
+We did take a look at CMA, but the use case seems to be slightly
+different. Inorder to allocate large contiguous pages, CMA creates a new
+miratetype called MIGRATE_CMA, which effectively isolates pages from the
+buddy allocator.
 
-Thanks,
+> I think you also need to clearly establish here why any memory that
+> you're going to want to power off can't use (or shouldn't use)
+> ZONE_MOVABLE.  It seems a bit silly to have it there, and ignore it for
+> such a similar use case.  Memory hot-remove and power-down are not
+> horrifically different beasts.
+> 
 
-	M.
+Memory hot add and remove are definite usecases for conserving memory
+power. In this first version of the RFC patch, I have not yet added the
+support for ZONE_MOVABLE. I am currently testing the patch that creates
+movable zones under regions, thus ensuring that it can be easily
+evacuated using page migration.
+
+> BTW, that's probably something else to add to your list: make sure
+> mem_map[]s for memory in a region get allocated *in* that region. 
+> 
+
+There are a few reasons why we decided that we must have all the kernel
+non-movable data structures co-located in a single region as much as
+possible:
+
+- Having a region devoid of non-movable memory will enable the complete
+  memory region to be even hot-removed
+- If the memory is evacuated and later turned off (loss of content),
+  then the mem_map[]s will be lost. So when the memory comes back on,
+  the mem_map[]s will need to be reinitialized. While the hotplug
+  approach will work for exploiting PASR, it may not be the most
+  efficient one
+- When the memory is put into a lower power state, having the
+  mem_maps[]s in a single region would ensure that any references to
+  just the struct pages will not lead to references to the actual memory
+
+However, it might be worth taking a look at it again.
+
 -- 
-Reality is an implementation detail.
+Regards,
+Ankita Garg (ankita at in.ibm.com)
+Linux Technology Center
+IBM India Systems & Technology Labs,
+Bangalore, India
