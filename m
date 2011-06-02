@@ -1,113 +1,137 @@
 From: kmpark@infradead.org (Kyungmin Park)
-Date: Fri, 3 Jun 2011 08:48:05 +0900
-Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
-In-Reply-To: <201106022149.47936.heiko@sntech.de>
-References: <201106022149.47936.heiko@sntech.de>
-Message-ID: <BANLkTi=xVzdLDq5wbzLtQFu+nz=8G9SbKQ@mail.gmail.com>
+Date: Fri, 3 Jun 2011 08:57:00 +0900
+Subject: [RFC 0/6] iommu: generic api migration and grouping
+In-Reply-To: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+Message-ID: <BANLkTimQA0Nsh+jgS=hD1VxKkD3zg84y+A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Interesting, I also use the latest kernel and boot well.
-As I don't have the s3c2416 user manaul, I'm not sure it's support
-AUTO CMD12 or not. but at least it's support at s3c6410 and later.
+Good approach.
+CC'ed the Samsung IOMMU developer. Marek.
 
-[    1.355000] sdhci: Secure Digital Host Controller Interface driver
-[    1.360000] sdhci: Copyright(c) Pierre Ossman
-[    1.365000] s3c-sdhci s3c-sdhci.0: clock source 2: sclk_mmc (50000000 Hz)
-[    1.375000] mmc0: SDHCI controller on samsung-hsmmc [s3c-sdhci.0] using ADMA
-[    1.380000] s3c-sdhci s3c-sdhci.2: clock source 2: sclk_mmc (50000000 Hz)
-[    1.385000] mmc1: no vmmc regulator found
-[    1.390000] mmc1: SDHCI controller on samsung-hsmmc [s3c-sdhci.2] using ADMA
-[    1.400000] s3c-sdhci s3c-sdhci.3: clock source 2: sclk_mmc (50000000 Hz)
-[    1.405000] mmc2: no vmmc regulator found
-[    1.410000] mmc2: SDHCI controller on samsung-hsmmc [s3c-sdhci.3] using ADMA
-...
-[    1.435000] Waiting for root device /dev/mmcblk0p3...
-[    1.650000] mmc0: new high speed MMC card at address 0001
-[    1.655000] mmcblk0: mmc0:0001 SEM08G 7.39 GiB
-[    1.660000] mmcblk0boot0: mmc0:0001 SEM08G partition 1 1.00 MiB
-[    1.665000] mmcblk0boot1: mmc0:0001 SEM08G partition 2 1.00 MiB
-[    1.675000]  mmcblk0: p1 p2 p3 p4 < p5 p6 >
-[    1.680000]  mmcblk0boot1: unknown partition table
-[    1.685000]  mmcblk0boot0: unknown partition table
+BTW, Russell wants to use the DMA based IOMMU?
 
-I also check the external SD card.
+Please see the RFC patch, ARM: DMA-mapping & IOMMU integration
+http://www.spinics.net/lists/linux-mm/msg19856.html
 
 Thank you,
 Kyungmin Park
 
-
-On Fri, Jun 3, 2011 at 4:49 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi,
+On Fri, Jun 3, 2011 at 7:27 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> First stab at iommu consolidation:
 >
-> after upgrading my development kernel from 2.6.38 to 3.0rc1 I get flooded (i.e.
-> it never stops) by messages of the form:
+> - Migrate OMAP's iommu driver to the generic iommu API. With this in hand,
+> ?users can now start using the generic iommu layer instead of calling
+> ?omap-specific iommu API.
 >
-> mmc1: Got data interrupt 0x00100000 even though no data operation was in
-> progress.
-> ?sdhci: =========== REGISTER DUMP (mmc1)===========
-> ?sdhci: Sys addr: 0x37b1b000 | Version: ?0x00000401
-> ?sdhci: Blk size: 0x00007200 | Blk cnt: ?0x00000000
-> ?sdhci: Argument: 0x00010000 | Trn mode: 0x00000033
-> ?sdhci: Present: ?0x01e70002 | Host ctl: 0x00000012
-> ?sdhci: Power: ? ?0x0000000a | Blk gap: ?0x00000000
-> ?sdhci: Wake-up: ?0x00000000 | Clock: ? ?0x0000020f
-> ?sdhci: Timeout: ?0x0000000e | Int stat: 0x00108000
-> ?sdhci: Int enab: 0x02ff000b | Sig enab: 0x02ff000b
-> ?sdhci: AC12 err: 0x00000000 | Slot int: 0x00000001
-> ?sdhci: Caps: ? ? 0x05e80080 | Caps_1: ? 0x00000000
-> ?sdhci: Cmd: ? ? ?0x00000d1a | Max curr: 0x00000000
-> ?sdhci: Host ctl2: 0x00000000
-> ?sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x37846808
-> ?sdhci: ===========================================
+> ?New code that requires functionality missing from the generic iommu api,
+> ?will add that functionality in the generic framework (e.g. adding framework
+> ?awareness to multi page sizes, supported by the underlying hardware, will
+> ?avoid the otherwise-inevitable code duplication when mapping a memory
+> ?region).
 >
+> ?OMAP-specific api that is still exposed in the omap iommu driver can
+> ?now be either moved to the generic iommu framework, or just removed (if not
+> ?used).
 >
-> hardware: S3C2416 based board, mmc0 is an external micro-SD and mmc1 is a
-> ?mmc1: new high speed MMC card at address 0001
-> ?mmcblk1: mmc1:0001 HYNIX ?1.88 GiB
-> ?mmcblk1boot0: mmc1:0001 HYNIX ?partition 1 256 KiB
-> ?mmcblk1boot1: mmc1:0001 HYNIX ?partition 2 256 KiB
-> ? mmcblk1: p1 p2 p3
-> ? mmcblk1boot1: unknown partition table
-> ? mmcblk1boot0: unknown partition table
+> ?This api (and other omap-specific primitives like struct iommu) needs to
+> ?be omapified (i.e. renamed to include an 'omap_' prefix). At this early
+> ?point of this patch set this is too much churn though, so I'll do that
+> ?in the following iteration, after (and if), the general direction is
+> ?accepted.
 >
-> it uses therefore the sdhci-s3c driver.
+> - Migrate OMAP's iovmm (virtual memory manager) driver to the generic
+> ?iommu API. With this in hand, iovmm no longer uses omap-specific api
+> ?for mapping/unmapping operations. Nevertheless, iovmm is still coupled
+> ?with omap's iommu even with this change: it assumes omap page sizes,
+> ?and it uses omap's iommu objects to maintain its internal state.
 >
+> ?Further generalizing of iovmm strongly depends on our broader plans for
+> ?providing a generic virtual memory manager and allocation framework
+> ?(which, as discussed, should be separated from a specific mapper).
 >
-> I did some prodding in the code and found the following peculiarities:
+> ?iovmm has a mainline user: omap3isp, and therefore must be maintained,
+> ?but new potential users will either have to generalize it, or come up
+> ?with a different generic framework that will replace it.
 >
-> - When I remove Kyungmins AUTO_CMD12-quirk in sdhci-s3c it seems I get one
-> functional boot and have only the following messages in the kernel log
+> - Migrate OMAP's iommu mainline user, omap3isp, to the generic API as well
+> ?(so it doesn't break). As with iovmm, omap3isp still depends on
+> ?omap's iommu, mainly because iovmm depends on it, but also for
+> ?iommu context saving and restoring.
 >
-> ?mmcblk1boot0: retrying using single block read
-> ?mmc1: ADMA error
-> ?mmcblk1boot0: error -5 transferring data, sector 448, nr 32, card status
-> 0x900
-> ?end_request: I/O error, dev mmcblk1boot0, sector 448
-> ?Buffer I/O error on device mmcblk1boot0, logical block 56
-> ?mmcblk1boot1: retrying using single block read
-> ?mmc1: ADMA error
-> ?mmcblk1boot1: error -5 transferring data, sector 448, nr 32, card status
-> 0x900
-> ?end_request: I/O error, dev mmcblk1boot1, sector 448
+> ?It is definitely desirable to completely remove omap3isp's dependency
+> ?on the omap-specific iommu layer, and that will be possible as the
+> ?required functionality will be added to generic framework.
 >
-> But after a soft reset the irq message flood seems to return.
+> - Create a dedicated iommu drivers folder (and put the base iommu code there)
+> - Move OMAP's and MSM's iommu drivers to that drivers iommu folder
 >
-> - When I completely remove the boot partition registration in
-> mmc_blk_alloc_parts() in card/block.c it seems that everything return to
-> normal, i.e. no strange messages at all
+> ?Putting all iommu drivers together will ease finding similarities
+> ?between different platforms, with the intention of solving problems once,
+> ?in a generic framework which everyone can use.
 >
+> ?I've only moved the omap and msm implementations for now, to demonstrate
+> ?the idea (and support the ARM diet :), but if this is found desirable,
+> ?we can bring in intel-iommu.c and amd_iommu.c as well.
 >
-> I'm not sure if this is a problem of only my board or if it happens on more
-> hardware.
+> Meta:
 >
+> - This patch set is not bisectable; it was splitted (and ordered) this way
+> ?to ease its review. Later iterations of this patch set will fix that
+> ?(most likely by squashing the first three patches)
+> - Based on and tested with 3.0-rc1
+> - OMAP's iommu code was tested on both OMAP3 and OMAP4
+> - omap3isp code was tested with a sensor-less OMAP3 (memory-to-memory only)
+> ?(thanks Laurent Pinchart for showing me the magic needed to test omap3isp :)
+> - MSM code was only compile tested
 >
-> Heiko
+> Ohad Ben-Cohen (6):
+> ?omap: iommu: generic iommu api migration
+> ?omap: iovmm: generic iommu api migration
+> ?media: omap3isp: generic iommu api migration
+> ?drivers: iommu: move to a dedicated folder
+> ?omap: iommu/iovmm: move to dedicated iommu folder
+> ?msm: iommu: move to dedicated iommu drivers folder
 >
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> ?arch/arm/mach-msm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 15 -
+> ?arch/arm/mach-msm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?arch/arm/plat-omap/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? | ? 12 -
+> ?arch/arm/plat-omap/Makefile ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 -
+> ?arch/arm/plat-omap/include/plat/iommu.h ? ? ? ? ? ?| ? ?3 +-
+> ?arch/arm/plat-omap/{ => include/plat}/iopgtable.h ?| ? 18 ++
+> ?arch/arm/plat-omap/include/plat/iovmm.h ? ? ? ? ? ?| ? 27 +-
+> ?arch/x86/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?5 +-
+> ?drivers/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
+> ?drivers/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?1 +
+> ?drivers/base/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 -
+> ?drivers/iommu/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 32 +++
+> ?drivers/iommu/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?5 +
+> ?drivers/{base => iommu}/iommu.c ? ? ? ? ? ? ? ? ? ?| ? ?0
+> ?.../mach-msm/iommu.c => drivers/iommu/msm-iommu.c ?| ? ?0
+> ?.../iommu/omap-iommu-debug.c ? ? ? ? ? ? ? ? ? ? ? | ? ?2 +-
+> ?.../iommu.c => drivers/iommu/omap-iommu.c ? ? ? ? ?| ?290 +++++++++++++++++---
+> ?.../iovmm.c => drivers/iommu/omap-iovmm.c ? ? ? ? ?| ?113 +++++---
+> ?drivers/media/video/Kconfig ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +-
+> ?drivers/media/video/omap3isp/isp.c ? ? ? ? ? ? ? ? | ? 41 +++-
+> ?drivers/media/video/omap3isp/isp.h ? ? ? ? ? ? ? ? | ? ?3 +
+> ?drivers/media/video/omap3isp/ispccdc.c ? ? ? ? ? ? | ? 16 +-
+> ?drivers/media/video/omap3isp/ispstat.c ? ? ? ? ? ? | ? ?6 +-
+> ?drivers/media/video/omap3isp/ispvideo.c ? ? ? ? ? ?| ? ?4 +-
+> ?24 files changed, 451 insertions(+), 151 deletions(-)
+> ?rename arch/arm/plat-omap/{ => include/plat}/iopgtable.h (84%)
+> ?create mode 100644 drivers/iommu/Kconfig
+> ?create mode 100644 drivers/iommu/Makefile
+> ?rename drivers/{base => iommu}/iommu.c (100%)
+> ?rename arch/arm/mach-msm/iommu.c => drivers/iommu/msm-iommu.c (100%)
+> ?rename arch/arm/plat-omap/iommu-debug.c => drivers/iommu/omap-iommu-debug.c (99%)
+> ?rename arch/arm/plat-omap/iommu.c => drivers/iommu/omap-iommu.c (77%)
+> ?rename arch/arm/plat-omap/iovmm.c => drivers/iommu/omap-iovmm.c (85%)
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
