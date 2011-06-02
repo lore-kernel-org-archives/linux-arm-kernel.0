@@ -1,18 +1,57 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Thu, 2 Jun 2011 14:24:52 +0900
-Subject: [PATCH] Fix build warning of the defconfigs
-In-Reply-To: <1306945763-6583-1-git-send-email-wanlong.gao@gmail.com>
-References: <1306945763-6583-1-git-send-email-wanlong.gao@gmail.com>
-Message-ID: <20110602052452.GA6087@linux-sh.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 2 Jun 2011 13:56:15 +0800
+Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <1306914144.10976.4.camel@vkoul-udesk3>
+References: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
+	<1306914144.10976.4.camel@vkoul-udesk3>
+Message-ID: <20110602055614.GA18508@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2011 at 12:29:23AM +0800, Wanlong Gao wrote:
-> RTC_CLASS is changed to bool.
-> So value 'm' is invalid.
+On Wed, Jun 01, 2011 at 01:12:24PM +0530, Koul, Vinod wrote:
+> On Thu, 2011-05-26 at 14:31 +0800, Shawn Guo wrote:
+> > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> > max_segment_number into device_dma_parameters and creates the
+> > corresponding dmaengine API dma_set(get)_max_seg_number for it.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  include/linux/device.h      |    1 +
+> >  include/linux/dma-mapping.h |   15 +++++++++++++++
+> >  2 files changed, 16 insertions(+), 0 deletions(-)
+> Can you explain me why this change is required, the patch description
+> isn't helping for this.
 > 
-> Signed-off-by: Wanlong Gao <wanlong.gao@gmail.com>
+> If you satisfy me with above then I am okay with it, but I need ACK from
+> Dan before applying...
+> 
+I recently saw you people are trying to sort out the slave dma api
+document.  This reminds me there is small piece missing, which the
+patch here is trying to add.
 
->  arch/sh/configs/titan_defconfig            |    2 +-
+Here is the user story.  The mxs-mmc is the mmc host controller for
+Freescale MXS architecture.  There are a pair of  mmc host specific
+parameters max_seg_size and max_segs that mxs-mmc host driver needs
+to tell mmc core, so that mmc core can know how big each data segment
+could be and how many segments could be handled one time in a scatter
+list by host driver.
 
-Acked-by: Paul Mundt <lethal@linux-sh.org>
+The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
+mxs-dma to transfer data in scatter list.  That is to say mxs-mmc has
+not idea of what max_seg_size and max_segs should be, because they are
+all mxs-dma capability parameters, and mxs-mmc needs to query them
+from mxs-dma.
+
+Right now, there is well defined dma api (dma_get_max_seg_size) for
+mmc to query max_seg_size from dma driver, but the one for max_segs is
+missing.  That's why mxs-mmc driver has to hard-code it.
+
+The mxs-mmc is just one example to demonstrate the need of the new
+api, and I'm sure there are other mmc host drivers (mxcmmc on imx-dma
+is another example) and possibly even other dmaengine users need this
+new api to know the maximum segments that dma driver can handle per
+dma call.
+
+-- 
+Regards,
+Shawn
