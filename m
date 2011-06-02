@@ -1,50 +1,82 @@
-From: gxt@mprc.pku.edu.cn (Guan Xuetao)
-Date: Thu, 02 Jun 2011 17:49:17 +0800
-Subject: [PATCH] Fix build warning of the defconfigs
-In-Reply-To: <1306945763-6583-1-git-send-email-wanlong.gao@gmail.com>
-References: <1306945763-6583-1-git-send-email-wanlong.gao@gmail.com>
-Message-ID: <1307008157.1652.4.camel@epip-laptop>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 2 Jun 2011 11:33:48 +0800
+Subject: [PATCH v2 0/4] Move plat-mxc gpio driver into drivers/gpio
+Message-ID: <1306985632-18820-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-06-02 at 00:29 +0800, Wanlong Gao wrote:
-> RTC_CLASS is changed to bool.
-> So value 'm' is invalid.
-> 
-> Signed-off-by: Wanlong Gao <wanlong.gao@gmail.com>
-> ---
->  arch/arm/configs/davinci_all_defconfig     |    2 +-
->  arch/arm/configs/mxs_defconfig             |    2 +-
->  arch/arm/configs/netx_defconfig            |    2 +-
->  arch/arm/configs/viper_defconfig           |    2 +-
->  arch/arm/configs/xcep_defconfig            |    2 +-
->  arch/arm/configs/zeus_defconfig            |    2 +-
->  arch/avr32/configs/atngw100_mrmt_defconfig |    2 +-
->  arch/blackfin/configs/CM-BF548_defconfig   |    2 +-
->  arch/mips/configs/mtx1_defconfig           |    2 +-
->  arch/powerpc/configs/52xx/pcm030_defconfig |    2 +-
->  arch/powerpc/configs/ps3_defconfig         |    2 +-
->  arch/sh/configs/titan_defconfig            |    2 +-
->  arch/unicore32/configs/debug_defconfig     |    2 +-
->  13 files changed, 13 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/unicore32/configs/debug_defconfig b/arch/unicore32/configs/debug_defconfig
-> index b5fbde9..1c367f0 100644
-> --- a/arch/unicore32/configs/debug_defconfig
-> +++ b/arch/unicore32/configs/debug_defconfig
-> @@ -168,7 +168,7 @@ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->  
->  #	Real Time Clock
->  CONFIG_RTC_LIB=m
-> -CONFIG_RTC_CLASS=m
-> +CONFIG_RTC_CLASS=y
->  
->  ### File systems
->  CONFIG_EXT2_FS=m
+The patch set moves plat-mxc gpio driver into drivers/gpio, and
+migrates mach-imx and mach-mx5 to the new driver.
 
-I adjust this config option recently, and enable it with y.
-So please just drop the modification in unicore32 config file.
+Changes since v1:
+* Eliminate the use of port->id which is not needed yet.
+* Move the call to mxc_register_gpio into per-soc-init function.
+  As the result, all the board files get touched to plug in this
+  hook which will benefit all the possible per-soc setup coming
+  in the future.
 
-Thanks & Regards.
+Shawn Guo (4):
+      gpio: gpio-mxc: add gpio driver for Freescale MXC architecture
+      ARM: mxc: migrate mach-mx5 gpio driver to gpio-mxc
+      ARM: mxc: migrate mach-imx gpio driver to gpio-mxc
+      ARM: mxc: remove plat-mxc/gpio driver
 
-Guan Xuetao
+ arch/arm/mach-imx/mach-apf9328.c                |    2 +
+ arch/arm/mach-imx/mach-armadillo5x0.c           |    2 +
+ arch/arm/mach-imx/mach-bug.c                    |    2 +
+ arch/arm/mach-imx/mach-cpuimx27.c               |    2 +
+ arch/arm/mach-imx/mach-cpuimx35.c               |    2 +
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c        |    2 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c     |    2 +
+ arch/arm/mach-imx/mach-imx27ipcam.c             |    2 +
+ arch/arm/mach-imx/mach-imx27lite.c              |    2 +
+ arch/arm/mach-imx/mach-kzm_arm11_01.c           |    2 +
+ arch/arm/mach-imx/mach-mx1ads.c                 |    2 +
+ arch/arm/mach-imx/mach-mx21ads.c                |    2 +
+ arch/arm/mach-imx/mach-mx25_3ds.c               |    2 +
+ arch/arm/mach-imx/mach-mx27_3ds.c               |    2 +
+ arch/arm/mach-imx/mach-mx27ads.c                |    2 +
+ arch/arm/mach-imx/mach-mx31_3ds.c               |    2 +
+ arch/arm/mach-imx/mach-mx31ads.c                |    2 +
+ arch/arm/mach-imx/mach-mx31lilly.c              |    2 +
+ arch/arm/mach-imx/mach-mx31lite.c               |    2 +
+ arch/arm/mach-imx/mach-mx31moboard.c            |    2 +
+ arch/arm/mach-imx/mach-mx35_3ds.c               |    2 +
+ arch/arm/mach-imx/mach-mxt_td60.c               |    2 +
+ arch/arm/mach-imx/mach-pca100.c                 |    2 +
+ arch/arm/mach-imx/mach-pcm037.c                 |    2 +
+ arch/arm/mach-imx/mach-pcm038.c                 |    2 +
+ arch/arm/mach-imx/mach-pcm043.c                 |    2 +
+ arch/arm/mach-imx/mach-qong.c                   |    2 +
+ arch/arm/mach-imx/mach-scb9328.c                |    2 +
+ arch/arm/mach-imx/mach-vpr200.c                 |    2 +
+ arch/arm/mach-imx/mm-imx1.c                     |   17 +-
+ arch/arm/mach-imx/mm-imx21.c                    |   21 +-
+ arch/arm/mach-imx/mm-imx25.c                    |   16 +-
+ arch/arm/mach-imx/mm-imx27.c                    |   21 +-
+ arch/arm/mach-imx/mm-imx31.c                    |   15 +-
+ arch/arm/mach-imx/mm-imx35.c                    |   15 +-
+ arch/arm/mach-mx5/board-cpuimx51.c              |    2 +
+ arch/arm/mach-mx5/board-cpuimx51sd.c            |    2 +
+ arch/arm/mach-mx5/board-mx50_rdp.c              |    2 +
+ arch/arm/mach-mx5/board-mx51_3ds.c              |    2 +
+ arch/arm/mach-mx5/board-mx51_babbage.c          |    2 +
+ arch/arm/mach-mx5/board-mx51_efikamx.c          |    2 +
+ arch/arm/mach-mx5/board-mx51_efikasb.c          |    2 +
+ arch/arm/mach-mx5/board-mx53_evk.c              |    2 +
+ arch/arm/mach-mx5/board-mx53_loco.c             |    2 +
+ arch/arm/mach-mx5/board-mx53_smd.c              |    2 +
+ arch/arm/mach-mx5/devices.c                     |   64 ----
+ arch/arm/mach-mx5/mm-mx50.c                     |   21 +-
+ arch/arm/mach-mx5/mm.c                          |   25 +-
+ arch/arm/plat-mxc/Makefile                      |    2 +-
+ arch/arm/plat-mxc/devices.c                     |   11 +
+ arch/arm/plat-mxc/devices/Makefile              |    1 +
+ arch/arm/plat-mxc/devices/platform-gpio-mxc.c   |   32 ++
+ arch/arm/plat-mxc/gpio.c                        |  361 -------------------
+ arch/arm/plat-mxc/include/mach/common.h         |   12 +-
+ arch/arm/plat-mxc/include/mach/devices-common.h |    2 +
+ arch/arm/plat-mxc/include/mach/gpio.h           |   27 --
+ drivers/gpio/Makefile                           |    1 +
+ drivers/gpio/gpio-mxc.c                         |  433 +++++++++++++++++++++++
+ 58 files changed, 648 insertions(+), 527 deletions(-)
