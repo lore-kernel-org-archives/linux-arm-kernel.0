@@ -1,66 +1,61 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 2 Jun 2011 12:58:30 +0200
-Subject: [PATCH v3 3/3] remove the now empty mach-s3c2410/irq.c
-In-Reply-To: <201106021254.57644.heiko@sntech.de>
-References: <201106021254.57644.heiko@sntech.de>
-Message-ID: <201106021258.30979.heiko@sntech.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Jun 2011 12:01:37 +0100
+Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
+In-Reply-To: <4DE7637B.3060901@stericsson.com>
+References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
+	<20110602094622.GS3660@n2100.arm.linux.org.uk>
+	<4DE7637B.3060901@stericsson.com>
+Message-ID: <20110602110137.GU3660@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+On Thu, Jun 02, 2011 at 12:18:35PM +0200, Mattias Wallin wrote:
+> On 06/02/2011 11:46 AM, Russell King - ARM Linux wrote:
+>> Why don't we just find a way of fixing sched_clock so that the value
+>> doesn't reset over a suspend/resume cycle?
+> Even if the value isn't reset during suspend/resume we want the  
+> clocksource to keep counting. Or is it ok to have the clocksource stop  
+> or freeze during suspend?
 
----
- arch/arm/mach-s3c2410/Makefile |    1 -
- arch/arm/mach-s3c2410/irq.c    |   29 -----------------------------
- 2 files changed, 0 insertions(+), 30 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/irq.c
+kernel/time/timekeeping.c:timekeeping_suspend():
 
-diff --git a/arch/arm/mach-s3c2410/Makefile b/arch/arm/mach-s3c2410/Makefile
-index 0d468e9..8169535 100644
---- a/arch/arm/mach-s3c2410/Makefile
-+++ b/arch/arm/mach-s3c2410/Makefile
-@@ -10,7 +10,6 @@ obj-n				:=
- obj-				:=
- 
- obj-$(CONFIG_CPU_S3C2410)	+= s3c2410.o
--obj-$(CONFIG_CPU_S3C2410)	+= irq.o
- obj-$(CONFIG_CPU_S3C2410_DMA)	+= dma.o
- obj-$(CONFIG_CPU_S3C2410_DMA)	+= dma.o
- obj-$(CONFIG_S3C2410_PM)	+= pm.o sleep.o
-diff --git a/arch/arm/mach-s3c2410/irq.c b/arch/arm/mach-s3c2410/irq.c
-deleted file mode 100644
-index 4428695..0000000
---- a/arch/arm/mach-s3c2410/irq.c
-+++ /dev/null
-@@ -1,29 +0,0 @@
--/* linux/arch/arm/mach-s3c2410/irq.c
-- *
-- * Copyright (c) 2006 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-- *
--*/
--
--#include <linux/init.h>
--#include <linux/module.h>
--#include <linux/interrupt.h>
--#include <linux/ioport.h>
--#include <linux/syscore_ops.h>
--
--#include <plat/cpu.h>
--#include <plat/pm.h>
--- 
-1.7.1
+        timekeeping_forward_now();
+
+which does:
+        cycle_now = clock->read(clock);
+        cycle_delta = (cycle_now - clock->cycle_last) & clock->mask;
+        clock->cycle_last = cycle_now;
+
+So that updates the time with the current offset between cycle_last and
+the current value.
+
+kernel/time/timekeeping.c:timekeeping_resume():
+        /* re-base the last cycle value */
+        timekeeper.clock->cycle_last = timekeeper.clock->read(timekeeper.clock);
+
+So this re-sets cycle_last to the current value of the clocksource.  This
+means that on resume, the clocksource can start counting from any value it
+likes.
+
+So, without any additional external inputs, time resumes incrementing at
+the point where the suspend occurred without any jump backwards or forwards.
+
+The code accounts for the sleep time by using read_persistent_clock() read
+a timer which continues running during sleep to calculate the delta between
+suspend and resume, and injects the delta between them to wind the time
+forward.
+
+> Then we have cpuidle. Is it ok to stop/freeze the timer during cpuidle  
+> sleep states?
+
+During _idle_ (iow, no task running) sched_clock and the clocksource
+should both continue to run - the scheduler needs to know how long the
+system has been idle for, and the clocksource can't stop because we'll
+lose track of time.
+
+Remember that the clockevent stuff is used as a trigger to the timekeeping
+code to read the clocksource, and update the current time.  Time is moved
+forward by the delta between a previous clocksource read and the current
+clocksource read.  So stopping or resetting the clocksource in unexpected
+ways (other than over suspend/resume as mentioned above) will result in
+time going weird.
