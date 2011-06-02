@@ -1,43 +1,128 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu,  2 Jun 2011 21:59:34 +0300
-Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
-Message-ID: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+Date: Thu,  2 Jun 2011 21:59:35 +0300
+Subject: [PATCH v2 2/5] net: ep93xx_eth: pass struct device to DMA API
+	functions
+In-Reply-To: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+Message-ID: <c0ddfc297e0ea1e64e58cedd6552c6b2e52c5fe8.1307040443.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As the driver is now passing platform device to the DMA mapping functions,
-we should give it valid DMA masks.
+We shouldn't use NULL for any DMA API functions, unless we are dealing with
+ISA or EISA device. So pass correct struct dev pointer to these functions.
 
 Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
-Changes to previous version are:
-	- moved this patch to be first
-	- added Russell's acks
+ drivers/net/arm/ep93xx_eth.c |   26 ++++++++++++++++----------
+ 1 files changed, 16 insertions(+), 10 deletions(-)
 
- arch/arm/mach-ep93xx/core.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
-index 8207954..1d4b65f 100644
---- a/arch/arm/mach-ep93xx/core.c
-+++ b/arch/arm/mach-ep93xx/core.c
-@@ -402,11 +402,15 @@ static struct resource ep93xx_eth_resource[] = {
- 	}
- };
+diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
+index 5a77001..8779d3b 100644
+--- a/drivers/net/arm/ep93xx_eth.c
++++ b/drivers/net/arm/ep93xx_eth.c
+@@ -159,6 +159,8 @@ struct ep93xx_priv
+ 	void __iomem		*base_addr;
+ 	int			irq;
  
-+static u64 ep93xx_eth_dma_mask = DMA_BIT_MASK(32);
++	struct device		*dma_dev;
 +
- static struct platform_device ep93xx_eth_device = {
- 	.name		= "ep93xx-eth",
- 	.id		= -1,
- 	.dev		= {
--		.platform_data	= &ep93xx_eth_data,
-+		.platform_data		= &ep93xx_eth_data,
-+		.coherent_dma_mask	= DMA_BIT_MASK(32),
-+		.dma_mask		= &ep93xx_eth_dma_mask,
- 	},
- 	.num_resources	= ARRAY_SIZE(ep93xx_eth_resource),
- 	.resource	= ep93xx_eth_resource,
+ 	struct ep93xx_descs	*descs;
+ 	dma_addr_t		descs_dma_addr;
+ 
+@@ -284,7 +286,8 @@ static int ep93xx_rx(struct net_device *dev, int processed, int budget)
+ 		skb = dev_alloc_skb(length + 2);
+ 		if (likely(skb != NULL)) {
+ 			skb_reserve(skb, 2);
+-			dma_sync_single_for_cpu(NULL, ep->descs->rdesc[entry].buf_addr,
++			dma_sync_single_for_cpu(ep->dma_dev,
++						ep->descs->rdesc[entry].buf_addr,
+ 						length, DMA_FROM_DEVICE);
+ 			skb_copy_to_linear_data(skb, ep->rx_buf[entry], length);
+ 			skb_put(skb, length);
+@@ -362,7 +365,7 @@ static int ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	ep->descs->tdesc[entry].tdesc1 =
+ 		TDESC1_EOF | (entry << 16) | (skb->len & 0xfff);
+ 	skb_copy_and_csum_dev(skb, ep->tx_buf[entry]);
+-	dma_sync_single_for_cpu(NULL, ep->descs->tdesc[entry].buf_addr,
++	dma_sync_single_for_cpu(ep->dma_dev, ep->descs->tdesc[entry].buf_addr,
+ 				skb->len, DMA_TO_DEVICE);
+ 	dev_kfree_skb(skb);
+ 
+@@ -457,6 +460,7 @@ static irqreturn_t ep93xx_irq(int irq, void *dev_id)
+ 
+ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+ {
++	struct device *dev = ep->dma_dev;
+ 	int i;
+ 
+ 	for (i = 0; i < RX_QUEUE_ENTRIES; i += 2) {
+@@ -464,7 +468,7 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+ 
+ 		d = ep->descs->rdesc[i].buf_addr;
+ 		if (d)
+-			dma_unmap_single(NULL, d, PAGE_SIZE, DMA_FROM_DEVICE);
++			dma_unmap_single(dev, d, PAGE_SIZE, DMA_FROM_DEVICE);
+ 
+ 		if (ep->rx_buf[i] != NULL)
+ 			free_page((unsigned long)ep->rx_buf[i]);
+@@ -475,13 +479,13 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+ 
+ 		d = ep->descs->tdesc[i].buf_addr;
+ 		if (d)
+-			dma_unmap_single(NULL, d, PAGE_SIZE, DMA_TO_DEVICE);
++			dma_unmap_single(dev, d, PAGE_SIZE, DMA_TO_DEVICE);
+ 
+ 		if (ep->tx_buf[i] != NULL)
+ 			free_page((unsigned long)ep->tx_buf[i]);
+ 	}
+ 
+-	dma_free_coherent(NULL, sizeof(struct ep93xx_descs), ep->descs,
++	dma_free_coherent(dev, sizeof(struct ep93xx_descs), ep->descs,
+ 							ep->descs_dma_addr);
+ }
+ 
+@@ -491,9 +495,10 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+  */
+ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+ {
++	struct device *dev = ep->dma_dev;
+ 	int i;
+ 
+-	ep->descs = dma_alloc_coherent(NULL, sizeof(struct ep93xx_descs),
++	ep->descs = dma_alloc_coherent(dev, sizeof(struct ep93xx_descs),
+ 				&ep->descs_dma_addr, GFP_KERNEL | GFP_DMA);
+ 	if (ep->descs == NULL)
+ 		return 1;
+@@ -506,8 +511,8 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+ 		if (page == NULL)
+ 			goto err;
+ 
+-		d = dma_map_single(NULL, page, PAGE_SIZE, DMA_FROM_DEVICE);
+-		if (dma_mapping_error(NULL, d)) {
++		d = dma_map_single(dev, page, PAGE_SIZE, DMA_FROM_DEVICE);
++		if (dma_mapping_error(dev, d)) {
+ 			free_page((unsigned long)page);
+ 			goto err;
+ 		}
+@@ -529,8 +534,8 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+ 		if (page == NULL)
+ 			goto err;
+ 
+-		d = dma_map_single(NULL, page, PAGE_SIZE, DMA_TO_DEVICE);
+-		if (dma_mapping_error(NULL, d)) {
++		d = dma_map_single(dev, page, PAGE_SIZE, DMA_TO_DEVICE);
++		if (dma_mapping_error(dev, d)) {
+ 			free_page((unsigned long)page);
+ 			goto err;
+ 		}
+@@ -829,6 +834,7 @@ static int ep93xx_eth_probe(struct platform_device *pdev)
+ 	}
+ 	ep = netdev_priv(dev);
+ 	ep->dev = dev;
++	ep->dma_dev = &pdev->dev;
+ 	netif_napi_add(dev, &ep->napi, ep93xx_poll, 64);
+ 
+ 	platform_set_drvdata(pdev, dev);
 -- 
 1.7.4.4
