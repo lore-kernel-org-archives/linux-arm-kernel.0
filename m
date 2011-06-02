@@ -1,115 +1,74 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Thu, 2 Jun 2011 16:46:09 +0800
-Subject: arm: fix lockdep warning of "unannotated irqs-off"(v2)
-Message-ID: <20110602164609.3ad67e37@tom-ThinkPad-T410>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Thu, 02 Jun 2011 09:54:13 +0100
+Subject: [PATCH] ARM: exynos4: fix secondary CPU boot
+In-Reply-To: <BANLkTi=mvCgi_6Y57aVjpwrMhL58zPcUHw@mail.gmail.com>
+References: <1305899190-16732-1-git-send-email-marc.zyngier@arm.com>
+	<4DDD3C57.6020705@samsung.com>
+	<1306346645.27474.182.camel@e102391-lin.cambridge.arm.com>
+	<4DDD531A.50604@samsung.com>
+	<1306422710.27474.237.camel@e102391-lin.cambridge.arm.com>
+	<BANLkTi=fjq5ki8BGDhQxHVD3u-s7W-C1rw@mail.gmail.com>
+	<1307003689.31098.6.camel@e102391-lin.cambridge.arm.com>
+	<BANLkTi=mvCgi_6Y57aVjpwrMhL58zPcUHw@mail.gmail.com>
+Message-ID: <1307004853.31098.12.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 6dff1e25a75f0fd99b115c96564444952c0a2cc6 Mon Sep 17 00:00:00 2001
-From: Ming Lei <ming.lei@canonical.com>
-Date: Wed, 1 Jun 2011 15:02:24 +0800
-Subject: [PATCH] arm: fix lockdep warning of "unannotated irqs-off"(v2)
+On Thu, 2011-06-02 at 17:39 +0900, Kyungmin Park wrote:
+> On Thu, Jun 2, 2011 at 5:34 PM, Marc Zyngier <Marc.Zyngier@arm.com> wrote:
+> > On Thu, 2011-06-02 at 16:01 +0900, Kyungmin Park wrote:
+> >> On Fri, May 27, 2011 at 12:11 AM, Marc Zyngier <Marc.Zyngier@arm.com> wrote:
+> >> > On Wed, 2011-05-25 at 12:06 -0700, Kukjin Kim wrote:
+> >> >> On 05/25/11 11:04, Marc Zyngier wrote:
+> >> >> > On Wed, 2011-05-25 at 10:28 -0700, Kukjin Kim wrote:
+> >> >> >> On 05/20/11 06:46, Marc Zyngier wrote:
+> >> >>
+> >> >> (snip)
+> >> >>
+> >> >> > So that address has changed between two SoC revisions? That's
+> >> >> > unfortunate, to say the least. I'm most probably using an early revision
+> >> >> > of the hardware (EVT0?), as it doesn't even support MCT.
+> >> >> >
+> >> >> I'm afraid :( and I agree secondary CPU should work on all of
+> >> >> Exynos4210. But I'm still think about the method...
+> >> >>
+> >> >> > What about the following patch?
+> >> >> >
+> >> >> Uhm...this is really hack but I'd like to use another normal way...?
+> >> >
+> >> > Oh, no question about the hack status. The trouble is, unless there is a
+> >> > sure way to tell which SoC revision we're running on, there's little
+> >> > else we can do than poke both locations and pray.
+> >> >
+> >> > Is there such a way to identify the SoC revision?
+> >>
+> >> It's also required for OneNAND. as you know C210 EVT0 OneNAND DMA has
+> >> bug and need to workaround.
+> >>
+> >> platform codes should provide the these function. please see the OMAP
+> >> codes. how to handle it.
+> >
+> > So we know there's a need beyond the wish to see the second core up and
+> > running on my board.
+> >
+> > Now what is the proper method to detect the revision of the SOC?
+> > Handling it is no problem, once we have the information. Unfortunately
+> > the documentation I have is less than helpful on that subject.
+> 
+> It can be distinguished by chip id. but there's no code to handle this one.
+> 
+> 0x4320 0200 EVT0
+> 0x4321 0210 EVT1
+> 0x4321 0211 EVT2
 
-This patch fixes the lockdep warning of "unannotated irqs-off"[1].
+Apparently, the low 8 bits can be overloaded by the efuse. Which makes
+telling EVT1 from EVT2 unreliable.
 
-After entering __irq_usr, arm core has disabled interrupt automatically,
-but __irq_usr does not annotate the irq disable, so lockdep may complain
-the warning if it has chance to check this in irq handler.
+But at least this is a start. I'll see if I can come up with something
+minimal enough to be merged as a fix.
 
-This patch adds trace_hardirqs_off in __irq_usr before entering irq_handler
-to handle the irq, also calls ret_to_user_from_irq to avoid calling
-disable_irq again.
+Thanks,
 
-This is also a fix for irq off tracer.
-
-[1], lockdep warning log of "unannotated irqs-off"
-
-[   13.804687] ------------[ cut here ]------------
-[   13.809570] WARNING: at kernel/lockdep.c:3335 check_flags+0x78/0x1d0()
-[   13.816467] Modules linked in:
-[   13.819732] Backtrace:
-[   13.822357] [<c01cb42c>] (dump_backtrace+0x0/0x100) from [<c06abb14>] (dump_stack+0x20/0x24)
-[   13.831268]  r6:c07d8c2c r5:00000d07 r4:00000000 r3:00000000
-[   13.837280] [<c06abaf4>] (dump_stack+0x0/0x24) from [<c01ffc04>] (warn_slowpath_common+0x5c/0x74)
-[   13.846649] [<c01ffba8>] (warn_slowpath_common+0x0/0x74) from [<c01ffc48>] (warn_slowpath_null+0x2c/0x34)
-[   13.856781]  r8:00000000 r7:00000000 r6:c18b8194 r5:60000093 r4:ef182000
-[   13.863708] r3:00000009
-[   13.866485] [<c01ffc1c>] (warn_slowpath_null+0x0/0x34) from [<c0237d84>] (check_flags+0x78/0x1d0)
-[   13.875823] [<c0237d0c>] (check_flags+0x0/0x1d0) from [<c023afc8>] (lock_acquire+0x4c/0x150)
-[   13.884704] [<c023af7c>] (lock_acquire+0x0/0x150) from [<c06af638>] (_raw_spin_lock+0x4c/0x84)
-[   13.893798] [<c06af5ec>] (_raw_spin_lock+0x0/0x84) from [<c01f9a44>] (sched_ttwu_pending+0x58/0x8c)
-[   13.903320]  r6:ef92d040 r5:00000003 r4:c18b8180
-[   13.908233] [<c01f99ec>] (sched_ttwu_pending+0x0/0x8c) from [<c01f9a90>] (scheduler_ipi+0x18/0x1c)
-[   13.917663]  r6:ef183fb0 r5:00000003 r4:00000000 r3:00000001
-[   13.923645] [<c01f9a78>] (scheduler_ipi+0x0/0x1c) from [<c01bc458>] (do_IPI+0x9c/0xfc)
-[   13.932006] [<c01bc3bc>] (do_IPI+0x0/0xfc) from [<c06b0888>] (__irq_usr+0x48/0xe0)
-[   13.939971] Exception stack(0xef183fb0 to 0xef183ff8)
-[   13.945281] 3fa0:                                     ffffffc3 0001500c 00000001 0001500c
-[   13.953948] 3fc0: 00000050 400b45f0 400d9000 00000000 00000001 400d9600 6474e552 bea05b3c
-[   13.962585] 3fe0: 400d96c0 bea059c0 400b6574 400b65d8 20000010 ffffffff
-[   13.969573]  r6:00000403 r5:fa240100 r4:ffffffff r3:20000010
-[   13.975585] ---[ end trace efc4896ab0fb62cb ]---
-[   13.980468] possible reason: unannotated irqs-off.
-[   13.985534] irq event stamp: 1610
-[   13.989044] hardirqs last  enabled at (1610): [<c01c703c>] no_work_pending+0x8/0x2c
-[   13.997131] hardirqs last disabled at (1609): [<c01c7024>] ret_slow_syscall+0xc/0x1c
-[   14.005371] softirqs last  enabled at (0): [<c01fe5e4>] copy_process+0x2cc/0xa24
-[   14.013183] softirqs last disabled at (0): [<  (null)>]   (null)
-
-Signed-off-by: Ming Lei <ming.lei@canonical.com>
----
- arch/arm/kernel/entry-armv.S   |    6 +++++-
- arch/arm/kernel/entry-common.S |    2 ++
- 2 files changed, 7 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index e8d8856..90c62cd 100644
---- a/arch/arm/kernel/entry-armv.S
-+++ b/arch/arm/kernel/entry-armv.S
-@@ -435,6 +435,10 @@ __irq_usr:
- 	usr_entry
- 	kuser_cmpxchg_check
- 
-+#ifdef CONFIG_IRQSOFF_TRACER
-+	bl	trace_hardirqs_off
-+#endif
-+
- 	get_thread_info tsk
- #ifdef CONFIG_PREEMPT
- 	ldr	r8, [tsk, #TI_PREEMPT]		@ get preempt count
-@@ -453,7 +457,7 @@ __irq_usr:
- #endif
- 
- 	mov	why, #0
--	b	ret_to_user
-+	b	ret_to_user_from_irq
-  UNWIND(.fnend		)
- ENDPROC(__irq_usr)
- 
-diff --git a/arch/arm/kernel/entry-common.S b/arch/arm/kernel/entry-common.S
-index 1e7b04a..b2a27b6 100644
---- a/arch/arm/kernel/entry-common.S
-+++ b/arch/arm/kernel/entry-common.S
-@@ -64,6 +64,7 @@ work_resched:
- ENTRY(ret_to_user)
- ret_slow_syscall:
- 	disable_irq				@ disable interrupts
-+ENTRY(ret_to_user_from_irq)
- 	ldr	r1, [tsk, #TI_FLAGS]
- 	tst	r1, #_TIF_WORK_MASK
- 	bne	work_pending
-@@ -75,6 +76,7 @@ no_work_pending:
- 	arch_ret_to_user r1, lr
- 
- 	restore_user_regs fast = 0, offset = 0
-+ENDPROC(ret_to_user_from_irq)
- ENDPROC(ret_to_user)
- 
- /*
+	M.
 -- 
-1.7.4.1
-
-
-
---
-Ming Lei
+Reality is an implementation detail.
