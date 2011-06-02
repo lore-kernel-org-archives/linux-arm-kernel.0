@@ -1,51 +1,72 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 02 Jun 2011 14:38:23 -0500
-Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
-	running early
-In-Reply-To: <1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
-References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>	<20110602163152.GH32751@game.jcrosoft.org>
-	<1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
-Message-ID: <4DE7E6AF.4020404@gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Thu, 2 Jun 2011 21:49:47 +0200
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+Message-ID: <201106022149.47936.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2011 11:56 AM, Marc Zyngier wrote:
-> On Thu, 2011-06-02 at 18:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
-> wrote:
->> On 15:03 Wed 01 Jun     , Marc Zyngier wrote:
->>> Currently, the boot CPU has its local timer enabled long after
->>> the delay loop has been calibrated. This makes it impossible to
->>> boot a system that only uses local timers, like the A15.
->>>
->>> Use late_time_init hook to initialize the boot CPU local timer.
->>> Since shmobile is already using this hook, add an ARM specific
->>> arm_late_time_init hook that platforms can use instead.
->>>
->>> Cc: Paul Mundt<lethal@linux-sh.org>
->>> Cc: Magnus Damm<magnus.damm@gmail.com>
->>> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
->> I propose to switch to early platform devce and earlytimer
->>
->> this will avoid the arm_late_time_init hook
->>
->> and will make it cross arch
->
-> I believe this is orthogonal. shmobile (the only ARM user of
-> late_time_init) is already doing some early_platform stuff for its
-> timers.
->
-> What I'm trying to achieve here is to make sure the timer on CPU0 is
-> actually up, running and registered as a clock_event_device before we
-> hit the delay loop.
->
-> Or maybe I've misunderstood what you're pointing me to?
->
+Hi,
 
-I believe he is referring to this patch which generically enables the 
-shmobile code for ARM:
+after upgrading my development kernel from 2.6.38 to 3.0rc1 I get flooded (i.e. 
+it never stops) by messages of the form:
 
-http://www.spinics.net/lists/arm-kernel/msg123736.html
+mmc1: Got data interrupt 0x00100000 even though no data operation was in 
+progress.
+  sdhci: =========== REGISTER DUMP (mmc1)===========
+  sdhci: Sys addr: 0x37b1b000 | Version:  0x00000401
+  sdhci: Blk size: 0x00007200 | Blk cnt:  0x00000000
+  sdhci: Argument: 0x00010000 | Trn mode: 0x00000033
+  sdhci: Present:  0x01e70002 | Host ctl: 0x00000012
+  sdhci: Power:    0x0000000a | Blk gap:  0x00000000
+  sdhci: Wake-up:  0x00000000 | Clock:    0x0000020f
+  sdhci: Timeout:  0x0000000e | Int stat: 0x00108000
+  sdhci: Int enab: 0x02ff000b | Sig enab: 0x02ff000b
+  sdhci: AC12 err: 0x00000000 | Slot int: 0x00000001
+  sdhci: Caps:     0x05e80080 | Caps_1:   0x00000000
+  sdhci: Cmd:      0x00000d1a | Max curr: 0x00000000
+  sdhci: Host ctl2: 0x00000000
+  sdhci: ADMA Err: 0x00000000 | ADMA Ptr: 0x37846808
+  sdhci: ===========================================
 
-I don't think it has been pulled into mainline yet.
 
-Rob
+hardware: S3C2416 based board, mmc0 is an external micro-SD and mmc1 is a
+  mmc1: new high speed MMC card at address 0001
+  mmcblk1: mmc1:0001 HYNIX  1.88 GiB 
+  mmcblk1boot0: mmc1:0001 HYNIX  partition 1 256 KiB
+  mmcblk1boot1: mmc1:0001 HYNIX  partition 2 256 KiB
+   mmcblk1: p1 p2 p3
+   mmcblk1boot1: unknown partition table
+   mmcblk1boot0: unknown partition table
+
+it uses therefore the sdhci-s3c driver.
+
+
+I did some prodding in the code and found the following peculiarities:
+
+- When I remove Kyungmins AUTO_CMD12-quirk in sdhci-s3c it seems I get one 
+functional boot and have only the following messages in the kernel log
+
+  mmcblk1boot0: retrying using single block read
+  mmc1: ADMA error
+  mmcblk1boot0: error -5 transferring data, sector 448, nr 32, card status 
+0x900
+  end_request: I/O error, dev mmcblk1boot0, sector 448
+  Buffer I/O error on device mmcblk1boot0, logical block 56
+  mmcblk1boot1: retrying using single block read
+  mmc1: ADMA error
+  mmcblk1boot1: error -5 transferring data, sector 448, nr 32, card status 
+0x900
+  end_request: I/O error, dev mmcblk1boot1, sector 448
+
+But after a soft reset the irq message flood seems to return.
+
+- When I completely remove the boot partition registration in 
+mmc_blk_alloc_parts() in card/block.c it seems that everything return to 
+normal, i.e. no strange messages at all
+
+
+I'm not sure if this is a problem of only my board or if it happens on more 
+hardware.
+
+
+Heiko
