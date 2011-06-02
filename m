@@ -1,37 +1,61 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 2 Jun 2011 18:57:08 +0900
-Subject: [PATCH 4/5] ARM: S3C6410: Support 800MHz operation in cpufreq
-In-Reply-To: <BANLkTikpO9VR9tqJT_bROA_KfdxOBS7U0Q@mail.gmail.com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
-	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<1306921493-30911-4-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<037201cc2046$f5cc53b0$e164fb10$@com>
-	<20110601104042.GA15387@opensource.wolfsonmicro.com>
-	<038c01cc20b9$a55a5120$f00ef360$@com>
-	<20110602082830.GA3085@opensource.wolfsonmicro.com>
-	<039601cc2109$319c9770$94d5c650$@com>
-	<BANLkTimC=MrmjinzufrnOMSAgiQvVKdWhA@mail.gmail.com>
-	<BANLkTikpO9VR9tqJT_bROA_KfdxOBS7U0Q@mail.gmail.com>
-Message-ID: <BANLkTikJR1CR=fwomzrsRgXib-LUiU=UQw@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 2 Jun 2011 10:59:38 +0100
+Subject: Clarification on ARM V6 context switching code
+In-Reply-To: <20110602081105.GA651@T61>
+References: <20110602081105.GA651@T61>
+Message-ID: <001501cc210b$c8ecc9e0$5ac65da0$@deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 2, 2011 at 6:50 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Thu, Jun 2, 2011 at 3:14 PM, Kyungmin Park <kmpark@infradead.org> wrote:
->>>>
->>>> It's really unfortunate that there's no software visible method I'm
->>>> aware of :/
->>> Unfortunately, There is no method to detect 800Mhz s3c6410 by software.
->>
->> Then how about to introduce the software flags. and set it at each
->> board. It can support the 800MHz.
->> Also this flags are handled at cpufreq drivers properly.
->>
->> How do you think?
->
-> Two SMDKs may have different versions of s3c6410.
-> Which file do we want to set the flags in ?
+Hi Linu,
 
-Does it general case in real? As SMDK is development board. If make a
-real board, it usually uses the same revision chip.
->
+> While trying to understand the v6 context switching code, found some
+> disparity with the code and the architecture specification/TRM.
+
+Ok.
+ 
+> Here is my doubt,
+> 
+> 1. According to the architecture spec(ARM DDI 0406B), while switching
+> the ASID, the architecture expects the TTBR to contain ONLY global
+> mappings except the below cases where we
+> -  switch to a reserved context ID
+> -  disable the non global mappings
+
+Actually, on modern CPUs (Cortex-A15) we can't even use the reserved context
+ID safely.
+
+> as explained in section "Synchronization of changes of ASID and TTBR.
+> 
+> In "cpu_v6_switch_mm" function  in arch/arm/mm/proc-v6.S,
+> we use TTBR0 during the switch which points to process page table
+> having both global and non global entries. We neither switch to a
+> reserved context ID nor disable non global mappings.
+> 
+> This appears to be out of sync with the spec?
+
+It is out of sync with the spec, but the spec is the v7 ARM ARM and covers the
+case of speculating, out-of-order CPUs.
+ 
+> If the above is true, how about using the reserved context id during
+> the switch ?
+
+I don't believe that this is necessary for any existing v6 cores. Since we are
+only using global mappings during context-switch and we assume that no
+speculation is taking place, then not using a reserved ASID should be fine.
+
+Of course, if you're seeing issues on real hardware then this needs to be fixed!
+
+> 2. In the same function, are we not missing a IMB sequence after
+> writing to the context ID register as expected by the  the ARM 11
+> MPCore TRM(ARM DDI 0360F, section  3.4.25 )  ?
+
+Since we don't use the user mappings during context-switch, I don't think an
+instruction barrier is necessary for any existing v6 implementations.
+
+> Please point out if i misunderstood the spec/TRM.
+
+It looks like you've understood the specs, but Linux takes some shortcuts
+because of the nature of real v6 hardware.
+
+Will
