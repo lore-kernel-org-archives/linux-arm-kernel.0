@@ -1,47 +1,142 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 2 Jun 2011 09:40:50 -0600
-Subject: [RFC 2/2] ARM:Tegra: Device Tree Support: Initialize audio card
-	gpio's from the device tree.
-In-Reply-To: <20110601161856.GB15583@opensource.wolfsonmicro.com>
-References: <20110530033826.GE4130@opensource.wolfsonmicro.com>
-	<20110530061155.GC23517@ponder.secretlab.ca>
-	<4DE336A1.5040509@firmworks.com>
-	<20110530070138.GA5036@opensource.wolfsonmicro.com>
-	<8d2515b13c817cc956b185d043bcef00@kernel.crashing.org>
-	<BANLkTi=hkScxYpt449CQCky+bLU3UvkC_A@mail.gmail.com>
-	<4DE403C5.7060003@firmworks.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0498E1C22D@HQMAIL01.nvidia.com>
-	<4DE536AD.5080200@firmworks.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF0498E1C3F5@HQMAIL01.nvidia.com>
-	<20110601161856.GB15583@opensource.wolfsonmicro.com>
-Message-ID: <BANLkTinvdwDHtFQ=Pt5bh=OmMjkzffk8dw@mail.gmail.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Thu, 2 Jun 2011 16:44:02 +0100 (BST)
+Subject: using identity_mapping_add & switching MMU state - how ?
+Message-ID: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 1, 2011 at 10:18 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Wed, Jun 01, 2011 at 08:59:55AM -0700, Stephen Warren wrote:
->
->> My perspective is that cut/pasting the entire SoC definition into a board
->> definition is the devicetree equivalent of having more than one driver
->> per chip, not sharing gpio/pinmux/... code, etc. in the kernel; the very
->> stuff that caused Linus to complain about the state of ARM Linux.
->
-> Very strongly agreed, we've had to do that in the past because of
-> limitations in the device tree infrastructure but if we end up having to
-> cut'n'paste that's not going to be great for maintainability.
-
-+2
-
-cut'n'paste is not an option.  period.  :-)
-
-g.
+Hi,
 
 
->
+I'm trying to find a way to do an MMU off / on transition.
+
+What I want to do is to call cpu_do_resume() from the hibernation restore 
+codepath.
+
+I've succeeded to make this work by adding a test whether the MMU is 
+already on when cpu_resume_mmu() is called.
+
+I'm not sure that sort of thing is proper; hence I've been trying to find 
+a way to disable the MMU before calling cpu_do_resume().
+
+Can't seem to get this to work though; even though I'm creating a separate 
+MMU context that's given 1:1 mappings for all of kernel code/data, 
+execution still hangs as soon as I enable the code section below that 
+switches the MMU off.
 
 
+What I have at the moment is code that looks like this:
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+==============================================================================
+[ ... ]
+unsigned long notrace __swsusp_arch_restore_image(void)
+{
+ 	extern struct pbe *restore_pblist;
+ 	struct pbe *pbe;
+
+ 	/* __swsusp_pg_dir has been created using pgd_alloc(&init_mm); */
+
+ 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
+
+ 	for (pbe = restore_pblist; pbe; pbe = pbe->next)
+ 		copy_page(pbe->orig_address, pbe->address);
+
+ 	flush_tlb_all();
+ 	flush_cache_all();
+
+ 	identity_mapping_add(__swsusp_pg_dir, __pa(_stext), __pa(_etext));
+ 	identity_mapping_add(__swsusp_pg_dir, __pa(_sdata), __pa(_edata));
+
+ 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
+
+ 	flush_tlb_all();
+ 	flush_cache_all();
+
+ 	cpu_proc_fin();		/* turns caches off */
+
+ 	/* caller requires v:p offset to calculate physical addresses */
+ 	return (unsigned long)(PHYS_OFFSET - PAGE_OFFSET);
+}
+
+[ ... ]
+ENTRY(swsusp_arch_resume)
+ 	mov	r2, #PSR_I_BIT | PSR_F_BIT | SVC_MODE
+ 	msr	cpsr_c, r2
+ 	/*
+ 	 * Switch stack to a nosavedata region to make sure image restore
+ 	 * doesn't clobber it underneath itself.
+ 	 */
+ 	ldr	sp, =(__swsusp_resume_stk + PAGE_SIZE / 2)
+ 	bl	__swsusp_arch_restore_image
+
+ 	/*
+ 	 * Restore the CPU registers.
+ 	 */
+ 	mov	r1, r0
+ 	ldr	r0, =(__swsusp_arch_ctx + (NREGS * 4))
+/*
+  * This is what I'm trying to switch off; yet, doing so makes things hang
+  */
+#if 0
+ 	ldr	r2, =cpu_do_resume
+ 	sub	r2, r1			@ __pa()
+ 	ldr	r3, =.Lmmu_is_off
+ 	sub	r3, r1			@ __pa()
+ 	sub	r0, r1			@ __pa()
+ 	ldr	lr, =.Lpost_mmu
+ 	mrc	p15, 0, r1, c1, c0, 0
+ 	bic	r1, #CR_M
+ 	mcr	p15, 0, r1, c1, c0, 0	@ MMU OFF
+
+ 	mrc	p15, 0, r1, c2, c0, 0	@ queue a dependency on CP15
+         sub     pc, r3, r1, lsr #32	@ to local label, phys addr
+.ltorg
+.align 5
+.Lmmu_is_off:
+ 	mov	pc, r2			@ jump to phys cpu_v6_do_resume
+.Lpost_mmu:
+#else
+ 	bl	cpu_do_resume
+#endif
+ 	ldr	r0, =__swsusp_arch_ctx
+ 	ldmia	r0!, {r1-r11,lr}	@ nonvolatile regs
+ 	ldr	sp, [r0]		@ stack
+ 	msr	cpsr, r1
+ 	msr	spsr, r2
+
+ 	mov	r0, #0
+ 	stmfd	sp!, {r0, lr}
+ 	bl	cpu_init		@ reinitialize other modes
+ 	ldmfd	sp!, {r0, pc}
+ENDPROC(swsusp_arch_resume)
+==============================================================================
+
+I.e. it performs the steps:
+
+ 	- flush all caches, tlbs
+ 	- setup identity mappings for all kernel code & data
+ 	- switch to a self-contained pagedir
+ 	- flush again
+ 	- finish cpu (disable caches)
+ 	- switch MMU off, re-read config reg to force necessary wait,
+ 	  and jump to physical address of "self".
+
+
+As said, things work just fine if simply doing the "bl cpu_do_resume" and 
+adding a "MMU already on" check to cpu_resume_mmu().
+
+
+I must be missing something there; I've been reading the ARM kexec 
+postings,
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/020183.html
+
+for the basic idea, and used the style from smp.c (alloc a temporary 
+pagedir, create identity mappings there). Still, there's something not 
+quite right ...
+
+
+Any ideas what I'm missing ?
+Thanks,
+
+FrankH.
