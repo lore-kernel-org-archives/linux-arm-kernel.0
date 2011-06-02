@@ -1,30 +1,26 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 2 Jun 2011 18:31:52 +0200
-Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
-	running early
-In-Reply-To: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
-References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20110602163152.GH32751@game.jcrosoft.org>
+Date: Thu, 2 Jun 2011 18:32:37 +0200
+Subject: [PATCH RFC] at91: Use "pclk" as con_id on at91cap9 and at91rm9200
+In-Reply-To: <BANLkTikDJhE6dbGmz5QAgEJeKRknp2jDpw@mail.gmail.com>
+References: <BANLkTikDJhE6dbGmz5QAgEJeKRknp2jDpw@mail.gmail.com>
+Message-ID: <20110602163237.GI32751@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15:03 Wed 01 Jun     , Marc Zyngier wrote:
-> Currently, the boot CPU has its local timer enabled long after
-> the delay loop has been calibrated. This makes it impossible to
-> boot a system that only uses local timers, like the A15.
+On 01:36 Thu 02 Jun     , Joachim Eastwood wrote:
+> Hello,
 > 
-> Use late_time_init hook to initialize the boot CPU local timer.
-> Since shmobile is already using this hook, add an ARM specific
-> arm_late_time_init hook that platforms can use instead.
+> I am not 100% sure this is the right thing to do, but it makes the
+> atmel-ssc driver happy on my at91rm9200 board.
 > 
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: Magnus Damm <magnus.damm@gmail.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-I propose to switch to early platform devce and earlytimer
-
-this will avoid the arm_late_time_init hook
-
-and will make it cross arch
+> 
+> 
+> This unifies the con_id across all at91 machines.
+> 
+> The atmel-ssc driver expects the con_id to be "pclk" or it will fail probing.
+> 
+> Signed-off-by: Joachim Eastwood <joachim.eastwood@jotron.com>
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
 Best Regards,
 J.
