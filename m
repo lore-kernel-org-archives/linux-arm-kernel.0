@@ -1,93 +1,164 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Fri, 3 Jun 2011 00:21:50 +0800
-Subject: [RFC 1/2] ARM:Tegra: Device Tree Support: Initialize the audio
-	card from the device tree.
-In-Reply-To: <20110602160445.GA8373@ponder.secretlab.ca>
-References: <20110527205444.21000.90209.stgit@riker>
-	<20110527205706.21000.34832.stgit@riker>
-	<BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
-	<BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
-	<BANLkTikWpiY_o27OF-Jxvq7iPeWzrAYOsQ@mail.gmail.com>
-	<20110602160445.GA8373@ponder.secretlab.ca>
-Message-ID: <BANLkTikGp_O-Wd3nMhbV+-RLeXZoWeB6eQ@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 2 Jun 2011 17:22:07 +0100
+Subject: using identity_mapping_add & switching MMU state - how ?
+In-Reply-To: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
+Message-ID: <20110602162207.GB2156@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/3 Grant Likely <grant.likely@secretlab.ca>
->
-> On Thu, Jun 02, 2011 at 05:07:02PM +0800, Barry Song wrote:
-> > 2011/6/2 Grant Likely <grant.likely@secretlab.ca>:
-> > > On Wed, Jun 1, 2011 at 1:07 AM, Barry Song <21cnbao@gmail.com> wrote:
-> > >> 2011/5/28 John Bonesio <bones@secretlab.ca>:
-> > >>> This patch makes it so the top level audio card is initialized from the device
-> > >>> tree. This is just the first step getting the audio complex of devices
-> > >>> iniialized from device tree nodes.
-> > >>>
-> > >>> Signed-off-by: John Bonesio<bones@secretlab.ca>
-> > >>> ---
-> > >>>
-> > >>> ?arch/arm/boot/dts/tegra-harmony.dts | ? ?4 +++
-> > >>> ?arch/arm/mach-tegra/board-dt.c ? ? ?| ? ?3 ++
-> > >>> ?sound/soc/tegra/harmony.c ? ? ? ? ? | ? 45 ++++++++++++++++++++++++++++++++---
-> > >>> ?3 files changed, 48 insertions(+), 4 deletions(-)
-> > >>>
-> > >>> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
-> > >>> index 05521a5..217a7f0 100644
-> > >>> --- a/arch/arm/boot/dts/tegra-harmony.dts
-> > >>> +++ b/arch/arm/boot/dts/tegra-harmony.dts
-> > >>> @@ -53,6 +53,10 @@
-> > >>> ? ? ? ? ? ? ? ?clock-frequency = <400000>;
-> > >>> ? ? ? ?};
-> > >>>
-> > >>> + ? ? ? harmony_audio: audio_card {
-> > >>> + ? ? ? ? ? ? ? compatible = "nvidia,harmony-audio";
-> > >>> + ? ? ? };
-> > >>> +
-> > >>> ? ? ? ?serial at 70006300 {
-> > >>> ? ? ? ? ? ? ? ?status = "ok";
-> > >>> ? ? ? ? ? ? ? ?clock-frequency = < 216000000 >;
-> > >>> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
-> > >>> index c498e84..a569ad9 100644
-> > >>> --- a/arch/arm/mach-tegra/board-dt.c
-> > >>> +++ b/arch/arm/mach-tegra/board-dt.c
-> > >>> @@ -56,6 +56,9 @@ static struct platform_device *tegra250_devices[] __initdata = {
-> > >>> ? ? ? ?&tegra_i2c_device2,
-> > >>> ? ? ? ?&tegra_i2c_device3,
-> > >>> ? ? ? ?&tegra_i2c_device4,
-> > >>> + ? ? ? &tegra_i2s_device1,
-> > >>> + ? ? ? &tegra_das_device,
-> > >>> + ? ? ? &tegra_pcm_device,
-> > >>
-> > >> i am thinking whether platform_device should be created by
-> > >> of_platform_device_create after scanning device tree, but not by
-> > >> hard-code? looks like the two patches are only trying to let device
-> > >> tree deliver gpio to drivers?
-> > >
-> > > Can you please restate your question? ?I don't think I understand what
-> > > you are trying to ask.
-> >
-> > i mean we don't need to have this platform device registerred by the
-> > old way here. we may get it by matching information in dts and delete
-> > all platform_device and related codes in arch/arm. For example:
->
-> Ah, I see what you mean. ?Yes, it is ultimately the goal to register
-> all the device from data in the device tree, but we're taking things
-> one step at a time. ?For this series, it is expedient to register the
-> on-chip devices, and to move to dynamic registration later.
->
-> Right now we can't do dynamic registration for on-chip devices in a
-> lot of cases because we don't have the infrastructure to hook up the
-> associated struct clks.
-Arnd has required me to use device tree in our new SoC for the coming
-upstream. so i am trying to define a property like clock = "uart" in
-dts. then in drivers,
-i get this  string by:
-clk = of_get_property(np, "clock", NULL);
-then request this clock by clk_get().
+On Thu, Jun 02, 2011 at 04:44:02PM +0100, Frank Hofmann wrote:
+> Hi,
+> 
+> 
+> I'm trying to find a way to do an MMU off / on transition.
+> 
+> What I want to do is to call cpu_do_resume() from the hibernation
+> restore codepath.
+> 
+> I've succeeded to make this work by adding a test whether the MMU is
+> already on when cpu_resume_mmu() is called.
+> 
+> I'm not sure that sort of thing is proper; hence I've been trying to
+> find a way to disable the MMU before calling cpu_do_resume().
+> 
+> Can't seem to get this to work though; even though I'm creating a
+> separate MMU context that's given 1:1 mappings for all of kernel
+> code/data, execution still hangs as soon as I enable the code
+> section below that switches the MMU off.
 
-it does work for the moment, but maybe is not what you like :-)
+I think Per Fransson has been working on this area for kexec.
 
->
-> g.
->
->
+Given the intrinsic scariness of code for turning MMUs off, I think
+it would be best if there's a single common implementation which is
+usable for hibernation and kexec, and any other code which needs
+to do this (CPU hotplug?)
+
+Maybe Per has some ideas on how to do that...
+
+Cheers
+---Dave
+
+> 
+> 
+> What I have at the moment is code that looks like this:
+> 
+> ==============================================================================
+> [ ... ]
+> unsigned long notrace __swsusp_arch_restore_image(void)
+> {
+> 	extern struct pbe *restore_pblist;
+> 	struct pbe *pbe;
+> 
+> 	/* __swsusp_pg_dir has been created using pgd_alloc(&init_mm); */
+> 
+> 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
+> 
+> 	for (pbe = restore_pblist; pbe; pbe = pbe->next)
+> 		copy_page(pbe->orig_address, pbe->address);
+> 
+> 	flush_tlb_all();
+> 	flush_cache_all();
+> 
+> 	identity_mapping_add(__swsusp_pg_dir, __pa(_stext), __pa(_etext));
+> 	identity_mapping_add(__swsusp_pg_dir, __pa(_sdata), __pa(_edata));
+> 
+> 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
+> 
+> 	flush_tlb_all();
+> 	flush_cache_all();
+> 
+> 	cpu_proc_fin();		/* turns caches off */
+> 
+> 	/* caller requires v:p offset to calculate physical addresses */
+> 	return (unsigned long)(PHYS_OFFSET - PAGE_OFFSET);
+> }
+> 
+> [ ... ]
+> ENTRY(swsusp_arch_resume)
+> 	mov	r2, #PSR_I_BIT | PSR_F_BIT | SVC_MODE
+> 	msr	cpsr_c, r2
+> 	/*
+> 	 * Switch stack to a nosavedata region to make sure image restore
+> 	 * doesn't clobber it underneath itself.
+> 	 */
+> 	ldr	sp, =(__swsusp_resume_stk + PAGE_SIZE / 2)
+> 	bl	__swsusp_arch_restore_image
+> 
+> 	/*
+> 	 * Restore the CPU registers.
+> 	 */
+> 	mov	r1, r0
+> 	ldr	r0, =(__swsusp_arch_ctx + (NREGS * 4))
+> /*
+>  * This is what I'm trying to switch off; yet, doing so makes things hang
+>  */
+> #if 0
+> 	ldr	r2, =cpu_do_resume
+> 	sub	r2, r1			@ __pa()
+> 	ldr	r3, =.Lmmu_is_off
+> 	sub	r3, r1			@ __pa()
+> 	sub	r0, r1			@ __pa()
+> 	ldr	lr, =.Lpost_mmu
+> 	mrc	p15, 0, r1, c1, c0, 0
+> 	bic	r1, #CR_M
+> 	mcr	p15, 0, r1, c1, c0, 0	@ MMU OFF
+> 
+> 	mrc	p15, 0, r1, c2, c0, 0	@ queue a dependency on CP15
+>         sub     pc, r3, r1, lsr #32	@ to local label, phys addr
+> .ltorg
+> .align 5
+> .Lmmu_is_off:
+> 	mov	pc, r2			@ jump to phys cpu_v6_do_resume
+> .Lpost_mmu:
+> #else
+> 	bl	cpu_do_resume
+> #endif
+> 	ldr	r0, =__swsusp_arch_ctx
+> 	ldmia	r0!, {r1-r11,lr}	@ nonvolatile regs
+> 	ldr	sp, [r0]		@ stack
+> 	msr	cpsr, r1
+> 	msr	spsr, r2
+> 
+> 	mov	r0, #0
+> 	stmfd	sp!, {r0, lr}
+> 	bl	cpu_init		@ reinitialize other modes
+> 	ldmfd	sp!, {r0, pc}
+> ENDPROC(swsusp_arch_resume)
+> ==============================================================================
+> 
+> I.e. it performs the steps:
+> 
+> 	- flush all caches, tlbs
+> 	- setup identity mappings for all kernel code & data
+> 	- switch to a self-contained pagedir
+> 	- flush again
+> 	- finish cpu (disable caches)
+> 	- switch MMU off, re-read config reg to force necessary wait,
+> 	  and jump to physical address of "self".
+> 
+> 
+> As said, things work just fine if simply doing the "bl
+> cpu_do_resume" and adding a "MMU already on" check to
+> cpu_resume_mmu().
+> 
+> 
+> I must be missing something there; I've been reading the ARM kexec
+> postings,
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2010-July/020183.html
+> 
+> for the basic idea, and used the style from smp.c (alloc a temporary
+> pagedir, create identity mappings there). Still, there's something
+> not quite right ...
+> 
+> 
+> Any ideas what I'm missing ?
+> Thanks,
+> 
+> FrankH.
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
