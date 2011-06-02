@@ -1,40 +1,27 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 2 Jun 2011 15:26:39 -0600 (MDT)
-Subject: [PATCH 9/10] arch/arm/mach-omap2/clock.c: add missing clk_put
-In-Reply-To: <1306948213-20767-9-git-send-email-julia@diku.dk>
-References: <1306948213-20767-9-git-send-email-julia@diku.dk>
-Message-ID: <alpine.DEB.2.00.1106021526220.26852@utopia.booyaka.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 2 Jun 2011 22:36:56 +0100
+Subject: [RFC 1/2] ARM:Tegra: Device Tree Support: Initialize the audio
+	card from the device tree.
+In-Reply-To: <20110602160445.GA8373@ponder.secretlab.ca>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205706.21000.34832.stgit@riker>
+	<BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
+	<BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
+	<BANLkTikWpiY_o27OF-Jxvq7iPeWzrAYOsQ@mail.gmail.com>
+	<20110602160445.GA8373@ponder.secretlab.ca>
+Message-ID: <20110602213656.GB10532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Jun 2011, Julia Lawall wrote:
+On Thu, Jun 02, 2011 at 10:04:45AM -0600, Grant Likely wrote:
+> Right now we can't do dynamic registration for on-chip devices in a
+> lot of cases because we don't have the infrastructure to hook up the
+> associated struct clks.
 
-> From: Julia Lawall <julia@diku.dk>
-> 
-> Add missing call to clk_put.
-> 
-> A simplified version of the semantic match that finds this problem is as
-> follows: (http://coccinelle.lip6.fr/)
-> 
-> // <smpl>
-> @r exists@
-> expression e1,e2;
-> statement S;
-> @@
-> 
-> e1 = clk_get at p1(...);
-> ... when != e1 = e2
->     when != clk_put(e1)
->     when any
-> if (...) { ... when != clk_put(e1)
->                when != if (...) { ... clk_put(e1) ... }
-> * return at p3 ...;
->  } else S
-> // </smpl>
-> 
-> Signed-off-by: Julia Lawall <julia@diku.dk>
+I've been wondering about this, and I don't see it as a blocking problem
+as you seem to be.
 
-Acked-by: Paul Walmsley <paul@pwsan.com>
-
-
-- Paul
+I assume platform devices have stable names when they're created from
+the device tree?  If yes, there's no problem having the DT start to
+describe the SoC specific devices _today_ - all that the clk API using
+clkdev requires is a stable device name.
