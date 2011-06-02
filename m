@@ -1,95 +1,103 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Thu, 2 Jun 2011 14:24:09 +0530
-Subject: [PATCH 01/10] mm: Introduce the memory regions data structure
-In-Reply-To: <1306863260.15490.35.camel@nimitz>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<1306499498-14263-2-git-send-email-ankita@in.ibm.com>
-	<1306510203.22505.69.camel@nimitz>
-	<20110527182041.GM5654@dirshya.in.ibm.com>
-	<1306531912.22505.84.camel@nimitz>
-	<20110529081618.GC8333@in.ibm.com>
-	<1306863260.15490.35.camel@nimitz>
-Message-ID: <20110602085409.GA28096@in.ibm.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Thu, 2 Jun 2011 17:07:02 +0800
+Subject: [RFC 1/2] ARM:Tegra: Device Tree Support: Initialize the audio
+	card from the device tree.
+In-Reply-To: <BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205706.21000.34832.stgit@riker>
+	<BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
+	<BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
+Message-ID: <BANLkTikWpiY_o27OF-Jxvq7iPeWzrAYOsQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On Tue, May 31, 2011 at 10:34:20AM -0700, Dave Hansen wrote:
-> On Sun, 2011-05-29 at 13:46 +0530, Ankita Garg wrote:
-> > > It's worth noting that we already do targeted reclaim on boundaries
-> > > other than zones.  The lumpy reclaim and memory compaction logically do
-> > > the same thing.  So, it's at least possible to do this without having
-> > > the global LRU designed around the way you want to reclaim.
-> > >
-> > My understanding maybe incorrect, but doesn't both lumpy reclaim and
-> > memory compaction still work under zone boundary ? While trying to free
-> > up higher order pages, lumpy reclaim checks to ensure that pages that
-> > are selected do not cross zone boundary. Further, compaction walks
-> > through the pages in a zone and tries to re-arrange them.
-> 
-> I'm asserting that we don't need memory regions in the
-> 
-> 	pgdat->regions[]->zones[]
-> 
-> layout to do what you're asking for.
-> 
-> Lumpy reclaim is limited to a zone because it's trying to satisfy and
-> allocation request that came in for *THAT* *ZONE*.  It's useless to go
-> clear out other zones.  In your case, you don't care about zone
-> boundaries: you want to reclaim things regardless.
+2011/6/2 Grant Likely <grant.likely@secretlab.ca>:
+> On Wed, Jun 1, 2011 at 1:07 AM, Barry Song <21cnbao@gmail.com> wrote:
+>> 2011/5/28 John Bonesio <bones@secretlab.ca>:
+>>> This patch makes it so the top level audio card is initialized from the device
+>>> tree. This is just the first step getting the audio complex of devices
+>>> iniialized from device tree nodes.
+>>>
+>>> Signed-off-by: John Bonesio<bones@secretlab.ca>
+>>> ---
+>>>
+>>> ?arch/arm/boot/dts/tegra-harmony.dts | ? ?4 +++
+>>> ?arch/arm/mach-tegra/board-dt.c ? ? ?| ? ?3 ++
+>>> ?sound/soc/tegra/harmony.c ? ? ? ? ? | ? 45 ++++++++++++++++++++++++++++++++---
+>>> ?3 files changed, 48 insertions(+), 4 deletions(-)
+>>>
+>>> diff --git a/arch/arm/boot/dts/tegra-harmony.dts b/arch/arm/boot/dts/tegra-harmony.dts
+>>> index 05521a5..217a7f0 100644
+>>> --- a/arch/arm/boot/dts/tegra-harmony.dts
+>>> +++ b/arch/arm/boot/dts/tegra-harmony.dts
+>>> @@ -53,6 +53,10 @@
+>>> ? ? ? ? ? ? ? ?clock-frequency = <400000>;
+>>> ? ? ? ?};
+>>>
+>>> + ? ? ? harmony_audio: audio_card {
+>>> + ? ? ? ? ? ? ? compatible = "nvidia,harmony-audio";
+>>> + ? ? ? };
+>>> +
+>>> ? ? ? ?serial at 70006300 {
+>>> ? ? ? ? ? ? ? ?status = "ok";
+>>> ? ? ? ? ? ? ? ?clock-frequency = < 216000000 >;
+>>> diff --git a/arch/arm/mach-tegra/board-dt.c b/arch/arm/mach-tegra/board-dt.c
+>>> index c498e84..a569ad9 100644
+>>> --- a/arch/arm/mach-tegra/board-dt.c
+>>> +++ b/arch/arm/mach-tegra/board-dt.c
+>>> @@ -56,6 +56,9 @@ static struct platform_device *tegra250_devices[] __initdata = {
+>>> ? ? ? ?&tegra_i2c_device2,
+>>> ? ? ? ?&tegra_i2c_device3,
+>>> ? ? ? ?&tegra_i2c_device4,
+>>> + ? ? ? &tegra_i2s_device1,
+>>> + ? ? ? &tegra_das_device,
+>>> + ? ? ? &tegra_pcm_device,
+>>
+>> i am thinking whether platform_device should be created by
+>> of_platform_device_create after scanning device tree, but not by
+>> hard-code? looks like the two patches are only trying to let device
+>> tree deliver gpio to drivers?
 >
+> Can you please restate your question? ?I don't think I understand what
+> you are trying to ask.
 
-Ok true. So I guess lumpy reclaim could be extended to just free up
-pages spanning the entire region and not just a particular zone.
- 
-> There was a "cma: Contiguous Memory Allocator added" patch posted a bit
-> ago to linux-mm at .  You might want to take a look at it for some
-> inspiration.
-> 
+i mean we don't need to have this platform device registerred by the
+old way here. we may get it by matching information in dts and delete
+all platform_device and related codes in arch/arm. For example:
+dts:
+        amba {
+                compatible = "simple-bus";
+                #address-cells = <1>;
+                #size-cells = <1>;
+                ranges;
 
-We did take a look at CMA, but the use case seems to be slightly
-different. Inorder to allocate large contiguous pages, CMA creates a new
-miratetype called MIGRATE_CMA, which effectively isolates pages from the
-buddy allocator.
+                harmony_audio: audio_card {
+                       compatible = "nvidia,harmony-audio";
+                       .....
+                };
+                ....
+                ....
+       }
+then in arch/arm board file, let the platform device registerred automatically:
 
-> I think you also need to clearly establish here why any memory that
-> you're going to want to power off can't use (or shouldn't use)
-> ZONE_MOVABLE.  It seems a bit silly to have it there, and ignore it for
-> such a similar use case.  Memory hot-remove and power-down are not
-> horrifically different beasts.
-> 
+static struct of_device_id cell_bus_ids[] __initdata = {
+        { .compatible = "simple-bus", },
+        {},
+};
 
-Memory hot add and remove are definite usecases for conserving memory
-power. In this first version of the RFC patch, I have not yet added the
-support for ZONE_MOVABLE. I am currently testing the patch that creates
-movable zones under regions, thus ensuring that it can be easily
-evacuated using page migration.
+static int __init cell_publish_devices(void)
+{
+        of_platform_bus_probe(NULL, cell_bus_ids, NULL);
 
-> BTW, that's probably something else to add to your list: make sure
-> mem_map[]s for memory in a region get allocated *in* that region. 
-> 
+        return 0;
+}
 
-There are a few reasons why we decided that we must have all the kernel
-non-movable data structures co-located in a single region as much as
-possible:
 
-- Having a region devoid of non-movable memory will enable the complete
-  memory region to be even hot-removed
-- If the memory is evacuated and later turned off (loss of content),
-  then the mem_map[]s will be lost. So when the memory comes back on,
-  the mem_map[]s will need to be reinitialized. While the hotplug
-  approach will work for exploiting PASR, it may not be the most
-  efficient one
-- When the memory is put into a lower power state, having the
-  mem_maps[]s in a single region would ensure that any references to
-  just the struct pages will not lead to references to the actual memory
-
-However, it might be worth taking a look at it again.
-
--- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+>
+> g.
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
