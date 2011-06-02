@@ -1,99 +1,68 @@
-From: richard.zhu@linaro.org (Richard Zhu)
-Date: Thu, 2 Jun 2011 17:12:10 +0800
-Subject: [RFC] mmc: Enable the ADMA on esdhc imx driver
-Message-ID: <1307005930-10935-1-git-send-email-richard.zhu@linaro.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Thu, 02 Jun 2011 18:27:27 +0900
+Subject: [PATCH] ARM: samsung: Remove unused onenand plat functions
+Message-ID: <20110602092727.GA14973@july>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eanble the ADMA mode on freescale esdhc imx driver,
-tested on MX51 and MX53.
+From: Kyungmin Park <kyungmin.park@samsung.com>
 
-Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+There's no place to use these functions.
+and actually no need to set the platform data.
+
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- drivers/mmc/host/sdhci-esdhc-imx.c |   40 ++++++++++++++++++++++++++++++-----
- 1 files changed, 34 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index a19967d..64f33cb 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -31,6 +31,8 @@
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
+diff --git a/arch/arm/plat-s5p/dev-onenand.c b/arch/arm/plat-s5p/dev-onenand.c
+index 6db9262..20336c8 100644
+--- a/arch/arm/plat-s5p/dev-onenand.c
++++ b/arch/arm/plat-s5p/dev-onenand.c
+@@ -15,8 +15,6 @@
  
-+#define  SDHCI_VENDOR_SPEC_INT_ADMA_ERR	0x10000000
-+
- #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
- /*
-  * The CMDTYPE of the CMD register (offset 0xE) should be set to
-@@ -80,6 +82,20 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- 			val |= SDHCI_CARD_PRESENT;
- 	}
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/onenand.h>
  
-+	if (unlikely(reg == SDHCI_CAPABILITIES)) {
-+		if (val & SDHCI_CAN_DO_ADMA1) {
-+			val &= ~SDHCI_CAN_DO_ADMA1;
-+			val |= SDHCI_CAN_DO_ADMA2;
-+		}
-+	}
-+
-+	if (unlikely(reg == SDHCI_INT_STATUS)) {
-+		if (val & SDHCI_VENDOR_SPEC_INT_ADMA_ERR) {
-+			val &= ~SDHCI_VENDOR_SPEC_INT_ADMA_ERR;
-+			val |= SDHCI_INT_ADMA_ERROR;
-+		}
-+	}
-+
- 	return val;
- }
+ #include <mach/irqs.h>
+ #include <mach/map.h>
+@@ -45,13 +43,3 @@ struct platform_device s5p_device_onenand = {
+ 	.num_resources	= ARRAY_SIZE(s5p_onenand_resources),
+ 	.resource	= s5p_onenand_resources,
+ };
+-
+-void s5p_onenand_set_platdata(struct onenand_platform_data *pdata)
+-{
+-	struct onenand_platform_data *pd;
+-
+-	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
+-	if (!pd)
+-		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+-	s5p_device_onenand.dev.platform_data = pd;
+-}
+diff --git a/arch/arm/plat-samsung/dev-onenand.c b/arch/arm/plat-samsung/dev-onenand.c
+index 45ec732..f54ae71 100644
+--- a/arch/arm/plat-samsung/dev-onenand.c
++++ b/arch/arm/plat-samsung/dev-onenand.c
+@@ -13,8 +13,6 @@
  
-@@ -105,6 +121,13 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
- 	}
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+-#include <linux/mtd/mtd.h>
+-#include <linux/mtd/onenand.h>
  
-+	if (unlikely((reg == SDHCI_INT_ENABLE)
-+				|| (reg == SDHCI_SIGNAL_ENABLE))) {
-+		if (val & SDHCI_INT_ADMA_ERROR) {
-+			val &= ~SDHCI_INT_ADMA_ERROR;
-+			val |= SDHCI_VENDOR_SPEC_INT_ADMA_ERR;
-+		}
-+	}
- 	writel(val, host->ioaddr + reg);
- }
- 
-@@ -166,12 +189,16 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
- 	case SDHCI_HOST_CONTROL:
- 		/* FSL messed up here, so we can just keep those two */
- 		new_val = val & (SDHCI_CTRL_LED | SDHCI_CTRL_4BITBUS);
--		/* ensure the endianess */
-+		/* ensure the endi1ness */
- 		new_val |= ESDHC_HOST_CONTROL_LE;
--		/* DMA mode bits are shifted */
--		new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-+		if (val & SDHCI_CTRL_DMA_MASK) {
-+			/* DMA mode bits are shifted */
-+			new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-+
-+			esdhc_clrset_le(host, 0xffff, new_val, reg);
-+		} else
-+			esdhc_clrset_le(host, 0xff, val, reg);
- 
--		esdhc_clrset_le(host, 0xffff, new_val, reg);
- 		return;
- 	}
- 	esdhc_clrset_le(host, 0xff, val, reg);
-@@ -322,9 +349,10 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- }
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_HISPD_BIT
-+			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
-+			| SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC
- 			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
--	/* ADMA has issues. Might be fixable */
- 	.ops = &sdhci_esdhc_ops,
- 	.init = esdhc_pltfm_init,
- 	.exit = esdhc_pltfm_exit,
--- 
-1.7.1
+ #include <mach/irqs.h>
+ #include <mach/map.h>
+@@ -43,13 +41,3 @@ struct platform_device s3c_device_onenand = {
+ 	.num_resources	= ARRAY_SIZE(s3c_onenand_resources),
+ 	.resource	= s3c_onenand_resources,
+ };
+-
+-void s3c_onenand_set_platdata(struct onenand_platform_data *pdata)
+-{
+-	struct onenand_platform_data *pd;
+-
+-	pd = kmemdup(pdata, sizeof(struct onenand_platform_data), GFP_KERNEL);
+-	if (!pd)
+-		printk(KERN_ERR "%s: no memory for platform data\n", __func__);
+-	s3c_device_onenand.dev.platform_data = pd;
+-}
