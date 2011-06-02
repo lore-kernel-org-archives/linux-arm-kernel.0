@@ -1,48 +1,115 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 3 Jun 2011 00:01:20 +0200
-Subject: [GIT PULL] scalable TWD localtimer
-Message-ID: <BANLkTik0TVpfax1Fe8c_6A9SFUNzfDbxyw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri,  3 Jun 2011 01:27:37 +0300
+Subject: [RFC 0/6] iommu: generic api migration and grouping
+Message-ID: <1307053663-24572-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+First stab at iommu consolidation:
 
-please consider pulling this for the -rc series since I see this as a
-horrible bug that Thomas just fixed the infrastructure to properly
-counter the week before the merge window.
+- Migrate OMAP's iommu driver to the generic iommu API. With this in hand,
+  users can now start using the generic iommu layer instead of calling
+  omap-specific iommu API.
 
-You probably know the story but basically there is one clockline
-into the ARM-supplied MPCore thing, and it inevitably also clocks
-the TWD. Sadly that includes the localtimer, which will make all
-clockevents scale in both directions, firing too late or too early
-as compared to desired wall-clock time (or system clocksource) as
-the clock speed of the core is changed. Right now there is no
-compensation whatsoever for this so to run the system reliably
-on v3.0-rc1, cpufreq has to be disabled.
+  New code that requires functionality missing from the generic iommu api,
+  will add that functionality in the generic framework (e.g. adding framework
+  awareness to multi page sizes, supported by the underlying hardware, will
+  avoid the otherwise-inevitable code duplication when mapping a memory
+  region).
 
-Thomas and Colin did the grunt work, I added a scaling smp_twd
-clock reflecting the Ux500 cpufreq changes, and now it is rock solid
-as far as I can tell.
+  OMAP-specific api that is still exposed in the omap iommu driver can
+  now be either moved to the generic iommu framework, or just removed (if not
+  used).
 
-I couldn't test this in next since it messes around in your tree,
-if you don't think this is -rc material please consider pulling into
-the devel branch so we get early testing of it in -next as an
-alternative route to mainline.
+  This api (and other omap-specific primitives like struct iommu) needs to
+  be omapified (i.e. renamed to include an 'omap_' prefix). At this early
+  point of this patch set this is too much churn though, so I'll do that
+  in the following iteration, after (and if), the general direction is
+  accepted.
+  
+- Migrate OMAP's iovmm (virtual memory manager) driver to the generic
+  iommu API. With this in hand, iovmm no longer uses omap-specific api
+  for mapping/unmapping operations. Nevertheless, iovmm is still coupled
+  with omap's iommu even with this change: it assumes omap page sizes,
+  and it uses omap's iommu objects to maintain its internal state.
 
-The following changes since commit 55922c9d1b84b89cb946c777fddccb3247e7df2c:
+  Further generalizing of iovmm strongly depends on our broader plans for
+  providing a generic virtual memory manager and allocation framework
+  (which, as discussed, should be separated from a specific mapper).
 
-  Linux 3.0-rc1 (2011-05-29 17:43:36 -0700)
+  iovmm has a mainline user: omap3isp, and therefore must be maintained,
+  but new potential users will either have to generalize it, or come up
+  with a different generic framework that will replace it.
 
-are available in the git repository at:
- git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-twd-clockevents
+- Migrate OMAP's iommu mainline user, omap3isp, to the generic API as well
+  (so it doesn't break). As with iovmm, omap3isp still depends on
+  omap's iommu, mainly because iovmm depends on it, but also for
+  iommu context saving and restoring.
 
-Colin Cross (1):
-      ARM: smp_twd: Reconfigure clockevents after cpufreq change
+  It is definitely desirable to completely remove omap3isp's dependency
+  on the omap-specific iommu layer, and that will be possible as the
+  required functionality will be added to generic framework.
 
-Linus Walleij (1):
-      mach-ux500: register a clock for the SMP TWD
+- Create a dedicated iommu drivers folder (and put the base iommu code there)
+- Move OMAP's and MSM's iommu drivers to that drivers iommu folder
 
- arch/arm/kernel/smp_twd.c   |   90 ++++++++++++++++++++++++++++++++++++++++---
- arch/arm/mach-ux500/clock.c |   48 +++++++++++++++++++++++
- 2 files changed, 132 insertions(+), 6 deletions(-)
+  Putting all iommu drivers together will ease finding similarities
+  between different platforms, with the intention of solving problems once,
+  in a generic framework which everyone can use.
+
+  I've only moved the omap and msm implementations for now, to demonstrate
+  the idea (and support the ARM diet :), but if this is found desirable,
+  we can bring in intel-iommu.c and amd_iommu.c as well.
+
+Meta:
+
+- This patch set is not bisectable; it was splitted (and ordered) this way
+  to ease its review. Later iterations of this patch set will fix that
+  (most likely by squashing the first three patches)
+- Based on and tested with 3.0-rc1
+- OMAP's iommu code was tested on both OMAP3 and OMAP4
+- omap3isp code was tested with a sensor-less OMAP3 (memory-to-memory only)
+  (thanks Laurent Pinchart for showing me the magic needed to test omap3isp :)
+- MSM code was only compile tested
+
+Ohad Ben-Cohen (6):
+  omap: iommu: generic iommu api migration
+  omap: iovmm: generic iommu api migration
+  media: omap3isp: generic iommu api migration
+  drivers: iommu: move to a dedicated folder
+  omap: iommu/iovmm: move to dedicated iommu folder
+  msm: iommu: move to dedicated iommu drivers folder
+
+ arch/arm/mach-msm/Kconfig                          |   15 -
+ arch/arm/mach-msm/Makefile                         |    2 +-
+ arch/arm/plat-omap/Kconfig                         |   12 -
+ arch/arm/plat-omap/Makefile                        |    2 -
+ arch/arm/plat-omap/include/plat/iommu.h            |    3 +-
+ arch/arm/plat-omap/{ => include/plat}/iopgtable.h  |   18 ++
+ arch/arm/plat-omap/include/plat/iovmm.h            |   27 +-
+ arch/x86/Kconfig                                   |    5 +-
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/base/Makefile                              |    1 -
+ drivers/iommu/Kconfig                              |   32 +++
+ drivers/iommu/Makefile                             |    5 +
+ drivers/{base => iommu}/iommu.c                    |    0
+ .../mach-msm/iommu.c => drivers/iommu/msm-iommu.c  |    0
+ .../iommu/omap-iommu-debug.c                       |    2 +-
+ .../iommu.c => drivers/iommu/omap-iommu.c          |  290 +++++++++++++++++---
+ .../iovmm.c => drivers/iommu/omap-iovmm.c          |  113 +++++---
+ drivers/media/video/Kconfig                        |    2 +-
+ drivers/media/video/omap3isp/isp.c                 |   41 +++-
+ drivers/media/video/omap3isp/isp.h                 |    3 +
+ drivers/media/video/omap3isp/ispccdc.c             |   16 +-
+ drivers/media/video/omap3isp/ispstat.c             |    6 +-
+ drivers/media/video/omap3isp/ispvideo.c            |    4 +-
+ 24 files changed, 451 insertions(+), 151 deletions(-)
+ rename arch/arm/plat-omap/{ => include/plat}/iopgtable.h (84%)
+ create mode 100644 drivers/iommu/Kconfig
+ create mode 100644 drivers/iommu/Makefile
+ rename drivers/{base => iommu}/iommu.c (100%)
+ rename arch/arm/mach-msm/iommu.c => drivers/iommu/msm-iommu.c (100%)
+ rename arch/arm/plat-omap/iommu-debug.c => drivers/iommu/omap-iommu-debug.c (99%)
+ rename arch/arm/plat-omap/iommu.c => drivers/iommu/omap-iommu.c (77%)
+ rename arch/arm/plat-omap/iovmm.c => drivers/iommu/omap-iovmm.c (85%)
