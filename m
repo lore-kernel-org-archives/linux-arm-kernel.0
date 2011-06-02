@@ -1,25 +1,41 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Thu, 2 Jun 2011 12:18:35 +0200
-Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
-In-Reply-To: <20110602094622.GS3660@n2100.arm.linux.org.uk>
-References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
-	<20110602094622.GS3660@n2100.arm.linux.org.uk>
-Message-ID: <4DE7637B.3060901@stericsson.com>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Thu, 2 Jun 2011 12:29:05 +0200 (CEST)
+Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
+In-Reply-To: <alpine.LFD.2.02.1106021134190.3078@ionos>
+References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
+	<alpine.LFD.2.02.1105312319530.3078@ionos>
+	<BANLkTi=UyypKZUQOCCL-KWyAbMQBKY4ccg@mail.gmail.com>
+	<alpine.LFD.2.02.1106011027360.3078@ionos>
+	<20110601092229.GE3660@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.02.1106011201530.3078@ionos>
+	<4DE6ECAF.9080409@codeaurora.org>
+	<alpine.LFD.2.02.1106021134190.3078@ionos>
+Message-ID: <alpine.LFD.2.02.1106021225290.3078@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/02/2011 11:46 AM, Russell King - ARM Linux wrote:
-> Why don't we just find a way of fixing sched_clock so that the value
-> doesn't reset over a suspend/resume cycle?
-Even if the value isn't reset during suspend/resume we want the 
-clocksource to keep counting. Or is it ok to have the clocksource stop 
-or freeze during suspend?
-Then we have cpuidle. Is it ok to stop/freeze the timer during cpuidle 
-sleep states?
-My view is that sched_clock and the clocksource read should return the 
-time since boot and keep counting during sleep and suspend. (In this 
-case we use the same timer for both sched_clk and clocksource.)
-> IOW, lets fix the problem
-> for_everyone_  rather than only fixing it for one platform at a time.
-I agree that fixing it for everyone would be better and I can give it a 
-try if I get pointed in the right direction.
+On Thu, 2 Jun 2011, Thomas Gleixner wrote:
+> On Wed, 1 Jun 2011, Stephen Boyd wrote:
+> 
+> Need to check that.
+> 
+> > runtime?
+
+It's pretty simple and thanks for pointing it out!
+
+diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
+index c027d4f..e4c699d 100644
+--- a/kernel/time/clockevents.c
++++ b/kernel/time/clockevents.c
+@@ -182,7 +182,10 @@ void clockevents_register_device(struct clock_event_device *dev)
+ 	unsigned long flags;
+ 
+ 	BUG_ON(dev->mode != CLOCK_EVT_MODE_UNUSED);
+-	BUG_ON(!dev->cpumask);
++	if (!dev->cpumask) {
++		WARN_ON(num_possible_cpus() > 1);
++		dev->cpumask = cpumask_of(smp_processor_id());
++	}
+ 
+ 	raw_spin_lock_irqsave(&clockevents_lock, flags);
+ 
