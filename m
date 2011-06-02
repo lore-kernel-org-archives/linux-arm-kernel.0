@@ -1,17 +1,18 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed,  1 Jun 2011 17:19:39 -0700
-Subject: [PATCH v4 13/18] I2C: OMAP2+: Pass flags up to omap i2c platform_data
-	as well
+Date: Wed,  1 Jun 2011 17:19:40 -0700
+Subject: [PATCH v4 14/18] I2C: OMAP1/OMAP2+: create omap I2C functionality
+	flags for each cpu_... test
 In-Reply-To: <1306973984-15165-1-git-send-email-khilman@ti.com>
 References: <1306973984-15165-1-git-send-email-khilman@ti.com>
-Message-ID: <1306973984-15165-14-git-send-email-khilman@ti.com>
+Message-ID: <1306973984-15165-15-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andy Green <andy@warmcat.com>
 
-This is how the driver can find the flags for its implementation
-functionality in its platform_data
+These represent the 8 kinds of implementation functionality
+that up until now were inferred by the 16 remaining cpu_...()
+tests in the omap i2c driver.
 
 Cc: patches at linaro.org
 Cc: Ben Dooks <ben-linux@fluff.org>
@@ -20,36 +21,34 @@ Signed-off-by: Andy Green <andy.green@linaro.org>
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/i2c.c |    7 ++++++-
- 1 files changed, 6 insertions(+), 1 deletions(-)
+ include/linux/i2c-omap.h |   15 +++++++++++++++
+ 1 files changed, 15 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-omap/i2c.c b/arch/arm/plat-omap/i2c.c
-index 0d3eda7..9098669 100644
---- a/arch/arm/plat-omap/i2c.c
-+++ b/arch/arm/plat-omap/i2c.c
-@@ -141,6 +141,7 @@ static inline int omap2_i2c_add_bus(int bus_id)
- 	struct omap_device *od;
- 	char oh_name[MAX_OMAP_I2C_HWMOD_NAME_LEN];
- 	struct omap_i2c_bus_platform_data *pdata;
-+	struct omap_i2c_dev_attr *dev_attr;
+diff --git a/include/linux/i2c-omap.h b/include/linux/i2c-omap.h
+index 776c8e1..98ae49b 100644
+--- a/include/linux/i2c-omap.h
++++ b/include/linux/i2c-omap.h
+@@ -15,6 +15,21 @@
+ #define OMAP_I2C_IP_VERSION_1 1
+ #define OMAP_I2C_IP_VERSION_2 2
  
- 	omap2_i2c_mux_pins(bus_id);
- 
-@@ -156,10 +157,14 @@ static inline int omap2_i2c_add_bus(int bus_id)
- 	pdata = &i2c_pdata[bus_id - 1];
- 	/*
- 	 * pass the hwmod class's CPU-specific knowledge of I2C IP revision in
--	 * use up to the OMAP I2C driver via platform data
-+	 * use, and functionality implementation flags, up to the OMAP I2C
-+	 * driver via platform data
- 	 */
- 	pdata->rev = oh->class->rev;
- 
-+	dev_attr = (struct omap_i2c_dev_attr *)oh->dev_attr;
-+	pdata->flags = dev_attr->flags;
++/* struct omap_i2c_bus_platform_data .flags meanings */
 +
- 	/*
- 	 * When waiting for completion of a i2c transfer, we need to
- 	 * set a wake up latency constraint for the MPU. This is to
++#define OMAP_I2C_FLAG_NO_FIFO 1
++#define OMAP_I2C_FLAG_SIMPLE_CLOCK 2
++#define OMAP_I2C_FLAG_16BIT_DATA_REG 4
++#define OMAP_I2C_FLAG_RESET_REGS_POSTIDLE 8
++#define OMAP_I2C_FLAG_APPLY_ERRATA_I207 0x10
++#define OMAP_I2C_FLAG_ALWAYS_ARMXOR_CLK 0x20
++#define OMAP_I2C_FLAG_FORCE_19200_INT_CLK 0x40
++/* how the CPU address bus must be translated for I2C unit access */
++#define OMAP_I2C_FLAG_BUS_SHIFT_NONE 0
++#define OMAP_I2C_FLAG_BUS_SHIFT_1 0x80
++#define OMAP_I2C_FLAG_BUS_SHIFT_2 0x100
++#define OMAP_I2C_FLAG_BUS_SHIFT__SHIFT 7
++
+ struct omap_i2c_bus_platform_data {
+ 	u32		clkrate;
+ 	u32		rev;
 -- 
 1.7.4
