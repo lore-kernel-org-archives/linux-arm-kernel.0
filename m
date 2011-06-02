@@ -1,59 +1,177 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 2 Jun 2011 11:35:26 +0200 (CEST)
-Subject: [PATCH 3/3] mach-u300: cleanup clockevent code
-In-Reply-To: <4DE6ECAF.9080409@codeaurora.org>
-References: <1306876145-6778-1-git-send-email-linus.walleij@stericsson.com>
-	<alpine.LFD.2.02.1105312319530.3078@ionos>
-	<BANLkTi=UyypKZUQOCCL-KWyAbMQBKY4ccg@mail.gmail.com>
-	<alpine.LFD.2.02.1106011027360.3078@ionos>
-	<20110601092229.GE3660@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.02.1106011201530.3078@ionos>
-	<4DE6ECAF.9080409@codeaurora.org>
-Message-ID: <alpine.LFD.2.02.1106021134190.3078@ionos>
+From: mattias.wallin@stericsson.com (Mattias Wallin)
+Date: Thu, 2 Jun 2011 11:35:30 +0200
+Subject: [PATCHv2 2/3] clocksource: add DB8500 PRCMU Timer support
+Message-ID: <1307007330-1113-1-git-send-email-mattias.wallin@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 1 Jun 2011, Stephen Boyd wrote:
-> On 06/01/2011 03:03 AM, Thomas Gleixner wrote:
-> > Something like the below should work for both UP and SMP
-> >
-> > diff --git a/kernel/time/clockevents.c b/kernel/time/clockevents.c
-> > index c027d4f..739801b 100644
-> > --- a/kernel/time/clockevents.c
-> > +++ b/kernel/time/clockevents.c
-> > @@ -173,6 +173,12 @@ static void clockevents_notify_released(void)
-> >  	}
-> >  }
-> >  
-> > +#ifdef CONFIG_SMP
-> > +# define CPU_MASK_CHECK(x)		WARN_ON(!x)
-> > +#else
-> > +# define CPU_MASK_CHECK(x)		(!x)
-> > +#endif
-> > +
-> >  /**
-> >   * clockevents_register_device - register a clock event device
-> >   * @dev:	device to register
-> > @@ -182,7 +188,8 @@ void clockevents_register_device(struct clock_event_device *dev)
-> >  	unsigned long flags;
-> >  
-> >  	BUG_ON(dev->mode != CLOCK_EVT_MODE_UNUSED);
-> > -	BUG_ON(!dev->cpumask);
-> > +	if (CPU_MASK_CHECK(dev->cpumask))
-> > +		dev->cpumask = cpumask_of(smp_processor_id());
-> >  
-> >  	raw_spin_lock_irqsave(&clockevents_lock, flags);
-> 
-> Won't this print a big WARNING on SMP_ON_UP=y and is_smp() == false
-> kernels? Is there a generic cross-architecture way to check for SMP at
+The DB8500 PRCMU Timer is a low resolution timer (32KHz) but have
+the advantage of beeing always on. I.e continue to count in all
+cpuidle sleep states.
+To be able to alternate between another sched_clk driver an config
+option is added to be able to remove the sched_clk part.
 
-Need to check that.
+Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/clocksource/Kconfig               |   15 +++++
+ drivers/clocksource/Makefile              |    1 +
+ drivers/clocksource/clksrc-db8500-prcmu.c |   90 +++++++++++++++++++++++++++++
+ include/linux/clksrc-db8500-prcmu.h       |   17 ++++++
+ 4 files changed, 123 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clocksource/clksrc-db8500-prcmu.c
+ create mode 100644 include/linux/clksrc-db8500-prcmu.h
 
-> runtime?
-> 
-> Also, I don't understand the original motivation for this change. The
-> assignment to cpumask was there in the u300 timer code already so the
-> commit text from Linus is a bit misleading/confusing.
-
-The point is that we can remove these assignements for UP all over the
-place and just do it in the core code.
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 96c9219..d7ee415 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -3,3 +3,18 @@ config CLKSRC_I8253
+ 
+ config CLKSRC_MMIO
+ 	bool
++
++config CLKSRC_DB8500_PRCMU
++	bool "Clocksource PRCMU Timer"
++	depends on MFD_DB8500_PRCMU
++	default y
++	help
++	  Use the always on PRCMU Timer as clocksource
++
++config CLKSRC_DB8500_PRCMU_SCHED_CLOCK
++	bool "Clocksource PRCMU Timer sched_clock"
++	depends on (CLKSRC_DB8500_PRCMU && !NOMADIK_MTU_SCHED_CLOCK)
++	select HAVE_SCHED_CLOCK
++	default y
++	help
++	  Use the always on PRCMU Timer as sched_clock
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index b995942..f2308ba 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -8,3 +8,4 @@ obj-$(CONFIG_SH_TIMER_MTU2)	+= sh_mtu2.o
+ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
+ obj-$(CONFIG_CLKSRC_I8253)	+= i8253.o
+ obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
++obj-$(CONFIG_CLKSRC_DB8500_PRCMU)	+= clksrc-db8500-prcmu.o
+diff --git a/drivers/clocksource/clksrc-db8500-prcmu.c b/drivers/clocksource/clksrc-db8500-prcmu.c
+new file mode 100644
+index 0000000..f18973d
+--- /dev/null
++++ b/drivers/clocksource/clksrc-db8500-prcmu.c
+@@ -0,0 +1,90 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2011
++ *
++ * License Terms: GNU General Public License v2
++ * Author: Mattias Wallin <mattias.wallin@stericsson.com> for ST-Ericsson
++ * sched_clock implementation is based on:
++ * plat-nomadik/timer.c Linus Walleij <linus.walleij@stericsson.com>
++ *
++ * Clocksource DB8500 PRCMU Timer
++ * The PRCMU in the DB8500 chip has 5 timers which
++ * are available in an always-on power domain.
++ * Timer 4 is dedicated to our always-on clock source.
++ */
++#include <linux/clockchips.h>
++#include <linux/clksrc-db8500-prcmu.h>
++#include <asm/sched_clock.h>
++#include <mach/setup.h>
++#include <mach/db8500-regs.h>
++#include <mach/hardware.h>
++
++#define RATE_32K		(32768)
++
++#define TIMER_MODE_CONTINOUS	(0x1)
++#define TIMER_DOWNCOUNT_VAL	(0xffffffff)
++
++/* PRCMU Timer 4 */
++#define PRCMU_TIMER_4_REF       (prcmu_base + 0x450)
++#define PRCMU_TIMER_4_DOWNCOUNT (prcmu_base + 0x454)
++#define PRCMU_TIMER_4_MODE      (prcmu_base + 0x458)
++
++static __iomem void *prcmu_base;
++
++#define SCHED_CLOCK_MIN_WRAP (131072) /* 2^32 / 32768 */
++
++/*
++ * We read the timer twice to make sure the value is stable.
++ * Timer glitches will otherwise occur when reading during a transition.
++ */
++static cycle_t clksrc_db8500_prcmu_read(struct clocksource *cs)
++{
++	u32 count, count2;
++
++	do {
++		count = readl(PRCMU_TIMER_4_DOWNCOUNT);
++		count2 = readl(PRCMU_TIMER_4_DOWNCOUNT);
++	} while (count2 != count);
++
++	/* Negate because the timer is a decrementing counter */
++	return ~count;
++}
++
++static struct clocksource clocksource_db8500_prcmu = {
++	.name		= "clksrc-db8500-prcmu-timer4",
++	.rating		= 300,
++	.read		= clksrc_db8500_prcmu_read,
++	.shift		= 10,
++	.mask		= CLOCKSOURCE_MASK(32),
++	.flags		= CLOCK_SOURCE_IS_CONTINUOUS,
++};
++
++#ifdef CONFIG_CLKSRC_DB8500_PRCMU_SCHED_CLOCK
++static DEFINE_CLOCK_DATA(cd);
++
++static void notrace clksrc_db8500_prcmu_update_sched_clock(void)
++{
++	u32 cyc = clksrc_db8500_prcmu_read(&clocksource_db8500_prcmu);
++	update_sched_clock(&cd, cyc, (u32)~0);
++}
++#endif
++
++void __init clksrc_db8500_prcmu_init(void)
++{
++	prcmu_base = __io_address(U8500_PRCMU_BASE);
++
++	/*
++	 * The A9 sub system expects the timer to be configured as
++	 * a continous looping timer.
++	 * The PRCMU should configure it but if it for some reason
++	 * don't we do it here.
++	 */
++	if (readl(PRCMU_TIMER_4_MODE) != TIMER_MODE_CONTINOUS) {
++		writel(TIMER_MODE_CONTINOUS, PRCMU_TIMER_4_MODE);
++		writel(TIMER_DOWNCOUNT_VAL, PRCMU_TIMER_4_REF);
++	}
++#ifdef CONFIG_CLKSRC_DB8500_PRCMU_SCHED_CLOCK
++	init_sched_clock(&cd, clksrc_db8500_prcmu_update_sched_clock,
++		32, RATE_32K);
++#endif
++	clocksource_register_hz(&clocksource_db8500_prcmu, RATE_32K);
++}
+diff --git a/include/linux/clksrc-db8500-prcmu.h b/include/linux/clksrc-db8500-prcmu.h
+new file mode 100644
+index 0000000..42b8587
+--- /dev/null
++++ b/include/linux/clksrc-db8500-prcmu.h
+@@ -0,0 +1,17 @@
++/*
++ * Copyright (C) ST-Ericsson SA 2011
++ *
++ * License Terms: GNU General Public License v2
++ * Author: Mattias Wallin <mattias.wallin@stericsson.com>
++ *
++ */
++#ifndef __CLKSRC_DB8500_PRCMU_H
++#define __CLKSRC_DB8500_PRCMU_H
++
++#ifdef CONFIG_CLKSRC_DB8500_PRCMU
++void __init clksrc_db8500_prcmu_init(void);
++#else
++void __init clksrc_db8500_prcmu_init(void) {}
++#endif
++
++#endif
+-- 
+1.7.4.3
