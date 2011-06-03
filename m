@@ -1,29 +1,18 @@
 From: greg@kroah.com (Greg KH)
-Date: Sat, 4 Jun 2011 07:32:03 +0900
-Subject: [stable] [PATCH v2] MAX1111: Fix Race condition causing NULL
-	pointer exception
-In-Reply-To: <1307131203-10845-1-git-send-email-morpheus.ibis@gmail.com>
-References: <1307131203-10845-1-git-send-email-morpheus.ibis@gmail.com>
-Message-ID: <20110603223203.GA9161@kroah.com>
+Date: Sat, 4 Jun 2011 07:32:26 +0900
+Subject: [stable] [PATCH] MTD: pxa3xx_nand: fix nand detection issue
+In-Reply-To: <BANLkTinuqQmp43K4H0iPDbb-H-rDA_nL9w@mail.gmail.com>
+References: <BANLkTimos3-Ds4Y8FDfDZegqAhH7nSS4PA@mail.gmail.com>
+	<1305865207-7869-1-git-send-email-leiwen@marvell.com>
+	<BANLkTinuqQmp43K4H0iPDbb-H-rDA_nL9w@mail.gmail.com>
+Message-ID: <20110603223226.GC9161@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2011 at 10:00:03PM +0200, Pavel Herrmann wrote:
-> spi_sync call uses its spi_message parameter to keep completion information,
-> having this structure static is not thread-safe, potentially causing one
-> thread having pointers to memory on or above other threads stack. use mutex
-> to prevent multiple access
+On Fri, Jun 03, 2011 at 11:11:54PM +0800, Lei Wen wrote:
+> Tested-by: Daniel Mack <zonque@gmail.com>
 > 
-> Signed-off-by: Pavel Herrmann <morpheus.ibis@gmail.com>
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: Pavel Machek <pavel@ucw.cz>
-> Acked-by: Marek Vasut <marek.vasut@gmail.com>
-> Acked-by: Cyril Hrubis <metan@ucw.cz>
-> 
-> ---
->  drivers/hwmon/max1111.c |   12 ++++++++++++
->  1 files changed, 12 insertions(+), 0 deletions(-)
->
+> Also cc to MTD maillist and stable kernel.
 
 
 <formletter>
