@@ -1,88 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jun 2011 17:53:15 +0200
-Subject: [RFC 0/6] iommu: generic api migration and grouping
-In-Reply-To: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-Message-ID: <201106031753.16095.arnd@arndb.de>
+From: Artem.Bityutskiy@nokia.com (Artem Bityutskiy)
+Date: Fri, 03 Jun 2011 18:49:19 +0300
+Subject: [PATCH 2/2] mtd: drop ceiva map driver
+In-Reply-To: <1307015648-17505-2-git-send-email-dbaryshkov@gmail.com>
+References: <1307015648-17505-1-git-send-email-dbaryshkov@gmail.com>
+	<1307015648-17505-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1307116159.3069.22.camel@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 June 2011, Ohad Ben-Cohen wrote:
-> First stab at iommu consolidation:
-
-Hi Ohad,
-
-Great to see your progress here!
- 
-> - Migrate OMAP's iommu driver to the generic iommu API. With this in hand,
->   users can now start using the generic iommu layer instead of calling
->   omap-specific iommu API.
+On Thu, 2011-06-02 at 15:54 +0400, Dmitry Eremin-Solenikov wrote:
+> The same functionality is provided by physmap flash driver,
+> drivers/mtd/maps/ceiva.c didn't receive any functional changes since
+> the start of current git history, so drop it.
 > 
->   New code that requires functionality missing from the generic iommu api,
->   will add that functionality in the generic framework (e.g. adding framework
->   awareness to multi page sizes, supported by the underlying hardware, will
->   avoid the otherwise-inevitable code duplication when mapping a memory
->   region).
->
->   OMAP-specific api that is still exposed in the omap iommu driver can
->   now be either moved to the generic iommu framework, or just removed (if not
->   used).
-> 
->   This api (and other omap-specific primitives like struct iommu) needs to
->   be omapified (i.e. renamed to include an 'omap_' prefix). At this early
->   point of this patch set this is too much churn though, so I'll do that
->   in the following iteration, after (and if), the general direction is
->   accepted.
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 
-Sounds all good.
+How about this: I take this patch to l2-mtd-2.6, but not taking the
+first patch. If someone complains that he needs ceiva, we'll add you
+first patch. Otherwise, you should kill all the other ceiva bits. Is
+this OK?
 
-> - Migrate OMAP's iovmm (virtual memory manager) driver to the generic
->   iommu API. With this in hand, iovmm no longer uses omap-specific api
->   for mapping/unmapping operations. Nevertheless, iovmm is still coupled
->   with omap's iommu even with this change: it assumes omap page sizes,
->   and it uses omap's iommu objects to maintain its internal state.
-> 
->   Further generalizing of iovmm strongly depends on our broader plans for
->   providing a generic virtual memory manager and allocation framework
->   (which, as discussed, should be separated from a specific mapper).
-> 
->   iovmm has a mainline user: omap3isp, and therefore must be maintained,
->   but new potential users will either have to generalize it, or come up
->   with a different generic framework that will replace it.
-
-I think the future of iovmm is looking not so good. Marek Szyprowski
-is working on a generic version of the dma-mapping API (dma_map_ops)
-based on the iommu API. As far as I can tell, once we have that in
-place, we you can migrate omap3isp from iovmm to dma-mapping and
-remove iovmm.
-
-Of course if there are things missing from the dma-mapping API
-that are present in iovmm, we should know about them so that we can
-extend the dma-mapping API accordingly.
-
-> - Migrate OMAP's iommu mainline user, omap3isp, to the generic API as well
->   (so it doesn't break). As with iovmm, omap3isp still depends on
->   omap's iommu, mainly because iovmm depends on it, but also for
->   iommu context saving and restoring.
-> 
->   It is definitely desirable to completely remove omap3isp's dependency
->   on the omap-specific iommu layer, and that will be possible as the
->   required functionality will be added to generic framework.
-
-ok.
-
-> - Create a dedicated iommu drivers folder (and put the base iommu code there)
->
-> - Move OMAP's and MSM's iommu drivers to that drivers iommu folder
-> 
->   Putting all iommu drivers together will ease finding similarities
->   between different platforms, with the intention of solving problems once,
->   in a generic framework which everyone can use.
-> 
->   I've only moved the omap and msm implementations for now, to demonstrate
->   the idea (and support the ARM diet :), but if this is found desirable,
->   we can bring in intel-iommu.c and amd_iommu.c as well.
-
-Yes, very good idea.
-
-	Arnd
+-- 
+Best Regards,
+Artem Bityutskiy (????? ????????)
