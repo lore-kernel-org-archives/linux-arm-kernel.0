@@ -1,39 +1,42 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jun 2011 18:20:51 +0200
-Subject: [PATCH v3 0/3] provide sdhci driver for mmp2 and pxa910
-In-Reply-To: <BANLkTikP72ybaqa8zDgNjBQg8Q6SH5fMdw@mail.gmail.com>
-References: <BANLkTikP72ybaqa8zDgNjBQg8Q6SH5fMdw@mail.gmail.com>
-Message-ID: <201106031820.51922.arnd@arndb.de>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 3 Jun 2011 09:59:26 -0700
+Subject: [PATCH 2/3] davinci: dm6467/T EVM: pass reference clock rate to
+	dm646x_init()
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D2D2D55@dbde02.ent.ti.com>
+References: <1307034677-27236-1-git-send-email-nsekhar@ti.com>
+	<1307034677-27236-2-git-send-email-nsekhar@ti.com>
+	<BANLkTi=oj2Okguie+fje7oDRcPNcWMdAsw@mail.gmail.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D2D2D55@dbde02.ent.ti.com>
+Message-ID: <BANLkTimBef9aRWGi1=7_BPK9pNjLY0MnGLnvd1zDzjVj-VZTiQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 June 2011, zhangfei gao wrote:
-> Here are patches to provide separate sdhci driver for mmp2 and pxa910
-> based on sdhci-platfm.
-> Rename to sdhci-pxav3.c and sdhci-pxav2.c
-> Remove sdhci-pxa.c, which is used to share among pxa serious, since
-> under this method, platform difference have to be put under arch/arm,
-> which is not easy to track.
-> As a result, mmp2 mmc resource should be updated accordingly.
+Hi,
 
-Looks all good content-wise. I do have a few comments regarding the
-style of submission, please follow that the next time:
+On Fri, Jun 3, 2011 at 4:32 AM, Nori, Sekhar <nsekhar@ti.com> wrote:
+> Hi Olof,
+>
+> On Thu, Jun 02, 2011 at 23:31:05, Olof Johansson wrote:
+>
+>> Do you foresee needing more members of the davinci_board_info struct
+>> in the near future? If so, this approach is OK. If this is the only
+>> anticipated use today, just passing in the refclk rate as an integer
+>> argument would be just as clean, with less infrastructure.
+>
+> There was some discussion on passing PLL configuration information too.
+> So yes, the structure is likely extended in future.
+>
+> Also, most boards end up using the reference clock used by the EVM.
+> In that case, with this approach, most boards just pass NULL instead of
+> replicating the reference clock frequency in all board files.
 
-* Make all patches a reply to the  [PATCH 0/x] email, so they show up
-  as a single thread. This helps finding the emails when your mail 
-  client sorts threads by last reply. The option in git-send-email
-  is '--thread --no-chain-reply'.
+OK, that sounds reasonable.
 
-* The changelog has extra spaces in it that shouldn't be there. I assume
-  they come from using git-show instead of git-format-patch to create
-  the emails.
+Only change I would like to request in that case (sorry, not
+commenting on the patch directly here), is to mark dm646x_evm
+__initdata (or even make it a local variable in the function), so for
+multiboard kernels you won't need to keep the static struct around for
+hardware you're not running on.
 
-* Make sure a series is bisectable. This means that each patch results
-  in a working kernel without regressions when you apply only part of
-  the series. There are multiple ways to get there. In this case, you
-  could fold the patch that updates the resources into the patch that
-  changes the format. Alternatively, you could first create the new driver
-  in the new format, then change the resources, and finally remove the
-  now obsolete driver.
 
-	Arnd
+-Olof
