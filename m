@@ -1,81 +1,68 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Fri, 3 Jun 2011 23:11:54 +0800
-Subject: [PATCH] MTD: pxa3xx_nand: fix nand detection issue
-In-Reply-To: <1305865207-7869-1-git-send-email-leiwen@marvell.com>
-References: <BANLkTimos3-Ds4Y8FDfDZegqAhH7nSS4PA@mail.gmail.com>
-	<1305865207-7869-1-git-send-email-leiwen@marvell.com>
-Message-ID: <BANLkTinuqQmp43K4H0iPDbb-H-rDA_nL9w@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Fri, 3 Jun 2011 23:26:44 +0800
+Subject: [PATCH v2 0/4] Move plat-mxc gpio driver into drivers/gpio
+In-Reply-To: <BANLkTi=5kNAt51DP3-rykkT3ZONczD5Crg@mail.gmail.com>
+References: <1306985632-18820-1-git-send-email-shawn.guo@linaro.org>
+	<20110603075201.GE10532@n2100.arm.linux.org.uk>
+	<20110603143406.GA19344@S2100-06.ap.freescale.net>
+	<BANLkTi=5kNAt51DP3-rykkT3ZONczD5Crg@mail.gmail.com>
+Message-ID: <20110603152643.GB19344@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested-by: Daniel Mack <zonque@gmail.com>
+Hi Grant,
 
-Also cc to MTD maillist and stable kernel.
+On Fri, Jun 03, 2011 at 08:55:58AM -0600, Grant Likely wrote:
+> On Fri, Jun 3, 2011 at 8:34 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> > Hi Russell,
+> >
+> > On Fri, Jun 03, 2011 at 08:52:01AM +0100, Russell King - ARM Linux wrote:
+> >> On Thu, Jun 02, 2011 at 11:33:48AM +0800, Shawn Guo wrote:
+> >> > ?arch/arm/plat-mxc/gpio.c ? ? ? ? ? ? ? ? ? ? ? ?| ?361 -------------------
+> >> > ?drivers/gpio/gpio-mxc.c ? ? ? ? ? ? ? ? ? ? ? ? | ?433 +++++++++++++++++++++++
+> >>
+> > My bad here. ?I should have used 'git diff --stat -M' to show the
+> > the following.
+> >
+> > .../arm/plat-mxc/gpio.c => drivers/gpio/gpio-mxc.c | ?216 +++++++++++++-------
+> >
+> >> I'm wondering why just moving this driver into drivers/gpio has
+> >> resulted in it growing by 72 lines - and it's not clear from the
+> >> diffs why that is because of the way they're broken up.
+> >>
+> > Yes, I agree. ?But when I did something like that to ease the review,
+> > people think it's not necessary :)
+> >
+> > http://permalink.gmane.org/gmane.linux.kernel/1143257
+> 
+> The issue was bisectability: it looked like the build would break
+> after applying the first patch.  The first patch should move the
 
-On Fri, May 20, 2011 at 12:20 PM, Lei Wen <leiwen@marvell.com> wrote:
-> When keep_config is set, the detection would goes different routine.
-> That the driver would read out the setting which is set previously
-> by bootloader. While most bootloader keep the irq mask as off, and
-> current driver need all irq default open, keep_config behavior would
-> lead to no irq at all.
->
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> ---
-> ?drivers/mtd/nand/pxa3xx_nand.c | ? 12 +++++++-----
-> ?1 files changed, 7 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
-> index ff07012..9896aef 100644
-> --- a/drivers/mtd/nand/pxa3xx_nand.c
-> +++ b/drivers/mtd/nand/pxa3xx_nand.c
-> @@ -813,7 +813,7 @@ static int pxa3xx_nand_detect_config(struct pxa3xx_nand_info *info)
-> ? ? ? ?info->page_size = ndcr & NDCR_PAGE_SZ ? 2048 : 512;
-> ? ? ? ?/* set info fields needed to read id */
-> ? ? ? ?info->read_id_bytes = (info->page_size == 2048) ? 4 : 2;
-> - ? ? ? info->reg_ndcr = ndcr;
-> + ? ? ? info->reg_ndcr = ndcr & ~NDCR_INT_MASK;
-> ? ? ? ?info->cmdset = &default_cmdset;
->
-> ? ? ? ?info->ndtr0cs0 = nand_readl(info, NDTR0CS0);
-> @@ -882,7 +882,7 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
-> ? ? ? ?struct pxa3xx_nand_info *info = mtd->priv;
-> ? ? ? ?struct platform_device *pdev = info->pdev;
-> ? ? ? ?struct pxa3xx_nand_platform_data *pdata = pdev->dev.platform_data;
-> - ? ? ? struct nand_flash_dev pxa3xx_flash_ids[2] = { {NULL,}, {NULL,} };
-> + ? ? ? struct nand_flash_dev pxa3xx_flash_ids[2], *def = NULL;
-> ? ? ? ?const struct pxa3xx_nand_flash *f = NULL;
-> ? ? ? ?struct nand_chip *chip = mtd->priv;
-> ? ? ? ?uint32_t id = -1;
-> @@ -942,8 +942,10 @@ static int pxa3xx_nand_scan(struct mtd_info *mtd)
-> ? ? ? ?pxa3xx_flash_ids[0].erasesize = f->page_size * f->page_per_block;
-> ? ? ? ?if (f->flash_width == 16)
-> ? ? ? ? ? ? ? ?pxa3xx_flash_ids[0].options = NAND_BUSWIDTH_16;
-> + ? ? ? pxa3xx_flash_ids[1].name = NULL;
-> + ? ? ? def = pxa3xx_flash_ids;
-> ?KEEP_CONFIG:
-> - ? ? ? if (nand_scan_ident(mtd, 1, pxa3xx_flash_ids))
-> + ? ? ? if (nand_scan_ident(mtd, 1, def))
-> ? ? ? ? ? ? ? ?return -ENODEV;
-> ? ? ? ?/* calculate addressing information */
-> ? ? ? ?info->col_addr_cycles = (mtd->writesize >= 2048) ? 2 : 1;
-> @@ -954,9 +956,9 @@ KEEP_CONFIG:
-> ? ? ? ? ? ? ? ?info->row_addr_cycles = 2;
-> ? ? ? ?mtd->name = mtd_names[0];
-> ? ? ? ?chip->ecc.mode = NAND_ECC_HW;
-> - ? ? ? chip->ecc.size = f->page_size;
-> + ? ? ? chip->ecc.size = info->page_size;
->
-> - ? ? ? chip->options = (f->flash_width == 16) ? NAND_BUSWIDTH_16 : 0;
-> + ? ? ? chip->options = (info->reg_ndcr & NDCR_DWIDTH_M) ? NAND_BUSWIDTH_16 : 0;
-> ? ? ? ?chip->options |= NAND_NO_AUTOINCR;
-> ? ? ? ?chip->options |= NAND_NO_READRDY;
->
-> --
-> 1.7.0.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Yes, the build would break only if you change Kconfig/Makefile to
+actually build it.  The patch does not enable the build of the driver
+in the patch.
+
+> driver without breaking the build, and then you can follow up with
+> driver fixes.  I don't want to see functional changes mixed in with
+> the file move change.
+> 
+Understood.  Do you want me to resend the gpio-mxs and gpio-mxc patch
+sets for that?  Or can I follow the practice you and Russell
+suggested in the future posts?  I have learnt the lesson.
+
+> > +
+> > +static struct platform_driver mxc_gpio_driver = {
+> > + ? ? ? .driver ? ? ? ? = {
+> > + ? ? ? ? ? ? ? .name ? = "gpio-mxc",
+> 
+> .owner = THIS_MODULE,
+> 
+Do I need to re-spin the patch set to fix it, or maintainer (you or
+Sascha) can help to fix it up?
+
+BTW, do you and Sascha get the agreement on which tree the gpio-mxs
+and gpio-mxc should go through?
+
+-- 
+Regards,
+Shawn
