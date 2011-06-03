@@ -1,37 +1,63 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Fri, 3 Jun 2011 09:56:42 +0200
-Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
-In-Reply-To: <BANLkTi=xVzdLDq5wbzLtQFu+nz=8G9SbKQ@mail.gmail.com>
-References: <201106022149.47936.heiko@sntech.de>
-	<BANLkTi=xVzdLDq5wbzLtQFu+nz=8G9SbKQ@mail.gmail.com>
-Message-ID: <201106030956.43174.heiko@sntech.de>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Fri, 03 Jun 2011 09:20:34 +0100
+Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
+	running early
+In-Reply-To: <4DE7E6AF.4020404@gmail.com>
+References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
+	<20110602163152.GH32751@game.jcrosoft.org>
+	<1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
+	<4DE7E6AF.4020404@gmail.com>
+Message-ID: <1307089234.31098.43.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 2011-06-02 at 14:38 -0500, Rob Herring wrote:
+> On 06/02/2011 11:56 AM, Marc Zyngier wrote:
+> > On Thu, 2011-06-02 at 18:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
+> > wrote:
+> >> On 15:03 Wed 01 Jun     , Marc Zyngier wrote:
+> >>> Currently, the boot CPU has its local timer enabled long after
+> >>> the delay loop has been calibrated. This makes it impossible to
+> >>> boot a system that only uses local timers, like the A15.
+> >>>
+> >>> Use late_time_init hook to initialize the boot CPU local timer.
+> >>> Since shmobile is already using this hook, add an ARM specific
+> >>> arm_late_time_init hook that platforms can use instead.
+> >>>
+> >>> Cc: Paul Mundt<lethal@linux-sh.org>
+> >>> Cc: Magnus Damm<magnus.damm@gmail.com>
+> >>> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
+> >> I propose to switch to early platform devce and earlytimer
+> >>
+> >> this will avoid the arm_late_time_init hook
+> >>
+> >> and will make it cross arch
+> >
+> > I believe this is orthogonal. shmobile (the only ARM user of
+> > late_time_init) is already doing some early_platform stuff for its
+> > timers.
+> >
+> > What I'm trying to achieve here is to make sure the timer on CPU0 is
+> > actually up, running and registered as a clock_event_device before we
+> > hit the delay loop.
+> >
+> > Or maybe I've misunderstood what you're pointing me to?
+> >
+> 
+> I believe he is referring to this patch which generically enables the 
+> shmobile code for ARM:
+> 
+> http://www.spinics.net/lists/arm-kernel/msg123736.html
 
-Am Freitag 03 Juni 2011, 01:48:05 schrieb Kyungmin Park:
-> As I don't have the s3c2416 user manaul, I'm not sure it's support
-> AUTO CMD12 or not. but at least it's support at s3c6410 and later.
-According to the manual, the 2416 supports AUTO CMD12.
+Ah, I see. With that patch, I can indeed loose the additional hook.
 
-As I wrote disabling auto cmd12 only works sometimes and other times the irq 
-storm happens like with auto cmd12 enabled - always after the first reboot.
-So it seems auto cmd12 is not the real reason for the error.
+> I don't think it has been pulled into mainline yet.
 
-Do you also encounter the second error later on (for me in udev stage):
->  mmcblk1boot0: retrying using single block read
->  mmc1: ADMA error
->  mmcblk1boot0: error -5 transferring data, sector 448, nr 32, card status
-> 0x900
->  end_request: I/O error, dev mmcblk1boot0, sector 448
->  Buffer I/O error on device mmcblk1boot0, logical block 56
->  mmcblk1boot1: retrying using single block read
->  mmc1: ADMA error
->  mmcblk1boot1: error -5 transferring data, sector 448, nr 32, card status
-> 0x900
->  end_request: I/O error, dev mmcblk1boot1, sector 448
+I'll rebase my patch on top of this one if there's a consensus around
+it.
 
+Thanks,
 
-Thanks
-Heiko
+	M.
+-- 
+Reality is an implementation detail.
