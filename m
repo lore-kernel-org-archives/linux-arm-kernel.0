@@ -1,90 +1,80 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  3 Jun 2011 15:15:48 +0100
-Subject: [PATCH v6 04/14] ARM: omap4: use remapped PPI interrupts for local
+Date: Fri,  3 Jun 2011 15:15:50 +0100
+Subject: [PATCH v6 06/14] ARM: shmobile: use remapped PPI interrupts for local
 	timer
 In-Reply-To: <1307110558-29710-1-git-send-email-marc.zyngier@arm.com>
 References: <1307110558-29710-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1307110558-29710-5-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1307110558-29710-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the normal interrupt scheme for the local timers by using
 a remapped PPI interrupt.
 
-Tested on a Pandaboard.
-
-Cc: Tony Lindgren <tony@atomide.com>
-Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Cc: Paul Mundt <lethal@linux-sh.org>
+Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-omap2/Kconfig                    |    1 +
- arch/arm/mach-omap2/include/mach/entry-macro.S |   14 +-------------
- arch/arm/mach-omap2/timer-mpu.c                |    3 ++-
- 3 files changed, 4 insertions(+), 14 deletions(-)
+ arch/arm/mach-shmobile/Kconfig                    |    1 +
+ arch/arm/mach-shmobile/entry-intc.S               |    3 ---
+ arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 ---
+ arch/arm/mach-shmobile/localtimer.c               |    3 ++-
+ 4 files changed, 3 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 19d5891..284694c 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,6 +44,7 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
- 	select CPU_V7
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 0c8f6cf..ddcf28c 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -26,6 +26,7 @@ config ARCH_SH73A0
+ 	select SH_CLK_CPG
+ 	select ARCH_WANT_OPTIONAL_GPIOLIB
  	select ARM_GIC
 +	select ARM_GIC_VPPI
- 	select LOCAL_TIMERS if SMP
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
-diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
-index a48690b..22d86ef 100644
---- a/arch/arm/mach-omap2/include/mach/entry-macro.S
-+++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
-@@ -78,7 +78,7 @@
- 4401:		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
- 		ldr     \tmp, =1021
- 		bic     \irqnr, \irqstat, #0x1c00
--		cmp     \irqnr, #29
-+		cmp     \irqnr, #15
- 		cmpcc   \irqnr, \irqnr
- 		cmpne   \irqnr, \tmp
- 		cmpcs   \irqnr, \irqnr
-@@ -101,18 +101,6 @@
- 		it	cs
- 		cmpcs	\irqnr, \irqnr
- 		.endm
--
--		/* As above, this assumes that irqstat and base are preserved */
--
--		.macro test_for_ltirq, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		mov 	\tmp, #0
--		cmp	\irqnr, #29
--		itt	eq
--		moveq	\tmp, #1
--		streq	\irqstat, [\base, #GIC_CPU_EOI]
--		cmp	\tmp, #0
--		.endm
- #endif	/* CONFIG_SMP */
  
- #else	/* MULTI_OMAP2 */
-diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
-index 31c0ac4..1fd5ca5 100644
---- a/arch/arm/mach-omap2/timer-mpu.c
-+++ b/arch/arm/mach-omap2/timer-mpu.c
-@@ -22,6 +22,7 @@
- #include <asm/irq.h>
+ comment "SH-Mobile Board Type"
+ 
+diff --git a/arch/arm/mach-shmobile/entry-intc.S b/arch/arm/mach-shmobile/entry-intc.S
+index cac0a7a..1a1c00c 100644
+--- a/arch/arm/mach-shmobile/entry-intc.S
++++ b/arch/arm/mach-shmobile/entry-intc.S
+@@ -51,7 +51,4 @@
+ 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+ 	.endm
+ 
+-	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
+-	.endm
+-
+ 	arch_irq_handler shmobile_handle_irq_intc
+diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+index d791f10..8d4a416 100644
+--- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
++++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
+@@ -27,8 +27,5 @@
+ 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
+ 	.endm
+ 
+-	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
+-	.endm
+-
+ 	.macro  arch_ret_to_user, tmp1, tmp2
+ 	.endm
+diff --git a/arch/arm/mach-shmobile/localtimer.c b/arch/arm/mach-shmobile/localtimer.c
+index ad9ccc9..8a67b1c 100644
+--- a/arch/arm/mach-shmobile/localtimer.c
++++ b/arch/arm/mach-shmobile/localtimer.c
+@@ -14,13 +14,14 @@
+ #include <linux/clockchips.h>
  #include <asm/smp_twd.h>
  #include <asm/localtimer.h>
 +#include <asm/hardware/gic.h>
  
  /*
   * Setup the local clock events for a CPU.
-@@ -32,7 +33,7 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
- 	if (omap_rev() == OMAP4430_REV_ES1_0)
- 		return -ENXIO;
- 
--	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
-+	evt->irq = gic_ppi_to_vppi(OMAP44XX_IRQ_LOCALTIMER);
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
+-	evt->irq = 29;
++	evt->irq = gic_ppi_to_vppi(29);
  	twd_timer_setup(evt);
  	return 0;
  }
