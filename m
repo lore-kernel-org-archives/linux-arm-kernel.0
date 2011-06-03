@@ -1,62 +1,69 @@
-From: matt@genesi-usa.com (Matt Sealey)
-Date: Thu, 2 Jun 2011 18:59:49 -0500
-Subject: i.MX consolidation patches
-In-Reply-To: <20110602154659.697EFD09481@gemini.denx.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<20110530075745.GA31492@S2100-06.ap.freescale.net>
-	<20110601123522.GE23771@pengutronix.de>
-	<20110601134749.GI3660@n2100.arm.linux.org.uk>
-	<20110601141847.GG23771@pengutronix.de>
-	<20110601210855.663A3CEFB4E@gemini.denx.de>
-	<BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com>
-	<20110602154659.697EFD09481@gemini.denx.de>
-Message-ID: <BANLkTimk1fVi7YdwmCFJ1-M82NSHe4SzYQ@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Fri, 3 Jun 2011 02:12:47 +0200
+Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
+	limitation in IOMMU
+In-Reply-To: <20110601140306.GC6700@n2100.arm.linux.org.uk>
+References: <20110601131744.GH11352@atomide.com>
+	<201106011550.50873.laurent.pinchart@ideasonboard.com>
+	<20110601140306.GC6700@n2100.arm.linux.org.uk>
+Message-ID: <201106030212.48226.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 2, 2011 at 10:46 AM, Wolfgang Denk <wd@denx.de> wrote:
-> Dear Matt,
->
->> * Assuming all ARM kernels are PIC (guaranteed, right?)
->> * Assuming all ARM kernels start at entry point 0 (true for Image and zImage)
->
-> You mean offset 0 to the start of the image here.
+Hi Russell,
 
-Yep. I missed a couple words between point and 0 :)
+On Wednesday 01 June 2011 16:03:06 Russell King - ARM Linux wrote:
+> On Wed, Jun 01, 2011 at 03:50:50PM +0200, Laurent Pinchart wrote:
+> > In the specific iovmm case, the driver uses the sglist API to build a
+> > list of page-size sg entries, and then process it in software. Is that
+> > considered as an abuse of the sglist API, or valid usage ?
+> > 
+> > Anyway, sglist chaining is not needed by iovmm. As iovmm just walks the
+> > sglist manually, it's easier to allocate it in one go rather than using
+> > sglist chaining. This of course doesn't make your patch unneeded or
+> > wrong.
+> 
+> Well, there's a two issues here:
+> 1. Should iovmm use sg_phys(sg) with sg_dma_len(sg) ?
+>    Probably not, because a scatterlist before DMA API mapping is defined
+>    by sg_page(sg), sg->offset, sg->length and has N entries.  After DMA
+>    API mapping (n = dma_map_sg(dev, sg, N, dir)), it has n entries where
+>    n <= N, and the DMA address/lengths are sg_dma_address(sg) and
+>    sg_dma_len(sg).  Both these are undefined for unmapped scatterlists.
+> 
+>    Getting this wrong means breakage when CONFIG_NEED_SG_DMA_LENGTH is
+>    enabled.
 
->> * Assuming there is a globally invalid magic value you can set in the
->> uImage header as load address (not sure)
->
-> I dislike this.
+iovmm abuses the sglist API, there's no doubt on that. It will break when 
+CONFIG_NEED_SG_DMA_LENGTH is enabled. iovmm should probably not use the sglist 
+API, and it should probably not even exist in the first place. I know that TI 
+is working on moving the OMAP-specific iommu/iovmm implementation to the 
+generic IOMMU API, but that will take time. In the meantime, I'd like to fix 
+iovmm to avoid the userspace-triggerable BUG_ON().
 
-Me too but how else would you do it? A flag in the uImage header that says
-disregard the load address would work. Or a U-Boot that basically disregarded
-the load address *anyway*.
+> 2. What would be the effect of enabling SG list chaining on iovmm?
+>    The code uses the correct SG list walking helpers (for_each_sg) so
+>    it should be able to cope with chained SG lists.
 
-I understand Sascha pointed out 0x0 is the standard load address on PPC
-but we're talking about an ARM thing here. U-Boot knows both what processor
-it is built for and it knows from the uImage header which architecture
-the kernel
-image is for. It only needs to be true that 0x0 is totally invalid,
-stupid value to
-use as a load address on ARM, and it would comply with the expectations that
-if (address) then it can carry on as before, else do the "new" behavior of
-deriving the address of the Linux entry point..
+Yes it should. It might be slightly less efficient, but I don't think we will 
+notice.
 
->> Set that magic value, U-Boot magically derives the correct entry point
->> as the first address of the payload,
->> and jumps to it?
->
-> That means you would not want to encode a load address in the image,
-> and always run from the current location, no matter where it is?
+> So, I think there's no problem here with chained SG lists, but there is
+> an issue with using sg_dma_len().  I'd suggest converting stuff to use
+> sg->length with sg_page(sg) rather than sg_dma_len(sg).
 
-Exactly. Isn't this the beauty of position independent code, that you don't need
-to hardcode a load address?
+With sg_page(sg) ? I'm not sure to follow you there.
 
-In the case of most Linux images the first thing they do is decompress
-themselves
-anyway.
+> As for whether SG chaining is required or not, if you're running up against
+> the maximum SG table size, then you do have a requirement for SG chaining.
+
+The SG table size limit makes sure that the SG list fits in a page, so that it 
+can be passed to the hardware. This isn't needed by iovmm, as it processes the 
+sglist in software. iovmm could use SG chaining, but we would then need to 
+enable it for the SoCs on which iovmm is used. I don't know if they properly 
+support that.
 
 -- 
-Matt Sealey <matt@genesi-usa.com>
-Product Development Analyst, Genesi USA, Inc.
+Regards,
+
+Laurent Pinchart
