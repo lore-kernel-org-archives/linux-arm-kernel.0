@@ -1,20 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jun 2011 08:54:51 +0100
-Subject: [PATCH 1/2] clps711x/ceiva: port to use physmap flash
-In-Reply-To: <BANLkTimG86aN5hUBy=GgpMAxhiQSPbetPg@mail.gmail.com>
-References: <1307015648-17505-1-git-send-email-dbaryshkov@gmail.com>
-	<1307075905.4405.130.camel@localhost>
-	<BANLkTi=TQfMec9Kuq4-P9Rokp44g67Tx6A@mail.gmail.com>
-	<1307077842.4405.133.camel@localhost>
-	<BANLkTimG86aN5hUBy=GgpMAxhiQSPbetPg@mail.gmail.com>
-Message-ID: <20110603075451.GF10532@n2100.arm.linux.org.uk>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Fri, 3 Jun 2011 09:56:42 +0200
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+In-Reply-To: <BANLkTi=xVzdLDq5wbzLtQFu+nz=8G9SbKQ@mail.gmail.com>
+References: <201106022149.47936.heiko@sntech.de>
+	<BANLkTi=xVzdLDq5wbzLtQFu+nz=8G9SbKQ@mail.gmail.com>
+Message-ID: <201106030956.43174.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2011 at 09:17:31AM +0400, Dmitry Eremin-Solenikov wrote:
-> Anyway the patch removing mtd support can be pushed via mtd tree
-> (there is really no point on mtd/maps/ceiva.c), and removing ceiva
-> depends on Russell's decision.
+Hi,
 
-If it's not getting any attention and no one's interested in it then
-it can be removed.
+Am Freitag 03 Juni 2011, 01:48:05 schrieb Kyungmin Park:
+> As I don't have the s3c2416 user manaul, I'm not sure it's support
+> AUTO CMD12 or not. but at least it's support at s3c6410 and later.
+According to the manual, the 2416 supports AUTO CMD12.
+
+As I wrote disabling auto cmd12 only works sometimes and other times the irq 
+storm happens like with auto cmd12 enabled - always after the first reboot.
+So it seems auto cmd12 is not the real reason for the error.
+
+Do you also encounter the second error later on (for me in udev stage):
+>  mmcblk1boot0: retrying using single block read
+>  mmc1: ADMA error
+>  mmcblk1boot0: error -5 transferring data, sector 448, nr 32, card status
+> 0x900
+>  end_request: I/O error, dev mmcblk1boot0, sector 448
+>  Buffer I/O error on device mmcblk1boot0, logical block 56
+>  mmcblk1boot1: retrying using single block read
+>  mmc1: ADMA error
+>  mmcblk1boot1: error -5 transferring data, sector 448, nr 32, card status
+> 0x900
+>  end_request: I/O error, dev mmcblk1boot1, sector 448
+
+
+Thanks
+Heiko
