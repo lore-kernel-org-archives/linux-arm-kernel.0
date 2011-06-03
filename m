@@ -1,115 +1,155 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Fri,  3 Jun 2011 15:44:16 -0700
-Subject: [PATCH v2 4/7] msm: gpio: Remove ifdefs on gpio chip registers
+Date: Fri,  3 Jun 2011 15:44:18 -0700
+Subject: [PATCH v2 6/7] gpio_msm: Move Qualcomm v6 MSM driver into drivers
 In-Reply-To: <1307141059-22431-1-git-send-email-davidb@codeaurora.org>
 References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
 	<1307141059-22431-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1307141059-22431-5-git-send-email-davidb@codeaurora.org>
+Message-ID: <1307141059-22431-7-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select the GPIO register configuration at runtime rather than through
-idefs.
+Migrate the driver for the v6-based MSM chips into drivers/gpio.  The
+driver is unchanged, only moved.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-msm/gpio.c |   33 ++++++++++++++++++++++++++-------
- 1 files changed, 26 insertions(+), 7 deletions(-)
+ arch/arm/mach-msm/Kconfig                          |    3 +++
+ arch/arm/mach-msm/Makefile                         |    2 --
+ drivers/gpio/Kconfig                               |    8 ++++++++
+ drivers/gpio/Makefile                              |    1 +
+ arch/arm/mach-msm/gpio.c => drivers/gpio/msm_v1.c  |    7 +++----
+ .../mach-msm/gpio_hw.h => drivers/gpio/msm_v1.h    |    9 ++++-----
+ 6 files changed, 19 insertions(+), 11 deletions(-)
+ rename arch/arm/mach-msm/gpio.c => drivers/gpio/msm_v1.c (98%)
+ rename arch/arm/mach-msm/gpio_hw.h => drivers/gpio/msm_v1.h (98%)
 
-diff --git a/arch/arm/mach-msm/gpio.c b/arch/arm/mach-msm/gpio.c
-index 335afbd..e96199d 100644
+diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
+index 1516896..cc7c0b2 100644
+--- a/arch/arm/mach-msm/Kconfig
++++ b/arch/arm/mach-msm/Kconfig
+@@ -11,6 +11,7 @@ config ARCH_MSM7X00A
+ 	select MSM_SMD
+ 	select MSM_SMD_PKG3
+ 	select CPU_V6
++	select GPIO_MSM_V1
+ 	select MSM_PROC_COMM
+ 	select HAS_MSM_DEBUG_UART_PHYS
+ 
+@@ -22,6 +23,7 @@ config ARCH_MSM7X30
+ 	select MSM_VIC
+ 	select CPU_V7
+ 	select MSM_GPIOMUX
++	select GPIO_MSM_V1
+ 	select MSM_PROC_COMM
+ 	select HAS_MSM_DEBUG_UART_PHYS
+ 
+@@ -33,6 +35,7 @@ config ARCH_QSD8X50
+ 	select MSM_VIC
+ 	select CPU_V7
+ 	select MSM_GPIOMUX
++	select GPIO_MSM_V1
+ 	select MSM_PROC_COMM
+ 	select HAS_MSM_DEBUG_UART_PHYS
+ 
+diff --git a/arch/arm/mach-msm/Makefile b/arch/arm/mach-msm/Makefile
+index 9519fd2..c0709af 100644
+--- a/arch/arm/mach-msm/Makefile
++++ b/arch/arm/mach-msm/Makefile
+@@ -34,6 +34,4 @@ ifndef CONFIG_ARCH_MSM8960
+ # TODO: TLMM Mapping issues need to be resolved
+ obj-y	+= gpio-v2.o
+ endif
+-else
+-obj-y	+= gpio.o
+ endif
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index 4a7f631..c19ecd6a 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -164,6 +164,14 @@ config GPIO_VX855
+ 	  additional drivers must be enabled in order to use the
+ 	  functionality of the device.
+ 
++config GPIO_MSM_V1
++	tristate "Qualcomm MSM GPIO v1"
++	depends on GPIOLIB && ARCH_MSM
++	help
++	  Say yes here to support the GPIO interface on ARM v6 based
++	  Qualcomm MSM chips.  Most of the pins on the MSM can be
++	  selected for GPIO, and are controlled by this driver.
++
+ comment "I2C GPIO expanders:"
+ 
+ config GPIO_MAX7300
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index b605f8e..2a7c24c 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -45,6 +45,7 @@ obj-$(CONFIG_GPIO_RDC321X)	+= rdc321x-gpio.o
+ obj-$(CONFIG_GPIO_JANZ_TTL)	+= janz-ttl.o
+ obj-$(CONFIG_GPIO_SX150X)	+= sx150x.o
+ obj-$(CONFIG_GPIO_VX855)	+= vx855_gpio.o
++obj-$(CONFIG_GPIO_MSM_V1)	+= msm_v1.o
+ obj-$(CONFIG_GPIO_ML_IOH)	+= ml_ioh_gpio.o
+ obj-$(CONFIG_AB8500_GPIO)       += ab8500-gpio.o
+ obj-$(CONFIG_GPIO_TPS65910)	+= tps65910-gpio.o
+diff --git a/arch/arm/mach-msm/gpio.c b/drivers/gpio/msm_v1.c
+similarity index 98%
+rename from arch/arm/mach-msm/gpio.c
+rename to drivers/gpio/msm_v1.c
+index 6767deb..89ed35b 100644
 --- a/arch/arm/mach-msm/gpio.c
-+++ b/arch/arm/mach-msm/gpio.c
-@@ -20,6 +20,7 @@
- #include <linux/io.h>
- #include <linux/irq.h>
++++ b/drivers/gpio/msm_v1.c
+@@ -1,7 +1,6 @@
+-/* linux/arch/arm/mach-msm/gpio.c
+- *
++/*
+  * Copyright (C) 2007 Google, Inc.
+- * Copyright (c) 2009-2010, Code Aurora Forum. All rights reserved.
++ * Copyright (c) 2009-2011, Code Aurora Forum. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -22,7 +21,7 @@
  #include <linux/module.h>
-+#include <mach/cpu.h>
- #include "gpio_hw.h"
- #include "gpiomux.h"
+ #include <mach/cpu.h>
+ #include <mach/msm_gpiomux.h>
+-#include "gpio_hw.h"
++#include "msm_v1.h"
  
-@@ -189,15 +190,19 @@ static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
- #define msm_gpio_free NULL
- #endif
+ #define FIRST_GPIO_IRQ MSM_GPIO_TO_INT(0)
  
--struct msm_gpio_chip msm_gpio_chips[] = {
--#if defined(CONFIG_ARCH_MSM7X00A)
-+static struct msm_gpio_chip *msm_gpio_chips;
-+static int msm_gpio_count;
-+
-+static struct msm_gpio_chip msm_gpio_chips_msm7x01[] = {
- 	MSM_GPIO_BANK(MSM7X00, 0,   0,  15),
- 	MSM_GPIO_BANK(MSM7X00, 1,  16,  42),
- 	MSM_GPIO_BANK(MSM7X00, 2,  43,  67),
- 	MSM_GPIO_BANK(MSM7X00, 3,  68,  94),
- 	MSM_GPIO_BANK(MSM7X00, 4,  95, 106),
- 	MSM_GPIO_BANK(MSM7X00, 5, 107, 121),
--#elif defined(CONFIG_ARCH_MSM7X30)
-+};
-+
-+static struct msm_gpio_chip msm_gpio_chips_msm7x30[] = {
- 	MSM_GPIO_BANK(MSM7X30, 0,   0,  15),
- 	MSM_GPIO_BANK(MSM7X30, 1,  16,  43),
- 	MSM_GPIO_BANK(MSM7X30, 2,  44,  67),
-@@ -206,7 +211,9 @@ struct msm_gpio_chip msm_gpio_chips[] = {
- 	MSM_GPIO_BANK(MSM7X30, 5, 107, 133),
- 	MSM_GPIO_BANK(MSM7X30, 6, 134, 150),
- 	MSM_GPIO_BANK(MSM7X30, 7, 151, 181),
--#elif defined(CONFIG_ARCH_QSD8X50)
-+};
-+
-+static struct msm_gpio_chip msm_gpio_chips_qsd8x50[] = {
- 	MSM_GPIO_BANK(QSD8X50, 0,   0,  15),
- 	MSM_GPIO_BANK(QSD8X50, 1,  16,  42),
- 	MSM_GPIO_BANK(QSD8X50, 2,  43,  67),
-@@ -215,7 +222,6 @@ struct msm_gpio_chip msm_gpio_chips[] = {
- 	MSM_GPIO_BANK(QSD8X50, 5, 104, 121),
- 	MSM_GPIO_BANK(QSD8X50, 6, 122, 152),
- 	MSM_GPIO_BANK(QSD8X50, 7, 153, 164),
--#endif
- };
+diff --git a/arch/arm/mach-msm/gpio_hw.h b/drivers/gpio/msm_v1.h
+similarity index 98%
+rename from arch/arm/mach-msm/gpio_hw.h
+rename to drivers/gpio/msm_v1.h
+index ba7972a..a3e3cb2 100644
+--- a/arch/arm/mach-msm/gpio_hw.h
++++ b/drivers/gpio/msm_v1.h
+@@ -1,8 +1,7 @@
+-/* arch/arm/mach-msm/gpio_hw.h
+- *
++/*
+  * Copyright (C) 2007 Google, Inc.
+  * Author: Brian Swetland <swetland@google.com>
+- * Copyright (c) 2008-2010, Code Aurora Forum. All rights reserved.
++ * Copyright (c) 2008-2011, Code Aurora Forum. All rights reserved.
+  *
+  * This software is licensed under the terms of the GNU General Public
+  * License version 2, as published by the Free Software Foundation, and
+@@ -15,8 +14,8 @@
+  *
+  */
  
- static void msm_gpio_irq_ack(struct irq_data *d)
-@@ -311,7 +317,7 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
- 	int i, j, mask;
- 	unsigned val;
+-#ifndef __ARCH_ARM_MACH_MSM_GPIO_HW_H
+-#define __ARCH_ARM_MACH_MSM_GPIO_HW_H
++#ifndef _MSM_GPIO_V1_H
++#define _MSM_GPIO_V1_H
  
--	for (i = 0; i < ARRAY_SIZE(msm_gpio_chips); i++) {
-+	for (i = 0; i < msm_gpio_count; i++) {
- 		struct msm_gpio_chip *msm_chip = &msm_gpio_chips[i];
- 		val = readl(msm_chip->regs.int_status);
- 		val &= msm_chip->int_enable[0];
-@@ -342,6 +348,19 @@ static int __init msm_init_gpio(void)
- {
- 	int i, j = 0;
+ #include <mach/msm_iomap.h>
  
-+	if (cpu_is_msm7x01()) {
-+		msm_gpio_chips = msm_gpio_chips_msm7x01;
-+		msm_gpio_count = ARRAY_SIZE(msm_gpio_chips_msm7x01);
-+	} else if (cpu_is_msm7x30()) {
-+		msm_gpio_chips = msm_gpio_chips_msm7x30;
-+		msm_gpio_count = ARRAY_SIZE(msm_gpio_chips_msm7x30);
-+	} else if (cpu_is_qsd8x50()) {
-+		msm_gpio_chips = msm_gpio_chips_qsd8x50;
-+		msm_gpio_count = ARRAY_SIZE(msm_gpio_chips_qsd8x50);
-+	} else {
-+		return 0;
-+	}
-+
- 	for (i = FIRST_GPIO_IRQ; i < FIRST_GPIO_IRQ + NR_GPIO_IRQS; i++) {
- 		if (i - FIRST_GPIO_IRQ >=
- 			msm_gpio_chips[j].chip.base +
-@@ -353,7 +372,7 @@ static int __init msm_init_gpio(void)
- 		set_irq_flags(i, IRQF_VALID);
- 	}
- 
--	for (i = 0; i < ARRAY_SIZE(msm_gpio_chips); i++) {
-+	for (i = 0; i < msm_gpio_count; i++) {
- 		spin_lock_init(&msm_gpio_chips[i].lock);
- 		writel(0, msm_gpio_chips[i].regs.int_en);
- 		gpiochip_add(&msm_gpio_chips[i].chip);
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
