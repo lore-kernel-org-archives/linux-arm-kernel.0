@@ -1,136 +1,30 @@
-From: charu@ti.com (Varadarajan, Charulatha)
-Date: Fri, 3 Jun 2011 16:50:02 +0530
-Subject: [PATCH 15/15] OMAP: GPIO: clean omap_gpio_mod_init function
-In-Reply-To: <87r57mjq9d.fsf@ti.com>
-References: <1306247094-25372-1-git-send-email-tarun.kanti@ti.com>
-	<1306247094-25372-16-git-send-email-tarun.kanti@ti.com>
-	<87r57mjq9d.fsf@ti.com>
-Message-ID: <BANLkTi=e1PowoD7er46g1q+8EOqLfJNGTQ@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 3 Jun 2011 17:02:11 +0530
+Subject: [PATCH 2/3] davinci: dm6467/T EVM: pass reference clock rate to
+	dm646x_init()
+In-Reply-To: <BANLkTi=oj2Okguie+fje7oDRcPNcWMdAsw@mail.gmail.com>
+References: <1307034677-27236-1-git-send-email-nsekhar@ti.com>
+	<1307034677-27236-2-git-send-email-nsekhar@ti.com>
+	<BANLkTi=oj2Okguie+fje7oDRcPNcWMdAsw@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D2D2D55@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+Hi Olof,
 
-On Thu, May 26, 2011 at 05:18, Kevin Hilman <khilman@ti.com> wrote:
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
->
->> From: Charulatha V <charu@ti.com>
->>
->> With register offsets now defined for respective OMAP versions
->> we can get rid of cpu_class_* checks. In addition, organized
->> common initialization for the different OMAP silicon versions.
->>
->> Signed-off-by: Charulatha V <charu@ti.com>
->> Signed-off-by: Tarun Kanti DebBarma <tarun.kanti@ti.com>
->
-> The sysconfig stuff in this patch should be removed. ?In fact, now that
-> hwmod is used to manage all the GPIO IP blocks, the driver should not be
-> touching sysconfig at all.
+On Thu, Jun 02, 2011 at 23:31:05, Olof Johansson wrote:
 
-The sysconfig stuff in this patch is for OMAP16XX.
+> Do you foresee needing more members of the davinci_board_info struct
+> in the near future? If so, this approach is OK. If this is the only
+> anticipated use today, just passing in the refclk rate as an integer
+> argument would be just as clean, with less infrastructure.
 
->
-> The hwmod defaults should be enough, and for enabling wake-ups, the
-> device-specific code should be calling omap_hwmod_enable_wakeup() (which
-> will also enable smart-idle if the IP supports it.)
->
->
->> ---
->> ?arch/arm/mach-omap1/gpio16xx.c ? ? ? ? | ? ?1 +
->> ?arch/arm/plat-omap/include/plat/gpio.h | ? ?1 +
->> ?drivers/gpio/gpio_omap.c ? ? ? ? ? ? ? | ? 74 +++++++++++++-------------------
->> ?3 files changed, 32 insertions(+), 44 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap1/gpio16xx.c b/arch/arm/mach-omap1/gpio16xx.c
->> index 24f6cfa..e9f8abd 100644
->> --- a/arch/arm/mach-omap1/gpio16xx.c
->> +++ b/arch/arm/mach-omap1/gpio16xx.c
->> @@ -227,6 +227,7 @@ static int __init omap16xx_gpio_init(void)
->> ? ? ? omap16xx_gpio_regs.wkupset = OMAP1610_GPIO_SET_WAKEUPENA;
->> ? ? ? omap16xx_gpio_regs.edgectrl1 = OMAP1610_GPIO_EDGE_CTRL1;
->> ? ? ? omap16xx_gpio_regs.edgectrl2 = OMAP1610_GPIO_EDGE_CTRL2;
->> + ? ? omap16xx_gpio_regs.sysconfig = OMAP1610_GPIO_SYSCONFIG;
->>
->> ? ? ? for (i = 0; i < ARRAY_SIZE(omap16xx_gpio_dev); i++)
->> ? ? ? ? ? ? ? platform_device_register(omap16xx_gpio_dev[i]);
->> diff --git a/arch/arm/plat-omap/include/plat/gpio.h b/arch/arm/plat-omap/include/plat/gpio.h
->> index f82881c..ac45191 100644
->> --- a/arch/arm/plat-omap/include/plat/gpio.h
->> +++ b/arch/arm/plat-omap/include/plat/gpio.h
->> @@ -176,6 +176,7 @@ struct omap_gpio_dev_attr {
->>
->> ?struct omap_gpio_reg_offs {
->> ? ? ? u16 revision;
->> + ? ? u16 sysconfig;
->> ? ? ? u16 direction;
->> ? ? ? u16 datain;
->> ? ? ? u16 dataout;
->> diff --git a/drivers/gpio/gpio_omap.c b/drivers/gpio/gpio_omap.c
->> index ebeb16e..3649c74 100644
->> --- a/drivers/gpio/gpio_omap.c
->> +++ b/drivers/gpio/gpio_omap.c
->> @@ -885,65 +885,51 @@ static void __init omap_gpio_show_rev(struct gpio_bank *bank)
->> ? ? ? called = true;
->> ?}
->>
->> -/* This lock class tells lockdep that GPIO irqs are in a different
->> +/*
->> + * This lock class tells lockdep that GPIO irqs are in a different
->> ? * category than their parents, so it won't report false recursion.
->> ? */
->> ?static struct lock_class_key gpio_lock_class;
->>
->> -/* TODO: Cleanup cpu_is_* checks */
->> ?static void omap_gpio_mod_init(struct gpio_bank *bank)
->> ?{
->> - ? ? if (cpu_class_is_omap2()) {
->> - ? ? ? ? ? ? if (cpu_is_omap44xx()) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0xffffffff, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_IRQSTATUSCLR0);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0x00000000, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_GPIO_DEBOUNCENABLE);
->> - ? ? ? ? ? ? ? ? ? ? /* Initialize interface clk ungated, module enabled */
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0, bank->base + OMAP4_GPIO_CTRL);
->> - ? ? ? ? ? ? } else if (cpu_is_omap34xx()) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0x00000000, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_IRQENABLE1);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0xffffffff, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_IRQSTATUS1);
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0x00000000, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP24XX_GPIO_DEBOUNCE_EN);
->> + ? ? if (bank->width == 32) {
->> + ? ? ? ? ? ? u32 l = 0;
->> +
->> + ? ? ? ? ? ? if (bank->regs->irqenable_inv)
->> + ? ? ? ? ? ? ? ? ? ? l = ~l;
->>
->> + ? ? ? ? ? ? __raw_writel(l, bank->base + bank->regs->irqstatus);
->
-> The ->irqenable_inv flag doesn't affect ->irqstatus.
->
->> + ? ? ? ? ? ? __raw_writel(l, bank->base + bank->regs->irqenable);
->> +
->> + ? ? ? ? ? ? if (bank->regs->debounce_en != USHRT_MAX)
->> + ? ? ? ? ? ? ? ? ? ? __raw_writel(l, bank->base + bank->regs->debounce_en);
->
-> If ->irqenable_inv = true, debounce was just enabled for all GPIOs in
-> the bank.
->
->> + ? ? ? ? ? ? if (bank->regs->ctrl != USHRT_MAX)
->> ? ? ? ? ? ? ? ? ? ? ? /* Initialize interface clk ungated, module enabled */
->> - ? ? ? ? ? ? ? ? ? ? __raw_writel(0, bank->base + OMAP24XX_GPIO_CTRL);
->> - ? ? ? ? ? ? }
->> - ? ? } else if (cpu_class_is_omap1()) {
->> - ? ? ? ? ? ? if (bank_is_mpuio(bank)) {
->> - ? ? ? ? ? ? ? ? ? ? __raw_writew(0xffff, bank->base +
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP_MPUIO_GPIO_MASKIT / bank->stride);
->> + ? ? ? ? ? ? ? ? ? ? ?__raw_writel(l, bank->base + bank->regs->ctrl);
->
-> If ->irqenable_env = true, all the clocks were just gated.
+There was some discussion on passing PLL configuration information too.
+So yes, the structure is likely extended in future.
 
-Okay. Will do the needful.
+Also, most boards end up using the reference clock used by the EVM.
+In that case, with this approach, most boards just pass NULL instead of
+replicating the reference clock frequency in all board files.
 
->
-> Similar problems below.
->
-> Kevin
+Thanks,
+Sekhar
