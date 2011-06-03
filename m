@@ -1,25 +1,63 @@
-From: Artem.Bityutskiy@nokia.com (Artem Bityutskiy)
-Date: Fri, 03 Jun 2011 18:49:19 +0300
-Subject: [PATCH 2/2] mtd: drop ceiva map driver
-In-Reply-To: <1307015648-17505-2-git-send-email-dbaryshkov@gmail.com>
-References: <1307015648-17505-1-git-send-email-dbaryshkov@gmail.com>
-	<1307015648-17505-2-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <1307116159.3069.22.camel@localhost>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Fri, 3 Jun 2011 16:56:32 +0100 (BST)
+Subject: using identity_mapping_add & switching MMU state - how ?
+In-Reply-To: <alpine.DEB.2.00.1106030834240.2311@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106021621400.2311@localhost6.localdomain6>
+	<20110602201611.GA10532@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106030834240.2311@localhost6.localdomain6>
+Message-ID: <alpine.DEB.2.00.1106031626590.2311@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-06-02 at 15:54 +0400, Dmitry Eremin-Solenikov wrote:
-> The same functionality is provided by physmap flash driver,
-> drivers/mtd/maps/ceiva.c didn't receive any functional changes since
-> the start of current git history, so drop it.
-> 
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+Hi Russell, hi all,
 
-How about this: I take this patch to l2-mtd-2.6, but not taking the
-first patch. If someone complains that he needs ceiva, we'll add you
-first patch. Otherwise, you should kill all the other ceiva bits. Is
-this OK?
 
--- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+thanks for the help and suggestions; I've managed to get the V->P->V 
+transition to work, so the next thing to do for the hibernation code is to 
+fix it up in such a way that it directly calls cpu_suspend/cpu_resume.
+
+Job for next week.
+
+
+What I've found that caused a problem was the use of a "mint" pagedir. 
+I've been using this:
+
+ 	/* pre-resume */
+ 	pgd_t __swsusp_pg_dir = pgd_alloc(&init_mm);
+
+
+ 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
+
+ 	... [ restore copy loop ] ...
+
+ 	identity_mapping_add(__swsusp_pg_dir, __pa(_stext), __pa(_etext));
+ 	identity_mapping_add(__swsusp_pg_dir, __pa(_sdata), __pa(_edata));
+ 	cpu_switch_mm(__swsusp_pg_dir, &init_mm);
+
+ 	cpu_proc_fin();
+ 	flush_tlb_all();
+ 	flush_cache_all();
+
+ 	cpu_reset(__pa(__builtin_return_address(0)));
+
+to return to the 1:1-mapped resume function.
+
+But that would hang; I believe it's simply fallen foul of the kernel heap 
+overwrite done by the copy loop.
+
+
+I've noticed it works just fine if using the initial tables.
+
+ 	cpu_switch_mm(swapper_pg_dir, &init_mm);
+
+and setting the identity mappings within swapper_pg_dir.
+
+
+I'd prefer to get away from "abusing" swapper_pg_dir for this; I don't 
+think it should have these identity mappings in (and right now I'm not 
+attempting to take them out again). But I don't yet have a good idea where 
+else to take a usable pagedir from.
+
+
+Anyway ... a great weekend to everyone !
+FrankH.
