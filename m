@@ -1,53 +1,38 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Fri, 3 Jun 2011 10:06:00 +0100
-Subject: [RFC 3/3] ARM:Tegra: Device Tree Support: Initialize from wm8903
-	the device tree
-In-Reply-To: <BANLkTimqf+BC=R3qRn3z3eKOjNXohGUsHA@mail.gmail.com>
-References: <20110511231905.10362.12844.stgit@riker>
-	<20110511232711.10362.53256.stgit@riker>
-	<20110512074917.GA16250@opensource.wolfsonmicro.com>
-	<BANLkTimqf+BC=R3qRn3z3eKOjNXohGUsHA@mail.gmail.com>
-Message-ID: <20110603090600.GC21286@opensource.wolfsonmicro.com>
+From: Marc.Zyngier@arm.com (Marc Zyngier)
+Date: Fri, 03 Jun 2011 10:11:39 +0100
+Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
+	running early
+In-Reply-To: <20110603085735.GH10532@n2100.arm.linux.org.uk>
+References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
+	<20110603085735.GH10532@n2100.arm.linux.org.uk>
+Message-ID: <1307092299.31098.51.camel@e102391-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2011 at 10:46:18AM -0600, Grant Likely wrote:
+On Fri, 2011-06-03 at 09:57 +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 01, 2011 at 03:03:26PM +0100, Marc Zyngier wrote:
+> > Currently, the boot CPU has its local timer enabled long after
+> > the delay loop has been calibrated. This makes it impossible to
+> > boot a system that only uses local timers, like the A15.
+> > 
+> > Use late_time_init hook to initialize the boot CPU local timer.
+> > Since shmobile is already using this hook, add an ARM specific
+> > arm_late_time_init hook that platforms can use instead.
+> 
+> Why do we need to initialize the per-cpu timer in late_time_init() ?
+> Is there a reason it doesn't work at time_init(), and if not can it
+> be fixed to work there?
 
-> Yeah, it's not great.  I'd really like to have a set of helper
-> functions that locate and decode the data for the most common types of
-> properties, but I've not sat down to focus on it and I've not seen a
-> pattern I'm happy with yet.  It does need to be solved though.  The
+It's an ugly mess: TWD needs to be calibrated, and this requires that
+jiffies are progressing. For that, you need another timer to be already
+registered (fine, we have that on all TWD platforms). But time_init() is
+run with interrupts disabled, and you'd hang calibrating TWD.
 
-Yes, looking at the examples you've got below it looks like you've got a
-similar set of issues to the ones that I've been running into trying to
-factor the register map access code out of ASoC.
+This can be solved by merging Colin's scalable TWD, and make sure all
+platforms provide a "smp_twd" clock. Then we can get rid of the
+calibration, and time_init() becomes the natural spot for
+percpu_timer_setup().
 
-> Perhaps something like:
-
-> /* Not sure about this; in this case the return value is an error code
-> so that bad properties can be detected */
-> int dt_decode_cell(struct *property, int index, u32 *out_val);
-> int dt_decode_string(struct *property, int index, char **out_val);
-> int dt_decode_number(struct *property, int start, int len, unsigned
-> long long *out_val);
-
-> and perhaps a set of companion functions:
-> int dt_get_prop_cell(struct *device_node, char *propname, int index,
-> u32 *out_val);
-> int dt_get_prop_string(struct *device_node, char *propname, int index,
-> char **out_val);
-> int dt_get_prop_number(struct *device_node, char *propname, int start,
-> int len, unsigned long long *out_val);
-
-> The first set would be used when the property pointer has already be
-> obtained, and multiple datum need to be extracted.  The second would
-> be most useful when only one value will be extracted from a property.
-> I'm not totally happy with returning the value via a passed in pointer
-> though.  Thoughts?
-
-Yes, I think this sort of format with the error out of band from the
-number is best if a little ugly, and especially the second set is
-definitely going to cut down the amount of boiler plate code.  It's a
-little painful having to pass a pointer to the result but otherwise the
-error handling gets a bit rubbish, especially for the numbers where
-there really isn't a sensible invalid value.
+	M.
+-- 
+Reality is an implementation detail.
