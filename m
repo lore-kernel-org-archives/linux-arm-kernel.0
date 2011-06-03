@@ -1,35 +1,31 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Fri,  3 Jun 2011 23:24:03 +0300
-Subject: [PATCH] omap: pandora: fix NAND support
-Message-ID: <1307132643-17432-1-git-send-email-notasas@gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 3 Jun 2011 23:26:16 +0300
+Subject: [RFC 0/6] iommu: generic api migration and grouping
+In-Reply-To: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+Message-ID: <BANLkTinBWQ=1kxcD4J-=gLMHziQFf6FrDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit d5ce2b65 "omap3630: nand: fix device size to work in polled mode"
-changed values for .devsize in nand platform data, now we have to pass
-NAND_BUSWIDTH_16 instead of '1' to select 16bit NAND.
+On Fri, Jun 3, 2011 at 1:27 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> First stab at iommu consolidation:
 
-Update pandora's platform data accordingly, also specify appropriate
-transfer type.
+All but the first email in this submission were blocked by lakml's filters.
 
-Signed-off-by: Grazvydas Ignotas <notasas@gmail.com>
----
- arch/arm/mach-omap2/board-omap3pandora.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+If anyone was looking for the patches, check them out in lkml's archives.
 
-diff --git a/arch/arm/mach-omap2/board-omap3pandora.c b/arch/arm/mach-omap2/board-omap3pandora.c
-index 1d10736..a3d655c 100644
---- a/arch/arm/mach-omap2/board-omap3pandora.c
-+++ b/arch/arm/mach-omap2/board-omap3pandora.c
-@@ -86,7 +86,8 @@ static struct mtd_partition omap3pandora_nand_partitions[] = {
- 
- static struct omap_nand_platform_data pandora_nand_data = {
- 	.cs		= 0,
--	.devsize	= 1,	/* '0' for 8-bit, '1' for 16-bit device */
-+	.devsize	= NAND_BUSWIDTH_16,
-+	.xfer_type	= NAND_OMAP_PREFETCH_DMA,
- 	.parts		= omap3pandora_nand_partitions,
- 	.nr_parts	= ARRAY_SIZE(omap3pandora_nand_partitions),
- };
--- 
-1.7.0.4
+Here's the blocking notification:
+
+> Your mail to 'linux-arm-kernel' with the subject
+>
+>   [RFC 6/6] msm: iommu: move to dedicated iommu drivers folder
+>
+> Is being held until the list moderator can review it for approval.
+>
+> The reason it is being held:
+>
+>   Message has a suspicious header
+>
+> Either the message will get posted to the list, or you will receive
+> notification of the moderator's decision.  If you would like to cancel
+> this posting, please visit the following URL:
