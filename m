@@ -1,145 +1,67 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  3 Jun 2011 15:15:58 +0100
-Subject: [PATCH v6 14/14] ARM: exynos4: switch MCT to the full local timer
-	infrastructure
-In-Reply-To: <1307110558-29710-1-git-send-email-marc.zyngier@arm.com>
-References: <1307110558-29710-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1307110558-29710-15-git-send-email-marc.zyngier@arm.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Jun 2011 16:18:09 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <20110603121702.DB9E82FA@gemini.denx.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+	<20110601210855.663A3CEFB4E@gemini.denx.de>
+	<BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com>
+	<20110602154659.697EFD09481@gemini.denx.de>
+	<20110603120258.GR23771@pengutronix.de>
+	<20110603121702.DB9E82FA@gemini.denx.de>
+Message-ID: <20110603141809.GS23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Despite MCT not using PPIs, there is now no reason for not
-using the local timer infrastructure.
+On Fri, Jun 03, 2011 at 02:17:02PM +0200, Wolfgang Denk wrote:
+> Dear Sascha Hauer,
+> 
+> In message <20110603120258.GR23771@pengutronix.de> you wrote:
+> >
+> > > I'm not a friend of using magic values that are "totally-impossible".
+> > > This is confusing, and here it is not needed.
+> > 
+> > I find using a field labelled 'entry point' and 'load address' as
+> > absolute addresses or offsets into sdram depending on some flag
+> > also quite confusing. btw how do you want to decide whether the
+> > fields are offsets or absolute addresses? I see no flags field in
+> > the uImage format.
+> 
+> I would define a new image type.  Instead of "-T kernel" we could for
+> example use a new type "-T relkernel" to indicate that addresses are
+> relative to start of system RAM.
+> 
+> > > If we could agree to interpret load address and entry point as
+> > > offsets, the only remaining problem is to find out if we can use a
+> > > common offset.
+> > 
+> > The zImages encapsulated in uImages are relocatable. So pick any offset
+> > between 32k and 128MB into sdram like Russell explained. Higher values
+> > are not desirable as this would break boards with less sdram.
+> 
+> What about the images without the preloader?  You know that U-Boot
+> already provides all the needed code to perform the uncompressing, so
+> it would be nice if we could avoid to include this into each and every
+> image.  Is the raw kernel image, without the preloader, also
+> relocatable and can be started at any address (keeping above
+> restrictions in mind, of course)?
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-exynos4/mct.c |   68 ++++++++++++++++++------------------------
- 1 files changed, 29 insertions(+), 39 deletions(-)
+No, the raw image has to be started at
+virt_to_phys(PAGE_OFFSET + TEXT_OFFSET) which is usually 32k into sdram.
+Only some subarchs define it differently:
 
-diff --git a/arch/arm/mach-exynos4/mct.c b/arch/arm/mach-exynos4/mct.c
-index 14ac10b..1a30278 100644
---- a/arch/arm/mach-exynos4/mct.c
-+++ b/arch/arm/mach-exynos4/mct.c
-@@ -22,6 +22,7 @@
- 
- #include <mach/map.h>
- #include <mach/regs-mct.h>
-+#include <asm/localtimer.h>
- #include <asm/mach/time.h>
- 
- static unsigned long clk_cnt_per_tick;
-@@ -30,9 +31,10 @@ static unsigned long clk_rate;
- struct mct_clock_event_device {
- 	struct clock_event_device *evt;
- 	void __iomem *base;
-+	bool booted;
- };
- 
--struct mct_clock_event_device mct_tick[2];
-+static struct mct_clock_event_device mct_tick[2];
- 
- static void exynos4_mct_write(unsigned int value, void *addr)
- {
-@@ -307,17 +309,20 @@ static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
- 		exynos4_mct_tick_start(clk_cnt_per_tick, mevt);
- 		break;
- 
--	case CLOCK_EVT_MODE_ONESHOT:
- 	case CLOCK_EVT_MODE_UNUSED:
-+		disable_irq(evt->irq);
-+		/* fall through */
-+	case CLOCK_EVT_MODE_ONESHOT:
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 	case CLOCK_EVT_MODE_RESUME:
- 		break;
- 	}
- }
- 
--static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
-+int local_timer_ack(void)
- {
--	struct mct_clock_event_device *mevt = dev_id;
-+	unsigned int cpu = smp_processor_id();
-+	struct mct_clock_event_device *mevt = &mct_tick[cpu];
- 	struct clock_event_device *evt = mevt->evt;
- 
- 	/*
-@@ -330,27 +335,14 @@ static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
- 
- 	/* Clear the MCT tick interrupt */
- 	exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
--
--	evt->event_handler(evt);
--
--	return IRQ_HANDLED;
-+	
-+	return 1;
- }
- 
--static struct irqaction mct_tick0_event_irq = {
--	.name		= "mct_tick0_irq",
--	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
--	.handler	= exynos4_mct_tick_isr,
--};
--
--static struct irqaction mct_tick1_event_irq = {
--	.name		= "mct_tick1_irq",
--	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
--	.handler	= exynos4_mct_tick_isr,
--};
--
--static void exynos4_mct_tick_init(struct clock_event_device *evt)
-+int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
- 	unsigned int cpu = smp_processor_id();
-+	int err = 0;
- 
- 	mct_tick[cpu].evt = evt;
- 
-@@ -378,27 +370,25 @@ static void exynos4_mct_tick_init(struct clock_event_device *evt)
- 
- 	exynos4_mct_write(0x1, mct_tick[cpu].base + MCT_L_TCNTB_OFFSET);
- 
--	if (cpu == 0) {
--		mct_tick0_event_irq.dev_id = &mct_tick[cpu];
--		setup_irq(IRQ_MCT_L0, &mct_tick0_event_irq);
--	} else {
--		mct_tick1_event_irq.dev_id = &mct_tick[cpu];
--		irq_set_affinity(IRQ_MCT1, cpumask_of(1));
--		setup_irq(IRQ_MCT_L1, &mct_tick1_event_irq);
--	}
--}
-+	if (cpu == 0)
-+		evt->irq = IRQ_MCT_L0;
-+	else
-+		evt->irq = IRQ_MCT_L1;
- 
--/* Setup the local clock events for a CPU */
--void __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	exynos4_mct_tick_init(evt);
--}
-+	if (!mct_tick[cpu].booted) {
-+		irq_set_affinity(evt->irq, cpumask_of(cpu));
-+		err = request_irq(evt->irq, percpu_timer_handler,
-+				  IRQF_TIMER | IRQF_NOBALANCING,
-+				  evt->name, evt);
- 
--int local_timer_ack(void)
--{
--	return 0;
--}
-+		if (err)
-+			pr_err("MCT: request_irq failed for %s\n", evt->name);
-+		mct_tick[cpu].booted = true;
-+	} else
-+		enable_irq(evt->irq);
- 
-+	return err;
-+}
- #endif /* CONFIG_LOCAL_TIMERS */
- 
- static void __init exynos4_timer_resources(void)
+textofs-y := 0x00008000
+textofs-$(CONFIG_ARCH_CLPS711X) := 0x00028000
+textofs-$(CONFIG_PM_H1940)      := 0x00108000
+textofs-$(CONFIG_SA1111) := 0x00208000
+
+Sascha
+
 -- 
-1.7.0.4
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
