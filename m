@@ -1,35 +1,70 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 3 Jun 2011 13:23:00 +0000
-Subject: [PATCH v2 3/4] ARM: mxc: migrate mach-imx gpio driver to gpio-mxc
-In-Reply-To: <BANLkTikUnDN81f3cv-buqsKUgdqXsRcYhQ@mail.gmail.com>
-References: <1306985632-18820-1-git-send-email-shawn.guo@linaro.org>
-	<1306985632-18820-4-git-send-email-shawn.guo@linaro.org>
-	<BANLkTikUnDN81f3cv-buqsKUgdqXsRcYhQ@mail.gmail.com>
-Message-ID: <201106031323.01024.arnd@arndb.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Fri, 03 Jun 2011 16:37:59 +0300
+Subject: [PATCH v2] arm: omap3: cm-t35: add support for cm-t3730
+In-Reply-To: <20110531130447.GK11352@atomide.com>
+References: <4DC27317.7020206@compulab.co.il>
+	<1304839231-11329-1-git-send-email-grinberg@compulab.co.il>
+	<20110531130447.GK11352@atomide.com>
+Message-ID: <4DE8E3B7.5020107@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 03 June 2011 11:54:14 Fabio Estevam wrote:
-> On Thu, Jun 2, 2011 at 12:33 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-> ...
-> 
-> > +void __init imx1_soc_init(void)
-> > +{
-> > +       mxc_register_gpio(0, MX1_GPIO1_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTA, 0);
-> > +       mxc_register_gpio(1, MX1_GPIO2_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTB, 0);
-> > +       mxc_register_gpio(2, MX1_GPIO3_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTC, 0);
-> > +       mxc_register_gpio(3, MX1_GPIO4_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTD, 0);
-> 
-> By just reading the function names like "imx1_soc_init" we have really
-> no clue of what it actually does.
-> 
-> "soc_init" is too vague IMHO. Could?t you change the names to
-> something like "imx1_gpio_init" or "imx1_gpio_register".
-> 
-> It would be nice at least are dealing with gpio.
+Hi Tony,
 
-Olof and I asked Shawn to do it specifically this way, so we have a place
-where more SOC specific initialization can be added without having to
-change every single board file.
 
-	Arnd
+On 05/31/11 16:04, Tony Lindgren wrote:
+
+> * Igor Grinberg <grinberg@compulab.co.il> [110508 00:17]:
+>> cm-t3730 is basically the same board as cm-t35, but has DM3730 SoC
+>> assembled and therefore some changes are required.
+>> +static void cm_t35_mux_init(void)
+>> +{
+>> +	int mux_mode = OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT;
+>> +
+>> +	omap3_mux_init(cm_t35_common_board_mux, OMAP_PACKAGE_CUS);
+>> +
+>> +	if (cpu_is_omap34xx()) {
+>> +		omap_mux_init_signal("gpio_70", mux_mode);
+>> +		omap_mux_init_signal("gpio_71", mux_mode);
+>> +		omap_mux_init_signal("gpio_72", mux_mode);
+>> +		omap_mux_init_signal("gpio_73", mux_mode);
+>> +		omap_mux_init_signal("gpio_74", mux_mode);
+>> +		omap_mux_init_signal("gpio_75", mux_mode);
+>> +	} else if (cpu_is_omap3630()) {
+>> +		mux_mode = OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT;
+>> +		omap_mux_init_signal("sys_boot0", mux_mode);
+>> +		omap_mux_init_signal("sys_boot1", mux_mode);
+>> +		omap_mux_init_signal("sys_boot3", mux_mode);
+>> +		omap_mux_init_signal("sys_boot4", mux_mode);
+>> +		omap_mux_init_signal("sys_boot5", mux_mode);
+>> +		omap_mux_init_signal("sys_boot6", mux_mode);
+>> +	}
+>> +
+>> +	omap_mux_init_signal("dss_data18", mux_mode);
+>> +	omap_mux_init_signal("dss_data19", mux_mode);
+>> +	omap_mux_init_signal("dss_data20", mux_mode);
+>> +	omap_mux_init_signal("dss_data21", mux_mode);
+>> +	omap_mux_init_signal("dss_data22", mux_mode);
+>> +	omap_mux_init_signal("dss_data23", mux_mode);
+>> +}
+>> +#else
+>> +static inline void cm_t35_mux_init(void) {}
+>>  #endif
+> Should this cpu_is_omap if else done once and then set
+> some data based on it? That would be better if you need to
+> use it for detection for other things later on as it will
+> avoid multiple cpu_is/machine_is if else lines of code.
+
+I'm not sure I understand what are you trying to propose here...
+If you look once again on the code, there is currently only one if (cpu_is_..) {} else {}
+statement currently present.
+(I can remove the "if (cpu_is_omap3630())" - it indeed has no value)
+
+Indeed, there will be some other differences...
+Each time I submit a patch, I try to be as optimal as I can,
+but again I'm open for suggestions...
+(though I think it is optimal, e.g. 33 lines for a new running board...)
+
+-- 
+Regards,
+Igor.
