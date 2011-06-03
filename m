@@ -1,47 +1,28 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 3 Jun 2011 08:55:58 -0600
-Subject: [PATCH v2 0/4] Move plat-mxc gpio driver into drivers/gpio
-In-Reply-To: <20110603143406.GA19344@S2100-06.ap.freescale.net>
-References: <1306985632-18820-1-git-send-email-shawn.guo@linaro.org>
-	<20110603075201.GE10532@n2100.arm.linux.org.uk>
-	<20110603143406.GA19344@S2100-06.ap.freescale.net>
-Message-ID: <BANLkTi=5kNAt51DP3-rykkT3ZONczD5Crg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri,  3 Jun 2011 15:57:19 +0100
+Subject: [PATCH v1 04/18] ARM: exynos4: remove stubbed twd_timer_setup call
+In-Reply-To: <1307113053-30209-1-git-send-email-marc.zyngier@arm.com>
+References: <1307113053-30209-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1307113053-30209-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 3, 2011 at 8:34 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
-> Hi Russell,
->
-> On Fri, Jun 03, 2011 at 08:52:01AM +0100, Russell King - ARM Linux wrote:
->> On Thu, Jun 02, 2011 at 11:33:48AM +0800, Shawn Guo wrote:
->> > ?arch/arm/plat-mxc/gpio.c ? ? ? ? ? ? ? ? ? ? ? ?| ?361 -------------------
->> > ?drivers/gpio/gpio-mxc.c ? ? ? ? ? ? ? ? ? ? ? ? | ?433 +++++++++++++++++++++++
->>
-> My bad here. ?I should have used 'git diff --stat -M' to show the
-> the following.
->
-> .../arm/plat-mxc/gpio.c => drivers/gpio/gpio-mxc.c | ?216 +++++++++++++-------
->
->> I'm wondering why just moving this driver into drivers/gpio has
->> resulted in it growing by 72 lines - and it's not clear from the
->> diffs why that is because of the way they're broken up.
->>
-> Yes, I agree. ?But when I did something like that to ease the review,
-> people think it's not necessary :)
->
-> http://permalink.gmane.org/gmane.linux.kernel/1143257
+Cc: Kukjin Kim <kgene.kim@samsung.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-exynos4/localtimer.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-The issue was bisectability: it looked like the build would break
-after applying the first patch.  The first patch should move the
-driver without breaking the build, and then you can follow up with
-driver fixes.  I don't want to see functional changes mixed in with
-the file move change.
-
-> +
-> +static struct platform_driver mxc_gpio_driver = {
-> + ? ? ? .driver ? ? ? ? = {
-> + ? ? ? ? ? ? ? .name ? = "gpio-mxc",
-
-.owner = THIS_MODULE,
-
-g.
+diff --git a/arch/arm/mach-exynos4/localtimer.c b/arch/arm/mach-exynos4/localtimer.c
+index 315de6f..6184e29 100644
+--- a/arch/arm/mach-exynos4/localtimer.c
++++ b/arch/arm/mach-exynos4/localtimer.c
+@@ -22,6 +22,5 @@
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
+ 	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
+-	twd_timer_setup(evt);
+ 	return 0;
+ }
+-- 
+1.7.0.4
