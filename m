@@ -1,64 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Jun 2011 09:55:00 +0100
-Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
-	running early
-In-Reply-To: <4DE7E6AF.4020404@gmail.com>
-References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
-	<20110602163152.GH32751@game.jcrosoft.org>
-	<1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
-	<4DE7E6AF.4020404@gmail.com>
-Message-ID: <20110603085500.GG10532@n2100.arm.linux.org.uk>
+From: Josh.wu@atmel.com (Wu, Josh)
+Date: Fri, 3 Jun 2011 16:57:03 +0800
+Subject: [PATCH v2] [media] at91: add Atmel Image Sensor Interface (ISI)
+	support
+In-Reply-To: <201105271549.46099.arnd@arndb.de>
+References: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
+	<201105271549.46099.arnd@arndb.de>
+Message-ID: <4C79549CB6F772498162A641D92D532801DAC9AD@penmb01.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2011 at 02:38:23PM -0500, Rob Herring wrote:
-> On 06/02/2011 11:56 AM, Marc Zyngier wrote:
->> On Thu, 2011-06-02 at 18:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
->> wrote:
->>> On 15:03 Wed 01 Jun     , Marc Zyngier wrote:
->>>> Currently, the boot CPU has its local timer enabled long after
->>>> the delay loop has been calibrated. This makes it impossible to
->>>> boot a system that only uses local timers, like the A15.
->>>>
->>>> Use late_time_init hook to initialize the boot CPU local timer.
->>>> Since shmobile is already using this hook, add an ARM specific
->>>> arm_late_time_init hook that platforms can use instead.
->>>>
->>>> Cc: Paul Mundt<lethal@linux-sh.org>
->>>> Cc: Magnus Damm<magnus.damm@gmail.com>
->>>> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
->>> I propose to switch to early platform devce and earlytimer
->>>
->>> this will avoid the arm_late_time_init hook
->>>
->>> and will make it cross arch
->>
->> I believe this is orthogonal. shmobile (the only ARM user of
->> late_time_init) is already doing some early_platform stuff for its
->> timers.
->>
->> What I'm trying to achieve here is to make sure the timer on CPU0 is
->> actually up, running and registered as a clock_event_device before we
->> hit the delay loop.
->>
->> Or maybe I've misunderstood what you're pointing me to?
->>
->
-> I believe he is referring to this patch which generically enables the  
-> shmobile code for ARM:
->
-> http://www.spinics.net/lists/arm-kernel/msg123736.html
->
-> I don't think it has been pulled into mainline yet.
+Hi, Arnd
 
-And I really don't like it:
-1. It adds an additional layer of complexity.
-2. We end up needing more ways to initialize stuff even earlier in the
-   kernel boot sequence.
-3. Tracking down what gets called when becomes a lot harder.
+On Friday, May 27, 2011 9:50 PM, Arnd Bergmann wrote
 
-At one time there used to be a good rule to follow: Keep it Simple, Damnit.
-This doesn't follow that.
+>On Friday 27 May 2011, Josh Wu wrote:
+>> This patch is to enable Atmel Image Sensor Interface (ISI) driver support.
+>> - Using soc-camera framework with videobuf2 dma-contig allocator
+>> - Supporting video streaming of YUV packed format
+>> - Tested on AT91SAM9M10G45-EK with OV2640
+>> 
+>> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-And so far, no one has explained _why_ shmobile uses this stuff... so
-my presumption at the moment is that there's no real good reason.
+> Looks good to me now.
+
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+
+Thank you very much. I'll send a version 3 code.
+
+Best Regards,
+Josh Wu
