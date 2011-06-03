@@ -1,307 +1,348 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri,  3 Jun 2011 15:15:53 +0100
-Subject: [PATCH v6 09/14] ARM: msm: use remapped PPI interrupts for local timer
+Date: Fri,  3 Jun 2011 15:15:45 +0100
+Subject: [PATCH v6 01/14] ARM: gic: add per-cpu interrupt multiplexer
 In-Reply-To: <1307110558-29710-1-git-send-email-marc.zyngier@arm.com>
 References: <1307110558-29710-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1307110558-29710-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1307110558-29710-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the normal interrupt scheme for the local timers by using
-a remapped PPI interrupt.
+The kernel doesn't handle very well the concept of per-cpu interrupt
+as implemented by the ARM architecture (the same interrupt level is
+exposed on each core).
 
-MSM already had a very similar scheme, though still mixing both
-GIC-specific and generic APIs.
+To work around the problem, add another irq_chip to handle PPIs and
+remap them so that a single interrupt number is only used on a given
+CPU (for example, IRQ 29 and 30 get exposed as IRQ 128 and 129 on
+core 0, 130 and 131 on core 1...).
 
-Fixes and ideas courtesy of Stephen Boyd.
+A helper function gic_ppi_to_vppi() is used to convert the PPI number
+to the per-processor IRQ.
 
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
-Reviewed-and-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Will Deacon <will.deacon@arm.com>
+Tested-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm/mach-msm/Kconfig                         |    2 +
- arch/arm/mach-msm/board-msm8x60.c                 |   11 ---
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +--------------------
- arch/arm/mach-msm/timer.c                         |   59 +++++++++--------
- 4 files changed, 33 insertions(+), 112 deletions(-)
+ arch/arm/common/Kconfig                         |    5 +
+ arch/arm/common/gic.c                           |  133 ++++++++++++++++++++++-
+ arch/arm/include/asm/entry-macro-multi.S        |    2 +-
+ arch/arm/include/asm/hardware/entry-macro-gic.S |   19 ++--
+ arch/arm/include/asm/hardware/gic.h             |   11 ++
+ arch/arm/kernel/irq.c                           |    8 ++-
+ 6 files changed, 165 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 1516896..1ea7d6f 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -42,6 +42,7 @@ config ARCH_MSM8X60
- 				  && !MACH_MSM8X60_FFA)
- 	select ARCH_MSM_SCORPIONMP
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
- 	select CPU_V7
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
-@@ -52,6 +53,7 @@ config ARCH_MSM8960
- 	select ARCH_MSM_SCORPIONMP
- 	select MACH_MSM8960_SIM if (!MACH_MSM8960_RUMI3)
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
- 	select CPU_V7
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
-diff --git a/arch/arm/mach-msm/board-msm8x60.c b/arch/arm/mach-msm/board-msm8x60.c
-index 1163b6f..d70a2f6 100644
---- a/arch/arm/mach-msm/board-msm8x60.c
-+++ b/arch/arm/mach-msm/board-msm8x60.c
-@@ -36,8 +36,6 @@ static void __init msm8x60_map_io(void)
+diff --git a/arch/arm/common/Kconfig b/arch/arm/common/Kconfig
+index 4b71766..6c7001e 100644
+--- a/arch/arm/common/Kconfig
++++ b/arch/arm/common/Kconfig
+@@ -1,6 +1,11 @@
+ config ARM_GIC
+ 	bool
  
- static void __init msm8x60_init_irq(void)
- {
--	unsigned int i;
--
- 	gic_init(0, GIC_PPI_START, MSM_QGIC_DIST_BASE,
- 		 (void *)MSM_QGIC_CPU_BASE);
++config ARM_GIC_VPPI
++	depends on ARM_GIC
++	select SPARSE_IRQ
++	bool
++
+ config ARM_VIC
+ 	bool
  
-@@ -49,15 +47,6 @@ static void __init msm8x60_init_irq(void)
- 	 */
- 	if (!machine_is_msm8x60_sim())
- 		writel(0x0000FFFF, MSM_QGIC_DIST_BASE + GIC_DIST_ENABLE_SET);
--
--	/* FIXME: Not installing AVS_SVICINT and AVS_SVICINTSWDONE yet
--	 * as they are configured as level, which does not play nice with
--	 * handle_percpu_irq.
--	 */
--	for (i = GIC_PPI_START; i < GIC_SPI_START; i++) {
--		if (i != AVS_SVICINT && i != AVS_SVICINTSWDONE)
--			irq_set_handler(i, handle_percpu_irq);
--	}
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 4ddd0a6..2146d5e 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -42,6 +42,12 @@ struct gic_chip_data {
+ 	unsigned int irq_offset;
+ 	void __iomem *dist_base;
+ 	void __iomem *cpu_base;
++#ifdef CONFIG_ARM_GIC_VPPI
++	/* These fields must be 0 on secondary GICs */
++	int	     ppi_base;
++	int	     vppi_base;
++	u16	     nrppis;
++#endif
+ };
+ 
+ /*
+@@ -262,12 +268,88 @@ void __init gic_cascade_irq(unsigned int gic_nr, unsigned int irq)
+ 	irq_set_chained_handler(irq, gic_handle_cascade_irq);
  }
  
- static void __init msm8x60_init(void)
-diff --git a/arch/arm/mach-msm/include/mach/entry-macro-qgic.S b/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
-index 1246715..717076f 100644
---- a/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
-+++ b/arch/arm/mach-msm/include/mach/entry-macro-qgic.S
-@@ -8,81 +8,10 @@
-  * warranty of any kind, whether express or implied.
++#ifdef CONFIG_ARM_GIC_VPPI
++unsigned int gic_ppi_to_vppi(unsigned int irq)
++{
++	struct gic_chip_data *chip_data = irq_get_chip_data(irq);
++	unsigned int vppi_irq;
++	unsigned int ppi;
++
++	WARN_ON(!chip_data->vppi_base);
++
++	ppi = irq - chip_data->ppi_base;
++	vppi_irq = ppi + chip_data->nrppis * smp_processor_id();
++	vppi_irq += chip_data->vppi_base;
++
++	return vppi_irq;
++}
++
++static void gic_handle_ppi(unsigned int irq, struct irq_desc *desc)
++{
++	unsigned int vppi_irq;
++
++	vppi_irq = gic_ppi_to_vppi(irq);
++	generic_handle_irq(vppi_irq);
++}
++
++static struct irq_data *gic_vppi_to_ppi(struct irq_data *d)
++{
++	struct gic_chip_data *chip_data = irq_data_get_irq_chip_data(d);
++	unsigned int ppi_irq;
++
++	ppi_irq = d->irq - chip_data->vppi_base - chip_data->nrppis * smp_processor_id();
++	ppi_irq += chip_data->ppi_base;
++
++	return irq_get_irq_data(ppi_irq);
++}
++
++static void gic_ppi_eoi_irq(struct irq_data *d)
++{
++	gic_eoi_irq(gic_vppi_to_ppi(d));
++}
++
++static void gic_ppi_mask_irq(struct irq_data *d)
++{
++	gic_mask_irq(gic_vppi_to_ppi(d));
++}
++
++static void gic_ppi_unmask_irq(struct irq_data *d)
++{
++	gic_unmask_irq(gic_vppi_to_ppi(d));
++}
++
++static int gic_ppi_set_type(struct irq_data *d, unsigned int type)
++{
++	return gic_set_type(gic_vppi_to_ppi(d), type);
++}
++
++static int gic_ppi_set_wake(struct irq_data *d, unsigned int on)
++{
++	return gic_set_wake(gic_vppi_to_ppi(d), on);
++}
++
++static int __init gic_irq_is_ppi(struct gic_chip_data *gic, unsigned int irq)
++{
++	return (irq >= (gic->irq_offset + 16) && irq <= (gic->irq_offset + 31));
++}
++
++static struct irq_chip gic_ppi_chip = {
++	.name			= "GIC-PPI",
++	.irq_eoi		= gic_ppi_eoi_irq,
++	.irq_mask		= gic_ppi_mask_irq,
++	.irq_unmask		= gic_ppi_unmask_irq,
++	.irq_set_type		= gic_ppi_set_type,
++	.irq_set_wake		= gic_ppi_set_wake,
++};
++#endif
++
+ static void __init gic_dist_init(struct gic_chip_data *gic,
+ 	unsigned int irq_start)
+ {
+-	unsigned int gic_irqs, irq_limit, i;
++	unsigned int gic_irqs, irq_limit, i, nrvppis = 0;
+ 	void __iomem *base = gic->dist_base;
+ 	u32 cpumask = 1 << smp_processor_id();
++	u32 dist_ctr, nrcpus;
+ 
+ 	cpumask |= cpumask << 8;
+ 	cpumask |= cpumask << 16;
+@@ -278,11 +360,32 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+ 	 * Find out how many interrupts are supported.
+ 	 * The GIC only supports up to 1020 interrupt sources.
+ 	 */
+-	gic_irqs = readl_relaxed(base + GIC_DIST_CTR) & 0x1f;
+-	gic_irqs = (gic_irqs + 1) * 32;
++	dist_ctr = readl_relaxed(base + GIC_DIST_CTR);
++	gic_irqs = ((dist_ctr & 0x1f) + 1) * 32;
+ 	if (gic_irqs > 1020)
+ 		gic_irqs = 1020;
+ 
++	/* Find out how many CPUs are supported (8 max). */
++	nrcpus = ((dist_ctr >> 5) & 7) + 1;
++
++#ifdef CONFIG_ARM_GIC_VPPI
++	/*
++	 * Nobody would be insane enough to use PPIs on a secondary
++	 * GIC, right?
++	 */
++	if (gic == &gic_data[0]) {
++		gic->nrppis = 16 - (irq_start % 16);
++		gic->ppi_base = gic->irq_offset + 32 - gic->nrppis;
++		nrvppis = gic->nrppis * nrcpus;
++	} else {
++		gic->ppi_base = 0;
++		gic->vppi_base = 0;
++	}
++#endif
++
++	pr_info("Configuring GIC with %d sources (%d additional PPIs)\n",
++		gic_irqs, nrvppis);
++
+ 	/*
+ 	 * Set all global interrupts to be level triggered, active low.
+ 	 */
+@@ -319,10 +422,32 @@ static void __init gic_dist_init(struct gic_chip_data *gic,
+ 	 * Setup the Linux IRQ subsystem.
+ 	 */
+ 	for (i = irq_start; i < irq_limit; i++) {
+-		irq_set_chip_and_handler(i, &gic_chip, handle_fasteoi_irq);
++#ifdef CONFIG_ARM_GIC_VPPI
++		if (nrvppis && gic_irq_is_ppi(gic, i))
++			irq_set_chip_and_handler(i, &gic_chip, gic_handle_ppi);
++		else
++#endif
++		{
++			irq_set_chip_and_handler(i, &gic_chip,
++						 handle_fasteoi_irq);
++			set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
++		}
++		irq_set_chip_data(i, gic);
++	}
++
++#ifdef CONFIG_ARM_GIC_VPPI
++	if (!nrvppis)
++		goto out;
++	gic->vppi_base = irq_alloc_descs(-1, 0, nrvppis, 0);
++	if (WARN_ON(gic->vppi_base < 0))
++		goto out;
++	for (i = gic->vppi_base; i < (gic->vppi_base + nrvppis); i++) {
++		irq_set_chip_and_handler(i, &gic_ppi_chip, handle_percpu_irq);
+ 		irq_set_chip_data(i, gic);
+ 		set_irq_flags(i, IRQF_VALID | IRQF_PROBE);
+ 	}
++out:
++#endif
+ 
+ 	writel_relaxed(1, base + GIC_DIST_CTRL);
+ }
+diff --git a/arch/arm/include/asm/entry-macro-multi.S b/arch/arm/include/asm/entry-macro-multi.S
+index ec0bbf7..c599795 100644
+--- a/arch/arm/include/asm/entry-macro-multi.S
++++ b/arch/arm/include/asm/entry-macro-multi.S
+@@ -24,7 +24,7 @@
+ 	adrne	lr, BSYM(1b)
+ 	bne	do_IPI
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
++#if defined(CONFIG_LOCAL_TIMERS) && !defined(CONFIG_ARM_GIC_VPPI)
+ 	test_for_ltirq r0, r6, r5, lr
+ 	movne	r0, sp
+ 	adrne	lr, BSYM(1b)
+diff --git a/arch/arm/include/asm/hardware/entry-macro-gic.S b/arch/arm/include/asm/hardware/entry-macro-gic.S
+index c115b82..14a3363 100644
+--- a/arch/arm/include/asm/hardware/entry-macro-gic.S
++++ b/arch/arm/include/asm/hardware/entry-macro-gic.S
+@@ -17,23 +17,26 @@
+ 	.endm
+ #endif
+ 
++#ifdef CONFIG_ARM_GIC_VPPI
++#define DO_IRQ_BASE	16
++#else
++#define DO_IRQ_BASE	30
++#endif
++
+ /*
+  * The interrupt numbering scheme is defined in the
+  * interrupt controller spec.  To wit:
+  *
+  * Interrupts 0-15 are IPI
+- * 16-28 are reserved
+- * 29-31 are local.  We allow 30 to be used for the watchdog.
++ * 16-31 are local.  We allow 30 to be used for the watchdog.
+  * 32-1020 are global
+  * 1021-1022 are reserved
+  * 1023 is "spurious" (no interrupt)
+  *
+- * For now, we ignore all local interrupts so only return an interrupt if it's
+- * between 30 and 1020.  The test_for_ipi routine below will pick up on IPIs.
+- *
+  * A simple read from the controller will tell us the number of the highest
+  * priority enabled interrupt.  We then just need to check whether it is in the
+- * valid range for an IRQ (30-1020 inclusive).
++ * valid range for an IRQ (30-1020 inclusive). If CONFIG_ARM_GIC_VPPI is
++ * enabled, local interrupts are handled the same way as global ones.
   */
  
--#include <mach/hardware.h>
--#include <asm/hardware/gic.h>
-+#include <asm/hardware/entry-macro-gic.S>
+ 	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+@@ -43,7 +46,7 @@
  
- 	.macro	disable_fiq
+ 	ldr	\tmp, =1021
+ 	bic     \irqnr, \irqstat, #0x1c00
+-	cmp     \irqnr, #29
++	cmp     \irqnr, #(DO_IRQ_BASE - 1)
+ 	cmpcc	\irqnr, \irqnr
+ 	cmpne	\irqnr, \tmp
+ 	cmpcs	\irqnr, \irqnr
+@@ -63,6 +66,7 @@
+ 	cmpcs	\irqnr, \irqnr
  	.endm
  
--	.macro  get_irqnr_preamble, base, tmp
--	ldr	\base, =gic_cpu_base_addr
--	ldr	\base, [\base]
--	.endm
--
- 	.macro  arch_ret_to_user, tmp1, tmp2
++#ifndef CONFIG_ARM_GIC_VPPI
+ /* As above, this assumes that irqstat and base are preserved.. */
+ 
+ 	.macro test_for_ltirq, irqnr, irqstat, base, tmp
+@@ -73,3 +77,4 @@
+ 	streq	\irqstat, [\base, #GIC_CPU_EOI]
+ 	cmp	\tmp, #0
  	.endm
--
--	/*
--	 * The interrupt numbering scheme is defined in the
--	 * interrupt controller spec.  To wit:
--	 *
--	 * Migrated the code from ARM MP port to be more consistent
--	 * with interrupt processing , the following still holds true
--	 * however, all interrupts are treated the same regardless of
--	 * if they are local IPI or PPI
--	 *
--	 * Interrupts 0-15 are IPI
--	 * 16-31 are PPI
--	 *   (16-18 are the timers)
--	 * 32-1020 are global
--	 * 1021-1022 are reserved
--	 * 1023 is "spurious" (no interrupt)
--	 *
--	 * A simple read from the controller will tell us the number of the
--	 * highest priority enabled interrupt.  We then just need to check
--	 * whether it is in the valid range for an IRQ (0-1020 inclusive).
--	 *
--	 * Base ARM code assumes that the local (private) peripheral interrupts
--	 * are not valid, we treat them differently, in that the privates are
--	 * handled like normal shared interrupts with the exception that only
--	 * one processor can register the interrupt and the handler must be
--	 * the same for all processors.
--	 */
--
--	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
--
--	ldr  \irqstat, [\base, #GIC_CPU_INTACK] /* bits 12-10 =srcCPU,
--						   9-0 =int # */
--
--	bic     \irqnr, \irqstat, #0x1c00	@mask src
--	cmp     \irqnr, #15
--	ldr		\tmp, =1021
--	cmpcc	\irqnr, \irqnr
--	cmpne	\irqnr, \tmp
--	cmpcs	\irqnr, \irqnr
--
--	.endm
--
--	/* We assume that irqstat (the raw value of the IRQ acknowledge
--	 * register) is preserved from the macro above.
--	 * If there is an IPI, we immediately signal end of interrupt on the
--	 * controller, since this requires the original irqstat value which
--	 * we won't easily be able to recreate later.
--	 */
--	.macro test_for_ipi, irqnr, irqstat, base, tmp
--    bic \irqnr, \irqstat, #0x1c00
--    cmp \irqnr, #16
--    strcc   \irqstat, [\base, #GIC_CPU_EOI]
--    cmpcs   \irqnr, \irqnr
--	.endm
--
--	/* As above, this assumes that irqstat and base are preserved.. */
--
--	.macro test_for_ltirq, irqnr, irqstat, base, tmp
--    bic \irqnr, \irqstat, #0x1c00
--    mov     \tmp, #0
--    cmp \irqnr, #16
--    moveq   \tmp, #1
--    streq   \irqstat, [\base, #GIC_CPU_EOI]
--    cmp \tmp, #0
--	.endm
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index 38b95e9..b2747cc 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -23,6 +23,7 @@
- #include <linux/io.h>
++#endif
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 0691f9d..9dbffed 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -33,6 +33,8 @@
+ #define GIC_DIST_SOFTINT		0xf00
  
- #include <asm/mach/time.h>
-+#include <asm/hardware/gic.h>
- #include <mach/msm_iomap.h>
- #include <mach/cpu.h>
+ #ifndef __ASSEMBLY__
++#include <linux/cpumask.h>
++
+ extern void __iomem *gic_cpu_base_addr;
+ extern struct irq_chip gic_arch_extn;
  
-@@ -67,7 +68,7 @@ enum timer_location {
- struct msm_clock {
- 	struct clock_event_device   clockevent;
- 	struct clocksource          clocksource;
--	struct irqaction            irq;
-+	unsigned int		    irq;
- 	void __iomem                *regbase;
- 	uint32_t                    freq;
- 	uint32_t                    shift;
-@@ -83,13 +84,10 @@ enum {
+@@ -41,6 +43,15 @@ void gic_secondary_init(unsigned int);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+ void gic_enable_ppi(unsigned int);
++#ifdef CONFIG_ARM_GIC_VPPI
++unsigned int gic_ppi_to_vppi(unsigned int irq);
++#else
++static inline unsigned int gic_ppi_to_vppi(unsigned int irq)
++{
++	return irq;
++}
++#endif
++
+ #endif
  
- 
- static struct msm_clock msm_clocks[];
--static struct clock_event_device *local_clock_event;
- 
- static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
+ #endif
+diff --git a/arch/arm/kernel/irq.c b/arch/arm/kernel/irq.c
+index 83bbad0..237959f 100644
+--- a/arch/arm/kernel/irq.c
++++ b/arch/arm/kernel/irq.c
+@@ -124,8 +124,14 @@ void __init init_IRQ(void)
+ #ifdef CONFIG_SPARSE_IRQ
+ int __init arch_probe_nr_irqs(void)
  {
- 	struct clock_event_device *evt = dev_id;
--	if (smp_processor_id() != 0)
--		evt = local_clock_event;
- 	if (evt->event_handler == NULL)
- 		return IRQ_HANDLED;
- 	evt->event_handler(evt);
-@@ -140,6 +138,8 @@ static void msm_timer_set_mode(enum clock_event_mode mode,
- 		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
- 		break;
- 	case CLOCK_EVT_MODE_UNUSED:
-+		disable_irq(evt->irq);
-+		/* fall through */
- 	case CLOCK_EVT_MODE_SHUTDOWN:
- 		writel(0, clock->regbase + TIMER_ENABLE);
- 		break;
-@@ -163,13 +163,7 @@ static struct msm_clock msm_clocks[] = {
- 			.mask           = CLOCKSOURCE_MASK(32),
- 			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
- 		},
--		.irq = {
--			.name    = "gp_timer",
--			.flags   = IRQF_DISABLED | IRQF_TIMER | IRQF_TRIGGER_RISING,
--			.handler = msm_timer_interrupt,
--			.dev_id  = &msm_clocks[0].clockevent,
--			.irq     = INT_GP_TIMER_EXP
--		},
-+		.irq = INT_GP_TIMER_EXP,
- 		.freq = GPT_HZ,
- 	},
- 	[MSM_CLOCK_DGT] = {
-@@ -188,13 +182,7 @@ static struct msm_clock msm_clocks[] = {
- 			.mask           = CLOCKSOURCE_MASK((32 - MSM_DGT_SHIFT)),
- 			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
- 		},
--		.irq = {
--			.name    = "dg_timer",
--			.flags   = IRQF_DISABLED | IRQF_TIMER | IRQF_TRIGGER_RISING,
--			.handler = msm_timer_interrupt,
--			.dev_id  = &msm_clocks[1].clockevent,
--			.irq     = INT_DEBUG_TIMER_EXP
--		},
-+		.irq = INT_DEBUG_TIMER_EXP,
- 		.freq = DGT_HZ >> MSM_DGT_SHIFT,
- 		.shift = MSM_DGT_SHIFT,
- 	}
-@@ -253,10 +241,13 @@ static void __init msm_timer_init(void)
- 			printk(KERN_ERR "msm_timer_init: clocksource_register "
- 			       "failed for %s\n", cs->name);
++	int initcnt;
++
+ 	nr_irqs = machine_desc->nr_irqs ? machine_desc->nr_irqs : NR_IRQS;
+-	return nr_irqs;
++	initcnt = nr_irqs;
++#ifdef CONFIG_ARM_GIC_VPPI
++	nr_irqs += 16 * 8;	/* 16 PPIs, 8 CPUs */
++#endif
++	return initcnt;
+ }
+ #endif
  
--		res = setup_irq(clock->irq.irq, &clock->irq);
-+		ce->irq = gic_ppi_to_vppi(clock->irq);
-+		res = request_irq(ce->irq, msm_timer_interrupt,
-+				  IRQF_TIMER | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
-+				  ce->name, ce);
- 		if (res)
--			printk(KERN_ERR "msm_timer_init: setup_irq "
--			       "failed for %s\n", cs->name);
-+			pr_err("msm_timer_init: request_irq failed for %s\n",
-+			       ce->name);
- 
- 		clockevents_register_device(ce);
- 	}
-@@ -265,7 +256,9 @@ static void __init msm_timer_init(void)
- #ifdef CONFIG_SMP
- int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
-+	static bool local_timer_inited;
- 	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
-+	int res;
- 
- 	/* Use existing clock_event for cpu 0 */
- 	if (!smp_processor_id())
-@@ -273,12 +266,7 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
- 
- 	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
- 
--	if (!local_clock_event) {
--		writel(0, clock->regbase  + TIMER_ENABLE);
--		writel(0, clock->regbase + TIMER_CLEAR);
--		writel(~0, clock->regbase + TIMER_MATCH_VAL);
--	}
--	evt->irq = clock->irq.irq;
-+	evt->irq = gic_ppi_to_vppi(clock->irq);
- 	evt->name = "local_timer";
- 	evt->features = CLOCK_EVT_FEAT_ONESHOT;
- 	evt->rating = clock->clockevent.rating;
-@@ -290,9 +278,22 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
- 		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
- 	evt->min_delta_ns = clockevent_delta2ns(4, evt);
- 
--	local_clock_event = evt;
-+	if (!local_timer_inited) {
-+		writel(0, clock->regbase  + TIMER_ENABLE);
-+		writel(0, clock->regbase + TIMER_CLEAR);
-+		writel(~0, clock->regbase + TIMER_MATCH_VAL);
- 
--	gic_enable_ppi(clock->irq.irq);
-+		res = request_irq(evt->irq, msm_timer_interrupt,
-+				  IRQF_TIMER | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
-+				  clock->clockevent.name, evt);
-+		if (res) {
-+			pr_err("local_timer_setup: request_irq failed for %s\n",
-+			       clock->clockevent.name);
-+			return res;
-+		}
-+		local_timer_inited = true;
-+	} else
-+		enable_irq(evt->irq);
- 
- 	clockevents_register_device(evt);
- 	return 0;
 -- 
 1.7.0.4
