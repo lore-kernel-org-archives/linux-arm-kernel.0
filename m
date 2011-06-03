@@ -1,28 +1,26 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 3 Jun 2011 13:21:07 +0400
-Subject: [PATCH 1/2] clps711x/ceiva: port to use physmap flash
-In-Reply-To: <20110603075451.GF10532@n2100.arm.linux.org.uk>
-References: <1307015648-17505-1-git-send-email-dbaryshkov@gmail.com>
-	<1307075905.4405.130.camel@localhost>
-	<BANLkTi=TQfMec9Kuq4-P9Rokp44g67Tx6A@mail.gmail.com>
-	<1307077842.4405.133.camel@localhost>
-	<BANLkTimG86aN5hUBy=GgpMAxhiQSPbetPg@mail.gmail.com>
-	<20110603075451.GF10532@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTinfbi+fMq5nbWfYyUSVTXx-263jQw@mail.gmail.com>
+Date: Fri, 3 Jun 2011 13:22:18 +0400
+Subject: clps711x/ceiva support
+In-Reply-To: <20110603053445.GA11543@doriath.ww600.siemens.net>
+References: <20110603053445.GA11543@doriath.ww600.siemens.net>
+Message-ID: <BANLkTik9xPaM7gqdsfKTxSB29kXpXuZoxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/3/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Fri, Jun 03, 2011 at 09:17:31AM +0400, Dmitry Eremin-Solenikov wrote:
->> Anyway the patch removing mtd support can be pushed via mtd tree
->> (there is really no point on mtd/maps/ceiva.c), and removing ceiva
->> depends on Russell's decision.
+On 6/3/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
+> Hello,
 >
-> If it's not getting any attention and no one's interested in it then
-> it can be removed.
+> While doing mtd cleanup, I've stumbled upon clps711x/ceiva platform.
+> It's a Ceiva/Polaroid PhotoMax Digital Picture Frame. Support for it was
+> commited before 2.6.12-rc2, current git contains no functional changes
+> since it's start. Driver containing MTD support for that board was
+> broken for some time already.
+>
+> Artem Bityutskiy asked me to ask on ARM tree if this board is alive or
+> not. Are there any objections to drop that board file?
 
-I've sent a separate e-mail to ARM ML to see if anybody is interested.
-
+BTW: is the whole clps771x arch used/cared about, or it's just stuck
+w/o maintainership and usage?
 
 -- 
 With best wishes
