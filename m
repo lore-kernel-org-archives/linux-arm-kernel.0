@@ -1,69 +1,57 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Fri, 3 Jun 2011 02:12:47 +0200
-Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
-	limitation in IOMMU
-In-Reply-To: <20110601140306.GC6700@n2100.arm.linux.org.uk>
-References: <20110601131744.GH11352@atomide.com>
-	<201106011550.50873.laurent.pinchart@ideasonboard.com>
-	<20110601140306.GC6700@n2100.arm.linux.org.uk>
-Message-ID: <201106030212.48226.laurent.pinchart@ideasonboard.com>
+From: 21cnbao@gmail.com (Barry Song)
+Date: Fri, 3 Jun 2011 09:19:59 +0800
+Subject: [RFC 1/2] ARM:Tegra: Device Tree Support: Initialize the audio
+	card from the device tree.
+In-Reply-To: <20110602213656.GB10532@n2100.arm.linux.org.uk>
+References: <20110527205444.21000.90209.stgit@riker>
+	<20110527205706.21000.34832.stgit@riker>
+	<BANLkTi=NMjBjWVv_o3PocejhgGr8TdG+1Q@mail.gmail.com>
+	<BANLkTi=PtEhxxmZo2DqvmySCmnEd3LbezQ@mail.gmail.com>
+	<BANLkTikWpiY_o27OF-Jxvq7iPeWzrAYOsQ@mail.gmail.com>
+	<20110602160445.GA8373@ponder.secretlab.ca>
+	<20110602213656.GB10532@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTimavC-6oMhAHHsBJ2_Em7aXi7eyNQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+2011/6/3 Russell King - ARM Linux <linux@arm.linux.org.uk>:
+> On Thu, Jun 02, 2011 at 10:04:45AM -0600, Grant Likely wrote:
+>> Right now we can't do dynamic registration for on-chip devices in a
+>> lot of cases because we don't have the infrastructure to hook up the
+>> associated struct clks.
+>
+> I've been wondering about this, and I don't see it as a blocking problem
+> as you seem to be.
+>
+> I assume platform devices have stable names when they're created from
+> the device tree? ?If yes, there's no problem having the DT start to
+> describe the SoC specific devices _today_ - all that the clk API using
+> clkdev requires is a stable device name.
 
-On Wednesday 01 June 2011 16:03:06 Russell King - ARM Linux wrote:
-> On Wed, Jun 01, 2011 at 03:50:50PM +0200, Laurent Pinchart wrote:
-> > In the specific iovmm case, the driver uses the sglist API to build a
-> > list of page-size sg entries, and then process it in software. Is that
-> > considered as an abuse of the sglist API, or valid usage ?
-> > 
-> > Anyway, sglist chaining is not needed by iovmm. As iovmm just walks the
-> > sglist manually, it's easier to allocate it in one go rather than using
-> > sglist chaining. This of course doesn't make your patch unneeded or
-> > wrong.
-> 
-> Well, there's a two issues here:
-> 1. Should iovmm use sg_phys(sg) with sg_dma_len(sg) ?
->    Probably not, because a scatterlist before DMA API mapping is defined
->    by sg_page(sg), sg->offset, sg->length and has N entries.  After DMA
->    API mapping (n = dma_map_sg(dev, sg, N, dir)), it has n entries where
->    n <= N, and the DMA address/lengths are sg_dma_address(sg) and
->    sg_dma_len(sg).  Both these are undefined for unmapped scatterlists.
-> 
->    Getting this wrong means breakage when CONFIG_NEED_SG_DMA_LENGTH is
->    enabled.
+when i write the following nodes in dts,
 
-iovmm abuses the sglist API, there's no doubt on that. It will break when 
-CONFIG_NEED_SG_DMA_LENGTH is enabled. iovmm should probably not use the sglist 
-API, and it should probably not even exist in the first place. I know that TI 
-is working on moving the OMAP-specific iommu/iovmm implementation to the 
-generic IOMMU API, but that will take time. In the meantime, I'd like to fix 
-iovmm to avoid the userspace-triggerable BUG_ON().
+uart0: uart at 0xb0060000 {
+	compatible = "sirf,uart";
+	...
+}
 
-> 2. What would be the effect of enabling SG list chaining on iovmm?
->    The code uses the correct SG list walking helpers (for_each_sg) so
->    it should be able to cope with chained SG lists.
+uart1: uart at 0xb0050000 {
+	compatible = "sirf,uart";
+	...
+}
 
-Yes it should. It might be slightly less efficient, but I don't think we will 
-notice.
+uart2: uart at 0xb0070000 {
+	compatible = "sirf,uart";
+	...
+}
 
-> So, I think there's no problem here with chained SG lists, but there is
-> an issue with using sg_dma_len().  I'd suggest converting stuff to use
-> sg->length with sg_page(sg) rather than sg_dma_len(sg).
+then create these platform devices by of_platform_xxx things, i get
+some platform devices like the below.
 
-With sg_page(sg) ? I'm not sure to follow you there.
+b0060000.uart
+b0050000.uart
+b0070000.uart
 
-> As for whether SG chaining is required or not, if you're running up against
-> the maximum SG table size, then you do have a requirement for SG chaining.
+so these are the "stable names" you are talking about? or something else?
 
-The SG table size limit makes sure that the SG list fits in a page, so that it 
-can be passed to the hardware. This isn't needed by iovmm, as it processes the 
-sglist in software. iovmm could use SG chaining, but we would then need to 
-enable it for the SoCs on which iovmm is used. I don't know if they properly 
-support that.
-
--- 
-Regards,
-
-Laurent Pinchart
+>
