@@ -1,33 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 3 Jun 2011 08:54:14 -0300
-Subject: [PATCH v2 3/4] ARM: mxc: migrate mach-imx gpio driver to gpio-mxc
-In-Reply-To: <1306985632-18820-4-git-send-email-shawn.guo@linaro.org>
-References: <1306985632-18820-1-git-send-email-shawn.guo@linaro.org>
-	<1306985632-18820-4-git-send-email-shawn.guo@linaro.org>
-Message-ID: <BANLkTikUnDN81f3cv-buqsKUgdqXsRcYhQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Fri, 3 Jun 2011 14:02:58 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <20110602154659.697EFD09481@gemini.denx.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+	<20110601210855.663A3CEFB4E@gemini.denx.de>
+	<BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com>
+	<20110602154659.697EFD09481@gemini.denx.de>
+Message-ID: <20110603120258.GR23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Thu, Jun 02, 2011 at 05:46:59PM +0200, Wolfgang Denk wrote:
+> Dear Matt,
+> 
+> In message <BANLkTi=HqEBRzyU4_HXnNHTeOPL9vPW8PA@mail.gmail.com> you wrote:
+> >
+> > In this case, just a load address in the uImage header of 0 (or some
+> > other totally-impossible value like 0xffffffff
+> > in case 0 is perfectly valid somewhere) and then just jump to the
+> > entry point by deriving the value from the
+> > header size - based on the fact that ARM images are PIC and the Linux
+> > kernel always puts the entry point
+> > at 0 offset - to the address of the uImage header + size of the uImage
+> > header (which U-Boot knows already
+> > from parsing the header).
+> 
+> I'm not a friend of using magic values that are "totally-impossible".
+> This is confusing, and here it is not needed.
 
-On Thu, Jun 2, 2011 at 12:33 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
-...
+I find using a field labelled 'entry point' and 'load address' as
+absolute addresses or offsets into sdram depending on some flag
+also quite confusing. btw how do you want to decide whether the
+fields are offsets or absolute addresses? I see no flags field in
+the uImage format.
 
-> +void __init imx1_soc_init(void)
-> +{
-> + ? ? ? mxc_register_gpio(0, MX1_GPIO1_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTA, 0);
-> + ? ? ? mxc_register_gpio(1, MX1_GPIO2_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTB, 0);
-> + ? ? ? mxc_register_gpio(2, MX1_GPIO3_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTC, 0);
-> + ? ? ? mxc_register_gpio(3, MX1_GPIO4_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTD, 0);
+> 
+> If we could agree to interpret load address and entry point as
+> offsets, the only remaining problem is to find out if we can use a
+> common offset.
 
-By just reading the function names like "imx1_soc_init" we have really
-no clue of what it actually does.
+The zImages encapsulated in uImages are relocatable. So pick any offset
+between 32k and 128MB into sdram like Russell explained. Higher values
+are not desirable as this would break boards with less sdram.
 
-"soc_init" is too vague IMHO. Could?t you change the names to
-something like "imx1_gpio_init" or "imx1_gpio_register".
+Sascha
 
-It would be nice at least are dealing with gpio.
 
-Regards,
-
-Fabio Estevam
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
