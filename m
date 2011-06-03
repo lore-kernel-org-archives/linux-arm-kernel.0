@@ -1,201 +1,64 @@
-From: Josh.wu@atmel.com (Wu, Josh)
-Date: Fri, 3 Jun 2011 16:52:38 +0800
-Subject: [PATCH v2] [media] at91: add Atmel Image Sensor Interface (ISI)
-	support
-In-Reply-To: <20110527120629.GA3603@game.jcrosoft.org>
-References: <1306496329-14535-1-git-send-email-josh.wu@atmel.com>
-	<20110527120629.GA3603@game.jcrosoft.org>
-Message-ID: <4C79549CB6F772498162A641D92D532801DAC995@penmb01.corp.atmel.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Jun 2011 09:55:00 +0100
+Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
+	running early
+In-Reply-To: <4DE7E6AF.4020404@gmail.com>
+References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
+	<20110602163152.GH32751@game.jcrosoft.org>
+	<1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
+	<4DE7E6AF.4020404@gmail.com>
+Message-ID: <20110603085500.GG10532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Jean-Christophe
+On Thu, Jun 02, 2011 at 02:38:23PM -0500, Rob Herring wrote:
+> On 06/02/2011 11:56 AM, Marc Zyngier wrote:
+>> On Thu, 2011-06-02 at 18:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
+>> wrote:
+>>> On 15:03 Wed 01 Jun     , Marc Zyngier wrote:
+>>>> Currently, the boot CPU has its local timer enabled long after
+>>>> the delay loop has been calibrated. This makes it impossible to
+>>>> boot a system that only uses local timers, like the A15.
+>>>>
+>>>> Use late_time_init hook to initialize the boot CPU local timer.
+>>>> Since shmobile is already using this hook, add an ARM specific
+>>>> arm_late_time_init hook that platforms can use instead.
+>>>>
+>>>> Cc: Paul Mundt<lethal@linux-sh.org>
+>>>> Cc: Magnus Damm<magnus.damm@gmail.com>
+>>>> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
+>>> I propose to switch to early platform devce and earlytimer
+>>>
+>>> this will avoid the arm_late_time_init hook
+>>>
+>>> and will make it cross arch
+>>
+>> I believe this is orthogonal. shmobile (the only ARM user of
+>> late_time_init) is already doing some early_platform stuff for its
+>> timers.
+>>
+>> What I'm trying to achieve here is to make sure the timer on CPU0 is
+>> actually up, running and registered as a clock_event_device before we
+>> hit the delay loop.
+>>
+>> Or maybe I've misunderstood what you're pointing me to?
+>>
+>
+> I believe he is referring to this patch which generically enables the  
+> shmobile code for ARM:
+>
+> http://www.spinics.net/lists/arm-kernel/msg123736.html
+>
+> I don't think it has been pulled into mainline yet.
 
-Thank you for the review.
+And I really don't like it:
+1. It adds an additional layer of complexity.
+2. We end up needing more ways to initialize stuff even earlier in the
+   kernel boot sequence.
+3. Tracking down what gets called when becomes a lot harder.
 
-Jean-Christophe PLAGNIOL-VILLARD wrote on Friday, May 27, 2011 8:06 PM:
+At one time there used to be a good rule to follow: Keep it Simple, Damnit.
+This doesn't follow that.
 
->> +/* ISI interrupt service routine */
->> +static irqreturn_t isi_interrupt(int irq, void *dev_id) {
->> +	struct atmel_isi *isi = dev_id;
->> +	u32 status, mask, pending;
->> +	irqreturn_t ret = IRQ_NONE;
->> +
->> +	spin_lock(&isi->lock);
->> +
->> +	status = isi_readl(isi, ISI_STATUS);
->> +	mask = isi_readl(isi, ISI_INTMASK);
->> +	pending = status & mask;
->> +
->> +	if (pending & ISI_CTRL_SRST) {
->> +		complete(&isi->isi_complete);
->> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
->> +		ret = IRQ_HANDLED;
->> +	}
->> +	if (pending & ISI_CTRL_DIS) {
->> +		complete(&isi->isi_complete);
->> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
->> +		ret = IRQ_HANDLED;
->> +	}
-
-> no else here?
-
->> +
->> +	if (pending & ISI_SR_VSYNC) {
->> +		switch (isi->state) {
->> +		case ISI_STATE_IDLE:
->> +			isi->state = ISI_STATE_READY;
->> +			wake_up_interruptible(&isi->capture_wq);
->> +			break;
->> +		}
-
-> really switch here?
-
-I will remove the switch here.
-
-I think this part of IRQ handling code need to refine a little bit. The SRST and DIS_DONE is more independent. And other interrupts can compose together.
-Following is the latest code, I think is more reasonable.
-
-if (pending & ISI_CTRL_SRST) {
-	complete(&isi->complete);
-	isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
-	ret = IRQ_HANDLED;
-} else if (pending & ISI_CTRL_DIS) {
-	complete(&isi->complete);
-	isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
-	ret = IRQ_HANDLED;
-} else {
-	if ((pending & ISI_SR_VSYNC) &&
-			(isi->state == ISI_STATE_IDLE)) {
-		isi->state = ISI_STATE_READY;
-		wake_up_interruptible(&isi->vsync_wq);
-		ret = IRQ_HANDLED;
-	}
-	if (likely(pending & ISI_SR_CXFR_DONE))
-		ret = atmel_isi_handle_streaming(isi);
-}
-
->> +	} else if (likely(pending & ISI_SR_CXFR_DONE)) {
->> +		ret = atmel_isi_handle_streaming(isi);
->> +	}
->> +
->> +	spin_unlock(&isi->lock);
->> +
->> +	return ret;
->> +}
->> +
->> +#define	WAIT_ISI_RESET		1
->> +#define	WAIT_ISI_DISABLE	0
->> +static int atmel_isi_wait_status(int wait_reset, struct atmel_isi 
->> +*isi)
-
->I thinkhave teh atmel_isti first parameter is better
-
-I will fix it.
-
->> +{
->> +	unsigned long timeout;
->> +	/*
->> +	 * The reset or disable will only succeed if we have a
->> +	 * pixel clock from the camera.
->> +	 */
->> +	init_completion(&isi->isi_complete);
->> +
->> +	if (wait_reset) {
->> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
->> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
->> +	} else {
->> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
->> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
->> +	}
->> +
->> +	timeout = wait_for_completion_timeout(&isi->isi_complete,
->> +			msecs_to_jiffies(100));
->> +	if (timeout == 0)
->> +		return -ETIMEDOUT;
->> +
->> +	return 0;
->> +}
->> +
->> +/* ------------------------------------------------------------------
->> +	Videobuf operations
->> +   
->> +------------------------------------------------------------------*/
->> +static int queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
->> +				unsigned int *nplanes, unsigned long sizes[],
->> +				void *alloc_ctxs[])
->> +{
->> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vq);
->> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
->> +	struct atmel_isi *isi = ici->priv;
->> +	unsigned long size;
->> +	int ret, bytes_per_line;
->> +
->> +	/* Reset ISI */
->> +	ret = atmel_isi_wait_status(WAIT_ISI_RESET, isi);
->> +	if (ret < 0) {
->> +		dev_err(icd->dev.parent, "Reset ISI timed out\n");
->> +		return ret;
->> +	}
->> +	/* Disable all interrupts */
->> +	isi_writel(isi, ISI_INTDIS, ~0UL);
->> +
->> +	bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
->> +						icd->current_fmt->host_fmt);
->> +
->> +	if (bytes_per_line < 0)
->> +		return bytes_per_line;
->> +
->> +	size = bytes_per_line * icd->user_height;
->> +
->> +	if (*nbuffers == 0)
->> +		*nbuffers = MAX_BUFFER_NUMS;
->> +	if (*nbuffers > MAX_BUFFER_NUMS)
-
-> else here
-
-I will add it.
-
->> +		*nbuffers = MAX_BUFFER_NUMS;
->> +
->> +	if (size * *nbuffers > VID_LIMIT_BYTES)
->> +		*nbuffers = VID_LIMIT_BYTES / size;
->> +
->> +	*nplanes = 1;
->> +	sizes[0] = size;
->> +	alloc_ctxs[0] = isi->alloc_ctx;
->> +
->> +	isi->sequence = 0;
->> +	isi->active = NULL;
->> +
->> +	dev_dbg(icd->dev.parent, "%s, count=%d, size=%ld\n", __func__,
->> +		*nbuffers, size);
->> +
->> +	return 0;
->> +}
->> +
->> +static int buffer_init(struct vb2_buffer *vb) {
->> +	struct frame_buffer *buf = container_of(vb, struct frame_buffer, 
->> +vb);
->> +
->> +	buf->p_fb_desc = NULL;
->> +	buf->fb_desc_phys = 0;
-
-> memset 0?
-
-OK.
-
->> +	INIT_LIST_HEAD(&buf->list);
->> +
->> +	return 0;
->> +}
->> +
-
->otherwise the patch look good
->if you fix the upper issue
->Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-
-Thank you very much. I will send out version3 soon.
-
-Best Regards,
-Josh Wu
+And so far, no one has explained _why_ shmobile uses this stuff... so
+my presumption at the moment is that there's no real good reason.
