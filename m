@@ -1,38 +1,29 @@
-From: Marc.Zyngier@arm.com (Marc Zyngier)
-Date: Fri, 03 Jun 2011 10:11:39 +0100
-Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
-	running early
-In-Reply-To: <20110603085735.GH10532@n2100.arm.linux.org.uk>
-References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
-	<20110603085735.GH10532@n2100.arm.linux.org.uk>
-Message-ID: <1307092299.31098.51.camel@e102391-lin.cambridge.arm.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 3 Jun 2011 13:21:07 +0400
+Subject: [PATCH 1/2] clps711x/ceiva: port to use physmap flash
+In-Reply-To: <20110603075451.GF10532@n2100.arm.linux.org.uk>
+References: <1307015648-17505-1-git-send-email-dbaryshkov@gmail.com>
+	<1307075905.4405.130.camel@localhost>
+	<BANLkTi=TQfMec9Kuq4-P9Rokp44g67Tx6A@mail.gmail.com>
+	<1307077842.4405.133.camel@localhost>
+	<BANLkTimG86aN5hUBy=GgpMAxhiQSPbetPg@mail.gmail.com>
+	<20110603075451.GF10532@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTinfbi+fMq5nbWfYyUSVTXx-263jQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-06-03 at 09:57 +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 01, 2011 at 03:03:26PM +0100, Marc Zyngier wrote:
-> > Currently, the boot CPU has its local timer enabled long after
-> > the delay loop has been calibrated. This makes it impossible to
-> > boot a system that only uses local timers, like the A15.
-> > 
-> > Use late_time_init hook to initialize the boot CPU local timer.
-> > Since shmobile is already using this hook, add an ARM specific
-> > arm_late_time_init hook that platforms can use instead.
-> 
-> Why do we need to initialize the per-cpu timer in late_time_init() ?
-> Is there a reason it doesn't work at time_init(), and if not can it
-> be fixed to work there?
+On 6/3/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> On Fri, Jun 03, 2011 at 09:17:31AM +0400, Dmitry Eremin-Solenikov wrote:
+>> Anyway the patch removing mtd support can be pushed via mtd tree
+>> (there is really no point on mtd/maps/ceiva.c), and removing ceiva
+>> depends on Russell's decision.
+>
+> If it's not getting any attention and no one's interested in it then
+> it can be removed.
 
-It's an ugly mess: TWD needs to be calibrated, and this requires that
-jiffies are progressing. For that, you need another timer to be already
-registered (fine, we have that on all TWD platforms). But time_init() is
-run with interrupts disabled, and you'd hang calibrating TWD.
+I've sent a separate e-mail to ARM ML to see if anybody is interested.
 
-This can be solved by merging Colin's scalable TWD, and make sure all
-platforms provide a "smp_twd" clock. Then we can get rid of the
-calibration, and time_init() becomes the natural spot for
-percpu_timer_setup().
 
-	M.
 -- 
-Reality is an implementation detail.
+With best wishes
+Dmitry
