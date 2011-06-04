@@ -1,33 +1,41 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 4 Jun 2011 10:51:29 -0700
-Subject: [PATCH v2] ARM: mx53: Fix alternate modes for MX53_PAD_PATA_DATA6
-In-Reply-To: <1307205300-2084-1-git-send-email-festevam@gmail.com>
-References: <1307205300-2084-1-git-send-email-festevam@gmail.com>
-Message-ID: <BANLkTimJGuiCHMBsOM60zqMBWR_iJr6PgQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat,  4 Jun 2011 15:23:03 -0300
+Subject: [PATCH 1/2] ARM: mx5/mx51_3ds: Fix build due to missing header and
+	wrong define
+Message-ID: <1307211784-13353-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 4, 2011 at 9:35 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> MX53_PAD_PATA_DATA6 can have the following alternate modes:
->
-> PATA_DATA_6: ? ? ? ? ? ?mode 0
-> GPIO2_6: ? ? ? ? ? ? ? ?mode 1
-> EMI_NANDF_D_6: ? ? ? ? ?mode 3
-> ESDHC4_DAT6 ? ? ? ? ? ? mode 4
-> GPU3d_GPU_DEBUG_OUT_6 ? mode 5
-> IPU_DIAG_BUS_6 ? ? ? ? ?mode 6
->
-> Fix the modes accordingly.
->
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> Signed-off-by: Dinh Nguyen <dinh.nguyen@freescale.com>
-> ---
->
-> Changes since v1:
-> - Improved subject and added a commit message
+commit b50d28 (ARM i.MX: get rid of wrong MXC_INTERNAL_IRQ usage) broke mx51_3ds build.
 
-Thanks!
+Fix it by adding the missing gpio header and also add the missing parenthesis for 
+EXPIO_PARENT_INT definition.
 
-Not that I can verify the MUX changes, but:
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-mx5/board-mx51_3ds.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
 
-Acked-by: Olof Johansson <olof@lixom.net>
+diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
+index 288965d..befcbad 100644
+--- a/arch/arm/mach-mx5/board-mx51_3ds.c
++++ b/arch/arm/mach-mx5/board-mx51_3ds.c
+@@ -13,6 +13,7 @@
+ #include <linux/irq.h>
+ #include <linux/platform_device.h>
+ #include <linux/spi/spi.h>
++#include <linux/gpio.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/arch.h>
+@@ -26,7 +27,7 @@
+ #include "devices-imx51.h"
+ #include "devices.h"
+ 
+-#define EXPIO_PARENT_INT	gpio_to_irq((IMX_GPIO_NR(1, 6))
++#define EXPIO_PARENT_INT	gpio_to_irq((IMX_GPIO_NR(1, 6)))
+ #define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
+ 
+ static iomux_v3_cfg_t mx51_3ds_pads[] = {
+-- 
+1.7.1
