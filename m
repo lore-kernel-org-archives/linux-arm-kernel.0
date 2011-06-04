@@ -1,41 +1,36 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Sat,  4 Jun 2011 15:23:03 -0300
-Subject: [PATCH 1/2] ARM: mx5/mx51_3ds: Fix build due to missing header and
-	wrong define
-Message-ID: <1307211784-13353-1-git-send-email-festevam@gmail.com>
+Date: Sat,  4 Jun 2011 15:23:04 -0300
+Subject: [PATCH 2/2] ARM: mx5/eukrea_mbimx51-baseboard: Fix build issue due to
+	removed irq
+In-Reply-To: <1307211784-13353-1-git-send-email-festevam@gmail.com>
+References: <1307211784-13353-1-git-send-email-festevam@gmail.com>
+Message-ID: <1307211784-13353-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit b50d28 (ARM i.MX: get rid of wrong MXC_INTERNAL_IRQ usage) broke mx51_3ds build.
+commit b50d28 (ARM i.MX: get rid of wrong MXC_INTERNAL_IRQ usage) broke eukrea_mbimx51-baseboard
+build because it removed MBIMX51_TSC2007_IRQ and still referenced it in irq_set_irq_type.
 
-Fix it by adding the missing gpio header and also add the missing parenthesis for 
-EXPIO_PARENT_INT definition.
+Fix it by using gpio_to_irq with the correct GPIO parameter.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/mach-mx5/board-mx51_3ds.c |    3 ++-
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |    3 ++-
  1 files changed, 2 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index 288965d..befcbad 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -13,6 +13,7 @@
- #include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
-+#include <linux/gpio.h>
+diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+index 592d172..b89d829 100644
+--- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
++++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
+@@ -197,7 +197,8 @@ void __init eukrea_mbimx51_baseboard_init(void)
  
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -26,7 +27,7 @@
- #include "devices-imx51.h"
- #include "devices.h"
+ 	gpio_request(MBIMX51_TSC2007_GPIO, "tsc2007_irq");
+ 	gpio_direction_input(MBIMX51_TSC2007_GPIO);
+-	irq_set_irq_type(MBIMX51_TSC2007_IRQ, IRQF_TRIGGER_FALLING);
++	irq_set_irq_type(gpio_to_irq(MBIMX51_TSC2007_GPIO),
++					IRQF_TRIGGER_FALLING);
+ 	i2c_register_board_info(1, mbimx51_i2c_devices,
+ 				ARRAY_SIZE(mbimx51_i2c_devices));
  
--#define EXPIO_PARENT_INT	gpio_to_irq((IMX_GPIO_NR(1, 6))
-+#define EXPIO_PARENT_INT	gpio_to_irq((IMX_GPIO_NR(1, 6)))
- #define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
- 
- static iomux_v3_cfg_t mx51_3ds_pads[] = {
 -- 
 1.7.1
