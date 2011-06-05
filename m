@@ -1,21 +1,34 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Sun, 5 Jun 2011 11:10:27 +0200
-Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
-In-Reply-To: <20110605085948.GB16018@acer>
-References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-	<20110605083445.GT16318@ibawizard.net>
-	<20110605085948.GB16018@acer>
-Message-ID: <20110605091027.GU16318@ibawizard.net>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 5 Jun 2011 12:54:50 +0300
+Subject: [PATCH v4] ARM: ep93xx: use more reliable CPLD watchdog for
+	reset on ts72xx
+In-Reply-To: <1307125685-5110-1-git-send-email-ynezz@true.cz>
+References: <ADE657CA350FB648AAC2C43247A983F001F381FC4A7E@AUSP01VMBX24.collaborationhost.net>
+	<1307125685-5110-1-git-send-email-ynezz@true.cz>
+Message-ID: <20110605095450.GC16018@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika Westerberg <mika.westerberg@iki.fi> [2011-06-05 11:59:48]:
+On Fri, Jun 03, 2011 at 08:28:05PM +0200, Petr ?tetiar wrote:
 
-> Unfortunately - no. But what's wrong with 'git am <mbox>'? ;-)
+> @@ -13,11 +16,16 @@ static inline void arch_reset(char mode, const char *cmd)
+>  {
+>  	local_irq_disable();
+>  
+> -	/*
+> -	 * Set then clear the SWRST bit to initiate a software reset
+> -	 */
+> -	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+> -	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+> +	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
+> +	    board_is_ts7300() || board_is_ts7400()) {
+> +		/* We use more reliable CPLD watchdog to perform the reset */
+> +		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
+> +		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
 
-Nothing, it's just complicated if you don't read emails on the same machine as
-you develop on. Just found patchwork thread, so it's solved[1]. Thanks.
+I just noticed that you are accessing the registers via *physical* address. It
+currently works because arm_machine_restart() sets up 1:1 mappings in place of
+userspace before arch_reset() gets called.
 
-1. https://patchwork.kernel.org/project/linux-arm-kernel/list/
-
--- ynezz
+This might cause some problems as the register accesses are cached, or does it
+make a difference in ARM920?
