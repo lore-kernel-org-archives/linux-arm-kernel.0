@@ -1,31 +1,68 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Sun, 5 Jun 2011 09:51:28 +0200
-Subject: [PATCH v4] ARM: ep93xx: use more reliable CPLD watchdog for
-	reset on ts72xx
-In-Reply-To: <BANLkTikMGkwVp4bGPbdSdx61PLUw23sWkFFxyThLTMkrnqpCCw@mail.gmail.com>
-References: <ADE657CA350FB648AAC2C43247A983F001F381FC4A7E@AUSP01VMBX24.collaborationhost.net>
-	<1307125685-5110-1-git-send-email-ynezz@true.cz>
-	<BANLkTikMGkwVp4bGPbdSdx61PLUw23sWkFFxyThLTMkrnqpCCw@mail.gmail.com>
-Message-ID: <20110605075128.GS16318@ibawizard.net>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 5 Jun 2011 11:19:04 +0300
+Subject: [PATCH v2 0/5] ep93xx DMA patches
+In-Reply-To: <cover.1306662317.git.mika.westerberg@iki.fi>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+Message-ID: <20110605081904.GA16018@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof Johansson <olof@lixom.net> [2011-06-03 11:43:27]:
+Vinod,
 
-Hi,
+As this series has acks for all the subsystem maintainers, would it be ok for
+you to take the entire series via your tree? Or do you have any idea how to
+get it merged?
 
-> It would be nicer to introduce a function pointer here, that's filled
-> in by the ts72xx.c machine_init function but NULL by default:
-
-yes, I didn't liked the modification of the shared machine code either and I
-personally dislike the ifdefs also, but
-
-> Otherwise, other boards would add another if statement, any new ts72xx
-> board would need to modify the soc-common header, etc.
-
-this is very unlikely to happen. The TS's ep93xx based products seems to be
-EOL, they'll just sell them until they've parts/SOC available.
-
-I'll leave the decision up to the maintainers.
-
--- ynezz
+On Sun, May 29, 2011 at 01:10:01PM +0300, Mika Westerberg wrote:
+> This is an updated version of the ep93xx DMA patches. Previous version can be
+> found here: https://lkml.org/lkml/2011/5/22/86.
+> 
+> Changes to v1:
+>  * removed unnecessary header
+>  * corrected SPI driver documentation
+>  * DMA driver platform code is only compiled when CONFIG_EP93XX_DMA is
+>    enabled
+> 
+> I tried to put all the acks in place, hope I got them right.
+> 
+> There is a dependency between patch 1 and patch 4 which I'm not entirely sure
+> how to solve. Basically it is required that we have patch 1 applied before
+> patch 4 or merge conflict results.
+> 
+> Otherwise it shouldn't matter in which order the patches arrive to the
+> mainline.
+> 
+> Unless someone has a better idea, I suggest that these patches will go through
+> their respective subsystem trees. All the maintainers should be copied.
+> 
+> Thanks,
+> MW
+> 
+> Mika Westerberg (5):
+>   dmaengine: add ep93xx DMA support
+>   ep93xx: add dmaengine platform code
+>   ASoC: ep93xx: convert to use the DMA engine API
+>   ep93xx: remove the old M2P DMA code
+>   spi/ep93xx: add DMA support
+> 
+>  Documentation/spi/ep93xx_spi                   |   10 +
+>  arch/arm/mach-ep93xx/Makefile                  |    4 +-
+>  arch/arm/mach-ep93xx/core.c                    |    6 +-
+>  arch/arm/mach-ep93xx/dma-m2p.c                 |  411 -------
+>  arch/arm/mach-ep93xx/dma.c                     |  108 ++
+>  arch/arm/mach-ep93xx/include/mach/dma.h        |  190 ++---
+>  arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h |    2 +
+>  drivers/dma/Kconfig                            |    7 +
+>  drivers/dma/Makefile                           |    1 +
+>  drivers/dma/ep93xx_dma.c                       | 1355 ++++++++++++++++++++++++
+>  drivers/spi/ep93xx_spi.c                       |  303 +++++-
+>  sound/soc/ep93xx/ep93xx-ac97.c                 |    4 +-
+>  sound/soc/ep93xx/ep93xx-i2s.c                  |    4 +-
+>  sound/soc/ep93xx/ep93xx-pcm.c                  |  137 ++--
+>  14 files changed, 1930 insertions(+), 612 deletions(-)
+>  delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
+>  create mode 100644 arch/arm/mach-ep93xx/dma.c
+>  create mode 100644 drivers/dma/ep93xx_dma.c
+> 
+> -- 
+> 1.7.4.4
