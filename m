@@ -1,48 +1,36 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Sun, 5 Jun 2011 17:38:42 +0530
-Subject: [PATCH] davinci: make PCM platform devices static
-Message-ID: <b6a445acd3407e085b564a1efea6d903dda80f3f.1307274978.git.nsekhar@ti.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Sun, 05 Jun 2011 17:00:04 +0400
+Subject: [PATCH 2/3] davinci: dm6467/T EVM: pass reference clock rate
+	to dm646x_init()
+In-Reply-To: <1307034677-27236-2-git-send-email-nsekhar@ti.com>
+References: <1307034677-27236-1-git-send-email-nsekhar@ti.com>
+	<1307034677-27236-2-git-send-email-nsekhar@ti.com>
+Message-ID: <4DEB7DD4.5050706@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the PCM device structures used in devices.c
-and devices-da8xx.c static as they are used only
-in the respective files.
+Hello.
 
-This was found when trying to build a single image
-for DaVinci and DA8x devices using runtime P2V support.
+On 02-06-2011 21:11, Sekhar Nori wrote:
 
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
----
- arch/arm/mach-davinci/devices-da8xx.c |    2 +-
- arch/arm/mach-davinci/devices.c       |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+> From: Bob Dunlop<bob.dunlop@xyzzy.org.uk>
 
-diff --git a/arch/arm/mach-davinci/devices-da8xx.c b/arch/arm/mach-davinci/devices-da8xx.c
-index 87aa19e..8c3cdc1 100644
---- a/arch/arm/mach-davinci/devices-da8xx.c
-+++ b/arch/arm/mach-davinci/devices-da8xx.c
-@@ -496,7 +496,7 @@ static struct platform_device da850_mcasp_device = {
- 	.resource	= da850_mcasp_resources,
- };
- 
--struct platform_device davinci_pcm_device = {
-+static struct platform_device davinci_pcm_device = {
- 	.name	= "davinci-pcm-audio",
- 	.id	= -1,
- };
-diff --git a/arch/arm/mach-davinci/devices.c b/arch/arm/mach-davinci/devices.c
-index 8f4f736..806a2f0 100644
---- a/arch/arm/mach-davinci/devices.c
-+++ b/arch/arm/mach-davinci/devices.c
-@@ -298,7 +298,7 @@ static void davinci_init_wdt(void)
- 
- /*-------------------------------------------------------------------------*/
- 
--struct platform_device davinci_pcm_device = {
-+static struct platform_device davinci_pcm_device = {
- 	.name		= "davinci-pcm-audio",
- 	.id		= -1,
- };
--- 
-1.7.3.2
+> The DM6467 and DM6467T EVMs use different reference clock
+> frequencies. This difference is currently supported by having
+> the SoC code call a public board routine which sets up the reference
+> clock frequency. This does not scale as more boards are added.
+
+> Instead, pass the reference clock frequency as a parameter
+> to dm646x_init(). Boards which do not need the default reference
+> clock changed can pass NULL to this function.
+
+> Signed-off-by: Bob Dunlop<bob.dunlop@xyzzy.org.uk>
+> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
+> ---
+> I have marked Bob as the author of this patch since it is essentially
+> his idea. Hope he doesnt mind that :)
+
+    I don't think you should ascribe *your* patch to Bob. There's 
+Suggested-by: line if you want to credit Bob.
+
+WBR, Sergei
