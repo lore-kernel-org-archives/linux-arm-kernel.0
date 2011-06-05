@@ -1,90 +1,76 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun,  5 Jun 2011 23:59:05 +0800
-Subject: [PATCH v4 3/3] gpio/mxs: Remove the use of gpio-mxs.h
-In-Reply-To: <1307289545-6993-1-git-send-email-shawn.guo@linaro.org>
-References: <1307289545-6993-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1307289545-6993-4-git-send-email-shawn.guo@linaro.org>
+Date: Mon,  6 Jun 2011 00:07:53 +0800
+Subject: [PATCH v4 0/2] Move plat-mxc gpio driver into drivers/gpio
+Message-ID: <1307290075-7062-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch moves "struct mxs_gpio_port" into gpio-mxs.c, as it needs
-not to be public at all.  And then the header
-arch/arm/mach-mxs/include/mach/gpio-mxs.h can be deleted.
+The patch set moves plat-mxc gpio driver into drivers/gpio, and
+migrates mach-imx and mach-mx5 to the new driver.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/mach-mxs/include/mach/gpio-mxs.h |   34 -----------------------------
- drivers/gpio/gpio-mxs.c                   |   10 +++++++-
- 2 files changed, 9 insertions(+), 35 deletions(-)
- delete mode 100644 arch/arm/mach-mxs/include/mach/gpio-mxs.h
+Changes since v3:
+ * Reorganize the patch set per Grant's comments
 
-diff --git a/arch/arm/mach-mxs/include/mach/gpio-mxs.h b/arch/arm/mach-mxs/include/mach/gpio-mxs.h
-deleted file mode 100644
-index 005bb06..0000000
---- a/arch/arm/mach-mxs/include/mach/gpio-mxs.h
-+++ /dev/null
-@@ -1,34 +0,0 @@
--/*
-- * Copyright 2007 Freescale Semiconductor, Inc. All Rights Reserved.
-- * Copyright 2008 Juergen Beisert, kernel at pengutronix.de
-- *
-- * This program is free software; you can redistribute it and/or
-- * modify it under the terms of the GNU General Public License
-- * as published by the Free Software Foundation; either version 2
-- * of the License, or (at your option) any later version.
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License
-- * along with this program; if not, write to the Free Software
-- * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
-- * MA  02110-1301, USA.
-- */
--
--#ifndef __MXS_GPIO_H__
--#define __MXS_GPIO_H__
--
--struct mxs_gpio_port {
--	void __iomem *base;
--	int id;
--	int irq;
--	int irq_high;
--	int virtual_irq_start;
--	struct gpio_chip chip;
--};
--
--int mxs_gpio_init(struct mxs_gpio_port*, int);
--
--#endif /* __MXS_GPIO_H__ */
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index 6fd9f01..a287614 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -28,7 +28,6 @@
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- #include <mach/mxs.h>
--#include <mach/gpio-mxs.h>
- 
- #define MXS_SET		0x4
- #define MXS_CLR		0x8
-@@ -49,6 +48,15 @@
- #define GPIO_INT_LEV_MASK	(1 << 0)
- #define GPIO_INT_POL_MASK	(1 << 1)
- 
-+struct mxs_gpio_port {
-+	void __iomem *base;
-+	int id;
-+	int irq;
-+	int irq_high;
-+	int virtual_irq_start;
-+	struct gpio_chip chip;
-+};
-+
- /* Note: This driver assumes 32 GPIOs are handled in one register */
- 
- static void clear_gpio_irqstatus(struct mxs_gpio_port *port, u32 index)
--- 
-1.7.4.1
+Shawn Guo (2):
+      gpio/mxc: Move Freescale MXC gpio driver to drivers/gpio
+      gpio/mxc: Change gpio-mxc into an upstanding gpio driver
+
+ arch/arm/mach-imx/mach-apf9328.c                   |    2 +
+ arch/arm/mach-imx/mach-armadillo5x0.c              |    2 +
+ arch/arm/mach-imx/mach-bug.c                       |    2 +
+ arch/arm/mach-imx/mach-cpuimx27.c                  |    2 +
+ arch/arm/mach-imx/mach-cpuimx35.c                  |    2 +
+ arch/arm/mach-imx/mach-eukrea_cpuimx25.c           |    2 +
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |    2 +
+ arch/arm/mach-imx/mach-imx27ipcam.c                |    2 +
+ arch/arm/mach-imx/mach-imx27lite.c                 |    2 +
+ arch/arm/mach-imx/mach-kzm_arm11_01.c              |    2 +
+ arch/arm/mach-imx/mach-mx1ads.c                    |    2 +
+ arch/arm/mach-imx/mach-mx21ads.c                   |    2 +
+ arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
+ arch/arm/mach-imx/mach-mx27_3ds.c                  |    2 +
+ arch/arm/mach-imx/mach-mx27ads.c                   |    2 +
+ arch/arm/mach-imx/mach-mx31_3ds.c                  |    2 +
+ arch/arm/mach-imx/mach-mx31ads.c                   |    2 +
+ arch/arm/mach-imx/mach-mx31lilly.c                 |    2 +
+ arch/arm/mach-imx/mach-mx31lite.c                  |    2 +
+ arch/arm/mach-imx/mach-mx31moboard.c               |    2 +
+ arch/arm/mach-imx/mach-mx35_3ds.c                  |    2 +
+ arch/arm/mach-imx/mach-mxt_td60.c                  |    2 +
+ arch/arm/mach-imx/mach-pca100.c                    |    2 +
+ arch/arm/mach-imx/mach-pcm037.c                    |    2 +
+ arch/arm/mach-imx/mach-pcm038.c                    |    2 +
+ arch/arm/mach-imx/mach-pcm043.c                    |    2 +
+ arch/arm/mach-imx/mach-qong.c                      |    2 +
+ arch/arm/mach-imx/mach-scb9328.c                   |    2 +
+ arch/arm/mach-imx/mach-vpr200.c                    |    2 +
+ arch/arm/mach-imx/mm-imx1.c                        |   17 +-
+ arch/arm/mach-imx/mm-imx21.c                       |   21 +-
+ arch/arm/mach-imx/mm-imx25.c                       |   16 +-
+ arch/arm/mach-imx/mm-imx27.c                       |   21 +-
+ arch/arm/mach-imx/mm-imx31.c                       |   15 +-
+ arch/arm/mach-imx/mm-imx35.c                       |   15 +-
+ arch/arm/mach-mx5/board-cpuimx51.c                 |    2 +
+ arch/arm/mach-mx5/board-cpuimx51sd.c               |    2 +
+ arch/arm/mach-mx5/board-mx50_rdp.c                 |    2 +
+ arch/arm/mach-mx5/board-mx51_3ds.c                 |    2 +
+ arch/arm/mach-mx5/board-mx51_babbage.c             |    2 +
+ arch/arm/mach-mx5/board-mx51_efikamx.c             |    2 +
+ arch/arm/mach-mx5/board-mx51_efikasb.c             |    2 +
+ arch/arm/mach-mx5/board-mx53_evk.c                 |    2 +
+ arch/arm/mach-mx5/board-mx53_loco.c                |    2 +
+ arch/arm/mach-mx5/board-mx53_smd.c                 |    2 +
+ arch/arm/mach-mx5/devices.c                        |   64 ------
+ arch/arm/mach-mx5/mm-mx50.c                        |   21 +-
+ arch/arm/mach-mx5/mm.c                             |   25 ++-
+ arch/arm/plat-mxc/Makefile                         |    2 +-
+ arch/arm/plat-mxc/devices.c                        |   11 +
+ arch/arm/plat-mxc/devices/Makefile                 |    1 +
+ arch/arm/plat-mxc/devices/platform-gpio-mxc.c      |   32 +++
+ arch/arm/plat-mxc/include/mach/common.h            |   12 +-
+ arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +
+ arch/arm/plat-mxc/include/mach/gpio.h              |   27 ---
+ drivers/gpio/Kconfig                               |    4 +
+ drivers/gpio/Makefile                              |    1 +
+ .../arm/plat-mxc/gpio.c => drivers/gpio/gpio-mxc.c |  217 +++++++++++++-------
+ 58 files changed, 364 insertions(+), 238 deletions(-)
