@@ -1,65 +1,31 @@
-From: ccross@android.com (Colin Cross)
-Date: Sat, 4 Jun 2011 19:37:54 -0700
-Subject: [PATCH] ARM: omap4: gpio: fix setting IRQWAKEN bits
-In-Reply-To: <1307214239-16316-1-git-send-email-ccross@android.com>
-References: <1307214239-16316-1-git-send-email-ccross@android.com>
-Message-ID: <BANLkTingmUNvZO_szivRkmn7LRO4L5A+5Q@mail.gmail.com>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Sun, 5 Jun 2011 09:51:28 +0200
+Subject: [PATCH v4] ARM: ep93xx: use more reliable CPLD watchdog for
+	reset on ts72xx
+In-Reply-To: <BANLkTikMGkwVp4bGPbdSdx61PLUw23sWkFFxyThLTMkrnqpCCw@mail.gmail.com>
+References: <ADE657CA350FB648AAC2C43247A983F001F381FC4A7E@AUSP01VMBX24.collaborationhost.net>
+	<1307125685-5110-1-git-send-email-ynezz@true.cz>
+	<BANLkTikMGkwVp4bGPbdSdx61PLUw23sWkFFxyThLTMkrnqpCCw@mail.gmail.com>
+Message-ID: <20110605075128.GS16318@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 4, 2011 at 12:03 PM, Colin Cross <ccross@android.com> wrote:
-> Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
-> causing only the last bit set to take effect, resulting in lost
-> wakeups when the GPIO controller is in idle.
->
-> Replace direct writes to IRQWAKEN with writes to SETWKUENA and
-> CLEARWKUEN.
->
-> Signed-off-by: Colin Cross <ccross@android.com>
-> ---
-> ?arch/arm/plat-omap/gpio.c | ? 14 +++++---------
-> ?1 files changed, 5 insertions(+), 9 deletions(-)
->
-> diff --git a/arch/arm/plat-omap/gpio.c b/arch/arm/plat-omap/gpio.c
-> index c985652..23ac7b6 100644
-> --- a/arch/arm/plat-omap/gpio.c
-> +++ b/arch/arm/plat-omap/gpio.c
-> @@ -539,7 +539,6 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
-> ?{
-> ? ? ? ?void __iomem *base = bank->base;
-> ? ? ? ?u32 gpio_bit = 1 << gpio;
-> - ? ? ? u32 val;
->
-> ? ? ? ?if (cpu_is_omap44xx()) {
-> ? ? ? ? ? ? ? ?MOD_REG_BIT(OMAP4_GPIO_LEVELDETECT0, gpio_bit,
-> @@ -563,14 +562,11 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
-> ? ? ? ?if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
-> ? ? ? ? ? ? ? ?if (cpu_is_omap44xx()) {
-> ? ? ? ? ? ? ? ? ? ? ? ?if (trigger != 0)
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(1 << gpio, bank->base+
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_IRQWAKEN0);
-> - ? ? ? ? ? ? ? ? ? ? ? else {
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? val = __raw_readl(bank->base +
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? OMAP4_GPIO_IRQWAKEN0);
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(val & (~(1 << gpio)), bank->base +
-> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP4_GPIO_IRQWAKEN0);
-> - ? ? ? ? ? ? ? ? ? ? ? }
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(gpio_bit,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + OMAP4_GPIO_SETWKUENA);
-> + ? ? ? ? ? ? ? ? ? ? ? else
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __raw_writel(gpio_bit,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? bank->base + OMAP4_GPIO_CLEARWKUENA);
+Olof Johansson <olof@lixom.net> [2011-06-03 11:43:27]:
 
-Todd pointed out that the OMAP4 TRM says not to use SETWKUENA and
-CLEARWKUENA.  I'll send another patch that applies to v3.0-rc1 that
-uses MOD_REG_BIT on IRQWAKEN_0, and another patch that adds the
-necessary locking around the read-modify-writes in
-_set_gpio_triggering.
+Hi,
 
-> ? ? ? ? ? ? ? ?} else {
-> ? ? ? ? ? ? ? ? ? ? ? ?/*
-> ? ? ? ? ? ? ? ? ? ? ? ? * GPIO wakeup request can only be generated on edge
-> --
-> 1.7.4.1
->
->
+> It would be nicer to introduce a function pointer here, that's filled
+> in by the ts72xx.c machine_init function but NULL by default:
+
+yes, I didn't liked the modification of the shared machine code either and I
+personally dislike the ifdefs also, but
+
+> Otherwise, other boards would add another if statement, any new ts72xx
+> board would need to modify the soc-common header, etc.
+
+this is very unlikely to happen. The TS's ep93xx based products seems to be
+EOL, they'll just sell them until they've parts/SOC available.
+
+I'll leave the decision up to the maintainers.
+
+-- ynezz
