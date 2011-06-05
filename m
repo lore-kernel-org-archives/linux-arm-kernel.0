@@ -1,35 +1,31 @@
-From: avinashhm@ti.com (Avinash.H.M.)
-Date: Sun, 5 Jun 2011 14:19:15 +0530
-Subject: [PATCH v4] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
-In-Reply-To: <1305906384-22061-1-git-send-email-avinashhm@ti.com>
-References: <1305906384-22061-1-git-send-email-avinashhm@ti.com>
-Message-ID: <20110605084915.GA2887@avinash-laptop>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sun, 5 Jun 2011 11:59:48 +0300
+Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
+In-Reply-To: <20110605083445.GT16318@ibawizard.net>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+	<20110605083445.GT16318@ibawizard.net>
+Message-ID: <20110605085948.GB16018@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, May 20, 2011 at 09:16:24PM +0530, Avinash.H.M wrote:
-> The sequence of _ocp_softreset doesn't work for i2c. The i2c module has a
-> special sequence to reset the module. The sequence is
->  - Disable the I2C.
->  - Write to SOFTRESET bit.
->  - Enable the I2C.
->  - Poll on the RESETDONE bit.
-> The sequence is implemented as a function and the i2c_class is updated with
-> the correct 'reset' pointer.  omap_hwmod_softreset function is implemented
-> which triggers the softreset by writing into sysconfig register. On following
-> this sequence, i2c module resets properly and timeouts are not seen.
+On Sun, Jun 05, 2011 at 10:34:45AM +0200, Petr ?tetiar wrote:
 > 
-> Cc: Rajendra Nayak <rnayak@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
-> Cc: Benoit Cousson <b-cousson@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Signed-off-by: Avinash.H.M <avinashhm@ti.com>
-> ---
+> do you have the series available somewhere for pull? I would like to test the
+> changes for you on my ts7250/ts7300, but I'm quite lazy and would like to just
+> cherry-pick the changes if possible :-)
 
-Hi Kevin, Paul ,
+Unfortunately - no. But what's wrong with 'git am <mbox>'? ;-)
 
-Ping .. could you please review this.
+> I also wonder, why this patch[1] from Herbert Valerio Riedel has never made it
+> upstream, this email[2] is the last trace of the patch I could find. Looks
+> like Herbert did few fixes to the driver and thanks to Matthieu, I'm using
+> this forward ported patch[3] since today, without any problems.
 
-thanks ,
+I have no idea.
 
-- Avinash
+It looks like David Miller (CC'd) has been taking care of ep93xx_eth.c maybe
+he knows this better.
+
+> Do you personaly use the ethernet on the ep93xx/ts72xx heavily?
+
+Yes, I have NFS roots for the boards so it is essential for me.
