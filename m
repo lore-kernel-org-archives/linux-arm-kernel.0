@@ -1,68 +1,32 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 5 Jun 2011 11:19:04 +0300
-Subject: [PATCH v2 0/5] ep93xx DMA patches
-In-Reply-To: <cover.1306662317.git.mika.westerberg@iki.fi>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
-Message-ID: <20110605081904.GA16018@acer>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Sun, 5 Jun 2011 10:34:45 +0200
+Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
+In-Reply-To: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+Message-ID: <20110605083445.GT16318@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
+Mika Westerberg <mika.westerberg@iki.fi> [2011-06-02 21:59:34]:
 
-As this series has acks for all the subsystem maintainers, would it be ok for
-you to take the entire series via your tree? Or do you have any idea how to
-get it merged?
+> As the driver is now passing platform device to the DMA mapping functions,
+> we should give it valid DMA masks.
 
-On Sun, May 29, 2011 at 01:10:01PM +0300, Mika Westerberg wrote:
-> This is an updated version of the ep93xx DMA patches. Previous version can be
-> found here: https://lkml.org/lkml/2011/5/22/86.
-> 
-> Changes to v1:
->  * removed unnecessary header
->  * corrected SPI driver documentation
->  * DMA driver platform code is only compiled when CONFIG_EP93XX_DMA is
->    enabled
-> 
-> I tried to put all the acks in place, hope I got them right.
-> 
-> There is a dependency between patch 1 and patch 4 which I'm not entirely sure
-> how to solve. Basically it is required that we have patch 1 applied before
-> patch 4 or merge conflict results.
-> 
-> Otherwise it shouldn't matter in which order the patches arrive to the
-> mainline.
-> 
-> Unless someone has a better idea, I suggest that these patches will go through
-> their respective subsystem trees. All the maintainers should be copied.
-> 
-> Thanks,
-> MW
-> 
-> Mika Westerberg (5):
->   dmaengine: add ep93xx DMA support
->   ep93xx: add dmaengine platform code
->   ASoC: ep93xx: convert to use the DMA engine API
->   ep93xx: remove the old M2P DMA code
->   spi/ep93xx: add DMA support
-> 
->  Documentation/spi/ep93xx_spi                   |   10 +
->  arch/arm/mach-ep93xx/Makefile                  |    4 +-
->  arch/arm/mach-ep93xx/core.c                    |    6 +-
->  arch/arm/mach-ep93xx/dma-m2p.c                 |  411 -------
->  arch/arm/mach-ep93xx/dma.c                     |  108 ++
->  arch/arm/mach-ep93xx/include/mach/dma.h        |  190 ++---
->  arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h |    2 +
->  drivers/dma/Kconfig                            |    7 +
->  drivers/dma/Makefile                           |    1 +
->  drivers/dma/ep93xx_dma.c                       | 1355 ++++++++++++++++++++++++
->  drivers/spi/ep93xx_spi.c                       |  303 +++++-
->  sound/soc/ep93xx/ep93xx-ac97.c                 |    4 +-
->  sound/soc/ep93xx/ep93xx-i2s.c                  |    4 +-
->  sound/soc/ep93xx/ep93xx-pcm.c                  |  137 ++--
->  14 files changed, 1930 insertions(+), 612 deletions(-)
->  delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
->  create mode 100644 arch/arm/mach-ep93xx/dma.c
->  create mode 100644 drivers/dma/ep93xx_dma.c
-> 
-> -- 
-> 1.7.4.4
+Hi Mika,
+
+do you have the series available somewhere for pull? I would like to test the
+changes for you on my ts7250/ts7300, but I'm quite lazy and would like to just
+cherry-pick the changes if possible :-)
+
+I also wonder, why this patch[1] from Herbert Valerio Riedel has never made it
+upstream, this email[2] is the last trace of the patch I could find. Looks
+like Herbert did few fixes to the driver and thanks to Matthieu, I'm using
+this forward ported patch[3] since today, without any problems.
+
+Do you personaly use the ethernet on the ep93xx/ts72xx heavily?
+
+1. http://ynezz.ibawizard.net/ts72xx/linux-kernel/2.6.24.y/ep93xx-eth-phylib-framework.patch
+2. http://www.mail-archive.com/netdev at vger.kernel.org/msg62550.html
+3. https://github.com/ynezz/linux-2.6/commit/1dcf7aeb7ca4d7e441be2467926b606b46060a44
+
+-- ynezz
