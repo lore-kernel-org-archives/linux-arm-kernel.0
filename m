@@ -1,31 +1,21 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 5 Jun 2011 11:59:48 +0300
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Sun, 5 Jun 2011 11:10:27 +0200
 Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
-In-Reply-To: <20110605083445.GT16318@ibawizard.net>
+In-Reply-To: <20110605085948.GB16018@acer>
 References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
 	<20110605083445.GT16318@ibawizard.net>
-Message-ID: <20110605085948.GB16018@acer>
+	<20110605085948.GB16018@acer>
+Message-ID: <20110605091027.GU16318@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 05, 2011 at 10:34:45AM +0200, Petr ?tetiar wrote:
-> 
-> do you have the series available somewhere for pull? I would like to test the
-> changes for you on my ts7250/ts7300, but I'm quite lazy and would like to just
-> cherry-pick the changes if possible :-)
+Mika Westerberg <mika.westerberg@iki.fi> [2011-06-05 11:59:48]:
 
-Unfortunately - no. But what's wrong with 'git am <mbox>'? ;-)
+> Unfortunately - no. But what's wrong with 'git am <mbox>'? ;-)
 
-> I also wonder, why this patch[1] from Herbert Valerio Riedel has never made it
-> upstream, this email[2] is the last trace of the patch I could find. Looks
-> like Herbert did few fixes to the driver and thanks to Matthieu, I'm using
-> this forward ported patch[3] since today, without any problems.
+Nothing, it's just complicated if you don't read emails on the same machine as
+you develop on. Just found patchwork thread, so it's solved[1]. Thanks.
 
-I have no idea.
+1. https://patchwork.kernel.org/project/linux-arm-kernel/list/
 
-It looks like David Miller (CC'd) has been taking care of ep93xx_eth.c maybe
-he knows this better.
-
-> Do you personaly use the ethernet on the ep93xx/ts72xx heavily?
-
-Yes, I have NFS roots for the boards so it is essential for me.
+-- ynezz
