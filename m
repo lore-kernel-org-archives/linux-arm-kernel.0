@@ -1,7 +1,29 @@
 From: hector.oron@gmail.com (Hector Oron)
-Date: Sun, 05 Jun 2011 20:33:57 +0200
-Subject: No subject
-Message-ID: <4debcc19.9139e30a.50fb.ffffb313@mx.google.com>
+Date: Sun, 5 Jun 2011 19:24:09 +0100
+Subject: [PATCH] plat-iop: fixes fail to build from source
+Message-ID: <mailman.6.1307298849.24103.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+  arch/arm/plat-iop/cp6.c:42: error: 'MODE_MASK' undeclared here (not in a function)
+  arch/arm/plat-iop/cp6.c:43: error: 'SVC_MODE' undeclared here (not in a function)
+
+Signed-off-by: Hector Oron <hector.oron@gmail.com>
+---
+ arch/arm/plat-iop/cp6.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-iop/cp6.c b/arch/arm/plat-iop/cp6.c
+index 9612a87..bab73e2 100644
+--- a/arch/arm/plat-iop/cp6.c
++++ b/arch/arm/plat-iop/cp6.c
+@@ -18,6 +18,7 @@
+  */
+ #include <linux/init.h>
+ #include <asm/traps.h>
++#include <asm/ptrace.h>
+ 
+ static int cp6_trap(struct pt_regs *regs, unsigned int instr)
+ {
+-- 
+1.7.4.1
