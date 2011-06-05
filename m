@@ -1,32 +1,35 @@
-From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
-Date: Sun, 5 Jun 2011 10:34:45 +0200
-Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
-In-Reply-To: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-Message-ID: <20110605083445.GT16318@ibawizard.net>
+From: avinashhm@ti.com (Avinash.H.M.)
+Date: Sun, 5 Jun 2011 14:19:15 +0530
+Subject: [PATCH v4] OMAP2/3: hwmod: fix the i2c-reset timeout during bootup
+In-Reply-To: <1305906384-22061-1-git-send-email-avinashhm@ti.com>
+References: <1305906384-22061-1-git-send-email-avinashhm@ti.com>
+Message-ID: <20110605084915.GA2887@avinash-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mika Westerberg <mika.westerberg@iki.fi> [2011-06-02 21:59:34]:
+On Fri, May 20, 2011 at 09:16:24PM +0530, Avinash.H.M wrote:
+> The sequence of _ocp_softreset doesn't work for i2c. The i2c module has a
+> special sequence to reset the module. The sequence is
+>  - Disable the I2C.
+>  - Write to SOFTRESET bit.
+>  - Enable the I2C.
+>  - Poll on the RESETDONE bit.
+> The sequence is implemented as a function and the i2c_class is updated with
+> the correct 'reset' pointer.  omap_hwmod_softreset function is implemented
+> which triggers the softreset by writing into sysconfig register. On following
+> this sequence, i2c module resets properly and timeouts are not seen.
+> 
+> Cc: Rajendra Nayak <rnayak@ti.com>
+> Cc: Paul Walmsley <paul@pwsan.com>
+> Cc: Benoit Cousson <b-cousson@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Avinash.H.M <avinashhm@ti.com>
+> ---
 
-> As the driver is now passing platform device to the DMA mapping functions,
-> we should give it valid DMA masks.
+Hi Kevin, Paul ,
 
-Hi Mika,
+Ping .. could you please review this.
 
-do you have the series available somewhere for pull? I would like to test the
-changes for you on my ts7250/ts7300, but I'm quite lazy and would like to just
-cherry-pick the changes if possible :-)
+thanks ,
 
-I also wonder, why this patch[1] from Herbert Valerio Riedel has never made it
-upstream, this email[2] is the last trace of the patch I could find. Looks
-like Herbert did few fixes to the driver and thanks to Matthieu, I'm using
-this forward ported patch[3] since today, without any problems.
-
-Do you personaly use the ethernet on the ep93xx/ts72xx heavily?
-
-1. http://ynezz.ibawizard.net/ts72xx/linux-kernel/2.6.24.y/ep93xx-eth-phylib-framework.patch
-2. http://www.mail-archive.com/netdev at vger.kernel.org/msg62550.html
-3. https://github.com/ynezz/linux-2.6/commit/1dcf7aeb7ca4d7e441be2467926b606b46060a44
-
--- ynezz
+- Avinash
