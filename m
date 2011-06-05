@@ -1,159 +1,291 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 6 Jun 2011 00:23:14 +0800
-Subject: [PATCH v3 1/3] gpio: gpio-mxs: copy mach-mxs/gpio.c into
-	drivers/gpio
-In-Reply-To: <20110604222946.GA31236@ponder.secretlab.ca>
-References: <1307184940-16291-1-git-send-email-shawn.guo@linaro.org>
-	<1307184940-16291-2-git-send-email-shawn.guo@linaro.org>
-	<20110604222946.GA31236@ponder.secretlab.ca>
-Message-ID: <20110605162313.GA20553@S2100-06.ap.freescale.net>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Sun, 5 Jun 2011 19:57:36 +0200
+Subject: [PATCH] ep93xx-eth: convert to phylib
+Message-ID: <201106051957.36492.florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 04, 2011 at 04:29:46PM -0600, Grant Likely wrote:
-> On Sat, Jun 04, 2011 at 06:55:38PM +0800, Shawn Guo wrote:
-> > As the first patch of the series that moves mach-mxc gpio driver into
-> > drivers/gpio, it copies arch/arm/mach-mxs/gpio.c into
-> > drivers/gpio/gpio-mxs.c.  The later patches will make necessary
-> > changes to the driver, migrate the existing users to it, and lastly
-> > deletes mach-mxs gpio driver.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  drivers/gpio/gpio-mxs.c |  331 +++++++++++++++++++++++++++++++++++++++++++++++
-> 
-> [sigh]  I fear we are having a communication breakdown.  Since your
-> /moving/ a file, you need to make it easy for readers to understand
-> what has changed and why.  That means using 1 patch to move the file
-> with only the changes absolutely necessary to ensure bisectability,
-> and then followup patches for the clean up.
-> 
-> Adding a new copy in one patch, and then removing the old copy in the
-> other patch does not make it easy for a reader to understand what
-> changed.  Below is what you're first patch should look like (using the
-> -M flag to show the actual changes which are only #include differences).
-> 
-Oops, I misunderstood your point.  But one thing I have been trying
-hard is to keep changes for driver and subarch in separate patches,
-which is something I was asked to do when I started working with
-community.  As you will anyway pick up the patch set as a whole,
-this is not a problem then.  I just sent the updates of gpio-mxs
-and gpio-mxc with you approach.  As a side effect, you will see
-patch #2 of gpio-mxc becomes a very big patch in term of number of
-files it changes.
+ep93xx-eth lacked support for monitoring link status changes, with this
+patch, link changes are now watched and reported correctly.
 
-> I've build tested this patch and have it sitting in the gpio/next
-> branch of git://git.secretlab.ca/git/linux-2.6 at the moment if you
-> want to build the rest of your series on top of it.
-> 
-Thanks for the patch demonstrating.  I have one minor comment below.
-
-> g.
-> 
-> ---
-> 
-> commit e084f5b06ca7f3d94d9d042d288a3311398e5c49
-> Author: Grant Likely <grant.likely@secretlab.ca>
-> Date:   Sat Jun 4 16:18:59 2011 -0600
-> 
->     gpio/mxs: Move Freescale mxs gpio driver to drivers/gpio
->     
->     GPIO drivers are getting moved to drivers/gpio for cleanup and
->     consolidation.  This patch moves the mxs driver.  Follow up patches
->     will clean it up and make it a fine upstanding example of a gpio
->     driver.
->     
->     Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> 
->  arch/arm/mach-mxs/Makefile                         |    2 +-
->  .../mach-mxs/{gpio.h => include/mach/gpio-mxs.h}   |    0
->  arch/arm/mach-mxs/mach-mx28evk.c                   |    2 +-
->  drivers/gpio/Kconfig                               |    4 ++++
->  drivers/gpio/Makefile                              |    1 +
->  .../arm/mach-mxs/gpio.c => drivers/gpio/gpio-mxs.c |    3 +--
->  6 files changed, 8 insertions(+), 4 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> index 58e8923..6c38262 100644
-> --- a/arch/arm/mach-mxs/Makefile
-> +++ b/arch/arm/mach-mxs/Makefile
-> @@ -1,5 +1,5 @@
->  # Common support
-> -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
-> +obj-y := clock.o devices.o icoll.o iomux.o system.o timer.o
->  
->  obj-$(CONFIG_MXS_OCOTP) += ocotp.o
->  obj-$(CONFIG_PM) += pm.o
-> diff --git a/arch/arm/mach-mxs/gpio.h b/arch/arm/mach-mxs/include/mach/gpio-mxs.h
-> similarity index 100%
-> rename from arch/arm/mach-mxs/gpio.h
-> rename to arch/arm/mach-mxs/include/mach/gpio-mxs.h
-> diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> index eacdc6b..347cf35 100644
-> --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> @@ -24,9 +24,9 @@
->  
->  #include <mach/common.h>
->  #include <mach/iomux-mx28.h>
-> +#include <mach/gpio-mxs.h>
->  
-This is the problem of existing code.  The gpio.h (in turn gpio-mxs.h)
-does not need to be included here.  So we can simply drop it in this
-patch.  I have incorporated it when sending the patch within my series.
-
->  #include "devices-mx28.h"
-> -#include "gpio.h"
->  
->  #define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
->  #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
-> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> index 21271a5..afe44aa 100644
-> --- a/drivers/gpio/Kconfig
-> +++ b/drivers/gpio/Kconfig
-> @@ -94,6 +94,10 @@ config GPIO_EXYNOS4
->  	def_bool y
->  	depends on CPU_EXYNOS4210
->  
-> +config GPIO_MXS
-> +	def_bool y
-> +	depends on ARCH_MXS
-> +
->  config GPIO_PLAT_SAMSUNG
->  	def_bool y
->  	depends on SAMSUNG_GPIOLIB_4BIT
-> diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> index e6e5032..8733d02 100644
-> --- a/drivers/gpio/Makefile
-> +++ b/drivers/gpio/Makefile
-> @@ -10,6 +10,7 @@ obj-$(CONFIG_GPIO_BASIC_MMIO_CORE)	+= basic_mmio_gpio.o
->  obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
->  obj-$(CONFIG_GPIO_EP93XX)	+= gpio-ep93xx.o
->  obj-$(CONFIG_GPIO_EXYNOS4)	+= gpio-exynos4.o
-> +obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
->  obj-$(CONFIG_GPIO_PLAT_SAMSUNG)	+= gpio-plat-samsung.o
->  obj-$(CONFIG_GPIO_S5PC100)	+= gpio-s5pc100.o
->  obj-$(CONFIG_GPIO_S5PV210)	+= gpio-s5pv210.o
-> diff --git a/arch/arm/mach-mxs/gpio.c b/drivers/gpio/gpio-mxs.c
-> similarity index 99%
-> rename from arch/arm/mach-mxs/gpio.c
-> rename to drivers/gpio/gpio-mxs.c
-> index 2c950fe..bac7b6b 100644
-> --- a/arch/arm/mach-mxs/gpio.c
-> +++ b/drivers/gpio/gpio-mxs.c
-> @@ -27,10 +27,9 @@
->  #include <linux/gpio.h>
->  #include <mach/mx23.h>
->  #include <mach/mx28.h>
-> +#include <mach/gpio-mxs.h>
->  #include <asm-generic/bug.h>
->  
-> -#include "gpio.h"
-> -
->  static struct mxs_gpio_port *mxs_gpio_ports;
->  static int gpio_table_size;
->  
-
+Signed-off-by: Florian Fainelli <florian@openwrt.org>
+---
+diff --git a/drivers/net/arm/Kconfig b/drivers/net/arm/Kconfig
+index 39e1c0d..53d075e 100644
+--- a/drivers/net/arm/Kconfig
++++ b/drivers/net/arm/Kconfig
+@@ -51,7 +51,7 @@ config ARM_KS8695_ETHER
+ config EP93XX_ETH
+ 	tristate "EP93xx Ethernet support"
+ 	depends on ARM && ARCH_EP93XX
+-	select MII
++	select PHYLIB
+ 	help
+ 	  This is a driver for the ethernet hardware included in EP93xx CPUs.
+ 	  Say Y if you are building a kernel for EP93xx based devices.
+diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
+index 5a77001..4669b6c 100644
+--- a/drivers/net/arm/ep93xx_eth.c
++++ b/drivers/net/arm/ep93xx_eth.c
+@@ -24,6 +24,7 @@
+ #include <linux/delay.h>
+ #include <linux/io.h>
+ #include <linux/slab.h>
++#include <linux/phy.h>
+ 
+ #include <mach/hardware.h>
+ 
+@@ -175,7 +176,11 @@ struct ep93xx_priv
+ 	struct net_device	*dev;
+ 	struct napi_struct	napi;
+ 
+-	struct mii_if_info	mii;
++	struct mii_bus		*mii_bus;
++	struct phy_device	*phydev;
++	int			old_link;
++	int			old_duplex;
++	unsigned int		phy_addr;
+ 	u8			mdc_divisor;
+ };
+ 
+@@ -186,8 +191,9 @@ struct ep93xx_priv
+ #define wrw(ep, off, val)	__raw_writew((val), (ep)->base_addr + (off))
+ #define wrl(ep, off, val)	__raw_writel((val), (ep)->base_addr + (off))
+ 
+-static int ep93xx_mdio_read(struct net_device *dev, int phy_id, int reg)
++static int ep93xx_mdiobus_read(struct mii_bus *bus, int phy_id, int reg)
+ {
++	struct net_device *dev = bus->priv;
+ 	struct ep93xx_priv *ep = netdev_priv(dev);
+ 	int data;
+ 	int i;
+@@ -210,8 +216,9 @@ static int ep93xx_mdio_read(struct net_device *dev, int phy_id, int reg)
+ 	return data;
+ }
+ 
+-static void ep93xx_mdio_write(struct net_device *dev, int phy_id, int reg, int data)
++static int ep93xx_mdiobus_write(struct mii_bus *bus, int phy_id, int reg, u16 data)
+ {
++	struct net_device *dev = bus->priv;
+ 	struct ep93xx_priv *ep = netdev_priv(dev);
+ 	int i;
+ 
+@@ -224,8 +231,84 @@ static void ep93xx_mdio_write(struct net_device *dev, int phy_id, int reg, int d
+ 		msleep(1);
+ 	}
+ 
+-	if (i == 10)
++	if (i == 10) {
+ 		pr_info("mdio write timed out\n");
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
++static int ep93xx_mdiobus_reset(struct mii_bus *bus)
++{
++	return 0;
++}
++
++static void ep93xx_adjust_link(struct net_device *dev)
++{
++	struct ep93xx_priv * ep = netdev_priv(dev);
++	struct phy_device *phydev = ep->phydev;
++	int status_changed = 0;
++
++	BUG_ON(!phydev);
++
++	if (ep->old_link != phydev->link) {
++		status_changed = 1;
++		ep->old_link = phydev->link;
++	}
++
++	if (phydev->link && (ep->old_duplex != phydev->duplex)) {
++		status_changed = 1;
++		ep->old_duplex = phydev->duplex;
++	}
++
++	if (status_changed) {
++		pr_info("%s: link %s", dev->name, phydev->link ?
++			"UP" : "DOWN");
++		if (phydev->link)
++			pr_cont(" - %d/%s", phydev->speed,
++			DUPLEX_FULL == phydev->duplex ? "full" : "half");
++		pr_cont("\n");
++	}
++}
++
++static int ep93xx_mii_probe(struct net_device *dev)
++{
++	struct ep93xx_priv * ep = netdev_priv(dev);
++	struct phy_device *phydev = NULL;
++
++	/* use platform supplied PHY address if valid */
++	if (ep->phy_addr)
++		phydev = ep->mii_bus->phy_map[ep->phy_addr];
++	else
++		phydev = phy_find_first(ep->mii_bus);
++
++	if (!phydev) {
++		pr_err("no PHY found\n");
++		return -ENODEV;
++	}
++
++	phydev = phy_connect(dev, dev_name(&phydev->dev), &ep93xx_adjust_link,
++					0, PHY_INTERFACE_MODE_MII);
++	if (IS_ERR(phydev)) {
++		pr_err("could not attach to PHY\n");
++		return PTR_ERR(phydev);
++	}
++
++	/* mask with MAC supported features */
++	phydev->supported &= PHY_BASIC_FEATURES;
++	phydev->advertising = phydev->supported;
++	ep->phydev = phydev;
++	ep->old_link = 0;
++	ep->old_duplex = -1;
++
++	pr_info("attached PHY driver [%s] "
++		"(mii_bus:phy_addr=%s)\n",
++		phydev->drv->name, dev_name(&phydev->dev));
++
++	phy_start(phydev);
++
++	return 0;
+ }
+ 
+ static int ep93xx_rx(struct net_device *dev, int processed, int budget)
+@@ -570,7 +653,7 @@ static int ep93xx_start_hw(struct net_device *dev)
+ 	wrl(ep, REG_SELFCTL, ((ep->mdc_divisor - 1) << 9));
+ 
+ 	/* Does the PHY support preamble suppress?  */
+-	if ((ep93xx_mdio_read(dev, ep->mii.phy_id, MII_BMSR) & 0x0040) != 0)
++	if ((ep93xx_mdiobus_read(ep->mii_bus, ep->phy_addr, MII_BMSR) & 0x0040) != 0)
+ 		wrl(ep, REG_SELFCTL, ((ep->mdc_divisor - 1) << 9) | (1 << 8));
+ 
+ 	/* Receive descriptor ring.  */
+@@ -703,9 +786,11 @@ static int ep93xx_close(struct net_device *dev)
+ static int ep93xx_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+ {
+ 	struct ep93xx_priv *ep = netdev_priv(dev);
+-	struct mii_ioctl_data *data = if_mii(ifr);
+ 
+-	return generic_mii_ioctl(&ep->mii, data, cmd, NULL);
++	if (!ep->phydev)
++		return -ENODEV;
++
++	return phy_mii_ioctl(ep->phydev, ifr, cmd);
+ }
+ 
+ static void ep93xx_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+@@ -717,25 +802,19 @@ static void ep93xx_get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *i
+ static int ep93xx_get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+ {
+ 	struct ep93xx_priv *ep = netdev_priv(dev);
+-	return mii_ethtool_gset(&ep->mii, cmd);
++	return phy_ethtool_gset(ep->phydev, cmd);
+ }
+ 
+ static int ep93xx_set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+ {
+ 	struct ep93xx_priv *ep = netdev_priv(dev);
+-	return mii_ethtool_sset(&ep->mii, cmd);
++	return phy_ethtool_sset(ep->phydev, cmd);
+ }
+ 
+ static int ep93xx_nway_reset(struct net_device *dev)
+ {
+ 	struct ep93xx_priv *ep = netdev_priv(dev);
+-	return mii_nway_restart(&ep->mii);
+-}
+-
+-static u32 ep93xx_get_link(struct net_device *dev)
+-{
+-	struct ep93xx_priv *ep = netdev_priv(dev);
+-	return mii_link_ok(&ep->mii);
++	return phy_start_aneg(ep->phydev);
+ }
+ 
+ static const struct ethtool_ops ep93xx_ethtool_ops = {
+@@ -743,7 +822,7 @@ static const struct ethtool_ops ep93xx_ethtool_ops = {
+ 	.get_settings		= ep93xx_get_settings,
+ 	.set_settings		= ep93xx_set_settings,
+ 	.nway_reset		= ep93xx_nway_reset,
+-	.get_link		= ep93xx_get_link,
++	.get_link		= ethtool_op_get_link,
+ };
+ 
+ static const struct net_device_ops ep93xx_netdev_ops = {
+@@ -789,6 +868,11 @@ static int ep93xx_eth_remove(struct platform_device *pdev)
+ 
+ 	/* @@@ Force down.  */
+ 	unregister_netdev(dev);
++
++	mdiobus_unregister(ep->mii_bus);
++	kfree(ep->mii_bus->irq);
++	mdiobus_free(ep->mii_bus);
++
+ 	ep93xx_free_buffers(ep);
+ 
+ 	if (ep->base_addr != NULL)
+@@ -811,7 +895,8 @@ static int ep93xx_eth_probe(struct platform_device *pdev)
+ 	struct ep93xx_priv *ep;
+ 	struct resource *mem;
+ 	int irq;
+-	int err;
++	int err = 0;
++	int i;
+ 
+ 	if (pdev == NULL)
+ 		return -ENODEV;
+@@ -849,13 +934,41 @@ static int ep93xx_eth_probe(struct platform_device *pdev)
+ 	}
+ 	ep->irq = irq;
+ 
+-	ep->mii.phy_id = data->phy_id;
+-	ep->mii.phy_id_mask = 0x1f;
+-	ep->mii.reg_num_mask = 0x1f;
+-	ep->mii.dev = dev;
+-	ep->mii.mdio_read = ep93xx_mdio_read;
+-	ep->mii.mdio_write = ep93xx_mdio_write;
++	ep->mii_bus = mdiobus_alloc();
++	if (!ep->mii_bus) {
++		dev_err(&pdev->dev, "Failed to allocate mdiobus\n");
++		goto err_out;
++	}
++
++	ep->phy_addr = data->phy_id;
++	ep->mii_bus->priv = dev;
++	ep->mii_bus->read = ep93xx_mdiobus_read;
++	ep->mii_bus->write = ep93xx_mdiobus_write;
++	ep->mii_bus->reset = ep93xx_mdiobus_reset;
++	ep->mii_bus->name = "ep93xx_eth_mii";
+ 	ep->mdc_divisor = 40;	/* Max HCLK 100 MHz, min MDIO clk 2.5 MHz.  */
++	snprintf(ep->mii_bus->id, MII_BUS_ID_SIZE, "%x",
++				(pdev->id != -1) ? pdev->id : 0);
++	ep->mii_bus->irq = kmalloc(sizeof(int) * PHY_MAX_ADDR, GFP_KERNEL);
++	if (!ep->mii_bus->irq) {
++		dev_err(&pdev->dev, "mii_bus irq allocation failed\n");
++		goto err_out;
++	}
++
++	for (i = 0; i < PHY_MAX_ADDR; i++)
++		ep->mii_bus->irq[i] = PHY_POLL;
++
++	err = mdiobus_register(ep->mii_bus);
++	if (err) {
++		dev_err(&pdev->dev, "Failed to register MII bus\n");
++		goto err_out;
++	}
++
++	err = ep93xx_mii_probe(dev);
++	if (err) {
++		dev_err(&pdev->dev, "failed to probe MII bus\n");
++		goto err_out;
++	}
+ 
+ 	if (is_zero_ether_addr(dev->dev_addr))
+ 		random_ether_addr(dev->dev_addr);
 -- 
-Regards,
-Shawn
+1.7.4.1
