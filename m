@@ -1,34 +1,42 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Sun, 5 Jun 2011 12:54:50 +0300
-Subject: [PATCH v4] ARM: ep93xx: use more reliable CPLD watchdog for
-	reset on ts72xx
-In-Reply-To: <1307125685-5110-1-git-send-email-ynezz@true.cz>
-References: <ADE657CA350FB648AAC2C43247A983F001F381FC4A7E@AUSP01VMBX24.collaborationhost.net>
-	<1307125685-5110-1-git-send-email-ynezz@true.cz>
-Message-ID: <20110605095450.GC16018@acer>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Sun, 5 Jun 2011 16:39:28 +0530
+Subject: [PATCH 1/3] davinci: dm646x.h: include header files under mach/ after
+	those in linux/
+Message-ID: <94ab47e0d35e30c2e503b5fed887db7097f8744f.1307270971.git.nsekhar@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2011 at 08:28:05PM +0200, Petr ?tetiar wrote:
+The general header file inclusion order followed
+in the kernel is to include files under linux/
+first and then under mach/.
 
-> @@ -13,11 +16,16 @@ static inline void arch_reset(char mode, const char *cmd)
->  {
->  	local_irq_disable();
->  
-> -	/*
-> -	 * Set then clear the SWRST bit to initiate a software reset
-> -	 */
-> -	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-> -	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-> +	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
-> +	    board_is_ts7300() || board_is_ts7400()) {
-> +		/* We use more reliable CPLD watchdog to perform the reset */
-> +		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
-> +		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
+The dm646x.h file has the opposite of this. Fix it.
 
-I just noticed that you are accessing the registers via *physical* address. It
-currently works because arm_machine_restart() sets up 1:1 mappings in place of
-userspace before arch_reset() gets called.
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+---
+ arch/arm/mach-davinci/include/mach/dm646x.h |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-This might cause some problems as the register accesses are cached, or does it
-make a difference in ARM920?
+diff --git a/arch/arm/mach-davinci/include/mach/dm646x.h b/arch/arm/mach-davinci/include/mach/dm646x.h
+index 7a27f3f..5e95b02 100644
+--- a/arch/arm/mach-davinci/include/mach/dm646x.h
++++ b/arch/arm/mach-davinci/include/mach/dm646x.h
+@@ -11,13 +11,14 @@
+ #ifndef __ASM_ARCH_DM646X_H
+ #define __ASM_ARCH_DM646X_H
+ 
+-#include <mach/hardware.h>
+-#include <mach/asp.h>
+ #include <linux/i2c.h>
+ #include <linux/videodev2.h>
+ #include <linux/clk.h>
+ #include <linux/davinci_emac.h>
+ 
++#include <mach/hardware.h>
++#include <mach/asp.h>
++
+ #define DM646X_EMAC_BASE		(0x01C80000)
+ #define DM646X_EMAC_MDIO_BASE		(DM646X_EMAC_BASE + 0x4000)
+ #define DM646X_EMAC_CNTRL_OFFSET	(0x0000)
+-- 
+1.7.3.2
