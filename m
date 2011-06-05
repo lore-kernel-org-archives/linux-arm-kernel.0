@@ -1,36 +1,33 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Sun, 05 Jun 2011 17:00:04 +0400
-Subject: [PATCH 2/3] davinci: dm6467/T EVM: pass reference clock rate
-	to dm646x_init()
-In-Reply-To: <1307034677-27236-2-git-send-email-nsekhar@ti.com>
-References: <1307034677-27236-1-git-send-email-nsekhar@ti.com>
-	<1307034677-27236-2-git-send-email-nsekhar@ti.com>
-Message-ID: <4DEB7DD4.5050706@mvista.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun,  5 Jun 2011 23:59:02 +0800
+Subject: [PATCH v4 0/3] Move Freescale MXS gpio driver into drivers/gpio
+Message-ID: <1307289545-6993-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+The patch set moves Freescale MXS gpio driver from mach-mxs into
+drivers/gpio.
 
-On 02-06-2011 21:11, Sekhar Nori wrote:
+Changes since v3:
+ * Reorganize the patch set per Grant's comments
 
-> From: Bob Dunlop<bob.dunlop@xyzzy.org.uk>
+Grant Likely (1):
+      gpio/mxs: Move Freescale mxs gpio driver to drivers/gpio
 
-> The DM6467 and DM6467T EVMs use different reference clock
-> frequencies. This difference is currently supported by having
-> the SoC code call a public board routine which sets up the reference
-> clock frequency. This does not scale as more boards are added.
+Shawn Guo (2):
+      gpio/mxs: Change gpio-mxs into an upstanding gpio driver
+      gpio/mxs: Remove the use of gpio-mxs.h
 
-> Instead, pass the reference clock frequency as a parameter
-> to dm646x_init(). Boards which do not need the default reference
-> clock changed can pass NULL to this function.
-
-> Signed-off-by: Bob Dunlop<bob.dunlop@xyzzy.org.uk>
-> Signed-off-by: Sekhar Nori<nsekhar@ti.com>
-> ---
-> I have marked Bob as the author of this patch since it is essentially
-> his idea. Hope he doesnt mind that :)
-
-    I don't think you should ascribe *your* patch to Bob. There's 
-Suggested-by: line if you want to credit Bob.
-
-WBR, Sergei
+ arch/arm/mach-mxs/Makefile                         |    2 +-
+ arch/arm/mach-mxs/devices.c                        |   11 +
+ arch/arm/mach-mxs/devices/Makefile                 |    1 +
+ arch/arm/mach-mxs/devices/platform-gpio-mxs.c      |   53 +++++
+ arch/arm/mach-mxs/gpio.h                           |   34 ---
+ arch/arm/mach-mxs/include/mach/devices-common.h    |    2 +
+ arch/arm/mach-mxs/mach-mx28evk.c                   |    1 -
+ arch/arm/mach-mxs/mm-mx23.c                        |    1 -
+ arch/arm/mach-mxs/mm-mx28.c                        |    1 -
+ drivers/gpio/Kconfig                               |    4 +
+ drivers/gpio/Makefile                              |    1 +
+ .../arm/mach-mxs/gpio.c => drivers/gpio/gpio-mxs.c |  227 ++++++++++++--------
+ 12 files changed, 206 insertions(+), 132 deletions(-)
