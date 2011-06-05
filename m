@@ -1,51 +1,49 @@
-From: hector.oron@gmail.com (Hector Oron)
-Date: Sun, 5 Jun 2011 20:36:10 +0200
-Subject: [PATCH] plat-iop: fixes fail to build from source
-Message-ID: <BANLkTi=3uYdS+04zX_2vWLcOmEgr8aRQQw@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 5 Jun 2011 22:39:37 +0300
+Subject: [RFC 0/6] iommu: generic api migration and grouping
+In-Reply-To: <201106031753.16095.arnd@arndb.de>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+	<201106031753.16095.arnd@arndb.de>
+Message-ID: <BANLkTim2pDu25ZudZ7ZzOwka0V1sYEhDKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-Resending and adding subject. Apologies for inconveniences.
+On Fri, Jun 3, 2011 at 6:53 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> I think the future of iovmm is looking not so good. Marek Szyprowski
+> is working on a generic version of the dma-mapping API (dma_map_ops)
+> based on the iommu API.
 
-2011/6/5 Hector Oron <hector.oron@gmail.com>:
-> From ace377ade6dce2e3cca400281f8be60398f0c04c Mon Sep 17 00:00:00 2001
-> From: Hector Oron <hector.oron@gmail.com>
-> Date: Sun, 5 Jun 2011 19:24:09 +0100
-> Subject: [PATCH] plat-iop: fixes fail to build from source
->
-> ?arch/arm/plat-iop/cp6.c:42: error: 'MODE_MASK' undeclared here (not in a function)
-> ?arch/arm/plat-iop/cp6.c:43: error: 'SVC_MODE' undeclared here (not in a function)
->
-> Signed-off-by: Hector Oron <hector.oron@gmail.com>
-> ---
-> ?arch/arm/plat-iop/cp6.c | ? ?1 +
-> ?1 files changed, 1 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/plat-iop/cp6.c b/arch/arm/plat-iop/cp6.c
-> index 9612a87..bab73e2 100644
-> --- a/arch/arm/plat-iop/cp6.c
-> +++ b/arch/arm/plat-iop/cp6.c
-> @@ -18,6 +18,7 @@
-> ?*/
-> ?#include <linux/init.h>
-> ?#include <asm/traps.h>
-> +#include <asm/ptrace.h>
->
-> ?static int cp6_trap(struct pt_regs *regs, unsigned int instr)
-> ?{
-> --
-> 1.7.4.1
->
->
+Nice! I missed Marek's work somehow.
 
+> As far as I can tell, once we have that in
+> place, we you can migrate omap3isp from iovmm to dma-mapping and
+> remove iovmm.
 
+Sounds like a plan.
 
--- 
-?H?ctor Or?n ?-.. . -... .. .- -. ? -.. . ...- . .-.. --- .--. . .-.
+I'd still prefer us to take small steps here, and not gate the omap
+iommu cleanups with Marek's generic dma_map_ops work though. Let's go
+forward and migrate omap's iommu to the generic iommu API, so new code
+will be able to use it (e.g. the long coming virtio-based IPC/AMP
+framework).
 
-<free spam>
--- Would you like to make a donation for Debian Conference?
-? ?** http://debconf11.debconf.org/payments.xhtml **
-</free spam>
+We'll migrate iovmm/omap3isp just enough so they don't break, but once
+the generic dma_map_ops work materializes, we'd be able to complete
+the migration, remove iovmm, and decouple omap3isp from omap-specific
+iommu APIs for good.
+
+>> ? I've only moved the omap and msm implementations for now, to demonstrate
+>> ? the idea (and support the ARM diet :), but if this is found desirable,
+>> ? we can bring in intel-iommu.c and amd_iommu.c as well.
+>
+> Yes, very good idea.
+
+Great!
+(to move intel-iommu.c, we'll have to move the declaration of
+pci_find_upstream_pcie_bridge() from drivers/pci/pci.h to
+include/linux/pci.h, but that's probably not too bad).
+
+Thanks,
+Ohad.
