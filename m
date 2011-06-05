@@ -1,19 +1,48 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sun, 5 Jun 2011 22:43:31 +0300
-Subject: [RFC 0/6] iommu: generic api migration and grouping
-In-Reply-To: <BANLkTimQA0Nsh+jgS=hD1VxKkD3zg84y+A@mail.gmail.com>
-References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-	<BANLkTimQA0Nsh+jgS=hD1VxKkD3zg84y+A@mail.gmail.com>
-Message-ID: <BANLkTi=AybRE7d8tBZixKh5L6LetC0=axQ@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Sun, 05 Jun 2011 14:06:57 -0700 (PDT)
+Subject: [PATCH] ep93xx-eth: convert to phylib
+In-Reply-To: <201106052029.24742.f.fainelli@gmail.com>
+References: <201106051957.36492.florian@openwrt.org>
+	<201106052029.24742.f.fainelli@gmail.com>
+Message-ID: <20110605.140657.1039864716002412071.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kyungmin,
+From: Florian Fainelli <f.fainelli@gmail.com>
+Date: Sun, 5 Jun 2011 20:29:24 +0200
 
-On Fri, Jun 3, 2011 at 2:57 AM, Kyungmin Park <kmpark@infradead.org> wrote:
-> Please see the RFC patch, ARM: DMA-mapping & IOMMU integration
-> http://www.spinics.net/lists/linux-mm/msg19856.html
+> On Sunday 05 June 2011 19:57:36 Florian Fainelli wrote:
+>> ep93xx-eth lacked support for monitoring link status changes, with this
+>> patch, link changes are now watched and reported correctly.
+>> 
+>> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+>> ---
+> 
+> I just stumbled upon: http://www.mail-
+> archive.com/netdev at vger.kernel.org/msg62549.html
+> which does not seem to have been merged.
+> 
+> I will respin my patch with Herbert's changes
 
-Marek's work somehow escaped me, thanks for the pointers !
+If people wonder why things don't get merged in situations like
+this it's because there is no clear person standing up to act as
+a maintainer.
 
-Ohad.
+Instead there are several different people submitting changes to
+this one driver and I haven't got a clue who is authoritative and
+who is not.
+
+So 9 times out of ten I'm not going to merge anything submitted
+in this way unless I start to see lots of ACKs from other developers.
+
+When it gets to the point where multiple people are touching the
+driver in all sorts of ways, there needs to be someone to do all of
+the merging and making sure the patches get applied in the right order
+and handling merge conflicts handled properly.  Then they submit them
+formally here as a sane single set of patches to the list.
+
+So who is going to step up and be the ep93xx-eth maintainer?  Lennert
+is listed in MAINTAINERS, but I see little to no activity from him.
+
+The last ACK Lennert gave for a patch to this driver was in May 2010,
+more than a year ago.
