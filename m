@@ -1,65 +1,145 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Mon,  6 Jun 2011 14:51:07 -0700
-Subject: [PATCH v3 0/8] Move Qualcomm gpio drivers into drivers dir
-In-Reply-To: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+Date: Mon,  6 Jun 2011 14:51:09 -0700
+Subject: [PATCH v3 2/8] msm: Remove chip-ifdefs for GPIO io mappings
+In-Reply-To: <1307397075-11733-1-git-send-email-davidb@codeaurora.org>
 References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1307397075-11733-1-git-send-email-davidb@codeaurora.org>
+	<1307397075-11733-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1307397075-11733-3-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series moves the Qualcomm MSM gpio device drivers into the
-drivers/gpio directory.
+The two GPIO controllers are always mapped to the same virtual address
+across all MSM devices.  Instead of selecting this at compile time,
+determine the physical address at runtime, eliminating yet something
+else preventing multiple MSM targets from being compiled into the same
+kernel.
 
-The MSM's have two flavors of gpio driver.  The one for the newer
-v7-based chips is a bit cleaner, and can just be moved.  The one for
-the older v6-based chips took some cleanup to get rid of numerous
-ifdefs based on the particular machine.  Both drivers can now be
-selected and will be used on appropriate targets.
+Signed-off-by: David Brown <davidb@codeaurora.org>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/mach-msm/include/mach/msm_iomap-7x00.h |   10 ++++------
+ arch/arm/mach-msm/include/mach/msm_iomap-7x30.h |   10 ++++------
+ arch/arm/mach-msm/include/mach/msm_iomap-8x50.h |   10 ++++------
+ arch/arm/mach-msm/include/mach/msm_iomap.h      |    2 ++
+ arch/arm/mach-msm/io.c                          |   12 ++++++------
+ 5 files changed, 20 insertions(+), 24 deletions(-)
 
-There is still a minor entanglement with the MSM-specific gpiomux
-code.  This will be cleaned up as MSM moves to use pinmux.
-
-patch history:
-------
-v2 - Move header to mach-msm mach dir
-   - Fix Kconfig description
-   - Base off of Linus tree instead of linux-next (postponed for ARM issues)
-v3 - Use gpio-* naming for drivers
-   - Maintain order in Kconfig/Makefile
-   - Fold register defs into C file
-
-David Brown (8):
-  msm: gpio: Remove unsupported devices
-  msm: Remove chip-ifdefs for GPIO io mappings
-  msm: gpio: Remove chip-specific register definitions
-  msm: gpio: Remove ifdefs on gpio chip registers
-  msm: gpiomux: Move public API to public header
-  msm: gpio: Fold register defs into C file
-  gpio_msm: Move Qualcomm v6 MSM driver into drivers
-  gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
-
- arch/arm/mach-msm/Kconfig                          |    4 +
- arch/arm/mach-msm/Makefile                         |    8 -
- arch/arm/mach-msm/gpio.c                           |  375 ------------
- arch/arm/mach-msm/gpio_hw.h                        |  278 ---------
- arch/arm/mach-msm/gpiomux.h                        |   17 +-
- arch/arm/mach-msm/include/mach/msm_gpiomux.h       |   38 ++
- arch/arm/mach-msm/include/mach/msm_iomap-7x00.h    |   10 +-
- arch/arm/mach-msm/include/mach/msm_iomap-7x30.h    |   10 +-
- arch/arm/mach-msm/include/mach/msm_iomap-8x50.h    |   10 +-
- arch/arm/mach-msm/include/mach/msm_iomap.h         |    2 +
- arch/arm/mach-msm/io.c                             |   12 +-
- drivers/gpio/Kconfig                               |   16 +
- drivers/gpio/Makefile                              |    2 +
- drivers/gpio/gpio-msm-v1.c                         |  636 ++++++++++++++++++++
- .../gpio-v2.c => drivers/gpio/gpio-msm-v2.c        |    4 +-
- 15 files changed, 719 insertions(+), 704 deletions(-)
- delete mode 100644 arch/arm/mach-msm/gpio.c
- delete mode 100644 arch/arm/mach-msm/gpio_hw.h
- create mode 100644 arch/arm/mach-msm/include/mach/msm_gpiomux.h
- create mode 100644 drivers/gpio/gpio-msm-v1.c
- rename arch/arm/mach-msm/gpio-v2.c => drivers/gpio/gpio-msm-v2.c (99%)
-
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+index 8f99d97..94fe9fe 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x00.h
+@@ -55,13 +55,11 @@
+ #define MSM_DMOV_PHYS         0xA9700000
+ #define MSM_DMOV_SIZE         SZ_4K
+ 
+-#define MSM_GPIO1_BASE        IOMEM(0xE0003000)
+-#define MSM_GPIO1_PHYS        0xA9200000
+-#define MSM_GPIO1_SIZE        SZ_4K
++#define MSM7X00_GPIO1_PHYS        0xA9200000
++#define MSM7X00_GPIO1_SIZE        SZ_4K
+ 
+-#define MSM_GPIO2_BASE        IOMEM(0xE0004000)
+-#define MSM_GPIO2_PHYS        0xA9300000
+-#define MSM_GPIO2_SIZE        SZ_4K
++#define MSM7X00_GPIO2_PHYS        0xA9300000
++#define MSM7X00_GPIO2_SIZE        SZ_4K
+ 
+ #define MSM_CLK_CTL_BASE      IOMEM(0xE0005000)
+ #define MSM_CLK_CTL_PHYS      0xA8600000
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
+index 4d84be1..3769444 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-7x30.h
+@@ -46,13 +46,11 @@
+ #define MSM_DMOV_PHYS         0xAC400000
+ #define MSM_DMOV_SIZE         SZ_4K
+ 
+-#define MSM_GPIO1_BASE        IOMEM(0xE0003000)
+-#define MSM_GPIO1_PHYS        0xAC001000
+-#define MSM_GPIO1_SIZE        SZ_4K
++#define MSM7X30_GPIO1_PHYS        0xAC001000
++#define MSM7X30_GPIO1_SIZE        SZ_4K
+ 
+-#define MSM_GPIO2_BASE        IOMEM(0xE0004000)
+-#define MSM_GPIO2_PHYS        0xAC101000
+-#define MSM_GPIO2_SIZE        SZ_4K
++#define MSM7X30_GPIO2_PHYS        0xAC101000
++#define MSM7X30_GPIO2_SIZE        SZ_4K
+ 
+ #define MSM_CLK_CTL_BASE      IOMEM(0xE0005000)
+ #define MSM_CLK_CTL_PHYS      0xAB800000
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
+index d414320..d67cd73 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap-8x50.h
+@@ -46,13 +46,11 @@
+ #define MSM_DMOV_PHYS         0xA9700000
+ #define MSM_DMOV_SIZE         SZ_4K
+ 
+-#define MSM_GPIO1_BASE        IOMEM(0xE0003000)
+-#define MSM_GPIO1_PHYS        0xA9000000
+-#define MSM_GPIO1_SIZE        SZ_4K
++#define QSD8X50_GPIO1_PHYS        0xA9000000
++#define QSD8X50_GPIO1_SIZE        SZ_4K
+ 
+-#define MSM_GPIO2_BASE        IOMEM(0xE0004000)
+-#define MSM_GPIO2_PHYS        0xA9100000
+-#define MSM_GPIO2_SIZE        SZ_4K
++#define QSD8X50_GPIO2_PHYS        0xA9100000
++#define QSD8X50_GPIO2_SIZE        SZ_4K
+ 
+ #define MSM_CLK_CTL_BASE      IOMEM(0xE0005000)
+ #define MSM_CLK_CTL_PHYS      0xA8600000
+diff --git a/arch/arm/mach-msm/include/mach/msm_iomap.h b/arch/arm/mach-msm/include/mach/msm_iomap.h
+index 2f494b6..4ded152 100644
+--- a/arch/arm/mach-msm/include/mach/msm_iomap.h
++++ b/arch/arm/mach-msm/include/mach/msm_iomap.h
+@@ -61,5 +61,7 @@
+ #define MSM_QGIC_CPU_BASE	IOMEM(0xF0001000)
+ #define MSM_TMR_BASE		IOMEM(0xF0200000)
+ #define MSM_TMR0_BASE		IOMEM(0xF0201000)
++#define MSM_GPIO1_BASE		IOMEM(0xE0003000)
++#define MSM_GPIO2_BASE		IOMEM(0xE0004000)
+ 
+ #endif
+diff --git a/arch/arm/mach-msm/io.c b/arch/arm/mach-msm/io.c
+index cec6ed1..140ddbb 100644
+--- a/arch/arm/mach-msm/io.c
++++ b/arch/arm/mach-msm/io.c
+@@ -43,8 +43,8 @@ static struct map_desc msm_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
+ 	MSM_CHIP_DEVICE(CSR, MSM7X00),
+ 	MSM_DEVICE(DMOV),
+-	MSM_DEVICE(GPIO1),
+-	MSM_DEVICE(GPIO2),
++	MSM_CHIP_DEVICE(GPIO1, MSM7X00),
++	MSM_CHIP_DEVICE(GPIO2, MSM7X00),
+ 	MSM_DEVICE(CLK_CTL),
+ #ifdef CONFIG_MSM_DEBUG_UART
+ 	MSM_DEVICE(DEBUG_UART),
+@@ -76,8 +76,8 @@ static struct map_desc qsd8x50_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
+ 	MSM_CHIP_DEVICE(CSR, QSD8X50),
+ 	MSM_DEVICE(DMOV),
+-	MSM_DEVICE(GPIO1),
+-	MSM_DEVICE(GPIO2),
++	MSM_CHIP_DEVICE(GPIO1, QSD8X50),
++	MSM_CHIP_DEVICE(GPIO2, QSD8X50),
+ 	MSM_DEVICE(CLK_CTL),
+ 	MSM_DEVICE(SIRC),
+ 	MSM_DEVICE(SCPLL),
+@@ -135,8 +135,8 @@ static struct map_desc msm7x30_io_desc[] __initdata = {
+ 	MSM_DEVICE(VIC),
+ 	MSM_CHIP_DEVICE(CSR, MSM7X30),
+ 	MSM_DEVICE(DMOV),
+-	MSM_DEVICE(GPIO1),
+-	MSM_DEVICE(GPIO2),
++	MSM_CHIP_DEVICE(GPIO1, MSM7X30),
++	MSM_CHIP_DEVICE(GPIO2, MSM7X30),
+ 	MSM_DEVICE(CLK_CTL),
+ 	MSM_DEVICE(CLK_CTL_SH2),
+ 	MSM_DEVICE(AD5),
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
