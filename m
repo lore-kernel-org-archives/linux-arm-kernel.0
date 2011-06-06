@@ -1,164 +1,39 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  6 Jun 2011 22:31:29 +0800
-Subject: [PATCH v2] gpio/mxs: convert gpio-mxs to use basic_mmio_gpio library
-Message-ID: <1307370689-1941-1-git-send-email-shawn.guo@linaro.org>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Mon, 6 Jun 2011 16:43:51 +0200
+Subject: [PATCH 1/3] pxa2xx vpac: pcmcia - free gpios on exist rather than
+	requesting them again.
+In-Reply-To: <1307370255-15963-2-git-send-email-jic23@cam.ac.uk>
+References: <1307370255-15963-1-git-send-email-jic23@cam.ac.uk>
+	<1307370255-15963-2-git-send-email-jic23@cam.ac.uk>
+Message-ID: <201106061643.51869.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio-mxs controller complies with basic_mmio_gpio library.  This
-patch converts the driver to use the library.
+On Monday, June 06, 2011 04:24:13 PM Jonathan Cameron wrote:
+> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
+> ---
+>  drivers/pcmcia/pxa2xx_vpac270.c |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/pcmcia/pxa2xx_vpac270.c
+> b/drivers/pcmcia/pxa2xx_vpac270.c index 435002d..413dc7d 100644
+> --- a/drivers/pcmcia/pxa2xx_vpac270.c
+> +++ b/drivers/pcmcia/pxa2xx_vpac270.c
+> @@ -75,10 +75,10 @@ static int vpac270_pcmcia_hw_init(struct
+> soc_pcmcia_socket *skt) static void vpac270_pcmcia_hw_shutdown(struct
+> soc_pcmcia_socket *skt) {
+>  	if (skt->nr == 0)
+> -		gpio_request_array(vpac270_pcmcia_gpios,
+> +		gpio_free_array(vpac270_pcmcia_gpios,
+>  					ARRAY_SIZE(vpac270_pcmcia_gpios));
+>  	else
+> -		gpio_request_array(vpac270_cf_gpios,
+> +		gpio_free_array(vpac270_cf_gpios,
+>  					ARRAY_SIZE(vpac270_cf_gpios));
+>  }
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
- * Drop '[PATCH 1/2] gpio/mxs: save the unnecessary function
-   mxs_gpio_to_irq'
+Please add my
 
- drivers/gpio/Kconfig    |    1 +
- drivers/gpio/gpio-mxs.c |   80 ++++++++++------------------------------------
- 2 files changed, 19 insertions(+), 62 deletions(-)
+Acked-by: Marek Vasut <marek.vasut@gmail.com>
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index daaef0f..0b858e5 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -96,6 +96,7 @@ config GPIO_EXYNOS4
- config GPIO_MXS
- 	def_bool y
- 	depends on ARCH_MXS
-+	select GPIO_BASIC_MMIO_CORE
- 
- config GPIO_PLAT_SAMSUNG
- 	bool "Samsung SoCs GPIO library support"
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index a287614..9d2dba7 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -27,6 +27,7 @@
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-+#include <linux/basic_mmio_gpio.h>
- #include <mach/mxs.h>
- 
- #define MXS_SET		0x4
-@@ -54,7 +55,7 @@ struct mxs_gpio_port {
- 	int irq;
- 	int irq_high;
- 	int virtual_irq_start;
--	struct gpio_chip chip;
-+	struct bgpio_chip bgc;
- };
- 
- /* Note: This driver assumes 32 GPIOs are handled in one register */
-@@ -99,8 +100,6 @@ static void mxs_gpio_unmask_irq(struct irq_data *d)
- 	set_gpio_irqenable(port, gpio & 0x1f, 1);
- }
- 
--static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
--
- static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- {
- 	u32 gpio = irq_to_gpio(d->irq);
-@@ -203,61 +202,15 @@ static struct irq_chip gpio_irq_chip = {
- 	.irq_set_wake = mxs_gpio_set_wake_irq,
- };
- 
--static void mxs_set_gpio_direction(struct gpio_chip *chip, unsigned offset,
--				int dir)
--{
--	struct mxs_gpio_port *port =
--		container_of(chip, struct mxs_gpio_port, chip);
--	void __iomem *pin_addr = port->base + PINCTRL_DOE(port->id);
--
--	if (dir)
--		writel(1 << offset, pin_addr + MXS_SET);
--	else
--		writel(1 << offset, pin_addr + MXS_CLR);
--}
--
--static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset)
--{
--	struct mxs_gpio_port *port =
--		container_of(chip, struct mxs_gpio_port, chip);
--
--	return (readl(port->base + PINCTRL_DIN(port->id)) >> offset) & 1;
--}
--
--static void mxs_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
--{
--	struct mxs_gpio_port *port =
--		container_of(chip, struct mxs_gpio_port, chip);
--	void __iomem *pin_addr = port->base + PINCTRL_DOUT(port->id);
--
--	if (value)
--		writel(1 << offset, pin_addr + MXS_SET);
--	else
--		writel(1 << offset, pin_addr + MXS_CLR);
--}
--
--static int mxs_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-+static int mxs_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
- {
-+	struct bgpio_chip *bgc = to_bgpio_chip(gc);
- 	struct mxs_gpio_port *port =
--		container_of(chip, struct mxs_gpio_port, chip);
-+		container_of(bgc, struct mxs_gpio_port, bgc);
- 
- 	return port->virtual_irq_start + offset;
- }
- 
--static int mxs_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
--{
--	mxs_set_gpio_direction(chip, offset, 0);
--	return 0;
--}
--
--static int mxs_gpio_direction_output(struct gpio_chip *chip,
--				     unsigned offset, int value)
--{
--	mxs_gpio_set(chip, offset, value);
--	mxs_set_gpio_direction(chip, offset, 1);
--	return 0;
--}
--
- static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- {
- 	static void __iomem *base;
-@@ -322,21 +275,24 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 	irq_set_chained_handler(port->irq, mxs_gpio_irq_handler);
- 	irq_set_handler_data(port->irq, port);
- 
--	/* register gpio chip */
--	port->chip.direction_input = mxs_gpio_direction_input;
--	port->chip.direction_output = mxs_gpio_direction_output;
--	port->chip.get = mxs_gpio_get;
--	port->chip.set = mxs_gpio_set;
--	port->chip.to_irq = mxs_gpio_to_irq;
--	port->chip.base = port->id * 32;
--	port->chip.ngpio = 32;
--
--	err = gpiochip_add(&port->chip);
-+	err = bgpio_init(&port->bgc, &pdev->dev, 4,
-+			 port->base + PINCTRL_DIN(port->id),
-+			 port->base + PINCTRL_DOUT(port->id), NULL,
-+			 port->base + PINCTRL_DOE(port->id), NULL, false);
- 	if (err)
- 		goto out_iounmap;
- 
-+	port->bgc.gc.to_irq = mxs_gpio_to_irq;
-+	port->bgc.gc.base = port->id * 32;
-+
-+	err = gpiochip_add(&port->bgc.gc);
-+	if (err)
-+		goto out_bgpio_remove;
-+
- 	return 0;
- 
-+out_bgpio_remove:
-+	bgpio_remove(&port->bgc);
- out_iounmap:
- 	if (iores)
- 		iounmap(port->base);
--- 
-1.7.4.1
+Thanks, cheers
