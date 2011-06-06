@@ -1,54 +1,122 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon,  6 Jun 2011 13:38:17 -0700
-Subject: [PATCH v2 1/2] ARM: omap4: gpio: fix setting IRQWAKEN bits
-Message-ID: <1307392698-21170-1-git-send-email-ccross@android.com>
+From: peterhuewe@gmx.de (Peter Huewe)
+Date: Mon,  6 Jun 2011 22:43:31 +0200
+Subject: [PATCH 1/2] mfd/ab3550: Use kstrtoul_from_user
+Message-ID: <1307393012-32582-1-git-send-email-peterhuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
-causing only the last bit set to take effect, resulting in lost
-wakeups when the GPIO controller is in idle.
+This patch replaces the code for getting an unsigned long from a
+userspace buffer by a simple call to kstroul_from_user.
+This makes it easier to read and less error prone.
 
-Replace direct writes to IRQWAKEN with MOD_REG_BIT calls to
-perform a read-modify-write on the register.
+Kernel Version: v3.0-rc2
 
-Signed-off-by: Colin Cross <ccross@android.com>
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
 ---
- drivers/gpio/gpio-omap.c |   12 ++----------
- 1 files changed, 2 insertions(+), 10 deletions(-)
+ drivers/mfd/ab3550-core.c |   41 +++++++++++------------------------------
+ 1 files changed, 11 insertions(+), 30 deletions(-)
 
-Santosh, I left your Acked-by off this patch because I changed
-the register access to match the OMAP4 TRM.
-
-diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
-index 6c51191..8ba6957 100644
---- a/drivers/gpio/gpio-omap.c
-+++ b/drivers/gpio/gpio-omap.c
-@@ -432,7 +432,6 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
+diff --git a/drivers/mfd/ab3550-core.c b/drivers/mfd/ab3550-core.c
+index 3d7dce6..56ba194 100644
+--- a/drivers/mfd/ab3550-core.c
++++ b/drivers/mfd/ab3550-core.c
+@@ -879,20 +879,13 @@ static ssize_t ab3550_bank_write(struct file *file,
+ 	size_t count, loff_t *ppos)
  {
- 	void __iomem *base = bank->base;
- 	u32 gpio_bit = 1 << gpio;
--	u32 val;
+ 	struct ab3550 *ab = ((struct seq_file *)(file->private_data))->private;
+-	char buf[32];
+-	int buf_size;
+ 	unsigned long user_bank;
+ 	int err;
  
- 	if (cpu_is_omap44xx()) {
- 		MOD_REG_BIT(OMAP4_GPIO_LEVELDETECT0, gpio_bit,
-@@ -455,15 +454,8 @@ static inline void set_24xx_gpio_triggering(struct gpio_bank *bank, int gpio,
+ 	/* Get userspace string and assure termination */
+-	buf_size = min(count, (sizeof(buf) - 1));
+-	if (copy_from_user(buf, user_buf, buf_size))
+-		return -EFAULT;
+-	buf[buf_size] = 0;
+-
+-	err = strict_strtoul(buf, 0, &user_bank);
++	err = kstrtoul_from_user(user_buf, count, 0, &user_bank);
+ 	if (err)
+-		return -EINVAL;
++		return err;
+ 
+ 	if (user_bank >= AB3550_NUM_BANKS) {
+ 		dev_err(&ab->i2c_client[0]->dev,
+@@ -902,7 +895,7 @@ static ssize_t ab3550_bank_write(struct file *file,
+ 
+ 	ab->debug_bank = user_bank;
+ 
+-	return buf_size;
++	return count;
+ }
+ 
+ static int ab3550_address_print(struct seq_file *s, void *p)
+@@ -923,27 +916,21 @@ static ssize_t ab3550_address_write(struct file *file,
+ 	size_t count, loff_t *ppos)
+ {
+ 	struct ab3550 *ab = ((struct seq_file *)(file->private_data))->private;
+-	char buf[32];
+-	int buf_size;
+ 	unsigned long user_address;
+ 	int err;
+ 
+ 	/* Get userspace string and assure termination */
+-	buf_size = min(count, (sizeof(buf) - 1));
+-	if (copy_from_user(buf, user_buf, buf_size))
+-		return -EFAULT;
+-	buf[buf_size] = 0;
+-
+-	err = strict_strtoul(buf, 0, &user_address);
++	err = kstrtoul_from_user(user_buf, count, 0, &user_address);
+ 	if (err)
+-		return -EINVAL;
++		return err;
++
+ 	if (user_address > 0xff) {
+ 		dev_err(&ab->i2c_client[0]->dev,
+ 			"debugfs error input > 0xff\n");
+ 		return -EINVAL;
  	}
- 	if (likely(!(bank->non_wakeup_gpios & gpio_bit))) {
- 		if (cpu_is_omap44xx()) {
--			if (trigger != 0)
--				__raw_writel(1 << gpio, bank->base+
--						OMAP4_GPIO_IRQWAKEN0);
--			else {
--				val = __raw_readl(bank->base +
--							OMAP4_GPIO_IRQWAKEN0);
--				__raw_writel(val & (~(1 << gpio)), bank->base +
--							 OMAP4_GPIO_IRQWAKEN0);
--			}
-+			MOD_REG_BIT(OMAP4_GPIO_IRQWAKEN0, gpio_bit,
-+				trigger != 0);
- 		} else {
- 			/*
- 			 * GPIO wakeup request can only be generated on edge
+ 	ab->debug_address = user_address;
+-	return buf_size;
++	return count;
+ }
+ 
+ static int ab3550_val_print(struct seq_file *s, void *p)
+@@ -971,21 +958,15 @@ static ssize_t ab3550_val_write(struct file *file,
+ 	size_t count, loff_t *ppos)
+ {
+ 	struct ab3550 *ab = ((struct seq_file *)(file->private_data))->private;
+-	char buf[32];
+-	int buf_size;
+ 	unsigned long user_val;
+ 	int err;
+ 	u8 regvalue;
+ 
+ 	/* Get userspace string and assure termination */
+-	buf_size = min(count, (sizeof(buf)-1));
+-	if (copy_from_user(buf, user_buf, buf_size))
+-		return -EFAULT;
+-	buf[buf_size] = 0;
+-
+-	err = strict_strtoul(buf, 0, &user_val);
++	err = kstrtoul_from_user(user_buf, count, 0, &user_val);
+ 	if (err)
+-		return -EINVAL;
++		return err;
++
+ 	if (user_val > 0xff) {
+ 		dev_err(&ab->i2c_client[0]->dev,
+ 			"debugfs error input > 0xff\n");
+@@ -1002,7 +983,7 @@ static ssize_t ab3550_val_write(struct file *file,
+ 	if (err)
+ 		return -EINVAL;
+ 
+-	return buf_size;
++	return count;
+ }
+ 
+ static const struct file_operations ab3550_bank_fops = {
 -- 
-1.7.4.1
+1.7.3.4
