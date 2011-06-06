@@ -1,29 +1,29 @@
-From: zecke@selfish.org (Holger Freyther)
-Date: Mon, 06 Jun 2011 17:32:59 +0200
-Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <alpine.LFD.2.02.1106061719290.13964@ionos>
-References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
-	<alpine.LFD.2.02.1106061650210.13964@ionos>
-	<4DECEDF9.4010202@selfish.org>
-	<alpine.LFD.2.02.1106061719290.13964@ionos>
-Message-ID: <4DECF32B.6000508@selfish.org>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Mon, 6 Jun 2011 17:35:57 +0200
+Subject: [RFC 0/6] iommu: generic api migration and grouping
+In-Reply-To: <BANLkTi=i2s-Ujiy4qn_XQv+9dMjUC9R66A@mail.gmail.com>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+	<20110606100950.GC30762@amd.com>
+	<BANLkTi=i2s-Ujiy4qn_XQv+9dMjUC9R66A@mail.gmail.com>
+Message-ID: <20110606153557.GE1953@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2011 05:25 PM, Thomas Gleixner wrote:
+On Mon, Jun 06, 2011 at 11:15:30AM -0400, Ohad Ben-Cohen wrote:
 
-> Crap, yes. The code which does the chained handler setup overwrites
-> chip_data.
-> 
+> This is insufficient; users need somehow to tell what page sizes are
+> supported by the underlying hardware (we can't assume host page-sizes,
+> and we want to use bigger pages whenever possible, to relax the TLB
+> pressure).
+/
+What does the IOMMU-API user need this info for? On the x86 IOMMUs these
+details are handled transparently by the IOMMU driver.
 
-Ah, you were too fast in the end, I just finished reading linux/irq.h. :)
+	Joerg
 
+-- 
+AMD Operating System Research Center
 
-
-> Subject: arm: davinci: Fix fallout from generic irq chip conversion
-> From: Thomas Gleixner <tglx@linutronix.de>
-> Date: Mon, 06 Jun 2011 11:51:43 +0200
-> 
-> Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-
-Tested-by: Holger Hans Peter Freyther <holger@freyther.de>
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
