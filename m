@@ -1,181 +1,111 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 6 Jun 2011 02:10:52 -0600
-Subject: [PATCH v3 1/3] gpio: gpio-mxs: copy mach-mxs/gpio.c into
-	drivers/gpio
-In-Reply-To: <20110605162313.GA20553@S2100-06.ap.freescale.net>
-References: <1307184940-16291-1-git-send-email-shawn.guo@linaro.org>
-	<1307184940-16291-2-git-send-email-shawn.guo@linaro.org>
-	<20110604222946.GA31236@ponder.secretlab.ca>
-	<20110605162313.GA20553@S2100-06.ap.freescale.net>
-Message-ID: <20110606081052.GE10410@ponder.secretlab.ca>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 6 Jun 2011 10:12:05 +0200
+Subject: [PATCH v4 2/2] gpio/mxc: Change gpio-mxc into an upstanding gpio
+	driver
+In-Reply-To: <20110606075241.GD10410@ponder.secretlab.ca>
+References: <1307290075-7062-1-git-send-email-shawn.guo@linaro.org>
+	<1307290075-7062-3-git-send-email-shawn.guo@linaro.org>
+	<20110606075241.GD10410@ponder.secretlab.ca>
+Message-ID: <20110606081205.GC32632@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2011 at 12:23:14AM +0800, Shawn Guo wrote:
-> On Sat, Jun 04, 2011 at 04:29:46PM -0600, Grant Likely wrote:
-> > On Sat, Jun 04, 2011 at 06:55:38PM +0800, Shawn Guo wrote:
-> > > As the first patch of the series that moves mach-mxc gpio driver into
-> > > drivers/gpio, it copies arch/arm/mach-mxs/gpio.c into
-> > > drivers/gpio/gpio-mxs.c.  The later patches will make necessary
-> > > changes to the driver, migrate the existing users to it, and lastly
-> > > deletes mach-mxs gpio driver.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > >  drivers/gpio/gpio-mxs.c |  331 +++++++++++++++++++++++++++++++++++++++++++++++
+On Mon, Jun 06, 2011 at 01:52:41AM -0600, Grant Likely wrote:
+> On Mon, Jun 06, 2011 at 12:07:55AM +0800, Shawn Guo wrote:
+> > The patch makes necessary changes on gpio-mxc as below to turn it
+> > into an upstanding gpio driver.
 > > 
-> > [sigh]  I fear we are having a communication breakdown.  Since your
-> > /moving/ a file, you need to make it easy for readers to understand
-> > what has changed and why.  That means using 1 patch to move the file
-> > with only the changes absolutely necessary to ensure bisectability,
-> > and then followup patches for the clean up.
+> >  * Add a list to save all mx2 ports references, so that
+> >    mx2_gpio_irq_handler can walk through all interrupt status
+> >    registers
 > > 
-> > Adding a new copy in one patch, and then removing the old copy in the
-> > other patch does not make it easy for a reader to understand what
-> > changed.  Below is what you're first patch should look like (using the
-> > -M flag to show the actual changes which are only #include differences).
+> >  * Use readl/writel to replace mach-specific accessors
+> >    __raw_readl/__raw_writel
 > > 
-> Oops, I misunderstood your point.  But one thing I have been trying
-> hard is to keep changes for driver and subarch in separate patches,
-> which is something I was asked to do when I started working with
-> community.
+> >  * Change mxc_gpio_init into mxc_gpio_probe function
+> > 
+> >  * Move "struct mxc_gpio_port" into gpio-mxc.c, as it needs not to
+> >    be public at all, and also make some other cleanup on
+> >    plat-mxc/include/mach/gpio.h at the same time
+> > 
+> > And the patch then migrates mach-imx and mach-mx5 to the updated
+> > driver by adding corresponding platform devices.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Acked-by: Olof Johansson <olof@lixom.net>
+> 
+> Applied, thanks.
 
-Heh, and sometimes those of us actually maintaining stuff just plain
-change our mind when we see what something actually looks like in
-practise.  :-)
+I'm not completely happy with this patch going through your tree. It
+does massive changes to arch/arm/mach-*mx*, so expect merge conflicts
+here.
 
-In this case, the changes were intertwined enough that there wasn't
-much benefit in keeping the arch and drivers stuff in separate
-patches.
-
-> As you will anyway pick up the patch set as a whole,
-> this is not a problem then.  I just sent the updates of gpio-mxs
-> and gpio-mxc with you approach.  As a side effect, you will see
-> patch #2 of gpio-mxc becomes a very big patch in term of number of
-> files it changes.
-
-Thanks.  It's actually not that big.  I've seen (and created) much
-worse.
+Sascha
 
 > 
-> > I've build tested this patch and have it sitting in the gpio/next
-> > branch of git://git.secretlab.ca/git/linux-2.6 at the moment if you
-> > want to build the rest of your series on top of it.
-> > 
-> Thanks for the patch demonstrating.  I have one minor comment below.
+> g.
 > 
-> > g.
-> > 
 > > ---
+> >  arch/arm/mach-imx/mach-apf9328.c                |    2 +
+> >  arch/arm/mach-imx/mach-armadillo5x0.c           |    2 +
+> >  arch/arm/mach-imx/mach-bug.c                    |    2 +
+> >  arch/arm/mach-imx/mach-cpuimx27.c               |    2 +
+> >  arch/arm/mach-imx/mach-cpuimx35.c               |    2 +
+> >  arch/arm/mach-imx/mach-eukrea_cpuimx25.c        |    2 +
+> >  arch/arm/mach-imx/mach-imx27_visstrim_m10.c     |    2 +
+> >  arch/arm/mach-imx/mach-imx27ipcam.c             |    2 +
+> >  arch/arm/mach-imx/mach-imx27lite.c              |    2 +
+> >  arch/arm/mach-imx/mach-kzm_arm11_01.c           |    2 +
+> >  arch/arm/mach-imx/mach-mx1ads.c                 |    2 +
+> >  arch/arm/mach-imx/mach-mx21ads.c                |    2 +
+> >  arch/arm/mach-imx/mach-mx25_3ds.c               |    2 +
+> >  arch/arm/mach-imx/mach-mx27_3ds.c               |    2 +
+> >  arch/arm/mach-imx/mach-mx27ads.c                |    2 +
+> >  arch/arm/mach-imx/mach-mx31_3ds.c               |    2 +
+> >  arch/arm/mach-imx/mach-mx31ads.c                |    2 +
+> >  arch/arm/mach-imx/mach-mx31lilly.c              |    2 +
+> >  arch/arm/mach-imx/mach-mx31lite.c               |    2 +
+> >  arch/arm/mach-imx/mach-mx31moboard.c            |    2 +
+> >  arch/arm/mach-imx/mach-mx35_3ds.c               |    2 +
+> >  arch/arm/mach-imx/mach-mxt_td60.c               |    2 +
+> >  arch/arm/mach-imx/mach-pca100.c                 |    2 +
+> >  arch/arm/mach-imx/mach-pcm037.c                 |    2 +
+> >  arch/arm/mach-imx/mach-pcm038.c                 |    2 +
+> >  arch/arm/mach-imx/mach-pcm043.c                 |    2 +
+> >  arch/arm/mach-imx/mach-qong.c                   |    2 +
+> >  arch/arm/mach-imx/mach-scb9328.c                |    2 +
+> >  arch/arm/mach-imx/mach-vpr200.c                 |    2 +
+> >  arch/arm/mach-imx/mm-imx1.c                     |   17 +-
+> >  arch/arm/mach-imx/mm-imx21.c                    |   21 +--
+> >  arch/arm/mach-imx/mm-imx25.c                    |   16 +-
+> >  arch/arm/mach-imx/mm-imx27.c                    |   21 +--
+> >  arch/arm/mach-imx/mm-imx31.c                    |   15 +-
+> >  arch/arm/mach-imx/mm-imx35.c                    |   15 +-
+> >  arch/arm/mach-mx5/board-cpuimx51.c              |    2 +
+> >  arch/arm/mach-mx5/board-cpuimx51sd.c            |    2 +
+> >  arch/arm/mach-mx5/board-mx50_rdp.c              |    2 +
+> >  arch/arm/mach-mx5/board-mx51_3ds.c              |    2 +
+> >  arch/arm/mach-mx5/board-mx51_babbage.c          |    2 +
+> >  arch/arm/mach-mx5/board-mx51_efikamx.c          |    2 +
+> >  arch/arm/mach-mx5/board-mx51_efikasb.c          |    2 +
+> >  arch/arm/mach-mx5/board-mx53_evk.c              |    2 +
+> >  arch/arm/mach-mx5/board-mx53_loco.c             |    2 +
+> >  arch/arm/mach-mx5/board-mx53_smd.c              |    2 +
+> >  arch/arm/mach-mx5/devices.c                     |   64 -------
+> >  arch/arm/mach-mx5/mm-mx50.c                     |   21 +--
+> >  arch/arm/mach-mx5/mm.c                          |   25 ++-
+> >  arch/arm/plat-mxc/devices.c                     |   11 ++
+> >  arch/arm/plat-mxc/devices/Makefile              |    1 +
+> >  arch/arm/plat-mxc/devices/platform-gpio-mxc.c   |   32 ++++
+> >  arch/arm/plat-mxc/include/mach/common.h         |   12 ++-
+> >  arch/arm/plat-mxc/include/mach/devices-common.h |    2 +
+> >  arch/arm/plat-mxc/include/mach/gpio.h           |   27 ---
+> >  drivers/gpio/gpio-mxc.c                         |  217 +++++++++++++++--------
+> >  55 files changed, 358 insertions(+), 237 deletions(-)
+> >  create mode 100644 arch/arm/plat-mxc/devices/platform-gpio-mxc.c
 > > 
-> > commit e084f5b06ca7f3d94d9d042d288a3311398e5c49
-> > Author: Grant Likely <grant.likely@secretlab.ca>
-> > Date:   Sat Jun 4 16:18:59 2011 -0600
-> > 
-> >     gpio/mxs: Move Freescale mxs gpio driver to drivers/gpio
-> >     
-> >     GPIO drivers are getting moved to drivers/gpio for cleanup and
-> >     consolidation.  This patch moves the mxs driver.  Follow up patches
-> >     will clean it up and make it a fine upstanding example of a gpio
-> >     driver.
-> >     
-> >     Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
-> > 
-> >  arch/arm/mach-mxs/Makefile                         |    2 +-
-> >  .../mach-mxs/{gpio.h => include/mach/gpio-mxs.h}   |    0
-> >  arch/arm/mach-mxs/mach-mx28evk.c                   |    2 +-
-> >  drivers/gpio/Kconfig                               |    4 ++++
-> >  drivers/gpio/Makefile                              |    1 +
-> >  .../arm/mach-mxs/gpio.c => drivers/gpio/gpio-mxs.c |    3 +--
-> >  6 files changed, 8 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-mxs/Makefile b/arch/arm/mach-mxs/Makefile
-> > index 58e8923..6c38262 100644
-> > --- a/arch/arm/mach-mxs/Makefile
-> > +++ b/arch/arm/mach-mxs/Makefile
-> > @@ -1,5 +1,5 @@
-> >  # Common support
-> > -obj-y := clock.o devices.o gpio.o icoll.o iomux.o system.o timer.o
-> > +obj-y := clock.o devices.o icoll.o iomux.o system.o timer.o
-> >  
-> >  obj-$(CONFIG_MXS_OCOTP) += ocotp.o
-> >  obj-$(CONFIG_PM) += pm.o
-> > diff --git a/arch/arm/mach-mxs/gpio.h b/arch/arm/mach-mxs/include/mach/gpio-mxs.h
-> > similarity index 100%
-> > rename from arch/arm/mach-mxs/gpio.h
-> > rename to arch/arm/mach-mxs/include/mach/gpio-mxs.h
-> > diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
-> > index eacdc6b..347cf35 100644
-> > --- a/arch/arm/mach-mxs/mach-mx28evk.c
-> > +++ b/arch/arm/mach-mxs/mach-mx28evk.c
-> > @@ -24,9 +24,9 @@
-> >  
-> >  #include <mach/common.h>
-> >  #include <mach/iomux-mx28.h>
-> > +#include <mach/gpio-mxs.h>
-> >  
-> This is the problem of existing code.  The gpio.h (in turn gpio-mxs.h)
-> does not need to be included here.  So we can simply drop it in this
-> patch.  I have incorporated it when sending the patch within my series.
-
-Oops, I missed you comment here and replied to one of your patches
-with a nonsensical comment about missing a header.  Sorry.  Everything
-should be in order in my tree now.
-
-> 
-> >  #include "devices-mx28.h"
-> > -#include "gpio.h"
-> >  
-> >  #define MX28EVK_FLEXCAN_SWITCH	MXS_GPIO_NR(2, 13)
-> >  #define MX28EVK_FEC_PHY_POWER	MXS_GPIO_NR(2, 15)
-> > diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-> > index 21271a5..afe44aa 100644
-> > --- a/drivers/gpio/Kconfig
-> > +++ b/drivers/gpio/Kconfig
-> > @@ -94,6 +94,10 @@ config GPIO_EXYNOS4
-> >  	def_bool y
-> >  	depends on CPU_EXYNOS4210
-> >  
-> > +config GPIO_MXS
-> > +	def_bool y
-> > +	depends on ARCH_MXS
-> > +
-> >  config GPIO_PLAT_SAMSUNG
-> >  	def_bool y
-> >  	depends on SAMSUNG_GPIOLIB_4BIT
-> > diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
-> > index e6e5032..8733d02 100644
-> > --- a/drivers/gpio/Makefile
-> > +++ b/drivers/gpio/Makefile
-> > @@ -10,6 +10,7 @@ obj-$(CONFIG_GPIO_BASIC_MMIO_CORE)	+= basic_mmio_gpio.o
-> >  obj-$(CONFIG_GPIO_BASIC_MMIO)	+= basic_mmio_gpio.o
-> >  obj-$(CONFIG_GPIO_EP93XX)	+= gpio-ep93xx.o
-> >  obj-$(CONFIG_GPIO_EXYNOS4)	+= gpio-exynos4.o
-> > +obj-$(CONFIG_GPIO_MXS)		+= gpio-mxs.o
-> >  obj-$(CONFIG_GPIO_PLAT_SAMSUNG)	+= gpio-plat-samsung.o
-> >  obj-$(CONFIG_GPIO_S5PC100)	+= gpio-s5pc100.o
-> >  obj-$(CONFIG_GPIO_S5PV210)	+= gpio-s5pv210.o
-> > diff --git a/arch/arm/mach-mxs/gpio.c b/drivers/gpio/gpio-mxs.c
-> > similarity index 99%
-> > rename from arch/arm/mach-mxs/gpio.c
-> > rename to drivers/gpio/gpio-mxs.c
-> > index 2c950fe..bac7b6b 100644
-> > --- a/arch/arm/mach-mxs/gpio.c
-> > +++ b/drivers/gpio/gpio-mxs.c
-> > @@ -27,10 +27,9 @@
-> >  #include <linux/gpio.h>
-> >  #include <mach/mx23.h>
-> >  #include <mach/mx28.h>
-> > +#include <mach/gpio-mxs.h>
-> >  #include <asm-generic/bug.h>
-> >  
-> > -#include "gpio.h"
-> > -
-> >  static struct mxs_gpio_port *mxs_gpio_ports;
-> >  static int gpio_table_size;
-> >  
-> 
-> -- 
-> Regards,
-> Shawn
-> 
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
