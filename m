@@ -1,114 +1,52 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 6 Jun 2011 03:27:19 -0700
-Subject: [GIT PULL] omap fixes for v3.0-rc2
-Message-ID: <20110606102718.GJ11352@atomide.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 6 Jun 2011 12:28:55 +0200
+Subject: MMC and reliable write - was: since when does ARM map the
+	kernel memory in sections?
+In-Reply-To: <20110503080414.GH5832@shareable.org>
+References: <201104122052.17453.pwaechtler@mac.com>
+	<201104262100.42670.pwaechtler@mac.com>
+	<20110426190719.GA5832@shareable.org>
+	<201104262238.02979.pwaechtler@mac.com>
+	<20110426224546.GC5832@shareable.org>
+	<BANLkTimTsBARiHmbY37bA6oahacs7zbORA@mail.gmail.com>
+	<20110427130719.GE5832@shareable.org>
+	<BANLkTimMvGfkmcXKrM=vtFNGqdoUJpqwcw@mail.gmail.com>
+	<20110503080414.GH5832@shareable.org>
+Message-ID: <20110606102855.GA5820@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi!
 
-Please pull omap fixes from:
+> > So basically add a new REQ_ flag - something like REQ_SAFE, which
+> > would ensure that data
+> > on block storage is not corrupted due to interrupting this write (or
+> > even, after the write, if the card does some optimizations). We
+> > already have a flag that ensures corruptions don't occur
+> > because of local-to-disk caches - REQ_FUA, so this would just thinking
+> > about what effects REQ_FUA  already has that's not considered. On a
+> > (spinning) disk, I can't image that interrupting a REQ_FUA write would
+> > cause data loss somewhere other than where data was written.
+> > 
+> > Then it would be as simple as a mount flag that would ensure all
+> > (write) accesses are FUA accesses, to ensure desired behavior for
+> > platforms where power could be cut at any moment.
+> 
+> I think you're mixing up different concepts.
+> 
+> On a spinning hard disk, _all_ writes don't cause data loss other than
+> where data is written, rounded up to the sector (512 or 4096 bytes).
 
-git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git fixes
+...
 
-This contains build and warning related fixes, mux and mmc init fixes, and
-some board related fixes. Also included is one patch to remove duplicate
-defines of NAND_BLOCK_SIZE.
+Yes, so on mmc there are two different problems:
 
-Regards,
+* reliability of write itself (REL_WRITE solves that)
 
-Tony
-
-
-The following changes since commit 55922c9d1b84b89cb946c777fddccb3247e7df2c:
-  Linus Torvalds (1):
-        Linux 3.0-rc1
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git fixes
-
-Alexander Holler (1):
-      arm: omap3: beagle: Ensure msecure is mux'd to be able to set the RTC
-
-Axel Lin (1):
-      ARM: OMAP2: Add missing include of linux/gpio.h
-
-Balaji T K (2):
-      ARM: OMAP4: MMC: no regulator off during probe for eMMC
-      ARM: OMAP4: MMC: increase delay for pbias
-
-Colin Cross (2):
-      ARM: omap2+: mux: Allow board mux settings to be NULL
-      ARM: omap4: Pass core and wakeup mux tables to omap4_mux_init
-
-Govindraj.R (1):
-      OMAP2+: mux: fix compilation warnings
-
-Igor Grinberg (3):
-      arm: omap3: cm-t3517: fix section mismatch warning
-      arm: omap2plus: fix ads7846 pendown gpio request
-      arm: omap2plus: move NAND_BLOCK_SIZE out of boards
-
-Janusz Krzysztofik (1):
-      OMAP: fix compilation error
-
-Jarkko Nikula (2):
-      omap: rx51: Set regulator V28_A always on
-      omap: rx51: Don't power up speaker amplifier at bootup
-
-Julia Lawall (1):
-      arch/arm/mach-omap1/dma.c: Invert calls to platform_device_put and platform_device_del
-
-Omar Ramirez Luna (1):
-      OMAP: iovmm: fix SW flags passed by user
-
-Rabin Vincent (1):
-      OMAP4: fix return value of omap4_l3_init
-
-Santosh Shilimkar (2):
-      OMAP2+: Fix 9 section mismatch(es) warnings from mach-omap2/built-in.o
-      OMAP: SRAM: Fix warning: format '%08lx' expects type 'long unsigned int'
-
-Shubhrajyoti D (1):
-      omap4: hwmod: Enable the keypad
-
-Tasslehoff Kjappfot (1):
-      omap3: Free Beagle rev gpios when they are read, so others can read them later
-
-Todd Poynor (1):
-      ARM: OMAP2: Add missing iounmap in omap4430_phy_init
-
- arch/arm/mach-omap1/dma.c                    |   11 ++++++-----
- arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
- arch/arm/mach-omap2/board-3430sdp.c          |    6 +++---
- arch/arm/mach-omap2/board-4430sdp.c          |   11 ++++++-----
- arch/arm/mach-omap2/board-apollon.c          |    2 +-
- arch/arm/mach-omap2/board-cm-t35.c           |    2 --
- arch/arm/mach-omap2/board-cm-t3517.c         |    5 ++---
- arch/arm/mach-omap2/board-devkit8000.c       |    2 --
- arch/arm/mach-omap2/board-omap3beagle.c      |    8 ++++++--
- arch/arm/mach-omap2/board-omap3pandora.c     |    4 +---
- arch/arm/mach-omap2/board-omap3touchbook.c   |    2 --
- arch/arm/mach-omap2/board-omap4panda.c       |    8 ++++----
- arch/arm/mach-omap2/board-overo.c            |    4 +---
- arch/arm/mach-omap2/board-rx51-peripherals.c |    3 ++-
- arch/arm/mach-omap2/board-zoom-display.c     |    2 +-
- arch/arm/mach-omap2/common-board-devices.c   |   20 ++++++++++----------
- arch/arm/mach-omap2/common-board-devices.h   |    2 ++
- arch/arm/mach-omap2/devices.c                |    2 +-
- arch/arm/mach-omap2/hsmmc.c                  |   16 +++++++++++++---
- arch/arm/mach-omap2/hsmmc.h                  |    1 +
- arch/arm/mach-omap2/mux.c                    |    5 ++++-
- arch/arm/mach-omap2/mux.h                    |    6 ++++--
- arch/arm/mach-omap2/mux44xx.c                |    5 +++--
- arch/arm/mach-omap2/omap_hwmod.c             |    2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    2 +-
- arch/arm/mach-omap2/omap_phy_internal.c      |    4 +++-
- arch/arm/plat-omap/include/plat/flash.h      |    1 +
- arch/arm/plat-omap/include/plat/iovmm.h      |    3 ---
- arch/arm/plat-omap/include/plat/mmc.h        |    3 +++
- arch/arm/plat-omap/iovmm.c                   |    4 ----
- arch/arm/plat-omap/sram.c                    |   12 ++++++------
- drivers/mmc/host/omap_hsmmc.c                |    3 +++
- 32 files changed, 90 insertions(+), 73 deletions(-)
+* reliability of data around write (there are for bits "controlling"
+  it in 4.4.1 MMC specs, unfortunately they are only writable by card
+  manufacturer AFAICS).
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
