@@ -1,65 +1,112 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  6 Jun 2011 17:55:47 +0100
-Subject: [PATCH 03/11] ARM: hwcaps: use shifts instead of hardcoded constants
+Date: Mon,  6 Jun 2011 17:55:45 +0100
+Subject: [PATCH 01/11] arm: Convert v7 proc infos into a common macro
 In-Reply-To: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
 References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307379355-13802-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1307379355-13802-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HWCAP numbers are defined as constants, each one being a power of 2.
-This has become slightly unwieldy now that we have reached 32k.
+From: Pawel Moll <pawel.moll@arm.com>
 
-This patch changes the HWCAP defines to use (1 << n) instead of coding
-the constant directly. The values remain unchanged.
+As most of the proc info content is common across all v7
+processors, this patch converts existing A9 and generic v7
+descriptions into a macro (allowing extra flags in future).
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
 ---
- arch/arm/include/asm/hwcap.h |   32 ++++++++++++++++----------------
- 1 files changed, 16 insertions(+), 16 deletions(-)
+ arch/arm/mm/proc-v7.S |   67 +++++++++++++++++-------------------------------
+ 1 files changed, 24 insertions(+), 43 deletions(-)
 
-diff --git a/arch/arm/include/asm/hwcap.h b/arch/arm/include/asm/hwcap.h
-index c1062c3..81512db 100644
---- a/arch/arm/include/asm/hwcap.h
-+++ b/arch/arm/include/asm/hwcap.h
-@@ -4,22 +4,22 @@
- /*
-  * HWCAP flags - for elf_hwcap (in kernel) and AT_HWCAP
-  */
--#define HWCAP_SWP	1
--#define HWCAP_HALF	2
--#define HWCAP_THUMB	4
--#define HWCAP_26BIT	8	/* Play it safe */
--#define HWCAP_FAST_MULT	16
--#define HWCAP_FPA	32
--#define HWCAP_VFP	64
--#define HWCAP_EDSP	128
--#define HWCAP_JAVA	256
--#define HWCAP_IWMMXT	512
--#define HWCAP_CRUNCH	1024
--#define HWCAP_THUMBEE	2048
--#define HWCAP_NEON	4096
--#define HWCAP_VFPv3	8192
--#define HWCAP_VFPv3D16	16384
--#define HWCAP_TLS	32768
-+#define HWCAP_SWP	(1 << 0)
-+#define HWCAP_HALF	(1 << 1)
-+#define HWCAP_THUMB	(1 << 2)
-+#define HWCAP_26BIT	(1 << 3)	/* Play it safe */
-+#define HWCAP_FAST_MULT	(1 << 4)
-+#define HWCAP_FPA	(1 << 5)
-+#define HWCAP_VFP	(1 << 6)
-+#define HWCAP_EDSP	(1 << 7)
-+#define HWCAP_JAVA	(1 << 8)
-+#define HWCAP_IWMMXT	(1 << 9)
-+#define HWCAP_CRUNCH	(1 << 10)
-+#define HWCAP_THUMBEE	(1 << 11)
-+#define HWCAP_NEON	(1 << 12)
-+#define HWCAP_VFPv3	(1 << 13)
-+#define HWCAP_VFPv3D16	(1 << 14)
-+#define HWCAP_TLS	(1 << 15)
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index b3b566e..d5245d4 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -436,33 +436,36 @@ cpu_elf_name:
  
- #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
- /*
+ 	.section ".proc.info.init", #alloc, #execinstr
+ 
+-	.type   __v7_ca9mp_proc_info, #object
+-__v7_ca9mp_proc_info:
+-	.long	0x410fc090		@ Required ID value
+-	.long	0xff0ffff0		@ Mask for ID
+-	ALT_SMP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_SMP)
+-	ALT_UP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_UP)
+-	.long   PMD_TYPE_SECT | \
+-		PMD_SECT_XN | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	W(b)	__v7_ca9mp_setup
++	/*
++	 * Standard v7 proc info content
++	 */
++.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
++	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
++			PMD_FLAGS_SMP | \mm_mmuflags)
++	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
++			PMD_FLAGS_UP | \mm_mmuflags)
++	.long	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | \
++		PMD_SECT_AP_READ | \io_mmuflags
++	W(b)	\initfunc
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
++	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
++		HWCAP_EDSP | HWCAP_TLS | \hwcaps
+ 	.long	cpu_v7_name
+ 	.long	v7_processor_functions
+ 	.long	v7wbi_tlb_fns
+ 	.long	v6_user_fns
+ 	.long	v7_cache_fns
++.endm
++
++	/*
++	 * ARM Ltd. Cortex A9 processor.
++	 */
++	.type   __v7_ca9mp_proc_info, #object
++__v7_ca9mp_proc_info:
++	.long	0x410fc090
++	.long	0xff0ffff0
++	__v7_proc __v7_ca9mp_setup
+ 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+ 
+ 	/*
+@@ -472,27 +475,5 @@ __v7_ca9mp_proc_info:
+ __v7_proc_info:
+ 	.long	0x000f0000		@ Required ID value
+ 	.long	0x000f0000		@ Mask for ID
+-	ALT_SMP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_SMP)
+-	ALT_UP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_UP)
+-	.long   PMD_TYPE_SECT | \
+-		PMD_SECT_XN | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	W(b)	__v7_setup
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
+-	.long	cpu_v7_name
+-	.long	v7_processor_functions
+-	.long	v7wbi_tlb_fns
+-	.long	v6_user_fns
+-	.long	v7_cache_fns
++	__v7_proc __v7_setup
+ 	.size	__v7_proc_info, . - __v7_proc_info
 -- 
 1.7.0.4
