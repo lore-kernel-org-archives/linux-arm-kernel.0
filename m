@@ -1,39 +1,42 @@
 From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Mon, 6 Jun 2011 17:06:01 +0900
-Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
-In-Reply-To: <20110606065419.GA20904@S2100-06.ap.freescale.net>
-References: <1307338118.10976.74.camel@vkoul-udesk3>
-	<20110606153634D.fujita.tomonori@lab.ntt.co.jp>
-	<20110606065419.GA20904@S2100-06.ap.freescale.net>
-Message-ID: <20110606163913U.fujita.tomonori@lab.ntt.co.jp>
+Date: Mon, 6 Jun 2011 17:06:03 +0900
+Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <1307345414-26872-1-git-send-email-shawn.guo@linaro.org>
+References: <1307345414-26872-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110606170420I.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jun 2011 14:54:21 +0800
-Shawn Guo <shawn.guo@freescale.com> wrote:
+On Mon,  6 Jun 2011 15:30:12 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-> On Mon, Jun 06, 2011 at 03:38:12PM +0900, FUJITA Tomonori wrote:
-> > On Mon, 06 Jun 2011 10:58:38 +0530
-> > "Koul, Vinod" <vinod.koul@intel.com> wrote:
-> > 
-> > > On Sun, 2011-06-05 at 10:30 +0900, FUJITA Tomonori wrote:
-> > > > On Wed, 1 Jun 2011 10:33:57 +0800
-> > > > Shawn Guo <shawn.guo@freescale.com> wrote:
-> > > > 
-> > > > > On Thu, May 26, 2011 at 02:31:31PM +0800, Shawn Guo wrote:
-> > > > > > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
-> > > > > > max_segment_number into device_dma_parameters and creates the
-> > > > > > corresponding dmaengine API dma_set(get)_max_seg_number for it.
-> > > > > > 
-> > > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > > > ---
-> > > > > >  include/linux/device.h      |    1 +
-> > > > > >  include/linux/dma-mapping.h |   15 +++++++++++++++
-> > > > > >  2 files changed, 16 insertions(+), 0 deletions(-)
-> > > > 
-> > > > include/linux/dma-mapping.h is for DMA mapping API (please see
-> > > > Documentation/DMA-API*.txt).
-> > > > 
-> Hmm, I think they are all about dmaengine.
+> Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> max_segment_number into device_dma_parameters and creates the
+> corresponding dmaengine API dma_set(get)_max_seg_number for it.
 
-No, I added them for the DMA mapping API (mainly, IOMMUs).
+As I wrote in another mail, dma_get|set_max_seg_size and
+dma_get|set_seg_boundary are added to the dma mapping API. That is,
+they enable the drivers (or subsystems) to tell IOMMUs about the
+device dma limitations. When IOMMUs merge scatter list entries, they
+look at the limitations.
+
+
+> Here is the user story that tells the need of the new api.  The
+> mxs-mmc is the mmc host controller for Freescale MXS architecture.
+> There are a pair of  mmc host specific parameters max_seg_size and
+> max_segs that mxs-mmc host driver needs to tell mmc core, so that
+> mmc core can know how big each data segment could be and how many
+> segments could be handled one time in a scatter list by host driver.
+> 
+> The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
+> mxs-dma to transfer data in scatter list.  That is to say mxs-mmc has
+> no idea of what max_seg_size and max_segs should be, because they are
+> all mxs-dma capability parameters, and mxs-mmc needs to query them
+> from mxs-dma.
+
+max_segs isn't unrelated with the dma mapping API. I explained above,
+IOMMUs doesn't increase the number of segments (could decrease the
+number of segments by merging).
+
+The limitation about the number of segment already lives elsewhere
+(e.g. queue's limits.max_segments).
