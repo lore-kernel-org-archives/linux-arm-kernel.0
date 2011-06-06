@@ -1,52 +1,114 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Jun 2011 11:15:56 +0100
-Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
-In-Reply-To: <20110606191041U.fujita.tomonori@lab.ntt.co.jp>
-References: <20110606091410.GB10508@n2100.arm.linux.org.uk>
-	<20110606183925D.fujita.tomonori@lab.ntt.co.jp>
-	<20110606094751.GC10508@n2100.arm.linux.org.uk>
-	<20110606191041U.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20110606101556.GE10508@n2100.arm.linux.org.uk>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 6 Jun 2011 03:27:19 -0700
+Subject: [GIT PULL] omap fixes for v3.0-rc2
+Message-ID: <20110606102718.GJ11352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2011 at 07:12:20PM +0900, FUJITA Tomonori wrote:
-> On Mon, 6 Jun 2011 10:47:51 +0100
-> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
-> > On Mon, Jun 06, 2011 at 06:41:09PM +0900, FUJITA Tomonori wrote:
-> > > On Mon, 6 Jun 2011 10:14:10 +0100
-> > > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > > 
-> > > > On Mon, Jun 06, 2011 at 05:06:03PM +0900, FUJITA Tomonori wrote:
-> > > > > max_segs isn't unrelated with the dma mapping API. I explained above,
-> > > > > IOMMUs doesn't increase the number of segments (could decrease the
-> > > > > number of segments by merging).
-> > > > > 
-> > > > > The limitation about the number of segment already lives elsewhere
-> > > > > (e.g. queue's limits.max_segments).
-> > > > 
-> > > > I think you're missing the point entirely.
-> > > > 
-> > > > Lets take the problem at hand: you have two devices.  One of them is
-> > > > handled by the DMA engine code.  One of them is a block device.
-> > > > 
-> > > > The block layer needs to know the various parameters of what is
-> > > > allowable for DMA, including such things as the maximum size of a
-> > > > segment, and the _number_ of segments that can be placed into any
-> > > > one request.
-> > > > 
-> > > > As the DMA provider is _entirely_ separate and unknown to the block
-> > > > device driver, the block device driver has no way to sanely provide
-> > > > these parameters to the block layer - they are not a property of the
-> > > > block device driver, but of the DMA provider.
-> > > 
-> > > struct device_dma_parameters is used for a property of the block
-> > > device drivers (and scsi HBA drivers, etc). Not DMA provider. Right?
-> > 
-> > Wrong.  struct device_dma_parameters is a property of the _DMA_ _provider_.
-> > It has to be.  Read what I said above and think about it.
-> 
-> I think that it's up to your definition of DMA provider.
+Hi Linus,
 
-I give up.
+Please pull omap fixes from:
+
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git fixes
+
+This contains build and warning related fixes, mux and mmc init fixes, and
+some board related fixes. Also included is one patch to remove duplicate
+defines of NAND_BLOCK_SIZE.
+
+Regards,
+
+Tony
+
+
+The following changes since commit 55922c9d1b84b89cb946c777fddccb3247e7df2c:
+  Linus Torvalds (1):
+        Linux 3.0-rc1
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git fixes
+
+Alexander Holler (1):
+      arm: omap3: beagle: Ensure msecure is mux'd to be able to set the RTC
+
+Axel Lin (1):
+      ARM: OMAP2: Add missing include of linux/gpio.h
+
+Balaji T K (2):
+      ARM: OMAP4: MMC: no regulator off during probe for eMMC
+      ARM: OMAP4: MMC: increase delay for pbias
+
+Colin Cross (2):
+      ARM: omap2+: mux: Allow board mux settings to be NULL
+      ARM: omap4: Pass core and wakeup mux tables to omap4_mux_init
+
+Govindraj.R (1):
+      OMAP2+: mux: fix compilation warnings
+
+Igor Grinberg (3):
+      arm: omap3: cm-t3517: fix section mismatch warning
+      arm: omap2plus: fix ads7846 pendown gpio request
+      arm: omap2plus: move NAND_BLOCK_SIZE out of boards
+
+Janusz Krzysztofik (1):
+      OMAP: fix compilation error
+
+Jarkko Nikula (2):
+      omap: rx51: Set regulator V28_A always on
+      omap: rx51: Don't power up speaker amplifier at bootup
+
+Julia Lawall (1):
+      arch/arm/mach-omap1/dma.c: Invert calls to platform_device_put and platform_device_del
+
+Omar Ramirez Luna (1):
+      OMAP: iovmm: fix SW flags passed by user
+
+Rabin Vincent (1):
+      OMAP4: fix return value of omap4_l3_init
+
+Santosh Shilimkar (2):
+      OMAP2+: Fix 9 section mismatch(es) warnings from mach-omap2/built-in.o
+      OMAP: SRAM: Fix warning: format '%08lx' expects type 'long unsigned int'
+
+Shubhrajyoti D (1):
+      omap4: hwmod: Enable the keypad
+
+Tasslehoff Kjappfot (1):
+      omap3: Free Beagle rev gpios when they are read, so others can read them later
+
+Todd Poynor (1):
+      ARM: OMAP2: Add missing iounmap in omap4430_phy_init
+
+ arch/arm/mach-omap1/dma.c                    |   11 ++++++-----
+ arch/arm/mach-omap2/board-2430sdp.c          |    2 +-
+ arch/arm/mach-omap2/board-3430sdp.c          |    6 +++---
+ arch/arm/mach-omap2/board-4430sdp.c          |   11 ++++++-----
+ arch/arm/mach-omap2/board-apollon.c          |    2 +-
+ arch/arm/mach-omap2/board-cm-t35.c           |    2 --
+ arch/arm/mach-omap2/board-cm-t3517.c         |    5 ++---
+ arch/arm/mach-omap2/board-devkit8000.c       |    2 --
+ arch/arm/mach-omap2/board-omap3beagle.c      |    8 ++++++--
+ arch/arm/mach-omap2/board-omap3pandora.c     |    4 +---
+ arch/arm/mach-omap2/board-omap3touchbook.c   |    2 --
+ arch/arm/mach-omap2/board-omap4panda.c       |    8 ++++----
+ arch/arm/mach-omap2/board-overo.c            |    4 +---
+ arch/arm/mach-omap2/board-rx51-peripherals.c |    3 ++-
+ arch/arm/mach-omap2/board-zoom-display.c     |    2 +-
+ arch/arm/mach-omap2/common-board-devices.c   |   20 ++++++++++----------
+ arch/arm/mach-omap2/common-board-devices.h   |    2 ++
+ arch/arm/mach-omap2/devices.c                |    2 +-
+ arch/arm/mach-omap2/hsmmc.c                  |   16 +++++++++++++---
+ arch/arm/mach-omap2/hsmmc.h                  |    1 +
+ arch/arm/mach-omap2/mux.c                    |    5 ++++-
+ arch/arm/mach-omap2/mux.h                    |    6 ++++--
+ arch/arm/mach-omap2/mux44xx.c                |    5 +++--
+ arch/arm/mach-omap2/omap_hwmod.c             |    2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c   |    2 +-
+ arch/arm/mach-omap2/omap_phy_internal.c      |    4 +++-
+ arch/arm/plat-omap/include/plat/flash.h      |    1 +
+ arch/arm/plat-omap/include/plat/iovmm.h      |    3 ---
+ arch/arm/plat-omap/include/plat/mmc.h        |    3 +++
+ arch/arm/plat-omap/iovmm.c                   |    4 ----
+ arch/arm/plat-omap/sram.c                    |   12 ++++++------
+ drivers/mmc/host/omap_hsmmc.c                |    3 +++
+ 32 files changed, 90 insertions(+), 73 deletions(-)
