@@ -1,122 +1,51 @@
-From: peterhuewe@gmx.de (Peter Huewe)
-Date: Mon,  6 Jun 2011 22:43:32 +0200
-Subject: [PATCH 2/2] mfd/ab8500: Use kstrtoul_from_user
-In-Reply-To: <1307393012-32582-1-git-send-email-peterhuewe@gmx.de>
-References: <1307393012-32582-1-git-send-email-peterhuewe@gmx.de>
-Message-ID: <1307393012-32582-2-git-send-email-peterhuewe@gmx.de>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Mon, 6 Jun 2011 13:44:57 -0700
+Subject: [PATCH] plat-mxc/pwm.c: use resource_size()
+Message-ID: <201106061344.58017.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the code for getting an unsigned long from a
-userspace buffer by a simple call to kstroul_from_user.
-This makes it easier to read and less error prone.
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Sascha Hauer <kernel@pengutronix.de>
 
-Kernel Version: v3.0-rc2
-
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
 ---
- drivers/mfd/ab8500-debugfs.c |   41 +++++++++++------------------------------
- 1 files changed, 11 insertions(+), 30 deletions(-)
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 64748e4..64bdeeb 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -419,20 +419,13 @@ static ssize_t ab8500_bank_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_bank;
- 	int err;
- 
- 	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_bank);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_bank);
- 	if (err)
--		return -EINVAL;
-+		return err;
- 
- 	if (user_bank >= AB8500_NUM_BANKS) {
- 		dev_err(dev, "debugfs error input > number of banks\n");
-@@ -441,7 +434,7 @@ static ssize_t ab8500_bank_write(struct file *file,
- 
- 	debug_bank = user_bank;
- 
--	return buf_size;
-+	return count;
- }
- 
- static int ab8500_address_print(struct seq_file *s, void *p)
-@@ -459,26 +452,20 @@ static ssize_t ab8500_address_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_address;
- 	int err;
- 
- 	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_address);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_address);
- 	if (err)
--		return -EINVAL;
-+		return err;
-+
- 	if (user_address > 0xff) {
- 		dev_err(dev, "debugfs error input > 0xff\n");
- 		return -EINVAL;
- 	}
- 	debug_address = user_address;
--	return buf_size;
-+	return count;
- }
- 
- static int ab8500_val_print(struct seq_file *s, void *p)
-@@ -509,20 +496,14 @@ static ssize_t ab8500_val_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
- 	unsigned long user_val;
- 	int err;
- 
- 	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf)-1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_val);
-+	err = kstrtoul_from_user(user_buf, count, 0, &user_val);
- 	if (err)
--		return -EINVAL;
-+		return err;
-+
- 	if (user_val > 0xff) {
- 		dev_err(dev, "debugfs error input > 0xff\n");
- 		return -EINVAL;
-@@ -534,7 +515,7 @@ static ssize_t ab8500_val_write(struct file *file,
- 		return -EINVAL;
+diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
+index 7a61ef8..761c3c9 100644
+--- a/arch/arm/plat-mxc/pwm.c
++++ b/arch/arm/plat-mxc/pwm.c
+@@ -214,14 +214,14 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
+ 		goto err_free_clk;
  	}
  
--	return buf_size;
-+	return count;
- }
+-	r = request_mem_region(r->start, r->end - r->start + 1, pdev->name);
++	r = request_mem_region(r->start, resource_size(r), pdev->name);
+ 	if (r == NULL) {
+ 		dev_err(&pdev->dev, "failed to request memory resource\n");
+ 		ret = -EBUSY;
+ 		goto err_free_clk;
+ 	}
  
- static const struct file_operations ab8500_bank_fops = {
--- 
-1.7.3.4
+-	pwm->mmio_base = ioremap(r->start, r->end - r->start + 1);
++	pwm->mmio_base = ioremap(r->start, resource_size(r));
+ 	if (pwm->mmio_base == NULL) {
+ 		dev_err(&pdev->dev, "failed to ioremap() registers\n");
+ 		ret = -ENODEV;
+@@ -236,7 +236,7 @@ static int __devinit mxc_pwm_probe(struct platform_device *pdev)
+ 	return 0;
+ 
+ err_free_mem:
+-	release_mem_region(r->start, r->end - r->start + 1);
++	release_mem_region(r->start, resource_size(r));
+ err_free_clk:
+ 	clk_put(pwm->clk);
+ err_free:
+@@ -260,7 +260,7 @@ static int __devexit mxc_pwm_remove(struct platform_device *pdev)
+ 	iounmap(pwm->mmio_base);
+ 
+ 	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+-	release_mem_region(r->start, r->end - r->start + 1);
++	release_mem_region(r->start, resource_size(r));
+ 
+ 	clk_put(pwm->clk);
+ 
