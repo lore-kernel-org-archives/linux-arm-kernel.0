@@ -1,108 +1,49 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Mon, 6 Jun 2011 14:20:00 +0900
-Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
-	running early
-In-Reply-To: <20110603085500.GG10532@n2100.arm.linux.org.uk>
-References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
-	<20110602163152.GH32751@game.jcrosoft.org>
-	<1307033815.31098.31.camel@e102391-lin.cambridge.arm.com>
-	<4DE7E6AF.4020404@gmail.com>
-	<20110603085500.GG10532@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=J2HEnDyS0-vPBg-P9KD4NgK42gg@mail.gmail.com>
+From: hans-christian.egtvedt@atmel.com (Hans-Christian Egtvedt)
+Date: Mon, 06 Jun 2011 07:49:31 +0200
+Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
+In-Reply-To: <BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
+	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
+	<BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+Message-ID: <1307339371.9413.5.camel@hcegtvedt.norway.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, 2011-06-01 at 18:54 +0400, Dmitry Eremin-Solenikov wrote:
+> On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
+> > On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
+> >> Currently atmel_nand driver used by AT91 and AVR32 calls a special
+> >> callback
+> >> which return nand partition table and number of partitions. However in all
+> >> boards this callback returns just static data. So drop this callback and
+> >> make atmel_nand use partition table provided statically via platform_data.
+> >>
+> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >
+> > Thanks for this update, always nice seeing code being optimized. I
+> > really can't recall why it was made like this in the first place...
+> >
+> > For the AVR32 related parts:
+> >
+> > Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+> >
+> > <snipp diff>
+> >
+> > Will this go through the linux-mtd tree (since it spans two archs) or
+> > should it go through an arch tree?
+> 
+> On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
+> as I'd also like to submit several (a pile) patches cleaning up mtd
+> partitioning, which would depend on this.
 
-On Fri, Jun 3, 2011 at 5:55 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Jun 02, 2011 at 02:38:23PM -0500, Rob Herring wrote:
->> On 06/02/2011 11:56 AM, Marc Zyngier wrote:
->>> On Thu, 2011-06-02 at 18:31 +0200, Jean-Christophe PLAGNIOL-VILLARD
->>> wrote:
->>>> On 15:03 Wed 01 Jun ? ? , Marc Zyngier wrote:
->>>>> Currently, the boot CPU has its local timer enabled long after
->>>>> the delay loop has been calibrated. This makes it impossible to
->>>>> boot a system that only uses local timers, like the A15.
->>>>>
->>>>> Use late_time_init hook to initialize the boot CPU local timer.
->>>>> Since shmobile is already using this hook, add an ARM specific
->>>>> arm_late_time_init hook that platforms can use instead.
->>>>>
->>>>> Cc: Paul Mundt<lethal@linux-sh.org>
->>>>> Cc: Magnus Damm<magnus.damm@gmail.com>
->>>>> Signed-off-by: Marc Zyngier<marc.zyngier@arm.com>
->>>> I propose to switch to early platform devce and earlytimer
->>>>
->>>> this will avoid the arm_late_time_init hook
->>>>
->>>> and will make it cross arch
->>>
->>> I believe this is orthogonal. shmobile (the only ARM user of
->>> late_time_init) is already doing some early_platform stuff for its
->>> timers.
->>>
->>> What I'm trying to achieve here is to make sure the timer on CPU0 is
->>> actually up, running and registered as a clock_event_device before we
->>> hit the delay loop.
->>>
->>> Or maybe I've misunderstood what you're pointing me to?
->>>
->>
->> I believe he is referring to this patch which generically enables the
->> shmobile code for ARM:
->>
->> http://www.spinics.net/lists/arm-kernel/msg123736.html
->>
->> I don't think it has been pulled into mainline yet.
->
-> And I really don't like it:
-> 1. It adds an additional layer of complexity.
-> 2. We end up needing more ways to initialize stuff even earlier in the
-> ? kernel boot sequence.
-> 3. Tracking down what gets called when becomes a lot harder.
->
-> At one time there used to be a good rule to follow: Keep it Simple, Damnit.
-> This doesn't follow that.
+I'm fine by sending the changes for AVR32 through linux-mtd, they are
+minor and so far doesn't touch anything else that is changed.
 
-I'm a big fan of KISS too, and I do agree the early platform code adds
-a certain level of complexity. That aside, I believe the benefits of
-early platform drivers justify the added complexity.
+> OTOH, I think there will be a cleanup of AT91 platform, which would bring
+> lot's of conflicts with this patch, if it goes through linux-mtd.
 
-> And so far, no one has explained _why_ shmobile uses this stuff... so
-> my presumption at the moment is that there's no real good reason.
+AT91 will probably be worse, yes, should be doable by git to solve the
+conflicts on its own. I'll leave it to Nicolas to give his verdict.
 
-The reason behind the early platform driver code is to reuse part of
-the driver model early during boot. The normal driver model allows
-platform devices and drivers to split device configuration and the
-actual device driver that operates on the device configuration. This
-is for instance very useful on SoCs where you have multiple instances
-of hardware blocks and you'd like to allow the user to select instance
-via platform data and/or kernel command line.
-
-On the sh architecture and on shmobile ARM we use early platform
-drivers for timers and for early console support. In practice this
-means we allow the kernel to associate device data with a certain
-driver before the regular driver model is fully initialized. Early
-code is by definition rather fragile, but one nice outcome of all this
-is that the serial driver now allows the user to select serial port
-instance on the kernel command line. This while the I/O base and IRQ
-configuration is kept with per-SoC code and the serial driver is a
-slightly enhanced normal platform driver.
-
-There may of course be better ways to achieve what we want, and I am
-open to alternative solutions. But so far I have not seen any other
-code that allows us to separate device configuration from driver code
-early on during boot.
-
-For more information, please have a look at:
-
-commit 13977091a988fb0d21821c2221ddc920eba36b79
-Author: Magnus Damm <damm@igel.co.jp>
-Date:   Mon Mar 30 14:37:25 2009 -0700
-
-    Driver Core: early platform driver
-
-Cheers,
-
-/ magnus
+-- 
+Hans-Christian Egtvedt
