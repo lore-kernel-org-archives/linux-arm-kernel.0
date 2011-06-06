@@ -1,33 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  6 Jun 2011 17:55:50 +0100
-Subject: [PATCH 06/11] ARM: cortex-a5: add HWCAP_VFPv4D16 to proc info
-	structure
-In-Reply-To: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
-References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307379355-13802-7-git-send-email-will.deacon@arm.com>
+Date: Mon,  6 Jun 2011 17:55:44 +0100
+Subject: [PATCH 00/11] Core support for Cortex-A5 and Cortex-A15
+Message-ID: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Cortex-A5 implements VFPv4D16, so add this to the hwcaps for this
-processor.
+Hello,
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/proc-v7.S |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Here is a patch series for adding support for the Cortex-A5 and
+Cortex-A15 cores to Linux. The first two patches (from Pawel) are
+already in Russell's patch system, but I included them here for
+completeness.
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b22d98d..8eba506 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -466,7 +466,7 @@ cpu_elf_name:
- __v7_ca5mp_proc_info:
- 	.long	0x410fc050
- 	.long	0xff0ffff0
--	__v7_proc __v7_ca5mp_setup
-+	__v7_proc __v7_ca5mp_setup, HWCAP_VFPv4D16
- 	.size	__v7_ca5mp_proc_info, . - __v7_ca5mp_proc_info
- 
- 	/*
--- 
-1.7.0.4
+Anyway, the main thing is the HWCAP stuff as the perf stuff is all
+rather boring.
+
+Enjoy!
+
+Will
+
+
+Pawel Moll (2):
+  arm: Convert v7 proc infos into a common macro
+  arm: Add Cortex A5 proc info
+
+Will Deacon (9):
+  ARM: hwcaps: use shifts instead of hardcoded constants
+  ARM: hwcaps: add new HWCAP defines for ARMv7-A
+  ARM: proc: reorder macro parameters for __v7_proc macro
+  ARM: cortex-a5: add HWCAP_VFPv4D16 to proc info structure
+  ARM: proc: add proc info for Cortex-A15MP using classic page tables
+  ARM: perf: remove confusing comment from v7 perf events backend
+  ARM: perf: add PMUv2 common event definitions
+  ARM: perf: add support for the Cortex-A5 PMU
+  ARM: perf: add support for the Cortex-A15 PMU
+
+ arch/arm/include/asm/hwcap.h      |   37 +++--
+ arch/arm/include/asm/perf_event.h |    2 +
+ arch/arm/kernel/perf_event.c      |    6 +
+ arch/arm/kernel/perf_event_v7.c   |  344 ++++++++++++++++++++++++++++++++++--
+ arch/arm/mm/proc-v7.S             |   98 ++++++-----
+ 5 files changed, 406 insertions(+), 81 deletions(-)
