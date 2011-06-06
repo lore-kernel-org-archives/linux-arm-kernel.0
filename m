@@ -1,59 +1,44 @@
-From: zdevai@gmail.com (Zoltan Devai)
-Date: Mon, 6 Jun 2011 19:17:54 +0200
-Subject: kernel - userspace shared memory
-Message-ID: <BANLkTikGHoBTDyPN7T7N88DfMF1F322T2A@mail.gmail.com>
+From: green@linuxhacker.ru (Oleg Drokin)
+Date: Mon, 6 Jun 2011 13:18:41 -0400
+Subject: [PATCH 1/2] cleanup regulator supply definitions in mach-omap2 to
+	use REGULATOR_SUPPLY
+In-Reply-To: <20110606171326.GK12242@legolas.emea.dhcp.ti.com>
+References: <1307342762-25363-1-git-send-email-green@linuxhacker.ru>
+	<1307342762-25363-2-git-send-email-green@linuxhacker.ru>
+	<20110606092126.GG18731@legolas.emea.dhcp.ti.com>
+	<EA5D78AA-5A89-43AC-9D14-F378673F5D41@linuxhacker.ru>
+	<20110606171326.GK12242@legolas.emea.dhcp.ti.com>
+Message-ID: <547324C9-4B76-410E-86E6-092D062C95AB@linuxhacker.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hello!
 
-We are having a kernel driver and a userspace application that
-communicates via shared memory. The problem is, that when the userspace
-application modifies some data in the shared memory, this modification
-is not "visible" when the kernel driver takes a look at that memory
-location (specifically this code is in a kernel timer function).
-Actually, the modification is sometimes seen, sometimes not,
-which suggests that we are having some kind of cache coherency issue.
-The strange thing is, that AFAIK we have disabled caching on the pages
-where the shared memory resides.
+On Jun 6, 2011, at 1:13 PM, Felipe Balbi wrote:
+> On Mon, Jun 06, 2011 at 11:45:29AM -0400, Oleg Drokin wrote:
+>>>> -static struct regulator_consumer_supply sdp4430_vaux_supply[] = {
+>>>> -	{
+>>>> -		.supply = "vmmc",
+>>>> -		.dev_name = "omap_hsmmc.1",
+>>>> -	},
+>>>> -};
+>>>> +static struct regulator_consumer_supply sdp4430_vaux_supply =
+>>>> +	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1");
+>>> this should be an array, as it was before.
+>> 
+>> Only one is defined right now.
+>> Whoever needs a second element can convert it to array, I think?
+>> What;s the importance of having it as an array right now?
+> because later patches will be easier to review. Look below:
+...
+> can you see now ?
 
-Below is the code that we use to create the shared memory area.
+Ok, I get the idea. Do you think it would be best to convert every supply
+definition to an array then just in case?
+I wonder what are the chances of additional regulators to appear at all
+in many of these.
+What about supplies that are not going to have additional elements
+(like that cm-t35 board, because there simply are no more regulators in the twl)?
 
-1. Do you see any problems with it?
-2. As it can be seen, we are disabling caching for the user space
-   mapping, maybe we need to explicitly disable it for the kernel
-   mapping too? If yes, how to access the PTEs that are doing the kernel
-   logical mappings and disable caching?
-3. Any hints on how to debug the source of such an error?
-
-Any help is appreciated.
-
-Best regards,
-Istvan Devai
-(actually sent by Zoltan Devai, on his behalf)
-----------------------------------------
-
-Kernel initialization code (error handling is omitted for clarity, also
-the code that rounds the memory to the nearest page boundary):
-
-kmalloc_ptr = kmalloc((SHAREDMEM_PAGE_NUM) * PAGE_SIZE, GFP_KERNEL);
-for (i = 0; i < SHAREDMEM_PAGE_NUM * PAGE_SIZE; i+= PAGE_SIZE) {
-            SetPageReserved(virt_to_page(((unsigned long)kmalloc_ptr) + i));
-    }
-
-Kernel mmap code:
-
-vma->vm_flags |= VM_RESERVED;
-vma->vm_page_prot = pgprot_noncached(vma->vm_page_prot);
-
-/* map the whole physically contiguous area in one piece */
-remap_pfn_range(vma,
-                           vma->vm_start,
-                           virt_to_phys((void *)kmalloc_ptr) >> PAGE_SHIFT,
-                           length,
-                           vma->vm_page_prot)) < 0)
-
-Userspace mmap code:
-
-mmap(0, len, PROT_READ|PROT_WRITE, MAP_SHARED| MAP_LOCKED, fd,
-MMAP_OFFSET_SHAREDMEM)
+Bye,
+    Oleg
