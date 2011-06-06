@@ -1,61 +1,33 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Mon, 06 Jun 2011 11:05:01 +0530
-Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
-In-Reply-To: <20110602055614.GA18508@S2100-06.ap.freescale.net>
-References: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
-	<1306914144.10976.4.camel@vkoul-udesk3>
-	<20110602055614.GA18508@S2100-06.ap.freescale.net>
-Message-ID: <1307338501.10976.77.camel@vkoul-udesk3>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 06 Jun 2011 08:09:44 +0200
+Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
+In-Reply-To: <BANLkTinALGrXrUaobMW13ng7tT7PsubXvA@mail.gmail.com>
+References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
+	<BANLkTinALGrXrUaobMW13ng7tT7PsubXvA@mail.gmail.com>
+Message-ID: <005601cc2410$551f8ef0$ff5eacd0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-06-02 at 13:56 +0800, Shawn Guo wrote:
-> On Wed, Jun 01, 2011 at 01:12:24PM +0530, Koul, Vinod wrote:
-> > On Thu, 2011-05-26 at 14:31 +0800, Shawn Guo wrote:
-> > > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
-> > > max_segment_number into device_dma_parameters and creates the
-> > > corresponding dmaengine API dma_set(get)_max_seg_number for it.
-> > > 
-> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > ---
-> > >  include/linux/device.h      |    1 +
-> > >  include/linux/dma-mapping.h |   15 +++++++++++++++
-> > >  2 files changed, 16 insertions(+), 0 deletions(-)
-> > Can you explain me why this change is required, the patch description
-> > isn't helping for this.
-> > 
-> > If you satisfy me with above then I am okay with it, but I need ACK from
-> > Dan before applying...
-> > 
-> I recently saw you people are trying to sort out the slave dma api
-> document.  This reminds me there is small piece missing, which the
-> patch here is trying to add.
-> 
-> Here is the user story.  The mxs-mmc is the mmc host controller for
-> Freescale MXS architecture.  There are a pair of  mmc host specific
-> parameters max_seg_size and max_segs that mxs-mmc host driver needs
-> to tell mmc core, so that mmc core can know how big each data segment
-> could be and how many segments could be handled one time in a scatter
-> list by host driver.
-> 
-> The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
-> mxs-dma to transfer data in scatter list.  That is to say mxs-mmc has
-> not idea of what max_seg_size and max_segs should be, because they are
-> all mxs-dma capability parameters, and mxs-mmc needs to query them
-> from mxs-dma.
-> 
-> Right now, there is well defined dma api (dma_get_max_seg_size) for
-> mmc to query max_seg_size from dma driver, but the one for max_segs is
-> missing.  That's why mxs-mmc driver has to hard-code it.
-> 
-> The mxs-mmc is just one example to demonstrate the need of the new
-> api, and I'm sure there are other mmc host drivers (mxcmmc on imx-dma
-> is another example) and possibly even other dmaengine users need this
-> new api to know the maximum segments that dma driver can handle per
-> dma call.
-> 
-Looks fine, care to add above in your patch description.
-Few years down it will be really helpful to know why this was added.
+Hello,
 
+On Saturday, June 04, 2011 6:13 PM Ohad Ben- Cohen wrote:
+
+> On Wed, May 25, 2011 at 10:35 AM, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > I've finaly managed to clean up a bit my works and present the initial,
+> > very proof-of-concept version of patches that were ready just before
+> > Linaro meeting.
+> 
+> Btw, none of the patches seem to have made it through to lakml (only
+> the cover letter did).
+
+Hmmm, it looks that I need to resend the patches.
+ 
+> Marek, did you get a "Message has a suspicious header" bounce too ?
+
+Yes, I got it but I have no idea what is wrong... Do you have any suggestions?
+
+Best regards
 -- 
-~Vinod
+Marek Szyprowski
+Samsung Poland R&D Center
