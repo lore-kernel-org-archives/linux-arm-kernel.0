@@ -1,32 +1,57 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 6 Jun 2011 09:50:59 -0300
-Subject: [PATCH v2 1/2] ARM: mx5/mx51_3ds: Fix build due to missing header
-	and wrong define
-In-Reply-To: <20110606074258.GX23771@pengutronix.de>
-References: <1307212185-18184-1-git-send-email-festevam@gmail.com>
-	<20110606074258.GX23771@pengutronix.de>
-Message-ID: <BANLkTik9MQrJt-7Gkdw_Cpwi0ZXo3RScTA@mail.gmail.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Mon, 6 Jun 2011 18:32:21 +0530
+Subject: [PATCH 2/3] davinci: dm6467/T EVM: pass reference clock rate to
+	dm646x_init()
+In-Reply-To: <20110606122552.GA2729@xyzzy.org.uk>
+References: <1307034677-27236-1-git-send-email-nsekhar@ti.com>
+	<1307034677-27236-2-git-send-email-nsekhar@ti.com>
+	<4DEB7DD4.5050706@mvista.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D38344A@dbde02.ent.ti.com>
+	<20110606122552.GA2729@xyzzy.org.uk>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D383514@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi Bob,
 
-On Mon, Jun 6, 2011 at 4:42 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-...
-> I squashed these two patches into the original commit which breaks the
-> build. Can I have you ack for the following?
->
-> 8<------------------------------------------------------
-> [PATCH] ARM i.MX: get rid of wrong MXC_INTERNAL_IRQ usage
->
-> There are several occurences where MXC_INTERNAL_IRQ is
-> assumed to be the start of the gpio interrupts. It was never
-> meant this way. Replace these with gpio_to_irq.
->
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+On Mon, Jun 06, 2011 at 17:55:52, Bob Dunlop wrote:
+> Hi,
+> 
+> On Mon, Jun 06 at 05:01, Nori, Sekhar wrote:
+> > On Sun, Jun 05, 2011 at 18:30:04, Sergei Shtylyov wrote:
+> > >     I don't think you should ascribe *your* patch to Bob. There's 
+> > > Suggested-by: line if you want to credit Bob.
+> > 
+> > Bob, do you have an opinion on this? If not, I will go with what
+> > Sergei is suggesting.
+> 
+> I have no problem one way or the other, we all know who we are.
 
-Acked-by: Fabio Estevam <fabio.estevam@freescale.com>
+Okay, I will do what Sergei is suggesting then.
 
-Regards,
+> 
+> Anyway I'd like to propose a simpler patch that covers both boards in one.
+> Fewer files touched than the original da850 patch.
+> 
+> Add the ref_clk_rate parameter to the davinci_soc_info structure and
+> perform the clock adjustment in davinci_common_init().  The code assumes
 
-Fabio Estevam
+Lets not extend davinci_soc_info any further. We need to be looking
+at ways of reducing its usage (for example by making GPIO code use
+platform device).
+
+Also, refclk is a board information not soc information so placing
+it there makes it misplaced.
+
+> that if which to tweak the ref_clk it will be the first one listed in
+> cpu_clocks[] which is the case for all boards sofar.
+> 
+> The only downside is you need to export the davinci_soc_info_dm646x struct
+> in order to tweak it.
+
+That's not very elegant as well. SoC information structure for a given
+SoC should be private to the SoC specific file. Making it public will
+open it up for abuse.
+
+Thanks,
+Sekhar
