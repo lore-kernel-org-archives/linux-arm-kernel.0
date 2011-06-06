@@ -1,60 +1,38 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Mon, 6 Jun 2011 21:20:30 +0200
-Subject: [RFC 0/6] iommu: generic api migration and grouping
-In-Reply-To: <BANLkTinwwVO4TmsxuTfSBf6jqYrEVV3b_A@mail.gmail.com>
-References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-	<20110606100950.GC30762@amd.com>
-	<BANLkTi=i2s-Ujiy4qn_XQv+9dMjUC9R66A@mail.gmail.com>
-	<20110606153557.GE1953@amd.com>
-	<BANLkTinwwVO4TmsxuTfSBf6jqYrEVV3b_A@mail.gmail.com>
-Message-ID: <20110606192030.GA4356@amd.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Jun 2011 22:24:38 +0300
+Subject: [PATCH 1/2] cleanup regulator supply definitions in mach-omap2
+In-Reply-To: <1307386628-1153-2-git-send-email-green@linuxhacker.ru>
+References: <1307386628-1153-1-git-send-email-green@linuxhacker.ru>
+	<1307386628-1153-2-git-send-email-green@linuxhacker.ru>
+Message-ID: <20110606192436.GO12242@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2011 at 12:36:13PM -0400, Ohad Ben-Cohen wrote:
-> On Mon, Jun 6, 2011 at 6:35 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> > On Mon, Jun 06, 2011 at 11:15:30AM -0400, Ohad Ben-Cohen wrote:
-> >
-> >> This is insufficient; users need somehow to tell what page sizes are
-> >> supported by the underlying hardware (we can't assume host page-sizes,
-> >> and we want to use bigger pages whenever possible, to relax the TLB
-> >> pressure).
-> > /
-> > What does the IOMMU-API user need this info for? On the x86 IOMMUs these
-> > details are handled transparently by the IOMMU driver.
+On Mon, Jun 06, 2011 at 02:57:07PM -0400, green at linuxhacker.ru wrote:
+> From: Oleg Drokin <green@linuxhacker.ru>
 > 
-> That's one way to do that, but then it means duplicating this logic
-> inside the different IOMMU implementations.
+> to use REGULATOR_SUPPLY arrays.
 > 
-> Take the OMAP (and seemingly MSM too) example: we have 4KB, 64KB, 1MB
-> and 16MB page-table entries. When we map a memory region, we need to
-> break it up to a minimum number of pages (while validating
-> sizes/alignments are sane). It's not complicated, but it can be nice
-> if it'd be implemented only once.
+> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
+> CC: Mike Rapoport <mike@compulab.co.il>
+> CC: Nishant Kamat <nskamat@ti.com>
+> CC: Steve Sakoman <steve@sakoman.com>
+> CC: Felipe Balbi <balbi@ti.com>
+> CC: Santosh Shilimkar <santosh.shilimkar@ti.com>
+> CC: peter.barada at logicpd.com
+> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
 
-Well, it certainly makes sense to have a single implementation for this.
-But I want to hide this complexity to the user of the IOMMU-API. The
-best choice is to put this into the layer between the IOMMU-API and the
-backend implementation.
+Acked-by: Felipe Balbi <balbi@ti.com>
 
-> In addition, unless we require 'va' and 'pa' to have the exact same
-> alignment, we might run into specific page configuration that the
-> IOMMU implementation cannot restore on ->unmap, since unmap only takes
-> 'va' and 'order'. So we will either have to supply 'pa' too, or have
-> the implementation remember the mapping in order to unmap it later.
-> That begins to be a bit messy...
-
-That interface is not put into stone. There were other complains about
-the ->unmap part recently, so there is certainly room for improvement
-there.
-
-Regards,
-
-	Joerg
+I also compile tested with omap2plus_defconfig against 3.0-rc2 and it's
+fine.
 
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110606/a07b47a8/attachment.sig>
