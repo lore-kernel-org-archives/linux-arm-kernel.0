@@ -1,20 +1,39 @@
-From: holger@freyther.de (Holger Hans Peter Freyther)
-Date: Mon, 06 Jun 2011 15:40:16 +0200
-Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <4DECCADE.6080100@selfish.org>
-References: <4DECCADE.6080100@selfish.org>
-Message-ID: <4DECD8C0.6010908@freyther.de>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Mon,  6 Jun 2011 14:52:23 +0100
+Subject: [PATCH 0/2] pxa2xx viper glue code fix + trizeps irrelevant ifdef
+	removal.
+Message-ID: <1307368345-13445-1-git-send-email-jic23@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2011 02:41 PM, Holger Freyther wrote:
-> Hi,
-> 
-> my not mainlined with custom drivers board support seems to suffer from an
-> issue introduced by moving the irq.c to the generic GPIO interrupt code
-> (aac4dd1dab8acfc244d697473d2a5f4424a5746c, reverting it makes the oops go
-> away). I think this is caused by either interrupt #46 or #47 on this system
-> which is on the second 'bank'.
+The first patch looks like a simple bug.
+The second removes an ifdef that doesn't do anything.
 
-I resorted to printf debugging, it is IRQ 56 which is the IRQ_GPIOBNK0.. so I
-wonder if this IRQ should end up in the GC GPIO code at all?
+I was looking through this code with a vague view to simplifying it.
+Why do pxa2xx and sa1100 require lots of platform glue when others
+subarches do not?
+
+On the second one, it looks to me like all those ifdefs could be
+trivially removed.
+
+Otherwise, a lot of these bits of glue code could be greatly reduced
+by introducing a few default functions and const structures.  Anyone
+bored enough to do it?
+
+I might carry on dabbling if people familiar with all these boards
+are happy to review.
+
+Jonathan
+
+
+Jonathan Cameron (2):
+  pxa2xx viper: pcmcia - free gpios on exist rather than requesting
+    them again.
+  pxa2xx trizeps4: pcmcia remove unnecessary ifdefs
+
+ drivers/pcmcia/pxa2xx_trizeps4.c |    4 ----
+ drivers/pcmcia/pxa2xx_vpac270.c  |    4 ++--
+ 2 files changed, 2 insertions(+), 6 deletions(-)
+
+-- 
+1.7.3.4
