@@ -1,31 +1,47 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Mon, 6 Jun 2011 18:25:36 +0900
-Subject: [PATCH] ARM: local timers: Allow boot CPU to have its timer
-	running early
-In-Reply-To: <20110603085735.GH10532@n2100.arm.linux.org.uk>
-References: <1306937006-26597-1-git-send-email-marc.zyngier@arm.com>
-	<20110603085735.GH10532@n2100.arm.linux.org.uk>
-Message-ID: <20110606092535.GA30400@linux-sh.org>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Mon, 6 Jun 2011 18:41:09 +0900
+Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <20110606091410.GB10508@n2100.arm.linux.org.uk>
+References: <1307345414-26872-1-git-send-email-shawn.guo@linaro.org>
+	<20110606170420I.fujita.tomonori@lab.ntt.co.jp>
+	<20110606091410.GB10508@n2100.arm.linux.org.uk>
+Message-ID: <20110606183925D.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 03, 2011 at 09:57:35AM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 01, 2011 at 03:03:26PM +0100, Marc Zyngier wrote:
-> > Currently, the boot CPU has its local timer enabled long after
-> > the delay loop has been calibrated. This makes it impossible to
-> > boot a system that only uses local timers, like the A15.
-> > 
-> > Use late_time_init hook to initialize the boot CPU local timer.
-> > Since shmobile is already using this hook, add an ARM specific
-> > arm_late_time_init hook that platforms can use instead.
-> 
-> Why do we need to initialize the per-cpu timer in late_time_init() ?
-> Is there a reason it doesn't work at time_init(), and if not can it
-> be fixed to work there?
+On Mon, 6 Jun 2011 10:14:10 +0100
+Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
-There are a number of ordering issues. It's necessary to have the clock
-framework and everything else initialized before the per-cpu timer can
-come up. While we did originally have this at the end of the time_init()
-path there were some interactivity issues with regards to lockdep and
-having IRQs initialized too early, which was the principle rationale for
-deferring it.
+> On Mon, Jun 06, 2011 at 05:06:03PM +0900, FUJITA Tomonori wrote:
+> > max_segs isn't unrelated with the dma mapping API. I explained above,
+> > IOMMUs doesn't increase the number of segments (could decrease the
+> > number of segments by merging).
+> > 
+> > The limitation about the number of segment already lives elsewhere
+> > (e.g. queue's limits.max_segments).
+> 
+> I think you're missing the point entirely.
+> 
+> Lets take the problem at hand: you have two devices.  One of them is
+> handled by the DMA engine code.  One of them is a block device.
+> 
+> The block layer needs to know the various parameters of what is
+> allowable for DMA, including such things as the maximum size of a
+> segment, and the _number_ of segments that can be placed into any
+> one request.
+> 
+> As the DMA provider is _entirely_ separate and unknown to the block
+> device driver, the block device driver has no way to sanely provide
+> these parameters to the block layer - they are not a property of the
+> block device driver, but of the DMA provider.
+
+struct device_dma_parameters is used for a property of the block
+device drivers (and scsi HBA drivers, etc). Not DMA provider. Right?
+
+The drivers calls dma_set_seg_boundary() and the subsystems call
+dma_get_seg_boundary to set the value to queues.
+
+This patch is trying to use struct device_dma_parameters in a
+different way. It adds a new DMA parameter but for the DMA parameter
+for a different layer. I'm not sure about different-layer stuff in 
+one structure and using similar API.
