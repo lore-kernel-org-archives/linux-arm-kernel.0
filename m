@@ -1,68 +1,20 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 6 Jun 2011 17:44:00 +0100
-Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
-	limitation in IOMMU
-In-Reply-To: <201106061823.18767.laurent.pinchart@ideasonboard.com>
-References: <20110601131744.GH11352@atomide.com>
-	<201106030212.48226.laurent.pinchart@ideasonboard.com>
-	<20110603063211.GA18082@n2100.arm.linux.org.uk>
-	<201106061823.18767.laurent.pinchart@ideasonboard.com>
-Message-ID: <20110606164400.GA9456@n2100.arm.linux.org.uk>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Mon, 6 Jun 2011 19:42:21 +0300
+Subject: [PATCH v2 0/5] ep93xx DMA patches
+In-Reply-To: <1307342380.10976.79.camel@vkoul-udesk3>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+	<20110605081904.GA16018@acer>
+	<1307342380.10976.79.camel@vkoul-udesk3>
+Message-ID: <20110606164221.GA3082@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2011 at 06:23:18PM +0200, Laurent Pinchart wrote:
-> Hi Russell,
+On Mon, Jun 06, 2011 at 12:09:40PM +0530, Koul, Vinod wrote:
 > 
-> On Friday 03 June 2011 08:32:12 Russell King - ARM Linux wrote:
-> > SG chaining has _nothing_ to do with hardware.  It's all to do with software
-> > and hitting the SG table limit.
-> 
-> What's the reason for limiting the SG table size to one page then ?
+> I have applied this series to next including the asoc and spi changes,
+> if anyone has any objections please let me know
 
-As I say, it's got nothing to do with them ending up being passed to
-hardware.  Take a look at their definition:
+Great, thanks!
 
-struct scatterlist {
-#ifdef CONFIG_DEBUG_SG
-        unsigned long   sg_magic;
-#endif
-        unsigned long   page_link;
-        unsigned int    offset;
-        unsigned int    length;
-        dma_addr_t      dma_address;
-#ifdef CONFIG_NEED_SG_DMA_LENGTH
-        unsigned int    dma_length;
-#endif
-};
-
-That clearly isn't hardware specific - hardware won't cope with
-CONFIG_DEBUG_SG being enabled or disabled, or whether the architecture
-supports the dma_length field, or that this structure has developed from
-being:
-
-	void *addr;
-	unsigend int length;
-	unsigned long dma_address;
-
-to the above over the evolution of the kernel.  Or that we use the bottom
-two bits of page_link as our own flag bits?
-
-So no, this struct goes nowhere near hardware of any kind.  It's merely
-used as a container to pass a list of scatter-gather locations in memory
-internally around within the kernel, especially to dma_map_sg()/
-dma_unmap_sg().
-
-If you look at IDE or ATA code, or even SCSI code, you'll find the same
-pattern.  They're passed a scatterlist.  They map it for dma using
-dma_map_sg().  They then walk the scatterlist and extract the dma
-address and length using sg_dma_address() and sg_dma_length() and create
-the _hardware_ table from that information - and the hardware table very
-much depends on the hardware itself.  Once DMA is complete, they unmap
-the DMA region using dma_unmap_sg().
-
-One very good reason that its limited to one page is because allocations
-larger than one page are prone to failure.  Would you want your company
-server failing to read/write data to its storage just because it couldn't
-get a contiguous 8K page for a 5K long scatterlist?  I think if Linux
-did that, it wouldn't have a future in the enterprise marketplace.
+I believe that this was the best option considering that now we don't have to
+worry about dependencies.
