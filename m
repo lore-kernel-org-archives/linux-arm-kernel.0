@@ -1,49 +1,93 @@
-From: hans-christian.egtvedt@atmel.com (Hans-Christian Egtvedt)
-Date: Mon, 06 Jun 2011 07:49:31 +0200
-Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
-In-Reply-To: <BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
-References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
-	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
-	<BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
-Message-ID: <1307339371.9413.5.camel@hcegtvedt.norway.atmel.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Mon, 06 Jun 2011 10:58:38 +0530
+Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <20110605102855L.fujita.tomonori@lab.ntt.co.jp>
+References: <1306391493-29425-1-git-send-email-shawn.guo@linaro.org>
+	<20110601023356.GA1501@S2100-06.ap.freescale.net>
+	<20110605102855L.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <1307338118.10976.74.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-06-01 at 18:54 +0400, Dmitry Eremin-Solenikov wrote:
-> On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
-> > On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
-> >> Currently atmel_nand driver used by AT91 and AVR32 calls a special
-> >> callback
-> >> which return nand partition table and number of partitions. However in all
-> >> boards this callback returns just static data. So drop this callback and
-> >> make atmel_nand use partition table provided statically via platform_data.
-> >>
-> >> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >
-> > Thanks for this update, always nice seeing code being optimized. I
-> > really can't recall why it was made like this in the first place...
-> >
-> > For the AVR32 related parts:
-> >
-> > Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
-> >
-> > <snipp diff>
-> >
-> > Will this go through the linux-mtd tree (since it spans two archs) or
-> > should it go through an arch tree?
+On Sun, 2011-06-05 at 10:30 +0900, FUJITA Tomonori wrote:
+> On Wed, 1 Jun 2011 10:33:57 +0800
+> Shawn Guo <shawn.guo@freescale.com> wrote:
 > 
-> On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
-> as I'd also like to submit several (a pile) patches cleaning up mtd
-> partitioning, which would depend on this.
+> > On Thu, May 26, 2011 at 02:31:31PM +0800, Shawn Guo wrote:
+> > > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> > > max_segment_number into device_dma_parameters and creates the
+> > > corresponding dmaengine API dma_set(get)_max_seg_number for it.
+> > > 
+> > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > ---
+> > >  include/linux/device.h      |    1 +
+> > >  include/linux/dma-mapping.h |   15 +++++++++++++++
+> > >  2 files changed, 16 insertions(+), 0 deletions(-)
+> 
+> include/linux/dma-mapping.h is for DMA mapping API (please see
+> Documentation/DMA-API*.txt).
+> 
+> What does dma_set(get)_max_seg_size do? And it's related with DMA
+> mapping API?
+See the other post by author
 
-I'm fine by sending the changes for AVR32 through linux-mtd, they are
-minor and so far doesn't touch anything else that is changed.
 
-> OTOH, I think there will be a cleanup of AT91 platform, which would bring
-> lot's of conflicts with this patch, if it goes through linux-mtd.
 
-AT91 will probably be worse, yes, should be doable by git to solve the
-conflicts on its own. I'll leave it to Nicolas to give his verdict.
+> 
+> 
+> > > 
+> > > diff --git a/include/linux/device.h b/include/linux/device.h
+> > > index c66111a..44cb2528 100644
+> > > --- a/include/linux/device.h
+> > > +++ b/include/linux/device.h
+> > > @@ -487,6 +487,7 @@ struct device_dma_parameters {
+> > >  	 * sg limitations.
+> > >  	 */
+> > >  	unsigned int max_segment_size;
+> > > +	unsigned int max_segment_number;
+> > >  	unsigned long segment_boundary_mask;
+> > >  };
+> > >  
+> > > diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> > > index ba8319a..fd314f4 100644
+> > > --- a/include/linux/dma-mapping.h
+> > > +++ b/include/linux/dma-mapping.h
+> > > @@ -131,6 +131,21 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+> > >  		return -EIO;
+> > >  }
+> > >  
+> > > +static inline unsigned int dma_get_max_seg_number(struct device *dev)
+> > > +{
+> > > +	return dev->dma_parms ? dev->dma_parms->max_segment_number : 1;
+> > > +}
+> > > +
+> > > +static inline unsigned int dma_set_max_seg_number(struct device *dev,
+> > > +						  unsigned int number)
+> > > +{
+> > > +	if (dev->dma_parms) {
+> > > +		dev->dma_parms->max_segment_number = number;
+> > > +		return 0;
+> > > +	} else
+> > > +		return -EIO;
+> > > +}
+> > > +
+> > >  static inline unsigned long dma_get_seg_boundary(struct device *dev)
+> > >  {
+> > >  	return dev->dma_parms ?
+> > > -- 
+> > > 1.7.4.1
+> > 
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > Please read the FAQ at  http://www.tux.org/lkml/
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
 
 -- 
-Hans-Christian Egtvedt
+~Vinod
