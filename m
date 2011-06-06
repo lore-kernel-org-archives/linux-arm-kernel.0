@@ -1,50 +1,41 @@
 From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 6 Jun 2011 23:30:29 +0200 (CEST)
+Date: Mon, 6 Jun 2011 23:31:31 +0200 (CEST)
 Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <20110606163210.GC7448@n2100.arm.linux.org.uk>
-References: <4DECCADE.6080100@selfish.org>
-	<alpine.LFD.2.02.1106061518480.13964@ionos>
-	<20110606163210.GC7448@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.02.1106062327310.13964@ionos>
+In-Reply-To: <4DECF32B.6000508@selfish.org>
+References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
+	<alpine.LFD.2.02.1106061650210.13964@ionos>
+	<4DECEDF9.4010202@selfish.org>
+	<alpine.LFD.2.02.1106061719290.13964@ionos>
+	<4DECF32B.6000508@selfish.org>
+Message-ID: <alpine.LFD.2.02.1106062330380.13964@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jun 2011, Russell King - ARM Linux wrote:
+Kevin,
 
-> On Mon, Jun 06, 2011 at 04:49:59PM +0200, Thomas Gleixner wrote:
-> > 0000014c <irq_gc_mask_clr_bit>:
-> >  14c:   e5903014        ldr     r3, [r0, #20]
-> >  150:   e590c000        ldr     ip, [r0]
-> >  154:   e5932004        ldr     r2, [r3, #4]
-> >  158:   e593100c        ldr     r1, [r3, #12]
-> >  15c:   e062200c        rsb     r2, r2, ip
-> >  160:   e3a0c001        mov     ip, #1
-> >  164:   e1c1221c        bic     r2, r1, ip, lsl r2
-> >  168:   e583200c        str     r2, [r3, #12]
-> >  16c:   e590000c        ldr     r0, [r0, #12]
-> >  170:   e5931000        ldr     r1, [r3]
-> >  174:   e5903064        ldr     r3, [r0, #100]  ; 0x64
-> >  178:   e7812003        str     r2, [r1, r3]
-> >  17c:   e12fff1e        bx      lr
-> > 
-> > So it's the "str r2, [r1, r3]" and obviously r1 is pointing into
-> > nirwana. r3 makes me wonder as well. We write 0x18 into ct->regs.mask
-> > because we add 0x04 to the base pointer. So where comes the 0x1c from?
+On Mon, 6 Jun 2011, Holger Freyther wrote:
+
+> On 06/06/2011 05:25 PM, Thomas Gleixner wrote:
 > 
-> Beware - I don't think you can build the file and work out what went
-> wrong in this manner.  Compilers like to change their register
-> allocation for even the slightest difference of compiler options
-> and preceding _unrelated_ code.
+> > Crap, yes. The code which does the chained handler setup overwrites
+> > chip_data.
+> > 
+> 
+> Ah, you were too fast in the end, I just finished reading linux/irq.h. :)
+> 
+> 
+> 
+> > Subject: arm: davinci: Fix fallout from generic irq chip conversion
+> > From: Thomas Gleixner <tglx@linutronix.de>
+> > Date: Mon, 06 Jun 2011 11:51:43 +0200
+> > 
+> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> 
+> Tested-by: Holger Hans Peter Freyther <holger@freyther.de>
 
-Just for fun I tried 5 different compilers and they all come up with the 
+can you please pick that up? It should have a Cc: stable at kernel.org
+tag as well.
 
-     str     r2, [r1, r3]
+Thanks,
 
-which is the only possible culprit for the register content combo in
-this particular case.
-
-> Unless we have the Code: line we don't know what the code being executed
-> was.  It's important that folk always report the entire oops dump, not
-> extracts from it that they _think_ may be relevant.
-
-No argument.
+	tglx
