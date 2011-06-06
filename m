@@ -1,31 +1,60 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Mon, 6 Jun 2011 20:26:07 +0300
-Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
-In-Reply-To: <20110605.140801.1144137337172959622.davem@davemloft.net>
-References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-	<20110605083445.GT16318@ibawizard.net>
-	<20110605085948.GB16018@acer>
-	<20110605.140801.1144137337172959622.davem@davemloft.net>
-Message-ID: <20110606172607.GB3082@acer>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 6 Jun 2011 20:28:35 +0300
+Subject: [PATCH 1/2] cleanup regulator supply definitions in mach-omap2
+	to use REGULATOR_SUPPLY
+In-Reply-To: <547324C9-4B76-410E-86E6-092D062C95AB@linuxhacker.ru>
+References: <1307342762-25363-1-git-send-email-green@linuxhacker.ru>
+	<1307342762-25363-2-git-send-email-green@linuxhacker.ru>
+	<20110606092126.GG18731@legolas.emea.dhcp.ti.com>
+	<EA5D78AA-5A89-43AC-9D14-F378673F5D41@linuxhacker.ru>
+	<20110606171326.GK12242@legolas.emea.dhcp.ti.com>
+	<547324C9-4B76-410E-86E6-092D062C95AB@linuxhacker.ru>
+Message-ID: <20110606172832.GM12242@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 05, 2011 at 02:08:01PM -0700, David Miller wrote:
-> From: Mika Westerberg <mika.westerberg@iki.fi>
-> Date: Sun, 5 Jun 2011 11:59:48 +0300
+On Mon, Jun 06, 2011 at 01:18:41PM -0400, Oleg Drokin wrote:
+> Hello!
 > 
-> > It looks like David Miller (CC'd) has been taking care of ep93xx_eth.c maybe
-> > he knows this better.
+> On Jun 6, 2011, at 1:13 PM, Felipe Balbi wrote:
+> > On Mon, Jun 06, 2011 at 11:45:29AM -0400, Oleg Drokin wrote:
+> >>>> -static struct regulator_consumer_supply sdp4430_vaux_supply[] = {
+> >>>> -	{
+> >>>> -		.supply = "vmmc",
+> >>>> -		.dev_name = "omap_hsmmc.1",
+> >>>> -	},
+> >>>> -};
+> >>>> +static struct regulator_consumer_supply sdp4430_vaux_supply =
+> >>>> +	REGULATOR_SUPPLY("vmmc", "omap_hsmmc.1");
+> >>> this should be an array, as it was before.
+> >> 
+> >> Only one is defined right now.
+> >> Whoever needs a second element can convert it to array, I think?
+> >> What;s the importance of having it as an array right now?
+> > because later patches will be easier to review. Look below:
+> ...
+> > can you see now ?
 > 
-> Someone needs to step up and take over as the real maintainer of this
-> driver.  The way the driver is currently being hacked on is
-> unsustainable.
+> Ok, I get the idea. Do you think it would be best to convert every supply
+> definition to an array then just in case?
 
-Can't agree more.
+I think that while you're doing this big conversion, why not ?
 
-Hartley, Ryan: do you have any preferences? Are you guys already overwhelmed
-with your current maintenance work, or could you consider taking this one as
-well? 
+> I wonder what are the chances of additional regulators to appear at all
+> in many of these.
+> What about supplies that are not going to have additional elements
+> (like that cm-t35 board, because there simply are no more regulators in the twl)?
 
-If no one else steps up, I can volunteer but I have to admit that I don't know
-much about that driver.
+Still, It's the same thing I was discussing with Alan Stern on another
+thread, it comes down to uniformity and you never know when someone
+might decide to hook up and always on supply to any node :-p
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110606/a30dde24/attachment.sig>
