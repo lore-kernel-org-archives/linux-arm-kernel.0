@@ -1,41 +1,43 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  6 Jun 2011 15:30:14 +0800
-Subject: [PATCH v2 3/3] mmc: mxs-mmc: call dmaengine API to set mmc->max_segs
-In-Reply-To: <1307345414-26872-1-git-send-email-shawn.guo@linaro.org>
-References: <1307345414-26872-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1307345414-26872-3-git-send-email-shawn.guo@linaro.org>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Mon, 6 Jun 2011 12:53:57 +0530
+Subject: [PATCH] ARM: omap4: gpio: fix setting IRQWAKEN bits
+In-Reply-To: <4DEC7B6D.6060901@ti.com>
+References: <1307214239-16316-1-git-send-email-ccross@android.com>
+	<4DEC7B6D.6060901@ti.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037B7B69A6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With dmaengine API dma_get_max_seg_number added, we now can call
-the API to get and number and then set mmc->max_segs instead of
-hard-coding it.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/mxs-mmc.c |    6 +++++-
- 1 files changed, 5 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/mmc/host/mxs-mmc.c b/drivers/mmc/host/mxs-mmc.c
-index 99d39a6..d783af3 100644
---- a/drivers/mmc/host/mxs-mmc.c
-+++ b/drivers/mmc/host/mxs-mmc.c
-@@ -745,11 +745,15 @@ static int mxs_mmc_probe(struct platform_device *pdev)
- 	mmc->f_max = 288000000;
- 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
- 
--	mmc->max_segs = 52;
- 	mmc->max_blk_size = 1 << 0xf;
- 	mmc->max_blk_count = (ssp_is_old()) ? 0xff : 0xffffff;
- 	mmc->max_req_size = (ssp_is_old()) ? 0xffff : 0xffffffff;
- 	mmc->max_seg_size = dma_get_max_seg_size(host->dmach->device->dev);
-+	/*
-+	 * Reserve one segment for carrying on pio words to get dma engine
-+	 * program mmc controller registers
-+	 */
-+	mmc->max_segs = dma_get_max_seg_number(host->dmach->device->dev) - 1;
- 
- 	platform_set_drvdata(pdev, mmc);
- 
--- 
-1.7.4.1
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org [mailto:linux-omap-
+> owner at vger.kernel.org] On Behalf Of Shilimkar, Santosh
+> Sent: Monday, June 06, 2011 12:32 PM
+> To: Colin Cross
+> Cc: linux-omap at vger.kernel.org; Tony Lindgren; Russell King; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] ARM: omap4: gpio: fix setting IRQWAKEN bits
+> 
+> On 6/5/2011 12:33 AM, Colin Cross wrote:
+> > Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
+> > causing only the last bit set to take effect, resulting in lost
+> > wakeups when the GPIO controller is in idle.
+> >
+> > Replace direct writes to IRQWAKEN with writes to SETWKUENA and
+> > CLEARWKUEN.
+> >
+> > Signed-off-by: Colin Cross<ccross@android.com>
+> 
+> Looks good. This needs to be fixed on top of the clean-up
+> branch where GPIO movemnt to driver/gpio/* happening.
+> 
+> For this change,
+> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+This is also available as part of following cleanup series we are doing.
+However, since this is a defect we can prioritize it over the cleanup.
+--
+Tarun
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
