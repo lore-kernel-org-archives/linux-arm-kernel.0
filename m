@@ -1,41 +1,65 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 6 Jun 2011 23:31:31 +0200 (CEST)
-Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <4DECF32B.6000508@selfish.org>
-References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
-	<alpine.LFD.2.02.1106061650210.13964@ionos>
-	<4DECEDF9.4010202@selfish.org>
-	<alpine.LFD.2.02.1106061719290.13964@ionos>
-	<4DECF32B.6000508@selfish.org>
-Message-ID: <alpine.LFD.2.02.1106062330380.13964@ionos>
+From: davidb@codeaurora.org (David Brown)
+Date: Mon,  6 Jun 2011 14:51:07 -0700
+Subject: [PATCH v3 0/8] Move Qualcomm gpio drivers into drivers dir
+In-Reply-To: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <1307397075-11733-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Kevin,
+This patch series moves the Qualcomm MSM gpio device drivers into the
+drivers/gpio directory.
 
-On Mon, 6 Jun 2011, Holger Freyther wrote:
+The MSM's have two flavors of gpio driver.  The one for the newer
+v7-based chips is a bit cleaner, and can just be moved.  The one for
+the older v6-based chips took some cleanup to get rid of numerous
+ifdefs based on the particular machine.  Both drivers can now be
+selected and will be used on appropriate targets.
 
-> On 06/06/2011 05:25 PM, Thomas Gleixner wrote:
-> 
-> > Crap, yes. The code which does the chained handler setup overwrites
-> > chip_data.
-> > 
-> 
-> Ah, you were too fast in the end, I just finished reading linux/irq.h. :)
-> 
-> 
-> 
-> > Subject: arm: davinci: Fix fallout from generic irq chip conversion
-> > From: Thomas Gleixner <tglx@linutronix.de>
-> > Date: Mon, 06 Jun 2011 11:51:43 +0200
-> > 
-> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> 
-> Tested-by: Holger Hans Peter Freyther <holger@freyther.de>
+There is still a minor entanglement with the MSM-specific gpiomux
+code.  This will be cleaned up as MSM moves to use pinmux.
 
-can you please pick that up? It should have a Cc: stable at kernel.org
-tag as well.
+patch history:
+------
+v2 - Move header to mach-msm mach dir
+   - Fix Kconfig description
+   - Base off of Linus tree instead of linux-next (postponed for ARM issues)
+v3 - Use gpio-* naming for drivers
+   - Maintain order in Kconfig/Makefile
+   - Fold register defs into C file
 
-Thanks,
+David Brown (8):
+  msm: gpio: Remove unsupported devices
+  msm: Remove chip-ifdefs for GPIO io mappings
+  msm: gpio: Remove chip-specific register definitions
+  msm: gpio: Remove ifdefs on gpio chip registers
+  msm: gpiomux: Move public API to public header
+  msm: gpio: Fold register defs into C file
+  gpio_msm: Move Qualcomm v6 MSM driver into drivers
+  gpio_msm: Move Qualcomm MSM v2 gpio driver into drivers
 
-	tglx
+ arch/arm/mach-msm/Kconfig                          |    4 +
+ arch/arm/mach-msm/Makefile                         |    8 -
+ arch/arm/mach-msm/gpio.c                           |  375 ------------
+ arch/arm/mach-msm/gpio_hw.h                        |  278 ---------
+ arch/arm/mach-msm/gpiomux.h                        |   17 +-
+ arch/arm/mach-msm/include/mach/msm_gpiomux.h       |   38 ++
+ arch/arm/mach-msm/include/mach/msm_iomap-7x00.h    |   10 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-7x30.h    |   10 +-
+ arch/arm/mach-msm/include/mach/msm_iomap-8x50.h    |   10 +-
+ arch/arm/mach-msm/include/mach/msm_iomap.h         |    2 +
+ arch/arm/mach-msm/io.c                             |   12 +-
+ drivers/gpio/Kconfig                               |   16 +
+ drivers/gpio/Makefile                              |    2 +
+ drivers/gpio/gpio-msm-v1.c                         |  636 ++++++++++++++++++++
+ .../gpio-v2.c => drivers/gpio/gpio-msm-v2.c        |    4 +-
+ 15 files changed, 719 insertions(+), 704 deletions(-)
+ delete mode 100644 arch/arm/mach-msm/gpio.c
+ delete mode 100644 arch/arm/mach-msm/gpio_hw.h
+ create mode 100644 arch/arm/mach-msm/include/mach/msm_gpiomux.h
+ create mode 100644 drivers/gpio/gpio-msm-v1.c
+ rename arch/arm/mach-msm/gpio-v2.c => drivers/gpio/gpio-msm-v2.c (99%)
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
