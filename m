@@ -1,51 +1,51 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 6 Jun 2011 12:28:55 +0200
-Subject: MMC and reliable write - was: since when does ARM map the
-	kernel memory in sections?
-In-Reply-To: <20110503080414.GH5832@shareable.org>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<201104262100.42670.pwaechtler@mac.com>
-	<20110426190719.GA5832@shareable.org>
-	<201104262238.02979.pwaechtler@mac.com>
-	<20110426224546.GC5832@shareable.org>
-	<BANLkTimTsBARiHmbY37bA6oahacs7zbORA@mail.gmail.com>
-	<20110427130719.GE5832@shareable.org>
-	<BANLkTimMvGfkmcXKrM=vtFNGqdoUJpqwcw@mail.gmail.com>
-	<20110503080414.GH5832@shareable.org>
-Message-ID: <20110606102855.GA5820@atrey.karlin.mff.cuni.cz>
+Date: Mon, 6 Jun 2011 12:29:06 +0200
+Subject: [BUG] "sched: Remove rq->lock from the first half of ttwu()"
+	locks up on ARM
+In-Reply-To: <20110527120629.GA32617@elte.hu>
+References: <BANLkTi=XbTXQsu3jUEvQyCfBy6-aRnqSpw@mail.gmail.com>
+	<1306405979.1200.63.camel@twins>
+	<1306407759.27474.207.camel@e102391-lin.cambridge.arm.com>
+	<1306409575.1200.71.camel@twins> <1306412511.1200.90.camel@twins>
+	<20110526122623.GA11875@elte.hu>
+	<20110526123137.GG24876@n2100.arm.linux.org.uk>
+	<20110526125007.GA27083@elte.hu>
+	<BANLkTinUZ7EwN_nBCi_RQ9u8-LBcr_A74g@mail.gmail.com>
+	<20110527120629.GA32617@elte.hu>
+Message-ID: <20110606102905.GB5820@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-> > So basically add a new REQ_ flag - something like REQ_SAFE, which
-> > would ensure that data
-> > on block storage is not corrupted due to interrupting this write (or
-> > even, after the write, if the card does some optimizations). We
-> > already have a flag that ensures corruptions don't occur
-> > because of local-to-disk caches - REQ_FUA, so this would just thinking
-> > about what effects REQ_FUA  already has that's not considered. On a
-> > (spinning) disk, I can't image that interrupting a REQ_FUA write would
-> > cause data loss somewhere other than where data was written.
-> > 
-> > Then it would be as simple as a mount flag that would ensure all
-> > (write) accesses are FUA accesses, to ensure desired behavior for
-> > platforms where power could be cut at any moment.
+> The expectations are to have irqs off (we are holding the runqueue 
+> lock if !__ARCH_WANT_INTERRUPTS_ON_CTXSW), so that's not workable i 
+> suspect.
 > 
-> I think you're mixing up different concepts.
+> But in theory we could drop the rq lock and restart the scheduler 
+> task-pick and balancing sequence when the ARM TLB tag rolls over. So 
+> instead of this fragile and assymetric method we'd have a 
+> straightforward retry-in-rare-cases method.
 > 
-> On a spinning hard disk, _all_ writes don't cause data loss other than
-> where data is written, rounded up to the sector (512 or 4096 bytes).
+> That means some modifications to switch_mm() but should be solvable.
+> 
+> That would make ARM special only in so far that it's one of the few 
+> architectures that signal 'retry task pickup' via switch_mm() - it 
+> would use the stock scheduler otherwise and we could remove 
+> __ARCH_WANT_INTERRUPTS_ON_CTXSW and perhaps even 
+> __ARCH_WANT_UNLOCKED_CTXSW altogether.
+> 
+> I'd suggest doing this once modern ARM chips get so widespread that 
+> you can realistically induce a ~700 usecs irqs-off delays on old, 
+> virtual-cache ARM chips. Old chips would likely use old kernels 
+> anyway, right?
 
-...
+Not really. Equivalent machines (400g) with new chips do not exist, so
+many people are stuck with Sharp Zaurus, and track latest kernels,
+because support is actually improving there.
 
-Yes, so on mmc there are two different problems:
-
-* reliability of write itself (REL_WRITE solves that)
-
-* reliability of data around write (there are for bits "controlling"
-  it in 4.4.1 MMC specs, unfortunately they are only writable by card
-  manufacturer AFAICS).
+(And yes, I'd like to keep using bluetooth CF card with 16550-style
+chip.)
 									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
