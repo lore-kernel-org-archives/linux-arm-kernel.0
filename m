@@ -1,89 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 6 Jun 2011 10:02:16 +0200
-Subject: [PATCH 1/2] gpio/mxs: save the unnecessary function
-	mxs_gpio_to_irq
-In-Reply-To: <1307341247-26382-1-git-send-email-shawn.guo@linaro.org>
-References: <1307341247-26382-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110606080216.GB32632@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Mon, 06 Jun 2011 10:05:42 +0200
+Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
+In-Reply-To: <BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
+	<BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+Message-ID: <4DEC8A56.1030707@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On Mon, Jun 06, 2011 at 02:20:46PM +0800, Shawn Guo wrote:
-> The irq number can be easily calculated from the sum of
-> MXS_GPIO_IRQ_START and gpio number.  The patch directly defines
-> gpio_to_irq for it and removes mxs_gpio_to_irq to simplify the
-> the driver.
+Le 01/06/2011 16:54, Dmitry Eremin-Solenikov :
+> On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
+>> On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
+>>> Currently atmel_nand driver used by AT91 and AVR32 calls a special
+>>> callback
+>>> which return nand partition table and number of partitions. However in all
+>>> boards this callback returns just static data. So drop this callback and
+>>> make atmel_nand use partition table provided statically via platform_data.
+>>>
+>>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>>
+>> Thanks for this update, always nice seeing code being optimized. I
+>> really can't recall why it was made like this in the first place...
+>>
+>> For the AVR32 related parts:
+>>
+>> Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+>>
+>> <snipp diff>
+>>
+>> Will this go through the linux-mtd tree (since it spans two archs) or
+>> should it go through an arch tree?
 > 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-mxs/include/mach/gpio.h |    2 +-
->  drivers/gpio/gpio-mxs.c               |    9 ---------
->  2 files changed, 1 insertions(+), 10 deletions(-)
+> On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
+> as I'd also like to submit several (a pile) patches cleaning up mtd
+> partitioning, which would depend on this.
 > 
-> diff --git a/arch/arm/mach-mxs/include/mach/gpio.h b/arch/arm/mach-mxs/include/mach/gpio.h
-> index 828cccc..18017c5 100644
-> --- a/arch/arm/mach-mxs/include/mach/gpio.h
-> +++ b/arch/arm/mach-mxs/include/mach/gpio.h
-> @@ -28,8 +28,8 @@
->  #define gpio_get_value		__gpio_get_value
->  #define gpio_set_value		__gpio_set_value
->  #define gpio_cansleep		__gpio_cansleep
-> -#define gpio_to_irq		__gpio_to_irq
->  
->  #define irq_to_gpio(irq)	((irq) - MXS_GPIO_IRQ_START)
-> +#define gpio_to_irq(gpio)	(MXS_GPIO_IRQ_START + (gpio))
+> OTOH, I think there will be a cleanup of AT91 platform, which would bring
+> lot's of conflicts with this patch, if it goes through linux-mtd.
 
-NACK
 
-This is no good idea. __gpio_to_irq also works correctly for i2c gpio
-expanders and the like whereas your patch limits the gio_to_irq usage to
-internal gpios. Better to keep it like it is.
+I am in favor for a mainline inclusion through linux-mtd tree.
 
-Sascha
+On the AT91 side, we will have to take this inclusion into account to
+avoid merge conflicts... But as long as this cleanup is not ready yet, I
+prefer to go forward this way.
 
->  
->  #endif /* __MACH_MXS_GPIO_H__ */
-> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-> index a287614..d01f046 100644
-> --- a/drivers/gpio/gpio-mxs.c
-> +++ b/drivers/gpio/gpio-mxs.c
-> @@ -236,14 +236,6 @@ static void mxs_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
->  		writel(1 << offset, pin_addr + MXS_CLR);
->  }
->  
-> -static int mxs_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
-> -{
-> -	struct mxs_gpio_port *port =
-> -		container_of(chip, struct mxs_gpio_port, chip);
-> -
-> -	return port->virtual_irq_start + offset;
-> -}
-> -
->  static int mxs_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
->  {
->  	mxs_set_gpio_direction(chip, offset, 0);
-> @@ -327,7 +319,6 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
->  	port->chip.direction_output = mxs_gpio_direction_output;
->  	port->chip.get = mxs_gpio_get;
->  	port->chip.set = mxs_gpio_set;
-> -	port->chip.to_irq = mxs_gpio_to_irq;
->  	port->chip.base = port->id * 32;
->  	port->chip.ngpio = 32;
->  
-> -- 
-> 1.7.4.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+For that purpose, that would be good to see this patch in linux-next.
 
+Thanks to all of you, bye,
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Nicolas Ferre
