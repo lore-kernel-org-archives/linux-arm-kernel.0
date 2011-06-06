@@ -1,91 +1,65 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  6 Jun 2011 17:55:53 +0100
-Subject: [PATCH 09/11] ARM: perf: add PMUv2 common event definitions
+Date: Mon,  6 Jun 2011 17:55:47 +0100
+Subject: [PATCH 03/11] ARM: hwcaps: use shifts instead of hardcoded constants
 In-Reply-To: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
 References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307379355-13802-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1307379355-13802-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PMUv2 specification reserves a number of event encodings
-for common events.
+The HWCAP numbers are defined as constants, each one being a power of 2.
+This has become slightly unwieldy now that we have reached 32k.
 
-This patch adds these events to the common event enumeration
-in preparation for PMUv2 cores, such as Cortex-A15.
+This patch changes the HWCAP defines to use (1 << n) instead of coding
+the constant directly. The values remain unchanged.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_v7.c |   35 +++++++++++++++++++++++++----------
- 1 files changed, 25 insertions(+), 10 deletions(-)
+ arch/arm/include/asm/hwcap.h |   32 ++++++++++++++++----------------
+ 1 files changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 554eba3..01b1145 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -17,17 +17,23 @@
+diff --git a/arch/arm/include/asm/hwcap.h b/arch/arm/include/asm/hwcap.h
+index c1062c3..81512db 100644
+--- a/arch/arm/include/asm/hwcap.h
++++ b/arch/arm/include/asm/hwcap.h
+@@ -4,22 +4,22 @@
+ /*
+  * HWCAP flags - for elf_hwcap (in kernel) and AT_HWCAP
   */
+-#define HWCAP_SWP	1
+-#define HWCAP_HALF	2
+-#define HWCAP_THUMB	4
+-#define HWCAP_26BIT	8	/* Play it safe */
+-#define HWCAP_FAST_MULT	16
+-#define HWCAP_FPA	32
+-#define HWCAP_VFP	64
+-#define HWCAP_EDSP	128
+-#define HWCAP_JAVA	256
+-#define HWCAP_IWMMXT	512
+-#define HWCAP_CRUNCH	1024
+-#define HWCAP_THUMBEE	2048
+-#define HWCAP_NEON	4096
+-#define HWCAP_VFPv3	8192
+-#define HWCAP_VFPv3D16	16384
+-#define HWCAP_TLS	32768
++#define HWCAP_SWP	(1 << 0)
++#define HWCAP_HALF	(1 << 1)
++#define HWCAP_THUMB	(1 << 2)
++#define HWCAP_26BIT	(1 << 3)	/* Play it safe */
++#define HWCAP_FAST_MULT	(1 << 4)
++#define HWCAP_FPA	(1 << 5)
++#define HWCAP_VFP	(1 << 6)
++#define HWCAP_EDSP	(1 << 7)
++#define HWCAP_JAVA	(1 << 8)
++#define HWCAP_IWMMXT	(1 << 9)
++#define HWCAP_CRUNCH	(1 << 10)
++#define HWCAP_THUMBEE	(1 << 11)
++#define HWCAP_NEON	(1 << 12)
++#define HWCAP_VFPv3	(1 << 13)
++#define HWCAP_VFPv3D16	(1 << 14)
++#define HWCAP_TLS	(1 << 15)
  
- #ifdef CONFIG_CPU_V7
--/* Common ARMv7 event types */
-+/*
-+ * Common ARMv7 event types
-+ *
-+ * Note: An implementation may not be able to count all of these events
-+ * but the encodings are considered to be `reserved' in the case that
-+ * they are not available.
-+ */
- enum armv7_perf_types {
- 	ARMV7_PERFCTR_PMNC_SW_INCR		= 0x00,
- 	ARMV7_PERFCTR_IFETCH_MISS		= 0x01,
- 	ARMV7_PERFCTR_ITLB_MISS			= 0x02,
--	ARMV7_PERFCTR_DCACHE_REFILL		= 0x03,
--	ARMV7_PERFCTR_DCACHE_ACCESS		= 0x04,
-+	ARMV7_PERFCTR_DCACHE_REFILL		= 0x03,	/* L1 */
-+	ARMV7_PERFCTR_DCACHE_ACCESS		= 0x04,	/* L1 */
- 	ARMV7_PERFCTR_DTLB_REFILL		= 0x05,
- 	ARMV7_PERFCTR_DREAD			= 0x06,
- 	ARMV7_PERFCTR_DWRITE			= 0x07,
--
-+	ARMV7_PERFCTR_INSTR_EXECUTED		= 0x08,
- 	ARMV7_PERFCTR_EXC_TAKEN			= 0x09,
- 	ARMV7_PERFCTR_EXC_EXECUTED		= 0x0A,
- 	ARMV7_PERFCTR_CID_WRITE			= 0x0B,
-@@ -39,21 +45,30 @@ enum armv7_perf_types {
- 	 */
- 	ARMV7_PERFCTR_PC_WRITE			= 0x0C,
- 	ARMV7_PERFCTR_PC_IMM_BRANCH		= 0x0D,
-+	ARMV7_PERFCTR_PC_PROC_RETURN		= 0x0E,
- 	ARMV7_PERFCTR_UNALIGNED_ACCESS		= 0x0F,
-+
-+	/* These events are defined by the PMUv2 supplement (ARM DDI 0457A). */
- 	ARMV7_PERFCTR_PC_BRANCH_MIS_PRED	= 0x10,
- 	ARMV7_PERFCTR_CLOCK_CYCLES		= 0x11,
--
--	ARMV7_PERFCTR_PC_BRANCH_MIS_USED	= 0x12,
-+	ARMV7_PERFCTR_PC_BRANCH_PRED		= 0x12,
-+	ARMV7_PERFCTR_MEM_ACCESS		= 0x13,
-+	ARMV7_PERFCTR_L1_ICACHE_ACCESS		= 0x14,
-+	ARMV7_PERFCTR_L1_DCACHE_WB		= 0x15,
-+	ARMV7_PERFCTR_L2_DCACHE_ACCESS		= 0x16,
-+	ARMV7_PERFCTR_L2_DCACHE_REFILL		= 0x17,
-+	ARMV7_PERFCTR_L2_DCACHE_WB		= 0x18,
-+	ARMV7_PERFCTR_BUS_ACCESS		= 0x19,
-+	ARMV7_PERFCTR_MEMORY_ERROR		= 0x1A,
-+	ARMV7_PERFCTR_INSTR_SPEC		= 0x1B,
-+	ARMV7_PERFCTR_TTBR_WRITE		= 0x1C,
-+	ARMV7_PERFCTR_BUS_CYCLES		= 0x1D,
- 
- 	ARMV7_PERFCTR_CPU_CYCLES		= 0xFF
- };
- 
- /* ARMv7 Cortex-A8 specific event types */
- enum armv7_a8_perf_types {
--	ARMV7_PERFCTR_INSTR_EXECUTED		= 0x08,
--
--	ARMV7_PERFCTR_PC_PROC_RETURN		= 0x0E,
--
- 	ARMV7_PERFCTR_WRITE_BUFFER_FULL		= 0x40,
- 	ARMV7_PERFCTR_L2_STORE_MERGED		= 0x41,
- 	ARMV7_PERFCTR_L2_STORE_BUFF		= 0x42,
+ #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
+ /*
 -- 
 1.7.0.4
