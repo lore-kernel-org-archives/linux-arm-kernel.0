@@ -1,37 +1,23 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Mon, 6 Jun 2011 15:38:12 +0900
-Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
-In-Reply-To: <1307338118.10976.74.camel@vkoul-udesk3>
-References: <20110601023356.GA1501@S2100-06.ap.freescale.net>
-	<20110605102855L.fujita.tomonori@lab.ntt.co.jp>
-	<1307338118.10976.74.camel@vkoul-udesk3>
-Message-ID: <20110606153634D.fujita.tomonori@lab.ntt.co.jp>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 06 Jun 2011 12:18:47 +0530
+Subject: [PATCH 1/2] cleanup regulator supply definitions in mach-omap2
+	to use REGULATOR_SUPPLY
+In-Reply-To: <1307342762-25363-2-git-send-email-green@linuxhacker.ru>
+References: <1307342762-25363-1-git-send-email-green@linuxhacker.ru>
+	<1307342762-25363-2-git-send-email-green@linuxhacker.ru>
+Message-ID: <4DEC784F.9060503@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 06 Jun 2011 10:58:38 +0530
-"Koul, Vinod" <vinod.koul@intel.com> wrote:
-
-> On Sun, 2011-06-05 at 10:30 +0900, FUJITA Tomonori wrote:
-> > On Wed, 1 Jun 2011 10:33:57 +0800
-> > Shawn Guo <shawn.guo@freescale.com> wrote:
-> > 
-> > > On Thu, May 26, 2011 at 02:31:31PM +0800, Shawn Guo wrote:
-> > > > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
-> > > > max_segment_number into device_dma_parameters and creates the
-> > > > corresponding dmaengine API dma_set(get)_max_seg_number for it.
-> > > > 
-> > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > ---
-> > > >  include/linux/device.h      |    1 +
-> > > >  include/linux/dma-mapping.h |   15 +++++++++++++++
-> > > >  2 files changed, 16 insertions(+), 0 deletions(-)
-> > 
-> > include/linux/dma-mapping.h is for DMA mapping API (please see
-> > Documentation/DMA-API*.txt).
-> > 
-> > What does dma_set(get)_max_seg_size do? And it's related with DMA
-> > mapping API?
-> See the other post by author
-
-The pointer, please.
+On 6/6/2011 12:16 PM, green at linuxhacker.ru wrote:
+> From: Oleg Drokin<green@linuxhacker.ru>
+>
+> CC: Mark Brown<broonie@opensource.wolfsonmicro.com>
+> CC: Mike Rapoport<mike@compulab.co.il>
+> CC: Nishant Kamat<nskamat@ti.com>
+> CC: Steve Sakoman<steve@sakoman.com>
+> CC: Felipe Balbi<balbi@ti.com>
+> CC: Santosh Shilimkar<santosh.shilimkar@ti.com>
+> Signed-off-by: Oleg Drokin<green@linuxhacker.ru>
+> ---
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>	
