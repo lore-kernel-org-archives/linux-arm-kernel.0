@@ -1,171 +1,100 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 6 Jun 2011 10:03:42 -0600
-Subject: [PATCH v4 2/2] gpio/mxc: Change gpio-mxc into an upstanding gpio
-	driver
-In-Reply-To: <20110606084720.GZ23771@pengutronix.de>
-References: <1307290075-7062-1-git-send-email-shawn.guo@linaro.org>
-	<1307290075-7062-3-git-send-email-shawn.guo@linaro.org>
-	<20110606075241.GD10410@ponder.secretlab.ca>
-	<20110606081205.GC32632@pengutronix.de>
-	<BANLkTinY44trVnt-XXaH85Vsj46put6N1Q@mail.gmail.com>
-	<20110606084720.GZ23771@pengutronix.de>
-Message-ID: <BANLkTi=1jMPLM3aW2wQo=yE5mEybVbV5PA@mail.gmail.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 6 Jun 2011 18:23:18 +0200
+Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
+	limitation in IOMMU
+In-Reply-To: <20110603063211.GA18082@n2100.arm.linux.org.uk>
+References: <20110601131744.GH11352@atomide.com>
+	<201106030212.48226.laurent.pinchart@ideasonboard.com>
+	<20110603063211.GA18082@n2100.arm.linux.org.uk>
+Message-ID: <201106061823.18767.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 6, 2011 at 2:47 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Mon, Jun 06, 2011 at 02:18:29AM -0600, Grant Likely wrote:
->> On Mon, Jun 6, 2011 at 2:12 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
->> > On Mon, Jun 06, 2011 at 01:52:41AM -0600, Grant Likely wrote:
->> >> On Mon, Jun 06, 2011 at 12:07:55AM +0800, Shawn Guo wrote:
->> >> > The patch makes necessary changes on gpio-mxc as below to turn it
->> >> > into an upstanding gpio driver.
->> >> >
->> >> > ?* Add a list to save all mx2 ports references, so that
->> >> > ? ?mx2_gpio_irq_handler can walk through all interrupt status
->> >> > ? ?registers
->> >> >
->> >> > ?* Use readl/writel to replace mach-specific accessors
->> >> > ? ?__raw_readl/__raw_writel
->> >> >
->> >> > ?* Change mxc_gpio_init into mxc_gpio_probe function
->> >> >
->> >> > ?* Move "struct mxc_gpio_port" into gpio-mxc.c, as it needs not to
->> >> > ? ?be public at all, and also make some other cleanup on
->> >> > ? ?plat-mxc/include/mach/gpio.h at the same time
->> >> >
->> >> > And the patch then migrates mach-imx and mach-mx5 to the updated
->> >> > driver by adding corresponding platform devices.
->> >> >
->> >> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->> >> > Acked-by: Olof Johansson <olof@lixom.net>
->> >>
->> >> Applied, thanks.
->> >
->> > I'm not completely happy with this patch going through your tree. It
->> > does massive changes to arch/arm/mach-*mx*, so expect merge conflicts
->> > here.
->>
->> There are also massive changes going on in drivers/gpio. ?The solution
->> here is to probably put these changes into a new dedicated branch
->> based on Linus' tree, we both agree not to rebase that branch, and
->> both of us merge the branch into our trees.
->
-> That can work. I just checked that atm there are no conflicts between my
-> branch and Shawns patches. Can you set up such a branch? Otherwise I can
-> just keep an eye on conflicts and we set up such a branch once a real
-> conflict arises.
+Hi Russell,
 
-Done.  I'm assuming this constitutes an 'acked-by' for the mxs
-patches.  I've already got your a-b for the mxc patches.  The whole
-thing is based on 3.0-rc2, and is pushed out to the following branch.
-If it looks good to you, then go ahead and merge it into your tree,
-and I'll merge it into gpio/next.
+On Friday 03 June 2011 08:32:12 Russell King - ARM Linux wrote:
+> On Fri, Jun 03, 2011 at 02:12:47AM +0200, Laurent Pinchart wrote:
+> > On Wednesday 01 June 2011 16:03:06 Russell King - ARM Linux wrote:
+> > > On Wed, Jun 01, 2011 at 03:50:50PM +0200, Laurent Pinchart wrote:
+> > > > In the specific iovmm case, the driver uses the sglist API to build a
+> > > > list of page-size sg entries, and then process it in software. Is
+> > > > that considered as an abuse of the sglist API, or valid usage ?
+> > > > 
+> > > > Anyway, sglist chaining is not needed by iovmm. As iovmm just walks
+> > > > the sglist manually, it's easier to allocate it in one go rather
+> > > > than using sglist chaining. This of course doesn't make your patch
+> > > > unneeded or wrong.
+> > > 
+> > > Well, there's a two issues here:
+> > > 1. Should iovmm use sg_phys(sg) with sg_dma_len(sg) ?
+> > > 
+> > >    Probably not, because a scatterlist before DMA API mapping is
+> > >    defined by sg_page(sg), sg->offset, sg->length and has N entries. 
+> > >    After DMA API mapping (n = dma_map_sg(dev, sg, N, dir)), it has n
+> > >    entries where n <= N, and the DMA address/lengths are
+> > >    sg_dma_address(sg) and sg_dma_len(sg).  Both these are undefined
+> > >    for unmapped scatterlists.
+> > >    
+> > >    Getting this wrong means breakage when CONFIG_NEED_SG_DMA_LENGTH is
+> > >    enabled.
+> > 
+> > iovmm abuses the sglist API, there's no doubt on that. It will break when
+> > CONFIG_NEED_SG_DMA_LENGTH is enabled. iovmm should probably not use the
+> > sglist API, and it should probably not even exist in the first place. I
+> > know that TI is working on moving the OMAP-specific iommu/iovmm
+> > implementation to the generic IOMMU API, but that will take time. In the
+> > meantime, I'd like to fix iovmm to avoid the userspace-triggerable
+> > BUG_ON().
+> > 
+> > > 2. What would be the effect of enabling SG list chaining on iovmm?
+> > > 
+> > >    The code uses the correct SG list walking helpers (for_each_sg) so
+> > >    it should be able to cope with chained SG lists.
+> > 
+> > Yes it should. It might be slightly less efficient, but I don't think we
+> > will notice.
+> > 
+> > > So, I think there's no problem here with chained SG lists, but there is
+> > > an issue with using sg_dma_len().  I'd suggest converting stuff to use
+> > > sg->length with sg_page(sg) rather than sg_dma_len(sg).
+> > 
+> > With sg_page(sg) ? I'm not sure to follow you there.
+> 
+> sg->length and sg_page(sg) are paired (and sg->length is paired with
+> other stuff).  They describe the scatterlist _before_ DMA API mapping.
+> After DMA API mapping, the scatterlist describes a list of regions
+> defined by sg_dma_address(sg) and sg_dma_len(sg) - sg_dma_len(sg) is
+> _only_ paired with sg_dma_address(sg).
 
-The following changes since commit 59c5f46fbe01a00eedf54a23789634438bb80603:
+OK. The driver is already using sg_phys(sg), which is a wrapper around 
+sg_page(sg). I still need to replace sg_dma_len(sg) with sg->length.
 
-  Linux 3.0-rc2 (2011-06-06 18:06:33 +0900)
+> > > As for whether SG chaining is required or not, if you're running up
+> > > against the maximum SG table size, then you do have a requirement for
+> > > SG chaining.
+> > 
+> > The SG table size limit makes sure that the SG list fits in a page, so
+> > that it can be passed to the hardware. This isn't needed by iovmm, as it
+> > processes the sglist in software. iovmm could use SG chaining, but we
+> > would then need to enable it for the SoCs on which iovmm is used. I
+> > don't know if they properly support that.
+> 
+> Err, no.  scatterlists are _never_ passed to hardware.  They're a kernel
+> internal description of a list of regions in memory, which initially
+> start off as describing the kernels view of those regions.  After DMA
+> mapping, they describe it in terms of the device's view of those
+> regions.
+> 
+> At that point, scatterlists get converted to whatever form is required
+> by the hardware doing DMA, which most certainly won't be the layout which
+> struct scatterlist describes.
+> 
+> SG chaining has _nothing_ to do with hardware.  It's all to do with software
+> and hitting the SG table limit.
 
-are available in the git repository at:
-  git://git.secretlab.ca/git/linux-2.6 gpio/next-mx
-
-Grant Likely (1):
-      gpio/mxs: Move Freescale mxs gpio driver to drivers/gpio
-
-Shawn Guo (4):
-      gpio/mxs: Change gpio-mxs into an upstanding gpio driver
-      gpio/mxc: Move Freescale MXC gpio driver to drivers/gpio
-      gpio/mxc: Change gpio-mxc into an upstanding gpio driver
-      gpio/mxc: convert gpio-mxc to use basic_mmio_gpio library
-
- arch/arm/mach-imx/mach-apf9328.c                   |    2 +
- arch/arm/mach-imx/mach-armadillo5x0.c              |    2 +
- arch/arm/mach-imx/mach-bug.c                       |    2 +
- arch/arm/mach-imx/mach-cpuimx27.c                  |    2 +
- arch/arm/mach-imx/mach-cpuimx35.c                  |    2 +
- arch/arm/mach-imx/mach-eukrea_cpuimx25.c           |    2 +
- arch/arm/mach-imx/mach-imx27_visstrim_m10.c        |    2 +
- arch/arm/mach-imx/mach-imx27ipcam.c                |    2 +
- arch/arm/mach-imx/mach-imx27lite.c                 |    2 +
- arch/arm/mach-imx/mach-kzm_arm11_01.c              |    2 +
- arch/arm/mach-imx/mach-mx1ads.c                    |    2 +
- arch/arm/mach-imx/mach-mx21ads.c                   |    2 +
- arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
- arch/arm/mach-imx/mach-mx27_3ds.c                  |    2 +
- arch/arm/mach-imx/mach-mx27ads.c                   |    2 +
- arch/arm/mach-imx/mach-mx31_3ds.c                  |    2 +
- arch/arm/mach-imx/mach-mx31ads.c                   |    2 +
- arch/arm/mach-imx/mach-mx31lilly.c                 |    2 +
- arch/arm/mach-imx/mach-mx31lite.c                  |    2 +
- arch/arm/mach-imx/mach-mx31moboard.c               |    2 +
- arch/arm/mach-imx/mach-mx35_3ds.c                  |    2 +
- arch/arm/mach-imx/mach-mxt_td60.c                  |    2 +
- arch/arm/mach-imx/mach-pca100.c                    |    2 +
- arch/arm/mach-imx/mach-pcm037.c                    |    2 +
- arch/arm/mach-imx/mach-pcm038.c                    |    2 +
- arch/arm/mach-imx/mach-pcm043.c                    |    2 +
- arch/arm/mach-imx/mach-qong.c                      |    2 +
- arch/arm/mach-imx/mach-scb9328.c                   |    2 +
- arch/arm/mach-imx/mach-vpr200.c                    |    2 +
- arch/arm/mach-imx/mm-imx1.c                        |   17 +-
- arch/arm/mach-imx/mm-imx21.c                       |   21 +-
- arch/arm/mach-imx/mm-imx25.c                       |   16 +-
- arch/arm/mach-imx/mm-imx27.c                       |   21 +-
- arch/arm/mach-imx/mm-imx31.c                       |   15 +-
- arch/arm/mach-imx/mm-imx35.c                       |   15 +-
- arch/arm/mach-mx5/board-cpuimx51.c                 |    2 +
- arch/arm/mach-mx5/board-cpuimx51sd.c               |    2 +
- arch/arm/mach-mx5/board-mx50_rdp.c                 |    2 +
- arch/arm/mach-mx5/board-mx51_3ds.c                 |    2 +
- arch/arm/mach-mx5/board-mx51_babbage.c             |    2 +
- arch/arm/mach-mx5/board-mx51_efikamx.c             |    2 +
- arch/arm/mach-mx5/board-mx51_efikasb.c             |    2 +
- arch/arm/mach-mx5/board-mx53_evk.c                 |    2 +
- arch/arm/mach-mx5/board-mx53_loco.c                |    2 +
- arch/arm/mach-mx5/board-mx53_smd.c                 |    2 +
- arch/arm/mach-mx5/devices.c                        |   64 -----
- arch/arm/mach-mx5/mm-mx50.c                        |   21 +-
- arch/arm/mach-mx5/mm.c                             |   25 ++-
- arch/arm/mach-mxs/Makefile                         |    2 +-
- arch/arm/mach-mxs/devices.c                        |   11 +
- arch/arm/mach-mxs/devices/Makefile                 |    1 +
- arch/arm/mach-mxs/devices/platform-gpio-mxs.c      |   53 ++++
- arch/arm/mach-mxs/gpio.h                           |   34 ---
- arch/arm/mach-mxs/include/mach/devices-common.h    |    2 +
- arch/arm/mach-mxs/mach-mx28evk.c                   |    1 -
- arch/arm/mach-mxs/mm-mx23.c                        |    1 -
- arch/arm/mach-mxs/mm-mx28.c                        |    1 -
- arch/arm/plat-mxc/Makefile                         |    2 +-
- arch/arm/plat-mxc/devices.c                        |   11 +
- arch/arm/plat-mxc/devices/Makefile                 |    1 +
- arch/arm/plat-mxc/devices/platform-gpio-mxc.c      |   32 +++
- arch/arm/plat-mxc/include/mach/common.h            |   12 +-
- arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +
- arch/arm/plat-mxc/include/mach/gpio.h              |   27 --
- drivers/gpio/Kconfig                               |    9 +
- drivers/gpio/Makefile                              |    2 +
- .../arm/plat-mxc/gpio.c => drivers/gpio/gpio-mxc.c |  266 +++++++++++---------
- .../arm/mach-mxs/gpio.c => drivers/gpio/gpio-mxs.c |  227 ++++++++++-------
- 68 files changed, 568 insertions(+), 422 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-gpio-mxs.c
- delete mode 100644 arch/arm/mach-mxs/gpio.h
- create mode 100644 arch/arm/plat-mxc/devices/platform-gpio-mxc.c
- rename arch/arm/plat-mxc/gpio.c => drivers/gpio/gpio-mxc.c (60%)
- rename arch/arm/mach-mxs/gpio.c => drivers/gpio/gpio-mxs.c (58%)
-
-
->
-> Sascha
->
-> --
-> Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ? ? ? ? ? ? ? ? ? ? ? ? ? |
-> Industrial Linux Solutions ? ? ? ? ? ? ? ? | http://www.pengutronix.de/ ?|
-> Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0 ? ?|
-> Amtsgericht Hildesheim, HRA 2686 ? ? ? ? ? | Fax: ? +49-5121-206917-5555 |
->
-
-
+What's the reason for limiting the SG table size to one page then ?
 
 -- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Regards,
+
+Laurent Pinchart
