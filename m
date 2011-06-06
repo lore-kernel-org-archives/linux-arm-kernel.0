@@ -1,47 +1,23 @@
-From: jic23@cam.ac.uk (Jonathan Cameron)
-Date: Mon, 06 Jun 2011 15:15:40 +0100
-Subject: [PATCH 1/2] pxa2xx viper: pcmcia - free gpios on exist rather
-	than	requesting them again.
-In-Reply-To: <4DECDEDB.8090309@arm.com>
-References: <1307368345-13445-1-git-send-email-jic23@cam.ac.uk>
-	<1307368345-13445-2-git-send-email-jic23@cam.ac.uk>
-	<4DECDEDB.8090309@arm.com>
-Message-ID: <4DECE10C.7000508@cam.ac.uk>
+From: tiwai@suse.de (Takashi Iwai)
+Date: Mon, 06 Jun 2011 16:10:52 +0200
+Subject: 3.0-rc1: alsactl restore fails on spitz
+In-Reply-To: <20110602031455.GC1565@ucw.cz>
+References: <20110602031455.GC1565@ucw.cz>
+Message-ID: <s5hboyb6oer.wl%tiwai@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/11 15:06, Marc Zyngier wrote:
-> Hi Jonathan,
+At Thu, 2 Jun 2011 05:14:55 +0200,
+Pavel Machek wrote:
 > 
-> On 06/06/11 14:52, Jonathan Cameron wrote:
->> Signed-off-by: Jonathan Cameron<jic23@cam.ac.uk>
->> ---
->>   drivers/pcmcia/pxa2xx_vpac270.c |    4 ++--
->>   1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/pcmcia/pxa2xx_vpac270.c b/drivers/pcmcia/pxa2xx_vpac270.c
->> index 435002d..413dc7d 100644
->> --- a/drivers/pcmcia/pxa2xx_vpac270.c
->> +++ b/drivers/pcmcia/pxa2xx_vpac270.c
->> @@ -75,10 +75,10 @@ static int vpac270_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
->>   static void vpac270_pcmcia_hw_shutdown(struct soc_pcmcia_socket *skt)
->>   {
->>       if (skt->nr == 0)
->> -        gpio_request_array(vpac270_pcmcia_gpios,
->> +        gpio_free_array(vpac270_pcmcia_gpios,
->>                       ARRAY_SIZE(vpac270_pcmcia_gpios));
->>       else
->> -        gpio_request_array(vpac270_cf_gpios,
->> +        gpio_free_array(vpac270_cf_gpios,
->>                       ARRAY_SIZE(vpac270_cf_gpios));
->>   }
->>
+> Hi
 > 
-> You may want to update the subject to reflect the fact that you're updating the voipac driver, and not the viper one.
-> 
-> Cheers,
-Gah.
+> Something changed in ALSA land, if you use sound you may want to check.
 
-Sorry about that will repost in a sec.
+alsactl is known to grumble when the mixer element number id is
+changed.  It just complains but does his job at best, continuing to
+restore the mixer status by guessing from the element name.  So,
+usually it should work as is.
 
-Jonathan
+
+Takashi
