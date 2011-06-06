@@ -1,33 +1,61 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 06 Jun 2011 08:09:44 +0200
-Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
-In-Reply-To: <BANLkTinALGrXrUaobMW13ng7tT7PsubXvA@mail.gmail.com>
-References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
-	<BANLkTinALGrXrUaobMW13ng7tT7PsubXvA@mail.gmail.com>
-Message-ID: <005601cc2410$551f8ef0$ff5eacd0$%szyprowski@samsung.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Mon,  6 Jun 2011 14:20:46 +0800
+Subject: [PATCH 1/2] gpio/mxs: save the unnecessary function mxs_gpio_to_irq
+Message-ID: <1307341247-26382-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The irq number can be easily calculated from the sum of
+MXS_GPIO_IRQ_START and gpio number.  The patch directly defines
+gpio_to_irq for it and removes mxs_gpio_to_irq to simplify the
+the driver.
 
-On Saturday, June 04, 2011 6:13 PM Ohad Ben- Cohen wrote:
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/mach-mxs/include/mach/gpio.h |    2 +-
+ drivers/gpio/gpio-mxs.c               |    9 ---------
+ 2 files changed, 1 insertions(+), 10 deletions(-)
 
-> On Wed, May 25, 2011 at 10:35 AM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> > I've finaly managed to clean up a bit my works and present the initial,
-> > very proof-of-concept version of patches that were ready just before
-> > Linaro meeting.
-> 
-> Btw, none of the patches seem to have made it through to lakml (only
-> the cover letter did).
-
-Hmmm, it looks that I need to resend the patches.
+diff --git a/arch/arm/mach-mxs/include/mach/gpio.h b/arch/arm/mach-mxs/include/mach/gpio.h
+index 828cccc..18017c5 100644
+--- a/arch/arm/mach-mxs/include/mach/gpio.h
++++ b/arch/arm/mach-mxs/include/mach/gpio.h
+@@ -28,8 +28,8 @@
+ #define gpio_get_value		__gpio_get_value
+ #define gpio_set_value		__gpio_set_value
+ #define gpio_cansleep		__gpio_cansleep
+-#define gpio_to_irq		__gpio_to_irq
  
-> Marek, did you get a "Message has a suspicious header" bounce too ?
-
-Yes, I got it but I have no idea what is wrong... Do you have any suggestions?
-
-Best regards
+ #define irq_to_gpio(irq)	((irq) - MXS_GPIO_IRQ_START)
++#define gpio_to_irq(gpio)	(MXS_GPIO_IRQ_START + (gpio))
+ 
+ #endif /* __MACH_MXS_GPIO_H__ */
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index a287614..d01f046 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -236,14 +236,6 @@ static void mxs_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ 		writel(1 << offset, pin_addr + MXS_CLR);
+ }
+ 
+-static int mxs_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct mxs_gpio_port *port =
+-		container_of(chip, struct mxs_gpio_port, chip);
+-
+-	return port->virtual_irq_start + offset;
+-}
+-
+ static int mxs_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+ {
+ 	mxs_set_gpio_direction(chip, offset, 0);
+@@ -327,7 +319,6 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
+ 	port->chip.direction_output = mxs_gpio_direction_output;
+ 	port->chip.get = mxs_gpio_get;
+ 	port->chip.set = mxs_gpio_set;
+-	port->chip.to_irq = mxs_gpio_to_irq;
+ 	port->chip.base = port->id * 32;
+ 	port->chip.ngpio = 32;
+ 
 -- 
-Marek Szyprowski
-Samsung Poland R&D Center
+1.7.4.1
