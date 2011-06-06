@@ -1,35 +1,28 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Mon, 6 Jun 2011 16:54:25 +0200 (CEST)
-Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <4DECD8C0.6010908@freyther.de>
-References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
-Message-ID: <alpine.LFD.2.02.1106061650210.13964@ionos>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Mon, 06 Jun 2011 16:08:58 +0100
+Subject: RFC pcmcia soc_common/pcmcia_low_level: Making socket_init and
+	socket_suspend optional
+In-Reply-To: <4DECEC43.4090108@cam.ac.uk>
+References: <4DECEC43.4090108@cam.ac.uk>
+Message-ID: <4DECED8A.1000505@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 6 Jun 2011, Holger Hans Peter Freyther wrote:
-
-> On 06/06/2011 02:41 PM, Holger Freyther wrote:
-> > Hi,
-> > 
-> > my not mainlined with custom drivers board support seems to suffer from an
-> > issue introduced by moving the irq.c to the generic GPIO interrupt code
-> > (aac4dd1dab8acfc244d697473d2a5f4424a5746c, reverting it makes the oops go
-> > away). I think this is caused by either interrupt #46 or #47 on this system
-> > which is on the second 'bank'.
+Sorry, sent this to the long dead old arm list.
+> Hi All,
 > 
-> I resorted to printf debugging, it is IRQ 56 which is the IRQ_GPIOBNK0.. so I
-> wonder if this IRQ should end up in the GC GPIO code at all?
-
-That depends on davinci_soc_info.intc_irq_num.
-
-#define DAVINCI_N_AINTC_IRQ     64
-#define DA830_N_CP_INTC_IRQ     96
-#define TNETV107X_N_CP_INTC_IRQ                 96
-
-No idea which one applies to your machine, but for all in tree boards
-56 is in the range of intc interrupts.
-
-Thanks,
-
-	tglx
+> Whilst looking at tidying up some of the glue code in pcmcia/pxa2xx_*
+> 
+> I noticed a lot of boards (10) define empty versions of
+> socket_init and socket_suspend.
+> 
+> This seems to me to indicate that these two functions should be optional.
+> 
+> Does anyone have any objection to making them so?
+> 
+> (couple of ifs in socket_common.c should do the job).
+> 
+> 
+> Thanks,
+> 
+> Jonathan
