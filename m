@@ -1,52 +1,39 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Mon, 06 Jun 2011 10:05:42 +0200
-Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
-In-Reply-To: <BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
-References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
-	<BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
-Message-ID: <4DEC8A56.1030707@atmel.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Mon, 6 Jun 2011 17:06:01 +0900
+Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <20110606065419.GA20904@S2100-06.ap.freescale.net>
+References: <1307338118.10976.74.camel@vkoul-udesk3>
+	<20110606153634D.fujita.tomonori@lab.ntt.co.jp>
+	<20110606065419.GA20904@S2100-06.ap.freescale.net>
+Message-ID: <20110606163913U.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 01/06/2011 16:54, Dmitry Eremin-Solenikov :
-> On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
->> On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
->>> Currently atmel_nand driver used by AT91 and AVR32 calls a special
->>> callback
->>> which return nand partition table and number of partitions. However in all
->>> boards this callback returns just static data. So drop this callback and
->>> make atmel_nand use partition table provided statically via platform_data.
->>>
->>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->>
->> Thanks for this update, always nice seeing code being optimized. I
->> really can't recall why it was made like this in the first place...
->>
->> For the AVR32 related parts:
->>
->> Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
->>
->> <snipp diff>
->>
->> Will this go through the linux-mtd tree (since it spans two archs) or
->> should it go through an arch tree?
-> 
-> On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
-> as I'd also like to submit several (a pile) patches cleaning up mtd
-> partitioning, which would depend on this.
-> 
-> OTOH, I think there will be a cleanup of AT91 platform, which would bring
-> lot's of conflicts with this patch, if it goes through linux-mtd.
+On Mon, 6 Jun 2011 14:54:21 +0800
+Shawn Guo <shawn.guo@freescale.com> wrote:
 
+> On Mon, Jun 06, 2011 at 03:38:12PM +0900, FUJITA Tomonori wrote:
+> > On Mon, 06 Jun 2011 10:58:38 +0530
+> > "Koul, Vinod" <vinod.koul@intel.com> wrote:
+> > 
+> > > On Sun, 2011-06-05 at 10:30 +0900, FUJITA Tomonori wrote:
+> > > > On Wed, 1 Jun 2011 10:33:57 +0800
+> > > > Shawn Guo <shawn.guo@freescale.com> wrote:
+> > > > 
+> > > > > On Thu, May 26, 2011 at 02:31:31PM +0800, Shawn Guo wrote:
+> > > > > > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> > > > > > max_segment_number into device_dma_parameters and creates the
+> > > > > > corresponding dmaengine API dma_set(get)_max_seg_number for it.
+> > > > > > 
+> > > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > > > > > ---
+> > > > > >  include/linux/device.h      |    1 +
+> > > > > >  include/linux/dma-mapping.h |   15 +++++++++++++++
+> > > > > >  2 files changed, 16 insertions(+), 0 deletions(-)
+> > > > 
+> > > > include/linux/dma-mapping.h is for DMA mapping API (please see
+> > > > Documentation/DMA-API*.txt).
+> > > > 
+> Hmm, I think they are all about dmaengine.
 
-I am in favor for a mainline inclusion through linux-mtd tree.
-
-On the AT91 side, we will have to take this inclusion into account to
-avoid merge conflicts... But as long as this cleanup is not ready yet, I
-prefer to go forward this way.
-
-For that purpose, that would be good to see this patch in linux-next.
-
-Thanks to all of you, bye,
--- 
-Nicolas Ferre
+No, I added them for the DMA mapping API (mainly, IOMMUs).
