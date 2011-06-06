@@ -1,71 +1,78 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 6 Jun 2011 18:49:46 +0200
-Subject: [RFC] mmc: Enable the ADMA on esdhc imx driver
-In-Reply-To: <1307005930-10935-1-git-send-email-richard.zhu@linaro.org>
-References: <1307005930-10935-1-git-send-email-richard.zhu@linaro.org>
-Message-ID: <20110606164946.GA14126@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 6 Jun 2011 18:54:10 +0200
+Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
+	limitation in IOMMU
+In-Reply-To: <20110606164400.GA9456@n2100.arm.linux.org.uk>
+References: <20110601131744.GH11352@atomide.com>
+	<201106061823.18767.laurent.pinchart@ideasonboard.com>
+	<20110606164400.GA9456@n2100.arm.linux.org.uk>
+Message-ID: <201106061854.10450.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 02, 2011 at 05:12:10PM +0800, Richard Zhu wrote:
-> Eanble the ADMA mode on freescale esdhc imx driver,
-> tested on MX51 and MX53.
+Hi Russell,
 
-Please describe a little bit why the patch helps. Does it also work on mx25/35?
-What does the new bit cover what the old one didn't cover? Why does the new one
-even exist?
-
+On Monday 06 June 2011 18:44:00 Russell King - ARM Linux wrote:
+> On Mon, Jun 06, 2011 at 06:23:18PM +0200, Laurent Pinchart wrote:
+> > Hi Russell,
+> > 
+> > On Friday 03 June 2011 08:32:12 Russell King - ARM Linux wrote:
+> > > SG chaining has _nothing_ to do with hardware.  It's all to do with
+> > > software and hitting the SG table limit.
+> > 
+> > What's the reason for limiting the SG table size to one page then ?
 > 
-> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   40 ++++++++++++++++++++++++++++++-----
->  1 files changed, 34 insertions(+), 6 deletions(-)
+> As I say, it's got nothing to do with them ending up being passed to
+> hardware.  Take a look at their definition:
 > 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index a19967d..64f33cb 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -31,6 +31,8 @@
->  #define SDHCI_VENDOR_SPEC		0xC0
->  #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
->  
-> +#define  SDHCI_VENDOR_SPEC_INT_ADMA_ERR	0x10000000
-> +
+> struct scatterlist {
+> #ifdef CONFIG_DEBUG_SG
+>         unsigned long   sg_magic;
+> #endif
+>         unsigned long   page_link;
+>         unsigned int    offset;
+>         unsigned int    length;
+>         dma_addr_t      dma_address;
+> #ifdef CONFIG_NEED_SG_DMA_LENGTH
+>         unsigned int    dma_length;
+> #endif
+> };
+> 
+> That clearly isn't hardware specific - hardware won't cope with
+> CONFIG_DEBUG_SG being enabled or disabled, or whether the architecture
+> supports the dma_length field, or that this structure has developed from
+> being:
+> 
+> 	void *addr;
+> 	unsigend int length;
+> 	unsigned long dma_address;
+> 
+> to the above over the evolution of the kernel.  Or that we use the bottom
+> two bits of page_link as our own flag bits?
+> 
+> So no, this struct goes nowhere near hardware of any kind.  It's merely
+> used as a container to pass a list of scatter-gather locations in memory
+> internally around within the kernel, especially to dma_map_sg()/
+> dma_unmap_sg().
+> 
+> If you look at IDE or ATA code, or even SCSI code, you'll find the same
+> pattern.  They're passed a scatterlist.  They map it for dma using
+> dma_map_sg().  They then walk the scatterlist and extract the dma
+> address and length using sg_dma_address() and sg_dma_length() and create
+> the _hardware_ table from that information - and the hardware table very
+> much depends on the hardware itself.  Once DMA is complete, they unmap
+> the DMA region using dma_unmap_sg().
+> 
+> One very good reason that its limited to one page is because allocations
+> larger than one page are prone to failure.  Would you want your company
+> server failing to read/write data to its storage just because it couldn't
+> get a contiguous 8K page for a 5K long scatterlist?  I think if Linux
+> did that, it wouldn't have a future in the enterprise marketplace.
 
->From the code below, this name is wrong because the bit is not in VENDOR_SPEC.
-
-> @@ -166,12 +189,16 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
->  	case SDHCI_HOST_CONTROL:
->  		/* FSL messed up here, so we can just keep those two */
->  		new_val = val & (SDHCI_CTRL_LED | SDHCI_CTRL_4BITBUS);
-> -		/* ensure the endianess */
-> +		/* ensure the endi1ness */
-
-Ehrm?
-
-> -		/* DMA mode bits are shifted */
-> -		new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-> +		if (val & SDHCI_CTRL_DMA_MASK) {
-> +			/* DMA mode bits are shifted */
-> +			new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-> +
-> +			esdhc_clrset_le(host, 0xffff, new_val, reg);
-> +		} else
-> +			esdhc_clrset_le(host, 0xff, val, reg);
-
-Why can't we always write 16-bit? (and else-block needs braces)
-
-Regards,
-
-   Wolfram
+Of course not, but if the scatterlist is only touched by kernel code, it 
+doesn't need to be contiguous in memory. It could be allocated with vmalloc().
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110606/b65ae423/attachment.sig>
+Regards,
+
+Laurent Pinchart
