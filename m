@@ -1,47 +1,24 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 6 Jun 2011 14:54:21 +0800
-Subject: [PATCH 1/3] dmaengine: add new dma API for max_segment_number
-In-Reply-To: <20110606153634D.fujita.tomonori@lab.ntt.co.jp>
-References: <20110601023356.GA1501@S2100-06.ap.freescale.net>
-	<20110605102855L.fujita.tomonori@lab.ntt.co.jp>
-	<1307338118.10976.74.camel@vkoul-udesk3>
-	<20110606153634D.fujita.tomonori@lab.ntt.co.jp>
-Message-ID: <20110606065419.GA20904@S2100-06.ap.freescale.net>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 06 Jun 2011 12:32:05 +0530
+Subject: [PATCH] ARM: omap4: gpio: fix setting IRQWAKEN bits
+In-Reply-To: <1307214239-16316-1-git-send-email-ccross@android.com>
+References: <1307214239-16316-1-git-send-email-ccross@android.com>
+Message-ID: <4DEC7B6D.6060901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2011 at 03:38:12PM +0900, FUJITA Tomonori wrote:
-> On Mon, 06 Jun 2011 10:58:38 +0530
-> "Koul, Vinod" <vinod.koul@intel.com> wrote:
-> 
-> > On Sun, 2011-06-05 at 10:30 +0900, FUJITA Tomonori wrote:
-> > > On Wed, 1 Jun 2011 10:33:57 +0800
-> > > Shawn Guo <shawn.guo@freescale.com> wrote:
-> > > 
-> > > > On Thu, May 26, 2011 at 02:31:31PM +0800, Shawn Guo wrote:
-> > > > > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
-> > > > > max_segment_number into device_dma_parameters and creates the
-> > > > > corresponding dmaengine API dma_set(get)_max_seg_number for it.
-> > > > > 
-> > > > > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > > > > ---
-> > > > >  include/linux/device.h      |    1 +
-> > > > >  include/linux/dma-mapping.h |   15 +++++++++++++++
-> > > > >  2 files changed, 16 insertions(+), 0 deletions(-)
-> > > 
-> > > include/linux/dma-mapping.h is for DMA mapping API (please see
-> > > Documentation/DMA-API*.txt).
-> > > 
-Hmm, I think they are all about dmaengine.
+On 6/5/2011 12:33 AM, Colin Cross wrote:
+> Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
+> causing only the last bit set to take effect, resulting in lost
+> wakeups when the GPIO controller is in idle.
+>
+> Replace direct writes to IRQWAKEN with writes to SETWKUENA and
+> CLEARWKUEN.
+>
+> Signed-off-by: Colin Cross<ccross@android.com>
 
-> > > What does dma_set(get)_max_seg_size do? And it's related with DMA
-> > > mapping API?
-> > See the other post by author
-> 
-> The pointer, please.
-> 
-http://permalink.gmane.org/gmane.linux.kernel/1149304
+Looks good. This needs to be fixed on top of the clean-up
+branch where GPIO movemnt to driver/gpio/* happening.
 
--- 
-Regards,
-Shawn
+For this change,
+Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>	
