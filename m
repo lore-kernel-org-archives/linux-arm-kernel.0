@@ -1,47 +1,48 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 06 Jun 2011 15:50:55 -0700
-Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <alpine.LFD.2.02.1106062330380.13964@ionos> (Thomas Gleixner's
-	message of "Mon, 6 Jun 2011 23:31:31 +0200 (CEST)")
-References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
-	<alpine.LFD.2.02.1106061650210.13964@ionos>
-	<4DECEDF9.4010202@selfish.org>
-	<alpine.LFD.2.02.1106061719290.13964@ionos>
-	<4DECF32B.6000508@selfish.org>
-	<alpine.LFD.2.02.1106062330380.13964@ionos>
-Message-ID: <87y61evak0.fsf@ti.com>
+From: toddpoynor@google.com (Todd Poynor)
+Date: Mon, 6 Jun 2011 16:05:22 -0700
+Subject: [PATCH] ARM: omap4: gpio: fix setting IRQWAKEN bits
+In-Reply-To: <87r576wpz6.fsf@ti.com>
+References: <1307214239-16316-1-git-send-email-ccross@android.com>
+	<BANLkTingmUNvZO_szivRkmn7LRO4L5A+5Q@mail.gmail.com>
+	<87r576wpz6.fsf@ti.com>
+Message-ID: <20110606230522.GA16590@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas Gleixner <tglx@linutronix.de> writes:
+On Mon, Jun 06, 2011 at 03:32:29PM -0700, Kevin Hilman wrote:
+> Colin Cross <ccross@android.com> writes:
+> 
+> > On Sat, Jun 4, 2011 at 12:03 PM, Colin Cross <ccross@android.com> wrote:
+> >> Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
+> >> causing only the last bit set to take effect, resulting in lost
+> >> wakeups when the GPIO controller is in idle.
+> >>
+> >> Replace direct writes to IRQWAKEN with writes to SETWKUENA and
+> >> CLEARWKUEN.
+> >>
+> >> Signed-off-by: Colin Cross <ccross@android.com>
+> 
+> [...]
+> 
+> >
+> > Todd pointed out that the OMAP4 TRM says not to use SETWKUENA and
+> > CLEARWKUENA.  
+> 
+> In my GPIO cleanups, I was wondering why the set/clear registers were
+> not used here. Todd, can you give the TRM version & reference for this?
+> I didn't find anything after a quick scan/search.
 
-> Kevin,
->
-> On Mon, 6 Jun 2011, Holger Freyther wrote:
->
->> On 06/06/2011 05:25 PM, Thomas Gleixner wrote:
->> 
->> > Crap, yes. The code which does the chained handler setup overwrites
->> > chip_data.
->> > 
->> 
->> Ah, you were too fast in the end, I just finished reading linux/irq.h. :)
->> 
->> 
->> 
->> > Subject: arm: davinci: Fix fallout from generic irq chip conversion
->> > From: Thomas Gleixner <tglx@linutronix.de>
->> > Date: Mon, 06 Jun 2011 11:51:43 +0200
->> > 
->> > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
->> 
->> Tested-by: Holger Hans Peter Freyther <holger@freyther.de>
->
-> can you please pick that up? It should have a Cc: stable at kernel.org
-> tag as well.
+http://focus.ti.com/general/docs/wtbu/wtbudocumentcenter.tsp?templateId=6123&navigationId=12037
 
-Yup, will do.
+OMAP4460 Multimedia Device Silicon Revision 1.0 Version E
+February 2011?Revised May 2011
 
-Thanks,
+p. 5357 Table 25-68. GPIO_CLEARWKUPENA
 
-Kevin
+"Caution: This register is kept for backward software compatibility. Use
+GPIO_IRQWAKEN_0 and GPIO_IRQWAKEN_1 instead."
+
+OMAP4430 TRM is similar.
+
+
+Todd
