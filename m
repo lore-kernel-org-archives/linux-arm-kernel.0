@@ -1,48 +1,52 @@
-From: notasas@gmail.com (Grazvydas Ignotas)
-Date: Mon, 6 Jun 2011 13:13:21 +0300
-Subject: [PATCH 2/2] Remove old-style supply.dev assignments common in
-	hsmmc init
-In-Reply-To: <1307342762-25363-3-git-send-email-green@linuxhacker.ru>
-References: <1307342762-25363-1-git-send-email-green@linuxhacker.ru>
-	<1307342762-25363-3-git-send-email-green@linuxhacker.ru>
-Message-ID: <BANLkTimgW+53CEfU8wNpaO8wPgWJ3yT90w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 6 Jun 2011 11:15:56 +0100
+Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <20110606191041U.fujita.tomonori@lab.ntt.co.jp>
+References: <20110606091410.GB10508@n2100.arm.linux.org.uk>
+	<20110606183925D.fujita.tomonori@lab.ntt.co.jp>
+	<20110606094751.GC10508@n2100.arm.linux.org.uk>
+	<20110606191041U.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <20110606101556.GE10508@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 6, 2011 at 9:46 AM,  <green@linuxhacker.ru> wrote:
-> From: Oleg Drokin <green@linuxhacker.ru>
->
-> CC: Mark Brown <broonie@opensource.wolfsonmicro.com>
-> CC: Mike Rapoport <mike@compulab.co.il>
-> CC: Nishant Kamat <nskamat@ti.com>
-> CC: Steve Sakoman <steve@sakoman.com>
-> CC: Felipe Balbi <balbi@ti.com>
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
-> ---
-> ?arch/arm/mach-omap2/board-cm-t35.c ? ? ? ? ? | ? ?2 --
-> ?arch/arm/mach-omap2/board-ldp.c ? ? ? ? ? ? ?| ? ?2 --
-> ?arch/arm/mach-omap2/board-omap3beagle.c ? ? ?| ? ?4 ----
-> ?arch/arm/mach-omap2/board-omap3evm.c ? ? ? ? | ? ?4 ----
-> ?arch/arm/mach-omap2/board-omap3logic.c ? ? ? | ? ?2 --
-> ?arch/arm/mach-omap2/board-omap3stalker.c ? ? | ? ?4 ----
-> ?arch/arm/mach-omap2/board-omap3touchbook.c ? | ? ?4 ----
-> ?arch/arm/mach-omap2/board-overo.c ? ? ? ? ? ?| ? ?2 --
-> ?arch/arm/mach-omap2/board-zoom-peripherals.c | ? ?7 -------
-> ?9 files changed, 0 insertions(+), 31 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-> index 33855e4..a38cd70 100644
-> --- a/arch/arm/mach-omap2/board-cm-t35.c
-> +++ b/arch/arm/mach-omap2/board-cm-t35.c
-> @@ -480,8 +480,6 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
-> ? ? ? ?omap2_hsmmc_init(mmc);
->
-> ? ? ? ?/* link regulators to MMC adapters */
+On Mon, Jun 06, 2011 at 07:12:20PM +0900, FUJITA Tomonori wrote:
+> On Mon, 6 Jun 2011 10:47:51 +0100
+> Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> 
+> > On Mon, Jun 06, 2011 at 06:41:09PM +0900, FUJITA Tomonori wrote:
+> > > On Mon, 6 Jun 2011 10:14:10 +0100
+> > > Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> > > 
+> > > > On Mon, Jun 06, 2011 at 05:06:03PM +0900, FUJITA Tomonori wrote:
+> > > > > max_segs isn't unrelated with the dma mapping API. I explained above,
+> > > > > IOMMUs doesn't increase the number of segments (could decrease the
+> > > > > number of segments by merging).
+> > > > > 
+> > > > > The limitation about the number of segment already lives elsewhere
+> > > > > (e.g. queue's limits.max_segments).
+> > > > 
+> > > > I think you're missing the point entirely.
+> > > > 
+> > > > Lets take the problem at hand: you have two devices.  One of them is
+> > > > handled by the DMA engine code.  One of them is a block device.
+> > > > 
+> > > > The block layer needs to know the various parameters of what is
+> > > > allowable for DMA, including such things as the maximum size of a
+> > > > segment, and the _number_ of segments that can be placed into any
+> > > > one request.
+> > > > 
+> > > > As the DMA provider is _entirely_ separate and unknown to the block
+> > > > device driver, the block device driver has no way to sanely provide
+> > > > these parameters to the block layer - they are not a property of the
+> > > > block device driver, but of the DMA provider.
+> > > 
+> > > struct device_dma_parameters is used for a property of the block
+> > > device drivers (and scsi HBA drivers, etc). Not DMA provider. Right?
+> > 
+> > Wrong.  struct device_dma_parameters is a property of the _DMA_ _provider_.
+> > It has to be.  Read what I said above and think about it.
+> 
+> I think that it's up to your definition of DMA provider.
 
-Would be useful to remove this comment too.
-
-> - ? ? ? cm_t35_vmmc1_supply.dev = mmc[0].dev;
-> - ? ? ? cm_t35_vsim_supply.dev = mmc[0].dev;
->
-> ? ? ? ?return 0;
-> ?}
+I give up.
