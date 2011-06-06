@@ -1,196 +1,509 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 6 Jun 2011 09:42:58 +0200
-Subject: [PATCH v2 1/2] ARM: mx5/mx51_3ds: Fix build due to missing
-	header and wrong define
-In-Reply-To: <1307212185-18184-1-git-send-email-festevam@gmail.com>
-References: <1307212185-18184-1-git-send-email-festevam@gmail.com>
-Message-ID: <20110606074258.GX23771@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 6 Jun 2011 01:47:31 -0600
+Subject: [PATCH v4 2/3] gpio/mxs: Change gpio-mxs into an upstanding gpio
+	driver
+In-Reply-To: <1307289545-6993-3-git-send-email-shawn.guo@linaro.org>
+References: <1307289545-6993-1-git-send-email-shawn.guo@linaro.org>
+	<1307289545-6993-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110606074731.GB10410@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Sun, Jun 05, 2011 at 11:59:04PM +0800, Shawn Guo wrote:
+> The patch makes necessary changes on gpio-mxs as below to turn it
+> into an upstanding gpio driver.
+> 
+>  * Clean up the gpio port definition stuff
+> 
+>  * Use readl/writel to replace mach-specific accessors
+>    __raw_readl/__raw_writel
+> 
+>  * Change mxs_gpio_init into mxs_gpio_probe function
+> 
+> And it then migrates mach-mxs to the updated driver by adding
+> corresponding platform devices.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 
-On Sat, Jun 04, 2011 at 03:29:44PM -0300, Fabio Estevam wrote:
-> commit b50d28 (ARM i.MX: get rid of wrong MXC_INTERNAL_IRQ usage) broke mx51_3ds build.
-> 
-> Fix it by adding the missing gpio header and also removed the extra parenthesis for 
-> EXPIO_PARENT_INT definition.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+Applied, thanks
+
+g.
+
 > ---
-> Changes since v1:
-> - removed extra parenthesis in EXPIO_PARENT_INT
+>  arch/arm/mach-mxs/devices.c                     |   11 ++
+>  arch/arm/mach-mxs/devices/Makefile              |    1 +
+>  arch/arm/mach-mxs/devices/platform-gpio-mxs.c   |   53 ++++++
+>  arch/arm/mach-mxs/include/mach/devices-common.h |    2 +
+>  arch/arm/mach-mxs/mm-mx23.c                     |    1 -
+>  arch/arm/mach-mxs/mm-mx28.c                     |    1 -
+>  drivers/gpio/gpio-mxs.c                         |  216 +++++++++++++----------
+>  7 files changed, 191 insertions(+), 94 deletions(-)
+>  create mode 100644 arch/arm/mach-mxs/devices/platform-gpio-mxs.c
 > 
->  arch/arm/mach-mx5/board-mx51_3ds.c |    3 ++-
-
-I squashed these two patches into the original commit which breaks the
-build. Can I have you ack for the following?
-
-8<------------------------------------------------------
-[PATCH] ARM i.MX: get rid of wrong MXC_INTERNAL_IRQ usage
-
-There are several occurences where MXC_INTERNAL_IRQ is
-assumed to be the start of the gpio interrupts. It was never
-meant this way. Replace these with gpio_to_irq.
-
-Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
----
- arch/arm/mach-imx/mach-mx27_3ds.c            |    2 +-
- arch/arm/mach-imx/mach-mx35_3ds.c            |    2 +-
- arch/arm/mach-mx5/board-cpuimx51.c           |   12 ++++--------
- arch/arm/mach-mx5/board-mx51_3ds.c           |    3 ++-
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c |    6 +++---
- arch/arm/plat-mxc/include/mach/iomux-v1.h    |    3 ---
- 6 files changed, 11 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-index 6e1accf..fcbac6e 100644
---- a/arch/arm/mach-imx/mach-mx27_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-@@ -45,7 +45,7 @@
- #define SD1_EN_GPIO (GPIO_PORTB + 25)
- #define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
- #define SPI2_SS0 (GPIO_PORTD + 21)
--#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTC + 28)
-+#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(3, 28))
- 
- static const int mx27pdk_pins[] __initconst = {
- 	/* UART1 */
-diff --git a/arch/arm/mach-imx/mach-mx35_3ds.c b/arch/arm/mach-imx/mach-mx35_3ds.c
-index 882880a..c10221d 100644
---- a/arch/arm/mach-imx/mach-mx35_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx35_3ds.c
-@@ -43,7 +43,7 @@
- 
- #include "devices-imx35.h"
- 
--#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 1)
-+#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 1))
- 
- static const struct imxuart_platform_data uart_pdata __initconst = {
- 	.flags = IMXUART_HAVE_RTSCTS,
-diff --git a/arch/arm/mach-mx5/board-cpuimx51.c b/arch/arm/mach-mx5/board-cpuimx51.c
-index 4efa02e..7fbfd06 100644
---- a/arch/arm/mach-mx5/board-cpuimx51.c
-+++ b/arch/arm/mach-mx5/board-cpuimx51.c
-@@ -43,10 +43,6 @@
- #define CPUIMX51_QUARTB_GPIO	IMX_GPIO_NR(3, 25)
- #define CPUIMX51_QUARTC_GPIO	IMX_GPIO_NR(3, 26)
- #define CPUIMX51_QUARTD_GPIO	IMX_GPIO_NR(3, 27)
--#define CPUIMX51_QUARTA_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTA_GPIO)
--#define CPUIMX51_QUARTB_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTB_GPIO)
--#define CPUIMX51_QUARTC_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTC_GPIO)
--#define CPUIMX51_QUARTD_IRQ	(MXC_INTERNAL_IRQS + CPUIMX51_QUARTD_GPIO)
- #define CPUIMX51_QUART_XTAL	14745600
- #define CPUIMX51_QUART_REGSHIFT	17
- 
-@@ -61,7 +57,7 @@
- static struct plat_serial8250_port serial_platform_data[] = {
- 	{
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x400000),
--		.irq = CPUIMX51_QUARTA_IRQ,
-+		.irq = gpio_to_irq(CPUIMX51_QUARTA_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-@@ -69,7 +65,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x800000),
--		.irq = CPUIMX51_QUARTB_IRQ,
-+		.irq = gpio_to_irq(CPUIMX51_QUARTB_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-@@ -77,7 +73,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x1000000),
--		.irq = CPUIMX51_QUARTC_IRQ,
-+		.irq = gpio_to_irq(CPUIMX51_QUARTC_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-@@ -85,7 +81,7 @@ static struct plat_serial8250_port serial_platform_data[] = {
- 		.flags = UPF_BOOT_AUTOCONF | UPF_SKIP_TEST | UPF_IOREMAP,
- 	}, {
- 		.mapbase = (unsigned long)(MX51_CS1_BASE_ADDR + 0x2000000),
--		.irq = CPUIMX51_QUARTD_IRQ,
-+		.irq = irq_to_gpio(CPUIMX51_QUARTD_GPIO),
- 		.irqflags = IRQF_TRIGGER_HIGH,
- 		.uartclk = CPUIMX51_QUART_XTAL,
- 		.regshift = CPUIMX51_QUART_REGSHIFT,
-diff --git a/arch/arm/mach-mx5/board-mx51_3ds.c b/arch/arm/mach-mx5/board-mx51_3ds.c
-index 63dfbea..11b2c7a 100644
---- a/arch/arm/mach-mx5/board-mx51_3ds.c
-+++ b/arch/arm/mach-mx5/board-mx51_3ds.c
-@@ -13,6 +13,7 @@
- #include <linux/irq.h>
- #include <linux/platform_device.h>
- #include <linux/spi/spi.h>
-+#include <linux/gpio.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/arch.h>
-@@ -26,7 +27,7 @@
- #include "devices-imx51.h"
- #include "devices.h"
- 
--#define EXPIO_PARENT_INT	(MXC_INTERNAL_IRQS + GPIO_PORTA + 6)
-+#define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(1, 6))
- #define MX51_3DS_ECSPI2_CS	(GPIO_PORTC + 28)
- 
- static iomux_v3_cfg_t mx51_3ds_pads[] = {
-diff --git a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-index 02ce720..bbf4564 100644
---- a/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-+++ b/arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c
-@@ -31,7 +31,6 @@
- #include "devices.h"
- 
- #define MBIMX51_TSC2007_GPIO	IMX_GPIO_NR(3, 30)
--#define MBIMX51_TSC2007_IRQ	(MXC_INTERNAL_IRQS + MBIMX51_TSC2007_GPIO)
- #define MBIMX51_LED0		IMX_GPIO_NR(3, 5)
- #define MBIMX51_LED1		IMX_GPIO_NR(3, 6)
- #define MBIMX51_LED2		IMX_GPIO_NR(3, 7)
-@@ -161,7 +160,7 @@ struct tsc2007_platform_data tsc2007_data = {
- static struct i2c_board_info mbimx51_i2c_devices[] = {
- 	{
- 		I2C_BOARD_INFO("tsc2007", 0x49),
--		.irq  = MBIMX51_TSC2007_IRQ,
-+		.irq  = gpio_to_irq(MBIMX51_TSC2007_GPIO),
- 		.platform_data = &tsc2007_data,
- 	}, {
- 		I2C_BOARD_INFO("tlv320aic23", 0x1a),
-@@ -198,7 +197,8 @@ void __init eukrea_mbimx51_baseboard_init(void)
- 
- 	gpio_request(MBIMX51_TSC2007_GPIO, "tsc2007_irq");
- 	gpio_direction_input(MBIMX51_TSC2007_GPIO);
--	irq_set_irq_type(MBIMX51_TSC2007_IRQ, IRQF_TRIGGER_FALLING);
-+	irq_set_irq_type(gpio_to_irq(MBIMX51_TSC2007_GPIO),
-+					IRQF_TRIGGER_FALLING);
- 	i2c_register_board_info(1, mbimx51_i2c_devices,
- 				ARRAY_SIZE(mbimx51_i2c_devices));
- 
-diff --git a/arch/arm/plat-mxc/include/mach/iomux-v1.h b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-index c07d302..a7fc51e 100644
---- a/arch/arm/plat-mxc/include/mach/iomux-v1.h
-+++ b/arch/arm/plat-mxc/include/mach/iomux-v1.h
-@@ -85,9 +85,6 @@
- #define GPIO_BOUT_0	(2 << GPIO_BOUT_SHIFT)
- #define GPIO_BOUT_1	(3 << GPIO_BOUT_SHIFT)
- 
--/* decode irq number to use with IMR(x), ISR(x) and friends */
--#define IRQ_TO_REG(irq) ((irq - MXC_INTERNAL_IRQS) >> 5)
--
- #define IRQ_GPIOA(x)  (MXC_GPIO_IRQ_START + x)
- #define IRQ_GPIOB(x)  (IRQ_GPIOA(32) + x)
- #define IRQ_GPIOC(x)  (IRQ_GPIOB(32) + x)
--- 
-1.7.5.3
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+> diff --git a/arch/arm/mach-mxs/devices.c b/arch/arm/mach-mxs/devices.c
+> index cfdb6b2..fe3e847 100644
+> --- a/arch/arm/mach-mxs/devices.c
+> +++ b/arch/arm/mach-mxs/devices.c
+> @@ -88,3 +88,14 @@ int __init mxs_add_amba_device(const struct amba_device *dev)
+>  
+>  	return amba_device_register(adev, &iomem_resource);
+>  }
+> +
+> +struct device mxs_apbh_bus = {
+> +	.init_name	= "mxs_apbh",
+> +	.parent         = &platform_bus,
+> +};
+> +
+> +static int __init mxs_device_init(void)
+> +{
+> +	return device_register(&mxs_apbh_bus);
+> +}
+> +core_initcall(mxs_device_init);
+> diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
+> index 324f282..351915c 100644
+> --- a/arch/arm/mach-mxs/devices/Makefile
+> +++ b/arch/arm/mach-mxs/devices/Makefile
+> @@ -6,4 +6,5 @@ obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_I2C) += platform-mxs-i2c.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_MMC) += platform-mxs-mmc.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_PWM) += platform-mxs-pwm.o
+> +obj-y += platform-gpio-mxs.o
+>  obj-$(CONFIG_MXS_HAVE_PLATFORM_MXSFB) += platform-mxsfb.o
+> diff --git a/arch/arm/mach-mxs/devices/platform-gpio-mxs.c b/arch/arm/mach-mxs/devices/platform-gpio-mxs.c
+> new file mode 100644
+> index 0000000..ed0885e
+> --- /dev/null
+> +++ b/arch/arm/mach-mxs/devices/platform-gpio-mxs.c
+> @@ -0,0 +1,53 @@
+> +/*
+> + * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+> + *
+> + * This program is free software; you can redistribute it and/or modify it under
+> + * the terms of the GNU General Public License version 2 as published by the
+> + * Free Software Foundation.
+> + */
+> +#include <linux/compiler.h>
+> +#include <linux/err.h>
+> +#include <linux/init.h>
+> +
+> +#include <mach/mx23.h>
+> +#include <mach/mx28.h>
+> +#include <mach/devices-common.h>
+> +
+> +struct platform_device *__init mxs_add_gpio(
+> +	int id, resource_size_t iobase, int irq)
+> +{
+> +	struct resource res[] = {
+> +		{
+> +			.start = iobase,
+> +			.end = iobase + SZ_8K - 1,
+> +			.flags = IORESOURCE_MEM,
+> +		}, {
+> +			.start = irq,
+> +			.end = irq,
+> +			.flags = IORESOURCE_IRQ,
+> +		},
+> +	};
+> +
+> +	return platform_device_register_resndata(&mxs_apbh_bus,
+> +			"gpio-mxs", id, res, ARRAY_SIZE(res), NULL, 0);
+> +}
+> +
+> +static int __init mxs_add_mxs_gpio(void)
+> +{
+> +	if (cpu_is_mx23()) {
+> +		mxs_add_gpio(0, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO0);
+> +		mxs_add_gpio(1, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO1);
+> +		mxs_add_gpio(2, MX23_PINCTRL_BASE_ADDR, MX23_INT_GPIO2);
+> +	}
+> +
+> +	if (cpu_is_mx28()) {
+> +		mxs_add_gpio(0, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO0);
+> +		mxs_add_gpio(1, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO1);
+> +		mxs_add_gpio(2, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO2);
+> +		mxs_add_gpio(3, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO3);
+> +		mxs_add_gpio(4, MX28_PINCTRL_BASE_ADDR, MX28_INT_GPIO4);
+> +	}
+> +
+> +	return 0;
+> +}
+> +postcore_initcall(mxs_add_mxs_gpio);
+> diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
+> index 7a37469..812d7a8 100644
+> --- a/arch/arm/mach-mxs/include/mach/devices-common.h
+> +++ b/arch/arm/mach-mxs/include/mach/devices-common.h
+> @@ -11,6 +11,8 @@
+>  #include <linux/init.h>
+>  #include <linux/amba/bus.h>
+>  
+> +extern struct device mxs_apbh_bus;
+> +
+>  struct platform_device *mxs_add_platform_device_dmamask(
+>  		const char *name, int id,
+>  		const struct resource *res, unsigned int num_resources,
+> diff --git a/arch/arm/mach-mxs/mm-mx23.c b/arch/arm/mach-mxs/mm-mx23.c
+> index 5148cd6..1b2345a 100644
+> --- a/arch/arm/mach-mxs/mm-mx23.c
+> +++ b/arch/arm/mach-mxs/mm-mx23.c
+> @@ -41,5 +41,4 @@ void __init mx23_map_io(void)
+>  void __init mx23_init_irq(void)
+>  {
+>  	icoll_init_irq();
+> -	mx23_register_gpios();
+>  }
+> diff --git a/arch/arm/mach-mxs/mm-mx28.c b/arch/arm/mach-mxs/mm-mx28.c
+> index 7e4cea3..b6e18dd 100644
+> --- a/arch/arm/mach-mxs/mm-mx28.c
+> +++ b/arch/arm/mach-mxs/mm-mx28.c
+> @@ -41,5 +41,4 @@ void __init mx28_map_io(void)
+>  void __init mx28_init_irq(void)
+>  {
+>  	icoll_init_irq();
+> -	mx28_register_gpios();
+>  }
+> diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+> index bac7b6b..6fd9f01 100644
+> --- a/drivers/gpio/gpio-mxs.c
+> +++ b/drivers/gpio/gpio-mxs.c
+> @@ -25,13 +25,13 @@
+>  #include <linux/io.h>
+>  #include <linux/irq.h>
+>  #include <linux/gpio.h>
+> -#include <mach/mx23.h>
+> -#include <mach/mx28.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +#include <mach/mxs.h>
+>  #include <mach/gpio-mxs.h>
+> -#include <asm-generic/bug.h>
+>  
+> -static struct mxs_gpio_port *mxs_gpio_ports;
+> -static int gpio_table_size;
+> +#define MXS_SET		0x4
+> +#define MXS_CLR		0x8
+>  
+>  #define PINCTRL_DOUT(n)		((cpu_is_mx23() ? 0x0500 : 0x0700) + (n) * 0x10)
+>  #define PINCTRL_DIN(n)		((cpu_is_mx23() ? 0x0600 : 0x0900) + (n) * 0x10)
+> @@ -53,36 +53,42 @@ static int gpio_table_size;
+>  
+>  static void clear_gpio_irqstatus(struct mxs_gpio_port *port, u32 index)
+>  {
+> -	__mxs_clrl(1 << index, port->base + PINCTRL_IRQSTAT(port->id));
+> +	writel(1 << index, port->base + PINCTRL_IRQSTAT(port->id) + MXS_CLR);
+>  }
+>  
+>  static void set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
+>  				int enable)
+>  {
+>  	if (enable) {
+> -		__mxs_setl(1 << index, port->base + PINCTRL_IRQEN(port->id));
+> -		__mxs_setl(1 << index, port->base + PINCTRL_PIN2IRQ(port->id));
+> +		writel(1 << index,
+> +			port->base + PINCTRL_IRQEN(port->id) + MXS_SET);
+> +		writel(1 << index,
+> +			port->base + PINCTRL_PIN2IRQ(port->id) + MXS_SET);
+>  	} else {
+> -		__mxs_clrl(1 << index, port->base + PINCTRL_IRQEN(port->id));
+> +		writel(1 << index,
+> +			port->base + PINCTRL_IRQEN(port->id) + MXS_CLR);
+>  	}
+>  }
+>  
+>  static void mxs_gpio_ack_irq(struct irq_data *d)
+>  {
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	u32 gpio = irq_to_gpio(d->irq);
+> -	clear_gpio_irqstatus(&mxs_gpio_ports[gpio / 32], gpio & 0x1f);
+> +	clear_gpio_irqstatus(port, gpio & 0x1f);
+>  }
+>  
+>  static void mxs_gpio_mask_irq(struct irq_data *d)
+>  {
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	u32 gpio = irq_to_gpio(d->irq);
+> -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 0);
+> +	set_gpio_irqenable(port, gpio & 0x1f, 0);
+>  }
+>  
+>  static void mxs_gpio_unmask_irq(struct irq_data *d)
+>  {
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	u32 gpio = irq_to_gpio(d->irq);
+> -	set_gpio_irqenable(&mxs_gpio_ports[gpio / 32], gpio & 0x1f, 1);
+> +	set_gpio_irqenable(port, gpio & 0x1f, 1);
+>  }
+>  
+>  static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset);
+> @@ -91,7 +97,7 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+>  {
+>  	u32 gpio = irq_to_gpio(d->irq);
+>  	u32 pin_mask = 1 << (gpio & 31);
+> -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  	void __iomem *pin_addr;
+>  	int edge;
+>  
+> @@ -115,16 +121,16 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+>  	/* set level or edge */
+>  	pin_addr = port->base + PINCTRL_IRQLEV(port->id);
+>  	if (edge & GPIO_INT_LEV_MASK)
+> -		__mxs_setl(pin_mask, pin_addr);
+> +		writel(pin_mask, pin_addr + MXS_SET);
+>  	else
+> -		__mxs_clrl(pin_mask, pin_addr);
+> +		writel(pin_mask, pin_addr + MXS_CLR);
+>  
+>  	/* set polarity */
+>  	pin_addr = port->base + PINCTRL_IRQPOL(port->id);
+>  	if (edge & GPIO_INT_POL_MASK)
+> -		__mxs_setl(pin_mask, pin_addr);
+> +		writel(pin_mask, pin_addr + MXS_SET);
+>  	else
+> -		__mxs_clrl(pin_mask, pin_addr);
+> +		writel(pin_mask, pin_addr + MXS_CLR);
+>  
+>  	clear_gpio_irqstatus(port, gpio & 0x1f);
+>  
+> @@ -135,13 +141,13 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
+>  static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+>  {
+>  	u32 irq_stat;
+> -	struct mxs_gpio_port *port = (struct mxs_gpio_port *)irq_get_handler_data(irq);
+> +	struct mxs_gpio_port *port = irq_get_handler_data(irq);
+>  	u32 gpio_irq_no_base = port->virtual_irq_start;
+>  
+>  	desc->irq_data.chip->irq_ack(&desc->irq_data);
+>  
+> -	irq_stat = __raw_readl(port->base + PINCTRL_IRQSTAT(port->id)) &
+> -			__raw_readl(port->base + PINCTRL_IRQEN(port->id));
+> +	irq_stat = readl(port->base + PINCTRL_IRQSTAT(port->id)) &
+> +			readl(port->base + PINCTRL_IRQEN(port->id));
+>  
+>  	while (irq_stat != 0) {
+>  		int irqoffset = fls(irq_stat) - 1;
+> @@ -163,7 +169,7 @@ static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
+>  {
+>  	u32 gpio = irq_to_gpio(d->irq);
+>  	u32 gpio_idx = gpio & 0x1f;
+> -	struct mxs_gpio_port *port = &mxs_gpio_ports[gpio / 32];
+> +	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+>  
+>  	if (enable) {
+>  		if (port->irq_high && (gpio_idx >= 16))
+> @@ -197,9 +203,9 @@ static void mxs_set_gpio_direction(struct gpio_chip *chip, unsigned offset,
+>  	void __iomem *pin_addr = port->base + PINCTRL_DOE(port->id);
+>  
+>  	if (dir)
+> -		__mxs_setl(1 << offset, pin_addr);
+> +		writel(1 << offset, pin_addr + MXS_SET);
+>  	else
+> -		__mxs_clrl(1 << offset, pin_addr);
+> +		writel(1 << offset, pin_addr + MXS_CLR);
+>  }
+>  
+>  static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset)
+> @@ -207,7 +213,7 @@ static int mxs_gpio_get(struct gpio_chip *chip, unsigned offset)
+>  	struct mxs_gpio_port *port =
+>  		container_of(chip, struct mxs_gpio_port, chip);
+>  
+> -	return (__raw_readl(port->base + PINCTRL_DIN(port->id)) >> offset) & 1;
+> +	return (readl(port->base + PINCTRL_DIN(port->id)) >> offset) & 1;
+>  }
+>  
+>  static void mxs_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+> @@ -217,9 +223,9 @@ static void mxs_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+>  	void __iomem *pin_addr = port->base + PINCTRL_DOUT(port->id);
+>  
+>  	if (value)
+> -		__mxs_setl(1 << offset, pin_addr);
+> +		writel(1 << offset, pin_addr + MXS_SET);
+>  	else
+> -		__mxs_clrl(1 << offset, pin_addr);
+> +		writel(1 << offset, pin_addr + MXS_CLR);
+>  }
+>  
+>  static int mxs_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+> @@ -244,87 +250,113 @@ static int mxs_gpio_direction_output(struct gpio_chip *chip,
+>  	return 0;
+>  }
+>  
+> -int __init mxs_gpio_init(struct mxs_gpio_port *port, int cnt)
+> +static int __devinit mxs_gpio_probe(struct platform_device *pdev)
+>  {
+> -	int i, j;
+> +	static void __iomem *base;
+> +	struct mxs_gpio_port *port;
+> +	struct resource *iores = NULL;
+> +	int err, i;
+> +
+> +	port = kzalloc(sizeof(struct mxs_gpio_port), GFP_KERNEL);
+> +	if (!port)
+> +		return -ENOMEM;
+> +
+> +	port->id = pdev->id;
+> +	port->virtual_irq_start = MXS_GPIO_IRQ_START + port->id * 32;
+> +
+> +	/*
+> +	 * map memory region only once, as all the gpio ports
+> +	 * share the same one
+> +	 */
+> +	if (!base) {
+> +		iores = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +		if (!iores) {
+> +			err = -ENODEV;
+> +			goto out_kfree;
+> +		}
+>  
+> -	/* save for local usage */
+> -	mxs_gpio_ports = port;
+> -	gpio_table_size = cnt;
+> +		if (!request_mem_region(iores->start, resource_size(iores),
+> +					pdev->name)) {
+> +			err = -EBUSY;
+> +			goto out_kfree;
+> +		}
+>  
+> -	pr_info("MXS GPIO hardware\n");
+> +		base = ioremap(iores->start, resource_size(iores));
+> +		if (!base) {
+> +			err = -ENOMEM;
+> +			goto out_release_mem;
+> +		}
+> +	}
+> +	port->base = base;
+>  
+> -	for (i = 0; i < cnt; i++) {
+> -		/* disable the interrupt and clear the status */
+> -		__raw_writel(0, port[i].base + PINCTRL_PIN2IRQ(i));
+> -		__raw_writel(0, port[i].base + PINCTRL_IRQEN(i));
+> +	port->irq = platform_get_irq(pdev, 0);
+> +	if (port->irq < 0) {
+> +		err = -EINVAL;
+> +		goto out_iounmap;
+> +	}
+>  
+> -		/* clear address has to be used to clear IRQSTAT bits */
+> -		__mxs_clrl(~0U, port[i].base + PINCTRL_IRQSTAT(i));
+> +	/* disable the interrupt and clear the status */
+> +	writel(0, port->base + PINCTRL_PIN2IRQ(port->id));
+> +	writel(0, port->base + PINCTRL_IRQEN(port->id));
+>  
+> -		for (j = port[i].virtual_irq_start;
+> -			j < port[i].virtual_irq_start + 32; j++) {
+> -			irq_set_chip_and_handler(j, &gpio_irq_chip,
+> -						 handle_level_irq);
+> -			set_irq_flags(j, IRQF_VALID);
+> -		}
+> +	/* clear address has to be used to clear IRQSTAT bits */
+> +	writel(~0U, port->base + PINCTRL_IRQSTAT(port->id) + MXS_CLR);
+>  
+> -		/* setup one handler for each entry */
+> -		irq_set_chained_handler(port[i].irq, mxs_gpio_irq_handler);
+> -		irq_set_handler_data(port[i].irq, &port[i]);
+> -
+> -		/* register gpio chip */
+> -		port[i].chip.direction_input = mxs_gpio_direction_input;
+> -		port[i].chip.direction_output = mxs_gpio_direction_output;
+> -		port[i].chip.get = mxs_gpio_get;
+> -		port[i].chip.set = mxs_gpio_set;
+> -		port[i].chip.to_irq = mxs_gpio_to_irq;
+> -		port[i].chip.base = i * 32;
+> -		port[i].chip.ngpio = 32;
+> -
+> -		/* its a serious configuration bug when it fails */
+> -		BUG_ON(gpiochip_add(&port[i].chip) < 0);
+> +	for (i = port->virtual_irq_start;
+> +		i < port->virtual_irq_start + 32; i++) {
+> +		irq_set_chip_and_handler(i, &gpio_irq_chip,
+> +					 handle_level_irq);
+> +		set_irq_flags(i, IRQF_VALID);
+> +		irq_set_chip_data(i, port);
+>  	}
+>  
+> -	return 0;
+> -}
+> +	/* setup one handler for each entry */
+> +	irq_set_chained_handler(port->irq, mxs_gpio_irq_handler);
+> +	irq_set_handler_data(port->irq, port);
+>  
+> -#define MX23_GPIO_BASE	MX23_IO_ADDRESS(MX23_PINCTRL_BASE_ADDR)
+> -#define MX28_GPIO_BASE	MX28_IO_ADDRESS(MX28_PINCTRL_BASE_ADDR)
+> +	/* register gpio chip */
+> +	port->chip.direction_input = mxs_gpio_direction_input;
+> +	port->chip.direction_output = mxs_gpio_direction_output;
+> +	port->chip.get = mxs_gpio_get;
+> +	port->chip.set = mxs_gpio_set;
+> +	port->chip.to_irq = mxs_gpio_to_irq;
+> +	port->chip.base = port->id * 32;
+> +	port->chip.ngpio = 32;
+>  
+> -#define DEFINE_MXS_GPIO_PORT(_base, _irq, _id)				\
+> -	{								\
+> -		.chip.label = "gpio-" #_id,				\
+> -		.id = _id,						\
+> -		.irq = _irq,						\
+> -		.base = _base,						\
+> -		.virtual_irq_start = MXS_GPIO_IRQ_START + (_id) * 32,	\
+> -	}
+> +	err = gpiochip_add(&port->chip);
+> +	if (err)
+> +		goto out_iounmap;
+>  
+> -#ifdef CONFIG_SOC_IMX23
+> -static struct mxs_gpio_port mx23_gpio_ports[] = {
+> -	DEFINE_MXS_GPIO_PORT(MX23_GPIO_BASE, MX23_INT_GPIO0, 0),
+> -	DEFINE_MXS_GPIO_PORT(MX23_GPIO_BASE, MX23_INT_GPIO1, 1),
+> -	DEFINE_MXS_GPIO_PORT(MX23_GPIO_BASE, MX23_INT_GPIO2, 2),
+> -};
+> +	return 0;
+>  
+> -int __init mx23_register_gpios(void)
+> -{
+> -	return mxs_gpio_init(mx23_gpio_ports, ARRAY_SIZE(mx23_gpio_ports));
+> +out_iounmap:
+> +	if (iores)
+> +		iounmap(port->base);
+> +out_release_mem:
+> +	if (iores)
+> +		release_mem_region(iores->start, resource_size(iores));
+> +out_kfree:
+> +	kfree(port);
+> +	dev_info(&pdev->dev, "%s failed with errno %d\n", __func__, err);
+> +	return err;
+>  }
+> -#endif
+> -
+> -#ifdef CONFIG_SOC_IMX28
+> -static struct mxs_gpio_port mx28_gpio_ports[] = {
+> -	DEFINE_MXS_GPIO_PORT(MX28_GPIO_BASE, MX28_INT_GPIO0, 0),
+> -	DEFINE_MXS_GPIO_PORT(MX28_GPIO_BASE, MX28_INT_GPIO1, 1),
+> -	DEFINE_MXS_GPIO_PORT(MX28_GPIO_BASE, MX28_INT_GPIO2, 2),
+> -	DEFINE_MXS_GPIO_PORT(MX28_GPIO_BASE, MX28_INT_GPIO3, 3),
+> -	DEFINE_MXS_GPIO_PORT(MX28_GPIO_BASE, MX28_INT_GPIO4, 4),
+> +
+> +static struct platform_driver mxs_gpio_driver = {
+> +	.driver		= {
+> +		.name	= "gpio-mxs",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= mxs_gpio_probe,
+>  };
+>  
+> -int __init mx28_register_gpios(void)
+> +static int __init mxs_gpio_init(void)
+>  {
+> -	return mxs_gpio_init(mx28_gpio_ports, ARRAY_SIZE(mx28_gpio_ports));
+> +	return platform_driver_register(&mxs_gpio_driver);
+>  }
+> -#endif
+> +postcore_initcall(mxs_gpio_init);
+> +
+> +MODULE_AUTHOR("Freescale Semiconductor, "
+> +	      "Daniel Mack <danielncaiaq.de>, "
+> +	      "Juergen Beisert <kernel@pengutronix.de>");
+> +MODULE_DESCRIPTION("Freescale MXS GPIO");
+> +MODULE_LICENSE("GPL");
+> -- 
+> 1.7.4.1
+> 
