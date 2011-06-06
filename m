@@ -1,174 +1,59 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon,  6 Jun 2011 13:22:41 +0800
-Subject: [PATCH] gpio/mxc: convert gpio-mxc to use basic_mmio_gpio library
-Message-ID: <1307337761-10606-1-git-send-email-shawn.guo@linaro.org>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Mon, 6 Jun 2011 07:15:52 +0200
+Subject: [PATCH] ep93xx-eth: convert to phylib
+In-Reply-To: <20110605.140657.1039864716002412071.davem@davemloft.net>
+References: <201106051957.36492.florian@openwrt.org>
+	<201106052029.24742.f.fainelli@gmail.com>
+	<20110605.140657.1039864716002412071.davem@davemloft.net>
+Message-ID: <201106060715.52332.florian@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio-mxc controller complies with basic_mmio_gpio library.  The
-patch convert the driver to use the library.
+On Sunday 05 June 2011 23:06:57 David Miller wrote:
+> From: Florian Fainelli <f.fainelli@gmail.com>
+> Date: Sun, 5 Jun 2011 20:29:24 +0200
+> 
+> > On Sunday 05 June 2011 19:57:36 Florian Fainelli wrote:
+> >> ep93xx-eth lacked support for monitoring link status changes, with this
+> >> patch, link changes are now watched and reported correctly.
+> >> 
+> >> Signed-off-by: Florian Fainelli <florian@openwrt.org>
+> >> ---
+> > 
+> > I just stumbled upon: http://www.mail-
+> > archive.com/netdev at vger.kernel.org/msg62549.html
+> > which does not seem to have been merged.
+> > 
+> > I will respin my patch with Herbert's changes
+> 
+> If people wonder why things don't get merged in situations like
+> this it's because there is no clear person standing up to act as
+> a maintainer.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-The patch is based on the series below.
+No problem here so far.
 
-  [PATCH v4 0/2] Move plat-mxc gpio driver into drivers/gpio
+> 
+> Instead there are several different people submitting changes to
+> this one driver and I haven't got a clue who is authoritative and
+> who is not.
+> 
+> So 9 times out of ten I'm not going to merge anything submitted
+> in this way unless I start to see lots of ACKs from other developers.
+> 
+> When it gets to the point where multiple people are touching the
+> driver in all sorts of ways, there needs to be someone to do all of
+> the merging and making sure the patches get applied in the right order
+> and handling merge conflicts handled properly.  Then they submit them
+> formally here as a sane single set of patches to the list.
+> 
+> So who is going to step up and be the ep93xx-eth maintainer?  Lennert
+> is listed in MAINTAINERS, but I see little to no activity from him.
 
-Thanks Jamie Iles for reminding this work.
+Lennert, do you still have time, hardware and will to maintain that driver?
 
- drivers/gpio/Kconfig    |    1 +
- drivers/gpio/gpio-mxc.c |   83 ++++++++---------------------------------------
- 2 files changed, 15 insertions(+), 69 deletions(-)
+> 
+> The last ACK Lennert gave for a patch to this driver was in May 2010,
+> more than a year ago.
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 5f00b41..d973abd 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -96,6 +96,7 @@ config GPIO_EXYNOS4
- config GPIO_MXC
- 	def_bool y
- 	depends on ARCH_MXC
-+	select GPIO_BASIC_MMIO_CORE
- 
- config GPIO_PLAT_SAMSUNG
- 	bool "Samsung SoCs GPIO library support"
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 844079a..b351952893 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -26,6 +26,7 @@
- #include <linux/gpio.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
-+#include <linux/basic_mmio_gpio.h>
- #include <mach/hardware.h>
- #include <asm-generic/bug.h>
- 
-@@ -35,9 +36,8 @@ struct mxc_gpio_port {
- 	int irq;
- 	int irq_high;
- 	int virtual_irq_start;
--	struct gpio_chip chip;
-+	struct bgpio_chip bgc;
- 	u32 both_edges;
--	spinlock_t lock;
- };
- 
- /*
-@@ -101,8 +101,6 @@ static void gpio_unmask_irq(struct irq_data *d)
- 	_set_gpio_irqenable(port, gpio & 0x1f, 1);
- }
- 
--static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset);
--
- static int gpio_set_irq_type(struct irq_data *d, u32 type)
- {
- 	u32 gpio = irq_to_gpio(d->irq);
-@@ -120,7 +118,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
- 		edge = GPIO_INT_FALL_EDGE;
- 		break;
- 	case IRQ_TYPE_EDGE_BOTH:
--		val = mxc_gpio_get(&port->chip, gpio & 31);
-+		val = gpio_get_value(gpio & 31);
- 		if (val) {
- 			edge = GPIO_INT_LOW_LEV;
- 			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
-@@ -259,60 +257,6 @@ static struct irq_chip gpio_irq_chip = {
- 	.irq_set_wake = gpio_set_wake_irq,
- };
- 
--static void _set_gpio_direction(struct gpio_chip *chip, unsigned offset,
--				int dir)
--{
--	struct mxc_gpio_port *port =
--		container_of(chip, struct mxc_gpio_port, chip);
--	u32 l;
--	unsigned long flags;
--
--	spin_lock_irqsave(&port->lock, flags);
--	l = readl(port->base + GPIO_GDIR);
--	if (dir)
--		l |= 1 << offset;
--	else
--		l &= ~(1 << offset);
--	writel(l, port->base + GPIO_GDIR);
--	spin_unlock_irqrestore(&port->lock, flags);
--}
--
--static void mxc_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
--{
--	struct mxc_gpio_port *port =
--		container_of(chip, struct mxc_gpio_port, chip);
--	void __iomem *reg = port->base + GPIO_DR;
--	u32 l;
--	unsigned long flags;
--
--	spin_lock_irqsave(&port->lock, flags);
--	l = (readl(reg) & (~(1 << offset))) | (!!value << offset);
--	writel(l, reg);
--	spin_unlock_irqrestore(&port->lock, flags);
--}
--
--static int mxc_gpio_get(struct gpio_chip *chip, unsigned offset)
--{
--	struct mxc_gpio_port *port =
--		container_of(chip, struct mxc_gpio_port, chip);
--
--	return (readl(port->base + GPIO_PSR) >> offset) & 1;
--}
--
--static int mxc_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
--{
--	_set_gpio_direction(chip, offset, 0);
--	return 0;
--}
--
--static int mxc_gpio_direction_output(struct gpio_chip *chip,
--				     unsigned offset, int value)
--{
--	mxc_gpio_set(chip, offset, value);
--	_set_gpio_direction(chip, offset, 1);
--	return 0;
--}
--
- /*
-  * This lock class tells lockdep that GPIO irqs are in a different
-  * category than their parents, so it won't report false recursion.
-@@ -385,24 +329,25 @@ static int __devinit mxc_gpio_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	/* register gpio chip */
--	port->chip.direction_input = mxc_gpio_direction_input;
--	port->chip.direction_output = mxc_gpio_direction_output;
--	port->chip.get = mxc_gpio_get;
--	port->chip.set = mxc_gpio_set;
--	port->chip.base = pdev->id * 32;
--	port->chip.ngpio = 32;
-+	err = bgpio_init(&port->bgc, &pdev->dev, 4,
-+			 port->base + GPIO_PSR,
-+			 port->base + GPIO_DR, NULL,
-+			 port->base + GPIO_GDIR, NULL, false);
-+	if (err)
-+		goto out_iounmap;
- 
--	spin_lock_init(&port->lock);
-+	port->bgc.gc.base = pdev->id * 32;
- 
--	err = gpiochip_add(&port->chip);
-+	err = gpiochip_add(&port->bgc.gc);
- 	if (err)
--		goto out_iounmap;
-+		goto out_bgpio_remove;
- 
- 	list_add_tail(&port->node, &mxc_gpio_ports);
- 
- 	return 0;
- 
-+out_bgpio_remove:
-+	bgpio_remove(&port->bgc);
- out_iounmap:
- 	iounmap(port->base);
- out_release_mem:
--- 
-1.7.4.1
+--
+Florian
