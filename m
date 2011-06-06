@@ -1,59 +1,69 @@
-From: pwaechtler@mac.com (Peter Waechtler)
-Date: Mon, 6 Jun 2011 22:38:26 +0200
-Subject: MMC and reliable write - was: since when does ARM map
-	=?iso-8859-1?q?the=09kernel_memory_in?= sections?
-In-Reply-To: <20110606102855.GA5820@atrey.karlin.mff.cuni.cz>
-References: <201104122052.17453.pwaechtler@mac.com>
-	<20110503080414.GH5832@shareable.org>
-	<20110606102855.GA5820@atrey.karlin.mff.cuni.cz>
-Message-ID: <201106062238.26713.pwaechtler@mac.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon,  6 Jun 2011 13:38:18 -0700
+Subject: [PATCH v2 2/2] ARM: omap4: gpio: add locking around calls to
+	_set_gpio_triggering
+In-Reply-To: <1307392698-21170-1-git-send-email-ccross@android.com>
+References: <1307392698-21170-1-git-send-email-ccross@android.com>
+Message-ID: <1307392698-21170-2-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 6. Juni 2011, 12:28:55 schrieb Pavel Machek:
-> Hi!
-> 
-> > > So basically add a new REQ_ flag - something like REQ_SAFE, which
-> > > would ensure that data
-> > > on block storage is not corrupted due to interrupting this write (or
-> > > even, after the write, if the card does some optimizations). We
-> > > already have a flag that ensures corruptions don't occur
-> > > because of local-to-disk caches - REQ_FUA, so this would just thinking
-> > > about what effects REQ_FUA  already has that's not considered. On a
-> > > (spinning) disk, I can't image that interrupting a REQ_FUA write would
-> > > cause data loss somewhere other than where data was written.
-> > > 
-> > > Then it would be as simple as a mount flag that would ensure all
-> > > (write) accesses are FUA accesses, to ensure desired behavior for
-> > > platforms where power could be cut at any moment.
-> > 
-> > I think you're mixing up different concepts.
-> > 
-> > On a spinning hard disk, _all_ writes don't cause data loss other than
-> > where data is written, rounded up to the sector (512 or 4096 bytes).
-> 
-> ...
-> 
-> Yes, so on mmc there are two different problems:
-> 
-> * reliability of write itself (REL_WRITE solves that)
-> 
-> * reliability of data around write (there are for bits "controlling"
->   it in 4.4.1 MMC specs, unfortunately they are only writable by card
->   manufacturer AFAICS).
-> 									Pavel
+_set_gpio_triggering uses read-modify-write on bank registers,
+lock bank->lock around all calls to it to prevent register
+corruption if two cpus access gpios in the same bank at the
+same time.
 
-Yes - and there is another issue (but you could say that it fits to 2):
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ drivers/gpio/gpio-omap.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
 
-background operations
-
-After programming a page the "pairing" page should be corrected.
-Then there is garbage collection and wear leveling. If this is 
-interrupted/disturbed by a sudden power loss "at the wrong moment": user data 
-gets possibly corrupted.
-
-The power supply has to give you a signal that power will be lost, say, in 30 
-ms. Now a mechanism has to be specified how to tell the device to stop any 
-programming in a timely fashion - the HPI (high prio interrupt) comes to mind.
-
-	Peter
+diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+index 8ba6957..b14bfd4 100644
+--- a/drivers/gpio/gpio-omap.c
++++ b/drivers/gpio/gpio-omap.c
+@@ -1126,8 +1126,11 @@ static void gpio_irq_shutdown(struct irq_data *d)
+ {
+ 	unsigned int gpio = d->irq - IH_GPIO_BASE;
+ 	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&bank->lock, flags);
+ 	_reset_gpio(bank, gpio);
++	spin_unlock_irqrestore(&bank->lock, flags);
+ }
+ 
+ static void gpio_ack_irq(struct irq_data *d)
+@@ -1142,9 +1145,12 @@ static void gpio_mask_irq(struct irq_data *d)
+ {
+ 	unsigned int gpio = d->irq - IH_GPIO_BASE;
+ 	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&bank->lock, flags);
+ 	_set_gpio_irqenable(bank, gpio, 0);
+ 	_set_gpio_triggering(bank, get_gpio_index(gpio), IRQ_TYPE_NONE);
++	spin_unlock_irqrestore(&bank->lock, flags);
+ }
+ 
+ static void gpio_unmask_irq(struct irq_data *d)
+@@ -1153,7 +1159,9 @@ static void gpio_unmask_irq(struct irq_data *d)
+ 	struct gpio_bank *bank = irq_data_get_irq_chip_data(d);
+ 	unsigned int irq_mask = 1 << get_gpio_index(gpio);
+ 	u32 trigger = irqd_get_trigger_type(d);
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&bank->lock, flags);
+ 	if (trigger)
+ 		_set_gpio_triggering(bank, get_gpio_index(gpio), trigger);
+ 
+@@ -1165,6 +1173,7 @@ static void gpio_unmask_irq(struct irq_data *d)
+ 	}
+ 
+ 	_set_gpio_irqenable(bank, gpio, 1);
++	spin_unlock_irqrestore(&bank->lock, flags);
+ }
+ 
+ static struct irq_chip gpio_irq_chip = {
+-- 
+1.7.4.1
