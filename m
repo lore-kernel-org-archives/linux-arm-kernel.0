@@ -1,54 +1,52 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 6 Jun 2011 20:22:19 +0800
-Subject: [PATCH v4 0/2] Move plat-mxc gpio driver into drivers/gpio
-In-Reply-To: <20110606085051.GA23771@pengutronix.de>
-References: <1307290075-7062-1-git-send-email-shawn.guo@linaro.org>
-	<20110606085051.GA23771@pengutronix.de>
-Message-ID: <20110606122219.GC21204@S2100-06.ap.freescale.net>
+Date: Mon, 6 Jun 2011 20:30:33 +0800
+Subject: [PATCH 1/2] gpio/mxs: save the unnecessary function
+	mxs_gpio_to_irq
+In-Reply-To: <20110606080216.GB32632@pengutronix.de>
+References: <1307341247-26382-1-git-send-email-shawn.guo@linaro.org>
+	<20110606080216.GB32632@pengutronix.de>
+Message-ID: <20110606123032.GD21204@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 06, 2011 at 10:50:51AM +0200, Sascha Hauer wrote:
-> On Mon, Jun 06, 2011 at 12:07:53AM +0800, Shawn Guo wrote:
-> > The patch set moves plat-mxc gpio driver into drivers/gpio, and
-> > migrates mach-imx and mach-mx5 to the new driver.
-> > 
-> > Changes since v3:
-> >  * Reorganize the patch set per Grant's comments
-> > 
-> > Shawn Guo (2):
-> >       gpio/mxc: Move Freescale MXC gpio driver to drivers/gpio
-> >       gpio/mxc: Change gpio-mxc into an upstanding gpio driver
-> > 
-> >  arch/arm/plat-mxc/include/mach/common.h            |   12 +-
-> >  arch/arm/plat-mxc/include/mach/devices-common.h    |    2 +
-> >  arch/arm/plat-mxc/include/mach/gpio.h              |   27 ---
-> >  drivers/gpio/Kconfig                               |    4 +
-> >  drivers/gpio/Makefile                              |    1 +
-> >  .../arm/plat-mxc/gpio.c => drivers/gpio/gpio-mxc.c |  217 +++++++++++++-------
+On Mon, Jun 06, 2011 at 10:02:16AM +0200, Sascha Hauer wrote:
+> Hi Shawn,
 > 
-> While at renaming I'd prefer naming this file gpio-imx.c. We currently
-> have inconsistent naming between mxc vs. imx and I'd like to get rid
-> of the former.
+> On Mon, Jun 06, 2011 at 02:20:46PM +0800, Shawn Guo wrote:
+> > The irq number can be easily calculated from the sum of
+> > MXS_GPIO_IRQ_START and gpio number.  The patch directly defines
+> > gpio_to_irq for it and removes mxs_gpio_to_irq to simplify the
+> > the driver.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/mach-mxs/include/mach/gpio.h |    2 +-
+> >  drivers/gpio/gpio-mxs.c               |    9 ---------
+> >  2 files changed, 1 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/include/mach/gpio.h b/arch/arm/mach-mxs/include/mach/gpio.h
+> > index 828cccc..18017c5 100644
+> > --- a/arch/arm/mach-mxs/include/mach/gpio.h
+> > +++ b/arch/arm/mach-mxs/include/mach/gpio.h
+> > @@ -28,8 +28,8 @@
+> >  #define gpio_get_value		__gpio_get_value
+> >  #define gpio_set_value		__gpio_set_value
+> >  #define gpio_cansleep		__gpio_cansleep
+> > -#define gpio_to_irq		__gpio_to_irq
+> >  
+> >  #define irq_to_gpio(irq)	((irq) - MXS_GPIO_IRQ_START)
+> > +#define gpio_to_irq(gpio)	(MXS_GPIO_IRQ_START + (gpio))
 > 
-It's not just a file name.  The "mxc" is embedded in the variable
-and function name all over the driver.  I would currently keep it as
-it is for the reasons below.
-
- * The driver was moved out from plat-mxc, so naturally the name
-   gpio-mxc is picked.
-
- * Changing name to gpio-imx would require replace all "mxc" with
-   "imx" all over the file, IMO.  This makes the diff of the patch
-   look complex.
-
- * i.MX23 and i.MX28 are also part of imx family, but architecture
-   name "imx" does not cover it.  Taking "mxs" as the architecture name 
-   for i.MX23 and i.MX28, "mxc" stands well what it stands right now.
-
-I would start renaming the driver with another patch, probably when
-I see mach-mx5 start getting merged into mach-imx and plat-mxc renamed
-to plat-imx.
+> NACK
+> 
+> This is no good idea. __gpio_to_irq also works correctly for i2c gpio
+> expanders and the like whereas your patch limits the gio_to_irq usage to
+> internal gpios. Better to keep it like it is.
+> 
+What I was trying to do is moving gpio-mxs one step closer to
+gpio-mxc.  I thought what gpio-mxc is doing should have been proved
+fine by a wider users/platforms.  But you are telling this is one
+step backward.  Then I will drop the patch.
 
 -- 
 Regards,
