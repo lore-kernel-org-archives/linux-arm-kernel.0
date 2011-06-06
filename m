@@ -1,41 +1,115 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Mon,  6 Jun 2011 14:51:08 -0700
-Subject: [PATCH v3 1/8] msm: gpio: Remove unsupported devices
+Date: Mon,  6 Jun 2011 14:51:11 -0700
+Subject: [PATCH v3 4/8] msm: gpio: Remove ifdefs on gpio chip registers
 In-Reply-To: <1307397075-11733-1-git-send-email-davidb@codeaurora.org>
 References: <1305755453-31112-1-git-send-email-davidb@codeaurora.org>
 	<1307397075-11733-1-git-send-email-davidb@codeaurora.org>
-Message-ID: <1307397075-11733-2-git-send-email-davidb@codeaurora.org>
+Message-ID: <1307397075-11733-5-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The MSM7x25 and MSM7x27 devices are not yet supported in the kernel.
-Remove #ifdef-based tables supporting these chips for now.
+Select the GPIO register configuration at runtime rather than through
+idefs.
 
 Signed-off-by: David Brown <davidb@codeaurora.org>
 Acked-by: Linus Walleij <linus.walleij@linaro.org>
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/mach-msm/gpio.c |    7 -------
- 1 files changed, 0 insertions(+), 7 deletions(-)
+ arch/arm/mach-msm/gpio.c |   33 ++++++++++++++++++++++++++-------
+ 1 files changed, 26 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-msm/gpio.c b/arch/arm/mach-msm/gpio.c
-index 5ea273b..c358ced 100644
+index 335afbd..e96199d 100644
 --- a/arch/arm/mach-msm/gpio.c
 +++ b/arch/arm/mach-msm/gpio.c
-@@ -197,13 +197,6 @@ struct msm_gpio_chip msm_gpio_chips[] = {
- 	MSM_GPIO_BANK(3,  68,  94),
- 	MSM_GPIO_BANK(4,  95, 106),
- 	MSM_GPIO_BANK(5, 107, 121),
--#elif defined(CONFIG_ARCH_MSM7X25) || defined(CONFIG_ARCH_MSM7X27)
--	MSM_GPIO_BANK(0,   0,  15),
--	MSM_GPIO_BANK(1,  16,  42),
--	MSM_GPIO_BANK(2,  43,  67),
--	MSM_GPIO_BANK(3,  68,  94),
--	MSM_GPIO_BANK(4,  95, 106),
--	MSM_GPIO_BANK(5, 107, 132),
- #elif defined(CONFIG_ARCH_MSM7X30)
- 	MSM_GPIO_BANK(0,   0,  15),
- 	MSM_GPIO_BANK(1,  16,  43),
+@@ -20,6 +20,7 @@
+ #include <linux/io.h>
+ #include <linux/irq.h>
+ #include <linux/module.h>
++#include <mach/cpu.h>
+ #include "gpio_hw.h"
+ #include "gpiomux.h"
+ 
+@@ -189,15 +190,19 @@ static void msm_gpio_free(struct gpio_chip *chip, unsigned offset)
+ #define msm_gpio_free NULL
+ #endif
+ 
+-struct msm_gpio_chip msm_gpio_chips[] = {
+-#if defined(CONFIG_ARCH_MSM7X00A)
++static struct msm_gpio_chip *msm_gpio_chips;
++static int msm_gpio_count;
++
++static struct msm_gpio_chip msm_gpio_chips_msm7x01[] = {
+ 	MSM_GPIO_BANK(MSM7X00, 0,   0,  15),
+ 	MSM_GPIO_BANK(MSM7X00, 1,  16,  42),
+ 	MSM_GPIO_BANK(MSM7X00, 2,  43,  67),
+ 	MSM_GPIO_BANK(MSM7X00, 3,  68,  94),
+ 	MSM_GPIO_BANK(MSM7X00, 4,  95, 106),
+ 	MSM_GPIO_BANK(MSM7X00, 5, 107, 121),
+-#elif defined(CONFIG_ARCH_MSM7X30)
++};
++
++static struct msm_gpio_chip msm_gpio_chips_msm7x30[] = {
+ 	MSM_GPIO_BANK(MSM7X30, 0,   0,  15),
+ 	MSM_GPIO_BANK(MSM7X30, 1,  16,  43),
+ 	MSM_GPIO_BANK(MSM7X30, 2,  44,  67),
+@@ -206,7 +211,9 @@ struct msm_gpio_chip msm_gpio_chips[] = {
+ 	MSM_GPIO_BANK(MSM7X30, 5, 107, 133),
+ 	MSM_GPIO_BANK(MSM7X30, 6, 134, 150),
+ 	MSM_GPIO_BANK(MSM7X30, 7, 151, 181),
+-#elif defined(CONFIG_ARCH_QSD8X50)
++};
++
++static struct msm_gpio_chip msm_gpio_chips_qsd8x50[] = {
+ 	MSM_GPIO_BANK(QSD8X50, 0,   0,  15),
+ 	MSM_GPIO_BANK(QSD8X50, 1,  16,  42),
+ 	MSM_GPIO_BANK(QSD8X50, 2,  43,  67),
+@@ -215,7 +222,6 @@ struct msm_gpio_chip msm_gpio_chips[] = {
+ 	MSM_GPIO_BANK(QSD8X50, 5, 104, 121),
+ 	MSM_GPIO_BANK(QSD8X50, 6, 122, 152),
+ 	MSM_GPIO_BANK(QSD8X50, 7, 153, 164),
+-#endif
+ };
+ 
+ static void msm_gpio_irq_ack(struct irq_data *d)
+@@ -311,7 +317,7 @@ static void msm_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
+ 	int i, j, mask;
+ 	unsigned val;
+ 
+-	for (i = 0; i < ARRAY_SIZE(msm_gpio_chips); i++) {
++	for (i = 0; i < msm_gpio_count; i++) {
+ 		struct msm_gpio_chip *msm_chip = &msm_gpio_chips[i];
+ 		val = readl(msm_chip->regs.int_status);
+ 		val &= msm_chip->int_enable[0];
+@@ -342,6 +348,19 @@ static int __init msm_init_gpio(void)
+ {
+ 	int i, j = 0;
+ 
++	if (cpu_is_msm7x01()) {
++		msm_gpio_chips = msm_gpio_chips_msm7x01;
++		msm_gpio_count = ARRAY_SIZE(msm_gpio_chips_msm7x01);
++	} else if (cpu_is_msm7x30()) {
++		msm_gpio_chips = msm_gpio_chips_msm7x30;
++		msm_gpio_count = ARRAY_SIZE(msm_gpio_chips_msm7x30);
++	} else if (cpu_is_qsd8x50()) {
++		msm_gpio_chips = msm_gpio_chips_qsd8x50;
++		msm_gpio_count = ARRAY_SIZE(msm_gpio_chips_qsd8x50);
++	} else {
++		return 0;
++	}
++
+ 	for (i = FIRST_GPIO_IRQ; i < FIRST_GPIO_IRQ + NR_GPIO_IRQS; i++) {
+ 		if (i - FIRST_GPIO_IRQ >=
+ 			msm_gpio_chips[j].chip.base +
+@@ -353,7 +372,7 @@ static int __init msm_init_gpio(void)
+ 		set_irq_flags(i, IRQF_VALID);
+ 	}
+ 
+-	for (i = 0; i < ARRAY_SIZE(msm_gpio_chips); i++) {
++	for (i = 0; i < msm_gpio_count; i++) {
+ 		spin_lock_init(&msm_gpio_chips[i].lock);
+ 		writel(0, msm_gpio_chips[i].regs.int_en);
+ 		gpiochip_add(&msm_gpio_chips[i].chip);
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
