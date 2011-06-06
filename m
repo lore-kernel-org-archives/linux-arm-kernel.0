@@ -1,112 +1,35 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon,  6 Jun 2011 17:55:45 +0100
-Subject: [PATCH 01/11] arm: Convert v7 proc infos into a common macro
+Date: Mon,  6 Jun 2011 17:55:49 +0100
+Subject: [PATCH 05/11] ARM: proc: reorder macro parameters for __v7_proc macro
 In-Reply-To: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
 References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307379355-13802-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1307379355-13802-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pawel Moll <pawel.moll@arm.com>
+The __v7_proc macro takes paramaters for mmu flags, io flags and hwcaps.
 
-As most of the proc info content is common across all v7
-processors, this patch converts existing A9 and generic v7
-descriptions into a macro (allowing extra flags in future).
+Since hwcaps tend to change more often between cores than the other
+parameters, change the ordering so we don't have to provide empty values
+for the flag arguments in the common case.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/proc-v7.S |   67 +++++++++++++++++-------------------------------
- 1 files changed, 24 insertions(+), 43 deletions(-)
+ arch/arm/mm/proc-v7.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b3b566e..d5245d4 100644
+index 7f482c2..b22d98d 100644
 --- a/arch/arm/mm/proc-v7.S
 +++ b/arch/arm/mm/proc-v7.S
-@@ -436,33 +436,36 @@ cpu_elf_name:
- 
- 	.section ".proc.info.init", #alloc, #execinstr
- 
--	.type   __v7_ca9mp_proc_info, #object
--__v7_ca9mp_proc_info:
--	.long	0x410fc090		@ Required ID value
--	.long	0xff0ffff0		@ Mask for ID
--	ALT_SMP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_SMP)
--	ALT_UP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_UP)
--	.long   PMD_TYPE_SECT | \
--		PMD_SECT_XN | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ
--	W(b)	__v7_ca9mp_setup
-+	/*
-+	 * Standard v7 proc info content
-+	 */
-+.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
-+	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
-+			PMD_FLAGS_SMP | \mm_mmuflags)
-+	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
-+			PMD_FLAGS_UP | \mm_mmuflags)
-+	.long	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \io_mmuflags
-+	W(b)	\initfunc
- 	.long	cpu_arch_name
- 	.long	cpu_elf_name
--	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
-+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
-+		HWCAP_EDSP | HWCAP_TLS | \hwcaps
- 	.long	cpu_v7_name
- 	.long	v7_processor_functions
- 	.long	v7wbi_tlb_fns
- 	.long	v6_user_fns
- 	.long	v7_cache_fns
-+.endm
-+
-+	/*
-+	 * ARM Ltd. Cortex A9 processor.
-+	 */
-+	.type   __v7_ca9mp_proc_info, #object
-+__v7_ca9mp_proc_info:
-+	.long	0x410fc090
-+	.long	0xff0ffff0
-+	__v7_proc __v7_ca9mp_setup
- 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
- 
+@@ -440,7 +440,7 @@ cpu_elf_name:
  	/*
-@@ -472,27 +475,5 @@ __v7_ca9mp_proc_info:
- __v7_proc_info:
- 	.long	0x000f0000		@ Required ID value
- 	.long	0x000f0000		@ Mask for ID
--	ALT_SMP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_SMP)
--	ALT_UP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_UP)
--	.long   PMD_TYPE_SECT | \
--		PMD_SECT_XN | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ
--	W(b)	__v7_setup
--	.long	cpu_arch_name
--	.long	cpu_elf_name
--	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
--	.long	cpu_v7_name
--	.long	v7_processor_functions
--	.long	v7wbi_tlb_fns
--	.long	v6_user_fns
--	.long	v7_cache_fns
-+	__v7_proc __v7_setup
- 	.size	__v7_proc_info, . - __v7_proc_info
+ 	 * Standard v7 proc info content
+ 	 */
+-.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
++.macro __v7_proc initfunc, hwcaps = 0, mm_mmuflags = 0, io_mmuflags = 0
+ 	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
+ 			PMD_FLAGS_SMP | \mm_mmuflags)
+ 	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
 -- 
 1.7.0.4
