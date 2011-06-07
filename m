@@ -1,132 +1,43 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue,  7 Jun 2011 12:45:46 +0200
-Subject: [PATCH 1/5] DRM: add i.MX IPUv3 base driver
+Date: Tue,  7 Jun 2011 12:45:47 +0200
+Subject: [PATCH 2/5] DRM i.MX IPU: Add support for IPU submodules
 In-Reply-To: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
 References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1307443550-25549-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1307443550-25549-3-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The IPU is the Image Processing Unit found on i.MX51/53 SoCs. It
-features several units for image processing, this patch adds support
-for the units needed for Framebuffer support, namely:
-
-- Display Controller (dc)
-- Display Interface (di)
-- Display Multi Fifo Controller (dmfc)
-- Display Processor (dp)
-- Image DMA Controller (idmac)
-
-This patch is based on the Freescale driver, but follows a different
-approach. The Freescale code implements logical idmac channels and
-the handling of the subunits is hidden in common idmac code pathes
-in big switch/case statements. This patch instead just provides code
-and resource management for the different subunits. The user, in this
-case the framebuffer driver, decides how the different units play
-together.
-
-The IPU has other units missing in this patch:
-
-- CMOS Sensor Interface (csi)
-- Video Deinterlacer (vdi)
-- Sensor Multi FIFO Controler (smfc)
-- Image Converter (ic)
-- Image Rotator (irt)
-
-So expect more files to come in this directory.
+Can be squashed into the last patch, just split up to avoid hitting
+list limits.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- arch/arm/plat-mxc/include/mach/ipu-v3.h |   22 +
- drivers/gpu/drm/Kconfig                 |    6 +
- drivers/gpu/drm/Makefile                |    1 +
- drivers/gpu/drm/imx/Makefile            |    1 +
- drivers/gpu/drm/imx/ipu-v3/Makefile     |    3 +
- drivers/gpu/drm/imx/ipu-v3/ipu-common.c |  799 +++++++++++++++++++++++++++++++
- drivers/gpu/drm/imx/ipu-v3/ipu-prv.h    |  218 +++++++++
- include/drm/imx-ipu-v3.h                |  308 ++++++++++++
- 8 files changed, 1358 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/plat-mxc/include/mach/ipu-v3.h
- create mode 100644 drivers/gpu/drm/imx/Makefile
- create mode 100644 drivers/gpu/drm/imx/ipu-v3/Makefile
- create mode 100644 drivers/gpu/drm/imx/ipu-v3/ipu-common.c
- create mode 100644 drivers/gpu/drm/imx/ipu-v3/ipu-prv.h
- create mode 100644 include/drm/imx-ipu-v3.h
+ drivers/gpu/drm/imx/ipu-v3/Makefile   |    2 +-
+ drivers/gpu/drm/imx/ipu-v3/ipu-dc.c   |  440 ++++++++++++++++++++++
+ drivers/gpu/drm/imx/ipu-v3/ipu-di.c   |  665 +++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/imx/ipu-v3/ipu-dmfc.c |  393 +++++++++++++++++++
+ drivers/gpu/drm/imx/ipu-v3/ipu-dp.c   |  342 +++++++++++++++++
+ 5 files changed, 1841 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/gpu/drm/imx/ipu-v3/ipu-dc.c
+ create mode 100644 drivers/gpu/drm/imx/ipu-v3/ipu-di.c
+ create mode 100644 drivers/gpu/drm/imx/ipu-v3/ipu-dmfc.c
+ create mode 100644 drivers/gpu/drm/imx/ipu-v3/ipu-dp.c
 
-diff --git a/arch/arm/plat-mxc/include/mach/ipu-v3.h b/arch/arm/plat-mxc/include/mach/ipu-v3.h
-new file mode 100644
-index 0000000..1dd7232
---- /dev/null
-+++ b/arch/arm/plat-mxc/include/mach/ipu-v3.h
-@@ -0,0 +1,22 @@
-+/*
-+ * Copyright (c) 2010 Sascha Hauer <s.hauer@pengutronix.de>
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License as published by the
-+ * Free Software Foundation; either version 2 of the License, or (at your
-+ * option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-+ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
-+ * for more details.
-+ */
-+
-+#ifndef __MACH_IPU_V3_H_
-+#define __MACH_IPU_V3_H_
-+
-+struct imx_ipuv3_platform_data {
-+	int rev;
-+};
-+
-+#endif /* __MACH_IPU_V3_H_ */
-diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
-index b493663..969dc38 100644
---- a/drivers/gpu/drm/Kconfig
-+++ b/drivers/gpu/drm/Kconfig
-@@ -158,3 +158,9 @@ config DRM_SAVAGE
- 	help
- 	  Choose this option if you have a Savage3D/4/SuperSavage/Pro/Twister
- 	  chipset. If M is selected the module will be called savage.
-+
-+config DRM_IMX_IPUV3
-+	tristate "i.MX IPUv3"
-+	depends on DRM && ARCH_MXC
-+	help
-+	  Choose this if you have a i.MX51/53 processor.
-diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
-index 89cf05a..97c35eb 100644
---- a/drivers/gpu/drm/Makefile
-+++ b/drivers/gpu/drm/Makefile
-@@ -35,4 +35,5 @@ obj-$(CONFIG_DRM_SAVAGE)+= savage/
- obj-$(CONFIG_DRM_VMWGFX)+= vmwgfx/
- obj-$(CONFIG_DRM_VIA)	+=via/
- obj-$(CONFIG_DRM_NOUVEAU) +=nouveau/
-+obj-$(CONFIG_DRM_IMX_IPUV3) +=imx/
- obj-y			+= i2c/
-diff --git a/drivers/gpu/drm/imx/Makefile b/drivers/gpu/drm/imx/Makefile
-new file mode 100644
-index 0000000..776e6b4
---- /dev/null
-+++ b/drivers/gpu/drm/imx/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_DRM_IMX_IPUV3) += ipu-v3/
 diff --git a/drivers/gpu/drm/imx/ipu-v3/Makefile b/drivers/gpu/drm/imx/ipu-v3/Makefile
-new file mode 100644
-index 0000000..b073fd3
---- /dev/null
+index b073fd3..877433c 100644
+--- a/drivers/gpu/drm/imx/ipu-v3/Makefile
 +++ b/drivers/gpu/drm/imx/ipu-v3/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_DRM_IMX_IPUV3) += imx-ipu-v3.o
-+
-+imx-ipu-v3-objs := ipu-common.o
-diff --git a/drivers/gpu/drm/imx/ipu-v3/ipu-common.c b/drivers/gpu/drm/imx/ipu-v3/ipu-common.c
+@@ -1,3 +1,3 @@
+ obj-$(CONFIG_DRM_IMX_IPUV3) += imx-ipu-v3.o
+ 
+-imx-ipu-v3-objs := ipu-common.o
++imx-ipu-v3-objs := ipu-common.o ipu-dc.o ipu-di.o ipu-dp.o ipu-dmfc.o
+diff --git a/drivers/gpu/drm/imx/ipu-v3/ipu-dc.c b/drivers/gpu/drm/imx/ipu-v3/ipu-dc.c
 new file mode 100644
-index 0000000..7d8be76
+index 0000000..7841a35
 --- /dev/null
-+++ b/drivers/gpu/drm/imx/ipu-v3/ipu-common.c
-@@ -0,0 +1,799 @@
++++ b/drivers/gpu/drm/imx/ipu-v3/ipu-dc.c
+@@ -0,0 +1,440 @@
 +/*
 + * Copyright (c) 2010 Sascha Hauer <s.hauer@pengutronix.de>
 + * Copyright (C) 2005-2009 Freescale Semiconductor, Inc.
@@ -143,795 +54,436 @@ index 0000000..7d8be76
 + */
 +
 +#include <linux/types.h>
-+#include <linux/init.h>
-+#include <linux/platform_device.h>
-+#include <linux/err.h>
-+#include <linux/spinlock.h>
++#include <linux/errno.h>
 +#include <linux/delay.h>
-+#include <linux/interrupt.h>
 +#include <linux/io.h>
-+#include <linux/clk.h>
-+#include <linux/list.h>
-+#include <linux/irq.h>
-+#include <mach/common.h>
-+#include <mach/ipu-v3.h>
 +#include <drm/imx-ipu-v3.h>
 +
 +#include "ipu-prv.h"
 +
-+static inline u32 ipu_cm_read(struct ipu_soc *ipu, unsigned offset)
++#define ASYNC_SER_WAVE 6
++
++#define DC_DISP_ID_SERIAL	2
++#define DC_DISP_ID_ASYNC	3
++
++#define DC_MAP_CONF_PTR(n)	(0x0108 + ((n) & ~0x1) * 2)
++#define DC_MAP_CONF_VAL(n)	(0x0144 + ((n) & ~0x1) * 2)
++
++#define DC_EVT_NF		0
++#define DC_EVT_NL		1
++#define DC_EVT_EOF		2
++#define DC_EVT_NFIELD		3
++#define DC_EVT_EOL		4
++#define DC_EVT_EOFIELD		5
++#define DC_EVT_NEW_ADDR		6
++#define DC_EVT_NEW_CHAN		7
++#define DC_EVT_NEW_DATA		8
++
++#define DC_EVT_NEW_ADDR_W_0	0
++#define DC_EVT_NEW_ADDR_W_1	1
++#define DC_EVT_NEW_CHAN_W_0	2
++#define DC_EVT_NEW_CHAN_W_1	3
++#define DC_EVT_NEW_DATA_W_0	4
++#define DC_EVT_NEW_DATA_W_1	5
++#define DC_EVT_NEW_ADDR_R_0	6
++#define DC_EVT_NEW_ADDR_R_1	7
++#define DC_EVT_NEW_CHAN_R_0	8
++#define DC_EVT_NEW_CHAN_R_1	9
++#define DC_EVT_NEW_DATA_R_0	10
++#define DC_EVT_NEW_DATA_R_1	11
++
++#define DC_WR_CH_CONF		0x0
++#define DC_WR_CH_ADDR		0x4
++#define DC_RL_CH(evt)		(8 + ((evt) & ~0x1) * 2)
++
++#define DC_GEN			0x00d4
++#define DC_DISP_CONF1(disp)	(0x00d8 + (disp) * 4)
++#define DC_DISP_CONF2(disp)	(0x00e8 + (disp) * 4)
++#define DC_STAT			0x01c8
++
++#define WROD(lf)		(0x18 | (lf << 1))
++
++#define DC_WR_CH_CONF_FIELD_MODE		(1 << 9)
++#define DC_WR_CH_CONF_PROG_TYPE_OFFSET		5
++#define DC_WR_CH_CONF_PROG_TYPE_MASK		(7 << 5)
++#define DC_WR_CH_CONF_PROG_DI_ID		(1 << 2)
++#define DC_WR_CH_CONF_PROG_DISP_ID_OFFSET	3
++#define DC_WR_CH_CONF_PROG_DISP_ID_MASK		(3 << 3)
++
++struct ipu_dc_priv;
++
++struct ipu_dc {
++	unsigned int		di; /* The display interface number assigned to this dc channel */
++	void __iomem		*base;
++	struct ipu_dc_priv	*priv;
++	int			chno;
++	bool			in_use;
++};
++
++struct ipu_dc_priv {
++	void __iomem		*dc_reg;
++	void __iomem		*dc_tmpl_reg;
++	struct ipu_soc		*ipu;
++	struct device		*dev;
++	struct ipu_dc		channels[10];
++	struct mutex		mutex;
++};
++
++static void ipu_dc_link_event(struct ipu_dc *dc, int event, int addr, int priority)
 +{
-+	return readl(ipu->cm_reg + offset);
++	u32 reg;
++
++	reg = readl(dc->base + DC_RL_CH(event));
++	reg &= ~(0xffff << (16 * (event & 0x1)));
++	reg |= ((addr << 8) | priority) << (16 * (event & 0x1));
++	writel(reg, dc->base + DC_RL_CH(event));
 +}
 +
-+static inline void ipu_cm_write(struct ipu_soc *ipu, u32 value, unsigned offset)
++static void ipu_dc_write_tmpl(struct ipu_dc *dc, int word, u32 opcode, u32 operand,
++		int map, int wave, int glue, int sync)
 +{
-+	writel(value, ipu->cm_reg + offset);
++	struct ipu_dc_priv *priv = dc->priv;
++	u32 reg;
++	int stop = 1;
++
++	reg = sync;
++	reg |= glue << 4;
++	reg |= ++wave << 11;
++	reg |= ++map << 15;
++	reg |= (operand << 20) & 0xfff00000;
++	writel(reg, priv->dc_tmpl_reg + word * 8);
++
++	reg = operand >> 12;
++	reg |= opcode << 4;
++	reg |= stop << 9;
++	writel(reg, priv->dc_tmpl_reg + word * 8 + 4);
 +}
 +
-+static inline u32 ipu_idmac_read(struct ipu_soc *ipu, unsigned offset)
++static int ipu_pixfmt_to_map(u32 fmt)
 +{
-+	return readl(ipu->idmac_reg + offset);
-+}
-+
-+static inline void ipu_idmac_write(struct ipu_soc *ipu, u32 value, unsigned offset)
-+{
-+	writel(value, ipu->idmac_reg + offset);
-+}
-+
-+void ipu_srm_dp_sync_update(struct ipu_soc *ipu)
-+{
-+	u32 val;
-+
-+	val = ipu_cm_read(ipu, IPU_SRM_PRI2);
-+	val |= 0x8;
-+	ipu_cm_write(ipu, val, IPU_SRM_PRI2);
-+}
-+EXPORT_SYMBOL_GPL(ipu_srm_dp_sync_update);
-+
-+struct ipu_ch_param *ipu_get_cpmem(struct ipu_channel *channel)
-+{
-+	struct ipu_soc *ipu = channel->ipu;
-+
-+	return ipu->cpmem_base + channel->num;
-+}
-+EXPORT_SYMBOL_GPL(ipu_get_cpmem);
-+
-+void ipu_ch_param_set_field(struct ipu_ch_param *base, u32 wbs, u32 v)
-+{
-+	u32 bit = (wbs >> 8) % 160;
-+	u32 size = wbs & 0xff;
-+	u32 word = (wbs >> 8) / 160;
-+	u32 i = bit / 32;
-+	u32 ofs = bit % 32;
-+	u32 mask = (1 << size) - 1;
-+
-+	pr_debug("%s %d %d %d\n", __func__, word, bit , size);
-+
-+	base->word[word].data[i] &= ~(mask << ofs);
-+	base->word[word].data[i] |= v << ofs;
-+
-+	if ((bit + size - 1) / 32 > i) {
-+		base->word[word].data[i + 1] &= ~(v >> (mask ? (32 - ofs) : 0));
-+		base->word[word].data[i + 1] |= v >> (ofs ? (32 - ofs) : 0);
++	switch (fmt) {
++	case IPU_PIX_FMT_GENERIC:
++	case IPU_PIX_FMT_RGB24:
++		return 0;
++	case IPU_PIX_FMT_RGB666:
++		return 1;
++	case IPU_PIX_FMT_YUV444:
++		return 2;
++	case IPU_PIX_FMT_RGB565:
++		return 3;
++	case IPU_PIX_FMT_LVDS666:
++		return 4;
++	case IPU_PIX_FMT_GBR24:
++		return 13;
 +	}
++
++	return -EINVAL;
 +}
-+EXPORT_SYMBOL_GPL(ipu_ch_param_set_field);
 +
-+u32 ipu_ch_param_read_field(struct ipu_ch_param *base, u32 wbs)
++#define SYNC_WAVE 0
++
++int ipu_dc_init_sync(struct ipu_dc *dc, int di, bool interlaced,
++		u32 pixel_fmt, u32 width)
 +{
-+	u32 bit = (wbs >> 8) % 160;
-+	u32 size = wbs & 0xff;
-+	u32 word = (wbs >> 8) / 160;
-+	u32 i = bit / 32;
-+	u32 ofs = bit % 32;
-+	u32 mask = (1 << size) - 1;
-+	u32 val = 0;
++	struct ipu_dc_priv *priv = dc->priv;
++	u32 reg = 0, map;
 +
-+	pr_debug("%s %d %d %d\n", __func__, word, bit , size);
++	dc->di = di;
 +
-+	val = (base->word[word].data[i] >> ofs) & mask;
-+
-+	if ((bit + size - 1) / 32 > i) {
-+		u32 tmp;
-+		tmp = base->word[word].data[i + 1];
-+		tmp &= mask >> (ofs ? (32 - ofs) : 0);
-+		val |= tmp << (ofs ? (32 - ofs) : 0);
++	map = ipu_pixfmt_to_map(pixel_fmt);
++	if (map < 0) {
++		dev_dbg(priv->dev, "IPU_DISP: No MAP\n");
++		return -EINVAL;
 +	}
 +
-+	return val;
-+}
-+EXPORT_SYMBOL_GPL(ipu_ch_param_read_field);
++	ipu_get(priv->ipu);
 +
-+void ipu_cpmem_set_format_rgb(struct ipu_ch_param *p, struct ipu_rgb *rgb)
-+{
-+	int bpp = 0, npb = 0, ro, go, bo, to;
++	if (interlaced) {
++		ipu_dc_link_event(dc, DC_EVT_NL, 0, 3);
++		ipu_dc_link_event(dc, DC_EVT_EOL, 0, 2);
++		ipu_dc_link_event(dc, DC_EVT_NEW_DATA, 0, 1);
 +
-+	ro = rgb->bits_per_pixel - rgb->red.length - rgb->red.offset;
-+	go = rgb->bits_per_pixel - rgb->green.length - rgb->green.offset;
-+	bo = rgb->bits_per_pixel - rgb->blue.length - rgb->blue.offset;
-+	to = rgb->bits_per_pixel - rgb->transp.length - rgb->transp.offset;
-+
-+	ipu_ch_param_set_field(p, IPU_FIELD_WID0, rgb->red.length - 1);
-+	ipu_ch_param_set_field(p, IPU_FIELD_OFS0, ro);
-+	ipu_ch_param_set_field(p, IPU_FIELD_WID1, rgb->green.length - 1);
-+	ipu_ch_param_set_field(p, IPU_FIELD_OFS1, go);
-+	ipu_ch_param_set_field(p, IPU_FIELD_WID2, rgb->blue.length - 1);
-+	ipu_ch_param_set_field(p, IPU_FIELD_OFS2, bo);
-+
-+	if (rgb->transp.length) {
-+		ipu_ch_param_set_field(p, IPU_FIELD_WID3, rgb->transp.length - 1);
-+		ipu_ch_param_set_field(p, IPU_FIELD_OFS3, to);
++		/* Init template microcode */
++		ipu_dc_write_tmpl(dc, 0, WROD(0), 0, map, SYNC_WAVE, 0, 8);
 +	} else {
-+		ipu_ch_param_set_field(p, IPU_FIELD_WID3, 7);
-+		ipu_ch_param_set_field(p, IPU_FIELD_OFS3, rgb->bits_per_pixel);
++		if (di) {
++			ipu_dc_link_event(dc, DC_EVT_NL, 2, 3);
++			ipu_dc_link_event(dc, DC_EVT_EOL, 3, 2);
++			ipu_dc_link_event(dc, DC_EVT_NEW_DATA, 4, 1);
++			/* Init template microcode */
++			ipu_dc_write_tmpl(dc, 2, WROD(0), 0, map, SYNC_WAVE, 8, 5);
++			ipu_dc_write_tmpl(dc, 3, WROD(0), 0, map, SYNC_WAVE, 4, 5);
++			ipu_dc_write_tmpl(dc, 4, WROD(0), 0, map, SYNC_WAVE, 0, 5);
++		} else {
++			ipu_dc_link_event(dc, DC_EVT_NL, 5, 3);
++			ipu_dc_link_event(dc, DC_EVT_EOL, 6, 2);
++			ipu_dc_link_event(dc, DC_EVT_NEW_DATA, 7, 1);
++			/* Init template microcode */
++			ipu_dc_write_tmpl(dc, 5, WROD(0), 0, map, SYNC_WAVE, 8, 5);
++			ipu_dc_write_tmpl(dc, 6, WROD(0), 0, map, SYNC_WAVE, 4, 5);
++			ipu_dc_write_tmpl(dc, 7, WROD(0), 0, map, SYNC_WAVE, 0, 5);
++		}
 +	}
++	ipu_dc_link_event(dc, DC_EVT_NF, 0, 0);
++	ipu_dc_link_event(dc, DC_EVT_NFIELD, 0, 0);
++	ipu_dc_link_event(dc, DC_EVT_EOF, 0, 0);
++	ipu_dc_link_event(dc, DC_EVT_EOFIELD, 0, 0);
++	ipu_dc_link_event(dc, DC_EVT_NEW_CHAN, 0, 0);
++	ipu_dc_link_event(dc, DC_EVT_NEW_ADDR, 0, 0);
 +
-+	switch (rgb->bits_per_pixel) {
-+	case 32:
-+		bpp = 0;
-+		npb = 15;
-+		break;
-+	case 24:
-+		bpp = 1;
-+		npb = 19;
-+		break;
-+	case 16:
-+		bpp = 3;
-+		npb = 31;
-+		break;
-+	case 8:
-+		bpp = 5;
-+		npb = 63;
-+		break;
-+	}
-+	ipu_ch_param_set_field(p, IPU_FIELD_BPP, bpp);
-+	ipu_ch_param_set_field(p, IPU_FIELD_NPB, npb);
-+	ipu_ch_param_set_field(p, IPU_FIELD_PFS, 7); /* rgb mode */
++	reg = 0x2;
++	reg |= di << DC_WR_CH_CONF_PROG_DISP_ID_OFFSET;
++	reg |= di << 2;
++	if (interlaced)
++		reg |= DC_WR_CH_CONF_FIELD_MODE;
++
++	writel(reg, dc->base + DC_WR_CH_CONF);
++
++	writel(0x00000000, dc->base + DC_WR_CH_ADDR);
++
++	writel(0x00000084, priv->dc_reg + DC_GEN);
++
++	writel(width, priv->dc_reg + DC_DISP_CONF2(di));
++
++	ipu_module_enable(priv->ipu, IPU_CONF_DC_EN);
++
++	ipu_put(priv->ipu);
++
++	return 0;
 +}
-+EXPORT_SYMBOL_GPL(ipu_cpmem_set_format_rgb);
++EXPORT_SYMBOL_GPL(ipu_dc_init_sync);
 +
-+void ipu_cpmem_set_yuv_interleaved(struct ipu_ch_param *p, u32 pixel_format)
++void ipu_dc_init_async(struct ipu_dc *dc, int di, bool interlaced)
 +{
-+	switch (pixel_format) {
-+	case IPU_PIX_FMT_UYVY:
-+		ipu_ch_param_set_field(p, IPU_FIELD_BPP, 3);	/* bits/pixel */
-+		ipu_ch_param_set_field(p, IPU_FIELD_PFS, 0xA);	/* pix format */
-+		ipu_ch_param_set_field(p, IPU_FIELD_NPB, 15);	/* burst size */
-+		break;
-+	case IPU_PIX_FMT_YUYV:
-+		ipu_ch_param_set_field(p, IPU_FIELD_BPP, 3);	/* bits/pixel */
-+		ipu_ch_param_set_field(p, IPU_FIELD_PFS, 0x8);	/* pix format */
-+		ipu_ch_param_set_field(p, IPU_FIELD_NPB, 31);	/* burst size */
-+		break;
-+	}
++	struct ipu_dc_priv *priv = dc->priv;
++	u32 reg = 0;
++
++	dc->di = di;
++
++	ipu_dc_link_event(dc, DC_EVT_NEW_DATA_W_0, 0x64, 1);
++	ipu_dc_link_event(dc, DC_EVT_NEW_DATA_W_1, 0x64, 1);
++
++	reg = 0x3;
++	reg |= DC_DISP_ID_SERIAL << DC_WR_CH_CONF_PROG_DISP_ID_OFFSET;
++	writel(reg, dc->base + DC_WR_CH_CONF);
++
++	writel(0x00000000, dc->base + DC_WR_CH_ADDR);
++
++	writel(0x00000084, priv->dc_reg + DC_GEN);
++
++	ipu_module_enable(priv->ipu, IPU_CONF_DC_EN);
 +}
-+EXPORT_SYMBOL_GPL(ipu_cpmem_set_yuv_interleaved);
++EXPORT_SYMBOL_GPL(ipu_dc_init_async);
 +
-+struct ipu_channel *ipu_idmac_get(struct ipu_soc *ipu, unsigned num)
++void ipu_dc_enable_channel(struct ipu_dc *dc)
 +{
-+	struct ipu_channel *channel;
-+
-+	dev_dbg(ipu->dev, "%s %d\n", __func__, num);
-+
-+	if (num > 63)
-+		return ERR_PTR(-ENODEV);
-+
-+	mutex_lock(&ipu->channel_lock);
-+
-+	channel = &ipu->channel[num];
-+
-+	if (channel->busy) {
-+		channel = ERR_PTR(-EBUSY);
-+		goto out;
-+	}
-+
-+	channel->busy = 1;
-+	channel->num = num;
-+
-+out:
-+	mutex_unlock(&ipu->channel_lock);
-+
-+	return channel;
-+}
-+EXPORT_SYMBOL_GPL(ipu_idmac_get);
-+
-+void ipu_idmac_put(struct ipu_channel *channel)
-+{
-+	struct ipu_soc *ipu = channel->ipu;
-+
-+	dev_dbg(ipu->dev, "%s %d\n", __func__, channel->num);
-+
-+	mutex_lock(&ipu->channel_lock);
-+
-+	channel->busy = 0;
-+
-+	mutex_unlock(&ipu->channel_lock);
-+}
-+EXPORT_SYMBOL_GPL(ipu_idmac_put);
-+
-+#define idma_mask(ch)			(1 << (ch & 0x1f))
-+
-+void ipu_idmac_set_double_buffer(struct ipu_channel *channel, bool doublebuffer)
-+{
-+	struct ipu_soc *ipu = channel->ipu;
-+	unsigned long flags;
++	int di;
 +	u32 reg;
 +
-+	spin_lock_irqsave(&ipu->lock, flags);
++	di = dc->di;
 +
-+	reg = ipu_cm_read(ipu, IPU_CHA_DB_MODE_SEL(channel->num));
-+	if (doublebuffer)
-+		reg |= idma_mask(channel->num);
-+	else
-+		reg &= ~idma_mask(channel->num);
-+	ipu_cm_write(ipu, reg, IPU_CHA_DB_MODE_SEL(channel->num));
-+
-+	spin_unlock_irqrestore(&ipu->lock, flags);
++	reg = readl(dc->base + DC_WR_CH_CONF);
++	reg |= 4 << DC_WR_CH_CONF_PROG_TYPE_OFFSET;
++	writel(reg, dc->base + DC_WR_CH_CONF);
 +}
-+EXPORT_SYMBOL_GPL(ipu_idmac_set_double_buffer);
++EXPORT_SYMBOL_GPL(ipu_dc_enable_channel);
 +
-+int ipu_module_enable(struct ipu_soc *ipu, u32 mask)
++void ipu_dc_disable_channel(struct ipu_dc *dc)
 +{
-+	unsigned long lock_flags;
-+	u32 val;
++	struct ipu_dc_priv *priv = dc->priv;
++	u32 reg;
++	int irq = 0, timeout = 50;
 +
-+	spin_lock_irqsave(&ipu->lock, lock_flags);
-+
-+	val = ipu_cm_read(ipu, IPU_DISP_GEN);
-+
-+	if (mask & IPU_CONF_DI0_EN)
-+		val |= IPU_DI0_COUNTER_RELEASE;
-+	if (mask & IPU_CONF_DI1_EN)
-+		val |= IPU_DI1_COUNTER_RELEASE;
-+
-+	ipu_cm_write(ipu, val, IPU_DISP_GEN);
-+
-+	val = ipu_cm_read(ipu, IPU_CONF);
-+	val |= mask;
-+	ipu_cm_write(ipu, val, IPU_CONF);
-+
-+	spin_unlock_irqrestore(&ipu->lock, lock_flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(ipu_module_enable);
-+
-+int ipu_module_disable(struct ipu_soc *ipu, u32 mask)
-+{
-+	unsigned long lock_flags;
-+	u32 val;
-+
-+	spin_lock_irqsave(&ipu->lock, lock_flags);
-+
-+	val = ipu_cm_read(ipu, IPU_CONF);
-+	val &= ~mask;
-+	ipu_cm_write(ipu, val, IPU_CONF);
-+
-+	val = ipu_cm_read(ipu, IPU_DISP_GEN);
-+
-+	if (mask & IPU_CONF_DI0_EN)
-+		val &= ~IPU_DI0_COUNTER_RELEASE;
-+	if (mask & IPU_CONF_DI1_EN)
-+		val &= ~IPU_DI1_COUNTER_RELEASE;
-+
-+	ipu_cm_write(ipu, val, IPU_DISP_GEN);
-+
-+	spin_unlock_irqrestore(&ipu->lock, lock_flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(ipu_module_disable);
-+
-+void ipu_idmac_select_buffer(struct ipu_channel *channel, u32 buf_num)
-+{
-+	struct ipu_soc *ipu = channel->ipu;
-+	unsigned int chno = channel->num;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ipu->lock, flags);
-+
-+	/* Mark buffer as ready. */
-+	if (buf_num == 0)
-+		ipu_cm_write(ipu, idma_mask(chno), IPU_CHA_BUF0_RDY(chno));
-+	else
-+		ipu_cm_write(ipu, idma_mask(chno), IPU_CHA_BUF1_RDY(chno));
-+
-+	spin_unlock_irqrestore(&ipu->lock, flags);
-+}
-+EXPORT_SYMBOL_GPL(ipu_idmac_select_buffer);
-+
-+int ipu_idmac_enable_channel(struct ipu_channel *channel)
-+{
-+	struct ipu_soc *ipu = channel->ipu;
-+	u32 val;
-+	unsigned long flags;
-+
-+	ipu_get(ipu);
-+
-+	spin_lock_irqsave(&ipu->lock, flags);
-+
-+	val = ipu_idmac_read(ipu, IDMAC_CHA_EN(channel->num));
-+	val |= idma_mask(channel->num);
-+	ipu_idmac_write(ipu, val, IDMAC_CHA_EN(channel->num));
-+
-+	spin_unlock_irqrestore(&ipu->lock, flags);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(ipu_idmac_enable_channel);
-+
-+int ipu_idmac_disable_channel(struct ipu_channel *channel)
-+{
-+	struct ipu_soc *ipu = channel->ipu;
-+	u32 val;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&ipu->lock, flags);
-+
-+	/* Disable DMA channel(s) */
-+	val = ipu_idmac_read(ipu, IDMAC_CHA_EN(channel->num));
-+	val &= ~idma_mask(channel->num);
-+	ipu_idmac_write(ipu, val, IDMAC_CHA_EN(channel->num));
-+
-+	/* Set channel buffers NOT to be ready */
-+	ipu_cm_write(ipu, 0xf0000000, IPU_GPR); /* write one to clear */
-+
-+	if (ipu_cm_read(ipu, IPU_CHA_BUF0_RDY(channel->num)) & idma_mask(channel->num)) {
-+		ipu_cm_write(ipu, idma_mask(channel->num),
-+			     IPU_CHA_BUF0_RDY(channel->num));
-+	}
-+	if (ipu_cm_read(ipu, IPU_CHA_BUF1_RDY(channel->num)) & idma_mask(channel->num)) {
-+		ipu_cm_write(ipu, idma_mask(channel->num),
-+			     IPU_CHA_BUF1_RDY(channel->num));
++	if (dc->chno == 1) {
++		irq = IPU_IRQ_DC_FC_1;
++	} else if (dc->chno == 5) {
++		irq = IPU_IRQ_DP_SF_END;
++	} else {
++		return;
 +	}
 +
-+	ipu_cm_write(ipu, 0x0, IPU_GPR); /* write one to set */
++	/* should wait for the interrupt here */
++	mdelay(50);
 +
-+	/* Reset the double buffer */
-+	val = ipu_cm_read(ipu, IPU_CHA_DB_MODE_SEL(channel->num));
-+	val &= ~idma_mask(channel->num);
-+	ipu_cm_write(ipu, val, IPU_CHA_DB_MODE_SEL(channel->num));
-+
-+	spin_unlock_irqrestore(&ipu->lock, flags);
-+
-+	ipu_put(ipu);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(ipu_idmac_disable_channel);
-+
-+static int ipu_reset(struct ipu_soc *ipu)
-+{
-+	int timeout = 10000;
-+	u32 val;
-+
-+	/* hard reset the IPU */
-+	val = readl(MX51_IO_ADDRESS(MX51_SRC_BASE_ADDR));
-+	val |= 1 << 3;
-+	writel(val, MX51_IO_ADDRESS(MX51_SRC_BASE_ADDR));
-+
-+	mdelay(300); /* FIXME: such a big delay needed? */
-+
-+	ipu_cm_write(ipu, 0x807FFFFF, IPU_MEM_RST);
-+
-+	while (ipu_cm_read(ipu, IPU_MEM_RST) & 0x80000000) {
-+		if (!timeout--)
-+			return -ETIME;
-+		udelay(100);
++	/* Wait for DC triple buffer to empty */
++	if (dc->di == 0)
++		while ((readl(priv->dc_reg + DC_STAT) & 0x00000002)
++			!= 0x00000002) {
++			msleep(2);
++			timeout -= 2;
++			if (timeout <= 0)
++				break;
++		}
++	else if (dc->di == 1)
++		while ((readl(priv->dc_reg + DC_STAT) & 0x00000020)
++			!= 0x00000020) {
++			msleep(2);
++			timeout -= 2;
++			if (timeout <= 0)
++				break;
 +	}
 +
-+	return 0;
++	reg = readl(dc->base + DC_WR_CH_CONF);
++	reg &= ~DC_WR_CH_CONF_PROG_TYPE_MASK;
++	writel(reg, dc->base + DC_WR_CH_CONF);
++}
++EXPORT_SYMBOL_GPL(ipu_dc_disable_channel);
++
++static void ipu_dc_map_link(struct ipu_dc_priv *priv, int current_map,
++		int base_map_0, int buf_num_0,
++		int base_map_1, int buf_num_1,
++		int base_map_2, int buf_num_2)
++{
++	int ptr_0 = base_map_0 * 3 + buf_num_0;
++	int ptr_1 = base_map_1 * 3 + buf_num_1;
++	int ptr_2 = base_map_2 * 3 + buf_num_2;
++	int ptr;
++	u32 reg;
++	ptr = (ptr_2 << 10) +  (ptr_1 << 5) + ptr_0;
++
++	reg = readl(priv->dc_reg + DC_MAP_CONF_PTR(current_map));
++	reg &= ~(0x1F << ((16 * (current_map & 0x1))));
++	reg |= ptr << ((16 * (current_map & 0x1)));
++	writel(reg, priv->dc_reg + DC_MAP_CONF_PTR(current_map));
 +}
 +
-+static int ipu_submodules_init(struct ipu_soc *ipu, struct platform_device *pdev,
-+		unsigned long ipu_base, struct clk *ipu_clk)
++static void ipu_dc_map_config(struct ipu_dc_priv *priv, int map,
++		int byte_num, int offset, int mask)
 +{
-+	char *unit;
-+	int ret;
-+	struct device *dev = &pdev->dev;
-+
-+	ret = ipu_di_init(ipu, dev, 0, ipu_base + IPU_DI0_REG_BASE,
-+			IPU_CONF_DI0_EN, ipu_clk);
-+	if (ret) {
-+		unit = "di0";
-+		goto err_di_0;
-+	}
-+
-+	ret = ipu_di_init(ipu, dev, 1, ipu_base + IPU_DI1_REG_BASE,
-+			IPU_CONF_DI1_EN, ipu_clk);
-+	if (ret) {
-+		unit = "di1";
-+		goto err_di_1;
-+	}
-+
-+	ret = ipu_dc_init(ipu, dev, ipu_base + IPU_DC_REG_BASE,
-+			ipu_base + IPU_DC_TMPL_REG_BASE);
-+	if (ret) {
-+		unit = "dc_template";
-+		goto err_dc;
-+	}
-+
-+	ret = ipu_dmfc_init(ipu, dev, ipu_base + IPU_DMFC_REG_BASE, ipu_clk);
-+	if (ret) {
-+		unit = "dmfc";
-+		goto err_dmfc;
-+	}
-+
-+	ret = ipu_dp_init(ipu, dev, ipu_base + IPU_SRM_REG_BASE);
-+	if (ret) {
-+		unit = "dp";
-+		goto err_dp;
-+	}
-+
-+	ret = ipu_capture_init(ipu, dev, ipu_base + IPU_CSI0_REG_BASE,
-+		ipu_base + IPU_CSI1_REG_BASE, ipu_base + IPU_SMFC_REG_BASE);
-+	if (ret) {
-+		unit = "capture";
-+		goto err_capture;
-+	}
-+
-+	return 0;
-+
-+err_capture:
-+	ipu_dp_exit(ipu);
-+err_dp:
-+	ipu_dmfc_exit(ipu);
-+err_dmfc:
-+	ipu_dc_exit(ipu);
-+err_dc:
-+	ipu_di_exit(ipu, 1);
-+err_di_1:
-+	ipu_di_exit(ipu, 0);
-+err_di_0:
-+	dev_err(&pdev->dev, "init %s failed with %d\n", unit, ret);
-+	return ret;
-+}
-+
-+void ipu_get(struct ipu_soc *ipu)
-+{
-+	mutex_lock(&ipu->channel_lock);
-+
-+	ipu->usecount++;
-+
-+	if (ipu->usecount == 1)
-+		clk_enable(ipu->clk);
-+
-+	mutex_unlock(&ipu->channel_lock);
-+}
-+EXPORT_SYMBOL_GPL(ipu_get);
-+
-+void ipu_put(struct ipu_soc *ipu)
-+{
-+	mutex_lock(&ipu->channel_lock);
-+
-+	ipu->usecount--;
-+
-+	if (ipu->usecount == 0)
-+		clk_disable(ipu->clk);
-+
-+	WARN_ON(ipu->usecount < 0);
-+
-+	mutex_unlock(&ipu->channel_lock);
-+}
-+EXPORT_SYMBOL_GPL(ipu_put);
-+
-+static void ipu_irq_handle(struct ipu_soc *ipu, const int *regs, int num_regs)
-+{
-+	unsigned long status;
-+	int i, bit, irq_base;
-+
-+	for (i = 0; i < num_regs; i++) {
-+
-+		status = ipu_cm_read(ipu, IPU_INT_STAT(regs[i]));
-+		status &= ipu_cm_read(ipu, IPU_INT_CTRL(regs[i]));
-+
-+		irq_base = ipu->irq_start + regs[i] * 32;
-+		for_each_set_bit(bit, &status, 32)
-+			generic_handle_irq(irq_base + bit);
-+	}
-+}
-+
-+static void ipu_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct ipu_soc *ipu = irq_desc_get_handler_data(desc);
-+	const int int_reg[] = { 0, 1, 2, 3, 10, 11, 12, 13, 14};
-+
-+	ipu_irq_handle(ipu, int_reg, ARRAY_SIZE(int_reg));
-+}
-+
-+static void ipu_err_irq_handler(unsigned int irq, struct irq_desc *desc)
-+{
-+	struct ipu_soc *ipu = irq_desc_get_handler_data(desc);
-+	const int int_reg[] = { 4, 5, 8, 9};
-+
-+	ipu_irq_handle(ipu, int_reg, ARRAY_SIZE(int_reg));
-+}
-+
-+static void ipu_ack_irq(struct irq_data *d)
-+{
-+	struct ipu_soc *ipu = irq_data_get_irq_chip_data(d);
-+	unsigned int irq = d->irq - ipu->irq_start;
-+
-+	ipu_cm_write(ipu, 1 << (irq % 32), IPU_INT_STAT(irq / 32));
-+}
-+
-+static void ipu_unmask_irq(struct irq_data *d)
-+{
-+	struct ipu_soc *ipu = irq_data_get_irq_chip_data(d);
-+	unsigned int irq = d->irq - ipu->irq_start;
-+	unsigned long flags;
++	int ptr = map * 3 + byte_num;
 +	u32 reg;
 +
-+	spin_lock_irqsave(&ipu->lock, flags);
-+	reg = ipu_cm_read(ipu, IPU_INT_CTRL(irq / 32));
-+	reg |= 1 << (irq % 32);
-+	ipu_cm_write(ipu, reg, IPU_INT_CTRL(irq / 32));
-+	spin_unlock_irqrestore(&ipu->lock, flags);
++	reg = readl(priv->dc_reg + DC_MAP_CONF_VAL(ptr));
++	reg &= ~(0xffff << (16 * (ptr & 0x1)));
++	reg |= ((offset << 8) | mask) << (16 * (ptr & 0x1));
++	writel(reg, priv->dc_reg + DC_MAP_CONF_VAL(ptr));
++
++	reg = readl(priv->dc_reg + DC_MAP_CONF_PTR(map));
++	reg &= ~(0x1f << ((16 * (map & 0x1)) + (5 * byte_num)));
++	reg |= ptr << ((16 * (map & 0x1)) + (5 * byte_num));
++	writel(reg, priv->dc_reg + DC_MAP_CONF_PTR(map));
 +}
 +
-+static void ipu_mask_irq(struct irq_data *d)
++static void ipu_dc_map_clear(struct ipu_dc_priv *priv, int map)
 +{
-+	struct ipu_soc *ipu = irq_data_get_irq_chip_data(d);
-+	unsigned int irq = d->irq - ipu->irq_start;
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(&ipu->lock, flags);
-+	reg = ipu_cm_read(ipu, IPU_INT_CTRL(irq / 32));
-+	reg &= ~(1 << (irq % 32));
-+	ipu_cm_write(ipu, reg, IPU_INT_CTRL(irq / 32));
-+	spin_unlock_irqrestore(&ipu->lock, flags);
++	u32 reg = readl(priv->dc_reg + DC_MAP_CONF_PTR(map));
++	writel(reg & ~(0xffff << (16 * (map & 0x1))),
++		     priv->dc_reg + DC_MAP_CONF_PTR(map));
 +}
 +
-+static struct irq_chip ipu_irq_chip = {
-+	.name = "IPU",
-+	.irq_ack = ipu_ack_irq,
-+	.irq_mask = ipu_mask_irq,
-+	.irq_unmask = ipu_unmask_irq,
-+};
-+
-+static void ipu_submodules_exit(struct ipu_soc *ipu)
++struct ipu_dc *ipu_dc_get(struct ipu_soc *ipu, int channel)
 +{
-+	ipu_dp_exit(ipu);
-+	ipu_dmfc_exit(ipu);
-+	ipu_dc_exit(ipu);
-+	ipu_di_exit(ipu, 1);
-+	ipu_di_exit(ipu, 0);
-+	ipu_capture_exit(ipu);
++	struct ipu_dc_priv *priv = ipu->dc_priv;
++	struct ipu_dc *dc;
++
++	if (channel > 9)
++		return NULL;
++
++	dc = &priv->channels[channel];
++
++	mutex_lock(&priv->mutex);
++
++	if (dc->in_use) {
++		mutex_unlock(&priv->mutex);
++		ERR_PTR(-EBUSY);
++	}
++
++	dc->in_use = 1;
++
++	mutex_unlock(&priv->mutex);
++
++	return dc;
 +}
++EXPORT_SYMBOL_GPL(ipu_dc_get);
 +
-+static int platform_remove_devices_fn(struct device *dev, void *unused)
++void ipu_dc_put(struct ipu_dc *dc)
 +{
-+	struct platform_device *pdev = to_platform_device(dev);
++	struct ipu_dc_priv *priv = dc->priv;
 +
-+	platform_device_unregister(pdev);
-+
-+	return 0;
++	mutex_lock(&priv->mutex);
++	dc->in_use = 0;
++	mutex_unlock(&priv->mutex);
 +}
++EXPORT_SYMBOL_GPL(ipu_dc_put);
 +
-+static void platform_device_unregister_children(struct platform_device *pdev)
++int ipu_dc_init(struct ipu_soc *ipu, struct device *dev,
++		unsigned long base, unsigned long template_base)
 +{
-+	device_for_each_child(&pdev->dev, NULL, platform_remove_devices_fn);
-+}
-+
-+static int ipu_add_subdevice_pdata(struct device *dev,
-+		const char *name, int id, void *pdata, int irq)
-+{
-+	struct platform_device *pdev;
-+	struct resource res[] = {
-+		{
-+			.flags = IORESOURCE_IRQ,
-+			.start = irq,
-+			.end = irq,
-+		},
-+	};
-+
-+	pdev = platform_device_register_resndata(dev, name, id, res,
-+			ARRAY_SIZE(res), NULL, 0);
-+	return pdev ? 0 : -EINVAL;
-+}
-+
-+static int ipu_add_client_devices(struct ipu_soc *ipu)
-+{
-+	int ret;
-+
-+	ret = ipu_add_subdevice_pdata(ipu->dev, "imx-ipuv3-ovl", 0, NULL,
-+			ipu->irq_start +
-+			IPU_IRQ_EOF(IPUV3_CHANNEL_MEM_FG_SYNC));
-+	ret |= ipu_add_subdevice_pdata(ipu->dev, "imx-ipuv3-camera", 0, NULL,
-+			ipu->irq_start +
-+			IPU_IRQ_EOF(IPUV3_CHANNEL_CSI0));
-+	ret |= ipu_add_subdevice_pdata(ipu->dev, "imx-drm", 0, NULL,
-+			ipu->irq_start +
-+			IPU_IRQ_EOF(IPUV3_CHANNEL_MEM_FG_SYNC));
-+
-+	if (ret)
-+		platform_device_unregister_children(to_platform_device(ipu->dev));
-+
-+	return ret;
-+}
-+
-+static int ipu_irq_init(struct ipu_soc *ipu)
-+{
++	struct ipu_dc_priv *priv;
++	static int channel_offsets[] = { 0, 0x1c, 0x38, 0x54, 0x58, 0x5c,
++		0x78, 0, 0x94, 0xb4};
 +	int i;
 +
-+	ipu->irq_start = irq_alloc_descs(-1, 0, IPU_NUM_IRQS, 0);
-+	if (ipu->irq_start < 0)
-+		return ipu->irq_start;
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
 +
-+	for (i = ipu->irq_start; i < ipu->irq_start + IPU_NUM_IRQS; i++) {
-+		irq_set_chip_and_handler(i, &ipu_irq_chip, handle_level_irq);
-+		set_irq_flags(i, IRQF_VALID);
-+		irq_set_chip_data(i, ipu);
++	mutex_init(&priv->mutex);
++
++	priv->dev = dev;
++	priv->ipu = ipu;
++	priv->dc_reg = devm_ioremap(dev, base, PAGE_SIZE);
++	priv->dc_tmpl_reg = devm_ioremap(dev, template_base, PAGE_SIZE);
++	if (!priv->dc_reg || !priv->dc_tmpl_reg)
++		return -ENOMEM;
++
++	for (i = 0; i < 10; i++) {
++		priv->channels[i].chno = i;
++		priv->channels[i].priv = priv;
++		priv->channels[i].base = priv->dc_reg + channel_offsets[i];
 +	}
 +
-+	irq_set_chained_handler(ipu->irq_sync, ipu_irq_handler);
-+	irq_set_handler_data(ipu->irq_sync, ipu);
-+	irq_set_chained_handler(ipu->irq_err, ipu_err_irq_handler);
-+	irq_set_handler_data(ipu->irq_err, ipu);
++	ipu->dc_priv = priv;
++
++	dev_dbg(dev, "DC base: 0x%08lx template base: 0x%08lx\n",
++			base, template_base);
++
++	/* IPU_PIX_FMT_RGB24 */
++	ipu_dc_map_clear(priv, 0);
++	ipu_dc_map_config(priv, 0, 0, 7, 0xff);
++	ipu_dc_map_config(priv, 0, 1, 15, 0xff);
++	ipu_dc_map_config(priv, 0, 2, 23, 0xff);
++
++	/* IPU_PIX_FMT_RGB666 */
++	ipu_dc_map_clear(priv, 1);
++	ipu_dc_map_config(priv, 1, 0, 5, 0xfc);
++	ipu_dc_map_config(priv, 1, 1, 11, 0xfc);
++	ipu_dc_map_config(priv, 1, 2, 17, 0xfc);
++
++	/* IPU_PIX_FMT_YUV444 */
++	ipu_dc_map_clear(priv, 2);
++	ipu_dc_map_config(priv, 2, 0, 15, 0xff);
++	ipu_dc_map_config(priv, 2, 1, 23, 0xff);
++	ipu_dc_map_config(priv, 2, 2, 7, 0xff);
++
++	/* IPU_PIX_FMT_RGB565 */
++	ipu_dc_map_clear(priv, 3);
++	ipu_dc_map_config(priv, 3, 0, 4, 0xf8);
++	ipu_dc_map_config(priv, 3, 1, 10, 0xfc);
++	ipu_dc_map_config(priv, 3, 2, 15, 0xf8);
++
++	/* IPU_PIX_FMT_LVDS666 */
++	ipu_dc_map_clear(priv, 4);
++	ipu_dc_map_config(priv, 4, 0, 5, 0xfc);
++	ipu_dc_map_config(priv, 4, 1, 13, 0xfc);
++	ipu_dc_map_config(priv, 4, 2, 21, 0xfc);
++
++	/* IPU_PIX_FMT_GBR24 */
++	ipu_dc_map_clear(priv, 13);
++	ipu_dc_map_link(priv, 13, 0, 2, 0, 0, 0, 1);
 +
 +	return 0;
 +}
 +
-+static void ipu_irq_exit(struct ipu_soc *ipu)
++void ipu_dc_exit(struct ipu_soc *ipu)
 +{
-+	int i;
-+
-+	irq_set_chained_handler(ipu->irq_err, NULL);
-+	irq_set_handler_data(ipu->irq_err, NULL);
-+	irq_set_chained_handler(ipu->irq_sync, NULL);
-+	irq_set_handler_data(ipu->irq_sync, NULL);
-+
-+	for (i = ipu->irq_start; i < ipu->irq_start + IPU_NUM_IRQS; i++) {
-+		set_irq_flags(i, 0);
-+		irq_set_chip(i, NULL);
-+		irq_set_chip_data(i, NULL);
-+	}
-+
-+	irq_free_descs(ipu->irq_start, IPU_NUM_IRQS);
 +}
-+
-+static int __devinit ipu_probe(struct platform_device *pdev)
-+{
-+	struct ipu_soc *ipu;
-+	struct resource *res;
-+	unsigned long ipu_base;
-+	int i, ret, irq_sync, irq_err;
-+
-+	irq_sync = platform_get_irq(pdev, 0);
-+	irq_err = platform_get_irq(pdev, 1);
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	if (!res || irq_sync < 0 || irq_err < 0)
-+		return -ENODEV;
-+
-+	ipu_base = res->start;
-+
-+	ipu = devm_kzalloc(&pdev->dev, sizeof(*ipu), GFP_KERNEL);
-+	if (!ipu)
-+		return -ENODEV;
-+
-+	for (i = 0; i < 64; i++)
-+		ipu->channel[i].ipu = ipu;
-+
-+	spin_lock_init(&ipu->lock);
-+	mutex_init(&ipu->channel_lock);
-+
-+	ipu->cm_reg = devm_ioremap(&pdev->dev, ipu_base + IPU_CM_REG_BASE, PAGE_SIZE);
-+	ipu->idmac_reg = devm_ioremap(&pdev->dev, ipu_base + IPU_IDMAC_REG_BASE, PAGE_SIZE);
-+	ipu->cpmem_base = devm_ioremap(&pdev->dev, ipu_base + IPU_CPMEM_REG_BASE, PAGE_SIZE);
-+	if (!ipu->cm_reg || !ipu->idmac_reg || !ipu->cpmem_base) {
-+		ret = -ENOMEM;
-+		goto failed_ioremap;
-+	}
-+
-+	ipu->clk = clk_get(&pdev->dev, "ipu");
-+	if (IS_ERR(ipu->clk)) {
-+		ret = PTR_ERR(ipu->clk);
-+		dev_err(&pdev->dev, "clk_get failed with %d", ret);
-+		goto failed_clk_get;
-+	}
-+
-+	platform_set_drvdata(pdev, ipu);
-+
-+	ipu_get(ipu);
-+
-+	ipu->dev = &pdev->dev;
-+	ipu->irq_sync = irq_sync;
-+	ipu->irq_err = irq_err;
-+
-+	ret = ipu_irq_init(ipu);
-+	if (ret)
-+		goto out_failed_irq;
-+
-+	ipu_reset(ipu);
-+
-+	ret = ipu_submodules_init(ipu, pdev, ipu_base, ipu->clk);
-+	if (ret)
-+		goto failed_submodules_init;
-+
-+	/* Set sync refresh channels as high priority */
-+	ipu_idmac_write(ipu, 0x18800000, IDMAC_CHA_PRI(0));
-+
-+	/* Set MCU_T to divide MCU access window into 2 */
-+	ipu_cm_write(ipu, 0x00400000L | (IPU_MCU_T_DEFAULT << 18), IPU_DISP_GEN);
-+
-+	ret = ipu_add_client_devices(ipu);
-+	if (ret) {
-+		dev_err(&pdev->dev, "adding client devices failed with %d\n", ret);
-+		goto failed_add_clients;
-+	}
-+
-+	ipu_put(ipu);
-+
-+	return 0;
-+
-+failed_add_clients:
-+	ipu_submodules_exit(ipu);
-+failed_submodules_init:
-+	ipu_irq_exit(ipu);
-+out_failed_irq:
-+	ipu_put(ipu);
-+	clk_put(ipu->clk);
-+failed_clk_get:
-+failed_ioremap:
-+	return ret;
-+}
-+
-+static int __devexit ipu_remove(struct platform_device *pdev)
-+{
-+	struct ipu_soc *ipu = platform_get_drvdata(pdev);
-+	struct resource *res;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+
-+	platform_device_unregister_children(pdev);
-+	ipu_submodules_exit(ipu);
-+	ipu_irq_exit(ipu);
-+
-+	if (ipu->usecount != 0) {
-+		dev_err(ipu->dev, "unbalanced use count: %d\n", ipu->usecount);
-+		clk_disable(ipu->clk);
-+	}
-+
-+	clk_put(ipu->clk);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver imx_ipu_driver = {
-+	.driver = {
-+		.name = "imx-ipuv3",
-+	},
-+	.probe = ipu_probe,
-+	.remove = __devexit_p(ipu_remove),
-+};
-+
-+static int __init imx_ipu_init(void)
-+{
-+	int32_t ret;
-+
-+	ret = platform_driver_register(&imx_ipu_driver);
-+	return 0;
-+}
-+subsys_initcall(imx_ipu_init);
-+
-+static void __exit imx_ipu_exit(void)
-+{
-+	platform_driver_unregister(&imx_ipu_driver);
-+}
-+module_exit(imx_ipu_exit);
-+
-+MODULE_DESCRIPTION("i.MX IPU v3 driver");
-+MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
-+MODULE_LICENSE("GPL");
-diff --git a/drivers/gpu/drm/imx/ipu-v3/ipu-prv.h b/drivers/gpu/drm/imx/ipu-v3/ipu-prv.h
+diff --git a/drivers/gpu/drm/imx/ipu-v3/ipu-di.c b/drivers/gpu/drm/imx/ipu-v3/ipu-di.c
 new file mode 100644
-index 0000000..d0fc55b
+index 0000000..3580386
 --- /dev/null
-+++ b/drivers/gpu/drm/imx/ipu-v3/ipu-prv.h
-@@ -0,0 +1,218 @@
++++ b/drivers/gpu/drm/imx/ipu-v3/ipu-di.c
+@@ -0,0 +1,665 @@
 +/*
 + * Copyright (c) 2010 Sascha Hauer <s.hauer@pengutronix.de>
 + * Copyright (C) 2005-2009 Freescale Semiconductor, Inc.
@@ -946,523 +498,1403 @@ index 0000000..d0fc55b
 + * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 + * for more details.
 + */
-+#ifndef __IPU_PRV_H__
-+#define __IPU_PRV_H__
-+
-+struct ipu_soc;
 +
 +#include <linux/types.h>
-+#include <linux/device.h>
-+#include <linux/clk.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/err.h>
 +#include <linux/platform_device.h>
-+#include <mach/hardware.h>
++#include <drm/imx-ipu-v3.h>
++#include <linux/clk.h>
++#include <linux/clkdev.h>
 +
-+#define IPUV3_CHANNEL_CSI0			 0
-+#define IPUV3_CHANNEL_CSI1			 1
-+#define IPUV3_CHANNEL_CSI2			 2
-+#define IPUV3_CHANNEL_CSI3			 3
-+#define IPUV3_CHANNEL_MEM_BG_SYNC		23
-+#define IPUV3_CHANNEL_MEM_FG_SYNC		27
-+#define IPUV3_CHANNEL_MEM_DC_SYNC		28
-+#define IPUV3_CHANNEL_MEM_FG_SYNC_ALPHA	31
-+#define IPUV3_CHANNEL_MEM_DC_ASYNC		41
-+#define IPUV3_CHANNEL_ROT_ENC_MEM		45
-+#define IPUV3_CHANNEL_ROT_VF_MEM		46
-+#define IPUV3_CHANNEL_ROT_PP_MEM		47
-+#define IPUV3_CHANNEL_ROT_ENC_MEM_OUT	48
-+#define IPUV3_CHANNEL_ROT_VF_MEM_OUT		49
-+#define IPUV3_CHANNEL_ROT_PP_MEM_OUT		50
-+#define IPUV3_CHANNEL_MEM_BG_SYNC_ALPHA	51
++#include "ipu-prv.h"
 +
-+#define IPU_CM_REG_BASE		0
-+#define IPU_MCU_T_DEFAULT	8
-+#define IPU_IDMAC_REG_BASE	(IPU_CM_REG_BASE + 0x00008000)
-+#define IPU_ISP_REG_BASE	(IPU_CM_REG_BASE + 0x00010000)
-+#define IPU_DP_REG_BASE		(IPU_CM_REG_BASE + 0x00018000)
-+#define IPU_IC_REG_BASE		(IPU_CM_REG_BASE + 0x00020000)
-+#define IPU_IRT_REG_BASE	(IPU_CM_REG_BASE + 0x00028000)
-+#define IPU_CSI0_REG_BASE	(IPU_CM_REG_BASE + 0x00030000)
-+#define IPU_CSI1_REG_BASE	(IPU_CM_REG_BASE + 0x00038000)
-+#define IPU_DI0_REG_BASE	(IPU_CM_REG_BASE + 0x00040000)
-+#define IPU_DI1_REG_BASE	(IPU_CM_REG_BASE + 0x00048000)
-+#define IPU_SMFC_REG_BASE	(IPU_CM_REG_BASE + 0x00050000)
-+#define IPU_DC_REG_BASE		(IPU_CM_REG_BASE + 0x00058000)
-+#define IPU_DMFC_REG_BASE	(IPU_CM_REG_BASE + 0x00060000)
-+#define IPU_CPMEM_REG_BASE	(IPU_CM_REG_BASE + 0x01000000)
-+#define IPU_LUT_REG_BASE	(IPU_CM_REG_BASE + 0x01020000)
-+#define IPU_SRM_REG_BASE	(IPU_CM_REG_BASE + 0x01040000)
-+#define IPU_TPM_REG_BASE	(IPU_CM_REG_BASE + 0x01060000)
-+#define IPU_DC_TMPL_REG_BASE	(IPU_CM_REG_BASE + 0x01080000)
-+#define IPU_ISP_TBPR_REG_BASE	(IPU_CM_REG_BASE + 0x010c0000)
-+#define IPU_VDI_REG_BASE	(IPU_CM_REG_BASE + 0x00068000)
++#define SYNC_WAVE 0
 +
-+/* Register addresses */
-+/* IPU Common registers */
-+#define IPU_CM_REG(offset)	(offset)
++#define DC_DISP_ID_SYNC(di)	(di)
 +
-+#define IPU_CONF			IPU_CM_REG(0)
-+
-+#define IPU_SRM_PRI1			IPU_CM_REG(0x00a0)
-+#define IPU_SRM_PRI2			IPU_CM_REG(0x00a4)
-+#define IPU_FS_PROC_FLOW1		IPU_CM_REG(0x00a8)
-+#define IPU_FS_PROC_FLOW2		IPU_CM_REG(0x00ac)
-+#define IPU_FS_PROC_FLOW3		IPU_CM_REG(0x00b0)
-+#define IPU_FS_DISP_FLOW1		IPU_CM_REG(0x00b4)
-+#define IPU_FS_DISP_FLOW2		IPU_CM_REG(0x00b8)
-+#define IPU_SKIP			IPU_CM_REG(0x00bc)
-+#define IPU_DISP_ALT_CONF		IPU_CM_REG(0x00c0)
-+#define IPU_DISP_GEN			IPU_CM_REG(0x00c4)
-+#define IPU_DISP_ALT1			IPU_CM_REG(0x00c8)
-+#define IPU_DISP_ALT2			IPU_CM_REG(0x00cc)
-+#define IPU_DISP_ALT3			IPU_CM_REG(0x00d0)
-+#define IPU_DISP_ALT4			IPU_CM_REG(0x00d4)
-+#define IPU_SNOOP			IPU_CM_REG(0x00d8)
-+#define IPU_MEM_RST			IPU_CM_REG(0x00dc)
-+#define IPU_PM				IPU_CM_REG(0x00e0)
-+#define IPU_GPR				IPU_CM_REG(0x00e4)
-+#define IPU_CHA_DB_MODE_SEL(ch)		IPU_CM_REG(0x0150 + 4 * ((ch) / 32))
-+#define IPU_ALT_CHA_DB_MODE_SEL(ch)	IPU_CM_REG(0x0168 + 4 * ((ch) / 32))
-+#define IPU_CHA_CUR_BUF(ch)		IPU_CM_REG(0x023C + 4 * ((ch) / 32))
-+#define IPU_ALT_CUR_BUF0		IPU_CM_REG(0x0244)
-+#define IPU_ALT_CUR_BUF1		IPU_CM_REG(0x0248)
-+#define IPU_SRM_STAT			IPU_CM_REG(0x024C)
-+#define IPU_PROC_TASK_STAT		IPU_CM_REG(0x0250)
-+#define IPU_DISP_TASK_STAT		IPU_CM_REG(0x0254)
-+#define IPU_CHA_BUF0_RDY(ch)		IPU_CM_REG(0x0268 + 4 * ((ch) / 32))
-+#define IPU_CHA_BUF1_RDY(ch)		IPU_CM_REG(0x0270 + 4 * ((ch) / 32))
-+#define IPU_ALT_CHA_BUF0_RDY(ch)	IPU_CM_REG(0x0278 + 4 * ((ch) / 32))
-+#define IPU_ALT_CHA_BUF1_RDY(ch)	IPU_CM_REG(0x0280 + 4 * ((ch) / 32))
-+
-+#define IPU_INT_CTRL(n)		IPU_CM_REG(0x003C + 4 * (n))
-+#define IPU_INT_STAT(n)		IPU_CM_REG(0x0200 + 4 * (n))
-+
-+#define IPU_DI0_COUNTER_RELEASE			(1 << 24)
-+#define IPU_DI1_COUNTER_RELEASE			(1 << 25)
-+
-+#define IPU_IDMAC_REG(offset)	(offset)
-+
-+#define IDMAC_CONF			IPU_IDMAC_REG(0x0000)
-+#define IDMAC_CHA_EN(ch)		IPU_IDMAC_REG(0x0004 + 4 * ((ch) / 32))
-+#define IDMAC_SEP_ALPHA			IPU_IDMAC_REG(0x000c)
-+#define IDMAC_ALT_SEP_ALPHA		IPU_IDMAC_REG(0x0010)
-+#define IDMAC_CHA_PRI(ch)		IPU_IDMAC_REG(0x0014 + 4 * ((ch) / 32))
-+#define IDMAC_WM_EN(ch)			IPU_IDMAC_REG(0x001c + 4 * ((ch) / 32))
-+#define IDMAC_CH_LOCK_EN_1		IPU_IDMAC_REG(0x0024)
-+#define IDMAC_CH_LOCK_EN_2		IPU_IDMAC_REG(0x0028)
-+#define IDMAC_SUB_ADDR_0		IPU_IDMAC_REG(0x002c)
-+#define IDMAC_SUB_ADDR_1		IPU_IDMAC_REG(0x0030)
-+#define IDMAC_SUB_ADDR_2		IPU_IDMAC_REG(0x0034)
-+#define IDMAC_BAND_EN(ch)		IPU_IDMAC_REG(0x0040 + 4 * ((ch) / 32))
-+#define IDMAC_CHA_BUSY(ch)		IPU_IDMAC_REG(0x0100 + 4 * ((ch) / 32))
-+
-+#define IPU_NUM_IRQS	(32 * 5)
-+
-+enum ipu_modules {
-+	IPU_CONF_CSI0_EN		= (1 << 0),
-+	IPU_CONF_CSI1_EN		= (1 << 1),
-+	IPU_CONF_IC_EN			= (1 << 2),
-+	IPU_CONF_ROT_EN			= (1 << 3),
-+	IPU_CONF_ISP_EN			= (1 << 4),
-+	IPU_CONF_DP_EN			= (1 << 5),
-+	IPU_CONF_DI0_EN			= (1 << 6),
-+	IPU_CONF_DI1_EN			= (1 << 7),
-+	IPU_CONF_SMFC_EN		= (1 << 8),
-+	IPU_CONF_DC_EN			= (1 << 9),
-+	IPU_CONF_DMFC_EN		= (1 << 10),
-+
-+	IPU_CONF_VDI_EN			= (1 << 12),
-+
-+	IPU_CONF_IDMAC_DIS		= (1 << 22),
-+
-+	IPU_CONF_IC_DMFC_SEL		= (1 << 25),
-+	IPU_CONF_IC_DMFC_SYNC		= (1 << 26),
-+	IPU_CONF_VDI_DMFC_SYNC		= (1 << 27),
-+
-+	IPU_CONF_CSI0_DATA_SOURCE	= (1 << 28),
-+	IPU_CONF_CSI1_DATA_SOURCE	= (1 << 29),
-+	IPU_CONF_IC_INPUT		= (1 << 30),
-+	IPU_CONF_CSI_SEL		= (1 << 31),
-+};
-+
-+struct ipu_channel {
-+	unsigned int num;
-+
-+	bool enabled;
-+	bool busy;
-+
++struct ipu_di {
++	void __iomem *base;
++	int id;
++	u32 module;
++	struct clk *clk;
++	struct clk *ipu_clk;
++	bool external_clk;
++	bool inuse;
++	bool initialized;
++	struct clk ipu_di_clk;
++	struct clk_lookup *clk_lookup;
 +	struct ipu_soc *ipu;
 +};
 +
-+struct ipu_dc_priv;
-+struct ipu_dmfc_priv;
++static struct ipu_di dis[2];
 +
-+struct ipu_soc {
-+	struct device		*dev;
-+	spinlock_t		lock;
-+	struct mutex		channel_lock;
++static DEFINE_MUTEX(di_mutex);
++static struct device *ipu_dev;
 +
-+	void __iomem		*cm_reg;
-+	void __iomem		*idmac_reg;
-+	struct ipu_ch_param	*cpmem_base;
-+
-+	int			usecount;
-+
-+	struct clk		*clk;
-+	struct ipu_channel	channel[64];
-+
-+	int			irq_start;
-+	int			irq_sync;
-+	int			irq_err;
-+
-+	struct ipu_dc_priv	*dc_priv;
-+	struct ipu_dp_priv	*dp_priv;
-+	struct ipu_dmfc_priv	*dmfc_priv;
++struct di_sync_config {
++	int run_count;
++	int run_src;
++	int offset_count;
++	int offset_src;
++	int repeat_count;
++	int cnt_clr_src;
++	int cnt_polarity_gen_en;
++	int cnt_polarity_clr_src;
++	int cnt_polarity_trigger_src;
++	int cnt_up;
++	int cnt_down;
 +};
 +
-+void ipu_srm_dp_sync_update(struct ipu_soc *ipu);
++enum di_pins {
++	DI_PIN11 = 0,
++	DI_PIN12 = 1,
++	DI_PIN13 = 2,
++	DI_PIN14 = 3,
++	DI_PIN15 = 4,
++	DI_PIN16 = 5,
++	DI_PIN17 = 6,
++	DI_PIN_CS = 7,
 +
-+int ipu_module_enable(struct ipu_soc *ipu, u32 mask);
-+int ipu_module_disable(struct ipu_soc *ipu, u32 mask);
++	DI_PIN_SER_CLK = 0,
++	DI_PIN_SER_RS = 1,
++};
 +
-+int ipu_di_init(struct ipu_soc *ipu, struct device *dev, int id, unsigned long base,
-+		u32 module, struct clk *ipu_clk);
-+void ipu_di_exit(struct ipu_soc *ipu, int id);
++enum di_sync_wave {
++	DI_SYNC_NONE = 0,
++	DI_SYNC_CLK = 1,
++	DI_SYNC_INT_HSYNC = 2,
++	DI_SYNC_HSYNC = 3,
++	DI_SYNC_VSYNC = 4,
++	DI_SYNC_DE = 6,
++};
 +
-+int ipu_dmfc_init(struct ipu_soc *ipu, struct device *dev, unsigned long base,
-+		struct clk *ipu_clk);
-+void ipu_dmfc_exit(struct ipu_soc *ipu);
++#define DI_GENERAL		0x0000
++#define DI_BS_CLKGEN0		0x0004
++#define DI_BS_CLKGEN1		0x0008
++#define DI_SW_GEN0(gen)		(0x000c + 4 * ((gen) - 1))
++#define DI_SW_GEN1(gen)		(0x0030 + 4 * ((gen) - 1))
++#define DI_STP_REP(gen)		(0x0148 + 4 * (((gen) - 1)/2))
++#define DI_SYNC_AS_GEN		0x0054
++#define DI_DW_GEN(gen)		(0x0058 + 4 * (gen))
++#define DI_DW_SET(gen, set)	(0x0088 + 4 * ((gen) + 0xc * (set)))
++#define DI_SER_CONF		0x015c
++#define DI_SSC			0x0160
++#define DI_POL			0x0164
++#define DI_AW0			0x0168
++#define DI_AW1			0x016c
++#define DI_SCR_CONF		0x0170
++#define DI_STAT			0x0174
 +
-+int ipu_dp_init(struct ipu_soc *ipu, struct device *dev, unsigned long base);
-+void ipu_dp_exit(struct ipu_soc *ipu);
++#define DI_SW_GEN0_RUN_COUNT(x)			((x) << 19)
++#define DI_SW_GEN0_RUN_SRC(x)			((x) << 16)
++#define DI_SW_GEN0_OFFSET_COUNT(x)		((x) << 3)
++#define DI_SW_GEN0_OFFSET_SRC(x)		((x) << 0)
 +
-+int ipu_dc_init(struct ipu_soc *ipu, struct device *dev, unsigned long base,
-+		unsigned long template_base);
-+void ipu_dc_exit(struct ipu_soc *ipu);
++#define DI_SW_GEN1_CNT_POL_GEN_EN(x)		((x) << 29)
++#define DI_SW_GEN1_CNT_CLR_SRC(x)		((x) << 25)
++#define DI_SW_GEN1_CNT_POL_TRIGGER_SRC(x)	((x) << 12)
++#define DI_SW_GEN1_CNT_POL_CLR_SRC(x)		((x) << 9)
++#define DI_SW_GEN1_CNT_DOWN(x)			((x) << 16)
++#define DI_SW_GEN1_CNT_UP(x)			(x)
++#define DI_SW_GEN1_AUTO_RELOAD			(0x10000000)
 +
-+int ipu_cpmem_init(struct ipu_soc *ipu, struct device *dev, unsigned long base);
-+void ipu_cpmem_exit(struct ipu_soc *ipu);
++#define DI_DW_GEN_ACCESS_SIZE_OFFSET		24
++#define DI_DW_GEN_COMPONENT_SIZE_OFFSET		16
 +
-+int ipu_capture_init(struct ipu_soc *ipu, struct device *dev, unsigned long csi1_base,
-+		unsigned long csi2_base, unsigned long smfc_base);
-+void ipu_capture_exit(struct ipu_soc *ipu);
++#define DI_GEN_DI_CLK_EXT			(1 << 20)
++#define DI_GEN_DI_VSYNC_EXT			(1 << 21)
++#define DI_GEN_POLARITY_1			(1 << 0)
++#define DI_GEN_POLARITY_2			(1 << 1)
++#define DI_GEN_POLARITY_3			(1 << 2)
++#define DI_GEN_POLARITY_4			(1 << 3)
++#define DI_GEN_POLARITY_5			(1 << 4)
++#define DI_GEN_POLARITY_6			(1 << 5)
++#define DI_GEN_POLARITY_7			(1 << 6)
++#define DI_GEN_POLARITY_8			(1 << 7)
 +
-+void ipu_get(struct ipu_soc *ipu);
-+void ipu_put(struct ipu_soc *ipu);
++#define DI_POL_DRDY_DATA_POLARITY		(1 << 7)
++#define DI_POL_DRDY_POLARITY_15			(1 << 4)
 +
-+#endif				/* __IPU_PRV_H__ */
-diff --git a/include/drm/imx-ipu-v3.h b/include/drm/imx-ipu-v3.h
++#define DI_VSYNC_SEL_OFFSET			13
++
++static inline u32 ipu_di_read(struct ipu_di *di, unsigned offset)
++{
++	return readl(di->base + offset);
++}
++
++static inline void ipu_di_write(struct ipu_di *di, u32 value, unsigned offset)
++{
++	writel(value, di->base + offset);
++}
++
++static unsigned long ipu_di_clk_get_rate(struct clk *clk)
++{
++	struct ipu_di *di = container_of(clk, struct ipu_di, ipu_di_clk);
++	unsigned long inrate = clk_parent_get_rate(clk);
++	unsigned long outrate;
++	u32 div = ipu_di_read(di, DI_BS_CLKGEN0);
++
++	outrate = (inrate / div) * 16;
++
++	dev_dbg(ipu_dev, "%s: inrate: %ld div: 0x%08x outrate: %ld\n",
++			__func__, inrate, div, outrate);
++
++	return outrate;
++}
++
++static int ipu_di_clk_calc_div(unsigned long inrate, unsigned long outrate)
++{
++	int div;
++
++	if (inrate <= outrate)
++		return 1 * 16;
++
++	div = DIV_ROUND_UP((inrate * 16), outrate);
++
++	return div;
++}
++
++static long ipu_di_clk_round_rate(struct clk *clk, unsigned long rate)
++{
++	unsigned long inrate = clk_parent_get_rate(clk);
++	unsigned long outrate;
++	int div;
++
++	div = ipu_di_clk_calc_div(inrate, rate);
++
++	outrate = (inrate * 16) / div;
++
++	dev_dbg(ipu_dev, "%s: inrate: %ld div: 0x%08x outrate: %ld wanted: %ld\n",
++			__func__, inrate, div, outrate, rate);
++
++	return outrate;
++}
++
++static int ipu_di_clk_set_rate(struct clk *clk, unsigned long rate)
++{
++	struct ipu_di *di = container_of(clk, struct ipu_di, ipu_di_clk);
++	unsigned long inrate = clk_parent_get_rate(clk);
++	int div;
++
++	div = ipu_di_clk_calc_div(inrate, rate);
++
++	ipu_di_write(di, div, DI_BS_CLKGEN0);
++
++	dev_dbg(ipu_dev, "%s: inrate: %ld div: 0x%08x\n", __func__, inrate, div);
++
++	return 0;
++}
++
++static struct clk *ipu_di_clk_get_parent(struct clk *clk)
++{
++	struct ipu_di *di = container_of(clk, struct ipu_di, ipu_di_clk);
++	return di->clk;
++}
++
++struct clk_ops ipu_di_clk_ops = {
++	.get_rate = ipu_di_clk_get_rate,
++	.round_rate = ipu_di_clk_round_rate,
++	.set_rate = ipu_di_clk_set_rate,
++	.get_parent = ipu_di_clk_get_parent,
++};
++
++static void ipu_di_data_wave_config(struct ipu_di *di,
++				     int wave_gen,
++				     int access_size, int component_size)
++{
++	u32 reg;
++	reg = (access_size << DI_DW_GEN_ACCESS_SIZE_OFFSET) |
++	    (component_size << DI_DW_GEN_COMPONENT_SIZE_OFFSET);
++	ipu_di_write(di, reg, DI_DW_GEN(wave_gen));
++}
++
++static void ipu_di_data_pin_config(struct ipu_di *di, int wave_gen, int di_pin, int set,
++				    int up, int down)
++{
++	u32 reg;
++
++	reg = ipu_di_read(di, DI_DW_GEN(wave_gen));
++	reg &= ~(0x3 << (di_pin * 2));
++	reg |= set << (di_pin * 2);
++	ipu_di_write(di, reg, DI_DW_GEN(wave_gen));
++
++	ipu_di_write(di, (down << 16) | up, DI_DW_SET(wave_gen, set));
++}
++
++static void ipu_di_sync_config(struct ipu_di *di, struct di_sync_config *config, int start, int count)
++{
++	u32 reg;
++	int i;
++
++	for (i = 0; i < count; i++) {
++		struct di_sync_config *c = &config[i];
++		int wave_gen = start + i + 1;
++
++		pr_debug("%s %d\n", __func__, wave_gen);
++		if ((c->run_count >= 0x1000) || (c->offset_count >= 0x1000) || (c->repeat_count >= 0x1000) ||
++			(c->cnt_up >= 0x400) || (c->cnt_down >= 0x400)) {
++			dev_err(ipu_dev, "DI%d counters out of range.\n", di->id);
++			return;
++		}
++
++		reg = DI_SW_GEN0_RUN_COUNT(c->run_count) |
++			DI_SW_GEN0_RUN_SRC(c->run_src) |
++			DI_SW_GEN0_OFFSET_COUNT(c->offset_count) |
++			DI_SW_GEN0_OFFSET_SRC(c->offset_src);
++		ipu_di_write(di, reg, DI_SW_GEN0(wave_gen));
++
++		reg = DI_SW_GEN1_CNT_POL_GEN_EN(c->cnt_polarity_gen_en) |
++			DI_SW_GEN1_CNT_CLR_SRC(c->cnt_clr_src) |
++			DI_SW_GEN1_CNT_POL_TRIGGER_SRC(c->cnt_polarity_trigger_src) |
++			DI_SW_GEN1_CNT_POL_CLR_SRC(c->cnt_polarity_clr_src) |
++			DI_SW_GEN1_CNT_DOWN(c->cnt_down) |
++			DI_SW_GEN1_CNT_UP(c->cnt_up);
++
++		if (c->repeat_count == 0) {
++			/* Enable auto reload */
++			reg |= DI_SW_GEN1_AUTO_RELOAD;
++		}
++
++		ipu_di_write(di, reg, DI_SW_GEN1(wave_gen));
++
++		reg = ipu_di_read(di, DI_STP_REP(wave_gen));
++		reg &= ~(0xffff << (16 * ((wave_gen - 1) & 0x1)));
++		reg |= c->repeat_count << (16 * ((wave_gen - 1) & 0x1));
++		ipu_di_write(di, reg, DI_STP_REP(wave_gen));
++	}
++}
++
++static void ipu_di_sync_config_interlaced(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
++{
++	u32 h_total = sig->width + sig->h_sync_width + sig->h_start_width + sig->h_end_width;
++	u32 v_total = sig->height + sig->v_sync_width + sig->v_start_width + sig->v_end_width;
++	u32 reg;
++	struct di_sync_config cfg[] = {
++		{
++			.run_count = h_total / 2 - 1,
++			.run_src = DI_SYNC_CLK,
++		}, {
++			.run_count = h_total - 11,
++			.run_src = DI_SYNC_CLK,
++			.cnt_down = 4,
++		}, {
++			.run_count = v_total * 2 - 1,
++			.run_src = DI_SYNC_INT_HSYNC,
++			.offset_count = 1,
++			.offset_src = DI_SYNC_INT_HSYNC,
++			.cnt_down = 4,
++		}, {
++			.run_count = v_total / 2 - 1,
++			.run_src = DI_SYNC_HSYNC,
++			.offset_count = sig->v_start_width,
++			.offset_src = DI_SYNC_HSYNC,
++			.repeat_count = 2,
++			.cnt_clr_src = DI_SYNC_VSYNC,
++		}, {
++			.run_src = DI_SYNC_HSYNC,
++			.repeat_count = sig->height / 2,
++			.cnt_clr_src = 4,
++		}, {
++			.run_count = v_total - 1,
++			.run_src = DI_SYNC_HSYNC,
++		}, {
++			.run_count = v_total / 2 - 1,
++			.run_src = DI_SYNC_HSYNC,
++			.offset_count = 9,
++			.offset_src = DI_SYNC_HSYNC,
++			.repeat_count = 2,
++			.cnt_clr_src = DI_SYNC_VSYNC,
++		}, {
++			.run_src = DI_SYNC_CLK,
++			.offset_count = sig->h_start_width,
++			.offset_src = DI_SYNC_CLK,
++			.repeat_count = sig->width,
++			.cnt_clr_src = 5,
++		}, {
++			.run_count = v_total - 1,
++			.run_src = DI_SYNC_INT_HSYNC,
++			.offset_count = v_total / 2,
++			.offset_src = DI_SYNC_INT_HSYNC,
++			.cnt_clr_src = DI_SYNC_HSYNC,
++			.cnt_down = 4,
++		}
++	};
++
++	ipu_di_sync_config(di, cfg, 0, ARRAY_SIZE(cfg));
++
++	/* set gentime select and tag sel */
++	reg = ipu_di_read(di, DI_SW_GEN1(9));
++	reg &= 0x1FFFFFFF;
++	reg |= (3 - 1) << 29 | 0x00008000;
++	ipu_di_write(di, reg, DI_SW_GEN1(9));
++
++	ipu_di_write(di, v_total / 2 - 1, DI_SCR_CONF);
++}
++
++static void ipu_di_sync_config_noninterlaced(struct ipu_di *di,
++		struct ipu_di_signal_cfg *sig, int div)
++{
++	u32 h_total = sig->width + sig->h_sync_width + sig->h_start_width +
++		sig->h_end_width;
++	u32 v_total = sig->height + sig->v_sync_width + sig->v_start_width +
++		sig->v_end_width;
++	struct di_sync_config cfg[] = {
++		{
++			.run_count = h_total - 1,
++			.run_src = DI_SYNC_CLK,
++		} , {
++			.run_count = h_total - 1,
++			.run_src = DI_SYNC_CLK,
++			.offset_count = div * sig->v_to_h_sync,
++			.offset_src = DI_SYNC_CLK,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_trigger_src = DI_SYNC_CLK,
++			.cnt_down = sig->h_sync_width * 2,
++		} , {
++			.run_count = v_total - 1,
++			.run_src = DI_SYNC_INT_HSYNC,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_trigger_src = DI_SYNC_INT_HSYNC,
++			.cnt_down = sig->v_sync_width * 2,
++		} , {
++			.run_src = DI_SYNC_HSYNC,
++			.offset_count = sig->v_sync_width + sig->v_start_width,
++			.offset_src = DI_SYNC_HSYNC,
++			.repeat_count = sig->height,
++			.cnt_clr_src = DI_SYNC_VSYNC,
++		} , {
++			.run_src = DI_SYNC_CLK,
++			.offset_count = sig->h_sync_width + sig->h_start_width,
++			.offset_src = DI_SYNC_CLK,
++			.repeat_count = sig->width,
++			.cnt_clr_src = 5,
++		} , {
++			/* unused */
++		} , {
++			/* unused */
++		} , {
++			/* unused */
++		} , {
++			/* unused */
++		},
++	};
++
++	ipu_di_write(di, v_total - 1, DI_SCR_CONF);
++	ipu_di_sync_config(di, cfg, 0, ARRAY_SIZE(cfg));
++}
++
++int ipu_di_init_sync_panel(struct ipu_di *di, struct ipu_di_signal_cfg *sig)
++{
++	u32 reg;
++	u32 di_gen, vsync_cnt;
++	u32 div;
++	u32 h_total, v_total;
++
++	dev_dbg(ipu_dev, "disp %d: panel size = %d x %d\n",
++		di->id, sig->width, sig->height);
++
++	if ((sig->v_sync_width == 0) || (sig->h_sync_width == 0))
++		return -EINVAL;
++
++	h_total = sig->width + sig->h_sync_width + sig->h_start_width + sig->h_end_width;
++	v_total = sig->height + sig->v_sync_width + sig->v_start_width + sig->v_end_width;
++
++	mutex_lock(&di_mutex);
++	ipu_get(di->ipu);
++sig->ext_clk = 1;
++	/* Init clocking */
++	if (sig->ext_clk) {
++		di->external_clk = true;
++	} else {
++		di->external_clk = false;
++	}
++
++	div = ipu_di_read(di, DI_BS_CLKGEN0);
++
++	/* Setup pixel clock timing */
++	/* Down time is half of period */
++	ipu_di_write(di, (div / 16) << 16, DI_BS_CLKGEN1);
++
++	ipu_di_data_wave_config(di, SYNC_WAVE, div / 16 - 1, div / 16 - 1);
++	ipu_di_data_pin_config(di, SYNC_WAVE, DI_PIN15, 3, 0, div / 16 * 2);
++
++	div = div / 16;		/* Now divider is integer portion */
++
++	di_gen = 0;
++	if (sig->ext_clk)
++		di_gen |= DI_GEN_DI_CLK_EXT | DI_GEN_DI_VSYNC_EXT;
++
++	if (sig->interlaced) {
++		ipu_di_sync_config_interlaced(di, sig);
++
++		/* set y_sel = 1 */
++		di_gen |= 0x10000000;
++		di_gen |= DI_GEN_POLARITY_5;
++		di_gen |= DI_GEN_POLARITY_8;
++
++		vsync_cnt = 7;
++
++		if (sig->Hsync_pol)
++			di_gen |= DI_GEN_POLARITY_3;
++		if (sig->Vsync_pol)
++			di_gen |= DI_GEN_POLARITY_2;
++	} else {
++		ipu_di_sync_config_noninterlaced(di, sig, div);
++
++		vsync_cnt = 3;
++
++		if (sig->Hsync_pol)
++			di_gen |= DI_GEN_POLARITY_2;
++		if (sig->Vsync_pol)
++			di_gen |= DI_GEN_POLARITY_3;
++	}
++
++	ipu_di_write(di, di_gen, DI_GENERAL);
++	ipu_di_write(di, (--vsync_cnt << DI_VSYNC_SEL_OFFSET) | 0x00000002,
++		     DI_SYNC_AS_GEN);
++
++	reg = ipu_di_read(di, DI_POL);
++	reg &= ~(DI_POL_DRDY_DATA_POLARITY | DI_POL_DRDY_POLARITY_15);
++
++	if (sig->enable_pol)
++		reg |= DI_POL_DRDY_POLARITY_15;
++	if (sig->data_pol)
++		reg |= DI_POL_DRDY_DATA_POLARITY;
++
++	ipu_di_write(di, reg, DI_POL);
++
++	ipu_put(di->ipu);
++	mutex_unlock(&di_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_di_init_sync_panel);
++
++void ipu_set_vga_delayed_hsync_vsync(struct ipu_di_signal_cfg *sig,
++		uint32_t hsync_delay, uint32_t vsync_delay)
++{
++	int h_total = sig->width + sig->h_sync_width + sig->h_start_width + sig->h_end_width;
++	int v_total = sig->height + sig->v_sync_width + sig->v_start_width + sig->v_end_width;
++	u32 di_gen;
++	struct ipu_di *di = &dis[1];
++	struct di_sync_config cfg[] = {
++		{
++			/* counter 7 for delay HSYNC */
++			.run_count = h_total - 1,
++			.run_src = DI_SYNC_CLK,
++			.offset_count = hsync_delay,
++			.offset_src = DI_SYNC_CLK,
++			.repeat_count = 0,
++			.cnt_clr_src = DI_SYNC_NONE,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_clr_src = DI_SYNC_NONE,
++			.cnt_polarity_trigger_src = DI_SYNC_CLK,
++			.cnt_up = 0,
++			.cnt_down = sig->h_sync_width * 2,
++		}, {
++			/* counter 8 for delay VSYNC */
++			.run_count = v_total - 1,
++			.run_src = DI_SYNC_INT_HSYNC,
++			.offset_count = vsync_delay,
++			.offset_src = DI_SYNC_INT_HSYNC,
++			.repeat_count = 0,
++			.cnt_clr_src = DI_SYNC_NONE,
++			.cnt_polarity_gen_en = 1,
++			.cnt_polarity_clr_src = DI_SYNC_NONE,
++			.cnt_polarity_trigger_src = DI_SYNC_INT_HSYNC,
++			.cnt_up = 0,
++			.cnt_down = sig->v_sync_width * 2,
++		}
++	};
++
++	ipu_di_sync_config(di, cfg, 6, ARRAY_SIZE(cfg));
++
++	di_gen = ipu_di_read(di, DI_GENERAL);
++	di_gen &= ~DI_GEN_POLARITY_2;
++	di_gen &= ~DI_GEN_POLARITY_3;
++	di_gen &= ~DI_GEN_POLARITY_7;
++	di_gen &= ~DI_GEN_POLARITY_8;
++	if (sig->Hsync_pol)
++		di_gen |= DI_GEN_POLARITY_7;
++	if (sig->Vsync_pol)
++		di_gen |= DI_GEN_POLARITY_8;
++	ipu_di_write(di, di_gen, DI_GENERAL);
++}
++EXPORT_SYMBOL_GPL(ipu_set_vga_delayed_hsync_vsync);
++
++int ipu_di_enable(struct ipu_di *di)
++{
++	ipu_get(di->ipu);
++
++	if (di->external_clk)
++		clk_enable(di->clk);
++
++	ipu_module_enable(di->ipu, di->module);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_di_enable);
++
++int ipu_di_disable(struct ipu_di *di)
++{
++	ipu_module_disable(di->ipu, di->module);
++	ipu_put(di->ipu);
++
++	if (di->external_clk)
++		clk_disable(di->clk);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_di_disable);
++
++static DEFINE_MUTEX(ipu_di_lock);
++
++struct ipu_di *ipu_di_get(struct ipu_soc *ipu, int disp)
++{
++	struct ipu_di *di;
++
++	if (disp > 1)
++		return ERR_PTR(-EINVAL);
++
++	di = &dis[disp];
++
++	mutex_lock(&ipu_di_lock);
++
++	if (!di->initialized) {
++		di = ERR_PTR(-ENOSYS);
++		goto out;
++	}
++
++	if (di->inuse) {
++		di = ERR_PTR(-EBUSY);
++		goto out;
++	}
++
++	di->inuse = true;
++out:
++	mutex_unlock(&ipu_di_lock);
++
++	return di;
++}
++EXPORT_SYMBOL_GPL(ipu_di_get);
++
++void ipu_di_put(struct ipu_di *di)
++{
++	mutex_lock(&ipu_di_lock);
++
++	di->inuse = false;
++
++	mutex_unlock(&ipu_di_lock);
++}
++EXPORT_SYMBOL_GPL(ipu_di_put);
++
++int ipu_di_init(struct ipu_soc *ipu, struct device *dev, int id,
++		unsigned long base,
++		u32 module, struct clk *ipu_clk)
++{
++	char *clk_id, *con_id;
++	struct ipu_di *di = &dis[id];
++
++	if (id > 1)
++		return -EINVAL;
++
++	if (id)
++		clk_id = "di1";
++	else
++		clk_id = "di0";
++
++	ipu_dev = dev;
++
++	di->clk = clk_get(dev, clk_id);
++	if (IS_ERR(di->clk))
++		return PTR_ERR(di->clk);
++
++	di->module = module;
++	di->id = id;
++	di->ipu_clk = ipu_clk;
++	di->base = devm_ioremap(dev, base, PAGE_SIZE);
++	dev_dbg(dev, "DI%d base: 0x%08lx\n", id, base);
++	di->initialized = true;
++	di->inuse = false;
++	di->ipu = ipu;
++	if (!di->base) {
++		printk("ficken?\n");
++		return -ENOMEM;
++	}
++
++	if (id == 0)
++		con_id = "pixclock0";
++	else
++		con_id = "pixclock1";
++
++	spin_lock_init(&di->ipu_di_clk.enable_lock);
++	mutex_init(&di->ipu_di_clk.prepare_lock);
++
++	strcpy(di->ipu_di_clk.name, "imx-drm.0");
++	di->ipu_di_clk.ops = &ipu_di_clk_ops;
++
++	di->clk_lookup = clkdev_alloc(&di->ipu_di_clk, con_id, "imx-drm.0");
++	clkdev_add(di->clk_lookup);
++
++	return 0;
++}
++
++void ipu_di_exit(struct ipu_soc *ipu, int id)
++{
++	struct ipu_di *di = &dis[id];
++
++	clkdev_drop(di->clk_lookup);
++	clk_put(di->clk);
++	di->initialized = false;
++}
+diff --git a/drivers/gpu/drm/imx/ipu-v3/ipu-dmfc.c b/drivers/gpu/drm/imx/ipu-v3/ipu-dmfc.c
 new file mode 100644
-index 0000000..f506408
+index 0000000..20387da
 --- /dev/null
-+++ b/include/drm/imx-ipu-v3.h
-@@ -0,0 +1,308 @@
++++ b/drivers/gpu/drm/imx/ipu-v3/ipu-dmfc.c
+@@ -0,0 +1,393 @@
 +/*
-+ * Copyright 2005-2009 Freescale Semiconductor, Inc.
++ * Copyright (c) 2010 Sascha Hauer <s.hauer@pengutronix.de>
++ * Copyright (C) 2005-2009 Freescale Semiconductor, Inc.
 + *
-+ * The code contained herein is licensed under the GNU Lesser General
-+ * Public License.  You may obtain a copy of the GNU Lesser General
-+ * Public License Version 2.1 or later@the following locations:
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
 + *
-+ * http://www.opensource.org/licenses/lgpl-license.html
-+ * http://www.gnu.org/copyleft/lgpl.html
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
 + */
-+
-+#ifndef __ASM_ARCH_IPU_H__
-+#define __ASM_ARCH_IPU_H__
++#define DEBUG
 +
 +#include <linux/types.h>
-+#include <linux/videodev2.h>
-+#include <linux/bitmap.h>
-+#include <linux/fb.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <drm/imx-ipu-v3.h>
 +
-+struct ipu_soc;
++#include "ipu-prv.h"
 +
-+/*
-+ * IPU Pixel Formats
-+ *
-+ * Pixel formats are defined with ASCII FOURCC code. The pixel format codes are
-+ * the same used by V4L2 API.
-+ */
++#define DMFC_RD_CHAN		0x0000
++#define DMFC_WR_CHAN		0x0004
++#define DMFC_WR_CHAN_DEF	0x0008
++#define DMFC_DP_CHAN		0x000c
++#define DMFC_DP_CHAN_DEF	0x0010
++#define DMFC_GENERAL1		0x0014
++#define DMFC_GENERAL2		0x0018
++#define DMFC_IC_CTRL		0x001c
++#define DMFC_STAT		0x0020
 +
-+/* Generic or Raw Data Formats */
-+#define IPU_PIX_FMT_GENERIC v4l2_fourcc('I', 'P', 'U', '0')	/* IPU Generic Data */
-+#define IPU_PIX_FMT_GENERIC_32 v4l2_fourcc('I', 'P', 'U', '1')	/* IPU Generic Data */
-+#define IPU_PIX_FMT_LVDS666 v4l2_fourcc('L', 'V', 'D', '6')	/* IPU Generic Data */
-+#define IPU_PIX_FMT_LVDS888 v4l2_fourcc('L', 'V', 'D', '8')	/* IPU Generic Data */
-+/* RGB Formats */
-+#define IPU_PIX_FMT_RGB332  V4L2_PIX_FMT_RGB332			/*  8  RGB-3-3-2    */
-+#define IPU_PIX_FMT_RGB555  V4L2_PIX_FMT_RGB555			/* 16  RGB-5-5-5    */
-+#define IPU_PIX_FMT_RGB565  V4L2_PIX_FMT_RGB565			/* 1 6  RGB-5-6-5   */
-+#define IPU_PIX_FMT_RGB666  v4l2_fourcc('R', 'G', 'B', '6')	/* 18  RGB-6-6-6    */
-+#define IPU_PIX_FMT_BGR666  v4l2_fourcc('B', 'G', 'R', '6')	/* 18  BGR-6-6-6    */
-+#define IPU_PIX_FMT_BGR24   V4L2_PIX_FMT_BGR24			/* 24  BGR-8-8-8    */
-+#define IPU_PIX_FMT_RGB24   V4L2_PIX_FMT_RGB24			/* 24  RGB-8-8-8    */
-+#define IPU_PIX_FMT_GBR24   v4l2_fourcc('G', 'B', 'R', '3')	/* 24  GBR-8-8-8    */
-+#define IPU_PIX_FMT_BGR32   V4L2_PIX_FMT_BGR32			/* 32  BGR-8-8-8-8  */
-+#define IPU_PIX_FMT_BGRA32  v4l2_fourcc('B', 'G', 'R', 'A')	/* 32  BGR-8-8-8-8  */
-+#define IPU_PIX_FMT_RGB32   V4L2_PIX_FMT_RGB32			/* 32  RGB-8-8-8-8  */
-+#define IPU_PIX_FMT_RGBA32  v4l2_fourcc('R', 'G', 'B', 'A')	/* 32  RGB-8-8-8-8  */
-+#define IPU_PIX_FMT_ABGR32  v4l2_fourcc('A', 'B', 'G', 'R')	/* 32  ABGR-8-8-8-8 */
-+/* YUV Interleaved Formats */
-+#define IPU_PIX_FMT_YUYV    V4L2_PIX_FMT_YUYV			/* 16 YUV 4:2:2 */
-+#define IPU_PIX_FMT_UYVY    V4L2_PIX_FMT_UYVY			/* 16 YUV 4:2:2 */
-+#define IPU_PIX_FMT_Y41P    V4L2_PIX_FMT_Y41P			/* 12 YUV 4:1:1 */
-+#define IPU_PIX_FMT_YUV444  V4L2_PIX_FMT_YUV444			/* 24 YUV 4:4:4 */
-+/* two planes -- one Y, one Cb + Cr interleaved  */
-+#define IPU_PIX_FMT_NV12    V4L2_PIX_FMT_NV12			/* 12  Y/CbCr 4:2:0  */
-+/* YUV Planar Formats */
-+#define IPU_PIX_FMT_GREY    V4L2_PIX_FMT_GREY			/* 8  Greyscale */
-+#define IPU_PIX_FMT_YVU410P V4L2_PIX_FMT_YVU410P		/* 9  YVU 4:1:0 */
-+#define IPU_PIX_FMT_YUV410P V4L2_PIX_FMT_YUV410P		/* 9  YUV 4:1:0 */
-+#define IPU_PIX_FMT_YVU420P v4l2_fourcc('Y', 'V', '1', '2')	/* 12 YVU 4:2:0 */
-+#define IPU_PIX_FMT_YUV420P v4l2_fourcc('I', '4', '2', '0')	/* 12 YUV 4:2:0 */
-+#define IPU_PIX_FMT_YUV420P2 v4l2_fourcc('Y', 'U', '1', '2')	/* 12 YUV 4:2:0 */
-+#define IPU_PIX_FMT_YVU422P v4l2_fourcc('Y', 'V', '1', '6')	/* 16 YVU 4:2:2 */
-+#define IPU_PIX_FMT_YUV422P V4L2_PIX_FMT_YUV422P		/* 16 YUV 4:2:2 */
++#define DMFC_WR_CHAN_1_28		0
++#define DMFC_WR_CHAN_2_41		8
++#define DMFC_WR_CHAN_1C_42		16
++#define DMFC_WR_CHAN_2C_43		24
 +
-+/*
-+ * Bitfield of Display Interface signal polarities.
-+ */
-+struct ipu_di_signal_cfg {
-+	unsigned datamask_en:1;
-+	unsigned ext_clk:1;
-+	unsigned interlaced:1;
-+	unsigned odd_field_first:1;
-+	unsigned clksel_en:1;
-+	unsigned clkidle_en:1;
-+	unsigned data_pol:1;	/* true = inverted */
-+	unsigned clk_pol:1;	/* true = rising edge */
-+	unsigned enable_pol:1;
-+	unsigned Hsync_pol:1;	/* true = active high */
-+	unsigned Vsync_pol:1;
++#define DMFC_DP_CHAN_5B_23		0
++#define DMFC_DP_CHAN_5F_27		8
++#define DMFC_DP_CHAN_6B_24		16
++#define DMFC_DP_CHAN_6F_29		24
 +
-+	u16 width;
-+	u16 height;
-+	u32 pixel_fmt;
-+	u16 h_start_width;
-+	u16 h_sync_width;
-+	u16 h_end_width;
-+	u16 v_start_width;
-+	u16 v_sync_width;
-+	u16 v_end_width;
-+	u32 v_to_h_sync;
++#define DMFC_FIFO_SIZE_64		(3 << 3)
++#define DMFC_FIFO_SIZE_128		(2 << 3)
++#define DMFC_FIFO_SIZE_256		(1 << 3)
++#define DMFC_FIFO_SIZE_512		(0 << 3)
++
++#define DMFC_SEGMENT(x)			((x & 0x7) << 0)
++#define DMFC_BURSTSIZE_32		(0 << 6)
++#define DMFC_BURSTSIZE_16		(1 << 6)
++#define DMFC_BURSTSIZE_8		(2 << 6)
++#define DMFC_BURSTSIZE_4		(3 << 6)
++
++struct dmfc_channel_data {
++	int		ipu_channel;
++	unsigned long	channel_reg;
++	unsigned long	shift;
++	unsigned	eot_shift;
++	unsigned	max_fifo_lines;
 +};
 +
-+typedef enum {
-+	IPU_COLORSPACE_RGB,
-+	IPU_COLORSPACE_YCBCR,
-+	IPU_COLORSPACE_YUV,
-+	IPU_COLORSPACE_UNKNOWN,
-+} ipu_color_space_t;
-+
-+#define IPU_IRQ_EOF(channel)		(channel)		/* 0 .. 63 */
-+#define IPU_IRQ_NFACK(channel)		((channel) + 64)	/* 64 .. 127 */
-+#define IPU_IRQ_NFB4EOF(channel)	((channel) + 128)	/* 128 .. 191 */
-+#define IPU_IRQ_EOS(channel)		((channel) + 192)	/* 192 .. 255 */
-+
-+#define IPU_IRQ_DP_SF_START		(448 + 2)
-+#define IPU_IRQ_DP_SF_END		(448 + 3)
-+#define IPU_IRQ_BG_SF_END		IPU_IRQ_DP_SF_END,
-+#define IPU_IRQ_DC_FC_0			(448 + 8)
-+#define IPU_IRQ_DC_FC_1			(448 + 9)
-+#define IPU_IRQ_DC_FC_2			(448 + 10)
-+#define IPU_IRQ_DC_FC_3			(448 + 11)
-+#define IPU_IRQ_DC_FC_4			(448 + 12)
-+#define IPU_IRQ_DC_FC_6			(448 + 13)
-+#define IPU_IRQ_VSYNC_PRE_0		(448 + 14)
-+#define IPU_IRQ_VSYNC_PRE_1		(448 + 15)
-+
-+#define IPU_IRQ_COUNT	(15 * 32)
-+
-+struct ipu_channel;
-+
-+/*
-+ * IPU Image DMA Controller (idmac) functions
-+ */
-+struct ipu_channel *ipu_idmac_get(struct ipu_soc *ipu, unsigned channel);
-+void ipu_idmac_put(struct ipu_channel *);
-+
-+int ipu_idmac_enable_channel(struct ipu_channel *channel);
-+int ipu_idmac_disable_channel(struct ipu_channel *channel);
-+
-+void ipu_idmac_set_double_buffer(struct ipu_channel *channel, bool doublebuffer);
-+void ipu_idmac_select_buffer(struct ipu_channel *channel, u32 buf_num);
-+
-+/*
-+ * IPU Display Controller (dc) functions
-+ */
-+struct ipu_dc;
-+struct ipu_dc *ipu_dc_get(struct ipu_soc *ipu, int channel);
-+void ipu_dc_put(struct ipu_dc *dc);
-+int ipu_dc_init_sync(struct ipu_dc *dc, int di, bool interlaced,
-+		u32 pixel_fmt, u32 width);
-+void ipu_dc_init_async(struct ipu_dc *dc, int di, bool interlaced);
-+void ipu_dc_enable_channel(struct ipu_dc *dc);
-+void ipu_dc_disable_channel(struct ipu_dc *dc);
-+
-+/*
-+ * IPU Display Interface (di) functions
-+ */
-+struct ipu_di;
-+struct ipu_di *ipu_di_get(struct ipu_soc *ipu, int disp);
-+void ipu_di_put(struct ipu_di *);
-+int ipu_di_disable(struct ipu_di *);
-+int ipu_di_enable(struct ipu_di *);
-+int ipu_di_init_sync_panel(struct ipu_di *, struct ipu_di_signal_cfg *sig);
-+
-+/*
-+ * IPU Display Multi FIFO Controller (dmfc) functions
-+ */
-+struct dmfc_channel;
-+int ipu_dmfc_enable_channel(struct dmfc_channel *dmfc);
-+void ipu_dmfc_disable_channel(struct dmfc_channel *dmfc);
-+int ipu_dmfc_alloc_bandwidth(struct dmfc_channel *dmfc, unsigned long bandwidth_mbs);
-+void ipu_dmfc_free_bandwidth(struct dmfc_channel *dmfc);
-+int ipu_dmfc_init_channel(struct dmfc_channel *dmfc, int width);
-+struct dmfc_channel *ipu_dmfc_get(struct ipu_soc *ipu, int ipu_channel);
-+void ipu_dmfc_put(struct dmfc_channel *dmfc);
-+
-+/*
-+ * IPU Display Processor (dp) functions
-+ */
-+#define IPU_DP_FLOW_SYNC_BG	0
-+#define IPU_DP_FLOW_SYNC_FG	1
-+#define IPU_DP_FLOW_ASYNC0_BG	2
-+#define IPU_DP_FLOW_ASYNC0_FG	3
-+#define IPU_DP_FLOW_ASYNC1_BG	4
-+#define IPU_DP_FLOW_ASYNC1_FG	5
-+
-+struct ipu_dp *ipu_dp_get(struct ipu_soc *ipu, unsigned int flow);
-+void ipu_dp_put(struct ipu_dp *);
-+int ipu_dp_enable_channel(struct ipu_dp *dp);
-+void ipu_dp_disable_channel(struct ipu_dp *dp);
-+int ipu_dp_setup_channel(struct ipu_dp *dp,
-+		ipu_color_space_t in, ipu_color_space_t out);
-+int ipu_dp_set_window_pos(struct ipu_dp *, u16 x_pos, u16 y_pos);
-+int ipu_dp_set_global_alpha(struct ipu_dp *dp, bool enable, u8 alpha,
-+		bool bg_chan);
-+
-+#define IPU_CPMEM_WORD(word, ofs, size) ((((word) * 160 + (ofs)) << 8) | (size))
-+
-+#define IPU_FIELD_UBO		IPU_CPMEM_WORD(0, 46, 22)
-+#define IPU_FIELD_VBO		IPU_CPMEM_WORD(0, 68, 22)
-+#define IPU_FIELD_IOX		IPU_CPMEM_WORD(0, 90, 4)
-+#define IPU_FIELD_RDRW		IPU_CPMEM_WORD(0, 94, 1)
-+#define IPU_FIELD_SO		IPU_CPMEM_WORD(0, 113, 1)
-+#define IPU_FIELD_SLY		IPU_CPMEM_WORD(1, 102, 14)
-+#define IPU_FIELD_SLUV		IPU_CPMEM_WORD(1, 128, 14)
-+
-+#define IPU_FIELD_XV		IPU_CPMEM_WORD(0, 0, 10)
-+#define IPU_FIELD_YV		IPU_CPMEM_WORD(0, 10, 9)
-+#define IPU_FIELD_XB		IPU_CPMEM_WORD(0, 19, 13)
-+#define IPU_FIELD_YB		IPU_CPMEM_WORD(0, 32, 12)
-+#define IPU_FIELD_NSB_B		IPU_CPMEM_WORD(0, 44, 1)
-+#define IPU_FIELD_CF		IPU_CPMEM_WORD(0, 45, 1)
-+#define IPU_FIELD_SX		IPU_CPMEM_WORD(0, 46, 12)
-+#define IPU_FIELD_SY		IPU_CPMEM_WORD(0, 58, 11)
-+#define IPU_FIELD_NS		IPU_CPMEM_WORD(0, 69, 10)
-+#define IPU_FIELD_SDX		IPU_CPMEM_WORD(0, 79, 7)
-+#define IPU_FIELD_SM		IPU_CPMEM_WORD(0, 86, 10)
-+#define IPU_FIELD_SCC		IPU_CPMEM_WORD(0, 96, 1)
-+#define IPU_FIELD_SCE		IPU_CPMEM_WORD(0, 97, 1)
-+#define IPU_FIELD_SDY		IPU_CPMEM_WORD(0, 98, 7)
-+#define IPU_FIELD_SDRX		IPU_CPMEM_WORD(0, 105, 1)
-+#define IPU_FIELD_SDRY		IPU_CPMEM_WORD(0, 106, 1)
-+#define IPU_FIELD_BPP		IPU_CPMEM_WORD(0, 107, 3)
-+#define IPU_FIELD_DEC_SEL	IPU_CPMEM_WORD(0, 110, 2)
-+#define IPU_FIELD_DIM		IPU_CPMEM_WORD(0, 112, 1)
-+#define IPU_FIELD_BNDM		IPU_CPMEM_WORD(0, 114, 3)
-+#define IPU_FIELD_BM		IPU_CPMEM_WORD(0, 117, 2)
-+#define IPU_FIELD_ROT		IPU_CPMEM_WORD(0, 119, 1)
-+#define IPU_FIELD_HF		IPU_CPMEM_WORD(0, 120, 1)
-+#define IPU_FIELD_VF		IPU_CPMEM_WORD(0, 121, 1)
-+#define IPU_FIELD_THE		IPU_CPMEM_WORD(0, 122, 1)
-+#define IPU_FIELD_CAP		IPU_CPMEM_WORD(0, 123, 1)
-+#define IPU_FIELD_CAE		IPU_CPMEM_WORD(0, 124, 1)
-+#define IPU_FIELD_FW		IPU_CPMEM_WORD(0, 125, 13)
-+#define IPU_FIELD_FH		IPU_CPMEM_WORD(0, 138, 12)
-+#define IPU_FIELD_EBA0		IPU_CPMEM_WORD(1, 0, 29)
-+#define IPU_FIELD_EBA1		IPU_CPMEM_WORD(1, 29, 29)
-+#define IPU_FIELD_ILO		IPU_CPMEM_WORD(1, 58, 20)
-+#define IPU_FIELD_NPB		IPU_CPMEM_WORD(1, 78, 7)
-+#define IPU_FIELD_PFS		IPU_CPMEM_WORD(1, 85, 4)
-+#define IPU_FIELD_ALU		IPU_CPMEM_WORD(1, 89, 1)
-+#define IPU_FIELD_ALBM		IPU_CPMEM_WORD(1, 90, 3)
-+#define IPU_FIELD_ID		IPU_CPMEM_WORD(1, 93, 2)
-+#define IPU_FIELD_TH		IPU_CPMEM_WORD(1, 95, 7)
-+#define IPU_FIELD_SL		IPU_CPMEM_WORD(1, 102, 14)
-+#define IPU_FIELD_WID0		IPU_CPMEM_WORD(1, 116, 3)
-+#define IPU_FIELD_WID1		IPU_CPMEM_WORD(1, 119, 3)
-+#define IPU_FIELD_WID2		IPU_CPMEM_WORD(1, 122, 3)
-+#define IPU_FIELD_WID3		IPU_CPMEM_WORD(1, 125, 3)
-+#define IPU_FIELD_OFS0		IPU_CPMEM_WORD(1, 128, 5)
-+#define IPU_FIELD_OFS1		IPU_CPMEM_WORD(1, 133, 5)
-+#define IPU_FIELD_OFS2		IPU_CPMEM_WORD(1, 138, 5)
-+#define IPU_FIELD_OFS3		IPU_CPMEM_WORD(1, 143, 5)
-+#define IPU_FIELD_SXYS		IPU_CPMEM_WORD(1, 148, 1)
-+#define IPU_FIELD_CRE		IPU_CPMEM_WORD(1, 149, 1)
-+#define IPU_FIELD_DEC_SEL2	IPU_CPMEM_WORD(1, 150, 1)
-+
-+struct ipu_cpmem_word {
-+	u32 data[5];
-+	u32 res[3];
++static const struct dmfc_channel_data dmfcdata[] = {
++	{
++		.ipu_channel	= 23,
++		.channel_reg	= DMFC_DP_CHAN,
++		.shift		= DMFC_DP_CHAN_5B_23,
++		.eot_shift	= 20,
++		.max_fifo_lines	= 3,
++	}, {
++		.ipu_channel	= 24,
++		.channel_reg	= DMFC_DP_CHAN,
++		.shift		= DMFC_DP_CHAN_6B_24,
++		.eot_shift	= 22,
++		.max_fifo_lines	= 1,
++	}, {
++		.ipu_channel	= 27,
++		.channel_reg	= DMFC_DP_CHAN,
++		.shift		= DMFC_DP_CHAN_5F_27,
++		.eot_shift	= 21,
++		.max_fifo_lines	= 2,
++	}, {
++		.ipu_channel	= 28,
++		.channel_reg	= DMFC_WR_CHAN,
++		.shift		= DMFC_WR_CHAN_1_28,
++		.eot_shift	= 16,
++		.max_fifo_lines	= 2,
++	}, {
++		.ipu_channel	= 29,
++		.channel_reg	= DMFC_DP_CHAN,
++		.shift		= DMFC_DP_CHAN_6F_29,
++		.eot_shift	= 23,
++		.max_fifo_lines	= 1,
++	},
 +};
 +
-+struct ipu_ch_param {
-+	struct ipu_cpmem_word word[2];
++#define DMFC_NUM_CHANNELS	ARRAY_SIZE(dmfcdata)
++
++struct ipu_dmfc_priv;
++
++struct dmfc_channel {
++	unsigned			slots;
++	unsigned			slotmask;
++	unsigned			segment;
++	struct ipu_soc			*ipu;
++	struct ipu_dmfc_priv		*priv;
++	const struct dmfc_channel_data	*data;
 +};
 +
-+void ipu_ch_param_set_field(struct ipu_ch_param *base, u32 wbs, u32 v);
++struct ipu_dmfc_priv {
++	struct ipu_soc *ipu;
++	struct device *dev;
++	struct dmfc_channel channels[DMFC_NUM_CHANNELS];
++	struct mutex mutex;
++	unsigned long bandwidth_per_slot;
++	void __iomem *base;
++	int use_count;
++};
 +
-+struct ipu_ch_param *ipu_get_cpmem(struct ipu_channel *channel);
-+
-+void ipu_ch_param_dump(struct ipu_ch_param *p);
-+
-+static inline void ipu_cpmem_set_buffer(struct ipu_ch_param *p, int bufnum,
-+		dma_addr_t buf)
++int ipu_dmfc_enable_channel(struct dmfc_channel *dmfc)
 +{
-+	if (bufnum)
-+		ipu_ch_param_set_field(p, IPU_FIELD_EBA1, buf >> 3);
++	struct ipu_dmfc_priv *priv = dmfc->priv;
++	mutex_lock(&priv->mutex);
++	ipu_get(dmfc->ipu);
++
++	if (!priv->use_count)
++		ipu_module_enable(priv->ipu, IPU_CONF_DMFC_EN);
++
++	priv->use_count++;
++
++	mutex_unlock(&priv->mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_dmfc_enable_channel);
++
++void ipu_dmfc_disable_channel(struct dmfc_channel *dmfc)
++{
++	struct ipu_dmfc_priv *priv = dmfc->priv;
++
++	mutex_lock(&priv->mutex);
++
++	priv->use_count--;
++
++	if (!priv->use_count)
++		ipu_module_disable(priv->ipu, IPU_CONF_DMFC_EN);
++
++	if (priv->use_count < 0)
++		priv->use_count = 0;
++
++	ipu_put(dmfc->ipu);
++	mutex_unlock(&priv->mutex);
++}
++EXPORT_SYMBOL_GPL(ipu_dmfc_disable_channel);
++
++static int ipu_dmfc_setup_channel(struct dmfc_channel *dmfc, int slots, int segment)
++{
++	struct ipu_dmfc_priv *priv = dmfc->priv;
++	u32 val, field;
++
++	dev_dbg(priv->dev, "dmfc: using %d slots starting from segment %d for IPU channel %d\n",
++			slots, segment, dmfc->data->ipu_channel);
++
++	if (!dmfc)
++		return -EINVAL;
++
++	switch (slots) {
++	case 1:
++		field = DMFC_FIFO_SIZE_64;
++		break;
++	case 2:
++		field = DMFC_FIFO_SIZE_128;
++		break;
++	case 4:
++		field = DMFC_FIFO_SIZE_256;
++		break;
++	case 8:
++		field = DMFC_FIFO_SIZE_512;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	field |= DMFC_SEGMENT(segment) | DMFC_BURSTSIZE_8;
++
++	val = readl(priv->base + dmfc->data->channel_reg);
++
++	val &= ~(0xff << dmfc->data->shift);
++	val |= field << dmfc->data->shift;
++
++	writel(val, priv->base + dmfc->data->channel_reg);
++
++	dmfc->slots = slots;
++	dmfc->segment = segment;
++	dmfc->slotmask = ((1 << slots) - 1) << segment;
++
++	return 0;
++}
++
++static int dmfc_bandwidth_to_slots(struct ipu_dmfc_priv *priv, unsigned long bandwidth)
++{
++	int slots = 1;
++
++	while (slots * priv->bandwidth_per_slot < bandwidth)
++		slots *= 2;
++
++	return slots;
++}
++
++static int dmfc_find_slots(struct ipu_dmfc_priv *priv, int slots)
++{
++	unsigned slotmask_need, slotmask_used = 0;
++	int i, segment = 0;
++
++	slotmask_need = (1 << slots) - 1;
++
++	for (i = 0; i < DMFC_NUM_CHANNELS; i++)
++		slotmask_used |= priv->channels[i].slotmask;
++
++	while (slotmask_need <= 0xff) {
++		if (!(slotmask_used & slotmask_need))
++			return segment;
++
++		slotmask_need <<= 1;
++		segment++;
++	}
++
++	return -EBUSY;
++}
++
++void ipu_dmfc_free_bandwidth(struct dmfc_channel *dmfc)
++{
++	struct ipu_dmfc_priv *priv = dmfc->priv;
++	int i;
++
++	dev_dbg(priv->dev, "dmfc: freeing %d slots starting from segment %d\n",
++			dmfc->slots, dmfc->segment);
++
++	mutex_lock(&priv->mutex);
++
++	if (!dmfc->slots)
++		goto out;
++
++	dmfc->slotmask = 0;
++	dmfc->slots = 0;
++	dmfc->segment = 0;
++
++	for (i = 0; i < DMFC_NUM_CHANNELS; i++)
++		priv->channels[i].slotmask = 0;
++
++	for (i = 0; i < DMFC_NUM_CHANNELS; i++) {
++		if (priv->channels[i].slots > 0) {
++			priv->channels[i].segment = dmfc_find_slots(priv, priv->channels[i].slots);
++			priv->channels[i].slotmask = ((1 << priv->channels[i].slots) - 1) <<
++				priv->channels[i].segment;
++		}
++	}
++
++	for (i = 0; i < DMFC_NUM_CHANNELS; i++) {
++		if (priv->channels[i].slots > 0)
++			ipu_dmfc_setup_channel(&priv->channels[i],
++					priv->channels[i].slots,
++					priv->channels[i].segment);
++	}
++out:
++	mutex_unlock(&priv->mutex);
++}
++EXPORT_SYMBOL_GPL(ipu_dmfc_free_bandwidth);
++
++int ipu_dmfc_alloc_bandwidth(struct dmfc_channel *dmfc,
++		unsigned long bandwidth_pixel_per_second)
++{
++	struct ipu_dmfc_priv *priv = dmfc->priv;
++	int slots = dmfc_bandwidth_to_slots(priv, bandwidth_pixel_per_second);
++	int segment = 0, ret = 0;
++
++	dev_dbg(priv->dev, "dmfc: trying to allocate %ldMpixel/s for IPU channel %d\n",
++			bandwidth_pixel_per_second / 1000000, dmfc->data->ipu_channel);
++
++	ipu_dmfc_free_bandwidth(dmfc);
++
++	ipu_get(priv->ipu);
++	mutex_lock(&priv->mutex);
++
++	if (slots > 8) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	segment = dmfc_find_slots(priv, slots);
++	if (segment < 0) {
++		ret = -EBUSY;
++		goto out;
++	}
++
++	ipu_dmfc_setup_channel(dmfc, slots, segment);
++
++out:
++	ipu_put(priv->ipu);
++	mutex_unlock(&priv->mutex);
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(ipu_dmfc_alloc_bandwidth);
++
++int ipu_dmfc_init_channel(struct dmfc_channel *dmfc, int width)
++{
++	struct ipu_dmfc_priv *priv = dmfc->priv;
++	u32 dmfc_gen1;
++
++	ipu_get(dmfc->ipu);
++
++	dmfc_gen1 = readl(priv->base + DMFC_GENERAL1);
++
++	if ((dmfc->slots * 64 * 4) / width > dmfc->data->max_fifo_lines)
++		dmfc_gen1 |= 1 << dmfc->data->eot_shift;
 +	else
-+		ipu_ch_param_set_field(p, IPU_FIELD_EBA0, buf >> 3);
++		dmfc_gen1 &= ~(1 << dmfc->data->eot_shift);
++
++	writel(dmfc_gen1, priv->base + DMFC_GENERAL1);
++
++	ipu_put(dmfc->ipu);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_dmfc_init_channel);
++
++struct dmfc_channel *ipu_dmfc_get(struct ipu_soc *ipu, int ipu_channel)
++{
++	struct ipu_dmfc_priv *priv = ipu->dmfc_priv;
++	int i;
++
++	for (i = 0; i < DMFC_NUM_CHANNELS; i++)
++		if (dmfcdata[i].ipu_channel == ipu_channel)
++			return &priv->channels[i];
++	return ERR_PTR(-ENODEV);
++}
++EXPORT_SYMBOL_GPL(ipu_dmfc_get);
++
++void ipu_dmfc_put(struct dmfc_channel *dmfc)
++{
++	ipu_dmfc_free_bandwidth(dmfc);
++}
++EXPORT_SYMBOL_GPL(ipu_dmfc_put);
++
++int ipu_dmfc_init(struct ipu_soc *ipu, struct device *dev, unsigned long base,
++		struct clk *ipu_clk)
++{
++	struct ipu_dmfc_priv *priv;
++	int i;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->base = devm_ioremap(dev, base, PAGE_SIZE);
++	if (!priv->base)
++		return -ENOMEM;
++
++	priv->dev = dev;
++	priv->ipu = ipu;
++	mutex_init(&priv->mutex);
++
++	ipu->dmfc_priv = priv;
++
++	for (i = 0; i < DMFC_NUM_CHANNELS; i++) {
++		priv->channels[i].priv = priv;
++		priv->channels[i].ipu = ipu;
++		priv->channels[i].data = &dmfcdata[i];
++	}
++
++	writel(0x0, priv->base + DMFC_WR_CHAN);
++	writel(0x0, priv->base + DMFC_DP_CHAN);
++
++	/*
++	 * We have a total bandwidth of clkrate * 4pixel divided
++	 * into 8 slots.
++	 */
++	priv->bandwidth_per_slot = clk_get_rate(ipu_clk) / 4;
++
++	dev_dbg(dev, "dmfc: 8 slots with %ldMpixel/s bandwidth each\n",
++			priv->bandwidth_per_slot / 1000000);
++
++	writel(0x202020f6, priv->base + DMFC_WR_CHAN_DEF);
++	writel(0x2020f6f6, priv->base + DMFC_DP_CHAN_DEF);
++	writel(0x00000003, priv->base + DMFC_GENERAL1);
++
++	return 0;
 +}
 +
-+static inline void ipu_cpmem_set_resolution(struct ipu_ch_param *p, int xres,
-+		int yres)
++void ipu_dmfc_exit(struct ipu_soc *ipu)
 +{
-+	ipu_ch_param_set_field(p, IPU_FIELD_FW, xres - 1);
-+	ipu_ch_param_set_field(p, IPU_FIELD_FH, yres - 1);
++}
+diff --git a/drivers/gpu/drm/imx/ipu-v3/ipu-dp.c b/drivers/gpu/drm/imx/ipu-v3/ipu-dp.c
+new file mode 100644
+index 0000000..4cd2c6d
+--- /dev/null
++++ b/drivers/gpu/drm/imx/ipu-v3/ipu-dp.c
+@@ -0,0 +1,342 @@
++/*
++ * Copyright (c) 2010 Sascha Hauer <s.hauer@pengutronix.de>
++ * Copyright (C) 2005-2009 Freescale Semiconductor, Inc.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License as published by the
++ * Free Software Foundation; either version 2 of the License, or (at your
++ * option) any later version.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
++ * for more details.
++ */
++#include <linux/kernel.h>
++#include <linux/types.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/err.h>
++#include <drm/imx-ipu-v3.h>
++
++#include "ipu-prv.h"
++
++#define DP_SYNC 0
++#define DP_ASYNC0 0x60
++#define DP_ASYNC1 0xBC
++
++#define DP_COM_CONF		0x0
++#define DP_GRAPH_WIND_CTRL	0x0004
++#define DP_FG_POS		0x0008
++#define DP_CSC_A_0		0x0044
++#define DP_CSC_A_1		0x0048
++#define DP_CSC_A_2		0x004C
++#define DP_CSC_A_3		0x0050
++#define DP_CSC_0		0x0054
++#define DP_CSC_1		0x0058
++
++#define DP_COM_CONF_FG_EN		(1 << 0)
++#define DP_COM_CONF_GWSEL		(1 << 1)
++#define DP_COM_CONF_GWAM		(1 << 2)
++#define DP_COM_CONF_GWCKE		(1 << 3)
++#define DP_COM_CONF_CSC_DEF_MASK	(3 << 8)
++#define DP_COM_CONF_CSC_DEF_OFFSET	8
++#define DP_COM_CONF_CSC_DEF_FG		(3 << 8)
++#define DP_COM_CONF_CSC_DEF_BG		(2 << 8)
++#define DP_COM_CONF_CSC_DEF_BOTH	(1 << 8)
++
++struct ipu_dp_priv;
++
++struct ipu_dp {
++	u32 flow;
++	bool in_use;
++	bool foreground;
++	ipu_color_space_t in_cs;
++};
++
++struct ipu_flow {
++	struct ipu_dp foreground;
++	struct ipu_dp background;
++	ipu_color_space_t out_cs;
++	void __iomem *base;
++	struct ipu_dp_priv *priv;
++};
++
++struct ipu_dp_priv {
++	struct ipu_soc *ipu;
++	struct device *dev;
++	void __iomem *base;
++	struct ipu_flow flow[3];
++	struct mutex mutex;
++	int use_count;
++};
++
++static u32 ipu_dp_flow_base[] = {DP_SYNC, DP_ASYNC0, DP_ASYNC1};
++
++static inline struct ipu_flow *to_flow(struct ipu_dp *dp)
++{
++	if (dp->foreground)
++		return container_of(dp, struct ipu_flow, foreground);
++	else
++		return container_of(dp, struct ipu_flow, background);
 +}
 +
-+static inline void ipu_cpmem_set_stride(struct ipu_ch_param *p, int stride)
++int ipu_dp_set_global_alpha(struct ipu_dp *dp, bool enable,
++		u8 alpha, bool bg_chan)
 +{
-+	ipu_ch_param_set_field(p, IPU_FIELD_SLY, stride - 1);
++	struct ipu_flow *flow = to_flow(dp);
++	struct ipu_dp_priv *priv = flow->priv;
++	u32 reg;
++
++	mutex_lock(&priv->mutex);
++
++	reg = readl(flow->base + DP_COM_CONF);
++	if (bg_chan)
++		reg &= ~DP_COM_CONF_GWSEL;
++	else
++		reg |= DP_COM_CONF_GWSEL;
++	writel(reg, flow->base + DP_COM_CONF);
++
++	if (enable) {
++		reg = readl(flow->base + DP_GRAPH_WIND_CTRL) & 0x00FFFFFFL;
++		writel(reg | ((u32) alpha << 24),
++			     flow->base + DP_GRAPH_WIND_CTRL);
++
++		reg = readl(flow->base + DP_COM_CONF);
++		writel(reg | DP_COM_CONF_GWAM, flow->base + DP_COM_CONF);
++	} else {
++		reg = readl(flow->base + DP_COM_CONF);
++		writel(reg & ~DP_COM_CONF_GWAM, flow->base + DP_COM_CONF);
++	}
++
++	ipu_srm_dp_sync_update(priv->ipu);
++
++	mutex_unlock(&priv->mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_dp_set_global_alpha);
++
++int ipu_dp_set_window_pos(struct ipu_dp *dp, u16 x_pos, u16 y_pos)
++{
++	struct ipu_flow *flow = to_flow(dp);
++	struct ipu_dp_priv *priv = flow->priv;
++
++	mutex_lock(&priv->mutex);
++
++	writel((x_pos << 16) | y_pos, flow->base + DP_FG_POS);
++
++	ipu_srm_dp_sync_update(priv->ipu);
++
++	mutex_unlock(&priv->mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_dp_set_window_pos);
++
++static void ipu_dp_csc_init(struct ipu_flow *flow,
++		ipu_color_space_t in,
++		ipu_color_space_t out,
++		u32 place)
++{
++	u32 reg;
++
++	reg = readl(flow->base + DP_COM_CONF);
++	reg &= ~DP_COM_CONF_CSC_DEF_MASK;
++
++	if (in == out) {
++		writel(reg, flow->base + DP_COM_CONF);
++		return;
++	};
++
++	if (in == IPU_COLORSPACE_RGB && out == IPU_COLORSPACE_YCBCR) {
++		writel(0x099 | (0x12d << 16), flow->base + DP_CSC_A_0);
++		writel(0x03a | (0x3a9 << 16), flow->base + DP_CSC_A_1);
++		writel(0x356 | (0x100 << 16), flow->base + DP_CSC_A_2);
++		writel(0x100 | (0x329 << 16), flow->base + DP_CSC_A_3);
++		writel(0x3d6 | (0x0000 << 16) | (2 << 30),
++				flow->base + DP_CSC_0);
++		writel(0x200 | (2 << 14) | (0x200 << 16) | (2 << 30),
++				flow->base + DP_CSC_1);
++	} else {
++		writel(0x095 | (0x000 << 16), flow->base + DP_CSC_A_0);
++		writel(0x0cc | (0x095 << 16), flow->base + DP_CSC_A_1);
++		writel(0x3ce | (0x398 << 16), flow->base + DP_CSC_A_2);
++		writel(0x095 | (0x0ff << 16), flow->base + DP_CSC_A_3);
++		writel(0x000 | (0x3e42 << 16) | (1 << 30),
++				flow->base + DP_CSC_0);
++		writel(0x10a | (1 << 14) | (0x3dd6 << 16) | (1 << 30),
++				flow->base + DP_CSC_1);
++	}
++
++	reg |= place;
++
++	writel(reg, flow->base + DP_COM_CONF);
 +}
 +
-+static inline void ipu_cpmem_set_high_priority(struct ipu_ch_param *p)
++int ipu_dp_setup_channel(struct ipu_dp *dp,
++		ipu_color_space_t in,
++		ipu_color_space_t out)
 +{
-+	ipu_ch_param_set_field(p, IPU_FIELD_ID, 1);
-+};
++	struct ipu_flow *flow = to_flow(dp);
++	struct ipu_dp_priv *priv = flow->priv;
 +
-+struct ipu_rgb {
-+	struct fb_bitfield	red;
-+	struct fb_bitfield	green;
-+	struct fb_bitfield	blue;
-+	struct fb_bitfield	transp;
-+	int			bits_per_pixel;	
-+};
++	ipu_get(priv->ipu);
++	mutex_lock(&priv->mutex);
 +
-+void ipu_cpmem_set_format_rgb(struct ipu_ch_param *, struct ipu_rgb *rgb);
++	dp->in_cs = in;
 +
-+static inline void ipu_cpmem_interlaced_scan(struct ipu_ch_param *p, int stride)
++	if (!dp->foreground)
++		flow->out_cs = out;
++
++	if (flow->foreground.in_cs == flow->background.in_cs) {
++		/*
++		 * foreground and background are of same colorspace, put
++		 * colorspace converter after combining unit.
++		 */
++		ipu_dp_csc_init(flow, flow->foreground.in_cs, flow->out_cs,
++				DP_COM_CONF_CSC_DEF_BOTH);
++	} else {
++		if (flow->foreground.in_cs == flow->out_cs)
++			/*
++			 * foreground identical to output, apply color conversion
++			 * on background
++			 */
++			ipu_dp_csc_init(flow, flow->background.in_cs, flow->out_cs,
++				DP_COM_CONF_CSC_DEF_BG);
++		else
++			ipu_dp_csc_init(flow, flow->foreground.in_cs, flow->out_cs,
++				DP_COM_CONF_CSC_DEF_FG);
++	}
++
++	ipu_srm_dp_sync_update(priv->ipu);
++
++	mutex_unlock(&priv->mutex);
++	ipu_put(priv->ipu);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_dp_setup_channel);
++
++int ipu_dp_enable_channel(struct ipu_dp *dp)
 +{
-+	ipu_ch_param_set_field(p, IPU_FIELD_SO, 1);
-+	ipu_ch_param_set_field(p, IPU_FIELD_ILO, stride / 8);
-+	ipu_ch_param_set_field(p, IPU_FIELD_SLY, (stride * 2) - 1);
-+};
++	struct ipu_flow *flow = to_flow(dp);
++	struct ipu_dp_priv *priv = flow->priv;
 +
-+void ipu_cpmem_set_yuv_interleaved(struct ipu_ch_param *p, u32 pixel_format);
++	mutex_lock(&priv->mutex);
++	ipu_get(priv->ipu);
 +
-+#endif
++	if (!priv->use_count)
++		ipu_module_enable(priv->ipu, IPU_CONF_DP_EN);
++
++	priv->use_count++;
++
++	if (dp->foreground) {
++		u32 reg;
++
++		reg = readl(flow->base + DP_COM_CONF);
++		reg |= DP_COM_CONF_FG_EN;
++		writel(reg, flow->base + DP_COM_CONF);
++
++		ipu_srm_dp_sync_update(priv->ipu);
++	}
++
++	mutex_unlock(&priv->mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(ipu_dp_enable_channel);
++
++void ipu_dp_disable_channel(struct ipu_dp *dp)
++{
++	struct ipu_flow *flow = to_flow(dp);
++	struct ipu_dp_priv *priv = flow->priv;
++
++	mutex_lock(&priv->mutex);
++
++	priv->use_count--;
++
++	if (dp->foreground) {
++		u32 reg, csc;
++
++		reg = readl(flow->base + DP_COM_CONF);
++		csc = reg & DP_COM_CONF_CSC_DEF_MASK;
++		if (csc == DP_COM_CONF_CSC_DEF_FG)
++			reg &= ~DP_COM_CONF_CSC_DEF_MASK;
++
++		reg &= ~DP_COM_CONF_FG_EN;
++		writel(reg, flow->base + DP_COM_CONF);
++
++		ipu_srm_dp_sync_update(priv->ipu);
++	}
++
++	if (!priv->use_count)
++		ipu_module_disable(priv->ipu, IPU_CONF_DP_EN);
++
++	if (priv->use_count < 0)
++		priv->use_count = 0;
++
++	ipu_put(priv->ipu);
++	mutex_unlock(&priv->mutex);
++}
++EXPORT_SYMBOL_GPL(ipu_dp_disable_channel);
++
++struct ipu_dp *ipu_dp_get(struct ipu_soc *ipu, unsigned int flow)
++{
++	struct ipu_dp_priv *priv = ipu->dp_priv;
++	struct ipu_dp *dp;
++
++	if (flow > 5)
++		return ERR_PTR(-EINVAL);
++
++	if (flow & 1)
++		dp = &priv->flow[flow >> 1].foreground;
++	else
++		dp = &priv->flow[flow >> 1].background;
++
++	if (dp->in_use)
++		return ERR_PTR(-EBUSY);
++
++	dp->in_use = true;
++
++	return dp;
++}
++EXPORT_SYMBOL_GPL(ipu_dp_get);
++
++void ipu_dp_put(struct ipu_dp *dp)
++{
++	dp->in_use = false;
++}
++EXPORT_SYMBOL_GPL(ipu_dp_put);
++
++int ipu_dp_init(struct ipu_soc *ipu, struct device *dev, unsigned long base)
++{
++	struct ipu_dp_priv *priv;
++	int i;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	priv->dev = dev;
++	priv->ipu = ipu;
++
++	ipu->dp_priv = priv;
++
++	priv->base = devm_ioremap(dev, base, PAGE_SIZE);
++	if (!priv->base) {
++		kfree(priv);
++		return -ENOMEM;
++	}
++
++	mutex_init(&priv->mutex);
++
++	for (i = 0; i < 3; i++) {
++		priv->flow[i].foreground.foreground = 1;
++		priv->flow[i].base = priv->base + ipu_dp_flow_base[i];
++		priv->flow[i].priv = priv;
++	}
++
++	return 0;
++}
++
++void ipu_dp_exit(struct ipu_soc *ipu)
++{
++}
 -- 
 1.7.5.3
