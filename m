@@ -1,181 +1,140 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue,  7 Jun 2011 22:00:54 +0800
-Subject: [PATCH 2/2] gpio/mxs: convert gpio-mxs to use generic irq chip
-In-Reply-To: <1307455254-7604-1-git-send-email-shawn.guo@linaro.org>
-References: <1307455254-7604-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1307455254-7604-2-git-send-email-shawn.guo@linaro.org>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Tue, 7 Jun 2011 14:54:53 +0100 (BST)
+Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to
+	a physical address
+In-Reply-To: <20110607132220.GB12639@e102144-lin.cambridge.arm.com>
+References: <1307379898-14256-1-git-send-email-will.deacon@arm.com>
+	<1307379898-14256-5-git-send-email-will.deacon@arm.com>
+	<alpine.DEB.2.00.1106071126290.2247@localhost6.localdomain6>
+	<alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
+	<20110607132220.GB12639@e102144-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.00.1106071435020.2247@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch converts gpio-mxs driver to use generic irq chip.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/gpio/Kconfig    |    1 +
- drivers/gpio/gpio-mxs.c |   95 +++++++++++++++++------------------------------
- 2 files changed, 35 insertions(+), 61 deletions(-)
 
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 0b858e5..59003bf 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -96,6 +96,7 @@ config GPIO_EXYNOS4
- config GPIO_MXS
- 	def_bool y
- 	depends on ARCH_MXS
-+	select GENERIC_IRQ_CHIP
- 	select GPIO_BASIC_MMIO_CORE
- 
- config GPIO_PLAT_SAMSUNG
-diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
-index ddde0f4..d8cafba 100644
---- a/drivers/gpio/gpio-mxs.c
-+++ b/drivers/gpio/gpio-mxs.c
-@@ -59,51 +59,12 @@ struct mxs_gpio_port {
- 
- /* Note: This driver assumes 32 GPIOs are handled in one register */
- 
--static void clear_gpio_irqstatus(struct mxs_gpio_port *port, u32 index)
--{
--	writel(1 << index, port->base + PINCTRL_IRQSTAT(port->id) + MXS_CLR);
--}
--
--static void set_gpio_irqenable(struct mxs_gpio_port *port, u32 index,
--				int enable)
--{
--	if (enable) {
--		writel(1 << index,
--			port->base + PINCTRL_IRQEN(port->id) + MXS_SET);
--		writel(1 << index,
--			port->base + PINCTRL_PIN2IRQ(port->id) + MXS_SET);
--	} else {
--		writel(1 << index,
--			port->base + PINCTRL_IRQEN(port->id) + MXS_CLR);
--	}
--}
--
--static void mxs_gpio_ack_irq(struct irq_data *d)
--{
--	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
--	u32 gpio = irq_to_gpio(d->irq);
--	clear_gpio_irqstatus(port, gpio & 0x1f);
--}
--
--static void mxs_gpio_mask_irq(struct irq_data *d)
--{
--	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
--	u32 gpio = irq_to_gpio(d->irq);
--	set_gpio_irqenable(port, gpio & 0x1f, 0);
--}
--
--static void mxs_gpio_unmask_irq(struct irq_data *d)
--{
--	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
--	u32 gpio = irq_to_gpio(d->irq);
--	set_gpio_irqenable(port, gpio & 0x1f, 1);
--}
--
- static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- {
- 	u32 gpio = irq_to_gpio(d->irq);
- 	u32 pin_mask = 1 << (gpio & 31);
--	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct mxs_gpio_port *port = gc->private;
- 	void __iomem *pin_addr;
- 	int edge;
- 
-@@ -138,7 +99,8 @@ static int mxs_gpio_set_irq_type(struct irq_data *d, unsigned int type)
- 	else
- 		writel(pin_mask, pin_addr + MXS_CLR);
- 
--	clear_gpio_irqstatus(port, gpio & 0x1f);
-+	writel(1 << (gpio & 0x1f),
-+	       port->base + PINCTRL_IRQSTAT(port->id) + MXS_CLR);
- 
- 	return 0;
- }
-@@ -173,7 +135,8 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
-  */
- static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
- {
--	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	struct mxs_gpio_port *port = gc->private;
- 
- 	if (enable)
- 		enable_irq_wake(port->irq);
-@@ -183,14 +146,26 @@ static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
- 	return 0;
- }
- 
--static struct irq_chip gpio_irq_chip = {
--	.name = "mxs gpio",
--	.irq_ack = mxs_gpio_ack_irq,
--	.irq_mask = mxs_gpio_mask_irq,
--	.irq_unmask = mxs_gpio_unmask_irq,
--	.irq_set_type = mxs_gpio_set_irq_type,
--	.irq_set_wake = mxs_gpio_set_wake_irq,
--};
-+static void __init mxs_gpio_init_gc(struct mxs_gpio_port *port)
-+{
-+	struct irq_chip_generic *gc;
-+	struct irq_chip_type *ct;
-+
-+	gc = irq_alloc_generic_chip("gpio-mxs", 1, port->virtual_irq_start,
-+				    port->base, handle_level_irq);
-+	gc->private = port;
-+
-+	ct = gc->chip_types;
-+	ct->chip.irq_ack = irq_gc_ack,
-+	ct->chip.irq_mask = irq_gc_mask_clr_bit;
-+	ct->chip.irq_unmask = irq_gc_mask_set_bit;
-+	ct->chip.irq_set_type = mxs_gpio_set_irq_type;
-+	ct->chip.irq_set_wake = mxs_gpio_set_wake_irq,
-+	ct->regs.ack = PINCTRL_IRQSTAT(port->id) + MXS_CLR;
-+	ct->regs.mask = PINCTRL_IRQEN(port->id);
-+
-+	irq_setup_generic_chip(gc, IRQ_MSK(32), 0, IRQ_NOREQUEST, 0);
-+}
- 
- static int mxs_gpio_to_irq(struct gpio_chip *gc, unsigned offset)
- {
-@@ -206,7 +181,7 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 	static void __iomem *base;
- 	struct mxs_gpio_port *port;
- 	struct resource *iores = NULL;
--	int err, i;
-+	int err;
- 
- 	port = kzalloc(sizeof(struct mxs_gpio_port), GFP_KERNEL);
- 	if (!port)
-@@ -246,20 +221,18 @@ static int __devinit mxs_gpio_probe(struct platform_device *pdev)
- 		goto out_iounmap;
- 	}
- 
--	/* disable the interrupt and clear the status */
--	writel(0, port->base + PINCTRL_PIN2IRQ(port->id));
-+	/*
-+	 * select the pin interrupt functionality but initially
-+	 * disable the interrupts
-+	 */
-+	writel(~0U, port->base + PINCTRL_PIN2IRQ(port->id));
- 	writel(0, port->base + PINCTRL_IRQEN(port->id));
- 
- 	/* clear address has to be used to clear IRQSTAT bits */
- 	writel(~0U, port->base + PINCTRL_IRQSTAT(port->id) + MXS_CLR);
- 
--	for (i = port->virtual_irq_start;
--		i < port->virtual_irq_start + 32; i++) {
--		irq_set_chip_and_handler(i, &gpio_irq_chip,
--					 handle_level_irq);
--		set_irq_flags(i, IRQF_VALID);
--		irq_set_chip_data(i, port);
--	}
-+	/* gpio-mxs can be a generic irq chip */
-+	mxs_gpio_init_gc(port);
- 
- 	/* setup one handler for each entry */
- 	irq_set_chained_handler(port->irq, mxs_gpio_irq_handler);
--- 
-1.7.4.1
+On Tue, 7 Jun 2011, Will Deacon wrote:
+
+> Hi Frank,
+>
+> Thanks for looking at this.
+
+Thanks for posting it ;-)
+
+[ ... ]
+>>>> +	/* Switch to the identity mapping. */
+>>>> +	((typeof(cpu_reset) *)virt_to_phys((void *)cpu_reset))(reset_code_phys);
+>>>
+>>> void (*reset_func)(unsigned long) = virt_to_phys(cpu_reset)
+>>
+>> Sorry, pressed wrong key ... posted too early.
+>
+> No problem.
+>
+>> I meant to say this line is magic, why not decouple the declaration bit
+>> from the invocation so that at least the function call looks "normal" ?
+>
+> You mean you don't like the LISP-ish look of it?! I take your point, I'll rework
+> that.
+
+ 	typeof(cpu_reset)(*phys_reset) =
+ 		(typeof(cpu_reset) *)virt_to_phys(cpu_reset);
+
+ 	reset_func(reset_code_phys);
+
+Works for me. Was experimenting with this when I pressed the wrong key.
+
+>
+>> Regarding the use of local_irq/fiq_disable - is it safe to call these
+>> multiple times, i.e. is it safe to invoke the reset function from a
+>> context where IRQ/FIQ are already off ?
+>
+> Yes, they just mask at the CPSR level.
+
+Good, thx for the confirmation.
+
+>
+>>
+>> Another question regarding the MMU tables.
+>>
+>> prepare_for_reboot / setup_mm_for_reboot assume that current->mm is
+>> available _and_ lowmem / user area there can be blotted over.
+>>
+>> Wrt. to hibernation, that's a stretch unless some way is found to fully
+>> "fake a context". With that I mean to create a threadinfo and pagedir
+>> that's guaranteed to sit outside the target kernel heap.
+>
+> Ouch, ok.
+>
+>> Currently, the hibernation code switches to swapper_pg_dir and puts the
+>> 1:1 mappings in there; I'm starting to think that is safe if for no other
+>> reason than swapper_pg_dir having _nothing_ in the user area ?
+>
+> That sounds ok providing that, when you come out of hibernate, the 1:1 mapping
+> doesn't persist in swapper_pg_dir.
+
+I can delete those mappings - as they're created by identity_mapping_add() 
+they can be ditched with identity_mapping_del() - which might be 
+sufficient, provided, and there's the critical bit why I ask, that 
+swapper_pg_dir _normally_ has nothing in the range anyway.
+
+Thing is, just because something appears to work doesn't mean it has no 
+unexpected/undesired side effects ... and I'm no ARM VM guru.
+
+
+>
+> However, stepping back a bit here, there is a bigger problem to tackle. If the
+> physical address of cpu_reset is bigger than TASK_SIZE, then we fail to map it
+> using the current identity mapping code [that piggy backs on the current task].
+> If PHYS_OFFSET > TASK_SIZE, this will *always* be the case and is probably quite
+> common for a 2:2 split.
+>
+> I can think of two ways to get around this:
+>
+> (1) Use /another/ set of page tables for mapping the cpu_reset code only [and
+>    nothing else]. This is tricky since it will need to be set extremely late-on
+>    where we don't care about mapping in the rest of the kernel, data, stack etc.
+>
+> (2) Make the assumption that the physical address of cpu_reset will not conflict
+>    with a virtual address that points at the kernel text via the linear mapping.
+>    This is probably a reasonable thing to assume, given that the kernel lives
+>    near the start of memory on most platforms. We could then take out the ID map
+>    but leaving the kernel text alone. We'd probably have to change to a new stack,
+>    which we could place immediately after the kernel text.
+>
+> What do you reckon?
+
+cpu_reset itself is relocatable, isn't it ? Maybe one could do the same 
+thing with/for it as for the reset code itself. I.e. relocate to a 
+"suitable" page if the 1:1 mapping for all of lowmem isn't possible. The 
+catch with that is of course somehow, such a "1:1 candidate page" must be 
+found.
+
+>
+>> Is it convention, design or accident that swapper_pg_dir doesn't map
+>> anything in the low range ?
+>
+> With the new switch_mm stuff, it's absolutely critical that we don't have
+> user mappings in there during normal execution (going down for hibernate
+> is probably ok since we'll clobber the caches and TLBs anyway).
+
+I'm using swapper_pg_dir for hibernate (restore) for the simple reason 
+that it maps all of kernel text/data writeable.
+
+When invoking resume via uswsusp and/or tuxonice, it's triggered from a 
+user context which is insufficient to _rewrite_ "universe".
+
+So when the time comes to do the cpu_reset / cpu_resume dance, the active 
+mm context is swapper_pg_dir; hence creating the identity mappings in 
+there.
+
+It's not hard to zap them afterwards; it'd be far more difficult to 
+restore previous contents if there had been any.
+
+Short: Good news that the user pagedir section in swapper_pg_dir is empty 
+by design.
+
+
+Thanks,
+FrankH.
