@@ -1,127 +1,44 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Tue, 7 Jun 2011 09:25:25 +0530
-Subject: [PATCH V2 1/3] drivers/pwm st_pwm: Add support for ST's Pulse
-	Width Modulator
-In-Reply-To: <20110606173339.268b9f9c.akpm@linux-foundation.org>
-References: <cover.1306831238.git.viresh.kumar@st.com>	<af3d50b271b17e404d236e19196adfd4618e2501.1306831238.git.viresh.kumar@st.com>
-	<20110606173339.268b9f9c.akpm@linux-foundation.org>
-Message-ID: <4DEDA12D.6080406@st.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Tue, 7 Jun 2011 13:26:45 +0800
+Subject: [PATCH v3 0/3] provide sdhci driver for mmp2 and pxa910
+In-Reply-To: <201106031820.51922.arnd@arndb.de>
+References: <BANLkTikP72ybaqa8zDgNjBQg8Q6SH5fMdw@mail.gmail.com>
+	<201106031820.51922.arnd@arndb.de>
+Message-ID: <BANLkTimefL_HHtvXc0af43dDv=B12roevA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/2011 06:03 AM, Andrew Morton wrote:
-> On Tue, 31 May 2011 14:21:51 +0530
-> Viresh Kumar <viresh.kumar@st.com> wrote:
+On Sat, Jun 4, 2011 at 12:20 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 03 June 2011, zhangfei gao wrote:
+>> Here are patches to provide separate sdhci driver for mmp2 and pxa910
+>> based on sdhci-platfm.
+>> Rename to sdhci-pxav3.c and sdhci-pxav2.c
+>> Remove sdhci-pxa.c, which is used to share among pxa serious, since
+>> under this method, platform difference have to be put under arch/arm,
+>> which is not easy to track.
+>> As a result, mmp2 mmc resource should be updated accordingly.
+>
+> Looks all good content-wise. I do have a few comments regarding the
+> style of submission, please follow that the next time:
+>
+> * Make all patches a reply to the ?[PATCH 0/x] email, so they show up
+> ?as a single thread. This helps finding the emails when your mail
+> ?client sorts threads by last reply. The option in git-send-email
+> ?is '--thread --no-chain-reply'.
+>
+> * The changelog has extra spaces in it that shouldn't be there. I assume
+> ?they come from using git-show instead of git-format-patch to create
+> ?the emails.
+>
+> * Make sure a series is bisectable. This means that each patch results
+> ?in a working kernel without regressions when you apply only part of
+> ?the series. There are multiple ways to get there. In this case, you
+> ?could fold the patch that updates the resources into the patch that
+> ?changes the format. Alternatively, you could first create the new driver
+> ?in the new format, then change the resources, and finally remove the
+> ?now obsolete driver.
+>
+> ? ? ? ?Arnd
 
->> + * lock: lock specific to a pwm device
-> 
-> More specificity here would be helpful.  Precisely which data does the
-> lock protect?
-> 
-
->> + * lock: lock specific to current pwm ip
-> 
-> Ditto.
-> 
-
-Ok.
-
->> +int pwm_config(struct pwm_device *pwmd, int duty_ns, int period_ns)
->> +{
->> +	u64 val, div, clk_rate;
->> +	unsigned long prescale = MIN_PRESCALE, pv, dc;
->> +	int ret = 0;
->> +
->> +	if (!pwmd) {
->> +		pr_err("pwm: config - NULL pwm device pointer\n");
->> +		return -EFAULT;
->> +	}
->> +
->> +	if (period_ns == 0 || duty_ns > period_ns) {
->> +		ret = -EINVAL;
->> +		goto err;
->> +	}
->> +
->> +	/* TODO: Need to optimize this loop */
->> +	while (1) {
->> +		div = 1000000000;
->> +		div *= 1 + prescale;
->> +		clk_rate = clk_get_rate(pwmd->pwm->clk);
->> +		val = clk_rate * period_ns;
->> +		pv = div64_u64(val, div);
->> +		val = clk_rate * duty_ns;
->> +		dc = div64_u64(val, div);
->> +
->> +		if ((pv == 0) || (dc == 0)) {
->> +			ret = -EINVAL;
->> +			goto err;
->> +		}
->> +		if ((pv > MAX_PERIOD) || (dc > MAX_DUTY)) {
->> +			prescale++;
->> +			if (prescale > MAX_PRESCALE) {
->> +				ret = -EINVAL;
->> +				goto err;
->> +			}
->> +			continue;
->> +		}
->> +		if ((pv < MIN_PERIOD) || (dc < MIN_DUTY)) {
->> +			ret = -EINVAL;
->> +			goto err;
->> +		}
->> +		break;
->> +	}
-> 
-> gee, is this some sort of puzzle?  So human-readable description of
-> what this code is doing would be an improvement.
-> 
-
-Sure. Will add that.
-
->> +	spin_lock(&pwmd->pwm->lock);
->> +	ret = clk_enable(pwmd->pwm->clk);
->> +	if (ret) {
->> +		spin_unlock(&pwmd->pwm->lock);
->> +		goto err;
->> +	}
->> +
->> +	spin_lock(&pwmd->lock);
->> +	writel(prescale << PRESCALE_SHIFT, pwmd->pwm->mmio_base +
->> +			pwmd->offset + PWMCR);
->> +	writel(dc, pwmd->pwm->mmio_base + pwmd->offset + PWMDCR);
->> +	writel(pv, pwmd->pwm->mmio_base + pwmd->offset + PWMPCR);
->> +	spin_unlock(&pwmd->lock);
->> +	clk_disable(pwmd->pwm->clk);
->> +	spin_unlock(&pwmd->pwm->lock);
-> 
-> The nesting rules for these two locks seems sensible and obvious, but I
-> guess documenting the rule wouldn't hurt.
-> 
-
-Ok.
-
->> +	return 0;
->> +err:
->> +	dev_err(&pwmd->pwm->pdev->dev, "pwm config fail\n");
->> +	return ret;
->> +}
->> +EXPORT_SYMBOL(pwm_config);
->> +
->>
->> ...
->>
->> +static int __devinit st_pwm_probe(struct platform_device *pdev)
-> 
-> And here things get rather odd.
-> 
-> Most of this file is a generic, non-device specific PWM layer, exported
-> to other modules.  But then we get into driver bits which are specific
-> to one paritular type of device.  Confused - this is like putting the
-> e100 driver inside net/ipv4/tcp.c?
-> 
-
-Sorry but i couldn't get this one completely. :(
-Driver is specific to pwm peripheral by ST. This driver can be used for
-SPEAr or may be other SoC or Devices, and is not at all dependent on SPEAr.
-
--- 
-viresh
+Thanks Arnd for your patient explanation, will take more care next time.
+>
