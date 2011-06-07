@@ -1,35 +1,28 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 7 Jun 2011 23:43:06 +0530
-Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <alpine.LFD.2.02.1106062330380.13964@ionos>
-References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
-	<alpine.LFD.2.02.1106061650210.13964@ionos>	<4DECEDF9.4010202@selfish.org>
-	<alpine.LFD.2.02.1106061719290.13964@ionos>	<4DECF32B.6000508@selfish.org>
-	<alpine.LFD.2.02.1106062330380.13964@ionos>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D383CDB@dbde02.ent.ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue,  7 Jun 2011 11:22:28 -0700
+Subject: [PATCH 0/3] I2C: OMAP: PM related cleanup
+Message-ID: <1307470951-22801-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
+Here's a small series of PM-related cleanups for the OMAP I2C driver.
 
-On Tue, Jun 07, 2011 at 03:01:31, Thomas Gleixner wrote:
+Series applies on top of the other cleanup series from Andy Green:
 
-> > > Subject: arm: davinci: Fix fallout from generic irq chip conversion
-> > > From: Thomas Gleixner <tglx@linutronix.de>
-> > > Date: Mon, 06 Jun 2011 11:51:43 +0200
-> > > 
-> > > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> > 
-> > Tested-by: Holger Hans Peter Freyther <holger@freyther.de>
-> 
-> can you please pick that up? It should have a Cc: stable at kernel.org
-> tag as well.
+  [PATCH v4 00/18] I2C: OMAP: I2C fixes, removal of cpu_is... from driver
 
-But generic IRQ chip support for DaVinci was merged only in
-v3.0-rc1.
+and is available from git here:
 
-$ git log --tags --source --oneline arch/arm/mach-davinci/irq.c
-aac4dd1 v3.0-rc1 arm: davinci: Use generic irq chip
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git wip/i2c
 
-Thanks,
-Sekhar
+Kevin Hilman (3):
+  I2C: OMAP: remove unneccesary use of pdev
+  I2C: OMAP: remove dev->idle, use usage counting provided by runtime
+    PM
+  I2C: OMAP: remove racy suspend/resume callbacks
+
+ drivers/i2c/busses/i2c-omap.c |   70 +++++++++++++++-------------------------
+ 1 files changed, 26 insertions(+), 44 deletions(-)
+
+-- 
+1.7.4
