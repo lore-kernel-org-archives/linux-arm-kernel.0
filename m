@@ -1,109 +1,82 @@
-From: richard.zhu@linaro.org (Richard Zhu)
-Date: Tue, 7 Jun 2011 17:37:04 +0800
-Subject: [PATCH V1] mmc: Enable the ADMA on esdhc imx driver
-Message-ID: <1307439424-3549-1-git-send-email-richard.zhu@linaro.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Tue, 07 Jun 2011 12:50:09 +0300
+Subject: [PATCH] arm: omap3: beagle: Ensure msecure is mux'd to be able
+	to set the RTC
+In-Reply-To: <4DEDDAF6.2070505@ahsoftware.de>
+References: <4D9AEB76.2060509@ahsoftware.de>
+	<1302010808-3065-1-git-send-email-holler@ahsoftware.de>
+	<20110531102903.GU11352@atomide.com>
+	<4DEDDAF6.2070505@ahsoftware.de>
+Message-ID: <4DEDF451.1080604@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eanble the ADMA2 mode on freescale esdhc imx driver,
-tested on MX51 and MX53.
+On 06/07/11 11:01, Alexander Holler wrote:
 
-Only ADMA2 mode is enabled, MX25/35 can't support the ADMA2 mode.
-So this patch is only used for MX51/53.
-The ADMA2 mode supported or not can be distinguished by the
-Capability Register(offset 0x40) of eSDHC module.
-Up to now, only MX51/MX53 set the ADMA2 supported bit(Bit20) in the
-Capability Register.
+> Am 31.05.2011 12:29, schrieb Tony Lindgren:
+>> * Alexander Holler<holler@ahsoftware.de>  [110405 06:38]:
+>>> Without msecure beeing high it isn't possible to set (or start)
+>>> the RTC.
+>>>
+>>> Tested with a BeagleBoard C4.
+>>
+>> Adding this into fixes.
+>>
+>> Tony
+>>
+>>> Signed-off-by: Alexander Holler<holler@ahsoftware.de>
+>>> ---
+>>>   arch/arm/mach-omap2/board-omap3beagle.c |    3 +++
+>>>   1 files changed, 3 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+>>> index 46d814a..ebe3a7e 100644
+>>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+>>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+>>> @@ -628,6 +628,9 @@ static void __init omap3_beagle_init(void)
+>>>       usb_ehci_init(&ehci_pdata);
+>>>       omap3beagle_flash_init();
+>>>
+>>> +    /* Ensure msecure is mux'd to be able to set the RTC. */
+>>> +    omap_mux_init_signal("sys_drm_msecure", OMAP_PIN_OFF_OUTPUT_HIGH);
+>>> +
+>>>       /* Ensure SDRC pins are mux'd for self-refresh */
+>>>       omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+>>>       omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+>>> -- 
+>>> 1.7.3.4
+>>>
+>
+> I've later switched to the following patch which muxes msecure as GPIO (the drm-mode isn't explained in the TRM) and also exports the GPIO, so root could easily switch it to prevent modifications on the RTC.
+>
+> (Warning, either my clipboard or the version of Thunderbird I'm currently using replaces the tabs with spaces in the pasted patch and I'm currently too lazy to search a workaround).
+>
+> ---
+>  arch/arm/mach-omap2/board-omap3beagle.c |    6 ++++++
+>  1 files changed, 6 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+> index 33007fd..24b4417 100644
+> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+> @@ -673,6 +673,12 @@ static void __init omap3_beagle_init(void)
+>         usbhs_init(&usbhs_bdata);
+>         omap3beagle_flash_init();
+>
+> +       /* Ensure msecure is high to be able to set the RTC. */
+> +       omap_mux_init_signal("gpio_22", OMAP_PIN_OFF_OUTPUT_HIGH);
+> +       gpio_request(22, "msecure");
+> +       gpio_direction_output(22, true);
 
-Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   36 +++++++++++++++++++++++++++++++-----
- 1 files changed, 31 insertions(+), 5 deletions(-)
+Can this be gpio_request_one() instead, please?
+Also, it will be nice to make a define for the magic 22.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index a19967d..8015e1a 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -31,6 +31,8 @@
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
- 
-+#define  SDHCI_SPEC_INT_ADMA_ERR	0x10000000
-+
- #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
- /*
-  * The CMDTYPE of the CMD register (offset 0xE) should be set to
-@@ -80,6 +82,20 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- 			val |= SDHCI_CARD_PRESENT;
- 	}
- 
-+	if (unlikely(reg == SDHCI_CAPABILITIES)) {
-+		if (val & SDHCI_CAN_DO_ADMA1) {
-+			val &= ~SDHCI_CAN_DO_ADMA1;
-+			val |= SDHCI_CAN_DO_ADMA2;
-+		}
-+	}
-+
-+	if (unlikely(reg == SDHCI_INT_STATUS)) {
-+		if (val & SDHCI_SPEC_INT_ADMA_ERR) {
-+			val &= ~SDHCI_SPEC_INT_ADMA_ERR;
-+			val |= SDHCI_INT_ADMA_ERROR;
-+		}
-+	}
-+
- 	return val;
- }
- 
-@@ -105,6 +121,13 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
- 	}
- 
-+	if (unlikely((reg == SDHCI_INT_ENABLE)
-+				|| (reg == SDHCI_SIGNAL_ENABLE))) {
-+		if (val & SDHCI_INT_ADMA_ERROR) {
-+			val &= ~SDHCI_INT_ADMA_ERROR;
-+			val |= SDHCI_SPEC_INT_ADMA_ERR;
-+		}
-+	}
- 	writel(val, host->ioaddr + reg);
- }
- 
-@@ -154,7 +177,7 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
- 
- static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
- {
--	u32 new_val;
-+	u16 new_val;
- 
- 	switch (reg) {
- 	case SDHCI_POWER_CONTROL:
-@@ -168,10 +191,12 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
- 		new_val = val & (SDHCI_CTRL_LED | SDHCI_CTRL_4BITBUS);
- 		/* ensure the endianess */
- 		new_val |= ESDHC_HOST_CONTROL_LE;
--		/* DMA mode bits are shifted */
--		new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-+		if (val & SDHCI_CTRL_DMA_MASK)
-+			/* DMA mode bits are shifted */
-+			new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
- 
- 		esdhc_clrset_le(host, 0xffff, new_val, reg);
-+
- 		return;
- 	}
- 	esdhc_clrset_le(host, 0xff, val, reg);
-@@ -322,9 +347,10 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- }
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_HISPD_BIT
-+			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
-+			| SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC
- 			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
--	/* ADMA has issues. Might be fixable */
- 	.ops = &sdhci_esdhc_ops,
- 	.init = esdhc_pltfm_init,
- 	.exit = esdhc_pltfm_exit,
+> +       gpio_export(22, false);
+> +
+>         /* Ensure SDRC pins are mux'd for self-refresh */
+>         omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+>         omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+
 -- 
-1.7.1
+Regards,
+Igor.
