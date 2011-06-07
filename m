@@ -1,25 +1,37 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 07 Jun 2011 15:33:30 +0300
-Subject: [PATCH 1/2] MTD: pxa3xx_nand: fix nand detection issue
-In-Reply-To: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
-References: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
-Message-ID: <1307450010.11104.81.camel@localhost>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 7 Jun 2011 20:55:41 +0800
+Subject: [PATCH] gpio/mxc: convert gpio-mxc to use generic irq chip
+In-Reply-To: <1307435137-31439-1-git-send-email-shawn.guo@linaro.org>
+References: <1307435137-31439-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110607125540.GA21913@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-06-07 at 03:01 -0700, Lei Wen wrote:
-> When keep_config is set, the detection would goes different routine.
-> That the driver would read out the setting which is set previously
-> by bootloader. While most bootloader keep the irq mask as off, and
-> current driver need all irq default open, keep_config behavior would
-> lead to no irq at all.
-> 
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> Tested-by: Daniel Mack <zonque@gmail.com>
-> Cc: stable at kernel.org
+Hi Grant,
 
-Pushed both patches to l2-mtd-2.6.git, thanks.
+On Tue, Jun 07, 2011 at 04:25:37PM +0800, Shawn Guo wrote:
+> The patch converts gpio-mxc driver to use generic irq chip.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  drivers/gpio/Kconfig    |    1 +
+>  drivers/gpio/gpio-mxc.c |   90 +++++++++++++++--------------------------------
+>  2 files changed, 30 insertions(+), 61 deletions(-)
+> 
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index d973abd..ee8802f 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -97,6 +97,7 @@ config GPIO_MXC
+>  	def_bool y
+>  	depends on ARCH_MXC
+>  	select GPIO_BASIC_MMIO_CORE
+> +	select GENERIC_IRQ_CHIP
+>  
+I should have put GENERIC_IRQ_CHIP before GPIO_BASIC_MMIO_CORE to get
+them sorted.  Would you mind fixing it when applying the patch, if
+there is no v2 of the patch?
 
 -- 
-Best Regards,
-Artem Bityutskiy (????? ????????)
+Regards,
+Shawn
