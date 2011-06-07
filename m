@@ -1,42 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Jun 2011 17:22:04 +0100
-Subject: [PATCH 06/11] ARM: cortex-a5: add HWCAP_VFPv4D16 to proc info
-	structure
-In-Reply-To: <20110607161736.GB19855@arm.com>
-References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
-	<1307379355-13802-7-git-send-email-will.deacon@arm.com>
-	<20110607161736.GB19855@arm.com>
-Message-ID: <20110607162204.GC12639@e102144-lin.cambridge.arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 07 Jun 2011 09:23:59 -0700
+Subject: [PATCH V2] davinci: da850: move input frequency to board
+	specific	files
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D383AA8@dbde02.ent.ti.com>
+	(Sekhar Nori's message of "Tue, 7 Jun 2011 16:09:33 +0530")
+References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
+	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
+	<874o42wpec.fsf@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D383AA8@dbde02.ent.ti.com>
+Message-ID: <877h8xr4o0.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2011 at 05:17:36PM +0100, Dave Martin wrote:
-> On Mon, Jun 06, 2011 at 05:55:50PM +0100, Will Deacon wrote:
-> > The Cortex-A5 implements VFPv4D16, so add this to the hwcaps for this
-> > processor.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/mm/proc-v7.S |    2 +-
-> >  1 files changed, 1 insertions(+), 1 deletions(-)
-> > 
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index b22d98d..8eba506 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -466,7 +466,7 @@ cpu_elf_name:
-> >  __v7_ca5mp_proc_info:
-> >  	.long	0x410fc050
-> >  	.long	0xff0ffff0
-> > -	__v7_proc __v7_ca5mp_setup
-> > +	__v7_proc __v7_ca5mp_setup, HWCAP_VFPv4D16
-> 
-> Is VFPv4 a superset of VFPv3?  If so, should we also include
-> HWCAP_VFPv3D16 (and what about HWCAP_VFP)?
+"Nori, Sekhar" <nsekhar@ti.com> writes:
+
+> Hi Kevin,
 >
+> On Tue, Jun 07, 2011 at 04:14:59, Hilman, Kevin wrote:
+>> Christian Riesch <christian.riesch@omicron.at> writes:
+>> 
+>> > From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+>> >
+>> > Currently the input frequency of the SoC is hardcoded in the SoC specific
+>> > da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
+>> > range from 12 to 50 MHz, boards with different oscillator/crystal
+>> > frequencies may be built.
+>> >
+>> > This patch allows setting a different input frequency in the board
+>> > specific files to support boards with oscillator/crystal frequencies other
+>> > than 24 MHz.
+>> >
+>> > Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+>> > Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+>> 
+>> Why not allow board code to just do a clk_set_rate()?
+>> 
+>> Currently the ref_clk struct clk does not have a .set_rate method
+>> implemented, but that should be easy enough to add.  
+>> 
+>> Then the default ref_clk.rate would stay the 24MHz, but any boards that
+>> want to override that simply use clk_get(), clk_set_rate(), clk_put()
+>
+> That's certainly much more elegant, but this would mean the whole
+> clock tree is traversed again on each boot.
+>
+> I am doing some measurements to see if there is any big difference
+> in boot-time if this is done. Will get back with results.
 
-Actually, it looks like this shouldn't be declared statically at all, since the
-kernel have not have VFP support compiled in. Rather, the vfp code will detect
-the capability and adjust elf_hwcap at runtime.
+I don't expect this to be a big boot-time impact.
 
-Will
+However, some of the clock.c assumptions might need to be updated as it
+currently is written from the perspective that the PLL clocks are the
+"root" clocks.
+
+Setting (and propagating) clock rates is what the clock framework is
+for, so adding a new interface to set a custom clock rate just doesn't
+seem right.  I understand that the reference oscillator might be
+considered a special case, but if this can be done with the clock
+framework, it is much preferred.
+
+Kevin
