@@ -1,49 +1,77 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 7 Jun 2011 13:40:34 -0600
-Subject: [PATCH v2 5/5] spi/ep93xx: add DMA support
-In-Reply-To: <20110607192945.GC3011@acer>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
-	<4b27fc93b7df900943e7c12084a8340cbc5fe1a8.1306662317.git.mika.westerberg@iki.fi>
-	<20110603204400.GH17972@ponder.secretlab.ca>
-	<20110607171403.GA3011@acer>
-	<BANLkTikKOcc2Vg1p3kG4ZSLjJ0RTZWS=2A@mail.gmail.com>
-	<20110607190607.GB3011@acer>
-	<20110607191824.GA2035@ponder.secretlab.ca>
-	<20110607192945.GC3011@acer>
-Message-ID: <20110607194034.GC2035@ponder.secretlab.ca>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 8 Jun 2011 01:16:40 +0530
+Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
+In-Reply-To: <20110607182923.GA28451@n2100.arm.linux.org.uk>
+References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
+	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
+	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
+	<20110607081527.GB20929@n2100.arm.linux.org.uk>
+	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
+	<20110607182923.GA28451@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTikLFCyzU3UApjjwfX0Vjujo9WAFZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2011 at 10:29:45PM +0300, Mika Westerberg wrote:
-> On Tue, Jun 07, 2011 at 01:18:24PM -0600, Grant Likely wrote:
-> > On Tue, Jun 07, 2011 at 10:06:07PM +0300, Mika Westerberg wrote:
-> > > On Tue, Jun 07, 2011 at 12:45:26PM -0600, Grant Likely wrote:
-> > > > On Tue, Jun 7, 2011 at 11:14 AM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> > > > >
-> > > > > I just realized that once the SPI driver renaming patch (spi: reorganize
-> > > > > drivers) enters linux-next, this patch (which sits on Vinod's tree) will cause
-> > > > > a merge conflict. Any ideas how to avoid it beforehand?
-> > > > 
-> > > > Yes, put the whole series into a separate branch all by itself.  Merge
-> > > > that branch into Vinod's tree and I'll also merge it into spi/next,
-> > > > and I'll fix up the merge conflict when I do.
-> > > 
-> > > More stupid questions: Do you mean that I create a branch in my public
-> > > repository somewhere? If that is the case, then there is a problem that I
-> > > don't have any public repository and I doubt that I get such before linux-next
-> > > is rebuilt.
-> > 
-> > It doesn't have to be your repo.  Vinod could do it, or I could.
-> 
-> Ah, I see.
-> 
-> Would it then be possible that you could do it? Please let me and Vinod know
-> what is needed from us.
-> 
-> And sorry for this mess.
+On Tue, Jun 7, 2011 at 11:59 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+>> The discussion did take off a few months ago, but we didn't reach anywhere.
+>> Being able to queue request from the 'done' callback, the need of
+>> circular buffer
+>> API (possibly a free-running one too) and callbacks in irq-context, as
+>> they happen,
+>> were a few requirements for having fast peripherals with shallow fifo
+>> work without underruns.
+>
+> I can see why you have these concerns; the problem is the slave DMA
+> engine API was never properly documented.
+>
+> 1. The slave API does permit the done callback to submit new requests
+> ? already (and any DMA engine driver which doesn't allow that is broken.)
+>
+> Note that slave APIs _should_ permit several requests to be queued up
+> and as each finish, the next one should be started. ?In other words,
+> once DMA has started it should continue until there is no more work for
+> the DMA engine to perform.
+>
+> 2. Circular buffer support has been added - see device_prep_dma_cyclic().
+>
+> However, 2 is not really a requirement for audio - you can queue several
+> single slave transfers (one per period) initially, and then you get
+> callbacks as each transfer completes. ?In the callback, you can submit
+> an additional buffer, and continue doing so causing DMA to never end.
+>
+> I believe that this is a saner approach than the circular buffer support,
+> and its what I tried to put together for the AMBA PL041 AACI DMA (but
+> unfortunately, ARMs platforms are totally broken when it comes to DMA.)
+>
+> This also removes the need for the callback to be in IRQ context.
+>
+> So I don't see that anything you've mentioned is a problem with the API
+> as it stands today - there may be issues with the way the DMA engine
+> driver has been implemented which cause it not to conform to what I've
+> said above, but those are driver bugs and not a fault of the API.
 
-I'll need an ack from Vinod first for the series so that I can add it
-before I make the commits, but other than that I have no problem doing
-so.
+Yes, after reading Vinod's mail, I did see that CYCLIC option has been added.
+Though I am still not sure how effective would that be for fast
+peripherals(please
+have a look at my reply to Mark's post), when doing callbacks from
+tasklets scheduled
+from irq-handlers is the norm with dma drivers of generic api.
+Playing regular audio is no problem, but playing pro quality over
+SPDIF with active multimedia h/w, sometimes is for some devices.
 
-g.
+Besides, people might have different work priorities atm. I don't
+think anybody believes we can do without common APIs.
+
+Btw, Samsung DMA API doesn't support the 'free-running' circular
+buffer either. But that was my planned TODO while I was there and I
+think someone is working on it(?)
+
+IMHO Samsung SoC team (not his majesty Mr Kyungmin Park) are justified if they
+are not so eager right now. Since I no more would have to spend
+sleepless nights over
+SPDIF underruns, I can side with what Kukjin Kim(Samsung maintainer)
+decides, who has to live with the results.
+
+Thanks,
+Jassi
