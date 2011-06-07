@@ -1,82 +1,43 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 07 Jun 2011 12:50:09 +0300
-Subject: [PATCH] arm: omap3: beagle: Ensure msecure is mux'd to be able
-	to set the RTC
-In-Reply-To: <4DEDDAF6.2070505@ahsoftware.de>
-References: <4D9AEB76.2060509@ahsoftware.de>
-	<1302010808-3065-1-git-send-email-holler@ahsoftware.de>
-	<20110531102903.GU11352@atomide.com>
-	<4DEDDAF6.2070505@ahsoftware.de>
-Message-ID: <4DEDF451.1080604@compulab.co.il>
+From: leiwen@marvell.com (Lei Wen)
+Date: Tue,  7 Jun 2011 03:01:07 -0700
+Subject: [PATCH 2/2] MTD: pxa3xx_nand: Fix blank page ECC mismatch
+In-Reply-To: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
+References: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
+Message-ID: <1307440867-18993-2-git-send-email-leiwen@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/11 11:01, Alexander Holler wrote:
+From: Daniel Mack <zonque@gmail.com>
 
-> Am 31.05.2011 12:29, schrieb Tony Lindgren:
->> * Alexander Holler<holler@ahsoftware.de>  [110405 06:38]:
->>> Without msecure beeing high it isn't possible to set (or start)
->>> the RTC.
->>>
->>> Tested with a BeagleBoard C4.
->>
->> Adding this into fixes.
->>
->> Tony
->>
->>> Signed-off-by: Alexander Holler<holler@ahsoftware.de>
->>> ---
->>>   arch/arm/mach-omap2/board-omap3beagle.c |    3 +++
->>>   1 files changed, 3 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
->>> index 46d814a..ebe3a7e 100644
->>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
->>> @@ -628,6 +628,9 @@ static void __init omap3_beagle_init(void)
->>>       usb_ehci_init(&ehci_pdata);
->>>       omap3beagle_flash_init();
->>>
->>> +    /* Ensure msecure is mux'd to be able to set the RTC. */
->>> +    omap_mux_init_signal("sys_drm_msecure", OMAP_PIN_OFF_OUTPUT_HIGH);
->>> +
->>>       /* Ensure SDRC pins are mux'd for self-refresh */
->>>       omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
->>>       omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
->>> -- 
->>> 1.7.3.4
->>>
->
-> I've later switched to the following patch which muxes msecure as GPIO (the drm-mode isn't explained in the TRM) and also exports the GPIO, so root could easily switch it to prevent modifications on the RTC.
->
-> (Warning, either my clipboard or the version of Thunderbird I'm currently using replaces the tabs with spaces in the pasted patch and I'm currently too lazy to search a workaround).
->
-> ---
->  arch/arm/mach-omap2/board-omap3beagle.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-> index 33007fd..24b4417 100644
-> --- a/arch/arm/mach-omap2/board-omap3beagle.c
-> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
-> @@ -673,6 +673,12 @@ static void __init omap3_beagle_init(void)
->         usbhs_init(&usbhs_bdata);
->         omap3beagle_flash_init();
->
-> +       /* Ensure msecure is high to be able to set the RTC. */
-> +       omap_mux_init_signal("gpio_22", OMAP_PIN_OFF_OUTPUT_HIGH);
-> +       gpio_request(22, "msecure");
-> +       gpio_direction_output(22, true);
+This bug was introduced in f8155a40 ("mtd: pxa3xx_nand: rework irq
+logic") and causes the PXA3xx NAND controller fail to operate with NAND
+flash that has empty pages. According to the comment in this block, the
+hardware controller will report a double-bit error for empty pages,
+which can and must be ignored.
 
-Can this be gpio_request_one() instead, please?
-Also, it will be nice to make a define for the magic 22.
+This patch restores the original behaviour of the driver.
 
-> +       gpio_export(22, false);
-> +
->         /* Ensure SDRC pins are mux'd for self-refresh */
->         omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
->         omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+Acked-by: Lei Wen <leiwen@marvell.com>
+Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
+Cc: David Woodhouse <David.Woodhouse@intel.com>
+Cc: stable at kernel.org
+---
+ drivers/mtd/nand/pxa3xx_nand.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index faa0edd..30689cc 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -685,6 +685,8 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
+ 		 * OOB, ignore such double bit errors
+ 		 */
+ 		if (is_buf_blank(buf, mtd->writesize))
++			info->retcode = ERR_NONE;
++		else
+ 			mtd->ecc_stats.failed++;
+ 	}
+ 
 -- 
-Regards,
-Igor.
+1.7.0.4
