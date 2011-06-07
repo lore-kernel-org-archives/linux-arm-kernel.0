@@ -1,387 +1,416 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue,  7 Jun 2011 12:45:49 +0200
-Subject: [PATCH 4/5] DRM: Add support for the sii902x HDMI/DVI encoder
+Date: Tue,  7 Jun 2011 12:45:48 +0200
+Subject: [PATCH 3/5] DRM: Add drm encoder/connector helper
 In-Reply-To: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
 References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1307443550-25549-5-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1307443550-25549-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+At least in the embedded world encoders and connectors are not
+at all visible in software. Often enough there is a 1:1
+relationship between encoders and connectors. Add helpers to
+handle this case and to ease driver implementation for SoCs.
+
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/gpu/drm/Kconfig       |    6 +
- drivers/gpu/drm/i2c/Makefile  |    3 +
- drivers/gpu/drm/i2c/sii902x.c |  334 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 343 insertions(+), 0 deletions(-)
- create mode 100644 drivers/gpu/drm/i2c/sii902x.c
+ drivers/gpu/drm/Kconfig     |    7 +
+ drivers/gpu/drm/Makefile    |    1 +
+ drivers/gpu/drm/drm_encon.c |  302 +++++++++++++++++++++++++++++++++++++++++++
+ include/drm/drm_encon.h     |   46 +++++++
+ 4 files changed, 356 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/gpu/drm/drm_encon.c
+ create mode 100644 include/drm/drm_encon.h
 
 diff --git a/drivers/gpu/drm/Kconfig b/drivers/gpu/drm/Kconfig
-index bcd9a27..01d5444 100644
+index 969dc38..bcd9a27 100644
 --- a/drivers/gpu/drm/Kconfig
 +++ b/drivers/gpu/drm/Kconfig
-@@ -166,6 +166,12 @@ config DRM_SAVAGE
- 	  Choose this option if you have a Savage3D/4/SuperSavage/Pro/Twister
- 	  chipset. If M is selected the module will be called savage.
+@@ -28,6 +28,13 @@ config DRM_KMS_HELPER
+ 	help
+ 	  FB and CRTC helpers for KMS drivers.
  
-+config DRM_I2C_SII902X
-+	tristate "sii902x"
-+	depends on DRM && I2C
++config DRM_KMS_ENCON
++	tristate
++	depends on DRM
 +	help
-+	  Support for sii902x DVI/HDMI encoder chips
++	  helper for KMS drivers which use connectors and encoders with
++	  a 1:1 relationship
 +
- config DRM_IMX_IPUV3
- 	tristate "i.MX IPUv3"
- 	depends on DRM && ARCH_MXC
-diff --git a/drivers/gpu/drm/i2c/Makefile b/drivers/gpu/drm/i2c/Makefile
-index 9286256..a7a8d40 100644
---- a/drivers/gpu/drm/i2c/Makefile
-+++ b/drivers/gpu/drm/i2c/Makefile
-@@ -5,3 +5,6 @@ obj-$(CONFIG_DRM_I2C_CH7006) += ch7006.o
+ config DRM_TTM
+ 	tristate
+ 	depends on DRM
+diff --git a/drivers/gpu/drm/Makefile b/drivers/gpu/drm/Makefile
+index 97c35eb..19a1aec 100644
+--- a/drivers/gpu/drm/Makefile
++++ b/drivers/gpu/drm/Makefile
+@@ -19,6 +19,7 @@ drm-$(CONFIG_COMPAT) += drm_ioc32.o
+ drm_kms_helper-y := drm_fb_helper.o drm_crtc_helper.o drm_dp_i2c_helper.o
  
- sil164-y := sil164_drv.o
- obj-$(CONFIG_DRM_I2C_SIL164) += sil164.o
-+
-+sii902x := sii902x_drv.o
-+obj-$(CONFIG_DRM_I2C_SII902X) += sii902x.o
-diff --git a/drivers/gpu/drm/i2c/sii902x.c b/drivers/gpu/drm/i2c/sii902x.c
+ obj-$(CONFIG_DRM_KMS_HELPER) += drm_kms_helper.o
++obj-$(CONFIG_DRM_KMS_ENCON) += drm_encon.o
+ 
+ CFLAGS_drm_trace_points.o := -I$(src)
+ 
+diff --git a/drivers/gpu/drm/drm_encon.c b/drivers/gpu/drm/drm_encon.c
 new file mode 100644
-index 0000000..7928533
+index 0000000..42d46c8
 --- /dev/null
-+++ b/drivers/gpu/drm/i2c/sii902x.c
-@@ -0,0 +1,334 @@
++++ b/drivers/gpu/drm/drm_encon.c
+@@ -0,0 +1,302 @@
 +/*
-+ * Copyright (C) 2010 Francisco Jerez.
-+ * All Rights Reserved.
++ * Implementation of a 1:1 relationship for drm encoders and connectors
 + *
-+ * Permission is hereby granted, free of charge, to any person obtaining
-+ * a copy of this software and associated documentation files (the
-+ * "Software"), to deal in the Software without restriction, including
-+ * without limitation the rights to use, copy, modify, merge, publish,
-+ * distribute, sublicense, and/or sell copies of the Software, and to
-+ * permit persons to whom the Software is furnished to do so, subject to
-+ * the following conditions:
++ * Copyright (C) 2011 Sascha Hauer, Pengutronix
 + *
-+ * The above copyright notice and this permission notice (including the
-+ * next paragraph) shall be included in all copies or substantial
-+ * portions of the Software.
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version 2
++ * of the License, or (at your option) any later version.
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
 + *
-+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-+ * IN NO EVENT SHALL THE COPYRIGHT OWNER(S) AND/OR ITS SUPPLIERS BE
-+ * LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
-+ * OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
-+ * WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-+ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston,
++ * MA 02110-1301, USA.
 + */
-+
 +#include <drm/drmP.h>
++#include <drm/drm_fb_helper.h>
 +#include <drm/drm_crtc_helper.h>
 +#include <drm/drm_encoder_slave.h>
 +#include <drm/drm_encon.h>
 +
-+struct sii902x_encoder_params {
-+};
++#define con_to_encon(x) container_of(x, struct drm_encoder_connector, connector)
++#define enc_to_encon(x) container_of(x, struct drm_encoder_connector, encoder)
 +
-+struct sii902x_priv {
-+	struct sii902x_encoder_params config;
-+	struct i2c_client *client;
-+	struct drm_encoder_connector encon;
-+};
-+
-+#define to_sii902x(x) container_of(x, struct sii902x_priv, encon)
-+
-+static int sii902x_write(struct i2c_client *client, uint8_t addr, uint8_t val)
++static enum drm_connector_status connector_detect(struct drm_connector *connector,
++		bool force)
 +{
-+	int ret;
++	struct drm_encoder_connector *encon = con_to_encon(connector);
 +
-+	ret = i2c_smbus_write_byte_data(client, addr, val);
-+	if (ret) {
-+		dev_dbg(&client->dev, "%s failed with %d\n", __func__, ret);
-+	}
-+	return ret;
++	if (encon->funcs->detect)
++		return encon->funcs->detect(encon);
++
++	return connector_status_connected;
 +}
 +
-+static uint8_t sii902x_read(struct i2c_client *client, uint8_t addr)
++static int connector_set_property(struct drm_connector *connector,
++		struct drm_property *property, uint64_t val)
 +{
-+	int dat;
++	struct drm_encoder_connector *encon = con_to_encon(connector);
 +
-+	dat = i2c_smbus_read_byte_data(client, addr);
++	if (encon->funcs->set_property)
++		return encon->funcs->set_property(encon, property, val);
 +
-+	return dat;	
++	return -EINVAL;
 +}
 +
-+static int hdmi_cap = 0; /* FIXME */
-+
-+static void sii902x_poweron(struct sii902x_priv *priv)
++static void connector_destroy(struct drm_connector *connector)
 +{
-+	struct i2c_client *client = priv->client;
-+
-+	/* Turn on DVI or HDMI */
-+	if (hdmi_cap)
-+		sii902x_write(client, 0x1A, 0x01 | 4);
-+	else
-+		sii902x_write(client, 0x1A, 0x00);
-+
-+	return;
++	/* not here */
 +}
 +
-+static void sii902x_poweroff(struct sii902x_priv *priv)
++static int connector_get_modes(struct drm_connector *connector)
 +{
-+	struct i2c_client *client = priv->client;
-+	
-+	/* disable tmds before changing resolution */
-+	if (hdmi_cap)
-+		sii902x_write(client, 0x1A, 0x11);
-+	else
-+		sii902x_write(client, 0x1A, 0x10);
++	struct drm_encoder_connector *encon = con_to_encon(connector);
 +
-+	return;
-+}
-+
-+static int sii902x_get_modes(struct drm_encoder_connector *encon)
-+{
-+	struct sii902x_priv *priv = to_sii902x(encon);
-+	struct i2c_client *client = priv->client;
-+	struct i2c_adapter *adap = client->adapter;
-+	struct drm_connector *connector = &encon->connector;
-+	struct edid *edid;
-+	int ret;
-+	int old, dat, cnt = 100;
-+
-+	old = sii902x_read(client, 0x1A);
-+
-+	sii902x_write(client, 0x1A, old | 0x4);
-+	do {
-+		cnt--;
-+		msleep(10);
-+		dat = sii902x_read(client, 0x1A);
-+	} while ((!(dat & 0x2)) && cnt);
-+
-+	if (!cnt)
-+		return -ETIMEDOUT;
-+
-+	sii902x_write(client, 0x1A, old | 0x06);
-+
-+	edid = drm_get_edid(connector, adap);
-+	if (edid) {
-+		drm_mode_connector_update_edid_property(connector, edid);
-+		ret = drm_add_edid_modes(connector, edid);
-+		connector->display_info.raw_edid = NULL;
-+		kfree(edid);
-+	}
-+
-+	cnt = 100;
-+	do {
-+		cnt--;
-+		sii902x_write(client, 0x1A, old & ~0x6);
-+		msleep(10);
-+		dat = sii902x_read(client, 0x1A);
-+	} while ((dat & 0x6) && cnt);
-+
-+	if (!cnt)
-+		ret = -1;
-+
-+	sii902x_write(client, 0x1A, old);
++	if (encon->funcs->get_modes)
++		return encon->funcs->get_modes(encon);
 +
 +	return 0;
 +}
 +
-+static irqreturn_t sii902x_detect_handler(int irq, void *data)
-+{
-+	struct sii902x_priv *priv = data;
-+	struct i2c_client *client = priv->client;
-+	int dat;
-+
-+	dat = sii902x_read(client, 0x3D);
-+	if (dat & 0x1) {
-+		/* cable connection changes */
-+		if (dat & 0x4) {
-+			printk("plugin\n");
-+		} else {
-+			printk("plugout\n");
-+		}
-+	}
-+	sii902x_write(client, 0x3D, dat);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+
-+static int sii902x_mode_valid(struct drm_encoder_connector *encon,
++static int connector_mode_valid(struct drm_connector *connector,
 +			  struct drm_display_mode *mode)
 +{
-+	return MODE_OK;
++	struct drm_encoder_connector *encon = con_to_encon(connector);
++
++	if (encon->funcs && encon->funcs->mode_valid)
++		return encon->funcs->mode_valid(encon, mode);
++
++	return 0;
 +}
 +
-+static void sii902x_mode_set(struct drm_encoder_connector *encon,
++static struct drm_encoder *connector_best_encoder(struct drm_connector *connector)
++{
++	struct drm_encoder_connector *encon = con_to_encon(connector);
++
++	return &encon->encoder;
++}
++
++static void encoder_reset(struct drm_encoder *encoder)
++{
++	struct drm_encoder_connector *encon = enc_to_encon(encoder);
++
++	if (encon->funcs && encon->funcs->reset)
++		encon->funcs->reset(encon);
++}
++
++static void encoder_dpms(struct drm_encoder *encoder, int mode)
++{
++	struct drm_encoder_connector *encon = enc_to_encon(encoder);
++
++	if (encon->funcs->dpms)
++		encon->funcs->dpms(encon, mode);
++}
++
++static bool encoder_mode_fixup(struct drm_encoder *encoder,
++			   struct drm_display_mode *mode,
++			   struct drm_display_mode *adjusted_mode)
++{
++	struct drm_encoder_connector *encon = enc_to_encon(encoder);
++
++	if (encon->funcs->mode_fixup)
++		return encon->funcs->mode_fixup(encon, mode, adjusted_mode);
++
++	return true;
++}
++
++static void encoder_prepare(struct drm_encoder *encoder)
++{
++	struct drm_encoder_connector *encon = enc_to_encon(encoder);
++
++	if (encon->funcs->prepare)
++		encon->funcs->prepare(encon);
++}
++
++static void encoder_commit(struct drm_encoder *encoder)
++{
++	struct drm_encoder_connector *encon = enc_to_encon(encoder);
++
++	if (encon->funcs->commit)
++		encon->funcs->commit(encon);
++}
++
++static void encoder_mode_set(struct drm_encoder *encoder,
 +			 struct drm_display_mode *mode,
 +			 struct drm_display_mode *adjusted_mode)
 +{
-+	struct sii902x_priv *priv = to_sii902x(encon);
-+	struct i2c_client *client = priv->client;
-+	u16 data[4];
-+	u32 refresh;
-+	u8 *tmp;
-+	int i;
++	struct drm_encoder_connector *encon = enc_to_encon(encoder);
 +
-+	/* Power up */
-+	sii902x_write(client, 0x1E, 0x00);
-+
-+	dev_dbg(&client->dev, "%s: %dx%d, pixclk %d\n", __func__,
-+			mode->hdisplay, mode->vdisplay,
-+			mode->clock * 1000);
-+
-+	/* set TPI video mode */
-+	data[0] = mode->clock / 10;
-+	data[2] = mode->htotal;
-+	data[3] = mode->vtotal;
-+	refresh = data[2] * data[3];
-+	refresh = (mode->clock * 1000) / refresh;
-+	data[1] = refresh * 100;
-+	tmp = (u8 *)data;
-+	for (i = 0; i < 8; i++)
-+		sii902x_write(client, i, tmp[i]);
-+
-+	/* input bus/pixel: full pixel wide (24bit), rising edge */
-+	sii902x_write(client, 0x08, 0x70);
-+	/* Set input format to RGB */
-+	sii902x_write(client, 0x09, 0x00);
-+	/* set output format to RGB */
-+	sii902x_write(client, 0x0A, 0x00);
-+	/* audio setup */
-+	sii902x_write(client, 0x25, 0x00);
-+	sii902x_write(client, 0x26, 0x40);
-+	sii902x_write(client, 0x27, 0x00);
++	if (encon->funcs->mode_set)
++		encon->funcs->mode_set(encon, mode, adjusted_mode);
 +}
 +
-+static void sii902x_dpms(struct drm_encoder_connector *encon, int mode)
++static void encoder_disable(struct drm_encoder *encoder)
 +{
-+	struct sii902x_priv *priv = to_sii902x(encon);
-+
-+	if (mode)
-+		sii902x_poweroff(priv);
-+	else
-+		sii902x_poweron(priv);
 +}
 +
-+static void sii902x_prepare(struct drm_encoder_connector *encon)
++static void encoder_destroy(struct drm_encoder *encoder)
 +{
-+	struct sii902x_priv *priv = to_sii902x(encon);
-+
-+	sii902x_poweroff(priv);
++	/* not here */
 +}
 +
-+static void sii902x_commit(struct drm_encoder_connector *encon)
-+{
-+	struct sii902x_priv *priv = to_sii902x(encon);
-+
-+	sii902x_poweron(priv);
-+}
-+
-+struct drm_encoder_connector_funcs sii902x_funcs = {
-+	.dpms = sii902x_dpms,
-+	.prepare = sii902x_prepare,
-+	.commit = sii902x_commit,
-+	.get_modes = sii902x_get_modes,
-+	.mode_valid = sii902x_mode_valid,
-+	.mode_set = sii902x_mode_set,
++struct drm_connector_funcs connector_funcs = {
++	.dpms = drm_helper_connector_dpms,
++	.fill_modes = drm_helper_probe_single_connector_modes,
++	/* .save unused in drm, only used in nouveau */
++	/* .restore unused in drm, only used in nouveau */
++	.detect = connector_detect,
++	/* .reset called by encoder */
++	.set_property = connector_set_property,
++	.destroy = connector_destroy,
 +};
 +
-+/* I2C driver functions */
++struct drm_connector_helper_funcs connector_helper_funcs = {
++	.get_modes = connector_get_modes,
++	.mode_valid = connector_mode_valid,
++	.best_encoder = connector_best_encoder,
++};
 +
-+static int
-+sii902x_probe(struct i2c_client *client, const struct i2c_device_id *id)
++static struct drm_encoder_funcs encoder_funcs = {
++	.reset = encoder_reset,
++	.destroy = encoder_destroy,
++};
++
++static struct drm_encoder_helper_funcs encoder_helper_funcs = {
++	.dpms = encoder_dpms,
++	/* .save unused in drm, only used in nouveau */
++	/* .restore unused in drm, only used in nouveau */
++	/* .detect unused in drm, only used in nouveau, radeon */
++	.mode_fixup = encoder_mode_fixup,
++	.prepare = encoder_prepare,
++	.commit = encoder_commit,
++	.mode_set = encoder_mode_set,
++	.disable = encoder_disable,
++};
++
++int drm_encoder_connector_init(struct drm_device *drm,
++		struct drm_encoder_connector *c)
 +{
-+	int dat, ret;
-+	struct sii902x_priv *priv;
-+	const char *drm_name = "imx-drm.0"; /* FIXME: pass from pdata */
-+	int encon_id = 0; /* FIXME: pass from pdata */
++	struct drm_connector *connector = &c->connector;
++	struct drm_encoder *encoder = &c->encoder;
 +
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv)
-+		return -ENOMEM;
++	drm_connector_helper_add(connector, &connector_helper_funcs);
++	drm_connector_init(drm, &c->connector,
++			   &connector_funcs, DRM_MODE_CONNECTOR_VGA);
 +
-+	priv->client = client;
++	drm_encoder_init(drm, encoder, &encoder_funcs, DRM_MODE_ENCODER_TMDS);
++	drm_encoder_helper_add(encoder, &encoder_helper_funcs);
 +
-+	/* Set 902x in hardware TPI mode on and jump out of D3 state */
-+	if (sii902x_write(client, 0xc7, 0x00) < 0) {
-+		dev_err(&client->dev, "SII902x: cound not find device\n");
-+		return -ENODEV;
-+	}
-+
-+	/* read device ID */
-+	dat = sii902x_read(client, 0x1b);
-+	if (dat != 0xb0) {
-+		dev_err(&client->dev, "not found. id is 0x%02x instead of 0xb0\n",
-+				dat);
-+		return -ENODEV;
-+	}
-+
-+	if (client->irq) {
-+		ret = request_threaded_irq(client->irq, NULL, sii902x_detect_handler,
-+				IRQF_TRIGGER_FALLING,
-+				"SII902x_det", priv);
-+		sii902x_write(client, 0x3c, 0x01);
-+	}
-+
-+	priv->encon.funcs = &sii902x_funcs;
-+
-+	i2c_set_clientdata(client, priv);
-+
-+	drm_encon_register(drm_name, encon_id, &priv->encon);
-+
-+	dev_info(&client->dev, "initialized\n");
++	drm_mode_connector_attach_encoder(connector, encoder);
++	drm_sysfs_connector_add(connector);
 +
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(drm_encoder_connector_init);
 +
-+static int sii902x_remove(struct i2c_client *client)
++void drm_encoder_connector_cleanup(struct drm_device *drm,
++		struct drm_encoder_connector *c)
 +{
-+	struct sii902x_priv *priv;
++	struct drm_connector *connector = &c->connector;
++	struct drm_encoder *encoder = &c->encoder;
++
++	drm_sysfs_connector_remove(connector);
++	drm_mode_connector_detach_encoder(connector, encoder);
++	drm_encoder_cleanup(encoder);
++	drm_connector_cleanup(connector);
++	c->inuse = 0;
++}
++EXPORT_SYMBOL_GPL(drm_encoder_connector_cleanup);
++
++static LIST_HEAD(encon_list);
++static DEFINE_MUTEX(encon_list_mutex);
++
++int drm_encon_register(const char *drm_name, int id,
++		struct drm_encoder_connector *encon)
++{
++	encon->drm_name = kstrdup(drm_name, GFP_KERNEL);
++	encon->id = id;
++
++	mutex_lock(&encon_list_mutex);
++	list_add_tail(&encon->list, &encon_list);
++	mutex_unlock(&encon_list_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(drm_encon_register);
++
++int drm_encon_unregister(struct drm_encoder_connector *encon)
++{
++	if (encon->inuse)
++		return -EBUSY;
++
++	kfree(encon->drm_name);
++
++	mutex_lock(&encon_list_mutex);
++	list_del(&encon->list);
++	mutex_unlock(&encon_list_mutex);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(drm_encon_unregister);
++
++struct drm_encoder_connector *drm_encon_get(struct drm_device *drm, int id)
++{
++	const char *drm_name = dev_name(drm->dev);
++	struct drm_encoder_connector *encon;
++
++	mutex_lock(&encon_list_mutex);
++	list_for_each_entry(encon, &encon_list, list) {
++		if (!strcmp(drm_name, encon->drm_name) && encon->id == id) {
++			if (encon->inuse)
++				goto out;
++			encon->inuse = 1;
++			mutex_unlock(&encon_list_mutex);
++			return encon;
++		}
++	}
++out:
++	mutex_unlock(&encon_list_mutex);
++
++	return NULL;
++}
++EXPORT_SYMBOL_GPL(drm_encon_get);
++
++static struct drm_encoder_connector_funcs dummy_funcs;
++
++/* TODO: allow to pass an array of fixed modes */
++struct drm_encoder_connector *drm_encon_add_dummy(const char *drm_name, int id)
++{
++	struct drm_encoder_connector *encon;
 +	int ret;
 +
-+	priv = i2c_get_clientdata(client);
++	encon = kzalloc(sizeof(*encon), GFP_KERNEL);
++	if (!encon)
++		return NULL;
 +
-+	ret = drm_encon_unregister(&priv->encon);
++	encon->funcs = &dummy_funcs;
++	ret = drm_encon_register(drm_name, id, encon);
++	if (ret) {
++		kfree(encon);
++		return NULL;
++	}
++
++	return encon;
++}
++EXPORT_SYMBOL_GPL(drm_encon_add_dummy);
++
++int drm_encon_remove_dummy(struct drm_encoder_connector *encon)
++{
++	int ret;
++
++	ret = drm_encon_unregister(encon);
 +	if (ret)
 +		return ret;
-+
-+	kfree(priv);
-+
++	kfree(encon);
 +	return 0;
 +}
++EXPORT_SYMBOL_GPL(drm_encon_remove_dummy);
+diff --git a/include/drm/drm_encon.h b/include/drm/drm_encon.h
+new file mode 100644
+index 0000000..f1d290b
+--- /dev/null
++++ b/include/drm/drm_encon.h
+@@ -0,0 +1,46 @@
++#ifndef __DRM_ENCON_H
++#define __DRM_ENCON_H
 +
-+static struct i2c_device_id sii902x_ids[] = {
-+	{ "sii9022", 0 },
-+	{ }
++struct drm_encoder_connector;
++
++struct drm_encoder_connector_funcs {
++	int (*get_modes)(struct drm_encoder_connector *encon);
++	int (*mode_valid)(struct drm_encoder_connector *encon,
++			struct drm_display_mode *mode);
++	void (*mode_set)(struct drm_encoder_connector *encon,
++			 struct drm_display_mode *mode,
++			 struct drm_display_mode *adjusted_mode);
++	void (*reset)(struct drm_encoder_connector *encon);
++	void (*dpms)(struct drm_encoder_connector *encon, int mode);
++	enum drm_connector_status (*detect)(struct drm_encoder_connector *encon);
++	void (*commit)(struct drm_encoder_connector *encon);
++	bool (*mode_fixup)(struct drm_encoder_connector *encon,
++			struct drm_display_mode *mode,
++			struct drm_display_mode *adjusted_mode);
++	void (*prepare)(struct drm_encoder_connector *encon);
++	int (*set_property)(struct drm_encoder_connector *encon,
++			struct drm_property *property, uint64_t val);
 +};
-+MODULE_DEVICE_TABLE(i2c, sii902x_ids);
 +
-+static struct i2c_driver sii902x_i2c_driver = {
-+	.probe = sii902x_probe,
-+	.remove = sii902x_remove,
-+	.driver = {
-+		.name = "sii902x",
-+	},
-+	.id_table = sii902x_ids,
++struct drm_encoder_connector {
++	struct drm_connector connector;
++	struct drm_encoder encoder;
++	struct drm_encoder_connector_funcs *funcs;
++	struct list_head list;
++	int id;
++	const char *drm_name;
++	int inuse;
 +};
 +
-+static int __init sii902x_init(void)
-+{
-+	return i2c_add_driver(&sii902x_i2c_driver);
-+}
++int drm_encoder_connector_init(struct drm_device *drm,
++		struct drm_encoder_connector *c);
++void drm_encoder_connector_cleanup(struct drm_device *drm,
++		struct drm_encoder_connector *c);
++int drm_encon_register(const char *drm_name, int id,
++		struct drm_encoder_connector *encon);
++int drm_encon_unregister(struct drm_encoder_connector *encon);
++struct drm_encoder_connector *drm_encon_get(struct drm_device *drm, int id);
++struct drm_encoder_connector *drm_encon_add_dummy(const char *drm_name, int id);
++int drm_encon_remove_dummy(struct drm_encoder_connector *encon);
 +
-+static void __exit sii902x_exit(void)
-+{
-+	i2c_del_driver(&sii902x_i2c_driver);
-+}
-+
-+MODULE_AUTHOR("Sascha Hauer <s.hauer@pengutronix.de>");
-+MODULE_DESCRIPTION("Silicon Image sii902x HDMI transmitter driver");
-+MODULE_LICENSE("GPL");
-+
-+module_init(sii902x_init);
-+module_exit(sii902x_exit);
++#endif /* __DRM_ENCON_H */
 -- 
 1.7.5.3
