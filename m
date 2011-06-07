@@ -1,111 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Jun 2011 14:22:20 +0100
-Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to
-	a physical address
-In-Reply-To: <alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
-References: <1307379898-14256-1-git-send-email-will.deacon@arm.com>
-	<1307379898-14256-5-git-send-email-will.deacon@arm.com>
-	<alpine.DEB.2.00.1106071126290.2247@localhost6.localdomain6>
-	<alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
-Message-ID: <20110607132220.GB12639@e102144-lin.cambridge.arm.com>
+From: ben-i2c@fluff.org (Ben Dooks)
+Date: Tue, 7 Jun 2011 14:41:51 +0100
+Subject: [PATCH v4 00/18] I2C: OMAP: I2C fixes, removal of cpu_is...
+	from driver
+In-Reply-To: <1306973984-15165-1-git-send-email-khilman@ti.com>
+References: <1306973984-15165-1-git-send-email-khilman@ti.com>
+Message-ID: <20110607134151.GE15795@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
-
-Thanks for looking at this.
-
-On Tue, Jun 07, 2011 at 12:37:23PM +0100, Frank Hofmann wrote:
-> >> +void arm_machine_reset(unsigned long reset_code_phys)
-> >> +{
-> >> +	unsigned long cpu_reset_end = PAGE_ALIGN((unsigned long)cpu_reset);
-> >> +	/* This is stricter than necessary but better to be safe than sorry. 
-> >> */
-> >> +	BUG_ON(virt_to_phys((void *)cpu_reset_end) >= TASK_SIZE);
-> >> +
-> >> +	/* Disable interrupts first */
-> >> +	local_irq_disable();
-> >> +	local_fiq_disable();
-> >> +
-> >> +	/*
-> >> +	 * Clean and invalidate L2.
-> >> +	 * This is racy, so we must be the last guy left.
-> >> +	 */
-> >> +	WARN_ON(num_online_cpus() > 1);
-> >> +	/* Flush while we still have locking available to us. */
-> >> +	outer_flush_all();
-> >> +	outer_disable();
-> >> +	/* Data destroyed here will only be speculative. */
-> >> +	outer_inv_all();
-> >> +
-> >> +	prepare_for_reboot(0);
-> >> +
-> >> +	/* Switch to the identity mapping. */
-> >> +	((typeof(cpu_reset) *)virt_to_phys((void *)cpu_reset))(reset_code_phys);
-> >
-> > void (*reset_func)(unsigned long) = virt_to_phys(cpu_reset)
+On Wed, Jun 01, 2011 at 05:19:26PM -0700, Kevin Hilman wrote:
+> Ben, 
 > 
-> Sorry, pressed wrong key ... posted too early.
+> Please pull in this series from Andy Green for the next merge window.
 
-No problem.
-
-> I meant to say this line is magic, why not decouple the declaration bit 
-> from the invocation so that at least the function call looks "normal" ?
-
-You mean you don't like the LISP-ish look of it?! I take your point, I'll rework
-that.
-
-> Regarding the use of local_irq/fiq_disable - is it safe to call these 
-> multiple times, i.e. is it safe to invoke the reset function from a 
-> context where IRQ/FIQ are already off ?
-
-Yes, they just mask at the CPSR level.
-
+I'll have a look through this set as soon as possible.
+ 
+> v4 is simply a rebase of Andy's v3 against v3.0-rc1 with some basic
+> sanity testing against with the latest kernel.
 > 
-> Another question regarding the MMU tables.
+> It's also available here for pulling:
 > 
-> prepare_for_reboot / setup_mm_for_reboot assume that current->mm is 
-> available _and_ lowmem / user area there can be blotted over.
+> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/i2c-andy
 > 
-> Wrt. to hibernation, that's a stretch unless some way is found to fully 
-> "fake a context". With that I mean to create a threadinfo and pagedir 
-> that's guaranteed to sit outside the target kernel heap.
+> Original cover letter from Andy below:
+> 
+> The following series removes cpu_...() usage completely from the
+> omap-i2c driver by having decisions about functional implementation
+> choices in the SoC held in cpu-specific hwmod tables that are
+> already established, or for OMAP1 where there is no hwmod, set at
+> OMAP1-specific i2c bus addition time.
+> 
+> Along the way it solves two issues with the existing implementation,
+> that only 16-bit accesses are documented to be allowed to the I2C
+> peripheral unit, and that due to a confusion in the existing driver
+> about whether it is faced with a newer IP version on OMAP3530, currently
+> it writes to a random non-existent I2C register at times on that
+> platform.
+> 
+> The patch series is quite extended from the first try thanks to
+> comments from Benoit Cousson.
+> 
+> This 3rd try is based on 2.6.38-rc8 as requested.
+> 
+> Andy Green (18):
+>   I2C: OMAP2+: Set hwmod flags to only allow 16-bit accesses to i2c
+>   I2C: OMAP2+: Name registers in I2C IP V2 only accordingly
+>   I2C: OMAP2+: Introduce I2C IP versioning constants
+>   I2C: OMAP2+: Tag all OMAP2+ hwmod defintions with I2C IP revision
+>   I2C: OMAP: add rev to omap i2c platform data
+>   I2C: OMAP1: set IP revision in platform data
+>   I2C: OMAP2+: Pass hwmod rev knowledge via platform_data when i2c bus
+>     added
+>   I2C: OMAP2+: use platform_data ip revision to select register map
+>   I2C: OMAP2+: Solve array bounds overflow error on i2c idle
+>   I2C: OMAP2+: address confused probed version naming
+>   I2C: OMAP2+: increase omap_i2c_dev_attr flags from u8 to u32
+>   I2C: OMAP1/OMAP2+: add flags field to omap i2c platform data
+>   I2C: OMAP2+: Pass flags up to omap i2c platform_data as well
+>   I2C: OMAP1/OMAP2+: create omap I2C functionality flags for each
+>     cpu_... test
+>   I2C: OMAP2+: add correct functionality flags to all omap2plus i2c
+>     dev_attr
+>   I2C: OMAP1: set i2c unit feature implementation flags in platform
+>     data
+>   I2C: OMAP2+: Convert omap I2C driver to use feature implementation
+>     flags from platform data
+>   I2C: OMAP1/OMAP2+: prepend I2C IP version to probed version shown in
+>     dev_info
+> 
+>  arch/arm/mach-omap2/omap_hwmod_2420_data.c |    8 ++-
+>  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    6 ++
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   13 ++++
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   18 ++++-
+>  arch/arm/plat-omap/i2c.c                   |   27 ++++++++
+>  arch/arm/plat-omap/include/plat/i2c.h      |    3 +-
+>  drivers/i2c/busses/i2c-omap.c              |  100 +++++++++++++++-------------
+>  include/linux/i2c-omap.h                   |   29 ++++++++
+>  8 files changed, 153 insertions(+), 51 deletions(-)
+> 
+> -- 
+> 1.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Ouch, ok.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-> Currently, the hibernation code switches to swapper_pg_dir and puts the 
-> 1:1 mappings in there; I'm starting to think that is safe if for no other 
-> reason than swapper_pg_dir having _nothing_ in the user area ?
-
-That sounds ok providing that, when you come out of hibernate, the 1:1 mapping
-doesn't persist in swapper_pg_dir.
-
-However, stepping back a bit here, there is a bigger problem to tackle. If the
-physical address of cpu_reset is bigger than TASK_SIZE, then we fail to map it
-using the current identity mapping code [that piggy backs on the current task].
-If PHYS_OFFSET > TASK_SIZE, this will *always* be the case and is probably quite
-common for a 2:2 split.
-
-I can think of two ways to get around this:
-
-(1) Use /another/ set of page tables for mapping the cpu_reset code only [and
-    nothing else]. This is tricky since it will need to be set extremely late-on
-    where we don't care about mapping in the rest of the kernel, data, stack etc.
-
-(2) Make the assumption that the physical address of cpu_reset will not conflict
-    with a virtual address that points at the kernel text via the linear mapping.
-    This is probably a reasonable thing to assume, given that the kernel lives
-    near the start of memory on most platforms. We could then take out the ID map
-    but leaving the kernel text alone. We'd probably have to change to a new stack,
-    which we could place immediately after the kernel text.
-
-What do you reckon?
-
-> Is it convention, design or accident that swapper_pg_dir doesn't map 
-> anything in the low range ?
-
-With the new switch_mm stuff, it's absolutely critical that we don't have
-user mappings in there during normal execution (going down for hibernate
-is probably ok since we'll clobber the caches and TLBs anyway).
-
-Will
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
