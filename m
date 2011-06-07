@@ -1,40 +1,56 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 7 Jun 2011 16:46:26 +0300
-Subject: [RFC 2/6] omap: iovmm: generic iommu api migration
-In-Reply-To: <201106071326.53106.laurent.pinchart@ideasonboard.com>
-References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-	<201106071105.16262.laurent.pinchart@ideasonboard.com>
-	<BANLkTi=nJXSEfWRXqwnHys1b5i5rgLcYpw@mail.gmail.com>
-	<201106071326.53106.laurent.pinchart@ideasonboard.com>
-Message-ID: <BANLkTimqt=yMGHcqEH5u-4GkMX9=+BuB6A@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Tue,  7 Jun 2011 22:00:53 +0800
+Subject: [PATCH 1/2] gpio/mxs: remove irq_high related implementation
+Message-ID: <1307455254-7604-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Laurent,
+The irq_high stuff was mistakenly copied from mxc gpio driver.
+The mxs gpio controller has only one irq line for each 32-pin
+gpio port.  The patch remove irq_high related codes.
 
-On Tue, Jun 7, 2011 at 2:26 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
->> Right now we have a BUG_ON if pa is unaligned, but that can be changed
->> if needed (do we want it to handle offsets ?).
->
-> At least for the OMAP3 ISP we need to, as video buffers don't necessarily
-> start on page boundaries.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/gpio/gpio-mxs.c |   18 ++++--------------
+ 1 files changed, 4 insertions(+), 14 deletions(-)
 
-Where do you take care of those potential offsets today ? Or do you
-simply ignore the offsets and map the entire page ?
-
-Seems like omap's iommu (mostly) rejects unaligned pa addresses, see:
-
-4abb761749abfb4ec403e4054f9dae2ee604e54f "omap iommu: Reject unaligned
-addresses at setting page table entry"
-
-(this doesn't seem to cover 4KB entries though, only large pages,
-sections and super sections)
-
-> A separate patch is indeed needed, yes. As you're already working on iommu it
-> might be simpler if you add it to your tree.
-
-Sure, i'll send it.
-
-Thanks,
-Ohad.
+diff --git a/drivers/gpio/gpio-mxs.c b/drivers/gpio/gpio-mxs.c
+index 9d2dba7..ddde0f4 100644
+--- a/drivers/gpio/gpio-mxs.c
++++ b/drivers/gpio/gpio-mxs.c
+@@ -53,7 +53,6 @@ struct mxs_gpio_port {
+ 	void __iomem *base;
+ 	int id;
+ 	int irq;
+-	int irq_high;
+ 	int virtual_irq_start;
+ 	struct bgpio_chip bgc;
+ };
+@@ -174,21 +173,12 @@ static void mxs_gpio_irq_handler(u32 irq, struct irq_desc *desc)
+  */
+ static int mxs_gpio_set_wake_irq(struct irq_data *d, unsigned int enable)
+ {
+-	u32 gpio = irq_to_gpio(d->irq);
+-	u32 gpio_idx = gpio & 0x1f;
+ 	struct mxs_gpio_port *port = irq_data_get_irq_chip_data(d);
+ 
+-	if (enable) {
+-		if (port->irq_high && (gpio_idx >= 16))
+-			enable_irq_wake(port->irq_high);
+-		else
+-			enable_irq_wake(port->irq);
+-	} else {
+-		if (port->irq_high && (gpio_idx >= 16))
+-			disable_irq_wake(port->irq_high);
+-		else
+-			disable_irq_wake(port->irq);
+-	}
++	if (enable)
++		enable_irq_wake(port->irq);
++	else
++		disable_irq_wake(port->irq);
+ 
+ 	return 0;
+ }
+-- 
+1.7.4.1
