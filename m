@@ -1,39 +1,45 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 8 Jun 2011 00:59:40 +0200 (CEST)
-Subject: TI-Davinci 6446 oops on interrupts
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D383CDB@dbde02.ent.ti.com>
-References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
-	<alpine.LFD.2.02.1106061650210.13964@ionos>
-	<4DECEDF9.4010202@selfish.org>
-	<alpine.LFD.2.02.1106061719290.13964@ionos>
-	<4DECF32B.6000508@selfish.org>
-	<alpine.LFD.2.02.1106062330380.13964@ionos>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D383CDB@dbde02.ent.ti.com>
-Message-ID: <alpine.LFD.2.02.1106080058580.11814@ionos>
+From: prakity@marvell.com (Philip Rakity)
+Date: Tue, 7 Jun 2011 16:51:07 -0700
+Subject: [PATCH v2 1/3] mmc: support sdhci-mmp2
+In-Reply-To: <BANLkTi=S=Q+AdKECCHg2u6X=VWEOtEox_w@mail.gmail.com>
+References: <1306315367-15602-1-git-send-email-zhangfei.gao@marvell.com>
+	<201105271746.04775.arnd@arndb.de>
+	<BANLkTi=S=Q+AdKECCHg2u6X=VWEOtEox_w@mail.gmail.com>
+Message-ID: <86F2B225-A55D-41D9-B805-41C639C1882C@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Jun 2011, Nori, Sekhar wrote:
 
-> Hi Thomas,
-> 
-> On Tue, Jun 07, 2011 at 03:01:31, Thomas Gleixner wrote:
-> 
-> > > > Subject: arm: davinci: Fix fallout from generic irq chip conversion
-> > > > From: Thomas Gleixner <tglx@linutronix.de>
-> > > > Date: Mon, 06 Jun 2011 11:51:43 +0200
-> > > > 
-> > > > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-> > > 
-> > > Tested-by: Holger Hans Peter Freyther <holger@freyther.de>
-> > 
-> > can you please pick that up? It should have a Cc: stable at kernel.org
-> > tag as well.
-> 
-> But generic IRQ chip support for DaVinci was merged only in
-> v3.0-rc1.
-> 
-> $ git log --tags --source --oneline arch/arm/mach-davinci/irq.c
-> aac4dd1 v3.0-rc1 arm: davinci: Use generic irq chip
+On May 29, 2011, at 10:42 PM, zhangfei gao wrote:
 
-Of course. Stupid me !
+>> 
+>> There is a little room for simplification, I think:
+>> 
+>>> +static unsigned int mmp2_get_ro(struct sdhci_host *host)
+>>> +{
+>>> +     /* Micro SD does not support write-protect feature */
+>>> +     return 0;
+>>> +}
+>> 
+>> You shouldn't need to provide an empty get_ro function, the
+>> default is that there is no write-protect.
+> 
+> Thanks Arnd for review.
+> The reason to put get_ro here is some board use micro sd, while some
+> board design is general sd card.
+> The micro sd do not use write-protect, while SDHCI_WRITE_PROTECT will
+> return 1 in our controller, so it shows read only.
+> So add one call back for the board with micro sd card via flag.
+
+
+
+The code sets get_ro is for all the controllers.   Some board designs may connect the WP signal.
+
+The host->ops field should be filled in using information in the board
+file using a flag such as the example with  PXA_FLAG_CARD_PERMANENT.
+
+eg
+
+	if (pdata && pdata->flags & PXA_FLAG_NO_WP) {
+		***** etc ****
+	}
