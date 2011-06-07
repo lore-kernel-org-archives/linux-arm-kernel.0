@@ -1,51 +1,94 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 07 Jun 2011 11:54:47 -0500
-Subject: [PATCH 3/3] ARM: l2x0: Add OF based initialization
-In-Reply-To: <BANLkTi=7rHjKV=+hNKzEHvZMeDPwknOWtg@mail.gmail.com>
-References: <1307456541-11026-1-git-send-email-robherring2@gmail.com>	<1307456541-11026-4-git-send-email-robherring2@gmail.com>
-	<BANLkTi=7rHjKV=+hNKzEHvZMeDPwknOWtg@mail.gmail.com>
-Message-ID: <4DEE57D7.1030704@gmail.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 7 Jun 2011 11:10:30 -0600
+Subject: [PATCH] ARM: EXYNOS4: Fix incorrect mapping of gpio pull-up
+	macro to register setting
+In-Reply-To: <BANLkTi=YeOyK1WX61NtyprYdUyNmSo1sTw@mail.gmail.com>
+References: <1307435689-15954-1-git-send-email-thomas.ab@samsung.com>
+	<BANLkTi=YeOyK1WX61NtyprYdUyNmSo1sTw@mail.gmail.com>
+Message-ID: <20110607171030.GE17754@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Olof,
+On Tue, Jun 07, 2011 at 05:42:47PM +0900, Kyungmin Park wrote:
+> On Tue, Jun 7, 2011 at 5:34 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
+> > The S3C_GPIO_PULL_UP macro value incorrectly maps to a reserved setting of GPIO
+> > pull up/down registers on Exynos4 platform. Fix this incorrect mapping by adding
+> > wrappers to the s3c_gpio_setpull_updown and s3c_gpio_getpull_updown functions.
+> 
+> Personally I like to use the variable instead of function hooking.
+> set the correct variable at cpu dection and use it
+> then these thing make a single generic function and each gpio_cfg use
+> the same thing.
+> 
+> Anyway it's next step. current fix the bug first.
+> 
+> Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
 
-On 06/07/2011 11:20 AM, Olof Johansson wrote:
-> On Tue, Jun 7, 2011 at 7:22 AM, Rob Herring<robherring2@gmail.com>  wrote:
->
->> +- aux-value : Value to set the Auxillary Control register to. Setting masked
->> +  bits is undefined. Default value is 0.
->> +- aux-mask : Mask of bits to preserve in the Auxillary Control register.
->> +  Default value is 0xffffffff.
->
-> The device tree should describe the hardware, not the way the linux
-> kernel drives the hardware. In the case of the AUX register, it's
-> mostly a collection of options that are either turned on or off. I
-> don't think they should necessarily be described as an opaque 32-bit
-> word, but instead as separate attributes.
+Applied, thanks.
 
-Unfortunately, the meaning of the bits depends on the model and there 
-doesn't seem to be any commonality or subset of options as to what each 
-platform is setting up.
+g.
 
->
-> At least the geometry should be specified that way.
-
-That's probably the only part that doesn't get changed. :)
-
->
-> For feature enable bits, it depends on what features should be enabled
-> and from the kernel side. I'm not sure that belongs in the device tree
-> at all.
-
-I don't think it can be decided what the kernel needs to setup by the 
-device tree. The main reason it's needed in the kernel at all is 
-probably because the bootloader didn't setup aux_ctrl or set it up 
-incorrectly.
-
-Perhaps the magic values should just be left in the platforms and 
-continue to be passed into the OF init function:
-
-l2x0_of_init(__u32 aux_val, __u32 aux_mask);
-
-Rob
+> 
+> >
+> > Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
+> > ---
+> > ?drivers/gpio/gpio-exynos4.c | ? 29 +++++++++++++++++++++++++----
+> > ?1 files changed, 25 insertions(+), 4 deletions(-)
+> >
+> > diff --git a/drivers/gpio/gpio-exynos4.c b/drivers/gpio/gpio-exynos4.c
+> > index d54ca6a..9029835 100644
+> > --- a/drivers/gpio/gpio-exynos4.c
+> > +++ b/drivers/gpio/gpio-exynos4.c
+> > @@ -21,16 +21,37 @@
+> > ?#include <plat/gpio-cfg.h>
+> > ?#include <plat/gpio-cfg-helpers.h>
+> >
+> > +int s3c_gpio_setpull_exynos4(struct s3c_gpio_chip *chip,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int off, s3c_gpio_pull_t pull)
+> > +{
+> > + ? ? ? if (pull == S3C_GPIO_PULL_UP)
+> > + ? ? ? ? ? ? ? pull = 3;
+> > +
+> > + ? ? ? return s3c_gpio_setpull_updown(chip, off, pull);
+> > +}
+> static?
+> > +
+> > +s3c_gpio_pull_t s3c_gpio_getpull_exynos4(struct s3c_gpio_chip *chip,
+> > + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int off)
+> > +{
+> > + ? ? ? s3c_gpio_pull_t pull;
+> > +
+> > + ? ? ? pull = s3c_gpio_getpull_updown(chip, off);
+> > + ? ? ? if (pull == 3)
+> > + ? ? ? ? ? ? ? pull = S3C_GPIO_PULL_UP;
+> > +
+> > + ? ? ? return pull;
+> > +}
+> ditto.
+> > +
+> > ?static struct s3c_gpio_cfg gpio_cfg = {
+> > ? ? ? ?.set_config ? ? = s3c_gpio_setcfg_s3c64xx_4bit,
+> > - ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_updown,
+> > - ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_updown,
+> > + ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_exynos4,
+> > + ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_exynos4,
+> > ?};
+> >
+> > ?static struct s3c_gpio_cfg gpio_cfg_noint = {
+> > ? ? ? ?.set_config ? ? = s3c_gpio_setcfg_s3c64xx_4bit,
+> > - ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_updown,
+> > - ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_updown,
+> > + ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_exynos4,
+> > + ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_exynos4,
+> > ?};
+> >
+> > ?/*
+> > --
+> > 1.6.6.rc2
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
