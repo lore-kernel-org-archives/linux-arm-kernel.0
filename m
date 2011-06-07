@@ -1,10 +1,10 @@
 From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 7 Jun 2011 11:05:15 +0200
-Subject: [RFC 2/6] omap: iovmm: generic iommu api migration
-In-Reply-To: <1307053663-24572-3-git-send-email-ohad@wizery.com>
+Date: Tue, 7 Jun 2011 11:22:47 +0200
+Subject: [RFC 1/6] omap: iommu: generic iommu api migration
+In-Reply-To: <1307053663-24572-2-git-send-email-ohad@wizery.com>
 References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-	<1307053663-24572-3-git-send-email-ohad@wizery.com>
-Message-ID: <201106071105.16262.laurent.pinchart@ideasonboard.com>
+	<1307053663-24572-2-git-send-email-ohad@wizery.com>
+Message-ID: <201106071122.47804.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,83 +12,112 @@ Hi Ohad,
 
 Thanks for the patch.
 
-On Friday 03 June 2011 00:27:39 Ohad Ben-Cohen wrote:
-> Migrate omap's iovmm (virtual memory manager) to the generic iommu api.
+On Friday 03 June 2011 00:27:38 Ohad Ben-Cohen wrote:
+> Migrate OMAP's iommu to the generic iommu api, so users can stay
+> generic, and non-omap-specific code can be removed and eventually
+> consolidated into a generic framework.
 > 
-> This brings iovmm a step forward towards being completely non
-> omap-specific (it's still assuming omap's iommu page sizes, and also
-> maintaining state inside omap's internal iommu structure, but it no
-> longer calls omap-specific iommu map/unmap api).
-> 
-> Further generalizing of iovmm (or complete removal) should take place
-> together with broader plans of providing a generic virtual memory manager
-> and allocation framework (de-coupled from specific mappers).
+> Tested on both OMAP3 and OMAP4.
 > 
 > Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 
 [snip]
 
-> diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-> index 51ef43e..80bb2b6 100644
-> --- a/arch/arm/plat-omap/iovmm.c
-> +++ b/arch/arm/plat-omap/iovmm.c
+> diff --git a/arch/arm/plat-omap/iommu.c b/arch/arm/plat-omap/iommu.c
+> index 34fc31e..f06e99c 100644
+> --- a/arch/arm/plat-omap/iommu.c
+> +++ b/arch/arm/plat-omap/iommu.c
 
 [snip]
 
-> @@ -473,22 +475,22 @@ static int map_iovm_area(struct iommu *obj, struct
-> iovm_struct *new, u32 pa;
->  		int pgsz;
->  		size_t bytes;
-> -		struct iotlb_entry e;
-> 
->  		pa = sg_phys(sg);
->  		bytes = sg_dma_len(sg);
-> 
->  		flags &= ~IOVMF_PGSZ_MASK;
+> +static int omap_iommu_domain_init(struct iommu_domain *domain)
+> +{
+> +	struct omap_iommu_domain *omap_domain;
 > +
->  		pgsz = bytes_to_iopgsz(bytes);
->  		if (pgsz < 0)
->  			goto err_out;
-> -		flags |= pgsz;
+> +	omap_domain = kzalloc(sizeof(*omap_domain), GFP_KERNEL);
+> +	if (!omap_domain) {
+> +		pr_err("kzalloc failed\n");
+> +		goto fail_nomem;
+> +	}
+> +
+> +	omap_domain->pgtable = (u32 *)__get_free_pages(GFP_KERNEL,
+> +					get_order(IOPGD_TABLE_SIZE));
+> +	if (!omap_domain->pgtable) {
+> +		pr_err("__get_free_pages failed\n");
+> +		goto fail_nomem;
+> +	}
+> +
+> +	BUG_ON(!IS_ALIGNED((long)omap_domain->pgtable, IOPGD_TABLE_SIZE));
 
-pgsz isn't used anymore, you can remove it.
+Either __get_free_pages() guarantees that the allocated memory will be aligned 
+on an IOPGD_TABLE_SIZE boundary, in which case the BUG_ON() is unnecessary, or 
+doesn't offer such guarantee, in which case the BUG_ON() will oops randomly. 
+In both cases BUG_ON() should probably be avoided.
+
+> +	memset(omap_domain->pgtable, 0, IOPGD_TABLE_SIZE);
+> +	clean_dcache_area(omap_domain->pgtable, IOPGD_TABLE_SIZE);
+> +	mutex_init(&omap_domain->lock);
+> +
+> +	domain->priv = omap_domain;
+> +
+> +	return 0;
+> +
+> +fail_nomem:
+> +	kfree(omap_domain);
+> +	return -ENOMEM;
+> +}
+> +
+> +/* assume device was already detached */
+> +static void omap_iommu_domain_destroy(struct iommu_domain *domain)
+> +{
+> +	struct omap_iommu_domain *omap_domain = domain->priv;
+> +
+> +	domain->priv = NULL;
+> +
+> +	kfree(omap_domain);
+
+This leaks omap_domain->pgtable.
+
+The free_pages() call in omap_iommu_remove() should be removed, as 
+omap_iommu_probe() doesn't allocate the pages table anymore. You can also 
+remove the the struct iommu::iopgd field.
+
+> +}
+
 
 > +
-> +		order = get_order(bytes);
+> +static phys_addr_t omap_iommu_iova_to_phys(struct iommu_domain *domain,
+> +					  unsigned long da)
+> +{
+> +	struct omap_iommu_domain *omap_domain = domain->priv;
+> +	struct iommu *oiommu = omap_domain->iommu_dev;
+> +	struct device *dev = oiommu->dev;
+> +	u32 *pgd, *pte;
+> +	phys_addr_t ret = 0;
+> +
+> +	iopgtable_lookup_entry(oiommu, da, &pgd, &pte);
+> +
+> +	if (pte) {
+> +		if (iopte_is_small(*pte))
+> +			ret = omap_iommu_translate(*pte, da, IOPTE_MASK);
+> +		else if (iopte_is_large(*pte))
+> +			ret = omap_iommu_translate(*pte, da, IOLARGE_MASK);
+> +		else
+> +			dev_err(dev, "bogus pte 0x%x", *pte);
+> +	} else {
+> +		if (iopgd_is_section(*pgd))
+> +			ret = omap_iommu_translate(*pgd, da, IOSECTION_MASK);
+> +		else if (iopgd_is_super(*pgd))
+> +			ret = omap_iommu_translate(*pgd, da, IOSUPER_MASK);
+> +		else
+> +			dev_err(dev, "bogus pgd 0x%x", *pgd);
+> +	}
+> +
+> +	return ret;
 
-Does iommu_map() handle offsets correctly, or does it expect pa to be aligned 
-to an order (or other) boundary ? Same comment for iommu_unmap() in 
-unmap_iovm_area().
+You return 0 in the bogus pte/pgd cases. Is that intentional ?
 
->  		pr_debug("%s: [%d] %08x %08x(%x)\n", __func__,
->  			 i, da, pa, bytes);
-> 
-> -		iotlb_init_entry(&e, da, pa, flags);
-> -		err = iopgtable_store_entry(obj, &e);
-> +		err = iommu_map(domain, da, pa, order, flags);
->  		if (err)
->  			goto err_out;
-> 
-> @@ -502,9 +504,11 @@ err_out:
->  	for_each_sg(sgt->sgl, sg, i, j) {
->  		size_t bytes;
-> 
-> -		bytes = iopgtable_clear_entry(obj, da);
-> +		bytes = sg_dma_len(sg);
-
-As Russell pointed out, we should use sg->length instead of sg_dma_length(sg). 
-sg_dma_length(sg) is only valid after the scatter list has been DMA-mapped, 
-which doesn't happen in the iovmm driver. This applies to all sg_dma_len(sg) 
-calls.
-
-> +		order = get_order(bytes);
-> 
-> -		BUG_ON(!iopgsz_ok(bytes));
-> +		/* ignore failures.. we're already handling one */
-> +		iommu_unmap(domain, da, order);
-> 
->  		da += bytes;
->  	}
+> +}
 
 -- 
 Regards,
