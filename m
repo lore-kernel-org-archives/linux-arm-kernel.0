@@ -1,43 +1,42 @@
-From: davej@redhat.com (Dave Jones)
-Date: Mon, 6 Jun 2011 20:59:12 -0400
-Subject: [PATCH 1/5] CPUFREQ/S3C64xx: Move S3C64xx CPUfreq driver into
-	drivers/cpufreq
-In-Reply-To: <20110601164510.GA21467@redhat.com>
-References: <20110601094313.GA23122@opensource.wolfsonmicro.com>
-	<1306921493-30911-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<BANLkTinR_WLjsgm5ogt_BbJwPFC0Kc1Dqg@mail.gmail.com>
-	<20110601095811.GB13591@opensource.wolfsonmicro.com>
-	<20110601164510.GA21467@redhat.com>
-Message-ID: <20110607005912.GB20918@redhat.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 6 Jun 2011 19:06:36 -0600
+Subject: [PATCH v2 1/2] ARM: omap4: gpio: fix setting IRQWAKEN bits
+In-Reply-To: <87boyav99n.fsf@ti.com>
+References: <1307392698-21170-1-git-send-email-ccross@android.com>
+	<87boyav99n.fsf@ti.com>
+Message-ID: <BANLkTik-UK9EPsnUkQeih+Zf_9py-X2Q0A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 12:45:10PM -0400, Dave Jones wrote:
- > On Wed, Jun 01, 2011 at 10:58:11AM +0100, Mark Brown wrote:
- >  > On Wed, Jun 01, 2011 at 06:55:05PM +0900, Kyungmin Park wrote:
- >  > 
- >  > > Instead of samsung tree, it should be handled at cpufreq tree.
- >  > > CCed the cpufreq maintainer.
- >  > 
- >  > Well, it's a something for both really as both trees are updated.  I
- >  > sent the orginal copy of this patch to both places but both sets of
- >  > maintainers just ignored it (I've never seen any response from the
- >  > cpufreq maintainers on this driver ever since I originally submitted
- >  > it).  
- > 
- > Sorry about that. It's actually in my 'to merge' mailbox, but I've been
- > laggy at dealing with it recently.  I'll try and clear the backlog in
- > the next day or two.
+On Mon, Jun 6, 2011 at 5:18 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Hi Colin,
+>
+> Colin Cross <ccross@android.com> writes:
+>
+>> Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
+>> causing only the last bit set to take effect, resulting in lost
+>> wakeups when the GPIO controller is in idle.
+>>
+>> Replace direct writes to IRQWAKEN with MOD_REG_BIT calls to
+>> perform a read-modify-write on the register.
+>>
+>> Signed-off-by: Colin Cross <ccross@android.com>
+>
+> Thanks, I'll queue these both for Grant for the 3.0-rc fixes along with
+> another GPIO fix for a section mismatch I have queued.
+>
+> Minor: now that this driver has moved to drivers, I changed the subject
+> prefixes slightly. ?They now read:
+>
+> GPIO: OMAP: fix setting IRQWAKEN bits for OMAP4
+> GPIO: OMAP: add locking around calls to _set_gpio_triggering
 
-Ok, I finally got around to sorting this out. It needed some small changes
-to fix up rejects in drivers/cpufreq/Makefile, but they looked trivial enough
-that I'm sure they're ok. But look them over anyway ?
+If you're collecting fixes for Linus anyway, go ahead and add my a-b
+line and include these two to send on to Linus
 
-I also applied the S5PV210/EXYNOS4210 patch which also needed the same fixing.
-Both pushed out to cpufreq.next
+Acked-by: Grant Likely <grant.likely@secretlab.ca>
 
-Let me know if there's anything I've missed
+Or, if they are only gpio fixes, then I'd also be happy to get a git
+pull req for the changes.  :-)
 
-thanks,
-
-	Dave
+g.
