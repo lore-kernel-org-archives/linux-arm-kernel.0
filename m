@@ -1,36 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 7 Jun 2011 08:46:53 +0200
-Subject: [GIT PULL] i.MX patches for -rc
-Message-ID: <20110607064653.GI23771@pengutronix.de>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 7 Jun 2011 08:49:48 +0200
+Subject: [PATCH v2 1/2] sdio: add quirk to handle pending IRQ in case of
+	none CCCR_INTx bits
+In-Reply-To: <4DE6B0E8.9050306@boundarydevices.com>
+References: <1306918113-23872-1-git-send-email-per.forlin@stericsson.com>
+	<1306918113-23872-2-git-send-email-per.forlin@stericsson.com>
+	<4DE6B0E8.9050306@boundarydevices.com>
+Message-ID: <BANLkTi=Dmntzb=4BBptwqZ5WfBMQYbaTGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 1 June 2011 23:36, Troy Kisky <troy.kisky@boundarydevices.com> wrote:
+> On 6/1/2011 1:48 AM, Per Forlin wrote:
+>> From: Per Forlin <per.forlin@linaro.org>
+>
+>> diff --git a/include/linux/mmc/card.h b/include/linux/mmc/card.h
+>> index 7b4fd7b..852021c 100644
+>> --- a/include/linux/mmc/card.h
+>> +++ b/include/linux/mmc/card.h
+>> @@ -175,6 +175,7 @@ struct mmc_card {
+>> ?#define MMC_QUIRK_DISABLE_CD (1<<5) ? ? ? ? ?/* disconnect CD/DAT[3] resistor */
+>> ?#define MMC_QUIRK_INAND_CMD38 ? ? ? ?(1<<6) ? ? ? ? ?/* iNAND devices have broken CMD38 */
+>> ?#define MMC_QUIRK_BLK_NO_CMD23 ? ? ? (1<<7) ? ? ? ? ?/* Avoid CMD23 for regular multiblock */
+>> +#define MMC_QUIRK_SDIO_IRQ_CCCR_INTX_0 (1<<7) ? ? ? ?/* SDIO card has IRQ even if CCCR_INTx is 0 */
+>
+> Using the same value as MMC_QUIRK_BLK_NO_CMD23 looks odd...
+>
+Thanks for your observation.
+Typo, it should be (1 << 8)
+I'll update the patch but I don't plan post a new version yet. The
+root cause issue in the libertas is resolved. If the fix turns out to
+be needed later on I resend it.
 
-Hi Russell,
-
-Please pull the following two small i.MX fixes.
-
-Sascha
-
-
-The following changes since commit 55922c9d1b84b89cb946c777fddccb3247e7df2c:
-
-  Linux 3.0-rc1 (2011-05-29 17:43:36 -0700)
-
-are available in the git repository at:
-  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
-
-Fabio Estevam (1):
-      ARM: mx51/sdma: Check the chip revision in run-time
-
-Wolfram Sang (1):
-      arm: mxs: include asm/processor.h for cpu_relax()
-
- arch/arm/mach-mxs/ocotp.c                    |    2 ++
- arch/arm/plat-mxc/devices/platform-imx-dma.c |    6 ++++--
- 2 files changed, 6 insertions(+), 2 deletions(-)
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Thanks,
+Per
