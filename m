@@ -1,26 +1,49 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 7 Jun 2011 12:45:36 -0300
-Subject: [PATCH 1/5] DRM: add i.MX IPUv3 base driver
-In-Reply-To: <1307443550-25549-2-git-send-email-s.hauer@pengutronix.de>
-References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
-	<1307443550-25549-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <BANLkTinLWq+ONvkKgRm4xucRgA3xTemn1A@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Tue, 07 Jun 2011 09:04:09 -0700
+Subject: [PATCH v2 1/2] ARM: omap4: gpio: fix setting IRQWAKEN bits
+In-Reply-To: <BANLkTik-UK9EPsnUkQeih+Zf_9py-X2Q0A@mail.gmail.com> (Grant
+	Likely's message of "Mon, 6 Jun 2011 19:06:36 -0600")
+References: <1307392698-21170-1-git-send-email-ccross@android.com>
+	<87boyav99n.fsf@ti.com>
+	<BANLkTik-UK9EPsnUkQeih+Zf_9py-X2Q0A@mail.gmail.com>
+Message-ID: <87hb81r5l2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-On Tue, Jun 7, 2011 at 7:45 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-...
-> +static int __init imx_ipu_init(void)
-> +{
-> + ? ? ? int32_t ret;
-> +
-> + ? ? ? ret = platform_driver_register(&imx_ipu_driver);
-> + ? ? ? return 0;
+> On Mon, Jun 6, 2011 at 5:18 PM, Kevin Hilman <khilman@ti.com> wrote:
+>> Hi Colin,
+>>
+>> Colin Cross <ccross@android.com> writes:
+>>
+>>> Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
+>>> causing only the last bit set to take effect, resulting in lost
+>>> wakeups when the GPIO controller is in idle.
+>>>
+>>> Replace direct writes to IRQWAKEN with MOD_REG_BIT calls to
+>>> perform a read-modify-write on the register.
+>>>
+>>> Signed-off-by: Colin Cross <ccross@android.com>
+>>
+>> Thanks, I'll queue these both for Grant for the 3.0-rc fixes along with
+>> another GPIO fix for a section mismatch I have queued.
+>>
+>> Minor: now that this driver has moved to drivers, I changed the subject
+>> prefixes slightly. ?They now read:
+>>
+>> GPIO: OMAP: fix setting IRQWAKEN bits for OMAP4
+>> GPIO: OMAP: add locking around calls to _set_gpio_triggering
+>
+> If you're collecting fixes for Linus anyway, go ahead and add my a-b
+> line and include these two to send on to Linus
+>
+> Acked-by: Grant Likely <grant.likely@secretlab.ca>
+>
+> Or, if they are only gpio fixes, then I'd also be happy to get a git
+> pull req for the changes.  :-)
+>
 
-Did you intend to return ret here instead?
+I have a GPIO-only queue, so I'll have a pull req for you today.
 
-Regards,
-
-Fabio Estevam
+Kevin
