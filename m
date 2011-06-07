@@ -1,37 +1,56 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 7 Jun 2011 11:58:29 +0200
-Subject: [RFC 0/6] iommu: generic api migration and grouping
-In-Reply-To: <BANLkTimR3KofKA3LSKXdX8k1FGR0XUxu=Q@mail.gmail.com>
-References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-	<20110606100950.GC30762@amd.com>
-	<BANLkTi=i2s-Ujiy4qn_XQv+9dMjUC9R66A@mail.gmail.com>
-	<20110606153557.GE1953@amd.com>
-	<BANLkTinwwVO4TmsxuTfSBf6jqYrEVV3b_A@mail.gmail.com>
-	<20110606192030.GA4356@amd.com>
-	<BANLkTinx21-E3DRe9D7LRB8e1aeOwv=-9A@mail.gmail.com>
-	<20110607075221.GB4407@amd.com>
-	<BANLkTimR3KofKA3LSKXdX8k1FGR0XUxu=Q@mail.gmail.com>
-Message-ID: <20110607095829.GD4407@amd.com>
+From: viresh.kumar@st.com (viresh kumar)
+Date: Tue, 7 Jun 2011 15:40:17 +0530
+Subject: [PATCH V2 1/3] drivers/pwm st_pwm: Add support for ST's Pulse
+	Width Modulator
+In-Reply-To: <201106070928.53761.arnd@arndb.de>
+References: <cover.1306831238.git.viresh.kumar@st.com>
+	<20110606173339.268b9f9c.akpm@linux-foundation.org>
+	<4DEDA12D.6080406@st.com> <201106070928.53761.arnd@arndb.de>
+Message-ID: <4DEDF909.2000608@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2011 at 05:22:11AM -0400, Ohad Ben-Cohen wrote:
-> On Tue, Jun 7, 2011 at 10:52 AM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> > Yup. Btw, is there any IOMMU hardware which supports non-natural
-> > alignment? In this case we need to expose these requirements somehow.
+On 06/07/2011 12:58 PM, Arnd Bergmann wrote:
+> On Tuesday 07 June 2011 05:55:25 viresh kumar wrote:
+>>>> +static int __devinit st_pwm_probe(struct platform_device *pdev)
+>>>
+>>> And here things get rather odd.
+>>>
+>>> Most of this file is a generic, non-device specific PWM layer, exported
+>>> to other modules.  But then we get into driver bits which are specific
+>>> to one paritular type of device.  Confused - this is like putting the
+>>> e100 driver inside net/ipv4/tcp.c?
+>>>
+>>
+>> Sorry but i couldn't get this one completely. :(
+>> Driver is specific to pwm peripheral by ST. This driver can be used for
+>> SPEAr or may be other SoC or Devices, and is not at all dependent on SPEAr.
 > 
-> Not sure there are. Let's start with natural alignment, and extend it
-> only if someone with additional requirements shows up.
+> 
 
-Btw, mind to split out your changes which move the iommu-api into
-drivers/iommu? I can merge them meanwhile into my iommu tree and start
-working on a proposal for the generic large page-size support.
+Now i get the question correctly. :)
 
-	Joerg
+> It was my suggestion to start drivers/pwm/ with this driver. We currently
+> have a number of pwm drivers spread over the entire tree, all using slight
+> the same interface header. They all look like this one, and are each used
+> on one SOC, so you have to choose at compile-time which one to use.
+> 
+> There are two problems with this of course:
+> 1. the drivers that export the same interface should be in one directory
+> 2. there should be a common abstraction layer to avoid duplicate code and
+>    enable building a kernel with multiple PWM drivers builtin.
+> 
+> Moving this driver to drivers/pwm is the first step to address the
+> problem 1, we will move the other drivers in the 3.1 or 3.2 timeframe.
+> 
+> There is independent by Sascha Hauer to work on the abstraction layer
+> for all the drivers. Once that is in, we will change the individual drivers
+> in drivers/pwm accordingly.
+> 
+
+Above was exactly the reason why i didn't separated framework from device
+specific part. As soon as framework is pushed, i will update my driver to
+work with it.
 
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+viresh
