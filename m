@@ -1,39 +1,29 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Tue, 7 Jun 2011 20:27:07 +0800
-Subject: [PATCH 1/2] MTD: pxa3xx_nand: fix nand detection issue
-In-Reply-To: <1307445395.11104.78.camel@localhost>
-References: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
-	<1307445395.11104.78.camel@localhost>
-Message-ID: <BANLkTin7yd3YL9sPAV+4YfDzQqSe5=NBFA@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 7 Jun 2011 15:27:55 +0300
+Subject: [RFC 1/6] omap: iommu: generic iommu api migration
+In-Reply-To: <201106071340.15199.laurent.pinchart@ideasonboard.com>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+	<201106071122.47804.laurent.pinchart@ideasonboard.com>
+	<BANLkTineGVvmph=Om2FGR_+mkiMW6k7UAw@mail.gmail.com>
+	<201106071340.15199.laurent.pinchart@ideasonboard.com>
+Message-ID: <BANLkTikGvCDhOev02=n3H1pQvF69fn1uuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
+On Tue, Jun 7, 2011 at 2:40 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> My point is that if the allocator guarantees the alignment (not as a side
+> effect of the implementation, but per its API) there's no need to check it
+> again. As the alignement is required, we need an allocator that guarantees it
+> anyway.
 
-On Tue, Jun 7, 2011 at 7:16 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Tue, 2011-06-07 at 03:01 -0700, Lei Wen wrote:
->> When keep_config is set, the detection would goes different routine.
->> That the driver would read out the setting which is set previously
->> by bootloader. While most bootloader keep the irq mask as off, and
->> current driver need all irq default open, keep_config behavior would
->> lead to no irq at all.
->>
->> Signed-off-by: Lei Wen <leiwen@marvell.com>
->> Tested-by: Daniel Mack <zonque@gmail.com>
->> Cc: stable at kernel.org
->
-> When the regression was introduced? Commit id?
+I understand, but I'd still prefer to have an explicit check that the
+hardware alignment requirement is met.
 
-This regression should be introduced by below commit:
+There's no cost in doing that (it's a cold path), and even if it would
+only fail once and with an extremely broken kernel - it's worth it.
+Will save huge amount of debugging pain (think of the poor guy that
+will have to debug this...).
 
-commit f8155a404db95656f1519b28fdb96cb68f8b2364
-Author: Lei Wen <leiwen@marvell.com>
-Date:   Mon Feb 28 10:32:11 2011 +0800
-
-    mtd: pxa3xx_nand: rework irq logic
-
-So its should be:
-Cc: stable at kernel.org [2.6.38+]
-
-Best regards,
-Lei
+Thanks,
+Ohad.
