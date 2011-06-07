@@ -1,51 +1,70 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 07 Jun 2011 09:12:25 +0200
-Subject: [PATCH] ARM: fix ioremap to allow mapping some specific RAM areas
-Message-ID: <1307430745-17329-1-git-send-email-m.szyprowski@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Jun 2011 09:17:41 +0200
+Subject: [PATCH v3 2/4] mmc: support sdhci-pxav2.c
+In-Reply-To: <BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
+References: <1307094606-8692-1-git-send-email-zhangfei.gao@marvell.com>
+	<1E53FF9F-5C6A-4AA2-B441-DD712C5D6715@marvell.com>
+	<BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
+Message-ID: <201106070917.41691.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Creating more than one mapping on ARMv6+ might cause unspecified behavior,
-so ioremap() should fail if it was called with area that matches low memory.
-However if the board code removes the specific area from low memory
-mapping on boot (for example by calling memblock_remove()), then creating
-a mapping with ioremap might be desired.
+On Tuesday 07 June 2011 08:08:27 zhangfei gao wrote:
+> >> +config MMC_SDHCI_PXAV2
+> >> +     tristate "Marvell PXAV2 SD Host Controller support"
+> >> +     select MMC_SDHCI
+> >> +     select MMC_SDHCI_PLTFM
+> >> +     help
+> >> +       This selects the Marvell(R) PXAV2 SD Host Controller.
+> >> +       If you have a PXAV2 platform (such as pxa910) with SD Host Controller
+> >> +       and a card slot, say Y or M here.
+> >> +
+> >> +       If unsure, say N.
+> >> +
+> >
+> > The following might be a better approach.  This way we preserve the existing SDHCI_PXA definition
+> > and allow users to see what CPU's are supported.
+> >
+> > config MMC_SDHCI_PXA
+> >>       tristate "Marvell MMP SD Host Controller support"
+> >>       depends on ARCH_MMP2
+> >>      select MMC_SDHCI_PXAV3
+> >
+> >
+> >> config MMC_SDHCI_PXA168
+> >>       tristate "Marvell PXA168 SD Host Controller support"
+> >>       depends on ARCH_PXA
+> >>      select MMC_SDHCI_PXAV2
+> >>
+> >> config MMC_SDHCI_PXA9XX
+> >>       tristate "Marvell PXA910 SD Host Controller support"
+> >>       depends on ARCH_PXA
+> >>      select MMC_SDHCI_PXAV3
+> >>
+> >> config MMC_SDHCI_MMP2
+> >>       tristate "Marvell MMP SD Host Controller support"
+> >>       depends on ARCH_MMP2
+> >>      select MMC_SDHCI_PXAV3
+> >
+> Still prefer the original method, it is simple and no dependence.
+> >
 
-This patch enables creating mapping for RAM by ioremap call, but only if
-the target area has no low memory mapping yet. This enables board code to
-reserve particular memory areas with memblock_remove() and provide them to
-device drivers with a declare_coherent_memory() call.
+How about changing the title of the option though? A user will
+usually not know if he is using the v2 or v3 controller without
+reading the help text. If you change it to
 
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mm/ioremap.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+config MMC_SDHCI_PXAV2
+	tristate "Marvell PXA168 SD Host Controller support (PXAV2)"
+	default CPU_PXA168
 
-diff --git a/arch/arm/mm/ioremap.c b/arch/arm/mm/ioremap.c
-index ab50627..d3fcc05 100644
---- a/arch/arm/mm/ioremap.c
-+++ b/arch/arm/mm/ioremap.c
-@@ -25,6 +25,7 @@
- #include <linux/mm.h>
- #include <linux/vmalloc.h>
- #include <linux/io.h>
-+#include <linux/memblock.h>
- 
- #include <asm/cputype.h>
- #include <asm/cacheflush.h>
-@@ -202,9 +203,10 @@ void __iomem * __arm_ioremap_pfn_caller(unsigned long pfn,
- 		return NULL;
- 
- 	/*
--	 * Don't allow RAM to be mapped - this causes problems with ARMv6+
-+	 * Don't allow low memory to be mapped again - this causes problems
-+	 * with ARMv6+
- 	 */
--	if (WARN_ON(pfn_valid(pfn)))
-+	if (WARN_ON(memblock_is_memory(pfn << PAGE_SHIFT)))
- 		return NULL;
- 
- 	type = get_mem_type(mtype);
--- 
-1.7.1.569.g6f426
+config MMC_SDHCI_PXAV3
+	tristate "Marvell MMP2/PX9XX SD Host Controller support (PXAV3)"
+	default CPU_MMP2 || CPU_PXA910
+
+you increase the chances of users getting the configuration right.
+
+	Arnd
+
+BTW, both of you: Please always remove the lines that you don't refer to
+when you reply to an email. It's very annoying having to scroll through
+dozens of lines of citations to see what you are actually writing.
