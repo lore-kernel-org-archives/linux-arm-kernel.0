@@ -1,47 +1,71 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 7 Jun 2011 16:09:33 +0530
-Subject: [PATCH V2] davinci: da850: move input frequency to board
-	specific	files
-In-Reply-To: <874o42wpec.fsf@ti.com>
-References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
-	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
-	<874o42wpec.fsf@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D383AA8@dbde02.ent.ti.com>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Tue, 07 Jun 2011 15:35:29 +0530
+Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
+In-Reply-To: <BANLkTimid914CxUdf2j6X3c=1c1MuRbxXg@mail.gmail.com>
+References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
+	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
+	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
+	<BANLkTimid914CxUdf2j6X3c=1c1MuRbxXg@mail.gmail.com>
+Message-ID: <1307441129.10976.86.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Tue, Jun 07, 2011 at 04:14:59, Hilman, Kevin wrote:
-> Christian Riesch <christian.riesch@omicron.at> writes:
+On Tue, 2011-06-07 at 15:45 +0530, Linus Walleij wrote:
+> On Tue, Jun 7, 2011 at 10:09 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
 > 
-> > From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
-> >
-> > Currently the input frequency of the SoC is hardcoded in the SoC specific
-> > da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
-> > range from 12 to 50 MHz, boards with different oscillator/crystal
-> > frequencies may be built.
-> >
-> > This patch allows setting a different input frequency in the board
-> > specific files to support boards with oscillator/crystal frequencies other
-> > than 24 MHz.
-> >
-> > Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
-> > Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+> > There are some features of Samsung's DMA API that
+> > the drivers have come to rely upon.
 > 
-> Why not allow board code to just do a clk_set_rate()?
+> Can we get an overview of what these features are?
 > 
-> Currently the ref_clk struct clk does not have a .set_rate method
-> implemented, but that should be easy enough to add.  
+> When I look at this specific code I cannot see anything that
+> the dmaengine does not already support or can be made to
+> support easily.
 > 
-> Then the default ref_clk.rate would stay the 24MHz, but any boards that
-> want to override that simply use clk_get(), clk_set_rate(), clk_put()
+> s3c2410_dma_getposition => device_tx_status()
+> 
+> s3c2410_dma_devconfig - not even needed with dmaengine
+>  sematics, we already know the directions for any transfer.
+> 
+> s3c2410_dma_setflags => device_control() if it needs to be
+>   runtime, else platform data. device_control() is prepared to
+>   be extended for any custom weirdness flags if need be.
+> 
+> s3c2410_dma_set_buffdone_fn - no clue what this is, help
+>   us. If related to cyclic transfer as one could guess, we
+>   already have an API for that.
+> 
+> s3c2410_dma_ctrl => device_control() - there are two
+>   weird controls named TIMEOUT and FLUSH, TIMEOUT
+>   seem strange semantically for a ctrl* function, it seems like
+>   something that should come from the hardware, and flush
+>   is maybe an applicable extension, though I think any DMA
+>   engine with a running channel will indeed flush anything
+>   as quick as it can, if related to circular transfers we can
+>   handle that.
+> 
+> The rest seems to be about retrieveing channels, putting them
+> back on the heap and allocating resources for them as we
+> already do in dmaengine.
+> 
+> > I am not particularly a fan of the generic API. And IIRC,
+> > neither is Ben Dooks, the designer of the
+> > Samsung's DMA API.
+> 
+> This is not soccer/football/cricket. ;-)
+> 
+> Seriously, if there are any longstanding issues with the API we
+> need them nailed down, please help!
+Looking back at the archives two main things seems to be of concern [1]
+1) need of circular API
+2) being able to do submit(issue_pending) in callback
+Both of them are already available and people using them.
 
-That's certainly much more elegant, but this would mean the whole
-clock tree is traversed again on each boot.
+If you have any more requirement, lets discuss, there are drivers in
+sound spi and mmc which use dmaengine. The API supports a generic
+implementation as well as passing custom parameters, so not sure why it
+wont work. 
 
-I am doing some measurements to see if there is any big difference
-in boot-time if this is done. Will get back with results.
-
-Thanks,
-Sekhar
+-- 
+~Vinod
+[1]: http://comments.gmane.org/gmane.linux.ports.arm.kernel/74524
