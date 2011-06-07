@@ -1,52 +1,64 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 7 Jun 2011 10:37:33 -0600
-Subject: [PATCH v2 1/2] ARM: omap4: gpio: fix setting IRQWAKEN bits
-In-Reply-To: <87hb81r5l2.fsf@ti.com>
-References: <1307392698-21170-1-git-send-email-ccross@android.com>
-	<87boyav99n.fsf@ti.com>
-	<BANLkTik-UK9EPsnUkQeih+Zf_9py-X2Q0A@mail.gmail.com>
-	<87hb81r5l2.fsf@ti.com>
-Message-ID: <BANLkTikRiHQWkfCt3ica-+aFy+JJte5g8A@mail.gmail.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Tue, 7 Jun 2011 17:48:17 +0100 (BST)
+Subject: [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+Message-ID: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2011 at 10:04 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
->
->> On Mon, Jun 6, 2011 at 5:18 PM, Kevin Hilman <khilman@ti.com> wrote:
->>> Hi Colin,
->>>
->>> Colin Cross <ccross@android.com> writes:
->>>
->>>> Setting the IRQWAKEN bit was overwriting previous IRQWAKEN bits,
->>>> causing only the last bit set to take effect, resulting in lost
->>>> wakeups when the GPIO controller is in idle.
->>>>
->>>> Replace direct writes to IRQWAKEN with MOD_REG_BIT calls to
->>>> perform a read-modify-write on the register.
->>>>
->>>> Signed-off-by: Colin Cross <ccross@android.com>
->>>
->>> Thanks, I'll queue these both for Grant for the 3.0-rc fixes along with
->>> another GPIO fix for a section mismatch I have queued.
->>>
->>> Minor: now that this driver has moved to drivers, I changed the subject
->>> prefixes slightly. ?They now read:
->>>
->>> GPIO: OMAP: fix setting IRQWAKEN bits for OMAP4
->>> GPIO: OMAP: add locking around calls to _set_gpio_triggering
->>
->> If you're collecting fixes for Linus anyway, go ahead and add my a-b
->> line and include these two to send on to Linus
->>
->> Acked-by: Grant Likely <grant.likely@secretlab.ca>
->>
->> Or, if they are only gpio fixes, then I'd also be happy to get a git
->> pull req for the changes. ?:-)
->>
->
-> I have a GPIO-only queue, so I'll have a pull req for you today.
+Hi,
 
-thx.
+time for another round on this one...
 
-g.
+This got quite a bit cleaned up now.
+
+There's now no more need for a "swsusp context" at all. The code uses 
+cpu_suspend/resume and keeps the snapshot state on the stack while 
+writing it out.
+
+There are a few dependencies this patch brings in:
+
+* due to the use of cpu_suspend / cpu_resume, it'll only apply as-is
+   to kernels no older than f6b0fa02e8b0708d17d631afce456524eadf87ff,
+   where Russell King introduced the generic interface.
+   Patching these into older kernels is a little work.
+
+* it temporarily uses swapper_pg_dir and establishes 1:1 mappings there
+   for a MMU-off transition, which is necessary before resume.
+   In order to tear these down afterwards, identity_mapping_del() needs
+   to be called; for some reason that's #ifdef CONFIG_SMP ...
+
+* it needs to "catch" sleep_save_sp after cpu_suspend() so that resume
+   can be provided with the proper starting point.
+   This requires an ENTRY(sleep_save_sp) in arch/arm/kernel/sleep.S so
+   that the symbol becomes public.
+
+* it assumes cpu_reset will disable the MMU. cpu_v6_reset/cpu_v7_reset
+   are currently not doing so (amongst some other minor chip types).
+
+* there's kind of a circular dependency between CONFIG_HIBERNATION and
+   CONFIG_PM_SLEEP, on ARM. The latter is necessary so that cpu_suspend
+   and cpu_resume are compiled in, but it cannot be selected via
+   ARCH_HIBERNATION_POSSIBLE because CONFIG_PM_SLEEP depends on
+   CONFIG_HIBERNATION_INTERFACE - selected by CONFIG_HIBERNATION.
+
+   Consequence is that right now, both CONFIG_PM_SLEEP and ...HIBERNATION
+   must be set in your defconfig file to be able to compile.
+
+   (my head swirls from writing this ...)
+
+Otherwise, this is by far the cleanest in the series yet.
+
+
+I've tested this on ARM1176; still need to do OMAP3 (Cortex-A8), will 
+report on that.
+
+
+Please let me know what you think,
+FrankH.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: hibernation-07Jun2011.patch
+Type: text/x-diff
+Size: 7450 bytes
+Desc: 
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110607/3a42d570/attachment.bin>
