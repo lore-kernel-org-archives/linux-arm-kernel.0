@@ -1,62 +1,46 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Tue, 7 Jun 2011 12:22:58 +0100 (BST)
-Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to
-	a physical address
-In-Reply-To: <1307379898-14256-5-git-send-email-will.deacon@arm.com>
-References: <1307379898-14256-1-git-send-email-will.deacon@arm.com>
-	<1307379898-14256-5-git-send-email-will.deacon@arm.com>
-Message-ID: <alpine.DEB.2.00.1106071126290.2247@localhost6.localdomain6>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Tue, 7 Jun 2011 13:26:52 +0200
+Subject: [RFC 2/6] omap: iovmm: generic iommu api migration
+In-Reply-To: <BANLkTi=nJXSEfWRXqwnHys1b5i5rgLcYpw@mail.gmail.com>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+	<201106071105.16262.laurent.pinchart@ideasonboard.com>
+	<BANLkTi=nJXSEfWRXqwnHys1b5i5rgLcYpw@mail.gmail.com>
+Message-ID: <201106071326.53106.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Ohad,
 
+On Tuesday 07 June 2011 12:28:53 Ohad Ben-Cohen wrote:
+> On Tue, Jun 7, 2011 at 12:05 PM, Laurent Pinchart wrote:
+> > pgsz isn't used anymore, you can remove it.
+> 
+> Ok.
+> 
+> >> +             order = get_order(bytes);
+> > 
+> > Does iommu_map() handle offsets correctly, or does it expect pa to be
+> > aligned to an order (or other) boundary ?
+> 
+> Right now we have a BUG_ON if pa is unaligned, but that can be changed
+> if needed (do we want it to handle offsets ?).
 
-On Mon, 6 Jun 2011, Will Deacon wrote:
+At least for the OMAP3 ISP we need to, as video buffers don't necessarily 
+start on page boundaries.
 
-> Tools such as kexec and CPU hotplug require a way to reset the processor
-> and branch to some code in physical space. This requires various bits of
-> jiggery pokery with the caches and MMU which, when it goes wrong, tends
-> to lock up the system.
->
-> This patch implements a new function, arm_machine_reset, for
-> consolidating this code in one place where it can be used by multiple
-> subsystems.
->
-[ ... ]
-> +void arm_machine_reset(unsigned long reset_code_phys)
-> +{
-> +	unsigned long cpu_reset_end = PAGE_ALIGN((unsigned long)cpu_reset);
-> +	/* This is stricter than necessary but better to be safe than sorry. */
-> +	BUG_ON(virt_to_phys((void *)cpu_reset_end) >= TASK_SIZE);
-> +
-> +	/* Disable interrupts first */
-> +	local_irq_disable();
-> +	local_fiq_disable();
-> +
-> +	/*
-> +	 * Clean and invalidate L2.
-> +	 * This is racy, so we must be the last guy left.
-> +	 */
-> +	WARN_ON(num_online_cpus() > 1);
-> +	/* Flush while we still have locking available to us. */
-> +	outer_flush_all();
-> +	outer_disable();
-> +	/* Data destroyed here will only be speculative. */
-> +	outer_inv_all();
-> +
-> +	prepare_for_reboot(0);
-> +
-> +	/* Switch to the identity mapping. */
-> +	((typeof(cpu_reset) *)virt_to_phys((void *)cpu_reset))(reset_code_phys);
+> > As Russell pointed out, we should use sg->length instead of
+> > sg_dma_length(sg). sg_dma_length(sg) is only valid after the scatter
+> > list has been DMA-mapped, which doesn't happen in the iovmm driver. This
+> > applies to all sg_dma_len(sg) calls.
+> 
+> I'll make sure I don't introduce such calls, but it sounds like a
+> separate patch should take care of the existing ones; pls tell me if
+> you want me to send one.
 
-void (*reset_func)(unsigned long) = virt_to_phys(cpu_reset)
+A separate patch is indeed needed, yes. As you're already working on iommu it 
+might be simpler if you add it to your tree. Otherwise I can send it.
 
-> +}
-> +
-> /*
->  * Function pointers to optional machine specific functions
->  */
-> -- 
-> 1.7.0.4
->
->
+-- 
+Regards,
+
+Laurent Pinchart
