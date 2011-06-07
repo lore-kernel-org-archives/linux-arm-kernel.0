@@ -1,27 +1,43 @@
-From: alan@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Tue, 7 Jun 2011 20:59:28 +0100
-Subject: [RFC PATCH] KMS support for i.MX51/53
-In-Reply-To: <20110607191205.GK23771@pengutronix.de>
-References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
-	<20110607121701.71cdd06e@lxorguk.ukuu.org.uk>
-	<20110607191205.GK23771@pengutronix.de>
-Message-ID: <20110607205928.22f3e1ef@lxorguk.ukuu.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 7 Jun 2011 22:41:51 +0100
+Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
+In-Reply-To: <BANLkTikXGpxpyF8kQORqswD5tqNEjtj3dA@mail.gmail.com>
+References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
+	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
+	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
+	<20110607081527.GB20929@n2100.arm.linux.org.uk>
+	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
+	<20110607182923.GA28451@n2100.arm.linux.org.uk>
+	<20110607184329.GA20849@sirena.org.uk>
+	<BANLkTikXGpxpyF8kQORqswD5tqNEjtj3dA@mail.gmail.com>
+Message-ID: <20110607214151.GA7712@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm not sure I understand you correctly. I have no address space on the
-> card side since my 'card' just uses main memory. The memory I need must
-> be a physically contiguous portion of sdram. I'm afraid shmem backing
-> memory is not of much use for me.
+On Wed, Jun 08, 2011 at 12:31:42AM +0530, Jassi Brar wrote:
+> On Wed, Jun 8, 2011 at 12:13 AM, Mark Brown
 
-I hadn't realised you had that underlying limit. If you are limited to a
-specific chunk of SDRAM and it must be physically linear rather than any
-of memory then indeed it's not.
+> > Circular buffers are nice from the point of view of allowing you to
+> > (providing the hardware supports it) totally disable the periodic audio
+> > interrupts and leave the system to run for very long times off the
 
-I'd been tweaking GEM so you can borrow the abstraction and handles but
-back them with your own allocator but in my case it makes sense because I
-can use either main memory or a chunk of linear preallocated memory
-reserved by the firmware so I wanted the commonality and single set of
-handles for GEM, IOCTL_MODE_CREATE_DUMB etc.
+> This is what I called free-running circular buffer.
+> Besides power saving scenario, it is necessary for a fast peripheral
+> with shallow fifo.
+> The peripheral throws underrun errors, if the dma h/w doesn't support
+> LLI and cpu takes
+> a bit long loading-triggering the next transfer on DMA due to
+> irq-latency for some reason.
 
-Alan
+That's fairly unusual, though - usually DMA controllers seem to support
+chaining requests before they support circular operation, at which point
+unless the hardware is badly misdone you can just chain another buffer,
+giving that buffer's worth of time for the CPU to respond.
+
+> > You can also do this with an circular chain of sequential buffers of
+> > course.
+
+> This is what is called Circular buffer in Samsung's DMA API.
+
+Which is a little bit unusual as it's basically a pure software
+construct rather than a hardware feature.
