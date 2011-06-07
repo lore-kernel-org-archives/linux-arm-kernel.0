@@ -1,85 +1,62 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 07 Jun 2011 14:29:08 -0400 (EDT)
-Subject: [PATCH,RFC] mmp clockevent handling race
-In-Reply-To: <20110607140456.GE11275@wantstofly.org>
-References: <20110607140456.GE11275@wantstofly.org>
-Message-ID: <alpine.LFD.2.00.1106071416230.2142@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Jun 2011 19:29:23 +0100
+Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
+In-Reply-To: <BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
+References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
+	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
+	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
+	<20110607081527.GB20929@n2100.arm.linux.org.uk>
+	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
+Message-ID: <20110607182923.GA28451@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Jun 2011, Lennert Buytenhek wrote:
+On Tue, Jun 07, 2011 at 03:45:18PM +0530, Jassi Brar wrote:
+> On Tue, Jun 7, 2011 at 1:45 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Jun 07, 2011 at 01:39:43PM +0530, Jassi Brar wrote:
+> >> Unfortunately, no. There are some features of Samsung's DMA API that
+> >> the drivers have come to rely upon.
+> >> Besides, I am not particularly a fan of the generic API. And IIRC,
+> >> neither is Ben Dooks, the designer of the
+> >> Samsung's DMA API.
+> >
+> > We are now at the point where this is non-optional. ?If the generic API
+> > doesn't fit what Samsung needs, then that needs to be discussed and
+> > whatever problems there are need to be resolved.
+> The discussion did take off a few months ago, but we didn't reach anywhere.
+> Being able to queue request from the 'done' callback, the need of
+> circular buffer
+> API (possibly a free-running one too) and callbacks in irq-context, as
+> they happen,
+> were a few requirements for having fast peripherals with shallow fifo
+> work without underruns.
 
-> Hi!
-> 
-> The patch below has been sitting around in the OLPC XO-1.75 (MMP2-based
-> XO) bringup kernel tree for some time now, and upon recent rebasing of
-> this tree to 3.0, it was discovered that something like this patch is
-> still needed.
-> 
-> Symptoms: e.g. as described here: http://dev.laptop.org/ticket/10945
-> -- applications hang for a couple of minutes at a time, and sometimes
-> there are several-minute hangs during the boot process.
-> 
-> >From the ticket:
-> 
-> 	The problem in the current upstream mmp timer handling code
-> 	that appears to be triggered here is that it handles clockevents
-> 	by setting up a comparator on the free-running clocksource timer
-> 	to match and trigger an interrupt at 'current_time + delta',
-> 	which if delta is small enough can lead to 'current_time + delta'
-> 	already being in the past when comparator setup has finished,
-> 	and the requested event will not trigger. 
+I can see why you have these concerns; the problem is the slave DMA
+engine API was never properly documented.
 
-This is a classical issue that was solved on the SA1100 more than 10 
-years ago.
+1. The slave API does permit the done callback to submit new requests
+   already (and any DMA engine driver which doesn't allow that is broken.)
 
-> What this patch does is to rewrite the timer handling code to use
-> two timers, one for the free-running clocksource, and one to trigger
-> clockevents with, which is more or less the standard approach to this.
-> It's kind of invasive, though (certainly more invasive than it strictly
-> needs to be, as it reorganises time.c somewhat at the same time), and
-> something like this is probably too invasive for 3.0 at this point.
-> 
-> A safer "fix" for 3.0 may be to disallow NO_HZ/HIGH_RES_TIMERS on mmp.
-> 
-> Any thoughts?
+Note that slave APIs _should_ permit several requests to be queued up
+and as each finish, the next one should be started.  In other words,
+once DMA has started it should continue until there is no more work for
+the DMA engine to perform.
 
-What about simply this:
+2. Circular buffer support has been added - see device_prep_dma_cyclic().
 
-diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-index 99833b9..8b8f99a 100644
---- a/arch/arm/mach-mmp/time.c
-+++ b/arch/arm/mach-mmp/time.c
-@@ -39,7 +39,7 @@
- 
- #define TIMERS_VIRT_BASE	TIMERS1_VIRT_BASE
- 
--#define MAX_DELTA		(0xfffffffe)
-+#define MAX_DELTA		(0xfffffffe - 16)
- #define MIN_DELTA		(16)
- 
- static DEFINE_CLOCK_DATA(cd);
-@@ -85,7 +85,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
- static int timer_set_next_event(unsigned long delta,
- 				struct clock_event_device *dev)
- {
--	unsigned long flags, next;
-+	unsigned long flags, next, now;
- 
- 	local_irq_save(flags);
- 
-@@ -95,9 +95,10 @@ static int timer_set_next_event(unsigned long delta,
- 
- 	next = timer_read() + delta;
- 	__raw_writel(next, TIMERS_VIRT_BASE + TMR_TN_MM(0, 0));
-+	now = timer_read();
- 
- 	local_irq_restore(flags);
--	return 0;
-+	return (signed)(next - now) <= MIN_DELTA ? -ETIME : 0;
- }
- 
- static void timer_set_mode(enum clock_event_mode mode,
+However, 2 is not really a requirement for audio - you can queue several
+single slave transfers (one per period) initially, and then you get
+callbacks as each transfer completes.  In the callback, you can submit
+an additional buffer, and continue doing so causing DMA to never end.
 
+I believe that this is a saner approach than the circular buffer support,
+and its what I tried to put together for the AMBA PL041 AACI DMA (but
+unfortunately, ARMs platforms are totally broken when it comes to DMA.)
 
-Nicolas
+This also removes the need for the callback to be in IRQ context.
+
+So I don't see that anything you've mentioned is a problem with the API
+as it stands today - there may be issues with the way the DMA engine
+driver has been implemented which cause it not to conform to what I've
+said above, but those are driver bugs and not a fault of the API.
