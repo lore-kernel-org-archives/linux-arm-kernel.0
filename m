@@ -1,53 +1,30 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 7 Jun 2011 17:46:46 +0900
-Subject: [PATCH] Consolidate the clkdev header files
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F381FC48C2@AUSP01VMBX24.collaborationhost.net>
-References: <20110530010416.GA24365@july>
-	<ADE657CA350FB648AAC2C43247A983F001F381FC48C2@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <BANLkTikTE=Gz0g4zao8OdGanMmZxt_zb=g@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 7 Jun 2011 09:54:46 +0100
+Subject: [PATCH] ARM: fix ioremap to allow mapping some specific RAM areas
+In-Reply-To: <003c01cc24ef$151827b0$3f487710$%szyprowski@samsung.com>
+References: <1307430745-17329-1-git-send-email-m.szyprowski@samsung.com>
+	<20110607080541.GA20929@n2100.arm.linux.org.uk>
+	<003c01cc24ef$151827b0$3f487710$%szyprowski@samsung.com>
+Message-ID: <20110607085446.GC20929@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tue, Jun 07, 2011 at 10:44:15AM +0200, Marek Szyprowski wrote:
+> On Tuesday, June 07, 2011 10:06 AM Russell King - ARM Linux wrote:
+> > NAK.  pfn_valid is already defined like this:
+> > 
+> > int pfn_valid(unsigned long pfn)
+> > {
+> >         return memblock_is_memory(pfn << PAGE_SHIFT);
+> > }
+> > 
+> > provided you enable ARCH_HAS_HOLES_MEMORYMODEL, which you must do if
+> > you're punching holes in the memory map.
+> 
+> Ok, I see the point in ARCH_HAS_HOLES_MEMORYMODEL, but it doesn't solve my
+> problem. In case of Samsung Exynos4 and S5PV210 platforms we use SPARSEMEM,
+> but the above definition of pfn_valid() function is correct only if SPARSEMEM
+> is not enabled.
 
-Any comments on this patch?
-
-Thank you,
-Kyungmin Park
-
-On Wed, Jun 1, 2011 at 1:40 AM, H Hartley Sweeten
-<hartleys@visionengravers.com> wrote:
-> On Sunday, May 29, 2011 6:04 PM, Kyungmin Park wrote:
->> From: Kyungmin Park <kyungmin.park@samsung.com>
->>
->> Now most of ARM machines has the alsmot same __clk_get/put() macro
->>
->> So place it at the arch/arm/include/asm/clkdev.h and remove the reduntant header files
->>
->> But some machines don't have the same form as above. It can use the machince specific clkdev file by HAVE_MACH_CLKDEV config
->>
->> Now there are only 3 caese.
->>
->> 1) define the clk structure with clkdev macro => Need to move clk structure to proper header file
->>
->> arch/arm/mach-versatile/include/mach/clkdev.h
->> arch/arm/mach-realview/include/mach/clkdev.h
->> arch/arm/mach-vexpress/include/mach/clkdev.h
->> arch/arm/mach-integrator/include/mach/clkdev.h
->>
->> 2) export the __clk_get/put function at clock.c
->>
->> arch/arm/mach-shmobile/include/mach/clkdev.h
->>
->> 3) demuxing the clk source
->> arch/arm/mach-u300/include/mach/clkdev.h
->>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
->> ---
->> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?6 ++++
->> ?arch/arm/include/asm/clkdev.h ? ? ? ? ? ? ? ?| ? ?5 ++++
->
->> ?arch/arm/mach-ep93xx/include/mach/clkdev.h ? | ? 11 --------
->
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
->
+Sparsemem has been fixed recently (during the merge window) so that this
+is now correct.
