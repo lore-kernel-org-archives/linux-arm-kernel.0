@@ -1,45 +1,38 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 7 Jun 2011 12:13:30 +0200
-Subject: [PATCH] Consolidate the clkdev header files
-In-Reply-To: <20110530010416.GA24365@july>
-References: <20110530010416.GA24365@july>
-Message-ID: <20110607101330.GD16937@game.jcrosoft.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 7 Jun 2011 13:28:53 +0300
+Subject: [RFC 2/6] omap: iovmm: generic iommu api migration
+In-Reply-To: <201106071105.16262.laurent.pinchart@ideasonboard.com>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+	<1307053663-24572-3-git-send-email-ohad@wizery.com>
+	<201106071105.16262.laurent.pinchart@ideasonboard.com>
+Message-ID: <BANLkTi=nJXSEfWRXqwnHys1b5i5rgLcYpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:04 Mon 30 May     , Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Now most of ARM machines has the alsmot same __clk_get/put() macro
-> 
-> So place it at the arch/arm/include/asm/clkdev.h and remove the reduntant header files
-> 
-> But some machines don't have the same form as above. It can use the machince specific clkdev file by HAVE_MACH_CLKDEV config
-> 
-> Now there are only 3 caese.
-> 
-> 1) define the clk structure with clkdev macro => Need to move clk structure to proper header file
-> 
-> arch/arm/mach-versatile/include/mach/clkdev.h
-> arch/arm/mach-realview/include/mach/clkdev.h
-> arch/arm/mach-vexpress/include/mach/clkdev.h
-> arch/arm/mach-integrator/include/mach/clkdev.h
-> 
-> 2) export the __clk_get/put function at clock.c
-> 
-> arch/arm/mach-shmobile/include/mach/clkdev.h
-> 
-> 3) demuxing the clk source
-> arch/arm/mach-u300/include/mach/clkdev.h
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> ---
->  arch/arm/Kconfig                             |    6 ++++
->  arch/arm/include/asm/clkdev.h                |    5 ++++
->  arch/arm/mach-at91/include/mach/clkdev.h     |    7 -----
-for at91
+Hi Laurent,
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Tue, Jun 7, 2011 at 12:05 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> pgsz isn't used anymore, you can remove it.
 
-Best Regards,
-J.
+Ok.
+
+>> + ? ? ? ? ? ? order = get_order(bytes);
+>
+> Does iommu_map() handle offsets correctly, or does it expect pa to be aligned
+> to an order (or other) boundary ?
+
+Right now we have a BUG_ON if pa is unaligned, but that can be changed
+if needed (do we want it to handle offsets ?).
+
+> As Russell pointed out, we should use sg->length instead of sg_dma_length(sg).
+> sg_dma_length(sg) is only valid after the scatter list has been DMA-mapped,
+> which doesn't happen in the iovmm driver. This applies to all sg_dma_len(sg)
+> calls.
+
+I'll make sure I don't introduce such calls, but it sounds like a
+separate patch should take care of the existing ones; pls tell me if
+you want me to send one.
+
+Thanks,
+Ohad.
