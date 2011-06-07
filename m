@@ -1,52 +1,45 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue,  7 Jun 2011 11:16:02 -0500
-Subject: [PATCH] ARM: allow enabling SCU code on UP
-Message-ID: <1307463362-18387-1-git-send-email-robherring2@gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 7 Jun 2011 17:17:36 +0100
+Subject: [PATCH 06/11] ARM: cortex-a5: add HWCAP_VFPv4D16 to proc info
+	structure
+In-Reply-To: <1307379355-13802-7-git-send-email-will.deacon@arm.com>
+References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
+	<1307379355-13802-7-git-send-email-will.deacon@arm.com>
+Message-ID: <20110607161736.GB19855@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Mon, Jun 06, 2011 at 05:55:50PM +0100, Will Deacon wrote:
+> The Cortex-A5 implements VFPv4D16, so add this to the hwcaps for this
+> processor.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/mm/proc-v7.S |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> index b22d98d..8eba506 100644
+> --- a/arch/arm/mm/proc-v7.S
+> +++ b/arch/arm/mm/proc-v7.S
+> @@ -466,7 +466,7 @@ cpu_elf_name:
+>  __v7_ca5mp_proc_info:
+>  	.long	0x410fc050
+>  	.long	0xff0ffff0
+> -	__v7_proc __v7_ca5mp_setup
+> +	__v7_proc __v7_ca5mp_setup, HWCAP_VFPv4D16
 
-The scu_power_mode function can be used on UP builds as it drives signals
-to an SOC power controller. So make it selectable for !SMP.
+Is VFPv4 a superset of VFPv3?  If so, should we also include
+HWCAP_VFPv3D16 (and what about HWCAP_VFP)?
 
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- arch/arm/Kconfig          |    1 -
- arch/arm/kernel/smp_scu.c |    2 ++
- 2 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..8665a24 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1346,7 +1346,6 @@ config SMP_ON_UP
- 
- config HAVE_ARM_SCU
- 	bool
--	depends on SMP
- 	help
- 	  This option enables support for the ARM system coherency unit
- 
-diff --git a/arch/arm/kernel/smp_scu.c b/arch/arm/kernel/smp_scu.c
-index a1e757c..79ed5e7 100644
---- a/arch/arm/kernel/smp_scu.c
-+++ b/arch/arm/kernel/smp_scu.c
-@@ -20,6 +20,7 @@
- #define SCU_INVALIDATE		0x0c
- #define SCU_FPGA_REVISION	0x10
- 
-+#ifdef CONFIG_SMP
- /*
-  * Get the number of CPU cores from the SCU configuration
-  */
-@@ -50,6 +51,7 @@ void __init scu_enable(void __iomem *scu_base)
- 	 */
- 	flush_cache_all();
- }
-+#endif
- 
- /*
-  * Set the executing CPUs power mode as defined.  This will be in
--- 
-1.7.4.1
+>  	.size	__v7_ca5mp_proc_info, . - __v7_ca5mp_proc_info
+>  
+>  	/*
+> -- 
+> 1.7.0.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
