@@ -1,70 +1,111 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jun 2011 09:17:41 +0200
-Subject: [PATCH v3 2/4] mmc: support sdhci-pxav2.c
-In-Reply-To: <BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
-References: <1307094606-8692-1-git-send-email-zhangfei.gao@marvell.com>
-	<1E53FF9F-5C6A-4AA2-B441-DD712C5D6715@marvell.com>
-	<BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
-Message-ID: <201106070917.41691.arnd@arndb.de>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Tue, 7 Jun 2011 09:18:50 +0200
+Subject: [PATCH 09/11] ARM: perf: add PMUv2 common event definitions
+In-Reply-To: <1307379355-13802-10-git-send-email-will.deacon@arm.com>
+References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
+	<1307379355-13802-10-git-send-email-will.deacon@arm.com>
+Message-ID: <BANLkTinL_arEKuu9XvnF43PrZ+rv2+dNrg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 June 2011 08:08:27 zhangfei gao wrote:
-> >> +config MMC_SDHCI_PXAV2
-> >> +     tristate "Marvell PXAV2 SD Host Controller support"
-> >> +     select MMC_SDHCI
-> >> +     select MMC_SDHCI_PLTFM
-> >> +     help
-> >> +       This selects the Marvell(R) PXAV2 SD Host Controller.
-> >> +       If you have a PXAV2 platform (such as pxa910) with SD Host Controller
-> >> +       and a card slot, say Y or M here.
-> >> +
-> >> +       If unsure, say N.
-> >> +
-> >
-> > The following might be a better approach.  This way we preserve the existing SDHCI_PXA definition
-> > and allow users to see what CPU's are supported.
-> >
-> > config MMC_SDHCI_PXA
-> >>       tristate "Marvell MMP SD Host Controller support"
-> >>       depends on ARCH_MMP2
-> >>      select MMC_SDHCI_PXAV3
-> >
-> >
-> >> config MMC_SDHCI_PXA168
-> >>       tristate "Marvell PXA168 SD Host Controller support"
-> >>       depends on ARCH_PXA
-> >>      select MMC_SDHCI_PXAV2
-> >>
-> >> config MMC_SDHCI_PXA9XX
-> >>       tristate "Marvell PXA910 SD Host Controller support"
-> >>       depends on ARCH_PXA
-> >>      select MMC_SDHCI_PXAV3
-> >>
-> >> config MMC_SDHCI_MMP2
-> >>       tristate "Marvell MMP SD Host Controller support"
-> >>       depends on ARCH_MMP2
-> >>      select MMC_SDHCI_PXAV3
-> >
-> Still prefer the original method, it is simple and no dependence.
-> >
+Hi Will,
 
-How about changing the title of the option though? A user will
-usually not know if he is using the v2 or v3 controller without
-reading the help text. If you change it to
+On Mon, Jun 6, 2011 at 6:55 PM, Will Deacon <will.deacon@arm.com> wrote:
+> The PMUv2 specification reserves a number of event encodings
+> for common events.
+>
+> This patch adds these events to the common event enumeration
+> in preparation for PMUv2 cores, such as Cortex-A15.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> ?arch/arm/kernel/perf_event_v7.c | ? 35 +++++++++++++++++++++++++----------
+> ?1 files changed, 25 insertions(+), 10 deletions(-)
+>
+> diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+> index 554eba3..01b1145 100644
+> --- a/arch/arm/kernel/perf_event_v7.c
+> +++ b/arch/arm/kernel/perf_event_v7.c
+> @@ -17,17 +17,23 @@
+> ?*/
+>
+> ?#ifdef CONFIG_CPU_V7
+> -/* Common ARMv7 event types */
+> +/*
+> + * Common ARMv7 event types
+> + *
+> + * Note: An implementation may not be able to count all of these events
+> + * but the encodings are considered to be `reserved' in the case that
+> + * they are not available.
+> + */
+> ?enum armv7_perf_types {
+> ? ? ? ?ARMV7_PERFCTR_PMNC_SW_INCR ? ? ? ? ? ? ?= 0x00,
+> ? ? ? ?ARMV7_PERFCTR_IFETCH_MISS ? ? ? ? ? ? ? = 0x01,
+> ? ? ? ?ARMV7_PERFCTR_ITLB_MISS ? ? ? ? ? ? ? ? = 0x02,
+> - ? ? ? ARMV7_PERFCTR_DCACHE_REFILL ? ? ? ? ? ? = 0x03,
+> - ? ? ? ARMV7_PERFCTR_DCACHE_ACCESS ? ? ? ? ? ? = 0x04,
+> + ? ? ? ARMV7_PERFCTR_DCACHE_REFILL ? ? ? ? ? ? = 0x03, /* L1 */
+> + ? ? ? ARMV7_PERFCTR_DCACHE_ACCESS ? ? ? ? ? ? = 0x04, /* L1 */
+> ? ? ? ?ARMV7_PERFCTR_DTLB_REFILL ? ? ? ? ? ? ? = 0x05,
+> ? ? ? ?ARMV7_PERFCTR_DREAD ? ? ? ? ? ? ? ? ? ? = 0x06,
+> ? ? ? ?ARMV7_PERFCTR_DWRITE ? ? ? ? ? ? ? ? ? ?= 0x07,
+> -
+> + ? ? ? ARMV7_PERFCTR_INSTR_EXECUTED ? ? ? ? ? ?= 0x08,
+> ? ? ? ?ARMV7_PERFCTR_EXC_TAKEN ? ? ? ? ? ? ? ? = 0x09,
+> ? ? ? ?ARMV7_PERFCTR_EXC_EXECUTED ? ? ? ? ? ? ?= 0x0A,
+> ? ? ? ?ARMV7_PERFCTR_CID_WRITE ? ? ? ? ? ? ? ? = 0x0B,
+> @@ -39,21 +45,30 @@ enum armv7_perf_types {
+> ? ? ? ? */
+> ? ? ? ?ARMV7_PERFCTR_PC_WRITE ? ? ? ? ? ? ? ? ?= 0x0C,
+> ? ? ? ?ARMV7_PERFCTR_PC_IMM_BRANCH ? ? ? ? ? ? = 0x0D,
+> + ? ? ? ARMV7_PERFCTR_PC_PROC_RETURN ? ? ? ? ? ?= 0x0E,
+Will ARMV7_PERFCTR_INSTR_EXECUTED and ARMV7_PERFCTR_PC_PROC_RETURN
+work for all v7 implementations? For example they are not defined for
+A9.
 
-config MMC_SDHCI_PXAV2
-	tristate "Marvell PXA168 SD Host Controller support (PXAV2)"
-	default CPU_PXA168
+> ? ? ? ?ARMV7_PERFCTR_UNALIGNED_ACCESS ? ? ? ? ?= 0x0F,
+> +
+> + ? ? ? /* These events are defined by the PMUv2 supplement (ARM DDI 0457A). */
+> ? ? ? ?ARMV7_PERFCTR_PC_BRANCH_MIS_PRED ? ? ? ?= 0x10,
+> ? ? ? ?ARMV7_PERFCTR_CLOCK_CYCLES ? ? ? ? ? ? ?= 0x11,
+> -
+> - ? ? ? ARMV7_PERFCTR_PC_BRANCH_MIS_USED ? ? ? ?= 0x12,
+> + ? ? ? ARMV7_PERFCTR_PC_BRANCH_PRED ? ? ? ? ? ?= 0x12,
+> + ? ? ? ARMV7_PERFCTR_MEM_ACCESS ? ? ? ? ? ? ? ?= 0x13,
+> + ? ? ? ARMV7_PERFCTR_L1_ICACHE_ACCESS ? ? ? ? ?= 0x14,
+> + ? ? ? ARMV7_PERFCTR_L1_DCACHE_WB ? ? ? ? ? ? ?= 0x15,
+> + ? ? ? ARMV7_PERFCTR_L2_DCACHE_ACCESS ? ? ? ? ?= 0x16,
+> + ? ? ? ARMV7_PERFCTR_L2_DCACHE_REFILL ? ? ? ? ?= 0x17,
+> + ? ? ? ARMV7_PERFCTR_L2_DCACHE_WB ? ? ? ? ? ? ?= 0x18,
+> + ? ? ? ARMV7_PERFCTR_BUS_ACCESS ? ? ? ? ? ? ? ?= 0x19,
+> + ? ? ? ARMV7_PERFCTR_MEMORY_ERROR ? ? ? ? ? ? ?= 0x1A,
+> + ? ? ? ARMV7_PERFCTR_INSTR_SPEC ? ? ? ? ? ? ? ?= 0x1B,
+> + ? ? ? ARMV7_PERFCTR_TTBR_WRITE ? ? ? ? ? ? ? ?= 0x1C,
+> + ? ? ? ARMV7_PERFCTR_BUS_CYCLES ? ? ? ? ? ? ? ?= 0x1D,
+Same question for those new events that are not defined for A8 and A9.
 
-config MMC_SDHCI_PXAV3
-	tristate "Marvell MMP2/PX9XX SD Host Controller support (PXAV3)"
-	default CPU_MMP2 || CPU_PXA910
+Thanks,
+Jean
 
-you increase the chances of users getting the configuration right.
-
-	Arnd
-
-BTW, both of you: Please always remove the lines that you don't refer to
-when you reply to an email. It's very annoying having to scroll through
-dozens of lines of citations to see what you are actually writing.
+>
+> ? ? ? ?ARMV7_PERFCTR_CPU_CYCLES ? ? ? ? ? ? ? ?= 0xFF
+> ?};
+>
+> ?/* ARMv7 Cortex-A8 specific event types */
+> ?enum armv7_a8_perf_types {
+> - ? ? ? ARMV7_PERFCTR_INSTR_EXECUTED ? ? ? ? ? ?= 0x08,
+> -
+> - ? ? ? ARMV7_PERFCTR_PC_PROC_RETURN ? ? ? ? ? ?= 0x0E,
+> -
+> ? ? ? ?ARMV7_PERFCTR_WRITE_BUFFER_FULL ? ? ? ? = 0x40,
+> ? ? ? ?ARMV7_PERFCTR_L2_STORE_MERGED ? ? ? ? ? = 0x41,
+> ? ? ? ?ARMV7_PERFCTR_L2_STORE_BUFF ? ? ? ? ? ? = 0x42,
+> --
+> 1.7.0.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
