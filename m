@@ -1,46 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Jun 2011 09:28:53 +0200
-Subject: [PATCH V2 1/3] drivers/pwm st_pwm: Add support for ST's Pulse
-	Width Modulator
-In-Reply-To: <4DEDA12D.6080406@st.com>
-References: <cover.1306831238.git.viresh.kumar@st.com>
-	<20110606173339.268b9f9c.akpm@linux-foundation.org>
-	<4DEDA12D.6080406@st.com>
-Message-ID: <201106070928.53761.arnd@arndb.de>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 7 Jun 2011 15:31:48 +0800
+Subject: [PATCH v3 2/4] mmc: support sdhci-pxav2.c
+In-Reply-To: <201106070917.41691.arnd@arndb.de>
+References: <1307094606-8692-1-git-send-email-zhangfei.gao@marvell.com>
+	<1E53FF9F-5C6A-4AA2-B441-DD712C5D6715@marvell.com>
+	<BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
+	<201106070917.41691.arnd@arndb.de>
+Message-ID: <BANLkTinsk0AzBYd+fO9Oz1RO9smNzJTsTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 07 June 2011 05:55:25 viresh kumar wrote:
-> >> +static int __devinit st_pwm_probe(struct platform_device *pdev)
-> > 
-> > And here things get rather odd.
-> > 
-> > Most of this file is a generic, non-device specific PWM layer, exported
-> > to other modules.  But then we get into driver bits which are specific
-> > to one paritular type of device.  Confused - this is like putting the
-> > e100 driver inside net/ipv4/tcp.c?
-> > 
-> 
-> Sorry but i couldn't get this one completely. :(
-> Driver is specific to pwm peripheral by ST. This driver can be used for
-> SPEAr or may be other SoC or Devices, and is not at all dependent on SPEAr.
+> How about changing the title of the option though? A user will
+> usually not know if he is using the v2 or v3 controller without
+> reading the help text. If you change it to
+>
+> config MMC_SDHCI_PXAV2
+> ? ? ? ?tristate "Marvell PXA168 SD Host Controller support (PXAV2)"
+> ? ? ? ?default CPU_PXA168
+>
+> config MMC_SDHCI_PXAV3
+> ? ? ? ?tristate "Marvell MMP2/PX9XX SD Host Controller support (PXAV3)"
+> ? ? ? ?default CPU_MMP2 || CPU_PXA910
+>
 
+Yeah, the above is much cleaner/simpler.
 
-It was my suggestion to start drivers/pwm/ with this driver. We currently
-have a number of pwm drivers spread over the entire tree, all using slight
-the same interface header. They all look like this one, and are each used
-on one SOC, so you have to choose at compile-time which one to use.
-
-There are two problems with this of course:
-1. the drivers that export the same interface should be in one directory
-2. there should be a common abstraction layer to avoid duplicate code and
-   enable building a kernel with multiple PWM drivers builtin.
-
-Moving this driver to drivers/pwm is the first step to address the
-problem 1, we will move the other drivers in the 3.1 or 3.2 timeframe.
-
-There is independent by Sascha Hauer to work on the abstraction layer
-for all the drivers. Once that is in, we will change the individual drivers
-in drivers/pwm accordingly.
-
-	Arnd
+> you increase the chances of users getting the configuration right.
+>
+> ? ? ? ?Arnd
+>
+> BTW, both of you: Please always remove the lines that you don't refer to
+> when you reply to an email. It's very annoying having to scroll through
+> dozens of lines of citations to see what you are actually writing.
+>
