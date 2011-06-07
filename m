@@ -1,45 +1,28 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 07 Jun 2011 12:49:36 +0200
-Subject: [PATCH] ARM: fix ioremap to allow mapping some specific RAM	areas
-In-Reply-To: <20110607085446.GC20929@n2100.arm.linux.org.uk>
-References: <1307430745-17329-1-git-send-email-m.szyprowski@samsung.com>
-	<20110607080541.GA20929@n2100.arm.linux.org.uk>
-	<003c01cc24ef$151827b0$3f487710$%szyprowski@samsung.com>
-	<20110607085446.GC20929@n2100.arm.linux.org.uk>
-Message-ID: <004001cc2500$97d4dfc0$c77e9f40$%szyprowski@samsung.com>
+From: alan@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Tue, 7 Jun 2011 12:17:01 +0100
+Subject: [RFC PATCH] KMS support for i.MX51/53
+In-Reply-To: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
+References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110607121701.71cdd06e@lxorguk.ukuu.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> Currently I don't use any sophisticated memory allocater like GEM
+> or similar. I helped myself with simple dma_alloc where needed. At
 
-On Tuesday, June 07, 2011 10:55 AM Russell King - ARM Linux wrote:
+GEM is actually pretty sane when you get your head around it a spot. The
+main thing it took me a bit of time to get my head around is that it
+allocates backing memory and handles but it doesn't allocate address
+space on the card side.
 
-> On Tue, Jun 07, 2011 at 10:44:15AM +0200, Marek Szyprowski wrote:
-> > On Tuesday, June 07, 2011 10:06 AM Russell King - ARM Linux wrote:
-> > > NAK.  pfn_valid is already defined like this:
-> > >
-> > > int pfn_valid(unsigned long pfn)
-> > > {
-> > >         return memblock_is_memory(pfn << PAGE_SHIFT);
-> > > }
-> > >
-> > > provided you enable ARCH_HAS_HOLES_MEMORYMODEL, which you must do if
-> > > you're punching holes in the memory map.
-> >
-> > Ok, I see the point in ARCH_HAS_HOLES_MEMORYMODEL, but it doesn't solve
-> my
-> > problem. In case of Samsung Exynos4 and S5PV210 platforms we use
-> SPARSEMEM,
-> > but the above definition of pfn_valid() function is correct only if
-> SPARSEMEM
-> > is not enabled.
-> 
-> Sparsemem has been fixed recently (during the merge window) so that this
-> is now correct.
+For a minimal GEM take a look at drivers/staging/gma500/psb_gem.c. As I
+need to use a GTT and allocate address space I also use a standard Linux
+resource struct. If you just need to grab RAM and don't care about
+address spaces then you are well away except for getting console support I
+imagine.
 
-OK, thanks for help.
+The GMS500 one has no magic interfaces for things like swapping objects,
+as the card is just using it for 2D frame buffer objects so hopefully is
+a bit easier to follow than the full works.
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Alan
