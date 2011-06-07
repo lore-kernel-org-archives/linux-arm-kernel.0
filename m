@@ -1,34 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 7 Jun 2011 21:12:06 +0200
-Subject: [RFC PATCH] KMS support for i.MX51/53
-In-Reply-To: <20110607121701.71cdd06e@lxorguk.ukuu.org.uk>
-References: <1307443550-25549-1-git-send-email-s.hauer@pengutronix.de>
-	<20110607121701.71cdd06e@lxorguk.ukuu.org.uk>
-Message-ID: <20110607191205.GK23771@pengutronix.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 7 Jun 2011 13:18:24 -0600
+Subject: [PATCH v2 5/5] spi/ep93xx: add DMA support
+In-Reply-To: <20110607190607.GB3011@acer>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+	<4b27fc93b7df900943e7c12084a8340cbc5fe1a8.1306662317.git.mika.westerberg@iki.fi>
+	<20110603204400.GH17972@ponder.secretlab.ca>
+	<20110607171403.GA3011@acer>
+	<BANLkTikKOcc2Vg1p3kG4ZSLjJ0RTZWS=2A@mail.gmail.com>
+	<20110607190607.GB3011@acer>
+Message-ID: <20110607191824.GA2035@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2011 at 12:17:01PM +0100, Alan Cox wrote:
-> > Currently I don't use any sophisticated memory allocater like GEM
-> > or similar. I helped myself with simple dma_alloc where needed. At
+On Tue, Jun 07, 2011 at 10:06:07PM +0300, Mika Westerberg wrote:
+> On Tue, Jun 07, 2011 at 12:45:26PM -0600, Grant Likely wrote:
+> > On Tue, Jun 7, 2011 at 11:14 AM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> > >
+> > > I just realized that once the SPI driver renaming patch (spi: reorganize
+> > > drivers) enters linux-next, this patch (which sits on Vinod's tree) will cause
+> > > a merge conflict. Any ideas how to avoid it beforehand?
+> > 
+> > Yes, put the whole series into a separate branch all by itself.  Merge
+> > that branch into Vinod's tree and I'll also merge it into spi/next,
+> > and I'll fix up the merge conflict when I do.
 > 
-> GEM is actually pretty sane when you get your head around it a spot. The
-> main thing it took me a bit of time to get my head around is that it
-> allocates backing memory and handles but it doesn't allocate address
-> space on the card side.
+> More stupid questions: Do you mean that I create a branch in my public
+> repository somewhere? If that is the case, then there is a problem that I
+> don't have any public repository and I doubt that I get such before linux-next
+> is rebuilt.
 
-I'm not sure I understand you correctly. I have no address space on the
-card side since my 'card' just uses main memory. The memory I need must
-be a physically contiguous portion of sdram. I'm afraid shmem backing
-memory is not of much use for me.
+It doesn't have to be your repo.  Vinod could do it, or I could.
 
-Correct me if I mix things up...
-
-Sascha
-
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+g.
