@@ -1,50 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue,  7 Jun 2011 11:38:38 +0100
-Subject: [PATCH] ARM: mm: ensure TTBR0 is restored when changing ASID on
-	rollover
-Message-ID: <1307443118-11573-1-git-send-email-will.deacon@arm.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 7 Jun 2011 16:09:33 +0530
+Subject: [PATCH V2] davinci: da850: move input frequency to board
+	specific	files
+In-Reply-To: <874o42wpec.fsf@ti.com>
+References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
+	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
+	<874o42wpec.fsf@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D383AA8@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In 52af9c6c ("ARM: 6943/1: mm: use TTBR1 instead of reserved context ID")
-I updated the ASID rollover code to use only the kernel page tables
-whilst updating the ASID.
+Hi Kevin,
 
-Unfortunately, the code to restore the user page tables was part of a
-later patch which isn't yet in mainline, so this leaves the code
-quite broken.
+On Tue, Jun 07, 2011 at 04:14:59, Hilman, Kevin wrote:
+> Christian Riesch <christian.riesch@omicron.at> writes:
+> 
+> > From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+> >
+> > Currently the input frequency of the SoC is hardcoded in the SoC specific
+> > da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
+> > range from 12 to 50 MHz, boards with different oscillator/crystal
+> > frequencies may be built.
+> >
+> > This patch allows setting a different input frequency in the board
+> > specific files to support boards with oscillator/crystal frequencies other
+> > than 24 MHz.
+> >
+> > Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+> > Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+> 
+> Why not allow board code to just do a clk_set_rate()?
+> 
+> Currently the ref_clk struct clk does not have a .set_rate method
+> implemented, but that should be easy enough to add.  
+> 
+> Then the default ref_clk.rate would stay the 24MHz, but any boards that
+> want to override that simply use clk_get(), clk_set_rate(), clk_put()
 
-This patch fixes the issue by calling cpu_switch_mm to change the ASID
-which has the side-effect of setting up TTBR0 to point to the user
-tables.
+That's certainly much more elegant, but this would mean the whole
+clock tree is traversed again on each boot.
 
-Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+I am doing some measurements to see if there is any big difference
+in boot-time if this is done. Will get back with results.
 
-Russell - I've reposted this to the list because it somehow got lost in
-the archive and you've expressed some concerns over the code via the
-patch system. I think the only opportunity for a race is when a CPU
-doing switch_mm is interrupted by a rollover event occurring on another
-core, but this is something that exists in the current code anyway and
-is not affected by this patch.
-
- arch/arm/mm/context.c |    3 +--
- 1 files changed, 1 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/mm/context.c b/arch/arm/mm/context.c
-index 8bfae96..2352395 100644
---- a/arch/arm/mm/context.c
-+++ b/arch/arm/mm/context.c
-@@ -100,8 +100,7 @@ static void reset_context(void *info)
- 	set_mm_context(mm, asid);
- 
- 	/* set the new ASID */
--	asm("mcr	p15, 0, %0, c13, c0, 1\n" : : "r" (mm->context.id));
--	isb();
-+	cpu_switch_mm(mm->pgd, mm);
- }
- 
- #else
--- 
-1.7.0.4
+Thanks,
+Sekhar
