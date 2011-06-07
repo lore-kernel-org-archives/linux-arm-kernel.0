@@ -1,50 +1,28 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Wed, 8 Jun 2011 00:31:42 +0530
-Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
-In-Reply-To: <20110607184329.GA20849@sirena.org.uk>
-References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
-	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
-	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
-	<20110607081527.GB20929@n2100.arm.linux.org.uk>
-	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
-	<20110607182923.GA28451@n2100.arm.linux.org.uk>
-	<20110607184329.GA20849@sirena.org.uk>
-Message-ID: <BANLkTikXGpxpyF8kQORqswD5tqNEjtj3dA@mail.gmail.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Tue, 7 Jun 2011 22:06:07 +0300
+Subject: [PATCH v2 5/5] spi/ep93xx: add DMA support
+In-Reply-To: <BANLkTikKOcc2Vg1p3kG4ZSLjJ0RTZWS=2A@mail.gmail.com>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+	<4b27fc93b7df900943e7c12084a8340cbc5fe1a8.1306662317.git.mika.westerberg@iki.fi>
+	<20110603204400.GH17972@ponder.secretlab.ca>
+	<20110607171403.GA3011@acer>
+	<BANLkTikKOcc2Vg1p3kG4ZSLjJ0RTZWS=2A@mail.gmail.com>
+Message-ID: <20110607190607.GB3011@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2011 at 12:13 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Tue, Jun 07, 2011 at 07:29:23PM +0100, Russell King - ARM Linux wrote:
->
->> 2. Circular buffer support has been added - see device_prep_dma_cyclic().
->
->> However, 2 is not really a requirement for audio - you can queue several
->> single slave transfers (one per period) initially, and then you get
->> callbacks as each transfer completes. ?In the callback, you can submit
->> an additional buffer, and continue doing so causing DMA to never end.
->
->> I believe that this is a saner approach than the circular buffer support,
->> and its what I tried to put together for the AMBA PL041 AACI DMA (but
->> unfortunately, ARMs platforms are totally broken when it comes to DMA.)
->
-> Circular buffers are nice from the point of view of allowing you to
-> (providing the hardware supports it) totally disable the periodic audio
-> interrupts and leave the system to run for very long times off the
-> normal system timers. ?This gives a small but non-zero power benefit
-> providing the hardware gives you enough information about where the DMA
-> is so you can find out if you need to mix in a notification, otherwise
-> you get obvious latency issues.
+On Tue, Jun 07, 2011 at 12:45:26PM -0600, Grant Likely wrote:
+> On Tue, Jun 7, 2011 at 11:14 AM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> >
+> > I just realized that once the SPI driver renaming patch (spi: reorganize
+> > drivers) enters linux-next, this patch (which sits on Vinod's tree) will cause
+> > a merge conflict. Any ideas how to avoid it beforehand?
+> 
+> Yes, put the whole series into a separate branch all by itself.  Merge
+> that branch into Vinod's tree and I'll also merge it into spi/next,
+> and I'll fix up the merge conflict when I do.
 
-This is what I called free-running circular buffer.
-Besides power saving scenario, it is necessary for a fast peripheral
-with shallow fifo.
-The peripheral throws underrun errors, if the dma h/w doesn't support
-LLI and cpu takes
-a bit long loading-triggering the next transfer on DMA due to
-irq-latency for some reason.
-
-
-> You can also do this with an circular chain of sequential buffers of
-> course.
-This is what is called Circular buffer in Samsung's DMA API.
+More stupid questions: Do you mean that I create a branch in my public
+repository somewhere? If that is the case, then there is a problem that I
+don't have any public repository and I doubt that I get such before linux-next
+is rebuilt.
