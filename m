@@ -1,49 +1,53 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 07 Jun 2011 10:44:15 +0200
-Subject: [PATCH] ARM: fix ioremap to allow mapping some specific RAM areas
-In-Reply-To: <20110607080541.GA20929@n2100.arm.linux.org.uk>
-References: <1307430745-17329-1-git-send-email-m.szyprowski@samsung.com>
-	<20110607080541.GA20929@n2100.arm.linux.org.uk>
-Message-ID: <003c01cc24ef$151827b0$3f487710$%szyprowski@samsung.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 7 Jun 2011 17:46:46 +0900
+Subject: [PATCH] Consolidate the clkdev header files
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F381FC48C2@AUSP01VMBX24.collaborationhost.net>
+References: <20110530010416.GA24365@july>
+	<ADE657CA350FB648AAC2C43247A983F001F381FC48C2@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <BANLkTikTE=Gz0g4zao8OdGanMmZxt_zb=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hi Russell,
 
-On Tuesday, June 07, 2011 10:06 AM Russell King - ARM Linux wrote:
+Any comments on this patch?
 
-> On Tue, Jun 07, 2011 at 09:12:25AM +0200, Marek Szyprowski wrote:
-> > Creating more than one mapping on ARMv6+ might cause unspecified behavior,
-> > so ioremap() should fail if it was called with area that matches low
-> memory.
-> > However if the board code removes the specific area from low memory
-> > mapping on boot (for example by calling memblock_remove()), then creating
-> > a mapping with ioremap might be desired.
-> >
-> > This patch enables creating mapping for RAM by ioremap call, but only if
-> > the target area has no low memory mapping yet. This enables board code to
-> > reserve particular memory areas with memblock_remove() and provide them
-> to
-> > device drivers with a declare_coherent_memory() call.
-> 
-> NAK.  pfn_valid is already defined like this:
-> 
-> int pfn_valid(unsigned long pfn)
-> {
->         return memblock_is_memory(pfn << PAGE_SHIFT);
-> }
-> 
-> provided you enable ARCH_HAS_HOLES_MEMORYMODEL, which you must do if
-> you're punching holes in the memory map.
+Thank you,
+Kyungmin Park
 
-Ok, I see the point in ARCH_HAS_HOLES_MEMORYMODEL, but it doesn't solve my
-problem. In case of Samsung Exynos4 and S5PV210 platforms we use SPARSEMEM,
-but the above definition of pfn_valid() function is correct only if SPARSEMEM
-is not enabled.
-
-How do you suggest to solve this issue in case of SPARSEMEM platforms?
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+On Wed, Jun 1, 2011 at 1:40 AM, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
+> On Sunday, May 29, 2011 6:04 PM, Kyungmin Park wrote:
+>> From: Kyungmin Park <kyungmin.park@samsung.com>
+>>
+>> Now most of ARM machines has the alsmot same __clk_get/put() macro
+>>
+>> So place it at the arch/arm/include/asm/clkdev.h and remove the reduntant header files
+>>
+>> But some machines don't have the same form as above. It can use the machince specific clkdev file by HAVE_MACH_CLKDEV config
+>>
+>> Now there are only 3 caese.
+>>
+>> 1) define the clk structure with clkdev macro => Need to move clk structure to proper header file
+>>
+>> arch/arm/mach-versatile/include/mach/clkdev.h
+>> arch/arm/mach-realview/include/mach/clkdev.h
+>> arch/arm/mach-vexpress/include/mach/clkdev.h
+>> arch/arm/mach-integrator/include/mach/clkdev.h
+>>
+>> 2) export the __clk_get/put function at clock.c
+>>
+>> arch/arm/mach-shmobile/include/mach/clkdev.h
+>>
+>> 3) demuxing the clk source
+>> arch/arm/mach-u300/include/mach/clkdev.h
+>>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> ---
+>> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? ?6 ++++
+>> ?arch/arm/include/asm/clkdev.h ? ? ? ? ? ? ? ?| ? ?5 ++++
+>
+>> ?arch/arm/mach-ep93xx/include/mach/clkdev.h ? | ? 11 --------
+>
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+>
