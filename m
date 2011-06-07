@@ -1,34 +1,36 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 7 Jun 2011 08:41:20 +0200
-Subject: [PATCH v2 0/2] sdio: add quirk for spurious SDIO IRQ
-In-Reply-To: <alpine.LFD.2.00.1106011157000.30544@xanadu.home>
-References: <1306918113-23872-1-git-send-email-per.forlin@stericsson.com>
-	<alpine.LFD.2.00.1106011157000.30544@xanadu.home>
-Message-ID: <BANLkTimnZ=SDbrNiHL8+pHjjbQ-UrzCYpQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 7 Jun 2011 08:46:53 +0200
+Subject: [GIT PULL] i.MX patches for -rc
+Message-ID: <20110607064653.GI23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 June 2011 17:59, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
-> On Wed, 1 Jun 2011, Per Forlin wrote:
->
->> From: Per Forlin <per.forlin@linaro.org>
->>
->> Daniel Drake reported an issue in the libertas sdio client that was
->> triggered by the sdio_single_irq functionality. His SDIO device seems to
->> raise an interrupt even though there are no bits set in the CCCR_INTx
->> register. This behaviour is not supported by the sdio_single_irq feature nor
->> the SDIO spec. The purpose of the sdio_single_irq feature is to avoid the
->> overhead of checking the CCCR_INTx registers, this result in no error
->> handling of the case if there is a pending IRQ with none CCCR_INTx bits set.
->>
->> This patchset adds a quirk to support this spurious IRQ issue and also report
->> a warning if an SDIO interrupt is raised but none CCCR_INTx bits are set.
->
-> Given that the issue can be fixed locally to the libertas driver, I'd
-> suggest not merging this series until truly unfixable issues come up, as
-> Daniel said.
->
-I agree too.
 
-Thanks,
-Per
+Hi Russell,
+
+Please pull the following two small i.MX fixes.
+
+Sascha
+
+
+The following changes since commit 55922c9d1b84b89cb946c777fddccb3247e7df2c:
+
+  Linux 3.0-rc1 (2011-05-29 17:43:36 -0700)
+
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git for-rmk
+
+Fabio Estevam (1):
+      ARM: mx51/sdma: Check the chip revision in run-time
+
+Wolfram Sang (1):
+      arm: mxs: include asm/processor.h for cpu_relax()
+
+ arch/arm/mach-mxs/ocotp.c                    |    2 ++
+ arch/arm/plat-mxc/devices/platform-imx-dma.c |    6 ++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
