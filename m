@@ -1,35 +1,176 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 06 Jun 2011 16:29:43 -0700
-Subject: [GIT PULL] OMAP PM fixes for v3.0-rc
-Message-ID: <87oc2atu6w.fsf@ti.com>
+From: akpm@linux-foundation.org (Andrew Morton)
+Date: Mon, 6 Jun 2011 17:33:39 -0700
+Subject: [PATCH V2 1/3] drivers/pwm st_pwm: Add support for ST's Pulse
+	Width Modulator
+In-Reply-To: <af3d50b271b17e404d236e19196adfd4618e2501.1306831238.git.viresh.kumar@st.com>
+References: <cover.1306831238.git.viresh.kumar@st.com>
+	<af3d50b271b17e404d236e19196adfd4618e2501.1306831238.git.viresh.kumar@st.com>
+Message-ID: <20110606173339.268b9f9c.akpm@linux-foundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+On Tue, 31 May 2011 14:21:51 +0530
+Viresh Kumar <viresh.kumar@st.com> wrote:
 
-Please pull the following fixes for v3.0-rc.  Looks like I just missed
-your pull request, so you can add this to the next one.
+> This patch adds support for ST Microelectronics Pulse Width Modulator. This is
+> currently used by ST's SPEAr platform and tested on the same.
+> 
+> This patch also adds drivers/pwm directory as suggested by Arnd Bergmann in
+> following discussion:
+> 
+> http://comments.gmane.org/gmane.linux.ports.arm.kernel/118651
+> 
+>
+> ...
+>
+> +/**
+> + * struct pwm_device: struct representing pwm device/channel
+> + *
+> + * pwmd_id: id of pwm device
+> + * pwm: pointer to parent pwm ip
+> + * label: used for storing label passed in pwm_request
+> + * offset: base address offset from parent pwm mmio_base
+> + * busy: represents usage status of a pwm device
+> + * lock: lock specific to a pwm device
 
-Note that I split the section mismatch patch from Russell into two.  One
-to go through you for OMAP core and the other (GPIO) to go through that
-driver tree.
+More specificity here would be helpful.  Precisely which data does the
+lock protect?
 
-Kevin
+> + * node: node for adding device to parent pwm's devices list
+> + *
+> + * Each pwm IP contains four independent pwm device/channels. Some or all of
+> + * which may be present in our configuration.
+> + */
+> +struct pwm_device {
+> +	unsigned pwmd_id;
+> +	struct pwm *pwm;
+> +	const char *label;
+> +	unsigned offset;
+> +	unsigned busy;
+> +	spinlock_t lock;
+> +	struct list_head node;
+> +};
+> +
+> +/**
+> + * struct pwm: struct representing pwm ip
+> + *
+> + * id: id of pwm ip
+> + * mmio_base: base address of pwm
+> + * clk: pointer to clk structure of pwm ip
+> + * clk_enabled: clock enable status
+> + * pdev: pointer to pdev structure of pwm
+> + * lock: lock specific to current pwm ip
+
+Ditto.
+
+> + * devices: list of devices/childrens of pwm ip
+> + * node: node for adding pwm to global list of all pwm ips
+> + */
+> +struct pwm {
+> +	unsigned id;
+> +	void __iomem *mmio_base;
+> +	struct clk *clk;
+> +	int clk_enabled;
+> +	struct platform_device *pdev;
+> +	spinlock_t lock;
+> +	struct list_head devices;
+> +	struct list_head node;
+> +};
+> +
+> +/*
+> + * period_ns = 10^9 * (PRESCALE + 1) * PV / PWM_CLK_RATE
+> + * duty_ns = 10^9 * (PRESCALE + 1) * DC / PWM_CLK_RATE
+> + *
+> + * PV = (PWM_CLK_RATE * period_ns)/ (10^9 * (PRESCALE + 1))
+> + * DC = (PWM_CLK_RATE * duty_ns)/ (10^9 * (PRESCALE + 1))
+> + */
+> +int pwm_config(struct pwm_device *pwmd, int duty_ns, int period_ns)
+> +{
+> +	u64 val, div, clk_rate;
+> +	unsigned long prescale = MIN_PRESCALE, pv, dc;
+> +	int ret = 0;
+> +
+> +	if (!pwmd) {
+> +		pr_err("pwm: config - NULL pwm device pointer\n");
+> +		return -EFAULT;
+> +	}
+> +
+> +	if (period_ns == 0 || duty_ns > period_ns) {
+> +		ret = -EINVAL;
+> +		goto err;
+> +	}
+> +
+> +	/* TODO: Need to optimize this loop */
+> +	while (1) {
+> +		div = 1000000000;
+> +		div *= 1 + prescale;
+> +		clk_rate = clk_get_rate(pwmd->pwm->clk);
+> +		val = clk_rate * period_ns;
+> +		pv = div64_u64(val, div);
+> +		val = clk_rate * duty_ns;
+> +		dc = div64_u64(val, div);
+> +
+> +		if ((pv == 0) || (dc == 0)) {
+> +			ret = -EINVAL;
+> +			goto err;
+> +		}
+> +		if ((pv > MAX_PERIOD) || (dc > MAX_DUTY)) {
+> +			prescale++;
+> +			if (prescale > MAX_PRESCALE) {
+> +				ret = -EINVAL;
+> +				goto err;
+> +			}
+> +			continue;
+> +		}
+> +		if ((pv < MIN_PERIOD) || (dc < MIN_DUTY)) {
+> +			ret = -EINVAL;
+> +			goto err;
+> +		}
+> +		break;
+> +	}
+
+gee, is this some sort of puzzle?  So human-readable description of
+what this code is doing would be an improvement.
 
 
-The following changes since commit 59c5f46fbe01a00eedf54a23789634438bb80603:
+> +	/*
+> +	 * NOTE: the clock to PWM has to be enabled first
+> +	 * before writing to the registers
+> +	 */
+> +	spin_lock(&pwmd->pwm->lock);
+> +	ret = clk_enable(pwmd->pwm->clk);
+> +	if (ret) {
+> +		spin_unlock(&pwmd->pwm->lock);
+> +		goto err;
+> +	}
+> +
+> +	spin_lock(&pwmd->lock);
+> +	writel(prescale << PRESCALE_SHIFT, pwmd->pwm->mmio_base +
+> +			pwmd->offset + PWMCR);
+> +	writel(dc, pwmd->pwm->mmio_base + pwmd->offset + PWMDCR);
+> +	writel(pv, pwmd->pwm->mmio_base + pwmd->offset + PWMPCR);
+> +	spin_unlock(&pwmd->lock);
+> +	clk_disable(pwmd->pwm->clk);
+> +	spin_unlock(&pwmd->pwm->lock);
 
-  Linux 3.0-rc2 (2011-06-06 18:06:33 +0900)
+The nesting rules for these two locks seems sensible and obvious, but I
+guess documenting the rule wouldn't hurt.
 
-are available in the git repository at:
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.0/pm-fixes
+> +	return 0;
+> +err:
+> +	dev_err(&pwmd->pwm->pdev->dev, "pwm config fail\n");
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL(pwm_config);
+> +
+>
+> ...
+>
+> +static int __devinit st_pwm_probe(struct platform_device *pdev)
 
-Kevin Hilman (1):
-      OMAP: PM: omap_device: fix device power domain callbacks
+And here things get rather odd.
 
-Russell King (1):
-      OMAP: PM debug: fix section mismatch warnings
-
- arch/arm/mach-omap2/pm-debug.c   |    4 ++--
- arch/arm/plat-omap/omap_device.c |   19 +++++++++++++++++--
- 2 files changed, 19 insertions(+), 4 deletions(-)
+Most of this file is a generic, non-device specific PWM layer, exported
+to other modules.  But then we get into driver bits which are specific
+to one paritular type of device.  Confused - this is like putting the
+e100 driver inside net/ipv4/tcp.c?
