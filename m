@@ -1,87 +1,49 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 7 Jun 2011 17:42:47 +0900
-Subject: [PATCH] ARM: EXYNOS4: Fix incorrect mapping of gpio pull-up macro
-	to register setting
-In-Reply-To: <1307435689-15954-1-git-send-email-thomas.ab@samsung.com>
-References: <1307435689-15954-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <BANLkTi=YeOyK1WX61NtyprYdUyNmSo1sTw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 07 Jun 2011 10:44:15 +0200
+Subject: [PATCH] ARM: fix ioremap to allow mapping some specific RAM areas
+In-Reply-To: <20110607080541.GA20929@n2100.arm.linux.org.uk>
+References: <1307430745-17329-1-git-send-email-m.szyprowski@samsung.com>
+	<20110607080541.GA20929@n2100.arm.linux.org.uk>
+Message-ID: <003c01cc24ef$151827b0$3f487710$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2011 at 5:34 PM, Thomas Abraham <thomas.ab@samsung.com> wrote:
-> The S3C_GPIO_PULL_UP macro value incorrectly maps to a reserved setting of GPIO
-> pull up/down registers on Exynos4 platform. Fix this incorrect mapping by adding
-> wrappers to the s3c_gpio_setpull_updown and s3c_gpio_getpull_updown functions.
+Hello,
 
-Personally I like to use the variable instead of function hooking.
-set the correct variable at cpu dection and use it
-then these thing make a single generic function and each gpio_cfg use
-the same thing.
+On Tuesday, June 07, 2011 10:06 AM Russell King - ARM Linux wrote:
 
-Anyway it's next step. current fix the bug first.
+> On Tue, Jun 07, 2011 at 09:12:25AM +0200, Marek Szyprowski wrote:
+> > Creating more than one mapping on ARMv6+ might cause unspecified behavior,
+> > so ioremap() should fail if it was called with area that matches low
+> memory.
+> > However if the board code removes the specific area from low memory
+> > mapping on boot (for example by calling memblock_remove()), then creating
+> > a mapping with ioremap might be desired.
+> >
+> > This patch enables creating mapping for RAM by ioremap call, but only if
+> > the target area has no low memory mapping yet. This enables board code to
+> > reserve particular memory areas with memblock_remove() and provide them
+> to
+> > device drivers with a declare_coherent_memory() call.
+> 
+> NAK.  pfn_valid is already defined like this:
+> 
+> int pfn_valid(unsigned long pfn)
+> {
+>         return memblock_is_memory(pfn << PAGE_SHIFT);
+> }
+> 
+> provided you enable ARCH_HAS_HOLES_MEMORYMODEL, which you must do if
+> you're punching holes in the memory map.
 
-Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+Ok, I see the point in ARCH_HAS_HOLES_MEMORYMODEL, but it doesn't solve my
+problem. In case of Samsung Exynos4 and S5PV210 platforms we use SPARSEMEM,
+but the above definition of pfn_valid() function is correct only if SPARSEMEM
+is not enabled.
 
->
-> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
-> ---
-> ?drivers/gpio/gpio-exynos4.c | ? 29 +++++++++++++++++++++++++----
-> ?1 files changed, 25 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/gpio/gpio-exynos4.c b/drivers/gpio/gpio-exynos4.c
-> index d54ca6a..9029835 100644
-> --- a/drivers/gpio/gpio-exynos4.c
-> +++ b/drivers/gpio/gpio-exynos4.c
-> @@ -21,16 +21,37 @@
-> ?#include <plat/gpio-cfg.h>
-> ?#include <plat/gpio-cfg-helpers.h>
->
-> +int s3c_gpio_setpull_exynos4(struct s3c_gpio_chip *chip,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int off, s3c_gpio_pull_t pull)
-> +{
-> + ? ? ? if (pull == S3C_GPIO_PULL_UP)
-> + ? ? ? ? ? ? ? pull = 3;
-> +
-> + ? ? ? return s3c_gpio_setpull_updown(chip, off, pull);
-> +}
-static?
-> +
-> +s3c_gpio_pull_t s3c_gpio_getpull_exynos4(struct s3c_gpio_chip *chip,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int off)
-> +{
-> + ? ? ? s3c_gpio_pull_t pull;
-> +
-> + ? ? ? pull = s3c_gpio_getpull_updown(chip, off);
-> + ? ? ? if (pull == 3)
-> + ? ? ? ? ? ? ? pull = S3C_GPIO_PULL_UP;
-> +
-> + ? ? ? return pull;
-> +}
-ditto.
-> +
-> ?static struct s3c_gpio_cfg gpio_cfg = {
-> ? ? ? ?.set_config ? ? = s3c_gpio_setcfg_s3c64xx_4bit,
-> - ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_updown,
-> - ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_updown,
-> + ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_exynos4,
-> + ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_exynos4,
-> ?};
->
-> ?static struct s3c_gpio_cfg gpio_cfg_noint = {
-> ? ? ? ?.set_config ? ? = s3c_gpio_setcfg_s3c64xx_4bit,
-> - ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_updown,
-> - ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_updown,
-> + ? ? ? .set_pull ? ? ? = s3c_gpio_setpull_exynos4,
-> + ? ? ? .get_pull ? ? ? = s3c_gpio_getpull_exynos4,
-> ?};
->
-> ?/*
-> --
-> 1.6.6.rc2
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+How do you suggest to solve this issue in case of SPARSEMEM platforms?
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
