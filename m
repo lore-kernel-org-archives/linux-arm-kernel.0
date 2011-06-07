@@ -1,35 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 7 Jun 2011 23:36:14 +0100
-Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
-In-Reply-To: <BANLkTikLFCyzU3UApjjwfX0Vjujo9WAFZA@mail.gmail.com>
-References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
-	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
-	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
-	<20110607081527.GB20929@n2100.arm.linux.org.uk>
-	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
-	<20110607182923.GA28451@n2100.arm.linux.org.uk>
-	<BANLkTikLFCyzU3UApjjwfX0Vjujo9WAFZA@mail.gmail.com>
-Message-ID: <20110607223614.GC28451@n2100.arm.linux.org.uk>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 8 Jun 2011 00:59:40 +0200 (CEST)
+Subject: TI-Davinci 6446 oops on interrupts
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D383CDB@dbde02.ent.ti.com>
+References: <4DECCADE.6080100@selfish.org> <4DECD8C0.6010908@freyther.de>
+	<alpine.LFD.2.02.1106061650210.13964@ionos>
+	<4DECEDF9.4010202@selfish.org>
+	<alpine.LFD.2.02.1106061719290.13964@ionos>
+	<4DECF32B.6000508@selfish.org>
+	<alpine.LFD.2.02.1106062330380.13964@ionos>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D383CDB@dbde02.ent.ti.com>
+Message-ID: <alpine.LFD.2.02.1106080058580.11814@ionos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 01:16:40AM +0530, Jassi Brar wrote:
-> IMHO Samsung SoC team (not his majesty Mr Kyungmin Park) are justified
-> if they are not so eager right now. Since I no more would have to spend
-> sleepless nights over
-> SPDIF underruns, I can side with what Kukjin Kim(Samsung maintainer)
-> decides, who has to live with the results.
+On Tue, 7 Jun 2011, Nori, Sekhar wrote:
 
-Well, the question is _when_ will these things happen in the Samsung
-world?
+> Hi Thomas,
+> 
+> On Tue, Jun 07, 2011 at 03:01:31, Thomas Gleixner wrote:
+> 
+> > > > Subject: arm: davinci: Fix fallout from generic irq chip conversion
+> > > > From: Thomas Gleixner <tglx@linutronix.de>
+> > > > Date: Mon, 06 Jun 2011 11:51:43 +0200
+> > > > 
+> > > > Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+> > > 
+> > > Tested-by: Holger Hans Peter Freyther <holger@freyther.de>
+> > 
+> > can you please pick that up? It should have a Cc: stable at kernel.org
+> > tag as well.
+> 
+> But generic IRQ chip support for DaVinci was merged only in
+> v3.0-rc1.
+> 
+> $ git log --tags --source --oneline arch/arm/mach-davinci/irq.c
+> aac4dd1 v3.0-rc1 arm: davinci: Use generic irq chip
 
-I see no effort from the Samsung folk to even start considering moving
-to common APIs - I see precisely the opposite.  They seem to have a
-strong desire to invent their own new APIs all the time rather than
-look at existing APIs and discuss how they can be used or adapted so
-they work for Samsung.
-
-That is not sustainable, and if it continues, it will probably result
-in Samsung stuff being chucked out of mainline.  We are most definitely
-at the point where custom APIs are no longer permissible, especially
-for any new SoCs.
+Of course. Stupid me !
