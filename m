@@ -1,48 +1,143 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Tue, 7 Jun 2011 08:04:57 -0700
-Subject: [PATCH v3 2/4] mmc: support sdhci-pxav2.c
-In-Reply-To: <BANLkTinsk0AzBYd+fO9Oz1RO9smNzJTsTA@mail.gmail.com>
-References: <1307094606-8692-1-git-send-email-zhangfei.gao@marvell.com>
-	<1E53FF9F-5C6A-4AA2-B441-DD712C5D6715@marvell.com>
-	<BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
-	<201106070917.41691.arnd@arndb.de>
-	<BANLkTinsk0AzBYd+fO9Oz1RO9smNzJTsTA@mail.gmail.com>
-Message-ID: <A5ADAC80-98EE-4184-A958-965A3EC275F9@marvell.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 7 Jun 2011 16:36:54 +0100
+Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to a
+	physical address
+In-Reply-To: <alpine.DEB.2.00.1106071435020.2247@localhost6.localdomain6>
+References: <1307379898-14256-1-git-send-email-will.deacon@arm.com>
+	<1307379898-14256-5-git-send-email-will.deacon@arm.com>
+	<alpine.DEB.2.00.1106071126290.2247@localhost6.localdomain6>
+	<alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
+	<20110607132220.GB12639@e102144-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1106071435020.2247@localhost6.localdomain6>
+Message-ID: <20110607153654.GA19855@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On Jun 7, 2011, at 12:31 AM, Eric Miao wrote:
-
->> How about changing the title of the option though? A user will
->> usually not know if he is using the v2 or v3 controller without
->> reading the help text. If you change it to
->> 
->> config MMC_SDHCI_PXAV2
->>        tristate "Marvell PXA168 SD Host Controller support (PXAV2)"
->>        default CPU_PXA168
-
-change to
->>        tristate "Marvell PXA9xx SD Host Controller support (PXAV2)"
-
-the pxa168 will not work in all cases with the V2 code.  It needs IO_ACCESSORS for readw and
-a callback to sdhci.c to delay then time between transfers.  Once V2 code is mainline
-I will resubmit the pxa168 code.
-
-
->> 
->> config MMC_SDHCI_PXAV3
->>        tristate "Marvell MMP2/PX9XX SD Host Controller support (PXAV3)"
->>        default CPU_MMP2 || CPU_PXA910
->> 
+On Tue, Jun 07, 2011 at 02:54:53PM +0100, Frank Hofmann wrote:
 > 
-> Yeah, the above is much cleaner/simpler.
 > 
->> you increase the chances of users getting the configuration right.
->> 
->>        Arnd
->> 
->> BTW, both of you: Please always remove the lines that you don't refer to
->> when you reply to an email. It's very annoying having to scroll through
->> dozens of lines of citations to see what you are actually writing.
->> 
+> On Tue, 7 Jun 2011, Will Deacon wrote:
+> 
+> >Hi Frank,
+> >
+> >Thanks for looking at this.
+> 
+> Thanks for posting it ;-)
+> 
+> [ ... ]
+> >>>>+	/* Switch to the identity mapping. */
+> >>>>+	((typeof(cpu_reset) *)virt_to_phys((void *)cpu_reset))(reset_code_phys);
+> >>>
+> >>>void (*reset_func)(unsigned long) = virt_to_phys(cpu_reset)
+> >>
+> >>Sorry, pressed wrong key ... posted too early.
+> >
+> >No problem.
+> >
+> >>I meant to say this line is magic, why not decouple the declaration bit
+> >>from the invocation so that at least the function call looks "normal" ?
+> >
+> >You mean you don't like the LISP-ish look of it?! I take your point, I'll rework
+> >that.
+> 
+> 	typeof(cpu_reset)(*phys_reset) =
+> 		(typeof(cpu_reset) *)virt_to_phys(cpu_reset);
+
+This is a declaration, but the extra parentheses confuse me.
+
+How about:
+
+	typeof(cpu_reset) *phys_reset =
+		(typeof(cpu_reset) *)virt_to_phys(cpu_reset);
+
+or even:
+
+	typedef typeof(cpu_reset) *phys_reset_t;
+	phys_reset_t phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+> 
+> 	reset_func(reset_code_phys);
+
+Do you mean reset_func(phys_reset) ?
+
+> 
+> Works for me. Was experimenting with this when I pressed the wrong key.
+> 
+> >
+> >>Regarding the use of local_irq/fiq_disable - is it safe to call these
+> >>multiple times, i.e. is it safe to invoke the reset function from a
+> >>context where IRQ/FIQ are already off ?
+> >
+> >Yes, they just mask at the CPSR level.
+> 
+> Good, thx for the confirmation.
+> 
+> >
+> >>
+> >>Another question regarding the MMU tables.
+> >>
+> >>prepare_for_reboot / setup_mm_for_reboot assume that current->mm is
+> >>available _and_ lowmem / user area there can be blotted over.
+> >>
+> >>Wrt. to hibernation, that's a stretch unless some way is found to fully
+> >>"fake a context". With that I mean to create a threadinfo and pagedir
+> >>that's guaranteed to sit outside the target kernel heap.
+> >
+> >Ouch, ok.
+> >
+> >>Currently, the hibernation code switches to swapper_pg_dir and puts the
+> >>1:1 mappings in there; I'm starting to think that is safe if for no other
+> >>reason than swapper_pg_dir having _nothing_ in the user area ?
+> >
+> >That sounds ok providing that, when you come out of hibernate, the 1:1 mapping
+> >doesn't persist in swapper_pg_dir.
+> 
+> I can delete those mappings - as they're created by
+> identity_mapping_add() they can be ditched with
+> identity_mapping_del() - which might be sufficient, provided, and
+> there's the critical bit why I ask, that swapper_pg_dir _normally_
+> has nothing in the range anyway.
+> 
+> Thing is, just because something appears to work doesn't mean it has
+> no unexpected/undesired side effects ... and I'm no ARM VM guru.
+> 
+> 
+> >
+> >However, stepping back a bit here, there is a bigger problem to tackle. If the
+> >physical address of cpu_reset is bigger than TASK_SIZE, then we fail to map it
+> >using the current identity mapping code [that piggy backs on the current task].
+> >If PHYS_OFFSET > TASK_SIZE, this will *always* be the case and is probably quite
+> >common for a 2:2 split.
+> >
+> >I can think of two ways to get around this:
+> >
+> >(1) Use /another/ set of page tables for mapping the cpu_reset code only [and
+> >   nothing else]. This is tricky since it will need to be set extremely late-on
+> >   where we don't care about mapping in the rest of the kernel, data, stack etc.
+> >
+> >(2) Make the assumption that the physical address of cpu_reset will not conflict
+> >   with a virtual address that points at the kernel text via the linear mapping.
+> >   This is probably a reasonable thing to assume, given that the kernel lives
+> >   near the start of memory on most platforms. We could then take out the ID map
+> >   but leaving the kernel text alone. We'd probably have to change to a new stack,
+> >   which we could place immediately after the kernel text.
+> >
+> >What do you reckon?
+> 
+> cpu_reset itself is relocatable, isn't it ? Maybe one could do the
+> same thing with/for it as for the reset code itself. I.e. relocate
+> to a "suitable" page if the 1:1 mapping for all of lowmem isn't
+> possible. The catch with that is of course somehow, such a "1:1
+> candidate page" must be found.
+
+If cpu_reset is guaranteed to be position-independent and self-contained, we could
+just copy it (with fncpy() for example).  We would still need to know the length
+of that function somehow though.  Maybe just assuming that it's not longer than
+a page would be safe enough.
+
+In this case we would just need to find an identity-mappable target location to
+copy the code to; we can find such a location in the same way as that used to
+find space for the alternate stack, i.e., somewhere after the end of the kernel
+image.
+
+Cheers
+---Dave
