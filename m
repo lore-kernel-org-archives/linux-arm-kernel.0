@@ -1,74 +1,82 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Wed, 8 Jun 2011 23:13:52 +0900
-Subject: [PATCH] ARM: S5PV210: Fix build breakage due to renaming of
-	S3C_VA_USB_HSPHY
-In-Reply-To: <005501cc25e3$7df601e0$79e205a0$%szyprowski@samsung.com>
-References: <1307532337-29348-1-git-send-email-thomas.ab@samsung.com>
-	<005501cc25e3$7df601e0$79e205a0$%szyprowski@samsung.com>
-Message-ID: <BANLkTi=c1p7yxswvymBWS1PQeqW=+weKbQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 08 Jun 2011 10:15:02 -0400 (EDT)
+Subject: Dynamic patching in discarded sections
+In-Reply-To: <201106081123.59414.arnd@arndb.de>
+References: <201106081123.59414.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1106080946000.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2011 at 10:53 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
->
-> There is already the patch that fixes this issue available on
-> kgene/s5p_fixes_for_linus branch. Please check commit 08115a139 from
-> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->
-> On Wednesday, June 08, 2011 1:26 PM Thomas Abraham wrote:
->
->> Commit 8f1d169f999fea892c3fcbf5a79ae8525a477572
->> ("ARM: EXYNOS4: Add usb host phy control") renamed S3C_VA_USB_HSPHY
->> to S5P_VA_USB_HSPHY in s5p-map.h file. Fix build for S5PV210 platform.
+On Wed, 8 Jun 2011, Arnd Bergmann wrote:
 
-Hi Thomas & Marek,
+> I've been playing with randconfig builds and found an interesting problem
+> with the combination of:
+> 
+> CONFIG_ARM_PATCH_PHYS_VIRT=y
+> CONFIG_HOTPLUG=n
+> CONFIG_DMABOUNCE=n
+> CONFIG_MMC_SPI=y
+> 
+> The problem is shown with this code:
+> 
+> static int __devexit mmc_spi_remove(struct spi_device *spi)
+> {
+> 	...   
+>                         dma_unmap_single(host->dma_dev, host->ones_dma,
+>                                 MMC_SPI_BLOCKSIZE, DMA_TO_DEVICE);
+>                         dma_unmap_single(host->dma_dev, host->data_dma,
+>                                 sizeof(*host->data), DMA_BIDIRECTIONAL);
+> 	...
+> }
+> 
+> and the error message (in case someone looks for this using google) is
+> 
+> `.devexit.text' referenced in section `.pv_table' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
+> `.devexit.text' referenced in section `.pv_table' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
+> 
+> What happens is that dma_unmap_single() calls
+>  __dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir), which requires
+> patching in the caller. However, due to CONFIG_HOTPLUG being disabled, the
+> __devexit section gets discarded, and the linker cannot create an entry in the
+> .pvtable section for the mmc_spi_remove function.
 
-We lived for long time with mismatch prefix.
-So how about to clean up the mismatch prefix, S3C_* and S5P_* at this time?
+We really need to push for better toolchain support here.  This could 
+easily be solved with some way to query the currently active section 
+from the assembler and use that to construct the argument to the
+.pushsection directive.  This way, the .pvtable section could become 
+.pvtable.__devexit when the reference is made from a __devexit section, 
+and that could be discarded altogether at link time if unneeded.
 
-One method is that it just passes the physical address and driver
-should ioremap at driver instead of static mapping.
+Dave Martin proposed an extension to gas here (also sent to 
+binutils at sourceware.org):
 
-How do you think?
+http://article.gmane.org/gmane.linux.linaro.toolchain/701
 
-Thank you,
-Kyungmin Park
+But as far as I know, nothing further happened. And this is not an ARM 
+specific issue either as the X86 alternates have the same problem.
 
->>
->> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->> ---
->> ?arch/arm/mach-s5pv210/cpu.c | ? ?2 +-
->> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
->> index 61e6c24..b343582 100644
->> --- a/arch/arm/mach-s5pv210/cpu.c
->> +++ b/arch/arm/mach-s5pv210/cpu.c
->> @@ -91,7 +91,7 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
->> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->> ? ? ? }, {
->> - ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S3C_VA_USB_HSPHY,
->> + ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_USB_HSPHY,
->> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?=__phys_to_pfn(S5PV210_PA_HSPHY),
->> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->> --
->> 1.6.6.rc2
->
-> S3C_VA_USB_HSPHY is the correct name, it is also used on s3c64xx and
-> s3c-hsotg driver (see drivers/usb/gadget).
->
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> I don't know if the same problem exists in other places in the code, but it's
+> entirely possible. I also couldn't think of a good solution for this, short of
+> moving the definition of dma_unmap_single() to out of line code.
+
+Probably the best interim solution would be:
+
+diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+index dfbb377..f231c92 100644
+--- a/arch/arm/kernel/vmlinux.lds.S
++++ b/arch/arm/kernel/vmlinux.lds.S
+@@ -21,7 +21,8 @@
+ #define ARM_CPU_KEEP(x)
+ #endif
+ 
+-#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
++#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
++    defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+ #define ARM_EXIT_KEEP(x)	x
+ #else
+ #define ARM_EXIT_KEEP(x)
+
+But clearly the toolchain should be more accommodating instead.
+
+
+Nicolas
