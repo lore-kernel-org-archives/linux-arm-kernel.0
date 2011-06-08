@@ -1,37 +1,24 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 8 Jun 2011 12:33:15 +0200
-Subject: [PATCH v3 1/2] omap3: iovmm: Work around sg_alloc_table size
-	limitation in IOMMU
-In-Reply-To: <20110606180052.GB9456@n2100.arm.linux.org.uk>
-References: <20110601131744.GH11352@atomide.com>
-	<201106061854.10450.laurent.pinchart@ideasonboard.com>
-	<20110606180052.GB9456@n2100.arm.linux.org.uk>
-Message-ID: <201106081233.16397.laurent.pinchart@ideasonboard.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 8 Jun 2011 13:33:10 +0300
+Subject: [PATCH 4/4] x86: intel-iommu: move to drivers/iommu/
+In-Reply-To: <1307524659.4771.12.camel@i7.infradead.org>
+References: <1307522062-19273-1-git-send-email-ohad@wizery.com>
+	<1307522062-19273-5-git-send-email-ohad@wizery.com>
+	<1307524659.4771.12.camel@i7.infradead.org>
+Message-ID: <BANLkTi=eRmd4h3+StGCR_-uVKo5F9fyd7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Wed, Jun 8, 2011 at 12:17 PM, David Woodhouse <dwmw2@infradead.org> wrote:
+> At least iova.o wants to go with it. That's one of the parts that is a
+> candidate for harmonisation across IOMMU implementations, either by
+> removing it or by having others use it too. It's how we allocate virtual
+> I/O address space.
+>
+> I suspect the interrupt remapping support may well want to move with it
+> too. It's no more out-of-place in drivers/iommu than it is in
+> drivers/pci. And then you can certainly move dmar.o too.
 
-On Monday 06 June 2011 20:00:52 Russell King - ARM Linux wrote:
-> On Mon, Jun 06, 2011 at 06:54:10PM +0200, Laurent Pinchart wrote:
-> > Of course not, but if the scatterlist is only touched by kernel code, it
-> > doesn't need to be contiguous in memory. It could be allocated with
-> > vmalloc().
-> 
-> Except vmalloc has a higher latency and a more restrictive API than
-> other allocators (think about the coherency issues with SMP systems
-> which may have to do TLB flushing on several cores, etc.)
+Sounds good, thanks.
 
-Right, thank you for the explanation. It is now clear to me why we want to use 
-the page allocator and handle scatter list chaining in the critical paths. We 
-could still use vmalloc() in the iovmm driver, but that's probably not worth 
-it if we can enable scatter list chaining for the system.
-
-With your patch scatter list chaining can be enabled at the platform level for 
-the ARM architecture. What are the platform requirements to enable scatter 
-list chaining ?
-
--- 
-Regards,
-
-Laurent Pinchart
+I'll wait a bit to see if there're more comments, and then re-send this one
