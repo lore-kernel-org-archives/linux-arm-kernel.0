@@ -1,37 +1,71 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 8 Jun 2011 15:21:29 +0530
-Subject: [GIT PULL] DaVinci fixes for v3.0-rc
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D384091@dbde02.ent.ti.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  8 Jun 2011 11:13:38 +0100
+Subject: [PATCH] ARM: tegra/harmony: enable USB host ports
+Message-ID: <1307528018-14454-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+The Harmony board code doesn't have any support for USB, leaving
+the board without any ethernet support. Add the necessary
+declarations to have it up and running, at least for the J6 and J25
+connectors, as well as the ethernet port.
 
-Can you please pull these two changes for v3.0-rc release?
+The OTG port is left unused, short of any documentation.
 
-Thomas's patch fixes a regression because of generic irq chip
-support for DaVinci introduced in v3.0-rc1. My patch is not
-a regression fix but fixes an issue that has been existing for
-a while.
+Cc: Stephen Warren <swarren@nvidia.com>
+Cc: Olof Johansson <olofj@google.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+Not sure if this is the right time to send this, as this should
+eventually be handled by the device tree. May be useful to some
+people in the meantime.
 
-Thanks,
-Sekhar
+Patch against v3.0-rc2.
 
-The following changes since commit 59c5f46fbe01a00eedf54a23789634438bb80603:
-  Linus Torvalds (1):
-        Linux 3.0-rc2
+ arch/arm/mach-tegra/board-harmony.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-are available in the git repository at:
-
-  git://gitorious.org/linux-davinci/linux-davinci.git davinci-next
-
-Sekhar Nori (1):
-      davinci: make PCM platform devices static
-
-Thomas Gleixner (1):
-      arm: davinci: Fix fallout from generic irq chip conversion
-
- arch/arm/mach-davinci/devices-da8xx.c |    2 +-
- arch/arm/mach-davinci/devices.c       |    2 +-
- arch/arm/mach-davinci/gpio.c          |    7 ++++---
- 3 files changed, 6 insertions(+), 5 deletions(-)
+diff --git a/arch/arm/mach-tegra/board-harmony.c b/arch/arm/mach-tegra/board-harmony.c
+index 30e18bc..b95156a 100644
+--- a/arch/arm/mach-tegra/board-harmony.c
++++ b/arch/arm/mach-tegra/board-harmony.c
+@@ -26,6 +26,7 @@
+ #include <linux/gpio.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c-tegra.h>
++#include <linux/platform_data/tegra_usb.h>
+ 
+ #include <sound/wm8903.h>
+ 
+@@ -143,6 +144,8 @@ static struct platform_device *harmony_devices[] __initdata = {
+ 	&tegra_das_device,
+ 	&tegra_pcm_device,
+ 	&harmony_audio_device,
++	&tegra_ehci1_device,
++	&tegra_ehci3_device,
+ };
+ 
+ static void __init tegra_harmony_fixup(struct machine_desc *desc,
+@@ -185,6 +188,10 @@ static struct tegra_sdhci_platform_data sdhci_pdata4 = {
+ 	.is_8bit	= 1,
+ };
+ 
++static struct tegra_ehci_platform_data ehci_data = {
++	.operating_mode = TEGRA_USB_HOST,
++};
++
+ static void __init tegra_harmony_init(void)
+ {
+ 	tegra_clk_init_from_table(harmony_clk_init_table);
+@@ -195,6 +202,9 @@ static void __init tegra_harmony_init(void)
+ 	tegra_sdhci_device2.dev.platform_data = &sdhci_pdata2;
+ 	tegra_sdhci_device4.dev.platform_data = &sdhci_pdata4;
+ 
++	tegra_ehci1_device.dev.platform_data = &ehci_data;
++	tegra_ehci3_device.dev.platform_data = &ehci_data;
++
+ 	platform_add_devices(harmony_devices, ARRAY_SIZE(harmony_devices));
+ 	harmony_i2c_init();
+ 	harmony_regulator_init();
+-- 
+1.7.0.4
