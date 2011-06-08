@@ -1,85 +1,92 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 8 Jun 2011 16:53:02 +0530
-Subject: [PATCH v3 00/12] OMAP2+: Serial: Runtime adaptation + cleanup
-Message-ID: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+Date: Wed, 8 Jun 2011 16:53:14 +0530
+Subject: [PATCH v3 12/12] OMAP4: Serial: Set TX_FIFO_THRESHOLD if uart in dma
+	mode for es2.0
+In-Reply-To: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1307532194-13039-13-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Converting uart driver to adapt to pm runtime api's.
-Code re-org + cleanup.
-Moving some functionality from serial.c to omap-serial.c
 
-Changes involves:
-================
-1.) Cleaning up certain uart calls from sram_idle func.
-2.) Removed all types of uart clock handling code from serial.c
-3.) Using hwmod_mux api enable wakeup capability for uart pad during
-   hwmod_idle state i.e., when uart clocks are disabled we can enable
-   io-pad wakeup capability for uart if mux_data is available for
-   given uart. Also during during resume from idle call to uart we need
-   to enable clocks back conditionally and this can be done only when io-pad
-   wakeup event bit is set for uart_rx pad. So we need a hwmod api
-   which can probe the uart pad and let us know whether a uart wakeup
-   happened. So omap_hmwod_pad_wakeup_status api is added to meet this
-   requirement.
-3.) Adapted omap-serial driver to use runtime api's.
-4.) Modify serial_init calls to accept certain uart parameters from board file.
-5.) using resume_call to enable uart port back untill we have irq_chaining available.
+>From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 01 Jun 2011 16:03:18 -0000
+Subject: No subject
+Message-ID: <mailman.9.1307532245.24103.linux-arm-kernel@lists.infradead.org>
 
-Patch series is based on 3.0-rc2.
-Hosted at: https://gitorious.org/runtime_3-0/runtime_3-0/commits/master
+uart tx threshold value using the new register UART_TX_DMA_THRESHOLD, this
+register can used if UART_MDR3 bit(2) is set. We have to ensure
+tx_threshold + tx_trigger <= 63 from es2.0 onwards. By default we are using
+tx_trigger of 1 so we can set threshold to 62 to satisfy above criteria.
+Without the threshold setting we hit dma_sync lost errors on tx channel
+leading to data loss on rx side
 
-Dependency Patches:
-----------
-This patch series depends on patch [1], [2] posted earlier.
-3.0-rc2 needs [3] patch for core to hit low power states.
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ arch/arm/mach-omap2/serial.c                  |    4 ++++
+ arch/arm/plat-omap/include/plat/omap-serial.h |   11 +++++++++++
+ drivers/tty/serial/omap-serial.c              |    5 +++++
+ 3 files changed, 20 insertions(+), 0 deletions(-)
 
-[1] http://www.spinics.net/lists/arm-kernel/msg124495.html
-
-[2] http://www.spinics.net/lists/arm-kernel/msg124493.html
-
-[3] http://git.kernel.org/?p=linux/kernel/git/khilman/linux-omap-pm.git;
-	a=commit;h=345f79b3de7f6d651e4dba794af7c7303bdfd649
-
-Testing updates:
-----------------
-3430SDP:
-retention, off_mode, system_wide suspend is tested.
-(earlyprintk & no_console_suspend checked)
-
-OMAP3630 - Zoom3:
-pm-retention checked, off mode for per domain checked.
-[uart3/uart4 in per domain on omap3630].
-[ZOOM3 tested with uart3 as console uart and pm-ret checked]
-
-OMAP4430-SDP/PANDA: Boot tested.
-OMAP2420/2430SDP: Boot tested.
--------------
-Govindraj.R (11):
-  OMAP2+: UART: Remove certain uart calls from sram_idle
-  OMAP2+: UART: Remove uart clock handling code from serial.c
-  OMAP2+: Serial: Add default mux for all uarts.
-  Serial: OMAP: Add runtime pm support for omap-serial driver
-  OMAP: Serial: Hold console lock for console usage.
-  Serial: OMAP2+: Move erratum handling from serial.c
-  OMAP: Serial: Allow UART parameters to be configured from board file.
-  OMAP3: Serial: Remove uart pads from 3430 board file.
-  OMAP: Serial: Use resume call from prcm to enable uart
-  OMAP2: Serial: Add has_async_wake flag.
-  OMAP4: Serial: Set TX_FIFO_THRESHOLD if uart in dma mode for es2.0
-
-Jon Hunter (1):
-  Serial: OMAP2+: Make the RX_TIMEOUT for DMA configurable for each
-    UART
-
- arch/arm/mach-omap2/board-3430sdp.c           |  100 +---
- arch/arm/mach-omap2/board-4430sdp.c           |    8 +-
- arch/arm/mach-omap2/board-n8x0.c              |    6 +-
- arch/arm/mach-omap2/board-omap4panda.c        |    8 +-
- arch/arm/mach-omap2/pm24xx.c                  |   19 +-
- arch/arm/mach-omap2/pm34xx.c                  |   26 +-
- arch/arm/mach-omap2/serial.c                  |  929 +++++++------------------
- arch/arm/plat-omap/include/plat/omap-serial.h |   49 ++-
- arch/arm/plat-omap/include/plat/serial.h      |   12 +-
- drivers/tty/serial/omap-serial.c              |  336 ++++++++-
- 10 files changed, 620 insertions(+), 873 deletions(-)
+diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+index 0a95c95..437fc0b 100644
+--- a/arch/arm/mach-omap2/serial.c
++++ b/arch/arm/mach-omap2/serial.c
+@@ -401,6 +401,10 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+ 	if (bdata->id == omap_uart_con_id)
+ 		pdata->console_uart = true;
+ 
++	if (pdata->dma_enabled &&
++			cpu_is_omap44xx() && omap_rev() > OMAP4430_REV_ES1_0)
++		pdata->errata |= OMAP4_UART_ERRATA_i659_TX_THR;
++
+ 	od = omap_device_build(name, bdata->id, oh, pdata,
+ 				sizeof(*pdata), omap_uart_latency,
+ 				ARRAY_SIZE(omap_uart_latency), false);
+diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+index 69e6d4b..0d10f72 100644
+--- a/arch/arm/plat-omap/include/plat/omap-serial.h
++++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+@@ -56,12 +56,23 @@
+ #define DEFAULT_RXDMA_BUFSIZE	4096		/* RX DMA buffer size */
+ #define DEFAULT_AUTOSUSPEND_DELAY (30 * HZ) /* Runtime autosuspend (msecs) */
+ 
++/*
++ * (Errata i659) - From OMAP4430 ES 2.0 onwards set
++ * tx_threshold while using UART in DMA Mode
++ * and ensure tx_threshold + tx_trigger <= 63
++ */
++#define UART_MDR3		0x20
++#define UART_TX_DMA_THRESHOLD	0x21
++#define SET_DMA_TX_THRESHOLD	BIT(2)
++/* Setting TX Threshold Level to 62 */
++#define TX_FIFO_THR_LVL		0x3E
+ 
+ #define OMAP_MAX_HSUART_PORTS	4
+ 
+ #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
+ 
+ #define UART_ERRATA_i202_MDR1_ACCESS	BIT(0)
++#define OMAP4_UART_ERRATA_i659_TX_THR	BIT(1)
+ 
+ struct omap_uart_port_info {
+ 	bool			dma_enabled;	/* To specify DMA Mode */
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index dbe76f3..a9645ac 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -818,6 +818,11 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
+ 
+ 	if (up->use_dma) {
++		if (up->errata & OMAP4_UART_ERRATA_i659_TX_THR) {
++			serial_out(up, UART_MDR3, SET_DMA_TX_THRESHOLD);
++			serial_out(up, UART_TX_DMA_THRESHOLD, TX_FIFO_THR_LVL);
++		}
++
+ 		serial_out(up, UART_TI752_TLR, 0);
+ 		serial_out(up, UART_OMAP_SCR,
+ 			(UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8));
+-- 
+1.7.0.4
