@@ -1,58 +1,48 @@
 From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Wed, 8 Jun 2011 10:56:17 +0800
-Subject: [PATCH v2 1/3] mmc: support sdhci-mmp2
-In-Reply-To: <86F2B225-A55D-41D9-B805-41C639C1882C@marvell.com>
-References: <1306315367-15602-1-git-send-email-zhangfei.gao@marvell.com>
-	<201105271746.04775.arnd@arndb.de>
-	<BANLkTi=S=Q+AdKECCHg2u6X=VWEOtEox_w@mail.gmail.com>
-	<86F2B225-A55D-41D9-B805-41C639C1882C@marvell.com>
-Message-ID: <BANLkTinTKV3DwVdi8p-BYCZ4ON_ce4T74g@mail.gmail.com>
+Date: Wed, 8 Jun 2011 11:03:22 +0800
+Subject: [PATCH v3 2/4] mmc: support sdhci-pxav2.c
+In-Reply-To: <A5ADAC80-98EE-4184-A958-965A3EC275F9@marvell.com>
+References: <1307094606-8692-1-git-send-email-zhangfei.gao@marvell.com>
+	<1E53FF9F-5C6A-4AA2-B441-DD712C5D6715@marvell.com>
+	<BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
+	<201106070917.41691.arnd@arndb.de>
+	<BANLkTinsk0AzBYd+fO9Oz1RO9smNzJTsTA@mail.gmail.com>
+	<A5ADAC80-98EE-4184-A958-965A3EC275F9@marvell.com>
+Message-ID: <BANLkTin4nHnaZyA1-Gh5TV+v9BqbRwJSSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2011 at 7:51 AM, Philip Rakity <prakity@marvell.com> wrote:
+On Tue, Jun 7, 2011 at 11:04 PM, Philip Rakity <prakity@marvell.com> wrote:
 >
-> On May 29, 2011, at 10:42 PM, zhangfei gao wrote:
+> On Jun 7, 2011, at 12:31 AM, Eric Miao wrote:
+>
+>>> How about changing the title of the option though? A user will
+>>> usually not know if he is using the v2 or v3 controller without
+>>> reading the help text. If you change it to
+>>>
+>>> config MMC_SDHCI_PXAV2
+>>> ? ? ? ?tristate "Marvell PXA168 SD Host Controller support (PXAV2)"
+>>> ? ? ? ?default CPU_PXA168
+>
+> change to
+>>> ? ? ? ?tristate "Marvell PXA9xx SD Host Controller support (PXAV2)"
+>
+> the pxa168 will not work in all cases with the V2 code. ?It needs IO_ACCESSORS for readw and
+> a callback to sdhci.c to delay then time between transfers. ?Once V2 code is mainline
+> I will resubmit the pxa168 code.
+>
 >
 >>>
->>> There is a little room for simplification, I think:
+>>> config MMC_SDHCI_PXAV3
+>>> ? ? ? ?tristate "Marvell MMP2/PX9XX SD Host Controller support (PXAV3)"
+>>> ? ? ? ?default CPU_MMP2 || CPU_PXA910
 >>>
->>>> +static unsigned int mmp2_get_ro(struct sdhci_host *host)
->>>> +{
->>>> + ? ? /* Micro SD does not support write-protect feature */
->>>> + ? ? return 0;
->>>> +}
->>>
->>> You shouldn't need to provide an empty get_ro function, the
->>> default is that there is no write-protect.
 >>
->> Thanks Arnd for review.
->> The reason to put get_ro here is some board use micro sd, while some
->> board design is general sd card.
->> The micro sd do not use write-protect, while SDHCI_WRITE_PROTECT will
->> return 1 in our controller, so it shows read only.
->> So add one call back for the board with micro sd card via flag.
->
->
->
-> The code sets get_ro is for all the controllers. ? Some board designs may connect the WP signal.
->
-> The host->ops field should be filled in using information in the board
-> file using a flag such as the example with ?PXA_FLAG_CARD_PERMANENT.
->
-> eg
->
-> ? ? ? ?if (pdata && pdata->flags & PXA_FLAG_NO_WP) {
-> ? ? ? ? ? ? ? ?***** etc ****
-> ? ? ? ?}
->
->
+>> Yeah, the above is much cleaner/simpler.
+>>
+>>> you increase the chances of users getting the configuration right.
+>>>
+>>> ? ? ? ?Arnd
+>>>
 
-This method is used in v1,
-The method makes sdhci_ops non-const and have to dynamically alloc
-sdhci_ops, since host->ops is pointer.
-Will keep use const sdhci_ops, recommended by Arnd.
-
->
->
->
+Thanks for good suggestion. Will update to v4.
