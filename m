@@ -1,51 +1,112 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2011 13:30:22 +0100
-Subject: [Patch v2 00/11] Core support for Cortex-A5 and Cortex-A15
-Message-ID: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+Date: Wed,  8 Jun 2011 13:30:23 +0100
+Subject: [Patch v2 01/11] arm: Convert v7 proc infos into a common macro
+In-Reply-To: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1307536233-30089-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Pawel Moll <pawel.moll@arm.com>
 
-This is version 2 of the patch series originally posted here:
+As most of the proc info content is common across all v7
+processors, this patch converts existing A9 and generic v7
+descriptions into a macro (allowing extra flags in future).
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052141.html
+Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+---
+ arch/arm/mm/proc-v7.S |   67 +++++++++++++++++-------------------------------
+ 1 files changed, 24 insertions(+), 43 deletions(-)
 
-Changes from v1 include:
-
-  * Removal of HWCAP_VFPv4D16
-  * Dynamic detection of VFPv4
-  * Updates to hwcap_str array
-  * Some spelling fixes
-
-Tested on Realview-PBX (Cortex-A9) without regressions. Also tested on
-Cortex-A5 (w/ NEON) and Cortex-A15 (w/ NEON).
-
-Feedback welcome.
-
-Will
-
-
-Pawel Moll (2):
-  arm: Convert v7 proc infos into a common macro
-  arm: Add Cortex A5 proc info
-
-Will Deacon (9):
-  ARM: hwcaps: use shifts instead of hardcoded constants
-  ARM: hwcaps: add new HWCAP defines for ARMv7-A
-  ARM: proc: reorder macro parameters for __v7_proc macro
-  ARM: proc: add proc info for Cortex-A15MP using classic page tables
-  ARM: vfp: add VFPv4 capability detection and populate elf_hwcap
-  ARM: perf: remove confusing comment from v7 perf events backend
-  ARM: perf: add PMUv2 common event definitions
-  ARM: perf: add support for the Cortex-A5 PMU
-  ARM: perf: add support for the Cortex-A15 PMU
-
- arch/arm/include/asm/hwcap.h      |   36 ++--
- arch/arm/include/asm/perf_event.h |    2 +
- arch/arm/kernel/perf_event.c      |    6 +
- arch/arm/kernel/perf_event_v7.c   |  344 ++++++++++++++++++++++++++++++++++--
- arch/arm/kernel/setup.c           |    4 +
- arch/arm/mm/proc-v7.S             |   98 ++++++-----
- arch/arm/vfp/vfpmodule.c          |    6 +-
- 7 files changed, 413 insertions(+), 83 deletions(-)
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index b3b566e..d5245d4 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -436,33 +436,36 @@ cpu_elf_name:
+ 
+ 	.section ".proc.info.init", #alloc, #execinstr
+ 
+-	.type   __v7_ca9mp_proc_info, #object
+-__v7_ca9mp_proc_info:
+-	.long	0x410fc090		@ Required ID value
+-	.long	0xff0ffff0		@ Mask for ID
+-	ALT_SMP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_SMP)
+-	ALT_UP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_UP)
+-	.long   PMD_TYPE_SECT | \
+-		PMD_SECT_XN | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	W(b)	__v7_ca9mp_setup
++	/*
++	 * Standard v7 proc info content
++	 */
++.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
++	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
++			PMD_FLAGS_SMP | \mm_mmuflags)
++	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
++			PMD_FLAGS_UP | \mm_mmuflags)
++	.long	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | \
++		PMD_SECT_AP_READ | \io_mmuflags
++	W(b)	\initfunc
+ 	.long	cpu_arch_name
+ 	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
++	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
++		HWCAP_EDSP | HWCAP_TLS | \hwcaps
+ 	.long	cpu_v7_name
+ 	.long	v7_processor_functions
+ 	.long	v7wbi_tlb_fns
+ 	.long	v6_user_fns
+ 	.long	v7_cache_fns
++.endm
++
++	/*
++	 * ARM Ltd. Cortex A9 processor.
++	 */
++	.type   __v7_ca9mp_proc_info, #object
++__v7_ca9mp_proc_info:
++	.long	0x410fc090
++	.long	0xff0ffff0
++	__v7_proc __v7_ca9mp_setup
+ 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
+ 
+ 	/*
+@@ -472,27 +475,5 @@ __v7_ca9mp_proc_info:
+ __v7_proc_info:
+ 	.long	0x000f0000		@ Required ID value
+ 	.long	0x000f0000		@ Mask for ID
+-	ALT_SMP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_SMP)
+-	ALT_UP(.long \
+-		PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ | \
+-		PMD_FLAGS_UP)
+-	.long   PMD_TYPE_SECT | \
+-		PMD_SECT_XN | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	W(b)	__v7_setup
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
+-	.long	cpu_v7_name
+-	.long	v7_processor_functions
+-	.long	v7wbi_tlb_fns
+-	.long	v6_user_fns
+-	.long	v7_cache_fns
++	__v7_proc __v7_setup
+ 	.size	__v7_proc_info, . - __v7_proc_info
+-- 
+1.7.0.4
