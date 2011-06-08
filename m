@@ -1,52 +1,36 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2011 13:30:29 +0100
-Subject: [Patch v2 07/11] ARM: vfp: add VFPv4 capability detection and
-	populate elf_hwcap
+Date: Wed,  8 Jun 2011 13:30:27 +0100
+Subject: [Patch v2 05/11] ARM: proc: reorder macro parameters for __v7_proc
+	macro
 In-Reply-To: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
 References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307536233-30089-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1307536233-30089-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The presence of VFPv4 cannot be detected simply by looking at the FPSID
-subarchitecture field, as a value >= 2 signifies the architecture as
-VFPv3 or later.
+The __v7_proc macro takes paramaters for mmu flags, io flags and hwcaps.
 
-This patch reads from MVFR1 to check whether or not the fused multiple
-accumulate instructions are supported. Since these are introduced with
-VFPv4, this tells us what we need to know.
+Since hwcaps tend to change more often between cores than the other
+parameters, change the ordering so we don't have to provide empty values
+for the flag arguments in the common case.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/vfp/vfpmodule.c |    6 ++++--
- 1 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/mm/proc-v7.S |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
-index f25e7ec..650d90b 100644
---- a/arch/arm/vfp/vfpmodule.c
-+++ b/arch/arm/vfp/vfpmodule.c
-@@ -582,7 +582,6 @@ static int __init vfp_init(void)
- 				elf_hwcap |= HWCAP_VFPv3D16;
- 		}
- #endif
--#ifdef CONFIG_NEON
- 		/*
- 		 * Check for the presence of the Advanced SIMD
- 		 * load/store instructions, integer and single
-@@ -590,10 +589,13 @@ static int __init vfp_init(void)
- 		 * for NEON if the hardware has the MVFR registers.
- 		 */
- 		if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
-+#ifdef CONFIG_NEON
- 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
- 				elf_hwcap |= HWCAP_NEON;
--		}
- #endif
-+			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
-+				elf_hwcap |= HWCAP_VFPv4;
-+		}
- 	}
- 	return 0;
- }
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 7f482c2..b22d98d 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -440,7 +440,7 @@ cpu_elf_name:
+ 	/*
+ 	 * Standard v7 proc info content
+ 	 */
+-.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
++.macro __v7_proc initfunc, hwcaps = 0, mm_mmuflags = 0, io_mmuflags = 0
+ 	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
+ 			PMD_FLAGS_SMP | \mm_mmuflags)
+ 	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
 -- 
 1.7.0.4
