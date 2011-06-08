@@ -1,134 +1,57 @@
-From: haojian.zhuang@marvell.com (Haojian Zhuang)
-Date: Wed, 8 Jun 2011 12:16:57 +0800
-Subject: [PATCH,RFC] mmp clockevent handling race
-In-Reply-To: <BANLkTimBGDuPrHTnT1xu9QXnWQc+04BUxw@mail.gmail.com>
-References: <20110607140456.GE11275@wantstofly.org>
-	<alpine.LFD.2.00.1106071416230.2142@xanadu.home>
-	<1307499937.8890.2.camel@Lily>
-	<BANLkTi=MhX97=pXTFfJfO8=E=2Q98YdC6A@mail.gmail.com>
-	<1307502890.8890.9.camel@Lily>
-	<BANLkTimBGDuPrHTnT1xu9QXnWQc+04BUxw@mail.gmail.com>
-Message-ID: <1307506618.8890.16.camel@Lily>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Wed, 08 Jun 2011 09:28:32 +0530
+Subject: [PATCH v2 5/5] spi/ep93xx: add DMA support
+In-Reply-To: <20110607194034.GC2035@ponder.secretlab.ca>
+References: <cover.1306662317.git.mika.westerberg@iki.fi>
+	<4b27fc93b7df900943e7c12084a8340cbc5fe1a8.1306662317.git.mika.westerberg@iki.fi>
+	<20110603204400.GH17972@ponder.secretlab.ca>
+	<20110607171403.GA3011@acer>
+	<BANLkTikKOcc2Vg1p3kG4ZSLjJ0RTZWS=2A@mail.gmail.com>
+	<20110607190607.GB3011@acer>
+	<20110607191824.GA2035@ponder.secretlab.ca>
+	<20110607192945.GC3011@acer>
+	<20110607194034.GC2035@ponder.secretlab.ca>
+Message-ID: <1307505512.10976.91.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-06-07 at 20:23 -0700, Eric Miao wrote:
-> On Wed, Jun 8, 2011 at 11:14 AM, Haojian Zhuang
-> <haojian.zhuang@marvell.com> wrote:
-> > On Tue, 2011-06-07 at 20:05 -0700, Eric Miao wrote:
-> >> On Wed, Jun 8, 2011 at 10:25 AM, Haojian Zhuang
-> >> <haojian.zhuang@marvell.com> wrote:
-> >> > On Tue, 2011-06-07 at 11:29 -0700, Nicolas Pitre wrote:
-> >> >> On Tue, 7 Jun 2011, Lennert Buytenhek wrote:
-> >> >>
-> >> >> > Hi!
-> >> >> >
-> >> >> > The patch below has been sitting around in the OLPC XO-1.75 (MMP2-based
-> >> >> > XO) bringup kernel tree for some time now, and upon recent rebasing of
-> >> >> > this tree to 3.0, it was discovered that something like this patch is
-> >> >> > still needed.
-> >> >> >
-> >> >> > Symptoms: e.g. as described here: http://dev.laptop.org/ticket/10945
-> >> >> > -- applications hang for a couple of minutes at a time, and sometimes
-> >> >> > there are several-minute hangs during the boot process.
-> >> >> >
-> >> >> > >From the ticket:
-> >> >> >
-> >> >> >     The problem in the current upstream mmp timer handling code
-> >> >> >     that appears to be triggered here is that it handles clockevents
-> >> >> >     by setting up a comparator on the free-running clocksource timer
-> >> >> >     to match and trigger an interrupt at 'current_time + delta',
-> >> >> >     which if delta is small enough can lead to 'current_time + delta'
-> >> >> >     already being in the past when comparator setup has finished,
-> >> >> >     and the requested event will not trigger.
-> >> >>
-> >> >> This is a classical issue that was solved on the SA1100 more than 10
-> >> >> years ago.
-> >> >>
-> >> >> > What this patch does is to rewrite the timer handling code to use
-> >> >> > two timers, one for the free-running clocksource, and one to trigger
-> >> >> > clockevents with, which is more or less the standard approach to this.
-> >> >> > It's kind of invasive, though (certainly more invasive than it strictly
-> >> >> > needs to be, as it reorganises time.c somewhat at the same time), and
-> >> >> > something like this is probably too invasive for 3.0 at this point.
-> >> >> >
-> >> >> > A safer "fix" for 3.0 may be to disallow NO_HZ/HIGH_RES_TIMERS on mmp.
-> >> >> >
-> >> >> > Any thoughts?
-> >> >>
-> >> >> What about simply this:
-> >> >>
-> >> >> diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
-> >> >> index 99833b9..8b8f99a 100644
-> >> >> --- a/arch/arm/mach-mmp/time.c
-> >> >> +++ b/arch/arm/mach-mmp/time.c
-> >> >> @@ -39,7 +39,7 @@
-> >> >>
-> >> >>  #define TIMERS_VIRT_BASE     TIMERS1_VIRT_BASE
-> >> >>
-> >> >> -#define MAX_DELTA            (0xfffffffe)
-> >> >> +#define MAX_DELTA            (0xfffffffe - 16)
-> >> >>  #define MIN_DELTA            (16)
-> >> >>
-> >> >>  static DEFINE_CLOCK_DATA(cd);
-> >> >> @@ -85,7 +85,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
-> >> >>  static int timer_set_next_event(unsigned long delta,
-> >> >>                               struct clock_event_device *dev)
-> >> >>  {
-> >> >> -     unsigned long flags, next;
-> >> >> +     unsigned long flags, next, now;
-> >> >>
-> >> >>       local_irq_save(flags);
-> >> >>
-> >> >> @@ -95,9 +95,10 @@ static int timer_set_next_event(unsigned long delta,
-> >> >>
-> >> >>       next = timer_read() + delta;
-> >> >>       __raw_writel(next, TIMERS_VIRT_BASE + TMR_TN_MM(0, 0));
-> >> >> +     now = timer_read();
-> >> >>
-> >> >>       local_irq_restore(flags);
-> >> >> -     return 0;
-> >> >> +     return (signed)(next - now) <= MIN_DELTA ? -ETIME : 0;
-> >> >>  }
-> >> >>
-> >> >>  static void timer_set_mode(enum clock_event_mode mode,
-> >> >>
-> >> >>
-> >> >> Nicolas
-> >> > It seems good. But we still need to use two different timer. Because
-> >> > writing match register needs to stop counter register first. This is a
-> >> > limitation in the silicon.
-> >>
-> >> Well, the first thing is Lennert's RFC patch needs a bit cleanup :-) I tried
-> >> very hard to figure out the actual changes.
-> >>
-> >> Using two timers isn't a bad idea. Yet if it has to disable timer0 when
-> >> modifying timer1's next triggering event, it doesn't seem to solve the
-> >> real problem with two timers.
-> > Since timer registers is defined as group mode. Counter register and
-> > match register exist in each group. We can use timer 0 as clock source,
-> > only read timer counter. We can use timer 1 as clock event. While we're
-> > writing match register, we just need to disable counter register of
-> > group 1, not group 0. Since it's silicon limitation.
+On Tue, 2011-06-07 at 13:40 -0600, Grant Likely wrote:
+> On Tue, Jun 07, 2011 at 10:29:45PM +0300, Mika Westerberg wrote:
+> > On Tue, Jun 07, 2011 at 01:18:24PM -0600, Grant Likely wrote:
+> > > On Tue, Jun 07, 2011 at 10:06:07PM +0300, Mika Westerberg wrote:
+> > > > On Tue, Jun 07, 2011 at 12:45:26PM -0600, Grant Likely wrote:
+> > > > > On Tue, Jun 7, 2011 at 11:14 AM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
+> > > > > >
+> > > > > > I just realized that once the SPI driver renaming patch (spi: reorganize
+> > > > > > drivers) enters linux-next, this patch (which sits on Vinod's tree) will cause
+> > > > > > a merge conflict. Any ideas how to avoid it beforehand?
+> > > > > 
+> > > > > Yes, put the whole series into a separate branch all by itself.  Merge
+> > > > > that branch into Vinod's tree and I'll also merge it into spi/next,
+> > > > > and I'll fix up the merge conflict when I do.
+> > > > 
+> > > > More stupid questions: Do you mean that I create a branch in my public
+> > > > repository somewhere? If that is the case, then there is a problem that I
+> > > > don't have any public repository and I doubt that I get such before linux-next
+> > > > is rebuilt.
+> > > 
+> > > It doesn't have to be your repo.  Vinod could do it, or I could.
+> > 
+> > Ah, I see.
+> > 
+> > Would it then be possible that you could do it? Please let me and Vinod know
+> > what is needed from us.
+> > 
+> > And sorry for this mess.
 > 
-> A bit confused, but is this disabling stops the clock source from incrementing
-> for a while?
-> 
-Clock source is always free-running. Clock source (timer0) is used to
-keep time always increasing.
+> I'll need an ack from Vinod first for the series so that I can add it
+> before I make the commits, but other than that I have no problem doing
+> so.
+Acked-by: Vinod Koul <vinod.koul@intel.com>
 
-Clock event needs to be disabled since match register always match
-counter register is the same group. In order to synchronization, we need
-to make sure that counter register shouldn't be increased while match
-register is updating.
+Let me know which branch you have pushed and I will merge that to my
+tree
 
-> >>
-> >> Haojian,
-> >>
-> >> Do we have any other timer that could be used as an independent
-> >> clock source?
-> > So both timer 0 and timer 1 are necessary. Timer0 can be used as clock
-> > source. Timer 1 can be used as clock event. And we needn't other timer
-> > to be used as clock source.
-> >
-> >
+
+-- 
+~Vinod
