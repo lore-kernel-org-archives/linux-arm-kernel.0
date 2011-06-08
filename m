@@ -1,86 +1,403 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Thu, 09 Jun 2011 00:57:09 +0300
-Subject: [PATCH] arm: omap3: beagle: Ensure msecure is mux'd to be able
-	to set the RTC
-In-Reply-To: <4DEE0858.2020308@ahsoftware.de>
-References: <4D9AEB76.2060509@ahsoftware.de>
-	<1302010808-3065-1-git-send-email-holler@ahsoftware.de>
-	<20110531102903.GU11352@atomide.com>
-	<4DEDDAF6.2070505@ahsoftware.de> <4DEDF451.1080604@compulab.co.il>
-	<4DEE0858.2020308@ahsoftware.de>
-Message-ID: <4DEFF035.4070004@compulab.co.il>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 8 Jun 2011 16:07:57 -0600
+Subject: [PATCH] gpio-ep93xx: convert to platform_driver and use
+	basic_mmio_gpio library
+In-Reply-To: <201106081435.33578.hartleys@visionengravers.com>
+References: <201106081435.33578.hartleys@visionengravers.com>
+Message-ID: <20110608220757.GB17138@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/11 14:15, Alexander Holler wrote:
+On Wed, Jun 08, 2011 at 02:35:33PM -0700, H Hartley Sweeten wrote:
+> This converts the gpio-ep93xx driver into a platform_driver and uses
+> the basic_mmio_gpio library.
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Ryan Mallon <ryan@bluewatersys.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
 
-> Am 07.06.2011 11:50, schrieb Igor Grinberg:
->> On 06/07/11 11:01, Alexander Holler wrote:
->>
->>> Am 31.05.2011 12:29, schrieb Tony Lindgren:
->>>> * Alexander Holler<holler@ahsoftware.de>   [110405 06:38]:
->>>>> Without msecure beeing high it isn't possible to set (or start)
->>>>> the RTC.
->>>>>
->>>>> Tested with a BeagleBoard C4.
->>>>
->>>> Adding this into fixes.
->>>>
->>>> Tony
->>>>
->>>>> Signed-off-by: Alexander Holler<holler@ahsoftware.de>
->>>>> ---
->>>>>    arch/arm/mach-omap2/board-omap3beagle.c |    3 +++
->>>>>    1 files changed, 3 insertions(+), 0 deletions(-)
->>>>>
->>>>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
->>>>> index 46d814a..ebe3a7e 100644
->>>>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->>>>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
->>>>> @@ -628,6 +628,9 @@ static void __init omap3_beagle_init(void)
->>>>>        usb_ehci_init(&ehci_pdata);
->>>>>        omap3beagle_flash_init();
->>>>>
->>>>> +    /* Ensure msecure is mux'd to be able to set the RTC. */
->>>>> +    omap_mux_init_signal("sys_drm_msecure", OMAP_PIN_OFF_OUTPUT_HIGH);
->>>>> +
->>>>>        /* Ensure SDRC pins are mux'd for self-refresh */
->>>>>        omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
->>>>>        omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
->>>>> -- 
->>>>> 1.7.3.4
->>>>>
->>>
->>> I've later switched to the following patch which muxes msecure as GPIO (the drm-mode isn't explained in the TRM) and also exports the GPIO, so root could easily switch it to prevent modifications on the RTC.
->>>
->>> (Warning, either my clipboard or the version of Thunderbird I'm currently using replaces the tabs with spaces in the pasted patch and I'm currently too lazy to search a workaround).
->>>
->>> ---
->>>   arch/arm/mach-omap2/board-omap3beagle.c |    6 ++++++
->>>   1 files changed, 6 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
->>> index 33007fd..24b4417 100644
->>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
->>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
->>> @@ -673,6 +673,12 @@ static void __init omap3_beagle_init(void)
->>>          usbhs_init(&usbhs_bdata);
->>>          omap3beagle_flash_init();
->>>
->>> +       /* Ensure msecure is high to be able to set the RTC. */
->>> +       omap_mux_init_signal("gpio_22", OMAP_PIN_OFF_OUTPUT_HIGH);
->>> +       gpio_request(22, "msecure");
->>> +       gpio_direction_output(22, true);
->>
->> Can this be gpio_request_one() instead, please?
->> Also, it will be nice to make a define for the magic 22.
->
-> You need the "gpio_22" in the mux_init, so using a define would imho introduce a potential source for an error, at least when the define would not be anywhere near the "gpio_22" and someone would forget change the string too, when he changes the define. So I don't think a define adds much value there.
+Merged, thanks.
 
-Why not leave "sys_drm_msecure" for mux_init, or does it make troubles on XM?
+g.
 
-What about gpio_request_one()? To conform with the rest of the file and mach-omap2/*.
-
--- 
-Regards,
-Igor.
+> 
+> ---
+> 
+> diff --git a/arch/arm/mach-ep93xx/core.c b/arch/arm/mach-ep93xx/core.c
+> index cc9f1d4..1280046 100644
+> --- a/arch/arm/mach-ep93xx/core.c
+> +++ b/arch/arm/mach-ep93xx/core.c
+> @@ -174,14 +174,10 @@ struct sys_timer ep93xx_timer = {
+>  /*************************************************************************
+>   * EP93xx IRQ handling
+>   *************************************************************************/
+> -extern void ep93xx_gpio_init_irq(void);
+> -
+>  void __init ep93xx_init_irq(void)
+>  {
+>  	vic_init(EP93XX_VIC1_BASE, 0, EP93XX_VIC1_VALID_IRQ_MASK, 0);
+>  	vic_init(EP93XX_VIC2_BASE, 32, EP93XX_VIC2_VALID_IRQ_MASK, 0);
+> -
+> -	ep93xx_gpio_init_irq();
+>  }
+>  
+>  
+> @@ -241,6 +237,24 @@ unsigned int ep93xx_chip_revision(void)
+>  }
+>  
+>  /*************************************************************************
+> + * EP93xx GPIO
+> + *************************************************************************/
+> +static struct resource ep93xx_gpio_resource[] = {
+> +	{
+> +		.start		= EP93XX_GPIO_PHYS_BASE,
+> +		.end		= EP93XX_GPIO_PHYS_BASE + 0xcc - 1,
+> +		.flags		= IORESOURCE_MEM,
+> +	},
+> +};
+> +
+> +static struct platform_device ep93xx_gpio_device = {
+> +	.name		= "gpio-ep93xx",
+> +	.id		= -1,
+> +	.num_resources	= ARRAY_SIZE(ep93xx_gpio_resource),
+> +	.resource	= ep93xx_gpio_resource,
+> +};
+> +
+> +/*************************************************************************
+>   * EP93xx peripheral handling
+>   *************************************************************************/
+>  #define EP93XX_UART_MCR_OFFSET		(0x0100)
+> @@ -870,14 +884,13 @@ void __init ep93xx_register_ac97(void)
+>  	platform_device_register(&ep93xx_pcm_device);
+>  }
+>  
+> -extern void ep93xx_gpio_init(void);
+> -
+>  void __init ep93xx_init_devices(void)
+>  {
+>  	/* Disallow access to MaverickCrunch initially */
+>  	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_CPENA);
+>  
+> -	ep93xx_gpio_init();
+> +	/* Get the GPIO working early, other devices need it */
+> +	platform_device_register(&ep93xx_gpio_device);
+>  
+>  	amba_device_register(&uart1_device, &iomem_resource);
+>  	amba_device_register(&uart2_device, &iomem_resource);
+> diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+> index b84666a..9f06e63 100644
+> --- a/drivers/gpio/Kconfig
+> +++ b/drivers/gpio/Kconfig
+> @@ -87,6 +87,7 @@ config GPIO_IT8761E
+>  config GPIO_EP93XX
+>  	def_bool y
+>  	depends on ARCH_EP93XX
+> +	select GPIO_GENERIC
+>  
+>  config GPIO_EXYNOS4
+>  	def_bool y
+> diff --git a/drivers/gpio/gpio-ep93xx.c b/drivers/gpio/gpio-ep93xx.c
+> index 3d427b9..22ffa1d 100644
+> --- a/drivers/gpio/gpio-ep93xx.c
+> +++ b/drivers/gpio/gpio-ep93xx.c
+> @@ -2,6 +2,7 @@
+>   * Generic EP93xx GPIO handling
+>   *
+>   * Copyright (c) 2008 Ryan Mallon <ryan@bluewatersys.com>
+> + * Copyright (c) 2011 H Hartley Sweeten <hsweeten@visionengravers.com>
+>   *
+>   * Based on code originally from:
+>   *  linux/arch/arm/mach-ep93xx/core.c
+> @@ -14,14 +15,20 @@
+>  #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+>  
+>  #include <linux/init.h>
+> -#include <linux/module.h>
+> -#include <linux/seq_file.h>
+> +#include <linux/platform_device.h>
+>  #include <linux/io.h>
+>  #include <linux/gpio.h>
+>  #include <linux/irq.h>
+> +#include <linux/slab.h>
+> +#include <linux/basic_mmio_gpio.h>
+>  
+>  #include <mach/hardware.h>
+>  
+> +struct ep93xx_gpio {
+> +	void __iomem		*mmio_base;
+> +	struct bgpio_chip	bgc[8];
+> +};
+> +
+>  /*************************************************************************
+>   * Interrupt handling for EP93xx on-chip GPIOs
+>   *************************************************************************/
+> @@ -223,7 +230,7 @@ static struct irq_chip ep93xx_gpio_irq_chip = {
+>  	.irq_set_type	= ep93xx_gpio_irq_type,
+>  };
+>  
+> -void __init ep93xx_gpio_init_irq(void)
+> +static void ep93xx_gpio_init_irq(void)
+>  {
+>  	int gpio_irq;
+>  
+> @@ -258,151 +265,142 @@ void __init ep93xx_gpio_init_irq(void)
+>  /*************************************************************************
+>   * gpiolib interface for EP93xx on-chip GPIOs
+>   *************************************************************************/
+> -struct ep93xx_gpio_chip {
+> -	struct gpio_chip	chip;
+> -
+> -	void __iomem		*data_reg;
+> -	void __iomem		*data_dir_reg;
+> +struct ep93xx_gpio_bank {
+> +	const char	*label;
+> +	int		data;
+> +	int		dir;
+> +	int		base;
+> +	bool		has_debounce;
+>  };
+>  
+> -#define to_ep93xx_gpio_chip(c) container_of(c, struct ep93xx_gpio_chip, chip)
+> +#define EP93XX_GPIO_BANK(_label, _data, _dir, _base, _debounce)	\
+> +	{							\
+> +		.label		= _label,			\
+> +		.data		= _data,			\
+> +		.dir		= _dir,				\
+> +		.base		= _base,			\
+> +		.has_debounce	= _debounce,			\
+> +	}
+>  
+> -static int ep93xx_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+> +static struct ep93xx_gpio_bank ep93xx_gpio_banks[] = {
+> +	EP93XX_GPIO_BANK("A", 0x00, 0x10, 0, true),
+> +	EP93XX_GPIO_BANK("B", 0x04, 0x14, 8, true),
+> +	EP93XX_GPIO_BANK("C", 0x08, 0x18, 40, false),
+> +	EP93XX_GPIO_BANK("D", 0x0c, 0x1c, 24, false),
+> +	EP93XX_GPIO_BANK("E", 0x20, 0x24, 32, false),
+> +	EP93XX_GPIO_BANK("F", 0x30, 0x34, 16, true),
+> +	EP93XX_GPIO_BANK("G", 0x38, 0x3c, 48, false),
+> +	EP93XX_GPIO_BANK("H", 0x40, 0x44, 56, false),
+> +};
+> +
+> +static int ep93xx_gpio_set_debounce(struct gpio_chip *chip,
+> +				    unsigned offset, unsigned debounce)
+>  {
+> -	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
+> -	unsigned long flags;
+> -	u8 v;
+> +	int gpio = chip->base + offset;
+> +	int irq = gpio_to_irq(gpio);
+>  
+> -	local_irq_save(flags);
+> -	v = __raw_readb(ep93xx_chip->data_dir_reg);
+> -	v &= ~(1 << offset);
+> -	__raw_writeb(v, ep93xx_chip->data_dir_reg);
+> -	local_irq_restore(flags);
+> +	if (irq < 0)
+> +		return -EINVAL;
+> +
+> +	ep93xx_gpio_int_debounce(irq, debounce ? true : false);
+>  
+>  	return 0;
+>  }
+>  
+> -static int ep93xx_gpio_direction_output(struct gpio_chip *chip,
+> -					unsigned offset, int val)
+> +static int ep93xx_gpio_add_bank(struct bgpio_chip *bgc, struct device *dev,
+> +	void __iomem *mmio_base, struct ep93xx_gpio_bank *bank)
+>  {
+> -	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
+> -	unsigned long flags;
+> -	int line;
+> -	u8 v;
+> -
+> -	local_irq_save(flags);
+> +	void __iomem *data = mmio_base + bank->data;
+> +	void __iomem *dir =  mmio_base + bank->dir;
+> +	int err;
+>  
+> -	/* Set the value */
+> -	v = __raw_readb(ep93xx_chip->data_reg);
+> -	if (val)
+> -		v |= (1 << offset);
+> -	else
+> -		v &= ~(1 << offset);
+> -	__raw_writeb(v, ep93xx_chip->data_reg);
+> -
+> -	/* Drive as an output */
+> -	line = chip->base + offset;
+> -	if (line <= EP93XX_GPIO_LINE_MAX_IRQ) {
+> -		/* Ports A/B/F */
+> -		ep93xx_gpio_int_mask(line);
+> -		ep93xx_gpio_update_int_params(line >> 3);
+> -	}
+> +	err = bgpio_init(bgc, dev, 1, data, NULL, NULL, dir, NULL, false);
+> +	if (err)
+> +		return err;
+>  
+> -	v = __raw_readb(ep93xx_chip->data_dir_reg);
+> -	v |= (1 << offset);
+> -	__raw_writeb(v, ep93xx_chip->data_dir_reg);
+> +	bgc->gc.label = bank->label;
+> +	bgc->gc.base = bank->base;
+>  
+> -	local_irq_restore(flags);
+> +	if (bank->has_debounce)
+> +		bgc->gc.set_debounce = ep93xx_gpio_set_debounce;
+>  
+> -	return 0;
+> +	return gpiochip_add(&bgc->gc);
+>  }
+>  
+> -static int ep93xx_gpio_get(struct gpio_chip *chip, unsigned offset)
+> +static int __devinit ep93xx_gpio_probe(struct platform_device *pdev)
+>  {
+> -	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
+> +	struct ep93xx_gpio *ep93xx_gpio;
+> +	struct resource *res;
+> +	void __iomem *mmio;
+> +	int i;
+> +	int ret;
+>  
+> -	return !!(__raw_readb(ep93xx_chip->data_reg) & (1 << offset));
+> -}
+> +	ep93xx_gpio = kzalloc(sizeof(*ep93xx_gpio), GFP_KERNEL);
+> +	if (!ep93xx_gpio)
+> +		return -ENOMEM;
+>  
+> -static void ep93xx_gpio_set(struct gpio_chip *chip, unsigned offset, int val)
+> -{
+> -	struct ep93xx_gpio_chip *ep93xx_chip = to_ep93xx_gpio_chip(chip);
+> -	unsigned long flags;
+> -	u8 v;
+> -
+> -	local_irq_save(flags);
+> -	v = __raw_readb(ep93xx_chip->data_reg);
+> -	if (val)
+> -		v |= (1 << offset);
+> -	else
+> -		v &= ~(1 << offset);
+> -	__raw_writeb(v, ep93xx_chip->data_reg);
+> -	local_irq_restore(flags);
+> -}
+> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!res) {
+> +		ret = -ENXIO;
+> +		goto exit_free;
+> +	}
+>  
+> -static int ep93xx_gpio_set_debounce(struct gpio_chip *chip,
+> -				    unsigned offset, unsigned debounce)
+> -{
+> -	int gpio = chip->base + offset;
+> -	int irq = gpio_to_irq(gpio);
+> +	if (!request_mem_region(res->start, resource_size(res), pdev->name)) {
+> +		ret = -EBUSY;
+> +		goto exit_free;
+> +	}
+>  
+> -	if (irq < 0)
+> -		return -EINVAL;
+> +	mmio = ioremap(res->start, resource_size(res));
+> +	if (!mmio) {
+> +		ret = -ENXIO;
+> +		goto exit_release;
+> +	}
+> +	ep93xx_gpio->mmio_base = mmio;
+>  
+> -	ep93xx_gpio_int_debounce(irq, debounce ? true : false);
+> +	/* Default all ports to GPIO */
+> +	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
+> +			       EP93XX_SYSCON_DEVCFG_GONK |
+> +			       EP93XX_SYSCON_DEVCFG_EONIDE |
+> +			       EP93XX_SYSCON_DEVCFG_GONIDE |
+> +			       EP93XX_SYSCON_DEVCFG_HONIDE);
+>  
+> -	return 0;
+> -}
+> +	for (i = 0; i < ARRAY_SIZE(ep93xx_gpio_banks); i++) {
+> +		struct bgpio_chip *bgc = &ep93xx_gpio->bgc[i];
+> +		struct ep93xx_gpio_bank *bank = &ep93xx_gpio_banks[i];
+>  
+> -#define EP93XX_GPIO_BANK(name, dr, ddr, base_gpio)			\
+> -	{								\
+> -		.chip = {						\
+> -			.label		  = name,			\
+> -			.direction_input  = ep93xx_gpio_direction_input, \
+> -			.direction_output = ep93xx_gpio_direction_output, \
+> -			.get		  = ep93xx_gpio_get,		\
+> -			.set		  = ep93xx_gpio_set,		\
+> -			.base		  = base_gpio,			\
+> -			.ngpio		  = 8,				\
+> -		},							\
+> -		.data_reg	= EP93XX_GPIO_REG(dr),			\
+> -		.data_dir_reg	= EP93XX_GPIO_REG(ddr),			\
+> +		if (ep93xx_gpio_add_bank(bgc, &pdev->dev, mmio, bank))
+> +			dev_warn(&pdev->dev, "Unable to add gpio bank %s\n",
+> +				bank->label);
+>  	}
+>  
+> -static struct ep93xx_gpio_chip ep93xx_gpio_banks[] = {
+> -	EP93XX_GPIO_BANK("A", 0x00, 0x10, 0),
+> -	EP93XX_GPIO_BANK("B", 0x04, 0x14, 8),
+> -	EP93XX_GPIO_BANK("C", 0x08, 0x18, 40),
+> -	EP93XX_GPIO_BANK("D", 0x0c, 0x1c, 24),
+> -	EP93XX_GPIO_BANK("E", 0x20, 0x24, 32),
+> -	EP93XX_GPIO_BANK("F", 0x30, 0x34, 16),
+> -	EP93XX_GPIO_BANK("G", 0x38, 0x3c, 48),
+> -	EP93XX_GPIO_BANK("H", 0x40, 0x44, 56),
+> -};
+> +	ep93xx_gpio_init_irq();
+>  
+> -void __init ep93xx_gpio_init(void)
+> -{
+> -	int i;
+> +	return 0;
+>  
+> -	/* Set Ports C, D, E, G, and H for GPIO use */
+> -	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_KEYS |
+> -				 EP93XX_SYSCON_DEVCFG_GONK |
+> -				 EP93XX_SYSCON_DEVCFG_EONIDE |
+> -				 EP93XX_SYSCON_DEVCFG_GONIDE |
+> -				 EP93XX_SYSCON_DEVCFG_HONIDE);
+> +exit_release:
+> +	release_mem_region(res->start, resource_size(res));
+> +exit_free:
+> +	kfree(ep93xx_gpio);
+> +	dev_info(&pdev->dev, "%s failed with errno %d\n", __func__, ret);
+> +	return ret;
+> +}
+>  
+> -	for (i = 0; i < ARRAY_SIZE(ep93xx_gpio_banks); i++) {
+> -		struct gpio_chip *chip = &ep93xx_gpio_banks[i].chip;
+> -
+> -		/*
+> -		 * Ports A, B, and F support input debouncing when
+> -		 * used as interrupts.
+> -		 */
+> -		if (!strcmp(chip->label, "A") ||
+> -		    !strcmp(chip->label, "B") ||
+> -		    !strcmp(chip->label, "F"))
+> -			chip->set_debounce = ep93xx_gpio_set_debounce;
+> -
+> -		gpiochip_add(chip);
+> -	}
+> +static struct platform_driver ep93xx_gpio_driver = {
+> +	.driver		= {
+> +		.name	= "gpio-ep93xx",
+> +		.owner	= THIS_MODULE,
+> +	},
+> +	.probe		= ep93xx_gpio_probe,
+> +};
+> +
+> +static int __init ep93xx_gpio_init(void)
+> +{
+> +	pr_info("%s\n", __func__);
+> +        return platform_driver_register(&ep93xx_gpio_driver);
+>  }
+> +postcore_initcall(ep93xx_gpio_init);
+> +
+> +MODULE_AUTHOR("Ryan Mallon <ryan@bluewatersys.com> "
+> +		"H Hartley Sweeten <hsweeten@visionengravers.com>");
+> +MODULE_DESCRIPTION("EP93XX GPIO driver");
+> +MODULE_LICENSE("GPL");
