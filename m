@@ -1,21 +1,22 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 8 Jun 2011 09:17:36 -0600
-Subject: [GIT PULL] GPIO: OMAP fixes for v3.0-rc
-In-Reply-To: <878vtdkww4.fsf@ti.com>
-References: <878vtdkww4.fsf@ti.com>
-Message-ID: <20110608151736.GF8499@ponder.secretlab.ca>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed,  8 Jun 2011 16:28:29 +0100
+Subject: [PATCH 0/2] ARM PMU reservation cleanup
+Message-ID: <1307546911-2714-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2011 at 05:08:27PM -0700, Kevin Hilman wrote:
-> Grant,
-> 
-> Here's a small set of OMAP GPIO fixes for v3.0-rc.
-> 
-> Thanks,
-> 
-> Kevin
+Hi all,
 
-Merged, thanks.
+These patches clean up the PMU reservation framework to separate the
+core logic from modifications required to add FDT support.
 
-g.
+This refactoring may require trivial changes to LTTng.
+
+Mark Rutland (2):
+  ARM: pmu: refactor reservation
+  ARM: pmu: reject duplicate PMU registrations
+
+ arch/arm/include/asm/pmu.h   |    2 +-
+ arch/arm/kernel/perf_event.c |    4 ++--
+ arch/arm/kernel/pmu.c        |   39 ++++++++++++++++++++++-----------------
+ 3 files changed, 25 insertions(+), 20 deletions(-)
