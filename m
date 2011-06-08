@@ -1,40 +1,25 @@
-From: jon-hunter@ti.com (Jon Hunter)
-Date: Wed, 8 Jun 2011 15:39:04 -0500
-Subject: [PATCH v3 04/12] Serial: OMAP: Add runtime pm support for
-	omap-serial driver
-In-Reply-To: <1307532194-13039-5-git-send-email-govindraj.raja@ti.com>
-References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-	<1307532194-13039-5-git-send-email-govindraj.raja@ti.com>
-Message-ID: <4DEFDDE8.3090808@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Jun 2011 21:41:27 +0100
+Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <BANLkTikFKr+3Qph+CR40SUV-DCir1v=KBg@mail.gmail.com>
+References: <BANLkTin7mqqTsosPHbztaPfL7s_TUGT1qg@mail.gmail.com>
+	<20110608142121T.fujita.tomonori@lab.ntt.co.jp>
+	<BANLkTi=FcNncT_6HpvB_6OnQ94f0_sz7Gw@mail.gmail.com>
+	<20110608160844E.fujita.tomonori@lab.ntt.co.jp>
+	<BANLkTikFKr+3Qph+CR40SUV-DCir1v=KBg@mail.gmail.com>
+Message-ID: <20110608204127.GC13151@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Govindraj,
+On Wed, Jun 08, 2011 at 01:05:57PM -0700, Dan Williams wrote:
+> Even if that were the case it would be same situation that the scsi device
+> driver reports maximum parameters, but the subsystem opts for
+> something tighter.  Whether the maximal parameters come from the scsi
+> device or the dma channel is moot.
 
-On 6/8/2011 6:23 AM, Govindraj.R wrote:
-
-[snip]
-
-> +
-> +#define OMAP_UART_AUTOSUSPEND_DELAY (30 * HZ) /* Value is msecs */
-
-[snip]
-
-> @@ -1295,18 +1381,36 @@ static int serial_omap_probe(struct platform_device *pdev)
->   		up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
->   	}
->
-> +	pm_runtime_use_autosuspend(&pdev->dev);
-> +	pm_runtime_set_autosuspend_delay(&pdev->dev,
-> +			OMAP_UART_AUTOSUSPEND_DELAY);
-
-Something is weird here...DEFAULT_AUTOSUSPEND_DELAY is defined as 
-(30*HZ) which would appear to be jiffies (ticks per second) and NOT 
-msecs. However, pm_runtime_set_autosuspend is clearly expecting msecs. 
-So this seems to conflict. By default 30*HZ for omap would be 30*128 = 
-3840ms so not quite 4 seconds.
-
-What were you intending here?
-
-Cheers
-Jon
+Except for the small issue that many DMA-engine using devices do not
+have _any_ DMA capabilities of their own, which means they don't have
+anything to put in their own struct device's DMA parameters.  We can't
+go around making up random insane parameters in the hope that they'll
+exceed whatever DMA-engine is being used with the device - that's a
+hack not a solution.
