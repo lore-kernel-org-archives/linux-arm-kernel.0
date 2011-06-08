@@ -1,33 +1,38 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 8 Jun 2011 14:04:35 +0100
-Subject: [PATCH] ARM: mm: ensure TTBR0 is restored when changing ASID on
-	rollover
-In-Reply-To: <1307443118-11573-1-git-send-email-will.deacon@arm.com>
-References: <1307443118-11573-1-git-send-email-will.deacon@arm.com>
-Message-ID: <BANLkTimnqrMtdvicvvwCwPRqQjZSTSXhFw@mail.gmail.com>
+From: matthew@wil.cx (Matthew Wilcox)
+Date: Wed, 8 Jun 2011 07:05:22 -0600
+Subject: [PATCH 0/4] drivers/iommu/ relocations
+In-Reply-To: <1307522062-19273-1-git-send-email-ohad@wizery.com>
+References: <1307522062-19273-1-git-send-email-ohad@wizery.com>
+Message-ID: <20110608130522.GC29089@parisc-linux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 June 2011 11:38, Will Deacon <will.deacon@arm.com> wrote:
-> In 52af9c6c ("ARM: 6943/1: mm: use TTBR1 instead of reserved context ID")
-> I updated the ASID rollover code to use only the kernel page tables
-> whilst updating the ASID.
->
-> Unfortunately, the code to restore the user page tables was part of a
-> later patch which isn't yet in mainline, so this leaves the code
-> quite broken.
+On Wed, Jun 08, 2011 at 11:34:18AM +0300, Ohad Ben-Cohen wrote:
+> Create a dedicated iommu drivers folder, put the base iommu code there,
+> and move the existing IOMMU API users as well (msm-iommu, amd_iommu and
+> intel-iommu).
+> 
+> Putting all iommu drivers together will ease finding similarities
+> between different platforms, with the intention of solving problems once,
+> in a generic framework, which everyone can use.
+> 
+> OMAP's iommu will be moved too as soon as it's migrated.
+> 
+> For previous discussions on this, please see:
+> https://lkml.org/lkml/2011/6/2/369
+> 
+> Ohad Ben-Cohen (4):
+>   drivers: iommu: move to a dedicated folder
+>   msm: iommu: move to drivers/iommu/
+>   x86: amd_iommu: move to drivers/iommu/
+>   x86: intel-iommu: move to drivers/iommu/
 
-IOW, after an ASID roll-over on SMP, the cross-called reset_context()
-function sets TTBR0 to swapper_pg_dir but never sets it back to the
-one of the currently running process. So interrupted user space
-processes would fault when returning from an ASID roll-over event
-happening on a different CPU.
+You've missed at least parisc, ia64, alpha, sparc, powerpc and sh which
+have IOMMUs.  Not that they necessarily all need to be moved across in
+one patchset, but saying "all iommu drivers" is clearly false.
 
-> This patch fixes the issue by calling cpu_switch_mm to change the ASID
-> which has the side-effect of setting up TTBR0 to point to the user
-> tables.
->
-> Reported-by: Marc Zyngier <marc.zyngier@arm.com>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+-- 
+Matthew Wilcox				Intel Open Source Technology Centre
+"Bill, look, we understand that you're interested in selling us this
+operating system, but compare it to ours.  We can't possibly take such
+a retrograde step."
