@@ -1,48 +1,105 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Wed, 8 Jun 2011 11:03:22 +0800
-Subject: [PATCH v3 2/4] mmc: support sdhci-pxav2.c
-In-Reply-To: <A5ADAC80-98EE-4184-A958-965A3EC275F9@marvell.com>
-References: <1307094606-8692-1-git-send-email-zhangfei.gao@marvell.com>
-	<1E53FF9F-5C6A-4AA2-B441-DD712C5D6715@marvell.com>
-	<BANLkTik9an1N8914nC5MVL7+nHh+NhDNAA@mail.gmail.com>
-	<201106070917.41691.arnd@arndb.de>
-	<BANLkTinsk0AzBYd+fO9Oz1RO9smNzJTsTA@mail.gmail.com>
-	<A5ADAC80-98EE-4184-A958-965A3EC275F9@marvell.com>
-Message-ID: <BANLkTin4nHnaZyA1-Gh5TV+v9BqbRwJSSg@mail.gmail.com>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Wed, 8 Jun 2011 11:05:39 +0800
+Subject: [PATCH,RFC] mmp clockevent handling race
+In-Reply-To: <1307499937.8890.2.camel@Lily>
+References: <20110607140456.GE11275@wantstofly.org>
+	<alpine.LFD.2.00.1106071416230.2142@xanadu.home>
+	<1307499937.8890.2.camel@Lily>
+Message-ID: <BANLkTi=MhX97=pXTFfJfO8=E=2Q98YdC6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2011 at 11:04 PM, Philip Rakity <prakity@marvell.com> wrote:
->
-> On Jun 7, 2011, at 12:31 AM, Eric Miao wrote:
->
->>> How about changing the title of the option though? A user will
->>> usually not know if he is using the v2 or v3 controller without
->>> reading the help text. If you change it to
->>>
->>> config MMC_SDHCI_PXAV2
->>> ? ? ? ?tristate "Marvell PXA168 SD Host Controller support (PXAV2)"
->>> ? ? ? ?default CPU_PXA168
->
-> change to
->>> ? ? ? ?tristate "Marvell PXA9xx SD Host Controller support (PXAV2)"
->
-> the pxa168 will not work in all cases with the V2 code. ?It needs IO_ACCESSORS for readw and
-> a callback to sdhci.c to delay then time between transfers. ?Once V2 code is mainline
-> I will resubmit the pxa168 code.
->
->
->>>
->>> config MMC_SDHCI_PXAV3
->>> ? ? ? ?tristate "Marvell MMP2/PX9XX SD Host Controller support (PXAV3)"
->>> ? ? ? ?default CPU_MMP2 || CPU_PXA910
->>>
+On Wed, Jun 8, 2011 at 10:25 AM, Haojian Zhuang
+<haojian.zhuang@marvell.com> wrote:
+> On Tue, 2011-06-07 at 11:29 -0700, Nicolas Pitre wrote:
+>> On Tue, 7 Jun 2011, Lennert Buytenhek wrote:
 >>
->> Yeah, the above is much cleaner/simpler.
+>> > Hi!
+>> >
+>> > The patch below has been sitting around in the OLPC XO-1.75 (MMP2-based
+>> > XO) bringup kernel tree for some time now, and upon recent rebasing of
+>> > this tree to 3.0, it was discovered that something like this patch is
+>> > still needed.
+>> >
+>> > Symptoms: e.g. as described here: http://dev.laptop.org/ticket/10945
+>> > -- applications hang for a couple of minutes at a time, and sometimes
+>> > there are several-minute hangs during the boot process.
+>> >
+>> > >From the ticket:
+>> >
+>> > ? ? The problem in the current upstream mmp timer handling code
+>> > ? ? that appears to be triggered here is that it handles clockevents
+>> > ? ? by setting up a comparator on the free-running clocksource timer
+>> > ? ? to match and trigger an interrupt at 'current_time + delta',
+>> > ? ? which if delta is small enough can lead to 'current_time + delta'
+>> > ? ? already being in the past when comparator setup has finished,
+>> > ? ? and the requested event will not trigger.
 >>
->>> you increase the chances of users getting the configuration right.
->>>
->>> ? ? ? ?Arnd
->>>
+>> This is a classical issue that was solved on the SA1100 more than 10
+>> years ago.
+>>
+>> > What this patch does is to rewrite the timer handling code to use
+>> > two timers, one for the free-running clocksource, and one to trigger
+>> > clockevents with, which is more or less the standard approach to this.
+>> > It's kind of invasive, though (certainly more invasive than it strictly
+>> > needs to be, as it reorganises time.c somewhat at the same time), and
+>> > something like this is probably too invasive for 3.0 at this point.
+>> >
+>> > A safer "fix" for 3.0 may be to disallow NO_HZ/HIGH_RES_TIMERS on mmp.
+>> >
+>> > Any thoughts?
+>>
+>> What about simply this:
+>>
+>> diff --git a/arch/arm/mach-mmp/time.c b/arch/arm/mach-mmp/time.c
+>> index 99833b9..8b8f99a 100644
+>> --- a/arch/arm/mach-mmp/time.c
+>> +++ b/arch/arm/mach-mmp/time.c
+>> @@ -39,7 +39,7 @@
+>>
+>> ?#define TIMERS_VIRT_BASE ? ? TIMERS1_VIRT_BASE
+>>
+>> -#define MAX_DELTA ? ? ? ? ? ?(0xfffffffe)
+>> +#define MAX_DELTA ? ? ? ? ? ?(0xfffffffe - 16)
+>> ?#define MIN_DELTA ? ? ? ? ? ?(16)
+>>
+>> ?static DEFINE_CLOCK_DATA(cd);
+>> @@ -85,7 +85,7 @@ static irqreturn_t timer_interrupt(int irq, void *dev_id)
+>> ?static int timer_set_next_event(unsigned long delta,
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct clock_event_device *dev)
+>> ?{
+>> - ? ? unsigned long flags, next;
+>> + ? ? unsigned long flags, next, now;
+>>
+>> ? ? ? local_irq_save(flags);
+>>
+>> @@ -95,9 +95,10 @@ static int timer_set_next_event(unsigned long delta,
+>>
+>> ? ? ? next = timer_read() + delta;
+>> ? ? ? __raw_writel(next, TIMERS_VIRT_BASE + TMR_TN_MM(0, 0));
+>> + ? ? now = timer_read();
+>>
+>> ? ? ? local_irq_restore(flags);
+>> - ? ? return 0;
+>> + ? ? return (signed)(next - now) <= MIN_DELTA ? -ETIME : 0;
+>> ?}
+>>
+>> ?static void timer_set_mode(enum clock_event_mode mode,
+>>
+>>
+>> Nicolas
+> It seems good. But we still need to use two different timer. Because
+> writing match register needs to stop counter register first. This is a
+> limitation in the silicon.
 
-Thanks for good suggestion. Will update to v4.
+Well, the first thing is Lennert's RFC patch needs a bit cleanup :-) I tried
+very hard to figure out the actual changes.
+
+Using two timers isn't a bad idea. Yet if it has to disable timer0 when
+modifying timer1's next triggering event, it doesn't seem to solve the
+real problem with two timers.
+
+Haojian,
+
+Do we have any other timer that could be used as an independent
+clock source?
