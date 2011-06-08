@@ -1,953 +1,1259 @@
-From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 8 Jun 2011 16:53:04 +0530
-Subject: [PATCH v3 02/12] OMAP2+: UART: Remove uart clock handling code from
-	serial.c
-In-Reply-To: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1307532194-13039-3-git-send-email-govindraj.raja@ti.com>
+From: g.liakhovetski@gmx.de (Guennadi Liakhovetski)
+Date: Wed, 8 Jun 2011 13:51:29 +0200 (CEST)
+Subject: [PATCH v4] [media] at91: add Atmel Image Sensor Interface (ISI)
+	support
+In-Reply-To: <1307497219-21496-1-git-send-email-josh.wu@atmel.com>
+References: <1307497219-21496-1-git-send-email-josh.wu@atmel.com>
+Message-ID: <Pine.LNX.4.64.1106081350250.24274@axis700.grange>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cleanup serial.c file in preparation to addition of runtime api's in omap-serial
-file. Remove all clock handling mechanism as this will be taken care with
-pm runtime api's in omap-serial.c file itself.
+On Wed, 8 Jun 2011, Josh Wu wrote:
 
-1.) Remove omap-device enable and disable. We can can use get_sync/put_sync api's
-2.) Remove context save/restore can be done with runtime_resume callback for
-    get_sync call. No need to save context as all reg details available in
-    uart_port structure can be used for restore, so add missing regs in
-    uart port struct.
-3.) Add func to identify console uart.
-4.) Erratum handling informed as flag to driver and func to handle erratum
-    can be moved to omap-serial driver itself.
+> This patch is to enable Atmel Image Sensor Interface (ISI) driver support.
+> - Using soc-camera framework with videobuf2 dma-contig allocator
+> - Supporting video streaming of YUV packed format
+> - Tested on AT91SAM9M10G45-EK with OV2640
+> 
+> Signed-off-by: Josh Wu <josh.wu@atmel.com>
 
-Acked-by: Alan Cox <alan@linux.intel.com>
-Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+Thanks for the good work! I don't have any more (important) comments left, 
+I've applied this patch to my 3.1 queue.
+
+Thanks
+Guennadi
+
+> ---
+> base on branch staging/for_v3.0
+> Modified in V4:
+> remove redundant spin_lock code.
+> using isi_dma_desc in frame_buffer structure.
+> refactor the error handling code in probe() function.
+> other coding style fix.
+> 
+>  drivers/media/video/Kconfig     |    8 +
+>  drivers/media/video/Makefile    |    1 +
+>  drivers/media/video/atmel-isi.c | 1048 +++++++++++++++++++++++++++++++++++++++
+>  include/media/atmel-isi.h       |  119 +++++
+>  4 files changed, 1176 insertions(+), 0 deletions(-)
+>  create mode 100644 drivers/media/video/atmel-isi.c
+>  create mode 100644 include/media/atmel-isi.h
+> 
+> diff --git a/drivers/media/video/Kconfig b/drivers/media/video/Kconfig
+> index bb53de7..93d1098 100644
+> --- a/drivers/media/video/Kconfig
+> +++ b/drivers/media/video/Kconfig
+> @@ -952,6 +952,14 @@ config  VIDEO_SAMSUNG_S5P_FIMC
+>  	  To compile this driver as a module, choose M here: the
+>  	  module will be called s5p-fimc.
+>  
+> +config VIDEO_ATMEL_ISI
+> +	tristate "ATMEL Image Sensor Interface (ISI) support"
+> +	depends on VIDEO_DEV && SOC_CAMERA && ARCH_AT91
+> +	select VIDEOBUF2_DMA_CONTIG
+> +	---help---
+> +	  This module makes the ATMEL Image Sensor Interface available
+> +	  as a v4l2 device.
+> +
+>  config VIDEO_S5P_MIPI_CSIS
+>  	tristate "Samsung S5P and EXYNOS4 MIPI CSI receiver driver"
+>  	depends on VIDEO_V4L2 && PM_RUNTIME && PLAT_S5P && VIDEO_V4L2_SUBDEV_API
+> diff --git a/drivers/media/video/Makefile b/drivers/media/video/Makefile
+> index f0fecd6..d9833f4 100644
+> --- a/drivers/media/video/Makefile
+> +++ b/drivers/media/video/Makefile
+> @@ -166,6 +166,7 @@ obj-$(CONFIG_VIDEO_PXA27x)		+= pxa_camera.o
+>  obj-$(CONFIG_VIDEO_SH_MOBILE_CSI2)	+= sh_mobile_csi2.o
+>  obj-$(CONFIG_VIDEO_SH_MOBILE_CEU)	+= sh_mobile_ceu_camera.o
+>  obj-$(CONFIG_VIDEO_OMAP1)		+= omap1_camera.o
+> +obj-$(CONFIG_VIDEO_ATMEL_ISI)		+= atmel-isi.o
+>  
+>  obj-$(CONFIG_VIDEO_SAMSUNG_S5P_FIMC) 	+= s5p-fimc/
+>  
+> diff --git a/drivers/media/video/atmel-isi.c b/drivers/media/video/atmel-isi.c
+> new file mode 100644
+> index 0000000..4742c28
+> --- /dev/null
+> +++ b/drivers/media/video/atmel-isi.c
+> @@ -0,0 +1,1048 @@
+> +/*
+> + * Copyright (c) 2011 Atmel Corporation
+> + * Josh Wu, <josh.wu@atmel.com>
+> + *
+> + * Based on previous work by Lars Haring, <lars.haring@atmel.com>
+> + * and Sedji Gaouaou
+> + * Based on the bttv driver for Bt848 with respective copyright holders
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/completion.h>
+> +#include <linux/delay.h>
+> +#include <linux/fs.h>
+> +#include <linux/init.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +#include <media/atmel-isi.h>
+> +#include <media/soc_camera.h>
+> +#include <media/soc_mediabus.h>
+> +#include <media/videobuf2-dma-contig.h>
+> +
+> +#define MAX_BUFFER_NUM			32
+> +#define MAX_SUPPORT_WIDTH		2048
+> +#define MAX_SUPPORT_HEIGHT		2048
+> +#define VID_LIMIT_BYTES			(16 * 1024 * 1024)
+> +#define MIN_FRAME_RATE			15
+> +#define FRAME_INTERVAL_MILLI_SEC	(1000 / MIN_FRAME_RATE)
+> +
+> +/* ISI states */
+> +enum {
+> +	ISI_STATE_IDLE = 0,
+> +	ISI_STATE_READY,
+> +	ISI_STATE_WAIT_SOF,
+> +};
+> +
+> +/* Frame buffer descriptor */
+> +struct fbd {
+> +	/* Physical address of the frame buffer */
+> +	u32 fb_address;
+> +	/* DMA Control Register(only in HISI2) */
+> +	u32 dma_ctrl;
+> +	/* Physical address of the next fbd */
+> +	u32 next_fbd_address;
+> +};
+> +
+> +static void set_dma_ctrl(struct fbd *fb_desc, u32 ctrl)
+> +{
+> +	fb_desc->dma_ctrl = ctrl;
+> +}
+> +
+> +struct isi_dma_desc {
+> +	struct list_head list;
+> +	struct fbd *p_fbd;
+> +	u32 fbd_phys;
+> +};
+> +
+> +/* Frame buffer data */
+> +struct frame_buffer {
+> +	struct vb2_buffer vb;
+> +	struct isi_dma_desc *p_dma_desc;
+> +	struct list_head list;
+> +};
+> +
+> +struct atmel_isi {
+> +	/* Protects the access of variables shared with the ISR */
+> +	spinlock_t			lock;
+> +	void __iomem			*regs;
+> +
+> +	int				sequence;
+> +	/* State of the ISI module in capturing mode */
+> +	int				state;
+> +
+> +	/* Wait queue for waiting for SOF */
+> +	wait_queue_head_t		vsync_wq;
+> +
+> +	struct vb2_alloc_ctx		*alloc_ctx;
+> +
+> +	/* Allocate descriptors for dma buffer use */
+> +	struct fbd			*p_fb_descriptors;
+> +	u32				fb_descriptors_phys;
+> +	struct				list_head dma_desc_head;
+> +	struct isi_dma_desc		dma_desc[MAX_BUFFER_NUM];
+> +
+> +	struct completion		complete;
+> +	struct clk			*pclk;
+> +	unsigned int			irq;
+> +
+> +	struct isi_platform_data	*pdata;
+> +
+> +	struct list_head		video_buffer_list;
+> +	struct frame_buffer		*active;
+> +
+> +	struct soc_camera_device	*icd;
+> +	struct soc_camera_host		soc_host;
+> +};
+> +
+> +static void isi_writel(struct atmel_isi *isi, u32 reg, u32 val)
+> +{
+> +	writel(val, isi->regs + reg);
+> +}
+> +static u32 isi_readl(struct atmel_isi *isi, u32 reg)
+> +{
+> +	return readl(isi->regs + reg);
+> +}
+> +
+> +static int configure_geometry(struct atmel_isi *isi, u32 width,
+> +			u32 height, enum v4l2_mbus_pixelcode code)
+> +{
+> +	u32 cfg2, cr;
+> +
+> +	switch (code) {
+> +	/* YUV, including grey */
+> +	case V4L2_MBUS_FMT_Y8_1X8:
+> +		cr = ISI_CFG2_GRAYSCALE;
+> +		break;
+> +	case V4L2_MBUS_FMT_UYVY8_2X8:
+> +		cr = ISI_CFG2_YCC_SWAP_MODE_3;
+> +		break;
+> +	case V4L2_MBUS_FMT_VYUY8_2X8:
+> +		cr = ISI_CFG2_YCC_SWAP_MODE_2;
+> +		break;
+> +	case V4L2_MBUS_FMT_YUYV8_2X8:
+> +		cr = ISI_CFG2_YCC_SWAP_MODE_1;
+> +		break;
+> +	case V4L2_MBUS_FMT_YVYU8_2X8:
+> +		cr = ISI_CFG2_YCC_SWAP_DEFAULT;
+> +		break;
+> +	/* RGB, TODO */
+> +	default:
+> +		return -EINVAL;
+> +	}
+> +
+> +	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> +
+> +	cfg2 = isi_readl(isi, ISI_CFG2);
+> +	cfg2 |= cr;
+> +	/* Set width */
+> +	cfg2 &= ~(ISI_CFG2_IM_HSIZE_MASK);
+> +	cfg2 |= ((width - 1) << ISI_CFG2_IM_HSIZE_OFFSET) &
+> +			ISI_CFG2_IM_HSIZE_MASK;
+> +	/* Set height */
+> +	cfg2 &= ~(ISI_CFG2_IM_VSIZE_MASK);
+> +	cfg2 |= ((height - 1) << ISI_CFG2_IM_VSIZE_OFFSET)
+> +			& ISI_CFG2_IM_VSIZE_MASK;
+> +	isi_writel(isi, ISI_CFG2, cfg2);
+> +
+> +	return 0;
+> +}
+> +
+> +static irqreturn_t atmel_isi_handle_streaming(struct atmel_isi *isi)
+> +{
+> +	if (isi->active) {
+> +		struct vb2_buffer *vb = &isi->active->vb;
+> +		struct frame_buffer *buf = isi->active;
+> +
+> +		list_del_init(&buf->list);
+> +		do_gettimeofday(&vb->v4l2_buf.timestamp);
+> +		vb->v4l2_buf.sequence = isi->sequence++;
+> +		vb2_buffer_done(vb, VB2_BUF_STATE_DONE);
+> +	}
+> +
+> +	if (list_empty(&isi->video_buffer_list)) {
+> +		isi->active = NULL;
+> +	} else {
+> +		/* start next dma frame. */
+> +		isi->active = list_entry(isi->video_buffer_list.next,
+> +					struct frame_buffer, list);
+> +		isi_writel(isi, ISI_DMA_C_DSCR,
+> +			isi->active->p_dma_desc->fbd_phys);
+> +		isi_writel(isi, ISI_DMA_C_CTRL,
+> +			ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
+> +		isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
+> +	}
+> +	return IRQ_HANDLED;
+> +}
+> +
+> +/* ISI interrupt service routine */
+> +static irqreturn_t isi_interrupt(int irq, void *dev_id)
+> +{
+> +	struct atmel_isi *isi = dev_id;
+> +	u32 status, mask, pending;
+> +	irqreturn_t ret = IRQ_NONE;
+> +
+> +	spin_lock(&isi->lock);
+> +
+> +	status = isi_readl(isi, ISI_STATUS);
+> +	mask = isi_readl(isi, ISI_INTMASK);
+> +	pending = status & mask;
+> +
+> +	if (pending & ISI_CTRL_SRST) {
+> +		complete(&isi->complete);
+> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_SRST);
+> +		ret = IRQ_HANDLED;
+> +	} else if (pending & ISI_CTRL_DIS) {
+> +		complete(&isi->complete);
+> +		isi_writel(isi, ISI_INTDIS, ISI_CTRL_DIS);
+> +		ret = IRQ_HANDLED;
+> +	} else {
+> +		if ((pending & ISI_SR_VSYNC) &&
+> +				(isi->state == ISI_STATE_IDLE)) {
+> +			isi->state = ISI_STATE_READY;
+> +			wake_up_interruptible(&isi->vsync_wq);
+> +			ret = IRQ_HANDLED;
+> +		}
+> +		if (likely(pending & ISI_SR_CXFR_DONE))
+> +			ret = atmel_isi_handle_streaming(isi);
+> +	}
+> +
+> +	spin_unlock(&isi->lock);
+> +	return ret;
+> +}
+> +
+> +#define	WAIT_ISI_RESET		1
+> +#define	WAIT_ISI_DISABLE	0
+> +static int atmel_isi_wait_status(struct atmel_isi *isi, int wait_reset)
+> +{
+> +	unsigned long timeout;
+> +	/*
+> +	 * The reset or disable will only succeed if we have a
+> +	 * pixel clock from the camera.
+> +	 */
+> +	init_completion(&isi->complete);
+> +
+> +	if (wait_reset) {
+> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_SRST);
+> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_SRST);
+> +	} else {
+> +		isi_writel(isi, ISI_INTEN, ISI_CTRL_DIS);
+> +		isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> +	}
+> +
+> +	timeout = wait_for_completion_timeout(&isi->complete,
+> +			msecs_to_jiffies(100));
+> +	if (timeout == 0)
+> +		return -ETIMEDOUT;
+> +
+> +	return 0;
+> +}
+> +
+> +/* ------------------------------------------------------------------
+> +	Videobuf operations
+> +   ------------------------------------------------------------------*/
+> +static int queue_setup(struct vb2_queue *vq, unsigned int *nbuffers,
+> +				unsigned int *nplanes, unsigned long sizes[],
+> +				void *alloc_ctxs[])
+> +{
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vq);
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	unsigned long size;
+> +	int ret, bytes_per_line;
+> +
+> +	/* Reset ISI */
+> +	ret = atmel_isi_wait_status(isi, WAIT_ISI_RESET);
+> +	if (ret < 0) {
+> +		dev_err(icd->dev.parent, "Reset ISI timed out\n");
+> +		return ret;
+> +	}
+> +	/* Disable all interrupts */
+> +	isi_writel(isi, ISI_INTDIS, ~0UL);
+> +
+> +	bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
+> +						icd->current_fmt->host_fmt);
+> +
+> +	if (bytes_per_line < 0)
+> +		return bytes_per_line;
+> +
+> +	size = bytes_per_line * icd->user_height;
+> +
+> +	if (!*nbuffers || *nbuffers > MAX_BUFFER_NUM)
+> +		*nbuffers = MAX_BUFFER_NUM;
+> +
+> +	if (size * *nbuffers > VID_LIMIT_BYTES)
+> +		*nbuffers = VID_LIMIT_BYTES / size;
+> +
+> +	*nplanes = 1;
+> +	sizes[0] = size;
+> +	alloc_ctxs[0] = isi->alloc_ctx;
+> +
+> +	isi->sequence = 0;
+> +	isi->active = NULL;
+> +
+> +	dev_dbg(icd->dev.parent, "%s, count=%d, size=%ld\n", __func__,
+> +		*nbuffers, size);
+> +
+> +	return 0;
+> +}
+> +
+> +static int buffer_init(struct vb2_buffer *vb)
+> +{
+> +	struct frame_buffer *buf = container_of(vb, struct frame_buffer, vb);
+> +
+> +	buf->p_dma_desc = NULL;
+> +	INIT_LIST_HEAD(&buf->list);
+> +
+> +	return 0;
+> +}
+> +
+> +static int buffer_prepare(struct vb2_buffer *vb)
+> +{
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vb->vb2_queue);
+> +	struct frame_buffer *buf = container_of(vb, struct frame_buffer, vb);
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	unsigned long size;
+> +	struct isi_dma_desc *desc;
+> +	int bytes_per_line = soc_mbus_bytes_per_line(icd->user_width,
+> +						icd->current_fmt->host_fmt);
+> +
+> +	if (bytes_per_line < 0)
+> +		return bytes_per_line;
+> +
+> +	size = bytes_per_line * icd->user_height;
+> +
+> +	if (vb2_plane_size(vb, 0) < size) {
+> +		dev_err(icd->dev.parent, "%s data will not fit into plane (%lu < %lu)\n",
+> +				__func__, vb2_plane_size(vb, 0), size);
+> +		return -EINVAL;
+> +	}
+> +
+> +	vb2_set_plane_payload(&buf->vb, 0, size);
+> +
+> +	if (!buf->p_dma_desc) {
+> +		if (list_empty(&isi->dma_desc_head)) {
+> +			dev_err(icd->dev.parent, "Not enough dma descriptors.\n");
+> +			return -EINVAL;
+> +		} else {
+> +			/* Get an available descriptor */
+> +			desc = list_entry(isi->dma_desc_head.next,
+> +						struct isi_dma_desc, list);
+> +			/* Delete the descriptor since now it is used */
+> +			list_del_init(&desc->list);
+> +
+> +			/* Initialize the dma descriptor */
+> +			desc->p_fbd->fb_address =
+> +					vb2_dma_contig_plane_paddr(vb, 0);
+> +			desc->p_fbd->next_fbd_address = 0;
+> +			set_dma_ctrl(desc->p_fbd, ISI_DMA_CTRL_WB);
+> +
+> +			buf->p_dma_desc = desc;
+> +		}
+> +	}
+> +	return 0;
+> +}
+> +
+> +static void buffer_cleanup(struct vb2_buffer *vb)
+> +{
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vb->vb2_queue);
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	struct frame_buffer *buf = container_of(vb, struct frame_buffer, vb);
+> +
+> +	/* This descriptor is available now and we add to head list */
+> +	if (buf->p_dma_desc)
+> +		list_add(&buf->p_dma_desc->list, &isi->dma_desc_head);
+> +}
+> +
+> +static void start_dma(struct atmel_isi *isi, struct frame_buffer *buffer)
+> +{
+> +	u32 ctrl, cfg1;
+> +
+> +	cfg1 = isi_readl(isi, ISI_CFG1);
+> +	/* Enable irq: cxfr for the codec path, pxfr for the preview path */
+> +	isi_writel(isi, ISI_INTEN,
+> +			ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
+> +
+> +	/* Check if already in a frame */
+> +	if (isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) {
+> +		dev_err(isi->icd->dev.parent, "Already in frame handling.\n");
+> +		return;
+> +	}
+> +
+> +	isi_writel(isi, ISI_DMA_C_DSCR, buffer->p_dma_desc->fbd_phys);
+> +	isi_writel(isi, ISI_DMA_C_CTRL, ISI_DMA_CTRL_FETCH | ISI_DMA_CTRL_DONE);
+> +	isi_writel(isi, ISI_DMA_CHER, ISI_DMA_CHSR_C_CH);
+> +
+> +	/* Enable linked list */
+> +	cfg1 |= isi->pdata->frate | ISI_CFG1_DISCR;
+> +
+> +	/* Enable codec path and ISI */
+> +	ctrl = ISI_CTRL_CDC | ISI_CTRL_EN;
+> +	isi_writel(isi, ISI_CTRL, ctrl);
+> +	isi_writel(isi, ISI_CFG1, cfg1);
+> +}
+> +
+> +static void buffer_queue(struct vb2_buffer *vb)
+> +{
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vb->vb2_queue);
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	struct frame_buffer *buf = container_of(vb, struct frame_buffer, vb);
+> +	unsigned long flags = 0;
+> +
+> +	spin_lock_irqsave(&isi->lock, flags);
+> +	list_add_tail(&buf->list, &isi->video_buffer_list);
+> +
+> +	if (isi->active == NULL) {
+> +		isi->active = buf;
+> +		start_dma(isi, buf);
+> +	}
+> +	spin_unlock_irqrestore(&isi->lock, flags);
+> +}
+> +
+> +static int start_streaming(struct vb2_queue *vq)
+> +{
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vq);
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +
+> +	u32 sr = 0;
+> +	int ret;
+> +
+> +	spin_lock_irq(&isi->lock);
+> +	isi->state = ISI_STATE_IDLE;
+> +	/* Clear any pending SOF interrupt */
+> +	sr = isi_readl(isi, ISI_STATUS);
+> +	/* Enable VSYNC interrupt for SOF */
+> +	isi_writel(isi, ISI_INTEN, ISI_SR_VSYNC);
+> +	isi_writel(isi, ISI_CTRL, ISI_CTRL_EN);
+> +	spin_unlock_irq(&isi->lock);
+> +
+> +	dev_dbg(icd->dev.parent, "Waiting for SOF\n");
+> +	ret = wait_event_interruptible(isi->vsync_wq,
+> +				       isi->state != ISI_STATE_IDLE);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (isi->state != ISI_STATE_READY)
+> +		return -EIO;
+> +
+> +	spin_lock_irq(&isi->lock);
+> +	isi->state = ISI_STATE_WAIT_SOF;
+> +	isi_writel(isi, ISI_INTDIS, ISI_SR_VSYNC);
+> +	spin_unlock_irq(&isi->lock);
+> +
+> +	return 0;
+> +}
+> +
+> +/* abort streaming and wait for last buffer */
+> +static int stop_streaming(struct vb2_queue *vq)
+> +{
+> +	struct soc_camera_device *icd = soc_camera_from_vb2q(vq);
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	struct frame_buffer *buf, *node;
+> +	int ret = 0;
+> +	unsigned long timeout;
+> +
+> +	spin_lock_irq(&isi->lock);
+> +	isi->active = NULL;
+> +	/* Release all active buffers */
+> +	list_for_each_entry_safe(buf, node, &isi->video_buffer_list, list) {
+> +		list_del_init(&buf->list);
+> +		vb2_buffer_done(&buf->vb, VB2_BUF_STATE_ERROR);
+> +	}
+> +	spin_unlock_irq(&isi->lock);
+> +
+> +	timeout = jiffies + FRAME_INTERVAL_MILLI_SEC * HZ;
+> +	/* Wait until the end of the current frame. */
+> +	while ((isi_readl(isi, ISI_STATUS) & ISI_CTRL_CDC) &&
+> +			time_before(jiffies, timeout))
+> +		msleep(1);
+> +
+> +	if (time_after(jiffies, timeout)) {
+> +		dev_err(icd->dev.parent,
+> +			"Timeout waiting for finishing codec request\n");
+> +		return -ETIMEDOUT;
+> +	}
+> +
+> +	/* Disable interrupts */
+> +	isi_writel(isi, ISI_INTDIS,
+> +			ISI_SR_CXFR_DONE | ISI_SR_PXFR_DONE);
+> +
+> +	/* Disable ISI and wait for it is done */
+> +	ret = atmel_isi_wait_status(isi, WAIT_ISI_DISABLE);
+> +	if (ret < 0)
+> +		dev_err(icd->dev.parent, "Disable ISI timed out\n");
+> +
+> +	return ret;
+> +}
+> +
+> +static struct vb2_ops isi_video_qops = {
+> +	.queue_setup		= queue_setup,
+> +	.buf_init		= buffer_init,
+> +	.buf_prepare		= buffer_prepare,
+> +	.buf_cleanup		= buffer_cleanup,
+> +	.buf_queue		= buffer_queue,
+> +	.start_streaming	= start_streaming,
+> +	.stop_streaming		= stop_streaming,
+> +	.wait_prepare		= soc_camera_unlock,
+> +	.wait_finish		= soc_camera_lock,
+> +};
+> +
+> +/* ------------------------------------------------------------------
+> +	SOC camera operations for the device
+> +   ------------------------------------------------------------------*/
+> +static int isi_camera_init_videobuf(struct vb2_queue *q,
+> +				     struct soc_camera_device *icd)
+> +{
+> +	q->type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+> +	q->io_modes = VB2_MMAP;
+> +	q->drv_priv = icd;
+> +	q->buf_struct_size = sizeof(struct frame_buffer);
+> +	q->ops = &isi_video_qops;
+> +	q->mem_ops = &vb2_dma_contig_memops;
+> +
+> +	return vb2_queue_init(q);
+> +}
+> +
+> +static int isi_camera_set_fmt(struct soc_camera_device *icd,
+> +			      struct v4l2_format *f)
+> +{
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
+> +	const struct soc_camera_format_xlate *xlate;
+> +	struct v4l2_pix_format *pix = &f->fmt.pix;
+> +	struct v4l2_mbus_framefmt mf;
+> +	int ret;
+> +
+> +	xlate = soc_camera_xlate_by_fourcc(icd, pix->pixelformat);
+> +	if (!xlate) {
+> +		dev_warn(icd->dev.parent, "Format %x not found\n",
+> +			 pix->pixelformat);
+> +		return -EINVAL;
+> +	}
+> +
+> +	dev_dbg(icd->dev.parent, "Plan to set format %dx%d\n",
+> +			pix->width, pix->height);
+> +
+> +	mf.width	= pix->width;
+> +	mf.height	= pix->height;
+> +	mf.field	= pix->field;
+> +	mf.colorspace	= pix->colorspace;
+> +	mf.code		= xlate->code;
+> +
+> +	ret = v4l2_subdev_call(sd, video, s_mbus_fmt, &mf);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	if (mf.code != xlate->code)
+> +		return -EINVAL;
+> +
+> +	ret = configure_geometry(isi, pix->width, pix->height, xlate->code);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	pix->width		= mf.width;
+> +	pix->height		= mf.height;
+> +	pix->field		= mf.field;
+> +	pix->colorspace		= mf.colorspace;
+> +	icd->current_fmt	= xlate;
+> +
+> +	dev_dbg(icd->dev.parent, "Finally set format %dx%d\n",
+> +		pix->width, pix->height);
+> +
+> +	return ret;
+> +}
+> +
+> +static int isi_camera_try_fmt(struct soc_camera_device *icd,
+> +			      struct v4l2_format *f)
+> +{
+> +	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
+> +	const struct soc_camera_format_xlate *xlate;
+> +	struct v4l2_pix_format *pix = &f->fmt.pix;
+> +	struct v4l2_mbus_framefmt mf;
+> +	u32 pixfmt = pix->pixelformat;
+> +	int ret;
+> +
+> +	xlate = soc_camera_xlate_by_fourcc(icd, pixfmt);
+> +	if (pixfmt && !xlate) {
+> +		dev_warn(icd->dev.parent, "Format %x not found\n", pixfmt);
+> +		return -EINVAL;
+> +	}
+> +
+> +	/* limit to Atmel ISI hardware capabilities */
+> +	if (pix->height > MAX_SUPPORT_HEIGHT)
+> +		pix->height = MAX_SUPPORT_HEIGHT;
+> +	if (pix->width > MAX_SUPPORT_WIDTH)
+> +		pix->width = MAX_SUPPORT_WIDTH;
+> +
+> +	/* limit to sensor capabilities */
+> +	mf.width	= pix->width;
+> +	mf.height	= pix->height;
+> +	mf.field	= pix->field;
+> +	mf.colorspace	= pix->colorspace;
+> +	mf.code		= xlate->code;
+> +
+> +	ret = v4l2_subdev_call(sd, video, try_mbus_fmt, &mf);
+> +	if (ret < 0)
+> +		return ret;
+> +
+> +	pix->width	= mf.width;
+> +	pix->height	= mf.height;
+> +	pix->colorspace	= mf.colorspace;
+> +
+> +	switch (mf.field) {
+> +	case V4L2_FIELD_ANY:
+> +		pix->field = V4L2_FIELD_NONE;
+> +		break;
+> +	case V4L2_FIELD_NONE:
+> +		break;
+> +	default:
+> +		dev_err(icd->dev.parent, "Field type %d unsupported.\n",
+> +			mf.field);
+> +		ret = -EINVAL;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static const struct soc_mbus_pixelfmt isi_camera_formats[] = {
+> +	{
+> +		.fourcc			= V4L2_PIX_FMT_YUYV,
+> +		.name			= "Packed YUV422 16 bit",
+> +		.bits_per_sample	= 8,
+> +		.packing		= SOC_MBUS_PACKING_2X8_PADHI,
+> +		.order			= SOC_MBUS_ORDER_LE,
+> +	},
+> +};
+> +
+> +/* This will be corrected as we get more formats */
+> +static bool isi_camera_packing_supported(const struct soc_mbus_pixelfmt *fmt)
+> +{
+> +	return	fmt->packing == SOC_MBUS_PACKING_NONE ||
+> +		(fmt->bits_per_sample == 8 &&
+> +		 fmt->packing == SOC_MBUS_PACKING_2X8_PADHI) ||
+> +		(fmt->bits_per_sample > 8 &&
+> +		 fmt->packing == SOC_MBUS_PACKING_EXTEND16);
+> +}
+> +
+> +static unsigned long make_bus_param(struct atmel_isi *isi)
+> +{
+> +	unsigned long flags;
+> +	/*
+> +	 * Platform specified synchronization and pixel clock polarities are
+> +	 * only a recommendation and are only used during probing. Atmel ISI
+> +	 * camera interface only works in master mode, i.e., uses HSYNC and
+> +	 * VSYNC signals from the sensor
+> +	 */
+> +	flags = SOCAM_MASTER |
+> +		SOCAM_HSYNC_ACTIVE_HIGH |
+> +		SOCAM_HSYNC_ACTIVE_LOW |
+> +		SOCAM_VSYNC_ACTIVE_HIGH |
+> +		SOCAM_VSYNC_ACTIVE_LOW |
+> +		SOCAM_PCLK_SAMPLE_RISING |
+> +		SOCAM_PCLK_SAMPLE_FALLING |
+> +		SOCAM_DATA_ACTIVE_HIGH;
+> +
+> +	if (isi->pdata->data_width_flags & ISI_DATAWIDTH_10)
+> +		flags |= SOCAM_DATAWIDTH_10;
+> +
+> +	if (isi->pdata->data_width_flags & ISI_DATAWIDTH_8)
+> +		flags |= SOCAM_DATAWIDTH_8;
+> +
+> +	if (flags & SOCAM_DATAWIDTH_MASK)
+> +		return flags;
+> +
+> +	return 0;
+> +}
+> +
+> +static int isi_camera_try_bus_param(struct soc_camera_device *icd,
+> +				    unsigned char buswidth)
+> +{
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	unsigned long camera_flags;
+> +	int ret;
+> +
+> +	camera_flags = icd->ops->query_bus_param(icd);
+> +	ret = soc_camera_bus_param_compatible(camera_flags,
+> +					make_bus_param(isi));
+> +	if (!ret)
+> +		return -EINVAL;
+> +	return 0;
+> +}
+> +
+> +
+> +static int isi_camera_get_formats(struct soc_camera_device *icd,
+> +				  unsigned int idx,
+> +				  struct soc_camera_format_xlate *xlate)
+> +{
+> +	struct v4l2_subdev *sd = soc_camera_to_subdev(icd);
+> +	int formats = 0, ret;
+> +	/* sensor format */
+> +	enum v4l2_mbus_pixelcode code;
+> +	/* soc camera host format */
+> +	const struct soc_mbus_pixelfmt *fmt;
+> +
+> +	ret = v4l2_subdev_call(sd, video, enum_mbus_fmt, idx, &code);
+> +	if (ret < 0)
+> +		/* No more formats */
+> +		return 0;
+> +
+> +	fmt = soc_mbus_get_fmtdesc(code);
+> +	if (!fmt) {
+> +		dev_err(icd->dev.parent,
+> +			"Invalid format code #%u: %d\n", idx, code);
+> +		return 0;
+> +	}
+> +
+> +	/* This also checks support for the requested bits-per-sample */
+> +	ret = isi_camera_try_bus_param(icd, fmt->bits_per_sample);
+> +	if (ret < 0) {
+> +		dev_err(icd->dev.parent,
+> +			"Fail to try the bus parameters.\n");
+> +		return 0;
+> +	}
+> +
+> +	switch (code) {
+> +	case V4L2_MBUS_FMT_UYVY8_2X8:
+> +	case V4L2_MBUS_FMT_VYUY8_2X8:
+> +	case V4L2_MBUS_FMT_YUYV8_2X8:
+> +	case V4L2_MBUS_FMT_YVYU8_2X8:
+> +		formats++;
+> +		if (xlate) {
+> +			xlate->host_fmt	= &isi_camera_formats[0];
+> +			xlate->code	= code;
+> +			xlate++;
+> +			dev_dbg(icd->dev.parent, "Providing format %s using code %d\n",
+> +				isi_camera_formats[0].name, code);
+> +		}
+> +		break;
+> +	default:
+> +		if (!isi_camera_packing_supported(fmt))
+> +			return 0;
+> +		if (xlate)
+> +			dev_dbg(icd->dev.parent,
+> +				"Providing format %s in pass-through mode\n",
+> +				fmt->name);
+> +	}
+> +
+> +	/* Generic pass-through */
+> +	formats++;
+> +	if (xlate) {
+> +		xlate->host_fmt	= fmt;
+> +		xlate->code	= code;
+> +		xlate++;
+> +	}
+> +
+> +	return formats;
+> +}
+> +
+> +/* Called with .video_lock held */
+> +static int isi_camera_add_device(struct soc_camera_device *icd)
+> +{
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	int ret;
+> +
+> +	if (isi->icd)
+> +		return -EBUSY;
+> +
+> +	ret = clk_enable(isi->pclk);
+> +	if (ret)
+> +		return ret;
+> +
+> +	isi->icd = icd;
+> +	dev_dbg(icd->dev.parent, "Atmel ISI Camera driver attached to camera %d\n",
+> +		 icd->devnum);
+> +	return 0;
+> +}
+> +/* Called with .video_lock held */
+> +static void isi_camera_remove_device(struct soc_camera_device *icd)
+> +{
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +
+> +	BUG_ON(icd != isi->icd);
+> +
+> +	clk_disable(isi->pclk);
+> +	isi->icd = NULL;
+> +
+> +	dev_dbg(icd->dev.parent, "Atmel ISI Camera driver detached from camera %d\n",
+> +		 icd->devnum);
+> +}
+> +
+> +static unsigned int isi_camera_poll(struct file *file, poll_table *pt)
+> +{
+> +	struct soc_camera_device *icd = file->private_data;
+> +
+> +	return vb2_poll(&icd->vb2_vidq, file, pt);
+> +}
+> +
+> +static int isi_camera_querycap(struct soc_camera_host *ici,
+> +			       struct v4l2_capability *cap)
+> +{
+> +	strcpy(cap->driver, "atmel-isi");
+> +	strcpy(cap->card, "Atmel Image Sensor Interface");
+> +	cap->capabilities = (V4L2_CAP_VIDEO_CAPTURE |
+> +				V4L2_CAP_STREAMING);
+> +	return 0;
+> +}
+> +
+> +static int isi_camera_set_bus_param(struct soc_camera_device *icd, u32 pixfmt)
+> +{
+> +	struct soc_camera_host *ici = to_soc_camera_host(icd->dev.parent);
+> +	struct atmel_isi *isi = ici->priv;
+> +	unsigned long bus_flags, camera_flags, common_flags;
+> +	int ret;
+> +	u32 cfg1 = 0;
+> +
+> +	camera_flags = icd->ops->query_bus_param(icd);
+> +
+> +	bus_flags = make_bus_param(isi);
+> +	common_flags = soc_camera_bus_param_compatible(camera_flags, bus_flags);
+> +	dev_dbg(icd->dev.parent, "Flags cam: 0x%lx host: 0x%lx common: 0x%lx\n",
+> +		camera_flags, bus_flags, common_flags);
+> +	if (!common_flags)
+> +		return -EINVAL;
+> +
+> +	/* Make choises, based on platform preferences */
+> +	if ((common_flags & SOCAM_HSYNC_ACTIVE_HIGH) &&
+> +	    (common_flags & SOCAM_HSYNC_ACTIVE_LOW)) {
+> +		if (isi->pdata->hsync_act_low)
+> +			common_flags &= ~SOCAM_HSYNC_ACTIVE_HIGH;
+> +		else
+> +			common_flags &= ~SOCAM_HSYNC_ACTIVE_LOW;
+> +	}
+> +
+> +	if ((common_flags & SOCAM_VSYNC_ACTIVE_HIGH) &&
+> +	    (common_flags & SOCAM_VSYNC_ACTIVE_LOW)) {
+> +		if (isi->pdata->vsync_act_low)
+> +			common_flags &= ~SOCAM_VSYNC_ACTIVE_HIGH;
+> +		else
+> +			common_flags &= ~SOCAM_VSYNC_ACTIVE_LOW;
+> +	}
+> +
+> +	if ((common_flags & SOCAM_PCLK_SAMPLE_RISING) &&
+> +	    (common_flags & SOCAM_PCLK_SAMPLE_FALLING)) {
+> +		if (isi->pdata->pclk_act_falling)
+> +			common_flags &= ~SOCAM_PCLK_SAMPLE_RISING;
+> +		else
+> +			common_flags &= ~SOCAM_PCLK_SAMPLE_FALLING;
+> +	}
+> +
+> +	ret = icd->ops->set_bus_param(icd, common_flags);
+> +	if (ret < 0) {
+> +		dev_dbg(icd->dev.parent, "Camera set_bus_param(%lx) returned %d\n",
+> +			common_flags, ret);
+> +		return ret;
+> +	}
+> +
+> +	/* set bus param for ISI */
+> +	if (common_flags & SOCAM_HSYNC_ACTIVE_LOW)
+> +		cfg1 |= ISI_CFG1_HSYNC_POL_ACTIVE_LOW;
+> +	if (common_flags & SOCAM_VSYNC_ACTIVE_LOW)
+> +		cfg1 |= ISI_CFG1_VSYNC_POL_ACTIVE_LOW;
+> +	if (common_flags & SOCAM_PCLK_SAMPLE_FALLING)
+> +		cfg1 |= ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING;
+> +
+> +	if (isi->pdata->has_emb_sync)
+> +		cfg1 |= ISI_CFG1_EMB_SYNC;
+> +	if (isi->pdata->isi_full_mode)
+> +		cfg1 |= ISI_CFG1_FULL_MODE;
+> +
+> +	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> +	isi_writel(isi, ISI_CFG1, cfg1);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct soc_camera_host_ops isi_soc_camera_host_ops = {
+> +	.owner		= THIS_MODULE,
+> +	.add		= isi_camera_add_device,
+> +	.remove		= isi_camera_remove_device,
+> +	.set_fmt	= isi_camera_set_fmt,
+> +	.try_fmt	= isi_camera_try_fmt,
+> +	.get_formats	= isi_camera_get_formats,
+> +	.init_videobuf2	= isi_camera_init_videobuf,
+> +	.poll		= isi_camera_poll,
+> +	.querycap	= isi_camera_querycap,
+> +	.set_bus_param	= isi_camera_set_bus_param,
+> +};
+> +
+> +/* -----------------------------------------------------------------------*/
+> +static int __devexit atmel_isi_remove(struct platform_device *pdev)
+> +{
+> +	struct soc_camera_host *soc_host = to_soc_camera_host(&pdev->dev);
+> +	struct atmel_isi *isi = container_of(soc_host,
+> +					struct atmel_isi, soc_host);
+> +
+> +	free_irq(isi->irq, isi);
+> +	soc_camera_host_unregister(soc_host);
+> +	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
+> +	dma_free_coherent(&pdev->dev,
+> +			sizeof(struct fbd) * MAX_BUFFER_NUM,
+> +			isi->p_fb_descriptors,
+> +			isi->fb_descriptors_phys);
+> +
+> +	iounmap(isi->regs);
+> +	clk_put(isi->pclk);
+> +	kfree(isi);
+> +
+> +	return 0;
+> +}
+> +
+> +static int __devinit atmel_isi_probe(struct platform_device *pdev)
+> +{
+> +	unsigned int irq;
+> +	struct atmel_isi *isi;
+> +	struct clk *pclk;
+> +	struct resource *regs;
+> +	int ret, i;
+> +	struct device *dev = &pdev->dev;
+> +	struct soc_camera_host *soc_host;
+> +	struct isi_platform_data *pdata;
+> +
+> +	pdata = dev->platform_data;
+> +	if (!pdata || !pdata->data_width_flags) {
+> +		dev_err(&pdev->dev,
+> +			"No config available for Atmel ISI\n");
+> +		return -EINVAL;
+> +	}
+> +
+> +	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	if (!regs)
+> +		return -ENXIO;
+> +
+> +	pclk = clk_get(&pdev->dev, "isi_clk");
+> +	if (IS_ERR(pclk))
+> +		return PTR_ERR(pclk);
+> +
+> +	isi = kzalloc(sizeof(struct atmel_isi), GFP_KERNEL);
+> +	if (!isi) {
+> +		ret = -ENOMEM;
+> +		dev_err(&pdev->dev, "Can't allocate interface!\n");
+> +		goto err_alloc_isi;
+> +	}
+> +
+> +	isi->pclk = pclk;
+> +	isi->pdata = pdata;
+> +	isi->active = NULL;
+> +	spin_lock_init(&isi->lock);
+> +	init_waitqueue_head(&isi->vsync_wq);
+> +	INIT_LIST_HEAD(&isi->video_buffer_list);
+> +	INIT_LIST_HEAD(&isi->dma_desc_head);
+> +
+> +	isi->p_fb_descriptors = dma_alloc_coherent(&pdev->dev,
+> +				sizeof(struct fbd) * MAX_BUFFER_NUM,
+> +				&isi->fb_descriptors_phys,
+> +				GFP_KERNEL);
+> +	if (!isi->p_fb_descriptors) {
+> +		ret = -ENOMEM;
+> +		dev_err(&pdev->dev, "Can't allocate descriptors!\n");
+> +		goto err_alloc_descriptors;
+> +	}
+> +
+> +	for (i = 0; i < MAX_BUFFER_NUM; i++) {
+> +		isi->dma_desc[i].p_fbd = isi->p_fb_descriptors + i;
+> +		isi->dma_desc[i].fbd_phys = isi->fb_descriptors_phys +
+> +					i * sizeof(struct fbd);
+> +		list_add(&isi->dma_desc[i].list, &isi->dma_desc_head);
+> +	}
+> +
+> +	isi->alloc_ctx = vb2_dma_contig_init_ctx(&pdev->dev);
+> +	if (IS_ERR(isi->alloc_ctx)) {
+> +		ret = PTR_ERR(isi->alloc_ctx);
+> +		goto err_alloc_ctx;
+> +	}
+> +
+> +	isi->regs = ioremap(regs->start, resource_size(regs));
+> +	if (!isi->regs) {
+> +		ret = -ENOMEM;
+> +		goto err_ioremap;
+> +	}
+> +
+> +	isi_writel(isi, ISI_CTRL, ISI_CTRL_DIS);
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		ret = irq;
+> +		goto err_req_irq;
+> +	}
+> +
+> +	ret = request_irq(irq, isi_interrupt, 0, "isi", isi);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Unable to request irq %d\n", irq);
+> +		goto err_req_irq;
+> +	}
+> +	isi->irq = irq;
+> +
+> +	soc_host		= &isi->soc_host;
+> +	soc_host->drv_name	= "isi-camera";
+> +	soc_host->ops		= &isi_soc_camera_host_ops;
+> +	soc_host->priv		= isi;
+> +	soc_host->v4l2_dev.dev	= &pdev->dev;
+> +	soc_host->nr		= pdev->id;
+> +
+> +	ret = soc_camera_host_register(soc_host);
+> +	if (ret) {
+> +		dev_err(&pdev->dev, "Unable to register soc camera host\n");
+> +		goto err_register_soc_camera_host;
+> +	}
+> +	return 0;
+> +
+> +err_register_soc_camera_host:
+> +	free_irq(isi->irq, isi);
+> +err_req_irq:
+> +	iounmap(isi->regs);
+> +err_ioremap:
+> +	vb2_dma_contig_cleanup_ctx(isi->alloc_ctx);
+> +err_alloc_ctx:
+> +	dma_free_coherent(&pdev->dev,
+> +			sizeof(struct fbd) * MAX_BUFFER_NUM,
+> +			isi->p_fb_descriptors,
+> +			isi->fb_descriptors_phys);
+> +err_alloc_descriptors:
+> +	kfree(isi);
+> +err_alloc_isi:
+> +	clk_put(isi->pclk);
+> +
+> +	return ret;
+> +}
+> +
+> +static struct platform_driver atmel_isi_driver = {
+> +	.probe		= atmel_isi_probe,
+> +	.remove		= __devexit_p(atmel_isi_remove),
+> +	.driver		= {
+> +		.name = "atmel_isi",
+> +		.owner = THIS_MODULE,
+> +	},
+> +};
+> +
+> +static int __init atmel_isi_init_module(void)
+> +{
+> +	return  platform_driver_probe(&atmel_isi_driver, &atmel_isi_probe);
+> +}
+> +
+> +static void __exit atmel_isi_exit(void)
+> +{
+> +	platform_driver_unregister(&atmel_isi_driver);
+> +}
+> +module_init(atmel_isi_init_module);
+> +module_exit(atmel_isi_exit);
+> +
+> +MODULE_AUTHOR("Josh Wu <josh.wu@atmel.com>");
+> +MODULE_DESCRIPTION("The V4L2 driver for Atmel Linux");
+> +MODULE_LICENSE("GPL");
+> +MODULE_SUPPORTED_DEVICE("video");
+> diff --git a/include/media/atmel-isi.h b/include/media/atmel-isi.h
+> new file mode 100644
+> index 0000000..26cece5
+> --- /dev/null
+> +++ b/include/media/atmel-isi.h
+> @@ -0,0 +1,119 @@
+> +/*
+> + * Register definitions for the Atmel Image Sensor Interface.
+> + *
+> + * Copyright (C) 2011 Atmel Corporation
+> + * Josh Wu, <josh.wu@atmel.com>
+> + *
+> + * Based on previous work by Lars Haring, <lars.haring@atmel.com>
+> + * and Sedji Gaouaou
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +#ifndef __ATMEL_ISI_H__
+> +#define __ATMEL_ISI_H__
+> +
+> +#include <linux/types.h>
+> +
+> +/* ISI_V2 register offsets */
+> +#define ISI_CFG1				0x0000
+> +#define ISI_CFG2				0x0004
+> +#define ISI_PSIZE				0x0008
+> +#define ISI_PDECF				0x000c
+> +#define ISI_Y2R_SET0				0x0010
+> +#define ISI_Y2R_SET1				0x0014
+> +#define ISI_R2Y_SET0				0x0018
+> +#define ISI_R2Y_SET1				0x001C
+> +#define ISI_R2Y_SET2				0x0020
+> +#define ISI_CTRL				0x0024
+> +#define ISI_STATUS				0x0028
+> +#define ISI_INTEN				0x002C
+> +#define ISI_INTDIS				0x0030
+> +#define ISI_INTMASK				0x0034
+> +#define ISI_DMA_CHER				0x0038
+> +#define ISI_DMA_CHDR				0x003C
+> +#define ISI_DMA_CHSR				0x0040
+> +#define ISI_DMA_P_ADDR				0x0044
+> +#define ISI_DMA_P_CTRL				0x0048
+> +#define ISI_DMA_P_DSCR				0x004C
+> +#define ISI_DMA_C_ADDR				0x0050
+> +#define ISI_DMA_C_CTRL				0x0054
+> +#define ISI_DMA_C_DSCR				0x0058
+> +
+> +/* Bitfields in CFG1 */
+> +#define ISI_CFG1_HSYNC_POL_ACTIVE_LOW		(1 << 2)
+> +#define ISI_CFG1_VSYNC_POL_ACTIVE_LOW		(1 << 3)
+> +#define ISI_CFG1_PIXCLK_POL_ACTIVE_FALLING	(1 << 4)
+> +#define ISI_CFG1_EMB_SYNC			(1 << 6)
+> +#define ISI_CFG1_CRC_SYNC			(1 << 7)
+> +/* Constants for FRATE(ISI_V2) */
+> +#define		ISI_CFG1_FRATE_CAPTURE_ALL	(0 << 8)
+> +#define		ISI_CFG1_FRATE_DIV_2		(1 << 8)
+> +#define		ISI_CFG1_FRATE_DIV_3		(2 << 8)
+> +#define		ISI_CFG1_FRATE_DIV_4		(3 << 8)
+> +#define		ISI_CFG1_FRATE_DIV_5		(4 << 8)
+> +#define		ISI_CFG1_FRATE_DIV_6		(5 << 8)
+> +#define		ISI_CFG1_FRATE_DIV_7		(6 << 8)
+> +#define		ISI_CFG1_FRATE_DIV_8		(7 << 8)
+> +#define ISI_CFG1_DISCR				(1 << 11)
+> +#define ISI_CFG1_FULL_MODE			(1 << 12)
+> +
+> +/* Bitfields in CFG2 */
+> +#define ISI_CFG2_GRAYSCALE			(1 << 13)
+> +/* Constants for YCC_SWAP(ISI_V2) */
+> +#define		ISI_CFG2_YCC_SWAP_DEFAULT	(0 << 28)
+> +#define		ISI_CFG2_YCC_SWAP_MODE_1	(1 << 28)
+> +#define		ISI_CFG2_YCC_SWAP_MODE_2	(2 << 28)
+> +#define		ISI_CFG2_YCC_SWAP_MODE_3	(3 << 28)
+> +#define ISI_CFG2_IM_VSIZE_OFFSET		0
+> +#define ISI_CFG2_IM_HSIZE_OFFSET		16
+> +#define ISI_CFG2_IM_VSIZE_MASK		(0x7FF << ISI_CFG2_IM_VSIZE_OFFSET)
+> +#define ISI_CFG2_IM_HSIZE_MASK		(0x7FF << ISI_CFG2_IM_HSIZE_OFFSET)
+> +
+> +/* Bitfields in CTRL */
+> +/* Also using in SR(ISI_V2) */
+> +#define ISI_CTRL_EN				(1 << 0)
+> +#define ISI_CTRL_CDC				(1 << 8)
+> +/* Also using in SR/IER/IDR/IMR(ISI_V2) */
+> +#define ISI_CTRL_DIS				(1 << 1)
+> +#define ISI_CTRL_SRST				(1 << 2)
+> +
+> +/* Bitfields in SR */
+> +#define ISI_SR_SIP				(1 << 19)
+> +/* Also using in SR/IER/IDR/IMR */
+> +#define ISI_SR_VSYNC				(1 << 10)
+> +#define ISI_SR_PXFR_DONE			(1 << 16)
+> +#define ISI_SR_CXFR_DONE			(1 << 17)
+> +#define ISI_SR_P_OVR				(1 << 24)
+> +#define ISI_SR_C_OVR				(1 << 25)
+> +#define ISI_SR_CRC_ERR				(1 << 26)
+> +#define ISI_SR_FR_OVR				(1 << 27)
+> +
+> +/* Bitfields in DMA_C_CTRL & in DMA_P_CTRL */
+> +#define ISI_DMA_CTRL_FETCH			(1 << 0)
+> +#define ISI_DMA_CTRL_WB				(1 << 1)
+> +#define ISI_DMA_CTRL_IEN			(1 << 2)
+> +#define ISI_DMA_CTRL_DONE			(1 << 3)
+> +
+> +/* Bitfields in DMA_CHSR/CHER/CHDR */
+> +#define ISI_DMA_CHSR_P_CH			(1 << 0)
+> +#define ISI_DMA_CHSR_C_CH			(1 << 1)
+> +
+> +/* Definition for isi_platform_data */
+> +#define ISI_DATAWIDTH_8				0x01
+> +#define ISI_DATAWIDTH_10			0x02
+> +
+> +struct isi_platform_data {
+> +	u8 has_emb_sync;
+> +	u8 emb_crc_sync;
+> +	u8 hsync_act_low;
+> +	u8 vsync_act_low;
+> +	u8 pclk_act_falling;
+> +	u8 isi_full_mode;
+> +	u32 data_width_flags;
+> +	/* Using for ISI_CFG1 */
+> +	u32 frate;
+> +};
+> +
+> +#endif /* __ATMEL_ISI_H__ */
+> -- 
+> 1.6.3.3
+> 
+
 ---
- arch/arm/mach-omap2/serial.c                  |  754 ++-----------------------
- arch/arm/plat-omap/include/plat/omap-serial.h |   15 +-
- 2 files changed, 74 insertions(+), 695 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 1ac361b..b16768a 100644
---- a/arch/arm/mach-omap2/serial.c
-+++ b/arch/arm/mach-omap2/serial.c
-@@ -19,25 +19,18 @@
-  */
- #include <linux/kernel.h>
- #include <linux/init.h>
--#include <linux/serial_reg.h>
- #include <linux/clk.h>
- #include <linux/io.h>
- #include <linux/delay.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
--#include <linux/serial_8250.h>
- #include <linux/pm_runtime.h>
--#include <linux/console.h>
- 
--#ifdef CONFIG_SERIAL_OMAP
- #include <plat/omap-serial.h>
--#endif
--
- #include <plat/common.h>
- #include <plat/board.h>
- #include <plat/clock.h>
- #include <plat/dma.h>
--#include <plat/omap_hwmod.h>
- #include <plat/omap_device.h>
- 
- #include "prm2xxx_3xxx.h"
-@@ -47,65 +40,9 @@
- #include "control.h"
- #include "mux.h"
- 
--#define UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV	0x52
--#define UART_OMAP_WER		0x17	/* Wake-up enable register */
--
--#define UART_ERRATA_FIFO_FULL_ABORT	(0x1 << 0)
--#define UART_ERRATA_i202_MDR1_ACCESS	(0x1 << 1)
--
--/*
-- * NOTE: By default the serial timeout is disabled as it causes lost characters
-- * over the serial ports. This means that the UART clocks will stay on until
-- * disabled via sysfs. This also causes that any deeper omap sleep states are
-- * blocked. 
-- */
--#define DEFAULT_TIMEOUT 0
--
--#define MAX_UART_HWMOD_NAME_LEN		16
-+#define MAX_UART_HWMOD_NAME_LEN                16
- 
--struct omap_uart_state {
--	int num;
--	int can_sleep;
--	struct timer_list timer;
--	u32 timeout;
--
--	void __iomem *wk_st;
--	void __iomem *wk_en;
--	u32 wk_mask;
--	u32 padconf;
--	u32 dma_enabled;
--
--	struct clk *ick;
--	struct clk *fck;
--	int clocked;
--
--	int irq;
--	int regshift;
--	int irqflags;
--	void __iomem *membase;
--	resource_size_t mapbase;
--
--	struct list_head node;
--	struct omap_hwmod *oh;
--	struct platform_device *pdev;
--
--	u32 errata;
--#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
--	int context_valid;
--
--	/* Registers to be saved/restored for OFF-mode */
--	u16 dll;
--	u16 dlh;
--	u16 ier;
--	u16 sysc;
--	u16 scr;
--	u16 wer;
--	u16 mcr;
--#endif
--};
--
--static LIST_HEAD(uart_list);
--static u8 num_uarts;
-+static int omap_uart_con_id __initdata = -1;
- 
- static int uart_idle_hwmod(struct omap_device *od)
- {
-@@ -129,396 +66,35 @@ static struct omap_device_pm_latency omap_uart_latency[] = {
- 	},
- };
- 
--static inline unsigned int __serial_read_reg(struct uart_port *up,
--					     int offset)
--{
--	offset <<= up->regshift;
--	return (unsigned int)__raw_readb(up->membase + offset);
--}
--
--static inline unsigned int serial_read_reg(struct omap_uart_state *uart,
--					   int offset)
--{
--	offset <<= uart->regshift;
--	return (unsigned int)__raw_readb(uart->membase + offset);
--}
--
--static inline void __serial_write_reg(struct uart_port *up, int offset,
--		int value)
--{
--	offset <<= up->regshift;
--	__raw_writeb(value, up->membase + offset);
--}
--
--static inline void serial_write_reg(struct omap_uart_state *uart, int offset,
--				    int value)
--{
--	offset <<= uart->regshift;
--	__raw_writeb(value, uart->membase + offset);
--}
--
--/*
-- * Internal UARTs need to be initialized for the 8250 autoconfig to work
-- * properly. Note that the TX watermark initialization may not be needed
-- * once the 8250.c watermark handling code is merged.
-- */
--
--static inline void __init omap_uart_reset(struct omap_uart_state *uart)
--{
--	serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
--	serial_write_reg(uart, UART_OMAP_SCR, 0x08);
--	serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_16X_MODE);
--}
--
--#if defined(CONFIG_PM) && defined(CONFIG_ARCH_OMAP3)
--
--/*
-- * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
-- * The access to uart register after MDR1 Access
-- * causes UART to corrupt data.
-- *
-- * Need a delay =
-- * 5 L4 clock cycles + 5 UART functional clock cycle (@48MHz = ~0.2uS)
-- * give 10 times as much
-- */
--static void omap_uart_mdr1_errataset(struct omap_uart_state *uart, u8 mdr1_val,
--		u8 fcr_val)
--{
--	u8 timeout = 255;
--
--	serial_write_reg(uart, UART_OMAP_MDR1, mdr1_val);
--	udelay(2);
--	serial_write_reg(uart, UART_FCR, fcr_val | UART_FCR_CLEAR_XMIT |
--			UART_FCR_CLEAR_RCVR);
--	/*
--	 * Wait for FIFO to empty: when empty, RX_FIFO_E bit is 0 and
--	 * TX_FIFO_E bit is 1.
--	 */
--	while (UART_LSR_THRE != (serial_read_reg(uart, UART_LSR) &
--				(UART_LSR_THRE | UART_LSR_DR))) {
--		timeout--;
--		if (!timeout) {
--			/* Should *never* happen. we warn and carry on */
--			dev_crit(&uart->pdev->dev, "Errata i202: timedout %x\n",
--			serial_read_reg(uart, UART_LSR));
--			break;
--		}
--		udelay(1);
--	}
--}
--
--static void omap_uart_save_context(struct omap_uart_state *uart)
--{
--	u16 lcr = 0;
--
--	if (!enable_off_mode)
--		return;
--
--	lcr = serial_read_reg(uart, UART_LCR);
--	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
--	uart->dll = serial_read_reg(uart, UART_DLL);
--	uart->dlh = serial_read_reg(uart, UART_DLM);
--	serial_write_reg(uart, UART_LCR, lcr);
--	uart->ier = serial_read_reg(uart, UART_IER);
--	uart->sysc = serial_read_reg(uart, UART_OMAP_SYSC);
--	uart->scr = serial_read_reg(uart, UART_OMAP_SCR);
--	uart->wer = serial_read_reg(uart, UART_OMAP_WER);
--	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_A);
--	uart->mcr = serial_read_reg(uart, UART_MCR);
--	serial_write_reg(uart, UART_LCR, lcr);
--
--	uart->context_valid = 1;
--}
--
--static void omap_uart_restore_context(struct omap_uart_state *uart)
-+static void omap_uart_idle_init(struct omap_uart_port_info *uart,
-+				unsigned short num)
- {
--	u16 efr = 0;
--
--	if (!enable_off_mode)
--		return;
--
--	if (!uart->context_valid)
--		return;
--
--	uart->context_valid = 0;
--
--	if (uart->errata & UART_ERRATA_i202_MDR1_ACCESS)
--		omap_uart_mdr1_errataset(uart, UART_OMAP_MDR1_DISABLE, 0xA0);
--	else
--		serial_write_reg(uart, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
--
--	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
--	efr = serial_read_reg(uart, UART_EFR);
--	serial_write_reg(uart, UART_EFR, UART_EFR_ECB);
--	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
--	serial_write_reg(uart, UART_IER, 0x0);
--	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
--	serial_write_reg(uart, UART_DLL, uart->dll);
--	serial_write_reg(uart, UART_DLM, uart->dlh);
--	serial_write_reg(uart, UART_LCR, 0x0); /* Operational mode */
--	serial_write_reg(uart, UART_IER, uart->ier);
--	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_A);
--	serial_write_reg(uart, UART_MCR, uart->mcr);
--	serial_write_reg(uart, UART_LCR, UART_LCR_CONF_MODE_B);
--	serial_write_reg(uart, UART_EFR, efr);
--	serial_write_reg(uart, UART_LCR, UART_LCR_WLEN8);
--	serial_write_reg(uart, UART_OMAP_SCR, uart->scr);
--	serial_write_reg(uart, UART_OMAP_WER, uart->wer);
--	serial_write_reg(uart, UART_OMAP_SYSC, uart->sysc);
--
--	if (uart->errata & UART_ERRATA_i202_MDR1_ACCESS)
--		omap_uart_mdr1_errataset(uart, UART_OMAP_MDR1_16X_MODE, 0xA1);
--	else
--		/* UART 16x mode */
--		serial_write_reg(uart, UART_OMAP_MDR1,
--				UART_OMAP_MDR1_16X_MODE);
--}
--#else
--static inline void omap_uart_save_context(struct omap_uart_state *uart) {}
--static inline void omap_uart_restore_context(struct omap_uart_state *uart) {}
--#endif /* CONFIG_PM && CONFIG_ARCH_OMAP3 */
--
--static inline void omap_uart_enable_clocks(struct omap_uart_state *uart)
--{
--	if (uart->clocked)
--		return;
--
--	omap_device_enable(uart->pdev);
--	uart->clocked = 1;
--	omap_uart_restore_context(uart);
--}
--
--#ifdef CONFIG_PM
--
--static inline void omap_uart_disable_clocks(struct omap_uart_state *uart)
--{
--	if (!uart->clocked)
--		return;
--
--	omap_uart_save_context(uart);
--	uart->clocked = 0;
--	omap_device_idle(uart->pdev);
--}
--
--static void omap_uart_enable_wakeup(struct omap_uart_state *uart)
--{
--	/* Set wake-enable bit */
--	if (uart->wk_en && uart->wk_mask) {
--		u32 v = __raw_readl(uart->wk_en);
--		v |= uart->wk_mask;
--		__raw_writel(v, uart->wk_en);
--	}
--
--	/* Ensure IOPAD wake-enables are set */
--	if (cpu_is_omap34xx() && uart->padconf) {
--		u16 v = omap_ctrl_readw(uart->padconf);
--		v |= OMAP3_PADCONF_WAKEUPENABLE0;
--		omap_ctrl_writew(v, uart->padconf);
--	}
--}
--
--static void omap_uart_disable_wakeup(struct omap_uart_state *uart)
--{
--	/* Clear wake-enable bit */
--	if (uart->wk_en && uart->wk_mask) {
--		u32 v = __raw_readl(uart->wk_en);
--		v &= ~uart->wk_mask;
--		__raw_writel(v, uart->wk_en);
--	}
--
--	/* Ensure IOPAD wake-enables are cleared */
--	if (cpu_is_omap34xx() && uart->padconf) {
--		u16 v = omap_ctrl_readw(uart->padconf);
--		v &= ~OMAP3_PADCONF_WAKEUPENABLE0;
--		omap_ctrl_writew(v, uart->padconf);
--	}
--}
--
--static void omap_uart_smart_idle_enable(struct omap_uart_state *uart,
--					       int enable)
--{
--	u8 idlemode;
--
--	if (enable) {
--		/**
--		 * Errata 2.15: [UART]:Cannot Acknowledge Idle Requests
--		 * in Smartidle Mode When Configured for DMA Operations.
--		 */
--		if (uart->dma_enabled)
--			idlemode = HWMOD_IDLEMODE_FORCE;
--		else
--			idlemode = HWMOD_IDLEMODE_SMART;
--	} else {
--		idlemode = HWMOD_IDLEMODE_NO;
--	}
--
--	omap_hwmod_set_slave_idlemode(uart->oh, idlemode);
--}
--
--static void omap_uart_block_sleep(struct omap_uart_state *uart)
--{
--	omap_uart_enable_clocks(uart);
--
--	omap_uart_smart_idle_enable(uart, 0);
--	uart->can_sleep = 0;
--	if (uart->timeout)
--		mod_timer(&uart->timer, jiffies + uart->timeout);
--	else
--		del_timer(&uart->timer);
--}
--
--static void omap_uart_allow_sleep(struct omap_uart_state *uart)
--{
--	if (device_may_wakeup(&uart->pdev->dev))
--		omap_uart_enable_wakeup(uart);
--	else
--		omap_uart_disable_wakeup(uart);
--
--	if (!uart->clocked)
--		return;
--
--	omap_uart_smart_idle_enable(uart, 1);
--	uart->can_sleep = 1;
--	del_timer(&uart->timer);
--}
--
--static void omap_uart_idle_timer(unsigned long data)
--{
--	struct omap_uart_state *uart = (struct omap_uart_state *)data;
--
--	omap_uart_allow_sleep(uart);
--}
--
--void omap_uart_prepare_idle(int num)
--{
--	struct omap_uart_state *uart;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		if (num == uart->num && uart->can_sleep) {
--			omap_uart_disable_clocks(uart);
--			return;
--		}
--	}
--}
--
--void omap_uart_resume_idle(int num)
--{
--	struct omap_uart_state *uart;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		if (num == uart->num && uart->can_sleep) {
--			omap_uart_enable_clocks(uart);
--
--			/* Check for IO pad wakeup */
--			if (cpu_is_omap34xx() && uart->padconf) {
--				u16 p = omap_ctrl_readw(uart->padconf);
--
--				if (p & OMAP3_PADCONF_WAKEUPEVENT0)
--					omap_uart_block_sleep(uart);
--			}
--
--			/* Check for normal UART wakeup */
--			if (__raw_readl(uart->wk_st) & uart->wk_mask)
--				omap_uart_block_sleep(uart);
--			return;
--		}
--	}
--}
--
--void omap_uart_prepare_suspend(void)
--{
--	struct omap_uart_state *uart;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		omap_uart_allow_sleep(uart);
--	}
--}
--
--int omap_uart_can_sleep(void)
--{
--	struct omap_uart_state *uart;
--	int can_sleep = 1;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		if (!uart->clocked)
--			continue;
--
--		if (!uart->can_sleep) {
--			can_sleep = 0;
--			continue;
--		}
--
--		/* This UART can now safely sleep. */
--		omap_uart_allow_sleep(uart);
--	}
--
--	return can_sleep;
--}
--
--/**
-- * omap_uart_interrupt()
-- *
-- * This handler is used only to detect that *any* UART interrupt has
-- * occurred.  It does _nothing_ to handle the interrupt.  Rather,
-- * any UART interrupt will trigger the inactivity timer so the
-- * UART will not idle or sleep for its timeout period.
-- *
-- **/
--/* static int first_interrupt; */
--static irqreturn_t omap_uart_interrupt(int irq, void *dev_id)
--{
--	struct omap_uart_state *uart = dev_id;
--
--	omap_uart_block_sleep(uart);
--
--	return IRQ_NONE;
--}
--
--static void omap_uart_idle_init(struct omap_uart_state *uart)
--{
--	int ret;
--
--	uart->can_sleep = 0;
--	uart->timeout = DEFAULT_TIMEOUT;
--	setup_timer(&uart->timer, omap_uart_idle_timer,
--		    (unsigned long) uart);
--	if (uart->timeout)
--		mod_timer(&uart->timer, jiffies + uart->timeout);
--	omap_uart_smart_idle_enable(uart, 0);
--
--	if (cpu_is_omap34xx() && !cpu_is_ti816x()) {
--		u32 mod = (uart->num > 1) ? OMAP3430_PER_MOD : CORE_MOD;
-+	if (cpu_is_omap34xx()) {
-+		u32 mod = num > 1 ? OMAP3430_PER_MOD : CORE_MOD;
- 		u32 wk_mask = 0;
--		u32 padconf = 0;
- 
--		/* XXX These PRM accesses do not belong here */
- 		uart->wk_en = OMAP34XX_PRM_REGADDR(mod, PM_WKEN1);
- 		uart->wk_st = OMAP34XX_PRM_REGADDR(mod, PM_WKST1);
--		switch (uart->num) {
-+		switch (num) {
- 		case 0:
- 			wk_mask = OMAP3430_ST_UART1_MASK;
--			padconf = 0x182;
- 			break;
- 		case 1:
- 			wk_mask = OMAP3430_ST_UART2_MASK;
--			padconf = 0x17a;
- 			break;
- 		case 2:
- 			wk_mask = OMAP3430_ST_UART3_MASK;
--			padconf = 0x19e;
- 			break;
- 		case 3:
- 			wk_mask = OMAP3630_ST_UART4_MASK;
--			padconf = 0x0d2;
- 			break;
- 		}
- 		uart->wk_mask = wk_mask;
--		uart->padconf = padconf;
- 	} else if (cpu_is_omap24xx()) {
- 		u32 wk_mask = 0;
- 		u32 wk_en = PM_WKEN1, wk_st = PM_WKST1;
- 
--		switch (uart->num) {
-+		switch (num) {
- 		case 0:
- 			wk_mask = OMAP24XX_ST_UART1_MASK;
- 			break;
-@@ -543,155 +119,49 @@ static void omap_uart_idle_init(struct omap_uart_state *uart)
- 		uart->wk_en = NULL;
- 		uart->wk_st = NULL;
- 		uart->wk_mask = 0;
--		uart->padconf = 0;
--	}
--
--	uart->irqflags |= IRQF_SHARED;
--	ret = request_threaded_irq(uart->irq, NULL, omap_uart_interrupt,
--				   IRQF_SHARED, "serial idle", (void *)uart);
--	WARN_ON(ret);
--}
--
--void omap_uart_enable_irqs(int enable)
--{
--	int ret;
--	struct omap_uart_state *uart;
--
--	list_for_each_entry(uart, &uart_list, node) {
--		if (enable) {
--			pm_runtime_put_sync(&uart->pdev->dev);
--			ret = request_threaded_irq(uart->irq, NULL,
--						   omap_uart_interrupt,
--						   IRQF_SHARED,
--						   "serial idle",
--						   (void *)uart);
--		} else {
--			pm_runtime_get_noresume(&uart->pdev->dev);
--			free_irq(uart->irq, (void *)uart);
--		}
--	}
--}
--
--static ssize_t sleep_timeout_show(struct device *dev,
--				  struct device_attribute *attr,
--				  char *buf)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_device *odev = to_omap_device(pdev);
--	struct omap_uart_state *uart = odev->hwmods[0]->dev_attr;
--
--	return sprintf(buf, "%u\n", uart->timeout / HZ);
--}
--
--static ssize_t sleep_timeout_store(struct device *dev,
--				   struct device_attribute *attr,
--				   const char *buf, size_t n)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct omap_device *odev = to_omap_device(pdev);
--	struct omap_uart_state *uart = odev->hwmods[0]->dev_attr;
--	unsigned int value;
--
--	if (sscanf(buf, "%u", &value) != 1) {
--		dev_err(dev, "sleep_timeout_store: Invalid value\n");
--		return -EINVAL;
- 	}
--
--	uart->timeout = value * HZ;
--	if (uart->timeout)
--		mod_timer(&uart->timer, jiffies + uart->timeout);
--	else
--		/* A zero value means disable timeout feature */
--		omap_uart_block_sleep(uart);
--
--	return n;
--}
--
--static DEVICE_ATTR(sleep_timeout, 0644, sleep_timeout_show,
--		sleep_timeout_store);
--#define DEV_CREATE_FILE(dev, attr) WARN_ON(device_create_file(dev, attr))
--#else
--static inline void omap_uart_idle_init(struct omap_uart_state *uart) {}
--static void omap_uart_block_sleep(struct omap_uart_state *uart)
--{
--	/* Needed to enable UART clocks when built without CONFIG_PM */
--	omap_uart_enable_clocks(uart);
- }
--#define DEV_CREATE_FILE(dev, attr)
--#endif /* CONFIG_PM */
- 
--#ifndef CONFIG_SERIAL_OMAP
--/*
-- * Override the default 8250 read handler: mem_serial_in()
-- * Empty RX fifo read causes an abort on omap3630 and omap4
-- * This function makes sure that an empty rx fifo is not read on these silicons
-- * (OMAP1/2/3430 are not affected)
-- */
--static unsigned int serial_in_override(struct uart_port *up, int offset)
-+char *cmdline_find_option(char *str)
- {
--	if (UART_RX == offset) {
--		unsigned int lsr;
--		lsr = __serial_read_reg(up, UART_LSR);
--		if (!(lsr & UART_LSR_DR))
--			return -EPERM;
--	}
-+	extern char *saved_command_line;
- 
--	return __serial_read_reg(up, offset);
-+	return strstr(saved_command_line, str);
- }
- 
--static void serial_out_override(struct uart_port *up, int offset, int value)
-+struct omap_hwmod *omap_uart_hwmod_lookup(int num)
- {
--	unsigned int status, tmout = 10000;
-+	struct omap_hwmod *oh;
-+	char oh_name[MAX_UART_HWMOD_NAME_LEN];
- 
--	status = __serial_read_reg(up, UART_LSR);
--	while (!(status & UART_LSR_THRE)) {
--		/* Wait up to 10ms for the character(s) to be sent. */
--		if (--tmout == 0)
--			break;
--		udelay(1);
--		status = __serial_read_reg(up, UART_LSR);
--	}
--	__serial_write_reg(up, offset, value);
-+	snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN, "uart%d", num + 1);
-+	oh = omap_hwmod_lookup(oh_name);
-+	WARN(IS_ERR(oh), "Could not lookup hmwod info for %s\n",
-+					oh_name);
-+	return oh;
- }
--#endif
- 
- static int __init omap_serial_early_init(void)
- {
-+#ifdef CONFIG_EARLY_PRINTK
- 	int i = 0;
-+	char omap_tty_name[MAX_UART_HWMOD_NAME_LEN];
-+	struct omap_hwmod *oh;
- 
--	do {
--		char oh_name[MAX_UART_HWMOD_NAME_LEN];
--		struct omap_hwmod *oh;
--		struct omap_uart_state *uart;
--
--		snprintf(oh_name, MAX_UART_HWMOD_NAME_LEN,
--			 "uart%d", i + 1);
--		oh = omap_hwmod_lookup(oh_name);
--		if (!oh)
--			break;
--
--		uart = kzalloc(sizeof(struct omap_uart_state), GFP_KERNEL);
--		if (WARN_ON(!uart))
--			return -ENODEV;
--
--		uart->oh = oh;
--		uart->num = i++;
--		list_add_tail(&uart->node, &uart_list);
--		num_uarts++;
--
--		/*
--		 * NOTE: omap_hwmod_setup*() has not yet been called,
--		 *       so no hwmod functions will work yet.
--		 */
--
--		/*
--		 * During UART early init, device need to be probed
--		 * to determine SoC specific init before omap_device
--		 * is ready.  Therefore, don't allow idle here
--		 */
--		uart->oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
--	} while (1);
--
-+	if (!cmdline_find_option("earlyprintk"))
-+		return 0;
-+
-+	for (i = 0; i < OMAP_MAX_HSUART_PORTS; i++) {
-+		snprintf(omap_tty_name, MAX_UART_HWMOD_NAME_LEN,
-+			"%s%d", OMAP_SERIAL_NAME, i);
-+		if (cmdline_find_option(omap_tty_name)) {
-+			omap_uart_con_id = i;
-+			oh = omap_uart_hwmod_lookup(i);
-+			oh->flags |= HWMOD_INIT_NO_IDLE | HWMOD_INIT_NO_RESET;
-+			return 0;
-+		}
-+	}
-+#endif
- 	return 0;
- }
- core_initcall(omap_serial_early_init);
-@@ -709,149 +179,50 @@ core_initcall(omap_serial_early_init);
-  */
- void __init omap_serial_init_port(struct omap_board_data *bdata)
- {
--	struct omap_uart_state *uart;
- 	struct omap_hwmod *oh;
- 	struct omap_device *od;
--	void *pdata = NULL;
--	u32 pdata_size = 0;
--	char *name;
--#ifndef CONFIG_SERIAL_OMAP
--	struct plat_serial8250_port ports[2] = {
--		{},
--		{.flags = 0},
--	};
--	struct plat_serial8250_port *p = &ports[0];
--#else
--	struct omap_uart_port_info omap_up;
--#endif
-+	struct omap_uart_port_info *pdata;
-+	char *name = DRIVER_NAME;
- 
- 	if (WARN_ON(!bdata))
- 		return;
- 	if (WARN_ON(bdata->id < 0))
- 		return;
--	if (WARN_ON(bdata->id >= num_uarts))
-+	if (WARN_ON(bdata->id >= OMAP_MAX_HSUART_PORTS))
- 		return;
- 
--	list_for_each_entry(uart, &uart_list, node)
--		if (bdata->id == uart->num)
--			break;
--
--	oh = uart->oh;
--	uart->dma_enabled = 0;
--#ifndef CONFIG_SERIAL_OMAP
--	name = "serial8250";
--
--	/*
--	 * !! 8250 driver does not use standard IORESOURCE* It
--	 * has it's own custom pdata that can be taken from
--	 * the hwmod resource data.  But, this needs to be
--	 * done after the build.
--	 *
--	 * ?? does it have to be done before the register ??
--	 * YES, because platform_device_data_add() copies
--	 * pdata, it does not use a pointer.
--	 */
--	p->flags = UPF_BOOT_AUTOCONF;
--	p->iotype = UPIO_MEM;
--	p->regshift = 2;
--	p->uartclk = OMAP24XX_BASE_BAUD * 16;
--	p->irq = oh->mpu_irqs[0].irq;
--	p->mapbase = oh->slaves[0]->addr->pa_start;
--	p->membase = omap_hwmod_get_mpu_rt_va(oh);
--	p->irqflags = IRQF_SHARED;
--	p->private_data = uart;
--
--	/*
--	 * omap44xx, ti816x: Never read empty UART fifo
--	 * omap3xxx: Never read empty UART fifo on UARTs
--	 * with IP rev >=0x52
--	 */
--	uart->regshift = p->regshift;
--	uart->membase = p->membase;
--	if (cpu_is_omap44xx() || cpu_is_ti816x())
--		uart->errata |= UART_ERRATA_FIFO_FULL_ABORT;
--	else if ((serial_read_reg(uart, UART_OMAP_MVER) & 0xFF)
--			>= UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV)
--		uart->errata |= UART_ERRATA_FIFO_FULL_ABORT;
-+	oh = omap_uart_hwmod_lookup(bdata->id);
-+	if (!oh)
-+		return;
- 
--	if (uart->errata & UART_ERRATA_FIFO_FULL_ABORT) {
--		p->serial_in = serial_in_override;
--		p->serial_out = serial_out_override;
-+	pdata = kzalloc(sizeof(*pdata), GFP_KERNEL);
-+	if (!pdata) {
-+		pr_err("Memory allocation for UART pdata failed\n");
-+		return;
- 	}
- 
--	pdata = &ports[0];
--	pdata_size = 2 * sizeof(struct plat_serial8250_port);
--#else
--
--	name = DRIVER_NAME;
--
--	omap_up.dma_enabled = uart->dma_enabled;
--	omap_up.uartclk = OMAP24XX_BASE_BAUD * 16;
--	omap_up.mapbase = oh->slaves[0]->addr->pa_start;
--	omap_up.membase = omap_hwmod_get_mpu_rt_va(oh);
--	omap_up.irqflags = IRQF_SHARED;
--	omap_up.flags = UPF_BOOT_AUTOCONF | UPF_SHARE_IRQ;
-+	/* Enable the MDR1 errata for OMAP3 */
-+	if (cpu_is_omap34xx())
-+		pdata->errata |= UART_ERRATA_i202_MDR1_ACCESS;
- 
--	pdata = &omap_up;
--	pdata_size = sizeof(struct omap_uart_port_info);
--#endif
-+	omap_uart_idle_init(pdata, bdata->id);
- 
--	if (WARN_ON(!oh))
--		return;
-+	pdata->uartclk = OMAP24XX_BASE_BAUD * 16;
-+	pdata->flags = UPF_BOOT_AUTOCONF;
-+	if (bdata->id == omap_uart_con_id)
-+		pdata->console_uart = true;
- 
--	od = omap_device_build(name, uart->num, oh, pdata, pdata_size,
--			       omap_uart_latency,
--			       ARRAY_SIZE(omap_uart_latency), false);
-+	od = omap_device_build(name, bdata->id, oh, pdata,
-+				sizeof(*pdata), omap_uart_latency,
-+				ARRAY_SIZE(omap_uart_latency), false);
- 	WARN(IS_ERR(od), "Could not build omap_device for %s: %s.\n",
- 	     name, oh->name);
- 
- 	oh->mux = omap_hwmod_mux_init(bdata->pads, bdata->pads_cnt);
--
--	uart->irq = oh->mpu_irqs[0].irq;
--	uart->regshift = 2;
--	uart->mapbase = oh->slaves[0]->addr->pa_start;
--	uart->membase = omap_hwmod_get_mpu_rt_va(oh);
--	uart->pdev = &od->pdev;
--
--	oh->dev_attr = uart;
--
--	console_lock(); /* in case the earlycon is on the UART */
--
--	/*
--	 * Because of early UART probing, UART did not get idled
--	 * on init.  Now that omap_device is ready, ensure full idle
--	 * before doing omap_device_enable().
--	 */
--	omap_hwmod_idle(uart->oh);
--
--	omap_device_enable(uart->pdev);
--	omap_uart_idle_init(uart);
--	omap_uart_reset(uart);
--	omap_hwmod_enable_wakeup(uart->oh);
--	omap_device_idle(uart->pdev);
--
--	/*
--	 * Need to block sleep long enough for interrupt driven
--	 * driver to start.  Console driver is in polling mode
--	 * so device needs to be kept enabled while polling driver
--	 * is in use.
--	 */
--	if (uart->timeout)
--		uart->timeout = (30 * HZ);
--	omap_uart_block_sleep(uart);
--	uart->timeout = DEFAULT_TIMEOUT;
--
--	console_unlock();
--
--	if ((cpu_is_omap34xx() && uart->padconf) ||
--	    (uart->wk_en && uart->wk_mask)) {
-+	if (((cpu_is_omap34xx() || cpu_is_omap44xx()) && bdata->pads) ||
-+	    (pdata->wk_en && pdata->wk_mask)) {
- 		device_init_wakeup(&od->pdev.dev, true);
--		DEV_CREATE_FILE(&od->pdev.dev, &dev_attr_sleep_timeout);
- 	}
--
--	/* Enable the MDR1 errata for OMAP3 */
--	if (cpu_is_omap34xx() && !cpu_is_ti816x())
--		uart->errata |= UART_ERRATA_i202_MDR1_ACCESS;
- }
- 
- /**
-@@ -863,15 +234,14 @@ void __init omap_serial_init_port(struct omap_board_data *bdata)
-  */
- void __init omap_serial_init(void)
- {
--	struct omap_uart_state *uart;
- 	struct omap_board_data bdata;
-+	u8 i;
- 
--	list_for_each_entry(uart, &uart_list, node) {
--		bdata.id = uart->num;
-+	for (i = 0; i < OMAP_MAX_HSUART_PORTS; i++) {
-+		bdata.id = i;
- 		bdata.flags = 0;
- 		bdata.pads = NULL;
- 		bdata.pads_cnt = 0;
- 		omap_serial_init_port(&bdata);
--
- 	}
- }
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index 2682043..2ca885b 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -56,13 +56,18 @@
- 
- #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
- 
-+#define UART_ERRATA_i202_MDR1_ACCESS	BIT(0)
-+
- struct omap_uart_port_info {
- 	bool			dma_enabled;	/* To specify DMA Mode */
- 	unsigned int		uartclk;	/* UART clock rate */
--	void __iomem		*membase;	/* ioremap cookie or NULL */
--	resource_size_t		mapbase;	/* resource base */
--	unsigned long		irqflags;	/* request_irq flags */
- 	upf_t			flags;		/* UPF_* flags */
-+	unsigned int		errata;
-+	unsigned int		console_uart;
-+
-+	void __iomem *wk_st;
-+	void __iomem *wk_en;
-+	u32 wk_mask;
- };
- 
- struct uart_omap_dma {
-@@ -100,6 +105,9 @@ struct uart_omap_port {
- 	unsigned char		mcr;
- 	unsigned char		fcr;
- 	unsigned char		efr;
-+	unsigned char		dll;
-+	unsigned char		dlh;
-+	unsigned char		mdr1;
- 
- 	int			use_dma;
- 	/*
-@@ -111,6 +119,7 @@ struct uart_omap_port {
- 	unsigned char		msr_saved_flags;
- 	char			name[20];
- 	unsigned long		port_activity;
-+	unsigned int		errata;
- };
- 
- #endif /* __OMAP_SERIAL_H__ */
--- 
-1.7.0.4
+Guennadi Liakhovetski, Ph.D.
+Freelance Open-Source Software Developer
+http://www.open-technology.de/
