@@ -1,67 +1,37 @@
-From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
-Date: Wed, 8 Jun 2011 18:32:35 +0530
-Subject: [PATCH] davinci: da850 EVM: read mac address from SPI flash
-Message-ID: <1307538155-27197-1-git-send-email-sudhakar.raj@ti.com>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Wed, 8 Jun 2011 15:35:55 +0200
+Subject: [PATCH 0/4] drivers/iommu/ relocations
+In-Reply-To: <BANLkTin5JYt4=gru181N_BuvnHB7kUTUeQ@mail.gmail.com>
+References: <1307522062-19273-1-git-send-email-ohad@wizery.com>
+	<20110608130522.GC29089@parisc-linux.org>
+	<BANLkTin5JYt4=gru181N_BuvnHB7kUTUeQ@mail.gmail.com>
+Message-ID: <20110608133555.GC21591@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DA850/OMAP-L138 EMAC driver uses random mac address instead of
-a fixed one because the mac address is not stuffed into EMAC
-platform data.
+On Wed, Jun 08, 2011 at 09:11:16AM -0400, Ohad Ben-Cohen wrote:
+> On Wed, Jun 8, 2011 at 4:05 PM, Matthew Wilcox <matthew@wil.cx> wrote:
+> > You've missed at least parisc, ia64, alpha, sparc, powerpc and sh which
+> > have IOMMUs.
+> 
+> None of these seem to call register_iommu.
+> 
+> > Not that they necessarily all need to be moved across in
+> > one patchset, but saying "all iommu drivers" is clearly false.
+> 
+> I've moved only the existing IOMMU API users.
 
-This patch provides a function which reads the mac address
-stored in SPI flash (registered as MTD device) and populates the
-EMAC platform data. The function which reads the mac address is
-registered as a callback which gets called upon addition of MTD
-device.
+And I think that is good for now. The iommu-api needs to be extended to
+cover all kinds of iommus (like the iommus available on other
+architectures). It is definitly the plan to do that and have a common
+dma_ops implementation for all of them. But lets start small by now and
+move forward step by step :-)
 
-NOTE: In case the MAC address stored in SPI flash is erased, follow
-the instructions at [1] to restore it.
+	Joerg
 
-[1] http://processors.wiki.ti.com/index.php/GSG:_OMAP-L138_DVEVM_Additional_Procedures#Restoring_MAC_address_on_SPI_Flash
-
-Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
----
- arch/arm/mach-davinci/board-da850-evm.c |   20 ++++++++++++++++++++
- 1 files changed, 20 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
-index a7b41bf..3ff64b8 100644
---- a/arch/arm/mach-davinci/board-da850-evm.c
-+++ b/arch/arm/mach-davinci/board-da850-evm.c
-@@ -115,6 +115,23 @@ static struct spi_board_info da850evm_spi_info[] = {
- 	},
- };
- 
-+static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
-+{
-+	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
-+	size_t retlen;
-+
-+	if (!strcmp(mtd->name, "MAC-Address")) {
-+		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
-+		if (retlen == ETH_ALEN)
-+			pr_info("Read MAC addr from SPI Flash: %pM\n",
-+				mac_addr);
-+	}
-+}
-+
-+static struct mtd_notifier da850evm_spi_notifier = {
-+	.add	= da850_evm_m25p80_notify_add,
-+};
-+
- static struct mtd_partition da850_evm_norflash_partition[] = {
- 	{
- 		.name           = "bootloaders + env",
-@@ -1237,6 +1254,9 @@ static __init void da850_evm_init(void)
- 	if (ret)
- 		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
- 				ret);
-+
-+	if (mtd_has_partitions())
-+		register_mtd_user(&da850evm_spi_notifier);
- }
- 
- #ifdef CONFIG_SERIAL_8250_CONSOLE
 -- 
-1.7.1
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
