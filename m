@@ -1,43 +1,51 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 8 Jun 2011 17:38:25 +0530
-Subject: [PATCH V2] davinci: da850: move input frequency to board
-	specific	files
-In-Reply-To: <877h8xr4o0.fsf@ti.com>
-References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
-	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
-	<874o42wpec.fsf@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D383AA8@dbde02.ent.ti.com>
-	<877h8xr4o0.fsf@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D425AD7@dbde02.ent.ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  8 Jun 2011 13:30:30 +0100
+Subject: [Patch v2 08/11] ARM: perf: remove confusing comment from v7 perf
+	events backend
+In-Reply-To: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1307536233-30089-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 07, 2011 at 21:53:59, Hilman, Kevin wrote:
+The comment about measuring TLB misses and refills in the ARMv7 perf
+backend makes little sense and refers loosely to raw counters that
+should be used instead.
 
-> I don't expect this to be a big boot-time impact.
+This patch removes the comments to avoid any confusion.
 
-You are right. Using PRINTK_TIME on DM365 I saw no noticeable boot-time
-change. When I profiled the code using do_gettimeofday(), I saw it
-was taking ~95 usecs to complete the propagation. I was mainly worried
-about all the recursion and reading of PLL and sysclk registers. Seems
-its not so bad.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/kernel/perf_event_v7.c |   10 ----------
+ 1 files changed, 0 insertions(+), 10 deletions(-)
 
-> However, some of the clock.c assumptions might need to be updated as it
-> currently is written from the perspective that the PLL clocks are the
-> "root" clocks.
-
-Hmm, just calling clk_set_rate() on refclk propagated the rate
-nicely across the tree. It seems DaVinci clock code is not in
-such a bad shape :) Or did I miss the concern?
-
-> Setting (and propagating) clock rates is what the clock framework is
-> for, so adding a new interface to set a custom clock rate just doesn't
-> seem right.  I understand that the reference oscillator might be
-> considered a special case, but if this can be done with the clock
-> framework, it is much preferred.
-
-Okay. Will modify the DM6467/T EVM code to use this method
-instead.
-
-Thanks,
-Sekhar
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 4960686..554eba3 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -207,11 +207,6 @@ static const unsigned armv7_a8_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 		},
+ 	},
+ 	[C(DTLB)] = {
+-		/*
+-		 * Only ITLB misses and DTLB refills are supported.
+-		 * If users want the DTLB refills misses a raw counter
+-		 * must be used.
+-		 */
+ 		[C(OP_READ)] = {
+ 			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
+ 			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
+@@ -323,11 +318,6 @@ static const unsigned armv7_a9_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 		},
+ 	},
+ 	[C(DTLB)] = {
+-		/*
+-		 * Only ITLB misses and DTLB refills are supported.
+-		 * If users want the DTLB refills misses a raw counter
+-		 * must be used.
+-		 */
+ 		[C(OP_READ)] = {
+ 			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
+ 			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
+-- 
+1.7.0.4
