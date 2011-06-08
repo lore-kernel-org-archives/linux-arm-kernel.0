@@ -1,43 +1,73 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Wed, 8 Jun 2011 12:46:52 +0200
-Subject: [RFC 2/6] omap: iovmm: generic iommu api migration
-In-Reply-To: <BANLkTimqt=yMGHcqEH5u-4GkMX9=+BuB6A@mail.gmail.com>
-References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-	<201106071326.53106.laurent.pinchart@ideasonboard.com>
-	<BANLkTimqt=yMGHcqEH5u-4GkMX9=+BuB6A@mail.gmail.com>
-Message-ID: <201106081246.53106.laurent.pinchart@ideasonboard.com>
+From: govindraj.raja@ti.com (Govindraj.R)
+Date: Wed, 8 Jun 2011 16:53:07 +0530
+Subject: [PATCH v3 05/12] OMAP: Serial: Hold console lock for console usage.
+In-Reply-To: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1307532194-13039-6-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ohad,
+Acquire console lock before enabling and writing to console-uart
+to avoid any recursive prints from console write.
+for ex:
+        --> printk
+          --> uart_console_write
+            --> get_sync
+              --> printk from omap_device enable
+                --> uart_console write
 
-On Tuesday 07 June 2011 15:46:26 Ohad Ben-Cohen wrote:
-> On Tue, Jun 7, 2011 at 2:26 PM, Laurent Pinchart wrote:
-> >> Right now we have a BUG_ON if pa is unaligned, but that can be changed
-> >> if needed (do we want it to handle offsets ?).
-> > 
-> > At least for the OMAP3 ISP we need to, as video buffers don't necessarily
-> > start on page boundaries.
-> 
-> Where do you take care of those potential offsets today ? Or do you
-> simply ignore the offsets and map the entire page ?
+Use RPM_SUSPENDING check to avoid below scenario during bootup
+As during bootup console_lock is not available.
+       --> uart_add_one_port
+           --> console_register
+               --> console_lock
+                --> console_unlock
+                     --> call_console_drivers (here yet console_lock is not released)
+                          --> uart_console_write
 
-Here http://marc.info/?l=linux-omap&m=130693502326513&w=2 :-)
+Acked-by: Alan Cox <alan@linux.intel.com>
+Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+---
+ drivers/tty/serial/omap-serial.c |   20 +++++++++++++++++++-
+ 1 files changed, 19 insertions(+), 1 deletions(-)
 
-> Seems like omap's iommu (mostly) rejects unaligned pa addresses, see:
-> 
-> 4abb761749abfb4ec403e4054f9dae2ee604e54f "omap iommu: Reject unaligned
-> addresses at setting page table entry"
-> 
-> (this doesn't seem to cover 4KB entries though, only large pages,
-> sections and super sections)
-> 
-> > A separate patch is indeed needed, yes. As you're already working on
-> > iommu it might be simpler if you add it to your tree.
-> 
-> Sure, i'll send it.
-
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index 897416f..ee94291 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -1008,7 +1008,22 @@ serial_omap_console_write(struct console *co, const char *s,
+ 	struct uart_omap_port *up = serial_omap_console_ports[co->index];
+ 	unsigned long flags;
+ 	unsigned int ier;
+-	int locked = 1;
++	int console_lock = 0, locked = 1;
++
++	if (console_trylock())
++		console_lock = 1;
++
++	/*
++	 * If console_lock is not available and we are in suspending
++	 * state then we can avoid the console usage scenario
++	 * as this may introduce recursive prints.
++	 * Basically this scenario occurs during boot while
++	 * printing debug bootlogs.
++	 */
++
++	if (!console_lock &&
++		up->pdev->dev.power.runtime_status == RPM_SUSPENDING)
++		return;
+ 
+ 	local_irq_save(flags);
+ 	if (up->port.sysrq)
+@@ -1044,6 +1059,9 @@ serial_omap_console_write(struct console *co, const char *s,
+ 	if (up->msr_saved_flags)
+ 		check_modem_status(up);
+ 
++	if (console_lock)
++		console_unlock();
++
+ 	serial_omap_port_disable(up);
+ 	if (locked)
+ 		spin_unlock(&up->port.lock);
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.0.4
