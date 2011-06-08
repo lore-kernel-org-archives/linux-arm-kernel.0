@@ -1,51 +1,34 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed,  8 Jun 2011 09:43:55 +0300
-Subject: [PATCH] omap: iovmm: s/sg_dma_len(sg)/sg->length/
-Message-ID: <1307515436-20805-1-git-send-email-ohad@wizery.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Tue, 7 Jun 2011 23:56:21 -0700
+Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <20110608142121T.fujita.tomonori@lab.ntt.co.jp>
+References: <20110606094751.GC10508@n2100.arm.linux.org.uk>
+	<20110606191041U.fujita.tomonori@lab.ntt.co.jp>
+	<BANLkTin7mqqTsosPHbztaPfL7s_TUGT1qg@mail.gmail.com>
+	<20110608142121T.fujita.tomonori@lab.ntt.co.jp>
+Message-ID: <BANLkTi=FcNncT_6HpvB_6OnQ94f0_sz7Gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-iovmm is erroneously using sg_dma_len with unmapped (DMA API-wise)
-SG entries, and will break if CONFIG_NEED_SG_DMA_LENGTH is enabled.
+On Tue, Jun 7, 2011 at 10:23 PM, FUJITA Tomonori
+<fujita.tomonori@lab.ntt.co.jp> wrote:
+> On Mon, 6 Jun 2011 11:48:56 -0700
+> Dan Williams <dan.j.williams@intel.com> wrote:
+>
+>> dmaengine expands the class of dma providers to include standalone dma
+>> agents on a host bus (or elsewhere) in addition to the traditional bus
+>> mastering host-bus-adapters that the existing api understands. ?So in
+>> the case of slave dma the dma capabilities of the block-device are
+>> irrelevant because another agent will do the transfer on behalf of the
+>> block-device driver. ?So the value should be whatever the dma device
+>> driver says it is.
+>
+> The dma parameter restriction could be due to software (HBA drivers,
+> or subsystem). The value should be whatever the dma device driver says
+> it is in such case?
 
-Fix that by using sg->length instead.
-
-Reported-by: Russell King <linux@arm.linux.org.uk>
-Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
----
- arch/arm/plat-omap/iovmm.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/plat-omap/iovmm.c b/arch/arm/plat-omap/iovmm.c
-index 83a37c5..c60737c 100644
---- a/arch/arm/plat-omap/iovmm.c
-+++ b/arch/arm/plat-omap/iovmm.c
-@@ -72,7 +72,7 @@ static size_t sgtable_len(const struct sg_table *sgt)
- 	for_each_sg(sgt->sgl, sg, sgt->nents, i) {
- 		size_t bytes;
- 
--		bytes = sg_dma_len(sg);
-+		bytes = sg->length;
- 
- 		if (!iopgsz_ok(bytes)) {
- 			pr_err("%s: sg[%d] not iommu pagesize(%x)\n",
-@@ -198,7 +198,7 @@ static void *vmap_sg(const struct sg_table *sgt)
- 		int err;
- 
- 		pa = sg_phys(sg);
--		bytes = sg_dma_len(sg);
-+		bytes = sg->length;
- 
- 		BUG_ON(bytes != PAGE_SIZE);
- 
-@@ -476,7 +476,7 @@ static int map_iovm_area(struct iommu *obj, struct iovm_struct *new,
- 		struct iotlb_entry e;
- 
- 		pa = sg_phys(sg);
--		bytes = sg_dma_len(sg);
-+		bytes = sg->length;
- 
- 		flags &= ~IOVMF_PGSZ_MASK;
- 		pgsz = bytes_to_iopgsz(bytes);
--- 
-1.7.1
+I'm assuming that the dma driver is taking responsibility for setting
+this correctly.  How would this work otherwise... HBA driver or
+subsystem queries the dmaengine device and then sets this parameter on
+its behalf?  In other words dmanengine *is* the subsystem, if I am
+understanding your definition.
