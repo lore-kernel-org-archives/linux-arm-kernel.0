@@ -1,103 +1,86 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 8 Jun 2011 15:53:56 -0600
-Subject: [PATCH v2 5/5] spi/ep93xx: add DMA support
-In-Reply-To: <1307505512.10976.91.camel@vkoul-udesk3>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
-	<4b27fc93b7df900943e7c12084a8340cbc5fe1a8.1306662317.git.mika.westerberg@iki.fi>
-	<20110603204400.GH17972@ponder.secretlab.ca>
-	<20110607171403.GA3011@acer>
-	<BANLkTikKOcc2Vg1p3kG4ZSLjJ0RTZWS=2A@mail.gmail.com>
-	<20110607190607.GB3011@acer>
-	<20110607191824.GA2035@ponder.secretlab.ca>
-	<20110607192945.GC3011@acer>
-	<20110607194034.GC2035@ponder.secretlab.ca>
-	<1307505512.10976.91.camel@vkoul-udesk3>
-Message-ID: <20110608215356.GA17138@ponder.secretlab.ca>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Wed, 8 Jun 2011 23:53:49 +0200
+Subject: [RESEND] [PATCH 1/2] OMAP1: allow reserving memory for camera
+In-Reply-To: <201012102203.54413.jkrzyszt@tis.icnet.pl>
+References: <201012051929.07220.jkrzyszt@tis.icnet.pl>
+	<20101210170356.GA28472@n2100.arm.linux.org.uk>
+	<201012102203.54413.jkrzyszt@tis.icnet.pl>
+Message-ID: <201106082354.10985.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 09:28:32AM +0530, Koul, Vinod wrote:
-> On Tue, 2011-06-07 at 13:40 -0600, Grant Likely wrote:
-> > On Tue, Jun 07, 2011 at 10:29:45PM +0300, Mika Westerberg wrote:
-> > > On Tue, Jun 07, 2011 at 01:18:24PM -0600, Grant Likely wrote:
-> > > > On Tue, Jun 07, 2011 at 10:06:07PM +0300, Mika Westerberg wrote:
-> > > > > On Tue, Jun 07, 2011 at 12:45:26PM -0600, Grant Likely wrote:
-> > > > > > On Tue, Jun 7, 2011 at 11:14 AM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> > > > > > >
-> > > > > > > I just realized that once the SPI driver renaming patch (spi: reorganize
-> > > > > > > drivers) enters linux-next, this patch (which sits on Vinod's tree) will cause
-> > > > > > > a merge conflict. Any ideas how to avoid it beforehand?
-> > > > > > 
-> > > > > > Yes, put the whole series into a separate branch all by itself.  Merge
-> > > > > > that branch into Vinod's tree and I'll also merge it into spi/next,
-> > > > > > and I'll fix up the merge conflict when I do.
-> > > > > 
-> > > > > More stupid questions: Do you mean that I create a branch in my public
-> > > > > repository somewhere? If that is the case, then there is a problem that I
-> > > > > don't have any public repository and I doubt that I get such before linux-next
-> > > > > is rebuilt.
-> > > > 
-> > > > It doesn't have to be your repo.  Vinod could do it, or I could.
+On Fri 10 Dec 2010 at 22:03:52 Janusz Krzysztofik wrote:
+> Friday 10 December 2010 18:03:56 Russell King - ARM Linux napisa?(a):
+> > On Fri, Dec 10, 2010 at 12:03:07PM +0100, Janusz Krzysztofik wrote:
+> > >  void __init omap1_camera_init(void *info)
+> > >  {
+> > >  
+> > >  	struct platform_device *dev = &omap1_camera_device;
 > > > 
-> > > Ah, I see.
+> > > +	dma_addr_t paddr = omap1_camera_phys_mempool_base;
+> > > +	dma_addr_t size = omap1_camera_phys_mempool_size;
 > > > 
-> > > Would it then be possible that you could do it? Please let me and Vinod know
-> > > what is needed from us.
+> > >  	int ret;
+> > >  	
+> > >  	dev->dev.platform_data = info;
 > > > 
-> > > And sorry for this mess.
+> > > +	if (paddr) {
+> > > +		if (dma_declare_coherent_memory(&dev->dev, paddr, paddr, size,
+> > > +				DMA_MEMORY_MAP | DMA_MEMORY_EXCLUSIVE))
 > > 
-> > I'll need an ack from Vinod first for the series so that I can add it
-> > before I make the commits, but other than that I have no problem doing
-> > so.
-> Acked-by: Vinod Koul <vinod.koul@intel.com>
+> > Although this works, you're ending up with SDRAM being mapped via
+> > ioremap, which uses MT_DEVICE - so what is SDRAM ends up being
+> > mapped as if it were a device.
+> > 
+> > For OMAP1, which is ARMv5 or lower, device memory becomes
+> > 'uncacheable, unbufferable' which is luckily what is used for the
+> > DMA coherent memory on those platforms - so no technical problem
+> > here.
+> > 
+> > However, on ARMv6 and later, ioremapped memory is device memory,
+> > which has different ordering wrt normal memory mappings, and may
+> > appear on different busses on the CPU's interface.  So, this is
+> > something I don't encourage as it's unclear that the hardware will
+> > work.
+> > 
+> > Essentially, dma_declare_coherent_memory() on ARM with main SDRAM
+> > should be viewed as a 'it might work, it might not, and it might
+> > stop working in the future' kind of interface.  In other words,
+> > there is no guarantee that this kind of thing will be supported in
+> > the future.
 > 
-> Let me know which branch you have pushed and I will merge that to my
-> tree
+> I was affraid of an unswer of this kind. I'm not capable of comming
+> out with any better, alternative solutions. Any hints other than
+> giving up with that old videobuf-contig, coherent memory based
+> interface? Or can we agree on that 'luckily uncacheable,
+> unbufferable, SDRAM based DMA coherent memory' solution for now?
 
-Just pushed out to the branch below.  Take a look, make sure it is
-correct, and if it looks good to you then go ahead and merge it, and I
-ll also merge it into spi/next.
+Russell, Tony,
 
-The following changes since commit 59c5f46fbe01a00eedf54a23789634438bb80603:
+Sorry for getting back to this old thread, but since my previous 
+attempts to provide[1] or support[2] a possibly better solution to the 
+problem all failed on one hand, and I can see patches not very different 
+from mine[3] being accepted for arch/arm/mach-{mx3,imx} during this and 
+previous merge windows[4][5][6] on the other, is there any chance for the 
+'dma_declare_coherent_memory() over a memblock_alloc()->free()->remove() 
+obtained area' based solution being accepted for omap1_camera as well if 
+I resend it refreshed?
 
-  Linux 3.0-rc2 (2011-06-06 18:06:33 +0900)
+BTW, commit 6d3163ce86dd386b4f7bda80241d7fea2bc0bb1d, "mm: check if any 
+page in a pageblock is reserved before marking it MIGRATE_RESERVE", 
+almost corrected the problem for me, allowing for very stable device 
+operation in videobuf_dma_contig mode once all resident programs get 
+settled up and no unusual activity happens, but this is still not 100% 
+reliable, so I think that only using a kind of memory area reservered 
+during boot for the purpose can be considered as free of transient 
+-ENOMEM issues.
 
-are available in the git repository at:
-  git://git.secretlab.ca/git/linux-2.6 ep93xx-dma
+Thanks,
+Janusz
 
-Geert Uytterhoeven (1):
-      spi/rtc-m41t93: Use spi_get_drvdata() for SPI devices
-
-Govindraj.R (1):
-      spi/omap2: fix uninitialized variable
-
-Grant Likely (1):
-      Merge remote-tracking branch 'origin' into spi/merge
-
-Mika Westerberg (5):
-      dmaengine: add ep93xx DMA support
-      ep93xx: add dmaengine platform code
-      ASoC: ep93xx: convert to use the DMA engine API
-      ep93xx: remove the old M2P DMA code
-      spi/ep93xx: add DMA support
-
- Documentation/spi/ep93xx_spi                   |   10 +
- arch/arm/mach-ep93xx/Makefile                  |    4 +-
- arch/arm/mach-ep93xx/core.c                    |    6 +-
- arch/arm/mach-ep93xx/dma-m2p.c                 |  411 -------
- arch/arm/mach-ep93xx/dma.c                     |  108 ++
- arch/arm/mach-ep93xx/include/mach/dma.h        |  190 ++---
- arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h |    2 +
- drivers/dma/Kconfig                            |    7 +
- drivers/dma/Makefile                           |    1 +
- drivers/dma/ep93xx_dma.c                       | 1355 ++++++++++++++++++++++++
- drivers/rtc/rtc-m41t93.c                       |    2 +-
- drivers/spi/ep93xx_spi.c                       |  303 +++++-
- drivers/spi/omap2_mcspi.c                      |    2 +-
- sound/soc/ep93xx/ep93xx-ac97.c                 |    4 +-
- sound/soc/ep93xx/ep93xx-i2s.c                  |    4 +-
- sound/soc/ep93xx/ep93xx-pcm.c                  |  137 ++--
- 16 files changed, 1932 insertions(+), 614 deletions(-)
- delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
- create mode 100644 arch/arm/mach-ep93xx/dma.c
- create mode 100644 drivers/dma/ep93xx_dma.c
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/036419.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/036551.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2010-December/034643.html
+[4] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;h=164f7b5237cca2701dd2943928ec8d078877a28d
+[5] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;h=031e912741746e4350204bb0436590ca0e993a7d
+[6] http://git.kernel.org/?p=linux/kernel/git/torvalds/linux-2.6.git;h=dca7c0b4293a06d1ed9387e729a4882896abccc2
