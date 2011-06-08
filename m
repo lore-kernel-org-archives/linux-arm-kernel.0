@@ -1,50 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2011 13:30:24 +0100
-Subject: [Patch v2 02/11] arm: Add Cortex A5 proc info
+Date: Wed,  8 Jun 2011 13:30:25 +0100
+Subject: [Patch v2 03/11] ARM: hwcaps: use shifts instead of hardcoded
+	constants
 In-Reply-To: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
 References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307536233-30089-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1307536233-30089-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pawel Moll <pawel.moll@arm.com>
+The HWCAP numbers are defined as constants, each one being a power of 2.
+This has become slightly unwieldy now that we have reached 32k.
 
-This patch adds processor info for ARM Ltd. Cortex A5,
-which has SCU initialisation procedure identical to A9.
+This patch changes the HWCAP defines to use (1 << n) instead of coding
+the constant directly. The values remain unchanged.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/proc-v7.S |   11 +++++++++++
- 1 files changed, 11 insertions(+), 0 deletions(-)
+ arch/arm/include/asm/hwcap.h |   32 ++++++++++++++++----------------
+ 1 files changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index d5245d4..7f482c2 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -273,6 +273,7 @@ cpu_resume_l1_flags:
-  *	It is assumed that:
-  *	- cache type register is implemented
+diff --git a/arch/arm/include/asm/hwcap.h b/arch/arm/include/asm/hwcap.h
+index c1062c3..81512db 100644
+--- a/arch/arm/include/asm/hwcap.h
++++ b/arch/arm/include/asm/hwcap.h
+@@ -4,22 +4,22 @@
+ /*
+  * HWCAP flags - for elf_hwcap (in kernel) and AT_HWCAP
   */
-+__v7_ca5mp_setup:
- __v7_ca9mp_setup:
- #ifdef CONFIG_SMP
- 	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
-@@ -459,6 +460,16 @@ cpu_elf_name:
- .endm
+-#define HWCAP_SWP	1
+-#define HWCAP_HALF	2
+-#define HWCAP_THUMB	4
+-#define HWCAP_26BIT	8	/* Play it safe */
+-#define HWCAP_FAST_MULT	16
+-#define HWCAP_FPA	32
+-#define HWCAP_VFP	64
+-#define HWCAP_EDSP	128
+-#define HWCAP_JAVA	256
+-#define HWCAP_IWMMXT	512
+-#define HWCAP_CRUNCH	1024
+-#define HWCAP_THUMBEE	2048
+-#define HWCAP_NEON	4096
+-#define HWCAP_VFPv3	8192
+-#define HWCAP_VFPv3D16	16384
+-#define HWCAP_TLS	32768
++#define HWCAP_SWP	(1 << 0)
++#define HWCAP_HALF	(1 << 1)
++#define HWCAP_THUMB	(1 << 2)
++#define HWCAP_26BIT	(1 << 3)	/* Play it safe */
++#define HWCAP_FAST_MULT	(1 << 4)
++#define HWCAP_FPA	(1 << 5)
++#define HWCAP_VFP	(1 << 6)
++#define HWCAP_EDSP	(1 << 7)
++#define HWCAP_JAVA	(1 << 8)
++#define HWCAP_IWMMXT	(1 << 9)
++#define HWCAP_CRUNCH	(1 << 10)
++#define HWCAP_THUMBEE	(1 << 11)
++#define HWCAP_NEON	(1 << 12)
++#define HWCAP_VFPv3	(1 << 13)
++#define HWCAP_VFPv3D16	(1 << 14)
++#define HWCAP_TLS	(1 << 15)
  
- 	/*
-+	 * ARM Ltd. Cortex A5 processor.
-+	 */
-+	.type   __v7_ca5mp_proc_info, #object
-+__v7_ca5mp_proc_info:
-+	.long	0x410fc050
-+	.long	0xff0ffff0
-+	__v7_proc __v7_ca5mp_setup
-+	.size	__v7_ca5mp_proc_info, . - __v7_ca5mp_proc_info
-+
-+	/*
- 	 * ARM Ltd. Cortex A9 processor.
- 	 */
- 	.type   __v7_ca9mp_proc_info, #object
+ #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
+ /*
 -- 
 1.7.0.4
