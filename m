@@ -1,81 +1,111 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 8 Jun 2011 16:54:47 +0100
-Subject: [PATCH 1/3] ARM: pmu: add OF probing support
-In-Reply-To: <1307456541-11026-2-git-send-email-robherring2@gmail.com>
-References: <1307456541-11026-1-git-send-email-robherring2@gmail.com>
-	<1307456541-11026-2-git-send-email-robherring2@gmail.com>
-Message-ID: <000001cc25f4$64c2d5c0$2e488140$@rutland@arm.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Wed, 8 Jun 2011 16:55:11 +0100 (BST)
+Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to
+	a physical address
+In-Reply-To: <alpine.DEB.2.00.1106071714400.2236@localhost6.localdomain6>
+References: <1307379898-14256-1-git-send-email-will.deacon@arm.com>
+	<1307379898-14256-5-git-send-email-will.deacon@arm.com>
+	<alpine.DEB.2.00.1106071126290.2247@localhost6.localdomain6>
+	<alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
+	<20110607132220.GB12639@e102144-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1106071435020.2247@localhost6.localdomain6>
+	<20110607153654.GA19855@arm.com>
+	<alpine.DEB.2.00.1106071714400.2236@localhost6.localdomain6>
+Message-ID: <alpine.DEB.2.00.1106081638420.11513@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
->  static int __devinit pmu_device_probe(struct platform_device *pdev)
->  {
-> +	enum arm_pmu_type type = pdev->id;
-> 
-> -	if (pdev->id < 0 || pdev->id >= ARM_NUM_PMU_DEVICES) {
-> +	if (pdev->dev.of_node)
-> +		type = ARM_PMU_DEVICE_CPU;
-> +
-> +	if (type < 0 || type >= ARM_NUM_PMU_DEVICES) {
->  		pr_warning("received registration request for unknown "
->  				"device %d\n", pdev->id);
->  		return -EINVAL;
->  	}
-> 
-> -	if (pmu_devices[pdev->id])
-> +	if (pmu_devices[type])
->  		pr_warning("registering new PMU device type %d overwrites "
-> -				"previous registration!\n", pdev->id);
-> +				"previous registration!\n", type);
->  	else
->  		pr_info("registered new PMU device of type %d\n",
-> -				pdev->id);
-> +				type);
-> 
-> -	pmu_devices[pdev->id] = pdev;
-> +	pmu_devices[type] = pdev;
->  	return 0;
->  }
 
-I don't think this is the best way to handle the type when we've got an FDT
-description:
+On Tue, 7 Jun 2011, Frank Hofmann wrote:
 
-* release_pmu hasn't been updated to match the type logic here, so it might do
-  anything when handed a platform_device initialised by FDT code.
+>
+>
+> On Tue, 7 Jun 2011, Dave Martin wrote:
+[ ... ]
+>> How about:
+>>
+>> 	typeof(cpu_reset) *phys_reset =
+>> 		(typeof(cpu_reset) *)virt_to_phys(cpu_reset);
+>
+> Function pointers ;-)
+> Thanks.
 
-* the warning message for an invalid registration still uses pdev->id rather
-  than type. This can't currently be reached when the PMU was handed to us via
-  FDT, but it may confuse refactoring later on.
+Hmmm ...
 
-* If we want to add a new PMU type, we'll have to add more logic to
-  pmu_device_probe. Given that work is going on to add support for system PMUs,
-  this doesn't seem particularly brilliant.
+Just found a problem with this.
 
-> +static struct of_device_id pmu_device_ids[] = {
-> +	{ .compatible = "arm,cortex-a9-pmu" },
-> +	{ .compatible = "arm,cortex-a8-pmu" },
-> +	{ .compatible = "arm,arm1136-pmu" },
-> +	{ .compatible = "arm,arm1176-pmu" },
-> +	{},
-> +};
-> +
->  static struct platform_driver pmu_driver = {
->  	.driver		= {
->  		.name	= "arm-pmu",
-> +		.of_match_table = pmu_device_ids,
->  	},
->  	.probe		= pmu_device_probe,
->  };
+If you have a MULTI_CPU config, this doesn't compile. For two reasons:
 
-This all seems fine for handling CPU PMUs.
+1. you cannot use cpu_reset as argument to virt_to_phys because you can't
+    take the address
+    That bit can be fixed by changing the MULTI_CPU #define in
+    <asm/proc-fns.h> not to include the macro argument.
+    (There is no code in the arm tree using cpu_reset_whatever names which
+    would break from that change ... still, not that nice)
 
-I think that a better strategy would be to separate the type logic from the
-registration. I have a patch for this:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052455.html
+2. even when you do that, you loose the "typeof()" information and the
+    above still doesn't compile.
 
-With it, you won't need to change pmu_device_probe, and adding FDT support
-should just be a matter of adding the of_match_table.
+Only a manual type override,
 
-Mark
+ 	void (*phys_reset)(unsigned long) = (void (*)(unsigned long))cpu_reset;
+
+is accepted then.
+
+FrankH.
+
+>
+>> 
+>> or even:
+>>
+>> 	typedef typeof(cpu_reset) *phys_reset_t;
+>> 	phys_reset_t phys_reset = (phys_reset_t)virt_to_phys(cpu_reset);
+>>>
+>>> 	reset_func(reset_code_phys);
+>> 
+>> Do you mean reset_func(phys_reset) ?
+>
+> 	phys_reset(reset_code_phys);
+>
+> me and my copy & paste ...
+>
+> [ ... ]
+>>> cpu_reset itself is relocatable, isn't it ? Maybe one could do the
+>>> same thing with/for it as for the reset code itself. I.e. relocate
+>>> to a "suitable" page if the 1:1 mapping for all of lowmem isn't
+>>> possible. The catch with that is of course somehow, such a "1:1
+>>> candidate page" must be found.
+>> 
+>> If cpu_reset is guaranteed to be position-independent and self-contained, 
+>> we could
+>> just copy it (with fncpy() for example).  We would still need to know the 
+>> length
+>> of that function somehow though.  Maybe just assuming that it's not longer 
+>> than
+>> a page would be safe enough.
+>
+> In all current CPU implementations it's position-dependent and 
+> self-contained; all they do are suitable control reg modifications, ending 
+> all with "mov pc, r0".
+>
+>> 
+>> In this case we would just need to find an identity-mappable target 
+>> location to
+>> copy the code to; we can find such a location in the same way as that used 
+>> to
+>> find space for the alternate stack, i.e., somewhere after the end of the 
+>> kernel
+>> image.
+>
+> If that's a normal thing to do, then this kind of 1:1-bounce-page seems a 
+> good way of avoiding the address range collision.
+>
+> best regards,
+> FrankH.
+>
+>> 
+>> Cheers
+>> ---Dave
+>> 
+>
