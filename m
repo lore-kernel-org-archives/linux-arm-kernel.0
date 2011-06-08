@@ -1,92 +1,163 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 8 Jun 2011 16:53:14 +0530
-Subject: [PATCH v3 12/12] OMAP4: Serial: Set TX_FIFO_THRESHOLD if uart in dma
-	mode for es2.0
+Date: Wed, 8 Jun 2011 16:53:05 +0530
+Subject: [PATCH v3 03/12] OMAP2+: Serial: Add default mux for all uarts.
 In-Reply-To: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
 References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1307532194-13039-13-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1307532194-13039-4-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.9.1307532245.24103.linux-arm-kernel@lists.infradead.org>
-
-uart tx threshold value using the new register UART_TX_DMA_THRESHOLD, this
-register can used if UART_MDR3 bit(2) is set. We have to ensure
-tx_threshold + tx_trigger <= 63 from es2.0 onwards. By default we are using
-tx_trigger of 1 so we can set threshold to 62 to satisfy above criteria.
-Without the threshold setting we hit dma_sync lost errors on tx channel
-leading to data loss on rx side
+Add default mux data for all uarts if mux info is not passed from
+board file to avoid breaking any board support.
 
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/serial.c                  |    4 ++++
- arch/arm/plat-omap/include/plat/omap-serial.h |   11 +++++++++++
- drivers/tty/serial/omap-serial.c              |    5 +++++
- 3 files changed, 20 insertions(+), 0 deletions(-)
+ arch/arm/mach-omap2/serial.c |  127 +++++++++++++++++++++++++++++++++++++++++-
+ 1 files changed, 126 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
-index 0a95c95..437fc0b 100644
+index b16768a..8c1a4c7 100644
 --- a/arch/arm/mach-omap2/serial.c
 +++ b/arch/arm/mach-omap2/serial.c
-@@ -401,6 +401,10 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
- 	if (bdata->id == omap_uart_con_id)
- 		pdata->console_uart = true;
+@@ -66,6 +66,129 @@ static struct omap_device_pm_latency omap_uart_latency[] = {
+ 	},
+ };
  
-+	if (pdata->dma_enabled &&
-+			cpu_is_omap44xx() && omap_rev() > OMAP4430_REV_ES1_0)
-+		pdata->errata |= OMAP4_UART_ERRATA_i659_TX_THR;
++#ifdef CONFIG_OMAP_MUX
++static struct omap_device_pad default_uart1_pads[] __initdata = {
++	{
++		.name	= "uart1_cts.uart1_cts",
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart1_rts.uart1_rts",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart1_tx.uart1_tx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart1_rx.uart1_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++};
 +
- 	od = omap_device_build(name, bdata->id, oh, pdata,
- 				sizeof(*pdata), omap_uart_latency,
- 				ARRAY_SIZE(omap_uart_latency), false);
-diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
-index 69e6d4b..0d10f72 100644
---- a/arch/arm/plat-omap/include/plat/omap-serial.h
-+++ b/arch/arm/plat-omap/include/plat/omap-serial.h
-@@ -56,12 +56,23 @@
- #define DEFAULT_RXDMA_BUFSIZE	4096		/* RX DMA buffer size */
- #define DEFAULT_AUTOSUSPEND_DELAY (30 * HZ) /* Runtime autosuspend (msecs) */
- 
-+/*
-+ * (Errata i659) - From OMAP4430 ES 2.0 onwards set
-+ * tx_threshold while using UART in DMA Mode
-+ * and ensure tx_threshold + tx_trigger <= 63
-+ */
-+#define UART_MDR3		0x20
-+#define UART_TX_DMA_THRESHOLD	0x21
-+#define SET_DMA_TX_THRESHOLD	BIT(2)
-+/* Setting TX Threshold Level to 62 */
-+#define TX_FIFO_THR_LVL		0x3E
- 
- #define OMAP_MAX_HSUART_PORTS	4
- 
- #define MSR_SAVE_FLAGS		UART_MSR_ANY_DELTA
- 
- #define UART_ERRATA_i202_MDR1_ACCESS	BIT(0)
-+#define OMAP4_UART_ERRATA_i659_TX_THR	BIT(1)
- 
- struct omap_uart_port_info {
- 	bool			dma_enabled;	/* To specify DMA Mode */
-diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
-index dbe76f3..a9645ac 100644
---- a/drivers/tty/serial/omap-serial.c
-+++ b/drivers/tty/serial/omap-serial.c
-@@ -818,6 +818,11 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
- 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
- 
- 	if (up->use_dma) {
-+		if (up->errata & OMAP4_UART_ERRATA_i659_TX_THR) {
-+			serial_out(up, UART_MDR3, SET_DMA_TX_THRESHOLD);
-+			serial_out(up, UART_TX_DMA_THRESHOLD, TX_FIFO_THR_LVL);
++static struct omap_device_pad default_uart2_pads[] __initdata = {
++	{
++		.name	= "uart2_cts.uart2_cts",
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart2_rts.uart2_rts",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart2_tx.uart2_tx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart2_rx.uart2_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++};
++
++static struct omap_device_pad default_uart3_pads[] __initdata = {
++	{
++		.name	= "uart3_cts_rctx.uart3_cts_rctx",
++		.enable	= OMAP_PIN_INPUT_PULLUP | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart3_rts_sd.uart3_rts_sd",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart3_tx_irtx.uart3_tx_irtx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart3_rx_irrx.uart3_rx_irrx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
++	},
++};
++
++static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {
++	{
++		.name   = "gpmc_wait2.uart4_tx",
++		.enable = OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "gpmc_wait3.uart4_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE2,
++	},
++};
++
++static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {
++	{
++		.name	= "uart4_tx.uart4_tx",
++		.enable	= OMAP_PIN_OUTPUT | OMAP_MUX_MODE0,
++	},
++	{
++		.name	= "uart4_rx.uart4_rx",
++		.flags	= OMAP_DEVICE_PAD_REMUX | OMAP_DEVICE_PAD_WAKEUP,
++		.enable	= OMAP_PIN_INPUT | OMAP_MUX_MODE0,
++	},
++};
++#else
++static struct omap_device_pad default_uart1_pads[] __initdata = {};
++static struct omap_device_pad default_uart2_pads[] __initdata = {};
++static struct omap_device_pad default_uart3_pads[] __initdata = {};
++static struct omap_device_pad default_omap36xx_uart4_pads[] __initdata = {};
++static struct omap_device_pad default_omap4_uart4_pads[] __initdata = {};
++#endif
++
++static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
++{
++	switch (bdata->id) {
++	case 0:
++		bdata->pads = default_uart1_pads;
++		bdata->pads_cnt = ARRAY_SIZE(default_uart1_pads);
++		break;
++	case 1:
++		bdata->pads = default_uart2_pads;
++		bdata->pads_cnt = ARRAY_SIZE(default_uart2_pads);
++		break;
++	case 2:
++		bdata->pads = default_uart3_pads;
++		bdata->pads_cnt = ARRAY_SIZE(default_uart3_pads);
++		break;
++	case 3:
++		if (cpu_is_omap44xx()) {
++			bdata->pads = default_omap4_uart4_pads;
++			bdata->pads_cnt =
++				ARRAY_SIZE(default_omap4_uart4_pads);
++		} else {
++			bdata->pads = default_omap36xx_uart4_pads;
++			bdata->pads_cnt =
++				ARRAY_SIZE(default_omap36xx_uart4_pads);
 +		}
++		break;
++	default:
++		break;
++	}
++}
 +
- 		serial_out(up, UART_TI752_TLR, 0);
- 		serial_out(up, UART_OMAP_SCR,
- 			(UART_FCR_TRIGGER_4 | UART_FCR_TRIGGER_8));
+ static void omap_uart_idle_init(struct omap_uart_port_info *uart,
+ 				unsigned short num)
+ {
+@@ -242,6 +365,8 @@ void __init omap_serial_init(void)
+ 		bdata.flags = 0;
+ 		bdata.pads = NULL;
+ 		bdata.pads_cnt = 0;
+-		omap_serial_init_port(&bdata);
++
++		if (cpu_is_omap44xx() || cpu_is_omap34xx())
++			omap_serial_fill_default_pads(&bdata);
+ 	}
+ }
 -- 
 1.7.0.4
