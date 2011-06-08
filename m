@@ -1,99 +1,88 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 8 Jun 2011 17:24:29 +0100
-Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to a
-	physical address
-In-Reply-To: <alpine.DEB.2.00.1106081707040.11513@localhost6.localdomain6>
-References: <1307379898-14256-5-git-send-email-will.deacon@arm.com>
-	<alpine.DEB.2.00.1106071126290.2247@localhost6.localdomain6>
-	<alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
-	<20110607132220.GB12639@e102144-lin.cambridge.arm.com>
-	<alpine.DEB.2.00.1106071435020.2247@localhost6.localdomain6>
-	<20110607153654.GA19855@arm.com>
-	<alpine.DEB.2.00.1106071714400.2236@localhost6.localdomain6>
-	<alpine.DEB.2.00.1106081638420.11513@localhost6.localdomain6>
-	<20110608160527.GA6851@e102144-lin.cambridge.arm.com>
-	<alpine.DEB.2.00.1106081707040.11513@localhost6.localdomain6>
-Message-ID: <20110608162429.GA28436@arm.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 08 Jun 2011 11:40:01 -0500
+Subject: [PATCH 1/3] ARM: pmu: add OF probing support
+In-Reply-To: <000001cc25f4$64c2d5c0$2e488140$@rutland@arm.com>
+References: <1307456541-11026-1-git-send-email-robherring2@gmail.com>
+	<1307456541-11026-2-git-send-email-robherring2@gmail.com>
+	<000001cc25f4$64c2d5c0$2e488140$@rutland@arm.com>
+Message-ID: <4DEFA5E1.9010600@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 05:10:05PM +0100, Frank Hofmann wrote:
-> 
-> 
-> On Wed, 8 Jun 2011, Will Deacon wrote:
-> 
-> >On Wed, Jun 08, 2011 at 04:55:11PM +0100, Frank Hofmann wrote:
-> >>
-> >>
-> >>On Tue, 7 Jun 2011, Frank Hofmann wrote:
-> >>
-> >>>
-> >>>
-> >>>On Tue, 7 Jun 2011, Dave Martin wrote:
-> >>[ ... ]
-> >>>>How about:
-> >>>>
-> >>>>	typeof(cpu_reset) *phys_reset =
-> >>>>		(typeof(cpu_reset) *)virt_to_phys(cpu_reset);
-> >>>
-> >>>Function pointers ;-)
-> >>>Thanks.
-> >>
-> >>Hmmm ...
-> >>
-> >>Just found a problem with this.
-> >>
-> >>If you have a MULTI_CPU config, this doesn't compile. For two reasons:
-> >>
-> >>1. you cannot use cpu_reset as argument to virt_to_phys because you can't
-> >>    take the address
-> >>    That bit can be fixed by changing the MULTI_CPU #define in
-> >>    <asm/proc-fns.h> not to include the macro argument.
-> >>    (There is no code in the arm tree using cpu_reset_whatever names which
-> >>    would break from that change ... still, not that nice)
-> >>
-> >>2. even when you do that, you loose the "typeof()" information and the
-> >>    above still doesn't compile.
-> >>
-> >>Only a manual type override,
-> >>
-> >> 	void (*phys_reset)(unsigned long) = (void (*)(unsigned long))cpu_reset;
-> >>
-> >>is accepted then.
-> >
-> >Damn, yes, I assumed the MULTI_CPU case would just pointer at the structure field,
-> >but it takes the argument as parameter for the invocation. Oh well, I'll hardcode
-> >the type after all then!
-> 
-> It's not just that - the worse bit is that as long as the #define
-> looks like:
-> 
-> #define	cpu_reset(addr)		processor.reset(addr)
-> 
-> compile is being refused; one has to ditch the argument part of the
-> macro to be able to take the address.
-> 
-> I'm unsure how desirable that change is; it's got the unwanted
-> consequence that people who decide to use function names like
-> "graphics_cpu_reset" or "cpu_reset_specialregisters" would fall flat
-> on their face.
+Mark,
 
-The preprocessor won't expand a macro name unless it appears as a separate
-token, surely?
+On 06/08/2011 10:54 AM, Mark Rutland wrote:
+> Hi,
+>
+>>   static int __devinit pmu_device_probe(struct platform_device *pdev)
+>>   {
+>> +	enum arm_pmu_type type = pdev->id;
+>>
+>> -	if (pdev->id<  0 || pdev->id>= ARM_NUM_PMU_DEVICES) {
+>> +	if (pdev->dev.of_node)
+>> +		type = ARM_PMU_DEVICE_CPU;
+>> +
+>> +	if (type<  0 || type>= ARM_NUM_PMU_DEVICES) {
+>>   		pr_warning("received registration request for unknown "
+>>   				"device %d\n", pdev->id);
+>>   		return -EINVAL;
+>>   	}
+>>
+>> -	if (pmu_devices[pdev->id])
+>> +	if (pmu_devices[type])
+>>   		pr_warning("registering new PMU device type %d overwrites "
+>> -				"previous registration!\n", pdev->id);
+>> +				"previous registration!\n", type);
+>>   	else
+>>   		pr_info("registered new PMU device of type %d\n",
+>> -				pdev->id);
+>> +				type);
+>>
+>> -	pmu_devices[pdev->id] = pdev;
+>> +	pmu_devices[type] = pdev;
+>>   	return 0;
+>>   }
+>
+> I don't think this is the best way to handle the type when we've got an FDT
+> description:
+>
+> * release_pmu hasn't been updated to match the type logic here, so it might do
+>    anything when handed a platform_device initialised by FDT code.
+>
+> * the warning message for an invalid registration still uses pdev->id rather
+>    than type. This can't currently be reached when the PMU was handed to us via
+>    FDT, but it may confuse refactoring later on.
+>
+> * If we want to add a new PMU type, we'll have to add more logic to
+>    pmu_device_probe. Given that work is going on to add support for system PMUs,
+>    this doesn't seem particularly brilliant.
+>
+>> +static struct of_device_id pmu_device_ids[] = {
+>> +	{ .compatible = "arm,cortex-a9-pmu" },
+>> +	{ .compatible = "arm,cortex-a8-pmu" },
+>> +	{ .compatible = "arm,arm1136-pmu" },
+>> +	{ .compatible = "arm,arm1176-pmu" },
+>> +	{},
+>> +};
+>> +
+>>   static struct platform_driver pmu_driver = {
+>>   	.driver		= {
+>>   		.name	= "arm-pmu",
+>> +		.of_match_table = pmu_device_ids,
+>>   	},
+>>   	.probe		= pmu_device_probe,
+>>   };
+>
+> This all seems fine for handling CPU PMUs.
+>
+> I think that a better strategy would be to separate the type logic from the
+> registration. I have a patch for this:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052455.html
+>
+> With it, you won't need to change pmu_device_probe, and adding FDT support
+> should just be a matter of adding the of_match_table.
+>
 
-So if I have
+Okay. I'll rebase mine on top of your changes.
 
-#define cpu_reset processor.reset
-
-then 
-
-	cpu_reset(graphics_cpu_reset)
-
-expands to
-
-	processor.reset(graphics_cpu_reset)
-
-Which is the intention (even if it's a stupid example)
-
-Cheers
----Dave
+Rob
