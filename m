@@ -1,35 +1,28 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed,  8 Jun 2011 17:56:38 +0200
-Subject: [PATCH] ARM: mx53: Fix the base addresses for the DDR memory regions
-Message-ID: <1307548598-12963-1-git-send-email-mkl@pengutronix.de>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Wed, 8 Jun 2011 18:03:23 +0200
+Subject: [PATCH] omap: iovmm: s/sg_dma_len(sg)/sg->length/
+In-Reply-To: <1307515436-20805-1-git-send-email-ohad@wizery.com>
+References: <1307515436-20805-1-git-send-email-ohad@wizery.com>
+Message-ID: <201106081803.24729.laurent.pinchart@ideasonboard.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
+Hi Ohad,
 
-This patch applied to the imx-for-3.0 branch of
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=summary
+Thanks for the patch.
 
-regards, Marc
+On Wednesday 08 June 2011 08:43:55 Ohad Ben-Cohen wrote:
+> iovmm is erroneously using sg_dma_len with unmapped (DMA API-wise)
+> SG entries, and will break if CONFIG_NEED_SG_DMA_LENGTH is enabled.
+> 
+> Fix that by using sg->length instead.
+> 
+> Reported-by: Russell King <linux@arm.linux.org.uk>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 
- arch/arm/plat-mxc/include/mach/mx53.h |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+Tested-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
-index 5a2104e..e14a4f0 100644
---- a/arch/arm/plat-mxc/include/mach/mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/mx53.h
-@@ -145,8 +145,8 @@
- /*
-  * Memory regions and CS
-  */
--#define MX53_CSD0_BASE_ADDR		0x90000000
--#define MX53_CSD1_BASE_ADDR		0xA0000000
-+#define MX53_CSD0_BASE_ADDR		0x70000000
-+#define MX53_CSD1_BASE_ADDR		0xB0000000
- #define MX53_CS0_BASE_ADDR		0xF0000000
- #define MX53_CS1_32MB_BASE_ADDR	0xF2000000
- #define MX53_CS1_64MB_BASE_ADDR		0xF4000000
 -- 
-1.7.4.1
+Regards,
+
+Laurent Pinchart
