@@ -1,43 +1,59 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Jun 2011 11:23:59 +0200
-Subject: Dynamic patching in discarded sections
-Message-ID: <201106081123.59414.arnd@arndb.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Jun 2011 10:24:39 +0100
+Subject: [PATCH 06/11] ARM: cortex-a5: add HWCAP_VFPv4D16 to proc info
+	structure
+In-Reply-To: <20110608090501.GA3595@arm.com>
+References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
+	<1307379355-13802-7-git-send-email-will.deacon@arm.com>
+	<20110607161736.GB19855@arm.com>
+	<20110607162204.GC12639@e102144-lin.cambridge.arm.com>
+	<20110608090501.GA3595@arm.com>
+Message-ID: <20110608092439.GB3876@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been playing with randconfig builds and found an interesting problem
-with the combination of:
+On Wed, Jun 08, 2011 at 10:05:01AM +0100, Dave Martin wrote:
+> On Tue, Jun 07, 2011 at 05:22:04PM +0100, Will Deacon wrote:
+> > On Tue, Jun 07, 2011 at 05:17:36PM +0100, Dave Martin wrote:
+> > > On Mon, Jun 06, 2011 at 05:55:50PM +0100, Will Deacon wrote:
+> > > > The Cortex-A5 implements VFPv4D16, so add this to the hwcaps for this
+> > > > processor.
+> > > > 
+> > > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > > ---
+> > > >  arch/arm/mm/proc-v7.S |    2 +-
+> > > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > > 
+> > > > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> > > > index b22d98d..8eba506 100644
+> > > > --- a/arch/arm/mm/proc-v7.S
+> > > > +++ b/arch/arm/mm/proc-v7.S
+> > > > @@ -466,7 +466,7 @@ cpu_elf_name:
+> > > >  __v7_ca5mp_proc_info:
+> > > >  	.long	0x410fc050
+> > > >  	.long	0xff0ffff0
+> > > > -	__v7_proc __v7_ca5mp_setup
+> > > > +	__v7_proc __v7_ca5mp_setup, HWCAP_VFPv4D16
+> > > 
+> > > Is VFPv4 a superset of VFPv3?  If so, should we also include
+> > > HWCAP_VFPv3D16 (and what about HWCAP_VFP)?
+> > >
+> > 
+> > Actually, it looks like this shouldn't be declared statically at all, since the
+> > kernel have not have VFP support compiled in. Rather, the vfp code will detect
+> > the capability and adjust elf_hwcap at runtime.
+> 
+> Hah, yes, quite right.  My bad.
 
-CONFIG_ARM_PATCH_PHYS_VIRT=y
-CONFIG_HOTPLUG=n
-CONFIG_DMABOUNCE=n
-CONFIG_MMC_SPI=y
+I'll fix it for v2.
 
-The problem is shown with this code:
+As for the D16 stuff, I've had a better idea [need to check with the tools
+guys]. Rather than waste two bits for VFPv4 and VFPv4D16, it should probably
+be something like:
 
-static int __devexit mmc_spi_remove(struct spi_device *spi)
-{
-	...   
-                        dma_unmap_single(host->dma_dev, host->ones_dma,
-                                MMC_SPI_BLOCKSIZE, DMA_TO_DEVICE);
-                        dma_unmap_single(host->dma_dev, host->data_dma,
-                                sizeof(*host->data), DMA_BIDIRECTIONAL);
-	...
-}
+VFPv3    : HWCAP_VFPv3
+VFPv3D16 : HWCAP_VFPv3 | HWCAP_VFPv3D16
+VFPv4    : HWCAP_VFPv3 | HWCAP_VFPv4
+VFPv4D16 : HWCAP_VFPv3 | HWCAP_VFPv3D16 | HWCAP_VFPv4
 
-and the error message (in case someone looks for this using google) is
-
-`.devexit.text' referenced in section `.pv_table' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
-`.devexit.text' referenced in section `.pv_table' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
-
-What happens is that dma_unmap_single() calls
- __dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir), which requires
-patching in the caller. However, due to CONFIG_HOTPLUG being disabled, the
-__devexit section gets discarded, and the linker cannot create an entry in the
-.pvtable section for the mmc_spi_remove function.
-
-I don't know if the same problem exists in other places in the code, but it's
-entirely possible. I also couldn't think of a good solution for this, short of
-moving the definition of dma_unmap_single() to out of line code.
-
-	Arnd
+Will
