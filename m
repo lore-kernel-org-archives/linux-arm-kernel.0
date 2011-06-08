@@ -1,82 +1,58 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 08 Jun 2011 10:15:02 -0400 (EDT)
-Subject: Dynamic patching in discarded sections
-In-Reply-To: <201106081123.59414.arnd@arndb.de>
-References: <201106081123.59414.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1106080946000.2142@xanadu.home>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Wed, 8 Jun 2011 16:32:45 +0200
+Subject: [PATCH 0/4] drivers/iommu/ relocations
+In-Reply-To: <20110608093546.GG4407@amd.com>
+References: <1307522062-19273-1-git-send-email-ohad@wizery.com>
+	<20110608093546.GG4407@amd.com>
+Message-ID: <20110608143245.GI30752@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Jun 2011, Arnd Bergmann wrote:
 
-> I've been playing with randconfig builds and found an interesting problem
-> with the combination of:
+* Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+
+> (Cc'ing Ingo)
 > 
-> CONFIG_ARM_PATCH_PHYS_VIRT=y
-> CONFIG_HOTPLUG=n
-> CONFIG_DMABOUNCE=n
-> CONFIG_MMC_SPI=y
+> On Wed, Jun 08, 2011 at 04:34:18AM -0400, Ohad Ben-Cohen wrote:
+> > Create a dedicated iommu drivers folder, put the base iommu code there,
+> > and move the existing IOMMU API users as well (msm-iommu, amd_iommu and
+> > intel-iommu).
+> > 
+> > Putting all iommu drivers together will ease finding similarities
+> > between different platforms, with the intention of solving problems once,
+> > in a generic framework, which everyone can use.
+> > 
+> > OMAP's iommu will be moved too as soon as it's migrated.
 > 
-> The problem is shown with this code:
+> Great, thanks. I'll apply the patches as soon as the relevant ACKs come
+> in. Looking at the MAINTAINERS file David Brown needs to ACK the MSM
+> patch and David Woodhouse the VT-d patch.
 > 
-> static int __devexit mmc_spi_remove(struct spi_device *spi)
-> {
-> 	...   
->                         dma_unmap_single(host->dma_dev, host->ones_dma,
->                                 MMC_SPI_BLOCKSIZE, DMA_TO_DEVICE);
->                         dma_unmap_single(host->dma_dev, host->data_dma,
->                                 sizeof(*host->data), DMA_BIDIRECTIONAL);
-> 	...
-> }
+> David B., David W., is this direction ok for both of you?
 > 
-> and the error message (in case someone looks for this using google) is
+> A more important question is how we handle the IOMMU tree. Currently the
+> situation is as follows:
 > 
-> `.devexit.text' referenced in section `.pv_table' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
-> `.devexit.text' referenced in section `.pv_table' of drivers/built-in.o: defined in discarded section `.devexit.text' of drivers/built-in.o
+> 	* The AMD IOMMU changes go upstream through Ingo
+> 	* David Woohouse has his own tree which he sents directly to
+> 	  Linus
+> 	* Not sure about the ARM IOMMU code
+> 	* And to comlicate things further there is the upcoming ARM
+> 	  integration tree which may contain code that depends on IOMMU
+> 	  changes
 > 
-> What happens is that dma_unmap_single() calls
->  __dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir), which requires
-> patching in the caller. However, due to CONFIG_HOTPLUG being disabled, the
-> __devexit section gets discarded, and the linker cannot create an entry in the
-> .pvtable section for the mmc_spi_remove function.
+> My suggestion is that the ARM tree pulls in the necessary changes from
+> the IOMMU tree and the IOMMU code goes upstream through Ingo or directly
+> to Linus (with some time in linux-next, of course). Thoughts?
 
-We really need to push for better toolchain support here.  This could 
-easily be solved with some way to query the currently active section 
-from the assembler and use that to construct the argument to the
-.pushsection directive.  This way, the .pvtable section could become 
-.pvtable.__devexit when the reference is made from a __devexit section, 
-and that could be discarded altogether at link time if unneeded.
+I can certainly pull from you trees you pull from elsewhere.
 
-Dave Martin proposed an extension to gas here (also sent to 
-binutils at sourceware.org):
+David could help keep things tidier by sending the Intel IOMMU bits 
+to me as well.
 
-http://article.gmane.org/gmane.linux.linaro.toolchain/701
+In any case the tip:core/iommu tree is in linux-next so whatever you 
+send me shows up there on the next day or so.
 
-But as far as I know, nothing further happened. And this is not an ARM 
-specific issue either as the X86 alternates have the same problem.
+Thanks,
 
-> I don't know if the same problem exists in other places in the code, but it's
-> entirely possible. I also couldn't think of a good solution for this, short of
-> moving the definition of dma_unmap_single() to out of line code.
-
-Probably the best interim solution would be:
-
-diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-index dfbb377..f231c92 100644
---- a/arch/arm/kernel/vmlinux.lds.S
-+++ b/arch/arm/kernel/vmlinux.lds.S
-@@ -21,7 +21,8 @@
- #define ARM_CPU_KEEP(x)
- #endif
- 
--#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
-+#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-+    defined(CONFIG_ARM_PATCH_PHYS_VIRT)
- #define ARM_EXIT_KEEP(x)	x
- #else
- #define ARM_EXIT_KEEP(x)
-
-But clearly the toolchain should be more accommodating instead.
-
-
-Nicolas
+	Ingo
