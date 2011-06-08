@@ -1,38 +1,30 @@
-From: matthew@wil.cx (Matthew Wilcox)
-Date: Wed, 8 Jun 2011 07:05:22 -0600
-Subject: [PATCH 0/4] drivers/iommu/ relocations
-In-Reply-To: <1307522062-19273-1-git-send-email-ohad@wizery.com>
-References: <1307522062-19273-1-git-send-email-ohad@wizery.com>
-Message-ID: <20110608130522.GC29089@parisc-linux.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 8 Jun 2011 14:08:38 +0100
+Subject: [Patch v2 09/11] ARM: perf: add PMUv2 common event definitions
+In-Reply-To: <BANLkTik-ms3r-+VSAw2vSDGKqO+31xwghw@mail.gmail.com>
+References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+	<1307536233-30089-10-git-send-email-will.deacon@arm.com>
+	<BANLkTik-ms3r-+VSAw2vSDGKqO+31xwghw@mail.gmail.com>
+Message-ID: <20110608130838.GF3876@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 11:34:18AM +0300, Ohad Ben-Cohen wrote:
-> Create a dedicated iommu drivers folder, put the base iommu code there,
-> and move the existing IOMMU API users as well (msm-iommu, amd_iommu and
-> intel-iommu).
+On Wed, Jun 08, 2011 at 02:02:41PM +0100, Jean Pihet wrote:
+> Hi Will,
 > 
-> Putting all iommu drivers together will ease finding similarities
-> between different platforms, with the intention of solving problems once,
-> in a generic framework, which everyone can use.
+> On Wed, Jun 8, 2011 at 2:30 PM, Will Deacon <will.deacon@arm.com> wrote:
+> > The PMUv2 specification reserves a number of event encodings
+> > for common events.
+> >
+> > This patch adds these events to the common event enumeration
+> > in preparation for PMUv2 cores, such as Cortex-A15.
+> >
+> > Cc: Jean Pihet <jean.pihet@newoldbits.com>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
 > 
-> OMAP's iommu will be moved too as soon as it's migrated.
-> 
-> For previous discussions on this, please see:
-> https://lkml.org/lkml/2011/6/2/369
-> 
-> Ohad Ben-Cohen (4):
->   drivers: iommu: move to a dedicated folder
->   msm: iommu: move to drivers/iommu/
->   x86: amd_iommu: move to drivers/iommu/
->   x86: intel-iommu: move to drivers/iommu/
+> The change looks good, here is the acked-by FWIW:
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-You've missed at least parisc, ia64, alpha, sparc, powerpc and sh which
-have IOMMUs.  Not that they necessarily all need to be moved across in
-one patchset, but saying "all iommu drivers" is clearly false.
+Cheers Jean, I'll add your Ack (rather than S-O-B).
 
--- 
-Matthew Wilcox				Intel Open Source Technology Centre
-"Bill, look, we understand that you're interested in selling us this
-operating system, but compare it to ours.  We can't possibly take such
-a retrograde step."
+Will
