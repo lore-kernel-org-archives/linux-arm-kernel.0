@@ -1,51 +1,52 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2011 13:30:30 +0100
-Subject: [Patch v2 08/11] ARM: perf: remove confusing comment from v7 perf
-	events backend
+Date: Wed,  8 Jun 2011 13:30:29 +0100
+Subject: [Patch v2 07/11] ARM: vfp: add VFPv4 capability detection and
+	populate elf_hwcap
 In-Reply-To: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
 References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307536233-30089-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1307536233-30089-8-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The comment about measuring TLB misses and refills in the ARMv7 perf
-backend makes little sense and refers loosely to raw counters that
-should be used instead.
+The presence of VFPv4 cannot be detected simply by looking at the FPSID
+subarchitecture field, as a value >= 2 signifies the architecture as
+VFPv3 or later.
 
-This patch removes the comments to avoid any confusion.
+This patch reads from MVFR1 to check whether or not the fused multiple
+accumulate instructions are supported. Since these are introduced with
+VFPv4, this tells us what we need to know.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/perf_event_v7.c |   10 ----------
- 1 files changed, 0 insertions(+), 10 deletions(-)
+ arch/arm/vfp/vfpmodule.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 4960686..554eba3 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -207,11 +207,6 @@ static const unsigned armv7_a8_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 		},
- 	},
- 	[C(DTLB)] = {
--		/*
--		 * Only ITLB misses and DTLB refills are supported.
--		 * If users want the DTLB refills misses a raw counter
--		 * must be used.
--		 */
- 		[C(OP_READ)] = {
- 			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
- 			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
-@@ -323,11 +318,6 @@ static const unsigned armv7_a9_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 		},
- 	},
- 	[C(DTLB)] = {
--		/*
--		 * Only ITLB misses and DTLB refills are supported.
--		 * If users want the DTLB refills misses a raw counter
--		 * must be used.
--		 */
- 		[C(OP_READ)] = {
- 			[C(RESULT_ACCESS)]	= CACHE_OP_UNSUPPORTED,
- 			[C(RESULT_MISS)]	= ARMV7_PERFCTR_DTLB_REFILL,
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index f25e7ec..650d90b 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -582,7 +582,6 @@ static int __init vfp_init(void)
+ 				elf_hwcap |= HWCAP_VFPv3D16;
+ 		}
+ #endif
+-#ifdef CONFIG_NEON
+ 		/*
+ 		 * Check for the presence of the Advanced SIMD
+ 		 * load/store instructions, integer and single
+@@ -590,10 +589,13 @@ static int __init vfp_init(void)
+ 		 * for NEON if the hardware has the MVFR registers.
+ 		 */
+ 		if ((read_cpuid_id() & 0x000f0000) == 0x000f0000) {
++#ifdef CONFIG_NEON
+ 			if ((fmrx(MVFR1) & 0x000fff00) == 0x00011100)
+ 				elf_hwcap |= HWCAP_NEON;
+-		}
+ #endif
++			if ((fmrx(MVFR1) & 0xf0000000) == 0x10000000)
++				elf_hwcap |= HWCAP_VFPv4;
++		}
+ 	}
+ 	return 0;
+ }
 -- 
 1.7.0.4
