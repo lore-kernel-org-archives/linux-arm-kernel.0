@@ -1,38 +1,67 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 8 Jun 2011 15:12:10 +0200
-Subject: [Patch v2 09/11] ARM: perf: add PMUv2 common event definitions
-In-Reply-To: <20110608130838.GF3876@e102144-lin.cambridge.arm.com>
-References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
-	<1307536233-30089-10-git-send-email-will.deacon@arm.com>
-	<BANLkTik-ms3r-+VSAw2vSDGKqO+31xwghw@mail.gmail.com>
-	<20110608130838.GF3876@e102144-lin.cambridge.arm.com>
-Message-ID: <BANLkTimTPbUU7LFxkevuEm01M0u9PFYHwA@mail.gmail.com>
+From: sudhakar.raj@ti.com (Rajashekhara, Sudhakar)
+Date: Wed, 8 Jun 2011 18:32:35 +0530
+Subject: [PATCH] davinci: da850 EVM: read mac address from SPI flash
+Message-ID: <1307538155-27197-1-git-send-email-sudhakar.raj@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2011 at 3:08 PM, Will Deacon <will.deacon@arm.com> wrote:
-> On Wed, Jun 08, 2011 at 02:02:41PM +0100, Jean Pihet wrote:
->> Hi Will,
->>
->> On Wed, Jun 8, 2011 at 2:30 PM, Will Deacon <will.deacon@arm.com> wrote:
->> > The PMUv2 specification reserves a number of event encodings
->> > for common events.
->> >
->> > This patch adds these events to the common event enumeration
->> > in preparation for PMUv2 cores, such as Cortex-A15.
->> >
->> > Cc: Jean Pihet <jean.pihet@newoldbits.com>
->> > Signed-off-by: Will Deacon <will.deacon@arm.com>
->>
->> The change looks good, here is the acked-by FWIW:
->> Signed-off-by: Jean Pihet <j-pihet@ti.com>
->
-> Cheers Jean, I'll add your Ack (rather than S-O-B).
-Yes sorry about the wrong copy-paste ;p
+DA850/OMAP-L138 EMAC driver uses random mac address instead of
+a fixed one because the mac address is not stuffed into EMAC
+platform data.
 
-Thanks,
-Jean
+This patch provides a function which reads the mac address
+stored in SPI flash (registered as MTD device) and populates the
+EMAC platform data. The function which reads the mac address is
+registered as a callback which gets called upon addition of MTD
+device.
 
->
-> Will
->
+NOTE: In case the MAC address stored in SPI flash is erased, follow
+the instructions at [1] to restore it.
+
+[1] http://processors.wiki.ti.com/index.php/GSG:_OMAP-L138_DVEVM_Additional_Procedures#Restoring_MAC_address_on_SPI_Flash
+
+Signed-off-by: Rajashekhara, Sudhakar <sudhakar.raj@ti.com>
+---
+ arch/arm/mach-davinci/board-da850-evm.c |   20 ++++++++++++++++++++
+ 1 files changed, 20 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index a7b41bf..3ff64b8 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -115,6 +115,23 @@ static struct spi_board_info da850evm_spi_info[] = {
+ 	},
+ };
+ 
++static void da850_evm_m25p80_notify_add(struct mtd_info *mtd)
++{
++	char *mac_addr = davinci_soc_info.emac_pdata->mac_addr;
++	size_t retlen;
++
++	if (!strcmp(mtd->name, "MAC-Address")) {
++		mtd->read(mtd, 0, ETH_ALEN, &retlen, mac_addr);
++		if (retlen == ETH_ALEN)
++			pr_info("Read MAC addr from SPI Flash: %pM\n",
++				mac_addr);
++	}
++}
++
++static struct mtd_notifier da850evm_spi_notifier = {
++	.add	= da850_evm_m25p80_notify_add,
++};
++
+ static struct mtd_partition da850_evm_norflash_partition[] = {
+ 	{
+ 		.name           = "bootloaders + env",
+@@ -1237,6 +1254,9 @@ static __init void da850_evm_init(void)
+ 	if (ret)
+ 		pr_warning("da850_evm_init: spi 1 registration failed: %d\n",
+ 				ret);
++
++	if (mtd_has_partitions())
++		register_mtd_user(&da850evm_spi_notifier);
+ }
+ 
+ #ifdef CONFIG_SERIAL_8250_CONSOLE
+-- 
+1.7.1
