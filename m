@@ -1,71 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Jun 2011 22:49:20 +0100
-Subject: [PATCH] ARM: mm: ensure TTBR0 is restored when changing ASID
-	on rollover
-In-Reply-To: <BANLkTi=mUeqrytK=vwx+UxrMEGZvU4=9+g@mail.gmail.com>
-References: <1307443118-11573-1-git-send-email-will.deacon@arm.com>
-	<20110608200106.GA13151@n2100.arm.linux.org.uk>
-	<20110608202323.GA4430@e102144-lin.cambridge.arm.com>
-	<20110608203615.GB13151@n2100.arm.linux.org.uk>
-	<BANLkTi=mUeqrytK=vwx+UxrMEGZvU4=9+g@mail.gmail.com>
-Message-ID: <20110608214920.GE13151@n2100.arm.linux.org.uk>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 8 Jun 2011 14:52:17 -0700
+Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <20110608204127.GC13151@n2100.arm.linux.org.uk>
+References: <BANLkTin7mqqTsosPHbztaPfL7s_TUGT1qg@mail.gmail.com>
+	<20110608142121T.fujita.tomonori@lab.ntt.co.jp>
+	<BANLkTi=FcNncT_6HpvB_6OnQ94f0_sz7Gw@mail.gmail.com>
+	<20110608160844E.fujita.tomonori@lab.ntt.co.jp>
+	<BANLkTikFKr+3Qph+CR40SUV-DCir1v=KBg@mail.gmail.com>
+	<20110608204127.GC13151@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTi=Z7gXjEAPrdkF1x34Y5KzMH67aVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 10:12:23PM +0100, Catalin Marinas wrote:
-> On 8 June 2011 21:36, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> > On Wed, Jun 08, 2011 at 09:23:23PM +0100, Will Deacon wrote:
-> >> On Wed, Jun 08, 2011 at 09:01:06PM +0100, Russell King - ARM Linux wrote:
-> >> > However, these patches are introducing a brand new race between the
-> >> > switch_mm code and the reset_context code.
-> >> >
-> >> > With the new switch_mm() code, we switch TTBR0 to be the same as TTBR1.
-> >> > If we then receive an IPI for reset_context(), we will change TTBR0
-> >> > to point at a set of page tables which don't contain just global mappings.
-> >> >
-> >> > After returning from reset_context(), we will resume switch_mm(), and
-> >> > change the ASID value with the page tables pointing to non-global
-> >> > mappings, violating the whole reason for the switch_mm() change.
-> >>
-> >> Whilst this is a new race condition, it is analagous to the one we have
-> >> already and could be fixed at the same time.
-> >
-> > Ok, I think we should revert the original patches then. ?They were rushed
-> > in during the merge window, and as can be seen, rushing in patches because
-> > we _think_ they're right is never the correct thing to do - we've ended
-> > up with a completely broken situation as stuff now stands.
-> 
-> We rushed a series of patches fixing this but you didn't like the
-> patch disabling interrupts around cpu_switch_mm().
+On Wed, Jun 8, 2011 at 1:41 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Jun 08, 2011 at 01:05:57PM -0700, Dan Williams wrote:
+>> Even if that were the case it would be same situation that the scsi device
+>> driver reports maximum parameters, but the subsystem opts for
+>> something tighter. ?Whether the maximal parameters come from the scsi
+>> device or the dma channel is moot.
+>
+> Except for the small issue that many DMA-engine using devices do not
+> have _any_ DMA capabilities of their own, which means they don't have
+> anything to put in their own struct device's DMA parameters. ?We can't
+> go around making up random insane parameters in the hope that they'll
+> exceed whatever DMA-engine is being used with the device - that's a
+> hack not a solution.
 
-No.  We rushed the entire thing as can be seen due to the "forgotten"
-patch and the submission of it _during_ the merge window.  Clearly
-no one had thought enough about the inter-relationship between the
-patches when deciding that only some of the patches should go in.
-
-That's why there's a big reason to avoid merging any new patches during
-the merge window - it gives time for such things to be found before it
-becomes a problem.
-
-> Please note that the old switch_mm code with reserved ASID is broken
-> on A15 (and not just in theory), hence the need to use reserved TTBR0.
-
-But A15 is not actively supported in mainline yet so that's not a
-decision relevant to what we do with mainline.
-
-> > Let's take out these changes and sort it out properly - not only do we
-> > need to sort out these problems but we should also get rid of the
-> > __ARCH_WANT_INTERRUPTS_ON_CTXSW thing completely. ?I have a patch which
-> > I've only tested on SA-1110 which does this so far, but it needs a little
-> > more work to clean up some stuff.
-> 
-> Even if you get rid of __ARCH_WANT_INTERRUPTS_ON_CTXSW, I would much
-> prefer to use the new switch_mm code as a base rather than going back
-> to the reserved ASID. The simplest way to fix the race condition you
-> mentioned is to also integrate the other patch from Will which
-> disables the interrupts around cpu_switch_mm(). After that we have
-> more time to review the __ARCH_WANT_INTERRUPTS_ON_CTXSW patch.
-
-Once we have the context switching situation sorted for VIVT we can then
-reconsider these patches - their pre-requisits will have been solved by
-way of the VIVT situation being sorted.
+So, I was operating under the assumption that most dmaengine drivers
+would ignore this api, it's just useful to the subset of slave-dma
+consumers that have apriori knowledge that the best answer for the dma
+geometry comes from the channel.  But not sure how we prevent abuse of
+this api for cases where a better answer is available from another
+source, which I think is what Tomonori-san is worried about.
