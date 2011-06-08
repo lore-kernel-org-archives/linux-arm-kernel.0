@@ -1,104 +1,207 @@
-From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Wed, 8 Jun 2011 20:24:49 +0530
-Subject: [PATCH] ARM: S5PV210: Fix build breakage due to renaming of
-	S3C_VA_USB_HSPHY
-In-Reply-To: <BANLkTi=c1p7yxswvymBWS1PQeqW=+weKbQ@mail.gmail.com>
-References: <1307532337-29348-1-git-send-email-thomas.ab@samsung.com>
-	<005501cc25e3$7df601e0$79e205a0$%szyprowski@samsung.com>
-	<BANLkTi=c1p7yxswvymBWS1PQeqW=+weKbQ@mail.gmail.com>
-Message-ID: <BANLkTinP=J07jsprzGO=+hsjMQ9C6_VBcw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 8 Jun 2011 23:02:05 +0800
+Subject: [PATCH] ARM: mxc: convert tzic to use generic irq chip
+In-Reply-To: <1307425656-18040-1-git-send-email-shawn.guo@linaro.org>
+References: <1307425656-18040-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110608150204.GA17370@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8 June 2011 19:43, Kyungmin Park <kmpark@infradead.org> wrote:
-> On Wed, Jun 8, 2011 at 10:53 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
->> Hello,
->>
->> There is already the patch that fixes this issue available on
->> kgene/s5p_fixes_for_linus branch. Please check commit 08115a139 from
->> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
->>
->> On Wednesday, June 08, 2011 1:26 PM Thomas Abraham wrote:
->>
->>> Commit 8f1d169f999fea892c3fcbf5a79ae8525a477572
->>> ("ARM: EXYNOS4: Add usb host phy control") renamed S3C_VA_USB_HSPHY
->>> to S5P_VA_USB_HSPHY in s5p-map.h file. Fix build for S5PV210 platform.
->
-> Hi Thomas & Marek,
+Hi Sascha,
 
-Hi Mr. Park,
+Any comment on this patch?
 
->
-> We lived for long time with mismatch prefix.
-> So how about to clean up the mismatch prefix, S3C_* and S5P_* at this time?
->
-> One method is that it just passes the physical address and driver
-> should ioremap at driver instead of static mapping.
->
-> How do you think?
+[The pengutronix email address was misspelled in the initial posting.]
 
-USB Phy region static mapping could be moved to driver but how do we
-have handle SROMC? There is no particular driver as such for SROMC.
-There are others such as COREPERI_BASE and DMC that do not have any
-driver.
+-- 
+Regards,
+Shawn
 
-And most of the platform data and code are reusable across SoC since
-we use common macros. For example, arch/arm/plat-samsung/dev-hsmmc.c.
-If we use physical address in such cases, we will have to duplicate
-it.
-
-As long as we can reuse s3c prefix for s5p plaforms, probably we
-should continue using them. Any new additions for S5P platforms should
-use the s5p prefix. Or we could arrive at a common consensus and stick
-to it. I prefer not to rename s3c prefixes which are reusable for s5p
-platforms.
-
-Thanks,
-Thomas.
-
->
-> Thank you,
-> Kyungmin Park
->
->>>
->>> Signed-off-by: Thomas Abraham <thomas.ab@samsung.com>
->>> ---
->>> ?arch/arm/mach-s5pv210/cpu.c | ? ?2 +-
->>> ?1 files changed, 1 insertions(+), 1 deletions(-)
->>>
->>> diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
->>> index 61e6c24..b343582 100644
->>> --- a/arch/arm/mach-s5pv210/cpu.c
->>> +++ b/arch/arm/mach-s5pv210/cpu.c
->>> @@ -91,7 +91,7 @@ static struct map_desc s5pv210_iodesc[] __initdata = {
->>> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->>> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->>> ? ? ? }, {
->>> - ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S3C_VA_USB_HSPHY,
->>> + ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S5P_VA_USB_HSPHY,
->>> ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?=__phys_to_pfn(S5PV210_PA_HSPHY),
->>> ? ? ? ? ? ? ? .length ? ? ? ? = SZ_4K,
->>> ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
->>> --
->>> 1.6.6.rc2
->>
->> S3C_VA_USB_HSPHY is the correct name, it is also used on s3c64xx and
->> s3c-hsotg driver (see drivers/usb/gadget).
->>
->> Best regards
->> --
->> Marek Szyprowski
->> Samsung Poland R&D Center
->>
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+On Tue, Jun 07, 2011 at 01:47:36PM +0800, Shawn Guo wrote:
+> The patch converts mxc tzic interrupt controller to use generic irq
+> chip.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+>  arch/arm/Kconfig               |    1 +
+>  arch/arm/plat-mxc/irq-common.c |   13 +++---
+>  arch/arm/plat-mxc/tzic.c       |   97 ++++++++++-----------------------------
+>  3 files changed, 32 insertions(+), 79 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9adc278..3002266 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -376,6 +376,7 @@ config ARCH_MXC
+>  	select ARCH_REQUIRE_GPIOLIB
+>  	select CLKDEV_LOOKUP
+>  	select CLKSRC_MMIO
+> +	select GENERIC_IRQ_CHIP
+>  	select HAVE_SCHED_CLOCK
+>  	help
+>  	  Support for Freescale MXC/iMX-based family of processors
+> diff --git a/arch/arm/plat-mxc/irq-common.c b/arch/arm/plat-mxc/irq-common.c
+> index e1c6eff..96953e2 100644
+> --- a/arch/arm/plat-mxc/irq-common.c
+> +++ b/arch/arm/plat-mxc/irq-common.c
+> @@ -42,17 +42,16 @@ EXPORT_SYMBOL(imx_irq_set_priority);
+>  
+>  int mxc_set_irq_fiq(unsigned int irq, unsigned int type)
+>  {
+> -	struct mxc_irq_chip *chip;
+> -	struct irq_chip *base;
+> +	struct irq_chip_generic *gc;
+> +	int (*set_irq_fiq)(unsigned int, unsigned int);
+>  	int ret;
+>  
+>  	ret = -ENOSYS;
+>  
+> -	base = irq_get_chip(irq);
+> -	if (base) {
+> -		chip = container_of(base, struct mxc_irq_chip, base);
+> -		if (chip->set_irq_fiq)
+> -			ret = chip->set_irq_fiq(irq, type);
+> +	gc = irq_get_chip_data(irq);
+> +	if (gc && gc->private) {
+> +		set_irq_fiq = gc->private;
+> +		ret = set_irq_fiq(irq, type);
+>  	}
+>  
+>  	return ret;
+> diff --git a/arch/arm/plat-mxc/tzic.c b/arch/arm/plat-mxc/tzic.c
+> index 57f9395..d126bba 100644
+> --- a/arch/arm/plat-mxc/tzic.c
+> +++ b/arch/arm/plat-mxc/tzic.c
+> @@ -66,78 +66,34 @@ static int tzic_set_irq_fiq(unsigned int irq, unsigned int type)
+>  
+>  	return 0;
+>  }
+> +#else
+> +#define tzic_set_irq_fiq NULL
+>  #endif
+>  
+> -/**
+> - * tzic_mask_irq() - Disable interrupt source "d" in the TZIC
+> - *
+> - * @param  d            interrupt source
+> - */
+> -static void tzic_mask_irq(struct irq_data *d)
+> -{
+> -	int index, off;
+> -
+> -	index = d->irq >> 5;
+> -	off = d->irq & 0x1F;
+> -	__raw_writel(1 << off, tzic_base + TZIC_ENCLEAR0(index));
+> -}
+> -
+> -/**
+> - * tzic_unmask_irq() - Enable interrupt source "d" in the TZIC
+> - *
+> - * @param  d            interrupt source
+> - */
+> -static void tzic_unmask_irq(struct irq_data *d)
+> -{
+> -	int index, off;
+> -
+> -	index = d->irq >> 5;
+> -	off = d->irq & 0x1F;
+> -	__raw_writel(1 << off, tzic_base + TZIC_ENSET0(index));
+> -}
+> -
+> -static unsigned int wakeup_intr[4];
+> +static unsigned int *wakeup_intr[4];
+>  
+> -/**
+> - * tzic_set_wake_irq() - Set interrupt source "d" in the TZIC as a wake-up source.
+> - *
+> - * @param  d            interrupt source
+> - * @param  enable       enable as wake-up if equal to non-zero
+> - * 			disble as wake-up if equal to zero
+> - *
+> - * @return       This function returns 0 on success.
+> - */
+> -static int tzic_set_wake_irq(struct irq_data *d, unsigned int enable)
+> +static __init void tzic_init_gc(unsigned int irq_start)
+>  {
+> -	unsigned int index, off;
+> -
+> -	index = d->irq >> 5;
+> -	off = d->irq & 0x1F;
+> -
+> -	if (index > 3)
+> -		return -EINVAL;
+> -
+> -	if (enable)
+> -		wakeup_intr[index] |= (1 << off);
+> -	else
+> -		wakeup_intr[index] &= ~(1 << off);
+> -
+> -	return 0;
+> +	struct irq_chip_generic *gc;
+> +	struct irq_chip_type *ct;
+> +	int idx = irq_start >> 5;
+> +
+> +	gc = irq_alloc_generic_chip("tzic", 1, irq_start, tzic_base,
+> +				    handle_level_irq);
+> +	gc->private = tzic_set_irq_fiq;
+> +	gc->wake_enabled = IRQ_MSK(32);
+> +	wakeup_intr[idx] = &gc->wake_active;
+> +
+> +	ct = gc->chip_types;
+> +	ct->chip.irq_mask = irq_gc_mask_disable_reg;
+> +	ct->chip.irq_unmask = irq_gc_unmask_enable_reg;
+> +	ct->chip.irq_set_wake = irq_gc_set_wake;
+> +	ct->regs.disable = TZIC_ENCLEAR0(idx);
+> +	ct->regs.enable = TZIC_ENSET0(idx);
+> +
+> +	irq_setup_generic_chip(gc, IRQ_MSK(32), 0, IRQ_NOREQUEST, 0);
+>  }
+>  
+> -static struct mxc_irq_chip mxc_tzic_chip = {
+> -	.base = {
+> -		.name = "MXC_TZIC",
+> -		.irq_ack = tzic_mask_irq,
+> -		.irq_mask = tzic_mask_irq,
+> -		.irq_unmask = tzic_unmask_irq,
+> -		.irq_set_wake = tzic_set_wake_irq,
+> -	},
+> -#ifdef CONFIG_FIQ
+> -	.set_irq_fiq = tzic_set_irq_fiq,
+> -#endif
+> -};
+> -
+>  /*
+>   * This function initializes the TZIC hardware and disables all the
+>   * interrupts. It registers the interrupt enable and disable functions
+> @@ -166,11 +122,8 @@ void __init tzic_init_irq(void __iomem *irqbase)
+>  
+>  	/* all IRQ no FIQ Warning :: No selection */
+>  
+> -	for (i = 0; i < MXC_INTERNAL_IRQS; i++) {
+> -		irq_set_chip_and_handler(i, &mxc_tzic_chip.base,
+> -					 handle_level_irq);
+> -		set_irq_flags(i, IRQF_VALID);
+> -	}
+> +	for (i = 0; i < MXC_INTERNAL_IRQS; i += 32)
+> +		tzic_init_gc(i);
+>  
+>  #ifdef CONFIG_FIQ
+>  	/* Initialize FIQ */
+> @@ -197,7 +150,7 @@ int tzic_enable_wake(int is_idle)
+>  
+>  	for (i = 0; i < 4; i++) {
+>  		v = is_idle ? __raw_readl(tzic_base + TZIC_ENSET0(i)) :
+> -			wakeup_intr[i];
+> +			*wakeup_intr[i];
+>  		__raw_writel(v, tzic_base + TZIC_WAKEUP0(i));
+>  	}
+>  
+> -- 
+> 1.7.4.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
