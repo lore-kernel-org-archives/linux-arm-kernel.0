@@ -1,36 +1,46 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 8 Jun 2011 09:55:27 +0100
-Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
-In-Reply-To: <BANLkTimwAHdpJbLqqBwEXjqWwg75SciUVw@mail.gmail.com>
-References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
-	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
-	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
-	<20110607081527.GB20929@n2100.arm.linux.org.uk>
-	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
-	<20110607182923.GA28451@n2100.arm.linux.org.uk>
-	<20110607184329.GA20849@sirena.org.uk>
-	<BANLkTikXGpxpyF8kQORqswD5tqNEjtj3dA@mail.gmail.com>
-	<20110607214151.GA7712@opensource.wolfsonmicro.com>
-	<BANLkTimwAHdpJbLqqBwEXjqWwg75SciUVw@mail.gmail.com>
-Message-ID: <20110608085526.GA2828@opensource.wolfsonmicro.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 8 Jun 2011 10:05:01 +0100
+Subject: [PATCH 06/11] ARM: cortex-a5: add HWCAP_VFPv4D16 to proc info
+	structure
+In-Reply-To: <20110607162204.GC12639@e102144-lin.cambridge.arm.com>
+References: <1307379355-13802-1-git-send-email-will.deacon@arm.com>
+	<1307379355-13802-7-git-send-email-will.deacon@arm.com>
+	<20110607161736.GB19855@arm.com>
+	<20110607162204.GC12639@e102144-lin.cambridge.arm.com>
+Message-ID: <20110608090501.GA3595@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 08:21:08AM +0530, Jassi Brar wrote:
-> On Wed, Jun 8, 2011 at 3:11 AM, Mark Brown
+On Tue, Jun 07, 2011 at 05:22:04PM +0100, Will Deacon wrote:
+> On Tue, Jun 07, 2011 at 05:17:36PM +0100, Dave Martin wrote:
+> > On Mon, Jun 06, 2011 at 05:55:50PM +0100, Will Deacon wrote:
+> > > The Cortex-A5 implements VFPv4D16, so add this to the hwcaps for this
+> > > processor.
+> > > 
+> > > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > > ---
+> > >  arch/arm/mm/proc-v7.S |    2 +-
+> > >  1 files changed, 1 insertions(+), 1 deletions(-)
+> > > 
+> > > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+> > > index b22d98d..8eba506 100644
+> > > --- a/arch/arm/mm/proc-v7.S
+> > > +++ b/arch/arm/mm/proc-v7.S
+> > > @@ -466,7 +466,7 @@ cpu_elf_name:
+> > >  __v7_ca5mp_proc_info:
+> > >  	.long	0x410fc050
+> > >  	.long	0xff0ffff0
+> > > -	__v7_proc __v7_ca5mp_setup
+> > > +	__v7_proc __v7_ca5mp_setup, HWCAP_VFPv4D16
+> > 
+> > Is VFPv4 a superset of VFPv3?  If so, should we also include
+> > HWCAP_VFPv3D16 (and what about HWCAP_VFP)?
+> >
+> 
+> Actually, it looks like this shouldn't be declared statically at all, since the
+> kernel have not have VFP support compiled in. Rather, the vfp code will detect
+> the capability and adjust elf_hwcap at runtime.
 
-> > That's fairly unusual, though - usually DMA controllers seem to support
-> > chaining requests before they support circular operation, at which point
-> > unless the hardware is badly misdone you can just chain another buffer,
-> > giving that buffer's worth of time for the CPU to respond.
+Hah, yes, quite right.  My bad.
 
-> While writing PL330 driver, I wasn't able to figure out a way to implement LLI.
-> Please have a look at the PL330 trm and suggest if we can implement it in a
-> generic way without considering them special requests.
-> I know pl080 supports LLI and it's fine.
-
-I'm perfectly prepared to believe that there's poorly designed hardware
-out there (either due to just poor design or deploying a controller in
-an inappropriate application) that requires us to do things in software;
-it's just relatively unusual as users tend to run into issues which
-either can't be resolved or are excessively painful to resolve.
+---Dave
