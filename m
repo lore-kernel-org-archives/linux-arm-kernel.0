@@ -1,67 +1,51 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2011 13:30:28 +0100
-Subject: [Patch v2 06/11] ARM: proc: add proc info for Cortex-A15MP using
-	classic page tables
-In-Reply-To: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
-References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307536233-30089-7-git-send-email-will.deacon@arm.com>
+Date: Wed,  8 Jun 2011 13:30:22 +0100
+Subject: [Patch v2 00/11] Core support for Cortex-A5 and Cortex-A15
+Message-ID: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Multicore implementations of the Cortex-A15 require bit 6 of the
-auxiliary control register to be set in order for cache and TLB
-maintenance operations to be broadcast between CPUs.
+Hi,
 
-This patch adds a new proc_info structure for Cortex-A15, which enables
-the SMP bit during setup and includes the new HWCAP for integer
-division.
+This is version 2 of the patch series originally posted here:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/proc-v7.S |   20 ++++++++++++++++++--
- 1 files changed, 18 insertions(+), 2 deletions(-)
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052141.html
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b22d98d..4937744 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -275,12 +275,18 @@ cpu_resume_l1_flags:
-  */
- __v7_ca5mp_setup:
- __v7_ca9mp_setup:
-+	mov	r10, #(1 << 0)			@ TLB ops broadcasting
-+	b	1f
-+__v7_ca15mp_setup:
-+	mov	r10, #0
-+1:
- #ifdef CONFIG_SMP
- 	ALT_SMP(mrc	p15, 0, r0, c1, c0, 1)
- 	ALT_UP(mov	r0, #(1 << 6))		@ fake it for UP
- 	tst	r0, #(1 << 6)			@ SMP/nAMP mode enabled?
--	orreq	r0, r0, #(1 << 6) | (1 << 0)	@ Enable SMP/nAMP mode and
--	mcreq	p15, 0, r0, c1, c0, 1		@ TLB ops broadcasting
-+	orreq	r0, r0, #(1 << 6)		@ Enable SMP/nAMP mode
-+	orreq	r0, r0, r10			@ Enable CPU-specific SMP bits
-+	mcreq	p15, 0, r0, c1, c0, 1
- #endif
- __v7_setup:
- 	adr	r12, __v7_setup_stack		@ the local stack
-@@ -480,6 +486,16 @@ __v7_ca9mp_proc_info:
- 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
- 
- 	/*
-+	 * ARM Ltd. Cortex A15 processor.
-+	 */
-+	.type	__v7_ca15mp_proc_info, #object
-+__v7_ca15mp_proc_info:
-+	.long	0x410fc0f0
-+	.long	0xff0ffff0
-+	__v7_proc __v7_ca15mp_setup, HWCAP_IDIV
-+	.size	__v7_ca15mp_proc_info, . - __v7_ca15mp_proc_info
-+
-+	/*
- 	 * Match any ARMv7 processor core.
- 	 */
- 	.type	__v7_proc_info, #object
--- 
-1.7.0.4
+Changes from v1 include:
+
+  * Removal of HWCAP_VFPv4D16
+  * Dynamic detection of VFPv4
+  * Updates to hwcap_str array
+  * Some spelling fixes
+
+Tested on Realview-PBX (Cortex-A9) without regressions. Also tested on
+Cortex-A5 (w/ NEON) and Cortex-A15 (w/ NEON).
+
+Feedback welcome.
+
+Will
+
+
+Pawel Moll (2):
+  arm: Convert v7 proc infos into a common macro
+  arm: Add Cortex A5 proc info
+
+Will Deacon (9):
+  ARM: hwcaps: use shifts instead of hardcoded constants
+  ARM: hwcaps: add new HWCAP defines for ARMv7-A
+  ARM: proc: reorder macro parameters for __v7_proc macro
+  ARM: proc: add proc info for Cortex-A15MP using classic page tables
+  ARM: vfp: add VFPv4 capability detection and populate elf_hwcap
+  ARM: perf: remove confusing comment from v7 perf events backend
+  ARM: perf: add PMUv2 common event definitions
+  ARM: perf: add support for the Cortex-A5 PMU
+  ARM: perf: add support for the Cortex-A15 PMU
+
+ arch/arm/include/asm/hwcap.h      |   36 ++--
+ arch/arm/include/asm/perf_event.h |    2 +
+ arch/arm/kernel/perf_event.c      |    6 +
+ arch/arm/kernel/perf_event_v7.c   |  344 ++++++++++++++++++++++++++++++++++--
+ arch/arm/kernel/setup.c           |    4 +
+ arch/arm/mm/proc-v7.S             |   98 ++++++-----
+ arch/arm/vfp/vfpmodule.c          |    6 +-
+ 7 files changed, 413 insertions(+), 83 deletions(-)
