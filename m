@@ -1,185 +1,120 @@
 From: govindraj.raja@ti.com (Govindraj.R)
-Date: Wed, 8 Jun 2011 16:53:03 +0530
-Subject: [PATCH v3 01/12] OMAP2+: UART: Remove certain uart calls from
-	sram_idle
+Date: Wed, 8 Jun 2011 16:53:08 +0530
+Subject: [PATCH v3 06/12] Serial: OMAP2+: Move erratum handling from serial.c
 In-Reply-To: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
 References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-Message-ID: <1307532194-13039-2-git-send-email-govindraj.raja@ti.com>
+Message-ID: <1307532194-13039-7-git-send-email-govindraj.raja@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation to UART runtime conversion. Remove certain uart specific calls
-from sram_idle path in pm24xx/34xx files.
-These func calls will no more be used with upcoming uart runtime design.
+Move the erratum handling mechanism from serial.c to driver file
+and utilise the same func. in driver file.
 
-1.) Removing console lock holding :- Now can be handled with omap-serial file
-    itself.
-2.) omap_uart_can_sleep :- not needed driver can autosuspend based on usage_count
-    and autosuspend delay.
-3.) omap_uart_prepare_suspend :- omap-serial can be taken care with driver
-    suspend/resume hooks.
-4.) Also remove individual uart_prepare/resume calls.
-
+Acked-by: Alan Cox <alan@linux.intel.com>
 Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 ---
- arch/arm/mach-omap2/pm24xx.c             |   19 -------------------
- arch/arm/mach-omap2/pm34xx.c             |   24 ------------------------
- arch/arm/plat-omap/include/plat/serial.h |    6 ------
- 3 files changed, 0 insertions(+), 49 deletions(-)
+ drivers/tty/serial/omap-serial.c |   57 ++++++++++++++++++++++++++++++++++---
+ 1 files changed, 52 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
-index df3ded6..c405bda 100644
---- a/arch/arm/mach-omap2/pm24xx.c
-+++ b/arch/arm/mach-omap2/pm24xx.c
-@@ -132,27 +132,11 @@ static void omap2_enter_full_retention(void)
- 	if (omap_irq_pending())
- 		goto no_sleep;
+diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+index ee94291..2ad8fa0 100644
+--- a/drivers/tty/serial/omap-serial.c
++++ b/drivers/tty/serial/omap-serial.c
+@@ -52,6 +52,7 @@ static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+ static void uart_tx_dma_callback(int lch, u16 ch_status, void *data);
+ static void serial_omap_rx_timeout(unsigned long uart_no);
+ static int serial_omap_start_rxdma(struct uart_omap_port *up);
++static void omap_uart_mdr1_errataset(struct uart_omap_port *up, u8 mdr1);
  
--	/* Block console output in case it is on one of the OMAP UARTs */
--	if (!is_suspending())
--		if (!console_trylock())
--			goto no_sleep;
--
--	omap_uart_prepare_idle(0);
--	omap_uart_prepare_idle(1);
--	omap_uart_prepare_idle(2);
--
- 	/* Jump to SRAM suspend code */
- 	omap2_sram_suspend(sdrc_read_reg(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
- 			   OMAP_SDRC_REGADDR(SDRC_POWER));
- 
--	omap_uart_resume_idle(2);
--	omap_uart_resume_idle(1);
--	omap_uart_resume_idle(0);
--
--	if (!is_suspending())
--		console_unlock();
--
- no_sleep:
- 	if (omap2_pm_debug) {
- 		unsigned long long tmp;
-@@ -267,8 +251,6 @@ static int omap2_can_sleep(void)
+ static inline unsigned int serial_in(struct uart_omap_port *up, int offset)
  {
- 	if (omap2_fclks_active())
- 		return 0;
--	if (!omap_uart_can_sleep())
--		return 0;
- 	if (osc_ck->usecount > 1)
- 		return 0;
- 	if (omap_dma_running())
-@@ -319,7 +301,6 @@ static int omap2_pm_suspend(void)
- 	mir1 = omap_readl(0x480fe0a4);
- 	omap_writel(1 << 5, 0x480fe0ac);
+@@ -807,7 +808,11 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	serial_out(up, UART_MCR, up->mcr);
  
--	omap_uart_prepare_suspend();
- 	omap2_enter_full_retention();
+ 	/* Protocol, Baud Rate, and Interrupt Settings */
+-	serial_out(up, UART_OMAP_MDR1, up->mdr1);
++	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
++		omap_uart_mdr1_errataset(up, up->mdr1);
++	else
++		serial_out(up, UART_OMAP_MDR1, up->mdr1);
++
+ 	serial_out(up, UART_LCR, UART_LCR_CONF_MODE_B);
  
- 	omap_writel(mir1, 0x480fe0a4);
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index c155c9d..ac7b7f8 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -391,18 +391,9 @@ void omap_sram_idle(void)
- 		omap3_enable_io_chain();
- 	}
+ 	up->efr = serial_in(up, UART_EFR);
+@@ -832,7 +837,10 @@ serial_omap_set_termios(struct uart_port *port, struct ktermios *termios,
+ 	else
+ 		up->mdr1 = UART_OMAP_MDR1_16X_MODE;
  
--	/* Block console output in case it is on one of the OMAP UARTs */
--	if (!is_suspending())
--		if (per_next_state < PWRDM_POWER_ON ||
--		    core_next_state < PWRDM_POWER_ON)
--			if (!console_trylock())
--				goto console_still_active;
--
- 	/* PER */
- 	if (per_next_state < PWRDM_POWER_ON) {
- 		per_going_off = (per_next_state == PWRDM_POWER_OFF) ? 1 : 0;
--		omap_uart_prepare_idle(2);
--		omap_uart_prepare_idle(3);
- 		omap2_gpio_prepare_for_idle(per_going_off);
- 		if (per_next_state == PWRDM_POWER_OFF)
- 				omap3_per_save_context();
-@@ -410,8 +401,6 @@ void omap_sram_idle(void)
+-	serial_out(up, UART_OMAP_MDR1, up->mdr1)
++	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
++		omap_uart_mdr1_errataset(up, up->mdr1);
++	else
++		serial_out(up, UART_OMAP_MDR1, up->mdr1);
  
- 	/* CORE */
- 	if (core_next_state < PWRDM_POWER_ON) {
--		omap_uart_prepare_idle(0);
--		omap_uart_prepare_idle(1);
- 		if (core_next_state == PWRDM_POWER_OFF) {
- 			omap3_core_save_context();
- 			omap3_cm_save_context();
-@@ -458,8 +447,6 @@ void omap_sram_idle(void)
- 			omap3_sram_restore_context();
- 			omap2_sms_restore_context();
- 		}
--		omap_uart_resume_idle(0);
--		omap_uart_resume_idle(1);
- 		if (core_next_state == PWRDM_POWER_OFF)
- 			omap2_prm_clear_mod_reg_bits(OMAP3430_AUTO_OFF_MASK,
- 					       OMAP3430_GR_MOD,
-@@ -473,14 +460,8 @@ void omap_sram_idle(void)
- 		omap2_gpio_resume_after_idle();
- 		if (per_prev_state == PWRDM_POWER_OFF)
- 			omap3_per_restore_context();
--		omap_uart_resume_idle(2);
--		omap_uart_resume_idle(3);
- 	}
+ 	/* Hardware Flow Control Configuration */
  
--	if (!is_suspending())
--		console_unlock();
--
--console_still_active:
- 	/* Disable IO-PAD and IO-CHAIN wakeup */
- 	if (omap3_has_io_wakeup() &&
- 	    (per_next_state < PWRDM_POWER_ON ||
-@@ -499,8 +480,6 @@ int omap3_can_sleep(void)
- {
- 	if (!sleep_while_idle)
- 		return 0;
--	if (!omap_uart_can_sleep())
--		return 0;
- 	return 1;
- }
- 
-@@ -549,7 +528,6 @@ static int omap3_pm_suspend(void)
- 			goto restore;
- 	}
- 
--	omap_uart_prepare_suspend();
- 	omap3_intc_suspend();
- 
- 	omap_sram_idle();
-@@ -596,14 +574,12 @@ static int omap3_pm_begin(suspend_state_t state)
- {
- 	disable_hlt();
- 	suspend_state = state;
--	omap_uart_enable_irqs(0);
+@@ -1447,11 +1455,48 @@ static int serial_omap_remove(struct platform_device *dev)
  	return 0;
  }
  
- static void omap3_pm_end(void)
++/*
++ * Work Around for Errata i202 (3430 - 1.12, 3630 - 1.6)
++ * The access to uart register after MDR1 Access
++ * causes UART to corrupt data.
++ *
++ * Need a delay =
++ * 5 L4 clock cycles + 5 UART functional clock cycle (@48MHz = ~0.2uS)
++ * give 10 times as much
++ */
++static void omap_uart_mdr1_errataset(struct uart_omap_port *up, u8 mdr1)
++{
++	u8 timeout = 255;
++
++	serial_out(up, UART_OMAP_MDR1, mdr1);
++	udelay(2);
++	serial_out(up, UART_FCR, up->fcr | UART_FCR_CLEAR_XMIT |
++			UART_FCR_CLEAR_RCVR);
++	/*
++	 * Wait for FIFO to empty: when empty, RX_FIFO_E bit is 0 and
++	 * TX_FIFO_E bit is 1.
++	 */
++	while (UART_LSR_THRE != (serial_in(up, UART_LSR) &
++				(UART_LSR_THRE | UART_LSR_DR))) {
++		timeout--;
++		if (!timeout) {
++			/* Should *never* happen. we warn and carry on */
++			dev_crit(&up->pdev->dev, "Errata i202: timedout %x\n",
++						serial_in(up, UART_LSR));
++			break;
++		}
++		udelay(1);
++	}
++}
++
+ static void omap_uart_restore_context(struct uart_omap_port *up)
  {
- 	suspend_state = PM_SUSPEND_ON;
--	omap_uart_enable_irqs(1);
- 	enable_hlt();
- 	return;
+ 	u16 efr = 0;
+ 
+-	serial_out(up, UART_OMAP_MDR1, up->mdr1);
++	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
++		omap_uart_mdr1_errataset(up, UART_OMAP_MDR1_DISABLE);
++	else
++		serial_out(up, UART_OMAP_MDR1, UART_OMAP_MDR1_DISABLE);
+ 	serial_out(up, UART_LCR, 0xBF); /* Config B mode */
+ 	efr = serial_in(up, UART_EFR);
+ 	serial_out(up, UART_EFR, UART_EFR_ECB);
+@@ -1468,8 +1513,10 @@ static void omap_uart_restore_context(struct uart_omap_port *up)
+ 	serial_out(up, UART_LCR, 0xBF); /* Config B mode */
+ 	serial_out(up, UART_EFR, efr);
+ 	serial_out(up, UART_LCR, up->lcr);
+-	/* UART 16x mode */
+-	serial_out(up, UART_OMAP_MDR1, up->mdr1);
++	if (up->errata & UART_ERRATA_i202_MDR1_ACCESS)
++		omap_uart_mdr1_errataset(up, up->mdr1);
++	else
++		serial_out(up, UART_OMAP_MDR1, up->mdr1);
  }
-diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
-index 2723f91..ab1761a 100644
---- a/arch/arm/plat-omap/include/plat/serial.h
-+++ b/arch/arm/plat-omap/include/plat/serial.h
-@@ -106,12 +106,6 @@ struct omap_board_data;
  
- extern void omap_serial_init(void);
- extern void omap_serial_init_port(struct omap_board_data *bdata);
--extern int omap_uart_can_sleep(void);
--extern void omap_uart_check_wakeup(void);
--extern void omap_uart_prepare_suspend(void);
--extern void omap_uart_prepare_idle(int num);
--extern void omap_uart_resume_idle(int num);
--extern void omap_uart_enable_irqs(int enable);
- #endif
- 
- #endif
+ static int omap_serial_runtime_suspend(struct device *dev)
 -- 
 1.7.0.4
