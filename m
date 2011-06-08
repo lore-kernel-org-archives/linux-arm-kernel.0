@@ -1,112 +1,92 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  8 Jun 2011 13:30:23 +0100
-Subject: [Patch v2 01/11] arm: Convert v7 proc infos into a common macro
+Date: Wed,  8 Jun 2011 13:30:31 +0100
+Subject: [Patch v2 09/11] ARM: perf: add PMUv2 common event definitions
 In-Reply-To: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
 References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307536233-30089-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1307536233-30089-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pawel Moll <pawel.moll@arm.com>
+The PMUv2 specification reserves a number of event encodings
+for common events.
 
-As most of the proc info content is common across all v7
-processors, this patch converts existing A9 and generic v7
-descriptions into a macro (allowing extra flags in future).
+This patch adds these events to the common event enumeration
+in preparation for PMUv2 cores, such as Cortex-A15.
 
-Signed-off-by: Pawel Moll <pawel.moll@arm.com>
+Cc: Jean Pihet <jean.pihet@newoldbits.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/proc-v7.S |   67 +++++++++++++++++-------------------------------
- 1 files changed, 24 insertions(+), 43 deletions(-)
+ arch/arm/kernel/perf_event_v7.c |   35 +++++++++++++++++++++++++----------
+ 1 files changed, 25 insertions(+), 10 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b3b566e..d5245d4 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -436,33 +436,36 @@ cpu_elf_name:
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index 554eba3..01b1145 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -17,17 +17,23 @@
+  */
  
- 	.section ".proc.info.init", #alloc, #execinstr
- 
--	.type   __v7_ca9mp_proc_info, #object
--__v7_ca9mp_proc_info:
--	.long	0x410fc090		@ Required ID value
--	.long	0xff0ffff0		@ Mask for ID
--	ALT_SMP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_SMP)
--	ALT_UP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_UP)
--	.long   PMD_TYPE_SECT | \
--		PMD_SECT_XN | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ
--	W(b)	__v7_ca9mp_setup
-+	/*
-+	 * Standard v7 proc info content
-+	 */
-+.macro __v7_proc initfunc, mm_mmuflags = 0, io_mmuflags = 0, hwcaps = 0
-+	ALT_SMP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
-+			PMD_FLAGS_SMP | \mm_mmuflags)
-+	ALT_UP(.long	PMD_TYPE_SECT | PMD_SECT_AP_WRITE | PMD_SECT_AP_READ | \
-+			PMD_FLAGS_UP | \mm_mmuflags)
-+	.long	PMD_TYPE_SECT | PMD_SECT_XN | PMD_SECT_AP_WRITE | \
-+		PMD_SECT_AP_READ | \io_mmuflags
-+	W(b)	\initfunc
- 	.long	cpu_arch_name
- 	.long	cpu_elf_name
--	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
-+	.long	HWCAP_SWP | HWCAP_HALF | HWCAP_THUMB | HWCAP_FAST_MULT | \
-+		HWCAP_EDSP | HWCAP_TLS | \hwcaps
- 	.long	cpu_v7_name
- 	.long	v7_processor_functions
- 	.long	v7wbi_tlb_fns
- 	.long	v6_user_fns
- 	.long	v7_cache_fns
-+.endm
+ #ifdef CONFIG_CPU_V7
+-/* Common ARMv7 event types */
++/*
++ * Common ARMv7 event types
++ *
++ * Note: An implementation may not be able to count all of these events
++ * but the encodings are considered to be `reserved' in the case that
++ * they are not available.
++ */
+ enum armv7_perf_types {
+ 	ARMV7_PERFCTR_PMNC_SW_INCR		= 0x00,
+ 	ARMV7_PERFCTR_IFETCH_MISS		= 0x01,
+ 	ARMV7_PERFCTR_ITLB_MISS			= 0x02,
+-	ARMV7_PERFCTR_DCACHE_REFILL		= 0x03,
+-	ARMV7_PERFCTR_DCACHE_ACCESS		= 0x04,
++	ARMV7_PERFCTR_DCACHE_REFILL		= 0x03,	/* L1 */
++	ARMV7_PERFCTR_DCACHE_ACCESS		= 0x04,	/* L1 */
+ 	ARMV7_PERFCTR_DTLB_REFILL		= 0x05,
+ 	ARMV7_PERFCTR_DREAD			= 0x06,
+ 	ARMV7_PERFCTR_DWRITE			= 0x07,
+-
++	ARMV7_PERFCTR_INSTR_EXECUTED		= 0x08,
+ 	ARMV7_PERFCTR_EXC_TAKEN			= 0x09,
+ 	ARMV7_PERFCTR_EXC_EXECUTED		= 0x0A,
+ 	ARMV7_PERFCTR_CID_WRITE			= 0x0B,
+@@ -39,21 +45,30 @@ enum armv7_perf_types {
+ 	 */
+ 	ARMV7_PERFCTR_PC_WRITE			= 0x0C,
+ 	ARMV7_PERFCTR_PC_IMM_BRANCH		= 0x0D,
++	ARMV7_PERFCTR_PC_PROC_RETURN		= 0x0E,
+ 	ARMV7_PERFCTR_UNALIGNED_ACCESS		= 0x0F,
 +
-+	/*
-+	 * ARM Ltd. Cortex A9 processor.
-+	 */
-+	.type   __v7_ca9mp_proc_info, #object
-+__v7_ca9mp_proc_info:
-+	.long	0x410fc090
-+	.long	0xff0ffff0
-+	__v7_proc __v7_ca9mp_setup
- 	.size	__v7_ca9mp_proc_info, . - __v7_ca9mp_proc_info
++	/* These events are defined by the PMUv2 supplement (ARM DDI 0457A). */
+ 	ARMV7_PERFCTR_PC_BRANCH_MIS_PRED	= 0x10,
+ 	ARMV7_PERFCTR_CLOCK_CYCLES		= 0x11,
+-
+-	ARMV7_PERFCTR_PC_BRANCH_MIS_USED	= 0x12,
++	ARMV7_PERFCTR_PC_BRANCH_PRED		= 0x12,
++	ARMV7_PERFCTR_MEM_ACCESS		= 0x13,
++	ARMV7_PERFCTR_L1_ICACHE_ACCESS		= 0x14,
++	ARMV7_PERFCTR_L1_DCACHE_WB		= 0x15,
++	ARMV7_PERFCTR_L2_DCACHE_ACCESS		= 0x16,
++	ARMV7_PERFCTR_L2_DCACHE_REFILL		= 0x17,
++	ARMV7_PERFCTR_L2_DCACHE_WB		= 0x18,
++	ARMV7_PERFCTR_BUS_ACCESS		= 0x19,
++	ARMV7_PERFCTR_MEMORY_ERROR		= 0x1A,
++	ARMV7_PERFCTR_INSTR_SPEC		= 0x1B,
++	ARMV7_PERFCTR_TTBR_WRITE		= 0x1C,
++	ARMV7_PERFCTR_BUS_CYCLES		= 0x1D,
  
- 	/*
-@@ -472,27 +475,5 @@ __v7_ca9mp_proc_info:
- __v7_proc_info:
- 	.long	0x000f0000		@ Required ID value
- 	.long	0x000f0000		@ Mask for ID
--	ALT_SMP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_SMP)
--	ALT_UP(.long \
--		PMD_TYPE_SECT | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ | \
--		PMD_FLAGS_UP)
--	.long   PMD_TYPE_SECT | \
--		PMD_SECT_XN | \
--		PMD_SECT_AP_WRITE | \
--		PMD_SECT_AP_READ
--	W(b)	__v7_setup
--	.long	cpu_arch_name
--	.long	cpu_elf_name
--	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP|HWCAP_TLS
--	.long	cpu_v7_name
--	.long	v7_processor_functions
--	.long	v7wbi_tlb_fns
--	.long	v6_user_fns
--	.long	v7_cache_fns
-+	__v7_proc __v7_setup
- 	.size	__v7_proc_info, . - __v7_proc_info
+ 	ARMV7_PERFCTR_CPU_CYCLES		= 0xFF
+ };
+ 
+ /* ARMv7 Cortex-A8 specific event types */
+ enum armv7_a8_perf_types {
+-	ARMV7_PERFCTR_INSTR_EXECUTED		= 0x08,
+-
+-	ARMV7_PERFCTR_PC_PROC_RETURN		= 0x0E,
+-
+ 	ARMV7_PERFCTR_WRITE_BUFFER_FULL		= 0x40,
+ 	ARMV7_PERFCTR_L2_STORE_MERGED		= 0x41,
+ 	ARMV7_PERFCTR_L2_STORE_BUFF		= 0x42,
 -- 
 1.7.0.4
