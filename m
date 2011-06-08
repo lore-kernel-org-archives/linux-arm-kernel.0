@@ -1,93 +1,40 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 8 Jun 2011 22:30:22 +0200
-Subject: [PATCH V1] mmc: Enable the ADMA on esdhc imx driver
-In-Reply-To: <1307503005-3969-1-git-send-email-richard.zhu@linaro.org>
-References: <1307503005-3969-1-git-send-email-richard.zhu@linaro.org>
-Message-ID: <20110608203022.GC21996@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 8 Jun 2011 21:36:15 +0100
+Subject: [PATCH] ARM: mm: ensure TTBR0 is restored when changing ASID
+	on rollover
+In-Reply-To: <20110608202323.GA4430@e102144-lin.cambridge.arm.com>
+References: <1307443118-11573-1-git-send-email-will.deacon@arm.com>
+	<20110608200106.GA13151@n2100.arm.linux.org.uk>
+	<20110608202323.GA4430@e102144-lin.cambridge.arm.com>
+Message-ID: <20110608203615.GB13151@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 11:16:45AM +0800, Richard Zhu wrote:
-> Eanble the ADMA2 mode on freescale esdhc imx driver,
-> tested on MX51 and MX53.
-
-What does the new, vendor specific bit in the interrupt register cover what the
-old ADMA_ERROR bit did not cover? And is the old one the same as in mx25, so
-the new bit can be seen as the fixup which makes ADMA work only on mx51/53?
-
-Information like this should be added to the define, so people will clearly
-know later.
-
+On Wed, Jun 08, 2011 at 09:23:23PM +0100, Will Deacon wrote:
+> On Wed, Jun 08, 2011 at 09:01:06PM +0100, Russell King - ARM Linux wrote:
+> > However, these patches are introducing a brand new race between the
+> > switch_mm code and the reset_context code.
+> > 
+> > With the new switch_mm() code, we switch TTBR0 to be the same as TTBR1.
+> > If we then receive an IPI for reset_context(), we will change TTBR0
+> > to point at a set of page tables which don't contain just global mappings.
+> > 
+> > After returning from reset_context(), we will resume switch_mm(), and
+> > change the ASID value with the page tables pointing to non-global
+> > mappings, violating the whole reason for the switch_mm() change.
 > 
-> Only ADMA2 mode is enabled, MX25/35 can't support the ADMA2 mode.
-> So this patch is only used for MX51/53.
-> The ADMA2 mode supported or not can be distinguished by the
-> Capability Register(offset 0x40) of eSDHC module.
-> Up to now, only MX51/MX53 set the ADMA2 supported bit(Bit20) in the
-> Capability Register.
-> 
-> Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
-> ---
->  drivers/mmc/host/sdhci-esdhc-imx.c |   36 +++++++++++++++++++++++++++++++-----
->  1 files changed, 31 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-> index a19967d..8015e1a 100644
-> --- a/drivers/mmc/host/sdhci-esdhc-imx.c
-> +++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-> @@ -31,6 +31,8 @@
->  #define SDHCI_VENDOR_SPEC		0xC0
->  #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
->  
-> +#define  SDHCI_SPEC_INT_ADMA_ERR	0x10000000
+> Whilst this is a new race condition, it is analagous to the one we have
+> already and could be fixed at the same time.
 
-There is no register SDHCI_SPEC_*. I'd suggest
-"SDHCI_INT_VENDOR_SPEC_ADMA_ERROR".
+Ok, I think we should revert the original patches then.  They were rushed
+in during the merge window, and as can be seen, rushing in patches because
+we _think_ they're right is never the correct thing to do - we've ended
+up with a completely broken situation as stuff now stands.
 
-> +	if (unlikely(reg == SDHCI_CAPABILITIES)) {
-> +		if (val & SDHCI_CAN_DO_ADMA1) {
-> +			val &= ~SDHCI_CAN_DO_ADMA1;
-> +			val |= SDHCI_CAN_DO_ADMA2;
+Let's take out these changes and sort it out properly - not only do we
+need to sort out these problems but we should also get rid of the
+__ARCH_WANT_INTERRUPTS_ON_CTXSW thing completely.  I have a patch which
+I've only tested on SA-1110 which does this so far, but it needs a little
+more work to clean up some stuff.
 
-Why is this needed? Above you say, MX51/53 has ADMA2 bit already set?
-And you would set ADMA2 for mx25/35 now?
-
-> @@ -154,7 +177,7 @@ static void esdhc_writew_le(struct sdhci_host *host, u16 val, int reg)
->  
->  static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
->  {
-> -	u32 new_val;
-> +	u16 new_val;
-
-Why? esdhc_clrset_le wants a u32.
-
->  
->  	switch (reg) {
->  	case SDHCI_POWER_CONTROL:
-> @@ -168,10 +191,12 @@ static void esdhc_writeb_le(struct sdhci_host *host, u8 val, int reg)
->  		new_val = val & (SDHCI_CTRL_LED | SDHCI_CTRL_4BITBUS);
->  		/* ensure the endianess */
->  		new_val |= ESDHC_HOST_CONTROL_LE;
-> -		/* DMA mode bits are shifted */
-> -		new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-> +		if (val & SDHCI_CTRL_DMA_MASK)
-> +			/* DMA mode bits are shifted */
-> +			new_val |= (val & SDHCI_CTRL_DMA_MASK) << 5;
-
-I think the if doesn't save much than just doing this simple operation; it also
-adds another line and level of indentation.
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110608/c4fceae5/attachment.sig>
+So, we're weren't - and still aren't - ready for any of these changes.
