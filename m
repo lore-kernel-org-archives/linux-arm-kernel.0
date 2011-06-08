@@ -1,46 +1,33 @@
-From: zhangfei.gao@gmail.com (zhangfei gao)
-Date: Wed, 8 Jun 2011 14:08:33 +0800
-Subject: [PATCH v2 1/3] mmc: support sdhci-mmp2
-In-Reply-To: <6B2AC372-8A17-41B9-AA5F-BBE5189D17C4@marvell.com>
-References: <1306315367-15602-1-git-send-email-zhangfei.gao@marvell.com>
-	<201105271746.04775.arnd@arndb.de>
-	<BANLkTi=S=Q+AdKECCHg2u6X=VWEOtEox_w@mail.gmail.com>
-	<86F2B225-A55D-41D9-B805-41C639C1882C@marvell.com>
-	<BANLkTinTKV3DwVdi8p-BYCZ4ON_ce4T74g@mail.gmail.com>
-	<6B2AC372-8A17-41B9-AA5F-BBE5189D17C4@marvell.com>
-Message-ID: <BANLkTi=DOHLt1uv-Oz=qnQCE-qmNAVahcg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Jun 2011 08:16:00 +0200
+Subject: [RFC PATCH v3 2/2] dt: add custom device creation to platform bus
+	scan
+In-Reply-To: <4DEEE8AF.50603@gmail.com>
+References: <1306359073-16274-1-git-send-email-robherring2@gmail.com>
+	<201106012329.20651.arnd@arndb.de> <4DEEE8AF.50603@gmail.com>
+Message-ID: <201106080816.00565.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>
->> This method is used in v1,
->> The method makes sdhci_ops non-const and have to dynamically alloc
->> sdhci_ops, since host->ops is pointer.
->> Will keep use const sdhci_ops, recommended by Arnd.
+On Wednesday 08 June 2011 05:12:47 Rob Herring wrote:
+> The simplest solutions are usually the best. With that, the 2nd patch 
+> becomes:
 >
->
-> Not acceptable.
->
->
-> There are ?3 cases for ?WP signal
->
-> a) They are connected to the controller using GPIO
-> b( They are NOT connected and the corresponding ?pin is not used
-> c) They are NOT connected and the corresponding ?pin is used by something else.
->
-> case a)
-> ? ? ? ?program GPIO as is done today in brownstone and aspen
->
-> case b)
-> ? ? ? ?configure the MFP pin to be pull high/low to indicate NO WP. ?The pin cannot be left floating
+>   static int of_dev_node_match(struct device *dev, void *data)
+>   {
+> @@ -234,6 +235,11 @@ static int of_platform_bus_create(struct 
+> device_node *bus,
+>                  return 0;
+>          }
+> 
+> +       if (of_device_is_compatible(bus, "arm,amba-device")) {
+> +               of_amba_device_create(bus, parent);
+> +               return 0;
+> +       }
+> +
 
-Thanks, configure WP pin to LOW should be work for micro sd card.
->
-> case c)
-> ? ? ? ?you need a quirk and the call back.
->
->
->
->
->
->
+Sounds good to me, just remind me what of_amba_device_create does when
+amba is disabled. I guess it should do nothing in that case, there
+can be no amba drivers loaded, so the device is clearly not needed.
+
+	Arnd
