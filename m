@@ -1,71 +1,18 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 8 Jun 2011 20:53:23 +0200
-Subject: ARM: 6910/1: MTD: physmap: let set_vpp() pass a platform_device
-	instead of a map_info
-In-Reply-To: <201105240059.p4O0xPfN009516@hera.kernel.org>
-References: <201105240059.p4O0xPfN009516@hera.kernel.org>
-Message-ID: <BANLkTim1=DBd1AvPw1VuPfGi_Z5ktAhyPg@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 8 Jun 2011 22:35:22 +0300
+Subject: [PATCH 4/4] x86: intel-iommu: move to drivers/iommu/
+In-Reply-To: <20110608174734.GF23047@sequoia.sous-sol.org>
+References: <1307522062-19273-1-git-send-email-ohad@wizery.com>
+	<1307522062-19273-5-git-send-email-ohad@wizery.com>
+	<20110608174734.GF23047@sequoia.sous-sol.org>
+Message-ID: <BANLkTinu4hCk3PqXL6dA3JUqCX-BPwg3wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 24, 2011 at 02:59, Linux Kernel Mailing List
-<linux-kernel@vger.kernel.org> wrote:
-> ? ?ARM: 6910/1: MTD: physmap: let set_vpp() pass a platform_device instead of a map_info
+On Wed, Jun 8, 2011 at 8:47 PM, Chris Wright <chrisw@sous-sol.org> wrote:
+> You may want to further restrict to x86 and ia64
+> And I think you'll need to fixup arch/ia64/Kconfig
 >
-> ? ?The set_vpp() method provided by physmap passes a map_info back to
-> ? ?the platform code, which has little relevance as far as the platform
-> ? ?is concerned (this parameter is completely unused).
->
-> ? ?Instead, pass the platform_device, which can be used in the pismo
-> ? ?driver to retrieve some important information in a nicer way, instead
-> ? ?of the hack that was in place.
->
-> ? ?The empty set_vpp function in board-at572d940hf_ek.c is left untouched,
-> ? ?as the board/SoC is scheduled for removal.
->
-> ? ?Cc: Andrew Victor <linux@maxim.org.za>
-> ? ?Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ? ?Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> ? ?Cc: Philipp Zabel <philipp.zabel@gmail.com>
-> ? ?Cc: Eric Miao <eric.y.miao@gmail.com>
-> ? ?Cc: Ben Dooks <ben-linux@fluff.org>
-> ? ?Acked-by: Artem Bityutskiy <Artem.Bityutskiy@nokia.com>
-> ? ?Acked-by: David Woodhouse <dwmw2@infradead.org>
-> ? ?Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ? ?Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> BTW, I think EXPERIMENTAL can be dropped by now.
 
-> --- a/include/linux/mtd/physmap.h
-> +++ b/include/linux/mtd/physmap.h
-> @@ -24,7 +24,7 @@ struct physmap_flash_data {
-> ? ? ? ?unsigned int ? ? ? ? ? ?width;
-> ? ? ? ?int ? ? ? ? ? ? ? ? ? ? (*init)(struct platform_device *);
-> ? ? ? ?void ? ? ? ? ? ? ? ? ? ?(*exit)(struct platform_device *);
-> - ? ? ? void ? ? ? ? ? ? ? ? ? ?(*set_vpp)(struct map_info *, int);
-> + ? ? ? void ? ? ? ? ? ? ? ? ? ?(*set_vpp)(struct platform_device *, int);
-> ? ? ? ?unsigned int ? ? ? ? ? ?nr_parts;
-> ? ? ? ?unsigned int ? ? ? ? ? ?pfow_base;
-> ? ? ? ?char ? ? ? ? ? ? ? ? ? ?*probe_type;
-
-You forgot to update the set_vpp parameter of physmap_configure():
-
-void physmap_configure(unsigned long addr, unsigned long size,
-                int bankwidth, void (*set_vpp)(struct map_info *, int) );
-
-causing
-
-drivers/mtd/maps/physmap.c: In function ?physmap_configure?:
-drivers/mtd/maps/physmap.c:255: warning: assignment from incompatible
-pointer type
-
-Interestingly, there are no (in-tree) users of physmap_configure()?
-
-Gr{oetje,eeting}s,
-
-? ? ? ? ? ? ? ? ? ? ? ? Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+Sounds all good, thanks a lot !
