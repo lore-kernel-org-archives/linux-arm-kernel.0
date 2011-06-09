@@ -1,29 +1,61 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 9 Jun 2011 20:28:49 +0100
-Subject: ARM/DT: registering clks from DT in .init_early
-In-Reply-To: <20110609164557.GK3711@pulham.picochip.com>
-References: <20110609164557.GK3711@pulham.picochip.com>
-Message-ID: <20110609192849.GL3711@pulham.picochip.com>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Thu, 9 Jun 2011 22:50:52 +0300
+Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F381FC56CE@AUSP01VMBX24.collaborationhost.net>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+	<20110605083445.GT16318@ibawizard.net>
+	<20110605085948.GB16018@acer>
+	<20110605.140801.1144137337172959622.davem@davemloft.net>
+	<20110606172607.GB3082@acer>
+	<ADE657CA350FB648AAC2C43247A983F001F381FC56CE@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <20110609195052.GB2857@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 05:45:57PM +0100, Jamie Iles wrote:
-> I'm currently working on moving our platform to device tree with the aim 
-> of mainlining it.  Before device tree we registered the clks in the 
-> .init_early machine callback which is fine as the clks are static data.  
-> I'm now trying to dynamically register these clks from the device tree 
-> but the slab allocator isn't available at this stage so I can't allocate 
-> them dynamically.
+(corrected Ryan's email address, added Florian Fainelli)
+
+On Mon, Jun 06, 2011 at 12:48:19PM -0500, H Hartley Sweeten wrote:
+> On Monday, June 06, 2011 10:26 AM, Mika Westerberg wrote:
+> > On Sun, Jun 05, 2011 at 02:08:01PM -0700, David Miller wrote:
+> >> From: Mika Westerberg <mika.westerberg@iki.fi>
+> >> Date: Sun, 5 Jun 2011 11:59:48 +0300
+> >> 
+> >>> It looks like David Miller (CC'd) has been taking care of ep93xx_eth.c maybe
+> >>> he knows this better.
+> >> 
+> >> Someone needs to step up and take over as the real maintainer of this
+> >> driver.  The way the driver is currently being hacked on is
+> >> unsustainable.
+> >
+> > Can't agree more.
+> >
+> > Hartley, Ryan: do you have any preferences? Are you guys already overwhelmed
+> > with your current maintenance work, or could you consider taking this one as
+> > well? 
+> >
+> > If no one else steps up, I can volunteer but I have to admit that I don't know
+> > much about that driver.
 > 
-> Am I heading in the wrong direction here?  We currently get the 
-> clocksource and clock event frequency from a clk so I don't think this 
-> can be made later (though I guess this could come from device tree 
-> instead).
+> I feel the same way.
+> 
+> If Lennert is no longer maintaining the this driver we really need someone to
+> step up and handle it.
+> 
+> I have no problem doing it but I really don't have a good grasp on the driver
+> or the whole network subsystem.
+> 
+> If Lennert is willing to hand it over, I have no problem being listed as a
+> co-maintainer along with either yourself of Ryan.  Between the two (or three)
+> of us we should be able to handle it.
 
-OK, I found http://permalink.gmane.org/gmane.linux.ports.arm.kernel/105261
-which describes the issue.  I've changed to alloc_bootmem() which Grant 
-suggested in that thread and that does resolve the crash, however 
-of_clk_add_provider() uses kzalloc() and I can't help but feel that it's 
-going to get a bit too messy doing it this way.
+Hartley,
 
-Jamie
+Can you take maintainership of this driver? Since you already maintain most of
+the ep93xx core stuff I think that you are the right person for the job. If
+you need any assistance I believe me and Ryan can help you out.
+
+We have now few patches queued:
+	- this series from me to fix the DMA API violations
+	- phylib patches from Florian Fainelli
+
+It would be great to get those in someday :-)
