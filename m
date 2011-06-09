@@ -1,190 +1,111 @@
-From: sundaram@ti.com (Raju, Sundaram)
-Date: Thu, 9 Jun 2011 21:31:56 +0530
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <20110609124723.GA24636@n2100.arm.linux.org.uk>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 9 Jun 2011 17:11:13 +0100
+Subject: [PATCH v2 04/10] ARM: lib: add switch_stack function for safely
+	changing stack
+In-Reply-To: <1307635142-11312-5-git-send-email-will.deacon@arm.com>
+References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
+	<1307635142-11312-5-git-send-email-will.deacon@arm.com>
+Message-ID: <20110609161113.GA29954@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here it is, with proper line wrapping;
+On Thu, Jun 09, 2011 at 04:58:56PM +0100, Will Deacon wrote:
+> When disabling the MMU, it is necessary to take out a 1:1 identity map
+> of the reset code so that it can safely be executed with and without
+> the MMU active. To avoid the situation where the physical address of the
+> reset code aliases with the virtual address of the active stack (which
+> cannot be included in the 1:1 mapping), it is desirable to change to a
+> new stack at a location which is less likely to alias.
+> 
+> This code adds a new lib function, switch_stack:
+> 
+> void switch_stack(void (*fn)(void *), void *arg, void *sp);
+> 
+> which changes the stack to point at the sp parameter, before invoking
+> fn(arg) with the new stack selected.
+> 
+> Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/lib/Makefile       |    3 +-
+>  arch/arm/lib/switch_stack.S |   44 +++++++++++++++++++++++++++++++++++++++++++
+>  2 files changed, 46 insertions(+), 1 deletions(-)
+>  create mode 100644 arch/arm/lib/switch_stack.S
+> 
+> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+> index 59ff42d..5fa67de 100644
+> --- a/arch/arm/lib/Makefile
+> +++ b/arch/arm/lib/Makefile
+> @@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+>  		   testchangebit.o testclearbit.o testsetbit.o        \
+>  		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
+>  		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
+> -		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
+> +		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
+> +		   switch_stack.o
+>  
+>  mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+>  
+> diff --git a/arch/arm/lib/switch_stack.S b/arch/arm/lib/switch_stack.S
+> new file mode 100644
+> index 0000000..76e3844
+> --- /dev/null
+> +++ b/arch/arm/lib/switch_stack.S
+> @@ -0,0 +1,44 @@
+> +/*
+> + * arch/arm/lib/switch_stack.S
+> + *
+> + * Copyright (C) 2011 ARM Ltd.
+> + * Written by Will Deacon <will.deacon@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program; if not, write to the Free Software
+> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> + */
+> +
+> +#include <linux/linkage.h>
+> +#include <asm/assembler.h>
+> +
+> +/*
+> + * void switch_stack(void (*fn)(void *), void *arg, void *sp)
+> + *
+> + * Change the stack to that pointed at by sp, then invoke fn(arg) with
+> + * the new stack.
+> + */
+> +ENTRY(switch_stack)
+> +	str	sp, [r2, #-4]!
+> +	str	lr, [r2, #-4]!
+> +
+> +	mov	sp, r2
+> +	mov	r2, r0
+> +	mov	r0, r1
+> +
+> +	adr	lr, BSYM(1f)
+> +	mov	pc, r2
+> +
+> +1:	ldr	lr, [sp, #4]
 
-SDMA and EDMA are TI SoC specific DMA controllers. Their drivers have 
-been maintained in the respective SoC folders till now.
-arch/arm/plat-omap/dma.c
-arch/arm/mach-davinci/dma.c
+Looks like this should be
 
-I have gone through the existing offload engine (DMA) drivers in 
-drivers/dma which do slave transfers.
-I would like to move SDMA and EDMA also to dmaengine framework.
+	ldr	lr, [sp, #4]!
 
-I believe that even though the dmaengine framework addresses and 
-supports most of the required use cases of a client driver to a DMA 
-controller, some extensions are required in it to make it still more 
-generic.
+...otherwise we'll also load the lr value into sp.
+Looks like that may have been my mistake.
 
-Current framework contains two APIs to prepare for slave transfers: 
+---Dave
 
-struct dma_async_tx_descriptor *(*device_prep_slave_sg)(
-		struct dma_chan *chan, struct scatterlist *sgl,
-		unsigned int sg_len, enum dma_data_direction direction,
-		unsigned long flags);
-
-struct dma_async_tx_descriptor *(*device_prep_dma_cyclic)(
-		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-		size_t period_len, enum dma_data_direction direction);
-
-and one control API. 
-int (*device_control)(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
-		unsigned long arg);
-
-A simple single buffer transfer (i.e. non sg transfer) can be done only
-as a trivial case of the device_prep_slave_sg API. The client driver is
-expected to prepare a sg list and provide to the dmaengine API for that
-single buffer also.
-
-In a slave transfer, the client has to define all the buffer related 
-attributes and the peripheral related attributes. 
-
-The above 2 APIs in the dmaengine framework expect all the 
-peripheral/slave related attributes to be filled in the 
-dma_slave_config data structure. 
-struct dma_slave_config {
-        enum dma_data_direction direction;
-        dma_addr_t src_addr;
-        dma_addr_t dst_addr;
-        enum dma_slave_buswidth src_addr_width;
-        enum dma_slave_buswidth dst_addr_width;
-        u32 src_maxburst;
-        u32 dst_maxburst;
-};
-
-This data structure is passed to the offload engine via the dma_chan 
-data structure in its private pointer.
-
-Now coming to the buffer related attributes, sg list is a nice way to 
-represent a disjoint buffer; all the offload engines in drivers/dma 
-create a descriptor for each of the contiguous chunk in the sg list 
-buffer and pass it to the controller. 
-
-But many a times a client may want to transfer from a single buffer to
-the peripheral and most of the DMA controllers have the capability to 
-transfer data in chunks/frames directly at a stretch. 
-All the attributes of a buffer, which are required for the transfer 
-can be programmed in single descriptor and submitted to the 
-DMA controller. 
-
-So I think the slave transfer API must also have a provision to pass 
-the buffer configuration. The buffer attributes have to be passed 
-directly as an argument in the prepare API, unlike dma_slave_config 
-as they will be different for each buffer that is going to be 
-transferred. 
-
-It is a stretch and impractical to use a highly segmented buffer (like
-the one described below) in a sglist. This is because sg list itself 
-is a representation of a disjoint buffer collection in terms of 
-smaller buffers. Now then each of these smaller buffers can have 
-different buffer configurations (like described below) and we are not 
-going to go down that road now. 
-
-Hence it makes sense to pass these buffer attributes for only a single
-buffer transfer and not a sg list. 
-This can be done by OPTION #1 
-1. Adding a pointer of the dma_buffer_config data structure in the 
-device_prep_slave_sg API.
-2. Ensuring that it will be ignored if a sg list passed. 
-Only when a single buffer is passed (in the sg list) then this buffer 
-configuration will be used.
-3. Any client that wants to do a sg transfer can simply ignore this 
-buffer configuration and pass NULL.
-The main disadvantage of this option is that all the existing drivers 
-need to be updated since the API signature is changed.
-
-It might even be better to have a separate API for non sg transfers.
-This is OPTION #2 
-Advantages of this option are 
-1. No change required in the existing drivers that use 
-device_prep_slave_sg API. 
-2. If any offload engine wants to prepare a simple buffer transfer 
-differently and not as a trivial case of a sg list, 
-this will be useful. 
-I know this can be done using 2 different implementations inside the 
-device_prep_slave_sg itself, but I think it's cleaner to have 
-different APIs. I have provided the generic buffer configuration 
-I can think of, here and also a new API definition, 
-if it makes sense to have one. This buffer configuration might not 
-be completely generic, and hence I ask all of you to please provide 
-comments to improve it. 
-
-Generic buffer description: 
-A generic buffer can be split into number of frames which contain 
-number of chunks inside them. The frames need not be contiguous, 
-nor do the chunks inside a frame. 
-
--------------------------------------------------------------------
- | Chunk 0 |ICG| Chunk 1 |ICG| ... |ICG| Chunk n | Frame 0 
--------------------------------------------------------------------
- |		Inter Frame Gap			     | 
--------------------------------------------------------------------
- | Chunk 0 |ICG| Chunk 1 |ICG| ... |ICG| Chunk n | Frame 1 
--------------------------------------------------------------------
- |		Inter Frame Gap			     | 
--------------------------------------------------------------------
- |		........					     | 
--------------------------------------------------------------------
- |		Inter Frame Gap			     | 
--------------------------------------------------------------------
- | Chunk 0 |ICG| Chunk 1 |ICG| ... |ICG| Chunk n | Frame m 
--------------------------------------------------------------------
-
-Note: ICG = Inter Chunk Gap.
-
-struct dma_buffer_config {
-	u32 chunk_size; /* number of bytes in a chunk */
-	u32 frame_size; /* number of chunks in a frame */
-	/* u32 n_frames; number of frames in the buffer */
-	u32 inter_chunk_gap; /* number of bytes between end of a chunk 
-				and the start of the next chunk */ 
-	u32 inter_frame_gap; /* number of bytes between end of a frame 
-				and the start of the next frame */ 
-	bool sync_rate; /* 0 - a sync event is required from the 
-				peripheral to transfer a chunk 
-			1 - a sync event is required from the 
-				peripheral to transfer a frame */ 
-};
-
-The patch to add a new API for single buffer transfers alone: 
-diff --git a/include/linux/dmaengine.h b/include/linux/dmaengine.h
-@@ -491,6 +492,10 @@ struct dma_device {
-		struct dma_chan *chan, struct scatterlist *sgl,
-		unsigned int sg_len, enum dma_data_direction direction,
-		unsigned long flags);
-+	struct dma_async_tx_descriptor *(*device_prep_slave)(
-+		struct dma_chan *chan, dma_addr_t buf_addr,
-+		unsigned int buf_len, void *buf_prop,
-+		enum dma_data_direction direction, unsigned long flags);
-	struct dma_async_tx_descriptor *(*device_prep_dma_cyclic)(
-		struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
-		size_t period_len, enum dma_data_direction direction);
-
-The number of frames (n_frames) can always be determined using all 
-other values in the dma_buffer_config along with the 
-buffer length (buf_len) passed in the API. 
-n_frames = buf_len / (chunk_sixe * frame_size); 
-
-Regards, 
-Sundaram
-
------Original Message-----
-From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-Sent: Thursday, June 09, 2011 6:17 PM
-To: Raju, Sundaram
-Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; davinci-linux-open-source at linux.davincidsp.com; linux-omap at vger.kernel.org
-Subject: Re: [RFC] dmaengine: add new api for preparing simple slave transfer
-
-Can you please re-post with sensible wrapping at or before column 72.
-I'm not manually reformatting your entire message just so I can find
-the relevant bits to reply to.
-
-Thanks.
+> +	ldr	sp, [sp]
+> +	mov	pc, lr
+> +ENDPROC(switch_stack)
+> -- 
+> 1.7.0.4
+> 
