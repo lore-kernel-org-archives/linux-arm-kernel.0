@@ -1,73 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jun 2011 22:59:39 +0100
-Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
-In-Reply-To: <4DEF7CA1.8080809@stericsson.com>
-References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
-	<20110602094622.GS3660@n2100.arm.linux.org.uk>
-	<4DE7637B.3060901@stericsson.com>
-	<20110602110137.GU3660@n2100.arm.linux.org.uk>
-	<4DE77D9A.6090301@stericsson.com> <4DE788B2.5060308@ti.com>
-	<1307040455.11492.52.camel@work-vm>
-	<4DEF7CA1.8080809@stericsson.com>
-Message-ID: <20110609215939.GI24424@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 09 Jun 2011 15:16:09 -0700
+Subject: [PATCH] ARM: EXYNOS4: Fix incorrect mapping of gpio pull-up macro
+	to register setting
+In-Reply-To: <20110607171030.GE17754@ponder.secretlab.ca>
+References: <1307435689-15954-1-git-send-email-thomas.ab@samsung.com>
+	<BANLkTi=YeOyK1WX61NtyprYdUyNmSo1sTw@mail.gmail.com>
+	<20110607171030.GE17754@ponder.secretlab.ca>
+Message-ID: <4DF14629.1070307@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 03:44:01PM +0200, Mattias Wallin wrote:
-> On 06/02/2011 08:47 PM, john stultz wrote:
->> Yea. The basic idea is to interpolate between two counters to produce a
->> a continuous clocksource for the timekeeping core.
->>
->> As Russell pointed out, error is injected to the timekeeping code every
->> time you switch between clocksources or the persistent clock. Doing this
->> very frequently will provide very poor time.
->>
->> So by using an interpolated clocksource, we would be able to maintain
->> clock adjustments via ntp and provide accurate long term time, while
->> still having fine-grained resolution (along with some short term error).
->>
->> However, its all easier said then done. There are lots of gotchas and
->> corner-cases with interpolation. That's the whole reason we moved from
->> tick based timekeeping to continuous clocksource based timekeeping. I
->> believe the KVM folks have used similar interpolation method for their
->> kvm clocksource, and I know they had numerous issues. But it seems to
->> work well enough, so I would take a peek at their code to start.
+On 06/07/11 10:10, Grant Likely wrote:
+> On Tue, Jun 07, 2011 at 05:42:47PM +0900, Kyungmin Park wrote:
+>> On Tue, Jun 7, 2011 at 5:34 PM, Thomas Abraham<thomas.ab@samsung.com>  wrote:
+
+(snip)
+
+> Applied, thanks.
 >
-> Russell,
-> What is your gut feeling about above interpolated clocksource strategy  
-> suggestion?
+> g.
 
-I think you're not going to maintain precision even with the above idea.
-There's two problems:
+Hi Grant, sorry for late response.
 
-1. When you switch from the high resolution to the low resolution, you
-need to know how many high-res count increments have elapsed since the
-last low-res count increment occurred.  From this you know the offset
-between current time and the last low-res count increment and so can
-correct for this change.
+Could you please add my ack on this?
 
-2. When you switch from the low-res to high-res, because the high-res
-has restarted, you have lost track of the high-res counter.  The only
-point when things are re-synchronisable is at the point when the low-res
-counter increments.  So you either:
-a) have to wait for the low-res to increment,
-b) or you use the high-res counter to time until the low-res increments
- and then factor in some correction factor.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Either way looks like it will be fraught with problems - particularly
-the resulting increase in latency caused by this when switching between
-states, or the period of loss of precision caused by (2b) which may be
-more disruptive to NTP.
+>>> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
 
-> While we (I) look at an alternative clocksource strategy and experiment  
-> are you ok with the three patches I sent?
+(snip)
 
-No - I'd like you to check whether the patch I sent fixes your
-sched_clock problem across suspend/resume so that we can get that sorted
-for everyone, instead of coming up with platform specific fixes.  Then
-we can work out how to hook that into cpuidle so that it works properly
-there.
+Thanks.
 
-We're no longer going to go down the route of platforms working around
-problems with common infrastructure in their own individual private
-ways.  That madness has to stop right now.
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
