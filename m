@@ -1,259 +1,47 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 9 Jun 2011 22:56:32 +0200
-Subject: [PATCH 1/2] amba pl011: workaround for uart registers lockup
-Message-ID: <1307652992-3365-1-git-send-email-linus.walleij@stericsson.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 9 Jun 2011 15:59:54 -0500
+Subject: [PATCH v2 4/5] net: ep93xx_eth: drop GFP_DMA from call to
+	dma_alloc_coherent()
+In-Reply-To: <c2142b13f03e2d183a4f28b9b2b8fc81b30530a8.1307040443.git.mika.westerberg@iki.fi>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+	<c2142b13f03e2d183a4f28b9b2b8fc81b30530a8.1307040443.git.mika.westerberg@iki.fi>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3820B8623@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
+On Thursday, June 02, 2011 12:00 PM, Mika Westerberg wrote:
+>
+> Commit a197b59ae6e8 (mm: fail GFP_DMA allocations when ZONE_DMA is not
+> configured) made page allocator to return NULL if GFP_DMA is set but
+> CONFIG_ZONE_DMA is disabled.
+>
+> This causes ep93xx_eth to fail:
+>
+>  WARNING: at mm/page_alloc.c:2251 __alloc_pages_nodemask+0x11c/0x638()
+>  Modules linked in:
+>  [<c0035498>] (unwind_backtrace+0x0/0xf4) from [<c0043da4>] (warn_slowpath_common+0x48/0x60)
+>  [<c0043da4>] (warn_slowpath_common+0x48/0x60) from [<c0043dd8>] (warn_slowpath_null+0x1c/0x24)
+>  [<c0043dd8>] (warn_slowpath_null+0x1c/0x24) from [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638)
+>  [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638) from [<c00366fc>] (__dma_alloc+0x8c/0x3ec)
+>  [<c00366fc>] (__dma_alloc+0x8c/0x3ec) from [<c0036adc>] (dma_alloc_coherent+0x54/0x60)
+>  [<c0036adc>] (dma_alloc_coherent+0x54/0x60) from [<c0227808>] (ep93xx_open+0x20/0x864)
+>  [<c0227808>] (ep93xx_open+0x20/0x864) from [<c0283144>] (__dev_open+0xb8/0x108)
+>  [<c0283144>] (__dev_open+0xb8/0x108) from [<c0280528>] (__dev_change_flags+0x70/0x128)
+>  [<c0280528>] (__dev_change_flags+0x70/0x128) from [<c0283054>] (dev_change_flags+0x10/0x48)
+>  [<c0283054>] (dev_change_flags+0x10/0x48) from [<c001a720>] (ip_auto_config+0x190/0xf68)
+>  [<c001a720>] (ip_auto_config+0x190/0xf68) from [<c00233b0>] (do_one_initcall+0x34/0x18c)
+>  [<c00233b0>] (do_one_initcall+0x34/0x18c) from [<c0008400>] (kernel_init+0x94/0x134)
+>  [<c0008400>] (kernel_init+0x94/0x134) from [<c0030858>] (kernel_thread_exit+0x0/0x8)
+>
+> Since there is no restrictions for DMA on ep93xx, we can fix this by just
+> removing the GFP_DMA flag from the call.
+> 
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-This workaround aims to break the deadlock situation
-which raises during continuous transfer of data for long
-duration over uart with hardware flow control. It is
-observed that CTS interrupt cannot be cleared in uart
-interrupt register (ICR). Hence further transfer over
-uart gets blocked.
+If this is a bug fix maybe it should be submitted as a separate patch.  Russell could
+apply it now to fix the problem.
 
-It is seen that during such deadlock condition ICR
-don't get cleared even on multiple write. This leads
-pass_counter to decrease and finally reach zero. This
-can be taken as trigger point to run this UART_BT_WA.
+Regardless,
 
-Workaround backups the register configuration, does soft
-reset of UART using BIT-0 of PRCC_K_SOFTRST_SET/CLEAR
-registers and restores the registers.
-
-This patch also provides support for uart init and exit
-function calls if present.
-
-Signed-off-by: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/tty/serial/amba-pl011.c |  123 ++++++++++++++++++++++++++++++++++++++-
- include/linux/amba/serial.h     |    3 +
- 2 files changed, 125 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8dc0541..f5f6831 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -50,6 +50,7 @@
- #include <linux/dmaengine.h>
- #include <linux/dma-mapping.h>
- #include <linux/scatterlist.h>
-+#include <linux/delay.h>
- 
- #include <asm/io.h>
- #include <asm/sizes.h>
-@@ -65,6 +66,30 @@
- #define UART_DR_ERROR		(UART011_DR_OE|UART011_DR_BE|UART011_DR_PE|UART011_DR_FE)
- #define UART_DUMMY_DR_RX	(1 << 16)
- 
-+
-+#define UART_WA_SAVE_NR 14
-+
-+static void pl011_lockup_wa(unsigned long data);
-+static const u32 uart_wa_reg[UART_WA_SAVE_NR] = {
-+	ST_UART011_DMAWM,
-+	ST_UART011_TIMEOUT,
-+	ST_UART011_LCRH_RX,
-+	UART011_IBRD,
-+	UART011_FBRD,
-+	ST_UART011_LCRH_TX,
-+	UART011_IFLS,
-+	ST_UART011_XFCR,
-+	ST_UART011_XON1,
-+	ST_UART011_XON2,
-+	ST_UART011_XOFF1,
-+	ST_UART011_XOFF2,
-+	UART011_CR,
-+	UART011_IMSC
-+};
-+
-+static u32 uart_wa_regdata[UART_WA_SAVE_NR];
-+static DECLARE_TASKLET(pl011_lockup_tlet, pl011_lockup_wa, 0);
-+
- /* There is by now@least one vendor with differing details, so handle it */
- struct vendor_data {
- 	unsigned int		ifls;
-@@ -72,6 +97,7 @@ struct vendor_data {
- 	unsigned int		lcrh_tx;
- 	unsigned int		lcrh_rx;
- 	bool			oversampling;
-+	bool			interrupt_may_hang;   /* vendor-specific */
- 	bool			dma_threshold;
- };
- 
-@@ -90,9 +116,12 @@ static struct vendor_data vendor_st = {
- 	.lcrh_tx		= ST_UART011_LCRH_TX,
- 	.lcrh_rx		= ST_UART011_LCRH_RX,
- 	.oversampling		= true,
-+	.interrupt_may_hang	= true,
- 	.dma_threshold		= true,
- };
- 
-+static struct uart_amba_port *amba_ports[UART_NR];
-+
- /* Deals with DMA transactions */
- 
- struct pl011_sgbuf {
-@@ -132,6 +161,7 @@ struct uart_amba_port {
- 	unsigned int		lcrh_rx;	/* vendor-specific */
- 	bool			autorts;
- 	char			type[12];
-+	bool			interrupt_may_hang; /* vendor-specific */
- #ifdef CONFIG_DMA_ENGINE
- 	/* DMA stuff */
- 	bool			using_tx_dma;
-@@ -1008,6 +1038,68 @@ static inline bool pl011_dma_rx_running(struct uart_amba_port *uap)
- #endif
- 
- 
-+/*
-+ * pl011_lockup_wa
-+ * This workaround aims to break the deadlock situation
-+ * when after long transfer over uart in hardware flow
-+ * control, uart interrupt registers cannot be cleared.
-+ * Hence uart transfer gets blocked.
-+ *
-+ * It is seen that during such deadlock condition ICR
-+ * don't get cleared even on multiple write. This leads
-+ * pass_counter to decrease and finally reach zero. This
-+ * can be taken as trigger point to run this UART_BT_WA.
-+ *
-+ */
-+static void pl011_lockup_wa(unsigned long data)
-+{
-+	struct uart_amba_port *uap = amba_ports[0];
-+	void __iomem *base = uap->port.membase;
-+	struct circ_buf *xmit = &uap->port.state->xmit;
-+	struct tty_struct *tty = uap->port.state->port.tty;
-+	int buf_empty_retries = 200;
-+	int loop;
-+
-+	/* Stop HCI layer from submitting data for tx */
-+	tty->hw_stopped = 1;
-+	while (!uart_circ_empty(xmit)) {
-+		if (buf_empty_retries-- == 0)
-+			break;
-+		udelay(100);
-+	}
-+
-+	/* Backup registers */
-+	for (loop = 0; loop < UART_WA_SAVE_NR; loop++)
-+		uart_wa_regdata[loop] = readl(base + uart_wa_reg[loop]);
-+
-+	/* Disable UART so that FIFO data is flushed out */
-+	writew(0x00, uap->port.membase + UART011_CR);
-+
-+	/* Soft reset UART module */
-+	if (uap->port.dev->platform_data) {
-+		struct amba_pl011_data *plat;
-+
-+		plat = uap->port.dev->platform_data;
-+		if (plat->reset)
-+			plat->reset();
-+	}
-+
-+	/* Restore registers */
-+	for (loop = 0; loop < UART_WA_SAVE_NR; loop++)
-+		writew(uart_wa_regdata[loop] ,
-+				uap->port.membase + uart_wa_reg[loop]);
-+
-+	/* Initialise the old status of the modem signals */
-+	uap->old_status = readw(uap->port.membase + UART01x_FR) &
-+		UART01x_FR_MODEM_ANY;
-+
-+	if (readl(base + UART011_MIS) & 0x2)
-+		printk(KERN_EMERG "UART_BT_WA: ***FAILED***\n");
-+
-+	/* Start Tx/Rx */
-+	tty->hw_stopped = 0;
-+}
-+
- static void pl011_stop_tx(struct uart_port *port)
- {
- 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
-@@ -1158,8 +1250,11 @@ static irqreturn_t pl011_int(int irq, void *dev_id)
- 			if (status & UART011_TXIS)
- 				pl011_tx_chars(uap);
- 
--			if (pass_counter-- == 0)
-+			if (pass_counter-- == 0) {
-+				if (uap->interrupt_may_hang)
-+					tasklet_schedule(&pl011_lockup_tlet);
- 				break;
-+			}
- 
- 			status = readw(uap->port.membase + UART011_MIS);
- 		} while (status != 0);
-@@ -1339,6 +1434,14 @@ static int pl011_startup(struct uart_port *port)
- 	writew(uap->im, uap->port.membase + UART011_IMSC);
- 	spin_unlock_irq(&uap->port.lock);
- 
-+	if (uap->port.dev->platform_data) {
-+		struct amba_pl011_data *plat;
-+
-+		plat = uap->port.dev->platform_data;
-+		if (plat->init)
-+			plat->init();
-+	}
-+
- 	return 0;
- 
-  clk_dis:
-@@ -1394,6 +1497,15 @@ static void pl011_shutdown(struct uart_port *port)
- 	 * Shut down the clock producer
- 	 */
- 	clk_disable(uap->clk);
-+
-+	if (uap->port.dev->platform_data) {
-+		struct amba_pl011_data *plat;
-+
-+		plat = uap->port.dev->platform_data;
-+		if (plat->exit)
-+			plat->exit();
-+	}
-+
- }
- 
- static void
-@@ -1700,6 +1812,14 @@ static int __init pl011_console_setup(struct console *co, char *options)
- 	if (!uap)
- 		return -ENODEV;
- 
-+	if (uap->port.dev->platform_data) {
-+		struct amba_pl011_data *plat;
-+
-+		plat = uap->port.dev->platform_data;
-+		if (plat->init)
-+			plat->init();
-+	}
-+
- 	uap->port.uartclk = clk_get_rate(uap->clk);
- 
- 	if (options)
-@@ -1774,6 +1894,7 @@ static int pl011_probe(struct amba_device *dev, const struct amba_id *id)
- 	uap->lcrh_rx = vendor->lcrh_rx;
- 	uap->lcrh_tx = vendor->lcrh_tx;
- 	uap->fifosize = vendor->fifosize;
-+	uap->interrupt_may_hang = vendor->interrupt_may_hang;
- 	uap->port.dev = &dev->dev;
- 	uap->port.mapbase = dev->res.start;
- 	uap->port.membase = base;
-diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
-index 5479fdc..514ed45 100644
---- a/include/linux/amba/serial.h
-+++ b/include/linux/amba/serial.h
-@@ -201,6 +201,9 @@ struct amba_pl011_data {
- 	bool (*dma_filter)(struct dma_chan *chan, void *filter_param);
- 	void *dma_rx_param;
- 	void *dma_tx_param;
-+        void (*init) (void);
-+	void (*exit) (void);
-+	void (*reset) (void);
- };
- #endif
- 
--- 
-1.7.3.2
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
