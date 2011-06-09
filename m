@@ -1,29 +1,22 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Thu, 9 Jun 2011 09:42:22 +0300
-Subject: [RFC 2/6] omap: iovmm: generic iommu api migration
-In-Reply-To: <201106081246.53106.laurent.pinchart@ideasonboard.com>
-References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
-	<201106071326.53106.laurent.pinchart@ideasonboard.com>
-	<BANLkTimqt=yMGHcqEH5u-4GkMX9=+BuB6A@mail.gmail.com>
-	<201106081246.53106.laurent.pinchart@ideasonboard.com>
-Message-ID: <BANLkTikowqhMj=stjziwHeN4UxEKo09qrw@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 9 Jun 2011 09:46:39 +0300
+Subject: [PATCH 4/4] This patch add configuraton for ok2440 development
+	board.
+In-Reply-To: <1307581402-3808-4-git-send-email-wdgvip@gmail.com>
+References: <1307581402-3808-1-git-send-email-wdgvip@gmail.com>
+	<1307581402-3808-4-git-send-email-wdgvip@gmail.com>
+Message-ID: <201106090946.40337.anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 8, 2011 at 1:46 PM, Laurent Pinchart
-<laurent.pinchart@ideasonboard.com> wrote:
-> On Tuesday 07 June 2011 15:46:26 Ohad Ben-Cohen wrote:
->> Where do you take care of those potential offsets today ? Or do you
->> simply ignore the offsets and map the entire page ?
->
-> Here http://marc.info/?l=linux-omap&m=130693502326513&w=2 :-)
+On Thursday 09 June 2011 04:03:22 Wu DaoGuang wrote:
+> Add the default configuration for ok2440 development board.
 
-:)
+Please, no huge defconfigs. Modify s3c2410_defconfig instead.
 
-Ok so it seems iovmm will take care of that for now ?
-
-Let's get the basics working with the IOMMU API and then revise this
-when we switch from iovmm to the generic dma.
-
-Thanks,
-Ohad.
+> Signed-off-by: Wu DaoGuang <wdgvip@gmail.com>
+> ---
+>  arch/arm/configs/ok2440_defconfig | 2821
+> +++++++++++++++++++++++++++++++++++++ 1 files changed, 2821 insertions(+),
+> 0 deletions(-)
+>  create mode 100644 arch/arm/configs/ok2440_defconfig
