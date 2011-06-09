@@ -1,39 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jun 2011 17:40:24 +0100
-Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <4DF0F45A.3030103@ti.com>
-References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
-	<201106072348.44624.rjw@sisk.pl>
-	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-	<20110609154058.GA24424@n2100.arm.linux.org.uk>
-	<4DF0F45A.3030103@ti.com>
-Message-ID: <20110609164024.GB24424@n2100.arm.linux.org.uk>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 9 Jun 2011 11:43:05 -0500
+Subject: [PATCH] gpio-ep93xx: convert to platform_driver and use
+	basic_mmio_gpio library
+In-Reply-To: <20110608220757.GB17138@ponder.secretlab.ca>
+References: <201106081435.33578.hartleys@visionengravers.com>
+	<20110608220757.GB17138@ponder.secretlab.ca>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3820B84D3@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 09:57:06PM +0530, Santosh Shilimkar wrote:
-> On 6/9/2011 9:10 PM, Russell King - ARM Linux wrote:
->> On Thu, Jun 09, 2011 at 04:30:08PM +0100, Frank Hofmann wrote:
->>> Btw, when testing this I found that generic cpu_suspend seems to be just
->>> fine for OMAP3; the OMAP platforms though do not at this time use the
->>> generic cpu_suspend/resume for sleep, is it planned to change that ?
->>
->> That's because OMAP was doing changes to their sleep code while I was
->> consolidating the sleep code, and although I asked several times that
->> the OMAP folk should participate in this effort, but evidentally I was
->> unsuccessful in achieving anything in that direction.
+On Wednesday, June 08, 2011 3:08 PM, Grant Likely wrote:
 >
-> Agreed but the situation at that point was the code was not at
-> all in convertible position. Looking at your below comment,
-> it's still not :)
+> Merged, thanks.
 
-Well, I had a look before posting this reply, and ran away from it.
-I've gone back to it several times since, and got a similar reaction.
+Thanks.  I just noticed I left in a debug message I added when changing
+this to a platform_driver.
 
-I seem to remember that it looked _more_ convertable when I looked at
-it when doing the generic suspend/resume support - I could see a nice
-simple way to pull out the saving and just leave the PLL resume stuff
-in SRAM.
+>> +static int __init ep93xx_gpio_init(void)
+>> +{
+>> +	pr_info("%s\n", __func__);
+>> +	return platform_driver_register(&ep93xx_gpio_driver);
+>>  }
 
-I'm now convinced that if I try to convert it use the generic support,
-it will end up being a horrible broken mess.
+That pr_info shouldn't be there.  It just adds noise.
+
+Would you prefer a full new patch or just an incremental patch to remove
+this line?  The patch is already in next-20110609.
+
+Thanks, sorry for the trouble.
+
+Regards,
+Hartley
