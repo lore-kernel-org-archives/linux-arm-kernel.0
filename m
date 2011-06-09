@@ -1,106 +1,73 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 10 Jun 2011 00:59:26 +0300
-Subject: [PATCH] arm: omap: mark dt_compat __initconst
-Message-ID: <1307656766-20083-1-git-send-email-balbi@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Jun 2011 22:59:39 +0100
+Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
+In-Reply-To: <4DEF7CA1.8080809@stericsson.com>
+References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
+	<20110602094622.GS3660@n2100.arm.linux.org.uk>
+	<4DE7637B.3060901@stericsson.com>
+	<20110602110137.GU3660@n2100.arm.linux.org.uk>
+	<4DE77D9A.6090301@stericsson.com> <4DE788B2.5060308@ti.com>
+	<1307040455.11492.52.camel@work-vm>
+	<4DEF7CA1.8080809@stericsson.com>
+Message-ID: <20110609215939.GI24424@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-we have a special section for const data
-which is only needed during init, that's
-__initconst. Use that instead of __initdata
-which is for non-const data.
+On Wed, Jun 08, 2011 at 03:44:01PM +0200, Mattias Wallin wrote:
+> On 06/02/2011 08:47 PM, john stultz wrote:
+>> Yea. The basic idea is to interpolate between two counters to produce a
+>> a continuous clocksource for the timekeeping core.
+>>
+>> As Russell pointed out, error is injected to the timekeeping code every
+>> time you switch between clocksources or the persistent clock. Doing this
+>> very frequently will provide very poor time.
+>>
+>> So by using an interpolated clocksource, we would be able to maintain
+>> clock adjustments via ntp and provide accurate long term time, while
+>> still having fine-grained resolution (along with some short term error).
+>>
+>> However, its all easier said then done. There are lots of gotchas and
+>> corner-cases with interpolation. That's the whole reason we moved from
+>> tick based timekeeping to continuous clocksource based timekeeping. I
+>> believe the KVM folks have used similar interpolation method for their
+>> kvm clocksource, and I know they had numerous issues. But it seems to
+>> work well enough, so I would take a peek at their code to start.
+>
+> Russell,
+> What is your gut feeling about above interpolated clocksource strategy  
+> suggestion?
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+I think you're not going to maintain precision even with the above idea.
+There's two problems:
 
-This patch is against devel-devicetree branch from
-linux-omap.
+1. When you switch from the high resolution to the low resolution, you
+need to know how many high-res count increments have elapsed since the
+last low-res count increment occurred.  From this you know the offset
+between current time and the last low-res count increment and so can
+correct for this change.
 
- arch/arm/mach-omap2/board-igep0020.c    |    2 +-
- arch/arm/mach-omap2/board-igep0030.c    |    2 +-
- arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
- arch/arm/mach-omap2/board-omap4panda.c  |    2 +-
- arch/arm/mach-omap2/board-overo.c       |    2 +-
- arch/arm/mach-omap2/board-zoom.c        |    2 +-
- 6 files changed, 6 insertions(+), 6 deletions(-)
+2. When you switch from the low-res to high-res, because the high-res
+has restarted, you have lost track of the high-res counter.  The only
+point when things are re-synchronisable is at the point when the low-res
+counter increments.  So you either:
+a) have to wait for the low-res to increment,
+b) or you use the high-res counter to time until the low-res increments
+ and then factor in some correction factor.
 
-diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
-index eb198a6..d9888eb 100644
---- a/arch/arm/mach-omap2/board-igep0020.c
-+++ b/arch/arm/mach-omap2/board-igep0020.c
-@@ -703,7 +703,7 @@ static void __init igep2_init(void)
- 
- }
- 
--static const char *igep2_dt_compat[] __initdata = {
-+static const char *igep2_dt_compat[] __initconst = {
- 	"ISEE,igep-v2",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-igep0030.c b/arch/arm/mach-omap2/board-igep0030.c
-index e13fdf0..984e4a1 100644
---- a/arch/arm/mach-omap2/board-igep0030.c
-+++ b/arch/arm/mach-omap2/board-igep0030.c
-@@ -447,7 +447,7 @@ static void __init igep3_init(void)
- 
- }
- 
--static const char *igep3_dt_compat[] __initdata = {
-+static const char *igep3_dt_compat[] __initconst = {
- 	"ISEE,igep-v3",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index b9ad453..85ca38f 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -681,7 +681,7 @@ static void __init omap3_beagle_init(void)
- 	beagle_opp_init();
- }
- 
--static const char *omap3_beagle_dt_match[] __initdata = {
-+static const char *omap3_beagle_dt_match[] __initconst = {
- 	"ti,omap3-beagle",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index 47738db..58adeaf 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -741,7 +741,7 @@ static void __init omap4_panda_map_io(void)
- 	omap44xx_map_common_io();
- }
- 
--static const char *omap4_panda_match[] __initdata = {
-+static const char *omap4_panda_match[] __initconst = {
- 	"ti,omap4-panda",
- 	NULL,
- };
-diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
-index e91942a..e88f846 100644
---- a/arch/arm/mach-omap2/board-overo.c
-+++ b/arch/arm/mach-omap2/board-overo.c
-@@ -785,7 +785,7 @@ static void __init overo_init(void)
- 					"OVERO_GPIO_USBH_CPEN\n");
- }
- 
--static const char *omap3_overo_dt_match[] __initdata = {
-+static const char *omap3_overo_dt_match[] __initconst = {
- 	"gumstix,omap3-overo",
- 	NULL
- };
-diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
-index 6cc9569..0627ea2 100644
---- a/arch/arm/mach-omap2/board-zoom.c
-+++ b/arch/arm/mach-omap2/board-zoom.c
-@@ -132,7 +132,7 @@ static void __init omap_zoom_init(void)
- 	zoom_display_init();
- }
- 
--static const char *zoom3_dt_match[] __initdata = {
-+static const char *zoom3_dt_match[] __initconst = {
- 	"ti,zoom3",
- 	NULL
- };
--- 
-1.7.6.rc1
+Either way looks like it will be fraught with problems - particularly
+the resulting increase in latency caused by this when switching between
+states, or the period of loss of precision caused by (2b) which may be
+more disruptive to NTP.
+
+> While we (I) look at an alternative clocksource strategy and experiment  
+> are you ok with the three patches I sent?
+
+No - I'd like you to check whether the patch I sent fixes your
+sched_clock problem across suspend/resume so that we can get that sorted
+for everyone, instead of coming up with platform specific fixes.  Then
+we can work out how to hook that into cpuidle so that it works properly
+there.
+
+We're no longer going to go down the route of platforms working around
+problems with common infrastructure in their own individual private
+ways.  That madness has to stop right now.
