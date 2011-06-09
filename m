@@ -1,43 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Jun 2011 11:33:41 -0700
-Subject: [PATCH 0/9] Add clkdev support for Samsung platforms
-In-Reply-To: <1307594324-11053-1-git-send-email-thomas.ab@samsung.com>
-References: <1307594324-11053-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <4DF11205.7040103@samsung.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 9 Jun 2011 12:42:16 -0600
+Subject: [PATCH] gpio-ep93xx: convert to platform_driver and use
+	basic_mmio_gpio library
+In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3820B84D3@AUSP01VMBX24.collaborationhost.net>
+References: <201106081435.33578.hartleys@visionengravers.com>
+	<20110608220757.GB17138@ponder.secretlab.ca>
+	<ADE657CA350FB648AAC2C43247A983F001F3820B84D3@AUSP01VMBX24.collaborationhost.net>
+Message-ID: <BANLkTim1_6LZ1u_p-uhf5dYQYuKTjSSqZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/08/11 21:38, Thomas Abraham wrote:
-> This patch series adds clkdev support for all Samsung platforms. clkdev
-> support is a prerequisite for adding device tree on Samsung platforms
-> and possibly revive framebuffer driver patches for Exynos4 platforms.
+On Thu, Jun 9, 2011 at 10:43 AM, H Hartley Sweeten
+<hartleys@visionengravers.com> wrote:
+> On Wednesday, June 08, 2011 3:08 PM, Grant Likely wrote:
+>>
+>> Merged, thanks.
 >
-> The first of the two patches are for eliminating the explict
-> console_initcall from the serial drivers. This is required to prevent
-> the clk_get being invoked at time when device registrations have not
-> completed.
+> Thanks. ?I just noticed I left in a debug message I added when changing
+> this to a platform_driver.
 >
-> This patch series is based on the latest
-> git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
+>>> +static int __init ep93xx_gpio_init(void)
+>>> +{
+>>> + ? ?pr_info("%s\n", __func__);
+>>> + ? ?return platform_driver_register(&ep93xx_gpio_driver);
+>>> ?}
 >
-> and the patch "[PATCH] Consolidate the clkdev header files".
+> That pr_info shouldn't be there. ?It just adds noise.
 >
-> It has been tested on the following boards.
+> Would you prefer a full new patch or just an incremental patch to remove
+> this line? ?The patch is already in next-20110609.
 >
-> SMDK2416, SMDK2440, SMDK2450, SMDK6410, SMDK6440, SMDK6450,
-> SMDKC100, SMDKV210 and SMDKV310.
->
+> Thanks, sorry for the trouble
 
-Thomas,
+Neither.  I just fixed it up and pushed out a commit.
 
-Basically, this is good to me. I will check again after backing to
-my office and will apply whole series :)
+g.
 
-If any problems, let you know.
-Thanks.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
