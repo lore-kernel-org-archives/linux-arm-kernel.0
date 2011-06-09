@@ -1,55 +1,50 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  9 Jun 2011 16:59:02 +0100
-Subject: [PATCH v2 10/10] ARM: stop: execute platform callback from cpu_stop
-	code
+Date: Thu,  9 Jun 2011 16:59:01 +0100
+Subject: [PATCH v2 09/10] ARM: kexec: use arm_machine_reset for branching to
+	the reboot buffer
 In-Reply-To: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
 References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307635142-11312-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1307635142-11312-10-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sending IPI_CPU_STOP to a CPU causes it to execute a busy cpu_relax
-loop forever. This makes it impossible to kexec successfully on an SMP
-system since the secondary CPUs do not reset.
-
-This patch adds a callback to platform_cpu_kill, defined when
-CONFIG_HOTPLUG_CPU=y, from the ipi_cpu_stop handling code. This function
-currently just returns 1 on all platforms that define it but allows them
-to do something more sophisticated in the future.
+Now that there is a common way to reset the machine, let's use it
+instead of reinventing the wheel in the kexec backend.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/Kconfig      |    2 +-
- arch/arm/kernel/smp.c |    4 ++++
- 2 files changed, 5 insertions(+), 1 deletions(-)
+ arch/arm/kernel/machine_kexec.c |   14 ++------------
+ 1 files changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..c26d8f6 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1795,7 +1795,7 @@ config XIP_PHYS_ADDR
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index e59bbd4..f84567c 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -16,8 +16,6 @@
+ extern const unsigned char relocate_new_kernel[];
+ extern const unsigned int relocate_new_kernel_size;
  
- config KEXEC
- 	bool "Kexec system call (EXPERIMENTAL)"
--	depends on EXPERIMENTAL
-+	depends on EXPERIMENTAL && (!SMP || HOTPLUG_CPU)
- 	help
- 	  kexec is a system call that implements the ability to shutdown your
- 	  current kernel, and to start another kernel.  It is like a reboot
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index dfc76aa..39189bf 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -548,6 +548,10 @@ static void ipi_cpu_stop(unsigned int cpu)
- 	local_fiq_disable();
- 	local_irq_disable();
+-extern void setup_mm_for_reboot(char mode);
+-
+ extern unsigned long kexec_start_address;
+ extern unsigned long kexec_indirection_page;
+ extern unsigned long kexec_mach_type;
+@@ -111,14 +109,6 @@ void machine_kexec(struct kimage *image)
  
-+#ifdef CONFIG_HOTPLUG_CPU
-+	platform_cpu_kill(cpu);
-+#endif
+ 	if (kexec_reinit)
+ 		kexec_reinit();
+-	local_irq_disable();
+-	local_fiq_disable();
+-	setup_mm_for_reboot(0); /* mode is not used, so just pass 0*/
+-	flush_cache_all();
+-	outer_flush_all();
+-	outer_disable();
+-	cpu_proc_fin();
+-	outer_inv_all();
+-	flush_cache_all();
+-	cpu_reset(reboot_code_buffer_phys);
 +
- 	while (1)
- 		cpu_relax();
++	arm_machine_reset(reboot_code_buffer_phys);
  }
 -- 
 1.7.0.4
