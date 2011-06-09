@@ -1,47 +1,24 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Thu, 9 Jun 2011 15:59:54 -0500
-Subject: [PATCH v2 4/5] net: ep93xx_eth: drop GFP_DMA from call to
-	dma_alloc_coherent()
-In-Reply-To: <c2142b13f03e2d183a4f28b9b2b8fc81b30530a8.1307040443.git.mika.westerberg@iki.fi>
-References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-	<c2142b13f03e2d183a4f28b9b2b8fc81b30530a8.1307040443.git.mika.westerberg@iki.fi>
-Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3820B8623@AUSP01VMBX24.collaborationhost.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Jun 2011 22:02:18 +0100
+Subject: [PATCH 2/2] amba pl011: platform data for reg lockup and glitch
+In-Reply-To: <1307653008-3398-1-git-send-email-linus.walleij@stericsson.com>
+References: <1307653008-3398-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110609210218.GH24424@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 02, 2011 12:00 PM, Mika Westerberg wrote:
->
-> Commit a197b59ae6e8 (mm: fail GFP_DMA allocations when ZONE_DMA is not
-> configured) made page allocator to return NULL if GFP_DMA is set but
-> CONFIG_ZONE_DMA is disabled.
->
-> This causes ep93xx_eth to fail:
->
->  WARNING: at mm/page_alloc.c:2251 __alloc_pages_nodemask+0x11c/0x638()
->  Modules linked in:
->  [<c0035498>] (unwind_backtrace+0x0/0xf4) from [<c0043da4>] (warn_slowpath_common+0x48/0x60)
->  [<c0043da4>] (warn_slowpath_common+0x48/0x60) from [<c0043dd8>] (warn_slowpath_null+0x1c/0x24)
->  [<c0043dd8>] (warn_slowpath_null+0x1c/0x24) from [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638)
->  [<c0083b6c>] (__alloc_pages_nodemask+0x11c/0x638) from [<c00366fc>] (__dma_alloc+0x8c/0x3ec)
->  [<c00366fc>] (__dma_alloc+0x8c/0x3ec) from [<c0036adc>] (dma_alloc_coherent+0x54/0x60)
->  [<c0036adc>] (dma_alloc_coherent+0x54/0x60) from [<c0227808>] (ep93xx_open+0x20/0x864)
->  [<c0227808>] (ep93xx_open+0x20/0x864) from [<c0283144>] (__dev_open+0xb8/0x108)
->  [<c0283144>] (__dev_open+0xb8/0x108) from [<c0280528>] (__dev_change_flags+0x70/0x128)
->  [<c0280528>] (__dev_change_flags+0x70/0x128) from [<c0283054>] (dev_change_flags+0x10/0x48)
->  [<c0283054>] (dev_change_flags+0x10/0x48) from [<c001a720>] (ip_auto_config+0x190/0xf68)
->  [<c001a720>] (ip_auto_config+0x190/0xf68) from [<c00233b0>] (do_one_initcall+0x34/0x18c)
->  [<c00233b0>] (do_one_initcall+0x34/0x18c) from [<c0008400>] (kernel_init+0x94/0x134)
->  [<c0008400>] (kernel_init+0x94/0x134) from [<c0030858>] (kernel_thread_exit+0x0/0x8)
->
-> Since there is no restrictions for DMA on ep93xx, we can fix this by just
-> removing the GFP_DMA flag from the call.
-> 
-> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Thu, Jun 09, 2011 at 10:56:48PM +0200, Linus Walleij wrote:
+> +	/* uart-0 pins gpio configuration should be
+> +	 * kept intact to prevent glitch in tx line
+> +	 * when tty dev is opened. Later these pins
+> +	 * are configured to uart mop500_pins_uart0
+> +	 *
+> +	 * It will be replaced with uart configuration
+> +	 * once the issue is solved.
+> +	 */
+> +	GPIO0_GPIO	| PIN_INPUT_PULLUP,
+> +	GPIO1_GPIO	| PIN_OUTPUT_HIGH,
+> +	GPIO2_GPIO	| PIN_INPUT_PULLUP,
+> +	GPIO3_GPIO	| PIN_OUTPUT_LOW,
 
-If this is a bug fix maybe it should be submitted as a separate patch.  Russell could
-apply it now to fix the problem.
-
-Regardless,
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Why do you want the TXD line (GPIO3) to be indicating a break condition?
