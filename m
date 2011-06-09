@@ -1,58 +1,63 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Thu, 9 Jun 2011 17:53:53 +0100 (BST)
-Subject: [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <20110609165029.GC24424@n2100.arm.linux.org.uk>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 09 Jun 2011 22:26:43 +0530
+Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+In-Reply-To: <alpine.DEB.2.00.1106091742350.11513@localhost6.localdomain6>
 References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
-	<20110609165029.GC24424@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1106091752210.11513@localhost6.localdomain6>
+	<201106072348.44624.rjw@sisk.pl>
+	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
+	<20110609154058.GA24424@n2100.arm.linux.org.uk>
+	<4DF0F45A.3030103@ti.com>
+	<alpine.DEB.2.00.1106091742350.11513@localhost6.localdomain6>
+Message-ID: <4DF0FB4B.3080806@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Thu, 9 Jun 2011, Russell King - ARM Linux wrote:
-
-> On Tue, Jun 07, 2011 at 05:48:17PM +0100, Frank Hofmann wrote:
->> There are a few dependencies this patch brings in:
->>
->> * due to the use of cpu_suspend / cpu_resume, it'll only apply as-is
->>   to kernels no older than f6b0fa02e8b0708d17d631afce456524eadf87ff,
->>   where Russell King introduced the generic interface.
->>   Patching these into older kernels is a little work.
->>
->> * it temporarily uses swapper_pg_dir and establishes 1:1 mappings there
->>   for a MMU-off transition, which is necessary before resume.
->>   In order to tear these down afterwards, identity_mapping_del() needs
->>   to be called; for some reason that's #ifdef CONFIG_SMP ...
->>
->> * it needs to "catch" sleep_save_sp after cpu_suspend() so that resume
->>   can be provided with the proper starting point.
->>   This requires an ENTRY(sleep_save_sp) in arch/arm/kernel/sleep.S so
->>   that the symbol becomes public.
->>
->> * it assumes cpu_reset will disable the MMU. cpu_v6_reset/cpu_v7_reset
->>   are currently not doing so (amongst some other minor chip types).
->>
->> * there's kind of a circular dependency between CONFIG_HIBERNATION and
->>   CONFIG_PM_SLEEP, on ARM. The latter is necessary so that cpu_suspend
->>   and cpu_resume are compiled in, but it cannot be selected via
->>   ARCH_HIBERNATION_POSSIBLE because CONFIG_PM_SLEEP depends on
->>   CONFIG_HIBERNATION_INTERFACE - selected by CONFIG_HIBERNATION.
+On 6/9/2011 10:14 PM, Frank Hofmann wrote:
 >
-> Another issue is that it uses PHYS_OFFSET in assembly code which is not
-> permissible with P2V patching.
 >
+> On Thu, 9 Jun 2011, Santosh Shilimkar wrote:
+>
+>> On 6/9/2011 9:10 PM, Russell King - ARM Linux wrote:
+>>> On Thu, Jun 09, 2011 at 04:30:08PM +0100, Frank Hofmann wrote:
+>>>> Btw, when testing this I found that generic cpu_suspend seems to be
+>>>> just
+>>>> fine for OMAP3; the OMAP platforms though do not at this time use the
+>>>> generic cpu_suspend/resume for sleep, is it planned to change that ?
+>>>
+>>> That's because OMAP was doing changes to their sleep code while I was
+>>> consolidating the sleep code, and although I asked several times that
+>>> the OMAP folk should participate in this effort, but evidentally I was
+>>> unsuccessful in achieving anything in that direction.
+>>>
+>> Agreed but the situation at that point was the code was not at
+>> all in convertible position. Looking at your below comment,
+>> it's still not :)
+>>
+>>> And of course since then it's been forgotten about, and I've given up
+>>> on that particular aspect. I've also come to the conclusion that OMAP
+>>> is sufficiently weird (requiring soo much to execute from SRAM) that
+>>> its hopeless to persue.
+>>>
+>> We did discuss this Russell and requested your help here. I guess
+>> you have already looked at OMAP code from generic suspend
+>> hooks point of view and the SRAM execution, Errata's seems to
+>> make you feel it's not going to work.
+>> Is that what you mean here ?
+>>
+>> Regards
+>> Santosh
+>>
+>
+> Sorry for interjecting ... you're right there's a lot special about
+> OMAP. What I've been talking about is a rather small(ish) bit. Maybe the
+> diff illustrates what I mean - use cpu_suspend/resume for the parts of
+> off-mode save/restore that are non-OMAP-specific.
+>
+> Like this (not tested, just for illustration what I mean):
+>
+Mostly it won't work.
+Just replied to your questions. I think you can get the
+answer on why this change won't work in it's current form.
 
-Would calling something like:
-
-unsigned long __swsusp_arch_get_vpoffset(void *addr)
-{
-         return (virt_to_phys(addr) - (unsigned long)addr);
-}
-
-from the assembly be ok ?
-
-(That's what I've gone for at the moment to address this; a generic func 
-somewhere to query for this would obviously be ok as well)
-
-FrankH.
+Regards
+Santosh
