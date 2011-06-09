@@ -1,40 +1,47 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Thu, 09 Jun 2011 16:31:06 -0700
-Subject: [PATCH] msm: timer: compensate for timer shift in
-	msm_read_timer_count
-In-Reply-To: <1307626910.16418.1.camel@m0nster> (Daniel Walker's message of
-	"Thu, 09 Jun 2011 06:41:50 -0700")
-References: <1307591042-2369-1-git-send-email-johlstei@codeaurora.org>
-	<1307626910.16418.1.camel@m0nster>
-Message-ID: <8ya1uz2inut.fsf@huya.qualcomm.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 9 Jun 2011 18:40:21 -0500
+Subject: [PATCH v2 2/5] net: ep93xx_eth: pass struct device to DMA API
+	functions
+In-Reply-To: <c0ddfc297e0ea1e64e58cedd6552c6b2e52c5fe8.1307040443.git.mika.westerberg@iki.fi>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+	<c0ddfc297e0ea1e64e58cedd6552c6b2e52c5fe8.1307040443.git.mika.westerberg@iki.fi>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3820B8699@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09 2011, Daniel Walker wrote:
-
->> diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
->> index 38b95e9..b3579fe 100644
->> --- a/arch/arm/mach-msm/timer.c
->> +++ b/arch/arm/mach-msm/timer.c
->> @@ -100,7 +100,7 @@ static cycle_t msm_read_timer_count(struct clocksource *cs)
->>  {
->>  	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
->>  
->> -	return readl(clk->global_counter);
->> +	return readl(clk->global_counter) >> clk->shift;
->>  }
+On Thursday, June 02, 2011 12:00 PM, Mika Westerberg wrote:
 >
-> Could you comment in the code with something explaining what the shift
-> is doing.
+> We shouldn't use NULL for any DMA API functions, unless we are dealing with
+> ISA or EISA device. So pass correct struct dev pointer to these functions.
+>
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  drivers/net/arm/ep93xx_eth.c |   26 ++++++++++++++++----------
+>  1 files changed, 16 insertions(+), 10 deletions(-)
+> 
+> diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
+> index 5a77001..8779d3b 100644
+> --- a/drivers/net/arm/ep93xx_eth.c
+> +++ b/drivers/net/arm/ep93xx_eth.c
+> @@ -159,6 +159,8 @@ struct ep93xx_priv
+>  	void __iomem		*base_addr;
+>  	int			irq;
+>  
+> +	struct device		*dma_dev;
 
-Probably best to describe this near msm_clock's definition (or
-MSM_DGT_SHIFT), since it is a bit unclear what these values are.
-A good (but short) description of how the shifts and even why.
+Mika,
 
-The comment shouldn't be in the function body (CodingStyle, chapter 8).
+I just noticed this macro in include/linux/netdevice.h
 
-David
+/* Set the sysfs physical device reference for the network logical device
+ * if set prior to registration will cause a symlink during initialization.
+ */
+#define SET_NETDEV_DEV(net, pdev)       ((net)->dev.parent = (pdev))
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Is there anyway you could use that macro in the probe to save the platform_device
+(with it's associated device) instead of introducing a new struct device * in the
+private data?
+
+Regards,
+Hartley
