@@ -1,49 +1,38 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Thu, 9 Jun 2011 22:18:11 +0530
-Subject: [PATCH V2] davinci: da850: move input frequency to board
-	specific	files
-In-Reply-To: <BANLkTinjV3cdNe92MkiWcXH8GJmOcF_nuA@mail.gmail.com>
-References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
-	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
-	<874o42wpec.fsf@ti.com>
-	<BANLkTinjV3cdNe92MkiWcXH8GJmOcF_nuA@mail.gmail.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D42628A@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Jun 2011 17:50:29 +0100
+Subject: [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+In-Reply-To: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
+Message-ID: <20110609165029.GC24424@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+On Tue, Jun 07, 2011 at 05:48:17PM +0100, Frank Hofmann wrote:
+> There are a few dependencies this patch brings in:
+>
+> * due to the use of cpu_suspend / cpu_resume, it'll only apply as-is
+>   to kernels no older than f6b0fa02e8b0708d17d631afce456524eadf87ff,
+>   where Russell King introduced the generic interface.
+>   Patching these into older kernels is a little work.
+>
+> * it temporarily uses swapper_pg_dir and establishes 1:1 mappings there
+>   for a MMU-off transition, which is necessary before resume.
+>   In order to tear these down afterwards, identity_mapping_del() needs
+>   to be called; for some reason that's #ifdef CONFIG_SMP ...
+>
+> * it needs to "catch" sleep_save_sp after cpu_suspend() so that resume
+>   can be provided with the proper starting point.
+>   This requires an ENTRY(sleep_save_sp) in arch/arm/kernel/sleep.S so
+>   that the symbol becomes public.
+>
+> * it assumes cpu_reset will disable the MMU. cpu_v6_reset/cpu_v7_reset
+>   are currently not doing so (amongst some other minor chip types).
+>
+> * there's kind of a circular dependency between CONFIG_HIBERNATION and
+>   CONFIG_PM_SLEEP, on ARM. The latter is necessary so that cpu_suspend
+>   and cpu_resume are compiled in, but it cannot be selected via
+>   ARCH_HIBERNATION_POSSIBLE because CONFIG_PM_SLEEP depends on
+>   CONFIG_HIBERNATION_INTERFACE - selected by CONFIG_HIBERNATION.
 
-On Thu, Jun 09, 2011 at 15:35:12, Christian Riesch wrote:
-> Hi Kevin,
-> 
-> On Tue, Jun 7, 2011 at 12:44 AM, Kevin Hilman <khilman@ti.com> wrote:
-> > Christian Riesch <christian.riesch@omicron.at> writes:
-> >
-> >> From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
-> >>
-> >> Currently the input frequency of the SoC is hardcoded in the SoC specific
-> >> da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
-> >> range from 12 to 50 MHz, boards with different oscillator/crystal
-> >> frequencies may be built.
-> >>
-> >> This patch allows setting a different input frequency in the board
-> >> specific files to support boards with oscillator/crystal frequencies other
-> >> than 24 MHz.
-> >>
-> >> Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
-> >> Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
-> >
-> > Why not allow board code to just do a clk_set_rate()?
-> 
-> I'm fine with this method (In fact it was the first thing that I
-> tried, I added a .set_rate method to ref_clk, it worked well for me).
-> However I wonder whether first initializing the clock with the wrong
-> value (24 MHz) and later correcting it via clk_set_rate() would break
-> something. In the meantime, the data in the clock tree do not reflect
-> the actual frequencies that are present on the SoC.
-
-Doing this right after <soc>_init() should be safe. The board should not
-assume clocks to be setup before this call is made.
-
-Thanks,
-Sekhar
+Another issue is that it uses PHYS_OFFSET in assembly code which is not
+permissible with P2V patching.
