@@ -1,32 +1,106 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Jun 2011 14:41:23 -0700
-Subject: [PATCH] ARM: SAMSUNG: Add support for pre-sleep/post-restore
-	gpio control
-In-Reply-To: <003b01cc24df$29b841b0$7d28c510$%szyprowski@samsung.com>
-References: <1303925654-27715-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<00fc01cc0baa$d7d94cb0$878be610$%kim@samsung.com>
-	<003b01cc24df$29b841b0$7d28c510$%szyprowski@samsung.com>
-Message-ID: <4DF13E03.50803@samsung.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 10 Jun 2011 00:59:26 +0300
+Subject: [PATCH] arm: omap: mark dt_compat __initconst
+Message-ID: <1307656766-20083-1-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/11 23:50, Marek Szyprowski wrote:
-> Hello,
->
-Hi :)
+we have a special section for const data
+which is only needed during init, that's
+__initconst. Use that instead of __initdata
+which is for non-const data.
 
-(snip)
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
 
->
-> This patch lacks stubs for s5p64x0, s5pc100 and exynos4. I will send a quick fix
-> soon.
+This patch is against devel-devicetree branch from
+linux-omap.
 
-Oops, I couldn't test it all on my laptop which is so slow :(
+ arch/arm/mach-omap2/board-igep0020.c    |    2 +-
+ arch/arm/mach-omap2/board-igep0030.c    |    2 +-
+ arch/arm/mach-omap2/board-omap3beagle.c |    2 +-
+ arch/arm/mach-omap2/board-omap4panda.c  |    2 +-
+ arch/arm/mach-omap2/board-overo.c       |    2 +-
+ arch/arm/mach-omap2/board-zoom.c        |    2 +-
+ 6 files changed, 6 insertions(+), 6 deletions(-)
 
-OK, thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/mach-omap2/board-igep0020.c b/arch/arm/mach-omap2/board-igep0020.c
+index eb198a6..d9888eb 100644
+--- a/arch/arm/mach-omap2/board-igep0020.c
++++ b/arch/arm/mach-omap2/board-igep0020.c
+@@ -703,7 +703,7 @@ static void __init igep2_init(void)
+ 
+ }
+ 
+-static const char *igep2_dt_compat[] __initdata = {
++static const char *igep2_dt_compat[] __initconst = {
+ 	"ISEE,igep-v2",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-omap2/board-igep0030.c b/arch/arm/mach-omap2/board-igep0030.c
+index e13fdf0..984e4a1 100644
+--- a/arch/arm/mach-omap2/board-igep0030.c
++++ b/arch/arm/mach-omap2/board-igep0030.c
+@@ -447,7 +447,7 @@ static void __init igep3_init(void)
+ 
+ }
+ 
+-static const char *igep3_dt_compat[] __initdata = {
++static const char *igep3_dt_compat[] __initconst = {
+ 	"ISEE,igep-v3",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index b9ad453..85ca38f 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -681,7 +681,7 @@ static void __init omap3_beagle_init(void)
+ 	beagle_opp_init();
+ }
+ 
+-static const char *omap3_beagle_dt_match[] __initdata = {
++static const char *omap3_beagle_dt_match[] __initconst = {
+ 	"ti,omap3-beagle",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index 47738db..58adeaf 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -741,7 +741,7 @@ static void __init omap4_panda_map_io(void)
+ 	omap44xx_map_common_io();
+ }
+ 
+-static const char *omap4_panda_match[] __initdata = {
++static const char *omap4_panda_match[] __initconst = {
+ 	"ti,omap4-panda",
+ 	NULL,
+ };
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index e91942a..e88f846 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -785,7 +785,7 @@ static void __init overo_init(void)
+ 					"OVERO_GPIO_USBH_CPEN\n");
+ }
+ 
+-static const char *omap3_overo_dt_match[] __initdata = {
++static const char *omap3_overo_dt_match[] __initconst = {
+ 	"gumstix,omap3-overo",
+ 	NULL
+ };
+diff --git a/arch/arm/mach-omap2/board-zoom.c b/arch/arm/mach-omap2/board-zoom.c
+index 6cc9569..0627ea2 100644
+--- a/arch/arm/mach-omap2/board-zoom.c
++++ b/arch/arm/mach-omap2/board-zoom.c
+@@ -132,7 +132,7 @@ static void __init omap_zoom_init(void)
+ 	zoom_display_init();
+ }
+ 
+-static const char *zoom3_dt_match[] __initdata = {
++static const char *zoom3_dt_match[] __initconst = {
+ 	"ti,zoom3",
+ 	NULL
+ };
+-- 
+1.7.6.rc1
