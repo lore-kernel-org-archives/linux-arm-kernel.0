@@ -1,45 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 9 Jun 2011 11:06:38 +0100
-Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to
-	a physical address
-In-Reply-To: <alpine.DEB.2.00.1106091053340.11513@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
-	<20110607132220.GB12639@e102144-lin.cambridge.arm.com>
-	<alpine.DEB.2.00.1106071435020.2247@localhost6.localdomain6>
-	<20110607153654.GA19855@arm.com>
-	<alpine.DEB.2.00.1106071714400.2236@localhost6.localdomain6>
-	<alpine.DEB.2.00.1106081638420.11513@localhost6.localdomain6>
-	<20110608160527.GA6851@e102144-lin.cambridge.arm.com>
-	<alpine.DEB.2.00.1106081707040.11513@localhost6.localdomain6>
-	<20110608162429.GA28436@arm.com>
-	<alpine.DEB.2.00.1106091053340.11513@localhost6.localdomain6>
-Message-ID: <20110609100638.GC24873@e102144-lin.cambridge.arm.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Thu, 9 Jun 2011 16:24:08 +0530
+Subject: [PATCH 3/8] OMAP2+: PM: Initialise sleep_switch to a non-valid value
+In-Reply-To: <1307616853-28395-3-git-send-email-rnayak@ti.com>
+References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
+	<1307616853-28395-2-git-send-email-rnayak@ti.com>
+	<1307616853-28395-3-git-send-email-rnayak@ti.com>
+Message-ID: <1307616853-28395-4-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Frank,
+sleep_switch which is initialised to 0 in omap_set_pwrdm_state
+happens to be a valid sleep_switch type (FORCEWAKEUP_SWITCH)
+which are defined as
+#define FORCEWAKEUP_SWITCH      0
+#define LOWPOWERSTATE_SWITCH    1
 
-On Thu, Jun 09, 2011 at 11:00:56AM +0100, Frank Hofmann wrote:
-> Ah, I was concerned that it'd change
-> 
->  	graphics_cpu_reset ===> graphics_processor.reset
-> 
-> but you're correct that kind of substitution is not happening.
-> 
-> Anyway as Will mentioned, the !MULTI_CPU case has the #define the 
-> following way in any case:
-> 
-> #define	____glue(name,fn)	name##fn
-> #define	__glue(name,fn)		____glue(name,fn)
-> #define	cpu_reset		__glue(CPU_NAME,_reset)
-> 
-> I.e. in the !MULTI_CPU case cpu_reset is defined without the macro 
-> argument, while the MULTI_CPU define _has_ the macro argument.
-> 
-> Would it be ok to remove the (args) part from the MULTI_CPU #define then ?
+This causes the function to wrongly program some clock domains
+even when the Powerdomain is in ON state.
 
-I was planning to do that in v2 of the patches.
+Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+---
+ arch/arm/mach-omap2/pm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Cheers,
-
-Will
+diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+index 49486f5..d48813f 100644
+--- a/arch/arm/mach-omap2/pm.c
++++ b/arch/arm/mach-omap2/pm.c
+@@ -106,7 +106,7 @@ static void omap2_init_processor_devices(void)
+ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+ {
+ 	u32 cur_state;
+-	int sleep_switch = 0;
++	int sleep_switch = -1;
+ 	int ret = 0;
+ 
+ 	if (pwrdm == NULL || IS_ERR(pwrdm))
+-- 
+1.7.0.4
