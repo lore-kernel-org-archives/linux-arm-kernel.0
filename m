@@ -1,36 +1,56 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  9 Jun 2011 16:58:53 +0100
-Subject: [PATCH v2 01/10] ARM: l2x0: fix disabling function to avoid livelock
+Date: Thu,  9 Jun 2011 16:58:54 +0100
+Subject: [PATCH v2 02/10] ARM: l2x0: fix invalidate-all function to avoid
+	livelock
 In-Reply-To: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
 References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307635142-11312-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1307635142-11312-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The l2x0_disable function attempts to writel with the l2x0_lock held.
-This results in livelock when the writel contains an outer_sync call
-for the platform.
+With the L2 cache disabled, exclusive memory access instructions may
+cease to function correctly, leading to livelock when trying to acquire
+a spinlock.
 
-This patch replaces the writel with a call to writel_relaxed in the
-disabling code, preventing livelock from occurring.
+The l2x0 invalidate-all routine *must* run with the cache disabled and so
+needs to take extra care not to take any locks along the way.
+
+This patch modifies the invalidation routine to avoid locking. Since
+the cache is disabled, we make the assumption that other CPUs are not
+executing background maintenance tasks on the L2 cache whilst we are
+invalidating it.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/cache-l2x0.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mm/cache-l2x0.c |   11 ++++++-----
+ 1 files changed, 6 insertions(+), 5 deletions(-)
 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index ef59099..2bce3be 100644
+index 2bce3be..fe5630f 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -266,7 +266,7 @@ static void l2x0_disable(void)
- 	unsigned long flags;
+@@ -148,16 +148,17 @@ static void l2x0_clean_all(void)
  
- 	spin_lock_irqsave(&l2x0_lock, flags);
--	writel(0, l2x0_base + L2X0_CTRL);
-+	writel_relaxed(0, l2x0_base + L2X0_CTRL);
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
+ static void l2x0_inv_all(void)
+ {
+-	unsigned long flags;
+-
+-	/* invalidate all ways */
+-	spin_lock_irqsave(&l2x0_lock, flags);
+ 	/* Invalidating when L2 is enabled is a nono */
+ 	BUG_ON(readl(l2x0_base + L2X0_CTRL) & 1);
++
++	/*
++	 * invalidate all ways
++	 * Since the L2 is disabled, exclusive accessors may not be
++	 * available to us, so avoid taking any locks.
++	 */
+ 	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_INV_WAY);
+ 	cache_wait_way(l2x0_base + L2X0_INV_WAY, l2x0_way_mask);
+ 	cache_sync();
+-	spin_unlock_irqrestore(&l2x0_lock, flags);
  }
  
+ static void l2x0_inv_range(unsigned long start, unsigned long end)
 -- 
 1.7.0.4
