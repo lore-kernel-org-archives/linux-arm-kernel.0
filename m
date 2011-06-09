@@ -1,55 +1,40 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Thu, 9 Jun 2011 10:05:47 +0530
-Subject: [PATCH v3 04/12] Serial: OMAP: Add runtime pm support for
-	omap-serial driver
-In-Reply-To: <4DEFDDE8.3090808@ti.com>
-References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-	<1307532194-13039-5-git-send-email-govindraj.raja@ti.com>
-	<4DEFDDE8.3090808@ti.com>
-Message-ID: <BANLkTik1fRzQEnGyzTLour-_kYxR+y2kGg@mail.gmail.com>
+From: Snikam@nvidia.com (Sachin Nikam)
+Date: Thu, 9 Jun 2011 10:06:35 +0530
+Subject: [PATCH v4 5/5] ARM: mmp2: update mmp2_defconfig to support mmc
+In-Reply-To: <201106081700.48447.arnd@arndb.de>
+References: <1307526121-12059-1-git-send-email-zhangfei.gao@marvell.com>
+	<1307526121-12059-6-git-send-email-zhangfei.gao@marvell.com>
+	<723849F6A4B5A3408299DF1FFE37CA776C09CFC25F@BGMAIL02.nvidia.com>
+	<201106081700.48447.arnd@arndb.de>
+Message-ID: <723849F6A4B5A3408299DF1FFE37CA776C09CFC260@BGMAIL02.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 9, 2011 at 2:09 AM, Jon Hunter <jon-hunter@ti.com> wrote:
-> Hi Govindraj,
->
-> On 6/8/2011 6:23 AM, Govindraj.R wrote:
->
-> [snip]
->
->> +
->> +#define OMAP_UART_AUTOSUSPEND_DELAY (30 * HZ) /* Value is msecs */
->
-> [snip]
->
->> @@ -1295,18 +1381,36 @@ static int serial_omap_probe(struct
->> platform_device *pdev)
->> ? ? ? ? ? ? ? ?up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
->> ? ? ? ?}
->>
->> + ? ? ? pm_runtime_use_autosuspend(&pdev->dev);
->> + ? ? ? pm_runtime_set_autosuspend_delay(&pdev->dev,
->> + ? ? ? ? ? ? ? ? ? ? ? OMAP_UART_AUTOSUSPEND_DELAY);
->
-> Something is weird here...DEFAULT_AUTOSUSPEND_DELAY is defined as (30*HZ)
-> which would appear to be jiffies (ticks per second) and NOT msecs. However,
-> pm_runtime_set_autosuspend is clearly expecting msecs. So this seems to
-> conflict. By default 30*HZ for omap would be 30*128 = 3840ms so not quite 4
-> seconds.
->
-> What were you intending here?
+Thanks for the reply Arnd.
+Sure I will start posting the patches.
+Regards,
+Sachin Nikam.
 
-Intention is to get approx 3 secs timeout for autosuspend.
+-----Original Message-----
+From: linux-mmc-owner@vger.kernel.org [mailto:linux-mmc-owner at vger.kernel.org] On Behalf Of Arnd Bergmann
+Sent: Wednesday, June 08, 2011 8:31 PM
+To: Sachin Nikam
+Cc: 'Zhangfei Gao'; Nicolas Pitre; Philip Rakity; Wolfram Sang; Chris Ball; linux-mmc at vger.kernel.org; Jun Nie; Raymond Wu; Haojian Zhuang; Qiming Wu; Eric Miao; linux-arm-kernel
+Subject: Re: [PATCH v4 5/5] ARM: mmp2: update mmp2_defconfig to support mmc
 
+On Wednesday 08 June 2011, Sachin Nikam wrote:
+> 
+> Does anybody knows which kernel version will have the SD 4.0 (UHS-II) support?
+
+The SD 4.0 standard is not yet available, so it cannot be implemented.
+I would assume that support will be in the kernel version following the
+release of the spec, or one release later if the timing is bad.
+
+If you already have access to the spec, feel free to post patches so
+we can include it earlier.
+
+	Arnd
 --
-Thanks,
-Govindraj.R
-
->
-> Cheers
-> Jon
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
+the body of a message to majordomo at vger.kernel.org
+More majordomo info at  http://vger.kernel.org/majordomo-info.html
