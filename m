@@ -1,41 +1,45 @@
-From: christian.riesch@omicron.at (Christian Riesch)
-Date: Thu, 9 Jun 2011 12:05:12 +0200
-Subject: [PATCH V2] davinci: da850: move input frequency to board specific
-	files
-In-Reply-To: <874o42wpec.fsf@ti.com>
-References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
-	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
-	<874o42wpec.fsf@ti.com>
-Message-ID: <BANLkTinjV3cdNe92MkiWcXH8GJmOcF_nuA@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 9 Jun 2011 11:06:38 +0100
+Subject: [PATCH 4/6] ARM: reset: add reset functionality for jumping to
+	a physical address
+In-Reply-To: <alpine.DEB.2.00.1106091053340.11513@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106071223100.2247@localhost6.localdomain6>
+	<20110607132220.GB12639@e102144-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1106071435020.2247@localhost6.localdomain6>
+	<20110607153654.GA19855@arm.com>
+	<alpine.DEB.2.00.1106071714400.2236@localhost6.localdomain6>
+	<alpine.DEB.2.00.1106081638420.11513@localhost6.localdomain6>
+	<20110608160527.GA6851@e102144-lin.cambridge.arm.com>
+	<alpine.DEB.2.00.1106081707040.11513@localhost6.localdomain6>
+	<20110608162429.GA28436@arm.com>
+	<alpine.DEB.2.00.1106091053340.11513@localhost6.localdomain6>
+Message-ID: <20110609100638.GC24873@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Hi Frank,
 
-On Tue, Jun 7, 2011 at 12:44 AM, Kevin Hilman <khilman@ti.com> wrote:
-> Christian Riesch <christian.riesch@omicron.at> writes:
->
->> From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
->>
->> Currently the input frequency of the SoC is hardcoded in the SoC specific
->> da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
->> range from 12 to 50 MHz, boards with different oscillator/crystal
->> frequencies may be built.
->>
->> This patch allows setting a different input frequency in the board
->> specific files to support boards with oscillator/crystal frequencies other
->> than 24 MHz.
->>
->> Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
->> Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
->
-> Why not allow board code to just do a clk_set_rate()?
+On Thu, Jun 09, 2011 at 11:00:56AM +0100, Frank Hofmann wrote:
+> Ah, I was concerned that it'd change
+> 
+>  	graphics_cpu_reset ===> graphics_processor.reset
+> 
+> but you're correct that kind of substitution is not happening.
+> 
+> Anyway as Will mentioned, the !MULTI_CPU case has the #define the 
+> following way in any case:
+> 
+> #define	____glue(name,fn)	name##fn
+> #define	__glue(name,fn)		____glue(name,fn)
+> #define	cpu_reset		__glue(CPU_NAME,_reset)
+> 
+> I.e. in the !MULTI_CPU case cpu_reset is defined without the macro 
+> argument, while the MULTI_CPU define _has_ the macro argument.
+> 
+> Would it be ok to remove the (args) part from the MULTI_CPU #define then ?
 
-I'm fine with this method (In fact it was the first thing that I
-tried, I added a .set_rate method to ref_clk, it worked well for me).
-However I wonder whether first initializing the clock with the wrong
-value (24 MHz) and later correcting it via clk_set_rate() would break
-something. In the meantime, the data in the clock tree do not reflect
-the actual frequencies that are present on the SoC.
+I was planning to do that in v2 of the patches.
 
-Christian
+Cheers,
+
+Will
