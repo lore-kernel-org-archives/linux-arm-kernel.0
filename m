@@ -1,40 +1,56 @@
 From: rnayak@ti.com (Rajendra Nayak)
-Date: Thu, 9 Jun 2011 16:24:08 +0530
-Subject: [PATCH 3/8] OMAP2+: PM: Initialise sleep_switch to a non-valid value
-In-Reply-To: <1307616853-28395-3-git-send-email-rnayak@ti.com>
+Date: Thu, 9 Jun 2011 16:24:09 +0530
+Subject: [PATCH 4/8] OMAP2+: PM: idle clkdms only if already in idle
+In-Reply-To: <1307616853-28395-4-git-send-email-rnayak@ti.com>
 References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
 	<1307616853-28395-2-git-send-email-rnayak@ti.com>
 	<1307616853-28395-3-git-send-email-rnayak@ti.com>
-Message-ID: <1307616853-28395-4-git-send-email-rnayak@ti.com>
+	<1307616853-28395-4-git-send-email-rnayak@ti.com>
+Message-ID: <1307616853-28395-5-git-send-email-rnayak@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sleep_switch which is initialised to 0 in omap_set_pwrdm_state
-happens to be a valid sleep_switch type (FORCEWAKEUP_SWITCH)
-which are defined as
-#define FORCEWAKEUP_SWITCH      0
-#define LOWPOWERSTATE_SWITCH    1
-
-This causes the function to wrongly program some clock domains
-even when the Powerdomain is in ON state.
+The omap_set_pwrdm_state function forces clockdomains
+to idle, without checking the existing idle state
+programmed, instead based solely on the HW capability
+of the clockdomain to support idle.
+This is wrong and the clockdomains should be idled
+post a state_switch *only* if idle transitions on the
+clockdomain were already enabled.
 
 Signed-off-by: Rajendra Nayak <rnayak@ti.com>
 ---
- arch/arm/mach-omap2/pm.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap2/pm.c |    4 +++-
+ 1 files changed, 3 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-index 49486f5..d48813f 100644
+index d48813f..840b0e1 100644
 --- a/arch/arm/mach-omap2/pm.c
 +++ b/arch/arm/mach-omap2/pm.c
-@@ -106,7 +106,7 @@ static void omap2_init_processor_devices(void)
- int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
- {
+@@ -108,6 +108,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
  	u32 cur_state;
--	int sleep_switch = 0;
-+	int sleep_switch = -1;
+ 	int sleep_switch = -1;
  	int ret = 0;
++	int hwsup = 0;
  
  	if (pwrdm == NULL || IS_ERR(pwrdm))
+ 		return -EINVAL;
+@@ -127,6 +128,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+ 			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+ 			sleep_switch = LOWPOWERSTATE_SWITCH;
+ 		} else {
++			hwsup = clkdm_is_idle(pwrdm->pwrdm_clkdms[0]);
+ 			clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
+ 			pwrdm_wait_transition(pwrdm);
+ 			sleep_switch = FORCEWAKEUP_SWITCH;
+@@ -142,7 +144,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+ 
+ 	switch (sleep_switch) {
+ 	case FORCEWAKEUP_SWITCH:
+-		if (pwrdm->pwrdm_clkdms[0]->flags & CLKDM_CAN_ENABLE_AUTO)
++		if (hwsup)
+ 			clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
+ 		else
+ 			clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
 -- 
 1.7.0.4
