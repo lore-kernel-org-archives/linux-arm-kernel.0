@@ -1,34 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jun 2011 18:38:36 +0100
-Subject: [RFC PATCH 0/2] ARM: Add a generic macro for declaring
-	proc_info structs
-In-Reply-To: <1307640112-5360-1-git-send-email-dave.martin@linaro.org>
-References: <1307640112-5360-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20110609173836.GF24424@n2100.arm.linux.org.uk>
+Date: Thu, 9 Jun 2011 18:53:13 +0100
+Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+In-Reply-To: <20110609171255.GD24424@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
+	<201106072348.44624.rjw@sisk.pl>
+	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
+	<20110609154058.GA24424@n2100.arm.linux.org.uk>
+	<4DF0F45A.3030103@ti.com>
+	<20110609164024.GB24424@n2100.arm.linux.org.uk>
+	<4DF0FA73.8050607@ti.com>
+	<20110609171255.GD24424@n2100.arm.linux.org.uk>
+Message-ID: <20110609175313.GG24424@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 06:21:50PM +0100, Dave Martin wrote:
-> Based on recent problems with variable-size Thumb instructions
-> inside tables, this patch adds an experimental macro for declaring
-> proc_info structs, as an example of the kind of build-time robustness
-> we could implement for these and similar structures.
+On Thu, Jun 09, 2011 at 06:12:55PM +0100, Russell King - ARM Linux wrote:
+> > 3. Avoid direct write to AUXCTRL in generic suspend code.
+> 
+> This is the only problematical one that I can see.  We need to restore
+> this on systems running in secure mode.  What we could do is rather than
+> writing to the register, read it first and compare its value with what
+> was saved to see whether we need to write it.
+> 
+> Then, if platforms run in non-secure mode, they are responsible for
+> restoring that register back to its pre-suspend value before their
+> assembly calls cpu_resume().
 
-Could we just check the size of the proc_info region in the linker
-is a multiple of the struct size we expect?
+And here's a patch which does that:
 
-> However, this may be taking a sledgehammer to crack a nut,
-> and it will cause some churn, though it could leave is with a
-> cleaner situation afterwards.
+8<-----------
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+ARM: Avoid writing to auxctrl register unless it needs to be updated
 
-It does look very much like a sledge hammer to me.  All we're really
-after is whether the size of the region is what we expect it to be -
-which will tell us whether there's a T2 instruction in there.
+As the auxiliary control register is not writable in non-secure mode
+such as on OMAP, we must avoid writing the register when resuming in
+non-secure mode.  Avoid this by moving the responsibility to the
+SoC code in this case to ensure that the auxiliary control register
+is restored before cpu_resume() is called.
 
-It's also fragile - if the struct has a member inserted, who says that
-the offsets in the macro will be updated anyway... so it still suffers
-from the same problem of no real build-time checking.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+--
+ arch/arm/mm/proc-v7.S |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-At least if we check that the size of the region is a multiple of the
-struct size, we can catch whether there's any mismatch between the
-struct size and assembly rather trivially.
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index 3c38678..fa1e6d5 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -237,7 +237,9 @@ ENTRY(cpu_v7_do_resume)
+ 	mcr	p15, 0, r7, c2, c0, 0	@ TTB 0
+ 	mcr	p15, 0, r8, c2, c0, 1	@ TTB 1
+ 	mcr	p15, 0, ip, c2, c0, 2	@ TTB control register
+-	mcr	p15, 0, r10, c1, c0, 1	@ Auxiliary control register
++	mrc	p15, 0, r4, c1, c0, 1	@ Read auxiliary control register
++	teq	r4, r10
++	mcrne	p15, 0, r10, c1, c0, 1	@ Auxiliary control register
+ 	mcr	p15, 0, r11, c1, c0, 2	@ Co-processor access control
+ 	ldr	r4, =PRRR		@ PRRR
+ 	ldr	r5, =NMRR		@ NMRR
