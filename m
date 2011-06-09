@@ -1,55 +1,21 @@
-From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Thu, 9 Jun 2011 23:23:28 +0300
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Thu, 9 Jun 2011 15:27:11 -0500
 Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3820B85E7@AUSP01VMBX24.collaborationhost.net>
+In-Reply-To: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
 References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-	<20110605083445.GT16318@ibawizard.net>
-	<20110605085948.GB16018@acer>
-	<20110605.140801.1144137337172959622.davem@davemloft.net>
-	<20110606172607.GB3082@acer>
-	<ADE657CA350FB648AAC2C43247A983F001F381FC56CE@AUSP01VMBX24.collaborationhost.net>
-	<20110609195052.GB2857@acer>
-	<ADE657CA350FB648AAC2C43247A983F001F3820B85E7@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20110609202328.GD2857@acer>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3820B85F3@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 03:18:39PM -0500, H Hartley Sweeten wrote:
-> On Thursday, June 09, 2011 12:51 PM, Mika Westerberg wrote:
-> > On Mon, Jun 06, 2011 at 12:48:19PM -0500, H Hartley Sweeten wrote:
-> >> If Lennert is no longer maintaining the this driver we really need someone to
-> >> step up and handle it.
-> >> 
-> >> I have no problem doing it but I really don't have a good grasp on the driver
-> >> or the whole network subsystem.
-> >> 
-> >> If Lennert is willing to hand it over, I have no problem being listed as a
-> >> co-maintainer along with either yourself of Ryan.  Between the two (or three)
-> >> of us we should be able to handle it.
-> >
-> > Hartley,
-> >
-> > Can you take maintainership of this driver? Since you already maintain most of
-> > the ep93xx core stuff I think that you are the right person for the job. If
-> > you need any assistance I believe me and Ryan can help you out.
-> >
-> > We have now few patches queued:
-> >	- this series from me to fix the DMA API violations
-> >	- phylib patches from Florian Fainelli
-> >
-> > It would be great to get those in someday :-)
-> 
-> Hmm.. Ok, fine ;-)
-> 
-> I just submitted a patch to lkml changing the maintainership to myself.
-> 
-> Patches will still need to be applied through someone's tree, probably
-> David Miller's, since I don't have my own.
-> 
-> I think your series and Florian's patches are still in my inbox.  I'll try
-> to look at them today and provide feedback.
+On Thursday, June 02, 2011 12:00 PM, Mika Westerberg wrote:
+>
+> As the driver is now passing platform device to the DMA mapping functions,
+> we should give it valid DMA masks.
+>
+> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
+> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
 
-Ok, thanks :-)
+Since you made this patch the first in the series the commit message is not
+quite right.  Other than that:
 
-I was also going to test and review Florian's patches this week. I'll report
-back when I'm done.
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
