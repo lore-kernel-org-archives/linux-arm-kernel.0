@@ -1,125 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 09 Jun 2011 22:51:10 +0530
-Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <20110609171255.GD24424@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
-	<201106072348.44624.rjw@sisk.pl>
-	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-	<20110609154058.GA24424@n2100.arm.linux.org.uk>
-	<4DF0F45A.3030103@ti.com>
-	<20110609164024.GB24424@n2100.arm.linux.org.uk>
-	<4DF0FA73.8050607@ti.com>
-	<20110609171255.GD24424@n2100.arm.linux.org.uk>
-Message-ID: <4DF10106.7040406@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu,  9 Jun 2011 18:21:50 +0100
+Subject: [RFC PATCH 0/2] ARM: Add a generic macro for declaring proc_info
+	structs
+Message-ID: <1307640112-5360-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/9/2011 10:42 PM, Russell King - ARM Linux wrote:
-> On Thu, Jun 09, 2011 at 10:23:07PM +0530, Santosh Shilimkar wrote:
->> On 6/9/2011 10:10 PM, Russell King - ARM Linux wrote:
->>> On Thu, Jun 09, 2011 at 09:57:06PM +0530, Santosh Shilimkar wrote:
->>>> On 6/9/2011 9:10 PM, Russell King - ARM Linux wrote:
->>>>> On Thu, Jun 09, 2011 at 04:30:08PM +0100, Frank Hofmann wrote:
->>>>>> Btw, when testing this I found that generic cpu_suspend seems to be just
->>>>>> fine for OMAP3; the OMAP platforms though do not at this time use the
->>>>>> generic cpu_suspend/resume for sleep, is it planned to change that ?
->>>>>
->>>>> That's because OMAP was doing changes to their sleep code while I was
->>>>> consolidating the sleep code, and although I asked several times that
->>>>> the OMAP folk should participate in this effort, but evidentally I was
->>>>> unsuccessful in achieving anything in that direction.
->>>>
->>>> Agreed but the situation at that point was the code was not at
->>>> all in convertible position. Looking at your below comment,
->>>> it's still not :)
->>>
->>> Well, I had a look before posting this reply, and ran away from it.
->>> I've gone back to it several times since, and got a similar reaction.
->>>
->>> I seem to remember that it looked _more_ convertable when I looked at
->>> it when doing the generic suspend/resume support - I could see a nice
->>> simple way to pull out the saving and just leave the PLL resume stuff
->>> in SRAM.
->>>
->>> I'm now convinced that if I try to convert it use the generic support,
->>> it will end up being a horrible broken mess.
->>
->> I must admit that I had same impression when I started looking at it.
->>
->> Few provisions are necessary for OMAP which I can think of are:
->> 1. WFI loop should be made a seperate function so that it can pushed
->> on SRAM which is must for OMAP3.
->
-> If you look at the generic cpu suspend, it sits in the suspend path.
-> Once cpu_suspend() has been called, it will return as normal and you
-> can then do whatever you require to place the system into suspend -
-> including calling out to a function in WFI.
->
->> 2. A callback before WFI to implement the Errata WA's
->
-> "WA's" ?
->
-Software Work-Arounds for issues around WFI or special
-cases.
+Based on recent problems with variable-size Thumb instructions
+inside tables, this patch adds an experimental macro for declaring
+proc_info structs, as an example of the kind of build-time robustness
+we could implement for these and similar structures.
 
->> 3. Avoid direct write to AUXCTRL in generic suspend code.
->
-> This is the only problematical one that I can see.  We need to restore
-> this on systems running in secure mode.  What we could do is rather than
-> writing to the register, read it first and compare its value with what
-> was saved to see whether we need to write it.
->
-> Then, if platforms run in non-secure mode, they are responsible for
-> restoring that register back to its pre-suspend value before their
-> assembly calls cpu_resume().
->
->> 4. Before MMU is enabled in resume a callback to restore
->> secure register, setup auxctrl etc.
->
-> You can do this before your assembly calls cpu_resume().
->
->> Additionally the L2 cache handling isn't part of
->> these common suspend hooks.
->
-> L2 cache handling can't fit into the generic code - it doesn't really
-> belong there either.  It needs to be in the parent or hooked into the
-> syscore_ops stuff as I've said previously.
->
-Ok. I missed these points in last discussion.
+As such, it's an illustration of something we _could_ do, rather
+than something we necessarily should do.
 
-> So:
->
-> ENTRY(my_soc_suspend)
->          stmfd   sp!, {r4 - r12, lr}
->          ldr     r3, =resume
->          bl      cpu_suspend
-> 	/*
-> 	 * Insert whatever code is required here for suspend
-> 	 * eg, save secure mode, then jump to sram to call WFI function
-> 	 */
-> resume:
-> 	ldmfd	sp!, {r4 - r12, pc}
-> ENDPROC(my_soc_suspend)
->
-> ENTRY(my_soc_resume)
-> 	/*
-> 	 * Insert whatever other code is required to be run before resume
-> 	 * eg, WFI function returns to this symbol after DDR becomes
-> 	 * accessible.  restore secure mode state
-> 	 */
-> 	b	cpu_resume
-> ENDPROC(my_soc_resume)
->
-> What makes it far more complicated in the OMAP case is all that "is l1 state
-> lost?  is l2 state lost?" stuff.
+I'd be interested in people's views on this.
 
-Exactly. And that's where the most complexity comes in. Also on OMAP
-we use same sleep code for CPUidle and suspend and in idle, there
-are many low power states possible with variation of L1, l2, CPU logic,
-L2 controller logic, interrupt controller logic etc.
 
-Thanks for bringing up these points. Now I better understand
-as well why I struggled to get anything running relaibly
-on OMAP4 with few hours attempt with suspend hooks.
+Potential advantages include:
 
-Regards
+ * automatic build-time checking that struct proc_info is reasonably
+in sync with the assembler definitions;
+
+ * automatic checking that proc_info structure declarations are
+complete and correctly structured, with no mis-sized or misaligned
+elements (particularly important for Thumb-2 kernels);
+
+ * better readability of the declarations (depending on people's
+personal taste, of course);
+
+ * reduction of some boilerplate code (perhaps up to 700 lines net
+if we were to convert all arch/arm/mm/proc-*.S to use the macro.
+
+
+The same general technique could be potentially expanded to cover
+any struct defined in assembler.
+
+However, this may be taking a sledgehammer to crack a nut,
+and it will cause some churn, though it could leave is with a
+cleaner situation afterwards.
+
+
+Much lighter-weight, less invasive build-time checks could
+still deliver significant benefits.
+
+
+Dave Martin (2):
+  ARM: Add a generic macro for declaring proc_info structs
+  ARM: proc-v7: Use the new proc_info declaration macro
+
+ arch/arm/mm/proc-macros.S |  141 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v7.S     |   93 ++++++++++++-----------------
+ 2 files changed, 179 insertions(+), 55 deletions(-)
+
+-- 
+1.7.4.1
