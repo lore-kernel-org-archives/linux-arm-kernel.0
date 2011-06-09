@@ -1,39 +1,46 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 09 Jun 2011 11:23:14 +0200
-Subject: [PATCH] arm: omap3: beagle: Ensure msecure is mux'd to be able
-	to set the RTC
-In-Reply-To: <4DF078E4.8040903@compulab.co.il>
-References: <4D9AEB76.2060509@ahsoftware.de>
-	<1302010808-3065-1-git-send-email-holler@ahsoftware.de>
-	<20110531102903.GU11352@atomide.com>
-	<4DEDDAF6.2070505@ahsoftware.de> <4DEDF451.1080604@compulab.co.il>
-	<4DEE0858.2020308@ahsoftware.de> <4DEFF035.4070004@compulab.co.il>
-	<4DF0120E.5030204@ahsoftware.de> <4DF078E4.8040903@compulab.co.il>
-Message-ID: <4DF09102.9080503@ahsoftware.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 9 Jun 2011 10:47:10 +0100
+Subject: [PATCH] ARM: zImage: fix Thumb2 breakage
+In-Reply-To: <alpine.LFD.2.00.1106082350500.2142@xanadu.home>
+References: <alpine.LFD.2.00.1106082350500.2142@xanadu.home>
+Message-ID: <20110609094710.GB2208@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jun 08, 2011 at 11:53:02PM -0400, Nicolas Pitre wrote:
+> 
+> Commit af3e4fd37a "ARM: 6859/1: Add writethrough dcache support for
+> ARM926EJS processor" broke Thumb2 compilation by omitting to maintain
+> the wide encoding for the added branch instructions which made the
+> ARM926EJ-S record smaller than expected, breaking the record walk code.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> CC: Mark A. Greer <mgreer@mvista.com>
 
-Am 09.06.2011 09:40, schrieb Igor Grinberg:
-> On 06/09/11 03:21, Alexander Holler wrote:
+This patch looks right, and works for me.
 
-> I see. Is the new patch version somehow provides better functionality?
-> You configure the gpio for output, this means that the pin is actually driven
-> and not just relies on internal pullup (which can vary from chip to chip).
-> I know nothing about that msecure stuff, but may be it is better to drive the pin,
-> then just configuring the mux (enabling internal pullup)...
+Acked-by: Dave Martin <dave.martin@linaro.org>
 
-Just using the internal pullup was enough with my BeagleBoard C4.
-
->> Below is an updated version. The gpio_export() might be removed too.
->
-> The original patch version is already in Linus' tree, so this one will not apply as it is.
-> If you decide it is better then the original one, then it must be rebased.
-> Otherwise, looks OK.
-
-I'm fine with either version, so no new patch is necessary. ;)
-
-Regards,
-
-Alexander
+> ---
+> diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
+> index f9da419..942fad9 100644
+> --- a/arch/arm/boot/compressed/head.S
+> +++ b/arch/arm/boot/compressed/head.S
+> @@ -691,9 +691,9 @@ proc_types:
+>  
+>  		.word	0x41069260		@ ARM926EJ-S (v5TEJ)
+>  		.word	0xff0ffff0
+> -		b	__arm926ejs_mmu_cache_on
+> -		b	__armv4_mmu_cache_off
+> -		b	__armv5tej_mmu_cache_flush
+> +		W(b)	__arm926ejs_mmu_cache_on
+> +		W(b)	__armv4_mmu_cache_off
+> +		W(b)	__armv5tej_mmu_cache_flush
+>  
+>  		.word	0x00007000		@ ARM7 IDs
+>  		.word	0x0000f000
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
