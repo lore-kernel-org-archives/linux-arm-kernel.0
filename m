@@ -1,115 +1,63 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 9 Jun 2011 17:20:27 +0100
-Subject: [PATCH v2 04/10] ARM: lib: add switch_stack function for safely
-	changing stack
-In-Reply-To: <20110609161113.GA29954@arm.com>
-References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
-	<1307635142-11312-5-git-send-email-will.deacon@arm.com>
-	<20110609161113.GA29954@arm.com>
-Message-ID: <20110609162027.GB29954@arm.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Thu, 9 Jun 2011 17:26:35 +0100 (BST)
+Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+In-Reply-To: <20110609154058.GA24424@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
+	<201106072348.44624.rjw@sisk.pl>
+	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
+	<20110609154058.GA24424@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1106091707220.11513@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 05:11:13PM +0100, Dave Martin wrote:
-> On Thu, Jun 09, 2011 at 04:58:56PM +0100, Will Deacon wrote:
-> > When disabling the MMU, it is necessary to take out a 1:1 identity map
-> > of the reset code so that it can safely be executed with and without
-> > the MMU active. To avoid the situation where the physical address of the
-> > reset code aliases with the virtual address of the active stack (which
-> > cannot be included in the 1:1 mapping), it is desirable to change to a
-> > new stack at a location which is less likely to alias.
-> > 
-> > This code adds a new lib function, switch_stack:
-> > 
-> > void switch_stack(void (*fn)(void *), void *arg, void *sp);
-> > 
-> > which changes the stack to point at the sp parameter, before invoking
-> > fn(arg) with the new stack selected.
-> > 
-> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm/lib/Makefile       |    3 +-
-> >  arch/arm/lib/switch_stack.S |   44 +++++++++++++++++++++++++++++++++++++++++++
-> >  2 files changed, 46 insertions(+), 1 deletions(-)
-> >  create mode 100644 arch/arm/lib/switch_stack.S
-> > 
-> > diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> > index 59ff42d..5fa67de 100644
-> > --- a/arch/arm/lib/Makefile
-> > +++ b/arch/arm/lib/Makefile
-> > @@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
-> >  		   testchangebit.o testclearbit.o testsetbit.o        \
-> >  		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
-> >  		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
-> > -		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-> > +		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-> > +		   switch_stack.o
-> >  
-> >  mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
-> >  
-> > diff --git a/arch/arm/lib/switch_stack.S b/arch/arm/lib/switch_stack.S
-> > new file mode 100644
-> > index 0000000..76e3844
-> > --- /dev/null
-> > +++ b/arch/arm/lib/switch_stack.S
-> > @@ -0,0 +1,44 @@
-> > +/*
-> > + * arch/arm/lib/switch_stack.S
-> > + *
-> > + * Copyright (C) 2011 ARM Ltd.
-> > + * Written by Will Deacon <will.deacon@arm.com>
-> > + *
-> > + * This program is free software; you can redistribute it and/or modify
-> > + * it under the terms of the GNU General Public License version 2 as
-> > + * published by the Free Software Foundation.
-> > + *
-> > + * This program is distributed in the hope that it will be useful,
-> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> > + * GNU General Public License for more details.
-> > + *
-> > + * You should have received a copy of the GNU General Public License
-> > + * along with this program; if not, write to the Free Software
-> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-> > + */
-> > +
-> > +#include <linux/linkage.h>
-> > +#include <asm/assembler.h>
-> > +
-> > +/*
-> > + * void switch_stack(void (*fn)(void *), void *arg, void *sp)
-> > + *
-> > + * Change the stack to that pointed at by sp, then invoke fn(arg) with
-> > + * the new stack.
-> > + */
-> > +ENTRY(switch_stack)
-> > +	str	sp, [r2, #-4]!
-> > +	str	lr, [r2, #-4]!
-> > +
-> > +	mov	sp, r2
-> > +	mov	r2, r0
-> > +	mov	r0, r1
-> > +
-> > +	adr	lr, BSYM(1f)
-> > +	mov	pc, r2
-> > +
-> > +1:	ldr	lr, [sp, #4]
-> 
-> Looks like this should be
-> 
-> 	ldr	lr, [sp, #4]!
-> 
-> ...otherwise we'll also load the lr value into sp.
-> Looks like that may have been my mistake.
 
-Argh
 
-I really meant:
+On Thu, 9 Jun 2011, Russell King - ARM Linux wrote:
 
-	ldr	lr, [sp], #4
+> On Thu, Jun 09, 2011 at 04:30:08PM +0100, Frank Hofmann wrote:
+>> Btw, when testing this I found that generic cpu_suspend seems to be just
+>> fine for OMAP3; the OMAP platforms though do not at this time use the
+>> generic cpu_suspend/resume for sleep, is it planned to change that ?
+>
+> That's because OMAP was doing changes to their sleep code while I was
+> consolidating the sleep code, and although I asked several times that
+> the OMAP folk should participate in this effort, but evidentally I was
+> unsuccessful in achieving anything in that direction.
+>
+> And of course since then it's been forgotten about, and I've given up
+> on that particular aspect.  I've also come to the conclusion that OMAP
+> is sufficiently weird (requiring soo much to execute from SRAM) that
+> its hopeless to persue.
+>
 
-Apologies for the confusion!
+Thanks for the info.
 
-Cheers
----Dave
+You're right the omap sleep code is long. The l1_logic_lost sequence of 
+p15 accesses in there could probably be shortened via cpu_suspend/resume 
+but it's not fully obvious (to me) how to plug it in.
+
+I'm largely asking because the hibernation patch, as written (and using 
+the cpu_v7_do_suspend/resume backends), does "work" on OMAP3 as far as 
+I've tested it, i.e. it didn't need the complex dance done by the OMAP 
+sleep code itself.
+
+That said, there's secure state, there's maybe other stuff the iROM deals 
+with, and I don't know how to comprehensively test this gets restored to 
+a usable state (or even needs to), so a claim that the hibernation patch 
+is proven perfect goes a bit far. Hence quotes, "works".
+
+Re OMAP, there's two questions regarding hibernation/suspend-to-disk:
+
+a) What reasons if any are there why cpu_{v7_do_}suspend/resume are not
+    ok to use (on OMAP) for snapshotting core state, for the purpose of
+    hibernation ?
+    If there are any such issues, then how could they be addresssed ?
+
+b) Is it necessary to provide machine hooks in the hibernation code for
+    some auxilliary stuff that's not saved/restored by device suspend ?
+    If so, how would this need to look like, from the OMAP view ?
+
+OMAP is a complex piece as it seems, hence maybe someone can comment from 
+that angle ?
+
+FrankH.
