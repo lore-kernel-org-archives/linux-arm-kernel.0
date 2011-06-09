@@ -1,60 +1,47 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jun 2011 18:53:13 +0100
-Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <20110609171255.GD24424@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
-	<201106072348.44624.rjw@sisk.pl>
-	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-	<20110609154058.GA24424@n2100.arm.linux.org.uk>
-	<4DF0F45A.3030103@ti.com>
-	<20110609164024.GB24424@n2100.arm.linux.org.uk>
-	<4DF0FA73.8050607@ti.com>
-	<20110609171255.GD24424@n2100.arm.linux.org.uk>
-Message-ID: <20110609175313.GG24424@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 09 Jun 2011 11:24:01 -0700
+Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
+In-Reply-To: <20110607223614.GC28451@n2100.arm.linux.org.uk>
+References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
+	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
+	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
+	<20110607081527.GB20929@n2100.arm.linux.org.uk>
+	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
+	<20110607182923.GA28451@n2100.arm.linux.org.uk>
+	<BANLkTikLFCyzU3UApjjwfX0Vjujo9WAFZA@mail.gmail.com>
+	<20110607223614.GC28451@n2100.arm.linux.org.uk>
+Message-ID: <4DF10FC1.9030406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 06:12:55PM +0100, Russell King - ARM Linux wrote:
-> > 3. Avoid direct write to AUXCTRL in generic suspend code.
-> 
-> This is the only problematical one that I can see.  We need to restore
-> this on systems running in secure mode.  What we could do is rather than
-> writing to the register, read it first and compare its value with what
-> was saved to see whether we need to write it.
-> 
-> Then, if platforms run in non-secure mode, they are responsible for
-> restoring that register back to its pre-suspend value before their
-> assembly calls cpu_resume().
+On 06/07/11 15:36, Russell King - ARM Linux wrote:
+> I see no effort from the Samsung folk to even start considering moving
+> to common APIs - I see precisely the opposite.  They seem to have a
+> strong desire to invent their own new APIs all the time rather than
+> look at existing APIs and discuss how they can be used or adapted so
+> they work for Samsung.
+>
+> That is not sustainable, and if it continues, it will probably result
+> in Samsung stuff being chucked out of mainline.  We are most definitely
+> at the point where custom APIs are no longer permissible, especially
+> for any new SoCs.
 
-And here's a patch which does that:
+Hi Russell and everyone,
 
-8<-----------
-From: Russell King <rmk+kernel@arm.linux.org.uk>
-ARM: Avoid writing to auxctrl register unless it needs to be updated
+Sorry for late participation on this :(
+I'm out of my office for biz. trip so it was hard to check my e-mail
+and will be back to my country this weekend.
 
-As the auxiliary control register is not writable in non-secure mode
-such as on OMAP, we must avoid writing the register when resuming in
-non-secure mode.  Avoid this by moving the responsibility to the
-SoC code in this case to ensure that the auxiliary control register
-is restored before cpu_resume() is called.
+Anyway, I and my colleagues know what we have to do for Linux world.
+And as I know, we are preparing some stuff for it so please don't
+expect the worst :)
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+I should be back on this after discussing with my colleagues.
+
+Thanks.
+
+Best regards,
+Kgene.
 --
- arch/arm/mm/proc-v7.S |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index 3c38678..fa1e6d5 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -237,7 +237,9 @@ ENTRY(cpu_v7_do_resume)
- 	mcr	p15, 0, r7, c2, c0, 0	@ TTB 0
- 	mcr	p15, 0, r8, c2, c0, 1	@ TTB 1
- 	mcr	p15, 0, ip, c2, c0, 2	@ TTB control register
--	mcr	p15, 0, r10, c1, c0, 1	@ Auxiliary control register
-+	mrc	p15, 0, r4, c1, c0, 1	@ Read auxiliary control register
-+	teq	r4, r10
-+	mcrne	p15, 0, r10, c1, c0, 1	@ Auxiliary control register
- 	mcr	p15, 0, r11, c1, c0, 2	@ Co-processor access control
- 	ldr	r4, =PRRR		@ PRRR
- 	ldr	r5, =NMRR		@ NMRR
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
