@@ -1,98 +1,106 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  9 Jun 2011 16:58:56 +0100
-Subject: [PATCH v2 04/10] ARM: lib: add switch_stack function for safely
-	changing stack
+Date: Thu,  9 Jun 2011 16:58:57 +0100
+Subject: [PATCH v2 05/10] ARM: idmap: add header file for identity mapping
+	functions
 In-Reply-To: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
 References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307635142-11312-5-git-send-email-will.deacon@arm.com>
+Message-ID: <1307635142-11312-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When disabling the MMU, it is necessary to take out a 1:1 identity map
-of the reset code so that it can safely be executed with and without
-the MMU active. To avoid the situation where the physical address of the
-reset code aliases with the virtual address of the active stack (which
-cannot be included in the 1:1 mapping), it is desirable to change to a
-new stack at a location which is less likely to alias.
+The identity mappings functions are useful outside of SMP booting, so
+expose them through their own header file.
 
-This code adds a new lib function, switch_stack:
-
-void switch_stack(void (*fn)(void *), void *arg, void *sp);
-
-which changes the stack to point at the sp parameter, before invoking
-fn(arg) with the new stack selected.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/lib/Makefile       |    3 +-
- arch/arm/lib/switch_stack.S |   44 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/lib/switch_stack.S
+ arch/arm/include/asm/idmap.h   |   16 ++++++++++++++++
+ arch/arm/include/asm/pgtable.h |    3 ---
+ arch/arm/kernel/process.c      |    3 +--
+ arch/arm/kernel/smp.c          |    1 +
+ arch/arm/mm/idmap.c            |    1 +
+ 5 files changed, 19 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/include/asm/idmap.h
 
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index 59ff42d..5fa67de 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   testchangebit.o testclearbit.o testsetbit.o        \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
- 		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
--		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-+		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-+		   switch_stack.o
- 
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
- 
-diff --git a/arch/arm/lib/switch_stack.S b/arch/arm/lib/switch_stack.S
+diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
 new file mode 100644
-index 0000000..76e3844
+index 0000000..ea9517e
 --- /dev/null
-+++ b/arch/arm/lib/switch_stack.S
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/lib/switch_stack.S
-+ *
-+ * Copyright (C) 2011 ARM Ltd.
-+ * Written by Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
++++ b/arch/arm/include/asm/idmap.h
+@@ -0,0 +1,16 @@
++#ifndef _ARM_IDMAP_H
++#define _ARM_IDMAP_H
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
++#include <asm/page.h>
 +
-+/*
-+ * void switch_stack(void (*fn)(void *), void *arg, void *sp)
-+ *
-+ * Change the stack to that pointed at by sp, then invoke fn(arg) with
-+ * the new stack.
-+ */
-+ENTRY(switch_stack)
-+	str	sp, [r2, #-4]!
-+	str	lr, [r2, #-4]!
++void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end);
 +
-+	mov	sp, r2
-+	mov	r2, r0
-+	mov	r0, r1
++#ifdef CONFIG_SMP
++void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end);
++#else
++void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end) {};
++#endif
 +
-+	adr	lr, BSYM(1f)
-+	mov	pc, r2
++void setup_mm_for_reboot(char mode);
 +
-+1:	ldr	lr, [sp, #4]
-+	ldr	sp, [sp]
-+	mov	pc, lr
-+ENDPROC(switch_stack)
++#endif	/* _ARM_IDMAP_H */
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 5750704..9d559a8 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -474,9 +474,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+ 
+ #define pgtable_cache_init() do { } while (0)
+ 
+-void identity_mapping_add(pgd_t *, unsigned long, unsigned long);
+-void identity_mapping_del(pgd_t *, unsigned long, unsigned long);
+-
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* CONFIG_MMU */
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 5e1e541..8bd9d94 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -32,6 +32,7 @@
+ #include <linux/hw_breakpoint.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/idmap.h>
+ #include <asm/leds.h>
+ #include <asm/processor.h>
+ #include <asm/system.h>
+@@ -56,8 +57,6 @@ static const char *isa_modes[] = {
+   "ARM" , "Thumb" , "Jazelle", "ThumbEE"
+ };
+ 
+-extern void setup_mm_for_reboot(char mode);
+-
+ static volatile int hlt_counter;
+ 
+ #include <mach/system.h>
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 344e52b..dfc76aa 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -39,6 +39,7 @@
+ #include <asm/tlbflush.h>
+ #include <asm/ptrace.h>
+ #include <asm/localtimer.h>
++#include <asm/idmap.h>
+ 
+ /*
+  * as from 2.5, kernels no longer have an init_tasks structure
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 2be9139..4ae0f09 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -1,6 +1,7 @@
+ #include <linux/kernel.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/idmap.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
+ 
 -- 
 1.7.0.4
