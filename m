@@ -1,41 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 8 Jun 2011 19:46:13 -0600
-Subject: [PATCH] ARM: DT: don't try to access physical address zero
-In-Reply-To: <alpine.LFD.2.00.1106082138420.2142@xanadu.home>
-References: <alpine.LFD.2.00.1106082138420.2142@xanadu.home>
-Message-ID: <20110609014613.GA1112@ponder.secretlab.ca>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Wed,  8 Jun 2011 20:44:02 -0700
+Subject: [PATCH] msm: timer: compensate for timer shift in msm_read_timer_count
+Message-ID: <1307591042-2369-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 09:40:47PM -0400, Nicolas Pitre wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> If the DT physical address is zero, this is equivalent to no DT.
-> Especially when the actual RAM physical address is not located at zero,
-> the result of phys_to_virt() would point to la-la-land and crash the
-> kernel, which crash is completely silent this early during boot.
-> 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> CC: Grant Likely <grant.likely@secretlab.ca>
+Some msm targets have timers whose lower bits are unreliable. So, we
+present our timers as lower frequency than they actually are, and ignore
+the bottom 5 bits on such targets. This compensation was erroneously
+removed from the msm_read_timer_count function, so restore it.
 
-Hmmm, I thought I had fixed that.
+This was broken by 94790ec25 "msm: timer: SMP timer support for msm".
 
-This is obviously correct.
+Change-Id: I8c56bdf82629638748ccf352118ea664f967b87d
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+---
+ arch/arm/mach-msm/timer.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Acked-by: Grant Likely <grant.likely@secretlab.ca>
-
-> ---
-> diff --git a/arch/arm/kernel/devtree.c b/arch/arm/kernel/devtree.c
-> index a701e42..0cdd7b4 100644
-> --- a/arch/arm/kernel/devtree.c
-> +++ b/arch/arm/kernel/devtree.c
-> @@ -76,6 +76,9 @@ struct machine_desc * __init setup_machine_fdt(unsigned int dt_phys)
->  	unsigned long dt_root;
->  	const char *model;
->  
-> +	if (!dt_phys)
-> +		return NULL;
-> +
->  	devtree = phys_to_virt(dt_phys);
->  
->  	/* check device tree validity */
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 38b95e9..b3579fe 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -100,7 +100,7 @@ static cycle_t msm_read_timer_count(struct clocksource *cs)
+ {
+ 	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
+ 
+-	return readl(clk->global_counter);
++	return readl(clk->global_counter) >> clk->shift;
+ }
+ 
+ static struct msm_clock *clockevent_to_clock(struct clock_event_device *evt)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
