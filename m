@@ -1,63 +1,55 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Thu, 9 Jun 2011 13:34:56 +0900
-Subject: [PATCH v2 0/4] Samsung: Move Samsung SoCs GPIO drivers to
-	drivers/gpio
-In-Reply-To: <BANLkTikKs5E8WNSCG680mk2ow3+SH2WKLA@mail.gmail.com>
-References: <BANLkTikKs5E8WNSCG680mk2ow3+SH2WKLA@mail.gmail.com>
-Message-ID: <BANLkTima+xCpq5hKkPQkZuuyqsyk6Vhxww@mail.gmail.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Thu, 9 Jun 2011 10:05:47 +0530
+Subject: [PATCH v3 04/12] Serial: OMAP: Add runtime pm support for
+	omap-serial driver
+In-Reply-To: <4DEFDDE8.3090808@ti.com>
+References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+	<1307532194-13039-5-git-send-email-govindraj.raja@ti.com>
+	<4DEFDDE8.3090808@ti.com>
+Message-ID: <BANLkTik1fRzQEnGyzTLour-_kYxR+y2kGg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 9, 2011 at 1:05 PM, Bhuvana Kakunoori
-<bhuvana.kakunoori@linaro.org> wrote:
-> Hi Kyungmin,
+On Thu, Jun 9, 2011 at 2:09 AM, Jon Hunter <jon-hunter@ti.com> wrote:
+> Hi Govindraj,
 >
-> This is regards to the patch submitted by you at
-> http://www.spinics.net/lists/arm-kernel/msg125861.html
-> I didnt have the thread in my mailbox, so starting another thread.
-> Can you please let me know, what were your plans for consolidation when you
-> moved these folders to drivers/gpio?
-
-At least s5p100, s5pc110, and s5pc210 (aka exynos4) gpio drivers are
-moved and merged already.
-I want to make a simplified GPIO drivers for Samsung GPIOs.
-
-e.g., most recent (please ignore the old s3c24xx series GPIOs) SoCs
-use the 4-bit based GPIOs and has 8 pins at each banks.
-so it can defined as below and use the macro at drivers.
-
-#define SAMSUNG_GPIO(group, n)    (((group) * 8) + (n))
-enum s5pv210_gpio_groups {
-           S5PV210_GPA0,
-           S5PV210_GPA1,
-           ...
-};
-
-SAMSUNG_GPIO(S5PV210_GPA0, n);
-
-In the view of files & directories
-drivers/gpio/gpio-samsung.c for generic samsung gpio drivers.
-pass the required information with platform data. then driver got the
-platform data and register each gpio groups.
-it only defined the how many gpio banks are required and its base address.
-Of course there's special case, external GPIOs. then we set the flags
-as SAMSUNG_EXTERNAL_GPIO_FLAGS
-and register it as external gpios.
-
-I also consider to use the basic_mmio_gpios but it required to modify
-and need to expand for our use case since pullup and strength
-handling. but finally these are also should be moved to proper
-framework. as it's not defined at generic gpio drivers. Maybe pinmux
-can handle these.
-
-Do you have any ideas or opinions. then please let me know.
-
-Thank you,
-Kyungmin Park
-
-> I was looking into the gpio code for samsung platforms, and wanted to know
-> what you are working on.
+> On 6/8/2011 6:23 AM, Govindraj.R wrote:
 >
-> Regards
-> Bhuvana
+> [snip]
+>
+>> +
+>> +#define OMAP_UART_AUTOSUSPEND_DELAY (30 * HZ) /* Value is msecs */
+>
+> [snip]
+>
+>> @@ -1295,18 +1381,36 @@ static int serial_omap_probe(struct
+>> platform_device *pdev)
+>> ? ? ? ? ? ? ? ?up->uart_dma.rx_dma_channel = OMAP_UART_DMA_CH_FREE;
+>> ? ? ? ?}
+>>
+>> + ? ? ? pm_runtime_use_autosuspend(&pdev->dev);
+>> + ? ? ? pm_runtime_set_autosuspend_delay(&pdev->dev,
+>> + ? ? ? ? ? ? ? ? ? ? ? OMAP_UART_AUTOSUSPEND_DELAY);
+>
+> Something is weird here...DEFAULT_AUTOSUSPEND_DELAY is defined as (30*HZ)
+> which would appear to be jiffies (ticks per second) and NOT msecs. However,
+> pm_runtime_set_autosuspend is clearly expecting msecs. So this seems to
+> conflict. By default 30*HZ for omap would be 30*128 = 3840ms so not quite 4
+> seconds.
+>
+> What were you intending here?
+
+Intention is to get approx 3 secs timeout for autosuspend.
+
+--
+Thanks,
+Govindraj.R
+
+>
+> Cheers
+> Jon
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
