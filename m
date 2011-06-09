@@ -1,91 +1,29 @@
-From: richard.zhu@linaro.org (Richard Zhu)
-Date: Thu, 9 Jun 2011 13:37:59 +0800
-Subject: [PATCH V2] mmc: Enable the ADMA on esdhc imx driver
-Message-ID: <1307597879-6326-1-git-send-email-richard.zhu@linaro.org>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Thu, 9 Jun 2011 09:42:22 +0300
+Subject: [RFC 2/6] omap: iovmm: generic iommu api migration
+In-Reply-To: <201106081246.53106.laurent.pinchart@ideasonboard.com>
+References: <1307053663-24572-1-git-send-email-ohad@wizery.com>
+	<201106071326.53106.laurent.pinchart@ideasonboard.com>
+	<BANLkTimqt=yMGHcqEH5u-4GkMX9=+BuB6A@mail.gmail.com>
+	<201106081246.53106.laurent.pinchart@ideasonboard.com>
+Message-ID: <BANLkTikowqhMj=stjziwHeN4UxEKo09qrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eanble the ADMA2 mode on freescale esdhc imx driver,
-tested on MX51 and MX53.
+On Wed, Jun 8, 2011 at 1:46 PM, Laurent Pinchart
+<laurent.pinchart@ideasonboard.com> wrote:
+> On Tuesday 07 June 2011 15:46:26 Ohad Ben-Cohen wrote:
+>> Where do you take care of those potential offsets today ? Or do you
+>> simply ignore the offsets and map the entire page ?
+>
+> Here http://marc.info/?l=linux-omap&m=130693502326513&w=2 :-)
 
-Only ADMA2 mode is enabled, MX25/35 can't support the ADMA2 mode.
-So this patch is only used for MX51/53.
-The ADMA2 mode supported or not can be distinguished by the
-Capability Register(offset 0x40) of eSDHC module.
-Up to now, only MX51/MX53 set the ADMA2 supported bit(Bit20) in the
-Capability Register.
+:)
 
-Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |   34 ++++++++++++++++++++++++++++++++--
- 1 files changed, 32 insertions(+), 2 deletions(-)
+Ok so it seems iovmm will take care of that for now ?
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index a19967d..0696e36 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -31,6 +31,14 @@
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
- 
-+/*
-+ * There is INT DMA ERR mis-match between eSDHC and STD SDHC SPEC
-+ * Bit25 is used in STD SPEC, and is reserved in fsl eSDHC design,
-+ * but bit28 is used as the INT DMA ERR in fsl eSDHC design.
-+ * Define this macro DMA error INT for fsl eSDHC
-+ */
-+#define  SDHCI_INT_VENDOR_SPEC_DMA_ERR	0x10000000
-+
- #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
- /*
-  * The CMDTYPE of the CMD register (offset 0xE) should be set to
-@@ -80,6 +88,20 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- 			val |= SDHCI_CARD_PRESENT;
- 	}
- 
-+	if (unlikely(reg == SDHCI_CAPABILITIES)) {
-+		if (val & SDHCI_CAN_DO_ADMA1) {
-+			val &= ~SDHCI_CAN_DO_ADMA1;
-+			val |= SDHCI_CAN_DO_ADMA2;
-+		}
-+	}
-+
-+	if (unlikely(reg == SDHCI_INT_STATUS)) {
-+		if (val & SDHCI_INT_VENDOR_SPEC_DMA_ERR) {
-+			val &= ~SDHCI_INT_VENDOR_SPEC_DMA_ERR;
-+			val |= SDHCI_INT_ADMA_ERROR;
-+		}
-+	}
-+
- 	return val;
- }
- 
-@@ -105,6 +127,13 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
- 	}
- 
-+	if (unlikely((reg == SDHCI_INT_ENABLE)
-+				|| (reg == SDHCI_SIGNAL_ENABLE))) {
-+		if (val & SDHCI_INT_ADMA_ERROR) {
-+			val &= ~SDHCI_INT_ADMA_ERROR;
-+			val |= SDHCI_INT_VENDOR_SPEC_DMA_ERR;
-+		}
-+	}
- 	writel(val, host->ioaddr + reg);
- }
- 
-@@ -322,9 +351,10 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
- }
- 
- struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
--	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
-+	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_HISPD_BIT
-+			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
-+			| SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC
- 			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
--	/* ADMA has issues. Might be fixable */
- 	.ops = &sdhci_esdhc_ops,
- 	.init = esdhc_pltfm_init,
- 	.exit = esdhc_pltfm_exit,
--- 
-1.7.1
+Let's get the basics working with the IOMMU API and then revise this
+when we switch from iovmm to the generic dma.
+
+Thanks,
+Ohad.
