@@ -1,39 +1,40 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Jun 2011 15:16:09 -0700
-Subject: [PATCH] ARM: EXYNOS4: Fix incorrect mapping of gpio pull-up macro
-	to register setting
-In-Reply-To: <20110607171030.GE17754@ponder.secretlab.ca>
-References: <1307435689-15954-1-git-send-email-thomas.ab@samsung.com>
-	<BANLkTi=YeOyK1WX61NtyprYdUyNmSo1sTw@mail.gmail.com>
-	<20110607171030.GE17754@ponder.secretlab.ca>
-Message-ID: <4DF14629.1070307@samsung.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Thu, 09 Jun 2011 16:31:06 -0700
+Subject: [PATCH] msm: timer: compensate for timer shift in
+	msm_read_timer_count
+In-Reply-To: <1307626910.16418.1.camel@m0nster> (Daniel Walker's message of
+	"Thu, 09 Jun 2011 06:41:50 -0700")
+References: <1307591042-2369-1-git-send-email-johlstei@codeaurora.org>
+	<1307626910.16418.1.camel@m0nster>
+Message-ID: <8ya1uz2inut.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/11 10:10, Grant Likely wrote:
-> On Tue, Jun 07, 2011 at 05:42:47PM +0900, Kyungmin Park wrote:
->> On Tue, Jun 7, 2011 at 5:34 PM, Thomas Abraham<thomas.ab@samsung.com>  wrote:
+On Thu, Jun 09 2011, Daniel Walker wrote:
 
-(snip)
-
-> Applied, thanks.
+>> diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+>> index 38b95e9..b3579fe 100644
+>> --- a/arch/arm/mach-msm/timer.c
+>> +++ b/arch/arm/mach-msm/timer.c
+>> @@ -100,7 +100,7 @@ static cycle_t msm_read_timer_count(struct clocksource *cs)
+>>  {
+>>  	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
+>>  
+>> -	return readl(clk->global_counter);
+>> +	return readl(clk->global_counter) >> clk->shift;
+>>  }
 >
-> g.
+> Could you comment in the code with something explaining what the shift
+> is doing.
 
-Hi Grant, sorry for late response.
+Probably best to describe this near msm_clock's definition (or
+MSM_DGT_SHIFT), since it is a bit unclear what these values are.
+A good (but short) description of how the shifts and even why.
 
-Could you please add my ack on this?
+The comment shouldn't be in the function body (CodingStyle, chapter 8).
 
-Acked-by: Kukjin Kim <kgene.kim@samsung.com>
+David
 
->>> Signed-off-by: Thomas Abraham<thomas.ab@samsung.com>
-
-(snip)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
