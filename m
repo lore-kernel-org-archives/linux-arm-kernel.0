@@ -1,42 +1,35 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 09 Jun 2011 11:24:01 -0700
-Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
-In-Reply-To: <20110607223614.GC28451@n2100.arm.linux.org.uk>
-References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
-	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
-	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
-	<20110607081527.GB20929@n2100.arm.linux.org.uk>
-	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
-	<20110607182923.GA28451@n2100.arm.linux.org.uk>
-	<BANLkTikLFCyzU3UApjjwfX0Vjujo9WAFZA@mail.gmail.com>
-	<20110607223614.GC28451@n2100.arm.linux.org.uk>
-Message-ID: <4DF10FC1.9030406@samsung.com>
+Date: Thu, 09 Jun 2011 11:29:00 -0700
+Subject: [PATCH] [CPUFREQ] S3C6410: Support 800MHz operation in cpufreq
+In-Reply-To: <20110608140238.GB7204@redhat.com>
+References: <1307540955-10086-1-git-send-email-broonie@opensource.wolfsonmicro.com>
+	<20110608140238.GB7204@redhat.com>
+Message-ID: <4DF110EC.8030209@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/07/11 15:36, Russell King - ARM Linux wrote:
-> I see no effort from the Samsung folk to even start considering moving
-> to common APIs - I see precisely the opposite.  They seem to have a
-> strong desire to invent their own new APIs all the time rather than
-> look at existing APIs and discuss how they can be used or adapted so
-> they work for Samsung.
+On 06/08/11 07:02, Dave Jones wrote:
+> On Wed, Jun 08, 2011 at 02:49:15PM +0100, Mark Brown wrote:
+>   >  At least some newer S3C6410 silicon supports operation up to 800MHz rather
+>   >  than just 667MHz. Unfortunately I don't have access to any of documentation
+>   >  of this other than some running systems, add a new cpufreq table entry for
+>   >  this based on the behaviour of those systems.
+>   >
+>   >  Signed-off-by: Mark Brown<broonie@opensource.wolfsonmicro.com>
+>   >  ---
+>   >
+>   >  Kukjin already indicated on several occasions that he was happy with
+>   >  this change but it never seems to get applied or an actual ack.
 >
-> That is not sustainable, and if it continues, it will probably result
-> in Samsung stuff being chucked out of mainline.  We are most definitely
-> at the point where custom APIs are no longer permissible, especially
-> for any new SoCs.
+> applied, thanks.
+>
+> 	Dave
 
-Hi Russell and everyone,
+Dave, could you please add my ack on this?
 
-Sorry for late participation on this :(
-I'm out of my office for biz. trip so it was hard to check my e-mail
-and will be back to my country this weekend.
+Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Anyway, I and my colleagues know what we have to do for Linux world.
-And as I know, we are preparing some stuff for it so please don't
-expect the worst :)
-
-I should be back on this after discussing with my colleagues.
+Mark, sorry for late my ack :)
 
 Thanks.
 
