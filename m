@@ -1,25 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Jun 2011 16:40:58 +0100
-Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
-	<201106072348.44624.rjw@sisk.pl>
-	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-Message-ID: <20110609154058.GA24424@n2100.arm.linux.org.uk>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 9 Jun 2011 08:57:39 -0700
+Subject: [PATCH] ARM: tegra/harmony: enable USB host ports
+In-Reply-To: <BANLkTikRZw+OjUit=uLpHYS1KkPeM2FbEw@mail.gmail.com>
+References: <1307528018-14454-1-git-send-email-marc.zyngier@arm.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF0498E1CDC5@HQMAIL01.nvidia.com>
+	<4DEFADCB.90805@arm.com>
+	<BANLkTikRZw+OjUit=uLpHYS1KkPeM2FbEw@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF0498E1CFA6@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 04:30:08PM +0100, Frank Hofmann wrote:
-> Btw, when testing this I found that generic cpu_suspend seems to be just  
-> fine for OMAP3; the OMAP platforms though do not at this time use the  
-> generic cpu_suspend/resume for sleep, is it planned to change that ?
+Mike Rapoport wrote at Thursday, June 09, 2011 12:53 AM:
+> On Wed, Jun 8, 2011 at 8:13 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> >
+> > > I'm not sure if that platform data is appropriate for tegra_ehci1_device;
+> > > the ChromeOS kernel doesn't enable that port.
+> >
+> > There's probably some kind of GPIO trickery involved to reset the
+> > port...
+> 
+> I don't think it's possible to enable port 1 in host mode on
+> harmony... As far as I remember, port 1 is routed to mini-B connector
+> and there's nothing that would supply Vbus in the host mode...
 
-That's because OMAP was doing changes to their sleep code while I was
-consolidating the sleep code, and although I asked several times that
-the OMAP folk should participate in this effort, but evidentally I was
-unsuccessful in achieving anything in that direction.
+Yes, looking at the schematic, I don't think I can see anything to drive
+5v onto that connector, just detect whether it's there. For the other 3
+USB ports, there's clearly something to drive 5v based on a signal from
+the LAN/USB hub chip.
 
-And of course since then it's been forgotten about, and I've given up
-on that particular aspect.  I've also come to the conclusion that OMAP
-is sufficiently weird (requiring soo much to execute from SRAM) that
-its hopeless to persue.
+-- 
+nvpublic
