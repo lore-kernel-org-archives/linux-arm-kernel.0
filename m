@@ -1,62 +1,138 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Thu, 9 Jun 2011 09:07:02 +0900
-Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
-In-Reply-To: <BANLkTikFKr+3Qph+CR40SUV-DCir1v=KBg@mail.gmail.com>
-References: <BANLkTi=FcNncT_6HpvB_6OnQ94f0_sz7Gw@mail.gmail.com>
-	<20110608160844E.fujita.tomonori@lab.ntt.co.jp>
-	<BANLkTikFKr+3Qph+CR40SUV-DCir1v=KBg@mail.gmail.com>
-Message-ID: <20110609090403I.fujita.tomonori@lab.ntt.co.jp>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 09 Jun 2011 02:21:34 +0200
+Subject: [PATCH] arm: omap3: beagle: Ensure msecure is mux'd to be able
+	to set the RTC
+In-Reply-To: <4DEFF035.4070004@compulab.co.il>
+References: <4D9AEB76.2060509@ahsoftware.de>
+	<1302010808-3065-1-git-send-email-holler@ahsoftware.de>
+	<20110531102903.GU11352@atomide.com>
+	<4DEDDAF6.2070505@ahsoftware.de> <4DEDF451.1080604@compulab.co.il>
+	<4DEE0858.2020308@ahsoftware.de> <4DEFF035.4070004@compulab.co.il>
+Message-ID: <4DF0120E.5030204@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 8 Jun 2011 13:05:57 -0700
-Dan Williams <dan.j.williams@intel.com> wrote:
-
-> Perhaps, but this sounds like the reverse of what happens today where
-> scsi device drivers with knowledge of their own hardware will tell the
-> midlayer/subsystem the restriction.  The change with regard to this
-> patch is that the scsi device driver (for example) will recognize that
-> the device it is driving will not be a bus master and will arrange to
-> allocate a dma channel from dmaengine.  When said scsi driver reports
-> the dma restrictions to the subsystem it will borrow the parameters
-> from the dma channel, not the scsi device.  So yes, I still think it
-> should be whatever the dma channel says.
+On 08.06.2011 23:57, Igor Grinberg wrote:
+> On 06/07/11 14:15, Alexander Holler wrote:
 > 
-> Although, you've been doing scsi work longer than I, so maybe I'm
-> overlooking something...?
+>> Am 07.06.2011 11:50, schrieb Igor Grinberg:
+>>> On 06/07/11 11:01, Alexander Holler wrote:
+>>>
+>>>> Am 31.05.2011 12:29, schrieb Tony Lindgren:
+>>>>> * Alexander Holler<holler@ahsoftware.de>   [110405 06:38]:
+>>>>>> Without msecure beeing high it isn't possible to set (or start)
+>>>>>> the RTC.
+>>>>>>
+>>>>>> Tested with a BeagleBoard C4.
+>>>>>
+>>>>> Adding this into fixes.
+>>>>>
+>>>>> Tony
+>>>>>
+>>>>>> Signed-off-by: Alexander Holler<holler@ahsoftware.de>
+>>>>>> ---
+>>>>>>    arch/arm/mach-omap2/board-omap3beagle.c |    3 +++
+>>>>>>    1 files changed, 3 insertions(+), 0 deletions(-)
+>>>>>>
+>>>>>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+>>>>>> index 46d814a..ebe3a7e 100644
+>>>>>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+>>>>>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+>>>>>> @@ -628,6 +628,9 @@ static void __init omap3_beagle_init(void)
+>>>>>>        usb_ehci_init(&ehci_pdata);
+>>>>>>        omap3beagle_flash_init();
+>>>>>>
+>>>>>> +    /* Ensure msecure is mux'd to be able to set the RTC. */
+>>>>>> +    omap_mux_init_signal("sys_drm_msecure", OMAP_PIN_OFF_OUTPUT_HIGH);
+>>>>>> +
+>>>>>>        /* Ensure SDRC pins are mux'd for self-refresh */
+>>>>>>        omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+>>>>>>        omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+>>>>>> -- 
+>>>>>> 1.7.3.4
+>>>>>>
+>>>>
+>>>> I've later switched to the following patch which muxes msecure as GPIO (the drm-mode isn't explained in the TRM) and also exports the GPIO, so root could easily switch it to prevent modifications on the RTC.
+>>>>
+>>>> (Warning, either my clipboard or the version of Thunderbird I'm currently using replaces the tabs with spaces in the pasted patch and I'm currently too lazy to search a workaround).
+>>>>
+>>>> ---
+>>>>   arch/arm/mach-omap2/board-omap3beagle.c |    6 ++++++
+>>>>   1 files changed, 6 insertions(+), 0 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+>>>> index 33007fd..24b4417 100644
+>>>> --- a/arch/arm/mach-omap2/board-omap3beagle.c
+>>>> +++ b/arch/arm/mach-omap2/board-omap3beagle.c
+>>>> @@ -673,6 +673,12 @@ static void __init omap3_beagle_init(void)
+>>>>          usbhs_init(&usbhs_bdata);
+>>>>          omap3beagle_flash_init();
+>>>>
+>>>> +       /* Ensure msecure is high to be able to set the RTC. */
+>>>> +       omap_mux_init_signal("gpio_22", OMAP_PIN_OFF_OUTPUT_HIGH);
+>>>> +       gpio_request(22, "msecure");
+>>>> +       gpio_direction_output(22, true);
+>>>
+>>> Can this be gpio_request_one() instead, please?
+>>> Also, it will be nice to make a define for the magic 22.
+>>
+>> You need the "gpio_22" in the mux_init, so using a define would imho introduce a potential source for an error, at least when the define would not be anywhere near the "gpio_22" and someone would forget change the string too, when he changes the define. So I don't think a define adds much value there.
 > 
-> Are there any cases today where the subsystem imposes tighter
-> restrictions on the dma geometry than what the device reports?  Even
+> Why not leave "sys_drm_msecure" for mux_init, or does it make troubles on XM?
 
-Yeah, there are already lots.
+There is nothing wrong with the small patch which uses sys_drm_msecure.
+It's short and does everything which is needed to use the RTC. I've
+posted the solution with the use of the GPIO-mode only as an alternative
+because the drm-mode isn't explained in the TRM (I assume one has to
+sign a NDA to get more informations on that).
+So it is not obvious what my first patch does. Using sys_drm_msecure
+works because it seems to be always off, at least on the BeagleBoards.
+The additional functionality in my second patch to turn off possible
+modifications on the RTC through switching the GPIO is most likely just
+an educational feature, I don't think someone will ever use that.
+I don't have any preferences which solution will end in the kernel, I
+just wanted to offer the second one too.
 
-SCSI-mid layer set the max sg entries to 128 on many architectures
-(see SCSI_MAX_SG_CHAIN_SEGMENTS).
+> What about gpio_request_one()? To conform with the rest of the file and mach-omap2/*.
 
-SCSI HBA drivers stores the max sg entries in scsi_host structure.
+Below is an updated version. The gpio_export() might be removed too.
 
-SCSI-mid layer sets the tighter one (see __scsi_alloc_queue).
+Regards,
 
-	blk_queue_max_segments(q, min_t(unsigned short, shost->sg_tablesize,
-					SCSI_MAX_SG_CHAIN_SEGMENTS));
-
-As you know, modern SCSI HBA can handle more sg entries than 128.
+Alexander
 
 
-> if that were the case it would be same situation that the scsi device
-> driver reports maximum parameters, but the subsystem opts for
-> something tighter.  Whether the maximal parameters come from the scsi
-> device or the dma channel is moot.
+From: Alexander Holler <holler@ahsoftware.de>
+Date: Thu, 19 May 2011 11:42:05 +0200
+Subject: [PATCH v3] arm: omap3: beagle: Ensure msecure is mux'd and high
+to be able to set the RTC
 
-If only you convert all the SCSI HBA drivers to store the limit of sg
-entries in struct device_dma_parameters and use the proposed API.
+Without msecure beeing high it isn't possible to set (or start)
+the RTC.
 
-I can't find any description in this patchset about how we will
-convert software that already set the limit of max sg entries in a
-different way.
+Tested with a BeagleBoard C4.
 
-I don't think that this patchset needs to convert the SCSI (and other
-software layers setting the limit of max sg entries). But I think that
-we need a new rule, the data structure, and the API about how and
-where everyone sets the dma restrictions and tells them to the upper
-software layers.
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+---
+ arch/arm/mach-omap2/board-omap3beagle.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c
+b/arch/arm/mach-omap2/board-omap3beagle.c
+index 33007fd..4c9e26e 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -673,6 +673,11 @@ static void __init omap3_beagle_init(void)
+ 	usbhs_init(&usbhs_bdata);
+ 	omap3beagle_flash_init();
+
++	/* Ensure msecure is high to be able to set the RTC. */
++	omap_mux_init_signal("gpio_22", OMAP_PIN_OFF_OUTPUT_HIGH);
++	gpio_request_one(22, GPIOF_OUT_INIT_HIGH, "msecure");
++	gpio_export(22, false);
++
+ 	/* Ensure SDRC pins are mux'd for self-refresh */
+ 	omap_mux_init_signal("sdrc_cke0", OMAP_PIN_OUTPUT);
+ 	omap_mux_init_signal("sdrc_cke1", OMAP_PIN_OUTPUT);
+-- 
+1.7.3.4
