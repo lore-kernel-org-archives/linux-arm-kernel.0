@@ -1,111 +1,115 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 9 Jun 2011 17:11:13 +0100
+Date: Thu, 9 Jun 2011 17:20:27 +0100
 Subject: [PATCH v2 04/10] ARM: lib: add switch_stack function for safely
 	changing stack
-In-Reply-To: <1307635142-11312-5-git-send-email-will.deacon@arm.com>
+In-Reply-To: <20110609161113.GA29954@arm.com>
 References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
 	<1307635142-11312-5-git-send-email-will.deacon@arm.com>
-Message-ID: <20110609161113.GA29954@arm.com>
+	<20110609161113.GA29954@arm.com>
+Message-ID: <20110609162027.GB29954@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 04:58:56PM +0100, Will Deacon wrote:
-> When disabling the MMU, it is necessary to take out a 1:1 identity map
-> of the reset code so that it can safely be executed with and without
-> the MMU active. To avoid the situation where the physical address of the
-> reset code aliases with the virtual address of the active stack (which
-> cannot be included in the 1:1 mapping), it is desirable to change to a
-> new stack at a location which is less likely to alias.
+On Thu, Jun 09, 2011 at 05:11:13PM +0100, Dave Martin wrote:
+> On Thu, Jun 09, 2011 at 04:58:56PM +0100, Will Deacon wrote:
+> > When disabling the MMU, it is necessary to take out a 1:1 identity map
+> > of the reset code so that it can safely be executed with and without
+> > the MMU active. To avoid the situation where the physical address of the
+> > reset code aliases with the virtual address of the active stack (which
+> > cannot be included in the 1:1 mapping), it is desirable to change to a
+> > new stack at a location which is less likely to alias.
+> > 
+> > This code adds a new lib function, switch_stack:
+> > 
+> > void switch_stack(void (*fn)(void *), void *arg, void *sp);
+> > 
+> > which changes the stack to point at the sp parameter, before invoking
+> > fn(arg) with the new stack selected.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm/lib/Makefile       |    3 +-
+> >  arch/arm/lib/switch_stack.S |   44 +++++++++++++++++++++++++++++++++++++++++++
+> >  2 files changed, 46 insertions(+), 1 deletions(-)
+> >  create mode 100644 arch/arm/lib/switch_stack.S
+> > 
+> > diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+> > index 59ff42d..5fa67de 100644
+> > --- a/arch/arm/lib/Makefile
+> > +++ b/arch/arm/lib/Makefile
+> > @@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+> >  		   testchangebit.o testclearbit.o testsetbit.o        \
+> >  		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
+> >  		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
+> > -		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
+> > +		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
+> > +		   switch_stack.o
+> >  
+> >  mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+> >  
+> > diff --git a/arch/arm/lib/switch_stack.S b/arch/arm/lib/switch_stack.S
+> > new file mode 100644
+> > index 0000000..76e3844
+> > --- /dev/null
+> > +++ b/arch/arm/lib/switch_stack.S
+> > @@ -0,0 +1,44 @@
+> > +/*
+> > + * arch/arm/lib/switch_stack.S
+> > + *
+> > + * Copyright (C) 2011 ARM Ltd.
+> > + * Written by Will Deacon <will.deacon@arm.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + * You should have received a copy of the GNU General Public License
+> > + * along with this program; if not, write to the Free Software
+> > + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+> > + */
+> > +
+> > +#include <linux/linkage.h>
+> > +#include <asm/assembler.h>
+> > +
+> > +/*
+> > + * void switch_stack(void (*fn)(void *), void *arg, void *sp)
+> > + *
+> > + * Change the stack to that pointed at by sp, then invoke fn(arg) with
+> > + * the new stack.
+> > + */
+> > +ENTRY(switch_stack)
+> > +	str	sp, [r2, #-4]!
+> > +	str	lr, [r2, #-4]!
+> > +
+> > +	mov	sp, r2
+> > +	mov	r2, r0
+> > +	mov	r0, r1
+> > +
+> > +	adr	lr, BSYM(1f)
+> > +	mov	pc, r2
+> > +
+> > +1:	ldr	lr, [sp, #4]
 > 
-> This code adds a new lib function, switch_stack:
+> Looks like this should be
 > 
-> void switch_stack(void (*fn)(void *), void *arg, void *sp);
+> 	ldr	lr, [sp, #4]!
 > 
-> which changes the stack to point at the sp parameter, before invoking
-> fn(arg) with the new stack selected.
-> 
-> Signed-off-by: Dave Martin <dave.martin@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm/lib/Makefile       |    3 +-
->  arch/arm/lib/switch_stack.S |   44 +++++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 46 insertions(+), 1 deletions(-)
->  create mode 100644 arch/arm/lib/switch_stack.S
-> 
-> diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-> index 59ff42d..5fa67de 100644
-> --- a/arch/arm/lib/Makefile
-> +++ b/arch/arm/lib/Makefile
-> @@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
->  		   testchangebit.o testclearbit.o testsetbit.o        \
->  		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
->  		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
-> -		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-> +		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-> +		   switch_stack.o
->  
->  mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
->  
-> diff --git a/arch/arm/lib/switch_stack.S b/arch/arm/lib/switch_stack.S
-> new file mode 100644
-> index 0000000..76e3844
-> --- /dev/null
-> +++ b/arch/arm/lib/switch_stack.S
-> @@ -0,0 +1,44 @@
-> +/*
-> + * arch/arm/lib/switch_stack.S
-> + *
-> + * Copyright (C) 2011 ARM Ltd.
-> + * Written by Will Deacon <will.deacon@arm.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program; if not, write to the Free Software
-> + * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <asm/assembler.h>
-> +
-> +/*
-> + * void switch_stack(void (*fn)(void *), void *arg, void *sp)
-> + *
-> + * Change the stack to that pointed at by sp, then invoke fn(arg) with
-> + * the new stack.
-> + */
-> +ENTRY(switch_stack)
-> +	str	sp, [r2, #-4]!
-> +	str	lr, [r2, #-4]!
-> +
-> +	mov	sp, r2
-> +	mov	r2, r0
-> +	mov	r0, r1
-> +
-> +	adr	lr, BSYM(1f)
-> +	mov	pc, r2
-> +
-> +1:	ldr	lr, [sp, #4]
+> ...otherwise we'll also load the lr value into sp.
+> Looks like that may have been my mistake.
 
-Looks like this should be
+Argh
 
-	ldr	lr, [sp, #4]!
+I really meant:
 
-...otherwise we'll also load the lr value into sp.
-Looks like that may have been my mistake.
+	ldr	lr, [sp], #4
 
+Apologies for the confusion!
+
+Cheers
 ---Dave
-
-> +	ldr	sp, [sp]
-> +	mov	pc, lr
-> +ENDPROC(switch_stack)
-> -- 
-> 1.7.0.4
-> 
