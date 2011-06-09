@@ -1,50 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu,  9 Jun 2011 16:58:59 +0100
-Subject: [PATCH v2 07/10] ARM: multi-cpu: remove arguments from CPU proc macros
+Date: Thu,  9 Jun 2011 16:59:02 +0100
+Subject: [PATCH v2 10/10] ARM: stop: execute platform callback from cpu_stop
+	code
 In-Reply-To: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
 References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1307635142-11312-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1307635142-11312-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The macros for invoking functions via the processor struct in the
-MULTI_CPU case define the arguments as part of the macros, making it
-impossible to take the address of those functions.
+Sending IPI_CPU_STOP to a CPU causes it to execute a busy cpu_relax
+loop forever. This makes it impossible to kexec successfully on an SMP
+system since the secondary CPUs do not reset.
 
-This patch removes the arguments from the macro definitions so that we
-can take the address of these functions like we can for the !MULTI_CPU
-case.
+This patch adds a callback to platform_cpu_kill, defined when
+CONFIG_HOTPLUG_CPU=y, from the ipi_cpu_stop handling code. This function
+currently just returns 1 on all platforms that define it but allows them
+to do something more sophisticated in the future.
 
-Reported-by: Frank Hofmann <frank.hofmann@tomtom.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/proc-fns.h |   14 +++++++-------
- 1 files changed, 7 insertions(+), 7 deletions(-)
+ arch/arm/Kconfig      |    2 +-
+ arch/arm/kernel/smp.c |    4 ++++
+ 2 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
-index 8ec535e..633d1cb 100644
---- a/arch/arm/include/asm/proc-fns.h
-+++ b/arch/arm/include/asm/proc-fns.h
-@@ -82,13 +82,13 @@ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
- extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
- extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
- #else
--#define cpu_proc_init()			processor._proc_init()
--#define cpu_proc_fin()			processor._proc_fin()
--#define cpu_reset(addr)			processor.reset(addr)
--#define cpu_do_idle()			processor._do_idle()
--#define cpu_dcache_clean_area(addr,sz)	processor.dcache_clean_area(addr,sz)
--#define cpu_set_pte_ext(ptep,pte,ext)	processor.set_pte_ext(ptep,pte,ext)
--#define cpu_do_switch_mm(pgd,mm)	processor.switch_mm(pgd,mm)
-+#define cpu_proc_init			processor._proc_init
-+#define cpu_proc_fin			processor._proc_fin
-+#define cpu_reset			processor.reset
-+#define cpu_do_idle			processor._do_idle
-+#define cpu_dcache_clean_area		processor.dcache_clean_area
-+#define cpu_set_pte_ext			processor.set_pte_ext
-+#define cpu_do_switch_mm		processor.switch_mm
- #endif
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..c26d8f6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1795,7 +1795,7 @@ config XIP_PHYS_ADDR
  
- extern void cpu_resume(void);
+ config KEXEC
+ 	bool "Kexec system call (EXPERIMENTAL)"
+-	depends on EXPERIMENTAL
++	depends on EXPERIMENTAL && (!SMP || HOTPLUG_CPU)
+ 	help
+ 	  kexec is a system call that implements the ability to shutdown your
+ 	  current kernel, and to start another kernel.  It is like a reboot
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index dfc76aa..39189bf 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -548,6 +548,10 @@ static void ipi_cpu_stop(unsigned int cpu)
+ 	local_fiq_disable();
+ 	local_irq_disable();
+ 
++#ifdef CONFIG_HOTPLUG_CPU
++	platform_cpu_kill(cpu);
++#endif
++
+ 	while (1)
+ 		cpu_relax();
+ }
 -- 
 1.7.0.4
