@@ -1,20 +1,49 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Thu, 9 Jun 2011 17:45:57 +0100
-Subject: ARM/DT: registering clks from DT in .init_early
-Message-ID: <20110609164557.GK3711@pulham.picochip.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Thu, 9 Jun 2011 22:18:11 +0530
+Subject: [PATCH V2] davinci: da850: move input frequency to board
+	specific	files
+In-Reply-To: <BANLkTinjV3cdNe92MkiWcXH8GJmOcF_nuA@mail.gmail.com>
+References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
+	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
+	<874o42wpec.fsf@ti.com>
+	<BANLkTinjV3cdNe92MkiWcXH8GJmOcF_nuA@mail.gmail.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D42628A@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm currently working on moving our platform to device tree with the aim 
-of mainlining it.  Before device tree we registered the clks in the 
-.init_early machine callback which is fine as the clks are static data.  
-I'm now trying to dynamically register these clks from the device tree 
-but the slab allocator isn't available at this stage so I can't allocate 
-them dynamically.
+Hi Christian,
 
-Am I heading in the wrong direction here?  We currently get the 
-clocksource and clock event frequency from a clk so I don't think this 
-can be made later (though I guess this could come from device tree 
-instead).
+On Thu, Jun 09, 2011 at 15:35:12, Christian Riesch wrote:
+> Hi Kevin,
+> 
+> On Tue, Jun 7, 2011 at 12:44 AM, Kevin Hilman <khilman@ti.com> wrote:
+> > Christian Riesch <christian.riesch@omicron.at> writes:
+> >
+> >> From: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+> >>
+> >> Currently the input frequency of the SoC is hardcoded in the SoC specific
+> >> da850.c file to 24 MHz. Since the SoC accepts input frequencies in a wide
+> >> range from 12 to 50 MHz, boards with different oscillator/crystal
+> >> frequencies may be built.
+> >>
+> >> This patch allows setting a different input frequency in the board
+> >> specific files to support boards with oscillator/crystal frequencies other
+> >> than 24 MHz.
+> >>
+> >> Signed-off-by: Bob Dunlop <bob.dunlop@xyzzy.org.uk>
+> >> Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
+> >
+> > Why not allow board code to just do a clk_set_rate()?
+> 
+> I'm fine with this method (In fact it was the first thing that I
+> tried, I added a .set_rate method to ref_clk, it worked well for me).
+> However I wonder whether first initializing the clock with the wrong
+> value (24 MHz) and later correcting it via clk_set_rate() would break
+> something. In the meantime, the data in the clock tree do not reflect
+> the actual frequencies that are present on the SoC.
 
-Jamie
+Doing this right after <soc>_init() should be safe. The board should not
+assume clocks to be setup before this call is made.
+
+Thanks,
+Sekhar
