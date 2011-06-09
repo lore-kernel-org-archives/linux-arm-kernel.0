@@ -1,30 +1,37 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Thu, 9 Jun 2011 11:50:35 +0200
-Subject: [PATCH] mach-ux500: iomap PRCMU TCDM memory
-Message-ID: <1307613035-1633-1-git-send-email-mattias.wallin@stericsson.com>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Thu, 9 Jun 2011 10:55:47 +0100
+Subject: [PATCH 1/2] ARM: pmu: refactor reservation
+In-Reply-To: <1307546911-2714-2-git-send-email-mark.rutland@arm.com>
+References: <1307546911-2714-1-git-send-email-mark.rutland@arm.com>
+	<1307546911-2714-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <20110609095547.GA3711@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PRCMU TCDM memory needs to be iomapped for the PRCMU to work
-properly.
+On Wed, Jun 08, 2011 at 04:28:30PM +0100, Mark Rutland wrote:
+> Currently, PMU platform_device reservation relies on some minor abuse
+> of the platform_device::id field for determining the type of PMU. This
+> is problematic for device tree based probing, where the ID cannot be
+> controlled.
+> 
+> This patch removes reliance on the id field, and depends on each PMU's
+> platform driver to figure out which type it is. As all PMUs handled by
+> the current platform_driver name "arm-pmu" are CPU PMUs, this
+> convention is hardcoded. New PMU types will require the addition of new
+> platform drivers (e.g. "arm-pmu-l2cc").
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Acked-by: Will Deacon <will.deacon@arm.com>
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+> ---
 
-Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-ux500/cpu-db5500.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Looks good to me.
 
-diff --git a/arch/arm/mach-ux500/cpu-db5500.c b/arch/arm/mach-ux500/cpu-db5500.c
-index c51da69..7d940a8 100644
---- a/arch/arm/mach-ux500/cpu-db5500.c
-+++ b/arch/arm/mach-ux500/cpu-db5500.c
-@@ -43,6 +43,7 @@ static struct map_desc u5500_io_desc[] __initdata = {
- 	__IO_DEV_DESC(U5500_GPIO3_BASE, SZ_4K),
- 	__IO_DEV_DESC(U5500_GPIO4_BASE, SZ_4K),
- 	__IO_DEV_DESC(U5500_PRCMU_BASE, SZ_4K),
-+	__IO_DEV_DESC(U5500_PRCMU_TCDM_BASE, SZ_4K),
- };
- 
- static struct resource db5500_pmu_resources[] = {
--- 
-1.7.4.3
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+
+As a slight aside, when we have more PMU types could we key off of an ID 
+table rather than creating a new platform driver for each type?
+
+Jamie
