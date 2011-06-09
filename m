@@ -1,110 +1,125 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 09 Jun 2011 22:12:37 +0530
-Subject: [PATCH v2 5/5] spi/ep93xx: add DMA support
-In-Reply-To: <20110608215356.GA17138@ponder.secretlab.ca>
-References: <cover.1306662317.git.mika.westerberg@iki.fi>
-	<4b27fc93b7df900943e7c12084a8340cbc5fe1a8.1306662317.git.mika.westerberg@iki.fi>
-	<20110603204400.GH17972@ponder.secretlab.ca>
-	<20110607171403.GA3011@acer>
-	<BANLkTikKOcc2Vg1p3kG4ZSLjJ0RTZWS=2A@mail.gmail.com>
-	<20110607190607.GB3011@acer>
-	<20110607191824.GA2035@ponder.secretlab.ca>
-	<20110607192945.GC3011@acer>
-	<20110607194034.GC2035@ponder.secretlab.ca>
-	<1307505512.10976.91.camel@vkoul-udesk3>
-	<20110608215356.GA17138@ponder.secretlab.ca>
-Message-ID: <1307637757.10976.93.camel@vkoul-udesk3>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Thu, 09 Jun 2011 22:51:10 +0530
+Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+In-Reply-To: <20110609171255.GD24424@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
+	<201106072348.44624.rjw@sisk.pl>
+	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
+	<20110609154058.GA24424@n2100.arm.linux.org.uk>
+	<4DF0F45A.3030103@ti.com>
+	<20110609164024.GB24424@n2100.arm.linux.org.uk>
+	<4DF0FA73.8050607@ti.com>
+	<20110609171255.GD24424@n2100.arm.linux.org.uk>
+Message-ID: <4DF10106.7040406@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-06-08 at 15:53 -0600, Grant Likely wrote:
-> On Wed, Jun 08, 2011 at 09:28:32AM +0530, Koul, Vinod wrote:
-> > On Tue, 2011-06-07 at 13:40 -0600, Grant Likely wrote:
-> > > On Tue, Jun 07, 2011 at 10:29:45PM +0300, Mika Westerberg wrote:
-> > > > On Tue, Jun 07, 2011 at 01:18:24PM -0600, Grant Likely wrote:
-> > > > > On Tue, Jun 07, 2011 at 10:06:07PM +0300, Mika Westerberg wrote:
-> > > > > > On Tue, Jun 07, 2011 at 12:45:26PM -0600, Grant Likely wrote:
-> > > > > > > On Tue, Jun 7, 2011 at 11:14 AM, Mika Westerberg <mika.westerberg@iki.fi> wrote:
-> > > > > > > >
-> > > > > > > > I just realized that once the SPI driver renaming patch (spi: reorganize
-> > > > > > > > drivers) enters linux-next, this patch (which sits on Vinod's tree) will cause
-> > > > > > > > a merge conflict. Any ideas how to avoid it beforehand?
-> > > > > > > 
-> > > > > > > Yes, put the whole series into a separate branch all by itself.  Merge
-> > > > > > > that branch into Vinod's tree and I'll also merge it into spi/next,
-> > > > > > > and I'll fix up the merge conflict when I do.
-> > > > > > 
-> > > > > > More stupid questions: Do you mean that I create a branch in my public
-> > > > > > repository somewhere? If that is the case, then there is a problem that I
-> > > > > > don't have any public repository and I doubt that I get such before linux-next
-> > > > > > is rebuilt.
-> > > > > 
-> > > > > It doesn't have to be your repo.  Vinod could do it, or I could.
-> > > > 
-> > > > Ah, I see.
-> > > > 
-> > > > Would it then be possible that you could do it? Please let me and Vinod know
-> > > > what is needed from us.
-> > > > 
-> > > > And sorry for this mess.
-> > > 
-> > > I'll need an ack from Vinod first for the series so that I can add it
-> > > before I make the commits, but other than that I have no problem doing
-> > > so.
-> > Acked-by: Vinod Koul <vinod.koul@intel.com>
-> > 
-> > Let me know which branch you have pushed and I will merge that to my
-> > tree
-> 
-> Just pushed out to the branch below.  Take a look, make sure it is
-> correct, and if it looks good to you then go ahead and merge it, and I
-> ll also merge it into spi/next.
-> 
-> The following changes since commit 59c5f46fbe01a00eedf54a23789634438bb80603:
-> 
->   Linux 3.0-rc2 (2011-06-06 18:06:33 +0900)
-> 
-> are available in the git repository at:
->   git://git.secretlab.ca/git/linux-2.6 ep93xx-dma
-> 
-> Geert Uytterhoeven (1):
->       spi/rtc-m41t93: Use spi_get_drvdata() for SPI devices
-> 
-> Govindraj.R (1):
->       spi/omap2: fix uninitialized variable
-> 
-> Grant Likely (1):
->       Merge remote-tracking branch 'origin' into spi/merge
-> 
-> Mika Westerberg (5):
->       dmaengine: add ep93xx DMA support
->       ep93xx: add dmaengine platform code
->       ASoC: ep93xx: convert to use the DMA engine API
->       ep93xx: remove the old M2P DMA code
->       spi/ep93xx: add DMA support
-> 
->  Documentation/spi/ep93xx_spi                   |   10 +
->  arch/arm/mach-ep93xx/Makefile                  |    4 +-
->  arch/arm/mach-ep93xx/core.c                    |    6 +-
->  arch/arm/mach-ep93xx/dma-m2p.c                 |  411 -------
->  arch/arm/mach-ep93xx/dma.c                     |  108 ++
->  arch/arm/mach-ep93xx/include/mach/dma.h        |  190 ++---
->  arch/arm/mach-ep93xx/include/mach/ep93xx_spi.h |    2 +
->  drivers/dma/Kconfig                            |    7 +
->  drivers/dma/Makefile                           |    1 +
->  drivers/dma/ep93xx_dma.c                       | 1355 ++++++++++++++++++++++++
->  drivers/rtc/rtc-m41t93.c                       |    2 +-
->  drivers/spi/ep93xx_spi.c                       |  303 +++++-
->  drivers/spi/omap2_mcspi.c                      |    2 +-
->  sound/soc/ep93xx/ep93xx-ac97.c                 |    4 +-
->  sound/soc/ep93xx/ep93xx-i2s.c                  |    4 +-
->  sound/soc/ep93xx/ep93xx-pcm.c                  |  137 ++--
->  16 files changed, 1932 insertions(+), 614 deletions(-)
->  delete mode 100644 arch/arm/mach-ep93xx/dma-m2p.c
->  create mode 100644 arch/arm/mach-ep93xx/dma.c
->  create mode 100644 drivers/dma/ep93xx_dma.c
-Thanks, I have merged them into my slave-dma next.
+On 6/9/2011 10:42 PM, Russell King - ARM Linux wrote:
+> On Thu, Jun 09, 2011 at 10:23:07PM +0530, Santosh Shilimkar wrote:
+>> On 6/9/2011 10:10 PM, Russell King - ARM Linux wrote:
+>>> On Thu, Jun 09, 2011 at 09:57:06PM +0530, Santosh Shilimkar wrote:
+>>>> On 6/9/2011 9:10 PM, Russell King - ARM Linux wrote:
+>>>>> On Thu, Jun 09, 2011 at 04:30:08PM +0100, Frank Hofmann wrote:
+>>>>>> Btw, when testing this I found that generic cpu_suspend seems to be just
+>>>>>> fine for OMAP3; the OMAP platforms though do not at this time use the
+>>>>>> generic cpu_suspend/resume for sleep, is it planned to change that ?
+>>>>>
+>>>>> That's because OMAP was doing changes to their sleep code while I was
+>>>>> consolidating the sleep code, and although I asked several times that
+>>>>> the OMAP folk should participate in this effort, but evidentally I was
+>>>>> unsuccessful in achieving anything in that direction.
+>>>>
+>>>> Agreed but the situation at that point was the code was not at
+>>>> all in convertible position. Looking at your below comment,
+>>>> it's still not :)
+>>>
+>>> Well, I had a look before posting this reply, and ran away from it.
+>>> I've gone back to it several times since, and got a similar reaction.
+>>>
+>>> I seem to remember that it looked _more_ convertable when I looked at
+>>> it when doing the generic suspend/resume support - I could see a nice
+>>> simple way to pull out the saving and just leave the PLL resume stuff
+>>> in SRAM.
+>>>
+>>> I'm now convinced that if I try to convert it use the generic support,
+>>> it will end up being a horrible broken mess.
+>>
+>> I must admit that I had same impression when I started looking at it.
+>>
+>> Few provisions are necessary for OMAP which I can think of are:
+>> 1. WFI loop should be made a seperate function so that it can pushed
+>> on SRAM which is must for OMAP3.
+>
+> If you look at the generic cpu suspend, it sits in the suspend path.
+> Once cpu_suspend() has been called, it will return as normal and you
+> can then do whatever you require to place the system into suspend -
+> including calling out to a function in WFI.
+>
+>> 2. A callback before WFI to implement the Errata WA's
+>
+> "WA's" ?
+>
+Software Work-Arounds for issues around WFI or special
+cases.
 
+>> 3. Avoid direct write to AUXCTRL in generic suspend code.
+>
+> This is the only problematical one that I can see.  We need to restore
+> this on systems running in secure mode.  What we could do is rather than
+> writing to the register, read it first and compare its value with what
+> was saved to see whether we need to write it.
+>
+> Then, if platforms run in non-secure mode, they are responsible for
+> restoring that register back to its pre-suspend value before their
+> assembly calls cpu_resume().
+>
+>> 4. Before MMU is enabled in resume a callback to restore
+>> secure register, setup auxctrl etc.
+>
+> You can do this before your assembly calls cpu_resume().
+>
+>> Additionally the L2 cache handling isn't part of
+>> these common suspend hooks.
+>
+> L2 cache handling can't fit into the generic code - it doesn't really
+> belong there either.  It needs to be in the parent or hooked into the
+> syscore_ops stuff as I've said previously.
+>
+Ok. I missed these points in last discussion.
 
--- 
-~Vinod
+> So:
+>
+> ENTRY(my_soc_suspend)
+>          stmfd   sp!, {r4 - r12, lr}
+>          ldr     r3, =resume
+>          bl      cpu_suspend
+> 	/*
+> 	 * Insert whatever code is required here for suspend
+> 	 * eg, save secure mode, then jump to sram to call WFI function
+> 	 */
+> resume:
+> 	ldmfd	sp!, {r4 - r12, pc}
+> ENDPROC(my_soc_suspend)
+>
+> ENTRY(my_soc_resume)
+> 	/*
+> 	 * Insert whatever other code is required to be run before resume
+> 	 * eg, WFI function returns to this symbol after DDR becomes
+> 	 * accessible.  restore secure mode state
+> 	 */
+> 	b	cpu_resume
+> ENDPROC(my_soc_resume)
+>
+> What makes it far more complicated in the OMAP case is all that "is l1 state
+> lost?  is l2 state lost?" stuff.
+
+Exactly. And that's where the most complexity comes in. Also on OMAP
+we use same sleep code for CPUidle and suspend and in idle, there
+are many low power states possible with variation of L1, l2, CPU logic,
+L2 controller logic, interrupt controller logic etc.
+
+Thanks for bringing up these points. Now I better understand
+as well why I struggled to get anything running relaibly
+on OMAP4 with few hours attempt with suspend hooks.
+
+Regards
