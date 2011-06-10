@@ -1,80 +1,40 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Fri, 10 Jun 2011 22:17:19 +0530
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
-	<1307686140.10976.111.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
-Message-ID: <1307724439.10976.188.camel@vkoul-udesk3>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Fri, 10 Jun 2011 19:08:07 +0100
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110610175248.GF2230@linux.vnet.ibm.com>
+References: <20110528005640.9076c0b1.akpm@linux-foundation.org>
+	<20110609185259.GA29287@linux.vnet.ibm.com>
+	<BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
+	<20110610151121.GA2230@linux.vnet.ibm.com>
+	<20110610155954.GA25774@srcf.ucam.org>
+	<20110610165529.GC2230@linux.vnet.ibm.com>
+	<20110610170535.GC25774@srcf.ucam.org>
+	<20110610171939.GE2230@linux.vnet.ibm.com>
+	<20110610172307.GA27630@srcf.ucam.org>
+	<20110610175248.GF2230@linux.vnet.ibm.com>
+Message-ID: <20110610180807.GB28500@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2011-06-10 at 16:43 +0530, Raju, Sundaram wrote:
-> Vinod,
-
-...
-> > 
-> > > Now coming to the buffer related attributes, sg list is a nice way to
-> > > represent a disjoint buffer; all the offload engines in drivers/dma
-> > > create a descriptor for each of the contiguous chunk in the sg list
-> > > buffer and pass it to the controller.
-> > >
-> > > But many a times a client may want to transfer from a single buffer to
-> > > the peripheral and most of the DMA controllers have the capability to
-> > > transfer data in chunks/frames directly at a stretch.
-> > > All the attributes of a buffer, which are required for the transfer
-> > > can be programmed in single descriptor and submitted to the
-> > > DMA controller.
-> > >
-> > > So I think the slave transfer API must also have a provision to pass
-> > > the buffer configuration. The buffer attributes have to be passed
-> > > directly as an argument in the prepare API, unlike dma_slave_config
-> > > as they will be different for each buffer that is going to be
-> > > transferred.
-> > Can you articulate what attributes you are talking about. The
-> > dma_slave_config parameters don't represent buffer attributes. They
-> > represent the dma attributes on how you want to transfer. These things
-> > like bus widths, burst lengths are usually constant for the slave
-> > transfers, not sure why they should change per buffer?
-> > 
+On Fri, Jun 10, 2011 at 10:52:48AM -0700, Paul E. McKenney wrote:
+> On Fri, Jun 10, 2011 at 06:23:07PM +0100, Matthew Garrett wrote:
+> > I haven't seen too many ARM servers with 256GB of RAM :) I'm mostly 
+> > looking at this from an x86 perspective.
 > 
-> I have tried to explain the attributes in the previous mail 
-> I posted in this thread.
-> 
-> Yes, buffer attributes should not be represented in 
-> the dma_slave_config. It is for slave related data.
-> That is why had mentioned that buffer configuration should be
-> a separate structure and passed in the prepare API.
-> See quoted below:
-> 
-> <quote>
-> > struct dma_buffer_config {
-> > 	u32 chunk_size; /* number of bytes in a chunk */
-> > 	u32 frame_size; /* number of chunks in a frame */
-> > 	/* u32 n_frames; number of frames in the buffer */
-> > 	u32 inter_chunk_gap; /* number of bytes between end of a chunk 
-> > 				and the start of the next chunk */ 
-> > 	u32 inter_frame_gap; /* number of bytes between end of a frame 
-> > 				and the start of the next frame */ 
-> > 	bool sync_rate; /* 0 - a sync event is required from the 
-> > 				peripheral to transfer a chunk 
-> > 			1 - a sync event is required from the 
-> > 				peripheral to transfer a frame */ 
-> > };
-IIUC, you have a buffer with gaps in between (given by above params).
-Is your DMA h/w capable of parsing this buffer and directly do a
-transfer based on above parameters (without any work for SW), or you are
-doing this in your dma driver and then programming a list of buffers?
-In former case (although i haven't seen such dma controller yet), can
-you share the datasheet? It would make very little sense to change the
-current API for your extra special case. This special case needs to be
-handled differently rather than making rule out of it!!
+> But I have seen ARM embedded systems with CPU power consumption in
+> the milliwatt range, which greatly reduces the amount of RAM required
+> to get significant power savings from this approach.  Three orders
+> of magnitude less CPU power consumption translates (roughly) to three
+> orders of magnitude less memory required -- and embedded devices with
+> more than 256MB of memory are quite common.
 
-And in latter case you are really going the wrong path as Russel pointed
-out and trying to abuse the APIs
-
+I'm not saying that powering down memory isn't a win, just that in the 
+server market we're not even getting unused memory into self refresh at 
+the moment. If we can gain that hardware capability then sub-node zoning 
+means that we can look at allocating (and migrating?) RAM in such a way 
+as to get a lot of the win that we'd gain from actually cutting the 
+power, without the added overhead of actually shrinking our working set.
 
 -- 
-~Vinod
+Matthew Garrett | mjg59 at srcf.ucam.org
