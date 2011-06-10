@@ -1,47 +1,66 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 10 Jun 2011 15:13:14 -0600
-Subject: [PATCH v4 1/4] dt: check root nodes for match on
-	of_platform_populate
-In-Reply-To: <1307738923-7564-2-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-2-git-send-email-robherring2@gmail.com>
-Message-ID: <20110610211314.GB28994@ponder.secretlab.ca>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sat, 11 Jun 2011 00:55:43 +0300
+Subject: [PATCH v2 0/4] drivers/iommu/ relocations
+Message-ID: <1307742947-32118-1-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 03:48:40PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> of_platform_populate will create platform devices for the top-level nodes
-> if they have a compatible string, but regardless of a match or not.
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  drivers/of/platform.c |    2 ++
->  1 files changed, 2 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 9b785be..dc56a77 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -318,6 +318,8 @@ int of_platform_populate(struct device_node *root,
->  		return -EINVAL;
->  
->  	for_each_child_of_node(root, child) {
-> +		if (!of_match_node(matches, child))
-> +			continue;
+Create a dedicated iommu drivers folder, put the base iommu code there,
+and move the existing IOMMU API users as well (msm-iommu, amd_iommu and
+intel-iommu).
 
-This doesn't look right.  The point of of_platform_populate() is to
-register platform_devices for all the child nodes, regardless of
-whether or not they are in the match table.
+Putting all iommu drivers together will ease finding similarities
+between different platforms, with the intention of solving problems once,
+in a generic framework, which everyone can use.
 
-of_platform_bus_create() does the correct behaviour to check for
-whether or not to register grandchildren.
+OMAP's iommu will be moved too as soon as it's migrated.
 
->  		rc = of_platform_bus_create(child, matches, parent, true);
->  		if (rc)
->  			break;
-> -- 
-> 1.7.4.1
-> 
+For previous discussions on this, please see:
+https://lkml.org/lkml/2011/6/2/369
+
+v1->v2
+
+* move intel's iova, intr_remapping and dmar too (David Woodhouse)
+* move msm's iommu_dev as well (David Brown)
+* dmar: depend on x86/ia64, fix ia64 Kconfig, drop EXPERIMENTAL (Chris Wright)
+
+Ohad Ben-Cohen (4):
+  drivers: iommu: move to a dedicated folder
+  msm: iommu: move to drivers/iommu/
+  x86: amd_iommu: move to drivers/iommu/
+  x86/ia64: intel-iommu: move to drivers/iommu/
+
+ arch/arm/mach-msm/Kconfig                          |   19 ----
+ arch/arm/mach-msm/Makefile                         |    2 +-
+ arch/ia64/Kconfig                                  |   24 -----
+ arch/x86/Kconfig                                   |   79 ----------------
+ arch/x86/kernel/Makefile                           |    2 +-
+ drivers/Kconfig                                    |    2 +
+ drivers/Makefile                                   |    1 +
+ drivers/base/Makefile                              |    1 -
+ drivers/iommu/Kconfig                              |   97 ++++++++++++++++++++
+ drivers/iommu/Makefile                             |    5 +
+ {arch/x86/kernel => drivers/iommu}/amd_iommu.c     |    0
+ drivers/{pci => iommu}/dmar.c                      |    0
+ drivers/{pci => iommu}/intel-iommu.c               |    1 -
+ drivers/{pci => iommu}/intr_remapping.c            |    1 -
+ drivers/{pci => iommu}/intr_remapping.h            |    0
+ drivers/{base => iommu}/iommu.c                    |    0
+ drivers/{pci => iommu}/iova.c                      |    0
+ .../mach-msm/iommu.c => drivers/iommu/msm_iommu.c  |    0
+ .../iommu_dev.c => drivers/iommu/msm_iommu_dev.c   |    0
+ drivers/pci/Makefile                               |    5 -
+ drivers/pci/pci.h                                  |    2 -
+ include/linux/pci.h                                |   11 ++
+ 22 files changed, 118 insertions(+), 134 deletions(-)
+ create mode 100644 drivers/iommu/Kconfig
+ create mode 100644 drivers/iommu/Makefile
+ rename {arch/x86/kernel => drivers/iommu}/amd_iommu.c (100%)
+ rename drivers/{pci => iommu}/dmar.c (100%)
+ rename drivers/{pci => iommu}/intel-iommu.c (99%)
+ rename drivers/{pci => iommu}/intr_remapping.c (99%)
+ rename drivers/{pci => iommu}/intr_remapping.h (100%)
+ rename drivers/{base => iommu}/iommu.c (100%)
+ rename drivers/{pci => iommu}/iova.c (100%)
+ rename arch/arm/mach-msm/iommu.c => drivers/iommu/msm_iommu.c (100%)
+ rename arch/arm/mach-msm/iommu_dev.c => drivers/iommu/msm_iommu_dev.c (100%)
