@@ -1,76 +1,27 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 10 Jun 2011 10:48:51 +0200
-Subject: [PATCH 0/2] RFC: gpio: driver-local pin configuration
-Message-ID: <1307695731-28018-1-git-send-email-linus.walleij@stericsson.com>
+From: mattias.wallin@stericsson.com (Mattias Wallin)
+Date: Fri, 10 Jun 2011 10:54:10 +0200
+Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
+In-Reply-To: <20110609215939.GI24424@n2100.arm.linux.org.uk>
+References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
+	<20110602094622.GS3660@n2100.arm.linux.org.uk>
+	<4DE7637B.3060901@stericsson.com>
+	<20110602110137.GU3660@n2100.arm.linux.org.uk>
+	<4DE77D9A.6090301@stericsson.com> <4DE788B2.5060308@ti.com>
+	<1307040455.11492.52.camel@work-vm>
+	<4DEF7CA1.8080809@stericsson.com>
+	<20110609215939.GI24424@n2100.arm.linux.org.uk>
+Message-ID: <4DF1DBB2.4040501@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 06/09/2011 11:59 PM, Russell King - ARM Linux wrote:
+> No - I'd like you to check whether the patch I sent fixes your
+> sched_clock problem across suspend/resume so that we can get that sorted
+> for everyone, instead of coming up with platform specific fixes.  Then
+> we can work out how to hook that into cpuidle so that it works properly
+> there.
 
-This is a modification of the previous generic GPIO configuration
-patch series.
-
-I'm Cc:ing everyone involved in earlier discussions so we can
-move forward on this consolidation work, lest I cannot convert
-my drivers to use struct gpio_chip / gpiolib.
-
-Background: Grant didn't like the idea of an ioctl() like
-configuration function in the struct gpio_chip vtable, so we
-decided to see if it was wiser to go back to the initial suggestion
-of making it possible for drivers to dereference the struct
-gpio_chip and perform driver-local operations via regular
-function calls instead.
-
-So in this patch set I expose gpio_to_chip(), then alter the
-previous rewrite of the U300 GPIO driver to instead use a local
-configuration function by wrapping the previously defined config
-function into this:
-
-/* External function to configure pins */
-int u300_gpio_set_config(unsigned gpio, u16 param, unsigned long *data)
-{
-        struct gpio_chip *chip = gpio_to_chip(gpio);
-        unsigned offset = gpio - chip->base;
-
-        return u300_gpio_config(chip, offset, param, data);
-}
-
-This one is then exposed in the chip-specific header  in
-<linux/gpio/u300.h>, and all the configuration defines that
-were previously globally generic in <linux/gpio.h> are also
-moved there and made driver-specific without any attempt of
-generalizing this.
-
-So for anything that is not currently in struct gpio_chip you
-will have to implement something like this, per driver.
-
-I'm open for keeping the generic config defines in <linux/gpio.h>
-if Grant accepts that, it certainly will avoid some define
-duplication in driver headers. Right now I stay away from the
-gpiolib as much as I can.
-
-Comments welcome!
-
-Thanks,
-Linus Walleij
-
-
-Linus Walleij (2):
-  gpio: expose gpio_to_chip()
-  gpio/u300: rewrite gpio driver
-
- arch/arm/Kconfig                       |    2 +-
- arch/arm/mach-u300/Kconfig             |    1 +
- arch/arm/mach-u300/core.c              |   31 +-
- arch/arm/mach-u300/include/mach/gpio.h |  163 +-----
- arch/arm/mach-u300/include/mach/irqs.h |   25 +-
- drivers/gpio/Kconfig                   |    9 +
- drivers/gpio/gpio-u300.c               | 1176 +++++++++++++++++++-------------
- drivers/gpio/gpiolib.c                 |    2 +-
- include/asm-generic/gpio.h             |    1 +
- include/linux/gpio/u300.h              |   82 +++
- 10 files changed, 833 insertions(+), 659 deletions(-)
- create mode 100644 include/linux/gpio/u300.h
-
--- 
-1.7.3.2
+Ahh, I see your plan. I was focused on the cpuidle problem and your 
+patch only addressed suspend/resume.
+Anyway, now that I understand more what you are after I'll have a look 
+at it and come back to you.
