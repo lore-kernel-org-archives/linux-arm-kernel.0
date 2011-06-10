@@ -1,53 +1,53 @@
-From: arjan@infradead.org (Arjan van de Ven)
-Date: Fri, 10 Jun 2011 20:02:33 -0700
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Fri, 10 Jun 2011 23:03:45 +0530
 Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
 	Power Management
-In-Reply-To: <20110610193713.GJ2230@linux.vnet.ibm.com>
-References: <20110610151121.GA2230@linux.vnet.ibm.com>
+In-Reply-To: <20110610171939.GE2230@linux.vnet.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110528005640.9076c0b1.akpm@linux-foundation.org>
+	<20110609185259.GA29287@linux.vnet.ibm.com>
+	<BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
+	<20110610151121.GA2230@linux.vnet.ibm.com>
 	<20110610155954.GA25774@srcf.ucam.org>
 	<20110610165529.GC2230@linux.vnet.ibm.com>
 	<20110610170535.GC25774@srcf.ucam.org>
 	<20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610172307.GA27630@srcf.ucam.org>
-	<20110610175248.GF2230@linux.vnet.ibm.com>
-	<20110610180807.GB28500@srcf.ucam.org>
-	<20110610184738.GG2230@linux.vnet.ibm.com>
-	<20110610192329.GA30496@srcf.ucam.org>
-	<20110610193713.GJ2230@linux.vnet.ibm.com>
-Message-ID: <20110610200233.5ddd5a31@infradead.org>
+Message-ID: <20110610173345.GA8434@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2011 12:37:13 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-
-> On Fri, Jun 10, 2011 at 08:23:29PM +0100, Matthew Garrett wrote:
-> > On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney wrote:
+On Fri, Jun 10, 2011 at 10:19:39AM -0700, Paul E. McKenney wrote:
+> On Fri, Jun 10, 2011 at 06:05:35PM +0100, Matthew Garrett wrote:
+> > On Fri, Jun 10, 2011 at 09:55:29AM -0700, Paul E. McKenney wrote:
+> > > On Fri, Jun 10, 2011 at 04:59:54PM +0100, Matthew Garrett wrote:
+> > > > For the server case, the low hanging fruit would seem to be 
+> > > > finer-grained self-refresh. At best we seem to be able to do that on a 
+> > > > per-CPU socket basis right now. The difference between active and 
+> > > > self-refresh would seem to be much larger than the difference between 
+> > > > self-refresh and powered down.
+> > > 
+> > > By "finer-grained self-refresh" you mean turning off refresh for banks
+> > > of memory that are not being used, right?  If so, this is supported by
+> > > the memory-regions support provided, at least assuming that the regions
+> > > can be aligned with the self-refresh boundaries.
 > > 
-> > > And if I understand you correctly, then the patches that Ankita
-> > > posted should help your self-refresh case, along with the
-> > > originally intended the power-down case and special-purpose use
-> > > of memory case.
-> > 
-> > Yeah, I'd hope so once we actually have capable hardware.
+> > I mean at the hardware level. As far as I know, the best we can do at 
+> > the moment is to put an entire node into self refresh when the CPU hits 
+> > package C6.
 > 
-> Cool!!!
+> But this depends on the type of system and CPU family, right?  If you
+> can say, which hardware are you thinking of?  (I am thinking of ARM.)
 > 
-> So Ankita's patchset might be useful to you at some point, then.
-> 
-> Does it look like a reasonable implementation?
 
-as someone who is working on hardware that is PASR capable right now,
-I have to admit that our plan was to just hook into the buddy allocator,
-and use PASR on the top level of buddy (eg PASR off blocks that are
-free there, and PASR them back on once an allocation required the block
-to be broken up)..... that looked the very most simple to me.
-
-Maybe something much more elaborate is needed, but I didn't see why so
-far.
-
+And also whether the memory controller is on-chip or off-chip ? As
+package could be in C6, but other packages could be refering memory
+connected to this socket right ? And as Paul mentioned, at this point
+the ARM SoCs that have support for memory power management, have only a
+single node.
 
 -- 
-Arjan van de Ven 	Intel Open Source Technology Centre
-For development, discussion and tips for power savings, 
-visit http://www.lesswatts.org
+Regards,
+Ankita Garg (ankita at in.ibm.com)
+Linux Technology Center
+IBM India Systems & Technology Labs,
+Bangalore, India
