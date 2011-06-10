@@ -1,5 +1,5 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Fri, 10 Jun 2011 23:03:45 +0530
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Fri, 10 Jun 2011 18:23:07 +0100
 Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
 	Power Management
 In-Reply-To: <20110610171939.GE2230@linux.vnet.ibm.com>
@@ -12,42 +12,21 @@ References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
 	<20110610165529.GC2230@linux.vnet.ibm.com>
 	<20110610170535.GC25774@srcf.ucam.org>
 	<20110610171939.GE2230@linux.vnet.ibm.com>
-Message-ID: <20110610173345.GA8434@in.ibm.com>
+Message-ID: <20110610172307.GA27630@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Jun 10, 2011 at 10:19:39AM -0700, Paul E. McKenney wrote:
 > On Fri, Jun 10, 2011 at 06:05:35PM +0100, Matthew Garrett wrote:
-> > On Fri, Jun 10, 2011 at 09:55:29AM -0700, Paul E. McKenney wrote:
-> > > On Fri, Jun 10, 2011 at 04:59:54PM +0100, Matthew Garrett wrote:
-> > > > For the server case, the low hanging fruit would seem to be 
-> > > > finer-grained self-refresh. At best we seem to be able to do that on a 
-> > > > per-CPU socket basis right now. The difference between active and 
-> > > > self-refresh would seem to be much larger than the difference between 
-> > > > self-refresh and powered down.
-> > > 
-> > > By "finer-grained self-refresh" you mean turning off refresh for banks
-> > > of memory that are not being used, right?  If so, this is supported by
-> > > the memory-regions support provided, at least assuming that the regions
-> > > can be aligned with the self-refresh boundaries.
-> > 
 > > I mean at the hardware level. As far as I know, the best we can do at 
 > > the moment is to put an entire node into self refresh when the CPU hits 
 > > package C6.
 > 
 > But this depends on the type of system and CPU family, right?  If you
 > can say, which hardware are you thinking of?  (I am thinking of ARM.)
-> 
 
-And also whether the memory controller is on-chip or off-chip ? As
-package could be in C6, but other packages could be refering memory
-connected to this socket right ? And as Paul mentioned, at this point
-the ARM SoCs that have support for memory power management, have only a
-single node.
+I haven't seen too many ARM servers with 256GB of RAM :) I'm mostly 
+looking at this from an x86 perspective.
 
 -- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+Matthew Garrett | mjg59 at srcf.ucam.org
