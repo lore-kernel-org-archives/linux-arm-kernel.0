@@ -1,40 +1,80 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Fri, 10 Jun 2011 19:08:07 +0100
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110610175248.GF2230@linux.vnet.ibm.com>
-References: <20110528005640.9076c0b1.akpm@linux-foundation.org>
-	<20110609185259.GA29287@linux.vnet.ibm.com>
-	<BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
-	<20110610151121.GA2230@linux.vnet.ibm.com>
-	<20110610155954.GA25774@srcf.ucam.org>
-	<20110610165529.GC2230@linux.vnet.ibm.com>
-	<20110610170535.GC25774@srcf.ucam.org>
-	<20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610172307.GA27630@srcf.ucam.org>
-	<20110610175248.GF2230@linux.vnet.ibm.com>
-Message-ID: <20110610180807.GB28500@srcf.ucam.org>
+From: andre.silva@freescale.com (Andre Silva)
+Date: Fri, 10 Jun 2011 13:15:20 -0300
+Subject: [PATCH 1/2] ARM:mach-mx5/board-mx51_babbage: Add CD and WP GPIOs
+In-Reply-To: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
+References: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
+Message-ID: <1307722520-12952-2-git-send-email-andre.silva@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 10:52:48AM -0700, Paul E. McKenney wrote:
-> On Fri, Jun 10, 2011 at 06:23:07PM +0100, Matthew Garrett wrote:
-> > I haven't seen too many ARM servers with 256GB of RAM :) I'm mostly 
-> > looking at this from an x86 perspective.
-> 
-> But I have seen ARM embedded systems with CPU power consumption in
-> the milliwatt range, which greatly reduces the amount of RAM required
-> to get significant power savings from this approach.  Three orders
-> of magnitude less CPU power consumption translates (roughly) to three
-> orders of magnitude less memory required -- and embedded devices with
-> more than 256MB of memory are quite common.
+Signed-off-by: Andre Silva <andre.silva@freescale.com>
 
-I'm not saying that powering down memory isn't a win, just that in the 
-server market we're not even getting unused memory into self refresh at 
-the moment. If we can gain that hardware capability then sub-node zoning 
-means that we can look at allocating (and migrating?) RAM in such a way 
-as to get a lot of the win that we'd gain from actually cutting the 
-power, without the added overhead of actually shrinking our working set.
+---
+ arch/arm/mach-mx5/board-mx51_babbage.c |   24 +++++++++++++++++++++---
+ 1 files changed, 21 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+index 770f74b..3e58d5d 100644
+--- a/arch/arm/mach-mx5/board-mx51_babbage.c
++++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+@@ -41,6 +41,10 @@
+ #define BABBAGE_POWER_KEY	IMX_GPIO_NR(2, 21)
+ #define BABBAGE_ECSPI1_CS0	IMX_GPIO_NR(4, 24)
+ #define BABBAGE_ECSPI1_CS1	IMX_GPIO_NR(4, 25)
++#define BABBAGE_SD1_CD		IMX_GPIO_NR(1, 0)
++#define BABBAGE_SD1_WP		IMX_GPIO_NR(1, 1)
++#define BABBAGE_SD2_CD		IMX_GPIO_NR(1, 6)
++#define BABBAGE_SD2_WP		IMX_GPIO_NR(1, 5)
+ 
+ /* USB_CTRL_1 */
+ #define MX51_USB_CTRL_1_OFFSET			0x10
+@@ -142,7 +146,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+ 	MX51_PAD_SD1_DATA1__SD1_DATA1,
+ 	MX51_PAD_SD1_DATA2__SD1_DATA2,
+ 	MX51_PAD_SD1_DATA3__SD1_DATA3,
+-
++	MX51_PAD_GPIO1_0__GPIO1_0,
++	MX51_PAD_GPIO1_1__GPIO1_1,
++
+ 	/* SD 2 */
+ 	MX51_PAD_SD2_CMD__SD2_CMD,
+ 	MX51_PAD_SD2_CLK__SD2_CLK,
+@@ -150,6 +156,8 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+ 	MX51_PAD_SD2_DATA1__SD2_DATA1,
+ 	MX51_PAD_SD2_DATA2__SD2_DATA2,
+ 	MX51_PAD_SD2_DATA3__SD2_DATA3,
++	MX51_PAD_GPIO1_6__GPIO1_6,
++	MX51_PAD_GPIO1_5__GPIO1_5,
+ 
+ 	/* eCSPI1 */
+ 	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
+@@ -331,6 +339,16 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
+ 	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
+ };
+ 
++static const struct esdhc_platform_data mx51_babbage_sd1_data __initconst = {
++	.cd_gpio = BABBAGE_SD1_CD,
++	.wp_gpio = BABBAGE_SD1_WP,
++};
++
++static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
++	.cd_gpio = BABBAGE_SD2_CD,
++	.wp_gpio = BABBAGE_SD2_WP,
++};
++
+ /*
+  * Board specific initialization.
+  */
+@@ -374,8 +392,8 @@ static void __init mx51_babbage_init(void)
+ 	mxc_iomux_v3_setup_pad(usbh1stp);
+ 	babbage_usbhub_reset();
+ 
+-	imx51_add_sdhci_esdhc_imx(0, NULL);
+-	imx51_add_sdhci_esdhc_imx(1, NULL);
++	imx51_add_sdhci_esdhc_imx(0, &mx51_babbage_sd1_data);
++	imx51_add_sdhci_esdhc_imx(1, &mx51_babbage_sd2_data);
+ 
+ 	spi_register_board_info(mx51_babbage_spi_board_info,
+ 		ARRAY_SIZE(mx51_babbage_spi_board_info));
 -- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+1.7.1
