@@ -1,35 +1,81 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Fri, 10 Jun 2011 12:37:13 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110610192329.GA30496@srcf.ucam.org>
-References: <20110610151121.GA2230@linux.vnet.ibm.com>
-	<20110610155954.GA25774@srcf.ucam.org>
-	<20110610165529.GC2230@linux.vnet.ibm.com>
-	<20110610170535.GC25774@srcf.ucam.org>
-	<20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610172307.GA27630@srcf.ucam.org>
-	<20110610175248.GF2230@linux.vnet.ibm.com>
-	<20110610180807.GB28500@srcf.ucam.org>
-	<20110610184738.GG2230@linux.vnet.ibm.com>
-	<20110610192329.GA30496@srcf.ucam.org>
-Message-ID: <20110610193713.GJ2230@linux.vnet.ibm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Jun 2011 15:02:01 +0100
+Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+In-Reply-To: <alpine.DEB.2.00.1106101444490.20826@localhost6.localdomain6>
+References: <201106072348.44624.rjw@sisk.pl>
+	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
+	<20110609154058.GA24424@n2100.arm.linux.org.uk>
+	<4DF0F45A.3030103@ti.com>
+	<20110609164024.GB24424@n2100.arm.linux.org.uk>
+	<4DF0FA73.8050607@ti.com>
+	<20110609171255.GD24424@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106101110130.11513@localhost6.localdomain6>
+	<20110610134311.GK24424@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106101444490.20826@localhost6.localdomain6>
+Message-ID: <20110610140201.GM24424@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 08:23:29PM +0100, Matthew Garrett wrote:
-> On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney wrote:
-> 
-> > And if I understand you correctly, then the patches that Ankita posted
-> > should help your self-refresh case, along with the originally intended
-> > the power-down case and special-purpose use of memory case.
-> 
-> Yeah, I'd hope so once we actually have capable hardware.
+On Fri, Jun 10, 2011 at 02:47:30PM +0100, Frank Hofmann wrote:
+> On Fri, 10 Jun 2011, Russell King - ARM Linux wrote:
+>
+> [ ... ]
+>> What's the point when platform code has *ALREADY* to call these functions?
+>>
+>> Is it really too sodding difficult for platforms to do:
+>>
+>> my_suspend_hook()
+>> {
+>> 	mach_pre_suspend_hook();
+>> 	cpu_suspend();
+>> 	mach_post_suspend_hook();
+>> }
+>>
+>> ?
+>>
+>> <not read the rest of the message, this is getting idiotic>
+>>
+>
+> Sorry for being unclear.
+>
+> Yes, they already have to do all this. And they should.
+>
+>
+> Except for one thing:
+>
+> They all, IN ADDITION, do ALSO:
+>
+> 	wfi();			/* or whatever else to power down */
+>
+>
+> For Hibernation, _THAT_ needs to be out of the codepath.
+>
+>
+> So that one can snapshot without powering down.
 
-Cool!!!
+I think there's a fundamental problem here - what's required for S2RAM
+is not what's required for hibernate.  After cpu_suspend() has done
+its job, you are in a _very_ specific environment designed for the last
+stages of S2RAM _only_ and not hibernate.
 
-So Ankita's patchset might be useful to you at some point, then.
+In order to use cpu_suspend() for hibernate, it requires a completely
+different path entirely, and there's no getting away from that.
 
-Does it look like a reasonable implementation?
+You can see that when you analyze the differences between S2RAM and
+hibernate, when you realize that the final part of the S2RAM process
+(which happens after cpu_suspend() returns) on many SoCs is dealing
+with putting SDRAM into self-refresh mode before writing some kind of
+power mode register to tell the power supply to kill power to most
+of the platform.  That is all _very_ SoC specific.
 
-							Thanx, Paul
+Also realize that the code which executes after cpu_suspend() returns
+is _not_ running in the same context as the code which called
+cpu_suspend() - cpu_suspend() has modified the stack pointer to store
+the CPU specific state and that is not the same stack pointer as was
+the case before cpu_suspend() was called.
+
+You don't want to run any of that code when you're dealing with hibernate,
+so expecting to be able to reuse these S2RAM paths is not realistic.
+
+What we could do is provide a cpu_hibernate() function which has saner
+semantics for saving the CPU specific state for hibernate.
