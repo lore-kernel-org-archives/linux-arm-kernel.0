@@ -1,140 +1,202 @@
 From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Fri, 10 Jun 2011 15:54:05 +0100 (BST)
+Date: Fri, 10 Jun 2011 13:22:24 +0100 (BST)
 Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <20110610140201.GM24424@n2100.arm.linux.org.uk>
-References: <201106072348.44624.rjw@sisk.pl>
+In-Reply-To: <20110609171255.GD24424@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
+	<201106072348.44624.rjw@sisk.pl>
 	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
 	<20110609154058.GA24424@n2100.arm.linux.org.uk>
 	<4DF0F45A.3030103@ti.com>
 	<20110609164024.GB24424@n2100.arm.linux.org.uk>
 	<4DF0FA73.8050607@ti.com>
 	<20110609171255.GD24424@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1106101110130.11513@localhost6.localdomain6>
-	<20110610134311.GK24424@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1106101444490.20826@localhost6.localdomain6>
-	<20110610140201.GM24424@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1106101507390.20826@localhost6.localdomain6>
+Message-ID: <alpine.DEB.2.00.1106101110130.11513@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2011, Russell King - ARM Linux wrote:
+On Thu, 9 Jun 2011, Russell King - ARM Linux wrote:
 
->> [ ... ]
-> I think there's a fundamental problem here - what's required for S2RAM
-> is not what's required for hibernate.  After cpu_suspend() has done
-> its job, you are in a _very_ specific environment designed for the last
-> stages of S2RAM _only_ and not hibernate.
+> On Thu, Jun 09, 2011 at 10:23:07PM +0530, Santosh Shilimkar wrote:
+[ ... ]
+>> 3. Avoid direct write to AUXCTRL in generic suspend code.
 >
-> In order to use cpu_suspend() for hibernate, it requires a completely
-> different path entirely, and there's no getting away from that.
+> This is the only problematical one that I can see.  We need to restore
+> this on systems running in secure mode.  What we could do is rather than
+> writing to the register, read it first and compare its value with what
+> was saved to see whether we need to write it.
 >
-> You can see that when you analyze the differences between S2RAM and
-> hibernate, when you realize that the final part of the S2RAM process
-> (which happens after cpu_suspend() returns) on many SoCs is dealing
-> with putting SDRAM into self-refresh mode before writing some kind of
-> power mode register to tell the power supply to kill power to most
-> of the platform.  That is all _very_ SoC specific.
+> Then, if platforms run in non-secure mode, they are responsible for
+> restoring that register back to its pre-suspend value before their
+> assembly calls cpu_resume().
 
-Yes, that's what I'm trying to say - the _final_ stage, for s2ram, sends 
-the SoC to low-power.
-Up until there, we do the same for hibernation, don't we ? Where exactly 
-is it different ?
+While this is ok from the point of view of having cpu_suspend / resume 
+being service functions for the platform-specific idle/off-mode code, it 
+also illustrates the difficulty this creates for the hibernation code.
 
->
-> Also realize that the code which executes after cpu_suspend() returns
-> is _not_ running in the same context as the code which called
-> cpu_suspend() - cpu_suspend() has modified the stack pointer to store
-> the CPU specific state and that is not the same stack pointer as was
-> the case before cpu_suspend() was called.
-
-Yes, the function isn't "well behaved" from the ABI point of view because 
-it doesn't preserve registers (including the stack), but that can be 
-accommodated by the caller.
-The current s2ram callers have to accommodate that as well. Which is 
-ultimately easy for them - since poweroff doesn't care.
-
-
-The only reason why hibernation / swsusp_arch_suspend() is different there 
-is because the activity _after_ cpu_suspend() is extensive and _can fail_ 
-(saving the image); on that failure, one would prefer to see an error 
-message and continue instead of panicing the system. So the stack change 
-you mention needs to be addressed, swsusp_arch_suspend() must be a 
-well-behaved function from the ABI point of view.
-
-
-Normally, if all goes _right_, swsusp_save() does not return either. It 
-ends powering the system off. If one were willing to die without message 
-on failure to save the snapshot to disk, and would be willing to block 
-cpu_suspend during writing the snapshot (to guarantee sleep_save_sp isn't 
-changing) one wouldn't need to care about the stack and could simply:
-
-ENTRY(swsusp_arch_suspend)
- 	mrs	r1, cpsr
- 	mrs	r2, spsr
- 	stmfd	sp! {r1-r12,lr}
- 	bl	__swsusp_arch_get_vpoffset
- 	mov	r1, r0
- 	adr	r3, .Lresume_post_mmu
- 	bl	cpu_suspend
- 	bl	swsusp_save
-0:
- 	b	0b		@ should never reach this
-ENDPROC(swsusp_arch_suspend)
-
-
-Resume is quite trivial either way:
-
-ENTRY(swsusp_arch_resume)
-         setmode PSR_I_BIT | PSR_F_BIT | SVC_MODE, r2
-         ldr     sp, =(__swsusp_resume_stk + PAGE_SIZE / 2)
- 	/*
- 	 * replays image, and ends in cpu_reset(cpu_resume)
- 	 */
-         b       __swsusp_arch_restore_image
-.Lresume_post_mmu:
-         ldmfd   sp!, {r1-r12}
-         msr     cpsr, r1
-         msr     spsr, r2
-         bl      cpu_init                        @ reinitialize other modes
-         ldmfd   sp!, {lr}
-         b       __swsusp_arch_resume_finish     @ cleanup
-ENDPROC(swsusp_arch_resume)
-
+If it's not possible to call cpu_suspend / cpu_resume (or something like 
+it - not tied to names ...) as a full-featured generic interface, then 
+creating a true snapshot capability becomes problematic.
 
 >
-> You don't want to run any of that code when you're dealing with hibernate,
-> so expecting to be able to reuse these S2RAM paths is not realistic.
+>> 4. Before MMU is enabled in resume a callback to restore
+>> secure register, setup auxctrl etc.
+>
+> You can do this before your assembly calls cpu_resume().
 
-Hmm, well ... in the end, hibernation does:
+Only that it's known at the point of call to cpu_suspend/resume.
 
- 	<snapshot state>
- 	<some long operation that writes the image out>
- 	<poweroff>
+Again, I admit to being biased regarding the usecase here ...
 
-while s2ram does:
-
- 	<snapshot state>
- 	<some quick operation setting low power modes>
- 	<poweroff>
+See below.
 
 >
-> What we could do is provide a cpu_hibernate() function which has saner
-> semantics for saving the CPU specific state for hibernate.
+>> Additionally the L2 cache handling isn't part of
+>> these common suspend hooks.
+>
+> L2 cache handling can't fit into the generic code - it doesn't really
+> belong there either.  It needs to be in the parent or hooked into the
+> syscore_ops stuff as I've said previously.
 
-Yes, that's exactly what I'm hoping for. From my point of view, this 
-would, though, end up in:
+For the "take things down" side, dode like machine_restart() already is 
+able to flush/inval/disable all these things on the way down, without any 
+SoC-specific knowledge.
 
-cpu_soc_suspend:
- 	cpu_hibernate_snapshot_state();
- 	/* S2RAM codepath to send soc to low power */
+OMAP suspend/resume has, just recently, gone half-way there (use the 
+provided flush/inval instead of the home-grown table walker code),
 
-cpu_soc_resume:
- 	/* S2RAM codepath for waking up soc essentials */
- 	cpu_hibernate_restore_state();
+Agree with that. Cache flushing / disabling / invalidation has interfaces 
+(the outer_*, l2* and cache ops) already, and e.g. the OMAP code has 
+recently started to use some of those (kernel_flush instead of the 
+home-grown inval loop). Looks like that part is on its way.
 
-At least I can't come up with a really good reason why the state 
-snapshotting operation would have to be different between s2ram and 
-s2disk.
+On the resume side, there's actually a problem here - the generic way of 
+enabling a cache is through initcalls - which don't happen on resume, so 
+if the system comes out of a "low enough" state there's some work to do 
+here - which generic cpu_resume() does not do.
+
+>
+> So:
+>
+> ENTRY(my_soc_suspend)
+>        stmfd   sp!, {r4 - r12, lr}
+>        ldr     r3, =resume
+>        bl      cpu_suspend
+> 	/*
+> 	 * Insert whatever code is required here for suspend
+> 	 * eg, save secure mode, then jump to sram to call WFI function
+> 	 */
+> resume:
+> 	ldmfd	sp!, {r4 - r12, pc}
+> ENDPROC(my_soc_suspend)
+>
+> ENTRY(my_soc_resume)
+> 	/*
+> 	 * Insert whatever other code is required to be run before resume
+> 	 * eg, WFI function returns to this symbol after DDR becomes
+> 	 * accessible.  restore secure mode state
+> 	 */
+> 	b	cpu_resume
+> ENDPROC(my_soc_resume)
+
+That alone doesn't accommodate the following situations:
+
+a) there might be pre-suspend / post-resume activities necessary, i.e.
+    the assumption that any SoC-specific "go down" activity can be done
+    after cpu_suspend() and any SoC-specific "bring up" activity before
+    cpu_resume() might not be sufficient.
+    Case in point: Reenabling L2 caches after resume.
+
+b) my bias - snapshotting state (for hibernation).
+    Delegating this to a SoC-specific method risks creating code like
+    the OMAP stuff - where state saving, power management, off mode
+    and whatnot is all interwoven and interdependent.
+    It also creates the problem that _generic_ (platform-independent)
+    hibernation code becomes impossible to do ...
+
+    A clean thing are separate steps:
+
+ 	<mach preparation for suspend state snapshot>
+ 	<generic state snapshot>
+ 	<mach state snapshot>
+ 	...
+ 	<wfi>	/* or not ... */
+ 	...
+ 	<mach prep for resume / basic initialization>
+ 	<generic resume>
+ 	<mach resume>
+
+So why not have those hooks _inside_ cpu_suspend / cpu_resume, i.e. like:
+
+.data
+ENTRY(cpu_suspend)
+ 	mov	r9, lr
+#ifdef	CONFIG_ARCH_NEEDS_SPAGHETTI_SUSPEND
+ 	mov	lr, pc
+ 	ldr	pc, mach_pre_suspend_hook
+#endif
+ 	...
+#ifdef	CONFIG_ARCH_NEEDS_SPAGHETTI_SUSPEND
+ 	mov	lr, r9
+ 	ldr	r4, mach_post_suspend_hook
+ 	b	r4
+#else
+ 	mov	pc, r9
+END(cpu_suspend)
+
+#ifdef	CONFIG_ARCH_NEEDS_SPAGHETTI_SUSPEND
+mach_pre_suspend_hook:
+.long 0
+mach_post_suspend_hook:
+.long 0
+#endif
+
+
+and let the SoC initialization set them if it so desires ?
+
+
+This would allow to use them for snapshotting the state as well.
+
+Key point, again, from the hibernation bias, is really to have that 
+stuff _separate_ from power-down / wfi / whatever-to-enter-lowpower-mode.
+
+
+As many of these activities as possible should be dealt with by sysdev / 
+syscore, agreed; but unfortunately there might be certain things, 
+especially around secure state, that are too closely tied in to delegate 
+it to those ?
+
+
+>
+> What makes it far more complicated in the OMAP case is all that "is l1 state
+> lost?  is l2 state lost?" stuff.
+>
+
+It looks like it's structured this way:
+
+omap_cpu_suspend()
+{
+ 	switch (state) {
+ 	case 3:
+ 	case 1:
+ 		/* save context */
+ 	case 2:
+ 		/* clean caches */
+ 	case 0:
+ 		wfi();
+ 	}
+}
+
+omap_cpu_resume()	/* from OFF, case 2 / 0 never happens */
+{
+ 	if (state == 3)
+ 		/* disable / inval L2 */
+
+ 	/* restore context */
+ 	/* reenable L2 */
+}
+
+
+But the code doesn't perfectly match the comments in it.
 
 
 FrankH.
