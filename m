@@ -1,81 +1,14 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jun 2011 15:02:01 +0100
-Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <alpine.DEB.2.00.1106101444490.20826@localhost6.localdomain6>
-References: <201106072348.44624.rjw@sisk.pl>
-	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-	<20110609154058.GA24424@n2100.arm.linux.org.uk>
-	<4DF0F45A.3030103@ti.com>
-	<20110609164024.GB24424@n2100.arm.linux.org.uk>
-	<4DF0FA73.8050607@ti.com>
-	<20110609171255.GD24424@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1106101110130.11513@localhost6.localdomain6>
-	<20110610134311.GK24424@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1106101444490.20826@localhost6.localdomain6>
-Message-ID: <20110610140201.GM24424@n2100.arm.linux.org.uk>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 10 Jun 2011 15:07:55 +0100
+Subject: [PATCH 5/5] ASoC: SMDKV310: Enable SPDIF device
+In-Reply-To: <1307687667-9127-6-git-send-email-ch.naveen@samsung.com>
+References: <1307687667-9127-1-git-send-email-ch.naveen@samsung.com>
+	<1307687667-9127-6-git-send-email-ch.naveen@samsung.com>
+Message-ID: <20110610140755.GB22397@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 02:47:30PM +0100, Frank Hofmann wrote:
-> On Fri, 10 Jun 2011, Russell King - ARM Linux wrote:
->
-> [ ... ]
->> What's the point when platform code has *ALREADY* to call these functions?
->>
->> Is it really too sodding difficult for platforms to do:
->>
->> my_suspend_hook()
->> {
->> 	mach_pre_suspend_hook();
->> 	cpu_suspend();
->> 	mach_post_suspend_hook();
->> }
->>
->> ?
->>
->> <not read the rest of the message, this is getting idiotic>
->>
->
-> Sorry for being unclear.
->
-> Yes, they already have to do all this. And they should.
->
->
-> Except for one thing:
->
-> They all, IN ADDITION, do ALSO:
->
-> 	wfi();			/* or whatever else to power down */
->
->
-> For Hibernation, _THAT_ needs to be out of the codepath.
->
->
-> So that one can snapshot without powering down.
+On Fri, Jun 10, 2011 at 12:04:27PM +0530, Naveen Krishna Chatradhi wrote:
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
 
-I think there's a fundamental problem here - what's required for S2RAM
-is not what's required for hibernate.  After cpu_suspend() has done
-its job, you are in a _very_ specific environment designed for the last
-stages of S2RAM _only_ and not hibernate.
-
-In order to use cpu_suspend() for hibernate, it requires a completely
-different path entirely, and there's no getting away from that.
-
-You can see that when you analyze the differences between S2RAM and
-hibernate, when you realize that the final part of the S2RAM process
-(which happens after cpu_suspend() returns) on many SoCs is dealing
-with putting SDRAM into self-refresh mode before writing some kind of
-power mode register to tell the power supply to kill power to most
-of the platform.  That is all _very_ SoC specific.
-
-Also realize that the code which executes after cpu_suspend() returns
-is _not_ running in the same context as the code which called
-cpu_suspend() - cpu_suspend() has modified the stack pointer to store
-the CPU specific state and that is not the same stack pointer as was
-the case before cpu_suspend() was called.
-
-You don't want to run any of that code when you're dealing with hibernate,
-so expecting to be able to reuse these S2RAM paths is not realistic.
-
-What we could do is provide a cpu_hibernate() function which has saner
-semantics for saving the CPU specific state for hibernate.
+Applied, thanks.
