@@ -1,30 +1,25 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Fri, 10 Jun 2011 16:59:54 +0100
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110610151121.GA2230@linux.vnet.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110528005640.9076c0b1.akpm@linux-foundation.org>
-	<20110609185259.GA29287@linux.vnet.ibm.com>
-	<BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
-	<20110610151121.GA2230@linux.vnet.ibm.com>
-Message-ID: <20110610155954.GA25774@srcf.ucam.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Jun 2011 23:02:26 +0200
+Subject: [PATCH v4 4/4] dt: add amba device creation to platform bus scan
+In-Reply-To: <1307738923-7564-5-git-send-email-robherring2@gmail.com>
+References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
+	<1307738923-7564-5-git-send-email-robherring2@gmail.com>
+Message-ID: <201106102302.26462.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 08:11:21AM -0700, Paul E. McKenney wrote:
+On Friday 10 June 2011 22:48:43 Rob Herring wrote:
+> 
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Add support to the platform bus scanning to call custom device creation
+> function for amba devices.
+> 
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: arnd at arndb.de
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 
-> Of course, on a server, you could get similar results by having a very
-> large amount of memory (say 256GB) and a workload that needed all the
-> memory only occasionally for short periods, but could get by with much
-> less (say 8GB) the rest of the time.  I have no idea whether or not
-> anyone actually has such a system.
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-For the server case, the low hanging fruit would seem to be 
-finer-grained self-refresh. At best we seem to be able to do that on a 
-per-CPU socket basis right now. The difference between active and 
-self-refresh would seem to be much larger than the difference between 
-self-refresh and powered down.
-
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Looks so trivial now ;-)
