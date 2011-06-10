@@ -1,70 +1,77 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Thu, 9 Jun 2011 17:15:56 -0700
-Subject: [PATCH 4/8] OMAP2+: PM: idle clkdms only if already in idle
-In-Reply-To: <1307616853-28395-5-git-send-email-rnayak@ti.com>
-References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
-	<1307616853-28395-2-git-send-email-rnayak@ti.com>
-	<1307616853-28395-3-git-send-email-rnayak@ti.com>
-	<1307616853-28395-4-git-send-email-rnayak@ti.com>
-	<1307616853-28395-5-git-send-email-rnayak@ti.com>
-Message-ID: <20110610001556.GA9159@google.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Fri, 10 Jun 2011 09:51:53 +0900
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory Power
+	Management
+In-Reply-To: <20110609185259.GA29287@linux.vnet.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110528005640.9076c0b1.akpm@linux-foundation.org>
+	<20110609185259.GA29287@linux.vnet.ibm.com>
+Message-ID: <BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 04:24:09PM +0530, Rajendra Nayak wrote:
-> The omap_set_pwrdm_state function forces clockdomains
-> to idle, without checking the existing idle state
-> programmed, instead based solely on the HW capability
-> of the clockdomain to support idle.
-> This is wrong and the clockdomains should be idled
-> post a state_switch *only* if idle transitions on the
-> clockdomain were already enabled.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/mach-omap2/pm.c |    4 +++-
->  1 files changed, 3 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
-> index d48813f..840b0e1 100644
-> --- a/arch/arm/mach-omap2/pm.c
-> +++ b/arch/arm/mach-omap2/pm.c
-> @@ -108,6 +108,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
->  	u32 cur_state;
->  	int sleep_switch = -1;
->  	int ret = 0;
-> +	int hwsup = 0;
->  
->  	if (pwrdm == NULL || IS_ERR(pwrdm))
->  		return -EINVAL;
-> @@ -127,6 +128,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
->  			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
->  			sleep_switch = LOWPOWERSTATE_SWITCH;
->  		} else {
-> +			hwsup = clkdm_is_idle(pwrdm->pwrdm_clkdms[0]);
->  			clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
->  			pwrdm_wait_transition(pwrdm);
->  			sleep_switch = FORCEWAKEUP_SWITCH;
-> @@ -142,7 +144,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
->  
->  	switch (sleep_switch) {
->  	case FORCEWAKEUP_SWITCH:
-> -		if (pwrdm->pwrdm_clkdms[0]->flags & CLKDM_CAN_ENABLE_AUTO)
-> +		if (hwsup)
->  			clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
->  		else
->  			clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
+On Fri, Jun 10, 2011 at 3:52 AM, Paul E. McKenney
+<paulmck@linux.vnet.ibm.com> wrote:
+> On Sat, May 28, 2011 at 12:56:40AM -0700, Andrew Morton wrote:
+>> On Fri, 27 May 2011 18:01:28 +0530 Ankita Garg <ankita@in.ibm.com> wrote:
+>>
+>> > This patchset proposes a generic memory regions infrastructure that can be
+>> > used to tag boundaries of memory blocks which belongs to a specific memory
+>> > power management domain and further enable exploitation of platform memory
+>> > power management capabilities.
+>>
+>> A couple of quick thoughts...
+>>
+>> I'm seeing no estimate of how much energy we might save when this work
+>> is completed. ?But saving energy is the entire point of the entire
+>> patchset! ?So please spend some time thinking about that and update and
+>> maintain the [patch 0/n] description so others can get some idea of the
+>> benefit we might get from all of this. ?That estimate should include an
+>> estimate of what proportion of machines are likely to have hardware
+>> which can use this feature and in what timeframe.
+>>
+>> IOW, if it saves one microwatt on 0.001% of machines, not interested ;)
+>
+> FWIW, I have seen estimates on the order of a 5% reduction in power
+> consumption for some common types of embedded devices.
 
-Is concurrency protection needed here?  Not sure if it's expected that
-multiple threads would simultaneously manage the state of the same power
-domain, or that the associated clock domain would change state
-concurrently.
+Wow interesting. I can't expect it can reduce 5% power reduction.
+If it uses the 1GiBytes LPDDR2 memory. each memory port has 4Gib,
+another has 4Gib. so one bank size is 64MiB (512MiB / 8).
+So I don't expect it's difficult to contain the free or inactive
+memory more than 64MiB during runtime.
 
+Anyway can you describe the exact test environment? esp., memory type?
+As you know there are too much embedded devices which use the various
+environment.
 
-Todd
-> 1.7.0.4
-> 
+Thank you,
+Kyungmin Park
+>
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?Thanx, Paul
+>
+>> Also, all this code appears to be enabled on all machines? ?So machines
+>> which don't have the requisite hardware still carry any additional
+>> overhead which is added here. ?I can see that ifdeffing a feature like
+>> this would be ghastly but please also have a think about the
+>> implications of this and add that discussion also.
+>>
+>> If possible, it would be good to think up some microbenchmarks which
+>> probe the worst-case performance impact and describe those and present
+>> the results. ?So others can gain an understanding of the runtime costs.
+>>
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at ?http://www.tux.org/lkml/
+>>
+>
 > --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> To unsubscribe, send a message with 'unsubscribe linux-mm' in
+> the body to majordomo at kvack.org. ?For more info on Linux MM,
+> see: http://www.linux-mm.org/ .
+> Fight unfair telecom internet charges in Canada: sign http://stopthemeter.ca/
+> Don't email: <a href=mailto:"dont@kvack.org"> email at kvack.org </a>
+>
