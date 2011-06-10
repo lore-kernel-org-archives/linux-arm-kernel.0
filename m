@@ -1,36 +1,44 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 10 Jun 2011 15:48:39 -0500
-Subject: [PATCH v4 0/4] amba bus devicetree probing
-Message-ID: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
+Date: Fri, 10 Jun 2011 17:44:47 -0500
+Subject: [PATCH v4 2/4] dt: add EXPORT_SYMBOL to of_platform_populate
+In-Reply-To: <20110610213756.GC28994@ponder.secretlab.ca>
+References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
+	<1307738923-7564-3-git-send-email-robherring2@gmail.com>
+	<20110610213756.GC28994@ponder.secretlab.ca>
+Message-ID: <4DF29E5F.8030307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 06/10/2011 04:37 PM, Grant Likely wrote:
+> On Fri, Jun 10, 2011 at 03:48:41PM -0500, Rob Herring wrote:
+>> From: Rob Herring<rob.herring@calxeda.com>
+>>
+>> of_platform_populate is missing an EXPORT_SYMBOL, so add it.
+>>
+>> Cc: Grant Likely<grant.likely@secretlab.ca>
+>> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
+>> ---
+>>   drivers/of/platform.c |    1 +
+>>   1 files changed, 1 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+>> index dc56a77..8d0f477 100644
+>> --- a/drivers/of/platform.c
+>> +++ b/drivers/of/platform.c
+>> @@ -328,4 +328,5 @@ int of_platform_populate(struct device_node *root,
+>>   	of_node_put(root);
+>>   	return rc;
+>>   }
+>> +EXPORT_SYMBOL(of_platform_populate);
+>
+> I hadn't done this because I hadn't seen a need for calling it from
+> module code.  Do you have a driver that uses it?
+>
 
-This is updated amba bus DT probe support. Amba devices are now handled as a
-special case in the device tree bus scanning code. Found devices with a
-"arm,amba-device" compatible property will be created by of_amba_device_create.
+No, but then it doesn't appear that other functions in this file are 
+used by modules either. Only of_platform_device_create is used by a 
+module (drivers/macintosh) AFAICT.
 
-The first 2 patches are fixes for of_platform_populate.
-
-Applies to devicetree/next on git://git.secretlab.ca/git/linux-2.6
-
-Compile tested with DT enabled and AMBA bus enabled or disabled. 
+Either way, it doesn't really matter to me.
 
 Rob
-
-Rob Herring (4):
-  dt: check root nodes for match on of_platform_populate
-  dt: add EXPORT_SYMBOL to of_platform_populate
-  drivers/amba: create devices from device tree
-  dt: add amba device creation to platform bus scan
-
- Documentation/devicetree/bindings/arm/amba.txt |   21 ++++++++++
- drivers/amba/bus.c                             |   51 ++++++++++++++++++++++++
- drivers/of/platform.c                          |    9 ++++
- include/linux/amba/bus.h                       |   18 ++++++++
- 4 files changed, 99 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/amba.txt
-
--- 
-1.7.4.1
