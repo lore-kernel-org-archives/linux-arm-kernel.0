@@ -1,31 +1,126 @@
-From: shreshthakumar.sahu@stericsson.com (Shreshtha Kumar SAHU)
-Date: Fri, 10 Jun 2011 14:37:06 +0530
-Subject: [PATCH 2/2] amba pl011: platform data for reg lockup and glitch
-In-Reply-To: <20110609210218.GH24424@n2100.arm.linux.org.uk>
-References: <1307653008-3398-1-git-send-email-linus.walleij@stericsson.com>
-	<20110609210218.GH24424@n2100.arm.linux.org.uk>
-Message-ID: <20110610090704.GA476@bnru02.bnr.st.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Fri, 10 Jun 2011 10:13:18 +0100 (BST)
+Subject: [PATCH v2 05/10] ARM: idmap: add header file for identity mapping
+	functions
+In-Reply-To: <1307635142-11312-6-git-send-email-will.deacon@arm.com>
+References: <1307635142-11312-1-git-send-email-will.deacon@arm.com>
+	<1307635142-11312-6-git-send-email-will.deacon@arm.com>
+Message-ID: <alpine.DEB.2.00.1106101010120.11513@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 23:02:18 +0200, Russell King - ARM Linux wrote:
-> On Thu, Jun 09, 2011 at 10:56:48PM +0200, Linus Walleij wrote:
-> > +	/* uart-0 pins gpio configuration should be
-> > +	 * kept intact to prevent glitch in tx line
-> > +	 * when tty dev is opened. Later these pins
-> > +	 * are configured to uart mop500_pins_uart0
-> > +	 *
-> > +	 * It will be replaced with uart configuration
-> > +	 * once the issue is solved.
-> > +	 */
-> > +	GPIO0_GPIO	| PIN_INPUT_PULLUP,
-> > +	GPIO1_GPIO	| PIN_OUTPUT_HIGH,
-> > +	GPIO2_GPIO	| PIN_INPUT_PULLUP,
-> > +	GPIO3_GPIO	| PIN_OUTPUT_LOW,
-> 
-> Why do you want the TXD line (GPIO3) to be indicating a break condition?
+Hi Will,
 
-Yes it should be PIN_OUTPUT_HIGH, as it is configured in mop500_pins_uart0.
+I'm wondering why identity_mapping_del() is restricted to SMP.
+
+Yes have seen that the only current _user_ is SMP initialization, but does 
+that mean it has to be restricted to that ?
+
+I'd want to use it in hibernation resume code, to "cleanse" swapper_pg_dir 
+of the identity mappings _after_ resume. That task doesn't depend on SMP 
+or not.
 
 Thanks,
-Shreshtha
+FrankH.
+
+
+On Thu, 9 Jun 2011, Will Deacon wrote:
+
+> The identity mappings functions are useful outside of SMP booting, so
+> expose them through their own header file.
+>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+> arch/arm/include/asm/idmap.h   |   16 ++++++++++++++++
+> arch/arm/include/asm/pgtable.h |    3 ---
+> arch/arm/kernel/process.c      |    3 +--
+> arch/arm/kernel/smp.c          |    1 +
+> arch/arm/mm/idmap.c            |    1 +
+> 5 files changed, 19 insertions(+), 5 deletions(-)
+> create mode 100644 arch/arm/include/asm/idmap.h
+>
+> diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
+> new file mode 100644
+> index 0000000..ea9517e
+> --- /dev/null
+> +++ b/arch/arm/include/asm/idmap.h
+> @@ -0,0 +1,16 @@
+> +#ifndef _ARM_IDMAP_H
+> +#define _ARM_IDMAP_H
+> +
+> +#include <asm/page.h>
+> +
+> +void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end);
+> +
+> +#ifdef CONFIG_SMP
+> +void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end);
+> +#else
+> +void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end) {};
+> +#endif
+> +
+> +void setup_mm_for_reboot(char mode);
+> +
+> +#endif	/* _ARM_IDMAP_H */
+> diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+> index 5750704..9d559a8 100644
+> --- a/arch/arm/include/asm/pgtable.h
+> +++ b/arch/arm/include/asm/pgtable.h
+> @@ -474,9 +474,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
+>
+> #define pgtable_cache_init() do { } while (0)
+>
+> -void identity_mapping_add(pgd_t *, unsigned long, unsigned long);
+> -void identity_mapping_del(pgd_t *, unsigned long, unsigned long);
+> -
+> #endif /* !__ASSEMBLY__ */
+>
+> #endif /* CONFIG_MMU */
+> diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+> index 5e1e541..8bd9d94 100644
+> --- a/arch/arm/kernel/process.c
+> +++ b/arch/arm/kernel/process.c
+> @@ -32,6 +32,7 @@
+> #include <linux/hw_breakpoint.h>
+>
+> #include <asm/cacheflush.h>
+> +#include <asm/idmap.h>
+> #include <asm/leds.h>
+> #include <asm/processor.h>
+> #include <asm/system.h>
+> @@ -56,8 +57,6 @@ static const char *isa_modes[] = {
+>   "ARM" , "Thumb" , "Jazelle", "ThumbEE"
+> };
+>
+> -extern void setup_mm_for_reboot(char mode);
+> -
+> static volatile int hlt_counter;
+>
+> #include <mach/system.h>
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 344e52b..dfc76aa 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -39,6 +39,7 @@
+> #include <asm/tlbflush.h>
+> #include <asm/ptrace.h>
+> #include <asm/localtimer.h>
+> +#include <asm/idmap.h>
+>
+> /*
+>  * as from 2.5, kernels no longer have an init_tasks structure
+> diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+> index 2be9139..4ae0f09 100644
+> --- a/arch/arm/mm/idmap.c
+> +++ b/arch/arm/mm/idmap.c
+> @@ -1,6 +1,7 @@
+> #include <linux/kernel.h>
+>
+> #include <asm/cputype.h>
+> +#include <asm/idmap.h>
+> #include <asm/pgalloc.h>
+> #include <asm/pgtable.h>
+>
+> -- 
+> 1.7.0.4
+>
+>
