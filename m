@@ -1,35 +1,64 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 10 Jun 2011 15:37:56 -0600
-Subject: [PATCH v4 2/4] dt: add EXPORT_SYMBOL to of_platform_populate
-In-Reply-To: <1307738923-7564-3-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-3-git-send-email-robherring2@gmail.com>
-Message-ID: <20110610213756.GC28994@ponder.secretlab.ca>
+From: nm@ti.com (Menon, Nishanth)
+Date: Fri, 10 Jun 2011 11:20:13 -0500
+Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D426804@dbde02.ent.ti.com>
+References: <1307718873-27652-1-git-send-email-nm@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D426804@dbde02.ent.ti.com>
+Message-ID: <BANLkTimRyXm7uBkUsMNbzb_VrdWbQ2WqCA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 03:48:41PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> of_platform_populate is missing an EXPORT_SYMBOL, so add it.
-> 
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  drivers/of/platform.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index dc56a77..8d0f477 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -328,4 +328,5 @@ int of_platform_populate(struct device_node *root,
->  	of_node_put(root);
->  	return rc;
->  }
-> +EXPORT_SYMBOL(of_platform_populate);
+On Fri, Jun 10, 2011 at 11:08, Premi, Sanjeev <premi@ti.com> wrote:
+>> -----Original Message-----
+>> From: linux-omap-owner at vger.kernel.org
+>> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Menon, Nishanth
+>> Sent: Friday, June 10, 2011 8:45 PM
+>> To: linux-omap
+>> Cc: Tony; linux-arm; Balbi, Felipe; Menon, Nishanth
+>> Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
+>>
+>> Attempting to disable USB generates the following warning at
+>> the moment:
+>> warning: (ARCH_OMAP3 && ARCH_OMAP4) selects USB_ARCH_HAS_EHCI
+>> which has unmet direct dependencies (USB_SUPPORT)
+>>
+>> Signed-off-by: Nishanth Menon <nm@ti.com>
+>> ---
+>> based on 3.0-rc2
+>> ?arch/arm/mach-omap2/Kconfig | ? ?4 ++--
+>> ?1 files changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+>> index ef7e12f..d5cf1a8 100644
+>> --- a/arch/arm/mach-omap2/Kconfig
+>> +++ b/arch/arm/mach-omap2/Kconfig
+>> @@ -33,7 +33,7 @@ config ARCH_OMAP3
+>> ? ? ? depends on ARCH_OMAP2PLUS
+>> ? ? ? default y
+>> ? ? ? select CPU_V7
+>> - ? ? select USB_ARCH_HAS_EHCI
+>> + ? ? select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>> ? ? ? select ARM_L1_CACHE_SHIFT_6 if !ARCH_OMAP4
+>> ? ? ? select ARCH_HAS_OPP
+>> ? ? ? select PM_OPP if PM
+>> @@ -50,7 +50,7 @@ config ARCH_OMAP4
+>> ? ? ? select ARM_ERRATA_720789
+>> ? ? ? select ARCH_HAS_OPP
+>> ? ? ? select PM_OPP if PM
+>> - ? ? select USB_ARCH_HAS_EHCI
+>> + ? ? select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>>
+>> ?comment "OMAP Core Type"
+>> ? ? ? depends on ARCH_OMAP2
+>
+>
+> Here is earlier discussion on the same subject:
+> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42064.html
+>
+> Exactly same patch was proposed.
 
-I hadn't done this because I hadn't seen a need for calling it from
-module code.  Do you have a driver that uses it?
+You may want to do that for the full Kconfig file(not just for OMAP3)
+and post out..
 
-g.
+Regards,
+Nishanth Menon
