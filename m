@@ -1,33 +1,32 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Jun 2011 08:45:24 +0200
-Subject: kernel - userspace shared memory
-In-Reply-To: <4DF19AAA.40309@st.com>
-References: <BANLkTikGHoBTDyPN7T7N88DfMF1F322T2A@mail.gmail.com>
-	<4DF19AAA.40309@st.com>
-Message-ID: <201106100845.24482.arnd@arndb.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 10 Jun 2011 12:17:12 +0530
+Subject: [PATCH 5/5] ASoC: SMDKV310: Enable SPDIF device
+In-Reply-To: <1307687667-9127-6-git-send-email-ch.naveen@samsung.com>
+References: <1307687667-9127-1-git-send-email-ch.naveen@samsung.com>
+	<1307687667-9127-6-git-send-email-ch.naveen@samsung.com>
+Message-ID: <BANLkTikVeCoLei6xXHz1JU6Fb-ZC6gkQVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 June 2011 06:16:42 viresh kumar wrote:
-> On 06/06/2011 10:47 PM, Zoltan Devai wrote:
-> > Hi all,
-> > 
-> > We are having a kernel driver and a userspace application that
-> > communicates via shared memory. The problem is, that when the userspace
-> > application modifies some data in the shared memory, this modification
-> > is not "visible" when the kernel driver takes a look at that memory
-> > location (specifically this code is in a kernel timer function).
-> > Actually, the modification is sometimes seen, sometimes not,
-> > which suggests that we are having some kind of cache coherency issue.
-> > The strange thing is, that AFAIK we have disabled caching on the pages
-> > where the shared memory resides.
-> 
-> Which core are you using? One problem that i am aware of is, on ARMv7
-> "Multiple mappings of memory with different attributes is not supported".
-> And the result of such is unspecified.
+On Fri, Jun 10, 2011 at 12:04 PM, Naveen Krishna Chatradhi
+<ch.naveen@samsung.com> wrote:
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> ---
+> ?sound/soc/samsung/Kconfig | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/sound/soc/samsung/Kconfig b/sound/soc/samsung/Kconfig
+> index d155cbb..92236eb 100644
+> --- a/sound/soc/samsung/Kconfig
+> +++ b/sound/soc/samsung/Kconfig
+> @@ -158,7 +158,7 @@ config SND_SOC_GONI_AQUILA_WM8994
+>
+> ?config SND_SOC_SAMSUNG_SMDK_SPDIF
+> ? ? ? ?tristate "SoC S/PDIF Audio support for SMDK"
+> - ? ? ? depends on SND_SOC_SAMSUNG && (MACH_SMDKC100 || MACH_SMDKC110 || MACH_SMDKV210)
+> + ? ? ? depends on SND_SOC_SAMSUNG && (MACH_SMDKC100 || MACH_SMDKC110 || MACH_SMDKV210 || MACH_SMDKV310)
+> ? ? ? ?select SND_SAMSUNG_SPDIF
+> ? ? ? ?help
+> ? ? ? ? ?Say Y if you want to add support for SoC S/PDIF audio on the SMDK.
 
-There are also possible problems with cache aliases. Zoltan, if this is
-an out-of-tree driver, please post it here in patch form if you want
-anyone to give you a more specific answer.
-
-	Arnd
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
