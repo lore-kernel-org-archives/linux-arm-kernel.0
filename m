@@ -1,33 +1,37 @@
-From: viresh.kumar@st.com (viresh kumar)
-Date: Fri, 10 Jun 2011 09:46:42 +0530
-Subject: kernel - userspace shared memory
-In-Reply-To: <BANLkTikGHoBTDyPN7T7N88DfMF1F322T2A@mail.gmail.com>
-References: <BANLkTikGHoBTDyPN7T7N88DfMF1F322T2A@mail.gmail.com>
-Message-ID: <4DF19AAA.40309@st.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 9 Jun 2011 23:06:02 -0600
+Subject: [PATCH] ARM: EXYNOS4: Fix incorrect mapping of gpio pull-up macro
+	to register setting
+In-Reply-To: <4DF14629.1070307@samsung.com>
+References: <1307435689-15954-1-git-send-email-thomas.ab@samsung.com>
+	<BANLkTi=YeOyK1WX61NtyprYdUyNmSo1sTw@mail.gmail.com>
+	<20110607171030.GE17754@ponder.secretlab.ca>
+	<4DF14629.1070307@samsung.com>
+Message-ID: <BANLkTik1sK_B3KPU0vNi08HO0NFCE-7Rxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/06/2011 10:47 PM, Zoltan Devai wrote:
-> Hi all,
-> 
-> We are having a kernel driver and a userspace application that
-> communicates via shared memory. The problem is, that when the userspace
-> application modifies some data in the shared memory, this modification
-> is not "visible" when the kernel driver takes a look at that memory
-> location (specifically this code is in a kernel timer function).
-> Actually, the modification is sometimes seen, sometimes not,
-> which suggests that we are having some kind of cache coherency issue.
-> The strange thing is, that AFAIK we have disabled caching on the pages
-> where the shared memory resides.
+On Thu, Jun 9, 2011 at 4:16 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> On 06/07/11 10:10, Grant Likely wrote:
+>>
+>> On Tue, Jun 07, 2011 at 05:42:47PM +0900, Kyungmin Park wrote:
+>>>
+>>> On Tue, Jun 7, 2011 at 5:34 PM, Thomas Abraham<thomas.ab@samsung.com>
+>>> ?wrote:
+>
+> (snip)
+>
+>> Applied, thanks.
+>>
+>> g.
+>
+> Hi Grant, sorry for late response.
+>
+> Could you please add my ack on this?
+>
+> Acked-by: Kukjin Kim <kgene.kim@samsung.com>
 
-Which core are you using? One problem that i am aware of is, on ARMv7
-"Multiple mappings of memory with different attributes is not supported".
-And the result of such is unspecified.
+Unfortunately that would require me to rebase my tree, which I'm
+trying really hard to avoid.
 
-And for that we need to allocate memory with dma_mmap_writecombine() and remap it
-for virtual space with dma_mmap_writecombine().
-
-HTH.
-
--- 
-viresh
+g.
