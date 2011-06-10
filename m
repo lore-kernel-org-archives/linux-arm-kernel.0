@@ -1,40 +1,37 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Fri, 10 Jun 2011 10:14:33 -0500
-Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
-Message-ID: <1307718873-27652-1-git-send-email-nm@ti.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 10 Jun 2011 11:21:06 -0700
+Subject: [PATCH] ARM: bug.h: fix sparse error: symbol '__bug' redeclared
+Message-ID: <201106101121.07197.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Attempting to disable USB generates the following warning at the moment:
-warning: (ARCH_OMAP3 && ARCH_OMAP4) selects USB_ARCH_HAS_EHCI which has unmet direct dependencies (USB_SUPPORT)
+The symbol '__bug' is declared in arch/arm/include/asm/bug.h as:
 
-Signed-off-by: Nishanth Menon <nm@ti.com>
+extern void __bug(const char *file, int line) __attribute__((noreturn));
+
+But is defined in arch/arm/kernel/traps.c as:
+
+void __attribute__((noreturn)) __bug(const char *file, int line)
+
+The different position of the __attribute_((noreturn)) causes a sparse error.
+
+Change the declaration to match the definition to quiet the error.
+
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Russell King <linux@arm.linux.org.uk> 
+
 ---
-based on 3.0-rc2
- arch/arm/mach-omap2/Kconfig |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index ef7e12f..d5cf1a8 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -33,7 +33,7 @@ config ARCH_OMAP3
- 	depends on ARCH_OMAP2PLUS
- 	default y
- 	select CPU_V7
--	select USB_ARCH_HAS_EHCI
-+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select ARM_L1_CACHE_SHIFT_6 if !ARCH_OMAP4
- 	select ARCH_HAS_OPP
- 	select PM_OPP if PM
-@@ -50,7 +50,7 @@ config ARCH_OMAP4
- 	select ARM_ERRATA_720789
- 	select ARCH_HAS_OPP
- 	select PM_OPP if PM
--	select USB_ARCH_HAS_EHCI
-+	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
+index 4d88425..0e56435 100644
+--- a/arch/arm/include/asm/bug.h
++++ b/arch/arm/include/asm/bug.h
+@@ -4,7 +4,7 @@
  
- comment "OMAP Core Type"
- 	depends on ARCH_OMAP2
--- 
-1.7.1
+ #ifdef CONFIG_BUG
+ #ifdef CONFIG_DEBUG_BUGVERBOSE
+-extern void __bug(const char *file, int line) __attribute__((noreturn));
++extern void __attribute__((noreturn)) __bug(const char *file, int line);
+ 
+ /* give file/line information */
+ #define BUG()		__bug(__FILE__, __LINE__)
