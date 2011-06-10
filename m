@@ -1,80 +1,68 @@
-From: andre.silva@freescale.com (Andre Silva)
-Date: Fri, 10 Jun 2011 13:15:20 -0300
-Subject: [PATCH 1/2] ARM:mach-mx5/board-mx51_babbage: Add CD and WP GPIOs
-In-Reply-To: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
-References: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
-Message-ID: <1307722520-12952-2-git-send-email-andre.silva@freescale.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Fri, 10 Jun 2011 21:38:12 +0530
+Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
+In-Reply-To: <1307718873-27652-1-git-send-email-nm@ti.com>
+References: <1307718873-27652-1-git-send-email-nm@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D426804@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andre Silva <andre.silva@freescale.com>
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Menon, Nishanth
+> Sent: Friday, June 10, 2011 8:45 PM
+> To: linux-omap
+> Cc: Tony; linux-arm; Balbi, Felipe; Menon, Nishanth
+> Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
+> 
+> Attempting to disable USB generates the following warning at 
+> the moment:
+> warning: (ARCH_OMAP3 && ARCH_OMAP4) selects USB_ARCH_HAS_EHCI 
+> which has unmet direct dependencies (USB_SUPPORT)
+> 
+> Signed-off-by: Nishanth Menon <nm@ti.com>
+> ---
+> based on 3.0-rc2
+>  arch/arm/mach-omap2/Kconfig |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+> index ef7e12f..d5cf1a8 100644
+> --- a/arch/arm/mach-omap2/Kconfig
+> +++ b/arch/arm/mach-omap2/Kconfig
+> @@ -33,7 +33,7 @@ config ARCH_OMAP3
+>  	depends on ARCH_OMAP2PLUS
+>  	default y
+>  	select CPU_V7
+> -	select USB_ARCH_HAS_EHCI
+> +	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>  	select ARM_L1_CACHE_SHIFT_6 if !ARCH_OMAP4
+>  	select ARCH_HAS_OPP
+>  	select PM_OPP if PM
+> @@ -50,7 +50,7 @@ config ARCH_OMAP4
+>  	select ARM_ERRATA_720789
+>  	select ARCH_HAS_OPP
+>  	select PM_OPP if PM
+> -	select USB_ARCH_HAS_EHCI
+> +	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+>  
+>  comment "OMAP Core Type"
+>  	depends on ARCH_OMAP2
 
----
- arch/arm/mach-mx5/board-mx51_babbage.c |   24 +++++++++++++++++++++---
- 1 files changed, 21 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-index 770f74b..3e58d5d 100644
---- a/arch/arm/mach-mx5/board-mx51_babbage.c
-+++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-@@ -41,6 +41,10 @@
- #define BABBAGE_POWER_KEY	IMX_GPIO_NR(2, 21)
- #define BABBAGE_ECSPI1_CS0	IMX_GPIO_NR(4, 24)
- #define BABBAGE_ECSPI1_CS1	IMX_GPIO_NR(4, 25)
-+#define BABBAGE_SD1_CD		IMX_GPIO_NR(1, 0)
-+#define BABBAGE_SD1_WP		IMX_GPIO_NR(1, 1)
-+#define BABBAGE_SD2_CD		IMX_GPIO_NR(1, 6)
-+#define BABBAGE_SD2_WP		IMX_GPIO_NR(1, 5)
- 
- /* USB_CTRL_1 */
- #define MX51_USB_CTRL_1_OFFSET			0x10
-@@ -142,7 +146,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
- 	MX51_PAD_SD1_DATA1__SD1_DATA1,
- 	MX51_PAD_SD1_DATA2__SD1_DATA2,
- 	MX51_PAD_SD1_DATA3__SD1_DATA3,
--
-+	MX51_PAD_GPIO1_0__GPIO1_0,
-+	MX51_PAD_GPIO1_1__GPIO1_1,
-+
- 	/* SD 2 */
- 	MX51_PAD_SD2_CMD__SD2_CMD,
- 	MX51_PAD_SD2_CLK__SD2_CLK,
-@@ -150,6 +156,8 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
- 	MX51_PAD_SD2_DATA1__SD2_DATA1,
- 	MX51_PAD_SD2_DATA2__SD2_DATA2,
- 	MX51_PAD_SD2_DATA3__SD2_DATA3,
-+	MX51_PAD_GPIO1_6__GPIO1_6,
-+	MX51_PAD_GPIO1_5__GPIO1_5,
- 
- 	/* eCSPI1 */
- 	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
-@@ -331,6 +339,16 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
- 	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
- };
- 
-+static const struct esdhc_platform_data mx51_babbage_sd1_data __initconst = {
-+	.cd_gpio = BABBAGE_SD1_CD,
-+	.wp_gpio = BABBAGE_SD1_WP,
-+};
-+
-+static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
-+	.cd_gpio = BABBAGE_SD2_CD,
-+	.wp_gpio = BABBAGE_SD2_WP,
-+};
-+
- /*
-  * Board specific initialization.
-  */
-@@ -374,8 +392,8 @@ static void __init mx51_babbage_init(void)
- 	mxc_iomux_v3_setup_pad(usbh1stp);
- 	babbage_usbhub_reset();
- 
--	imx51_add_sdhci_esdhc_imx(0, NULL);
--	imx51_add_sdhci_esdhc_imx(1, NULL);
-+	imx51_add_sdhci_esdhc_imx(0, &mx51_babbage_sd1_data);
-+	imx51_add_sdhci_esdhc_imx(1, &mx51_babbage_sd2_data);
- 
- 	spi_register_board_info(mx51_babbage_spi_board_info,
- 		ARRAY_SIZE(mx51_babbage_spi_board_info));
--- 
-1.7.1
+Here is earlier discussion on the same subject:
+http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42064.html
+
+Exactly same patch was proposed.
+
+~sanjeev
+
+> -- 
+> 1.7.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe 
+> linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
