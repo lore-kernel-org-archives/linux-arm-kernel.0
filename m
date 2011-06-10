@@ -1,142 +1,298 @@
 From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Sat, 11 Jun 2011 00:55:44 +0300
-Subject: [PATCH v2 1/4] drivers: iommu: move to a dedicated folder
+Date: Sat, 11 Jun 2011 00:55:47 +0300
+Subject: [PATCH v2 4/4] x86/ia64: intel-iommu: move to drivers/iommu/
 In-Reply-To: <1307742947-32118-1-git-send-email-ohad@wizery.com>
 References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
-Message-ID: <1307742947-32118-2-git-send-email-ohad@wizery.com>
+Message-ID: <1307742947-32118-5-git-send-email-ohad@wizery.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Create a dedicated folder for iommu drivers, and move the base
-iommu implementation over there.
+This should ease finding similarities with different platforms,
+with the intention of solving problems once in a generic framework
+which everyone can use.
 
-Grouping the various iommu drivers in a single location will help
-finding similar problems shared by different platforms, so they
-could be solved once, in the iommu framework, instead of solved
-differently (or duplicated) in each driver.
+Note: to move intel-iommu.c, the declaration of pci_find_upstream_pcie_bridge()
+has to move from drivers/pci/pci.h to include/linux/pci.h. This is handled
+in this patch, too.
+
+As suggested, also drop DMAR's EXPERIMENTAL tag while we're at it.
+
+Compile-tested on x86_64.
 
 Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 ---
- arch/arm/mach-msm/Kconfig       |    3 ---
- arch/ia64/Kconfig               |    3 ---
- arch/x86/Kconfig                |    5 ++---
- drivers/Kconfig                 |    2 ++
- drivers/Makefile                |    1 +
- drivers/base/Makefile           |    1 -
- drivers/iommu/Kconfig           |    3 +++
- drivers/iommu/Makefile          |    1 +
- drivers/{base => iommu}/iommu.c |    0
- 9 files changed, 9 insertions(+), 10 deletions(-)
- create mode 100644 drivers/iommu/Kconfig
- create mode 100644 drivers/iommu/Makefile
- rename drivers/{base => iommu}/iommu.c (100%)
+sorry, not tested on ia64 (not even compiled)
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 1516896..efb7b7d 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -205,9 +205,6 @@ config MSM_GPIOMUX
- config MSM_V2_TLMM
- 	bool
- 
--config IOMMU_API
--	bool
--
- config MSM_SCM
- 	bool
- endif
+ arch/ia64/Kconfig                       |   21 -------------
+ arch/x86/Kconfig                        |   50 -------------------------------
+ drivers/iommu/Kconfig                   |   49 ++++++++++++++++++++++++++++++
+ drivers/iommu/Makefile                  |    2 +
+ drivers/{pci => iommu}/dmar.c           |    0
+ drivers/{pci => iommu}/intel-iommu.c    |    1 -
+ drivers/{pci => iommu}/intr_remapping.c |    1 -
+ drivers/{pci => iommu}/intr_remapping.h |    0
+ drivers/{pci => iommu}/iova.c           |    0
+ drivers/pci/Makefile                    |    5 ---
+ drivers/pci/pci.h                       |    2 -
+ include/linux/pci.h                     |   11 +++++++
+ 12 files changed, 62 insertions(+), 80 deletions(-)
+ rename drivers/{pci => iommu}/dmar.c (100%)
+ rename drivers/{pci => iommu}/intel-iommu.c (99%)
+ rename drivers/{pci => iommu}/intr_remapping.c (99%)
+ rename drivers/{pci => iommu}/intr_remapping.h (100%)
+ rename drivers/{pci => iommu}/iova.c (100%)
+
 diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 38280ef..9929e4e 100644
+index 9929e4e..7336ba6 100644
 --- a/arch/ia64/Kconfig
 +++ b/arch/ia64/Kconfig
-@@ -681,6 +681,3 @@ source "lib/Kconfig"
+@@ -627,27 +627,6 @@ source "drivers/pci/hotplug/Kconfig"
  
- config IOMMU_HELPER
- 	def_bool (IA64_HP_ZX1 || IA64_HP_ZX1_SWIOTLB || IA64_GENERIC || SWIOTLB)
+ source "drivers/pcmcia/Kconfig"
+ 
+-config DMAR
+-        bool "Support for DMA Remapping Devices (EXPERIMENTAL)"
+-        depends on IA64_GENERIC && ACPI && EXPERIMENTAL
+-	help
+-	  DMA remapping (DMAR) devices support enables independent address
+-	  translations for Direct Memory Access (DMA) from devices.
+-	  These DMA remapping devices are reported via ACPI tables
+-	  and include PCI device scope covered by these DMA
+-	  remapping devices.
 -
--config IOMMU_API
--	def_bool (DMAR)
+-config DMAR_DEFAULT_ON
+-	def_bool y
+-	prompt "Enable DMA Remapping Devices by default"
+-	depends on DMAR
+-	help
+-	  Selecting this option will enable a DMAR device at boot time if
+-	  one is found. If this option is not selected, DMAR support can
+-	  be enabled by passing intel_iommu=on to the kernel. It is
+-	  recommended you say N here while the DMAR code remains
+-	  experimental.
+-
+ endmenu
+ 
+ endif
 diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index da34972..460d573 100644
+index 1b6a2e2..a169573 100644
 --- a/arch/x86/Kconfig
 +++ b/arch/x86/Kconfig
-@@ -685,6 +685,7 @@ config AMD_IOMMU
- 	select SWIOTLB
- 	select PCI_MSI
- 	select PCI_IOV
-+	select IOMMU_API
- 	depends on X86_64 && PCI && ACPI
- 	---help---
- 	  With this option you can enable support for AMD IOMMU hardware in
-@@ -720,9 +721,6 @@ config SWIOTLB
- config IOMMU_HELPER
- 	def_bool (CALGARY_IOMMU || GART_IOMMU || SWIOTLB || AMD_IOMMU)
+@@ -1912,56 +1912,6 @@ config PCI_CNB20LE_QUIRK
  
--config IOMMU_API
--	def_bool (AMD_IOMMU || DMAR)
+ 	  You should say N unless you know you need this.
+ 
+-config DMAR
+-	bool "Support for DMA Remapping Devices (EXPERIMENTAL)"
+-	depends on PCI_MSI && ACPI && EXPERIMENTAL
+-	select IOMMU_API
+-	help
+-	  DMA remapping (DMAR) devices support enables independent address
+-	  translations for Direct Memory Access (DMA) from devices.
+-	  These DMA remapping devices are reported via ACPI tables
+-	  and include PCI device scope covered by these DMA
+-	  remapping devices.
 -
- config MAXSMP
- 	bool "Enable Maximum number of SMP Processors and NUMA Nodes"
- 	depends on X86_64 && SMP && DEBUG_KERNEL && EXPERIMENTAL
-@@ -1945,6 +1943,7 @@ config PCI_CNB20LE_QUIRK
- config DMAR
- 	bool "Support for DMA Remapping Devices (EXPERIMENTAL)"
- 	depends on PCI_MSI && ACPI && EXPERIMENTAL
-+	select IOMMU_API
- 	help
- 	  DMA remapping (DMAR) devices support enables independent address
- 	  translations for Direct Memory Access (DMA) from devices.
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index 3bb154d..9d51318 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -126,4 +126,6 @@ source "drivers/hwspinlock/Kconfig"
+-config DMAR_DEFAULT_ON
+-	def_bool y
+-	prompt "Enable DMA Remapping Devices by default"
+-	depends on DMAR
+-	help
+-	  Selecting this option will enable a DMAR device at boot time if
+-	  one is found. If this option is not selected, DMAR support can
+-	  be enabled by passing intel_iommu=on to the kernel. It is
+-	  recommended you say N here while the DMAR code remains
+-	  experimental.
+-
+-config DMAR_BROKEN_GFX_WA
+-	bool "Workaround broken graphics drivers (going away soon)"
+-	depends on DMAR && BROKEN
+-	---help---
+-	  Current Graphics drivers tend to use physical address
+-	  for DMA and avoid using DMA APIs. Setting this config
+-	  option permits the IOMMU driver to set a unity map for
+-	  all the OS-visible memory. Hence the driver can continue
+-	  to use physical addresses for DMA, at least until this
+-	  option is removed in the 2.6.32 kernel.
+-
+-config DMAR_FLOPPY_WA
+-	def_bool y
+-	depends on DMAR
+-	---help---
+-	  Floppy disk drivers are known to bypass DMA API calls
+-	  thereby failing to work when IOMMU is enabled. This
+-	  workaround will setup a 1:1 mapping for the first
+-	  16MiB to make floppy (an ISA device) work.
+-
+-config INTR_REMAP
+-	bool "Support for Interrupt Remapping (EXPERIMENTAL)"
+-	depends on X86_64 && X86_IO_APIC && PCI_MSI && ACPI && EXPERIMENTAL
+-	---help---
+-	  Supports Interrupt remapping for IO-APIC and MSI devices.
+-	  To use x2apic mode in the CPU's which support x2APIC enhancements or
+-	  to support platforms with CPU's having > 8 bit APIC ID, say Y.
+-
+ source "drivers/pci/pcie/Kconfig"
  
- source "drivers/clocksource/Kconfig"
- 
-+source "drivers/iommu/Kconfig"
-+
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index 09f3232..2f7a71a 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -122,3 +122,4 @@ obj-y				+= ieee802154/
- obj-y				+= clk/
- 
- obj-$(CONFIG_HWSPINLOCK)	+= hwspinlock/
-+obj-$(CONFIG_IOMMU_API)		+= iommu/
-diff --git a/drivers/base/Makefile b/drivers/base/Makefile
-index 4c5701c..5ab0d07 100644
---- a/drivers/base/Makefile
-+++ b/drivers/base/Makefile
-@@ -13,7 +13,6 @@ obj-$(CONFIG_FW_LOADER)	+= firmware_class.o
- obj-$(CONFIG_NUMA)	+= node.o
- obj-$(CONFIG_MEMORY_HOTPLUG_SPARSE) += memory.o
- obj-$(CONFIG_SMP)	+= topology.o
--obj-$(CONFIG_IOMMU_API) += iommu.o
- ifeq ($(CONFIG_SYSFS),y)
- obj-$(CONFIG_MODULES)	+= module.o
- endif
+ source "drivers/pci/Kconfig"
 diff --git a/drivers/iommu/Kconfig b/drivers/iommu/Kconfig
-new file mode 100644
-index 0000000..2c5dfb4
---- /dev/null
+index 9246c5b..e2a5f14 100644
+--- a/drivers/iommu/Kconfig
 +++ b/drivers/iommu/Kconfig
-@@ -0,0 +1,3 @@
-+# IOMMU_API always gets selected by whoever wants it.
-+config IOMMU_API
-+	bool
+@@ -46,3 +46,52 @@ config AMD_IOMMU_STATS
+ 	  statistics about whats happening in the driver and exports that
+ 	  information to userspace via debugfs.
+ 	  If unsure, say N.
++
++# Intel IOMMU support
++config DMAR
++	bool "Support for DMA Remapping Devices"
++	depends on PCI_MSI && ACPI && (X86 || IA64_GENERIC)
++	select IOMMU_API
++	help
++	  DMA remapping (DMAR) devices support enables independent address
++	  translations for Direct Memory Access (DMA) from devices.
++	  These DMA remapping devices are reported via ACPI tables
++	  and include PCI device scope covered by these DMA
++	  remapping devices.
++
++config DMAR_DEFAULT_ON
++	def_bool y
++	prompt "Enable DMA Remapping Devices by default"
++	depends on DMAR
++	help
++	  Selecting this option will enable a DMAR device at boot time if
++	  one is found. If this option is not selected, DMAR support can
++	  be enabled by passing intel_iommu=on to the kernel.
++
++config DMAR_BROKEN_GFX_WA
++	bool "Workaround broken graphics drivers (going away soon)"
++	depends on DMAR && BROKEN && X86
++	---help---
++	  Current Graphics drivers tend to use physical address
++	  for DMA and avoid using DMA APIs. Setting this config
++	  option permits the IOMMU driver to set a unity map for
++	  all the OS-visible memory. Hence the driver can continue
++	  to use physical addresses for DMA, at least until this
++	  option is removed in the 2.6.32 kernel.
++
++config DMAR_FLOPPY_WA
++	def_bool y
++	depends on DMAR && X86
++	---help---
++	  Floppy disk drivers are known to bypass DMA API calls
++	  thereby failing to work when IOMMU is enabled. This
++	  workaround will setup a 1:1 mapping for the first
++	  16MiB to make floppy (an ISA device) work.
++
++config INTR_REMAP
++	bool "Support for Interrupt Remapping (EXPERIMENTAL)"
++	depends on X86_64 && X86_IO_APIC && PCI_MSI && ACPI && EXPERIMENTAL
++	---help---
++	  Supports Interrupt remapping for IO-APIC and MSI devices.
++	  To use x2apic mode in the CPU's which support x2APIC enhancements or
++	  to support platforms with CPU's having > 8 bit APIC ID, say Y.
 diff --git a/drivers/iommu/Makefile b/drivers/iommu/Makefile
-new file mode 100644
-index 0000000..241ba4c
---- /dev/null
+index 4237eaf..49e9c0f 100644
+--- a/drivers/iommu/Makefile
 +++ b/drivers/iommu/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_IOMMU_API) += iommu.o
-diff --git a/drivers/base/iommu.c b/drivers/iommu/iommu.c
+@@ -1,3 +1,5 @@
+ obj-$(CONFIG_IOMMU_API) += iommu.o
+ obj-$(CONFIG_MSM_IOMMU) += msm_iommu.o msm_iommu_dev.o
+ obj-$(CONFIG_AMD_IOMMU) += amd_iommu.o
++obj-$(CONFIG_DMAR) += dmar.o iova.o intel-iommu.o
++obj-$(CONFIG_INTR_REMAP) += dmar.o intr_remapping.o
+diff --git a/drivers/pci/dmar.c b/drivers/iommu/dmar.c
 similarity index 100%
-rename from drivers/base/iommu.c
-rename to drivers/iommu/iommu.c
+rename from drivers/pci/dmar.c
+rename to drivers/iommu/dmar.c
+diff --git a/drivers/pci/intel-iommu.c b/drivers/iommu/intel-iommu.c
+similarity index 99%
+rename from drivers/pci/intel-iommu.c
+rename to drivers/iommu/intel-iommu.c
+index 59f17ac..fd7a055 100644
+--- a/drivers/pci/intel-iommu.c
++++ b/drivers/iommu/intel-iommu.c
+@@ -42,7 +42,6 @@
+ #include <linux/pci-ats.h>
+ #include <asm/cacheflush.h>
+ #include <asm/iommu.h>
+-#include "pci.h"
+ 
+ #define ROOT_SIZE		VTD_PAGE_SIZE
+ #define CONTEXT_SIZE		VTD_PAGE_SIZE
+diff --git a/drivers/pci/intr_remapping.c b/drivers/iommu/intr_remapping.c
+similarity index 99%
+rename from drivers/pci/intr_remapping.c
+rename to drivers/iommu/intr_remapping.c
+index 3607faf..1a89d4a 100644
+--- a/drivers/pci/intr_remapping.c
++++ b/drivers/iommu/intr_remapping.c
+@@ -13,7 +13,6 @@
+ #include "intr_remapping.h"
+ #include <acpi/acpi.h>
+ #include <asm/pci-direct.h>
+-#include "pci.h"
+ 
+ static struct ioapic_scope ir_ioapic[MAX_IO_APICS];
+ static struct hpet_scope ir_hpet[MAX_HPET_TBS];
+diff --git a/drivers/pci/intr_remapping.h b/drivers/iommu/intr_remapping.h
+similarity index 100%
+rename from drivers/pci/intr_remapping.h
+rename to drivers/iommu/intr_remapping.h
+diff --git a/drivers/pci/iova.c b/drivers/iommu/iova.c
+similarity index 100%
+rename from drivers/pci/iova.c
+rename to drivers/iommu/iova.c
+diff --git a/drivers/pci/Makefile b/drivers/pci/Makefile
+index c85f744..f7739d0 100644
+--- a/drivers/pci/Makefile
++++ b/drivers/pci/Makefile
+@@ -29,11 +29,6 @@ obj-$(CONFIG_PCI_MSI) += msi.o
+ # Build the Hypertransport interrupt support
+ obj-$(CONFIG_HT_IRQ) += htirq.o
+ 
+-# Build Intel IOMMU support
+-obj-$(CONFIG_DMAR) += dmar.o iova.o intel-iommu.o
+-
+-obj-$(CONFIG_INTR_REMAP) += dmar.o intr_remapping.o
+-
+ obj-$(CONFIG_PCI_IOV) += iov.o
+ 
+ #
+diff --git a/drivers/pci/pci.h b/drivers/pci/pci.h
+index 731e202..b7bf11d 100644
+--- a/drivers/pci/pci.h
++++ b/drivers/pci/pci.h
+@@ -184,8 +184,6 @@ pci_match_one_device(const struct pci_device_id *id, const struct pci_dev *dev)
+ 	return NULL;
+ }
+ 
+-struct pci_dev *pci_find_upstream_pcie_bridge(struct pci_dev *pdev);
+-
+ /* PCI slot sysfs helper code */
+ #define to_pci_slot(s) container_of(s, struct pci_slot, kobj)
+ 
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index c446b5c..970bfe0 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -1589,5 +1589,16 @@ int pci_vpd_find_tag(const u8 *buf, unsigned int off, unsigned int len, u8 rdt);
+ int pci_vpd_find_info_keyword(const u8 *buf, unsigned int off,
+ 			      unsigned int len, const char *kw);
+ 
++/**
++ * pci_find_upstream_pcie_bridge - find upstream PCIe-to-PCI bridge of a device
++ * @pdev: the PCI device
++ *
++ * if the device is PCIE, return NULL
++ * if the device isn't connected to a PCIe bridge (that is its parent is a
++ * legacy PCI bridge and the bridge is directly connected to bus 0), return its
++ * parent
++ */
++struct pci_dev *pci_find_upstream_pcie_bridge(struct pci_dev *pdev);
++
+ #endif /* __KERNEL__ */
+ #endif /* LINUX_PCI_H */
 -- 
 1.7.1
