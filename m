@@ -1,38 +1,23 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Fri, 10 Jun 2011 08:09:09 +0200
-Subject: [PATCH] ARM: SAMSUNG: Add support for pre-sleep/post-restore	gpio
-	control
-In-Reply-To: <4DF13E03.50803@samsung.com>
-References: <1303925654-27715-1-git-send-email-broonie@opensource.wolfsonmicro.com>
-	<00fc01cc0baa$d7d94cb0$878be610$%kim@samsung.com>
-	<003b01cc24df$29b841b0$7d28c510$%szyprowski@samsung.com>
-	<4DF13E03.50803@samsung.com>
-Message-ID: <001f01cc2734$e97e8f70$bc7bae50$%szyprowski@samsung.com>
+From: ch.naveen@samsung.com (Naveen Krishna Chatradhi)
+Date: Fri, 10 Jun 2011 12:04:22 +0530
+Subject: [PATCH 0/5] ARM: Add SPDIF support for EXYNOS4
+Message-ID: <1307687667-9127-1-git-send-email-ch.naveen@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+EXYNOS4 supports S/PDIF transmitter simillar to the one in S5PV210.
 
-On Thursday, June 09, 2011 11:41 PM Kukjin Kim wrote:
+This patchset adds the clock support, fixes improper gpio configs
+and enables the device for SMDKV310.
 
-> On 06/06/11 23:50, Marek Szyprowski wrote:
-> > Hello,
-> >
-> Hi :)
-> 
-> (snip)
-> 
-> >
-> > This patch lacks stubs for s5p64x0, s5pc100 and exynos4. I will send a
-> quick fix
-> > soon.
-> 
-> Oops, I couldn't test it all on my laptop which is so slow :(
+ o To Kukjin Kim, Sangbeom Kim and Seungwhan Youn,
+[PATCH 1/5] ARM: EXYNOS4: Add EPLL clock operations
+[PATCH 2/5] ARM: EXYNOS4: Add sclk_spdif clocks
+[PATCH 3/5] ARM: EXYNOS4: fix improper gpio configuration
+[PATCH 4/5] ARM: EXYNOS4: Add SPDIF for SMDKV310
 
-In fact the problem was only on exynos4 platform, because both s5p64x0 and
-s5pc100 don't support pm at all. I've posted build fix patch for exynos4.
- 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+ o To Seungwhan Youn, Jassi Brar, Mark Brown and Liam Girdwood,
+[PATCH 5/5] ASoC: SMDKV310: Enable SPDIF device
+
+Best Regards,
+Naveen Krishna Chatradhi
