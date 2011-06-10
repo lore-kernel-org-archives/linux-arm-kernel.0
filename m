@@ -1,186 +1,45 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 10 Jun 2011 16:22:36 -0600
-Subject: [PATCH v4 3/4] drivers/amba: create devices from device tree
-In-Reply-To: <1307738923-7564-4-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-4-git-send-email-robherring2@gmail.com>
-Message-ID: <20110610222236.GD28994@ponder.secretlab.ca>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Fri, 10 Jun 2011 12:30:48 -0500
+Subject: [PATCH v2 2/5] net: ep93xx_eth: pass struct device to DMA API
+	functions
+In-Reply-To: <20110610165545.GA2753@acer>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+	<c0ddfc297e0ea1e64e58cedd6552c6b2e52c5fe8.1307040443.git.mika.westerberg@iki.fi>
+	<ADE657CA350FB648AAC2C43247A983F001F3820B8699@AUSP01VMBX24.collaborationhost.net>
+	<20110610165545.GA2753@acer>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F3820B880E@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 03:48:42PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Add a function to create amba bus devices (i.e. primecell peripherals) from
-> device tree nodes. The device tree scanning is done by
-> of_platform_probe/populate functions which can call of_amba_device_create
-> based on a match table entry.
-> 
-> Nodes with a "arm,amba-deviceid" property can override the h/w peripheral id
-> value.
-> 
-> Based on the original work by Jeremy Kerr.
-> 
-> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: linux at arm.linux.org.uk
-> Cc: arnd at arndb.de
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  Documentation/devicetree/bindings/arm/amba.txt |   21 ++++++++++
->  drivers/amba/bus.c                             |   51 ++++++++++++++++++++++++
->  include/linux/amba/bus.h                       |   18 ++++++++
->  3 files changed, 90 insertions(+), 0 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/amba.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/amba.txt b/Documentation/devicetree/bindings/arm/amba.txt
-> new file mode 100644
-> index 0000000..23fde7f
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/amba.txt
-> @@ -0,0 +1,21 @@
-> +* ARM Primecell Peripherals
-> +
-> +ARM, Ltd. Primecell peripherals have a standard id register that can be used to
-> +identify the peripheral type, vendor, and revision. This value can be used for
-> +driver matching. 
-> +
-> +Required properties:
-> +
-> +- compatible : should be a specific value for peripheral and "arm,amba-device"
+On Friday, June 10, 2011 9:56 AM, Mika Westerberg wrote:
+> On Thu, Jun 09, 2011 at 06:40:21PM -0500, H Hartley Sweeten wrote:
+>> 
+>> I just noticed this macro in include/linux/netdevice.h
+>> 
+>> /* Set the sysfs physical device reference for the network logical device
+>>  * if set prior to registration will cause a symlink during initialization.
+>>  */
+>> #define SET_NETDEV_DEV(net, pdev)       ((net)->dev.parent = (pdev))
+>> 
+>> Is there anyway you could use that macro in the probe to save the platform_device
+>> (with it's associated device) instead of introducing a new struct device * in the
+>> private data?
+>
+> Nice finding, thanks.
+>
+> I'll look into that and send new version of the whole series soon.
 
-After recent conversations, I'd like to change this to
-"arm,primecell" to better reflect the kind of devices it models.
+It looks like after doing this in the probe:
 
-> +
-> +Optional properties:
-> +
-> +- arm,amba-deviceid : Value to override the h/w value with
+	SET_NETDEV_DEV(dev, &pdev->dev);
 
-Similarly, based on the primecell device documents, this should
-probabaly be arm,primecell-periphid.
+You can then pass the required struct device pointer to the DMA API functions
+like this:
 
-> +
-> +Example:
-> +
-> +serial at fff36000 {
-> +	compatible = "arm,pl011", "arm,amba-device";
-> +	arm,amba-deviceid = <0x00341011>;
-> +};
-> +
-> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-> index d74926e..19f712b 100644
-> --- a/drivers/amba/bus.c
-> +++ b/drivers/amba/bus.c
-> @@ -13,6 +13,11 @@
->  #include <linux/string.h>
->  #include <linux/slab.h>
->  #include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_platform.h>
->  #include <linux/pm.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/amba/bus.h>
-> @@ -785,3 +790,49 @@ EXPORT_SYMBOL(amba_device_unregister);
->  EXPORT_SYMBOL(amba_find_device);
->  EXPORT_SYMBOL(amba_request_regions);
->  EXPORT_SYMBOL(amba_release_regions);
-> +
-> +#ifdef CONFIG_OF
-> +int of_amba_device_create(struct device_node *node, struct device *parent)
-> +{
-> +	struct amba_device *dev;
-> +	const void *prop;
-> +	int i, ret;
-> +
-> +	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-> +	if (!dev)
-> +		return -ENOMEM;
-> +
-> +	/* setup generic device info */
-> +	dev->dev.coherent_dma_mask = ~0;
-> +	dev->dev.of_node = node;
-> +	dev->dev.parent = parent;
-> +	of_device_make_bus_id(&dev->dev);
-> +
-> +	/* setup amba-specific device info */
-> +	dev->dma_mask = ~0;
-> +
-> +	/* Allow the arm,amba-deviceid value to override the h/w value */
-> +	prop = of_get_property(node, "arm,amba-deviceid", NULL);
-> +	if (prop)
-> +		dev->periphid = of_read_ulong(prop, 1);
-> +
-> +	/* Decode the IRQs and address ranges */
-> +	for (i = 0; i < AMBA_NR_IRQS; i++)
-> +		dev->irq[i] = irq_of_parse_and_map(node, i);
-> +
-> +	ret = of_address_to_resource(node, 0, &dev->res);
-> +	if (ret)
-> +		goto err_free;
-> +
-> +	ret = amba_device_register(dev, &iomem_resource);
-> +	if (ret)
-> +		goto err_free;
-> +
-> +	return 0;
-> +
-> +err_free:
-> +	kfree(dev);
-> +	return ret;
-> +}
-> +
+static int ep93xx_rx(struct net_device *dev, int processed, int budget)
+{
+	...
+	dma_sync_single_for_cpu(dev->dev.parent, ...
 
-Yeah, I think this looks like the right thing to do.  I'll pick it up
-into devicetree/test and probably move it to devicetree/arm in the
-near future after testing a bit.
-
-> +#endif /* CONFIG_OF */
-> diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-> index fcbbe71..0177274 100644
-> --- a/include/linux/amba/bus.h
-> +++ b/include/linux/amba/bus.h
-> @@ -24,6 +24,7 @@
->  #define AMBA_CID	0xb105f00d
->  
->  struct clk;
-> +struct device_node;
->  
->  struct amba_device {
->  	struct device		dev;
-> @@ -63,6 +64,7 @@ extern struct bus_type amba_bustype;
->  #define amba_get_drvdata(d)	dev_get_drvdata(&d->dev)
->  #define amba_set_drvdata(d,p)	dev_set_drvdata(&d->dev, p)
->  
-> +#ifdef CONFIG_ARM_AMBA
->  int amba_driver_register(struct amba_driver *);
->  void amba_driver_unregister(struct amba_driver *);
->  int amba_device_register(struct amba_device *, struct resource *);
-> @@ -94,4 +96,20 @@ void amba_release_regions(struct amba_device *);
->  #define amba_manf(d)	AMBA_MANF_BITS((d)->periphid)
->  #define amba_part(d)	AMBA_PART_BITS((d)->periphid)
->  
-> +#ifdef CONFIG_OF
-> +int of_amba_device_create(struct device_node *node, struct device *parent);
-> +#endif
-> +
-> +#else
-> +
-> +#ifdef CONFIG_OF
-> +static inline int of_amba_device_create(struct device_node *node, 
-> +					struct device *parent)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +
-> +#endif /* CONFIG_ARM_AMBA */
-> +
->  #endif
-> -- 
-> 1.7.4.1
-> 
+Regards,
+Hartley
