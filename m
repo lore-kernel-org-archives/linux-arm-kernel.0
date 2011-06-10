@@ -1,22 +1,70 @@
 From: toddpoynor@google.com (Todd Poynor)
-Date: Thu, 9 Jun 2011 17:07:15 -0700
-Subject: [PATCH 1/8] OMAP2+: clockdomain: Add an api to read idle mode
-In-Reply-To: <1307616853-28395-2-git-send-email-rnayak@ti.com>
+Date: Thu, 9 Jun 2011 17:15:56 -0700
+Subject: [PATCH 4/8] OMAP2+: PM: idle clkdms only if already in idle
+In-Reply-To: <1307616853-28395-5-git-send-email-rnayak@ti.com>
 References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
 	<1307616853-28395-2-git-send-email-rnayak@ti.com>
-Message-ID: <20110610000715.GA9059@google.com>
+	<1307616853-28395-3-git-send-email-rnayak@ti.com>
+	<1307616853-28395-4-git-send-email-rnayak@ti.com>
+	<1307616853-28395-5-git-send-email-rnayak@ti.com>
+Message-ID: <20110610001556.GA9159@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 04:24:06PM +0530, Rajendra Nayak wrote:
-> Add a clockdomain api to check if hardware supervised
-> idle transitions are enabled on a clockdomain.
+On Thu, Jun 09, 2011 at 04:24:09PM +0530, Rajendra Nayak wrote:
+> The omap_set_pwrdm_state function forces clockdomains
+> to idle, without checking the existing idle state
+> programmed, instead based solely on the HW capability
+> of the clockdomain to support idle.
+> This is wrong and the clockdomains should be idled
+> post a state_switch *only* if idle transitions on the
+> clockdomain were already enabled.
 > 
-...
-> + * clkdm_is_idle - Check if the clkdm hwsup/autoidle is enabled
+> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
+> ---
+>  arch/arm/mach-omap2/pm.c |    4 +++-
+>  1 files changed, 3 insertions(+), 1 deletions(-)
+> 
+> diff --git a/arch/arm/mach-omap2/pm.c b/arch/arm/mach-omap2/pm.c
+> index d48813f..840b0e1 100644
+> --- a/arch/arm/mach-omap2/pm.c
+> +++ b/arch/arm/mach-omap2/pm.c
+> @@ -108,6 +108,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+>  	u32 cur_state;
+>  	int sleep_switch = -1;
+>  	int ret = 0;
+> +	int hwsup = 0;
+>  
+>  	if (pwrdm == NULL || IS_ERR(pwrdm))
+>  		return -EINVAL;
+> @@ -127,6 +128,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+>  			(pwrdm->flags & PWRDM_HAS_LOWPOWERSTATECHANGE)) {
+>  			sleep_switch = LOWPOWERSTATE_SWITCH;
+>  		} else {
+> +			hwsup = clkdm_is_idle(pwrdm->pwrdm_clkdms[0]);
+>  			clkdm_wakeup(pwrdm->pwrdm_clkdms[0]);
+>  			pwrdm_wait_transition(pwrdm);
+>  			sleep_switch = FORCEWAKEUP_SWITCH;
+> @@ -142,7 +144,7 @@ int omap_set_pwrdm_state(struct powerdomain *pwrdm, u32 state)
+>  
+>  	switch (sleep_switch) {
+>  	case FORCEWAKEUP_SWITCH:
+> -		if (pwrdm->pwrdm_clkdms[0]->flags & CLKDM_CAN_ENABLE_AUTO)
+> +		if (hwsup)
+>  			clkdm_allow_idle(pwrdm->pwrdm_clkdms[0]);
+>  		else
+>  			clkdm_sleep(pwrdm->pwrdm_clkdms[0]);
 
-A minor suggestion on naming: "clkdm_allows_idle" seems more accurate
-and a natural complement to the existing clkdm_allow_idle().
+Is concurrency protection needed here?  Not sure if it's expected that
+multiple threads would simultaneously manage the state of the same power
+domain, or that the associated clock domain would change state
+concurrently.
 
 
 Todd
+> 1.7.0.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
