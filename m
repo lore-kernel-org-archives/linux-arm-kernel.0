@@ -1,149 +1,60 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 10 Jun 2011 17:37:37 -0500
-Subject: [PATCH v4 3/4] drivers/amba: create devices from device tree
-In-Reply-To: <20110610222236.GD28994@ponder.secretlab.ca>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-4-git-send-email-robherring2@gmail.com>
-	<20110610222236.GD28994@ponder.secretlab.ca>
-Message-ID: <4DF29CB1.9070701@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Jun 2011 18:42:51 +0800
+Subject: [PATCH 3/4] mmc: sdhci-esdhc-imx: remove "WP" from flag
+	ESDHC_FLAG_GPIO_FOR_CD_WP
+In-Reply-To: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1307702572-22066-4-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2011 05:22 PM, Grant Likely wrote:
-> On Fri, Jun 10, 2011 at 03:48:42PM -0500, Rob Herring wrote:
->> From: Rob Herring<rob.herring@calxeda.com>
->>
->> Add a function to create amba bus devices (i.e. primecell peripherals) from
->> device tree nodes. The device tree scanning is done by
->> of_platform_probe/populate functions which can call of_amba_device_create
->> based on a match table entry.
->>
->> Nodes with a "arm,amba-deviceid" property can override the h/w peripheral id
->> value.
->>
->> Based on the original work by Jeremy Kerr.
->>
->> Cc: Jeremy Kerr<jeremy.kerr@canonical.com>
->> Cc: Grant Likely<grant.likely@secretlab.ca>
->> Cc: linux at arm.linux.org.uk
->> Cc: arnd at arndb.de
->> Acked-by: Linus Walleij<linus.walleij@linaro.org>
->> Signed-off-by: Rob Herring<rob.herring@calxeda.com>
->> ---
->>   Documentation/devicetree/bindings/arm/amba.txt |   21 ++++++++++
->>   drivers/amba/bus.c                             |   51 ++++++++++++++++++++++++
->>   include/linux/amba/bus.h                       |   18 ++++++++
->>   3 files changed, 90 insertions(+), 0 deletions(-)
->>   create mode 100644 Documentation/devicetree/bindings/arm/amba.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/amba.txt b/Documentation/devicetree/bindings/arm/amba.txt
->> new file mode 100644
->> index 0000000..23fde7f
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/amba.txt
->> @@ -0,0 +1,21 @@
->> +* ARM Primecell Peripherals
->> +
->> +ARM, Ltd. Primecell peripherals have a standard id register that can be used to
->> +identify the peripheral type, vendor, and revision. This value can be used for
->> +driver matching.
->> +
->> +Required properties:
->> +
->> +- compatible : should be a specific value for peripheral and "arm,amba-device"
->
-> After recent conversations, I'd like to change this to
-> "arm,primecell" to better reflect the kind of devices it models.
+The use of flag ESDHC_FLAG_GPIO_FOR_CD_WP is all CD related.  It does
+not necessarily need to bother WP in the flag name.
 
-That did cross my mind as I was writing the doc...
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
->
->> +
->> +Optional properties:
->> +
->> +- arm,amba-deviceid : Value to override the h/w value with
->
-> Similarly, based on the primecell device documents, this should
-> probabaly be arm,primecell-periphid.
->
->> +
->> +Example:
->> +
->> +serial at fff36000 {
->> +	compatible = "arm,pl011", "arm,amba-device";
->> +	arm,amba-deviceid =<0x00341011>;
->> +};
->> +
->> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
->> index d74926e..19f712b 100644
->> --- a/drivers/amba/bus.c
->> +++ b/drivers/amba/bus.c
->> @@ -13,6 +13,11 @@
->>   #include<linux/string.h>
->>   #include<linux/slab.h>
->>   #include<linux/io.h>
->> +#include<linux/of.h>
->> +#include<linux/of_irq.h>
->> +#include<linux/of_address.h>
->> +#include<linux/of_device.h>
->> +#include<linux/of_platform.h>
->>   #include<linux/pm.h>
->>   #include<linux/pm_runtime.h>
->>   #include<linux/amba/bus.h>
->> @@ -785,3 +790,49 @@ EXPORT_SYMBOL(amba_device_unregister);
->>   EXPORT_SYMBOL(amba_find_device);
->>   EXPORT_SYMBOL(amba_request_regions);
->>   EXPORT_SYMBOL(amba_release_regions);
->> +
->> +#ifdef CONFIG_OF
->> +int of_amba_device_create(struct device_node *node, struct device *parent)
->> +{
->> +	struct amba_device *dev;
->> +	const void *prop;
->> +	int i, ret;
->> +
->> +	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
->> +	if (!dev)
->> +		return -ENOMEM;
->> +
->> +	/* setup generic device info */
->> +	dev->dev.coherent_dma_mask = ~0;
->> +	dev->dev.of_node = node;
->> +	dev->dev.parent = parent;
->> +	of_device_make_bus_id(&dev->dev);
->> +
->> +	/* setup amba-specific device info */
->> +	dev->dma_mask = ~0;
->> +
->> +	/* Allow the arm,amba-deviceid value to override the h/w value */
->> +	prop = of_get_property(node, "arm,amba-deviceid", NULL);
->> +	if (prop)
->> +		dev->periphid = of_read_ulong(prop, 1);
->> +
->> +	/* Decode the IRQs and address ranges */
->> +	for (i = 0; i<  AMBA_NR_IRQS; i++)
->> +		dev->irq[i] = irq_of_parse_and_map(node, i);
->> +
->> +	ret = of_address_to_resource(node, 0,&dev->res);
->> +	if (ret)
->> +		goto err_free;
->> +
->> +	ret = amba_device_register(dev,&iomem_resource);
->> +	if (ret)
->> +		goto err_free;
->> +
->> +	return 0;
->> +
->> +err_free:
->> +	kfree(dev);
->> +	return ret;
->> +}
->> +
->
-> Yeah, I think this looks like the right thing to do.  I'll pick it up
-> into devicetree/test and probably move it to devicetree/arm in the
-> near future after testing a bit.
-
-Okay, I'll respin with your and Arnd's comments.
-
-Rob
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 94097c0..79b7a9a 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -29,7 +29,7 @@
+ #define SDHCI_VENDOR_SPEC		0xC0
+ #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
+ 
+-#define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
++#define ESDHC_FLAG_GPIO_FOR_CD		(1 << 0)
+ /*
+  * The CMDTYPE of the CMD register (offset 0xE) should be set to
+  * "11" when the STOP CMD12 is issued on imx53 to abort one
+@@ -77,7 +77,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+ 	u32 val = readl(host->ioaddr + reg);
+ 
+ 	if (unlikely((reg == SDHCI_PRESENT_STATE)
+-			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP))) {
++			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD))) {
+ 		struct esdhc_platform_data *boarddata =
+ 				host->mmc->parent->platform_data;
+ 
+@@ -99,7 +99,7 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
+ 
+ 	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)
+-			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)))
++			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD)))
+ 		/*
+ 		 * these interrupts won't work with a custom card_detect gpio
+ 		 * (only applied to mx25/35)
+@@ -308,7 +308,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
+ 			goto no_card_detect_irq;
+ 		}
+ 
+-		imx_data->flags |= ESDHC_FLAG_GPIO_FOR_CD_WP;
++		imx_data->flags |= ESDHC_FLAG_GPIO_FOR_CD;
+ 		/* Now we have a working card_detect again */
+ 		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
+ 	}
+-- 
+1.7.4.1
