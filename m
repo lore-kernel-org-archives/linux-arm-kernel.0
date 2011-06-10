@@ -1,54 +1,55 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 10 Jun 2011 16:39:02 -0600
-Subject: [PATCH v4 4/4] dt: add amba device creation to platform bus scan
-In-Reply-To: <1307738923-7564-5-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-5-git-send-email-robherring2@gmail.com>
-Message-ID: <20110610223902.GF28994@ponder.secretlab.ca>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Fri, 10 Jun 2011 14:47:30 +0100 (BST)
+Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
+In-Reply-To: <20110610134311.GK24424@n2100.arm.linux.org.uk>
+References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
+	<201106072348.44624.rjw@sisk.pl>
+	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
+	<20110609154058.GA24424@n2100.arm.linux.org.uk>
+	<4DF0F45A.3030103@ti.com>
+	<20110609164024.GB24424@n2100.arm.linux.org.uk>
+	<4DF0FA73.8050607@ti.com>
+	<20110609171255.GD24424@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106101110130.11513@localhost6.localdomain6>
+	<20110610134311.GK24424@n2100.arm.linux.org.uk>
+Message-ID: <alpine.DEB.2.00.1106101444490.20826@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 03:48:43PM -0500, Rob Herring wrote:
-> From: Rob Herring <rob.herring@calxeda.com>
-> 
-> Add support to the platform bus scanning to call custom device creation
-> function for amba devices.
-> 
-> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-> Cc: Grant Likely <grant.likely@secretlab.ca>
-> Cc: arnd at arndb.de
-> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
-> ---
->  drivers/of/platform.c |    6 ++++++
->  1 files changed, 6 insertions(+), 0 deletions(-)
-> 
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 8d0f477..1712f22 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -21,6 +21,7 @@
->  #include <linux/of_irq.h>
->  #include <linux/of_platform.h>
->  #include <linux/platform_device.h>
-> +#include <linux/amba/bus.h>
->  
->  static int of_dev_node_match(struct device *dev, void *data)
->  {
-> @@ -234,6 +235,11 @@ static int of_platform_bus_create(struct device_node *bus,
->  		return 0;
->  	}
->  
-> +	if (of_device_is_compatible(bus, "arm,amba-device")) {
-> +		of_amba_device_create(bus, parent);
-> +		return 0;
-> +	}
-> +	
+On Fri, 10 Jun 2011, Russell King - ARM Linux wrote:
 
-Yeah, this is the right thing to do.  I'll pick it up.
+[ ... ]
+> What's the point when platform code has *ALREADY* to call these functions?
+>
+> Is it really too sodding difficult for platforms to do:
+>
+> my_suspend_hook()
+> {
+> 	mach_pre_suspend_hook();
+> 	cpu_suspend();
+> 	mach_post_suspend_hook();
+> }
+>
+> ?
+>
+> <not read the rest of the message, this is getting idiotic>
+>
 
->  	dev = of_platform_device_create(bus, NULL, parent);
->  	if (!dev || !of_match_node(matches, bus))
->  		return 0;
-> -- 
-> 1.7.4.1
-> 
+Sorry for being unclear.
+
+Yes, they already have to do all this. And they should.
+
+
+Except for one thing:
+
+They all, IN ADDITION, do ALSO:
+
+ 	wfi();			/* or whatever else to power down */
+
+
+For Hibernation, _THAT_ needs to be out of the codepath.
+
+
+So that one can snapshot without powering down.
+
+FrankH.
