@@ -1,28 +1,22 @@
 From: mika.westerberg@iki.fi (Mika Westerberg)
-Date: Fri, 10 Jun 2011 19:55:45 +0300
-Subject: [PATCH v2 2/5] net: ep93xx_eth: pass struct device to DMA API
-	functions
-In-Reply-To: <ADE657CA350FB648AAC2C43247A983F001F3820B8699@AUSP01VMBX24.collaborationhost.net>
+Date: Fri, 10 Jun 2011 19:56:22 +0300
+Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
+In-Reply-To: <20110610154736.GA16318@ibawizard.net>
 References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
-	<c0ddfc297e0ea1e64e58cedd6552c6b2e52c5fe8.1307040443.git.mika.westerberg@iki.fi>
-	<ADE657CA350FB648AAC2C43247A983F001F3820B8699@AUSP01VMBX24.collaborationhost.net>
-Message-ID: <20110610165545.GA2753@acer>
+	<20110605083445.GT16318@ibawizard.net>
+	<20110605085948.GB16018@acer>
+	<20110610154736.GA16318@ibawizard.net>
+Message-ID: <20110610165622.GB2753@acer>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 06:40:21PM -0500, H Hartley Sweeten wrote:
+On Fri, Jun 10, 2011 at 05:47:36PM +0200, Petr ?tetiar wrote:
 > 
-> I just noticed this macro in include/linux/netdevice.h
+> I've tested the whole series and didn't find any problems so far, thanks. You
+> can add my
 > 
-> /* Set the sysfs physical device reference for the network logical device
->  * if set prior to registration will cause a symlink during initialization.
->  */
-> #define SET_NETDEV_DEV(net, pdev)       ((net)->dev.parent = (pdev))
+> 	Tested-by: Petr ?tetiar <ynezz@true.cz>
 > 
-> Is there anyway you could use that macro in the probe to save the platform_device
-> (with it's associated device) instead of introducing a new struct device * in the
-> private data?
+> if you wish.
 
-Nice finding, thanks.
-
-I'll look into that and send new version of the whole series soon.
+Cool. Thanks for testing :)
