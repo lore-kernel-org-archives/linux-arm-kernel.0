@@ -1,38 +1,120 @@
-From: mattias.wallin@stericsson.com (Mattias Wallin)
-Date: Fri, 10 Jun 2011 18:00:19 +0200
-Subject: [PATCHv2 0/3] clocksource: add db8500 PRCMU timer
-In-Reply-To: <4DF1DBB2.4040501@stericsson.com>
-References: <1307007271-1004-1-git-send-email-mattias.wallin@stericsson.com>
-	<20110602094622.GS3660@n2100.arm.linux.org.uk>
-	<4DE7637B.3060901@stericsson.com>
-	<20110602110137.GU3660@n2100.arm.linux.org.uk>
-	<4DE77D9A.6090301@stericsson.com> <4DE788B2.5060308@ti.com>
-	<1307040455.11492.52.camel@work-vm>
-	<4DEF7CA1.8080809@stericsson.com>
-	<20110609215939.GI24424@n2100.arm.linux.org.uk>
-	<4DF1DBB2.4040501@stericsson.com>
-Message-ID: <4DF23F93.8070102@stericsson.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 10 Jun 2011 18:21:50 +0200
+Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <1307699698-29369-9-git-send-email-m.szyprowski@samsung.com>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<1307699698-29369-9-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201106101821.50437.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2011 10:54 AM, Mattias Wallin wrote:
-> On 06/09/2011 11:59 PM, Russell King - ARM Linux wrote:
->> No - I'd like you to check whether the patch I sent fixes your
->> sched_clock problem across suspend/resume so that we can get that sorted
->> for everyone, instead of coming up with platform specific fixes.  Then
->> we can work out how to hook that into cpuidle so that it works properly
->> there.
+On Friday 10 June 2011, Marek Szyprowski wrote:
+>The Contiguous Memory Allocator is a set of functions that lets
+>one initialise a region of memory which then can be used to perform
+>allocations of contiguous memory chunks from.
 >
-> Ahh, I see your plan. I was focused on the cpuidle problem and your
-> patch only addressed suspend/resume.
-> Anyway, now that I understand more what you are after I'll have a look
-> at it and come back to you.
+>CMA allows for creation of separate contexts. Kernel is allowed to
+>allocate movable pages within CMA's managed memory so that it can be
+>used for page cache when CMA devices do not use it. On cm_alloc()
+>request such pages are migrated out of CMA area to free required
+>contiguous block.
 
-Unfortunately you will not get an answer if your patch works or not now. 
-Our u8500 mainline code is missing suspend support and I have been 
-trying to get suspend for u8500 to work without success. Since I will be 
-away for two weeks I will try to get the suspend guys to work on it 
-meanwhile.
+Hi Marek,
 
-Kind Regards,
-Mattias Wallin
+I'm generally happy with the patches 1 through 7, i.e the heavy lifting
+to make contiguous allocations work. Thank you very much for keeping
+up the work and submitting these in a good shape.
+
+I do think that we need to discuss the driver-visible API a bit more.
+My feeling is that this is rather un-Linux-like and it needs to be
+simplified some more. Of course, I don't mind being overruled by the
+memory management experts here, or if you can argue that it's really
+the right way to do it.
+
+> + * Driver usage
+> + *
+> + *   CMA should not be used directly by the device drivers. It should
+> + *   be considered as helper framework for dma-mapping subsystm and
+> + *   respective (platform)bus drivers.
+> + *
+> + *   The CMA client needs to have a pointer to a CMA context
+> + *   represented by a struct cma (which is an opaque data type).
+> + *
+> + *   Once such pointer is obtained, a caller may allocate contiguous
+> + *   memory chunk using the following function:
+> + *
+> + *     cm_alloc()
+> + *
+> + *   This function returns a pointer to the first struct page which
+> + *   represent a contiguous memory chunk.  This pointer
+> + *   may be used with the following function:
+> + *
+> + *     cm_free()    -- frees allocated contiguous memory
+
+Please explain why you want a new top-level API here. I think it
+would be much nicer if a device driver could simply call 
+alloc_pages(..., GFP_CMA) or similar, where all the complexity
+in here gets hidden behind a conditional deep inside of the
+page allocator.
+
+Evidently, the two functions you describe here have an extra argument
+for the context. Can you elaborate why that is really needed? What
+is the specific requirement to have multiple such contexts in one
+system and what is the worst-case effect that you would get when
+the interface is simplified to have only one for all devices?
+
+Alternatively, would it be possible to provide the cm_alloc/cm_free
+functions only as backing to the dma mapping API and not export them
+as a generic device driver interface?
+
+> + * Platform/machine integration
+> + *
+> + *   CMA context must be created on platform or machine initialisation
+> + *   and passed to respective subsystem that will be a client for CMA.
+> + *   The latter may be done by a global variable or some filed in
+> + *   struct device.  For the former CMA provides the following functions:
+> + *
+> + *     cma_init_migratetype()
+> + *     cma_reserve()
+> + *     cma_create()
+> + *
+> + *   The first one initialises a portion of reserved memory so that it
+> + *   can be used with CMA.  The second first tries to reserve memory
+> + *   (using memblock) and then initialise it.
+> + *
+> + *   The cma_reserve() function must be called when memblock is still
+> + *   operational and reserving memory with it is still possible.  On
+> + *   ARM platform the "reserve" machine callback is a perfect place to
+> + *   call it.
+> + *
+> + *   The last function creates a CMA context on a range of previously
+> + *   initialised memory addresses.  Because it uses kmalloc() it needs
+> + *   to be called after SLAB is initialised.
+> + */
+
+This interface looks flawed to me for multiple reasons:
+
+* It requires you to call three distinct functions in order to do one
+  thing, and they all take the same arguments (more or less). Why not
+  have one function call at the latest possible point where you can
+  still change the memory attributes, and have everything else
+  happen automatically?
+
+* It requires you to pass the exact location of the area. I can see why
+  you want that on certain machines that require DMA areas to be spread
+  across multiple memory buses, but IMHO it's not appropriate for a
+  generic API.
+
+* It requires you to hardcode the size in a machine specific source file.
+  This probably seems to be a natural thing to do when you have worked a
+  lot on the ARM architecture, but it's really not. We really want to
+  get rid of board files and replace them with generic probing based on
+  the device tree, and the size of the area is more policy than a property
+  of the hardware that can be accurately described in the device tree or
+  a board file.
+
+I'm sure that we can find a solution for all of these problems, it just
+takes a few good ideas. Especially for the last point, I don't have a
+better suggestion yet, but hopefully someone else can come up with one.
+
+	Arnd
