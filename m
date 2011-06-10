@@ -1,42 +1,36 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Fri, 10 Jun 2011 16:30:42 -0600
-Subject: [PATCH v4 3/4] drivers/amba: create devices from device tree
-In-Reply-To: <201106102304.06279.arnd@arndb.de>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-4-git-send-email-robherring2@gmail.com>
-	<201106102304.06279.arnd@arndb.de>
-Message-ID: <20110610223042.GE28994@ponder.secretlab.ca>
+From: robherring2@gmail.com (Rob Herring)
+Date: Fri, 10 Jun 2011 15:48:39 -0500
+Subject: [PATCH v4 0/4] amba bus devicetree probing
+Message-ID: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 11:04:06PM +0200, Arnd Bergmann wrote:
-> On Friday 10 June 2011 22:48:42 Rob Herring wrote:
-> > 
-> > +#ifdef CONFIG_OF
-> > +int of_amba_device_create(struct device_node *node, struct device *parent);
+From: Rob Herring <rob.herring@calxeda.com>
 
-Actually, it would probably be good to have of_amba_device_create()
-return a pointer to the created amba_device.
+This is updated amba bus DT probe support. Amba devices are now handled as a
+special case in the device tree bus scanning code. Found devices with a
+"arm,amba-device" compatible property will be created by of_amba_device_create.
 
-> > +#endif
-> > +
-> > +#else
-> > +
-> > +#ifdef CONFIG_OF
-> > +static inline int of_amba_device_create(struct device_node *node, 
-> > +                                       struct device *parent)
-> > +{
-> > +       return 0;
-> > +}
-> > +#endif
-> > +
-> 
-> We normally don't use #ifdef around declarations like this, it doesn't
-> hurt to have them even when the code is not there. Otherwise the patch
-> looks good.
+The first 2 patches are fixes for of_platform_populate.
 
-Yes, this hook will never get called or referenced by anything if
-CONFIG_OF is not selected.  The only real user of it will be
-drivers/of/platform.c
+Applies to devicetree/next on git://git.secretlab.ca/git/linux-2.6
 
-g.
+Compile tested with DT enabled and AMBA bus enabled or disabled. 
+
+Rob
+
+Rob Herring (4):
+  dt: check root nodes for match on of_platform_populate
+  dt: add EXPORT_SYMBOL to of_platform_populate
+  drivers/amba: create devices from device tree
+  dt: add amba device creation to platform bus scan
+
+ Documentation/devicetree/bindings/arm/amba.txt |   21 ++++++++++
+ drivers/amba/bus.c                             |   51 ++++++++++++++++++++++++
+ drivers/of/platform.c                          |    9 ++++
+ include/linux/amba/bus.h                       |   18 ++++++++
+ 4 files changed, 99 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/amba.txt
+
+-- 
+1.7.4.1
