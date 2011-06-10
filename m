@@ -1,33 +1,86 @@
-From: zecke@selfish.org (Holger Hans Peter Freyther)
-Date: Fri, 10 Jun 2011 20:38:43 +0200
-Subject: [PATCH] irq: Check if someone is overwriting the irq chip data
-Message-ID: <mailman.14.1307792983.24103.linux-arm-kernel@lists.infradead.org>
+From: sundaram@ti.com (Raju, Sundaram)
+Date: Fri, 10 Jun 2011 17:18:46 +0530
+Subject: [RFC] dmaengine: add new api for preparing simple slave	transfer
+In-Reply-To: <20110610104318.GC24636@n2100.arm.linux.org.uk>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
+	<20110609124723.GA24636@n2100.arm.linux.org.uk>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
+	<20110609163206.GB24636@n2100.arm.linux.org.uk>
+	<1307686397.10976.116.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE337F@dbde02.ent.ti.com>
+	<20110610104318.GC24636@n2100.arm.linux.org.uk>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE3452@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This tries to establish the semantic that one can either
-set the chip data to NULL or if it is NULL to some value
-but never overwrite a non NULL value.
+Russell,
 
-Signed-off-by: Holger Hans Peter Freyther <zecke@selfish.org>
----
- kernel/irq/chip.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+> -----Original Message-----
+> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk]
+> Sent: Friday, June 10, 2011 4:13 PM
+> To: Raju, Sundaram
+> Cc: Koul, Vinod; Dan; davinci-linux-open-source at linux.davincidsp.com; linux-
+> omap at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC] dmaengine: add new api for preparing simple slave transfer
+> 
+> On Fri, Jun 10, 2011 at 03:51:41PM +0530, Raju, Sundaram wrote:
+> > Consider a simple video use case of de-interlacing a video buffer.
+> > Odd lines have to be transferred first, and then the even lines are
+> > transferred separately. This can be done by programming the
+> > inter frame gap as the line size of the video buffer in the DMAC.
+> > This will require you to have only 2 descriptors, one for the
+> > odd lines and another for the even lines. This results in only
+> > 2 descriptors being written to DMAC registers.
+> 
+> How would this be handled with DMACs which can't 'skip' bytes in the
+> buffer?  You would have to generate a list of LLIs separately
+> describing each 'line' of video and chain them together.
 
-diff --git a/kernel/irq/chip.c b/kernel/irq/chip.c
-index d5a3009..25e446d 100644
---- a/kernel/irq/chip.c
-+++ b/kernel/irq/chip.c
-@@ -123,6 +123,10 @@ int irq_set_chip_data(unsigned int irq, void *data)
+Correct.
 
- 	if (!desc)
- 		return -EINVAL;
-+
-+	BUG_ON(data && desc->irq_data.chip_data &&
-+		data != desc->irq_data.chip_data);
-+
- 	desc->irq_data.chip_data = data;
- 	irq_put_desc_unlock(desc, flags);
- 	return 0;
--- 
-1.7.4.1
+> 
+> How do you handle the situation where a driver uses your new proposed
+> API, but it doesn't support that in hardware.
+> 
+
+It should be handled the same way how a sg buffer is handled, 
+if LLI chaining feature is not available in the hardware. 
+
+It has to be submitted as a queue of separate descriptors to
+the DMAC, where each descriptor will be processed after the 
+completion of the previous descriptor.
+
+> > Actually we can deduce the chunk_size from the
+> > dma_slave_config itself. It is either the src_addr_width or
+> > dst_addr_width based on the direction. Because at a stretch
+> > DMAC cannot transfer more than the slave register width.
+> 
+> I think you're misinterpreting those fields.  (dst|src)_addr_width tells
+> the DMA controller the width of each transaction - whether to issue a
+> byte, half-word, word or double-word read or write to the peripheral.
+> It doesn't say how many of those to issue, it just says what the
+> peripheral access size is to be.
+> 
+> In other words, they describe the width of the FIFO register.
+
+Yes correct, I was just giving an example for considering or
+understanding a buffer in 3D and how each dimension should be.
+
+chunk_size = (src|dst)_addr_width, for a special case,
+i.e, if DMAC is programmed to transfer the entire 1D buffer
+per sync event received from the peripheral.
+
+In slave transfer, the peripheral is going to give a sync event to 
+DMAC when the FIFO register is full|empty.
+
+Now DMACs capable of 3D transfer, do transfer of the whole 1D
+buffer per sync received or even whole 2D buffer per sync received
+(based on the sync rate programmed in the DMAC).
+
+So the DMAC has to be programmed for a 1D size (i.e. chunk size)
+equal to that of the width of the FIFO register if the sync rate
+programmed in DMAC is "per chunk".  
+
+Regards,
+Sundaram
