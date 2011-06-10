@@ -1,58 +1,36 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 10 Jun 2011 18:42:49 +0800
-Subject: [PATCH 1/4] mmc: sdhci: fix interrupt storm from card detection
-In-Reply-To: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
-References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1307702572-22066-2-git-send-email-shawn.guo@linaro.org>
+From: nm@ti.com (Menon, Nishanth)
+Date: Fri, 10 Jun 2011 17:19:13 -0500
+Subject: Duration of mdelay and udelay depends on MPU frequency in SMP
+In-Reply-To: <4DCB8158.8060507@ti.com>
+References: <BANLkTikGXzLba8uqXoffaUixBrEGj-XzRQ@mail.gmail.com>
+	<BANLkTimVPnzMCL=NMb7hDkL97nJ=XdFExw@mail.gmail.com>
+	<4DCB8158.8060507@ti.com>
+Message-ID: <BANLkTin1Tmjwjz8+J22Qi=cwu34Qp-B-wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The issue was initially found by Eric Benard as below.
+On Thu, May 12, 2011 at 01:42, Santosh Shilimkar
+<santosh.shilimkar@ti.com> wrote:
+> On 5/5/2011 12:23 PM, Saquib wrote:
+>> Can anyone please help me to understand and fix this issue?
+>>
+>> When CPU frequency is "1008MHz", duration of delay was close to
+>> theoretical value, however, when "300MHz", it was close to about 4 times
+>> the theoretical value.
+>>
+>> I tested it on OMAP4(SMP) blaze board.
+>
+>>
+> It's a well known problem if the udelay() is based of global lpj.
+> You can read more here [1]
+>
+> Regards
+> Santosh
+> [1] http://eeek.borgchat.net/lists/arm-kernel/msg120702.html
+I am curious about this topic now.
+Searching Russel's patchworks for this:
+http://www.arm.linux.org.uk/developer/patches/search.php?summary=udelay
+I see nothing queued. What is the recommendation for udelay?
 
-http://permalink.gmane.org/gmane.linux.ports.arm.kernel/108031
-
-Not sure about other SDHCI based controller, but on Freescale eSDHC,
-the SDHCI_INT_CARD_INSERT bits will be immediately set again when it
-gets cleared, if a card is inserted. The driver need to mask the irq
-to prevent interrupt storm which will freeze the system.  And the
-SDHCI_INT_CARD_REMOVE gets the same situation.
-
-The patch fixes the problem based on the initial idea from
-Eric Benard.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Eric Benard <eric@eukrea.com>
----
- drivers/mmc/host/sdhci.c |   13 ++++++++++---
- 1 files changed, 10 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-index 91d9892..71a2505 100644
---- a/drivers/mmc/host/sdhci.c
-+++ b/drivers/mmc/host/sdhci.c
-@@ -2154,13 +2154,20 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
- 		mmc_hostname(host->mmc), intmask);
- 
- 	if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
-+		u32 present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
-+			      SDHCI_CARD_PRESENT;
-+
-+		sdhci_mask_irqs(host, present ? SDHCI_INT_CARD_INSERT :
-+						SDHCI_INT_CARD_REMOVE);
-+		sdhci_unmask_irqs(host, present ? SDHCI_INT_CARD_REMOVE :
-+						  SDHCI_INT_CARD_INSERT);
-+
- 		sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
--			SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
-+			     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
-+		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
- 		tasklet_schedule(&host->card_tasklet);
- 	}
- 
--	intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
--
- 	if (intmask & SDHCI_INT_CMD_MASK) {
- 		sdhci_writel(host, intmask & SDHCI_INT_CMD_MASK,
- 			SDHCI_INT_STATUS);
--- 
-1.7.4.1
+Regards,
+Nishanth Menon
