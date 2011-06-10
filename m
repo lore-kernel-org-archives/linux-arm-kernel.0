@@ -1,31 +1,16 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Jun 2011 23:06:48 +0200
-Subject: [PATCH v4 1/4] dt: check root nodes for match on
-	of_platform_populate
-In-Reply-To: <1307738923-7564-2-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-2-git-send-email-robherring2@gmail.com>
-Message-ID: <201106102306.48426.arnd@arndb.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Fri, 10 Jun 2011 19:24:05 +0300
+Subject: [PATCH 2/4] msm: iommu: move to drivers/iommu/
+In-Reply-To: <8yamxhsklhd.fsf@huya.qualcomm.com>
+References: <1307522062-19273-1-git-send-email-ohad@wizery.com>
+	<1307522062-19273-3-git-send-email-ohad@wizery.com>
+	<8yamxhsklhd.fsf@huya.qualcomm.com>
+Message-ID: <BANLkTi=owGc5JU1eF5wZmgiC0GbTCury8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 June 2011 22:48:40 Rob Herring wrote:
-> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> index 9b785be..dc56a77 100644
-> --- a/drivers/of/platform.c
-> +++ b/drivers/of/platform.c
-> @@ -318,6 +318,8 @@ int of_platform_populate(struct device_node *root,
->                 return -EINVAL;
->  
->         for_each_child_of_node(root, child) {
-> +               if (!of_match_node(matches, child))
-> +                       continue;
->                 rc = of_platform_bus_create(child, matches, parent, true);
->                 if (rc)
->                         break;
+On Thu, Jun 9, 2011 at 1:27 AM, David Brown <davidb@codeaurora.org> wrote:
+> Moving the driver is good. ?I'm wondering what we should do with
+> iommu_dev.c, though. ?Wouldn't it make sense to move this file as well?
 
-
-Why doesn't of_platform_populate just call of_platform_bus_create on the
-root node? That should normally take care of matching all children.
-
-	Arnd
+Yeah, it does make sense. I'll move that one too, thanks.
