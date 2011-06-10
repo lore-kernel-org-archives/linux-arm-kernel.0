@@ -1,29 +1,18 @@
-From: mjg59@srcf.ucam.org (Matthew Garrett)
-Date: Fri, 10 Jun 2011 20:23:29 +0100
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110610184738.GG2230@linux.vnet.ibm.com>
-References: <BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
-	<20110610151121.GA2230@linux.vnet.ibm.com>
-	<20110610155954.GA25774@srcf.ucam.org>
-	<20110610165529.GC2230@linux.vnet.ibm.com>
-	<20110610170535.GC25774@srcf.ucam.org>
-	<20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610172307.GA27630@srcf.ucam.org>
-	<20110610175248.GF2230@linux.vnet.ibm.com>
-	<20110610180807.GB28500@srcf.ucam.org>
-	<20110610184738.GG2230@linux.vnet.ibm.com>
-Message-ID: <20110610192329.GA30496@srcf.ucam.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 10 Jun 2011 14:48:21 +0100
+Subject: [PATCH] arm, exec: remove redundant set_fs(USER_DS)
+In-Reply-To: <1307711337-4042-1-git-send-email-minipli@googlemail.com>
+References: <BANLkTiknCeAxe30MJdVTxDom+ko8+EDQ4A@mail.gmail.com>
+	<1307642718-22257-1-git-send-email-minipli@googlemail.com>
+	<20110609155630.0f734351.akpm@linux-foundation.org>
+	<1307711337-4042-1-git-send-email-minipli@googlemail.com>
+Message-ID: <20110610134821.GL24424@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney wrote:
+On Fri, Jun 10, 2011 at 03:08:57PM +0200, Mathias Krause wrote:
+> The address limit is already set in flush_old_exec() so this
+> set_fs(USER_DS) is redundant.
 
-> And if I understand you correctly, then the patches that Ankita posted
-> should help your self-refresh case, along with the originally intended
-> the power-down case and special-purpose use of memory case.
-
-Yeah, I'd hope so once we actually have capable hardware.
-
--- 
-Matthew Garrett | mjg59 at srcf.ucam.org
+Please show where and how this is done.  I've looked and can't see
+any equivalent call to set_fs() in flush_old_exec().
