@@ -1,55 +1,40 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Fri, 10 Jun 2011 14:47:30 +0100 (BST)
-Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <20110610134311.GK24424@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
-	<201106072348.44624.rjw@sisk.pl>
-	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-	<20110609154058.GA24424@n2100.arm.linux.org.uk>
-	<4DF0F45A.3030103@ti.com>
-	<20110609164024.GB24424@n2100.arm.linux.org.uk>
-	<4DF0FA73.8050607@ti.com>
-	<20110609171255.GD24424@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1106101110130.11513@localhost6.localdomain6>
-	<20110610134311.GK24424@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1106101444490.20826@localhost6.localdomain6>
+From: nm@ti.com (Nishanth Menon)
+Date: Fri, 10 Jun 2011 10:14:33 -0500
+Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
+Message-ID: <1307718873-27652-1-git-send-email-nm@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2011, Russell King - ARM Linux wrote:
+Attempting to disable USB generates the following warning at the moment:
+warning: (ARCH_OMAP3 && ARCH_OMAP4) selects USB_ARCH_HAS_EHCI which has unmet direct dependencies (USB_SUPPORT)
 
-[ ... ]
-> What's the point when platform code has *ALREADY* to call these functions?
->
-> Is it really too sodding difficult for platforms to do:
->
-> my_suspend_hook()
-> {
-> 	mach_pre_suspend_hook();
-> 	cpu_suspend();
-> 	mach_post_suspend_hook();
-> }
->
-> ?
->
-> <not read the rest of the message, this is getting idiotic>
->
+Signed-off-by: Nishanth Menon <nm@ti.com>
+---
+based on 3.0-rc2
+ arch/arm/mach-omap2/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Sorry for being unclear.
-
-Yes, they already have to do all this. And they should.
-
-
-Except for one thing:
-
-They all, IN ADDITION, do ALSO:
-
- 	wfi();			/* or whatever else to power down */
-
-
-For Hibernation, _THAT_ needs to be out of the codepath.
-
-
-So that one can snapshot without powering down.
-
-FrankH.
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index ef7e12f..d5cf1a8 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -33,7 +33,7 @@ config ARCH_OMAP3
+ 	depends on ARCH_OMAP2PLUS
+ 	default y
+ 	select CPU_V7
+-	select USB_ARCH_HAS_EHCI
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 	select ARM_L1_CACHE_SHIFT_6 if !ARCH_OMAP4
+ 	select ARCH_HAS_OPP
+ 	select PM_OPP if PM
+@@ -50,7 +50,7 @@ config ARCH_OMAP4
+ 	select ARM_ERRATA_720789
+ 	select ARCH_HAS_OPP
+ 	select PM_OPP if PM
+-	select USB_ARCH_HAS_EHCI
++	select USB_ARCH_HAS_EHCI if USB_SUPPORT
+ 
+ comment "OMAP Core Type"
+ 	depends on ARCH_OMAP2
+-- 
+1.7.1
