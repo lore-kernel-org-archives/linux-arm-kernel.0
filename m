@@ -1,25 +1,35 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Fri, 10 Jun 2011 22:52:47 -0400 (EDT)
-Subject: [PATCH v2] ARM: kirkwood: Add support for Buffalo LS-XHL
-In-Reply-To: <20110610134508.GL8223@kw.sim.vm.gnt>
-References: <1307655488-12811-1-git-send-email-michael@walle.cc>
-	<1307655488-12811-2-git-send-email-michael@walle.cc>
-	<20110610134508.GL8223@kw.sim.vm.gnt>
-Message-ID: <alpine.LFD.2.00.1106102233370.2142@xanadu.home>
+From: mjg59@srcf.ucam.org (Matthew Garrett)
+Date: Fri, 10 Jun 2011 18:05:35 +0100
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110610165529.GC2230@linux.vnet.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110528005640.9076c0b1.akpm@linux-foundation.org>
+	<20110609185259.GA29287@linux.vnet.ibm.com>
+	<BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
+	<20110610151121.GA2230@linux.vnet.ibm.com>
+	<20110610155954.GA25774@srcf.ucam.org>
+	<20110610165529.GC2230@linux.vnet.ibm.com>
+Message-ID: <20110610170535.GC25774@srcf.ucam.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 10 Jun 2011, Simon Guinot wrote:
+On Fri, Jun 10, 2011 at 09:55:29AM -0700, Paul E. McKenney wrote:
+> On Fri, Jun 10, 2011 at 04:59:54PM +0100, Matthew Garrett wrote:
+> > For the server case, the low hanging fruit would seem to be 
+> > finer-grained self-refresh. At best we seem to be able to do that on a 
+> > per-CPU socket basis right now. The difference between active and 
+> > self-refresh would seem to be much larger than the difference between 
+> > self-refresh and powered down.
+> 
+> By "finer-grained self-refresh" you mean turning off refresh for banks
+> of memory that are not being used, right?  If so, this is supported by
+> the memory-regions support provided, at least assuming that the regions
+> can be aligned with the self-refresh boundaries.
 
-> BTW, I don't know if Nicolas will mainline this old fashioned board
-> setup. He is waiting for a DT alternative for Kirkwood.
+I mean at the hardware level. As far as I know, the best we can do at 
+the moment is to put an entire node into self refresh when the CPU hits 
+package C6.
 
-That's exact.  Right now there is a de facto moratorium with the 
-addition of old style board support to the mainline kernel.
-
-We need some generic Kirkwood infrastructure based on device tree to be 
-created instead.  And then the addition of support for a new board would 
-only require a new DTB to be passed to the kernel.
-
-
-Nicolas
+-- 
+Matthew Garrett | mjg59 at srcf.ucam.org
