@@ -1,32 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 10 Jun 2011 23:04:06 +0200
-Subject: [PATCH v4 3/4] drivers/amba: create devices from device tree
-In-Reply-To: <1307738923-7564-4-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-	<1307738923-7564-4-git-send-email-robherring2@gmail.com>
-Message-ID: <201106102304.06279.arnd@arndb.de>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Fri, 10 Jun 2011 12:37:13 -0700
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110610192329.GA30496@srcf.ucam.org>
+References: <20110610151121.GA2230@linux.vnet.ibm.com>
+	<20110610155954.GA25774@srcf.ucam.org>
+	<20110610165529.GC2230@linux.vnet.ibm.com>
+	<20110610170535.GC25774@srcf.ucam.org>
+	<20110610171939.GE2230@linux.vnet.ibm.com>
+	<20110610172307.GA27630@srcf.ucam.org>
+	<20110610175248.GF2230@linux.vnet.ibm.com>
+	<20110610180807.GB28500@srcf.ucam.org>
+	<20110610184738.GG2230@linux.vnet.ibm.com>
+	<20110610192329.GA30496@srcf.ucam.org>
+Message-ID: <20110610193713.GJ2230@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 10 June 2011 22:48:42 Rob Herring wrote:
+On Fri, Jun 10, 2011 at 08:23:29PM +0100, Matthew Garrett wrote:
+> On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney wrote:
 > 
-> +#ifdef CONFIG_OF
-> +int of_amba_device_create(struct device_node *node, struct device *parent);
-> +#endif
-> +
-> +#else
-> +
-> +#ifdef CONFIG_OF
-> +static inline int of_amba_device_create(struct device_node *node, 
-> +                                       struct device *parent)
-> +{
-> +       return 0;
-> +}
-> +#endif
-> +
+> > And if I understand you correctly, then the patches that Ankita posted
+> > should help your self-refresh case, along with the originally intended
+> > the power-down case and special-purpose use of memory case.
+> 
+> Yeah, I'd hope so once we actually have capable hardware.
 
-We normally don't use #ifdef around declarations like this, it doesn't
-hurt to have them even when the code is not there. Otherwise the patch
-looks good.
+Cool!!!
 
-	Arnd
+So Ankita's patchset might be useful to you at some point, then.
+
+Does it look like a reasonable implementation?
+
+							Thanx, Paul
