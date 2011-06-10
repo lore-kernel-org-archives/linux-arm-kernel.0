@@ -1,42 +1,29 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Jun 2011 11:43:18 +0100
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE337F@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
-	<20110609163206.GB24636@n2100.arm.linux.org.uk>
-	<1307686397.10976.116.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE337F@dbde02.ent.ti.com>
-Message-ID: <20110610104318.GC24636@n2100.arm.linux.org.uk>
+From: ynezz@true.cz (Petr =?iso-8859-2?Q?=A9tetiar?=)
+Date: Fri, 10 Jun 2011 17:47:36 +0200
+Subject: [PATCH v2 1/5] ep93xx: set DMA masks for the ep93xx_eth
+In-Reply-To: <20110605085948.GB16018@acer>
+References: <f20d8fe52f823e7e65423720c53f2935d3e08967.1307040443.git.mika.westerberg@iki.fi>
+	<20110605083445.GT16318@ibawizard.net>
+	<20110605085948.GB16018@acer>
+Message-ID: <20110610154736.GA16318@ibawizard.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 03:51:41PM +0530, Raju, Sundaram wrote:
-> Consider a simple video use case of de-interlacing a video buffer.
-> Odd lines have to be transferred first, and then the even lines are 
-> transferred separately. This can be done by programming the 
-> inter frame gap as the line size of the video buffer in the DMAC.
-> This will require you to have only 2 descriptors, one for the
-> odd lines and another for the even lines. This results in only
-> 2 descriptors being written to DMAC registers.
+Mika Westerberg <mika.westerberg@iki.fi> [2011-06-05 11:59:48]:
 
-How would this be handled with DMACs which can't 'skip' bytes in the
-buffer?  You would have to generate a list of LLIs separately
-describing each 'line' of video and chain them together.
+> On Sun, Jun 05, 2011 at 10:34:45AM +0200, Petr ?tetiar wrote:
+> > 
+> > do you have the series available somewhere for pull? I would like to test the
+> > changes for you on my ts7250/ts7300, but I'm quite lazy and would like to just
+> > cherry-pick the changes if possible :-)
+> 
+> Unfortunately - no. But what's wrong with 'git am <mbox>'? ;-)
 
-How do you handle the situation where a driver uses your new proposed
-API, but it doesn't support that in hardware.
+I've tested the whole series and didn't find any problems so far, thanks. You
+can add my
 
-> Actually we can deduce the chunk_size from the 
-> dma_slave_config itself. It is either the src_addr_width or
-> dst_addr_width based on the direction. Because at a stretch
-> DMAC cannot transfer more than the slave register width.
+	Tested-by: Petr ?tetiar <ynezz@true.cz>
 
-I think you're misinterpreting those fields.  (dst|src)_addr_width tells
-the DMA controller the width of each transaction - whether to issue a
-byte, half-word, word or double-word read or write to the peripheral.
-It doesn't say how many of those to issue, it just says what the
-peripheral access size is to be.
+if you wish.
 
-In other words, they describe the width of the FIFO register.
+-- ynezz
