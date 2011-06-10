@@ -1,34 +1,34 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 10 Jun 2011 17:31:08 -0700
-Subject: [PATCH] fb.h: ARM uses __raw_{read/write}
-Message-ID: <201106101731.08578.hartleys@visionengravers.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Jun 2011 18:42:50 +0800
+Subject: [PATCH 2/4] mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get
+	cleared
+In-Reply-To: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1307702572-22066-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM provides __raw_{read/write}* functions for memory access. These
-should be used instead of the default '(*(volatile' stuff to make sure the
-memory accesses are typesafe (void __iomem *).
+The function esdhc_readl_le intends to clear bit SDHCI_CARD_PRESENT,
+when the card detect gpio tells there is no card.  But it does not
+clear the bit actually.  The patch gives a fix on that.
 
-This also fixes a number of sparse warning like:
-
-  warning: cast removes address space of expression
-
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 ---
+ drivers/mmc/host/sdhci-esdhc-imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index 6a82748..a040e92e 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -937,7 +937,7 @@ static inline struct apertures_struct *alloc_apertures(unsigned int max_num) {
- #define fb_memcpy_fromfb sbus_memcpy_fromio
- #define fb_memcpy_tofb sbus_memcpy_toio
- 
--#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__)
-+#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__) || defined(__arm__)
- 
- #define fb_readb __raw_readb
- #define fb_readw __raw_readw
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 248b8e5..94097c0 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -84,7 +84,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+ 		if (boarddata && gpio_is_valid(boarddata->cd_gpio)
+ 				&& gpio_get_value(boarddata->cd_gpio))
+ 			/* no card, if a valid gpio says so... */
+-			val &= SDHCI_CARD_PRESENT;
++			val &= ~SDHCI_CARD_PRESENT;
+ 		else
+ 			/* ... in all other cases assume card is present */
+ 			val |= SDHCI_CARD_PRESENT;
+-- 
+1.7.4.1
