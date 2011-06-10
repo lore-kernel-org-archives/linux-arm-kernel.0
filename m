@@ -1,64 +1,58 @@
-From: nm@ti.com (Menon, Nishanth)
-Date: Fri, 10 Jun 2011 11:20:13 -0500
-Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D426804@dbde02.ent.ti.com>
-References: <1307718873-27652-1-git-send-email-nm@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D426804@dbde02.ent.ti.com>
-Message-ID: <BANLkTimRyXm7uBkUsMNbzb_VrdWbQ2WqCA@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Jun 2011 18:42:49 +0800
+Subject: [PATCH 1/4] mmc: sdhci: fix interrupt storm from card detection
+In-Reply-To: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1307702572-22066-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 11:08, Premi, Sanjeev <premi@ti.com> wrote:
->> -----Original Message-----
->> From: linux-omap-owner at vger.kernel.org
->> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Menon, Nishanth
->> Sent: Friday, June 10, 2011 8:45 PM
->> To: linux-omap
->> Cc: Tony; linux-arm; Balbi, Felipe; Menon, Nishanth
->> Subject: [PATCH] OMAP3+: Kconfig: has EHCI only if USB present
->>
->> Attempting to disable USB generates the following warning at
->> the moment:
->> warning: (ARCH_OMAP3 && ARCH_OMAP4) selects USB_ARCH_HAS_EHCI
->> which has unmet direct dependencies (USB_SUPPORT)
->>
->> Signed-off-by: Nishanth Menon <nm@ti.com>
->> ---
->> based on 3.0-rc2
->> ?arch/arm/mach-omap2/Kconfig | ? ?4 ++--
->> ?1 files changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
->> index ef7e12f..d5cf1a8 100644
->> --- a/arch/arm/mach-omap2/Kconfig
->> +++ b/arch/arm/mach-omap2/Kconfig
->> @@ -33,7 +33,7 @@ config ARCH_OMAP3
->> ? ? ? depends on ARCH_OMAP2PLUS
->> ? ? ? default y
->> ? ? ? select CPU_V7
->> - ? ? select USB_ARCH_HAS_EHCI
->> + ? ? select USB_ARCH_HAS_EHCI if USB_SUPPORT
->> ? ? ? select ARM_L1_CACHE_SHIFT_6 if !ARCH_OMAP4
->> ? ? ? select ARCH_HAS_OPP
->> ? ? ? select PM_OPP if PM
->> @@ -50,7 +50,7 @@ config ARCH_OMAP4
->> ? ? ? select ARM_ERRATA_720789
->> ? ? ? select ARCH_HAS_OPP
->> ? ? ? select PM_OPP if PM
->> - ? ? select USB_ARCH_HAS_EHCI
->> + ? ? select USB_ARCH_HAS_EHCI if USB_SUPPORT
->>
->> ?comment "OMAP Core Type"
->> ? ? ? depends on ARCH_OMAP2
->
->
-> Here is earlier discussion on the same subject:
-> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg42064.html
->
-> Exactly same patch was proposed.
+The issue was initially found by Eric Benard as below.
 
-You may want to do that for the full Kconfig file(not just for OMAP3)
-and post out..
+http://permalink.gmane.org/gmane.linux.ports.arm.kernel/108031
 
-Regards,
-Nishanth Menon
+Not sure about other SDHCI based controller, but on Freescale eSDHC,
+the SDHCI_INT_CARD_INSERT bits will be immediately set again when it
+gets cleared, if a card is inserted. The driver need to mask the irq
+to prevent interrupt storm which will freeze the system.  And the
+SDHCI_INT_CARD_REMOVE gets the same situation.
+
+The patch fixes the problem based on the initial idea from
+Eric Benard.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Eric Benard <eric@eukrea.com>
+---
+ drivers/mmc/host/sdhci.c |   13 ++++++++++---
+ 1 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index 91d9892..71a2505 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -2154,13 +2154,20 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
+ 		mmc_hostname(host->mmc), intmask);
+ 
+ 	if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
++		u32 present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
++			      SDHCI_CARD_PRESENT;
++
++		sdhci_mask_irqs(host, present ? SDHCI_INT_CARD_INSERT :
++						SDHCI_INT_CARD_REMOVE);
++		sdhci_unmask_irqs(host, present ? SDHCI_INT_CARD_REMOVE :
++						  SDHCI_INT_CARD_INSERT);
++
+ 		sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
+-			SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
++			     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
++		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
+ 		tasklet_schedule(&host->card_tasklet);
+ 	}
+ 
+-	intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
+-
+ 	if (intmask & SDHCI_INT_CMD_MASK) {
+ 		sdhci_writel(host, intmask & SDHCI_INT_CMD_MASK,
+ 			SDHCI_INT_STATUS);
+-- 
+1.7.4.1
