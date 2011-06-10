@@ -1,43 +1,186 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 10 Jun 2011 18:42:48 +0800
-Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
-	support for mx5
-Message-ID: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Fri, 10 Jun 2011 16:22:36 -0600
+Subject: [PATCH v4 3/4] drivers/amba: create devices from device tree
+In-Reply-To: <1307738923-7564-4-git-send-email-robherring2@gmail.com>
+References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
+	<1307738923-7564-4-git-send-email-robherring2@gmail.com>
+Message-ID: <20110610222236.GD28994@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The card-present polling within sdhci based driver is very expensive
-in terms of the impact to system performance.  We observe a few
-system performance issues from Freescale and Linaro on mx5 platforms,
-which have been proved card polling related.
+On Fri, Jun 10, 2011 at 03:48:42PM -0500, Rob Herring wrote:
+> From: Rob Herring <rob.herring@calxeda.com>
+> 
+> Add a function to create amba bus devices (i.e. primecell peripherals) from
+> device tree nodes. The device tree scanning is done by
+> of_platform_probe/populate functions which can call of_amba_device_create
+> based on a match table entry.
+> 
+> Nodes with a "arm,amba-deviceid" property can override the h/w peripheral id
+> value.
+> 
+> Based on the original work by Jeremy Kerr.
+> 
+> Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
+> Cc: Grant Likely <grant.likely@secretlab.ca>
+> Cc: linux at arm.linux.org.uk
+> Cc: arnd at arndb.de
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+> ---
+>  Documentation/devicetree/bindings/arm/amba.txt |   21 ++++++++++
+>  drivers/amba/bus.c                             |   51 ++++++++++++++++++++++++
+>  include/linux/amba/bus.h                       |   18 ++++++++
+>  3 files changed, 90 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/amba.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/amba.txt b/Documentation/devicetree/bindings/arm/amba.txt
+> new file mode 100644
+> index 0000000..23fde7f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/amba.txt
+> @@ -0,0 +1,21 @@
+> +* ARM Primecell Peripherals
+> +
+> +ARM, Ltd. Primecell peripherals have a standard id register that can be used to
+> +identify the peripheral type, vendor, and revision. This value can be used for
+> +driver matching. 
+> +
+> +Required properties:
+> +
+> +- compatible : should be a specific value for peripheral and "arm,amba-device"
 
-The patch set extends the current sdhci-esdhc-imx card_detect and
-write_protect support to cover mx5 platforms, and solves above
-performance issues.
+After recent conversations, I'd like to change this to
+"arm,primecell" to better reflect the kind of devices it models.
 
-Shawn Guo (4):
-      mmc: sdhci: fix interrupt storm from card detection
-      mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
-      mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
-      mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
+> +
+> +Optional properties:
+> +
+> +- arm,amba-deviceid : Value to override the h/w value with
 
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |    3 +-
- arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |    3 +-
- arch/arm/mach-imx/mach-mx25_3ds.c              |    2 +
- arch/arm/mach-imx/mach-mx35_3ds.c              |    7 +-
- arch/arm/mach-imx/mach-pcm043.c                |    2 +
- arch/arm/mach-imx/mach-vpr200.c                |    7 +-
- arch/arm/mach-mx5/board-mx51_3ds.c             |    7 +-
- arch/arm/mach-mx5/board-mx51_babbage.c         |   27 +++++-
- arch/arm/mach-mx5/board-mx51_efikamx.c         |    7 +-
- arch/arm/mach-mx5/board-mx51_efikasb.c         |    7 +-
- arch/arm/mach-mx5/board-mx53_evk.c             |   14 +++-
- arch/arm/mach-mx5/board-mx53_loco.c            |   14 +++-
- arch/arm/mach-mx5/board-mx53_smd.c             |   21 ++++-
- arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c   |   14 +++-
- arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c   |    7 +-
- arch/arm/mach-mx5/mx51_efika.c                 |    7 +-
- arch/arm/plat-mxc/include/mach/esdhc.h         |   25 ++++-
- drivers/mmc/host/sdhci-esdhc-imx.c             |  117 +++++++++++++----------
- drivers/mmc/host/sdhci.c                       |   13 ++-
- 19 files changed, 225 insertions(+), 79 deletions(-)
+Similarly, based on the primecell device documents, this should
+probabaly be arm,primecell-periphid.
+
+> +
+> +Example:
+> +
+> +serial at fff36000 {
+> +	compatible = "arm,pl011", "arm,amba-device";
+> +	arm,amba-deviceid = <0x00341011>;
+> +};
+> +
+> diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
+> index d74926e..19f712b 100644
+> --- a/drivers/amba/bus.c
+> +++ b/drivers/amba/bus.c
+> @@ -13,6 +13,11 @@
+>  #include <linux/string.h>
+>  #include <linux/slab.h>
+>  #include <linux/io.h>
+> +#include <linux/of.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_address.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_platform.h>
+>  #include <linux/pm.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/amba/bus.h>
+> @@ -785,3 +790,49 @@ EXPORT_SYMBOL(amba_device_unregister);
+>  EXPORT_SYMBOL(amba_find_device);
+>  EXPORT_SYMBOL(amba_request_regions);
+>  EXPORT_SYMBOL(amba_release_regions);
+> +
+> +#ifdef CONFIG_OF
+> +int of_amba_device_create(struct device_node *node, struct device *parent)
+> +{
+> +	struct amba_device *dev;
+> +	const void *prop;
+> +	int i, ret;
+> +
+> +	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
+> +	if (!dev)
+> +		return -ENOMEM;
+> +
+> +	/* setup generic device info */
+> +	dev->dev.coherent_dma_mask = ~0;
+> +	dev->dev.of_node = node;
+> +	dev->dev.parent = parent;
+> +	of_device_make_bus_id(&dev->dev);
+> +
+> +	/* setup amba-specific device info */
+> +	dev->dma_mask = ~0;
+> +
+> +	/* Allow the arm,amba-deviceid value to override the h/w value */
+> +	prop = of_get_property(node, "arm,amba-deviceid", NULL);
+> +	if (prop)
+> +		dev->periphid = of_read_ulong(prop, 1);
+> +
+> +	/* Decode the IRQs and address ranges */
+> +	for (i = 0; i < AMBA_NR_IRQS; i++)
+> +		dev->irq[i] = irq_of_parse_and_map(node, i);
+> +
+> +	ret = of_address_to_resource(node, 0, &dev->res);
+> +	if (ret)
+> +		goto err_free;
+> +
+> +	ret = amba_device_register(dev, &iomem_resource);
+> +	if (ret)
+> +		goto err_free;
+> +
+> +	return 0;
+> +
+> +err_free:
+> +	kfree(dev);
+> +	return ret;
+> +}
+> +
+
+Yeah, I think this looks like the right thing to do.  I'll pick it up
+into devicetree/test and probably move it to devicetree/arm in the
+near future after testing a bit.
+
+> +#endif /* CONFIG_OF */
+> diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
+> index fcbbe71..0177274 100644
+> --- a/include/linux/amba/bus.h
+> +++ b/include/linux/amba/bus.h
+> @@ -24,6 +24,7 @@
+>  #define AMBA_CID	0xb105f00d
+>  
+>  struct clk;
+> +struct device_node;
+>  
+>  struct amba_device {
+>  	struct device		dev;
+> @@ -63,6 +64,7 @@ extern struct bus_type amba_bustype;
+>  #define amba_get_drvdata(d)	dev_get_drvdata(&d->dev)
+>  #define amba_set_drvdata(d,p)	dev_set_drvdata(&d->dev, p)
+>  
+> +#ifdef CONFIG_ARM_AMBA
+>  int amba_driver_register(struct amba_driver *);
+>  void amba_driver_unregister(struct amba_driver *);
+>  int amba_device_register(struct amba_device *, struct resource *);
+> @@ -94,4 +96,20 @@ void amba_release_regions(struct amba_device *);
+>  #define amba_manf(d)	AMBA_MANF_BITS((d)->periphid)
+>  #define amba_part(d)	AMBA_PART_BITS((d)->periphid)
+>  
+> +#ifdef CONFIG_OF
+> +int of_amba_device_create(struct device_node *node, struct device *parent);
+> +#endif
+> +
+> +#else
+> +
+> +#ifdef CONFIG_OF
+> +static inline int of_amba_device_create(struct device_node *node, 
+> +					struct device *parent)
+> +{
+> +	return 0;
+> +}
+> +#endif
+> +
+> +#endif /* CONFIG_ARM_AMBA */
+> +
+>  #endif
+> -- 
+> 1.7.4.1
+> 
