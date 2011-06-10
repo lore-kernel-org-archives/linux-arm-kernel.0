@@ -1,48 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 10 Jun 2011 15:48:43 -0500
-Subject: [PATCH v4 4/4] dt: add amba device creation to platform bus scan
-In-Reply-To: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1307738923-7564-5-git-send-email-robherring2@gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Fri, 10 Jun 2011 18:42:48 +0800
+Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
+	support for mx5
+Message-ID: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+The card-present polling within sdhci based driver is very expensive
+in terms of the impact to system performance.  We observe a few
+system performance issues from Freescale and Linaro on mx5 platforms,
+which have been proved card polling related.
 
-Add support to the platform bus scanning to call custom device creation
-function for amba devices.
+The patch set extends the current sdhci-esdhc-imx card_detect and
+write_protect support to cover mx5 platforms, and solves above
+performance issues.
 
-Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: arnd at arndb.de
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- drivers/of/platform.c |    6 ++++++
- 1 files changed, 6 insertions(+), 0 deletions(-)
+Shawn Guo (4):
+      mmc: sdhci: fix interrupt storm from card detection
+      mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
+      mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
+      mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 8d0f477..1712f22 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -21,6 +21,7 @@
- #include <linux/of_irq.h>
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
-+#include <linux/amba/bus.h>
- 
- static int of_dev_node_match(struct device *dev, void *data)
- {
-@@ -234,6 +235,11 @@ static int of_platform_bus_create(struct device_node *bus,
- 		return 0;
- 	}
- 
-+	if (of_device_is_compatible(bus, "arm,amba-device")) {
-+		of_amba_device_create(bus, parent);
-+		return 0;
-+	}
-+	
- 	dev = of_platform_device_create(bus, NULL, parent);
- 	if (!dev || !of_match_node(matches, bus))
- 		return 0;
--- 
-1.7.4.1
+ arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c |    3 +-
+ arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c |    3 +-
+ arch/arm/mach-imx/mach-mx25_3ds.c              |    2 +
+ arch/arm/mach-imx/mach-mx35_3ds.c              |    7 +-
+ arch/arm/mach-imx/mach-pcm043.c                |    2 +
+ arch/arm/mach-imx/mach-vpr200.c                |    7 +-
+ arch/arm/mach-mx5/board-mx51_3ds.c             |    7 +-
+ arch/arm/mach-mx5/board-mx51_babbage.c         |   27 +++++-
+ arch/arm/mach-mx5/board-mx51_efikamx.c         |    7 +-
+ arch/arm/mach-mx5/board-mx51_efikasb.c         |    7 +-
+ arch/arm/mach-mx5/board-mx53_evk.c             |   14 +++-
+ arch/arm/mach-mx5/board-mx53_loco.c            |   14 +++-
+ arch/arm/mach-mx5/board-mx53_smd.c             |   21 ++++-
+ arch/arm/mach-mx5/eukrea_mbimx51-baseboard.c   |   14 +++-
+ arch/arm/mach-mx5/eukrea_mbimxsd-baseboard.c   |    7 +-
+ arch/arm/mach-mx5/mx51_efika.c                 |    7 +-
+ arch/arm/plat-mxc/include/mach/esdhc.h         |   25 ++++-
+ drivers/mmc/host/sdhci-esdhc-imx.c             |  117 +++++++++++++----------
+ drivers/mmc/host/sdhci.c                       |   13 ++-
+ 19 files changed, 225 insertions(+), 79 deletions(-)
