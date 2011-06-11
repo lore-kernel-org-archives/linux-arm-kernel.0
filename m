@@ -1,29 +1,96 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Fri, 10 Jun 2011 13:50:07 +0100
-Subject: [RFC PATCH 3/5] w90x900: convert to basic-mmio-gpio
-In-Reply-To: <BANLkTincujypx04vpogGyZ8c0SDz9uUUrg@mail.gmail.com>
-References: <1302522502-24381-1-git-send-email-jamie@jamieiles.com>
-	<1302522502-24381-4-git-send-email-jamie@jamieiles.com>
-	<BANLkTincujypx04vpogGyZ8c0SDz9uUUrg@mail.gmail.com>
-Message-ID: <20110610125007.GO3711@pulham.picochip.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 12 Jun 2011 00:51:40 +0800
+Subject: [PATCH 1/2] ARM:mach-mx5/board-mx51_babbage: Add CD and WP GPIOs
+In-Reply-To: <1307722520-12952-2-git-send-email-andre.silva@freescale.com>
+References: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
+	<1307722520-12952-2-git-send-email-andre.silva@freescale.com>
+Message-ID: <20110611165139.GC29093@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Hi Andre,
 
-On Mon, Apr 11, 2011 at 10:27:56PM +0800, Wan ZongShun wrote:
-> 2011/4/11 Jamie Iles <jamie@jamieiles.com>:
-> > The basic-mmio-gpio driver is capable of supporting this controller so
-> > convert the platform to use it for basic GPIO support.
-> >
-> > Cc: Wan ZongShun <mcuos.com@gmail.com>
-> > Signed-off-by: Jamie Iles <jamie@jamieiles.com>
+On Fri, Jun 10, 2011 at 01:15:20PM -0300, Andre Silva wrote:
+> Signed-off-by: Andre Silva <andre.silva@freescale.com>
 > 
-> Acked-by: Wan ZongShun <mcuos.com@gmail.com>
+> ---
+>  arch/arm/mach-mx5/board-mx51_babbage.c |   24 +++++++++++++++++++++---
+>  1 files changed, 21 insertions(+), 3 deletions(-)
 > 
-> Thanks, so you can submit it to Russell for merging.
+> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
+> index 770f74b..3e58d5d 100644
+> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
+> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
+> @@ -41,6 +41,10 @@
+>  #define BABBAGE_POWER_KEY	IMX_GPIO_NR(2, 21)
+>  #define BABBAGE_ECSPI1_CS0	IMX_GPIO_NR(4, 24)
+>  #define BABBAGE_ECSPI1_CS1	IMX_GPIO_NR(4, 25)
+> +#define BABBAGE_SD1_CD		IMX_GPIO_NR(1, 0)
+> +#define BABBAGE_SD1_WP		IMX_GPIO_NR(1, 1)
+> +#define BABBAGE_SD2_CD		IMX_GPIO_NR(1, 6)
+> +#define BABBAGE_SD2_WP		IMX_GPIO_NR(1, 5)
+>  
+>  /* USB_CTRL_1 */
+>  #define MX51_USB_CTRL_1_OFFSET			0x10
+> @@ -142,7 +146,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+>  	MX51_PAD_SD1_DATA1__SD1_DATA1,
+>  	MX51_PAD_SD1_DATA2__SD1_DATA2,
+>  	MX51_PAD_SD1_DATA3__SD1_DATA3,
+> -
+> +	MX51_PAD_GPIO1_0__GPIO1_0,
+> +	MX51_PAD_GPIO1_1__GPIO1_1,
+> +
+>  	/* SD 2 */
+>  	MX51_PAD_SD2_CMD__SD2_CMD,
+>  	MX51_PAD_SD2_CLK__SD2_CLK,
+> @@ -150,6 +156,8 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
+>  	MX51_PAD_SD2_DATA1__SD2_DATA1,
+>  	MX51_PAD_SD2_DATA2__SD2_DATA2,
+>  	MX51_PAD_SD2_DATA3__SD2_DATA3,
+> +	MX51_PAD_GPIO1_6__GPIO1_6,
+> +	MX51_PAD_GPIO1_5__GPIO1_5,
+>  
+>  	/* eCSPI1 */
+>  	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
+> @@ -331,6 +339,16 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
+>  	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
+>  };
+>  
+> +static const struct esdhc_platform_data mx51_babbage_sd1_data __initconst = {
+> +	.cd_gpio = BABBAGE_SD1_CD,
+> +	.wp_gpio = BABBAGE_SD1_WP,
+> +};
+> +
+> +static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
+> +	.cd_gpio = BABBAGE_SD2_CD,
+> +	.wp_gpio = BABBAGE_SD2_WP,
+> +};
+> +
+>  /*
+>   * Board specific initialization.
+>   */
+> @@ -374,8 +392,8 @@ static void __init mx51_babbage_init(void)
+>  	mxc_iomux_v3_setup_pad(usbh1stp);
+>  	babbage_usbhub_reset();
+>  
+> -	imx51_add_sdhci_esdhc_imx(0, NULL);
+> -	imx51_add_sdhci_esdhc_imx(1, NULL);
+> +	imx51_add_sdhci_esdhc_imx(0, &mx51_babbage_sd1_data);
+> +	imx51_add_sdhci_esdhc_imx(1, &mx51_babbage_sd2_data);
+>  
+>  	spi_register_board_info(mx51_babbage_spi_board_info,
+>  		ARRAY_SIZE(mx51_babbage_spi_board_info));
+> -- 
+> 1.7.1
+> 
+I'm wondering how you tested the patches, as CD and WP has not been
+supported by sdhci-esdhc-imx driver yet.
 
-All of the dependencies for this are now merged, is it okay to put this 
-one in the patch system?
+PS. I'm adding the support with the patch set below.
 
-Jamie
+[PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
+support for mx5
+
+-- 
+Regards,
+Shawn
