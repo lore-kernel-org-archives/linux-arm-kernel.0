@@ -1,58 +1,37 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Sat, 11 Jun 2011 10:08:29 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110610173345.GA8434@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110528005640.9076c0b1.akpm@linux-foundation.org>
-	<20110609185259.GA29287@linux.vnet.ibm.com>
-	<BANLkTinxeeSby_+tta8EhzCg3VbD6+=g+g@mail.gmail.com>
-	<20110610151121.GA2230@linux.vnet.ibm.com>
-	<20110610155954.GA25774@srcf.ucam.org>
-	<20110610165529.GC2230@linux.vnet.ibm.com>
-	<20110610170535.GC25774@srcf.ucam.org>
-	<20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610173345.GA8434@in.ibm.com>
-Message-ID: <20110611170829.GB2212@linux.vnet.ibm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 12 Jun 2011 01:21:14 +0800
+Subject: [PATCH 2/2] ARM:mach-mx5/board-mx53_loco: Add CD and WP GPIOs
+In-Reply-To: <2952C0A749B3034EA13D670115D4FEC8F1A0C4@039-SN1MPN1-005.039d.mgd.msft.net>
+References: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
+	<20110611165856.GD29093@S2100-06.ap.freescale.net>
+	<2952C0A749B3034EA13D670115D4FEC8F1A0C4@039-SN1MPN1-005.039d.mgd.msft.net>
+Message-ID: <20110611172113.GE29093@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 11:03:45PM +0530, Ankita Garg wrote:
-> On Fri, Jun 10, 2011 at 10:19:39AM -0700, Paul E. McKenney wrote:
-> > On Fri, Jun 10, 2011 at 06:05:35PM +0100, Matthew Garrett wrote:
-> > > On Fri, Jun 10, 2011 at 09:55:29AM -0700, Paul E. McKenney wrote:
-> > > > On Fri, Jun 10, 2011 at 04:59:54PM +0100, Matthew Garrett wrote:
-> > > > > For the server case, the low hanging fruit would seem to be 
-> > > > > finer-grained self-refresh. At best we seem to be able to do that on a 
-> > > > > per-CPU socket basis right now. The difference between active and 
-> > > > > self-refresh would seem to be much larger than the difference between 
-> > > > > self-refresh and powered down.
-> > > > 
-> > > > By "finer-grained self-refresh" you mean turning off refresh for banks
-> > > > of memory that are not being used, right?  If so, this is supported by
-> > > > the memory-regions support provided, at least assuming that the regions
-> > > > can be aligned with the self-refresh boundaries.
-> > > 
-> > > I mean at the hardware level. As far as I know, the best we can do at 
-> > > the moment is to put an entire node into self refresh when the CPU hits 
-> > > package C6.
-> > 
-> > But this depends on the type of system and CPU family, right?  If you
-> > can say, which hardware are you thinking of?  (I am thinking of ARM.)
-> > 
+On Sun, Jun 12, 2011 at 12:59:39AM +0800, Silva Andre-B22958 wrote:
+> Hi Shawn,
 > 
-> And also whether the memory controller is on-chip or off-chip ? As
-> package could be in C6, but other packages could be refering memory
-> connected to this socket right ? And as Paul mentioned, at this point
-> the ARM SoCs that have support for memory power management, have only a
-> single node.
+> The tests was done simpling inserting and removing the SD card, 
 
-I suspect that this will be changing shortly, and that finer-grained
-control might be available.
+That said you saw CD working, and what about WP?
 
-However, there are also use cases where contiguous memory is required from
-time to time by media codecs, and being able to use that memory for other
-purposes when the media codec is not in use reduced the total amount of
-memory required, which reduces power consumption all the time, right?  ;-)
+> since before no parameters were passed to the  imx53_add_sdhci_esdhc_imx and the controller was able to detect the card via software. When setting up the iomux (CD) pin and passing it to the  imx53_add_sdhci_esdhc_imx function, it should be able to start detecting the card using the pin instead.
+> 
+No, your CD gpio setup does not make any change.  The CD is working
+in the exactly same way before you patch.  If you check function
+esdhc_pltfm_init of sdhci-esdhc-imx driver, you will find the
+following.
 
-							Thanx, Paul
+                /* i.MX5x has issues to be researched */
+                if (!cpu_is_mx25() && !cpu_is_mx35())
+                        goto not_supported;
+
+CD gpio interrupt only gets supported on mx25 and mx35 currently,
+and mx5 CD works with flag SDHCI_QUIRK_BROKEN_CARD_DETECTION set,
+in which case a very expensive method is being used to poll card
+present by sdhci driver.
+
+-- 
+Regards,
+Shawn
