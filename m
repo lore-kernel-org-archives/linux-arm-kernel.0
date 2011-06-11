@@ -1,170 +1,106 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Fri, 10 Jun 2011 15:48:42 -0500
-Subject: [PATCH v4 3/4] drivers/amba: create devices from device tree
-In-Reply-To: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-References: <1307738923-7564-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1307738923-7564-4-git-send-email-robherring2@gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 11 Jun 2011 21:16:38 +0800
+Subject: [PATCH 4/4] mmc: sdhci-esdhc-imx: extend card_detect and
+	write_protect support
+In-Reply-To: <877h8slgsl.fsf@lebrac.rtp-net.org>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<1307702572-22066-5-git-send-email-shawn.guo@linaro.org>
+	<87boy4lnp9.fsf@lebrac.rtp-net.org>
+	<20110611115031.GA29093@S2100-06.ap.freescale.net>
+	<877h8slgsl.fsf@lebrac.rtp-net.org>
+Message-ID: <20110611131637.GB29093@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On Sat, Jun 11, 2011 at 01:59:54PM +0200, Arnaud Patard wrote:
+> Shawn Guo <shawn.guo@freescale.com> writes:
+> 
+> > On Sat, Jun 11, 2011 at 11:30:42AM +0200, Arnaud Patard wrote:
+> >> Shawn Guo <shawn.guo@linaro.org> writes:
+> >> 
+> >> Hi,
+> >> 
+> >> > The patch extends card_detect and write_protect support to get mx5
+> >> > family and more scenarios supported.  The changes include:
+> >> >
+> >> >  * Turn platform_data from optional to mandatory
+> >> >  * Add cd_types and wp_types into platform_data to cover more use
+> >> >    cases
+> >> >  * Remove the use of flag ESDHC_FLAG_GPIO_FOR_CD
+> >> >  * Adjust machine codes to adopt the platform_data changes
+> >> 
+> >> Before I go and test theses patches, I'd like to get some
+> >> clarification. From what I see, you've modified all over the place the
+> >> code to provide a platform_data, setting wp/cd type to type "NONE", as
+> >> if it was the default you choose. Why this default and not considerer
+> >> the "SIGNAL" type being the default ? Is this choice the safest one when
+> >> one doesn't know what type to choose or can it have some bad side
+> >> effects ?
+> >
+> > The mx51_babbage is the only board support I'm concerned about in
+> > this patch.  For other boards, I chose to translate the NULL pdata
+> > into "NONE" for both wp/cd types as the safest one, because I do not
+> > have (or care to check) the board schematics telling how wp/cd are
+> > routed on those boards.  The patch ensures there is no regression
+> > for those boards, and let people who have schematics to set up wp/cd
+> > types later.
+> 
+> ok. Thanks for making things clear. I see some changes for
+> loco/imx53qsb. Do you need testers for it too or you've tested it ?
+> 
+I do not see changes for loco except NULL pdata -> "NONE" types.  But
+testing are always welcomed and appreciated.
 
-Add a function to create amba bus devices (i.e. primecell peripherals) from
-device tree nodes. The device tree scanning is done by
-of_platform_probe/populate functions which can call of_amba_device_create
-based on a match table entry.
+> >
+> >> Also, why didn't you modify the imx*_add_sdhci_esdhc_imx() functions to
+> >> provide the default platform_data by themselves that if the 2nd argument
+> >> was NULL instead of modifying all theses machines files ?
+> >> 
+> > As I said above, the wp/cd "NONE" types translated from NULL pdata
+> > will be set up properly later by people who have schematics.
+> 
+> You're not answering my question about moving the NULL-> "NONE" type
+> from *all* modified machine file into the imx*add_sdhci_esdhc_imx(). If
+> it's the default, why all machines file have to be modified to set it ?
+> Moreover, *nothing* AFAICS is preventing to call theses functions will
+> NULL. What will happen ? An oops ? To me, a default is the value set
+> when nothing is set, and clearly modifying all functions call site due
+> to having to provide the default seems imho wrong.
+> 
+Ah, good point.  Please review changes below.  If it looks good to
+you, I will incorporate it in the next version of the patch.
 
-Nodes with a "arm,amba-deviceid" property can override the h/w peripheral id
-value.
+diff --git a/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c b/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
+index 6b2940b..a880f73 100644
+--- a/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
++++ b/arch/arm/plat-mxc/devices/platform-sdhci-esdhc-imx.c
+@@ -65,6 +65,11 @@ imx53_sdhci_esdhc_imx_data[] __initconst = {
+ };
+ #endif /* ifdef CONFIG_SOC_IMX53 */
 
-Based on the original work by Jeremy Kerr.
-
-Cc: Jeremy Kerr <jeremy.kerr@canonical.com>
-Cc: Grant Likely <grant.likely@secretlab.ca>
-Cc: linux at arm.linux.org.uk
-Cc: arnd at arndb.de
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
-Signed-off-by: Rob Herring <rob.herring@calxeda.com>
----
- Documentation/devicetree/bindings/arm/amba.txt |   21 ++++++++++
- drivers/amba/bus.c                             |   51 ++++++++++++++++++++++++
- include/linux/amba/bus.h                       |   18 ++++++++
- 3 files changed, 90 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/amba.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/amba.txt b/Documentation/devicetree/bindings/arm/amba.txt
-new file mode 100644
-index 0000000..23fde7f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amba.txt
-@@ -0,0 +1,21 @@
-+* ARM Primecell Peripherals
-+
-+ARM, Ltd. Primecell peripherals have a standard id register that can be used to
-+identify the peripheral type, vendor, and revision. This value can be used for
-+driver matching. 
-+
-+Required properties:
-+
-+- compatible : should be a specific value for peripheral and "arm,amba-device"
-+
-+Optional properties:
-+
-+- arm,amba-deviceid : Value to override the h/w value with
-+
-+Example:
-+
-+serial at fff36000 {
-+	compatible = "arm,pl011", "arm,amba-device";
-+	arm,amba-deviceid = <0x00341011>;
++static const struct esdhc_platform_data default_esdhc_pdata __initconst = {
++       .wp_type = ESDHC_WP_NONE,
++       .cd_type = ESDHC_CD_NONE,
 +};
 +
-diff --git a/drivers/amba/bus.c b/drivers/amba/bus.c
-index d74926e..19f712b 100644
---- a/drivers/amba/bus.c
-+++ b/drivers/amba/bus.c
-@@ -13,6 +13,11 @@
- #include <linux/string.h>
- #include <linux/slab.h>
- #include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/of_platform.h>
- #include <linux/pm.h>
- #include <linux/pm_runtime.h>
- #include <linux/amba/bus.h>
-@@ -785,3 +790,49 @@ EXPORT_SYMBOL(amba_device_unregister);
- EXPORT_SYMBOL(amba_find_device);
- EXPORT_SYMBOL(amba_request_regions);
- EXPORT_SYMBOL(amba_release_regions);
+ struct platform_device *__init imx_add_sdhci_esdhc_imx(
+                const struct imx_sdhci_esdhc_imx_data *data,
+                const struct esdhc_platform_data *pdata)
+@@ -81,6 +86,13 @@ struct platform_device *__init imx_add_sdhci_esdhc_imx(
+                },
+        };
+
++       /*
++        * If machine does not provide a pdata, use the default one
++        * which means none WP/CD support
++        */
++       if (!pdata)
++               pdata = &default_esdhc_pdata;
 +
-+#ifdef CONFIG_OF
-+int of_amba_device_create(struct device_node *node, struct device *parent)
-+{
-+	struct amba_device *dev;
-+	const void *prop;
-+	int i, ret;
-+
-+	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
-+	if (!dev)
-+		return -ENOMEM;
-+
-+	/* setup generic device info */
-+	dev->dev.coherent_dma_mask = ~0;
-+	dev->dev.of_node = node;
-+	dev->dev.parent = parent;
-+	of_device_make_bus_id(&dev->dev);
-+
-+	/* setup amba-specific device info */
-+	dev->dma_mask = ~0;
-+
-+	/* Allow the arm,amba-deviceid value to override the h/w value */
-+	prop = of_get_property(node, "arm,amba-deviceid", NULL);
-+	if (prop)
-+		dev->periphid = of_read_ulong(prop, 1);
-+
-+	/* Decode the IRQs and address ranges */
-+	for (i = 0; i < AMBA_NR_IRQS; i++)
-+		dev->irq[i] = irq_of_parse_and_map(node, i);
-+
-+	ret = of_address_to_resource(node, 0, &dev->res);
-+	if (ret)
-+		goto err_free;
-+
-+	ret = amba_device_register(dev, &iomem_resource);
-+	if (ret)
-+		goto err_free;
-+
-+	return 0;
-+
-+err_free:
-+	kfree(dev);
-+	return ret;
-+}
-+
-+#endif /* CONFIG_OF */
-diff --git a/include/linux/amba/bus.h b/include/linux/amba/bus.h
-index fcbbe71..0177274 100644
---- a/include/linux/amba/bus.h
-+++ b/include/linux/amba/bus.h
-@@ -24,6 +24,7 @@
- #define AMBA_CID	0xb105f00d
- 
- struct clk;
-+struct device_node;
- 
- struct amba_device {
- 	struct device		dev;
-@@ -63,6 +64,7 @@ extern struct bus_type amba_bustype;
- #define amba_get_drvdata(d)	dev_get_drvdata(&d->dev)
- #define amba_set_drvdata(d,p)	dev_set_drvdata(&d->dev, p)
- 
-+#ifdef CONFIG_ARM_AMBA
- int amba_driver_register(struct amba_driver *);
- void amba_driver_unregister(struct amba_driver *);
- int amba_device_register(struct amba_device *, struct resource *);
-@@ -94,4 +96,20 @@ void amba_release_regions(struct amba_device *);
- #define amba_manf(d)	AMBA_MANF_BITS((d)->periphid)
- #define amba_part(d)	AMBA_PART_BITS((d)->periphid)
- 
-+#ifdef CONFIG_OF
-+int of_amba_device_create(struct device_node *node, struct device *parent);
-+#endif
-+
-+#else
-+
-+#ifdef CONFIG_OF
-+static inline int of_amba_device_create(struct device_node *node, 
-+					struct device *parent)
-+{
-+	return 0;
-+}
-+#endif
-+
-+#endif /* CONFIG_ARM_AMBA */
-+
- #endif
+        return imx_add_platform_device("sdhci-esdhc-imx", data->id, res,
+                        ARRAY_SIZE(res), pdata, sizeof(*pdata));
+ }
+
 -- 
-1.7.4.1
+Regards,
+Shawn
