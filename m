@@ -1,95 +1,74 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 12 Jun 2011 00:51:40 +0800
-Subject: [PATCH 1/2] ARM:mach-mx5/board-mx51_babbage: Add CD and WP GPIOs
-In-Reply-To: <1307722520-12952-2-git-send-email-andre.silva@freescale.com>
+Date: Sun, 12 Jun 2011 00:58:57 +0800
+Subject: [PATCH 2/2] ARM:mach-mx5/board-mx53_loco: Add CD and WP GPIOs
+In-Reply-To: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
 References: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
-	<1307722520-12952-2-git-send-email-andre.silva@freescale.com>
-Message-ID: <20110611165139.GC29093@S2100-06.ap.freescale.net>
+Message-ID: <20110611165856.GD29093@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andre,
-
-On Fri, Jun 10, 2011 at 01:15:20PM -0300, Andre Silva wrote:
+On Fri, Jun 10, 2011 at 01:15:19PM -0300, Andre Silva wrote:
 > Signed-off-by: Andre Silva <andre.silva@freescale.com>
 > 
 > ---
->  arch/arm/mach-mx5/board-mx51_babbage.c |   24 +++++++++++++++++++++---
->  1 files changed, 21 insertions(+), 3 deletions(-)
+>  arch/arm/mach-mx5/board-mx53_loco.c |   18 ++++++++++++++++--
+>  1 files changed, 16 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/mach-mx5/board-mx51_babbage.c b/arch/arm/mach-mx5/board-mx51_babbage.c
-> index 770f74b..3e58d5d 100644
-> --- a/arch/arm/mach-mx5/board-mx51_babbage.c
-> +++ b/arch/arm/mach-mx5/board-mx51_babbage.c
-> @@ -41,6 +41,10 @@
->  #define BABBAGE_POWER_KEY	IMX_GPIO_NR(2, 21)
->  #define BABBAGE_ECSPI1_CS0	IMX_GPIO_NR(4, 24)
->  #define BABBAGE_ECSPI1_CS1	IMX_GPIO_NR(4, 25)
-> +#define BABBAGE_SD1_CD		IMX_GPIO_NR(1, 0)
-> +#define BABBAGE_SD1_WP		IMX_GPIO_NR(1, 1)
-> +#define BABBAGE_SD2_CD		IMX_GPIO_NR(1, 6)
-> +#define BABBAGE_SD2_WP		IMX_GPIO_NR(1, 5)
+> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
+> index e5e8c85..52cb150 100644
+> --- a/arch/arm/mach-mx5/board-mx53_loco.c
+> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
+> @@ -39,6 +39,9 @@
+>  #define MX53_LOCO_UI2			IMX_GPIO_NR(2, 15)
+>  #define LOCO_FEC_PHY_RST		IMX_GPIO_NR(7, 6)
+>  #define LOCO_LED			IMX_GPIO_NR(7, 7)
+> +#define LOCO_SD3_CD			IMX_GPIO_NR(3, 11)
+> +#define LOCO_SD3_WP			IMX_GPIO_NR(3, 12)
+> +#define LOCO_SD1_CD			IMX_GPIO_NR(3, 13)
 >  
->  /* USB_CTRL_1 */
->  #define MX51_USB_CTRL_1_OFFSET			0x10
-> @@ -142,7 +146,9 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
->  	MX51_PAD_SD1_DATA1__SD1_DATA1,
->  	MX51_PAD_SD1_DATA2__SD1_DATA2,
->  	MX51_PAD_SD1_DATA3__SD1_DATA3,
-> -
-> +	MX51_PAD_GPIO1_0__GPIO1_0,
-> +	MX51_PAD_GPIO1_1__GPIO1_1,
-> +
->  	/* SD 2 */
->  	MX51_PAD_SD2_CMD__SD2_CMD,
->  	MX51_PAD_SD2_CLK__SD2_CLK,
-> @@ -150,6 +156,8 @@ static iomux_v3_cfg_t mx51babbage_pads[] = {
->  	MX51_PAD_SD2_DATA1__SD2_DATA1,
->  	MX51_PAD_SD2_DATA2__SD2_DATA2,
->  	MX51_PAD_SD2_DATA3__SD2_DATA3,
-> +	MX51_PAD_GPIO1_6__GPIO1_6,
-> +	MX51_PAD_GPIO1_5__GPIO1_5,
->  
->  	/* eCSPI1 */
->  	MX51_PAD_CSPI1_MISO__ECSPI1_MISO,
-> @@ -331,6 +339,16 @@ static const struct spi_imx_master mx51_babbage_spi_pdata __initconst = {
->  	.num_chipselect = ARRAY_SIZE(mx51_babbage_spi_cs),
+>  static iomux_v3_cfg_t mx53_loco_pads[] = {
+>  	/* FEC */
+> @@ -71,6 +74,8 @@ static iomux_v3_cfg_t mx53_loco_pads[] = {
+>  	MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
+>  	MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
+>  	MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
+> +	/* SD1_CD */
+> +	MX53_PAD_EIM_DA13__GPIO3_13,
+>  	/* SD3 */
+>  	MX53_PAD_PATA_DATA8__ESDHC3_DAT0,
+>  	MX53_PAD_PATA_DATA9__ESDHC3_DAT1,
+> @@ -203,6 +208,15 @@ static const struct gpio_keys_platform_data loco_button_data __initconst = {
+>  	.nbuttons       = ARRAY_SIZE(loco_buttons),
 >  };
 >  
-> +static const struct esdhc_platform_data mx51_babbage_sd1_data __initconst = {
-> +	.cd_gpio = BABBAGE_SD1_CD,
-> +	.wp_gpio = BABBAGE_SD1_WP,
+> +static const struct esdhc_platform_data mx53_loco_sd1_data __initconst = {
+> +	.cd_gpio = LOCO_SD1_CD,
 > +};
 > +
-> +static const struct esdhc_platform_data mx51_babbage_sd2_data __initconst = {
-> +	.cd_gpio = BABBAGE_SD2_CD,
-> +	.wp_gpio = BABBAGE_SD2_WP,
+> +static const struct esdhc_platform_data mx53_loco_sd3_data __initconst = {
+> +	.cd_gpio = LOCO_SD3_CD,
+> +	.wp_gpio = LOCO_SD3_WP,
 > +};
 > +
->  /*
->   * Board specific initialization.
->   */
-> @@ -374,8 +392,8 @@ static void __init mx51_babbage_init(void)
->  	mxc_iomux_v3_setup_pad(usbh1stp);
->  	babbage_usbhub_reset();
->  
-> -	imx51_add_sdhci_esdhc_imx(0, NULL);
-> -	imx51_add_sdhci_esdhc_imx(1, NULL);
-> +	imx51_add_sdhci_esdhc_imx(0, &mx51_babbage_sd1_data);
-> +	imx51_add_sdhci_esdhc_imx(1, &mx51_babbage_sd2_data);
->  
->  	spi_register_board_info(mx51_babbage_spi_board_info,
->  		ARRAY_SIZE(mx51_babbage_spi_board_info));
+>  static inline void mx53_loco_fec_reset(void)
+>  {
+>  	int ret;
+> @@ -249,8 +263,8 @@ static void __init mx53_loco_board_init(void)
+>  	imx53_add_imx2_wdt(0, NULL);
+>  	imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
+>  	imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
+> -	imx53_add_sdhci_esdhc_imx(0, NULL);
+> -	imx53_add_sdhci_esdhc_imx(2, NULL);
+> +	imx53_add_sdhci_esdhc_imx(0, &mx53_loco_sd1_data);
+> +	imx53_add_sdhci_esdhc_imx(2, &mx53_loco_sd3_data);
+>  	imx_add_gpio_keys(&loco_button_data);
+>  	gpio_led_register_device(-1, &mx53loco_leds_data);
+>  }
 > -- 
 > 1.7.1
 > 
-I'm wondering how you tested the patches, as CD and WP has not been
-supported by sdhci-esdhc-imx driver yet.
-
-PS. I'm adding the support with the patch set below.
-
-[PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
-support for mx5
+The sdhci-esdhc-imx driver currently only supports CD and WP for mx25
+and mx35.  How did you test the patch?
 
 -- 
 Regards,
