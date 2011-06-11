@@ -1,88 +1,36 @@
-From: arjan@infradead.org (Arjan van de Ven)
-Date: Sat, 11 Jun 2011 10:26:54 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110611170610.GA2212@linux.vnet.ibm.com>
-References: <20110610165529.GC2230@linux.vnet.ibm.com>
-	<20110610170535.GC25774@srcf.ucam.org>
-	<20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610172307.GA27630@srcf.ucam.org>
-	<20110610175248.GF2230@linux.vnet.ibm.com>
-	<20110610180807.GB28500@srcf.ucam.org>
-	<20110610184738.GG2230@linux.vnet.ibm.com>
-	<20110610192329.GA30496@srcf.ucam.org>
-	<20110610193713.GJ2230@linux.vnet.ibm.com>
-	<20110610200233.5ddd5a31@infradead.org>
-	<20110611170610.GA2212@linux.vnet.ibm.com>
-Message-ID: <20110611102654.01e5cea9@infradead.org>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sun, 12 Jun 2011 01:33:29 +0800
+Subject: [PATCH] gpio/mxc: fix a bug with gpio_get_value calling
+Message-ID: <1307813609-27758-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 11 Jun 2011 10:06:10 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+When calling gpio_get_value, the gpio number other than bit offset
+should be passed as the argument.
 
-> On Fri, Jun 10, 2011 at 08:02:33PM -0700, Arjan van de Ven wrote:
-> > On Fri, 10 Jun 2011 12:37:13 -0700
-> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > 
-> > > On Fri, Jun 10, 2011 at 08:23:29PM +0100, Matthew Garrett wrote:
-> > > > On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney
-> > > > wrote:
-> > > > 
-> > > > > And if I understand you correctly, then the patches that
-> > > > > Ankita posted should help your self-refresh case, along with
-> > > > > the originally intended the power-down case and
-> > > > > special-purpose use of memory case.
-> > > > 
-> > > > Yeah, I'd hope so once we actually have capable hardware.
-> > > 
-> > > Cool!!!
-> > > 
-> > > So Ankita's patchset might be useful to you at some point, then.
-> > > 
-> > > Does it look like a reasonable implementation?
-> > 
-> > as someone who is working on hardware that is PASR capable right
-> > now, I have to admit that our plan was to just hook into the buddy
-> > allocator, and use PASR on the top level of buddy (eg PASR off
-> > blocks that are free there, and PASR them back on once an
-> > allocation required the block to be broken up)..... that looked the
-> > very most simple to me.
-> > 
-> > Maybe something much more elaborate is needed, but I didn't see why
-> > so far.
-> 
-> If I understand correctly, you face the same issue that affects
-> transparent huge pages, but on a much larger scale.  If you have even
-> one non-moveable allocation in a given top-level buddy block, you
-> won't be able to PASR that block.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Grant, Sascha,
 
-yep we'd use a non-kernel zone for that; not too big a deal.
-(the much larger scale you can debate, if your memory controller is
-configured correctly the PASR regions are not all that much bigger than
-hugepages)
-> 
-> In addition, one of the things that Ankita's patchset is looking to do
-> is to control allocations in a given region, so that the region can be
-> easily evacuated.  One use for this is to power off regions of memory,
-> another is to PASR off regions of memory, and a third is to ensure
-> that large regions of memory are available for when needed by media
-> codecs (e.g., cameras), but can be used for other purposes when the
-> media codecs don't need them (e.g., when viewing photos rather than
-> taking them).
+This is an important bug fix.  Currently, if any driver request 
+any gpio not on port 1 for IRQ_TYPE_EDGE_BOTH, we run into kernel
+oops.  So please apply the patch asap.  Thanks.
 
-the codec issue seems to be solved in time; a previous generation
-silicon on our (Intel) side had ARM ecosystem blocks that did not do
-scatter gather, however the current generation ARM ecosystem blocks all
-seem to have added S/G to them....
-(in part this is coming from the strong desire to get camera/etc blocks
-to all use "GPU texture" class memory, so that the camera can directly
-deposit its information into a gpu texture, and similar for media
-encode/decode blocks... this avoids copies as well as duplicate memory).
+ drivers/gpio/gpio-mxc.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-
-
+diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+index 950e53a..2f6a81b 100644
+--- a/drivers/gpio/gpio-mxc.c
++++ b/drivers/gpio/gpio-mxc.c
+@@ -83,7 +83,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+ 		edge = GPIO_INT_FALL_EDGE;
+ 		break;
+ 	case IRQ_TYPE_EDGE_BOTH:
+-		val = gpio_get_value(gpio & 31);
++		val = gpio_get_value(gpio);
+ 		if (val) {
+ 			edge = GPIO_INT_LOW_LEV;
+ 			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
 -- 
-Arjan van de Ven 	Intel Open Source Technology Centre
-For development, discussion and tips for power savings, 
-visit http://www.lesswatts.org
+1.7.4.1
