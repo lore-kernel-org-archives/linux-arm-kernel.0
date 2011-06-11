@@ -1,93 +1,69 @@
-From: B22958@freescale.com (Silva Andre-B22958)
-Date: Sat, 11 Jun 2011 16:59:39 +0000
-Subject: [PATCH 2/2] ARM:mach-mx5/board-mx53_loco: Add CD and WP GPIOs
-In-Reply-To: <20110611165856.GD29093@S2100-06.ap.freescale.net>
-References: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>,
-	<20110611165856.GD29093@S2100-06.ap.freescale.net>
-Message-ID: <2952C0A749B3034EA13D670115D4FEC8F1A0C4@039-SN1MPN1-005.039d.mgd.msft.net>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Sat, 11 Jun 2011 10:06:10 -0700
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110610200233.5ddd5a31@infradead.org>
+References: <20110610165529.GC2230@linux.vnet.ibm.com>
+	<20110610170535.GC25774@srcf.ucam.org>
+	<20110610171939.GE2230@linux.vnet.ibm.com>
+	<20110610172307.GA27630@srcf.ucam.org>
+	<20110610175248.GF2230@linux.vnet.ibm.com>
+	<20110610180807.GB28500@srcf.ucam.org>
+	<20110610184738.GG2230@linux.vnet.ibm.com>
+	<20110610192329.GA30496@srcf.ucam.org>
+	<20110610193713.GJ2230@linux.vnet.ibm.com>
+	<20110610200233.5ddd5a31@infradead.org>
+Message-ID: <20110611170610.GA2212@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+On Fri, Jun 10, 2011 at 08:02:33PM -0700, Arjan van de Ven wrote:
+> On Fri, 10 Jun 2011 12:37:13 -0700
+> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> 
+> > On Fri, Jun 10, 2011 at 08:23:29PM +0100, Matthew Garrett wrote:
+> > > On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney wrote:
+> > > 
+> > > > And if I understand you correctly, then the patches that Ankita
+> > > > posted should help your self-refresh case, along with the
+> > > > originally intended the power-down case and special-purpose use
+> > > > of memory case.
+> > > 
+> > > Yeah, I'd hope so once we actually have capable hardware.
+> > 
+> > Cool!!!
+> > 
+> > So Ankita's patchset might be useful to you at some point, then.
+> > 
+> > Does it look like a reasonable implementation?
+> 
+> as someone who is working on hardware that is PASR capable right now,
+> I have to admit that our plan was to just hook into the buddy allocator,
+> and use PASR on the top level of buddy (eg PASR off blocks that are
+> free there, and PASR them back on once an allocation required the block
+> to be broken up)..... that looked the very most simple to me.
+> 
+> Maybe something much more elaborate is needed, but I didn't see why so
+> far.
 
-The tests was done simpling inserting and removing the SD card, 
-since before no parameters were passed to the  imx53_add_sdhci_esdhc_imx and the controller was able to detect the card via software. When setting up the iomux (CD) pin and passing it to the  imx53_add_sdhci_esdhc_imx function, it should be able to start detecting the card using the pin instead.
+If I understand correctly, you face the same issue that affects
+transparent huge pages, but on a much larger scale.  If you have even
+one non-moveable allocation in a given top-level buddy block, you won't
+be able to PASR that block.
 
-the same test was made for [PATCH1/2].
+In addition, one of the things that Ankita's patchset is looking to do
+is to control allocations in a given region, so that the region can be
+easily evacuated.  One use for this is to power off regions of memory,
+another is to PASR off regions of memory, and a third is to ensure that
+large regions of memory are available for when needed by media codecs
+(e.g., cameras), but can be used for other purposes when the media codecs
+don't need them (e.g., when viewing photos rather than taking them).
 
-regards,
 
-Andre
-________________________________________
-From: Guo Shawn-R65073
-Sent: Saturday, June 11, 2011 1:58 PM
-To: Silva Andre-B22958
-Cc: linux-arm-kernel at lists.infradead.org; kernel at pengutronix.de
-Subject: Re: [PATCH 2/2] ARM:mach-mx5/board-mx53_loco: Add CD and WP GPIOs
+>From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 01 Jun 2011 16:03:18 -0000
+Subject: No subject
+Message-ID: <mailman.15.1307811980.24103.linux-arm-kernel@lists.infradead.org>
 
-On Fri, Jun 10, 2011 at 01:15:19PM -0300, Andre Silva wrote:
-> Signed-off-by: Andre Silva <andre.silva@freescale.com>
->
-> ---
->  arch/arm/mach-mx5/board-mx53_loco.c |   18 ++++++++++++++++--
->  1 files changed, 16 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-mx5/board-mx53_loco.c b/arch/arm/mach-mx5/board-mx53_loco.c
-> index e5e8c85..52cb150 100644
-> --- a/arch/arm/mach-mx5/board-mx53_loco.c
-> +++ b/arch/arm/mach-mx5/board-mx53_loco.c
-> @@ -39,6 +39,9 @@
->  #define MX53_LOCO_UI2                        IMX_GPIO_NR(2, 15)
->  #define LOCO_FEC_PHY_RST             IMX_GPIO_NR(7, 6)
->  #define LOCO_LED                     IMX_GPIO_NR(7, 7)
-> +#define LOCO_SD3_CD                  IMX_GPIO_NR(3, 11)
-> +#define LOCO_SD3_WP                  IMX_GPIO_NR(3, 12)
-> +#define LOCO_SD1_CD                  IMX_GPIO_NR(3, 13)
->
->  static iomux_v3_cfg_t mx53_loco_pads[] = {
->       /* FEC */
-> @@ -71,6 +74,8 @@ static iomux_v3_cfg_t mx53_loco_pads[] = {
->       MX53_PAD_SD1_DATA1__ESDHC1_DAT1,
->       MX53_PAD_SD1_DATA2__ESDHC1_DAT2,
->       MX53_PAD_SD1_DATA3__ESDHC1_DAT3,
-> +     /* SD1_CD */
-> +     MX53_PAD_EIM_DA13__GPIO3_13,
->       /* SD3 */
->       MX53_PAD_PATA_DATA8__ESDHC3_DAT0,
->       MX53_PAD_PATA_DATA9__ESDHC3_DAT1,
-> @@ -203,6 +208,15 @@ static const struct gpio_keys_platform_data loco_button_data __initconst = {
->       .nbuttons       = ARRAY_SIZE(loco_buttons),
->  };
->
-> +static const struct esdhc_platform_data mx53_loco_sd1_data __initconst = {
-> +     .cd_gpio = LOCO_SD1_CD,
-> +};
-> +
-> +static const struct esdhc_platform_data mx53_loco_sd3_data __initconst = {
-> +     .cd_gpio = LOCO_SD3_CD,
-> +     .wp_gpio = LOCO_SD3_WP,
-> +};
-> +
->  static inline void mx53_loco_fec_reset(void)
->  {
->       int ret;
-> @@ -249,8 +263,8 @@ static void __init mx53_loco_board_init(void)
->       imx53_add_imx2_wdt(0, NULL);
->       imx53_add_imx_i2c(0, &mx53_loco_i2c_data);
->       imx53_add_imx_i2c(1, &mx53_loco_i2c_data);
-> -     imx53_add_sdhci_esdhc_imx(0, NULL);
-> -     imx53_add_sdhci_esdhc_imx(2, NULL);
-> +     imx53_add_sdhci_esdhc_imx(0, &mx53_loco_sd1_data);
-> +     imx53_add_sdhci_esdhc_imx(2, &mx53_loco_sd3_data);
->       imx_add_gpio_keys(&loco_button_data);
->       gpio_led_register_device(-1, &mx53loco_leds_data);
->  }
-> --
-> 1.7.1
->
-The sdhci-esdhc-imx driver currently only supports CD and WP for mx25
-and mx35.  How did you test the patch?
-
---
-Regards,
-Shawn
+							Thanx, Paul
