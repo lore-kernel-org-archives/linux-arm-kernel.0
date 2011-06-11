@@ -1,60 +1,67 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Fri, 10 Jun 2011 18:42:51 +0800
-Subject: [PATCH 3/4] mmc: sdhci-esdhc-imx: remove "WP" from flag
-	ESDHC_FLAG_GPIO_FOR_CD_WP
-In-Reply-To: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Sat, 11 Jun 2011 13:59:54 +0200
+Subject: [PATCH 4/4] mmc: sdhci-esdhc-imx: extend card_detect and
+	write_protect support
+In-Reply-To: <20110611115031.GA29093@S2100-06.ap.freescale.net> (Shawn Guo's
+	message of "Sat, 11 Jun 2011 19:50:33 +0800")
 References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1307702572-22066-4-git-send-email-shawn.guo@linaro.org>
+	<1307702572-22066-5-git-send-email-shawn.guo@linaro.org>
+	<87boy4lnp9.fsf@lebrac.rtp-net.org>
+	<20110611115031.GA29093@S2100-06.ap.freescale.net>
+Message-ID: <877h8slgsl.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of flag ESDHC_FLAG_GPIO_FOR_CD_WP is all CD related.  It does
-not necessarily need to bother WP in the flag name.
+Shawn Guo <shawn.guo@freescale.com> writes:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+> On Sat, Jun 11, 2011 at 11:30:42AM +0200, Arnaud Patard wrote:
+>> Shawn Guo <shawn.guo@linaro.org> writes:
+>> 
+>> Hi,
+>> 
+>> > The patch extends card_detect and write_protect support to get mx5
+>> > family and more scenarios supported.  The changes include:
+>> >
+>> >  * Turn platform_data from optional to mandatory
+>> >  * Add cd_types and wp_types into platform_data to cover more use
+>> >    cases
+>> >  * Remove the use of flag ESDHC_FLAG_GPIO_FOR_CD
+>> >  * Adjust machine codes to adopt the platform_data changes
+>> 
+>> Before I go and test theses patches, I'd like to get some
+>> clarification. From what I see, you've modified all over the place the
+>> code to provide a platform_data, setting wp/cd type to type "NONE", as
+>> if it was the default you choose. Why this default and not considerer
+>> the "SIGNAL" type being the default ? Is this choice the safest one when
+>> one doesn't know what type to choose or can it have some bad side
+>> effects ?
+>
+> The mx51_babbage is the only board support I'm concerned about in
+> this patch.  For other boards, I chose to translate the NULL pdata
+> into "NONE" for both wp/cd types as the safest one, because I do not
+> have (or care to check) the board schematics telling how wp/cd are
+> routed on those boards.  The patch ensures there is no regression
+> for those boards, and let people who have schematics to set up wp/cd
+> types later.
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 94097c0..79b7a9a 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -29,7 +29,7 @@
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
- 
--#define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
-+#define ESDHC_FLAG_GPIO_FOR_CD		(1 << 0)
- /*
-  * The CMDTYPE of the CMD register (offset 0xE) should be set to
-  * "11" when the STOP CMD12 is issued on imx53 to abort one
-@@ -77,7 +77,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- 	u32 val = readl(host->ioaddr + reg);
- 
- 	if (unlikely((reg == SDHCI_PRESENT_STATE)
--			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP))) {
-+			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD))) {
- 		struct esdhc_platform_data *boarddata =
- 				host->mmc->parent->platform_data;
- 
-@@ -99,7 +99,7 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
- 
- 	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)
--			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)))
-+			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD)))
- 		/*
- 		 * these interrupts won't work with a custom card_detect gpio
- 		 * (only applied to mx25/35)
-@@ -308,7 +308,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 			goto no_card_detect_irq;
- 		}
- 
--		imx_data->flags |= ESDHC_FLAG_GPIO_FOR_CD_WP;
-+		imx_data->flags |= ESDHC_FLAG_GPIO_FOR_CD;
- 		/* Now we have a working card_detect again */
- 		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
- 	}
--- 
-1.7.4.1
+ok. Thanks for making things clear. I see some changes for
+loco/imx53qsb. Do you need testers for it too or you've tested it ?
+
+>
+>> Also, why didn't you modify the imx*_add_sdhci_esdhc_imx() functions to
+>> provide the default platform_data by themselves that if the 2nd argument
+>> was NULL instead of modifying all theses machines files ?
+>> 
+> As I said above, the wp/cd "NONE" types translated from NULL pdata
+> will be set up properly later by people who have schematics.
+
+You're not answering my question about moving the NULL-> "NONE" type
+from *all* modified machine file into the imx*add_sdhci_esdhc_imx(). If
+it's the default, why all machines file have to be modified to set it ?
+Moreover, *nothing* AFAICS is preventing to call theses functions will
+NULL. What will happen ? An oops ? To me, a default is the value set
+when nothing is set, and clearly modifying all functions call site due
+to having to provide the default seems imho wrong.
+
+Thanks,
+Arnaud
