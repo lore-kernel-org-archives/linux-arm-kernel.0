@@ -1,36 +1,124 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sun, 12 Jun 2011 01:33:29 +0800
-Subject: [PATCH] gpio/mxc: fix a bug with gpio_get_value calling
-Message-ID: <1307813609-27758-1-git-send-email-shawn.guo@linaro.org>
+From: mika.westerberg@iki.fi (Mika Westerberg)
+Date: Sat, 11 Jun 2011 21:39:55 +0300
+Subject: [PATCH v3 2/5] net: ep93xx_eth: pass struct device to DMA API
+	functions
+In-Reply-To: <a908e30a30247a07b2352002742f291d1df0eb18.1307816881.git.mika.westerberg@iki.fi>
+References: <a908e30a30247a07b2352002742f291d1df0eb18.1307816881.git.mika.westerberg@iki.fi>
+Message-ID: <b69ec17080017f62baaa94bc1d21960022dc7381.1307816881.git.mika.westerberg@iki.fi>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When calling gpio_get_value, the gpio number other than bit offset
-should be passed as the argument.
+We shouldn't use NULL for any DMA API functions, unless we are dealing with
+ISA or EISA device. So pass correct struct dev pointer to these functions.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
 ---
-Grant, Sascha,
+I modified this patch according to Hartley's comments; There is no separate
+dma_dev pointer in ep93xx_priv structure but we use SET_NETDEV_DEV() to store
+pointer to the platform device which we use as the device for DMA API.
 
-This is an important bug fix.  Currently, if any driver request 
-any gpio not on port 1 for IRQ_TYPE_EDGE_BOTH, we run into kernel
-oops.  So please apply the patch asap.  Thanks.
+Because this patch is different than the original one, I dropped all the acks
+and tested-by's.
 
- drivers/gpio/gpio-mxc.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ drivers/net/arm/ep93xx_eth.c |   23 +++++++++++++----------
+ 1 files changed, 13 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
-index 950e53a..2f6a81b 100644
---- a/drivers/gpio/gpio-mxc.c
-+++ b/drivers/gpio/gpio-mxc.c
-@@ -83,7 +83,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
- 		edge = GPIO_INT_FALL_EDGE;
- 		break;
- 	case IRQ_TYPE_EDGE_BOTH:
--		val = gpio_get_value(gpio & 31);
-+		val = gpio_get_value(gpio);
- 		if (val) {
- 			edge = GPIO_INT_LOW_LEV;
- 			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
+diff --git a/drivers/net/arm/ep93xx_eth.c b/drivers/net/arm/ep93xx_eth.c
+index 5a77001..f65dfb6 100644
+--- a/drivers/net/arm/ep93xx_eth.c
++++ b/drivers/net/arm/ep93xx_eth.c
+@@ -284,7 +284,7 @@ static int ep93xx_rx(struct net_device *dev, int processed, int budget)
+ 		skb = dev_alloc_skb(length + 2);
+ 		if (likely(skb != NULL)) {
+ 			skb_reserve(skb, 2);
+-			dma_sync_single_for_cpu(NULL, ep->descs->rdesc[entry].buf_addr,
++			dma_sync_single_for_cpu(dev->dev.parent, ep->descs->rdesc[entry].buf_addr,
+ 						length, DMA_FROM_DEVICE);
+ 			skb_copy_to_linear_data(skb, ep->rx_buf[entry], length);
+ 			skb_put(skb, length);
+@@ -362,7 +362,7 @@ static int ep93xx_xmit(struct sk_buff *skb, struct net_device *dev)
+ 	ep->descs->tdesc[entry].tdesc1 =
+ 		TDESC1_EOF | (entry << 16) | (skb->len & 0xfff);
+ 	skb_copy_and_csum_dev(skb, ep->tx_buf[entry]);
+-	dma_sync_single_for_cpu(NULL, ep->descs->tdesc[entry].buf_addr,
++	dma_sync_single_for_cpu(dev->dev.parent, ep->descs->tdesc[entry].buf_addr,
+ 				skb->len, DMA_TO_DEVICE);
+ 	dev_kfree_skb(skb);
+ 
+@@ -457,6 +457,7 @@ static irqreturn_t ep93xx_irq(int irq, void *dev_id)
+ 
+ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+ {
++	struct device *dev = ep->dev->dev.parent;
+ 	int i;
+ 
+ 	for (i = 0; i < RX_QUEUE_ENTRIES; i += 2) {
+@@ -464,7 +465,7 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+ 
+ 		d = ep->descs->rdesc[i].buf_addr;
+ 		if (d)
+-			dma_unmap_single(NULL, d, PAGE_SIZE, DMA_FROM_DEVICE);
++			dma_unmap_single(dev, d, PAGE_SIZE, DMA_FROM_DEVICE);
+ 
+ 		if (ep->rx_buf[i] != NULL)
+ 			free_page((unsigned long)ep->rx_buf[i]);
+@@ -475,13 +476,13 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+ 
+ 		d = ep->descs->tdesc[i].buf_addr;
+ 		if (d)
+-			dma_unmap_single(NULL, d, PAGE_SIZE, DMA_TO_DEVICE);
++			dma_unmap_single(dev, d, PAGE_SIZE, DMA_TO_DEVICE);
+ 
+ 		if (ep->tx_buf[i] != NULL)
+ 			free_page((unsigned long)ep->tx_buf[i]);
+ 	}
+ 
+-	dma_free_coherent(NULL, sizeof(struct ep93xx_descs), ep->descs,
++	dma_free_coherent(dev, sizeof(struct ep93xx_descs), ep->descs,
+ 							ep->descs_dma_addr);
+ }
+ 
+@@ -491,9 +492,10 @@ static void ep93xx_free_buffers(struct ep93xx_priv *ep)
+  */
+ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+ {
++	struct device *dev = ep->dev->dev.parent;
+ 	int i;
+ 
+-	ep->descs = dma_alloc_coherent(NULL, sizeof(struct ep93xx_descs),
++	ep->descs = dma_alloc_coherent(dev, sizeof(struct ep93xx_descs),
+ 				&ep->descs_dma_addr, GFP_KERNEL | GFP_DMA);
+ 	if (ep->descs == NULL)
+ 		return 1;
+@@ -506,8 +508,8 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+ 		if (page == NULL)
+ 			goto err;
+ 
+-		d = dma_map_single(NULL, page, PAGE_SIZE, DMA_FROM_DEVICE);
+-		if (dma_mapping_error(NULL, d)) {
++		d = dma_map_single(dev, page, PAGE_SIZE, DMA_FROM_DEVICE);
++		if (dma_mapping_error(dev, d)) {
+ 			free_page((unsigned long)page);
+ 			goto err;
+ 		}
+@@ -529,8 +531,8 @@ static int ep93xx_alloc_buffers(struct ep93xx_priv *ep)
+ 		if (page == NULL)
+ 			goto err;
+ 
+-		d = dma_map_single(NULL, page, PAGE_SIZE, DMA_TO_DEVICE);
+-		if (dma_mapping_error(NULL, d)) {
++		d = dma_map_single(dev, page, PAGE_SIZE, DMA_TO_DEVICE);
++		if (dma_mapping_error(dev, d)) {
+ 			free_page((unsigned long)page);
+ 			goto err;
+ 		}
+@@ -829,6 +831,7 @@ static int ep93xx_eth_probe(struct platform_device *pdev)
+ 	}
+ 	ep = netdev_priv(dev);
+ 	ep->dev = dev;
++	SET_NETDEV_DEV(dev, &pdev->dev);
+ 	netif_napi_add(dev, &ep->napi, ep93xx_poll, 64);
+ 
+ 	platform_set_drvdata(pdev, dev);
 -- 
-1.7.4.1
+1.7.4.4
