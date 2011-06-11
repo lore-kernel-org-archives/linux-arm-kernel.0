@@ -1,37 +1,35 @@
-From: hartleys@visionengravers.com (H Hartley Sweeten)
-Date: Fri, 10 Jun 2011 11:21:06 -0700
-Subject: [PATCH] ARM: bug.h: fix sparse error: symbol '__bug' redeclared
-Message-ID: <201106101121.07197.hartleys@visionengravers.com>
+From: richardcochran@gmail.com (Richard Cochran)
+Date: Sat, 11 Jun 2011 07:15:10 +0200
+Subject: [PATCH] arm: fix regression in ixp4xx clocksource
+In-Reply-To: <20110601225826.GR3660@n2100.arm.linux.org.uk>
+References: <20110530084307.GA28953@riccoc20.at.omicron.at>
+	<20110601225826.GR3660@n2100.arm.linux.org.uk>
+Message-ID: <20110611051510.GA3283@riccoc20.at.omicron.at>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The symbol '__bug' is declared in arch/arm/include/asm/bug.h as:
+On Wed, Jun 01, 2011 at 11:58:26PM +0100, Russell King - ARM Linux wrote:
+> On Mon, May 30, 2011 at 10:43:07AM +0200, Richard Cochran wrote:
+> > Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
+> > 
+> >    clocksource: convert ARM 32-bit up counting clocksources
+> > 
+> > broke the build for ixp4xx and made big endian operation impossible.
+> > This commit restores the original behaviour.
+> 
+> I'm really not happy about using the MMIO clocksource stuff with random
+> other read functions like this - it defeats the entire purpose of the
+> MMIO clocksource stuff.  Maybe we should just undo the change for IXP4xx
+> and treat it as "special" for the time being.
 
-extern void __bug(const char *file, int line) __attribute__((noreturn));
+I took another look at the whole MMIO clocksource implementation and
+can't understand why all of the accessors use le_to_cpu. This seems to
+imply that all peripheral buses are little endian (except for ixp,
+which no one cares about, anyhow).
 
-But is defined in arch/arm/kernel/traps.c as:
+I understand (or have been told) that almost all arm implementations
+out there are little endian. Why not use use a normal load to read the
+timer? Are there machines with LE peripheral buses but BE cores?
 
-void __attribute__((noreturn)) __bug(const char *file, int line)
-
-The different position of the __attribute_((noreturn)) causes a sparse error.
-
-Change the declaration to match the definition to quiet the error.
-
-Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-Cc: Russell King <linux@arm.linux.org.uk> 
-
----
-
-diff --git a/arch/arm/include/asm/bug.h b/arch/arm/include/asm/bug.h
-index 4d88425..0e56435 100644
---- a/arch/arm/include/asm/bug.h
-+++ b/arch/arm/include/asm/bug.h
-@@ -4,7 +4,7 @@
- 
- #ifdef CONFIG_BUG
- #ifdef CONFIG_DEBUG_BUGVERBOSE
--extern void __bug(const char *file, int line) __attribute__((noreturn));
-+extern void __attribute__((noreturn)) __bug(const char *file, int line);
- 
- /* give file/line information */
- #define BUG()		__bug(__FILE__, __LINE__)
+Thanks,
+Richard
