@@ -1,48 +1,70 @@
-From: mikpe@it.uu.se (Mikael Pettersson)
-Date: Sat, 11 Jun 2011 13:22:18 +0200
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-In-Reply-To: <20110611051510.GA3283@riccoc20.at.omicron.at>
-References: <20110530084307.GA28953@riccoc20.at.omicron.at>
-	<20110601225826.GR3660@n2100.arm.linux.org.uk>
-	<20110611051510.GA3283@riccoc20.at.omicron.at>
-Message-ID: <19955.20458.788309.51588@pilspetsen.it.uu.se>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sat, 11 Jun 2011 19:50:33 +0800
+Subject: [PATCH 4/4] mmc: sdhci-esdhc-imx: extend card_detect and
+	write_protect support
+In-Reply-To: <87boy4lnp9.fsf@lebrac.rtp-net.org>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<1307702572-22066-5-git-send-email-shawn.guo@linaro.org>
+	<87boy4lnp9.fsf@lebrac.rtp-net.org>
+Message-ID: <20110611115031.GA29093@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Richard Cochran writes:
- > On Wed, Jun 01, 2011 at 11:58:26PM +0100, Russell King - ARM Linux wrote:
- > > On Mon, May 30, 2011 at 10:43:07AM +0200, Richard Cochran wrote:
- > > > Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
- > > > 
- > > >    clocksource: convert ARM 32-bit up counting clocksources
- > > > 
- > > > broke the build for ixp4xx and made big endian operation impossible.
- > > > This commit restores the original behaviour.
- > > 
- > > I'm really not happy about using the MMIO clocksource stuff with random
- > > other read functions like this - it defeats the entire purpose of the
- > > MMIO clocksource stuff.  Maybe we should just undo the change for IXP4xx
- > > and treat it as "special" for the time being.
- > 
- > I took another look at the whole MMIO clocksource implementation and
- > can't understand why all of the accessors use le_to_cpu. This seems to
- > imply that all peripheral buses are little endian (except for ixp,
- > which no one cares about, anyhow).
+On Sat, Jun 11, 2011 at 11:30:42AM +0200, Arnaud Patard wrote:
+> Shawn Guo <shawn.guo@linaro.org> writes:
+> 
+> Hi,
+> 
+> > The patch extends card_detect and write_protect support to get mx5
+> > family and more scenarios supported.  The changes include:
+> >
+> >  * Turn platform_data from optional to mandatory
+> >  * Add cd_types and wp_types into platform_data to cover more use
+> >    cases
+> >  * Remove the use of flag ESDHC_FLAG_GPIO_FOR_CD
+> >  * Adjust machine codes to adopt the platform_data changes
+> 
+> Before I go and test theses patches, I'd like to get some
+> clarification. From what I see, you've modified all over the place the
+> code to provide a platform_data, setting wp/cd type to type "NONE", as
+> if it was the default you choose. Why this default and not considerer
+> the "SIGNAL" type being the default ? Is this choice the safest one when
+> one doesn't know what type to choose or can it have some bad side
+> effects ?
 
-"no one"? ixp4xx is still being used.
+The mx51_babbage is the only board support I'm concerned about in
+this patch.  For other boards, I chose to translate the NULL pdata
+into "NONE" for both wp/cd types as the safest one, because I do not
+have (or care to check) the board schematics telling how wp/cd are
+routed on those boards.  The patch ensures there is no regression
+for those boards, and let people who have schematics to set up wp/cd
+types later.
 
- > I understand (or have been told) that almost all arm implementations
- > out there are little endian. Why not use use a normal load to read the
- > timer? Are there machines with LE peripheral buses but BE cores?
+> Also, why didn't you modify the imx*_add_sdhci_esdhc_imx() functions to
+> provide the default platform_data by themselves that if the 2nd argument
+> was NULL instead of modifying all theses machines files ?
+> 
+As I said above, the wp/cd "NONE" types translated from NULL pdata
+will be set up properly later by people who have schematics.
 
-ARM cores often have software-controllable endianess (see the ARM ARM).
-Off the top of my head:
-- ixp4xx: natively BE core and peripherals, but some people like to
-  switch the core to LE for user-space SW compatibility reasons
-  (I run my ixp4xx in BE as intended though)
-- Kirkwood: natively LE core and peripherals, but the core is switchable
-  to BE, although driver support for that appears to be incomplete
+> 
+> Last comment: How did you choose the platform_data values ? I mean, for
+> that the cases I'm mainly take care of (efika mx and sb platforms), you
+> choose NONE type, while the code has :
+> 
+>         MX51_PAD_GPIO1_0__SD1_CD,
+>         MX51_PAD_GPIO1_1__SD1_WP,
+>         MX51_PAD_GPIO1_7__SD2_WP,
+>         MX51_PAD_GPIO1_8__SD2_CD,
+> 
+> which means that it would rather be the SIGNAL type if I got it
+> right. Does this mean that you've set the type to NONE for all platforms
+> you didn't know what the answer was ? (I guess/hope that theses 2
+> questions will be answered by your answers to my previous questions tbh).
+> 
+I hope you have got the answers to these 2 questions from above
+answer.  Otherwise, please let me know.
 
-And then there were the old chips where the integer core and the FPA
-(ancient FPU) could run with different endianesses ... lots of software
-had problems with that; I'm glad EABI and VFP put an end to that insanity.
+-- 
+Regards,
+Shawn
