@@ -1,37 +1,88 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Sun, 12 Jun 2011 01:21:14 +0800
-Subject: [PATCH 2/2] ARM:mach-mx5/board-mx53_loco: Add CD and WP GPIOs
-In-Reply-To: <2952C0A749B3034EA13D670115D4FEC8F1A0C4@039-SN1MPN1-005.039d.mgd.msft.net>
-References: <1307722520-12952-1-git-send-email-andre.silva@freescale.com>
-	<20110611165856.GD29093@S2100-06.ap.freescale.net>
-	<2952C0A749B3034EA13D670115D4FEC8F1A0C4@039-SN1MPN1-005.039d.mgd.msft.net>
-Message-ID: <20110611172113.GE29093@S2100-06.ap.freescale.net>
+From: arjan@infradead.org (Arjan van de Ven)
+Date: Sat, 11 Jun 2011 10:26:54 -0700
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110611170610.GA2212@linux.vnet.ibm.com>
+References: <20110610165529.GC2230@linux.vnet.ibm.com>
+	<20110610170535.GC25774@srcf.ucam.org>
+	<20110610171939.GE2230@linux.vnet.ibm.com>
+	<20110610172307.GA27630@srcf.ucam.org>
+	<20110610175248.GF2230@linux.vnet.ibm.com>
+	<20110610180807.GB28500@srcf.ucam.org>
+	<20110610184738.GG2230@linux.vnet.ibm.com>
+	<20110610192329.GA30496@srcf.ucam.org>
+	<20110610193713.GJ2230@linux.vnet.ibm.com>
+	<20110610200233.5ddd5a31@infradead.org>
+	<20110611170610.GA2212@linux.vnet.ibm.com>
+Message-ID: <20110611102654.01e5cea9@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2011 at 12:59:39AM +0800, Silva Andre-B22958 wrote:
-> Hi Shawn,
+On Sat, 11 Jun 2011 10:06:10 -0700
+"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+
+> On Fri, Jun 10, 2011 at 08:02:33PM -0700, Arjan van de Ven wrote:
+> > On Fri, 10 Jun 2011 12:37:13 -0700
+> > "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> > 
+> > > On Fri, Jun 10, 2011 at 08:23:29PM +0100, Matthew Garrett wrote:
+> > > > On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney
+> > > > wrote:
+> > > > 
+> > > > > And if I understand you correctly, then the patches that
+> > > > > Ankita posted should help your self-refresh case, along with
+> > > > > the originally intended the power-down case and
+> > > > > special-purpose use of memory case.
+> > > > 
+> > > > Yeah, I'd hope so once we actually have capable hardware.
+> > > 
+> > > Cool!!!
+> > > 
+> > > So Ankita's patchset might be useful to you at some point, then.
+> > > 
+> > > Does it look like a reasonable implementation?
+> > 
+> > as someone who is working on hardware that is PASR capable right
+> > now, I have to admit that our plan was to just hook into the buddy
+> > allocator, and use PASR on the top level of buddy (eg PASR off
+> > blocks that are free there, and PASR them back on once an
+> > allocation required the block to be broken up)..... that looked the
+> > very most simple to me.
+> > 
+> > Maybe something much more elaborate is needed, but I didn't see why
+> > so far.
 > 
-> The tests was done simpling inserting and removing the SD card, 
+> If I understand correctly, you face the same issue that affects
+> transparent huge pages, but on a much larger scale.  If you have even
+> one non-moveable allocation in a given top-level buddy block, you
+> won't be able to PASR that block.
 
-That said you saw CD working, and what about WP?
-
-> since before no parameters were passed to the  imx53_add_sdhci_esdhc_imx and the controller was able to detect the card via software. When setting up the iomux (CD) pin and passing it to the  imx53_add_sdhci_esdhc_imx function, it should be able to start detecting the card using the pin instead.
+yep we'd use a non-kernel zone for that; not too big a deal.
+(the much larger scale you can debate, if your memory controller is
+configured correctly the PASR regions are not all that much bigger than
+hugepages)
 > 
-No, your CD gpio setup does not make any change.  The CD is working
-in the exactly same way before you patch.  If you check function
-esdhc_pltfm_init of sdhci-esdhc-imx driver, you will find the
-following.
+> In addition, one of the things that Ankita's patchset is looking to do
+> is to control allocations in a given region, so that the region can be
+> easily evacuated.  One use for this is to power off regions of memory,
+> another is to PASR off regions of memory, and a third is to ensure
+> that large regions of memory are available for when needed by media
+> codecs (e.g., cameras), but can be used for other purposes when the
+> media codecs don't need them (e.g., when viewing photos rather than
+> taking them).
 
-                /* i.MX5x has issues to be researched */
-                if (!cpu_is_mx25() && !cpu_is_mx35())
-                        goto not_supported;
+the codec issue seems to be solved in time; a previous generation
+silicon on our (Intel) side had ARM ecosystem blocks that did not do
+scatter gather, however the current generation ARM ecosystem blocks all
+seem to have added S/G to them....
+(in part this is coming from the strong desire to get camera/etc blocks
+to all use "GPU texture" class memory, so that the camera can directly
+deposit its information into a gpu texture, and similar for media
+encode/decode blocks... this avoids copies as well as duplicate memory).
 
-CD gpio interrupt only gets supported on mx25 and mx35 currently,
-and mx5 CD works with flag SDHCI_QUIRK_BROKEN_CARD_DETECTION set,
-in which case a very expensive method is being used to poll card
-present by sdhci driver.
+
 
 -- 
-Regards,
-Shawn
+Arjan van de Ven 	Intel Open Source Technology Centre
+For development, discussion and tips for power savings, 
+visit http://www.lesswatts.org
