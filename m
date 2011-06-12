@@ -1,63 +1,49 @@
 From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
-Date: Sun, 12 Jun 2011 17:04:56 +0200
-Subject: [PATCH v2 1/5] ARM: ep93xx: use more reliable CPLD watchdog for reset
-	on ts72xx
+Date: Sun, 12 Jun 2011 17:04:57 +0200
+Subject: [PATCH v2 2/5] ARM: ep93xx: add model detection for ts-7300 and
+	ts-7400 boards
 In-Reply-To: <1307891100-31123-1-git-send-email-ynezz@true.cz>
 References: <1307891100-31123-1-git-send-email-ynezz@true.cz>
-Message-ID: <1307891100-31123-2-git-send-email-ynezz@true.cz>
+Message-ID: <1307891100-31123-3-git-send-email-ynezz@true.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
-available, so use this one to reset the board instead of the soft reset in
-CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
-while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
-so far.
-
 Cc: Ryan Mallon <ryan@bluewatersys.com>
-Tested-by: Mika Westerberg <mika.westerberg@iki.fi>
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Acked-By: H Hartley Sweeten <hsweeten@visionengravers.com>
 Signed-off-by: Petr ?tetiar <ynezz@true.cz>
 ---
- arch/arm/mach-ep93xx/include/mach/system.h |   18 +++++++++++++-----
- 1 files changed, 13 insertions(+), 5 deletions(-)
+ arch/arm/mach-ep93xx/include/mach/ts72xx.h |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
-index 6d661fe..67ec430 100644
---- a/arch/arm/mach-ep93xx/include/mach/system.h
-+++ b/arch/arm/mach-ep93xx/include/mach/system.h
-@@ -2,7 +2,10 @@
-  * arch/arm/mach-ep93xx/include/mach/system.h
-  */
+diff --git a/arch/arm/mach-ep93xx/include/mach/ts72xx.h b/arch/arm/mach-ep93xx/include/mach/ts72xx.h
+index 0eabec6..ee7f875 100644
+--- a/arch/arm/mach-ep93xx/include/mach/ts72xx.h
++++ b/arch/arm/mach-ep93xx/include/mach/ts72xx.h
+@@ -20,6 +20,8 @@
+ #define TS72XX_MODEL_TS7200		0x00
+ #define TS72XX_MODEL_TS7250		0x01
+ #define TS72XX_MODEL_TS7260		0x02
++#define TS72XX_MODEL_TS7300		0x03
++#define TS72XX_MODEL_TS7400		0x04
  
-+#include <linux/io.h>
+ 
+ #define TS72XX_OPTIONS_PHYS_BASE	0x22400000
+@@ -66,6 +68,16 @@ static inline int board_is_ts7260(void)
+ 	return __raw_readb(TS72XX_MODEL_VIRT_BASE) == TS72XX_MODEL_TS7260;
+ }
+ 
++static inline int board_is_ts7300(void)
++{
++	return __raw_readb(TS72XX_MODEL_VIRT_BASE) == TS72XX_MODEL_TS7300;
++}
 +
- #include <mach/hardware.h>
-+#include <mach/ts72xx.h>
- 
- static inline void arch_idle(void)
++static inline int board_is_ts7400(void)
++{
++	return __raw_readb(TS72XX_MODEL_VIRT_BASE) == TS72XX_MODEL_TS7400;
++}
++
+ static inline int is_max197_installed(void)
  {
-@@ -13,11 +16,16 @@ static inline void arch_reset(char mode, const char *cmd)
- {
- 	local_irq_disable();
- 
--	/*
--	 * Set then clear the SWRST bit to initiate a software reset
--	 */
--	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
--	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-+	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
-+	    board_is_ts7300() || board_is_ts7400()) {
-+		/* We use more reliable CPLD watchdog to perform the reset */
-+		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
-+		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
-+	} else {
-+		/* Set then clear the SWRST bit to initiate a software reset */
-+		ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-+		ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
-+	}
- 
- 	while (1)
- 		;
+ 	return !!(__raw_readb(TS72XX_OPTIONS_VIRT_BASE) &
 -- 
 1.7.1
