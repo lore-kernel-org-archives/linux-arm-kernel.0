@@ -1,43 +1,78 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Jun 2011 14:51:59 +0100
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-In-Reply-To: <20110611051510.GA3283@riccoc20.at.omicron.at>
-References: <20110530084307.GA28953@riccoc20.at.omicron.at>
-	<20110601225826.GR3660@n2100.arm.linux.org.uk>
-	<20110611051510.GA3283@riccoc20.at.omicron.at>
-Message-ID: <20110612135159.GH10283@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 12 Jun 2011 16:15:23 +0200
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <20110612115820.GF10283@n2100.arm.linux.org.uk>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110612112219.GD16318@ibawizard.net>
+	<20110612115820.GF10283@n2100.arm.linux.org.uk>
+Message-ID: <201106121615.24059.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 11, 2011 at 07:15:10AM +0200, Richard Cochran wrote:
-> On Wed, Jun 01, 2011 at 11:58:26PM +0100, Russell King - ARM Linux wrote:
-> > On Mon, May 30, 2011 at 10:43:07AM +0200, Richard Cochran wrote:
-> > > Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
-> > > 
-> > >    clocksource: convert ARM 32-bit up counting clocksources
-> > > 
-> > > broke the build for ixp4xx and made big endian operation impossible.
-> > > This commit restores the original behaviour.
-> > 
-> > I'm really not happy about using the MMIO clocksource stuff with random
-> > other read functions like this - it defeats the entire purpose of the
-> > MMIO clocksource stuff.  Maybe we should just undo the change for IXP4xx
-> > and treat it as "special" for the time being.
+On Sunday 12 June 2011 13:58:20 Russell King - ARM Linux wrote:
+> Exactly my point - I have quite a number of platforms here which will
+> never be able to have a boot loader capable of modifying a DT blob for
+> the kernel.
 > 
-> I took another look at the whole MMIO clocksource implementation and
-> can't understand why all of the accessors use le_to_cpu. This seems to
-> imply that all peripheral buses are little endian (except for ixp,
-> which no one cares about, anyhow).
+> One of the points of Nicolas' patch set is to allow existing boot loaders
+> to boot kernels where the hardware description is contained in a DT blob
+> encapsulated with the kernel.  That's great but the way things are currently
+> setup, it means that the boot loader does nothing more than loading and
+> executing - and we lose the existing flexibility for the boot loader to
+> pass platform specific information to the kernel.
+> 
+> So, what I'm considering to do is update the boot protocol such that the
+> base address of the DT blob is provided in r3, separately from the ATAG
+> pointer in r2.
+>
+> This means that boot loaders can provide a DT blob (r2 = 0 r3 => DT) or
+> they can provide ATAGs (r2 => atag, r3 = indeterminant).  We can then
+> cater for the situation where we have an ATAG boot loader, but a kernel
+> with an appended DT description (r2 => atag, r3 => DT) and have the ATAG
+> information override the DT for things like memory layout and the command
+> line string.
 
-What would they use as an ioremap-compatible interface instead of
-readl()/readw() ?
+But when you have both atag and DT and the atag overrides the DT, that
+means we have incorrect information in the DT, and code might later
+rely on that information.
 
-readl_be()/readw_be() doesn't work for the majority of platforms using
-this stuff.  We also don't have native endian equivalents across the
-kernel.  Not everyone provides the relaxed versions.
+IMHO when we allow passing a DT to a kernel while booting from an
+existing boot loader that only knows about atag, the code that loads
+the DT should be responsible for updating the DT with the atag information,
+not pass two conflicting sets of data into the actual kernel.
 
-It's basically a problem, and its one of the unfortunate prices paid
-by consolidating code - things become harder and less efficient to do.
+> Let me give a situation where this matters: you have a boot loader which
+> loads a kernel from disk and executes it.  You have 256MB of RAM fitted
+> to the machine.  You replace this kernel with a DT-enabled kernel which
+> has the DT blob appended to the kernel.  The DT blob says you have 256MB
+> of RAM.
+> 
+> You remove a 128MB DIMM because its gone faulty.  You try to boot.  The
+> boot loader provides the kernel with an ATAG telling it that there's
+> 128MB of RAM.  However, the kernel ignores the ATAGs and instead looks
+> at the encapsulated DT information which tells it that there's 256MB
+> of RAM.  Your kernel OOPSes.  You reboot, and try passing a command
+> line argument of 'mem=128M'. The kernel again ignores this because its
+> an ATAG.
+> 
+> The result: you can't boot the platform.
+>
+> Another case: your flash has become corrupted, and the kernel won't mount
+> the flash based rootfs.  You want to boot from a root-NFS export to sort
+> the problem out, but the kernel ignores your new command line telling it
+> to do so.
+> 
+> The result: you can't boot the platform.
+> 
+> Another case: you have a Thecus N2100 acting as a server, with a pair
+> of drives setup as raid 1.  You reboot it one day and it refuses to build
+> the raid 1 rootfs, and so panics at boot.  You want to change the kernel
+> command line so that it mounts root from somewhere else, but because
+> you're using a DT based kernel, it ignores you.
+> 
+> The result: you can't boot the platform.
 
-In this case, I think we need a set of _be() clocksource accessors in
-mmio.c, and leave it up to the platform to select the correct accessor.
+So we need to at least the command line and the memory layout to be adapted
+in the in-memory DT, from the atags. Any other tags?
+
+	Arnd
