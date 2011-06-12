@@ -1,5 +1,5 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 12 Jun 2011 14:59:29 -0400 (EDT)
+From: imp@bsdimp.com (Warner Losh)
+Date: Sun, 12 Jun 2011 13:26:13 -0600
 Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
 In-Reply-To: <20110612155940.GM10283@n2100.arm.linux.org.uk>
 References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
@@ -10,21 +10,21 @@ References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
 	<20110612151931.GK10283@n2100.arm.linux.org.uk>
 	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
 	<20110612155940.GM10283@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1106121454510.2142@xanadu.home>
+Message-ID: <737CB01A-32EE-44F7-A3CB-CD0E36B0E5AB@bsdimp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
 
+On Jun 12, 2011, at 9:59 AM, Russell King - ARM Linux wrote:
 > On Sun, Jun 12, 2011 at 11:47:59AM -0400, Nicolas Pitre wrote:
-> > On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
-> > > And we've ended up with a fucked up situation which is extremely
-> > > fragile, and actually makes me _NOT_ want to convert any existing
-> > > platforms to use DT in the least.
-> > 
-> > Agreed.  I don't think that anything older than OMAP2 is worth 
-> > converting to DT.  The return on the investment is simply not worth it, 
-> > other than for experimental purposes.
+>> On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
+>>> And we've ended up with a fucked up situation which is extremely
+>>> fragile, and actually makes me _NOT_ want to convert any existing
+>>> platforms to use DT in the least.
+>> 
+>> Agreed.  I don't think that anything older than OMAP2 is worth 
+>> converting to DT.  The return on the investment is simply not worth it, 
+>> other than for experimental purposes.
 > 
 > I think you haven't appreciated the situation - let's take PXA as an
 > example.  PXA has been around for years, and IP in the latest silicon
@@ -51,11 +51,6 @@ On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
 > loaders, with that information taking precidence over the DT blob
 > supplied with the kernel.
 
-Well... OK.  Let's see how this can be accommodated with the existing 
-patch floating around doing that.
+The only other way out would be to have a small ATAG interpreter that modified/generated the DT so that the rest of the kernel could rely on it completely. This would fatten what is a very slim later right now, but it would mean the whole rest of the kernel could trust the DT blob as gospel.
 
-@Grant: could you post the patch you have for that?  Let's see how this 
-can be made to play nicely with the DTB append patch.
-
-
-Nicolas
+Warner
