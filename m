@@ -1,21 +1,34 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 12 Jun 2011 02:06:37 -0400
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-Message-ID: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+Date: Sun, 12 Jun 2011 02:06:38 -0400
+Subject: [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64 bits in
+	size
+In-Reply-To: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <1307858800-16712-2-git-send-email-nicolas.pitre@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a resend of those patches with fixups after the latest changes
-in mainline.
+This is needed for proper alignment when the DTB appending feature
+is used.
 
-[PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64 bits in size
-This one is new and trivial.
+Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+---
+ arch/arm/boot/compressed/vmlinux.lds.in |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
 
-[PATCH 2/3] ARM: zImage: Allow the appending of a device tree binary
-Mostly John Bonesio's version with some adjustments and cleanups.
-
-[PATCH 3/3] ARM: zImage: make sure appended DTB doesn't get overwritten by kernel .bss
-New, simpler alternative to Tony Lindgren's version.
-
-
-Nicolas
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
+index ea80abe..6c02db1 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.in
++++ b/arch/arm/boot/compressed/vmlinux.lds.in
+@@ -47,6 +47,9 @@ SECTIONS
+   .got			: { *(.got) }
+   _got_end = .;
+   .got.plt		: { *(.got.plt) }
++
++  /* ensure the zImage file size is always a multiple of 64 bits */
++  .pad			: { BYTE(0); . = ALIGN(8); }
+   _edata = .;
+ 
+   . = BSS_START;
+-- 
+1.7.4
