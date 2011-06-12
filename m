@@ -1,51 +1,44 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 11 Jun 2011 16:26:00 -0700 (PDT)
-Subject: [PATCH v3 5/5] net: ep93xx_eth: fix DMA API violations
-In-Reply-To: <d1ab2a21856804a430be57469595d5c1f7cb936c.1307816881.git.mika.westerberg@iki.fi>
-References: <a908e30a30247a07b2352002742f291d1df0eb18.1307816881.git.mika.westerberg@iki.fi>
-	<a908e30a30247a07b2352002742f291d1df0eb18.1307816881.git.mika.westerberg@iki.fi>
-	<d1ab2a21856804a430be57469595d5c1f7cb936c.1307816881.git.mika.westerberg@iki.fi>
-Message-ID: <20110611.162600.1058381951078443013.davem@davemloft.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sat, 11 Jun 2011 21:01:51 -0600
+Subject: [PATCH] gpio/mxc: fix a bug with gpio_get_value calling
+In-Reply-To: <1307813609-27758-1-git-send-email-shawn.guo@linaro.org>
+References: <1307813609-27758-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110612030151.GA24912@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mika Westerberg <mika.westerberg@iki.fi>
-Date: Sat, 11 Jun 2011 21:39:58 +0300
-
-> Russell King said:
->>
->> So, to summarize what its doing:
->>
->> 1. It allocates buffers for rx and tx.
->> 2. It maps them with dma_map_single().
->>       This transfers ownership of the buffer to the DMA device.
->> 3. In ep93xx_xmit,
->> 3a. It copies the data into the buffer with skb_copy_and_csum_dev()
->>       This violates the DMA buffer ownership rules - the CPU should
->>       not be writing to this buffer while it is (in principle) owned
->>       by the DMA device.
->> 3b. It then calls dma_sync_single_for_cpu() for the buffer.
->>       This transfers ownership of the buffer to the CPU, which surely
->>       is the wrong direction.
->> 4. In ep93xx_rx,
->> 4a. It calls dma_sync_single_for_cpu() for the buffer.
->>       This at least transfers the DMA buffer ownership to the CPU
->>       before the CPU reads the buffer
->> 4b. It then uses skb_copy_to_linear_data() to copy the data out.
->>       At no point does it transfer ownership back to the DMA device.
->> 5. When the driver is removed, it dma_unmap_single()'s the buffer.
->>       This transfers ownership of the buffer to the CPU.
->> 6. It frees the buffer.
->>
->> While it may work on ep93xx, it's not respecting the DMA API rules,
->> and with DMA debugging enabled it will probably encounter quite a few
->> warnings.
+On Sun, Jun 12, 2011 at 01:33:29AM +0800, Shawn Guo wrote:
+> When calling gpio_get_value, the gpio number other than bit offset
+> should be passed as the argument.
 > 
-> This patch fixes these violations.
-> 
-> Signed-off-by: Mika Westerberg <mika.westerberg@iki.fi>
-> Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Tested-by: Petr Stetiar <ynezz@true.cz>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-Applied.
+Applied, thanks.
+
+g.
+> ---
+> Grant, Sascha,
+> 
+> This is an important bug fix.  Currently, if any driver request 
+> any gpio not on port 1 for IRQ_TYPE_EDGE_BOTH, we run into kernel
+> oops.  So please apply the patch asap.  Thanks.
+> 
+>  drivers/gpio/gpio-mxc.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-mxc.c b/drivers/gpio/gpio-mxc.c
+> index 950e53a..2f6a81b 100644
+> --- a/drivers/gpio/gpio-mxc.c
+> +++ b/drivers/gpio/gpio-mxc.c
+> @@ -83,7 +83,7 @@ static int gpio_set_irq_type(struct irq_data *d, u32 type)
+>  		edge = GPIO_INT_FALL_EDGE;
+>  		break;
+>  	case IRQ_TYPE_EDGE_BOTH:
+> -		val = gpio_get_value(gpio & 31);
+> +		val = gpio_get_value(gpio);
+>  		if (val) {
+>  			edge = GPIO_INT_LOW_LEV;
+>  			pr_debug("mxc: set GPIO %d to low trigger\n", gpio);
+> -- 
+> 1.7.4.1
+> 
