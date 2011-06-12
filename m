@@ -1,86 +1,45 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 12 Jun 2011 02:06:40 -0400
-Subject: [PATCH 3/3] ARM: zImage: make sure appended DTB doesn't get
-	overwritten by kernel .bss
-In-Reply-To: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-Message-ID: <1307858800-16712-4-git-send-email-nicolas.pitre@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 12 Jun 2011 02:14:13 -0400 (EDT)
+Subject: [PATCH] ARM: Make sure appended device tree data won't overlap
+	kernel BSS
+In-Reply-To: <20110513112120.GO31483@atomide.com>
+References: <20110429102623.GX3755@atomide.com>
+	<alpine.LFD.2.00.1104290909310.24613@xanadu.home>
+	<20110429135334.GR5126@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1104291509540.24613@xanadu.home>
+	<20110504072317.GU2092@atomide.com>
+	<alpine.LFD.2.00.1105040936040.24613@xanadu.home>
+	<20110509111929.GA11410@atomide.com>
+	<20110509144949.GE30958@atomide.com>
+	<20110512125952.GN31483@atomide.com>
+	<alpine.LFD.2.00.1105130930330.2762@xanadu.home>
+	<20110513112120.GO31483@atomide.com>
+Message-ID: <alpine.LFD.2.00.1106120209450.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The appended DTB gets relocated with the decompressor code to get out
-of the way of the decompressed kernel.  However the .bss section may
-be larger than the relocated code and data, therefore overwriting the
-DTB.  Let's make sure the relocation takes care of moving zImage so
-no conflict with .bss occurs.
+On Fri, 13 May 2011, Tony Lindgren wrote:
 
-Thanks to Tony Lindgren <tony@atomide.com> for figuring out this issue.
+> From: Tony Lindgren <tony@atomide.com>
+> Date: Thu, 12 May 2011 05:29:49 -0700
+> Subject: [PATCH] ARM: zImage: Make sure appended device tree data won't overlap kernel BSS
+> 
+> Do this before relocating the compressed kernel + device tree data.
+> Otherwise we would have to split the copying into two parts, or copy
+> the device tree data twice.
+> 
+> As we only have one register available, pass the size of kernel BSS
+> via linker and do the calculation using r1, then save it to the stack.
+> 
+> Note that this patch now makes the stack also usable earlier for
+> CONFIG_ARM_APPENDED_DTB.
+> 
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+[...]
 
-While at it, let's clean up the code a bit so that the wont_overwrite
-symbol is used while determining if a conflict exists, making the above
-change more precise as well as eliminating some ARM/THUMB alternates.
+Please tell me what you think of this alternative: 
+http://article.gmane.org/gmane.linux.ports.arm.kernel/120182
+I think it is a cleaner solution.
 
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
----
- arch/arm/boot/compressed/Makefile |    3 +++
- arch/arm/boot/compressed/head.S   |   19 +++++++++++++++----
- 2 files changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 23aad07..48bead9 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -98,6 +98,9 @@ endif
- ccflags-y := -fpic -fno-builtin
- asflags-y := -Wa,-march=all
- 
-+# Supply kernel BSS size to the decompressor via a linker symbol.
-+KBSS_SZ = $(shell size $(obj)/../../../../vmlinux | awk 'END{print $$3}')
-+LDFLAGS_vmlinux = --defsym _kernel_bss_size=$(KBSS_SZ)
- # Supply ZRELADDR to the decompressor via a linker symbol.
- ifneq ($(CONFIG_AUTO_ZRELADDR),y)
- LDFLAGS_vmlinux += --defsym zreladdr=$(ZRELADDR)
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index 4bc009c..a9e97c9 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -248,6 +248,18 @@ restart:	adr	r0, LC0
- 
- 		mov	r8, r6			@ use the appended device tree
- 
-+		/*
-+		 * Make sure that the DTB doesn't end up in the final
-+		 * kernel's .bss area. To do so, we adjust the decompressed
-+		 * kernel size to compensate if that .bss size is larger
-+		 * than the relocated code.
-+		 */
-+		ldr	r5, =_kernel_bss_size
-+		adr	r1, wont_overwrite
-+		sub	r1, r6, r1
-+		subs	r1, r5, r1
-+		addhi	r9, r9, r1
-+
- 		/* Get the dtb's size */
- 		ldr	r5, [r6, #4]
- #ifndef __ARMEB__
-@@ -276,15 +288,14 @@ dtb_check_done:
-  *   r10 = end of this image, including  bss/stack/malloc space if non XIP
-  * We basically want:
-  *   r4 - 16k page directory >= r10 -> OK
-- *   r4 + image length <= current position (pc) -> OK
-+ *   r4 + image length <= address of wont_overwrite -> OK
-  */
- 		add	r10, r10, #16384
- 		cmp	r4, r10
- 		bhs	wont_overwrite
- 		add	r10, r4, r9
--   ARM(		cmp	r10, pc		)
-- THUMB(		mov	lr, pc		)
-- THUMB(		cmp	r10, lr		)
-+		adr	r9, wont_overwrite
-+		cmp	r10, r9
- 		bls	wont_overwrite
- 
- /*
--- 
-1.7.4
+Nicolas
