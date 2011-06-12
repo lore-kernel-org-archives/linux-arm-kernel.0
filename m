@@ -1,30 +1,63 @@
 From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
-Date: Sun, 12 Jun 2011 17:04:55 +0200
-Subject: [PATCH v2 0/5] ep93xx/ts72xx patches
-Message-ID: <1307891100-31123-1-git-send-email-ynezz@true.cz>
+Date: Sun, 12 Jun 2011 17:04:56 +0200
+Subject: [PATCH v2 1/5] ARM: ep93xx: use more reliable CPLD watchdog for reset
+	on ts72xx
+In-Reply-To: <1307891100-31123-1-git-send-email-ynezz@true.cz>
+References: <1307891100-31123-1-git-send-email-ynezz@true.cz>
+Message-ID: <1307891100-31123-2-git-send-email-ynezz@true.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whole patchset is available on my GitHub repository[1] also.
+On all ep93xx based boards from Technologic Systems, there's CPLD watchdog
+available, so use this one to reset the board instead of the soft reset in
+CPU.  I've seen some weird lockups with the soft reset on ep93xx in the past,
+while the reset via CPLD watchdog seems to be rock solid (tm) and works fine
+so far.
 
-1. https://github.com/ynezz/linux-2.6/commits/ts72xx-upstream
-
-
-Changes since v1:
-
-* incorporated Ryan's and Hartley's comments on CPLD watchdog patch
-* added one more patch 5/5, which is fixing the bug in the model detection
-
-
-Petr ?tetiar (5):
-  ARM: ep93xx: use more reliable CPLD watchdog for reset on ts72xx
-  ARM: ep93xx: add model detection for ts-7300 and ts-7400 boards
-  ARM: ep93xx: increase NR_BANKS to 16 for support of 128MB RAM
-  ARM: ep93xx: fix inverted RTS/DTR signals on uart1
-  ARM: ep93xx: ts72xx: fix board model detection
-
- arch/arm/include/asm/setup.h               |    6 +++++-
- arch/arm/mach-ep93xx/core.c                |    4 ++--
+Cc: Ryan Mallon <ryan@bluewatersys.com>
+Tested-by: Mika Westerberg <mika.westerberg@iki.fi>
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+---
  arch/arm/mach-ep93xx/include/mach/system.h |   18 +++++++++++++-----
- arch/arm/mach-ep93xx/include/mach/ts72xx.h |   26 ++++++++++++++++++++++----
- 4 files changed, 42 insertions(+), 12 deletions(-)
+ 1 files changed, 13 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/mach-ep93xx/include/mach/system.h b/arch/arm/mach-ep93xx/include/mach/system.h
+index 6d661fe..67ec430 100644
+--- a/arch/arm/mach-ep93xx/include/mach/system.h
++++ b/arch/arm/mach-ep93xx/include/mach/system.h
+@@ -2,7 +2,10 @@
+  * arch/arm/mach-ep93xx/include/mach/system.h
+  */
+ 
++#include <linux/io.h>
++
+ #include <mach/hardware.h>
++#include <mach/ts72xx.h>
+ 
+ static inline void arch_idle(void)
+ {
+@@ -13,11 +16,16 @@ static inline void arch_reset(char mode, const char *cmd)
+ {
+ 	local_irq_disable();
+ 
+-	/*
+-	 * Set then clear the SWRST bit to initiate a software reset
+-	 */
+-	ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
+-	ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
++	if (board_is_ts7200() || board_is_ts7250() || board_is_ts7260() ||
++	    board_is_ts7300() || board_is_ts7400()) {
++		/* We use more reliable CPLD watchdog to perform the reset */
++		__raw_writeb(0x5, TS72XX_WDT_FEED_PHYS_BASE);
++		__raw_writeb(0x1, TS72XX_WDT_CONTROL_PHYS_BASE);
++	} else {
++		/* Set then clear the SWRST bit to initiate a software reset */
++		ep93xx_devcfg_set_bits(EP93XX_SYSCON_DEVCFG_SWRST);
++		ep93xx_devcfg_clear_bits(EP93XX_SYSCON_DEVCFG_SWRST);
++	}
+ 
+ 	while (1)
+ 		;
+-- 
+1.7.1
