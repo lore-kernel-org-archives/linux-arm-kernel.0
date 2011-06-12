@@ -1,51 +1,84 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Jun 2011 16:19:31 +0100
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <20110612145751.GA4013@ponder.secretlab.ca>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110612112219.GD16318@ibawizard.net>
-	<20110612115820.GF10283@n2100.arm.linux.org.uk>
-	<201106121615.24059.arnd@arndb.de>
-	<20110612145751.GA4013@ponder.secretlab.ca>
-Message-ID: <20110612151931.GK10283@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 12 Jun 2011 23:28:20 +0800
+Subject: [PATCH v2 1/3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <BANLkTi=-t9HVc6U6QY07su+c3WztsGoq3Q@mail.gmail.com>
+References: <1307345414-26872-1-git-send-email-shawn.guo@linaro.org>
+	<BANLkTi=-t9HVc6U6QY07su+c3WztsGoq3Q@mail.gmail.com>
+Message-ID: <20110612152819.GA29737@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2011 at 08:57:51AM -0600, Grant Likely wrote:
-> On Sun, Jun 12, 2011 at 04:15:23PM +0200, Arnd Bergmann wrote:
-> > But when you have both atag and DT and the atag overrides the DT, that
-> > means we have incorrect information in the DT, and code might later
-> > rely on that information.
-> > 
-> > IMHO when we allow passing a DT to a kernel while booting from an
-> > existing boot loader that only knows about atag, the code that loads
-> > the DT should be responsible for updating the DT with the atag information,
-> > not pass two conflicting sets of data into the actual kernel.
+On Tue, Jun 07, 2011 at 03:35:51PM -0700, Dan Williams wrote:
+> On Mon, Jun 6, 2011 at 12:30 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> > Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> > max_segment_number into device_dma_parameters and creates the
+> > corresponding dmaengine API dma_set(get)_max_seg_number for it.
+> >
+> > Here is the user story that tells the need of the new api. ?The
+> > mxs-mmc is the mmc host controller for Freescale MXS architecture.
+> > There are a pair of ?mmc host specific parameters max_seg_size and
+> > max_segs that mxs-mmc host driver needs to tell mmc core, so that
+> > mmc core can know how big each data segment could be and how many
+> > segments could be handled one time in a scatter list by host driver.
+> >
+> > The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
+> > mxs-dma to transfer data in scatter list. ?That is to say mxs-mmc has
+> > no idea of what max_seg_size and max_segs should be, because they are
+> > all mxs-dma capability parameters, and mxs-mmc needs to query them
+> > from mxs-dma.
+> >
+> > Right now, there is well defined dma api (dma_get_max_seg_size) for
+> > mmc to query max_seg_size from dma driver, but the one for max_segs
+> > is missing. ?That's why mxs-mmc driver has to hard-code it.
+> >
+> > The mxs-mmc is just one example to demonstrate the need of the new
+> > api, and there are other mmc host drivers (mxcmmc on imx-dma is
+> > another example) and possibly even other dmaengine users need this
+> > new api to know the maximum segments that dma driver can handle per
+> > dma call.
+> >
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> > Changes since v1:
+> > ?* Update commit message to explain why the new api is needed
+> >
+> > ?include/linux/device.h ? ? ?| ? ?1 +
+> > ?include/linux/dma-mapping.h | ? 15 +++++++++++++++
+> > ?2 files changed, 16 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/include/linux/device.h b/include/linux/device.h
+> > index c66111a..44cb2528 100644
+> > --- a/include/linux/device.h
+> > +++ b/include/linux/device.h
+> > @@ -487,6 +487,7 @@ struct device_dma_parameters {
+> > ? ? ? ? * sg limitations.
+> > ? ? ? ? */
 > 
-> I completely agree here.  I /started/ from the position that ATAGs and
-> DTB would coexist, and after extensive debate[1] my opinion turned around
-> to it should be one or the other.  Otherwise there are all kinds of
-> questions about accuracy of the information and which takes
-> precedence.
+> Given the discussion seems like this patch is missing an update to the
+> documentation of the struct to clarify the definition of dma provider.
+>  I.e. that this info belongs to the device doing the dma, and that is
+> is not necessarily the same as the device that is requesting dma
+> service.
+> 
+What about the following?
 
-And we've ended up with a fucked up situation which is extremely
-fragile, and actually makes me _NOT_ want to convert any existing
-platforms to use DT in the least.
+/*
+ * device_dma_parameters is a property of DMA provider, and it belongs to the
+ * 'struct device' that actually provides DMA service, typically the drivers
+ * under drivers/dma, although in some cases the DMA provider and block device
+ * uses DMA service happen to be the same 'struct device'.
+ *
+ * It's not necessary for every single DMA providers to have this structure,
+ * because some DMA providers simply do not have these parameters/limitations.
+ * For those do have, the DMA providers should be responsible for setting the
+ * parameters up.
+ */
+struct device_dma_parameters {
+        unsigned int max_segment_size;
+        unsigned int max_segment_number;
+        unsigned long segment_boundary_mask;
+};
 
-This I view as a fundamental blocker which needs addressing before
-anyone can make use of DT on ARM.
-
-DT is _not_ the authoritive source of information on systems with
-ATAGs.
-
-Imagine this situation: you have your PC.  It provides memory information
-through the E820 interface.  You convert your kernel to use DT and it
-only uses the information passed from the DT blob, which it loaded as
-part of your kernel off disk.
-
-However, your RAM size has changed.  Should the kernel continue to believe
-the memory information found in the encapsulated DT blob, or should it
-continue to get it from the E820 interface?
-
-It's precisely the same problem here.  The E820 interface _has_ to take
-precedence because that is the _authoritive_ source of information.
+-- 
+Regards,
+Shawn
