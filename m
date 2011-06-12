@@ -1,78 +1,51 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Jun 2011 16:14:22 +0100
-Subject: [RFC PATCH 0/2] ARM: Add a generic macro for declaring
-	proc_info structs
-In-Reply-To: <20110612082220.GB10283@n2100.arm.linux.org.uk>
-References: <1307640112-5360-1-git-send-email-dave.martin@linaro.org>
-	<20110609173836.GF24424@n2100.arm.linux.org.uk>
-	<20110610085752.GA2129@arm.com>
-	<20110612082220.GB10283@n2100.arm.linux.org.uk>
-Message-ID: <20110612151422.GJ10283@n2100.arm.linux.org.uk>
+Date: Sun, 12 Jun 2011 16:19:31 +0100
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <20110612145751.GA4013@ponder.secretlab.ca>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110612112219.GD16318@ibawizard.net>
+	<20110612115820.GF10283@n2100.arm.linux.org.uk>
+	<201106121615.24059.arnd@arndb.de>
+	<20110612145751.GA4013@ponder.secretlab.ca>
+Message-ID: <20110612151931.GK10283@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2011 at 09:22:21AM +0100, Russell King - ARM Linux wrote:
-> On Fri, Jun 10, 2011 at 09:57:52AM +0100, Dave Martin wrote:
-> > On Thu, Jun 09, 2011 at 06:38:36PM +0100, Russell King - ARM Linux wrote:
-> > > It does look very much like a sledge hammer to me.  All we're really
-> > > after is whether the size of the region is what we expect it to be -
-> > > which will tell us whether there's a T2 instruction in there.
+On Sun, Jun 12, 2011 at 08:57:51AM -0600, Grant Likely wrote:
+> On Sun, Jun 12, 2011 at 04:15:23PM +0200, Arnd Bergmann wrote:
+> > But when you have both atag and DT and the atag overrides the DT, that
+> > means we have incorrect information in the DT, and code might later
+> > rely on that information.
 > > 
-> > True, although the intent was no to solve just that one problem,
-> > but to show how to avoid a whole variety of trivial mistakes.
-> > Since proc_info structs don't tend to get changed much after
-> > they're initially written, I guess that such mistakes don't actually
-> > occur very often, though.
+> > IMHO when we allow passing a DT to a kernel while booting from an
+> > existing boot loader that only knows about atag, the code that loads
+> > the DT should be responsible for updating the DT with the atag information,
+> > not pass two conflicting sets of data into the actual kernel.
 > 
-> We have several other structures encoded in assembly - and to do this
-> for every one would be excessive.  The amount of churn produced too
-> would be large.
-> 
-> Historically we've had little problem with these structs being wrong -
-> about once or twice pre-Thumb for a decade IIRC (where at least one was
-> down to "using an old patch but didn't update it properly for the new
-> proc-*.S files".)
+> I completely agree here.  I /started/ from the position that ATAGs and
+> DTB would coexist, and after extensive debate[1] my opinion turned around
+> to it should be one or the other.  Otherwise there are all kinds of
+> questions about accuracy of the information and which takes
+> precedence.
 
-What may be worth doing is something like this, where all entries follow
-a well defined naming scheme:
+And we've ended up with a fucked up situation which is extremely
+fragile, and actually makes me _NOT_ want to convert any existing
+platforms to use DT in the least.
 
-	.macro	processor_functions, name, dabort, pabort, suspend, nommu
-	.type	\name\()_processor_functions, #object
-ENTRY(\name\()_processor_functions)
-	.word	\dabort\()_abort
-	.word	\pabort\()_pabort
-	.word	cpu_\name\()_proc_init
-	.word	cpu_\name\()_proc_fin
-	.word	cpu_\name\()_reset
-	.word	cpu_\name\()_do_idle
-	.word	cpu_\name\()_dcache_clean_area
-	.word	cpu_\name\()_switch_mm
-	.ifne \nommu
-	.word	0
-	.else
-	.word	cpu_\name\()_set_pte_ext
-	.endif
-	.ifne \suspend
-	.word	cpu_\name\()_suspend_size
-	.word	cpu_\name\()_do_suspend
-	.word	cpu_\name\()_do_resume
-	.else
-	.word	0
-	.word	0
-	.word	0
-	.endif
-	.size	\name\()_processor_functions, . - \name\()_processor_functions
-	.endm
+This I view as a fundamental blocker which needs addressing before
+anyone can make use of DT on ARM.
 
-and this has great value to ensuring that the structure in assembly
-matches what is in the headers as it means that instead of having N
-places to update these structures, we're down to its header and one
-macro - and also ensures that proc files which miss out on the update
-won't link to an apparantly working kernel.
+DT is _not_ the authoritive source of information on systems with
+ATAGs.
 
-The cache and tlb structures follow a very similar naming scheme to
-the above.
+Imagine this situation: you have your PC.  It provides memory information
+through the E820 interface.  You convert your kernel to use DT and it
+only uses the information passed from the DT blob, which it loaded as
+part of your kernel off disk.
 
-The proc_info structures are much harder to deal with because they
-don't contain such commonality, but I'm sure it may be possible to
-come up with something along these lines.
+However, your RAM size has changed.  Should the kernel continue to believe
+the memory information found in the encapsulated DT blob, or should it
+continue to get it from the E820 interface?
+
+It's precisely the same problem here.  The E820 interface _has_ to take
+precedence because that is the _authoritive_ source of information.
