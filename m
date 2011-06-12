@@ -1,32 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sun, 12 Jun 2011 09:22:21 +0100
-Subject: [RFC PATCH 0/2] ARM: Add a generic macro for declaring
-	proc_info structs
-In-Reply-To: <20110610085752.GA2129@arm.com>
-References: <1307640112-5360-1-git-send-email-dave.martin@linaro.org>
-	<20110609173836.GF24424@n2100.arm.linux.org.uk>
-	<20110610085752.GA2129@arm.com>
-Message-ID: <20110612082220.GB10283@n2100.arm.linux.org.uk>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 12 Jun 2011 16:34:15 +0800
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <20110612081541.GA10283@n2100.arm.linux.org.uk>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110612081541.GA10283@n2100.arm.linux.org.uk>
+Message-ID: <20110612083414.GA29516@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 09:57:52AM +0100, Dave Martin wrote:
-> On Thu, Jun 09, 2011 at 06:38:36PM +0100, Russell King - ARM Linux wrote:
-> > It does look very much like a sledge hammer to me.  All we're really
-> > after is whether the size of the region is what we expect it to be -
-> > which will tell us whether there's a T2 instruction in there.
+On Sun, Jun 12, 2011 at 09:15:41AM +0100, Russell King - ARM Linux wrote:
+> On Sun, Jun 12, 2011 at 02:06:37AM -0400, Nicolas Pitre wrote:
+> > This is a resend of those patches with fixups after the latest changes
+> > in mainline.
+> > 
+> > [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64 bits in size
+> > This one is new and trivial.
+> > 
+> > [PATCH 2/3] ARM: zImage: Allow the appending of a device tree binary
+> > Mostly John Bonesio's version with some adjustments and cleanups.
+> > 
+> > [PATCH 3/3] ARM: zImage: make sure appended DTB doesn't get overwritten by kernel .bss
+> > New, simpler alternative to Tony Lindgren's version.
 > 
-> True, although the intent was no to solve just that one problem,
-> but to show how to avoid a whole variety of trivial mistakes.
-> Since proc_info structs don't tend to get changed much after
-> they're initially written, I guess that such mistakes don't actually
-> occur very often, though.
+> One thing which has been bugging me for some time is that the DT stuff
+> completely overrides the ATAGs.  This is wrong with solutions like this.
+> 
+> We have a set of perfectly good boot loaders which provide correct
+> information to the kernel via ATAGs.  If we start moving everything
+> over to DT, then we run into a problem because the ATAGs are ignored -
+> stuff such as the RAM size and command line passed from the boot loader
+> will be entirely ignored, instead these having to be encoded into the
+> kernel at build time.
+> 
+What u-boot does right now is replacing the parameters in dtb with
+its for those it's interested in, for example command line is one,
+before it passes dtb to kernel.
 
-We have several other structures encoded in assembly - and to do this
-for every one would be excessive.  The amount of churn produced too
-would be large.
-
-Historically we've had little problem with these structs being wrong -
-about once or twice pre-Thumb for a decade IIRC (where at least one was
-down to "using an old patch but didn't update it properly for the new
-proc-*.S files".)
+-- 
+Regards,
+Shawn
