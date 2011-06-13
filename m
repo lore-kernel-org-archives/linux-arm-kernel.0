@@ -1,48 +1,92 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Jun 2011 03:49:41 -0700
-Subject: [PATCH] ARM: Make sure appended device tree data won't overlap
-	kernel BSS
-In-Reply-To: <alpine.LFD.2.00.1106120209450.2142@xanadu.home>
-References: <20110429135334.GR5126@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1104291509540.24613@xanadu.home>
-	<20110504072317.GU2092@atomide.com>
-	<alpine.LFD.2.00.1105040936040.24613@xanadu.home>
-	<20110509111929.GA11410@atomide.com>
-	<20110509144949.GE30958@atomide.com>
-	<20110512125952.GN31483@atomide.com>
-	<alpine.LFD.2.00.1105130930330.2762@xanadu.home>
-	<20110513112120.GO31483@atomide.com>
-	<alpine.LFD.2.00.1106120209450.2142@xanadu.home>
-Message-ID: <20110613104940.GF10951@atomide.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Jun 2011 12:21:49 +0100
+Subject: [PATCH v7 04/14] ARM: omap4: use remapped PPI interrupts for local
+	timer
+In-Reply-To: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
+References: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1307964119-4187-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nico@fluxnic.net> [110611 23:09]:
-> On Fri, 13 May 2011, Tony Lindgren wrote:
-> 
-> > From: Tony Lindgren <tony@atomide.com>
-> > Date: Thu, 12 May 2011 05:29:49 -0700
-> > Subject: [PATCH] ARM: zImage: Make sure appended device tree data won't overlap kernel BSS
-> > 
-> > Do this before relocating the compressed kernel + device tree data.
-> > Otherwise we would have to split the copying into two parts, or copy
-> > the device tree data twice.
-> > 
-> > As we only have one register available, pass the size of kernel BSS
-> > via linker and do the calculation using r1, then save it to the stack.
-> > 
-> > Note that this patch now makes the stack also usable earlier for
-> > CONFIG_ARM_APPENDED_DTB.
-> > 
-> > Signed-off-by: Tony Lindgren <tony@atomide.com>
-> [...]
-> 
-> Please tell me what you think of this alternative: 
-> http://article.gmane.org/gmane.linux.ports.arm.kernel/120182
-> I think it is a cleaner solution.
+Use the normal interrupt scheme for the local timers by using
+a remapped PPI interrupt.
 
-Yeah that's nice, I acked that one in the thread.
+Tested on a Pandaboard.
 
-Regards,
+Cc: Tony Lindgren <tony@atomide.com>
+Reviewed-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Tested-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-omap2/Kconfig                    |    1 +
+ arch/arm/mach-omap2/include/mach/entry-macro.S |   14 +-------------
+ arch/arm/mach-omap2/timer-mpu.c                |    3 ++-
+ 3 files changed, 4 insertions(+), 14 deletions(-)
 
-Tony
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 19d5891..284694c 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -44,6 +44,7 @@ config ARCH_OMAP4
+ 	depends on ARCH_OMAP2PLUS
+ 	select CPU_V7
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select LOCAL_TIMERS if SMP
+ 	select PL310_ERRATA_588369
+ 	select PL310_ERRATA_727915
+diff --git a/arch/arm/mach-omap2/include/mach/entry-macro.S b/arch/arm/mach-omap2/include/mach/entry-macro.S
+index a48690b..22d86ef 100644
+--- a/arch/arm/mach-omap2/include/mach/entry-macro.S
++++ b/arch/arm/mach-omap2/include/mach/entry-macro.S
+@@ -78,7 +78,7 @@
+ 4401:		ldr     \irqstat, [\base, #GIC_CPU_INTACK]
+ 		ldr     \tmp, =1021
+ 		bic     \irqnr, \irqstat, #0x1c00
+-		cmp     \irqnr, #29
++		cmp     \irqnr, #15
+ 		cmpcc   \irqnr, \irqnr
+ 		cmpne   \irqnr, \tmp
+ 		cmpcs   \irqnr, \irqnr
+@@ -101,18 +101,6 @@
+ 		it	cs
+ 		cmpcs	\irqnr, \irqnr
+ 		.endm
+-
+-		/* As above, this assumes that irqstat and base are preserved */
+-
+-		.macro test_for_ltirq, irqnr, irqstat, base, tmp
+-		bic	\irqnr, \irqstat, #0x1c00
+-		mov 	\tmp, #0
+-		cmp	\irqnr, #29
+-		itt	eq
+-		moveq	\tmp, #1
+-		streq	\irqstat, [\base, #GIC_CPU_EOI]
+-		cmp	\tmp, #0
+-		.endm
+ #endif	/* CONFIG_SMP */
+ 
+ #else	/* MULTI_OMAP2 */
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+index 31c0ac4..1fd5ca5 100644
+--- a/arch/arm/mach-omap2/timer-mpu.c
++++ b/arch/arm/mach-omap2/timer-mpu.c
+@@ -22,6 +22,7 @@
+ #include <asm/irq.h>
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
++#include <asm/hardware/gic.h>
+ 
+ /*
+  * Setup the local clock events for a CPU.
+@@ -32,7 +33,7 @@ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ 	if (omap_rev() == OMAP4430_REV_ES1_0)
+ 		return -ENXIO;
+ 
+-	evt->irq = OMAP44XX_IRQ_LOCALTIMER;
++	evt->irq = gic_ppi_to_vppi(OMAP44XX_IRQ_LOCALTIMER);
+ 	twd_timer_setup(evt);
+ 	return 0;
+ }
+-- 
+1.7.0.4
