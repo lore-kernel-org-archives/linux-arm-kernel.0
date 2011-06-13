@@ -1,48 +1,78 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 13 Jun 2011 11:08:19 +0100
-Subject: [PATCH] fb.h: ARM uses __raw_{read/write}
-In-Reply-To: <20110613040003.GA29731@linux-sh.org>
-References: <201106101731.08578.hartleys@visionengravers.com>
-	<20110613040003.GA29731@linux-sh.org>
-Message-ID: <20110613100819.GA26914@1n450.cable.virginmedia.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 13 Jun 2011 11:19:42 +0100
+Subject: [PATCH] ARM: mm: cache-l2x0: Add support for re-enabling l2x0
+In-Reply-To: <1307926019-28958-1-git-send-email-ccross@android.com>
+References: <1307926019-28958-1-git-send-email-ccross@android.com>
+Message-ID: <20110613101942.GA7924@e102568-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 01:00:04PM +0900, Paul Mundt wrote:
-> On Fri, Jun 10, 2011 at 05:31:08PM -0700, H Hartley Sweeten wrote:
-> > ARM provides __raw_{read/write}* functions for memory access. These
-> > should be used instead of the default '(*(volatile' stuff to make sure the
-> > memory accesses are typesafe (void __iomem *).
-> > 
-> > This also fixes a number of sparse warning like:
-> > 
-> >   warning: cast removes address space of expression
-> > 
-> > Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> > Cc: Paul Mundt <lethal@linux-sh.org>
-> > Cc: Russell King <linux@arm.linux.org.uk>
+On Mon, Jun 13, 2011 at 01:46:58AM +0100, Colin Cross wrote:
+> Remove __init annotation from l2x0_init so it can be used to
+> reinitialize the l2x0 after it has been reset during suspend.
 > 
-> I'm not sure what semantics are desirable for ARM here, so I'll wait for
-> Russell to reply.
+> Only print the init messages the first time l2x0_init is called.
 > 
-> This wrapping will basically mean that the fb_read/write ops are using
-> __raw_xxx variants while the memset and memcpy wrappers will be using the
-> regular read/write[bwl] routines which contain __iormb() calls. Given
-> that ioread/write and friends all wrap in to the normal versions with the
-> barriers, I would suppose that this is the default behaviour that is
-> desired, as opposed to wrapping in to the __raw_xxx variants directly.
+> Add l2x0_enable to re-enable the l2x0 after l2x0_disable if
+> the l2x0 was not reset.
+> 
+> l2x0_disable cannot use writel, as writel calls wmb(), and wmb()
+> may call outer_cache_sync, which takes the same spinlock as
+> l2x0_disable.
+> 
+> Signed-off-by: Colin Cross <ccross@android.com>
+> ---
+>  arch/arm/include/asm/hardware/cache-l2x0.h |    3 ++-
+>  arch/arm/mm/cache-l2x0.c                   |   18 ++++++++++++++----
+>  2 files changed, 16 insertions(+), 5 deletions(-)
+>
 
-The intention for the __iormb/__iowmb calls is in relation to DMA
-transfers where a buffer in normal RAM is filled in with data and the
-transfer started by a writel() to a device. We need to make sure that
-the normal RAM writing completes before the writel().
+[...]
 
-The change proposed by Hartley wouldn't make much difference from the
-current volatile accesses (__raw_* accessors are implemented as volatile
-on ARM).
+> +/* enables l2x0 after l2x0_disable, does not invalidate */
+> +void l2x0_enable(void)
+> +{
+> +	unsigned long flags;
+> +
+> +	spin_lock_irqsave(&l2x0_lock, flags);
+> +	writel_relaxed(1, l2x0_base + L2X0_CTRL);
+> +	spin_unlock_irqrestore(&l2x0_lock, flags);
+> +}
+> +
+>  static void l2x0_disable(void)
+>  {
+>  	unsigned long flags;
+>  
+>  	spin_lock_irqsave(&l2x0_lock, flags);
+> -	writel(0, l2x0_base + L2X0_CTRL);
+> +	writel_relaxed(0, l2x0_base + L2X0_CTRL);
+>  	spin_unlock_irqrestore(&l2x0_lock, flags);
+>  }
 
-I think the memcpy_(from|to)io could be optimised on ARM to only add a
-barrier before or after he copying loop.
+This function is still dodgy to use, since we are disabling L2
+possibly with current function stack lines allocated, which might wreak havoc.
 
--- 
-Catalin
+>  
+> -void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+> +void l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+>  {
+>  	__u32 aux;
+>  	__u32 cache_id;
+> @@ -340,7 +350,7 @@ void __init l2x0_init(void __iomem *base, __u32 aux_val, __u32 aux_mask)
+>  	outer_cache.disable = l2x0_disable;
+>  	outer_cache.set_debug = l2x0_set_debug;
+>  
+> -	printk(KERN_INFO "%s cache controller enabled\n", type);
+> -	printk(KERN_INFO "l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
+> +	pr_info_once("%s cache controller enabled\n", type);
+> +	pr_info_once("l2x0: %d ways, CACHE_ID 0x%08x, AUX_CTRL 0x%08x, Cache size: %d B\n",
+>  			ways, cache_id, aux, l2x0_size);
+>  }
+
+We might still need hooks to save/restore PL310 context since registers
+like tag and data RAM control are gone on reset. Furthermore, on L2 RAM
+retention we want to reinit L2 without having to invalidate L2 RAM(s),
+which means we cannot use l2x0_init as it is. I added a couple of hooks to
+outer_cache in order to carry out this task, patch coming.
+
+Lorenzo
