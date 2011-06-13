@@ -1,79 +1,98 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Jun 2011 08:02:36 -0700
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <20110613142044.GC13643@n2100.arm.linux.org.uk>
-References: <20110612115820.GF10283@n2100.arm.linux.org.uk>
-	<201106121615.24059.arnd@arndb.de>
-	<20110612145751.GA4013@ponder.secretlab.ca>
-	<20110612151931.GK10283@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
-	<20110612155940.GM10283@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1106121454510.2142@xanadu.home>
-	<20110613095142.GA10951@atomide.com>
-	<alpine.LFD.2.00.1106131010150.2142@xanadu.home>
-	<20110613142044.GC13643@n2100.arm.linux.org.uk>
-Message-ID: <20110613150236.GH3352@atomide.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 13 Jun 2011 09:02:47 -0600
+Subject: [PATCH] gpio/plat-pxa: fix clash with gpiolib namespace
+In-Reply-To: <BANLkTikkT6ZvsSycu13Fnsek43f9+YUkVA@mail.gmail.com>
+References: <1307954539-5681-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTikkT6ZvsSycu13Fnsek43f9+YUkVA@mail.gmail.com>
+Message-ID: <20110613150247.GA18161@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110613 07:16]:
-> On Mon, Jun 13, 2011 at 10:14:07AM -0400, Nicolas Pitre wrote:
-> > On Mon, 13 Jun 2011, Tony Lindgren wrote:
-> > 
-> > > * Nicolas Pitre <nicolas.pitre@linaro.org> [110612 11:55]:
-> > > > On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
-> > > > 
-> > > > > I don't see this as a sustainable way forward.  If we're going to move a
-> > > > > particular SoC over to DT, we need to move the entire SoC over.  We can't
-> > > > > do this half-heartedly.
-> > > > > 
-> > > > > And that means we _must_ deal with accepting ATAGs from existing boot
-> > > > > loaders, with that information taking precidence over the DT blob
-> > > > > supplied with the kernel.
-> > > > 
-> > > > Well... OK.  Let's see how this can be accommodated with the existing 
-> > > > patch floating around doing that.
-> > > 
-> > > I agree that we need to parse the user configurable ATAGs to support
-> > > existing hardware properly. Otherwise we have edit the .dts for each board
-> > > to change the user configurable things, which is not nice for distros.
-> > 
-> > You mean "existing bootloaders", right?
-
-Yes that's correct. There are some bootloaders that will never get updated
-as they're proprietary and signed.
-
-> > Updated bootloaders should translate user configurable information into 
-> > proper DT records and pass the resulting DTB to the kernel separately.
+On Mon, Jun 13, 2011 at 05:03:50PM +0800, Eric Miao wrote:
+> On Mon, Jun 13, 2011 at 4:42 PM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+> > From: Linus Walleij <linus.walleij@linaro.org>
+> >
+> > The PXA platform code has a static inline helper called
+> > gpio_to_chip which clashes with the gpiolib namespace if we
+> > try to expose the function with the same name from gpiolib,
+> > and it's still confusing even if we don't do that. So rename
+> > it to gpio_to_pxachip().
+> >
+> > Reported-by: H Hartley Sweeten <hartleys@visionengravers.com>
+> > Cc: Eric Miao <eric.miao@linaro.org>
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > 
-> OMAP is one of the code bases where this really matters - they have a
-> _lot_ of existing platforms with boot loaders which do the ATAG stuff.
-> They also have a lot of code in arch/arm that needs to be converted to
-> a DT representation.
+> OK, applied to 'devel'.
 
-I think we're OK to start using appended device tree support for mach-omap2
-once we have some real data. The only thing missing is the support for
-parsing ATAGs for cmdline and other user configurable stuff.
+Is the pxa gpio driver going to be moved to drivers/gpio this cycle?
+If so, you'll probably want to keep the gpio changes in a separate
+branch that can be merged both into gpio/next and your devel branch,
+just in case there ends up being merge issues between our branches in
+linux-next.
 
-Of course that means that we need to set the DT_APPEND support on in the
-omap2plus_defconfig. And I'm assuming that the DT_APPEND support works
-also with bootloader passed DT data if the appended data is empty..
- 
-> With the current situation where you can have either ATAGs or DT but
-> not both, they're currently facing either having to break all the
-> existing platforms by ignoring the ATAGs _or_ keeping two copies of
-> a considerable amount of data - one in DT form and one in its existing
-> form.
+g.
+
 > 
-> At present, DT can only be used sensibly on brand new SoCs where there
-> are no existing platforms with ATAG based boot loaders to worry about.
-> As things stand at present, even with your patch series, existing SoCs
-> have no viable path to transition to DT.
-
-The situation is not actually not that bad, but currently changes to
-the .dts file are needed. So some parsing of user configurable ATAGs
-is badly needed.
-
-Regards,
-
-Tony
+> > ---
+> > ?arch/arm/plat-pxa/gpio.c | ? 10 +++++-----
+> > ?1 files changed, 5 insertions(+), 5 deletions(-)
+> >
+> > diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
+> > index 48ebb94..a11dc36 100644
+> > --- a/arch/arm/plat-pxa/gpio.c
+> > +++ b/arch/arm/plat-pxa/gpio.c
+> > @@ -50,7 +50,7 @@ static inline void __iomem *gpio_chip_base(struct gpio_chip *c)
+> > ? ? ? ?return container_of(c, struct pxa_gpio_chip, chip)->regbase;
+> > ?}
+> >
+> > -static inline struct pxa_gpio_chip *gpio_to_chip(unsigned gpio)
+> > +static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
+> > ?{
+> > ? ? ? ?return &pxa_gpio_chips[gpio_to_bank(gpio)];
+> > ?}
+> > @@ -161,7 +161,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
+> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> > ? ? ? ?unsigned long gpdr, mask = GPIO_bit(gpio);
+> >
+> > - ? ? ? c = gpio_to_chip(gpio);
+> > + ? ? ? c = gpio_to_pxachip(gpio);
+> >
+> > ? ? ? ?if (type == IRQ_TYPE_PROBE) {
+> > ? ? ? ? ? ? ? ?/* Don't mess with enabled GPIOs using preconfigured edges or
+> > @@ -230,7 +230,7 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+> > ?static void pxa_ack_muxed_gpio(struct irq_data *d)
+> > ?{
+> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> > - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+> > + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+> >
+> > ? ? ? ?__raw_writel(GPIO_bit(gpio), c->regbase + GEDR_OFFSET);
+> > ?}
+> > @@ -238,7 +238,7 @@ static void pxa_ack_muxed_gpio(struct irq_data *d)
+> > ?static void pxa_mask_muxed_gpio(struct irq_data *d)
+> > ?{
+> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> > - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+> > + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+> > ? ? ? ?uint32_t grer, gfer;
+> >
+> > ? ? ? ?c->irq_mask &= ~GPIO_bit(gpio);
+> > @@ -252,7 +252,7 @@ static void pxa_mask_muxed_gpio(struct irq_data *d)
+> > ?static void pxa_unmask_muxed_gpio(struct irq_data *d)
+> > ?{
+> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> > - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+> > + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+> >
+> > ? ? ? ?c->irq_mask |= GPIO_bit(gpio);
+> > ? ? ? ?update_edge_detect(c);
+> > --
+> > 1.7.3.2
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> >
