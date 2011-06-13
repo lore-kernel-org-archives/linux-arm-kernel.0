@@ -1,35 +1,31 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 13 Jun 2011 10:08:55 -0400 (EDT)
-Subject: [PATCH 2/3] ARM: zImage: Allow the appending of a device tree
-	binary
-In-Reply-To: <20110613112604.GB12325@n2100.arm.linux.org.uk>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<1307858800-16712-3-git-send-email-nicolas.pitre@linaro.org>
-	<20110613104648.GD10951@atomide.com>
-	<20110613112604.GB12325@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1106131008220.2142@xanadu.home>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Jun 2011 15:10:13 +0100
+Subject: [Patch v2 03/11] ARM: hwcaps: use shifts instead of hardcoded
+	constants
+In-Reply-To: <4DF616C4.4040709@ru.mvista.com>
+References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+	<1307536233-30089-4-git-send-email-will.deacon@arm.com>
+	<4DF616C4.4040709@ru.mvista.com>
+Message-ID: <20110613141013.GA419@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
+Sergei,
 
-> On Mon, Jun 13, 2011 at 03:46:49AM -0700, Tony Lindgren wrote:
-> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110611 23:03]:
-> > > From: John Bonesio <bones@secretlab.ca>
-> > > 
-> > > This patch provides the ability to boot using a device tree that is appended
-> > > to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
-> > > 
-> > > Signed-off-by: John Bonesio <bones@secretlab.ca>
-> > > [nico: adjusted to latest zImage changes plus additional cleanups]
-> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > 
-> > Looks like this rebased version has two nice improvments: It uses r5
-> > instead of lr, and keeps stack usable early on :)
+On Mon, Jun 13, 2011 at 02:55:16PM +0100, Sergei Shtylyov wrote:
+> Hello.
 > 
-> One of the comments still refers to lr though.
+> On 08-06-2011 16:30, Will Deacon wrote:
+> 
+> > The HWCAP numbers are defined as constants, each one being a power of 2.
+> > This has become slightly unwieldy now that we have reached 32k.
+> 
+> > This patch changes the HWCAP defines to use (1<<  n) instead of coding
+> > the constant directly. The values remain unchanged.
+> 
+>     Perhaps it's better to use BIT(n) macro instead?
 
-Heh.  Fixed.
+That has the downside of breaking userspace, unless we export linux/bitops.h
+and remove the __KERNEL__ guards around the BIT macro.
 
-
-Nicolas
+Will
