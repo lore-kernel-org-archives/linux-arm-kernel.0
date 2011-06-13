@@ -1,31 +1,22 @@
 From: lethal@linux-sh.org (Paul Mundt)
-Date: Mon, 13 Jun 2011 13:00:04 +0900
-Subject: [PATCH] fb.h: ARM uses __raw_{read/write}
-In-Reply-To: <201106101731.08578.hartleys@visionengravers.com>
-References: <201106101731.08578.hartleys@visionengravers.com>
-Message-ID: <20110613040003.GA29731@linux-sh.org>
+Date: Mon, 13 Jun 2011 13:24:10 +0900
+Subject: [PATCH] PCI: Make the struct pci_dev * argument of pci_fixup_irqs
+	const.
+In-Reply-To: <20110610143021.GA26043@linux-mips.org>
+References: <20110610143021.GA26043@linux-mips.org>
+Message-ID: <20110613042410.GB29731@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 05:31:08PM -0700, H Hartley Sweeten wrote:
-> ARM provides __raw_{read/write}* functions for memory access. These
-> should be used instead of the default '(*(volatile' stuff to make sure the
-> memory accesses are typesafe (void __iomem *).
+On Fri, Jun 10, 2011 at 03:30:21PM +0100, Ralf Baechle wrote:
+> Aside of the usual motivation for constification,  this function has a
+> history of being abused a hook for interrupt and other fixups so I turned
+> this function const ages ago in the MIPS code but it should be done
+> treewide.
 > 
-> This also fixes a number of sparse warning like:
+> Due to function pointer passing in varous places a few other functions
+> had to be constified as well.
 > 
->   warning: cast removes address space of expression
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-> Cc: Paul Mundt <lethal@linux-sh.org>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> 
-I'm not sure what semantics are desirable for ARM here, so I'll wait for
-Russell to reply.
+> Signed-off-by: Ralf Baechle <ralf@linux-mips.org>
 
-This wrapping will basically mean that the fb_read/write ops are using
-__raw_xxx variants while the memset and memcpy wrappers will be using the
-regular read/write[bwl] routines which contain __iormb() calls. Given
-that ioread/write and friends all wrap in to the normal versions with the
-barriers, I would suppose that this is the default behaviour that is
-desired, as opposed to wrapping in to the __raw_xxx variants directly.
+Acked-by: Paul Mundt <lethal@linux-sh.org>
