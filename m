@@ -1,129 +1,49 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 13 Jun 2011 15:17:57 -0700
-Subject: [PATCH 1/3] ARM: Add cpu power management notifiers
-In-Reply-To: <1307925825-28566-2-git-send-email-ccross@android.com> (Colin
-	Cross's message of "Sun, 12 Jun 2011 17:43:43 -0700")
-References: <1307925825-28566-1-git-send-email-ccross@android.com>
-	<1307925825-28566-2-git-send-email-ccross@android.com>
-Message-ID: <87ips9fka2.fsf@ti.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Mon, 13 Jun 2011 16:04:00 -0700
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110613072850.7234462b@infradead.org>
+References: <20110610175248.GF2230@linux.vnet.ibm.com>
+	<20110610180807.GB28500@srcf.ucam.org>
+	<20110610184738.GG2230@linux.vnet.ibm.com>
+	<20110610192329.GA30496@srcf.ucam.org>
+	<20110610193713.GJ2230@linux.vnet.ibm.com>
+	<20110610200233.5ddd5a31@infradead.org>
+	<20110611170610.GA2212@linux.vnet.ibm.com>
+	<20110611102654.01e5cea9@infradead.org>
+	<20110612230707.GE2212@linux.vnet.ibm.com>
+	<20110613072850.7234462b@infradead.org>
+Message-ID: <20110613230400.GL2326@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross <ccross@android.com> writes:
+On Mon, Jun 13, 2011 at 07:28:50AM -0700, Arjan van de Ven wrote:
+> On Sun, 12 Jun 2011 16:07:07 -0700
+> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
+> > > 
+> > > the codec issue seems to be solved in time; a previous generation
+> > > silicon on our (Intel) side had ARM ecosystem blocks that did not do
+> > > scatter gather, however the current generation ARM ecosystem blocks
+> > > all seem to have added S/G to them....
+> > > (in part this is coming from the strong desire to get camera/etc
+> > > blocks to all use "GPU texture" class memory, so that the camera
+> > > can directly deposit its information into a gpu texture, and
+> > > similar for media encode/decode blocks... this avoids copies as
+> > > well as duplicate memory).
+> > 
+> > That is indeed a clever approach!
+> > 
+> > Of course, if the GPU textures are in main memory, there will still
+> > be memory consumption gains to be had as the image size varies (e.g.,
+> > displaying image on one hand vs. menus and UI on the other). 
+> 
+> graphics drivers and the whole graphics stack is set up to deal with
+> that... textures aren't per se "screen size", the texture for a button
+> is only as large as the button (with some rounding up to multiples of
+> some small power of two) 
 
-> During some CPU power modes entered during idle, hotplug and
-> suspend, peripherals located in the CPU power domain, such as
-> the GIC and VFP, may be powered down.  Add a notifier chain
-> that allows drivers for those peripherals to be notified
-> before and after they may be reset.
->
-> Signed-off-by: Colin Cross <ccross@android.com>
+In addition, I would expect that for quite some time there will continue
+to be a lot of systems with display hardware a bit too simple to qualify
+as "GPU".
 
-This is great, thanks!
-
-I had hacked up something OMAP-specific a while back to do something
-similar, and have been meaning to make it more generic, so this is
-perfect.  Also, if it is moved outside ARM, note that x86_64 has a
-idle_notifier infrastructure that is somewhat similar, and if you're
-motivated, it should probably be converted to this as well.  See
-arch/x86/kernel/process_64.c.
-
-Also, for the sake of the comments/changelog, the usefulness of these
-notifiers is not limited to low-power states where power is off and IP
-blocks may be reset.  It could be considered as simply a generic
-notification mechanism for any CPU PM transitions.
-
-On OMAP we have other peripherals (not in the CPU power domain) where we
-need to control their PM transitions in relation to the CPU PM
-transitions so the notifiers are useful for any low-power state
-transition of the CPU(s).  The drivers for these peripherals use runtime
-PM in their CPU PM notifiers to trigger the device PM transitions. (The
-drivers must use the synchronous versions of the runtime PM get/put
-calls with device in pm_runtime_irq_safe() mode.)
-
-In this series, I don't see any calls to cpu_[complex_]pm_[enter|exit]().  
-Based on that, I assume you prefer to leave it up to platform-specific
-idle/PM code to place these calls.  Or, do you plan to have this
-triggered by generic CPUidle, suspend/resume and/or hotplug code?  At
-least on OMAP, I prefer having the calls in platform-specific code.
-
-I have a minor enhancement request.  The notifier callbacks provide for
-passing a void * through the notifier chain.  Could you add a way for a
-void * to be registered at cpu_pm_register_notifier() time and that
-would be passed through the notifier call chain?  This would allow using
-the same struct notifier_block and callback for multiple instances of
-the same IP, and the instances could be differentiated in the callback
-using the void *.
-
-Also, FWIW I tested this on OMAP3 (Cortex-A8 UP) using
-cpu_pm_enter/exit() in the code path shared between idle and suspend.  I
-successfully triggered PM transitions in non-CPU power-domain
-peripherals, and it worked great. 
-
-Some other minor comments below...
-
-[...]
-
-> diff --git a/arch/arm/kernel/cpu_pm.c b/arch/arm/kernel/cpu_pm.c
-> new file mode 100644
-> index 0000000..48a5b53
-> --- /dev/null
-> +++ b/arch/arm/kernel/cpu_pm.c
-> @@ -0,0 +1,181 @@
-> +/*
-> + * Copyright (C) 2011 Google, Inc.
-> + *
-> + * Author:
-> + *	Colin Cross <ccross@android.com>
-> + *
-> + * This software is licensed under the terms of the GNU General Public
-> + * License version 2, as published by the Free Software Foundation, and
-> + * may be copied, distributed, and modified under those terms.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/notifier.h>
-> +#include <linux/spinlock.h>
-> +
-> +#include <asm/cpu_pm.h>
-> +
-> +/*
-> + * When a CPU goes to a low power state that turns off power to the CPU's
-> + * power domain, the contents of some blocks (floating point coprocessors,
-> + * interrutp controllers, caches, timers) in the same power domain can
-
-typo: interrutp
-
-> + * be lost.  The cpm_pm notifiers provide a method for platform idle, suspend,
-> + * and hotplug implementations to notify the drivers for these blocks that
-> + * they may be reset.
-> + *
-> + * All cpu_pm notifications must be called with interrupts disabled.
-> + *
-> + * The notifications are split into two classes, CPU notifications and CPU
-> + * complex notifications.
-> + *
-> + * CPU notifications apply to a single CPU, and must be called on the affected
-> + * CPU.  They are used to save per-cpu context for affected blocks.
-> + *
-> + * CPU complex notifications apply to all CPUs in a single power domain. They
-> + * are used to save any global context for affected blocks, and must be called
-> + * after all the CPUs in the power domain have been notified of the low power
-> + * state.
-> + *
-> + */
-
-Not directly related to this series, but I'm a bit confused on terminology.
-
-I've seen both 'CPU complex' and 'CPU cluster' used in ARM SMP land, but
-haven't seen precise definitions of either.  Does one imply all CPUs,
-and the other imply all CPUs in the same power domain?
-
-Kevin
+							Thanx, Paul
