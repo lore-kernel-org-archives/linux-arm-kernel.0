@@ -1,59 +1,34 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jun 2011 15:20:44 +0100
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <alpine.LFD.2.00.1106131010150.2142@xanadu.home>
-References: <20110612112219.GD16318@ibawizard.net>
-	<20110612115820.GF10283@n2100.arm.linux.org.uk>
-	<201106121615.24059.arnd@arndb.de>
-	<20110612145751.GA4013@ponder.secretlab.ca>
-	<20110612151931.GK10283@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
-	<20110612155940.GM10283@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1106121454510.2142@xanadu.home>
-	<20110613095142.GA10951@atomide.com>
-	<alpine.LFD.2.00.1106131010150.2142@xanadu.home>
-Message-ID: <20110613142044.GC13643@n2100.arm.linux.org.uk>
+Date: Mon, 13 Jun 2011 15:22:10 +0100
+Subject: [Patch v2 03/11] ARM: hwcaps: use shifts instead of hardcoded
+	constants
+In-Reply-To: <20110613141013.GA419@e102144-lin.cambridge.arm.com>
+References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+	<1307536233-30089-4-git-send-email-will.deacon@arm.com>
+	<4DF616C4.4040709@ru.mvista.com>
+	<20110613141013.GA419@e102144-lin.cambridge.arm.com>
+Message-ID: <20110613142209.GD13643@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 10:14:07AM -0400, Nicolas Pitre wrote:
-> On Mon, 13 Jun 2011, Tony Lindgren wrote:
+On Mon, Jun 13, 2011 at 03:10:13PM +0100, Will Deacon wrote:
+> Sergei,
 > 
-> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110612 11:55]:
-> > > On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
-> > > 
-> > > > I don't see this as a sustainable way forward.  If we're going to move a
-> > > > particular SoC over to DT, we need to move the entire SoC over.  We can't
-> > > > do this half-heartedly.
-> > > > 
-> > > > And that means we _must_ deal with accepting ATAGs from existing boot
-> > > > loaders, with that information taking precidence over the DT blob
-> > > > supplied with the kernel.
-> > > 
-> > > Well... OK.  Let's see how this can be accommodated with the existing 
-> > > patch floating around doing that.
+> On Mon, Jun 13, 2011 at 02:55:16PM +0100, Sergei Shtylyov wrote:
+> > Hello.
 > > 
-> > I agree that we need to parse the user configurable ATAGs to support
-> > existing hardware properly. Otherwise we have edit the .dts for each board
-> > to change the user configurable things, which is not nice for distros.
+> > On 08-06-2011 16:30, Will Deacon wrote:
+> > 
+> > > The HWCAP numbers are defined as constants, each one being a power of 2.
+> > > This has become slightly unwieldy now that we have reached 32k.
+> > 
+> > > This patch changes the HWCAP defines to use (1<<  n) instead of coding
+> > > the constant directly. The values remain unchanged.
+> > 
+> >     Perhaps it's better to use BIT(n) macro instead?
 > 
-> You mean "existing bootloaders", right?
-> 
-> Updated bootloaders should translate user configurable information into 
-> proper DT records and pass the resulting DTB to the kernel separately.
+> That has the downside of breaking userspace, unless we export linux/bitops.h
+> and remove the __KERNEL__ guards around the BIT macro.
 
-OMAP is one of the code bases where this really matters - they have a
-_lot_ of existing platforms with boot loaders which do the ATAG stuff.
-They also have a lot of code in arch/arm that needs to be converted to
-a DT representation.
-
-With the current situation where you can have either ATAGs or DT but
-not both, they're currently facing either having to break all the
-existing platforms by ignoring the ATAGs _or_ keeping two copies of
-a considerable amount of data - one in DT form and one in its existing
-form.
-
-At present, DT can only be used sensibly on brand new SoCs where there
-are no existing platforms with ATAG based boot loaders to worry about.
-As things stand at present, even with your patch series, existing SoCs
-have no viable path to transition to DT.
+And potentially break userspace programs which also have a BIT() macro.
+No, we need to keep using plain C for exported definitions.
