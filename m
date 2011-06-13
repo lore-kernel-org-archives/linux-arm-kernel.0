@@ -1,71 +1,40 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 13 Jun 2011 11:41:45 +0100
-Subject: [PATCH 2/3] ARM: gic: Use cpu pm notifiers to save gic state
-In-Reply-To: <1307925825-28566-3-git-send-email-ccross@android.com>
-References: <1307925825-28566-1-git-send-email-ccross@android.com>
-	<1307925825-28566-3-git-send-email-ccross@android.com>
-Message-ID: <20110613104145.GA8230@e102568-lin.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jun 2011 03:43:05 -0700
+Subject: [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64
+	bits in size
+In-Reply-To: <1307858800-16712-2-git-send-email-nicolas.pitre@linaro.org>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<1307858800-16712-2-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <20110613104305.GC10951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Colin,
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110611 23:02]:
+> This is needed for proper alignment when the DTB appending feature
+> is used.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-On Mon, Jun 13, 2011 at 01:43:44AM +0100, Colin Cross wrote:
-> When the cpu is powered down in a low power mode, the gic cpu
-> interface may be reset, and when the cpu complex is powered
-> down, the gic distributor may also be reset.
-> 
-> This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
-> and restore the gic cpu interface registers, and the
-> CPU_COMPLEX_PM_ENTER and CPU_COMPLEX_PM_EXIT notifiers to save
-> and restore the gic distributor registers.
-> 
-> Signed-off-by: Colin Cross <ccross@android.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
+
 > ---
->  arch/arm/common/gic.c |  212 +++++++++++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 212 insertions(+), 0 deletions(-)
+>  arch/arm/boot/compressed/vmlinux.lds.in |    3 +++
+>  1 files changed, 3 insertions(+), 0 deletions(-)
 > 
-
-[...]
-
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
+> index ea80abe..6c02db1 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.in
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.in
+> @@ -47,6 +47,9 @@ SECTIONS
+>    .got			: { *(.got) }
+>    _got_end = .;
+>    .got.plt		: { *(.got.plt) }
 > +
-> +static void __init gic_cpu_pm_init(struct gic_chip_data *gic)
-> +{
-> +	gic->saved_ppi_enable = __alloc_percpu(DIV_ROUND_UP(32, 32) * 4,
-> +		sizeof(u32));
-> +	BUG_ON(!gic->saved_ppi_enable);
-> +
-> +	gic->saved_ppi_conf = __alloc_percpu(DIV_ROUND_UP(32, 16) * 4,
-> +		sizeof(u32));
-> +	BUG_ON(!gic->saved_ppi_conf);
-> +
-> +	gic->saved_ppi_pri = __alloc_percpu(DIV_ROUND_UP(32, 4) * 4,
-> +		sizeof(u32));
-> +	BUG_ON(!gic->saved_ppi_pri);
-> +
-> +	cpu_pm_register_notifier(&gic_notifier_block);
-> +}
-> +#else
-> +static void __init gic_cpu_pm_init(struct gic_chip_data *gic)
-> +{
-> +}
-> +#endif
-> +
->  void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
->  	void __iomem *dist_base, void __iomem *cpu_base)
->  {
-> @@ -367,6 +578,7 @@ void __init gic_init(unsigned int gic_nr, unsigned int irq_start,
+> +  /* ensure the zImage file size is always a multiple of 64 bits */
+> +  .pad			: { BYTE(0); . = ALIGN(8); }
+>    _edata = .;
 >  
->  	gic_dist_init(gic, irq_start);
->  	gic_cpu_init(gic);
-> +	gic_cpu_pm_init(gic);
->  }
->  
+>    . = BSS_START;
+> -- 
+> 1.7.4
 > 
-
-I have been using this patchset for a while and it works perfectly fine.
-I reckon one bit we could improve is allowing to register a subsystem depending
-on a flag set @init, for now it is a save "all default registered subsystems or nothing" solution on cpu_pm_enter(), maybe we could add this level of
-configurability as an improvement (GIC being a good example, see OMAP).
-
-Lorenzo
