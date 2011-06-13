@@ -1,92 +1,76 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 13 Jun 2011 10:44:14 -0600
-Subject: [PATCH 1/3] ARM: pmu: add OF probing support
-In-Reply-To: <4DEFA5E1.9010600@gmail.com>
-References: <1307456541-11026-1-git-send-email-robherring2@gmail.com>
-	<1307456541-11026-2-git-send-email-robherring2@gmail.com>
-	<000001cc25f4$64c2d5c0$2e488140$@rutland@arm.com>
-	<4DEFA5E1.9010600@gmail.com>
-Message-ID: <20110613164414.GE18161@ponder.secretlab.ca>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jun 2011 17:44:52 +0100
+Subject: [RFC PATCH v5] ARM hibernation / suspend-to-disk (fwd)
+In-Reply-To: <alpine.DEB.2.00.1106131400090.25153@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>
+	<20110613122601.GC12325@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106131400090.25153@localhost6.localdomain6>
+Message-ID: <20110613164452.GE13643@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 08, 2011 at 11:40:01AM -0500, Rob Herring wrote:
-> Mark,
-> 
-> On 06/08/2011 10:54 AM, Mark Rutland wrote:
-> >Hi,
-> >
-> >>  static int __devinit pmu_device_probe(struct platform_device *pdev)
-> >>  {
-> >>+	enum arm_pmu_type type = pdev->id;
-> >>
-> >>-	if (pdev->id<  0 || pdev->id>= ARM_NUM_PMU_DEVICES) {
-> >>+	if (pdev->dev.of_node)
-> >>+		type = ARM_PMU_DEVICE_CPU;
-> >>+
-> >>+	if (type<  0 || type>= ARM_NUM_PMU_DEVICES) {
-> >>  		pr_warning("received registration request for unknown "
-> >>  				"device %d\n", pdev->id);
-> >>  		return -EINVAL;
-> >>  	}
-> >>
-> >>-	if (pmu_devices[pdev->id])
-> >>+	if (pmu_devices[type])
-> >>  		pr_warning("registering new PMU device type %d overwrites "
-> >>-				"previous registration!\n", pdev->id);
-> >>+				"previous registration!\n", type);
-> >>  	else
-> >>  		pr_info("registered new PMU device of type %d\n",
-> >>-				pdev->id);
-> >>+				type);
-> >>
-> >>-	pmu_devices[pdev->id] = pdev;
-> >>+	pmu_devices[type] = pdev;
-> >>  	return 0;
-> >>  }
-> >
-> >I don't think this is the best way to handle the type when we've got an FDT
-> >description:
-> >
-> >* release_pmu hasn't been updated to match the type logic here, so it might do
-> >   anything when handed a platform_device initialised by FDT code.
-> >
-> >* the warning message for an invalid registration still uses pdev->id rather
-> >   than type. This can't currently be reached when the PMU was handed to us via
-> >   FDT, but it may confuse refactoring later on.
-> >
-> >* If we want to add a new PMU type, we'll have to add more logic to
-> >   pmu_device_probe. Given that work is going on to add support for system PMUs,
-> >   this doesn't seem particularly brilliant.
-> >
-> >>+static struct of_device_id pmu_device_ids[] = {
-> >>+	{ .compatible = "arm,cortex-a9-pmu" },
-> >>+	{ .compatible = "arm,cortex-a8-pmu" },
-> >>+	{ .compatible = "arm,arm1136-pmu" },
-> >>+	{ .compatible = "arm,arm1176-pmu" },
-> >>+	{},
-> >>+};
-> >>+
-> >>  static struct platform_driver pmu_driver = {
-> >>  	.driver		= {
-> >>  		.name	= "arm-pmu",
-> >>+		.of_match_table = pmu_device_ids,
-> >>  	},
-> >>  	.probe		= pmu_device_probe,
-> >>  };
-> >
-> >This all seems fine for handling CPU PMUs.
-> >
-> >I think that a better strategy would be to separate the type logic from the
-> >registration. I have a patch for this:
-> >http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052455.html
-> >
-> >With it, you won't need to change pmu_device_probe, and adding FDT support
-> >should just be a matter of adding the of_match_table.
-> >
-> 
-> Okay. I'll rebase mine on top of your changes.
+On Mon, Jun 13, 2011 at 02:20:12PM +0100, Frank Hofmann wrote:
+>
+>
+> On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
+>
+>> On Mon, Jun 13, 2011 at 01:04:02PM +0100, Frank Hofmann wrote:
+>>>   To make it clear: IF AND ONLY IF your suspend(-to-ram) func looks like:
+>>>
+>>> 	ENTRY(acmeSoC_cpu_suspend)
+>>> 		stmfd	sp!, {r4-r12,lr}
+>>> 		ldr	r3, resume_mmu_done
+>>> 		bl	cpu_suspend
+>>> 	resume_mmu_done:
+>>> 		ldmfd	sp!, {r3-r12,pc}
+>>> 	ENDPROC(acmeSoC_cpu_suspend)
+>>
+>> Nothing has that - because you can't execute that ldmfd after the call
+>> to cpu_suspend returns.  I don't think you've understood what I said on
+>> that subject in the previous thread.
+>>
+>
+> Ok, to illustrate a bit more, what is ok and what not.
 
-The DT binding looks good to me though.
+Actually, we can do something about cpu_suspend.
 
-g.
+Currently cpu_suspend is not like a normal C function - when it's called
+it returns normally to a bunch of code which is not expected to return.
+The return path is via code pointed to by 'r3'.
+
+It also corrupts a bunch of registers in ways which make it non-compliant
+with a C API.
+
+If we do make this complaint as a normal C-like function, it eliminates
+this register saving.  We also swap 'lr' and 'r3', so cpu_suspend
+effectively only returns to following code on resume - and r3 points
+to the suspend code.
+
+So, this becomes:
+	ENTRY(acmeSoC_cpu_suspend)
+		stmfd	sp!, {lr}
+		adr	r3, soc_finish_suspend
+		bl	cpu_suspend
+		ldmfd	sp!, {pc}
+	ENDPROC(acmeSoC_cpu_suspend)
+
+	soc_finish_suspend:
+		blah
+		blah
+		put soc to sleep
+		never return
+
+or even:
+
+static void soc_suspend(void)
+{
+	[soc specific preparation]
+
+	cpu_suspend(0, PLAT_PHYS_OFFSET - PAGE_OFFSET,
+		soc_suspend_arg, soc_suspend_fn);
+
+	[soc specific cleanup ]
+}
+
+where soc_suspend_fn can be either assembly or C code - but must never
+return.  Patches will follow this evening.
