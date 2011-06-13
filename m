@@ -1,36 +1,31 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Sun, 12 Jun 2011 21:32:28 -0500
-Subject: [patch 00/16] arm: Replace arm sched_clock by clocksource based
-	sched_clock
-In-Reply-To: <20110423205036.795894921@linutronix.de>
-References: <20110423205036.795894921@linutronix.de>
-Message-ID: <4DF576BC.5010206@gmail.com>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Mon, 13 Jun 2011 13:00:04 +0900
+Subject: [PATCH] fb.h: ARM uses __raw_{read/write}
+In-Reply-To: <201106101731.08578.hartleys@visionengravers.com>
+References: <201106101731.08578.hartleys@visionengravers.com>
+Message-ID: <20110613040003.GA29731@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Fri, Jun 10, 2011 at 05:31:08PM -0700, H Hartley Sweeten wrote:
+> ARM provides __raw_{read/write}* functions for memory access. These
+> should be used instead of the default '(*(volatile' stuff to make sure the
+> memory accesses are typesafe (void __iomem *).
+> 
+> This also fixes a number of sparse warning like:
+> 
+>   warning: cast removes address space of expression
+> 
+> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> 
+I'm not sure what semantics are desirable for ARM here, so I'll wait for
+Russell to reply.
 
-On 04/23/2011 03:54 PM, Thomas Gleixner wrote:
-> Most of ARM sched_clocks is using the timekeeping clocksource as the
-> sched_clock. Only versatile uses a different clock for it, but there
-> is no real reason why it can't use the clocksource as well.
->
-> The core timekeeping code makes already sure that we don't wrap the
-> timekeeper and we can base a sched_clock easily on that.
->
-> It uses the read function of the clocksource and keeps track of time
-> independent of the timekeeping code as the ARM sched_clock
-> implementation does. It also uses it's own sequence counter so
-> sched_clock is not dependent on xtime_lock. The update sequence is
-> just adding offsets once in a while and runs from do_timer() which
-> also makes sure that only one core tries to update it.
->
-> Only lightly tested on orion. Please give it a go.
->
-> Another 650 lines gone :)
->
-
-What's happening with this patch series? Just wondering if I'll need to 
-add yet another sched_clock implementation or not.
-
-Rob
+This wrapping will basically mean that the fb_read/write ops are using
+__raw_xxx variants while the memset and memcpy wrappers will be using the
+regular read/write[bwl] routines which contain __iormb() calls. Given
+that ioread/write and friends all wrap in to the normal versions with the
+barriers, I would suppose that this is the default behaviour that is
+desired, as opposed to wrapping in to the __raw_xxx variants directly.
