@@ -1,57 +1,71 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jun 2011 10:35:55 +0100
-Subject: [PATCH 2/4] ARM: pmu: reject duplicate PMU registrations
+Date: Mon, 13 Jun 2011 10:35:57 +0100
+Subject: [PATCH 4/4] ARM: pmu: add platform_device_id table support
 In-Reply-To: <4DEFA5E1.9010600@gmail.com>
 References: <4DEFA5E1.9010600@gmail.com>
-Message-ID: <1307957757-23001-3-git-send-email-mark.rutland@arm.com>
+Message-ID: <1307957757-23001-5-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, the PMU reservation framework allows for multiple PMUs of
-the same type to register themselves. This can lead to a bug with the
-sequence:
+This patch adds support for platform_device_id tables, allowing new
+PMU types to be registered with the correct type, without requiring
+new platform_driver shims to provide the type.
 
-register_pmu(pmu1);
-reserve_pmu(pmu_type);
-register_pmu(pmu2);
-release_pmu(pmu1);
+Macros matching functionality of the of_device_id table macros are
+provided for convenience.
 
-Here, pmu1 cannot be released, and pmu2 cannot be reserved.
-
-This patch modifies register_pmu to reject registrations where a PMU is
-already present, preventing this problem. PMUs which can have multiple
-instances should not use the PMU reservation framework.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-By: Jamie Iles <jamie@jamieiles.com>
-Acked-By: Will Deacon <will.deacon@arm.com>
+Cc: Jamie Iles <jamie@jamieiles.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/pmu.c |   12 ++++++------
- 1 files changed, 6 insertions(+), 6 deletions(-)
+ arch/arm/kernel/pmu.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-index 87942b9..de6b1b0 100644
+index d34cf88..23c3af2 100644
 --- a/arch/arm/kernel/pmu.c
 +++ b/arch/arm/kernel/pmu.c
-@@ -34,13 +34,13 @@ static int __devinit pmu_register(struct platform_device *pdev,
- 		return -EINVAL;
+@@ -62,9 +62,22 @@ static struct of_device_id armpmu_of_device_ids[] = {
+ 	{},
+ };
+ 
++#define PLAT_MATCH_PMU(name, type) {	\
++	.name = name,		\
++	.driver_data = (void *) type,	\
++}
++
++#define PLAT_MATCH_CPU(name)	PLAT_MATCH_PMU(name, ARM_PMU_DEVICE_CPU)
++
++static struct platform_device_id armpmu_plat_device_ids[] = {
++	/* None for now */
++	{},
++};
++
+ enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
+ {
+ 	const struct of_device_id	*of_id;
++	const struct platform_device_id *pdev_id;
+ 
+ 	/* provided by of_device_id table */
+ 	if (pdev->dev.of_node) {
+@@ -73,6 +86,11 @@ enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
+ 		return (enum arm_pmu_type) of_id->data;
  	}
  
--	if (pmu_devices[type])
--		pr_warning("registering new PMU device type %d overwrites "
--				"previous registration!\n", type);
--	else
--		pr_info("registered new PMU device of type %d\n",
--				type);
-+	if (pmu_devices[type]) {
-+		pr_warning("rejecting duplicate registration of PMU device "
-+			"type %d.", type);
-+		return -ENOSPC;
++	/* Provided by platform_device_id table */
++	if ((pdev_id = platform_get_device_id(pdev))) {
++		return (enum arm_pmu_type) pdev_id->driver_data;
 +	}
- 
-+	pr_info("registered new PMU device of type %d\n", type);
- 	pmu_devices[type] = pdev;
- 	return 0;
++
+ 	/* Provided by a 'legacy' platform_device */
+ 	return ARM_PMU_DEVICE_CPU;
  }
+@@ -88,6 +106,7 @@ static struct platform_driver armpmu_driver = {
+ 		.of_match_table = armpmu_of_device_ids,
+ 	},
+ 	.probe		= armpmu_device_probe,
++	.id_table	= armpmu_plat_device_ids,
+ };
+ 
+ static int __init register_pmu_driver(void)
 -- 
 1.7.0.4
