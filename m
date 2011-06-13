@@ -1,53 +1,81 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 13 Jun 2011 15:16:08 -0400 (EDT)
-Subject: [PATCH 00/14] Re-jig cpu_suspend for a saner calling convention
-In-Reply-To: <20110613171446.GF13643@n2100.arm.linux.org.uk>
+Date: Mon, 13 Jun 2011 15:29:02 -0400 (EDT)
+Subject: [PATCH 03/14] ARM: suspend: extract common code from
+	MULTI_CPU/!MULTI_CPU paths
+In-Reply-To: <E1QWAju-0002dr-P6@rmk-PC.arm.linux.org.uk>
 References: <20110613171446.GF13643@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1106131513210.2142@xanadu.home>
+	<E1QWAju-0002dr-P6@rmk-PC.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1106131522410.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
 
-> Currently cpu_suspend is not like a normal C function - when it's called
-> it returns normally to a bunch of code which is not expected to return.
-> The return path is via code pointed to by 'r3'.
-> 
-> It also corrupts a bunch of registers in ways which make it non-compliant
-> with a C API.
-> 
-> If we do make this complaint as a normal C-like function, it eliminates
-> this register saving.  We also swap 'lr' and 'r3', so cpu_suspend
-> effectively only returns to following code on resume - and r3 points
-> to the suspend code.
-> 
-> So, this becomes:
->         ENTRY(acmeSoC_cpu_suspend)
->                 stmfd   sp!, {lr}
->                 adr     r3, soc_finish_suspend
->                 bl      cpu_suspend
->                 ldmfd   sp!, {pc}
->         ENDPROC(acmeSoC_cpu_suspend)
-> 
->         soc_finish_suspend:
->                 blah
->                 blah
->                 put soc to sleep
->                 never return
-> 
-> or even:
-> 
-> static void soc_suspend(void)
-> {
->         [soc specific preparation]
-> 
->         cpu_suspend(0, PLAT_PHYS_OFFSET - PAGE_OFFSET,
+> Very little code is different between these two paths now, so extract
+> the common code.
 
-Please let's try not to use PLAT_PHYS_OFFSET if it can be avoided, 
-especially when the plain PHYS_OFFSET would do just as well.  I'm 
-currently trying to get rid of all instances of PLAT_PHYS_OFFSET from 
-the kernel in order to eventually support multiple SOCs in a single 
-kernel image.
+What about simply always using the MULTI_CPU path unconditionally here?  
+The struct processor pointer could be made available in all cases, and 
+non critical paths could choose to always use it to simplify the code.
 
-
-Nicolas
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/kernel/sleep.S |   24 ++++++------------------
+>  1 files changed, 6 insertions(+), 18 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> index f8e9251..0a778c3 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -19,29 +19,13 @@ ENTRY(cpu_suspend)
+>  	mov	r9, lr
+>  #ifdef MULTI_CPU
+>  	ldr	r10, =processor
+> -	mov	r2, sp			@ current virtual SP
+>  	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
+>  	ldr	ip, [r10, #CPU_DO_RESUME] @ virtual resume function
+> -	sub	sp, sp, r0		@ allocate CPU state on stack
+> -	mov	r0, sp			@ save pointer
+> -	add	ip, ip, r1		@ convert resume fn to phys
+> -	stmfd	sp!, {r1, r2, ip}	@ save v:p, virt SP, phys resume fn
+> -	ldr	r3, =sleep_save_sp
+> -	add	r2, sp, r1		@ convert SP to phys
+> -#ifdef CONFIG_SMP
+> -	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
+> -	ALT_UP(mov lr, #0)
+> -	and	lr, lr, #15
+> -	str	r2, [r3, lr, lsl #2]	@ save phys SP
+>  #else
+> -	str	r2, [r3]		@ save phys SP
+> -#endif
+> -	mov	lr, pc
+> -	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
+> -#else
+> -	mov	r2, sp			@ current virtual SP
+>  	ldr	r0, =cpu_suspend_size
+>  	ldr	ip, =cpu_do_resume
+> +#endif
+> +	mov	r2, sp			@ current virtual SP
+>  	sub	sp, sp, r0		@ allocate CPU state on stack
+>  	mov	r0, sp			@ save pointer
+>  	add	ip, ip, r1		@ convert resume fn to phys
+> @@ -56,6 +40,10 @@ ENTRY(cpu_suspend)
+>  #else
+>  	str	r2, [r3]		@ save phys SP
+>  #endif
+> +#ifdef MULTI_CPU
+> +	mov	lr, pc
+> +	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
+> +#else
+>  	bl	cpu_do_suspend
+>  #endif
+>  
+> -- 
+> 1.7.4.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
