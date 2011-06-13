@@ -1,22 +1,33 @@
-From: lethal@linux-sh.org (Paul Mundt)
-Date: Mon, 13 Jun 2011 13:24:10 +0900
-Subject: [PATCH] PCI: Make the struct pci_dev * argument of pci_fixup_irqs
-	const.
-In-Reply-To: <20110610143021.GA26043@linux-mips.org>
-References: <20110610143021.GA26043@linux-mips.org>
-Message-ID: <20110613042410.GB29731@linux-sh.org>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Sun, 12 Jun 2011 22:31:44 -0600
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+Message-ID: <BANLkTik_hH9tZ5MMbOYzhZwLFTFQyJyfRg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 03:30:21PM +0100, Ralf Baechle wrote:
-> Aside of the usual motivation for constification,  this function has a
-> history of being abused a hook for interrupt and other fixups so I turned
-> this function const ages ago in the MIPS code but it should be done
-> treewide.
-> 
-> Due to function pointer passing in varous places a few other functions
-> had to be constified as well.
-> 
-> Signed-off-by: Ralf Baechle <ralf@linux-mips.org>
+On Sun, Jun 12, 2011 at 12:06 AM, Nicolas Pitre
+<nicolas.pitre@linaro.org> wrote:
+> This is a resend of those patches with fixups after the latest changes
+> in mainline.
+>
+> [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64 bits in size
+> This one is new and trivial.
+>
+> [PATCH 2/3] ARM: zImage: Allow the appending of a device tree binary
+> Mostly John Bonesio's version with some adjustments and cleanups.
+>
+> [PATCH 3/3] ARM: zImage: make sure appended DTB doesn't get overwritten by kernel .bss
+> New, simpler alternative to Tony Lindgren's version.
 
-Acked-by: Paul Mundt <lethal@linux-sh.org>
+I've gone ahead and added the series to devicetree/test for anyone who
+want to play with it.
+
+Thanks,
+g.
+
+
+-- 
+Grant Likely, B.Sc., P.Eng.
+Secret Lab Technologies Ltd.
