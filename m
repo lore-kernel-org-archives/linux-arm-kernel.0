@@ -1,62 +1,92 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Mon, 13 Jun 2011 17:11:07 +0100 (BST)
-Subject: [RFC PATCH v5] ARM hibernation / suspend-to-disk (fwd)
-In-Reply-To: <alpine.DEB.2.00.1106131546070.19778@localhost6.localdomain6>
-References: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>
-	<20110613122601.GC12325@n2100.arm.linux.org.uk>
-	<alpine.DEB.2.00.1106131400090.25153@localhost6.localdomain6>
-	<20110613135649.GB8498@arm.com>
-	<alpine.DEB.2.00.1106131546070.19778@localhost6.localdomain6>
-Message-ID: <alpine.DEB.2.00.1106131643420.19778@localhost6.localdomain6>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Mon, 13 Jun 2011 10:44:14 -0600
+Subject: [PATCH 1/3] ARM: pmu: add OF probing support
+In-Reply-To: <4DEFA5E1.9010600@gmail.com>
+References: <1307456541-11026-1-git-send-email-robherring2@gmail.com>
+	<1307456541-11026-2-git-send-email-robherring2@gmail.com>
+	<000001cc25f4$64c2d5c0$2e488140$@rutland@arm.com>
+	<4DEFA5E1.9010600@gmail.com>
+Message-ID: <20110613164414.GE18161@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jun 2011, Frank Hofmann wrote:
+On Wed, Jun 08, 2011 at 11:40:01AM -0500, Rob Herring wrote:
+> Mark,
+> 
+> On 06/08/2011 10:54 AM, Mark Rutland wrote:
+> >Hi,
+> >
+> >>  static int __devinit pmu_device_probe(struct platform_device *pdev)
+> >>  {
+> >>+	enum arm_pmu_type type = pdev->id;
+> >>
+> >>-	if (pdev->id<  0 || pdev->id>= ARM_NUM_PMU_DEVICES) {
+> >>+	if (pdev->dev.of_node)
+> >>+		type = ARM_PMU_DEVICE_CPU;
+> >>+
+> >>+	if (type<  0 || type>= ARM_NUM_PMU_DEVICES) {
+> >>  		pr_warning("received registration request for unknown "
+> >>  				"device %d\n", pdev->id);
+> >>  		return -EINVAL;
+> >>  	}
+> >>
+> >>-	if (pmu_devices[pdev->id])
+> >>+	if (pmu_devices[type])
+> >>  		pr_warning("registering new PMU device type %d overwrites "
+> >>-				"previous registration!\n", pdev->id);
+> >>+				"previous registration!\n", type);
+> >>  	else
+> >>  		pr_info("registered new PMU device of type %d\n",
+> >>-				pdev->id);
+> >>+				type);
+> >>
+> >>-	pmu_devices[pdev->id] = pdev;
+> >>+	pmu_devices[type] = pdev;
+> >>  	return 0;
+> >>  }
+> >
+> >I don't think this is the best way to handle the type when we've got an FDT
+> >description:
+> >
+> >* release_pmu hasn't been updated to match the type logic here, so it might do
+> >   anything when handed a platform_device initialised by FDT code.
+> >
+> >* the warning message for an invalid registration still uses pdev->id rather
+> >   than type. This can't currently be reached when the PMU was handed to us via
+> >   FDT, but it may confuse refactoring later on.
+> >
+> >* If we want to add a new PMU type, we'll have to add more logic to
+> >   pmu_device_probe. Given that work is going on to add support for system PMUs,
+> >   this doesn't seem particularly brilliant.
+> >
+> >>+static struct of_device_id pmu_device_ids[] = {
+> >>+	{ .compatible = "arm,cortex-a9-pmu" },
+> >>+	{ .compatible = "arm,cortex-a8-pmu" },
+> >>+	{ .compatible = "arm,arm1136-pmu" },
+> >>+	{ .compatible = "arm,arm1176-pmu" },
+> >>+	{},
+> >>+};
+> >>+
+> >>  static struct platform_driver pmu_driver = {
+> >>  	.driver		= {
+> >>  		.name	= "arm-pmu",
+> >>+		.of_match_table = pmu_device_ids,
+> >>  	},
+> >>  	.probe		= pmu_device_probe,
+> >>  };
+> >
+> >This all seems fine for handling CPU PMUs.
+> >
+> >I think that a better strategy would be to separate the type logic from the
+> >registration. I have a patch for this:
+> >http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052455.html
+> >
+> >With it, you won't need to change pmu_device_probe, and adding FDT support
+> >should just be a matter of adding the of_match_table.
+> >
+> 
+> Okay. I'll rebase mine on top of your changes.
 
-[ ... ]
-> So it's kind of a two-pronged attack to minimize the SoC-specific code, 
-> Colin's framework to extract common code from the "outer" parts and Russell's 
-> cpu_suspend/resume to extract common code from the "inner" parts.
+The DT binding looks good to me though.
 
-Also, to clarify on the hibernation side:
-
-
-The biggest shortfall of the hibernation support patch that I've posted is 
-that it currently has no awareness of the "peripheral" side of things at 
-all, i.e. all the stuff done by the platform_suspend_ops->begin/enter/end 
-for the suspend-to-mem case isn't replicated sufficiently by the 
-hibernation codepath.
-
-If you like, swsusp_arch_suspend / resume are on the same level of 
-complexity as are the functions in platform_suspend_ops. But the current 
-hibernation patch does only parts of that. It gets away with this largely 
-because it "resumes from ON" ...
-
-As far as that is concerned, Russell really has a point, to do all this 
-properly / well for the hibernation case, a hibernation-specific approach 
-on the platform_ops abstraction level would be better than just to hack 
-low-level generics together for the sake of hacking low-level generics 
-together.
-
-
-If just doing per-SoC hibernation, then the code bloat problem remains, on 
-ARM there's already platform_suspend_ops per SoC; if one adds a full set 
-of platform_hibernation_ops per SoC without thinking where/how to 
-consolidate, it'd only create another mess. Beware the beginnings ...
-
-
-I had thought the idea of using cpu_suspend / resume actually made it 
-clear that my main point for all this "use generics wherever imaginable" 
-is to never allow for unnecessary bloat in the first place and hence opt 
-for generics even if somewhat imperfect / shoehorned for the general case.
-
-I'd like to apologize if that didn't come over.
-
-
-I'm following the work in this area; compared to where things were a year 
-ago a lot of things have happened already. In a way, my hope is that part 
-of all this blah of mine is helping to identify areas where code might be 
-shared even if that starts out as coincidental (as is the current use of 
-cpu_suspend / resume inside the hibernation patch).
-
-FrankH.
+g.
