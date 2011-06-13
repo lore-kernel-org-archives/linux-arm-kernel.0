@@ -1,82 +1,68 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Jun 2011 12:21:51 +0100
-Subject: [PATCH v7 06/14] ARM: shmobile: use remapped PPI interrupts for local
-	timer
+Date: Mon, 13 Jun 2011 12:21:47 +0100
+Subject: [PATCH v7 02/14] ARM: smp: add interrupt handler for local timers
 In-Reply-To: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
 References: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1307964119-4187-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1307964119-4187-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the normal interrupt scheme for the local timers by using
-a remapped PPI interrupt.
+Provide a "normal" interrupt handler for local timers.
+It is expected that most timer implementations will use this
+handler unless they have more specific requirements.
 
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Magnus Damm <magnus.damm@gmail.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-shmobile/Kconfig                    |    1 +
- arch/arm/mach-shmobile/entry-intc.S               |    3 ---
- arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 ---
- arch/arm/mach-shmobile/localtimer.c               |    3 ++-
- 4 files changed, 3 insertions(+), 7 deletions(-)
+ arch/arm/include/asm/localtimer.h |    6 ++++++
+ arch/arm/kernel/smp.c             |   12 ++++++++++++
+ 2 files changed, 18 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 0c8f6cf..ddcf28c 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -26,6 +26,7 @@ config ARCH_SH73A0
- 	select SH_CLK_CPG
- 	select ARCH_WANT_OPTIONAL_GPIOLIB
- 	select ARM_GIC
-+	select ARM_GIC_VPPI
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index 080d74f..bef44b3 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -10,6 +10,8 @@
+ #ifndef __ASM_ARM_LOCALTIMER_H
+ #define __ASM_ARM_LOCALTIMER_H
  
- comment "SH-Mobile Board Type"
- 
-diff --git a/arch/arm/mach-shmobile/entry-intc.S b/arch/arm/mach-shmobile/entry-intc.S
-index cac0a7a..1a1c00c 100644
---- a/arch/arm/mach-shmobile/entry-intc.S
-+++ b/arch/arm/mach-shmobile/entry-intc.S
-@@ -51,7 +51,4 @@
- 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
- 	.endm
- 
--	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
--	.endm
--
- 	arch_irq_handler shmobile_handle_irq_intc
-diff --git a/arch/arm/mach-shmobile/include/mach/entry-macro.S b/arch/arm/mach-shmobile/include/mach/entry-macro.S
-index d791f10..8d4a416 100644
---- a/arch/arm/mach-shmobile/include/mach/entry-macro.S
-+++ b/arch/arm/mach-shmobile/include/mach/entry-macro.S
-@@ -27,8 +27,5 @@
- 	.macro  test_for_ipi, irqnr, irqstat, base, tmp
- 	.endm
- 
--	.macro  test_for_ltirq, irqnr, irqstat, base, tmp
--	.endm
--
- 	.macro  arch_ret_to_user, tmp1, tmp2
- 	.endm
-diff --git a/arch/arm/mach-shmobile/localtimer.c b/arch/arm/mach-shmobile/localtimer.c
-index ad9ccc9..8a67b1c 100644
---- a/arch/arm/mach-shmobile/localtimer.c
-+++ b/arch/arm/mach-shmobile/localtimer.c
-@@ -14,13 +14,14 @@
- #include <linux/clockchips.h>
- #include <asm/smp_twd.h>
- #include <asm/localtimer.h>
-+#include <asm/hardware/gic.h>
++#include <linux/interrupt.h>
++
+ struct clock_event_device;
  
  /*
-  * Setup the local clock events for a CPU.
+@@ -22,6 +24,10 @@ void percpu_timer_setup(void);
   */
- int __cpuinit local_timer_setup(struct clock_event_device *evt)
- {
--	evt->irq = 29;
-+	evt->irq = gic_ppi_to_vppi(29);
- 	twd_timer_setup(evt);
- 	return 0;
+ asmlinkage void do_local_timer(struct pt_regs *);
+ 
++/*
++ * Per-cpu timer IRQ handler
++ */
++irqreturn_t percpu_timer_handler(int irq, void *dev_id);
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+ 
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 344e52b..daa7088 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -460,6 +460,18 @@ asmlinkage void __exception_irq_entry do_local_timer(struct pt_regs *regs)
+ 	set_irq_regs(old_regs);
  }
+ 
++irqreturn_t percpu_timer_handler(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	if (local_timer_ack()) {
++		evt->event_handler(evt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
+ void show_local_irqs(struct seq_file *p, int prec)
+ {
+ 	unsigned int cpu;
 -- 
 1.7.0.4
