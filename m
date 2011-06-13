@@ -1,35 +1,37 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 13 Jun 2011 16:44:16 -0400 (EDT)
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <BANLkTik_hH9tZ5MMbOYzhZwLFTFQyJyfRg@mail.gmail.com>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<BANLkTik_hH9tZ5MMbOYzhZwLFTFQyJyfRg@mail.gmail.com>
-Message-ID: <alpine.LFD.2.00.1106131640370.2142@xanadu.home>
+From: dart@solonet.org.ua (=?UTF-8?B?0JTQtdC90LjRgSDQmtGD0LfRjNC80LXQvdC60L4=?=)
+Date: Tue, 14 Jun 2011 00:21:42 +0300
+Subject: [PATCH] arm mach-s3c2440 mach-mini2440: New LCD-W35i support
+Message-ID: <BANLkTikfLQH=_tSMkFGB7Jx_4vUKPmn-3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 12 Jun 2011, Grant Likely wrote:
+From: Denis Kuzmenko <dart@solonet.org.ua>
+LCD-W35i support for Mini2440 development board
 
-> On Sun, Jun 12, 2011 at 12:06 AM, Nicolas Pitre
-> <nicolas.pitre@linaro.org> wrote:
-> > This is a resend of those patches with fixups after the latest changes
-> > in mainline.
-> >
-> > [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64 bits in size
-> > This one is new and trivial.
-> >
-> > [PATCH 2/3] ARM: zImage: Allow the appending of a device tree binary
-> > Mostly John Bonesio's version with some adjustments and cleanups.
-> >
-> > [PATCH 3/3] ARM: zImage: make sure appended DTB doesn't get overwritten by kernel .bss
-> > New, simpler alternative to Tony Lindgren's version.
-> 
-> I've gone ahead and added the series to devicetree/test for anyone who
-> want to play with it.
+--- linux-2.6.39.1/arch/arm/mach-s3c2440/mach-mini2440.c
+2011-06-03 03:34:20.000000000 +0300
++++ linux-2.6.39.1-dart/arch/arm/mach-s3c2440/mach-mini2440.c
+2011-06-13 23:37:38.785984118 +0300
+@@ -167,6 +167,20 @@ static struct s3c2410fb_display mini2440
+                .lcdcon5        = (S3C2410_LCDCON5_FRM565 |
+                                   S3C2410_LCDCON5_HWSWP),
+        },
++       /* LCD-W35i 3.5" display (LQ035Q1DG06)*/
++       [3] = {
++               _LCD_DECLARE(
++                       7,              /* clock */
++                       320, 68, 66, 4, /* xres, margin_right,
+margin_left, hsync */
++                       240, 4, 4, 9,   /* yres, margin_top,
+margin_bottom, vsync */
++                       60),            /* refresh rate */
++               .lcdcon5        = (S3C2410_LCDCON5_FRM565 |
++                                  S3C2410_LCDCON5_INVVDEN |
++                                  S3C2410_LCDCON5_INVVFRAME |
++                                  S3C2410_LCDCON5_INVVLINE |
++                                  S3C2410_LCDCON5_INVVCLK |
++                                  S3C2410_LCDCON5_HWSWP),
++       },
+ };
 
-I've published those patches with all the latest fixes and ACKs here:
-
-	git://git.linaro.org/people/nico/linux.git zImage_DTB_append
-
-
-Nicolas
+ /* todo - put into gpio header */
