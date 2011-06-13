@@ -1,34 +1,45 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Jun 2011 02:59:31 -0700
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <20110612155940.GM10283@n2100.arm.linux.org.uk>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110612112219.GD16318@ibawizard.net>
-	<20110612115820.GF10283@n2100.arm.linux.org.uk>
-	<201106121615.24059.arnd@arndb.de>
-	<20110612145751.GA4013@ponder.secretlab.ca>
-	<20110612151931.GK10283@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
-	<20110612155940.GM10283@n2100.arm.linux.org.uk>
-Message-ID: <20110613095931.GB10951@atomide.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 13 Jun 2011 18:02:02 +0800
+Subject: [PATCH 5/6] arm: footbridge: convert old leds event driver to led
+	gpio trigger driver of Netwinder
+In-Reply-To: <20110613082301.GB9393@n2100.arm.linux.org.uk>
+References: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
+	<1307947185-5159-6-git-send-email-bryan.wu@canonical.com>
+	<20110613082301.GB9393@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTim-Vbe+rp-aJaXuy8ja4UKDsV8MGA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110612 08:55]:
-> 
-> I don't see this as a sustainable way forward.  If we're going to move a
-> particular SoC over to DT, we need to move the entire SoC over.  We can't
-> do this half-heartedly.
+On Mon, Jun 13, 2011 at 4:23 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 13, 2011 at 02:39:44PM +0800, Bryan Wu wrote:
+>> +/* LEDs */
+>> +static struct gpio_led nw_gpio_leds[] = {
+>> + ? ? ? ?{
+>> + ? ? ? ? ? ? ? ?.name ? ? ? ? ? ? ? ? ? = "netwinder::led_red",
+>> + ? ? ? ? ? ? ? ?.default_trigger ? ? ? ?= "heartbeat",
+>> + ? ? ? ? ? ? ? ?.gpio ? ? ? ? ? ? ? ? ? = GPIO_RED_LED,
+>> + ? ? ? ?},
+>> + ? ? ? ?{
+>> + ? ? ? ? ? ? ? ?.name ? ? ? ? ? ? ? ? ? = "netwinder::led_green",
+>> + ? ? ? ? ? ? ? ?.default_trigger ? ? ? ?= "timer",
+>> + ? ? ? ? ? ? ? ?.gpio ? ? ? ? ? ? ? ? ? = GPIO_GREEN_LED,
+>> + ? ? ? ?},
+>
+> This is especially broken. ?This platform has no GPIO support other
+> than its private stuff, which makes the use of the GPIO LED driver
+> useless. ?The GPIO_*_LED constants are bitmasks for the CPLD
+> controller.
+>
 
-Agreed. In addition to ATAGs, we need to also consider the large chunks
-of data in kernel that Linus originally complained about. We absolutely don't
-want to have the same in two places both in .dts files and in platform data
-for things like mux, clocks, hwmod data etc.
+I was totally confused by the name GPIO_*_* definitions stuff in the
+hardware.h. Sorry about that, it looks like I need rewrite it as my
+6th patch.
 
-So we need to make sure the DT append support works transparently for
-existing bootloaders so we can just drop the the old data instead of
-keeping it around.
-
-Regards,
-
-Tony
+Thanks,
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
