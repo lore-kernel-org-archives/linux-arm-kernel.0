@@ -1,23 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jun 2011 21:01:45 +0100
-Subject: [PATCH 03/14] ARM: suspend: extract common code from
-	MULTI_CPU/!MULTI_CPU paths
-In-Reply-To: <alpine.LFD.2.00.1106131522410.2142@xanadu.home>
-References: <20110613171446.GF13643@n2100.arm.linux.org.uk>
-	<E1QWAju-0002dr-P6@rmk-PC.arm.linux.org.uk>
-	<alpine.LFD.2.00.1106131522410.2142@xanadu.home>
-Message-ID: <20110613200145.GG13643@n2100.arm.linux.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon, 13 Jun 2011 20:24:27 +0000 (UTC)
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<201106121615.24059.arnd@arndb.de>
+	<20110612143428.GI10283@n2100.arm.linux.org.uk>
+	<201106121701.22418.arnd@arndb.de>
+	<20110612153536.GL10283@n2100.arm.linux.org.uk>
+Message-ID: <it5rlq$3f0$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 03:29:02PM -0400, Nicolas Pitre wrote:
-> On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
-> 
-> > Very little code is different between these two paths now, so extract
-> > the common code.
-> 
-> What about simply always using the MULTI_CPU path unconditionally here?  
-> The struct processor pointer could be made available in all cases, and 
-> non critical paths could choose to always use it to simplify the code.
+Russell King - ARM Linux wrote:
 
-For the ifdef sections I don't think its worth it.
+> On Sun, Jun 12, 2011 at 05:01:22PM +0200, Arnd Bergmann wrote:
+>> Of course it should override the device tree, I'm not arguing that.
+>> All I'm saying is that we don't need to special-case this or support
+>> both formats once the kernel is there as long as we move the information
+>> into appropriate DT-representation of the same data.
+>
+> You're arguing for it to be parsed by whatever fragment of assembly code
+> we have to place around the zImage to merge it into DT.
+>
+> And yes, it's going to have to be assembly code because we don't have a
+> C environment at that point which can run in a relocatable way.
+
+Please, again look at the cuboot stuff which is used on powerpc. It uses
+limited C environment: it's executed before kernel entry, so it can use
+stack, etc. as setup by the bootloader.
+
+
+-- 
+With best wishes
+Dmitry
