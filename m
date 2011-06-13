@@ -1,146 +1,77 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Jun 2011 12:21:45 +0100
-Subject: [PATCH v7 00/14] Consolidating GIC per-cpu interrupts
-Message-ID: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
+Date: Mon, 13 Jun 2011 12:21:50 +0100
+Subject: [PATCH v7 05/14] ARM: versatile: use remapped PPI interrupts for
+	local timer
+In-Reply-To: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
+References: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1307964119-4187-6-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current GIC per-cpu interrupts (aka PPIs) suffer from a number of
-problems:
+Use the normal interrupt scheme for the local timers by using
+a remapped PPI interrupt.
 
-- They use a completely separate scheme to handle the interrupts,
-  mostly because the PPI concept doesn't really match the kernel view
-  of an interrupt.
-- PPIs can only be used by the timer code, unless we add more low-level
-  assembly code.
-- The local timer code can only be used by devices generating PPIs,
-  and not SPIs.
-- At least one platform (msm) has started implementing its own
-  alternative scheme.
-- Some low-level code gets duplicated, as usual...
+Tested on VExpress and PB-11MP.
 
-The proposed solution is to let the GIC code expose the PPIs as
-something that the kernel can manage. Instead of having a single
-interrupt number shared on all cores, make the interrupt number be
-different on each CPU.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-realview/Kconfig       |    2 ++
+ arch/arm/mach-vexpress/Kconfig       |    1 +
+ arch/arm/plat-versatile/localtimer.c |    3 ++-
+ 3 files changed, 5 insertions(+), 1 deletions(-)
 
-This enables the use of the normal kernel API (request_irq() and
-friends) and the elimination of some low level code. On the other
-side, it causes quite a bit of churn in the timer code.
-
-This patch set is based on 3.0-rc2. Tested on PB-11MP, Tegra2
-(Harmony) and SMDK-V310.
-
-
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.16.1307964198.24103.linux-arm-kernel@lists.infradead.org>
-
-- Fix compilation when !CONFIG_PM.
-
-
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.17.1307964198.24103.linux-arm-kernel@lists.infradead.org>
-
-- Update Exynos4 MCT to use the local timer infrastructure, now that
-  it doesn't depend on PPIs anymore. Untested, as the board I have
-  doesn't implement MCT (EVT0 syndrome).
-
-
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.18.1307964198.24103.linux-arm-kernel@lists.infradead.org>
-
-- Fix arch/arm/common/Kconfig indentation
-- Fix MSM warning when building UP.
-
-
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.19.1307964198.24103.linux-arm-kernel@lists.infradead.org>
-
-- Fix yet another CPU_HOTPLUG problem: instead of calling free_irq()
-  on timer halt, just disable the interrupt. On timer restart, detect
-  that the interrupt has been requested already and just enable the
-  interrupt back. This avoid doing a request_irq() with preemption
-  disabled, which triggers an ugly warning. Reported by Stephen Boyd.
-
-
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.20.1307964198.24103.linux-arm-kernel@lists.infradead.org>
-
-- More MSM fixes
-- Dropped MSM interrupt handler removal, as this requires more discussion,
-  and will be addressed in a separate series.
-- Moved introduction of percpu_timer_handler to a separate patch
-
-
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.21.1307964198.24103.linux-arm-kernel@lists.infradead.org>
-
-- Fix crash while hotpluging a CPU
-- Use handle_percpu_irq() instead of handle_fasteoi_irq()
-- MSM fixes courtesy of Stephen Boyd
-- MSM switched to percpu_timer_handler()
-- Remove local timer interrupt accounting
-- Restructure patches #1 and #2
-
-Marc Zyngier (14):
-  ARM: gic: add per-cpu interrupt multiplexer
-  ARM: smp: add interrupt handler for local timers
-  ARM: smp_twd: add support for remapped PPI interrupts
-  ARM: omap4: use remapped PPI interrupts for local timer
-  ARM: versatile: use remapped PPI interrupts for local timer
-  ARM: shmobile: use remapped PPI interrupts for local timer
-  ARM: ux500: use remapped PPI interrupts for local timer
-  ARM: tegra: use remapped PPI interrupts for local timer
-  ARM: msm: use remapped PPI interrupts for local timer
-  ARM: exynos4: use remapped PPI interrupts for local timer
-  ARM: gic: remove previous local timer interrupt handling
-  ARM: gic: add compute_irqnr macro for exynos4
-  ARM: SMP: automatically select ARM_GIC_VPPI
-  ARM: exynos4: switch MCT to the full local timer infrastructure
-
- arch/arm/Kconfig                                  |    1 +
- arch/arm/common/Kconfig                           |    5 +
- arch/arm/common/gic.c                             |  147 +++++++++++++++++=
-++--
- arch/arm/include/asm/entry-macro-multi.S          |    7 -
- arch/arm/include/asm/hardirq.h                    |    3 -
- arch/arm/include/asm/hardware/entry-macro-gic.S   |   31 ++---
- arch/arm/include/asm/hardware/gic.h               |   12 ++-
- arch/arm/include/asm/localtimer.h                 |    7 +-
- arch/arm/include/asm/smp.h                        |    5 -
- arch/arm/kernel/irq.c                             |   11 +-
- arch/arm/kernel/smp.c                             |   27 +---
- arch/arm/kernel/smp_twd.c                         |   25 +++-
- arch/arm/mach-exynos4/include/mach/entry-macro.S  |   70 +---------
- arch/arm/mach-exynos4/localtimer.c                |    3 +-
- arch/arm/mach-exynos4/mct.c                       |   68 ++++------
- arch/arm/mach-msm/board-msm8x60.c                 |   11 --
- arch/arm/mach-msm/include/mach/entry-macro-qgic.S |   73 +----------
- arch/arm/mach-msm/timer.c                         |   59 ++++----
- arch/arm/mach-omap2/include/mach/entry-macro.S    |   14 +--
- arch/arm/mach-omap2/timer-mpu.c                   |    3 +-
- arch/arm/mach-shmobile/entry-intc.S               |    3 -
- arch/arm/mach-shmobile/include/mach/entry-macro.S |    3 -
- arch/arm/mach-shmobile/localtimer.c               |    3 +-
- arch/arm/mach-tegra/localtimer.c                  |    3 +-
- arch/arm/mach-ux500/localtimer.c                  |    3 +-
- arch/arm/plat-versatile/localtimer.c              |    3 +-
- 26 files changed, 279 insertions(+), 321 deletions(-)
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index b9a9805..12c7c56 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -38,6 +38,7 @@ config MACH_REALVIEW_PB11MP
+ 	bool "Support RealView(R) Platform Baseboard for ARM11MPCore"
+ 	select CPU_V6K
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_HAS_BARRIERS if SMP
+ 	help
+@@ -76,6 +77,7 @@ config MACH_REALVIEW_PBA8
+ config MACH_REALVIEW_PBX
+ 	bool "Support RealView(R) Platform Baseboard Explore"
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
+ 	select ZONE_DMA if SPARSEMEM
+diff --git a/arch/arm/mach-vexpress/Kconfig b/arch/arm/mach-vexpress/Kconfig
+index 9311484..07a53aa 100644
+--- a/arch/arm/mach-vexpress/Kconfig
++++ b/arch/arm/mach-vexpress/Kconfig
+@@ -5,6 +5,7 @@ config ARCH_VEXPRESS_CA9X4
+ 	bool "Versatile Express Cortex-A9x4 tile"
+ 	select CPU_V7
+ 	select ARM_GIC
++	select ARM_GIC_VPPI
+ 	select ARM_ERRATA_720789
+ 	select ARM_ERRATA_751472
+ 	select ARM_ERRATA_753970
+diff --git a/arch/arm/plat-versatile/localtimer.c b/arch/arm/plat-versatile/localtimer.c
+index 0fb3961..a76daf4 100644
+--- a/arch/arm/plat-versatile/localtimer.c
++++ b/arch/arm/plat-versatile/localtimer.c
+@@ -14,6 +14,7 @@
+ 
+ #include <asm/smp_twd.h>
+ #include <asm/localtimer.h>
++#include <asm/hardware/gic.h>
+ #include <mach/irqs.h>
+ 
+ /*
+@@ -21,7 +22,7 @@
+  */
+ int __cpuinit local_timer_setup(struct clock_event_device *evt)
+ {
+-	evt->irq = IRQ_LOCALTIMER;
++	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
+ 	twd_timer_setup(evt);
+ 	return 0;
+ }
+-- 
+1.7.0.4
