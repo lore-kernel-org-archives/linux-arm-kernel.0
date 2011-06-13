@@ -1,66 +1,114 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Jun 2011 17:46:18 +0200
-Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
-In-Reply-To: <BANLkTikR5AE=-wTWzrSJ0TUaks0_rA3mcg@mail.gmail.com>
-References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
-	<201106131707.49217.arnd@arndb.de>
-	<BANLkTikR5AE=-wTWzrSJ0TUaks0_rA3mcg@mail.gmail.com>
-Message-ID: <201106131746.18972.arnd@arndb.de>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Mon, 13 Jun 2011 23:49:10 +0800
+Subject: [PATCH] gpio/plat-pxa: fix clash with gpiolib namespace
+In-Reply-To: <20110613150247.GA18161@ponder.secretlab.ca>
+References: <1307954539-5681-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTikkT6ZvsSycu13Fnsek43f9+YUkVA@mail.gmail.com>
+	<20110613150247.GA18161@ponder.secretlab.ca>
+Message-ID: <BANLkTiky1GrQu7ooxgUNGfLQsW8haTF4sA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 June 2011 17:30:44 KyongHo Cho wrote:
-> On Tue, Jun 14, 2011 at 12:07 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > I'm sure that the graphics people will disagree with you on that.
-> > Having the frame buffer mapped in write-combine mode is rather
-> > important when you want to efficiently output videos from your
-> > CPU.
-> >
-> I agree with you.
-> But I am discussing about dma_alloc_writecombine() in ARM.
-> You can see that only ARM and AVR32 implement it and there are few
-> drivers which use it.
-> No function in dma_map_ops corresponds to dma_alloc_writecombine().
-> That's why Marek tried to add 'alloc_writecombine' to dma_map_ops.
+On Mon, Jun 13, 2011 at 11:02 PM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> On Mon, Jun 13, 2011 at 05:03:50PM +0800, Eric Miao wrote:
+>> On Mon, Jun 13, 2011 at 4:42 PM, Linus Walleij
+>> <linus.walleij@stericsson.com> wrote:
+>> > From: Linus Walleij <linus.walleij@linaro.org>
+>> >
+>> > The PXA platform code has a static inline helper called
+>> > gpio_to_chip which clashes with the gpiolib namespace if we
+>> > try to expose the function with the same name from gpiolib,
+>> > and it's still confusing even if we don't do that. So rename
+>> > it to gpio_to_pxachip().
+>> >
+>> > Reported-by: H Hartley Sweeten <hartleys@visionengravers.com>
+>> > Cc: Eric Miao <eric.miao@linaro.org>
+>> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> OK, applied to 'devel'.
+>
+> Is the pxa gpio driver going to be moved to drivers/gpio this cycle?
+> If so, you'll probably want to keep the gpio changes in a separate
+> branch that can be merged both into gpio/next and your devel branch,
+> just in case there ends up being merge issues between our branches in
+> linux-next.
 
-Yes, and I think Marek's patch is really necessary. The reason we
-need dma_alloc_writecombine on ARM is because the page attributes in
-the kernel need to match the ones in user space, while other
-architectures either handle the writecombine flag outside of the
-page table or can have multiple conflicting mappings.
+Working on that - the problem is the tight coupling of IRQ subsystem and
+PXA's odd interrupt routing scheme (GPIO0, GPIO1 have dedicated IRQs,
+yet GPIO2 and above they share a single GPIO), while some other PXAs
+they all share a single IRQ line. Would work on that for some time
+though, so yeah I'll possibly keep this in seperate branch.
 
-The reason that I suspect AVR32 needs it is to share device drivers
-with ARM.
-
-> > I can understand that there are arguments why mapping a DMA buffer into
-> > user space doesn't belong into dma_map_ops, but I don't see how the
-> > presence of an IOMMU is one of them.
-> >
-> > The entire purpose of dma_map_ops is to hide from the user whether
-> > you have an IOMMU or not, so that would be the main argument for
-> > putting it in there, not against doing so.
-> >
-> I also understand the reasons why dma_map_ops maps a buffer into user space.
-> Mapping in device and user space at the same time or in a simple
-> approach may look good.
-> But I think mapping to user must be and driver-specific.
-> Moreover, kernel already provides various ways to map physical memory
-> to user space.
-
-I believe the idea of providing dma_mmap_... is to ensure that the
-page attributes are not conflicting and the DMA code is the place
-that decides on the page attributes for the kernel mapping, so no
-other place in the kernel can really know what it should be in user
-space.
-
-> And I think that remapping DMA address that is in device address space
-> to user space is not a good idea
-> because DMA address is not same to physical address semantically if
-> features of IOMMU are implemented.
-
-I'm totally not following this argument. This has nothing to do with IOMMU
-or not. If you have an IOMMU, the dma code will know where the pages are
-anyway, so it can always map them into user space. The dma code might
-have an easier way to do it other than follwoing the page tables.
-
-	Arnd
+>
+> g.
+>
+>>
+>> > ---
+>> > ?arch/arm/plat-pxa/gpio.c | ? 10 +++++-----
+>> > ?1 files changed, 5 insertions(+), 5 deletions(-)
+>> >
+>> > diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
+>> > index 48ebb94..a11dc36 100644
+>> > --- a/arch/arm/plat-pxa/gpio.c
+>> > +++ b/arch/arm/plat-pxa/gpio.c
+>> > @@ -50,7 +50,7 @@ static inline void __iomem *gpio_chip_base(struct gpio_chip *c)
+>> > ? ? ? ?return container_of(c, struct pxa_gpio_chip, chip)->regbase;
+>> > ?}
+>> >
+>> > -static inline struct pxa_gpio_chip *gpio_to_chip(unsigned gpio)
+>> > +static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
+>> > ?{
+>> > ? ? ? ?return &pxa_gpio_chips[gpio_to_bank(gpio)];
+>> > ?}
+>> > @@ -161,7 +161,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
+>> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+>> > ? ? ? ?unsigned long gpdr, mask = GPIO_bit(gpio);
+>> >
+>> > - ? ? ? c = gpio_to_chip(gpio);
+>> > + ? ? ? c = gpio_to_pxachip(gpio);
+>> >
+>> > ? ? ? ?if (type == IRQ_TYPE_PROBE) {
+>> > ? ? ? ? ? ? ? ?/* Don't mess with enabled GPIOs using preconfigured edges or
+>> > @@ -230,7 +230,7 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+>> > ?static void pxa_ack_muxed_gpio(struct irq_data *d)
+>> > ?{
+>> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+>> > - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+>> > + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+>> >
+>> > ? ? ? ?__raw_writel(GPIO_bit(gpio), c->regbase + GEDR_OFFSET);
+>> > ?}
+>> > @@ -238,7 +238,7 @@ static void pxa_ack_muxed_gpio(struct irq_data *d)
+>> > ?static void pxa_mask_muxed_gpio(struct irq_data *d)
+>> > ?{
+>> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+>> > - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+>> > + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+>> > ? ? ? ?uint32_t grer, gfer;
+>> >
+>> > ? ? ? ?c->irq_mask &= ~GPIO_bit(gpio);
+>> > @@ -252,7 +252,7 @@ static void pxa_mask_muxed_gpio(struct irq_data *d)
+>> > ?static void pxa_unmask_muxed_gpio(struct irq_data *d)
+>> > ?{
+>> > ? ? ? ?int gpio = irq_to_gpio(d->irq);
+>> > - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+>> > + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+>> >
+>> > ? ? ? ?c->irq_mask |= GPIO_bit(gpio);
+>> > ? ? ? ?update_edge_detect(c);
+>> > --
+>> > 1.7.3.2
+>> >
+>> >
+>> > _______________________________________________
+>> > linux-arm-kernel mailing list
+>> > linux-arm-kernel at lists.infradead.org
+>> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> >
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
