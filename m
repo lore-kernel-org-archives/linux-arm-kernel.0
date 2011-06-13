@@ -1,48 +1,31 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Mon, 13 Jun 2011 16:33:08 +0400
-Subject: [PATCH 4/4] ARM: pmu: add platform_device_id table support
-In-Reply-To: <1307957757-23001-5-git-send-email-mark.rutland@arm.com>
-References: <4DEFA5E1.9010600@gmail.com>
-	<1307957757-23001-5-git-send-email-mark.rutland@arm.com>
-Message-ID: <4DF60384.4050805@ru.mvista.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 13 Jun 2011 09:36:45 -0300
+Subject: [PATCH 5/6] ARM: mxc: all three imx51 TOs use TO1 version of sdma
+	script
+In-Reply-To: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
+References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+	<1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
+Message-ID: <BANLkTimAUDZ+H5Q_NuvWEna=XvOgFoTq5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Hi Shawn,
 
-On 13-06-2011 13:35, Mark Rutland wrote:
-
-> This patch adds support for platform_device_id tables, allowing new
-> PMU types to be registered with the correct type, without requiring
-> new platform_driver shims to provide the type.
-
-> Macros matching functionality of the of_device_id table macros are
-> provided for convenience.
-
-> Cc: Jamie Iles<jamie@jamieiles.com>
-> Cc: Will Deacon<will.deacon@arm.com>
-> ---
->   arch/arm/kernel/pmu.c |   19 +++++++++++++++++++
->   1 files changed, 19 insertions(+), 0 deletions(-)
-
-> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-> index d34cf88..23c3af2 100644
-> --- a/arch/arm/kernel/pmu.c
-> +++ b/arch/arm/kernel/pmu.c
-[...]
-> @@ -73,6 +86,11 @@ enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
->   		return (enum arm_pmu_type) of_id->data;
->   	}
+On Mon, Jun 13, 2011 at 4:37 AM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> Though there are three TOs of imx51 soc, the sdma script never
+> changes since TO1, which means all three TOs of imx51 uses TO1
+> version of sdma script.
 >
-> +	/* Provided by platform_device_id table */
-> +	if ((pdev_id = platform_get_device_id(pdev))) {
+> The current code passes TO number to imx-sdma driver to load
+> different firmware for different TO. ?That means we have to prepare
+> 3 identical firmwares, sdma-imx25-to1.bin sdma-imx25-to2.bin and
+> sdma-imx25-to3.bin,
 
-    scripts/checkpatch.pl should warn about using = in the *if* statement...
+I think you want to mean:
+sdma-imx51-to1.bin, sdma-imx51-to2.bin, sdma-imx51-to3.bin
 
-> +		return (enum arm_pmu_type) pdev_id->driver_data;
-> +	}
+Please fix the commit log.
 
-    scripts/checkpatch.pl should warn about unneeded {} here.
-    Did you run your patch thru it?
+Regards,
 
-WBR, Sergei
+Fabio Estevam
