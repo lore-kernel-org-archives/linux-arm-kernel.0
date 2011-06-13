@@ -1,50 +1,48 @@
-From: ratheendran.s@gmail.com (Ravi)
-Date: Mon, 13 Jun 2011 09:30:07 +0000 (UTC)
-Subject: linux2.6.35 porting on S3C2416 (USB Host controller driver is not
-	comming Up.)
-Message-ID: <loom.20110613T091605-51@post.gmane.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 13 Jun 2011 10:35:53 +0100
+Subject: [PATCH 0/4] ARM: pmu: improve PMU type identification
+In-Reply-To: <4DEFA5E1.9010600@gmail.com>
+References: <4DEFA5E1.9010600@gmail.com>
+Message-ID: <1307957757-23001-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear All,
+Hi Rob,
 
-I am trying to port linux-2.6.35.12 on s3c2416 based board(kit2416).I was
-sucessfully able to port kernal,device driver for watchdog,RTC,serialport,LCD
-and NAND flash(256MB).
+I've Addded Jamie on Cc here as he was interested in the possibility of
+adding platform_device_id tables. Hopefully it'll be easy to discuss
+{of,platform}_id_tables in one thread.
 
-I followed these steps to call these device at boot time.
+As Jamie pointed out to me the existence of platform_device_id tables,
+I took a look around and noticed that of_device_id tables also seem to
+provide support for driver-specific parameters (I saw an example of
+usage in arch/sparc/kernel/pci_schizo.c).
 
-Include 's3c_device_ohci' in smdk2416_devices structure.
-a. static struct platform_device *smdk2416_devices[] __initdata = {
-	&s3c_device_i2c0, 
-	&s3c_device_lcd, //s3c_device_lcd, 
-	&s3c_device_rtc,
-	&s3c_device_adc,
-	&s3c_device_iis,
-	&s3c_device_usbgadget,
-	&s3c_device_ohci, //USB related config
-	//&s3c_device_usb,
-	&s3c_device_hsmmc1,
-	&s3c_device_smc911x,		
-};
-2. in kernel menuconfig
-    [*] USB support  ---> 
-    [*]     OHCI HCD support 
+I've had a go at getting {of,platform}_device_id tables to provide the
+PMU type, so they can be used similarly (the macros make entries look
+identical apart from the {plat,of} prefix).
 
-3.menu "S3C2416 Machines"
- config MACH_SMDK2416
-        bool "SMDK2416"
-        select CPU_S3C2416
-        select S3C_DEV_FB
-        select S3C_DEV_HSMMC
-        select S3C_DEV_HSMMC1
-        select MACH_SMDK #essl_patch
-        select S3C_DEV_NAND #essl_patch
-        select S3C_DEV_USB_HOST  # essl_patch
+I don't have any entries currently for the platform_device_id table,
+but it'd be useful for system pmus, if we were to add an L2 Cache
+controller PMU driver, it might have a binding like:
+
+> PLAT_MATCH("arm,pl310-pmu", ARM_PMU_TYPE_L2CC),
+
+How does the following series look to you? The first 2 patches are the
+ones I mentioned before, unchanged (apart from additional acks).
+
+Mark.
 
 
-For the above config I am not able to call the driver of USB HOST Controller
-Interface.
+Mark Rutland (4):
+  ARM: pmu: refactor reservation
+  ARM: pmu: reject duplicate PMU registrations
+  ARM: pmu: add OF probing support
+  ARM: pmu: add platform_device_id table support
 
-
-Ravi
+ Documentation/devicetree/bindings/arm/pmu.txt |   22 ++++++
+ arch/arm/include/asm/pmu.h                    |    2 +-
+ arch/arm/kernel/perf_event.c                  |    4 +-
+ arch/arm/kernel/pmu.c                         |   91 ++++++++++++++++++++-----
+ 4 files changed, 99 insertions(+), 20 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
