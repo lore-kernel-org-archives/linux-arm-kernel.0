@@ -1,140 +1,131 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jun 2011 10:35:54 +0100
-Subject: [PATCH 1/4] ARM: pmu: refactor reservation
+Date: Mon, 13 Jun 2011 10:35:56 +0100
+Subject: [PATCH 3/4] ARM: pmu: add OF probing support
 In-Reply-To: <4DEFA5E1.9010600@gmail.com>
 References: <4DEFA5E1.9010600@gmail.com>
-Message-ID: <1307957757-23001-2-git-send-email-mark.rutland@arm.com>
+Message-ID: <1307957757-23001-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, PMU platform_device reservation relies on some minor abuse
-of the platform_device::id field for determining the type of PMU. This
-is problematic for device tree based probing, where the ID cannot be
-controlled.
+This is based on an earlier patch from Rob Herring <rob.herring@calxeda.com>
 
-This patch removes reliance on the id field, and depends on each PMU's
-platform driver to figure out which type it is. As all PMUs handled by
-the current platform_driver name "arm-pmu" are CPU PMUs, this
-convention is hardcoded. New PMU types can be supported through the use
-of {of,platform}_device_id tables
+> Add OF match table to enable OF style driver binding. The dts entry is like
+> this:
+>
+> pmu {
+> 	compatible = "arm,cortex-a9-pmu";
+> 	interrupts = <100 101>;
+> };
+>
+> The use of pdev->id as an index breaks with OF device binding, so set the type
+> based on the OF compatible string.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Jamie Iles <jamie@jamieiles.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
+This modification sets the PMU hardware type based on data embedded in the
+binding, allowing easy addition of new PMU types in future.
+
+Support for new PMU types not provided by devicetree can be added later using
+platform_device_id tables in a similar fashion.
+
+Cc: Jamie Iles <jamie@jamieiles.com>
 Cc: Rob Herring <rob.herring@calxeda.com>
-Cc: Mathieu Desnoyers <mathieu.desnoyers@efficios.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/pmu.h   |    2 +-
- arch/arm/kernel/perf_event.c |    4 ++--
- arch/arm/kernel/pmu.c        |   33 +++++++++++++++++++--------------
- 3 files changed, 22 insertions(+), 17 deletions(-)
+ 
+ Rob: would you be happy to merge this into your tree? or would you
+ rather I sent it through Russell?
 
-diff --git a/arch/arm/include/asm/pmu.h b/arch/arm/include/asm/pmu.h
-index 7544ce6..67c70a3 100644
---- a/arch/arm/include/asm/pmu.h
-+++ b/arch/arm/include/asm/pmu.h
-@@ -52,7 +52,7 @@ reserve_pmu(enum arm_pmu_type device);
-  * a cookie.
-  */
- extern int
--release_pmu(struct platform_device *pdev);
-+release_pmu(enum arm_pmu_type type);
- 
- /**
-  * init_pmu() - Initialise the PMU.
-diff --git a/arch/arm/kernel/perf_event.c b/arch/arm/kernel/perf_event.c
-index d53c0ab..a6c643f 100644
---- a/arch/arm/kernel/perf_event.c
-+++ b/arch/arm/kernel/perf_event.c
-@@ -435,7 +435,7 @@ armpmu_reserve_hardware(void)
- 			if (irq >= 0)
- 				free_irq(irq, NULL);
- 		}
--		release_pmu(pmu_device);
-+		release_pmu(ARM_PMU_DEVICE_CPU);
- 		pmu_device = NULL;
- 	}
- 
-@@ -454,7 +454,7 @@ armpmu_release_hardware(void)
- 	}
- 	armpmu->stop();
- 
--	release_pmu(pmu_device);
-+	release_pmu(ARM_PMU_DEVICE_CPU);
- 	pmu_device = NULL;
- }
- 
+ Documentation/devicetree/bindings/arm/pmu.txt |   22 +++++++++++++++
+ arch/arm/kernel/pmu.c                         |   35 ++++++++++++++++++++++++-
+ 2 files changed, 56 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+new file mode 100644
+index 0000000..739d00c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/pmu.txt
+@@ -0,0 +1,22 @@
++* ARM Performance Monitor Units
++
++ARM cores often have a PMU for counting cpu and cache events like cache misses
++and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
++representation in the device tree should be done as under:-
++
++Required properties:
++
++- compatible : should be one of
++	"arm,cortex-a9-pmu"
++	"arm,cortex-a8-pmu"
++	"arm,arm1176-pmu"
++	"arm,arm1136-pmu"
++- interrupts : 1 combined interrupt or 1 per core.
++
++Example:
++
++pmu {
++        compatible = "arm,cortex-a9-pmu";
++        interrupts = <100 101>;
++};
++
 diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-index 2c79eec..87942b9 100644
+index de6b1b0..d34cf88 100644
 --- a/arch/arm/kernel/pmu.c
 +++ b/arch/arm/kernel/pmu.c
-@@ -25,36 +25,41 @@ static volatile long pmu_lock;
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
  
- static struct platform_device *pmu_devices[ARM_NUM_PMU_DEVICES];
- 
--static int __devinit pmu_device_probe(struct platform_device *pdev)
-+static int __devinit pmu_register(struct platform_device *pdev,
-+					enum arm_pmu_type type)
- {
--
--	if (pdev->id < 0 || pdev->id >= ARM_NUM_PMU_DEVICES) {
-+	if (type < 0 || type >= ARM_NUM_PMU_DEVICES) {
- 		pr_warning("received registration request for unknown "
--				"device %d\n", pdev->id);
-+				"device %d\n", type);
- 		return -EINVAL;
- 	}
- 
--	if (pmu_devices[pdev->id])
-+	if (pmu_devices[type])
- 		pr_warning("registering new PMU device type %d overwrites "
--				"previous registration!\n", pdev->id);
-+				"previous registration!\n", type);
- 	else
- 		pr_info("registered new PMU device of type %d\n",
--				pdev->id);
-+				type);
- 
--	pmu_devices[pdev->id] = pdev;
-+	pmu_devices[type] = pdev;
+ #include <asm/pmu.h>
+@@ -45,14 +46,46 @@ static int __devinit pmu_register(struct platform_device *pdev,
  	return 0;
  }
  
--static struct platform_driver pmu_driver = {
-+static int __devinit armpmu_device_probe(struct platform_device *pdev)
-+{
-+	return pmu_register(pdev, ARM_PMU_DEVICE_CPU);
++#define OF_MATCH_PMU(name, type) {	\
++	.compatible = name,		\
++	.data = (void *) type,	\
 +}
 +
-+static struct platform_driver armpmu_driver = {
++#define OF_MATCH_CPU(name)	OF_MATCH_PMU(name, ARM_PMU_DEVICE_CPU)
++
++static struct of_device_id armpmu_of_device_ids[] = {
++	/* None for now. */
++	OF_MATCH_CPU("arm,cortex-a9-pmu"),
++	OF_MATCH_CPU("arm,cortex-a8-pmu"),
++	OF_MATCH_CPU("arm,arm1136-pmu"),
++	OF_MATCH_CPU("arm,arm1176-pmu"),
++	{},
++};
++
++enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
++{
++	const struct of_device_id	*of_id;
++
++	/* provided by of_device_id table */
++	if (pdev->dev.of_node) {
++		of_id = of_match_device(armpmu_of_device_ids, &pdev->dev);
++		BUG_ON(!of_id);
++		return (enum arm_pmu_type) of_id->data;
++	}
++
++	/* Provided by a 'legacy' platform_device */
++	return ARM_PMU_DEVICE_CPU;
++}
++
+ static int __devinit armpmu_device_probe(struct platform_device *pdev)
+ {
+-	return pmu_register(pdev, ARM_PMU_DEVICE_CPU);
++	return pmu_register(pdev, armpmu_device_type(pdev));
+ }
+ 
+ static struct platform_driver armpmu_driver = {
  	.driver		= {
  		.name	= "arm-pmu",
++		.of_match_table = armpmu_of_device_ids,
  	},
--	.probe		= pmu_device_probe,
-+	.probe		= armpmu_device_probe,
+ 	.probe		= armpmu_device_probe,
  };
- 
- static int __init register_pmu_driver(void)
- {
--	return platform_driver_register(&pmu_driver);
-+	return platform_driver_register(&armpmu_driver);
- }
- device_initcall(register_pmu_driver);
- 
-@@ -77,11 +82,11 @@ reserve_pmu(enum arm_pmu_type device)
- EXPORT_SYMBOL_GPL(reserve_pmu);
- 
- int
--release_pmu(struct platform_device *pdev)
-+release_pmu(enum arm_pmu_type device)
- {
--	if (WARN_ON(pdev != pmu_devices[pdev->id]))
-+	if (WARN_ON(!pmu_devices[device]))
- 		return -EINVAL;
--	clear_bit_unlock(pdev->id, &pmu_lock);
-+	clear_bit_unlock(device, &pmu_lock);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(release_pmu);
 -- 
 1.7.0.4
