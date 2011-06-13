@@ -1,20 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Jun 2011 06:49:43 -0700
-Subject: [PATCH] omap: pandora: fix NAND support
-In-Reply-To: <1307132643-17432-1-git-send-email-notasas@gmail.com>
-References: <1307132643-17432-1-git-send-email-notasas@gmail.com>
-Message-ID: <20110613134943.GF3352@atomide.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Jun 2011 08:55:05 -0500
+Subject: [PATCH 3/4] ARM: pmu: add OF probing support
+In-Reply-To: <B393A6715F47FC43935D96EA15105EFF15CF24E41C@GEORGE.Emea.Arm.com>
+References: <4DEFA5E1.9010600@gmail.com>
+	<1307957757-23001-4-git-send-email-mark.rutland@arm.com>
+	<4DF6134B.3090307@gmail.com>
+	<B393A6715F47FC43935D96EA15105EFF15CF24E41C@GEORGE.Emea.Arm.com>
+Message-ID: <4DF616B9.6000202@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [110603 13:20]:
-> Commit d5ce2b65 "omap3630: nand: fix device size to work in polled mode"
-> changed values for .devsize in nand platform data, now we have to pass
-> NAND_BUSWIDTH_16 instead of '1' to select 16bit NAND.
+On 06/13/2011 08:48 AM, Mark Rutland wrote:
+>> -----Original Message-----
+>> From: Rob Herring [mailto:robherring2 at gmail.com]
+>> Sent: 13 June 2011 14:40
+>> To: Mark Rutland
+>> Cc: linux-arm-kernel at lists.infradead.org; Jamie Iles; Will Deacon
+>> Subject: Re: [PATCH 3/4] ARM: pmu: add OF probing support
+>>
+>> Mark,
+>>
+>> On 06/13/2011 04:35 AM, Mark Rutland wrote:
+>>> This is based on an earlier patch from Rob Herring
+>> <rob.herring@calxeda.com>
+>>>
+>>>> Add OF match table to enable OF style driver binding. The dts entry
+>> is like
+>>>> this:
+>>>>
+>>>> pmu {
+>>>>    compatible = "arm,cortex-a9-pmu";
+>>>>    interrupts = <100 101>;
+>>>> };
+>>>>
+>>>> The use of pdev->id as an index breaks with OF device binding, so
+>> set the type
+>>>> based on the OF compatible string.
+>>>
+>>> This modification sets the PMU hardware type based on data embedded
+>> in the
+>>> binding, allowing easy addition of new PMU types in future.
+>>>
+>>> Support for new PMU types not provided by devicetree can be added
+>> later using
+>>> platform_device_id tables in a similar fashion.
+>>>
+>>> Cc: Jamie Iles <jamie@jamieiles.com>
+>>> Cc: Rob Herring <rob.herring@calxeda.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> ---
+>>>
+>>>  Rob: would you be happy to merge this into your tree? or would you
+>>>  rather I sent it through Russell?
+>>
+>> Looks good to me. I'm happy for you to take it.
+>>
+>> Rob
 > 
-> Update pandora's platform data accordingly, also specify appropriate
-> transfer type.
+> Thanks. Mind if I add your Ack?
+> 
 
-Thanks adding to fixes.
-
-Tony
+Acked-by: Rob Herring <rob.herring@calxeda.com>
