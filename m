@@ -1,27 +1,54 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Mon, 13 Jun 2011 07:58:31 +0200
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-In-Reply-To: <20110612135159.GH10283@n2100.arm.linux.org.uk>
-References: <20110530084307.GA28953@riccoc20.at.omicron.at>
-	<20110601225826.GR3660@n2100.arm.linux.org.uk>
-	<20110611051510.GA3283@riccoc20.at.omicron.at>
-	<20110612135159.GH10283@n2100.arm.linux.org.uk>
-Message-ID: <20110613055831.GA3757@riccoc20.at.omicron.at>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Mon, 13 Jun 2011 14:39:39 +0800
+Subject: [PATCH 0/6] footbridge consolidation patches 
+Message-ID: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12, 2011 at 02:51:59PM +0100, Russell King - ARM Linux wrote:
->
-> It's basically a problem, and its one of the unfortunate prices paid
-> by consolidating code - things become harder and less efficient to do.
-> 
-> In this case, I think we need a set of _be() clocksource accessors in
-> mmio.c, and leave it up to the platform to select the correct accessor.
+When trying to convert old leds event driver to led trigger drivers, I reviewed
+the code of mach-footbridge. move seperated PCI code and leds code into a
+single board files like other machines.
 
-So, is IXP the only machine that would need such accessors?
+leds trigger code is based on Linus Walleij's driver in
+arch/arm/plat-versatile/leds.c
 
-If so, then I think just using my patch as a single exception would be
-fine (maybe adding a comment justifying the exception).
+Built successfully with footbridge_defconfig.
 
-Thanks,
-Richard
+Bryan Wu (6):
+  arm: footbridge: consolidation code of CATS machine
+  arm: footbridge: consolidation code of EBSA285 machine
+  arm: footbridge: consolidation code of Netwinder machine
+  arm: footbridge: consolidation code of Compaq Personal Server
+  arm: footbridge: convert old leds event driver to led gpio trigger
+    driver of Netwinder
+  arm: footbridge: convert old leds event driver to led trigger drivers
+    of EBSA285
+
+ arch/arm/mach-footbridge/Kconfig          |    6 +
+ arch/arm/mach-footbridge/Makefile         |   15 +-
+ arch/arm/mach-footbridge/cats-hw.c        |   95 ----
+ arch/arm/mach-footbridge/cats-pci.c       |   58 ---
+ arch/arm/mach-footbridge/cats.c           |  143 ++++++
+ arch/arm/mach-footbridge/ebsa285-leds.c   |  139 ------
+ arch/arm/mach-footbridge/ebsa285-pci.c    |   48 --
+ arch/arm/mach-footbridge/ebsa285.c        |  114 +++++-
+ arch/arm/mach-footbridge/netwinder-hw.c   |  660 --------------------------
+ arch/arm/mach-footbridge/netwinder-leds.c |  139 ------
+ arch/arm/mach-footbridge/netwinder-pci.c  |   62 ---
+ arch/arm/mach-footbridge/netwinder.c      |  737 +++++++++++++++++++++++++++++
+ arch/arm/mach-footbridge/personal-pci.c   |   56 ---
+ arch/arm/mach-footbridge/personal.c       |   46 ++
+ 14 files changed, 1047 insertions(+), 1271 deletions(-)
+ delete mode 100644 arch/arm/mach-footbridge/cats-hw.c
+ delete mode 100644 arch/arm/mach-footbridge/cats-pci.c
+ create mode 100644 arch/arm/mach-footbridge/cats.c
+ delete mode 100644 arch/arm/mach-footbridge/ebsa285-leds.c
+ delete mode 100644 arch/arm/mach-footbridge/ebsa285-pci.c
+ delete mode 100644 arch/arm/mach-footbridge/netwinder-hw.c
+ delete mode 100644 arch/arm/mach-footbridge/netwinder-leds.c
+ delete mode 100644 arch/arm/mach-footbridge/netwinder-pci.c
+ create mode 100644 arch/arm/mach-footbridge/netwinder.c
+ delete mode 100644 arch/arm/mach-footbridge/personal-pci.c
+
+-- 
+1.7.5
