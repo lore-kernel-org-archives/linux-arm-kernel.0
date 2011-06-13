@@ -1,61 +1,41 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 13 Jun 2011 09:04:16 -0600
-Subject: [PATCH] gpio/74x164: fix clash with gpiolib namespace
-In-Reply-To: <1307954835-20812-1-git-send-email-linus.walleij@stericsson.com>
-References: <1307954835-20812-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110613150416.GC18161@ponder.secretlab.ca>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 13 Jun 2011 17:07:49 +0200
+Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
+In-Reply-To: <BANLkTi=HtrFETnjk1Zu0v9wqa==r0OALvA@mail.gmail.com>
+References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
+	<BANLkTi=HtrFETnjk1Zu0v9wqa==r0OALvA@mail.gmail.com>
+Message-ID: <201106131707.49217.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 10:47:15AM +0200, Linus Walleij wrote:
-> The 74x164 GPIO driver has a static inline helper called
-> gpio_to_chip which clashes with the gpiolib namespace if we
-> try to expose the function with the same name from gpiolib,
-> and it's still confusing even if we don't do that. So rename
-> it to gpio_to_74x164_chip().
+On Monday 13 June 2011 16:12:05 KyongHo Cho wrote:
+> Of course, the mapping created by by dma_alloc_writecombine()
+> may be more efficient for CPU to update the DMA buffer.
+> But I think mapping with dma_alloc_coherent() is not such a
+> performance bottleneck.
 > 
-> Reported-by: H Hartley Sweeten <hartleys@visionengravers.com>
-> Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
+> I think it is better to remove dma_alloc_writecombine() and replace
+> all of it with dma_alloc_coherent().
 
-Merged, thanks.
+I'm sure that the graphics people will disagree with you on that.
+Having the frame buffer mapped in write-combine mode is rather
+important when you want to efficiently output videos from your
+CPU.
 
-g.
-
-> ---
->  drivers/gpio/gpio-74x164.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
+> In addition, IMHO, mapping to user's address is not a duty of dma_map_ops.
+> dma_mmap_*() is not suitable for a system that has IOMMU
+> because a DMA address does not equal to its correspondent physical
+> address semantically.
 > 
-> diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
-> index 7fb60b6..ff525c0 100644
-> --- a/drivers/gpio/gpio-74x164.c
-> +++ b/drivers/gpio/gpio-74x164.c
-> @@ -23,7 +23,7 @@ struct gen_74x164_chip {
->  	u8			port_config;
->  };
->  
-> -static struct gen_74x164_chip *gpio_to_chip(struct gpio_chip *gc)
-> +static struct gen_74x164_chip *gpio_to_74x164_chip(struct gpio_chip *gc)
->  {
->  	return container_of(gc, struct gen_74x164_chip, gpio_chip);
->  }
-> @@ -36,7 +36,7 @@ static int __gen_74x164_write_config(struct gen_74x164_chip *chip)
->  
->  static int gen_74x164_get_value(struct gpio_chip *gc, unsigned offset)
->  {
-> -	struct gen_74x164_chip *chip = gpio_to_chip(gc);
-> +	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
->  	int ret;
->  
->  	mutex_lock(&chip->lock);
-> @@ -49,7 +49,7 @@ static int gen_74x164_get_value(struct gpio_chip *gc, unsigned offset)
->  static void gen_74x164_set_value(struct gpio_chip *gc,
->  		unsigned offset, int val)
->  {
-> -	struct gen_74x164_chip *chip = gpio_to_chip(gc);
-> +	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
->  
->  	mutex_lock(&chip->lock);
->  	if (val)
-> -- 
-> 1.7.3.2
-> 
+> I think DMA APIs of ARM must be changed drastically to support IOMMU
+> because IOMMU API does not manage virtual address space.
+
+I can understand that there are arguments why mapping a DMA buffer into
+user space doesn't belong into dma_map_ops, but I don't see how the
+presence of an IOMMU is one of them.
+
+The entire purpose of dma_map_ops is to hide from the user whether
+you have an IOMMU or not, so that would be the main argument for
+putting it in there, not against doing so.
+
+	Arnd
