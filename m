@@ -1,71 +1,38 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 13 Jun 2011 10:35:57 +0100
-Subject: [PATCH 4/4] ARM: pmu: add platform_device_id table support
-In-Reply-To: <4DEFA5E1.9010600@gmail.com>
-References: <4DEFA5E1.9010600@gmail.com>
-Message-ID: <1307957757-23001-5-git-send-email-mark.rutland@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jun 2011 02:51:42 -0700
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <alpine.LFD.2.00.1106121454510.2142@xanadu.home>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110612112219.GD16318@ibawizard.net>
+	<20110612115820.GF10283@n2100.arm.linux.org.uk>
+	<201106121615.24059.arnd@arndb.de>
+	<20110612145751.GA4013@ponder.secretlab.ca>
+	<20110612151931.GK10283@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
+	<20110612155940.GM10283@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1106121454510.2142@xanadu.home>
+Message-ID: <20110613095142.GA10951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for platform_device_id tables, allowing new
-PMU types to be registered with the correct type, without requiring
-new platform_driver shims to provide the type.
+* Nicolas Pitre <nicolas.pitre@linaro.org> [110612 11:55]:
+> On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
+> 
+> > I don't see this as a sustainable way forward.  If we're going to move a
+> > particular SoC over to DT, we need to move the entire SoC over.  We can't
+> > do this half-heartedly.
+> > 
+> > And that means we _must_ deal with accepting ATAGs from existing boot
+> > loaders, with that information taking precidence over the DT blob
+> > supplied with the kernel.
+> 
+> Well... OK.  Let's see how this can be accommodated with the existing 
+> patch floating around doing that.
 
-Macros matching functionality of the of_device_id table macros are
-provided for convenience.
+I agree that we need to parse the user configurable ATAGs to support
+existing hardware properly. Otherwise we have edit the .dts for each board
+to change the user configurable things, which is not nice for distros.
 
-Cc: Jamie Iles <jamie@jamieiles.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/kernel/pmu.c |   19 +++++++++++++++++++
- 1 files changed, 19 insertions(+), 0 deletions(-)
+Regards,
 
-diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-index d34cf88..23c3af2 100644
---- a/arch/arm/kernel/pmu.c
-+++ b/arch/arm/kernel/pmu.c
-@@ -62,9 +62,22 @@ static struct of_device_id armpmu_of_device_ids[] = {
- 	{},
- };
- 
-+#define PLAT_MATCH_PMU(name, type) {	\
-+	.name = name,		\
-+	.driver_data = (void *) type,	\
-+}
-+
-+#define PLAT_MATCH_CPU(name)	PLAT_MATCH_PMU(name, ARM_PMU_DEVICE_CPU)
-+
-+static struct platform_device_id armpmu_plat_device_ids[] = {
-+	/* None for now */
-+	{},
-+};
-+
- enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
- {
- 	const struct of_device_id	*of_id;
-+	const struct platform_device_id *pdev_id;
- 
- 	/* provided by of_device_id table */
- 	if (pdev->dev.of_node) {
-@@ -73,6 +86,11 @@ enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
- 		return (enum arm_pmu_type) of_id->data;
- 	}
- 
-+	/* Provided by platform_device_id table */
-+	if ((pdev_id = platform_get_device_id(pdev))) {
-+		return (enum arm_pmu_type) pdev_id->driver_data;
-+	}
-+
- 	/* Provided by a 'legacy' platform_device */
- 	return ARM_PMU_DEVICE_CPU;
- }
-@@ -88,6 +106,7 @@ static struct platform_driver armpmu_driver = {
- 		.of_match_table = armpmu_of_device_ids,
- 	},
- 	.probe		= armpmu_device_probe,
-+	.id_table	= armpmu_plat_device_ids,
- };
- 
- static int __init register_pmu_driver(void)
--- 
-1.7.0.4
+Tony
