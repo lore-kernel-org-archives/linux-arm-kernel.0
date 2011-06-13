@@ -1,9 +1,9 @@
 From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 13 Jun 2011 14:39:41 +0800
-Subject: [PATCH 2/6] arm: footbridge: consolidation code of EBSA285 machine
+Date: Mon, 13 Jun 2011 14:39:42 +0800
+Subject: [PATCH 3/6] arm: footbridge: consolidation code of Netwinder machine
 In-Reply-To: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
 References: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <1307947185-5159-3-git-send-email-bryan.wu@canonical.com>
+Message-ID: <1307947185-5159-4-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,32 +11,710 @@ move PCI code to board file
 
 Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 ---
- arch/arm/mach-footbridge/Makefile      |    1 -
- arch/arm/mach-footbridge/ebsa285-pci.c |   48 --------------------------------
- arch/arm/mach-footbridge/ebsa285.c     |   38 +++++++++++++++++++++++++
- 3 files changed, 38 insertions(+), 49 deletions(-)
- delete mode 100644 arch/arm/mach-footbridge/ebsa285-pci.c
+ arch/arm/mach-footbridge/Makefile        |    3 +-
+ arch/arm/mach-footbridge/netwinder-hw.c  |  660 ---------------------------
+ arch/arm/mach-footbridge/netwinder-pci.c |   62 ---
+ arch/arm/mach-footbridge/netwinder.c     |  713 ++++++++++++++++++++++++++++++
+ 4 files changed, 714 insertions(+), 724 deletions(-)
+ delete mode 100644 arch/arm/mach-footbridge/netwinder-hw.c
+ delete mode 100644 arch/arm/mach-footbridge/netwinder-pci.c
+ create mode 100644 arch/arm/mach-footbridge/netwinder.c
 
 diff --git a/arch/arm/mach-footbridge/Makefile b/arch/arm/mach-footbridge/Makefile
-index e0a8b21..e051668 100644
+index e051668..68f7988 100644
 --- a/arch/arm/mach-footbridge/Makefile
 +++ b/arch/arm/mach-footbridge/Makefile
 @@ -9,7 +9,6 @@ obj-m			:=
  obj-n			:=
  obj-			:=
  
--pci-$(CONFIG_ARCH_EBSA285_HOST) += ebsa285-pci.o
- pci-$(CONFIG_ARCH_NETWINDER) += netwinder-pci.o
+-pci-$(CONFIG_ARCH_NETWINDER) += netwinder-pci.o
  pci-$(CONFIG_ARCH_PERSONAL_SERVER) += personal-pci.o
  
-diff --git a/arch/arm/mach-footbridge/ebsa285-pci.c b/arch/arm/mach-footbridge/ebsa285-pci.c
+ leds-$(CONFIG_ARCH_EBSA285) += ebsa285-leds.o
+@@ -17,7 +16,7 @@ leds-$(CONFIG_ARCH_NETWINDER) += netwinder-leds.o
+ 
+ obj-$(CONFIG_ARCH_CATS) += cats.o isa-timer.o
+ obj-$(CONFIG_ARCH_EBSA285) += ebsa285.o dc21285-timer.o
+-obj-$(CONFIG_ARCH_NETWINDER) += netwinder-hw.o isa-timer.o
++obj-$(CONFIG_ARCH_NETWINDER) += netwinder.o isa-timer.o
+ obj-$(CONFIG_ARCH_PERSONAL_SERVER) += personal.o dc21285-timer.o
+ 
+ obj-$(CONFIG_PCI)	+=$(pci-y)
+diff --git a/arch/arm/mach-footbridge/netwinder-hw.c b/arch/arm/mach-footbridge/netwinder-hw.c
 deleted file mode 100644
-index e5ab5bd..0000000
---- a/arch/arm/mach-footbridge/ebsa285-pci.c
+index 06e514f..0000000
+--- a/arch/arm/mach-footbridge/netwinder-hw.c
 +++ /dev/null
-@@ -1,48 +0,0 @@
+@@ -1,660 +0,0 @@
 -/*
-- * linux/arch/arm/mach-footbridge/ebsa285-pci.c
+- * linux/arch/arm/mach-footbridge/netwinder-hw.c
+- *
+- * Netwinder machine fixup
+- *
+- * Copyright (C) 1998, 1999 Russell King, Phil Blundell
+- */
+-#include <linux/module.h>
+-#include <linux/ioport.h>
+-#include <linux/kernel.h>
+-#include <linux/delay.h>
+-#include <linux/init.h>
+-#include <linux/io.h>
+-#include <linux/spinlock.h>
+-
+-#include <asm/hardware/dec21285.h>
+-#include <asm/leds.h>
+-#include <asm/mach-types.h>
+-#include <asm/setup.h>
+-
+-#include <asm/mach/arch.h>
+-
+-#include "common.h"
+-
+-#define IRDA_IO_BASE		0x180
+-#define GP1_IO_BASE		0x338
+-#define GP2_IO_BASE		0x33a
+-
+-
+-#ifdef CONFIG_LEDS
+-#define DEFAULT_LEDS	0
+-#else
+-#define DEFAULT_LEDS	GPIO_GREEN_LED
+-#endif
+-
+-/*
+- * Winbond WB83977F accessibility stuff
+- */
+-static inline void wb977_open(void)
+-{
+-	outb(0x87, 0x370);
+-	outb(0x87, 0x370);
+-}
+-
+-static inline void wb977_close(void)
+-{
+-	outb(0xaa, 0x370);
+-}
+-
+-static inline void wb977_wb(int reg, int val)
+-{
+-	outb(reg, 0x370);
+-	outb(val, 0x371);
+-}
+-
+-static inline void wb977_ww(int reg, int val)
+-{
+-	outb(reg, 0x370);
+-	outb(val >> 8, 0x371);
+-	outb(reg + 1, 0x370);
+-	outb(val & 255, 0x371);
+-}
+-
+-#define wb977_device_select(dev)	wb977_wb(0x07, dev)
+-#define wb977_device_disable()		wb977_wb(0x30, 0x00)
+-#define wb977_device_enable()		wb977_wb(0x30, 0x01)
+-
+-/*
+- * This is a lock for accessing ports GP1_IO_BASE and GP2_IO_BASE
+- */
+-DEFINE_SPINLOCK(nw_gpio_lock);
+-EXPORT_SYMBOL(nw_gpio_lock);
+-
+-static unsigned int current_gpio_op;
+-static unsigned int current_gpio_io;
+-static unsigned int current_cpld;
+-
+-void nw_gpio_modify_op(unsigned int mask, unsigned int set)
+-{
+-	unsigned int new_gpio, changed;
+-
+-	new_gpio = (current_gpio_op & ~mask) | set;
+-	changed = new_gpio ^ current_gpio_op;
+-	current_gpio_op = new_gpio;
+-
+-	if (changed & 0xff)
+-		outb(new_gpio, GP1_IO_BASE);
+-	if (changed & 0xff00)
+-		outb(new_gpio >> 8, GP2_IO_BASE);
+-}
+-EXPORT_SYMBOL(nw_gpio_modify_op);
+-
+-static inline void __gpio_modify_io(int mask, int in)
+-{
+-	unsigned int new_gpio, changed;
+-	int port;
+-
+-	new_gpio = (current_gpio_io & ~mask) | in;
+-	changed = new_gpio ^ current_gpio_io;
+-	current_gpio_io = new_gpio;
+-
+-	changed >>= 1;
+-	new_gpio >>= 1;
+-
+-	wb977_device_select(7);
+-
+-	for (port = 0xe1; changed && port < 0xe8; changed >>= 1) {
+-		wb977_wb(port, new_gpio & 1);
+-
+-		port += 1;
+-		new_gpio >>= 1;
+-	}
+-
+-	wb977_device_select(8);
+-
+-	for (port = 0xe8; changed && port < 0xec; changed >>= 1) {
+-		wb977_wb(port, new_gpio & 1);
+-
+-		port += 1;
+-		new_gpio >>= 1;
+-	}
+-}
+-
+-void nw_gpio_modify_io(unsigned int mask, unsigned int in)
+-{
+-	/* Open up the SuperIO chip */
+-	wb977_open();
+-
+-	__gpio_modify_io(mask, in);
+-
+-	/* Close up the EFER gate */
+-	wb977_close();
+-}
+-EXPORT_SYMBOL(nw_gpio_modify_io);
+-
+-unsigned int nw_gpio_read(void)
+-{
+-	return inb(GP1_IO_BASE) | inb(GP2_IO_BASE) << 8;
+-}
+-EXPORT_SYMBOL(nw_gpio_read);
+-
+-/*
+- * Initialise the Winbond W83977F global registers
+- */
+-static inline void wb977_init_global(void)
+-{
+-	/*
+-	 * Enable R/W config registers
+-	 */
+-	wb977_wb(0x26, 0x40);
+-
+-	/*
+-	 * Power down FDC (not used)
+-	 */
+-	wb977_wb(0x22, 0xfe);
+-
+-	/*
+-	 * GP12, GP11, CIRRX, IRRXH, GP10
+-	 */
+-	wb977_wb(0x2a, 0xc1);
+-
+-	/*
+-	 * GP23, GP22, GP21, GP20, GP13
+-	 */
+-	wb977_wb(0x2b, 0x6b);
+-
+-	/*
+-	 * GP17, GP16, GP15, GP14
+-	 */
+-	wb977_wb(0x2c, 0x55);
+-}
+-
+-/*
+- * Initialise the Winbond W83977F printer port
+- */
+-static inline void wb977_init_printer(void)
+-{
+-	wb977_device_select(1);
+-
+-	/*
+-	 * mode 1 == EPP
+-	 */
+-	wb977_wb(0xf0, 0x01);
+-}
+-
+-/*
+- * Initialise the Winbond W83977F keyboard controller
+- */
+-static inline void wb977_init_keyboard(void)
+-{
+-	wb977_device_select(5);
+-
+-	/*
+-	 * Keyboard controller address
+-	 */
+-	wb977_ww(0x60, 0x0060);
+-	wb977_ww(0x62, 0x0064);
+-
+-	/*
+-	 * Keyboard IRQ 1, active high, edge trigger
+-	 */
+-	wb977_wb(0x70, 1);
+-	wb977_wb(0x71, 0x02);
+-
+-	/*
+-	 * Mouse IRQ 5, active high, edge trigger
+-	 */
+-	wb977_wb(0x72, 5);
+-	wb977_wb(0x73, 0x02);
+-
+-	/*
+-	 * KBC 8MHz
+-	 */
+-	wb977_wb(0xf0, 0x40);
+-
+-	/*
+-	 * Enable device
+-	 */
+-	wb977_device_enable();
+-}
+-
+-/*
+- * Initialise the Winbond W83977F Infra-Red device
+- */
+-static inline void wb977_init_irda(void)
+-{
+-	wb977_device_select(6);
+-
+-	/*
+-	 * IR base address
+-	 */
+-	wb977_ww(0x60, IRDA_IO_BASE);
+-
+-	/*
+-	 * IRDA IRQ 6, active high, edge trigger
+-	 */
+-	wb977_wb(0x70, 6);
+-	wb977_wb(0x71, 0x02);
+-
+-	/*
+-	 * RX DMA - ISA DMA 0
+-	 */
+-	wb977_wb(0x74, 0x00);
+-
+-	/*
+-	 * TX DMA - Disable Tx DMA
+-	 */
+-	wb977_wb(0x75, 0x04);
+-
+-	/*
+-	 * Append CRC, Enable bank selection
+-	 */
+-	wb977_wb(0xf0, 0x03);
+-
+-	/*
+-	 * Enable device
+-	 */
+-	wb977_device_enable();
+-}
+-
+-/*
+- * Initialise Winbond W83977F general purpose IO
+- */
+-static inline void wb977_init_gpio(void)
+-{
+-	unsigned long flags;
+-
+-	/*
+-	 * Set up initial I/O definitions
+-	 */
+-	current_gpio_io = -1;
+-	__gpio_modify_io(-1, GPIO_DONE | GPIO_WDTIMER);
+-
+-	wb977_device_select(7);
+-
+-	/*
+-	 * Group1 base address
+-	 */
+-	wb977_ww(0x60, GP1_IO_BASE);
+-	wb977_ww(0x62, 0);
+-	wb977_ww(0x64, 0);
+-
+-	/*
+-	 * GP10 (Orage button) IRQ 10, active high, edge trigger
+-	 */
+-	wb977_wb(0x70, 10);
+-	wb977_wb(0x71, 0x02);
+-
+-	/*
+-	 * GP10: Debounce filter enabled, IRQ, input
+-	 */
+-	wb977_wb(0xe0, 0x19);
+-
+-	/*
+-	 * Enable Group1
+-	 */
+-	wb977_device_enable();
+-
+-	wb977_device_select(8);
+-
+-	/*
+-	 * Group2 base address
+-	 */
+-	wb977_ww(0x60, GP2_IO_BASE);
+-
+-	/*
+-	 * Clear watchdog timer regs
+-	 *  - timer disable
+-	 */
+-	wb977_wb(0xf2, 0x00);
+-
+-	/*
+-	 *  - disable LED, no mouse nor keyboard IRQ
+-	 */
+-	wb977_wb(0xf3, 0x00);
+-
+-	/*
+-	 *  - timer counting, disable power LED, disable timeouot
+-	 */
+-	wb977_wb(0xf4, 0x00);
+-
+-	/*
+-	 * Enable group2
+-	 */
+-	wb977_device_enable();
+-
+-	/*
+-	 * Set Group1/Group2 outputs
+-	 */
+-	spin_lock_irqsave(&nw_gpio_lock, flags);
+-	nw_gpio_modify_op(-1, GPIO_RED_LED | GPIO_FAN);
+-	spin_unlock_irqrestore(&nw_gpio_lock, flags);
+-}
+-
+-/*
+- * Initialise the Winbond W83977F chip.
+- */
+-static void __init wb977_init(void)
+-{
+-	request_region(0x370, 2, "W83977AF configuration");
+-
+-	/*
+-	 * Open up the SuperIO chip
+-	 */
+-	wb977_open();
+-
+-	/*
+-	 * Initialise the global registers
+-	 */
+-	wb977_init_global();
+-
+-	/*
+-	 * Initialise the various devices in
+-	 * the multi-IO chip.
+-	 */
+-	wb977_init_printer();
+-	wb977_init_keyboard();
+-	wb977_init_irda();
+-	wb977_init_gpio();
+-
+-	/*
+-	 * Close up the EFER gate
+-	 */
+-	wb977_close();
+-}
+-
+-void nw_cpld_modify(unsigned int mask, unsigned int set)
+-{
+-	int msk;
+-
+-	current_cpld = (current_cpld & ~mask) | set;
+-
+-	nw_gpio_modify_io(GPIO_DATA | GPIO_IOCLK | GPIO_IOLOAD, 0);
+-	nw_gpio_modify_op(GPIO_IOLOAD, 0);
+-
+-	for (msk = 8; msk; msk >>= 1) {
+-		int bit = current_cpld & msk;
+-
+-		nw_gpio_modify_op(GPIO_DATA | GPIO_IOCLK, bit ? GPIO_DATA : 0);
+-		nw_gpio_modify_op(GPIO_IOCLK, GPIO_IOCLK);
+-	}
+-
+-	nw_gpio_modify_op(GPIO_IOCLK|GPIO_DATA, 0);
+-	nw_gpio_modify_op(GPIO_IOLOAD|GPIO_DSCLK, GPIO_IOLOAD|GPIO_DSCLK);
+-	nw_gpio_modify_op(GPIO_IOLOAD, 0);
+-}
+-EXPORT_SYMBOL(nw_cpld_modify);
+-
+-static void __init cpld_init(void)
+-{
+-	unsigned long flags;
+-
+-	spin_lock_irqsave(&nw_gpio_lock, flags);
+-	nw_cpld_modify(-1, CPLD_UNMUTE | CPLD_7111_DISABLE);
+-	spin_unlock_irqrestore(&nw_gpio_lock, flags);
+-}
+-
+-static unsigned char rwa_unlock[] __initdata =
+-{ 0x00, 0x00, 0x6a, 0xb5, 0xda, 0xed, 0xf6, 0xfb, 0x7d, 0xbe, 0xdf, 0x6f, 0x37, 0x1b,
+-  0x0d, 0x86, 0xc3, 0x61, 0xb0, 0x58, 0x2c, 0x16, 0x8b, 0x45, 0xa2, 0xd1, 0xe8, 0x74,
+-  0x3a, 0x9d, 0xce, 0xe7, 0x73, 0x39 };
+-
+-#ifndef DEBUG
+-#define dprintk(x...)
+-#else
+-#define dprintk(x...) printk(x)
+-#endif
+-
+-#define WRITE_RWA(r,v) do { outb((r), 0x279); udelay(10); outb((v), 0xa79); } while (0)
+-
+-static inline void rwa010_unlock(void)
+-{
+-	int i;
+-
+-	WRITE_RWA(2, 2);
+-	mdelay(10);
+-
+-	for (i = 0; i < sizeof(rwa_unlock); i++) {
+-		outb(rwa_unlock[i], 0x279);
+-		udelay(10);
+-	}
+-}
+-
+-static inline void rwa010_read_ident(void)
+-{
+-	unsigned char si[9];
+-	int i, j;
+-
+-	WRITE_RWA(3, 0);
+-	WRITE_RWA(0, 128);
+-
+-	outb(1, 0x279);
+-
+-	mdelay(1);
+-
+-	dprintk("Identifier: ");
+-	for (i = 0; i < 9; i++) {
+-		si[i] = 0;
+-		for (j = 0; j < 8; j++) {
+-			int bit;
+-			udelay(250);
+-			inb(0x203);
+-			udelay(250);
+-			bit = inb(0x203);
+-			dprintk("%02X ", bit);
+-			bit = (bit == 0xaa) ? 1 : 0;
+-			si[i] |= bit << j;
+-		}
+-		dprintk("(%02X) ", si[i]);
+-	}
+-	dprintk("\n");
+-}
+-
+-static inline void rwa010_global_init(void)
+-{
+-	WRITE_RWA(6, 2);	// Assign a card no = 2
+-
+-	dprintk("Card no = %d\n", inb(0x203));
+-
+-	/* disable the modem section of the chip */
+-	WRITE_RWA(7, 3);
+-	WRITE_RWA(0x30, 0);
+-
+-	/* disable the cdrom section of the chip */
+-	WRITE_RWA(7, 4);
+-	WRITE_RWA(0x30, 0);
+-
+-	/* disable the MPU-401 section of the chip */
+-	WRITE_RWA(7, 2);
+-	WRITE_RWA(0x30, 0);
+-}
+-
+-static inline void rwa010_game_port_init(void)
+-{
+-	int i;
+-
+-	WRITE_RWA(7, 5);
+-
+-	dprintk("Slider base: ");
+-	WRITE_RWA(0x61, 1);
+-	i = inb(0x203);
+-
+-	WRITE_RWA(0x60, 2);
+-	dprintk("%02X%02X (201)\n", inb(0x203), i);
+-
+-	WRITE_RWA(0x30, 1);
+-}
+-
+-static inline void rwa010_waveartist_init(int base, int irq, int dma)
+-{
+-	int i;
+-
+-	WRITE_RWA(7, 0);
+-
+-	dprintk("WaveArtist base: ");
+-	WRITE_RWA(0x61, base & 255);
+-	i = inb(0x203);
+-
+-	WRITE_RWA(0x60, base >> 8);
+-	dprintk("%02X%02X (%X),", inb(0x203), i, base);
+-
+-	WRITE_RWA(0x70, irq);
+-	dprintk(" irq: %d (%d),", inb(0x203), irq);
+-
+-	WRITE_RWA(0x74, dma);
+-	dprintk(" dma: %d (%d)\n", inb(0x203), dma);
+-
+-	WRITE_RWA(0x30, 1);
+-}
+-
+-static inline void rwa010_soundblaster_init(int sb_base, int al_base, int irq, int dma)
+-{
+-	int i;
+-
+-	WRITE_RWA(7, 1);
+-
+-	dprintk("SoundBlaster base: ");
+-	WRITE_RWA(0x61, sb_base & 255);
+-	i = inb(0x203);
+-
+-	WRITE_RWA(0x60, sb_base >> 8);
+-	dprintk("%02X%02X (%X),", inb(0x203), i, sb_base);
+-
+-	dprintk(" irq: ");
+-	WRITE_RWA(0x70, irq);
+-	dprintk("%d (%d),", inb(0x203), irq);
+-
+-	dprintk(" 8-bit DMA: ");
+-	WRITE_RWA(0x74, dma);
+-	dprintk("%d (%d)\n", inb(0x203), dma);
+-
+-	dprintk("AdLib base: ");
+-	WRITE_RWA(0x63, al_base & 255);
+-	i = inb(0x203);
+-
+-	WRITE_RWA(0x62, al_base >> 8);
+-	dprintk("%02X%02X (%X)\n", inb(0x203), i, al_base);
+-
+-	WRITE_RWA(0x30, 1);
+-}
+-
+-static void rwa010_soundblaster_reset(void)
+-{
+-	int i;
+-
+-	outb(1, 0x226);
+-	udelay(3);
+-	outb(0, 0x226);
+-
+-	for (i = 0; i < 5; i++) {
+-		if (inb(0x22e) & 0x80)
+-			break;
+-		mdelay(1);
+-	}
+-	if (i == 5)
+-		printk("SoundBlaster: DSP reset failed\n");
+-
+-	dprintk("SoundBlaster DSP reset: %02X (AA)\n", inb(0x22a));
+-
+-	for (i = 0; i < 5; i++) {
+-		if ((inb(0x22c) & 0x80) == 0)
+-			break;
+-		mdelay(1);
+-	}
+-
+-	if (i == 5)
+-		printk("SoundBlaster: DSP not ready\n");
+-	else {
+-		outb(0xe1, 0x22c);
+-
+-		dprintk("SoundBlaster DSP id: ");
+-		i = inb(0x22a);
+-		udelay(1);
+-		i |= inb(0x22a) << 8;
+-		dprintk("%04X\n", i);
+-
+-		for (i = 0; i < 5; i++) {
+-			if ((inb(0x22c) & 0x80) == 0)
+-				break;
+-			mdelay(1);
+-		}
+-
+-		if (i == 5)
+-			printk("SoundBlaster: could not turn speaker off\n");
+-
+-		outb(0xd3, 0x22c);
+-	}
+-
+-	/* turn on OPL3 */
+-	outb(5, 0x38a);
+-	outb(1, 0x38b);
+-}
+-
+-static void __init rwa010_init(void)
+-{
+-	rwa010_unlock();
+-	rwa010_read_ident();
+-	rwa010_global_init();
+-	rwa010_game_port_init();
+-	rwa010_waveartist_init(0x250, 3, 7);
+-	rwa010_soundblaster_init(0x220, 0x388, 3, 1);
+-	rwa010_soundblaster_reset();
+-}
+-
+-/*
+- * Initialise any other hardware after we've got the PCI bus
+- * initialised.  We may need the PCI bus to talk to this other
+- * hardware.
+- */
+-static int __init nw_hw_init(void)
+-{
+-	if (machine_is_netwinder()) {
+-		unsigned long flags;
+-
+-		wb977_init();
+-		cpld_init();
+-		rwa010_init();
+-
+-		spin_lock_irqsave(&nw_gpio_lock, flags);
+-		nw_gpio_modify_op(GPIO_RED_LED|GPIO_GREEN_LED, DEFAULT_LEDS);
+-		spin_unlock_irqrestore(&nw_gpio_lock, flags);
+-	}
+-	return 0;
+-}
+-
+-__initcall(nw_hw_init);
+-
+-/*
+- * Older NeTTroms either do not provide a parameters
+- * page, or they don't supply correct information in
+- * the parameter page.
+- */
+-static void __init
+-fixup_netwinder(struct machine_desc *desc, struct tag *tags,
+-		char **cmdline, struct meminfo *mi)
+-{
+-#ifdef CONFIG_ISAPNP
+-	extern int isapnp_disable;
+-
+-	/*
+-	 * We must not use the kernels ISAPnP code
+-	 * on the NetWinder - it will reset the settings
+-	 * for the WaveArtist chip and render it inoperable.
+-	 */
+-	isapnp_disable = 1;
+-#endif
+-}
+-
+-MACHINE_START(NETWINDER, "Rebel-NetWinder")
+-	/* Maintainer: Russell King/Rebel.com */
+-	.boot_params	= 0x00000100,
+-	.video_start	= 0x000a0000,
+-	.video_end	= 0x000bffff,
+-	.reserve_lp0	= 1,
+-	.reserve_lp2	= 1,
+-	.fixup		= fixup_netwinder,
+-	.map_io		= footbridge_map_io,
+-	.init_irq	= footbridge_init_irq,
+-	.timer		= &isa_timer,
+-MACHINE_END
+diff --git a/arch/arm/mach-footbridge/netwinder-pci.c b/arch/arm/mach-footbridge/netwinder-pci.c
+deleted file mode 100644
+index e263d6d..0000000
+--- a/arch/arm/mach-footbridge/netwinder-pci.c
++++ /dev/null
+@@ -1,62 +0,0 @@
+-/*
+- * linux/arch/arm/mach-footbridge/netwinder-pci.c
 - *
 - * PCI bios-type initialisation for PCI machines
 - *
@@ -50,24 +728,38 @@ index e5ab5bd..0000000
 -#include <asm/mach/pci.h>
 -#include <asm/mach-types.h>
 -
--static int irqmap_ebsa285[] __initdata = { IRQ_IN3, IRQ_IN1, IRQ_IN0, IRQ_PCI };
--
--static int __init ebsa285_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+-/*
+- * We now use the slot ID instead of the device identifiers to select
+- * which interrupt is routed where.
+- */
+-static int __init netwinder_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 -{
--	if (dev->vendor == PCI_VENDOR_ID_CONTAQ &&
--	    dev->device == PCI_DEVICE_ID_CONTAQ_82C693)
--		switch (PCI_FUNC(dev->devfn)) {
--		case 1:	return 14;
--		case 2:	return 15;
--		case 3:	return 12;
--		}
+-	switch (slot) {
+-	case 0:  /* host bridge */
+-		return 0;
 -
--	return irqmap_ebsa285[(slot + pin) & 3];
+-	case 9:  /* CyberPro */
+-		return IRQ_NETWINDER_VGA;
+-
+-	case 10: /* DC21143 */
+-		return IRQ_NETWINDER_ETHER100;
+-
+-	case 12: /* Winbond 553 */
+-		return IRQ_ISA_HARDDISK1;
+-
+-	case 13: /* Winbond 89C940F */
+-		return IRQ_NETWINDER_ETHER10;
+-
+-	default:
+-		printk(KERN_ERR "PCI: unknown device in slot %s\n",
+-			pci_name(dev));
+-		return 0;
+-	}
 -}
 -
--static struct hw_pci ebsa285_pci __initdata = {
+-static struct hw_pci netwinder_pci __initdata = {
 -	.swizzle		= pci_std_swizzle,
--	.map_irq		= ebsa285_map_irq,
+-	.map_irq		= netwinder_map_irq,
 -	.nr_controllers		= 1,
 -	.setup			= dc21285_setup,
 -	.scan			= dc21285_scan_bus,
@@ -75,52 +767,704 @@ index e5ab5bd..0000000
 -	.postinit		= dc21285_postinit,
 -};
 -
--static int __init ebsa285_init_pci(void)
+-static int __init netwinder_pci_init(void)
 -{
--	if (machine_is_ebsa285())
--		pci_common_init(&ebsa285_pci);
+-	if (machine_is_netwinder())
+-		pci_common_init(&netwinder_pci);
 -	return 0;
 -}
 -
--subsys_initcall(ebsa285_init_pci);
-diff --git a/arch/arm/mach-footbridge/ebsa285.c b/arch/arm/mach-footbridge/ebsa285.c
-index 2ef69ff..fc91c85 100644
---- a/arch/arm/mach-footbridge/ebsa285.c
-+++ b/arch/arm/mach-footbridge/ebsa285.c
-@@ -5,7 +5,11 @@
-  */
- #include <linux/init.h>
- #include <linux/spinlock.h>
+-subsys_initcall(netwinder_pci_init);
+diff --git a/arch/arm/mach-footbridge/netwinder.c b/arch/arm/mach-footbridge/netwinder.c
+new file mode 100644
+index 0000000..c4e5139
+--- /dev/null
++++ b/arch/arm/mach-footbridge/netwinder.c
+@@ -0,0 +1,713 @@
++/*
++ * linux/arch/arm/mach-footbridge/netwinder-hw.c
++ *
++ * Netwinder machine fixup
++ *
++ * Copyright (C) 1998, 1999 Russell King, Phil Blundell
++ */
++#include <linux/module.h>
++#include <linux/ioport.h>
 +#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/spinlock.h>
 +#include <linux/pci.h>
- 
++
++
 +#include <asm/irq.h>
 +#include <asm/mach/pci.h>
- #include <asm/hardware/dec21285.h>
- #include <asm/mach-types.h>
- 
-@@ -13,6 +17,40 @@
- 
- #include "common.h"
- 
-+static int irqmap_ebsa285[] __initdata = { IRQ_IN3, IRQ_IN1, IRQ_IN0, IRQ_PCI };
++#include <asm/hardware/dec21285.h>
++#include <asm/leds.h>
++#include <asm/mach-types.h>
++#include <asm/setup.h>
 +
-+static int __init ebsa285_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
++#include <asm/mach/arch.h>
++
++#include "common.h"
++
++#define IRDA_IO_BASE		0x180
++#define GP1_IO_BASE		0x338
++#define GP2_IO_BASE		0x33a
++
++
++#ifdef CONFIG_LEDS
++#define DEFAULT_LEDS	0
++#else
++#define DEFAULT_LEDS	GPIO_GREEN_LED
++#endif
++
++/*
++ * Winbond WB83977F accessibility stuff
++ */
++static inline void wb977_open(void)
 +{
-+	if (dev->vendor == PCI_VENDOR_ID_CONTAQ &&
-+	    dev->device == PCI_DEVICE_ID_CONTAQ_82C693)
-+		switch (PCI_FUNC(dev->devfn)) {
-+		case 1:	return 14;
-+		case 2:	return 15;
-+		case 3:	return 12;
-+		}
-+
-+	return irqmap_ebsa285[(slot + pin) & 3];
++	outb(0x87, 0x370);
++	outb(0x87, 0x370);
 +}
 +
-+static struct hw_pci ebsa285_pci __initdata = {
++static inline void wb977_close(void)
++{
++	outb(0xaa, 0x370);
++}
++
++static inline void wb977_wb(int reg, int val)
++{
++	outb(reg, 0x370);
++	outb(val, 0x371);
++}
++
++static inline void wb977_ww(int reg, int val)
++{
++	outb(reg, 0x370);
++	outb(val >> 8, 0x371);
++	outb(reg + 1, 0x370);
++	outb(val & 255, 0x371);
++}
++
++#define wb977_device_select(dev)	wb977_wb(0x07, dev)
++#define wb977_device_disable()		wb977_wb(0x30, 0x00)
++#define wb977_device_enable()		wb977_wb(0x30, 0x01)
++
++/*
++ * This is a lock for accessing ports GP1_IO_BASE and GP2_IO_BASE
++ */
++DEFINE_SPINLOCK(nw_gpio_lock);
++EXPORT_SYMBOL(nw_gpio_lock);
++
++static unsigned int current_gpio_op;
++static unsigned int current_gpio_io;
++static unsigned int current_cpld;
++
++void nw_gpio_modify_op(unsigned int mask, unsigned int set)
++{
++	unsigned int new_gpio, changed;
++
++	new_gpio = (current_gpio_op & ~mask) | set;
++	changed = new_gpio ^ current_gpio_op;
++	current_gpio_op = new_gpio;
++
++	if (changed & 0xff)
++		outb(new_gpio, GP1_IO_BASE);
++	if (changed & 0xff00)
++		outb(new_gpio >> 8, GP2_IO_BASE);
++}
++EXPORT_SYMBOL(nw_gpio_modify_op);
++
++static inline void __gpio_modify_io(int mask, int in)
++{
++	unsigned int new_gpio, changed;
++	int port;
++
++	new_gpio = (current_gpio_io & ~mask) | in;
++	changed = new_gpio ^ current_gpio_io;
++	current_gpio_io = new_gpio;
++
++	changed >>= 1;
++	new_gpio >>= 1;
++
++	wb977_device_select(7);
++
++	for (port = 0xe1; changed && port < 0xe8; changed >>= 1) {
++		wb977_wb(port, new_gpio & 1);
++
++		port += 1;
++		new_gpio >>= 1;
++	}
++
++	wb977_device_select(8);
++
++	for (port = 0xe8; changed && port < 0xec; changed >>= 1) {
++		wb977_wb(port, new_gpio & 1);
++
++		port += 1;
++		new_gpio >>= 1;
++	}
++}
++
++void nw_gpio_modify_io(unsigned int mask, unsigned int in)
++{
++	/* Open up the SuperIO chip */
++	wb977_open();
++
++	__gpio_modify_io(mask, in);
++
++	/* Close up the EFER gate */
++	wb977_close();
++}
++EXPORT_SYMBOL(nw_gpio_modify_io);
++
++unsigned int nw_gpio_read(void)
++{
++	return inb(GP1_IO_BASE) | inb(GP2_IO_BASE) << 8;
++}
++EXPORT_SYMBOL(nw_gpio_read);
++
++/*
++ * Initialise the Winbond W83977F global registers
++ */
++static inline void wb977_init_global(void)
++{
++	/*
++	 * Enable R/W config registers
++	 */
++	wb977_wb(0x26, 0x40);
++
++	/*
++	 * Power down FDC (not used)
++	 */
++	wb977_wb(0x22, 0xfe);
++
++	/*
++	 * GP12, GP11, CIRRX, IRRXH, GP10
++	 */
++	wb977_wb(0x2a, 0xc1);
++
++	/*
++	 * GP23, GP22, GP21, GP20, GP13
++	 */
++	wb977_wb(0x2b, 0x6b);
++
++	/*
++	 * GP17, GP16, GP15, GP14
++	 */
++	wb977_wb(0x2c, 0x55);
++}
++
++/*
++ * Initialise the Winbond W83977F printer port
++ */
++static inline void wb977_init_printer(void)
++{
++	wb977_device_select(1);
++
++	/*
++	 * mode 1 == EPP
++	 */
++	wb977_wb(0xf0, 0x01);
++}
++
++/*
++ * Initialise the Winbond W83977F keyboard controller
++ */
++static inline void wb977_init_keyboard(void)
++{
++	wb977_device_select(5);
++
++	/*
++	 * Keyboard controller address
++	 */
++	wb977_ww(0x60, 0x0060);
++	wb977_ww(0x62, 0x0064);
++
++	/*
++	 * Keyboard IRQ 1, active high, edge trigger
++	 */
++	wb977_wb(0x70, 1);
++	wb977_wb(0x71, 0x02);
++
++	/*
++	 * Mouse IRQ 5, active high, edge trigger
++	 */
++	wb977_wb(0x72, 5);
++	wb977_wb(0x73, 0x02);
++
++	/*
++	 * KBC 8MHz
++	 */
++	wb977_wb(0xf0, 0x40);
++
++	/*
++	 * Enable device
++	 */
++	wb977_device_enable();
++}
++
++/*
++ * Initialise the Winbond W83977F Infra-Red device
++ */
++static inline void wb977_init_irda(void)
++{
++	wb977_device_select(6);
++
++	/*
++	 * IR base address
++	 */
++	wb977_ww(0x60, IRDA_IO_BASE);
++
++	/*
++	 * IRDA IRQ 6, active high, edge trigger
++	 */
++	wb977_wb(0x70, 6);
++	wb977_wb(0x71, 0x02);
++
++	/*
++	 * RX DMA - ISA DMA 0
++	 */
++	wb977_wb(0x74, 0x00);
++
++	/*
++	 * TX DMA - Disable Tx DMA
++	 */
++	wb977_wb(0x75, 0x04);
++
++	/*
++	 * Append CRC, Enable bank selection
++	 */
++	wb977_wb(0xf0, 0x03);
++
++	/*
++	 * Enable device
++	 */
++	wb977_device_enable();
++}
++
++/*
++ * Initialise Winbond W83977F general purpose IO
++ */
++static inline void wb977_init_gpio(void)
++{
++	unsigned long flags;
++
++	/*
++	 * Set up initial I/O definitions
++	 */
++	current_gpio_io = -1;
++	__gpio_modify_io(-1, GPIO_DONE | GPIO_WDTIMER);
++
++	wb977_device_select(7);
++
++	/*
++	 * Group1 base address
++	 */
++	wb977_ww(0x60, GP1_IO_BASE);
++	wb977_ww(0x62, 0);
++	wb977_ww(0x64, 0);
++
++	/*
++	 * GP10 (Orage button) IRQ 10, active high, edge trigger
++	 */
++	wb977_wb(0x70, 10);
++	wb977_wb(0x71, 0x02);
++
++	/*
++	 * GP10: Debounce filter enabled, IRQ, input
++	 */
++	wb977_wb(0xe0, 0x19);
++
++	/*
++	 * Enable Group1
++	 */
++	wb977_device_enable();
++
++	wb977_device_select(8);
++
++	/*
++	 * Group2 base address
++	 */
++	wb977_ww(0x60, GP2_IO_BASE);
++
++	/*
++	 * Clear watchdog timer regs
++	 *  - timer disable
++	 */
++	wb977_wb(0xf2, 0x00);
++
++	/*
++	 *  - disable LED, no mouse nor keyboard IRQ
++	 */
++	wb977_wb(0xf3, 0x00);
++
++	/*
++	 *  - timer counting, disable power LED, disable timeouot
++	 */
++	wb977_wb(0xf4, 0x00);
++
++	/*
++	 * Enable group2
++	 */
++	wb977_device_enable();
++
++	/*
++	 * Set Group1/Group2 outputs
++	 */
++	spin_lock_irqsave(&nw_gpio_lock, flags);
++	nw_gpio_modify_op(-1, GPIO_RED_LED | GPIO_FAN);
++	spin_unlock_irqrestore(&nw_gpio_lock, flags);
++}
++
++/*
++ * Initialise the Winbond W83977F chip.
++ */
++static void __init wb977_init(void)
++{
++	request_region(0x370, 2, "W83977AF configuration");
++
++	/*
++	 * Open up the SuperIO chip
++	 */
++	wb977_open();
++
++	/*
++	 * Initialise the global registers
++	 */
++	wb977_init_global();
++
++	/*
++	 * Initialise the various devices in
++	 * the multi-IO chip.
++	 */
++	wb977_init_printer();
++	wb977_init_keyboard();
++	wb977_init_irda();
++	wb977_init_gpio();
++
++	/*
++	 * Close up the EFER gate
++	 */
++	wb977_close();
++}
++
++void nw_cpld_modify(unsigned int mask, unsigned int set)
++{
++	int msk;
++
++	current_cpld = (current_cpld & ~mask) | set;
++
++	nw_gpio_modify_io(GPIO_DATA | GPIO_IOCLK | GPIO_IOLOAD, 0);
++	nw_gpio_modify_op(GPIO_IOLOAD, 0);
++
++	for (msk = 8; msk; msk >>= 1) {
++		int bit = current_cpld & msk;
++
++		nw_gpio_modify_op(GPIO_DATA | GPIO_IOCLK, bit ? GPIO_DATA : 0);
++		nw_gpio_modify_op(GPIO_IOCLK, GPIO_IOCLK);
++	}
++
++	nw_gpio_modify_op(GPIO_IOCLK|GPIO_DATA, 0);
++	nw_gpio_modify_op(GPIO_IOLOAD|GPIO_DSCLK, GPIO_IOLOAD|GPIO_DSCLK);
++	nw_gpio_modify_op(GPIO_IOLOAD, 0);
++}
++EXPORT_SYMBOL(nw_cpld_modify);
++
++static void __init cpld_init(void)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&nw_gpio_lock, flags);
++	nw_cpld_modify(-1, CPLD_UNMUTE | CPLD_7111_DISABLE);
++	spin_unlock_irqrestore(&nw_gpio_lock, flags);
++}
++
++static unsigned char rwa_unlock[] __initdata =
++{ 0x00, 0x00, 0x6a, 0xb5, 0xda, 0xed, 0xf6, 0xfb, 0x7d, 0xbe, 0xdf, 0x6f, 0x37, 0x1b,
++  0x0d, 0x86, 0xc3, 0x61, 0xb0, 0x58, 0x2c, 0x16, 0x8b, 0x45, 0xa2, 0xd1, 0xe8, 0x74,
++  0x3a, 0x9d, 0xce, 0xe7, 0x73, 0x39 };
++
++#ifndef DEBUG
++#define dprintk(x...)
++#else
++#define dprintk(x...) printk(x)
++#endif
++
++#define WRITE_RWA(r,v) do { outb((r), 0x279); udelay(10); outb((v), 0xa79); } while (0)
++
++static inline void rwa010_unlock(void)
++{
++	int i;
++
++	WRITE_RWA(2, 2);
++	mdelay(10);
++
++	for (i = 0; i < sizeof(rwa_unlock); i++) {
++		outb(rwa_unlock[i], 0x279);
++		udelay(10);
++	}
++}
++
++static inline void rwa010_read_ident(void)
++{
++	unsigned char si[9];
++	int i, j;
++
++	WRITE_RWA(3, 0);
++	WRITE_RWA(0, 128);
++
++	outb(1, 0x279);
++
++	mdelay(1);
++
++	dprintk("Identifier: ");
++	for (i = 0; i < 9; i++) {
++		si[i] = 0;
++		for (j = 0; j < 8; j++) {
++			int bit;
++			udelay(250);
++			inb(0x203);
++			udelay(250);
++			bit = inb(0x203);
++			dprintk("%02X ", bit);
++			bit = (bit == 0xaa) ? 1 : 0;
++			si[i] |= bit << j;
++		}
++		dprintk("(%02X) ", si[i]);
++	}
++	dprintk("\n");
++}
++
++static inline void rwa010_global_init(void)
++{
++	WRITE_RWA(6, 2);	// Assign a card no = 2
++
++	dprintk("Card no = %d\n", inb(0x203));
++
++	/* disable the modem section of the chip */
++	WRITE_RWA(7, 3);
++	WRITE_RWA(0x30, 0);
++
++	/* disable the cdrom section of the chip */
++	WRITE_RWA(7, 4);
++	WRITE_RWA(0x30, 0);
++
++	/* disable the MPU-401 section of the chip */
++	WRITE_RWA(7, 2);
++	WRITE_RWA(0x30, 0);
++}
++
++static inline void rwa010_game_port_init(void)
++{
++	int i;
++
++	WRITE_RWA(7, 5);
++
++	dprintk("Slider base: ");
++	WRITE_RWA(0x61, 1);
++	i = inb(0x203);
++
++	WRITE_RWA(0x60, 2);
++	dprintk("%02X%02X (201)\n", inb(0x203), i);
++
++	WRITE_RWA(0x30, 1);
++}
++
++static inline void rwa010_waveartist_init(int base, int irq, int dma)
++{
++	int i;
++
++	WRITE_RWA(7, 0);
++
++	dprintk("WaveArtist base: ");
++	WRITE_RWA(0x61, base & 255);
++	i = inb(0x203);
++
++	WRITE_RWA(0x60, base >> 8);
++	dprintk("%02X%02X (%X),", inb(0x203), i, base);
++
++	WRITE_RWA(0x70, irq);
++	dprintk(" irq: %d (%d),", inb(0x203), irq);
++
++	WRITE_RWA(0x74, dma);
++	dprintk(" dma: %d (%d)\n", inb(0x203), dma);
++
++	WRITE_RWA(0x30, 1);
++}
++
++static inline void rwa010_soundblaster_init(int sb_base, int al_base, int irq, int dma)
++{
++	int i;
++
++	WRITE_RWA(7, 1);
++
++	dprintk("SoundBlaster base: ");
++	WRITE_RWA(0x61, sb_base & 255);
++	i = inb(0x203);
++
++	WRITE_RWA(0x60, sb_base >> 8);
++	dprintk("%02X%02X (%X),", inb(0x203), i, sb_base);
++
++	dprintk(" irq: ");
++	WRITE_RWA(0x70, irq);
++	dprintk("%d (%d),", inb(0x203), irq);
++
++	dprintk(" 8-bit DMA: ");
++	WRITE_RWA(0x74, dma);
++	dprintk("%d (%d)\n", inb(0x203), dma);
++
++	dprintk("AdLib base: ");
++	WRITE_RWA(0x63, al_base & 255);
++	i = inb(0x203);
++
++	WRITE_RWA(0x62, al_base >> 8);
++	dprintk("%02X%02X (%X)\n", inb(0x203), i, al_base);
++
++	WRITE_RWA(0x30, 1);
++}
++
++static void rwa010_soundblaster_reset(void)
++{
++	int i;
++
++	outb(1, 0x226);
++	udelay(3);
++	outb(0, 0x226);
++
++	for (i = 0; i < 5; i++) {
++		if (inb(0x22e) & 0x80)
++			break;
++		mdelay(1);
++	}
++	if (i == 5)
++		printk("SoundBlaster: DSP reset failed\n");
++
++	dprintk("SoundBlaster DSP reset: %02X (AA)\n", inb(0x22a));
++
++	for (i = 0; i < 5; i++) {
++		if ((inb(0x22c) & 0x80) == 0)
++			break;
++		mdelay(1);
++	}
++
++	if (i == 5)
++		printk("SoundBlaster: DSP not ready\n");
++	else {
++		outb(0xe1, 0x22c);
++
++		dprintk("SoundBlaster DSP id: ");
++		i = inb(0x22a);
++		udelay(1);
++		i |= inb(0x22a) << 8;
++		dprintk("%04X\n", i);
++
++		for (i = 0; i < 5; i++) {
++			if ((inb(0x22c) & 0x80) == 0)
++				break;
++			mdelay(1);
++		}
++
++		if (i == 5)
++			printk("SoundBlaster: could not turn speaker off\n");
++
++		outb(0xd3, 0x22c);
++	}
++
++	/* turn on OPL3 */
++	outb(5, 0x38a);
++	outb(1, 0x38b);
++}
++
++static void __init rwa010_init(void)
++{
++	rwa010_unlock();
++	rwa010_read_ident();
++	rwa010_global_init();
++	rwa010_game_port_init();
++	rwa010_waveartist_init(0x250, 3, 7);
++	rwa010_soundblaster_init(0x220, 0x388, 3, 1);
++	rwa010_soundblaster_reset();
++}
++
++/*
++ * Initialise any other hardware after we've got the PCI bus
++ * initialised.  We may need the PCI bus to talk to this other
++ * hardware.
++ */
++static int __init nw_hw_init(void)
++{
++	if (machine_is_netwinder()) {
++		unsigned long flags;
++
++		wb977_init();
++		cpld_init();
++		rwa010_init();
++
++		spin_lock_irqsave(&nw_gpio_lock, flags);
++		nw_gpio_modify_op(GPIO_RED_LED|GPIO_GREEN_LED, DEFAULT_LEDS);
++		spin_unlock_irqrestore(&nw_gpio_lock, flags);
++	}
++	return 0;
++}
++
++__initcall(nw_hw_init);
++
++/*
++ * Older NeTTroms either do not provide a parameters
++ * page, or they don't supply correct information in
++ * the parameter page.
++ */
++static void __init
++fixup_netwinder(struct machine_desc *desc, struct tag *tags,
++		char **cmdline, struct meminfo *mi)
++{
++#ifdef CONFIG_ISAPNP
++	extern int isapnp_disable;
++
++	/*
++	 * We must not use the kernels ISAPnP code
++	 * on the NetWinder - it will reset the settings
++	 * for the WaveArtist chip and render it inoperable.
++	 */
++	isapnp_disable = 1;
++#endif
++}
++
++/*
++ * We now use the slot ID instead of the device identifiers to select
++ * which interrupt is routed where.
++ */
++static int __init netwinder_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
++{
++	switch (slot) {
++	case 0:  /* host bridge */
++		return 0;
++
++	case 9:  /* CyberPro */
++		return IRQ_NETWINDER_VGA;
++
++	case 10: /* DC21143 */
++		return IRQ_NETWINDER_ETHER100;
++
++	case 12: /* Winbond 553 */
++		return IRQ_ISA_HARDDISK1;
++
++	case 13: /* Winbond 89C940F */
++		return IRQ_NETWINDER_ETHER10;
++
++	default:
++		printk(KERN_ERR "PCI: unknown device in slot %s\n",
++			pci_name(dev));
++		return 0;
++	}
++}
++
++static struct hw_pci netwinder_pci __initdata = {
 +	.swizzle		= pci_std_swizzle,
-+	.map_irq		= ebsa285_map_irq,
++	.map_irq		= netwinder_map_irq,
 +	.nr_controllers		= 1,
 +	.setup			= dc21285_setup,
 +	.scan			= dc21285_scan_bus,
@@ -128,17 +1472,27 @@ index 2ef69ff..fc91c85 100644
 +	.postinit		= dc21285_postinit,
 +};
 +
-+static int __init ebsa285_init_pci(void)
++static int __init netwinder_pci_init(void)
 +{
-+	if (machine_is_ebsa285())
-+		pci_common_init(&ebsa285_pci);
++	if (machine_is_netwinder())
++		pci_common_init(&netwinder_pci);
 +	return 0;
 +}
 +
-+subsys_initcall(ebsa285_init_pci);
++subsys_initcall(netwinder_pci_init);
 +
- MACHINE_START(EBSA285, "EBSA285")
- 	/* Maintainer: Russell King */
- 	.boot_params	= 0x00000100,
++
++MACHINE_START(NETWINDER, "Rebel-NetWinder")
++	/* Maintainer: Russell King/Rebel.com */
++	.boot_params	= 0x00000100,
++	.video_start	= 0x000a0000,
++	.video_end	= 0x000bffff,
++	.reserve_lp0	= 1,
++	.reserve_lp2	= 1,
++	.fixup		= fixup_netwinder,
++	.map_io		= footbridge_map_io,
++	.init_irq	= footbridge_init_irq,
++	.timer		= &isa_timer,
++MACHINE_END
 -- 
 1.7.5
