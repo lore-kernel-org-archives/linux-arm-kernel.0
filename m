@@ -1,28 +1,43 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Jun 2011 15:37:10 +0200
-Subject: [PATCH] fb.h: ARM uses __raw_{read/write}
-In-Reply-To: <20110613100819.GA26914@1n450.cable.virginmedia.net>
-References: <201106101731.08578.hartleys@visionengravers.com>
-	<20110613040003.GA29731@linux-sh.org>
-	<20110613100819.GA26914@1n450.cable.virginmedia.net>
-Message-ID: <201106131537.10698.arnd@arndb.de>
+From: robherring2@gmail.com (Rob Herring)
+Date: Mon, 13 Jun 2011 08:40:27 -0500
+Subject: [PATCH 3/4] ARM: pmu: add OF probing support
+In-Reply-To: <1307957757-23001-4-git-send-email-mark.rutland@arm.com>
+References: <4DEFA5E1.9010600@gmail.com>
+	<1307957757-23001-4-git-send-email-mark.rutland@arm.com>
+Message-ID: <4DF6134B.3090307@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 June 2011 12:08:19 Catalin Marinas wrote:
-> The change proposed by Hartley wouldn't make much difference from the
-> current volatile accesses (__raw_* accessors are implemented as volatile
-> on ARM).
+Mark,
 
-I guess it would mainly make a difference if we get a platform where
-the PCI bus window is not in the same address space as the regular
-physical memory and the accessors actually need to do a computation
-on the address. AFAICT, ARM does not currently have any such platform
-and I would hope that it says that way.
+On 06/13/2011 04:35 AM, Mark Rutland wrote:
+> This is based on an earlier patch from Rob Herring <rob.herring@calxeda.com>
+> 
+>> Add OF match table to enable OF style driver binding. The dts entry is like
+>> this:
+>>
+>> pmu {
+>> 	compatible = "arm,cortex-a9-pmu";
+>> 	interrupts = <100 101>;
+>> };
+>>
+>> The use of pdev->id as an index breaks with OF device binding, so set the type
+>> based on the OF compatible string.
+> 
+> This modification sets the PMU hardware type based on data embedded in the
+> binding, allowing easy addition of new PMU types in future.
+> 
+> Support for new PMU types not provided by devicetree can be added later using
+> platform_device_id tables in a similar fashion.
+> 
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Cc: Rob Herring <rob.herring@calxeda.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  
+>  Rob: would you be happy to merge this into your tree? or would you
+>  rather I sent it through Russell?
 
-> I think the memcpy_(from|to)io could be optimised on ARM to only add a
-> barrier before or after he copying loop.
+Looks good to me. I'm happy for you to take it.
 
-Agreed, good idea.
-
-	Arnd
+Rob
