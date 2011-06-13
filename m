@@ -1,64 +1,57 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jun 2011 18:16:52 +0100
-Subject: [PATCH 06/14] ARM: suspend: rejig suspend follow-on function calling
-	convention
+Date: Mon, 13 Jun 2011 18:17:12 +0100
+Subject: [PATCH 07/14] ARM: suspend: move sa1100 to use proper suspend func
+	arg0
 In-Reply-To: <20110613171446.GF13643@n2100.arm.linux.org.uk>
 References: <20110613171446.GF13643@n2100.arm.linux.org.uk>
-Message-ID: <E1QWAku-0002e3-3d@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QWAlE-0002e7-HC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save the suspend function pointer onto the stack for use when returning.
-Allocate r2 to pass an argument to the suspend function.
+In the previous commit, we introduced an official way to supply an
+argument to the suspend function.  Convert the sa1100 suspend code
+to use this method.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/sleep.S |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-pxa/sleep.S |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 358be13..b924bcc 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -10,6 +10,7 @@
- /*
-  * Save CPU state for a suspend
-  *  r1 = v:p offset
-+ *  r2 = suspend function arg0
-  *  r3 = virtual return function
-  * Note: sp is decremented to allocate space for CPU state on stack
-  * r0-r3,ip,lr corrupted
-@@ -17,7 +18,6 @@
- ENTRY(cpu_suspend)
- 	stmfd	sp!, {r3}
- 	stmfd	sp!, {r4 - r11}
--	mov	r9, lr
- #ifdef MULTI_CPU
- 	ldr	r10, =processor
- 	ldr	r5, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
-@@ -33,6 +33,7 @@ ENTRY(cpu_suspend)
- 	stmfd	sp!, {r1, r6, ip}	@ save v:p, virt SP, phys resume fn
- 	ldr	r5, =sleep_save_sp
- 	add	r6, sp, r1		@ convert SP to phys
-+	stmfd	sp!, {r2, lr}		@ save suspend func arg and pointer
- #ifdef CONFIG_SMP
- 	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
- 	ALT_UP(mov lr, #0)
-@@ -51,12 +52,12 @@ ENTRY(cpu_suspend)
- 	@ flush data cache
- #ifdef MULTI_CACHE
- 	ldr	r10, =cpu_cache
--	mov	lr, r9
-+	mov	lr, pc
- 	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
- #else
--	mov	lr, r9
--	b	__cpuc_flush_kern_all
-+	bl	__cpuc_flush_kern_all
+diff --git a/arch/arm/mach-pxa/sleep.S b/arch/arm/mach-pxa/sleep.S
+index 6f53688..613ddfa 100644
+--- a/arch/arm/mach-pxa/sleep.S
++++ b/arch/arm/mach-pxa/sleep.S
+@@ -59,7 +59,7 @@ ENTRY(pxa27x_cpu_suspend)
+ 	mra	r2, r3, acc0
  #endif
-+	ldmfd	sp!, {r0, pc}		@ call suspend fn
- ENDPROC(cpu_suspend)
- 	.ltorg
+ 	stmfd	sp!, {r2 - r12, lr}		@ save registers on stack
+-	mov	r4, r0				@ save sleep mode
++	mov	r2, r0				@ save sleep mode
+ 	ldr	r3, =pxa_cpu_resume		@ resume function
+ 	bl	cpu_suspend
  
+@@ -67,7 +67,7 @@ ENTRY(pxa27x_cpu_suspend)
+ 	@ (also workaround for sighting 28071)
+ 
+ 	@ prepare value for sleep mode
+-	mov	r1, r4				@ sleep mode
++	mov	r1, r0				@ sleep mode
+ 
+ 	@ prepare pointer to physical address 0 (virtual mapping in generic.c)
+ 	mov	r2, #UNCACHED_PHYS_0
+@@ -109,11 +109,11 @@ ENTRY(pxa27x_cpu_suspend)
+ 
+ ENTRY(pxa25x_cpu_suspend)
+ 	stmfd	sp!, {r2 - r12, lr}		@ save registers on stack
+-	mov	r4, r0				@ save sleep mode
++	mov	r2, r0				@ save sleep mode
+ 	ldr	r3, =pxa_cpu_resume		@ resume function
+ 	bl	cpu_suspend
+ 	@ prepare value for sleep mode
+-	mov	r1, r4				@ sleep mode
++	mov	r1, r0				@ sleep mode
+ 
+ 	@ prepare pointer to physical address 0 (virtual mapping in generic.c)
+ 	mov	r2, #UNCACHED_PHYS_0
 -- 
 1.7.4.4
