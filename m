@@ -1,67 +1,87 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 12 Jun 2011 21:33:00 -0300
-Subject: [PATCH] ARM: mx53: Add SDMA support for MX53
-Message-ID: <1307925180-16991-1-git-send-email-festevam@gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Sun, 12 Jun 2011 17:43:45 -0700
+Subject: [PATCH 3/3] ARM: vfp: Use cpu pm notifiers to save vfp state
+In-Reply-To: <1307925825-28566-1-git-send-email-ccross@android.com>
+References: <1307925825-28566-1-git-send-email-ccross@android.com>
+Message-ID: <1307925825-28566-4-git-send-email-ccross@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/devices/platform-imx-dma.c |   28 ++++++++++++++++++++++++++
- 1 files changed, 28 insertions(+), 0 deletions(-)
+When the cpu is powered down in a low power mode, the vfp
+registers may be reset.
 
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-index b130f60..4e7fbc2 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-@@ -51,6 +51,11 @@ struct imx_imx_sdma_data imx51_imx_sdma_data __initconst =
- 	imx_imx_sdma_data_entry_single(MX51, 2, "imx51", 0);
- #endif /* ifdef CONFIG_SOC_IMX51 */
+This patch uses CPU_PM_ENTER and CPU_PM_EXIT notifiers to save
+and restore the cpu's vfp registers.
+
+Signed-off-by: Colin Cross <ccross@android.com>
+---
+ arch/arm/vfp/vfpmodule.c |   40 ++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 40 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
+index f25e7ec..6f08dbe 100644
+--- a/arch/arm/vfp/vfpmodule.c
++++ b/arch/arm/vfp/vfpmodule.c
+@@ -21,6 +21,7 @@
+ #include <asm/cputype.h>
+ #include <asm/thread_notify.h>
+ #include <asm/vfp.h>
++#include <asm/cpu_pm.h>
  
-+#ifdef CONFIG_SOC_IMX53
-+struct imx_imx_sdma_data imx53_imx_sdma_data __initconst =
-+	imx_imx_sdma_data_entry_single(MX53, 2, "imx53", 0);
-+#endif /* ifdef CONFIG_SOC_IMX53 */
-+
- static struct platform_device __init __maybe_unused *imx_add_imx_sdma(
- 		const struct imx_imx_sdma_data *data)
- {
-@@ -153,6 +158,22 @@ static struct sdma_script_start_addrs addr_imx51 = {
+ #include "vfpinstr.h"
+ #include "vfp.h"
+@@ -169,6 +170,44 @@ static struct notifier_block vfp_notifier_block = {
+ 	.notifier_call	= vfp_notifier,
  };
- #endif
  
-+#ifdef CONFIG_SOC_IMX53
-+static struct sdma_script_start_addrs addr_imx53 = {
-+	.ap_2_ap_addr = 642,
-+	.app_2_mcu_addr = 683,
-+	.mcu_2_app_addr = 747,
-+	.uart_2_mcu_addr = 817,
-+	.shp_2_mcu_addr = 891,
-+	.mcu_2_shp_addr = 960,
-+	.uartsh_2_mcu_addr = 1032,
-+	.spdif_2_mcu_addr = 1100,
-+	.mcu_2_spdif_addr = 1134,
-+	.firi_2_mcu_addr = 1193,
-+	.mcu_2_firi_addr = 1290,
++#ifdef CONFIG_CPU_PM
++static int vfp_cpu_pm_notifier(struct notifier_block *self, unsigned long cmd,
++	void *v)
++{
++	u32 fpexc = fmrx(FPEXC);
++	unsigned int cpu = smp_processor_id();
++
++	switch (cmd) {
++	case CPU_PM_ENTER:
++		if (last_VFP_context[cpu]) {
++			fmxr(FPEXC, fpexc | FPEXC_EN);
++			vfp_save_state(last_VFP_context[cpu], fpexc);
++			/* force a reload when coming back from idle */
++			last_VFP_context[cpu] = NULL;
++			fmxr(FPEXC, fpexc & ~FPEXC_EN);
++		}
++		break;
++	case CPU_PM_ENTER_FAILED:
++	case CPU_PM_EXIT:
++		/* make sure VFP is disabled when leaving idle */
++		fmxr(FPEXC, fpexc & ~FPEXC_EN);
++		break;
++	}
++	return NOTIFY_OK;
++}
++
++static struct notifier_block vfp_cpu_pm_notifier_block = {
++	.notifier_call = vfp_cpu_pm_notifier,
 +};
++
++static void vfp_cpu_pm_init(void)
++{
++	cpu_pm_register_notifier(&vfp_cpu_pm_notifier_block);
++}
++#else
++static inline void vfp_cpu_pm_init(void) { }
 +#endif
 +
- static int __init imxXX_add_imx_dma(void)
- {
- 	struct platform_device *ret;
-@@ -202,6 +223,13 @@ static int __init imxXX_add_imx_dma(void)
- 		ret = imx_add_imx_sdma(&imx51_imx_sdma_data);
- 	} else
- #endif
-+
-+#if defined(CONFIG_SOC_IMX53)
-+	if (cpu_is_mx53()) {
-+		imx53_imx_sdma_data.pdata.script_addrs = &addr_imx53;
-+		ret = imx_add_imx_sdma(&imx53_imx_sdma_data);
-+	} else
-+#endif
- 		ret = ERR_PTR(-ENODEV);
+ /*
+  * Raise a SIGFPE for the current process.
+  * sicode describes the signal being raised.
+@@ -563,6 +602,7 @@ static int __init vfp_init(void)
+ 		vfp_vector = vfp_support_entry;
  
- 	if (IS_ERR(ret))
+ 		thread_register_notifier(&vfp_notifier_block);
++		vfp_cpu_pm_init();
+ 		vfp_pm_init();
+ 
+ 		/*
 -- 
-1.7.1
+1.7.4.1
