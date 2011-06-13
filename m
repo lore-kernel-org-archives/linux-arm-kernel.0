@@ -1,34 +1,31 @@
 From: shawn.guo@linaro.org (Shawn Guo)
-Date: Mon, 13 Jun 2011 15:37:19 +0800
-Subject: [PATCH 0/6] Some fixes and cleanup on imx-dma device registration
-Message-ID: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+Date: Mon, 13 Jun 2011 15:37:20 +0800
+Subject: [PATCH 1/6] ARM: mxc: imx-sdma device gets 16K iosize than 4K
+In-Reply-To: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1307950645-26529-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch set makes some small fixes on imx-dma device registration
-code, and then cleans up the code by breaking the concentrated
-imx-dma device registration into soc specific setup function.
-This is basically what gpio-mxc device registration is doing.
-In this way, we can avoid the churn of "#ifdef" and the cpu_is_mx
-checking on such a long list of soc family, which makes no sense,
-considering more soc supports need to be added and we need to
-support single image for multiple socs in the long run.
+The sdma on all imx soc gets 16K IO space not 4K.
 
-Shawn Guo (6):
-      ARM: mxc: imx-sdma device gets 16K iosize than 4K
-      ARM: mxc: sdma on imx25 is a V2 block
-      ARM: mxc: change imx-dma default to_version to 1
-      ARM: mxc: imx-dma on imx25 has no other TO version but TO1
-      ARM: mxc: all three imx51 TOs use TO1 version of sdma script
-      ARM: mxc: clean up imx-dma device registration
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ arch/arm/plat-mxc/devices/platform-imx-dma.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
- arch/arm/mach-imx/mm-imx21.c                    |    3 +
- arch/arm/mach-imx/mm-imx25.c                    |   26 +++
- arch/arm/mach-imx/mm-imx27.c                    |    3 +
- arch/arm/mach-imx/mm-imx31.c                    |   24 +++
- arch/arm/mach-imx/mm-imx35.c                    |   44 +++++
- arch/arm/mach-mx5/mm.c                          |   23 +++
- arch/arm/plat-mxc/devices.c                     |   16 ++-
- arch/arm/plat-mxc/devices/platform-imx-dma.c    |  204 ++---------------------
- arch/arm/plat-mxc/include/mach/devices-common.h |    6 +
- 9 files changed, 157 insertions(+), 192 deletions(-)
+diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+index b130f60..222e439 100644
+--- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
++++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+@@ -57,7 +57,7 @@ static struct platform_device __init __maybe_unused *imx_add_imx_sdma(
+ 	struct resource res[] = {
+ 		{
+ 			.start = data->iobase,
+-			.end = data->iobase + SZ_4K - 1,
++			.end = data->iobase + SZ_16K - 1,
+ 			.flags = IORESOURCE_MEM,
+ 		}, {
+ 			.start = data->irq,
+-- 
+1.7.4.1
