@@ -1,63 +1,26 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Mon, 13 Jun 2011 08:55:05 -0500
-Subject: [PATCH 3/4] ARM: pmu: add OF probing support
-In-Reply-To: <B393A6715F47FC43935D96EA15105EFF15CF24E41C@GEORGE.Emea.Arm.com>
-References: <4DEFA5E1.9010600@gmail.com>
-	<1307957757-23001-4-git-send-email-mark.rutland@arm.com>
-	<4DF6134B.3090307@gmail.com>
-	<B393A6715F47FC43935D96EA15105EFF15CF24E41C@GEORGE.Emea.Arm.com>
-Message-ID: <4DF616B9.6000202@gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 13 Jun 2011 17:55:16 +0400
+Subject: [Patch v2 03/11] ARM: hwcaps: use shifts instead of hardcoded
+	constants
+In-Reply-To: <1307536233-30089-4-git-send-email-will.deacon@arm.com>
+References: <1307536233-30089-1-git-send-email-will.deacon@arm.com>
+	<1307536233-30089-4-git-send-email-will.deacon@arm.com>
+Message-ID: <4DF616C4.4040709@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/13/2011 08:48 AM, Mark Rutland wrote:
->> -----Original Message-----
->> From: Rob Herring [mailto:robherring2 at gmail.com]
->> Sent: 13 June 2011 14:40
->> To: Mark Rutland
->> Cc: linux-arm-kernel at lists.infradead.org; Jamie Iles; Will Deacon
->> Subject: Re: [PATCH 3/4] ARM: pmu: add OF probing support
->>
->> Mark,
->>
->> On 06/13/2011 04:35 AM, Mark Rutland wrote:
->>> This is based on an earlier patch from Rob Herring
->> <rob.herring@calxeda.com>
->>>
->>>> Add OF match table to enable OF style driver binding. The dts entry
->> is like
->>>> this:
->>>>
->>>> pmu {
->>>>    compatible = "arm,cortex-a9-pmu";
->>>>    interrupts = <100 101>;
->>>> };
->>>>
->>>> The use of pdev->id as an index breaks with OF device binding, so
->> set the type
->>>> based on the OF compatible string.
->>>
->>> This modification sets the PMU hardware type based on data embedded
->> in the
->>> binding, allowing easy addition of new PMU types in future.
->>>
->>> Support for new PMU types not provided by devicetree can be added
->> later using
->>> platform_device_id tables in a similar fashion.
->>>
->>> Cc: Jamie Iles <jamie@jamieiles.com>
->>> Cc: Rob Herring <rob.herring@calxeda.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> ---
->>>
->>>  Rob: would you be happy to merge this into your tree? or would you
->>>  rather I sent it through Russell?
->>
->> Looks good to me. I'm happy for you to take it.
->>
->> Rob
-> 
-> Thanks. Mind if I add your Ack?
-> 
+Hello.
 
-Acked-by: Rob Herring <rob.herring@calxeda.com>
+On 08-06-2011 16:30, Will Deacon wrote:
+
+> The HWCAP numbers are defined as constants, each one being a power of 2.
+> This has become slightly unwieldy now that we have reached 32k.
+
+> This patch changes the HWCAP defines to use (1<<  n) instead of coding
+> the constant directly. The values remain unchanged.
+
+    Perhaps it's better to use BIT(n) macro instead?
+
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+WBR, Sergei
