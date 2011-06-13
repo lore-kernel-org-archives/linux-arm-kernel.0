@@ -1,34 +1,35 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 13 Jun 2011 10:06:56 -0400 (EDT)
-Subject: [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64
-	bits in size
-In-Reply-To: <20110613112454.GA12325@n2100.arm.linux.org.uk>
+Date: Mon, 13 Jun 2011 10:08:55 -0400 (EDT)
+Subject: [PATCH 2/3] ARM: zImage: Allow the appending of a device tree
+	binary
+In-Reply-To: <20110613112604.GB12325@n2100.arm.linux.org.uk>
 References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<1307858800-16712-2-git-send-email-nicolas.pitre@linaro.org>
-	<20110613112454.GA12325@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1106131003090.2142@xanadu.home>
+	<1307858800-16712-3-git-send-email-nicolas.pitre@linaro.org>
+	<20110613104648.GD10951@atomide.com>
+	<20110613112604.GB12325@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1106131008220.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
 
-> On Sun, Jun 12, 2011 at 02:06:38AM -0400, Nicolas Pitre wrote:
-> > diff --git a/arch/arm/boot/compressed/vmlinux.lds.in b/arch/arm/boot/compressed/vmlinux.lds.in
-> > index ea80abe..6c02db1 100644
-> > --- a/arch/arm/boot/compressed/vmlinux.lds.in
-> > +++ b/arch/arm/boot/compressed/vmlinux.lds.in
-> > @@ -47,6 +47,9 @@ SECTIONS
-> >    .got			: { *(.got) }
-> >    _got_end = .;
-> >    .got.plt		: { *(.got.plt) }
-> > +
-> > +  /* ensure the zImage file size is always a multiple of 64 bits */
-> > +  .pad			: { BYTE(0); . = ALIGN(8); }
+> On Mon, Jun 13, 2011 at 03:46:49AM -0700, Tony Lindgren wrote:
+> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110611 23:03]:
+> > > From: John Bonesio <bones@secretlab.ca>
+> > > 
+> > > This patch provides the ability to boot using a device tree that is appended
+> > > to the raw binary zImage (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+> > > 
+> > > Signed-off-by: John Bonesio <bones@secretlab.ca>
+> > > [nico: adjusted to latest zImage changes plus additional cleanups]
+> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > 
+> > Looks like this rebased version has two nice improvments: It uses r5
+> > instead of lr, and keeps stack usable early on :)
 > 
-> Why add a byte before aligning?  Isn't merely aligning to 64-bit sufficient?
+> One of the comments still refers to lr though.
 
-No.  If a section is empty, despite the align statement, ld would simply 
-omit it entirely and the output file size won't be aligned.
+Heh.  Fixed.
 
 
 Nicolas
