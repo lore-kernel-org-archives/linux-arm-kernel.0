@@ -1,58 +1,59 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jun 2011 18:14:46 +0100
-Subject: [PATCH 00/14] Re-jig cpu_suspend for a saner calling convention
-Message-ID: <20110613171446.GF13643@n2100.arm.linux.org.uk>
+Date: Mon, 13 Jun 2011 18:15:10 +0100
+Subject: [PATCH 01/14] ARM: suspend: make MULTI_CPU and !MULTI_CPU resume
+	paths the same
+In-Reply-To: <20110613171446.GF13643@n2100.arm.linux.org.uk>
+References: <20110613171446.GF13643@n2100.arm.linux.org.uk>
+Message-ID: <E1QWAjG-0002di-21@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently cpu_suspend is not like a normal C function - when it's called
-it returns normally to a bunch of code which is not expected to return.
-The return path is via code pointed to by 'r3'.
+Eliminate the differences between MULTI_CPU and non-MULTI_CPU resume
+paths, making the saved structure identical irrespective of the way
+the kernel was configured.
 
-It also corrupts a bunch of registers in ways which make it non-compliant
-with a C API.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/sleep.S |   12 +++---------
+ 1 files changed, 3 insertions(+), 9 deletions(-)
 
-If we do make this complaint as a normal C-like function, it eliminates
-this register saving.  We also swap 'lr' and 'r3', so cpu_suspend
-effectively only returns to following code on resume - and r3 points
-to the suspend code.
-
-So, this becomes:
-        ENTRY(acmeSoC_cpu_suspend)
-                stmfd   sp!, {lr}
-                adr     r3, soc_finish_suspend
-                bl      cpu_suspend
-                ldmfd   sp!, {pc}
-        ENDPROC(acmeSoC_cpu_suspend)
-
-        soc_finish_suspend:
-                blah
-                blah
-                put soc to sleep
-                never return
-
-or even:
-
-static void soc_suspend(void)
-{
-        [soc specific preparation]
-
-        cpu_suspend(0, PLAT_PHYS_OFFSET - PAGE_OFFSET,
-                soc_suspend_arg, soc_suspend_fn);
-
-        [soc specific cleanup ]
-}
-
-where soc_suspend_fn can be either assembly or C code - but must never
-return.
-
-Tested on Assabet (SA1100) only.
-
- arch/arm/kernel/sleep.S       |   70 +++++++++++++++-------------------------
- arch/arm/mach-exynos4/sleep.S |   10 ++----
- arch/arm/mach-pxa/sleep.S     |   48 ++++++++++++++--------------
- arch/arm/mach-s3c64xx/sleep.S |   11 ++-----
- arch/arm/mach-s5pv210/sleep.S |   10 ++----
- arch/arm/mach-sa1100/sleep.S  |   17 +++-------
- arch/arm/plat-s3c24xx/sleep.S |   12 ++-----
- 7 files changed, 67 insertions(+), 111 deletions(-)
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 6398ead..97a6577 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -40,9 +40,11 @@ ENTRY(cpu_suspend)
+ #else
+ 	mov	r2, sp			@ current virtual SP
+ 	ldr	r0, =cpu_suspend_size
++	ldr	ip, =cpu_do_resume
+ 	sub	sp, sp, r0		@ allocate CPU state on stack
+ 	mov	r0, sp			@ save pointer
+-	stmfd	sp!, {r1, r2, r3}	@ save v:p, virt SP, return fn
++	add	ip, ip, r1		@ convert resume fn to phys
++	stmfd	sp!, {r1, r2, r3, ip}	@ save v:p, virt SP, retfn, phys resume fn
+ 	ldr	r3, =sleep_save_sp
+ 	add	r2, sp, r1		@ convert SP to phys
+ #ifdef CONFIG_SMP
+@@ -120,20 +122,12 @@ ENTRY(cpu_resume)
+ 	ldr	r0, sleep_save_sp	@ stack phys addr
+ #endif
+ 	setmode	PSR_I_BIT | PSR_F_BIT | SVC_MODE, r1  @ set SVC, irqs off
+-#ifdef MULTI_CPU
+ 	@ load v:p, stack, return fn, resume fn
+   ARM(	ldmia	r0!, {r1, sp, lr, pc}	)
+ THUMB(	ldmia	r0!, {r1, r2, r3, r4}	)
+ THUMB(	mov	sp, r2			)
+ THUMB(	mov	lr, r3			)
+ THUMB(	bx	r4			)
+-#else
+-	@ load v:p, stack, return fn
+-  ARM(	ldmia	r0!, {r1, sp, lr}	)
+-THUMB(	ldmia	r0!, {r1, r2, lr}	)
+-THUMB(	mov	sp, r2			)
+-	b	cpu_do_resume
+-#endif
+ ENDPROC(cpu_resume)
+ 
+ sleep_save_sp:
+-- 
+1.7.4.4
