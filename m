@@ -1,24 +1,29 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Jun 2011 09:20:44 +0100
-Subject: [PATCH 0/6] footbridge consolidation patches
-In-Reply-To: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
+Date: Mon, 13 Jun 2011 09:23:01 +0100
+Subject: [PATCH 5/6] arm: footbridge: convert old leds event driver to
+	led gpio trigger driver of Netwinder
+In-Reply-To: <1307947185-5159-6-git-send-email-bryan.wu@canonical.com>
 References: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
-Message-ID: <20110613082044.GA9393@n2100.arm.linux.org.uk>
+	<1307947185-5159-6-git-send-email-bryan.wu@canonical.com>
+Message-ID: <20110613082301.GB9393@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 02:39:39PM +0800, Bryan Wu wrote:
-> When trying to convert old leds event driver to led trigger drivers, I reviewed
-> the code of mach-footbridge. move seperated PCI code and leds code into a
-> single board files like other machines.
+On Mon, Jun 13, 2011 at 02:39:44PM +0800, Bryan Wu wrote:
+> +/* LEDs */
+> +static struct gpio_led nw_gpio_leds[] = {
+> +        {
+> +                .name                   = "netwinder::led_red",
+> +                .default_trigger        = "heartbeat",
+> +                .gpio                   = GPIO_RED_LED,
+> +        },
+> +        {
+> +                .name                   = "netwinder::led_green",
+> +                .default_trigger        = "timer",
+> +                .gpio                   = GPIO_GREEN_LED,
+> +        },
 
-This looks like it breaks all these when CONFIG_PCI=n.  In that case,
-we would avoid building the PCI supporting files.  However, with your
-merged files, we build it anyway and end up with undefined calls to
-the PCI subsystem.
-
-The code is separated to avoid that, and to avoid ifdefs.
-
-I'm not entirely sure what the point of this patch set is, because it
-mostly just moves the code into one file per platform and doesn't
-consolidate anything between the platforms themselves.
+This is especially broken.  This platform has no GPIO support other
+than its private stuff, which makes the use of the GPIO LED driver
+useless.  The GPIO_*_LED constants are bitmasks for the CPLD
+controller.
