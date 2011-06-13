@@ -1,23 +1,24 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jun 2011 10:16:01 +0200
-Subject: [PATCH] mach-ux500: iomap PRCMU TCDM memory
-In-Reply-To: <1307613035-1633-1-git-send-email-mattias.wallin@stericsson.com>
-References: <1307613035-1633-1-git-send-email-mattias.wallin@stericsson.com>
-Message-ID: <BANLkTikHwORWqUChqE7RJUKr+9rCPz-USw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Jun 2011 09:20:44 +0100
+Subject: [PATCH 0/6] footbridge consolidation patches
+In-Reply-To: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
+References: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <20110613082044.GA9393@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 9, 2011 at 11:50 AM, Mattias Wallin
-<mattias.wallin@stericsson.com> wrote:
+On Mon, Jun 13, 2011 at 02:39:39PM +0800, Bryan Wu wrote:
+> When trying to convert old leds event driver to led trigger drivers, I reviewed
+> the code of mach-footbridge. move seperated PCI code and leds code into a
+> single board files like other machines.
 
-> The PRCMU TCDM memory needs to be iomapped for the PRCMU to work
-> properly.
->
-> Signed-off-by: Mattias Wallin <mattias.wallin@stericsson.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+This looks like it breaks all these when CONFIG_PCI=n.  In that case,
+we would avoid building the PCI supporting files.  However, with your
+merged files, we build it anyway and end up with undefined calls to
+the PCI subsystem.
 
-I've picked this into the ux500-core branch for further passing to the
-arch maintainer tree.
+The code is separated to avoid that, and to avoid ifdefs.
 
-Thanks,
-Linus Walleij
+I'm not entirely sure what the point of this patch set is, because it
+mostly just moves the code into one file per platform and doesn't
+consolidate anything between the platforms themselves.
