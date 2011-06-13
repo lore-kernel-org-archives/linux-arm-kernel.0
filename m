@@ -1,21 +1,95 @@
-From: johnlinn@comcast.net (johnlinn at comcast.net)
-Date: Mon, 13 Jun 2011 21:31:59 +0000 (UTC)
-Subject: DMA setup for ARM platform with hole low in memory
-In-Reply-To: <1347566644.1505253.1308000163643.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-Message-ID: <315025466.1505794.1308000719987.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+From: prakity@marvell.com (Philip Rakity)
+Date: Mon, 13 Jun 2011 14:35:26 -0700
+Subject: [PATCH v4 2/5] mmc: support sdhci-pxav2.c
+In-Reply-To: <1307526121-12059-3-git-send-email-zhangfei.gao@marvell.com>
+References: <1307526121-12059-1-git-send-email-zhangfei.gao@marvell.com>
+	<1307526121-12059-3-git-send-email-zhangfei.gao@marvell.com>
+Message-ID: <0059AEB1-3536-4540-924A-A95C7F3AD21A@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I'm trying to decide the best way to setup this ARM platform DMA to deal with the fact that the lowest 512K of memory can not be DMAed into.  The rest of memory space is fine.
 
+On Jun 8, 2011, at 2:41 AM, Zhangfei Gao wrote:
 
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.24.1308000730.24103.linux-arm-kernel@lists.infradead.org>
+> 	SDHCI driver for PXAV2 SoCs, such as pxa910, the driver based on sdhci-pltfm to handle resource etc.
+> 
+> Signed-off-by: Zhangfei Gao <zhangfei.gao@marvell.com>
+> Signed-off-by: Jun Nie <njun@marvell.com>
+> Signed-off-by: Qiming Wu <wuqm@marvell.com>
+> ---
 
-Am I missing the easier way?
+> +++ b/drivers/mmc/host/sdhci-pxav2.c
+> +
+> +#define SD_FIFO_PARAM		0xe0
+> +#define DIS_PAD_SD_CLK_GATE	0x0400 /* Turn on/off Dynamic SD Clock Gating */
+> +#define CLK_GATE_ON		0x0200 /* Disable/enable Clock Gate */
+> +#define CLK_GATE_CTL		0x0100 /* Clock Gate Control */
+> +#define CLK_GATE_SETTING_BITS	(DIS_PAD_SD_CLK_GATE | \
+> +		CLK_GATE_ON | CLK_GATE_CTL)
+> +
+> +#define SD_CLOCK_BURST_SIZE_SETUP	0xe6
+> +#define SDCLK_SEL_SHIFT		8
+> +#define SDCLK_SEL_MASK		0x3
+> +#define SDCLK_DELAY_SHIFT	10
+> +#define SDCLK_DELAY_MASK	0x3c
+> +
+> +#define SD_CE_ATA_2		0xea
+> +#define MMC_CARD		0x1000
+> +#define MMC_WIDTH		0x0100
+> +
+> +static void pxav2_set_private_registers(struct sdhci_host *host, u8 mask)
+> +{
+> +	struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+> +	struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+> +
+> +	if (mask == SDHCI_RESET_ALL) {
+> +		u16 tmp = 0;
+> +
+> +		/*
+> +		 * tune timing of read data/command when crc error happen
+> +		 * no performance impact
+> +		 */
+> +		if (pdata->clk_delay_sel == 1) {
+> +			tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+> +
+> +			tmp &= ~(SDCLK_DELAY_MASK << SDCLK_DELAY_SHIFT);
+> +			tmp |= (pdata->clk_delay_cycles & SDCLK_DELAY_MASK)
+> +				<< SDCLK_DELAY_SHIFT;
+> +			tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+> +			tmp |= (1 & SDCLK_SEL_MASK) << SDCLK_SEL_SHIFT;
+> +
+> +			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+> +		}
 
-Thanks,
-John
+There are 3 possible value for clk_delay_sel.
+
+0  == do not use clk_delay_cycles
+1 == use programmed clk_delay_cycles value (the code above)
+all other values use the sd_clk which was used to drive the output
+
+The code about only handles 2 of the 3 cases
+
+suggest
+
+	(if (pdata->clk_delay_sel) {
+> +		if (pdata->clk_delay_sel == 1) {
+> +			tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+> +
+> +			tmp &= ~(SDCLK_DELAY_MASK << SDCLK_DELAY_SHIFT);
+> +			tmp |= (pdata->clk_delay_cycles & SDCLK_DELAY_MASK)
+> +				<< SDCLK_DELAY_SHIFT;
+> +			tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+> +			tmp |= 1 << SDCLK_SEL_SHIFT;
+> +
+> +			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+> +		} else {
+
+> +			tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+> +			tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+> +			tmp |= 2  << SDCLK_SEL_SHIFT;
+> +			writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+	           }
+         }
+
+Philip and Mark
+> 
