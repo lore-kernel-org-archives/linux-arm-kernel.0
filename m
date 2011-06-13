@@ -1,159 +1,35 @@
-From: frank.hofmann@tomtom.com (Frank Hofmann)
-Date: Mon, 13 Jun 2011 14:20:12 +0100 (BST)
-Subject: [RFC PATCH v5] ARM hibernation / suspend-to-disk (fwd)
-In-Reply-To: <20110613122601.GC12325@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>
-	<20110613122601.GC12325@n2100.arm.linux.org.uk>
-Message-ID: <alpine.DEB.2.00.1106131400090.25153@localhost6.localdomain6>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jun 2011 06:33:07 -0700
+Subject: [PATCH v2] arm: omap3: cm-t35: add support for cm-t3730
+In-Reply-To: <4DE8E3B7.5020107@compulab.co.il>
+References: <4DC27317.7020206@compulab.co.il>
+	<1304839231-11329-1-git-send-email-grinberg@compulab.co.il>
+	<20110531130447.GK11352@atomide.com>
+	<4DE8E3B7.5020107@compulab.co.il>
+Message-ID: <20110613133307.GC3352@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
-
-> On Mon, Jun 13, 2011 at 01:04:02PM +0100, Frank Hofmann wrote:
->>   To make it clear: IF AND ONLY IF your suspend(-to-ram) func looks like:
->>
->> 	ENTRY(acmeSoC_cpu_suspend)
->> 		stmfd	sp!, {r4-r12,lr}
->> 		ldr	r3, resume_mmu_done
->> 		bl	cpu_suspend
->> 	resume_mmu_done:
->> 		ldmfd	sp!, {r3-r12,pc}
->> 	ENDPROC(acmeSoC_cpu_suspend)
+* Igor Grinberg <grinberg@compulab.co.il> [110603 06:33]:
+> 
+> I'm not sure I understand what are you trying to propose here...
+> If you look once again on the code, there is currently only one if (cpu_is_..) {} else {}
+> statement currently present.
+> (I can remove the "if (cpu_is_omap3630())" - it indeed has no value)
 >
-> Nothing has that - because you can't execute that ldmfd after the call
-> to cpu_suspend returns.  I don't think you've understood what I said on
-> that subject in the previous thread.
->
+> Indeed, there will be some other differences...
+> Each time I submit a patch, I try to be as optimal as I can,
+> but again I'm open for suggestions...
+> (though I think it is optimal, e.g. 33 lines for a new running board...)
 
-Ok, to illustrate a bit more, what is ok and what not.
+What I meant is that maybe you should do the detection first in some
+get_revision function and populate the gpio pins there. Sort of like
+this recent beagle patch:
 
+https://patchwork.kernel.org/patch/859662/
 
+That way adding support for other differences will be easier.
 
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.22.1307971213.24103.linux-arm-kernel@lists.infradead.org>
+Regards,
 
-a) a case where the hibernation patch as I posted it is ok for core state:
-
-arch/arm/mach-exynos4/sleep.S has:
-
-ENTRY(s3c_cpu_save)
-
-         stmfd   sp!, { r3 - r12, lr }
-         ldr     r3, =resume_with_mmu
-         bl      cpu_suspend
-
-         ldr     r0, =pm_cpu_sleep
-         ldr     r0, [ r0 ]
-         mov     pc, r0
-
-resume_with_mmu:
-         ldmfd   sp!, { r3 - r12, pc }
-
-ENTRY(s3c_cpu_resume)
-         b       cpu_resume
-
-
-I.e. it does nothing before but set up the arguments for cpu_suspend, and 
-does nothing afterwards but redirect to a function that enters low power 
-(and switches the CPU off).
-Likewise, all it does for resume is redirect to cpu_resume which will 
-ultimately end up jumping to resume_with_mmu: as requested.
-
-
-b) a case where the hibernation patch is insufficient even though the
-    code in the soc suspend func uses cpu_suspend:
-
-arch/arm/mach-pxa/sleep.S has:
-
-/*
-  * pxa27x_cpu_suspend()
-  *
-  * Forces CPU into sleep state.
-  *
-  * r0 = value for PWRMODE M field for desired sleep state
-  * r1 = v:p offset
-  */
-ENTRY(pxa27x_cpu_suspend)
-
-#ifndef CONFIG_IWMMXT
-         mra     r2, r3, acc0
-#endif
-         stmfd   sp!, {r2 - r12, lr}             @ save registers on stack
-         mov     r4, r0                          @ save sleep mode
-         ldr     r3, =pxa_cpu_resume             @ resume function
-         bl      cpu_suspend
-[ ... some stuff ... ]
-         ldr     r6, =CCCR
-         ldr     r8, [r6]                @ keep original value for resume
-
-         ldr     r7, =CCCR_SLEEP         @ prepare CCCR sleep value
-         mov     r0, #0x2                @ prepare value for CLKCFG
-
-         @ align execution to a cache line
-         b       pxa_cpu_do_suspend
-#endif
-[ ... ]
-pxa_cpu_do_suspend:
-
-         @ All needed values are now in registers.
-         @ These last instructions should be in cache
-
-         @ initiate the frequency change...
-         str     r7, [r6]
-         mcr     p14, 0, r0, c6, c0, 0
-
-         @ restore the original cpu speed value for resume
-         str     r8, [r6]
-[ ... ]
-/*
-  * pxa_cpu_resume()
-  *
-  * entry point from bootloader into kernel during resume
-  */
-         .align 5
-pxa_cpu_resume:
-         ldmfd   sp!, {r2, r3}
-#ifndef CONFIG_IWMMXT
-         mar     acc0, r2, r3
-#endif
-         ldmfd   sp!, {r4 - r12, pc}             @ return to caller
-
-
-
-In this case, there's _MORE_ state saved (the CCCR / CCCR_SLEEP accesses) 
-after the call to cpu_suspend things that aren't dealt with by the way the 
-hibernation support patch currently operates.
-
-There also is _more_ restored at resume than what the generic part does 
-for you.
-
-Whether these things (for example) are relevant wrt. to a hibernation 
-resume is something I simply do not know.
-
-
-A third example of a soc suspend func, even more complex, with more 
-constraints, would be as already mentioned, OMAP. On that as well the 
-caveat applies, "what works empirically might not be correct in all 
-cases".
-
-
-
-
-This hopefully illustrates what someone who tries to make suspend-to-disk 
-work for a particular ARM SoC has to look out for, and why the patch 
-shouldn't be blindly adopted ?!
-
-
-
-Again, it's only a starting point. An improved one compared to having 
-ARCH-#ifdefs and huge code bloat all over swsusp.S, but not sufficient for 
-the general case quite yet.
-
-
-FrankH.
+Tony
