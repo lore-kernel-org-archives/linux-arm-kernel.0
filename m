@@ -1,52 +1,87 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Mon, 13 Jun 2011 10:47:15 +0200
-Subject: [PATCH] gpio/74x164: fix clash with gpiolib namespace
-Message-ID: <1307954835-20812-1-git-send-email-linus.walleij@stericsson.com>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Mon, 13 Jun 2011 17:03:50 +0800
+Subject: [PATCH] gpio/plat-pxa: fix clash with gpiolib namespace
+In-Reply-To: <1307954539-5681-1-git-send-email-linus.walleij@stericsson.com>
+References: <1307954539-5681-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <BANLkTikkT6ZvsSycu13Fnsek43f9+YUkVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 74x164 GPIO driver has a static inline helper called
-gpio_to_chip which clashes with the gpiolib namespace if we
-try to expose the function with the same name from gpiolib,
-and it's still confusing even if we don't do that. So rename
-it to gpio_to_74x164_chip().
+On Mon, Jun 13, 2011 at 4:42 PM, Linus Walleij
+<linus.walleij@stericsson.com> wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+>
+> The PXA platform code has a static inline helper called
+> gpio_to_chip which clashes with the gpiolib namespace if we
+> try to expose the function with the same name from gpiolib,
+> and it's still confusing even if we don't do that. So rename
+> it to gpio_to_pxachip().
+>
+> Reported-by: H Hartley Sweeten <hartleys@visionengravers.com>
+> Cc: Eric Miao <eric.miao@linaro.org>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-Reported-by: H Hartley Sweeten <hartleys@visionengravers.com>
-Signed-off-by: Linus Walleij <linus.walleij@stericsson.com>
----
- drivers/gpio/gpio-74x164.c |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+OK, applied to 'devel'.
 
-diff --git a/drivers/gpio/gpio-74x164.c b/drivers/gpio/gpio-74x164.c
-index 7fb60b6..ff525c0 100644
---- a/drivers/gpio/gpio-74x164.c
-+++ b/drivers/gpio/gpio-74x164.c
-@@ -23,7 +23,7 @@ struct gen_74x164_chip {
- 	u8			port_config;
- };
- 
--static struct gen_74x164_chip *gpio_to_chip(struct gpio_chip *gc)
-+static struct gen_74x164_chip *gpio_to_74x164_chip(struct gpio_chip *gc)
- {
- 	return container_of(gc, struct gen_74x164_chip, gpio_chip);
- }
-@@ -36,7 +36,7 @@ static int __gen_74x164_write_config(struct gen_74x164_chip *chip)
- 
- static int gen_74x164_get_value(struct gpio_chip *gc, unsigned offset)
- {
--	struct gen_74x164_chip *chip = gpio_to_chip(gc);
-+	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
- 	int ret;
- 
- 	mutex_lock(&chip->lock);
-@@ -49,7 +49,7 @@ static int gen_74x164_get_value(struct gpio_chip *gc, unsigned offset)
- static void gen_74x164_set_value(struct gpio_chip *gc,
- 		unsigned offset, int val)
- {
--	struct gen_74x164_chip *chip = gpio_to_chip(gc);
-+	struct gen_74x164_chip *chip = gpio_to_74x164_chip(gc);
- 
- 	mutex_lock(&chip->lock);
- 	if (val)
--- 
-1.7.3.2
+> ---
+> ?arch/arm/plat-pxa/gpio.c | ? 10 +++++-----
+> ?1 files changed, 5 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm/plat-pxa/gpio.c b/arch/arm/plat-pxa/gpio.c
+> index 48ebb94..a11dc36 100644
+> --- a/arch/arm/plat-pxa/gpio.c
+> +++ b/arch/arm/plat-pxa/gpio.c
+> @@ -50,7 +50,7 @@ static inline void __iomem *gpio_chip_base(struct gpio_chip *c)
+> ? ? ? ?return container_of(c, struct pxa_gpio_chip, chip)->regbase;
+> ?}
+>
+> -static inline struct pxa_gpio_chip *gpio_to_chip(unsigned gpio)
+> +static inline struct pxa_gpio_chip *gpio_to_pxachip(unsigned gpio)
+> ?{
+> ? ? ? ?return &pxa_gpio_chips[gpio_to_bank(gpio)];
+> ?}
+> @@ -161,7 +161,7 @@ static int pxa_gpio_irq_type(struct irq_data *d, unsigned int type)
+> ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> ? ? ? ?unsigned long gpdr, mask = GPIO_bit(gpio);
+>
+> - ? ? ? c = gpio_to_chip(gpio);
+> + ? ? ? c = gpio_to_pxachip(gpio);
+>
+> ? ? ? ?if (type == IRQ_TYPE_PROBE) {
+> ? ? ? ? ? ? ? ?/* Don't mess with enabled GPIOs using preconfigured edges or
+> @@ -230,7 +230,7 @@ static void pxa_gpio_demux_handler(unsigned int irq, struct irq_desc *desc)
+> ?static void pxa_ack_muxed_gpio(struct irq_data *d)
+> ?{
+> ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+> + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+>
+> ? ? ? ?__raw_writel(GPIO_bit(gpio), c->regbase + GEDR_OFFSET);
+> ?}
+> @@ -238,7 +238,7 @@ static void pxa_ack_muxed_gpio(struct irq_data *d)
+> ?static void pxa_mask_muxed_gpio(struct irq_data *d)
+> ?{
+> ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+> + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+> ? ? ? ?uint32_t grer, gfer;
+>
+> ? ? ? ?c->irq_mask &= ~GPIO_bit(gpio);
+> @@ -252,7 +252,7 @@ static void pxa_mask_muxed_gpio(struct irq_data *d)
+> ?static void pxa_unmask_muxed_gpio(struct irq_data *d)
+> ?{
+> ? ? ? ?int gpio = irq_to_gpio(d->irq);
+> - ? ? ? struct pxa_gpio_chip *c = gpio_to_chip(gpio);
+> + ? ? ? struct pxa_gpio_chip *c = gpio_to_pxachip(gpio);
+>
+> ? ? ? ?c->irq_mask |= GPIO_bit(gpio);
+> ? ? ? ?update_edge_detect(c);
+> --
+> 1.7.3.2
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
