@@ -1,51 +1,50 @@
-From: arjan@infradead.org (Arjan van de Ven)
-Date: Mon, 13 Jun 2011 07:28:50 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110612230707.GE2212@linux.vnet.ibm.com>
-References: <20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610172307.GA27630@srcf.ucam.org>
-	<20110610175248.GF2230@linux.vnet.ibm.com>
-	<20110610180807.GB28500@srcf.ucam.org>
-	<20110610184738.GG2230@linux.vnet.ibm.com>
-	<20110610192329.GA30496@srcf.ucam.org>
-	<20110610193713.GJ2230@linux.vnet.ibm.com>
-	<20110610200233.5ddd5a31@infradead.org>
-	<20110611170610.GA2212@linux.vnet.ibm.com>
-	<20110611102654.01e5cea9@infradead.org>
-	<20110612230707.GE2212@linux.vnet.ibm.com>
-Message-ID: <20110613072850.7234462b@infradead.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Mon, 13 Jun 2011 15:29:29 +0100
+Subject: [PATCH 4/4] ARM: pmu: add platform_device_id table support
+In-Reply-To: <1307957757-23001-5-git-send-email-mark.rutland@arm.com>
+References: <4DEFA5E1.9010600@gmail.com>
+	<1307957757-23001-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <20110613142929.GB18690@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 12 Jun 2011 16:07:07 -0700
-"Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> > 
-> > the codec issue seems to be solved in time; a previous generation
-> > silicon on our (Intel) side had ARM ecosystem blocks that did not do
-> > scatter gather, however the current generation ARM ecosystem blocks
-> > all seem to have added S/G to them....
-> > (in part this is coming from the strong desire to get camera/etc
-> > blocks to all use "GPU texture" class memory, so that the camera
-> > can directly deposit its information into a gpu texture, and
-> > similar for media encode/decode blocks... this avoids copies as
-> > well as duplicate memory).
+On Mon, Jun 13, 2011 at 10:35:57AM +0100, Mark Rutland wrote:
+> This patch adds support for platform_device_id tables, allowing new
+> PMU types to be registered with the correct type, without requiring
+> new platform_driver shims to provide the type.
 > 
-> That is indeed a clever approach!
+> Macros matching functionality of the of_device_id table macros are
+> provided for convenience.
 > 
-> Of course, if the GPU textures are in main memory, there will still
-> be memory consumption gains to be had as the image size varies (e.g.,
-> displaying image on one hand vs. menus and UI on the other). 
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm/kernel/pmu.c |   19 +++++++++++++++++++
+>  1 files changed, 19 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
+> index d34cf88..23c3af2 100644
+> --- a/arch/arm/kernel/pmu.c
+> +++ b/arch/arm/kernel/pmu.c
+> @@ -62,9 +62,22 @@ static struct of_device_id armpmu_of_device_ids[] = {
+>  	{},
+>  };
+>  
+> +#define PLAT_MATCH_PMU(name, type) {	\
+> +	.name = name,		\
+> +	.driver_data = (void *) type,	\
+> +}
+> +
+> +#define PLAT_MATCH_CPU(name)	PLAT_MATCH_PMU(name, ARM_PMU_DEVICE_CPU)
+> +
+> +static struct platform_device_id armpmu_plat_device_ids[] = {
+> +	/* None for now */
 
-graphics drivers and the whole graphics stack is set up to deal with
-that... textures aren't per se "screen size", the texture for a button
-is only as large as the button (with some rounding up to multiples of
-some small power of two) 
+I guess we could put "arm-pmu" in here but I'm not sure it's worth a 
+respin.
 
+The series looks nice though, feel free to add my Acked-by for them.
 
+Acked-by: Jamie Iles <jamie@jamieiles.com>
 
-
--- 
-Arjan van de Ven 	Intel Open Source Technology Centre
-For development, discussion and tips for power savings, 
-visit http://www.lesswatts.org
+Jamie
