@@ -1,42 +1,34 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 13 Jun 2011 17:57:53 +0800
-Subject: [PATCH 0/6] footbridge consolidation patches
-In-Reply-To: <20110613082044.GA9393@n2100.arm.linux.org.uk>
-References: <1307947185-5159-1-git-send-email-bryan.wu@canonical.com>
-	<20110613082044.GA9393@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikTveEyKkYay9_4Y0SX6_V-DF7wfQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Jun 2011 02:59:31 -0700
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <20110612155940.GM10283@n2100.arm.linux.org.uk>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110612112219.GD16318@ibawizard.net>
+	<20110612115820.GF10283@n2100.arm.linux.org.uk>
+	<201106121615.24059.arnd@arndb.de>
+	<20110612145751.GA4013@ponder.secretlab.ca>
+	<20110612151931.GK10283@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
+	<20110612155940.GM10283@n2100.arm.linux.org.uk>
+Message-ID: <20110613095931.GB10951@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 4:20 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 13, 2011 at 02:39:39PM +0800, Bryan Wu wrote:
->> When trying to convert old leds event driver to led trigger drivers, I reviewed
->> the code of mach-footbridge. move seperated PCI code and leds code into a
->> single board files like other machines.
->
-> This looks like it breaks all these when CONFIG_PCI=n. ?In that case,
-> we would avoid building the PCI supporting files. ?However, with your
-> merged files, we build it anyway and end up with undefined calls to
-> the PCI subsystem.
->
-> The code is separated to avoid that, and to avoid ifdefs.
->
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110612 08:55]:
+> 
+> I don't see this as a sustainable way forward.  If we're going to move a
+> particular SoC over to DT, we need to move the entire SoC over.  We can't
+> do this half-heartedly.
 
-Yes, indeed.
+Agreed. In addition to ATAGs, we need to also consider the large chunks
+of data in kernel that Linus originally complained about. We absolutely don't
+want to have the same in two places both in .dts files and in platform data
+for things like mux, clocks, hwmod data etc.
 
-Actually, my plan is to move code into one board file per machine but
-it needs ifdef which I missed in my patches.
-If you think the first 4 patches are useless, I think we can ignore them.
+So we need to make sure the DT append support works transparently for
+existing bootloaders so we can just drop the the old data instead of
+keeping it around.
 
-> I'm not entirely sure what the point of this patch set is, because it
-> mostly just moves the code into one file per platform and doesn't
-> consolidate anything between the platforms themselves.
->
+Regards,
 
-I just start to convert the led drivers into a common framework like
-gpio leds or led triggers. mach-footbridge is the my first step. I
-will move to other subarch later after you review this patchset.
-
-Thanks,
--Bryan
+Tony
