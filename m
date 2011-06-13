@@ -1,78 +1,143 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 13 Jun 2011 19:13:44 -0400 (EDT)
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <8yaaadlfi3q.fsf@huya.qualcomm.com>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110612081541.GA10283@n2100.arm.linux.org.uk>
-	<20110612083414.GA29516@S2100-06.ap.freescale.net>
-	<20110612092131.GC10283@n2100.arm.linux.org.uk>
-	<20110612095217.GD10283@n2100.arm.linux.org.uk>
-	<20110612104215.GC29516@S2100-06.ap.freescale.net>
-	<20110612104048.GE10283@n2100.arm.linux.org.uk>
-	<8yaaadlfi3q.fsf@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1106131910570.2142@xanadu.home>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Mon, 13 Jun 2011 16:28:43 -0700
+Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
+In-Reply-To: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
+References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04992C02AC@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jun 2011, David Brown wrote:
+Linus Walleij wrote at Monday, June 13, 2011 10:58 AM:
+> This creates a subsystem for handling of pinmux devices. These are
+> devices that enable and disable groups of pins on primarily PGA and
+> BGA type of chip packages and common in embedded systems.
 
-> On Sun, Jun 12 2011, Russell King - ARM Linux wrote:
-> 
-> > On Sun, Jun 12, 2011 at 06:42:16PM +0800, Shawn Guo wrote:
-> >> On Sun, Jun 12, 2011 at 10:52:17AM +0100, Russell King - ARM Linux wrote:
-> >> > On Sun, Jun 12, 2011 at 05:38:23PM +0800, Shawn Guo wrote:
-> >> > > On Sun, Jun 12, 2011 at 10:21:31AM +0100, Russell King - ARM Linux wrote:
-> >> > > > What if your platform doesn't use uboot?
-> >> > > 
-> >> > > Add dtb parsing support with the help from libfdt, I guess.  It is
-> >> > > some amount of work, but it's not a rewrite of bootloader, IMHO.
-> >> > 
-> >> > I guess you're suggesting that this wrapper uses libfdt to merge
-> >> > the ATAGs with the DT info?
-> >> > 
-> >> No, ATAGs does not play at all in this case.  For u-boot example
-> >> again, if it boots a dt kernel, dtb will be parsed to get cmdline
-> >> node overwritten as bootargs env value, and then it boots the dt
-> >> kernel with this updated dtb.
-> >
-> > You've missed my point entirely.  What you're saying is that we have to
-> > re-build and replace the boot loader in order to pass a command line into
-> > a kernel using the DT wrapper.
-> >
-> > I'm saying that you shouldn't have to, and the kernel should accept the
-> > memory size and command line from the ATAGs _in addition_ to the
-> > appended DT blob, and the ATAGs in that case should take precidence.
-> 
-> Having just now booted an MSM target using device tree, I'm going to
-> agree with Russell here.  I don't really see a clean transition path for
-> us to hard cut over to DT, at least on existing targets.
-> 
-> The MSMs use a custom bootloader.  It builds ATAGS to pass in memory
-> information, command line arguments, and the ramdisk address.  Working
-> with the bootloader team just to do this was difficult; trying to
-> support DT in the bootloader would be even more difficult.
-> 
-> But, beyond this, we have to still be able to boot our production
-> kernels (which don't have DT support, and probably won't for quite some
-> time).
-> 
-> The steps I had to go through to boot a DT kernel were kind of
-> complicated:
-> 
->   - Boot kernel in a debugger, and inspect the ATAGS.
-> 
->   - Edit my DTS file to match the current values.
-> 
->   - Compile the DTS file.
-> 
->   - Load the dtb on top of the ATAGS.
-> 
-> Unless I'm missing something, I don't see a clean way of supporting this
-> that doesn't involve the kernel being able to parse the ATAGS as well.
+I'm a little confused by this version. In particular:
 
-FYI: I've dug up the patch from John Bonesio doing just that.  While the 
-patch doesn't apply anymore, it looks trivial enough.  I should have it 
-working by tomorrow.
+* I don't see some changes that I thought we'd agreed upon during earlier
+review rounds, such as:
 
+** Removing pinmux_ops members list_functions, get_function_name, 
+get_function_pins; it seems odd not to push this into the pinmux core
+as data, but instead have the core pull it out of the driver in a
+"polling" function.
 
-Nicolas
+** Similarly, I'd asked for at least some documentation about how to
+handle the "multi-width bus" problem, but I didn't see that.
+
+* I'm confused by the new data model even more than before:
+
+** How can the board/machine name pins? That should be a function of the
+chip (i.e. pinmux driver), since that's where the pins are located. A
+chip's pins don't have different names on different boards; the names of
+the signals on the PCB connected to those pins are defined by the board,
+but not the names of the actual pins themselves.
+
+** struct pinmux_map requires that each function name be globally unique,
+since one can only specify "function" not "function on a specific chip".
+This can't be a requirement; what if there are two instances of the same
+chip on the board (think some expansion chip attached to a memory-mapped
+bus rather than the primary SoC itself).
+
+** Perhaps primarily due to the lack of consideration in the documentation,
+I'm not convinced we have a clearly defined path to solve the "multi-width
+bus" issue. This needs to be a feature of the core pinmux API, rather than
+something that's deferred to the board/machine files setting up different
+function mappings, since it's not possible to solve purely in function
+mappins as they're defined today.
+
+Some minor mainly typo, patch-separation, etc. feedback below.
+
+...
+> +Pinmux, also known as padmux, ballmux, alternate functions or mission modes
+> +is a way for chip vendors producing some kind of electrical packages to use
+> +a certain physical bin (ball, pad, finger, etc) for multiple mutually exclusive
+
+s/bin/pin/
+
+...
+> +A simple driver for the above example will work by setting bits 0, 1 or 2
+> +into some register mamed MUX, so it enumerates its available settings and
+
+s/mamed/named
+
+> +++ b/drivers/pinctrl/Kconfig
+...
+> +config PINMUX_U300
+> +	bool "U300 pinmux driver"
+> +	depends on ARCH_U300
+> +	help
+> +	  Say Y here to enable the U300 pinmux driver
+> +
+> +endif
+
+Shouldn't that portion be part of the second patch?
+
+> +++ b/drivers/pinctrl/Makefile
+...
+> +obj-$(CONFIG_PINMUX_U300)	+= pinmux-u300.o
+
+Same here.
+
+> +++ b/include/linux/pinctrl/machine.h
+> +/**
+> + * struct pinmux_map - boards/machines shall provide this map for devices
+> + * @function: a functional name for this mapping so it can be passed down
+> + *	to the driver to invoke that function and be referenced by this ID
+> + *	in e.g. pinmux_get()
+> + * @dev: the device using this specific mapping, may be NULL if you provide
+> + *	.dev_name instead (this is more common)
+> + * @dev_name: the name of the device using this specific mapping, the name
+> + *	must be the same that will return your struct device*
+
+s/that will return/as in/ ?
+
+> +++ b/include/linux/pinctrl/pinmux.h
+> +struct pinmux;
+> +
+> +#ifdef CONFIG_PINCTRL
+> +
+> +struct pinmux_dev;
+
+I think "struct pinmux_map" is needed outside that ifdef, or an include of
+<pinctrl/machine.h>.
+
+> +/**
+> + * struct pinmux_ops - pinmux operations, to be implemented by drivers
+> + * @request: called by the core to see if a certain pin can be muxed in
+> + *	and made available in a certain mux setting The driver is allowed
+> + *	to answer "no" by returning a negative error code
+
+That says "and made available in a certain mux setting", but no mux setting
+is passed in. s/a certain/the current/?
+
+Documentation for @free is missing here
+
+> +/**
+> + * struct pinmux_desc - pinmux descriptor, register this to pinmux subsystem
+> + * @name: name for the pinmux
+> + * @ops: pinmux operation table
+> + * @owner: module providing the pinmux, used for refcounting
+> + * @base: the number of the first pin handled by this pinmux, in the global
+> + *	pin space, subtracted from a given pin to get the offset into the range
+> + *	of a certain pinmux
+> + * @npins: the number of pins handled by this pinmux - note that
+> + *	this is the number of possible pin settings, if your driver handles
+> + *	8 pins that each can be muxed in 3 different ways, you reserve 24
+> + *	pins in the global pin space and set this to 24
+
+That's not correct, right; if you have 8 pins, you just say 8 here?
+
+The multiplier for N functions per pin is through list_functions,
+get_function_name, get_function_pins as I understand it.
+
+> +static inline int pinmux_register_mappings(struct pinmux_map const *map,
+> +					   unsigned num_maps)
+> +{
+> +	return 0;
+> +}
+
+I think you moved that to <pinmux/machine.h>?
+
+--
+nvpublic
