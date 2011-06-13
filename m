@@ -1,41 +1,62 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 13 Jun 2011 17:07:49 +0200
-Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
-In-Reply-To: <BANLkTi=HtrFETnjk1Zu0v9wqa==r0OALvA@mail.gmail.com>
-References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
-	<BANLkTi=HtrFETnjk1Zu0v9wqa==r0OALvA@mail.gmail.com>
-Message-ID: <201106131707.49217.arnd@arndb.de>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 13 Jun 2011 11:14:17 -0400 (EDT)
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <20110613142044.GC13643@n2100.arm.linux.org.uk>
+References: <20110612112219.GD16318@ibawizard.net>
+	<20110612115820.GF10283@n2100.arm.linux.org.uk>
+	<201106121615.24059.arnd@arndb.de>
+	<20110612145751.GA4013@ponder.secretlab.ca>
+	<20110612151931.GK10283@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
+	<20110612155940.GM10283@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1106121454510.2142@xanadu.home>
+	<20110613095142.GA10951@atomide.com>
+	<alpine.LFD.2.00.1106131010150.2142@xanadu.home>
+	<20110613142044.GC13643@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1106131058080.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 13 June 2011 16:12:05 KyongHo Cho wrote:
-> Of course, the mapping created by by dma_alloc_writecombine()
-> may be more efficient for CPU to update the DMA buffer.
-> But I think mapping with dma_alloc_coherent() is not such a
-> performance bottleneck.
+On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
+
+> On Mon, Jun 13, 2011 at 10:14:07AM -0400, Nicolas Pitre wrote:
+> > On Mon, 13 Jun 2011, Tony Lindgren wrote:
+> > 
+> > > I agree that we need to parse the user configurable ATAGs to support
+> > > existing hardware properly. Otherwise we have edit the .dts for each board
+> > > to change the user configurable things, which is not nice for distros.
+> > 
+> > You mean "existing bootloaders", right?
+> > 
+> > Updated bootloaders should translate user configurable information into 
+> > proper DT records and pass the resulting DTB to the kernel separately.
 > 
-> I think it is better to remove dma_alloc_writecombine() and replace
-> all of it with dma_alloc_coherent().
+> OMAP is one of the code bases where this really matters - they have a
+> _lot_ of existing platforms with boot loaders which do the ATAG stuff.
+> They also have a lot of code in arch/arm that needs to be converted to
+> a DT representation.
 
-I'm sure that the graphics people will disagree with you on that.
-Having the frame buffer mapped in write-combine mode is rather
-important when you want to efficiently output videos from your
-CPU.
+Yes, agreed.  I just wanted to make the situation clear above, so people 
+aren't confused in believing that the DT data is always static.  New 
+bootloaders should have the same ability to dynamically change some of 
+the parameters passed to the kernel.  So the issue is not about existing 
+hardware, but rather about existing bootloaders.
 
-> In addition, IMHO, mapping to user's address is not a duty of dma_map_ops.
-> dma_mmap_*() is not suitable for a system that has IOMMU
-> because a DMA address does not equal to its correspondent physical
-> address semantically.
+> With the current situation where you can have either ATAGs or DT but
+> not both, they're currently facing either having to break all the
+> existing platforms by ignoring the ATAGs _or_ keeping two copies of
+> a considerable amount of data - one in DT form and one in its existing
+> form.
 > 
-> I think DMA APIs of ARM must be changed drastically to support IOMMU
-> because IOMMU API does not manage virtual address space.
+> At present, DT can only be used sensibly on brand new SoCs where there
+> are no existing platforms with ATAG based boot loaders to worry about.
+> As things stand at present, even with your patch series, existing SoCs
+> have no viable path to transition to DT.
 
-I can understand that there are arguments why mapping a DMA buffer into
-user space doesn't belong into dma_map_ops, but I don't see how the
-presence of an IOMMU is one of them.
+As I said, I'm now convinced that the patch adding a shim to translate 
+ATAGs into DT entries should be added to this series.  I was reluctant 
+initially for insentive purposes, but your argument clearly tilted the 
+balance the other way.
 
-The entire purpose of dma_map_ops is to hide from the user whether
-you have an IOMMU or not, so that would be the main argument for
-putting it in there, not against doing so.
 
-	Arnd
+Nicolas
