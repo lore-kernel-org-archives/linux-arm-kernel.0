@@ -1,81 +1,58 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 13 Jun 2011 15:29:02 -0400 (EDT)
-Subject: [PATCH 03/14] ARM: suspend: extract common code from
-	MULTI_CPU/!MULTI_CPU paths
-In-Reply-To: <E1QWAju-0002dr-P6@rmk-PC.arm.linux.org.uk>
-References: <20110613171446.GF13643@n2100.arm.linux.org.uk>
-	<E1QWAju-0002dr-P6@rmk-PC.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1106131522410.2142@xanadu.home>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 13 Jun 2011 22:34:49 +0300
+Subject: [PATCH v2] arm: omap3: cm-t35: add support for cm-t3730
+In-Reply-To: <20110613133307.GC3352@atomide.com>
+References: <4DC27317.7020206@compulab.co.il>
+	<1304839231-11329-1-git-send-email-grinberg@compulab.co.il>
+	<20110531130447.GK11352@atomide.com>
+	<4DE8E3B7.5020107@compulab.co.il>
+	<20110613133307.GC3352@atomide.com>
+Message-ID: <4DF66659.3070102@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
+On 06/13/11 16:33, Tony Lindgren wrote:
+> * Igor Grinberg <grinberg@compulab.co.il> [110603 06:33]:
+>> I'm not sure I understand what are you trying to propose here...
+>> If you look once again on the code, there is currently only one if (cpu_is_..) {} else {}
+>> statement currently present.
+>> (I can remove the "if (cpu_is_omap3630())" - it indeed has no value)
+>>
+>> Indeed, there will be some other differences...
+>> Each time I submit a patch, I try to be as optimal as I can,
+>> but again I'm open for suggestions...
+>> (though I think it is optimal, e.g. 33 lines for a new running board...)
+> What I meant is that maybe you should do the detection first in some
+> get_revision function and populate the gpio pins there. Sort of like
+> this recent beagle patch:
+>
+> https://patchwork.kernel.org/patch/859662/
 
-> Very little code is different between these two paths now, so extract
-> the common code.
+Yes I've seen this patch (actually, I was one of the people who reviewed it).
 
-What about simply always using the MULTI_CPU path unconditionally here?  
-The struct processor pointer could be made available in all cases, and 
-non critical paths could choose to always use it to simplify the code.
+> That way adding support for other differences will be easier.
 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/sleep.S |   24 ++++++------------------
->  1 files changed, 6 insertions(+), 18 deletions(-)
-> 
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index f8e9251..0a778c3 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -19,29 +19,13 @@ ENTRY(cpu_suspend)
->  	mov	r9, lr
->  #ifdef MULTI_CPU
->  	ldr	r10, =processor
-> -	mov	r2, sp			@ current virtual SP
->  	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
->  	ldr	ip, [r10, #CPU_DO_RESUME] @ virtual resume function
-> -	sub	sp, sp, r0		@ allocate CPU state on stack
-> -	mov	r0, sp			@ save pointer
-> -	add	ip, ip, r1		@ convert resume fn to phys
-> -	stmfd	sp!, {r1, r2, ip}	@ save v:p, virt SP, phys resume fn
-> -	ldr	r3, =sleep_save_sp
-> -	add	r2, sp, r1		@ convert SP to phys
-> -#ifdef CONFIG_SMP
-> -	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
-> -	ALT_UP(mov lr, #0)
-> -	and	lr, lr, #15
-> -	str	r2, [r3, lr, lsl #2]	@ save phys SP
->  #else
-> -	str	r2, [r3]		@ save phys SP
-> -#endif
-> -	mov	lr, pc
-> -	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
-> -#else
-> -	mov	r2, sp			@ current virtual SP
->  	ldr	r0, =cpu_suspend_size
->  	ldr	ip, =cpu_do_resume
-> +#endif
-> +	mov	r2, sp			@ current virtual SP
->  	sub	sp, sp, r0		@ allocate CPU state on stack
->  	mov	r0, sp			@ save pointer
->  	add	ip, ip, r1		@ convert resume fn to phys
-> @@ -56,6 +40,10 @@ ENTRY(cpu_suspend)
->  #else
->  	str	r2, [r3]		@ save phys SP
->  #endif
-> +#ifdef MULTI_CPU
-> +	mov	lr, pc
-> +	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
-> +#else
->  	bl	cpu_do_suspend
->  #endif
->  
-> -- 
-> 1.7.4.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+OK, now I understand what you mean.
+I think currently this is not optimal for cm-t35/3730 and will just complicate
+things and introduce more l-o-c.
+
+The situation on beagle board is much more complicated then on cm-t3x.
+Beagle has quite a large number of revisions,
+while cm-t35 has only one and cm-t3730 has only one.
+Moreover, there is no difference in gpios - same numbers are used
+for the same functionality.
+
+In particular the only two differences (that s/w cares about) between the boards are:
+1) mux of the DSS pins
+2) no NAND on cm-t3730 (still not introduced by the patch in subj)
+
+Nevertheless, I will try to come up with something,
+so we can see and decide what is a better option.
+
+I will base it on your devel-board branch
+(correct me if you want it some other way).
+
+
+-- 
+Regards,
+Igor.
