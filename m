@@ -1,34 +1,35 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Mon, 13 Jun 2011 20:24:27 +0000 (UTC)
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 13 Jun 2011 16:44:16 -0400 (EDT)
 Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <BANLkTik_hH9tZ5MMbOYzhZwLFTFQyJyfRg@mail.gmail.com>
 References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<201106121615.24059.arnd@arndb.de>
-	<20110612143428.GI10283@n2100.arm.linux.org.uk>
-	<201106121701.22418.arnd@arndb.de>
-	<20110612153536.GL10283@n2100.arm.linux.org.uk>
-Message-ID: <it5rlq$3f0$1@dough.gmane.org>
+	<BANLkTik_hH9tZ5MMbOYzhZwLFTFQyJyfRg@mail.gmail.com>
+Message-ID: <alpine.LFD.2.00.1106131640370.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+On Sun, 12 Jun 2011, Grant Likely wrote:
 
-> On Sun, Jun 12, 2011 at 05:01:22PM +0200, Arnd Bergmann wrote:
->> Of course it should override the device tree, I'm not arguing that.
->> All I'm saying is that we don't need to special-case this or support
->> both formats once the kernel is there as long as we move the information
->> into appropriate DT-representation of the same data.
->
-> You're arguing for it to be parsed by whatever fragment of assembly code
-> we have to place around the zImage to merge it into DT.
->
-> And yes, it's going to have to be assembly code because we don't have a
-> C environment at that point which can run in a relocatable way.
+> On Sun, Jun 12, 2011 at 12:06 AM, Nicolas Pitre
+> <nicolas.pitre@linaro.org> wrote:
+> > This is a resend of those patches with fixups after the latest changes
+> > in mainline.
+> >
+> > [PATCH 1/3] ARM: zImage: ensure it is always a multiple of 64 bits in size
+> > This one is new and trivial.
+> >
+> > [PATCH 2/3] ARM: zImage: Allow the appending of a device tree binary
+> > Mostly John Bonesio's version with some adjustments and cleanups.
+> >
+> > [PATCH 3/3] ARM: zImage: make sure appended DTB doesn't get overwritten by kernel .bss
+> > New, simpler alternative to Tony Lindgren's version.
+> 
+> I've gone ahead and added the series to devicetree/test for anyone who
+> want to play with it.
 
-Please, again look at the cuboot stuff which is used on powerpc. It uses
-limited C environment: it's executed before kernel entry, so it can use
-stack, etc. as setup by the bootloader.
+I've published those patches with all the latest fixes and ACKs here:
+
+	git://git.linaro.org/people/nico/linux.git zImage_DTB_append
 
 
--- 
-With best wishes
-Dmitry
+Nicolas
