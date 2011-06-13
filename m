@@ -1,71 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 13 Jun 2011 16:13:15 +0200
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <20110610133338.GD24636@n2100.arm.linux.org.uk>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
-	<20110609163206.GB24636@n2100.arm.linux.org.uk>
-	<1307686397.10976.116.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE337F@dbde02.ent.ti.com>
-	<20110610104318.GC24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3452@dbde02.ent.ti.com>
-	<20110610133338.GD24636@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTimZ=v4W1hFJ7hvZRmyHMSU_3MmZEA@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Mon, 13 Jun 2011 10:14:07 -0400 (EDT)
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <20110613095142.GA10951@atomide.com>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110612112219.GD16318@ibawizard.net>
+	<20110612115820.GF10283@n2100.arm.linux.org.uk>
+	<201106121615.24059.arnd@arndb.de>
+	<20110612145751.GA4013@ponder.secretlab.ca>
+	<20110612151931.GK10283@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1106121145570.2142@xanadu.home>
+	<20110612155940.GM10283@n2100.arm.linux.org.uk>
+	<alpine.LFD.2.00.1106121454510.2142@xanadu.home>
+	<20110613095142.GA10951@atomide.com>
+Message-ID: <alpine.LFD.2.00.1106131010150.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 3:33 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Fri, Jun 10, 2011 at 05:18:46PM +0530, Raju, Sundaram wrote:
->> Now DMACs capable of 3D transfer, do transfer of the whole 1D
->> buffer per sync received or even whole 2D buffer per sync received
->> (based on the sync rate programmed in the DMAC).
->
-> The only issue which I see that we don't cover is the case where you want
-> to describe a single buffer which is organised as N bytes to be transferred,
-> M following bytes to be skipped, N bytes to be transferred, M bytes to be
-> skipped. ?I doubt there are many controllers which can be programmed with
-> both 'N' and 'M' parameters directly.
+On Mon, 13 Jun 2011, Tony Lindgren wrote:
 
-Sundaram is this how your controller works?
-I mean the hardware can skip over sequences like this?
+> * Nicolas Pitre <nicolas.pitre@linaro.org> [110612 11:55]:
+> > On Sun, 12 Jun 2011, Russell King - ARM Linux wrote:
+> > 
+> > > I don't see this as a sustainable way forward.  If we're going to move a
+> > > particular SoC over to DT, we need to move the entire SoC over.  We can't
+> > > do this half-heartedly.
+> > > 
+> > > And that means we _must_ deal with accepting ATAGs from existing boot
+> > > loaders, with that information taking precidence over the DT blob
+> > > supplied with the kernel.
+> > 
+> > Well... OK.  Let's see how this can be accommodated with the existing 
+> > patch floating around doing that.
+> 
+> I agree that we need to parse the user configurable ATAGs to support
+> existing hardware properly. Otherwise we have edit the .dts for each board
+> to change the user configurable things, which is not nice for distros.
 
-When we added the config interface to DMAengine I originally included
-a "custom config" call, but Dan wanted me to keep it out until we
-had some specific usecase for it. FSLDMA recently started
-to use it.
+You mean "existing bootloaders", right?
 
-Notice how dmaengine_slave_config() is implemented:
+Updated bootloaders should translate user configurable information into 
+proper DT records and pass the resulting DTB to the kernel separately.
 
-static inline int dmaengine_slave_config(struct dma_chan *chan,
-					  struct dma_slave_config *config)
-{
-	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
-			(unsigned long)config);
-}
 
-So what is passed to the driver is just an unsigned long.
-
-This is actually modeled to be ioctl()-like so you can pass in a
-custom config to the same callback on the device driver,
-just use some other enumerator than DMA_SLAVE_CONFIG,
-say like FSLDMA already does with FSLDMA_EXTERNAL_START.
-
-Just put some enumerator in enum dma_ctrl_cmd in
-dmaengine.h such as SDMA_TEXAS_STRIDE_CONFIG and call
-like this:
-
-/* However that config struct needs to look, basically */
-static struct sdma_ti_stride_cgf = {
-     take = M,
-     skip = N,
-};
-
-ret = chan->device->device_control(chan, SDMA_TEXAS_STRIDE_CONFIG,
-&sdma_ti_stride_cfg);
-
-Or something like this.
-
-Thanks,
-Linus Walleij
+Nicolas
