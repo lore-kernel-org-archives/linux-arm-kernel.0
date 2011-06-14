@@ -1,154 +1,164 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 13 Jun 2011 23:15:58 -0700
-Subject: [PATCH 1/3] ARM: Add cpu power management notifiers
-In-Reply-To: <87ips9fka2.fsf@ti.com>
-References: <1307925825-28566-1-git-send-email-ccross@android.com>
-	<1307925825-28566-2-git-send-email-ccross@android.com>
-	<87ips9fka2.fsf@ti.com>
-Message-ID: <BANLkTinnZtPFY1Aae=8uDbyt5sh9xAxiNw@mail.gmail.com>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Tue, 14 Jun 2011 12:01:41 +0530
+Subject: [PATCH 2/5] ARM: EXYNOS4: Add sclk_spdif clocks
+In-Reply-To: <005701cc2a56$947a7870$bd6f6950$%kim@samsung.com>
+References: <1307687667-9127-1-git-send-email-ch.naveen@samsung.com>
+	<1307687667-9127-3-git-send-email-ch.naveen@samsung.com>
+	<005701cc2a56$947a7870$bd6f6950$%kim@samsung.com>
+Message-ID: <BANLkTi=OLyuB435xbV6yYsG1geMcSDeZig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 3:17 PM, Kevin Hilman <khilman@ti.com> wrote:
-> Colin Cross <ccross@android.com> writes:
->
->> During some CPU power modes entered during idle, hotplug and
->> suspend, peripherals located in the CPU power domain, such as
->> the GIC and VFP, may be powered down. ?Add a notifier chain
->> that allows drivers for those peripherals to be notified
->> before and after they may be reset.
+Hi Kukjin,
+
+On 14 June 2011 11:17, Kukjin Kim <kgene.kim@samsung.com> wrote:
+>> From: Naveen Krishna Chatradhi wrote:
 >>
->> Signed-off-by: Colin Cross <ccross@android.com>
+>> Add the sclk_spdif clock is of type 'struct clksrc_clk' clock.
+>> Also, add clk_spdifcdclk clocks of type 'struct clk' clock.
+>>
+>> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+>> ---
+>> ?arch/arm/mach-exynos4/clock.c | ? 70
+>> +++++++++++++++++++++++++++++++++++++++++
+>> ?1 files changed, 70 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+>> index 7aa4aef..57ca356 100644
+>> --- a/arch/arm/mach-exynos4/clock.c
+>> +++ b/arch/arm/mach-exynos4/clock.c
+>> @@ -73,6 +73,11 @@ static struct clk clk_audiocdclk2 = {
+>> ? ? ? .id ? ? ? ? ? ? = 2,
+>> ?};
+>>
+>> +static struct clk clk_spdifcdclk = {
+>> + ? ? .name ? ? ? ? ? = "spdifcdclk",
+>> + ? ? .id ? ? ? ? ? ? = -1,
+>> +};
 >
-> This is great, thanks!
+> Do we really need this?
+This is to complete the clock structure.
 >
-> I had hacked up something OMAP-specific a while back to do something
-> similar, and have been meaning to make it more generic, so this is
-> perfect. ?Also, if it is moved outside ARM, note that x86_64 has a
-> idle_notifier infrastructure that is somewhat similar, and if you're
-> motivated, it should probably be converted to this as well. ?See
-> arch/x86/kernel/process_64.c.
-
-I'll take a look at x86
-
-> Also, for the sake of the comments/changelog, the usefulness of these
-> notifiers is not limited to low-power states where power is off and IP
-> blocks may be reset. ?It could be considered as simply a generic
-> notification mechanism for any CPU PM transitions.
+> spdif_extclk? not spdifcdclk.
+Sorry, my bad. Will change
 >
-> On OMAP we have other peripherals (not in the CPU power domain) where we
-> need to control their PM transitions in relation to the CPU PM
-> transitions so the notifiers are useful for any low-power state
-> transition of the CPU(s). ?The drivers for these peripherals use runtime
-> PM in their CPU PM notifiers to trigger the device PM transitions. (The
-> drivers must use the synchronous versions of the runtime PM get/put
-> calls with device in pm_runtime_irq_safe() mode.)
-
-Can you give a concrete example of this so I can describe it correctly?
-
-> In this series, I don't see any calls to cpu_[complex_]pm_[enter|exit]().
-> Based on that, I assume you prefer to leave it up to platform-specific
-> idle/PM code to place these calls. ?Or, do you plan to have this
-> triggered by generic CPUidle, suspend/resume and/or hotplug code? ?At
-> least on OMAP, I prefer having the calls in platform-specific code.
-
-I will post the Tegra code that uses this soon.  I expect that the
-decision on exactly when to call these functions will be unique to
-each platform, so I think it should start in the platform-specific
-code.
-
-> I have a minor enhancement request. ?The notifier callbacks provide for
-> passing a void * through the notifier chain. ?Could you add a way for a
-> void * to be registered at cpu_pm_register_notifier() time and that
-> would be passed through the notifier call chain? ?This would allow using
-> the same struct notifier_block and callback for multiple instances of
-> the same IP, and the instances could be differentiated in the callback
-> using the void *.
-
-The void * passed to the notifier comes from the call to
-notifier_call_chain(), not from the call to register_notifier().  You
-can get the behavior you want by putting the notifier_block inside
-your device struct and using container_of on the notifier_bock.
-
-> Also, FWIW I tested this on OMAP3 (Cortex-A8 UP) using
-> cpu_pm_enter/exit() in the code path shared between idle and suspend. ?I
-> successfully triggered PM transitions in non-CPU power-domain
-> peripherals, and it worked great.
-
-Great!  Can I get a tested-by?
-
-> Some other minor comments below...
->
-> [...]
->
->> diff --git a/arch/arm/kernel/cpu_pm.c b/arch/arm/kernel/cpu_pm.c
->> new file mode 100644
->> index 0000000..48a5b53
->> --- /dev/null
->> +++ b/arch/arm/kernel/cpu_pm.c
->> @@ -0,0 +1,181 @@
->> +/*
->> + * Copyright (C) 2011 Google, Inc.
->> + *
->> + * Author:
->> + * ? Colin Cross <ccross@android.com>
->> + *
->> + * This software is licensed under the terms of the GNU General Public
->> + * License version 2, as published by the Free Software Foundation, and
->> + * may be copied, distributed, and modified under those terms.
->> + *
->> + * This program is distributed in the hope that it will be useful,
->> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
->> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
->> + * GNU General Public License for more details.
->> + *
->> + */
 >> +
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/notifier.h>
->> +#include <linux/spinlock.h>
+>> ?static int exynos4_clksrc_mask_top_ctrl(struct clk *clk, int enable)
+>> ?{
+>> ? ? ? return s5p_gatectrl(S5P_CLKSRC_MASK_TOP, clk, enable);
+>> @@ -592,6 +597,11 @@ static struct clk init_clocks_off[] = {
+>> ? ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_peril_ctrl,
+>> ? ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 21),
+>> ? ? ? }, {
+>> + ? ? ? ? ? ? .name ? ? ? ? ? = "spdif",
+>> + ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+>> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_peril_ctrl,
+>> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 26),
+>> + ? ? }, {
+>> ? ? ? ? ? ? ? .name ? ? ? ? ? = "ac97",
+>> ? ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+>> ? ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clk_ip_peril_ctrl,
+>> @@ -858,6 +868,65 @@ static struct clk init_clocks[] = {
+>> ? ? ? }
+>> ?};
+>>
+>> +static int exynos4_spdif_set_rate(struct clk *clk, unsigned long rate)
+>> +{
+>> + ? ? struct clk *pclk;
+>> + ? ? int ret;
 >> +
->> +#include <asm/cpu_pm.h>
+>> + ? ? pclk = clk_get_parent(clk);
+>> + ? ? if (IS_ERR(pclk))
+>> + ? ? ? ? ? ? return -EINVAL;
 >> +
->> +/*
->> + * When a CPU goes to a low power state that turns off power to the CPU's
->> + * power domain, the contents of some blocks (floating point coprocessors,
->> + * interrutp controllers, caches, timers) in the same power domain can
+>> + ? ? ret = pclk->ops->set_rate(pclk, rate);
+>> + ? ? clk_put(pclk);
+>> +
+>> + ? ? return ret;
+>> +}
+>> +
+>> +static unsigned long exynos4_spdif_get_rate(struct clk *clk)
+>> +{
+>> + ? ? struct clk *pclk;
+>> + ? ? int rate;
+>> +
+>> + ? ? pclk = clk_get_parent(clk);
+>> + ? ? if (IS_ERR(pclk))
+>> + ? ? ? ? ? ? return -EINVAL;
+>> +
+>> + ? ? rate = pclk->ops->get_rate(clk);
+>> + ? ? clk_put(pclk);
+>> +
+>> + ? ? return rate;
+>> +}
 >
-> typo: interrutp
-
-Will fix
-
->> + * be lost. ?The cpm_pm notifiers provide a method for platform idle, suspend,
->> + * and hotplug implementations to notify the drivers for these blocks that
->> + * they may be reset.
->> + *
->> + * All cpu_pm notifications must be called with interrupts disabled.
->> + *
->> + * The notifications are split into two classes, CPU notifications and CPU
->> + * complex notifications.
->> + *
->> + * CPU notifications apply to a single CPU, and must be called on the affected
->> + * CPU. ?They are used to save per-cpu context for affected blocks.
->> + *
->> + * CPU complex notifications apply to all CPUs in a single power domain. They
->> + * are used to save any global context for affected blocks, and must be called
->> + * after all the CPUs in the power domain have been notified of the low power
->> + * state.
->> + *
->> + */
+> I think, we can move above into plat-s5p for common spdif with others.
+Sure, Will move.
+Note: It wont apply for S5P64X0 series.
 >
-> Not directly related to this series, but I'm a bit confused on terminology.
+>> +
+>> +static struct clk_ops exynos4_sclk_spdif_ops = {
+>> + ? ? .set_rate ? ? ? = exynos4_spdif_set_rate,
+>> + ? ? .get_rate ? ? ? = exynos4_spdif_get_rate,
+>> +};
+>> +
+>> +static struct clk *clkset_sclk_spdif_list[] = {
+>> + ? ? [0] = &clk_sclk_audio0.clk,
+>> + ? ? [1] = &clk_sclk_audio1.clk,
+>> + ? ? [2] = &clk_sclk_audio2.clk,
+>> + ? ? [3] = &clk_spdifcdclk,
+>> +};
+>> +
+>> +static struct clksrc_sources clkset_sclk_spdif = {
+>> + ? ? .sources ? ? ? ?= clkset_sclk_spdif_list,
+>> + ? ? .nr_sources ? ? = ARRAY_SIZE(clkset_sclk_spdif_list),
+>> +};
+>> +
+>> +static struct clksrc_clk clk_sclk_spdif = {
+>> + ? ? .clk ? ?= {
+>> + ? ? ? ? ? ? .name ? ? ? ? ? = "sclk_spdif",
+>> + ? ? ? ? ? ? .id ? ? ? ? ? ? = -1,
+>> + ? ? ? ? ? ? .enable ? ? ? ? = exynos4_clksrc_mask_peril1_ctrl,
+>> + ? ? ? ? ? ? .ctrlbit ? ? ? ?= (1 << 8),
+>> + ? ? ? ? ? ? .ops ? ? ? ? ? ?= &exynos4_sclk_spdif_ops,
+>> + ? ? },
+>> + ? ? ? ? ? ? .sources = &clkset_sclk_spdif,
+>> + ? ? ? ? ? ? .reg_src = { .reg = S5P_CLKSRC_PERIL1, .shift = 8, .size = 2
+> },
+>> +};
+>> +
+>> ?static struct clk *clkset_group_list[] = {
+>> ? ? ? [0] = &clk_ext_xtal_mux,
+>> ? ? ? [1] = &clk_xusbxti,
+>> @@ -1274,6 +1343,7 @@ static struct clksrc_clk *sysclks[] = {
+>> ? ? ? &clk_sclk_audio0,
+>> ? ? ? &clk_sclk_audio1,
+>> ? ? ? &clk_sclk_audio2,
+>> + ? ? &clk_sclk_spdif,
+>> ?};
+>>
+>> ?static u32 epll_div[][6] = {
+>> --
+>> 1.7.2.3
 >
-> I've seen both 'CPU complex' and 'CPU cluster' used in ARM SMP land, but
-> haven't seen precise definitions of either. ?Does one imply all CPUs,
-> and the other imply all CPUs in the same power domain?
+>
+>
+> Thanks.
+>
+> Best regards,
+> Kgene.
+> --
+> Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+> SW Solution Development Team, Samsung Electronics Co., Ltd.
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
 
-'CPU complex' is the terminology I cribbed from some of nVidia's Tegra
-patches, but I think 'CPU cluster' is a better term for what I mean -
-the group of CPUs that share some external state, like the L2 or GIC
-distributor.  In practice, all existing platforms seem to have a
-single cluster (as far as Linux is concerned).  The ARM ARM uses
-'cluster', but doesn't directly define it, and doesn't use 'CPU
-complex' at all.
+
+
+-- 
+Shine bright,
+(: Nav :)
