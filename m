@@ -1,34 +1,62 @@
 From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 15 Jun 2011 00:16:13 +0300
-Subject: [PATCH 2/3] arm: omap3: cm-t35: fix slow path warning
+Date: Wed, 15 Jun 2011 00:16:12 +0300
+Subject: [PATCH 1/3] arm: omap3: cm-t35: minor comments fixes
 In-Reply-To: <20110614073648.GI3352@atomide.com>
 References: <20110614073648.GI3352@atomide.com>
-Message-ID: <1308086174-3080-2-git-send-email-grinberg@compulab.co.il>
+Message-ID: <1308086174-3080-1-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix warning issued by gpio_set_value() call with TPS gpios.
+Update authors and copyright, remove Free S/W Foundation postal address,
+fix offsets of NAND partitions in comments.
 
 Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
 ---
- arch/arm/mach-omap2/board-cm-t35.c |    4 ++--
- 1 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/mach-omap2/board-cm-t35.c |   14 +++++---------
+ 1 files changed, 5 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 6c5881b..256b81c 100644
+index 77456de..6c5881b 100644
 --- a/arch/arm/mach-omap2/board-cm-t35.c
 +++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -466,9 +466,9 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
- 	if (gpio_request_one(wlan_rst, GPIOF_OUT_INIT_HIGH, "WLAN RST") == 0) {
- 		gpio_export(wlan_rst, 0);
- 		udelay(10);
--		gpio_set_value(wlan_rst, 0);
-+		gpio_set_value_cansleep(wlan_rst, 0);
- 		udelay(10);
--		gpio_set_value(wlan_rst, 1);
-+		gpio_set_value_cansleep(wlan_rst, 1);
- 	} else {
- 		pr_err("CM-T35: could not obtain gpio for WiFi reset\n");
- 	}
+@@ -1,8 +1,9 @@
+ /*
+  * board-cm-t35.c (CompuLab CM-T35 module)
+  *
+- * Copyright (C) 2009 CompuLab, Ltd.
+- * Author: Mike Rapoport <mike@compulab.co.il>
++ * Copyright (C) 2009-2011 CompuLab, Ltd.
++ * Authors: Mike Rapoport <mike@compulab.co.il>
++ *	    Igor Grinberg <grinberg@compulab.co.il>
+  *
+  * This program is free software; you can redistribute it and/or
+  * modify it under the terms of the GNU General Public License
+@@ -13,11 +14,6 @@
+  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+  * General Public License for more details.
+  *
+- * You should have received a copy of the GNU General Public License
+- * along with this program; if not, write to the Free Software
+- * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA
+- * 02110-1301 USA
+- *
+  */
+ 
+ #include <linux/kernel.h>
+@@ -149,12 +145,12 @@ static struct mtd_partition cm_t35_nand_partitions[] = {
+ 	},
+ 	{
+ 		.name           = "linux",
+-		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x280000 */
++		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x2A0000 */
+ 		.size           = 32 * NAND_BLOCK_SIZE,
+ 	},
+ 	{
+ 		.name           = "rootfs",
+-		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x680000 */
++		.offset         = MTDPART_OFS_APPEND,	/* Offset = 0x6A0000 */
+ 		.size           = MTDPART_SIZ_FULL,
+ 	},
+ };
 -- 
 1.7.3.4
