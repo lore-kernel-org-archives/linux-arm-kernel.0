@@ -1,95 +1,68 @@
-From: angus.ainslie@linaro.org (Angus Ainslie)
-Date: Tue, 14 Jun 2011 16:13:35 -0600
-Subject: [PATCH] ARM: exynos4: fix secondary CPU boot on early SoC revision=
-Message-ID: <mailman.26.1308090403.24103.linux-arm-kernel@lists.infradead.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 14 Jun 2011 17:32:49 -0500
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <201106142232.02217.arnd@arndb.de>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>	<20110614145329.GK23145@atomide.com>	<alpine.LFD.2.00.1106141322530.2142@xanadu.home>
+	<201106142232.02217.arnd@arndb.de>
+Message-ID: <4DF7E191.1050705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s
+On 06/14/2011 03:32 PM, Arnd Bergmann wrote:
+> On Tuesday 14 June 2011 19:28:49 Nicolas Pitre wrote:
+>> On Tue, 14 Jun 2011, Tony Lindgren wrote:
+>>
+>>> * Nicolas Pitre <nicolas.pitre@linaro.org> [110614 00:04]:
+>>>> +
+>>>> +   for_each_tag(atag, atag_list) {
+>>>> +           if (atag->hdr.tag == ATAG_CMDLINE) {
+>>>> +                   setprop_string(dt, "/chosen", "bootargs",
+>>>> +                                     atag->u.cmdline.cmdline);
+>>>> +           } else if (atag->hdr.tag == ATAG_MEM) {
+>>>> +                   uint32_t mem_reg_property[2];
+>>>> +                   mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
+>>>> +                   mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
+>>>> +                   setprop(dt, "/memory", "reg", mem_reg_property,
+>>>> +                              sizeof(mem_reg_property));
+>>>> +           } else if (atag->hdr.tag == ATAG_INITRD2) {
+>>>> +                   uint32_t initrd_start, initrd_size;
+>>>> +                   initrd_start = atag->u.initrd.start;
+>>>> +                   initrd_size = atag->u.initrd.size;
+>>>> +                   setprop_cell(dt, "/chosen", "linux,initrd-start",
+>>>> +                                   initrd_start);
+>>>> +                   setprop_cell(dt, "/chosen", "linux,initrd-end",
+>>>> +                                   initrd_start + initrd_size);
+>>>> +           }
+>>>> +   }
+>>>
+>>> I think Russell posted a complete list of the ATAGs to translate
+>>> somewhere, but at least ATAG_REVISION is missing here. That's being
+>>> used quite a bit as system_rev to set things dynamically.
+>>
+>> No problem.  This is a work in progress.  We still can test the concept 
+>> and fine tune the actual set of ATAGs being translated.
+> 
+> Let's talk about the revision field now, because it doesn't have a
+> direct correspondence in existing attributes.
+> 
+> Functionality-wise, this would probably be the "compatible" property
+> of the root node, with its most specific name to match, but that's not
+> trivial to generate.
+> 
+> In some cases, the system revisions have significant differences in their
+> devices (why else would you care about the revision), which means that you
+> actually need a different device tree per revision anyway. If that's the
+> common case, we could just ignore it completely or instead have a way
+> to choose a specific device tree from a list based on the revision.
+> 
+> Another option would be to merge both the ATAG_REVISION and ATAG_SERIAL
+> into a string and put them into the root "serial-number" property that
+> is fairly easy to do, but would be harder to parse if you actually rely
+> on specific values.
+> 
 
-It appears that the system-wide flags register that used to be at
-0x02025000 on the first revision of Exynos4 has moved to 0x02020000.
+IIRC, system_rev at least can be specified on the kernel command line,
+so you could just append the cmd line. However, if you force the
+built-in command line to be used that would not work,
 
-The kernel has been updated accordingly, but this unfortunately leaves
-early boards without SMP support (the secondary CPU spins endlessly
-in BL0 waiting for an address to be written at that memory location).
-
-Use the CPU id to decide whether we are running on EVT0 and use the
-old location in that case.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Angus Ainslie <angus.ainslie@linaro.org>
----
- arch/arm/mach-exynos4/include/mach/map.h |    1 +
- arch/arm/mach-exynos4/platsmp.c          |   23 ++++++++++++++++++++++-
- 2 files changed, 23 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h
-b/arch/arm/mach-exynos4/include/mach/map.h
-index 0009e77..781e149 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos4/include/mach/map.h
-@@ -24,6 +24,7 @@
- #include <plat/map-s5p.h>
-
- #define EXYNOS4_PA_SYSRAM              0x02020000
-+#define EXYNOS4_PA_SYSRAM_EVT0         0x02025000
-
- #define EXYNOS4_PA_FIMC0               0x11800000
- #define EXYNOS4_PA_FIMC1               0x11810000
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsm=
-p.c
-index c5e65a0..5f70aec 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -155,6 +155,8 @@ void __init smp_init_cpus(void)
- void __init platform_smp_prepare_cpus(unsigned int max_cpus)
- {
-        int i;
-+       unsigned long idcode;
-+       void __iomem *sysram_evt0;
-
-        /*
-         * Initialise the present map, which describes the set of CPUs
-@@ -165,11 +167,30 @@ void __init platform_smp_prepare_cpus(unsigned
-int max_cpus)
-
-        scu_enable(scu_base_addr());
-
-+       idcode =3D __raw_readl(S5P_VA_CHIPID);
-+
-        /*
-         * Write the address of secondary startup into the
-         * system-wide flags register. The boot monitor waits
-         * until it receives a soft interrupt, and then the
-         * secondary CPU branches to this address.
-         */
--       __raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-S5P_VA_SYSRAM);
-+       if ((idcode & 0xF0000) =3D=3D 0) {
-+               /*
-+                * EVT0 has the system-wide flags register at a
-different address.
-+                * Poke it as well, in case we're running on an old
-SoC revision.
-+                */
-+               sysram_evt0 =3D ioremap(EXYNOS4_PA_SYSRAM_EVT0, SZ_4K);
-+               if (!sysram_evt0) {
-+                       pr_err("Unable to remap EXYNOS4_PA_SYSRAM_EVT0\n");
-+                       return;
-+               }
-+               __raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-+                            sysram_evt0);
-+               iounmap(sysram_evt0);
-+       } else {
-+               __raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)),
-+                            S5P_VA_SYSRAM);
-+       }
-+
- }
---=20
-1.7.4.1
-
---=20
-Angus Ainslie <angus.ainslie@linaro.org>
-Team Lead, Samsung Landing Team
+Rob
