@@ -1,79 +1,101 @@
-From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
-Date: Tue, 14 Jun 2011 19:01:43 +0530
-Subject: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
-Message-ID: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jun 2011 15:49:29 +0200
+Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <006a01cc29a9$1394c330$3abe4990$%szyprowski@samsung.com>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106101821.50437.arnd@arndb.de>
+	<006a01cc29a9$1394c330$3abe4990$%szyprowski@samsung.com>
+Message-ID: <201106141549.29315.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is continuation of cleanup of OMAP GPIO driver and fixes.
-The cleanup include getting rid of cpu_is_* checks wherever possible,
-use of gpio_bank list instead of static array, use of unique platform
-specific value associated data member to OMAP platforms to avoid
-cpu_is_* checks. The series also include PM runtime support.
+On Monday 13 June 2011, Marek Szyprowski wrote:
+> cm_alloc/free are definitely not meant to be called from device drivers.
+> They should be only considered as a backend for dma-mapping.
+>
+> 'Raw' contiguous memory block doesn't really make sense for the device
+> drivers. What the drivers require is a contiguous memory block that is
+> somehow mapped into respective bus address space, so dma-mapping 
+> framework is the right interface.
+> 
+> alloc_pages(..., GFP_CMA) looks nice but in fact it is really impractical.
+> The driver will need to map such buffer to dma context anyway, so imho
+> dma_alloc_attributed() will give the drivers much more flexibility. In
+> terms of dma-mapping the context argument isn't anything odd. 
 
-Baseline: git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
-Branch: wip/gpio-cleanup
-commit 1bb718191ab0158837ea6633d6fbdeb08fb755dc
-GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
+Ok.
 
-v2:
-(1) Do special handling of non-wakeup GPIOs only on OMAP2420. Avoid this
-handling on OMAP3430.
+> If possible I would like to make cma something similar to 
+> declare_dma_coherent()&friends, so the board/platform/bus startup code
+> will just call declare_dma_contiguous() to enable support for cma for
+> particular devices.
 
-(2) Isolate cleanups and fixes into separate set of patches. Keep the cleanup
-first followed by the fixes.
+Sounds good, I like that.
 
-(3) Avoid calling omap_gpio_get_context_loss() directly and instead call it
-through function pointer in pdata initialized during init.
+> > This interface looks flawed to me for multiple reasons:
+> > 
+> > * It requires you to call three distinct functions in order to do one
+> >   thing, and they all take the same arguments (more or less). Why not
+> >   have one function call at the latest possible point where you can
+> >   still change the memory attributes, and have everything else
+> >   happen automatically?
+> 
+> Initialization part will be definitely simplified, I must confess that I
+> was in hurry to post the patches before the weekend and just forgot to
+> cleanup this part...
 
-(4) workaround_enabled flag is not longer needed and is removed.
+Fair enough. In cases like this, it's often good to add a TODO section
+to the patch description, or a FIXME comment in the patch itself.
 
-(5) Call pwrdm_post_transition() before calling omap_gpio_resume_after_idle().
+> > * It requires you to pass the exact location of the area. I can see why
+> >   you want that on certain machines that require DMA areas to be spread
+> >   across multiple memory buses, but IMHO it's not appropriate for a
+> >   generic API.
+> 
+> IMHO we can also use some NULL context to indicate some global, system 
+> wide CMA area and again -> in terms of dma-mapping api having a context 
+> isn't anything uncommon.
 
-(6) In omap2_gpio_resume_after_idle() do context restore before handling
-workaround.
+Please explain the exact requirements that lead you to defining multiple
+contexts. My feeling is that in most cases we don't need them and can
+simply live with a single area. Depending on how obscure the cases are
+where we do need something beyond that, we can then come up with
+special-case solutions for them.
 
-(7) Use PM runtime framework.
+> > * It requires you to hardcode the size in a machine specific source file.
+> >   This probably seems to be a natural thing to do when you have worked a
+> >   lot on the ARM architecture, but it's really not. We really want to
+> >   get rid of board files and replace them with generic probing based on
+> >   the device tree, and the size of the area is more policy than a property
+> >   of the hardware that can be accurately described in the device tree or
+> >   a board file.
+> 
+> The problem is the fact that right now, we still have board files and we
+> have to live with them for a while (with all advantages and disadvantages).
+> I hope that you won't require me to rewrite the whole support for all ARM 
+> platforms to get rid of board files to get CMA merged ;)
 
-(8) Modify register offset names to : wkup_status, wkup_clear, wkup_set.
-Also use 'base + offset' for readibility in all relevant places.
+Of course not. But we need to know what we want a platform with device
+tree support to look like when it's using CMA, so we don't make it
+harder to change the platforms over than it already is.
 
-(9) Remove unwanted messages from commit section like TODO, etc.
+> I see no problem defining CMA areas in device tree, as this is something
+> really specific to particular board configuration. 
 
-Test Details:
-* Compile tested for omap1_defconfig and omap2plus_defconfig.
-* OMAP1710-H3: Bootup test.
-* OMAP2430-SDP, OMAP3430-SDP, OMAP4430-SDP: Functional testing. 
-* PM Testing on OMAP3430-SDP: retention, off_mode, system_wide
-suspend and gpio wakeup.
+The problem with defining CMA areas in the device tree is that it's not
+a property of the hardware, but really policy. The device tree file
+should not contain anything related to a specific operating system
+because you might want to boot something on the board that doesn't
+know about CMA, and even when you only care about using Linux, the
+implementation might change to the point where hardcoded CMA areas
+no longer make sense.
 
-Charulatha V (13):
-  OMAP: GPIO: Remove dependency on gpio_bank_count
-  OMAP2PLUS: GPIO: Use flag to identify wakeup domain
-  OMAP: GPIO: Make gpio_context part of gpio_bank structure
-  OMAP: GPIO: Fix pwrdm_post_transition call sequence
-  OMAP: GPIO: handle save/restore ctx in GPIO driver
-  OMAP2PLUS: GPIO: make non-wakeup GPIO part of pdata
-  OMAP: GPIO: Avoid cpu checks during module ena/disable
-  OMAP: GPIO: clean set_gpio_triggering function
-  OMAP: GPIO: clean omap_gpio_mod_init function
-  OMAP15xx: GPIO: Use pinctrl offset instead of macro
-  OMAP: GPIO: Fix use of readl/readw to access isr_reg
-  OMAP: GPIO: Remove bank->method & METHOD_* macros
-  OMAP: GPIO: Fix bankwidth for OMAP7xx MPUIO
+IMHO we should first aim for a solution that works almost everywhere
+without the kernel knowing what board it's running on, and then we
+can add quirks for devices that have special requirements. I think
+the situation is similar to the vmalloc virtual address space, which
+normally has a hardcoded size that works almost everywhere, but there
+are certain drivers etc that require much more, or there are situations
+where you want to make it smaller in order to avoid highmem. 
 
-Tarun Kanti DebBarma (5):
-  OMAP: GPIO: Use wkup regs off/suspend support flag
-  OMAP: GPIO: Use level/edge detect reg offsets
-  OMAP: GPIO: Remove hardcoded offsets in ctxt save/restore
-  OMAP: GPIO: use PM runtime framework
-  OMAP2: GPIO: clean prepare_for_idle and resume_after_idle
-
- arch/arm/mach-omap1/gpio15xx.c         |    7 +-
- arch/arm/mach-omap1/gpio16xx.c         |   20 +-
- arch/arm/mach-omap1/gpio7xx.c          |   14 +-
- arch/arm/mach-omap2/gpio.c             |   52 ++-
- arch/arm/mach-omap2/pm34xx.c           |   21 +-
- arch/arm/plat-omap/include/plat/gpio.h |   35 +-
- drivers/gpio/gpio-omap.c               | 1082 ++++++++++++++------------------
- 7 files changed, 572 insertions(+), 659 deletions(-)
+	Arnd
