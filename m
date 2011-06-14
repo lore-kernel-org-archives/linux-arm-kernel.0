@@ -1,37 +1,46 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 14 Jun 2011 14:48:42 +0800
-Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
-	support for mx5
-In-Reply-To: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
-References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110614064841.GB30295@S2100-06.ap.freescale.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Tue, 14 Jun 2011 15:53:02 +0900
+Subject: [PATCH 3/5] ARM: EXYNOS4: fix improper gpio configuration
+In-Reply-To: <1307687667-9127-4-git-send-email-ch.naveen@samsung.com>
+References: <1307687667-9127-1-git-send-email-ch.naveen@samsung.com>
+	<1307687667-9127-4-git-send-email-ch.naveen@samsung.com>
+Message-ID: <007601cc2a5f$bb4c47e0$31e4d7a0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 06:42:48PM +0800, Shawn Guo wrote:
-> The card-present polling within sdhci based driver is very expensive
-> in terms of the impact to system performance.  We observe a few
-> system performance issues from Freescale and Linaro on mx5 platforms,
-> which have been proved card polling related.
+Naveen Krishna Chatradhi wrote:
 > 
-> The patch set extends the current sdhci-esdhc-imx card_detect and
-> write_protect support to cover mx5 platforms, and solves above
-> performance issues.
+> These pins are incorrectly configured for PCM2
+> configure them to SPDIF(_OUT & _EXT_CLK)
 > 
-> Shawn Guo (4):
->       mmc: sdhci: fix interrupt storm from card detection
->       mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
->       mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
->       mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> ---
+>  arch/arm/mach-exynos4/dev-audio.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
-Hi Arnaud,
+> diff --git a/arch/arm/mach-exynos4/dev-audio.c
+b/arch/arm/mach-exynos4/dev-
+> audio.c
+> index 6347594..5add5fa 100644
+> --- a/arch/arm/mach-exynos4/dev-audio.c
+> +++ b/arch/arm/mach-exynos4/dev-audio.c
+> @@ -335,7 +335,7 @@ struct platform_device exynos4_device_ac97 = {
+> 
+>  static int exynos4_spdif_cfg_gpio(struct platform_device *pdev)
+>  {
+> -	s3c_gpio_cfgpin_range(EXYNOS4_GPC1(0), 2, S3C_GPIO_SFN(3));
+> +	s3c_gpio_cfgpin_range(EXYNOS4_GPC1(0), 2, S3C_GPIO_SFN(4));
+> 
+>  	return 0;
+>  }
+> --
 
-Any chance to play with it yet?
+OK, will apply into s5p-fixes-for-linus branch with Jassi's ack.
 
-Hi Wolfram,
+Thanks.
 
-Any comment?
-
--- 
-Regards,
-Shawn
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
