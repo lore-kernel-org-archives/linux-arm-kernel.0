@@ -1,68 +1,122 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 14 Jun 2011 16:27:54 -0700
-Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
-In-Reply-To: <alpine.LFD.2.00.1106140300500.2142@xanadu.home>
-Message-ID: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
+From: peter.fordham@gmail.com (Peter Fordham)
+Date: Tue, 14 Jun 2011 16:29:26 -0700
+Subject: [MPCore Watchdog]: Convert from misc_dev to dynamic device node.
+Message-ID: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some targets have multiple memory regions.  Parse up to 8 of these
-when converting the atags to fdt.
+The current MPCore watchdog driver uses a misc_dev device node.
+This patch changes it to use dynamically allocated device numbers.
 
-Signed-off-by: David Brown <davidb@codeaurora.org>
 ---
-With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
-It seems to work as long as my device tree has placeholders for all of
-the properties I need.
+ drivers/watchdog/mpcore_wdt.c |   48 +++++++++++++++++++++++++++++------------
+ 1 files changed, 34 insertions(+), 14 deletions(-)
 
-It still seems rather clunky, especially that it requires bootimg from
-a zImage.
+diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
+index 2b4af22..f6afc20 100644
+--- a/drivers/watchdog/mpcore_wdt.c
++++ b/drivers/watchdog/mpcore_wdt.c
+@@ -32,6 +32,8 @@
+ #include <linux/uaccess.h>
+ #include <linux/slab.h>
+ #include <linux/io.h>
++#include <linux/cdev.h>
++#include <linux/device.h>
 
-David
+ #include <asm/smp_twd.h>
 
- arch/arm/boot/compressed/atags_to_fdt.c |   16 +++++++++++-----
- 1 files changed, 11 insertions(+), 5 deletions(-)
+@@ -42,6 +44,9 @@ struct mpcore_wdt {
+ 	int		irq;
+ 	unsigned int	perturb;
+ 	char		expect_close;
++        struct cdev     cdev;
++        struct class    *class;
++        dev_t           number;
+ };
 
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-index 11c1a88..ac93e28 100644
---- a/arch/arm/boot/compressed/atags_to_fdt.c
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -31,6 +31,8 @@ static int setprop_cell(void *fdt, const char *node_path,
- int atags_to_fdt(void *dt,  void *atag_list)
+ static struct platform_device *mpcore_wdt_dev;
+@@ -318,12 +323,6 @@ static const struct file_operations mpcore_wdt_fops = {
+ 	.release	= mpcore_wdt_release,
+ };
+
+-static struct miscdevice mpcore_wdt_miscdev = {
+-	.minor		= WATCHDOG_MINOR,
+-	.name		= "watchdog",
+-	.fops		= &mpcore_wdt_fops,
+-};
+-
+ static int __devinit mpcore_wdt_probe(struct platform_device *dev)
  {
- 	struct tag *atag = atag_list;
-+	uint32_t mem_reg_property[16];
-+	int memcount = 0;
- 
- 	/* make sure we've got an aligned pointer */
- 	if ((u32)atag_list & 0x3)
-@@ -51,11 +53,10 @@ int atags_to_fdt(void *dt,  void *atag_list)
- 			setprop_string(dt, "/chosen", "bootargs",
- 			                  atag->u.cmdline.cmdline);
- 		} else if (atag->hdr.tag == ATAG_MEM) {
--			uint32_t mem_reg_property[2];
--			mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
--			mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
--			setprop(dt, "/memory", "reg", mem_reg_property,
--			           sizeof(mem_reg_property));
-+			if (memcount >= sizeof(mem_reg_property)/sizeof(uint32_t))
-+				continue;
-+			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.start);
-+			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.size);
- 		} else if (atag->hdr.tag == ATAG_INITRD2) {
- 			uint32_t initrd_start, initrd_size;
- 			initrd_start = atag->u.initrd.start;
-@@ -67,5 +68,10 @@ int atags_to_fdt(void *dt,  void *atag_list)
- 		}
+ 	struct mpcore_wdt *wdt;
+@@ -358,14 +357,15 @@ static int __devinit mpcore_wdt_probe(struct
+platform_device *dev)
+ 		goto err_free;
  	}
- 
-+	if (memcount) {
-+		setprop(dt, "/memory", "reg", mem_reg_property,
-+				4*memcount);
-+	}
+
+-	mpcore_wdt_miscdev.parent = &dev->dev;
+-	ret = misc_register(&mpcore_wdt_miscdev);
+-	if (ret) {
++ 	ret = alloc_chrdev_region(&wdt->number, 0, 1, "mpcore_wdt");
++	if (ret < 0) {
+ 		dev_printk(KERN_ERR, wdt->dev,
+-			"cannot register miscdev on minor=%d (err=%d)\n",
+-							WATCHDOG_MINOR, ret);
++			"cannot register with dynamic device number (err=%d)\n", -ret);
+ 		goto err_misc;
+ 	}
++	dev_printk(KERN_INFO, wdt->dev, "using device number %d, %d",
+MAJOR(wdt->number), MINOR(wdt->number));
 +
- 	return 0;
- }
++        cdev_init(&wdt->cdev, &mpcore_wdt_fops);
+
+ 	ret = request_irq(wdt->irq, mpcore_wdt_fire, IRQF_DISABLED,
+ 							"mpcore_wdt", wdt);
+@@ -379,10 +379,24 @@ static int __devinit mpcore_wdt_probe(struct
+platform_device *dev)
+ 	platform_set_drvdata(dev, wdt);
+ 	mpcore_wdt_dev = dev;
+
+-	return 0;
++        ret = cdev_add(&wdt->cdev, wdt->number, 1);
++	if (ret < 0) {
++		dev_printk(KERN_ERR, wdt->dev, "failed to add character device\n");
++		goto err_cdev_add;
++	}
+
++        /* create /dev/watchdog
++         * we use udev to make the file
++         */
++        wdt->class = class_create(THIS_MODULE,"watchdog");
++        (void) device_create(wdt->class, wdt->dev,
+wdt->number,NULL,"watchdog");
++
++        return 0;
++
++err_cdev_add:
++	free_irq(wdt->irq, wdt);
+ err_irq:
+-	misc_deregister(&mpcore_wdt_miscdev);
++        unregister_chrdev_region (wdt->number, 1);
+ err_misc:
+ 	iounmap(wdt->base);
+ err_free:
+@@ -395,9 +409,15 @@ static int __devexit mpcore_wdt_remove(struct
+platform_device *dev)
+ {
+ 	struct mpcore_wdt *wdt = platform_get_drvdata(dev);
+
++        device_destroy(wdt->class,wdt->number);
++        class_unregister(wdt->class);
++        class_destroy(wdt->class);
++
++        cdev_del(&wdt->cdev);
++
+ 	platform_set_drvdata(dev, NULL);
+
+-	misc_deregister(&mpcore_wdt_miscdev);
++        unregister_chrdev_region (wdt->number, 1);
+
+ 	mpcore_wdt_dev = NULL;
+
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.7.0.4
