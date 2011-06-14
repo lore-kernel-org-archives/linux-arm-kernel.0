@@ -1,63 +1,122 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Jun 2011 22:32:01 +0200
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <alpine.LFD.2.00.1106141322530.2142@xanadu.home>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110614145329.GK23145@atomide.com>
-	<alpine.LFD.2.00.1106141322530.2142@xanadu.home>
-Message-ID: <201106142232.02217.arnd@arndb.de>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Tue, 14 Jun 2011 15:32:41 -0500
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+In-Reply-To: <201106141610.42700.heiko@sntech.de>
+References: <201106022149.47936.heiko@sntech.de>
+	<201106030956.43174.heiko@sntech.de>
+	<BANLkTi=YvSL_yzku6v3tsJaaLTL=fBXShg@mail.gmail.com>
+	<201106141610.42700.heiko@sntech.de>
+Message-ID: <BANLkTimzxUQnVn5VC8EOaJeHq=wifUhZ4A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 June 2011 19:28:49 Nicolas Pitre wrote:
-> On Tue, 14 Jun 2011, Tony Lindgren wrote:
-> 
-> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110614 00:04]:
-> > > +
-> > > +   for_each_tag(atag, atag_list) {
-> > > +           if (atag->hdr.tag == ATAG_CMDLINE) {
-> > > +                   setprop_string(dt, "/chosen", "bootargs",
-> > > +                                     atag->u.cmdline.cmdline);
-> > > +           } else if (atag->hdr.tag == ATAG_MEM) {
-> > > +                   uint32_t mem_reg_property[2];
-> > > +                   mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
-> > > +                   mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
-> > > +                   setprop(dt, "/memory", "reg", mem_reg_property,
-> > > +                              sizeof(mem_reg_property));
-> > > +           } else if (atag->hdr.tag == ATAG_INITRD2) {
-> > > +                   uint32_t initrd_start, initrd_size;
-> > > +                   initrd_start = atag->u.initrd.start;
-> > > +                   initrd_size = atag->u.initrd.size;
-> > > +                   setprop_cell(dt, "/chosen", "linux,initrd-start",
-> > > +                                   initrd_start);
-> > > +                   setprop_cell(dt, "/chosen", "linux,initrd-end",
-> > > +                                   initrd_start + initrd_size);
-> > > +           }
-> > > +   }
-> > 
-> > I think Russell posted a complete list of the ATAGs to translate
-> > somewhere, but at least ATAG_REVISION is missing here. That's being
-> > used quite a bit as system_rev to set things dynamically.
-> 
-> No problem.  This is a work in progress.  We still can test the concept 
-> and fine tune the actual set of ATAGs being translated.
+Hi Heiko,
 
-Let's talk about the revision field now, because it doesn't have a
-direct correspondence in existing attributes.
+On Tue, Jun 14, 2011 at 9:10 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Hi Andrei,
+>
+> Am Dienstag 14 Juni 2011 schrieb Andrei Warkentin:
+>> I recently came back from vacation (which is why I didn't pitch in
+>> before). Has there been any further update on this? I want to exclude
+>> my EMMC partitioning changes as the possible culprit here.
+>
+> nope, no updates yet. The flood also only starts when udev wants to
+> create its device nodes, meaning the initial detection seems not to
+> produce this problem
+>
+> But when I disable the whole boot partition stuff, it works as before
+> without irq storms.
+>
+> As there don't seem to exist reports from other emmc users about this
+> I guess the problem lays somewhere between the boot-partitions-patch
+> and the sdhci-s3c driver (for s3c2416 at least).
+>
+> As my knowledge about the whole mmc-subsystem is quite spare I also
+> don't really know where to start looking for the culprit yet.
 
-Functionality-wise, this would probably be the "compatible" property
-of the root node, with its most specific name to match, but that's not
-trivial to generate.
+Alright. Curious. Can you let me know what eMMC device you are
+connecting to the controller? What is the eMMC revision?
 
-In some cases, the system revisions have significant differences in their
-devices (why else would you care about the revision), which means that you
-actually need a different device tree per revision anyway. If that's the
-common case, we could just ignore it completely or instead have a way
-to choose a specific device tree from a list based on the revision.
+Can you also apply the following and let me know the results? This
+adds an error message if the partition switch fails, and forces the
+device to ALWAYS switch back to main user area after every completed
+RQ.
 
-Another option would be to merge both the ATAG_REVISION and ATAG_SERIAL
-into a string and put them into the root "serial-number" property that
-is fairly easy to do, but would be harder to parse if you actually rely
-on specific values.
+>>>>>>>>>>>> start
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 71da564..74e1029 100755
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -450,9 +450,12 @@ static inline int mmc_blk_part_switch(struct
+mmc_card *card,
+                ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
+                                 EXT_CSD_PART_CONFIG, card->ext_csd.part_config,
+                                 card->ext_csd.part_time);
+-               if (ret)
++               if (ret) {
++                       printk(KERN_ERR ">>> error switching to part_type %d\n",
++                              md->part_type);
+                        return ret;
+-}
++               }
++       }
 
-	Arnd
+        main_md->part_curr = md->part_type;
+        return 0;
+@@ -964,6 +967,13 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq,
+struct request *req)
+        }
+
+ out:
++
++       /* Switch to main_md (type = 0) */
++       ret = mmc_blk_part_switch(card, (struct mmc_blk_data *)
+mmc_get_drvdata(card));
++       if (ret) {
++               ret = 0;
++       }
++
+        mmc_release_host(card->host);
+        return ret;
+ }
+>>>>>>>>>>>>>>>> end
+
+I am curious about the results. Here is another thing to try out. This
+forces a switch to user area (main partition) every time blk resume is
+invoked -
+
+>>>>>>>>>>>>>>>>>>> start
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 71da564..f7be8f7 100755
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -1318,6 +1318,7 @@ static int mmc_blk_suspend(struct mmc_card
+*card, pm_message_t state)
+
+ static int mmc_blk_resume(struct mmc_card *card)
+ {
++       int ret;
+        struct mmc_blk_data *part_md;
+        struct mmc_blk_data *md = mmc_get_drvdata(card);
+
+@@ -1325,10 +1326,13 @@ static int mmc_blk_resume(struct mmc_card *card)
+                mmc_blk_set_blksize(md, card);
+
+                /*
+-                * Resume involves the card going into idle state,
+-                * so current partition is always the main one.
++                * Force main user area on resume. Technically
++                * card should have switched itself during reset.
+                 */
+-               md->part_curr = md->part_type;
++               ret = mmc_blk_part_switch(card, md);
++               if (ret)
++                       return ret;
++
+                mmc_queue_resume(&md->queue);
+                list_for_each_entry(part_md, &md->part, part) {
+                        mmc_queue_resume(&part_md->queue);
+>>>>>>>>>>>>>>>>>>> end
+
+Thanks for helping tracking this down,
+A
