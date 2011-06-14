@@ -1,37 +1,43 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 14 Jun 2011 14:20:14 +0900
-Subject: [PATCH] dma-mapping: Undefine dma_map_single(),
-	etc if CONFIG_HAVE_DMA_ATTRS is defined
-In-Reply-To: <1308025989-877-1-git-send-email-pullip.cho@samsung.com>
-References: <1308025989-877-1-git-send-email-pullip.cho@samsung.com>
-Message-ID: <005501cc2a52$c05df650$4119e2f0$%kim@samsung.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 14 Jun 2011 09:21:05 +0400
+Subject: [PATCH] scoop: drop pcmcia_init callback
+Message-ID: <1308028865-8460-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pullip.cho at samsung.com wrote:
-> 
-> From: KyongHo Cho <pullip.cho@samsung.com>
-> 
-> If <asm/dma-mapping.h> includes <asm-generic/dma-mapping-common.h>,
-> dma_map_single() become defined recursively when CONFIG_HAVE_DMA_ATTRS
-> is not defined.
-> Since dma_map_*_attrs() are defined in <linux/dma-mapping.h>, those
-> in <asm-generic/dma-mapping-common.h> must be not defined
-> if CONFIG_HAVE_DMA_ATTRS is not defined.
-> 
-> Signed-off-by: KyongHo Cho <pullip.cho@samsung.com>
-> CC: FUJITA Tomonori <fujita.tomonori@lab.ntt.co.jp>
-> CC: Joerg Roedel <joerg.roedel@amd.com>
-> CC Arnd Bergmann <arnd@arndb.de>
-> 
-> Change-Id: Ib99ee2b355dbe679263ce2e4e27d6219148c8338
+A pcmcia_init callback isn't used on any of the platforms. Drop it.
 
-Please don't use this here.
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/include/asm/hardware/scoop.h |    1 -
+ drivers/pcmcia/pxa2xx_sharpsl.c       |    3 ---
+ 2 files changed, 0 insertions(+), 4 deletions(-)
 
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+diff --git a/arch/arm/include/asm/hardware/scoop.h b/arch/arm/include/asm/hardware/scoop.h
+index ebb3cea..58cdf5d 100644
+--- a/arch/arm/include/asm/hardware/scoop.h
++++ b/arch/arm/include/asm/hardware/scoop.h
+@@ -61,7 +61,6 @@ struct scoop_pcmcia_dev {
+ struct scoop_pcmcia_config {
+ 	struct scoop_pcmcia_dev *devs;
+ 	int num_devs;
+-	void (*pcmcia_init)(void);
+ 	void (*power_ctrl)(struct device *scoop, unsigned short cpr, int nr);
+ };
+ 
+diff --git a/drivers/pcmcia/pxa2xx_sharpsl.c b/drivers/pcmcia/pxa2xx_sharpsl.c
+index cece435..ca8cb322 100644
+--- a/drivers/pcmcia/pxa2xx_sharpsl.c
++++ b/drivers/pcmcia/pxa2xx_sharpsl.c
+@@ -48,9 +48,6 @@ static int sharpsl_pcmcia_hw_init(struct soc_pcmcia_socket *skt)
+ {
+ 	int ret;
+ 
+-	if (platform_scoop_config->pcmcia_init)
+-		platform_scoop_config->pcmcia_init();
+-
+ 	/* Register interrupts */
+ 	if (SCOOP_DEV[skt->nr].cd_irq >= 0) {
+ 		struct pcmcia_irqs cd_irq;
+-- 
+1.7.5.3
