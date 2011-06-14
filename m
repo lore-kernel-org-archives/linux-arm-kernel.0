@@ -1,77 +1,56 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Tue, 14 Jun 2011 07:56:28 -0600
-Subject: [PATCH 2/3] ARM: gic: add OF based initialization
-In-Reply-To: <20110613221447.GI13643@n2100.arm.linux.org.uk>
-References: <1307456541-11026-1-git-send-email-robherring2@gmail.com>
-	<1307456541-11026-3-git-send-email-robherring2@gmail.com>
-	<20110613165316.GF18161@ponder.secretlab.ca>
-	<20110613221447.GI13643@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=eYVftJLyckv5Jpz-Qq1KpPc7AgQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Tue, 14 Jun 2011 16:10:39 +0200
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+In-Reply-To: <BANLkTi=YvSL_yzku6v3tsJaaLTL=fBXShg@mail.gmail.com>
+References: <201106022149.47936.heiko@sntech.de>
+	<201106030956.43174.heiko@sntech.de>
+	<BANLkTi=YvSL_yzku6v3tsJaaLTL=fBXShg@mail.gmail.com>
+Message-ID: <201106141610.42700.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 4:14 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 13, 2011 at 10:53:16AM -0600, Grant Likely wrote:
->> On Tue, Jun 07, 2011 at 09:22:20AM -0500, Rob Herring wrote:
->> > +- interrupt-controller : Identifies the node as an interrupt controller
->> > +- #interrupt-cells : Specifies the number of cells needed to encode an
->> > + ?interrupt source. ?The type shall be a <u32> and the value shall be 1.
->> > +- reg : Specifies base physical address(s) and size of the GIC registers. The
->> > + ?first 2 values are the GIC distributor register base and size. The 2nd 2
->> > + ?values are the GIC cpu interface register base and size.
->> > +- irq-start : The first actual interrupt that is connected to h/w.
->>
->> Drop irq-start. ?That's a Linux internal implementation detail, and
->> Linux can easily handle dynamic assignment of irq ranges.
->
-> Something has to be done with the IRQs on GIC, because Linux probably
-> won't have a 1:1 mapping between the hardware IRQ numbers and the Linux
-> IRQ numbers
->
-> Have you seen the patches from Marc which deal with the per-CPU
-> interrupts by creating individual Linux IRQ numbers for each CPU for
-> each per-CPU interrupt? ?So you can end up with 16 per-CPU x 4 CPUs =
-> 64 Linux interrupts for 16 "hardware" interrupts.
->
-> How would DT deal with that - and how would you specify a connection
-> between a per-CPU PMU and one of the per-CPU interrupts?
+Hi Andrei,
 
-In general, bindings focus on the hardware and hardware configuration
-instead of what Linux needs internally.  For a lot of interrupt
-controllers, an irq specifier consists of two u32 values.  The first
-value being the hardware irq number (perhaps 0-15 in this case), and
-the second value being a set of flags.
+Am Dienstag 14 Juni 2011 schrieb Andrei Warkentin:
+> I recently came back from vacation (which is why I didn't pitch in
+> before). Has there been any further update on this? I want to exclude
+> my EMMC partitioning changes as the possible culprit here.
 
-Without looking deeply and the GIC interface details, I suspect that
-the CPU affinity would best be represented as a field in the flags
-value.
+nope, no updates yet. The flood also only starts when udev wants to
+create its device nodes, meaning the initial detection seems not to
+produce this problem
 
-The per-CPU PMU connections then wouldn't be any different from any
-other irq in that the irq specifier would include a CPU affinity
-value.
+But when I disable the whole boot partition stuff, it works as before
+without irq storms.
 
->
-> The sensible thing from a DT point of view I think would be to ignore
-> that abstraction, and have some kind of mapping layer between DT and
-> drivers which knew about that.
+As there don't seem to exist reports from other emmc users about this
+I guess the problem lays somewhere between the boot-partitions-patch
+and the sdhci-s3c driver (for s3c2416 at least).
 
-Yup, and that is exactly what is done.  On powerpc it uses the virtual
-irq infrastructure.  For ARM and everyone else, there are patches on
-list for irq_domain which implements the required behaviour.  The
-interrupt controller driver can make decisions about how to map the
-hardware irq to a linux irq number.  For most irq controllers, it will
-be a simple 1:1 mapping, but for something complex like the gic, it
-can do something different if need be.
+As my knowledge about the whole mmc-subsystem is quite spare I also
+don't really know where to start looking for the culprit yet.
 
-> ?But that sounds like a world of pain.
+Heiko
 
-Actually, it turns out not to be.  We've been needing/wanting some
-form of irq_domains anyway for a while now to better manage hwirq ->
-linuxirq mappings.  Adding DT to the mix means also suppling a DT
-decode function to get the hwirq number from the interrupt specifier.
 
-I'll be reposting a bunch of patches in the next few days that fills
-in most of the missing pieces for irq mapping.
-
-g.
+diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+index 71da564..32290c5 100644
+--- a/drivers/mmc/card/block.c
++++ b/drivers/mmc/card/block.c
+@@ -1136,7 +1136,7 @@ static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)
+ 
+ 	if (!mmc_card_mmc(card))
+ 		return 0;
+-
++/*
+ 	if (card->ext_csd.boot_size) {
+ 		ret = mmc_blk_alloc_part(card, md, EXT_CSD_PART_CONFIG_ACC_BOOT0,
+ 					 card->ext_csd.boot_size >> 9,
+@@ -1151,7 +1151,7 @@ static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)
+ 		if (ret)
+ 			return ret;
+ 	}
+-
++*/
+ 	return ret;
+ }
