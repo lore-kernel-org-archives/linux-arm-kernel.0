@@ -1,56 +1,38 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Tue, 14 Jun 2011 16:10:39 +0200
-Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
-In-Reply-To: <BANLkTi=YvSL_yzku6v3tsJaaLTL=fBXShg@mail.gmail.com>
-References: <201106022149.47936.heiko@sntech.de>
-	<201106030956.43174.heiko@sntech.de>
-	<BANLkTi=YvSL_yzku6v3tsJaaLTL=fBXShg@mail.gmail.com>
-Message-ID: <201106141610.42700.heiko@sntech.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Jun 2011 06:55:19 -0700
+Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
+In-Reply-To: <BANLkTikE_caRE9uD6KN7h7OcY4nyUoRk9g@mail.gmail.com>
+References: <1308053788-25937-1-git-send-email-shahar@wizery.com>
+	<20110614123359.GB23145@atomide.com>
+	<BANLkTikE_caRE9uD6KN7h7OcY4nyUoRk9g@mail.gmail.com>
+Message-ID: <20110614135518.GH23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrei,
+* Shahar Lev <shahar@wizery.com> [110614 06:21]:
+> On Tue, Jun 14, 2011 at 3:34 PM, Tony Lindgren <tony@atomide.com> wrote:
+> >
+> > This your should try to remove as it won't work nicely for supporting
+> > various boards with the same kernel as we already do with
+> > omap2plus_defconfig.
+> >
+> > Can you somehow detect the daughter board dynamically and then
+> > set the flags?
+> >
+> 
+> We thought about multi-board kernels, but unfortunately have no
+> better solution, since there is no dynamic way to probe these cards.
+> Even worse, these cards sometimes come with different clocks in them,
+> hence the 2nd OMAP3EVM_MISTRAL_WL12XX_REFCLOCK entry we had to
+> introduce...
+> 
+> Maybe we should add two bootargs with which the user can override this
+> Kconfig configuration? This should allow using the same kernel binary
+> with different omap3evm boards.
+> 
+> It's a bit cumbersome though..
 
-Am Dienstag 14 Juni 2011 schrieb Andrei Warkentin:
-> I recently came back from vacation (which is why I didn't pitch in
-> before). Has there been any further update on this? I want to exclude
-> my EMMC partitioning changes as the possible culprit here.
+Yes cmdline should do the trick until we have devicetree data
+available..
 
-nope, no updates yet. The flood also only starts when udev wants to
-create its device nodes, meaning the initial detection seems not to
-produce this problem
-
-But when I disable the whole boot partition stuff, it works as before
-without irq storms.
-
-As there don't seem to exist reports from other emmc users about this
-I guess the problem lays somewhere between the boot-partitions-patch
-and the sdhci-s3c driver (for s3c2416 at least).
-
-As my knowledge about the whole mmc-subsystem is quite spare I also
-don't really know where to start looking for the culprit yet.
-
-Heiko
-
-
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index 71da564..32290c5 100644
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -1136,7 +1136,7 @@ static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)
- 
- 	if (!mmc_card_mmc(card))
- 		return 0;
--
-+/*
- 	if (card->ext_csd.boot_size) {
- 		ret = mmc_blk_alloc_part(card, md, EXT_CSD_PART_CONFIG_ACC_BOOT0,
- 					 card->ext_csd.boot_size >> 9,
-@@ -1151,7 +1151,7 @@ static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)
- 		if (ret)
- 			return ret;
- 	}
--
-+*/
- 	return ret;
- }
+Tony
