@@ -1,31 +1,52 @@
-From: shahar@wizery.com (Shahar Lev)
-Date: Tue, 14 Jun 2011 16:26:06 +0300
-Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
-In-Reply-To: <20110614123359.GB23145@atomide.com>
-References: <1308053788-25937-1-git-send-email-shahar@wizery.com>
-	<20110614123359.GB23145@atomide.com>
-Message-ID: <BANLkTikE_caRE9uD6KN7h7OcY4nyUoRk9g@mail.gmail.com>
+From: saeed@marvell.com (Saeed Bishara)
+Date: Tue, 14 Jun 2011 16:28:52 +0300
+Subject: [PATCH] ARM: realview,
+	vexpress: fix section mismatch from platform_cpu_die() to pen_release
+Message-ID: <1308058132-32058-1-git-send-email-saeed@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 3:34 PM, Tony Lindgren <tony@atomide.com> wrote:
->
-> This your should try to remove as it won't work nicely for supporting
-> various boards with the same kernel as we already do with
-> omap2plus_defconfig.
->
-> Can you somehow detect the daughter board dynamically and then
-> set the flags?
->
+This patch fixes the following false section mismatch warning, this function used
+only in CONFIG_HOTPLUG_CPU, and in this configuration, the cpuinit section will not
+be freed, so it's ok to reference pen_release.
 
-We thought about multi-board kernels, but unfortunately have no
-better solution, since there is no dynamic way to probe these cards.
-Even worse, these cards sometimes come with different clocks in them,
-hence the 2nd OMAP3EVM_MISTRAL_WL12XX_REFCLOCK entry we had to
-introduce...
+WARNING: vmlinux.o(.text+0x12484): Section mismatch in reference from the function platform_cpu_die() to the variable .cpuinit.data:pen_release
+The function platform_cpu_die() references
+the variable __cpuinitdata pen_release.
+This is often because platform_cpu_die lacks a __cpuinitdata
+annotation or the annotation of pen_release is wrong.
 
-Maybe we should add two bootargs with which the user can override this
-Kconfig configuration? This should allow using the same kernel binary
-with different omap3evm boards.
+Signed-off-by: Saeed Bishara <saeed@marvell.com>
+---
+ arch/arm/mach-realview/hotplug.c |    2 +-
+ arch/arm/mach-vexpress/hotplug.c |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-It's a bit cumbersome though..
+diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
+index a87523d..44841c6 100644
+--- a/arch/arm/mach-realview/hotplug.c
++++ b/arch/arm/mach-realview/hotplug.c
+@@ -97,7 +97,7 @@ int platform_cpu_kill(unsigned int cpu)
+  *
+  * Called with IRQs disabled
+  */
+-void platform_cpu_die(unsigned int cpu)
++void __ref platform_cpu_die(unsigned int cpu)
+ {
+ 	int spurious = 0;
+ 
+diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
+index ea4cbfb..0436fcf 100644
+--- a/arch/arm/mach-vexpress/hotplug.c
++++ b/arch/arm/mach-vexpress/hotplug.c
+@@ -98,7 +98,7 @@ int platform_cpu_kill(unsigned int cpu)
+  *
+  * Called with IRQs disabled
+  */
+-void platform_cpu_die(unsigned int cpu)
++void __ref platform_cpu_die(unsigned int cpu)
+ {
+ 	int spurious = 0;
+ 
+-- 
+1.7.4.1
