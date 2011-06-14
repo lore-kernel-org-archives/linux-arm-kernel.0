@@ -1,27 +1,29 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Tue, 14 Jun 2011 12:29:16 +0200
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 14 Jun 2011 13:44:56 +0300
 Subject: [PATCH v2 0/4] drivers/iommu/ relocations
-In-Reply-To: <1307742947-32118-1-git-send-email-ohad@wizery.com>
+In-Reply-To: <20110614102916.GF29908@amd.com>
 References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
-Message-ID: <20110614102916.GF29908@amd.com>
+	<20110614102916.GF29908@amd.com>
+Message-ID: <BANLkTinABOiqzhY_FfCeQLyE53Wr=OtAeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 05:55:43PM -0400, Ohad Ben-Cohen wrote:
-> Ohad Ben-Cohen (4):
->   drivers: iommu: move to a dedicated folder
->   msm: iommu: move to drivers/iommu/
->   x86: amd_iommu: move to drivers/iommu/
->   x86/ia64: intel-iommu: move to drivers/iommu/
+On Tue, Jun 14, 2011 at 1:29 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
+> Btw, what tree do these patches apply against?
 
-Btw, what tree do these patches apply against? I tried to apply them to
-v3.0-rc3 and got conflicts. Can you rebase them against -rc3?
+v3.0-rc2
 
-	Joerg
+> I tried to apply them to v3.0-rc3 and got conflicts.
 
--- 
-AMD Operating System Research Center
+What kind of conflicts ? I just tried rc3 and it applied cleanly.
 
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Just in case, I'm attaching the patches too.
+
+Tell me if you still see any issue, thanks !
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: iommu-patches.tar.bz2
+Type: application/x-bzip2
+Size: 6609 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110614/d5650219/attachment.bz2>
