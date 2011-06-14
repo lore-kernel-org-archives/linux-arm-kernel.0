@@ -1,27 +1,154 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Jun 2011 08:14:55 +0200
-Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
-In-Reply-To: <4DF6FBBA.7010309@ti.com>
-References: <1306919711-30965-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTikEx0+SpwiWHqLNcs0oaLoN4LccHQ@mail.gmail.com>
-	<BANLkTik8sz+JQE1nTcEvZLo5PynwK0+zZA@mail.gmail.com>
-	<4DF6FBBA.7010309@ti.com>
-Message-ID: <BANLkTin7DGz4P1J4k0LV8oxFTkBPJwuX9Q@mail.gmail.com>
+From: ccross@android.com (Colin Cross)
+Date: Mon, 13 Jun 2011 23:15:58 -0700
+Subject: [PATCH 1/3] ARM: Add cpu power management notifiers
+In-Reply-To: <87ips9fka2.fsf@ti.com>
+References: <1307925825-28566-1-git-send-email-ccross@android.com>
+	<1307925825-28566-2-git-send-email-ccross@android.com>
+	<87ips9fka2.fsf@ti.com>
+Message-ID: <BANLkTinnZtPFY1Aae=8uDbyt5sh9xAxiNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/14 Santosh Shilimkar <santosh.shilimkar@ti.com>:
+On Mon, Jun 13, 2011 at 3:17 PM, Kevin Hilman <khilman@ti.com> wrote:
+> Colin Cross <ccross@android.com> writes:
+>
+>> During some CPU power modes entered during idle, hotplug and
+>> suspend, peripherals located in the CPU power domain, such as
+>> the GIC and VFP, may be powered down. ?Add a notifier chain
+>> that allows drivers for those peripherals to be notified
+>> before and after they may be reset.
+>>
+>> Signed-off-by: Colin Cross <ccross@android.com>
+>
+> This is great, thanks!
+>
+> I had hacked up something OMAP-specific a while back to do something
+> similar, and have been meaning to make it more generic, so this is
+> perfect. ?Also, if it is moved outside ARM, note that x86_64 has a
+> idle_notifier infrastructure that is somewhat similar, and if you're
+> motivated, it should probably be converted to this as well. ?See
+> arch/x86/kernel/process_64.c.
 
-> That should be taken care by
-> "smp_call_function_single(freqs->cpu, )" with notifier
-> being called with all the available CPU's in the mask.
+I'll take a look at x86
 
-Ah! I see now.
+> Also, for the sake of the comments/changelog, the usefulness of these
+> notifiers is not limited to low-power states where power is off and IP
+> blocks may be reset. ?It could be considered as simply a generic
+> notification mechanism for any CPU PM transitions.
+>
+> On OMAP we have other peripherals (not in the CPU power domain) where we
+> need to control their PM transitions in relation to the CPU PM
+> transitions so the notifiers are useful for any low-power state
+> transition of the CPU(s). ?The drivers for these peripherals use runtime
+> PM in their CPU PM notifiers to trigger the device PM transitions. (The
+> drivers must use the synchronous versions of the runtime PM get/put
+> calls with device in pm_runtime_irq_safe() mode.)
 
-> Did you see any issue with this patch on your platform ?
+Can you give a concrete example of this so I can describe it correctly?
 
-No, I don't think so, I think we saw the problem on an
-earlier version that didn't use smp_call_function_single().
+> In this series, I don't see any calls to cpu_[complex_]pm_[enter|exit]().
+> Based on that, I assume you prefer to leave it up to platform-specific
+> idle/PM code to place these calls. ?Or, do you plan to have this
+> triggered by generic CPUidle, suspend/resume and/or hotplug code? ?At
+> least on OMAP, I prefer having the calls in platform-specific code.
 
-Thanks,
-Linus Walleij
+I will post the Tegra code that uses this soon.  I expect that the
+decision on exactly when to call these functions will be unique to
+each platform, so I think it should start in the platform-specific
+code.
+
+> I have a minor enhancement request. ?The notifier callbacks provide for
+> passing a void * through the notifier chain. ?Could you add a way for a
+> void * to be registered at cpu_pm_register_notifier() time and that
+> would be passed through the notifier call chain? ?This would allow using
+> the same struct notifier_block and callback for multiple instances of
+> the same IP, and the instances could be differentiated in the callback
+> using the void *.
+
+The void * passed to the notifier comes from the call to
+notifier_call_chain(), not from the call to register_notifier().  You
+can get the behavior you want by putting the notifier_block inside
+your device struct and using container_of on the notifier_bock.
+
+> Also, FWIW I tested this on OMAP3 (Cortex-A8 UP) using
+> cpu_pm_enter/exit() in the code path shared between idle and suspend. ?I
+> successfully triggered PM transitions in non-CPU power-domain
+> peripherals, and it worked great.
+
+Great!  Can I get a tested-by?
+
+> Some other minor comments below...
+>
+> [...]
+>
+>> diff --git a/arch/arm/kernel/cpu_pm.c b/arch/arm/kernel/cpu_pm.c
+>> new file mode 100644
+>> index 0000000..48a5b53
+>> --- /dev/null
+>> +++ b/arch/arm/kernel/cpu_pm.c
+>> @@ -0,0 +1,181 @@
+>> +/*
+>> + * Copyright (C) 2011 Google, Inc.
+>> + *
+>> + * Author:
+>> + * ? Colin Cross <ccross@android.com>
+>> + *
+>> + * This software is licensed under the terms of the GNU General Public
+>> + * License version 2, as published by the Free Software Foundation, and
+>> + * may be copied, distributed, and modified under those terms.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. ?See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + */
+>> +
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/notifier.h>
+>> +#include <linux/spinlock.h>
+>> +
+>> +#include <asm/cpu_pm.h>
+>> +
+>> +/*
+>> + * When a CPU goes to a low power state that turns off power to the CPU's
+>> + * power domain, the contents of some blocks (floating point coprocessors,
+>> + * interrutp controllers, caches, timers) in the same power domain can
+>
+> typo: interrutp
+
+Will fix
+
+>> + * be lost. ?The cpm_pm notifiers provide a method for platform idle, suspend,
+>> + * and hotplug implementations to notify the drivers for these blocks that
+>> + * they may be reset.
+>> + *
+>> + * All cpu_pm notifications must be called with interrupts disabled.
+>> + *
+>> + * The notifications are split into two classes, CPU notifications and CPU
+>> + * complex notifications.
+>> + *
+>> + * CPU notifications apply to a single CPU, and must be called on the affected
+>> + * CPU. ?They are used to save per-cpu context for affected blocks.
+>> + *
+>> + * CPU complex notifications apply to all CPUs in a single power domain. They
+>> + * are used to save any global context for affected blocks, and must be called
+>> + * after all the CPUs in the power domain have been notified of the low power
+>> + * state.
+>> + *
+>> + */
+>
+> Not directly related to this series, but I'm a bit confused on terminology.
+>
+> I've seen both 'CPU complex' and 'CPU cluster' used in ARM SMP land, but
+> haven't seen precise definitions of either. ?Does one imply all CPUs,
+> and the other imply all CPUs in the same power domain?
+
+'CPU complex' is the terminology I cribbed from some of nVidia's Tegra
+patches, but I think 'CPU cluster' is a better term for what I mean -
+the group of CPUs that share some external state, like the L2 or GIC
+distributor.  In practice, all existing platforms seem to have a
+single cluster (as far as Linux is concerned).  The ARM ARM uses
+'cluster', but doesn't directly define it, and doesn't use 'CPU
+complex' at all.
