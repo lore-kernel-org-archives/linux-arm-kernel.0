@@ -1,44 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jun 2011 05:34:00 -0700
-Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
-In-Reply-To: <1308053788-25937-1-git-send-email-shahar@wizery.com>
-References: <y>
- <1308053788-25937-1-git-send-email-shahar@wizery.com>
-Message-ID: <20110614123359.GB23145@atomide.com>
+From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter?= Ujfalusi)
+Date: Tue, 14 Jun 2011 15:38:41 +0300
+Subject: [RFC 1/2] omap: mcbsp: Drop SPI mode support
+In-Reply-To: <1308050632-4733-1-git-send-email-jhnikula@gmail.com>
+References: <1308050632-4733-1-git-send-email-jhnikula@gmail.com>
+Message-ID: <6027329.5ZCJWRgjcM@barack>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Shahar Lev <shahar@wizery.com> [110614 05:12]:
->  
-> +config OMAP3EVM_MISTRAL_WL12XX
-> +	bool "Enable Mistral WL12XX daughter board support"
-> +	depends on MACH_OMAP3EVM
-> +	help
-> +	  Support for the Mistral WL12XX daughter board.
-> +	  This extension board which supports both WLAN and Bluetooth.
-> +	  Specifically, for WL1271, more info can be found at
-> +	  http://mistralsolutions.com/component/jumi/Download_Common_Code.html?docid=298
-> +
-> +config OMAP3EVM_MISTRAL_WL12XX_REFCLOCK
-> +	int "Ref clock value"
-> +	range 0 5
-> +	depends on OMAP3EVM_MISTRAL_WL12XX
-> +	default 2
-> +	help
-> +	  Set ref clock value for the Mistral WL12XX daughter board.
-> +	  Select 0 for 19.2 MHz.
-> +	  Select 1 for 26 MHz.
-> +	  Select 2 for 38.4 MHz.
-> +	  Select 3 for 52 MHz.
-> +	  Select 4 for 38.4 MHz, XTAL.
-> +	  Select 5 for 26 MHz, XTAL.
-> +
+On Tuesday 14 June 2011 13:23:51 Jarkko Nikula wrote:
+> We haven't seen any use for the SPI API in McBSP driver over the years. More
+> over, Peter Ujfalusi <peter.ujfalusi@ti.com> noticed that SPI mode is not
+> even supported since OMAP2430 so it's very unlikely that we'll see any use
+> for it in the future either.
+> 
+> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
 
-This your should try to remove as it won't work nicely for supporting
-various boards with the same kernel as we already do with
-omap2plus_defconfig.
+Either now or later, but for both:
 
-Can you somehow detect the daughter board dynamically and then
-set the flags?
-
-Tony
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
