@@ -1,48 +1,89 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jun 2011 07:53:29 -0700
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <alpine.LFD.2.00.1106140300500.2142@xanadu.home>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110612081541.GA10283@n2100.arm.linux.org.uk>
-	<20110612083414.GA29516@S2100-06.ap.freescale.net>
-	<20110612092131.GC10283@n2100.arm.linux.org.uk>
-	<20110612095217.GD10283@n2100.arm.linux.org.uk>
-	<20110612104215.GC29516@S2100-06.ap.freescale.net>
-	<20110612104048.GE10283@n2100.arm.linux.org.uk>
-	<8yaaadlfi3q.fsf@huya.qualcomm.com>
-	<alpine.LFD.2.00.1106131910570.2142@xanadu.home>
-	<alpine.LFD.2.00.1106140300500.2142@xanadu.home>
-Message-ID: <20110614145329.GK23145@atomide.com>
+From: prakity@marvell.com (Philip Rakity)
+Date: Tue, 14 Jun 2011 08:00:01 -0700
+Subject: [PATCH v4 2/5] mmc: support sdhci-pxav2.c
+In-Reply-To: <BANLkTimeb-Ax99rQDYckLsVSncxhrh7amg@mail.gmail.com>
+References: <1307526121-12059-1-git-send-email-zhangfei.gao@marvell.com>
+	<1307526121-12059-3-git-send-email-zhangfei.gao@marvell.com>
+	<0059AEB1-3536-4540-924A-A95C7F3AD21A@marvell.com>
+	<BANLkTimeb-Ax99rQDYckLsVSncxhrh7amg@mail.gmail.com>
+Message-ID: <5BEA9179-AA1B-4C49-A090-1DC78B1DE5A1@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Nicolas Pitre <nicolas.pitre@linaro.org> [110614 00:04]:
-> +
-> +	for_each_tag(atag, atag_list) {
-> +		if (atag->hdr.tag == ATAG_CMDLINE) {
-> +			setprop_string(dt, "/chosen", "bootargs",
-> +			                  atag->u.cmdline.cmdline);
-> +		} else if (atag->hdr.tag == ATAG_MEM) {
-> +			uint32_t mem_reg_property[2];
-> +			mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
-> +			mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
-> +			setprop(dt, "/memory", "reg", mem_reg_property,
-> +			           sizeof(mem_reg_property));
-> +		} else if (atag->hdr.tag == ATAG_INITRD2) {
-> +			uint32_t initrd_start, initrd_size;
-> +			initrd_start = atag->u.initrd.start;
-> +			initrd_size = atag->u.initrd.size;
-> +			setprop_cell(dt, "/chosen", "linux,initrd-start",
-> +			                initrd_start);
-> +			setprop_cell(dt, "/chosen", "linux,initrd-end",
-> +			                initrd_start + initrd_size);
-> +		}
-> +	}
 
-I think Russell posted a complete list of the ATAGs to translate
-somewhere, but at least ATAG_REVISION is missing here. That's being
-used quite a bit as system_rev to set things dynamically.
+On Jun 13, 2011, at 11:07 PM, zhangfei gao wrote:
 
-Regards,
+>>> +static void pxav2_set_private_registers(struct sdhci_host *host, u8 mask)
+>>> +{
+>>> +     struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+>>> +     struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
+>>> +
+>>> +     if (mask == SDHCI_RESET_ALL) {
+>>> +             u16 tmp = 0;
+>>> +
+>>> +             /*
+>>> +              * tune timing of read data/command when crc error happen
+>>> +              * no performance impact
+>>> +              */
+>>> +             if (pdata->clk_delay_sel == 1) {
+>>> +                     tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>>> +
+>>> +                     tmp &= ~(SDCLK_DELAY_MASK << SDCLK_DELAY_SHIFT);
+>>> +                     tmp |= (pdata->clk_delay_cycles & SDCLK_DELAY_MASK)
+>>> +                             << SDCLK_DELAY_SHIFT;
+>>> +                     tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+>>> +                     tmp |= (1 & SDCLK_SEL_MASK) << SDCLK_SEL_SHIFT;
+>>> +
+>>> +                     writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>>> +             }
+>> 
+>> There are 3 possible value for clk_delay_sel.
+>> 
+>> 0  == do not use clk_delay_cycles
+>> 1 == use programmed clk_delay_cycles value (the code above)
+>> all other values use the sd_clk which was used to drive the output
+>> 
+>> The code about only handles 2 of the 3 cases
+> 
+> pxa910/920 only require two cases.
+> 1, clk_delay_sel = 1 with delay value.
+> 2, use default setting and directly use sd_clk. clk_delay_sel = 3.
+> 
+>> 
+>> suggest
+>> 
+>>        (if (pdata->clk_delay_sel) {
+>>> +             if (pdata->clk_delay_sel == 1) {
+>>> +                     tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>>> +
+>>> +                     tmp &= ~(SDCLK_DELAY_MASK << SDCLK_DELAY_SHIFT);
+>>> +                     tmp |= (pdata->clk_delay_cycles & SDCLK_DELAY_MASK)
+>>> +                             << SDCLK_DELAY_SHIFT;
+>>> +                     tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+>>> +                     tmp |= 1 << SDCLK_SEL_SHIFT;
+>>> +
+>>> +                     writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>>> +             } else {
+>> 
+>>> +                     tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>>> +                     tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+>>> +                     tmp |= 2  << SDCLK_SEL_SHIFT;
+>>> +                     writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+> The else is default setting on pxa910 after reset.
+>>                   }
+>>         }
+>> 
+>> Philip and Mark
 
-Tony
+If you are comfortable not support mode 0 then I am okay with this patch set.
+
+Acked-by: Philip Rakity <prakity@marvell.com>
+Acked-by: Mark F. Brown <mark.brown314@gmail.com>
+
+>>> 
+>> 
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>> 
