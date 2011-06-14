@@ -1,22 +1,28 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jun 2011 04:36:09 -0700
-Subject: [RFC 1/2] omap: mcbsp: Drop SPI mode support
-In-Reply-To: <1308050632-4733-1-git-send-email-jhnikula@gmail.com>
-References: <1308050632-4733-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <20110614113608.GP3352@atomide.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 14 Jun 2011 19:51:00 +0800
+Subject: [PATCH 3/4] mmc: sdhci-esdhc-imx: remove "WP" from flag
+	ESDHC_FLAG_GPIO_FOR_CD_WP
+In-Reply-To: <20110614092812.GC5043@pengutronix.de>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<1307702572-22066-4-git-send-email-shawn.guo@linaro.org>
+	<20110614092812.GC5043@pengutronix.de>
+Message-ID: <20110614115059.GE30295@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Jarkko Nikula <jhnikula@gmail.com> [110614 04:18]:
-> We haven't seen any use for the SPI API in McBSP driver over the years. More
-> over, Peter Ujfalusi <peter.ujfalusi@ti.com> noticed that SPI mode is not
-> even supported since OMAP2430 so it's very unlikely that we'll see any use
-> for it in the future either.
+On Tue, Jun 14, 2011 at 11:28:13AM +0200, Wolfram Sang wrote:
+> On Fri, Jun 10, 2011 at 06:42:51PM +0800, Shawn Guo wrote:
+> > The use of flag ESDHC_FLAG_GPIO_FOR_CD_WP is all CD related.  It does
+> > not necessarily need to bother WP in the flag name.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> 
+> I'd just squash it into the next one?
+> 
+I'd like to have this patch to give the exact meaning of the flag,
+and then the following patch removes the flag with proper CD only
+case handling.
 
-Sounds fair to me, our first priority should be to get this
-code moved to live under drivers. If the SPI support is needed,
-it can be added back later on.
-
+-- 
 Regards,
-
-Tony
+Shawn
