@@ -1,98 +1,216 @@
-From: sundaram@ti.com (Raju, Sundaram)
-Date: Tue, 14 Jun 2011 11:08:51 +0530
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <BANLkTimZ=v4W1hFJ7hvZRmyHMSU_3MmZEA@mail.gmail.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
-	<20110609163206.GB24636@n2100.arm.linux.org.uk>
-	<1307686397.10976.116.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE337F@dbde02.ent.ti.com>
-	<20110610104318.GC24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3452@dbde02.ent.ti.com>
-	<20110610133338.GD24636@n2100.arm.linux.org.uk>
-	<BANLkTimZ=v4W1hFJ7hvZRmyHMSU_3MmZEA@mail.gmail.com>
-Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9403020B7B37@dbde02.ent.ti.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 14 Jun 2011 09:44:29 +0400
+Subject: [PATCH] sa1100: move serial_sa1100.h header to
+	arch/arm/mach-sa1100/include/mach
+Message-ID: <1308030269-32629-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus,
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ arch/arm/mach-sa1100/assabet.c                     |    2 +-
+ arch/arm/mach-sa1100/badge4.c                      |    2 +-
+ arch/arm/mach-sa1100/cerf.c                        |    2 +-
+ arch/arm/mach-sa1100/collie.c                      |    2 +-
+ arch/arm/mach-sa1100/h3xxx.c                       |    2 +-
+ arch/arm/mach-sa1100/hackkit.c                     |    2 +-
+ .../include}/mach/serial_sa1100.h                  |    0
+ arch/arm/mach-sa1100/jornada720.c                  |    2 +-
+ arch/arm/mach-sa1100/lart.c                        |    2 +-
+ arch/arm/mach-sa1100/nanoengine.c                  |    2 +-
+ arch/arm/mach-sa1100/neponset.c                    |    2 +-
+ arch/arm/mach-sa1100/pleb.c                        |    2 +-
+ arch/arm/mach-sa1100/shannon.c                     |    2 +-
+ arch/arm/mach-sa1100/simpad.c                      |    2 +-
+ drivers/tty/serial/sa1100.c                        |    2 +-
+ 15 files changed, 14 insertions(+), 14 deletions(-)
+ rename arch/arm/{include/asm => mach-sa1100/include}/mach/serial_sa1100.h (100%)
 
-Thanks for the pointers.
-
-> -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: Monday, June 13, 2011 7:43 PM
-> To: Raju, Sundaram
-> Cc: Russell King - ARM Linux; Koul, Vinod; Dan; davinci-linux-open-
-> source at linux.davincidsp.com; linux-omap at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [RFC] dmaengine: add new api for preparing simple slave transfer
-> 
-> On Fri, Jun 10, 2011 at 3:33 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Fri, Jun 10, 2011 at 05:18:46PM +0530, Raju, Sundaram wrote:
-> >> Now DMACs capable of 3D transfer, do transfer of the whole 1D
-> >> buffer per sync received or even whole 2D buffer per sync received
-> >> (based on the sync rate programmed in the DMAC).
-> >
-> > The only issue which I see that we don't cover is the case where you want
-> > to describe a single buffer which is organised as N bytes to be transferred,
-> > M following bytes to be skipped, N bytes to be transferred, M bytes to be
-> > skipped. ?I doubt there are many controllers which can be programmed with
-> > both 'N' and 'M' parameters directly.
-> 
-> Sundaram is this how your controller works?
-> I mean the hardware can skip over sequences like this?
-> 
-> When we added the config interface to DMAengine I originally included
-> a "custom config" call, but Dan wanted me to keep it out until we
-> had some specific usecase for it. FSLDMA recently started
-> to use it.
-> 
-> Notice how dmaengine_slave_config() is implemented:
-> 
-> static inline int dmaengine_slave_config(struct dma_chan *chan,
-> 					  struct dma_slave_config *config)
-> {
-> 	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
-> 			(unsigned long)config);
-> }
-> 
-> So what is passed to the driver is just an unsigned long.
-> 
-> This is actually modeled to be ioctl()-like so you can pass in a
-> custom config to the same callback on the device driver,
-> just use some other enumerator than DMA_SLAVE_CONFIG,
-> say like FSLDMA already does with FSLDMA_EXTERNAL_START.
-> 
-> Just put some enumerator in enum dma_ctrl_cmd in
-> dmaengine.h such as SDMA_TEXAS_STRIDE_CONFIG and call
-> like this:
-> 
-> /* However that config struct needs to look, basically */
-> static struct sdma_ti_stride_cgf = {
->      take = M,
->      skip = N,
-> };
-> 
-> ret = chan->device->device_control(chan, SDMA_TEXAS_STRIDE_CONFIG,
-> &sdma_ti_stride_cfg);
-> 
-> Or something like this.
-
-Yes, the hardware can skip over sequences like that.
-I also thought about your suggestion, at first before submitting the RFC.
-But I dint pursue this because, this ioctl() call has to be made before
-every single prepare call.
-
-I may have to end up using this if we decide not to change the API
-signature for prepare APIs.
-
-I actually intend to use this for all DMAC related ioctl(). Configuring
-the DMAC and programming various modes etc specific to the
-DMAC. I suppose this is the only way to do it.
-Let me know if there is any other way to do it.
-
-Thanks,
-Sundaram
+diff --git a/arch/arm/mach-sa1100/assabet.c b/arch/arm/mach-sa1100/assabet.c
+index 5778274..56779ce 100644
+--- a/arch/arm/mach-sa1100/assabet.c
++++ b/arch/arm/mach-sa1100/assabet.c
+@@ -33,7 +33,7 @@
+ #include <asm/mach/flash.h>
+ #include <asm/mach/irda.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ #include <mach/assabet.h>
+ #include <mach/mcp.h>
+ 
+diff --git a/arch/arm/mach-sa1100/badge4.c b/arch/arm/mach-sa1100/badge4.c
+index 4f19ff8..2a586df 100644
+--- a/arch/arm/mach-sa1100/badge4.c
++++ b/arch/arm/mach-sa1100/badge4.c
+@@ -32,7 +32,7 @@
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+ #include <asm/hardware/sa1111.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ #include <mach/badge4.h>
+ 
+diff --git a/arch/arm/mach-sa1100/cerf.c b/arch/arm/mach-sa1100/cerf.c
+index 7f3da4b..084c8b1 100644
+--- a/arch/arm/mach-sa1100/cerf.c
++++ b/arch/arm/mach-sa1100/cerf.c
+@@ -26,7 +26,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ #include <mach/cerf.h>
+ #include <mach/mcp.h>
+diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+index bd3e1bf..f614a59 100644
+--- a/arch/arm/mach-sa1100/collie.c
++++ b/arch/arm/mach-sa1100/collie.c
+@@ -37,7 +37,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ #include <asm/hardware/scoop.h>
+ #include <asm/mach/sharpsl_param.h>
+diff --git a/arch/arm/mach-sa1100/h3xxx.c b/arch/arm/mach-sa1100/h3xxx.c
+index b0784c9..368af40 100644
+--- a/arch/arm/mach-sa1100/h3xxx.c
++++ b/arch/arm/mach-sa1100/h3xxx.c
+@@ -22,7 +22,7 @@
+ 
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ #include <mach/h3xxx.h>
+ 
+diff --git a/arch/arm/mach-sa1100/hackkit.c b/arch/arm/mach-sa1100/hackkit.c
+index db5e434..d270d87 100644
+--- a/arch/arm/mach-sa1100/hackkit.c
++++ b/arch/arm/mach-sa1100/hackkit.c
+@@ -33,7 +33,7 @@
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ #include "generic.h"
+ 
+diff --git a/arch/arm/include/asm/mach/serial_sa1100.h b/arch/arm/mach-sa1100/include/mach/serial_sa1100.h
+similarity index 100%
+rename from arch/arm/include/asm/mach/serial_sa1100.h
+rename to arch/arm/mach-sa1100/include/mach/serial_sa1100.h
+diff --git a/arch/arm/mach-sa1100/jornada720.c b/arch/arm/mach-sa1100/jornada720.c
+index 491ac9f..fffa6d1 100644
+--- a/arch/arm/mach-sa1100/jornada720.c
++++ b/arch/arm/mach-sa1100/jornada720.c
+@@ -31,7 +31,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ #include "generic.h"
+ 
+diff --git a/arch/arm/mach-sa1100/lart.c b/arch/arm/mach-sa1100/lart.c
+index 7b9556b..e398b5c 100644
+--- a/arch/arm/mach-sa1100/lart.c
++++ b/arch/arm/mach-sa1100/lart.c
+@@ -13,7 +13,7 @@
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ #include <mach/mcp.h>
+ 
+ #include "generic.h"
+diff --git a/arch/arm/mach-sa1100/nanoengine.c b/arch/arm/mach-sa1100/nanoengine.c
+index 72087f0..c743ca7 100644
+--- a/arch/arm/mach-sa1100/nanoengine.c
++++ b/arch/arm/mach-sa1100/nanoengine.c
+@@ -23,7 +23,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/nanoengine.h>
+diff --git a/arch/arm/mach-sa1100/neponset.c b/arch/arm/mach-sa1100/neponset.c
+index b4fa53a..552a845 100644
+--- a/arch/arm/mach-sa1100/neponset.c
++++ b/arch/arm/mach-sa1100/neponset.c
+@@ -14,7 +14,7 @@
+ #include <asm/irq.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/irq.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ #include <mach/assabet.h>
+ #include <mach/neponset.h>
+ #include <asm/hardware/sa1111.h>
+diff --git a/arch/arm/mach-sa1100/pleb.c b/arch/arm/mach-sa1100/pleb.c
+index 65161f2..f9809a8 100644
+--- a/arch/arm/mach-sa1100/pleb.c
++++ b/arch/arm/mach-sa1100/pleb.c
+@@ -18,7 +18,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+ #include <asm/mach/flash.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ #include <mach/irqs.h>
+ 
+ #include "generic.h"
+diff --git a/arch/arm/mach-sa1100/shannon.c b/arch/arm/mach-sa1100/shannon.c
+index 7917b24..5148ca3 100644
+--- a/arch/arm/mach-sa1100/shannon.c
++++ b/arch/arm/mach-sa1100/shannon.c
+@@ -16,7 +16,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ #include <mach/mcp.h>
+ #include <mach/shannon.h>
+ 
+diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+index cfb7607..dd1942c 100644
+--- a/arch/arm/mach-sa1100/simpad.c
++++ b/arch/arm/mach-sa1100/simpad.c
+@@ -22,7 +22,7 @@
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+ #include <asm/mach/map.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ #include <mach/mcp.h>
+ #include <mach/simpad.h>
+ 
+diff --git a/drivers/tty/serial/sa1100.c b/drivers/tty/serial/sa1100.c
+index ef7a21a..0426ee0 100644
+--- a/drivers/tty/serial/sa1100.c
++++ b/drivers/tty/serial/sa1100.c
+@@ -38,7 +38,7 @@
+ 
+ #include <asm/irq.h>
+ #include <mach/hardware.h>
+-#include <asm/mach/serial_sa1100.h>
++#include <mach/serial_sa1100.h>
+ 
+ /* We've been assigned a range on the "Low-density serial ports" major */
+ #define SERIAL_SA1100_MAJOR	204
+-- 
+1.7.5.3
