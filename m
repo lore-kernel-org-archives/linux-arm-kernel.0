@@ -1,29 +1,27 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 14 Jun 2011 11:16:10 +0100
-Subject: DMA setup for ARM platform with hole low in memory
-In-Reply-To: <315025466.1505794.1308000719987.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-References: <1347566644.1505253.1308000163643.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-	<315025466.1505794.1308000719987.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-Message-ID: <20110614101610.GA12419@1n450.cable.virginmedia.net>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Tue, 14 Jun 2011 12:29:16 +0200
+Subject: [PATCH v2 0/4] drivers/iommu/ relocations
+In-Reply-To: <1307742947-32118-1-git-send-email-ohad@wizery.com>
+References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
+Message-ID: <20110614102916.GF29908@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 09:31:59PM +0000, johnlinn at comcast.net wrote:
-> I'm trying to decide the best way to setup this ARM platform DMA to
-> deal with the fact that the lowest 512K of memory can not be DMAed
-> into.  The rest of memory space is fine.
-> 
-> From my digging and prototyping it seems like a DMA zone will do the
-> job, but maybe there's an easier way. The DMA mask doesn't seem to
-> really help with this hole in memory and would still need to be
-> 0xFFFFFFFF it appears.
+On Fri, Jun 10, 2011 at 05:55:43PM -0400, Ohad Ben-Cohen wrote:
+> Ohad Ben-Cohen (4):
+>   drivers: iommu: move to a dedicated folder
+>   msm: iommu: move to drivers/iommu/
+>   x86: amd_iommu: move to drivers/iommu/
+>   x86/ia64: intel-iommu: move to drivers/iommu/
 
-The DMA zone won't help because it assumes that it is always at the
-bottom of the RAM. The simples way is to mark that area as reserved and
-never use it. It's not that bad since I suspect you already have the
-kernel and swapper_pg_dir using most of it.
+Btw, what tree do these patches apply against? I tried to apply them to
+v3.0-rc3 and got conflicts. Can you rebase them against -rc3?
 
-Have a look at arch/arm/mach-integrator/core.c - integrator_reserve().
+	Joerg
 
 -- 
-Catalin
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
