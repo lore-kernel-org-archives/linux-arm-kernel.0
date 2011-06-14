@@ -1,48 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 14 Jun 2011 11:19:14 +0200
-Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
-In-Reply-To: <1307988690.26699.9.camel@Joe-Laptop>
-References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
-	<1307988690.26699.9.camel@Joe-Laptop>
-Message-ID: <BANLkTi=YQcQ2C=RhMrB_CpWXN7ba9SxfEg@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 14 Jun 2011 11:22:36 +0200
+Subject: [PATCH 2/4] mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not
+	get cleared
+In-Reply-To: <1307702572-22066-3-git-send-email-shawn.guo@linaro.org>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<1307702572-22066-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110614092236.GA5043@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
+On Fri, Jun 10, 2011 at 06:42:50PM +0800, Shawn Guo wrote:
+> The function esdhc_readl_le intends to clear bit SDHCI_CARD_PRESENT,
+> when the card detect gpio tells there is no card.  But it does not
+> clear the bit actually.  The patch gives a fix on that.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-thanks for the review, excellent as always.
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
 
-I fixed all except the below pattern, also searched the source to make sure
-there were no other cases of the same errors.
+Should go to stable, too.
 
-On Mon, Jun 13, 2011 at 8:11 PM, Joe Perches <joe@perches.com> wrote:
+Thanks for catching it!
 
->> +int pinctrl_register_pins_dense(struct pinctrl_pin_desc const *pins,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned num_descs, unsigned num_pins)
->> +{
->> + ? ? int ret;
->> + ? ? unsigned i;
->> +
->> + ? ? ret = pinctrl_register_pins(pins, num_descs, num_pins);
->> + ? ? if (ret) {
->> + ? ? ? ? ? ? for (i = 0; i < num_pins; i++) {
->> + ? ? ? ? ? ? ? ? ? ? struct pin_desc *pindesc;
->> +
->> + ? ? ? ? ? ? ? ? ? ? spin_lock(&pin_desc_tree_lock);
->> + ? ? ? ? ? ? ? ? ? ? pindesc = radix_tree_lookup(&pin_desc_tree, i);
->> + ? ? ? ? ? ? ? ? ? ? if (pindesc != NULL) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? radix_tree_delete(&pin_desc_tree, i);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? num_pins --;
->> + ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? ? ? ? ? spin_unlock(&pin_desc_tree_lock);
->> + ? ? ? ? ? ? ? ? ? ? kfree(pindesc);
->> + ? ? ? ? ? ? }
->
-> Second use of this pattern. ?Maybe use pinctrl_free_pindescs?
-
-It is quite different actually - in the second case here. we loop over a list
-with holes, and we pick each one pin. We cannot loop over the entire
-pin range because in this case we don't know the size of the range.
-
-Thanks,
-Linus Walleij
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110614/65ad02ca/attachment.sig>
