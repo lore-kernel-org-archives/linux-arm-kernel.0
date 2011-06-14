@@ -1,38 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 14 Jun 2011 20:30:07 +0200
-Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106141803.00876.arnd@arndb.de>
-	<op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>
-Message-ID: <201106142030.07549.arnd@arndb.de>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 14 Jun 2011 15:42:50 -0300
+Subject: [PATCH 2/2] ARM: mach-imx/mx31lilly: Fix section mismatches
+In-Reply-To: <1308076970-2568-1-git-send-email-fabio.estevam@freescale.com>
+References: <1308076970-2568-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1308076970-2568-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 June 2011 18:58:35 Michal Nazarewicz wrote:
-> On Tue, 14 Jun 2011 18:03:00 +0200, Arnd Bergmann wrote:
-> > For all I know, that is something that is only true for a few very  
-> > special Samsung devices,
-> 
-> Maybe.  I'm just answering your question. :)
-> 
-> Ah yes, I forgot that separate regions for different purposes could
-> decrease fragmentation.
+Fix the following section mismatches:
 
-That is indeed a good point, but having a good allocator algorithm
-could also solve this. I don't know too much about these allocation
-algorithms, but there are probably multiple working approaches to this.
+WARNING: vmlinux.o(.text+0x1026c): Section mismatch in reference from the function lilly1131_usb_init() to the variable .init.rodata:imx31_mxc_ehci_hs_data
+The function lilly1131_usb_init() references
+the variable __initconst imx31_mxc_ehci_hs_data.
+This is often because lilly1131_usb_init lacks a __initconst 
+annotation or the annotation of imx31_mxc_ehci_hs_data is wrong.
 
-> > I would suggest going forward without having multiple regions:
-> 
-> Is having support for multiple regions a bad thing?  Frankly,
-> removing this support will change code from reading context passed
-> as argument to code reading context from global variable.  Nothing
-> is gained; functionality is lost.
+WARNING: vmlinux.o(.text+0x10270): Section mismatch in reference from the function lilly1131_usb_init() to the (unknown reference) .init.rodata:(unknown)
+The function lilly1131_usb_init() references
+the (unknown reference) __initconst (unknown).
+This is often because lilly1131_usb_init lacks a __initconst 
+annotation or the annotation of (unknown) is wrong.
 
-What is bad IMHO is making them the default, which forces the board
-code to care about memory management details. I would much prefer
-to have contiguous allocation parameters tuned automatically to just
-work on most boards before we add ways to do board-specific hacks.
+WARNING: vmlinux.o(.text+0x10274): Section mismatch in reference from the function lilly1131_usb_init() to the (unknown reference) .init.data:(unknown)
+The function lilly1131_usb_init() references
+the (unknown reference) __initdata (unknown).
+This is often because lilly1131_usb_init lacks a __initdata 
+annotation or the annotation of (unknown) is wrong.
 
-	Arnd
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-mx31lilly.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-imx/mach-mx31lilly.c b/arch/arm/mach-imx/mach-mx31lilly.c
+index 750368d..126913a 100644
+--- a/arch/arm/mach-imx/mach-mx31lilly.c
++++ b/arch/arm/mach-imx/mach-mx31lilly.c
+@@ -192,7 +192,7 @@ static struct mxc_usbh_platform_data usbh2_pdata __initdata = {
+ 	.portsc	= MXC_EHCI_MODE_ULPI | MXC_EHCI_UTMI_8BIT,
+ };
+ 
+-static void lilly1131_usb_init(void)
++static void __init lilly1131_usb_init(void)
+ {
+ 	imx31_add_mxc_ehci_hs(1, &usbh1_pdata);
+ 
+-- 
+1.6.0.4
