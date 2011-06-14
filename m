@@ -1,23 +1,35 @@
-From: michael@walle.cc (Michael Walle)
-Date: Wed, 15 Jun 2011 00:01:08 +0200
-Subject: [PATCH 0/2 RFC] arm/kirkwood: add dreamplug support.
-In-Reply-To: <cover.1308080024.git.jason@lakedaemon.net>
-References: <cover.1308080024.git.jason@lakedaemon.net>
-Message-ID: <201106150001.08606.michael@walle.cc>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 14 Jun 2011 16:06:32 -0600
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <201106142342.29405.arnd@arndb.de>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<201106142232.02217.arnd@arndb.de>
+	<alpine.LFD.2.00.1106141650520.2142@xanadu.home>
+	<201106142342.29405.arnd@arndb.de>
+Message-ID: <BANLkTim5C340ZB4Hu1xFQpHAkcWJEgKjMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag 14 Juni 2011, 21:52:53 schrieb linux_arm at lakedaemon.net:
-> From: Jason Cooper <linux_arm@lakedaemon.net>
-> This is an RFC patch series until mach-types is updated.  This compiles,
-> loads, runs, and sees the SPI flash.
+On Tue, Jun 14, 2011 at 3:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 14 June 2011 23:21:52 Nicolas Pitre wrote:
+>> Otherwise, if the revision number is effectively non probable, then I
+>> would guess it is the device tree's purpose to carry that information
+>> somehow, right? ?Maybe this can be appended to the board name string?
+>
+> That's what I meant with adding it to "compatible", which is a list of
+> strings with varying degrees of detailed information, e.g.
+>
+> ?ti,omap7
+> ?ti,omap7-squirrelboard
+> ?ti,omap7-squirrelboard-v3
+> ?ti,omap7-squirrelboard-v3.17b
+>
+> You can match the list against a specific revision or a less specific
+> identifier if you just want to know whether you are on a squirrelboard
+> or a hamsterboard.
 
-Hi Jason,
+Yes, that's generally the right way to handle it.  In practice I've
+not seen many cases where it is really required, but it doesn't hurt
+if somebody wants to include it in the DT for their board.
 
-in case no one else reply to your patch. I wanted to submit a patch, which 
-adds support for the LS-XHL, based on kirkwood, too. Old-fashioned machine 
-support files won't be accepted anymore. Instead you would have to submit a 
-DTS once the kirkwood arch has support for device trees.
-
--- 
-Michael
+g.
