@@ -1,54 +1,68 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Tue, 14 Jun 2011 23:34:04 +0100
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <4DF7C3CA.9050902@zytor.com>
-References: <20110614190850.GA13526@linux-mips.org>
-	<4DF7C3CA.9050902@zytor.com>
-Message-ID: <20110614223404.GA30057@linux-mips.org>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 14 Jun 2011 16:27:54 -0700
+Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
+In-Reply-To: <alpine.LFD.2.00.1106140300500.2142@xanadu.home>
+Message-ID: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 01:25:46PM -0700, H. Peter Anvin wrote:
+Some targets have multiple memory regions.  Parse up to 8 of these
+when converting the atags to fdt.
 
-> On 06/14/2011 12:08 PM, Ralf Baechle wrote:
-> > The PC parallel port Kconfig as acquired one of those messy terms to
-> > describe it's architecture dependencies:
-> > 
-> >        depends on (!SPARC64 || PCI) && !SPARC32 && !M32R && !FRV && \
-> >                (!M68K || ISA) && !MN10300 && !AVR32 && !BLACKFIN
-> > 
-> > This isn't just ugly - it also almost certainly describes the dependencies
-> > too coarse grainedly.  This is an attempt at cleaing the mess up.
-> > 
-> > I tried to faithfully aproximate the old behaviour but the existing
-> > behaviour seems inacurate if not wrong for some architectures or platforms.
-> > To improve on this I rely on comments from other arch and platforms
-> > maintainers.  Any system that can take PCI multi-IO card or has a PC-style
-> > parallel port on the mainboard should probably should now do a
-> > select HAVE_PC_PARPORT.  And some arch Kconfig files should further
-> > restrict the use of HAVE_PC_PARPORT to only those platforms that actually
-> > need it.
-> > 
-> 
-> Why on earth restrict it like that?  It's just a device driver, like
-> more or less any other device driver...
+Signed-off-by: David Brown <davidb@codeaurora.org>
+---
+With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
+It seems to work as long as my device tree has placeholders for all of
+the properties I need.
 
-Some of the older MIPS systems are based on PC chipsets from Intel, OPTi
-or others.  On those you can expect the parport_pc driver to actually work.
-The ISA/PCI implementations are often between lackluster and pure brokeness
-such as with non-functioning I/O port address space.  So I don't want to
-run such drivers on such a platforms, things might turn ugly.
+It still seems rather clunky, especially that it requires bootimg from
+a zImage.
 
-Embedded systems often have PCI but no PCI slots or there may even be an
-apropriate SuperIO chip in the the system but nothing wired to the parallel
-port bits.
+David
 
-And there are systems such as DECstations which have nothing that even
-at a parsec's distance has a similarity to (E)ISA or PCI - but still
-PARPORT_PC is offered along with 40 other options that depend on it.
+ arch/arm/boot/compressed/atags_to_fdt.c |   16 +++++++++++-----
+ 1 files changed, 11 insertions(+), 5 deletions(-)
 
-There is no point in offering to build something that couldn't possibly be
-used.  It just makes the kernel harder to configure and inflates the test
-matrix for no good reason.
-
-  Ralf
+diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
+index 11c1a88..ac93e28 100644
+--- a/arch/arm/boot/compressed/atags_to_fdt.c
++++ b/arch/arm/boot/compressed/atags_to_fdt.c
+@@ -31,6 +31,8 @@ static int setprop_cell(void *fdt, const char *node_path,
+ int atags_to_fdt(void *dt,  void *atag_list)
+ {
+ 	struct tag *atag = atag_list;
++	uint32_t mem_reg_property[16];
++	int memcount = 0;
+ 
+ 	/* make sure we've got an aligned pointer */
+ 	if ((u32)atag_list & 0x3)
+@@ -51,11 +53,10 @@ int atags_to_fdt(void *dt,  void *atag_list)
+ 			setprop_string(dt, "/chosen", "bootargs",
+ 			                  atag->u.cmdline.cmdline);
+ 		} else if (atag->hdr.tag == ATAG_MEM) {
+-			uint32_t mem_reg_property[2];
+-			mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
+-			mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
+-			setprop(dt, "/memory", "reg", mem_reg_property,
+-			           sizeof(mem_reg_property));
++			if (memcount >= sizeof(mem_reg_property)/sizeof(uint32_t))
++				continue;
++			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.start);
++			mem_reg_property[memcount++] = cpu_to_fdt32(atag->u.mem.size);
+ 		} else if (atag->hdr.tag == ATAG_INITRD2) {
+ 			uint32_t initrd_start, initrd_size;
+ 			initrd_start = atag->u.initrd.start;
+@@ -67,5 +68,10 @@ int atags_to_fdt(void *dt,  void *atag_list)
+ 		}
+ 	}
+ 
++	if (memcount) {
++		setprop(dt, "/memory", "reg", mem_reg_property,
++				4*memcount);
++	}
++
+ 	return 0;
+ }
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
