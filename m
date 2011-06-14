@@ -1,29 +1,39 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 14 Jun 2011 13:44:56 +0300
-Subject: [PATCH v2 0/4] drivers/iommu/ relocations
-In-Reply-To: <20110614102916.GF29908@amd.com>
-References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
-	<20110614102916.GF29908@amd.com>
-Message-ID: <BANLkTinABOiqzhY_FfCeQLyE53Wr=OtAeQ@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 14 Jun 2011 14:51:12 +0400
+Subject: [PATCH] arm mach-s3c2440 mach-mini2440: New LCD-W35i support
+In-Reply-To: <BANLkTikfLQH=_tSMkFGB7Jx_4vUKPmn-3w@mail.gmail.com>
+References: <BANLkTikfLQH=_tSMkFGB7Jx_4vUKPmn-3w@mail.gmail.com>
+Message-ID: <4DF73D20.20700@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 1:29 PM, Roedel, Joerg <Joerg.Roedel@amd.com> wrote:
-> Btw, what tree do these patches apply against?
+Hello.
 
-v3.0-rc2
+On 14-06-2011 1:21, ????? ????????? wrote:
 
-> I tried to apply them to v3.0-rc3 and got conflicts.
+> From: Denis Kuzmenko <dart@solonet.org.ua>
 
-What kind of conflicts ? I just tried rc3 and it applied cleanly.
+    Need an empty line here...
 
-Just in case, I'm attaching the patches too.
+> LCD-W35i support for Mini2440 development board
 
-Tell me if you still see any issue, thanks !
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: iommu-patches.tar.bz2
-Type: application/x-bzip2
-Size: 6609 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110614/d5650219/attachment.bz2>
+> --- linux-2.6.39.1/arch/arm/mach-s3c2440/mach-mini2440.c
+> 2011-06-03 03:34:20.000000000 +0300
+> +++ linux-2.6.39.1-dart/arch/arm/mach-s3c2440/mach-mini2440.c
+> 2011-06-13 23:37:38.785984118 +0300
+> @@ -167,6 +167,20 @@ static struct s3c2410fb_display mini2440
+>                  .lcdcon5        = (S3C2410_LCDCON5_FRM565 |
+>                                     S3C2410_LCDCON5_HWSWP),
+>          },
+> +       /* LCD-W35i 3.5" display (LQ035Q1DG06)*/
+> +       [3] = {
+> +               _LCD_DECLARE(
+> +                       7,              /* clock */
+> +                       320, 68, 66, 4, /* xres, margin_right,
+> margin_left, hsync */
+> +                       240, 4, 4, 9,   /* yres, margin_top,
+> margin_bottom, vsync */
+
+    Your patch is line wrapped. Seems easy to fix though...
+
+WBR, Sergei
