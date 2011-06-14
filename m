@@ -1,46 +1,49 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 14 Jun 2011 14:20:07 +0800
-Subject: [PATCH v2 5/6] ARM: mxc: all three imx51 TOs use TO1 version of sdma
-	script
-In-Reply-To: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
-References: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 14 Jun 2011 11:42:10 +0530
+Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
+In-Reply-To: <BANLkTik8sz+JQE1nTcEvZLo5PynwK0+zZA@mail.gmail.com>
+References: <1306919711-30965-1-git-send-email-linus.walleij@stericsson.com>	<BANLkTikEx0+SpwiWHqLNcs0oaLoN4LccHQ@mail.gmail.com>
+	<BANLkTik8sz+JQE1nTcEvZLo5PynwK0+zZA@mail.gmail.com>
+Message-ID: <4DF6FBBA.7010309@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Though there are three TOs of imx51 soc, the sdma script never
-changes since TO1, which means all three TOs of imx51 uses TO1
-version of sdma script.
+On 6/14/2011 11:30 AM, Colin Cross wrote:
+> On Mon, Jun 13, 2011 at 10:50 PM, Linus Walleij
+> <linus.ml.walleij@gmail.com>  wrote:
+>> Colin, Per Fransson noted this:
+>>
+>>> From: Colin Cross<ccross@android.com>
+>>
+>>> +/*
+>>> + * Updates clockevent frequency when the cpu frequency changes.
+>>> + * Called on the cpu that is changing frequency with interrupts disabled.
+>>> + */
+>>> +static void twd_update_frequency(void *data)
+>>> +{
+>>> +       twd_timer_rate = clk_get_rate(twd_clk);
+>>> +
+>>> +       clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
+>>> +}
+>>
+>> Will only update the clockevent on the CPU where the cpufreq notifier
+>> gets called will it not? It's not called on each CPU AFAICT.
+>>
+>> So this function has to traverse all CPUs in twd_ce.
+>
+> OMAP and Tegra both iterate through all the affected cpus in the
+> cpufreq driver and call cpufreq_notify_transtion once for each,
+> setting freqs.cpu to the target cpu.  The listener in the smp_twd
+> driver then bounces through smp_call_function_single to make sure it
+> is running on the affected cpu.  I believe that is the correct way to
+> handle multiple affected cpus.
+>
+I agree with Collin. That should be taken care by
+"smp_call_function_single(freqs->cpu, )" with notifier
+being called with all the available CPU's in the mask.
 
-The current code passes TO number to imx-sdma driver to load
-different firmware for different TO.  That means we have to prepare
-3 identical firmwares, sdma-imx51-to1.bin sdma-imx51-to2.bin and
-sdma-imx51-to3.bin, to have the kernel capable of running on all
-three TOs.  This just makes no sense.
+Linus,
+Did you see any issue with this patch on your platform ?
 
-The patch removes the TO number passing and get the default TO1
-version of sdma firmware work for all TOs.
-
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
-Changes since v1:
- * fix typo in imx51 firmware name caught by Fabio Estevam
-
- arch/arm/plat-mxc/devices/platform-imx-dma.c |    2 --
- 1 files changed, 0 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-index c64f015..2091540 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-@@ -196,8 +196,6 @@ static int __init imxXX_add_imx_dma(void)
- 
- #if defined(CONFIG_SOC_IMX51)
- 	if (cpu_is_mx51()) {
--		int to_version = mx51_revision() >> 4;
--		imx51_imx_sdma_data.pdata.to_version = to_version;
- 		imx51_imx_sdma_data.pdata.script_addrs = &addr_imx51;
- 		ret = imx_add_imx_sdma(&imx51_imx_sdma_data);
- 	} else
--- 
-1.7.4.1
+Regards
+Santosh
