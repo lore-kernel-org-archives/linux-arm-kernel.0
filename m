@@ -1,139 +1,98 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Tue, 14 Jun 2011 14:33:25 +0900
-Subject: [PATCH 1/5] ARM: EXYNOS4: Add EPLL clock operations
-In-Reply-To: <1307687667-9127-2-git-send-email-ch.naveen@samsung.com>
-References: <1307687667-9127-1-git-send-email-ch.naveen@samsung.com>
-	<1307687667-9127-2-git-send-email-ch.naveen@samsung.com>
-Message-ID: <005601cc2a54$988a9460$c99fbd20$%kim@samsung.com>
+From: sundaram@ti.com (Raju, Sundaram)
+Date: Tue, 14 Jun 2011 11:08:51 +0530
+Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
+In-Reply-To: <BANLkTimZ=v4W1hFJ7hvZRmyHMSU_3MmZEA@mail.gmail.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
+	<20110609124723.GA24636@n2100.arm.linux.org.uk>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
+	<20110609163206.GB24636@n2100.arm.linux.org.uk>
+	<1307686397.10976.116.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE337F@dbde02.ent.ti.com>
+	<20110610104318.GC24636@n2100.arm.linux.org.uk>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3452@dbde02.ent.ti.com>
+	<20110610133338.GD24636@n2100.arm.linux.org.uk>
+	<BANLkTimZ=v4W1hFJ7hvZRmyHMSU_3MmZEA@mail.gmail.com>
+Message-ID: <E0D41E29EB0DAC4E9F3FF173962E9E9403020B7B37@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Naveen Krishna Chatradhi wrote:
-> 
-> This patch adds EPLL specific clock get_rate/set_rate
-> operations on EXYNOS4.
-> 
-> Note: Initial code from S5PV210
-> http://permalink.gmane.org/gmane.linux.alsa.devel/77519
-> 
-> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
-> ---
->  arch/arm/mach-exynos4/clock.c |   78
-> +++++++++++++++++++++++++++++++++++++++++
->  1 files changed, 78 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
-> index b1b93b9..7aa4aef 100644
-> --- a/arch/arm/mach-exynos4/clock.c
-> +++ b/arch/arm/mach-exynos4/clock.c
-> @@ -1276,6 +1276,82 @@ static struct clksrc_clk *sysclks[] = {
->  	&clk_sclk_audio2,
->  };
-> 
-> +static u32 epll_div[][6] = {
-> +	{  48000000, 0, 48, 3, 3, 0 },
-> +	{  96000000, 0, 48, 3, 2, 0 },
-> +	{ 144000000, 1, 72, 3, 2, 0 },
-> +	{ 192000000, 0, 48, 3, 1, 0 },
-> +	{ 288000000, 1, 72, 3, 1, 0 },
-> +	{  32750000, 1, 65, 3, 4, 35127 },
-> +	{  32768000, 1, 65, 3, 4, 35127 },
-> +	{  45158400, 0, 45, 3, 3, 10355 },
-> +	{  45000000, 0, 45, 3, 3, 10355 },
-> +	{  45158000, 0, 45, 3, 3, 10355 },
-> +	{  49125000, 0, 49, 3, 3, 9961 },
-> +	{  49152000, 0, 49, 3, 3, 9961 },
-> +	{  67737600, 1, 67, 3, 3, 48366 },
-> +	{  67738000, 1, 67, 3, 3, 48366 },
-> +	{  73800000, 1, 73, 3, 3, 47710 },
-> +	{  73728000, 1, 73, 3, 3, 47710 },
-> +	{  36000000, 1, 32, 3, 4, 0 },
-> +	{  60000000, 1, 60, 3, 3, 0 },
-> +	{  72000000, 1, 72, 3, 3, 0 },
-> +	{  80000000, 1, 80, 3, 3, 0 },
-> +	{  84000000, 0, 42, 3, 2, 0 },
-> +	{  50000000, 0, 50, 3, 3, 0 },
-> +};
-> +
-> +static int exynos4_epll_set_rate(struct clk *clk, unsigned long rate)
-> +{
-> +	unsigned int epll_con, epll_con_k;
-> +	unsigned int i;
-> +
-> +	/* Return if nothing changed */
-> +	if (clk->rate == rate)
-> +		return 0;
-> +
-> +	epll_con = __raw_readl(S5P_EPLL_CON);
-> +	epll_con_k = __raw_readl(S5P_EPLL_CON1);
-> +
-> +	epll_con_k &= ~PLL46XX_KDIV_MASK;
-> +	epll_con &= ~(1 << 27 |
-> +			PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT |
-> +			PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT |
-> +			PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT);
-> +
-> +	for (i = 0; i < ARRAY_SIZE(epll_div); i++) {
-> +		if (epll_div[i][0] == rate) {
-> +			epll_con_k |= epll_div[i][5] << 0;
-> +			epll_con |= (epll_div[i][1] << 27 |
-> +					epll_div[i][2] <<
-> PLL46XX_MDIV_SHIFT |
-> +					epll_div[i][3] <<
-> PLL46XX_PDIV_SHIFT |
-> +					epll_div[i][4] <<
-> PLL46XX_SDIV_SHIFT);
-> +			break;
-> +		}
-> +	}
-> +
-> +	if (i == ARRAY_SIZE(epll_div)) {
-> +		printk(KERN_ERR "%s: Invalid Clock EPLL Frequency\n",
-> +				__func__);
-> +		return -EINVAL;
-> +	}
-> +
-> +	__raw_writel(epll_con, S5P_EPLL_CON);
-> +	__raw_writel(epll_con_k, S5P_EPLL_CON1);
-> +
-> +	printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
-> +			clk->rate, rate);
-> +
-> +	clk->rate = rate;
-> +
-> +	return 0;
-> +}
+Linus,
 
-I think, this is same with S5PV210.
+Thanks for the pointers.
 
-Would be better if this could be moved into plat-s5p/ with other set_pllXXX.
-
-> +
-> +static struct clk_ops exynos4_epll_ops = {
-> +	.set_rate = exynos4_epll_set_rate,
-> +	.get_rate = s5p_epll_get_rate,
-> +};
-> +
->  static int xtal_rate;
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: Monday, June 13, 2011 7:43 PM
+> To: Raju, Sundaram
+> Cc: Russell King - ARM Linux; Koul, Vinod; Dan; davinci-linux-open-
+> source at linux.davincidsp.com; linux-omap at vger.kernel.org; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [RFC] dmaengine: add new api for preparing simple slave transfer
 > 
->  static unsigned long exynos4_fout_apll_get_rate(struct clk *clk)
-> @@ -1354,6 +1430,8 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
->  	for (ptr = 0; ptr < ARRAY_SIZE(clksrcs); ptr++)
->  		s3c_set_clksrc(&clksrcs[ptr], true);
+> On Fri, Jun 10, 2011 at 3:33 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Fri, Jun 10, 2011 at 05:18:46PM +0530, Raju, Sundaram wrote:
+> >> Now DMACs capable of 3D transfer, do transfer of the whole 1D
+> >> buffer per sync received or even whole 2D buffer per sync received
+> >> (based on the sync rate programmed in the DMAC).
+> >
+> > The only issue which I see that we don't cover is the case where you want
+> > to describe a single buffer which is organised as N bytes to be transferred,
+> > M following bytes to be skipped, N bytes to be transferred, M bytes to be
+> > skipped. ?I doubt there are many controllers which can be programmed with
+> > both 'N' and 'M' parameters directly.
 > 
-> +	clk_fout_epll.ops = &exynos4_epll_ops;
-> +
->  	clk_audiocdclk0.rate = PCM_EXTCLK0;
->  	clk_set_parent(&clk_sclk_audio0.clk, &clk_audiocdclk0);
->  }
-> --
+> Sundaram is this how your controller works?
+> I mean the hardware can skip over sequences like this?
+> 
+> When we added the config interface to DMAengine I originally included
+> a "custom config" call, but Dan wanted me to keep it out until we
+> had some specific usecase for it. FSLDMA recently started
+> to use it.
+> 
+> Notice how dmaengine_slave_config() is implemented:
+> 
+> static inline int dmaengine_slave_config(struct dma_chan *chan,
+> 					  struct dma_slave_config *config)
+> {
+> 	return dmaengine_device_control(chan, DMA_SLAVE_CONFIG,
+> 			(unsigned long)config);
+> }
+> 
+> So what is passed to the driver is just an unsigned long.
+> 
+> This is actually modeled to be ioctl()-like so you can pass in a
+> custom config to the same callback on the device driver,
+> just use some other enumerator than DMA_SLAVE_CONFIG,
+> say like FSLDMA already does with FSLDMA_EXTERNAL_START.
+> 
+> Just put some enumerator in enum dma_ctrl_cmd in
+> dmaengine.h such as SDMA_TEXAS_STRIDE_CONFIG and call
+> like this:
+> 
+> /* However that config struct needs to look, basically */
+> static struct sdma_ti_stride_cgf = {
+>      take = M,
+>      skip = N,
+> };
+> 
+> ret = chan->device->device_control(chan, SDMA_TEXAS_STRIDE_CONFIG,
+> &sdma_ti_stride_cfg);
+> 
+> Or something like this.
 
+Yes, the hardware can skip over sequences like that.
+I also thought about your suggestion, at first before submitting the RFC.
+But I dint pursue this because, this ioctl() call has to be made before
+every single prepare call.
 
+I may have to end up using this if we decide not to change the API
+signature for prepare APIs.
 
-Thanks.
+I actually intend to use this for all DMAC related ioctl(). Configuring
+the DMAC and programming various modes etc specific to the
+DMAC. I suppose this is the only way to do it.
+Let me know if there is any other way to do it.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Thanks,
+Sundaram
