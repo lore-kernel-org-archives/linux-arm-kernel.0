@@ -1,52 +1,46 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 13 Jun 2011 17:33:53 -0600
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <20110613220559.GH13643@n2100.arm.linux.org.uk>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<201106121615.24059.arnd@arndb.de>
-	<20110612143428.GI10283@n2100.arm.linux.org.uk>
-	<201106121701.22418.arnd@arndb.de>
-	<20110612153536.GL10283@n2100.arm.linux.org.uk>
-	<it5rlq$3f0$1@dough.gmane.org>
-	<20110613220559.GH13643@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTimkH8t9cc8nk4EiXhD19NMDSqbddA@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Mon, 13 Jun 2011 19:09:06 -0500
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+In-Reply-To: <201106030956.43174.heiko@sntech.de>
+References: <201106022149.47936.heiko@sntech.de>
+	<BANLkTi=xVzdLDq5wbzLtQFu+nz=8G9SbKQ@mail.gmail.com>
+	<201106030956.43174.heiko@sntech.de>
+Message-ID: <BANLkTi=YvSL_yzku6v3tsJaaLTL=fBXShg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 4:05 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 13, 2011 at 08:24:27PM +0000, Dmitry Eremin-Solenikov wrote:
->> Russell King - ARM Linux wrote:
->>
->> > On Sun, Jun 12, 2011 at 05:01:22PM +0200, Arnd Bergmann wrote:
->> >> Of course it should override the device tree, I'm not arguing that.
->> >> All I'm saying is that we don't need to special-case this or support
->> >> both formats once the kernel is there as long as we move the information
->> >> into appropriate DT-representation of the same data.
->> >
->> > You're arguing for it to be parsed by whatever fragment of assembly code
->> > we have to place around the zImage to merge it into DT.
->> >
->> > And yes, it's going to have to be assembly code because we don't have a
->> > C environment at that point which can run in a relocatable way.
->>
->> Please, again look at the cuboot stuff which is used on powerpc. It uses
->> limited C environment: it's executed before kernel entry, so it can use
->> stack, etc. as setup by the bootloader.
->
-> Boot loaders don't pass a stack to the kernel - what may be in the
-> stack pointer may not be valid at the point when the kernel is called -
-> it may be that it can only be used while the MMU is on, and at this
-> point the MMU will be off. ?So you can't rely on anything from the
-> boot loader which I haven't documented as being part of the ARM kernel
-> boot protocol.
->
-> Please understand that we absolutely must get this issue resolved before
-> the next merge window, and have a solution ready to be merged at that
-> point. ?As I see it, this is one of the major issues that requires
-> addressing. ?Why?
+Hi Everybody,
 
-John Bonesio is working on it this week (starting tomorrow), and will
-get an updated patch out ASAP.
+On Fri, Jun 3, 2011 at 2:56 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>
+> Hi,
+>
+> Am Freitag 03 Juni 2011, 01:48:05 schrieb Kyungmin Park:
+> > As I don't have the s3c2416 user manaul, I'm not sure it's support
+> > AUTO CMD12 or not. but at least it's support at s3c6410 and later.
+> According to the manual, the 2416 supports AUTO CMD12.
+>
+> As I wrote disabling auto cmd12 only works sometimes and other times the irq
+> storm happens like with auto cmd12 enabled - always after the first reboot.
+> So it seems auto cmd12 is not the real reason for the error.
+>
+> Do you also encounter the second error later on (for me in udev stage):
+> > ?mmcblk1boot0: retrying using single block read
+> > ?mmc1: ADMA error
+> > ?mmcblk1boot0: error -5 transferring data, sector 448, nr 32, card status
+> > 0x900
+> > ?end_request: I/O error, dev mmcblk1boot0, sector 448
+> > ?Buffer I/O error on device mmcblk1boot0, logical block 56
+> > ?mmcblk1boot1: retrying using single block read
+> > ?mmc1: ADMA error
+> > ?mmcblk1boot1: error -5 transferring data, sector 448, nr 32, card status
+> > 0x900
+> > ?end_request: I/O error, dev mmcblk1boot1, sector 448
+>
+>
 
-g.
+I recently came back from vacation (which is why I didn't pitch in
+before). Has there been any further update on this? I want to exclude
+my EMMC partitioning changes as the possible culprit here.
+
+A
