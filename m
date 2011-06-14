@@ -1,57 +1,38 @@
-From: jbarnes@virtuousgeek.org (Jesse Barnes)
-Date: Tue, 14 Jun 2011 11:21:08 -0700
-Subject: [Linaro-mm-sig] [RFC 0/2] ARM: DMA-mapping & IOMMU integration
-In-Reply-To: <BANLkTimV5ZXVTDDFqHxMpOkrgokdCp1YXA@mail.gmail.com>
-References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
-	<BANLkTi=HtrFETnjk1Zu0v9wqa==r0OALvA@mail.gmail.com>
-	<201106131707.49217.arnd@arndb.de>
-	<BANLkTikR5AE=-wTWzrSJ0TUaks0_rA3mcg@mail.gmail.com>
-	<20110613154033.GA29185@1n450.cable.virginmedia.net>
-	<BANLkTikkCV=rWM_Pq6t6EyVRHcWeoMPUqw@mail.gmail.com>
-	<BANLkTi=C6NKT94Fk6Rq6wmhndVixOqC6mg@mail.gmail.com>
-	<20110613115437.62824f2f@jbarnes-desktop>
-	<BANLkTimV5ZXVTDDFqHxMpOkrgokdCp1YXA@mail.gmail.com>
-Message-ID: <20110614112108.0186c562@jbarnes-desktop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jun 2011 20:30:07 +0200
+Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106141803.00876.arnd@arndb.de>
+	<op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>
+Message-ID: <201106142030.07549.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 14 Jun 2011 11:15:38 -0700
-"Michael K. Edwards" <m.k.edwards@gmail.com> wrote:
-> What doesn't seem to be straightforward to do from userland is to
-> allocate pages that are locked to physical memory and mapped for
-> write-combining.  The device driver shouldn't have to mediate their
-> allocation, just map to a physical address (or set up an IOMMU entry,
-> I suppose) and pass that to the hardware that needs it.  Typical
-> userland code that could use such a mechanism would be the Qt/OpenGL
-> back end (which needs to store decompressed images and other
-> pre-rendered assets in GPU-ready buffers) and media pipelines.
+On Tuesday 14 June 2011 18:58:35 Michal Nazarewicz wrote:
+> On Tue, 14 Jun 2011 18:03:00 +0200, Arnd Bergmann wrote:
+> > For all I know, that is something that is only true for a few very  
+> > special Samsung devices,
+> 
+> Maybe.  I'm just answering your question. :)
+> 
+> Ah yes, I forgot that separate regions for different purposes could
+> decrease fragmentation.
 
-We try to avoid allowing userspace to pin arbitrary buffers though.  So
-on the gfx side, userspace can allocate buffers, but they're only
-actually pinned when some operation is performed on them (e.g. they're
-referenced in a command buffer or used for a mode set operation).
+That is indeed a good point, but having a good allocator algorithm
+could also solve this. I don't know too much about these allocation
+algorithms, but there are probably multiple working approaches to this.
 
-Something like ION or GEM can provide the basic alloc & map API, but
-the platform code still has to deal with grabbing hunks of memory,
-making them uncached or write combine, and mapping them to app space
-without conflicts.
+> > I would suggest going forward without having multiple regions:
+> 
+> Is having support for multiple regions a bad thing?  Frankly,
+> removing this support will change code from reading context passed
+> as argument to code reading context from global variable.  Nothing
+> is gained; functionality is lost.
 
-> Also a nice source of sample code; though, again, I don't want this to
-> be driver-specific.  I might want a stage in my media pipeline that
-> uses the GPU to perform, say, lens distortion correction.  I shouldn't
-> have to go through contortions to use the same buffers from the GPU
-> and the video capture device.  The two devices are likely to have
-> their own variants on scatter-gather DMA, with a circularly linked
-> list of block descriptors with ownership bits and all that jazz; but
-> the actual data buffers should be generic, and the userland pipeline
-> setup code should just allocate them (presumably as contiguous regions
-> in a write-combining hugepage) and feed them to the plumbing.
+What is bad IMHO is making them the default, which forces the board
+code to care about memory management details. I would much prefer
+to have contiguous allocation parameters tuned automatically to just
+work on most boards before we add ways to do board-specific hacks.
 
-Totally agree.  That's one reason I don't think enhancing the DMA
-mapping API in the kernel is a complete solution.  Sure, the platform
-code needs to be able to map buffers to devices and use any available
-IOMMUs, but we still need a userspace API for all of that, with its
-associated changes to the CPU MMU handling.
-
--- 
-Jesse Barnes, Intel Open Source Technology Center
+	Arnd
