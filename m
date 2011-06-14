@@ -1,30 +1,34 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Tue, 14 Jun 2011 15:01:22 -0600
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory	Allocator
-	added
-In-Reply-To: <201106142242.25157.arnd@arndb.de>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>	<20110614170158.GU2419@fooishbar.org>	<BANLkTi=cJisuP8=_YSg4h-nsjGj3zsM7sg@mail.gmail.com>
-	<201106142242.25157.arnd@arndb.de>
-Message-ID: <4DF7CC22.6050602@codeaurora.org>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 15 Jun 2011 00:16:13 +0300
+Subject: [PATCH 2/3] arm: omap3: cm-t35: fix slow path warning
+In-Reply-To: <20110614073648.GI3352@atomide.com>
+References: <20110614073648.GI3352@atomide.com>
+Message-ID: <1308086174-3080-2-git-send-email-grinberg@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2011 02:42 PM, Arnd Bergmann wrote:
-> On Tuesday 14 June 2011 20:58:25 Zach Pfeffer wrote:
->> I've seen this split bank allocation in Qualcomm and TI SoCs, with
->> Samsung, that makes 3 major SoC vendors (I would be surprised if
->> Nvidia didn't also need to do this) - so I think some configurable
->> method to control allocations is necessarily. The chips can't do
->> decode without it (and by can't do I mean 1080P and higher decode is
->> not functionally useful). Far from special, this would appear to be
->> the default.
->
-> Thanks for the insight, that's a much better argument than 'something
-> may need it'. Are those all chips without an IOMMU or do we also
-> need to solve the IOMMU case with split bank allocation?
+Fix warning issued by gpio_set_value() call with TPS gpios.
 
-Yes. The IOMMU case with split bank allocation is key, especially for shared
-buffers. Consider the case where video is using a certain bank for performance
-purposes and that frame is shared with the GPU.
+Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
+---
+ arch/arm/mach-omap2/board-cm-t35.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-Jordan
+diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
+index 6c5881b..256b81c 100644
+--- a/arch/arm/mach-omap2/board-cm-t35.c
++++ b/arch/arm/mach-omap2/board-cm-t35.c
+@@ -466,9 +466,9 @@ static int cm_t35_twl_gpio_setup(struct device *dev, unsigned gpio,
+ 	if (gpio_request_one(wlan_rst, GPIOF_OUT_INIT_HIGH, "WLAN RST") == 0) {
+ 		gpio_export(wlan_rst, 0);
+ 		udelay(10);
+-		gpio_set_value(wlan_rst, 0);
++		gpio_set_value_cansleep(wlan_rst, 0);
+ 		udelay(10);
+-		gpio_set_value(wlan_rst, 1);
++		gpio_set_value_cansleep(wlan_rst, 1);
+ 	} else {
+ 		pr_err("CM-T35: could not obtain gpio for WiFi reset\n");
+ 	}
+-- 
+1.7.3.4
