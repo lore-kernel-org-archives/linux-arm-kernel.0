@@ -1,39 +1,61 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 14 Jun 2011 14:51:12 +0400
-Subject: [PATCH] arm mach-s3c2440 mach-mini2440: New LCD-W35i support
-In-Reply-To: <BANLkTikfLQH=_tSMkFGB7Jx_4vUKPmn-3w@mail.gmail.com>
-References: <BANLkTikfLQH=_tSMkFGB7Jx_4vUKPmn-3w@mail.gmail.com>
-Message-ID: <4DF73D20.20700@ru.mvista.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 14 Jun 2011 11:58:20 +0100
+Subject: [RFC PATCH v2 0/5] Add generic macros for declaring various CPU
+	structs
+Message-ID: <1308049105-16080-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Based on previous discussions, this series provides an alternative
+macro for defining CPU-specific structures compactly.
 
-On 14-06-2011 1:21, ????? ????????? wrote:
+I don't get to have so much fun with macros in this version, but
+it's more straightforward and actually allows the declarations to
+be collapsed down further by taking advantage of common naming
+conventions.
 
-> From: Denis Kuzmenko <dart@solonet.org.ua>
+In this RFC, only the arch names, processor_functions and
+cache_functions are turned into macros, to show how this could
+work.  This could be straightforwardly extended to cover tlb_fns,
+but proc_info is more complex and may require a bit more thought.
 
-    Need an empty line here...
+A couple of files are ported to use the macros as an example.
 
-> LCD-W35i support for Mini2440 development board
+These patches are for illustration only and **untested** (although
+I have build-tested omap2plus_defconfig).
 
-> --- linux-2.6.39.1/arch/arm/mach-s3c2440/mach-mini2440.c
-> 2011-06-03 03:34:20.000000000 +0300
-> +++ linux-2.6.39.1-dart/arch/arm/mach-s3c2440/mach-mini2440.c
-> 2011-06-13 23:37:38.785984118 +0300
-> @@ -167,6 +167,20 @@ static struct s3c2410fb_display mini2440
->                  .lcdcon5        = (S3C2410_LCDCON5_FRM565 |
->                                     S3C2410_LCDCON5_HWSWP),
->          },
-> +       /* LCD-W35i 3.5" display (LQ035Q1DG06)*/
-> +       [3] = {
-> +               _LCD_DECLARE(
-> +                       7,              /* clock */
-> +                       320, 68, 66, 4, /* xres, margin_right,
-> margin_left, hsync */
-> +                       240, 4, 4, 9,   /* yres, margin_top,
-> margin_bottom, vsync */
+Unresolved issues:
 
-    Your patch is line wrapped. Seems easy to fix though...
+ * The architecture/CPU name strings were previously split out into
+   separate places, with the CPU name in .text and the other
+   strings in .rodata.  This looked anomalous, so now a common
+   mergeable string section .rodata.str is used instead.  This can
+   be changed if needed.
 
-WBR, Sergei
+ * For consistency, I've renamed the arch/CPU name string labels.
+   If that is seen as unnecessary churn, it can be undone.
+
+ * It's unclear whether it's better to switch sections inside the
+   macros or outside.  Currently I switch inside, but the previous
+   section is always restored using .popsection at the end of the
+   macro to avoid confusion.  I'm assuming that there will never
+   be a need to put any of this data in a custom section: if that's
+   a bad assumption, we could move the section directives back
+   outside the macros.
+
+Dave Martin (5):
+  ARM: mm: Add generic proc/arch struct definition macros
+  ARM: proc-v7: Use new generic struct definition macros
+  ARM: cache-v7: Use new generic struct definition macros
+  ARM: proc-v6: Use new generic struct definition macros
+  ARM: cache-v6: Use new generic struct definition macros
+
+ arch/arm/mm/cache-v6.S    |   16 +--------
+ arch/arm/mm/cache-v7.S    |   16 +--------
+ arch/arm/mm/proc-macros.S |   79 +++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/proc-v6.S     |   43 +++---------------------
+ arch/arm/mm/proc-v7.S     |   46 ++++---------------------
+ 5 files changed, 94 insertions(+), 106 deletions(-)
+
+-- 
+1.7.4.1
