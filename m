@@ -1,52 +1,79 @@
-From: saeed@marvell.com (Saeed Bishara)
-Date: Tue, 14 Jun 2011 16:28:52 +0300
-Subject: [PATCH] ARM: realview,
-	vexpress: fix section mismatch from platform_cpu_die() to pen_release
-Message-ID: <1308058132-32058-1-git-send-email-saeed@marvell.com>
+From: tarun.kanti@ti.com (Tarun Kanti DebBarma)
+Date: Tue, 14 Jun 2011 19:01:43 +0530
+Subject: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
+Message-ID: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes the following false section mismatch warning, this function used
-only in CONFIG_HOTPLUG_CPU, and in this configuration, the cpuinit section will not
-be freed, so it's ok to reference pen_release.
+This series is continuation of cleanup of OMAP GPIO driver and fixes.
+The cleanup include getting rid of cpu_is_* checks wherever possible,
+use of gpio_bank list instead of static array, use of unique platform
+specific value associated data member to OMAP platforms to avoid
+cpu_is_* checks. The series also include PM runtime support.
 
-WARNING: vmlinux.o(.text+0x12484): Section mismatch in reference from the function platform_cpu_die() to the variable .cpuinit.data:pen_release
-The function platform_cpu_die() references
-the variable __cpuinitdata pen_release.
-This is often because platform_cpu_die lacks a __cpuinitdata
-annotation or the annotation of pen_release is wrong.
+Baseline: git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git
+Branch: wip/gpio-cleanup
+commit 1bb718191ab0158837ea6633d6fbdeb08fb755dc
+GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
 
-Signed-off-by: Saeed Bishara <saeed@marvell.com>
----
- arch/arm/mach-realview/hotplug.c |    2 +-
- arch/arm/mach-vexpress/hotplug.c |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+v2:
+(1) Do special handling of non-wakeup GPIOs only on OMAP2420. Avoid this
+handling on OMAP3430.
 
-diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-index a87523d..44841c6 100644
---- a/arch/arm/mach-realview/hotplug.c
-+++ b/arch/arm/mach-realview/hotplug.c
-@@ -97,7 +97,7 @@ int platform_cpu_kill(unsigned int cpu)
-  *
-  * Called with IRQs disabled
-  */
--void platform_cpu_die(unsigned int cpu)
-+void __ref platform_cpu_die(unsigned int cpu)
- {
- 	int spurious = 0;
- 
-diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
-index ea4cbfb..0436fcf 100644
---- a/arch/arm/mach-vexpress/hotplug.c
-+++ b/arch/arm/mach-vexpress/hotplug.c
-@@ -98,7 +98,7 @@ int platform_cpu_kill(unsigned int cpu)
-  *
-  * Called with IRQs disabled
-  */
--void platform_cpu_die(unsigned int cpu)
-+void __ref platform_cpu_die(unsigned int cpu)
- {
- 	int spurious = 0;
- 
--- 
-1.7.4.1
+(2) Isolate cleanups and fixes into separate set of patches. Keep the cleanup
+first followed by the fixes.
+
+(3) Avoid calling omap_gpio_get_context_loss() directly and instead call it
+through function pointer in pdata initialized during init.
+
+(4) workaround_enabled flag is not longer needed and is removed.
+
+(5) Call pwrdm_post_transition() before calling omap_gpio_resume_after_idle().
+
+(6) In omap2_gpio_resume_after_idle() do context restore before handling
+workaround.
+
+(7) Use PM runtime framework.
+
+(8) Modify register offset names to : wkup_status, wkup_clear, wkup_set.
+Also use 'base + offset' for readibility in all relevant places.
+
+(9) Remove unwanted messages from commit section like TODO, etc.
+
+Test Details:
+* Compile tested for omap1_defconfig and omap2plus_defconfig.
+* OMAP1710-H3: Bootup test.
+* OMAP2430-SDP, OMAP3430-SDP, OMAP4430-SDP: Functional testing. 
+* PM Testing on OMAP3430-SDP: retention, off_mode, system_wide
+suspend and gpio wakeup.
+
+Charulatha V (13):
+  OMAP: GPIO: Remove dependency on gpio_bank_count
+  OMAP2PLUS: GPIO: Use flag to identify wakeup domain
+  OMAP: GPIO: Make gpio_context part of gpio_bank structure
+  OMAP: GPIO: Fix pwrdm_post_transition call sequence
+  OMAP: GPIO: handle save/restore ctx in GPIO driver
+  OMAP2PLUS: GPIO: make non-wakeup GPIO part of pdata
+  OMAP: GPIO: Avoid cpu checks during module ena/disable
+  OMAP: GPIO: clean set_gpio_triggering function
+  OMAP: GPIO: clean omap_gpio_mod_init function
+  OMAP15xx: GPIO: Use pinctrl offset instead of macro
+  OMAP: GPIO: Fix use of readl/readw to access isr_reg
+  OMAP: GPIO: Remove bank->method & METHOD_* macros
+  OMAP: GPIO: Fix bankwidth for OMAP7xx MPUIO
+
+Tarun Kanti DebBarma (5):
+  OMAP: GPIO: Use wkup regs off/suspend support flag
+  OMAP: GPIO: Use level/edge detect reg offsets
+  OMAP: GPIO: Remove hardcoded offsets in ctxt save/restore
+  OMAP: GPIO: use PM runtime framework
+  OMAP2: GPIO: clean prepare_for_idle and resume_after_idle
+
+ arch/arm/mach-omap1/gpio15xx.c         |    7 +-
+ arch/arm/mach-omap1/gpio16xx.c         |   20 +-
+ arch/arm/mach-omap1/gpio7xx.c          |   14 +-
+ arch/arm/mach-omap2/gpio.c             |   52 ++-
+ arch/arm/mach-omap2/pm34xx.c           |   21 +-
+ arch/arm/plat-omap/include/plat/gpio.h |   35 +-
+ drivers/gpio/gpio-omap.c               | 1082 ++++++++++++++------------------
+ 7 files changed, 572 insertions(+), 659 deletions(-)
