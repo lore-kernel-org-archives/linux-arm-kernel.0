@@ -1,45 +1,58 @@
-From: tom.leiming@gmail.com (Ming Lei)
-Date: Tue, 14 Jun 2011 18:59:48 +0800
-Subject: OMPA4: 3.0-rc1: Unhandled fault during insmod 'ohci-hcd.ko'
-In-Reply-To: <BANLkTin=7aEaPDf=2Aa9SApdGetyvdz50g@mail.gmail.com>
-References: <BANLkTinYcxJqUM4G2ERew3okUTdf0LOLGA@mail.gmail.com>
-	<BANLkTin=7aEaPDf=2Aa9SApdGetyvdz50g@mail.gmail.com>
-Message-ID: <BANLkTi=TPNWMe9_gb7SY2J62SC0L8EoRcw@mail.gmail.com>
+From: udmderic@gmail.com (udmd-eric wann)
+Date: Tue, 14 Jun 2011 19:02:24 +0800
+Subject: About secondary CPU resume PC address?
+Message-ID: <BANLkTim-QXzsNTgrKsGac+Yum44KavvJ2w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+  Hi:
 
-2011/6/5 Todd Poynor <toddpoynor@google.com>:
-> In general, the imprecise external abort usually means an access was made to
-> registers of a module whose clock is gated. ?The calls to clk_enable()
-> within?usbhs_enable() probably aren't following the proper sequence of
-> ensuring the CD_L3_INIT clock domain is on (CM_L3INIT_CLKSTCTRL.CLKTRCTRL =
-> 0x2 SW_WKUP) and then the associated module slaves woken up
-> (CM_L3INIT_HSUSBHOST_CLKCTRL.MODULEMODE = 0x2 Enabled, similar
-> for?CM_L3INIT_HSUSBTLL_CLKCTRL). ?Probably needs calls to the OMAP device
-> layer to set those up, but I dunno the details of this device or why it
-> broke.
->
+        We am tracing Cortex-A9 SMP suspend/resume code now.
+        We use linux-2.6.39 mach-tegra and mach-exynos4210 for reference code.
+        (We don't have the hardware.)
 
-No doubt, it is caused by gated clock, ehci will be OK if revert the
-commit below:
+        In mach-tegra, hardware can power down both CPU cores and the GICs.
+      (http://lists.arm.linux.org.uk/lurker/message/20110124.020118.a08c51fc.en.html)
 
-commit 7e6502d577106fb5b202bbaac64c5f1b065e6daa
-Author: Keshava Munegowda <Keshava_mgowda@ti.com>
-Date:   Sun May 22 22:51:26 2011 +0200
+        Because CPU power off, so some CPU information should be
+remembered in SRAM/Register/RAM ...
+      The most important information we think is resume PC address for
+"both" CPUs.
 
-    mfd: Add omap-usbhs runtime PM support
+      For boot CPU, the resume address is handled by ROM code.
+      But for secondary CPU, where is the resume entry address??
 
-    The usbhs core driver does not enable/disable the interface and
-    functional clocks; These clocks are handled by hwmod and runtime pm,
-    hence insted of the clock enable/disable, the runtime pm APIS are
-    used. however,the port clocks and tll clocks are handled
-    by the usbhs core.
+      It seems that tegra2 set the secondary CPU wakeup address in
+function
+       boot_secondary
 
-    Signed-off-by: Keshava Munegowda <keshava_mgowda@ti.com>
-    Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
+       int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+       {
+       		...
+       		/* set the reset vector to point to the secondary_startup routine */
 
+		boot_vector = virt_to_phys(tegra_secondary_startup);
+		old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
+		writel(boot_vector, EVP_CPU_RESET_VECTOR);
+		...
+       }
 
--- 
-Ming Lei
+       mach-tegra also set the function tegra_secondary_startup in
+__CPUINIT section.
+       So the secondary CPU resume will run the same path like the
+first cold boot...
+       Is it correct?
+
+          However, in mach-exynos4, we don't see this behavior.
+       mach-exynos4 set secondary cpu wakeup address only in
+       void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+       and exynos4_secondary_startup is in __INIT section.
+       So we don't know when the secondary cpu resume, which entry
+address it should run...
+       Do we miss some important key point?
+
+       Thanks for your help.
+
+       Best Regards
+
+Eric Wann
