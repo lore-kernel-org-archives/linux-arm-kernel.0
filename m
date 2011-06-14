@@ -1,34 +1,32 @@
 From: davidb@codeaurora.org (David Brown)
-Date: Mon, 13 Jun 2011 17:13:04 -0700
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <alpine.LFD.2.00.1106121051380.2142@xanadu.home> (Nicolas Pitre's
-	message of "Sun, 12 Jun 2011 11:41:40 -0400 (EDT)")
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110612081541.GA10283@n2100.arm.linux.org.uk>
-	<20110612083414.GA29516@S2100-06.ap.freescale.net>
-	<20110612112219.GD16318@ibawizard.net>
-	<20110612115820.GF10283@n2100.arm.linux.org.uk>
-	<alpine.LFD.2.00.1106121051380.2142@xanadu.home>
-Message-ID: <8ya62o9fey7.fsf@huya.qualcomm.com>
+Date: Mon, 13 Jun 2011 17:17:13 -0700
+Subject: [PATCH v7 09/14] ARM: msm: use remapped PPI interrupts for local
+	timer
+In-Reply-To: <1307964119-4187-10-git-send-email-marc.zyngier@arm.com> (Marc
+	Zyngier's message of "Mon, 13 Jun 2011 12:21:54 +0100")
+References: <1307964119-4187-1-git-send-email-marc.zyngier@arm.com>
+	<1307964119-4187-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <8ya1uyxfera.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 12 2011, Nicolas Pitre wrote:
+On Mon, Jun 13 2011, Marc Zyngier wrote:
 
-> It is not pointless.  Never it was in the cards to convert old platforms 
-> first.  The most problematic platforms responsible for the high volume 
-> of changes that has gone in mainline lately are the modern ones, not PXA 
-> based ones.  So DT is going to be most effective for the new stuff to 
-> come.  And realistically that's where we might get developers attention, 
-> not with those platforms being end-of-lived by their manufacturers.
+> Use the normal interrupt scheme for the local timers by using
+> a remapped PPI interrupt.
+>
+> MSM already had a very similar scheme, though still mixing both
+> GIC-specific and generic APIs.
+>
+> Fixes and ideas courtesy of Stephen Boyd.
+>
+> Cc: David Brown <davidb@codeaurora.org>
+> Cc: Daniel Walker <dwalker@fifo99.com>
+> Cc: Bryan Huntsman <bryanh@codeaurora.org>
+> Reviewed-and-Tested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-New stuff doesn't necessarily mean new boot loaders.  I don't have a lot
-of control over the bootloaders on MSM.  We can probably move away from
-ATAGS, but only after every kernel that could possibly boot on that
-target will work with DT.  I don't see that happening for at least a
-year.
-
-David
+Acked-by: David Brown <davidb@codeaurora.org>
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
