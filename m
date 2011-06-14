@@ -1,58 +1,42 @@
-From: udmderic@gmail.com (udmd-eric wann)
-Date: Tue, 14 Jun 2011 19:02:24 +0800
-Subject: About secondary CPU resume PC address?
-Message-ID: <BANLkTim-QXzsNTgrKsGac+Yum44KavvJ2w@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 14 Jun 2011 13:13:29 +0200
+Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
+	support for mx5
+In-Reply-To: <20110614064841.GB30295@S2100-06.ap.freescale.net> (Shawn Guo's
+	message of "Tue, 14 Jun 2011 14:48:42 +0800")
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<20110614064841.GB30295@S2100-06.ap.freescale.net>
+Message-ID: <87ei2wk6na.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-  Hi:
+Shawn Guo <shawn.guo@freescale.com> writes:
 
-        We am tracing Cortex-A9 SMP suspend/resume code now.
-        We use linux-2.6.39 mach-tegra and mach-exynos4210 for reference code.
-        (We don't have the hardware.)
+Hi,
 
-        In mach-tegra, hardware can power down both CPU cores and the GICs.
-      (http://lists.arm.linux.org.uk/lurker/message/20110124.020118.a08c51fc.en.html)
+> On Fri, Jun 10, 2011 at 06:42:48PM +0800, Shawn Guo wrote:
+>> The card-present polling within sdhci based driver is very expensive
+>> in terms of the impact to system performance.  We observe a few
+>> system performance issues from Freescale and Linaro on mx5 platforms,
+>> which have been proved card polling related.
+>> 
+>> The patch set extends the current sdhci-esdhc-imx card_detect and
+>> write_protect support to cover mx5 platforms, and solves above
+>> performance issues.
+>> 
+>> Shawn Guo (4):
+>>       mmc: sdhci: fix interrupt storm from card detection
+>>       mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
+>>       mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
+>>       mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
+>> 
+> Hi Arnaud,
+>
+> Any chance to play with it yet?
 
-        Because CPU power off, so some CPU information should be
-remembered in SRAM/Register/RAM ...
-      The most important information we think is resume PC address for
-"both" CPUs.
+I tried applying the patch 4 (v2) on mmc git and Sascha Hauer's for-next
+branch and failed. Can you please tell me on which tree should I apply
+it ?
 
-      For boot CPU, the resume address is handled by ROM code.
-      But for secondary CPU, where is the resume entry address??
-
-      It seems that tegra2 set the secondary CPU wakeup address in
-function
-       boot_secondary
-
-       int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
-       {
-       		...
-       		/* set the reset vector to point to the secondary_startup routine */
-
-		boot_vector = virt_to_phys(tegra_secondary_startup);
-		old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
-		writel(boot_vector, EVP_CPU_RESET_VECTOR);
-		...
-       }
-
-       mach-tegra also set the function tegra_secondary_startup in
-__CPUINIT section.
-       So the secondary CPU resume will run the same path like the
-first cold boot...
-       Is it correct?
-
-          However, in mach-exynos4, we don't see this behavior.
-       mach-exynos4 set secondary cpu wakeup address only in
-       void __init platform_smp_prepare_cpus(unsigned int max_cpus)
-       and exynos4_secondary_startup is in __INIT section.
-       So we don't know when the secondary cpu resume, which entry
-address it should run...
-       Do we miss some important key point?
-
-       Thanks for your help.
-
-       Best Regards
-
-Eric Wann
+Thanks,
+Arnaud
