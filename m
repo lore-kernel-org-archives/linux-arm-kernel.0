@@ -1,43 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Jun 2011 04:50:56 -0700
-Subject: [PATCH] OMAP1: enable GENERIC_IRQ_CHIP
-In-Reply-To: <1307491366-28793-1-git-send-email-khilman@ti.com>
-References: <1307491366-28793-1-git-send-email-khilman@ti.com>
-Message-ID: <20110614115056.GT3352@atomide.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 14 Jun 2011 19:55:58 +0800
+Subject: [PATCH 1/4] mmc: sdhci: fix interrupt storm from card detection
+In-Reply-To: <20110614092410.GB5043@pengutronix.de>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<1307702572-22066-2-git-send-email-shawn.guo@linaro.org>
+	<20110614092410.GB5043@pengutronix.de>
+Message-ID: <20110614115557.GF30295@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [110607 16:58]:
-> OMAP1 needs this also since GPIO driver (common for all OMAPs) is
-> being converted to use generic IRQ chip.
+On Tue, Jun 14, 2011 at 11:24:10AM +0200, Wolfram Sang wrote:
+> On Fri, Jun 10, 2011 at 06:42:49PM +0800, Shawn Guo wrote:
+> > The issue was initially found by Eric Benard as below.
+> > 
+> > http://permalink.gmane.org/gmane.linux.ports.arm.kernel/108031
+> > 
+> > Not sure about other SDHCI based controller, but on Freescale eSDHC,
+> > the SDHCI_INT_CARD_INSERT bits will be immediately set again when it
+> > gets cleared, if a card is inserted. The driver need to mask the irq
+> > to prevent interrupt storm which will freeze the system.  And the
+> > SDHCI_INT_CARD_REMOVE gets the same situation.
+> > 
+> > The patch fixes the problem based on the initial idea from
+> > Eric Benard.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Eric Benard <eric@eukrea.com>
 > 
-> Signed-off-by: Kevin Hilman <khilman@ti.com>
-
-Maybe queue this together with your GPIO patches?
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-
-> ---
->  arch/arm/plat-omap/Kconfig |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
+> Hmm, that should get enough testing on non-imx (and even non-ARM)
+> devices. And a comment describing the situation.
 > 
-> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> index 49a4c75..9a4a6bf 100644
-> --- a/arch/arm/plat-omap/Kconfig
-> +++ b/arch/arm/plat-omap/Kconfig
-> @@ -13,6 +13,7 @@ config ARCH_OMAP1
->  	bool "TI OMAP1"
->  	select CLKDEV_LOOKUP
->  	select CLKSRC_MMIO
-> +	select GENERIC_IRQ_CHIP
->  	help
->  	  "Systems based on omap7xx, omap15xx or omap16xx"
->  
-> -- 
-> 1.7.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Agreed.  Will add something in commit message to mention the
+situation.  That's why I hope we can get the patch on mmc-next at
+early stage of the cycle, so everyone can start testing it and
+report problems, if any.
+
+-- 
+Regards,
+Shawn
