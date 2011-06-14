@@ -1,332 +1,152 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Tue, 14 Jun 2011 03:09:02 -0400 (EDT)
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <alpine.LFD.2.00.1106131910570.2142@xanadu.home>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<20110612081541.GA10283@n2100.arm.linux.org.uk>
-	<20110612083414.GA29516@S2100-06.ap.freescale.net>
-	<20110612092131.GC10283@n2100.arm.linux.org.uk>
-	<20110612095217.GD10283@n2100.arm.linux.org.uk>
-	<20110612104215.GC29516@S2100-06.ap.freescale.net>
-	<20110612104048.GE10283@n2100.arm.linux.org.uk>
-	<8yaaadlfi3q.fsf@huya.qualcomm.com>
-	<alpine.LFD.2.00.1106131910570.2142@xanadu.home>
-Message-ID: <alpine.LFD.2.00.1106140300500.2142@xanadu.home>
+From: eric.miao@linaro.org (Eric Miao)
+Date: Tue, 14 Jun 2011 15:19:47 +0800
+Subject: [PATCH] ARM: mx53: add pad configuration for I2C signals
+Message-ID: <1308035987-22507-1-git-send-email-eric.miao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 13 Jun 2011, Nicolas Pitre wrote:
+I2C signals SDA/SCL are a bit different, they need to be pull-up and
+open-drain (so to support multiple I2C devices).
 
-> > Unless I'm missing something, I don't see a clean way of supporting this
-> > that doesn't involve the kernel being able to parse the ATAGS as well.
-> 
-> FYI: I've dug up the patch from John Bonesio doing just that.  While the 
-> patch doesn't apply anymore, it looks trivial enough.  I should have it 
-> working by tomorrow.
+Signed-off-by: Richard Zhao <richard.zhao@linaro.org>
+Signed-off-by: Eric Miao <eric.miao@linaro.org>
+---
+ arch/arm/plat-mxc/include/mach/iomux-mx53.h |   31 ++++++++++++++------------
+ 1 files changed, 17 insertions(+), 14 deletions(-)
 
-Well, here it is.  It compiles, but otherwise completely untested.
-
-This applies on top of the 3 other patches I posted when this thread was 
-started.
-
-While this could be cleaned up further, the functionality should all be 
-there and usable.
-
-From: Nicolas Pitre <nicolas.pitre@linaro.org>
-Date: Tue, 14 Jun 2011 02:40:33 -0400
-Subject: [PATCH] ARM: zImage: allow supplementing appended DTB with traditional ATAG data
-
-This is based on an older patch from John Bonesio <bones@secretlab.ca>.
-
-Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 66b7d1e..166bd2a 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1735,6 +1735,17 @@ config ARM_APPENDED_DTB
- 	  (dtb) appended to zImage
- 	  (e.g. cat zImage <filename>.dtb > zImage_w_dtb).
+diff --git a/arch/arm/plat-mxc/include/mach/iomux-mx53.h b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+index e95d9cb..468674f 100644
+--- a/arch/arm/plat-mxc/include/mach/iomux-mx53.h
++++ b/arch/arm/plat-mxc/include/mach/iomux-mx53.h
+@@ -30,6 +30,9 @@
+ #define MX53_SDHC_PAD_CTRL 	(PAD_CTL_HYS | PAD_CTL_PKE | PAD_CTL_PUE | \
+ 				PAD_CTL_PUS_47K_UP | PAD_CTL_DSE_HIGH | \
+ 				PAD_CTL_SRE_FAST)
++#define PAD_CTRL_I2C	(PAD_CTL_SRE_FAST | PAD_CTL_ODE | PAD_CTL_PKE | \
++			PAD_CTL_PUE | PAD_CTL_DSE_HIGH | PAD_CTL_PUS_100K_UP \
++			| PAD_CTL_HYS)
  
-+config ARM_ATAG_DTB_COMPAT
-+	bool "Supplement the appended DTB with traditional ATAG information"
-+	depends on ARM_APPENDED_DTB
-+	help
-+	  Some old bootloaders can't be updated to a DTB capable one, yet
-+	  they provide ATAGs with memory configuration, the ramdisk address,
-+	  the kernel cmdline string, etc.  To allow a device tree enabled
-+	  kernel to be used with such bootloaders, this option allows
-+	  zImage to extract the information from the ATAG list and store it
-+	  at run time into the appended DTB.
-+
- config CMDLINE
- 	string "Default kernel command string"
- 	default ""
-diff --git a/arch/arm/boot/compressed/.gitignore b/arch/arm/boot/compressed/.gitignore
-index c602896..e0936a1 100644
---- a/arch/arm/boot/compressed/.gitignore
-+++ b/arch/arm/boot/compressed/.gitignore
-@@ -5,3 +5,12 @@ piggy.lzo
- piggy.lzma
- vmlinux
- vmlinux.lds
-+
-+# borrowed libfdt files
-+fdt.c
-+fdt.h
-+fdt_ro.c
-+fdt_rw.c
-+fdt_wip.c
-+libfdt.h
-+libfdt_internal.h
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 48bead9..4b94995 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -83,19 +83,36 @@ suffix_$(CONFIG_KERNEL_GZIP) = gzip
- suffix_$(CONFIG_KERNEL_LZO)  = lzo
- suffix_$(CONFIG_KERNEL_LZMA) = lzma
- 
-+# libfdt files for the ATAG compatibility mode
-+
-+libfdt		:= fdt_rw.c fdt_ro.c fdt_wip.c fdt.c
-+libfdt_hdrs	:= fdt.h libfdt.h libfdt_internal.h
-+
-+libfdt_objs	:= $(addsuffix .o, $(basename $(libfdt)))
-+
-+$(addprefix $(obj)/,$(libfdt) $(libfdt_hdrs)): $(obj)/%: $(srctree)/scripts/dtc/libfdt/%
-+	$(call if_changed,shipped)
-+
-+$(addprefix $(obj)/,$(libfdt_objs) atags_to_fdt.o): \
-+	$(addprefix $(obj)/,$(libfdt_hdrs))
-+
-+ifeq ($(CONFIG_ARM_ATAG_DTB_COMPAT),y)
-+OBJS	+= $(libfdt_objs) atags_to_fdt.o 
-+endif
-+
- targets       := vmlinux vmlinux.lds \
- 		 piggy.$(suffix_y) piggy.$(suffix_y).o \
- 		 font.o font.c head.o misc.o $(OBJS)
- 
- # Make sure files are removed during clean
--extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S
-+extra-y       += piggy.gzip piggy.lzo piggy.lzma lib1funcs.S $(libfdt) $(libfdt_hdrs)
- 
- ifeq ($(CONFIG_FUNCTION_TRACER),y)
- ORIG_CFLAGS := $(KBUILD_CFLAGS)
- KBUILD_CFLAGS = $(subst -pg, , $(ORIG_CFLAGS))
- endif
- 
--ccflags-y := -fpic -fno-builtin
-+ccflags-y := -fpic -fno-builtin -I$(src)
- asflags-y := -Wa,-march=all
- 
- # Supply kernel BSS size to the decompressor via a linker symbol.
-@@ -118,7 +135,7 @@ LDFLAGS_vmlinux += -X
- LDFLAGS_vmlinux += -T
- 
- # For __aeabi_uidivmod
--lib1funcs = $(obj)/lib1funcs.o
-+lib1funcs = $(obj)/lib1funcs.o $(obj)/../../lib/lib.a
- 
- $(obj)/lib1funcs.S: $(srctree)/arch/$(SRCARCH)/lib/lib1funcs.S FORCE
- 	$(call cmd,shipped)
-diff --git a/arch/arm/boot/compressed/atags_to_fdt.c b/arch/arm/boot/compressed/atags_to_fdt.c
-new file mode 100644
-index 0000000..11c1a88
---- /dev/null
-+++ b/arch/arm/boot/compressed/atags_to_fdt.c
-@@ -0,0 +1,71 @@
-+#include <asm/setup.h>
-+#include <libfdt.h>
-+
-+static int setprop(void *fdt, const char *node_path, const char *property,
-+		   uint32_t *val_array, int size)
-+{
-+	int offset = fdt_path_offset(fdt, node_path);
-+	if (offset < 0)
-+		return offset;
-+	return fdt_setprop(fdt, offset, property, val_array, size);
-+}
-+
-+static int setprop_string(void *fdt, const char *node_path,
-+			  const char *property, const char *string)
-+{
-+	int offset = fdt_path_offset(fdt, node_path);
-+	if (offset < 0)
-+		return offset;
-+	return fdt_setprop_string(fdt, offset, property, string);
-+}
-+
-+static int setprop_cell(void *fdt, const char *node_path,
-+			const char *property, uint32_t val)
-+{
-+	int offset = fdt_path_offset(fdt, node_path);
-+	if (offset < 0)
-+		return offset;
-+	return fdt_setprop_cell(fdt, offset, property, val);
-+}
-+
-+int atags_to_fdt(void *dt,  void *atag_list)
-+{
-+	struct tag *atag = atag_list;
-+
-+	/* make sure we've got an aligned pointer */
-+	if ((u32)atag_list & 0x3)
-+		return -1;
-+
-+	/* if we get a DTB here we're done already */
-+	if (*(u32 *)atag_list == fdt32_to_cpu(FDT_MAGIC))
-+	       return 0;	
-+
-+	/* validate the ATAG */
-+	if (atag->hdr.tag != ATAG_CORE ||
-+	    (atag->hdr.size != tag_size(tag_core) &&
-+	     atag->hdr.size != 2))
-+		return -1;
-+
-+	for_each_tag(atag, atag_list) {
-+		if (atag->hdr.tag == ATAG_CMDLINE) {
-+			setprop_string(dt, "/chosen", "bootargs",
-+			                  atag->u.cmdline.cmdline);
-+		} else if (atag->hdr.tag == ATAG_MEM) {
-+			uint32_t mem_reg_property[2];
-+			mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
-+			mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
-+			setprop(dt, "/memory", "reg", mem_reg_property,
-+			           sizeof(mem_reg_property));
-+		} else if (atag->hdr.tag == ATAG_INITRD2) {
-+			uint32_t initrd_start, initrd_size;
-+			initrd_start = atag->u.initrd.start;
-+			initrd_size = atag->u.initrd.size;
-+			setprop_cell(dt, "/chosen", "linux,initrd-start",
-+			                initrd_start);
-+			setprop_cell(dt, "/chosen", "linux,initrd-end",
-+			                initrd_start + initrd_size);
-+		}
-+	}
-+
-+	return 0;
-+}
-diff --git a/arch/arm/boot/compressed/head.S b/arch/arm/boot/compressed/head.S
-index d4f8db2..5a0a2409 100644
---- a/arch/arm/boot/compressed/head.S
-+++ b/arch/arm/boot/compressed/head.S
-@@ -246,6 +246,36 @@ restart:	adr	r0, LC0
- 		cmp	lr, r1
- 		bne	dtb_check_done		@ not found
- 
-+#ifdef CONFIG_ARM_ATAG_DTB_COMPAT
-+		/*
-+		 * OK... Let's do some funky business here.
-+		 * If we do have a DTB appended to zImage, and we do have
-+		 * an ATAG list around, we want the later to be translated
-+		 * and folded into the former here.  To be on the safe side,
-+		 * let's temporarily move  the stack away into the malloc
-+		 * area.  No GOT fixup has occurred yet, but none of the
-+		 * code we're about to call uses any global variable.
-+		*/
-+		add	sp, sp, #0x10000
-+		stmfd	sp!, {r0-r3, ip, lr}
-+		mov	r0, r6
-+		mov	r1, r8
-+		bl	atags_to_fdt
-+		
-+		/*
-+		 * If that didn't work (non-zero return), there is no ATAG
-+		 * at the location pointed by r8.  Try the typical 0x100
-+		 * offset from start of RAM.
-+		 */
-+		cmp	r0, #0
-+		mov	r0, r6
-+		sub	r1, r4, #(TEXT_OFFSET - 0x100)
-+		blne	atags_to_fdt
-+
-+		ldmfd	sp!, {r0-r3, ip, lr}
-+		sub	sp, sp, #0x10000
-+#endif
-+
- 		mov	r8, r6			@ use the appended device tree
- 
- 		/*
-diff --git a/arch/arm/boot/compressed/libfdt_env.h b/arch/arm/boot/compressed/libfdt_env.h
-new file mode 100644
-index 0000000..1f4e718
---- /dev/null
-+++ b/arch/arm/boot/compressed/libfdt_env.h
-@@ -0,0 +1,15 @@
-+#ifndef _ARM_LIBFDT_ENV_H
-+#define _ARM_LIBFDT_ENV_H
-+
-+#include <linux/types.h>
-+#include <linux/string.h>
-+#include <asm/byteorder.h>
-+
-+#define fdt16_to_cpu(x)		be16_to_cpu(x)
-+#define cpu_to_fdt16(x)		cpu_to_be16(x)
-+#define fdt32_to_cpu(x)		be32_to_cpu(x)
-+#define cpu_to_fdt32(x)		cpu_to_be32(x)
-+#define fdt64_to_cpu(x)		be64_to_cpu(x)
-+#define cpu_to_fdt64(x)		cpu_to_be64(x)
-+
-+#endif
-diff --git a/arch/arm/boot/compressed/misc.c b/arch/arm/boot/compressed/misc.c
-index 832d372..747de6b 100644
---- a/arch/arm/boot/compressed/misc.c
-+++ b/arch/arm/boot/compressed/misc.c
-@@ -136,6 +136,55 @@ void *memcpy(void *__dest, __const void *__src, size_t __n)
- 	return __dest;
- }
- 
-+void *memmove(void *__dest, __const void *__src, size_t __n)
-+{
-+	unsigned char *d = __dest;
-+	const unsigned char *s = __src;
-+
-+	if (__dest <= __src)
-+		return memcpy(__dest, __src, __n);
-+
-+	while (--__n >= 0)
-+		d[__n] = s[__n];
-+
-+	return __dest;
-+}
-+
-+size_t strlen(const char *s)
-+{
-+	const char *sc;
-+
-+	for (sc = s; *sc != '\0'; ++sc)
-+		/* nothing */;
-+	return sc - s;
-+}
-+
-+int memcmp(const void *cs, const void *ct, size_t count)
-+{
-+	const unsigned char *su1, *su2;
-+	int res = 0;
-+
-+	for (su1 = cs, su2 = ct; 0 < count; ++su1, ++su2, count--)
-+		if ((res = *su1 - *su2) != 0)
-+			break;
-+	return res;
-+}
-+
-+int strcmp(const char *cs, const char *ct)
-+{
-+	unsigned char c1, c2;
-+
-+	while (1) {
-+		c1 = *cs++;
-+		c2 = *ct++;
-+		if (c1 != c2)
-+			return c1 < c2 ? -1 : 1;
-+		if (!c1)
-+			break;
-+	}
-+	return 0;
-+}
-+
- /*
-  * gzip declarations
-  */
+ #define _MX53_PAD_GPIO_19__KPP_COL_5		IOMUX_PAD(0x348, 0x20, 0, 0x840, 0, 0)
+ #define _MX53_PAD_GPIO_19__GPIO4_5		IOMUX_PAD(0x348, 0x20, 1, 0x0, 0, 0)
+@@ -1256,7 +1259,7 @@
+ #define MX53_PAD_KEY_COL3__GPIO4_12		(_MX53_PAD_KEY_COL3__GPIO4_12 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL3__USBOH3_H2_DP		(_MX53_PAD_KEY_COL3__USBOH3_H2_DP | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL3__SPDIF_IN1		(_MX53_PAD_KEY_COL3__SPDIF_IN1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_KEY_COL3__I2C2_SCL		(_MX53_PAD_KEY_COL3__I2C2_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_KEY_COL3__I2C2_SCL		(_MX53_PAD_KEY_COL3__I2C2_SCL | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_KEY_COL3__ECSPI1_SS3		(_MX53_PAD_KEY_COL3__ECSPI1_SS3 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL3__FEC_CRS		(_MX53_PAD_KEY_COL3__FEC_CRS | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_COL3__USBPHY1_SIECLOCK		(_MX53_PAD_KEY_COL3__USBPHY1_SIECLOCK | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1264,7 +1267,7 @@
+ #define MX53_PAD_KEY_ROW3__GPIO4_13		(_MX53_PAD_KEY_ROW3__GPIO4_13 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW3__USBOH3_H2_DM		(_MX53_PAD_KEY_ROW3__USBOH3_H2_DM | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW3__CCM_ASRC_EXT_CLK		(_MX53_PAD_KEY_ROW3__CCM_ASRC_EXT_CLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_KEY_ROW3__I2C2_SDA		(_MX53_PAD_KEY_ROW3__I2C2_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_KEY_ROW3__I2C2_SDA		(_MX53_PAD_KEY_ROW3__I2C2_SDA | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_KEY_ROW3__OSC32K_32K_OUT		(_MX53_PAD_KEY_ROW3__OSC32K_32K_OUT | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW3__CCM_PLL4_BYP		(_MX53_PAD_KEY_ROW3__CCM_PLL4_BYP | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0		(_MX53_PAD_KEY_ROW3__USBPHY1_LINESTATE_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1536,7 +1539,7 @@
+ #define MX53_PAD_CSI0_DAT8__KPP_COL_7		(_MX53_PAD_CSI0_DAT8__KPP_COL_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT8__ECSPI2_SCLK		(_MX53_PAD_CSI0_DAT8__ECSPI2_SCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT8__USBOH3_USBH3_OC		(_MX53_PAD_CSI0_DAT8__USBOH3_USBH3_OC | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_CSI0_DAT8__I2C1_SDA		(_MX53_PAD_CSI0_DAT8__I2C1_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_CSI0_DAT8__I2C1_SDA		(_MX53_PAD_CSI0_DAT8__I2C1_SDA | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_CSI0_DAT8__EMI_EMI_DEBUG_37		(_MX53_PAD_CSI0_DAT8__EMI_EMI_DEBUG_37 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT8__TPIU_TRACE_5		(_MX53_PAD_CSI0_DAT8__TPIU_TRACE_5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__IPU_CSI0_D_9		(_MX53_PAD_CSI0_DAT9__IPU_CSI0_D_9 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1544,7 +1547,7 @@
+ #define MX53_PAD_CSI0_DAT9__KPP_ROW_7		(_MX53_PAD_CSI0_DAT9__KPP_ROW_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__ECSPI2_MOSI		(_MX53_PAD_CSI0_DAT9__ECSPI2_MOSI | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__USBOH3_USBH3_PWR		(_MX53_PAD_CSI0_DAT9__USBOH3_USBH3_PWR | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_CSI0_DAT9__I2C1_SCL		(_MX53_PAD_CSI0_DAT9__I2C1_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_CSI0_DAT9__I2C1_SCL		(_MX53_PAD_CSI0_DAT9__I2C1_SCL | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_CSI0_DAT9__EMI_EMI_DEBUG_38		(_MX53_PAD_CSI0_DAT9__EMI_EMI_DEBUG_38 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT9__TPIU_TRACE_6		(_MX53_PAD_CSI0_DAT9__TPIU_TRACE_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_CSI0_DAT10__IPU_CSI0_D_10		(_MX53_PAD_CSI0_DAT10__IPU_CSI0_D_10 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1631,25 +1634,25 @@
+ #define MX53_PAD_EIM_EB2__CCM_DI1_EXT_CLK		(_MX53_PAD_EIM_EB2__CCM_DI1_EXT_CLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_EB2__IPU_SER_DISP1_CS		(_MX53_PAD_EIM_EB2__IPU_SER_DISP1_CS | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_EB2__ECSPI1_SS0		(_MX53_PAD_EIM_EB2__ECSPI1_SS0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_EIM_EB2__I2C2_SCL		(_MX53_PAD_EIM_EB2__I2C2_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_EIM_EB2__I2C2_SCL		(_MX53_PAD_EIM_EB2__I2C2_SCL | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_EIM_D16__EMI_WEIM_D_16		(_MX53_PAD_EIM_D16__EMI_WEIM_D_16 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D16__GPIO3_16		(_MX53_PAD_EIM_D16__GPIO3_16 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D16__IPU_DI0_PIN5		(_MX53_PAD_EIM_D16__IPU_DI0_PIN5 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D16__IPU_DISPB1_SER_CLK		(_MX53_PAD_EIM_D16__IPU_DISPB1_SER_CLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D16__ECSPI1_SCLK		(_MX53_PAD_EIM_D16__ECSPI1_SCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_EIM_D16__I2C2_SDA		(_MX53_PAD_EIM_D16__I2C2_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_EIM_D16__I2C2_SDA		(_MX53_PAD_EIM_D16__I2C2_SDA | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_EIM_D17__EMI_WEIM_D_17		(_MX53_PAD_EIM_D17__EMI_WEIM_D_17 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D17__GPIO3_17		(_MX53_PAD_EIM_D17__GPIO3_17 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D17__IPU_DI0_PIN6		(_MX53_PAD_EIM_D17__IPU_DI0_PIN6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D17__IPU_DISPB1_SER_DIN		(_MX53_PAD_EIM_D17__IPU_DISPB1_SER_DIN | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D17__ECSPI1_MISO		(_MX53_PAD_EIM_D17__ECSPI1_MISO | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_EIM_D17__I2C3_SCL		(_MX53_PAD_EIM_D17__I2C3_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_EIM_D17__I2C3_SCL		(_MX53_PAD_EIM_D17__I2C3_SCL | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_EIM_D18__EMI_WEIM_D_18		(_MX53_PAD_EIM_D18__EMI_WEIM_D_18 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D18__GPIO3_18		(_MX53_PAD_EIM_D18__GPIO3_18 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D18__IPU_DI0_PIN7		(_MX53_PAD_EIM_D18__IPU_DI0_PIN7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D18__IPU_DISPB1_SER_DIO		(_MX53_PAD_EIM_D18__IPU_DISPB1_SER_DIO | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D18__ECSPI1_MOSI		(_MX53_PAD_EIM_D18__ECSPI1_MOSI | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_EIM_D18__I2C3_SDA		(_MX53_PAD_EIM_D18__I2C3_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_EIM_D18__I2C3_SDA		(_MX53_PAD_EIM_D18__I2C3_SDA | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_EIM_D18__IPU_DI1_D0_CS		(_MX53_PAD_EIM_D18__IPU_DI1_D0_CS | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D19__EMI_WEIM_D_19		(_MX53_PAD_EIM_D19__EMI_WEIM_D_19 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D19__GPIO3_19		(_MX53_PAD_EIM_D19__GPIO3_19 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1672,7 +1675,7 @@
+ #define MX53_PAD_EIM_D21__IPU_DI0_PIN17		(_MX53_PAD_EIM_D21__IPU_DI0_PIN17 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D21__IPU_DISPB0_SER_CLK		(_MX53_PAD_EIM_D21__IPU_DISPB0_SER_CLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D21__CSPI_SCLK		(_MX53_PAD_EIM_D21__CSPI_SCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_EIM_D21__I2C1_SCL		(_MX53_PAD_EIM_D21__I2C1_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_EIM_D21__I2C1_SCL		(_MX53_PAD_EIM_D21__I2C1_SCL | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_EIM_D21__USBOH3_USBOTG_OC		(_MX53_PAD_EIM_D21__USBOH3_USBOTG_OC | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D22__EMI_WEIM_D_22		(_MX53_PAD_EIM_D22__EMI_WEIM_D_22 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D22__GPIO3_22		(_MX53_PAD_EIM_D22__GPIO3_22 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -1732,7 +1735,7 @@
+ #define MX53_PAD_EIM_D28__UART2_CTS		(_MX53_PAD_EIM_D28__UART2_CTS | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D28__IPU_DISPB0_SER_DIO		(_MX53_PAD_EIM_D28__IPU_DISPB0_SER_DIO | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D28__CSPI_MOSI		(_MX53_PAD_EIM_D28__CSPI_MOSI | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_EIM_D28__I2C1_SDA		(_MX53_PAD_EIM_D28__I2C1_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_EIM_D28__I2C1_SDA		(_MX53_PAD_EIM_D28__I2C1_SDA | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_EIM_D28__IPU_EXT_TRIG		(_MX53_PAD_EIM_D28__IPU_EXT_TRIG | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D28__IPU_DI0_PIN13		(_MX53_PAD_EIM_D28__IPU_DI0_PIN13 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_EIM_D29__EMI_WEIM_D_29		(_MX53_PAD_EIM_D29__EMI_WEIM_D_29 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -2297,7 +2300,7 @@
+ #define MX53_PAD_GPIO_9__SCC_FAIL_STATE		(_MX53_PAD_GPIO_9__SCC_FAIL_STATE | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_3__ESAI1_HCKR		(_MX53_PAD_GPIO_3__ESAI1_HCKR | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_3__GPIO1_3		(_MX53_PAD_GPIO_3__GPIO1_3 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_GPIO_3__I2C3_SCL		(_MX53_PAD_GPIO_3__I2C3_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_GPIO_3__I2C3_SCL		(_MX53_PAD_GPIO_3__I2C3_SCL | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_GPIO_3__DPLLIP1_TOG_EN		(_MX53_PAD_GPIO_3__DPLLIP1_TOG_EN | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_3__CCM_CLKO2		(_MX53_PAD_GPIO_3__CCM_CLKO2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_3__OBSERVE_MUX_OBSRV_INT_OUT0		(_MX53_PAD_GPIO_3__OBSERVE_MUX_OBSRV_INT_OUT0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -2305,7 +2308,7 @@
+ #define MX53_PAD_GPIO_3__MLB_MLBCLK		(_MX53_PAD_GPIO_3__MLB_MLBCLK | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_6__ESAI1_SCKT		(_MX53_PAD_GPIO_6__ESAI1_SCKT | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_6__GPIO1_6		(_MX53_PAD_GPIO_6__GPIO1_6 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_GPIO_6__I2C3_SDA		(_MX53_PAD_GPIO_6__I2C3_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_GPIO_6__I2C3_SDA		(_MX53_PAD_GPIO_6__I2C3_SDA | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_GPIO_6__CCM_CCM_OUT_0		(_MX53_PAD_GPIO_6__CCM_CCM_OUT_0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_6__CSU_CSU_INT_DEB		(_MX53_PAD_GPIO_6__CSU_CSU_INT_DEB | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_6__OBSERVE_MUX_OBSRV_INT_OUT1		(_MX53_PAD_GPIO_6__OBSERVE_MUX_OBSRV_INT_OUT1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -2333,7 +2336,7 @@
+ #define MX53_PAD_GPIO_5__CCM_CLKO		(_MX53_PAD_GPIO_5__CCM_CLKO | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_5__CSU_CSU_ALARM_AUT_2		(_MX53_PAD_GPIO_5__CSU_CSU_ALARM_AUT_2 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_5__OBSERVE_MUX_OBSRV_INT_OUT4		(_MX53_PAD_GPIO_5__OBSERVE_MUX_OBSRV_INT_OUT4 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_GPIO_5__I2C3_SCL		(_MX53_PAD_GPIO_5__I2C3_SCL | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_GPIO_5__I2C3_SCL		(_MX53_PAD_GPIO_5__I2C3_SCL | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_GPIO_5__CCM_PLL1_BYP		(_MX53_PAD_GPIO_5__CCM_PLL1_BYP | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_7__ESAI1_TX4_RX1		(_MX53_PAD_GPIO_7__ESAI1_TX4_RX1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_7__GPIO1_7		(_MX53_PAD_GPIO_7__GPIO1_7 | MUX_PAD_CTRL(NO_PAD_CTRL))
+@@ -2356,7 +2359,7 @@
+ #define MX53_PAD_GPIO_16__TZIC_PWRFAIL_INT		(_MX53_PAD_GPIO_16__TZIC_PWRFAIL_INT | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_16__RTC_CE_RTC_EXT_TRIG1		(_MX53_PAD_GPIO_16__RTC_CE_RTC_EXT_TRIG1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_16__SPDIF_IN1		(_MX53_PAD_GPIO_16__SPDIF_IN1 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-#define MX53_PAD_GPIO_16__I2C3_SDA		(_MX53_PAD_GPIO_16__I2C3_SDA | MUX_PAD_CTRL(NO_PAD_CTRL))
++#define MX53_PAD_GPIO_16__I2C3_SDA		(_MX53_PAD_GPIO_16__I2C3_SDA | MUX_PAD_CTRL(PAD_CTRL_I2C))
+ #define MX53_PAD_GPIO_16__SJC_DE_B		(_MX53_PAD_GPIO_16__SJC_DE_B | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_17__ESAI1_TX0		(_MX53_PAD_GPIO_17__ESAI1_TX0 | MUX_PAD_CTRL(NO_PAD_CTRL))
+ #define MX53_PAD_GPIO_17__GPIO7_12		(_MX53_PAD_GPIO_17__GPIO7_12 | MUX_PAD_CTRL(NO_PAD_CTRL))
+-- 
+1.7.4.1
