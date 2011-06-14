@@ -1,39 +1,63 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 14 Jun 2011 22:32:08 +0200
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <20110614190850.GA13526@linux-mips.org>
-References: <20110614190850.GA13526@linux-mips.org>
-Message-ID: <BANLkTikuVsFS-UbS+Dap2Zy-f1+qLc1TLw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jun 2011 22:32:01 +0200
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <alpine.LFD.2.00.1106141322530.2142@xanadu.home>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110614145329.GK23145@atomide.com>
+	<alpine.LFD.2.00.1106141322530.2142@xanadu.home>
+Message-ID: <201106142232.02217.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 21:08, Ralf Baechle <ralf@linux-mips.org> wrote:
-> The PC parallel port Kconfig as acquired one of those messy terms to
-> describe it's architecture dependencies:
->
-> ? ? ? depends on (!SPARC64 || PCI) && !SPARC32 && !M32R && !FRV && \
-> ? ? ? ? ? ? ? (!M68K || ISA) && !MN10300 && !AVR32 && !BLACKFIN
->
-> This isn't just ugly - it also almost certainly describes the dependencies
-> too coarse grainedly. ?This is an attempt at cleaing the mess up.
+On Tuesday 14 June 2011 19:28:49 Nicolas Pitre wrote:
+> On Tue, 14 Jun 2011, Tony Lindgren wrote:
+> 
+> > * Nicolas Pitre <nicolas.pitre@linaro.org> [110614 00:04]:
+> > > +
+> > > +   for_each_tag(atag, atag_list) {
+> > > +           if (atag->hdr.tag == ATAG_CMDLINE) {
+> > > +                   setprop_string(dt, "/chosen", "bootargs",
+> > > +                                     atag->u.cmdline.cmdline);
+> > > +           } else if (atag->hdr.tag == ATAG_MEM) {
+> > > +                   uint32_t mem_reg_property[2];
+> > > +                   mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
+> > > +                   mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
+> > > +                   setprop(dt, "/memory", "reg", mem_reg_property,
+> > > +                              sizeof(mem_reg_property));
+> > > +           } else if (atag->hdr.tag == ATAG_INITRD2) {
+> > > +                   uint32_t initrd_start, initrd_size;
+> > > +                   initrd_start = atag->u.initrd.start;
+> > > +                   initrd_size = atag->u.initrd.size;
+> > > +                   setprop_cell(dt, "/chosen", "linux,initrd-start",
+> > > +                                   initrd_start);
+> > > +                   setprop_cell(dt, "/chosen", "linux,initrd-end",
+> > > +                                   initrd_start + initrd_size);
+> > > +           }
+> > > +   }
+> > 
+> > I think Russell posted a complete list of the ATAGs to translate
+> > somewhere, but at least ATAG_REVISION is missing here. That's being
+> > used quite a bit as system_rev to set things dynamically.
+> 
+> No problem.  This is a work in progress.  We still can test the concept 
+> and fine tune the actual set of ATAGs being translated.
 
-> --- a/arch/m68k/Kconfig.mmu
-> +++ b/arch/m68k/Kconfig.mmu
-> @@ -399,6 +399,7 @@ config ISA
-> ? ? ? ?bool
-> ? ? ? ?depends on Q40 || AMIGA_PCMCIA
-> ? ? ? ?default y
-> + ? ? ? select PARPORT_PC
+Let's talk about the revision field now, because it doesn't have a
+direct correspondence in existing attributes.
 
-Why do you select PARPORT_PC here instead of HAVE_PC_PARPORT?
+Functionality-wise, this would probably be the "compatible" property
+of the root node, with its most specific name to match, but that's not
+trivial to generate.
 
-Gr{oetje,eeting}s,
+In some cases, the system revisions have significant differences in their
+devices (why else would you care about the revision), which means that you
+actually need a different device tree per revision anyway. If that's the
+common case, we could just ignore it completely or instead have a way
+to choose a specific device tree from a list based on the revision.
 
-? ? ? ? ? ? ? ? ? ? ? ? Geert
+Another option would be to merge both the ATAG_REVISION and ATAG_SERIAL
+into a string and put them into the root "serial-number" property that
+is fairly easy to do, but would be harder to parse if you actually rely
+on specific values.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+	Arnd
