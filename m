@@ -1,82 +1,93 @@
-From: ccross@android.com (Colin Cross)
-Date: Tue, 14 Jun 2011 14:19:13 -0700
-Subject: [PATCH 0/3] CPU PM notifiers
-In-Reply-To: <201106142300.42487.rjw@sisk.pl>
-References: <1307925825-28566-1-git-send-email-ccross@android.com>
-	<201106132037.49009.rjw@sisk.pl>
-	<BANLkTi=zTVPkgDO1xXPhypn5Fz6c0PTp79Wq2a6s4jrz3WrJyQ@mail.gmail.com>
-	<201106142300.42487.rjw@sisk.pl>
-Message-ID: <BANLkTi=jGKE3d0XHB1EeQ08oOqAn3hpc-w@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 14 Jun 2011 17:21:52 -0400 (EDT)
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <201106142232.02217.arnd@arndb.de>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110614145329.GK23145@atomide.com>
+	<alpine.LFD.2.00.1106141322530.2142@xanadu.home>
+	<201106142232.02217.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1106141650520.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 2:00 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
-> On Monday, June 13, 2011, Colin Cross wrote:
->> On Mon, Jun 13, 2011 at 11:37 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
->> > On Monday, June 13, 2011, Colin Cross wrote:
->> >> This patch set tries to address Russell's concerns with platform
->> >> pm code calling into the driver for every block in the Cortex A9s
->> >> during idle, hotplug, and suspend. ?The first patch adds cpu pm
->> >> notifiers that can be called by platform code, the second uses
->> >> the notifier to save and restore the GIC state, and the third
->> >> saves the VFP state.
->> >>
->> >> The notifiers are used for two types of events, CPU PM events and
->> >> CPU complex PM events. ?CPU PM events are used to save and restore
->> >> per-cpu context when a single CPU is preparing to enter or has
->> >> just exited a low power state. ?For example, the VFP saves the
->> >> last thread context, and the GIC saves banked CPU registers.
->> >>
->> >> CPU complex events are used after all the CPUs in a power domain
->> >> have been prepared for the low power state. ?The GIC uses these
->> >> events to save global register state.
->> >>
->> >> Platforms that call the cpu_pm APIs must select
->> >> CONFIG_ARCH_USES_CPU_PM
->> >>
->> >> L2 cache is not covered by this patch set, as the determination
->> >> of when the L2 is reset and when it is retained is
->> >> platform-specific, and most of the APIs necessary are already
->> >> present.
->> >>
->> >> ?arch/arm/Kconfig ? ? ? ? ? ? ?| ? ?7 ++
->> >> ?arch/arm/common/gic.c ? ? ? ? | ?212 +++++++++++++++++++++++++++++++++++++++++
->> >> ?arch/arm/include/asm/cpu_pm.h | ? 54 +++++++++++
->> >> ?arch/arm/kernel/Makefile ? ? ?| ? ?1 +
->> >> ?arch/arm/kernel/cpu_pm.c ? ? ?| ?181 +++++++++++++++++++++++++++++++++++
->> >
->> > Is there any reason why this has to be ARM-specific? ?There are other
->> > architectures where this kind of feature might make sense (SH and
->> > powerpc at least).
->>
->> Nothing other than there are currently no adaptations for any drivers
->> besides ARM, but I can move it somewhere outside ARM. ?Any suggestions
->> where?
->
-> Well, there is kernel/cpu.c. ?It contains mostly CPU hotplug and PM
-> code at the moment, so it looks like a good place.
+On Tue, 14 Jun 2011, Arnd Bergmann wrote:
 
-OK, I'll look at moving it there.
+> On Tuesday 14 June 2011 19:28:49 Nicolas Pitre wrote:
+> > On Tue, 14 Jun 2011, Tony Lindgren wrote:
+> > 
+> > > * Nicolas Pitre <nicolas.pitre@linaro.org> [110614 00:04]:
+> > > > +
+> > > > +   for_each_tag(atag, atag_list) {
+> > > > +           if (atag->hdr.tag == ATAG_CMDLINE) {
+> > > > +                   setprop_string(dt, "/chosen", "bootargs",
+> > > > +                                     atag->u.cmdline.cmdline);
+> > > > +           } else if (atag->hdr.tag == ATAG_MEM) {
+> > > > +                   uint32_t mem_reg_property[2];
+> > > > +                   mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
+> > > > +                   mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
+> > > > +                   setprop(dt, "/memory", "reg", mem_reg_property,
+> > > > +                              sizeof(mem_reg_property));
+> > > > +           } else if (atag->hdr.tag == ATAG_INITRD2) {
+> > > > +                   uint32_t initrd_start, initrd_size;
+> > > > +                   initrd_start = atag->u.initrd.start;
+> > > > +                   initrd_size = atag->u.initrd.size;
+> > > > +                   setprop_cell(dt, "/chosen", "linux,initrd-start",
+> > > > +                                   initrd_start);
+> > > > +                   setprop_cell(dt, "/chosen", "linux,initrd-end",
+> > > > +                                   initrd_start + initrd_size);
+> > > > +           }
+> > > > +   }
+> > > 
+> > > I think Russell posted a complete list of the ATAGs to translate
+> > > somewhere, but at least ATAG_REVISION is missing here. That's being
+> > > used quite a bit as system_rev to set things dynamically.
+> > 
+> > No problem.  This is a work in progress.  We still can test the concept 
+> > and fine tune the actual set of ATAGs being translated.
+> 
+> Let's talk about the revision field now, because it doesn't have a
+> direct correspondence in existing attributes.
+> 
+> Functionality-wise, this would probably be the "compatible" property
+> of the root node, with its most specific name to match, but that's not
+> trivial to generate.
+> 
+> In some cases, the system revisions have significant differences in their
+> devices (why else would you care about the revision), which means that you
+> actually need a different device tree per revision anyway. If that's the
+> common case, we could just ignore it completely or instead have a way
+> to choose a specific device tree from a list based on the revision.
 
->> > Besides, is there any overlap between this feature and the CPU hotplug
->> > notifiers?
->>
->> I don't think so - the hotplug notifiers are used when a CPU is being
->> removed from the system, so no saving and restoring is necessary - the
->> CPU will be rebooted from scratch. ?They are used by systems outside
->> the CPU that need to know that a CPU no longer exists.
->>
->> CPU PM notifiers are used when a CPU is going through reset in a way
->> that should be transparent to most of the system.
->
-> Do I guess correctly that you mean cpuidle?
+I don't think this is all that common.  Almost half of the cases, the 
+system_rev variable is assigned a specific value from direct probing, 
+not from the ATAG_REVISION tag.  So there are only a few cases to 
+consider.
 
-cpuidle is the major user, but primary CPUs in suspend have to save
-and restore the same blocks, and tend to use the same platform sleep
-code as idle, so it's logical to use the notifiers for both.  On the
-other hand, some drivers that would use cpu_pm notifiers already use
-syscore ops to handle suspend and resume (like vfp) - maybe these
-notifiers should only be used in cpuidle, and syscore ops added to the
-gic driver?  I could also convert the notifiers to new syscore_ops -
-cpu_idle, cpu_unidle, cpu_cluster_idle, cpu_cluster_unidle, but I
-don't know how well that fits in to the intention for syscore.
+Yet it is used only for a few things, which doesn't indicate the system 
+differences are that significant in practice.
+
+If we were to use this revision number, which appears to be completely 
+arbitrary from one board to another, in order to select the appropriate 
+DTB amongst many possibilities, then we'll need something in the DTB 
+that can be correlated to this revision number in the first place.
+
+And let's remember that this is only about some compatibility 
+convenience for legacy systems.  I really don't want this to be 
+over engineered.
+
+> Another option would be to merge both the ATAG_REVISION and ATAG_SERIAL
+> into a string and put them into the root "serial-number" property that
+> is fairly easy to do, but would be harder to parse if you actually rely
+> on specific values.
+
+At some point, if some boards do use the ATAG to let the bootloader 
+specify the board revision, that must be because this revision number 
+can't be probed by software.  If this can be probed by software, then 
+let's do it with kernel code instead.
+
+Otherwise, if the revision number is effectively non probable, then I 
+would guess it is the device tree's purpose to carry that information 
+somehow, right?  Maybe this can be appended to the board name string?
+
+
+Nicolas
