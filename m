@@ -1,30 +1,30 @@
-From: tony.luck@intel.com (Luck, Tony)
-Date: Tue, 14 Jun 2011 15:08:37 -0700
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <20110614190850.GA13526@linux-mips.org>
-References: <20110614190850.GA13526@linux-mips.org>
-Message-ID: <987664A83D2D224EAE907B061CE93D5301E7281306@orsmsx505.amr.corp.intel.com>
+From: linux_arm@lakedaemon.net (Jason)
+Date: Tue, 14 Jun 2011 18:08:43 -0400
+Subject: [PATCH 0/2 RFC] arm/kirkwood: add dreamplug support.
+In-Reply-To: <201106150001.08606.michael@walle.cc>
+References: <cover.1308080024.git.jason@lakedaemon.net>
+	<201106150001.08606.michael@walle.cc>
+Message-ID: <20110614220843.GB15886@titan.lakedaemon.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-index 38280ef..849805a 100644
---- a/arch/ia64/Kconfig
-+++ b/arch/ia64/Kconfig
-@@ -23,6 +23,7 @@ config IA64
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_DMA_API_DEBUG
- 	select HAVE_GENERIC_HARDIRQS
-+	select HAVE_PC_PARPORT
- 	select GENERIC_IRQ_PROBE
- 	select GENERIC_PENDING_IRQ if SMP
- 	select IRQ_PER_CPU
+On Wed, Jun 15, 2011 at 12:01:08AM +0200, Michael Walle wrote:
+> Am Dienstag 14 Juni 2011, 21:52:53 schrieb linux_arm at lakedaemon.net:
+> > From: Jason Cooper <linux_arm@lakedaemon.net>
+> > This is an RFC patch series until mach-types is updated.  This compiles,
+> > loads, runs, and sees the SPI flash.
+> 
+> in case no one else reply to your patch. I wanted to submit a patch, which 
+> adds support for the LS-XHL, based on kirkwood, too. Old-fashioned machine 
+> support files won't be accepted anymore. Instead you would have to submit a 
+> DTS once the kirkwood arch has support for device trees.
+> 
+Ahhh, that's the key word I was missing.  :-)  I had been reading up on
+the arch/arm/* cleanup, and saw that SoC drivers should go in drivers/,
+but had missed the DTS bit.
 
-I took a look at the back of all my ia64 systems - none of them
-have a parallel port.  It seems unlikely that new systems will
-start adding parallel ports :-)
+Off to read...
 
-So even if I had a printer (or other device) that used a parallel
-port, I have no way to test it.
+thx,
 
--Tony
+Jason.
