@@ -1,41 +1,49 @@
-From: jcrouse@codeaurora.org (Jordan Crouse)
-Date: Tue, 14 Jun 2011 09:49:05 -0600
-Subject: [Linaro-mm-sig] [PATCH 02/10] lib: genalloc: Generic allocator
-	improvements
-In-Reply-To: <20110610135217.701a2fd2@lxorguk.ukuu.org.uk>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>	<1307699698-29369-3-git-send-email-m.szyprowski@samsung.com>	<20110610122451.15af86d1@lxorguk.ukuu.org.uk>	<000c01cc2769$02669b70$0733d250$%szyprowski@samsung.com>
-	<20110610135217.701a2fd2@lxorguk.ukuu.org.uk>
-Message-ID: <4DF782F1.9030105@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 14 Jun 2011 18:03:00 +0200
+Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <op.vw2jmhir3l0zgt@mnazarewicz-glaptop>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106141549.29315.arnd@arndb.de>
+	<op.vw2jmhir3l0zgt@mnazarewicz-glaptop>
+Message-ID: <201106141803.00876.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/10/2011 06:52 AM, Alan Cox wrote:
->> I plan to replace it with lib/bitmap.c bitmap_* based allocator (similar like
->> it it is used by dma_declare_coherent_memory() and friends in
->> drivers/base/dma-coherent.c). We need something really simple for CMA area
->> management.
->>
->> IMHO allocate_resource and friends a bit too heavy here, but good to know
->> that such allocator also exists.
->
-> Not sure I'd class allocate_resource as heavyweight but providing it's
-> using something that already exists rather than inventing yet another
-> allocator.
->
-> This wants dealing with before it goes upstream though so the chaneges in
-> lib/*c etc never have to reach mainline and then get changed back.
+On Tuesday 14 June 2011, Michal Nazarewicz wrote:
+> On Tue, 14 Jun 2011 15:49:29 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
+> > Please explain the exact requirements that lead you to defining multiple
+> > contexts.
+> 
+> Some devices may have access only to some banks of memory.  Some devices
+> may use different banks of memory for different purposes.
 
-Even if CMA doesn't end up using genalloc, there are existing consumers of
-the API and I think the _aligned function has value.
+For all I know, that is something that is only true for a few very special
+Samsung devices, and is completely unrelated of the need for contiguous
+allocations, so this approach becomes pointless as soon as the next
+generation of that chip grows an IOMMU, where we don't handle the special
+bank attributes. Also, the way I understood the situation for the Samsung
+SoC during the Budapest discussion, it's only a performance hack, not a
+functional requirement, unless you count '1080p playback' as a functional
+requirement.
 
-I agree that allocate_resource isn't overly heavy, but comparatively genalloc
-is really simple and lightweight for a driver to manage a contiguous address
-space without a lot of extra thought. I think both APIs serve slightly
-different masters, but if somebody thought about it long enough there could
-be some consolidation (same goes for the internal guts of
-dma_declare_coherent_memory).
+Supporting contiguous allocation is a very useful goal and many people want
+this, but supporting a crazy one-off hardware design with lots of generic
+infrastructure is going a bit too far. If you can't be more specific than
+'some devices may need this', I would suggest going forward without having
+multiple regions:
 
-I agree with Michal - if genalloc goes deprecated, then so be it, but as
-long as it lives, I think its useful to get these functions upstream.
+* Remove the registration of specific addresses from the initial patch
+  set (but keep the patch).
+* Add a heuristic plus command-line override to automatically come up
+  with a reasonable location+size for *one* CMA area in the system.
+* Ship the patch to add support for multiple CMA areas with the BSP
+  for the boards that need it (if any).
+* Wait for someone on a non-Samsung SoC to run into the same problem,
+  then have /them/ get the final patch in.
 
-Jordan
+Even if you think you can convince enough people that having support
+for distinct predefined regions is a good idea, I would recommend
+splitting that out of the initial merge so we can have that discussion
+separately from the other issues.
+
+	Arnd
