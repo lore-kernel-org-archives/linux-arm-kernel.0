@@ -1,68 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 14 Jun 2011 17:32:49 -0500
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <201106142232.02217.arnd@arndb.de>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>	<20110614145329.GK23145@atomide.com>	<alpine.LFD.2.00.1106141322530.2142@xanadu.home>
-	<201106142232.02217.arnd@arndb.de>
-Message-ID: <4DF7E191.1050705@gmail.com>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Tue, 14 Jun 2011 23:34:04 +0100
+Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
+In-Reply-To: <4DF7C3CA.9050902@zytor.com>
+References: <20110614190850.GA13526@linux-mips.org>
+	<4DF7C3CA.9050902@zytor.com>
+Message-ID: <20110614223404.GA30057@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2011 03:32 PM, Arnd Bergmann wrote:
-> On Tuesday 14 June 2011 19:28:49 Nicolas Pitre wrote:
->> On Tue, 14 Jun 2011, Tony Lindgren wrote:
->>
->>> * Nicolas Pitre <nicolas.pitre@linaro.org> [110614 00:04]:
->>>> +
->>>> +   for_each_tag(atag, atag_list) {
->>>> +           if (atag->hdr.tag == ATAG_CMDLINE) {
->>>> +                   setprop_string(dt, "/chosen", "bootargs",
->>>> +                                     atag->u.cmdline.cmdline);
->>>> +           } else if (atag->hdr.tag == ATAG_MEM) {
->>>> +                   uint32_t mem_reg_property[2];
->>>> +                   mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
->>>> +                   mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
->>>> +                   setprop(dt, "/memory", "reg", mem_reg_property,
->>>> +                              sizeof(mem_reg_property));
->>>> +           } else if (atag->hdr.tag == ATAG_INITRD2) {
->>>> +                   uint32_t initrd_start, initrd_size;
->>>> +                   initrd_start = atag->u.initrd.start;
->>>> +                   initrd_size = atag->u.initrd.size;
->>>> +                   setprop_cell(dt, "/chosen", "linux,initrd-start",
->>>> +                                   initrd_start);
->>>> +                   setprop_cell(dt, "/chosen", "linux,initrd-end",
->>>> +                                   initrd_start + initrd_size);
->>>> +           }
->>>> +   }
->>>
->>> I think Russell posted a complete list of the ATAGs to translate
->>> somewhere, but at least ATAG_REVISION is missing here. That's being
->>> used quite a bit as system_rev to set things dynamically.
->>
->> No problem.  This is a work in progress.  We still can test the concept 
->> and fine tune the actual set of ATAGs being translated.
-> 
-> Let's talk about the revision field now, because it doesn't have a
-> direct correspondence in existing attributes.
-> 
-> Functionality-wise, this would probably be the "compatible" property
-> of the root node, with its most specific name to match, but that's not
-> trivial to generate.
-> 
-> In some cases, the system revisions have significant differences in their
-> devices (why else would you care about the revision), which means that you
-> actually need a different device tree per revision anyway. If that's the
-> common case, we could just ignore it completely or instead have a way
-> to choose a specific device tree from a list based on the revision.
-> 
-> Another option would be to merge both the ATAG_REVISION and ATAG_SERIAL
-> into a string and put them into the root "serial-number" property that
-> is fairly easy to do, but would be harder to parse if you actually rely
-> on specific values.
-> 
+On Tue, Jun 14, 2011 at 01:25:46PM -0700, H. Peter Anvin wrote:
 
-IIRC, system_rev at least can be specified on the kernel command line,
-so you could just append the cmd line. However, if you force the
-built-in command line to be used that would not work,
+> On 06/14/2011 12:08 PM, Ralf Baechle wrote:
+> > The PC parallel port Kconfig as acquired one of those messy terms to
+> > describe it's architecture dependencies:
+> > 
+> >        depends on (!SPARC64 || PCI) && !SPARC32 && !M32R && !FRV && \
+> >                (!M68K || ISA) && !MN10300 && !AVR32 && !BLACKFIN
+> > 
+> > This isn't just ugly - it also almost certainly describes the dependencies
+> > too coarse grainedly.  This is an attempt at cleaing the mess up.
+> > 
+> > I tried to faithfully aproximate the old behaviour but the existing
+> > behaviour seems inacurate if not wrong for some architectures or platforms.
+> > To improve on this I rely on comments from other arch and platforms
+> > maintainers.  Any system that can take PCI multi-IO card or has a PC-style
+> > parallel port on the mainboard should probably should now do a
+> > select HAVE_PC_PARPORT.  And some arch Kconfig files should further
+> > restrict the use of HAVE_PC_PARPORT to only those platforms that actually
+> > need it.
+> > 
+> 
+> Why on earth restrict it like that?  It's just a device driver, like
+> more or less any other device driver...
 
-Rob
+Some of the older MIPS systems are based on PC chipsets from Intel, OPTi
+or others.  On those you can expect the parport_pc driver to actually work.
+The ISA/PCI implementations are often between lackluster and pure brokeness
+such as with non-functioning I/O port address space.  So I don't want to
+run such drivers on such a platforms, things might turn ugly.
+
+Embedded systems often have PCI but no PCI slots or there may even be an
+apropriate SuperIO chip in the the system but nothing wired to the parallel
+port bits.
+
+And there are systems such as DECstations which have nothing that even
+at a parsec's distance has a similarity to (E)ISA or PCI - but still
+PARPORT_PC is offered along with 40 other options that depend on it.
+
+There is no point in offering to build something that couldn't possibly be
+used.  It just makes the kernel harder to configure and inflates the test
+matrix for no good reason.
+
+  Ralf
