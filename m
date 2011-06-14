@@ -1,122 +1,63 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Tue, 14 Jun 2011 15:32:41 -0500
-Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
-In-Reply-To: <201106141610.42700.heiko@sntech.de>
-References: <201106022149.47936.heiko@sntech.de>
-	<201106030956.43174.heiko@sntech.de>
-	<BANLkTi=YvSL_yzku6v3tsJaaLTL=fBXShg@mail.gmail.com>
-	<201106141610.42700.heiko@sntech.de>
-Message-ID: <BANLkTimzxUQnVn5VC8EOaJeHq=wifUhZ4A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 14 Jun 2011 22:38:09 +0200
+Subject: [PATCH v2 5/6] ARM: mxc: all three imx51 TOs use TO1 version of
+	sdma script
+In-Reply-To: <1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
+References: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
+	<1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110614203809.GA23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+On Tue, Jun 14, 2011 at 02:20:07PM +0800, Shawn Guo wrote:
+> Though there are three TOs of imx51 soc, the sdma script never
+> changes since TO1, which means all three TOs of imx51 uses TO1
+> version of sdma script.
+> 
+> The current code passes TO number to imx-sdma driver to load
+> different firmware for different TO.  That means we have to prepare
+> 3 identical firmwares, sdma-imx51-to1.bin sdma-imx51-to2.bin and
+> sdma-imx51-to3.bin, to have the kernel capable of running on all
+> three TOs.  This just makes no sense.
+> 
+> The patch removes the TO number passing and get the default TO1
+> version of sdma firmware work for all TOs.
 
-On Tue, Jun 14, 2011 at 9:10 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Hi Andrei,
->
-> Am Dienstag 14 Juni 2011 schrieb Andrei Warkentin:
->> I recently came back from vacation (which is why I didn't pitch in
->> before). Has there been any further update on this? I want to exclude
->> my EMMC partitioning changes as the possible culprit here.
->
-> nope, no updates yet. The flood also only starts when udev wants to
-> create its device nodes, meaning the initial detection seems not to
-> produce this problem
->
-> But when I disable the whole boot partition stuff, it works as before
-> without irq storms.
->
-> As there don't seem to exist reports from other emmc users about this
-> I guess the problem lays somewhere between the boot-partitions-patch
-> and the sdhci-s3c driver (for s3c2416 at least).
->
-> As my knowledge about the whole mmc-subsystem is quite spare I also
-> don't really know where to start looking for the culprit yet.
+I don't agree to this approach. The SDMA firmware has been different on
+all TO versions of earlier i.MXs. For the linearity of the universe we
+should keep this. What about providing a link in userspace?
 
-Alright. Curious. Can you let me know what eMMC device you are
-connecting to the controller? What is the eMMC revision?
+Sascha
 
-Can you also apply the following and let me know the results? This
-adds an error message if the partition switch fails, and forces the
-device to ALWAYS switch back to main user area after every completed
-RQ.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> ---
+> Changes since v1:
+>  * fix typo in imx51 firmware name caught by Fabio Estevam
+> 
+>  arch/arm/plat-mxc/devices/platform-imx-dma.c |    2 --
+>  1 files changed, 0 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+> index c64f015..2091540 100644
+> --- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
+> +++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
+> @@ -196,8 +196,6 @@ static int __init imxXX_add_imx_dma(void)
+>  
+>  #if defined(CONFIG_SOC_IMX51)
+>  	if (cpu_is_mx51()) {
+> -		int to_version = mx51_revision() >> 4;
+> -		imx51_imx_sdma_data.pdata.to_version = to_version;
+>  		imx51_imx_sdma_data.pdata.script_addrs = &addr_imx51;
+>  		ret = imx_add_imx_sdma(&imx51_imx_sdma_data);
+>  	} else
+> -- 
+> 1.7.4.1
+> 
+> 
 
->>>>>>>>>>>> start
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index 71da564..74e1029 100755
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -450,9 +450,12 @@ static inline int mmc_blk_part_switch(struct
-mmc_card *card,
-                ret = mmc_switch(card, EXT_CSD_CMD_SET_NORMAL,
-                                 EXT_CSD_PART_CONFIG, card->ext_csd.part_config,
-                                 card->ext_csd.part_time);
--               if (ret)
-+               if (ret) {
-+                       printk(KERN_ERR ">>> error switching to part_type %d\n",
-+                              md->part_type);
-                        return ret;
--}
-+               }
-+       }
-
-        main_md->part_curr = md->part_type;
-        return 0;
-@@ -964,6 +967,13 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq,
-struct request *req)
-        }
-
- out:
-+
-+       /* Switch to main_md (type = 0) */
-+       ret = mmc_blk_part_switch(card, (struct mmc_blk_data *)
-mmc_get_drvdata(card));
-+       if (ret) {
-+               ret = 0;
-+       }
-+
-        mmc_release_host(card->host);
-        return ret;
- }
->>>>>>>>>>>>>>>> end
-
-I am curious about the results. Here is another thing to try out. This
-forces a switch to user area (main partition) every time blk resume is
-invoked -
-
->>>>>>>>>>>>>>>>>>> start
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index 71da564..f7be8f7 100755
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -1318,6 +1318,7 @@ static int mmc_blk_suspend(struct mmc_card
-*card, pm_message_t state)
-
- static int mmc_blk_resume(struct mmc_card *card)
- {
-+       int ret;
-        struct mmc_blk_data *part_md;
-        struct mmc_blk_data *md = mmc_get_drvdata(card);
-
-@@ -1325,10 +1326,13 @@ static int mmc_blk_resume(struct mmc_card *card)
-                mmc_blk_set_blksize(md, card);
-
-                /*
--                * Resume involves the card going into idle state,
--                * so current partition is always the main one.
-+                * Force main user area on resume. Technically
-+                * card should have switched itself during reset.
-                 */
--               md->part_curr = md->part_type;
-+               ret = mmc_blk_part_switch(card, md);
-+               if (ret)
-+                       return ret;
-+
-                mmc_queue_resume(&md->queue);
-                list_for_each_entry(part_md, &md->part, part) {
-                        mmc_queue_resume(&part_md->queue);
->>>>>>>>>>>>>>>>>>> end
-
-Thanks for helping tracking this down,
-A
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
