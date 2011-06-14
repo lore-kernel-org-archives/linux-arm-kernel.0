@@ -1,20 +1,27 @@
-From: peter.ujfalusi@ti.com (=?ISO-8859-1?Q?P=E9ter?= Ujfalusi)
-Date: Tue, 14 Jun 2011 15:38:41 +0300
-Subject: [RFC 1/2] omap: mcbsp: Drop SPI mode support
-In-Reply-To: <1308050632-4733-1-git-send-email-jhnikula@gmail.com>
-References: <1308050632-4733-1-git-send-email-jhnikula@gmail.com>
-Message-ID: <6027329.5ZCJWRgjcM@barack>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Jun 2011 05:41:38 -0700
+Subject: [PATCH] OMAP1: PM: register notifiers with generic clock ops
+	even when !PM_RUNTIME
+In-Reply-To: <1307491502-28883-1-git-send-email-khilman@ti.com>
+References: <1307491502-28883-1-git-send-email-khilman@ti.com>
+Message-ID: <20110614124137.GD23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 14 June 2011 13:23:51 Jarkko Nikula wrote:
-> We haven't seen any use for the SPI API in McBSP driver over the years. More
-> over, Peter Ujfalusi <peter.ujfalusi@ti.com> noticed that SPI mode is not
-> even supported since OMAP2430 so it's very unlikely that we'll see any use
-> for it in the future either.
+* Kevin Hilman <khilman@ti.com> [110607 17:00]:
+> When runtime PM is disabled, device clocks need to be enabled on
+> device add and disabled on device remove.  This currently is not
+> happening because in the !PM_RUNTIME case, no notifiers are registered
+> for OMAP1 devices.
 > 
-> Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
+> Fix this by ensuring notifiers are registered, even in the !PM_RUNTIME case.
+> 
+> Reported-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> Tested-by: Janusz Krzysztofik <jkrzyszt@tis.icnet.pl>
+> Signed-off-by: Kevin Hilman <khilman@ti.com>
+> ---
+> Tony, this fix should go in for v3.0-rc as well.
 
-Either now or later, but for both:
+Adding to devel-fixes.
 
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Tony
