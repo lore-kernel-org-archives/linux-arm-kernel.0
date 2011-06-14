@@ -1,198 +1,82 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 15 Jun 2011 00:16:14 +0300
-Subject: [PATCH v3 3/3] arm: omap3: cm-t35: add support for cm-t3730
-In-Reply-To: <20110614073648.GI3352@atomide.com>
-References: <20110614073648.GI3352@atomide.com>
-Message-ID: <1308086174-3080-3-git-send-email-grinberg@compulab.co.il>
+From: ccross@android.com (Colin Cross)
+Date: Tue, 14 Jun 2011 14:19:13 -0700
+Subject: [PATCH 0/3] CPU PM notifiers
+In-Reply-To: <201106142300.42487.rjw@sisk.pl>
+References: <1307925825-28566-1-git-send-email-ccross@android.com>
+	<201106132037.49009.rjw@sisk.pl>
+	<BANLkTi=zTVPkgDO1xXPhypn5Fz6c0PTp79Wq2a6s4jrz3WrJyQ@mail.gmail.com>
+	<201106142300.42487.rjw@sisk.pl>
+Message-ID: <BANLkTi=jGKE3d0XHB1EeQ08oOqAn3hpc-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cm-t3730 is basically the same board as cm-t35,
-but has AM/DM3730 SoC assembled and therefore some changes are required.
+On Tue, Jun 14, 2011 at 2:00 PM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+> On Monday, June 13, 2011, Colin Cross wrote:
+>> On Mon, Jun 13, 2011 at 11:37 AM, Rafael J. Wysocki <rjw@sisk.pl> wrote:
+>> > On Monday, June 13, 2011, Colin Cross wrote:
+>> >> This patch set tries to address Russell's concerns with platform
+>> >> pm code calling into the driver for every block in the Cortex A9s
+>> >> during idle, hotplug, and suspend. ?The first patch adds cpu pm
+>> >> notifiers that can be called by platform code, the second uses
+>> >> the notifier to save and restore the GIC state, and the third
+>> >> saves the VFP state.
+>> >>
+>> >> The notifiers are used for two types of events, CPU PM events and
+>> >> CPU complex PM events. ?CPU PM events are used to save and restore
+>> >> per-cpu context when a single CPU is preparing to enter or has
+>> >> just exited a low power state. ?For example, the VFP saves the
+>> >> last thread context, and the GIC saves banked CPU registers.
+>> >>
+>> >> CPU complex events are used after all the CPUs in a power domain
+>> >> have been prepared for the low power state. ?The GIC uses these
+>> >> events to save global register state.
+>> >>
+>> >> Platforms that call the cpu_pm APIs must select
+>> >> CONFIG_ARCH_USES_CPU_PM
+>> >>
+>> >> L2 cache is not covered by this patch set, as the determination
+>> >> of when the L2 is reset and when it is retained is
+>> >> platform-specific, and most of the APIs necessary are already
+>> >> present.
+>> >>
+>> >> ?arch/arm/Kconfig ? ? ? ? ? ? ?| ? ?7 ++
+>> >> ?arch/arm/common/gic.c ? ? ? ? | ?212 +++++++++++++++++++++++++++++++++++++++++
+>> >> ?arch/arm/include/asm/cpu_pm.h | ? 54 +++++++++++
+>> >> ?arch/arm/kernel/Makefile ? ? ?| ? ?1 +
+>> >> ?arch/arm/kernel/cpu_pm.c ? ? ?| ?181 +++++++++++++++++++++++++++++++++++
+>> >
+>> > Is there any reason why this has to be ARM-specific? ?There are other
+>> > architectures where this kind of feature might make sense (SH and
+>> > powerpc at least).
+>>
+>> Nothing other than there are currently no adaptations for any drivers
+>> besides ARM, but I can move it somewhere outside ARM. ?Any suggestions
+>> where?
+>
+> Well, there is kernel/cpu.c. ?It contains mostly CPU hotplug and PM
+> code at the moment, so it looks like a good place.
 
-Signed-off-by: Igor Grinberg <grinberg@compulab.co.il>
-Acked-by: Mike Rapoport <mike@compulab.co.il>
----
-v3:	fix MACH_* selection
-	remove completely the use of cpu_is_*
-v2:	Add debug uart entry
+OK, I'll look at moving it there.
 
+>> > Besides, is there any overlap between this feature and the CPU hotplug
+>> > notifiers?
+>>
+>> I don't think so - the hotplug notifiers are used when a CPU is being
+>> removed from the system, so no saving and restoring is necessary - the
+>> CPU will be rebooted from scratch. ?They are used by systems outside
+>> the CPU that need to know that a CPU no longer exists.
+>>
+>> CPU PM notifiers are used when a CPU is going through reset in a way
+>> that should be transparent to most of the system.
+>
+> Do I guess correctly that you mean cpuidle?
 
- arch/arm/mach-omap2/Kconfig                  |    6 ++-
- arch/arm/mach-omap2/board-cm-t35.c           |   77 ++++++++++++++++++++-----
- arch/arm/plat-omap/include/plat/uncompress.h |    1 +
- 3 files changed, 67 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 19d5891..4ae6257 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -266,9 +266,10 @@ config MACH_OMAP_ZOOM3
- 	select REGULATOR_FIXED_VOLTAGE
- 
- config MACH_CM_T35
--	bool "CompuLab CM-T35 module"
-+	bool "CompuLab CM-T35/CM-T3730 modules"
- 	depends on ARCH_OMAP3
- 	default y
-+	select MACH_CM_T3730
- 	select OMAP_PACKAGE_CUS
- 
- config MACH_CM_T3517
-@@ -277,6 +278,9 @@ config MACH_CM_T3517
- 	default y
- 	select OMAP_PACKAGE_CBB
- 
-+config MACH_CM_T3730
-+       bool
-+
- config MACH_IGEP0020
- 	bool "IGEP v2 board"
- 	depends on ARCH_OMAP3
-diff --git a/arch/arm/mach-omap2/board-cm-t35.c b/arch/arm/mach-omap2/board-cm-t35.c
-index 256b81c..ea31281 100644
---- a/arch/arm/mach-omap2/board-cm-t35.c
-+++ b/arch/arm/mach-omap2/board-cm-t35.c
-@@ -1,5 +1,5 @@
- /*
-- * board-cm-t35.c (CompuLab CM-T35 module)
-+ * CompuLab CM-T35/CM-T3730 modules support
-  *
-  * Copyright (C) 2009-2011 CompuLab, Ltd.
-  * Authors: Mike Rapoport <mike@compulab.co.il>
-@@ -574,17 +574,11 @@ static struct omap_board_mux board_mux[] __initdata = {
- 	OMAP3_MUX(UART1_TX, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(UART1_RX, OMAP_MUX_MODE0 | OMAP_PIN_INPUT),
- 
--	/* DSS */
-+	/* common DSS */
- 	OMAP3_MUX(DSS_PCLK, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_HSYNC, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_VSYNC, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_ACBIAS, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA0, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA1, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA2, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA3, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA4, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA5, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_DATA6, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_DATA7, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_DATA8, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
-@@ -597,12 +591,6 @@ static struct omap_board_mux board_mux[] __initdata = {
- 	OMAP3_MUX(DSS_DATA15, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_DATA16, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 	OMAP3_MUX(DSS_DATA17, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA18, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA19, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA20, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA21, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA22, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
--	OMAP3_MUX(DSS_DATA23, OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT),
- 
- 	/* display controls */
- 	OMAP3_MUX(MCBSP1_FSR, OMAP_MUX_MODE4 | OMAP_PIN_OUTPUT),
-@@ -615,19 +603,53 @@ static struct omap_board_mux board_mux[] __initdata = {
- 
- 	{ .reg_offset = OMAP_MUX_TERMINATOR },
- };
-+
-+static void __init cm_t3x_common_dss_mux_init(int mux_mode)
-+{
-+	omap_mux_init_signal("dss_data18", mux_mode);
-+	omap_mux_init_signal("dss_data19", mux_mode);
-+	omap_mux_init_signal("dss_data20", mux_mode);
-+	omap_mux_init_signal("dss_data21", mux_mode);
-+	omap_mux_init_signal("dss_data22", mux_mode);
-+	omap_mux_init_signal("dss_data23", mux_mode);
-+}
-+
-+static void __init cm_t35_init_mux(void)
-+{
-+	omap_mux_init_signal("gpio_70", OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("gpio_71", OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("gpio_72", OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("gpio_73", OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("gpio_74", OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("gpio_75", OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT);
-+	cm_t3x_common_dss_mux_init(OMAP_MUX_MODE0 | OMAP_PIN_OUTPUT);
-+}
-+
-+static void __init cm_t3730_init_mux(void)
-+{
-+	omap_mux_init_signal("sys_boot0", OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("sys_boot1", OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("sys_boot3", OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("sys_boot4", OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("sys_boot5", OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-+	omap_mux_init_signal("sys_boot6", OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-+	cm_t3x_common_dss_mux_init(OMAP_MUX_MODE3 | OMAP_PIN_OUTPUT);
-+}
-+#else
-+static inline void cm_t35_init_mux(void) {}
-+static inline void cm_t3730_init_mux(void) {}
- #endif
- 
- static struct omap_board_config_kernel cm_t35_config[] __initdata = {
- };
- 
--static void __init cm_t35_init(void)
-+static void __init cm_t3x_common_init(void)
- {
- 	omap_board_config = cm_t35_config;
- 	omap_board_config_size = ARRAY_SIZE(cm_t35_config);
- 	omap3_mux_init(board_mux, OMAP_PACKAGE_CUS);
- 	omap_serial_init();
- 	cm_t35_init_i2c();
--	cm_t35_init_nand();
- 	omap_ads7846_init(1, CM_T35_GPIO_PENDOWN, 0, NULL);
- 	cm_t35_init_ethernet();
- 	cm_t35_init_led();
-@@ -637,6 +659,19 @@ static void __init cm_t35_init(void)
- 	usbhs_init(&usbhs_bdata);
- }
- 
-+static void __init cm_t35_init(void)
-+{
-+	cm_t3x_common_init();
-+	cm_t35_init_mux();
-+	cm_t35_init_nand();
-+}
-+
-+static void __init cm_t3730_init(void)
-+{
-+	cm_t3x_common_init();
-+	cm_t3730_init_mux();
-+}
-+
- MACHINE_START(CM_T35, "Compulab CM-T35")
- 	.boot_params	= 0x80000100,
- 	.reserve	= omap_reserve,
-@@ -646,3 +681,13 @@ MACHINE_START(CM_T35, "Compulab CM-T35")
- 	.init_machine	= cm_t35_init,
- 	.timer		= &omap_timer,
- MACHINE_END
-+
-+MACHINE_START(CM_T3730, "Compulab CM-T3730")
-+	.boot_params    = 0x80000100,
-+	.reserve        = omap_reserve,
-+	.map_io         = omap3_map_io,
-+	.init_early     = cm_t35_init_early,
-+	.init_irq       = omap_init_irq,
-+	.init_machine   = cm_t3730_init,
-+	.timer          = &omap_timer,
-+MACHINE_END
-diff --git a/arch/arm/plat-omap/include/plat/uncompress.h b/arch/arm/plat-omap/include/plat/uncompress.h
-index ac4b60d..a067484 100644
---- a/arch/arm/plat-omap/include/plat/uncompress.h
-+++ b/arch/arm/plat-omap/include/plat/uncompress.h
-@@ -148,6 +148,7 @@ static inline void __arch_decomp_setup(unsigned long arch_id)
- 		/* omap3 based boards using UART3 */
- 		DEBUG_LL_OMAP3(3, cm_t35);
- 		DEBUG_LL_OMAP3(3, cm_t3517);
-+		DEBUG_LL_OMAP3(3, cm_t3730);
- 		DEBUG_LL_OMAP3(3, craneboard);
- 		DEBUG_LL_OMAP3(3, devkit8000);
- 		DEBUG_LL_OMAP3(3, igep0020);
--- 
-1.7.3.4
+cpuidle is the major user, but primary CPUs in suspend have to save
+and restore the same blocks, and tend to use the same platform sleep
+code as idle, so it's logical to use the notifiers for both.  On the
+other hand, some drivers that would use cpu_pm notifiers already use
+syscore ops to handle suspend and resume (like vfp) - maybe these
+notifiers should only be used in cpuidle, and syscore ops added to the
+gic driver?  I could also convert the notifiers to new syscore_ops -
+cpu_idle, cpu_unidle, cpu_cluster_idle, cpu_cluster_unidle, but I
+don't know how well that fits in to the intention for syscore.
