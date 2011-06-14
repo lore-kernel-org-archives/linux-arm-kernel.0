@@ -1,58 +1,67 @@
 From: zach.pfeffer@linaro.org (Zach Pfeffer)
-Date: Tue, 14 Jun 2011 13:58:25 -0500
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
-	Allocator added
-In-Reply-To: <20110614170158.GU2419@fooishbar.org>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106141549.29315.arnd@arndb.de>
-	<op.vw2jmhir3l0zgt@mnazarewicz-glaptop>
-	<201106141803.00876.arnd@arndb.de>
-	<20110614170158.GU2419@fooishbar.org>
-Message-ID: <BANLkTi=cJisuP8=_YSg4h-nsjGj3zsM7sg@mail.gmail.com>
+Date: Tue, 14 Jun 2011 14:10:04 -0500
+Subject: [Linaro-mm-sig] [RFC 0/2] ARM: DMA-mapping & IOMMU integration
+In-Reply-To: <20110614112108.0186c562@jbarnes-desktop>
+References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
+	<BANLkTi=HtrFETnjk1Zu0v9wqa==r0OALvA@mail.gmail.com>
+	<201106131707.49217.arnd@arndb.de>
+	<BANLkTikR5AE=-wTWzrSJ0TUaks0_rA3mcg@mail.gmail.com>
+	<20110613154033.GA29185@1n450.cable.virginmedia.net>
+	<BANLkTikkCV=rWM_Pq6t6EyVRHcWeoMPUqw@mail.gmail.com>
+	<BANLkTi=C6NKT94Fk6Rq6wmhndVixOqC6mg@mail.gmail.com>
+	<20110613115437.62824f2f@jbarnes-desktop>
+	<BANLkTimV5ZXVTDDFqHxMpOkrgokdCp1YXA@mail.gmail.com>
+	<20110614112108.0186c562@jbarnes-desktop>
+Message-ID: <BANLkTimXdVqAXP7nQLE=y79xOOJ1a5ayOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14 June 2011 12:01, Daniel Stone <daniels@collabora.com> wrote:
-> Hi,
+On 14 June 2011 13:21, Jesse Barnes <jbarnes@virtuousgeek.org> wrote:
+> On Tue, 14 Jun 2011 11:15:38 -0700
+> "Michael K. Edwards" <m.k.edwards@gmail.com> wrote:
+>> What doesn't seem to be straightforward to do from userland is to
+>> allocate pages that are locked to physical memory and mapped for
+>> write-combining. ?The device driver shouldn't have to mediate their
+>> allocation, just map to a physical address (or set up an IOMMU entry,
+>> I suppose) and pass that to the hardware that needs it. ?Typical
+>> userland code that could use such a mechanism would be the Qt/OpenGL
+>> back end (which needs to store decompressed images and other
+>> pre-rendered assets in GPU-ready buffers) and media pipelines.
 >
-> On Tue, Jun 14, 2011 at 06:03:00PM +0200, Arnd Bergmann wrote:
->> On Tuesday 14 June 2011, Michal Nazarewicz wrote:
->> > On Tue, 14 Jun 2011 15:49:29 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
->> > > Please explain the exact requirements that lead you to defining multiple
->> > > contexts.
->> >
->> > Some devices may have access only to some banks of memory. ?Some devices
->> > may use different banks of memory for different purposes.
->>
->> For all I know, that is something that is only true for a few very special
->> Samsung devices, and is completely unrelated of the need for contiguous
->> allocations, so this approach becomes pointless as soon as the next
->> generation of that chip grows an IOMMU, where we don't handle the special
->> bank attributes. Also, the way I understood the situation for the Samsung
->> SoC during the Budapest discussion, it's only a performance hack, not a
->> functional requirement, unless you count '1080p playback' as a functional
->> requirement.
-
-Coming in mid topic...
-
-I've seen this split bank allocation in Qualcomm and TI SoCs, with
-Samsung, that makes 3 major SoC vendors (I would be surprised if
-Nvidia didn't also need to do this) - so I think some configurable
-method to control allocations is necessarily. The chips can't do
-decode without it (and by can't do I mean 1080P and higher decode is
-not functionally useful). Far from special, this would appear to be
-the default.
-
-> Hm, I think that was something similar but not quite the same: talking
-> about having allocations split to lie between two banks of RAM to
-> maximise the read/write speed for performance reasons. ?That's something
-> that can be handled in the allocator, rather than an API constraint, as
-> this is.
+> We try to avoid allowing userspace to pin arbitrary buffers though. ?So
+> on the gfx side, userspace can allocate buffers, but they're only
+> actually pinned when some operation is performed on them (e.g. they're
+> referenced in a command buffer or used for a mode set operation).
 >
-> Not that I know of any hardware which is limited as such, but eh.
+> Something like ION or GEM can provide the basic alloc & map API, but
+> the platform code still has to deal with grabbing hunks of memory,
+> making them uncached or write combine, and mapping them to app space
+> without conflicts.
 >
-> Cheers,
-> Daniel
+>> Also a nice source of sample code; though, again, I don't want this to
+>> be driver-specific. ?I might want a stage in my media pipeline that
+>> uses the GPU to perform, say, lens distortion correction. ?I shouldn't
+>> have to go through contortions to use the same buffers from the GPU
+>> and the video capture device. ?The two devices are likely to have
+>> their own variants on scatter-gather DMA, with a circularly linked
+>> list of block descriptors with ownership bits and all that jazz; but
+>> the actual data buffers should be generic, and the userland pipeline
+>> setup code should just allocate them (presumably as contiguous regions
+>> in a write-combining hugepage) and feed them to the plumbing.
+>
+> Totally agree. ?That's one reason I don't think enhancing the DMA
+> mapping API in the kernel is a complete solution. ?Sure, the platform
+> code needs to be able to map buffers to devices and use any available
+> IOMMUs, but we still need a userspace API for all of that, with its
+> associated changes to the CPU MMU handling.
+
+I haven't seen all the discussions but it sounds like creating the
+correct userspace abstraction and then looking at how the kernel needs
+to change (instead of the other way around) may add some clarity to
+things.
+
+> --
+> Jesse Barnes, Intel Open Source Technology Center
 >
 > _______________________________________________
 > Linaro-mm-sig mailing list
