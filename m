@@ -1,151 +1,77 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 15 Jun 2011 00:48:58 +0100
-Subject: [MPCore Watchdog]: Convert from misc_dev to dynamic device node.
-In-Reply-To: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
-References: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
-Message-ID: <20110614234858.GA15534@gallagher>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Tue, 14 Jun 2011 19:50:02 -0400 (EDT)
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <4DF7E191.1050705@gmail.com>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110614145329.GK23145@atomide.com>
+	<alpine.LFD.2.00.1106141322530.2142@xanadu.home>
+	<201106142232.02217.arnd@arndb.de> <4DF7E191.1050705@gmail.com>
+Message-ID: <alpine.LFD.2.00.1106141948060.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+On Tue, 14 Jun 2011, Rob Herring wrote:
 
-On Tue, Jun 14, 2011 at 04:29:26PM -0700, Peter Fordham wrote:
-> The current MPCore watchdog driver uses a misc_dev device node.
-> This patch changes it to use dynamically allocated device numbers.
+> On 06/14/2011 03:32 PM, Arnd Bergmann wrote:
+> > On Tuesday 14 June 2011 19:28:49 Nicolas Pitre wrote:
+> >> On Tue, 14 Jun 2011, Tony Lindgren wrote:
+> >>
+> >>> * Nicolas Pitre <nicolas.pitre@linaro.org> [110614 00:04]:
+> >>>> +
+> >>>> +   for_each_tag(atag, atag_list) {
+> >>>> +           if (atag->hdr.tag == ATAG_CMDLINE) {
+> >>>> +                   setprop_string(dt, "/chosen", "bootargs",
+> >>>> +                                     atag->u.cmdline.cmdline);
+> >>>> +           } else if (atag->hdr.tag == ATAG_MEM) {
+> >>>> +                   uint32_t mem_reg_property[2];
+> >>>> +                   mem_reg_property[0] = cpu_to_fdt32(atag->u.mem.start);
+> >>>> +                   mem_reg_property[1] = cpu_to_fdt32(atag->u.mem.size);
+> >>>> +                   setprop(dt, "/memory", "reg", mem_reg_property,
+> >>>> +                              sizeof(mem_reg_property));
+> >>>> +           } else if (atag->hdr.tag == ATAG_INITRD2) {
+> >>>> +                   uint32_t initrd_start, initrd_size;
+> >>>> +                   initrd_start = atag->u.initrd.start;
+> >>>> +                   initrd_size = atag->u.initrd.size;
+> >>>> +                   setprop_cell(dt, "/chosen", "linux,initrd-start",
+> >>>> +                                   initrd_start);
+> >>>> +                   setprop_cell(dt, "/chosen", "linux,initrd-end",
+> >>>> +                                   initrd_start + initrd_size);
+> >>>> +           }
+> >>>> +   }
+> >>>
+> >>> I think Russell posted a complete list of the ATAGs to translate
+> >>> somewhere, but at least ATAG_REVISION is missing here. That's being
+> >>> used quite a bit as system_rev to set things dynamically.
+> >>
+> >> No problem.  This is a work in progress.  We still can test the concept 
+> >> and fine tune the actual set of ATAGs being translated.
+> > 
+> > Let's talk about the revision field now, because it doesn't have a
+> > direct correspondence in existing attributes.
+> > 
+> > Functionality-wise, this would probably be the "compatible" property
+> > of the root node, with its most specific name to match, but that's not
+> > trivial to generate.
+> > 
+> > In some cases, the system revisions have significant differences in their
+> > devices (why else would you care about the revision), which means that you
+> > actually need a different device tree per revision anyway. If that's the
+> > common case, we could just ignore it completely or instead have a way
+> > to choose a specific device tree from a list based on the revision.
+> > 
+> > Another option would be to merge both the ATAG_REVISION and ATAG_SERIAL
+> > into a string and put them into the root "serial-number" property that
+> > is fairly easy to do, but would be harder to parse if you actually rely
+> > on specific values.
+> > 
+> 
+> IIRC, system_rev at least can be specified on the kernel command line,
+> so you could just append the cmd line. However, if you force the
+> built-in command line to be used that would not work,
 
-I'm not sure that this is the correct thing to do.  All other watchdog devices 
-use a miscdevice with a major:minor of 10:130, is there a specific reason 
-that this node needs to be dynamic?
+If you do that then you probably don't care as much about translating 
+existing ATAGs from the bootloader and could as well just live with the 
+hardcoded values in the appended DTB.
 
-Also few other comments inline.
 
-Jamie
-
-> ---
->  drivers/watchdog/mpcore_wdt.c |   48 +++++++++++++++++++++++++++++------------
->  1 files changed, 34 insertions(+), 14 deletions(-)
-> 
-> diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-> index 2b4af22..f6afc20 100644
-> --- a/drivers/watchdog/mpcore_wdt.c
-> +++ b/drivers/watchdog/mpcore_wdt.c
-> @@ -32,6 +32,8 @@
->  #include <linux/uaccess.h>
->  #include <linux/slab.h>
->  #include <linux/io.h>
-> +#include <linux/cdev.h>
-> +#include <linux/device.h>
-> 
->  #include <asm/smp_twd.h>
-> 
-> @@ -42,6 +44,9 @@ struct mpcore_wdt {
->  	int		irq;
->  	unsigned int	perturb;
->  	char		expect_close;
-> +        struct cdev     cdev;
-> +        struct class    *class;
-> +        dev_t           number;
-
-It looks like tabs have been converted to spaces here.
-
->  };
-> 
->  static struct platform_device *mpcore_wdt_dev;
-> @@ -318,12 +323,6 @@ static const struct file_operations mpcore_wdt_fops = {
->  	.release	= mpcore_wdt_release,
->  };
-> 
-> -static struct miscdevice mpcore_wdt_miscdev = {
-> -	.minor		= WATCHDOG_MINOR,
-> -	.name		= "watchdog",
-> -	.fops		= &mpcore_wdt_fops,
-> -};
-> -
->  static int __devinit mpcore_wdt_probe(struct platform_device *dev)
->  {
->  	struct mpcore_wdt *wdt;
-> @@ -358,14 +357,15 @@ static int __devinit mpcore_wdt_probe(struct
-> platform_device *dev)
->  		goto err_free;
->  	}
-> 
-> -	mpcore_wdt_miscdev.parent = &dev->dev;
-> -	ret = misc_register(&mpcore_wdt_miscdev);
-> -	if (ret) {
-> + 	ret = alloc_chrdev_region(&wdt->number, 0, 1, "mpcore_wdt");
-> +	if (ret < 0) {
->  		dev_printk(KERN_ERR, wdt->dev,
-> -			"cannot register miscdev on minor=%d (err=%d)\n",
-> -							WATCHDOG_MINOR, ret);
-> +			"cannot register with dynamic device number (err=%d)\n", -ret);
->  		goto err_misc;
->  	}
-> +	dev_printk(KERN_INFO, wdt->dev, "using device number %d, %d",
-> MAJOR(wdt->number), MINOR(wdt->number));
-> +
-> +        cdev_init(&wdt->cdev, &mpcore_wdt_fops);
-> 
->  	ret = request_irq(wdt->irq, mpcore_wdt_fire, IRQF_DISABLED,
->  							"mpcore_wdt", wdt);
-> @@ -379,10 +379,24 @@ static int __devinit mpcore_wdt_probe(struct
-> platform_device *dev)
->  	platform_set_drvdata(dev, wdt);
->  	mpcore_wdt_dev = dev;
-> 
-> -	return 0;
-> +        ret = cdev_add(&wdt->cdev, wdt->number, 1);
-> +	if (ret < 0) {
-> +		dev_printk(KERN_ERR, wdt->dev, "failed to add character device\n");
-> +		goto err_cdev_add;
-> +	}
-> 
-> +        /* create /dev/watchdog
-> +         * we use udev to make the file
-> +         */
-> +        wdt->class = class_create(THIS_MODULE,"watchdog");
-> +        (void) device_create(wdt->class, wdt->dev,
-> wdt->number,NULL,"watchdog");
-
-The return value of class_create() and device_create() should be checked here 
-and handled appropriately.  I believe the sysfs classes are pretty much 
-deprecated now in preference of a bus too.
-
-> +
-> +        return 0;
-> +
-> +err_cdev_add:
-> +	free_irq(wdt->irq, wdt);
->  err_irq:
-> -	misc_deregister(&mpcore_wdt_miscdev);
-> +        unregister_chrdev_region (wdt->number, 1);
->  err_misc:
->  	iounmap(wdt->base);
->  err_free:
-> @@ -395,9 +409,15 @@ static int __devexit mpcore_wdt_remove(struct
-> platform_device *dev)
->  {
->  	struct mpcore_wdt *wdt = platform_get_drvdata(dev);
-> 
-> +        device_destroy(wdt->class,wdt->number);
-> +        class_unregister(wdt->class);
-> +        class_destroy(wdt->class);
-
-class_destroy() calls calls_unregister() internally so you wouldn't need to 
-call this.
-
-> +        cdev_del(&wdt->cdev);
-> +
->  	platform_set_drvdata(dev, NULL);
-> 
-> -	misc_deregister(&mpcore_wdt_miscdev);
-> +        unregister_chrdev_region (wdt->number, 1);
-> 
->  	mpcore_wdt_dev = NULL;
-> 
-> -- 
-> 1.7.0.4
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Nicolas
