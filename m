@@ -1,61 +1,117 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 14 Jun 2011 11:58:20 +0100
-Subject: [RFC PATCH v2 0/5] Add generic macros for declaring various CPU
-	structs
-Message-ID: <1308049105-16080-1-git-send-email-dave.martin@linaro.org>
+Date: Tue, 14 Jun 2011 11:58:21 +0100
+Subject: [RFC PATCH v2 1/5] ARM: mm: Add generic proc/arch struct definition
+	macros
+In-Reply-To: <1308049105-16080-1-git-send-email-dave.martin@linaro.org>
+References: <1308049105-16080-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <1308049105-16080-2-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on previous discussions, this series provides an alternative
-macro for defining CPU-specific structures compactly.
+This patch adds some generic macros to reduce boilerplate when
+declaring certain common structures in arch/arm/mm/*.S
 
-I don't get to have so much fun with macros in this version, but
-it's more straightforward and actually allows the declarations to
-be collapsed down further by taking advantage of common naming
-conventions.
+Thanks to Russell King for outlining what the
+define_processor_functions macro could look like.
 
-In this RFC, only the arch names, processor_functions and
-cache_functions are turned into macros, to show how this could
-work.  This could be straightforwardly extended to cover tlb_fns,
-but proc_info is more complex and may require a bit more thought.
-
-A couple of files are ported to use the macros as an example.
-
-These patches are for illustration only and **untested** (although
-I have build-tested omap2plus_defconfig).
-
-Unresolved issues:
-
- * The architecture/CPU name strings were previously split out into
-   separate places, with the CPU name in .text and the other
-   strings in .rodata.  This looked anomalous, so now a common
-   mergeable string section .rodata.str is used instead.  This can
-   be changed if needed.
-
- * For consistency, I've renamed the arch/CPU name string labels.
-   If that is seen as unnecessary churn, it can be undone.
-
- * It's unclear whether it's better to switch sections inside the
-   macros or outside.  Currently I switch inside, but the previous
-   section is always restored using .popsection at the end of the
-   macro to avoid confusion.  I'm assuming that there will never
-   be a need to put any of this data in a custom section: if that's
-   a bad assumption, we could move the section directives back
-   outside the macros.
-
-Dave Martin (5):
-  ARM: mm: Add generic proc/arch struct definition macros
-  ARM: proc-v7: Use new generic struct definition macros
-  ARM: cache-v7: Use new generic struct definition macros
-  ARM: proc-v6: Use new generic struct definition macros
-  ARM: cache-v6: Use new generic struct definition macros
-
- arch/arm/mm/cache-v6.S    |   16 +--------
- arch/arm/mm/cache-v7.S    |   16 +--------
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
+---
  arch/arm/mm/proc-macros.S |   79 +++++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mm/proc-v6.S     |   43 +++---------------------
- arch/arm/mm/proc-v7.S     |   46 ++++---------------------
- 5 files changed, 94 insertions(+), 106 deletions(-)
+ 1 files changed, 79 insertions(+), 0 deletions(-)
 
+diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+index 34261f9..3c5ffbb 100644
+--- a/arch/arm/mm/proc-macros.S
++++ b/arch/arm/mm/proc-macros.S
+@@ -4,6 +4,7 @@
+  *  VMA_VM_FLAGS
+  *  VM_EXEC
+  */
++#include <linux/init.h>
+ #include <asm/asm-offsets.h>
+ #include <asm/thread_info.h>
+ 
+@@ -254,3 +255,81 @@
+ 	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
+ 	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
+ 	.endm
++
++.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
++	.pushsection .text
++
++	__INITDATA
++
++	.type	\name\()_processor_functions, #object
++
++ENTRY(\name\()_processor_functions)
++	.word	\dabort\()_abort
++	.word	\pabort\()_pabort
++	.word	cpu_\name\()_proc_init
++	.word	cpu_\name\()_proc_fin
++	.word	cpu_\name\()_reset
++	.word	cpu_\name\()_do_idle
++	.word	cpu_\name\()_dcache_clean_area
++	.word	cpu_\name\()_switch_mm
++
++	.if \nommu
++	.word	0
++	.else
++	.word	cpu_\name\()_set_pte_ext
++	.endif
++
++	.if \suspend
++	.word	cpu_\name\()_suspend_size
++	.word	cpu_\name\()_do_suspend
++	.word	cpu_\name\()_do_resume
++	.else
++	.word	0
++	.word	0
++	.word	0
++	.endif
++
++	.size	\name\()_processor_functions, . - \name\()_processor_functions
++
++	.popsection
++.endm
++
++.macro define_proc_names name:req, arch:req, elf:req, cpu:req
++	.pushsection .rodata.str, "aMS", 1
++
++	.type \name\()_arch_name, #object
++\name\()_arch_name: .asciz "\arch"
++	.size \name\()_arch_name, . - \name\()_arch_name
++
++	.type \name\()_elf_name, #object
++\name\()_elf_name: .asciz "\elf"
++	.size \name\()_elf_name, . - \name\()_elf_name
++
++	.type \name\()_cpu_name, #object
++\name\()_cpu_name: .asciz "\cpu"
++	.size \name\()_cpu_name, . - \name\()_cpu_name
++
++	.popsection
++.endm
++
++.macro define_cache_functions name:req
++	.pushsection .text
++
++	__INITDATA
++
++	.type	\name\()_cache_fns, #object
++ENTRY(\name\()_cache_fns)
++	.long	\name\()_flush_icache_all
++	.long	\name\()_flush_kern_cache_all
++	.long	\name\()_flush_user_cache_all
++	.long	\name\()_flush_user_cache_range
++	.long	\name\()_coherent_kern_range
++	.long	\name\()_coherent_user_range
++	.long	\name\()_flush_kern_dcache_area
++	.long	\name\()_dma_map_area
++	.long	\name\()_dma_unmap_area
++	.long	\name\()_dma_flush_range
++	.size	\name\()_cache_fns, . - \name\()_cache_fns
++
++	.popsection
++.endm
 -- 
 1.7.4.1
