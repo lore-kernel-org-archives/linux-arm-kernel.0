@@ -1,61 +1,87 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Tue, 14 Jun 2011 16:29:57 +0200
-Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
-	support for mx5
-In-Reply-To: <20110614113902.GD30295@S2100-06.ap.freescale.net> (Shawn Guo's
-	message of "Tue, 14 Jun 2011 19:39:03 +0800")
-References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
-	<20110614064841.GB30295@S2100-06.ap.freescale.net>
-	<87ei2wk6na.fsf@lebrac.rtp-net.org>
-	<20110614113902.GD30295@S2100-06.ap.freescale.net>
-Message-ID: <87lix4iize.fsf@lebrac.rtp-net.org>
+From: ccross@google.com (Colin Cross)
+Date: Tue, 14 Jun 2011 07:48:40 -0700
+Subject: About secondary CPU resume PC address?
+In-Reply-To: <BANLkTim-QXzsNTgrKsGac+Yum44KavvJ2w@mail.gmail.com>
+References: <BANLkTim-QXzsNTgrKsGac+Yum44KavvJ2w@mail.gmail.com>
+Message-ID: <BANLkTin8ghuM36kAobA9wXrYDcdBDTMrJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shawn Guo <shawn.guo@freescale.com> writes:
+On Tue, Jun 14, 2011 at 4:02 AM, udmd-eric wann <udmderic@gmail.com> wrote:
+> ?Hi:
+>
+> ? ? ? ?We am tracing Cortex-A9 SMP suspend/resume code now.
+> ? ? ? ?We use linux-2.6.39 mach-tegra and mach-exynos4210 for reference code.
+> ? ? ? ?(We don't have the hardware.)
+>
+> ? ? ? ?In mach-tegra, hardware can power down both CPU cores and the GICs.
+> ? ? ?(http://lists.arm.linux.org.uk/lurker/message/20110124.020118.a08c51fc.en.html)
+>
+> ? ? ? ?Because CPU power off, so some CPU information should be
+> remembered in SRAM/Register/RAM ...
+> ? ? ?The most important information we think is resume PC address for
+> "both" CPUs.
+>
+> ? ? ?For boot CPU, the resume address is handled by ROM code.
+> ? ? ?But for secondary CPU, where is the resume entry address??
+>
+> ? ? ?It seems that tegra2 set the secondary CPU wakeup address in
+> function
+> ? ? ? boot_secondary
+>
+> ? ? ? int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
+> ? ? ? {
+> ? ? ? ? ? ? ? ?...
+> ? ? ? ? ? ? ? ?/* set the reset vector to point to the secondary_startup routine */
+>
+> ? ? ? ? ? ? ? ?boot_vector = virt_to_phys(tegra_secondary_startup);
+> ? ? ? ? ? ? ? ?old_boot_vector = readl(EVP_CPU_RESET_VECTOR);
+> ? ? ? ? ? ? ? ?writel(boot_vector, EVP_CPU_RESET_VECTOR);
+> ? ? ? ? ? ? ? ?...
+> ? ? ? }
+>
+> ? ? ? mach-tegra also set the function tegra_secondary_startup in
+> __CPUINIT section.
+> ? ? ? So the secondary CPU resume will run the same path like the
+> first cold boot...
+> ? ? ? Is it correct?
 
-> On Tue, Jun 14, 2011 at 01:13:29PM +0200, Arnaud Patard wrote:
->> Shawn Guo <shawn.guo@freescale.com> writes:
->> 
->> Hi,
->> 
->> > On Fri, Jun 10, 2011 at 06:42:48PM +0800, Shawn Guo wrote:
->> >> The card-present polling within sdhci based driver is very expensive
->> >> in terms of the impact to system performance.  We observe a few
->> >> system performance issues from Freescale and Linaro on mx5 platforms,
->> >> which have been proved card polling related.
->> >> 
->> >> The patch set extends the current sdhci-esdhc-imx card_detect and
->> >> write_protect support to cover mx5 platforms, and solves above
->> >> performance issues.
->> >> 
->> >> Shawn Guo (4):
->> >>       mmc: sdhci: fix interrupt storm from card detection
->> >>       mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
->> >>       mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
->> >>       mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
->> >> 
->> > Hi Arnaud,
->> >
->> > Any chance to play with it yet?
->> 
->> I tried applying the patch 4 (v2) on mmc git and Sascha Hauer's for-next
->> branch and failed. Can you please tell me on which tree should I apply
->> it ?
->> 
-> Sascha really should not picked up the following 3 patches.  They are
-> nonsense when driver is not even ready for the support.  These 3
-> patches have conflict with my patch set.  You should be able to
-> apply with these 3 removed.
+Linux does not suspend and resume the second CPU - it uses hotplug to
+shut the CPU down in suspend, and then turn it back on in resume,
+which should boot it from scratch, so no state has to be saved on the
+second CPU.
 
-They're still not applying. It's failing to failing
-sdhci-esdhc-imx.c. I'm currently trying t make sure I didn't miss
-something but it looks like the patch is not against for-next. For
-instance, look at :
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=blob;f=drivers/mmc/host/sdhci-esdhc-imx.c;h=a19967d0bfc48b0ce8216de0d1a727093ee9fa03;hb=refs/heads/for-next
+Different hardware treats the second CPU differently.  On Tegra, the
+second CPU is held in reset when booting or resuming.  The first CPU
+comes out of reset and starts booting from the address in
+EVP_CPU_RESET_VECTOR (which is set to tegra_resume).  When the hotplug
+code is called later to boot the second CPU, it modifies
+EVP_CPU_RESET_VECTOR to point to tegra_secondary_startup, and then
+takes the second CPU out of reset.
 
-It's already adding a esdhc_pltfm_get_ro() function, so I fail to see
-how a patch adding a function with same name can work.
+Other platforms may have a different reset vector for each CPU, and
+both CPUs may come out of reset at the same time, but the second CPU
+enters an infinite loop somewhere waiting for the first CPU to signal
+it.
 
-Thanks,
-Arnaud
+> ? ? ? ? ?However, in mach-exynos4, we don't see this behavior.
+> ? ? ? mach-exynos4 set secondary cpu wakeup address only in
+> ? ? ? void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+> ? ? ? and exynos4_secondary_startup is in __INIT section.
+> ? ? ? So we don't know when the secondary cpu resume, which entry
+> address it should run...
+> ? ? ? Do we miss some important key point?
+
+I'm not familiar with exynos4, but maybe it doesn't support hotplug?
+
+> ? ? ? Thanks for your help.
+>
+> ? ? ? Best Regards
+>
+> Eric Wann
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
