@@ -1,38 +1,79 @@
-From: ccross@android.com (Colin Cross)
-Date: Mon, 13 Jun 2011 23:00:15 -0700
-Subject: [PATCH] ARM: smp_twd: Reconfigure clockevents after cpufreq change
-In-Reply-To: <BANLkTikEx0+SpwiWHqLNcs0oaLoN4LccHQ@mail.gmail.com>
-References: <1306919711-30965-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTikEx0+SpwiWHqLNcs0oaLoN4LccHQ@mail.gmail.com>
-Message-ID: <BANLkTik8sz+JQE1nTcEvZLo5PynwK0+zZA@mail.gmail.com>
+From: zhangfei.gao@gmail.com (zhangfei gao)
+Date: Tue, 14 Jun 2011 14:07:53 +0800
+Subject: [PATCH v4 2/5] mmc: support sdhci-pxav2.c
+In-Reply-To: <0059AEB1-3536-4540-924A-A95C7F3AD21A@marvell.com>
+References: <1307526121-12059-1-git-send-email-zhangfei.gao@marvell.com>
+	<1307526121-12059-3-git-send-email-zhangfei.gao@marvell.com>
+	<0059AEB1-3536-4540-924A-A95C7F3AD21A@marvell.com>
+Message-ID: <BANLkTimeb-Ax99rQDYckLsVSncxhrh7amg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 13, 2011 at 10:50 PM, Linus Walleij
-<linus.ml.walleij@gmail.com> wrote:
-> Colin, Per Fransson noted this:
->
->> From: Colin Cross <ccross@android.com>
->
->> +/*
->> + * Updates clockevent frequency when the cpu frequency changes.
->> + * Called on the cpu that is changing frequency with interrupts disabled.
->> + */
->> +static void twd_update_frequency(void *data)
+>> +static void pxav2_set_private_registers(struct sdhci_host *host, u8 mask)
 >> +{
->> + ? ? ? twd_timer_rate = clk_get_rate(twd_clk);
+>> + ? ? struct platform_device *pdev = to_platform_device(mmc_dev(host->mmc));
+>> + ? ? struct sdhci_pxa_platdata *pdata = pdev->dev.platform_data;
 >> +
->> + ? ? ? clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
->> +}
+>> + ? ? if (mask == SDHCI_RESET_ALL) {
+>> + ? ? ? ? ? ? u16 tmp = 0;
+>> +
+>> + ? ? ? ? ? ? /*
+>> + ? ? ? ? ? ? ?* tune timing of read data/command when crc error happen
+>> + ? ? ? ? ? ? ?* no performance impact
+>> + ? ? ? ? ? ? ?*/
+>> + ? ? ? ? ? ? if (pdata->clk_delay_sel == 1) {
+>> + ? ? ? ? ? ? ? ? ? ? tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? tmp &= ~(SDCLK_DELAY_MASK << SDCLK_DELAY_SHIFT);
+>> + ? ? ? ? ? ? ? ? ? ? tmp |= (pdata->clk_delay_cycles & SDCLK_DELAY_MASK)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? << SDCLK_DELAY_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+>> + ? ? ? ? ? ? ? ? ? ? tmp |= (1 & SDCLK_SEL_MASK) << SDCLK_SEL_SHIFT;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>> + ? ? ? ? ? ? }
 >
-> Will only update the clockevent on the CPU where the cpufreq notifier
-> gets called will it not? It's not called on each CPU AFAICT.
+> There are 3 possible value for clk_delay_sel.
 >
-> So this function has to traverse all CPUs in twd_ce.
+> 0 ?== do not use clk_delay_cycles
+> 1 == use programmed clk_delay_cycles value (the code above)
+> all other values use the sd_clk which was used to drive the output
+>
+> The code about only handles 2 of the 3 cases
 
-OMAP and Tegra both iterate through all the affected cpus in the
-cpufreq driver and call cpufreq_notify_transtion once for each,
-setting freqs.cpu to the target cpu.  The listener in the smp_twd
-driver then bounces through smp_call_function_single to make sure it
-is running on the affected cpu.  I believe that is the correct way to
-handle multiple affected cpus.
+pxa910/920 only require two cases.
+1, clk_delay_sel = 1 with delay value.
+2, use default setting and directly use sd_clk. clk_delay_sel = 3.
+
+>
+> suggest
+>
+> ? ? ? ?(if (pdata->clk_delay_sel) {
+>> + ? ? ? ? ? ? if (pdata->clk_delay_sel == 1) {
+>> + ? ? ? ? ? ? ? ? ? ? tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? tmp &= ~(SDCLK_DELAY_MASK << SDCLK_DELAY_SHIFT);
+>> + ? ? ? ? ? ? ? ? ? ? tmp |= (pdata->clk_delay_cycles & SDCLK_DELAY_MASK)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? << SDCLK_DELAY_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+>> + ? ? ? ? ? ? ? ? ? ? tmp |= 1 << SDCLK_SEL_SHIFT;
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>> + ? ? ? ? ? ? } else {
+>
+>> + ? ? ? ? ? ? ? ? ? ? tmp = readw(host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+>> + ? ? ? ? ? ? ? ? ? ? tmp &= ~(SDCLK_SEL_MASK << SDCLK_SEL_SHIFT);
+>> + ? ? ? ? ? ? ? ? ? ? tmp |= 2 ?<< SDCLK_SEL_SHIFT;
+>> + ? ? ? ? ? ? ? ? ? ? writew(tmp, host->ioaddr + SD_CLOCK_BURST_SIZE_SETUP);
+The else is default setting on pxa910 after reset.
+> ? ? ? ? ? ? ? ? ? }
+> ? ? ? ? }
+>
+> Philip and Mark
+>>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
