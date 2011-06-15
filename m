@@ -1,37 +1,59 @@
-From: thellstrom@vmware.com (Thomas Hellstrom)
-Date: Wed, 15 Jun 2011 15:12:21 +0200
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory Allocator
-	added
-In-Reply-To: <BANLkTi=XTJuF4np7+rYHzJqWK20OxMrBsw@mail.gmail.com>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>	<201106141803.00876.arnd@arndb.de>	<op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>	<201106142030.07549.arnd@arndb.de>
-	<BANLkTi=XTJuF4np7+rYHzJqWK20OxMrBsw@mail.gmail.com>
-Message-ID: <4DF8AFB5.10205@vmware.com>
+From: jkrzyszt@tis.icnet.pl (Janusz Krzysztofik)
+Date: Wed, 15 Jun 2011 15:14:04 +0200
+Subject: [PATCH 3.0-rc2] OMAP: ams-delta: fix broken uevent sysfs entries
+In-Reply-To: <20110615130005.GM471@legolas.emea.dhcp.ti.com>
+References: <201106070316.41099.jkrzyszt@tis.icnet.pl>
+	<201106151453.07945.jkrzyszt@tis.icnet.pl>
+	<20110615130005.GM471@legolas.emea.dhcp.ti.com>
+Message-ID: <201106151514.11574.jkrzyszt@tis.icnet.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2011 01:53 PM, Daniel Vetter wrote:
-> On Tue, Jun 14, 2011 at 20:30, Arnd Bergmann<arnd@arndb.de>  wrote:
->    
->> On Tuesday 14 June 2011 18:58:35 Michal Nazarewicz wrote:
->>      
->>> Ah yes, I forgot that separate regions for different purposes could
->>> decrease fragmentation.
->>>        
->> That is indeed a good point, but having a good allocator algorithm
->> could also solve this. I don't know too much about these allocation
->> algorithms, but there are probably multiple working approaches to this.
->>      
-> imo no allocator algorithm is gonna help if you have comparably large,
-> variable-sized contiguous allocations out of a restricted address range.
-> It might work well enough if there are only a few sizes and/or there's
-> decent headroom. But for really generic workloads this would require
-> sync objects and eviction callbacks (i.e. what Thomas Hellstrom pushed
-> with ttm).
->    
+On Wed 15 Jun 2011 at 15:00:08 Felipe Balbi wrote:
+> Hi,
+> 
+> On Wed, Jun 15, 2011 at 02:53:01PM +0200, Janusz Krzysztofik wrote:
+> > 
+> > $ grep -r "struct .* platform_device .* = {" .|grep "__initdata"|grep -v '*'
+> > ./arch/arm/mach-omap1/board-ams-delta.c:static struct platform_device ams_delta_kp_device __initdata = {
+> > ./arch/arm/mach-omap1/board-ams-delta.c:static struct platform_device ams_delta_lcd_device __initdata = {
+> > ./arch/arm/mach-omap1/board-ams-delta.c:static struct platform_device ams_delta_led_device __initdata = {
+> > ./arch/arm/mach-omap1/board-ams-delta.c:static struct platform_device ams_delta_camera_device __initdata = {
+> > ./arch/arm/mach-omap1/gpio7xx.c:static struct __initdata platform_device omap7xx_mpu_gpio = {
+> > ./arch/arm/mach-omap1/gpio7xx.c:static struct __initdata platform_device omap7xx_gpio1 = {
+> > ./arch/arm/mach-omap1/gpio7xx.c:static struct __initdata platform_device omap7xx_gpio2 = {
+> > ./arch/arm/mach-omap1/gpio7xx.c:static struct __initdata platform_device omap7xx_gpio3 = {
+> > ./arch/arm/mach-omap1/gpio7xx.c:static struct __initdata platform_device omap7xx_gpio4 = {
+> > ./arch/arm/mach-omap1/gpio7xx.c:static struct __initdata platform_device omap7xx_gpio5 = {
+> > ./arch/arm/mach-omap1/gpio7xx.c:static struct __initdata platform_device omap7xx_gpio6 = {
+> > ./arch/arm/mach-omap1/gpio15xx.c:static struct __initdata platform_device omap15xx_mpu_gpio = {
+> > ./arch/arm/mach-omap1/gpio15xx.c:static struct __initdata platform_device omap15xx_gpio = {
+> > ./arch/arm/mach-omap1/gpio16xx.c:static struct __initdata platform_device omap16xx_mpu_gpio = {
+> > ./arch/arm/mach-omap1/gpio16xx.c:static struct __initdata platform_device omap16xx_gpio1 = {
+> > ./arch/arm/mach-omap1/gpio16xx.c:static struct __initdata platform_device omap16xx_gpio2 = {
+> > ./arch/arm/mach-omap1/gpio16xx.c:static struct __initdata platform_device omap16xx_gpio3 = {
+> > ./arch/arm/mach-omap1/gpio16xx.c:static struct __initdata platform_device omap16xx_gpio4 = {
+> > ./arch/arm/mach-omap2/board-rx51-peripherals.c:static struct platform_device rx51_si4713_dev __initdata_or_module = {
+> > 
+> > So, there is no single exact pattern found in the whole tree, and a
+> > few instances of similiar patterns of two kinds found only inside
+> > omap. If I follow any of the two, either moving '__initdata' in
+> > front of 'platform_device' or using '__initdata_or_module'
+> > instead, the problem no longer hits me (using my custom
+> > defconfig). However, the former seems not conformant to what one
+> > can learn from include/linux/init.h, so I suspect that placing
+> > __initdata like this can be a noop, while the latter means "can be
+> > init if no module support", which would probably still exhibit the
+> > problem if so configured.
+> > 
+> > How would you like to have this corrected then?
+> 
+> I guess removing __initdata from all platoform_device structures is
+> the way to go. We need to find another way to silent the section
+> mismatch warnings.
 
-Indeed, IIRC on the meeting I pointed out that there is no way to 
-generically solve the fragmentation problem without movable buffers. 
-(I'd do it as a simple CMA backend to TTM). This is exactly the same 
-problem as trying to fit buffers in a limited VRAM area.
+OK. I'll cook a patch which removes __initdata from all listed above 
+instead of only from board-ams-delta.
 
-/Thomas
+Thanks,
+Janusz
