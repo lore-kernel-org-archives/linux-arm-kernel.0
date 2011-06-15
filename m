@@ -1,84 +1,169 @@
-From: lbassel@codeaurora.org (Larry Bassel)
-Date: Wed, 15 Jun 2011 14:39:58 -0700
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
-	Allocator added
-In-Reply-To: <000901cc2b37$4c21f030$e465d090$%szyprowski@samsung.com>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<20110614170158.GU2419@fooishbar.org>
-	<BANLkTi=cJisuP8=_YSg4h-nsjGj3zsM7sg@mail.gmail.com>
-	<201106142242.25157.arnd@arndb.de>
-	<000901cc2b37$4c21f030$e465d090$%szyprowski@samsung.com>
-Message-ID: <20110615213958.GB28032@labbmf-linux.qualcomm.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 15 Jun 2011 14:48:02 -0700
+Subject: More pinmux feedback, and GPIO vs. pinmux interaction
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04992C067D@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 Jun 11 10:36, Marek Szyprowski wrote:
-> Hello,
-> 
-> On Tuesday, June 14, 2011 10:42 PM Arnd Bergmann wrote:
-> 
-> > On Tuesday 14 June 2011 20:58:25 Zach Pfeffer wrote:
-> > > I've seen this split bank allocation in Qualcomm and TI SoCs, with
-> > > Samsung, that makes 3 major SoC vendors (I would be surprised if
-> > > Nvidia didn't also need to do this) - so I think some configurable
-> > > method to control allocations is necessarily. The chips can't do
-> > > decode without it (and by can't do I mean 1080P and higher decode is
-> > > not functionally useful). Far from special, this would appear to be
-> > > the default.
+Linus (W),
 
-We at Qualcomm have some platforms that have memory of different
-performance characteristics, some drivers will need a way of
-specifying that they need fast memory for an allocation (and would prefer
-an error if it is not available rather than a fallback to slower
-memory). It would also be bad if allocators who don't need fast
-memory got it "accidentally", depriving those who really need it.
+Some more thoughts on pinmux:
 
-> > 
-> > Thanks for the insight, that's a much better argument than 'something
-> > may need it'. Are those all chips without an IOMMU or do we also
-> > need to solve the IOMMU case with split bank allocation?
-> > 
-> > I think I'd still prefer to see the support for multiple regions split
-> > out into one of the later patches, especially since that would defer
-> > the question of how to do the initialization for this case and make
-> > sure we first get a generic way.
-> > 
-> > You've convinced me that we need to solve the problem of allocating
-> > memory from a specific bank eventually, but separating it from the
-> > one at hand (contiguous allocation) should help getting the important
-> > groundwork in at first.
-> >
-> > The possible conflict that I still see with per-bank CMA regions are:
-> > 
-> > * It completely destroys memory power management in cases where that
-> >   is based on powering down entire memory banks.
-> 
-> I don't think that per-bank CMA regions destroys memory power management
-> more than the global CMA pool. Please note that the contiguous buffers
-> (or in general dma-buffers) right now are unmovable so they don't fit
-> well into memory power management.
+========== GPIO/pinmux API interactions
 
-We also have platforms where a well-defined part of the memory
-can be powered off, and other parts can't (or won't). We need a way
-to steer the place allocations come from to the memory that won't be
-turned off (so that CMA allocations are not an obstacle to memory
-hotremove).
+I'd like to understand how the gpio and pinmux subsystems are intended
+to interact.
 
-> 
-> Best regards
-> -- 
-> Marek Szyprowski
-> Samsung Poland R&D Center
-> 
-> 
-> 
-> _______________________________________________
-> Linaro-mm-sig mailing list
-> Linaro-mm-sig at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+Quoting from Documentation/gpio.txt:
 
-Larry Bassel
+  Note that requesting a GPIO does NOT cause it to be configured in any
+  way; it just marks that GPIO as in use.  Separate code must handle any
+  pin setup (e.g. controlling which pin the GPIO uses, pullup/pulldown).
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Due to this, the current Tegra GPIO driver contains additional non-
+standard functions:
+
+void tegra_gpio_enable(int gpio);
+void tegra_gpio_disable(int gpio);
+
+In some cases, those functions are called by board files at boot time,
+and in other cases by drivers themselves, right before gpio_request().
+
+Is it your intention that such custom functions be replaced by
+pinmux_request_gpio(), and the Tegra pinmux driver's gpio_request_enable
+op should call tegra_gpio_enable?
+
+That seems like the right idea to me.
+
+========== pinmux calling GPIO or vice-versa?
+
+Having pinmux call gpio appears to conflict with a couple of things from
+your recent pinmux patchset:
+
+> diff --git a/drivers/Kconfig b/drivers/Kconfig
+> +# pinctrl before gpio - gpio drivers may need it
+> +
+> +source "drivers/pinctrl/Kconfig"
+> +
+>  source "drivers/gpio/Kconfig"
+>
+> diff --git a/drivers/Makefile b/drivers/Makefile
+>...
+> +# GPIO must come after pinctrl as gpios may need to mux pins etc
+> +obj-y				+= pinctrl/
+
+Don't those patches imply that the GPIO controller code is calling into
+the pinmux code to perform muxing, not the other way around?
+
+========== When pins get marked as in-used
+
+There seems to be a discrepancy in the way the client APIs work: For
+special functions, the client calls pinmux_get, then later pinmux_enable,
+whereas for GPIOs, the client just calls pinmux_request_gpio. I'm not
+sure of the benefit of having separate pinmux_get and pinmux_enable
+calls; I thought the idea was that a client could:
+
+a = pinmux_get(dev, "funca");
+b = pinmux_get(dev, "funcb");
+pinmux_enable(a);
+...
+pinmux_disable(a);
+pinmux_enable(b);
+...
+pinmux_disable(b);
+pinmux_put(b);
+pinmux_put(a);
+
+However, since the pins are marked as reserved/in-use when pinmux_get
+is called rather than pinmux_enable, the code above won't work; it'd
+need to be:
+
+a = pinmux_get(dev, "funca");
+pinmux_enable(a);
+...
+pinmux_disable(a);
+pinmux_put(a);
+b = pinmux_get(dev, "funcb");
+pinmux_enable(b);
+...
+pinmux_disable(b);
+pinmux_put(b);
+
+Perhaps pin usage marking should be moved into enable/disable?
+
+========== Matched request/free calls for GPIOs
+
+A couple more comments on your recent pinmux patches in light of this:
+
+
+>From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
+From: bogus@does.not.exist.com ()
+Date: Wed, 01 Jun 2011 16:03:18 -0000
+Subject: No subject
+Message-ID: <mailman.28.1308174514.24103.linux-arm-kernel@lists.infradead.org>
+
++	/*
++	 * If there is no kind of request function for the pin we just assume
++	 * we got it by default and proceed.
++	 */
++	if (gpio && ops->gpio_request_enable)
++		/* This requests and enables a single GPIO pin */
++		status =3D ops->gpio_request_enable(pmxdev,
++						  pin - pmxdev->desc->base);
++	else if (ops->request)
++		status =3D ops->request(pmxdev,
++				      pin - pmxdev->desc->base);
++	else
++		status =3D 0;
+
+a) I feel the default should be to error out, not succeed; the whole
+point of the API is for HW where something must be programmed to enable
+each function. As such, if you don't provide that ops->request* function,
+that seems like an error.
+
+I think the logic above should be to always call ops->gpio_request_enable
+if (gpio):
+
+	if (gpio)
+		if (ops->gpio_request_enable)
+			/* This requests and enables a single GPIO pin */
+			status =3D ops->gpio_request_enable(pmxdev,
+						  pin - pmxdev->desc->base);
+	else
+		status =3D ops->request(pmxdev,
+				      pin - pmxdev->desc->base);
+
+(ops->gpio_request_enable could be optional if GPIOs aren't supported on
+any pinmux pins, whereas ops->request isn't optional, and should be checked
+during pinmux_register)
+
+Also, ops->gpio_request_enable should also be passed the GPIO number,
+so the driver can validate that it's the correct one. Often, only
+one value would be legal, but perhaps some pinmuxs allow 1 of N different
+GPIOs to be mapped to some pin, so selection of which GPIO is on par with
+selection of which special function to mux out, yet the driver still
+doesn't want to expose every GPIO possibility as a pinmux "function" due
+to explosion of the number of functions if it did that.
+
+b) When ops->gpio_request_enable is called to request a pin, it'd be nice
+if the core could track this, and specifically call a new ops->gpio_disable
+to free it, rather than the generic ops->free. There are two cases in HW:
+
+b1) "GPIO" is just another special function in a list, e.g. SPI, I2C, GPIO.
+In this case, free for a GPIO needs to either do nothing (the next call to
+request will simply set the desired function), or possibly do something to
+disable the pin in the same way as any other function. This works fine with
+a single free function.
+
+b2) GPIO enable/disable is a separate concept from the pinmuxing; on Tegra
+it'll be implemented by calling tegra_gpio_enable/disable. As such, a
+single free function would require the pinmux driver to store state
+indicating whether ops->free should call tegra_gpio_disable, or whether it
+should do cleanup to the pinmux registers. Since the core is managing GPIO
+vs. function allocation, I think the storing that state in the core makes
+sense.
+
+Thanks for reading. Hopefully this email didn't jump about too much.
+
+--=20
+nvpublic
