@@ -1,47 +1,37 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Wed, 15 Jun 2011 21:09:33 +0800
-Subject: [PATCH 2/3] pxa2xx trizeps4: pcmcia remove unnecessary ifdefs
-In-Reply-To: <201106061644.30567.marek.vasut@gmail.com>
-References: <1307370255-15963-1-git-send-email-jic23@cam.ac.uk>
-	<1307370255-15963-3-git-send-email-jic23@cam.ac.uk>
-	<201106061644.30567.marek.vasut@gmail.com>
-Message-ID: <BANLkTinam1sfo6OeFKTWxjLnD0mNZSHP6g@mail.gmail.com>
+From: thellstrom@vmware.com (Thomas Hellstrom)
+Date: Wed, 15 Jun 2011 15:12:21 +0200
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory Allocator
+	added
+In-Reply-To: <BANLkTi=XTJuF4np7+rYHzJqWK20OxMrBsw@mail.gmail.com>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>	<201106141803.00876.arnd@arndb.de>	<op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>	<201106142030.07549.arnd@arndb.de>
+	<BANLkTi=XTJuF4np7+rYHzJqWK20OxMrBsw@mail.gmail.com>
+Message-ID: <4DF8AFB5.10205@vmware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 6, 2011 at 10:44 PM, Marek Vasut <marek.vasut@gmail.com> wrote:
-> On Monday, June 06, 2011 04:24:14 PM Jonathan Cameron wrote:
->> Signed-off-by: Jonathan Cameron <jic23@cam.ac.uk>
->> ---
->> ?drivers/pcmcia/pxa2xx_trizeps4.c | ? ?4 ----
->> ?1 files changed, 0 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/pcmcia/pxa2xx_trizeps4.c
->> b/drivers/pcmcia/pxa2xx_trizeps4.c index b829e65..57ddb96 100644
->> --- a/drivers/pcmcia/pxa2xx_trizeps4.c
->> +++ b/drivers/pcmcia/pxa2xx_trizeps4.c
->> @@ -55,10 +55,6 @@ static int trizeps_pcmcia_hw_init(struct
->> soc_pcmcia_socket *skt) }
->> ? ? ? ? ? ? ? skt->socket.pci_irq = IRQ_GPIO(GPIO_PRDY);
->> ? ? ? ? ? ? ? break;
->> -
->> -#ifndef CONFIG_MACH_TRIZEPS_CONXS
->> - ? ? case 1:
->> -#endif
->> ? ? ? default:
->> ? ? ? ? ? ? ? break;
->> ? ? ? }
-> Please add my
->
-> Acked-by: Marek Vasut <marek.vasut@gmail.com>
->
+On 06/15/2011 01:53 PM, Daniel Vetter wrote:
+> On Tue, Jun 14, 2011 at 20:30, Arnd Bergmann<arnd@arndb.de>  wrote:
+>    
+>> On Tuesday 14 June 2011 18:58:35 Michal Nazarewicz wrote:
+>>      
+>>> Ah yes, I forgot that separate regions for different purposes could
+>>> decrease fragmentation.
+>>>        
+>> That is indeed a good point, but having a good allocator algorithm
+>> could also solve this. I don't know too much about these allocation
+>> algorithms, but there are probably multiple working approaches to this.
+>>      
+> imo no allocator algorithm is gonna help if you have comparably large,
+> variable-sized contiguous allocations out of a restricted address range.
+> It might work well enough if there are only a few sizes and/or there's
+> decent headroom. But for really generic workloads this would require
+> sync objects and eviction callbacks (i.e. what Thomas Hellstrom pushed
+> with ttm).
+>    
 
-Applied.
+Indeed, IIRC on the meeting I pointed out that there is no way to 
+generically solve the fragmentation problem without movable buffers. 
+(I'd do it as a simple CMA backend to TTM). This is exactly the same 
+problem as trying to fit buffers in a limited VRAM area.
 
-> Thanks, cheers
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+/Thomas
