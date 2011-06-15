@@ -1,62 +1,50 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Wed, 15 Jun 2011 22:23:21 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110610200233.5ddd5a31@infradead.org>
-References: <20110610165529.GC2230@linux.vnet.ibm.com>
-	<20110610170535.GC25774@srcf.ucam.org>
-	<20110610171939.GE2230@linux.vnet.ibm.com>
-	<20110610172307.GA27630@srcf.ucam.org>
-	<20110610175248.GF2230@linux.vnet.ibm.com>
-	<20110610180807.GB28500@srcf.ucam.org>
-	<20110610184738.GG2230@linux.vnet.ibm.com>
-	<20110610192329.GA30496@srcf.ucam.org>
-	<20110610193713.GJ2230@linux.vnet.ibm.com>
-	<20110610200233.5ddd5a31@infradead.org>
-Message-ID: <20110615165321.GC23151@in.ibm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 15 Jun 2011 18:23:17 +0100
+Subject: [PATCH v3 6/9] ARM: multi-cpu: remove arguments from CPU proc macros
+In-Reply-To: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
+References: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1308158600-7169-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The macros for invoking functions via the processor struct in the
+MULTI_CPU case define the arguments as part of the macros, making it
+impossible to take the address of those functions.
 
-On Fri, Jun 10, 2011 at 08:02:33PM -0700, Arjan van de Ven wrote:
-> On Fri, 10 Jun 2011 12:37:13 -0700
-> "Paul E. McKenney" <paulmck@linux.vnet.ibm.com> wrote:
-> 
-> > On Fri, Jun 10, 2011 at 08:23:29PM +0100, Matthew Garrett wrote:
-> > > On Fri, Jun 10, 2011 at 11:47:38AM -0700, Paul E. McKenney wrote:
-> > > 
-> > > > And if I understand you correctly, then the patches that Ankita
-> > > > posted should help your self-refresh case, along with the
-> > > > originally intended the power-down case and special-purpose use
-> > > > of memory case.
-> > > 
-> > > Yeah, I'd hope so once we actually have capable hardware.
-> > 
-> > Cool!!!
-> > 
-> > So Ankita's patchset might be useful to you at some point, then.
-> > 
-> > Does it look like a reasonable implementation?
-> 
-> as someone who is working on hardware that is PASR capable right now,
-> I have to admit that our plan was to just hook into the buddy allocator,
-> and use PASR on the top level of buddy (eg PASR off blocks that are
-> free there, and PASR them back on once an allocation required the block
-> to be broken up)..... that looked the very most simple to me.
-> 
+This patch removes the arguments from the macro definitions so that we
+can take the address of these functions like we can for the !MULTI_CPU
+case.
 
-The maximum order in buddy allocator is by default 1k pages. Isn't this
-too small a granularity to track blocks that might comprise a PASR unit? 
+Reported-by: Frank Hofmann <frank.hofmann@tomtom.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm/include/asm/proc-fns.h |   14 +++++++-------
+ 1 files changed, 7 insertions(+), 7 deletions(-)
 
-> Maybe something much more elaborate is needed, but I didn't see why so
-> far.
-> 
-> 
-
+diff --git a/arch/arm/include/asm/proc-fns.h b/arch/arm/include/asm/proc-fns.h
+index 8ec535e..633d1cb 100644
+--- a/arch/arm/include/asm/proc-fns.h
++++ b/arch/arm/include/asm/proc-fns.h
+@@ -82,13 +82,13 @@ extern void cpu_do_switch_mm(unsigned long pgd_phys, struct mm_struct *mm);
+ extern void cpu_set_pte_ext(pte_t *ptep, pte_t pte, unsigned int ext);
+ extern void cpu_reset(unsigned long addr) __attribute__((noreturn));
+ #else
+-#define cpu_proc_init()			processor._proc_init()
+-#define cpu_proc_fin()			processor._proc_fin()
+-#define cpu_reset(addr)			processor.reset(addr)
+-#define cpu_do_idle()			processor._do_idle()
+-#define cpu_dcache_clean_area(addr,sz)	processor.dcache_clean_area(addr,sz)
+-#define cpu_set_pte_ext(ptep,pte,ext)	processor.set_pte_ext(ptep,pte,ext)
+-#define cpu_do_switch_mm(pgd,mm)	processor.switch_mm(pgd,mm)
++#define cpu_proc_init			processor._proc_init
++#define cpu_proc_fin			processor._proc_fin
++#define cpu_reset			processor.reset
++#define cpu_do_idle			processor._do_idle
++#define cpu_dcache_clean_area		processor.dcache_clean_area
++#define cpu_set_pte_ext			processor.set_pte_ext
++#define cpu_do_switch_mm		processor.switch_mm
+ #endif
+ 
+ extern void cpu_resume(void);
 -- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+1.7.0.4
