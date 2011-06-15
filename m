@@ -1,45 +1,94 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 15 Jun 2011 19:15:18 +0800
-Subject: [PATCH v2 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
-	support for mx5
-Message-ID: <1308136522-3403-1-git-send-email-shawn.guo@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jun 2011 13:14:56 +0200
+Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <000601cc2b32$9e2a4030$da7ec090$%szyprowski@samsung.com>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106141549.29315.arnd@arndb.de>
+	<000601cc2b32$9e2a4030$da7ec090$%szyprowski@samsung.com>
+Message-ID: <201106151314.57150.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The card-present polling for sdhci based driver is very expensive
-in terms of the impact to system performance.  We observe a few
-system performance issues from Freescale and Linaro on mx5 platforms,
-which have been proved card polling related.
+On Wednesday 15 June 2011, Marek Szyprowski wrote:
 
-The patch set extends the current sdhci-esdhc-imx card_detect and
-write_protect support to cover mx5 platforms, and solves above
-performance issues.
+> > > If possible I would like to make cma something similar to
+> > > declare_dma_coherent()&friends, so the board/platform/bus startup code
+> > > will just call declare_dma_contiguous() to enable support for cma for
+> > > particular devices.
+> > 
+> > Sounds good, I like that.
+>  
+> Thanks. I thought a bit more on this and decided that I want to make this
+> declare_dma_contiguous() optional for the drivers. It should be used only
+> for some sophisticated cases like for example our video codec with two
+> memory interfaces for 2 separate banks. By default the dma-mapping will
+> use system-wide cma pool.
+> 
+> (snipped)
 
-Changes since v1:
- * Rebase on today's linux-next
- * Take the suggestion from Arnaud Patard to add default pdata in
-   imx_add_sdhci_esdhc_imx(), to avoid touching every single board
-   file for the platform_data changes
- * Add comment for sdhci.c change
- * Change ESDHC_CD(WP)_SIGNAL to ESDHC_CD(WP)_CONTROLLER for a more
-   descriptive name
- * Add missing NONE case handling in esdhc_pltfm_get_ro
- * Improve a couple comment wording per suggestion from Wolfram Sang
+Ok, good.
 
-Shawn Guo (4):
-      mmc: sdhci: fix interrupt storm from card detection
-      mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
-      mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
-      mmc: sdhci-esdhc-imx: extend card_detect and write_protect support for mx5
+> > Please explain the exact requirements that lead you to defining multiple
+> > contexts. My feeling is that in most cases we don't need them and can
+> > simply live with a single area. Depending on how obscure the cases are
+> > where we do need something beyond that, we can then come up with
+> > special-case solutions for them.
+> 
+> Like it was already stated we need such feature for our multimedia codec
+> to allocate buffers from different memory banks. I really don't see any
+> problems with the possibility to have additional cma areas for special
+> purposes.
 
- arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |    3 +-
- arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |    3 +-
- arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
- arch/arm/mach-imx/mach-pcm043.c                    |    2 +
- arch/arm/mach-mx5/board-mx51_babbage.c             |   14 ++-
- arch/arm/mach-mx5/board-mx53_loco.c                |    4 +
- .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   12 ++
- arch/arm/plat-mxc/include/mach/esdhc.h             |   25 ++++-
- drivers/mmc/host/sdhci-esdhc-imx.c                 |  123 ++++++++++++--------
- drivers/mmc/host/sdhci.c                           |   23 +++-
- 10 files changed, 145 insertions(+), 66 deletions(-)
+It's not a problem for special cases, I just want to make sure that
+the common case works well enough that we don't need too many special
+cases.
+
+> > The problem with defining CMA areas in the device tree is that it's not
+> > a property of the hardware, but really policy. The device tree file
+> > should not contain anything related to a specific operating system
+> > because you might want to boot something on the board that doesn't
+> > know about CMA, and even when you only care about using Linux, the
+> > implementation might change to the point where hardcoded CMA areas
+> > no longer make sense.
+> 
+> I really doubt that the device tree will carry only system-independent
+> information.
+
+So far, this has worked well enough.
+
+> Anyway, the preferred or required memory areas/banks for
+> buffer allocation is something that is a property of the hardware not
+> the OS policy.
+
+That is true. If there are hard requirements of the hardware, we
+can and should definitely document them in the device tree. It's
+totally fine to describe the layout of memory banks and affinity
+of devices to specific banks where that exists in hardware.
+
+The part that should not be in the device tree is a specific location
+of a buffer inside the bank when there is no hardware reason for
+the location.
+
+I guess it's also fine to describe requirements per device regarding
+how much contiguous memory it will need to operate, if you can provide
+that number independent of the application you want to run. The early
+boot code can walk the device tree and ensure that the region is
+large enough.
+
+> > IMHO we should first aim for a solution that works almost everywhere
+> > without the kernel knowing what board it's running on, and then we
+> > can add quirks for devices that have special requirements. I think
+> > the situation is similar to the vmalloc virtual address space, which
+> > normally has a hardcoded size that works almost everywhere, but there
+> > are certain drivers etc that require much more, or there are situations
+> > where you want to make it smaller in order to avoid highmem.
+> 
+> I'm trying to create something that will fulfill the requirements of my
+> hardware, that's why I cannot focus on a generic case only.
+
+Yes, that is the obvious conflict. My main interest is to have something
+that works not just for your hardware but works as good as possible on
+the widest possible range of hardware, which may mean it may run not quite
+as good in some of the cases.
+
+	Arnd
