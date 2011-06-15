@@ -1,44 +1,28 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Wed, 15 Jun 2011 16:20:15 -0400 (EDT)
-Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
-In-Reply-To: <8ya8vt2am2i.fsf@huya.qualcomm.com>
-References: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
-	<alpine.LFD.2.00.1106151540230.2142@xanadu.home>
-	<8ya8vt2am2i.fsf@huya.qualcomm.com>
-Message-ID: <alpine.LFD.2.00.1106151618570.2142@xanadu.home>
+From: ccross@android.com (Colin Cross)
+Date: Wed, 15 Jun 2011 13:21:56 -0700
+Subject: [PATCH 1/2] gpio/tegra: Move Tegra gpio driver to drivers/gpio
+In-Reply-To: <20110615193734.23641.8004.stgit@ponder>
+References: <20110615193734.23641.8004.stgit@ponder>
+Message-ID: <BANLkTinij15PZw11Y3Qt=PV1kkP1pw1oaszTdMfD55Cf8cOJkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jun 2011, David Brown wrote:
+On Wed, Jun 15, 2011 at 12:37 PM, Grant Likely
+<grant.likely@secretlab.ca> wrote:
+> As part of the gpio driver consolidation, this patch moves the Tegra driver
+> into drivers/gpio
+>
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>
+> If there are no objections, I'll merge this via gpio/next
 
-> On Wed, Jun 15 2011, Nicolas Pitre wrote:
-> 
-> > On Tue, 14 Jun 2011, David Brown wrote:
-> >
-> >> Some targets have multiple memory regions.  Parse up to 8 of these
-> >> when converting the atags to fdt.
-> >> 
-> >> Signed-off-by: David Brown <davidb@codeaurora.org>
-> >
-> > I've added your patch to my zImage patch queue.
-> >
-> >> With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
-> >> It seems to work as long as my device tree has placeholders for all of
-> >> the properties I need.
-> >
-> > I think those missing nodes should simply be created if missing.  I 
-> > however don't see any function in the libfdt API to do that -- there is 
-> > fdt_add_subnode() but no fdt_add_node().  Any DT expert please?
-> 
-> It does seem to only work if I already have nodes that are large enough
-> to hold the properties coming from the ATAG.  For example, I have to
-> have an array of memory reg values large enough, as well as a command
-> line large enough to hold the one passed from the bootloader.
-> 
-> If the DTB's command line is smaller than the one from ATAG, it just
-> silently leaves the DTB one in place.
+I have this patch as part of a series that should get posted later
+this week, as well as a patch on top of it that depends on this change
+and another change in my tree, but I'm pessimistic that my series will
+get in to 3.1 since it depends on some common consolidation that
+hasn't been agreed upon yet.  So,
+Acked-by: Colin Cross <ccross@android.com>
 
-That I can explain, and that looks easy to fix.
-
-
-Nicolas
+Put it in gpio/next, and I'll make sure any other Tegra patches with
+dependencies get pulled after yours.
