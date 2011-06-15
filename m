@@ -1,32 +1,33 @@
-From: peter.fordham@gmail.com (Peter Fordham)
-Date: Wed, 15 Jun 2011 12:49:43 -0700
-Subject: [MPCore Watchdog]: Convert from misc_dev to dynamic device node.
-In-Reply-To: <201106152136.23971.arnd@arndb.de>
-References: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
-	<BANLkTinY8bM0PyLLcu6icEsWT=X=KVV3DQ@mail.gmail.com>
-	<20110615190945.GA2518@pulham.picochip.com>
-	<201106152136.23971.arnd@arndb.de>
-Message-ID: <BANLkTi=_DDxRqhqi=9Me6gWmm2h3wb5Zng@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 15 Jun 2011 15:50:37 -0400 (EDT)
+Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
+In-Reply-To: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
+References: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
+Message-ID: <alpine.LFD.2.00.1106151540230.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 June 2011 12:36, Arnd Bergmann <arnd@arndb.de> wrote:
-> Let's first wait until the generic watchdog framework gets merged and
-> the drivers are converted. After that is in, we can discuss further changes.
+On Tue, 14 Jun 2011, David Brown wrote:
 
-That seems logical and reasonable. Are we saying no changes to watchdog
-drivers in general until this is done? because I have other patches
-for this driver
-that among other things actually make it work properly. As it stands today
-the timeout calculations are broken which results in random reboots.
+> Some targets have multiple memory regions.  Parse up to 8 of these
+> when converting the atags to fdt.
+> 
+> Signed-off-by: David Brown <davidb@codeaurora.org>
 
-The framework patch was submitted 3.5 months ago and isn't in yet. Is it held up
-on something? I don't see any negative comments.
+I've added your patch to my zImage patch queue.
 
-> I highly doubt that making an incompatible API change benefits anyone here,
-> but it certainly shouldn't be done for a single driver that is separate from
-> the framework.
+> With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
+> It seems to work as long as my device tree has placeholders for all of
+> the properties I need.
 
-Not to be a pedant but, this doesn't change the API at all.
+I think those missing nodes should simply be created if missing.  I 
+however don't see any function in the libfdt API to do that -- there is 
+fdt_add_subnode() but no fdt_add_node().  Any DT expert please?
 
--Pete
+Also, should the DTB be enlarged in order to add new nodes, or even 
+modify existing ones with larger properties?  In other words, 
+should something like fdt_move(fdt, fdt, fdt_totalsize(fdt)+HEADROOM) be 
+used beforehand?
+
+
+Nicolas
