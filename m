@@ -1,34 +1,40 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 15 Jun 2011 10:43:10 +0200
-Subject: [PATCH] mach-ixp4xx: fix build error
-Message-ID: <1308127390-30563-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 15 Jun 2011 10:43:21 +0200
+Subject: [PATCH] mach-h720x: fix build error
+Message-ID: <1308127401-30734-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Linus Walleij <linus.walleij@linaro.org>
 
-The introduction of clocksource_mmio_init() broke ixp4xx due to
-a surplus ampersand - IXP4XX_OSTS is already a pointe to I/O
-space.
+The h7201/h7202 machines did not build since they define
+ARM_DMA_ZONE_OFFSET but do not select ZONE_DMA. Fix it up by
+selecting ZONE_DMA in their Kconfig.
 
-Cc: Deepak Saxena <deepak.saxena@linaro.org>
+Cc: Sascha Hauer <s.hauer@pengutronix.de>
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/mach-ixp4xx/common.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ arch/arm/mach-h720x/Kconfig |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-index 74ed81a..5ec2918 100644
---- a/arch/arm/mach-ixp4xx/common.c
-+++ b/arch/arm/mach-ixp4xx/common.c
-@@ -425,7 +425,7 @@ static void __init ixp4xx_clocksource_init(void)
- {
- 	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
+diff --git a/arch/arm/mach-h720x/Kconfig b/arch/arm/mach-h720x/Kconfig
+index 9b6982e..abf356c 100644
+--- a/arch/arm/mach-h720x/Kconfig
++++ b/arch/arm/mach-h720x/Kconfig
+@@ -6,12 +6,14 @@ config ARCH_H7201
+ 	bool "gms30c7201"
+ 	depends on ARCH_H720X
+ 	select CPU_H7201
++	select ZONE_DMA
+ 	help
+ 	  Say Y here if you are using the Hynix GMS30C7201 Reference Board
  
--	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
-+	clocksource_mmio_init(IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
- 			clocksource_mmio_readl_up);
- }
- 
+ config ARCH_H7202
+ 	bool "hms30c7202"
+ 	select CPU_H7202
++	select ZONE_DMA
+ 	depends on ARCH_H720X
+ 	help
+ 	  Say Y here if you are using the Hynix HMS30C7202 Reference Board
 -- 
 1.7.3.2
