@@ -1,36 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 15 Jun 2011 13:24:24 +0200
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <201106151146.13320.arnd@arndb.de>
-References: <20110614190850.GA13526@linux-mips.org>
-	<201106142333.16203.arnd@arndb.de> <4DF83577.6040903@zytor.com>
-	<201106151146.13320.arnd@arndb.de>
-Message-ID: <BANLkTimMLDb6LL0HZv8XtHt=zvyE7eybyg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jun 2011 13:27:32 +0200
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous
+	=?iso-8859-1?q?Memory=09Allocator?= added
+In-Reply-To: <4DF7CC22.6050602@codeaurora.org>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106142242.25157.arnd@arndb.de>
+	<4DF7CC22.6050602@codeaurora.org>
+Message-ID: <201106151327.32226.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 11:46, Arnd Bergmann <arnd@arndb.de> wrote:
-> * In case of floppies, the "solution" was to write a driver for every platform that
-> ?doesn't have PIO, since they tend to have other differences. The amiflop and
-> ?ataflop drivers are not even use readb(), they just derefence volatile pointers
-> ?to do MMIO. I doubt we can find volunteers to clean that up.
+On Tuesday 14 June 2011, Jordan Crouse wrote:
+> 
+> On 06/14/2011 02:42 PM, Arnd Bergmann wrote:
+> > On Tuesday 14 June 2011 20:58:25 Zach Pfeffer wrote:
+> >> I've seen this split bank allocation in Qualcomm and TI SoCs, with
+> >> Samsung, that makes 3 major SoC vendors (I would be surprised if
+> >> Nvidia didn't also need to do this) - so I think some configurable
+> >> method to control allocations is necessarily. The chips can't do
+> >> decode without it (and by can't do I mean 1080P and higher decode is
+> >> not functionally useful). Far from special, this would appear to be
+> >> the default.
+> >
+> > Thanks for the insight, that's a much better argument than 'something
+> > may need it'. Are those all chips without an IOMMU or do we also
+> > need to solve the IOMMU case with split bank allocation?
+> 
+> Yes. The IOMMU case with split bank allocation is key, especially for shared
+> buffers. Consider the case where video is using a certain bank for performance
+> purposes and that frame is shared with the GPU.
 
-Amiflop drives the Amiga floppy controller, which is completely
-different from the
-PC-style floppy controller.
-Ataflop drives the Atari floppy controller, which seems to be a WD1772 and not
-related to PC-style floppy controllers neither.
+Could we use the non-uniform memory access (NUMA) code for this? That code
+does more than what we've been talking about, and we're currently thinking
+only of a degenerate case (one CPU node with multiple memory nodes), but my
+feeling is that we can still build on top of it.
 
-So none of them drive PC-style hardware, and both predate the generic readb()
-infrastructure.
+The NUMA code can describe relations between different areas of memory
+and how they interact with devices and processes, so you can attach a
+device to a specific node and have all allocations done from there.
+You can also set policy in user space, e.g. to have a video decoder
+process running on the bank that is not used by the GPU.
 
-Gr{oetje,eeting}s,
+In the DMA mapping API, that would mean we add another dma_attr to
+dma_alloc_* that lets you pass a node identifier.
 
-? ? ? ? ? ? ? ? ? ? ? ? Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-? ? ? ? ? ? ? ? ? ? ? ? ? ?? ?? -- Linus Torvalds
+	Arnd
