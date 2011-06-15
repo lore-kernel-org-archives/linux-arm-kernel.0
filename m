@@ -1,39 +1,26 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 14 Jun 2011 21:31:27 -0700
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Tue, 14 Jun 2011 21:40:16 -0700
 Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <987664A83D2D224EAE907B061CE93D5301E7281306@orsmsx505.amr.corp.intel.com>
+In-Reply-To: <4DF8329C.7000904@zytor.com>
 References: <20110614190850.GA13526@linux-mips.org>
-	<987664A83D2D224EAE907B061CE93D5301E7281306@orsmsx505.amr.corp.intel.com>
-Message-ID: <4DF8359F.10809@zytor.com>
+	<4DF7C3CA.9050902@zytor.com>
+	<20110614223404.GA30057@linux-mips.org>
+	<4DF8329C.7000904@zytor.com>
+Message-ID: <20110615044016.GC10553@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2011 03:08 PM, Luck, Tony wrote:
-> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
-> index 38280ef..849805a 100644
-> --- a/arch/ia64/Kconfig
-> +++ b/arch/ia64/Kconfig
-> @@ -23,6 +23,7 @@ config IA64
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_DMA_API_DEBUG
->  	select HAVE_GENERIC_HARDIRQS
-> +	select HAVE_PC_PARPORT
->  	select GENERIC_IRQ_PROBE
->  	select GENERIC_PENDING_IRQ if SMP
->  	select IRQ_PER_CPU
+On Wed, Jun 15, 2011 at 12:18:36AM -0400, H. Peter Anvin wrote:
+> On 06/14/2011 03:34 PM, Ralf Baechle wrote:
+> > 
+> > There is no point in offering to build something that couldn't possibly be
+> > used.  It just makes the kernel harder to configure and inflates the test
+> > matrix for no good reason.
+> > 
 > 
-> I took a look at the back of all my ia64 systems - none of them
-> have a parallel port.  It seems unlikely that new systems will
-> start adding parallel ports :-)
+> I see... that's why a bunch of devices that only exist on ARM and MIPS
+> SoCs are offered on x86 platforms?
 > 
-> So even if I had a printer (or other device) that used a parallel
-> port, I have no way to test it.
-> 
+http://en.wikipedia.org/wiki/Two_wrongs_make_a_right
 
-If it has PCI slots, it can have a parallel port.
-
-	-hpa
-
--- 
-H. Peter Anvin, Intel Open Source Technology Center
-I work for Intel.  I don't speak on their behalf.
+Guenter
