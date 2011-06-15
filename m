@@ -1,98 +1,50 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jun 2011 18:23:14 +0100
-Subject: [PATCH v3 3/9] ARM: lib: add switch_stack function for safely
-	changing stack
+Date: Wed, 15 Jun 2011 18:23:19 +0100
+Subject: [PATCH v3 8/9] ARM: kexec: use arm_machine_reset for branching to the
+	reboot buffer
 In-Reply-To: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
 References: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1308158600-7169-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1308158600-7169-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When disabling the MMU, it is necessary to take out a 1:1 identity map
-of the reset code so that it can safely be executed with and without
-the MMU active. To avoid the situation where the physical address of the
-reset code aliases with the virtual address of the active stack (which
-cannot be included in the 1:1 mapping), it is desirable to change to a
-new stack at a location which is less likely to alias.
+Now that there is a common way to reset the machine, let's use it
+instead of reinventing the wheel in the kexec backend.
 
-This code adds a new lib function, switch_stack:
-
-void switch_stack(void (*fn)(void *), void *arg, void *sp);
-
-which changes the stack to point at the sp parameter, before invoking
-fn(arg) with the new stack selected.
-
-Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/lib/Makefile       |    3 +-
- arch/arm/lib/switch_stack.S |   44 +++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 46 insertions(+), 1 deletions(-)
- create mode 100644 arch/arm/lib/switch_stack.S
+ arch/arm/kernel/machine_kexec.c |   14 ++------------
+ 1 files changed, 2 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
-index 59ff42d..5fa67de 100644
---- a/arch/arm/lib/Makefile
-+++ b/arch/arm/lib/Makefile
-@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
- 		   testchangebit.o testclearbit.o testsetbit.o        \
- 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
- 		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
--		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
-+		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
-+		   switch_stack.o
+diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
+index e59bbd4..f84567c 100644
+--- a/arch/arm/kernel/machine_kexec.c
++++ b/arch/arm/kernel/machine_kexec.c
+@@ -16,8 +16,6 @@
+ extern const unsigned char relocate_new_kernel[];
+ extern const unsigned int relocate_new_kernel_size;
  
- mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+-extern void setup_mm_for_reboot(char mode);
+-
+ extern unsigned long kexec_start_address;
+ extern unsigned long kexec_indirection_page;
+ extern unsigned long kexec_mach_type;
+@@ -111,14 +109,6 @@ void machine_kexec(struct kimage *image)
  
-diff --git a/arch/arm/lib/switch_stack.S b/arch/arm/lib/switch_stack.S
-new file mode 100644
-index 0000000..552090d
---- /dev/null
-+++ b/arch/arm/lib/switch_stack.S
-@@ -0,0 +1,44 @@
-+/*
-+ * arch/arm/lib/switch_stack.S
-+ *
-+ * Copyright (C) 2011 ARM Ltd.
-+ * Written by Will Deacon <will.deacon@arm.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
-+ */
+ 	if (kexec_reinit)
+ 		kexec_reinit();
+-	local_irq_disable();
+-	local_fiq_disable();
+-	setup_mm_for_reboot(0); /* mode is not used, so just pass 0*/
+-	flush_cache_all();
+-	outer_flush_all();
+-	outer_disable();
+-	cpu_proc_fin();
+-	outer_inv_all();
+-	flush_cache_all();
+-	cpu_reset(reboot_code_buffer_phys);
 +
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+
-+/*
-+ * void switch_stack(void (*fn)(void *), void *arg, void *sp)
-+ *
-+ * Change the stack to that pointed at by sp, then invoke fn(arg) with
-+ * the new stack.
-+ */
-+ENTRY(switch_stack)
-+	str	sp, [r2, #-4]!
-+	str	lr, [r2, #-4]!
-+
-+	mov	sp, r2
-+	mov	r2, r0
-+	mov	r0, r1
-+
-+	adr	lr, BSYM(1f)
-+	mov	pc, r2
-+
-+1:	ldr	lr, [sp]
-+	ldr	sp, [sp, #4]
-+	mov	pc, lr
-+ENDPROC(switch_stack)
++	arm_machine_reset(reboot_code_buffer_phys);
+ }
 -- 
 1.7.0.4
