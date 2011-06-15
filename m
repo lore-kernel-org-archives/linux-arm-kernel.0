@@ -1,59 +1,20 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 15 Jun 2011 13:38:04 -0600
-Subject: [PATCH 2/2] gpio/tegra: add devicetree support
-In-Reply-To: <20110615193734.23641.8004.stgit@ponder>
-References: <20110615193734.23641.8004.stgit@ponder>
-Message-ID: <20110615193759.23641.26212.stgit@ponder>
+From: peter.fordham@gmail.com (Peter Fordham)
+Date: Wed, 15 Jun 2011 12:37:31 -0700
+Subject: [MPCore Watchdog]: Convert from misc_dev to dynamic device node.
+In-Reply-To: <BANLkTin2vBCpiEMcLFTEJ1koUmdTQd11eQ@mail.gmail.com>
+References: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
+	<20110614234858.GA15534@gallagher>
+	<BANLkTik02nt4ttTTS-3u5R_ZH0W90FADJQ@mail.gmail.com>
+	<20110615085820.GH3075@pulham.picochip.com>
+	<BANLkTinY8bM0PyLLcu6icEsWT=X=KVV3DQ@mail.gmail.com>
+	<20110615190945.GA2518@pulham.picochip.com>
+	<BANLkTin2vBCpiEMcLFTEJ1koUmdTQd11eQ@mail.gmail.com>
+Message-ID: <BANLkTinwbcYLR3bAPdSNCay4OUWygi3-DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for decoding gpios from the device tree
+> It's a platform device so it's already on the platform bus under:
+>
+> /sys/devices/platform/mpcore_wdt
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- .../devicetree/bindings/gpio/gpio_nvidia.txt       |    7 +++++++
- drivers/gpio/gpio-tegra.c                          |   10 ++++++++++
- 2 files changed, 17 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-
-diff --git a/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-new file mode 100644
-index 0000000..afb3ff3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/gpio/gpio_nvidia.txt
-@@ -0,0 +1,7 @@
-+NVIDIA Tegra 2 GPIO controller
-+
-+Required properties:
-+- compatible : "nvidia,tegra250-gpio"
-+- #gpio-cells : Should be two. The first cell is the pin number and the
-+  second cell is used to specify optional parameters (currently unused).
-+- gpio-controller : Marks the device node as a GPIO controller.
-diff --git a/drivers/gpio/gpio-tegra.c b/drivers/gpio/gpio-tegra.c
-index 919d638..13afb88 100644
---- a/drivers/gpio/gpio-tegra.c
-+++ b/drivers/gpio/gpio-tegra.c
-@@ -23,6 +23,7 @@
- 
- #include <linux/io.h>
- #include <linux/gpio.h>
-+#include <linux/of.h>
- 
- #include <asm/mach/irq.h>
- 
-@@ -340,6 +341,15 @@ static int __init tegra_gpio_init(void)
- 		}
- 	}
- 
-+#ifdef CONFIG_OF_GPIO
-+	/*
-+	 * This isn't ideal, but it gets things hooked up until this
-+	 * driver is converted into a platform_device
-+	 */
-+	tegra_gpio_chip.of_node = of_find_compatible_node(NULL, NULL,
-+						"nvidia,tegra250-gpio");
-+#endif /* CONFIG_OF_GPIO */
-+
- 	gpiochip_add(&tegra_gpio_chip);
- 
- 	for (i = INT_GPIO_BASE; i < (INT_GPIO_BASE + TEGRA_NR_GPIOS); i++) {
+sorry, that should have been: /sys/bus/platform/devices/mpcore_wdt.
