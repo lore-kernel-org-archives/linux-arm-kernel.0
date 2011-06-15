@@ -1,75 +1,127 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 15 Jun 2011 15:40:04 +0100
-Subject: [PATCHv2 4/4] ARM: pmu: add platform_device_id table support
+Date: Wed, 15 Jun 2011 15:40:03 +0100
+Subject: [PATCHv2 3/4] ARM: pmu: add OF probing support
 In-Reply-To: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
 References: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <1308148804-5518-5-git-send-email-mark.rutland@arm.com>
+Message-ID: <1308148804-5518-4-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for platform_device_id tables, allowing new
-PMU types to be registered with the correct type, without requiring
-new platform_driver shims to provide the type. An single entry for
-existing devices is provided.
+This is based on an earlier patch from Rob Herring <rob.herring@calxeda.com>
 
-Macros matching functionality of the of_device_id table macros are
-provided for convenience.
+> Add OF match table to enable OF style driver binding. The dts entry is like
+> this:
+>
+> pmu {
+> 	compatible = "arm,cortex-a9-pmu";
+> 	interrupts = <100 101>;
+> };
+>
+> The use of pdev->id as an index breaks with OF device binding, so set the type
+> based on the OF compatible string.
+
+This modification sets the PMU hardware type based on data embedded in the
+binding, allowing easy addition of new PMU types in future.
+
+Support for new PMU types not provided by devicetree can be added later using
+platform_device_id tables in a similar fashion.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Acked-by: Jamie Iles <jamie@jamieiles.com>
-Cc: Rob Herring <rob.herring@calxeda.com>
+Acked-by: Rob Herring <rob.herring@calxeda.com>
 Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/pmu.c |   20 ++++++++++++++++++--
- 1 files changed, 18 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/arm/pmu.txt |   22 ++++++++++++++++
+ arch/arm/kernel/pmu.c                         |   34 ++++++++++++++++++++++++-
+ 2 files changed, 55 insertions(+), 1 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/pmu.txt
 
+diff --git a/Documentation/devicetree/bindings/arm/pmu.txt b/Documentation/devicetree/bindings/arm/pmu.txt
+new file mode 100644
+index 0000000..739d00c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/pmu.txt
+@@ -0,0 +1,22 @@
++* ARM Performance Monitor Units
++
++ARM cores often have a PMU for counting cpu and cache events like cache misses
++and hits. The interface to the PMU is part of the ARM ARM. The ARM PMU
++representation in the device tree should be done as under:-
++
++Required properties:
++
++- compatible : should be one of
++	"arm,cortex-a9-pmu"
++	"arm,cortex-a8-pmu"
++	"arm,arm1176-pmu"
++	"arm,arm1136-pmu"
++- interrupts : 1 combined interrupt or 1 per core.
++
++Example:
++
++pmu {
++        compatible = "arm,cortex-a9-pmu";
++        interrupts = <100 101>;
++};
++
 diff --git a/arch/arm/kernel/pmu.c b/arch/arm/kernel/pmu.c
-index 2ce00be..2b70709 100644
+index de6b1b0..2ce00be 100644
 --- a/arch/arm/kernel/pmu.c
 +++ b/arch/arm/kernel/pmu.c
-@@ -61,9 +61,22 @@ static struct of_device_id armpmu_of_device_ids[] = {
- 	{},
- };
+@@ -17,6 +17,7 @@
+ #include <linux/interrupt.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
++#include <linux/of_device.h>
+ #include <linux/platform_device.h>
  
-+#define PLAT_MATCH_PMU(_name, _type) {	\
-+	.name		= _name,	\
-+	.driver_data	= _type,	\
+ #include <asm/pmu.h>
+@@ -45,14 +46,45 @@ static int __devinit pmu_register(struct platform_device *pdev,
+ 	return 0;
+ }
+ 
++#define OF_MATCH_PMU(_name, _type) {	\
++	.compatible = _name,		\
++	.data = (void *)_type,		\
 +}
 +
-+#define PLAT_MATCH_CPU(_name)	PLAT_MATCH_PMU(_name, ARM_PMU_DEVICE_CPU)
++#define OF_MATCH_CPU(name)	OF_MATCH_PMU(name, ARM_PMU_DEVICE_CPU)
 +
-+static struct platform_device_id armpmu_plat_device_ids[] = {
-+	PLAT_MATCH_CPU("arm-pmu"),
++static struct of_device_id armpmu_of_device_ids[] = {
++	OF_MATCH_CPU("arm,cortex-a9-pmu"),
++	OF_MATCH_CPU("arm,cortex-a8-pmu"),
++	OF_MATCH_CPU("arm,arm1136-pmu"),
++	OF_MATCH_CPU("arm,arm1176-pmu"),
 +	{},
 +};
 +
- enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
++enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
++{
++	const struct of_device_id	*of_id;
++
++	/* provided by of_device_id table */
++	if (pdev->dev.of_node) {
++		of_id = of_match_device(armpmu_of_device_ids, &pdev->dev);
++		BUG_ON(!of_id);
++		return (enum arm_pmu_type)of_id->data;
++	}
++
++	/* Provided by a 'legacy' platform_device */
++	return ARM_PMU_DEVICE_CPU;
++}
++
+ static int __devinit armpmu_device_probe(struct platform_device *pdev)
  {
- 	const struct of_device_id	*of_id;
-+	const struct platform_device_id *pdev_id;
- 
- 	/* provided by of_device_id table */
- 	if (pdev->dev.of_node) {
-@@ -72,8 +85,10 @@ enum arm_pmu_type armpmu_device_type(struct platform_device *pdev)
- 		return (enum arm_pmu_type)of_id->data;
- 	}
- 
--	/* Provided by a 'legacy' platform_device */
--	return ARM_PMU_DEVICE_CPU;
-+	/* Provided by platform_device_id table */
-+	pdev_id = platform_get_device_id(pdev);
-+	BUG_ON(!pdev_id);
-+	return pdev_id->driver_data;
+-	return pmu_register(pdev, ARM_PMU_DEVICE_CPU);
++	return pmu_register(pdev, armpmu_device_type(pdev));
  }
  
- static int __devinit armpmu_device_probe(struct platform_device *pdev)
-@@ -87,6 +102,7 @@ static struct platform_driver armpmu_driver = {
- 		.of_match_table = armpmu_of_device_ids,
+ static struct platform_driver armpmu_driver = {
+ 	.driver		= {
+ 		.name	= "arm-pmu",
++		.of_match_table = armpmu_of_device_ids,
  	},
  	.probe		= armpmu_device_probe,
-+	.id_table	= armpmu_plat_device_ids,
  };
- 
- static int __init register_pmu_driver(void)
 -- 
 1.7.0.4
