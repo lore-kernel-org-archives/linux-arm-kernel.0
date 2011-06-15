@@ -1,26 +1,46 @@
 From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 15 Jun 2011 12:44:04 +0200
-Subject: [PATCH v2 4/4] mmc: sdhci-esdhc-imx: extend card_detect and
-	write_protect support for mx5
-In-Reply-To: <20110615103344.GA3579@S2100-06.ap.freescale.net>
-References: <1307702572-22066-5-git-send-email-shawn.guo@linaro.org>
-	<1308034059-4014-1-git-send-email-shawn.guo@linaro.org>
-	<20110614095129.GD5043@pengutronix.de>
-	<20110614130610.GH30295@S2100-06.ap.freescale.net>
-	<20110615103344.GA3579@S2100-06.ap.freescale.net>
-Message-ID: <20110615104404.GA3097@pengutronix.de>
+Date: Wed, 15 Jun 2011 12:53:18 +0200
+Subject: sdhci-esdhc-imx -- MMC 10x slower than it should be
+In-Reply-To: <20110615094001.GA21137@pma.sysgo.com>
+References: <20110615094001.GA21137@pma.sysgo.com>
+Message-ID: <20110615105318.GB3097@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Sorry.  I had some reason for moving esdhc_pltfm_get_ro around.  We
-> can not keep the existing approach (what I said above).  For mx51
-> babbage example, esdhc1 uses internal WP while esdhc2 uses gpio WP.
-> If we have esdhc_pltfm_get_ro handle gpio only and assign it to
-> sdhci_esdhc_ops.get_ro in .probe only when wp_type is ESDHC_WP_GPIO,
-> that works for esdhc2 but breaks esdhc1 WP function.  So no, I will
-> not change my code except adding NONE case handling there.
+Hi,
 
-Ok, fine with me. Thanks for checking!
+> We are seeing issues with sdhci-esdhc-imx in 2.6.39; performance is
+> not what it should be; it is about 10x lower in fact.
+
+Which SoC? 25/35/51/53?
+
+> ...any idea what this comment means? I'd like to eventualy support
+> 8BITBUS...
+
+8-Bit bus is not specified in the standard, so it cannot be detected.
+Check other drivers where they use MMC_CAP_8_BIT_DATA.
+
+> Part of the problem is that esdhc_writeb_le() does translation of bits
+> into breescale format; but readb() does not do translation back, and
+> core code uses read-modify-write on the register, for example when
+> turning on the LED. What to do there? Translate back? Add shadow
+> variable? Get rid of read-modify-write?
+
+Probably the least ugly solution :/
+
+> Any ideas why it is slow?
+
+Your board polls for card-detect, Shawn recently sent a series which
+lets you fix that for mx5.
+
+ADMA is marked broken in mainline, cause it didn't work with a number of
+cards. Richard sent a patch recently.
+
+Both series could need some more testing :)
+
+Regards,
+
+   Wolfram
 
 -- 
 Pengutronix e.K.                           | Wolfram Sang                |
@@ -31,4 +51,4 @@ Name: not available
 Type: application/pgp-signature
 Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110615/d5cff7fc/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110615/36f9c9d0/attachment.sig>
