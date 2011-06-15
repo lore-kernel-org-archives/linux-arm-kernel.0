@@ -1,76 +1,65 @@
 From: subashrp@gmail.com (Subash Patel)
-Date: Wed, 15 Jun 2011 11:31:10 +0530
-Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <201106141803.00876.arnd@arndb.de>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106141549.29315.arnd@arndb.de>
-	<op.vw2jmhir3l0zgt@mnazarewicz-glaptop>
-	<201106141803.00876.arnd@arndb.de>
-Message-ID: <4DF84AA6.80808@gmail.com>
+Date: Wed, 15 Jun 2011 11:59:01 +0530
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory Allocator
+	added
+In-Reply-To: <201106142242.25157.arnd@arndb.de>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>	<20110614170158.GU2419@fooishbar.org>	<BANLkTi=cJisuP8=_YSg4h-nsjGj3zsM7sg@mail.gmail.com>
+	<201106142242.25157.arnd@arndb.de>
+Message-ID: <4DF8512D.4020902@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
 
-On 06/14/2011 09:33 PM, Arnd Bergmann wrote:
-> On Tuesday 14 June 2011, Michal Nazarewicz wrote:
->> On Tue, 14 Jun 2011 15:49:29 +0200, Arnd Bergmann<arnd@arndb.de>  wrote:
->>> Please explain the exact requirements that lead you to defining multiple
->>> contexts.
->>
->> Some devices may have access only to some banks of memory.  Some devices
->> may use different banks of memory for different purposes.
+On 06/15/2011 02:12 AM, Arnd Bergmann wrote:
+> On Tuesday 14 June 2011 20:58:25 Zach Pfeffer wrote:
+>> I've seen this split bank allocation in Qualcomm and TI SoCs, with
+>> Samsung, that makes 3 major SoC vendors (I would be surprised if
+>> Nvidia didn't also need to do this) - so I think some configurable
+>> method to control allocations is necessarily. The chips can't do
+>> decode without it (and by can't do I mean 1080P and higher decode is
+>> not functionally useful). Far from special, this would appear to be
+>> the default.
 >
-> For all I know, that is something that is only true for a few very special
-> Samsung devices, and is completely unrelated of the need for contiguous
-> allocations, so this approach becomes pointless as soon as the next
-> generation of that chip grows an IOMMU, where we don't handle the special
-> bank attributes. Also, the way I understood the situation for the Samsung
-> SoC during the Budapest discussion, it's only a performance hack, not a
-> functional requirement, unless you count '1080p playback' as a functional
-> requirement.
+> Thanks for the insight, that's a much better argument than 'something
+> may need it'. Are those all chips without an IOMMU or do we also
+> need to solve the IOMMU case with split bank allocation?
+
+In exynos4, the IP's can work with/without IOMMU. So contiguous 
+allocator like CMA needs to have provision for this as well (now or 
+sometime in future). I hope someone will throw light on the other SoC's 
+as well (and I hope they aren't different either)
+
 >
-1080p at 30fps is indeed a functional requirement, as the IP has the 
-capability to achieve it. This IP itself can act as more than one AXI 
-master, and control more than one memory port(bank). So this is not a 
-*performance hack*
-
-Also, if I recall, during the Budapest discussion (I was on irc), I 
-recall that this requirement can become the information available to the 
-actual allocator. Below is the summary point I could collect from summit 
-notes:
-
-     * May also need to specify more attributes (specific physical 
-memory region)
-
-As per this point, the requirement (as above) must be attribute to the 
-allocator, which is CMA in this case.
-
-> Supporting contiguous allocation is a very useful goal and many people want
-> this, but supporting a crazy one-off hardware design with lots of generic
-> infrastructure is going a bit too far. If you can't be more specific than
-> 'some devices may need this', I would suggest going forward without having
-> multiple regions:
+> I think I'd still prefer to see the support for multiple regions split
+> out into one of the later patches, especially since that would defer
+> the question of how to do the initialization for this case and make
+> sure we first get a generic way.
 >
-> * Remove the registration of specific addresses from the initial patch
->    set (but keep the patch).
-> * Add a heuristic plus command-line override to automatically come up
->    with a reasonable location+size for *one* CMA area in the system.
-> * Ship the patch to add support for multiple CMA areas with the BSP
->    for the boards that need it (if any).
-> * Wait for someone on a non-Samsung SoC to run into the same problem,
->    then have /them/ get the final patch in.
+> You've convinced me that we need to solve the problem of allocating
+> memory from a specific bank eventually, but separating it from the
+> one at hand (contiguous allocation) should help getting the important
+> groundwork in at first.
 >
-> Even if you think you can convince enough people that having support
-> for distinct predefined regions is a good idea, I would recommend
-> splitting that out of the initial merge so we can have that discussion
-> separately from the other issues.
+> The possible conflict that I still see with per-bank CMA regions are:
+>
+> * It completely destroys memory power management in cases where that
+>    is based on powering down entire memory banks.
+
+I agree. But what if we release the per-bank buffers after we use it? 
+Shouldn't the memory power management switch-off the un-used banks then?
+
+>
+> * We still need to solve the same problem in case of IOMMU mappings
+>    at some point, even if today's hardware doesn't have this combination.
+>    It would be good to use the same solution for both.
 >
 > 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-media" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 
 Regards,
 Subash
