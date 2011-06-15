@@ -1,25 +1,37 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Wed, 15 Jun 2011 13:30:48 +0200
+From: daniel.vetter@ffwll.ch (Daniel Vetter)
+Date: Wed, 15 Jun 2011 13:53:22 +0200
 Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
 	Allocator added
-In-Reply-To: <201106151320.42182.arnd@arndb.de>
+In-Reply-To: <201106142030.07549.arnd@arndb.de>
 References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106142242.25157.arnd@arndb.de>
-	<op.vw31uxxl3l0zgt@mnazarewicz-glaptop>
-	<201106151320.42182.arnd@arndb.de>
-Message-ID: <op.vw37lm1a3l0zgt@mnazarewicz-glaptop>
+	<201106141803.00876.arnd@arndb.de>
+	<op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>
+	<201106142030.07549.arnd@arndb.de>
+Message-ID: <BANLkTi=XTJuF4np7+rYHzJqWK20OxMrBsw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Jun 2011 13:20:42 +0200, Arnd Bergmann <arnd@arndb.de> wrote:
-> The point is that on the higher level device drivers, we want to
-> hide the presence of CMA and/or IOMMU behind the dma mapping API,
-> but the device drivers do need to know about the bank properties.
+On Tue, Jun 14, 2011 at 20:30, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Tuesday 14 June 2011 18:58:35 Michal Nazarewicz wrote:
+>> Ah yes, I forgot that separate regions for different purposes could
+>> decrease fragmentation.
+>
+> That is indeed a good point, but having a good allocator algorithm
+> could also solve this. I don't know too much about these allocation
+> algorithms, but there are probably multiple working approaches to this.
 
-Gotcha, thanks.
+imo no allocator algorithm is gonna help if you have comparably large,
+variable-sized contiguous allocations out of a restricted address range.
+It might work well enough if there are only a few sizes and/or there's
+decent headroom. But for really generic workloads this would require
+sync objects and eviction callbacks (i.e. what Thomas Hellstrom pushed
+with ttm).
 
+So if this is only a requirement on very few platforms and can be
+cheaply fixed with multiple cma allocation areas (heck, we have
+slabs for the same reasons in the kernel), it might be a sensible
+compromise.
+-Daniel
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
-ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
+Daniel Vetter
+daniel.vetter at ffwll.ch - +41 (0) 79 365 57 48 - http://blog.ffwll.ch
