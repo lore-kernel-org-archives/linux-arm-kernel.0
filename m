@@ -1,46 +1,63 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 15 Jun 2011 01:08:21 -0700
-Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
-In-Reply-To: <BANLkTim5C340ZB4Hu1xFQpHAkcWJEgKjMw@mail.gmail.com>
-References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
-	<201106142232.02217.arnd@arndb.de>
-	<alpine.LFD.2.00.1106141650520.2142@xanadu.home>
-	<201106142342.29405.arnd@arndb.de>
-	<BANLkTim5C340ZB4Hu1xFQpHAkcWJEgKjMw@mail.gmail.com>
-Message-ID: <20110615080821.GM23145@atomide.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 15 Jun 2011 10:14:53 +0200
+Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <201106150937.18524.arnd@arndb.de>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106142030.07549.arnd@arndb.de>
+	<000501cc2b2b$789a54b0$69cefe10$%szyprowski@samsung.com>
+	<201106150937.18524.arnd@arndb.de>
+Message-ID: <000701cc2b34$4e090710$ea1b1530$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grant Likely <grant.likely@secretlab.ca> [110614 15:02]:
-> On Tue, Jun 14, 2011 at 3:42 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Tuesday 14 June 2011 23:21:52 Nicolas Pitre wrote:
-> >> Otherwise, if the revision number is effectively non probable, then I
-> >> would guess it is the device tree's purpose to carry that information
-> >> somehow, right? ?Maybe this can be appended to the board name string?
-> >
-> > That's what I meant with adding it to "compatible", which is a list of
-> > strings with varying degrees of detailed information, e.g.
-> >
-> > ?ti,omap7
-> > ?ti,omap7-squirrelboard
-> > ?ti,omap7-squirrelboard-v3
-> > ?ti,omap7-squirrelboard-v3.17b
-> >
-> > You can match the list against a specific revision or a less specific
-> > identifier if you just want to know whether you are on a squirrelboard
-> > or a hamsterboard.
+Hello,
+
+On Wednesday, June 15, 2011 9:37 AM Arnd Bergmann wrote:
+
+> On Wednesday 15 June 2011 09:11:39 Marek Szyprowski wrote:
+> > I see your concerns, but I really wonder how to determine the properties
+> > of the global/default cma pool. You definitely don't want to give all
+> > available memory o CMA, because it will have negative impact on kernel
+> > operation (kernel really needs to allocate unmovable pages from time to
+> > time).
 > 
-> Yes, that's generally the right way to handle it.  In practice I've
-> not seen many cases where it is really required, but it doesn't hurt
-> if somebody wants to include it in the DT for their board.
+> Exactly. This is a hard problem, so I would prefer to see a solution for
+> coming up with reasonable defaults.
 
-Appending the ATAG_REVISION to "compatible" and also setting system_rev
-to ATAG_REVISION like we already do should work.
+The problem is to define these reasonable defaults, because they also depend
+on the target usage pattern for the board. If one doesn't plan to use video
+codec at all, then the value calculated for full HD movie decoding are 
+definitely too high.
 
-Just to clarify things abit: We just can't generate .dts files for all
-existing hardware. It would require dumping out system_rev and other ATAGs
-on tens or hundeds of pieces of hardware.
+> > The only solution I see now is to provide Kconfig entry to determine
+> > the size of the global CMA pool, but this still have some issues,
+> > especially for multi-board kernels (each board probably will have
+> > different amount of RAM and different memory-consuming devices
+> > available). It looks that each board startup code still might need to
+> > tweak the size of CMA pool. I can add a kernel command line option for
+> > it, but such solution also will not solve all the cases (afair there
+> > was a discussion about kernel command line parameters for memory
+> > configuration and the conclusion was that it should be avoided).
+> 
+> The command line option can be a last resort if the heuristics fail,
+> but it's not much better than a fixed Kconfig setting.
+> 
+> How about a Kconfig option that defines the percentage of memory
+> to set aside for contiguous allocations?
 
-Regards,
+There can be probably both types of Kconfig entries: for absolute value
+and the percentage of the total memory, but still, creating a 
+fully-functional multi-board kernel will be really hard.
 
-Tony
+However there is one more issue here. It is quite common that embedded
+systems have memory that is not really contiguous in address space
+(there are some holes that splits it into 'banks' or regions). So we
+might have a system with 256MiB of memory split into 2 memory banks.
+In this case the CMA pool can use only one of them (the pool must be
+contiguous internally). I'm not sure if such systems might require more
+memory for contiguous buffers.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
