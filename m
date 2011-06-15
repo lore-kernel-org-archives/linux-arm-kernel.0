@@ -1,28 +1,44 @@
-From: ralf@linux-mips.org (Ralf Baechle)
-Date: Wed, 15 Jun 2011 09:34:37 +0100
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <4DF8329C.7000904@zytor.com>
-References: <20110614190850.GA13526@linux-mips.org>
-	<4DF7C3CA.9050902@zytor.com>
-	<20110614223404.GA30057@linux-mips.org>
-	<4DF8329C.7000904@zytor.com>
-Message-ID: <20110615083437.GA32624@linux-mips.org>
+From: jamie@jamieiles.com (Jamie Iles)
+Date: Wed, 15 Jun 2011 09:58:20 +0100
+Subject: [MPCore Watchdog]: Convert from misc_dev to dynamic device node.
+In-Reply-To: <BANLkTik02nt4ttTTS-3u5R_ZH0W90FADJQ@mail.gmail.com>
+References: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
+	<20110614234858.GA15534@gallagher>
+	<BANLkTik02nt4ttTTS-3u5R_ZH0W90FADJQ@mail.gmail.com>
+Message-ID: <20110615085820.GH3075@pulham.picochip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 09:18:36PM -0700, H. Peter Anvin wrote:
-
-> On 06/14/2011 03:34 PM, Ralf Baechle wrote:
-> > 
-> > There is no point in offering to build something that couldn't possibly be
-> > used.  It just makes the kernel harder to configure and inflates the test
-> > matrix for no good reason.
-> > 
+On Tue, Jun 14, 2011 at 05:19:06PM -0700, Peter Fordham wrote:
+> > On Tue, Jun 14, 2011 at 04:29:26PM -0700, Peter Fordham wrote:
+> >> The current MPCore watchdog driver uses a misc_dev device node.
+> >> This patch changes it to use dynamically allocated device numbers.
+> >
+> > I'm not sure that this is the correct thing to do. ?All other watchdog devices
+> > use a miscdevice with a major:minor of 10:130, is there a specific reason
+> > that this node needs to be dynamic?
 > 
-> I see... that's why a bunch of devices that only exist on ARM and MIPS
-> SoCs are offered on x86 platforms?
+> I was under the impressions that dynamic device nodes were the way of the
+> future. Is that not the case?
 
-Well, if you notice one of those, yell.  Or send patches.  Most of those
-have been fixed.
+Well they are for new devices/subsystems but watchdog has an established 
+major:minor pair that all other devices use so you don't really have to 
+worry about a namespace clash.
 
-  Ralf
+> I'll add the relevant checks in other places as per your suggestions.
+
+I've added Wim (watchdog driver maintainer), but I would think that if 
+this change is worth doing then it should be done for all drivers.
+
+> > I believe the sysfs classes are pretty much
+> > deprecated now in preference of a bus too.
+> 
+> Can you give me some more info here? I thought the sysfs stuff was the
+> new right way of doing stuff. The class stuff allows udev to automatically
+> create the right device node.
+
+So here's one that I'm aware of https://lkml.org/lkml/2011/3/25/502.  So 
+there's nothing wrong with using sysfs and a bus, but certainly a bus is 
+preferred over a class.
+
+Jamie
