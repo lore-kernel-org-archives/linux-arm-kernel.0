@@ -1,17 +1,23 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Wed, 15 Jun 2011 13:09:21 -0700
-Subject: [PATCH 2/2] gpio/tegra: add devicetree support
-In-Reply-To: <20110615193759.23641.26212.stgit@ponder>
+Date: Wed, 15 Jun 2011 13:11:26 -0700
+Subject: [PATCH 1/2] gpio/tegra: Move Tegra gpio driver to drivers/gpio
+In-Reply-To: <20110615193734.23641.8004.stgit@ponder>
 References: <20110615193734.23641.8004.stgit@ponder>
-	<20110615193759.23641.26212.stgit@ponder>
-Message-ID: <BANLkTinLnMSJOka2o6VTu3fJW2pCoacUKa2hH8kTtGvCV=Pw5w@mail.gmail.com>
+Message-ID: <BANLkTim-Up4xvwBpkN-3B8HFg86G7M3TUfSQUv5Tq_0Kf15wcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 12:38 PM, Grant Likely
+On Wed, Jun 15, 2011 at 12:37 PM, Grant Likely
 <grant.likely@secretlab.ca> wrote:
-> Add support for decoding gpios from the device tree
+> As part of the gpio driver consolidation, this patch moves the Tegra driver
+> into drivers/gpio
 >
 > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 
 Acked-by: Olof Johansson <olof@lixom.net>
+
+Colin said he had plans to do it, or I would already have sent this
+out. Thanks for doing it! :)
+
+
+-Olof
