@@ -1,29 +1,34 @@
-From: peter.fordham@gmail.com (Peter Fordham)
-Date: Wed, 15 Jun 2011 12:36:01 -0700
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jun 2011 21:36:23 +0200
 Subject: [MPCore Watchdog]: Convert from misc_dev to dynamic device node.
 In-Reply-To: <20110615190945.GA2518@pulham.picochip.com>
 References: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
-	<20110614234858.GA15534@gallagher>
-	<BANLkTik02nt4ttTTS-3u5R_ZH0W90FADJQ@mail.gmail.com>
-	<20110615085820.GH3075@pulham.picochip.com>
 	<BANLkTinY8bM0PyLLcu6icEsWT=X=KVV3DQ@mail.gmail.com>
 	<20110615190945.GA2518@pulham.picochip.com>
-Message-ID: <BANLkTin2vBCpiEMcLFTEJ1koUmdTQd11eQ@mail.gmail.com>
+Message-ID: <201106152136.23971.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The framework looks great. I hope it gets in soon.
+On Wednesday 15 June 2011 21:09:45 Jamie Iles wrote:
+> On Wed, Jun 15, 2011 at 11:57:12AM -0700, Peter Fordham wrote:
+> > > I've added Wim (watchdog driver maintainer), but I would think that if
+> > > this change is worth doing then it should be done for all drivers.
+> > 
+> > Agreed, but today this may be more work than I'm strictly interested in
+> > doing. If we do decide it's the right thing then I'll look into converting the
+> > other drivers later.
+> 
+> So I'm not fully aware of what particular problem this is solving, but 
+> if it is needed for this driver then it should really be done for all of 
+> them.  That's probably one for Wim to answer though.  Wim posted a 
+> series for a generic watchdog framework a while back[1] but this still 
+> made use of a misc device.
 
-> If you use a bus then the device creation is slightly more involved than
-> with a class - create the bus, allocate the device and assign the
-> bus_type then set the name with dev_set_name(). ?That should be enough
-> for udev to work out the name of the device.
+Let's first wait until the generic watchdog framework gets merged and
+the drivers are converted. After that is in, we can discuss further changes.
 
-It's a platform device so it's already on the platform bus under:
+I highly doubt that making an incompatible API change benefits anyone here,
+but it certainly shouldn't be done for a single driver that is separate from
+the framework.
 
-/sys/devices/platform/mpcore_wdt
-
-Do I need to create another bus? The platform driver name is used in driver
-matching so it doesn't seem like the right thing to do to change it to watchdog.
-
--Pete
+	Arnd
