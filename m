@@ -1,38 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 15 Jun 2011 16:57:54 +0200
-Subject: [PATCH] mach-ixp4xx: fix build error
-In-Reply-To: <20110615132943.GA14917@riccoc20.at.omicron.at>
-References: <1308127390-30563-1-git-send-email-linus.walleij@stericsson.com>
-	<20110615132943.GA14917@riccoc20.at.omicron.at>
-Message-ID: <BANLkTikov-4dJZQNFq9R2xaySZ22r=jcww@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 15 Jun 2011 10:01:08 -0500
+Subject: [PATCHv2 0/4] ARM: pmu: improve PMU type identification
+In-Reply-To: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
+References: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <4DF8C934.4020008@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 3:29 PM, Richard Cochran
-<richardcochran@gmail.com> wrote:
-> On Wed, Jun 15, 2011 at 10:43:10AM +0200, Linus Walleij wrote:
->> From: Linus Walleij <linus.walleij@linaro.org>
->>
->> The introduction of clocksource_mmio_init() broke ixp4xx due to
->> a surplus ampersand - IXP4XX_OSTS is already a pointe to I/O
->> space.
->
-> The fix you suggest will not work on big endian ixp. See
+Mark,
 
-Yeah! I see. Sorry for missing it, I was just looking over the broken
-kisskb items.
+On 06/15/2011 09:40 AM, Mark Rutland wrote:
+> Hi,
+> 
+> This is version 2 of the patches originally posted here:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052865.html
+> 
+> Changes since v1 include:
+> 
+>  * Added Acks from Jamie Iles & Rob Herring.
+>  * Add "arm-pmu" binding to the platform_device_id table, as driver name
+>    matching is not used when platform_driver::id_table exists.
+>  * Fixed name clash in PLAT_MATCH_PMU macro.
+>  * Removed unnecessary casts for platform_device_id::driver_data.
+>  * Aligned trailing backslashes on multi-line *_MATCH_PMU macros.
+>  * Removed spaces after casts.
+> 
+> The patches use {of,platform}_device_id tables to provide the PMU type, which
+> can be used similarly (the macros make entries look identical apart from the
+> {plat,of} prefix). This allows us to stop (ab)using platform_device::id, and
+> should allow for easier addition/modification of PMU driver bindings.
+> 
+> BSPs need no longer care about the Type of PMUs they register; as long as a
+> binding exists the type will be assigned correctly.
+> 
+> Rob, Jamie: would you mind if patches 3 & 4 were squashed together?
+> Patch 4 depends heavily on patch 3, and there doesn't seem to be a clean way of
+> fixing that.
+> 
+Interdependency is not really a good reason to combine patches, so I
+would leave them as is. Functionality wise, they are doing different things.
 
-> ? http://lists.arm.linux.org.uk/lurker/message/20110530.084307.f960f906.en.html
-
-You do this:
-
-+static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
-+{
-+    return *IXP4XX_OSTS;
-+}
-
-Which is essentially __raw_readl(IXP4XX_OSTS) to get the timer in current
-endianness, is it not? So please use __raw_readl() for that if I'm right.
-
-Thanks,
-Linus Walleij
+Rob
