@@ -1,38 +1,77 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 14 Jun 2011 22:43:43 -0700
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <20110615044016.GC10553@ericsson.com>
-References: <20110614190850.GA13526@linux-mips.org>
-	<4DF7C3CA.9050902@zytor.com>
-	<20110614223404.GA30057@linux-mips.org>
-	<4DF8329C.7000904@zytor.com> <20110615044016.GC10553@ericsson.com>
-Message-ID: <4DF8468F.1080806@zytor.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Wed, 15 Jun 2011 11:31:10 +0530
+Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
+In-Reply-To: <201106141803.00876.arnd@arndb.de>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106141549.29315.arnd@arndb.de>
+	<op.vw2jmhir3l0zgt@mnazarewicz-glaptop>
+	<201106141803.00876.arnd@arndb.de>
+Message-ID: <4DF84AA6.80808@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2011 09:40 PM, Guenter Roeck wrote:
-> On Wed, Jun 15, 2011 at 12:18:36AM -0400, H. Peter Anvin wrote:
->> On 06/14/2011 03:34 PM, Ralf Baechle wrote:
->>>
->>> There is no point in offering to build something that couldn't possibly be
->>> used.  It just makes the kernel harder to configure and inflates the test
->>> matrix for no good reason.
->>>
+Hi Arnd,
+
+On 06/14/2011 09:33 PM, Arnd Bergmann wrote:
+> On Tuesday 14 June 2011, Michal Nazarewicz wrote:
+>> On Tue, 14 Jun 2011 15:49:29 +0200, Arnd Bergmann<arnd@arndb.de>  wrote:
+>>> Please explain the exact requirements that lead you to defining multiple
+>>> contexts.
 >>
->> I see... that's why a bunch of devices that only exist on ARM and MIPS
->> SoCs are offered on x86 platforms?
->>
-> http://en.wikipedia.org/wiki/Two_wrongs_make_a_right
-> 
+>> Some devices may have access only to some banks of memory.  Some devices
+>> may use different banks of memory for different purposes.
+>
+> For all I know, that is something that is only true for a few very special
+> Samsung devices, and is completely unrelated of the need for contiguous
+> allocations, so this approach becomes pointless as soon as the next
+> generation of that chip grows an IOMMU, where we don't handle the special
+> bank attributes. Also, the way I understood the situation for the Samsung
+> SoC during the Budapest discussion, it's only a performance hack, not a
+> functional requirement, unless you count '1080p playback' as a functional
+> requirement.
+>
+1080p at 30fps is indeed a functional requirement, as the IP has the 
+capability to achieve it. This IP itself can act as more than one AXI 
+master, and control more than one memory port(bank). So this is not a 
+*performance hack*
 
-Except in this case it's not wrong.  It was done that way because it was
-discovered a long time ago that restricting drivers that were not
-*inherently* limited to specific platform just resulted in more bitrot
-and nasty surprises for the users who *did* need specific things after
-all, even though the maintainers had not thought so.
+Also, if I recall, during the Budapest discussion (I was on irc), I 
+recall that this requirement can become the information available to the 
+actual allocator. Below is the summary point I could collect from summit 
+notes:
 
-	-hpa
+     * May also need to specify more attributes (specific physical 
+memory region)
 
--- 
-H. Peter Anvin, Intel Open Source Technology Center
-I work for Intel.  I don't speak on their behalf.
+As per this point, the requirement (as above) must be attribute to the 
+allocator, which is CMA in this case.
+
+> Supporting contiguous allocation is a very useful goal and many people want
+> this, but supporting a crazy one-off hardware design with lots of generic
+> infrastructure is going a bit too far. If you can't be more specific than
+> 'some devices may need this', I would suggest going forward without having
+> multiple regions:
+>
+> * Remove the registration of specific addresses from the initial patch
+>    set (but keep the patch).
+> * Add a heuristic plus command-line override to automatically come up
+>    with a reasonable location+size for *one* CMA area in the system.
+> * Ship the patch to add support for multiple CMA areas with the BSP
+>    for the boards that need it (if any).
+> * Wait for someone on a non-Samsung SoC to run into the same problem,
+>    then have /them/ get the final patch in.
+>
+> Even if you think you can convince enough people that having support
+> for distinct predefined regions is a good idea, I would recommend
+> splitting that out of the initial merge so we can have that discussion
+> separately from the other issues.
+>
+> 	Arnd
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-media" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Regards,
+Subash
+SISO-SLG
