@@ -1,81 +1,69 @@
-From: tixy@yxit.co.uk (Tixy)
-Date: Wed, 15 Jun 2011 10:45:38 +0100
-Subject: [RFC] kprobes with thumb2 conditional code
-In-Reply-To: <alpine.LFD.2.00.1103171825040.26889@xanadu.home>
-References: <1299862881.2512.314.camel@computer2.home>
-	<AANLkTikno84z6+gY9hevSG++jZJbYO--bynu_ixsmkB0@mail.gmail.com>
-	<alpine.LFD.2.00.1103171825040.26889@xanadu.home>
-Message-ID: <1308131138.3154.9.camel@computer2>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Jun 2011 11:46:13 +0200
+Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
+In-Reply-To: <4DF83577.6040903@zytor.com>
+References: <20110614190850.GA13526@linux-mips.org>
+	<201106142333.16203.arnd@arndb.de> <4DF83577.6040903@zytor.com>
+Message-ID: <201106151146.13320.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I would like to revisit the discussion about how to handle kprobes
-placed on conditionally executed instructions...
-
-On Thu, 2011-03-17 at 18:46 -0400, Nicolas Pitre wrote: 
-> On Thu, 17 Mar 2011, Dave Martin wrote:
-> > On Fri, Mar 11, 2011 at 5:01 PM, Tixy <tixy@yxit.co.uk> wrote:
-> > > it uses unconditional instructions for its breakpoints. With thumb
-> > > instructions we can't force unconditional execution, so we would have an
-> > > 'implementation defined' situation whether it would fire or not when the
-> > > condition is false. (Thought you would hope it would be consistent on a
-> > > particular device.)
-> > >
-> > > Some options for dealing with this, in increasing order of
-> > > complexity...
-> > >
-> > > 1. Accept the situation as described.
-> > >
-> > > 2. Change arm probes to use conditional instructions so we would
-> > > (hopefully) have consistent undefined behaviour in both arm and thumb
-> > > code. (If that isn't an oxymoron :-)
-> > >
-> > > 3. Do 2, and modify kprobe_handler to test for false firings (breakpoint
-> > > when condition false) and not execute the probe's callback functions in
-> > > these cases. E.g. consistently make probe2 appear to not fire when
-> > > condition is false.
+On Wednesday 15 June 2011, H. Peter Anvin wrote:
+> On 06/14/2011 02:33 PM, Arnd Bergmann wrote:
+> >>
+> >> Why on earth restrict it like that?  It's just a device driver, like
+> >> more or less any other device driver...
 > > 
-> > My preference would be for option (1) or (3).  For (3), we could
-> > choose to extend this behaviour to cover the existing ARM
-> > implementation as well as Thumb, which could be a tidier and more
-> > consistent approach.  This seems to be the "right" thing, since it
-> > means kprobes never fire for real on instructions which are logically
-> > not executed, no matter how the compiler (or human) implemented the
-> > conditionality.  Currently, ARM kprobes can fire on instructions which
-> > would fail their condition check, which might be considered wrong.
+> > I'd say any other classic ISA/PC driver, including floppy, gameport or
+> > serial-8250. One problem with these is that we never fully worked out
+> > the dependencies for these, which we probably should. CONFIG_ISA
+> > generally means ISA add-on cards, but that might not be enabled for
+> > platforms that have a pc-parport but no ISA slots.
+> > 
 > 
-> Definitely #3.
+> OK, serial-8250 is clearly just plain wrong, since the 8250 series UARTs
+> are ubiquitous across just about every platform.
+
+Obviously you want to support 8250 uarts with MMIO on most architectures,
+but the driver can only be built if you define both MMIO and PIO 
+accessors (readb and outb). I would like to make the PIO part of 8250
+conditional on having PIO support so that an architecture that doesn't
+support this no longer has to provide fake accessor functions.
+
+> Parallel port is an intermediate case... Centronics parallel ports
+> predate the PC ecosystem by quite a bit, and the particular arrangement
+> of ports became popular with the PC and spread to other platforms, but
+> the particular variant of it known as ECP (as opposed to EPP) is ISA DMA
+> specific.
+
+The driver looks like it can easily be built without support for the ISA DMA
+API.
+
+> > On the other hand, you have embedded platforms that currently build support
+> > for parport-pc but define the inb/outb macros to plain pointer dereferences
+> > (otherwise you can't build the 8250 driver). Loading parport-pc on those
+> > machines typically results in derefencing user memory in the best case.
+> >
+> > What I'd love to see is a configuration option for "arch has working
+> > PC-style inb/outb instructions", so we can build a kernel without them but
+> > still get MMIO based drivers for PCI-less platforms.
 > 
-> In the ARM case, this can be achieved by saving the condition code 
-> of the replaced instruction when installing a probe, and test it 
-> against the CPSR value from the interrupted state.  If the condition is 
-> false then just skip the native emulation of the resulting NOP and 
-> ignore the probe callback.  In the Thumb2 case the IT state in the CPSR 
-> would indicate right away if the probe should be ignored.
+> Now, isn't that was iowrite/ioread was designed for?
 
-If we don't fire a probe because a conditional instruction wouldn't be
-executed then for branch instructions we only fire when branches are
-taken. So, with things like loops...
+Yes, it just isn't used consistently. As far as I can tell, this is for multiple
+number of reasons:
 
-1:  movs r0, r0, asl #1
-    bpl 1b
+* In case of 8250, the driver abstracts the difference between PIO and MMIO itself,
+  because it uses the same method to do indirect accesses and different strides.
+  Using ioread wouldn't really make the driver much simpler.
 
-the probe would fire on every iteration of the loop except the last.
-This inconsistency seems bad to me.
+* For parport-pc, the driver really only needs PIO, we don't even
+  try to support the same device on random MMIO addresses, and that might not
+  be necessary.
 
-We could make exceptions for branches, and every other instruction which
-can changes PC, but we would still have the issue that we can't force
-unconditional firing of Thumb branches in an IT block.
+* In case of floppies, the "solution" was to write a driver for every platform that
+  doesn't have PIO, since they tend to have other differences. The amiflop and
+  ataflop drivers are not even use readb(), they just derefence volatile pointers
+  to do MMIO. I doubt we can find volunteers to clean that up.
 
-There doesn't appear to be a single satisfactory solution. 
-
-Perhaps we should do option #1, i.e. don't change anything and have
-probes always firing except when breakpoints are missed in IT blocks due
-to the condition being false.
-
-Or looking at it another way, leave things as the are until someone
-comes up with a real-life use-case which indicates that a change is
-needed.
-
--- 
-Tixy 
+	Arnd
