@@ -1,38 +1,23 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2011 09:37:18 +0200
-Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <000501cc2b2b$789a54b0$69cefe10$%szyprowski@samsung.com>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106142030.07549.arnd@arndb.de>
-	<000501cc2b2b$789a54b0$69cefe10$%szyprowski@samsung.com>
-Message-ID: <201106150937.18524.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 15 Jun 2011 08:39:35 +0100
+Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
+In-Reply-To: <4DF8359F.10809@zytor.com>
+References: <20110614190850.GA13526@linux-mips.org>
+	<987664A83D2D224EAE907B061CE93D5301E7281306@orsmsx505.amr.corp.intel.com>
+	<4DF8359F.10809@zytor.com>
+Message-ID: <20110615073935.GA28989@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 June 2011 09:11:39 Marek Szyprowski wrote:
-> I see your concerns, but I really wonder how to determine the properties
-> of the global/default cma pool. You definitely don't want to give all
-> available memory o CMA, because it will have negative impact on kernel
-> operation (kernel really needs to allocate unmovable pages from time to
-> time). 
+On Tue, Jun 14, 2011 at 09:31:27PM -0700, H. Peter Anvin wrote:
+> On 06/14/2011 03:08 PM, Luck, Tony wrote:
+> > I took a look at the back of all my ia64 systems - none of them
+> > have a parallel port.  It seems unlikely that new systems will
+> > start adding parallel ports :-)
+> > 
+> > So even if I had a printer (or other device) that used a parallel
+> > port, I have no way to test it.
+> 
+> If it has PCI slots, it can have a parallel port.
 
-Exactly. This is a hard problem, so I would prefer to see a solution for
-coming up with reasonable defaults.
-
-> The only solution I see now is to provide Kconfig entry to determine
-> the size of the global CMA pool, but this still have some issues,
-> especially for multi-board kernels (each board probably will have
-> different amount of RAM and different memory-consuming devices
-> available). It looks that each board startup code still might need to
-> tweak the size of CMA pool. I can add a kernel command line option for
-> it, but such solution also will not solve all the cases (afair there
-> was a discussion about kernel command line parameters for memory 
-> configuration and the conclusion was that it should be avoided).
-
-The command line option can be a last resort if the heuristics fail,
-but it's not much better than a fixed Kconfig setting.
-
-How about a Kconfig option that defines the percentage of memory
-to set aside for contiguous allocations?
-
-	Arnd
+Is that a clue about where a select statement should be?
