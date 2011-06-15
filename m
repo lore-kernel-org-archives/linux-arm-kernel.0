@@ -1,41 +1,27 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 15 Jun 2011 16:33:48 -0700
-Subject: [PATCH v4 00/18] I2C: OMAP: I2C fixes,
-	removal of cpu_is... from driver
-In-Reply-To: <20110615213637.GH15795@trinity.fluff.org> (Ben Dooks's message
-	of "Wed, 15 Jun 2011 22:36:37 +0100")
-References: <1306973984-15165-1-git-send-email-khilman@ti.com>
-	<20110615213637.GH15795@trinity.fluff.org>
-Message-ID: <87k4cm1xgj.fsf@ti.com>
+Date: Wed, 15 Jun 2011 16:48:55 -0700
+Subject: [RESEND PATCH 0/2] ARM IRQ Kconfig patches
+In-Reply-To: <1308142960-20767-1-git-send-email-balbi@ti.com> (Felipe Balbi's
+	message of "Wed, 15 Jun 2011 16:02:38 +0300")
+References: <1308142960-20767-1-git-send-email-balbi@ti.com>
+Message-ID: <8762o61wrc.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ben,
+Felipe Balbi <balbi@ti.com> writes:
 
-Ben Dooks <ben-i2c@fluff.org> writes:
-
-> On Wed, Jun 01, 2011 at 05:19:26PM -0700, Kevin Hilman wrote:
->> Ben, 
->> 
->> Please pull in this series from Andy Green for the next merge window.
->> 
->> v4 is simply a rebase of Andy's v3 against v3.0-rc1 with some basic
->> sanity testing against with the latest kernel.
+> I have lost count how many times I have sent
+> these patches. Will someone either take them
+> in or NAK them so I stop sending ??
 >
-> These look much more like functionality changes than actual fixes, and
-> are much more suited for inclusion into -next for once the next stable
-> release is out.
+> Felipe Balbi (2):
+>   arm: Kconfig: select correct HAVE_SPARSE_IRQ symbol
+>   arm: Kconfig: allow OMAP to use sparse IRQ numbering
+>
 
-Correct, this is a rework of functionality, not a set of fixes.  This
-series is targeted for the next release (v3.1), not for fixes
-(v3.0-rc).  
+Tested-by: Kevin Hilman <khilman@ti.com>
 
-I was requesting for it to be included in your queue for -next and for
-the next merge window.
-
-Tony has already been merging this in his omap-testing branch so it is
-has been getting lots of testing on OMAP platforms already.
-
-Thanks,
+Looks good to me.  Built with CONFIG_SPARSE_IRQ=y and boot tested on
+OMAP3430/n900 & OMAP4430/Blaze.
 
 Kevin
