@@ -1,57 +1,44 @@
-From: peter.fordham@gmail.com (Peter Fordham)
-Date: Wed, 15 Jun 2011 13:18:32 -0700
-Subject: [MPCore Watchdog]: Add suspend/resume support.
-Message-ID: <BANLkTimy_X3EmefqtLRNy_NswzekXVXj6A@mail.gmail.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 15 Jun 2011 16:20:15 -0400 (EDT)
+Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
+In-Reply-To: <8ya8vt2am2i.fsf@huya.qualcomm.com>
+References: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
+	<alpine.LFD.2.00.1106151540230.2142@xanadu.home>
+	<8ya8vt2am2i.fsf@huya.qualcomm.com>
+Message-ID: <alpine.LFD.2.00.1106151618570.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for suspend and resume to the MPCore watchdog driver.
+On Wed, 15 Jun 2011, David Brown wrote:
 
----
- drivers/watchdog/mpcore_wdt.c |   24 ++++++++++++++++++++++++
- 1 files changed, 24 insertions(+), 0 deletions(-)
+> On Wed, Jun 15 2011, Nicolas Pitre wrote:
+> 
+> > On Tue, 14 Jun 2011, David Brown wrote:
+> >
+> >> Some targets have multiple memory regions.  Parse up to 8 of these
+> >> when converting the atags to fdt.
+> >> 
+> >> Signed-off-by: David Brown <davidb@codeaurora.org>
+> >
+> > I've added your patch to my zImage patch queue.
+> >
+> >> With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
+> >> It seems to work as long as my device tree has placeholders for all of
+> >> the properties I need.
+> >
+> > I think those missing nodes should simply be created if missing.  I 
+> > however don't see any function in the libfdt API to do that -- there is 
+> > fdt_add_subnode() but no fdt_add_node().  Any DT expert please?
+> 
+> It does seem to only work if I already have nodes that are large enough
+> to hold the properties coming from the ATAG.  For example, I have to
+> have an array of memory reg values large enough, as well as a command
+> line large enough to hold the one passed from the bootloader.
+> 
+> If the DTB's command line is smaller than the one from ATAG, it just
+> silently leaves the DTB one in place.
 
-diff --git a/drivers/watchdog/mpcore_wdt.c b/drivers/watchdog/mpcore_wdt.c
-index 2b4af22..5f63a74 100644
---- a/drivers/watchdog/mpcore_wdt.c
-+++ b/drivers/watchdog/mpcore_wdt.c
-@@ -407,12 +407,36 @@ static int __devexit mpcore_wdt_remove(struct
-platform_device *dev)
- 	return 0;
- }
+That I can explain, and that looks easy to fix.
 
-+#ifdef CONFIG_PM
-+static int mpcore_wdt_suspend(struct platform_device *dev, pm_message_t msg)
-+{
-+        struct mpcore_wdt *wdt = platform_get_drvdata(dev);
-+        mpcore_wdt_stop(wdt);		/* Turn the WDT off */
-+        return 0;
-+}
-+
-+static int mpcore_wdt_resume(struct platform_device *dev)
-+{
-+        struct mpcore_wdt *wdt = platform_get_drvdata(dev);
-+        /* re-activate timer */
-+        if (test_bit(0, &wdt->timer_alive)) {
-+                mpcore_wdt_start(wdt);
-+        }
-+        return 0;
-+}
-+#else
-+#define mpcore_wdt_suspend    NULL
-+#define mpcore_wdt_resume     NULL
-+#endif
-+
- /* work with hotplug and coldplug */
- MODULE_ALIAS("platform:mpcore_wdt");
 
- static struct platform_driver mpcore_wdt_driver = {
- 	.probe		= mpcore_wdt_probe,
- 	.remove		= __devexit_p(mpcore_wdt_remove),
-+        .suspend        = mpcore_wdt_suspend,
-+        .resume         = mpcore_wdt_resume,
- 	.shutdown	= mpcore_wdt_shutdown,
- 	.driver		= {
- 		.owner	= THIS_MODULE,
--- 
-1.7.0.4
+Nicolas
