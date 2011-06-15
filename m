@@ -1,47 +1,36 @@
 From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 14 Jun 2011 21:30:47 -0700
+Date: Tue, 14 Jun 2011 21:31:27 -0700
 Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <201106142333.16203.arnd@arndb.de>
+In-Reply-To: <987664A83D2D224EAE907B061CE93D5301E7281306@orsmsx505.amr.corp.intel.com>
 References: <20110614190850.GA13526@linux-mips.org>
-	<4DF7C3CA.9050902@zytor.com> <201106142333.16203.arnd@arndb.de>
-Message-ID: <4DF83577.6040903@zytor.com>
+	<987664A83D2D224EAE907B061CE93D5301E7281306@orsmsx505.amr.corp.intel.com>
+Message-ID: <4DF8359F.10809@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2011 02:33 PM, Arnd Bergmann wrote:
->>
->> Why on earth restrict it like that?  It's just a device driver, like
->> more or less any other device driver...
+On 06/14/2011 03:08 PM, Luck, Tony wrote:
+> diff --git a/arch/ia64/Kconfig b/arch/ia64/Kconfig
+> index 38280ef..849805a 100644
+> --- a/arch/ia64/Kconfig
+> +++ b/arch/ia64/Kconfig
+> @@ -23,6 +23,7 @@ config IA64
+>  	select HAVE_ARCH_TRACEHOOK
+>  	select HAVE_DMA_API_DEBUG
+>  	select HAVE_GENERIC_HARDIRQS
+> +	select HAVE_PC_PARPORT
+>  	select GENERIC_IRQ_PROBE
+>  	select GENERIC_PENDING_IRQ if SMP
+>  	select IRQ_PER_CPU
 > 
-> I'd say any other classic ISA/PC driver, including floppy, gameport or
-> serial-8250. One problem with these is that we never fully worked out
-> the dependencies for these, which we probably should. CONFIG_ISA
-> generally means ISA add-on cards, but that might not be enabled for
-> platforms that have a pc-parport but no ISA slots.
+> I took a look at the back of all my ia64 systems - none of them
+> have a parallel port.  It seems unlikely that new systems will
+> start adding parallel ports :-)
+> 
+> So even if I had a printer (or other device) that used a parallel
+> port, I have no way to test it.
 > 
 
-OK, serial-8250 is clearly just plain wrong, since the 8250 series UARTs
-are ubiquitous across just about every platform.
-
-Floppy is special (in the short bus sense), since it is closely tied to
-ISA DMA.  Conditionalizing this on ISA DMA makes total sense.
-
-Parallel port is an intermediate case... Centronics parallel ports
-predate the PC ecosystem by quite a bit, and the particular arrangement
-of ports became popular with the PC and spread to other platforms, but
-the particular variant of it known as ECP (as opposed to EPP) is ISA DMA
-specific.
-
-> On the other hand, you have embedded platforms that currently build support
-> for parport-pc but define the inb/outb macros to plain pointer dereferences
-> (otherwise you can't build the 8250 driver). Loading parport-pc on those
-> machines typically results in derefencing user memory in the best case.
->
-> What I'd love to see is a configuration option for "arch has working
-> PC-style inb/outb instructions", so we can build a kernel without them but
-> still get MMIO based drivers for PCI-less platforms.
-
-Now, isn't that was iowrite/ioread was designed for?
+If it has PCI slots, it can have a parallel port.
 
 	-hpa
 
