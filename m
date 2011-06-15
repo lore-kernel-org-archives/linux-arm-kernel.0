@@ -1,41 +1,32 @@
-From: jamie@jamieiles.com (Jamie Iles)
-Date: Wed, 15 Jun 2011 15:45:41 +0100
-Subject: [PATCHv2 0/4] ARM: pmu: improve PMU type identification
-In-Reply-To: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
-References: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20110615144541.GH24628@pulham.picochip.com>
+From: guenter.roeck@ericsson.com (Guenter Roeck)
+Date: Wed, 15 Jun 2011 07:36:34 -0700
+Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
+In-Reply-To: <20110615083437.GA32624@linux-mips.org>
+References: <20110614190850.GA13526@linux-mips.org>
+	<4DF7C3CA.9050902@zytor.com>
+	<20110614223404.GA30057@linux-mips.org>
+	<4DF8329C.7000904@zytor.com>
+	<20110615083437.GA32624@linux-mips.org>
+Message-ID: <20110615143634.GA12757@ericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 03:40:00PM +0100, Mark Rutland wrote:
-> Hi,
+On Wed, Jun 15, 2011 at 04:34:37AM -0400, Ralf Baechle wrote:
+> On Tue, Jun 14, 2011 at 09:18:36PM -0700, H. Peter Anvin wrote:
 > 
-> This is version 2 of the patches originally posted here:
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052865.html
+> > On 06/14/2011 03:34 PM, Ralf Baechle wrote:
+> > > 
+> > > There is no point in offering to build something that couldn't possibly be
+> > > used.  It just makes the kernel harder to configure and inflates the test
+> > > matrix for no good reason.
+> > > 
+> > 
+> > I see... that's why a bunch of devices that only exist on ARM and MIPS
+> > SoCs are offered on x86 platforms?
 > 
-> Changes since v1 include:
+> Well, if you notice one of those, yell.  Or send patches.  Most of those
+> have been fixed.
 > 
->  * Added Acks from Jamie Iles & Rob Herring.
->  * Add "arm-pmu" binding to the platform_device_id table, as driver name
->    matching is not used when platform_driver::id_table exists.
->  * Fixed name clash in PLAT_MATCH_PMU macro.
->  * Removed unnecessary casts for platform_device_id::driver_data.
->  * Aligned trailing backslashes on multi-line *_MATCH_PMU macros.
->  * Removed spaces after casts.
-> 
-> The patches use {of,platform}_device_id tables to provide the PMU type, which
-> can be used similarly (the macros make entries look identical apart from the
-> {plat,of} prefix). This allows us to stop (ab)using platform_device::id, and
-> should allow for easier addition/modification of PMU driver bindings.
-> 
-> BSPs need no longer care about the Type of PMUs they register; as long as a
-> binding exists the type will be assigned correctly.
-> 
-> Rob, Jamie: would you mind if patches 3 & 4 were squashed together?
-> Patch 4 depends heavily on patch 3, and there doesn't seem to be a clean way of
-> fixing that.
+I think he was being sarcastic, and wanted to say that it should be that way.
 
-Sounds good to me.  No other comments on the rest of it, all looks 
-great!
-
-Jamie
+Guenter
