@@ -1,100 +1,106 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jun 2011 18:23:16 +0100
-Subject: [PATCH v3 5/9] ARM: reset: allow kernelspace mappings to be flat
-	mapped during reset
+Date: Wed, 15 Jun 2011 18:23:15 +0100
+Subject: [PATCH v3 4/9] ARM: idmap: add header file for identity mapping
+	functions
 In-Reply-To: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
 References: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1308158600-7169-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1308158600-7169-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, switch_mm_for_reboot only takes out a 1:1 mapping from 0x0
-to TASK_SIZE during reboot. For situations where we actually want to
-turn off the MMU (e.g. kexec, hibernate, CPU hotplug) we want to map
-as much memory as possible using the identity mapping so that we
-increase the chance of mapping our reset code.
+The identity mappings functions are useful outside of SMP booting, so
+expose them through their own header file.
 
-This patch introduces a new reboot mode, 'k', which remaps all of memory
-apart from the kernel (PAGE_OFFSET - _end) and an additional page
-immediately following it, which can be used as a temporary stack if
-valid memory is available there. Note that this change makes it
-necessary to manipulate and switch to the swapper page tables rather
-than hijack the current task.
-
-Reviewed-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/include/asm/idmap.h |    7 +++++++
- arch/arm/mm/idmap.c          |   30 +++++++++++++++++++++---------
- 2 files changed, 28 insertions(+), 9 deletions(-)
+ arch/arm/include/asm/idmap.h   |   16 ++++++++++++++++
+ arch/arm/include/asm/pgtable.h |    3 ---
+ arch/arm/kernel/process.c      |    3 +--
+ arch/arm/kernel/smp.c          |    1 +
+ arch/arm/mm/idmap.c            |    1 +
+ 5 files changed, 19 insertions(+), 5 deletions(-)
+ create mode 100644 arch/arm/include/asm/idmap.h
 
 diff --git a/arch/arm/include/asm/idmap.h b/arch/arm/include/asm/idmap.h
-index ea9517e..abe455a 100644
---- a/arch/arm/include/asm/idmap.h
+new file mode 100644
+index 0000000..ea9517e
+--- /dev/null
 +++ b/arch/arm/include/asm/idmap.h
-@@ -2,6 +2,7 @@
- #define _ARM_IDMAP_H
- 
- #include <asm/page.h>
-+#include <asm/sections.h>
- 
- void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end);
- 
-@@ -11,6 +12,12 @@ void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end);
- void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end) {};
- #endif
- 
-+/* Modes understood from arm_machine_{restart,reset}. */
-+#define MODE_REMAP_KERNEL	'k'
+@@ -0,0 +1,16 @@
++#ifndef _ARM_IDMAP_H
++#define _ARM_IDMAP_H
 +
-+/* Page reserved after the kernel image. */
-+#define RESERVE_STACK_PAGE	ALIGN((unsigned long)_end + PAGE_SIZE, PMD_SIZE)
++#include <asm/page.h>
 +
- void setup_mm_for_reboot(char mode);
++void identity_mapping_add(pgd_t *pgd, unsigned long addr, unsigned long end);
++
++#ifdef CONFIG_SMP
++void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end);
++#else
++void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end) {};
++#endif
++
++void setup_mm_for_reboot(char mode);
++
++#endif	/* _ARM_IDMAP_H */
+diff --git a/arch/arm/include/asm/pgtable.h b/arch/arm/include/asm/pgtable.h
+index 5750704..9d559a8 100644
+--- a/arch/arm/include/asm/pgtable.h
++++ b/arch/arm/include/asm/pgtable.h
+@@ -474,9 +474,6 @@ static inline pte_t pte_modify(pte_t pte, pgprot_t newprot)
  
- #endif	/* _ARM_IDMAP_H */
-diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
-index 4ae0f09..e4ae3c5 100644
---- a/arch/arm/mm/idmap.c
-+++ b/arch/arm/mm/idmap.c
-@@ -75,17 +75,29 @@ void identity_mapping_del(pgd_t *pgd, unsigned long addr, unsigned long end)
- #endif
+ #define pgtable_cache_init() do { } while (0)
+ 
+-void identity_mapping_add(pgd_t *, unsigned long, unsigned long);
+-void identity_mapping_del(pgd_t *, unsigned long, unsigned long);
+-
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* CONFIG_MMU */
+diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
+index 5e1e541..8bd9d94 100644
+--- a/arch/arm/kernel/process.c
++++ b/arch/arm/kernel/process.c
+@@ -32,6 +32,7 @@
+ #include <linux/hw_breakpoint.h>
+ 
+ #include <asm/cacheflush.h>
++#include <asm/idmap.h>
+ #include <asm/leds.h>
+ #include <asm/processor.h>
+ #include <asm/system.h>
+@@ -56,8 +57,6 @@ static const char *isa_modes[] = {
+   "ARM" , "Thumb" , "Jazelle", "ThumbEE"
+ };
+ 
+-extern void setup_mm_for_reboot(char mode);
+-
+ static volatile int hlt_counter;
+ 
+ #include <mach/system.h>
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 344e52b..dfc76aa 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -39,6 +39,7 @@
+ #include <asm/tlbflush.h>
+ #include <asm/ptrace.h>
+ #include <asm/localtimer.h>
++#include <asm/idmap.h>
  
  /*
-- * In order to soft-boot, we need to insert a 1:1 mapping in place of
-- * the user-mode pages.  This will then ensure that we have predictable
-- * results when turning the mmu off
-+ * In order to soft-boot, we need to insert a 1:1 mapping of memory.
-+ * This will then ensure that we have predictable results when turning
-+ * the mmu off.
-  */
- void setup_mm_for_reboot(char mode)
- {
--	/*
--	 * We need to access to user-mode page tables here. For kernel threads
--	 * we don't have any user-mode mappings so we use the context that we
--	 * "borrowed".
--	 */
--	identity_mapping_add(current->active_mm->pgd, 0, TASK_SIZE);
-+
-+	identity_mapping_add(swapper_pg_dir, 0, TASK_SIZE);
-+	if (mode == MODE_REMAP_KERNEL) {
-+		/*
-+		 * Extend the flat mapping into kernelspace.
-+		 * We leave room for the kernel image and a `reboot stack'.
-+		 */
-+		identity_mapping_add(swapper_pg_dir, TASK_SIZE, PAGE_OFFSET);
-+		identity_mapping_add(swapper_pg_dir, RESERVE_STACK_PAGE, 0);
-+	}
-+
-+	/* Clean and invalidate L1. */
-+	flush_cache_all();
-+
-+	/* Switch exclusively to kernel mappings. */
-+	cpu_switch_mm(swapper_pg_dir, &init_mm);
-+
-+	/* Flush the TLB. */
- 	local_flush_tlb_all();
- }
+  * as from 2.5, kernels no longer have an init_tasks structure
+diff --git a/arch/arm/mm/idmap.c b/arch/arm/mm/idmap.c
+index 2be9139..4ae0f09 100644
+--- a/arch/arm/mm/idmap.c
++++ b/arch/arm/mm/idmap.c
+@@ -1,6 +1,7 @@
+ #include <linux/kernel.h>
+ 
+ #include <asm/cputype.h>
++#include <asm/idmap.h>
+ #include <asm/pgalloc.h>
+ #include <asm/pgtable.h>
+ 
 -- 
 1.7.0.4
