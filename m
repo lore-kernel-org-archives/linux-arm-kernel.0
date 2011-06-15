@@ -1,42 +1,50 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 15 Jun 2011 12:29:49 +0800
-Subject: [PATCH v2 5/6] ARM: mxc: all three imx51 TOs use TO1 version of
-	sdma script
-In-Reply-To: <20110614203809.GA23771@pengutronix.de>
-References: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
-	<1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
-	<20110614203809.GA23771@pengutronix.de>
-Message-ID: <20110615042948.GB31712@S2100-06.ap.freescale.net>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Tue, 14 Jun 2011 21:30:47 -0700
+Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
+In-Reply-To: <201106142333.16203.arnd@arndb.de>
+References: <20110614190850.GA13526@linux-mips.org>
+	<4DF7C3CA.9050902@zytor.com> <201106142333.16203.arnd@arndb.de>
+Message-ID: <4DF83577.6040903@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 10:38:09PM +0200, Sascha Hauer wrote:
-> On Tue, Jun 14, 2011 at 02:20:07PM +0800, Shawn Guo wrote:
-> > Though there are three TOs of imx51 soc, the sdma script never
-> > changes since TO1, which means all three TOs of imx51 uses TO1
-> > version of sdma script.
-> > 
-> > The current code passes TO number to imx-sdma driver to load
-> > different firmware for different TO.  That means we have to prepare
-> > 3 identical firmwares, sdma-imx51-to1.bin sdma-imx51-to2.bin and
-> > sdma-imx51-to3.bin, to have the kernel capable of running on all
-> > three TOs.  This just makes no sense.
-> > 
-> > The patch removes the TO number passing and get the default TO1
-> > version of sdma firmware work for all TOs.
+On 06/14/2011 02:33 PM, Arnd Bergmann wrote:
+>>
+>> Why on earth restrict it like that?  It's just a device driver, like
+>> more or less any other device driver...
 > 
-> I don't agree to this approach. The SDMA firmware has been different on
-> all TO versions of earlier i.MXs. For the linearity of the universe we
-> should keep this. What about providing a link in userspace?
+> I'd say any other classic ISA/PC driver, including floppy, gameport or
+> serial-8250. One problem with these is that we never fully worked out
+> the dependencies for these, which we probably should. CONFIG_ISA
+> generally means ISA add-on cards, but that might not be enabled for
+> platforms that have a pc-parport but no ISA slots.
 > 
-The fact is that mx31 and mx35 are the only two SoCs (relatively old
-ones) that have different SDMA firmwares on different TOs.  The
-relatively new ones, mx25 (TO1, TO1.1), mx50 (TO1, TO1.1), mx51
-(TO1, TO2, TO3) and mx53 (TO1, TO2) all have one version SDMA
-firmware for different TOs.  I do not see the mx31/35 case is a
-linearity of the universe.  Do we really want to bother ourselves
-with userspace link on so many latest SoCs?
+
+OK, serial-8250 is clearly just plain wrong, since the 8250 series UARTs
+are ubiquitous across just about every platform.
+
+Floppy is special (in the short bus sense), since it is closely tied to
+ISA DMA.  Conditionalizing this on ISA DMA makes total sense.
+
+Parallel port is an intermediate case... Centronics parallel ports
+predate the PC ecosystem by quite a bit, and the particular arrangement
+of ports became popular with the PC and spread to other platforms, but
+the particular variant of it known as ECP (as opposed to EPP) is ISA DMA
+specific.
+
+> On the other hand, you have embedded platforms that currently build support
+> for parport-pc but define the inb/outb macros to plain pointer dereferences
+> (otherwise you can't build the 8250 driver). Loading parport-pc on those
+> machines typically results in derefencing user memory in the best case.
+>
+> What I'd love to see is a configuration option for "arch has working
+> PC-style inb/outb instructions", so we can build a kernel without them but
+> still get MMIO based drivers for PCI-less platforms.
+
+Now, isn't that was iowrite/ioread was designed for?
+
+	-hpa
 
 -- 
-Regards,
-Shawn
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
