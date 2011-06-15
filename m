@@ -1,37 +1,22 @@
-From: daniel.vetter@ffwll.ch (Daniel Vetter)
-Date: Wed, 15 Jun 2011 13:53:22 +0200
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
-	Allocator added
-In-Reply-To: <201106142030.07549.arnd@arndb.de>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106141803.00876.arnd@arndb.de>
-	<op.vw2r3xrj3l0zgt@mnazarewicz-glaptop>
-	<201106142030.07549.arnd@arndb.de>
-Message-ID: <BANLkTi=XTJuF4np7+rYHzJqWK20OxMrBsw@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 15 Jun 2011 11:57:58 +0000 (UTC)
+Subject: GPIO vs. other drivers order
+Message-ID: <ita6o6$od6$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 20:30, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tuesday 14 June 2011 18:58:35 Michal Nazarewicz wrote:
->> Ah yes, I forgot that separate regions for different purposes could
->> decrease fragmentation.
->
-> That is indeed a good point, but having a good allocator algorithm
-> could also solve this. I don't know too much about these allocation
-> algorithms, but there are probably multiple working approaches to this.
+Hello, colleagues,
 
-imo no allocator algorithm is gonna help if you have comparably large,
-variable-sized contiguous allocations out of a restricted address range.
-It might work well enough if there are only a few sizes and/or there's
-decent headroom. But for really generic workloads this would require
-sync objects and eviction callbacks (i.e. what Thomas Hellstrom pushed
-with ttm).
+I'm currently looking at cleaning up LoCoMo and Scoop2 drivers (custom
+Sharp ASICs used by Sharp Zaurus PDAs). One of the problems I'm stuck at
+is about GPIO parts of that chips: there are plenty of other devices
+depending on GPIO pins working correctly (ranging from board code
+itself up to several other sub-drivers).
 
-So if this is only a requirement on very few platforms and can be
-cheaply fixed with multiple cma allocation areas (heck, we have
-slabs for the same reasons in the kernel), it might be a sensible
-compromise.
--Daniel
+What would be the better approach: to create a basic-mmio-gpio node (and
+hope for the order of initialization to be correct) or embed bgpio into
+main driver and call all necessary hooks directly from it?
+
 -- 
-Daniel Vetter
-daniel.vetter at ffwll.ch - +41 (0) 79 365 57 48 - http://blog.ffwll.ch
+With best wishes
+Dmitry
