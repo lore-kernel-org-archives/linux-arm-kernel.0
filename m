@@ -1,50 +1,58 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jun 2011 18:23:19 +0100
-Subject: [PATCH v3 8/9] ARM: kexec: use arm_machine_reset for branching to the
-	reboot buffer
+Date: Wed, 15 Jun 2011 18:23:13 +0100
+Subject: [PATCH v3 2/9] ARM: proc: add definition of cpu_reset for ARMv6 and
+	ARMv7 cores
 In-Reply-To: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
 References: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1308158600-7169-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1308158600-7169-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that there is a common way to reset the machine, let's use it
-instead of reinventing the wheel in the kexec backend.
+This patch adds simple definitions of cpu_reset for ARMv6 and ARMv7
+cores, which disable the MMU via the SCTLR.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/kernel/machine_kexec.c |   14 ++------------
- 1 files changed, 2 insertions(+), 12 deletions(-)
+ arch/arm/mm/proc-v6.S |    5 +++++
+ arch/arm/mm/proc-v7.S |    7 +++++++
+ 2 files changed, 12 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index e59bbd4..f84567c 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -16,8 +16,6 @@
- extern const unsigned char relocate_new_kernel[];
- extern const unsigned int relocate_new_kernel_size;
+diff --git a/arch/arm/mm/proc-v6.S b/arch/arm/mm/proc-v6.S
+index 1d2b845..f3b5232 100644
+--- a/arch/arm/mm/proc-v6.S
++++ b/arch/arm/mm/proc-v6.S
+@@ -56,6 +56,11 @@ ENTRY(cpu_v6_proc_fin)
+  */
+ 	.align	5
+ ENTRY(cpu_v6_reset)
++	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
++	bic	r1, r1, #0x1			@ ...............m
++	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
++	mov	r1, #0
++	mcr	p15, 0, r1, c7, c5, 4		@ ISB
+ 	mov	pc, r0
  
--extern void setup_mm_for_reboot(char mode);
--
- extern unsigned long kexec_start_address;
- extern unsigned long kexec_indirection_page;
- extern unsigned long kexec_mach_type;
-@@ -111,14 +109,6 @@ void machine_kexec(struct kimage *image)
+ /*
+diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
+index b3b566e..776443a 100644
+--- a/arch/arm/mm/proc-v7.S
++++ b/arch/arm/mm/proc-v7.S
+@@ -58,9 +58,16 @@ ENDPROC(cpu_v7_proc_fin)
+  *	to what would be the reset vector.
+  *
+  *	- loc   - location to jump to for soft reset
++ *
++ *	This code must be executed using a flat identity mapping with
++ *      caches disabled.
+  */
+ 	.align	5
+ ENTRY(cpu_v7_reset)
++	mrc	p15, 0, r1, c1, c0, 0		@ ctrl register
++	bic	r1, r1, #0x1			@ ...............m
++	mcr	p15, 0, r1, c1, c0, 0		@ disable MMU
++	isb
+ 	mov	pc, r0
+ ENDPROC(cpu_v7_reset)
  
- 	if (kexec_reinit)
- 		kexec_reinit();
--	local_irq_disable();
--	local_fiq_disable();
--	setup_mm_for_reboot(0); /* mode is not used, so just pass 0*/
--	flush_cache_all();
--	outer_flush_all();
--	outer_disable();
--	cpu_proc_fin();
--	outer_inv_all();
--	flush_cache_all();
--	cpu_reset(reboot_code_buffer_phys);
-+
-+	arm_machine_reset(reboot_code_buffer_phys);
- }
 -- 
 1.7.0.4
