@@ -1,45 +1,33 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Jun 2011 16:21:44 +0100
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <4DF8CAD5.1090902@zytor.com>
-References: <20110614190850.GA13526@linux-mips.org>
-	<4DF7C3CA.9050902@zytor.com> <201106142333.16203.arnd@arndb.de>
-	<4DF83577.6040903@zytor.com>
-	<20110615074749.GB28989@n2100.arm.linux.org.uk>
-	<4DF8CAD5.1090902@zytor.com>
-Message-ID: <20110615152144.GE28989@n2100.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 15 Jun 2011 18:24:45 +0300
+Subject: [RESEND PATCH 0/2] ARM IRQ Kconfig patches
+In-Reply-To: <20110615151422.GA2618@n2100.arm.linux.org.uk>
+References: <1308142960-20767-1-git-send-email-balbi@ti.com>
+	<20110615151422.GA2618@n2100.arm.linux.org.uk>
+Message-ID: <20110615152444.GZ471@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 08:08:05AM -0700, H. Peter Anvin wrote:
-> On 06/15/2011 12:47 AM, Russell King - ARM Linux wrote:
-> >>
-> >> OK, serial-8250 is clearly just plain wrong, since the 8250 series UARTs
-> >> are ubiquitous across just about every platform.
-> >>
-> >> Floppy is special (in the short bus sense), since it is closely tied to
-> >> ISA DMA.  Conditionalizing this on ISA DMA makes total sense.
-> > 
-> > No it doesn't.  It depends on the ISA DMA API, not that the machine has
-> > ISA DMA.
-> > 
-> > I have a platform which has no ISA DMA but uses the floppy driver.  Please
-> > don't break it.
+On Wed, Jun 15, 2011 at 04:14:22PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 15, 2011 at 04:02:38PM +0300, Felipe Balbi wrote:
+> > I have lost count how many times I have sent
+> > these patches. Will someone either take them
+> > in or NAK them so I stop sending ??
 > 
-> OK, even more case in point, then.
+> It might help to copy the MMP and PXA people so that we get to hear
+> their side of the story.  It may be that they always require sparse
+> IRQ support to be enabled.
+> 
+> 'cause at the moment I've no idea whether your patch is right or not.
 
-It's already been solved - ARCH_MAY_HAVE_PC_FDC is supposed to be
-defined to y in the cases where architectures have support for it.
+I'll do so... thanks, at least one reply :-D
 
-What we do on ARM for example is:
-
-config ARCH_MAY_HAVE_PC_FDC
-        bool
-
-and then select that symbol for our platforms which can have the
-floppy driver.
-
-And in any case we already have definitions for the presence of the
-ISA DMA API vs the common ISA DMA helpers in kernel/.  The presence
-of the ISA DMA API is given by CONFIG_ISA_DMA_API, while the
-ISA DMA helper CONFIG_GENERIC_ISA_DMA.
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110615/d868a602/attachment.sig>
