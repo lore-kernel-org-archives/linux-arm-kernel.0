@@ -1,94 +1,157 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Jun 2011 13:14:56 +0200
-Subject: [PATCH 08/10] mm: cma: Contiguous Memory Allocator added
-In-Reply-To: <000601cc2b32$9e2a4030$da7ec090$%szyprowski@samsung.com>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106141549.29315.arnd@arndb.de>
-	<000601cc2b32$9e2a4030$da7ec090$%szyprowski@samsung.com>
-Message-ID: <201106151314.57150.arnd@arndb.de>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Wed, 15 Jun 2011 12:16:56 +0100
+Subject: [RFC] kprobes with thumb2 conditional code
+In-Reply-To: <1308131138.3154.9.camel@computer2>
+References: <1299862881.2512.314.camel@computer2.home>
+	<AANLkTikno84z6+gY9hevSG++jZJbYO--bynu_ixsmkB0@mail.gmail.com>
+	<alpine.LFD.2.00.1103171825040.26889@xanadu.home>
+	<1308131138.3154.9.camel@computer2>
+Message-ID: <20110615111656.GA3434@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 15 June 2011, Marek Szyprowski wrote:
-
-> > > If possible I would like to make cma something similar to
-> > > declare_dma_coherent()&friends, so the board/platform/bus startup code
-> > > will just call declare_dma_contiguous() to enable support for cma for
-> > > particular devices.
+On Wed, Jun 15, 2011 at 10:45:38AM +0100, Tixy wrote:
+> I would like to revisit the discussion about how to handle kprobes
+> placed on conditionally executed instructions...
+> 
+> On Thu, 2011-03-17 at 18:46 -0400, Nicolas Pitre wrote: 
+> > On Thu, 17 Mar 2011, Dave Martin wrote:
+> > > On Fri, Mar 11, 2011 at 5:01 PM, Tixy <tixy@yxit.co.uk> wrote:
+> > > > it uses unconditional instructions for its breakpoints. With thumb
+> > > > instructions we can't force unconditional execution, so we would have an
+> > > > 'implementation defined' situation whether it would fire or not when the
+> > > > condition is false. (Thought you would hope it would be consistent on a
+> > > > particular device.)
+> > > >
+> > > > Some options for dealing with this, in increasing order of
+> > > > complexity...
+> > > >
+> > > > 1. Accept the situation as described.
+> > > >
+> > > > 2. Change arm probes to use conditional instructions so we would
+> > > > (hopefully) have consistent undefined behaviour in both arm and thumb
+> > > > code. (If that isn't an oxymoron :-)
+> > > >
+> > > > 3. Do 2, and modify kprobe_handler to test for false firings (breakpoint
+> > > > when condition false) and not execute the probe's callback functions in
+> > > > these cases. E.g. consistently make probe2 appear to not fire when
+> > > > condition is false.
+> > > 
+> > > My preference would be for option (1) or (3).  For (3), we could
+> > > choose to extend this behaviour to cover the existing ARM
+> > > implementation as well as Thumb, which could be a tidier and more
+> > > consistent approach.  This seems to be the "right" thing, since it
+> > > means kprobes never fire for real on instructions which are logically
+> > > not executed, no matter how the compiler (or human) implemented the
+> > > conditionality.  Currently, ARM kprobes can fire on instructions which
+> > > would fail their condition check, which might be considered wrong.
 > > 
-> > Sounds good, I like that.
->  
-> Thanks. I thought a bit more on this and decided that I want to make this
-> declare_dma_contiguous() optional for the drivers. It should be used only
-> for some sophisticated cases like for example our video codec with two
-> memory interfaces for 2 separate banks. By default the dma-mapping will
-> use system-wide cma pool.
+> > Definitely #3.
+> > 
+> > In the ARM case, this can be achieved by saving the condition code 
+> > of the replaced instruction when installing a probe, and test it 
+> > against the CPSR value from the interrupted state.  If the condition is 
+> > false then just skip the native emulation of the resulting NOP and 
+> > ignore the probe callback.  In the Thumb2 case the IT state in the CPSR 
+> > would indicate right away if the probe should be ignored.
 > 
-> (snipped)
-
-Ok, good.
-
-> > Please explain the exact requirements that lead you to defining multiple
-> > contexts. My feeling is that in most cases we don't need them and can
-> > simply live with a single area. Depending on how obscure the cases are
-> > where we do need something beyond that, we can then come up with
-> > special-case solutions for them.
+> If we don't fire a probe because a conditional instruction wouldn't be
+> executed then for branch instructions we only fire when branches are
+> taken. So, with things like loops...
 > 
-> Like it was already stated we need such feature for our multimedia codec
-> to allocate buffers from different memory banks. I really don't see any
-> problems with the possibility to have additional cma areas for special
-> purposes.
-
-It's not a problem for special cases, I just want to make sure that
-the common case works well enough that we don't need too many special
-cases.
-
-> > The problem with defining CMA areas in the device tree is that it's not
-> > a property of the hardware, but really policy. The device tree file
-> > should not contain anything related to a specific operating system
-> > because you might want to boot something on the board that doesn't
-> > know about CMA, and even when you only care about using Linux, the
-> > implementation might change to the point where hardcoded CMA areas
-> > no longer make sense.
+> 1:  movs r0, r0, asl #1
+>     bpl 1b
 > 
-> I really doubt that the device tree will carry only system-independent
-> information.
-
-So far, this has worked well enough.
-
-> Anyway, the preferred or required memory areas/banks for
-> buffer allocation is something that is a property of the hardware not
-> the OS policy.
-
-That is true. If there are hard requirements of the hardware, we
-can and should definitely document them in the device tree. It's
-totally fine to describe the layout of memory banks and affinity
-of devices to specific banks where that exists in hardware.
-
-The part that should not be in the device tree is a specific location
-of a buffer inside the bank when there is no hardware reason for
-the location.
-
-I guess it's also fine to describe requirements per device regarding
-how much contiguous memory it will need to operate, if you can provide
-that number independent of the application you want to run. The early
-boot code can walk the device tree and ensure that the region is
-large enough.
-
-> > IMHO we should first aim for a solution that works almost everywhere
-> > without the kernel knowing what board it's running on, and then we
-> > can add quirks for devices that have special requirements. I think
-> > the situation is similar to the vmalloc virtual address space, which
-> > normally has a hardcoded size that works almost everywhere, but there
-> > are certain drivers etc that require much more, or there are situations
-> > where you want to make it smaller in order to avoid highmem.
+> the probe would fire on every iteration of the loop except the last.
+> This inconsistency seems bad to me.
 > 
-> I'm trying to create something that will fulfill the requirements of my
-> hardware, that's why I cannot focus on a generic case only.
+> We could make exceptions for branches, and every other instruction which
+> can changes PC, but we would still have the issue that we can't force
+> unconditional firing of Thumb branches in an IT block.
 
-Yes, that is the obvious conflict. My main interest is to have something
-that works not just for your hardware but works as good as possible on
-the widest possible range of hardware, which may mean it may run not quite
-as good in some of the cases.
+I suspect that it's more common to see conditional branches outside IT
+blocks than inside, due to the different encodings available and the
+fact that it's most common for a conditional branch to follow some
+unconditional instruction to set up the condition.
 
-	Arnd
+According to my hacky measurements, only about 2% of the conditional
+branches in a typical vmlinux image are inside IT blocks.  So if we
+don't solve this case it may not be catastrophic.
+
+> There doesn't appear to be a single satisfactory solution. 
+
+Since the instruction stream can be reliably decoded _forwards_, we
+could trap on the branch-not-taken case by setting an additional probe
+after the affected branch.
+
+Where branches appear in IT blocks, they're not allowed to be anywhere
+except at the end of the block, so the next instruction is either outside
+the block, or is an IT instruction itself (in which case we can still
+set a probe on it).  In valid code there will always be a next instruction,
+since the CPU will fall through the branch if the condition is false.
+
+That would deal with almost all cases, but it adds a bit of complexity
+so I'm not convinced it's worth it.
+
+> 
+> Perhaps we should do option #1, i.e. don't change anything and have
+> probes always firing except when breakpoints are missed in IT blocks due
+> to the condition being false.
+> 
+> Or looking at it another way, leave things as the are until someone
+> comes up with a real-life use-case which indicates that a change is
+> needed.
+
+We could ask the question of what a developer is trying to detect when
+a kprobe is set.
+
+It would either be:
+
+	a) does the PC logically reach this address?
+	b) is this instruction logically executed?
+
+Currently, the proposed implementation (#3) follows interpretation (b).
+
+We cannot reliably implement (a) because the CPU may effectively skip
+over IT blocks rather than considering each instruction in turn for
+potential faulting; i.e., the CPU does not reliably answer question (a)
+for us.  Notions like where the PC is at a particular time and the 
+exact locations it visits usually can have pretty fuzzy meaning once
+you get into actual CPU implementation; so the ARM architecture doesn't
+commit CPU implementors to meaningfully answering question (a) in all
+situations -- which is the fundamental difficulty here, since this is
+the question people usually expect to be answered when they set a
+breakpoint.
+
+So, we have a choice between a consistent but sometimes counterintuitive
+approach (b), or an inconsistent (and hence sometimes counterintuitive)
+approach approximating (a).  The latter case will be more complex to
+implement, and I'm not sure of the benefits.
+
+We could make a special exception to the false-firing rule for branches,
+but that raises the question of which other instructions should be
+excepted.  Efectively, this means that we "guess" based on the actual
+instruction whether the developer meant (a) or (b) when setting their
+kprobe.  Unfortunately I don't think there's a correct answer to
+that question magically, unless the API has a way for the developer
+to actually state this.  It doesn't, AFAICT.
+
+Apart from simple things like breaking on entry to a function,
+I think we can (and should) expect developers using kprobes in an arch-
+specific manner to understand what they're doing.  For example,
+set your probe on the start of a loop, and the first unconditional
+instruction following the looping branch, not on the looping branch
+itself.
+
+Either way, we should of course document clearly the implemented
+kprobe firing behaviour so that people understand how to work with it.
+
+Those are just my thoughts ... I don't think there's any single
+correct answer to how to implement this.  Going for the simplest
+reasonable-looking approach and changing it later if and only if
+this causes problems for people seems the best approach in such cases.
+
+If you think that that #3 is not the simplest reasonable-looking
+approach after all, then I guess we can think about alternatives.
+
+---Cheers
