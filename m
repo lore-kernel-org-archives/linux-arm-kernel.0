@@ -1,157 +1,46 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Wed, 15 Jun 2011 12:16:56 +0100
-Subject: [RFC] kprobes with thumb2 conditional code
-In-Reply-To: <1308131138.3154.9.camel@computer2>
-References: <1299862881.2512.314.camel@computer2.home>
-	<AANLkTikno84z6+gY9hevSG++jZJbYO--bynu_ixsmkB0@mail.gmail.com>
-	<alpine.LFD.2.00.1103171825040.26889@xanadu.home>
-	<1308131138.3154.9.camel@computer2>
-Message-ID: <20110615111656.GA3434@arm.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 15 Jun 2011 19:24:34 +0800
+Subject: sdhci-esdhc-imx -- MMC 10x slower than it should be
+In-Reply-To: <20110615105318.GB3097@pengutronix.de>
+References: <20110615094001.GA21137@pma.sysgo.com>
+	<20110615105318.GB3097@pengutronix.de>
+Message-ID: <20110615112433.GB3579@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 10:45:38AM +0100, Tixy wrote:
-> I would like to revisit the discussion about how to handle kprobes
-> placed on conditionally executed instructions...
+On Wed, Jun 15, 2011 at 12:53:18PM +0200, Wolfram Sang wrote:
+> Hi,
 > 
-> On Thu, 2011-03-17 at 18:46 -0400, Nicolas Pitre wrote: 
-> > On Thu, 17 Mar 2011, Dave Martin wrote:
-> > > On Fri, Mar 11, 2011 at 5:01 PM, Tixy <tixy@yxit.co.uk> wrote:
-> > > > it uses unconditional instructions for its breakpoints. With thumb
-> > > > instructions we can't force unconditional execution, so we would have an
-> > > > 'implementation defined' situation whether it would fire or not when the
-> > > > condition is false. (Thought you would hope it would be consistent on a
-> > > > particular device.)
-> > > >
-> > > > Some options for dealing with this, in increasing order of
-> > > > complexity...
-> > > >
-> > > > 1. Accept the situation as described.
-> > > >
-> > > > 2. Change arm probes to use conditional instructions so we would
-> > > > (hopefully) have consistent undefined behaviour in both arm and thumb
-> > > > code. (If that isn't an oxymoron :-)
-> > > >
-> > > > 3. Do 2, and modify kprobe_handler to test for false firings (breakpoint
-> > > > when condition false) and not execute the probe's callback functions in
-> > > > these cases. E.g. consistently make probe2 appear to not fire when
-> > > > condition is false.
-> > > 
-> > > My preference would be for option (1) or (3).  For (3), we could
-> > > choose to extend this behaviour to cover the existing ARM
-> > > implementation as well as Thumb, which could be a tidier and more
-> > > consistent approach.  This seems to be the "right" thing, since it
-> > > means kprobes never fire for real on instructions which are logically
-> > > not executed, no matter how the compiler (or human) implemented the
-> > > conditionality.  Currently, ARM kprobes can fire on instructions which
-> > > would fail their condition check, which might be considered wrong.
-> > 
-> > Definitely #3.
-> > 
-> > In the ARM case, this can be achieved by saving the condition code 
-> > of the replaced instruction when installing a probe, and test it 
-> > against the CPSR value from the interrupted state.  If the condition is 
-> > false then just skip the native emulation of the resulting NOP and 
-> > ignore the probe callback.  In the Thumb2 case the IT state in the CPSR 
-> > would indicate right away if the probe should be ignored.
+> > We are seeing issues with sdhci-esdhc-imx in 2.6.39; performance is
+> > not what it should be; it is about 10x lower in fact.
 > 
-> If we don't fire a probe because a conditional instruction wouldn't be
-> executed then for branch instructions we only fire when branches are
-> taken. So, with things like loops...
+> Which SoC? 25/35/51/53?
 > 
-> 1:  movs r0, r0, asl #1
->     bpl 1b
+> > ...any idea what this comment means? I'd like to eventualy support
+> > 8BITBUS...
 > 
-> the probe would fire on every iteration of the loop except the last.
-> This inconsistency seems bad to me.
+> 8-Bit bus is not specified in the standard, so it cannot be detected.
+> Check other drivers where they use MMC_CAP_8_BIT_DATA.
 > 
-> We could make exceptions for branches, and every other instruction which
-> can changes PC, but we would still have the issue that we can't force
-> unconditional firing of Thumb branches in an IT block.
-
-I suspect that it's more common to see conditional branches outside IT
-blocks than inside, due to the different encodings available and the
-fact that it's most common for a conditional branch to follow some
-unconditional instruction to set up the condition.
-
-According to my hacky measurements, only about 2% of the conditional
-branches in a typical vmlinux image are inside IT blocks.  So if we
-don't solve this case it may not be catastrophic.
-
-> There doesn't appear to be a single satisfactory solution. 
-
-Since the instruction stream can be reliably decoded _forwards_, we
-could trap on the branch-not-taken case by setting an additional probe
-after the affected branch.
-
-Where branches appear in IT blocks, they're not allowed to be anywhere
-except at the end of the block, so the next instruction is either outside
-the block, or is an IT instruction itself (in which case we can still
-set a probe on it).  In valid code there will always be a next instruction,
-since the CPU will fall through the branch if the condition is false.
-
-That would deal with almost all cases, but it adds a bit of complexity
-so I'm not convinced it's worth it.
-
+> > Part of the problem is that esdhc_writeb_le() does translation of bits
+> > into breescale format; but readb() does not do translation back, and
+> > core code uses read-modify-write on the register, for example when
+> > turning on the LED. What to do there? Translate back? Add shadow
+> > variable? Get rid of read-modify-write?
 > 
-> Perhaps we should do option #1, i.e. don't change anything and have
-> probes always firing except when breakpoints are missed in IT blocks due
-> to the condition being false.
+> Probably the least ugly solution :/
 > 
-> Or looking at it another way, leave things as the are until someone
-> comes up with a real-life use-case which indicates that a change is
-> needed.
+> > Any ideas why it is slow?
+> 
+> Your board polls for card-detect, Shawn recently sent a series which
+> lets you fix that for mx5.
+> 
+> ADMA is marked broken in mainline, cause it didn't work with a number of
+> cards. Richard sent a patch recently.
+> 
+The ADMA support is recently added into Freescale BSP.  IOW, the ADMA
+does not play on kernel "2.6.34 -with-freescale-patches" either.
 
-We could ask the question of what a developer is trying to detect when
-a kprobe is set.
-
-It would either be:
-
-	a) does the PC logically reach this address?
-	b) is this instruction logically executed?
-
-Currently, the proposed implementation (#3) follows interpretation (b).
-
-We cannot reliably implement (a) because the CPU may effectively skip
-over IT blocks rather than considering each instruction in turn for
-potential faulting; i.e., the CPU does not reliably answer question (a)
-for us.  Notions like where the PC is at a particular time and the 
-exact locations it visits usually can have pretty fuzzy meaning once
-you get into actual CPU implementation; so the ARM architecture doesn't
-commit CPU implementors to meaningfully answering question (a) in all
-situations -- which is the fundamental difficulty here, since this is
-the question people usually expect to be answered when they set a
-breakpoint.
-
-So, we have a choice between a consistent but sometimes counterintuitive
-approach (b), or an inconsistent (and hence sometimes counterintuitive)
-approach approximating (a).  The latter case will be more complex to
-implement, and I'm not sure of the benefits.
-
-We could make a special exception to the false-firing rule for branches,
-but that raises the question of which other instructions should be
-excepted.  Efectively, this means that we "guess" based on the actual
-instruction whether the developer meant (a) or (b) when setting their
-kprobe.  Unfortunately I don't think there's a correct answer to
-that question magically, unless the API has a way for the developer
-to actually state this.  It doesn't, AFAICT.
-
-Apart from simple things like breaking on entry to a function,
-I think we can (and should) expect developers using kprobes in an arch-
-specific manner to understand what they're doing.  For example,
-set your probe on the start of a loop, and the first unconditional
-instruction following the looping branch, not on the looping branch
-itself.
-
-Either way, we should of course document clearly the implemented
-kprobe firing behaviour so that people understand how to work with it.
-
-Those are just my thoughts ... I don't think there's any single
-correct answer to how to implement this.  Going for the simplest
-reasonable-looking approach and changing it later if and only if
-this causes problems for people seems the best approach in such cases.
-
-If you think that that #3 is not the simplest reasonable-looking
-approach after all, then I guess we can think about alternatives.
-
----Cheers
+-- 
+Regards,
+Shawn
