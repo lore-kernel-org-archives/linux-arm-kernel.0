@@ -1,33 +1,28 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Wed, 15 Jun 2011 10:35:21 +0200
-Subject: [PATCH 0/9] Add clkdev support for Samsung platforms
-In-Reply-To: <1307594324-11053-1-git-send-email-thomas.ab@samsung.com>
-References: <1307594324-11053-1-git-send-email-thomas.ab@samsung.com>
-Message-ID: <20110615083521.GF3037@game.jcrosoft.org>
+From: ralf@linux-mips.org (Ralf Baechle)
+Date: Wed, 15 Jun 2011 09:34:37 +0100
+Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
+In-Reply-To: <4DF8329C.7000904@zytor.com>
+References: <20110614190850.GA13526@linux-mips.org>
+	<4DF7C3CA.9050902@zytor.com>
+	<20110614223404.GA30057@linux-mips.org>
+	<4DF8329C.7000904@zytor.com>
+Message-ID: <20110615083437.GA32624@linux-mips.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:08 Thu 09 Jun     , Thomas Abraham wrote:
-> This patch series adds clkdev support for all Samsung platforms. clkdev
-> support is a prerequisite for adding device tree on Samsung platforms
-> and possibly revive framebuffer driver patches for Exynos4 platforms.
-> 
-> The first of the two patches are for eliminating the explict
-> console_initcall from the serial drivers. This is required to prevent
-> the clk_get being invoked at time when device registrations have not
-> completed.
-> 
-> This patch series is based on the latest
-> git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
-> 
-> and the patch "[PATCH] Consolidate the clkdev header files".
-> 
-> It has been tested on the following boards.
-> 
-> SMDK2416, SMDK2440, SMDK2450, SMDK6410, SMDK6440, SMDK6450,
-> SMDKC100, SMDKV210 and SMDKV310.
-looks good
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On Tue, Jun 14, 2011 at 09:18:36PM -0700, H. Peter Anvin wrote:
 
-Best Regards,
-J.
+> On 06/14/2011 03:34 PM, Ralf Baechle wrote:
+> > 
+> > There is no point in offering to build something that couldn't possibly be
+> > used.  It just makes the kernel harder to configure and inflates the test
+> > matrix for no good reason.
+> > 
+> 
+> I see... that's why a bunch of devices that only exist on ARM and MIPS
+> SoCs are offered on x86 platforms?
+
+Well, if you notice one of those, yell.  Or send patches.  Most of those
+have been fixed.
+
+  Ralf
