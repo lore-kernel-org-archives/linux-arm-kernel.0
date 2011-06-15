@@ -1,98 +1,84 @@
-From: ben-i2c@fluff.org (Ben Dooks)
-Date: Wed, 15 Jun 2011 22:36:37 +0100
-Subject: [PATCH v4 00/18] I2C: OMAP: I2C fixes, removal of cpu_is...
-	from driver
-In-Reply-To: <1306973984-15165-1-git-send-email-khilman@ti.com>
-References: <1306973984-15165-1-git-send-email-khilman@ti.com>
-Message-ID: <20110615213637.GH15795@trinity.fluff.org>
+From: lbassel@codeaurora.org (Larry Bassel)
+Date: Wed, 15 Jun 2011 14:39:58 -0700
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
+	Allocator added
+In-Reply-To: <000901cc2b37$4c21f030$e465d090$%szyprowski@samsung.com>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<20110614170158.GU2419@fooishbar.org>
+	<BANLkTi=cJisuP8=_YSg4h-nsjGj3zsM7sg@mail.gmail.com>
+	<201106142242.25157.arnd@arndb.de>
+	<000901cc2b37$4c21f030$e465d090$%szyprowski@samsung.com>
+Message-ID: <20110615213958.GB28032@labbmf-linux.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 01, 2011 at 05:19:26PM -0700, Kevin Hilman wrote:
-> Ben, 
+On 15 Jun 11 10:36, Marek Szyprowski wrote:
+> Hello,
 > 
-> Please pull in this series from Andy Green for the next merge window.
+> On Tuesday, June 14, 2011 10:42 PM Arnd Bergmann wrote:
 > 
-> v4 is simply a rebase of Andy's v3 against v3.0-rc1 with some basic
-> sanity testing against with the latest kernel.
+> > On Tuesday 14 June 2011 20:58:25 Zach Pfeffer wrote:
+> > > I've seen this split bank allocation in Qualcomm and TI SoCs, with
+> > > Samsung, that makes 3 major SoC vendors (I would be surprised if
+> > > Nvidia didn't also need to do this) - so I think some configurable
+> > > method to control allocations is necessarily. The chips can't do
+> > > decode without it (and by can't do I mean 1080P and higher decode is
+> > > not functionally useful). Far from special, this would appear to be
+> > > the default.
 
-These look much more like functionality changes than actual fixes, and
-are much more suited for inclusion into -next for once the next stable
-release is out.
- 
-> It's also available here for pulling:
-> 
-> git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/i2c-andy
-> 
-> Original cover letter from Andy below:
-> 
-> The following series removes cpu_...() usage completely from the
-> omap-i2c driver by having decisions about functional implementation
-> choices in the SoC held in cpu-specific hwmod tables that are
-> already established, or for OMAP1 where there is no hwmod, set at
-> OMAP1-specific i2c bus addition time.
-> 
-> Along the way it solves two issues with the existing implementation,
-> that only 16-bit accesses are documented to be allowed to the I2C
-> peripheral unit, and that due to a confusion in the existing driver
-> about whether it is faced with a newer IP version on OMAP3530, currently
-> it writes to a random non-existent I2C register at times on that
-> platform.
+We at Qualcomm have some platforms that have memory of different
+performance characteristics, some drivers will need a way of
+specifying that they need fast memory for an allocation (and would prefer
+an error if it is not available rather than a fallback to slower
+memory). It would also be bad if allocators who don't need fast
+memory got it "accidentally", depriving those who really need it.
 
-As noted above there's rather lot of functionality change to go in
-with fixing bugs. Is there a possibility of just fixing as many problems
-without making a pile of changes?
- 
-> The patch series is quite extended from the first try thanks to
-> comments from Benoit Cousson.
+> > 
+> > Thanks for the insight, that's a much better argument than 'something
+> > may need it'. Are those all chips without an IOMMU or do we also
+> > need to solve the IOMMU case with split bank allocation?
+> > 
+> > I think I'd still prefer to see the support for multiple regions split
+> > out into one of the later patches, especially since that would defer
+> > the question of how to do the initialization for this case and make
+> > sure we first get a generic way.
+> > 
+> > You've convinced me that we need to solve the problem of allocating
+> > memory from a specific bank eventually, but separating it from the
+> > one at hand (contiguous allocation) should help getting the important
+> > groundwork in at first.
+> >
+> > The possible conflict that I still see with per-bank CMA regions are:
+> > 
+> > * It completely destroys memory power management in cases where that
+> >   is based on powering down entire memory banks.
 > 
-> This 3rd try is based on 2.6.38-rc8 as requested.
+> I don't think that per-bank CMA regions destroys memory power management
+> more than the global CMA pool. Please note that the contiguous buffers
+> (or in general dma-buffers) right now are unmovable so they don't fit
+> well into memory power management.
+
+We also have platforms where a well-defined part of the memory
+can be powered off, and other parts can't (or won't). We need a way
+to steer the place allocations come from to the memory that won't be
+turned off (so that CMA allocations are not an obstacle to memory
+hotremove).
+
 > 
-> Andy Green (18):
->   I2C: OMAP2+: Set hwmod flags to only allow 16-bit accesses to i2c
->   I2C: OMAP2+: Name registers in I2C IP V2 only accordingly
->   I2C: OMAP2+: Introduce I2C IP versioning constants
->   I2C: OMAP2+: Tag all OMAP2+ hwmod defintions with I2C IP revision
->   I2C: OMAP: add rev to omap i2c platform data
->   I2C: OMAP1: set IP revision in platform data
->   I2C: OMAP2+: Pass hwmod rev knowledge via platform_data when i2c bus
->     added
->   I2C: OMAP2+: use platform_data ip revision to select register map
->   I2C: OMAP2+: Solve array bounds overflow error on i2c idle
->   I2C: OMAP2+: address confused probed version naming
->   I2C: OMAP2+: increase omap_i2c_dev_attr flags from u8 to u32
->   I2C: OMAP1/OMAP2+: add flags field to omap i2c platform data
->   I2C: OMAP2+: Pass flags up to omap i2c platform_data as well
->   I2C: OMAP1/OMAP2+: create omap I2C functionality flags for each
->     cpu_... test
->   I2C: OMAP2+: add correct functionality flags to all omap2plus i2c
->     dev_attr
->   I2C: OMAP1: set i2c unit feature implementation flags in platform
->     data
->   I2C: OMAP2+: Convert omap I2C driver to use feature implementation
->     flags from platform data
->   I2C: OMAP1/OMAP2+: prepend I2C IP version to probed version shown in
->     dev_info
-> 
->  arch/arm/mach-omap2/omap_hwmod_2420_data.c |    8 ++-
->  arch/arm/mach-omap2/omap_hwmod_2430_data.c |    6 ++
->  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c |   13 ++++
->  arch/arm/mach-omap2/omap_hwmod_44xx_data.c |   18 ++++-
->  arch/arm/plat-omap/i2c.c                   |   27 ++++++++
->  arch/arm/plat-omap/include/plat/i2c.h      |    3 +-
->  drivers/i2c/busses/i2c-omap.c              |  100 +++++++++++++++-------------
->  include/linux/i2c-omap.h                   |   29 ++++++++
->  8 files changed, 153 insertions(+), 51 deletions(-)
-> 
+> Best regards
 > -- 
-> 1.7.4
+> Marek Szyprowski
+> Samsung Poland R&D Center
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-i2c" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> _______________________________________________
+> Linaro-mm-sig mailing list
+> Linaro-mm-sig at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+
+Larry Bassel
 
 -- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
-
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
