@@ -1,54 +1,34 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 15 Jun 2011 12:53:18 +0200
-Subject: sdhci-esdhc-imx -- MMC 10x slower than it should be
-In-Reply-To: <20110615094001.GA21137@pma.sysgo.com>
-References: <20110615094001.GA21137@pma.sysgo.com>
-Message-ID: <20110615105318.GB3097@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Wed, 15 Jun 2011 19:15:20 +0800
+Subject: [PATCH v2 2/4] mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get
+	cleared
+In-Reply-To: <1308136522-3403-1-git-send-email-shawn.guo@linaro.org>
+References: <1308136522-3403-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1308136522-3403-3-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The function esdhc_readl_le intends to clear bit SDHCI_CARD_PRESENT,
+when the card detect gpio tells there is no card.  But it does not
+clear the bit actually.  The patch gives a fix on that.
 
-> We are seeing issues with sdhci-esdhc-imx in 2.6.39; performance is
-> not what it should be; it is about 10x lower in fact.
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-Which SoC? 25/35/51/53?
-
-> ...any idea what this comment means? I'd like to eventualy support
-> 8BITBUS...
-
-8-Bit bus is not specified in the standard, so it cannot be detected.
-Check other drivers where they use MMC_CAP_8_BIT_DATA.
-
-> Part of the problem is that esdhc_writeb_le() does translation of bits
-> into breescale format; but readb() does not do translation back, and
-> core code uses read-modify-write on the register, for example when
-> turning on the LED. What to do there? Translate back? Add shadow
-> variable? Get rid of read-modify-write?
-
-Probably the least ugly solution :/
-
-> Any ideas why it is slow?
-
-Your board polls for card-detect, Shawn recently sent a series which
-lets you fix that for mx5.
-
-ADMA is marked broken in mainline, cause it didn't work with a number of
-cards. Richard sent a patch recently.
-
-Both series could need some more testing :)
-
-Regards,
-
-   Wolfram
-
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index 248b8e5..94097c0 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -84,7 +84,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+ 		if (boarddata && gpio_is_valid(boarddata->cd_gpio)
+ 				&& gpio_get_value(boarddata->cd_gpio))
+ 			/* no card, if a valid gpio says so... */
+-			val &= SDHCI_CARD_PRESENT;
++			val &= ~SDHCI_CARD_PRESENT;
+ 		else
+ 			/* ... in all other cases assume card is present */
+ 			val |= SDHCI_CARD_PRESENT;
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110615/36f9c9d0/attachment.sig>
+1.7.4.1
