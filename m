@@ -1,40 +1,33 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 15 Jun 2011 10:43:21 +0200
-Subject: [PATCH] mach-h720x: fix build error
-Message-ID: <1308127401-30734-1-git-send-email-linus.walleij@stericsson.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Wed, 15 Jun 2011 10:35:21 +0200
+Subject: [PATCH 0/9] Add clkdev support for Samsung platforms
+In-Reply-To: <1307594324-11053-1-git-send-email-thomas.ab@samsung.com>
+References: <1307594324-11053-1-git-send-email-thomas.ab@samsung.com>
+Message-ID: <20110615083521.GF3037@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On 10:08 Thu 09 Jun     , Thomas Abraham wrote:
+> This patch series adds clkdev support for all Samsung platforms. clkdev
+> support is a prerequisite for adding device tree on Samsung platforms
+> and possibly revive framebuffer driver patches for Exynos4 platforms.
+> 
+> The first of the two patches are for eliminating the explict
+> console_initcall from the serial drivers. This is required to prevent
+> the clk_get being invoked at time when device registrations have not
+> completed.
+> 
+> This patch series is based on the latest
+> git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git for-next
+> 
+> and the patch "[PATCH] Consolidate the clkdev header files".
+> 
+> It has been tested on the following boards.
+> 
+> SMDK2416, SMDK2440, SMDK2450, SMDK6410, SMDK6440, SMDK6450,
+> SMDKC100, SMDKV210 and SMDKV310.
+looks good
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-The h7201/h7202 machines did not build since they define
-ARM_DMA_ZONE_OFFSET but do not select ZONE_DMA. Fix it up by
-selecting ZONE_DMA in their Kconfig.
-
-Cc: Sascha Hauer <s.hauer@pengutronix.de>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/mach-h720x/Kconfig |    2 ++
- 1 files changed, 2 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-h720x/Kconfig b/arch/arm/mach-h720x/Kconfig
-index 9b6982e..abf356c 100644
---- a/arch/arm/mach-h720x/Kconfig
-+++ b/arch/arm/mach-h720x/Kconfig
-@@ -6,12 +6,14 @@ config ARCH_H7201
- 	bool "gms30c7201"
- 	depends on ARCH_H720X
- 	select CPU_H7201
-+	select ZONE_DMA
- 	help
- 	  Say Y here if you are using the Hynix GMS30C7201 Reference Board
- 
- config ARCH_H7202
- 	bool "hms30c7202"
- 	select CPU_H7202
-+	select ZONE_DMA
- 	depends on ARCH_H720X
- 	help
- 	  Say Y here if you are using the Hynix HMS30C7202 Reference Board
--- 
-1.7.3.2
+Best Regards,
+J.
