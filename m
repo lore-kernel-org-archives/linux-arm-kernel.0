@@ -1,26 +1,42 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Tue, 14 Jun 2011 21:18:36 -0700
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <20110614223404.GA30057@linux-mips.org>
-References: <20110614190850.GA13526@linux-mips.org>
-	<4DF7C3CA.9050902@zytor.com>
-	<20110614223404.GA30057@linux-mips.org>
-Message-ID: <4DF8329C.7000904@zytor.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 15 Jun 2011 12:29:49 +0800
+Subject: [PATCH v2 5/6] ARM: mxc: all three imx51 TOs use TO1 version of
+	sdma script
+In-Reply-To: <20110614203809.GA23771@pengutronix.de>
+References: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
+	<1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
+	<20110614203809.GA23771@pengutronix.de>
+Message-ID: <20110615042948.GB31712@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/14/2011 03:34 PM, Ralf Baechle wrote:
+On Tue, Jun 14, 2011 at 10:38:09PM +0200, Sascha Hauer wrote:
+> On Tue, Jun 14, 2011 at 02:20:07PM +0800, Shawn Guo wrote:
+> > Though there are three TOs of imx51 soc, the sdma script never
+> > changes since TO1, which means all three TOs of imx51 uses TO1
+> > version of sdma script.
+> > 
+> > The current code passes TO number to imx-sdma driver to load
+> > different firmware for different TO.  That means we have to prepare
+> > 3 identical firmwares, sdma-imx51-to1.bin sdma-imx51-to2.bin and
+> > sdma-imx51-to3.bin, to have the kernel capable of running on all
+> > three TOs.  This just makes no sense.
+> > 
+> > The patch removes the TO number passing and get the default TO1
+> > version of sdma firmware work for all TOs.
 > 
-> There is no point in offering to build something that couldn't possibly be
-> used.  It just makes the kernel harder to configure and inflates the test
-> matrix for no good reason.
+> I don't agree to this approach. The SDMA firmware has been different on
+> all TO versions of earlier i.MXs. For the linearity of the universe we
+> should keep this. What about providing a link in userspace?
 > 
-
-I see... that's why a bunch of devices that only exist on ARM and MIPS
-SoCs are offered on x86 platforms?
-
-	-hpa
+The fact is that mx31 and mx35 are the only two SoCs (relatively old
+ones) that have different SDMA firmwares on different TOs.  The
+relatively new ones, mx25 (TO1, TO1.1), mx50 (TO1, TO1.1), mx51
+(TO1, TO2, TO3) and mx53 (TO1, TO2) all have one version SDMA
+firmware for different TOs.  I do not see the mx31/35 case is a
+linearity of the universe.  Do we really want to bother ourselves
+with userspace link on so many latest SoCs?
 
 -- 
-H. Peter Anvin, Intel Open Source Technology Center
-I work for Intel.  I don't speak on their behalf.
+Regards,
+Shawn
