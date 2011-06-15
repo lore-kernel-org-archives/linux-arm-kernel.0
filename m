@@ -1,33 +1,47 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 15 Jun 2011 18:24:45 +0300
-Subject: [RESEND PATCH 0/2] ARM IRQ Kconfig patches
-In-Reply-To: <20110615151422.GA2618@n2100.arm.linux.org.uk>
-References: <1308142960-20767-1-git-send-email-balbi@ti.com>
-	<20110615151422.GA2618@n2100.arm.linux.org.uk>
-Message-ID: <20110615152444.GZ471@legolas.emea.dhcp.ti.com>
+From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
+Date: Thu, 16 Jun 2011 01:25:21 +0900
+Subject: [PATCH v3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <1308139721-4008-1-git-send-email-shawn.guo@linaro.org>
+References: <BANLkTi=-t9HVc6U6QY07su+c3WztsGoq3Q@mail.gmail.com>
+	<1308139721-4008-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110616012124M.fujita.tomonori@lab.ntt.co.jp>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 04:14:22PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 15, 2011 at 04:02:38PM +0300, Felipe Balbi wrote:
-> > I have lost count how many times I have sent
-> > these patches. Will someone either take them
-> > in or NAK them so I stop sending ??
-> 
-> It might help to copy the MMP and PXA people so that we get to hear
-> their side of the story.  It may be that they always require sparse
-> IRQ support to be enabled.
-> 
-> 'cause at the moment I've no idea whether your patch is right or not.
+On Wed, 15 Jun 2011 20:08:41 +0800
+Shawn Guo <shawn.guo@linaro.org> wrote:
 
-I'll do so... thanks, at least one reply :-D
+> Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> max_segment_number into device_dma_parameters and creates the
+> corresponding dmaengine API dma_set(get)_max_seg_number for it.
+> 
+> Here is the user story that tells the need of the new api.  The
+> mxs-mmc is the mmc host controller for Freescale MXS architecture.
+> There are a pair of  mmc host specific parameters max_seg_size and
+> max_segs that mxs-mmc host driver needs to tell mmc core, so that
+> mmc core can know how big each data segment could be and how many
+> segments could be handled one time in a scatter list by host driver.
+> 
+> The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
+> mxs-dma to transfer data in scatter list.  That is to say mxs-mmc has
+> no idea of what max_seg_size and max_segs should be, because they are
+> all mxs-dma capability parameters, and mxs-mmc needs to query them
+> from mxs-dma.
+> 
+> Right now, there is well defined dma api (dma_get_max_seg_size) for
+> mmc to query max_seg_size from dma driver, but the one for max_segs
+> is missing.  That's why mxs-mmc driver has to hard-code it.
+> 
+> The mxs-mmc is just one example to demonstrate the need of the new
+> api, and there are other mmc host drivers (mxcmmc on imx-dma is
+> another example) and possibly even other dmaengine users need this
+> new api to know the maximum segments that dma driver can handle per
+> dma call.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110615/d868a602/attachment.sig>
+As I wrote earlier, SCSI midlayer sets this parameter in a different
+way (storing this in SCSI specific data structure).
+
+If you add a new generic API for this parameter, please make sure that
+the API works well for the others that already do the same
+differently. That is, please send this to linux-scsi too (and discuss
+with SCSI maintainer).
