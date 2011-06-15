@@ -1,70 +1,98 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 15 Jun 2011 18:23:12 +0100
-Subject: [PATCH v3 1/9] ARM: l2x0: fix disabling function to avoid deadlock
+Date: Wed, 15 Jun 2011 18:23:14 +0100
+Subject: [PATCH v3 3/9] ARM: lib: add switch_stack function for safely
+	changing stack
 In-Reply-To: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
 References: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1308158600-7169-2-git-send-email-will.deacon@arm.com>
+Message-ID: <1308158600-7169-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The l2x0_disable function attempts to writel with the l2x0_lock held.
-This results in deadlock when the writel contains an outer_sync call
-for the platform since the l2x0_lock is already held by the disable
-function. A further problem is that disabling the L2 without flushing it
-first can lead to the spin_lock operation becoming visible after the
-spin_unlock, causing any subsequent L2 maintenance to deadlock.
+When disabling the MMU, it is necessary to take out a 1:1 identity map
+of the reset code so that it can safely be executed with and without
+the MMU active. To avoid the situation where the physical address of the
+reset code aliases with the virtual address of the active stack (which
+cannot be included in the 1:1 mapping), it is desirable to change to a
+new stack at a location which is less likely to alias.
 
-This patch replaces the writel with a call to writel_relaxed in the
-disabling code and adds a flush before disabling in the control
-register, preventing livelock from occurring.
+This code adds a new lib function, switch_stack:
 
+void switch_stack(void (*fn)(void *), void *arg, void *sp);
+
+which changes the stack to point at the sp parameter, before invoking
+fn(arg) with the new stack selected.
+
+Signed-off-by: Dave Martin <dave.martin@linaro.org>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/mm/cache-l2x0.c |   19 +++++++++++++------
- 1 files changed, 13 insertions(+), 6 deletions(-)
+ arch/arm/lib/Makefile       |    3 +-
+ arch/arm/lib/switch_stack.S |   44 +++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+), 1 deletions(-)
+ create mode 100644 arch/arm/lib/switch_stack.S
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index ef59099..44c0867 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -120,17 +120,22 @@ static void l2x0_cache_sync(void)
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
+diff --git a/arch/arm/lib/Makefile b/arch/arm/lib/Makefile
+index 59ff42d..5fa67de 100644
+--- a/arch/arm/lib/Makefile
++++ b/arch/arm/lib/Makefile
+@@ -13,7 +13,8 @@ lib-y		:= backtrace.o changebit.o csumipv6.o csumpartial.o   \
+ 		   testchangebit.o testclearbit.o testsetbit.o        \
+ 		   ashldi3.o ashrdi3.o lshrdi3.o muldi3.o             \
+ 		   ucmpdi2.o lib1funcs.o div64.o sha1.o               \
+-		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o
++		   io-readsb.o io-writesb.o io-readsl.o io-writesl.o  \
++		   switch_stack.o
  
--static void l2x0_flush_all(void)
-+static void __l2x0_flush_all(void)
- {
--	unsigned long flags;
--
--	/* clean all ways */
--	spin_lock_irqsave(&l2x0_lock, flags);
- 	debug_writel(0x03);
- 	writel_relaxed(l2x0_way_mask, l2x0_base + L2X0_CLEAN_INV_WAY);
- 	cache_wait_way(l2x0_base + L2X0_CLEAN_INV_WAY, l2x0_way_mask);
- 	cache_sync();
- 	debug_writel(0x00);
-+}
+ mmu-y	:= clear_user.o copy_page.o getuser.o putuser.o
+ 
+diff --git a/arch/arm/lib/switch_stack.S b/arch/arm/lib/switch_stack.S
+new file mode 100644
+index 0000000..552090d
+--- /dev/null
++++ b/arch/arm/lib/switch_stack.S
+@@ -0,0 +1,44 @@
++/*
++ * arch/arm/lib/switch_stack.S
++ *
++ * Copyright (C) 2011 ARM Ltd.
++ * Written by Will Deacon <will.deacon@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, write to the Free Software
++ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
++ */
 +
-+static void l2x0_flush_all(void)
-+{
-+	unsigned long flags;
++#include <linux/linkage.h>
++#include <asm/assembler.h>
 +
-+	/* clean all ways */
-+	spin_lock_irqsave(&l2x0_lock, flags);
-+	__l2x0_flush_all();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
-@@ -266,7 +271,9 @@ static void l2x0_disable(void)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&l2x0_lock, flags);
--	writel(0, l2x0_base + L2X0_CTRL);
-+	__l2x0_flush_all();
-+	writel_relaxed(0, l2x0_base + L2X0_CTRL);
-+	dsb();
- 	spin_unlock_irqrestore(&l2x0_lock, flags);
- }
- 
++/*
++ * void switch_stack(void (*fn)(void *), void *arg, void *sp)
++ *
++ * Change the stack to that pointed at by sp, then invoke fn(arg) with
++ * the new stack.
++ */
++ENTRY(switch_stack)
++	str	sp, [r2, #-4]!
++	str	lr, [r2, #-4]!
++
++	mov	sp, r2
++	mov	r2, r0
++	mov	r0, r1
++
++	adr	lr, BSYM(1f)
++	mov	pc, r2
++
++1:	ldr	lr, [sp]
++	ldr	sp, [sp, #4]
++	mov	pc, lr
++ENDPROC(switch_stack)
 -- 
 1.7.0.4
