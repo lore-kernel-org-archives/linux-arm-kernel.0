@@ -1,26 +1,42 @@
-From: guenter.roeck@ericsson.com (Guenter Roeck)
-Date: Tue, 14 Jun 2011 21:40:16 -0700
-Subject: [RFC,PATCH] Cleanup PC parallel port Kconfig
-In-Reply-To: <4DF8329C.7000904@zytor.com>
-References: <20110614190850.GA13526@linux-mips.org>
-	<4DF7C3CA.9050902@zytor.com>
-	<20110614223404.GA30057@linux-mips.org>
-	<4DF8329C.7000904@zytor.com>
-Message-ID: <20110615044016.GC10553@ericsson.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Tue, 14 Jun 2011 23:37:29 -0600
+Subject: [PATCH V2] ARM: Xilinx: Adding Xilinx board support
+In-Reply-To: <BANLkTi=rV0K3J4rsPVKw73KRG-E2h_CE=A@mail.gmail.com>
+References: <1305657064-4531-1-git-send-email-johnlinn@comcast.net>
+	<BANLkTi=rV0K3J4rsPVKw73KRG-E2h_CE=A@mail.gmail.com>
+Message-ID: <BANLkTinrBw1RsP09bwbmDJC9Pd5NguMEUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 12:18:36AM -0400, H. Peter Anvin wrote:
-> On 06/14/2011 03:34 PM, Ralf Baechle wrote:
-> > 
-> > There is no point in offering to build something that couldn't possibly be
-> > used.  It just makes the kernel harder to configure and inflates the test
-> > matrix for no good reason.
-> > 
-> 
-> I see... that's why a bunch of devices that only exist on ARM and MIPS
-> SoCs are offered on x86 platforms?
-> 
-http://en.wikipedia.org/wiki/Two_wrongs_make_a_right
+On Tue, Jun 14, 2011 at 9:23 PM, Barry Song <21cnbao@gmail.com> wrote:
+> 2011/5/18 ?<johnlinn@comcast.net>:
+>> +static struct of_device_id zynq_of_bus_ids[] __initdata = {
+>> + ? ? ? { .compatible = "simple-bus", },
+>> + ? ? ? {}
+>> +};
+>> +
+>> +/**
+>> + * xilinx_init_machine() - System specific initialization, intended to be
+>> + * ? ? ? ? ? ? ? ? ? ? ? ?called from board specific initialization.
+>> + */
+>> +void __init xilinx_init_machine(void)
+>> +{
+>> +#ifdef CONFIG_CACHE_L2X0
+>> + ? ? ? /*
+>> + ? ? ? ?* 64KB way size, 8-way associativity, parity disabled
+>> + ? ? ? ?*/
+>> + ? ? ? l2x0_init(PL310_L2CC_BASE, 0x02060000, 0xF0F0FFFF);
+>> +#endif
+>> +
+>> + ? ? ? of_platform_bus_probe(NULL, zynq_of_bus_ids, NULL);
+>> +}
+>
+> it looks to me a common machine init function is calling a
+> chip/board-special device probing. xilinx_init_machine ?is calling
+> zynq_of_bus_ids. what will happen if we add a new different with zynq?
 
-Guenter
+The bus_ids are actually pretty generic.  I've got a patch in my tree
+which I'll be posting soon that creates a generic bus id table that
+most platforms can use.
+
+g.
