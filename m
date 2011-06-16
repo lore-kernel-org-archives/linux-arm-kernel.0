@@ -1,37 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Jun 2011 09:03:12 +0200
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous
-	=?iso-8859-1?q?Memory=09Allocator?= added
-In-Reply-To: <4DF952CC.4010301@balister.org>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106150937.18524.arnd@arndb.de> <4DF952CC.4010301@balister.org>
-Message-ID: <201106160903.13135.arnd@arndb.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 16 Jun 2011 09:30:18 +0200
+Subject: [PATCH v2 5/6] ARM: mxc: all three imx51 TOs use TO1 version of
+	sdma script
+In-Reply-To: <20110615042948.GB31712@S2100-06.ap.freescale.net>
+References: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
+	<1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
+	<20110614203809.GA23771@pengutronix.de>
+	<20110615042948.GB31712@S2100-06.ap.freescale.net>
+Message-ID: <20110616073018.GF23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 16 June 2011 02:48:12 Philip Balister wrote:
-> On 06/15/2011 12:37 AM, Arnd Bergmann wrote:
-> > On Wednesday 15 June 2011 09:11:39 Marek Szyprowski wrote:
-> >> I see your concerns, but I really wonder how to determine the properties
-> >> of the global/default cma pool. You definitely don't want to give all
-> >> available memory o CMA, because it will have negative impact on kernel
-> >> operation (kernel really needs to allocate unmovable pages from time to
-> >> time).
-> >
-> > Exactly. This is a hard problem, so I would prefer to see a solution for
-> > coming up with reasonable defaults.
-> 
-> Is this a situation where passing the information from device tree might 
-> help? I know this does not help short term, but I am trying to 
-> understand the sorts of problems device tree can help solve.
+On Wed, Jun 15, 2011 at 12:29:49PM +0800, Shawn Guo wrote:
+> On Tue, Jun 14, 2011 at 10:38:09PM +0200, Sascha Hauer wrote:
+> > On Tue, Jun 14, 2011 at 02:20:07PM +0800, Shawn Guo wrote:
+> > > Though there are three TOs of imx51 soc, the sdma script never
+> > > changes since TO1, which means all three TOs of imx51 uses TO1
+> > > version of sdma script.
+> > > 
+> > > The current code passes TO number to imx-sdma driver to load
+> > > different firmware for different TO.  That means we have to prepare
+> > > 3 identical firmwares, sdma-imx51-to1.bin sdma-imx51-to2.bin and
+> > > sdma-imx51-to3.bin, to have the kernel capable of running on all
+> > > three TOs.  This just makes no sense.
+> > > 
+> > > The patch removes the TO number passing and get the default TO1
+> > > version of sdma firmware work for all TOs.
+> > 
+> > I don't agree to this approach. The SDMA firmware has been different on
+> > all TO versions of earlier i.MXs. For the linearity of the universe we
+> > should keep this. What about providing a link in userspace?
+> > 
+> The fact is that mx31 and mx35 are the only two SoCs (relatively old
+> ones) that have different SDMA firmwares on different TOs.  The
+> relatively new ones, mx25 (TO1, TO1.1), mx50 (TO1, TO1.1), mx51
+> (TO1, TO2, TO3) and mx53 (TO1, TO2) all have one version SDMA
+> firmware for different TOs.  I do not see the mx31/35 case is a
+> linearity of the universe.  Do we really want to bother ourselves
+> with userspace link on so many latest SoCs?
 
-The device tree is a good place to describe any hardware properties such
-as 'this device will need 32 MB of contiguous allocations on the memory
-bank described in that other device node'.
+Ok, then let's do it differently. Let's go away from "sdma-%s-to%d.bin"
+in the sdma driver and pass the string from platform data instead.
+Then we can pass the TO version where it's relevant and skip it where
+only one firmware exists. Using a sdma-imx51-to1.bin for to2 and to3
+is confusing.
 
-It is however not a good place to describe user settings such as 'I want
-to give this device a 200 MB pool for large allocations so I can run
-application X efficiently', because that would require knowledge in the
-boot loader about local policy, which it should generally not care about.
+Sascha
 
-	Arnd
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
