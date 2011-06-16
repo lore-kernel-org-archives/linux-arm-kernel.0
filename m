@@ -1,57 +1,51 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Thu, 16 Jun 2011 15:48:46 +0200
-Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
-In-Reply-To: <4DEC8A56.1030707@atmel.com>
-References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
-	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
-	<BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
-	<4DEC8A56.1030707@atmel.com>
-Message-ID: <20110616134846.GF4581@game.jcrosoft.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Thu, 16 Jun 2011 09:04:51 -0500
+Subject: [RFC PATCH 03/11] dt/irq: add irq_domain_add_simple() helper
+In-Reply-To: <20110616044141.29371.76366.stgit@ponder>
+References: <20110616042653.29371.2052.stgit@ponder>
+	<20110616044141.29371.76366.stgit@ponder>
+Message-ID: <4DFA0D83.6070604@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10:05 Mon 06 Jun     , Nicolas Ferre wrote:
-> Le 01/06/2011 16:54, Dmitry Eremin-Solenikov :
-> > On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
-> >> On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
-> >>> Currently atmel_nand driver used by AT91 and AVR32 calls a special
-> >>> callback
-> >>> which return nand partition table and number of partitions. However in all
-> >>> boards this callback returns just static data. So drop this callback and
-> >>> make atmel_nand use partition table provided statically via platform_data.
-> >>>
-> >>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> >>
-> >> Thanks for this update, always nice seeing code being optimized. I
-> >> really can't recall why it was made like this in the first place...
-> >>
-> >> For the AVR32 related parts:
-> >>
-> >> Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
-> >>
-> >> <snipp diff>
-> >>
-> >> Will this go through the linux-mtd tree (since it spans two archs) or
-> >> should it go through an arch tree?
-> > 
-> > On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
-> > as I'd also like to submit several (a pile) patches cleaning up mtd
-> > partitioning, which would depend on this.
-> > 
-> > OTOH, I think there will be a cleanup of AT91 platform, which would bring
-> > lot's of conflicts with this patch, if it goes through linux-mtd.
-> 
-> 
-> I am in favor for a mainline inclusion through linux-mtd tree.
-> 
-> On the AT91 side, we will have to take this inclusion into account to
-> avoid merge conflicts... But as long as this cleanup is not ready yet, I
-> prefer to go forward this way.
-> 
-> For that purpose, that would be good to see this patch in linux-next.
-agreed
+Grant,
 
-Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+On 06/15/2011 11:41 PM, Grant Likely wrote:
+> irq_domain_add_simple() is an easy way to generate an irq translation
+> domain for simple irq controllers.  It assumes a flat 1:1 mapping from
+> hardware irq number to an offset of the first linux irq number assigned
+> to the controller
+> 
+> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> ---
+>  include/linux/irq.h    |   11 +++++++++
+>  kernel/irq/irqdomain.c |   58 +++++++++++++++++++++++++++++++++++++++++++++++-
+>  2 files changed, 68 insertions(+), 1 deletions(-)
+> 
+> diff --git a/include/linux/irq.h b/include/linux/irq.h
+> index a103c01..50830fc 100644
+> --- a/include/linux/irq.h
+> +++ b/include/linux/irq.h
+> @@ -797,6 +797,17 @@ extern unsigned int irq_domain_map(struct irq_domain *domain,
+>  				   irq_hw_number_t hwirq);
+>  extern void irq_domain_unmap(struct irq_domain *domain, irq_hw_number_t hw);
+>  
+> +struct of_device_id;
+> +#ifdef CONFIG_OF
+> +extern void irq_domain_add_simple(struct device_node *controller, int irq_base);
+> +extern void irq_domain_generate_simple(struct of_device_id *match,
 
-Best Regards,
-J.
+match should be const
+
+> +					u64 phys_base, unsigned int irq_start);
+> +#else
+
+Empty function for irq_domain_add_simple?
+
+> +static inline void irq_domain_generate_simple(struct of_device_id *match,
+> +					u64 phys_base, unsigned int irq_start) { }
+> +#endif
+> +
+> +
+
+Rob
