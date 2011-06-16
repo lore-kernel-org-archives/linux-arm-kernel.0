@@ -1,324 +1,239 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Jun 2011 20:06:38 +0100
-Subject: [RFC PATCH 10/16] ARM: local timers: add exynos_mct driver to
-	driver/clocksource
+Date: Thu, 16 Jun 2011 20:06:31 +0100
+Subject: [RFC PATCH 03/16] ARM: local timers: move realview to
+	LOCAL_TIMER_DEVICES/ARM_SMP_TWD
 In-Reply-To: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
 References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1308251204-16719-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1308251204-16719-4-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a "new" driver to driver/clocksource to support the Samsung MCT
-hardware. This is basically the local timer part of
-arch/arm/mach-exynos4/mct.c, turned into a platform driver, and
-with a CPU notifier being used to start/stop timers on secondary
-cores.
+Convert the RealView platforms to use the new arm_smp_twd driver.
+Add the platform devices and register them as early platform devices.
 
-Cc: Kukjin Kim <kgene.kim@samsung.com>
+Tested on a PB11MP.
+
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/clocksource/Makefile      |    1 +
- drivers/clocksource/exynos4_mct.c |  283 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 284 insertions(+), 0 deletions(-)
- create mode 100644 drivers/clocksource/exynos4_mct.c
+ arch/arm/mach-realview/Kconfig           |    8 +++++++
+ arch/arm/mach-realview/realview_eb.c     |   31 ++++++++++++++++++++++++++---
+ arch/arm/mach-realview/realview_pb11mp.c |   30 +++++++++++++++++++++++++---
+ arch/arm/mach-realview/realview_pbx.c    |   31 +++++++++++++++++++++++++----
+ 4 files changed, 87 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-index b7e6397..7b30585 100644
---- a/drivers/clocksource/Makefile
-+++ b/drivers/clocksource/Makefile
-@@ -9,3 +9,4 @@ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
- obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
- obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
- obj-$(CONFIG_ARM_SMP_TWD)	+= arm_smp_twd.o
-+obj-$(CONFIG_EXYNOS4_MCT)	+= exynos4_mct.o
-diff --git a/drivers/clocksource/exynos4_mct.c b/drivers/clocksource/exynos4_mct.c
-new file mode 100644
-index 0000000..b07a9a9
---- /dev/null
-+++ b/drivers/clocksource/exynos4_mct.c
-@@ -0,0 +1,283 @@
-+/*
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * EXYNOS4 MCT(Multi-Core Timer) support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/interrupt.h>
-+#include <linux/irq.h>
-+#include <linux/clk.h>
-+#include <linux/clockchips.h>
-+#include <linux/platform_device.h>
-+#include <linux/delay.h>
-+#include <linux/cpu.h>
-+
-+#include <mach/regs-mct.h>
-+
-+static unsigned long clk_cnt_per_tick;
-+static unsigned long clk_rate;
-+
-+struct mct_clock_event_device {
-+	struct clock_event_device evt;
-+	void __iomem *base;
-+};
-+
-+static struct mct_clock_event_device __percpu *mct_tick;
-+
-+static void exynos4_mct_write(unsigned int value, void *addr)
-+{
-+	void __iomem *stat_addr;
-+	u32 mask;
-+	u32 i;
-+
-+	__raw_writel(value, addr);
-+
-+	switch ((u32) addr) {
-+	case (u32)(EXYNOS4_MCT_L0_BASE + MCT_L_TCON_OFFSET):
-+		stat_addr = EXYNOS4_MCT_L0_BASE + MCT_L_WSTAT_OFFSET;
-+		mask = 1 << 3;		/* L0_TCON write status */
-+		break;
-+	case (u32)(EXYNOS4_MCT_L1_BASE + MCT_L_TCON_OFFSET):
-+		stat_addr = EXYNOS4_MCT_L1_BASE + MCT_L_WSTAT_OFFSET;
-+		mask = 1 << 3;		/* L1_TCON write status */
-+		break;
-+	case (u32)(EXYNOS4_MCT_L0_BASE + MCT_L_TCNTB_OFFSET):
-+		stat_addr = EXYNOS4_MCT_L0_BASE + MCT_L_WSTAT_OFFSET;
-+		mask = 1 << 0;		/* L0_TCNTB write status */
-+		break;
-+	case (u32)(EXYNOS4_MCT_L1_BASE + MCT_L_TCNTB_OFFSET):
-+		stat_addr = EXYNOS4_MCT_L1_BASE + MCT_L_WSTAT_OFFSET;
-+		mask = 1 << 0;		/* L1_TCNTB write status */
-+		break;
-+	case (u32)(EXYNOS4_MCT_L0_BASE + MCT_L_ICNTB_OFFSET):
-+		stat_addr = EXYNOS4_MCT_L0_BASE + MCT_L_WSTAT_OFFSET;
-+		mask = 1 << 1;		/* L0_ICNTB write status */
-+		break;
-+	case (u32)(EXYNOS4_MCT_L1_BASE + MCT_L_ICNTB_OFFSET):
-+		stat_addr = EXYNOS4_MCT_L1_BASE + MCT_L_WSTAT_OFFSET;
-+		mask = 1 << 1;		/* L1_ICNTB write status */
-+		break;
-+	default:
-+		return;
-+	}
-+
-+	/* Wait maximum 1 ms until written values are applied */
-+	for (i = 0; i < loops_per_jiffy / 1000 * HZ; i++)
-+		if (__raw_readl(stat_addr) & mask) {
-+			__raw_writel(mask, stat_addr);
-+			return;
-+		}
-+
-+	panic("MCT hangs after writing %d (addr:0x%08x)\n", value, (u32)addr);
-+}
-+
-+/* Clock event handling */
-+static void exynos4_mct_tick_stop(void *data)
-+{
-+	struct mct_clock_event_device *mevt = data;
-+	unsigned long tmp;
-+	unsigned long mask = MCT_L_TCON_INT_START | MCT_L_TCON_TIMER_START;
-+	void __iomem *addr = mevt->base + MCT_L_TCON_OFFSET;
-+
-+	tmp = __raw_readl(addr);
-+	if (tmp & mask) {
-+		tmp &= ~mask;
-+		exynos4_mct_write(tmp, addr);
-+	}
-+}
-+
-+static void exynos4_mct_tick_start(unsigned long cycles,
-+				   struct mct_clock_event_device *mevt)
-+{
-+	unsigned long tmp;
-+
-+	exynos4_mct_tick_stop(mevt);
-+
-+	tmp = (1 << 31) | cycles;	/* MCT_L_UPDATE_ICNTB */
-+
-+	/* update interrupt count buffer */
-+	exynos4_mct_write(tmp, mevt->base + MCT_L_ICNTB_OFFSET);
-+
-+	/* enable MCT tick interrupt */
-+	exynos4_mct_write(0x1, mevt->base + MCT_L_INT_ENB_OFFSET);
-+
-+	tmp = __raw_readl(mevt->base + MCT_L_TCON_OFFSET);
-+	tmp |= MCT_L_TCON_INT_START | MCT_L_TCON_TIMER_START |
-+	       MCT_L_TCON_INTERVAL_MODE;
-+	exynos4_mct_write(tmp, mevt->base + MCT_L_TCON_OFFSET);
-+}
-+
-+static int exynos4_tick_set_next_event(unsigned long cycles,
-+				       struct clock_event_device *evt)
-+{
-+	struct mct_clock_event_device *mevt;
-+
-+	mevt = container_of(evt, struct mct_clock_event_device, evt);
-+	exynos4_mct_tick_start(cycles, mevt);
-+
-+	return 0;
-+}
-+
-+static inline void exynos4_tick_set_mode(enum clock_event_mode mode,
-+					 struct clock_event_device *evt)
-+{
-+	struct mct_clock_event_device *mevt;
-+
-+	mevt = container_of(evt, struct mct_clock_event_device, evt);
-+	exynos4_mct_tick_stop(mevt);
-+
-+	switch (mode) {
-+	case CLOCK_EVT_MODE_PERIODIC:
-+		exynos4_mct_tick_start(clk_cnt_per_tick, mevt);
-+		break;
-+
-+	case CLOCK_EVT_MODE_ONESHOT:
-+	case CLOCK_EVT_MODE_UNUSED:
-+	case CLOCK_EVT_MODE_SHUTDOWN:
-+	case CLOCK_EVT_MODE_RESUME:
-+		break;
-+	}
-+}
-+
-+static irqreturn_t exynos4_mct_tick_isr(int irq, void *dev_id)
-+{
-+	struct mct_clock_event_device *mevt = dev_id;
-+	struct clock_event_device *evt = &mevt->evt;
-+
-+	/*
-+	 * This is for supporting oneshot mode.
-+	 * Mct would generate interrupt periodically
-+	 * without explicit stopping.
-+	 */
-+	if (evt->mode != CLOCK_EVT_MODE_PERIODIC)
-+		exynos4_mct_tick_stop(mevt);
-+
-+	/* Clear the MCT tick interrupt */
-+	exynos4_mct_write(0x1, mevt->base + MCT_L_INT_CSTAT_OFFSET);
-+
-+	evt->event_handler(evt);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static struct irqaction mct_tick0_event_irq = {
-+	.name		= "mct_tick0_irq",
-+	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
-+	.handler	= exynos4_mct_tick_isr,
-+};
-+
-+static struct irqaction mct_tick1_event_irq = {
-+	.name		= "mct_tick1_irq",
-+	.flags		= IRQF_TIMER | IRQF_NOBALANCING,
-+	.handler	= exynos4_mct_tick_isr,
-+};
-+
-+static void exynos4_mct_tick_init(void *data)
-+{
-+	struct mct_clock_event_device *mevt = data;
-+	struct clock_event_device *evt = &mevt->evt;
-+	unsigned int cpu = smp_processor_id();
-+
-+	if (cpu == 0) {
-+		mevt->base = EXYNOS4_MCT_L0_BASE;
-+		evt->name = "mct_tick0";
-+	} else {
-+		mevt->base = EXYNOS4_MCT_L1_BASE;
-+		evt->name = "mct_tick1";
-+	}
-+
-+	evt->cpumask = cpumask_of(cpu);
-+	evt->set_next_event = exynos4_tick_set_next_event;
-+	evt->set_mode = exynos4_tick_set_mode;
-+	evt->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT;
-+	evt->rating = 450;
-+
-+	clockevents_calc_mult_shift(evt, clk_rate / 2, 5);
-+	evt->max_delta_ns =
-+		clockevent_delta2ns(0x7fffffff, evt);
-+	evt->min_delta_ns =
-+		clockevent_delta2ns(0xf, evt);
-+
-+	clockevents_register_device(evt);
-+
-+	exynos4_mct_write(0x1, mevt->base + MCT_L_TCNTB_OFFSET);
-+
-+	if (cpu == 0) {
-+		mct_tick0_event_irq.dev_id = mevt;
-+		setup_irq(IRQ_MCT_L0, &mct_tick0_event_irq);
-+	} else {
-+		mct_tick1_event_irq.dev_id = mevt;
-+		irq_set_affinity(IRQ_MCT1, cpumask_of(1));
-+		setup_irq(IRQ_MCT_L1, &mct_tick1_event_irq);
-+	}
-+}
-+
-+static int __cpuinit exynos4_mct_cpu_notify(struct notifier_block *self,
-+					    unsigned long action, void *data)
-+{
-+	int cpu = (int)data;
-+	struct mct_clock_event_device *mevt = per_cpu_ptr(mct_tick, cpu);
-+
-+	switch (action) {
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		smp_call_function_single(cpu, exynos4_mct_tick_init, mevt, 1);
-+		break;
-+
-+	case CPU_DOWN_PREPARE:
-+	case CPU_DOWN_PREPARE_FROZEN:
-+		smp_call_function_single(cpu, exynos4_mct_tick_stop, mevt, 1);
-+		break;
-+	}
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block __cpuinitdata exynos4_mct_cpu_nb = {
-+	.notifier_call = exynos4_mct_cpu_notify,
-+};
-+
-+static int exynos4_mct_probe(struct platform_device *pdev)
-+{
-+	struct clk *mct_clk;
-+	struct mct_clock_event_device *mevt;
-+
-+	if (mct_tick)
-+		return -EBUSY;
-+
-+	mct_tick = alloc_percpu(struct mct_clock_event_device);
-+	if (!mct_tick)
-+		return -ENOMEM;
-+
-+	mct_clk = clk_get(NULL, "xtal");
-+	clk_rate = clk_get_rate(mct_clk);
-+
-+	/* Immediately configure the timer on the boot CPU */
-+	mevt = per_cpu_ptr(mct_tick, smp_processor_id());
-+	exynos4_mct_tick_init(mevt);
-+
-+	register_cpu_notifier(&exynos4_mct_cpu_nb);
-+
-+	return 0;
-+}
-+
-+static int exynos4_mct_remove(struct platform_device *pdev)
-+{
-+	return -EBUSY;
-+}
-+
-+static struct platform_driver exynos4_mct_driver = {
-+	.probe	= exynos4_mct_probe,
-+	.remove = __devexit_p(exynos4_mct_remove),
-+	.driver = {
-+		.name	= "exynos4_mct",
+diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
+index b9a9805..7eec270 100644
+--- a/arch/arm/mach-realview/Kconfig
++++ b/arch/arm/mach-realview/Kconfig
+@@ -12,6 +12,8 @@ config REALVIEW_EB_A9MP
+ 	bool "Support Multicore Cortex-A9 Tile"
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V7
++	select LOCAL_TIMER_DEVICES
++	select ARM_SMP_TWD
+ 	help
+ 	  Enable support for the Cortex-A9MPCore tile fitted to the
+ 	  Realview(R) Emulation Baseboard platform.
+@@ -21,6 +23,8 @@ config REALVIEW_EB_ARM11MP
+ 	depends on MACH_REALVIEW_EB
+ 	select CPU_V6K
+ 	select ARCH_HAS_BARRIERS if SMP
++	select LOCAL_TIMER_DEVICES
++	select ARM_SMP_TWD
+ 	help
+ 	  Enable support for the ARM11MPCore tile fitted to the Realview(R)
+ 	  Emulation Baseboard platform.
+@@ -40,6 +44,8 @@ config MACH_REALVIEW_PB11MP
+ 	select ARM_GIC
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_HAS_BARRIERS if SMP
++	select LOCAL_TIMER_DEVICES
++	select ARM_SMP_TWD
+ 	help
+ 	  Include support for the ARM(R) RealView(R) Platform Baseboard for
+ 	  the ARM11MPCore.  This platform has an on-board ARM11MPCore and has
+@@ -79,6 +85,8 @@ config MACH_REALVIEW_PBX
+ 	select HAVE_PATA_PLATFORM
+ 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
+ 	select ZONE_DMA if SPARSEMEM
++	select LOCAL_TIMER_DEVICES
++	select ARM_SMP_TWD
+ 	help
+ 	  Include support for the ARM(R) RealView(R) Platform Baseboard
+ 	  Explore.
+diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
+index 10e75fa..fbc941c 100644
+--- a/arch/arm/mach-realview/realview_eb.c
++++ b/arch/arm/mach-realview/realview_eb.c
+@@ -36,7 +36,6 @@
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+-#include <asm/localtimer.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -330,6 +329,31 @@ static struct platform_device char_lcd_device = {
+ 	.resource	=	char_lcd_resources,
+ };
+ 
++static struct resource eb_twd_resources[] = {
++	{
++		.start	= REALVIEW_EB11MP_TWD_BASE,
++		.end	= REALVIEW_EB11MP_TWD_BASE + 0x10,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IRQ_LOCALTIMER,
++		.end	= IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
 +	},
 +};
 +
-+early_platform_init("localtimer", &exynos4_mct_driver);
++static struct platform_device eb_twd_device = {
++	.name		= "arm_smp_twd",
++	.id		= -1,
++	.resource	= eb_twd_resources,
++	.num_resources	= ARRAY_SIZE(eb_twd_resources),
++};
++
++static struct platform_device *eb_early_devices[] = {
++	&eb_twd_device,
++};
++
++
+ static void __init gic_init_irq(void)
+ {
+ 	if (core_tile_eb11mp() || core_tile_a9mp()) {
+@@ -401,14 +425,13 @@ static void __init realview_eb_timer_init(void)
+ 	timer3_va_base = __io_address(REALVIEW_EB_TIMER2_3_BASE) + 0x20;
+ 
+ 	if (core_tile_eb11mp() || core_tile_a9mp()) {
+-#ifdef CONFIG_LOCAL_TIMERS
+-		twd_base = __io_address(REALVIEW_EB11MP_TWD_BASE);
+-#endif
+ 		timer_irq = IRQ_EB11MP_TIMER0_1;
+ 	} else
+ 		timer_irq = IRQ_EB_TIMER0_1;
+ 
+ 	realview_timer_init(timer_irq);
++	early_platform_add_devices(eb_early_devices,
++				   ARRAY_SIZE(eb_early_devices));
+ }
+ 
+ static struct sys_timer realview_eb_timer = {
+diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
+index b2985fc..9ed17c1 100644
+--- a/arch/arm/mach-realview/realview_pb11mp.c
++++ b/arch/arm/mach-realview/realview_pb11mp.c
+@@ -36,7 +36,6 @@
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+-#include <asm/localtimer.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/flash.h>
+@@ -276,6 +275,30 @@ static struct platform_device pmu_device = {
+ 	.resource		= pmu_resources,
+ };
+ 
++static struct resource realview_pb11mp_twd_resources[] = {
++	{
++		.start	= REALVIEW_TC11MP_TWD_BASE,
++		.end	= REALVIEW_TC11MP_TWD_BASE + 0x10,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IRQ_LOCALTIMER,
++		.end	= IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device realview_pb11mp_twd_device = {
++	.name		= "arm_smp_twd",
++	.id		= -1,
++	.resource	= realview_pb11mp_twd_resources,
++	.num_resources	= ARRAY_SIZE(realview_pb11mp_twd_resources),
++};
++
++static struct platform_device *realview_pb11mp_early_devices[] = {
++	&realview_pb11mp_twd_device,
++};
++
+ static void __init gic_init_irq(void)
+ {
+ 	unsigned int pldctrl;
+@@ -305,10 +328,9 @@ static void __init realview_pb11mp_timer_init(void)
+ 	timer2_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE);
+ 	timer3_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE) + 0x20;
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+-	twd_base = __io_address(REALVIEW_TC11MP_TWD_BASE);
+-#endif
+ 	realview_timer_init(IRQ_TC11MP_TIMER0_1);
++	early_platform_add_devices(realview_pb11mp_early_devices,
++				   ARRAY_SIZE(realview_pb11mp_early_devices));
+ }
+ 
+ static struct sys_timer realview_pb11mp_timer = {
+diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
+index 92ace2c..768faec 100644
+--- a/arch/arm/mach-realview/realview_pbx.c
++++ b/arch/arm/mach-realview/realview_pbx.c
+@@ -31,7 +31,6 @@
+ #include <asm/leds.h>
+ #include <asm/mach-types.h>
+ #include <asm/pmu.h>
+-#include <asm/smp_twd.h>
+ #include <asm/pgtable.h>
+ #include <asm/hardware/gic.h>
+ #include <asm/hardware/cache-l2x0.h>
+@@ -288,6 +287,30 @@ static struct platform_device pmu_device = {
+ 	.resource		= pmu_resources,
+ };
+ 
++static struct resource realview_pbx_twd_resources[] = {
++	{
++		.start	= REALVIEW_PBX_TILE_TWD_BASE,
++		.end	= REALVIEW_PBX_TILE_TWD_BASE + 0x10,
++		.flags	= IORESOURCE_MEM,
++	},
++	{
++		.start	= IRQ_LOCALTIMER,
++		.end	= IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device realview_pbx_twd_device = {
++	.name		= "arm_smp_twd",
++	.id		= -1,
++	.resource	= realview_pbx_twd_resources,
++	.num_resources	= ARRAY_SIZE(realview_pbx_twd_resources),
++};
++
++static struct platform_device *realview_pbx_early_devices[] = {
++	&realview_pbx_twd_device,
++};
++
+ static void __init gic_init_irq(void)
+ {
+ 	/* ARM PBX on-board GIC */
+@@ -308,11 +331,9 @@ static void __init realview_pbx_timer_init(void)
+ 	timer2_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE);
+ 	timer3_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE) + 0x20;
+ 
+-#ifdef CONFIG_LOCAL_TIMERS
+-	if (core_tile_pbx11mp() || core_tile_pbxa9mp())
+-		twd_base = __io_address(REALVIEW_PBX_TILE_TWD_BASE);
+-#endif
+ 	realview_timer_init(IRQ_PBX_TIMER0_1);
++	early_platform_add_devices(realview_pbx_early_devices,
++				   ARRAY_SIZE(realview_pbx_early_devices));
+ }
+ 
+ static struct sys_timer realview_pbx_timer = {
 -- 
 1.7.0.4
