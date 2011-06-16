@@ -1,45 +1,51 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 16 Jun 2011 15:46:42 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <4DFA58B4.5030101@ahsoftware.de>
-Message-ID: <Pine.LNX.4.44L0.1106161541260.1697-100000@iolanthe.rowland.org>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Thu, 16 Jun 2011 13:07:45 -0700
+Subject: [RFC PATCH 06/16] ARM: local timers: move Tegra to
+	LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+In-Reply-To: <1308251204-16719-7-git-send-email-marc.zyngier@arm.com>
+References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
+	<1308251204-16719-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF04992C0804@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jun 2011, Alexander Holler wrote:
+Marc Zyngier wrote at Thursday, June 16, 2011 1:07 PM:
+> Convert the Tegra platforms to use the new arm_smp_twd driver.
+> Add the platform device and register it as early platform device.
 
-> >> I thought the compiler was not allowed to insert
-> >> padding if the natural alignment of the data types didn't require any.
-> >
-> > It's architecture dependent. The alignment of the structure is the maximum alignment
-> > of its members, so it gets to be 8 bytes if there is a 64 bit member in the struct
-> > on most architectures, but 4 bytes on x86.
-> 
-> Hmm, sorry, but that sentence just says something about the alignment of 
-> the structure itself and nothing about the alignment of it's members or 
-> do I understand something wrong?
+...
+> diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
+> index 9035042..4e1ecd0 100644
+> --- a/arch/arm/mach-tegra/timer.c
+> +++ b/arch/arm/mach-tegra/timer.c
 
-We're talking about padding, not alignment.  Obviously these two
-concepts are related, since fields with differing alignment
-requirements sometimes force the compiler to insert padding.  But they
-aren't the same thing.
+...
+> +static struct platform_device *tegra_early_devices[] = {
+> +	&tegra_twd_device,
+> +};
 
-The question is whether gcc will insert padding in a structure that 
-doesn't need it.  The kernel depends on peculiarities of gcc in many 
-ways; basing your strategy on what the C99 spec says is not always a 
-good idea.
+In the cases where the timer device is registered within a timer-specific
+file, as here, and hence is likely the only device to be registered, does
+it make sense to elide the platform_device array above, and ...
 
-> For me that means that I understand that when packed(,aligned(4)) is 
-> used, it's pretty sure, that there is no padding inbetween the members 
-> of e.g. struct ehci_regs. But without I'm unsure, so I would avoid that.
-> 
-> That aligned(4) is necessary (for ARM) is only a workaround because of 
-> the implementation of readl(), at least that is how I understood the 
-> discussion. But that is discussed elsewhere and don't want to take part 
-> in that discussion (and can't).
+...
+> @@ -241,6 +261,8 @@ static void __init tegra_init_timer(void)
+>  	tegra_clockevent.cpumask = cpu_all_mask;
+>  	tegra_clockevent.irq = tegra_timer_irq.irq;
+>  	clockevents_register_device(&tegra_clockevent);
+> +	early_platform_add_devices(tegra_early_devices,
+> +				   ARRAY_SIZE(tegra_early_devices));
+>  }
 
-Hmmm.  I won't say that ((packed,aligned(4))) is wrong.  But it's not 
-clearly necessary either.
+... and just refer to the single device directly here:
 
-Alan Stern
+early_platform_add_devices(&tegra_twd_device, 1);
+
+?
+
+Or, is there likelihood that more devices would have to be added to that
+array in the near future, or that such a change would make moving the
+registration somewhere common later more complex?
+
+-- 
+nvpublic
