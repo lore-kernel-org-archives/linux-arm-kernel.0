@@ -1,58 +1,71 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Thu, 16 Jun 2011 09:04:00 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110616042044.GA28563@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110613134701.2b23b8d8.kamezawa.hiroyu@jp.fujitsu.com>
-	<20110616042044.GA28563@in.ibm.com>
-Message-ID: <1308240240.11430.115.camel@nimitz>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 16 Jun 2011 09:07:39 -0700
+Subject: [PATCH 00/14] GPIO: OMAP: first round of cleanup
+In-Reply-To: <20110527032439.GK5032@ponder.secretlab.ca> (Grant Likely's
+	message of "Thu, 26 May 2011 21:24:39 -0600")
+References: <1305904497-26013-1-git-send-email-khilman@ti.com>
+	<20110527032439.GK5032@ponder.secretlab.ca>
+Message-ID: <87r56trc8k.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2011-06-16 at 09:50 +0530, Ankita Garg wrote:
-> - Correctly predicting memory pressure is difficult and thereby being
->   able to online the required pages at the right time could be a
->   challenge
+Grant Likely <grant.likely@secretlab.ca> writes:
 
-For the sake of this discussion, let's forget about this.  There are
-certainly a lot of scenarios where turning memory on/off is necessary
-and useful _without_ knowing what kind of load the system is under.  "We
-just shut down our huge database, and now have 99% of RAM free" is a
-fine, dumb, metric.  We don't have to have magical pony memory pressure
-detection as a prerequisite.
+> On Fri, May 20, 2011 at 05:14:43PM +0200, Kevin Hilman wrote:
+>> Start moving SoC-specific register handling out of the driver by passing
+>> in register offsets in via platform data.
+>> 
+>> Also, move OMAP1 MPUIO IRQ handling over to genric IRQ chip.
+>> 
+>> Applies on top of Tony's for-next branch (which include's the generic
+>> IRQ chip work from tglx) and the OMAP GPIO driver move to
+>> drivers/gpio.
+>
+> Hey Kevin,
+>
+> If you've got a branch with this series in it and tested, then I'd be
+> happy to pull that instead of applying the patches myself.
+>
 
-> - Memory hotplug is a heavy operation, so the overhead involved may be
->   high
+OK, I rebased this on v3.0-rc2 and now it's been through quite a bit
+more testing.
 
-I'm curious.  Why do you say this?  Could you elaborate a bit on _how_
-memory hotplug is different from what you're doing here?  On powerpc, at
-least, we can do memory hotplug in areas as small as 16MB.  That's _way_
-smaller than what you're talking about here, and I would assume that
-smaller here means less overhead.
+Here's a branch for you.
 
-> - Powering off memory is just one of the ways in which memory power could
->   be saved. The platform can also dynamically transition areas of memory
->   into a  content-preserving lower power state if it is not referenced
->   for a pre-defined threshold of time. In such a case, we would need a
->   mechanism to soft offline the pages - i.e, no new allocations to be
->   directed to that memory
+Also FYI, we'll probably have 2nd round of GPIO cleanups/updates and
+runtime PM conversion for the upcoming merge window too.
 
-OK...  That's fine, but I think you're avoiding the question a bit.  You
-need to demonstrate that this 'regions' thing is necessary to do this,
-and that we can not get by just modifying what we have now.  For
-instance:
+Kevin
 
-1. Have something like khugepaged try to find region-sized chunks of
-   memory to free.
-2. Modify the buddy allocator to be "picky" about when it lets you get 
-   access to these regions.
-3. Try to bunch up 'like allocations' like ZONE_MOVABLE does.
+The following changes since commit 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
 
-(2) could easily mean that we take the MAX_ORDER-1 buddy pages and treat
-them differently.  If the page being freed is going (or trying to go) in
-to a low power state, insert freed pages on to the tail, or on a special
-list.  When satisfying allocations, we'd make some bit of effort to
-return pages which are powered on.
+  Linux 3.0-rc3 (2011-06-13 15:29:59 -0700)
 
--- Dave
+are available in the git repository at:
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/gpio-cleanup
+
+Charulatha V (1):
+      GPIO: OMAP: remove get_gpio_bank()
+
+Kevin Hilman (13):
+      GPIO: OMAP: _clear_gpio_irqbank: fix flushing of posted write
+      GPIO: OMAP: remove MPUIO handling from _clear_gpio_irqbank()
+      GPIO: OMAP: move bank width into struct gpio_bank
+      GPIO: OMAP: _get_gpio_irqbank_mask: replace hard-coded mask with bank->width
+      GPIO: OMAP: replace get_gpio_index() by using bank width
+      GPIO: OMAP: consolidate direction, input, output, remove #ifdefs
+      GPIO: OMAP: consolidate IRQ status handling, remove #ifdefs
+      GPIO: OMAP: conslidate enable/disable of GPIO IRQs, remove ifdefs
+      GPIO: OMAP: convert MPUIO IRQ over to generic irq_chip
+      GPIO: OMAP: remove useless gpio_valid() & check_gpio() checks
+      GPIO: OMAP: cleanup _set_gpio_wakeup(), remove ifdefs
+      GPIO: OMAP: debounce remove SoC specific registers, use pdata
+      GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
+
+ arch/arm/mach-omap1/gpio15xx.c         |   22 +
+ arch/arm/mach-omap1/gpio16xx.c         |   28 ++
+ arch/arm/mach-omap1/gpio7xx.c          |   27 ++
+ arch/arm/mach-omap2/gpio.c             |   32 ++
+ arch/arm/plat-omap/include/plat/gpio.h |   20 +
+ drivers/gpio/gpio-omap.c               |  723 +++++++-------------------------
+ 6 files changed, 282 insertions(+), 570 deletions(-)
