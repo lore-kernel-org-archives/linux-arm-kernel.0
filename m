@@ -1,25 +1,56 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 16 Jun 2011 09:15:57 -0700
-Subject: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
-In-Reply-To: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com> (Tarun
-	Kanti DebBarma's message of "Tue, 14 Jun 2011 19:01:43 +0530")
-References: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com>
-Message-ID: <87ei2trbuq.fsf@ti.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 16 Jun 2011 18:17:10 +0200
+Subject: [PATCH] USB: ehci: use packed,
+	aligned(4) instead of removing the packed attribute
+In-Reply-To: <1303918648-7196-1-git-send-email-rabin@rab.in>
+References: <1303918648-7196-1-git-send-email-rabin@rab.in>
+Message-ID: <1308241030-15201-1-git-send-email-holler@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
+In commit 139540170d9d9b7ead3caaf540f161756b356d56 the attribute
+packed is removed from the structs which are used to access the EHCI-registers.
 
-> This series is continuation of cleanup of OMAP GPIO driver and fixes.
-> The cleanup include getting rid of cpu_is_* checks wherever possible,
-> use of gpio_bank list instead of static array, use of unique platform
-> specific value associated data member to OMAP platforms to avoid
-> cpu_is_* checks. The series also include PM runtime support.
+This is done to circumvent a problem with gcc 4.6, which might access members of
+packed structs on a byte by byte basis. But using packed, aligned(4) fixes that
+too and is imho the better solution. Otherwise (without packed) the compiler would be free
+to choose whatever alignment he thinks fits best, which might be e.g. 8-byte on 64-bit machines.
 
-A quick test of this series on 3430/n900 shows that it prevents PER
-retention.  I see CM_FCLKEN_PER=0000c000 (debounce clock for GPIO banks
-3 & 4 are still enabled.)
+Signed-off-by: Alexander Holler <holler@ahsoftware.de>
+---
+ include/linux/usb/ehci_def.h |    6 +++---
+ 1 files changed, 3 insertions(+), 3 deletions(-)
 
-Can you retest with debounce enabled on one of the GPIOs for one of your platforms?
-
-Kevin
+diff --git a/include/linux/usb/ehci_def.h b/include/linux/usb/ehci_def.h
+index 7cc95ee..15c87a9 100644
+--- a/include/linux/usb/ehci_def.h
++++ b/include/linux/usb/ehci_def.h
+@@ -57,7 +57,7 @@ struct ehci_caps {
+ #define HCC_PGM_FRAMELISTLEN(p) ((p)&(1 << 1))  /* true: periodic_size changes*/
+ #define HCC_64BIT_ADDR(p)       ((p)&(1))       /* true: can use 64-bit addr */
+ 	u8		portroute[8];	 /* nibbles for routing - offset 0xC */
+-};
++} __attribute__ ((packed, aligned(4)));
+ 
+ 
+ /* Section 2.3 Host Controller Operational Registers */
+@@ -155,7 +155,7 @@ struct ehci_regs {
+ #define PORT_CSC	(1<<1)		/* connect status change */
+ #define PORT_CONNECT	(1<<0)		/* device connected */
+ #define PORT_RWC_BITS   (PORT_CSC | PORT_PEC | PORT_OCC)
+-};
++} __attribute__ ((packed, aligned(4)));
+ 
+ #define USBMODE		0x68		/* USB Device mode */
+ #define USBMODE_SDIS	(1<<3)		/* Stream disable */
+@@ -199,7 +199,7 @@ struct ehci_dbg_port {
+ 	u32	data47;
+ 	u32	address;
+ #define DBGP_EPADDR(dev, ep)	(((dev)<<8)|(ep))
+-};
++} __attribute__ ((packed, aligned(4)));
+ 
+ #ifdef CONFIG_EARLY_PRINTK_DBGP
+ #include <linux/init.h>
+-- 
+1.7.3.4
