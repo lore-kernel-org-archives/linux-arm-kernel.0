@@ -1,60 +1,325 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 16 Jun 2011 19:51:13 +0800
-Subject: [PATCH v2 5/6] ARM: mxc: all three imx51 TOs use TO1 version of
-	sdma script
-In-Reply-To: <20110616073018.GF23771@pengutronix.de>
-References: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
-	<1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
-	<20110614203809.GA23771@pengutronix.de>
-	<20110615042948.GB31712@S2100-06.ap.freescale.net>
-	<20110616073018.GF23771@pengutronix.de>
-Message-ID: <20110616115112.GA9605@S2100-06.ap.freescale.net>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Thu, 16 Jun 2011 14:48:47 +0300
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+Message-ID: <20110616114847.GB2444@matterhorn1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 09:30:18AM +0200, Sascha Hauer wrote:
-> On Wed, Jun 15, 2011 at 12:29:49PM +0800, Shawn Guo wrote:
-> > On Tue, Jun 14, 2011 at 10:38:09PM +0200, Sascha Hauer wrote:
-> > > On Tue, Jun 14, 2011 at 02:20:07PM +0800, Shawn Guo wrote:
-> > > > Though there are three TOs of imx51 soc, the sdma script never
-> > > > changes since TO1, which means all three TOs of imx51 uses TO1
-> > > > version of sdma script.
-> > > > 
-> > > > The current code passes TO number to imx-sdma driver to load
-> > > > different firmware for different TO.  That means we have to prepare
-> > > > 3 identical firmwares, sdma-imx51-to1.bin sdma-imx51-to2.bin and
-> > > > sdma-imx51-to3.bin, to have the kernel capable of running on all
-> > > > three TOs.  This just makes no sense.
-> > > > 
-> > > > The patch removes the TO number passing and get the default TO1
-> > > > version of sdma firmware work for all TOs.
-> > > 
-> > > I don't agree to this approach. The SDMA firmware has been different on
-> > > all TO versions of earlier i.MXs. For the linearity of the universe we
-> > > should keep this. What about providing a link in userspace?
-> > > 
-> > The fact is that mx31 and mx35 are the only two SoCs (relatively old
-> > ones) that have different SDMA firmwares on different TOs.  The
-> > relatively new ones, mx25 (TO1, TO1.1), mx50 (TO1, TO1.1), mx51
-> > (TO1, TO2, TO3) and mx53 (TO1, TO2) all have one version SDMA
-> > firmware for different TOs.  I do not see the mx31/35 case is a
-> > linearity of the universe.  Do we really want to bother ourselves
-> > with userspace link on so many latest SoCs?
+On 11 Jun 16, Vincent Guittot wrote:
+> The affinity between Arm processors is defined in the MPIDR register.
+> We can identify which processors are in the same cluster,
+> and which ones have performance interdependency. The cpu topology
+>  of an Arm platform can be set thanks to this register and this topology
+> is then used by sched_mc and sched_smt.
+
+Probably worth adding a note that sched_mc/sched_smt are disabled by default
+and need to be enabled by writing to their respective sysfs files.
+
+> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+> ---
+>  arch/arm/Kconfig                |   26 ++++++++
+>  arch/arm/include/asm/topology.h |   33 ++++++++++
+>  arch/arm/kernel/Makefile        |    1 +
+>  arch/arm/kernel/smp.c           |    6 ++
+>  arch/arm/kernel/topology.c      |  133 +++++++++++++++++++++++++++++++++++++++
+>  5 files changed, 199 insertions(+), 0 deletions(-)
+>  create mode 100644 arch/arm/kernel/topology.c
 > 
-> Ok, then let's do it differently. Let's go away from "sdma-%s-to%d.bin"
-> in the sdma driver and pass the string from platform data instead.
-> Then we can pass the TO version where it's relevant and skip it where
-> only one firmware exists. Using a sdma-imx51-to1.bin for to2 and to3
-
-That means the sdma firmware dose not change since to1, confusing?
-But I'm fine with your idea, so okay, drop the patch from the series,
-and let's address this issue with another patch.
-
-Other patches look good to be applied?
-
-> is confusing.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 9adc278..bacf9af 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -219,6 +219,24 @@ source "kernel/Kconfig.freezer"
 > 
+>  menu "System Type"
+> 
+> +config SCHED_MC
+> +	bool "Multi-core scheduler support"
+> +	depends on SMP && ARM_CPU_TOPOLOGY
+> +	default n
+> +	help
+> +	  Multi-core scheduler support improves the CPU scheduler's decision
+> +	  making when dealing with multi-core CPU chips at a cost of slightly
+> +	  increased overhead in some places. If unsure say N here.
+> +
+> +config SCHED_SMT
+> +	bool "SMT scheduler support"
+> +	depends on SMP && ARM_CPU_TOPOLOGY
+> +	default n
+> +	help
+> +	  Improves the CPU scheduler's decision making when dealing with
+> +	  MultiThreading at a cost of slightly increased overhead in some
+> +	  places. If unsure say N here.
+> +
+>  config MMU
+>  	bool "MMU-based Paged Memory Management Support"
+>  	default y
+> @@ -1062,6 +1080,14 @@ if !MMU
+>  source "arch/arm/Kconfig-nommu"
+>  endif
+> 
+> +config ARM_CPU_TOPOLOGY
+> +	bool "Support cpu topology definition"
+> +	depends on SMP && CPU_V7
+> +	help
+> +	  Support Arm cpu topology definition. The MPIDR register defines
+> +	  affinity between processors which is used to set the cpu
+> +	  topology of an Arm System.
+> +
+>  config ARM_ERRATA_411920
+>  	bool "ARM errata: Invalidation of the Instruction Cache operation can fail"
+>  	depends on CPU_V6 || CPU_V6K
+> diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
+> index accbd7c..cb90d0a 100644
+> --- a/arch/arm/include/asm/topology.h
+> +++ b/arch/arm/include/asm/topology.h
+> @@ -1,6 +1,39 @@
+>  #ifndef _ASM_ARM_TOPOLOGY_H
+>  #define _ASM_ARM_TOPOLOGY_H
+> 
+> +#ifdef CONFIG_ARM_CPU_TOPOLOGY
+> +
+> +#include <linux/cpumask.h>
+> +
+> +struct cputopo_arm {
+> +	int thread_id;
+> +	int core_id;
+> +	int socket_id;
+> +	cpumask_t thread_sibling;
+> +	cpumask_t core_sibling;
+> +};
+> +
+> +extern struct cputopo_arm cpu_topology[NR_CPUS];
+> +
+> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
+> +#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
+> +#define topology_core_cpumask(cpu)	(&(cpu_topology[cpu].core_sibling))
+> +#define topology_thread_cpumask(cpu)	(&(cpu_topology[cpu].thread_sibling))
+> +
+> +#define mc_capable()	(cpu_topology[0].socket_id != -1)
+> +#define smt_capable()	(cpu_topology[0].thread_id != -1)
+> +
+> +void init_cpu_topology(void);
+> +void store_cpu_topology(unsigned int cpuid);
+> +const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
+> +
+> +#else
+> +
+> +#define init_cpu_topology() {};
+> +#define store_cpu_topology(cpuid) {};
+> +
+> +#endif
+> +
+>  #include <asm-generic/topology.h>
+> 
+>  #endif /* _ASM_ARM_TOPOLOGY_H */
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index a5b31af..816a481 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+>  obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+>  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+>  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+> +obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+> 
+>  ifneq ($(CONFIG_ARCH_EBSA110),y)
+>    obj-y		+= io.o
+> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+> index 344e52b..3e8dc3b 100644
+> --- a/arch/arm/kernel/smp.c
+> +++ b/arch/arm/kernel/smp.c
+> @@ -31,6 +31,7 @@
+>  #include <asm/cacheflush.h>
+>  #include <asm/cpu.h>
+>  #include <asm/cputype.h>
+> +#include <asm/topology.h>
+>  #include <asm/mmu_context.h>
+>  #include <asm/pgtable.h>
+>  #include <asm/pgalloc.h>
+> @@ -268,6 +269,9 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+>  	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
+> 
+>  	cpu_info->loops_per_jiffy = loops_per_jiffy;
+> +
+> +	store_cpu_topology(cpuid);
+> +
+>  }
+> 
+>  /*
+> @@ -354,6 +358,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+>  {
+>  	unsigned int ncores = num_possible_cpus();
+> 
+> +	init_cpu_topology();
+> +
+>  	smp_store_cpu_info(smp_processor_id());
+> 
+>  	/*
+> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+> new file mode 100644
+> index 0000000..d61723c
+> --- /dev/null
+> +++ b/arch/arm/kernel/topology.c
+> @@ -0,0 +1,133 @@
+> +/*
+> + * arch/arm/kernel/topology.c
+> + *
+> + * Copyright (C) 2011  vincent.guittot at linaro.org
 
--- 
-Regards,
-Shawn
+This should be 
+
+Copyright (C) 2011 Linaro Limited.
+
+Written by: Vincent Guittot
+
+> + *
+> + * based on arch/sh/kernel/topology.c
+> + *
+> + * This file is subject to the terms and conditions of the GNU General Public
+> + * License.  See the file "COPYING" in the main directory of this archive
+> + * for more details.
+> + */
+> +
+> +#include <linux/cpu.h>
+> +#include <linux/cpumask.h>
+> +#include <linux/init.h>
+> +#include <linux/percpu.h>
+> +#include <linux/node.h>
+> +#include <linux/nodemask.h>
+> +#include <linux/sched.h>
+> +
+> +#include <asm/cacheflush.h>
+> +#include <asm/topology.h>
+> +
+> +#define hard_smp_mpidr() \
+> +	({ \
+> +		unsigned int cpunum; \
+> +		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
+> +			: "=r" (cpunum)); \
+> +		cpunum; \
+> +	})
+> +
+> +struct cputopo_arm cpu_topology[NR_CPUS];
+> +
+> +const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
+> +{
+> +	return &(cpu_topology[cpu].core_sibling);
+> +}
+> +
+> +/*
+> + * store_cpu_topology is called at boot when only one cpu is running
+> + * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
+> + * which prevents simultaneous write access to cpu_topology array
+> + */
+> +void store_cpu_topology(unsigned int cpuid)
+> +{
+> +	struct cputopo_arm *cpuid_topo = &(cpu_topology[cpuid]);
+> +	unsigned int mpidr;
+> +	unsigned int cpu;
+> +
+> +	/* If the cpu topology has been already set, just return */
+> +	if (cpuid_topo->core_id != -1)
+> +		return;
+> +
+> +	mpidr = hard_smp_mpidr();
+> +
+> +	/* create cpu topology mapping */
+> +	if (mpidr & (0x3 << 30)) {
+
+Use #defines for the MPIDR bit-fields
+
+#define MPIDR_U_BITMASK (0x3 << 30)
+
+BTW, Bit 31 seems to always be 1, do you really want that in the mask?
+
+> +		/*
+> +		 * This is a multiprocessor system
+> +		 * multiprocessor format & multiprocessor mode field are set
+> +		 */
+> +
+> +		if (mpidr & (0x1 << 24)) {
+
+According to
+http://infocenter.arm.com/help/index.jsp?topic=/com.arm.doc.ddi0388f/CIHCHADB.html
+
+bit 24 is SBZ. Where is this redefined for MT?
+
+> +			/* core performance interdependency */
+> +			cpuid_topo->thread_id = (mpidr & 0x3);
+> +			cpuid_topo->core_id =  ((mpidr >> 8) & 0xF);
+> +			cpuid_topo->socket_id = ((mpidr >> 16) & 0xFF);
+
+Define BITMASKs for these bits too.
+
+> +		} else {
+> +			/* normal core interdependency */
+> +			cpuid_topo->thread_id = -1;
+> +			cpuid_topo->core_id = (mpidr & 0x3);
+> +			cpuid_topo->socket_id = ((mpidr >> 8) & 0xF);
+> +		}
+> +	} else {
+> +		/*
+> +		 * This is an uniprocessor system
+> +		 * we are in multiprocessor format but uniprocessor system
+> +		 * or in the old uniprocessor format
+> +		 */
+> +
+> +		cpuid_topo->thread_id = -1;
+> +		cpuid_topo->core_id = 0;
+> +		cpuid_topo->socket_id = -1;
+> +	}
+> +
+> +	/* update core and thread sibling masks */
+> +	for_each_possible_cpu(cpu) {
+> +		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
+> +
+> +		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
+> +			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
+> +			if (cpu != cpuid)
+> +				cpumask_set_cpu(cpu,
+> +					&cpuid_topo->core_sibling);
+> +
+> +			if (cpuid_topo->core_id == cpu_topo->core_id) {
+> +				cpumask_set_cpu(cpuid,
+> +					&cpu_topo->thread_sibling);
+> +				if (cpu != cpuid)
+> +					cpumask_set_cpu(cpu,
+> +						&cpuid_topo->thread_sibling);
+> +			}
+> +		}
+> +	}
+> +	smp_wmb();
+> +
+> +	printk(KERN_INFO "cpu %u : thread %d cpu %d, socket %d, mpidr %x\n",
+> +		cpuid, cpu_topology[cpuid].thread_id,
+> +		cpu_topology[cpuid].core_id,
+> +		cpu_topology[cpuid].socket_id, mpidr);
+> +
+> +}
+> +
+> +/*
+> + * init_cpu_topology is called at boot when only one cpu is running
+> + * which prevent simultaneous write access to cpu_topology array
+> + */
+> +void init_cpu_topology(void)
+> +{
+> +	unsigned int cpu;
+> +
+> +	/* init core mask */
+> +	for_each_possible_cpu(cpu) {
+> +		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
+> +
+> +		cpu_topo->thread_id = -1;
+> +		cpu_topo->core_id =  -1;
+> +		cpu_topo->socket_id = -1;
+> +		cpumask_clear(&cpu_topo->core_sibling);
+> +		cpumask_clear(&cpu_topo->thread_sibling);
+> +	}
+> +	smp_wmb();
+> +}
+> -- 
+> 1.7.4.1
+> 
