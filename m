@@ -1,52 +1,121 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Thu, 16 Jun 2011 15:23:08 +0530
-Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
-In-Reply-To: <1308053788-25937-1-git-send-email-shahar@wizery.com>
-References: <y> <1308053788-25937-1-git-send-email-shahar@wizery.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D563C4B@dbde02.ent.ti.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Thu, 16 Jun 2011 11:54:01 +0200
+Subject: [PATCH v3] dmaengine: add new dma API for max_segment_number
+In-Reply-To: <1308139721-4008-1-git-send-email-shawn.guo@linaro.org>
+References: <BANLkTi=-t9HVc6U6QY07su+c3WztsGoq3Q@mail.gmail.com>
+	<1308139721-4008-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <BANLkTikSj+9-p3uvDTbSYF1nX3sxvbDwUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Shahar Lev
-> Sent: Tuesday, June 14, 2011 5:46 PM
-> To: linux-omap at vger.kernel.org
-> Cc: linux-arm; Tony Lindgren; Shahar Lev
-> Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
-> 
-> Add Kconfig entries indicating the existence of omap3evm's
-> wlan/bt wl12xx daughter card (see
-> http://mistralsolutions.com/component/jumi/Download_Common_Cod
-> e.html?docid=298),
-> and the exact reference clock type that the wl12xx device is hardwired
-> to (the wl12xx driver must know this).
-> 
-> In addition, start using CONFIG_OMAP3EVM_MISTRAL_WL12XX in
-> the omap3evm's board file instead of CONFIG_WL12XX_PLATFORM_DATA,
-> because the latter only indicates that the driver is being built, and
-> shouldn't be used to assume the existence of extension cards.
-> 
-> Signed-off-by: Shahar Lev <shahar@wizery.com>
+On Wed, Jun 15, 2011 at 2:08 PM, Shawn Guo <shawn.guo@linaro.org> wrote:
+> [PATCH v3] dmaengine: add new dma API for max_segment_number
+The subject "dmaengine:" in this case is a bit misleading since the
+patches doesn't touch any code inside drivers/dmaengine.
+For this patch I would prefer subject "dma-mapping:"
+
+There is a need for the DMA clients to be able to extract the max seg
+number from the DMA provider/device. I think this patch is a sane way
+of making this information available.
+
+Regards,
+Per
+
+> Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+> max_segment_number into device_dma_parameters and creates the
+> corresponding dmaengine API dma_set(get)_max_seg_number for it.
+>
+> Here is the user story that tells the need of the new api. ?The
+> mxs-mmc is the mmc host controller for Freescale MXS architecture.
+> There are a pair of ?mmc host specific parameters max_seg_size and
+> max_segs that mxs-mmc host driver needs to tell mmc core, so that
+> mmc core can know how big each data segment could be and how many
+> segments could be handled one time in a scatter list by host driver.
+>
+> The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
+> mxs-dma to transfer data in scatter list. ?That is to say mxs-mmc has
+> no idea of what max_seg_size and max_segs should be, because they are
+> all mxs-dma capability parameters, and mxs-mmc needs to query them
+> from mxs-dma.
+>
+> Right now, there is well defined dma api (dma_get_max_seg_size) for
+> mmc to query max_seg_size from dma driver, but the one for max_segs
+> is missing. ?That's why mxs-mmc driver has to hard-code it.
+>
+> The mxs-mmc is just one example to demonstrate the need of the new
+> api, and there are other mmc host drivers (mxcmmc on imx-dma is
+> another example) and possibly even other dmaengine users need this
+> new api to know the maximum segments that dma driver can handle per
+> dma call.
+>
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 > ---
->  arch/arm/mach-omap2/Kconfig          |   23 +++++++++++++++++++++++
->  arch/arm/mach-omap2/board-omap3evm.c |   12 ++++++------
->  2 files changed, 29 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-> index 19d5891..8ef012d 100644
-> --- a/arch/arm/mach-omap2/Kconfig
-> +++ b/arch/arm/mach-omap2/Kconfig
-> @@ -342,6 +342,29 @@ config OMAP3_SDRC_AC_TIMING
->  	  wish to say no.  Selecting yes without understanding what is
->  	  going on could result in system crashes;
->  
-> +config OMAP3EVM_MISTRAL_WL12XX
-
-[sp] Could this be renamed simply as: OMAP3EVM_WL12XX?
-     OR is there a specific reason to add vendor/manufacturers' name
-     to the defintion? 
-
-~sanjeev
-
-[snip]...[snip]
+> ?include/linux/device.h ? ? ?| ? 16 ++++++++++++----
+> ?include/linux/dma-mapping.h | ? 15 +++++++++++++++
+> ?2 files changed, 27 insertions(+), 4 deletions(-)
+>
+> diff --git a/include/linux/device.h b/include/linux/device.h
+> index c66111a..f1152c5 100644
+> --- a/include/linux/device.h
+> +++ b/include/linux/device.h
+> @@ -481,12 +481,20 @@ extern int devres_release_group(struct device *dev, void *id);
+> ?extern void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
+> ?extern void devm_kfree(struct device *dev, void *p);
+>
+> +/*
+> + * device_dma_parameters is a property of DMA provider, and it belongs to the
+> + * 'struct device' that actually provides DMA service, typically the drivers
+> + * under drivers/dma, although in some cases the DMA provider and block device
+> + * uses DMA service happen to be the same 'struct device'.
+> + *
+> + * It's not necessary for every single DMA providers to have this structure,
+> + * because some DMA providers simply do not have these parameters/limitations.
+> + * For those do have, the DMA providers should be responsible for setting the
+> + * parameters up.
+> + */
+> ?struct device_dma_parameters {
+> - ? ? ? /*
+> - ? ? ? ?* a low level driver may set these to teach IOMMU code about
+> - ? ? ? ?* sg limitations.
+> - ? ? ? ?*/
+> ? ? ? ?unsigned int max_segment_size;
+> + ? ? ? unsigned int max_segment_number;
+> ? ? ? ?unsigned long segment_boundary_mask;
+> ?};
+>
+> diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+> index ba8319a..fd314f4 100644
+> --- a/include/linux/dma-mapping.h
+> +++ b/include/linux/dma-mapping.h
+> @@ -131,6 +131,21 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+> ? ? ? ? ? ? ? ?return -EIO;
+> ?}
+>
+> +static inline unsigned int dma_get_max_seg_number(struct device *dev)
+> +{
+> + ? ? ? return dev->dma_parms ? dev->dma_parms->max_segment_number : 1;
+> +}
+> +
+> +static inline unsigned int dma_set_max_seg_number(struct device *dev,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned int number)
+> +{
+> + ? ? ? if (dev->dma_parms) {
+> + ? ? ? ? ? ? ? dev->dma_parms->max_segment_number = number;
+> + ? ? ? ? ? ? ? return 0;
+> + ? ? ? } else
+> + ? ? ? ? ? ? ? return -EIO;
+> +}
+> +
+> ?static inline unsigned long dma_get_seg_boundary(struct device *dev)
+> ?{
+> ? ? ? ?return dev->dma_parms ?
+> --
+> 1.7.4.1
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
