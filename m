@@ -1,134 +1,84 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Jun 2011 22:13:37 +0100
-Subject: [RFC] Add Arm cpu topology definition
-In-Reply-To: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-Message-ID: <20110616211337.GB32629@n2100.arm.linux.org.uk>
+Date: Thu, 16 Jun 2011 22:31:28 +0100
+Subject: [RFC PATCH v5] ARM hibernation / suspend-to-disk (fwd)
+In-Reply-To: <alpine.DEB.2.00.1106151349520.11405@localhost6.localdomain6>
+References: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>
+	<20110613122601.GC12325@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106131400090.25153@localhost6.localdomain6>
+	<20110613164452.GE13643@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106151349520.11405@localhost6.localdomain6>
+Message-ID: <20110616213128.GC32629@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 10:49:13AM +0200, Vincent Guittot wrote:
-> @@ -219,6 +219,24 @@ source "kernel/Kconfig.freezer"
-> 
->  menu "System Type"
-> 
-> +config SCHED_MC
-> +	bool "Multi-core scheduler support"
-> +	depends on SMP && ARM_CPU_TOPOLOGY
-> +	default n
-> +	help
-> +	  Multi-core scheduler support improves the CPU scheduler's decision
-> +	  making when dealing with multi-core CPU chips at a cost of slightly
-> +	  increased overhead in some places. If unsure say N here.
-> +
-> +config SCHED_SMT
-> +	bool "SMT scheduler support"
-> +	depends on SMP && ARM_CPU_TOPOLOGY
-> +	default n
-> +	help
-> +	  Improves the CPU scheduler's decision making when dealing with
-> +	  MultiThreading at a cost of slightly increased overhead in some
-> +	  places. If unsure say N here.
+On Wed, Jun 15, 2011 at 02:35:26PM +0100, Frank Hofmann wrote:
+> this change is perfect; with this, the hibernation support code turns 
+> into the attached.
 
-Why place these in the "system type" menu?  Wouldn't it be better to
-place them along side ARM_CPU_TOPOLOGY, and place that along side
-the SMP option too?
+Should I assume that's an ack for all the patches?
 
-> +
->  config MMU
->  	bool "MMU-based Paged Memory Management Support"
->  	default y
-> @@ -1062,6 +1080,14 @@ if !MMU
->  source "arch/arm/Kconfig-nommu"
->  endif
-> 
-> +config ARM_CPU_TOPOLOGY
-> +	bool "Support cpu topology definition"
-> +	depends on SMP && CPU_V7
-> +	help
-> +	  Support Arm cpu topology definition. The MPIDR register defines
-> +	  affinity between processors which is used to set the cpu
-> +	  topology of an Arm System.
+> That's both better and simpler to perform a full suspend/resume cycle 
+> (via resetting in the cpu_suspend "finisher") after the snapshot image 
+> has been created, instead of shoehorning a return into this.
 
-Is there a reason you'd want to disable this?
+It's now not soo difficult to have an error code returned from the
+finisher function - the only thing we have to make sure is that
+the cpu_do_suspend helper just saves state and does not make any
+state changes.
 
-Please also note that it's "ARM" not "Arm".
+We can then do this, which makes it possible for the finisher to
+return, and we propagate its return value.  We also ensure that a
+path through from cpu_resume will result in a zero return value
+from cpu_suspend.
 
-> diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
-> index accbd7c..cb90d0a 100644
-> --- a/arch/arm/include/asm/topology.h
-> +++ b/arch/arm/include/asm/topology.h
-> @@ -1,6 +1,39 @@
->  #ifndef _ASM_ARM_TOPOLOGY_H
->  #define _ASM_ARM_TOPOLOGY_H
-> 
-> +#ifdef CONFIG_ARM_CPU_TOPOLOGY
-> +
-> +#include <linux/cpumask.h>
-> +
-> +struct cputopo_arm {
-> +	int thread_id;
-> +	int core_id;
-> +	int socket_id;
-> +	cpumask_t thread_sibling;
-> +	cpumask_t core_sibling;
-> +};
-> +
-> +extern struct cputopo_arm cpu_topology[NR_CPUS];
-> +
-> +#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
-> +#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-> +#define topology_core_cpumask(cpu)	(&(cpu_topology[cpu].core_sibling))
-> +#define topology_thread_cpumask(cpu)	(&(cpu_topology[cpu].thread_sibling))
+This isn't an invitation for people to make the S2RAM path return
+after they time out waiting for suspend to happen - that's potentially
+dangerous because in that case the suspend may happen while we're
+resuming devices which wouldn't be nice.
 
-The thing which naggs me about this is that its a static array, and we
-know from x86 that static arrays of per-cpu data have various issues
-(cache line bouncing, as well as limitations when we end up with large
-numbers of CPUs.)
-
-Lastly, x86 seems to do this:
-
-#define arch_provides_topology_pointers         yes
-
-and the only effect I can find of that define is in drivers/base/topology.c:
-
-#ifdef arch_provides_topology_pointers
-...
-        unsigned int cpu = dev->id;                                     \
-        return show_cpumap(0, topology_##name(cpu), buf);               \
-...
-#else
-...
-        return show_cpumap(0, topology_##name(dev->id), buf);           \
-...
-#endif
-
-dev->id is type 'u32' which devolves to 'unsigned int' on all supported
-arches.  So it looks to me like this arch_provides_topology_pointers
-define is completely pointless and we just have useless obfuscation for
-the hell of it.
-
-That's not a criticism of your patch, it's pointing out a difference
-between x86 and our implementation.
-
-> +#include <linux/cpu.h>
-> +#include <linux/cpumask.h>
-> +#include <linux/init.h>
-> +#include <linux/percpu.h>
-> +#include <linux/node.h>
-> +#include <linux/nodemask.h>
-> +#include <linux/sched.h>
-> +
-> +#include <asm/cacheflush.h>
-> +#include <asm/topology.h>
-> +
-> +#define hard_smp_mpidr() \
-> +	({ \
-> +		unsigned int cpunum; \
-> +		__asm__("mrc p15, 0, %0, c0, c0, 5"	\
-> +			: "=r" (cpunum)); \
-> +		cpunum; \
-> +	})
-
-Please add a definition for CPUID_MPIDR to arch/arm/include/asm/cputype.h
-and a read_cpuid_mpidr() function, and use that instead.
+diff -u b/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+--- b/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -12,7 +12,6 @@
+  *  r1 = v:p offset
+  *  r2 = suspend function arg0
+  *  r3 = suspend function
+- * Note: does not return until system resumes
+  */
+ ENTRY(cpu_suspend)
+ 	stmfd	sp!, {r4 - r11, lr}
+@@ -26,7 +25,7 @@
+ #endif
+ 	mov	r6, sp			@ current virtual SP
+ 	sub	sp, sp, r5		@ allocate CPU state on stack
+-	mov	r0, sp			@ save pointer
++	mov	r0, sp			@ save pointer to CPU save block
+ 	add	ip, ip, r1		@ convert resume fn to phys
+ 	stmfd	sp!, {r1, r6, ip}	@ save v:p, virt SP, phys resume fn
+ 	ldr	r5, =sleep_save_sp
+@@ -55,10 +54,17 @@
+ #else
+ 	bl	__cpuc_flush_kern_all
+ #endif
++	adr	lr, BSYM(cpu_suspend_abort)
+ 	ldmfd	sp!, {r0, pc}		@ call suspend fn
+ ENDPROC(cpu_suspend)
+ 	.ltorg
+ 
++cpu_suspend_abort:
++	ldmia	sp!, {r1 - r3}		@ pop v:p, virt SP, phys resume fn
++	mov	sp, r2
++	ldmfd	sp!, {r4 - r11, pc}
++ENDPROC(cpu_suspend_abort)
++
+ /*
+  * r0 = control register value
+  * r1 = v:p offset (preserved by cpu_do_resume)
+@@ -88,6 +94,7 @@
+ cpu_resume_after_mmu:
+ 	str	r5, [r2, r4, lsl #2]	@ restore old mapping
+ 	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
++	mov	r0, #0			@ return zero on success
+ 	ldmfd	sp!, {r4 - r11, pc}
+ ENDPROC(cpu_resume_after_mmu)
+ 
