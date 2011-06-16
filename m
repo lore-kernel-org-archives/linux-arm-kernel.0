@@ -1,73 +1,71 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 16 Jun 2011 08:56:59 -0600
-Subject: [RFC PATCH 11/11] arm/versatile: Add device tree support
-In-Reply-To: <201106161620.37205.arnd@arndb.de>
-References: <20110616042653.29371.2052.stgit@ponder>
-	<20110616044311.29371.49018.stgit@ponder>
-	<201106161620.37205.arnd@arndb.de>
-Message-ID: <20110616145659.GC3795@ponder.secretlab.ca>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 16 Jun 2011 08:06:28 -0700
+Subject: [PATCH V2] davinci: da850: move input frequency to board
+	specific	files
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D4CF84E@dbde02.ent.ti.com>
+	(Sekhar Nori's message of "Tue, 14 Jun 2011 21:03:20 +0530")
+References: <1306312622-4901-1-git-send-email-christian.riesch@omicron.at>
+	<1306488053-27978-1-git-send-email-christian.riesch@omicron.at>
+	<874o42wpec.fsf@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D383AA8@dbde02.ent.ti.com>
+	<877h8xr4o0.fsf@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D425AD7@dbde02.ent.ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D4CF84E@dbde02.ent.ti.com>
+Message-ID: <87oc1xstmz.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 04:20:37PM +0200, Arnd Bergmann wrote:
-> On Thursday 16 June 2011, Grant Likely wrote:
-> > This patch adds a new versatile platform for when using the device
-> > tree.  Add platform and amba devices are discovered and registered by
-> > parsing the device tree.  Clocks and initial io mappings are still
-> > configured statically.
-> 
-> Hi Grant,
-> 
-> Two small questions about the device tree contents:
-> 
-> > +       i2c at 10002000 {
-> > +               #address-cells = <1>;
-> > +               #size-cells = <0>;
-> > +               compatible = "arm,versatile-i2c";
-> > +               reg = <0x10002000 0x1000>;
-> > +
-> > +               rtc at 68 {
-> > +                       compatible = "dallas,ds1338";
-> > +                       reg = <0x68>;
-> > +               };
-> > +       };
-> > +
-> > +       net at 10010000 {
-> > +               compatible = "smsc,lan91c111";
-> > +               reg = <0x10010000 0x10000>;
-> > +               interrupts = <25>;
-> > +       };
-> > +
-> > +       lcd at 10008000 {
-> > +               compatible = "arm,versatile-lcd";
-> > +               reg = <0x10008000 0x1000>;
-> > +       };
-> 
-> Why are these devices on the top level, rather than on the AMBA bus or
-> the FPGA? From the documentation, it seems that they are implemented
-> in the FPGA, which would also match the address layout.
+"Nori, Sekhar" <nsekhar@ti.com> writes:
 
-Mostly because I 'faked' this device tree based on what is currently
-in the kernel for the Versatile platform.  I need to look at the
-documentation and make it reflect reality, including setting up ranges
-correctly (as you commented on below).
+> On Wed, Jun 08, 2011 at 17:38:25, Nori, Sekhar wrote:
+>> On Tue, Jun 07, 2011 at 21:53:59, Hilman, Kevin wrote:
+>> 
+>> > I don't expect this to be a big boot-time impact.
+>> 
+>> You are right. Using PRINTK_TIME on DM365 I saw no noticeable boot-time
+>> change. When I profiled the code using do_gettimeofday(), I saw it
+>> was taking ~95 usecs to complete the propagation. I was mainly worried
+>> about all the recursion and reading of PLL and sysclk registers. Seems
+>> its not so bad.
+>> 
+>> > However, some of the clock.c assumptions might need to be updated as it
+>> > currently is written from the perspective that the PLL clocks are the
+>> > "root" clocks.
+>> 
+>> Hmm, just calling clk_set_rate() on refclk propagated the rate
+>> nicely across the tree. It seems DaVinci clock code is not in
+>> such a bad shape :) Or did I miss the concern?
+>> 
+>> > Setting (and propagating) clock rates is what the clock framework is
+>> > for, so adding a new interface to set a custom clock rate just doesn't
+>> > seem right.  I understand that the reference oscillator might be
+>> > considered a special case, but if this can be done with the clock
+>> > framework, it is much preferred.
+>> 
+>> Okay. Will modify the DM6467/T EVM code to use this method
+>> instead.
+>
+> So, here is the patch. I suspect reference clock information
+> should come from devicetree data when available. I hope it is
+> OK to take this approach till that time?
+>
+> Thanks,
+> Sekhar
+>
+> -----8<------------
+> From: Sekhar Nori <nsekhar@ti.com>
+> Date: Thu, 2 Jun 2011 14:10:50 +0530
+> Subject: [PATCH 1/1] davinci: dm6467/T EVM: fix setting up of reference clock rate
+>
+> The DM6467 and DM6467T EVMs use different reference clock
+> frequencies. This difference is currently supported by having
+> the SoC code call a public board routine which sets up the reference
+> clock frequency. This does not scale as more boards are added.
+>
+> Instead, use the clk_set_rate() API to setup the reference clock
+> frequency to a different value from the board file.
+>
+> Suggested-by: Kevin Hilman <khilman@ti.com>
+> Signed-off-by: Sekhar Nori <nsekhar@ti.com>
 
-> 
-> > +       amba {
-> > +               compatible = "arm,amba-bus";
-> > +               #address-cells = <1>;
-> > +               #size-cells = <1>;
-> > +               ranges;
-> > +
-> > +               vic: intc at 10140000 {
-> > +                       compatible = "arm,versatile-vic", "arm,vic";
-> > +                       interrupt-controller;
-> > +                       #interrupt-cells = <1>;
-> > +                       reg = <0x10140000 0x1000>;
-> > +               };
-> > +
-> 
-> Why the empty ranges property? All device registers are based on 0x10000000,
-> so I'd expect this to be described like that here.
-> 
-> 	Arnd
+Acked-by: Kevin Hilman <khilman@ti.com>
