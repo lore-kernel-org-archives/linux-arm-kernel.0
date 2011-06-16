@@ -1,39 +1,47 @@
-From: premi@ti.com (Sanjeev Premi)
-Date: Fri, 17 Jun 2011 02:01:00 +0530
-Subject: [PATCH] omap2+: pm: Fix section mismatch in pm_dbg_init()
-Message-ID: <1308256260-15597-1-git-send-email-premi@ti.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Thu, 16 Jun 2011 15:35:52 -0500
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+In-Reply-To: <201106162214.11084.heiko@sntech.de>
+References: <201106022149.47936.heiko@sntech.de>
+	<201106141610.42700.heiko@sntech.de>
+	<BANLkTimzxUQnVn5VC8EOaJeHq=wifUhZ4A@mail.gmail.com>
+	<201106162214.11084.heiko@sntech.de>
+Message-ID: <BANLkTin3knd8CUP4wSrXYio-asrM+Omrhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the section mismatch warning:
+Hi,
 
-  WARNING: vmlinux.o(.text+0x21118): Section mismatch
-  in reference from the function pm_dbg_init() to the
-  function .init.text:pwrdms_setup()
-  The function pm_dbg_init() references
-  the function __init pwrdms_setup().
-  This is often because pm_dbg_init lacks a __init
-  annotation or the annotation of pwrdms_setup is wrong.
+On Thu, Jun 16, 2011 at 3:14 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Dienstag 14 Juni 2011, 22:32:41 schrieb Andrei Warkentin:
+>> Hi Heiko,
+>>
+>> On Tue, Jun 14, 2011 at 9:10 AM, Heiko St?bner <heiko@sntech.de> wrote:
+>> > nope, no updates yet. The flood also only starts when udev wants to
+>> > create its device nodes, meaning the initial detection seems not to
+>> > produce this problem
+>> >
+>> > But when I disable the whole boot partition stuff, it works as before
+>> > without irq storms.
+>> >
+>> > As there don't seem to exist reports from other emmc users about this
+>> > I guess the problem lays somewhere between the boot-partitions-patch
+>> > and the sdhci-s3c driver (for s3c2416 at least).
+>>
+>> Alright. Curious. Can you let me know what eMMC device you are
+>> connecting to the controller? What is the eMMC revision?
+> hmm ... how do I find these?
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
----
- Applies to current linux-omap master
+The simplest is probably knowing what part is in your platform. The
+slightly more involved is adding a relevant printk for
+card->ext_csd.rev inside drivers/mmc/core/mmc.c.
 
- arch/arm/mach-omap2/pm-debug.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> The real device providing the storage is a 2GB NAND Flash from Hynix.
+>
+> And sadly both of your patches didn't change anything.
+>
 
-diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
-index e01da45..ef33273 100644
---- a/arch/arm/mach-omap2/pm-debug.c
-+++ b/arch/arm/mach-omap2/pm-debug.c
-@@ -595,7 +595,7 @@ static int option_set(void *data, u64 val)
- 
- DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
- 
--static int pm_dbg_init(void)
-+static int __init pm_dbg_init(void)
- {
- 	int i;
- 	struct dentry *d;
--- 
-1.7.2.2
+Can you provide me dmesg for both patches?
+
+Thanks again,
+A
