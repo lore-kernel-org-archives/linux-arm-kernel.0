@@ -1,496 +1,143 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 15 Jun 2011 22:43:18 -0600
-Subject: [RFC PATCH 11/11] arm/versatile: Add device tree support
-In-Reply-To: <20110616042653.29371.2052.stgit@ponder>
-References: <20110616042653.29371.2052.stgit@ponder>
-Message-ID: <20110616044311.29371.49018.stgit@ponder>
+From: vinod.koul@intel.com (Koul, Vinod)
+Date: Thu, 16 Jun 2011 11:15:19 +0530
+Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
+In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
+References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
+	<20110609124723.GA24636@n2100.arm.linux.org.uk>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
+	<1307686140.10976.111.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
+	<1307724439.10976.188.camel@vkoul-udesk3>
+	<E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
+Message-ID: <1308203119.10976.234.camel@vkoul-udesk3>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For testing the dt work, define a dt-enabled versatile platform.
+On Tue, 2011-06-14 at 12:12 +0530, Raju, Sundaram wrote:
+> <snip>
+> > 
+> > The overall conclusion which I'm coming to is that we already support
+> > what you're asking for, but the problem is that we're using different
+> > (and I'd argue standard) terminology to describe what we have.
+> > 
+> > The only issue which I see that we don't cover is the case where you want
+> > to describe a single buffer which is organised as N bytes to be transferred,
+> > M following bytes to be skipped, N bytes to be transferred, M bytes to be
+> > skipped.  I doubt there are many controllers which can be programmed with
+> > both 'N' and 'M' parameters directly.
+> >
+> 
+> Yes this is what I wanted to communicate and discuss in the list.
+> Thanks for describing it in the standard terminology, and pointing me in the 
+> right direction.
+> 
+> Also please note that if the gap between the buffers in a scatterlist is
+> uniform and that can again be skipped by the DMAC automatically
+> by programming that gap size, then that feature also is not available 
+> in the current framework.
+> 
+> I understand it can be done with the existing scatterlist, but just writing
+> a value in a DMAC register is much better if available, than preparing 
+> a scatterlist and passing to the API.
+> 
+> > 
+> > Please, don't generate special cases.  Design proper APIs from the
+> > outset rather than abusing what's already there.  So no, don't abuse
+> > the address width stuff.
+> > 
+> > In any case, the address width stuff must still be used to describe the
+> > peripherals FIFO register.
+> >
+> 
+> I did not intend to abuse the existing address width. It might look 
+> like that because of how I described it here. 
+> I agree that the dma_slave_config is for peripheral related 
+> properties to be stored. I was pointing out that the chunk size
+> variable in the dma_buffer_config I proposed will be in most cases 
+> equal to FIFO register width, to describe what I actually meant by
+> chunk size.
+> 
+> > IIUC, you have a buffer with gaps in between (given by above params).
+> > Is your DMA h/w capable of parsing this buffer and directly do a
+> > transfer based on above parameters (without any work for SW), or you are
+> > doing this in your dma driver and then programming a list of buffers?
+> > In former case (although i haven't seen such dma controller yet), can
+> > you share the datasheet? It would make very little sense to change the
+> > current API for your extra special case. This special case needs to be
+> > handled differently rather than making rule out of it!!
+> > 
+> 
+> Yes, Vinod. This is directly handled in the DMAC h/w.
+> 
+> This capability is present in 2 TI DMACs.
+> EDMA (Enhanced DMA) in all TI DaVinci SoCs and the
+> SDMA (System DMA) in all TI OMAP SoCs. The drivers of these
+> controllers are present in the respective DaVinci tree and OMAP tree
+> under the SoC folders.
+> 
+> <quote>
+> > SDMA and EDMA are TI SoC specific DMA controllers. Their drivers have
+> > been maintained in the respective SoC folders till now.
+> > arch/arm/plat-omap/dma.c
+> > arch/arm/mach-davinci/dma.c
+> </quote>
+> 
+> The Manual of the EDMA controller in TI DaVinci SoCs is available at
+> http://www.ti.com/litv/pdf/sprue23d
+> Section 2.2 in the page 23 explains how transfers are made based
+> on the gaps programmed. It also explains how the 3D buffer is 
+> internally split in EDMA based on the gaps programmed.
+> 
+> The complete Reference manual of TI OMAP SoCs is available at
+> http://www.ti.com/litv/pdf/spruf98s
+> Chapter 9 in this document describes the SDMA controller.
+> Section 9.4.3 in page 981 explains the various address modes,
+> how the address is incremented by the DMAC and about the gaps 
+> in between buffers and frames and how the DMAC handles them.
+> 
+> Linus,
+> > 
+> > Is it really so bad? It is a custom configuration after all. Even if
+> > there were many DMACs out there supporting it, we'd probably
+> > model it like this, just pass something like DMA_STRIDE_CONFIG
+> > instead of something named after a specific slave controller.
+> > 
+> > This way DMACs that didn't support striding could NACK a
+> > transfer for device drivers requesting it and then it could figure
+> > out what to do.
+> > 
+> > If we can get some indication as to whether more DMACs can
+> > do this kind of stuff, we'd maybe like to introduce
+> > DMA_STRIDE_CONFIG already now.
+> >
+> 
+> I wanted to discuss this feature in the list and get this feature 
+> added to the current dmaengine framework. If the current APIs
+> can handle this feature, then its very good 
+> and I will follow that only.
+> 
+> If what you suggest is the right way to go then I am okay.
+> IMHO the framework should always handle the complex case
+> and individual implementations should implement a subset of
+> the capability and hence I suggest the changes I posted to the list.
+Okay now things are more clear on what you are trying to do...
 
-This patch adds a new versatile platform for when using the device
-tree.  Add platform and amba devices are discovered and registered by
-parsing the device tree.  Clocks and initial io mappings are still
-configured statically.
+1) The changes you need are to describe your buffer and convey to dmac
+so please don't talk about slave here as that is specific to dmac config
 
-This patch is definitely not complete since a few of the device
-drivers depend on static platform_data in order to initialize
-correctly.  The next step will be to fix up the breakage one driver at
-a time.  However, this patch leaves existing board support files
-alone, so nothing should be broken.
+2) I think this can be achieved in two ways:
+a) you use current standard sg_list mechanism, the dmac driver parses
+the list and  programs the dma offsets into dmac
+Pros: you can use existing APIs, no changes to i/f.
+If dmac has this capability they program dmac accordingly
+Cons: you need to create sg-list in client driver
 
-Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
----
- arch/arm/boot/dts/versatile-ab.dts     |  185 ++++++++++++++++++++++++++++++++
- arch/arm/boot/dts/versatile-pb.dts     |   48 ++++++++
- arch/arm/mach-versatile/Kconfig        |    8 +
- arch/arm/mach-versatile/Makefile       |    1 
- arch/arm/mach-versatile/core.c         |   61 +++++++++++
- arch/arm/mach-versatile/core.h         |    5 +
- arch/arm/mach-versatile/versatile_dt.c |   66 +++++++++++
- 7 files changed, 374 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/versatile-ab.dts
- create mode 100644 arch/arm/boot/dts/versatile-pb.dts
- create mode 100644 arch/arm/mach-versatile/versatile_dt.c
+b) create a new api to describe these offset values, something like:
+prep_buffer_offset(struct offset_description *buffer,.....)
+I would not like to change the current API for this and rather have a 
+new API for this, this should better then overriding current.
 
-diff --git a/arch/arm/boot/dts/versatile-ab.dts b/arch/arm/boot/dts/versatile-ab.dts
-new file mode 100644
-index 0000000..0e31dc9
---- /dev/null
-+++ b/arch/arm/boot/dts/versatile-ab.dts
-@@ -0,0 +1,185 @@
-+/dts-v1/;
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "ARM Versatile AB";
-+	compatible = "arm,versatile-ab";
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	interrupt-parent = <&vic>;
-+
-+	memory {
-+		reg = <0x0 0x08000000>;
-+	};
-+
-+	flash at 34000000 {
-+		compatible = "arm,versatile-flash";
-+		reg = <0x34000000 0x4000000>;
-+		bank-width = <4>;
-+	};
-+
-+	i2c at 10002000 {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "arm,versatile-i2c";
-+		reg = <0x10002000 0x1000>;
-+
-+		rtc at 68 {
-+			compatible = "dallas,ds1338";
-+			reg = <0x68>;
-+		};
-+	};
-+
-+	net at 10010000 {
-+		compatible = "smsc,lan91c111";
-+		reg = <0x10010000 0x10000>;
-+		interrupts = <25>;
-+	};
-+
-+	lcd at 10008000 {
-+		compatible = "arm,versatile-lcd";
-+		reg = <0x10008000 0x1000>;
-+	};
-+
-+	amba {
-+		compatible = "arm,amba-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		vic: intc at 10140000 {
-+			compatible = "arm,versatile-vic", "arm,vic";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x10140000 0x1000>;
-+		};
-+
-+		sic: intc at 10003000 {
-+			compatible = "arm,versatile-sic", "arm,sic";
-+			interrupt-controller;
-+			#interrupt-cells = <1>;
-+			reg = <0x10003000 0x1000>;
-+			interrupt-parent = <&vic>;
-+			interrupts = <31>; /* Cascaded to vic */
-+		};
-+
-+		dma at 10130000 {
-+			compatible = "arm,primecell";
-+			reg = <0x10130000 0x1000>;
-+			interrupts = <17>;
-+		};
-+
-+		uart0: uart at 101f1000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x101f1000 0x1000>;
-+			interrupts = <12>;
-+		};
-+
-+		uart1: uart at 101f2000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x101f2000 0x1000>;
-+			interrupts = <13>;
-+		};
-+
-+		uart2: uart at 101f3000 {
-+			compatible = "arm,pl011", "arm,primecell";
-+			reg = <0x101f3000 0x1000>;
-+			interrupts = <14>;
-+		};
-+
-+		smc at 10100000 {
-+			compatible = "arm,primecell";
-+			reg = <0x10100000 0x1000>;
-+		};
-+
-+		mpmc at 10110000 {
-+			compatible = "arm,primecell";
-+			reg = <0x10110000 0x1000>;
-+		};
-+
-+		display at 10120000 {
-+			compatible = "arm,pl110", "arm,primecell";
-+			reg = <0x10120000 0x1000>;
-+			interrupts = <16>;
-+		};
-+
-+		sctl at 101e0000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101e0000 0x1000>;
-+		};
-+
-+		watchdog at 101e1000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101e1000 0x1000>;
-+			interrupts = <0>;
-+		};
-+
-+		gpio0: gpio at 101e4000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101e4000 0x1000>;
-+			gpio-controller;
-+			interrupts = <6>;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		gpio1: gpio at 101e5000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101e5000 0x1000>;
-+			interrupts = <7>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		rtc at 101e8000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101e8000 0x1000>;
-+			interrupts = <10>;
-+		};
-+
-+		sci at 101f0000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101f0000 0x1000>;
-+			interrupts = <15>;
-+		};
-+
-+		ssp at 101f4000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101f4000 0x1000>;
-+			interrupts = <11>;
-+		};
-+
-+		fpga {
-+			compatible = "arm,versatile-fpga", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges = <0 0x10000000 0x10000>;
-+
-+			aaci at 4000 {
-+				compatible = "arm,primecell";
-+				reg = <0x4000 0x1000>;
-+				interrupts = <24>;
-+			};
-+			mmc at 5000 {
-+				compatible = "arm,primecell";
-+				reg = < 0x5000 0x1000>;
-+				interrupts = <22>;
-+			};
-+			kmi at 6000 {
-+				compatible = "arm,pl050", "arm,primecell";
-+				reg = <0x6000 0x1000>;
-+				interrupt-parent = <&sic>;
-+				interrupts = <3>;
-+			};
-+			kmi at 7000 {
-+				compatible = "arm,pl050", "arm,primecell";
-+				reg = <0x7000 0x1000>;
-+				interrupt-parent = <&sic>;
-+				interrupts = <4>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/versatile-pb.dts b/arch/arm/boot/dts/versatile-pb.dts
-new file mode 100644
-index 0000000..d1934af
---- /dev/null
-+++ b/arch/arm/boot/dts/versatile-pb.dts
-@@ -0,0 +1,48 @@
-+/include/ "versatile-ab.dts"
-+
-+/ {
-+	model = "ARM Versatile PB";
-+	compatible = "arm,versatile-pb";
-+
-+	amba {
-+		gpio2: gpio at 101e6000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101e6000 0x1000>;
-+			interrupts = <8>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		gpio3: gpio at 101e7000 {
-+			compatible = "arm,primecell";
-+			reg = <0x101e7000 0x1000>;
-+			interrupts = <9>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+		};
-+
-+		fpga {
-+			uart at 9000 {
-+				compatible = "arm,pl011", "arm,primecell";
-+				reg = <0x9000 0x1000>;
-+				interrupt-parent = <&sic>;
-+				interrupts = <6>;
-+			};
-+			sci at a000 {
-+				compatible = "arm,primecell";
-+				reg = <0xa000 0x1000>;
-+				interrupt-parent = <&sic>;
-+				interrupts = <5>;
-+			};
-+			mmc at b000 {
-+				compatible = "arm,primecell";
-+				reg = <0xb000 0x1000>;
-+				interrupts = <23>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-versatile/Kconfig b/arch/arm/mach-versatile/Kconfig
-index 9cdec5a..c1f38f6 100644
---- a/arch/arm/mach-versatile/Kconfig
-+++ b/arch/arm/mach-versatile/Kconfig
-@@ -17,4 +17,12 @@ config MACH_VERSATILE_AB
- 	  Include support for the ARM(R) Versatile Application Baseboard
- 	  for the ARM926EJ-S.
- 
-+config MACH_VERSATILE_DT
-+	bool "Support Versatile platform from device tree"
-+	select USE_OF
-+	select CPU_ARM926T
-+	help
-+	  Include support for the ARM(R) Versatile/PB platform,
-+	  using the device tree for discovery
-+
- endmenu
-diff --git a/arch/arm/mach-versatile/Makefile b/arch/arm/mach-versatile/Makefile
-index 97cf4d8..81fa3fe 100644
---- a/arch/arm/mach-versatile/Makefile
-+++ b/arch/arm/mach-versatile/Makefile
-@@ -5,4 +5,5 @@
- obj-y					:= core.o
- obj-$(CONFIG_ARCH_VERSATILE_PB)		+= versatile_pb.o
- obj-$(CONFIG_MACH_VERSATILE_AB)		+= versatile_ab.o
-+obj-$(CONFIG_MACH_VERSATILE_DT)		+= versatile_dt.o
- obj-$(CONFIG_PCI)			+= pci.o
-diff --git a/arch/arm/mach-versatile/core.c b/arch/arm/mach-versatile/core.c
-index 0c99cf0..80e010b 100644
---- a/arch/arm/mach-versatile/core.c
-+++ b/arch/arm/mach-versatile/core.c
-@@ -24,6 +24,8 @@
- #include <linux/platform_device.h>
- #include <linux/sysdev.h>
- #include <linux/interrupt.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
- #include <linux/amba/bus.h>
- #include <linux/amba/clcd.h>
- #include <linux/amba/pl061.h>
-@@ -83,13 +85,26 @@ static struct fpga_irq_data sic_irq = {
- #define PIC_MASK	0
- #endif
- 
-+/* Lookup table for finding a DT node that represents the vic instance */
-+static struct of_device_id vic_of_match[] __initdata = {
-+	{ .compatible = "arm,vic", },
-+	{}
-+};
-+
-+static struct of_device_id sic_of_match[] __initdata = {
-+	{ .compatible = "arm,sic", },
-+	{}
-+};
-+
- void __init versatile_init_irq(void)
- {
- 	vic_init(VA_VIC_BASE, IRQ_VIC_START, ~0, 0);
-+	irq_domain_generate_simple(vic_of_match, VERSATILE_VIC_BASE, IRQ_VIC_START);
- 
- 	writel(~0, VA_SIC_BASE + SIC_IRQ_ENABLE_CLEAR);
- 
- 	fpga_irq_init(IRQ_VICSOURCE31, ~PIC_MASK, &sic_irq);
-+	irq_domain_generate_simple(sic_of_match, VERSATILE_SIC_BASE, IRQ_SIC_START);
- 
- 	/*
- 	 * Interrupts on secondary controller from 0 to 8 are routed to
-@@ -646,6 +661,52 @@ static struct amba_device *amba_devs[] __initdata = {
- 	&kmi1_device,
- };
- 
-+#ifdef CONFIG_OF
-+/*
-+ * Lookup table for attaching a specific name and platform_data pointer to
-+ * devices as they get created by of_platform_populate().  Ideally this table
-+ * would not exist, but the current clock implementation depends on some devices
-+ * having a specific name.
-+ */
-+struct of_dev_auxdata versatile_auxdata_lookup[] __initdata = {
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI0_BASE, "fpga:05", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_KMI0_BASE, "fpga:06", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_KMI1_BASE, "fpga:07", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART3_BASE, "fpga:09", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MMCI1_BASE, "fpga:0b", NULL),
-+
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_CLCD_BASE, "dev:20", &clcd_plat_data),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART0_BASE, "dev:f1", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART1_BASE, "dev:f2", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_UART2_BASE, "dev:f3", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SSP_BASE, "dev:f4", NULL),
-+
-+#if 0
-+	/*
-+	 * These entries are unnecessary because no clocks referencing
-+	 * them.  I've left them in for now as place holders in case
-+	 * any of them need to be added back, but they should be
-+	 * removed before actually committing this patch.  --gcl
-+	 */
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_AACI_BASE, "fpga:04", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SCI1_BASE, "fpga:0a", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SMC_BASE, "dev:00", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_MPMC_BASE, "dev:10", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_DMAC_BASE, "dev:30", NULL),
-+
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SCTL_BASE, "dev:e0", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_WATCHDOG_BASE, "dev:e1", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_GPIO0_BASE, "dev:e4", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_GPIO1_BASE, "dev:e5", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_GPIO2_BASE, "dev:e6", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_GPIO3_BASE, "dev:e7", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_RTC_BASE, "dev:e8", NULL),
-+	OF_DEV_AUXDATA("arm,primecell", VERSATILE_SCI_BASE, "dev:f0", NULL),
-+#endif
-+	{}
-+};
-+#endif
-+
- #ifdef CONFIG_LEDS
- #define VA_LEDS_BASE (__io_address(VERSATILE_SYS_BASE) + VERSATILE_SYS_LED_OFFSET)
- 
-diff --git a/arch/arm/mach-versatile/core.h b/arch/arm/mach-versatile/core.h
-index fd6404e..c97b070 100644
---- a/arch/arm/mach-versatile/core.h
-+++ b/arch/arm/mach-versatile/core.h
-@@ -23,6 +23,7 @@
- #define __ASM_ARCH_VERSATILE_H
- 
- #include <linux/amba/bus.h>
-+#include <linux/of_platform.h>
- 
- extern void __init versatile_init(void);
- extern void __init versatile_init_early(void);
-@@ -31,6 +32,10 @@ extern void __init versatile_map_io(void);
- extern struct sys_timer versatile_timer;
- extern unsigned int mmc_status(struct device *dev);
- 
-+#ifdef CONFIG_OF
-+extern struct of_dev_auxdata versatile_auxdata_lookup[];
-+#endif
-+
- #define AMBA_DEVICE(name,busid,base,plat)			\
- static struct amba_device name##_device = {			\
- 	.dev		= {					\
-diff --git a/arch/arm/mach-versatile/versatile_dt.c b/arch/arm/mach-versatile/versatile_dt.c
-new file mode 100644
-index 0000000..f476a11
---- /dev/null
-+++ b/arch/arm/mach-versatile/versatile_dt.c
-@@ -0,0 +1,66 @@
-+/*
-+ * Versatile board support using the device tree
-+ *
-+ *  Copyright (C) 2010 Secret Lab Technologies Ltd.
-+ *  Copyright (C) 2009 Jeremy Kerr <jeremy.kerr@canonical.com>
-+ *  Copyright (C) 2004 ARM Limited
-+ *  Copyright (C) 2000 Deep Blue Solutions Ltd
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, write to the Free Software
-+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/device.h>
-+#include <linux/sysdev.h>
-+#include <linux/clk.h>
-+#include <linux/clkdev.h>
-+#include <linux/amba/bus.h>
-+#include <linux/amba/pl061.h>
-+#include <linux/amba/mmci.h>
-+#include <linux/io.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/of_fdt.h>
-+#include <linux/of_irq.h>
-+#include <linux/of_platform.h>
-+
-+#include <mach/hardware.h>
-+#include <asm/irq.h>
-+#include <asm/mach-types.h>
-+
-+#include <asm/mach/arch.h>
-+
-+#include "core.h"
-+
-+static void __init versatile_dt_init(void)
-+{
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     versatile_auxdata_lookup, NULL);
-+}
-+
-+static const char *versatile_dt_match[] __initdata = {
-+	"arm,versatile-ab",
-+	"arm,versatile-pb",
-+	NULL,
-+};
-+
-+DT_MACHINE_START(VERSATILE_PB, "ARM-Versatile (Device Tree Support)")
-+	.map_io		= versatile_map_io,
-+	.init_early	= versatile_init_early,
-+	.init_irq	= versatile_init_irq,
-+	.timer		= &versatile_timer,
-+	.init_machine	= versatile_dt_init,
-+	.dt_compat	= versatile_dt_match,
-+MACHINE_END
+Overall I would prefer you to use approach 2-a above
+
+-- 
+~Vinod
