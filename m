@@ -1,59 +1,103 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Thu, 16 Jun 2011 09:50:44 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110613134701.2b23b8d8.kamezawa.hiroyu@jp.fujitsu.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110613134701.2b23b8d8.kamezawa.hiroyu@jp.fujitsu.com>
-Message-ID: <20110616042044.GA28563@in.ibm.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Wed, 15 Jun 2011 22:40:29 -0600
+Subject: [RFC PATCH 00/11] Full device tree support for ARM Versatile
+Message-ID: <20110616042653.29371.2052.stgit@ponder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This series of patches is all over the place, and touches both
+core infrastructure and board ports.  The patches also vary quite a
+bit in terms of quality and readiness for merging.  However, I wanted
+to get the whole lot out onto the list together so it can be seen
+exactly what needs to be done to convert an ARM platform over to
+registering devices directly out of the DT.
 
-On Mon, Jun 13, 2011 at 01:47:01PM +0900, KAMEZAWA Hiroyuki wrote:
-> On Fri, 27 May 2011 18:01:28 +0530
-> Ankita Garg <ankita@in.ibm.com> wrote:
-> 
-> > Hi,
-> > 
-> 
-> I'm sorry if you've answered already.
-> 
-> Is memory hotplug is too bad and cannot be enhanced for this purpose ?
-> 
-> I wonder
->   - make section-size smaller (IIUC, IBM's system has 16MB section size)
-> 
->   - add per section statistics
-> 
->   - add a kind of balloon driver which does software memory offline
->     (which means making a contiguous chunk of free pages of section_size
->      by page migration) in background with regard to memory usage statistics.
->     If system says "need more memory!", balloon driver can online pages.
-> 
-> can work for your purpose. It can allow you page isolatation and
-> controls in 16MB unit.  If you need whole rework of memory hotplug, I think
-> it's better to rewrite memory hotplug, too.
->
+This first 3 patches are an early implementation of irq_domains, plus
+some helpers to make creating a simple irq_domain easy.  I've already
+posted the first patch before, and I haven't responded to any comments
+yet.  These patches are needed so that DT irq connections can be
+correctly mapped into the Linux IRQ numberspace.
 
-Interesting idea, but a few issues -
+Patches 4-7 modify the core DT infrastructure to create a new helper
+for registering devices (has slightly different semantics from the
+older of_platform_bus_probe()), working with AMBA devices, and
+allowing platform code to provide a lookup table of 'preferred' names
+and platform_data for DT described devices.
 
-- Correctly predicting memory pressure is difficult and thereby being
-  able to online the required pages at the right time could be a
-  challenge
-- Memory hotplug is a heavy operation, so the overhead involved may be
-  high
-- Powering off memory is just one of the ways in which memory power could
-  be saved. The platform can also dynamically transition areas of memory
-  into a  content-preserving lower power state if it is not referenced
-  for a pre-defined threshold of time. In such a case, we would need a
-  mechanism to soft offline the pages - i.e, no new allocations to be
-  directed to that memory
+The use of platform_data here is sure to raise an eyebrow or two, but
+I assure you it is both necessary and temporary.  Necessary because it
+allows platforms to transition to DT without having to fix all
+name-based clock connections and platform_data usage in device
+drivers.  Temporary because platform lookup tables will get removed
+after the drivers do get fixed.
+
+Patch 8 is a trivial powerpc patch to migrate a platform to the newer
+infrastructure, and patches 9 & 10 are also trivial infrastructure
+additions.
+
+Patch 11 is the main event.  It creates a new versatile machine
+definition which matches against a versatile device tree, and all
+device registrations are generated from DT data.  I've tested this one
+on the QEMU versatile model, but not real hardware.  Most certainly
+not everything is working here yet.  However, it is an example of how
+to migrate a platform over to using the DT.
+
+Cheers,
+g.
+
+---
+
+Grant Likely (11):
+      irq: add irq_domain translation infrastructure
+      of/address: Add of_find_matching_node_by_address helper
+      dt/irq: add irq_domain_add_simple() helper
+      dt: add of_platform_populate() for creating device from the device tree
+      dt: Add default match table for bus ids
+      drivers/amba: create devices from device tree
+      dt/platform: allow device name to be overridden
+      powerpc/5200: convert mpc5200 to use of_platform_populate()
+      arm/dt: Add dt machine definition
+      arm/dt: Add skeleton dtsi file
+      arm/versatile: Add device tree support
+
+
+ .../devicetree/bindings/arm/primecell.txt          |   21 ++
+ arch/arm/boot/dts/skeleton.dtsi                    |   13 +
+ arch/arm/boot/dts/versatile-ab.dts                 |  185 +++++++++++++++++++
+ arch/arm/boot/dts/versatile-pb.dts                 |   48 +++++
+ arch/arm/include/asm/mach/arch.h                   |    9 +
+ arch/arm/include/asm/prom.h                        |    5 -
+ arch/arm/kernel/devtree.c                          |   14 -
+ arch/arm/mach-versatile/Kconfig                    |    8 +
+ arch/arm/mach-versatile/Makefile                   |    1 
+ arch/arm/mach-versatile/core.c                     |   61 ++++++
+ arch/arm/mach-versatile/core.h                     |    5 +
+ arch/arm/mach-versatile/versatile_dt.c             |   66 +++++++
+ arch/microblaze/include/asm/irq.h                  |   10 -
+ arch/microblaze/kernel/irq.c                       |    7 -
+ arch/mips/include/asm/irq.h                        |    5 -
+ arch/mips/kernel/prom.c                            |   14 -
+ arch/powerpc/include/asm/irq.h                     |    1 
+ arch/powerpc/platforms/52xx/mpc52xx_common.c       |   10 -
+ arch/x86/include/asm/irq_controller.h              |   12 -
+ arch/x86/include/asm/prom.h                        |   10 -
+ arch/x86/kernel/devicetree.c                       |  101 +++-------
+ drivers/of/address.c                               |   18 ++
+ drivers/of/platform.c                              |  196 +++++++++++++++++++-
+ include/linux/irq.h                                |   92 +++++++++
+ include/linux/of_address.h                         |    4 
+ include/linux/of_irq.h                             |    2 
+ include/linux/of_platform.h                        |   40 ++++
+ kernel/irq/Makefile                                |    2 
+ kernel/irq/irqdomain.c                             |  193 ++++++++++++++++++++
+ 29 files changed, 994 insertions(+), 159 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/primecell.txt
+ create mode 100644 arch/arm/boot/dts/skeleton.dtsi
+ create mode 100644 arch/arm/boot/dts/versatile-ab.dts
+ create mode 100644 arch/arm/boot/dts/versatile-pb.dts
+ create mode 100644 arch/arm/mach-versatile/versatile_dt.c
+ delete mode 100644 arch/x86/include/asm/irq_controller.h
+ create mode 100644 kernel/irq/irqdomain.c
 
 -- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+Signature
