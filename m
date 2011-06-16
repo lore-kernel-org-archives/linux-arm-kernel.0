@@ -1,20 +1,17 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 16 Jun 2011 15:35:59 -0300
-Subject: MX27PDK does not boot on 'for-next'
-Message-ID: <BANLkTi=0g5ShRRWAdixWpF2w-ea5VMs8JQ@mail.gmail.com>
+From: shahar@wizery.com (Shahar Lev)
+Date: Thu, 16 Jun 2011 21:37:22 +0300
+Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D563C4B@dbde02.ent.ti.com>
+References: <1308053788-25937-1-git-send-email-shahar@wizery.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D563C4B@dbde02.ent.ti.com>
+Message-ID: <BANLkTikNwNdL30oEHUpKr-CJLPOXedGEmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+>
+> [sp] Could this be renamed simply as: OMAP3EVM_WL12XX?
+> ? ? OR is there a specific reason to add vendor/manufacturers' name
+> ? ? to the defintion?
+>
 
-I noticed that your tree 'for-next' makes MX27PDK not to boot.
-
-3.0-rc1, 3.0-rc2 and 3.0-rc3 all work fine on MX27PDK.
-
-I will try to find the offending patch, but just wanted to let you know.
-
-More likely to be related to the gpio-mxc conversion patches.
-
-Regards,
-
-Fabio Estevam
+I don't mind changing it.
