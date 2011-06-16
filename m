@@ -1,143 +1,37 @@
-From: vinod.koul@intel.com (Koul, Vinod)
-Date: Thu, 16 Jun 2011 11:15:19 +0530
-Subject: [RFC] dmaengine: add new api for preparing simple slave transfer
-In-Reply-To: <E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
-References: <E0D41E29EB0DAC4E9F3FF173962E9E940301FE2DED@dbde02.ent.ti.com>
-	<20110609124723.GA24636@n2100.arm.linux.org.uk>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE2EFB@dbde02.ent.ti.com>
-	<1307686140.10976.111.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E940301FE3405@dbde02.ent.ti.com>
-	<1307724439.10976.188.camel@vkoul-udesk3>
-	<E0D41E29EB0DAC4E9F3FF173962E9E9403020B7C2A@dbde02.ent.ti.com>
-Message-ID: <1308203119.10976.234.camel@vkoul-udesk3>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Jun 2011 09:03:12 +0200
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous
+	=?iso-8859-1?q?Memory=09Allocator?= added
+In-Reply-To: <4DF952CC.4010301@balister.org>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106150937.18524.arnd@arndb.de> <4DF952CC.4010301@balister.org>
+Message-ID: <201106160903.13135.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-06-14 at 12:12 +0530, Raju, Sundaram wrote:
-> <snip>
-> > 
-> > The overall conclusion which I'm coming to is that we already support
-> > what you're asking for, but the problem is that we're using different
-> > (and I'd argue standard) terminology to describe what we have.
-> > 
-> > The only issue which I see that we don't cover is the case where you want
-> > to describe a single buffer which is organised as N bytes to be transferred,
-> > M following bytes to be skipped, N bytes to be transferred, M bytes to be
-> > skipped.  I doubt there are many controllers which can be programmed with
-> > both 'N' and 'M' parameters directly.
+On Thursday 16 June 2011 02:48:12 Philip Balister wrote:
+> On 06/15/2011 12:37 AM, Arnd Bergmann wrote:
+> > On Wednesday 15 June 2011 09:11:39 Marek Szyprowski wrote:
+> >> I see your concerns, but I really wonder how to determine the properties
+> >> of the global/default cma pool. You definitely don't want to give all
+> >> available memory o CMA, because it will have negative impact on kernel
+> >> operation (kernel really needs to allocate unmovable pages from time to
+> >> time).
 > >
+> > Exactly. This is a hard problem, so I would prefer to see a solution for
+> > coming up with reasonable defaults.
 > 
-> Yes this is what I wanted to communicate and discuss in the list.
-> Thanks for describing it in the standard terminology, and pointing me in the 
-> right direction.
-> 
-> Also please note that if the gap between the buffers in a scatterlist is
-> uniform and that can again be skipped by the DMAC automatically
-> by programming that gap size, then that feature also is not available 
-> in the current framework.
-> 
-> I understand it can be done with the existing scatterlist, but just writing
-> a value in a DMAC register is much better if available, than preparing 
-> a scatterlist and passing to the API.
-> 
-> > 
-> > Please, don't generate special cases.  Design proper APIs from the
-> > outset rather than abusing what's already there.  So no, don't abuse
-> > the address width stuff.
-> > 
-> > In any case, the address width stuff must still be used to describe the
-> > peripherals FIFO register.
-> >
-> 
-> I did not intend to abuse the existing address width. It might look 
-> like that because of how I described it here. 
-> I agree that the dma_slave_config is for peripheral related 
-> properties to be stored. I was pointing out that the chunk size
-> variable in the dma_buffer_config I proposed will be in most cases 
-> equal to FIFO register width, to describe what I actually meant by
-> chunk size.
-> 
-> > IIUC, you have a buffer with gaps in between (given by above params).
-> > Is your DMA h/w capable of parsing this buffer and directly do a
-> > transfer based on above parameters (without any work for SW), or you are
-> > doing this in your dma driver and then programming a list of buffers?
-> > In former case (although i haven't seen such dma controller yet), can
-> > you share the datasheet? It would make very little sense to change the
-> > current API for your extra special case. This special case needs to be
-> > handled differently rather than making rule out of it!!
-> > 
-> 
-> Yes, Vinod. This is directly handled in the DMAC h/w.
-> 
-> This capability is present in 2 TI DMACs.
-> EDMA (Enhanced DMA) in all TI DaVinci SoCs and the
-> SDMA (System DMA) in all TI OMAP SoCs. The drivers of these
-> controllers are present in the respective DaVinci tree and OMAP tree
-> under the SoC folders.
-> 
-> <quote>
-> > SDMA and EDMA are TI SoC specific DMA controllers. Their drivers have
-> > been maintained in the respective SoC folders till now.
-> > arch/arm/plat-omap/dma.c
-> > arch/arm/mach-davinci/dma.c
-> </quote>
-> 
-> The Manual of the EDMA controller in TI DaVinci SoCs is available at
-> http://www.ti.com/litv/pdf/sprue23d
-> Section 2.2 in the page 23 explains how transfers are made based
-> on the gaps programmed. It also explains how the 3D buffer is 
-> internally split in EDMA based on the gaps programmed.
-> 
-> The complete Reference manual of TI OMAP SoCs is available at
-> http://www.ti.com/litv/pdf/spruf98s
-> Chapter 9 in this document describes the SDMA controller.
-> Section 9.4.3 in page 981 explains the various address modes,
-> how the address is incremented by the DMAC and about the gaps 
-> in between buffers and frames and how the DMAC handles them.
-> 
-> Linus,
-> > 
-> > Is it really so bad? It is a custom configuration after all. Even if
-> > there were many DMACs out there supporting it, we'd probably
-> > model it like this, just pass something like DMA_STRIDE_CONFIG
-> > instead of something named after a specific slave controller.
-> > 
-> > This way DMACs that didn't support striding could NACK a
-> > transfer for device drivers requesting it and then it could figure
-> > out what to do.
-> > 
-> > If we can get some indication as to whether more DMACs can
-> > do this kind of stuff, we'd maybe like to introduce
-> > DMA_STRIDE_CONFIG already now.
-> >
-> 
-> I wanted to discuss this feature in the list and get this feature 
-> added to the current dmaengine framework. If the current APIs
-> can handle this feature, then its very good 
-> and I will follow that only.
-> 
-> If what you suggest is the right way to go then I am okay.
-> IMHO the framework should always handle the complex case
-> and individual implementations should implement a subset of
-> the capability and hence I suggest the changes I posted to the list.
-Okay now things are more clear on what you are trying to do...
+> Is this a situation where passing the information from device tree might 
+> help? I know this does not help short term, but I am trying to 
+> understand the sorts of problems device tree can help solve.
 
-1) The changes you need are to describe your buffer and convey to dmac
-so please don't talk about slave here as that is specific to dmac config
+The device tree is a good place to describe any hardware properties such
+as 'this device will need 32 MB of contiguous allocations on the memory
+bank described in that other device node'.
 
-2) I think this can be achieved in two ways:
-a) you use current standard sg_list mechanism, the dmac driver parses
-the list and  programs the dma offsets into dmac
-Pros: you can use existing APIs, no changes to i/f.
-If dmac has this capability they program dmac accordingly
-Cons: you need to create sg-list in client driver
+It is however not a good place to describe user settings such as 'I want
+to give this device a 200 MB pool for large allocations so I can run
+application X efficiently', because that would require knowledge in the
+boot loader about local policy, which it should generally not care about.
 
-b) create a new api to describe these offset values, something like:
-prep_buffer_offset(struct offset_description *buffer,.....)
-I would not like to change the current API for this and rather have a 
-new API for this, this should better then overriding current.
-
-Overall I would prefer you to use approach 2-a above
-
--- 
-~Vinod
+	Arnd
