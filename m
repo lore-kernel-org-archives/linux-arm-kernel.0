@@ -1,65 +1,50 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 16 Jun 2011 11:25:15 -0700
-Subject: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D563E79@dbde02.ent.ti.com>
-	(Sanjeev Premi's message of "Thu, 16 Jun 2011 21:43:07 +0530")
-References: <1308229940-27025-1-git-send-email-premi@ti.com>
-	<877h8lsswk.fsf@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D563E79@dbde02.ent.ti.com>
-Message-ID: <87vcw5k510.fsf@ti.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Thu, 16 Jun 2011 20:32:33 +0200
+Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
+	support for mx5
+In-Reply-To: <20110614064841.GB30295@S2100-06.ap.freescale.net> (Shawn Guo's
+	message of "Tue, 14 Jun 2011 14:48:42 +0800")
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<20110614064841.GB30295@S2100-06.ap.freescale.net>
+Message-ID: <87lix1hbjy.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Premi, Sanjeev" <premi@ti.com> writes:
+Shawn Guo <shawn.guo@freescale.com> writes:
 
->> -----Original Message-----
->> From: Hilman, Kevin 
->> Sent: Thursday, June 16, 2011 8:52 PM
->> To: Premi, Sanjeev
->> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
->> Subject: Re: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
+Hi,
+
+> On Fri, Jun 10, 2011 at 06:42:48PM +0800, Shawn Guo wrote:
+>> The card-present polling within sdhci based driver is very expensive
+>> in terms of the impact to system performance.  We observe a few
+>> system performance issues from Freescale and Linaro on mx5 platforms,
+>> which have been proved card polling related.
 >> 
->> Hi Sanjeev,
+>> The patch set extends the current sdhci-esdhc-imx card_detect and
+>> write_protect support to cover mx5 platforms, and solves above
+>> performance issues.
 >> 
->> Sanjeev Premi <premi@ti.com> writes:
+>> Shawn Guo (4):
+>>       mmc: sdhci: fix interrupt storm from card detection
+>>       mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
+>>       mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
+>>       mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
 >> 
->> > When multiple wakeup sources are defined in a system,
->> > there is a small window, when more than one source
->> > can trigger wakeup interrupt.
->> >
->> > In the current implementation, the do-while() loop
->> > can handle all wakeup sources that are recorded when
->> > probing the status register in prcm_interrupt_handler().
->> >
->> > When the ISR executes due to next queued wakeup, it
->> > there is nothing to be handled and value of "c" is 0.
->> 
->> Thanks for tracking this one down.
->> 
->> However, It's still not clear to me what is happening here.
->> 
->> Why is the IRQ firing if there is nothing to be handled?  
->> That suggests
->> to me that the IRQ status is not properly being cleared.
+> Hi Arnaud,
 >
-> [SP] On the contrary the IRQ status is actually getting cleared,
->      but there are more than "1" PRCM interrupts queued.
->
->      The do-while() clears all the interrupt sources that
->      are flagged in the status register.
->
->      When the next wakeup interrupt is getting processed, the
->      status register doesn't contain any "source" to handle.
+> Any chance to play with it yet?
 
-Still confused.
+Finally managed to build a kernel with this version of the
+patchset. While I'm not polling anymore, I'm getting a lot of interrupts
+if the card is not inserted. Theses interrupts are not happening if the
+card is inserted. I can see things like this in the logs :
+sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000080
 
-If a wakeup interrupt is fired, it was caused by something.  
+[ of course, the bit of the present state register indicating card
+presence is equal to 0 ]
 
-IOW, if "the status register doesn't contain any source",  how is
+I've tested the SIGNAL case only. Don't know if switch to GPIO may help.
+Do you have same kind of issue on your side ?
 
-		if (irqstatus_mpu & (OMAP3430_WKUP_ST_MASK |
-				     OMAP3430_IO_ST_MASK)) 
-
-ever true?
-
-Kevin
+Thanks,
+Arnaud
