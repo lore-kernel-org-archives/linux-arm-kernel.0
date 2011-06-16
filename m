@@ -1,58 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Jun 2011 21:22:45 +0100
-Subject: [RFC PATCH 06/16] ARM: local timers: move Tegra
-	to	LOCAL_TIMER_DEVICES/ARM_SMP_TWD
-In-Reply-To: <74CDBE0F657A3D45AFBB94109FB122FF04992C0804@HQMAIL01.nvidia.com>
-References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-	<1308251204-16719-7-git-send-email-marc.zyngier@arm.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04992C0804@HQMAIL01.nvidia.com>
-Message-ID: <4DFA6615.7000700@arm.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 16 Jun 2011 16:30:27 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <4DFA634D.6000907@ahsoftware.de>
+Message-ID: <Pine.LNX.4.44L0.1106161626160.1697-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/06/11 21:07, Stephen Warren wrote:
-> Marc Zyngier wrote at Thursday, June 16, 2011 1:07 PM:
->> Convert the Tegra platforms to use the new arm_smp_twd driver.
->> Add the platform device and register it as early platform device.
-> 
-> ...
->> diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
->> index 9035042..4e1ecd0 100644
->> --- a/arch/arm/mach-tegra/timer.c
->> +++ b/arch/arm/mach-tegra/timer.c
-> 
-> ...
->> +static struct platform_device *tegra_early_devices[] = {
->> +	&tegra_twd_device,
->> +};
-> 
-> In the cases where the timer device is registered within a timer-specific
-> file, as here, and hence is likely the only device to be registered, does
-> it make sense to elide the platform_device array above, and ...
-> 
-> ...
->> @@ -241,6 +261,8 @@ static void __init tegra_init_timer(void)
->>  	tegra_clockevent.cpumask = cpu_all_mask;
->>  	tegra_clockevent.irq = tegra_timer_irq.irq;
->>  	clockevents_register_device(&tegra_clockevent);
->> +	early_platform_add_devices(tegra_early_devices,
->> +				   ARRAY_SIZE(tegra_early_devices));
->>  }
-> 
-> ... and just refer to the single device directly here:
-> 
-> early_platform_add_devices(&tegra_twd_device, 1);
-> 
-> ?
+On Thu, 16 Jun 2011, Alexander Holler wrote:
 
-Unfortunately not. From include/linux/platform_device.h:
-void early_platform_add_devices(struct platform_device **devs, int num);
+> > Hmmm.  I won't say that ((packed,aligned(4))) is wrong.  But it's not
+> > clearly necessary either.
+> 
+> Maybe I should have added a "cosmetic:" in front of the subject of the 
+> patch. ;)
+> 
+> Using packed doesn't seem to be necessary (at least not with those 
+> versions of gcc I'm using here), I've tried both versions (on arm, 
+> without packed and with packed, aligned(4)) and both are working. I've 
+> only posted the patch because I found the usage of packed, aligned(4) 
+> much clearer than without packed. And It might help avoiding such 
+> discussions like this with people like me who aren't that deep involved 
+> in gcc-specific implementation details. ;)
+> 
+> Anyway, feel free to nack that patch. I don't really care and just 
+> thought I should post it (e.g. as an alternative to removing that packed).
 
-There is no equivalent of platform_device_register() for early devices,
-so the array is mandatory.
+There are other structures that need to avoid padding but aren't marked
+((packed)), such as ehci_qtd and ehci_qh_hw in drivers/usb/host/ehci.h.  
+I don't see why those in ehci_def.h should get special treatment.
 
-Cheers,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Alan Stern
