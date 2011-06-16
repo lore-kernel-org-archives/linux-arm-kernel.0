@@ -1,52 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 16 Jun 2011 17:21:27 +0200
-Subject: Dynamic patching in discarded sections
-In-Reply-To: <alpine.LFD.2.00.1106080946000.2142@xanadu.home>
-References: <201106081123.59414.arnd@arndb.de>
-	<alpine.LFD.2.00.1106080946000.2142@xanadu.home>
-Message-ID: <201106161721.27330.arnd@arndb.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 16 Jun 2011 08:22:19 -0700
+Subject: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
+In-Reply-To: <1308229940-27025-1-git-send-email-premi@ti.com> (Sanjeev Premi's
+	message of "Thu, 16 Jun 2011 18:42:20 +0530")
+References: <1308229940-27025-1-git-send-email-premi@ti.com>
+Message-ID: <877h8lsswk.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 08 June 2011, Nicolas Pitre wrote:
-> Dave Martin proposed an extension to gas here (also sent to 
-> binutils at sourceware.org):
-> 
-> http://article.gmane.org/gmane.linux.linaro.toolchain/701
-> 
-> But as far as I know, nothing further happened. And this is not an ARM 
-> specific issue either as the X86 alternates have the same problem.
+Hi Sanjeev,
 
-Ah, yes. That would be really nice to have. Dave, do you still have hopes
-that this patch gets merged?
+Sanjeev Premi <premi@ti.com> writes:
 
-> > I don't know if the same problem exists in other places in the code, but it's
-> > entirely possible. I also couldn't think of a good solution for this, short of
-> > moving the definition of dma_unmap_single() to out of line code.
-> 
-> Probably the best interim solution would be:
-> 
-> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
-> index dfbb377..f231c92 100644
-> --- a/arch/arm/kernel/vmlinux.lds.S
-> +++ b/arch/arm/kernel/vmlinux.lds.S
-> @@ -21,7 +21,8 @@
->  #define ARM_CPU_KEEP(x)
->  #endif
->  
-> -#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
-> +#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
-> +    defined(CONFIG_ARM_PATCH_PHYS_VIRT)
->  #define ARM_EXIT_KEEP(x)       x
->  #else
->  #define ARM_EXIT_KEEP(x)
-> 
-> But clearly the toolchain should be more accommodating instead.
-> 
+> When multiple wakeup sources are defined in a system,
+> there is a small window, when more than one source
+> can trigger wakeup interrupt.
+>
+> In the current implementation, the do-while() loop
+> can handle all wakeup sources that are recorded when
+> probing the status register in prcm_interrupt_handler().
+>
+> When the ISR executes due to next queued wakeup, it
+> there is nothing to be handled and value of "c" is 0.
 
-10000 randconfig kernel build later without that patch, I'm rather sure
-that there is only a single driver that is suffering from this. While your
-patch absolutely makes sense, a less invasive workaround would be to just
-not mark mmc_spi_remove as __devexit until Dave's patch gets in.
+Thanks for tracking this one down.
 
-	Arnd
+However, It's still not clear to me what is happening here.
+
+Why is the IRQ firing if there is nothing to be handled?  That suggests
+to me that the IRQ status is not properly being cleared.
+
+Kevin
