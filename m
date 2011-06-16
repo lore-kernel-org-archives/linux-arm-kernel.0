@@ -1,56 +1,25 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Thu, 16 Jun 2011 21:43:07 +0530
-Subject: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
-In-Reply-To: <877h8lsswk.fsf@ti.com>
-References: <1308229940-27025-1-git-send-email-premi@ti.com>
-	<877h8lsswk.fsf@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D563E79@dbde02.ent.ti.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 16 Jun 2011 09:15:57 -0700
+Subject: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
+In-Reply-To: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com> (Tarun
+	Kanti DebBarma's message of "Tue, 14 Jun 2011 19:01:43 +0530")
+References: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com>
+Message-ID: <87ei2trbuq.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hilman, Kevin 
-> Sent: Thursday, June 16, 2011 8:52 PM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
-> 
-> Hi Sanjeev,
-> 
-> Sanjeev Premi <premi@ti.com> writes:
-> 
-> > When multiple wakeup sources are defined in a system,
-> > there is a small window, when more than one source
-> > can trigger wakeup interrupt.
-> >
-> > In the current implementation, the do-while() loop
-> > can handle all wakeup sources that are recorded when
-> > probing the status register in prcm_interrupt_handler().
-> >
-> > When the ISR executes due to next queued wakeup, it
-> > there is nothing to be handled and value of "c" is 0.
-> 
-> Thanks for tracking this one down.
-> 
-> However, It's still not clear to me what is happening here.
-> 
-> Why is the IRQ firing if there is nothing to be handled?  
-> That suggests
-> to me that the IRQ status is not properly being cleared.
+Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 
-[SP] On the contrary the IRQ status is actually getting cleared,
-     but there are more than "1" PRCM interrupts queued.
+> This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> The cleanup include getting rid of cpu_is_* checks wherever possible,
+> use of gpio_bank list instead of static array, use of unique platform
+> specific value associated data member to OMAP platforms to avoid
+> cpu_is_* checks. The series also include PM runtime support.
 
-     The do-while() clears all the interrupt sources that
-     are flagged in the status register.
+A quick test of this series on 3430/n900 shows that it prevents PER
+retention.  I see CM_FCLKEN_PER=0000c000 (debounce clock for GPIO banks
+3 & 4 are still enabled.)
 
-     When the next wakeup interrupt is getting processed, the
-     status register doesn't contain any "source" to handle.
-     and value of "c" is returned as 0.... leading to the
-     warning.
+Can you retest with debounce enabled on one of the GPIOs for one of your platforms?
 
-~sanjeev
-
-> 
-> Kevin
-> 
+Kevin
