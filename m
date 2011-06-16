@@ -1,71 +1,56 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 16 Jun 2011 09:07:39 -0700
-Subject: [PATCH 00/14] GPIO: OMAP: first round of cleanup
-In-Reply-To: <20110527032439.GK5032@ponder.secretlab.ca> (Grant Likely's
-	message of "Thu, 26 May 2011 21:24:39 -0600")
-References: <1305904497-26013-1-git-send-email-khilman@ti.com>
-	<20110527032439.GK5032@ponder.secretlab.ca>
-Message-ID: <87r56trc8k.fsf@ti.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Thu, 16 Jun 2011 21:43:07 +0530
+Subject: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
+In-Reply-To: <877h8lsswk.fsf@ti.com>
+References: <1308229940-27025-1-git-send-email-premi@ti.com>
+	<877h8lsswk.fsf@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D563E79@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Grant Likely <grant.likely@secretlab.ca> writes:
+> -----Original Message-----
+> From: Hilman, Kevin 
+> Sent: Thursday, June 16, 2011 8:52 PM
+> To: Premi, Sanjeev
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
+> 
+> Hi Sanjeev,
+> 
+> Sanjeev Premi <premi@ti.com> writes:
+> 
+> > When multiple wakeup sources are defined in a system,
+> > there is a small window, when more than one source
+> > can trigger wakeup interrupt.
+> >
+> > In the current implementation, the do-while() loop
+> > can handle all wakeup sources that are recorded when
+> > probing the status register in prcm_interrupt_handler().
+> >
+> > When the ISR executes due to next queued wakeup, it
+> > there is nothing to be handled and value of "c" is 0.
+> 
+> Thanks for tracking this one down.
+> 
+> However, It's still not clear to me what is happening here.
+> 
+> Why is the IRQ firing if there is nothing to be handled?  
+> That suggests
+> to me that the IRQ status is not properly being cleared.
 
-> On Fri, May 20, 2011 at 05:14:43PM +0200, Kevin Hilman wrote:
->> Start moving SoC-specific register handling out of the driver by passing
->> in register offsets in via platform data.
->> 
->> Also, move OMAP1 MPUIO IRQ handling over to genric IRQ chip.
->> 
->> Applies on top of Tony's for-next branch (which include's the generic
->> IRQ chip work from tglx) and the OMAP GPIO driver move to
->> drivers/gpio.
->
-> Hey Kevin,
->
-> If you've got a branch with this series in it and tested, then I'd be
-> happy to pull that instead of applying the patches myself.
->
+[SP] On the contrary the IRQ status is actually getting cleared,
+     but there are more than "1" PRCM interrupts queued.
 
-OK, I rebased this on v3.0-rc2 and now it's been through quite a bit
-more testing.
+     The do-while() clears all the interrupt sources that
+     are flagged in the status register.
 
-Here's a branch for you.
+     When the next wakeup interrupt is getting processed, the
+     status register doesn't contain any "source" to handle.
+     and value of "c" is returned as 0.... leading to the
+     warning.
 
-Also FYI, we'll probably have 2nd round of GPIO cleanups/updates and
-runtime PM conversion for the upcoming merge window too.
+~sanjeev
 
-Kevin
-
-The following changes since commit 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
-
-  Linux 3.0-rc3 (2011-06-13 15:29:59 -0700)
-
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/gpio-cleanup
-
-Charulatha V (1):
-      GPIO: OMAP: remove get_gpio_bank()
-
-Kevin Hilman (13):
-      GPIO: OMAP: _clear_gpio_irqbank: fix flushing of posted write
-      GPIO: OMAP: remove MPUIO handling from _clear_gpio_irqbank()
-      GPIO: OMAP: move bank width into struct gpio_bank
-      GPIO: OMAP: _get_gpio_irqbank_mask: replace hard-coded mask with bank->width
-      GPIO: OMAP: replace get_gpio_index() by using bank width
-      GPIO: OMAP: consolidate direction, input, output, remove #ifdefs
-      GPIO: OMAP: consolidate IRQ status handling, remove #ifdefs
-      GPIO: OMAP: conslidate enable/disable of GPIO IRQs, remove ifdefs
-      GPIO: OMAP: convert MPUIO IRQ over to generic irq_chip
-      GPIO: OMAP: remove useless gpio_valid() & check_gpio() checks
-      GPIO: OMAP: cleanup _set_gpio_wakeup(), remove ifdefs
-      GPIO: OMAP: debounce remove SoC specific registers, use pdata
-      GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
-
- arch/arm/mach-omap1/gpio15xx.c         |   22 +
- arch/arm/mach-omap1/gpio16xx.c         |   28 ++
- arch/arm/mach-omap1/gpio7xx.c          |   27 ++
- arch/arm/mach-omap2/gpio.c             |   32 ++
- arch/arm/plat-omap/include/plat/gpio.h |   20 +
- drivers/gpio/gpio-omap.c               |  723 +++++++-------------------------
- 6 files changed, 282 insertions(+), 570 deletions(-)
+> 
+> Kevin
+> 
