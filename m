@@ -1,55 +1,45 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 16 Jun 2011 12:40:30 -0700
-Subject: [RFC] Add Arm cpu topology definition
-In-Reply-To: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-Message-ID: <4DFA5C2E.40507@codeaurora.org>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Thu, 16 Jun 2011 15:46:42 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <4DFA58B4.5030101@ahsoftware.de>
+Message-ID: <Pine.LNX.4.44L0.1106161541260.1697-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2011 01:49 AM, Vincent Guittot wrote:
-> +config SCHED_MC
-> +	bool "Multi-core scheduler support"
-> +	depends on SMP && ARM_CPU_TOPOLOGY
-> +	default n
-> +	help
-> +	  Multi-core scheduler support improves the CPU scheduler's decision
-> +	  making when dealing with multi-core CPU chips at a cost of slightly
-> +	  increased overhead in some places. If unsure say N here.
-> +
-> +config SCHED_SMT
-> +	bool "SMT scheduler support"
-> +	depends on SMP && ARM_CPU_TOPOLOGY
-> +	default n
-> +	help
-> +	  Improves the CPU scheduler's decision making when dealing with
-> +	  MultiThreading at a cost of slightly increased overhead in some
-> +	  places. If unsure say N here.
-> +
+On Thu, 16 Jun 2011, Alexander Holler wrote:
 
-The default is already n so you can drop those two lines.
+> >> I thought the compiler was not allowed to insert
+> >> padding if the natural alignment of the data types didn't require any.
+> >
+> > It's architecture dependent. The alignment of the structure is the maximum alignment
+> > of its members, so it gets to be 8 bytes if there is a 64 bit member in the struct
+> > on most architectures, but 4 bytes on x86.
+> 
+> Hmm, sorry, but that sentence just says something about the alignment of 
+> the structure itself and nothing about the alignment of it's members or 
+> do I understand something wrong?
 
-> +		 * This is a multiprocessor system
-> +		 * multiprocessor format & multiprocessor mode field are set
-> +		 */
-> +
-> +		if (mpidr & (0x1 << 24)) {
-> +			/* core performance interdependency */
-> +			cpuid_topo->thread_id = (mpidr & 0x3);
-> +			cpuid_topo->core_id =  ((mpidr >> 8) & 0xF);
-> +			cpuid_topo->socket_id = ((mpidr >> 16) & 0xFF);
-> +		} else {
-> +			/* normal core interdependency */
-> +			cpuid_topo->thread_id = -1;
-> +			cpuid_topo->core_id = (mpidr & 0x3);
-> +			cpuid_topo->socket_id = ((mpidr >> 8) & 0xF);
-> +		}
-> +
+We're talking about padding, not alignment.  Obviously these two
+concepts are related, since fields with differing alignment
+requirements sometimes force the compiler to insert padding.  But they
+aren't the same thing.
 
-The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
-different vendors may attribute different meaning to these fields if
-they wish. Does that mean this should be a platform_*() function?
+The question is whether gcc will insert padding in a structure that 
+doesn't need it.  The kernel depends on peculiarities of gcc in many 
+ways; basing your strategy on what the C99 spec says is not always a 
+good idea.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+> For me that means that I understand that when packed(,aligned(4)) is 
+> used, it's pretty sure, that there is no padding inbetween the members 
+> of e.g. struct ehci_regs. But without I'm unsure, so I would avoid that.
+> 
+> That aligned(4) is necessary (for ARM) is only a workaround because of 
+> the implementation of readl(), at least that is how I understood the 
+> discussion. But that is discussed elsewhere and don't want to take part 
+> in that discussion (and can't).
+
+Hmmm.  I won't say that ((packed,aligned(4))) is wrong.  But it's not 
+clearly necessary either.
+
+Alan Stern
