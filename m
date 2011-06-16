@@ -1,47 +1,57 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 16 Jun 2011 15:48:48 +0200
-Subject: [RFC] Add Arm cpu topology definition
-In-Reply-To: <20110616132441.GJ14846@anthem.async.com.br>
-References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-	<20110616132441.GJ14846@anthem.async.com.br>
-Message-ID: <BANLkTi=zZsArjjEUoB=w-_1JxyMEr-KK_Q@mail.gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Thu, 16 Jun 2011 15:48:46 +0200
+Subject: [PATCH] ATMEL, AVR32: inline nand partition table access
+In-Reply-To: <4DEC8A56.1030707@atmel.com>
+References: <1306676962-22308-1-git-send-email-dbaryshkov@gmail.com>
+	<1306935129.1097.3.camel@hcegtvedt.norway.atmel.com>
+	<BANLkTi=s4kGg5NKrzNs1nu8S00Ue_Zv8vQ@mail.gmail.com>
+	<4DEC8A56.1030707@atmel.com>
+Message-ID: <20110616134846.GF4581@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2011 15:24, Christian Robottom Reis <kiko@linaro.org> wrote:
-> On Thu, Jun 16, 2011 at 10:49:13AM +0200, Vincent Guittot wrote:
->> @@ -219,6 +219,24 @@ source "kernel/Kconfig.freezer"
->>
->> ?menu "System Type"
->>
->> +config SCHED_MC
->> + ? ? bool "Multi-core scheduler support"
->> + ? ? depends on SMP && ARM_CPU_TOPOLOGY
->> + ? ? default n
->> + ? ? help
->> + ? ? ? Multi-core scheduler support improves the CPU scheduler's decision
->> + ? ? ? making when dealing with multi-core CPU chips at a cost of slightly
->> + ? ? ? increased overhead in some places. If unsure say N here.
->> +
->> +config SCHED_SMT
->> + ? ? bool "SMT scheduler support"
->> + ? ? depends on SMP && ARM_CPU_TOPOLOGY
->> + ? ? default n
->> + ? ? help
->> + ? ? ? Improves the CPU scheduler's decision making when dealing with
->> + ? ? ? MultiThreading at a cost of slightly increased overhead in some
->> + ? ? ? places. If unsure say N here.
->> +
->
-> Quick question: the patch doesn't actually seem to use the SCHED_MC and
-> SCHED_SMT config bits; is that actually correct?
+On 10:05 Mon 06 Jun     , Nicolas Ferre wrote:
+> Le 01/06/2011 16:54, Dmitry Eremin-Solenikov :
+> > On 6/1/11, Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com> wrote:
+> >> On Sun, 2011-05-29 at 17:49 +0400, Dmitry Eremin-Solenikov wrote:
+> >>> Currently atmel_nand driver used by AT91 and AVR32 calls a special
+> >>> callback
+> >>> which return nand partition table and number of partitions. However in all
+> >>> boards this callback returns just static data. So drop this callback and
+> >>> make atmel_nand use partition table provided statically via platform_data.
+> >>>
+> >>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> >>
+> >> Thanks for this update, always nice seeing code being optimized. I
+> >> really can't recall why it was made like this in the first place...
+> >>
+> >> For the AVR32 related parts:
+> >>
+> >> Acked-by: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
+> >>
+> >> <snipp diff>
+> >>
+> >> Will this go through the linux-mtd tree (since it spans two archs) or
+> >> should it go through an arch tree?
+> > 
+> > On one hand, I'd prefer for this to go through the linux-mtd, if noone objects,
+> > as I'd also like to submit several (a pile) patches cleaning up mtd
+> > partitioning, which would depend on this.
+> > 
+> > OTOH, I think there will be a cleanup of AT91 platform, which would bring
+> > lot's of conflicts with this patch, if it goes through linux-mtd.
+> 
+> 
+> I am in favor for a mainline inclusion through linux-mtd tree.
+> 
+> On the AT91 side, we will have to take this inclusion into account to
+> avoid merge conflicts... But as long as this cleanup is not ready yet, I
+> prefer to go forward this way.
+> 
+> For that purpose, that would be good to see this patch in linux-next.
+agreed
 
-The default config of the patch is to disable sched_mc and sched_smt.
-The 1st goal is to let each platform enable and test the feature.
-According to feedback, we could then change the default state of the
-configuration
+Acked-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
 
-> --
-> Christian Robottom Reis ? | [+55] 16 9112 6430 | http://launchpad.net/~kiko
-> Linaro Engineering VP ? ? | [ +1] 612 216 4935 | http://async.com.br/~kiko
->
+Best Regards,
+J.
