@@ -1,46 +1,55 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Thu, 16 Jun 2011 13:42:52 -0300
-Subject: [PATCH] ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
-Message-ID: <1308242572-5158-1-git-send-email-fabio.estevam@freescale.com>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 16 Jun 2011 10:56:24 -0600
+Subject: [RFC PATCH 03/11] dt/irq: add irq_domain_add_simple() helper
+In-Reply-To: <4DFA0D83.6070604@gmail.com>
+References: <20110616042653.29371.2052.stgit@ponder>
+	<20110616044141.29371.76366.stgit@ponder>
+	<4DFA0D83.6070604@gmail.com>
+Message-ID: <20110616165624.GG3795@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LCD on the mx31_3ds board is connected to CSPI1.
+On Thu, Jun 16, 2011 at 09:04:51AM -0500, Rob Herring wrote:
+> Grant,
+> 
+> On 06/15/2011 11:41 PM, Grant Likely wrote:
+> > irq_domain_add_simple() is an easy way to generate an irq translation
+> > domain for simple irq controllers.  It assumes a flat 1:1 mapping from
+> > hardware irq number to an offset of the first linux irq number assigned
+> > to the controller
+> > 
+> > Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
+> > ---
+> >  include/linux/irq.h    |   11 +++++++++
+> >  kernel/irq/irqdomain.c |   58 +++++++++++++++++++++++++++++++++++++++++++++++-
+> >  2 files changed, 68 insertions(+), 1 deletions(-)
+> > 
+> > diff --git a/include/linux/irq.h b/include/linux/irq.h
+> > index a103c01..50830fc 100644
+> > --- a/include/linux/irq.h
+> > +++ b/include/linux/irq.h
+> > @@ -797,6 +797,17 @@ extern unsigned int irq_domain_map(struct irq_domain *domain,
+> >  				   irq_hw_number_t hwirq);
+> >  extern void irq_domain_unmap(struct irq_domain *domain, irq_hw_number_t hw);
+> >  
+> > +struct of_device_id;
+> > +#ifdef CONFIG_OF
+> > +extern void irq_domain_add_simple(struct device_node *controller, int irq_base);
+> > +extern void irq_domain_generate_simple(struct of_device_id *match,
+> 
+> match should be const
 
-Fix the IOMUX settings so that LCD can work.
+yup
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-imx/mach-mx31_3ds.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> > +					u64 phys_base, unsigned int irq_start);
+> > +#else
+> 
+> Empty function for irq_domain_add_simple?
 
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index ab2a626..a6160ee 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -53,11 +53,8 @@ static int mx31_3ds_pins[] = {
- 	MX31_PIN_RXD1__RXD1,
- 	IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO),
- 	/*SPI0*/
--	MX31_PIN_CSPI1_SCLK__SCLK,
--	MX31_PIN_CSPI1_MOSI__MOSI,
--	MX31_PIN_CSPI1_MISO__MISO,
--	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
--	MX31_PIN_CSPI1_SS2__SS2, /* CS for LCD */
-+	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_ALT1),
-+	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_ALT1),
- 	/* SPI 1 */
- 	MX31_PIN_CSPI2_SCLK__SCLK,
- 	MX31_PIN_CSPI2_MOSI__MOSI,
-@@ -690,6 +687,9 @@ static void __init mx31_3ds_init(void)
- 	int ret;
- 
- 	imx31_soc_init();
-+
-+	/* Configure SPI1 IOMUX */
-+	mxc_iomux_set_gpr(MUX_PGP_CSPI_BB, true);
- 
- 	mxc_iomux_setup_multiple_pins(mx31_3ds_pins, ARRAY_SIZE(mx31_3ds_pins),
- 				      "mx31_3ds");
--- 
-1.6.0.4
+Haven't needed it yet.  I'll add it if it comes up.  Honestly, I'm not
+even sure if this patch will survive very long once the IRQ
+controllers start using irq_domains directly.  This is more of an easy
+way to get an irq_domain registration so that DT translations work.
+
+g.
