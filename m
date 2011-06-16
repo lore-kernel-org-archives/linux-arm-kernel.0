@@ -1,72 +1,44 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Thu, 16 Jun 2011 18:12:51 +0900
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110616042044.GA28563@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110613134701.2b23b8d8.kamezawa.hiroyu@jp.fujitsu.com>
-	<20110616042044.GA28563@in.ibm.com>
-Message-ID: <20110616181251.caf484b6.kamezawa.hiroyu@jp.fujitsu.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 16 Jun 2011 11:44:30 +0200
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <20110616085547.GH4935@const.famille.thibault.fr>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+	<20110616085547.GH4935@const.famille.thibault.fr>
+Message-ID: <BANLkTinxz1T7uPAS0u=gth3hAh+SFQkTQQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jun 2011 09:50:44 +0530
-Ankita Garg <ankita@in.ibm.com> wrote:
+On 16 June 2011 10:55, Samuel Thibault <samuel.thibault@ens-lyon.org> wrote:
+> Hello,
+>
+> Vincent Guittot, le Thu 16 Jun 2011 10:49:13 +0200, a ?crit :
+>> The affinity between Arm processors is defined in the MPIDR register.
+>> We can identify which processors are in the same cluster,
+>> and which ones have performance interdependency. The cpu topology
+>> ?of an Arm platform can be set thanks to this register and this topology
+>> is then used by sched_mc and sched_smt.
+>
+> Cool! ?Could you check that the hwloc tool gets also gets this
+> information from userland through /sys, and/or send me the output of the
+> hwloc-gather-topology tool from hwloc so we can add an testcase for
+> this?
+>
 
-> Hi,
-> 
-> On Mon, Jun 13, 2011 at 01:47:01PM +0900, KAMEZAWA Hiroyuki wrote:
-> > On Fri, 27 May 2011 18:01:28 +0530
-> > Ankita Garg <ankita@in.ibm.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > 
-> > I'm sorry if you've answered already.
-> > 
-> > Is memory hotplug is too bad and cannot be enhanced for this purpose ?
-> > 
-> > I wonder
-> >   - make section-size smaller (IIUC, IBM's system has 16MB section size)
-> > 
-> >   - add per section statistics
-> > 
-> >   - add a kind of balloon driver which does software memory offline
-> >     (which means making a contiguous chunk of free pages of section_size
-> >      by page migration) in background with regard to memory usage statistics.
-> >     If system says "need more memory!", balloon driver can online pages.
-> > 
-> > can work for your purpose. It can allow you page isolatation and
-> > controls in 16MB unit.  If you need whole rework of memory hotplug, I think
-> > it's better to rewrite memory hotplug, too.
-> >
-> 
-> Interesting idea, but a few issues -
-> 
-> - Correctly predicting memory pressure is difficult and thereby being
->   able to online the required pages at the right time could be a
->   challenge
+The output of hwloc-gather-topology is :
 
-But it will be required for your purpose, anyway. Isn't it ?
+Machine (phys=0 local=280840KB total=280840KB)
+  Socket #0 (phys=3)
+    Core #0 (phys=0)
+      PU #0 (phys=0)
+    Core #1 (phys=1)
+      PU #1 (phys=1)
+depth 0:        1 Machine (type #1)
+ depth 1:       1 Socket (type #3)
+  depth 2:      2 Cores (type #5)
+   depth 3:     2 PUs (type #6)
+Topology not from this system
 
-> - Memory hotplug is a heavy operation, so the overhead involved may be
->   high
+let me know if it's what you want
 
-soft-offline of small amount of pages will not very heavy.
-compaction and cma patches use the same kind of logic.
-
-
-> - Powering off memory is just one of the ways in which memory power could
->   be saved. The platform can also dynamically transition areas of memory
->   into a  content-preserving lower power state if it is not referenced
->   for a pre-defined threshold of time. In such a case, we would need a
->   mechanism to soft offline the pages - i.e, no new allocations to be
->   directed to that memory
-> 
-
-Hmm, sounds like a similar idea of CleanCache ?
-
-Reusing section is much easier than adding new one.., I think.
-
-Thanks,
--Kame
+> Samuel
+>
