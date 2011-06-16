@@ -1,52 +1,38 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Thu, 16 Jun 2011 18:46:58 +0530
-Subject: [PATCH v4 02/12] omap_hsmmc: use original sg_len for dma_unmap_sg
-In-Reply-To: <1306360653-6196-3-git-send-email-per.forlin@linaro.org>
-References: <1306360653-6196-1-git-send-email-per.forlin@linaro.org>
-	<1306360653-6196-3-git-send-email-per.forlin@linaro.org>
-Message-ID: <BANLkTinWzJ22NrVGofSNvgOcQePD1BKAuA@mail.gmail.com>
+From: kiko@linaro.org (Christian Robottom Reis)
+Date: Thu, 16 Jun 2011 10:24:41 -0300
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+Message-ID: <20110616132441.GJ14846@anthem.async.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 3:27 AM, Per Forlin <per.forlin@linaro.org> wrote:
-> Don't use the returned sg_len from dma_map_sg() as inparameter
-> to dma_unmap_sg(). Use the original sg_len for both dma_map_sg
-> and dma_unmap_sg.
->
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> ---
-> ?drivers/mmc/host/omap_hsmmc.c | ? ?5 +++--
-> ?1 files changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 259ece0..ad3731a 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -959,7 +959,8 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
-> ? ? ? ?spin_unlock(&host->irq_lock);
->
-> ? ? ? ?if (host->use_dma && dma_ch != -1) {
-> - ? ? ? ? ? ? ? dma_unmap_sg(mmc_dev(host->mmc), host->data->sg, host->dma_len,
-> + ? ? ? ? ? ? ? dma_unmap_sg(mmc_dev(host->mmc), host->data->sg,
-> + ? ? ? ? ? ? ? ? ? ? ? host->data->sg_len,
-> ? ? ? ? ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, host->data));
-> ? ? ? ? ? ? ? ?omap_free_dma(dma_ch);
-> ? ? ? ?}
-> @@ -1343,7 +1344,7 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
-> ? ? ? ? ? ? ? ?return;
-> ? ? ? ?}
->
-> - ? ? ? dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
-> + ? ? ? dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
-> ? ? ? ? ? ? ? ?omap_hsmmc_get_dma_dir(host, data));
->
-> ? ? ? ?req_in_progress = host->req_in_progress;
-> --
-> 1.7.4.1
->
+On Thu, Jun 16, 2011 at 10:49:13AM +0200, Vincent Guittot wrote:
+> @@ -219,6 +219,24 @@ source "kernel/Kconfig.freezer"
+> 
+>  menu "System Type"
+> 
+> +config SCHED_MC
+> +	bool "Multi-core scheduler support"
+> +	depends on SMP && ARM_CPU_TOPOLOGY
+> +	default n
+> +	help
+> +	  Multi-core scheduler support improves the CPU scheduler's decision
+> +	  making when dealing with multi-core CPU chips at a cost of slightly
+> +	  increased overhead in some places. If unsure say N here.
+> +
+> +config SCHED_SMT
+> +	bool "SMT scheduler support"
+> +	depends on SMP && ARM_CPU_TOPOLOGY
+> +	default n
+> +	help
+> +	  Improves the CPU scheduler's decision making when dealing with
+> +	  MultiThreading at a cost of slightly increased overhead in some
+> +	  places. If unsure say N here.
+> +
 
-Reviewed-by: Venkatraman S <svenkatr@ti.com>
-
-Perhaps this doesn't belong to $FEATURE and can be posted as a separate patch ?
-Thanks,
-Venkat.
+Quick question: the patch doesn't actually seem to use the SCHED_MC and
+SCHED_SMT config bits; is that actually correct?
+-- 
+Christian Robottom Reis   | [+55] 16 9112 6430 | http://launchpad.net/~kiko
+Linaro Engineering VP     | [ +1] 612 216 4935 | http://async.com.br/~kiko
