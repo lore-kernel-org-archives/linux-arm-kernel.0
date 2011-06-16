@@ -1,54 +1,60 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 16 Jun 2011 15:34:29 +0400
-Subject: [PATCH] arm mach-s3c2440 mach-mini2440: New LCD-W35i support
-In-Reply-To: <4DF7C50A.7060602@solonet.org.ua>
-References: <4DF7C50A.7060602@solonet.org.ua>
-Message-ID: <4DF9EA45.3020101@ru.mvista.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 16 Jun 2011 19:51:13 +0800
+Subject: [PATCH v2 5/6] ARM: mxc: all three imx51 TOs use TO1 version of
+	sdma script
+In-Reply-To: <20110616073018.GF23771@pengutronix.de>
+References: <1307950645-26529-6-git-send-email-shawn.guo@linaro.org>
+	<1308032407-3860-1-git-send-email-shawn.guo@linaro.org>
+	<20110614203809.GA23771@pengutronix.de>
+	<20110615042948.GB31712@S2100-06.ap.freescale.net>
+	<20110616073018.GF23771@pengutronix.de>
+Message-ID: <20110616115112.GA9605@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Jun 16, 2011 at 09:30:18AM +0200, Sascha Hauer wrote:
+> On Wed, Jun 15, 2011 at 12:29:49PM +0800, Shawn Guo wrote:
+> > On Tue, Jun 14, 2011 at 10:38:09PM +0200, Sascha Hauer wrote:
+> > > On Tue, Jun 14, 2011 at 02:20:07PM +0800, Shawn Guo wrote:
+> > > > Though there are three TOs of imx51 soc, the sdma script never
+> > > > changes since TO1, which means all three TOs of imx51 uses TO1
+> > > > version of sdma script.
+> > > > 
+> > > > The current code passes TO number to imx-sdma driver to load
+> > > > different firmware for different TO.  That means we have to prepare
+> > > > 3 identical firmwares, sdma-imx51-to1.bin sdma-imx51-to2.bin and
+> > > > sdma-imx51-to3.bin, to have the kernel capable of running on all
+> > > > three TOs.  This just makes no sense.
+> > > > 
+> > > > The patch removes the TO number passing and get the default TO1
+> > > > version of sdma firmware work for all TOs.
+> > > 
+> > > I don't agree to this approach. The SDMA firmware has been different on
+> > > all TO versions of earlier i.MXs. For the linearity of the universe we
+> > > should keep this. What about providing a link in userspace?
+> > > 
+> > The fact is that mx31 and mx35 are the only two SoCs (relatively old
+> > ones) that have different SDMA firmwares on different TOs.  The
+> > relatively new ones, mx25 (TO1, TO1.1), mx50 (TO1, TO1.1), mx51
+> > (TO1, TO2, TO3) and mx53 (TO1, TO2) all have one version SDMA
+> > firmware for different TOs.  I do not see the mx31/35 case is a
+> > linearity of the universe.  Do we really want to bother ourselves
+> > with userspace link on so many latest SoCs?
+> 
+> Ok, then let's do it differently. Let's go away from "sdma-%s-to%d.bin"
+> in the sdma driver and pass the string from platform data instead.
+> Then we can pass the TO version where it's relevant and skip it where
+> only one firmware exists. Using a sdma-imx51-to1.bin for to2 and to3
 
-On 15-06-2011 0:31, Denis Kuzmenko wrote:
+That means the sdma firmware dose not change since to1, confusing?
+But I'm fine with your idea, so okay, drop the patch from the series,
+and let's address this issue with another patch.
 
->> Need an empty line here...
->> Your patch is line wrapped. Seems easy to fix though...
+Other patches look good to be applied?
 
-> Thank you. Is the patch below okay?
+> is confusing.
+> 
 
-    Not yet. :-)
-
-> From: Denis Kuzmenko <dart@solonet.org.ua>
-
-> LCD-W35i support for Mini2440 development board
-
-    Your signoff needs to be here. Sorry -- didn't notice the first time.
-
-> --- linux-2.6.39.1/arch/arm/mach-s3c2440/mach-mini2440.c 2011-06-03
-> 03:34:20.000000000 +0300
-> +++ linux-2.6.39.1-dart/arch/arm/mach-s3c2440/mach-mini2440.c 2011-06-13
-> 23:37:38.785984118 +0300
-> @@ -167,6 +167,20 @@ static struct s3c2410fb_display mini2440
-> .lcdcon5 = (S3C2410_LCDCON5_FRM565 |
-> S3C2410_LCDCON5_HWSWP),
-> },
-> + /* LCD-W35i 3.5" display (LQ035Q1DG06)*/
-> + [3] = {
-> + _LCD_DECLARE(
-> + 7, /* clock */
-> + 320, 68, 66, 4, /* xres, margin_right, margin_left, hsync */
-> + 240, 4, 4, 9, /* yres, margin_top, margin_bottom, vsync */
-> + 60), /* refresh rate */
-> + .lcdcon5 = (S3C2410_LCDCON5_FRM565 |
-> + S3C2410_LCDCON5_INVVDEN |
-> + S3C2410_LCDCON5_INVVFRAME |
-> + S3C2410_LCDCON5_INVVLINE |
-> + S3C2410_LCDCON5_INVVCLK |
-> + S3C2410_LCDCON5_HWSWP),
-> + },
-> };
-
-    The patch has all tabs converted to spaces. Didn't notice it the first 
-time as well... :-/
-
-WBR, Sergei
+-- 
+Regards,
+Shawn
