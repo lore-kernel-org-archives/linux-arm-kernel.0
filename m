@@ -1,76 +1,46 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 16 Jun 2011 10:26:04 -0600
-Subject: [PATCH 00/14] GPIO: OMAP: first round of cleanup
-In-Reply-To: <87r56trc8k.fsf@ti.com>
-References: <1305904497-26013-1-git-send-email-khilman@ti.com>
-	<20110527032439.GK5032@ponder.secretlab.ca> <87r56trc8k.fsf@ti.com>
-Message-ID: <20110616162604.GE3795@ponder.secretlab.ca>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 16 Jun 2011 13:42:52 -0300
+Subject: [PATCH] ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
+Message-ID: <1308242572-5158-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 09:07:39AM -0700, Kevin Hilman wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
-> 
-> > On Fri, May 20, 2011 at 05:14:43PM +0200, Kevin Hilman wrote:
-> >> Start moving SoC-specific register handling out of the driver by passing
-> >> in register offsets in via platform data.
-> >> 
-> >> Also, move OMAP1 MPUIO IRQ handling over to genric IRQ chip.
-> >> 
-> >> Applies on top of Tony's for-next branch (which include's the generic
-> >> IRQ chip work from tglx) and the OMAP GPIO driver move to
-> >> drivers/gpio.
-> >
-> > Hey Kevin,
-> >
-> > If you've got a branch with this series in it and tested, then I'd be
-> > happy to pull that instead of applying the patches myself.
-> >
-> 
-> OK, I rebased this on v3.0-rc2 and now it's been through quite a bit
-> more testing.
-> 
-> Here's a branch for you.
+The LCD on the mx31_3ds board is connected to CSPI1.
 
-Thanks.  A minor comment though...
+Fix the IOMUX settings so that LCD can work.
 
-> 
-> Also FYI, we'll probably have 2nd round of GPIO cleanups/updates and
-> runtime PM conversion for the upcoming merge window too.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/mach-imx/mach-mx31_3ds.c |   10 +++++-----
+ 1 files changed, 5 insertions(+), 5 deletions(-)
 
-Okay.
-
-> 
-> Kevin
-> 
-> The following changes since commit 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
-> 
->   Linux 3.0-rc3 (2011-06-13 15:29:59 -0700)
-> 
-> are available in the git repository at:
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/gpio-cleanup
-> 
-> Charulatha V (1):
->       GPIO: OMAP: remove get_gpio_bank()
-> 
-> Kevin Hilman (13):
->       GPIO: OMAP: _clear_gpio_irqbank: fix flushing of posted write
->       GPIO: OMAP: remove MPUIO handling from _clear_gpio_irqbank()
->       GPIO: OMAP: move bank width into struct gpio_bank
->       GPIO: OMAP: _get_gpio_irqbank_mask: replace hard-coded mask with bank->width
->       GPIO: OMAP: replace get_gpio_index() by using bank width
->       GPIO: OMAP: consolidate direction, input, output, remove #ifdefs
->       GPIO: OMAP: consolidate IRQ status handling, remove #ifdefs
->       GPIO: OMAP: conslidate enable/disable of GPIO IRQs, remove ifdefs
->       GPIO: OMAP: convert MPUIO IRQ over to generic irq_chip
->       GPIO: OMAP: remove useless gpio_valid() & check_gpio() checks
->       GPIO: OMAP: cleanup _set_gpio_wakeup(), remove ifdefs
->       GPIO: OMAP: debounce remove SoC specific registers, use pdata
->       GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
-
-Use this form for the patch summaries please: "gpio/omap: ...."
-
-It's better for the pull req to Linus when all the gpio patches look the same.
-
-Thanks,
-g.
+diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+index ab2a626..a6160ee 100644
+--- a/arch/arm/mach-imx/mach-mx31_3ds.c
++++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+@@ -53,11 +53,8 @@ static int mx31_3ds_pins[] = {
+ 	MX31_PIN_RXD1__RXD1,
+ 	IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO),
+ 	/*SPI0*/
+-	MX31_PIN_CSPI1_SCLK__SCLK,
+-	MX31_PIN_CSPI1_MOSI__MOSI,
+-	MX31_PIN_CSPI1_MISO__MISO,
+-	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
+-	MX31_PIN_CSPI1_SS2__SS2, /* CS for LCD */
++	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_ALT1),
++	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_ALT1),
+ 	/* SPI 1 */
+ 	MX31_PIN_CSPI2_SCLK__SCLK,
+ 	MX31_PIN_CSPI2_MOSI__MOSI,
+@@ -690,6 +687,9 @@ static void __init mx31_3ds_init(void)
+ 	int ret;
+ 
+ 	imx31_soc_init();
++
++	/* Configure SPI1 IOMUX */
++	mxc_iomux_set_gpr(MUX_PGP_CSPI_BB, true);
+ 
+ 	mxc_iomux_setup_multiple_pins(mx31_3ds_pins, ARRAY_SIZE(mx31_3ds_pins),
+ 				      "mx31_3ds");
+-- 
+1.6.0.4
