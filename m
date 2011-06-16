@@ -1,29 +1,52 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 16 Jun 2011 08:16:28 -0700
-Subject: [PATCH 1/2] amba pl011: workaround for uart registers lockup
-In-Reply-To: <BANLkTikSEVCGGsjF_fTCNZsmjvGoic5u=Q@mail.gmail.com>
-References: <1307952693-25232-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTikSEVCGGsjF_fTCNZsmjvGoic5u=Q@mail.gmail.com>
-Message-ID: <20110616151628.GA30881@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 16 Jun 2011 17:21:27 +0200
+Subject: Dynamic patching in discarded sections
+In-Reply-To: <alpine.LFD.2.00.1106080946000.2142@xanadu.home>
+References: <201106081123.59414.arnd@arndb.de>
+	<alpine.LFD.2.00.1106080946000.2142@xanadu.home>
+Message-ID: <201106161721.27330.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 10:17:51AM +0200, Linus Walleij wrote:
-> On Mon, Jun 13, 2011 at 10:11 AM, Linus Walleij
-> <linus.walleij@stericsson.com> wrote:
+On Wednesday 08 June 2011, Nicolas Pitre wrote:
+> Dave Martin proposed an extension to gas here (also sent to 
+> binutils at sourceware.org):
 > 
-> > From: Shreshtha Kumar Sahu <shreshthakumar.sahu@stericsson.com>
-> >
-> > This workaround aims to break the deadlock situation
-> > which raises during continuous transfer of data for long
-> > duration over uart with hardware flow control. It is
-> > observed that CTS interrupt cannot be cleared in uart
-> > interrupt register (ICR). Hence further transfer over
-> > uart gets blocked.
+> http://article.gmane.org/gmane.linux.linaro.toolchain/701
 > 
-> Ping on this, Greg have you picked these two for the tty next tree?
+> But as far as I know, nothing further happened. And this is not an ARM 
+> specific issue either as the X86 alternates have the same problem.
 
-They are in my "to-apply" queue, and not lost, but been busy with "real
-work" lately, so have been slow to get to them, sorry.
+Ah, yes. That would be really nice to have. Dave, do you still have hopes
+that this patch gets merged?
 
-greg k-h
+> > I don't know if the same problem exists in other places in the code, but it's
+> > entirely possible. I also couldn't think of a good solution for this, short of
+> > moving the definition of dma_unmap_single() to out of line code.
+> 
+> Probably the best interim solution would be:
+> 
+> diff --git a/arch/arm/kernel/vmlinux.lds.S b/arch/arm/kernel/vmlinux.lds.S
+> index dfbb377..f231c92 100644
+> --- a/arch/arm/kernel/vmlinux.lds.S
+> +++ b/arch/arm/kernel/vmlinux.lds.S
+> @@ -21,7 +21,8 @@
+>  #define ARM_CPU_KEEP(x)
+>  #endif
+>  
+> -#if defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)
+> +#if (defined(CONFIG_SMP_ON_UP) && !defined(CONFIG_DEBUG_SPINLOCK)) || \
+> +    defined(CONFIG_ARM_PATCH_PHYS_VIRT)
+>  #define ARM_EXIT_KEEP(x)       x
+>  #else
+>  #define ARM_EXIT_KEEP(x)
+> 
+> But clearly the toolchain should be more accommodating instead.
+> 
+
+10000 randconfig kernel build later without that patch, I'm rather sure
+that there is only a single driver that is suffering from this. While your
+patch absolutely makes sense, a less invasive workaround would be to just
+not mark mmc_spi_remove as __devexit until Dave's patch gets in.
+
+	Arnd
