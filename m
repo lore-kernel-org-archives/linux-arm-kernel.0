@@ -1,109 +1,32 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 16 Jun 2011 17:30:02 +0900
-Subject: [PATCH 1/2] Samsung SoC ADC: use regulator (VDD for ADC).
-Message-ID: <1308213003-6526-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 16 Jun 2011 17:33:04 +0900
+Subject: [PATCH] Samsung SoC ADC: register address definition for
+	S5PV210/S5PC110/Exynos4
+In-Reply-To: <1308213003-6526-2-git-send-email-myungjoo.ham@samsung.com>
+References: <1308213003-6526-2-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1308213184-6607-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the Samsung ADC driver to enable VDD regulator at
-probe and resume and to disable at exit and suspend.
-In a platform where ADC's VDD regulator is not "always-on", this control
-is required although this patch does not provide fine-grained power
-control (turning on the regulator only when being accessed).
-
-However, if VDD regulator ("vdd" for the adc device) is not provided,
-the regulator control will not be activated because there are platforms
-that do not provide regulator for ADC device.
+ADCMUX register is added.
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/adc.c |   20 +++++++++++++++++++-
- 1 files changed, 19 insertions(+), 1 deletions(-)
+ arch/arm/plat-samsung/include/plat/regs-adc.h |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index e8f2be2..a8499d8 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
+diff --git a/arch/arm/plat-samsung/include/plat/regs-adc.h b/arch/arm/plat-samsung/include/plat/regs-adc.h
+index 7554c4f..035e8c3 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-adc.h
++++ b/arch/arm/plat-samsung/include/plat/regs-adc.h
 @@ -21,6 +21,7 @@
- #include <linux/clk.h>
- #include <linux/interrupt.h>
- #include <linux/io.h>
-+#include <linux/regulator/consumer.h>
+ #define S3C2410_ADCDAT1	   S3C2410_ADCREG(0x10)
+ #define S3C64XX_ADCUPDN		S3C2410_ADCREG(0x14)
+ #define S3C64XX_ADCCLRINT	S3C2410_ADCREG(0x18)
++#define S5P_ADCMUX		S3C2410_ADCREG(0x1C)
+ #define S3C64XX_ADCCLRINTPNDNUP	S3C2410_ADCREG(0x20)
  
- #include <plat/regs-adc.h>
- #include <plat/adc.h>
-@@ -59,6 +60,8 @@ struct s3c_adc_client {
- 			      unsigned *samples_left);
- };
  
-+#define S3C_ADC_REGULATOR_NAME		"vdd"
-+
- struct adc_device {
- 	struct platform_device	*pdev;
- 	struct platform_device	*owner;
-@@ -71,6 +74,7 @@ struct adc_device {
- 	unsigned int		 prescale;
- 
- 	int			 irq;
-+	struct regulator	*vdd;
- };
- 
- static struct adc_device *adc_dev;
-@@ -338,6 +342,12 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	adc->pdev = pdev;
- 	adc->prescale = S3C2410_ADCCON_PRSCVL(49);
- 
-+	adc->vdd = regulator_get(dev, S3C_ADC_REGULATOR_NAME);
-+	if (IS_ERR_OR_NULL(adc->vdd)) {
-+		dev_dbg(dev, "operating without regulator %s.\n", S3C_ADC_REGULATOR_NAME);
-+		adc->vdd = NULL; /* Do not control regulator */
-+	}
-+
- 	adc->irq = platform_get_irq(pdev, 1);
- 	if (adc->irq <= 0) {
- 		dev_err(dev, "failed to get adc irq\n");
-@@ -372,6 +382,8 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 		goto err_clk;
- 	}
- 
-+	if (adc->vdd)
-+		regulator_enable(adc->vdd);
- 	clk_enable(adc->clk);
- 
- 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
-@@ -406,6 +418,8 @@ static int __devexit s3c_adc_remove(struct platform_device *pdev)
- 	iounmap(adc->regs);
- 	free_irq(adc->irq, adc);
- 	clk_disable(adc->clk);
-+	if (adc->vdd)
-+		regulator_disable(adc->vdd);
- 	clk_put(adc->clk);
- 	kfree(adc);
- 
-@@ -428,6 +442,8 @@ static int s3c_adc_suspend(struct platform_device *pdev, pm_message_t state)
- 	disable_irq(adc->irq);
- 	spin_unlock_irqrestore(&adc->lock, flags);
- 	clk_disable(adc->clk);
-+	if (adc->vdd)
-+		regulator_disable(adc->vdd);
- 
- 	return 0;
- }
-@@ -436,6 +452,8 @@ static int s3c_adc_resume(struct platform_device *pdev)
- {
- 	struct adc_device *adc = platform_get_drvdata(pdev);
- 
-+	if (adc->vdd)
-+		regulator_enable(adc->vdd);
- 	clk_enable(adc->clk);
- 	enable_irq(adc->irq);
- 
-@@ -485,4 +503,4 @@ static int __init adc_init(void)
- 	return ret;
- }
- 
--arch_initcall(adc_init);
-+module_init(adc_init);
 -- 
 1.7.4.1
