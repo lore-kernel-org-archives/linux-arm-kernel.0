@@ -1,49 +1,167 @@
-From: list@solonet.org.ua (Denis Kuzmenko)
-Date: Thu, 16 Jun 2011 21:35:05 +0300
-Subject: [PATCH] arm mach-s3c2440 mach-mini2440: New LCD-W35i support
-In-Reply-To: <4DF9EA45.3020101@ru.mvista.com>
-References: <4DF7C50A.7060602@solonet.org.ua> <4DF9EA45.3020101@ru.mvista.com>
-Message-ID: <4DFA4CD9.9070601@solonet.org.ua>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 16 Jun 2011 20:06:35 +0100
+Subject: [RFC PATCH 07/16] ARM: local timers: move OMAP4 to
+	LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+In-Reply-To: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
+References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1308251204-16719-8-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2011 02:34 PM, Sergei Shtylyov wrote:
-> Hello.
-> Your signoff needs to be here. Sorry -- didn't notice the first time.
-> The patch has all tabs converted to spaces. Didn't notice it the first
-> time as well... :-/
+Convert the OMAP4 platforms to use the new arm_smp_twd driver.
+Add the platform device and register it as early platform device.
 
-Thanks for comments. How about this one?
+Tested on a Pandaboard.
 
-From: Denis Kuzmenko <dart@solonet.org.ua>
-Date: 2011-06-16 21:30:00 +0300
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/mach-omap2/Kconfig     |    3 +-
+ arch/arm/mach-omap2/Makefile    |    1 -
+ arch/arm/mach-omap2/timer-gp.c  |   40 ++++++++++++++++++++++++++++++++------
+ arch/arm/mach-omap2/timer-mpu.c |   40 ---------------------------------------
+ 4 files changed, 35 insertions(+), 49 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
 
-LCD-W35i support for Mini2440 development board
-
-Signed-off-by: Denis Kuzmenko <dart@solonet.org.ua>
-
---- linux-2.6.39.1/arch/arm/mach-s3c2440/mach-mini2440.c	2011-06-03 
-03:34:20.000000000 +0300
-+++ linux-2.6.39.1-dart/arch/arm/mach-s3c2440/mach-mini2440.c	2011-06-13 
-23:37:38.785984118 +0300
-@@ -167,6 +167,20 @@ static struct s3c2410fb_display mini2440
-  		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-  				   S3C2410_LCDCON5_HWSWP),
-  	},
-+	/* LCD-W35i 3.5" display (LQ035Q1DG06)*/
-+	[3] = {
-+		_LCD_DECLARE(
-+			7,		/* clock */
-+			320, 68, 66, 4,	/* xres, margin_right, margin_left, hsync */
-+			240, 4, 4, 9,	/* yres, margin_top, margin_bottom, vsync */
-+			60),		/* refresh rate */
-+		.lcdcon5	= (S3C2410_LCDCON5_FRM565 |
-+				   S3C2410_LCDCON5_INVVDEN |
-+				   S3C2410_LCDCON5_INVVFRAME |
-+				   S3C2410_LCDCON5_INVVLINE |
-+				   S3C2410_LCDCON5_INVVCLK |
-+				   S3C2410_LCDCON5_HWSWP),
+diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
+index 19d5891..805d7b9 100644
+--- a/arch/arm/mach-omap2/Kconfig
++++ b/arch/arm/mach-omap2/Kconfig
+@@ -44,7 +44,8 @@ config ARCH_OMAP4
+ 	depends on ARCH_OMAP2PLUS
+ 	select CPU_V7
+ 	select ARM_GIC
+-	select LOCAL_TIMERS if SMP
++	select LOCAL_TIMER_DEVICES if SMP
++	select ARM_SMP_TWD
+ 	select PL310_ERRATA_588369
+ 	select PL310_ERRATA_727915
+ 	select ARM_ERRATA_720789
+diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
+index b148077..f48c989 100644
+--- a/arch/arm/mach-omap2/Makefile
++++ b/arch/arm/mach-omap2/Makefile
+@@ -22,7 +22,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
+ 
+ # SMP support ONLY available for OMAP4
+ obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
+-obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
+ obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
+ obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
+ 
+diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
+index 3b9cf85..f2f0db6 100644
+--- a/arch/arm/mach-omap2/timer-gp.c
++++ b/arch/arm/mach-omap2/timer-gp.c
+@@ -35,10 +35,10 @@
+ #include <linux/irq.h>
+ #include <linux/clocksource.h>
+ #include <linux/clockchips.h>
++#include <linux/platform_device.h>
+ 
+ #include <asm/mach/time.h>
+ #include <plat/dmtimer.h>
+-#include <asm/localtimer.h>
+ #include <asm/sched_clock.h>
+ #include <plat/common.h>
+ #include <plat/omap_hwmod.h>
+@@ -247,18 +247,44 @@ static void __init omap2_gp_clocksource_init(void)
+ }
+ #endif
+ 
++#ifdef CONFIG_ARM_SMP_TWD
++static struct resource omap2_gp_twd_resources[] = {
++	{
++		.start	= OMAP44XX_LOCAL_TWD_BASE,
++		.end	= OMAP44XX_LOCAL_TWD_BASE + 0x10,
++		.flags	= IORESOURCE_MEM,
 +	},
-  };
-
-  /* todo - put into gpio header */
++	{
++		.start	= OMAP44XX_IRQ_LOCALTIMER,
++		.end	= OMAP44XX_IRQ_LOCALTIMER,
++		.flags	= IORESOURCE_IRQ,
++	},
++};
++
++static struct platform_device omap2_gp_twd_device = {
++	.name		= "arm_smp_twd",
++	.id		= -1,
++	.resource	= omap2_gp_twd_resources,
++	.num_resources	= ARRAY_SIZE(omap2_gp_twd_resources),
++};
++
++static struct platform_device *omap2_gp_early_devices[] = {
++	&omap2_gp_twd_device,
++};
++#endif
++
+ static void __init omap2_gp_timer_init(void)
+ {
+-#ifdef CONFIG_LOCAL_TIMERS
+-	if (cpu_is_omap44xx()) {
+-		twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
+-		BUG_ON(!twd_base);
+-	}
+-#endif
+ 	omap_dm_timer_init();
+ 
+ 	omap2_gp_clockevent_init();
+ 	omap2_gp_clocksource_init();
++#ifdef CONFIG_ARM_SMP_TWD
++	/* Local timers are not supprted on OMAP4430 ES1.0 */
++	if (omap_rev() != OMAP4430_REV_ES1_0)
++		early_platform_add_devices(omap2_gp_early_devices,
++					   ARRAY_SIZE(omap2_gp_early_devices));
++#endif
+ }
+ 
+ struct sys_timer omap_timer = {
+diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
+deleted file mode 100644
+index 1fd5ca5..0000000
+--- a/arch/arm/mach-omap2/timer-mpu.c
++++ /dev/null
+@@ -1,40 +0,0 @@
+-/*
+- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
+- * own timer in it's MPU domain. These timers will be driving the
+- * linux kernel SMP tick framework when active. These timers are not
+- * part of the wake up domain.
+- *
+- * Copyright (C) 2009 Texas Instruments, Inc.
+- *
+- * Author:
+- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
+- *
+- * This file is based on arm realview smp platform file.
+- * Copyright (C) 2002 ARM Ltd.
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-#include <linux/init.h>
+-#include <linux/smp.h>
+-#include <linux/clockchips.h>
+-#include <asm/irq.h>
+-#include <asm/smp_twd.h>
+-#include <asm/localtimer.h>
+-#include <asm/hardware/gic.h>
+-
+-/*
+- * Setup the local clock events for a CPU.
+- */
+-int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-{
+-	/* Local timers are not supprted on OMAP4430 ES1.0 */
+-	if (omap_rev() == OMAP4430_REV_ES1_0)
+-		return -ENXIO;
+-
+-	evt->irq = gic_ppi_to_vppi(OMAP44XX_IRQ_LOCALTIMER);
+-	twd_timer_setup(evt);
+-	return 0;
+-}
+-
+-- 
+1.7.0.4
