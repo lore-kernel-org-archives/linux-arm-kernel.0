@@ -1,126 +1,50 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 15 Jun 2011 22:41:55 -0600
-Subject: [RFC PATCH 04/11] dt: add of_platform_populate() for creating device
-	from the device tree
+Date: Wed, 15 Jun 2011 22:42:04 -0600
+Subject: [RFC PATCH 05/11] dt: Add default match table for bus ids
 In-Reply-To: <20110616042653.29371.2052.stgit@ponder>
 References: <20110616042653.29371.2052.stgit@ponder>
-Message-ID: <20110616044150.29371.19347.stgit@ponder>
+Message-ID: <20110616044200.29371.80953.stgit@ponder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-of_platform_populate() is similar to of_platform_bus_probe() except
-that it strictly enforces that all device nodes must have a compatible
-property, and it can be used to register devices (not buses) which are
-children of the root node.
+No need for most platforms to define their own bus table when calling
+of_platform_populate().  Supply a stock one.
 
 Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- drivers/of/platform.c       |   54 +++++++++++++++++++++++++++++++++++++++---
- include/linux/of_platform.h |    3 ++
- 2 files changed, 53 insertions(+), 4 deletions(-)
+ drivers/of/platform.c       |    8 ++++++++
+ include/linux/of_platform.h |    2 ++
+ 2 files changed, 10 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 63d3cb7..9b785be 100644
+index 9b785be..1f4a5d3 100644
 --- a/drivers/of/platform.c
 +++ b/drivers/of/platform.c
-@@ -221,19 +221,26 @@ EXPORT_SYMBOL(of_platform_device_create);
-  */
- static int of_platform_bus_create(struct device_node *bus,
- 				  const struct of_device_id *matches,
--				  struct device *parent)
-+				  struct device *parent, bool strict)
+@@ -22,6 +22,14 @@
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ 
++const struct of_device_id of_default_bus_match_table[] = {
++	{ .compatible = "simple-bus", },
++#ifdef CONFIG_ARM_AMBA
++	{ .compatible = "arm,amba-bus", },
++#endif /* CONFIG_ARM_AMBA */
++	{} /* Empty terminated list */
++};
++
+ static int of_dev_node_match(struct device *dev, void *data)
  {
- 	struct device_node *child;
- 	struct platform_device *dev;
- 	int rc = 0;
- 
-+	/* Make sure it has a compatible property */
-+	if (strict && (!of_get_property(bus, "compatible", NULL))) {
-+		pr_debug("%s() - skipping %s, no compatible prop\n",
-+			 __func__, bus->full_name);
-+		return 0;
-+	}
-+
- 	dev = of_platform_device_create(bus, NULL, parent);
- 	if (!dev || !of_match_node(matches, bus))
- 		return 0;
- 
- 	for_each_child_of_node(bus, child) {
- 		pr_debug("   create child: %s\n", child->full_name);
--		rc = of_platform_bus_create(child, matches, &dev->dev);
-+		rc = of_platform_bus_create(child, matches, &dev->dev, strict);
- 		if (rc) {
- 			of_node_put(child);
- 			break;
-@@ -267,11 +274,11 @@ int of_platform_bus_probe(struct device_node *root,
- 
- 	/* Do a self check of bus type, if there's a match, create children */
- 	if (of_match_node(matches, root)) {
--		rc = of_platform_bus_create(root, matches, parent);
-+		rc = of_platform_bus_create(root, matches, parent, false);
- 	} else for_each_child_of_node(root, child) {
- 		if (!of_match_node(matches, child))
- 			continue;
--		rc = of_platform_bus_create(child, matches, parent);
-+		rc = of_platform_bus_create(child, matches, parent, false);
- 		if (rc)
- 			break;
- 	}
-@@ -280,4 +287,43 @@ int of_platform_bus_probe(struct device_node *root,
- 	return rc;
- }
- EXPORT_SYMBOL(of_platform_bus_probe);
-+
-+/**
-+ * of_platform_populate() - Populate platform_devices from device tree data
-+ * @root: parent of the first level to probe or NULL for the root of the tree
-+ * @matches: match table, NULL to use the default
-+ * @parent: parent to hook devices from, NULL for toplevel
-+ *
-+ * Similar to of_platform_bus_probe(), this function walks the device tree
-+ * and creates devices from nodes.  It differs in that it follows the modern
-+ * convention of requiring all device nodes to have a 'compatible' property,
-+ * and it is suitable for creating devices which are children of the root
-+ * node (of_platform_bus_probe will only create children of the root which
-+ * are selected by the @matches argument).
-+ *
-+ * New board support should be using this function instead of
-+ * of_platform_bus_probe().
-+ *
-+ * Returns 0 on success, < 0 on failure.
-+ */
-+int of_platform_populate(struct device_node *root,
-+			const struct of_device_id *matches,
-+			struct device *parent)
-+{
-+	struct device_node *child;
-+	int rc = 0;
-+
-+	root = root ? of_node_get(root) : of_find_node_by_path("/");
-+	if (!root)
-+		return -EINVAL;
-+
-+	for_each_child_of_node(root, child) {
-+		rc = of_platform_bus_create(child, matches, parent, true);
-+		if (rc)
-+			break;
-+	}
-+
-+	of_node_put(root);
-+	return rc;
-+}
- #endif /* !CONFIG_SPARC */
+ 	return dev->of_node == data;
 diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index fb51ae3..43c723d 100644
+index 43c723d..8390233 100644
 --- a/include/linux/of_platform.h
 +++ b/include/linux/of_platform.h
-@@ -55,6 +55,9 @@ extern struct platform_device *of_platform_device_create(struct device_node *np,
- extern int of_platform_bus_probe(struct device_node *root,
- 				 const struct of_device_id *matches,
- 				 struct device *parent);
-+extern int of_platform_populate(struct device_node *root,
-+				const struct of_device_id *matches,
-+				struct device *parent);
- #endif /* !CONFIG_SPARC */
+@@ -40,6 +40,8 @@ struct of_platform_driver
+ #define	to_of_platform_driver(drv) \
+ 	container_of(drv,struct of_platform_driver, driver)
  
- #endif /* CONFIG_OF_DEVICE */
++extern const struct of_device_id of_default_bus_match_table[];
++
+ /* Platform drivers register/unregister */
+ extern struct platform_device *of_device_alloc(struct device_node *np,
+ 					 const char *bus_id,
