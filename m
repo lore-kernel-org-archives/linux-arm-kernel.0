@@ -1,28 +1,30 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 16 Jun 2011 22:40:52 +0100
-Subject: [RESEND PATCH 0/2] ARM IRQ Kconfig patches
-In-Reply-To: <4DF9EDB1.4000707@ru.mvista.com>
-References: <1308142960-20767-1-git-send-email-balbi@ti.com>
-	<4DF9EDB1.4000707@ru.mvista.com>
-Message-ID: <20110616214052.GA9698@n2100.arm.linux.org.uk>
+From: jj@chaosbits.net (Jesper Juhl)
+Date: Thu, 16 Jun 2011 23:51:38 +0200 (CEST)
+Subject: [PATCH][Trivial] ARM: remove duplicate include from
+	arch/arm/mach-dove/common.c
+In-Reply-To: <20110526144804.GA31651@lunn.ch>
+References: <alpine.LNX.2.00.1105261130190.17400@swampdragon.chaosbits.net>
+	<20110526144804.GA31651@lunn.ch>
+Message-ID: <alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 03:49:05PM +0400, Sergei Shtylyov wrote:
-> Hello.
->
-> On 15-06-2011 17:02, Felipe Balbi wrote:
->
->> I have lost count how many times I have sent
->> these patches. Will someone either take them
->> in or NAK them so I stop sending ??
->
->> Felipe Balbi (2):
->>    arm: Kconfig: select correct HAVE_SPARSE_IRQ symbol
->>    arm: Kconfig: allow OMAP to use sparse IRQ numbering
->
->    Why not put it into Russell's patch system already?
+On Thu, 26 May 2011, Andrew Lunn wrote:
 
-I would like _someone_ (such as those who introduced the ARM arch to
-the Sparse IRQ stuff) at least to ack them first so I don't have to
-wonder whether the patches are correct or not.
+> Jesper Juhl pointed out there is a redundant include of
+> linux/serial_8250.h. However it turns out both are redundant.
+> This patch removes them both.
+> 
+> Only compile tested.
+> 
+> Reported-by:  Jesper Juhl <jj@chaosbits.net>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+
+Seems you are right.
+
+Reviewed-by: Jesper Juhl <jj@chaosbits.net>
+
+-- 
+Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
+Don't top-post http://www.catb.org/jargon/html/T/top-post.html
+Plain text mails only, please.
