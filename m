@@ -1,239 +1,400 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Jun 2011 20:06:31 +0100
-Subject: [RFC PATCH 03/16] ARM: local timers: move realview to
-	LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+Date: Thu, 16 Jun 2011 20:06:42 +0100
+Subject: [RFC PATCH 14/16] ARM: local timers: add msm_timer driver to
+	driver/clocksource
 In-Reply-To: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
 References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1308251204-16719-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1308251204-16719-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the RealView platforms to use the new arm_smp_twd driver.
-Add the platform devices and register them as early platform devices.
+Add a "new" driver to driver/clocksource to support the MSM timer
+hardware. This is basically a copy of arch/arm/mach-msm/timer.c
+turned into a platform driver, with a CPU notifier being used
+to start/stop the timer on secondary core.
 
-Tested on a PB11MP.
-
+Cc: David Brown <davidb@codeaurora.org>
+Cc: Daniel Walker <dwalker@fifo99.com>
+Cc: Bryan Huntsman <bryanh@codeaurora.org>
+Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-realview/Kconfig           |    8 +++++++
- arch/arm/mach-realview/realview_eb.c     |   31 ++++++++++++++++++++++++++---
- arch/arm/mach-realview/realview_pb11mp.c |   30 +++++++++++++++++++++++++---
- arch/arm/mach-realview/realview_pbx.c    |   31 +++++++++++++++++++++++++----
- 4 files changed, 87 insertions(+), 13 deletions(-)
+ drivers/clocksource/Kconfig     |    3 +
+ drivers/clocksource/Makefile    |    1 +
+ drivers/clocksource/msm_timer.c |  345 +++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 349 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clocksource/msm_timer.c
 
-diff --git a/arch/arm/mach-realview/Kconfig b/arch/arm/mach-realview/Kconfig
-index b9a9805..7eec270 100644
---- a/arch/arm/mach-realview/Kconfig
-+++ b/arch/arm/mach-realview/Kconfig
-@@ -12,6 +12,8 @@ config REALVIEW_EB_A9MP
- 	bool "Support Multicore Cortex-A9 Tile"
- 	depends on MACH_REALVIEW_EB
- 	select CPU_V7
-+	select LOCAL_TIMER_DEVICES
-+	select ARM_SMP_TWD
- 	help
- 	  Enable support for the Cortex-A9MPCore tile fitted to the
- 	  Realview(R) Emulation Baseboard platform.
-@@ -21,6 +23,8 @@ config REALVIEW_EB_ARM11MP
- 	depends on MACH_REALVIEW_EB
- 	select CPU_V6K
- 	select ARCH_HAS_BARRIERS if SMP
-+	select LOCAL_TIMER_DEVICES
-+	select ARM_SMP_TWD
- 	help
- 	  Enable support for the ARM11MPCore tile fitted to the Realview(R)
- 	  Emulation Baseboard platform.
-@@ -40,6 +44,8 @@ config MACH_REALVIEW_PB11MP
- 	select ARM_GIC
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_HAS_BARRIERS if SMP
-+	select LOCAL_TIMER_DEVICES
-+	select ARM_SMP_TWD
- 	help
- 	  Include support for the ARM(R) RealView(R) Platform Baseboard for
- 	  the ARM11MPCore.  This platform has an on-board ARM11MPCore and has
-@@ -79,6 +85,8 @@ config MACH_REALVIEW_PBX
- 	select HAVE_PATA_PLATFORM
- 	select ARCH_SPARSEMEM_ENABLE if CPU_V7 && !REALVIEW_HIGH_PHYS_OFFSET
- 	select ZONE_DMA if SPARSEMEM
-+	select LOCAL_TIMER_DEVICES
-+	select ARM_SMP_TWD
- 	help
- 	  Include support for the ARM(R) RealView(R) Platform Baseboard
- 	  Explore.
-diff --git a/arch/arm/mach-realview/realview_eb.c b/arch/arm/mach-realview/realview_eb.c
-index 10e75fa..fbc941c 100644
---- a/arch/arm/mach-realview/realview_eb.c
-+++ b/arch/arm/mach-realview/realview_eb.c
-@@ -36,7 +36,6 @@
- #include <asm/pgtable.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
--#include <asm/localtimer.h>
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index a436dd4..c4cf8bc 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -12,3 +12,6 @@ config CLKSRC_MMIO
  
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -330,6 +329,31 @@ static struct platform_device char_lcd_device = {
- 	.resource	=	char_lcd_resources,
- };
- 
-+static struct resource eb_twd_resources[] = {
-+	{
-+		.start	= REALVIEW_EB11MP_TWD_BASE,
-+		.end	= REALVIEW_EB11MP_TWD_BASE + 0x10,
-+		.flags	= IORESOURCE_MEM,
+ config ARM_SMP_TWD
+        bool
++
++config MSM_TIMER
++       bool
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 7b30585..ffb4186 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+ obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+ obj-$(CONFIG_ARM_SMP_TWD)	+= arm_smp_twd.o
+ obj-$(CONFIG_EXYNOS4_MCT)	+= exynos4_mct.o
++obj-$(CONFIG_MSM_TIMER)		+= msm_timer.o
+diff --git a/drivers/clocksource/msm_timer.c b/drivers/clocksource/msm_timer.c
+new file mode 100644
+index 0000000..2ec66dd
+--- /dev/null
++++ b/drivers/clocksource/msm_timer.c
+@@ -0,0 +1,345 @@
++/*
++ *
++ * Copyright (C) 2007 Google, Inc.
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#include <linux/interrupt.h>
++#include <linux/clockchips.h>
++#include <linux/platform_device.h>
++#include <linux/cpu.h>
++
++#include <asm/hardware/gic.h>
++#include <mach/msm_iomap.h>
++#include <mach/cpu.h>
++
++#define TIMER_MATCH_VAL         0x0000
++#define TIMER_COUNT_VAL         0x0004
++#define TIMER_ENABLE            0x0008
++#define TIMER_ENABLE_CLR_ON_MATCH_EN    2
++#define TIMER_ENABLE_EN                 1
++#define TIMER_CLEAR             0x000C
++#define DGT_CLK_CTL             0x0034
++enum {
++	DGT_CLK_CTL_DIV_1 = 0,
++	DGT_CLK_CTL_DIV_2 = 1,
++	DGT_CLK_CTL_DIV_3 = 2,
++	DGT_CLK_CTL_DIV_4 = 3,
++};
++#define CSR_PROTECTION          0x0020
++#define CSR_PROTECTION_EN               1
++
++#define GPT_HZ 32768
++
++enum timer_location {
++	LOCAL_TIMER = 0,
++	GLOBAL_TIMER = 1,
++};
++
++#define MSM_GLOBAL_TIMER MSM_CLOCK_DGT
++
++/* TODO: Remove these ifdefs */
++#if defined(CONFIG_ARCH_QSD8X50)
++#define DGT_HZ (19200000 / 4) /* 19.2 MHz / 4 by default */
++#define MSM_DGT_SHIFT (0)
++#elif defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60) || \
++				      defined(CONFIG_ARCH_MSM8960)
++#define DGT_HZ (24576000 / 4) /* 24.576 MHz (LPXO) / 4 by default */
++#define MSM_DGT_SHIFT (0)
++#else
++#define DGT_HZ 19200000 /* 19.2 MHz or 600 KHz after shift */
++#define MSM_DGT_SHIFT (5)
++#endif
++
++struct msm_clock {
++	struct clock_event_device   clockevent;
++	struct clocksource          clocksource;
++	unsigned int		    irq;
++	void __iomem                *regbase;
++	uint32_t                    freq;
++	uint32_t                    shift;
++	void __iomem                *global_counter;
++	void __iomem                *local_counter;
++};
++
++enum {
++	MSM_CLOCK_GPT,
++	MSM_CLOCK_DGT,
++	NR_TIMERS,
++};
++
++static struct msm_clock msm_clocks[];
++
++static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++	if (evt->event_handler == NULL)
++		return IRQ_HANDLED;
++	evt->event_handler(evt);
++	return IRQ_HANDLED;
++}
++
++static cycle_t msm_read_timer_count(struct clocksource *cs)
++{
++	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
++
++	return readl(clk->global_counter);
++}
++
++static struct msm_clock *clockevent_to_clock(struct clock_event_device *evt)
++{
++	return container_of(evt, struct msm_clock, clockevent);
++}
++
++static int msm_timer_set_next_event(unsigned long cycles,
++				    struct clock_event_device *evt)
++{
++	struct msm_clock *clock = clockevent_to_clock(evt);
++	uint32_t now = readl(clock->local_counter);
++	uint32_t alarm = now + (cycles << clock->shift);
++
++	writel(alarm, clock->regbase + TIMER_MATCH_VAL);
++	return 0;
++}
++
++static void msm_timer_set_mode(enum clock_event_mode mode,
++			      struct clock_event_device *evt)
++{
++	struct msm_clock *clock = clockevent_to_clock(evt);
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_RESUME:
++	case CLOCK_EVT_MODE_PERIODIC:
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++		disable_irq(evt->irq);
++		/* fall through */
++	case CLOCK_EVT_MODE_SHUTDOWN:
++		writel(0, clock->regbase + TIMER_ENABLE);
++		break;
++	}
++}
++
++static struct msm_clock msm_clocks[] = {
++	[MSM_CLOCK_GPT] = {
++		.clockevent = {
++			.name           = "gp_timer",
++			.features       = CLOCK_EVT_FEAT_ONESHOT,
++			.shift          = 32,
++			.rating         = 200,
++			.set_next_event = msm_timer_set_next_event,
++			.set_mode       = msm_timer_set_mode,
++		},
++		.clocksource = {
++			.name           = "gp_timer",
++			.rating         = 200,
++			.read           = msm_read_timer_count,
++			.mask           = CLOCKSOURCE_MASK(32),
++			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
++		},
++		.irq = INT_GP_TIMER_EXP,
++		.freq = GPT_HZ,
 +	},
-+	{
-+		.start	= IRQ_LOCALTIMER,
-+		.end	= IRQ_LOCALTIMER,
-+		.flags	= IORESOURCE_IRQ,
++	[MSM_CLOCK_DGT] = {
++		.clockevent = {
++			.name           = "dg_timer",
++			.features       = CLOCK_EVT_FEAT_ONESHOT,
++			.shift          = 32 + MSM_DGT_SHIFT,
++			.rating         = 300,
++			.set_next_event = msm_timer_set_next_event,
++			.set_mode       = msm_timer_set_mode,
++		},
++		.clocksource = {
++			.name           = "dg_timer",
++			.rating         = 300,
++			.read           = msm_read_timer_count,
++			.mask           = CLOCKSOURCE_MASK((32 - MSM_DGT_SHIFT)),
++			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
++		},
++		.irq = INT_DEBUG_TIMER_EXP,
++		.freq = DGT_HZ >> MSM_DGT_SHIFT,
++		.shift = MSM_DGT_SHIFT,
++	}
++};
++
++static void __init msm_timer_primary_setup(void)
++{
++	int i;
++	int res;
++	int global_offset = 0;
++
++	if (cpu_is_msm7x01()) {
++		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
++		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
++	} else if (cpu_is_msm7x30()) {
++		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE + 0x04;
++		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x24;
++	} else if (cpu_is_qsd8x50()) {
++		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
++		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
++	} else if (cpu_is_msm8x60() || cpu_is_msm8960()) {
++		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_TMR_BASE + 0x04;
++		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_TMR_BASE + 0x24;
++
++		/* Use CPU0's timer as the global timer. */
++		global_offset = MSM_TMR0_BASE - MSM_TMR_BASE;
++	} else
++		BUG();
++
++#ifdef CONFIG_ARCH_MSM_SCORPIONMP
++	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
++#endif
++
++	for (i = 0; i < ARRAY_SIZE(msm_clocks); i++) {
++		struct msm_clock *clock = &msm_clocks[i];
++		struct clock_event_device *ce = &clock->clockevent;
++		struct clocksource *cs = &clock->clocksource;
++
++		clock->local_counter = clock->regbase + TIMER_COUNT_VAL;
++		clock->global_counter = clock->local_counter + global_offset;
++
++		writel(0, clock->regbase + TIMER_ENABLE);
++		writel(0, clock->regbase + TIMER_CLEAR);
++		writel(~0, clock->regbase + TIMER_MATCH_VAL);
++
++		ce->mult = div_sc(clock->freq, NSEC_PER_SEC, ce->shift);
++		/* allow at least 10 seconds to notice that the timer wrapped */
++		ce->max_delta_ns =
++			clockevent_delta2ns(0xf0000000 >> clock->shift, ce);
++		/* 4 gets rounded down to 3 */
++		ce->min_delta_ns = clockevent_delta2ns(4, ce);
++		ce->cpumask = cpumask_of(0);
++
++		res = clocksource_register_hz(cs, clock->freq);
++		if (res)
++			printk(KERN_ERR "msm_timer_init: clocksource_register "
++			       "failed for %s\n", cs->name);
++
++		ce->irq = gic_ppi_to_vppi(clock->irq);
++		res = request_irq(ce->irq, msm_timer_interrupt,
++				  IRQF_TIMER | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
++				  ce->name, ce);
++		if (res)
++			pr_err("msm_timer_init: request_irq failed for %s\n",
++			       ce->name);
++
++		clockevents_register_device(ce);
++	}
++}
++
++#ifdef CONFIG_SMP
++static void __cpuinit msm_timer_secondary_setup(void *data)
++{
++	static bool local_timer_inited;
++	struct clock_event_device *evt = data;
++	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
++	int res;
++
++	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
++
++	evt->irq = gic_ppi_to_vppi(clock->irq);
++	evt->name = "local_timer";
++	evt->features = CLOCK_EVT_FEAT_ONESHOT;
++	evt->rating = clock->clockevent.rating;
++	evt->set_mode = msm_timer_set_mode;
++	evt->set_next_event = msm_timer_set_next_event;
++	evt->shift = clock->clockevent.shift;
++	evt->mult = div_sc(clock->freq, NSEC_PER_SEC, evt->shift);
++	evt->max_delta_ns =
++		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
++	evt->min_delta_ns = clockevent_delta2ns(4, evt);
++
++	if (!local_timer_inited) {
++		writel(0, clock->regbase  + TIMER_ENABLE);
++		writel(0, clock->regbase + TIMER_CLEAR);
++		writel(~0, clock->regbase + TIMER_MATCH_VAL);
++
++		res = request_irq(evt->irq, msm_timer_interrupt,
++				  IRQF_TIMER | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
++				  clock->clockevent.name, evt);
++		if (res) {
++			pr_err("local_timer_setup: request_irq failed for %s\n",
++			       clock->clockevent.name);
++			return;
++		}
++		local_timer_inited = true;
++	} else
++		enable_irq(evt->irq);
++
++	clockevents_register_device(evt);
++}
++
++static void __cpuinit msm_timer_secondary_teardown(void *data)
++{
++	struct clock_event_device *clk = data;
++	msm_timer_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
++}
++
++static int __cpuinit msm_timer_cpu_notify(struct notifier_block *self,
++				    unsigned long action, void *data)
++{
++	int cpu = (int)data;
++	struct clock_event_device *clk;
++
++	clk = &msm_clocks[MSM_GLOBAL_TIMER].clockevent;
++
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		smp_call_function_single(cpu, msm_timer_secondary_setup,
++					 clk, 1);
++		break;
++
++	case CPU_DOWN_PREPARE:
++	case CPU_DOWN_PREPARE_FROZEN:
++		smp_call_function_single(cpu, msm_timer_secondary_teardown,
++					 clk, 1);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata msm_timer_cpu_nb = {
++	.notifier_call = msm_timer_cpu_notify,
++};
++#endif
++
++static int msm_timer_probe(struct platform_device *pdev)
++{
++	/* Immediately configure the timer on the boot CPU */
++	msm_timer_primary_setup();
++
++#ifdef CONFIG_SMP
++	register_cpu_notifier(&msm_timer_cpu_nb);
++#endif
++
++	return 0;
++}
++
++static int msm_timer_remove(struct platform_device *pdev)
++{
++	return -EBUSY;
++}
++
++static struct platform_driver msm_timer_driver = {
++	.probe	= msm_timer_probe,
++	.remove = __devexit_p(msm_timer_remove),
++	.driver = {
++		.name	= "msm_timer",
 +	},
 +};
 +
-+static struct platform_device eb_twd_device = {
-+	.name		= "arm_smp_twd",
-+	.id		= -1,
-+	.resource	= eb_twd_resources,
-+	.num_resources	= ARRAY_SIZE(eb_twd_resources),
-+};
-+
-+static struct platform_device *eb_early_devices[] = {
-+	&eb_twd_device,
-+};
-+
-+
- static void __init gic_init_irq(void)
- {
- 	if (core_tile_eb11mp() || core_tile_a9mp()) {
-@@ -401,14 +425,13 @@ static void __init realview_eb_timer_init(void)
- 	timer3_va_base = __io_address(REALVIEW_EB_TIMER2_3_BASE) + 0x20;
- 
- 	if (core_tile_eb11mp() || core_tile_a9mp()) {
--#ifdef CONFIG_LOCAL_TIMERS
--		twd_base = __io_address(REALVIEW_EB11MP_TWD_BASE);
--#endif
- 		timer_irq = IRQ_EB11MP_TIMER0_1;
- 	} else
- 		timer_irq = IRQ_EB_TIMER0_1;
- 
- 	realview_timer_init(timer_irq);
-+	early_platform_add_devices(eb_early_devices,
-+				   ARRAY_SIZE(eb_early_devices));
- }
- 
- static struct sys_timer realview_eb_timer = {
-diff --git a/arch/arm/mach-realview/realview_pb11mp.c b/arch/arm/mach-realview/realview_pb11mp.c
-index b2985fc..9ed17c1 100644
---- a/arch/arm/mach-realview/realview_pb11mp.c
-+++ b/arch/arm/mach-realview/realview_pb11mp.c
-@@ -36,7 +36,6 @@
- #include <asm/pgtable.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
--#include <asm/localtimer.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/flash.h>
-@@ -276,6 +275,30 @@ static struct platform_device pmu_device = {
- 	.resource		= pmu_resources,
- };
- 
-+static struct resource realview_pb11mp_twd_resources[] = {
-+	{
-+		.start	= REALVIEW_TC11MP_TWD_BASE,
-+		.end	= REALVIEW_TC11MP_TWD_BASE + 0x10,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= IRQ_LOCALTIMER,
-+		.end	= IRQ_LOCALTIMER,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device realview_pb11mp_twd_device = {
-+	.name		= "arm_smp_twd",
-+	.id		= -1,
-+	.resource	= realview_pb11mp_twd_resources,
-+	.num_resources	= ARRAY_SIZE(realview_pb11mp_twd_resources),
-+};
-+
-+static struct platform_device *realview_pb11mp_early_devices[] = {
-+	&realview_pb11mp_twd_device,
-+};
-+
- static void __init gic_init_irq(void)
- {
- 	unsigned int pldctrl;
-@@ -305,10 +328,9 @@ static void __init realview_pb11mp_timer_init(void)
- 	timer2_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE);
- 	timer3_va_base = __io_address(REALVIEW_PB11MP_TIMER2_3_BASE) + 0x20;
- 
--#ifdef CONFIG_LOCAL_TIMERS
--	twd_base = __io_address(REALVIEW_TC11MP_TWD_BASE);
--#endif
- 	realview_timer_init(IRQ_TC11MP_TIMER0_1);
-+	early_platform_add_devices(realview_pb11mp_early_devices,
-+				   ARRAY_SIZE(realview_pb11mp_early_devices));
- }
- 
- static struct sys_timer realview_pb11mp_timer = {
-diff --git a/arch/arm/mach-realview/realview_pbx.c b/arch/arm/mach-realview/realview_pbx.c
-index 92ace2c..768faec 100644
---- a/arch/arm/mach-realview/realview_pbx.c
-+++ b/arch/arm/mach-realview/realview_pbx.c
-@@ -31,7 +31,6 @@
- #include <asm/leds.h>
- #include <asm/mach-types.h>
- #include <asm/pmu.h>
--#include <asm/smp_twd.h>
- #include <asm/pgtable.h>
- #include <asm/hardware/gic.h>
- #include <asm/hardware/cache-l2x0.h>
-@@ -288,6 +287,30 @@ static struct platform_device pmu_device = {
- 	.resource		= pmu_resources,
- };
- 
-+static struct resource realview_pbx_twd_resources[] = {
-+	{
-+		.start	= REALVIEW_PBX_TILE_TWD_BASE,
-+		.end	= REALVIEW_PBX_TILE_TWD_BASE + 0x10,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= IRQ_LOCALTIMER,
-+		.end	= IRQ_LOCALTIMER,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device realview_pbx_twd_device = {
-+	.name		= "arm_smp_twd",
-+	.id		= -1,
-+	.resource	= realview_pbx_twd_resources,
-+	.num_resources	= ARRAY_SIZE(realview_pbx_twd_resources),
-+};
-+
-+static struct platform_device *realview_pbx_early_devices[] = {
-+	&realview_pbx_twd_device,
-+};
-+
- static void __init gic_init_irq(void)
- {
- 	/* ARM PBX on-board GIC */
-@@ -308,11 +331,9 @@ static void __init realview_pbx_timer_init(void)
- 	timer2_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE);
- 	timer3_va_base = __io_address(REALVIEW_PBX_TIMER2_3_BASE) + 0x20;
- 
--#ifdef CONFIG_LOCAL_TIMERS
--	if (core_tile_pbx11mp() || core_tile_pbxa9mp())
--		twd_base = __io_address(REALVIEW_PBX_TILE_TWD_BASE);
--#endif
- 	realview_timer_init(IRQ_PBX_TIMER0_1);
-+	early_platform_add_devices(realview_pbx_early_devices,
-+				   ARRAY_SIZE(realview_pbx_early_devices));
- }
- 
- static struct sys_timer realview_pbx_timer = {
++early_platform_init("localtimer", &msm_timer_driver);
 -- 
 1.7.0.4
