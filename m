@@ -1,33 +1,39 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Thu, 16 Jun 2011 16:30:27 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <4DFA634D.6000907@ahsoftware.de>
-Message-ID: <Pine.LNX.4.44L0.1106161626160.1697-100000@iolanthe.rowland.org>
+From: premi@ti.com (Sanjeev Premi)
+Date: Fri, 17 Jun 2011 02:01:00 +0530
+Subject: [PATCH] omap2+: pm: Fix section mismatch in pm_dbg_init()
+Message-ID: <1308256260-15597-1-git-send-email-premi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jun 2011, Alexander Holler wrote:
+Fix the section mismatch warning:
 
-> > Hmmm.  I won't say that ((packed,aligned(4))) is wrong.  But it's not
-> > clearly necessary either.
-> 
-> Maybe I should have added a "cosmetic:" in front of the subject of the 
-> patch. ;)
-> 
-> Using packed doesn't seem to be necessary (at least not with those 
-> versions of gcc I'm using here), I've tried both versions (on arm, 
-> without packed and with packed, aligned(4)) and both are working. I've 
-> only posted the patch because I found the usage of packed, aligned(4) 
-> much clearer than without packed. And It might help avoiding such 
-> discussions like this with people like me who aren't that deep involved 
-> in gcc-specific implementation details. ;)
-> 
-> Anyway, feel free to nack that patch. I don't really care and just 
-> thought I should post it (e.g. as an alternative to removing that packed).
+  WARNING: vmlinux.o(.text+0x21118): Section mismatch
+  in reference from the function pm_dbg_init() to the
+  function .init.text:pwrdms_setup()
+  The function pm_dbg_init() references
+  the function __init pwrdms_setup().
+  This is often because pm_dbg_init lacks a __init
+  annotation or the annotation of pwrdms_setup is wrong.
 
-There are other structures that need to avoid padding but aren't marked
-((packed)), such as ehci_qtd and ehci_qh_hw in drivers/usb/host/ehci.h.  
-I don't see why those in ehci_def.h should get special treatment.
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+---
+ Applies to current linux-omap master
 
-Alan Stern
+ arch/arm/mach-omap2/pm-debug.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+index e01da45..ef33273 100644
+--- a/arch/arm/mach-omap2/pm-debug.c
++++ b/arch/arm/mach-omap2/pm-debug.c
+@@ -595,7 +595,7 @@ static int option_set(void *data, u64 val)
+ 
+ DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
+ 
+-static int pm_dbg_init(void)
++static int __init pm_dbg_init(void)
+ {
+ 	int i;
+ 	struct dentry *d;
+-- 
+1.7.2.2
