@@ -1,91 +1,99 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Thu, 16 Jun 2011 18:02:20 +0800
-Subject: Slow spi_sync() on pxa2xx_spi
-In-Reply-To: <20110616095934.GC10075@excalibur.local>
-References: <20110616082112.GA10075@excalibur.local>
-	<BANLkTikuo_fHbw9FFMtorpg15vOnXMK-+g@mail.gmail.com>
-	<20110616091931.GB10075@excalibur.local>
-	<20110616095934.GC10075@excalibur.local>
-Message-ID: <BANLkTi=FJgwcBHsE=sLK4shzpdJYWwq3Pg@mail.gmail.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Thu, 16 Jun 2011 11:03:28 +0100
+Subject: [RFC PATCH v2 1/5] ARM: mm: Add generic proc/arch struct
+	definition macros
+In-Reply-To: <alpine.LFD.2.00.1106151944240.2142@xanadu.home>
+References: <1308049105-16080-1-git-send-email-dave.martin@linaro.org>
+	<1308049105-16080-2-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1106151944240.2142@xanadu.home>
+Message-ID: <20110616100328.GA2460@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 5:59 PM, Stefan Schmidt
-<stefan@datenfreihafen.org> wrote:
-> Hello.
->
-> On Thu, 2011-06-16 at 11:19, Stefan Schmidt wrote:
->>
->> On Thu, 2011-06-16 at 16:34, Eric Miao wrote:
->> >
->> > What is the SPI frequency?
->>
->> I tried various settings in .max_speed_hz from the original 6.6 MHt to
->> 10 MHz and 13MHz as maximum of the controller. Did also not change
->> anything for me.
->>
->> That reminds me that after defining DEBUG in pxa2xx_spi it did always
->> report 13MHz to me. Need to have a look at it.
->
-> Either the debug statement or the setting is indeed wrong.
->
-> [ ? ?0.696759] spi spi1.0: 13000000 Hz actual, PIO
-> [ ? ?0.715760] spi spi3.0: 13000000 Hz actual, PIO
->
-> Which comes from this part of the driver (with #define DEBUG set):
->
-> ? ? ? ?/* NOTE: ?PXA25x_SSP _could_ use external clocking ... */
-> ? ? ? ?if (!pxa25x_ssp_comp(drv_data))
-> ? ? ? ? ? ? ? ?dev_dbg(&spi->dev, "%ld Hz actual, %s\n",
-> ? ? ? ? ? ? ? ? ? ? ? ?clk_get_rate(ssp->clk)
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/ (1 + ((chip->cr0 & SSCR0_SCR(0xfff)) >> 8)),
-> ? ? ? ? ? ? ? ? ? ? ? ?chip->enable_dma ? "DMA" : "PIO");
-> ? ? ? ?else
-> ? ? ? ? ? ? ? ?dev_dbg(&spi->dev, "%ld Hz actual, %s\n",
-> ? ? ? ? ? ? ? ? ? ? ? ?clk_get_rate(ssp->clk) / 2
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?/ (1 + ((chip->cr0 & SSCR0_SCR(0x0ff)) >> 8)),
-> ? ? ? ? ? ? ? ? ? ? ? ?chip->enable_dma ? "DMA" : "PIO");
->
-> But the board file has this:
->
-> static struct spi_board_info spi_board_info[] __initdata = {
-> ? ? ? ?{
-> ? ? ? ? ? ? ? ?.modalias = "lis3l02dq",
-> ? ? ? ? ? ? ? ?.max_speed_hz = 8000000,/* 8MHz max spi frequency at 3V */
-> ? ? ? ? ? ? ? ?.bus_num = 1,
-> ? ? ? ? ? ? ? ?.chip_select = 0,
-> ? ? ? ? ? ? ? ?.controller_data = &staccel_chip_info,
-> ? ? ? ? ? ? ? ?.irq = IRQ_GPIO(96),
-> ? ? ? ?}, {
-> ? ? ? ? ? ? ? ?.modalias = "cc2420",
-> // ? ? ? ? ? ? ?.max_speed_hz = 6500000,
-> ? ? ? ? ? ? ? ?.max_speed_hz = 10000000, /* 10MHz */
-> ? ? ? ? ? ? ? ?.bus_num = 3,
-> ? ? ? ? ? ? ? ?.chip_select = 0,
-> ? ? ? ? ? ? ? ?.controller_data = &cc2420_info,
-> ? ? ? ? ? ? ? ?.platform_data = &cc2420_pdata,
->
-> ? ? ? ?},
-> };
->
-> Its neither 8MHz for spi1.0 nor 10MHz for spi3.0.
->
-> Adding some debug info shows me that the driver gets the data fine form the
-> platform data:
-> [ ? ?0.695770] spi spi1.0: chip->speed_hz: 8000000, spi->max_speed_hz: 8000000
-> [ ? ?0.695872] spi spi1.0: 13000000 Hz actual, PIO
-> [ ? ?0.714824] spi spi3.0: chip->speed_hz: 10000000, spi->max_speed_hz: 10000000
-> [ ? ?0.714929] spi spi3.0: 13000000 Hz actual, PIO
->
-> Thats directly above the chip->cr0 and chip->cr1 calculations. Is this just the
-> initial seeting and it gets overwritten before a transfer or is the speed
-> calculation wrong?
+On Wed, Jun 15, 2011 at 07:57:13PM -0400, Nicolas Pitre wrote:
+> On Tue, 14 Jun 2011, Dave Martin wrote:
+> 
+> > This patch adds some generic macros to reduce boilerplate when
+> > declaring certain common structures in arch/arm/mm/*.S
+> > 
+> > Thanks to Russell King for outlining what the
+> > define_processor_functions macro could look like.
+> > 
+> > Signed-off-by: Dave Martin <dave.martin@linaro.org>
+> > ---
+> >  arch/arm/mm/proc-macros.S |   79 +++++++++++++++++++++++++++++++++++++++++++++
+> >  1 files changed, 79 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mm/proc-macros.S b/arch/arm/mm/proc-macros.S
+> > index 34261f9..3c5ffbb 100644
+> > --- a/arch/arm/mm/proc-macros.S
+> > +++ b/arch/arm/mm/proc-macros.S
+> > @@ -254,3 +255,81 @@
+> >  	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
+> >  	mcr	p15, 0, ip, c7, c10, 4		@ data write barrier
+> >  	.endm
+> > +
+> > +.macro define_processor_functions name:req, dabort:req, pabort:req, nommu=0, suspend=0
+> > +	.pushsection .text
+> > +
+> > +	__INITDATA
+> 
+> Was this __INITDATA right after a .pushsection intentional?  One might 
+> be confused about the effective section after this.
 
-Every SPI chip has a clock setting, so spi_setup() will be done before
-every transfer, that's my understanding. Do check the resulting SCCR
-register settings to confirm it's not setup correctly before each transfer.
+The .pushsection is needed in order to save the previous state of the
+section stack so that it can be restored later with .popsection.
 
->
-> regards
-> Stefan Schmidt
->
+.pushsection syntactically requires an argument, though in this case it's
+not useful, so I just specify .text since this should be harmless.
+
+This is kind of unclear, so at the very least it could benefit from a
+comment.
+
+> 
+> The __INITDATA tag is actually doing a
+> 
+> 	.section	".init.data","aw",%progbits
+> 
+> Maybe this could be used as argument to .pushsection instead of .text 
+> (which in this case should probably have been .rodata otherwise anyway).
+
+The problem is that __INITDATA conflates the information about the section
+with the action of actually switching to the section.  Nowhere are the
+section name and flags available by themselves.  Since the point
+of a macro is to avoid copy-paste, I prefer not to manually copy-paste
+this stuff into a .pushsection directive in a random assembler file...
+
+Perhaps we should instead use
+
+	__INITDATA
+
+	/* ... */
+
+	.previous
+	.endm
+
+I tend to avoid ".previous" because I consider it somewhat broken:
+in the presence of macros, the section restored by .previous is
+indeterminate because a called macro may switch sections and hence
+change what .previous will refer to.  There is no way to restore what
+.previous points at after switching sections.
+
+In this case, we don't call any nested macro, so .previous _should_
+refer to the right thing.  We mess up .previous for the caller, but
+then we always mess that up when switching sections anyway.  Nothing
+in arch/arm/mm/*.S uses .previous, so we shouldn't get any problems
+resulting from this, in this particular case.
+
+Alternatively, we could propose a change <linux/init.h> to split the
+__INITDATA macro up, and define the related macros in a sane way:
+
+#define __INITDATA_NAME .init.data
+#define __INITDATA_FLAGS "aw",%progbtis
+#define __initdata __section(__INITDATA_NAME)
+#define __INITDATA .section __stringify(__INITDATA_NAME),__INITDATA_FLAGS
+
+Any thoughts on that?
+
+Cheers
+---Dave
