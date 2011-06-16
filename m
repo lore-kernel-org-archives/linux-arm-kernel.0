@@ -1,45 +1,82 @@
-From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
-Date: Thu, 16 Jun 2011 22:14:10 +0200
-Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
-In-Reply-To: <BANLkTimzxUQnVn5VC8EOaJeHq=wifUhZ4A@mail.gmail.com>
-References: <201106022149.47936.heiko@sntech.de>
-	<201106141610.42700.heiko@sntech.de>
-	<BANLkTimzxUQnVn5VC8EOaJeHq=wifUhZ4A@mail.gmail.com>
-Message-ID: <201106162214.11084.heiko@sntech.de>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Fri, 17 Jun 2011 01:46:36 +0530
+Subject: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
+In-Reply-To: <87vcw5k510.fsf@ti.com>
+References: <1308229940-27025-1-git-send-email-premi@ti.com>
+	<877h8lsswk.fsf@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D563E79@dbde02.ent.ti.com>
+	<87vcw5k510.fsf@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D563EF1@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag 14 Juni 2011, 22:32:41 schrieb Andrei Warkentin:
-> Hi Heiko,
+> -----Original Message-----
+> From: Hilman, Kevin 
+> Sent: Thursday, June 16, 2011 11:55 PM
+> To: Premi, Sanjeev
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
 > 
-> On Tue, Jun 14, 2011 at 9:10 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> > nope, no updates yet. The flood also only starts when udev wants to
-> > create its device nodes, meaning the initial detection seems not to
-> > produce this problem
-> > 
-> > But when I disable the whole boot partition stuff, it works as before
-> > without irq storms.
-> > 
-> > As there don't seem to exist reports from other emmc users about this
-> > I guess the problem lays somewhere between the boot-partitions-patch
-> > and the sdhci-s3c driver (for s3c2416 at least).
+> "Premi, Sanjeev" <premi@ti.com> writes:
 > 
-> Alright. Curious. Can you let me know what eMMC device you are
-> connecting to the controller? What is the eMMC revision?
-hmm ... how do I find these?
-The real device providing the storage is a 2GB NAND Flash from Hynix.
+> >> -----Original Message-----
+> >> From: Hilman, Kevin 
+> >> Sent: Thursday, June 16, 2011 8:52 PM
+> >> To: Premi, Sanjeev
+> >> Cc: linux-omap at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org
+> >> Subject: Re: [PATCH] omap3: pm: Downgrade WARN for no wakeup source
+> >> 
+> >> Hi Sanjeev,
+> >> 
+> >> Sanjeev Premi <premi@ti.com> writes:
+> >> 
+> >> > When multiple wakeup sources are defined in a system,
+> >> > there is a small window, when more than one source
+> >> > can trigger wakeup interrupt.
+> >> >
+> >> > In the current implementation, the do-while() loop
+> >> > can handle all wakeup sources that are recorded when
+> >> > probing the status register in prcm_interrupt_handler().
+> >> >
+> >> > When the ISR executes due to next queued wakeup, it
+> >> > there is nothing to be handled and value of "c" is 0.
+> >> 
+> >> Thanks for tracking this one down.
+> >> 
+> >> However, It's still not clear to me what is happening here.
+> >> 
+> >> Why is the IRQ firing if there is nothing to be handled?  
+> >> That suggests
+> >> to me that the IRQ status is not properly being cleared.
+> >
+> > [SP] On the contrary the IRQ status is actually getting cleared,
+> >      but there are more than "1" PRCM interrupts queued.
+> >
+> >      The do-while() clears all the interrupt sources that
+> >      are flagged in the status register.
+> >
+> >      When the next wakeup interrupt is getting processed, the
+> >      status register doesn't contain any "source" to handle.
+> 
+> Still confused.
+> 
+> If a wakeup interrupt is fired, it was caused by something.  
+> 
+> IOW, if "the status register doesn't contain any source",  how is
+> 
+> 		if (irqstatus_mpu & (OMAP3430_WKUP_ST_MASK |
+> 				     OMAP3430_IO_ST_MASK)) 
+> 
+> ever true?
 
-And sadly both of your patches didn't change anything.
+[sp] I had been hesitant to say "nesting" because the wakeup
+     interrupts seem to be independent of each other. But now
+     I think - from SW perspective, it should/could be considered
+     as nesting.
 
-I made two interessting observations:
-during boot the initial detection works ok - I can even mount the normal 
-partitions without hickup when I stop it before the udev stage.
+~sanjeev
 
-The irq storm seems to be caused by something udev does during its population 
-of the /dev filesystem.
-
-And second the mentioned irq storm never stops during the runtime of the 
-device. When I let it boot through it spews what must be millions of the irq 
-messages and does so until I shut it down.
-
-Heiko
+> 
+> Kevin
+> 
