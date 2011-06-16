@@ -1,57 +1,103 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Thu, 16 Jun 2011 11:43:53 +1000
-Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
-In-Reply-To: <alpine.LFD.2.00.1106151540230.2142@xanadu.home>
-References: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
-	<alpine.LFD.2.00.1106151540230.2142@xanadu.home>
-Message-ID: <20110616014353.GB16214@yookeroo.fritz.box>
+From: zach.pfeffer@linaro.org (Zach Pfeffer)
+Date: Wed, 15 Jun 2011 22:20:21 -0500
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
+	Allocator added
+In-Reply-To: <20110615213958.GB28032@labbmf-linux.qualcomm.com>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<20110614170158.GU2419@fooishbar.org>
+	<BANLkTi=cJisuP8=_YSg4h-nsjGj3zsM7sg@mail.gmail.com>
+	<201106142242.25157.arnd@arndb.de>
+	<000901cc2b37$4c21f030$e465d090$%szyprowski@samsung.com>
+	<20110615213958.GB28032@labbmf-linux.qualcomm.com>
+Message-ID: <BANLkTi=aYUFVQ3Mg73wrvQUR0zpbXC9Hsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 03:50:37PM -0400, Nicolas Pitre wrote:
-> On Tue, 14 Jun 2011, David Brown wrote:
-> 
-> > Some targets have multiple memory regions.  Parse up to 8 of these
-> > when converting the atags to fdt.
-> > 
-> > Signed-off-by: David Brown <davidb@codeaurora.org>
-> 
-> I've added your patch to my zImage patch queue.
-> 
-> > With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
-> > It seems to work as long as my device tree has placeholders for all of
-> > the properties I need.
-> 
-> I think those missing nodes should simply be created if missing.  I 
-> however don't see any function in the libfdt API to do that -- there is 
-> fdt_add_subnode() but no fdt_add_node().  Any DT expert please?
+On 15 June 2011 16:39, Larry Bassel <lbassel@codeaurora.org> wrote:
+> On 15 Jun 11 10:36, Marek Szyprowski wrote:
+>> Hello,
+>>
+>> On Tuesday, June 14, 2011 10:42 PM Arnd Bergmann wrote:
+>>
+>> > On Tuesday 14 June 2011 20:58:25 Zach Pfeffer wrote:
+>> > > I've seen this split bank allocation in Qualcomm and TI SoCs, with
+>> > > Samsung, that makes 3 major SoC vendors (I would be surprised if
+>> > > Nvidia didn't also need to do this) - so I think some configurable
+>> > > method to control allocations is necessarily. The chips can't do
+>> > > decode without it (and by can't do I mean 1080P and higher decode is
+>> > > not functionally useful). Far from special, this would appear to be
+>> > > the default.
+>
+> We at Qualcomm have some platforms that have memory of different
+> performance characteristics, some drivers will need a way of
+> specifying that they need fast memory for an allocation (and would prefer
+> an error if it is not available rather than a fallback to slower
+> memory). It would also be bad if allocators who don't need fast
+> memory got it "accidentally", depriving those who really need it.
 
-fdt_add_subnode() will create a new node as you require.  The
-"subnode" is just supposed to indicate that the parameters are in the
-form of the offset of the parent node and the new node's immediate
-name, rather than taking a full path name for the new node.
+I think this statement actually applies to all the SoCs that are
+coming out now and in the future from TI, Samsung, Nvidia, Freescale,
+ST Ericsson and others. It seems that in all cases users will want to:
 
-> Also, should the DTB be enlarged in order to add new nodes, or even 
-> modify existing ones with larger properties?  In other words, 
-> should something like fdt_move(fdt, fdt, fdt_totalsize(fdt)+HEADROOM) be 
-> used beforehand?
+1. Allocate memory with a per-SoC physical memory mapping policy that
+is usually manually specified, i.e. use this physical memory bank set
+for this allocation or nothing.
+2. Be able to easily pass a token to this memory between various
+userspace processes and the kernel.
+3. Be able to easily and explicitly access attributes of an allocation
+from all contexts.
+4. Be able to save and reload this memory without giving up the
+virtual address allocation.
 
-Yes, you will need to do this, fdt_open_into() is the function you
-want.  Without making room first, adding nodes or expanding existing
-properties will return -FDT_ERR_NOSPACE.  Once you've made whatever
-edits you need, you can use fdt_pack() to collapse the tree back to
-its minimum size.
-
-Although this is somewhat awkward, this approach is a deliberate
-design decision, to avoid making libfdt dependent on a working general
-purpose allocator, which may not be available when libfdt is used in
-very limited environments such as a firmware/bootloader.
-
-If you do find things you need to do which libfdt doesn't support, I'm
-more than happy to extend it as necessary.
-
--- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+In essence they want a architectural independent map object that can
+bounce around the system with a unique handle.
+>> >
+>> > Thanks for the insight, that's a much better argument than 'something
+>> > may need it'. Are those all chips without an IOMMU or do we also
+>> > need to solve the IOMMU case with split bank allocation?
+>> >
+>> > I think I'd still prefer to see the support for multiple regions split
+>> > out into one of the later patches, especially since that would defer
+>> > the question of how to do the initialization for this case and make
+>> > sure we first get a generic way.
+>> >
+>> > You've convinced me that we need to solve the problem of allocating
+>> > memory from a specific bank eventually, but separating it from the
+>> > one at hand (contiguous allocation) should help getting the important
+>> > groundwork in at first.
+>> >
+>> > The possible conflict that I still see with per-bank CMA regions are:
+>> >
+>> > * It completely destroys memory power management in cases where that
+>> > ? is based on powering down entire memory banks.
+>>
+>> I don't think that per-bank CMA regions destroys memory power management
+>> more than the global CMA pool. Please note that the contiguous buffers
+>> (or in general dma-buffers) right now are unmovable so they don't fit
+>> well into memory power management.
+>
+> We also have platforms where a well-defined part of the memory
+> can be powered off, and other parts can't (or won't). We need a way
+> to steer the place allocations come from to the memory that won't be
+> turned off (so that CMA allocations are not an obstacle to memory
+> hotremove).
+>
+>>
+>> Best regards
+>> --
+>> Marek Szyprowski
+>> Samsung Poland R&D Center
+>>
+>>
+>>
+>> _______________________________________________
+>> Linaro-mm-sig mailing list
+>> Linaro-mm-sig at lists.linaro.org
+>> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
+>
+> Larry Bassel
+>
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
