@@ -1,43 +1,82 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 16 Jun 2011 11:56:03 +0200
-Subject: [RFC] Add Arm cpu topology definition
-In-Reply-To: <20110616094737.GB5583@const.bordeaux.inria.fr>
-References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-	<20110616085547.GH4935@const.famille.thibault.fr>
-	<BANLkTinxz1T7uPAS0u=gth3hAh+SFQkTQQ@mail.gmail.com>
-	<20110616094737.GB5583@const.bordeaux.inria.fr>
-Message-ID: <BANLkTin2F-sJNjrMhTTqrh0J3ej9OVvQxA@mail.gmail.com>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Thu, 16 Jun 2011 11:59:34 +0200
+Subject: Slow spi_sync() on pxa2xx_spi
+In-Reply-To: <20110616091931.GB10075@excalibur.local>
+References: <20110616082112.GA10075@excalibur.local>
+	<BANLkTikuo_fHbw9FFMtorpg15vOnXMK-+g@mail.gmail.com>
+	<20110616091931.GB10075@excalibur.local>
+Message-ID: <20110616095934.GC10075@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 June 2011 11:47, Samuel Thibault <samuel.thibault@ens-lyon.org> wrote:
-> Vincent Guittot, le Thu 16 Jun 2011 11:44:30 +0200, a ?crit :
->> The output of hwloc-gather-topology is :
->>
->> Machine (phys=0 local=280840KB total=280840KB)
->> ? Socket #0 (phys=3)
->> ? ? Core #0 (phys=0)
->> ? ? ? PU #0 (phys=0)
->> ? ? Core #1 (phys=1)
->> ? ? ? PU #1 (phys=1)
->> depth 0: ? ? ? ?1 Machine (type #1)
->> ?depth 1: ? ? ? 1 Socket (type #3)
->> ? depth 2: ? ? ?2 Cores (type #5)
->> ? ?depth 3: ? ? 2 PUs (type #6)
->> Topology not from this system
->>
->> let me know if it's what you want
->
-> This looks good for a bicore socket, yes. ?Could you send me the tarball
-> it created, so we can include it in the hwloc testsuite?
->
+Hello.
 
-yes, I will send it to you
+On Thu, 2011-06-16 at 11:19, Stefan Schmidt wrote:
+> 
+> On Thu, 2011-06-16 at 16:34, Eric Miao wrote:
+> > 
+> > What is the SPI frequency?
+> 
+> I tried various settings in .max_speed_hz from the original 6.6 MHt to
+> 10 MHz and 13MHz as maximum of the controller. Did also not change
+> anything for me.
+> 
+> That reminds me that after defining DEBUG in pxa2xx_spi it did always
+> report 13MHz to me. Need to have a look at it.
 
-> Do you have a example with smt cores?
+Either the debug statement or the setting is indeed wrong.
 
-no, I haven't
+[    0.696759] spi spi1.0: 13000000 Hz actual, PIO
+[    0.715760] spi spi3.0: 13000000 Hz actual, PIO
 
->
-> Samuel
->
+Which comes from this part of the driver (with #define DEBUG set):
+
+        /* NOTE:  PXA25x_SSP _could_ use external clocking ... */
+        if (!pxa25x_ssp_comp(drv_data))
+                dev_dbg(&spi->dev, "%ld Hz actual, %s\n",
+                        clk_get_rate(ssp->clk)
+                                / (1 + ((chip->cr0 & SSCR0_SCR(0xfff)) >> 8)),
+                        chip->enable_dma ? "DMA" : "PIO");
+        else
+                dev_dbg(&spi->dev, "%ld Hz actual, %s\n",
+                        clk_get_rate(ssp->clk) / 2
+                                / (1 + ((chip->cr0 & SSCR0_SCR(0x0ff)) >> 8)),
+                        chip->enable_dma ? "DMA" : "PIO");
+
+But the board file has this:
+
+static struct spi_board_info spi_board_info[] __initdata = {
+        {
+                .modalias = "lis3l02dq",
+                .max_speed_hz = 8000000,/* 8MHz max spi frequency at 3V */
+                .bus_num = 1,
+                .chip_select = 0,
+                .controller_data = &staccel_chip_info,
+                .irq = IRQ_GPIO(96),
+        }, {
+                .modalias = "cc2420",
+//              .max_speed_hz = 6500000,
+                .max_speed_hz = 10000000, /* 10MHz */
+                .bus_num = 3,
+                .chip_select = 0,
+                .controller_data = &cc2420_info,
+                .platform_data = &cc2420_pdata,
+
+        },
+};
+
+Its neither 8MHz for spi1.0 nor 10MHz for spi3.0.
+
+Adding some debug info shows me that the driver gets the data fine form the
+platform data:
+[    0.695770] spi spi1.0: chip->speed_hz: 8000000, spi->max_speed_hz: 8000000
+[    0.695872] spi spi1.0: 13000000 Hz actual, PIO
+[    0.714824] spi spi3.0: chip->speed_hz: 10000000, spi->max_speed_hz: 10000000
+[    0.714929] spi spi3.0: 13000000 Hz actual, PIO
+
+Thats directly above the chip->cr0 and chip->cr1 calculations. Is this just the
+initial seeting and it gets overwritten before a transfer or is the speed
+calculation wrong?
+
+regards
+Stefan Schmidt
