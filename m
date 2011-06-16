@@ -1,52 +1,57 @@
-From: philip@balister.org (Philip Balister)
-Date: Wed, 15 Jun 2011 17:48:12 -0700
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory	Allocator
-	added
-In-Reply-To: <201106150937.18524.arnd@arndb.de>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>	<201106142030.07549.arnd@arndb.de>	<000501cc2b2b$789a54b0$69cefe10$%szyprowski@samsung.com>
-	<201106150937.18524.arnd@arndb.de>
-Message-ID: <4DF952CC.4010301@balister.org>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Thu, 16 Jun 2011 11:43:53 +1000
+Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
+In-Reply-To: <alpine.LFD.2.00.1106151540230.2142@xanadu.home>
+References: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
+	<alpine.LFD.2.00.1106151540230.2142@xanadu.home>
+Message-ID: <20110616014353.GB16214@yookeroo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/15/2011 12:37 AM, Arnd Bergmann wrote:
-> On Wednesday 15 June 2011 09:11:39 Marek Szyprowski wrote:
->> I see your concerns, but I really wonder how to determine the properties
->> of the global/default cma pool. You definitely don't want to give all
->> available memory o CMA, because it will have negative impact on kernel
->> operation (kernel really needs to allocate unmovable pages from time to
->> time).
->
-> Exactly. This is a hard problem, so I would prefer to see a solution for
-> coming up with reasonable defaults.
+On Wed, Jun 15, 2011 at 03:50:37PM -0400, Nicolas Pitre wrote:
+> On Tue, 14 Jun 2011, David Brown wrote:
+> 
+> > Some targets have multiple memory regions.  Parse up to 8 of these
+> > when converting the atags to fdt.
+> > 
+> > Signed-off-by: David Brown <davidb@codeaurora.org>
+> 
+> I've added your patch to my zImage patch queue.
+> 
+> > With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
+> > It seems to work as long as my device tree has placeholders for all of
+> > the properties I need.
+> 
+> I think those missing nodes should simply be created if missing.  I 
+> however don't see any function in the libfdt API to do that -- there is 
+> fdt_add_subnode() but no fdt_add_node().  Any DT expert please?
 
-Is this a situation where passing the information from device tree might 
-help? I know this does not help short term, but I am trying to 
-understand the sorts of problems device tree can help solve.
+fdt_add_subnode() will create a new node as you require.  The
+"subnode" is just supposed to indicate that the parameters are in the
+form of the offset of the parent node and the new node's immediate
+name, rather than taking a full path name for the new node.
 
-Philip
+> Also, should the DTB be enlarged in order to add new nodes, or even 
+> modify existing ones with larger properties?  In other words, 
+> should something like fdt_move(fdt, fdt, fdt_totalsize(fdt)+HEADROOM) be 
+> used beforehand?
 
->
->> The only solution I see now is to provide Kconfig entry to determine
->> the size of the global CMA pool, but this still have some issues,
->> especially for multi-board kernels (each board probably will have
->> different amount of RAM and different memory-consuming devices
->> available). It looks that each board startup code still might need to
->> tweak the size of CMA pool. I can add a kernel command line option for
->> it, but such solution also will not solve all the cases (afair there
->> was a discussion about kernel command line parameters for memory
->> configuration and the conclusion was that it should be avoided).
->
-> The command line option can be a last resort if the heuristics fail,
-> but it's not much better than a fixed Kconfig setting.
->
-> How about a Kconfig option that defines the percentage of memory
-> to set aside for contiguous allocations?
->
-> 	Arnd
->
-> _______________________________________________
-> Linaro-mm-sig mailing list
-> Linaro-mm-sig at lists.linaro.org
-> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
->
+Yes, you will need to do this, fdt_open_into() is the function you
+want.  Without making room first, adding nodes or expanding existing
+properties will return -FDT_ERR_NOSPACE.  Once you've made whatever
+edits you need, you can use fdt_pack() to collapse the tree back to
+its minimum size.
+
+Although this is somewhat awkward, this approach is a deliberate
+design decision, to avoid making libfdt dependent on a working general
+purpose allocator, which may not be available when libfdt is used in
+very limited environments such as a firmware/bootloader.
+
+If you do find things you need to do which libfdt doesn't support, I'm
+more than happy to extend it as necessary.
+
+-- 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
