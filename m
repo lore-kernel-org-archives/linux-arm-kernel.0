@@ -1,387 +1,316 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Jun 2011 20:06:43 +0100
-Subject: [RFC PATCH 15/16] ARM: local timers: move msm to
-	LOCAL_TIMER_DEVICES/MSM_TIMER
+Date: Thu, 16 Jun 2011 20:06:30 +0100
+Subject: [RFC PATCH 02/16] ARM: local timers: add arm_smp_twd driver to
+	driver/clocksource
 In-Reply-To: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
 References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1308251204-16719-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1308251204-16719-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the MSM platforms to use the new msm_timer driver.
-Add the platform device and register it as early platform device.
-In the process, timer.c is reduced to... erm... not a lot.
+Add a "new" driver to driver/clocksource to support the ARM TWD
+hardware. This is basically a copy of arch/arm/kernel/smp_twd.c,
+turned into a platform driver, with a CPU notifier being used
+to start/stop timers on secondary cores.
 
-Cc: David Brown <davidb@codeaurora.org>
-Cc: Daniel Walker <dwalker@fifo99.com>
-Cc: Bryan Huntsman <bryanh@codeaurora.org>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-msm/Kconfig |   10 ++
- arch/arm/mach-msm/timer.c |  290 ++-------------------------------------------
- 2 files changed, 18 insertions(+), 282 deletions(-)
+ drivers/clocksource/Kconfig       |    3 +
+ drivers/clocksource/Makefile      |    1 +
+ drivers/clocksource/arm_smp_twd.c |  265 +++++++++++++++++++++++++++++++++++++
+ 3 files changed, 269 insertions(+), 0 deletions(-)
+ create mode 100644 drivers/clocksource/arm_smp_twd.c
 
-diff --git a/arch/arm/mach-msm/Kconfig b/arch/arm/mach-msm/Kconfig
-index 1516896..65530ae 100644
---- a/arch/arm/mach-msm/Kconfig
-+++ b/arch/arm/mach-msm/Kconfig
-@@ -13,6 +13,8 @@ config ARCH_MSM7X00A
- 	select CPU_V6
- 	select MSM_PROC_COMM
- 	select HAS_MSM_DEBUG_UART_PHYS
-+	select LOCAL_TIMER_DEVICES
-+	select MSM_TIMER
+diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+index 330343b..a436dd4 100644
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -9,3 +9,6 @@ config CLKBLD_I8253
  
- config ARCH_MSM7X30
- 	bool "MSM7x30"
-@@ -24,6 +26,8 @@ config ARCH_MSM7X30
- 	select MSM_GPIOMUX
- 	select MSM_PROC_COMM
- 	select HAS_MSM_DEBUG_UART_PHYS
-+	select LOCAL_TIMER_DEVICES
-+	select MSM_TIMER
- 
- config ARCH_QSD8X50
- 	bool "QSD8X50"
-@@ -35,6 +39,8 @@ config ARCH_QSD8X50
- 	select MSM_GPIOMUX
- 	select MSM_PROC_COMM
- 	select HAS_MSM_DEBUG_UART_PHYS
-+	select LOCAL_TIMER_DEVICES
-+	select MSM_TIMER
- 
- config ARCH_MSM8X60
- 	bool "MSM8X60"
-@@ -46,6 +52,8 @@ config ARCH_MSM8X60
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
- 	select MSM_SCM if SMP
-+	select LOCAL_TIMER_DEVICES
-+	select MSM_TIMER
- 
- config ARCH_MSM8960
- 	bool "MSM8960"
-@@ -56,6 +64,8 @@ config ARCH_MSM8960
- 	select MSM_V2_TLMM
- 	select MSM_GPIOMUX
- 	select MSM_SCM if SMP
-+	select LOCAL_TIMER_DEVICES
-+	select MSM_TIMER
- 
- endchoice
- 
-diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
-index b2747cc..0ce27cf 100644
---- a/arch/arm/mach-msm/timer.c
-+++ b/arch/arm/mach-msm/timer.c
-@@ -13,299 +13,25 @@
-  *
-  */
- 
--#include <linux/init.h>
--#include <linux/time.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/clk.h>
--#include <linux/clockchips.h>
--#include <linux/delay.h>
--#include <linux/io.h>
+ config CLKSRC_MMIO
+ 	bool
++
++config ARM_SMP_TWD
++       bool
+diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+index 7922a0c..b7e6397 100644
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -8,3 +8,4 @@ obj-$(CONFIG_SH_TIMER_MTU2)	+= sh_mtu2.o
+ obj-$(CONFIG_SH_TIMER_TMU)	+= sh_tmu.o
+ obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+ obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
++obj-$(CONFIG_ARM_SMP_TWD)	+= arm_smp_twd.o
+diff --git a/drivers/clocksource/arm_smp_twd.c b/drivers/clocksource/arm_smp_twd.c
+new file mode 100644
+index 0000000..5e2e8cc
+--- /dev/null
++++ b/drivers/clocksource/arm_smp_twd.c
+@@ -0,0 +1,265 @@
++/*
++ *  linux/arch/arm/kernel/smp_twd.c
++ *
++ *  Copyright (C) 2002 ARM Ltd.
++ *  All Rights Reserved
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/delay.h>
++#include <linux/smp.h>
++#include <linux/cpu.h>
++#include <linux/jiffies.h>
++#include <linux/clockchips.h>
++#include <linux/interrupt.h>
++#include <linux/ioport.h>
 +#include <linux/platform_device.h>
- 
- #include <asm/mach/time.h>
--#include <asm/hardware/gic.h>
--#include <mach/msm_iomap.h>
--#include <mach/cpu.h>
- 
--#define TIMER_MATCH_VAL         0x0000
--#define TIMER_COUNT_VAL         0x0004
--#define TIMER_ENABLE            0x0008
--#define TIMER_ENABLE_CLR_ON_MATCH_EN    2
--#define TIMER_ENABLE_EN                 1
--#define TIMER_CLEAR             0x000C
--#define DGT_CLK_CTL             0x0034
--enum {
--	DGT_CLK_CTL_DIV_1 = 0,
--	DGT_CLK_CTL_DIV_2 = 1,
--	DGT_CLK_CTL_DIV_3 = 2,
--	DGT_CLK_CTL_DIV_4 = 3,
-+static struct platform_device msm_timer_device = {
-+	.name		= "msm_timer",
-+	.id		= -1,
- };
--#define CSR_PROTECTION          0x0020
--#define CSR_PROTECTION_EN               1
- 
--#define GPT_HZ 32768
--
--enum timer_location {
--	LOCAL_TIMER = 0,
--	GLOBAL_TIMER = 1,
--};
--
--#define MSM_GLOBAL_TIMER MSM_CLOCK_DGT
--
--/* TODO: Remove these ifdefs */
--#if defined(CONFIG_ARCH_QSD8X50)
--#define DGT_HZ (19200000 / 4) /* 19.2 MHz / 4 by default */
--#define MSM_DGT_SHIFT (0)
--#elif defined(CONFIG_ARCH_MSM7X30) || defined(CONFIG_ARCH_MSM8X60) || \
--				      defined(CONFIG_ARCH_MSM8960)
--#define DGT_HZ (24576000 / 4) /* 24.576 MHz (LPXO) / 4 by default */
--#define MSM_DGT_SHIFT (0)
--#else
--#define DGT_HZ 19200000 /* 19.2 MHz or 600 KHz after shift */
--#define MSM_DGT_SHIFT (5)
--#endif
--
--struct msm_clock {
--	struct clock_event_device   clockevent;
--	struct clocksource          clocksource;
--	unsigned int		    irq;
--	void __iomem                *regbase;
--	uint32_t                    freq;
--	uint32_t                    shift;
--	void __iomem                *global_counter;
--	void __iomem                *local_counter;
--};
--
--enum {
--	MSM_CLOCK_GPT,
--	MSM_CLOCK_DGT,
--	NR_TIMERS,
--};
--
--
--static struct msm_clock msm_clocks[];
--
--static irqreturn_t msm_timer_interrupt(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = dev_id;
--	if (evt->event_handler == NULL)
--		return IRQ_HANDLED;
--	evt->event_handler(evt);
--	return IRQ_HANDLED;
--}
--
--static cycle_t msm_read_timer_count(struct clocksource *cs)
--{
--	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
--
--	return readl(clk->global_counter);
--}
--
--static struct msm_clock *clockevent_to_clock(struct clock_event_device *evt)
--{
--#ifdef CONFIG_SMP
--	int i;
--	for (i = 0; i < NR_TIMERS; i++)
--		if (evt == &(msm_clocks[i].clockevent))
--			return &msm_clocks[i];
--	return &msm_clocks[MSM_GLOBAL_TIMER];
--#else
--	return container_of(evt, struct msm_clock, clockevent);
--#endif
--}
--
--static int msm_timer_set_next_event(unsigned long cycles,
--				    struct clock_event_device *evt)
--{
--	struct msm_clock *clock = clockevent_to_clock(evt);
--	uint32_t now = readl(clock->local_counter);
--	uint32_t alarm = now + (cycles << clock->shift);
--
--	writel(alarm, clock->regbase + TIMER_MATCH_VAL);
--	return 0;
--}
--
--static void msm_timer_set_mode(enum clock_event_mode mode,
--			      struct clock_event_device *evt)
--{
--	struct msm_clock *clock = clockevent_to_clock(evt);
--
--	switch (mode) {
--	case CLOCK_EVT_MODE_RESUME:
--	case CLOCK_EVT_MODE_PERIODIC:
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		writel(TIMER_ENABLE_EN, clock->regbase + TIMER_ENABLE);
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--		disable_irq(evt->irq);
--		/* fall through */
--	case CLOCK_EVT_MODE_SHUTDOWN:
--		writel(0, clock->regbase + TIMER_ENABLE);
--		break;
--	}
--}
--
--static struct msm_clock msm_clocks[] = {
--	[MSM_CLOCK_GPT] = {
--		.clockevent = {
--			.name           = "gp_timer",
--			.features       = CLOCK_EVT_FEAT_ONESHOT,
--			.shift          = 32,
--			.rating         = 200,
--			.set_next_event = msm_timer_set_next_event,
--			.set_mode       = msm_timer_set_mode,
--		},
--		.clocksource = {
--			.name           = "gp_timer",
--			.rating         = 200,
--			.read           = msm_read_timer_count,
--			.mask           = CLOCKSOURCE_MASK(32),
--			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
--		},
--		.irq = INT_GP_TIMER_EXP,
--		.freq = GPT_HZ,
--	},
--	[MSM_CLOCK_DGT] = {
--		.clockevent = {
--			.name           = "dg_timer",
--			.features       = CLOCK_EVT_FEAT_ONESHOT,
--			.shift          = 32 + MSM_DGT_SHIFT,
--			.rating         = 300,
--			.set_next_event = msm_timer_set_next_event,
--			.set_mode       = msm_timer_set_mode,
--		},
--		.clocksource = {
--			.name           = "dg_timer",
--			.rating         = 300,
--			.read           = msm_read_timer_count,
--			.mask           = CLOCKSOURCE_MASK((32 - MSM_DGT_SHIFT)),
--			.flags          = CLOCK_SOURCE_IS_CONTINUOUS,
--		},
--		.irq = INT_DEBUG_TIMER_EXP,
--		.freq = DGT_HZ >> MSM_DGT_SHIFT,
--		.shift = MSM_DGT_SHIFT,
--	}
-+static struct platform_device *msm_early_devices[] = {
-+	&msm_timer_device,
- };
- 
- static void __init msm_timer_init(void)
- {
--	int i;
--	int res;
--	int global_offset = 0;
--
--	if (cpu_is_msm7x01()) {
--		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
--		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
--	} else if (cpu_is_msm7x30()) {
--		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE + 0x04;
--		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x24;
--	} else if (cpu_is_qsd8x50()) {
--		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_CSR_BASE;
--		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_CSR_BASE + 0x10;
--	} else if (cpu_is_msm8x60() || cpu_is_msm8960()) {
--		msm_clocks[MSM_CLOCK_GPT].regbase = MSM_TMR_BASE + 0x04;
--		msm_clocks[MSM_CLOCK_DGT].regbase = MSM_TMR_BASE + 0x24;
--
--		/* Use CPU0's timer as the global timer. */
--		global_offset = MSM_TMR0_BASE - MSM_TMR_BASE;
--	} else
--		BUG();
--
--#ifdef CONFIG_ARCH_MSM_SCORPIONMP
--	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
--#endif
--
--	for (i = 0; i < ARRAY_SIZE(msm_clocks); i++) {
--		struct msm_clock *clock = &msm_clocks[i];
--		struct clock_event_device *ce = &clock->clockevent;
--		struct clocksource *cs = &clock->clocksource;
--
--		clock->local_counter = clock->regbase + TIMER_COUNT_VAL;
--		clock->global_counter = clock->local_counter + global_offset;
--
--		writel(0, clock->regbase + TIMER_ENABLE);
--		writel(0, clock->regbase + TIMER_CLEAR);
--		writel(~0, clock->regbase + TIMER_MATCH_VAL);
--
--		ce->mult = div_sc(clock->freq, NSEC_PER_SEC, ce->shift);
--		/* allow at least 10 seconds to notice that the timer wrapped */
--		ce->max_delta_ns =
--			clockevent_delta2ns(0xf0000000 >> clock->shift, ce);
--		/* 4 gets rounded down to 3 */
--		ce->min_delta_ns = clockevent_delta2ns(4, ce);
--		ce->cpumask = cpumask_of(0);
--
--		res = clocksource_register_hz(cs, clock->freq);
--		if (res)
--			printk(KERN_ERR "msm_timer_init: clocksource_register "
--			       "failed for %s\n", cs->name);
--
--		ce->irq = gic_ppi_to_vppi(clock->irq);
--		res = request_irq(ce->irq, msm_timer_interrupt,
--				  IRQF_TIMER | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
--				  ce->name, ce);
--		if (res)
--			pr_err("msm_timer_init: request_irq failed for %s\n",
--			       ce->name);
--
--		clockevents_register_device(ce);
--	}
--}
--
--#ifdef CONFIG_SMP
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	static bool local_timer_inited;
--	struct msm_clock *clock = &msm_clocks[MSM_GLOBAL_TIMER];
--	int res;
--
--	/* Use existing clock_event for cpu 0 */
--	if (!smp_processor_id())
--		return 0;
--
--	writel(DGT_CLK_CTL_DIV_4, MSM_TMR_BASE + DGT_CLK_CTL);
--
--	evt->irq = gic_ppi_to_vppi(clock->irq);
--	evt->name = "local_timer";
--	evt->features = CLOCK_EVT_FEAT_ONESHOT;
--	evt->rating = clock->clockevent.rating;
--	evt->set_mode = msm_timer_set_mode;
--	evt->set_next_event = msm_timer_set_next_event;
--	evt->shift = clock->clockevent.shift;
--	evt->mult = div_sc(clock->freq, NSEC_PER_SEC, evt->shift);
--	evt->max_delta_ns =
--		clockevent_delta2ns(0xf0000000 >> clock->shift, evt);
--	evt->min_delta_ns = clockevent_delta2ns(4, evt);
--
--	if (!local_timer_inited) {
--		writel(0, clock->regbase  + TIMER_ENABLE);
--		writel(0, clock->regbase + TIMER_CLEAR);
--		writel(~0, clock->regbase + TIMER_MATCH_VAL);
--
--		res = request_irq(evt->irq, msm_timer_interrupt,
--				  IRQF_TIMER | IRQF_NOBALANCING | IRQF_TRIGGER_RISING,
--				  clock->clockevent.name, evt);
--		if (res) {
--			pr_err("local_timer_setup: request_irq failed for %s\n",
--			       clock->clockevent.name);
--			return res;
--		}
--		local_timer_inited = true;
--	} else
--		enable_irq(evt->irq);
--
--	clockevents_register_device(evt);
--	return 0;
--}
--
--inline int local_timer_ack(void)
--{
--	return 1;
-+	early_platform_add_devices(msm_early_devices,
-+				   ARRAY_SIZE(msm_early_devices));
- }
- 
--#endif
--
- struct sys_timer msm_timer = {
- 	.init = msm_timer_init
- };
++
++#include <asm/hardware/gic.h>
++
++#define TWD_TIMER_LOAD			0x00
++#define TWD_TIMER_COUNTER		0x04
++#define TWD_TIMER_CONTROL		0x08
++#define TWD_TIMER_INTSTAT		0x0C
++
++#define TWD_TIMER_CONTROL_ENABLE	(1 << 0)
++#define TWD_TIMER_CONTROL_ONESHOT	(0 << 1)
++#define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
++#define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
++
++static void __iomem *twd_base;
++static int twd_ppi;
++
++static unsigned long twd_timer_rate;
++static DEFINE_PER_CPU(bool, irq_reqd);
++static struct clock_event_device __percpu *twd_evt;
++
++static void twd_set_mode(enum clock_event_mode mode,
++			 struct clock_event_device *clk)
++{
++	unsigned long ctrl;
++
++	switch (mode) {
++	case CLOCK_EVT_MODE_PERIODIC:
++		/* timer load already set up */
++		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
++			| TWD_TIMER_CONTROL_PERIODIC;
++		__raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
++		break;
++	case CLOCK_EVT_MODE_ONESHOT:
++		/* period set, and timer enabled in 'next_event' hook */
++		ctrl = TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT;
++		break;
++	case CLOCK_EVT_MODE_UNUSED:
++	case CLOCK_EVT_MODE_SHUTDOWN:
++	default:
++		ctrl = 0;
++	}
++
++	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++}
++
++static int twd_set_next_event(unsigned long evt,
++			      struct clock_event_device *unused)
++{
++	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
++
++	ctrl |= TWD_TIMER_CONTROL_ENABLE;
++
++	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
++	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
++
++	return 0;
++}
++
++static irqreturn_t twd_handler(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
++		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
++		evt->event_handler(evt);
++		return IRQ_HANDLED;
++	}
++
++	return IRQ_NONE;
++}
++
++static void __cpuinit twd_calibrate_rate(void)
++{
++	unsigned long count;
++	u64 waitjiffies;
++
++	/*
++	 * If this is the first time round, we need to work out how fast
++	 * the timer ticks
++	 */
++	if (twd_timer_rate == 0) {
++		printk(KERN_INFO "Calibrating local timer... ");
++
++		/* Wait for a tick to start */
++		waitjiffies = get_jiffies_64() + 1;
++
++		while (get_jiffies_64() < waitjiffies)
++			udelay(10);
++
++		/* OK, now the tick has started, let's get the timer going */
++		waitjiffies += 5;
++
++				 /* enable, no interrupt or reload */
++		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
++
++				 /* maximum value */
++		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
++
++		while (get_jiffies_64() < waitjiffies)
++			udelay(10);
++
++		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
++
++		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
++
++		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
++			(twd_timer_rate / 1000000) % 100);
++	}
++}
++
++/*
++ * Setup the local clock events for a CPU.
++ */
++static void __cpuinit twd_setup(void *data)
++{
++	struct clock_event_device *clk = data;
++	int err;
++
++	twd_calibrate_rate();
++
++	clk->name = "arm_smp_twd";
++	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
++			CLOCK_EVT_FEAT_C3STOP;
++	clk->rating = 450;
++	clk->set_mode = twd_set_mode;
++	clk->set_next_event = twd_set_next_event;
++	clk->shift = 20;
++	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
++	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
++	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
++	clk->irq = gic_ppi_to_vppi(twd_ppi);
++	clk->cpumask = cpumask_of(smp_processor_id());
++
++	pr_debug("Configuring %s on cpu #%d\n", clk->name, smp_processor_id());
++
++	err = request_irq(clk->irq, twd_handler,
++			  IRQF_PERCPU | IRQF_NOBALANCING | IRQF_TIMER,
++			  clk->name, clk);
++	if (err) {
++		pr_err("%s: can't register interrupt %d on cpu %d (%d)\n",
++		       clk->name, clk->irq, smp_processor_id(), err);
++		return;
++	}
++
++	clockevents_register_device(clk);
++}
++
++static void __cpuinit twd_teardown(void *data)
++{
++	struct clock_event_device *clk = data;
++	pr_debug("twd_teardown disable IRQ%d cpu #%d\n",
++		 clk->irq, smp_processor_id());
++	disable_irq(clk->irq);
++	twd_set_mode(CLOCK_EVT_MODE_UNUSED, clk);
++}
++
++static void __cpuinit twd_restart(void *data)
++{
++	struct clock_event_device *clk = data;
++	pr_debug("twd_restart enable IRQ%d cpu #%d\n",
++		 clk->irq, smp_processor_id());
++	enable_irq(clk->irq);
++	clockevents_register_device(clk);
++}
++
++static int __cpuinit twd_cpu_notify(struct notifier_block *self,
++				    unsigned long action, void *data)
++{
++	int cpu = (int)data;
++	struct clock_event_device *clk = per_cpu_ptr(twd_evt, cpu);
++	bool *reqd = &per_cpu(irq_reqd, cpu);
++
++	switch (action) {
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		if (!*reqd) {
++			smp_call_function_single(cpu, twd_setup, clk, 1);
++			*reqd = true;
++		} else {
++			smp_call_function_single(cpu, twd_restart, clk, 1);
++		}
++		break;
++
++	case CPU_DOWN_PREPARE:
++	case CPU_DOWN_PREPARE_FROZEN:
++		smp_call_function_single(cpu, twd_teardown, clk, 1);
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block __cpuinitdata twd_cpu_nb = {
++	.notifier_call = twd_cpu_notify,
++};
++
++static int twd_probe(struct platform_device *pdev)
++{
++	struct resource *mem;
++	struct clock_event_device *clk;
++	int irq;
++
++	if (twd_base)
++		return -EBUSY;
++
++	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	irq = platform_get_irq(pdev, 0);
++	if (!mem || irq < 0)
++		return -EINVAL;
++
++	twd_base	= ioremap(mem->start, resource_size(mem));
++	twd_evt		= alloc_percpu(struct clock_event_device);
++	if (!twd_base || !twd_evt) {
++		iounmap(twd_base);
++		twd_base = NULL;
++		free_percpu(twd_evt);
++		return -ENOMEM;
++	}
++
++	twd_ppi = irq;
++
++	/* Immediately configure the timer on the boot CPU */
++	clk = per_cpu_ptr(twd_evt, smp_processor_id());
++	twd_setup(clk);
++
++	register_cpu_notifier(&twd_cpu_nb);
++
++	return 0;
++}
++
++static int twd_remove(struct platform_device *pdev)
++{
++	return -EBUSY;
++}
++
++static struct platform_driver twd_driver = {
++	.probe	= twd_probe,
++	.remove = __devexit_p(twd_remove),
++	.driver = {
++		.name	= "arm_smp_twd",
++	},
++};
++
++early_platform_init("localtimer", &twd_driver);
 -- 
 1.7.0.4
