@@ -1,84 +1,47 @@
-From: svenkatr@ti.com (S, Venkatraman)
-Date: Thu, 16 Jun 2011 19:09:25 +0530
-Subject: [PATCH v4 00/12] mmc: use nonblock mmc requests to minimize
-	latency
-In-Reply-To: <1306360653-6196-1-git-send-email-per.forlin@linaro.org>
-References: <1306360653-6196-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <BANLkTi=v7nOaDmdUr2FscNtou-5vRhhmyw@mail.gmail.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Thu, 16 Jun 2011 15:48:48 +0200
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <20110616132441.GJ14846@anthem.async.com.br>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+	<20110616132441.GJ14846@anthem.async.com.br>
+Message-ID: <BANLkTi=zZsArjjEUoB=w-_1JxyMEr-KK_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, May 26, 2011 at 3:27 AM, Per Forlin <per.forlin@linaro.org> wrote:
-> How significant is the cache maintenance over head?
-> It depends, the eMMC are much faster now
-> compared to a few years ago and cache maintenance cost more due to
-> multiple cache levels and speculative cache pre-fetch. In relation the
-> cost for handling the caches have increased and is now a bottle neck
-> dealing with fast eMMC together with DMA.
+On 16 June 2011 15:24, Christian Robottom Reis <kiko@linaro.org> wrote:
+> On Thu, Jun 16, 2011 at 10:49:13AM +0200, Vincent Guittot wrote:
+>> @@ -219,6 +219,24 @@ source "kernel/Kconfig.freezer"
+>>
+>> ?menu "System Type"
+>>
+>> +config SCHED_MC
+>> + ? ? bool "Multi-core scheduler support"
+>> + ? ? depends on SMP && ARM_CPU_TOPOLOGY
+>> + ? ? default n
+>> + ? ? help
+>> + ? ? ? Multi-core scheduler support improves the CPU scheduler's decision
+>> + ? ? ? making when dealing with multi-core CPU chips at a cost of slightly
+>> + ? ? ? increased overhead in some places. If unsure say N here.
+>> +
+>> +config SCHED_SMT
+>> + ? ? bool "SMT scheduler support"
+>> + ? ? depends on SMP && ARM_CPU_TOPOLOGY
+>> + ? ? default n
+>> + ? ? help
+>> + ? ? ? Improves the CPU scheduler's decision making when dealing with
+>> + ? ? ? MultiThreading at a cost of slightly increased overhead in some
+>> + ? ? ? places. If unsure say N here.
+>> +
 >
-> The intention for introducing none blocking mmc requests is to minimize the
-> time between a mmc request ends and another mmc request starts. In the
-> current implementation the MMC controller is idle when dma_map_sg and
-> dma_unmap_sg is processing. Introducing none blocking mmc request makes it
-> possible to prepare the caches for next job parallel with an active
-> mmc request.
->
-> This is done by making the issue_rw_rq() none blocking.
-> The increase in throughput is proportional to the time it takes to
-> prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
-> a request and how fast the memory is. The faster the MMC/SD is
-> the more significant the prepare request time becomes. Measurements on U5500
-> and Panda on eMMC and SD shows significant performance gain for large
-> reads when running DMA mode. In the PIO case the performance is unchanged.
->
-> There are two optional hooks pre_req() and post_req() that the host driver
-> may implement in order to move work to before and after the actual mmc_request
-> function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
-> the dma descriptor and post_req runs the dma_unmap_sg.
->
-> Details on measurements from IOZone and mmc_test:
-> https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
->
-> Changes since v3:
-> ?* Based on 2.6.39-rc7
-> ?* Add error check for testlist in mmc_test.c
-> ?* Resolve in mmc-queue-thread that caused the mmc-thread to miss a wakeup.
-> ?* Move parallel request handling to core.c. This simplifies the interface
-> ? from 4 public functions to 1. This also gives access for SDIO to use the
-> ? same functionallity, even though the function is not tuned for the SDIO
-> ? execution flow yet.
->
-> Per Forlin (12):
-> ?mmc: add none blocking mmc request function
-> ?omap_hsmmc: use original sg_len for dma_unmap_sg
-> ?omap_hsmmc: add support for pre_req and post_req
-> ?mmci: implement pre_req() and post_req()
-> ?mmc: mmc_test: add debugfs file to list all tests
-> ?mmc: mmc_test: add test for none blocking transfers
-> ?mmc: add member in mmc queue struct to hold request data
-> ?mmc: add a block request prepare function
-> ?mmc: move error code in mmc_block_issue_rw_rq to a separate function.
-> ?mmc: add a second mmc queue request member
-> ?mmc: test: add random fault injection in core.c
-> ?mmc: add handling for two parallel block requests in issue_rw_rq
->
-> ?drivers/mmc/card/block.c ? ? ?| ?452 +++++++++++++++++++++++++----------------
-> ?drivers/mmc/card/mmc_test.c ? | ?361 ++++++++++++++++++++++++++++++++-
-> ?drivers/mmc/card/queue.c ? ? ?| ?184 +++++++++++------
-> ?drivers/mmc/card/queue.h ? ? ?| ? 32 +++-
-> ?drivers/mmc/core/core.c ? ? ? | ?165 ++++++++++++++-
-> ?drivers/mmc/core/debugfs.c ? ?| ? ?5 +
-> ?drivers/mmc/host/mmci.c ? ? ? | ?146 ++++++++++++--
-> ?drivers/mmc/host/mmci.h ? ? ? | ? ?8 +
-> ?drivers/mmc/host/omap_hsmmc.c | ? 90 ++++++++-
-> ?include/linux/mmc/core.h ? ? ?| ? ?6 +-
-> ?include/linux/mmc/host.h ? ? ?| ? 19 ++
-> ?lib/Kconfig.debug ? ? ? ? ? ? | ? 11 +
-> ?12 files changed, 1187 insertions(+), 292 deletions(-)
->
+> Quick question: the patch doesn't actually seem to use the SCHED_MC and
+> SCHED_SMT config bits; is that actually correct?
 
-Nitpick.. The mmc_test.c changes should be at the end of the series,
-after the async feature is available.
+The default config of the patch is to disable sched_mc and sched_smt.
+The 1st goal is to let each platform enable and test the feature.
+According to feedback, we could then change the default state of the
+configuration
 
-Regards,
-Venkat.
+> --
+> Christian Robottom Reis ? | [+55] 16 9112 6430 | http://launchpad.net/~kiko
+> Linaro Engineering VP ? ? | [ +1] 612 216 4935 | http://async.com.br/~kiko
+>
