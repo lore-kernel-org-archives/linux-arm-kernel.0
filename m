@@ -1,28 +1,73 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 16 Jun 2011 15:53:26 +0100
-Subject: [PATCH v3 1/9] ARM: l2x0: fix disabling function to avoid deadlock
-In-Reply-To: <1308158600-7169-2-git-send-email-will.deacon@arm.com>
-References: <1308158600-7169-1-git-send-email-will.deacon@arm.com>
-	<1308158600-7169-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20110616145326.GA21494@1n450.cable.virginmedia.net>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 16 Jun 2011 08:56:59 -0600
+Subject: [RFC PATCH 11/11] arm/versatile: Add device tree support
+In-Reply-To: <201106161620.37205.arnd@arndb.de>
+References: <20110616042653.29371.2052.stgit@ponder>
+	<20110616044311.29371.49018.stgit@ponder>
+	<201106161620.37205.arnd@arndb.de>
+Message-ID: <20110616145659.GC3795@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 06:23:12PM +0100, Will Deacon wrote:
-> The l2x0_disable function attempts to writel with the l2x0_lock held.
-> This results in deadlock when the writel contains an outer_sync call
-> for the platform since the l2x0_lock is already held by the disable
-> function. A further problem is that disabling the L2 without flushing it
-> first can lead to the spin_lock operation becoming visible after the
-> spin_unlock, causing any subsequent L2 maintenance to deadlock.
+On Thu, Jun 16, 2011 at 04:20:37PM +0200, Arnd Bergmann wrote:
+> On Thursday 16 June 2011, Grant Likely wrote:
+> > This patch adds a new versatile platform for when using the device
+> > tree.  Add platform and amba devices are discovered and registered by
+> > parsing the device tree.  Clocks and initial io mappings are still
+> > configured statically.
 > 
-> This patch replaces the writel with a call to writel_relaxed in the
-> disabling code and adds a flush before disabling in the control
-> register, preventing livelock from occurring.
+> Hi Grant,
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Two small questions about the device tree contents:
+> 
+> > +       i2c at 10002000 {
+> > +               #address-cells = <1>;
+> > +               #size-cells = <0>;
+> > +               compatible = "arm,versatile-i2c";
+> > +               reg = <0x10002000 0x1000>;
+> > +
+> > +               rtc at 68 {
+> > +                       compatible = "dallas,ds1338";
+> > +                       reg = <0x68>;
+> > +               };
+> > +       };
+> > +
+> > +       net at 10010000 {
+> > +               compatible = "smsc,lan91c111";
+> > +               reg = <0x10010000 0x10000>;
+> > +               interrupts = <25>;
+> > +       };
+> > +
+> > +       lcd at 10008000 {
+> > +               compatible = "arm,versatile-lcd";
+> > +               reg = <0x10008000 0x1000>;
+> > +       };
+> 
+> Why are these devices on the top level, rather than on the AMBA bus or
+> the FPGA? From the documentation, it seems that they are implemented
+> in the FPGA, which would also match the address layout.
 
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Mostly because I 'faked' this device tree based on what is currently
+in the kernel for the Versatile platform.  I need to look at the
+documentation and make it reflect reality, including setting up ranges
+correctly (as you commented on below).
 
--- 
-Catalin
+> 
+> > +       amba {
+> > +               compatible = "arm,amba-bus";
+> > +               #address-cells = <1>;
+> > +               #size-cells = <1>;
+> > +               ranges;
+> > +
+> > +               vic: intc at 10140000 {
+> > +                       compatible = "arm,versatile-vic", "arm,vic";
+> > +                       interrupt-controller;
+> > +                       #interrupt-cells = <1>;
+> > +                       reg = <0x10140000 0x1000>;
+> > +               };
+> > +
+> 
+> Why the empty ranges property? All device registers are based on 0x10000000,
+> so I'd expect this to be described like that here.
+> 
+> 	Arnd
