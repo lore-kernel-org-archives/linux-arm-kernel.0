@@ -1,100 +1,109 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 16 Jun 2011 17:30:03 +0900
-Subject: [PATCH 2/2] Samsung SoC ADC: Channel selection for S5PV210, S5PC110,
-	and Exynos4
-In-Reply-To: <1308213003-6526-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1308213003-6526-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1308213003-6526-2-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 16 Jun 2011 17:30:02 +0900
+Subject: [PATCH 1/2] Samsung SoC ADC: use regulator (VDD for ADC).
+Message-ID: <1308213003-6526-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In S5PV210/S5PC110/Exynos4, ADCMUX channel selection uses ADCMUX
-register, not ADCCON register. This patch corrects the behavior of
-Samsung-ADC for such cpus.
+This patch allows the Samsung ADC driver to enable VDD regulator at
+probe and resume and to disable at exit and suspend.
+In a platform where ADC's VDD regulator is not "always-on", this control
+is required although this patch does not provide fine-grained power
+control (turning on the regulator only when being accessed).
+
+However, if VDD regulator ("vdd" for the adc device) is not provided,
+the regulator control will not be activated because there are platforms
+that do not provide regulator for ADC device.
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/plat-samsung/adc.c |   24 +++++++++++++++++-------
- 1 files changed, 17 insertions(+), 7 deletions(-)
+ arch/arm/plat-samsung/adc.c |   20 +++++++++++++++++++-
+ 1 files changed, 19 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index a8499d8..7895819 100644
+index e8f2be2..a8499d8 100644
 --- a/arch/arm/plat-samsung/adc.c
 +++ b/arch/arm/plat-samsung/adc.c
-@@ -41,8 +41,10 @@
+@@ -21,6 +21,7 @@
+ #include <linux/clk.h>
+ #include <linux/interrupt.h>
+ #include <linux/io.h>
++#include <linux/regulator/consumer.h>
  
- enum s3c_cpu_type {
- 	TYPE_S3C24XX,
--	TYPE_S3C64XX
-+	TYPE_S3C64XX,
-+	TYPE_S5P,
+ #include <plat/regs-adc.h>
+ #include <plat/adc.h>
+@@ -59,6 +60,8 @@ struct s3c_adc_client {
+ 			      unsigned *samples_left);
  };
-+#define S3C64XX_OR_LATER(type)	((type) == TYPE_S3C64XX || (type) == TYPE_S5P)
  
- struct s3c_adc_client {
++#define S3C_ADC_REGULATOR_NAME		"vdd"
++
+ struct adc_device {
  	struct platform_device	*pdev;
-@@ -95,6 +97,7 @@ static inline void s3c_adc_select(struct adc_device *adc,
- 				  struct s3c_adc_client *client)
- {
- 	unsigned con = readl(adc->regs + S3C2410_ADCCON);
-+	enum s3c_cpu_type cpu = platform_get_device_id(adc->pdev)->driver_data;
+ 	struct platform_device	*owner;
+@@ -71,6 +74,7 @@ struct adc_device {
+ 	unsigned int		 prescale;
  
- 	client->select_cb(client, 1);
+ 	int			 irq;
++	struct regulator	*vdd;
+ };
  
-@@ -102,8 +105,12 @@ static inline void s3c_adc_select(struct adc_device *adc,
- 	con &= ~S3C2410_ADCCON_STDBM;
- 	con &= ~S3C2410_ADCCON_STARTMASK;
+ static struct adc_device *adc_dev;
+@@ -338,6 +342,12 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	adc->pdev = pdev;
+ 	adc->prescale = S3C2410_ADCCON_PRSCVL(49);
  
--	if (!client->is_ts)
--		con |= S3C2410_ADCCON_SELMUX(client->channel);
-+	if (!client->is_ts) {
-+		if (cpu == TYPE_S5P)
-+			writel(client->channel & 0xf, adc->regs + S5P_ADCMUX);
-+		else
-+			con |= S3C2410_ADCCON_SELMUX(client->channel);
++	adc->vdd = regulator_get(dev, S3C_ADC_REGULATOR_NAME);
++	if (IS_ERR_OR_NULL(adc->vdd)) {
++		dev_dbg(dev, "operating without regulator %s.\n", S3C_ADC_REGULATOR_NAME);
++		adc->vdd = NULL; /* Do not control regulator */
 +	}
- 
- 	writel(con, adc->regs + S3C2410_ADCCON);
- }
-@@ -289,8 +296,8 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
- 
- 	client->nr_samples--;
- 
--	if (cpu == TYPE_S3C64XX) {
--		/* S3C64XX ADC resolution is 12-bit */
-+	if (S3C64XX_OR_LATER(cpu)) {
-+		/* S3C64XX/S5P ADC resolution is 12-bit */
- 		data0 &= 0xfff;
- 		data1 &= 0xfff;
- 	} else {
-@@ -316,7 +323,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
++
+ 	adc->irq = platform_get_irq(pdev, 1);
+ 	if (adc->irq <= 0) {
+ 		dev_err(dev, "failed to get adc irq\n");
+@@ -372,6 +382,8 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 		goto err_clk;
  	}
  
- exit:
--	if (cpu == TYPE_S3C64XX) {
-+	if (S3C64XX_OR_LATER(cpu)) {
- 		/* Clear ADC interrupt */
- 		writel(0, adc->regs + S3C64XX_ADCCLRINT);
- 	}
-@@ -387,7 +394,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
++	if (adc->vdd)
++		regulator_enable(adc->vdd);
  	clk_enable(adc->clk);
  
  	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
--	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C64XX) {
-+	if (S3C64XX_OR_LATER(platform_get_device_id(pdev)->driver_data)) {
- 		/* Enable 12-bit ADC resolution */
- 		tmp |= S3C64XX_ADCCON_RESSEL;
- 	}
-@@ -475,6 +482,9 @@ static struct platform_device_id s3c_adc_driver_ids[] = {
- 	}, {
- 		.name           = "s3c64xx-adc",
- 		.driver_data    = TYPE_S3C64XX,
-+	}, {
-+		.name		= "s5p-adc",
-+		.driver_data	= TYPE_S5P,
- 	},
- 	{ }
- };
+@@ -406,6 +418,8 @@ static int __devexit s3c_adc_remove(struct platform_device *pdev)
+ 	iounmap(adc->regs);
+ 	free_irq(adc->irq, adc);
+ 	clk_disable(adc->clk);
++	if (adc->vdd)
++		regulator_disable(adc->vdd);
+ 	clk_put(adc->clk);
+ 	kfree(adc);
+ 
+@@ -428,6 +442,8 @@ static int s3c_adc_suspend(struct platform_device *pdev, pm_message_t state)
+ 	disable_irq(adc->irq);
+ 	spin_unlock_irqrestore(&adc->lock, flags);
+ 	clk_disable(adc->clk);
++	if (adc->vdd)
++		regulator_disable(adc->vdd);
+ 
+ 	return 0;
+ }
+@@ -436,6 +452,8 @@ static int s3c_adc_resume(struct platform_device *pdev)
+ {
+ 	struct adc_device *adc = platform_get_drvdata(pdev);
+ 
++	if (adc->vdd)
++		regulator_enable(adc->vdd);
+ 	clk_enable(adc->clk);
+ 	enable_irq(adc->irq);
+ 
+@@ -485,4 +503,4 @@ static int __init adc_init(void)
+ 	return ret;
+ }
+ 
+-arch_initcall(adc_init);
++module_init(adc_init);
 -- 
 1.7.4.1
