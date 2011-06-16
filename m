@@ -1,50 +1,155 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 15 Jun 2011 22:42:04 -0600
-Subject: [RFC PATCH 05/11] dt: Add default match table for bus ids
+Date: Wed, 15 Jun 2011 22:42:22 -0600
+Subject: [RFC PATCH 06/11] drivers/amba: create devices from device tree
 In-Reply-To: <20110616042653.29371.2052.stgit@ponder>
 References: <20110616042653.29371.2052.stgit@ponder>
-Message-ID: <20110616044200.29371.80953.stgit@ponder>
+Message-ID: <20110616044209.29371.34624.stgit@ponder>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No need for most platforms to define their own bus table when calling
-of_platform_populate().  Supply a stock one.
+Add a function to create amba_devices (i.e. primecell peripherals)
+from device tree nodes. The device tree scanning is done by the
+of_platform_populate() function which can call of_amba_device_create
+based on a match table entry.
 
+Nodes with a "arm,primecell-periphid" property can override the h/w
+peripheral id value.
+
+Based on the original work by Jeremy Kerr.
+
+Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+[grant.likely: add Jeremy's original s-o-b line, changes from review
+               comments, and moved all code to drivers/of/platform.c]
 Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
 ---
- drivers/of/platform.c       |    8 ++++++++
- include/linux/of_platform.h |    2 ++
- 2 files changed, 10 insertions(+), 0 deletions(-)
+ .../devicetree/bindings/arm/primecell.txt          |   21 ++++++
+ drivers/of/platform.c                              |   71 ++++++++++++++++++++
+ 2 files changed, 92 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/primecell.txt
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 9b785be..1f4a5d3 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -22,6 +22,14 @@
- #include <linux/of_platform.h>
- #include <linux/platform_device.h>
- 
-+const struct of_device_id of_default_bus_match_table[] = {
-+	{ .compatible = "simple-bus", },
-+#ifdef CONFIG_ARM_AMBA
-+	{ .compatible = "arm,amba-bus", },
-+#endif /* CONFIG_ARM_AMBA */
-+	{} /* Empty terminated list */
+diff --git a/Documentation/devicetree/bindings/arm/primecell.txt b/Documentation/devicetree/bindings/arm/primecell.txt
+new file mode 100644
+index 0000000..1d5d7a8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/primecell.txt
+@@ -0,0 +1,21 @@
++* ARM Primecell Peripherals
++
++ARM, Ltd. Primecell peripherals have a standard id register that can be used to
++identify the peripheral type, vendor, and revision. This value can be used for
++driver matching.
++
++Required properties:
++
++- compatible : should be a specific value for peripheral and "arm,primecell"
++
++Optional properties:
++
++- arm,primecell-periphid : Value to override the h/w value with
++
++Example:
++
++serial at fff36000 {
++	compatible = "arm,pl011", "arm,primecell";
++	arm,primecell-periphid = <0x00341011>;
 +};
 +
- static int of_dev_node_match(struct device *dev, void *data)
- {
- 	return dev->of_node == data;
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 43c723d..8390233 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -40,6 +40,8 @@ struct of_platform_driver
- #define	to_of_platform_driver(drv) \
- 	container_of(drv,struct of_platform_driver, driver)
+diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+index 1f4a5d3..4192ddc 100644
+--- a/drivers/of/platform.c
++++ b/drivers/of/platform.c
+@@ -13,6 +13,7 @@
+  */
+ #include <linux/errno.h>
+ #include <linux/module.h>
++#include <linux/amba/bus.h>
+ #include <linux/device.h>
+ #include <linux/dma-mapping.h>
+ #include <linux/slab.h>
+@@ -217,6 +218,71 @@ struct platform_device *of_platform_device_create(struct device_node *np,
+ }
+ EXPORT_SYMBOL(of_platform_device_create);
  
-+extern const struct of_device_id of_default_bus_match_table[];
++#ifdef CONFIG_ARM_AMBA
++static struct amba_device *of_amba_device_create(struct device_node *node,
++						 const char *bus_id,
++						 void *platform_data,
++						 struct device *parent)
++{
++	struct amba_device *dev;
++	const void *prop;
++	int i, ret;
 +
- /* Platform drivers register/unregister */
- extern struct platform_device *of_device_alloc(struct device_node *np,
- 					 const char *bus_id,
++	pr_debug("Creating amba device %s\n", node->full_name);
++
++	if (!of_device_is_available(node))
++		return NULL;
++
++	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
++	if (!dev)
++		return NULL;
++
++	/* setup generic device info */
++	dev->dev.coherent_dma_mask = ~0;
++	dev->dev.of_node = of_node_get(node);
++	dev->dev.parent = parent;
++	dev->dev.platform_data = platform_data;
++	if (bus_id)
++		dev_set_name(&dev->dev, "%s", bus_id);
++	else
++		of_device_make_bus_id(&dev->dev);
++
++	/* setup amba-specific device info */
++	dev->dma_mask = ~0;
++
++	/* Allow the HW Peripheral ID to be overridden */
++	prop = of_get_property(node, "arm,primecell-periphid", NULL);
++	if (prop)
++		dev->periphid = of_read_ulong(prop, 1);
++
++	/* Decode the IRQs and address ranges */
++	for (i = 0; i < AMBA_NR_IRQS; i++)
++		dev->irq[i] = irq_of_parse_and_map(node, i);
++
++	ret = of_address_to_resource(node, 0, &dev->res);
++	if (ret)
++		goto err_free;
++
++	ret = amba_device_register(dev, &iomem_resource);
++	if (ret)
++		goto err_free;
++
++	return dev;
++
++err_free:
++	kfree(dev);
++	return NULL;
++}
++#else /* CONFIG_ARM_AMBA */
++static struct amba_device *of_amba_device_create(struct device_node *node,
++						 const char *bus_id,
++						 void *platform_data,
++						 struct device *parent)
++{
++	return NULL;
++}
++#endif /* CONFIG_ARM_AMBA */
++
+ /**
+  * of_platform_bus_create() - Create a device for a node and its children.
+  * @bus: device node of the bus to instantiate
+@@ -242,6 +308,11 @@ static int of_platform_bus_create(struct device_node *bus,
+ 		return 0;
+ 	}
+ 
++	if (of_device_is_compatible(bus, "arm,primecell")) {
++		of_amba_device_create(bus, NULL, NULL, parent);
++		return 0;
++	}
++
+ 	dev = of_platform_device_create(bus, NULL, parent);
+ 	if (!dev || !of_match_node(matches, bus))
+ 		return 0;
