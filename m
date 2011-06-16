@@ -1,167 +1,129 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Jun 2011 20:06:35 +0100
-Subject: [RFC PATCH 07/16] ARM: local timers: move OMAP4 to
-	LOCAL_TIMER_DEVICES/ARM_SMP_TWD
-In-Reply-To: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1308251204-16719-8-git-send-email-marc.zyngier@arm.com>
+Date: Thu, 16 Jun 2011 20:06:28 +0100
+Subject: [RFC PATCH 00/16] Consolidation: move SMP local timers to
+	driver/clocksource
+Message-ID: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the OMAP4 platforms to use the new arm_smp_twd driver.
-Add the platform device and register it as early platform device.
+The arch/arm tree contains several SMP local timer implementations
+(smp_twd, Exynos4 mct, and the msm timer, with more to come), and the
+word these days is that they should be moved to the driver directory.
 
-Tested on a Pandaboard.
+Furthermore, the current core implementation makes it impossible to
+compile a kernel with several SMP local timer implementations, as the
+core code directly calls into the driver code.
 
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <santosh.shilimkar@ti.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/mach-omap2/Kconfig     |    3 +-
- arch/arm/mach-omap2/Makefile    |    1 -
- arch/arm/mach-omap2/timer-gp.c  |   40 ++++++++++++++++++++++++++++++++------
- arch/arm/mach-omap2/timer-mpu.c |   40 ---------------------------------------
- 4 files changed, 35 insertions(+), 49 deletions(-)
+This series moves these three drivers to driver/clocksource, with the
+following changes:
+- They are converted to platform devices, and registered as early devices.
+- CPU notifiers are used to start/stop the timers on secondary cores.
+
+Each platform registers an early platform device with the associated
+resources (memory, interrupts). At the core level, an early device
+probe hook is installed, and binds devices and drivers if
+possible. The broadcast timer is always registered by the core code,
+and is used by the kernel if no other timer is available.
+
+Small side effect on the mpcode_wdt watchdog driver, who used to share
+an include file with smp_twd, and now has a private copy of the
+definition of few registers it needs.
+
+It should be relatively easy to move other (non SMP)
+timers/clocksources the same way, as it's already been done for
+shmobile. Furthermore, it is now straightforward to convert these
+platform devices to OF devices, and plug everything into the device
+tree.
+
+Patches against next-20110615 + my earlier GIC-PPI series. Tested on
+VExpress, PB11MP, Pandaboard, Tegra Harmony and Exynos4 SMDK-v310.
+
+Thomas and Arnd cc-ed on the whole series, as this could be
+consolidation material.
+
+As always, comments welcome.
+
+Marc Zyngier (16):
+  ARM: local timers: early device probing hooks
+  ARM: local timers: add arm_smp_twd driver to driver/clocksource
+  ARM: local timers: move realview to LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+  ARM: local timers: move vexpress to LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+  ARM: local timers: remove localtimer.c from plat-versatile
+  ARM: local timers: move Tegra to LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+  ARM: local timers: move OMAP4 to LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+  ARM: local timers: move shmobile to LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+  ARM: local timers: move ux500 to LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+  ARM: local timers: add exynos_mct driver to driver/clocksource
+  ARM: local timers: move exynos4 to
+    LOCAL_TIMER_DEVICES/EXYNOS_MCT/ARM_SMP_TWD
+  ARM: watchdog: make mpcore_wdt independant from asm/smp_twd.h
+  ARM: local timers: remove smp_twd from arch/arm
+  ARM: local timers: add msm_timer driver to driver/clocksource
+  ARM: local timers: move msm to LOCAL_TIMER_DEVICES/MSM_TIMER
+  ARM: local timers: remove local timer support from arch/arm
+
+ arch/arm/Kconfig                         |   19 +--
+ arch/arm/include/asm/localtimer.h        |   58 -----
+ arch/arm/include/asm/mach/time.h         |    1 +
+ arch/arm/include/asm/smp_twd.h           |   28 ---
+ arch/arm/kernel/Makefile                 |    1 -
+ arch/arm/kernel/smp.c                    |   70 ++-----
+ arch/arm/kernel/smp_twd.c                |  163 --------------
+ arch/arm/kernel/time.c                   |   15 ++
+ arch/arm/mach-exynos4/Kconfig            |    2 +
+ arch/arm/mach-exynos4/Makefile           |    1 -
+ arch/arm/mach-exynos4/localtimer.c       |   27 ---
+ arch/arm/mach-exynos4/mct.c              |  197 +----------------
+ arch/arm/mach-exynos4/time.c             |   33 +++-
+ arch/arm/mach-msm/Kconfig                |   10 +
+ arch/arm/mach-msm/timer.c                |  290 +------------------------
+ arch/arm/mach-omap2/Kconfig              |    3 +-
+ arch/arm/mach-omap2/Makefile             |    1 -
+ arch/arm/mach-omap2/timer-gp.c           |   40 +++-
+ arch/arm/mach-omap2/timer-mpu.c          |   40 ----
+ arch/arm/mach-realview/Kconfig           |    8 +
+ arch/arm/mach-realview/realview_eb.c     |   31 +++-
+ arch/arm/mach-realview/realview_pb11mp.c |   30 +++-
+ arch/arm/mach-realview/realview_pbx.c    |   31 +++-
+ arch/arm/mach-shmobile/Kconfig           |    2 +
+ arch/arm/mach-shmobile/Makefile          |    1 -
+ arch/arm/mach-shmobile/localtimer.c      |   27 ---
+ arch/arm/mach-shmobile/platsmp.c         |    1 -
+ arch/arm/mach-shmobile/setup-sh73a0.c    |   21 ++
+ arch/arm/mach-shmobile/smp-sh73a0.c      |    6 -
+ arch/arm/mach-shmobile/timer.c           |    2 +-
+ arch/arm/mach-tegra/Kconfig              |    2 +
+ arch/arm/mach-tegra/Makefile             |    2 +-
+ arch/arm/mach-tegra/localtimer.c         |   27 ---
+ arch/arm/mach-tegra/timer.c              |   32 +++-
+ arch/arm/mach-ux500/Kconfig              |    2 +
+ arch/arm/mach-ux500/Makefile             |    1 -
+ arch/arm/mach-ux500/cpu-db5500.c         |    1 -
+ arch/arm/mach-ux500/cpu-db8500.c         |    1 -
+ arch/arm/mach-ux500/cpu.c                |   38 +++-
+ arch/arm/mach-ux500/localtimer.c         |   30 ---
+ arch/arm/mach-vexpress/Kconfig           |    2 +
+ arch/arm/mach-vexpress/ct-ca9x4.c        |   30 +++-
+ arch/arm/plat-s5p/s5p-time.c             |    1 -
+ arch/arm/plat-versatile/Makefile         |    1 -
+ arch/arm/plat-versatile/localtimer.c     |   28 ---
+ drivers/clocksource/Kconfig              |    6 +
+ drivers/clocksource/Makefile             |    3 +
+ drivers/clocksource/arm_smp_twd.c        |  265 +++++++++++++++++++++++
+ drivers/clocksource/exynos4_mct.c        |  283 ++++++++++++++++++++++++
+ drivers/clocksource/msm_timer.c          |  345 ++++++++++++++++++++++++++++++
+ drivers/watchdog/Kconfig                 |    2 +-
+ drivers/watchdog/mpcore_wdt.c            |    7 +-
+ 52 files changed, 1239 insertions(+), 1029 deletions(-)
+ delete mode 100644 arch/arm/include/asm/localtimer.h
+ delete mode 100644 arch/arm/include/asm/smp_twd.h
+ delete mode 100644 arch/arm/kernel/smp_twd.c
+ delete mode 100644 arch/arm/mach-exynos4/localtimer.c
  delete mode 100644 arch/arm/mach-omap2/timer-mpu.c
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 19d5891..805d7b9 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -44,7 +44,8 @@ config ARCH_OMAP4
- 	depends on ARCH_OMAP2PLUS
- 	select CPU_V7
- 	select ARM_GIC
--	select LOCAL_TIMERS if SMP
-+	select LOCAL_TIMER_DEVICES if SMP
-+	select ARM_SMP_TWD
- 	select PL310_ERRATA_588369
- 	select PL310_ERRATA_727915
- 	select ARM_ERRATA_720789
-diff --git a/arch/arm/mach-omap2/Makefile b/arch/arm/mach-omap2/Makefile
-index b148077..f48c989 100644
---- a/arch/arm/mach-omap2/Makefile
-+++ b/arch/arm/mach-omap2/Makefile
-@@ -22,7 +22,6 @@ obj-$(CONFIG_TWL4030_CORE) += omap_twl.o
- 
- # SMP support ONLY available for OMAP4
- obj-$(CONFIG_SMP)			+= omap-smp.o omap-headsmp.o
--obj-$(CONFIG_LOCAL_TIMERS)		+= timer-mpu.o
- obj-$(CONFIG_HOTPLUG_CPU)		+= omap-hotplug.o
- obj-$(CONFIG_ARCH_OMAP4)		+= omap44xx-smc.o omap4-common.o
- 
-diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
-index 3b9cf85..f2f0db6 100644
---- a/arch/arm/mach-omap2/timer-gp.c
-+++ b/arch/arm/mach-omap2/timer-gp.c
-@@ -35,10 +35,10 @@
- #include <linux/irq.h>
- #include <linux/clocksource.h>
- #include <linux/clockchips.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/mach/time.h>
- #include <plat/dmtimer.h>
--#include <asm/localtimer.h>
- #include <asm/sched_clock.h>
- #include <plat/common.h>
- #include <plat/omap_hwmod.h>
-@@ -247,18 +247,44 @@ static void __init omap2_gp_clocksource_init(void)
- }
- #endif
- 
-+#ifdef CONFIG_ARM_SMP_TWD
-+static struct resource omap2_gp_twd_resources[] = {
-+	{
-+		.start	= OMAP44XX_LOCAL_TWD_BASE,
-+		.end	= OMAP44XX_LOCAL_TWD_BASE + 0x10,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= OMAP44XX_IRQ_LOCALTIMER,
-+		.end	= OMAP44XX_IRQ_LOCALTIMER,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device omap2_gp_twd_device = {
-+	.name		= "arm_smp_twd",
-+	.id		= -1,
-+	.resource	= omap2_gp_twd_resources,
-+	.num_resources	= ARRAY_SIZE(omap2_gp_twd_resources),
-+};
-+
-+static struct platform_device *omap2_gp_early_devices[] = {
-+	&omap2_gp_twd_device,
-+};
-+#endif
-+
- static void __init omap2_gp_timer_init(void)
- {
--#ifdef CONFIG_LOCAL_TIMERS
--	if (cpu_is_omap44xx()) {
--		twd_base = ioremap(OMAP44XX_LOCAL_TWD_BASE, SZ_256);
--		BUG_ON(!twd_base);
--	}
--#endif
- 	omap_dm_timer_init();
- 
- 	omap2_gp_clockevent_init();
- 	omap2_gp_clocksource_init();
-+#ifdef CONFIG_ARM_SMP_TWD
-+	/* Local timers are not supprted on OMAP4430 ES1.0 */
-+	if (omap_rev() != OMAP4430_REV_ES1_0)
-+		early_platform_add_devices(omap2_gp_early_devices,
-+					   ARRAY_SIZE(omap2_gp_early_devices));
-+#endif
- }
- 
- struct sys_timer omap_timer = {
-diff --git a/arch/arm/mach-omap2/timer-mpu.c b/arch/arm/mach-omap2/timer-mpu.c
-deleted file mode 100644
-index 1fd5ca5..0000000
---- a/arch/arm/mach-omap2/timer-mpu.c
-+++ /dev/null
-@@ -1,40 +0,0 @@
--/*
-- * The MPU local timer source file. In OMAP4, both cortex-a9 cores have
-- * own timer in it's MPU domain. These timers will be driving the
-- * linux kernel SMP tick framework when active. These timers are not
-- * part of the wake up domain.
-- *
-- * Copyright (C) 2009 Texas Instruments, Inc.
-- *
-- * Author:
-- *      Santosh Shilimkar <santosh.shilimkar@ti.com>
-- *
-- * This file is based on arm realview smp platform file.
-- * Copyright (C) 2002 ARM Ltd.
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--#include <linux/init.h>
--#include <linux/smp.h>
--#include <linux/clockchips.h>
--#include <asm/irq.h>
--#include <asm/smp_twd.h>
--#include <asm/localtimer.h>
--#include <asm/hardware/gic.h>
--
--/*
-- * Setup the local clock events for a CPU.
-- */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	/* Local timers are not supprted on OMAP4430 ES1.0 */
--	if (omap_rev() == OMAP4430_REV_ES1_0)
--		return -ENXIO;
--
--	evt->irq = gic_ppi_to_vppi(OMAP44XX_IRQ_LOCALTIMER);
--	twd_timer_setup(evt);
--	return 0;
--}
--
--- 
-1.7.0.4
+ delete mode 100644 arch/arm/mach-shmobile/localtimer.c
+ delete mode 100644 arch/arm/mach-tegra/localtimer.c
+ delete mode 100644 arch/arm/mach-ux500/localtimer.c
+ delete mode 100644 arch/arm/plat-versatile/localtimer.c
+ create mode 100644 drivers/clocksource/arm_smp_twd.c
+ create mode 100644 drivers/clocksource/exynos4_mct.c
+ create mode 100644 drivers/clocksource/msm_timer.c
