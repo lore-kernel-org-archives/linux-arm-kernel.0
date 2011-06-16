@@ -1,48 +1,40 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 16 Jun 2011 14:19:42 +0200
-Subject: [PATCH V2] mmc: Enable the ADMA on esdhc imx driver
-In-Reply-To: <20110616120629.GD31375@pma.sysgo.com>
-References: <20110615082223.GA28798@atrey.karlin.mff.cuni.cz>
-	<20110616115133.GC31375@pma.sysgo.com>
-	<20110616120009.GA23579@pengutronix.de>
-	<20110616120629.GD31375@pma.sysgo.com>
-Message-ID: <20110616121942.GD23579@pengutronix.de>
+From: vitalywool@gmail.com (Vitaly Wool)
+Date: Thu, 16 Jun 2011 14:20:27 +0200
+Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
+In-Reply-To: <20110614135518.GH23145@atomide.com>
+References: <1308053788-25937-1-git-send-email-shahar@wizery.com>
+	<20110614123359.GB23145@atomide.com>
+	<BANLkTikE_caRE9uD6KN7h7OcY4nyUoRk9g@mail.gmail.com>
+	<20110614135518.GH23145@atomide.com>
+Message-ID: <BANLkTi=XocYNPwuB2_-T8AHQkfEuzUnd9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 02:06:29PM +0200, Pavel Machek wrote:
-> On Thu 2011-06-16 14:00:09, Wolfram Sang wrote:
-> > 
-> > > Unfortunately register differences are common. Is there better
-> > > approach than patching it in low level functions like this?
-> > 
-> > I am all ears for suggestions...
-> 
-> One way would be to move functions such as 
-> 
-> sdhci_activate_led()
-> 
-> to the low level driver,
+Hi Shahar, Tony,
 
-There is no "low level driver" if the controller is done right.
+On Tue, Jun 14, 2011 at 3:55 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Shahar Lev <shahar@wizery.com> [110614 06:21]:
+>> On Tue, Jun 14, 2011 at 3:34 PM, Tony Lindgren <tony@atomide.com> wrote:
+>> >
+>> > This your should try to remove as it won't work nicely for supporting
+>> > various boards with the same kernel as we already do with
+>> > omap2plus_defconfig.
+>> >
+>> > Can you somehow detect the daughter board dynamically and then
+>> > set the flags?
+>> >
+>>
+>> We thought about multi-board kernels, but unfortunately have no
+>> better solution, since there is no dynamic way to probe these cards.
+>> Even worse, these cards sometimes come with different clocks in them,
+>> hence the 2nd OMAP3EVM_MISTRAL_WL12XX_REFCLOCK entry we had to
+>> introduce...
+>>
+>> Maybe we should add two bootargs with which the user can override this
+>> Kconfig configuration? This should allow using the same kernel binary
+>> with different omap3evm boards.
 
-> and introduce functions such as write_host_control() -- with no
-> corresponding read_host_control, so that translation is easy to do...
+You won't need Kconfig parameters then. Just have module parameters
+and supply whatever default values you find reasonable.
 
-So, a seperate function for every register which differs from the
-standard? There are a lot of SoCs out there, and even more to come...
-
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110616/09c3d3da/attachment.sig>
+~Vitaly
