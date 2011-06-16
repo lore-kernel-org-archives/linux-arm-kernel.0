@@ -1,87 +1,55 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 16 Jun 2011 13:32:46 -0600
-Subject: [PATCH 00/14] GPIO: OMAP: first round of cleanup
-In-Reply-To: <877h8lljzt.fsf@ti.com>
-References: <1305904497-26013-1-git-send-email-khilman@ti.com>
-	<20110527032439.GK5032@ponder.secretlab.ca> <87r56trc8k.fsf@ti.com>
-	<20110616162604.GE3795@ponder.secretlab.ca> <877h8lljzt.fsf@ti.com>
-Message-ID: <20110616193246.GL3795@ponder.secretlab.ca>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 16 Jun 2011 12:40:30 -0700
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+Message-ID: <4DFA5C2E.40507@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 11:16:38AM -0700, Kevin Hilman wrote:
-> Grant Likely <grant.likely@secretlab.ca> writes:
-> 
-> > On Thu, Jun 16, 2011 at 09:07:39AM -0700, Kevin Hilman wrote:
-> >> Grant Likely <grant.likely@secretlab.ca> writes:
-> >> 
-> >> > On Fri, May 20, 2011 at 05:14:43PM +0200, Kevin Hilman wrote:
-> >> >> Start moving SoC-specific register handling out of the driver by passing
-> >> >> in register offsets in via platform data.
-> >> >> 
-> >> >> Also, move OMAP1 MPUIO IRQ handling over to genric IRQ chip.
-> >> >> 
-> >> >> Applies on top of Tony's for-next branch (which include's the generic
-> >> >> IRQ chip work from tglx) and the OMAP GPIO driver move to
-> >> >> drivers/gpio.
-> >> >
-> >> > Hey Kevin,
-> >> >
-> >> > If you've got a branch with this series in it and tested, then I'd be
-> >> > happy to pull that instead of applying the patches myself.
-> >> >
-> >> 
-> >> OK, I rebased this on v3.0-rc2 and now it's been through quite a bit
-> >> more testing.
-> >> 
-> >> Here's a branch for you.
-> >
-> > Thanks.  A minor comment though...
-> >
-> >> 
-> >> Also FYI, we'll probably have 2nd round of GPIO cleanups/updates and
-> >> runtime PM conversion for the upcoming merge window too.
-> >
-> > Okay.
-> >
-> >> 
-> >> Kevin
-> >> 
-> >> The following changes since commit 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
-> >> 
-> >>   Linux 3.0-rc3 (2011-06-13 15:29:59 -0700)
-> >> 
-> >> are available in the git repository at:
-> >>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/gpio-cleanup
-> >> 
-> >> Charulatha V (1):
-> >>       GPIO: OMAP: remove get_gpio_bank()
-> >> 
-> >> Kevin Hilman (13):
-> >>       GPIO: OMAP: _clear_gpio_irqbank: fix flushing of posted write
-> >>       GPIO: OMAP: remove MPUIO handling from _clear_gpio_irqbank()
-> >>       GPIO: OMAP: move bank width into struct gpio_bank
-> >>       GPIO: OMAP: _get_gpio_irqbank_mask: replace hard-coded mask with bank->width
-> >>       GPIO: OMAP: replace get_gpio_index() by using bank width
-> >>       GPIO: OMAP: consolidate direction, input, output, remove #ifdefs
-> >>       GPIO: OMAP: consolidate IRQ status handling, remove #ifdefs
-> >>       GPIO: OMAP: conslidate enable/disable of GPIO IRQs, remove ifdefs
-> >>       GPIO: OMAP: convert MPUIO IRQ over to generic irq_chip
-> >>       GPIO: OMAP: remove useless gpio_valid() & check_gpio() checks
-> >>       GPIO: OMAP: cleanup _set_gpio_wakeup(), remove ifdefs
-> >>       GPIO: OMAP: debounce remove SoC specific registers, use pdata
-> >>       GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
-> >
-> > Use this form for the patch summaries please: "gpio/omap: ...."
-> >
-> > It's better for the pull req to Linus when all the gpio patches look the same.
-> 
-> heh, every subsystem has it's own conventions.
-> 
-> OK, reworded the shortlogs, re-spun it and re-pushed to the same branch
-> name.  It might not be to all the mirrors yet, so you might want to pull
-> using ssh://master.kernel.org/...
+On 06/16/2011 01:49 AM, Vincent Guittot wrote:
+> +config SCHED_MC
+> +	bool "Multi-core scheduler support"
+> +	depends on SMP && ARM_CPU_TOPOLOGY
+> +	default n
+> +	help
+> +	  Multi-core scheduler support improves the CPU scheduler's decision
+> +	  making when dealing with multi-core CPU chips at a cost of slightly
+> +	  increased overhead in some places. If unsure say N here.
+> +
+> +config SCHED_SMT
+> +	bool "SMT scheduler support"
+> +	depends on SMP && ARM_CPU_TOPOLOGY
+> +	default n
+> +	help
+> +	  Improves the CPU scheduler's decision making when dealing with
+> +	  MultiThreading at a cost of slightly increased overhead in some
+> +	  places. If unsure say N here.
+> +
 
-Merged, thanks.
+The default is already n so you can drop those two lines.
 
-g.
+> +		 * This is a multiprocessor system
+> +		 * multiprocessor format & multiprocessor mode field are set
+> +		 */
+> +
+> +		if (mpidr & (0x1 << 24)) {
+> +			/* core performance interdependency */
+> +			cpuid_topo->thread_id = (mpidr & 0x3);
+> +			cpuid_topo->core_id =  ((mpidr >> 8) & 0xF);
+> +			cpuid_topo->socket_id = ((mpidr >> 16) & 0xFF);
+> +		} else {
+> +			/* normal core interdependency */
+> +			cpuid_topo->thread_id = -1;
+> +			cpuid_topo->core_id = (mpidr & 0x3);
+> +			cpuid_topo->socket_id = ((mpidr >> 8) & 0xF);
+> +		}
+> +
+
+The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
+different vendors may attribute different meaning to these fields if
+they wish. Does that mean this should be a platform_*() function?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
