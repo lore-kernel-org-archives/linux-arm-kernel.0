@@ -1,64 +1,135 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Jun 2011 20:06:34 +0100
-Subject: [RFC PATCH 06/16] ARM: local timers: move Tegra to
-	LOCAL_TIMER_DEVICES/ARM_SMP_TWD
+Date: Thu, 16 Jun 2011 20:06:41 +0100
+Subject: [RFC PATCH 13/16] ARM: local timers: remove smp_twd from arch/arm
 In-Reply-To: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
 References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1308251204-16719-7-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1308251204-16719-14-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Convert the Tegra platforms to use the new arm_smp_twd driver.
-Add the platform device and register it as early platform device.
+There is no in-tree user of arch/arm/kernel/smp_twd.c, as they've
+been all converted to driver/clocksource/arm_smp_twd.c.
 
-Tested on a Harmony board.
+Shed a tear, and get rid of it.
 
-Cc: Colin Cross <ccross@android.com>
-Cc: Erik Gilling <konkers@android.com>
-Cc: Olof Johansson <olof@lixom.net>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/mach-tegra/Kconfig      |    2 ++
- arch/arm/mach-tegra/Makefile     |    2 +-
- arch/arm/mach-tegra/localtimer.c |   27 ---------------------------
- arch/arm/mach-tegra/timer.c      |   32 +++++++++++++++++++++++++++-----
- 4 files changed, 30 insertions(+), 33 deletions(-)
- delete mode 100644 arch/arm/mach-tegra/localtimer.c
+ arch/arm/Kconfig                  |    8 --
+ arch/arm/include/asm/localtimer.h |   10 ---
+ arch/arm/include/asm/smp_twd.h    |   28 -------
+ arch/arm/kernel/Makefile          |    1 -
+ arch/arm/kernel/smp_twd.c         |  163 -------------------------------------
+ 5 files changed, 0 insertions(+), 210 deletions(-)
+ delete mode 100644 arch/arm/include/asm/smp_twd.h
+ delete mode 100644 arch/arm/kernel/smp_twd.c
 
-diff --git a/arch/arm/mach-tegra/Kconfig b/arch/arm/mach-tegra/Kconfig
-index 5ec1846..4b05f02 100644
---- a/arch/arm/mach-tegra/Kconfig
-+++ b/arch/arm/mach-tegra/Kconfig
-@@ -9,6 +9,8 @@ config ARCH_TEGRA_2x_SOC
- 	bool "Tegra 2 family"
- 	select CPU_V7
- 	select ARM_GIC
-+	select LOCAL_TIMER_DEVICES
-+	select ARM_SMP_TWD
- 	select ARCH_REQUIRE_GPIOLIB
- 	select USB_ARCH_HAS_EHCI if USB_SUPPORT
- 	select USB_ULPI if USB_SUPPORT
-diff --git a/arch/arm/mach-tegra/Makefile b/arch/arm/mach-tegra/Makefile
-index 823c703..efbddfc 100644
---- a/arch/arm/mach-tegra/Makefile
-+++ b/arch/arm/mach-tegra/Makefile
-@@ -12,7 +12,7 @@ obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += clock.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)         += tegra2_clocks.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= tegra2_emc.o
- obj-$(CONFIG_ARCH_TEGRA_2x_SOC)		+= pinmux-t2-tables.o
--obj-$(CONFIG_SMP)                       += platsmp.o localtimer.o headsmp.o
-+obj-$(CONFIG_SMP)                       += platsmp.o headsmp.o
- obj-$(CONFIG_HOTPLUG_CPU)               += hotplug.o
- obj-$(CONFIG_TEGRA_SYSTEM_DMA)		+= dma.o
- obj-$(CONFIG_CPU_FREQ)                  += cpu-tegra.o
-diff --git a/arch/arm/mach-tegra/localtimer.c b/arch/arm/mach-tegra/localtimer.c
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index dafb20a..f3c1124 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1370,13 +1370,6 @@ config HAVE_ARM_SCU
+ 	help
+ 	  This option enables support for the ARM system coherency unit
+ 
+-config HAVE_ARM_TWD
+-	bool
+-	depends on SMP
+-	select TICK_ONESHOT
+-	help
+-	  This options enables support for the ARM timer and watchdog unit
+-
+ choice
+ 	prompt "Memory split"
+ 	default VMSPLIT_3G
+@@ -1417,7 +1410,6 @@ config LOCAL_TIMERS
+ 	bool "Use local timer interrupts"
+ 	depends on SMP && !LOCAL_TIMER_DEVICES
+ 	default y
+-	select HAVE_ARM_TWD if (!ARCH_MSM_SCORPIONMP && !EXYNOS4_MCT)
+ 	help
+ 	  Enable support for local timers on SMP platforms, rather then the
+ 	  legacy IPI broadcast method.  Local timers allows the system
+diff --git a/arch/arm/include/asm/localtimer.h b/arch/arm/include/asm/localtimer.h
+index 5c8acb4..74af2cd 100644
+--- a/arch/arm/include/asm/localtimer.h
++++ b/arch/arm/include/asm/localtimer.h
+@@ -26,22 +26,12 @@ irqreturn_t percpu_timer_handler(int irq, void *dev_id);
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+ 
+-#ifdef CONFIG_HAVE_ARM_TWD
+-
+-#include "smp_twd.h"
+-
+-#define local_timer_ack()	twd_timer_ack()
+-
+-#else
+-
+ /*
+  * Platform provides this to acknowledge a local timer IRQ.
+  * Returns true if the local timer IRQ is to be processed.
+  */
+ int local_timer_ack(void);
+ 
+-#endif
+-
+ /*
+  * Setup a local timer interrupt for a CPU.
+  */
+diff --git a/arch/arm/include/asm/smp_twd.h b/arch/arm/include/asm/smp_twd.h
 deleted file mode 100644
-index 97cd0a9..0000000
---- a/arch/arm/mach-tegra/localtimer.c
+index fed9981..0000000
+--- a/arch/arm/include/asm/smp_twd.h
 +++ /dev/null
-@@ -1,27 +0,0 @@
+@@ -1,28 +0,0 @@
+-#ifndef __ASMARM_SMP_TWD_H
+-#define __ASMARM_SMP_TWD_H
+-
+-#define TWD_TIMER_LOAD			0x00
+-#define TWD_TIMER_COUNTER		0x04
+-#define TWD_TIMER_CONTROL		0x08
+-#define TWD_TIMER_INTSTAT		0x0C
+-
+-#define TWD_WDOG_LOAD			0x20
+-#define TWD_WDOG_COUNTER		0x24
+-#define TWD_WDOG_CONTROL		0x28
+-#define TWD_WDOG_INTSTAT		0x2C
+-#define TWD_WDOG_RESETSTAT		0x30
+-#define TWD_WDOG_DISABLE		0x34
+-
+-#define TWD_TIMER_CONTROL_ENABLE	(1 << 0)
+-#define TWD_TIMER_CONTROL_ONESHOT	(0 << 1)
+-#define TWD_TIMER_CONTROL_PERIODIC	(1 << 1)
+-#define TWD_TIMER_CONTROL_IT_ENABLE	(1 << 2)
+-
+-struct clock_event_device;
+-
+-extern void __iomem *twd_base;
+-
+-int twd_timer_ack(void);
+-void twd_timer_setup(struct clock_event_device *);
+-
+-#endif
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index a5b31af..c6c6d8b 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -33,7 +33,6 @@ obj-$(CONFIG_PM_SLEEP)		+= sleep.o
+ obj-$(CONFIG_HAVE_SCHED_CLOCK)	+= sched_clock.o
+ obj-$(CONFIG_SMP)		+= smp.o smp_tlb.o
+ obj-$(CONFIG_HAVE_ARM_SCU)	+= smp_scu.o
+-obj-$(CONFIG_HAVE_ARM_TWD)	+= smp_twd.o
+ obj-$(CONFIG_DYNAMIC_FTRACE)	+= ftrace.o
+ obj-$(CONFIG_FUNCTION_GRAPH_TRACER)	+= ftrace.o
+ obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o
+diff --git a/arch/arm/kernel/smp_twd.c b/arch/arm/kernel/smp_twd.c
+deleted file mode 100644
+index aa99656..0000000
+--- a/arch/arm/kernel/smp_twd.c
++++ /dev/null
+@@ -1,163 +0,0 @@
 -/*
-- *  arch/arm/mach-tegra/localtimer.c
+- *  linux/arch/arm/kernel/smp_twd.c
 - *
 - *  Copyright (C) 2002 ARM Ltd.
 - *  All Rights Reserved
@@ -68,87 +139,157 @@ index 97cd0a9..0000000
 - * published by the Free Software Foundation.
 - */
 -#include <linux/init.h>
+-#include <linux/kernel.h>
+-#include <linux/delay.h>
+-#include <linux/device.h>
 -#include <linux/smp.h>
+-#include <linux/jiffies.h>
 -#include <linux/clockchips.h>
--#include <asm/irq.h>
+-#include <linux/interrupt.h>
+-#include <linux/io.h>
+-
 -#include <asm/smp_twd.h>
 -#include <asm/localtimer.h>
 -#include <asm/hardware/gic.h>
 -
+-/* set up by the platform code */
+-void __iomem *twd_base;
+-
+-static unsigned long twd_timer_rate;
+-static DEFINE_PER_CPU(bool, irq_reqd);
+-
+-static void twd_set_mode(enum clock_event_mode mode,
+-			struct clock_event_device *clk)
+-{
+-	unsigned long ctrl;
+-
+-	switch (mode) {
+-	case CLOCK_EVT_MODE_PERIODIC:
+-		/* timer load already set up */
+-		ctrl = TWD_TIMER_CONTROL_ENABLE | TWD_TIMER_CONTROL_IT_ENABLE
+-			| TWD_TIMER_CONTROL_PERIODIC;
+-		__raw_writel(twd_timer_rate / HZ, twd_base + TWD_TIMER_LOAD);
+-		break;
+-	case CLOCK_EVT_MODE_ONESHOT:
+-		/* period set, and timer enabled in 'next_event' hook */
+-		ctrl = TWD_TIMER_CONTROL_IT_ENABLE | TWD_TIMER_CONTROL_ONESHOT;
+-		break;
+-	case CLOCK_EVT_MODE_UNUSED:
+-		disable_irq(clk->irq);
+-		/* fall through */
+-	case CLOCK_EVT_MODE_SHUTDOWN:
+-	default:
+-		ctrl = 0;
+-	}
+-
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+-}
+-
+-static int twd_set_next_event(unsigned long evt,
+-			struct clock_event_device *unused)
+-{
+-	unsigned long ctrl = __raw_readl(twd_base + TWD_TIMER_CONTROL);
+-
+-	ctrl |= TWD_TIMER_CONTROL_ENABLE;
+-
+-	__raw_writel(evt, twd_base + TWD_TIMER_COUNTER);
+-	__raw_writel(ctrl, twd_base + TWD_TIMER_CONTROL);
+-
+-	return 0;
+-}
+-
+-/*
+- * local_timer_ack: checks for a local timer interrupt.
+- *
+- * If a local timer interrupt has occurred, acknowledge and return 1.
+- * Otherwise, return 0.
+- */
+-int twd_timer_ack(void)
+-{
+-	if (__raw_readl(twd_base + TWD_TIMER_INTSTAT)) {
+-		__raw_writel(1, twd_base + TWD_TIMER_INTSTAT);
+-		return 1;
+-	}
+-
+-	return 0;
+-}
+-
+-static void __cpuinit twd_calibrate_rate(void)
+-{
+-	unsigned long count;
+-	u64 waitjiffies;
+-
+-	/*
+-	 * If this is the first time round, we need to work out how fast
+-	 * the timer ticks
+-	 */
+-	if (twd_timer_rate == 0) {
+-		printk(KERN_INFO "Calibrating local timer... ");
+-
+-		/* Wait for a tick to start */
+-		waitjiffies = get_jiffies_64() + 1;
+-
+-		while (get_jiffies_64() < waitjiffies)
+-			udelay(10);
+-
+-		/* OK, now the tick has started, let's get the timer going */
+-		waitjiffies += 5;
+-
+-				 /* enable, no interrupt or reload */
+-		__raw_writel(0x1, twd_base + TWD_TIMER_CONTROL);
+-
+-				 /* maximum value */
+-		__raw_writel(0xFFFFFFFFU, twd_base + TWD_TIMER_COUNTER);
+-
+-		while (get_jiffies_64() < waitjiffies)
+-			udelay(10);
+-
+-		count = __raw_readl(twd_base + TWD_TIMER_COUNTER);
+-
+-		twd_timer_rate = (0xFFFFFFFFU - count) * (HZ / 5);
+-
+-		printk("%lu.%02luMHz.\n", twd_timer_rate / 1000000,
+-			(twd_timer_rate / 1000000) % 100);
+-	}
+-}
+-
 -/*
 - * Setup the local clock events for a CPU.
 - */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
+-void __cpuinit twd_timer_setup(struct clock_event_device *clk)
 -{
--	evt->irq = gic_ppi_to_vppi(IRQ_LOCALTIMER);
--	twd_timer_setup(evt);
--	return 0;
--}
-diff --git a/arch/arm/mach-tegra/timer.c b/arch/arm/mach-tegra/timer.c
-index 9035042..4e1ecd0 100644
---- a/arch/arm/mach-tegra/timer.c
-+++ b/arch/arm/mach-tegra/timer.c
-@@ -27,9 +27,9 @@
- #include <linux/clocksource.h>
- #include <linux/clk.h>
- #include <linux/io.h>
-+#include <linux/platform_device.h>
- 
- #include <asm/mach/time.h>
--#include <asm/localtimer.h>
- #include <asm/sched_clock.h>
- 
- #include <mach/iomap.h>
-@@ -179,6 +179,30 @@ static struct irqaction tegra_timer_irq = {
- 	.irq		= INT_TMR3,
- };
- 
-+static struct resource tegra_twd_resources[] = {
-+	{
-+		.start	= TEGRA_ARM_PERIF_BASE + 0x600,
-+		.end	= TEGRA_ARM_PERIF_BASE + 0x600 + 0x10,
-+		.flags	= IORESOURCE_MEM,
-+	},
-+	{
-+		.start	= IRQ_LOCALTIMER,
-+		.end	= IRQ_LOCALTIMER,
-+		.flags	= IORESOURCE_IRQ,
-+	},
-+};
-+
-+static struct platform_device tegra_twd_device = {
-+	.name		= "arm_smp_twd",
-+	.id		= -1,
-+	.resource	= tegra_twd_resources,
-+	.num_resources	= ARRAY_SIZE(tegra_twd_resources),
-+};
-+
-+static struct platform_device *tegra_early_devices[] = {
-+	&tegra_twd_device,
-+};
-+
- static void __init tegra_init_timer(void)
- {
- 	struct clk *clk;
-@@ -197,10 +221,6 @@ static void __init tegra_init_timer(void)
- 	BUG_ON(IS_ERR(clk));
- 	clk_enable(clk);
- 
--#ifdef CONFIG_HAVE_ARM_TWD
--	twd_base = IO_ADDRESS(TEGRA_ARM_PERIF_BASE + 0x600);
--#endif
+-	int err;
+-	bool *reqd;
 -
- 	switch (rate) {
- 	case 12000000:
- 		timer_writel(0x000b, TIMERUS_USEC_CFG);
-@@ -241,6 +261,8 @@ static void __init tegra_init_timer(void)
- 	tegra_clockevent.cpumask = cpu_all_mask;
- 	tegra_clockevent.irq = tegra_timer_irq.irq;
- 	clockevents_register_device(&tegra_clockevent);
-+	early_platform_add_devices(tegra_early_devices,
-+				   ARRAY_SIZE(tegra_early_devices));
- }
- 
- struct sys_timer tegra_timer = {
+-	twd_calibrate_rate();
+-
+-	clk->name = "local_timer";
+-	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+-			CLOCK_EVT_FEAT_C3STOP;
+-	clk->rating = 350;
+-	clk->set_mode = twd_set_mode;
+-	clk->set_next_event = twd_set_next_event;
+-	clk->shift = 20;
+-	clk->mult = div_sc(twd_timer_rate, NSEC_PER_SEC, clk->shift);
+-	clk->max_delta_ns = clockevent_delta2ns(0xffffffff, clk);
+-	clk->min_delta_ns = clockevent_delta2ns(0xf, clk);
+-
+-	reqd = &__get_cpu_var(irq_reqd);
+-	if (!*reqd) {
+-		err = request_irq(clk->irq, percpu_timer_handler,
+-				  IRQF_PERCPU | IRQF_NOBALANCING | IRQF_TIMER,
+-				  clk->name, clk);
+-		if (err) {
+-			pr_err("%s: can't register interrupt %d on cpu %d (%d)\n",
+-			       clk->name, clk->irq, smp_processor_id(), err);
+-			return;
+-		}
+-
+-		*reqd = true;
+-	} else
+-		enable_irq(clk->irq);
+-
+-	clockevents_register_device(clk);
+-}
 -- 
 1.7.0.4
