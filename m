@@ -1,56 +1,76 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 16 Jun 2011 18:17:10 +0200
-Subject: [PATCH] USB: ehci: use packed,
-	aligned(4) instead of removing the packed attribute
-In-Reply-To: <1303918648-7196-1-git-send-email-rabin@rab.in>
-References: <1303918648-7196-1-git-send-email-rabin@rab.in>
-Message-ID: <1308241030-15201-1-git-send-email-holler@ahsoftware.de>
+From: grant.likely@secretlab.ca (Grant Likely)
+Date: Thu, 16 Jun 2011 10:26:04 -0600
+Subject: [PATCH 00/14] GPIO: OMAP: first round of cleanup
+In-Reply-To: <87r56trc8k.fsf@ti.com>
+References: <1305904497-26013-1-git-send-email-khilman@ti.com>
+	<20110527032439.GK5032@ponder.secretlab.ca> <87r56trc8k.fsf@ti.com>
+Message-ID: <20110616162604.GE3795@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In commit 139540170d9d9b7ead3caaf540f161756b356d56 the attribute
-packed is removed from the structs which are used to access the EHCI-registers.
+On Thu, Jun 16, 2011 at 09:07:39AM -0700, Kevin Hilman wrote:
+> Grant Likely <grant.likely@secretlab.ca> writes:
+> 
+> > On Fri, May 20, 2011 at 05:14:43PM +0200, Kevin Hilman wrote:
+> >> Start moving SoC-specific register handling out of the driver by passing
+> >> in register offsets in via platform data.
+> >> 
+> >> Also, move OMAP1 MPUIO IRQ handling over to genric IRQ chip.
+> >> 
+> >> Applies on top of Tony's for-next branch (which include's the generic
+> >> IRQ chip work from tglx) and the OMAP GPIO driver move to
+> >> drivers/gpio.
+> >
+> > Hey Kevin,
+> >
+> > If you've got a branch with this series in it and tested, then I'd be
+> > happy to pull that instead of applying the patches myself.
+> >
+> 
+> OK, I rebased this on v3.0-rc2 and now it's been through quite a bit
+> more testing.
+> 
+> Here's a branch for you.
 
-This is done to circumvent a problem with gcc 4.6, which might access members of
-packed structs on a byte by byte basis. But using packed, aligned(4) fixes that
-too and is imho the better solution. Otherwise (without packed) the compiler would be free
-to choose whatever alignment he thinks fits best, which might be e.g. 8-byte on 64-bit machines.
+Thanks.  A minor comment though...
 
-Signed-off-by: Alexander Holler <holler@ahsoftware.de>
----
- include/linux/usb/ehci_def.h |    6 +++---
- 1 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> Also FYI, we'll probably have 2nd round of GPIO cleanups/updates and
+> runtime PM conversion for the upcoming merge window too.
 
-diff --git a/include/linux/usb/ehci_def.h b/include/linux/usb/ehci_def.h
-index 7cc95ee..15c87a9 100644
---- a/include/linux/usb/ehci_def.h
-+++ b/include/linux/usb/ehci_def.h
-@@ -57,7 +57,7 @@ struct ehci_caps {
- #define HCC_PGM_FRAMELISTLEN(p) ((p)&(1 << 1))  /* true: periodic_size changes*/
- #define HCC_64BIT_ADDR(p)       ((p)&(1))       /* true: can use 64-bit addr */
- 	u8		portroute[8];	 /* nibbles for routing - offset 0xC */
--};
-+} __attribute__ ((packed, aligned(4)));
- 
- 
- /* Section 2.3 Host Controller Operational Registers */
-@@ -155,7 +155,7 @@ struct ehci_regs {
- #define PORT_CSC	(1<<1)		/* connect status change */
- #define PORT_CONNECT	(1<<0)		/* device connected */
- #define PORT_RWC_BITS   (PORT_CSC | PORT_PEC | PORT_OCC)
--};
-+} __attribute__ ((packed, aligned(4)));
- 
- #define USBMODE		0x68		/* USB Device mode */
- #define USBMODE_SDIS	(1<<3)		/* Stream disable */
-@@ -199,7 +199,7 @@ struct ehci_dbg_port {
- 	u32	data47;
- 	u32	address;
- #define DBGP_EPADDR(dev, ep)	(((dev)<<8)|(ep))
--};
-+} __attribute__ ((packed, aligned(4)));
- 
- #ifdef CONFIG_EARLY_PRINTK_DBGP
- #include <linux/init.h>
--- 
-1.7.3.4
+Okay.
+
+> 
+> Kevin
+> 
+> The following changes since commit 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
+> 
+>   Linux 3.0-rc3 (2011-06-13 15:29:59 -0700)
+> 
+> are available in the git repository at:
+>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/gpio-cleanup
+> 
+> Charulatha V (1):
+>       GPIO: OMAP: remove get_gpio_bank()
+> 
+> Kevin Hilman (13):
+>       GPIO: OMAP: _clear_gpio_irqbank: fix flushing of posted write
+>       GPIO: OMAP: remove MPUIO handling from _clear_gpio_irqbank()
+>       GPIO: OMAP: move bank width into struct gpio_bank
+>       GPIO: OMAP: _get_gpio_irqbank_mask: replace hard-coded mask with bank->width
+>       GPIO: OMAP: replace get_gpio_index() by using bank width
+>       GPIO: OMAP: consolidate direction, input, output, remove #ifdefs
+>       GPIO: OMAP: consolidate IRQ status handling, remove #ifdefs
+>       GPIO: OMAP: conslidate enable/disable of GPIO IRQs, remove ifdefs
+>       GPIO: OMAP: convert MPUIO IRQ over to generic irq_chip
+>       GPIO: OMAP: remove useless gpio_valid() & check_gpio() checks
+>       GPIO: OMAP: cleanup _set_gpio_wakeup(), remove ifdefs
+>       GPIO: OMAP: debounce remove SoC specific registers, use pdata
+>       GPIO: OMAP: cleanup show revision, remove cpu_is checks, display only once
+
+Use this form for the patch summaries please: "gpio/omap: ...."
+
+It's better for the pull req to Linus when all the gpio patches look the same.
+
+Thanks,
+g.
