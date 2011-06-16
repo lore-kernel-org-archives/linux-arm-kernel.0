@@ -1,108 +1,52 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 15 Jun 2011 17:12:53 -0700
-Subject: [PATCH 1/3] ARM: Add cpu power management notifiers
-In-Reply-To: <BANLkTinnZtPFY1Aae=8uDbyt5sh9xAxiNw@mail.gmail.com> (Colin
-	Cross's message of "Mon, 13 Jun 2011 23:15:58 -0700")
-References: <1307925825-28566-1-git-send-email-ccross@android.com>
-	<1307925825-28566-2-git-send-email-ccross@android.com>
-	<87ips9fka2.fsf@ti.com>
-	<BANLkTinnZtPFY1Aae=8uDbyt5sh9xAxiNw@mail.gmail.com>
-Message-ID: <87lix2y6pm.fsf@ti.com>
+From: philip@balister.org (Philip Balister)
+Date: Wed, 15 Jun 2011 17:48:12 -0700
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory	Allocator
+	added
+In-Reply-To: <201106150937.18524.arnd@arndb.de>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>	<201106142030.07549.arnd@arndb.de>	<000501cc2b2b$789a54b0$69cefe10$%szyprowski@samsung.com>
+	<201106150937.18524.arnd@arndb.de>
+Message-ID: <4DF952CC.4010301@balister.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Colin Cross <ccross@android.com> writes:
-
-> On Mon, Jun 13, 2011 at 3:17 PM, Kevin Hilman <khilman@ti.com> wrote:
->> Colin Cross <ccross@android.com> writes:
->>
->>> During some CPU power modes entered during idle, hotplug and
->>> suspend, peripherals located in the CPU power domain, such as
->>> the GIC and VFP, may be powered down. ?Add a notifier chain
->>> that allows drivers for those peripherals to be notified
->>> before and after they may be reset.
->>>
->>> Signed-off-by: Colin Cross <ccross@android.com>
->>
->> This is great, thanks!
->>
->> I had hacked up something OMAP-specific a while back to do something
->> similar, and have been meaning to make it more generic, so this is
->> perfect. ?Also, if it is moved outside ARM, note that x86_64 has a
->> idle_notifier infrastructure that is somewhat similar, and if you're
->> motivated, it should probably be converted to this as well. ?See
->> arch/x86/kernel/process_64.c.
+On 06/15/2011 12:37 AM, Arnd Bergmann wrote:
+> On Wednesday 15 June 2011 09:11:39 Marek Szyprowski wrote:
+>> I see your concerns, but I really wonder how to determine the properties
+>> of the global/default cma pool. You definitely don't want to give all
+>> available memory o CMA, because it will have negative impact on kernel
+>> operation (kernel really needs to allocate unmovable pages from time to
+>> time).
 >
-> I'll take a look at x86
+> Exactly. This is a hard problem, so I would prefer to see a solution for
+> coming up with reasonable defaults.
+
+Is this a situation where passing the information from device tree might 
+help? I know this does not help short term, but I am trying to 
+understand the sorts of problems device tree can help solve.
+
+Philip
+
 >
->> Also, for the sake of the comments/changelog, the usefulness of these
->> notifiers is not limited to low-power states where power is off and IP
->> blocks may be reset. ?It could be considered as simply a generic
->> notification mechanism for any CPU PM transitions.
->>
->> On OMAP we have other peripherals (not in the CPU power domain) where we
->> need to control their PM transitions in relation to the CPU PM
->> transitions so the notifiers are useful for any low-power state
->> transition of the CPU(s). ?The drivers for these peripherals use runtime
->> PM in their CPU PM notifiers to trigger the device PM transitions. (The
->> drivers must use the synchronous versions of the runtime PM get/put
->> calls with device in pm_runtime_irq_safe() mode.)
+>> The only solution I see now is to provide Kconfig entry to determine
+>> the size of the global CMA pool, but this still have some issues,
+>> especially for multi-board kernels (each board probably will have
+>> different amount of RAM and different memory-consuming devices
+>> available). It looks that each board startup code still might need to
+>> tweak the size of CMA pool. I can add a kernel command line option for
+>> it, but such solution also will not solve all the cases (afair there
+>> was a discussion about kernel command line parameters for memory
+>> configuration and the conclusion was that it should be avoided).
 >
-> Can you give a concrete example of this so I can describe it correctly?
+> The command line option can be a last resort if the heuristics fail,
+> but it's not much better than a fixed Kconfig setting.
 >
-
-One simple example is a clock controlling a thermal sensor.  The sensor
-(and thus the functional clock) should be active whenever the CPU is
-running, so the idle transition (clock gating) of this IP block should
-be coordinated with any idle transitions of the CPU cluster.
-
-Another example is any IP block that is not capable of waking up the CPU
-(or $DEITY forbid, where said wakeups are broken.)  A CPU_PM_EXIT
-notifier would be used to check for pending activity and take action.
-
->> In this series, I don't see any calls to cpu_[complex_]pm_[enter|exit]().
->> Based on that, I assume you prefer to leave it up to platform-specific
->> idle/PM code to place these calls. ?Or, do you plan to have this
->> triggered by generic CPUidle, suspend/resume and/or hotplug code? ?At
->> least on OMAP, I prefer having the calls in platform-specific code.
+> How about a Kconfig option that defines the percentage of memory
+> to set aside for contiguous allocations?
 >
-> I will post the Tegra code that uses this soon.  I expect that the
-> decision on exactly when to call these functions will be unique to
-> each platform, so I think it should start in the platform-specific
-> code.
-
-Agreed.
-
->> I have a minor enhancement request. ?The notifier callbacks provide for
->> passing a void * through the notifier chain. ?Could you add a way for a
->> void * to be registered at cpu_pm_register_notifier() time and that
->> would be passed through the notifier call chain? ?This would allow using
->> the same struct notifier_block and callback for multiple instances of
->> the same IP, and the instances could be differentiated in the callback
->> using the void *.
+> 	Arnd
 >
-> The void * passed to the notifier comes from the call to
-> notifier_call_chain(), not from the call to register_notifier().  
-
-I see now.
-
-> You can get the behavior you want by putting the notifier_block inside
-> your device struct and using container_of on the notifier_bock.
-
-Yeah, that's the way I did it, but it requires a separate 'struct
-notifier_block' for each device instance.  It's only a minor issue, but
-being able to pass in the 'void *' at registration time would allow a
-single struct notifier_block' for all instances of the device.
-
->> Also, FWIW I tested this on OMAP3 (Cortex-A8 UP) using
->> cpu_pm_enter/exit() in the code path shared between idle and suspend. ?I
->> successfully triggered PM transitions in non-CPU power-domain
->> peripherals, and it worked great.
+> _______________________________________________
+> Linaro-mm-sig mailing list
+> Linaro-mm-sig at lists.linaro.org
+> http://lists.linaro.org/mailman/listinfo/linaro-mm-sig
 >
-> Great!  Can I get a tested-by?
-
-Sure, meant to add it the first time.
-
-Tested-by: Kevin Hilman <khilman@ti.com>
-
-Kevin
