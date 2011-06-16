@@ -1,46 +1,100 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 16 Jun 2011 17:59:03 +0900
-Subject: [PATCH 2/2] ARM: Exynos4: ADC Support for NURI Board
-In-Reply-To: <1308214743-16295-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1308214743-16295-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1308214743-16295-2-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 16 Jun 2011 18:09:32 +0900
+Subject: [PATCH 2/2] Exynos4 NURI: add MAX17042 fuel gauge
+In-Reply-To: <1308215372-17420-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1308215372-17420-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1308215372-17420-2-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- arch/arm/mach-exynos4/mach-nuri.c |    4 +++-
- 1 files changed, 3 insertions(+), 1 deletions(-)
+ arch/arm/mach-exynos4/mach-nuri.c |   35 +++++++++++++++++++++++++++++++++++
+ 1 files changed, 35 insertions(+), 0 deletions(-)
 
 diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index 5ca6bdd..0604f5d 100644
+index c8c2431..b8c0c5d 100644
 --- a/arch/arm/mach-exynos4/mach-nuri.c
 +++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -29,6 +29,7 @@
- #include <asm/mach/arch.h>
- #include <asm/mach-types.h>
+@@ -13,8 +13,10 @@
+ #include <linux/input.h>
+ #include <linux/i2c.h>
+ #include <linux/i2c/atmel_mxt_ts.h>
++#include <linux/i2c-gpio.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/gpio.h>
++#include <linux/power/max17042_battery.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
+ #include <linux/mfd/max8997.h>
+@@ -983,6 +985,7 @@ static struct max8997_platform_data nuri_max8997_pdata = {
+ };
  
-+#include <plat/adc.h>
- #include <plat/regs-serial.h>
- #include <plat/exynos4.h>
- #include <plat/cpu.h>
-@@ -350,7 +351,7 @@ static void __init nuri_tsp_init(void)
+ #define NURI_PMIC_GPIO		EXYNOS4_GPX0(7)
++#define NURI_FUELGAUGE_GPIO	EXYNOS4_GPX2(3)
+ static void __init nuri_pmic_init(void)
+ {
+ 	int gpio;
+@@ -992,6 +995,11 @@ static void __init nuri_pmic_init(void)
+ 	gpio_request(gpio, "AP_PMIC_IRQ");
+ 	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+ 	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
++
++	gpio = NURI_FUELGAUGE_GPIO;
++	gpio_request(gpio, "FUEL_ALERT");
++	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
++	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
  }
  
- static struct regulator_consumer_supply nuri_max8997_ldo1_consumer[] = {
--	REGULATOR_SUPPLY("vadc", NULL), /* Used by CPU's ADC drv */
-+	REGULATOR_SUPPLY("vdd", "s5p-adc"), /* Used by CPU's ADC drv */
+ /* GPIO I2C 5 (PMIC) */
+@@ -1003,6 +1011,30 @@ static struct i2c_board_info i2c5_devs[] __initdata = {
+ 	},
  };
- static struct regulator_consumer_supply nuri_max8997_ldo3_consumer[] = {
- 	REGULATOR_SUPPLY("vdd11", "s5p-mipi-csis.0"), /* MIPI */
-@@ -1057,6 +1058,7 @@ static struct platform_device *nuri_devices[] __initdata = {
+ 
++static struct max17042_platform_data nuri_battery_platform_data = {
++	.enable_current_sense = false,
++};
++
++/* GPIO I2C 9 (Fuel Gauge) */
++static struct i2c_gpio_platform_data i2c9_gpio_data = {
++	.sda_pin		= EXYNOS4_GPY4(0),      /* XM0ADDR_8 */
++	.scl_pin		= EXYNOS4_GPY4(1),      /* XM0ADDR_9 */
++};
++static struct platform_device i2c9_gpio = {
++	.name			= "i2c-gpio",
++	.id			= 9,
++	.dev			= {
++		.platform_data	= &i2c9_gpio_data,
++	},
++};
++enum { I2C9_MAX17042};
++static struct i2c_board_info i2c9_devs[] __initdata = {
++	[I2C9_MAX17042] = {
++		I2C_BOARD_INFO("max17042", 0x36),
++		.platform_data = &nuri_battery_platform_data,
++	},
++};
++
+ /* USB EHCI */
+ static struct s5p_ehci_platdata nuri_ehci_pdata;
+ 
+@@ -1024,6 +1056,7 @@ static struct platform_device *nuri_devices[] __initdata = {
+ 	&s5p_device_ehci,
  	&s3c_device_i2c3,
  	&s3c_device_i2c5,
- 	&i2c9_gpio,
-+	&s3c_device_adc,
++	&i2c9_gpio,
  
  	/* NURI Devices */
  	&nuri_gpio_keys,
+@@ -1050,6 +1083,8 @@ static void __init nuri_machine_init(void)
+ 	s3c_i2c5_set_platdata(NULL);
+ 	i2c5_devs[I2C5_MAX8997].irq = gpio_to_irq(NURI_PMIC_GPIO);
+ 	i2c_register_board_info(5, i2c5_devs, ARRAY_SIZE(i2c5_devs));
++	i2c9_devs[I2C9_MAX17042].irq = gpio_to_irq(NURI_FUELGAUGE_GPIO);
++	i2c_register_board_info(9, i2c9_devs, ARRAY_SIZE(i2c9_devs));
+ 
+ 	nuri_ehci_init();
+ 	clk_xusbxti.rate = 24000000;
 -- 
 1.7.4.1
