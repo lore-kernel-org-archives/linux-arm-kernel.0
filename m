@@ -1,40 +1,104 @@
-From: vitalywool@gmail.com (Vitaly Wool)
-Date: Thu, 16 Jun 2011 14:20:27 +0200
-Subject: [PATCH] omap3evm: Add Mistral WL12XX config support
-In-Reply-To: <20110614135518.GH23145@atomide.com>
-References: <1308053788-25937-1-git-send-email-shahar@wizery.com>
-	<20110614123359.GB23145@atomide.com>
-	<BANLkTikE_caRE9uD6KN7h7OcY4nyUoRk9g@mail.gmail.com>
-	<20110614135518.GH23145@atomide.com>
-Message-ID: <BANLkTi=XocYNPwuB2_-T8AHQkfEuzUnd9Q@mail.gmail.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 16 Jun 2011 20:30:53 +0800
+Subject: [PATCH v3 RESEND] dma-mapping: add new API for max_segment_number
+In-Reply-To: <BANLkTi=-t9HVc6U6QY07su+c3WztsGoq3Q@mail.gmail.com>
+References: <BANLkTi=-t9HVc6U6QY07su+c3WztsGoq3Q@mail.gmail.com>
+Message-ID: <1308227453-2034-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shahar, Tony,
+Like dma_set(get)_max_seg_size for max_segment_size, the patch adds
+max_segment_number into device_dma_parameters and creates the
+corresponding API dma_set(get)_max_seg_number for it.
 
-On Tue, Jun 14, 2011 at 3:55 PM, Tony Lindgren <tony@atomide.com> wrote:
-> * Shahar Lev <shahar@wizery.com> [110614 06:21]:
->> On Tue, Jun 14, 2011 at 3:34 PM, Tony Lindgren <tony@atomide.com> wrote:
->> >
->> > This your should try to remove as it won't work nicely for supporting
->> > various boards with the same kernel as we already do with
->> > omap2plus_defconfig.
->> >
->> > Can you somehow detect the daughter board dynamically and then
->> > set the flags?
->> >
->>
->> We thought about multi-board kernels, but unfortunately have no
->> better solution, since there is no dynamic way to probe these cards.
->> Even worse, these cards sometimes come with different clocks in them,
->> hence the 2nd OMAP3EVM_MISTRAL_WL12XX_REFCLOCK entry we had to
->> introduce...
->>
->> Maybe we should add two bootargs with which the user can override this
->> Kconfig configuration? This should allow using the same kernel binary
->> with different omap3evm boards.
+Here is the user story that tells the need of the new api.  The
+mxs-mmc is the mmc host controller for Freescale MXS architecture.
+There are a pair of  mmc host specific parameters max_seg_size and
+max_segs that mxs-mmc host driver needs to tell mmc core, so that
+mmc core can know how big each data segment could be and how many
+segments could be handled one time in a scatter list by host driver.
 
-You won't need Kconfig parameters then. Just have module parameters
-and supply whatever default values you find reasonable.
+The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
+mxs-dma to transfer data in scatter list.  That is to say mxs-mmc has
+no idea of what max_seg_size and max_segs should be, because they are
+all mxs-dma capability parameters, and mxs-mmc needs to query them
+from mxs-dma.
 
-~Vitaly
+Right now, there is well defined dma api (dma_get_max_seg_size) for
+mmc to query max_seg_size from dma driver, but the one for max_segs
+is missing.  That's why mxs-mmc driver has to hard-code it.
+
+The mxs-mmc is just one example to demonstrate the need of the new
+api, and there are other mmc host drivers (mxcmmc on imx-dma is
+another example) and possibly even other dmaengine users need this
+new api to know the maximum segments that dma driver can handle per
+dma call.
+
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+---
+Reasons for resend:
+ * Cc linux-scsi for comment, per request from FUJITA Tomonori
+ * Take suggestion from Per Forlin to change patch subject to
+   dma-mapping
+
+ include/linux/device.h      |   16 ++++++++++++----
+ include/linux/dma-mapping.h |   15 +++++++++++++++
+ 2 files changed, 27 insertions(+), 4 deletions(-)
+
+diff --git a/include/linux/device.h b/include/linux/device.h
+index c66111a..f1152c5 100644
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -481,12 +481,20 @@ extern int devres_release_group(struct device *dev, void *id);
+ extern void *devm_kzalloc(struct device *dev, size_t size, gfp_t gfp);
+ extern void devm_kfree(struct device *dev, void *p);
+ 
++/*
++ * device_dma_parameters is a property of DMA provider, and it belongs to the
++ * 'struct device' that actually provides DMA service, typically the drivers
++ * under drivers/dma, although in some cases the DMA provider and block device
++ * uses DMA service happen to be the same 'struct device'.
++ *
++ * It's not necessary for every single DMA providers to have this structure,
++ * because some DMA providers simply do not have these parameters/limitations.
++ * For those do have, the DMA providers should be responsible for setting the
++ * parameters up.
++ */
+ struct device_dma_parameters {
+-	/*
+-	 * a low level driver may set these to teach IOMMU code about
+-	 * sg limitations.
+-	 */
+ 	unsigned int max_segment_size;
++	unsigned int max_segment_number;
+ 	unsigned long segment_boundary_mask;
+ };
+ 
+diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
+index ba8319a..fd314f4 100644
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -131,6 +131,21 @@ static inline unsigned int dma_set_max_seg_size(struct device *dev,
+ 		return -EIO;
+ }
+ 
++static inline unsigned int dma_get_max_seg_number(struct device *dev)
++{
++	return dev->dma_parms ? dev->dma_parms->max_segment_number : 1;
++}
++
++static inline unsigned int dma_set_max_seg_number(struct device *dev,
++						  unsigned int number)
++{
++	if (dev->dma_parms) {
++		dev->dma_parms->max_segment_number = number;
++		return 0;
++	} else
++		return -EIO;
++}
++
+ static inline unsigned long dma_get_seg_boundary(struct device *dev)
+ {
+ 	return dev->dma_parms ?
+-- 
+1.7.4.1
