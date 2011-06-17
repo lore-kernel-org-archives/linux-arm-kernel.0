@@ -1,32 +1,32 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Fri, 17 Jun 2011 15:42:32 +0400
-Subject: [PATCH] arm mach-s3c2440 mach-mini2440: New LCD-W35i support
-In-Reply-To: <4DFA4CD9.9070601@solonet.org.ua>
-References: <4DF7C50A.7060602@solonet.org.ua> <4DF9EA45.3020101@ru.mvista.com>
-	<4DFA4CD9.9070601@solonet.org.ua>
-Message-ID: <4DFB3DA8.7080502@ru.mvista.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Fri, 17 Jun 2011 14:03:52 +0200
+Subject: [PATCH] plat-iop: fix build error
+Message-ID: <1308312232-30488-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-On 16-06-2011 22:35, Denis Kuzmenko wrote:
+The iop13xx_defconfig didn't build since the platform code uses
+defines from <asm/ptrace.h>. Simply add the include so it
+compiles.
 
->> Hello.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/plat-iop/cp6.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
->> Your signoff needs to be here. Sorry -- didn't notice the first time.
->> The patch has all tabs converted to spaces. Didn't notice it the first
->> time as well... :-/
-
-> Thanks for comments. How about this one?
-
-    Seems fine now. :-)
-
-> From: Denis Kuzmenko <dart@solonet.org.ua>
-> Date: 2011-06-16 21:30:00 +0300
-
-> LCD-W35i support for Mini2440 development board
-
-> Signed-off-by: Denis Kuzmenko <dart@solonet.org.ua>
-
-WBR, Sergei
+diff --git a/arch/arm/plat-iop/cp6.c b/arch/arm/plat-iop/cp6.c
+index 9612a87..bab73e2 100644
+--- a/arch/arm/plat-iop/cp6.c
++++ b/arch/arm/plat-iop/cp6.c
+@@ -18,6 +18,7 @@
+  */
+ #include <linux/init.h>
+ #include <asm/traps.h>
++#include <asm/ptrace.h>
+ 
+ static int cp6_trap(struct pt_regs *regs, unsigned int instr)
+ {
+-- 
+1.7.3.2
