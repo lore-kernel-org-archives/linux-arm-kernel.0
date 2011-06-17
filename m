@@ -1,85 +1,50 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Fri, 17 Jun 2011 20:58:45 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110616181251.caf484b6.kamezawa.hiroyu@jp.fujitsu.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110613134701.2b23b8d8.kamezawa.hiroyu@jp.fujitsu.com>
-	<20110616042044.GA28563@in.ibm.com>
-	<20110616181251.caf484b6.kamezawa.hiroyu@jp.fujitsu.com>
-Message-ID: <20110617152845.GA13574@in.ibm.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Fri, 17 Jun 2011 19:35:59 +0400
+Subject: [PATCH] collie: don't read GPSR
+In-Reply-To: <BANLkTikgNuovqVax-KdYjx1FM3kGCH4dDQ@mail.gmail.com>
+References: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
+	<BANLkTikgNuovqVax-KdYjx1FM3kGCH4dDQ@mail.gmail.com>
+Message-ID: <BANLkTi=RPmwqzBvr_TYbPmd0s1-BM9unKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 6/17/11, Eric Miao <eric.y.miao@gmail.com> wrote:
+> Would it be better to switch to use gpio_* API instead of manipulating
+> GPxR directly?
 
-On Thu, Jun 16, 2011 at 06:12:51PM +0900, KAMEZAWA Hiroyuki wrote:
-> On Thu, 16 Jun 2011 09:50:44 +0530
-> Ankita Garg <ankita@in.ibm.com> wrote:
-> 
-> > Hi,
-> > 
-> > On Mon, Jun 13, 2011 at 01:47:01PM +0900, KAMEZAWA Hiroyuki wrote:
-> > > On Fri, 27 May 2011 18:01:28 +0530
-> > > Ankita Garg <ankita@in.ibm.com> wrote:
-> > > 
-> > > > Hi,
-> > > > 
-> > > 
-> > > I'm sorry if you've answered already.
-> > > 
-> > > Is memory hotplug is too bad and cannot be enhanced for this purpose ?
-> > > 
-> > > I wonder
-> > >   - make section-size smaller (IIUC, IBM's system has 16MB section size)
-> > > 
-> > >   - add per section statistics
-> > > 
-> > >   - add a kind of balloon driver which does software memory offline
-> > >     (which means making a contiguous chunk of free pages of section_size
-> > >      by page migration) in background with regard to memory usage statistics.
-> > >     If system says "need more memory!", balloon driver can online pages.
-> > > 
-> > > can work for your purpose. It can allow you page isolatation and
-> > > controls in 16MB unit.  If you need whole rework of memory hotplug, I think
-> > > it's better to rewrite memory hotplug, too.
-> > >
-> > 
-> > Interesting idea, but a few issues -
-> > 
-> > - Correctly predicting memory pressure is difficult and thereby being
-> >   able to online the required pages at the right time could be a
-> >   challenge
-> 
-> But it will be required for your purpose, anyway. Isn't it ?
-> 
-> > - Memory hotplug is a heavy operation, so the overhead involved may be
-> >   high
-> 
-> soft-offline of small amount of pages will not very heavy.
-> compaction and cma patches use the same kind of logic.
-> 
-> 
-> > - Powering off memory is just one of the ways in which memory power could
-> >   be saved. The platform can also dynamically transition areas of memory
-> >   into a  content-preserving lower power state if it is not referenced
-> >   for a pre-defined threshold of time. In such a case, we would need a
-> >   mechanism to soft offline the pages - i.e, no new allocations to be
-> >   directed to that memory
-> > 
-> 
-> Hmm, sounds like a similar idea of CleanCache ?
-> 
-> Reusing section is much easier than adding new one.., I think.
-> 
+Yes. Probably. But this would require a much bigger cleanup effort. Waiting
+for spare time for it.
 
-But sections do not define the granualarity at which memory operations
-are done right ? i.e, allocations/deallocations or reclaim cannot be
-directed to a section or a group of sections ?
+> On Fri, Jun 17, 2011 at 10:11 PM, Dmitry Eremin-Solenikov
+> <dbaryshkov@gmail.com> wrote:
+>> On StrongARM GPSR is write-only according to docs, so don't read from
+>> it. Just set the required GPIO.
+>>
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> ---
+>>  arch/arm/mach-sa1100/collie.c |    2 +-
+>>  1 files changed, 1 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
+>> index f28025e..3f32ba2 100644
+>> --- a/arch/arm/mach-sa1100/collie.c
+>> +++ b/arch/arm/mach-sa1100/collie.c
+>> @@ -339,7 +339,7 @@ static void __init collie_init(void)
+>>
+>>        PCFR = PCFR_OPDE;
+>>
+>> -       GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
+>> +       GPSR = _COLLIE_GPIO_UCB1x00_RESET;
+>>
+>>
+>>        platform_scoop_config = &collie_pcmcia_config;
+>> --
+>> 1.7.5.3
+>>
+>>
+>
+
 
 -- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+With best wishes
+Dmitry
