@@ -1,40 +1,29 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Fri, 17 Jun 2011 09:20:45 +0200
-Subject: [MPCore Watchdog]: Convert from misc_dev to dynamic device node.
-In-Reply-To: <201106152136.23971.arnd@arndb.de>
-References: <BANLkTinaQpnVxwX5rB1jrabGX6ArvhhS7g@mail.gmail.com>
-	<BANLkTinY8bM0PyLLcu6icEsWT=X=KVV3DQ@mail.gmail.com>
-	<20110615190945.GA2518@pulham.picochip.com>
-	<201106152136.23971.arnd@arndb.de>
-Message-ID: <20110617072045.GM23305@infomag.iguana.be>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 17 Jun 2011 08:21:25 +0100
+Subject: [PATCH 06/14] ARM: suspend: rejig suspend follow-on function
+	calling convention
+In-Reply-To: <4DFAC1F8.7040503@gmail.com>
+References: <20110613171446.GF13643@n2100.arm.linux.org.uk>
+	<E1QWAku-0002e3-3d@rmk-PC.arm.linux.org.uk>
+	<4DFAC1F8.7040503@gmail.com>
+Message-ID: <20110617072125.GD32629@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-> On Wednesday 15 June 2011 21:09:45 Jamie Iles wrote:
-> > On Wed, Jun 15, 2011 at 11:57:12AM -0700, Peter Fordham wrote:
-> > > > I've added Wim (watchdog driver maintainer), but I would think that if
-> > > > this change is worth doing then it should be done for all drivers.
-> > > 
-> > > Agreed, but today this may be more work than I'm strictly interested in
-> > > doing. If we do decide it's the right thing then I'll look into converting the
-> > > other drivers later.
-> > 
-> > So I'm not fully aware of what particular problem this is solving, but 
-> > if it is needed for this driver then it should really be done for all of 
-> > them.  That's probably one for Wim to answer though.  Wim posted a 
-> > series for a generic watchdog framework a while back[1] but this still 
-> > made use of a misc device.
+On Thu, Jun 16, 2011 at 09:54:48PM -0500, Rob Herring wrote:
+> If you change:
 > 
-> Let's first wait until the generic watchdog framework gets merged and
-> the drivers are converted. After that is in, we can discuss further changes.
+> > +	ldmfd	sp!, {r0, pc}		@ call suspend fn
 > 
-> I highly doubt that making an incompatible API change benefits anyone here,
-> but it certainly shouldn't be done for a single driver that is separate from
-> the framework.
+> To:
+> 	mov	lr, pc
+> 	ldmfd	sp!, {r0, pc}
+> 	ldmfd	sp!, {r1, r6, ip}
+> 	mov	sp, r6
+> 	ldmfd	sp!, {r4-r11, pc}
+> 
+> It will allow the suspend fn to return and abort suspend. With that, I'm
+> able to use this for core powerdown in cpuidle.
 
-Agree for the full 100%.
-
-Thanks,
-Wim.
+Did you see my last message in the "[RFC PATCH v5] ARM hibernation /
+suspend-to-disk (fwd)" thread?
