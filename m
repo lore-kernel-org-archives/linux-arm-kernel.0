@@ -1,39 +1,72 @@
-From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
-Date: Fri, 17 Jun 2011 11:12:32 +0530
-Subject: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
-In-Reply-To: <87ei2trbuq.fsf@ti.com>
-References: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com>
-	<87ei2trbuq.fsf@ti.com>
-Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037B9AC5B7@dbde02.ent.ti.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Fri, 17 Jun 2011 08:54:14 +0200
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <4DFA5C2E.40507@codeaurora.org>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+	<4DFA5C2E.40507@codeaurora.org>
+Message-ID: <BANLkTi=ik=iRtDb3K__CPxSH_8GusoBHKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Hilman, Kevin
-> Sent: Thursday, June 16, 2011 9:46 PM
-> To: DebBarma, Tarun Kanti
-> Cc: linux-omap at vger.kernel.org; Shilimkar, Santosh; tony at atomide.com;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
-> 
-> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
-> 
-> > This series is continuation of cleanup of OMAP GPIO driver and fixes.
-> > The cleanup include getting rid of cpu_is_* checks wherever possible,
-> > use of gpio_bank list instead of static array, use of unique platform
-> > specific value associated data member to OMAP platforms to avoid
-> > cpu_is_* checks. The series also include PM runtime support.
-> 
-> A quick test of this series on 3430/n900 shows that it prevents PER
-> retention.  I see CM_FCLKEN_PER=0000c000 (debounce clock for GPIO banks
-> 3 & 4 are still enabled.)
-> 
-> Can you retest with debounce enabled on one of the GPIOs for one of your
-> platforms?
-Sure, I will.
---
-Tarun
-> 
-> Kevin
-> 
-> 
+On 16 June 2011 21:40, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 06/16/2011 01:49 AM, Vincent Guittot wrote:
+>> +config SCHED_MC
+>> + ? ? bool "Multi-core scheduler support"
+>> + ? ? depends on SMP && ARM_CPU_TOPOLOGY
+>> + ? ? default n
+>> + ? ? help
+>> + ? ? ? Multi-core scheduler support improves the CPU scheduler's decision
+>> + ? ? ? making when dealing with multi-core CPU chips at a cost of slightly
+>> + ? ? ? increased overhead in some places. If unsure say N here.
+>> +
+>> +config SCHED_SMT
+>> + ? ? bool "SMT scheduler support"
+>> + ? ? depends on SMP && ARM_CPU_TOPOLOGY
+>> + ? ? default n
+>> + ? ? help
+>> + ? ? ? Improves the CPU scheduler's decision making when dealing with
+>> + ? ? ? MultiThreading at a cost of slightly increased overhead in some
+>> + ? ? ? places. If unsure say N here.
+>> +
+>
+> The default is already n so you can drop those two lines.
+>
+
+ok
+
+>> + ? ? ? ? ? ? ?* This is a multiprocessor system
+>> + ? ? ? ? ? ? ?* multiprocessor format & multiprocessor mode field are set
+>> + ? ? ? ? ? ? ?*/
+>> +
+>> + ? ? ? ? ? ? if (mpidr & (0x1 << 24)) {
+>> + ? ? ? ? ? ? ? ? ? ? /* core performance interdependency */
+>> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->thread_id = (mpidr & 0x3);
+>> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->core_id = ?((mpidr >> 8) & 0xF);
+>> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->socket_id = ((mpidr >> 16) & 0xFF);
+>> + ? ? ? ? ? ? } else {
+>> + ? ? ? ? ? ? ? ? ? ? /* normal core interdependency */
+>> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->thread_id = -1;
+>> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->core_id = (mpidr & 0x3);
+>> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->socket_id = ((mpidr >> 8) & 0xF);
+>> + ? ? ? ? ? ? }
+>> +
+>
+> The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
+> different vendors may attribute different meaning to these fields if
+> they wish. Does that mean this should be a platform_*() function?
+>
+
+The ARM ARM also provides a recommended use of the fields of this
+register and the TRM of each Cortex adds some details. On the cortex
+A9, each platform can only set the value of the Cluster ID with the
+CLUSTERID pins. I have tried to consolidate the value of MPIDR  across
+several platforms and they all match with the description.
+
+Have you got an example of a MPIDR register which doesn't match with
+the implementation ?
+
+> --
+> Sent by an employee of the Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+>
+>
