@@ -1,39 +1,26 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Fri, 17 Jun 2011 23:07:59 +0800
-Subject: [PATCH] collie: don't read GPSR
-In-Reply-To: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
-References: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <BANLkTikgNuovqVax-KdYjx1FM3kGCH4dDQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Jun 2011 17:09:43 +0200
+Subject: [RFC PATCH 10/16] ARM: local timers: add exynos_mct driver to
+	driver/clocksource
+In-Reply-To: <1308251204-16719-11-git-send-email-marc.zyngier@arm.com>
+References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
+	<1308251204-16719-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <201106171709.43973.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Would it be better to switch to use gpio_* API instead of manipulating
-GPxR directly?
+On Thursday 16 June 2011, Marc Zyngier wrote:
+> 
+> Add a "new" driver to driver/clocksource to support the Samsung MCT
+> hardware. This is basically the local timer part of
+> arch/arm/mach-exynos4/mct.c, turned into a platform driver, and
+> with a CPU notifier being used to start/stop timers on secondary
+> cores.
+> 
+> Cc: Kukjin Kim <kgene.kim@samsung.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-On Fri, Jun 17, 2011 at 10:11 PM, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> On StrongARM GPSR is write-only according to docs, so don't read from
-> it. Just set the required GPIO.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
-> ?arch/arm/mach-sa1100/collie.c | ? ?2 +-
-> ?1 files changed, 1 insertions(+), 1 deletions(-)
->
-> diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-> index f28025e..3f32ba2 100644
-> --- a/arch/arm/mach-sa1100/collie.c
-> +++ b/arch/arm/mach-sa1100/collie.c
-> @@ -339,7 +339,7 @@ static void __init collie_init(void)
->
-> ? ? ? ?PCFR = PCFR_OPDE;
->
-> - ? ? ? GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
-> + ? ? ? GPSR = _COLLIE_GPIO_UCB1x00_RESET;
->
->
-> ? ? ? ?platform_scoop_config = &collie_pcmcia_config;
-> --
-> 1.7.5.3
->
->
+My feeling is that it would be nicer to do this as an atomic change together
+with the removal of the existing code, rather than two patches.
+
+	Arnd
