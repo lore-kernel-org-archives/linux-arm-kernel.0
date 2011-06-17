@@ -1,70 +1,36 @@
-From: ptesarik@suse.cz (Petr Tesarik)
-Date: Fri, 17 Jun 2011 11:55:30 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <20110617093032.GA19235@elte.hu>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu>
-Message-ID: <201106171155.32062.ptesarik@suse.cz>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Fri, 17 Jun 2011 12:01:55 +0200 (CEST)
+Subject: [PATCH][Trivial] ARM: remove duplicate include from
+	arch/arm/mach-dove/common.c
+In-Reply-To: <alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
+References: <alpine.LNX.2.00.1105261130190.17400@swampdragon.chaosbits.net>
+	<20110526144804.GA31651@lunn.ch>
+	<alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
+Message-ID: <alpine.LNX.2.00.1106171201210.22872@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dne P? 17. ?ervna 2011 11:30:32 Ingo Molnar napsal(a):
-> * Petr Tesarik <ptesarik@suse.cz> wrote:
-> > This patch series enhances /dev/mem, so that read and write is
-> > possible at any address. The patchset includes actual
-> > implementation for x86.
+On Thu, 16 Jun 2011, Jesper Juhl wrote:
+
+> > Jesper Juhl pointed out there is a redundant include of
+> > linux/serial_8250.h. However it turns out both are redundant.
+> > This patch removes them both.
+> > 
+> > Only compile tested.
+> > 
+> > Reported-by:  Jesper Juhl <jj@chaosbits.net>
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> This series lacks a description of why this is desired.
-
-Hi Ingo,
-
-> My strong opinion is that it's not desired at all: /dev/mem never
-> worked beyond 4G addresses so by today it has become largely obsolete
-> and is on the way out really.
+> Seems you are right.
 > 
-> I'm aware of these current /dev/mem uses:
-> 
->  - Xorg maps below 4G non-RAM addresses and the video BIOS
-> 
->  - It used to have some debugging role but these days kexec and kgdb
->    has largely taken over that role - partly due to the 4G limit.
+> Reviewed-by: Jesper Juhl <jj@chaosbits.net>
 
-It is still used as a "memory source" by Dave Anderson's crash utility for 
-live examination of a running system. Redhat has "overcome" the /dev/mem 
-deficiencies by writing an out-of-tree re-implementation of /dev/mem, which 
-uses /dev/crash instead. As it is an "unnecessary duplication of an existing 
-driver", this method was rejected by the project manager here at SUSE.
+I don't seem to be able to find the patch anywhere during a quick search 
+of the archives. Could you please bounce it to me (in case it hasn't been 
+already applied elsewhere)?
 
-The suggested alternative was to enhance (or fix) the existing driver. Without 
-this patch series there is no way to access high memory. In conjunction with 
-CONFIG_HIGHPTE, it makes the crash utility near to useless on anything with 
-high memory, because crash can no longer translate virtual to physical 
-addresses.
+Thanks,
 
->  - there's some really horrible out-of-tree drivers that do mmap()s
->    via /dev/mem, those should be fixed if they want to move beyond
->    4G: their char device should be mmap()able.
-> 
->  - all distro kernel's i'm aware of use CONFIG_STRICT_DEVMEM=y, which
->    restricts /dev/mem to non-RAM pages of physical memory.
->    [ With the sad inclusion of the first 1MB, which Xorg needs. ]
-
-Well, there's one (quite unimportant) distro that doesn't compile with 
-CONFIG_STRICT_DEVMEM: openSUSE (and SLES, consequently).
-
-> Are you aware of any legitimate usecases?
-
-See above - live crash sessions on i586 (or any other arch that has high 
-memory).
-
-> Frankly, i dont think we ever *want* to 'fix' /dev/mem to support
-> addresses beyond 4G and grow messy userspace (and kernelspace) that
-> somehow relies on that. Thank goodness that we never supported it ...
-
-Let me put it differently. Do you think that an out-of-tree duplicated effort 
-(the crash.ko module) offered by Redhat is somehow superior to enhancing the 
-in-tree /dev/mem driver?
-
-Regards,
-Petr Tesarik
+-- 
+Jiri Kosina
+SUSE Labs
