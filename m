@@ -1,57 +1,39 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Fri, 17 Jun 2011 08:29:38 +0300
-Subject: not able to use the datacard USB modem with ARM9 baord
-In-Reply-To: <loom.20110617T064318-516@post.gmane.org>
-References: <loom.20110617T064318-516@post.gmane.org>
-Message-ID: <20110617052938.GA15523@tarshish>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Fri, 17 Jun 2011 11:12:32 +0530
+Subject: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
+In-Reply-To: <87ei2trbuq.fsf@ti.com>
+References: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com>
+	<87ei2trbuq.fsf@ti.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037B9AC5B7@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ravi,
-
-On Fri, Jun 17, 2011 at 05:03:47AM +0000, Ravi wrote:
-> I am using a ARM9 based mini2440 board.
+> -----Original Message-----
+> From: Hilman, Kevin
+> Sent: Thursday, June 16, 2011 9:46 PM
+> To: DebBarma, Tarun Kanti
+> Cc: linux-omap at vger.kernel.org; Shilimkar, Santosh; tony at atomide.com;
+> linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
 > 
-> I am trying to use the Data card(Reliance netconnect USB based modem) for
-> internet access.when I connect to PC this modem is recognized and I am able to
-> communicate with the modem with AT commands.
+> Tarun Kanti DebBarma <tarun.kanti@ti.com> writes:
 > 
-> now when I try using the same modem it is recognized as storage device and modem
-> part of driver is not activated.Please note I am using the same kernel version
-> on board and PC i.e linux version 2.6.32.
+> > This series is continuation of cleanup of OMAP GPIO driver and fixes.
+> > The cleanup include getting rid of cpu_is_* checks wherever possible,
+> > use of gpio_bank list instead of static array, use of unique platform
+> > specific value associated data member to OMAP platforms to avoid
+> > cpu_is_* checks. The series also include PM runtime support.
 > 
-> the configuration on kernel side are.
->   *** USB Device Class drivers                                                 
-> <*>   USB Modem (CDC ACM) support   
->  <*>   USB Serial Converter support  ---> 
->       <*>   USB driver for GSM and CDMA modems 
->       <*>   USB Qualcomm Serial modem  
+> A quick test of this series on 3430/n900 shows that it prevents PER
+> retention.  I see CM_FCLKEN_PER=0000c000 (debounce clock for GPIO banks
+> 3 & 4 are still enabled.)
 > 
-> I am appending the kernel message from kernel when data card is connected.
-> usb 1-1: new full speed USB device using s3c2410-ohci and address 2
-> usb 1-1: New USB device found, idVendor=19d2, idProduct=fff5
-> usb 1-1: New USB device strings: Mfr=1, Product=2, SerialNumber=3
-> usb 1-1: Product: USB Storage
-> usb 1-1: Manufacturer: ZTE, Incorporated
-> usb 1-1: SerialNumber: 000000000002
-> usb 1-1: configuration #1 chosen from 1 choice
-> scsi0 : SCSI emulation for USB Mass Storage devices
-> scsi 0:0:0:0: CD-ROM            ZTE      USB Storage FFF1 2.31 PQ: 0 ANSI: 2
-> sr0: scsi-1 drive
-> Uniform CD-ROM driver Revision: 3.20
+> Can you retest with debounce enabled on one of the GPIOs for one of your
+> platforms?
+Sure, I will.
+--
+Tarun
+> 
+> Kevin
 > 
 > 
-> 
-> Kindly let me know the changes required to make the data card working with my
-> embedded board.
-
-See http://www.draisberghof.de/usb_modeswitch/.
-
-Hope this helps.
-
-baruch
-
--- 
-                                                     ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.2.679.5364, http://www.tkos.co.il -
