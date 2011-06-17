@@ -1,32 +1,44 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Fri, 17 Jun 2011 14:03:52 +0200
-Subject: [PATCH] plat-iop: fix build error
-Message-ID: <1308312232-30488-1-git-send-email-linus.walleij@stericsson.com>
+From: J.Lambrecht@TELEVIC.com (=?iso-8859-1?Q?Lambrecht_J=FCrgen?=)
+Date: Fri, 17 Jun 2011 14:13:04 +0200
+Subject: unsigned int 'return -1' in /sound/soc/codecs/tlv320aic23.c
+Message-ID: <4DFB44D0.4080306@televic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hello,
 
-The iop13xx_defconfig didn't build since the platform code uses
-defines from <asm/ptrace.h>. Simply add the include so it
-compiles.
+I see this error in /sound/soc/codecs/tlv320aic23.c:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/plat-iop/cp6.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+static inline unsigned int tlv320aic23_read_reg_cache(struct snd_soc_codec
+               ^^^^^^^^
+                               *codec, unsigned int reg)
+{
+     u16 *cache = codec->reg_cache;
+     if (reg >= ARRAY_SIZE(tlv320aic23_reg))
+         return -1;
+                ^^
+     return cache[reg];
+}
 
-diff --git a/arch/arm/plat-iop/cp6.c b/arch/arm/plat-iop/cp6.c
-index 9612a87..bab73e2 100644
---- a/arch/arm/plat-iop/cp6.c
-+++ b/arch/arm/plat-iop/cp6.c
-@@ -18,6 +18,7 @@
-  */
- #include <linux/init.h>
- #include <asm/traps.h>
-+#include <asm/ptrace.h>
- 
- static int cp6_trap(struct pt_regs *regs, unsigned int instr)
- {
+Maybe better return 0?
+Best read the codec datasheet to find a safe or non-existing value?
+And also a "printk(KERN_ERR " then?
+Actually, better just remove the check, because if you want to write a 
+codec register, you must know what you are doing?
+
+I am busy with the codec driver for mc13783.
+Currently, the mc13783 (from Sascha Hauer) code does not check 'reg'.
+
+(I want to supply a patch finally, but as newbie: from which GIT?, 
+because mine is a merge of 2 branches of the Pengutronix GIT)
+
+Regards,
+J?rgen
+
 -- 
-1.7.3.2
+J?rgen Lambrecht
+R&D Associate
+Tel: +32 (0)51 303045    Fax: +32 (0)51 310670
+http://www.televic-rail.com
+Televic Rail NV - Leo Bekaertlaan 1 - 8870 Izegem - Belgium
+Company number 0825.539.581 - RPR Kortrijk
