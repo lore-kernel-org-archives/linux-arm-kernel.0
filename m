@@ -1,30 +1,36 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 17 Jun 2011 18:11:32 +0400
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 17 Jun 2011 16:49:31 +0200
 Subject: [PATCH] collie: don't read GPSR
-Message-ID: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
+In-Reply-To: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
+References: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <19963.27003.636701.332500@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On StrongARM GPSR is write-only according to docs, so don't read from
-it. Just set the required GPIO.
+Hi,
 
-Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
----
- arch/arm/mach-sa1100/collie.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+Dmitry Eremin-Solenikov writes:
+> On StrongARM GPSR is write-only according to docs, so don't read from
+> it. Just set the required GPIO.
+> 
+Anyway GPSR (and GPCR) is a bit oriented register that allows
+asserting individual bits without the need for read-modify-write
+cycles, making the access inherently multithread safe. Using
+read-modify-write on this register is contrary to the HW design.
 
-diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
-index f28025e..3f32ba2 100644
---- a/arch/arm/mach-sa1100/collie.c
-+++ b/arch/arm/mach-sa1100/collie.c
-@@ -339,7 +339,7 @@ static void __init collie_init(void)
- 
- 	PCFR = PCFR_OPDE;
- 
--	GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
-+	GPSR = _COLLIE_GPIO_UCB1x00_RESET;
- 
- 
- 	platform_scoop_config = &collie_pcmcia_config;
+A quick grep of the kernel source shows another abuse like this in
+drivers/video/sa1100fb.c:             GPSR |= SHANNON_GPIO_DISP_EN;
+drivers/video/sa1100fb.c:             GPCR |= SHANNON_GPIO_DISP_EN;
+
+
+Lothar Wa?mann
 -- 
-1.7.5.3
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
