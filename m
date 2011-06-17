@@ -1,59 +1,26 @@
-From: dima@android.com (Dima Zavin)
-Date: Fri, 17 Jun 2011 10:55:33 -0700
-Subject: OMPA4: 3.0-rc1: Unhandled fault during insmod 'ohci-hcd.ko'
-In-Reply-To: <BANLkTi=TPNWMe9_gb7SY2J62SC0L8EoRcw@mail.gmail.com>
-References: <BANLkTinYcxJqUM4G2ERew3okUTdf0LOLGA@mail.gmail.com>
-	<BANLkTin=7aEaPDf=2Aa9SApdGetyvdz50g@mail.gmail.com>
-	<BANLkTi=TPNWMe9_gb7SY2J62SC0L8EoRcw@mail.gmail.com>
-Message-ID: <BANLkTimc-tfBVL__=-R4nHSSApuh+fsittK9RiGGPOyTJfQgkg@mail.gmail.com>
+From: davidb@codeaurora.org (David Brown)
+Date: Fri, 17 Jun 2011 11:08:40 -0700
+Subject: [PATCH v2 2/4] msm: iommu: move to drivers/iommu/
+In-Reply-To: <1307742947-32118-3-git-send-email-ohad@wizery.com> (Ohad
+	Ben-Cohen's message of "Sat, 11 Jun 2011 00:55:45 +0300")
+References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
+	<1307742947-32118-3-git-send-email-ohad@wizery.com>
+Message-ID: <8yatyboqqjb.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Samuel,
+On Fri, Jun 10 2011, Ohad Ben-Cohen wrote:
 
-Could you please push this revert to Linus (since the original got
-pulled in through the mfd tree) so that 3.0 is not broken on Panda?
+> This should ease finding similarities with different platforms,
+> with the intention of solving problems once in a generic framework
+> which everyone can use.
+>
+> Compile-tested for MSM8X60.
+>
+> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
 
---DIma
+Acked-by: David Brown <davidb@codeaurora.org>
 
-On Tue, Jun 14, 2011 at 3:59 AM, Ming Lei <tom.leiming@gmail.com> wrote:
-> Hi,
->
-> 2011/6/5 Todd Poynor <toddpoynor@google.com>:
->> In general, the imprecise external abort usually means an access was made to
->> registers of a module whose clock is gated. ?The calls to clk_enable()
->> within?usbhs_enable() probably aren't following the proper sequence of
->> ensuring the CD_L3_INIT clock domain is on (CM_L3INIT_CLKSTCTRL.CLKTRCTRL =
->> 0x2 SW_WKUP) and then the associated module slaves woken up
->> (CM_L3INIT_HSUSBHOST_CLKCTRL.MODULEMODE = 0x2 Enabled, similar
->> for?CM_L3INIT_HSUSBTLL_CLKCTRL). ?Probably needs calls to the OMAP device
->> layer to set those up, but I dunno the details of this device or why it
->> broke.
->>
->
-> No doubt, it is caused by gated clock, ehci will be OK if revert the
-> commit below:
->
-> commit 7e6502d577106fb5b202bbaac64c5f1b065e6daa
-> Author: Keshava Munegowda <Keshava_mgowda@ti.com>
-> Date: ? Sun May 22 22:51:26 2011 +0200
->
-> ? ?mfd: Add omap-usbhs runtime PM support
->
-> ? ?The usbhs core driver does not enable/disable the interface and
-> ? ?functional clocks; These clocks are handled by hwmod and runtime pm,
-> ? ?hence insted of the clock enable/disable, the runtime pm APIS are
-> ? ?used. however,the port clocks and tll clocks are handled
-> ? ?by the usbhs core.
->
-> ? ?Signed-off-by: Keshava Munegowda <keshava_mgowda@ti.com>
-> ? ?Signed-off-by: Samuel Ortiz <sameo@linux.intel.com>
->
->
-> --
-> Ming Lei
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
