@@ -1,23 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 17 Jun 2011 18:10:27 +0200
-Subject: [RFC PATCH 01/16] ARM: local timers: early device probing hooks
-In-Reply-To: <4DFB6F09.6060407@arm.com>
-References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-	<201106171656.10745.arnd@arndb.de> <4DFB6F09.6060407@arm.com>
-Message-ID: <201106171810.27268.arnd@arndb.de>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 17 Jun 2011 18:17:12 +0200
+Subject: [PATCH] ARM: OMAP: Overo: remove duplicate call to
+	overo_ads7846_init()
+In-Reply-To: <87r56sbg3b.fsf@ti.com>
+References: <87r56sbg3b.fsf@ti.com>
+Message-ID: <1308327432-31177-1-git-send-email-zonque@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 17 June 2011, Marc Zyngier wrote:
-> > 
-> > Instead of having two separate global pointers, should we make the ARM specific
-> > callback a machine_desc callback?
-> 
-> Probably not. I only see this arm_late_time_init pointer as a temporary
-> measure. The only user (shmobile) uses this hook to install its own
-> early timers, and there is a patch floating around to move that code to
-> time.c. Unless we have other uses for such a callback, of course.
+overo_ads7846_init() is already called from overo_spi_init(), and
+calling it twice is not only unnecessary but causes a warning as
+"reg-fixed-voltage.1" is already added to the device tree.
 
-Ok, fair enough.
+Signed-off-by: Daniel Mack <zonque@gmail.com>
+---
+ arch/arm/mach-omap2/board-overo.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
 
-	Arnd
+diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+index 175e1ab..110475f 100644
+--- a/arch/arm/mach-omap2/board-overo.c
++++ b/arch/arm/mach-omap2/board-overo.c
+@@ -568,7 +568,6 @@ static void __init overo_init(void)
+ 	usb_musb_init(NULL);
+ 	usbhs_init(&usbhs_bdata);
+ 	overo_spi_init();
+-	overo_ads7846_init();
+ 	overo_init_smsc911x();
+ 	overo_display_init();
+ 	overo_init_led();
+-- 
+1.7.5.1
