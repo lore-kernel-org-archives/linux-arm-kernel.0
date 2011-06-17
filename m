@@ -1,50 +1,34 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Fri, 17 Jun 2011 19:35:59 +0400
-Subject: [PATCH] collie: don't read GPSR
-In-Reply-To: <BANLkTikgNuovqVax-KdYjx1FM3kGCH4dDQ@mail.gmail.com>
-References: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
-	<BANLkTikgNuovqVax-KdYjx1FM3kGCH4dDQ@mail.gmail.com>
-Message-ID: <BANLkTi=RPmwqzBvr_TYbPmd0s1-BM9unKg@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Jun 2011 16:24:51 +0100
+Subject: [RFC PATCH 00/16] Consolidation: move SMP local timers
+	to	driver/clocksource
+In-Reply-To: <201106171707.23989.arnd@arndb.de>
+References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
+	<201106171707.23989.arnd@arndb.de>
+Message-ID: <4DFB71C3.20105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/17/11, Eric Miao <eric.y.miao@gmail.com> wrote:
-> Would it be better to switch to use gpio_* API instead of manipulating
-> GPxR directly?
+On 17/06/11 16:07, Arnd Bergmann wrote:
+> On Thursday 16 June 2011, Marc Zyngier wrote:
+>> Patches against next-20110615 + my earlier GIC-PPI series. Tested on
+>> VExpress, PB11MP, Pandaboard, Tegra Harmony and Exynos4 SMDK-v310.
+>>
+>> Thomas and Arnd cc-ed on the whole series, as this could be
+>> consolidation material.
+> 
+> Very nice stuff. Should we take this all in one branch in the arm-soc tree,
+> pending Acks from the subarch maintainers?
+> 
+> We could also push it through the individual subarch branches, but my feeling
+> is that would be more work.
 
-Yes. Probably. But this would require a much bigger cleanup effort. Waiting
-for spare time for it.
+It seems far more work than it's worth, really. As long as the
+individual maintainers are happy with it, the single branch option seem
+nicer.
 
-> On Fri, Jun 17, 2011 at 10:11 PM, Dmitry Eremin-Solenikov
-> <dbaryshkov@gmail.com> wrote:
->> On StrongARM GPSR is write-only according to docs, so don't read from
->> it. Just set the required GPIO.
->>
->> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
->> ---
->>  arch/arm/mach-sa1100/collie.c |    2 +-
->>  1 files changed, 1 insertions(+), 1 deletions(-)
->>
->> diff --git a/arch/arm/mach-sa1100/collie.c b/arch/arm/mach-sa1100/collie.c
->> index f28025e..3f32ba2 100644
->> --- a/arch/arm/mach-sa1100/collie.c
->> +++ b/arch/arm/mach-sa1100/collie.c
->> @@ -339,7 +339,7 @@ static void __init collie_init(void)
->>
->>        PCFR = PCFR_OPDE;
->>
->> -       GPSR |= _COLLIE_GPIO_UCB1x00_RESET;
->> +       GPSR = _COLLIE_GPIO_UCB1x00_RESET;
->>
->>
->>        platform_scoop_config = &collie_pcmcia_config;
->> --
->> 1.7.5.3
->>
->>
->
+Cheers,
 
-
+	M.
 -- 
-With best wishes
-Dmitry
+Jazz is not dead. It just smells funny...
