@@ -1,48 +1,37 @@
 From: ptesarik@suse.cz (Petr Tesarik)
-Date: Fri, 17 Jun 2011 10:46:51 +0200
-Subject: [PATCH 07/10] arm: change valid_phys_addr_range's @addr param to
-	phys_addr_t
-In-Reply-To: <201106171038.25988.ptesarik@suse.cz>
-References: <201106171038.25988.ptesarik@suse.cz>
-Message-ID: <201106171046.52057.ptesarik@suse.cz>
+Date: Fri, 17 Jun 2011 10:38:25 +0200
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+Message-ID: <201106171038.25988.ptesarik@suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No other changes are needed, the function will work just fine with
-a potentially larger data type.
+This patch series enhances /dev/mem, so that read and write is possible
+at any address. The patchset includes actual implementation for x86.
 
+Petr Tesarik (10):
+  Return EOF on out-of-bounds read from /dev/mem
+  (un)xlate_dev_mem_ptr: use phys_addr_t for the @phys parameter
+  x86: translate highmem /dev/mem pointers
+  ia64: change xlate_dev_mem_ptr's argument to phys_addr_t
+  valid_phys_addr_range: use phys_addr_t for the @addr parameter
+  sh: change valid_phys_addr_range's @addr param to phys_addr_t
+  arm: change valid_phys_addr_range's @addr param to phys_addr_t
+  ia64: change valid_phys_addr_range's @addr param to phys_addr_t
+  x86: provide arch-specific valid_phys_addr_range()
+  Allow reading/writing all memory through /dev/mem
 
-Signed-off-by: Petr Tesarik <ptesarik@suse.cz>
----
- arch/arm/include/asm/io.h |    2 +-
- arch/arm/mm/mmap.c        |    2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/io.h       |    2 +-
+ arch/arm/mm/mmap.c              |    2 +-
+ arch/ia64/include/asm/io.h      |    2 +-
+ arch/ia64/include/asm/uaccess.h |    2 +-
+ arch/ia64/kernel/efi.c          |    2 +-
+ arch/sh/include/asm/io.h        |    2 +-
+ arch/sh/mm/mmap.c               |    2 +-
+ arch/x86/include/asm/io.h       |   15 +++++++++++++--
+ arch/x86/mm/ioremap.c           |   24 ++++++++++++++++++------
+ drivers/char/mem.c              |   14 ++++++++++----
+ 10 files changed, 48 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm/include/asm/io.h b/arch/arm/include/asm/io.h
-index d66605d..91e4ff2 100644
---- a/arch/arm/include/asm/io.h
-+++ b/arch/arm/include/asm/io.h
-@@ -290,7 +290,7 @@ extern void pci_iounmap(struct pci_dev *dev, void __iomem *addr);
- 
- #ifdef CONFIG_MMU
- #define ARCH_HAS_VALID_PHYS_ADDR_RANGE
--extern int valid_phys_addr_range(unsigned long addr, size_t size);
-+extern int valid_phys_addr_range(phys_addr_t addr, size_t size);
- extern int valid_mmap_phys_addr_range(unsigned long pfn, size_t size);
- extern int devmem_is_allowed(unsigned long pfn);
- #endif
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 74be05f..3bf1d88 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -127,7 +127,7 @@ full_search:
-  * You really shouldn't be using read() or write() on /dev/mem.  This
-  * might go away in the future.
-  */
--int valid_phys_addr_range(unsigned long addr, size_t size)
-+int valid_phys_addr_range(phys_addr_t addr, size_t size)
- {
- 	if (addr < PHYS_OFFSET)
- 		return 0;
 -- 
 1.7.3.4
