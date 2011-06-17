@@ -1,36 +1,36 @@
-From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
-Date: Fri, 17 Jun 2011 16:49:31 +0200
-Subject: [PATCH] collie: don't read GPSR
-In-Reply-To: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
-References: <1308319892-13057-1-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <19963.27003.636701.332500@ipc1.ka-ro>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 17 Jun 2011 16:56:10 +0200
+Subject: [RFC PATCH 01/16] ARM: local timers: early device probing hooks
+In-Reply-To: <1308251204-16719-2-git-send-email-marc.zyngier@arm.com>
+References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
+	<1308251204-16719-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <201106171656.10745.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thursday 16 June 2011, Marc Zyngier wrote:
+> @@ -147,6 +148,19 @@ static int __init timer_init_syscore_ops(void)
+>  
+>  device_initcall(timer_init_syscore_ops);
+>  
+> +void (* __initdata arm_late_time_init)(void);
+> +
+> +static void __init __arm_late_time_init(void)
+> +{
+> +       if (arm_late_time_init)
+> +               arm_late_time_init();
+> +
+> +#ifdef CONFIG_LOCAL_TIMER_DEVICES
+> +       early_platform_driver_register_all("localtimer");
+> +       early_platform_driver_probe("localtimer", 1, 0);
+> +#endif
+> +}
+> +
+>  void __init time_init(void)
+>  {
+>         system_timer = machine_desc->timer;
 
-Dmitry Eremin-Solenikov writes:
-> On StrongARM GPSR is write-only according to docs, so don't read from
-> it. Just set the required GPIO.
-> 
-Anyway GPSR (and GPCR) is a bit oriented register that allows
-asserting individual bits without the need for read-modify-write
-cycles, making the access inherently multithread safe. Using
-read-modify-write on this register is contrary to the HW design.
+Instead of having two separate global pointers, should we make the ARM specific
+callback a machine_desc callback?
 
-A quick grep of the kernel source shows another abuse like this in
-drivers/video/sa1100fb.c:             GPSR |= SHANNON_GPIO_DISP_EN;
-drivers/video/sa1100fb.c:             GPCR |= SHANNON_GPIO_DISP_EN;
-
-
-Lothar Wa?mann
--- 
-___________________________________________________________
-
-Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
-Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
-Gesch?ftsf?hrer: Matthias Kaussen
-Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
-
-www.karo-electronics.de | info at karo-electronics.de
-___________________________________________________________
+	Arnd
