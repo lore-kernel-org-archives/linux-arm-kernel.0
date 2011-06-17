@@ -1,47 +1,106 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Fri, 17 Jun 2011 11:30:32 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <201106171038.25988.ptesarik@suse.cz>
-References: <201106171038.25988.ptesarik@suse.cz>
-Message-ID: <20110617093032.GA19235@elte.hu>
+From: richard.zhu@linaro.org (Richard Zhu)
+Date: Fri, 17 Jun 2011 17:41:18 +0800
+Subject: [V3 PATCH] mmc: Enable the ADMA on esdhc imx driver
+Message-ID: <1308303678-9338-1-git-send-email-richard.zhu@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Eanble the ADMA2 mode on freescale esdhc imx driver,
+tested on MX51 and MX53.
 
-* Petr Tesarik <ptesarik@suse.cz> wrote:
+Only ADMA2 mode is enabled, MX25/35 can't support the ADMA2 mode.
+So this patch is only used for MX51/53.
+The ADMA2 mode supported or not can be distinguished by the
+bit20 of Capability Register(offset 0x40) and bit9-8 of HOST PROTOCOL
+Register(offset 0x28) in eSDHC module.
 
-> This patch series enhances /dev/mem, so that read and write is 
-> possible at any address. The patchset includes actual 
-> implementation for x86.
+Signed-off-by: Richard Zhu <richard.zhu@linaro.org>
+---
+ drivers/mmc/host/sdhci-esdhc-imx.c |   43 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 41 insertions(+), 2 deletions(-)
 
-This series lacks a description of why this is desired.
-
-My strong opinion is that it's not desired at all: /dev/mem never 
-worked beyond 4G addresses so by today it has become largely obsolete 
-and is on the way out really.
-
-I'm aware of these current /dev/mem uses:
-
- - Xorg maps below 4G non-RAM addresses and the video BIOS
-
- - It used to have some debugging role but these days kexec and kgdb 
-   has largely taken over that role - partly due to the 4G limit.
-
- - there's some really horrible out-of-tree drivers that do mmap()s
-   via /dev/mem, those should be fixed if they want to move beyond 
-   4G: their char device should be mmap()able.
-
- - all distro kernel's i'm aware of use CONFIG_STRICT_DEVMEM=y, which
-   restricts /dev/mem to non-RAM pages of physical memory.
-   [ With the sad inclusion of the first 1MB, which Xorg needs. ]
-
-Are you aware of any legitimate usecases?
-
-Frankly, i dont think we ever *want* to 'fix' /dev/mem to support 
-addresses beyond 4G and grow messy userspace (and kernelspace) that 
-somehow relies on that. Thank goodness that we never supported it ...
-
-Thanks,
-
-	Ingo
+diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
+index a19967d..6760e08 100644
+--- a/drivers/mmc/host/sdhci-esdhc-imx.c
++++ b/drivers/mmc/host/sdhci-esdhc-imx.c
+@@ -31,6 +31,14 @@
+ #define SDHCI_VENDOR_SPEC		0xC0
+ #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
+ 
++/*
++ * There is INT DMA ERR mis-match between eSDHC and STD SDHC SPEC
++ * Bit25 is used in STD SPEC, and is reserved in fsl eSDHC design,
++ * but bit28 is used as the INT DMA ERR in fsl eSDHC design.
++ * Define this macro DMA error INT for fsl eSDHC
++ */
++#define  SDHCI_INT_VENDOR_SPEC_DMA_ERR	0x10000000
++
+ #define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
+ /*
+  * The CMDTYPE of the CMD register (offset 0xE) should be set to
+@@ -62,6 +70,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+ {
+ 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+ 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
++	u32 dma_mode;
+ 
+ 	/* fake CARD_PRESENT flag on mx25/35 */
+ 	u32 val = readl(host->ioaddr + reg);
+@@ -80,6 +89,28 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
+ 			val |= SDHCI_CARD_PRESENT;
+ 	}
+ 
++	if (unlikely(reg == SDHCI_CAPABILITIES)) {
++		/* Only bit20 is used to indicate the ADMA capability of esdhc,
++		 * but bit20 is messed up on some SOCs, make a double check
++		 * on the DMA mode.
++		 */
++		dma_mode = readl(host->ioaddr + SDHCI_HOST_CONTROL) >> 5;
++		dma_mode &= SDHCI_CTRL_DMA_MASK; 
++
++		if ((val & SDHCI_CAN_DO_ADMA1)
++				&& (dma_mode > SDHCI_CTRL_ADMA1)) {
++			val &= ~SDHCI_CAN_DO_ADMA1;
++			val |= SDHCI_CAN_DO_ADMA2;
++		}
++	}
++
++	if (unlikely(reg == SDHCI_INT_STATUS)) {
++		if (val & SDHCI_INT_VENDOR_SPEC_DMA_ERR) {
++			val &= ~SDHCI_INT_VENDOR_SPEC_DMA_ERR;
++			val |= SDHCI_INT_ADMA_ERROR;
++		}
++	}
++
+ 	return val;
+ }
+ 
+@@ -105,6 +136,13 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
+ 			writel(v, host->ioaddr + SDHCI_VENDOR_SPEC);
+ 	}
+ 
++	if (unlikely((reg == SDHCI_INT_ENABLE)
++				|| (reg == SDHCI_SIGNAL_ENABLE))) {
++		if (val & SDHCI_INT_ADMA_ERROR) {
++			val &= ~SDHCI_INT_ADMA_ERROR;
++			val |= SDHCI_INT_VENDOR_SPEC_DMA_ERR;
++		}
++	}
+ 	writel(val, host->ioaddr + reg);
+ }
+ 
+@@ -322,9 +360,10 @@ static void esdhc_pltfm_exit(struct sdhci_host *host)
+ }
+ 
+ struct sdhci_pltfm_data sdhci_esdhc_imx_pdata = {
+-	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_BROKEN_ADMA
++	.quirks = ESDHC_DEFAULT_QUIRKS | SDHCI_QUIRK_NO_HISPD_BIT
++			| SDHCI_QUIRK_NO_ENDATTR_IN_NOPDESC
++			| SDHCI_QUIRK_BROKEN_ADMA_ZEROLEN_DESC
+ 			| SDHCI_QUIRK_BROKEN_CARD_DETECTION,
+-	/* ADMA has issues. Might be fixable */
+ 	.ops = &sdhci_esdhc_ops,
+ 	.init = esdhc_pltfm_init,
+ 	.exit = esdhc_pltfm_exit,
+-- 
+1.7.1
