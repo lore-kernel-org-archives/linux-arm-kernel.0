@@ -1,78 +1,54 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Thu, 16 Jun 2011 21:54:48 -0500
-Subject: [PATCH 06/14] ARM: suspend: rejig suspend follow-on function
-	calling convention
-In-Reply-To: <E1QWAku-0002e3-3d@rmk-PC.arm.linux.org.uk>
-References: <20110613171446.GF13643@n2100.arm.linux.org.uk>
-	<E1QWAku-0002e3-3d@rmk-PC.arm.linux.org.uk>
-Message-ID: <4DFAC1F8.7040503@gmail.com>
+From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
+Date: Fri, 17 Jun 2011 05:06:12 +0200
+Subject: [PATCH] atmel_serial: keep the platform_device unchanged
+In-Reply-To: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
+References: <1302724038-26236-1-git-send-email-plagnioj@jcrosoft.com>
+	<1307522703.10626.9.camel@hcegtvedt.norway.atmel.com>
+	<20110608134730.GA17584@game.jcrosoft.org>
+	<1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
+Message-ID: <20110617030612.GK4581@game.jcrosoft.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
-
-On 06/13/2011 12:16 PM, Russell King - ARM Linux wrote:
-> Save the suspend function pointer onto the stack for use when returning.
-> Allocate r2 to pass an argument to the suspend function.
+On 16:02 Wed 08 Jun     , Hans-Christian Egtvedt wrote:
+> On Wed, 2011-06-08 at 15:47 +0200, Jean-Christophe PLAGNIOL-VILLARD
+> wrote:
+> > On 10:45 Wed 08 Jun     , Hans-Christian Egtvedt wrote:
+> > > On Wed, 2011-04-13 at 21:47 +0200, Jean-Christophe PLAGNIOL-VILLARD
+> > > wrote:
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> ---
->  arch/arm/kernel/sleep.S |    9 +++++----
->  1 files changed, 5 insertions(+), 4 deletions(-)
+> <snipp>
 > 
-> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-> index 358be13..b924bcc 100644
-> --- a/arch/arm/kernel/sleep.S
-> +++ b/arch/arm/kernel/sleep.S
-> @@ -10,6 +10,7 @@
->  /*
->   * Save CPU state for a suspend
->   *  r1 = v:p offset
-> + *  r2 = suspend function arg0
->   *  r3 = virtual return function
->   * Note: sp is decremented to allocate space for CPU state on stack
->   * r0-r3,ip,lr corrupted
-> @@ -17,7 +18,6 @@
->  ENTRY(cpu_suspend)
->  	stmfd	sp!, {r3}
->  	stmfd	sp!, {r4 - r11}
-> -	mov	r9, lr
->  #ifdef MULTI_CPU
->  	ldr	r10, =processor
->  	ldr	r5, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
-> @@ -33,6 +33,7 @@ ENTRY(cpu_suspend)
->  	stmfd	sp!, {r1, r6, ip}	@ save v:p, virt SP, phys resume fn
->  	ldr	r5, =sleep_save_sp
->  	add	r6, sp, r1		@ convert SP to phys
-> +	stmfd	sp!, {r2, lr}		@ save suspend func arg and pointer
->  #ifdef CONFIG_SMP
->  	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
->  	ALT_UP(mov lr, #0)
-> @@ -51,12 +52,12 @@ ENTRY(cpu_suspend)
->  	@ flush data cache
->  #ifdef MULTI_CACHE
->  	ldr	r10, =cpu_cache
-> -	mov	lr, r9
-> +	mov	lr, pc
->  	ldr	pc, [r10, #CACHE_FLUSH_KERN_ALL]
->  #else
-> -	mov	lr, r9
-> -	b	__cpuc_flush_kern_all
-> +	bl	__cpuc_flush_kern_all
->  #endif
+> > > > diff --git a/arch/avr32/mach-at32ap/at32ap700x.c b/arch/avr32/mach-at32ap/at32ap700x.c
+> > > > index bfc9d07..aa677e2 100644
+> > > > --- a/arch/avr32/mach-at32ap/at32ap700x.c
+> > > > +++ b/arch/avr32/mach-at32ap/at32ap700x.c
+> > > > @@ -1014,6 +1014,7 @@ static struct platform_device *__initdata at32_usarts[4];
+> > > >  void __init at32_map_usart(unsigned int hw_id, unsigned int line, int flags)
+> > > >  {
+> > > >  	struct platform_device *pdev;
+> > > > +	struct atmel_uart_data *pdata;
+> > > >  
+> > > >  	switch (hw_id) {
+> > > >  	case 0:
+> > > > @@ -1042,7 +1043,8 @@ void __init at32_map_usart(unsigned int hw_id, unsigned int line, int flags)
+> > > >  		data->regs = (void __iomem *)pdev->resource[0].start;
+> > > >  	}
+> > > >  
+> > > > -	pdev->id = line;
+> > > 
+> > > AVR32 needs this to be present to work independent of which USART
+> > > peripheral the user chooses to use for console.
+> > > 
+> > > > +	pdata = pdev->dev.platform_data;
+> > > > +	pdata->num = portnr;
+> > here supposed to be
+> > 	pdata->num = line;
+> 
+> I know, but that doesn't fix the problem about not able to find a
+> console, the platform data id must also be 0 (if console is on ttyS0)
+> AFAICT.
+will test this weekend on avr32
 
-If you change:
-
-> +	ldmfd	sp!, {r0, pc}		@ call suspend fn
-
-To:
-	mov	lr, pc
-	ldmfd	sp!, {r0, pc}
-	ldmfd	sp!, {r1, r6, ip}
-	mov	sp, r6
-	ldmfd	sp!, {r4-r11, pc}
-
-It will allow the suspend fn to return and abort suspend. With that, I'm
-able to use this for core powerdown in cpuidle.
-
-Rob
+Best Regards,
+J.
