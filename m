@@ -1,29 +1,40 @@
-From: Joerg.Roedel@amd.com (Roedel, Joerg)
-Date: Fri, 17 Jun 2011 15:18:36 +0200
-Subject: [PATCH v2 4/4] x86/ia64: intel-iommu: move to drivers/iommu/
-In-Reply-To: <1307742947-32118-5-git-send-email-ohad@wizery.com>
-References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
-	<1307742947-32118-5-git-send-email-ohad@wizery.com>
-Message-ID: <20110617131836.GE6689@amd.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 17 Jun 2011 14:27:50 +0100
+Subject: [RFC PATCH 00/16] Consolidation: move SMP local timers to
+	driver/clocksource
+In-Reply-To: <BANLkTinSuce1SQkjKva+DoUVRoJrQjU10Q@mail.gmail.com>
+References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
+	<BANLkTinSuce1SQkjKva+DoUVRoJrQjU10Q@mail.gmail.com>
+Message-ID: <4DFB5656.2060000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 05:55:47PM -0400, Ohad Ben-Cohen wrote:
-> This should ease finding similarities with different platforms,
-> with the intention of solving problems once in a generic framework
-> which everyone can use.
+Hi Linus,
+
+On 17/06/11 12:00, Linus Walleij wrote:
+> Thanks for an excellent patch set Marc, take that as an Acked-by from me FWIW.
 > 
-> Note: to move intel-iommu.c, the declaration of pci_find_upstream_pcie_bridge()
-> has to move from drivers/pci/pci.h to include/linux/pci.h. This is handled
-> in this patch, too.
+> On Thu, Jun 16, 2011 at 9:06 PM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+>> Patches against next-20110615 + my earlier GIC-PPI series. Tested on
+>> VExpress, PB11MP, Pandaboard, Tegra Harmony and Exynos4 SMDK-v310.
+> 
+> This is making it hopeless for me to test on a plain -rc3 kernel,
+> do you have a public git branch I can just pull in to get all this?
+> 
+> I would like to test on U8500 and also rebase Colins TWD
+> CPUfreq patch on top of this so it can go in on top of the
+> consolidations.
 
-David, does this look good to you? Can you send an ACK if so?
+I've created a new repository on git.kernel.org:
+git://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git
+and rebased my stuff on top of -rc3 in the "local_timer_devices" branch.
+Tested on a PB11MP.
 
-	Joerg
+It may take some time for the mirrors to catch up...
 
+Cheers,
+
+	M.
 -- 
-AMD Operating System Research Center
-
-Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
-General Managers: Alberto Bozzo, Andrew Bowd
-Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
+Jazz is not dead. It just smells funny...
