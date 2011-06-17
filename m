@@ -1,34 +1,45 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 17 Jun 2011 16:24:51 +0100
-Subject: [RFC PATCH 00/16] Consolidation: move SMP local timers
-	to	driver/clocksource
-In-Reply-To: <201106171707.23989.arnd@arndb.de>
-References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-	<201106171707.23989.arnd@arndb.de>
-Message-ID: <4DFB71C3.20105@arm.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 17 Jun 2011 09:03:20 -0700
+Subject: [PATCH] ARM: OMAP: Overo: remove illegal extra call to
+	overo_ads7846_init()
+In-Reply-To: <1308324110-21918-1-git-send-email-zonque@gmail.com> (Daniel
+	Mack's message of "Fri, 17 Jun 2011 17:21:50 +0200")
+References: <1308324110-21918-1-git-send-email-zonque@gmail.com>
+Message-ID: <87r56sbg3b.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/11 16:07, Arnd Bergmann wrote:
-> On Thursday 16 June 2011, Marc Zyngier wrote:
->> Patches against next-20110615 + my earlier GIC-PPI series. Tested on
->> VExpress, PB11MP, Pandaboard, Tegra Harmony and Exynos4 SMDK-v310.
->>
->> Thomas and Arnd cc-ed on the whole series, as this could be
->> consolidation material.
-> 
-> Very nice stuff. Should we take this all in one branch in the arm-soc tree,
-> pending Acks from the subarch maintainers?
-> 
-> We could also push it through the individual subarch branches, but my feeling
-> is that would be more work.
+Daniel Mack <zonque@gmail.com> writes:
 
-It seems far more work than it's worth, really. As long as the
-individual maintainers are happy with it, the single branch option seem
-nicer.
+> Signed-off-by: Daniel Mack <zonque@gmail.com>
 
-Cheers,
+Thanks for fixing this, I noticed this recently too.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Please add a descriptive changelog.  For example, why is it duplcate?
+where is it already done?  what commit added the extra call, what
+problems does it cause, etc.
+
+Also, your subject says 'illegal', but it's not really illegal.  It's just
+wrong. :)   "remove duplcate call to..." is enough.
+
+Thanks,
+
+Kevin
+
+
+> ---
+>  arch/arm/mach-omap2/board-overo.c |    1 -
+>  1 files changed, 0 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-overo.c b/arch/arm/mach-omap2/board-overo.c
+> index 175e1ab..110475f 100644
+> --- a/arch/arm/mach-omap2/board-overo.c
+> +++ b/arch/arm/mach-omap2/board-overo.c
+> @@ -568,7 +568,6 @@ static void __init overo_init(void)
+>  	usb_musb_init(NULL);
+>  	usbhs_init(&usbhs_bdata);
+>  	overo_spi_init();
+> -	overo_ads7846_init();
+>  	overo_init_smsc911x();
+>  	overo_display_init();
+>  	overo_init_led();
