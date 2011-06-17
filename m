@@ -1,34 +1,40 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Fri, 17 Jun 2011 13:23:07 -0700
-Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
-In-Reply-To: <alpine.LFD.2.00.1106151540230.2142@xanadu.home> (Nicolas Pitre's
-	message of "Wed, 15 Jun 2011 15:50:37 -0400 (EDT)")
-References: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
-	<alpine.LFD.2.00.1106151540230.2142@xanadu.home>
-Message-ID: <8yalix0qkb8.fsf@huya.qualcomm.com>
+From: johlstei@codeaurora.org (Jeff Ohlstein)
+Date: Fri, 17 Jun 2011 13:55:38 -0700
+Subject: [PATCH v2] msm: timer: compensate for timer shift in
+	msm_read_timer_count
+Message-ID: <1308344138-2862-1-git-send-email-johlstei@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15 2011, Nicolas Pitre wrote:
+Some msm targets have timers whose lower bits are unreliable. So, we
+present our timers as lower frequency than they actually are, and ignore
+the bottom 5 bits on such targets. This compensation was erroneously
+removed from the msm_read_timer_count function, so restore it.
 
-> I think those missing nodes should simply be created if missing.  I 
-> however don't see any function in the libfdt API to do that -- there is 
-> fdt_add_subnode() but no fdt_add_node().  Any DT expert please?
->
-> Also, should the DTB be enlarged in order to add new nodes, or even 
-> modify existing ones with larger properties?  In other words, 
-> should something like fdt_move(fdt, fdt, fdt_totalsize(fdt)+HEADROOM) be 
-> used beforehand?
+This was broken by 94790ec25 "msm: timer: SMP timer support for msm".
 
-I've tried adding some padding to my DTB by passing '-p 1024'.  It does
-seem to try and do something, but I'm getting a fault in memmove() from
-fdt_splice() that I'm still trying to track down.
+Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+---
+ arch/arm/mach-msm/timer.c |    6 +++++-
+ 1 files changed, 5 insertions(+), 1 deletions(-)
 
-It looks like the expansion is possible, though, at least once
-everything is right.
-
-David
-
+diff --git a/arch/arm/mach-msm/timer.c b/arch/arm/mach-msm/timer.c
+index 38b95e9..608ec4d 100644
+--- a/arch/arm/mach-msm/timer.c
++++ b/arch/arm/mach-msm/timer.c
+@@ -100,7 +100,11 @@ static cycle_t msm_read_timer_count(struct clocksource *cs)
+ {
+ 	struct msm_clock *clk = container_of(cs, struct msm_clock, clocksource);
+ 
+-	return readl(clk->global_counter);
++	/*
++	 * Shift timer count down by a constant due to unreliable lower bits
++	 * on some targets.
++	 */
++	return readl(clk->global_counter) >> clk->shift;
+ }
+ 
+ static struct msm_clock *clockevent_to_clock(struct clock_event_device *evt)
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
 The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
