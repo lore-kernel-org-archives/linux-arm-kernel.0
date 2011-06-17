@@ -1,34 +1,29 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Fri, 17 Jun 2011 15:14:43 +0200 (CEST)
-Subject: [PATCH][Trivial] ARM: remove duplicate include from
-	arch/arm/mach-dove/common.c
-In-Reply-To: <alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
-References: <alpine.LNX.2.00.1105261130190.17400@swampdragon.chaosbits.net>
-	<20110526144804.GA31651@lunn.ch>
-	<alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
-Message-ID: <alpine.LNX.2.00.1106171514291.22872@pobox.suse.cz>
+From: Joerg.Roedel@amd.com (Roedel, Joerg)
+Date: Fri, 17 Jun 2011 15:18:36 +0200
+Subject: [PATCH v2 4/4] x86/ia64: intel-iommu: move to drivers/iommu/
+In-Reply-To: <1307742947-32118-5-git-send-email-ohad@wizery.com>
+References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
+	<1307742947-32118-5-git-send-email-ohad@wizery.com>
+Message-ID: <20110617131836.GE6689@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jun 2011, Jesper Juhl wrote:
+On Fri, Jun 10, 2011 at 05:55:47PM -0400, Ohad Ben-Cohen wrote:
+> This should ease finding similarities with different platforms,
+> with the intention of solving problems once in a generic framework
+> which everyone can use.
+> 
+> Note: to move intel-iommu.c, the declaration of pci_find_upstream_pcie_bridge()
+> has to move from drivers/pci/pci.h to include/linux/pci.h. This is handled
+> in this patch, too.
 
-> On Thu, 26 May 2011, Andrew Lunn wrote:
-> 
-> > Jesper Juhl pointed out there is a redundant include of
-> > linux/serial_8250.h. However it turns out both are redundant.
-> > This patch removes them both.
-> > 
-> > Only compile tested.
-> > 
-> > Reported-by:  Jesper Juhl <jj@chaosbits.net>
-> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
-> 
-> Seems you are right.
-> 
-> Reviewed-by: Jesper Juhl <jj@chaosbits.net>
+David, does this look good to you? Can you send an ACK if so?
 
-Doesn't seem to be in linux-next as of today. I have picked it up.
+	Joerg
 
 -- 
-Jiri Kosina
-SUSE Labs
+AMD Operating System Research Center
+
+Advanced Micro Devices GmbH Einsteinring 24 85609 Dornach
+General Managers: Alberto Bozzo, Andrew Bowd
+Registration: Dornach, Landkr. Muenchen; Registerger. Muenchen, HRB Nr. 43632
