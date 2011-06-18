@@ -1,227 +1,62 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Sat, 18 Jun 2011 23:19:14 +0800
-Subject: [PATCH 3/3] ARM: mx5: add basic device tree support for imx51 babbage
-In-Reply-To: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1308410354-21387-4-git-send-email-shawn.guo@linaro.org>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Sat, 18 Jun 2011 16:12:27 +0100
+Subject: [PATCH 1/2] Exynos4 NURI: configure regulators and PMIC
+In-Reply-To: <1308215372-17420-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1308215372-17420-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <20110618151227.GB25163@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the i.mx51 dt platform with uart and fec support.
-It also adds the dts file imx51 babbage, so that we can have a dt
-kernel on babbage booting into console with nfs root.
+On Thu, Jun 16, 2011 at 06:09:31PM +0900, MyungJoo Ham wrote:
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/boot/dts/imx51-babbage.dts |   89 +++++++++++++++++++++++++++++++++++
- arch/arm/mach-mx5/Kconfig           |    8 +++
- arch/arm/mach-mx5/Makefile          |    1 +
- arch/arm/mach-mx5/imx51-dt.c        |   70 +++++++++++++++++++++++++++
- 4 files changed, 168 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx51-babbage.dts
- create mode 100644 arch/arm/mach-mx5/imx51-dt.c
+>  static struct regulator_init_data emmc_fixed_voltage_init_data = {
+>  	.constraints		= {
+> +		.min_uV		= 2800000,
+> +		.max_uV		= 2800000,
+>  		.name		= "VMEM_VDD_2.8V",
+>  		.valid_ops_mask	= REGULATOR_CHANGE_STATUS,
 
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-new file mode 100644
-index 0000000..7976932
---- /dev/null
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -0,0 +1,89 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+/include/ "skeleton.dtsi"
-+
-+/ {
-+	model = "Freescale i.MX51 Babbage";
-+	compatible = "fsl,imx51-babbage", "fsl,imx51";
-+	interrupt-parent = <&tzic>;
-+
-+	chosen {
-+		bootargs = "console=ttymxc0,115200 root=/dev/mmcblk0p3 rootwait";
-+	};
-+
-+	memory {
-+		reg = <0x90000000 0x20000000>;
-+	};
-+
-+	tzic: tz-interrupt-controller at e0000000 {
-+		compatible = "fsl,imx51-tzic", "fsl,tzic";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		reg = <0xe0000000 0x4000>;
-+	};
-+
-+	aips at 70000000 { /* aips-1 */
-+		compatible = "fsl,aips-bus", "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x70000000 0x10000000>;
-+		ranges;
-+
-+		spba {
-+			compatible = "fsl,spba-bus", "simple-bus";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x70000000 0x40000>;
-+			ranges;
-+
-+			uart at 7000c000 {
-+				compatible = "fsl,imx51-uart", "fsl,imx-uart";
-+				reg = <0x7000c000 0x4000>;
-+				interrupts = <33>;
-+				id = <3>;
-+				fsl,has-rts-cts;
-+			};
-+		};
-+
-+		uart at 73fbc000 {
-+			compatible = "fsl,imx51-uart", "fsl,imx-uart";
-+			reg = <0x73fbc000 0x4000>;
-+			interrupts = <31>;
-+			id = <1>;
-+			fsl,has-rts-cts;
-+		};
-+
-+		uart at 73fc0000 {
-+			compatible = "fsl,imx51-uart", "fsl,imx-uart";
-+			reg = <0x73fc0000 0x4000>;
-+			interrupts = <32>;
-+			id = <2>;
-+			fsl,has-rts-cts;
-+		};
-+	};
-+
-+	aips at 80000000 {	/* aips-2 */
-+		compatible = "fsl,aips-bus", "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		reg = <0x80000000 0x10000000>;
-+		ranges;
-+
-+		fec at 83fec000 {
-+			compatible = "fsl,imx51-fec", "fsl,fec";
-+			reg = <0x83fec000 0x4000>;
-+			interrupts = <87>;
-+		};
-+	};
-+};
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 799fbc4..8bdd0c4 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -62,6 +62,14 @@ endif # ARCH_MX50_SUPPORTED
- if ARCH_MX51
- comment "i.MX51 machines:"
- 
-+config MACH_IMX51_DT
-+	bool "Support i.MX51 platforms from device tree"
-+	select SOC_IMX51
-+	select USE_OF
-+	help
-+	  Include support for Freescale i.MX51 based platforms
-+	  using the device tree for discovery
-+
- config MACH_MX51_BABBAGE
- 	bool "Support MX51 BABBAGE platforms"
- 	select SOC_IMX51
-diff --git a/arch/arm/mach-mx5/Makefile b/arch/arm/mach-mx5/Makefile
-index 0b9338c..47b483f 100644
---- a/arch/arm/mach-mx5/Makefile
-+++ b/arch/arm/mach-mx5/Makefile
-@@ -7,6 +7,7 @@ obj-y   := cpu.o mm.o clock-mx51-mx53.o devices.o ehci.o system.o
- obj-$(CONFIG_SOC_IMX50) += mm-mx50.o
- 
- obj-$(CONFIG_CPU_FREQ_IMX)    += cpu_op-mx51.o
-+obj-$(CONFIG_MACH_IMX51_DT) += imx51-dt.o
- obj-$(CONFIG_MACH_MX51_BABBAGE) += board-mx51_babbage.o
- obj-$(CONFIG_MACH_MX51_3DS) += board-mx51_3ds.o
- obj-$(CONFIG_MACH_MX53_EVK) += board-mx53_evk.o
-diff --git a/arch/arm/mach-mx5/imx51-dt.c b/arch/arm/mach-mx5/imx51-dt.c
-new file mode 100644
-index 0000000..8bfdb91
---- /dev/null
-+++ b/arch/arm/mach-mx5/imx51-dt.c
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ * Copyright 2011 Linaro Ltd.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+#include <linux/irq.h>
-+#include <linux/of_platform.h>
-+
-+#include <asm/mach/arch.h>
-+#include <asm/mach/time.h>
-+
-+#include <mach/common.h>
-+#include <mach/mx51.h>
-+
-+/*
-+ * Lookup table for attaching a specific name and platform_data pointer to
-+ * devices as they get created by of_platform_populate().  Ideally this table
-+ * would not exist, but the current clock implementation depends on some devices
-+ * having a specific name.
-+ */
-+static const struct of_dev_auxdata imx51_auxdata_lookup[] __initconst = {
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART1_BASE_ADDR, "imx-uart.0", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART2_BASE_ADDR, "imx-uart.1", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-uart", MX51_UART3_BASE_ADDR, "imx-uart.2", NULL),
-+	OF_DEV_AUXDATA("fsl,imx51-fec", MX51_FEC_BASE_ADDR, "fec.0", NULL),
-+	{}
-+};
-+
-+static const struct of_device_id tzic_of_match[] __initconst = {
-+	{ .compatible = "fsl,imx51-tzic", },
-+	{}
-+};
-+
-+static void __init imx51_dt_init(void)
-+{
-+	irq_domain_generate_simple(tzic_of_match, MX51_TZIC_BASE_ADDR, 0);
-+
-+	of_platform_populate(NULL, of_default_bus_match_table,
-+			     imx51_auxdata_lookup, NULL);
-+}
-+
-+static void __init imx51_timer_init(void)
-+{
-+	mx51_clocks_init(32768, 24000000, 22579200, 0);
-+}
-+
-+static struct sys_timer imx51_timer = {
-+	.init = imx51_timer_init,
-+};
-+
-+static const char *imx51_dt_board_compat[] __initdata = {
-+	"fsl,imx51-babbage",
-+	NULL
-+};
-+
-+DT_MACHINE_START(IMX51_DT, "Freescale i.MX51 (Device Tree Support)")
-+	.map_io		= mx51_map_io,
-+	.init_early	= imx51_init_early,
-+	.init_irq	= mx51_init_irq,
-+	.timer		= &imx51_timer,
-+	.init_machine	= imx51_dt_init,
-+	.dt_compat	= imx51_dt_board_compat,
-+MACHINE_END
--- 
-1.7.4.1
+Since the regualtor can't change voltage specifying the voltage here
+isn't going to achieve anything - to get the voltage reported through
+get_voltage() you need to put the voltage in the platform data for the
+fixed regulator.
+
+> +static struct regulator_consumer_supply nuri_max8997_ldo1_consumer[] = {
+> +	REGULATOR_SUPPLY("vadc", NULL), /* Used by CPU's ADC drv */
+> +};
+
+In the ADC regulator patch you called the supply vdd (though the chip
+normally calls it vadc so that's the better name)...
+
+Extra ' too.
+
+> +static struct regulator_consumer_supply nuri_max8997_ldo8_consumer[] = {
+> +	REGULATOR_SUPPLY("vusb_d", NULL), /* Used by CPU */
+> +	REGULATOR_SUPPLY("vdac", NULL), /* Used by CPU */
+> +};
+
+Another VADC?  For a different supply?
+
+> +		.state_mem	= {
+> +			.enabled	= 0,
+
+No need to initialize to zero.
+
+> +static struct regulator_init_data nuri_max8997_ldo10_data = {
+> +	.constraints	= {
+
+You should be able to use __initdata for a lot of this by the way.
+
+> +#define NURI_PMIC_GPIO		EXYNOS4_GPX0(7)
+> +static void __init nuri_pmic_init(void)
+> +{
+> +	int gpio;
+> +
+> +	nuri_max8997_pdata.irq_base = irq_get_next_irq(IRQ_GPIO_END);
+> +	gpio = NURI_PMIC_GPIO;
+> +	gpio_request(gpio, "AP_PMIC_IRQ");
+> +	s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+> +	s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> +}
+
+I'm not sure both the #define and the variable make sense here...
