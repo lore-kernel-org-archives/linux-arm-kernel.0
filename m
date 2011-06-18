@@ -1,28 +1,28 @@
-From: ratheendran.s@gmail.com (Ravi)
-Date: Sat, 18 Jun 2011 04:52:57 +0000 (UTC)
-Subject: USB serial Gadget is not working under WindowsXp
-Message-ID: <loom.20110618T063246-131@post.gmane.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 18 Jun 2011 10:55:18 +0200
+Subject: [PATCH] plat-iop: fix build error
+In-Reply-To: <87ei2sfq8j.fsf@lebrac.rtp-net.org>
+References: <1308312232-30488-1-git-send-email-linus.walleij@stericsson.com>
+	<87ei2sfq8j.fsf@lebrac.rtp-net.org>
+Message-ID: <BANLkTimo=oFQneCG1iQmWMf9xw4wLkGKaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+2011/6/17 Arnaud Patard <arnaud.patard@rtp-net.org>:
 
-Dear All,
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> The iop13xx_defconfig didn't build since the platform code uses
+>> defines from <asm/ptrace.h>. Simply add the include so it
+>> compiles.
+>
+> fwiw, same patch has been sent some time ago
+> (http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/052021.html)
+> but I don't know if it has been merged.
 
-I want to make the USB Gadget to work as a serial port,for this I enabled the
-the following in the kernel menuconfig.
+It hasn't since nobody has submitted it to the ARM maintainer.
 
-*** USB Device Class drivers***
-  <*>   USB Modem (CDC ACM) support 
-      <*>   USB Gadget Support  ---> 
-     <M>   USB Gadget Drivers     
-     <M>   Serial Gadget (with CDC ACM and CDC OBEX support)  
-       
-For this configuration I am able to get the serial Interface on the Linux host
-machine , In widows Xp machine I am facing the driver loading issue.
+I will put my patch into Russells patch tracker so it happens.
 
-I have followed all the steps mentioned in the
-"Documentation/usb/gadget_serial.txt" document.
-
-Please help me in fixing this issue.
-
-Ravi
+Thanks,
+Linus Walleij
