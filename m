@@ -1,23 +1,30 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Fri, 17 Jun 2011 13:59:28 -0700
-Subject: [PATCH] ARM: OMAP: Overo: remove duplicate call to
-	overo_ads7846_init()
-In-Reply-To: <1308327432-31177-1-git-send-email-zonque@gmail.com> (Daniel
-	Mack's message of "Fri, 17 Jun 2011 18:17:12 +0200")
-References: <87r56sbg3b.fsf@ti.com>
-	<1308327432-31177-1-git-send-email-zonque@gmail.com>
-Message-ID: <87lix0b2dr.fsf@ti.com>
+From: arjan@infradead.org (Arjan van de Ven)
+Date: Fri, 17 Jun 2011 21:08:56 -0700
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110615165321.GC23151@in.ibm.com>
+References: <20110610165529.GC2230@linux.vnet.ibm.com>
+	<20110610170535.GC25774@srcf.ucam.org>
+	<20110610171939.GE2230@linux.vnet.ibm.com>
+	<20110610172307.GA27630@srcf.ucam.org>
+	<20110610175248.GF2230@linux.vnet.ibm.com>
+	<20110610180807.GB28500@srcf.ucam.org>
+	<20110610184738.GG2230@linux.vnet.ibm.com>
+	<20110610192329.GA30496@srcf.ucam.org>
+	<20110610193713.GJ2230@linux.vnet.ibm.com>
+	<20110610200233.5ddd5a31@infradead.org>
+	<20110615165321.GC23151@in.ibm.com>
+Message-ID: <20110617210856.1dd3b482@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack <zonque@gmail.com> writes:
+On Wed, 15 Jun 2011 22:23:21 +0530
+Ankita Garg <ankita@in.ibm.com> wrote:
 
-> overo_ads7846_init() is already called from overo_spi_init(), and
-> calling it twice is not only unnecessary but causes a warning as
-> "reg-fixed-voltage.1" is already added to the device tree.
+> The maximum order in buddy allocator is by default 1k pages. Isn't
+> this too small a granularity to track blocks that might comprise a
+> PASR unit? 
 
-Excellent, thanks!
+we had to bump the default up a little, but not all that much
 
-> Signed-off-by: Daniel Mack <zonque@gmail.com>
-
-Tested-by: Kevin Hilman <khilman@ti.com>
+(like 4x)
