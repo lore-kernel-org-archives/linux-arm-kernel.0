@@ -1,58 +1,51 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 18 Jun 2011 10:26:55 -0600
-Subject: [PATCH 1/3] serial/imx: add device tree support
-In-Reply-To: <201106181821.46574.arnd@arndb.de>
+Date: Sat, 18 Jun 2011 10:29:27 -0600
+Subject: [PATCH 0/3] Add basic device support for imx51 babbage
+In-Reply-To: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
 References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
-	<201106181821.46574.arnd@arndb.de>
-Message-ID: <20110618162655.GK8195@ponder.secretlab.ca>
+Message-ID: <20110618162927.GM8195@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 18, 2011 at 06:21:46PM +0200, Arnd Bergmann wrote:
-> On Saturday 18 June 2011 17:19:12 Shawn Guo wrote:
-> >
-> > +Required properties:
-> > +- compatible : should be "fsl,<soc>-uart", "fsl,imx-uart"
-> > +- reg : address and length of the register set for the device
-> > +- interrupts : should contain uart interrupt
-> > +- id : should be the port ID defined by soc
-> > +
-> > +Optional properties:
-> > +- fsl,has-rts-cts : indicate it has rts-cts
-> > +- fsl,irda-mode : support irda mode
-> > +
-> > +Example:
-> > +
-> > +uart at 73fbc000 {
-> > +	compatible = "fsl,imx51-uart", "fsl,imx-uart";
-> > +	reg = <0x73fbc000 0x4000>;
-> > +	interrupts = <31>;
-> > +	id = <1>;
-> > +	fsl,has-rts-cts;
-> > +};
+On Sat, Jun 18, 2011 at 11:19:11PM +0800, Shawn Guo wrote:
+> This patch set adds the basic device tree support for imx51 babbage
+> board.  With uart and fec dt support added, the dt kernel can boot
+> into console with nfs root on babbage, so that we get a good base
+> to start playing dt and converting further drivers to use dt on
+> imx51.
 > 
-> Should this also support the "clock-frequency" property that 8250-style
-> serial ports support [1]?
+> It creates the platform imx51-dt for using the device tree, and
+> leaves existing board support files alone, so nothing should be
+> broken.  The plan is to add stuff step by step into imx51-dt to
+> get it support every existing imx51 boards, and then remove the
+> existing board files.
 > 
-> For the flow-control properties, should we name that more generic? The
-> same property certainly makes sense for other serial-ports if it does
-> here. OTOH, I'm not sure it's actually reliable, because it also depends
-> on whether the other side of the connection and the cable support hw flow
-> control.
+> It works against Linus tree plus the dt infrastructure patches
+> posted by Grant Likely as part of the following series.
+> 
+>   [RFC PATCH 00/11] Full device tree support for ARM Versatile
+> 
+> Comments are appreciated.
+> 
+> Shawn Guo (3):
+>       serial/imx: add device tree support
+>       net/fec: add device tree support
+>       ARM: mx5: add basic device tree support for imx51 babbage
 
-I'd like to see a few use cases before defining a common property.
-That said, has-rts-cts does sound like a useful generic property.
-Or maybe named "uart-has-rts-cts" to make it clear that it is a uart
-specific binding?
+Good work!  Other than minor comments, this series looks awesome.
 
 g.
 
 > 
-> 
-> 	Arnd
-> 
-> [1] http://playground.sun.com/1275/bindings/devices/html/serial-1_0d.html#HDR9
+>  Documentation/devicetree/bindings/net/fsl-fec.txt  |   14 +++
+>  .../bindings/tty/serial/fsl-imx-uart.txt           |   21 +++++
+>  arch/arm/boot/dts/imx51-babbage.dts                |   89 ++++++++++++++++++++
+>  arch/arm/mach-mx5/Kconfig                          |    8 ++
+>  arch/arm/mach-mx5/Makefile                         |    1 +
+>  arch/arm/mach-mx5/imx51-dt.c                       |   70 +++++++++++++++
+>  drivers/net/fec.c                                  |   28 ++++++
+>  drivers/tty/serial/imx.c                           |   81 ++++++++++++++++--
+>  8 files changed, 302 insertions(+), 10 deletions(-)
 > --
 > To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
 > the body of a message to majordomo at vger.kernel.org
