@@ -1,18 +1,28 @@
 From: ratheendran.s@gmail.com (Ravi)
-Date: Sat, 18 Jun 2011 04:32:12 +0000 (UTC)
-Subject: framebuffer for ST7565R chip set
-Message-ID: <loom.20110618T062436-185@post.gmane.org>
+Date: Sat, 18 Jun 2011 04:52:57 +0000 (UTC)
+Subject: USB serial Gadget is not working under WindowsXp
+Message-ID: <loom.20110618T063246-131@post.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 Dear All,
 
-I want to implement a linux frame buffer driver for graphical
-LCD(ST7565R chip set). This is 128X64 pixel resolution,that will be
-interfaced to ARM9(s3c2440) based board through a GPIO pins.
+I want to make the USB Gadget to work as a serial port,for this I enabled the
+the following in the kernel menuconfig.
 
-I am new to framebuffer concept,can anyone share a reference code if you have
-one,or give me pointers for the same.
+*** USB Device Class drivers***
+  <*>   USB Modem (CDC ACM) support 
+      <*>   USB Gadget Support  ---> 
+     <M>   USB Gadget Drivers     
+     <M>   Serial Gadget (with CDC ACM and CDC OBEX support)  
+       
+For this configuration I am able to get the serial Interface on the Linux host
+machine , In widows Xp machine I am facing the driver loading issue.
+
+I have followed all the steps mentioned in the
+"Documentation/usb/gadget_serial.txt" document.
+
+Please help me in fixing this issue.
 
 Ravi
