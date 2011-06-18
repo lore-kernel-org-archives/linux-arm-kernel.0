@@ -1,33 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 18 Jun 2011 20:11:32 +0200
-Subject: [PATCH 1/3] serial/imx: add device tree support
-In-Reply-To: <20110618162655.GK8195@ponder.secretlab.ca>
+Date: Sat, 18 Jun 2011 20:27:22 +0200
+Subject: [PATCH 2/3] net/fec: add device tree support
+In-Reply-To: <1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
 References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<201106181821.46574.arnd@arndb.de>
-	<20110618162655.GK8195@ponder.secretlab.ca>
-Message-ID: <201106182011.33146.arnd@arndb.de>
+	<1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <201106182027.22974.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 18 June 2011 18:26:55 Grant Likely wrote:
-> On Sat, Jun 18, 2011 at 06:21:46PM +0200, Arnd Bergmann wrote:
+On Saturday 18 June 2011 17:19:13 Shawn Guo wrote:
+> diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> new file mode 100644
+> index 0000000..705111d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> @@ -0,0 +1,14 @@
+> +* Freescale Fast Ethernet Controller (FEC)
+> +
+> +Required properties:
+> +- compatible : should be "fsl,<soc>-fec", "fsl,fec"
+> +- reg : address and length of the register set for the device
+> +- interrupts : should contain fec interrupt
+> +
+> +Example:
+> +
+> +fec at 83fec000 {
+> +	compatible = "fsl,imx51-fec", "fsl,fec";
+> +	reg = <0x83fec000 0x4000>;
+> +	interrupts = <87>;
+> +};
 
-> > Should this also support the "clock-frequency" property that 8250-style
-> > serial ports support [1]?
-> > 
-> > For the flow-control properties, should we name that more generic? The
-> > same property certainly makes sense for other serial-ports if it does
-> > here. OTOH, I'm not sure it's actually reliable, because it also depends
-> > on whether the other side of the connection and the cable support hw flow
-> > control.
-> 
-> I'd like to see a few use cases before defining a common property.
-> That said, has-rts-cts does sound like a useful generic property.
-> Or maybe named "uart-has-rts-cts" to make it clear that it is a uart
-> specific binding?
-> 
+How about also adding device_type="network" as required here, so you
+inherit the attributes like "local-mac-address".
 
+I would also suggest adding a call to of_get_mac_address() so you
+can read the address out of the device tree when it is not configured
+in hardware. Today, the driver relies on a module parameter or
+platform_data on hardware with a mac address set.
 
-Sounds ok to me.
+The other information that is currently encoded in platform_data
+is the phy mode. How about adding a property that enables RMII mode
+when present?
 
 	Arnd
