@@ -1,49 +1,53 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 18 Jun 2011 18:24:38 -0600
-Subject: [PATCH 2/3] net/fec: add device tree support
-In-Reply-To: <201106182027.22974.arnd@arndb.de>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
-	<201106182027.22974.arnd@arndb.de>
-Message-ID: <BANLkTimkT2G8v=hrzy0oB8Y0wfzc4jECuA@mail.gmail.com>
+From: cjb@laptop.org (Chris Ball)
+Date: Sat, 18 Jun 2011 23:20:25 -0400
+Subject: [PATCH RESEND] omap_hsmmc: use original sg_len for dma_unmap_sg
+In-Reply-To: <1308334461-3869-1-git-send-email-per.forlin@linaro.org> (Per
+	Forlin's message of "Fri, 17 Jun 2011 20:14:21 +0200")
+References: <1308334461-3869-1-git-send-email-per.forlin@linaro.org>
+Message-ID: <m2tybmzeva.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 18, 2011 at 12:27 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Saturday 18 June 2011 17:19:13 Shawn Guo wrote:
->> diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
->> new file mode 100644
->> index 0000000..705111d
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
->> @@ -0,0 +1,14 @@
->> +* Freescale Fast Ethernet Controller (FEC)
->> +
->> +Required properties:
->> +- compatible : should be "fsl,<soc>-fec", "fsl,fec"
->> +- reg : address and length of the register set for the device
->> +- interrupts : should contain fec interrupt
->> +
->> +Example:
->> +
->> +fec at 83fec000 {
->> + ? ? compatible = "fsl,imx51-fec", "fsl,fec";
->> + ? ? reg = <0x83fec000 0x4000>;
->> + ? ? interrupts = <87>;
->> +};
+Hi Per,
+
+On Fri, Jun 17 2011, Per Forlin wrote:
+> Don't use the returned sg_len from dma_map_sg() as inparameter
+> to dma_unmap_sg(). Use the original sg_len for both dma_map_sg
+> and dma_unmap_sg according to the documentation in DMA-API.txt.
 >
-> How about also adding device_type="network" as required here, so you
-> inherit the attributes like "local-mac-address".
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> Reviewed-by: Venkatraman S <svenkatr@ti.com>
+> ---
+>  drivers/mmc/host/omap_hsmmc.c |    5 +++--
+>  1 files changed, 3 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
+> index 259ece0..ad3731a 100644
+> --- a/drivers/mmc/host/omap_hsmmc.c
+> +++ b/drivers/mmc/host/omap_hsmmc.c
+> @@ -959,7 +959,8 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
+>  	spin_unlock(&host->irq_lock);
+>  
+>  	if (host->use_dma && dma_ch != -1) {
+> -		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg, host->dma_len,
+> +		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg,
+> +			host->data->sg_len,
+>  			omap_hsmmc_get_dma_dir(host, host->data));
+>  		omap_free_dma(dma_ch);
+>  	}
+> @@ -1343,7 +1344,7 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
+>  		return;
+>  	}
+>  
+> -	dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
+> +	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
+>  		omap_hsmmc_get_dma_dir(host, data));
+>  
+>  	req_in_progress = host->req_in_progress;
 
-local-mac-address should be used regardless.  "device_type" only makes
-sense when a platform uses real OpenFirmware with the runtime services
-api.  It should not be used with the flat tree.
+Pushed to mmc-next for 3.0-rc, thanks.
 
-> I would also suggest adding a call to of_get_mac_address() so you
-> can read the address out of the device tree when it is not configured
-> in hardware. Today, the driver relies on a module parameter or
-> platform_data on hardware with a mac address set.
-
-Yes, of_get_mac_address() is the right thing to do.
-
-g.
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
