@@ -1,313 +1,98 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Sun, 19 Jun 2011 23:17:37 +0200
-Subject: [PATCH v6 11/11] mmc: add handling for two parallel block requests in
-	issue_rw_rq
-In-Reply-To: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1308518257-9783-12-git-send-email-per.forlin@linaro.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 19 Jun 2011 17:27:08 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
+	packed attribute
+In-Reply-To: <Pine.LNX.4.44L0.1106191453200.14586-100000@netrider.rowland.org>
+References: <Pine.LNX.4.44L0.1106191453200.14586-100000@netrider.rowland.org>
+Message-ID: <alpine.LFD.2.00.1106191718000.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change mmc_blk_issue_rw_rq() to become asynchronous.
-The execution flow looks like this:
-The mmc-queue calls issue_rw_rq(), which sends the request
-to the host and returns back to the mmc-queue. The mmc-queue calls
-issue_rw_rq() again with a new request. This new request is prepared,
-in isuue_rw_rq(), then it waits for the active request to complete before
-pushing it to the host. When to mmc-queue is empty it will call
-isuue_rw_rq() with req=NULL to finish off the active request
-without starting a new request.
+On Sun, 19 Jun 2011, Alan Stern wrote:
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- drivers/mmc/card/block.c |  121 +++++++++++++++++++++++++++++++++-------------
- drivers/mmc/card/queue.c |   17 +++++--
- drivers/mmc/card/queue.h |    1 +
- 3 files changed, 101 insertions(+), 38 deletions(-)
+> On Sun, 19 Jun 2011, Nicolas Pitre wrote:
+> 
+> > On Thu, 16 Jun 2011, Arnd Bergmann wrote:
+> > 
+> > > On Thursday 16 June 2011 22:10:53 Alexander Holler wrote:
+> > > > Using packed doesn't seem to be necessary (at least not with those 
+> > > > versions of gcc I'm using here), I've tried both versions (on arm, 
+> > > > without packed and with packed, aligned(4)) and both are working. I've 
+> > > > only posted the patch because I found the usage of packed, aligned(4) 
+> > > > much clearer than without packed. And It might help avoiding such 
+> > > > discussions like this with people like me who aren't that deep involved 
+> > > > in gcc-specific implementation details. ;)
+> > > > 
+> > > > Anyway, feel free to nack that patch. I don't really care and just 
+> > > > thought I should post it (e.g. as an alternative to removing that packed).
+> > > 
+> > > At least I would be happier without the patch. I'm trying to convince
+> > > people to not use these attributes unless required because too much
+> > > harm is done when they are used without understanding the full
+> > > consequences. I also recommend using __packed as localized as possible,
+> > > i.e. set it for the members that need it, not the entire struct.
+> > > 
+> > > I agree that your patch is harmless, it's just the opposite of
+> > > a cleanup in my opinion.
+> > 
+> > The question is: does the structure really has to be packed?
+> 
+> What do you mean?  The structure really does need to be allocated
+> without padding between the fields; is that the same thing?  So do a
+> bunch of other structures that currently have no annotations at all.
 
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index 6a84a75..66db77a 100644
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -108,6 +108,7 @@ static DEFINE_MUTEX(open_lock);
- 
- enum mmc_blk_status {
- 	MMC_BLK_SUCCESS = 0,
-+	MMC_BLK_PARTIAL,
- 	MMC_BLK_RETRY,
- 	MMC_BLK_DATA_ERR,
- 	MMC_BLK_CMD_ERR,
-@@ -668,14 +669,16 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
- 	}
- }
- 
--static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
--					     struct request *req,
--					     struct mmc_card *card,
--					     struct mmc_blk_data *md)
-+static int mmc_blk_err_check(struct mmc_card *card,
-+			     struct mmc_async_req *areq)
- {
- 	struct mmc_command cmd;
- 	u32 status = 0;
- 	enum mmc_blk_status ret = MMC_BLK_SUCCESS;
-+	struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
-+						    mmc_active);
-+	struct mmc_blk_request *brq = &mq_mrq->brq;
-+	struct request *req = mq_mrq->req;
- 
- 	/*
- 	 * Check for errors here, but don't jump to cmd_err
-@@ -770,7 +773,11 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
- 		else
- 			ret = MMC_BLK_DATA_ERR;
- 	}
--out:
-+
-+	if (ret == MMC_BLK_SUCCESS &&
-+	    blk_rq_bytes(req) != brq->data.bytes_xfered)
-+		ret = MMC_BLK_PARTIAL;
-+ out:
- 	return ret;
- }
- 
-@@ -901,27 +908,59 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
- 		brq->data.sg_len = i;
- 	}
- 
-+	mqrq->mmc_active.mrq = &brq->mrq;
-+	mqrq->mmc_active.err_check = mmc_blk_err_check;
-+
- 	mmc_queue_bounce_pre(mqrq);
- }
- 
--static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
-+static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
- {
- 	struct mmc_blk_data *md = mq->data;
- 	struct mmc_card *card = md->queue.card;
--	struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
--	int ret = 1, disable_multi = 0;
-+	struct mmc_blk_request *brq;
-+	int ret = 1;
-+	int disable_multi = 0;
- 	enum mmc_blk_status status;
-+	struct mmc_queue_req *mq_rq;
-+	struct request *req;
-+	struct mmc_async_req *areq;
-+
-+	if (!rqc && !mq->mqrq_prev->req)
-+		goto out;
- 
- 	do {
--		mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
--		mmc_wait_for_req(card->host, &brq->mrq);
-+		if (rqc) {
-+			mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
-+			areq = &mq->mqrq_cur->mmc_active;
-+		} else
-+			areq = NULL;
-+		areq = mmc_start_req(card->host, areq, (int *) &status);
-+		if (!areq)
-+			goto out;
- 
--		mmc_queue_bounce_post(mq->mqrq_cur);
--		status = mmc_blk_err_check(brq, req, card, md);
-+		mq_rq = container_of(areq, struct mmc_queue_req, mmc_active);
-+		brq = &mq_rq->brq;
-+		req = mq_rq->req;
-+		mmc_queue_bounce_post(mq_rq);
- 
- 		switch (status) {
--		case MMC_BLK_CMD_ERR:
--			goto cmd_err;
-+		case MMC_BLK_SUCCESS:
-+		case MMC_BLK_PARTIAL:
-+			/*
-+			 * A block was successfully transferred.
-+			 */
-+			spin_lock_irq(&md->lock);
-+			ret = __blk_end_request(req, 0,
-+						brq->data.bytes_xfered);
-+			spin_unlock_irq(&md->lock);
-+			if (status == MMC_BLK_SUCCESS && ret) {
-+				/* If this happen it is a bug */
-+				printk(KERN_ERR "%s BUG rq_tot %d d_xfer %d\n",
-+				       __func__, blk_rq_bytes(req),
-+				       brq->data.bytes_xfered);
-+				goto cmd_err;
-+			}
- 			break;
- 		case MMC_BLK_RETRY:
- 			disable_multi = 1;
-@@ -934,36 +973,41 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 			 * read a single sector.
- 			 */
- 			spin_lock_irq(&md->lock);
--			ret = __blk_end_request(req, -EIO,
--						brq->data.blksz);
-+			ret = __blk_end_request(req, -EIO, brq->data.blksz);
- 			spin_unlock_irq(&md->lock);
--
-+			if (!ret)
-+				goto start_new_req;
- 			break;
--		case MMC_BLK_SUCCESS:
-+		case MMC_BLK_CMD_ERR:
-+			ret = 1;
-+			goto cmd_err;
-+			break;
-+		}
-+
-+		if (ret) {
- 			/*
--			 * A block was successfully transferred.
-+			 * In case of a none complete request
-+			 * prepare it again and resend.
- 			 */
--			spin_lock_irq(&md->lock);
--			ret = __blk_end_request(req, 0, brq->data.bytes_xfered);
--			spin_unlock_irq(&md->lock);
--			break;
-+			mmc_blk_rw_rq_prep(mq_rq, card, disable_multi, mq);
-+			mmc_start_req(card->host, &mq_rq->mmc_active, NULL);
- 		}
- 	} while (ret);
- 
- 	return 1;
--
-+ out:
-+	return 0;
-  cmd_err:
-- 	/*
-- 	 * If this is an SD card and we're writing, we can first
-- 	 * mark the known good sectors as ok.
-- 	 *
-+	/*
-+	 * If this is an SD card and we're writing, we can first
-+	 * mark the known good sectors as ok.
-+	 *
- 	 * If the card is not SD, we can still ok written sectors
- 	 * as reported by the controller (which might be less than
- 	 * the real number of written sectors, but never more).
- 	 */
- 	if (mmc_card_sd(card)) {
- 		u32 blocks;
--
- 		blocks = mmc_sd_num_wr_blocks(card);
- 		if (blocks != (u32)-1) {
- 			spin_lock_irq(&md->lock);
-@@ -981,6 +1025,12 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 		ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
- 	spin_unlock_irq(&md->lock);
- 
-+ start_new_req:
-+	if (rqc) {
-+		mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
-+		mmc_start_req(card->host, &mq->mqrq_cur->mmc_active, NULL);
-+	}
-+
- 	return 0;
- }
- 
-@@ -990,26 +1040,31 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
- 	struct mmc_blk_data *md = mq->data;
- 	struct mmc_card *card = md->queue.card;
- 
--	mmc_claim_host(card->host);
-+	if (req && !mq->mqrq_prev->req)
-+		/* claim host only for the first request */
-+		mmc_claim_host(card->host);
-+
- 	ret = mmc_blk_part_switch(card, md);
- 	if (ret) {
- 		ret = 0;
- 		goto out;
- 	}
- 
--	if (req->cmd_flags & REQ_DISCARD) {
-+	if (req && req->cmd_flags & REQ_DISCARD) {
- 		if (req->cmd_flags & REQ_SECURE)
- 			ret = mmc_blk_issue_secdiscard_rq(mq, req);
- 		else
- 			ret = mmc_blk_issue_discard_rq(mq, req);
--	} else if (req->cmd_flags & REQ_FLUSH) {
-+	} else if (req && req->cmd_flags & REQ_FLUSH) {
- 		ret = mmc_blk_issue_flush(mq, req);
- 	} else {
- 		ret = mmc_blk_issue_rw_rq(mq, req);
- 	}
- 
- out:
--	mmc_release_host(card->host);
-+	if (!req)
-+		/* release host only when there are no more requests */
-+		mmc_release_host(card->host);
- 	return ret;
- }
- 
-diff --git a/drivers/mmc/card/queue.c b/drivers/mmc/card/queue.c
-index 0757a39..2d6696a 100644
---- a/drivers/mmc/card/queue.c
-+++ b/drivers/mmc/card/queue.c
-@@ -52,6 +52,7 @@ static int mmc_queue_thread(void *d)
- 	down(&mq->thread_sem);
- 	do {
- 		struct request *req = NULL;
-+		struct mmc_queue_req *tmp;
- 
- 		spin_lock_irq(q->queue_lock);
- 		set_current_state(TASK_INTERRUPTIBLE);
-@@ -59,7 +60,10 @@ static int mmc_queue_thread(void *d)
- 		mq->mqrq_cur->req = req;
- 		spin_unlock_irq(q->queue_lock);
- 
--		if (!req) {
-+		if (req || mq->mqrq_prev->req) {
-+			set_current_state(TASK_RUNNING);
-+			mq->issue_fn(mq, req);
-+		} else {
- 			if (kthread_should_stop()) {
- 				set_current_state(TASK_RUNNING);
- 				break;
-@@ -67,11 +71,14 @@ static int mmc_queue_thread(void *d)
- 			up(&mq->thread_sem);
- 			schedule();
- 			down(&mq->thread_sem);
--			continue;
- 		}
--		set_current_state(TASK_RUNNING);
- 
--		mq->issue_fn(mq, req);
-+		/* Current request becomes previous request and vice versa. */
-+		mq->mqrq_prev->brq.mrq.data = NULL;
-+		mq->mqrq_prev->req = NULL;
-+		tmp = mq->mqrq_prev;
-+		mq->mqrq_prev = mq->mqrq_cur;
-+		mq->mqrq_cur = tmp;
- 	} while (1);
- 	up(&mq->thread_sem);
- 
-@@ -97,7 +104,7 @@ static void mmc_request(struct request_queue *q)
- 		return;
- 	}
- 
--	if (!mq->mqrq_cur->req)
-+	if (!mq->mqrq_cur->req && !mq->mqrq_prev->req)
- 		wake_up_process(mq->thread);
- }
- 
-diff --git a/drivers/mmc/card/queue.h b/drivers/mmc/card/queue.h
-index c8fb2dc..f937538 100644
---- a/drivers/mmc/card/queue.h
-+++ b/drivers/mmc/card/queue.h
-@@ -19,6 +19,7 @@ struct mmc_queue_req {
- 	char			*bounce_buf;
- 	struct scatterlist	*bounce_sg;
- 	unsigned int		bounce_sg_len;
-+	struct mmc_async_req	mmc_active;
- };
- 
- struct mmc_queue {
--- 
-1.7.4.1
+Yes, that's the same thing.  The packed attribute tells the compiler 
+that you don't want it to insert padding in it as it sees fit.
+
+> > If it does, then the follow-up question is: is a packing on word 
+> > boundaries sufficient?
+> 
+> Again, what do you mean?  The structure contains some 32-bit fields and 
+> it must always be allocated at a 4-byte boundary.  However there's 
+> nothing wrong with stricter allocation -- I don't recall the details 
+> but it's entirely possible that some of the fields could be 64 bits on 
+> some architectures, in which cases the alignment certainly should be 
+> 8-byte.
+
+The alignment attribute tells the compiler that whatever the structure 
+is, it will always be aligned to a 4-byte boundary.  And because 
+hardware representation very rarely express 4-byte values not aligned to 
+a 4-byte address boundary, the combination of both attributes is 
+actually the best way to have no padding in a structure but still access 
+it with word-sized accesses when possible.  Of course that assumes that 
+the non padded structure does have a sequence of members which sizes 
+match their alignments or a 4-byte boundary, whichever is the smallest.
+
+> > If the answer is yes in both cases, then having packed,aligned(4) is not 
+> > a frivolity but rather a correctness issue.
+> 
+> Why so?  Current systems work just fine without it.
+
+Doesn't mean that because it used to work that it is strictly correct.  
+Wouldn't be the first time that a GCC upgrade broke the kernel because 
+the kernel wasn't describing things properly enough.
+
+> >  We can of course provide a 
+> > define in include/linux/compiler-gcc.hto hide the ugliness of it 
+> > somewhat:
+> > 
+> > #define __packed_32  __attribute__((packed,aligned(4)))
+> > 
+> > I suspect that the vast majority of the __packed uses in the kernel 
+> > would be better with this __packed_32 instead, the actual need and 
+> > intent would be more clearly expressed, and the generated code in the 
+> > presence of those GCC changes would then be way more efficient and still 
+> > correct.
+> 
+> What if the intent is that the structure should be 4-byte aligned on 
+> 32-bit systems and 8-byte aligned on 64-bit systems?  The compiler 
+> already does this sort of thing automatically, why mess with it?
+
+Above you say that the structure must not contain padding, and now you 
+say that you want different alignment depending on whether or not the 
+architecture is 32 or 64 bits?
+
+/me confused now.
+
+
+Nicolas
