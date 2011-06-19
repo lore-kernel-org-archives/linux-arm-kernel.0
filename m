@@ -1,51 +1,25 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 19 Jun 2011 14:11:31 +0200
-Subject: [PATCH 2/3] net/fec: add device tree support
-In-Reply-To: <4DFDDFF4.8000305@snapgear.com>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
-	<4DFDDFF4.8000305@snapgear.com>
-Message-ID: <201106191411.32137.arnd@arndb.de>
+From: heiko@sntech.de (Heiko =?iso-8859-1?q?St=FCbner?=)
+Date: Sun, 19 Jun 2011 16:23:47 +0200
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+In-Reply-To: <BANLkTinCyr=pL9tyK+F9XxX2r15acqEsNA@mail.gmail.com>
+References: <201106022149.47936.heiko@sntech.de>
+	<BANLkTinCyr=pL9tyK+F9XxX2r15acqEsNA@mail.gmail.com>
+Message-ID: <201106191623.48470.heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 June 2011 13:39:32 Greg Ungerer wrote:
-> > +#ifdef CONFIG_OF
-> > +static const struct of_device_id fec_dt_ids[] = {
-> > +     { .compatible = "fsl,fec", .data =&fec_devtype[0], },
-> > +     {},
-> > +};
-> > +
-> > +static const struct of_device_id *
-> > +fec_get_of_device_id(struct platform_device *pdev)
-> > +{
-> > +     return of_match_device(fec_dt_ids,&pdev->dev);
-> > +}
-> > +#else
-> > +#define fec_dt_ids NULL
-> > +static inline struct of_device_id *
-> > +fec_get_of_device_id(struct platform_device *pdev)
-> > +{
-> > +     return NULL;
-> > +}
-> > +#endif
-> > +
-> >   static unsigned char macaddr[ETH_ALEN];
-> >   module_param_array(macaddr, byte, NULL, 0);
-> >   MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
-> > @@ -1363,6 +1385,11 @@ fec_probe(struct platform_device *pdev)
-> >       struct net_device *ndev;
-> >       int i, irq, ret = 0;
-> >       struct resource *r;
-> > +     const struct of_device_id *of_id;
-> > +
-> > +     of_id = fec_get_of_device_id(pdev);
+Am Samstag 18 Juni 2011, 22:56:11 schrieb Daniel Mack:
+> On Thu, Jun 2, 2011 at 9:49 PM, Heiko St?bner <heiko@sntech.de> wrote:
+> > Hi,
+> > 
+> > after upgrading my development kernel from 2.6.38 to 3.0rc1 I get flooded
+> > (i.e.
 > 
-> fec_get_of_device_id() is defined inside of "#ifdef CONFIG_OF". This
-> use of it will break compilation when this is not defined.
-> 
+> > it never stops) by messages of the form:
+> Even though it's not really related to SDIO, does reverting 06e8935
+> ("mmc: sdio: optimized SDIO IRQ handling for single irq") fix your
+> problem?
+sadly reverting this commit didn't fix the problem.
+It still floods everything with CMD13s and interrupts
 
-
-Why? Note the #else path defining an empty function.
-
-	Arnd
+Heiko
