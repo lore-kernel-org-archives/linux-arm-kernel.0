@@ -1,97 +1,72 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sun, 19 Jun 2011 12:44:34 -0600
-Subject: [PATCH 1/3] serial/imx: add device tree support
-In-Reply-To: <4DFE129E.1010800@gmail.com>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
-	<20110618161934.GH8195@ponder.secretlab.ca>
-	<20110619073000.GA23171@S2100-06.ap.freescale.net>
-	<BANLkTi=1hf7ycwMBcZ0+VDNRMG1_vdnSqA@mail.gmail.com>
-	<4DFE129E.1010800@gmail.com>
-Message-ID: <BANLkTi=Ur1+FAHd2J_KGZgtuGTHrrtBb_g@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sun, 19 Jun 2011 15:00:01 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106191048040.2142@xanadu.home>
+Message-ID: <Pine.LNX.4.44L0.1106191453200.14586-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 19, 2011 at 9:15 AM, Rob Herring <robherring2@gmail.com> wrote:
-> On 06/19/2011 10:05 AM, Grant Likely wrote:
->> On Sun, Jun 19, 2011 at 1:30 AM, Shawn Guo <shawn.guo@freescale.com> wrote:
->>> On Sat, Jun 18, 2011 at 10:19:34AM -0600, Grant Likely wrote:
->>>> On Sat, Jun 18, 2011 at 11:19:12PM +0800, Shawn Guo wrote:
->>>>> It adds device tree data parsing support for imx tty/serial driver.
->>>>>
->>>>> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
->>>>> Signed-off-by: Jason Liu <jason.hui@linaro.org>
->>>>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>>>> Cc: Sascha Hauer <s.hauer@pengutronix.de>
->>>>> ---
->>>>> ?.../bindings/tty/serial/fsl-imx-uart.txt ? ? ? ? ? | ? 21 +++++
->>>>> ?drivers/tty/serial/imx.c ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 81 +++++++++++++++++---
->>>>> ?2 files changed, 92 insertions(+), 10 deletions(-)
->>>>> ?create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
->>>>>
->>>>> diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
->>>>> new file mode 100644
->>>>> index 0000000..7648e17
->>>>> --- /dev/null
->>>>> +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
->>>>> @@ -0,0 +1,21 @@
->>>>> +* Freescale i.MX Universal Asynchronous Receiver/Transmitter (UART)
->>>>> +
->>>>> +Required properties:
->>>>> +- compatible : should be "fsl,<soc>-uart", "fsl,imx-uart"
->>>>
->>>> I'd make this "fsl,<soc>-uart", "fsl,imx51-uart"
->>>>
->>>> It's better to anchor these things on real silicon, or a real ip block
->>>> specification rather than something pseudo-generic. ?Subsequent chips,
->>>> like the imx53, should simply claim compatibility with the older
->>>> fsl,imx51-uart.
->>>
->>> It is a real IP block on all imx silicons (except imx23 and imx28
->>> which are known as former stmp).
->>>
->>>>
->>>> (in essence, "fsl,imx51-uart" becomes the generic string without the
->>>> downside of having no obvious recourse when new silicon shows up that
->>>> is an imx part, but isn't compatible with the imx51 uart.
->>>>
->>> In this case, should imx1 the ancestor of imx family than imx51
->>> becomes part of that generic string? ?Claiming uart of imx1, imx21
->>> and imx31 (senior than imx51) compatible with the imx51 uart seems
->>> odd to me.
->>>
->>> That said, IMO, "fsl,imx-uart" stands a real IP block specification
->>> here and can be a perfect generic compatibility string to tell the
->>> recourse of any imx silicon using this IP.
->>
->> Yes, but which /version/ of the IP block? ?Hardware designers are
->> notorious for changing hardware designs for newer silicon, sometimes
->> to add features, sometimes to fix bugs. ?While I understand the
->> temptation to boil a compatible value down to a nice clean generic
->> string, doing so only works in a perfect world. ?In the real world,
->> you still need to have some information about the specific
->> implementation. ?I prefer this specifying it to the SoC name, but I've
->> been known to be convinced that specifying it to the ip-block name &
->> version in certain circumstances, like for IP blocks in an FPGA, or
->> some of the Freescale powerpc pXXXX SoCs which actually had an IP
->> block swapped out midway through the life of the chip.
->>
->
-> There are definitely uart changes along the way with each generation.
->
->> Besides, encoding an soc or ip block version into the 'generic'
->> compatible values is not just good practice, it has *zero downside*.
->> That's the beauty of the compatible property semantics. ?Any node can
->> claim compatibility with an existing device. ?If no existing device
->> fits correctly, then the node simple does not claim compatibility.
->> Drivers can bind to any number of compatible strings, so it would be
->> just fine for the of_match_table list to include both "fsl,imx-21" and
->> "fsl,imx-51" (assuming that is the appropriate solution in this case).
->>
->
-> Don't you need uart or serial in here somewhere.
+On Sun, 19 Jun 2011, Nicolas Pitre wrote:
 
-you are of course correct.  The examples should be "fsl,imx21-uart" &
-"fsl,imx51-uart".  I was just writing too quickly.
+> On Thu, 16 Jun 2011, Arnd Bergmann wrote:
+> 
+> > On Thursday 16 June 2011 22:10:53 Alexander Holler wrote:
+> > > Using packed doesn't seem to be necessary (at least not with those 
+> > > versions of gcc I'm using here), I've tried both versions (on arm, 
+> > > without packed and with packed, aligned(4)) and both are working. I've 
+> > > only posted the patch because I found the usage of packed, aligned(4) 
+> > > much clearer than without packed. And It might help avoiding such 
+> > > discussions like this with people like me who aren't that deep involved 
+> > > in gcc-specific implementation details. ;)
+> > > 
+> > > Anyway, feel free to nack that patch. I don't really care and just 
+> > > thought I should post it (e.g. as an alternative to removing that packed).
+> > 
+> > At least I would be happier without the patch. I'm trying to convince
+> > people to not use these attributes unless required because too much
+> > harm is done when they are used without understanding the full
+> > consequences. I also recommend using __packed as localized as possible,
+> > i.e. set it for the members that need it, not the entire struct.
+> > 
+> > I agree that your patch is harmless, it's just the opposite of
+> > a cleanup in my opinion.
+> 
+> The question is: does the structure really has to be packed?
 
-g.
+What do you mean?  The structure really does need to be allocated
+without padding between the fields; is that the same thing?  So do a
+bunch of other structures that currently have no annotations at all.
+
+> If it does, then the follow-up question is: is a packing on word 
+> boundaries sufficient?
+
+Again, what do you mean?  The structure contains some 32-bit fields and 
+it must always be allocated at a 4-byte boundary.  However there's 
+nothing wrong with stricter allocation -- I don't recall the details 
+but it's entirely possible that some of the fields could be 64 bits on 
+some architectures, in which cases the alignment certainly should be 
+8-byte.
+
+> If the answer is yes in both cases, then having packed,aligned(4) is not 
+> a frivolity but rather a correctness issue.
+
+Why so?  Current systems work just fine without it.
+
+>  We can of course provide a 
+> define in include/linux/compiler-gcc.hto hide the ugliness of it 
+> somewhat:
+> 
+> #define __packed_32  __attribute__((packed,aligned(4)))
+> 
+> I suspect that the vast majority of the __packed uses in the kernel 
+> would be better with this __packed_32 instead, the actual need and 
+> intent would be more clearly expressed, and the generated code in the 
+> presence of those GCC changes would then be way more efficient and still 
+> correct.
+
+What if the intent is that the structure should be 4-byte aligned on 
+32-bit systems and 8-byte aligned on 64-bit systems?  The compiler 
+already does this sort of thing automatically, why mess with it?
+
+Alan Stern
