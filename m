@@ -1,53 +1,66 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Sat, 18 Jun 2011 23:20:25 -0400
-Subject: [PATCH RESEND] omap_hsmmc: use original sg_len for dma_unmap_sg
-In-Reply-To: <1308334461-3869-1-git-send-email-per.forlin@linaro.org> (Per
-	Forlin's message of "Fri, 17 Jun 2011 20:14:21 +0200")
-References: <1308334461-3869-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <m2tybmzeva.fsf@bob.laptop.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Sun, 19 Jun 2011 09:02:38 +0200
+Subject: [PATCH 1/3] serial/imx: add device tree support
+In-Reply-To: <20110618161934.GH8195@ponder.secretlab.ca>
+References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
+	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
+	<20110618161934.GH8195@ponder.secretlab.ca>
+Message-ID: <20110619070238.GD1632@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Per,
+On Sat, Jun 18, 2011 at 10:19:34AM -0600, Grant Likely wrote:
+> On Sat, Jun 18, 2011 at 11:19:12PM +0800, Shawn Guo wrote:
+> > It adds device tree data parsing support for imx tty/serial driver.
+> > 
+> > Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
+> > Signed-off-by: Jason Liu <jason.hui@linaro.org>
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  .../bindings/tty/serial/fsl-imx-uart.txt           |   21 +++++
+> >  drivers/tty/serial/imx.c                           |   81 +++++++++++++++++---
+> >  2 files changed, 92 insertions(+), 10 deletions(-)
+> >  create mode 100644 Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > new file mode 100644
+> > index 0000000..7648e17
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/tty/serial/fsl-imx-uart.txt
+> > @@ -0,0 +1,21 @@
+> > +* Freescale i.MX Universal Asynchronous Receiver/Transmitter (UART)
+> > +
+> > +Required properties:
+> > +- compatible : should be "fsl,<soc>-uart", "fsl,imx-uart"
+> 
+> I'd make this "fsl,<soc>-uart", "fsl,imx51-uart"
+> 
+> It's better to anchor these things on real silicon, or a real ip block
+> specification rather than something pseudo-generic.  Subsequent chips,
+> like the imx53, should simply claim compatibility with the older
+> fsl,imx51-uart.
+> 
+> (in essence, "fsl,imx51-uart" becomes the generic string without the
+> downside of having no obvious recourse when new silicon shows up that
+> is an imx part, but isn't compatible with the imx51 uart.
 
-On Fri, Jun 17 2011, Per Forlin wrote:
-> Don't use the returned sg_len from dma_map_sg() as inparameter
-> to dma_unmap_sg(). Use the original sg_len for both dma_map_sg
-> and dma_unmap_sg according to the documentation in DMA-API.txt.
->
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> Reviewed-by: Venkatraman S <svenkatr@ti.com>
-> ---
->  drivers/mmc/host/omap_hsmmc.c |    5 +++--
->  1 files changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/mmc/host/omap_hsmmc.c b/drivers/mmc/host/omap_hsmmc.c
-> index 259ece0..ad3731a 100644
-> --- a/drivers/mmc/host/omap_hsmmc.c
-> +++ b/drivers/mmc/host/omap_hsmmc.c
-> @@ -959,7 +959,8 @@ static void omap_hsmmc_dma_cleanup(struct omap_hsmmc_host *host, int errno)
->  	spin_unlock(&host->irq_lock);
->  
->  	if (host->use_dma && dma_ch != -1) {
-> -		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg, host->dma_len,
-> +		dma_unmap_sg(mmc_dev(host->mmc), host->data->sg,
-> +			host->data->sg_len,
->  			omap_hsmmc_get_dma_dir(host, host->data));
->  		omap_free_dma(dma_ch);
->  	}
-> @@ -1343,7 +1344,7 @@ static void omap_hsmmc_dma_cb(int lch, u16 ch_status, void *cb_data)
->  		return;
->  	}
->  
-> -	dma_unmap_sg(mmc_dev(host->mmc), data->sg, host->dma_len,
-> +	dma_unmap_sg(mmc_dev(host->mmc), data->sg, data->sg_len,
->  		omap_hsmmc_get_dma_dir(host, data));
->  
->  	req_in_progress = host->req_in_progress;
+Shouldn't that be the oldest SoC this core showed up? It might be an academic
+question, but it would look a bit funny if mx27 got dt-support and would have a
+imx51-uart? The first imx to have this core is the mx1. (Although there are
+some cpu_is_mx1() calls used in the driver, but they are still available, or?)
 
-Pushed to mmc-next for 3.0-rc, thanks.
+Regards,
 
-- Chris.
+   Wolfram
+
 -- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110619/14bcddb8/attachment.sig>
