@@ -1,11 +1,11 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Sun, 19 Jun 2011 09:02:38 +0200
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Sun, 19 Jun 2011 15:30:02 +0800
 Subject: [PATCH 1/3] serial/imx: add device tree support
 In-Reply-To: <20110618161934.GH8195@ponder.secretlab.ca>
 References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
 	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
 	<20110618161934.GH8195@ponder.secretlab.ca>
-Message-ID: <20110619070238.GD1632@pengutronix.de>
+Message-ID: <20110619073000.GA23171@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -40,27 +40,90 @@ On Sat, Jun 18, 2011 at 10:19:34AM -0600, Grant Likely wrote:
 > specification rather than something pseudo-generic.  Subsequent chips,
 > like the imx53, should simply claim compatibility with the older
 > fsl,imx51-uart.
+
+It is a real IP block on all imx silicons (except imx23 and imx28
+which are known as former stmp).
+
 > 
 > (in essence, "fsl,imx51-uart" becomes the generic string without the
 > downside of having no obvious recourse when new silicon shows up that
 > is an imx part, but isn't compatible with the imx51 uart.
+> 
+In this case, should imx1 the ancestor of imx family than imx51
+becomes part of that generic string?  Claiming uart of imx1, imx21
+and imx31 (senior than imx51) compatible with the imx51 uart seems
+odd to me.
 
-Shouldn't that be the oldest SoC this core showed up? It might be an academic
-question, but it would look a bit funny if mx27 got dt-support and would have a
-imx51-uart? The first imx to have this core is the mx1. (Although there are
-some cpu_is_mx1() calls used in the driver, but they are still available, or?)
+That said, IMO, "fsl,imx-uart" stands a real IP block specification
+here and can be a perfect generic compatibility string to tell the
+recourse of any imx silicon using this IP.
 
-Regards,
+> > +- reg : address and length of the register set for the device
+> > +- interrupts : should contain uart interrupt
+> > +- id : should be the port ID defined by soc
+> > +
+> > +Optional properties:
+> > +- fsl,has-rts-cts : indicate it has rts-cts
+> > +- fsl,irda-mode : support irda mode
+> > +
+> > +Example:
+> > +
+> > +uart at 73fbc000 {
+> > +	compatible = "fsl,imx51-uart", "fsl,imx-uart";
+> > +	reg = <0x73fbc000 0x4000>;
+> > +	interrupts = <31>;
+> > +	id = <1>;
+> > +	fsl,has-rts-cts;
+> > +};
+> > diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+> > index a544731..2769353 100644
+> > --- a/drivers/tty/serial/imx.c
+> > +++ b/drivers/tty/serial/imx.c
+> > @@ -45,6 +45,8 @@
+> >  #include <linux/delay.h>
+> >  #include <linux/rational.h>
+> >  #include <linux/slab.h>
+> > +#include <linux/of.h>
+> > +#include <linux/of_address.h>
+> >  
+> >  #include <asm/io.h>
+> >  #include <asm/irq.h>
+> > @@ -1223,6 +1225,63 @@ static int serial_imx_resume(struct platform_device *dev)
+> >  	return 0;
+> >  }
+> >  
+> > +#ifdef CONFIG_OF
+> > +static int serial_imx_probe_dt(struct imx_port *sport,
+> > +		struct platform_device *pdev)
+> > +{
+> > +	struct device_node *node = pdev->dev.of_node;
+> > +	const __be32 *line;
+> > +
+> > +	if (!node)
+> > +		return -ENODEV;
+> > +
+> > +	line = of_get_property(node, "id", NULL);
+> > +	if (!line)
+> > +		return -ENODEV;
+> > +
+> > +	sport->port.line = be32_to_cpup(line) - 1;
+> 
+> Hmmm, I really would like to be rid of this.  Instead, if uarts must
+> be enumerated, the driver should look for a /aliases/uart* property
+> that matches the of_node.  Doing it that way is already established in
+> the OpenFirmware documentation, and it ensures there are no overlaps
+> in the global namespace.
+> 
 
-   Wolfram
+I just gave one more try to avoid using 'aliases', and you gave a
+'no' again.  Now, I know how hard you are on this.  Okay, I start
+thinking about your suggestion seriously :)
+
+> We do need some infrastructure to make that easier though.  Would you
+> have time to help put that together?
+> 
+Ok, I will give it a try.
 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110619/14bcddb8/attachment.sig>
+Regards,
+Shawn
