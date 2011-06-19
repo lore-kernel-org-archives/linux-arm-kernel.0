@@ -1,57 +1,122 @@
-From: saeed.bishara@gmail.com (saeed bishara)
-Date: Sun, 19 Jun 2011 10:54:43 +0300
-Subject: [PATCH] ARM: realview, vexpress: fix section mismatch from
-	platform_cpu_die() to pen_release
-In-Reply-To: <1308058132-32058-1-git-send-email-saeed@marvell.com>
-References: <1308058132-32058-1-git-send-email-saeed@marvell.com>
-Message-ID: <BANLkTi=a+k3SwzYEFjU-jxEsOc0RGah_Og@mail.gmail.com>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Sun, 19 Jun 2011 21:39:32 +1000
+Subject: [PATCH 2/3] net/fec: add device tree support
+In-Reply-To: <1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
+References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
+	<1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <4DFDDFF4.8000305@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 14, 2011 at 4:28 PM, Saeed Bishara <saeed@marvell.com> wrote:
-> This patch fixes the following false section mismatch warning, this function used
-> only in CONFIG_HOTPLUG_CPU, and in this configuration, the cpuinit section will not
-> be freed, so it's ok to reference pen_release.
+
+Hi Shawn,
+
+On 06/19/2011 01:19 AM, Shawn Guo wrote:
+> It adds device tree data parsing support for fec driver.
 >
-> WARNING: vmlinux.o(.text+0x12484): Section mismatch in reference from the function platform_cpu_die() to the variable .cpuinit.data:pen_release
-> The function platform_cpu_die() references
-> the variable __cpuinitdata pen_release.
-> This is often because platform_cpu_die lacks a __cpuinitdata
-> annotation or the annotation of pen_release is wrong.
->
-> Signed-off-by: Saeed Bishara <saeed@marvell.com>
+> Signed-off-by: Jason Liu<jason.hui@linaro.org>
+> Signed-off-by: Shawn Guo<shawn.guo@linaro.org>
+> Cc: David S. Miller<davem@davemloft.net>
 > ---
-> ?arch/arm/mach-realview/hotplug.c | ? ?2 +-
-> ?arch/arm/mach-vexpress/hotplug.c | ? ?2 +-
-> ?2 files changed, 2 insertions(+), 2 deletions(-)
+>   Documentation/devicetree/bindings/net/fsl-fec.txt |   14 ++++++++++
+>   drivers/net/fec.c                                 |   28 +++++++++++++++++++++
+>   2 files changed, 42 insertions(+), 0 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/net/fsl-fec.txt
 >
-> diff --git a/arch/arm/mach-realview/hotplug.c b/arch/arm/mach-realview/hotplug.c
-> index a87523d..44841c6 100644
-> --- a/arch/arm/mach-realview/hotplug.c
-> +++ b/arch/arm/mach-realview/hotplug.c
-> @@ -97,7 +97,7 @@ int platform_cpu_kill(unsigned int cpu)
-> ?*
-> ?* Called with IRQs disabled
-> ?*/
-> -void platform_cpu_die(unsigned int cpu)
-> +void __ref platform_cpu_die(unsigned int cpu)
-> ?{
-> ? ? ? ?int spurious = 0;
+> diff --git a/Documentation/devicetree/bindings/net/fsl-fec.txt b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> new file mode 100644
+> index 0000000..705111d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/net/fsl-fec.txt
+> @@ -0,0 +1,14 @@
+> +* Freescale Fast Ethernet Controller (FEC)
+> +
+> +Required properties:
+> +- compatible : should be "fsl,<soc>-fec", "fsl,fec"
+> +- reg : address and length of the register set for the device
+> +- interrupts : should contain fec interrupt
+> +
+> +Example:
+> +
+> +fec at 83fec000 {
+> +	compatible = "fsl,imx51-fec", "fsl,fec";
+> +	reg =<0x83fec000 0x4000>;
+> +	interrupts =<87>;
+> +};
+> diff --git a/drivers/net/fec.c b/drivers/net/fec.c
+> index 885d8ba..ef3d175 100644
+> --- a/drivers/net/fec.c
+> +++ b/drivers/net/fec.c
+> @@ -44,6 +44,8 @@
+>   #include<linux/platform_device.h>
+>   #include<linux/phy.h>
+>   #include<linux/fec.h>
+> +#include<linux/of.h>
+> +#include<linux/of_device.h>
 >
-> diff --git a/arch/arm/mach-vexpress/hotplug.c b/arch/arm/mach-vexpress/hotplug.c
-> index ea4cbfb..0436fcf 100644
-> --- a/arch/arm/mach-vexpress/hotplug.c
-> +++ b/arch/arm/mach-vexpress/hotplug.c
-> @@ -98,7 +98,7 @@ int platform_cpu_kill(unsigned int cpu)
-> ?*
-> ?* Called with IRQs disabled
-> ?*/
-> -void platform_cpu_die(unsigned int cpu)
-> +void __ref platform_cpu_die(unsigned int cpu)
-> ?{
-> ? ? ? ?int spurious = 0;
+>   #include<asm/cacheflush.h>
 >
-> --
-> 1.7.4.1
-can you review this patch?
-saeed
+> @@ -78,6 +80,26 @@ static struct platform_device_id fec_devtype[] = {
+>   	{ }
+>   };
+>
+> +#ifdef CONFIG_OF
+> +static const struct of_device_id fec_dt_ids[] = {
+> +	{ .compatible = "fsl,fec", .data =&fec_devtype[0], },
+> +	{},
+> +};
+> +
+> +static const struct of_device_id *
+> +fec_get_of_device_id(struct platform_device *pdev)
+> +{
+> +	return of_match_device(fec_dt_ids,&pdev->dev);
+> +}
+> +#else
+> +#define fec_dt_ids NULL
+> +static inline struct of_device_id *
+> +fec_get_of_device_id(struct platform_device *pdev)
+> +{
+> +	return NULL;
+> +}
+> +#endif
+> +
+>   static unsigned char macaddr[ETH_ALEN];
+>   module_param_array(macaddr, byte, NULL, 0);
+>   MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
+> @@ -1363,6 +1385,11 @@ fec_probe(struct platform_device *pdev)
+>   	struct net_device *ndev;
+>   	int i, irq, ret = 0;
+>   	struct resource *r;
+> +	const struct of_device_id *of_id;
+> +
+> +	of_id = fec_get_of_device_id(pdev);
+
+fec_get_of_device_id() is defined inside of "#ifdef CONFIG_OF". This
+use of it will break compilation when this is not defined.
+
+Regards
+Greg
+
+
+
+> +	if (of_id)
+> +		pdev->id_entry = (struct platform_device_id *) of_id->data;
+>
+>   	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>   	if (!r)
+> @@ -1531,6 +1558,7 @@ static struct platform_driver fec_driver = {
+>   #ifdef CONFIG_PM
+>   		.pm	=&fec_pm_ops,
+>   #endif
+> +		.of_match_table = fec_dt_ids,
+>   	},
+>   	.id_table = fec_devtype,
+>   	.probe	= fec_probe,
+
+
+-- 
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close,                            FAX:         +61 7 3891 3630
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
