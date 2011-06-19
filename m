@@ -1,102 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 19 Jun 2011 22:02:23 +0200
+Date: Sun, 19 Jun 2011 22:11:00 +0200
 Subject: [PATCH] USB: ehci: use packed,
 	aligned(4) instead of removing the packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106191453200.14586-100000@netrider.rowland.org>
+In-Reply-To: <201106192202.23989.arnd@arndb.de>
 References: <Pine.LNX.4.44L0.1106191453200.14586-100000@netrider.rowland.org>
-Message-ID: <201106192202.23989.arnd@arndb.de>
+	<201106192202.23989.arnd@arndb.de>
+Message-ID: <201106192211.01076.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 19 June 2011 21:00:01 Alan Stern wrote:
-> On Sun, 19 Jun 2011, Nicolas Pitre wrote:
-> > On Thu, 16 Jun 2011, Arnd Bergmann wrote:
-> > > On Thursday 16 June 2011 22:10:53 Alexander Holler wrote:
-> > > At least I would be happier without the patch. I'm trying to convince
-> > > people to not use these attributes unless required because too much
-> > > harm is done when they are used without understanding the full
-> > > consequences. I also recommend using __packed as localized as possible,
-> > > i.e. set it for the members that need it, not the entire struct.
-> > > 
-> > > I agree that your patch is harmless, it's just the opposite of
-> > > a cleanup in my opinion.
-> > 
-> > The question is: does the structure really has to be packed?
+On Sunday 19 June 2011 22:02:23 Arnd Bergmann wrote:
+> In this case, we would have to do
 > 
-> What do you mean?  The structure really does need to be allocated
-> without padding between the fields; is that the same thing?  So do a
-> bunch of other structures that currently have no annotations at all.
-
-I guess the issue is that some ABIs actually require a minimum alignment,
-like the old ARM ABI that you can still use to build the kernel.
-
-If a structure is not a multiple of four bytes in size, that ABI
-will add padding at the end, e.g. in
-
-struct s {
-	char c[2];
-};
-
-struct t {
-	struct s t1;
-	unsigned short t2[3];
-};
-
-On most architectures, struct s will be two bytes in size and one byte
-aligned, while struct t is eight bytes and two byte aligned.
-
-On ARM oABI, struct s ends up with four byte size and alignment while
-struct t is twelve bytes long. All this is ok for regular structures,
-but not when they are used to describe memory layout of hardware
-registers on on-wire packets.
-
-> > If it does, then the follow-up question is: is a packing on word 
-> > boundaries sufficient?
+> struct s {
+>         char c[2];
+> } __packed;
 > 
-> > If the answer is yes in both cases, then having packed,aligned(4) is not 
-> > a frivolity but rather a correctness issue.
+> struct t {
+>         struct s t1;
+>         unsigned short t2[3] __aligned(2);
+> } __packed;
 > 
-> Why so?  Current systems work just fine without it.
-
-I think Nicolas got it backwards here, adding both packed and
-aligned(4) would make a structure like the one above consistently
-incorrect when used to describe a tightly packed hardware structure.
-
-In this case, we would have to do
-
-struct s {
-	char c[2];
-} __packed;
-
-struct t {
-	struct s t1;
-	unsigned short t2[3] __aligned(2);
-} __packed;
-
-To tell the compiler that t2 is indeed aligned, while struct t
-is packed to include no padding around t.
- 
-I actually recently stumbled over code that gets this wrong,
-see
-
-http://git.kernel.org/?p=linux/kernel/git/arnd/playground.git;a=commit;h=284cef173aafd531a708f48e71a9cc7249fc8a98
-
-> >  We can of course provide a 
-> > define in include/linux/compiler-gcc.hto hide the ugliness of it 
-> > somewhat:
-> > 
-> > #define __packed_32  __attribute__((packed,aligned(4)))
-> > 
-> > I suspect that the vast majority of the __packed uses in the kernel 
-> > would be better with this __packed_32 instead, the actual need and 
-> > intent would be more clearly expressed, and the generated code in the 
-> > presence of those GCC changes would then be way more efficient and still 
-> > correct.
+> To tell the compiler that t2 is indeed aligned, while struct t
+> is packed to include no padding around t.
+>  
+> I actually recently stumbled over code that gets this wrong,
+> see
 > 
-> What if the intent is that the structure should be 4-byte aligned on 
-> 32-bit systems and 8-byte aligned on 64-bit systems?  The compiler 
-> already does this sort of thing automatically, why mess with it?
+> http://git.kernel.org/?p=linux/kernel/git/arnd/playground.git;a=commit;h=284cef173aafd531a708f48e71a9cc7249fc8a98
+> 
 
-Different issue.
+Just to be clear: none of the ehci structures fall into this category.
+I would assume that we actually have a few more drivers with this
+bug in the kernel, but the patch proposed by Alexander would not
+help with this problem, and the EHCI driver is still correct without
+__packed.
 
 	Arnd
