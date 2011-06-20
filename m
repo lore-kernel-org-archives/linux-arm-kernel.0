@@ -1,40 +1,20 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Mon, 20 Jun 2011 12:34:37 +0200 (CEST)
-Subject: [PATCH][Trivial] S3C2410 bluetooth: Remove duplicate linux/leds.h
-	include
-In-Reply-To: <4DFF1AA5.80508@ru.mvista.com>
-References: <alpine.LNX.2.00.1106201035590.18991@swampdragon.chaosbits.net>
-	<4DFF1AA5.80508@ru.mvista.com>
-Message-ID: <alpine.LNX.2.00.1106201232530.18991@swampdragon.chaosbits.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 11:44:15 +0100
+Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
+In-Reply-To: <4DFF20B3.7010209@ti.com>
+References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110620095053.GA2082@n2100.arm.linux.org.uk>
+	<20110620101438.GD2082@n2100.arm.linux.org.uk>
+	<4DFF20B3.7010209@ti.com>
+Message-ID: <20110620104415.GF2082@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Sergei Shtylyov wrote:
+On Mon, Jun 20, 2011 at 03:58:03PM +0530, Santosh Shilimkar wrote:
+> No it doesn't work. I still get the crash. The important point
+> here is not to enable interrupts before CPU is marked
+> as online and active.
 
-> Hello.
-> 
-> On 20-06-2011 12:40, Jesper Juhl wrote:
-> 
-> > Remove the duplicate inclusion of linux/leds.h from
-> > arch/arm/mach-s3c2410/h1940-bluetooth.c that was added by commit 50e2d10d.
-> 
->    Pelase also specify that commit's summary in parens.
-> 
+What is the crash (in full please)?
 
-Anyone can just do a "git show 50e2d10d" to read it. But sure, here's a 
-new patch description:
-
-Remove the duplicate inclusion of linux/leds.h from 
-arch/arm/mach-s3c2410/h1940-bluetooth.c that was added by commit 50e2d10d 
-(ARM: S3C2410: H1940: Use leds-gpio driver for LEDs managing).
-
-
-> > Signed-off-by: Jesper Juhl<jj@chaosbits.net>
-> 
-> WBR, Sergei
-> 
-
--- 
-Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
-Don't top-post http://www.catb.org/jargon/html/T/top-post.html
-Plain text mails only, please.
+Do we know what interrupt is causing it?
