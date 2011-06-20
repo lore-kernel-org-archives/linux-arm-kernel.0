@@ -1,97 +1,68 @@
-From: david@gibson.dropbear.id.au (David Gibson)
-Date: Mon, 20 Jun 2011 14:53:32 +1000
-Subject: [PATCH] Support multiple MEM tags with atags->fdt conversion
-In-Reply-To: <alpine.LFD.2.00.1106192340510.2142@xanadu.home>
-References: <1308094074-24898-1-git-send-email-davidb@codeaurora.org>
-	<alpine.LFD.2.00.1106151540230.2142@xanadu.home>
-	<20110616014353.GB16214@yookeroo.fritz.box>
-	<alpine.LFD.2.00.1106192340510.2142@xanadu.home>
-Message-ID: <20110620045332.GM16214@yookeroo.fritz.box>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Mon, 20 Jun 2011 14:16:59 +0900
+Subject: [PATCH 1/2] Samsung SoC ADC: use regulator (VDD for ADC).
+In-Reply-To: <20110618150612.GA25163@sirena.org.uk>
+References: <1308213003-6526-1-git-send-email-myungjoo.ham@samsung.com>
+	<20110618150612.GA25163@sirena.org.uk>
+Message-ID: <BANLkTimHWJ=qgQOxQtBQd9u6-euf79PJTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 12:03:21AM -0400, Nicolas Pitre wrote:
-> On Thu, 16 Jun 2011, David Gibson wrote:
-> 
-> > On Wed, Jun 15, 2011 at 03:50:37PM -0400, Nicolas Pitre wrote:
-> > > On Tue, 14 Jun 2011, David Brown wrote:
-> > > 
-> > > > Some targets have multiple memory regions.  Parse up to 8 of these
-> > > > when converting the atags to fdt.
-> > > > 
-> > > > Signed-off-by: David Brown <davidb@codeaurora.org>
-> > > 
-> > > I've added your patch to my zImage patch queue.
-> > > 
-> > > > With this change, I am able to boot MSM8x60 combining ATAGS and my DT.
-> > > > It seems to work as long as my device tree has placeholders for all of
-> > > > the properties I need.
-> > > 
-> > > I think those missing nodes should simply be created if missing.  I 
-> > > however don't see any function in the libfdt API to do that -- there is 
-> > > fdt_add_subnode() but no fdt_add_node().  Any DT expert please?
-> > 
-> > fdt_add_subnode() will create a new node as you require.  The
-> > "subnode" is just supposed to indicate that the parameters are in the
-> > form of the offset of the parent node and the new node's immediate
-> > name, rather than taking a full path name for the new node.
-> 
-> Sure... but I'm still a total nincompoop with regard to FDT.
-> 
-> Let's suppose I do:
-> 
-> 	offset = fdt_path_offset(fdt, "/memory");
-> 
-> but that returns -FDT_ERR_NOTFOUND.  Now what?
-> 
-> If I look at the documentation for fdt_add_subnode():
-> 
-> /**
->  * fdt_add_subnode - creates a new node
->  * @fdt: pointer to the device tree blob
->  * @parentoffset: structure block offset of a node
->  * @name: name of the subnode to locate
->  * [...]
-> 
-> I have no node offset, and can't find the offset for the parent of an 
-> nonexistent node.  Should I use 0 for parentoffset here?  I'm guessing 
-> that "/memory" is at the top level so there is just no parent.
+Hello,
 
-Ah! I see the source of your confusion.  In this case the parent node
-is the root node, and the root node always has offset 0.  I guess this
-needs to be better documented, although I'm not immediately sure where.
+On Sun, Jun 19, 2011 at 12:06 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+> On Thu, Jun 16, 2011 at 05:30:02PM +0900, MyungJoo Ham wrote:
+>
+>> + ? ? adc->vdd = regulator_get(dev, S3C_ADC_REGULATOR_NAME);
+>
+> I'm not convinced that the #define for the name is terribly good style
+> here, especially given that you actually call it vdd in the code.
 
-> > > Also, should the DTB be enlarged in order to add new nodes, or even 
-> > > modify existing ones with larger properties?  In other words, 
-> > > should something like fdt_move(fdt, fdt, fdt_totalsize(fdt)+HEADROOM) be 
-> > > used beforehand?
-> > 
-> > Yes, you will need to do this, fdt_open_into() is the function you
-> > want.  Without making room first, adding nodes or expanding existing
-> > properties will return -FDT_ERR_NOSPACE.  Once you've made whatever
-> > edits you need, you can use fdt_pack() to collapse the tree back to
-> > its minimum size.
-> 
-> Excellent!
-> 
-> FRom a quick code inspection, fdt_open_into() appears to be fine with 
-> both the source and destination pointers being the same, right?
+Then, would it be fine to use as [ regulator_get(dev, "vdd"); ] ?
 
-Yes, that should be fine.  It should also be fine with the new buffer
-partially overlapping the existing tree.
+>
+>> + ? ? if (IS_ERR_OR_NULL(adc->vdd)) {
+>> + ? ? ? ? ? ? dev_dbg(dev, "operating without regulator %s.\n", S3C_ADC_REGULATOR_NAME);
+>> + ? ? ? ? ? ? adc->vdd = NULL; /* Do not control regulator */
+>> + ? ? }
+>> +
+>
+> No, don't do this. ?Just unconditionally assume the regulator is present
+> if power is essential for use of the device. ?The regulator API will
+> stub out correctly if it's not in use to allow things to proceed and if
+> vdd is genuinely not hooked up then the driver can't function.
 
-> > Although this is somewhat awkward, this approach is a deliberate
-> > design decision, to avoid making libfdt dependent on a working general
-> > purpose allocator, which may not be available when libfdt is used in
-> > very limited environments such as a firmware/bootloader.
-> 
-> This is perfect.  The environment where I want to use this code is 
-> fairly limited indeed.
+This ADC driver is for every ADC from S3C24xx series to Exynos4 (and
+its successors as well).
+The regulator (VDD for ADC) is essential for the recent chips
+(S5PC110, S5PV210, and Exynos4).
+I was just worried about the old boards using the same ADC driver
+(mach-s3c2410/mach-*.c, mach-s3c6410/mach-*.c, and so on) without
+ADC-VDD regulators defined.
 
-*smiles smugly*
+However, no s3c compliance defconfigs have ever used CONFIG_REGULATOR.
+Thus, it seems that it's safe to enforce using "vdd" with regulators
+in plat-samsung's ADC driver.
+I'll proceed as you have commented.
 
+>
+>> + ? ? if (adc->vdd)
+>> + ? ? ? ? ? ? regulator_enable(adc->vdd);
+>
+> You're not checking the return value here or anywhere else after the
+> inital get().
+>
+
+Ok. I'll let it handle errors from regulator_enable.
+
+
+Thank you!
+
+- MyungJoo.
 -- 
-David Gibson			| I'll have my music baroque, and my code
-david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
-				| _way_ _around_!
-http://www.ozlabs.org/~dgibson
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
