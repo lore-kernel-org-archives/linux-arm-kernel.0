@@ -1,39 +1,52 @@
-From: viliam.mateicka@gmail.com (Viliam Mateicka)
-Date: Mon, 20 Jun 2011 19:27:18 +0200
-Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
-In-Reply-To: <20110620170551.GE26623@legolas.emea.dhcp.ti.com>
-References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
-	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
-	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
-	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
-	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
-	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
-	<20110620160650.GA26623@legolas.emea.dhcp.ti.com>
-	<BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
-	<20110620170551.GE26623@legolas.emea.dhcp.ti.com>
-Message-ID: <BANLkTinc-9hxLQ1Epf5=PoHvxtapfO7Vvg@mail.gmail.com>
+From: johnlinn@comcast.net (johnlinn at comcast.net)
+Date: Mon, 20 Jun 2011 17:28:00 +0000 (UTC)
+Subject: Pull request for Xilinx Zynq platform support
+Message-ID: <659397895.105558.1308590880922.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I wonder then, who applies the patch first. One ass can't stop
-progress (was there some progress afterall ?) because of one
-line-break (which git produces by default afterall) and several
-non-conforming whitespace conversions. I think you should stop
-replying to me, because I'm kinda starting to like trolling afterall.
+Hi Arnd,
 
-Vilo
+Please pull this commit to support the Xilinx Zynq platform into your tree.
 
-On Mon, Jun 20, 2011 at 7:05 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, Jun 20, 2011 at 06:41:59PM +0200, Skacore Systems wrote:
->> Yeah I think that one line break and tabs are sabotaging your work.
->> So stop being an 8====O - hole. No wonder if you are paid by TI that
->> one line patch into the upstream takes you so long to comprehend.
->
-> you are this close for me to drop your fix and add you to the shitlist.
->
-> --
-> balbi
->
+This patch has been out in the community and mailing list for a while.  It has
+also been in linux-next for a while.
+
+Thanks,
+John Linn
+
+The following changes since commit 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
+  Linus Torvalds (1):
+        Linux 3.0-rc3
+
+are available in the git repository at:
+
+  git://git.xilinx.com/arm-next
+
+Grant Likely (1):
+      ARM: Xilinx: Adding Xilinx board support
+
+ Documentation/devicetree/bindings/arm/xilinx.txt |    7 +
+ arch/arm/Kconfig                                 |   14 +
+ arch/arm/Makefile                                |    2 +
+ arch/arm/boot/dts/zynq-ep107.dts                 |   52 ++++
+ arch/arm/mach-zynq/Makefile                      |    6 +
+ arch/arm/mach-zynq/Makefile.boot                 |    3 +
+ arch/arm/mach-zynq/board_dt.c                    |   37 +++
+ arch/arm/mach-zynq/common.c                      |  102 ++++++++
+ arch/arm/mach-zynq/common.h                      |   29 ++
+ arch/arm/mach-zynq/include/mach/clkdev.h         |   32 +++
+ arch/arm/mach-zynq/include/mach/debug-macro.S    |   36 +++
+ arch/arm/mach-zynq/include/mach/entry-macro.S    |   30 +++
+ arch/arm/mach-zynq/include/mach/hardware.h       |   18 ++
+ arch/arm/mach-zynq/include/mach/io.h             |   33 +++
+ arch/arm/mach-zynq/include/mach/irqs.h           |   21 ++
+ arch/arm/mach-zynq/include/mach/memory.h         |   22 ++
+ arch/arm/mach-zynq/include/mach/system.h         |   28 ++
+ arch/arm/mach-zynq/include/mach/timex.h          |   23 ++
+ arch/arm/mach-zynq/include/mach/uart.h           |   25 ++
+ arch/arm/mach-zynq/include/mach/uncompress.h     |   51 ++++
+ arch/arm/mach-zynq/include/mach/vmalloc.h        |   20 ++
+ arch/arm/mach-zynq/include/mach/zynq_soc.h       |   48 ++++
+ arch/arm/mach-zynq/timer.c                       |  298 ++++++++++++++++++++++
+ arch/arm/mm/Kconfig                  
