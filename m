@@ -1,31 +1,97 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Mon, 20 Jun 2011 21:37:38 +0530
-Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
-In-Reply-To: <BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
-References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
-	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
-	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
-	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
-	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
-	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
-Message-ID: <BANLkTinF6tqVGf6pL+GM9-u_W9DsVdCokg@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Jun 2011 12:16:18 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
+	packed attribute
+In-Reply-To: <Pine.LNX.4.44L0.1106201049420.2113-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1106201049420.2113-100000@iolanthe.rowland.org>
+Message-ID: <alpine.LFD.2.00.1106201207280.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 9:27 PM, Skacore Systems
-<skacore.systems@gmail.com> wrote:
-> Oh and I've finally cloned the mainline git. So here it's the last try.
-> I hope the TI people will not sabotage the Samsung's drivers any way longer !!!
->
-> Vilo
+On Mon, 20 Jun 2011, Alan Stern wrote:
 
-If you already cloned the git, it'd do good to have a quick look at
-the output of 'git log'
-and see how patches are supposed to be.  And hopefully you'll realize
-the following
-wouldn't look much useful if someone did 'git log' over your patch.
-"
-Oh and I've finally cloned the mainline git. So here it's the last try.
-I hope the TI people will not sabotage the Samsung's drivers any way longer !!!
-"
+> On Sun, 19 Jun 2011, Nicolas Pitre wrote:
+> 
+> > > > The question is: does the structure really has to be packed?
+> > > 
+> > > What do you mean?  The structure really does need to be allocated
+> > > without padding between the fields; is that the same thing?  So do a
+> > > bunch of other structures that currently have no annotations at all.
+> > 
+> > Yes, that's the same thing.  The packed attribute tells the compiler 
+> > that you don't want it to insert padding in it as it sees fit.
+> 
+> I thought the packed attribute does more than that.  For example, on
+> some architectures doesn't it also force the compiler to use
+> byte-oriented instructions for accessing the structure's fields?
+
+Yes, but that's a consequence of not being able to access those fields 
+in their naturally aligned position anymore.  Hence the addition of the 
+align attribute to tell the compiler that we know that the structure is 
+still aligned to a certain degree letting the compiler to avoid 
+byte-oriented instructions when possible.
+
+> > > > If the answer is yes in both cases, then having packed,aligned(4) is not 
+> > > > a frivolity but rather a correctness issue.
+> > > 
+> > > Why so?  Current systems work just fine without it.
+> > 
+> > Doesn't mean that because it used to work that it is strictly correct.  
+> > Wouldn't be the first time that a GCC upgrade broke the kernel because 
+> > the kernel wasn't describing things properly enough.
+> 
+> It seems most unlikely that a gcc upgrade would cause unnecessary 
+> padding to be added between a bunch of fields, all of the same size and 
+> alignment.
+
+It is not the padding, but rather the decision to use or not to use 
+byte-oriented instructions in the abscence of explicit alignment 
+indication which appears to have changed with a recent GCC, which is the 
+source of this thread.
+
+> > > What if the intent is that the structure should be 4-byte aligned on 
+> > > 32-bit systems and 8-byte aligned on 64-bit systems?  The compiler 
+> > > already does this sort of thing automatically, why mess with it?
+> > 
+> > Above you say that the structure must not contain padding, and now you 
+> > say that you want different alignment depending on whether or not the 
+> > architecture is 32 or 64 bits?
+> > 
+> > /me confused now.
+> 
+> I looked at the structures in question; they contain nothing but u32
+> values and arrays of u32's, except for an array of u8's at the end of
+> one of the structures.  So this question doesn't arise for them.
+> 
+> On the other hand, one of the other structures you haven't been 
+> considering looks like this (with a bunch of uninteresting #define 
+> lines omitted):
+> 
+> struct ehci_qtd {
+> 	/* first part defined by EHCI spec */
+> 	__hc32			hw_next;	/* see EHCI 3.5.1 */
+> 	__hc32			hw_alt_next;    /* see EHCI 3.5.2 */
+> 	__hc32			hw_token;       /* see EHCI 3.5.3 */
+> 	__hc32			hw_buf [5];        /* see EHCI 3.5.4 */
+> 	__hc32			hw_buf_hi [5];        /* Appendix B */
+> 
+> 	/* the rest is HCD-private */
+> 	dma_addr_t		qtd_dma;		/* qtd address */
+> 	struct list_head	qtd_list;		/* sw qtd list */
+> 	struct urb		*urb;			/* qtd's urb */
+> 	size_t			length;			/* length of buffer */
+> } __attribute__ ((aligned (32)));
+> 
+> (__hc32 is an unsigned 32-bit type which can be either big-endian or 
+> little-endian, depending on the device hardware.)
+> 
+> Only the first 5 fields need to be allocated without padding; the last 
+> 4 can be laid out arbitrarily because they do not correspond to 
+> anything in the hardware.  Once again, I do not think the ((packed)) 
+> attribute is needed here -- in fact, we probably want to avoid it 
+> because dma_addr_t can be 64 bits even on 32-bit architectures.
+
+Indeed, nothing indicates that any packed attribute is required here.
+
+
+Nicolas
