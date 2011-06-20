@@ -1,60 +1,226 @@
 From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 20 Jun 2011 09:50:12 +0200
-Subject: [PATCH 7/8] common: dma-mapping: change alloc/free_coherent method to
-	more generic alloc/free_attrs
+Date: Mon, 20 Jun 2011 09:50:11 +0200
+Subject: [PATCH 6/8] ARM: dma-mapping: remove redundant code and cleanup
 In-Reply-To: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
 References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <1308556213-24970-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <1308556213-24970-7-git-send-email-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce new alloc/free/mmap methods that take attributes argument.
-alloc/free_coherent can be implemented on top of the new alloc/free
-calls with NULL attributes. dma_alloc_non_coherent can be implemented
-using DMA_ATTR_NONCOHERENT attribute, dma_alloc_writecombine can also
-use separate DMA_ATTR_WRITECOMBINE attribute. This way the drivers will
-get more generic, platform independent way of allocating dma memory
-buffers with specific parameters.
-
-One more attribute can be usefull: DMA_ATTR_NOKERNELVADDR. Buffers with
-such attribute will not have valid kernel virtual address. They might be
-usefull for drivers that only exports the DMA buffers to userspace (like
-for example V4L2 or ALSA).
-
-mmap method is introduced to let the drivers create a user space mapping
-for a DMA buffer in generic, architecture independent way.
-
-TODO: update all dma_map_ops clients for all architectures
+This patch just performs a global cleanup in DMA mapping implementation
+for ARM architecture. Some of the tiny helper functions have been moved
+to the caller code, some have been merged together.
 
 Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 ---
- include/linux/dma-mapping.h |   13 +++++++++----
- 1 files changed, 9 insertions(+), 4 deletions(-)
+ arch/arm/mm/dma-mapping.c |  133 +++++++++------------------------------------
+ 1 files changed, 26 insertions(+), 107 deletions(-)
 
-diff --git a/include/linux/dma-mapping.h b/include/linux/dma-mapping.h
-index ba8319a..08a6fa8 100644
---- a/include/linux/dma-mapping.h
-+++ b/include/linux/dma-mapping.h
-@@ -16,10 +16,15 @@ enum dma_data_direction {
- };
+diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
+index 9536481..7c62e60 100644
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -36,64 +36,12 @@
+  * the CPU does do speculative prefetches, which means we clean caches
+  * before transfers and delay cache invalidation until transfer completion.
+  *
+- * Private support functions: these are not part of the API and are
+- * liable to change.  Drivers must not use these.
+  */
+-static inline void __dma_single_cpu_to_dev(const void *kaddr, size_t size,
+-	enum dma_data_direction dir)
+-{
+-	extern void ___dma_single_cpu_to_dev(const void *, size_t,
+-		enum dma_data_direction);
+-
+-	if (!arch_is_coherent())
+-		___dma_single_cpu_to_dev(kaddr, size, dir);
+-}
+-
+-static inline void __dma_single_dev_to_cpu(const void *kaddr, size_t size,
+-	enum dma_data_direction dir)
+-{
+-	extern void ___dma_single_dev_to_cpu(const void *, size_t,
+-		enum dma_data_direction);
+-
+-	if (!arch_is_coherent())
+-		___dma_single_dev_to_cpu(kaddr, size, dir);
+-}
+-
+-static inline void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+-	size_t size, enum dma_data_direction dir)
+-{
+-	extern void ___dma_page_cpu_to_dev(struct page *, unsigned long,
++static void __dma_page_cpu_to_dev(struct page *, unsigned long,
+ 		size_t, enum dma_data_direction);
+-
+-	if (!arch_is_coherent())
+-		___dma_page_cpu_to_dev(page, off, size, dir);
+-}
+-
+-static inline void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+-	size_t size, enum dma_data_direction dir)
+-{
+-	extern void ___dma_page_dev_to_cpu(struct page *, unsigned long,
++static void __dma_page_dev_to_cpu(struct page *, unsigned long,
+ 		size_t, enum dma_data_direction);
  
- struct dma_map_ops {
--	void* (*alloc_coherent)(struct device *dev, size_t size,
--				dma_addr_t *dma_handle, gfp_t gfp);
--	void (*free_coherent)(struct device *dev, size_t size,
--			      void *vaddr, dma_addr_t dma_handle);
-+	void* (*alloc)(struct device *dev, size_t size,
-+				dma_addr_t *dma_handle, gfp_t gfp,
-+				struct dma_attrs *attrs);
-+	void (*free)(struct device *dev, size_t size,
-+			      void *vaddr, dma_addr_t dma_handle,
-+			      struct dma_attrs *attrs);
-+	int (*mmap)(struct device *, struct vm_area_struct *,
-+			  void *, dma_addr_t, size_t, struct dma_attrs *attrs);
-+
- 	dma_addr_t (*map_page)(struct device *dev, struct page *page,
- 			       unsigned long offset, size_t size,
- 			       enum dma_data_direction dir,
+-	if (!arch_is_coherent())
+-		___dma_page_dev_to_cpu(page, off, size, dir);
+-}
+-
+-
+-static inline dma_addr_t __dma_map_page(struct device *dev, struct page *page,
+-	     unsigned long offset, size_t size, enum dma_data_direction dir)
+-{
+-	__dma_page_cpu_to_dev(page, offset, size, dir);
+-	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+-}
+-
+-static inline void __dma_unmap_page(struct device *dev, dma_addr_t handle,
+-		size_t size, enum dma_data_direction dir)
+-{
+-	__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
+-		handle & ~PAGE_MASK, size, dir);
+-}
+-
+ /**
+  * dma_map_page - map a portion of a page for streaming DMA
+  * @dev: valid struct device pointer, or NULL for ISA and EISA-like devices
+@@ -108,11 +56,13 @@ static inline void __dma_unmap_page(struct device *dev, dma_addr_t handle,
+  * The device owns this memory once this call has completed.  The CPU
+  * can regain ownership by calling dma_unmap_page().
+  */
+-static inline dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
++static dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+ 	     unsigned long offset, size_t size, enum dma_data_direction dir,
+ 	     struct dma_attrs *attrs)
+ {
+-	return __dma_map_page(dev, page, offset, size, dir);
++	if (!arch_is_coherent())
++		__dma_page_cpu_to_dev(page, offset, size, dir);
++	return pfn_to_dma(dev, page_to_pfn(page)) + offset;
+ }
+ 
+ /**
+@@ -130,23 +80,29 @@ static inline dma_addr_t arm_dma_map_page(struct device *dev, struct page *page,
+  * whatever the device wrote there.
+  */
+ 
+-static inline void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
++static void arm_dma_unmap_page(struct device *dev, dma_addr_t handle,
+ 		size_t size, enum dma_data_direction dir,
+ 		struct dma_attrs *attrs)
+ {
+-	__dma_unmap_page(dev, handle, size, dir);
++	if (!arch_is_coherent())
++		__dma_page_dev_to_cpu(pfn_to_page(dma_to_pfn(dev, handle)),
++				      handle & ~PAGE_MASK, size, dir);
+ }
+ 
+-static inline void arm_dma_sync_single_for_cpu(struct device *dev,
++static void arm_dma_sync_single_for_cpu(struct device *dev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+-	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
++	if (!arch_is_coherent())
++		__dma_page_dev_to_cpu(virt_to_page(dma_to_virt(dev, handle)),
++				      handle & ~PAGE_MASK, size, dir);
+ }
+ 
+-static inline void arm_dma_sync_single_for_device(struct device *dev,
++static void arm_dma_sync_single_for_device(struct device *dev,
+ 		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+ {
+-	__dma_single_cpu_to_dev(dma_to_virt(dev, handle), size, dir);
++	if (!arch_is_coherent())
++		__dma_page_cpu_to_dev(virt_to_page(dma_to_virt(dev, handle)),
++				      handle & ~PAGE_MASK, size, dir);
+ }
+ 
+ static int arm_dma_set_mask(struct device *dev, u64 dma_mask)
+@@ -567,47 +523,6 @@ void dma_free_coherent(struct device *dev, size_t size, void *cpu_addr, dma_addr
+ }
+ EXPORT_SYMBOL(dma_free_coherent);
+ 
+-/*
+- * Make an area consistent for devices.
+- * Note: Drivers should NOT use this function directly, as it will break
+- * platforms with CONFIG_DMABOUNCE.
+- * Use the driver DMA support - see dma-mapping.h (dma_sync_*)
+- */
+-void ___dma_single_cpu_to_dev(const void *kaddr, size_t size,
+-	enum dma_data_direction dir)
+-{
+-	unsigned long paddr;
+-
+-	BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
+-
+-	dmac_map_area(kaddr, size, dir);
+-
+-	paddr = __pa(kaddr);
+-	if (dir == DMA_FROM_DEVICE) {
+-		outer_inv_range(paddr, paddr + size);
+-	} else {
+-		outer_clean_range(paddr, paddr + size);
+-	}
+-	/* FIXME: non-speculating: flush on bidirectional mappings? */
+-}
+-EXPORT_SYMBOL(___dma_single_cpu_to_dev);
+-
+-void ___dma_single_dev_to_cpu(const void *kaddr, size_t size,
+-	enum dma_data_direction dir)
+-{
+-	BUG_ON(!virt_addr_valid(kaddr) || !virt_addr_valid(kaddr + size - 1));
+-
+-	/* FIXME: non-speculating: not required */
+-	/* don't bother invalidating if DMA to device */
+-	if (dir != DMA_TO_DEVICE) {
+-		unsigned long paddr = __pa(kaddr);
+-		outer_inv_range(paddr, paddr + size);
+-	}
+-
+-	dmac_unmap_area(kaddr, size, dir);
+-}
+-EXPORT_SYMBOL(___dma_single_dev_to_cpu);
+-
+ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 	size_t size, enum dma_data_direction dir,
+ 	void (*op)(const void *, size_t, int))
+@@ -652,7 +567,13 @@ static void dma_cache_maint_page(struct page *page, unsigned long offset,
+ 	} while (left);
+ }
+ 
+-void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
++/*
++ * Make an area consistent for devices.
++ * Note: Drivers should NOT use this function directly, as it will break
++ * platforms with CONFIG_DMABOUNCE.
++ * Use the driver DMA support - see dma-mapping.h (dma_sync_*)
++ */
++static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
+ 	size_t size, enum dma_data_direction dir)
+ {
+ 	unsigned long paddr;
+@@ -667,9 +588,8 @@ void ___dma_page_cpu_to_dev(struct page *page, unsigned long off,
+ 	}
+ 	/* FIXME: non-speculating: flush on bidirectional mappings? */
+ }
+-EXPORT_SYMBOL(___dma_page_cpu_to_dev);
+ 
+-void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
++static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
+ 	size_t size, enum dma_data_direction dir)
+ {
+ 	unsigned long paddr = page_to_phys(page) + off;
+@@ -687,7 +607,6 @@ void ___dma_page_dev_to_cpu(struct page *page, unsigned long off,
+ 	if (dir != DMA_TO_DEVICE && off == 0 && size >= PAGE_SIZE)
+ 		set_bit(PG_dcache_clean, &page->flags);
+ }
+-EXPORT_SYMBOL(___dma_page_dev_to_cpu);
+ 
+ /**
+  * generic_map_sg - map a set of SG buffers for streaming mode DMA
 -- 
 1.7.1.569.g6f426
