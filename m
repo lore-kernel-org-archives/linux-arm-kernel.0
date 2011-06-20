@@ -1,39 +1,36 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Mon, 20 Jun 2011 19:32:16 +0530
-Subject: Trouble with newer kernels on Gumstix Overo boards
-In-Reply-To: <4DFF4BCB.1000206@visionsystems.de>
-References: <BANLkTimJTBpj30EKf_EucvOf2yCHHbRrkQ@mail.gmail.com>
-	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047B99E7E7AD@dbde03.ent.ti.com>
-	<BANLkTimfeS1Xin779eg=8cdjqmqcQeB6HA@mail.gmail.com>
-	<4DFF4BCB.1000206@visionsystems.de>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D625B33@dbde02.ent.ti.com>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Mon, 20 Jun 2011 16:09:32 +0200 (CEST)
+Subject: [PATCH][Trivial] S3C2410 bluetooth: Remove duplicate linux/leds.h
+	include
+In-Reply-To: <1308566964.13261.14.camel@vivanov>
+References: <alpine.LNX.2.00.1106201035590.18991@swampdragon.chaosbits.net>
+	<4DFF1AA5.80508@ru.mvista.com>
+	<alpine.LNX.2.00.1106201232530.18991@swampdragon.chaosbits.net>
+	<1308566964.13261.14.camel@vivanov>
+Message-ID: <alpine.LNX.2.00.1106201608460.11049@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: linux-omap-owner at vger.kernel.org 
-> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Yegor Yefremov
-> Sent: Monday, June 20, 2011 7:02 PM
-> To: Daniel Mack
-> Cc: Gadiyar, Anand; Tony Lindgren; 
-> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: Trouble with newer kernels on Gumstix Overo boards
+On Mon, 20 Jun 2011, Vitaliy Ivanov wrote:
+
+> Giri,
 > 
+> I would still recommend to use the following patch as it corrects many 
+> other places for trivial includes duplication. Also I was the first who 
+> sent it:).
 
-[snip]...[snip]
+Unfortunately I haven't been copied on it.
 
+> --
+> From: Vitaliy Ivanov <vitalivanov@gmail.com>
 > 
-> Are you using some extra patches? I have a custom board based 
-> on am3517 SoC and I have much more errors during booting as I 
-> can see from your boot log. I have no problems booting 
-> 2.6.32/37 though. Any idea?
+> Many stupid corrections of duplicated includes based on the output of scripts/checkincludes.pl.
+> 
+> Signed-off-by: Vitaliy Ivanov <vitalivanov@gmail.com>
 
-[sp] You may want to follow this thread:
-     http://marc.info/?t=129864178000003&r=1&w=2
+I have applied it, and after performing build tests I will be pushing it 
+out.
 
-     It was few months ago, and I am not sure if I tested updated
-     patch(es) working. But, something to verify...
-
-~sanjeev
-
-[snip]...[snip]
+-- 
+Jiri Kosina
+SUSE Labs
