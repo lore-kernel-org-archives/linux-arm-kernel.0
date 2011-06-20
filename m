@@ -1,81 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jun 2011 18:26:13 +0200
-Subject: [PATCH] USB: ehci: use packed,
-	aligned(4) instead of removing the packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106201049420.2113-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1106201049420.2113-100000@iolanthe.rowland.org>
-Message-ID: <201106201826.13478.arnd@arndb.de>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Mon, 20 Jun 2011 18:40:45 +0200
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <4DFF6E58.8090306@zytor.com>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
+	<4DFE89E0.5020509@zytor.com> <20110620074124.GB24716@elte.hu>
+	<4DFF6E58.8090306@zytor.com>
+Message-ID: <20110620164045.GB10815@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 June 2011, Alan Stern wrote:
-> On Sun, 19 Jun 2011, Nicolas Pitre wrote:
-> 
-> > > > The question is: does the structure really has to be packed?
-> > > 
-> > > What do you mean?  The structure really does need to be allocated
-> > > without padding between the fields; is that the same thing?  So do a
-> > > bunch of other structures that currently have no annotations at all.
+
+* H. Peter Anvin <hpa@zytor.com> wrote:
+
+> On 06/20/2011 12:41 AM, Ingo Molnar wrote:
 > > 
-> > Yes, that's the same thing.  The packed attribute tells the compiler 
-> > that you don't want it to insert padding in it as it sees fit.
-> 
-> I thought the packed attribute does more than that.  For example, on
-> some architectures doesn't it also force the compiler to use
-> byte-oriented instructions for accessing the structure's fields?
-
-Correct, and ARM is one of those. Giving  both packed and aligned(4)
-will make gcc use 32-bit accesses again-
-
-> > > > If the answer is yes in both cases, then having packed,aligned(4) is not 
-> > > > a frivolity but rather a correctness issue.
-> > > 
-> > > Why so?  Current systems work just fine without it.
+> > * H. Peter Anvin <hpa@zytor.com> wrote:
 > > 
-> > Doesn't mean that because it used to work that it is strictly correct.  
-> > Wouldn't be the first time that a GCC upgrade broke the kernel because 
-> > the kernel wasn't describing things properly enough.
+> >> There are some test drivers which really want /dev/mem to work.
+> > 
+> > Test drivers and test hardware with zero enumeration can use below 4G 
+> > addresses just fine.
+> >
+> > Also, debugging is not an issue and some non-default kernel or boot 
+> > option can enable any sort of device i guess, so my main worry isnt 
+> > really security but that we should stand in the way of the apparent 
+> > practice of *shipping* user-space drivers that use /dev/mem ...
+> > 
 > 
-> It seems most unlikely that a gcc upgrade would cause unnecessary 
-> padding to be added between a bunch of fields, all of the same size and 
-> alignment.
+> We should either fix /dev/mem to work according to its 
+> specification or rip it out.  The issue with test drivers is not 
+> spurious... I ran into this one myself a few weeks ago while trying 
+> to do a memory test (by limiting the amount of memory available to 
+> the kernel).  This is something that is typically done on factory 
+> floors, and it would be nice to be able to get those environments 
+> over to using Linux.
 
-I agree. The issue is mostly between EABI and oABI compilers behaving
-differently on ARM, as well as differences between architectures.
+There is no reason why they couldnt use a .config option or a boot 
+option to get their weird stuff going, which weird stuff also happens 
+to be useful.
 
-> On the other hand, one of the other structures you haven't been 
-> considering looks like this (with a bunch of uninteresting #define 
-> lines omitted):
-> 
-> struct ehci_qtd {
-> 	/* first part defined by EHCI spec */
-> 	__hc32			hw_next;	/* see EHCI 3.5.1 */
-> 	__hc32			hw_alt_next;    /* see EHCI 3.5.2 */
-> 	__hc32			hw_token;       /* see EHCI 3.5.3 */
-> 	__hc32			hw_buf [5];        /* see EHCI 3.5.4 */
-> 	__hc32			hw_buf_hi [5];        /* Appendix B */
-> 
-> 	/* the rest is HCD-private */
-> 	dma_addr_t		qtd_dma;		/* qtd address */
-> 	struct list_head	qtd_list;		/* sw qtd list */
-> 	struct urb		*urb;			/* qtd's urb */
-> 	size_t			length;			/* length of buffer */
-> } __attribute__ ((aligned (32)));
-> 
-> (__hc32 is an unsigned 32-bit type which can be either big-endian or 
-> little-endian, depending on the device hardware.)
-> 
-> Only the first 5 fields need to be allocated without padding; the last 
-> 4 can be laid out arbitrarily because they do not correspond to 
-> anything in the hardware.  Once again, I do not think the ((packed)) 
-> attribute is needed here -- in fact, we probably want to avoid it 
-> because dma_addr_t can be 64 bits even on 32-bit architectures.
+What i'm somewhat against is having this enabled by default for weird 
+stuff that also happens to be harmful - and the fact that it never 
+worked over 4G physical gives us the perfect opportunity to do just 
+that.
 
-Agreed as well. The packing only ever matters for data structures
-interpreted outside of the kernel -- user space, hardware or
-network. The first five members in this structure seem to be
-accessed by hardware, but they are all aligned correctly. The
-other members are only used inside of the kernel and that has to
-be built using only one ABI. goto no_problem;
+Thanks,
 
-	Arnd
+	Ingo
