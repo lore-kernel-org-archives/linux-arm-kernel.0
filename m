@@ -1,89 +1,62 @@
-From: kamezawa.hiroyu@jp.fujitsu.com (KAMEZAWA Hiroyuki)
-Date: Mon, 20 Jun 2011 08:53:07 +0900
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110617152845.GA13574@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110613134701.2b23b8d8.kamezawa.hiroyu@jp.fujitsu.com>
-	<20110616042044.GA28563@in.ibm.com>
-	<20110616181251.caf484b6.kamezawa.hiroyu@jp.fujitsu.com>
-	<20110617152845.GA13574@in.ibm.com>
-Message-ID: <20110620085307.76e16c8f.kamezawa.hiroyu@jp.fujitsu.com>
+From: gerg@snapgear.com (Greg Ungerer)
+Date: Mon, 20 Jun 2011 10:05:37 +1000
+Subject: [PATCH 2/3] net/fec: add device tree support
+In-Reply-To: <201106191411.32137.arnd@arndb.de>
+References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
+	<1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
+	<4DFDDFF4.8000305@snapgear.com> <201106191411.32137.arnd@arndb.de>
+Message-ID: <4DFE8ED1.3050007@snapgear.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jun 2011 20:58:45 +0530
-Ankita Garg <ankita@in.ibm.com> wrote:
+On 19/06/11 22:11, Arnd Bergmann wrote:
+> On Sunday 19 June 2011 13:39:32 Greg Ungerer wrote:
+>>> +#ifdef CONFIG_OF
+>>> +static const struct of_device_id fec_dt_ids[] = {
+>>> +     { .compatible = "fsl,fec", .data =&fec_devtype[0], },
+>>> +     {},
+>>> +};
+>>> +
+>>> +static const struct of_device_id *
+>>> +fec_get_of_device_id(struct platform_device *pdev)
+>>> +{
+>>> +     return of_match_device(fec_dt_ids,&pdev->dev);
+>>> +}
+>>> +#else
+>>> +#define fec_dt_ids NULL
+>>> +static inline struct of_device_id *
+>>> +fec_get_of_device_id(struct platform_device *pdev)
+>>> +{
+>>> +     return NULL;
+>>> +}
+>>> +#endif
+>>> +
+>>>    static unsigned char macaddr[ETH_ALEN];
+>>>    module_param_array(macaddr, byte, NULL, 0);
+>>>    MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
+>>> @@ -1363,6 +1385,11 @@ fec_probe(struct platform_device *pdev)
+>>>        struct net_device *ndev;
+>>>        int i, irq, ret = 0;
+>>>        struct resource *r;
+>>> +     const struct of_device_id *of_id;
+>>> +
+>>> +     of_id = fec_get_of_device_id(pdev);
+>>
+>> fec_get_of_device_id() is defined inside of "#ifdef CONFIG_OF". This
+>> use of it will break compilation when this is not defined.
+>>
+>
+>
+> Why? Note the #else path defining an empty function.
 
-> Hi,
-> 
-> On Thu, Jun 16, 2011 at 06:12:51PM +0900, KAMEZAWA Hiroyuki wrote:
-> > On Thu, 16 Jun 2011 09:50:44 +0530
-> > Ankita Garg <ankita@in.ibm.com> wrote:
-> > 
-> > > Hi,
-> > > 
-> > > On Mon, Jun 13, 2011 at 01:47:01PM +0900, KAMEZAWA Hiroyuki wrote:
-> > > > On Fri, 27 May 2011 18:01:28 +0530
-> > > > Ankita Garg <ankita@in.ibm.com> wrote:
-> > > > 
-> > > > > Hi,
-> > > > > 
-> > > > 
-> > > > I'm sorry if you've answered already.
-> > > > 
-> > > > Is memory hotplug is too bad and cannot be enhanced for this purpose ?
-> > > > 
-> > > > I wonder
-> > > >   - make section-size smaller (IIUC, IBM's system has 16MB section size)
-> > > > 
-> > > >   - add per section statistics
-> > > > 
-> > > >   - add a kind of balloon driver which does software memory offline
-> > > >     (which means making a contiguous chunk of free pages of section_size
-> > > >      by page migration) in background with regard to memory usage statistics.
-> > > >     If system says "need more memory!", balloon driver can online pages.
-> > > > 
-> > > > can work for your purpose. It can allow you page isolatation and
-> > > > controls in 16MB unit.  If you need whole rework of memory hotplug, I think
-> > > > it's better to rewrite memory hotplug, too.
-> > > >
-> > > 
-> > > Interesting idea, but a few issues -
-> > > 
-> > > - Correctly predicting memory pressure is difficult and thereby being
-> > >   able to online the required pages at the right time could be a
-> > >   challenge
-> > 
-> > But it will be required for your purpose, anyway. Isn't it ?
-> > 
-> > > - Memory hotplug is a heavy operation, so the overhead involved may be
-> > >   high
-> > 
-> > soft-offline of small amount of pages will not very heavy.
-> > compaction and cma patches use the same kind of logic.
-> > 
-> > 
-> > > - Powering off memory is just one of the ways in which memory power could
-> > >   be saved. The platform can also dynamically transition areas of memory
-> > >   into a  content-preserving lower power state if it is not referenced
-> > >   for a pre-defined threshold of time. In such a case, we would need a
-> > >   mechanism to soft offline the pages - i.e, no new allocations to be
-> > >   directed to that memory
-> > > 
-> > 
-> > Hmm, sounds like a similar idea of CleanCache ?
-> > 
-> > Reusing section is much easier than adding new one.., I think.
-> > 
-> 
-> But sections do not define the granualarity at which memory operations
-> are done right ? i.e, allocations/deallocations or reclaim cannot be
-> directed to a section or a group of sections ?
+Sorry, missed that :-)
+
+Regards
+Greg
 
 
-Just because there are no users. If you'll be a 1st user, you can
-add codes, I think.
-
-Thanks,
--Kame
+------------------------------------------------------------------------
+Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
+SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
+8 Gardner Close                             FAX:         +61 7 3217 5323
+Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
