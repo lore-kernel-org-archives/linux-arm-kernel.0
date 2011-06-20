@@ -1,36 +1,49 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Mon, 20 Jun 2011 12:50:14 +0200 (CEST)
-Subject: [PATCH][Trivial] S3C2410 bluetooth: Remove duplicate linux/leds.h
-	include
-In-Reply-To: <BANLkTimjoiDxDX-_Qg4U6TSW6jjEa5xSsw@mail.gmail.com>
-References: <alpine.LNX.2.00.1106201035590.18991@swampdragon.chaosbits.net>
-	<BANLkTimjoiDxDX-_Qg4U6TSW6jjEa5xSsw@mail.gmail.com>
-Message-ID: <alpine.LNX.2.00.1106201249290.18991@swampdragon.chaosbits.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 12:13:36 +0100
+Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
+In-Reply-To: <4DFF255E.5030308@ti.com>
+References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110620095053.GA2082@n2100.arm.linux.org.uk>
+	<20110620101438.GD2082@n2100.arm.linux.org.uk>
+	<4DFF20B3.7010209@ti.com>
+	<20110620104415.GF2082@n2100.arm.linux.org.uk>
+	<4DFF255E.5030308@ti.com>
+Message-ID: <20110620111336.GG2082@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Vitaliy Ivanov wrote:
+On Mon, Jun 20, 2011 at 04:17:58PM +0530, Santosh Shilimkar wrote:
+> Yes. It's because of interrupt and the CPU active-online
+> race.
 
-[...]
-> Some time ago I already sent a patch to handle all the headers
-> duplication corrections. Please check this:
-> 
-> https://lkml.org/lkml/2011/6/16/301
-> 
-> It should handle all the cases you described at:
-> 
-> https://lkml.org/lkml/2011/6/20/72
-> https://lkml.org/lkml/2011/6/20/78
-> https://lkml.org/lkml/2011/6/20/75
-> 
-> I didn't receive any comments and still can see that it's not in
-> mainline Linus' tree.
-> 
+I don't see that as a conclusion from this dump.
 
-Ok, I was not aware of that patch. I'll take a look at it later when I 
-have some more time.
+> Here is the chash log..
+> [   21.025451] CPU1: Booted secondary processor
+> [   21.025451] CPU1: Unknown IPI message 0x1
+> [   21.029113] Switched to NOHz mode on CPU #1
+> [   21.029174] BUG: spinlock lockup on CPU#1, swapper/0, c06220c4
 
--- 
-Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
-Don't top-post http://www.catb.org/jargon/html/T/top-post.html
-Plain text mails only, please.
+That's the xtime seqlock.  We're trying to update the xtime from CPU1,
+which is not yet online and not yet active.  That's fine, we're just
+spinning on the spinlock here, waiting for the other CPUs to release
+it.
+
+But what this is saying is that the other CPUs aren't releasing it.
+The cpu hotplug code doesn't hold the seqlock either.  So who else is
+holding this lock, causing CPU1 to time out on it.
+
+The other thing is that this is only supposed to trigger after about
+one second:
+
+        u64 loops = loops_per_jiffy * HZ;
+                for (i = 0; i < loops; i++) {
+                        if (arch_spin_trylock(&lock->raw_lock))
+                                return;
+                        __delay(1);
+                }
+
+which from the timings you have at the beginning of your printk lines
+is clearly not the case - it's more like 61us.
+
+Are you running with those h/w timer delay patches?
