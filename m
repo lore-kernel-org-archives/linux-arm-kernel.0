@@ -1,34 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 20 Jun 2011 18:15:23 +0300
-Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
-In-Reply-To: <Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
-	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-Message-ID: <20110620151522.GN14262@legolas.emea.dhcp.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 20 Jun 2011 17:15:43 +0200
+Subject: [PATCH 2/8] ARM: dma-mapping: implement dma_map_single on top of
+	dma_map_page
+In-Reply-To: <20110620143911.GD26089@n2100.arm.linux.org.uk>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-3-git-send-email-m.szyprowski@samsung.com>
+	<20110620143911.GD26089@n2100.arm.linux.org.uk>
+Message-ID: <000101cc2f5c$ec21da40$c4658ec0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, Jun 20, 2011 at 11:07:51AM -0400, Alan Stern wrote:
-> On Mon, 20 Jun 2011, Viliam Mateicka wrote:
+On Monday, June 20, 2011 4:39 PM Russell King - ARM Linux wrote:
+
+> On Mon, Jun 20, 2011 at 09:50:07AM +0200, Marek Szyprowski wrote:
+> > This patch consolidates dma_map_single and dma_map_page calls. This is
+> > required to let dma-mapping framework on ARM architecture use common,
+> > generic dma-mapping helpers.
 > 
-> > So, will somebody at least react/reply (or just fix) ?
-> 
-> Have some patience.  You did not address your email message to either
-> of the driver's authors or to the current Gadget maintainer.  Also,
-> David Brownell is deceased and Greg KH is on vacation.
+> This breaks DMA API debugging, which requires that dma_map_page and
+> dma_unmap_page are paired separately from dma_map_single and
+> dma_unmap_single().
 
-besides, the patch formatting is wrong. That was noted before and the
-reply was less than acceptably polite, so unless the patch comes
-Perfect(TM), I'm not looking into it.
+Ok, right. This can be fixed by creating appropriate static inline functions
+in dma-mapping.h and moving dma_debug_* calls there. These function will be
+later removed by using dma_map_ops and include/asm-generic/dma-mapping-common.h
+inlines, which do all the dma_debug_* calls correctly anyway. 
 
+> This also breaks dmabounce when used with a highmem-enabled system -
+> dmabounce refuses the dma_map_page() API but allows the dma_map_single()
+> API.
+
+I really not sure how this change will break dma bounce code. 
+
+Does it mean that it is allowed to call dma_map_single() on kmapped HIGH_MEM 
+page?
+
+Best regards
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110620/ab068081/attachment.sig>
+Marek Szyprowski
+Samsung Poland R&D Center
