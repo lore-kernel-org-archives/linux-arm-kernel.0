@@ -1,186 +1,47 @@
-From: peterhuewe@gmx.de (Peter Huewe)
-Date: Mon, 20 Jun 2011 23:01:38 +0200
-Subject: [PATCH 2/2 v4] mfd/ab8500: Convert to kstrtou8_from_user
-In-Reply-To: <20110620195037.GA2534@p183.telecom.by>
-References: <20110620195037.GA2534@p183.telecom.by>
-Message-ID: <1308603698-32166-2-git-send-email-peterhuewe@gmx.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Jun 2011 17:03:17 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,
+	aligned(4) instead of removing the packed attribute
+In-Reply-To: <201106202239.31997.arnd@arndb.de>
+References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
+	<201106202207.23104.arnd@arndb.de>
+	<alpine.LFD.2.00.1106201622160.2142@xanadu.home>
+	<201106202239.31997.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1106201658330.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the code for getting an number from a
-userspace buffer by a simple call to kstrou8_from_user.
-This makes it easier to read and less error prone.
+On Mon, 20 Jun 2011, Arnd Bergmann wrote:
 
-Since the old buffers held only values up to 255, we don't need
-kstrtoul, but rather kstrtou8.
+> On Monday 20 June 2011 22:28:49 Nicolas Pitre wrote:
+> > On Mon, 20 Jun 2011, Arnd Bergmann wrote:
+> > 
+> > > On Monday 20 June 2011 19:39:34 Alexander Holler wrote:
+> > > > That packed without an additional aligned() caused errors on ARM with 
+> > > > gcc 4.6 is another problem which got (currently) fixed by removing packed.
+> > > 
+> > > Packed caused errors because it is *wrong*. The code as it was used undefined
+> > > behavior in the language.
+> > 
+> > I wouldn't call this issue as such, but this is a Red herring.
+> > 
+> > Could you please provide a pointer to the structure definition so a 
+> > second opinion to the usefulness of __packed there could be provided?  
+> 
+> The structures in question are ehci_caps, ehci_regs and ehci_dbg_port.
 
-Kernel Version: v3.0-rc3
+OK.  If anyone was still entertaining any doubts, those structures do 
+not require any packed attribute what so ever.
 
-Changes in v2:
-- Use kstrtou8 instead of kstrtoul due to small numbers
-- Dropped then unnecessary checks
-Changes in v3:
-- The local struct dev variable isn't needed anymore
-Changes in v4:
-- Drop unneccesary now local variables and casts
-- Change the debug_address and debug_bank members to u8 since they hold
-only values up to 255, and also remove the now superfluous u8 casts
+> The patch that remove the __packed attribute was 139540170 "USB: ehci:
+> remove structure packing from ehci_def".
 
-(Remarks from Alexey Dobriyan, Thanks!)
+Too late for this, but for the record:
 
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
----
- drivers/mfd/ab8500-debugfs.c |   74 ++++++++++++-----------------------------
- 1 files changed, 22 insertions(+), 52 deletions(-)
+Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 64748e4..5d3cd35 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -14,8 +14,8 @@
- #include <linux/mfd/abx500.h>
- #include <linux/mfd/ab8500.h>
- 
--static u32 debug_bank;
--static u32 debug_address;
-+static u8 debug_bank;
-+static u8 debug_address;
- 
- /**
-  * struct ab8500_reg_range
-@@ -357,7 +357,7 @@ static int ab8500_registers_print(struct seq_file *s, void *p)
- {
- 	struct device *dev = s->private;
- 	unsigned int i;
--	u32 bank = debug_bank;
-+	u8 bank = debug_bank;
- 
- 	seq_printf(s, AB8500_NAME_STRING " register values:\n");
- 
-@@ -372,7 +372,7 @@ static int ab8500_registers_print(struct seq_file *s, void *p)
- 			int err;
- 
- 			err = abx500_get_register_interruptible(dev,
--				(u8)bank, (u8)reg, &value);
-+				bank, (u8)reg, &value);
- 			if (err < 0) {
- 				dev_err(dev, "ab->read fail %d\n", err);
- 				return err;
-@@ -419,20 +419,13 @@ static ssize_t ab8500_bank_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
--	unsigned long user_bank;
-+	u8 user_bank;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_bank);
-+	/* Get userspace string and convert to number */
-+	err = kstrtou8_from_user(user_buf, count, 0, &user_bank);
- 	if (err)
--		return -EINVAL;
-+		return err;
- 
- 	if (user_bank >= AB8500_NUM_BANKS) {
- 		dev_err(dev, "debugfs error input > number of banks\n");
-@@ -441,7 +434,7 @@ static ssize_t ab8500_bank_write(struct file *file,
- 
- 	debug_bank = user_bank;
- 
--	return buf_size;
-+	return count;
- }
- 
- static int ab8500_address_print(struct seq_file *s, void *p)
-@@ -458,27 +451,14 @@ static ssize_t ab8500_address_write(struct file *file,
- 	const char __user *user_buf,
- 	size_t count, loff_t *ppos)
- {
--	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
--	unsigned long user_address;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_address);
-+	/* Get userspace string and convert to number*/
-+	err = kstrtou8_from_user(user_buf, count, 0, &debug_address);
- 	if (err)
--		return -EINVAL;
--	if (user_address > 0xff) {
--		dev_err(dev, "debugfs error input > 0xff\n");
--		return -EINVAL;
--	}
--	debug_address = user_address;
--	return buf_size;
-+		return err;
-+
-+	return count;
- }
- 
- static int ab8500_val_print(struct seq_file *s, void *p)
-@@ -488,7 +468,7 @@ static int ab8500_val_print(struct seq_file *s, void *p)
- 	u8 regvalue;
- 
- 	ret = abx500_get_register_interruptible(dev,
--		(u8)debug_bank, (u8)debug_address, &regvalue);
-+		debug_bank, debug_address, &regvalue);
- 	if (ret < 0) {
- 		dev_err(dev, "abx500_get_reg fail %d, %d\n",
- 			ret, __LINE__);
-@@ -509,32 +489,22 @@ static ssize_t ab8500_val_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
--	unsigned long user_val;
-+	u8 user_val;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf)-1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_val);
-+	/* Get userspace string and convert to number */
-+	err = kstrtou8_from_user(user_buf, count, 0, &user_val);
- 	if (err)
--		return -EINVAL;
--	if (user_val > 0xff) {
--		dev_err(dev, "debugfs error input > 0xff\n");
--		return -EINVAL;
--	}
-+		return err;
-+
- 	err = abx500_set_register_interruptible(dev,
--		(u8)debug_bank, debug_address, (u8)user_val);
-+		debug_bank, debug_address, user_val);
- 	if (err < 0) {
- 		printk(KERN_ERR "abx500_set_reg failed %d, %d", err, __LINE__);
- 		return -EINVAL;
- 	}
- 
--	return buf_size;
-+	return count;
- }
- 
- static const struct file_operations ab8500_bank_fops = {
--- 
-1.7.3.4
+Hopefully this thread still gathered enough wisdom about proper usage of 
+the packed and aligned attributes into the list archive.
+
+
+Nicolas
