@@ -1,29 +1,35 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Sun, 19 Jun 2011 23:13:46 -0400 (EDT)
-Subject: [RFC PATCH v2 1/5] ARM: mm: Add generic proc/arch struct
-	definition macros
-In-Reply-To: <20110616100328.GA2460@arm.com>
-References: <1308049105-16080-1-git-send-email-dave.martin@linaro.org>
-	<1308049105-16080-2-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1106151944240.2142@xanadu.home>
-	<20110616100328.GA2460@arm.com>
-Message-ID: <alpine.LFD.2.00.1106192311080.2142@xanadu.home>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Sun, 19 Jun 2011 23:20:20 -0400 (EDT)
+Subject: [PATCH][Trivial] ARM: remove duplicate include from
+	arch/arm/mach-dove/common.c
+In-Reply-To: <alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
+References: <alpine.LNX.2.00.1105261130190.17400@swampdragon.chaosbits.net>
+	<20110526144804.GA31651@lunn.ch>
+	<alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
+Message-ID: <alpine.LFD.2.00.1106192318310.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Jun 2011, Dave Martin wrote:
+On Thu, 16 Jun 2011, Jesper Juhl wrote:
 
-> Alternatively, we could propose a change <linux/init.h> to split the
-> __INITDATA macro up, and define the related macros in a sane way:
+> On Thu, 26 May 2011, Andrew Lunn wrote:
 > 
-> #define __INITDATA_NAME .init.data
-> #define __INITDATA_FLAGS "aw",%progbtis
-> #define __initdata __section(__INITDATA_NAME)
-> #define __INITDATA .section __stringify(__INITDATA_NAME),__INITDATA_FLAGS
+> > Jesper Juhl pointed out there is a redundant include of
+> > linux/serial_8250.h. However it turns out both are redundant.
+> > This patch removes them both.
+> > 
+> > Only compile tested.
+> > 
+> > Reported-by:  Jesper Juhl <jj@chaosbits.net>
+> > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 > 
-> Any thoughts on that?
+> Seems you are right.
+> 
+> Reviewed-by: Jesper Juhl <jj@chaosbits.net>
 
-I do like it.
+Could this patch be sent to RMK's patch system if no one else 
+picks it up please?
+Thanks.
 
 
 Nicolas
