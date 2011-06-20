@@ -1,59 +1,23 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jun 2011 20:32:13 +0100
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <alpine.LFD.2.00.1106201449320.2142@xanadu.home>
-References: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
-	<alpine.LFD.2.00.1106201449320.2142@xanadu.home>
-Message-ID: <20110620193213.GL26089@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 20 Jun 2011 21:34:00 +0200
+Subject: [PATCH 0/3] Improve MMC error handling (3rd rev)
+In-Reply-To: <20110620190945.GK26089@n2100.arm.linux.org.uk>
+References: <20110620190945.GK26089@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTi=K2iV+7QLuu=QMgh+V=xBUxmULdg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 03:14:26PM -0400, Nicolas Pitre wrote:
-> If you need that structure to be packed then so be it and nothing else 
-> can be done about it.
-> 
-> However if you have:
-> 
-> struct foo {
-> 	u32 c;
-> 	u64 d;
-> 	u32 e;
-> };
-> 
-> Here the d member is not naturally aligned.  On most architectures, 
-> including ARM with the ABI currently in use, the compiler would insert a 
-> 32-bit padding between c and d.
+On Mon, Jun 20, 2011 at 9:09 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
 
-And if 'struct foo' represents a structure in device memory, the end
-result is highly unpredicable whether or not you have padding or
-accessors to load 'd' there.  So, you would not have such a structure
-describing a data structure in memory returned by ioremap().
+> This is the third revision of my improvements to the MMC block
+> device error handling, which makes error handling more robust
+> and permits MMC/SD to continue working in the presence of
+> not-quite-perfect setups.
 
-Now, the real question is: is there any architecture which is (or may
-be) supported by the Linux kernel which would add padding to:
+All look like perfectly reasonable hardening of the MMC error
+path, so FWIW:
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-struct foo {
-	u8 a;
-	u8 b;
-	u16 c;
-	u32 d;
-	u64 e;
-};
-
-?
-
-The last gotcha here is struct size.
-
-struct bar {
-	u8 a;
-	u8 b;
-};
-
-May be 2 on some Linux supporting architectures, or may be larger due to
-tail padding.  Eg, ARM OABI will add two bytes of tail padding to this.
-
-If we assume that 'struct foo' will be laid out as we desire (iow, no
-additional padding with naturally aligned elements) then the only
-remaining issue is sizeof(struct), and that's a whole different ballgame.
-That shouldn't be solved by packed.
+Thanks,
+Linus Walleij
