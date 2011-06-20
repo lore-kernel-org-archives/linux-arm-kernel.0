@@ -1,37 +1,53 @@
-From: ray-lk@madrabbit.org (Ray Lee)
-Date: Mon, 20 Jun 2011 10:10:04 -0700
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <4DFE7FF9.9070406@gmail.com>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
-Message-ID: <BANLkTi=kP0LQ4Hx_uA8viA59aDnb1KePyQ@mail.gmail.com>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Jun 2011 13:10:50 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
+	packed attribute
+In-Reply-To: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
+Message-ID: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 19, 2011 at 4:02 PM, Ryan Mallon <rmallon@gmail.com> wrote:
-> On 17/06/11 19:30, Ingo Molnar wrote:
->> ?- there's some really horrible out-of-tree drivers that do mmap()s
->> ? ?via /dev/mem, those should be fixed if they want to move beyond
->> ? ?4G: their char device should be mmap()able.
->
-> There are drivers where this makes sense. For example an FPGA device with a
-> proprietary register layout on the memory bus can be done this way. The FPGA
-> can simply be mapped in user-space via /dev/mem and handled there. If the
-> device requires no access other than memory bus reads and writes then
-> writing a custom char device driver just to get an mmap function seems a bit
-> overkill.
+On Mon, 20 Jun 2011, Alan Stern wrote:
 
-While VFIO is still out-of-tree, it handles this use-case, as well as
-interrupts and transparent DMA remapping via the IOMMU. I'm using it
-on a current project and it works as advertised. UIO is in-tree and
-also handles this (as I understand it), but without DMA or interrupt
-support.
+> On Mon, 20 Jun 2011, Nicolas Pitre wrote:
+> 
+> > On Mon, 20 Jun 2011, Alan Stern wrote:
+> > 
+> > > On Sun, 19 Jun 2011, Nicolas Pitre wrote:
+> > > 
+> > > > > > The question is: does the structure really has to be packed?
+> > > > > 
+> > > > > What do you mean?  The structure really does need to be allocated
+> > > > > without padding between the fields; is that the same thing?  So do a
+> > > > > bunch of other structures that currently have no annotations at all.
+> > > > 
+> > > > Yes, that's the same thing.  The packed attribute tells the compiler 
+> > > > that you don't want it to insert padding in it as it sees fit.
+> > > 
+> > > I thought the packed attribute does more than that.  For example, on
+> > > some architectures doesn't it also force the compiler to use
+> > > byte-oriented instructions for accessing the structure's fields?
+> > 
+> > Yes, but that's a consequence of not being able to access those fields 
+> > in their naturally aligned position anymore.  Hence the addition of the 
+> > align attribute to tell the compiler that we know that the structure is 
+> > still aligned to a certain degree letting the compiler to avoid 
+> > byte-oriented instructions when possible.
+> 
+> Not exactly.  As far as I can tell, the ((packed)) attribute caused the 
+> compiler to change the structure's alignment from its natural value to 
+> 1.  That's why the fields weren't in their naturally aligned positions 
+> and why removing ((packed)) fixed the problem.
 
-   https://github.com/pugs/vfio-linux-2.6/blob/vfio/Documentation/vfio.txt
+Are we talking past each other?
 
-It's perhaps arguable whether any human with taste should ship a
-driver based on UIO/VFIO, but for code that exists solely to exercise
-and test a hardware design, it works great.
+Remember that I was the one asking if the align attribute was needed in 
+the first place.  If it is not then by all means please get rid of it!
 
-~r.
+But if it _is_ needed, then the generated code can be much better if the 
+packed attribute is _also_ followed by the align attribute to 
+increase it from 1.
+
+
+Nicolas
