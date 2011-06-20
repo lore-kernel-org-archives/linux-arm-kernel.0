@@ -1,104 +1,89 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 20 Jun 2011 15:26:08 +0900
-Subject: [PATCH 1/2] Exynos4 NURI: configure regulators and PMIC
-In-Reply-To: <20110618151227.GB25163@sirena.org.uk>
-References: <1308215372-17420-1-git-send-email-myungjoo.ham@samsung.com>
-	<20110618151227.GB25163@sirena.org.uk>
-Message-ID: <BANLkTiniwMCW-ED4CX=qybMvk243Zdki4Q@mail.gmail.com>
+From: dhylands@gmail.com (Dave Hylands)
+Date: Sun, 19 Jun 2011 23:39:49 -0700
+Subject: Problems with semaphores, mutexes, and atomic?
+Message-ID: <BANLkTikwGgrK0FFiee1a8PvDicJa-bUedg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 19, 2011 at 12:12 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Thu, Jun 16, 2011 at 06:09:31PM +0900, MyungJoo Ham wrote:
->
->> ?static struct regulator_init_data emmc_fixed_voltage_init_data = {
->> ? ? ? .constraints ? ? ? ? ? ?= {
->> + ? ? ? ? ? ? .min_uV ? ? ? ? = 2800000,
->> + ? ? ? ? ? ? .max_uV ? ? ? ? = 2800000,
->> ? ? ? ? ? ? ? .name ? ? ? ? ? = "VMEM_VDD_2.8V",
->> ? ? ? ? ? ? ? .valid_ops_mask = REGULATOR_CHANGE_STATUS,
->
-> Since the regualtor can't change voltage specifying the voltage here
-> isn't going to achieve anything - to get the voltage reported through
-> get_voltage() you need to put the voltage in the platform data for the
-> fixed regulator.
+Hi,
 
-Ah.. they are useless. I'll remove them.
+I wrote a small test module to test semaphores, mutexes and atomic
+increments, and I've tested it with CONFIG_SMP=y with 1 and 2
+processors and with CONFIG_SMP disabled.
 
->
->> +static struct regulator_consumer_supply nuri_max8997_ldo1_consumer[] = {
->> + ? ? REGULATOR_SUPPLY("vadc", NULL), /* Used by CPU's ADC drv */
->> +};
->
-> In the ADC regulator patch you called the supply vdd (though the chip
-> normally calls it vadc so that's the better name)...
+My test code can be found here:
+http://svn.hylands.org/linux/test-mutex/test-mutex.c
+(it's about 133 lines long).
 
-Um.. this happened as I have seperated NURI-board platform patch for
-ADC and PMIC.
-After ADC patch, that name became ("vdd", "s5p-adc").
-I'll let them either be merged or be disjoint completely.
+For each test, I launch 100 threads, and then increment a counter,
+either inside a mutex_lock/unlock, a down/up, or do an atomic_inc.
 
-Anyway, do you think "vadc" is better than "vdd" for ADC drivers? The
-circuit schematics says the pin on the consumer side is "VDD33_ADC"
-(VDD 3.3V for ADC).
+Each thread performs the loop a number of times, and at the end the
+count often doesn't have the expected value if the locks were in fact
+atomic.
 
+Typical output looks like:
 
->
-> Extra ' too.
->
->> +static struct regulator_consumer_supply nuri_max8997_ldo8_consumer[] = {
->> + ? ? REGULATOR_SUPPLY("vusb_d", NULL), /* Used by CPU */
->> + ? ? REGULATOR_SUPPLY("vdac", NULL), /* Used by CPU */
->> +};
->
-> Another VADC? ?For a different supply?
+192.168.0.50  ~ # modprobe test-mutex
+[   26.220000] Testing mutex...
+[   26.230000]     Launching threads ..........
+[   26.300000]     Waiting for threads to finish ..........
+[   26.310000]   counter = 999888 FAIL
+[   26.310000] Testing semaphore...
+[   26.310000]     Launching threads ..........
+[   26.440000]     Waiting for threads to finish ..........
+[   27.810000]   counter = 999575 FAIL
+[   27.810000] Testing atomic...
+[   27.820000]     Launching threads ..........
+[   28.030000]     Waiting for threads to finish ..........
+[   28.040000]  counter = 9910929 FAIL
 
-That's DAC (opposite to ADC).
+My processor info from /proc/cpuinfo looks like:
 
->
->> + ? ? ? ? ? ? .state_mem ? ? ?= {
->> + ? ? ? ? ? ? ? ? ? ? .enabled ? ? ? ?= 0,
->
-> No need to initialize to zero.
+192.168.0.50  ~ # cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 5 (v7l)
+processor       : 0
+BogoMIPS        : 1893.99
 
-Ok, I'll remove every zero-initialization from the patch.
+processor       : 1
+BogoMIPS        : 1893.99
 
->
->> +static struct regulator_init_data nuri_max8997_ldo10_data = {
->> + ? ? .constraints ? ?= {
->
-> You should be able to use __initdata for a lot of this by the way.
+Features        : swp half thumb fastmult vfp edsp neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x2
+CPU part        : 0xc09
+CPU revision    : 5
 
-Ah.. way to reduce some weight. Fine.
+I'm running 2.6.36.3, and some snippets from my boot log:
 
->
->> +#define NURI_PMIC_GPIO ? ? ? ? ? ? ? EXYNOS4_GPX0(7)
->> +static void __init nuri_pmic_init(void)
->> +{
->> + ? ? int gpio;
->> +
->> + ? ? nuri_max8997_pdata.irq_base = irq_get_next_irq(IRQ_GPIO_END);
->> + ? ? gpio = NURI_PMIC_GPIO;
->> + ? ? gpio_request(gpio, "AP_PMIC_IRQ");
->> + ? ? s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
->> + ? ? s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
->> +}
->
-> I'm not sure both the #define and the variable make sense here...
->
+Uncompressing Linux... done, booting the kernel.
+Linux version 2.6.36.3 (dhylands at dave-ubuntu) (gcc version 4.5.1 (GCC)
+) #40 SMP PREEMPT Sun Jun 19 13:41:47 PDT 2011
+CPU: ARMv7 Processor [412fc095] revision 5 (ARMv7), cr=10c53c7f
+CPU: VIPT nonaliasing data cache, VIPT aliasing instruction cache
 
-I've defined them because two statements are using the gpio address of
-NURI_PMIC.
+[    0.280000] CPU: Testing write buffer coherency: ok
+[    0.280000] Calibrating local timer... 474.46MHz.
+[    0.340000] L310 cache controller enabled
+[    0.340000] l2x0: 16 ways, CACHE_ID 0x410000c7, AUX_CTRL 0x7a450000
 
+So given that I'm seeing failures even with CONFIG_SMP disabled, I
+have to wonder whether my test is valid, or whether our SoC has issues
+some where.
 
+I even tried adding:
 
-Thanks you very much!
+    smp_mb();
+    dsb();
 
-- MyungJoo
+after acquiring the lock and before releasing the lock, but I still
+see failures.
+
+Any feedback would be appreciated, and I can provide more information,
+if needed.
+
 -- 
-MyungJoo Ham (???), Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
+Dave Hylands
+Shuswap, BC, Canada
+http://www.davehylands.com
