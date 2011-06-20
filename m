@@ -1,23 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 20 Jun 2011 21:34:00 +0200
-Subject: [PATCH 0/3] Improve MMC error handling (3rd rev)
-In-Reply-To: <20110620190945.GK26089@n2100.arm.linux.org.uk>
-References: <20110620190945.GK26089@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=K2iV+7QLuu=QMgh+V=xBUxmULdg@mail.gmail.com>
+From: andreiw@motorola.com (Andrei Warkentin)
+Date: Mon, 20 Jun 2011 14:34:53 -0500
+Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
+In-Reply-To: <201106191623.48470.heiko@sntech.de>
+References: <201106022149.47936.heiko@sntech.de>
+	<BANLkTinCyr=pL9tyK+F9XxX2r15acqEsNA@mail.gmail.com>
+	<201106191623.48470.heiko@sntech.de>
+Message-ID: <BANLkTi=FWsfFWQDKk4CbSB5JK5NXhVJZnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 9:09 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
+Heiko,
 
-> This is the third revision of my improvements to the MMC block
-> device error handling, which makes error handling more robust
-> and permits MMC/SD to continue working in the presence of
-> not-quite-perfect setups.
+On Sun, Jun 19, 2011 at 9:23 AM, Heiko St?bner <heiko@sntech.de> wrote:
+> Am Samstag 18 Juni 2011, 22:56:11 schrieb Daniel Mack:
 
-All look like perfectly reasonable hardening of the MMC error
-path, so FWIW:
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+The log you sent out seems a bit short (it's covers < 1s of boot time
+- usb0: no IPv6 routers present is the last line ). Can you send -
+1) A full log with errors without any of my patches.
+2) A full log with just the first patch.
+3) A full log with just the second patch.
 
-Thanks,
-Linus Walleij
+I'm interested in knowing what the pattern of access to boot0 and
+boot1 is that causes these failures - does it only report I/O errors
+for for certain blocks (say, above some number) or for all of them.
+
+A
