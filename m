@@ -1,73 +1,29 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 15:56:38 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
-	packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106201436430.2113-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1106201436430.2113-100000@iolanthe.rowland.org>
-Message-ID: <alpine.LFD.2.00.1106201537020.2142@xanadu.home>
+From: tarun.kanti@ti.com (DebBarma, Tarun Kanti)
+Date: Tue, 21 Jun 2011 01:30:25 +0530
+Subject: [PATCH v2 00/18] GPIO: OMAP: Driver Cleanup and Fixes
+In-Reply-To: <87ei2trbuq.fsf@ti.com>
+References: <1308058321-12875-1-git-send-email-tarun.kanti@ti.com>
+	<87ei2trbuq.fsf@ti.com>
+Message-ID: <5A47E75E594F054BAF48C5E4FC4B92AB037B9ACD84@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Alan Stern wrote:
-
-> On Mon, 20 Jun 2011, Alexander Holler wrote:
+[...]
 > 
-> > I see it that way: packed is needed to be sure that at least for struct 
-> > ehci_regs there are no padding bytes inbetween the members.
+> A quick test of this series on 3430/n900 shows that it prevents PER
+> retention.  I see CM_FCLKEN_PER=0000c000 (debounce clock for GPIO banks
+> 3 & 4 are still enabled.)
 > 
-> But is it _really_ needed?
+> Can you retest with debounce enabled on one of the GPIOs for one of your
+> platforms?
+With one of the module debounce clock enabled it doesn't go to retention.
+Later I disabled all modules debounce clock. It doesn't to retention either.
+So this is same as your observation. I am surprised what has happened now.
+The only thing I could recollect is few patches to solve LDO and
+OMAP1 issues while testing before posting. I will investigate further.
+--
+Tarun
 > 
-> > It might 
-> > work without, but that depends on the compiler (-version, architecture, 
-> > whatever).
+> Kevin
 > 
-> Have there _ever_ been _any_ combinations of compiler, version, 
-> architecture, whatever, that had unwanted padding bytes in this 
-> structure?
-
-This can be determined by simple code inspection.
-
-If you must have struct members which are not aligned to their natural 
-size then you need __packed.  Example:
-
-struct foo {
-	u8  a;
-	u16 b;
-	u32 c;
-	u64 d;
-};
-
-Without __packed, there will be padding between a and b, and between c 
-and d.  If the order of the members in this struct were reversed, then 
-everything would be naturally aligned and no padding between members 
-would be inserted.
-
-The size of structures is normally rounded up with padding to the size 
-of the largest basic element it contains.  Example:
-
-struct foo {
-	u64 a;
-	u8 b;
-};
-
-Here sizeof(struct foo) would return 16, even if the actual content 
-occupies 9 bytes only.  That's because the largest basic element is u64 
-i.e. 8 bytes.  Normally this trailing padding is not an issue, unless 
-you have an array of such a struct or if it is a member of another 
-struct.  If you want to get rid of that padding, you need to use 
-__packed again (which of course would make all subsequent instances of 
-that structure in your array completely misaligned too).
-
-Two odd exceptions with the old ABI on ARM:
-
-- The alignment of a 64-bit value is always 4 bytes not 8.
-
-- The size of all structures are always rounded up to a 4-byte boundary, 
-  irrespective of their content.
-
-If you fall into none of the above issues, then you don't need any 
-__packed, period.
-
-
-
-Nicolas
+> 
