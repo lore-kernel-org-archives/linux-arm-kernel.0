@@ -1,35 +1,103 @@
-From: hpa@zytor.com (H. Peter Anvin)
-Date: Mon, 20 Jun 2011 09:44:25 -0700
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <20110620164045.GB10815@elte.hu>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
-	<4DFE89E0.5020509@zytor.com> <20110620074124.GB24716@elte.hu>
-	<4DFF6E58.8090306@zytor.com> <20110620164045.GB10815@elte.hu>
-Message-ID: <4DFF78E9.7010202@zytor.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 20 Jun 2011 12:48:32 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106201207280.2142@xanadu.home>
+Message-ID: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/20/2011 09:40 AM, Ingo Molnar wrote:
-> 
-> There is no reason why they couldnt use a .config option or a boot 
-> option to get their weird stuff going, which weird stuff also happens 
-> to be useful.
-> 
-> What i'm somewhat against is having this enabled by default for weird 
-> stuff that also happens to be harmful - and the fact that it never 
-> worked over 4G physical gives us the perfect opportunity to do just 
-> that.
-> 
+On Mon, 20 Jun 2011, Nicolas Pitre wrote:
 
-I'm concerned about that notion.  I think it's fine to modularize
-/dev/mem, but what we're seeing is that Red Hat and all kinds of other
-entities are putting in ad hoc versions of /dev/mem, but of course doing
-so incorrectly.
+> On Mon, 20 Jun 2011, Alan Stern wrote:
+> 
+> > On Sun, 19 Jun 2011, Nicolas Pitre wrote:
+> > 
+> > > > > The question is: does the structure really has to be packed?
+> > > > 
+> > > > What do you mean?  The structure really does need to be allocated
+> > > > without padding between the fields; is that the same thing?  So do a
+> > > > bunch of other structures that currently have no annotations at all.
+> > > 
+> > > Yes, that's the same thing.  The packed attribute tells the compiler 
+> > > that you don't want it to insert padding in it as it sees fit.
+> > 
+> > I thought the packed attribute does more than that.  For example, on
+> > some architectures doesn't it also force the compiler to use
+> > byte-oriented instructions for accessing the structure's fields?
+> 
+> Yes, but that's a consequence of not being able to access those fields 
+> in their naturally aligned position anymore.  Hence the addition of the 
+> align attribute to tell the compiler that we know that the structure is 
+> still aligned to a certain degree letting the compiler to avoid 
+> byte-oriented instructions when possible.
 
-	-hpa
+Not exactly.  As far as I can tell, the ((packed)) attribute caused the 
+compiler to change the structure's alignment from its natural value to 
+1.  That's why the fields weren't in their naturally aligned positions 
+and why removing ((packed)) fixed the problem.
 
--- 
-H. Peter Anvin, Intel Open Source Technology Center
-I work for Intel.  I don't speak on their behalf.
+> > > > > If the answer is yes in both cases, then having packed,aligned(4) is not 
+> > > > > a frivolity but rather a correctness issue.
+> > > > 
+> > > > Why so?  Current systems work just fine without it.
+> > > 
+> > > Doesn't mean that because it used to work that it is strictly correct.  
+> > > Wouldn't be the first time that a GCC upgrade broke the kernel because 
+> > > the kernel wasn't describing things properly enough.
+> > 
+> > It seems most unlikely that a gcc upgrade would cause unnecessary 
+> > padding to be added between a bunch of fields, all of the same size and 
+> > alignment.
+> 
+> It is not the padding, but rather the decision to use or not to use 
+> byte-oriented instructions in the abscence of explicit alignment 
+> indication which appears to have changed with a recent GCC, which is the 
+> source of this thread.
+
+I thought the source of the thread had nothing to do with any recent
+changes to gcc.  Maybe I was wrong.  In any case, the issue was not the
+lack of an alignment indication but rather the unnecessary presence of
+a ((packed)) attribute causing the compiler to forget about the natural
+alignment.
+
+To put it another way, the problem was caused by having ((packed))  
+where it wasn't needed.  You want to fix the immediate fallout of the
+problem by adding an alignment attribute, instead of fixing the problem
+itself by removing the underlying cause.
+
+
+> > On the other hand, one of the other structures you haven't been 
+> > considering looks like this (with a bunch of uninteresting #define 
+> > lines omitted):
+> > 
+> > struct ehci_qtd {
+> > 	/* first part defined by EHCI spec */
+> > 	__hc32			hw_next;	/* see EHCI 3.5.1 */
+> > 	__hc32			hw_alt_next;    /* see EHCI 3.5.2 */
+> > 	__hc32			hw_token;       /* see EHCI 3.5.3 */
+> > 	__hc32			hw_buf [5];        /* see EHCI 3.5.4 */
+> > 	__hc32			hw_buf_hi [5];        /* Appendix B */
+> > 
+> > 	/* the rest is HCD-private */
+> > 	dma_addr_t		qtd_dma;		/* qtd address */
+> > 	struct list_head	qtd_list;		/* sw qtd list */
+> > 	struct urb		*urb;			/* qtd's urb */
+> > 	size_t			length;			/* length of buffer */
+> > } __attribute__ ((aligned (32)));
+> > 
+> > (__hc32 is an unsigned 32-bit type which can be either big-endian or 
+> > little-endian, depending on the device hardware.)
+> > 
+> > Only the first 5 fields need to be allocated without padding; the last 
+> > 4 can be laid out arbitrarily because they do not correspond to 
+> > anything in the hardware.  Once again, I do not think the ((packed)) 
+> > attribute is needed here -- in fact, we probably want to avoid it 
+> > because dma_addr_t can be 64 bits even on 32-bit architectures.
+> 
+> Indeed, nothing indicates that any packed attribute is required here.
+
+Likewise, nothing indicates any packed attribute is required for the 
+structures in include/linux/usb/ehci_def.h.
+
+Alan Stern
