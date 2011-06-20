@@ -1,61 +1,36 @@
-From: mina86@mina86.com (Michal Nazarewicz)
-Date: Mon, 20 Jun 2011 10:35:36 +0200
-Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to prepare
-	for generic dma_ops
-In-Reply-To: <1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <op.vxc8tmru3l0zgt@mnazarewicz-glaptop>
+From: jkosina@suse.cz (Jiri Kosina)
+Date: Mon, 20 Jun 2011 10:40:58 +0200 (CEST)
+Subject: [PATCH][Trivial] ARM: remove duplicate include from
+	arch/arm/mach-dove/common.c
+In-Reply-To: <alpine.LFD.2.00.1106192318310.2142@xanadu.home>
+References: <alpine.LNX.2.00.1105261130190.17400@swampdragon.chaosbits.net>
+	<20110526144804.GA31651@lunn.ch>
+	<alpine.LNX.2.00.1106162348320.8140@swampdragon.chaosbits.net>
+	<alpine.LFD.2.00.1106192318310.2142@xanadu.home>
+Message-ID: <alpine.LNX.2.00.1106201040480.11049@pobox.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011 09:50:06 +0200, Marek Szyprowski  
-<m.szyprowski@samsung.com> wrote:
-> +static inline void dma_sync_single_for_cpu(struct device *dev,
+On Sun, 19 Jun 2011, Nicolas Pitre wrote:
 
-I wouldn't really put inline here or in the function below.
+> > > Jesper Juhl pointed out there is a redundant include of
+> > > linux/serial_8250.h. However it turns out both are redundant.
+> > > This patch removes them both.
+> > > 
+> > > Only compile tested.
+> > > 
+> > > Reported-by:  Jesper Juhl <jj@chaosbits.net>
+> > > Signed-off-by: Andrew Lunn <andrew@lunn.ch>
+> > 
+> > Seems you are right.
+> > 
+> > Reviewed-by: Jesper Juhl <jj@chaosbits.net>
+> 
+> Could this patch be sent to RMK's patch system if no one else 
+> picks it up please?
 
-> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-> +{
-> +	BUG_ON(!valid_dma_direction(dir));
-> +
-> +	debug_dma_sync_single_for_cpu(dev, handle, size, dir);
-> +
-> +	if (!dmabounce_sync_for_cpu(dev, handle, size, dir))
-> +		return;
-> +
-> +	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
-
-I know it is just copy'n'paste but how about:
-
-	if (dmabounce_sync_for_cpu(dev, handle, size, dir))
-		__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
-
-> +}
-> +
-> +static inline void dma_sync_single_for_device(struct device *dev,
-> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
-> +{
-> +	BUG_ON(!valid_dma_direction(dir));
-> +
-> +	debug_dma_sync_single_for_device(dev, handle, size, dir);
-> +
-> +	if (!dmabounce_sync_for_device(dev, handle, size, dir))
-> +		return;
-> +
-> +	__dma_single_cpu_to_dev(dma_to_virt(dev, handle), size, dir);
-
-Same as above.
-
-> +}
-> +
->  /**
->   * dma_sync_single_range_for_cpu
->   * @dev: valid struct device pointer, or NULL for ISA and EISA-like  
-> devices
+I have picked it up last week.
 
 -- 
-Best regards,                                         _     _
-.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
-..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
-ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
+Jiri Kosina
+SUSE Labs
