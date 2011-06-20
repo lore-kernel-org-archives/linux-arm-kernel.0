@@ -1,56 +1,67 @@
 From: thomas.abraham@linaro.org (Thomas Abraham)
-Date: Mon, 20 Jun 2011 16:32:26 +0530
-Subject: [PATCH 0/6] Add basic device tree support for Samsung's Exynos4
-	platform
-Message-ID: <1308567752-13451-1-git-send-email-thomas.abraham@linaro.org>
+Date: Mon, 20 Jun 2011 16:32:29 +0530
+Subject: [PATCH 3/6] watchdog: s3c2410: Add support for device tree based probe
+In-Reply-To: <1308567752-13451-1-git-send-email-thomas.abraham@linaro.org>
+References: <1308567752-13451-1-git-send-email-thomas.abraham@linaro.org>
+Message-ID: <1308567752-13451-4-git-send-email-thomas.abraham@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds a basic device tree based boot for Samsung's Exynos4
-platforms and specifically for smdkv310 board. Device tree based driver
-probe is added for uart, sdhci and watchdog drivers. These patches
-enable booting to console on smdkv310 board with some of the devices
-initialized with data from the device tree.
+This patch adds the of_match_table to enable s3c2410-wdt driver
+to be probed when watchdog device node is found in the device tree.
 
-This patch series is based on
-git.secretlab.ca/git/linux-2.6.git devicetree/test
-
-and depends on the following patches which are not yet available in
-the devicetree/test branch.
-
-1. [PATCH] ARM: EXYNOS4: Fix card detection for sdhci 0 and 2
-[http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg04704.html]
-
-2. [PATCH] ARM: EXYNOS4: Fix missing S5P_VA_AUDSS definition
-[http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg04866.html]
-
-3. [PATCH 0/9] Add clkdev support for Samsung platforms
-[http://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg04874.html]
-
-4. Consolidate the clkdev header files
-[http://patchwork.ozlabs.org/patch/97862/]
-
-Thomas Abraham (6):
-  serial: samsung: Keep a copy of platform data in driver's private data
-  serial: samsung: Add device tree support for s5pv210 uart driver
-  watchdog: s3c2410: Add support for device tree based probe
-  mmc: sdhci-s3c: Add support for device tree based probe
-  arm: dts: Add nodes in smdkv310 device tree source file
-  arm: exynos4: Add a new Exynos4 device tree enabled machine
-
- Documentation/devicetree/bindings/arm/samsung.txt  |    3 +-
- .../bindings/tty/serial/samsung_uart.txt           |   50 +++++++
- .../devicetree/bindings/watchdog/samsung-wdt.txt   |   12 ++
- arch/arm/boot/dts/exynos4-smdkv310.dts             |  135 +++++++++++++++++++-
- arch/arm/mach-exynos4/Kconfig                      |   11 ++
- arch/arm/mach-exynos4/Makefile                     |    1 +
- arch/arm/mach-exynos4/mach-exynos4-dt.c            |   94 ++++++++++++++
- drivers/mmc/host/sdhci-s3c.c                       |   11 ++
- drivers/tty/serial/s5pv210.c                       |   39 +++++-
- drivers/tty/serial/samsung.c                       |  114 ++++++++++++++++-
- drivers/tty/serial/samsung.h                       |    4 +-
- drivers/watchdog/s3c2410_wdt.c                     |   10 ++
- 12 files changed, 473 insertions(+), 11 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/tty/serial/samsung_uart.txt
+Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
+---
+ .../devicetree/bindings/watchdog/samsung-wdt.txt   |   12 ++++++++++++
+ drivers/watchdog/s3c2410_wdt.c                     |   10 ++++++++++
+ 2 files changed, 22 insertions(+), 0 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
- create mode 100644 arch/arm/mach-exynos4/mach-exynos4-dt.c
+
+diff --git a/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
+new file mode 100644
+index 0000000..f2617e8
+--- /dev/null
++++ b/Documentation/devicetree/bindings/watchdog/samsung-wdt.txt
+@@ -0,0 +1,12 @@
++* Samsung's Watchdog Timer Controller
++
++The Samsung's Watchdog controller is used for resuming system operation
++after a preset amount of time during which the WDT reset event has not
++occured.
++
++Required properties:
++- compatible : should be "samsung,s3c2410-wdt"
++- reg : base physical address of the controller and length of memory mapped
++	region.
++- interrupts : interrupt number to the cpu.
++
+diff --git a/drivers/watchdog/s3c2410_wdt.c b/drivers/watchdog/s3c2410_wdt.c
+index f7f5aa0..30da88f 100644
+--- a/drivers/watchdog/s3c2410_wdt.c
++++ b/drivers/watchdog/s3c2410_wdt.c
+@@ -589,6 +589,15 @@ static int s3c2410wdt_resume(struct platform_device *dev)
+ #define s3c2410wdt_resume  NULL
+ #endif /* CONFIG_PM */
+ 
++#ifdef CONFIG_OF
++static const struct of_device_id s3c2410_wdt_match[] = {
++	{ .compatible = "samsung,s3c2410-wdt" },
++	{},
++};
++MODULE_DEVICE_TABLE(of, s3c2410_wdt_match);
++#else
++#define s3c2410_wdt_match NULL
++#endif
+ 
+ static struct platform_driver s3c2410wdt_driver = {
+ 	.probe		= s3c2410wdt_probe,
+@@ -599,6 +608,7 @@ static struct platform_driver s3c2410wdt_driver = {
+ 	.driver		= {
+ 		.owner	= THIS_MODULE,
+ 		.name	= "s3c2410-wdt",
++		.of_match_table	= s3c2410_wdt_match,
+ 	},
+ };
+ 
+-- 
+1.6.6.rc2
