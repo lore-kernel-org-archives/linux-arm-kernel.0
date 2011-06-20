@@ -1,70 +1,49 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Mon, 20 Jun 2011 09:26:58 +0200
-Subject: [PATCH] ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
-In-Reply-To: <1308242572-5158-1-git-send-email-fabio.estevam@freescale.com>
-References: <1308242572-5158-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110620072658.GQ23771@pengutronix.de>
+From: mingo@elte.hu (Ingo Molnar)
+Date: Mon, 20 Jun 2011 09:31:22 +0200
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <4DFE7FF9.9070406@gmail.com>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
+Message-ID: <20110620073122.GA24716@elte.hu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 16, 2011 at 01:42:52PM -0300, Fabio Estevam wrote:
-> The LCD on the mx31_3ds board is connected to CSPI1.
 
+* Ryan Mallon <rmallon@gmail.com> wrote:
 
->From bogus@does.not.exist.com  Wed Jun  1 12:03:18 2011
-From: bogus@does.not.exist.com ()
-Date: Wed, 01 Jun 2011 16:03:18 -0000
-Subject: No subject
-Message-ID: <mailman.29.1308554824.24103.linux-arm-kernel@lists.infradead.org>
+> On 17/06/11 19:30, Ingo Molnar wrote:
+> >* Petr Tesarik<ptesarik@suse.cz>  wrote:
+> >
+> >>This patch series enhances /dev/mem, so that read and write is
+> >>possible at any address. The patchset includes actual
+> >>implementation for x86.
+> >This series lacks a description of why this is desired.
+> >
+> >My strong opinion is that it's not desired at all: /dev/mem never
+> >worked beyond 4G addresses so by today it has become largely obsolete
+> >and is on the way out really.
+> >
+> >I'm aware of these current /dev/mem uses:
+> >
+> >  - Xorg maps below 4G non-RAM addresses and the video BIOS
+> >
+> >  - It used to have some debugging role but these days kexec and kgdb
+> >    has largely taken over that role - partly due to the 4G limit.
+> >
+> >  - there's some really horrible out-of-tree drivers that do mmap()s
+> >    via /dev/mem, those should be fixed if they want to move beyond
+> >    4G: their char device should be mmap()able.
+> 
+> There are drivers where this makes sense. For example an FPGA 
+> device with a proprietary register layout on the memory bus can be 
+> done this way. [...]
 
-instead of adding it. Can you explain a bit more?
+So you want us to help vendors screw users with insane, proprietary, 
+user-space drivers with sekrit binary blobs?
 
-Sascha
+Wow.
 
-> 
-> Fix the IOMUX settings so that LCD can work.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-imx/mach-mx31_3ds.c |   10 +++++-----
->  1 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-> index ab2a626..a6160ee 100644
-> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-> @@ -53,11 +53,8 @@ static int mx31_3ds_pins[] = {
->  	MX31_PIN_RXD1__RXD1,
->  	IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO),
->  	/*SPI0*/
-> -	MX31_PIN_CSPI1_SCLK__SCLK,
-> -	MX31_PIN_CSPI1_MOSI__MOSI,
-> -	MX31_PIN_CSPI1_MISO__MISO,
-> -	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
-> -	MX31_PIN_CSPI1_SS2__SS2, /* CS for LCD */
-> +	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_ALT1),
-> +	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_ALT1),
->  	/* SPI 1 */
->  	MX31_PIN_CSPI2_SCLK__SCLK,
->  	MX31_PIN_CSPI2_MOSI__MOSI,
-> @@ -690,6 +687,9 @@ static void __init mx31_3ds_init(void)
->  	int ret;
->  
->  	imx31_soc_init();
-> +
-> +	/* Configure SPI1 IOMUX */
-> +	mxc_iomux_set_gpr(MUX_PGP_CSPI_BB, true);
->  
->  	mxc_iomux_setup_multiple_pins(mx31_3ds_pins, ARRAY_SIZE(mx31_3ds_pins),
->  				      "mx31_3ds");
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
+Thanks,
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Ingo
