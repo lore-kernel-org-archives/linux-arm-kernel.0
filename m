@@ -1,15 +1,14 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 12:16:18 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
-	packed attribute
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Jun 2011 18:26:13 +0200
+Subject: [PATCH] USB: ehci: use packed,
+	aligned(4) instead of removing the packed attribute
 In-Reply-To: <Pine.LNX.4.44L0.1106201049420.2113-100000@iolanthe.rowland.org>
 References: <Pine.LNX.4.44L0.1106201049420.2113-100000@iolanthe.rowland.org>
-Message-ID: <alpine.LFD.2.00.1106201207280.2142@xanadu.home>
+Message-ID: <201106201826.13478.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Alan Stern wrote:
-
+On Monday 20 June 2011, Alan Stern wrote:
 > On Sun, 19 Jun 2011, Nicolas Pitre wrote:
 > 
 > > > > The question is: does the structure really has to be packed?
@@ -25,11 +24,8 @@ On Mon, 20 Jun 2011, Alan Stern wrote:
 > some architectures doesn't it also force the compiler to use
 > byte-oriented instructions for accessing the structure's fields?
 
-Yes, but that's a consequence of not being able to access those fields 
-in their naturally aligned position anymore.  Hence the addition of the 
-align attribute to tell the compiler that we know that the structure is 
-still aligned to a certain degree letting the compiler to avoid 
-byte-oriented instructions when possible.
+Correct, and ARM is one of those. Giving  both packed and aligned(4)
+will make gcc use 32-bit accesses again-
 
 > > > > If the answer is yes in both cases, then having packed,aligned(4) is not 
 > > > > a frivolity but rather a correctness issue.
@@ -44,25 +40,9 @@ byte-oriented instructions when possible.
 > padding to be added between a bunch of fields, all of the same size and 
 > alignment.
 
-It is not the padding, but rather the decision to use or not to use 
-byte-oriented instructions in the abscence of explicit alignment 
-indication which appears to have changed with a recent GCC, which is the 
-source of this thread.
+I agree. The issue is mostly between EABI and oABI compilers behaving
+differently on ARM, as well as differences between architectures.
 
-> > > What if the intent is that the structure should be 4-byte aligned on 
-> > > 32-bit systems and 8-byte aligned on 64-bit systems?  The compiler 
-> > > already does this sort of thing automatically, why mess with it?
-> > 
-> > Above you say that the structure must not contain padding, and now you 
-> > say that you want different alignment depending on whether or not the 
-> > architecture is 32 or 64 bits?
-> > 
-> > /me confused now.
-> 
-> I looked at the structures in question; they contain nothing but u32
-> values and arrays of u32's, except for an array of u8's at the end of
-> one of the structures.  So this question doesn't arise for them.
-> 
 > On the other hand, one of the other structures you haven't been 
 > considering looks like this (with a bunch of uninteresting #define 
 > lines omitted):
@@ -91,7 +71,11 @@ source of this thread.
 > attribute is needed here -- in fact, we probably want to avoid it 
 > because dma_addr_t can be 64 bits even on 32-bit architectures.
 
-Indeed, nothing indicates that any packed attribute is required here.
+Agreed as well. The packing only ever matters for data structures
+interpreted outside of the kernel -- user space, hardware or
+network. The first five members in this structure seem to be
+accessed by hardware, but they are all aligned correctly. The
+other members are only used inside of the kernel and that has to
+be built using only one ABI. goto no_problem;
 
-
-Nicolas
+	Arnd
