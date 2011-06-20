@@ -1,48 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 20 Jun 2011 09:25:30 +0100
-Subject: [RFC PATCH 00/16] Consolidation: move SMP local timers to
-	driver/clocksource
-In-Reply-To: <4DFB8E20.60802@gmail.com>
-References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-	<201106171707.23989.arnd@arndb.de> <4DFB8E20.60802@gmail.com>
-Message-ID: <4DFF03FA.8030906@arm.com>
+From: viliam.mateicka@gmail.com (Viliam Mateicka)
+Date: Mon, 20 Jun 2011 10:25:51 +0200
+Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
+In-Reply-To: <BANLkTin2w5muF+LV269DV1=L+_j8P6DT_Q@mail.gmail.com>
+References: <BANLkTin2w5muF+LV269DV1=L+_j8P6DT_Q@mail.gmail.com>
+Message-ID: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/06/11 18:25, Rob Herring wrote:
-> Arnd,
-> 
-> On 06/17/2011 10:07 AM, Arnd Bergmann wrote:
->> On Thursday 16 June 2011, Marc Zyngier wrote:
->>> Patches against next-20110615 + my earlier GIC-PPI series. Tested on
->>> VExpress, PB11MP, Pandaboard, Tegra Harmony and Exynos4 SMDK-v310.
->>>
->>> Thomas and Arnd cc-ed on the whole series, as this could be
->>> consolidation material.
->>
->> Very nice stuff. Should we take this all in one branch in the arm-soc tree,
->> pending Acks from the subarch maintainers?
->>
->> We could also push it through the individual subarch branches, but my feeling
->> is that would be more work.
->>
-> 
-> If this is the direction to go, then there are a lot of other timers
-> that can be moved besides just local timers. But Russell didn't really
-> like the shmobile patches for early platform devices which this relies
-> on. So we should get agreement on the small bit of infrastructure needed
-> first, then start moving individual timers.
+So, will somebody at least react/reply (or just fix) ?
 
-I'm open to suggestions. Should the early platform infrastructure be
-flagged as unsuitable, I'd be happy to switch to something else, as long
-as it is minimal, and does not create another ARM-specific API (been
-there, done that...).
+Vilo
 
-> Also, device tree support for early platform devices would be useful for
-> this.
-
-Indeed.
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+On Thu, Jun 16, 2011 at 10:04 AM, Viliam Mateicka
+<viliam.mateicka@gmail.com> wrote:
+> There is a bug in Samsung's UDC driver, which is completely disabling
+> the USB device when a custom UDC command is used.
+> Following patch seems to get the right?behavior (e.g. enabling pull-up
+> instead of disabling then Vcc is applied). Also I'm not in mailing
+> list so please CC me.
+>
+> Greetingz,
+> Vilo
+>
+> Signed-off-by: Viliam Mateicka <viliam.mateicka@gmail.com>
+>
+> --- drivers/usb/gadget/s3c2410_udc.c.orig ? ? ? 2011-05-19
+> 06:06:34.000000000 +0200
+> +++ drivers/usb/gadget/s3c2410_udc.c ? ?2011-06-16 08:57:19.000000000 +0200
+> @@ -1566,7 +1566,7 @@ static void s3c2410_udc_command(enum s3c
+> ? ? ? ? ? ? ? ? return;
+> ? ? ? ? if (udc_info->udc_command) {
+> - ? ? ? ? ? ? ? udc_info->udc_command(S3C2410_UDC_P_DISABLE);
+> + ? ? ? ? ? ? ? udc_info->udc_command(cmd);
+> ? ? ? ? } else if (gpio_is_valid(udc_info->pullup_pin)) {
+> ? ? ? ? ? ? ? ? int value;
+>
