@@ -1,47 +1,81 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 17:03:17 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,
-	aligned(4) instead of removing the packed attribute
-In-Reply-To: <201106202239.31997.arnd@arndb.de>
-References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
-	<201106202207.23104.arnd@arndb.de>
-	<alpine.LFD.2.00.1106201622160.2142@xanadu.home>
-	<201106202239.31997.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1106201658330.2142@xanadu.home>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 20 Jun 2011 17:04:23 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106201537020.2142@xanadu.home>
+Message-ID: <Pine.LNX.4.44L0.1106201700500.2113-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Arnd Bergmann wrote:
+On Mon, 20 Jun 2011, Nicolas Pitre wrote:
 
-> On Monday 20 June 2011 22:28:49 Nicolas Pitre wrote:
-> > On Mon, 20 Jun 2011, Arnd Bergmann wrote:
-> > 
-> > > On Monday 20 June 2011 19:39:34 Alexander Holler wrote:
-> > > > That packed without an additional aligned() caused errors on ARM with 
-> > > > gcc 4.6 is another problem which got (currently) fixed by removing packed.
-> > > 
-> > > Packed caused errors because it is *wrong*. The code as it was used undefined
-> > > behavior in the language.
-> > 
-> > I wouldn't call this issue as such, but this is a Red herring.
-> > 
-> > Could you please provide a pointer to the structure definition so a 
-> > second opinion to the usefulness of __packed there could be provided?  
+> On Mon, 20 Jun 2011, Alan Stern wrote:
 > 
-> The structures in question are ehci_caps, ehci_regs and ehci_dbg_port.
+> > On Mon, 20 Jun 2011, Alexander Holler wrote:
+> > 
+> > > I see it that way: packed is needed to be sure that at least for struct 
+> > > ehci_regs there are no padding bytes inbetween the members.
+> > 
+> > But is it _really_ needed?
+> > 
+> > > It might 
+> > > work without, but that depends on the compiler (-version, architecture, 
+> > > whatever).
+> > 
+> > Have there _ever_ been _any_ combinations of compiler, version, 
+> > architecture, whatever, that had unwanted padding bytes in this 
+> > structure?
+> 
+> This can be determined by simple code inspection.
+> 
+> If you must have struct members which are not aligned to their natural 
+> size then you need __packed.  Example:
+> 
+> struct foo {
+> 	u8  a;
+> 	u16 b;
+> 	u32 c;
+> 	u64 d;
+> };
+> 
+> Without __packed, there will be padding between a and b, and between c 
+> and d.
 
-OK.  If anyone was still entertaining any doubts, those structures do 
-not require any packed attribute what so ever.
+One byte of padding between a and b is enough.  No more is needed, and 
+the compiler would have to be pretty stupid to add anything else.
 
-> The patch that remove the __packed attribute was 139540170 "USB: ehci:
-> remove structure packing from ehci_def".
+>  If the order of the members in this struct were reversed, then 
+> everything would be naturally aligned and no padding between members 
+> would be inserted.
+> 
+> The size of structures is normally rounded up with padding to the size 
+> of the largest basic element it contains.  Example:
+> 
+> struct foo {
+> 	u64 a;
+> 	u8 b;
+> };
+> 
+> Here sizeof(struct foo) would return 16, even if the actual content 
+> occupies 9 bytes only.  That's because the largest basic element is u64 
+> i.e. 8 bytes.  Normally this trailing padding is not an issue, unless 
+> you have an array of such a struct or if it is a member of another 
+> struct.  If you want to get rid of that padding, you need to use 
+> __packed again (which of course would make all subsequent instances of 
+> that structure in your array completely misaligned too).
+> 
+> Two odd exceptions with the old ABI on ARM:
+> 
+> - The alignment of a 64-bit value is always 4 bytes not 8.
+> 
+> - The size of all structures are always rounded up to a 4-byte boundary, 
+>   irrespective of their content.
+> 
+> If you fall into none of the above issues, then you don't need any 
+> __packed, period.
 
-Too late for this, but for the record:
+We don't fall into any of these cases, and therefore as you say, we
+don't need packed.  Arnd and I have both explained this.  So why do you 
+keep arguing that we do need it?
 
-Reviewed-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-Hopefully this thread still gathered enough wisdom about proper usage of 
-the packed and aligned attributes into the list archive.
-
-
-Nicolas
+Alan Stern
