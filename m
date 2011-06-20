@@ -1,28 +1,39 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Mon, 20 Jun 2011 09:41:24 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <4DFE89E0.5020509@zytor.com>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
-	<4DFE89E0.5020509@zytor.com>
-Message-ID: <20110620074124.GB24716@elte.hu>
+From: dhylands@gmail.com (Dave Hylands)
+Date: Mon, 20 Jun 2011 00:44:16 -0700
+Subject: Problems with semaphores, mutexes, and atomic?
+In-Reply-To: <BANLkTimDcPWOwEMxdZdPyJdYx7KLGZn2wg@mail.gmail.com>
+References: <BANLkTikwGgrK0FFiee1a8PvDicJa-bUedg@mail.gmail.com>
+	<BANLkTimDcPWOwEMxdZdPyJdYx7KLGZn2wg@mail.gmail.com>
+Message-ID: <BANLkTimwzhucvub7ZXymxt2H5xVq=MYPvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Saeed,
 
-* H. Peter Anvin <hpa@zytor.com> wrote:
+On Mon, Jun 20, 2011 at 12:20 AM, saeed bishara <saeed.bishara@gmail.com> wrote:
+> On Mon, Jun 20, 2011 at 9:39 AM, Dave Hylands <dhylands@gmail.com> wrote:
+>> Hi,
+>>
+>> I wrote a small test module to test semaphores, mutexes and atomic
+>> increments, and I've tested it with CONFIG_SMP=y with 1 and 2
+>> processors and with CONFIG_SMP disabled.
+>>
+>> My test code can be found here:
+>> http://svn.hylands.org/linux/test-mutex/test-mutex.c
+>> (it's about 133 lines long).
+> yout code is not complete, the DEFINE_SEMAPHORE and DEFINE_SEMAPHORE
+> definitions are missing
 
-> There are some test drivers which really want /dev/mem to work.
+I don't follow. Line 7 & 8 has
 
-Test drivers and test hardware with zero enumeration can use below 4G 
-addresses just fine.
+DEFINE_MUTEX( lock );
+DEFINE_SEMAPHORE( sem_lock );
 
-Also, debugging is not an issue and some non-default kernel or boot 
-option can enable any sort of device i guess, so my main worry isnt 
-really security but that we should stand in the way of the apparent 
-practice of *shipping* user-space drivers that use /dev/mem ...
+and line 19 has
 
-Thanks,
+DEFINE_SEMAPHORE( thread_wait );
 
-	Ingo
+-- 
+Dave Hylands
+Shuswap, BC, Canada
+http://www.davehylands.com
