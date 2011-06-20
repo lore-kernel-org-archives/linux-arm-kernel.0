@@ -1,137 +1,22 @@
-From: viliam.mateicka@gmail.com (Viliam Mateicka)
-Date: Mon, 20 Jun 2011 21:05:07 +0200
-Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
-In-Reply-To: <20110620173444.GG26623@legolas.emea.dhcp.ti.com>
-References: <Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
-	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
-	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
-	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
-	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
-	<20110620160650.GA26623@legolas.emea.dhcp.ti.com>
-	<BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
-	<20110620170551.GE26623@legolas.emea.dhcp.ti.com>
-	<BANLkTinc-9hxLQ1Epf5=PoHvxtapfO7Vvg@mail.gmail.com>
-	<20110620173444.GG26623@legolas.emea.dhcp.ti.com>
-Message-ID: <BANLkTimaQq99BHAhBMYT_iZz4Kfag1n6Lw@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 20:09:45 +0100
+Subject: [PATCH 0/3] Improve MMC error handling (3rd rev)
+Message-ID: <20110620190945.GK26089@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Look. I didn't wanna spend more time with the issue because for me -
-it was solved. It was just the stupid byrocratic system you've
-enforced to minimize your work - which I would say its complete
-non-sence if it could ever have a problem with whitespace or line
-break. I understand that on the source level every character it's
-important to the look of the code, but at least when you try to force
-somebody to use some rules (which most of it at my copy were applied
-fine just fine by myself), at least use a tool which take a care about
-it (the look of the kernel code). Just look how much time it took to
-upstream a little change (valid on the first look), just because of my
-ignorance to some the formating rules (linebreaks and tabs namely - if
-you have a proper editor which takes care about it.) and a faulty
-mailer (I).
+This is the third revision of my improvements to the MMC block
+device error handling, which makes error handling more robust
+and permits MMC/SD to continue working in the presence of
+not-quite-perfect setups.
 
-Anyway, if the Documentation/SubmittingPatches would mention git
-format-patch and git send-email I would have use it and there would'nt
-be any trouble using faulty mailer.  Instead as a first option there
-is solution which almost everytime produces such a problems.
+Without this, my Versatile Express tends to fail to mount its rootfs
+on SD.  With this, it can successfully read and write data from the
+card in the presence of FIFO overruns and underruns, and also sensibly
+recover from command channel errors.
 
-So many thanks, for doing your job and keeping the bad asses using
-wrong tools out of the formating heaven. I could imagine that this
-would be hard (to get one line into the kernel) but still haven't
-thought that hard. I would like to thank you for your patience and the
-exact amount of right doingness, while showing me what's wrong instead
-of telling me how to do it properly.
+There is more to come, but this is the "safer" bits of the improvements.
 
-Also liked the diff between our patches:
-
-player tmp # diff -ur wastetime wastetime2
---- wastetime	2011-06-20 20:33:25.000000000 +0200
-+++ wastetime2	2011-06-20 20:30:21.000000000 +0200
-@@ -2,11 +2,12 @@
- index 100f263..b6e1ca5 100644
- --- a/drivers/usb/gadget/s3c2410_udc.c
- +++ b/drivers/usb/gadget/s3c2410_udc.c
--@@ -1567,7 +1567,7 @@ static void s3c2410_udc_command(enum
-s3c2410_udc_cmd_e cmd)
-- 		return;
--
-- 	if (udc_info->udc_command) {
---		udc_info->udc_command(S3C2410_UDC_P_DISABLE);
--+		udc_info->udc_command(cmd);
-- 	} else if (gpio_is_valid(udc_info->pullup_pin)) {
-- 		int value;
-+@@ -1567,7 +1567,7 @@ static void s3c2410_udc_command(enum
-+s3c2410_udc_cmd_e cmd)
-+                return;
-+
-+        if (udc_info->udc_command) {
-+-               udc_info->udc_command(S3C2410_UDC_P_DISABLE);
-++               udc_info->udc_command(cmd);
-+        } else if (gpio_is_valid(udc_info->pullup_pin)) {
-+                int value;
-
-Vilo
-
-On Mon, Jun 20, 2011 at 7:34 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, Jun 20, 2011 at 07:27:18PM +0200, Viliam Mateicka wrote:
->> I wonder then, who applies the patch first. One ass can't stop
->> progress (was there some progress afterall ?) because of one
->> line-break (which git produces by default afterall) and several
->> non-conforming whitespace conversions. I think you should stop
->> replying to me, because I'm kinda starting to like trolling afterall.
->
-> Look, maybe you're just new to git/linux and that's fine. The only
-> problem we had from day one is that you have been a complete dick when
-> replying.
->
-> If you go that road, that's what you'll get in return.
->
-> Just so you see the properly formatted patch, I'm quoting below. See
-> that there's no line breaks introduced by git.
->
-> commit c27c9b5312f4b2a7e66ee772943355d77fc2c550
-> Author: Viliam Mateicka <viliam.mateicka@gmail.com>
-> Date: ? Mon Jun 20 19:08:27 2011 +0300
->
-> ? ?usb: gadget: s3c2410_udc: fix custom UDC command handling
->
-> ? ?There is a bug in Samsung's UDC driver, which is
-> ? ?completely disabling the USB device when a custom
-> ? ?UDC command is used.
->
-> ? ?Following patch seems to get the right?behavior
-> ? ?(e.g. enabling pull-up instead of disabling then
-> ? ?Vcc is applied).
->
-> ? ?Signed-off-by: Viliam Mateicka <viliam.mateicka@gmail.com>
->
-> ? ?[ balbi at ti.com : manually re-created the patch because
-> ? ? ? ?author was unable to send a proper one ]
->
-> ? ?Signed-off-by: Felipe Balbi <balbi@ti.com>
->
-> diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-> index 100f263..b6e1ca5 100644
-> --- a/drivers/usb/gadget/s3c2410_udc.c
-> +++ b/drivers/usb/gadget/s3c2410_udc.c
-> @@ -1567,7 +1567,7 @@ static void s3c2410_udc_command(enum s3c2410_udc_cmd_e cmd)
-> ? ? ? ? ? ? ? ?return;
->
-> ? ? ? ?if (udc_info->udc_command) {
-> - ? ? ? ? ? ? ? udc_info->udc_command(S3C2410_UDC_P_DISABLE);
-> + ? ? ? ? ? ? ? udc_info->udc_command(cmd);
-> ? ? ? ?} else if (gpio_is_valid(udc_info->pullup_pin)) {
-> ? ? ? ? ? ? ? ?int value;
->
->
-> (if you see any line breaks that's your mailer, it's better to check
-> from the archives [1])
->
-> [1] http://marc.info/?l=linux-usb
->
-> --
-> balbi
->
+ drivers/mmc/card/block.c |  279 ++++++++++++++++++++++++++++++++++-----------
+ include/linux/mmc/mmc.h  |   10 ++
+ 2 files changed, 221 insertions(+), 68 deletions(-)
