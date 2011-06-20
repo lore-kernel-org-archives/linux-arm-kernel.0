@@ -1,40 +1,35 @@
-From: vitalivanov@gmail.com (Vitaliy Ivanov)
-Date: Mon, 20 Jun 2011 19:44:46 +0300
-Subject: [PATCH][Trivial] S3C2410 bluetooth: Remove duplicate linux/leds.h
-	include
-In-Reply-To: <alpine.LNX.2.00.1106201608460.11049@pobox.suse.cz>
-References: <alpine.LNX.2.00.1106201035590.18991@swampdragon.chaosbits.net>
-	<4DFF1AA5.80508@ru.mvista.com>
-	<alpine.LNX.2.00.1106201232530.18991@swampdragon.chaosbits.net>
-	<1308566964.13261.14.camel@vivanov>
-	<alpine.LNX.2.00.1106201608460.11049@pobox.suse.cz>
-Message-ID: <BANLkTimfWxPm6EC9PZvqaqELz1gf-0iVLA@mail.gmail.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Mon, 20 Jun 2011 09:44:25 -0700
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <20110620164045.GB10815@elte.hu>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
+	<4DFE89E0.5020509@zytor.com> <20110620074124.GB24716@elte.hu>
+	<4DFF6E58.8090306@zytor.com> <20110620164045.GB10815@elte.hu>
+Message-ID: <4DFF78E9.7010202@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 5:09 PM, Jiri Kosina <jkosina@suse.cz> wrote:
-> On Mon, 20 Jun 2011, Vitaliy Ivanov wrote:
->
->> Giri,
->>
->> I would still recommend to use the following patch as it corrects many
->> other places for trivial includes duplication. Also I was the first who
->> sent it:).
->
-> Unfortunately I haven't been copied on it.
->
->> --
->> From: Vitaliy Ivanov <vitalivanov@gmail.com>
->>
->> Many stupid corrections of duplicated includes based on the output of scripts/checkincludes.pl.
->>
->> Signed-off-by: Vitaliy Ivanov <vitalivanov@gmail.com>
->
-> I have applied it, and after performing build tests I will be pushing it
-> out.
+On 06/20/2011 09:40 AM, Ingo Molnar wrote:
+> 
+> There is no reason why they couldnt use a .config option or a boot 
+> option to get their weird stuff going, which weird stuff also happens 
+> to be useful.
+> 
+> What i'm somewhat against is having this enabled by default for weird 
+> stuff that also happens to be harmful - and the fact that it never 
+> worked over 4G physical gives us the perfect opportunity to do just 
+> that.
+> 
 
-Thanks Jiri. Can see it in your tree already. The patch itself is
-absolutely harmless except of one non usual correction to
-cyashalomap_kernel.h.
+I'm concerned about that notion.  I think it's fine to modularize
+/dev/mem, but what we're seeing is that Red Hat and all kinds of other
+entities are putting in ad hoc versions of /dev/mem, but of course doing
+so incorrectly.
 
-- Vitaliy
+	-hpa
+
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
