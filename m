@@ -1,76 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jun 2011 10:34:48 +0200
-Subject: Problems with semaphores, mutexes, and atomic?
-In-Reply-To: <BANLkTi=U29mWX0E2+8iQqEzDkycDeXS6nA@mail.gmail.com>
-References: <BANLkTikwGgrK0FFiee1a8PvDicJa-bUedg@mail.gmail.com>
-	<201106201003.06717.arnd@arndb.de>
-	<BANLkTi=U29mWX0E2+8iQqEzDkycDeXS6nA@mail.gmail.com>
-Message-ID: <201106201034.48753.arnd@arndb.de>
+From: mina86@mina86.com (Michal Nazarewicz)
+Date: Mon, 20 Jun 2011 10:35:36 +0200
+Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to prepare
+	for generic dma_ops
+In-Reply-To: <1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <op.vxc8tmru3l0zgt@mnazarewicz-glaptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 June 2011 10:21:27 Dave Hylands wrote:
+On Mon, 20 Jun 2011 09:50:06 +0200, Marek Szyprowski  
+<m.szyprowski@samsung.com> wrote:
+> +static inline void dma_sync_single_for_cpu(struct device *dev,
 
-> >> DEFINE_SEMAPHORE( thread_wait );
-> >
-> > DEFINE_SEMAPHORE needs another argument, your code won't compile.
-> 
-> As far as I can tell, DEFINE_SEMAPHORE takes exactly one argument (I
-> checked 2.6.36.3 and 2.6.39)
-> http://lxr.linux.no/linux+v2.6.36.3/include/linux/semaphore.h#L29
-> 
-> My code compiles just fine (no errors, no warnings).
+I wouldn't really put inline here or in the function below.
 
-Ah, sorry about that, yes. sema_init() takes two arguments, and I got
-confused because hardly anything uses DEFINE_SEMAPHORE these days
-as we're removing all semaphores from the kernel in order to deprecate
-the API.
+> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+> +{
+> +	BUG_ON(!valid_dma_direction(dir));
+> +
+> +	debug_dma_sync_single_for_cpu(dev, handle, size, dir);
+> +
+> +	if (!dmabounce_sync_for_cpu(dev, handle, size, dir))
+> +		return;
+> +
+> +	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
 
-> > You should basically never use semaphores anyway.
-> 
-> The purpose was to test if semaphores were in fact atomic. Semaphores
-> have their uses, and I agree, the test code doesn't demonstrate the
-> best way to increment a counter, but that's not the intention of the
-> test code.
+I know it is just copy'n'paste but how about:
 
-They are atomic. Further inspection of your code shows that your
-semaphore never sleeps, because you only ever down() it once.
+	if (dmabounce_sync_for_cpu(dev, handle, size, dir))
+		__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
 
-> > In order to wait
-> > for a kthread to finish, use kthread_stop(). Do not use a semaphore
-> > when you want a mutex.
-> 
-> That doesn't make sense. I don't want to stop the child thread, I want
-> to wait until it's finished.
+> +}
+> +
+> +static inline void dma_sync_single_for_device(struct device *dev,
+> +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+> +{
+> +	BUG_ON(!valid_dma_direction(dir));
+> +
+> +	debug_dma_sync_single_for_device(dev, handle, size, dir);
+> +
+> +	if (!dmabounce_sync_for_device(dev, handle, size, dir))
+> +		return;
+> +
+> +	__dma_single_cpu_to_dev(dma_to_virt(dev, handle), size, dir);
 
-But in your example, the kthread doesn't ever check kthread_should_stop(),
-so kthread_stop is not stopping it at all, it just waits for it to complete.
-This simple example (where the kthread doesn't stop) would be better
-served by a work queue (schedule_work) than a kthread, however.
+Same as above.
 
-> If I were to put checks in the loop with calls to kthread_should_stop,
-> then calling kthread_stop would make the thread stop early, which is
-> not what I'm trying to do. What I wanted was something equivalent to
-> pthread_join in user space, and the kthread_api doesn't appear to
-> offer any function with that functionality.
+> +}
+> +
+>  /**
+>   * dma_sync_single_range_for_cpu
+>   * @dev: valid struct device pointer, or NULL for ISA and EISA-like  
+> devices
 
-That is what is commonly called a completion. You initialize it
-before you hand off code to the other thread and then call
-complete() in the other thread, but wait_for_completion() in the
-waiter. This is of course what kthread_stop does internally,
-besides setting the should_stop variable(). You might argue
-that it would be good to also have a kthread_wait() function that
-does the same as kthread_stop() without setting that bit.
-
-Feel free to submit a patch for that if you can identify a few
-drivers that would benefit from that interface.
-
-> I don't see how you could use a mutex to achieve the same thing.
-> 
-> I agree that kthread_stop would have worked in this particular
-> instance, but I really consider that to be a misuse of the function,
-> and it certainly wouldn't work in the general case.
-
-Using a semaphore instead of a completion is also a misuse ;-)
-
-	Arnd
+-- 
+Best regards,                                         _     _
+.o. | Liege of Serenely Enlightened Majesty of      o' \,=./ `o
+..o | Computer Science,  Michal "mina86" Nazarewicz    (o o)
+ooo +-----<email/xmpp: mnazarewicz@google.com>-----ooO--(_)--Ooo--
