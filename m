@@ -1,57 +1,25 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 20 Jun 2011 12:28:53 -0600
-Subject: Pull request for Xilinx Zynq platform support
-In-Reply-To: <1368783016.107284.1308592519852.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-References: <20110620175000.GH26089@n2100.arm.linux.org.uk>
-	<1368783016.107284.1308592519852.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
-Message-ID: <BANLkTikgLDPbGe=ZNSCaqeB_CPv-XwU+kQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 20 Jun 2011 14:39:02 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <4DFF85D6.1090104@ahsoftware.de>
+Message-ID: <Pine.LNX.4.44L0.1106201436430.2113-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yeah, don't mess with the output of git request-pull.  You should
-include the whole thing in a pull req.
+On Mon, 20 Jun 2011, Alexander Holler wrote:
 
-g.
+> I see it that way: packed is needed to be sure that at least for struct 
+> ehci_regs there are no padding bytes inbetween the members.
 
-On Mon, Jun 20, 2011 at 11:55 AM,  <johnlinn@comcast.net> wrote:
->> On Mon, Jun 20, 2011 at 05:28:00PM +0000, johnlinn at comcast.net wrote:
->> > ?Documentation/devicetree/bindings/arm/xilinx.txt | 7 +
->> > ?arch/arm/Kconfig | 14 +
->> > ?arch/arm/Makefile | 2 +
->> > ?arch/arm/boot/dts/zynq-ep107.dts | 52 ++++
->> > ?arch/arm/mach-zynq/Makefile | 6 +
->> > ?arch/arm/mach-zynq/Makefile.boot | 3 +
->> > ?arch/arm/mach-zynq/board_dt.c | 37 +++
->> > ?arch/arm/mach-zynq/common.c | 102 ++++++++
->> > ?arch/arm/mach-zynq/common.h | 29 ++
->> > ?arch/arm/mach-zynq/include/mach/clkdev.h | 32 +++
->> > ?arch/arm/mach-zynq/include/mach/debug-macro.S | 36 +++
->> > ?arch/arm/mach-zynq/include/mach/entry-macro.S | 30 +++
->> > ?arch/arm/mach-zynq/include/mach/hardware.h | 18 ++
->> > ?arch/arm/mach-zynq/include/mach/io.h | 33 +++
->> > ?arch/arm/mach-zynq/include/mach/irqs.h | 21 ++
->> > ?arch/arm/mach-zynq/include/mach/memory.h | 22 ++
->> > ?arch/arm/mach-zynq/include/mach/system.h | 28 ++
->> > ?arch/arm/mach-zynq/include/mach/timex.h | 23 ++
->> > ?arch/arm/mach-zynq/include/mach/uart.h | 25 ++
->> > ?arch/arm/mach-zynq/include/mach/uncompress.h | 51 ++++
->> > ?arch/arm/mach-zynq/include/mach/vmalloc.h | 20 ++
->> > ?arch/arm/mach-zynq/include/mach/zynq_soc.h | 48 ++++
->> > ?arch/arm/mach-zynq/timer.c | 298 ++++++++++++++++++++++
->> > ?arch/arm/mm/Kconfig
->>
->> Looks like the diffstat is manged as well.
->
-> Thanks Russell, that was my mistake if your meaning it's not complete.
->
-> I thought the rest wasn't needed. I'll include the entire diffstat on the
-> next pull request also.
->
-> -- John
->
+But is it _really_ needed?
 
+> It might 
+> work without, but that depends on the compiler (-version, architecture, 
+> whatever).
 
+Have there _ever_ been _any_ combinations of compiler, version, 
+architecture, whatever, that had unwanted padding bytes in this 
+structure?
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+Alan Stern
