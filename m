@@ -1,25 +1,67 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 20 Jun 2011 11:31:25 +0100
-Subject: [PATCH 1/2] Exynos4 NURI: configure regulators and PMIC
-In-Reply-To: <BANLkTin6hSaNSDd+dEZdkk3F5O5nDYf9yQ@mail.gmail.com>
-References: <1308215372-17420-1-git-send-email-myungjoo.ham@samsung.com>
-	<20110618151227.GB25163@sirena.org.uk>
-	<BANLkTin6hSaNSDd+dEZdkk3F5O5nDYf9yQ@mail.gmail.com>
-Message-ID: <20110620103124.GD31864@opensource.wolfsonmicro.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Mon, 20 Jun 2011 18:41:04 +0800
+Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
+	support for mx5
+In-Reply-To: <87lix1hbjy.fsf@lebrac.rtp-net.org>
+References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
+	<20110614064841.GB30295@S2100-06.ap.freescale.net>
+	<87lix1hbjy.fsf@lebrac.rtp-net.org>
+Message-ID: <20110620104102.GB23757@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 04:58:09PM +0900, MyungJoo Ham wrote:
+Hi Arnaud,
 
-> However, the MAX8997 driver uses platform_data's entry (variables
-> defined in "static struct max8997_platform_data __initdata
-> nuri_max8997_pdata)
-> in its normal functions other than its probe function, which are often
-> called after boot.
+Sorry for the late replying.  Somehow I missed the message.
 
-That's bad practice on its part.
+On Thu, Jun 16, 2011 at 08:32:33PM +0200, Arnaud Patard wrote:
+> Shawn Guo <shawn.guo@freescale.com> writes:
+> 
+> Hi,
+> 
+> > On Fri, Jun 10, 2011 at 06:42:48PM +0800, Shawn Guo wrote:
+> >> The card-present polling within sdhci based driver is very expensive
+> >> in terms of the impact to system performance.  We observe a few
+> >> system performance issues from Freescale and Linaro on mx5 platforms,
+> >> which have been proved card polling related.
+> >> 
+> >> The patch set extends the current sdhci-esdhc-imx card_detect and
+> >> write_protect support to cover mx5 platforms, and solves above
+> >> performance issues.
+> >> 
+> >> Shawn Guo (4):
+> >>       mmc: sdhci: fix interrupt storm from card detection
+> >>       mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
+> >>       mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
+> >>       mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
+> >> 
+> > Hi Arnaud,
+> >
+> > Any chance to play with it yet?
+> 
+> Finally managed to build a kernel with this version of the
+> patchset. While I'm not polling anymore, I'm getting a lot of interrupts
+> if the card is not inserted. Theses interrupts are not happening if the
+> card is inserted. I can see things like this in the logs :
+> sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000080
+> 
+> [ of course, the bit of the present state register indicating card
+> presence is equal to 0 ]
+> 
+> I've tested the SIGNAL case only. Don't know if switch to GPIO may help.
+> Do you have same kind of issue on your side ?
+> 
+I reproduced the issue on my side with turn on debug switch (I should
+do so from the beginning).
 
-> I just can't sure whether I should let probe function copy
-> platform-data used by non-probe functions to its own local data
+GPIO mode does not have this issue.  But you do not have to switch to
+GPIO, as I have got it fixed in the v3 of the patch set (posted out
+a few minutes ago).  It can apply on linux-next cleanly.  You need
+to note that naming 'SIGNAL' has been changed to 'CONTROLLER' per
+Wolfram's comment.
 
-This is the best fix.
+Thanks for testing.
+
+-- 
+Regards,
+Shawn
