@@ -1,48 +1,46 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Mon, 20 Jun 2011 23:13:15 +0200
-Subject: GIT pull request - lpc32xx core updates
-In-Reply-To: <083DF309106F364B939360100EC290F811EDEE8AB8@eu1rdcrdc1wx030.exi.nxp.com>
-References: <1301592646-26356-1-git-send-email-w.sang@pengutronix.de>
-	<083DF309106F364B939360100EC290F811ED78EE79@eu1rdcrdc1wx030.exi.nxp.com>
-	<20110402110304.GD21760@pengutronix.de>
-	<083DF309106F364B939360100EC290F811EDEE8AB8@eu1rdcrdc1wx030.exi.nxp.com>
-Message-ID: <20110620211315.GC16148@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 22:16:55 +0100
+Subject: [PATCH] omap2+: pm: Fix section mismatch in pm_dbg_init()
+In-Reply-To: <87tybk6wh8.fsf@ti.com>
+References: <1308256260-15597-1-git-send-email-premi@ti.com>
+	<87tybk6wh8.fsf@ti.com>
+Message-ID: <20110620211655.GN2082@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
-
-On Wed, Apr 06, 2011 at 12:33:43AM +0200, Kevin Wells wrote:
+On Mon, Jun 20, 2011 at 02:09:39PM -0700, Kevin Hilman wrote:
+> Sanjeev Premi <premi@ti.com> writes:
 > 
-> Hi Russell,
+> > Fix the section mismatch warning:
+> >
+> >   WARNING: vmlinux.o(.text+0x21118): Section mismatch
+> >   in reference from the function pm_dbg_init() to the
+> >   function .init.text:pwrdms_setup()
+> >   The function pm_dbg_init() references
+> >   the function __init pwrdms_setup().
+> >   This is often because pm_dbg_init lacks a __init
+> >   annotation or the annotation of pwrdms_setup is wrong.
+> >
+> > Signed-off-by: Sanjeev Premi <premi@ti.com>
+> > ---
+> >  Applies to current linux-omap master
 > 
-> Can you please pull these reviewed updates for the LPC32xx?
+> A previous commit just removed the __init annotation here because of a
+> different conflict with the regset init.   The regset code is now
+> removed in my queue for 3.1, so this patch is fine on top of that
+> series.
 > 
->   git://git.lpclinux.com/linux-2.6-lpc for_rmk_32xx_04_05
-> 
-> Wolfram Sang (3):
->       arm: lpc32xx: add tsc-device
->       arm: lpc32xx: add rtc-device
->       arm: lpc32xx: clock: use bool logic instead of binary
-> 
->  arch/arm/mach-lpc32xx/clock.c  |    4 +-
->  arch/arm/mach-lpc32xx/common.c |   42 ++++++++++++++++++++++++++++++++++++++++
->  arch/arm/mach-lpc32xx/common.h |    2 +
->  3 files changed, 46 insertions(+), 2 deletions(-)
+> Queueing for v3.1 (branch: for_3.1/pm-misc)
 
-Could you try again for the next merge-window? :)
+Sigh.  Please put some thought into it first and stop applying patches
+without first doing some analysis and test-buliding the thing.  Otherwise
+you're going to be applying patches for ever which add and delete
+these things.
 
-Regards,
+If you make pm_dbg_init() __init, then you also have to make
+pm_dbg_regset_init() __init too.  What about the callers to
+pm_dbg_regset_init() - are these marked __init or not?  If not,
+they too will have to be marked __init, etc.
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110620/ab48e23f/attachment.sig>
+If that's not possible, then the __init attribute must be deleted
+from pwrdms_setup().
