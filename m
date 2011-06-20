@@ -1,85 +1,30 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 20 Jun 2011 20:34:45 +0300
-Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
-In-Reply-To: <BANLkTinc-9hxLQ1Epf5=PoHvxtapfO7Vvg@mail.gmail.com>
-References: <Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
-	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
-	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
-	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
-	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
-	<20110620160650.GA26623@legolas.emea.dhcp.ti.com>
-	<BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
-	<20110620170551.GE26623@legolas.emea.dhcp.ti.com>
-	<BANLkTinc-9hxLQ1Epf5=PoHvxtapfO7Vvg@mail.gmail.com>
-Message-ID: <20110620173444.GG26623@legolas.emea.dhcp.ti.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 20 Jun 2011 13:35:35 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
+Message-ID: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 20 Jun 2011, Nicolas Pitre wrote:
 
-On Mon, Jun 20, 2011 at 07:27:18PM +0200, Viliam Mateicka wrote:
-> I wonder then, who applies the patch first. One ass can't stop
-> progress (was there some progress afterall ?) because of one
-> line-break (which git produces by default afterall) and several
-> non-conforming whitespace conversions. I think you should stop
-> replying to me, because I'm kinda starting to like trolling afterall.
+> Are we talking past each other?
+> 
+> Remember that I was the one asking if the align attribute was needed in 
+> the first place.  If it is not then by all means please get rid of it!
+> 
+> But if it _is_ needed, then the generated code can be much better if the 
+> packed attribute is _also_ followed by the align attribute to 
+> increase it from 1.
 
-Look, maybe you're just new to git/linux and that's fine. The only
-problem we had from day one is that you have been a complete dick when
-replying.
+According to Arnd, any remaining possible issues will be addressed by
+changing the implementation of readl/writel on ARM.  It doesn't look as
+though the ehci files need anything else done.
 
-If you go that road, that's what you'll get in return.
+As far as I can tell, the other structures in ehci.h have 
+((aligned(32)) simply in order to save space, since there can be large 
+numbers of these structures allocated.  That doesn't apply to the 
+structures in ehci_def.h; there will only be one of each.
 
-Just so you see the properly formatted patch, I'm quoting below. See
-that there's no line breaks introduced by git.
-
-commit c27c9b5312f4b2a7e66ee772943355d77fc2c550
-Author: Viliam Mateicka <viliam.mateicka@gmail.com>
-Date:   Mon Jun 20 19:08:27 2011 +0300
-
-    usb: gadget: s3c2410_udc: fix custom UDC command handling
-    
-    There is a bug in Samsung's UDC driver, which is
-    completely disabling the USB device when a custom
-    UDC command is used.
-    
-    Following patch seems to get the right?behavior
-    (e.g. enabling pull-up instead of disabling then
-    Vcc is applied).
-    
-    Signed-off-by: Viliam Mateicka <viliam.mateicka@gmail.com>
-    
-    [ balbi at ti.com : manually re-created the patch because
-    	author was unable to send a proper one ]
-    
-    Signed-off-by: Felipe Balbi <balbi@ti.com>
-
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index 100f263..b6e1ca5 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -1567,7 +1567,7 @@ static void s3c2410_udc_command(enum s3c2410_udc_cmd_e cmd)
- 		return;
- 
- 	if (udc_info->udc_command) {
--		udc_info->udc_command(S3C2410_UDC_P_DISABLE);
-+		udc_info->udc_command(cmd);
- 	} else if (gpio_is_valid(udc_info->pullup_pin)) {
- 		int value;
- 
-
-(if you see any line breaks that's your mailer, it's better to check
-from the archives [1])
-
-[1] http://marc.info/?l=linux-usb
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110620/90132734/attachment.sig>
+Alan Stern
