@@ -1,36 +1,44 @@
-From: jkosina@suse.cz (Jiri Kosina)
-Date: Mon, 20 Jun 2011 16:09:32 +0200 (CEST)
-Subject: [PATCH][Trivial] S3C2410 bluetooth: Remove duplicate linux/leds.h
-	include
-In-Reply-To: <1308566964.13261.14.camel@vivanov>
-References: <alpine.LNX.2.00.1106201035590.18991@swampdragon.chaosbits.net>
-	<4DFF1AA5.80508@ru.mvista.com>
-	<alpine.LNX.2.00.1106201232530.18991@swampdragon.chaosbits.net>
-	<1308566964.13261.14.camel@vivanov>
-Message-ID: <alpine.LNX.2.00.1106201608460.11049@pobox.suse.cz>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 20 Jun 2011 15:17:53 +0100
+Subject: [PATCH 0/4] Consistently enter the kernel in ARM state
+In-Reply-To: <alpine.LFD.2.00.1106200957120.2142@xanadu.home>
+References: <1308577229-23681-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1106200957120.2142@xanadu.home>
+Message-ID: <20110620141753.GB6310@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Vitaliy Ivanov wrote:
-
-> Giri,
+On Mon, Jun 20, 2011 at 10:01:11AM -0400, Nicolas Pitre wrote:
+> On Mon, 20 Jun 2011, Dave Martin wrote:
 > 
-> I would still recommend to use the following patch as it corrects many 
-> other places for trivial includes duplication. Also I was the first who 
-> sent it:).
-
-Unfortunately I haven't been copied on it.
-
-> --
-> From: Vitaliy Ivanov <vitalivanov@gmail.com>
+> > This series rationalises the kernel entry requirements so that
+> > Image is entered in ARM state, just like zImage.
+> > 
+> > This should enable Image to be booted reliably for Thumb-2 kernels,
+> > just like zImage.
+> > 
+> > The Booting documentation is updated to describe the requirement:
+> > this resolves the ARM/Thumb ambiguity for Thumb-2 kernels; for ARM
+> > kernels there is no implied change.
+> > 
+> > Dave Martin (4):
+> >   ARM: head: Always Enter the kernel in ARM state
+> >   ARM: head-nommu: Always enter the kernel in ARM state
+> >   ARM: zImage: Jump to the decompressed kernel entry point in ARM state
 > 
-> Many stupid corrections of duplicated includes based on the output of scripts/checkincludes.pl.
-> 
-> Signed-off-by: Vitaliy Ivanov <vitalivanov@gmail.com>
+> I'm afraid the above 3 patches will have to be folded together, 
+> otherwise a Thumb2 kernel won't boot if the last patch is not applied, 
+> which might cause problems with git bisect.
 
-I have applied it, and after performing build tests I will be pushing it 
-out.
+Hmm, I was wondering about that.
 
--- 
-Jiri Kosina
-SUSE Labs
+> Otherwise you can add "Acked-by Nicolas Pitre <nicolas.pitre@linaro.org>"
+> to all of them.
+
+I'll fold the patches together.  It's a small series, so that shouldn't
+cause trouble for people.
+
+Thanks for the feedback.
+
+Cheers
+---Dave
