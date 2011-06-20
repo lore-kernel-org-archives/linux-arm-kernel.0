@@ -1,38 +1,55 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 20 Jun 2011 15:49:57 +0530
-Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
-In-Reply-To: <20110620095053.GA2082@n2100.arm.linux.org.uk>
-References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
-	<20110620095053.GA2082@n2100.arm.linux.org.uk>
-Message-ID: <4DFF1ECD.8080305@ti.com>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Mon, 20 Jun 2011 11:27:05 +0100
+Subject: [PATCH 1/2] Exynos4 NURI: configure regulators and PMIC
+In-Reply-To: <BANLkTiniwMCW-ED4CX=qybMvk243Zdki4Q@mail.gmail.com>
+References: <1308215372-17420-1-git-send-email-myungjoo.ham@samsung.com>
+	<20110618151227.GB25163@sirena.org.uk>
+	<BANLkTiniwMCW-ED4CX=qybMvk243Zdki4Q@mail.gmail.com>
+Message-ID: <20110620102705.GC31864@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/20/2011 3:20 PM, Russell King - ARM Linux wrote:
-> On Mon, Jun 20, 2011 at 02:53:59PM +0530, Santosh Shilimkar wrote:
->> The current ARM CPU hotplug code suffers from couple of race conditions
->> in CPU online path with scheduler.
->> The ARM CPU hotplug code doesn't wait for hot-plugged CPU to be marked
->> active as part of cpu_notify() by the CPU which brought it up before
->> enabling interrupts.
->
-> Hmm, why not just move the set_cpu_online() call before notify_cpu_starting()
-> and add the wait after the set_cpu_online() ?
-I think that's what patch is doing. Do you mean, calling hotplug
-notifier chain immediately after CPU marked as online. Something
-like below.
+On Mon, Jun 20, 2011 at 03:26:08PM +0900, MyungJoo Ham wrote:
+> On Sun, Jun 19, 2011 at 12:12 AM, Mark Brown
 
-	set_cpu_online(cpu, true);
-	notify_cpu_starting(cpu);
-         while (!cpumask_test_cpu(smp_processor_id(), cpu_active_mask))
-                 cpu_relax();
+> >> +static struct regulator_consumer_supply nuri_max8997_ldo1_consumer[] = {
+> >> + ? ? REGULATOR_SUPPLY("vadc", NULL), /* Used by CPU's ADC drv */
+> >> +};
 
-         /*
-          * Enable local interrupts.
-          */
-                 local_irq_enable();
-         local_fiq_enable();
+> > In the ADC regulator patch you called the supply vdd (though the chip
+> > normally calls it vadc so that's the better name)...
 
+> Um.. this happened as I have seperated NURI-board platform patch for
+> ADC and PMIC.
+> After ADC patch, that name became ("vdd", "s5p-adc").
+> I'll let them either be merged or be disjoint completely.
 
-Regards
-Santosh
+You may as well get it right to start off with, there's no harm 
+defining a supply that doesn't get used.
+
+> Anyway, do you think "vadc" is better than "vdd" for ADC drivers? The
+> circuit schematics says the pin on the consumer side is "VDD33_ADC"
+> (VDD 3.3V for ADC).
+
+If that's what the pin is called on the package that is the best name
+to use.
+
+> >> +static void __init nuri_pmic_init(void)
+> >> +{
+> >> + ? ? int gpio;
+> >> +
+> >> + ? ? nuri_max8997_pdata.irq_base = irq_get_next_irq(IRQ_GPIO_END);
+> >> + ? ? gpio = NURI_PMIC_GPIO;
+> >> + ? ? gpio_request(gpio, "AP_PMIC_IRQ");
+> >> + ? ? s3c_gpio_cfgpin(gpio, S3C_GPIO_SFN(0xf));
+> >> + ? ? s3c_gpio_setpull(gpio, S3C_GPIO_PULL_NONE);
+> >> +}
+
+> > I'm not sure both the #define and the variable make sense here...
+
+> I've defined them because two statements are using the gpio address of
+> NURI_PMIC.
+
+Right, but there's no point in doing both - either use the #define
+everywhere or use the variable everywhere but having both seems
+excessive.
