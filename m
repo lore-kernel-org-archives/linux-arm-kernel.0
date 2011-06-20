@@ -1,29 +1,35 @@
 From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 09:52:01 -0400 (EDT)
-Subject: [PATCH 0/2] kuser helpers documentation cleanup and 64-bit cmpxchg
-In-Reply-To: <20110620132150.GA6310@arm.com>
-References: <1308502494-20938-1-git-send-email-nico@fluxnic.net>
-	<20110620132150.GA6310@arm.com>
-Message-ID: <alpine.LFD.2.00.1106200949370.2142@xanadu.home>
+Date: Mon, 20 Jun 2011 10:01:11 -0400 (EDT)
+Subject: [PATCH 0/4] Consistently enter the kernel in ARM state
+In-Reply-To: <1308577229-23681-1-git-send-email-dave.martin@linaro.org>
+References: <1308577229-23681-1-git-send-email-dave.martin@linaro.org>
+Message-ID: <alpine.LFD.2.00.1106200957120.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 20 Jun 2011, Dave Martin wrote:
 
-> On Sun, Jun 19, 2011 at 12:54:52PM -0400, Nicolas Pitre wrote:
-> > This series cleans up the kuser documentation, then it adds 64-bit
-> > cmpxchg support as needed by some user space applications.
-> > 
-> > [PATCH 1/2] ARM: kuser: move interface documentation out of the source code
-> > [PATCH 2/2] ARM: add a kuser_cmpxchg64 user space helper
+> This series rationalises the kernel entry requirements so that
+> Image is entered in ARM state, just like zImage.
 > 
-> Hi again,
+> This should enable Image to be booted reliably for Thumb-2 kernels,
+> just like zImage.
 > 
-> It looks like these patches apply on top of my
-> 'ARM: kuser helpers: comment cleanup' patch, which didn't receive any
-> comments or acks and hasn't been merged.
-Yes, I merged it initially then folded it with the move as I mentioned 
-in my previous email.
+> The Booting documentation is updated to describe the requirement:
+> this resolves the ARM/Thumb ambiguity for Thumb-2 kernels; for ARM
+> kernels there is no implied change.
+> 
+> Dave Martin (4):
+>   ARM: head: Always Enter the kernel in ARM state
+>   ARM: head-nommu: Always enter the kernel in ARM state
+>   ARM: zImage: Jump to the decompressed kernel entry point in ARM state
+
+I'm afraid the above 3 patches will have to be folded together, 
+otherwise a Thumb2 kernel won't boot if the last patch is not applied, 
+which might cause problems with git bisect.
+
+Otherwise you can add "Acked-by Nicolas Pitre <nicolas.pitre@linaro.org>"
+to all of them.
 
 
 Nicolas
