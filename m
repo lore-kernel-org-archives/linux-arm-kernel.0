@@ -1,38 +1,43 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 20 Jun 2011 22:50:55 +0800
-Subject: [PATCH 6/6] ARM: mxc: clean up imx-dma device registration
-In-Reply-To: <1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
-References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
-	<1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110620145054.GA24184@S2100-06.ap.freescale.net>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Mon, 20 Jun 2011 23:45:41 +0900
+Subject: [PATCH 7/8] common: dma-mapping: change alloc/free_coherent
+	method to more generic alloc/free_attrs
+In-Reply-To: <1308556213-24970-8-git-send-email-m.szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-8-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <BANLkTikFdrOuXsLCfvyA_V+p7S_fd72dyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
+Hi.
 
-Any comment on this one?
+On Mon, Jun 20, 2011 at 4:50 PM, Marek Szyprowski
+<m.szyprowski@samsung.com> wrote:
+
+> ?struct dma_map_ops {
+> - ? ? ? void* (*alloc_coherent)(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t *dma_handle, gfp_t gfp);
+> - ? ? ? void (*free_coherent)(struct device *dev, size_t size,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *vaddr, dma_addr_t dma_handle);
+> + ? ? ? void* (*alloc)(struct device *dev, size_t size,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t *dma_handle, gfp_t gfp,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_attrs *attrs);
+> + ? ? ? void (*free)(struct device *dev, size_t size,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? void *vaddr, dma_addr_t dma_handle,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct dma_attrs *attrs);
+> + ? ? ? int (*mmap)(struct device *, struct vm_area_struct *,
+> + ? ? ? ? ? ? ? ? ? ? ? ? void *, dma_addr_t, size_t, struct dma_attrs *attrs);
+> +
+> ? ? ? ?dma_addr_t (*map_page)(struct device *dev, struct page *page,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? unsigned long offset, size_t size,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? enum dma_data_direction dir,
+
+I still don't agree with your idea that change alloc_coherent() with alloc().
+As I said before, we actually do not need dma_alloc_writecombine() anymore
+because it is not different from dma_alloc_coherent() in ARM.
+Most of other architectures do not have dma_alloc_writecombine().
+If you want dma_alloc_coherent() to allocate user virtual address,
+I believe that it is also available with mmap() you introduced.
 
 Regards,
-Shawn
-
-On Mon, Jun 13, 2011 at 03:37:25PM +0800, Shawn Guo wrote:
-> The patch follows the implementation of gpio-mxc device registration
-> to break the concentrated imx-dma device registration into soc
-> specific setup function.  Then we can avoid the churn of "#ifdef"
-> and the cpu_is_mx checking on such a long list, which makes no sense,
-> considering more soc supports need to be added and we need to support
-> single image for multiple socs in the long run.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> ---
->  arch/arm/mach-imx/mm-imx21.c                    |    3 +
->  arch/arm/mach-imx/mm-imx25.c                    |   26 +++
->  arch/arm/mach-imx/mm-imx27.c                    |    3 +
->  arch/arm/mach-imx/mm-imx31.c                    |   24 +++
->  arch/arm/mach-imx/mm-imx35.c                    |   44 +++++
->  arch/arm/mach-mx5/mm.c                          |   23 +++
->  arch/arm/plat-mxc/devices.c                     |   16 ++-
->  arch/arm/plat-mxc/devices/platform-imx-dma.c    |  202 ++---------------------
->  arch/arm/plat-mxc/include/mach/devices-common.h |    6 +
->  9 files changed, 157 insertions(+), 190 deletions(-)
-> 
+Cho KyongHo.
