@@ -1,71 +1,88 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jun 2011 20:10:49 +0100
-Subject: [PATCH 3/3] MMC: add checking of r/w command response
-In-Reply-To: <20110620190945.GK26089@n2100.arm.linux.org.uk>
-References: <20110620190945.GK26089@n2100.arm.linux.org.uk>
-Message-ID: <E1QYjs1-000806-20@rmk-PC.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Jun 2011 15:14:26 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
+	packed attribute
+In-Reply-To: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
+Message-ID: <alpine.LFD.2.00.1106201449320.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Check the status bits in the r/w command response for any errors.
-If error bits are set, then we won't have seen any data transferred,
-so its pointless doing any further checking.
+On Mon, 20 Jun 2011, Alan Stern wrote:
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/mmc/card/block.c |   26 +++++++++++++++++++++++++-
- 1 files changed, 25 insertions(+), 1 deletions(-)
+> On Mon, 20 Jun 2011, Nicolas Pitre wrote:
+> 
+> > Are we talking past each other?
+> > 
+> > Remember that I was the one asking if the align attribute was needed in 
+> > the first place.  If it is not then by all means please get rid of it!
+> > 
+> > But if it _is_ needed, then the generated code can be much better if the 
+> > packed attribute is _also_ followed by the align attribute to 
+> > increase it from 1.
+> 
+> According to Arnd, any remaining possible issues will be addressed by
+> changing the implementation of readl/writel on ARM.  It doesn't look as
+> though the ehci files need anything else done.
 
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index aa074c8..e5d1c8a 100644
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -812,6 +812,14 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
- 	}
- }
- 
-+#define CMD_ERRORS							\
-+	(R1_OUT_OF_RANGE |	/* Command argument out of range */	\
-+	 R1_ADDRESS_ERROR |	/* Misaligned address */		\
-+	 R1_BLOCK_LEN_ERROR |	/* Transferred block length incorrect */\
-+	 R1_WP_VIOLATION |	/* Tried to write to protected block */	\
-+	 R1_CC_ERROR |		/* Card controller error */		\
-+	 R1_ERROR)		/* General/unknown error */
-+
- static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- {
- 	struct mmc_blk_data *md = mq->data;
-@@ -967,6 +975,22 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 			}
- 		}
- 
-+		/*
-+		 * Check for errors relating to the execution of the
-+		 * initial command - such as address errors.  No data
-+		 * has been transferred.
-+		 */
-+		if (brq.cmd.resp[0] & CMD_ERRORS) {
-+			pr_err("%s: r/w command failed, status = %#x\n",
-+				req->rq_disk->disk_name, brq.cmd.resp[0]);
-+			goto cmd_abort;
-+		}
-+
-+		/*
-+		 * Everything else is either success, or a data error of some
-+		 * kind.  If it was a write, we may have transitioned to
-+		 * program mode, which we have to wait for it to complete.
-+		 */
- 		if (!mmc_host_is_spi(card->host) && rq_data_dir(req) != READ) {
- 			u32 status;
- 			do {
-@@ -986,7 +1010,7 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 		}
- 
- 		if (brq.data.error) {
--			pr_err("%s: error %d transferring data, sector %u nr %u, cmd response %#x card status %#x\n",
-+			pr_err("%s: error %d transferring data, sector %u, nr %u, cmd response %#x, card status %#x\n",
- 				req->rq_disk->disk_name, brq.data.error,
- 				(unsigned)blk_rq_pos(req),
- 				(unsigned)blk_rq_sectors(req),
--- 
-1.7.4.4
+Any usage of __packed is potentially making the code less optimal than 
+it could, depending on the actual layout of the structure where this is 
+applied, because outside of the IO accessor context, the compiler would 
+use less than optimal instructions when accessing the structure members.
+
+If what you have is:
+
+struct foo {
+	u8  c;
+	u32 d;
+	u8  e;
+};
+
+If you need that structure to be packed then so be it and nothing else 
+can be done about it.
+
+However if you have:
+
+struct foo {
+	u32 c;
+	u64 d;
+	u32 e;
+};
+
+Here the d member is not naturally aligned.  On most architectures, 
+including ARM with the ABI currently in use, the compiler would insert a 
+32-bit padding between c and d.  If you must prevent that from happening 
+then you'll mark this struct with __packed.  However that will also mark 
+it as having an alignment of 1, meaning that all accesses to this 
+structure will be done byte by byte and the resulting values 
+reconstructed with shifts and ORs.
+
+Whar ARnd is talking about is _only_ about the IO accessor on ARM which 
+behavior changed with newer GCC versions.  Changing the IO accessor 
+implementation will fix the byte sized access issue to the hardware, but 
+the rest of the code will still suck even if it will work correctly.
+
+By adding the aligned(4) attribute here, you're telling the compiler 
+that despite the packing attribute, it may assume that the structure is 
+still aligned on a 32-bit boundary (which is normally true except if you 
+cast a random pointer to this struct of course) and therefore it can 
+still use 32-bit sized accesses, and the u64 member will be correctly 
+accessed using a pair of 32-bit accesses instead of 8 byte sized 
+accesses.
+
+So this is a matter of being intelligent with those attributes and not 
+stamping them freely just because a structure might be mapped to some 
+hardware representation.  In most cases, the packed attribute is just 
+unneeded.
+
+> As far as I can tell, the other structures in ehci.h have 
+> ((aligned(32)) simply in order to save space, since there can be large 
+> numbers of these structures allocated.
+
+How can increasing the alignment to 32 bytes save space?
+
+Usually a greater alignment is used to ensure proper mapping to CPU 
+cache line boundaries, not to save space.
+
+
+Nicolas
