@@ -1,49 +1,42 @@
-From: skacore.systems@gmail.com (Skacore Systems)
-Date: Mon, 20 Jun 2011 17:20:02 +0200
-Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
-In-Reply-To: <20110620151522.GN14262@legolas.emea.dhcp.ti.com>
-References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
-	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
-Message-ID: <BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 20 Jun 2011 17:23:22 +0200
+Subject: [PATCH 4/8] ARM: dma-mapping: implement dma sg methods on top of
+	generic dma ops
+In-Reply-To: <20110620144012.GE26089@n2100.arm.linux.org.uk>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-5-git-send-email-m.szyprowski@samsung.com>
+	<20110620144012.GE26089@n2100.arm.linux.org.uk>
+Message-ID: <000801cc2f5d$fdd720a0$f98561e0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been exactly following
-http://www.kernel.org/doc/Documentation/SubmittingPatches:
+Hello,
 
-To create a patch for a single file, it is often sufficient to do:
+On Monday, June 20, 2011 4:40 PM Russell King - ARM Linux wrote:
 
-	SRCTREE= linux-2.6
-	MYFILE=  drivers/net/mydriver.c
+> On Mon, Jun 20, 2011 at 09:50:09AM +0200, Marek Szyprowski wrote:
+> > This patch converts all dma_sg methods to be generic (independent of the
+> > current DMA mapping implementation for ARM architecture). All dma sg
+> > operations are now implemented on top of respective
+> > dma_map_page/dma_sync_single_for* operations from dma_map_ops structure.
+> 
+> No.  We really don't want to do this.
 
-	cd $SRCTREE
-	cp $MYFILE $MYFILE.orig
-	vi $MYFILE	# make your change
-	cd ..
-	diff -up $SRCTREE/$MYFILE{.orig,} > /tmp/patch
+I assume you want to keep the current design for performance reasons?
 
-And that's what I've done. What do you think is wrong with it ???
+It's really not a problem for me. I can change my patches to keep 
+arm_dma_*_sg_* functions and create some stubs for dmabounce version.
 
-Vilo
+> If we want to move the dsb() out of the mapping functions (which I
+> have a patch for) to avoid doing a dsb() on each and every sg segment,
+> then we must not use the generic stuff.
 
+Ok, specialized (optimized) version of dma_*_sg_* operations are definitely
+better. The current version just calls respective dma_single_* operations in
+a loop, so in my patches I decided to create some generic version just to
+simplify the code. 
 
-On Mon, Jun 20, 2011 at 5:15 PM, Felipe Balbi <balbi@ti.com> wrote:
-> Hi,
->
-> On Mon, Jun 20, 2011 at 11:07:51AM -0400, Alan Stern wrote:
->> On Mon, 20 Jun 2011, Viliam Mateicka wrote:
->>
->> > So, will somebody at least react/reply (or just fix) ?
->>
->> Have some patience. ?You did not address your email message to either
->> of the driver's authors or to the current Gadget maintainer. ?Also,
->> David Brownell is deceased and Greg KH is on vacation.
->
-> besides, the patch formatting is wrong. That was noted before and the
-> reply was less than acceptably polite, so unless the patch comes
-> Perfect(TM), I'm not looking into it.
->
-> --
-> balbi
->
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
