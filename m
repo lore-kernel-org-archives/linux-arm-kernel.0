@@ -1,41 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jun 2011 22:14:00 +0200
-Subject: [PATCH] USB: ehci: use packed,
-	aligned(4) instead of removing the packed attribute
-In-Reply-To: <20110620193213.GL26089@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
-	<alpine.LFD.2.00.1106201449320.2142@xanadu.home>
-	<20110620193213.GL26089@n2100.arm.linux.org.uk>
-Message-ID: <201106202214.00998.arnd@arndb.de>
+From: PeterHuewe@gmx.de (Peter =?iso-8859-1?q?H=FCwe?=)
+Date: Mon, 20 Jun 2011 22:16:19 +0200
+Subject: [PATCH 1/2 v2] mfd/ab3550: Convert to kstrtou8_from_user
+In-Reply-To: <20110620195037.GA2534@p183.telecom.by>
+References: <BANLkTikKRVP4PW48YtR+mMMNsaxTDxoGtw@mail.gmail.com>
+	<1308599189-28555-1-git-send-email-peterhuewe@gmx.de>
+	<20110620195037.GA2534@p183.telecom.by>
+Message-ID: <201106202216.20343.PeterHuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 June 2011 21:32:13 Russell King - ARM Linux wrote:
-> > Here the d member is not naturally aligned.  On most architectures, 
-> > including ARM with the ABI currently in use, the compiler would insert a 
-> > 32-bit padding between c and d.
+Am Montag 20 Juni 2011, 21:50:38 schrieb Alexey Dobriyan:
+> On Mon, Jun 20, 2011 at 09:46:28PM +0200, Peter Huewe wrote:
+> > -	char buf[32];
+> > -	int buf_size;
+> > -	unsigned long user_address;
+> > +	u8 user_address;
+
+> > +	/* Get userspace string and convert to number */
+> > +	err = kstrtou8_from_user(user_buf, count, 0, &user_address);
+...
+> > 
+> >  	ab->debug_address = user_address;
+
 > 
-> And if 'struct foo' represents a structure in device memory, the end
-> result is highly unpredicable whether or not you have padding or
-> accessors to load 'd' there.  So, you would not have such a structure
-> describing a data structure in memory returned by ioremap().
+> You don't need temporary variable and should write straight to final
+> location, because kstrto* functions will never write to result unless it
+> was converted successfully.
 
-Right.
+Alexey thank you very much for your review, hints and most of all patience ;)
+The code really gets cleaner and cleaner.
 
-> Now, the real question is: is there any architecture which is (or may
-> be) supported by the Linux kernel which would add padding to:
-> 
-> struct foo {
->         u8 a;
->         u8 b;
->         u16 c;
->         u32 d;
->         u64 e;
-> };
+While changing the code (once again ;) and looking at your remarks I also saw 
+that ab3550->debug_address and ->debug_bank are always casted to u8.
 
-This is the other issue, which we were facing in the scsi drivers.
-If an architecture requires padding because some members require
-larger than natural alignment here, the 'packed' should be applied
-to that member, in order to change the alignment of that member.
+Do you think I could also change the two fields of the struct ab3550 (only 
+used in this file) to u8 in this patch, too?
+This way I could get rid of the u8* cast which is now needed in this case, if 
+I take you last remark into account.
+> err = kstrtou8_from_user(user_buf, count, 0, (u8 *)&ab->debug_address);
 
-	Arnd
+And also clean the code from all the other unnecessary u8 casts.
+
+What do you think?
+Or split it up into two seperate patches?
+
+Thanks,
+Peter
