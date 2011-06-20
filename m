@@ -1,35 +1,39 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 10:01:11 -0400 (EDT)
-Subject: [PATCH 0/4] Consistently enter the kernel in ARM state
-In-Reply-To: <1308577229-23681-1-git-send-email-dave.martin@linaro.org>
-References: <1308577229-23681-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1106200957120.2142@xanadu.home>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Mon, 20 Jun 2011 19:32:16 +0530
+Subject: Trouble with newer kernels on Gumstix Overo boards
+In-Reply-To: <4DFF4BCB.1000206@visionsystems.de>
+References: <BANLkTimJTBpj30EKf_EucvOf2yCHHbRrkQ@mail.gmail.com>
+	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047B99E7E7AD@dbde03.ent.ti.com>
+	<BANLkTimfeS1Xin779eg=8cdjqmqcQeB6HA@mail.gmail.com>
+	<4DFF4BCB.1000206@visionsystems.de>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D625B33@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Dave Martin wrote:
-
-> This series rationalises the kernel entry requirements so that
-> Image is entered in ARM state, just like zImage.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Yegor Yefremov
+> Sent: Monday, June 20, 2011 7:02 PM
+> To: Daniel Mack
+> Cc: Gadiyar, Anand; Tony Lindgren; 
+> linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: Trouble with newer kernels on Gumstix Overo boards
 > 
-> This should enable Image to be booted reliably for Thumb-2 kernels,
-> just like zImage.
+
+[snip]...[snip]
+
 > 
-> The Booting documentation is updated to describe the requirement:
-> this resolves the ARM/Thumb ambiguity for Thumb-2 kernels; for ARM
-> kernels there is no implied change.
-> 
-> Dave Martin (4):
->   ARM: head: Always Enter the kernel in ARM state
->   ARM: head-nommu: Always enter the kernel in ARM state
->   ARM: zImage: Jump to the decompressed kernel entry point in ARM state
+> Are you using some extra patches? I have a custom board based 
+> on am3517 SoC and I have much more errors during booting as I 
+> can see from your boot log. I have no problems booting 
+> 2.6.32/37 though. Any idea?
 
-I'm afraid the above 3 patches will have to be folded together, 
-otherwise a Thumb2 kernel won't boot if the last patch is not applied, 
-which might cause problems with git bisect.
+[sp] You may want to follow this thread:
+     http://marc.info/?t=129864178000003&r=1&w=2
 
-Otherwise you can add "Acked-by Nicolas Pitre <nicolas.pitre@linaro.org>"
-to all of them.
+     It was few months ago, and I am not sure if I tested updated
+     patch(es) working. But, something to verify...
 
+~sanjeev
 
-Nicolas
+[snip]...[snip]
