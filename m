@@ -1,28 +1,34 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Tue, 21 Jun 2011 00:14:14 +0900
-Subject: [Linaro-mm-sig] [PATCH 7/8] common: dma-mapping: change
-	alloc/free_coherent method to more generic alloc/free_attrs
-In-Reply-To: <20110620150610.GG26089@n2100.arm.linux.org.uk>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-8-git-send-email-m.szyprowski@samsung.com>
-	<BANLkTikFdrOuXsLCfvyA_V+p7S_fd72dyQ@mail.gmail.com>
-	<20110620150610.GG26089@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTimJDpKR4Nm8Lz3V1Yov=07wadAmfQ@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 20 Jun 2011 18:15:23 +0300
+Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
+In-Reply-To: <Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
+References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
+	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
+Message-ID: <20110620151522.GN14262@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 12:06 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> Wrong - there is a difference. ?For pre-ARMv6 CPUs, it returns memory
-> with different attributes from DMA coherent memory.
->
-> And we're not going to sweep away pre-ARMv6 CPUs any time soon. ?So
-> you can't ignore dma_alloc_writecombine() which must remain to sanely
-> support framebuffers.
->
-OK. Thanks.
+Hi,
 
-Then, I think we can implement dma_alloc_writecombine() away from dma_map_ops.
-IMHO, those devices that use dma_alloc_writecombine() are enough with
-the default dma_map_ops.
-Removing a member from dma_map_ops is too heavy work.
+On Mon, Jun 20, 2011 at 11:07:51AM -0400, Alan Stern wrote:
+> On Mon, 20 Jun 2011, Viliam Mateicka wrote:
+> 
+> > So, will somebody at least react/reply (or just fix) ?
+> 
+> Have some patience.  You did not address your email message to either
+> of the driver's authors or to the current Gadget maintainer.  Also,
+> David Brownell is deceased and Greg KH is on vacation.
+
+besides, the patch formatting is wrong. That was noted before and the
+reply was less than acceptably polite, so unless the patch comes
+Perfect(TM), I'm not looking into it.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110620/ab068081/attachment.sig>
