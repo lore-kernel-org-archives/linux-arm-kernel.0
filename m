@@ -1,31 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jun 2011 19:48:49 +0100
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Mon, 20 Jun 2011 14:57:29 -0400 (EDT)
 Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
 	the packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
-References: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
-	<Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
-Message-ID: <20110620184849.GI26089@n2100.arm.linux.org.uk>
+In-Reply-To: <4DFF9568.8030704@ahsoftware.de>
+Message-ID: <Pine.LNX.4.44L0.1106201455460.2113-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 01:35:35PM -0400, Alan Stern wrote:
-> According to Arnd, any remaining possible issues will be addressed by
-> changing the implementation of readl/writel on ARM.  It doesn't look as
-> though the ehci files need anything else done.
+On Mon, 20 Jun 2011, Alexander Holler wrote:
 
-I'm not about to change their implementation because they've proven
-themselves over the last 10 years to be perfectly fine, and changing
-them has a habbit of causing GCC to play less optimally than it should
-do.
+> Am 20.06.2011 20:39, schrieb Alan Stern:
+> > On Mon, 20 Jun 2011, Alexander Holler wrote:
+> >
+> >> I see it that way: packed is needed to be sure that at least for struct
+> >> ehci_regs there are no padding bytes inbetween the members.
+> >
+> > But is it _really_ needed?
+> >
+> >> It might
+> >> work without, but that depends on the compiler (-version, architecture,
+> >> whatever).
+> >
+> > Have there _ever_ been _any_ combinations of compiler, version,
+> > architecture, whatever, that had unwanted padding bytes in this
+> > structure?
+> 
+> I don't know. But if there would be no doubts, this discussion would not 
+> happen and I assume there never would have been an attribute packed there.
 
-I've seen drivers where GCC reloads the base address from the driver
-private data structure each time a register access is performed, rather
-than caching the base address in a register.  I've seen it issuing
-separate add instructions and using a zero pre-index load/store.  The
-existing way is the only way I've found to get GCC to come anywhere
-close to producing "optimal" code for the IO accessors.
+Don't be so sure.  That is very old code; the attribute could easily 
+have been present for no good reason.
 
-If it is the case that these structures do not require packing to get
-their desired layout, then they don't require packing, and the packed
-attribute should be dropped.
+Alan Stern
