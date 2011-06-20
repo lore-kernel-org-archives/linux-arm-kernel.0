@@ -1,56 +1,58 @@
-From: chaos.youn@samsung.com (Changhwan Youn)
-Date: Mon, 20 Jun 2011 16:34:18 +0900
-Subject: [PATCH 7/7] ARM: EXYNOS4: Add chained enrty/exit function to uart
-	interrupt handler
-In-Reply-To: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-Message-ID: <1308555258-4322-8-git-send-email-chaos.youn@samsung.com>
+From: rmallon@gmail.com (Ryan Mallon)
+Date: Mon, 20 Jun 2011 18:03:12 +1000
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <20110620073122.GA24716@elte.hu>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
+	<20110620073122.GA24716@elte.hu>
+Message-ID: <4DFEFEC0.3040703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds chained IRQ enter/exit functions to uart
-interrupt handler in order to function correctly on primary
-controllers with different methods of flow control.
+On 20/06/11 17:31, Ingo Molnar wrote:
+> * Ryan Mallon <rmallon@gmail.com> wrote:
+>
+>> On 17/06/11 19:30, Ingo Molnar wrote:
+>>> * Petr Tesarik<ptesarik@suse.cz>  wrote:
+>>>
+>>>> This patch series enhances /dev/mem, so that read and write is
+>>>> possible at any address. The patchset includes actual
+>>>> implementation for x86.
+>>> This series lacks a description of why this is desired.
+>>>
+>>> My strong opinion is that it's not desired at all: /dev/mem never
+>>> worked beyond 4G addresses so by today it has become largely obsolete
+>>> and is on the way out really.
+>>>
+>>> I'm aware of these current /dev/mem uses:
+>>>
+>>>  - Xorg maps below 4G non-RAM addresses and the video BIOS
+>>>
+>>>  - It used to have some debugging role but these days kexec and kgdb
+>>>    has largely taken over that role - partly due to the 4G limit.
+>>>
+>>>  - there's some really horrible out-of-tree drivers that do mmap()s
+>>>    via /dev/mem, those should be fixed if they want to move beyond
+>>>    4G: their char device should be mmap()able.
+>> There are drivers where this makes sense. For example an FPGA 
+>> device with a proprietary register layout on the memory bus can be 
+>> done this way. [...]
+> So you want us to help vendors screw users with insane, proprietary, 
+> user-space drivers with sekrit binary blobs?
+>
+> Wow.
+It's not about that. I mean proprietary in the sense that the register
+layout is not based on some open spec and is customised to some
+particular usage, not that it is evil, anti-GPL and "sekrit". I have
+worked on embedded products which have custom FPGAs for _very_ dedicated
+usage. The FPGA firmware is company IP and therefore not open (which is
+nothing to do with Linux). The types of products I'm talking about are
+often very niche market and dedicate use and therefore not a case of
+vendors screwing over the general public. Writing the drivers in
+user-space makes development easier; it's not an attempt to hide code
+from the public. There is nothing to stop a /dev/mem userspace driver
+from being open, just as there is nothing to stop a kernel driver for a
+closed platform under Linux being "closed".
 
-Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
----
- arch/arm/plat-samsung/irq-uart.c |    7 +++++++
- 1 files changed, 7 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-samsung/irq-uart.c b/arch/arm/plat-samsung/irq-uart.c
-index 32582c0..8960eaf 100644
---- a/arch/arm/plat-samsung/irq-uart.c
-+++ b/arch/arm/plat-samsung/irq-uart.c
-@@ -19,6 +19,8 @@
- #include <linux/irq.h>
- #include <linux/io.h>
- 
-+#include <asm/mach/irq.h>
-+
- #include <mach/map.h>
- #include <plat/irq-uart.h>
- #include <plat/regs-serial.h>
-@@ -30,9 +32,12 @@
- static void s3c_irq_demux_uart(unsigned int irq, struct irq_desc *desc)
- {
- 	struct s3c_uart_irq *uirq = desc->irq_data.handler_data;
-+	struct irq_chip *chip = irq_get_chip(irq);
- 	u32 pend = __raw_readl(uirq->regs + S3C64XX_UINTP);
- 	int base = uirq->base_irq;
- 
-+	chained_irq_enter(chip, desc);
-+
- 	if (pend & (1 << 0))
- 		generic_handle_irq(base);
- 	if (pend & (1 << 1))
-@@ -41,6 +46,8 @@ static void s3c_irq_demux_uart(unsigned int irq, struct irq_desc *desc)
- 		generic_handle_irq(base + 2);
- 	if (pend & (1 << 3))
- 		generic_handle_irq(base + 3);
-+
-+	chained_irq_exit(chip, desc);
- }
- 
- static void __init s3c_init_uart_irq(struct s3c_uart_irq *uirq)
--- 
-1.7.1
+~Ryan
