@@ -1,125 +1,39 @@
-From: skacore.systems@gmail.com (Skacore Systems)
-Date: Mon, 20 Jun 2011 17:57:31 +0200
-Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
-In-Reply-To: <BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
-References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
-	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
-	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
-	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
-	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
-	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
-Message-ID: <BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
+From: hpa@zytor.com (H. Peter Anvin)
+Date: Mon, 20 Jun 2011 08:59:20 -0700
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <20110620074124.GB24716@elte.hu>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
+	<4DFE89E0.5020509@zytor.com> <20110620074124.GB24716@elte.hu>
+Message-ID: <4DFF6E58.8090306@zytor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oh and I've finally cloned the mainline git. So here it's the last try.
-I hope the TI people will not sabotage the Samsung's drivers any way longer !!!
-
-Vilo
-
-diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
-index 100f263..b6e1ca5 100644
---- a/drivers/usb/gadget/s3c2410_udc.c
-+++ b/drivers/usb/gadget/s3c2410_udc.c
-@@ -1567,7 +1567,7 @@ static void s3c2410_udc_command(enum
-s3c2410_udc_cmd_e cmd)
-                return;
-
-        if (udc_info->udc_command) {
--               udc_info->udc_command(S3C2410_UDC_P_DISABLE);
-+               udc_info->udc_command(cmd);
-        } else if (gpio_is_valid(udc_info->pullup_pin)) {
-                int value;
-
-
-On Mon, Jun 20, 2011 at 5:48 PM, Skacore Systems
-<skacore.systems@gmail.com> wrote:
-> Ok I'm giving it up. This is just a non-sence.
-> I've followed the exact rules written there, so tell me how the patch
-> could be wrong.
-> The rules are obsolete or you made up a new ones ?
-> Regarding to the testing. If you've at least looked in to the patch
-> (and you probably not giving a stupid questions about it!)
-> you would know that this is 100% bug and you don't even have to
-> compile to see that fix is actually working.
-> And of course I've tested it on our production kernel.
-> Look somehow it's gonna fix it. It must not be you,
-> someone will just (I hope Samsung's people do care about their stuff) do it.
-> The amount of time I and you've put into this discussion is just pure waste.
+On 06/20/2011 12:41 AM, Ingo Molnar wrote:
+> 
+> * H. Peter Anvin <hpa@zytor.com> wrote:
+> 
+>> There are some test drivers which really want /dev/mem to work.
+> 
+> Test drivers and test hardware with zero enumeration can use below 4G 
+> addresses just fine.
 >
-> Vilo
->
->
-> On Mon, Jun 20, 2011 at 5:36 PM, Felipe Balbi <balbi@ti.com> wrote:
->> Hi,
->>
->> On Mon, Jun 20, 2011 at 05:20:02PM +0200, Skacore Systems wrote:
->>> I've been exactly following
->>> http://www.kernel.org/doc/Documentation/SubmittingPatches:
->>>
->>> To create a patch for a single file, it is often sufficient to do:
->>>
->>> ? ? ? SRCTREE= linux-2.6
->>> ? ? ? MYFILE= ?drivers/net/mydriver.c
->>>
->>> ? ? ? cd $SRCTREE
->>> ? ? ? cp $MYFILE $MYFILE.orig
->>> ? ? ? vi $MYFILE ? ? ?# make your change
->>> ? ? ? cd ..
->>> ? ? ? diff -up $SRCTREE/$MYFILE{.orig,} > /tmp/patch
->>>
->>> And that's what I've done. What do you think is wrong with it ???
->>
->> patch should be in 'p1' format to start with, not 'p0'!!
->>
->> Your commit log shouldn't include your "regards" or anything like that,
->> or that will go into the git history.
->>
->>> Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
->>
->> this should be something like:
->>
->> [PATCH] usb: gadget: s3c2410_udc: fix custom UDC command handling
->>
->> we generally put the subsystem on the subject to help maintainers
->> filter patches related to them.
->>
->>> There is a bug in Samsung's UDC driver, which is completely disabling
->>> the USB device when a custom UDC command is used.
->>> Following patch seems to get the right?behavior (e.g. enabling pull-up
->>> instead of disabling then Vcc is applied).
->>
->> "seems to get the right behavior" makes me wonder if you really tested
->> this properly. Either it fixes the problem, or it doesn't. Have you
->> tried with other possible commands to see if also helps ?
->>
->>> Also I'm not in mailing list so please CC me.
->>
->> this would go to commit log, shouldn't be here.
->>
->>> Greetingz,
->>> Vilo
->>
->> this shouldn't be here either.
->>
->>> Signed-off-by: Viliam Mateicka <viliam.mateicka@gmail.com>
->>
->> there should be a tear line here. (---)
->>
->>> --- drivers/usb/gadget/s3c2410_udc.c.orig ? ? ? 2011-05-19
->>> 06:06:34.000000000 +0200
->>
->> this line break is bogus.
->>
->> you could have looked at any mailing list archive for properly formatted
->> patches, but instead you chose to be unpolite with the persons who are
->> giving you a "service" free of charge.
->>
->> At [1] you can find an example of a proper patch
->>
->> [1] http://marc.info/?l=linux-usb&m=130833192703040&w=2
->>
->> --
->> balbi
->>
->
+> Also, debugging is not an issue and some non-default kernel or boot 
+> option can enable any sort of device i guess, so my main worry isnt 
+> really security but that we should stand in the way of the apparent 
+> practice of *shipping* user-space drivers that use /dev/mem ...
+> 
+
+We should either fix /dev/mem to work according to its specification or
+rip it out.  The issue with test drivers is not spurious... I ran into
+this one myself a few weeks ago while trying to do a memory test (by
+limiting the amount of memory available to the kernel).  This is
+something that is typically done on factory floors, and it would be nice
+to be able to get those environments over to using Linux.
+
+	-hpa
+
+-- 
+H. Peter Anvin, Intel Open Source Technology Center
+I work for Intel.  I don't speak on their behalf.
