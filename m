@@ -1,34 +1,36 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 20 Jun 2011 14:57:29 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 20:02:40 +0100
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing
 	the packed attribute
-In-Reply-To: <4DFF9568.8030704@ahsoftware.de>
-Message-ID: <Pine.LNX.4.44L0.1106201455460.2113-100000@iolanthe.rowland.org>
+In-Reply-To: <201106201858.45624.arnd@arndb.de>
+References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
+	<201106201858.45624.arnd@arndb.de>
+Message-ID: <20110620190240.GJ26089@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Alexander Holler wrote:
+On Mon, Jun 20, 2011 at 06:58:45PM +0200, Arnd Bergmann wrote:
+> A recent change in gcc changed the default behaviour when compiling the
+> ehci driver on ARM, but the behaviour was already nondeterministic
+> because the definition of the readl/writel macros on ARM relies on
+> unspecified behaviour (cast to pointer with larger aligment).
 
-> Am 20.06.2011 20:39, schrieb Alan Stern:
-> > On Mon, 20 Jun 2011, Alexander Holler wrote:
-> >
-> >> I see it that way: packed is needed to be sure that at least for struct
-> >> ehci_regs there are no padding bytes inbetween the members.
-> >
-> > But is it _really_ needed?
-> >
-> >> It might
-> >> work without, but that depends on the compiler (-version, architecture,
-> >> whatever).
-> >
-> > Have there _ever_ been _any_ combinations of compiler, version,
-> > architecture, whatever, that had unwanted padding bytes in this
-> > structure?
-> 
-> I don't know. But if there would be no doubts, this discussion would not 
-> happen and I assume there never would have been an attribute packed there.
+It's unspecified behaviour period.  If you pass a pointer to readl/writel
+which is not word aligned, what you get back is anyones guess.
 
-Don't be so sure.  That is very old code; the attribute could easily 
-have been present for no good reason.
+Unaligned load/stores to devices are 'unpredictable' on ARM, and are
+probably unpredictable on any other sane arch (unless you can predict
+how the load is going to be issued on the bus, how the peripheral is
+going to respond, and how the bus activity is going to be assembled
+into a word.)
 
-Alan Stern
+So, to issue a readl against an u16 pointer is unpredictable not only
+due to the C language, but also from the sanity point of view.
+
+> We are also going to change the ARM implementation to always do 32 bit
+> accesses in readl/writel, but the patch that went into the ehci driver
+> was correct nonetheless.
+
+Not without someone doing a comparitively large amount of work to analyze
+the effect of any change there and make sure that it doesn't have a
+negative impact to drivers.
