@@ -1,27 +1,22 @@
-From: andreiw@motorola.com (Andrei Warkentin)
-Date: Mon, 20 Jun 2011 14:34:53 -0500
-Subject: irq flood with mmc boot partitions on s3c2416 with 3.0rc1
-In-Reply-To: <201106191623.48470.heiko@sntech.de>
-References: <201106022149.47936.heiko@sntech.de>
-	<BANLkTinCyr=pL9tyK+F9XxX2r15acqEsNA@mail.gmail.com>
-	<201106191623.48470.heiko@sntech.de>
-Message-ID: <BANLkTi=FWsfFWQDKk4CbSB5JK5NXhVJZnQ@mail.gmail.com>
+From: PeterHuewe@gmx.de (Peter =?iso-8859-1?q?H=FCwe?=)
+Date: Mon, 20 Jun 2011 21:46:15 +0200
+Subject: [PATCH 2/2] mfd/ab8500: Use kstrtoul_from_user
+In-Reply-To: <BANLkTikKRVP4PW48YtR+mMMNsaxTDxoGtw@mail.gmail.com>
+References: <1307393012-32582-1-git-send-email-peterhuewe@gmx.de>
+	<1307393012-32582-2-git-send-email-peterhuewe@gmx.de>
+	<BANLkTikKRVP4PW48YtR+mMMNsaxTDxoGtw@mail.gmail.com>
+Message-ID: <201106202146.16585.PeterHuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+Am Montag 20 Juni 2011, 15:45:46 schrieb Alexey Dobriyan:
+> NAK
+> You should use kstrtou8_from_user() and drop 0xff check as well.
+> 
+> Do NOT blindly replace strict_strtoul with kstrtoul.
 
-On Sun, Jun 19, 2011 at 9:23 AM, Heiko St?bner <heiko@sntech.de> wrote:
-> Am Samstag 18 Juni 2011, 22:56:11 schrieb Daniel Mack:
+Thanks for spotting this - I'll review my other patches as well and redo them.
+Sorry for any inconvenience.
 
-The log you sent out seems a bit short (it's covers < 1s of boot time
-- usb0: no IPv6 routers present is the last line ). Can you send -
-1) A full log with errors without any of my patches.
-2) A full log with just the first patch.
-3) A full log with just the second patch.
-
-I'm interested in knowing what the pattern of access to boot0 and
-boot1 is that causes these failures - does it only report I/O errors
-for for certain blocks (say, above some number) or for all of them.
-
-A
+Thanks,
+Peter
