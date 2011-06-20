@@ -1,62 +1,26 @@
-From: gerg@snapgear.com (Greg Ungerer)
-Date: Mon, 20 Jun 2011 10:05:37 +1000
-Subject: [PATCH 2/3] net/fec: add device tree support
-In-Reply-To: <201106191411.32137.arnd@arndb.de>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-3-git-send-email-shawn.guo@linaro.org>
-	<4DFDDFF4.8000305@snapgear.com> <201106191411.32137.arnd@arndb.de>
-Message-ID: <4DFE8ED1.3050007@snapgear.com>
+From: matthew@wil.cx (Matthew Wilcox)
+Date: Sun, 19 Jun 2011 18:42:52 -0600
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of
+	arbitrary physical addresses
+In-Reply-To: <4DFE7FF9.9070406@gmail.com>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
+Message-ID: <20110620004252.GE19693@parisc-linux.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/06/11 22:11, Arnd Bergmann wrote:
-> On Sunday 19 June 2011 13:39:32 Greg Ungerer wrote:
->>> +#ifdef CONFIG_OF
->>> +static const struct of_device_id fec_dt_ids[] = {
->>> +     { .compatible = "fsl,fec", .data =&fec_devtype[0], },
->>> +     {},
->>> +};
->>> +
->>> +static const struct of_device_id *
->>> +fec_get_of_device_id(struct platform_device *pdev)
->>> +{
->>> +     return of_match_device(fec_dt_ids,&pdev->dev);
->>> +}
->>> +#else
->>> +#define fec_dt_ids NULL
->>> +static inline struct of_device_id *
->>> +fec_get_of_device_id(struct platform_device *pdev)
->>> +{
->>> +     return NULL;
->>> +}
->>> +#endif
->>> +
->>>    static unsigned char macaddr[ETH_ALEN];
->>>    module_param_array(macaddr, byte, NULL, 0);
->>>    MODULE_PARM_DESC(macaddr, "FEC Ethernet MAC address");
->>> @@ -1363,6 +1385,11 @@ fec_probe(struct platform_device *pdev)
->>>        struct net_device *ndev;
->>>        int i, irq, ret = 0;
->>>        struct resource *r;
->>> +     const struct of_device_id *of_id;
->>> +
->>> +     of_id = fec_get_of_device_id(pdev);
->>
->> fec_get_of_device_id() is defined inside of "#ifdef CONFIG_OF". This
->> use of it will break compilation when this is not defined.
->>
->
->
-> Why? Note the #else path defining an empty function.
+On Mon, Jun 20, 2011 at 09:02:17AM +1000, Ryan Mallon wrote:
+> There are drivers where this makes sense. For example an FPGA device  
+> with a proprietary register layout on the memory bus can be done this  
+> way. The FPGA can simply be mapped in user-space via /dev/mem and  
+> handled there. If the device requires no access other than memory bus  
+> reads and writes then writing a custom char device driver just to get an  
+> mmap function seems a bit overkill.
 
-Sorry, missed that :-)
+Calling a 30 line device driver "overkill" might in itself be overkill?
 
-Regards
-Greg
-
-
-------------------------------------------------------------------------
-Greg Ungerer  --  Principal Engineer        EMAIL:     gerg at snapgear.com
-SnapGear Group, McAfee                      PHONE:       +61 7 3435 2888
-8 Gardner Close                             FAX:         +61 7 3217 5323
-Milton, QLD, 4064, Australia                WEB: http://www.SnapGear.com
+-- 
+Matthew Wilcox				Intel Open Source Technology Centre
+"Bill, look, we understand that you're interested in selling us this
+operating system, but compare it to ours.  We can't possibly take such
+a retrograde step."
