@@ -1,444 +1,335 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Mon, 20 Jun 2011 12:19:22 +0100
-Subject: [PATCH 1/2] ARM: kuser: move interface documentation out of the
-	source code
-In-Reply-To: <1308502494-20938-2-git-send-email-nico@fluxnic.net>
-References: <1308502494-20938-1-git-send-email-nico@fluxnic.net>
-	<1308502494-20938-2-git-send-email-nico@fluxnic.net>
-Message-ID: <20110620111922.GB2067@arm.com>
+From: vincent.guittot@linaro.org (Vincent Guittot)
+Date: Mon, 20 Jun 2011 13:19:55 +0200
+Subject: [RFC PATCH v2] Add ARM cpu topology definition
+Message-ID: <1308568795-1985-1-git-send-email-vincent.guittot@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 19, 2011 at 12:54:53PM -0400, Nicolas Pitre wrote:
-> From: Nicolas Pitre <nicolas.pitre@linaro.org>
-> 
-> Digging into some assembly file in order to get information about the
-> kuser helpers is not that convivial.  Let's move that information to
-> a better formatted file in Documentation/arm/ and improve on it a bit.
-> 
-> Thanks to Dave Martin <dave.martin@linaro.org> for the initial cleanup and
-> clarifications.
-> 
-> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+The affinity between ARM processors is defined in the MPIDR register.
+We can identify which processors are in the same cluster,
+and which ones have performance interdependency.We can define the
+cpu topology of ARM platform, which is used by sched_mc and sched_smt.
 
-Good to see this, thanks.
+The default state of sched_mc and sched_smt config is disable.
+When enable, the behavior of the scheduler can be modified with
+sched_mc_power_savings and sched_smt_power_savings sysfs interfaces.
 
-Since the technical content is mostly pasted from entry-armv.S, I asssume that
-it is still correct.
+Changes since v1 :
+* Update the commit message
+* Add read_cpuid_mpidr in arch/arm/include/asm/cputype.h
+* Modify header of arch/arm/kernel/topology.c
+* Modify tests and manipulation of MPIDR's bitfields
+* Modify the place and dependancy of the config
+* Modify Noop functions
 
-Acked-by: Dave Martin <dave.martin@linaro.org>
+Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
+---
+ arch/arm/Kconfig                |   25 +++++++
+ arch/arm/include/asm/cputype.h  |    6 ++
+ arch/arm/include/asm/topology.h |   33 +++++++++
+ arch/arm/kernel/Makefile        |    1 +
+ arch/arm/kernel/smp.c           |    6 ++
+ arch/arm/kernel/topology.c      |  145 +++++++++++++++++++++++++++++++++++++++
+ 6 files changed, 216 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/kernel/topology.c
 
-> ---
->  Documentation/arm/kernel_user_helpers.txt |  204 +++++++++++++++++++++++++++++
->  arch/arm/kernel/entry-armv.S              |  152 +---------------------
->  2 files changed, 205 insertions(+), 151 deletions(-)
->  create mode 100644 Documentation/arm/kernel_user_helpers.txt
-> 
-> diff --git a/Documentation/arm/kernel_user_helpers.txt b/Documentation/arm/kernel_user_helpers.txt
-> new file mode 100644
-> index 0000000..fa42426
-> --- /dev/null
-> +++ b/Documentation/arm/kernel_user_helpers.txt
-> @@ -0,0 +1,204 @@
-> +Kernel-provided User Helpers
-> +============================
-> +
-> +These are segment of kernel provided user code reachable from user space 
-> +at a fixed address in kernel memory.  This is used to provide user space 
-> +with some operations which require kernel help because of unimplemented 
-> +native feature and/or instructions in many ARM CPUs. The idea is for this 
-> +code to be executed directly in user mode for best efficiency but which is 
-> +too intimate with the kernel counter part to be left to user libraries.  
-> +In fact this code might even differ from one CPU to another depending on 
-> +the available instruction set, or whether it is a SMP systems. In other 
-> +words, the kernel reserves the right to change this code as needed without 
-> +warning. Only the entry points and their results as documented here are 
-> +guaranteed to be stable.
-> +
-> +This is different from (but doesn't preclude) a full blown VDSO 
-> +implementation, however a VDSO would prevent some assembly tricks with 
-> +constants that allows for efficient branching to those code segments. And 
-> +since those code segments only use a few cycles before returning to user 
-> +code, the overhead of a VDSO indirect far call would add a measurable 
-> +overhead to such minimalistic operations.
-> +
-> +User space is expected to bypass those helpers and implement those things 
-> +inline (either in the code emitted directly by the compiler, or part of 
-> +the implementation of a library call) when optimizing for a recent enough 
-> +processor that has the necessary native support, but only if resulting 
-> +binaries are already to be incompatible with earlier ARM processors due to 
-> +useage of similar native instructions for other things.  In other words 
-> +don't make binaries unable to run on earlier processors just for the sake 
-> +of not using these kernel helpers if your compiled code is not going to 
-> +use new instructions for other purpose.
-> +
-> +New helpers may be added over time, so an older kernel may be missing some 
-> +helpers present in a newer kernel.  For this reason, programs must check 
-> +the value of __kuser_helper_version (see below) before assuming that it is 
-> +safe to call any particular helper.  This check should ideally be 
-> +performed only once at process startup time, and execution aborted early 
-> +if the required helpers are not provided by the kernel version that 
-> +process is running on.
-> +
-> +kuser_helper_version
-> +--------------------
-> +
-> +Location:	0xffff0ffc
-> +
-> +Reference declaration:
-> +
-> +  extern int32_t __kuser_helper_version;
-> +
-> +Definition:
-> +
-> +  This field contains the number of helpers being implemented by the
-> +  running kernel.  User space may read this to determine the availability
-> +  of a particular helper.
-> +
-> +Usage example:
-> +
-> +#define __kuser_helper_version (*(int32_t *)0xffff0ffc)
-> +
-> +void check_kuser_version(void)
-> +{
-> +	if (__kuser_helper_version < 2) {
-> +		fprintf(stderr, "can't do atomic operations, kernel too old\n");
-> +		abort();
-> +	}
-> +}
-> +
-> +Notes:
-> +
-> +  User space may assume that the value of this field never changes
-> +  during the lifetime of any single process.  This means that this
-> +  field can be read once during the initialisation of a library or
-> +  startup phase of a program.
-> +
-> +kuser_get_tls
-> +-------------
-> +
-> +Location:	0xffff0fe0
-> +
-> +Reference prototype:
-> +
-> +  void * __kuser_get_tls(void);
-> +
-> +Input:
-> +
-> +  lr = return address
-> +
-> +Output:
-> +
-> +  r0 = TLS value
-> +
-> +Clobbered registers:
-> +
-> +  none
-> +
-> +Definition:
-> +
-> +  Get the TLS value as previously set via the __ARM_NR_set_tls syscall.
-> +
-> +Usage example:
-> +
-> +typedef void * (__kuser_get_tls_t)(void);
-> +#define __kuser_get_tls (*(__kuser_get_tls_t *)0xffff0fe0)
-> +
-> +void foo()
-> +{
-> +	void *tls = __kuser_get_tls();
-> +	printf("TLS = %p\n", tls);
-> +}
-> +
-> +Notes:
-> +
-> +  - Valid only if __kuser_helper_version >= 1 (from kernel version 2.6.12).
-> +
-> +kuser_cmpxchg
-> +-------------
-> +
-> +Location:	0xffff0fc0
-> +
-> +Reference prototype:
-> +
-> +  int __kuser_cmpxchg(int32_t oldval, int32_t newval, volatile int32_t *ptr);
-> +
-> +Input:
-> +
-> +  r0 = oldval
-> +  r1 = newval
-> +  r2 = ptr
-> +  lr = return address
-> +
-> +Output:
-> +
-> +  r0 = success code (zero or non-zero)
-> +  C flag = set if r0 == 0, clear if r0 != 0
-> +
-> +Clobbered registers:
-> +
-> +  r3, ip, flags
-> +
-> +Definition:
-> +
-> +  Atomically store newval in *ptr only if *ptr is equal to oldval.
-> +  Return zero if *ptr was changed or non-zero if no exchange happened.
-> +  The C flag is also set if *ptr was changed to allow for assembly
-> +  optimization in the calling code.
-> +
-> +Usage example:
-> +
-> +typedef int (__kuser_cmpxchg_t)(int oldval, int newval, volatile int *ptr);
-> +#define __kuser_cmpxchg (*(__kuser_cmpxchg_t *)0xffff0fc0)
-> +
-> +int atomic_add(volatile int *ptr, int val)
-> +{
-> +	int old, new;
-> +
-> +	do {
-> +		old = *ptr;
-> +		new = old + val;
-> +	} while(__kuser_cmpxchg(old, new, ptr));
-> +
-> +	return new;
-> +}
-> +
-> +Notes:
-> +
-> +  - This routine already includes memory barriers as needed.
-> +
-> +  - Valid only if __kuser_helper_version >= 2 (from kernel version 2.6.12).
-> +
-> +kuser_memory_barrier
-> +--------------------
-> +
-> +Location:	0xffff0fa0
-> +
-> +Reference prototype:
-> +
-> +  void __kuser_memory_barrier(void);
-> +
-> +Input:
-> +
-> +  lr = return address
-> +
-> +Output:
-> +
-> +  none
-> +
-> +Clobbered registers:
-> +
-> +  none
-> +
-> +Definition:
-> +
-> +  Apply any needed memory barrier to preserve consistency with data modified
-> +  manually and __kuser_cmpxchg usage.
-> +
-> +Usage example:
-> +
-> +typedef void (__kuser_dmb_t)(void);
-> +#define __kuser_dmb (*(__kuser_dmb_t *)0xffff0fa0)
-> +
-> +Notes:
-> +
-> +  - Valid only if __kuser_helper_version >= 3 (from kernel version 2.6.15).
-> +
-> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-> index 5d444b5..63f7907 100644
-> --- a/arch/arm/kernel/entry-armv.S
-> +++ b/arch/arm/kernel/entry-armv.S
-> @@ -754,36 +754,12 @@ ENDPROC(__switch_to)
->  /*
->   * User helpers.
->   *
-> - * These are segment of kernel provided user code reachable from user space
-> - * at a fixed address in kernel memory.  This is used to provide user space
-> - * with some operations which require kernel help because of unimplemented
-> - * native feature and/or instructions in many ARM CPUs. The idea is for
-> - * this code to be executed directly in user mode for best efficiency but
-> - * which is too intimate with the kernel counter part to be left to user
-> - * libraries.  In fact this code might even differ from one CPU to another
-> - * depending on the available  instruction set and restrictions like on
-> - * SMP systems.  In other words, the kernel reserves the right to change
-> - * this code as needed without warning. Only the entry points and their
-> - * results are guaranteed to be stable.
-> - *
->   * Each segment is 32-byte aligned and will be moved to the top of the high
->   * vector page.  New segments (if ever needed) must be added in front of
->   * existing ones.  This mechanism should be used only for things that are
->   * really small and justified, and not be abused freely.
->   *
-> - * User space is expected to implement those things inline when optimizing
-> - * for a processor that has the necessary native support, but only if such
-> - * resulting binaries are already to be incompatible with earlier ARM
-> - * processors due to the use of unsupported instructions other than what
-> - * is provided here.  In other words don't make binaries unable to run on
-> - * earlier processors just for the sake of not using these kernel helpers
-> - * if your compiled code is not going to use the new instructions for other
-> - * purpose.
-> - *
-> - * New helpers may be added over time, so an older kernel may be missing
-> - * some helpers present in a newer kernel.  For this reason, programs
-> - * must check the value of __kernel_helper_version (see below) before
-> - * assuming that it is safe to call any particular helper.
-> + * See Documentation/arm/kernel_user_helpers.txt for formal definitions.
->   */
->   THUMB(	.arm	)
->  
-> @@ -799,93 +775,12 @@ ENDPROC(__switch_to)
->  	.globl	__kuser_helper_start
->  __kuser_helper_start:
->  
-> -/*
-> - * Reference prototype:
-> - *
-> - *	void __kernel_memory_barrier(void)
-> - *
-> - * Input:
-> - *
-> - *	lr = return address
-> - *
-> - * Output:
-> - *
-> - *	none
-> - *
-> - * Clobbered:
-> - *
-> - *	none
-> - *
-> - * Definition and user space usage example:
-> - *
-> - *	typedef void (__kernel_dmb_t)(void);
-> - *	#define __kernel_dmb (*(__kernel_dmb_t *)0xffff0fa0)
-> - *
-> - * Apply any needed memory barrier to preserve consistency with data modified
-> - * manually and __kuser_cmpxchg usage.
-> - *
-> - * Do not attempt to call this function unless __kernel_helper_version >= 3.
-> - */
-> -
->  __kuser_memory_barrier:				@ 0xffff0fa0
->  	smp_dmb	arm
->  	usr_ret	lr
->  
->  	.align	5
->  
-> -/*
-> - * Reference prototype:
-> - *
-> - *	int __kernel_cmpxchg(int oldval, int newval, int *ptr)
-> - *
-> - * Input:
-> - *
-> - *	r0 = oldval
-> - *	r1 = newval
-> - *	r2 = ptr
-> - *	lr = return address
-> - *
-> - * Output:
-> - *
-> - *	r0 = returned value (zero or non-zero)
-> - *	C flag = set if r0 == 0, clear if r0 != 0
-> - *
-> - * Clobbered:
-> - *
-> - *	r3, ip, flags
-> - *
-> - * Definition and user space usage example:
-> - *
-> - *	typedef int (__kernel_cmpxchg_t)(int oldval, int newval,
-> - *					 int volatile *ptr);
-> - *	#define __kernel_cmpxchg (*(__kernel_cmpxchg_t *)0xffff0fc0)
-> - *
-> - * Atomically store newval in *ptr if *ptr is equal to oldval for user space.
-> - * Return zero if *ptr was changed or non-zero if no exchange happened.
-> - * The C flag is also set if *ptr was changed to allow for assembly
-> - * optimization in the calling code.
-> - *
-> - * Do not attempt to call this function unless __kernel_helper_version >= 2.
-> - *
-> - * Notes:
-> - *
-> - *    - This routine already includes memory barriers as needed.
-> - *
-> - * For example, a user space atomic_add implementation could look like this:
-> - *
-> - * int atomic_add(int volatile *ptr, int val)
-> - * {
-> - *	int newval;
-> - *	do {
-> - *		int oldval = *ptr;
-> - *
-> - *		newval = oldval + val;
-> - *	while(__kernel_cmpxchg(oldval, newval, ptr));
-> - *
-> - *	return newval;
-> - * }
-> - */
-> -
->  __kuser_cmpxchg:				@ 0xffff0fc0
->  
->  #if defined(CONFIG_NEEDS_SYSCALL_FOR_CMPXCHG)
-> @@ -959,33 +854,6 @@ kuser_cmpxchg_fixup:
->  
->  	.align	5
->  
-> -/*
-> - * Reference prototype:
-> - *
-> - *	int __kernel_get_tls(void)
-> - *
-> - * Input:
-> - *
-> - *	lr = return address
-> - *
-> - * Output:
-> - *
-> - *	r0 = TLS value
-> - *
-> - * Clobbered:
-> - *
-> - *	none
-> - *
-> - * Definition and user space usage example:
-> - *
-> - *	typedef int (__kernel_get_tls_t)(void);
-> - *	#define __kernel_get_tls (*(__kernel_get_tls_t *)0xffff0fe0)
-> - *
-> - * Get the TLS value as previously set via the __ARM_NR_set_tls syscall.
-> - *
-> - * Do not attempt to call this function unless __kernel_helper_version >= 1.
-> - */
-> -
->  __kuser_get_tls:				@ 0xffff0fe0
->  	ldr	r0, [pc, #(16 - 8)]	@ read TLS, set in kuser_get_tls_init
->  	usr_ret	lr
-> @@ -994,24 +862,6 @@ __kuser_get_tls:				@ 0xffff0fe0
->  	.word	0			@ 0xffff0ff0 software TLS value, then
->  	.endr				@ pad up to __kuser_helper_version
->  
-> -/*
-> - * Reference declaration:
-> - *
-> - *	extern unsigned int __kernel_helper_version;
-> - *
-> - * Definition and user space usage example:
-> - *
-> - *	#define __kernel_helper_version (*(unsigned int *)0xffff0ffc)
-> - *
-> - * User space may read this to determine the curent number of helpers
-> - * available.
-> - *
-> - * User space may assume that the value of this field never changes
-> - * during the lifetime of any single process.  This means that this
-> - * field can be read once during the initialisation of a library or
-> - * startup phase of a program.
-> - */
-> -
->  __kuser_helper_version:				@ 0xffff0ffc
->  	.word	((__kuser_helper_end - __kuser_helper_start) >> 5)
->  
-> -- 
-> 1.7.4
-> 
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..c7b4ff9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1344,6 +1344,31 @@ config SMP_ON_UP
+ 
+ 	  If you don't know what to do here, say Y.
+ 
++config ARM_CPU_TOPOLOGY
++	bool "Support cpu topology definition"
++	depends on SMP && CPU_V7
++	default y
++	help
++	  Support ARM cpu topology definition. The MPIDR register defines
++	  affinity between processors which is used to set the cpu
++	  topology of an ARM System.
++
++config SCHED_MC
++	bool "Multi-core scheduler support"
++	depends on ARM_CPU_TOPOLOGY
++	help
++	  Multi-core scheduler support improves the CPU scheduler's decision
++	  making when dealing with multi-core CPU chips at a cost of slightly
++	  increased overhead in some places. If unsure say N here.
++
++config SCHED_SMT
++	bool "SMT scheduler support"
++	depends on ARM_CPU_TOPOLOGY
++	help
++	  Improves the CPU scheduler's decision making when dealing with
++	  MultiThreading at a cost of slightly increased overhead in some
++	  places. If unsure say N here.
++
+ config HAVE_ARM_SCU
+ 	bool
+ 	depends on SMP
+diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
+index cd4458f..cb47d28 100644
+--- a/arch/arm/include/asm/cputype.h
++++ b/arch/arm/include/asm/cputype.h
+@@ -8,6 +8,7 @@
+ #define CPUID_CACHETYPE	1
+ #define CPUID_TCM	2
+ #define CPUID_TLBTYPE	3
++#define CPUID_MPIDR	5
+ 
+ #define CPUID_EXT_PFR0	"c1, 0"
+ #define CPUID_EXT_PFR1	"c1, 1"
+@@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
+ 	return read_cpuid(CPUID_TCM);
+ }
+ 
++static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
++{
++	return read_cpuid(CPUID_MPIDR);
++}
++
+ /*
+  * Intel's XScale3 core supports some v6 features (supersections, L2)
+  * but advertises itself as v5 as it does not support the v6 ISA.  For
+diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
+index accbd7c..63a7454 100644
+--- a/arch/arm/include/asm/topology.h
++++ b/arch/arm/include/asm/topology.h
+@@ -1,6 +1,39 @@
+ #ifndef _ASM_ARM_TOPOLOGY_H
+ #define _ASM_ARM_TOPOLOGY_H
+ 
++#ifdef CONFIG_ARM_CPU_TOPOLOGY
++
++#include <linux/cpumask.h>
++
++struct cputopo_arm {
++	int thread_id;
++	int core_id;
++	int socket_id;
++	cpumask_t thread_sibling;
++	cpumask_t core_sibling;
++};
++
++extern struct cputopo_arm cpu_topology[NR_CPUS];
++
++#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
++#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
++#define topology_core_cpumask(cpu)	(&(cpu_topology[cpu].core_sibling))
++#define topology_thread_cpumask(cpu)	(&(cpu_topology[cpu].thread_sibling))
++
++#define mc_capable()	(cpu_topology[0].socket_id != -1)
++#define smt_capable()	(cpu_topology[0].thread_id != -1)
++
++void init_cpu_topology(void);
++void store_cpu_topology(unsigned int cpuid);
++const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
++
++#else
++
++static inline void init_cpu_topology(void) { };
++static inline void store_cpu_topology(unsigned int cpuid) { };
++
++#endif
++
+ #include <asm-generic/topology.h>
+ 
+ #endif /* _ASM_ARM_TOPOLOGY_H */
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index a5b31af..816a481 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
++obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+ 
+ ifneq ($(CONFIG_ARCH_EBSA110),y)
+   obj-y		+= io.o
+diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
+index 344e52b..3e8dc3b 100644
+--- a/arch/arm/kernel/smp.c
++++ b/arch/arm/kernel/smp.c
+@@ -31,6 +31,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/cpu.h>
+ #include <asm/cputype.h>
++#include <asm/topology.h>
+ #include <asm/mmu_context.h>
+ #include <asm/pgtable.h>
+ #include <asm/pgalloc.h>
+@@ -268,6 +269,9 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
+ 	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
+ 
+ 	cpu_info->loops_per_jiffy = loops_per_jiffy;
++
++	store_cpu_topology(cpuid);
++
+ }
+ 
+ /*
+@@ -354,6 +358,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
+ {
+ 	unsigned int ncores = num_possible_cpus();
+ 
++	init_cpu_topology();
++
+ 	smp_store_cpu_info(smp_processor_id());
+ 
+ 	/*
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+new file mode 100644
+index 0000000..dc9e4be
+--- /dev/null
++++ b/arch/arm/kernel/topology.c
+@@ -0,0 +1,145 @@
++/*
++ * arch/arm/kernel/topology.c
++ *
++ * Copyright (C) 2011 Linaro Limited.
++ * Written by: Vincent Guittot
++ *
++ * based on arch/sh/kernel/topology.c
++ *
++ * This file is subject to the terms and conditions of the GNU General Public
++ * License.  See the file "COPYING" in the main directory of this archive
++ * for more details.
++ */
++
++#include <linux/cpu.h>
++#include <linux/cpumask.h>
++#include <linux/init.h>
++#include <linux/percpu.h>
++#include <linux/node.h>
++#include <linux/nodemask.h>
++#include <linux/sched.h>
++
++#include <asm/cputype.h>
++#include <asm/topology.h>
++
++#define MPIDR_SMP_BITMASK (0x3 << 30)
++#define MPIDR_SMP_VALUE (0x2 << 30)
++
++#define MPIDR_MT_BITMASK (0x1 << 24)
++
++#define MPIDR_LEVEL0_MASK 0x3
++#define MPIDR_LEVEL0_SHIFT 0
++
++#define MPIDR_LEVEL1_MASK 0xF
++#define MPIDR_LEVEL1_SHIFT 8
++
++#define MPIDR_LEVEL2_MASK 0xFF
++#define MPIDR_LEVEL2_SHIFT 16
++
++struct cputopo_arm cpu_topology[NR_CPUS];
++
++const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
++{
++	return &(cpu_topology[cpu].core_sibling);
++}
++
++/*
++ * store_cpu_topology is called@boot when only one cpu is running
++ * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
++ * which prevents simultaneous write access to cpu_topology array
++ */
++void store_cpu_topology(unsigned int cpuid)
++{
++	struct cputopo_arm *cpuid_topo = &(cpu_topology[cpuid]);
++	unsigned int mpidr;
++	unsigned int cpu;
++
++	/* If the cpu topology has been already set, just return */
++	if (cpuid_topo->core_id != -1)
++		return;
++
++	mpidr = read_cpuid_mpidr();
++
++	/* create cpu topology mapping */
++	if ((mpidr & MPIDR_SMP_BITMASK) == MPIDR_SMP_VALUE) {
++		/*
++		 * This is a multiprocessor system
++		 * multiprocessor format & multiprocessor mode field are set
++		 */
++
++		if (mpidr & MPIDR_MT_BITMASK) {
++			/* core performance interdependency */
++			cpuid_topo->thread_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
++				& MPIDR_LEVEL0_MASK);
++			cpuid_topo->core_id =  ((mpidr >> MPIDR_LEVEL1_SHIFT)
++				& MPIDR_LEVEL1_MASK);
++			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL2_SHIFT)
++				& MPIDR_LEVEL2_MASK);
++		} else {
++			/* normal core interdependency */
++			cpuid_topo->thread_id = -1;
++			cpuid_topo->core_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
++				& MPIDR_LEVEL0_MASK);
++			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL1_SHIFT)
++				& MPIDR_LEVEL1_MASK);
++		}
++	} else {
++		/*
++		 * This is an uniprocessor system
++		 * we are in multiprocessor format but uniprocessor system
++		 * or in the old uniprocessor format
++		 */
++
++		cpuid_topo->thread_id = -1;
++		cpuid_topo->core_id = 0;
++		cpuid_topo->socket_id = -1;
++	}
++
++	/* update core and thread sibling masks */
++	for_each_possible_cpu(cpu) {
++		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
++
++		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
++			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
++			if (cpu != cpuid)
++				cpumask_set_cpu(cpu,
++					&cpuid_topo->core_sibling);
++
++			if (cpuid_topo->core_id == cpu_topo->core_id) {
++				cpumask_set_cpu(cpuid,
++					&cpu_topo->thread_sibling);
++				if (cpu != cpuid)
++					cpumask_set_cpu(cpu,
++						&cpuid_topo->thread_sibling);
++			}
++		}
++	}
++	smp_wmb();
++
++	printk(KERN_INFO "cpu %u : thread %d cpu %d, socket %d, mpidr %x\n",
++		cpuid, cpu_topology[cpuid].thread_id,
++		cpu_topology[cpuid].core_id,
++		cpu_topology[cpuid].socket_id, mpidr);
++
++}
++
++/*
++ * init_cpu_topology is called at boot when only one cpu is running
++ * which prevent simultaneous write access to cpu_topology array
++ */
++void init_cpu_topology(void)
++{
++	unsigned int cpu;
++
++	/* init core mask */
++	for_each_possible_cpu(cpu) {
++		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
++
++		cpu_topo->thread_id = -1;
++		cpu_topo->core_id =  -1;
++		cpu_topo->socket_id = -1;
++		cpumask_clear(&cpu_topo->core_sibling);
++		cpumask_clear(&cpu_topo->thread_sibling);
++	}
++	smp_wmb();
++}
+-- 
+1.7.4.1
