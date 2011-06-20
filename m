@@ -1,34 +1,59 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 15:29:44 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,
-	aligned(4) instead of removing the packed attribute
-In-Reply-To: <20110620190240.GJ26089@n2100.arm.linux.org.uk>
-References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
-	<201106201858.45624.arnd@arndb.de>
-	<20110620190240.GJ26089@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1106201521250.2142@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 20:32:13 +0100
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106201449320.2142@xanadu.home>
+References: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
+	<alpine.LFD.2.00.1106201449320.2142@xanadu.home>
+Message-ID: <20110620193213.GL26089@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Russell King - ARM Linux wrote:
-
-> On Mon, Jun 20, 2011 at 06:58:45PM +0200, Arnd Bergmann wrote:
-> > We are also going to change the ARM implementation to always do 32 bit
-> > accesses in readl/writel, but the patch that went into the ehci driver
-> > was correct nonetheless.
+On Mon, Jun 20, 2011 at 03:14:26PM -0400, Nicolas Pitre wrote:
+> If you need that structure to be packed then so be it and nothing else 
+> can be done about it.
 > 
-> Not without someone doing a comparitively large amount of work to analyze
-> the effect of any change there and make sure that it doesn't have a
-> negative impact to drivers.
+> However if you have:
+> 
+> struct foo {
+> 	u32 c;
+> 	u64 d;
+> 	u32 e;
+> };
+> 
+> Here the d member is not naturally aligned.  On most architectures, 
+> including ARM with the ABI currently in use, the compiler would insert a 
+> 32-bit padding between c and d.
 
-This thread prompted me to investigate a bit.  I have vague memories for 
-the reasons why we decided to use plain C for the IO accessors as the 
-inline assembly version didn't produce nearly the same code quality.  It 
-seems that GCC improved quite a bit there, and from a quick 
-investigation, it looks like comparable code is being generated with the 
-C and the inline asm versions with a recent enough GCC.  This is 
-certainly the case with the version causing issues with packed 
-structures.
+And if 'struct foo' represents a structure in device memory, the end
+result is highly unpredicable whether or not you have padding or
+accessors to load 'd' there.  So, you would not have such a structure
+describing a data structure in memory returned by ioremap().
 
+Now, the real question is: is there any architecture which is (or may
+be) supported by the Linux kernel which would add padding to:
 
-Nicolas
+struct foo {
+	u8 a;
+	u8 b;
+	u16 c;
+	u32 d;
+	u64 e;
+};
+
+?
+
+The last gotcha here is struct size.
+
+struct bar {
+	u8 a;
+	u8 b;
+};
+
+May be 2 on some Linux supporting architectures, or may be larger due to
+tail padding.  Eg, ARM OABI will add two bytes of tail padding to this.
+
+If we assume that 'struct foo' will be laid out as we desire (iow, no
+additional padding with naturally aligned elements) then the only
+remaining issue is sizeof(struct), and that's a whole different ballgame.
+That shouldn't be solved by packed.
