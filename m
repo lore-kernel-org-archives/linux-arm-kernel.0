@@ -1,36 +1,56 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Mon, 20 Jun 2011 17:05:20 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <201106202209.35152.arnd@arndb.de>
-Message-ID: <Pine.LNX.4.44L0.1106201704340.2113-100000@iolanthe.rowland.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 20 Jun 2011 14:09:39 -0700
+Subject: [PATCH] omap2+: pm: Fix section mismatch in pm_dbg_init()
+In-Reply-To: <1308256260-15597-1-git-send-email-premi@ti.com> (Sanjeev Premi's
+	message of "Fri, 17 Jun 2011 02:01:00 +0530")
+References: <1308256260-15597-1-git-send-email-premi@ti.com>
+Message-ID: <87tybk6wh8.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Arnd Bergmann wrote:
+Sanjeev Premi <premi@ti.com> writes:
 
-> On Monday 20 June 2011 20:39:02 Alan Stern wrote:
-> > On Mon, 20 Jun 2011, Alexander Holler wrote:
-> > 
-> > > I see it that way: packed is needed to be sure that at least for struct 
-> > > ehci_regs there are no padding bytes inbetween the members.
-> > 
-> > But is it really needed?
-> 
-> No. When the structure is marked packed, it's broken because it relies
-> on undefined behavior. If it's not packed, there is no problem.
-> 
-> > > It might 
-> > > work without, but that depends on the compiler (-version, architecture, 
-> > > whatever).
-> > 
-> > Have there ever been any combinations of compiler, version, 
-> > architecture, whatever, that had unwanted padding bytes in this 
-> > structure?
-> 
-> Only on compilers that are not able to build Linux kernels anyway.
+> Fix the section mismatch warning:
+>
+>   WARNING: vmlinux.o(.text+0x21118): Section mismatch
+>   in reference from the function pm_dbg_init() to the
+>   function .init.text:pwrdms_setup()
+>   The function pm_dbg_init() references
+>   the function __init pwrdms_setup().
+>   This is often because pm_dbg_init lacks a __init
+>   annotation or the annotation of pwrdms_setup is wrong.
+>
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> ---
+>  Applies to current linux-omap master
 
-Just as I thought.  There's no reason to accept the proposed patch; 
-we're fine the way we are now.
+A previous commit just removed the __init annotation here because of a
+different conflict with the regset init.   The regset code is now
+removed in my queue for 3.1, so this patch is fine on top of that
+series.
 
-Alan Stern
+Queueing for v3.1 (branch: for_3.1/pm-misc)
+
+Thanks,
+
+Kevin
+
+
+
+>
+>  arch/arm/mach-omap2/pm-debug.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm-debug.c b/arch/arm/mach-omap2/pm-debug.c
+> index e01da45..ef33273 100644
+> --- a/arch/arm/mach-omap2/pm-debug.c
+> +++ b/arch/arm/mach-omap2/pm-debug.c
+> @@ -595,7 +595,7 @@ static int option_set(void *data, u64 val)
+>  
+>  DEFINE_SIMPLE_ATTRIBUTE(pm_dbg_option_fops, option_get, option_set, "%llu\n");
+>  
+> -static int pm_dbg_init(void)
+> +static int __init pm_dbg_init(void)
+>  {
+>  	int i;
+>  	struct dentry *d;
