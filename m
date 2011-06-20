@@ -1,105 +1,48 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Mon, 20 Jun 2011 20:24:33 +0530
-Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
-In-Reply-To: <20110620142338.GL2082@n2100.arm.linux.org.uk>
-References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
-	<20110620095053.GA2082@n2100.arm.linux.org.uk>
-	<20110620101438.GD2082@n2100.arm.linux.org.uk>
-	<4DFF20B3.7010209@ti.com>
-	<20110620104415.GF2082@n2100.arm.linux.org.uk>
-	<4DFF255E.5030308@ti.com>
-	<20110620111336.GG2082@n2100.arm.linux.org.uk>
-	<4DFF2E37.8030602@ti.com>
-	<20110620114019.GH2082@n2100.arm.linux.org.uk>
-	<20110620142338.GL2082@n2100.arm.linux.org.uk>
-Message-ID: <4DFF5F29.2000904@ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 20 Jun 2011 16:59:44 +0200
+Subject: [RFC 0/2] ARM: DMA-mapping & IOMMU integration
+In-Reply-To: <4DFF59BB.100@gmail.com>
+References: <1306308920-8602-1-git-send-email-m.szyprowski@samsung.com>
+	<4DFF59BB.100@gmail.com>
+Message-ID: <000001cc2f5a$b0f1a3d0$12d4eb70$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/20/2011 7:53 PM, Russell King - ARM Linux wrote:
-> On Mon, Jun 20, 2011 at 12:40:19PM +0100, Russell King - ARM Linux wrote:
->> Ok.  So loops_per_jiffy must be too small.  My guess is you're using an
->> older kernel without 71c696b1 (calibrate: extract fall-back calculation
->> into own helper).
->
-> Right, this commit above helps show the problem - and it's fairly subtle.
->
-> It's a race condition.  Let's first look at the spinlock debugging code.
-> It does this:
->
-> static void __spin_lock_debug(raw_spinlock_t *lock)
-> {
->          u64 i;
->          u64 loops = loops_per_jiffy * HZ;
->
->          for (;;) {
->                  for (i = 0; i<  loops; i++) {
->                          if (arch_spin_trylock(&lock->raw_lock))
->                                  return;
->                          __delay(1);
->                  }
-> 		/* print warning */
-> 	}
-> }
->
-> If loops_per_jiffy is zero, we never try to grab the spinlock, because
-> we never enter the inner for loop.  We immediately print a warning,
-> and re-execute the outer loop for ever, resulting in the CPU locking up
-> in this condition.
->
-> In theory, we should never see a zero loops_per_jiffy value, because it
-> represents the number of loops __delay() needs to delay by one jiffy and
-> clearly zero makes no sense.
->
-> However, calibrate_delay() does this (which x86 and ARM call on secondary
-> CPU startup):
->
-> calibrate_delay()
-> {
-> ...
-> 	if (preset_lpj) {
-> 	} else if ((!printed)&&  lpj_fine) {
-> 	} else if ((loops_per_jiffy = calibrate_delay_direct()) != 0) {
-> 	} else {
-> 		/* approximation/convergence stuff */
-> 	}
-> }
->
-> Now, before 71c696b, this used to be:
->
->          } else {
->                  loops_per_jiffy = (1<<12);
->
-> So the window between calibrate_delay_direct() returning and setting
-> loops_per_jiffy to zero, and the re-initialization of loops_per_jiffy
-> was relatively short (maybe even the compiler optimized away the zero
-> write.)
->
-> However, after 71c696b, this now does:
->
->          } else {
->                  if (!printed)
->                          pr_info("Calibrating delay loop... ");
-> +               loops_per_jiffy = calibrate_delay_converge();
->
-> So, as loops_per_jiffy is not local to this function, the compiler has
-> to write out that zero value, before calling calibrate_delay_converge(),
-> and loops_per_jiffy only becomes non-zero _after_ calibrate_delay_converge()
-> has returned.  This opens the window and allows the spinlock debugging
-> code to explode.
->
-> This patch closes the window completely, by only writing to loops_per_jiffy
-> only when we have a real value for it.
->
-> This allows me to boot 3.0.0-rc3 on Versatile Express (4 CPU) whereas
-> without this it fails with spinlock lockup and rcu problems.
->
->   init/calibrate.c |   14 ++++++++------
->   1 files changed, 8 insertions(+), 6 deletions(-)
->
-I am away from my board now. Will test this change.
-btw, the online-active race is still open even with this patch close
-and should be fixed.
+Hello,
 
-Regards
-Santosh
+On Monday, June 20, 2011 4:31 PM Subash Patel wrote:
+
+> In function:
+> dma_alloc_coherent()->arm_iommu_alloc_attrs()->__iommu_alloc_buffer()
+> 
+> I have following questions:
+> 
+> a) Before we come to this point, we would have enabled SYSMMU in a call
+> to arm_iommu_init(). Shouldnt the SYSMMU be enabled after call to
+> __iommu_alloc_buffer(), but before __iommu_create_mapping()? If in case
+> the __iommu_alloc_buffer() fails, we dont disable the SYSMMU.
+
+I want to move enabling and disabling SYSMMU completely to the runtime_pm
+framework. As You can notice, the updated SYSMMU driver automatically
+becomes a parent of respective multimedia device and a child of the power
+domain to which both belongs. This means that sysmmu will operate only
+when multimedia device is enabled, what really makes sense. The sysmmu
+driver will need to be updated not to poke into the registers if it is
+disabled, but this should be really trivial change.
+
+> b) For huge buffer sizes, the pressure on SYSMMU would be very high.
+> Cant we have option to dictate the page size for the IOMMU from driver
+> in such cases? Should it always be the size of system pages?
+
+This was just a first version of dma-mapping and IOMMU integration, just
+to show the development road and start the discussion. Of course in the
+final version support for pages larger than 4KiB is highly expected. We
+can even reuse the recently posted CMA to allocate large pages for IOMMU
+to improve the performance and make sure that the framework will be able
+to allocate such pages even if the device is running for long time and 
+memory got fragmented by typically movable pages.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
