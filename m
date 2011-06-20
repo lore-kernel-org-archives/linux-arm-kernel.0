@@ -1,443 +1,248 @@
 From: chaos.youn@samsung.com (Changhwan Youn)
-Date: Mon, 20 Jun 2011 16:34:17 +0900
-Subject: [PATCH 6/7] ARM: EXYNOS4: Remove clock event timers using ARM private
-	timers
+Date: Mon, 20 Jun 2011 16:34:13 +0900
+Subject: [PATCH 2/7] ARM: EXYNOS4: modify interrupt mappings for external GIC
 In-Reply-To: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
 References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-Message-ID: <1308555258-4322-7-git-send-email-chaos.youn@samsung.com>
+Message-ID: <1308555258-4322-3-git-send-email-chaos.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-External GIC cannot support PPI (Private Peripheral Interrupt) for
-ARM private timers. Thus MCT should be selected as clock event timers
-by default.
+To support external GIC needs to update mapping of interrupt number.
+This patch modifies it for external GIC and accordingly removes
+the unused code.
 
 Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
 ---
- arch/arm/mach-exynos4/Kconfig                    |    3 +-
- arch/arm/mach-exynos4/Makefile                   |    7 +-
- arch/arm/mach-exynos4/cpu.c                      |    2 +-
- arch/arm/mach-exynos4/include/mach/entry-macro.S |    6 -
- arch/arm/mach-exynos4/include/mach/irqs.h        |    2 -
- arch/arm/mach-exynos4/localtimer.c               |   26 --
- arch/arm/mach-exynos4/time.c                     |  303 ----------------------
- 7 files changed, 4 insertions(+), 345 deletions(-)
- delete mode 100644 arch/arm/mach-exynos4/localtimer.c
- delete mode 100644 arch/arm/mach-exynos4/time.c
+ arch/arm/mach-exynos4/cpu.c               |    8 --
+ arch/arm/mach-exynos4/include/mach/irqs.h |  188 ++++++++++++++---------------
+ 2 files changed, 93 insertions(+), 103 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 1435fc3..0aca083 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -16,7 +16,8 @@ config CPU_EXYNOS4210
- 	  Enable EXYNOS4210 CPU support
- 
- config EXYNOS4_MCT
--	bool "Kernel timer support by MCT"
-+	bool
-+	default y
- 	help
- 	  Use MCT (Multi Core Timer) as kernel timers
- 
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 60fe5ec..c3c70ab 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -20,12 +20,7 @@ obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- 
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- 
--ifeq ($(CONFIG_EXYNOS4_MCT),y)
--obj-y				+= mct.o
--else
--obj-y				+= time.o
--obj-$(CONFIG_LOCAL_TIMERS)	+= localtimer.o
--endif
-+obj-$(CONFIG_EXYNOS4_MCT)	+= mct.o
- 
- obj-$(CONFIG_HOTPLUG_CPU)	+= hotplug.o
- 
 diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 40a866c..d153309 100644
+index 6a1ed74..fa33294 100644
 --- a/arch/arm/mach-exynos4/cpu.c
 +++ b/arch/arm/mach-exynos4/cpu.c
-@@ -172,7 +172,7 @@ void __init exynos4_init_irq(void)
- {
- 	int irq;
- 
--	gic_init(0, IRQ_LOCALTIMER, S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
-+	gic_init(0, IRQ_SPI(0), S5P_VA_GIC_DIST, S5P_VA_GIC_CPU);
- 	gic_arch_extn.irq_eoi = exynos4_gic_irq_eoi;
+@@ -167,14 +167,6 @@ void __init exynos4_init_irq(void)
  
  	for (irq = 0; irq < MAX_COMBINER_NR; irq++) {
-diff --git a/arch/arm/mach-exynos4/include/mach/entry-macro.S b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-index 4fad076..d7a1e28 100644
---- a/arch/arm/mach-exynos4/include/mach/entry-macro.S
-+++ b/arch/arm/mach-exynos4/include/mach/entry-macro.S
-@@ -80,10 +80,4 @@
- 		/* As above, this assumes that irqstat and base are preserved.. */
  
- 		.macro test_for_ltirq, irqnr, irqstat, base, tmp
--		bic	\irqnr, \irqstat, #0x1c00
--		mov	\tmp, #0
--		cmp	\irqnr, #29
--		moveq	\tmp, #1
--		streq	\irqstat, [\base, #GIC_CPU_EOI]
--		cmp	\tmp, #0
- 		.endm
+-		/*
+-		 * From SPI(0) to SPI(39) and SPI(51), SPI(53) are
+-		 * connected to the interrupt combiner. These irqs
+-		 * should be initialized to support cascade interrupt.
+-		 */
+-		if ((irq >= 40) && !(irq == 51) && !(irq == 53))
+-			continue;
+-
+ 		combiner_init(irq, (void __iomem *)S5P_VA_COMBINER(irq),
+ 				COMBINER_IRQ(irq, 0));
+ 		combiner_cascade_irq(irq, IRQ_SPI(irq));
 diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos4/include/mach/irqs.h
-index e497ea2..250427f 100644
+index 5d03730..e497ea2 100644
 --- a/arch/arm/mach-exynos4/include/mach/irqs.h
 +++ b/arch/arm/mach-exynos4/include/mach/irqs.h
-@@ -19,8 +19,6 @@
- 
- #define IRQ_PPI(x)		S5P_IRQ(x+16)
- 
--#define IRQ_LOCALTIMER		IRQ_PPI(13)
--
- /* SPI: Shared Peripheral Interrupt */
+@@ -25,34 +25,100 @@
  
  #define IRQ_SPI(x)		S5P_IRQ(x+32)
-diff --git a/arch/arm/mach-exynos4/localtimer.c b/arch/arm/mach-exynos4/localtimer.c
-deleted file mode 100644
-index 6bf3d0a..0000000
---- a/arch/arm/mach-exynos4/localtimer.c
-+++ /dev/null
-@@ -1,26 +0,0 @@
--/* linux/arch/arm/mach-exynos4/localtimer.c
-- *
-- * Cloned from linux/arch/arm/mach-realview/localtimer.c
-- *
-- *  Copyright (C) 2002 ARM Ltd.
-- *  All Rights Reserved
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/clockchips.h>
--
--#include <asm/irq.h>
--#include <asm/localtimer.h>
--
--/*
-- * Setup the local clock events for a CPU.
-- */
--int __cpuinit local_timer_setup(struct clock_event_device *evt)
--{
--	evt->irq = IRQ_LOCALTIMER;
--	twd_timer_setup(evt);
--	return 0;
--}
-diff --git a/arch/arm/mach-exynos4/time.c b/arch/arm/mach-exynos4/time.c
-deleted file mode 100644
-index 9a74294..0000000
---- a/arch/arm/mach-exynos4/time.c
-+++ /dev/null
-@@ -1,303 +0,0 @@
--/* linux/arch/arm/mach-exynos4/time.c
-- *
-- * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-- *		http://www.samsung.com
-- *
-- * EXYNOS4 (and compatible) HRT support
-- * PWM 2/4 is used for this feature
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
--*/
--
--#include <linux/sched.h>
--#include <linux/interrupt.h>
--#include <linux/irq.h>
--#include <linux/err.h>
--#include <linux/clk.h>
--#include <linux/clockchips.h>
--#include <linux/platform_device.h>
--
--#include <asm/smp_twd.h>
--
--#include <mach/map.h>
--#include <plat/regs-timer.h>
--#include <asm/mach/time.h>
--
--static unsigned long clock_count_per_tick;
--
--static struct clk *tin2;
--static struct clk *tin4;
--static struct clk *tdiv2;
--static struct clk *tdiv4;
--static struct clk *timerclk;
--
--static void exynos4_pwm_stop(unsigned int pwm_id)
--{
--	unsigned long tcon;
--
--	tcon = __raw_readl(S3C2410_TCON);
--
--	switch (pwm_id) {
--	case 2:
--		tcon &= ~S3C2410_TCON_T2START;
--		break;
--	case 4:
--		tcon &= ~S3C2410_TCON_T4START;
--		break;
--	default:
--		break;
--	}
--	__raw_writel(tcon, S3C2410_TCON);
--}
--
--static void exynos4_pwm_init(unsigned int pwm_id, unsigned long tcnt)
--{
--	unsigned long tcon;
--
--	tcon = __raw_readl(S3C2410_TCON);
--
--	/* timers reload after counting zero, so reduce the count by 1 */
--	tcnt--;
--
--	/* ensure timer is stopped... */
--	switch (pwm_id) {
--	case 2:
--		tcon &= ~(0xf<<12);
--		tcon |= S3C2410_TCON_T2MANUALUPD;
--
--		__raw_writel(tcnt, S3C2410_TCNTB(2));
--		__raw_writel(tcnt, S3C2410_TCMPB(2));
--		__raw_writel(tcon, S3C2410_TCON);
--
--		break;
--	case 4:
--		tcon &= ~(7<<20);
--		tcon |= S3C2410_TCON_T4MANUALUPD;
--
--		__raw_writel(tcnt, S3C2410_TCNTB(4));
--		__raw_writel(tcnt, S3C2410_TCMPB(4));
--		__raw_writel(tcon, S3C2410_TCON);
--
--		break;
--	default:
--		break;
--	}
--}
--
--static inline void exynos4_pwm_start(unsigned int pwm_id, bool periodic)
--{
--	unsigned long tcon;
--
--	tcon  = __raw_readl(S3C2410_TCON);
--
--	switch (pwm_id) {
--	case 2:
--		tcon |= S3C2410_TCON_T2START;
--		tcon &= ~S3C2410_TCON_T2MANUALUPD;
--
--		if (periodic)
--			tcon |= S3C2410_TCON_T2RELOAD;
--		else
--			tcon &= ~S3C2410_TCON_T2RELOAD;
--		break;
--	case 4:
--		tcon |= S3C2410_TCON_T4START;
--		tcon &= ~S3C2410_TCON_T4MANUALUPD;
--
--		if (periodic)
--			tcon |= S3C2410_TCON_T4RELOAD;
--		else
--			tcon &= ~S3C2410_TCON_T4RELOAD;
--		break;
--	default:
--		break;
--	}
--	__raw_writel(tcon, S3C2410_TCON);
--}
--
--static int exynos4_pwm_set_next_event(unsigned long cycles,
--					struct clock_event_device *evt)
--{
--	exynos4_pwm_init(2, cycles);
--	exynos4_pwm_start(2, 0);
--	return 0;
--}
--
--static void exynos4_pwm_set_mode(enum clock_event_mode mode,
--				struct clock_event_device *evt)
--{
--	exynos4_pwm_stop(2);
--
--	switch (mode) {
--	case CLOCK_EVT_MODE_PERIODIC:
--		exynos4_pwm_init(2, clock_count_per_tick);
--		exynos4_pwm_start(2, 1);
--		break;
--	case CLOCK_EVT_MODE_ONESHOT:
--		break;
--	case CLOCK_EVT_MODE_UNUSED:
--	case CLOCK_EVT_MODE_SHUTDOWN:
--	case CLOCK_EVT_MODE_RESUME:
--		break;
--	}
--}
--
--static struct clock_event_device pwm_event_device = {
--	.name		= "pwm_timer2",
--	.features       = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
--	.rating		= 200,
--	.shift		= 32,
--	.set_next_event	= exynos4_pwm_set_next_event,
--	.set_mode	= exynos4_pwm_set_mode,
--};
--
--irqreturn_t exynos4_clock_event_isr(int irq, void *dev_id)
--{
--	struct clock_event_device *evt = &pwm_event_device;
--
--	evt->event_handler(evt);
--
--	return IRQ_HANDLED;
--}
--
--static struct irqaction exynos4_clock_event_irq = {
--	.name		= "pwm_timer2_irq",
--	.flags		= IRQF_DISABLED | IRQF_TIMER | IRQF_IRQPOLL,
--	.handler	= exynos4_clock_event_isr,
--};
--
--static void __init exynos4_clockevent_init(void)
--{
--	unsigned long pclk;
--	unsigned long clock_rate;
--	struct clk *tscaler;
--
--	pclk = clk_get_rate(timerclk);
--
--	/* configure clock tick */
--
--	tscaler = clk_get_parent(tdiv2);
--
--	clk_set_rate(tscaler, pclk / 2);
--	clk_set_rate(tdiv2, pclk / 2);
--	clk_set_parent(tin2, tdiv2);
--
--	clock_rate = clk_get_rate(tin2);
--
--	clock_count_per_tick = clock_rate / HZ;
--
--	pwm_event_device.mult =
--		div_sc(clock_rate, NSEC_PER_SEC, pwm_event_device.shift);
--	pwm_event_device.max_delta_ns =
--		clockevent_delta2ns(-1, &pwm_event_device);
--	pwm_event_device.min_delta_ns =
--		clockevent_delta2ns(1, &pwm_event_device);
--
--	pwm_event_device.cpumask = cpumask_of(0);
--	clockevents_register_device(&pwm_event_device);
--
--	setup_irq(IRQ_TIMER2, &exynos4_clock_event_irq);
--}
--
--static cycle_t exynos4_pwm4_read(struct clocksource *cs)
--{
--	return (cycle_t) ~__raw_readl(S3C_TIMERREG(0x40));
--}
--
--#ifdef CONFIG_PM
--static void exynos4_pwm4_resume(struct clocksource *cs)
--{
--	unsigned long pclk;
--
--	pclk = clk_get_rate(timerclk);
--
--	clk_set_rate(tdiv4, pclk / 2);
--	clk_set_parent(tin4, tdiv4);
--
--	exynos4_pwm_init(4, ~0);
--	exynos4_pwm_start(4, 1);
--}
--#endif
--
--struct clocksource pwm_clocksource = {
--	.name		= "pwm_timer4",
--	.rating		= 250,
--	.read		= exynos4_pwm4_read,
--	.mask		= CLOCKSOURCE_MASK(32),
--	.flags		= CLOCK_SOURCE_IS_CONTINUOUS ,
--#ifdef CONFIG_PM
--	.resume		= exynos4_pwm4_resume,
--#endif
--};
--
--static void __init exynos4_clocksource_init(void)
--{
--	unsigned long pclk;
--	unsigned long clock_rate;
--
--	pclk = clk_get_rate(timerclk);
--
--	clk_set_rate(tdiv4, pclk / 2);
--	clk_set_parent(tin4, tdiv4);
--
--	clock_rate = clk_get_rate(tin4);
--
--	exynos4_pwm_init(4, ~0);
--	exynos4_pwm_start(4, 1);
--
--	if (clocksource_register_hz(&pwm_clocksource, clock_rate))
--		panic("%s: can't register clocksource\n", pwm_clocksource.name);
--}
--
--static void __init exynos4_timer_resources(void)
--{
--	struct platform_device tmpdev;
--
--	tmpdev.dev.bus = &platform_bus_type;
--
--	timerclk = clk_get(NULL, "timers");
--	if (IS_ERR(timerclk))
--		panic("failed to get timers clock for system timer");
--
--	clk_enable(timerclk);
--
--	tmpdev.id = 2;
--	tmpdev.dev.init_name = "s3c24xx-pwm.2";
--	tin2 = clk_get(&tmpdev.dev, "pwm-tin");
--	if (IS_ERR(tin2))
--		panic("failed to get pwm-tin2 clock for system timer");
--
--	tdiv2 = clk_get(&tmpdev.dev, "pwm-tdiv");
--	if (IS_ERR(tdiv2))
--		panic("failed to get pwm-tdiv2 clock for system timer");
--	clk_enable(tin2);
--
--	tmpdev.id = 4;
--	tmpdev.dev.init_name = "s3c24xx-pwm.4";
--	tin4 = clk_get(&tmpdev.dev, "pwm-tin");
--	if (IS_ERR(tin4))
--		panic("failed to get pwm-tin4 clock for system timer");
--
--	tdiv4 = clk_get(&tmpdev.dev, "pwm-tdiv");
--	if (IS_ERR(tdiv4))
--		panic("failed to get pwm-tdiv4 clock for system timer");
--
--	clk_enable(tin4);
--}
--
--static void __init exynos4_timer_init(void)
--{
--#ifdef CONFIG_LOCAL_TIMERS
--	twd_base = S5P_VA_TWD;
--#endif
--
--	exynos4_timer_resources();
--	exynos4_clockevent_init();
--	exynos4_clocksource_init();
--}
--
--struct sys_timer exynos4_timer = {
--	.init		= exynos4_timer_init,
--};
+ 
+-#define IRQ_MCT1		IRQ_SPI(35)
+-
+-#define IRQ_EINT0		IRQ_SPI(40)
+-#define IRQ_EINT1		IRQ_SPI(41)
+-#define IRQ_EINT2		IRQ_SPI(42)
+-#define IRQ_EINT3		IRQ_SPI(43)
+-#define IRQ_USB_HSOTG		IRQ_SPI(44)
+-#define IRQ_USB_HOST		IRQ_SPI(45)
+-#define IRQ_MODEM_IF		IRQ_SPI(46)
+-#define IRQ_ROTATOR		IRQ_SPI(47)
+-#define IRQ_JPEG		IRQ_SPI(48)
+-#define IRQ_2D			IRQ_SPI(49)
+-#define IRQ_PCIE		IRQ_SPI(50)
+-#define IRQ_MCT0		IRQ_SPI(51)
+-#define IRQ_MFC			IRQ_SPI(52)
+-#define IRQ_AUDIO_SS		IRQ_SPI(54)
+-#define IRQ_AC97		IRQ_SPI(55)
+-#define IRQ_SPDIF		IRQ_SPI(56)
+-#define IRQ_KEYPAD		IRQ_SPI(57)
+-#define IRQ_INTFEEDCTRL_SSS	IRQ_SPI(58)
+-#define IRQ_SLIMBUS		IRQ_SPI(59)
+-#define IRQ_PMU			IRQ_SPI(60)
+-#define IRQ_TSI			IRQ_SPI(61)
+-#define IRQ_SATA		IRQ_SPI(62)
+-#define IRQ_GPS			IRQ_SPI(63)
++#define IRQ_EINT0		IRQ_SPI(16)
++#define IRQ_EINT1		IRQ_SPI(17)
++#define IRQ_EINT2		IRQ_SPI(18)
++#define IRQ_EINT3		IRQ_SPI(19)
++#define IRQ_EINT4		IRQ_SPI(20)
++#define IRQ_EINT5		IRQ_SPI(21)
++#define IRQ_EINT6		IRQ_SPI(22)
++#define IRQ_EINT7		IRQ_SPI(23)
++#define IRQ_EINT8		IRQ_SPI(24)
++#define IRQ_EINT9		IRQ_SPI(25)
++#define IRQ_EINT10		IRQ_SPI(26)
++#define IRQ_EINT11		IRQ_SPI(27)
++#define IRQ_EINT12		IRQ_SPI(28)
++#define IRQ_EINT13		IRQ_SPI(29)
++#define IRQ_EINT14		IRQ_SPI(30)
++#define IRQ_EINT15		IRQ_SPI(31)
++#define IRQ_EINT16_31		IRQ_SPI(32)
++
++#define IRQ_PDMA0		IRQ_SPI(35)
++#define IRQ_PDMA1		IRQ_SPI(36)
++#define IRQ_TIMER0_VIC		IRQ_SPI(37)
++#define IRQ_TIMER1_VIC		IRQ_SPI(38)
++#define IRQ_TIMER2_VIC		IRQ_SPI(39)
++#define IRQ_TIMER3_VIC		IRQ_SPI(40)
++#define IRQ_TIMER4_VIC		IRQ_SPI(41)
++#define IRQ_MCT_L0		IRQ_SPI(42)
++#define IRQ_WDT			IRQ_SPI(43)
++#define IRQ_RTC_ALARM		IRQ_SPI(44)
++#define IRQ_RTC_TIC		IRQ_SPI(45)
++#define IRQ_GPIO_XB		IRQ_SPI(46)
++#define IRQ_GPIO_XA		IRQ_SPI(47)
++#define IRQ_MCT_L1		IRQ_SPI(48)
++
++#define IRQ_UART0		IRQ_SPI(52)
++#define IRQ_UART1		IRQ_SPI(53)
++#define IRQ_UART2		IRQ_SPI(54)
++#define IRQ_UART3		IRQ_SPI(55)
++#define IRQ_UART4		IRQ_SPI(56)
++#define IRQ_MCT_G0		IRQ_SPI(57)
++#define IRQ_IIC			IRQ_SPI(58)
++#define IRQ_IIC1		IRQ_SPI(59)
++#define IRQ_IIC2		IRQ_SPI(60)
++#define IRQ_IIC3		IRQ_SPI(61)
++#define IRQ_IIC4		IRQ_SPI(62)
++#define IRQ_IIC5		IRQ_SPI(63)
++#define IRQ_IIC6		IRQ_SPI(64)
++#define IRQ_IIC7		IRQ_SPI(65)
++
++#define IRQ_USB_HOST		IRQ_SPI(70)
++#define IRQ_USB_HSOTG		IRQ_SPI(71)
++#define IRQ_MODEM_IF		IRQ_SPI(72)
++#define IRQ_HSMMC0		IRQ_SPI(73)
++#define IRQ_HSMMC1		IRQ_SPI(74)
++#define IRQ_HSMMC2		IRQ_SPI(75)
++#define IRQ_HSMMC3		IRQ_SPI(76)
++
++#define IRQ_MIPICSI0		IRQ_SPI(78)
++
++#define IRQ_MIPICSI1		IRQ_SPI(80)
++
++#define IRQ_ONENAND_AUDI	IRQ_SPI(82)
++#define IRQ_ROTATOR		IRQ_SPI(83)
++#define IRQ_FIMC0		IRQ_SPI(84)
++#define IRQ_FIMC1		IRQ_SPI(85)
++#define IRQ_FIMC2		IRQ_SPI(86)
++#define IRQ_FIMC3		IRQ_SPI(87)
++#define IRQ_JPEG		IRQ_SPI(88)
++#define IRQ_2D			IRQ_SPI(89)
++#define IRQ_PCIE		IRQ_SPI(90)
++
++#define IRQ_MFC			IRQ_SPI(94)
++
++#define IRQ_AUDIO_SS		IRQ_SPI(96)
++#define IRQ_I2S0		IRQ_SPI(97)
++#define IRQ_I2S1		IRQ_SPI(98)
++#define IRQ_I2S2		IRQ_SPI(99)
++#define IRQ_AC97		IRQ_SPI(100)
++
++#define IRQ_SPDIF		IRQ_SPI(104)
++#define IRQ_ADC0		IRQ_SPI(105)
++#define IRQ_PEN0		IRQ_SPI(106)
++#define IRQ_ADC1		IRQ_SPI(107)
++#define IRQ_PEN1		IRQ_SPI(108)
++#define IRQ_KEYPAD		IRQ_SPI(109)
++#define IRQ_PMU			IRQ_SPI(110)
++#define IRQ_GPS			IRQ_SPI(111)
++#define IRQ_INTFEEDCTRL_SSS	IRQ_SPI(112)
++#define IRQ_SLIMBUS		IRQ_SPI(113)
++
++#define IRQ_TSI			IRQ_SPI(115)
++#define IRQ_SATA		IRQ_SPI(116)
+ 
+ #define MAX_IRQ_IN_COMBINER	8
+-#define COMBINER_GROUP(x)	((x) * MAX_IRQ_IN_COMBINER + IRQ_SPI(64))
++#define COMBINER_GROUP(x)	((x) * MAX_IRQ_IN_COMBINER + IRQ_SPI(128))
+ #define COMBINER_IRQ(x, y)	(COMBINER_GROUP(x) + y)
+ 
+ #define IRQ_SYSMMU_MDMA0_0	COMBINER_IRQ(4, 0)
+@@ -73,75 +139,7 @@
+ #define IRQ_SYSMMU_MFC_M1_0	COMBINER_IRQ(5, 6)
+ #define IRQ_SYSMMU_PCIE_0	COMBINER_IRQ(5, 7)
+ 
+-#define IRQ_PDMA0		COMBINER_IRQ(21, 0)
+-#define IRQ_PDMA1		COMBINER_IRQ(21, 1)
+-
+-#define IRQ_TIMER0_VIC		COMBINER_IRQ(22, 0)
+-#define IRQ_TIMER1_VIC		COMBINER_IRQ(22, 1)
+-#define IRQ_TIMER2_VIC		COMBINER_IRQ(22, 2)
+-#define IRQ_TIMER3_VIC		COMBINER_IRQ(22, 3)
+-#define IRQ_TIMER4_VIC		COMBINER_IRQ(22, 4)
+-
+-#define IRQ_RTC_ALARM		COMBINER_IRQ(23, 0)
+-#define IRQ_RTC_TIC		COMBINER_IRQ(23, 1)
+-
+-#define IRQ_GPIO_XB		COMBINER_IRQ(24, 0)
+-#define IRQ_GPIO_XA		COMBINER_IRQ(24, 1)
+-
+-#define IRQ_UART0		COMBINER_IRQ(26, 0)
+-#define IRQ_UART1		COMBINER_IRQ(26, 1)
+-#define IRQ_UART2		COMBINER_IRQ(26, 2)
+-#define IRQ_UART3		COMBINER_IRQ(26, 3)
+-#define IRQ_UART4		COMBINER_IRQ(26, 4)
+-
+-#define IRQ_IIC			COMBINER_IRQ(27, 0)
+-#define IRQ_IIC1		COMBINER_IRQ(27, 1)
+-#define IRQ_IIC2		COMBINER_IRQ(27, 2)
+-#define IRQ_IIC3		COMBINER_IRQ(27, 3)
+-#define IRQ_IIC4		COMBINER_IRQ(27, 4)
+-#define IRQ_IIC5		COMBINER_IRQ(27, 5)
+-#define IRQ_IIC6		COMBINER_IRQ(27, 6)
+-#define IRQ_IIC7		COMBINER_IRQ(27, 7)
+-
+-#define IRQ_HSMMC0		COMBINER_IRQ(29, 0)
+-#define IRQ_HSMMC1		COMBINER_IRQ(29, 1)
+-#define IRQ_HSMMC2		COMBINER_IRQ(29, 2)
+-#define IRQ_HSMMC3		COMBINER_IRQ(29, 3)
+-
+-#define IRQ_MIPI_CSIS0		COMBINER_IRQ(30, 0)
+-#define IRQ_MIPI_CSIS1		COMBINER_IRQ(30, 1)
+-
+-#define IRQ_FIMC0		COMBINER_IRQ(32, 0)
+-#define IRQ_FIMC1		COMBINER_IRQ(32, 1)
+-#define IRQ_FIMC2		COMBINER_IRQ(33, 0)
+-#define IRQ_FIMC3		COMBINER_IRQ(33, 1)
+-
+-#define IRQ_ONENAND_AUDI	COMBINER_IRQ(34, 0)
+-
+-#define IRQ_MCT_L1		COMBINER_IRQ(35, 3)
+-
+-#define IRQ_EINT4		COMBINER_IRQ(37, 0)
+-#define IRQ_EINT5		COMBINER_IRQ(37, 1)
+-#define IRQ_EINT6		COMBINER_IRQ(37, 2)
+-#define IRQ_EINT7		COMBINER_IRQ(37, 3)
+-#define IRQ_EINT8		COMBINER_IRQ(38, 0)
+-
+-#define IRQ_EINT9		COMBINER_IRQ(38, 1)
+-#define IRQ_EINT10		COMBINER_IRQ(38, 2)
+-#define IRQ_EINT11		COMBINER_IRQ(38, 3)
+-#define IRQ_EINT12		COMBINER_IRQ(38, 4)
+-#define IRQ_EINT13		COMBINER_IRQ(38, 5)
+-#define IRQ_EINT14		COMBINER_IRQ(38, 6)
+-#define IRQ_EINT15		COMBINER_IRQ(38, 7)
+-
+-#define IRQ_EINT16_31		COMBINER_IRQ(39, 0)
+-
+-#define IRQ_MCT_L0		COMBINER_IRQ(51, 0)
+-
+-#define IRQ_WDT			COMBINER_IRQ(53, 0)
+-#define IRQ_MCT_G0		COMBINER_IRQ(53, 4)
+-
+-#define MAX_COMBINER_NR		54
++#define MAX_COMBINER_NR		16
+ 
+ #define S5P_IRQ_EINT_BASE	COMBINER_IRQ(MAX_COMBINER_NR, 0)
+ 
 -- 
 1.7.1
