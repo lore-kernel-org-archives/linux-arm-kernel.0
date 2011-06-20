@@ -1,58 +1,42 @@
-From: rmallon@gmail.com (Ryan Mallon)
-Date: Mon, 20 Jun 2011 18:03:12 +1000
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <20110620073122.GA24716@elte.hu>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
-	<20110620073122.GA24716@elte.hu>
-Message-ID: <4DFEFEC0.3040703@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 20 Jun 2011 10:03:06 +0200
+Subject: Problems with semaphores, mutexes, and atomic?
+In-Reply-To: <BANLkTimwzhucvub7ZXymxt2H5xVq=MYPvw@mail.gmail.com>
+References: <BANLkTikwGgrK0FFiee1a8PvDicJa-bUedg@mail.gmail.com>
+	<BANLkTimDcPWOwEMxdZdPyJdYx7KLGZn2wg@mail.gmail.com>
+	<BANLkTimwzhucvub7ZXymxt2H5xVq=MYPvw@mail.gmail.com>
+Message-ID: <201106201003.06717.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/11 17:31, Ingo Molnar wrote:
-> * Ryan Mallon <rmallon@gmail.com> wrote:
->
->> On 17/06/11 19:30, Ingo Molnar wrote:
->>> * Petr Tesarik<ptesarik@suse.cz>  wrote:
->>>
->>>> This patch series enhances /dev/mem, so that read and write is
->>>> possible at any address. The patchset includes actual
->>>> implementation for x86.
->>> This series lacks a description of why this is desired.
->>>
->>> My strong opinion is that it's not desired at all: /dev/mem never
->>> worked beyond 4G addresses so by today it has become largely obsolete
->>> and is on the way out really.
->>>
->>> I'm aware of these current /dev/mem uses:
->>>
->>>  - Xorg maps below 4G non-RAM addresses and the video BIOS
->>>
->>>  - It used to have some debugging role but these days kexec and kgdb
->>>    has largely taken over that role - partly due to the 4G limit.
->>>
->>>  - there's some really horrible out-of-tree drivers that do mmap()s
->>>    via /dev/mem, those should be fixed if they want to move beyond
->>>    4G: their char device should be mmap()able.
->> There are drivers where this makes sense. For example an FPGA 
->> device with a proprietary register layout on the memory bus can be 
->> done this way. [...]
-> So you want us to help vendors screw users with insane, proprietary, 
-> user-space drivers with sekrit binary blobs?
->
-> Wow.
-It's not about that. I mean proprietary in the sense that the register
-layout is not based on some open spec and is customised to some
-particular usage, not that it is evil, anti-GPL and "sekrit". I have
-worked on embedded products which have custom FPGAs for _very_ dedicated
-usage. The FPGA firmware is company IP and therefore not open (which is
-nothing to do with Linux). The types of products I'm talking about are
-often very niche market and dedicate use and therefore not a case of
-vendors screwing over the general public. Writing the drivers in
-user-space makes development easier; it's not an attempt to hide code
-from the public. There is nothing to stop a /dev/mem userspace driver
-from being open, just as there is nothing to stop a kernel driver for a
-closed platform under Linux being "closed".
+On Monday 20 June 2011 09:44:16 Dave Hylands wrote:
+> On Mon, Jun 20, 2011 at 12:20 AM, saeed bishara <saeed.bishara@gmail.com> wrote:
+> > On Mon, Jun 20, 2011 at 9:39 AM, Dave Hylands <dhylands@gmail.com> wrote:
+> >> Hi,
+> >>
+> >> I wrote a small test module to test semaphores, mutexes and atomic
+> >> increments, and I've tested it with CONFIG_SMP=y with 1 and 2
+> >> processors and with CONFIG_SMP disabled.
+> >>
+> >> My test code can be found here:
+> >> http://svn.hylands.org/linux/test-mutex/test-mutex.c
+> >> (it's about 133 lines long).
+> > yout code is not complete, the DEFINE_SEMAPHORE and DEFINE_SEMAPHORE
+> > definitions are missing
+> 
+> I don't follow. Line 7 & 8 has
+> 
+> DEFINE_MUTEX( lock );
+> DEFINE_SEMAPHORE( sem_lock );
+> 
+> and line 19 has
+> 
+> DEFINE_SEMAPHORE( thread_wait );
 
-~Ryan
+DEFINE_SEMAPHORE needs another argument, your code won't compile.
+
+You should basically never use semaphores anyway. In order to wait
+for a kthread to finish, use kthread_stop(). Do not use a semaphore
+when you want a mutex.
+
+	Arnd
