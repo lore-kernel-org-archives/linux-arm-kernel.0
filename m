@@ -1,335 +1,55 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Mon, 20 Jun 2011 13:19:55 +0200
-Subject: [RFC PATCH v2] Add ARM cpu topology definition
-Message-ID: <1308568795-1985-1-git-send-email-vincent.guittot@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 20 Jun 2011 16:55:43 +0530
+Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
+In-Reply-To: <20110620111336.GG2082@n2100.arm.linux.org.uk>
+References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110620095053.GA2082@n2100.arm.linux.org.uk>
+	<20110620101438.GD2082@n2100.arm.linux.org.uk>
+	<4DFF20B3.7010209@ti.com>
+	<20110620104415.GF2082@n2100.arm.linux.org.uk>
+	<4DFF255E.5030308@ti.com>
+	<20110620111336.GG2082@n2100.arm.linux.org.uk>
+Message-ID: <4DFF2E37.8030602@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The affinity between ARM processors is defined in the MPIDR register.
-We can identify which processors are in the same cluster,
-and which ones have performance interdependency.We can define the
-cpu topology of ARM platform, which is used by sched_mc and sched_smt.
+On 6/20/2011 4:43 PM, Russell King - ARM Linux wrote:
+> On Mon, Jun 20, 2011 at 04:17:58PM +0530, Santosh Shilimkar wrote:
+>> Yes. It's because of interrupt and the CPU active-online
+>> race.
+>
+> I don't see that as a conclusion from this dump.
+>
+>> Here is the chash log..
+>> [   21.025451] CPU1: Booted secondary processor
+>> [   21.025451] CPU1: Unknown IPI message 0x1
+>> [   21.029113] Switched to NOHz mode on CPU #1
+>> [   21.029174] BUG: spinlock lockup on CPU#1, swapper/0, c06220c4
+>
+> That's the xtime seqlock.  We're trying to update the xtime from CPU1,
+> which is not yet online and not yet active.  That's fine, we're just
+> spinning on the spinlock here, waiting for the other CPUs to release
+> it.
+>
+> But what this is saying is that the other CPUs aren't releasing it.
+> The cpu hotplug code doesn't hold the seqlock either.  So who else is
+> holding this lock, causing CPU1 to time out on it.
+>
+> The other thing is that this is only supposed to trigger after about
+> one second:
+>
+>          u64 loops = loops_per_jiffy * HZ;
+>                  for (i = 0; i<  loops; i++) {
+>                          if (arch_spin_trylock(&lock->raw_lock))
+>                                  return;
+>                          __delay(1);
+>                  }
+>
+> which from the timings you have at the beginning of your printk lines
+> is clearly not the case - it's more like 61us.
+>
+> Are you running with those h/w timer delay patches?
+Nope.
 
-The default state of sched_mc and sched_smt config is disable.
-When enable, the behavior of the scheduler can be modified with
-sched_mc_power_savings and sched_smt_power_savings sysfs interfaces.
-
-Changes since v1 :
-* Update the commit message
-* Add read_cpuid_mpidr in arch/arm/include/asm/cputype.h
-* Modify header of arch/arm/kernel/topology.c
-* Modify tests and manipulation of MPIDR's bitfields
-* Modify the place and dependancy of the config
-* Modify Noop functions
-
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
----
- arch/arm/Kconfig                |   25 +++++++
- arch/arm/include/asm/cputype.h  |    6 ++
- arch/arm/include/asm/topology.h |   33 +++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/smp.c           |    6 ++
- arch/arm/kernel/topology.c      |  145 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 216 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/kernel/topology.c
-
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..c7b4ff9 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1344,6 +1344,31 @@ config SMP_ON_UP
- 
- 	  If you don't know what to do here, say Y.
- 
-+config ARM_CPU_TOPOLOGY
-+	bool "Support cpu topology definition"
-+	depends on SMP && CPU_V7
-+	default y
-+	help
-+	  Support ARM cpu topology definition. The MPIDR register defines
-+	  affinity between processors which is used to set the cpu
-+	  topology of an ARM System.
-+
-+config SCHED_MC
-+	bool "Multi-core scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Multi-core scheduler support improves the CPU scheduler's decision
-+	  making when dealing with multi-core CPU chips at a cost of slightly
-+	  increased overhead in some places. If unsure say N here.
-+
-+config SCHED_SMT
-+	bool "SMT scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Improves the CPU scheduler's decision making when dealing with
-+	  MultiThreading at a cost of slightly increased overhead in some
-+	  places. If unsure say N here.
-+
- config HAVE_ARM_SCU
- 	bool
- 	depends on SMP
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cd4458f..cb47d28 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -8,6 +8,7 @@
- #define CPUID_CACHETYPE	1
- #define CPUID_TCM	2
- #define CPUID_TLBTYPE	3
-+#define CPUID_MPIDR	5
- 
- #define CPUID_EXT_PFR0	"c1, 0"
- #define CPUID_EXT_PFR1	"c1, 1"
-@@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
- 	return read_cpuid(CPUID_TCM);
- }
- 
-+static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
-+{
-+	return read_cpuid(CPUID_MPIDR);
-+}
-+
- /*
-  * Intel's XScale3 core supports some v6 features (supersections, L2)
-  * but advertises itself as v5 as it does not support the v6 ISA.  For
-diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
-index accbd7c..63a7454 100644
---- a/arch/arm/include/asm/topology.h
-+++ b/arch/arm/include/asm/topology.h
-@@ -1,6 +1,39 @@
- #ifndef _ASM_ARM_TOPOLOGY_H
- #define _ASM_ARM_TOPOLOGY_H
- 
-+#ifdef CONFIG_ARM_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cputopo_arm {
-+	int thread_id;
-+	int core_id;
-+	int socket_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
-+};
-+
-+extern struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&(cpu_topology[cpu].core_sibling))
-+#define topology_thread_cpumask(cpu)	(&(cpu_topology[cpu].thread_sibling))
-+
-+#define mc_capable()	(cpu_topology[0].socket_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { };
-+static inline void store_cpu_topology(unsigned int cpuid) { };
-+
-+#endif
-+
- #include <asm-generic/topology.h>
- 
- #endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a5b31af..816a481 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-+obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- 
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 344e52b..3e8dc3b 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -31,6 +31,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-+#include <asm/topology.h>
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- #include <asm/pgalloc.h>
-@@ -268,6 +269,9 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
- 	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
- 
- 	cpu_info->loops_per_jiffy = loops_per_jiffy;
-+
-+	store_cpu_topology(cpuid);
-+
- }
- 
- /*
-@@ -354,6 +358,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	unsigned int ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
- 	smp_store_cpu_info(smp_processor_id());
- 
- 	/*
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-new file mode 100644
-index 0000000..dc9e4be
---- /dev/null
-+++ b/arch/arm/kernel/topology.c
-@@ -0,0 +1,145 @@
-+/*
-+ * arch/arm/kernel/topology.c
-+ *
-+ * Copyright (C) 2011 Linaro Limited.
-+ * Written by: Vincent Guittot
-+ *
-+ * based on arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/topology.h>
-+
-+#define MPIDR_SMP_BITMASK (0x3 << 30)
-+#define MPIDR_SMP_VALUE (0x2 << 30)
-+
-+#define MPIDR_MT_BITMASK (0x1 << 24)
-+
-+#define MPIDR_LEVEL0_MASK 0x3
-+#define MPIDR_LEVEL0_SHIFT 0
-+
-+#define MPIDR_LEVEL1_MASK 0xF
-+#define MPIDR_LEVEL1_SHIFT 8
-+
-+#define MPIDR_LEVEL2_MASK 0xFF
-+#define MPIDR_LEVEL2_SHIFT 16
-+
-+struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
-+{
-+	return &(cpu_topology[cpu].core_sibling);
-+}
-+
-+/*
-+ * store_cpu_topology is called@boot when only one cpu is running
-+ * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
-+ * which prevents simultaneous write access to cpu_topology array
-+ */
-+void store_cpu_topology(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpuid_topo = &(cpu_topology[cpuid]);
-+	unsigned int mpidr;
-+	unsigned int cpu;
-+
-+	/* If the cpu topology has been already set, just return */
-+	if (cpuid_topo->core_id != -1)
-+		return;
-+
-+	mpidr = read_cpuid_mpidr();
-+
-+	/* create cpu topology mapping */
-+	if ((mpidr & MPIDR_SMP_BITMASK) == MPIDR_SMP_VALUE) {
-+		/*
-+		 * This is a multiprocessor system
-+		 * multiprocessor format & multiprocessor mode field are set
-+		 */
-+
-+		if (mpidr & MPIDR_MT_BITMASK) {
-+			/* core performance interdependency */
-+			cpuid_topo->thread_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK);
-+			cpuid_topo->core_id =  ((mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK);
-+			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL2_SHIFT)
-+				& MPIDR_LEVEL2_MASK);
-+		} else {
-+			/* normal core interdependency */
-+			cpuid_topo->thread_id = -1;
-+			cpuid_topo->core_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK);
-+			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK);
-+		}
-+	} else {
-+		/*
-+		 * This is an uniprocessor system
-+		 * we are in multiprocessor format but uniprocessor system
-+		 * or in the old uniprocessor format
-+		 */
-+
-+		cpuid_topo->thread_id = -1;
-+		cpuid_topo->core_id = 0;
-+		cpuid_topo->socket_id = -1;
-+	}
-+
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
-+			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+			if (cpu != cpuid)
-+				cpumask_set_cpu(cpu,
-+					&cpuid_topo->core_sibling);
-+
-+			if (cpuid_topo->core_id == cpu_topo->core_id) {
-+				cpumask_set_cpu(cpuid,
-+					&cpu_topo->thread_sibling);
-+				if (cpu != cpuid)
-+					cpumask_set_cpu(cpu,
-+						&cpuid_topo->thread_sibling);
-+			}
-+		}
-+	}
-+	smp_wmb();
-+
-+	printk(KERN_INFO "cpu %u : thread %d cpu %d, socket %d, mpidr %x\n",
-+		cpuid, cpu_topology[cpuid].thread_id,
-+		cpu_topology[cpuid].core_id,
-+		cpu_topology[cpuid].socket_id, mpidr);
-+
-+}
-+
-+/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
-+ */
-+void init_cpu_topology(void)
-+{
-+	unsigned int cpu;
-+
-+	/* init core mask */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->socket_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+	smp_wmb();
-+}
--- 
-1.7.4.1
+Regards
+Santosh
