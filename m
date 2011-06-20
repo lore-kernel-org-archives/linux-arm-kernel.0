@@ -1,32 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 20 Jun 2011 18:58:45 +0200
-Subject: [PATCH] USB: ehci: use packed,
-	aligned(4) instead of removing the packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
-Message-ID: <201106201858.45624.arnd@arndb.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 20 Jun 2011 20:05:52 +0300
+Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
+In-Reply-To: <BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
+References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
+	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
+	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
+	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
+	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
+	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
+	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
+	<20110620160650.GA26623@legolas.emea.dhcp.ti.com>
+	<BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
+Message-ID: <20110620170551.GE26623@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 June 2011, Alan Stern wrote:
-> I thought the source of the thread had nothing to do with any recent
-> changes to gcc.  Maybe I was wrong.  In any case, the issue was not the
-> lack of an alignment indication but rather the unnecessary presence of
-> a ((packed)) attribute causing the compiler to forget about the natural
-> alignment.
-> 
-> To put it another way, the problem was caused by having ((packed))  
-> where it wasn't needed.  You want to fix the immediate fallout of the
-> problem by adding an alignment attribute, instead of fixing the problem
-> itself by removing the underlying cause.
+Hi,
 
-A recent change in gcc changed the default behaviour when compiling the
-ehci driver on ARM, but the behaviour was already nondeterministic
-because the definition of the readl/writel macros on ARM relies on
-unspecified behaviour (cast to pointer with larger aligment).
+On Mon, Jun 20, 2011 at 06:41:59PM +0200, Skacore Systems wrote:
+> Yeah I think that one line break and tabs are sabotaging your work.
+> So stop being an 8====O - hole. No wonder if you are paid by TI that
+> one line patch into the upstream takes you so long to comprehend.
 
-We are also going to change the ARM implementation to always do 32 bit
-accesses in readl/writel, but the patch that went into the ehci driver
-was correct nonetheless.
+you are this close for me to drop your fix and add you to the shitlist.
 
-	Arnd
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110620/f86b44e6/attachment.sig>
