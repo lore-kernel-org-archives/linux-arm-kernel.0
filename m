@@ -1,77 +1,85 @@
-From: johnlinn@comcast.net (johnlinn at comcast.net)
-Date: Mon, 20 Jun 2011 17:33:06 +0000 (UTC)
-Subject: Pull request for Xilinx Zynq platform support
-In-Reply-To: <BANLkTi=OcRgtg-WtZfzNkd4n6EkKpf=m9A@mail.gmail.com>
-Message-ID: <596894907.105804.1308591186352.JavaMail.root@sz0140a.emeryville.ca.mail.comcast.net>
+From: balbi@ti.com (Felipe Balbi)
+Date: Mon, 20 Jun 2011 20:34:45 +0300
+Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
+In-Reply-To: <BANLkTinc-9hxLQ1Epf5=PoHvxtapfO7Vvg@mail.gmail.com>
+References: <Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
+	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
+	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
+	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
+	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
+	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
+	<20110620160650.GA26623@legolas.emea.dhcp.ti.com>
+	<BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
+	<20110620170551.GE26623@legolas.emea.dhcp.ti.com>
+	<BANLkTinc-9hxLQ1Epf5=PoHvxtapfO7Vvg@mail.gmail.com>
+Message-ID: <20110620173444.GG26623@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Mon, Jun 20, 2011 at 11:28 AM, <johnlinn@comcast.net> wrote:
-> > Hi Arnd,
-> >
-> > Please pull this commit to support the Xilinx Zynq platform into
-> > your tree.
-> >
-> > This patch has been out in the community and mailing list for a
-> > while. ?It has
-> > also been in linux-next for a while.
-> >
-> > Thanks,
-> > John Linn
-> >
-> > The following changes since commit
-> > 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
-> > ?Linus Torvalds (1):
-> > ? ? ? ?Linux 3.0-rc3
-> >
-> > are available in the git repository at:
-> >
-> > ?git://git.xilinx.com/arm-next
-> >
-> > Grant Likely (1):
-> > ? ? ?ARM: Xilinx: Adding Xilinx board support
-> 
-> Oops, this isn't right. You should respin the branch to credit you as
-> the author. All I did was squash a bunch of patches together.
-> 
-> g.
+Hi,
 
-Ok, I'll respin the patch to remove that and send out the pull request again.
+On Mon, Jun 20, 2011 at 07:27:18PM +0200, Viliam Mateicka wrote:
+> I wonder then, who applies the patch first. One ass can't stop
+> progress (was there some progress afterall ?) because of one
+> line-break (which git produces by default afterall) and several
+> non-conforming whitespace conversions. I think you should stop
+> replying to me, because I'm kinda starting to like trolling afterall.
 
-Thanks,
-John
+Look, maybe you're just new to git/linux and that's fine. The only
+problem we had from day one is that you have been a complete dick when
+replying.
 
-> 
-> >
-> > ?Documentation/devicetree/bindings/arm/xilinx.txt | ? ?7 +
-> > ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 14 +
-> > ?arch/arm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?2 +
-> > ?arch/arm/boot/dts/zynq-ep107.dts ? ? ? ? ? ? ? ? | ? 52 ++++
-> > ?arch/arm/mach-zynq/Makefile ? ? ? ? ? ? ? ? ? ? ?| ? ?6 +
-> > ?arch/arm/mach-zynq/Makefile.boot ? ? ? ? ? ? ? ? | ? ?3 +
-> > ?arch/arm/mach-zynq/board_dt.c ? ? ? ? ? ? ? ? ? ?| ? 37 +++
-> > ?arch/arm/mach-zynq/common.c ? ? ? ? ? ? ? ? ? ? ?| ?102 ++++++++
-> > ?arch/arm/mach-zynq/common.h ? ? ? ? ? ? ? ? ? ? ?| ? 29 ++
-> > ?arch/arm/mach-zynq/include/mach/clkdev.h ? ? ? ? | ? 32 +++
-> > ?arch/arm/mach-zynq/include/mach/debug-macro.S ? ?| ? 36 +++
-> > ?arch/arm/mach-zynq/include/mach/entry-macro.S ? ?| ? 30 +++
-> > ?arch/arm/mach-zynq/include/mach/hardware.h ? ? ? | ? 18 ++
-> > ?arch/arm/mach-zynq/include/mach/io.h ? ? ? ? ? ? | ? 33 +++
-> > ?arch/arm/mach-zynq/include/mach/irqs.h ? ? ? ? ? | ? 21 ++
-> > ?arch/arm/mach-zynq/include/mach/memory.h ? ? ? ? | ? 22 ++
-> > ?arch/arm/mach-zynq/include/mach/system.h ? ? ? ? | ? 28 ++
-> > ?arch/arm/mach-zynq/include/mach/timex.h ? ? ? ? ?| ? 23 ++
-> > ?arch/arm/mach-zynq/include/mach/uart.h ? ? ? ? ? | ? 25 ++
-> > ?arch/arm/mach-zynq/include/mach/uncompress.h ? ? | ? 51 ++++
-> > ?arch/arm/mach-zynq/include/mach/vmalloc.h ? ? ? ?| ? 20 ++
-> > ?arch/arm/mach-zynq/include/mach/zynq_soc.h ? ? ? | ? 48 ++++
-> > ?arch/arm/mach-zynq/timer.c ? ? ? ? ? ? ? ? ? ? ? | ?298
-> > ++++++++++++++++++++++
-> > ?arch/arm/mm/Kconfig
-> >
-> 
-> 
-> 
-> --
-> Grant Likely, B.Sc., P.Eng.
-> Secret Lab Technologies Ltd.
+If you go that road, that's what you'll get in return.
+
+Just so you see the properly formatted patch, I'm quoting below. See
+that there's no line breaks introduced by git.
+
+commit c27c9b5312f4b2a7e66ee772943355d77fc2c550
+Author: Viliam Mateicka <viliam.mateicka@gmail.com>
+Date:   Mon Jun 20 19:08:27 2011 +0300
+
+    usb: gadget: s3c2410_udc: fix custom UDC command handling
+    
+    There is a bug in Samsung's UDC driver, which is
+    completely disabling the USB device when a custom
+    UDC command is used.
+    
+    Following patch seems to get the right?behavior
+    (e.g. enabling pull-up instead of disabling then
+    Vcc is applied).
+    
+    Signed-off-by: Viliam Mateicka <viliam.mateicka@gmail.com>
+    
+    [ balbi at ti.com : manually re-created the patch because
+    	author was unable to send a proper one ]
+    
+    Signed-off-by: Felipe Balbi <balbi@ti.com>
+
+diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
+index 100f263..b6e1ca5 100644
+--- a/drivers/usb/gadget/s3c2410_udc.c
++++ b/drivers/usb/gadget/s3c2410_udc.c
+@@ -1567,7 +1567,7 @@ static void s3c2410_udc_command(enum s3c2410_udc_cmd_e cmd)
+ 		return;
+ 
+ 	if (udc_info->udc_command) {
+-		udc_info->udc_command(S3C2410_UDC_P_DISABLE);
++		udc_info->udc_command(cmd);
+ 	} else if (gpio_is_valid(udc_info->pullup_pin)) {
+ 		int value;
+ 
+
+(if you see any line breaks that's your mailer, it's better to check
+from the archives [1])
+
+[1] http://marc.info/?l=linux-usb
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110620/90132734/attachment.sig>
