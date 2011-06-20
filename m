@@ -1,147 +1,73 @@
-From: peterhuewe@gmx.de (Peter Huewe)
-Date: Mon, 20 Jun 2011 21:51:03 +0200
-Subject: [PATCH v3] mfd/ab8500: Convert to kstrtou8_from_user
-In-Reply-To: <1308599189-28555-2-git-send-email-peterhuewe@gmx.de>
-References: <1308599189-28555-2-git-send-email-peterhuewe@gmx.de>
-Message-ID: <1308599463-29001-1-git-send-email-peterhuewe@gmx.de>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 20 Jun 2011 15:56:38 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
+	packed attribute
+In-Reply-To: <Pine.LNX.4.44L0.1106201436430.2113-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1106201436430.2113-100000@iolanthe.rowland.org>
+Message-ID: <alpine.LFD.2.00.1106201537020.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch replaces the code for getting an number from a
-userspace buffer by a simple call to kstrou8_from_user.
-This makes it easier to read and less error prone.
+On Mon, 20 Jun 2011, Alan Stern wrote:
 
-This patch replaces the code for getting an number from a
-userspace buffer by a simple call to kstrou8_from_user.
-This makes it easier to read and less error prone.
+> On Mon, 20 Jun 2011, Alexander Holler wrote:
+> 
+> > I see it that way: packed is needed to be sure that at least for struct 
+> > ehci_regs there are no padding bytes inbetween the members.
+> 
+> But is it _really_ needed?
+> 
+> > It might 
+> > work without, but that depends on the compiler (-version, architecture, 
+> > whatever).
+> 
+> Have there _ever_ been _any_ combinations of compiler, version, 
+> architecture, whatever, that had unwanted padding bytes in this 
+> structure?
 
-Since the old buffers held only values up to 255, we don't need
-kstrtoul, but rather kstrtou8.
+This can be determined by simple code inspection.
 
-Kernel Version: v3.0-rc3
+If you must have struct members which are not aligned to their natural 
+size then you need __packed.  Example:
 
-Changes in v2:
-- Use kstrtou8 instead of kstrtoul due to small numbers
-- Dropped then unnecessary checks
-(Both remarks from Alexey Dobriyan, Thanks!)
-Changes in v3:
-The local struct dev variable isn't needed anymore
+struct foo {
+	u8  a;
+	u16 b;
+	u32 c;
+	u64 d;
+};
 
-Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
----
- drivers/mfd/ab8500-debugfs.c |   62 +++++++++++------------------------------
- 1 files changed, 17 insertions(+), 45 deletions(-)
+Without __packed, there will be padding between a and b, and between c 
+and d.  If the order of the members in this struct were reversed, then 
+everything would be naturally aligned and no padding between members 
+would be inserted.
 
-diff --git a/drivers/mfd/ab8500-debugfs.c b/drivers/mfd/ab8500-debugfs.c
-index 64748e4..bb78f4a 100644
---- a/drivers/mfd/ab8500-debugfs.c
-+++ b/drivers/mfd/ab8500-debugfs.c
-@@ -419,20 +419,13 @@ static ssize_t ab8500_bank_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
--	unsigned long user_bank;
-+	u8 user_bank;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_bank);
-+	/* Get userspace string and convert to number */
-+	err = kstrtou8_from_user(user_buf, count, 0, &user_bank);
- 	if (err)
--		return -EINVAL;
-+		return err;
- 
- 	if (user_bank >= AB8500_NUM_BANKS) {
- 		dev_err(dev, "debugfs error input > number of banks\n");
-@@ -441,7 +434,7 @@ static ssize_t ab8500_bank_write(struct file *file,
- 
- 	debug_bank = user_bank;
- 
--	return buf_size;
-+	return count;
- }
- 
- static int ab8500_address_print(struct seq_file *s, void *p)
-@@ -458,27 +451,16 @@ static ssize_t ab8500_address_write(struct file *file,
- 	const char __user *user_buf,
- 	size_t count, loff_t *ppos)
- {
--	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
--	unsigned long user_address;
-+	u8 user_address;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf) - 1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_address);
-+	/* Get userspace string and convert to number*/
-+	err = kstrtou8_from_user(user_buf, count, 0, &user_address);
- 	if (err)
--		return -EINVAL;
--	if (user_address > 0xff) {
--		dev_err(dev, "debugfs error input > 0xff\n");
--		return -EINVAL;
--	}
-+		return err;
-+
- 	debug_address = user_address;
--	return buf_size;
-+	return count;
- }
- 
- static int ab8500_val_print(struct seq_file *s, void *p)
-@@ -509,24 +491,14 @@ static ssize_t ab8500_val_write(struct file *file,
- 	size_t count, loff_t *ppos)
- {
- 	struct device *dev = ((struct seq_file *)(file->private_data))->private;
--	char buf[32];
--	int buf_size;
--	unsigned long user_val;
-+	u8 user_val;
- 	int err;
- 
--	/* Get userspace string and assure termination */
--	buf_size = min(count, (sizeof(buf)-1));
--	if (copy_from_user(buf, user_buf, buf_size))
--		return -EFAULT;
--	buf[buf_size] = 0;
--
--	err = strict_strtoul(buf, 0, &user_val);
-+	/* Get userspace string and convert to number */
-+	err = kstrtou8_from_user(user_buf, count, 0, &user_val);
- 	if (err)
--		return -EINVAL;
--	if (user_val > 0xff) {
--		dev_err(dev, "debugfs error input > 0xff\n");
--		return -EINVAL;
--	}
-+		return err;
-+
- 	err = abx500_set_register_interruptible(dev,
- 		(u8)debug_bank, debug_address, (u8)user_val);
- 	if (err < 0) {
-@@ -534,7 +506,7 @@ static ssize_t ab8500_val_write(struct file *file,
- 		return -EINVAL;
- 	}
- 
--	return buf_size;
-+	return count;
- }
- 
- static const struct file_operations ab8500_bank_fops = {
--- 
-1.7.3.4
+The size of structures is normally rounded up with padding to the size 
+of the largest basic element it contains.  Example:
+
+struct foo {
+	u64 a;
+	u8 b;
+};
+
+Here sizeof(struct foo) would return 16, even if the actual content 
+occupies 9 bytes only.  That's because the largest basic element is u64 
+i.e. 8 bytes.  Normally this trailing padding is not an issue, unless 
+you have an array of such a struct or if it is a member of another 
+struct.  If you want to get rid of that padding, you need to use 
+__packed again (which of course would make all subsequent instances of 
+that structure in your array completely misaligned too).
+
+Two odd exceptions with the old ABI on ARM:
+
+- The alignment of a 64-bit value is always 4 bytes not 8.
+
+- The size of all structures are always rounded up to a 4-byte boundary, 
+  irrespective of their content.
+
+If you fall into none of the above issues, then you don't need any 
+__packed, period.
+
+
+
+Nicolas
