@@ -1,325 +1,280 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 20 Jun 2011 02:23:36 -0700
-Subject: [PATCH 04/10] omap: Make a subset of dmtimer functions into inline
-	functions
+Date: Mon, 20 Jun 2011 02:23:39 -0700
+Subject: [PATCH 05/10] omap2+: Use dmtimer macros for clockevent
 In-Reply-To: <20110620091754.357.56441.stgit@kaulin>
 References: <20110620091754.357.56441.stgit@kaulin>
-Message-ID: <20110620092336.357.41633.stgit@kaulin>
+Message-ID: <20110620092339.357.10396.stgit@kaulin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This will allow us to share the code between system timer and
-dmtimer device driver code without having to initialize all the
-dmtimers early. This change will also make the timer_set_next_event
-more efficient as the inline functions will optimize the code
-better for the timer reprogramming.
+This patch makes timer-gp.c to use only a subset of dmtimer
+functions without the need to initialize dmtimer code early.
+
+Also note that now with the inline functions, timer_set_next_event
+becomes more efficient in the lines of assembly code.
 
 Signed-off-by: Tony Lindgren <tony@atomide.com>
 Reviewed-by: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/plat-omap/dmtimer.c              |   78 ++++---------------
- arch/arm/plat-omap/include/plat/dmtimer.h |  119 +++++++++++++++++++++++++++++
- 2 files changed, 136 insertions(+), 61 deletions(-)
+ arch/arm/mach-omap2/timer-gp.c            |  147 ++++++++++++++++++++++-------
+ arch/arm/plat-omap/include/plat/dmtimer.h |    1 
+ 2 files changed, 113 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm/plat-omap/dmtimer.c b/arch/arm/plat-omap/dmtimer.c
-index dfdc3b2..7c5cb4e 100644
---- a/arch/arm/plat-omap/dmtimer.c
-+++ b/arch/arm/plat-omap/dmtimer.c
-@@ -170,11 +170,7 @@ static spinlock_t dm_timer_lock;
-  */
- static inline u32 omap_dm_timer_read_reg(struct omap_dm_timer *timer, u32 reg)
+diff --git a/arch/arm/mach-omap2/timer-gp.c b/arch/arm/mach-omap2/timer-gp.c
+index a0d8e83..62c0d5c 100644
+--- a/arch/arm/mach-omap2/timer-gp.c
++++ b/arch/arm/mach-omap2/timer-gp.c
+@@ -45,10 +45,33 @@
+ 
+ #include "timer-gp.h"
+ 
++/* Parent clocks, eventually these will come from the clock framework */
++
++#define OMAP2_MPU_SOURCE	"sys_ck"
++#define OMAP3_MPU_SOURCE	OMAP2_MPU_SOURCE
++#define OMAP4_MPU_SOURCE	"sys_clkin_ck"
++#define OMAP2_32K_SOURCE	"func_32k_ck"
++#define OMAP3_32K_SOURCE	"omap_32k_fck"
++#define OMAP4_32K_SOURCE	"sys_32k_ck"
++
++#ifdef CONFIG_OMAP_32K_TIMER
++#define OMAP2_CLKEV_SOURCE	OMAP2_32K_SOURCE
++#define OMAP3_CLKEV_SOURCE	OMAP3_32K_SOURCE
++#define OMAP4_CLKEV_SOURCE	OMAP4_32K_SOURCE
++#define OMAP3_SECURE_TIMER	12
++#else
++#define OMAP2_CLKEV_SOURCE	OMAP2_MPU_SOURCE
++#define OMAP3_CLKEV_SOURCE	OMAP3_MPU_SOURCE
++#define OMAP4_CLKEV_SOURCE	OMAP4_MPU_SOURCE
++#define OMAP3_SECURE_TIMER	1
++#endif
+ 
+ /* MAX_GPTIMER_ID: number of GPTIMERs on the chip */
+ #define MAX_GPTIMER_ID		12
+ 
++/* Clockevent code */
++
++static struct omap_dm_timer clkev;
+ static struct omap_dm_timer *gptimer;
+ static struct clock_event_device clockevent_gpt;
+ static u8 __initdata gptimer_id = 1;
+@@ -57,10 +80,9 @@ struct omap_dm_timer *gptimer_wakeup;
+ 
+ static irqreturn_t omap2_gp_timer_interrupt(int irq, void *dev_id)
  {
--	if (timer->posted)
--		while (readl(timer->io_base + (OMAP_TIMER_WRITE_PEND_REG & 0xff))
--				& (reg >> WPSHIFT))
--			cpu_relax();
--	return readl(timer->io_base + (reg & 0xff));
-+	return __omap_dm_timer_read(timer->io_base, reg, timer->posted);
+-	struct omap_dm_timer *gpt = (struct omap_dm_timer *)dev_id;
+ 	struct clock_event_device *evt = &clockevent_gpt;
+ 
+-	omap_dm_timer_write_status(gpt, OMAP_TIMER_INT_OVERFLOW);
++	__omap_dm_timer_write_status(clkev.io_base, OMAP_TIMER_INT_OVERFLOW);
+ 
+ 	evt->event_handler(evt);
+ 	return IRQ_HANDLED;
+@@ -75,7 +97,8 @@ static struct irqaction omap2_gp_timer_irq = {
+ static int omap2_gp_timer_set_next_event(unsigned long cycles,
+ 					 struct clock_event_device *evt)
+ {
+-	omap_dm_timer_set_load_start(gptimer, 0, 0xffffffff - cycles);
++	__omap_dm_timer_load_start(clkev.io_base, OMAP_TIMER_CTRL_ST,
++						0xffffffff - cycles, 1);
+ 
+ 	return 0;
+ }
+@@ -85,13 +108,18 @@ static void omap2_gp_timer_set_mode(enum clock_event_mode mode,
+ {
+ 	u32 period;
+ 
+-	omap_dm_timer_stop(gptimer);
++	__omap_dm_timer_stop(clkev.io_base, 1, clkev.rate);
+ 
+ 	switch (mode) {
+ 	case CLOCK_EVT_MODE_PERIODIC:
+-		period = clk_get_rate(omap_dm_timer_get_fclk(gptimer)) / HZ;
++		period = clkev.rate / HZ;
+ 		period -= 1;
+-		omap_dm_timer_set_load_start(gptimer, 1, 0xffffffff - period);
++		/* Looks like we need to first set the load value separately */
++		__omap_dm_timer_write(clkev.io_base, OMAP_TIMER_LOAD_REG,
++					0xffffffff - period, 1);
++		__omap_dm_timer_load_start(clkev.io_base,
++					OMAP_TIMER_CTRL_AR | OMAP_TIMER_CTRL_ST,
++						0xffffffff - period, 1);
+ 		break;
+ 	case CLOCK_EVT_MODE_ONESHOT:
+ 		break;
+@@ -130,43 +158,89 @@ int __init omap2_gp_clockevent_set_gptimer(u8 id)
+ 	return 0;
  }
  
- /*
-@@ -186,11 +182,7 @@ static inline u32 omap_dm_timer_read_reg(struct omap_dm_timer *timer, u32 reg)
- static void omap_dm_timer_write_reg(struct omap_dm_timer *timer, u32 reg,
- 						u32 value)
+-static void __init omap2_gp_clockevent_init(void)
++static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
++						int gptimer_id,
++						const char *fck_source)
  {
--	if (timer->posted)
--		while (readl(timer->io_base + (OMAP_TIMER_WRITE_PEND_REG & 0xff))
--				& (reg >> WPSHIFT))
--			cpu_relax();
--	writel(value, timer->io_base + (reg & 0xff));
-+	__omap_dm_timer_write(timer->io_base, reg, value, timer->posted);
+-	u32 tick_rate;
+-	int src;
+-	char clockevent_hwmod_name[8]; /* 8 = sizeof("timerXX0") */
++	char name[10]; /* 10 = sizeof("gptXX_Xck0") */
++	struct omap_hwmod *oh;
++	size_t size;
++	int res = 0;
++
++	sprintf(name, "timer%d", gptimer_id);
++	omap_hwmod_setup_one(name);
++	oh = omap_hwmod_lookup(name);
++	if (!oh)
++		return -ENODEV;
++
++	timer->irq = oh->mpu_irqs[0].irq;
++	timer->phys_base = oh->slaves[0]->addr->pa_start;
++	size = oh->slaves[0]->addr->pa_end - timer->phys_base;
++
++	/* Static mapping, never released */
++	timer->io_base = ioremap(timer->phys_base, size);
++	if (!timer->io_base)
++		return -ENXIO;
++
++	/* After the dmtimer is using hwmod these clocks won't be needed */
++	sprintf(name, "gpt%d_fck", gptimer_id);
++	timer->fclk = clk_get(NULL, name);
++	if (IS_ERR(timer->fclk))
++		return -ENODEV;
++
++	sprintf(name, "gpt%d_ick", gptimer_id);
++	timer->iclk = clk_get(NULL, name);
++	if (IS_ERR(timer->iclk)) {
++		clk_put(timer->fclk);
++		return -ENODEV;
++	}
+ 
+-	inited = 1;
++	omap_hwmod_enable(oh);
++
++	if (gptimer_id != 12) {
++		struct clk *src;
++
++		src = clk_get(NULL, fck_source);
++		if (IS_ERR(src)) {
++			res = -EINVAL;
++		} else {
++			res = __omap_dm_timer_set_source(timer->fclk, src);
++			if (IS_ERR_VALUE(res))
++				pr_warning("%s: timer%i cannot set source\n",
++						__func__, gptimer_id);
++			clk_put(src);
++		}
++	}
++	__omap_dm_timer_reset(timer->io_base, 1, 1);
++	timer->posted = 1;
++
++	timer->rate = clk_get_rate(timer->fclk);
+ 
+-	sprintf(clockevent_hwmod_name, "timer%d", gptimer_id);
+-	omap_hwmod_setup_one(clockevent_hwmod_name);
++	timer->reserved = 1;
+ 
+ 	gptimer = omap_dm_timer_request_specific(gptimer_id);
+ 	BUG_ON(gptimer == NULL);
+ 	gptimer_wakeup = gptimer;
+ 
+-#if defined(CONFIG_OMAP_32K_TIMER)
+-	src = OMAP_TIMER_SRC_32_KHZ;
+-#else
+-	src = OMAP_TIMER_SRC_SYS_CLK;
+-	WARN(gptimer_id == 12, "WARNING: GPTIMER12 can only use the "
+-	     "secure 32KiHz clock source\n");
+-#endif
++	return res;
++}
+ 
+-	if (gptimer_id != 12)
+-		WARN(IS_ERR_VALUE(omap_dm_timer_set_source(gptimer, src)),
+-		     "timer-gp: omap_dm_timer_set_source() failed\n");
++static void __init omap2_gp_clockevent_init(int gptimer_id,
++						const char *fck_source)
++{
++	int res;
+ 
+-	tick_rate = clk_get_rate(omap_dm_timer_get_fclk(gptimer));
++	inited = 1;
+ 
+-	pr_info("OMAP clockevent source: GPTIMER%d at %u Hz\n",
+-		gptimer_id, tick_rate);
++	res = omap_dm_timer_init_one(&clkev, gptimer_id, fck_source);
++	BUG_ON(res);
+ 
+ 	omap2_gp_timer_irq.dev_id = (void *)gptimer;
+-	setup_irq(omap_dm_timer_get_irq(gptimer), &omap2_gp_timer_irq);
+-	omap_dm_timer_set_int_enable(gptimer, OMAP_TIMER_INT_OVERFLOW);
++	setup_irq(clkev.irq, &omap2_gp_timer_irq);
+ 
+-	clockevent_gpt.mult = div_sc(tick_rate, NSEC_PER_SEC,
++	__omap_dm_timer_int_enable(clkev.io_base, OMAP_TIMER_INT_OVERFLOW);
++
++	clockevent_gpt.mult = div_sc(clkev.rate, NSEC_PER_SEC,
+ 				     clockevent_gpt.shift);
+ 	clockevent_gpt.max_delta_ns =
+ 		clockevent_delta2ns(0xffffffff, &clockevent_gpt);
+@@ -176,6 +250,9 @@ static void __init omap2_gp_clockevent_init(void)
+ 
+ 	clockevent_gpt.cpumask = cpumask_of(0);
+ 	clockevents_register_device(&clockevent_gpt);
++
++	pr_info("OMAP clockevent source: GPTIMER%d at %lu Hz\n",
++		gptimer_id, clkev.rate);
  }
  
- static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
-@@ -209,7 +201,7 @@ static void omap_dm_timer_wait_for_reset(struct omap_dm_timer *timer)
- 
- static void omap_dm_timer_reset(struct omap_dm_timer *timer)
- {
--	u32 l;
-+	int autoidle = 0, wakeup = 0;
- 
- 	if (!cpu_class_is_omap2() || timer != &dm_timers[0]) {
- 		omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG, 0x06);
-@@ -217,28 +209,21 @@ static void omap_dm_timer_reset(struct omap_dm_timer *timer)
- 	}
- 	omap_dm_timer_set_source(timer, OMAP_TIMER_SRC_32_KHZ);
- 
--	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_OCP_CFG_REG);
--	l |= 0x02 << 3;  /* Set to smart-idle mode */
--	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on idle */
--
- 	/* Enable autoidle on OMAP2 / OMAP3 */
- 	if (cpu_is_omap24xx() || cpu_is_omap34xx())
--		l |= 0x1 << 0;
-+		autoidle = 1;
- 
- 	/*
- 	 * Enable wake-up on OMAP2 CPUs.
- 	 */
- 	if (cpu_class_is_omap2())
--		l |= 1 << 2;
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_OCP_CFG_REG, l);
-+		wakeup = 1;
- 
--	/* Match hardware reset default of posted mode */
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_IF_CTRL_REG,
--			OMAP_TIMER_CTRL_POSTED);
-+	__omap_dm_timer_reset(timer->io_base, autoidle, wakeup);
- 	timer->posted = 1;
+ /* Clocksource code */
+@@ -247,11 +324,11 @@ static void __init omap2_gp_clocksource_init(void)
  }
- 
--static void omap_dm_timer_prepare(struct omap_dm_timer *timer)
-+void omap_dm_timer_prepare(struct omap_dm_timer *timer)
- {
- 	omap_dm_timer_enable(timer);
- 	omap_dm_timer_reset(timer);
-@@ -410,25 +395,13 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_start);
- 
- void omap_dm_timer_stop(struct omap_dm_timer *timer)
- {
--	u32 l;
-+	unsigned long rate = 0;
- 
--	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
--	if (l & OMAP_TIMER_CTRL_ST) {
--		l &= ~0x1;
--		omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
- #ifdef CONFIG_ARCH_OMAP2PLUS
--		/* Readback to make sure write has completed */
--		omap_dm_timer_read_reg(timer, OMAP_TIMER_CTRL_REG);
--		 /*
--		  * Wait for functional clock period x 3.5 to make sure that
--		  * timer is stopped
--		  */
--		udelay(3500000 / clk_get_rate(timer->fclk) + 1);
-+	rate = clk_get_rate(timer->fclk);
  #endif
--	}
--	/* Ack possibly pending interrupt */
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG,
--			OMAP_TIMER_INT_OVERFLOW);
-+
-+	__omap_dm_timer_stop(timer->io_base, timer->posted, rate);
+ 
+-#define OMAP_SYS_TIMER_INIT(name)					\
++#define OMAP_SYS_TIMER_INIT(name, clkev_nr, clkev_src)			\
+ static void __init omap##name##_timer_init(void)			\
+ {									\
+ 	omap_dm_timer_init();						\
+-	omap2_gp_clockevent_init();					\
++	omap2_gp_clockevent_init((clkev_nr), clkev_src);		\
+ 	omap2_gp_clocksource_init();					\
  }
- EXPORT_SYMBOL_GPL(omap_dm_timer_stop);
  
-@@ -451,22 +424,11 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
- 
- int omap_dm_timer_set_source(struct omap_dm_timer *timer, int source)
- {
--	int ret = -EINVAL;
--
- 	if (source < 0 || source >= 3)
- 		return -EINVAL;
- 
--	clk_disable(timer->fclk);
--	ret = clk_set_parent(timer->fclk, dm_source_clocks[source]);
--	clk_enable(timer->fclk);
--
--	/*
--	 * When the functional clock disappears, too quick writes seem
--	 * to cause an abort. XXX Is this still necessary?
--	 */
--	__delay(300000);
--
--	return ret;
-+	return __omap_dm_timer_set_source(timer->fclk,
-+						dm_source_clocks[source]);
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_set_source);
- 
-@@ -504,8 +466,7 @@ void omap_dm_timer_set_load_start(struct omap_dm_timer *timer, int autoreload,
- 	}
- 	l |= OMAP_TIMER_CTRL_ST;
- 
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_COUNTER_REG, load);
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_CTRL_REG, l);
-+	__omap_dm_timer_load_start(timer->io_base, l, load, timer->posted);
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_set_load_start);
- 
-@@ -558,8 +519,7 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_set_prescaler);
- void omap_dm_timer_set_int_enable(struct omap_dm_timer *timer,
- 				  unsigned int value)
- {
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_INT_EN_REG, value);
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_WAKEUP_EN_REG, value);
-+	__omap_dm_timer_int_enable(timer->io_base, value);
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_set_int_enable);
- 
-@@ -575,17 +535,13 @@ EXPORT_SYMBOL_GPL(omap_dm_timer_read_status);
- 
- void omap_dm_timer_write_status(struct omap_dm_timer *timer, unsigned int value)
- {
--	omap_dm_timer_write_reg(timer, OMAP_TIMER_STAT_REG, value);
-+	__omap_dm_timer_write_status(timer->io_base, value);
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_write_status);
- 
- unsigned int omap_dm_timer_read_counter(struct omap_dm_timer *timer)
- {
--	unsigned int l;
--
--	l = omap_dm_timer_read_reg(timer, OMAP_TIMER_COUNTER_REG);
--
--	return l;
-+	return __omap_dm_timer_read_counter(timer->io_base, timer->posted);
- }
- EXPORT_SYMBOL_GPL(omap_dm_timer_read_counter);
- 
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 3203105..54664a7 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -32,6 +32,9 @@
-  * 675 Mass Ave, Cambridge, MA 02139, USA.
-  */
- 
-+#include <linux/clk.h>
-+#include <linux/delay.h>
-+
- #ifndef __ASM_ARCH_DMTIMER_H
- #define __ASM_ARCH_DMTIMER_H
- 
-@@ -218,4 +221,120 @@ struct omap_dm_timer {
- 	unsigned posted:1;
+@@ -261,14 +338,14 @@ struct sys_timer omap##name##_timer = {					\
  };
  
-+void omap_dm_timer_prepare(struct omap_dm_timer *timer);
-+
-+static inline u32 __omap_dm_timer_read(void __iomem *base, u32 reg,
-+						int posted)
-+{
-+	if (posted)
-+		while (__raw_readl(base + (OMAP_TIMER_WRITE_PEND_REG & 0xff))
-+				& (reg >> WPSHIFT))
-+			cpu_relax();
-+
-+	return __raw_readl(base + (reg & 0xff));
-+}
-+
-+static inline void __omap_dm_timer_write(void __iomem *base, u32 reg, u32 val,
-+						int posted)
-+{
-+	if (posted)
-+		while (__raw_readl(base + (OMAP_TIMER_WRITE_PEND_REG & 0xff))
-+				& (reg >> WPSHIFT))
-+			cpu_relax();
-+
-+	__raw_writel(val, base + (reg & 0xff));
-+}
-+
-+/* Assumes the source clock has been set by caller */
-+static inline void __omap_dm_timer_reset(void __iomem *base, int autoidle,
-+						int wakeup)
-+{
-+	u32 l;
-+
-+	l = __omap_dm_timer_read(base, OMAP_TIMER_OCP_CFG_REG, 0);
-+	l |= 0x02 << 3;  /* Set to smart-idle mode */
-+	l |= 0x2 << 8;   /* Set clock activity to perserve f-clock on idle */
-+
-+	if (autoidle)
-+		l |= 0x1 << 0;
-+
-+	if (wakeup)
-+		l |= 1 << 2;
-+
-+	__omap_dm_timer_write(base, OMAP_TIMER_OCP_CFG_REG, l, 0);
-+
-+	/* Match hardware reset default of posted mode */
-+	__omap_dm_timer_write(base, OMAP_TIMER_IF_CTRL_REG,
-+					OMAP_TIMER_CTRL_POSTED, 0);
-+}
-+
-+static inline int __omap_dm_timer_set_source(struct clk *timer_fck,
-+						struct clk *parent)
-+{
-+	int ret;
-+
-+	clk_disable(timer_fck);
-+	ret = clk_set_parent(timer_fck, parent);
-+	clk_enable(timer_fck);
-+
-+	/*
-+	 * When the functional clock disappears, too quick writes seem
-+	 * to cause an abort. XXX Is this still necessary?
-+	 */
-+	__delay(300000);
-+
-+	return ret;
-+}
-+
-+static inline void __omap_dm_timer_stop(void __iomem *base, int posted,
-+						unsigned long rate)
-+{
-+	u32 l;
-+
-+	l = __omap_dm_timer_read(base, OMAP_TIMER_CTRL_REG, posted);
-+	if (l & OMAP_TIMER_CTRL_ST) {
-+		l &= ~0x1;
-+		__omap_dm_timer_write(base, OMAP_TIMER_CTRL_REG, l, posted);
-+#ifdef CONFIG_ARCH_OMAP2PLUS
-+		/* Readback to make sure write has completed */
-+		__omap_dm_timer_read(base, OMAP_TIMER_CTRL_REG, posted);
-+		/*
-+		 * Wait for functional clock period x 3.5 to make sure that
-+		 * timer is stopped
-+		 */
-+		udelay(3500000 / rate + 1);
-+#endif
-+	}
-+
-+	/* Ack possibly pending interrupt */
-+	__omap_dm_timer_write(base, OMAP_TIMER_STAT_REG,
-+					OMAP_TIMER_INT_OVERFLOW, 0);
-+}
-+
-+static inline void __omap_dm_timer_load_start(void __iomem *base, u32 ctrl,
-+						unsigned int load, int posted)
-+{
-+	__omap_dm_timer_write(base, OMAP_TIMER_COUNTER_REG, load, posted);
-+	__omap_dm_timer_write(base, OMAP_TIMER_CTRL_REG, ctrl, posted);
-+}
-+
-+static inline void __omap_dm_timer_int_enable(void __iomem *base,
-+						unsigned int value)
-+{
-+	__omap_dm_timer_write(base, OMAP_TIMER_INT_EN_REG, value, 0);
-+	__omap_dm_timer_write(base, OMAP_TIMER_WAKEUP_EN_REG, value, 0);
-+}
-+
-+static inline unsigned int __omap_dm_timer_read_counter(void __iomem *base,
-+							int posted)
-+{
-+	return __omap_dm_timer_read(base, OMAP_TIMER_COUNTER_REG, posted);
-+}
-+
-+static inline void __omap_dm_timer_write_status(void __iomem *base,
-+						unsigned int value)
-+{
-+	__omap_dm_timer_write(base, OMAP_TIMER_STAT_REG, value, 0);
-+}
-+
- #endif /* __ASM_ARCH_DMTIMER_H */
+ #ifdef CONFIG_ARCH_OMAP2
+-OMAP_SYS_TIMER_INIT(2)
++OMAP_SYS_TIMER_INIT(2, 1, OMAP2_CLKEV_SOURCE)
+ OMAP_SYS_TIMER(2)
+ #endif
+ 
+ #ifdef CONFIG_ARCH_OMAP3
+-OMAP_SYS_TIMER_INIT(3)
++OMAP_SYS_TIMER_INIT(3, 1, OMAP3_CLKEV_SOURCE)
+ OMAP_SYS_TIMER(3)
+-OMAP_SYS_TIMER_INIT(3_secure)
++OMAP_SYS_TIMER_INIT(3_secure, OMAP3_SECURE_TIMER, OMAP3_CLKEV_SOURCE)
+ OMAP_SYS_TIMER(3_secure)
+ #endif
+ 
+@@ -280,7 +357,7 @@ static void __init omap4_timer_init(void)
+ 	BUG_ON(!twd_base);
+ #endif
+ 	omap_dm_timer_init();
+-	omap2_gp_clockevent_init();
++	omap2_gp_clockevent_init(1, OMAP4_CLKEV_SOURCE);
+ 	omap2_gp_clocksource_init();
+ }
+ OMAP_SYS_TIMER(4)
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index 54664a7..dd8b3ff 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -216,6 +216,7 @@ struct omap_dm_timer {
+ 	struct clk *iclk, *fclk;
+ #endif
+ 	void __iomem *io_base;
++	unsigned long rate;
+ 	unsigned reserved:1;
+ 	unsigned enabled:1;
+ 	unsigned posted:1;
