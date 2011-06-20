@@ -1,36 +1,23 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Mon, 20 Jun 2011 23:37:53 +0900
-Subject: [PATCH 4/8] ARM: dma-mapping: implement dma sg methods on top of
-	generic dma ops
-In-Reply-To: <1308556213-24970-5-git-send-email-m.szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 15:39:11 +0100
+Subject: [PATCH 2/8] ARM: dma-mapping: implement dma_map_single on top
+	of dma_map_page
+In-Reply-To: <1308556213-24970-3-git-send-email-m.szyprowski@samsung.com>
 References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-5-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <BANLkTimwo9bMCevBRxfSZJBrkjDpdihtKw@mail.gmail.com>
+	<1308556213-24970-3-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20110620143911.GD26089@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+On Mon, Jun 20, 2011 at 09:50:07AM +0200, Marek Szyprowski wrote:
+> This patch consolidates dma_map_single and dma_map_page calls. This is
+> required to let dma-mapping framework on ARM architecture use common,
+> generic dma-mapping helpers.
 
-On Mon, Jun 20, 2011 at 4:50 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> -extern int arm_dma_map_sg(struct device *, struct scatterlist *, int,
-> +extern int generic_dma_map_sg(struct device *, struct scatterlist *, int,
-> ? ? ? ? ? ? ? ?enum dma_data_direction, struct dma_attrs *attrs);
-> -extern void arm_dma_unmap_sg(struct device *, struct scatterlist *, int,
-> +extern void generic_dma_unmap_sg(struct device *, struct scatterlist *, int,
-> ? ? ? ? ? ? ? ?enum dma_data_direction, struct dma_attrs *attrs);
-> -extern void arm_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
-> +extern void generic_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
-> ? ? ? ? ? ? ? ?enum dma_data_direction);
-> -extern void arm_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
-> +extern void generic_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
-> ? ? ? ? ? ? ? ?enum dma_data_direction);
->
+This breaks DMA API debugging, which requires that dma_map_page and
+dma_unmap_page are paired separately from dma_map_single and
+dma_unmap_single().
 
-I don't understand why you changed arm_dma_*() with generic_dma_*()
-even though they're functionality is not changed
-and they are still specific to ARM.
-They look like that they are generic in the kernel code.
-
-Regards,
-Cho KyongHo.
+This also breaks dmabounce when used with a highmem-enabled system -
+dmabounce refuses the dma_map_page() API but allows the dma_map_single()
+API.
