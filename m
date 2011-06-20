@@ -1,78 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jun 2011 12:40:19 +0100
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Mon, 20 Jun 2011 17:12:03 +0530
 Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
-In-Reply-To: <4DFF2E37.8030602@ti.com>
+In-Reply-To: <4DFF24D0.202@ti.com>
 References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
 	<20110620095053.GA2082@n2100.arm.linux.org.uk>
 	<20110620101438.GD2082@n2100.arm.linux.org.uk>
 	<4DFF20B3.7010209@ti.com>
-	<20110620104415.GF2082@n2100.arm.linux.org.uk>
-	<4DFF255E.5030308@ti.com>
-	<20110620111336.GG2082@n2100.arm.linux.org.uk>
-	<4DFF2E37.8030602@ti.com>
-Message-ID: <20110620114019.GH2082@n2100.arm.linux.org.uk>
+	<20110620103521.GE2082@n2100.arm.linux.org.uk>
+	<4DFF24D0.202@ti.com>
+Message-ID: <4DFF320B.7090009@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 04:55:43PM +0530, Santosh Shilimkar wrote:
-> On 6/20/2011 4:43 PM, Russell King - ARM Linux wrote:
->> On Mon, Jun 20, 2011 at 04:17:58PM +0530, Santosh Shilimkar wrote:
->>> Yes. It's because of interrupt and the CPU active-online
->>> race.
+On 6/20/2011 4:15 PM, Santosh Shilimkar wrote:
+> On 6/20/2011 4:05 PM, Russell King - ARM Linux wrote:
+>> On Mon, Jun 20, 2011 at 03:58:03PM +0530, Santosh Shilimkar wrote:
+>>> On 6/20/2011 3:44 PM, Russell King - ARM Linux wrote:
+>>>> On Mon, Jun 20, 2011 at 10:50:53AM +0100, Russell King - ARM Linux
+>>>> wrote:
+>>>>> On Mon, Jun 20, 2011 at 02:53:59PM +0530, Santosh Shilimkar wrote:
+>>>>>> The current ARM CPU hotplug code suffers from couple of race
+>>>>>> conditions
+>>>>>> in CPU online path with scheduler.
+>>>>>> The ARM CPU hotplug code doesn't wait for hot-plugged CPU to be
+>>>>>> marked
+>>>>>> active as part of cpu_notify() by the CPU which brought it up before
+>>>>>> enabling interrupts.
+>>>>>
+>>>>> Hmm, why not just move the set_cpu_online() call before
+>>>>> notify_cpu_starting()
+>>>>> and add the wait after the set_cpu_online() ?
+>>>>
+>>>> Actually, the race is caused by the CPU being marked online (and
+>>>> therefore
+>>>> available for the scheduler) but not yet active (the CPU asking this
+>>>> one
+>>>> to boot hasn't run the online notifiers yet.)
+>>>>
+>>> Scheduler uses the active mask and not online mask. For schedules CPU
+>>> is ready for migration as soon as it is marked as active and that's
+>>> the reason, interrupts should never be enabled before CPU is marked
+>>> as active in online path.
+>>>
+>>>> This, I feel, is a fault of generic code. If the CPU is not ready to
+>>>> have
+>>>> processes scheduled on it (because migration is not initialized)
+>>>> then we
+>>>> shouldn't be scheduling processes on the new CPU yet.
+>>>>
+>>>> In any case, this should close the window by ensuring that we don't
+>>>> receive
+>>>> an interrupt in the online-but-not-active case. Can you please test?
+>>>>
+>>> No it doesn't work. I still get the crash. The important point
+>>> here is not to enable interrupts before CPU is marked
+>>> as online and active.
 >>
->> I don't see that as a conclusion from this dump.
->>
->>> Here is the chash log..
->>> [   21.025451] CPU1: Booted secondary processor
->>> [   21.025451] CPU1: Unknown IPI message 0x1
->>> [   21.029113] Switched to NOHz mode on CPU #1
->>> [   21.029174] BUG: spinlock lockup on CPU#1, swapper/0, c06220c4
->>
->> That's the xtime seqlock.  We're trying to update the xtime from CPU1,
->> which is not yet online and not yet active.  That's fine, we're just
->> spinning on the spinlock here, waiting for the other CPUs to release
->> it.
->>
->> But what this is saying is that the other CPUs aren't releasing it.
->> The cpu hotplug code doesn't hold the seqlock either.  So who else is
->> holding this lock, causing CPU1 to time out on it.
->>
->> The other thing is that this is only supposed to trigger after about
->> one second:
->>
->>          u64 loops = loops_per_jiffy * HZ;
->>                  for (i = 0; i<  loops; i++) {
->>                          if (arch_spin_trylock(&lock->raw_lock))
->>                                  return;
->>                          __delay(1);
->>                  }
->>
->> which from the timings you have at the beginning of your printk lines
->> is clearly not the case - it's more like 61us.
->>
->> Are you running with those h/w timer delay patches?
-> Nope.
+>> But we can't do that.
+> Why is that ?
+> Is it because of calibration or the hotplug start notifies needs to
+> be called with interrupts enabled ?
+>
+BTW, how is ARM different from X86 here. I mean the X86 code seems to
+do similar what my patch is trying to fix for ARM. Some pointers
+would help me to understand why can't we delay the interrupt enable
+part on ARM hotplug code.
 
-Ok.  So loops_per_jiffy must be too small.  My guess is you're using an
-older kernel without 71c696b1 (calibrate: extract fall-back calculation
-into own helper).
-
-The delay calibration code used to start out by setting:
-
-	loops_per_jiffy = (1<<12);
-
-This will shorten the delay right down, and that's probably causing these
-false spinlock lockup bug dumps.
-
-Arranging for IRQs to be disabled across the delay calibration just avoids
-the issue by preventing any spinlock being taken.
-
-The reason that CPU#0 also complains about spinlock lockup is that for
-some reason CPU#1 never finishes its calibration, and so the loop also
-times out early on CPU#0.
-
-Of course, fiddling with this global variable in this way is _not_ a good
-idea while other CPUs are running and using that variable.
-
-We could also do with implementing trigger_all_cpu_backtrace() to get
-backtraces from the other CPUs when spinlock lockup happens...
+Regards
+Santosh
