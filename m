@@ -1,38 +1,54 @@
-From: tushar.behera@linaro.org (Tushar Behera)
-Date: Mon, 20 Jun 2011 16:16:01 +0530
-Subject: [PATCH 2/2] video: omap2: Compile omap2 support only when needed
-In-Reply-To: <1308566761-2850-1-git-send-email-tushar.behera@linaro.org>
-References: <1308566761-2850-1-git-send-email-tushar.behera@linaro.org>
-Message-ID: <1308566761-2850-3-git-send-email-tushar.behera@linaro.org>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 20 Jun 2011 12:46:50 +0200
+Subject: [PATCH 1/8] ARM: dma-mapping: remove offset parameter to prepare
+	for generic dma_ops
+In-Reply-To: <op.vxc8tmru3l0zgt@mnazarewicz-glaptop>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-2-git-send-email-m.szyprowski@samsung.com>
+	<op.vxc8tmru3l0zgt@mnazarewicz-glaptop>
+Message-ID: <000001cc2f37$5c5605f0$150211d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently display support for omap2 is selected by default and
-it gets built for all the configurations.
+Hello,
 
-Instead of it being a built-in feature, it's compilation should
-depend on the config option CONFIG_FB_OMAP2.
+On Monday, June 20, 2011 10:36 AM Michal Nazarewicz wrote:
 
-Cc: Paul Mundt <lethal@linux-sh.org>
-Cc: Tomi Valkeinen <tomi.valkeinen@nokia.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Tushar Behera <tushar.behera@linaro.org>
----
- drivers/video/Makefile |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> On Mon, 20 Jun 2011 09:50:06 +0200, Marek Szyprowski
+> <m.szyprowski@samsung.com> wrote:
+> > +static inline void dma_sync_single_for_cpu(struct device *dev,
+> 
+> I wouldn't really put inline here or in the function below.
+> 
+> > +		dma_addr_t handle, size_t size, enum dma_data_direction dir)
+> > +{
+> > +	BUG_ON(!valid_dma_direction(dir));
+> > +
+> > +	debug_dma_sync_single_for_cpu(dev, handle, size, dir);
+> > +
+> > +	if (!dmabounce_sync_for_cpu(dev, handle, size, dir))
+> > +		return;
+> > +
+> > +	__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
+> 
+> I know it is just copy'n'paste but how about:
 
-diff --git a/drivers/video/Makefile b/drivers/video/Makefile
-index 8b83129..a19e44e 100644
---- a/drivers/video/Makefile
-+++ b/drivers/video/Makefile
-@@ -133,7 +133,7 @@ obj-$(CONFIG_FB_SH_MOBILE_HDMI)	  += sh_mobile_hdmi.o
- obj-$(CONFIG_FB_SH_MOBILE_MERAM)  += sh_mobile_meram.o
- obj-$(CONFIG_FB_SH_MOBILE_LCDC)	  += sh_mobile_lcdcfb.o
- obj-$(CONFIG_FB_OMAP)             += omap/
--obj-y                             += omap2/
-+obj-$(CONFIG_FB_OMAP2)            += omap2/
- obj-$(CONFIG_XEN_FBDEV_FRONTEND)  += xen-fbfront.o
- obj-$(CONFIG_FB_CARMINE)          += carminefb.o
- obj-$(CONFIG_FB_MB862XX)	  += mb862xx/
+This patch is just about moving the code between the files and I wanted just
+to show what's being changed and how. There is a final cleanup anyway in the
+separate patch. All these patches are meant to start the discussion about
+the way the dma mapping can be redesigned for further extensions with generic
+iommu support. 
+
+> 
+> 	if (dmabounce_sync_for_cpu(dev, handle, size, dir))
+> 		__dma_single_dev_to_cpu(dma_to_virt(dev, handle), size, dir);
+
+The above lines will be removed by the next patches in this series, so I
+really see no point in changing this.
+
+(snipped)
+
+Best regards
 -- 
-1.7.4.1
+Marek Szyprowski
+Samsung Poland R&D Center
