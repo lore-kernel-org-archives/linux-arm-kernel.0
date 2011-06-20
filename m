@@ -1,77 +1,59 @@
 From: chaos.youn@samsung.com (Changhwan Youn)
-Date: Mon, 20 Jun 2011 16:34:12 +0900
-Subject: [PATCH 1/7] ARM: EXYNOS4: Add external GIC io memory mapping
+Date: Mon, 20 Jun 2011 16:34:15 +0900
+Subject: [PATCH 4/7] ARM: GIC: move gic_chip_data structure declaration to
+	header
 In-Reply-To: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
 References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-Message-ID: <1308555258-4322-2-git-send-email-chaos.youn@samsung.com>
+Message-ID: <1308555258-4322-5-git-send-email-chaos.youn@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds external GIC io memory mapping
-to support external GIC on EXYNOS4.
+Since Samsung EXYNOS4210 cannot support register banking in GIC,
+so needs to update CPU interface base address.
+The 'gic_chip_data' is used for it, this patch moves gic_chip_data
+structure declaraton to arch/arm/include/asm/hardware/gic.h to use
+it.
 
+Cc: Russell King <rmk+kernel@arm.linux.org.uk>
 Signed-off-by: Changhwan Youn <chaos.youn@samsung.com>
 ---
- arch/arm/mach-exynos4/cpu.c              |   10 ++++++++++
- arch/arm/mach-exynos4/include/mach/map.h |    5 +++--
- arch/arm/plat-s5p/include/plat/map-s5p.h |    5 +++--
- 3 files changed, 16 insertions(+), 4 deletions(-)
+ arch/arm/common/gic.c               |    6 ------
+ arch/arm/include/asm/hardware/gic.h |    6 ++++++
+ 2 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-index 1196f39..6a1ed74 100644
---- a/arch/arm/mach-exynos4/cpu.c
-+++ b/arch/arm/mach-exynos4/cpu.c
-@@ -107,6 +107,16 @@ static struct map_desc exynos4_iodesc[] __initdata = {
- 		.pfn		= __phys_to_pfn(EXYNOS4_PA_AUDSS),
- 		.length		= SZ_1K,
- 		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_GIC_CPU,
-+		.pfn		= __phys_to_pfn(EXYNOS4_PA_GIC_CPU),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
-+	}, {
-+		.virtual	= (unsigned long)S5P_VA_GIC_DIST,
-+		.pfn		= __phys_to_pfn(EXYNOS4_PA_GIC_DIST),
-+		.length		= SZ_64K,
-+		.type		= MT_DEVICE,
- 	},
- };
+diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
+index 4ddd0a6..23564ed 100644
+--- a/arch/arm/common/gic.c
++++ b/arch/arm/common/gic.c
+@@ -38,12 +38,6 @@ static DEFINE_SPINLOCK(irq_controller_lock);
+ /* Address of GIC 0 CPU interface */
+ void __iomem *gic_cpu_base_addr __read_mostly;
  
-diff --git a/arch/arm/mach-exynos4/include/mach/map.h b/arch/arm/mach-exynos4/include/mach/map.h
-index 57d8074..9d5d797 100644
---- a/arch/arm/mach-exynos4/include/mach/map.h
-+++ b/arch/arm/mach-exynos4/include/mach/map.h
-@@ -61,10 +61,11 @@
- 
- #define EXYNOS4_PA_COMBINER		0x10448000
- 
-+#define EXYNOS4_PA_GIC_CPU		0x10480000
-+#define EXYNOS4_PA_GIC_DIST		0x10490000
+-struct gic_chip_data {
+-	unsigned int irq_offset;
+-	void __iomem *dist_base;
+-	void __iomem *cpu_base;
+-};
+-
+ /*
+  * Supported arch specific GIC irq extension.
+  * Default make them NULL.
+diff --git a/arch/arm/include/asm/hardware/gic.h b/arch/arm/include/asm/hardware/gic.h
+index 0691f9d..435d3f8 100644
+--- a/arch/arm/include/asm/hardware/gic.h
++++ b/arch/arm/include/asm/hardware/gic.h
+@@ -41,6 +41,12 @@ void gic_secondary_init(unsigned int);
+ void gic_cascade_irq(unsigned int gic_nr, unsigned int irq);
+ void gic_raise_softirq(const struct cpumask *mask, unsigned int irq);
+ void gic_enable_ppi(unsigned int);
 +
- #define EXYNOS4_PA_COREPERI		0x10500000
--#define EXYNOS4_PA_GIC_CPU		0x10500100
- #define EXYNOS4_PA_TWD			0x10500600
--#define EXYNOS4_PA_GIC_DIST		0x10501000
- #define EXYNOS4_PA_L2CC			0x10502000
++struct gic_chip_data {
++	unsigned int irq_offset;
++	void __iomem *dist_base;
++	void __iomem *cpu_base;
++};
+ #endif
  
- #define EXYNOS4_PA_MDMA			0x10810000
-diff --git a/arch/arm/plat-s5p/include/plat/map-s5p.h b/arch/arm/plat-s5p/include/plat/map-s5p.h
-index daa4a44..264df2d 100644
---- a/arch/arm/plat-s5p/include/plat/map-s5p.h
-+++ b/arch/arm/plat-s5p/include/plat/map-s5p.h
-@@ -35,9 +35,10 @@
- #define S5P_VA_COREPERI_BASE	S3C_ADDR(0x02800000)
- #define S5P_VA_COREPERI(x)	(S5P_VA_COREPERI_BASE + (x))
- #define S5P_VA_SCU		S5P_VA_COREPERI(0x0)
--#define S5P_VA_GIC_CPU		S5P_VA_COREPERI(0x100)
- #define S5P_VA_TWD		S5P_VA_COREPERI(0x600)
--#define S5P_VA_GIC_DIST		S5P_VA_COREPERI(0x1000)
-+
-+#define S5P_VA_GIC_CPU		S3C_ADDR(0x02810000)
-+#define S5P_VA_GIC_DIST		S3C_ADDR(0x02820000)
- 
- #define S3C_VA_USB_HSPHY	S3C_ADDR(0x02900000)
- #define S5P_VA_AUDSS		S3C_ADDR(0x02A00000)
+ #endif
 -- 
 1.7.1
