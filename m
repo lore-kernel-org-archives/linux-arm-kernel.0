@@ -1,88 +1,34 @@
 From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 15:14:26 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
-	packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
-Message-ID: <alpine.LFD.2.00.1106201449320.2142@xanadu.home>
+Date: Mon, 20 Jun 2011 15:20:44 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,
+	aligned(4) instead of removing the packed attribute
+In-Reply-To: <20110620190240.GJ26089@n2100.arm.linux.org.uk>
+References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
+	<201106201858.45624.arnd@arndb.de>
+	<20110620190240.GJ26089@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.00.1106201515050.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Alan Stern wrote:
+On Mon, 20 Jun 2011, Russell King - ARM Linux wrote:
 
-> On Mon, 20 Jun 2011, Nicolas Pitre wrote:
+> On Mon, Jun 20, 2011 at 06:58:45PM +0200, Arnd Bergmann wrote:
+> > A recent change in gcc changed the default behaviour when compiling the
+> > ehci driver on ARM, but the behaviour was already nondeterministic
+> > because the definition of the readl/writel macros on ARM relies on
+> > unspecified behaviour (cast to pointer with larger aligment).
 > 
-> > Are we talking past each other?
-> > 
-> > Remember that I was the one asking if the align attribute was needed in 
-> > the first place.  If it is not then by all means please get rid of it!
-> > 
-> > But if it _is_ needed, then the generated code can be much better if the 
-> > packed attribute is _also_ followed by the align attribute to 
-> > increase it from 1.
-> 
-> According to Arnd, any remaining possible issues will be addressed by
-> changing the implementation of readl/writel on ARM.  It doesn't look as
-> though the ehci files need anything else done.
+> It's unspecified behaviour period.  If you pass a pointer to readl/writel
+> which is not word aligned, what you get back is anyones guess.
 
-Any usage of __packed is potentially making the code less optimal than 
-it could, depending on the actual layout of the structure where this is 
-applied, because outside of the IO accessor context, the compiler would 
-use less than optimal instructions when accessing the structure members.
+The pointer _is_ aligned.  The problem is that it comes from the address 
+of a structure member, which structure is marked __packed.
 
-If what you have is:
-
-struct foo {
-	u8  c;
-	u32 d;
-	u8  e;
-};
-
-If you need that structure to be packed then so be it and nothing else 
-can be done about it.
-
-However if you have:
-
-struct foo {
-	u32 c;
-	u64 d;
-	u32 e;
-};
-
-Here the d member is not naturally aligned.  On most architectures, 
-including ARM with the ABI currently in use, the compiler would insert a 
-32-bit padding between c and d.  If you must prevent that from happening 
-then you'll mark this struct with __packed.  However that will also mark 
-it as having an alignment of 1, meaning that all accesses to this 
-structure will be done byte by byte and the resulting values 
-reconstructed with shifts and ORs.
-
-Whar ARnd is talking about is _only_ about the IO accessor on ARM which 
-behavior changed with newer GCC versions.  Changing the IO accessor 
-implementation will fix the byte sized access issue to the hardware, but 
-the rest of the code will still suck even if it will work correctly.
-
-By adding the aligned(4) attribute here, you're telling the compiler 
-that despite the packing attribute, it may assume that the structure is 
-still aligned on a 32-bit boundary (which is normally true except if you 
-cast a random pointer to this struct of course) and therefore it can 
-still use 32-bit sized accesses, and the u64 member will be correctly 
-accessed using a pair of 32-bit accesses instead of 8 byte sized 
-accesses.
-
-So this is a matter of being intelligent with those attributes and not 
-stamping them freely just because a structure might be mapped to some 
-hardware representation.  In most cases, the packed attribute is just 
-unneeded.
-
-> As far as I can tell, the other structures in ehci.h have 
-> ((aligned(32)) simply in order to save space, since there can be large 
-> numbers of these structures allocated.
-
-How can increasing the alignment to 32 bytes save space?
-
-Usually a greater alignment is used to ensure proper mapping to CPU 
-cache line boundaries, not to save space.
+Older GCC would see the cast to unsigned int applied to that pointer 
+within the ARM's readl()/writel() implementation and ignore that the 
+source of the address is marked __packed, which __packed implies an 
+alignment of 1.  REcent GCC versions would honnor the alignment of 1 and 
+perform the unsigned int * access using byte sized loads/stores.
 
 
 Nicolas
