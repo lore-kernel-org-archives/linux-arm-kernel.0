@@ -1,291 +1,143 @@
 From: rajeshwari.s@samsung.com (Rajeshwari Shinde)
-Date: Mon, 20 Jun 2011 17:27:27 +0530
-Subject: [PATCH 1/3] ARM: S5P64X0: Add HSMMC setup for host Controller
+Date: Mon, 20 Jun 2011 17:27:29 +0530
+Subject: [PATCH 3/3] ARM: S5P64X0: Enable SDHCI support
 In-Reply-To: <1308571049-4412-1-git-send-email-rajeshwari.s@samsung.com>
 References: <1308571049-4412-1-git-send-email-rajeshwari.s@samsung.com>
-Message-ID: <1308571049-4412-2-git-send-email-rajeshwari.s@samsung.com>
+Message-ID: <1308571049-4412-4-git-send-email-rajeshwari.s@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: rajeshwari.s <rajeshwari.s@samsung.com>
 
-Adds support for HSMMC for S5P64X0 platform, performs
-setup for host controller and related GPIO.
+Enables SDHCI supports for S5P6440 and S5P6450.
 
 Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
 Signed-off-by: Rajeshwari.S <rajeshwari.s@samsung.com>
 ---
- arch/arm/mach-s5p64x0/Kconfig            |   31 ++++++++
- arch/arm/mach-s5p64x0/Makefile           |    2 +
- arch/arm/mach-s5p64x0/setup-sdhci-gpio.c |  121 ++++++++++++++++++++++++++++++
- arch/arm/mach-s5p64x0/setup-sdhci.c      |   54 +++++++++++++
- 4 files changed, 208 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
- create mode 100644 arch/arm/mach-s5p64x0/setup-sdhci.c
+ arch/arm/mach-s5p64x0/mach-smdk6440.c |   27 +++++++++++++++++++++++++++
+ arch/arm/mach-s5p64x0/mach-smdk6450.c |   27 +++++++++++++++++++++++++++
+ 2 files changed, 54 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-s5p64x0/Kconfig b/arch/arm/mach-s5p64x0/Kconfig
-index 017af4c..ed823b0 100644
---- a/arch/arm/mach-s5p64x0/Kconfig
-+++ b/arch/arm/mach-s5p64x0/Kconfig
-@@ -26,6 +26,17 @@ config S5P64X0_SETUP_I2C1
- 	help
- 	  Common setup code for i2c bus 1.
- 
-+config S5P64X0_SETUP_SDHCI
-+	bool
-+	select S5P64X0_SETUP_SDHCI_GPIO
-+	help
-+	  Internal helper functions for S5P64X0 based SDHCI systems
-+
-+config S5P64X0_SETUP_SDHCI_GPIO
-+	bool
-+	help
-+	  Common setup code for SDHCI gpio.
-+
- # machine support
- 
- config MACH_SMDK6440
-@@ -34,11 +45,15 @@ config MACH_SMDK6440
- 	select S3C_DEV_I2C1
- 	select S3C_DEV_RTC
- 	select S3C_DEV_WDT
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
-+	select S3C_DEV_HSMMC2
- 	select S3C64XX_DEV_SPI
- 	select SAMSUNG_DEV_ADC
- 	select SAMSUNG_DEV_PWM
- 	select SAMSUNG_DEV_TS
- 	select S5P64X0_SETUP_I2C1
-+	select S5P64X0_SETUP_SDHCI
- 	help
- 	  Machine support for the Samsung SMDK6440
- 
-@@ -48,12 +63,28 @@ config MACH_SMDK6450
- 	select S3C_DEV_I2C1
- 	select S3C_DEV_RTC
- 	select S3C_DEV_WDT
-+	select S3C_DEV_HSMMC
-+	select S3C_DEV_HSMMC1
-+	select S3C_DEV_HSMMC2
- 	select S3C64XX_DEV_SPI
- 	select SAMSUNG_DEV_ADC
- 	select SAMSUNG_DEV_PWM
- 	select SAMSUNG_DEV_TS
- 	select S5P64X0_SETUP_I2C1
-+	select S5P64X0_SETUP_SDHCI
- 	help
- 	  Machine support for the Samsung SMDK6450
- 
-+menu "Use 8-bit SDHCI bus width"
-+
-+config S5P64X0_SD_CH1_8BIT
-+	bool "SDHCI Channel 1 (Slot 1)"
-+	depends on MACH_SMDK6450 || MACH_SMDK6440
-+	default n
-+	help
-+	  Support SDHCI Channel 1 8-bit bus.
-+	  If selected, Channel 2 is disabled.
-+
-+endmenu
-+
- endif
-diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
-index ae6bf6f..60ff9b4 100644
---- a/arch/arm/mach-s5p64x0/Makefile
-+++ b/arch/arm/mach-s5p64x0/Makefile
-@@ -28,3 +28,5 @@ obj-y				+= dev-audio.o
- obj-$(CONFIG_S3C64XX_DEV_SPI)	+= dev-spi.o
- 
- obj-$(CONFIG_S5P64X0_SETUP_I2C1)	+= setup-i2c1.o
-+obj-$(CONFIG_S5P64X0_SETUP_SDHCI)	+= setup-sdhci.o
-+obj-$(CONFIG_S5P64X0_SETUP_SDHCI_GPIO)	+= setup-sdhci-gpio.o
-diff --git a/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c b/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
-new file mode 100644
-index 0000000..31541b3
---- /dev/null
-+++ b/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
-@@ -0,0 +1,121 @@
-+/* linux/arch/arm/mach-s5p64x0/setup-sdhci-gpio.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P64X0 - Helper functions for setting up SDHCI device(s) GPIO (HSMMC)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+#include <mach/gpio.h>
-+#include <mach/regs-gpio.h>
-+
-+#include <plat/gpio-cfg.h>
-+#include <plat/sdhci.h>
-+
-+
-+void s5p6440_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+
-+	/* Set all the necessary GPG pins to special-function 2 */
-+	s3c_gpio_cfgrange_nopull(S5P6440_GPG(0), 2 + width, S3C_GPIO_SFN(2));
-+
-+	/* Set GPG[6] pin to special-function 2 - MMC0 CDn */
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_setpull(S5P6440_GPG(6), S3C_GPIO_PULL_UP);
-+		s3c_gpio_cfgpin(S5P6440_GPG(6), S3C_GPIO_SFN(2));
-+	}
-+}
-+
-+void s5p6440_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+
-+	/* Set GPH[0:1] pins to special-function 2 - CLK and CMD */
-+	s3c_gpio_cfgrange_nopull(S5P6440_GPH(0), 2 , S3C_GPIO_SFN(2));
-+
-+	switch (width) {
-+	case 8:
-+		/* Set data pins GPH[6:9] special-function 2 */
-+		s3c_gpio_cfgrange_nopull(S5P6440_GPH(6), 4, S3C_GPIO_SFN(2));
-+	case 4:
-+		/* set data pins GPH[2:5] special-function 2 */
-+		s3c_gpio_cfgrange_nopull(S5P6440_GPH(2), 4, S3C_GPIO_SFN(2));
-+	default:
-+		break;
-+	}
-+
-+	/* Set GPG[6] pin to special-funtion 3 : MMC1 CDn */
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_setpull(S5P6440_GPG(6), S3C_GPIO_PULL_UP);
-+		s3c_gpio_cfgpin(S5P6440_GPG(6), S3C_GPIO_SFN(3));
-+	}
-+}
-+
-+void s5p6440_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	/* Set GPC[4:5] pins to special-function 3 - CLK and CMD */
-+	s3c_gpio_cfgrange_nopull(S5P6440_GPC(4), 2, S3C_GPIO_SFN(3));
-+
-+	/* Set data pins GPH[6:9] pins to special-function 3 */
-+	s3c_gpio_cfgrange_nopull(S5P6440_GPH(6), 4, S3C_GPIO_SFN(3));
-+
-+	/* No MMC2 CDn available */
-+}
-+
-+
-+/* S5P6450 SDHCI GPIO Settings */
-+void s5p6450_setup_sdhci0_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+
-+	/* Set all the necessary GPG pins to special-function 2 */
-+	s3c_gpio_cfgrange_nopull(S5P6450_GPG(0), 2 + width, S3C_GPIO_SFN(2));
-+
-+	/* Set GPG[6] to special-function 2 : MMC0 CDn */
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_setpull(S5P6450_GPG(6), S3C_GPIO_PULL_UP);
-+		s3c_gpio_cfgpin(S5P6450_GPG(6), S3C_GPIO_SFN(2));
-+	}
-+}
-+
-+void s5p6450_setup_sdhci1_cfg_gpio(struct platform_device *dev, int width)
-+{
-+	struct s3c_sdhci_platdata *pdata = dev->dev.platform_data;
-+
-+	/* Set GPH[0:1] pins to special-function 2 - CLK and CMD */
-+	s3c_gpio_cfgrange_nopull(S5P6450_GPH(0), 2, S3C_GPIO_SFN(2));
-+
-+	switch (width) {
-+	case 8:
-+		/* Set data pins GPH[6:9] to special-function 2 */
-+		s3c_gpio_cfgrange_nopull(S5P6450_GPH(6), 4, S3C_GPIO_SFN(2));
-+	case 4:
-+		/* Set data pins GPH[2:5] to special-function 2 */
-+		s3c_gpio_cfgrange_nopull(S5P6450_GPH(2), 4, S3C_GPIO_SFN(2));
-+	default:
-+		break;
-+	}
-+
-+	/* Set GPG[6] pin to special-funtion 3 : MMC1 CDn */
-+	if (pdata->cd_type == S3C_SDHCI_CD_INTERNAL) {
-+		s3c_gpio_setpull(S5P6450_GPG(6), S3C_GPIO_PULL_UP);
-+		s3c_gpio_cfgpin(S5P6450_GPG(6), S3C_GPIO_SFN(3));
-+	}
-+}
-+
-+void s5p6450_setup_sdhci2_cfg_gpio(struct platform_device *dev, int width)
-+{
-+
-+	/* Set all the necessary GPG pins to special-function 3 */
-+	s3c_gpio_cfgrange_nopull(S5P6450_GPG(7), 2 + width, S3C_GPIO_SFN(3));
-+
-+	/* No MMC2 CDn available */
-+}
-diff --git a/arch/arm/mach-s5p64x0/setup-sdhci.c b/arch/arm/mach-s5p64x0/setup-sdhci.c
-new file mode 100644
-index 0000000..729b824
---- /dev/null
-+++ b/arch/arm/mach-s5p64x0/setup-sdhci.c
-@@ -0,0 +1,54 @@
-+/* linux/arch/arm/mach-s5p64x0/setup-sdhci.c
-+ *
-+ * Copyright (c) 2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * S5P64X0 - Helper functions for settign up SDHCI device(s) (HSMMC)
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+*/
-+
-+#include <linux/kernel.h>
-+#include <linux/types.h>
-+#include <linux/interrupt.h>
-+#include <linux/platform_device.h>
-+#include <linux/io.h>
-+
-+#include <linux/mmc/card.h>
+diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+index 2d559f1..78c744f 100644
+--- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
++++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
+@@ -23,6 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/pwm_backlight.h>
 +#include <linux/mmc/host.h>
-+
-+#include <plat/regs-sdhci.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -46,6 +47,7 @@
+ #include <plat/adc.h>
+ #include <plat/ts.h>
+ #include <plat/s5p-time.h>
 +#include <plat/sdhci.h>
-+
-+/* clock sources for the mmc bus clock, order as for the ctrl2[5..4] */
-+
-+char *s5p64x0_hsmmc_clksrcs[4] = {
-+	[0] = NULL,
-+	[1] = NULL,
-+	[2] = "sclk_mmc",	/* mmc_bus */
-+	[3] = NULL,
+ 
+ #define SMDK6440_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+ 				S3C2410_UCON_RXILEVEL |		\
+@@ -141,6 +143,28 @@ static struct platform_device *smdk6440_devices[] __initdata = {
+ 	&s5p6440_device_iis,
+ 	&s3c_device_timer[1],
+ 	&smdk6440_backlight_device,
++	&s3c_device_hsmmc0,
++	&s3c_device_hsmmc1,
++	&s3c_device_hsmmc2,
 +};
 +
-+void s5p64x0_setup_sdhci_cfg_card(struct platform_device *dev,
-+				    void __iomem *r,
-+				    struct mmc_ios *ios,
-+				    struct mmc_card *card)
-+{
-+	u32 ctrl2 = 0, ctrl3 = 0;
++static struct s3c_sdhci_platdata smdk6440_hsmmc0_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
++	.clk_type	= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
 +
-+	/* don't need to alter anything acording to card-type */
-+	__raw_writel(S3C64XX_SDHCI_CONTROL4_DRIVE_9mA,
-+			r + S3C64XX_SDHCI_CONTROL4);
++static struct s3c_sdhci_platdata smdk6440_hsmmc1_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_INTERNAL,
++#if defined(CONFIG_S5P64X0_SD_CH1_8BIT)
++	.max_width	= 8,
++	.host_caps	= MMC_CAP_8_BIT_DATA,
++#endif
++	.clk_type	= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
 +
-+	ctrl2 = __raw_readl(r + S3C_SDHCI_CONTROL2);
-+	ctrl2 &= S3C_SDHCI_CTRL2_SELBASECLK_MASK;
-+	ctrl2 |= (S3C64XX_SDHCI_CTRL2_ENSTAASYNCCLR |
-+		  S3C64XX_SDHCI_CTRL2_ENCMDCNFMSK |
-+		  S3C_SDHCI_CTRL2_DFCNT_NONE |
-+		  S3C_SDHCI_CTRL2_ENCLKOUTHOLD);
++static struct s3c_sdhci_platdata smdk6440_hsmmc2_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
++	.clk_type	= S3C_SDHCI_CLK_DIV_EXTERNAL,
+ };
+ 
+ static struct s3c2410_platform_i2c s5p6440_i2c0_data __initdata = {
+@@ -194,6 +218,9 @@ static void __init smdk6440_machine_init(void)
+ 	i2c_register_board_info(1, smdk6440_i2c_devs1,
+ 			ARRAY_SIZE(smdk6440_i2c_devs1));
+ 
++	s3c_sdhci0_set_platdata(&smdk6440_hsmmc0_pdata);
++	s3c_sdhci1_set_platdata(&smdk6440_hsmmc1_pdata);
++	s3c_sdhci2_set_platdata(&smdk6440_hsmmc2_pdata);
+ 	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
+ }
+ 
+diff --git a/arch/arm/mach-s5p64x0/mach-smdk6450.c b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+index d19c469..099ca20 100644
+--- a/arch/arm/mach-s5p64x0/mach-smdk6450.c
++++ b/arch/arm/mach-s5p64x0/mach-smdk6450.c
+@@ -23,6 +23,7 @@
+ #include <linux/clk.h>
+ #include <linux/gpio.h>
+ #include <linux/pwm_backlight.h>
++#include <linux/mmc/host.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -46,6 +47,7 @@
+ #include <plat/adc.h>
+ #include <plat/ts.h>
+ #include <plat/s5p-time.h>
++#include <plat/sdhci.h>
+ 
+ #define SMDK6450_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
+ 				S3C2410_UCON_RXILEVEL |		\
+@@ -159,9 +161,31 @@ static struct platform_device *smdk6450_devices[] __initdata = {
+ 	&s5p6450_device_iis0,
+ 	&s3c_device_timer[1],
+ 	&smdk6450_backlight_device,
++	&s3c_device_hsmmc0,
++	&s3c_device_hsmmc1,
++	&s3c_device_hsmmc2,
+ 	/* s5p6450_device_spi0 will be added */
+ };
+ 
++static struct s3c_sdhci_platdata smdk6450_hsmmc0_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
++	.clk_type	= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
 +
-+	__raw_writel(ctrl2, r + S3C_SDHCI_CONTROL2);
-+	__raw_writel(ctrl3, r + S3C_SDHCI_CONTROL3);
-+}
++static struct s3c_sdhci_platdata smdk6450_hsmmc1_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
++#if defined(CONFIG_S5P64X0_SD_CH1_8BIT)
++	.max_width	= 8,
++	.host_caps	= MMC_CAP_8_BIT_DATA,
++#endif
++	.clk_type	= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
++
++static struct s3c_sdhci_platdata smdk6450_hsmmc2_pdata __initdata = {
++	.cd_type	= S3C_SDHCI_CD_NONE,
++	.clk_type	= S3C_SDHCI_CLK_DIV_EXTERNAL,
++};
++
+ static struct s3c2410_platform_i2c s5p6450_i2c0_data __initdata = {
+ 	.flags		= 0,
+ 	.slave_addr	= 0x10,
+@@ -213,6 +237,9 @@ static void __init smdk6450_machine_init(void)
+ 	i2c_register_board_info(1, smdk6450_i2c_devs1,
+ 			ARRAY_SIZE(smdk6450_i2c_devs1));
+ 
++	s3c_sdhci0_set_platdata(&smdk6450_hsmmc0_pdata);
++	s3c_sdhci1_set_platdata(&smdk6450_hsmmc1_pdata);
++	s3c_sdhci2_set_platdata(&smdk6450_hsmmc2_pdata);
+ 	platform_add_devices(smdk6450_devices, ARRAY_SIZE(smdk6450_devices));
+ }
+ 
 -- 
 1.7.0.4
