@@ -1,53 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 20 Jun 2011 13:10:50 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
-	packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>
-Message-ID: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
+From: viliam.mateicka@gmail.com (Viliam Mateicka)
+Date: Mon, 20 Jun 2011 19:27:18 +0200
+Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
+In-Reply-To: <20110620170551.GE26623@legolas.emea.dhcp.ti.com>
+References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
+	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
+	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
+	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
+	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
+	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
+	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
+	<20110620160650.GA26623@legolas.emea.dhcp.ti.com>
+	<BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
+	<20110620170551.GE26623@legolas.emea.dhcp.ti.com>
+Message-ID: <BANLkTinc-9hxLQ1Epf5=PoHvxtapfO7Vvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Alan Stern wrote:
+I wonder then, who applies the patch first. One ass can't stop
+progress (was there some progress afterall ?) because of one
+line-break (which git produces by default afterall) and several
+non-conforming whitespace conversions. I think you should stop
+replying to me, because I'm kinda starting to like trolling afterall.
 
-> On Mon, 20 Jun 2011, Nicolas Pitre wrote:
-> 
-> > On Mon, 20 Jun 2011, Alan Stern wrote:
-> > 
-> > > On Sun, 19 Jun 2011, Nicolas Pitre wrote:
-> > > 
-> > > > > > The question is: does the structure really has to be packed?
-> > > > > 
-> > > > > What do you mean?  The structure really does need to be allocated
-> > > > > without padding between the fields; is that the same thing?  So do a
-> > > > > bunch of other structures that currently have no annotations at all.
-> > > > 
-> > > > Yes, that's the same thing.  The packed attribute tells the compiler 
-> > > > that you don't want it to insert padding in it as it sees fit.
-> > > 
-> > > I thought the packed attribute does more than that.  For example, on
-> > > some architectures doesn't it also force the compiler to use
-> > > byte-oriented instructions for accessing the structure's fields?
-> > 
-> > Yes, but that's a consequence of not being able to access those fields 
-> > in their naturally aligned position anymore.  Hence the addition of the 
-> > align attribute to tell the compiler that we know that the structure is 
-> > still aligned to a certain degree letting the compiler to avoid 
-> > byte-oriented instructions when possible.
-> 
-> Not exactly.  As far as I can tell, the ((packed)) attribute caused the 
-> compiler to change the structure's alignment from its natural value to 
-> 1.  That's why the fields weren't in their naturally aligned positions 
-> and why removing ((packed)) fixed the problem.
+Vilo
 
-Are we talking past each other?
-
-Remember that I was the one asking if the align attribute was needed in 
-the first place.  If it is not then by all means please get rid of it!
-
-But if it _is_ needed, then the generated code can be much better if the 
-packed attribute is _also_ followed by the align attribute to 
-increase it from 1.
-
-
-Nicolas
+On Mon, Jun 20, 2011 at 7:05 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Mon, Jun 20, 2011 at 06:41:59PM +0200, Skacore Systems wrote:
+>> Yeah I think that one line break and tabs are sabotaging your work.
+>> So stop being an 8====O - hole. No wonder if you are paid by TI that
+>> one line patch into the upstream takes you so long to comprehend.
+>
+> you are this close for me to drop your fix and add you to the shitlist.
+>
+> --
+> balbi
+>
