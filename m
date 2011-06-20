@@ -1,40 +1,36 @@
 From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Mon, 20 Jun 2011 23:33:00 +0900
-Subject: [Linaro-mm-sig] [PATCH 3/8] ARM: dma-mapping: use
-	asm-generic/dma-mapping-common.h
-In-Reply-To: <1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
+Date: Mon, 20 Jun 2011 23:37:53 +0900
+Subject: [PATCH 4/8] ARM: dma-mapping: implement dma sg methods on top of
+	generic dma ops
+In-Reply-To: <1308556213-24970-5-git-send-email-m.szyprowski@samsung.com>
 References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <BANLkTimHE2jzQAav465WaG3iWVeHPyNRNQ@mail.gmail.com>
+	<1308556213-24970-5-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <BANLkTimwo9bMCevBRxfSZJBrkjDpdihtKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi.
 
-Great job.
-
 On Mon, Jun 20, 2011 at 4:50 PM, Marek Szyprowski
 <m.szyprowski@samsung.com> wrote:
-> +static inline void set_dma_ops(struct device *dev, struct dma_map_ops *ops)
-> +{
-> + ? ? ? dev->archdata.dma_ops = ops;
-> +}
-> +
+> -extern int arm_dma_map_sg(struct device *, struct scatterlist *, int,
+> +extern int generic_dma_map_sg(struct device *, struct scatterlist *, int,
+> ? ? ? ? ? ? ? ?enum dma_data_direction, struct dma_attrs *attrs);
+> -extern void arm_dma_unmap_sg(struct device *, struct scatterlist *, int,
+> +extern void generic_dma_unmap_sg(struct device *, struct scatterlist *, int,
+> ? ? ? ? ? ? ? ?enum dma_data_direction, struct dma_attrs *attrs);
+> -extern void arm_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
+> +extern void generic_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
+> ? ? ? ? ? ? ? ?enum dma_data_direction);
+> -extern void arm_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
+> +extern void generic_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
+> ? ? ? ? ? ? ? ?enum dma_data_direction);
+>
 
-Who calls set_dma_ops()?
-In the mach. initialization part?
-What if a device driver does not want to use arch's dma_map_ops
-when machine init procedure set a dma_map_ops?
-Even though, may arch defiens their dma_map_ops in archdata of device structure,
-I think it is not a good idea that is device structure contains a
-pointer to dma_map_ops
-that may not be common to all devices in a board.
-
-I also think that it is better to attach and to detach dma_map_ops dynamically.
-Moreover, a mapping is not permanent in our Exynos platform
-because a System MMU may be turned off while runtime.
-
-DMA API must come with IOMMU API to initialize IOMMU in runtime.
+I don't understand why you changed arm_dma_*() with generic_dma_*()
+even though they're functionality is not changed
+and they are still specific to ARM.
+They look like that they are generic in the kernel code.
 
 Regards,
 Cho KyongHo.
