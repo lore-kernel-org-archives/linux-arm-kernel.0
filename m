@@ -1,62 +1,31 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 20 Jun 2011 10:37:13 -0300
-Subject: [PATCH v2] ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
-Message-ID: <1308577033-10678-1-git-send-email-fabio.estevam@freescale.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Mon, 20 Jun 2011 14:40:25 +0100
+Subject: [PATCH 0/4] Consistently enter the kernel in ARM state
+Message-ID: <1308577229-23681-1-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Original code was assuming that the CSPI1 pins on the
-MX31PDK were the primary pin function, which is incorrect.
+This series rationalises the kernel entry requirements so that
+Image is entered in ARM state, just like zImage.
 
-On MX31PDK board these are the pins that provide CSPI1 functionality:
+This should enable Image to be booted reliably for Thumb-2 kernels,
+just like zImage.
 
-DSR_DCE1 (ALT mode 1) --> CSPI1_CLK
-RI_DCE1 (ALT mode 1) --> CSPI1_RDY
+The Booting documentation is updated to describe the requirement:
+this resolves the ARM/Thumb ambiguity for Thumb-2 kernels; for ARM
+kernels there is no implied change.
 
-DTR_DTE1  -->CSI1_MOSI
-DSR_DTE1 --> CSPI1_MISO
-DTR_DCE2 ---> CSPI1_SS2
+Dave Martin (4):
+  ARM: head: Always Enter the kernel in ARM state
+  ARM: head-nommu: Always enter the kernel in ARM state
+  ARM: zImage: Jump to the decompressed kernel entry point in ARM state
+  ARM: Documentation: clarify entry requirements for ARM versus Thumb-2
 
-The 3 IOMUX settings above are done via GPR as per Table A-1 of the MX31RM.
+ Documentation/arm/Booting       |    5 +++++
+ arch/arm/boot/compressed/head.S |    3 ++-
+ arch/arm/kernel/head-nommu.S    |    8 ++++++++
+ arch/arm/kernel/head.S          |    8 ++++++++
+ 4 files changed, 23 insertions(+), 1 deletions(-)
 
-This patch fixes the CSPI1 IOMUX and makes the LCD to be functional.
-
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-
-- Provided better explanation about this change on the commit message
-
- arch/arm/mach-imx/mach-mx31_3ds.c |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
-index ab2a626..a6160ee 100644
---- a/arch/arm/mach-imx/mach-mx31_3ds.c
-+++ b/arch/arm/mach-imx/mach-mx31_3ds.c
-@@ -53,11 +53,8 @@ static int mx31_3ds_pins[] = {
- 	MX31_PIN_RXD1__RXD1,
- 	IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO),
- 	/*SPI0*/
--	MX31_PIN_CSPI1_SCLK__SCLK,
--	MX31_PIN_CSPI1_MOSI__MOSI,
--	MX31_PIN_CSPI1_MISO__MISO,
--	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
--	MX31_PIN_CSPI1_SS2__SS2, /* CS for LCD */
-+	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_ALT1),
-+	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_ALT1),
- 	/* SPI 1 */
- 	MX31_PIN_CSPI2_SCLK__SCLK,
- 	MX31_PIN_CSPI2_MOSI__MOSI,
-@@ -690,6 +687,9 @@ static void __init mx31_3ds_init(void)
- 	int ret;
- 
- 	imx31_soc_init();
-+
-+	/* Configure SPI1 IOMUX */
-+	mxc_iomux_set_gpr(MUX_PGP_CSPI_BB, true);
- 
- 	mxc_iomux_setup_multiple_pins(mx31_3ds_pins, ARRAY_SIZE(mx31_3ds_pins),
- 				      "mx31_3ds");
 -- 
-1.6.0.4
+1.7.4.1
