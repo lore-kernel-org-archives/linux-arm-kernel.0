@@ -1,59 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jun 2011 13:57:15 +0100
-Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
-In-Reply-To: <4DFF3C95.1080903@ti.com>
-References: <20110620101438.GD2082@n2100.arm.linux.org.uk>
-	<4DFF20B3.7010209@ti.com>
-	<20110620104415.GF2082@n2100.arm.linux.org.uk>
-	<4DFF255E.5030308@ti.com>
-	<20110620111336.GG2082@n2100.arm.linux.org.uk>
-	<4DFF2E37.8030602@ti.com>
-	<20110620114019.GH2082@n2100.arm.linux.org.uk>
-	<4DFF3454.30507@ti.com>
-	<20110620121939.GI2082@n2100.arm.linux.org.uk>
-	<4DFF3C95.1080903@ti.com>
-Message-ID: <20110620125715.GK2082@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Mon, 20 Jun 2011 14:58:14 +0200
+Subject: [RFC/PATCH] OMAP PM: remove OMAP_PM_NONE config option
+In-Reply-To: <alpine.DEB.2.00.1105061407140.30136@utopia.booyaka.com>
+References: <1304673087-24643-1-git-send-email-j-pihet@ti.com>
+	<alpine.DEB.2.00.1105061016070.30136@utopia.booyaka.com>
+	<BANLkTimgrpKq_SrD=U9rzXspKv8eOcsv0w@mail.gmail.com>
+	<alpine.DEB.2.00.1105061407140.30136@utopia.booyaka.com>
+Message-ID: <BANLkTik=0=SFfEfcjE_be6Z+0D0onNQ4Gg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 05:57:01PM +0530, Santosh Shilimkar wrote:
-> On 6/20/2011 5:49 PM, Russell King - ARM Linux wrote:
->> On Mon, Jun 20, 2011 at 05:21:48PM +0530, Santosh Shilimkar wrote:
->>> On 6/20/2011 5:10 PM, Russell King - ARM Linux wrote:
->
-> [...]
->
->>>
->>> Any pointers on the other question about "why we need to enable
->>> interrupts before the CPU is ready?"
->>
->> To ensure that things like the delay loop calibration and twd calibration
->> can run, though that looks like it'll run happily enough with the boot
->> CPU updating jiffies.
->>
-> I guessed it and had same point as above. Calibration will still
-> work.
->
->> However, I'm still not taking your patch because I believe its just
->> papering over the real issue, which is not as you describe.
->>
->> You first need to work out why the spinlock lockup detection is firing
->> after just 61us rather than the full 1s and fix that.
->>
-> This is possibly because of my script which doesn't wait for 1
-> second.
+Hi Paul,
 
-How could a userspace script affect the internal behaviour of
-spin_lock() and the spinlock lockup detector?
-
-> Latest mainline kernel with omap2plus_defconfig and below simple script
-> to trigger the failure.
+> On Fri, 6 May 2011, Jean Pihet wrote:
 >
-> -------------
-> while true
-> do
-> echo 0 > /sys/devices/system/cpu/cpu1/online
-> echo 1 > /sys/devices/system/cpu/cpu1/online
-> done
+>> I checked the patch against the master branch of both Tony's and
+>> Linus's trees, it applies and compiles OK.
+>> Is that OK to you?
+>
+> If it applies cleanly against Linus's current tree, then yes, that's fine.
+Do you know what happened to this patch? Is it scheduled for merging
+into mainline?
 
-Thanks, I'll give it a go here and see if I can debug it further.
+>
+>
+> - Paul
+>
+
+Thanks,
+Jean
