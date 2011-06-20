@@ -1,46 +1,59 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 20 Jun 2011 09:43:13 -0300
-Subject: [PATCH] ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
-In-Reply-To: <20110620072658.GQ23771@pengutronix.de>
-References: <1308242572-5158-1-git-send-email-fabio.estevam@freescale.com>
-	<20110620072658.GQ23771@pengutronix.de>
-Message-ID: <BANLkTikeJ2vB1YW4+P0cgcLsAy7hP2Yc1w@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 13:57:15 +0100
+Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
+In-Reply-To: <4DFF3C95.1080903@ti.com>
+References: <20110620101438.GD2082@n2100.arm.linux.org.uk>
+	<4DFF20B3.7010209@ti.com>
+	<20110620104415.GF2082@n2100.arm.linux.org.uk>
+	<4DFF255E.5030308@ti.com>
+	<20110620111336.GG2082@n2100.arm.linux.org.uk>
+	<4DFF2E37.8030602@ti.com>
+	<20110620114019.GH2082@n2100.arm.linux.org.uk>
+	<4DFF3454.30507@ti.com>
+	<20110620121939.GI2082@n2100.arm.linux.org.uk>
+	<4DFF3C95.1080903@ti.com>
+Message-ID: <20110620125715.GK2082@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sascha,
-
-On Mon, Jun 20, 2011 at 4:26 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
-> On Thu, Jun 16, 2011 at 01:42:52PM -0300, Fabio Estevam wrote:
->> The LCD on the mx31_3ds board is connected to CSPI1.
+On Mon, Jun 20, 2011 at 05:57:01PM +0530, Santosh Shilimkar wrote:
+> On 6/20/2011 5:49 PM, Russell King - ARM Linux wrote:
+>> On Mon, Jun 20, 2011 at 05:21:48PM +0530, Santosh Shilimkar wrote:
+>>> On 6/20/2011 5:10 PM, Russell King - ARM Linux wrote:
 >
-> From the description I would say you remove exactly the setup we want
-> instead of adding it. Can you explain a bit more?
+> [...]
+>
+>>>
+>>> Any pointers on the other question about "why we need to enable
+>>> interrupts before the CPU is ready?"
+>>
+>> To ensure that things like the delay loop calibration and twd calibration
+>> can run, though that looks like it'll run happily enough with the boot
+>> CPU updating jiffies.
+>>
+> I guessed it and had same point as above. Calibration will still
+> work.
+>
+>> However, I'm still not taking your patch because I believe its just
+>> papering over the real issue, which is not as you describe.
+>>
+>> You first need to work out why the spinlock lockup detection is firing
+>> after just 61us rather than the full 1s and fix that.
+>>
+> This is possibly because of my script which doesn't wait for 1
+> second.
 
-Sure, the original code was assuming that the CSPI1 pins on the
-MX31PDK were the primary pin function, which is incorrect.
+How could a userspace script affect the internal behaviour of
+spin_lock() and the spinlock lockup detector?
 
-On MX31PDK board these are the pins that provide CSPI1 functionality:
+> Latest mainline kernel with omap2plus_defconfig and below simple script
+> to trigger the failure.
+>
+> -------------
+> while true
+> do
+> echo 0 > /sys/devices/system/cpu/cpu1/online
+> echo 1 > /sys/devices/system/cpu/cpu1/online
+> done
 
-DSR_DCE1 (ALT mode 1) --> CSPI1_CLK
-RI_DCE1 (ALT mode 1) --> CSPI1_RDY
-
-DTR_DTE1  -->CSI1_MOSI
-DSR_DTE1 --> CSPI1_MISO
-DTR_DCE2 ---> CSPI1_SS2
-
-The 3 IOMUX settings above are done via GPR as per Table A-1 of the MX31RM.
-
-So the patch I sent fixes the CSPI1 IOMUX and makes the LCD to be functional.
-
-I think we haven't seen this before because probably Redboot was doing
-the IOMUX for us. After I switched to U-boot I was not able to get the
-LCD to work and now with this patch it is working fine. FSL BSP also
-does the IOMUX in the same way.
-
-If you prefer I can post a v2 of this patch with a better explanation
-on the commit message.
-
-Regards,
-
-Fabio Estevam
+Thanks, I'll give it a go here and see if I can debug it further.
