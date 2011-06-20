@@ -1,67 +1,46 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 20 Jun 2011 18:41:04 +0800
-Subject: [PATCH 0/4] Extend sdhci-esdhc-imx card_detect and write_protect
-	support for mx5
-In-Reply-To: <87lix1hbjy.fsf@lebrac.rtp-net.org>
-References: <1307702572-22066-1-git-send-email-shawn.guo@linaro.org>
-	<20110614064841.GB30295@S2100-06.ap.freescale.net>
-	<87lix1hbjy.fsf@lebrac.rtp-net.org>
-Message-ID: <20110620104102.GB23757@S2100-06.ap.freescale.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Jun 2011 11:35:21 +0100
+Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
+In-Reply-To: <4DFF20B3.7010209@ti.com>
+References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110620095053.GA2082@n2100.arm.linux.org.uk>
+	<20110620101438.GD2082@n2100.arm.linux.org.uk>
+	<4DFF20B3.7010209@ti.com>
+Message-ID: <20110620103521.GE2082@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+On Mon, Jun 20, 2011 at 03:58:03PM +0530, Santosh Shilimkar wrote:
+> On 6/20/2011 3:44 PM, Russell King - ARM Linux wrote:
+>> On Mon, Jun 20, 2011 at 10:50:53AM +0100, Russell King - ARM Linux wrote:
+>>> On Mon, Jun 20, 2011 at 02:53:59PM +0530, Santosh Shilimkar wrote:
+>>>> The current ARM CPU hotplug code suffers from couple of race conditions
+>>>> in CPU online path with scheduler.
+>>>> The ARM CPU hotplug code doesn't wait for hot-plugged CPU to be marked
+>>>> active as part of cpu_notify() by the CPU which brought it up before
+>>>> enabling interrupts.
+>>>
+>>> Hmm, why not just move the set_cpu_online() call before notify_cpu_starting()
+>>> and add the wait after the set_cpu_online() ?
+>>
+>> Actually, the race is caused by the CPU being marked online (and therefore
+>> available for the scheduler) but not yet active (the CPU asking this one
+>> to boot hasn't run the online notifiers yet.)
+>>
+> Scheduler uses the active mask and not online mask. For schedules CPU
+> is ready for migration as soon as it is marked as active and that's
+> the reason, interrupts should never be enabled before CPU is marked
+> as active in online path.
+>
+>> This, I feel, is a fault of generic code.  If the CPU is not ready to have
+>> processes scheduled on it (because migration is not initialized) then we
+>> shouldn't be scheduling processes on the new CPU yet.
+>>
+>> In any case, this should close the window by ensuring that we don't receive
+>> an interrupt in the online-but-not-active case.  Can you please test?
+>>
+> No it doesn't work. I still get the crash. The important point
+> here is not to enable interrupts before CPU is marked
+> as online and active.
 
-Sorry for the late replying.  Somehow I missed the message.
-
-On Thu, Jun 16, 2011 at 08:32:33PM +0200, Arnaud Patard wrote:
-> Shawn Guo <shawn.guo@freescale.com> writes:
-> 
-> Hi,
-> 
-> > On Fri, Jun 10, 2011 at 06:42:48PM +0800, Shawn Guo wrote:
-> >> The card-present polling within sdhci based driver is very expensive
-> >> in terms of the impact to system performance.  We observe a few
-> >> system performance issues from Freescale and Linaro on mx5 platforms,
-> >> which have been proved card polling related.
-> >> 
-> >> The patch set extends the current sdhci-esdhc-imx card_detect and
-> >> write_protect support to cover mx5 platforms, and solves above
-> >> performance issues.
-> >> 
-> >> Shawn Guo (4):
-> >>       mmc: sdhci: fix interrupt storm from card detection
-> >>       mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
-> >>       mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
-> >>       mmc: sdhci-esdhc-imx: extend card_detect and write_protect support
-> >> 
-> > Hi Arnaud,
-> >
-> > Any chance to play with it yet?
-> 
-> Finally managed to build a kernel with this version of the
-> patchset. While I'm not polling anymore, I'm getting a lot of interrupts
-> if the card is not inserted. Theses interrupts are not happening if the
-> card is inserted. I can see things like this in the logs :
-> sdhci [sdhci_irq()]: *** mmc0 got interrupt: 0x00000080
-> 
-> [ of course, the bit of the present state register indicating card
-> presence is equal to 0 ]
-> 
-> I've tested the SIGNAL case only. Don't know if switch to GPIO may help.
-> Do you have same kind of issue on your side ?
-> 
-I reproduced the issue on my side with turn on debug switch (I should
-do so from the beginning).
-
-GPIO mode does not have this issue.  But you do not have to switch to
-GPIO, as I have got it fixed in the v3 of the patch set (posted out
-a few minutes ago).  It can apply on linux-next cleanly.  You need
-to note that naming 'SIGNAL' has been changed to 'CONTROLLER' per
-Wolfram's comment.
-
-Thanks for testing.
-
--- 
-Regards,
-Shawn
+But we can't do that.
