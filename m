@@ -1,48 +1,176 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 20 Jun 2011 21:55:59 +0100
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <201106202226.37381.arnd@arndb.de>
-References: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
-	<Pine.LNX.4.44L0.1106201329390.2113-100000@iolanthe.rowland.org>
-	<20110620184849.GI26089@n2100.arm.linux.org.uk>
-	<201106202226.37381.arnd@arndb.de>
-Message-ID: <20110620205559.GM26089@n2100.arm.linux.org.uk>
+From: peterhuewe@gmx.de (Peter Huewe)
+Date: Mon, 20 Jun 2011 23:01:37 +0200
+Subject: [PATCH 1/2 v3] mfd/ab3550: Convert to kstrtou8_from_user
+In-Reply-To: <20110620195037.GA2534@p183.telecom.by>
+References: <20110620195037.GA2534@p183.telecom.by>
+Message-ID: <1308603698-32166-1-git-send-email-peterhuewe@gmx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 10:26:37PM +0200, Arnd Bergmann wrote:
-> * We already need a compiler barrier in the non-_relaxed() versions of
->   the I/O accessors, which will force a reload of the base address
->   in a lot of cases, so the code is already suboptimal. Yes, we don't
->   have the barrier today without CONFIG_ARM_DMA_MEM_BUFFERABLE, but that
->   is a bug, because it lets the compiler move accesses to DMA buffers
->   around readl/writel.
+This patch replaces the code for getting an number from a
+userspace buffer by a simple call to kstrou8_from_user.
+This makes it easier to read and less error prone.
 
-You're now being obtuse there.  You don't need compiler barriers to
-guarantee order - that's what volatile does there.
+Since the old buffers held only values up to 255, we don't need
+kstrtoul, but rather kstrtou8.
 
-Before you start quoting stuff about volatile, look at the
-volatile-considered-harmful.txt document:
+Kernel Version: v3.0-rc3
 
-  - The above-mentioned accessor functions might use volatile on
-    architectures where direct I/O memory access does work.  Essentially,
-    each accessor call becomes a little critical section on its own and
-    ensures that the access happens as expected by the programmer.
+Changes in v2:
+- Use kstrtou8 instead of kstrtoul due to small numbers
+- Dropped then unnecessary checks
+Changes in v3:
+- Drop now unnecessary local variables
+- Change the debug_address and debug_bank members to u8 since they hold
+  only values up to 255, and also remove the now superfluous u8 casts
+(Remarks from Alexey Dobriyan, Thanks!)
 
-which is what we're doing here.  And because each accessor is its own
-little critical section, there's no need for a compiler barrier.
+Signed-off-by: Peter Huewe <peterhuewe@gmx.de>
+---
+ drivers/mfd/ab3550-core.c |   79 +++++++++++++-------------------------------
+ 1 files changed, 24 insertions(+), 55 deletions(-)
 
-> > If it is the case that these structures do not require packing to get
-> > their desired layout, then they don't require packing, and the packed
-> > attribute should be dropped.
-> 
-> Yes. But are you going to audit every other use of __packed in the kernel
-> to check if it is used on __iomem pointers?
-
-As I've said, using __packed on __iomem pointers is fraught for many
-reasons, and ignoring the other reasons and just concentrating on the
-IO accessor problem is bad news in any case.
-
-So yes, __packed needs to be solved _irrespective_ of the IO accessor
-issue.
+diff --git a/drivers/mfd/ab3550-core.c b/drivers/mfd/ab3550-core.c
+index 3d7dce6..bd0df90 100644
+--- a/drivers/mfd/ab3550-core.c
++++ b/drivers/mfd/ab3550-core.c
+@@ -73,8 +73,8 @@ struct ab3550 {
+ 	u8 startup_events[AB3550_NUM_EVENT_REG];
+ 	bool startup_events_read;
+ #ifdef CONFIG_DEBUG_FS
+-	unsigned int debug_bank;
+-	unsigned int debug_address;
++	u8 debug_bank;
++	u8 debug_address;
+ #endif
+ };
+ 
+@@ -879,20 +879,13 @@ static ssize_t ab3550_bank_write(struct file *file,
+ 	size_t count, loff_t *ppos)
+ {
+ 	struct ab3550 *ab = ((struct seq_file *)(file->private_data))->private;
+-	char buf[32];
+-	int buf_size;
+-	unsigned long user_bank;
++	u8 user_bank;
+ 	int err;
+ 
+-	/* Get userspace string and assure termination */
+-	buf_size = min(count, (sizeof(buf) - 1));
+-	if (copy_from_user(buf, user_buf, buf_size))
+-		return -EFAULT;
+-	buf[buf_size] = 0;
+-
+-	err = strict_strtoul(buf, 0, &user_bank);
++	/* Get userspace string and convert to number */
++	err = kstrtou8_from_user(user_buf, count, 0, &user_bank);
+ 	if (err)
+-		return -EINVAL;
++		return err;
+ 
+ 	if (user_bank >= AB3550_NUM_BANKS) {
+ 		dev_err(&ab->i2c_client[0]->dev,
+@@ -902,7 +895,7 @@ static ssize_t ab3550_bank_write(struct file *file,
+ 
+ 	ab->debug_bank = user_bank;
+ 
+-	return buf_size;
++	return count;
+ }
+ 
+ static int ab3550_address_print(struct seq_file *s, void *p)
+@@ -923,27 +916,14 @@ static ssize_t ab3550_address_write(struct file *file,
+ 	size_t count, loff_t *ppos)
+ {
+ 	struct ab3550 *ab = ((struct seq_file *)(file->private_data))->private;
+-	char buf[32];
+-	int buf_size;
+-	unsigned long user_address;
+ 	int err;
+ 
+-	/* Get userspace string and assure termination */
+-	buf_size = min(count, (sizeof(buf) - 1));
+-	if (copy_from_user(buf, user_buf, buf_size))
+-		return -EFAULT;
+-	buf[buf_size] = 0;
+-
+-	err = strict_strtoul(buf, 0, &user_address);
++	/* Get userspace string and convert to number */
++	err = kstrtou8_from_user(user_buf, count, 0, &ab->debug_address);
+ 	if (err)
+-		return -EINVAL;
+-	if (user_address > 0xff) {
+-		dev_err(&ab->i2c_client[0]->dev,
+-			"debugfs error input > 0xff\n");
+-		return -EINVAL;
+-	}
+-	ab->debug_address = user_address;
+-	return buf_size;
++		return err;
++
++	return count;
+ }
+ 
+ static int ab3550_val_print(struct seq_file *s, void *p)
+@@ -952,8 +932,8 @@ static int ab3550_val_print(struct seq_file *s, void *p)
+ 	int err;
+ 	u8 regvalue;
+ 
+-	err = get_register_interruptible(ab, (u8)ab->debug_bank,
+-		(u8)ab->debug_address, &regvalue);
++	err = get_register_interruptible(ab, ab->debug_bank,
++		ab->debug_address, &regvalue);
+ 	if (err)
+ 		return -EINVAL;
+ 	seq_printf(s, "0x%02X\n", regvalue);
+@@ -971,38 +951,27 @@ static ssize_t ab3550_val_write(struct file *file,
+ 	size_t count, loff_t *ppos)
+ {
+ 	struct ab3550 *ab = ((struct seq_file *)(file->private_data))->private;
+-	char buf[32];
+-	int buf_size;
+-	unsigned long user_val;
++	u8 user_val;
+ 	int err;
+ 	u8 regvalue;
+ 
+-	/* Get userspace string and assure termination */
+-	buf_size = min(count, (sizeof(buf)-1));
+-	if (copy_from_user(buf, user_buf, buf_size))
+-		return -EFAULT;
+-	buf[buf_size] = 0;
+-
+-	err = strict_strtoul(buf, 0, &user_val);
++	/* Get userspace string and convert to number */
++	err = kstrtou8_from_user(user_buf, count, 0, &user_val);
+ 	if (err)
+-		return -EINVAL;
+-	if (user_val > 0xff) {
+-		dev_err(&ab->i2c_client[0]->dev,
+-			"debugfs error input > 0xff\n");
+-		return -EINVAL;
+-	}
++		return err;
++
+ 	err = mask_and_set_register_interruptible(
+-		ab, (u8)ab->debug_bank,
+-		(u8)ab->debug_address, 0xFF, (u8)user_val);
++		ab, ab->debug_bank,
++		ab->debug_address, 0xFF, user_val);
+ 	if (err)
+ 		return -EINVAL;
+ 
+-	get_register_interruptible(ab, (u8)ab->debug_bank,
+-		(u8)ab->debug_address, &regvalue);
++	get_register_interruptible(ab, ab->debug_bank,
++		ab->debug_address, &regvalue);
+ 	if (err)
+ 		return -EINVAL;
+ 
+-	return buf_size;
++	return count;
+ }
+ 
+ static const struct file_operations ab3550_bank_fops = {
+-- 
+1.7.3.4
