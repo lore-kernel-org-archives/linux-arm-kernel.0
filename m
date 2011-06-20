@@ -1,51 +1,75 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Mon, 20 Jun 2011 18:40:45 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <4DFF6E58.8090306@zytor.com>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
-	<4DFE89E0.5020509@zytor.com> <20110620074124.GB24716@elte.hu>
-	<4DFF6E58.8090306@zytor.com>
-Message-ID: <20110620164045.GB10815@elte.hu>
+From: skacore.systems@gmail.com (Skacore Systems)
+Date: Mon, 20 Jun 2011 18:41:59 +0200
+Subject: [PATCH] s3c2410_udc: fix custom UDC command handling
+In-Reply-To: <20110620160650.GA26623@legolas.emea.dhcp.ti.com>
+References: <BANLkTimWM2oew2f9uWxoD1kw1=2bSYFFuw@mail.gmail.com>
+	<Pine.LNX.4.44L0.1106201105430.2113-100000@iolanthe.rowland.org>
+	<20110620151522.GN14262@legolas.emea.dhcp.ti.com>
+	<BANLkTi=5S6bWs3jr9hTsg2=LXh4xKAprUA@mail.gmail.com>
+	<20110620153645.GQ14262@legolas.emea.dhcp.ti.com>
+	<BANLkTik-zdp57zTjrafR0jXGoJiq2hrm3g@mail.gmail.com>
+	<BANLkTi=tuh028X-Rr9i8ZF_B_Q6VBK2-Lw@mail.gmail.com>
+	<20110620160650.GA26623@legolas.emea.dhcp.ti.com>
+Message-ID: <BANLkTi=nEma5muF9R3_QUzZWWJ64DW9Skw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Yeah I think that one line break and tabs are sabotaging your work.
+So stop being an 8====O - hole. No wonder if you are paid by TI that
+one line patch into the upstream takes you so long to comprehend.
 
-* H. Peter Anvin <hpa@zytor.com> wrote:
+Vilo
 
-> On 06/20/2011 12:41 AM, Ingo Molnar wrote:
-> > 
-> > * H. Peter Anvin <hpa@zytor.com> wrote:
-> > 
-> >> There are some test drivers which really want /dev/mem to work.
-> > 
-> > Test drivers and test hardware with zero enumeration can use below 4G 
-> > addresses just fine.
-> >
-> > Also, debugging is not an issue and some non-default kernel or boot 
-> > option can enable any sort of device i guess, so my main worry isnt 
-> > really security but that we should stand in the way of the apparent 
-> > practice of *shipping* user-space drivers that use /dev/mem ...
-> > 
-> 
-> We should either fix /dev/mem to work according to its 
-> specification or rip it out.  The issue with test drivers is not 
-> spurious... I ran into this one myself a few weeks ago while trying 
-> to do a memory test (by limiting the amount of memory available to 
-> the kernel).  This is something that is typically done on factory 
-> floors, and it would be nice to be able to get those environments 
-> over to using Linux.
-
-There is no reason why they couldnt use a .config option or a boot 
-option to get their weird stuff going, which weird stuff also happens 
-to be useful.
-
-What i'm somewhat against is having this enabled by default for weird 
-stuff that also happens to be harmful - and the fact that it never 
-worked over 4G physical gives us the perfect opportunity to do just 
-that.
-
-Thanks,
-
-	Ingo
+On Mon, Jun 20, 2011 at 6:06 PM, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Mon, Jun 20, 2011 at 05:57:31PM +0200, Skacore Systems wrote:
+>> Oh and I've finally cloned the mainline git. So here it's the last
+>> try. I hope the TI people will not sabotage the Samsung's drivers any
+>> way longer !!!
+>
+> Now you're just making an ass of yourself.
+>
+> what do you think you will get making such kind of statements ? I just
+> happen to be hired by TI, there's no such thing as TI trying to sabotage
+> Samsung's drivers.
+>
+> I'll fix this one out myself just to make you stop bothering me, but
+> don't expect me to put your patches in my priority list. If you really
+> think TI is sabotaging samsung's drivers, look at the big re-factor we
+> are doing on the entire Gadget framework, involving not only Samsung's
+> drivers but all the others.
+>
+> Even though you cloned the tree you still make a mistake which will
+> prevent me from applying the patch without manually editting it.
+>
+> On top of that, you decided not to follow our netiquette or our patch
+> formatting rules just because you think it's "nonsense". If you really
+> think that, why do you even bother sending the patch to this mailing
+> list ?
+>
+>> diff --git a/drivers/usb/gadget/s3c2410_udc.c b/drivers/usb/gadget/s3c2410_udc.c
+>> index 100f263..b6e1ca5 100644
+>> --- a/drivers/usb/gadget/s3c2410_udc.c
+>> +++ b/drivers/usb/gadget/s3c2410_udc.c
+>> @@ -1567,7 +1567,7 @@ static void s3c2410_udc_command(enum
+>> s3c2410_udc_cmd_e cmd)
+>
+> there shouldn't be this line break here.
+>
+>> ? ? ? ? ? ? ? ? return;
+>>
+>> ? ? ? ? if (udc_info->udc_command) {
+>> - ? ? ? ? ? ? ? udc_info->udc_command(S3C2410_UDC_P_DISABLE);
+>> + ? ? ? ? ? ? ? udc_info->udc_command(cmd);
+>> ? ? ? ? } else if (gpio_is_valid(udc_info->pullup_pin)) {
+>> ? ? ? ? ? ? ? ? int value;
+>
+> tabs where converted into spaces too.
+>
+> Next time, instead of been such an ass, spend some time learning the
+> process we use to do development. You'll see things will go smoother.
+>
+> --
+> balbi
+>
