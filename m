@@ -1,32 +1,31 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 00:05:12 +0100
-Subject: [PATCH] ARM: report present cpus in /proc/cpuinfo
-In-Reply-To: <4E012198.6010405@nvidia.com>
-References: <4E012198.6010405@nvidia.com>
-Message-ID: <20110621230512.GL23234@n2100.arm.linux.org.uk>
+Date: Wed, 22 Jun 2011 00:10:35 +0100
+Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
+In-Reply-To: <4E00FC2F.1010400@codeaurora.org>
+References: <20110620114019.GH2082@n2100.arm.linux.org.uk>
+	<20110620142338.GL2082@n2100.arm.linux.org.uk>
+	<4DFF5F29.2000904@ti.com> <4E005F92.8030208@ti.com>
+	<20110621100057.GB23802@n2100.arm.linux.org.uk>
+	<4E006FA0.7050508@ti.com>
+	<20110621101900.GC23802@n2100.arm.linux.org.uk>
+	<4E00708C.6050108@ti.com>
+	<20110621102600.GD23802@n2100.arm.linux.org.uk>
+	<4E00FC2F.1010400@codeaurora.org>
+Message-ID: <20110621231035.GE23802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 03:56:24PM -0700, Jon Mayo wrote:
-> Because arm linux likes to dynamically hotplug cpus, the meaning of
-> online has changed slightly. Previously online meant a cpus is
-> schedulable, and conversely offline means they it is not schedulable.
-> But with the current power management infrastructure there are cpus
-> that can be scheduled (after they are woken up automatically), yet are
-> not considered "online" because the masks and flags for them are not
-> set.
+On Tue, Jun 21, 2011 at 01:16:47PM -0700, Stephen Boyd wrote:
+> On 06/21/2011 03:26 AM, Russell King - ARM Linux wrote:
+> > On Tue, Jun 21, 2011 at 03:51:00PM +0530, Santosh Shilimkar wrote:
+> >> On 6/21/2011 3:49 PM, Russell King - ARM Linux wrote:
+> >>> I won't be committing the init/calibrate.c change to a git tree - it
+> >>> isn't ARM stuff so it goes in patch form.
+> >> Patches with change log would be fine as well.
+> > The answer is not at the moment, but maybe soon.
+> 
+> Should we send those two patches to the stable trees as well? They seem
+> to fix issues with cpu onlining that have existed for a long time.
 
-There be sharks here.  glibc can read /proc/cpuinfo to find out how
-many CPUs are online.  glibc can also read /proc/stat to determine
-that number.
-
-Both files should be using the same test to ensure consistency.  That
-is using the online mask, not the present mask.
-
-If a CPU is hot unplugged (and therefore the bit is clear in the online
-map) then it is not available for scheduling, and the system will not
-wake the CPU up without intervention, no matter how high the load will
-become, without userspace assistance.
-
-So I don't think your change is correct, and the code as it stands is
-right.
+Looks to me like the problem was introduced for 2.6.39-rc1, so we
+should probably get the fix into the 2.6.39-stable tree too.
