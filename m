@@ -1,41 +1,34 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 22 Jun 2011 00:35:27 +0200
-Subject: [PATCHv7] ARM: mx51: Add support for low power suspend on MX51
-In-Reply-To: <87k4cfa550.fsf@lebrac.rtp-net.org>
-References: <1301325297-24126-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<87k4cfa550.fsf@lebrac.rtp-net.org>
-Message-ID: <20110621223527.GF6069@pengutronix.de>
+From: jmayo@nvidia.com (Jon Mayo)
+Date: Tue, 21 Jun 2011 15:56:24 -0700
+Subject: [PATCH] ARM: report present cpus in /proc/cpuinfo
+Message-ID: <4E012198.6010405@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 11:46:35AM +0200, Arnaud Patard wrote:
-> <Dinh.Nguyen@freescale.com> writes:
-> 
-> Hi,
-> 
-> > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> >
-> > Adds initial low power suspend functionality to MX51.
-> > Supports "mem" and "standby" modes.
-> >
-> > Tested on mx51-babbage.
-> >
-> > Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
-> 
-> I fail to see this patch in imx tree. Did it get merged in some other
-> tree ?
+Because arm linux likes to dynamically hotplug cpus, the meaning of
+online has changed slightly. Previously online meant a cpus is
+schedulable, and conversely offline means they it is not schedulable.
+But with the current power management infrastructure there are cpus
+that can be scheduled (after they are woken up automatically), yet are
+not considered "online" because the masks and flags for them are not
+set.
 
-Not yet. Have you tested this patch?
+---
+  arch/arm/kernel/setup.c |    2 +-
+  1 files changed, 1 insertions(+), 1 deletions(-)
 
-Sascha
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index d5231ae..2c52b4e 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -905,7 +905,7 @@ static int c_show(struct seq_file *m, void *v)
+  		   cpu_name, read_cpuid_id() & 15, elf_platform);
 
-> 
-> Thanks,
-> Arnaud
-> 
-
+  #if defined(CONFIG_SMP)
+-	for_each_online_cpu(i) {
++	for_each_present_cpu(i) {
+  		/*
+  		 * glibc reads /proc/cpuinfo to determine the number of
+  		 * online processors, looking for lines beginning with
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.0.4
