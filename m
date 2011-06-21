@@ -1,76 +1,39 @@
-From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 21 Jun 2011 23:04:10 +0800
-Subject: Slow spi_sync() on pxa2xx_spi
-In-Reply-To: <20110621142025.GL3652@excalibur.local>
-References: <20110616082112.GA10075@excalibur.local>
-	<BANLkTikuo_fHbw9FFMtorpg15vOnXMK-+g@mail.gmail.com>
-	<20110616091931.GB10075@excalibur.local>
-	<BANLkTinU+chEbZRpFSdRH_dPE2vhK_7pHg@mail.gmail.com>
-	<20110621140341.GK3652@excalibur.local>
-	<BANLkTi=S+WJYqMJJZptMCxtzSUU=W2UL0Q@mail.gmail.com>
-	<20110621142025.GL3652@excalibur.local>
-Message-ID: <BANLkTi=+oNHYYL_=gYUCC+zFBfnkxZqJWA@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 21 Jun 2011 11:06:37 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106201653450.2142@xanadu.home>
+Message-ID: <Pine.LNX.4.44L0.1106211058250.2327-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 10:20 PM, Stefan Schmidt
-<stefan@datenfreihafen.org> wrote:
-> Hello.
->
-> On Tue, 2011-06-21 at 22:08, Eric Miao wrote:
->> On Tue, Jun 21, 2011 at 10:03 PM, Stefan Schmidt
->> <stefan@datenfreihafen.org> wrote:
->> > On Thu, 2011-06-16 at 17:44, Eric Miao wrote:
->> > > On Thu, Jun 16, 2011 at 5:19 PM, Stefan Schmidt
->> > > <stefan@datenfreihafen.org> wrote:
->> > > >
->> > > > Its either 8bit or 16bit for a message. The mentioned problem happens
->> > > > on a 8 bit message. It does nothing else then writing to a defined
->> > > > register address to trigger the hardware sending the data in the FIFO.
->> > >
->> > > This might get too much overhead. I didn't check the source code, but
->> > > my guess is it's waiting for interrupt for each message, and once the
->> > > interrupt of message being flushed out happens, it starts the next one
->> > > waiting for the FIFO empty interrupt coming. Did you try stuff more
->> > > bytes into a single message?
->> >
->> > Took me some time to implement and test al kind of different
->> > scenarios. As you suggested I tried to stuff more bytes into a message
->> > as well as testing all kind of combination with tx and rx thresholds,
->> > timout, PIO and DMA, cs_change , etc. No change.
->> >
->> > I then bit the bullet and changed the board to use the spi_gpio driver
->> > instead of pxa2xx. After some struggling (make sure you setup pin
->> > config correctly :)) I got it working but with the same result.
->> >
->> > My last test block was around using spi_async() instead of spi_sync
->> > and as well I was not able to reach my timing criteria. :(
->> >
->> > To me it seems right now as if it is just not possible to reach
->> > something in the 100 usec range with the SPI framework. Obviuously I
->> > would be loved to be proven wrong. :)
->> >
->> > As I'm running way out of time for this part of my project I'm back to
->> > the driver now trying to find a solution that avoids the tight timing
->> > criteria.
->>
->> I think for a time budget like this, you may want to try a dedicated
->> polling driver avoid all the interrupt/wait stuff, that's going to maximize
->> the throughput. If that's even not possible, it might be HW limitations.
->
-> You mean like configuring the pins as plain GPIO and have some small
-> bitbang functions on my own without the SPI framework? Just trying to
-> understand in what direction you are pointing me. :)
+On Mon, 20 Jun 2011, Nicolas Pitre wrote:
 
-I mean just to have a small driver, configure the SPI controller with
-hardcoded values, and try writing to the SSDR all by yourself, and
-polling the SSSR status bits. Not something simulating SPI w/ GPIO,
-that will be slow.
+> On Mon, 20 Jun 2011, Alan Stern wrote:
+> 
+> > On Mon, 20 Jun 2011, Nicolas Pitre wrote:
+> > 
+> > > > As far as I can tell, the other structures in ehci.h have 
+> > > > ((aligned(32)) simply in order to save space, since there can be large 
+> > > > numbers of these structures allocated.
+> > > 
+> > > How can increasing the alignment to 32 bytes save space?
+> > 
+> > No, no -- the alignment is _decreased_ to 32 bits.  Without the 
+> > attribute the alignment would have been 64 bits.
+> 
+> The aligned attribute requires a byte value not a bit value.
+> Maybe what you meant is ((aligned(4)) ?
 
->
-> I might have to try this if it turns out that wrokign around it in the
-> driver does not work (lets hope at least _something_ works). :)
->
-> regards
-> Stefan Schmidt
->
+Ah, very good point!  No, I meant ((aligned(32))).  Do "grep aligned 
+drivers/usb/host/ehci.h" and you'll see.
+
+So my understanding was wrong; these structure really are being forced 
+to a strict alignment.  And indeed, now that I go back and look at the 
+EHCI spec, it turns out that this alignment is required by the 
+hardware.
+
+Okay, so this digression was irrelevant to our discussion.  Forget I 
+mentioned it...
+
+Alan Stern
