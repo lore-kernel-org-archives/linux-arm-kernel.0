@@ -1,105 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 00:36:19 +0100
-Subject: [PATCH] ARM: report present cpus in /proc/cpuinfo
-In-Reply-To: <4E012820.2090208@nvidia.com>
-References: <4E012198.6010405@nvidia.com>
-	<20110621230512.GL23234@n2100.arm.linux.org.uk>
-	<4E012820.2090208@nvidia.com>
-Message-ID: <20110621233619.GM23234@n2100.arm.linux.org.uk>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 22 Jun 2011 01:38:30 +0200
+Subject: [PATCH v7 00/11] use nonblock mmc requests to minimize latency
+Message-ID: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 04:24:16PM -0700, Jon Mayo wrote:
-> On 06/21/2011 04:05 PM, Russell King - ARM Linux wrote:
->> On Tue, Jun 21, 2011 at 03:56:24PM -0700, Jon Mayo wrote:
->>> Because arm linux likes to dynamically hotplug cpus, the meaning of
->>> online has changed slightly. Previously online meant a cpus is
->>> schedulable, and conversely offline means they it is not schedulable.
->>> But with the current power management infrastructure there are cpus
->>> that can be scheduled (after they are woken up automatically), yet are
->>> not considered "online" because the masks and flags for them are not
->>> set.
->>
->> There be sharks here.  glibc can read /proc/cpuinfo to find out how
->> many CPUs are online.  glibc can also read /proc/stat to determine
->> that number.
->>
->
-> Yea. that's the issue I had with this patch. I couldn't come up with a  
-> way to make /proc/stat behave the same without impact other arches.
->
-> also what you described is something we call a race. :) reading and  
-> parsing cpuinfo then stat, or vice versa, is not atomic. glibc is just  
-> going to have to suck it up and deal with cpu1-3 on my system popping in  
-> and out randomly in both cpuinfo and stat with the current 
-> implementation.
+How significant is the cache maintenance over head?
+It depends, the eMMC are much faster now
+compared to a few years ago and cache maintenance cost more due to
+multiple cache levels and speculative cache pre-fetch. In relation the
+cost for handling the caches have increased and is now a bottle neck
+dealing with fast eMMC together with DMA.
 
-Well, that's how it is - Linus tends to be opposed to adding syscalls
-to allow glibc to get this kind of information, blaming glibc for being
-dumb instead.  If you look at the glibc source, you'll see that it has
-a hint about a 'syscall' for __get_nprocs - that's quite old and has
-never happened.  I don't hope out much hope of anything changing anytime
-soon.
+The intention for introducing non-blocking mmc requests is to minimize the
+time between a mmc request ends and another mmc request starts. In the
+current implementation the MMC controller is idle when dma_map_sg and
+dma_unmap_sg is processing. Introducing non-blocking mmc request makes it
+possible to prepare the caches for next job in parallel to an active
+mmc request.
 
-> I don't think the behavior of ARM linux makes sense. Neither change is  
-> truly correct in my mind. What I feel is the correct behavior is a list  
-> (in both stat and cpuinfo) of all cpus either running a task or ready to  
-> run a task.
+This is done by making the issue_rw_rq() non-blocking.
+The increase in throughput is proportional to the time it takes to
+prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
+a request and how fast the memory is. The faster the MMC/SD is
+the more significant the prepare request time becomes. Measurements on U5500
+and Panda on eMMC and SD shows significant performance gain for large
+reads when running DMA mode. In the PIO case the performance is unchanged.
 
-That _is_ what you have listed in /proc/cpuinfo and /proc/stat.
+There are two optional hooks pre_req() and post_req() that the host driver
+may implement in order to move work to before and after the actual mmc_request
+function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
+the dma descriptor and post_req runs the dma_unmap_sg.
 
-> cpu_possible_mask, cpu_present_mask, and cpu_online_mask  
-> don't have semantics on ARM that I feel is right. (I don't understand  
-> what cpu_active_mask is, but it's probably not what I want either)
+Details on measurements from IOZone and mmc_test:
+https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
 
-They have their defined meaning.
+Changes since v6:
+ * minor update of doc for mmc_start_req and code clean up.
+ * Indentifed a bug running tests on ext4 with discard enable.
+   The test procedure is documented here: https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req#Liability_test
+ * Resolved bug by preventing mmc async request run in parallel
+   to discard (mmc_erase).
 
-cpu_possible_mask - the CPU number may be available
-cpu_present_mask - the CPU number is present and is available to be brought
-	online upon request by the hotplug code
-cpu_online_mask - the CPU is becoming available for scheduling
-cpu_active_mask - the CPU is fully online and available for scheduling
+Per Forlin (11):
+  mmc: add non-blocking mmc request function
+  omap_hsmmc: add support for pre_req and post_req
+  mmci: implement pre_req() and post_req()
+  mmc: mmc_test: add debugfs file to list all tests
+  mmc: mmc_test: add test for non-blocking transfers
+  mmc: add member in mmc queue struct to hold request data
+  mmc: add a block request prepare function
+  mmc: move error code in mmc_block_issue_rw_rq to a separate function.
+  mmc: add a second mmc queue request member
+  mmc: test: add random fault injection in core.c
+  mmc: add handling for two parallel block requests in issue_rw_rq
 
-CPUs only spend a _very_ short time in the online but !active state
-(about the time it takes the CPU asking for it to be brought up to
-notice that it has been brought up, and for the scheduler migration
-code to receive the notification that the CPU is now online.)  So
-you can regard the active mask as a mere copy of the online mask for
-most purposes.
+ drivers/mmc/card/block.c      |  537 ++++++++++++++++++++++++-----------------
+ drivers/mmc/card/mmc_test.c   |  361 +++++++++++++++++++++++++++-
+ drivers/mmc/card/queue.c      |  184 +++++++++-----
+ drivers/mmc/card/queue.h      |   33 ++-
+ drivers/mmc/core/core.c       |  164 ++++++++++++-
+ drivers/mmc/core/debugfs.c    |    5 +
+ drivers/mmc/host/mmci.c       |  146 ++++++++++-
+ drivers/mmc/host/mmci.h       |    8 +
+ drivers/mmc/host/omap_hsmmc.c |   87 +++++++-
+ include/linux/mmc/core.h      |    6 +-
+ include/linux/mmc/host.h      |   24 ++
+ lib/Kconfig.debug             |   11 +
+ 12 files changed, 1237 insertions(+), 329 deletions(-)
 
-CPUs may be set in the possible mask but not the present mask - that
-can happen if you limit the number of CPUs on the kernel command line.
-However, we have no way to bring those CPUs to "present" status, and
-so they are not available for bringing online - as far as the software
-is concerned, they're as good as being physically unplugged.
-
-CPUs in the possible mask indicate CPUs which can be present while
-this kernel is running.
-
-So, actually, our use of these is correct - it can't be any different
-to any other architecture, because the code which interprets the state
-from these masks is all architecture independent.
-
-For instance, the generic hotplug code will refuse to bring a cpu
-online by doing this test:
-
-        if (cpu_online(cpu) || !cpu_present(cpu))
-                return -EINVAL;
-
-So, we (in arch/arm) can't change that decision.  Same for online &&
-active must both be set in order for any process to be scheduled onto
-that CPU - if any process is on a CPU which is going offline (and
-therefore !active, !online) then it will be migrated off that CPU by
-generic code before the CPU goes offline.
-
-I think what you're getting confused over is that within nvidia, you're
-probably dynamically hotplugging CPUs, and so offline CPUs are apparantly
-available to the system if the load on the system rises.  That's not
-something in the generic kernel, and is a custom addition.  Such an
-addition _can_ be seen to change the definition of the above masks,
-but that's not the fault of the kernel - that's the way you're driving
-the hotplug system.
-
-So, I don't believe there's anything what so ever wrong here, and I
-don't believe that we're doing anything different from any other SMP
-platform wrt these masks.
+-- 
+1.7.4.1
