@@ -1,60 +1,79 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Tue, 21 Jun 2011 16:00:38 +0400
-Subject: [RFC][PATCH 2/5] ARM: SAMSUNG: Changing the build condition of
-	OTG platform device for samsung.
-In-Reply-To: <20110621114940.GB2531@legolas.emea.dhcp.ti.com>
-References: <1308639827-2121-1-git-send-email-p.paneri@samsung.com>
-	<1308639827-2121-3-git-send-email-p.paneri@samsung.com>
-	<4E0084B8.1040201@ru.mvista.com>
-	<20110621114940.GB2531@legolas.emea.dhcp.ti.com>
-Message-ID: <4E0087E6.6020405@ru.mvista.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Tue, 21 Jun 2011 14:07:19 +0200
+Subject: [PATCH v2] ARM: mach-imx/mx31_3ds: Fix IOMUX for SPI1 signals
+In-Reply-To: <1308577033-10678-1-git-send-email-fabio.estevam@freescale.com>
+References: <1308577033-10678-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110621120719.GY23771@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Mon, Jun 20, 2011 at 10:37:13AM -0300, Fabio Estevam wrote:
+> Original code was assuming that the CSPI1 pins on the
+> MX31PDK were the primary pin function, which is incorrect.
+> 
+> On MX31PDK board these are the pins that provide CSPI1 functionality:
+> 
+> DSR_DCE1 (ALT mode 1) --> CSPI1_CLK
+> RI_DCE1 (ALT mode 1) --> CSPI1_RDY
+> 
+> DTR_DTE1  -->CSI1_MOSI
+> DSR_DTE1 --> CSPI1_MISO
+> DTR_DCE2 ---> CSPI1_SS2
+> 
+> The 3 IOMUX settings above are done via GPR as per Table A-1 of the MX31RM.
+> 
+> This patch fixes the CSPI1 IOMUX and makes the LCD to be functional.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 
-On 21-06-2011 15:49, Felipe Balbi wrote:
+Applied to -for-next
 
->>> From: Praveen Paneri<p.paneri@samsung.com>
+Sascha
 
->>> Adding dwc driver name in existing platform device
->>> to probe DWC OTG driver.
->>> Introduced otg_set_platdata function to pass platform data
->>> Added selectable config option to add DWC OTG driver for different
->>> machines.
+> ---
+> Changes since v1:
+> 
+> - Provided better explanation about this change on the commit message
+> 
+>  arch/arm/mach-imx/mach-mx31_3ds.c |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+> index ab2a626..a6160ee 100644
+> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+> @@ -53,11 +53,8 @@ static int mx31_3ds_pins[] = {
+>  	MX31_PIN_RXD1__RXD1,
+>  	IOMUX_MODE(MX31_PIN_GPIO1_1, IOMUX_CONFIG_GPIO),
+>  	/*SPI0*/
+> -	MX31_PIN_CSPI1_SCLK__SCLK,
+> -	MX31_PIN_CSPI1_MOSI__MOSI,
+> -	MX31_PIN_CSPI1_MISO__MISO,
+> -	MX31_PIN_CSPI1_SPI_RDY__SPI_RDY,
+> -	MX31_PIN_CSPI1_SS2__SS2, /* CS for LCD */
+> +	IOMUX_MODE(MX31_PIN_DSR_DCE1, IOMUX_CONFIG_ALT1),
+> +	IOMUX_MODE(MX31_PIN_RI_DCE1, IOMUX_CONFIG_ALT1),
+>  	/* SPI 1 */
+>  	MX31_PIN_CSPI2_SCLK__SCLK,
+>  	MX31_PIN_CSPI2_MOSI__MOSI,
+> @@ -690,6 +687,9 @@ static void __init mx31_3ds_init(void)
+>  	int ret;
+>  
+>  	imx31_soc_init();
+> +
+> +	/* Configure SPI1 IOMUX */
+> +	mxc_iomux_set_gpr(MUX_PGP_CSPI_BB, true);
+>  
+>  	mxc_iomux_setup_multiple_pins(mx31_3ds_pins, ARRAY_SIZE(mx31_3ds_pins),
+>  				      "mx31_3ds");
+> -- 
+> 1.6.0.4
+> 
+> 
+> 
 
->>> Signed-off-by: Praveen Paneri<p.paneri@samsung.com>
->> [...]
-
->>> diff --git a/arch/arm/plat-samsung/dev-usb-hsotg.c b/arch/arm/plat-samsung/dev-usb-hsotg.c
->>> index 33a844a..7e6228b 100644
->>> --- a/arch/arm/plat-samsung/dev-usb-hsotg.c
->>> +++ b/arch/arm/plat-samsung/dev-usb-hsotg.c
->> [...]
-
->>> @@ -37,7 +39,12 @@ static struct resource s3c_usb_hsotg_resources[] = {
->>>   static u64 s3c_hsotg_dmamask = DMA_BIT_MASK(32);
->>>
->>>   struct platform_device s3c_device_usb_hsotg = {
->>> +#ifdef CONFIG_S3C_DEV_USB_HSOTG
->>>   	.name		= "s3c-hsotg",
->>> +#endif
->>> +#ifdef CONFIG_S3C_DEV_DWC_OTG
->>> +	.name		= "dwc_otg",
->>> +#endif
-
->>     I'd done it as:
-
->> +#if defined(CONFIG_S3C_DEV_USB_HSOTG)
->>    	.name		= "s3c-hsotg",
->> +#elif defined(CONFIG_S3C_DEV_DWC_OTG)
->> +	.name		= "dwc_otg",
->> +#endif
-
-> no... don't do that. How many times do I have to repeat ? No ifdefs!! we
-> want both drivers to be able to be compiled as modules, so add both
-> platform devices.
-
-    Sorry, hadn't seen your mail when replying.
-
-WBR, Sergei
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
