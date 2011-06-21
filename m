@@ -1,27 +1,38 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Mon, 20 Jun 2011 16:42:27 -0700
-Subject: [GIT PULL] msm fixes for 3.0-rc4
-Message-ID: <8yar56onk7w.fsf@huya.qualcomm.com>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 21 Jun 2011 09:01:01 +0900
+Subject: [PATCH 0/7] ARM: EXYNOS4: Adds External GIC
+In-Reply-To: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
+References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
+Message-ID: <BANLkTiksfkfzs1nQS0C5uE=pizoOWcnPzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 2c53b436a30867eb6b47dd7bab23ba638d1fb0d2:
+Hi,
 
-  Linux 3.0-rc3 (2011-06-13 15:29:59 -0700)
+There are some boards which use the EVT0 chip. some SMDKV310 and
+Universal-C210.
+With this changes, it can't use these boards.
 
-are available in the git repository at:
-  git://codeaurora.org/quic/kernel/davidb/linux-msm.git msm-fix
+Do you want to remove EVT0 based boards?
 
-Jeff Ohlstein (1):
-      msm: timer: compensate for timer shift in msm_read_timer_count
+Thank you,
+Kyungmin Park
 
-Stephen Boyd (2):
-      msm: timer: Fix SMP build error
-      msm: timer: Fix DGT rate on 8960 and 8660
-
- arch/arm/mach-msm/timer.c |   14 +++++++++++---
- 1 files changed, 11 insertions(+), 3 deletions(-)
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+On Mon, Jun 20, 2011 at 4:34 PM, Changhwan Youn <chaos.youn@samsung.com> wrote:
+> This patch adds implementation External GIC on EXYNOS4 SoC.
+>
+> Note: need to update timer codes for supporting old type of
+> EXYNOS4 SoCs.
+>
+> [PATCH 1/7] ARM: EXYNOS4: Add external GIC io memory mapping
+> [PATCH 2/7] ARM: EXYNOS4: modify interrupt mappings for external GIC
+> [PATCH 3/7] ARM: EXYNOS4: set the affinity of mct1 interrupt using IRQ_MCT_L1
+> [PATCH 4/7] ARM: GIC: move gic_chip_data structure declaration to header
+> [PATCH 5/7] ARM: EXYNOS4: Add support external GIC
+> [PATCH 6/7] ARM: EXYNOS4: Remove clock event timers using ARM private timers
+> [PATCH 7/7] ARM: EXYNOS4: Add chained enrty/exit function to uart interrupt handler
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
