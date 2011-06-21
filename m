@@ -1,90 +1,179 @@
-From: p.paneri@samsung.com (p.paneri at samsung.com)
-Date: Tue, 21 Jun 2011 12:33:47 +0530
-Subject: [RFC][PATCH 5/5] ARM: S5P64x0: Adding OTG device for smdk6440
-In-Reply-To: <1308639827-2121-1-git-send-email-p.paneri@samsung.com>
-References: <1308639827-2121-1-git-send-email-p.paneri@samsung.com>
-Message-ID: <1308639827-2121-6-git-send-email-p.paneri@samsung.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 21 Jun 2011 09:05:53 +0200
+Subject: [PATCH v6 11/11] mmc: add handling for two parallel block
+	requests in issue_rw_rq
+In-Reply-To: <BANLkTimp1cu36uaky+zSWua+Civg_uQF+w@mail.gmail.com>
+References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
+	<1308518257-9783-12-git-send-email-per.forlin@linaro.org>
+	<BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
+	<BANLkTimp1cu36uaky+zSWua+Civg_uQF+w@mail.gmail.com>
+Message-ID: <BANLkTikkjhjmv8oJ-coGSzPwQjZ_eUurqA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Praveen Paneri <p.paneri@samsung.com>
+On 21 June 2011 08:40, Per Forlin <per.forlin@linaro.org> wrote:
+> On 20 June 2011 17:17, Kishore Kadiyala <kishorek.kadiyala@gmail.com> wrote:
+>> On Mon, Jun 20, 2011 at 2:47 AM, Per Forlin <per.forlin@linaro.org> wrote:
+>>> Change mmc_blk_issue_rw_rq() to become asynchronous.
+>>> The execution flow looks like this:
+>>> The mmc-queue calls issue_rw_rq(), which sends the request
+>>> to the host and returns back to the mmc-queue. The mmc-queue calls
+>>> issue_rw_rq() again with a new request. This new request is prepared,
+>>> in isuue_rw_rq(), then it waits for the active request to complete before
+>>> pushing it to the host. When to mmc-queue is empty it will call
+>>> isuue_rw_rq() with req=NULL to finish off the active request
+>>> without starting a new request.
+>>>
+>>> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+>>> ---
+>>> ?drivers/mmc/card/block.c | ?121 +++++++++++++++++++++++++++++++++-------------
+>>> ?drivers/mmc/card/queue.c | ? 17 +++++--
+>>> ?drivers/mmc/card/queue.h | ? ?1 +
+>>> ?3 files changed, 101 insertions(+), 38 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+>>> index 6a84a75..66db77a 100644
+>>> --- a/drivers/mmc/card/block.c
+>>> +++ b/drivers/mmc/card/block.c
+>>> @@ -108,6 +108,7 @@ static DEFINE_MUTEX(open_lock);
+>>>
+>>> ?enum mmc_blk_status {
+>>> ? ? ? ?MMC_BLK_SUCCESS = 0,
+>>> + ? ? ? MMC_BLK_PARTIAL,
+>>> ? ? ? ?MMC_BLK_RETRY,
+>>> ? ? ? ?MMC_BLK_DATA_ERR,
+>>> ? ? ? ?MMC_BLK_CMD_ERR,
+>>> @@ -668,14 +669,16 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
+>>> ? ? ? ?}
+>>> ?}
+>>>
+>>> -static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct request *req,
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_card *card,
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_blk_data *md)
+>>> +static int mmc_blk_err_check(struct mmc_card *card,
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_async_req *areq)
+>>> ?{
+>>> ? ? ? ?struct mmc_command cmd;
+>>> ? ? ? ?u32 status = 0;
+>>> ? ? ? ?enum mmc_blk_status ret = MMC_BLK_SUCCESS;
+>>> + ? ? ? struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
+>>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_active);
+>>> + ? ? ? struct mmc_blk_request *brq = &mq_mrq->brq;
+>>> + ? ? ? struct request *req = mq_mrq->req;
+>>>
+>>> ? ? ? ?/*
+>>> ? ? ? ? * Check for errors here, but don't jump to cmd_err
+>>> @@ -770,7 +773,11 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+>>> ? ? ? ? ? ? ? ?else
+>>> ? ? ? ? ? ? ? ? ? ? ? ?ret = MMC_BLK_DATA_ERR;
+>>> ? ? ? ?}
+>>> -out:
+>>> +
+>>> + ? ? ? if (ret == MMC_BLK_SUCCESS &&
+>>> + ? ? ? ? ? blk_rq_bytes(req) != brq->data.bytes_xfered)
+>>> + ? ? ? ? ? ? ? ret = MMC_BLK_PARTIAL;
+>>> + out:
+>>> ? ? ? ?return ret;
+>>> ?}
+>>>
+>>> @@ -901,27 +908,59 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
+>>> ? ? ? ? ? ? ? ?brq->data.sg_len = i;
+>>> ? ? ? ?}
+>>>
+>>> + ? ? ? mqrq->mmc_active.mrq = &brq->mrq;
+>>> + ? ? ? mqrq->mmc_active.err_check = mmc_blk_err_check;
+>>> +
+>>> ? ? ? ?mmc_queue_bounce_pre(mqrq);
+>>> ?}
+>>>
+>>> -static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
+>>> +static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
+>>> ?{
+>>> ? ? ? ?struct mmc_blk_data *md = mq->data;
+>>> ? ? ? ?struct mmc_card *card = md->queue.card;
+>>> - ? ? ? struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
+>>> - ? ? ? int ret = 1, disable_multi = 0;
+>>> + ? ? ? struct mmc_blk_request *brq;
+>>> + ? ? ? int ret = 1;
+>>> + ? ? ? int disable_multi = 0;
+>>> ? ? ? ?enum mmc_blk_status status;
+>>> + ? ? ? struct mmc_queue_req *mq_rq;
+>>> + ? ? ? struct request *req;
+>>> + ? ? ? struct mmc_async_req *areq;
+>>> +
+>>> + ? ? ? if (!rqc && !mq->mqrq_prev->req)
+>>> + ? ? ? ? ? ? ? goto out;
+>>>
+>>> ? ? ? ?do {
+>>> - ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
+>>> - ? ? ? ? ? ? ? mmc_wait_for_req(card->host, &brq->mrq);
+>>> + ? ? ? ? ? ? ? if (rqc) {
+>>> + ? ? ? ? ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
+>>> + ? ? ? ? ? ? ? ? ? ? ? areq = &mq->mqrq_cur->mmc_active;
+>>> + ? ? ? ? ? ? ? } else
+>>> + ? ? ? ? ? ? ? ? ? ? ? areq = NULL;
+>>> + ? ? ? ? ? ? ? areq = mmc_start_req(card->host, areq, (int *) &status);
+>>
+>> I think 'status' is used uninitialized.
+> status is an out parameter. From that perspective it is always initialised.
+> I should update the doc description of mmc_start_req to clarify this.
+>
+>> With this struct mmc_async_req *mmc_start_req in your first patch
+>> if (error)
+>> ? ? ? ?*error = err;
+>> return data;
+>> condition which always passes.
+>>
+>> You can have
+>> enum mmc_blk_status status = MMC_BLK_SUCCESS;
+In core.c there is no access to the type "enum mmc_blk_status status",
+this type is block.c specific.
+The intention is to make this function available for SDIO as well.
+"int err = 0;" is set at the top of mmc_start_req(). Default err condition is 0.
 
-Selected DWC OTG for smdk6440 and added platform specific
-data in machine file.
+What do you think about the following changes?
 
-Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
----
- arch/arm/Kconfig                      |    1 +
- arch/arm/mach-s5p64x0/mach-smdk6440.c |   24 ++++++++++++++++++++++++
- 2 files changed, 25 insertions(+), 0 deletions(-)
+  *     @areq: async request to start
+- *     @error: non zero in case of error
++ *     @error: out parameter returns 0 for success, otherwise non zero
+  *
+  *     Start a new MMC custom command request for a host.
+  *     If there is on ongoing async request wait for completion
+@@ -334,9 +334,7 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
+                                mmc_post_req(host, areq->mrq, -EINVAL);
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..e98bb53 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -728,6 +728,7 @@ config ARCH_S5P64X0
- 	select HAVE_SCHED_CLOCK
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C_RTC if RTC_CLASS
-+	select S3C_DEV_DWC_OTG
- 	help
- 	  Samsung S5P64X0 CPU based systems, such as the Samsung SMDK6440,
- 	  SMDK6450.
-diff --git a/arch/arm/mach-s5p64x0/mach-smdk6440.c b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-index 2d559f1..515e252 100644
---- a/arch/arm/mach-s5p64x0/mach-smdk6440.c
-+++ b/arch/arm/mach-s5p64x0/mach-smdk6440.c
-@@ -46,6 +46,7 @@
- #include <plat/adc.h>
- #include <plat/ts.h>
- #include <plat/s5p-time.h>
-+#include <plat/otg.h>
- 
- #define SMDK6440_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
- 				S3C2410_UCON_RXILEVEL |		\
-@@ -130,6 +131,27 @@ static struct platform_device smdk6440_backlight_device = {
- 	},
- };
- 
-+/* USB OTG */
-+#define S3C_DEV_RX_FIFO_SIZ	(4096>>2)
-+#define S3C_DEV_NPTX_FIFO_SIZ	(4096>>2)
-+#define S3C_HOST_RX_FIFO_SIZ	0x0000010D
-+#define S3C_HOST_NPTX_FIFO_SIZ	0x0080010D
-+#define S3C_HOST_CH_NUM		12
-+
-+static struct s5p_otg_platdata smdk6440_otg_pdata = {
-+	.dev_rx_fifo_size	= S3C_DEV_RX_FIFO_SIZ,
-+	.dev_nptx_fifo_size	= S3C_DEV_NPTX_FIFO_SIZ,
-+	.host_rx_fifo_size	= S3C_HOST_RX_FIFO_SIZ,
-+	.host_nptx_fifo_size	= S3C_HOST_NPTX_FIFO_SIZ,
-+	.host_ch_num		= S3C_HOST_CH_NUM,
-+};
-+
-+static void __init smdk6440_otg_init(void)
-+{
-+	struct s5p_otg_platdata *pdata = &smdk6440_otg_pdata;
-+
-+	s5p_otg_set_platdata(pdata);
-+}
- static struct platform_device *smdk6440_devices[] __initdata = {
- 	&s3c_device_adc,
- 	&s3c_device_rtc,
-@@ -141,6 +163,7 @@ static struct platform_device *smdk6440_devices[] __initdata = {
- 	&s5p6440_device_iis,
- 	&s3c_device_timer[1],
- 	&smdk6440_backlight_device,
-+	&s3c_device_usb_hsotg,
- };
- 
- static struct s3c2410_platform_i2c s5p6440_i2c0_data __initdata = {
-@@ -193,6 +216,7 @@ static void __init smdk6440_machine_init(void)
- 			ARRAY_SIZE(smdk6440_i2c_devs0));
- 	i2c_register_board_info(1, smdk6440_i2c_devs1,
- 			ARRAY_SIZE(smdk6440_i2c_devs1));
-+	smdk6440_otg_init();
- 
- 	platform_add_devices(smdk6440_devices, ARRAY_SIZE(smdk6440_devices));
- }
--- 
-1.7.0.4
+                        host->areq = NULL;
+-                       if (error)
+-                               *error = err;
+-                       return data;
++                       goto out;
+                }
+        }
+
+@@ -347,6 +345,7 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
+                mmc_post_req(host, host->areq->mrq, 0);
+
+        host->areq = areq;
++ out:
+        if (error)
+                *error = err;
+        return data;
+
+>>
+>> struct mmc_async_req *mmc_start_req ?{
+>> err = host->areq->err_check(host->card, host->areq);
+>> ? ? ? ? ? ? ? ?if (err) {
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ...
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ...
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? *error = err;
+>> ? ? ? ? ? ? ? ?}
+>>
+>> no need to update * error here in success case
+>> return data
+>> }
+> I agree, makes the code more clear.
+>
+> Thanks,
+> Per
+>
