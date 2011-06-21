@@ -1,59 +1,50 @@
-From: 21cnbao@gmail.com (Barry Song)
-Date: Tue, 21 Jun 2011 13:11:34 +0800
-Subject: [PATCH v4] ARM: vfp: Always save VFP state in vfp_pm_suspend
-In-Reply-To: <BANLkTikPd5AVJa-n1V1eyqh-HBACOi-ggQ@mail.gmail.com>
-References: <1304975791-8175-1-git-send-email-21cnbao@gmail.com>
-	<BANLkTikPd5AVJa-n1V1eyqh-HBACOi-ggQ@mail.gmail.com>
-Message-ID: <BANLkTimBuz5YLto3qWsR_pL1cDh9cwSbAA@mail.gmail.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 21 Jun 2011 08:24:53 +0300
+Subject: [PATCH 2/2] video: omap2: Compile omap2 support only when needed
+In-Reply-To: <4E0022B5.9000500@linaro.org>
+References: <1308566761-2850-1-git-send-email-tushar.behera@linaro.org>
+	<1308566761-2850-3-git-send-email-tushar.behera@linaro.org>
+	<1308575201.2076.57.camel@deskari>  <4E0022B5.9000500@linaro.org>
+Message-ID: <1308633893.1850.11.camel@deskari>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-this patch has been reviewed by Catalin Marinas for a long time. but
-why isn't there any feedback by now?
-it actually is a very useful fix to vfp PM.
+On Tue, 2011-06-21 at 10:18 +0530, Tushar Behera wrote:
+> Hi,
+> 
+> On Monday 20 June 2011 06:36 PM, Tomi Valkeinen wrote:
+> > On Mon, 2011-06-20 at 16:16 +0530, Tushar Behera wrote:
+> >> Currently display support for omap2 is selected by default and
+> >> it gets built for all the configurations.
+> >>
+> >> Instead of it being a built-in feature, it's compilation should
+> >> depend on the config option CONFIG_FB_OMAP2.
+> >
+> > No, I don't think so. omap2 directory contains vram, vrfb and omapdss,
+> > all of which can be used without omapfb driver. vram and vrfb can be
+> > even used without omapdss driver.
+> Even if I build the kernel with i386_defconfig, I get some compiled 
+> files within drivers/video/omap2.
+> 
+> $ make ARCH=x86 i386_defconfig O=out_dir
+> $ make ARCH=x86 O=out_dir
+> 
+> $ ls out_dir/drivers/video/omap2
+> built-in.o  displays  modules.builtin  modules.order
+> 
+> IMHO, drivers/video/omap2/ should not be compiled if the kernel is not 
+> built for omap2.
 
-2011/5/19 Barry Song <21cnbao@gmail.com>:
-> Any update for this?
->
-> 2011/5/10 Barry Song <21cnbao@gmail.com>:
->> From: Colin Cross <ccross@android.com>
->>
->> vfp_pm_suspend should save the VFP state any time there is
->> a last_VFP_context. ?If it only saves when the VFP is enabled,
->> the state can get lost when, on a UP system:
->> ? Thread 1 uses the VFP
->> ? Context switch occurs to thread 2, VFP is disabled but the
->> ? ? ?VFP context is not saved to allow lazy save and restore
->> ? Thread 2 initiates suspend
->> ? vfp_pm_suspend is called with the VFP disabled, but the
->> ? ? ?context has not been saved.
->>
->> Modify vfp_pm_suspend to save the VFP context whenever
->> last_VFP_context is set.
->>
->> Signed-off-by: Colin Cross <ccross@android.com>
->> Cc: Binghua Duan <binghua.duan@csr.com>
->> Signed-off-by: Rongjun Ying <rongjun.ying@csr.com>
->> Signed-off-by: Barry Song <21cnbao@gmail.com>
->> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->> ---
->> ?arch/arm/vfp/vfpmodule.c | ? ?4 ++++
->> ?1 files changed, 4 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/vfp/vfpmodule.c b/arch/arm/vfp/vfpmodule.c
->> index f746950..e6fe6ae 100644
->> --- a/arch/arm/vfp/vfpmodule.c
->> +++ b/arch/arm/vfp/vfpmodule.c
->> @@ -412,6 +412,10 @@ static int vfp_pm_suspend(struct sys_device *dev, pm_message_t state)
->>
->> ? ? ? ? ? ? ? ?/* disable, just in case */
->> ? ? ? ? ? ? ? ?fmxr(FPEXC, fmrx(FPEXC) & ~FPEXC_EN);
->> + ? ? ? } else if (last_VFP_context[ti->cpu]) {
->> + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc | FPEXC_EN);
->> + ? ? ? ? ? ? ? vfp_save_state(last_VFP_context[ti->cpu], fpexc);
->> + ? ? ? ? ? ? ? fmxr(FPEXC, fpexc);
->> ? ? ? ?}
->>
->> ? ? ? ?/* clear any information we had about last context state */
->> --
->> 1.6.0.4
+Ok. Yes, that's a known "problem". We could have a OMAPx check there,
+but then again, the driver is a driver for the DSS HW, which could, at
+least in theory, used in other SoCs.
+
+I don't think any driver should normally depend on ARCH_something or
+MACH_something.
+
+I think this is more of a "problem" with the build system. The same
+thing can be seen with, for example, drivers/video/backlight/ and
+drivers/video/display/ directories. In practice the created files do not
+affect the kernel in any way, as far as I see.
+
+ Tomi
