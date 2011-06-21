@@ -1,71 +1,34 @@
-From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Tue, 21 Jun 2011 16:31:19 +0200
-Subject: [PATCH] atmel_serial: fix internal port num
-In-Reply-To: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
-References: <1307541740.10626.15.camel@hcegtvedt.norway.atmel.com>
-Message-ID: <1308666679-12111-1-git-send-email-plagnioj@jcrosoft.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Tue, 21 Jun 2011 10:58:19 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106201824320.2142@xanadu.home>
+Message-ID: <Pine.LNX.4.44L0.1106211054460.2327-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-the atmel_ports is link to the console number and not the device id
+On Mon, 20 Jun 2011, Nicolas Pitre wrote:
 
-this was not detected on at91 as we always register the dbgu on the console
-as ttyS0
+> > We don't fall into any of these cases, and therefore as you say, we
+> > don't need packed.  Arnd and I have both explained this.  So why do you 
+> > keep arguing that we do need it?
+> 
+> Please show me where I keep arguing that you need it?
 
-tested on at91sam9263 by setting the dbgu as ttyS1 and use as console
+Not explicitly perhaps.  But you did write:
 
-diff --git a/arch/arm/mach-at91/board-sam9263ek.c b/arch/arm/mach-at91/board-sam9263ek.c
-index 70e5646..9b8a14f 100644
-- a/arch/arm/mach-at91/board-sam9263ek.c
-+ b/arch/arm/mach-at91/board-sam9263ek.c
-@@ -58,14 +58,14 @@ static void __init ek_init_early(void)
-        /* Initialize processor: 16.367 MHz crystal */
-        at91_initialize(16367660);
+> Doesn't mean that because it used to work that it is strictly correct.  
+> Wouldn't be the first time that a GCC upgrade broke the kernel because 
+> the kernel wasn't describing things properly enough.
 
--       /* DBGU on ttyS0. (Rx & Tx only) */
--       at91_register_uart(0, 0, 0);
-+       /* DBGU on ttyS1. (Rx & Tx only) */
-+       at91_register_uart(0, 1, 0);
+which strongly implies that "packed" is needed.  You also wrote:
 
--       /* USART0 on ttyS1. (Rx, Tx, RTS, CTS) */
--       at91_register_uart(AT91SAM9263_ID_US0, 1, ATMEL_UART_CTS | ATMEL_UART_RTS);
-+       /* USART0 on ttyS0. (Rx, Tx, RTS, CTS) */
-+       at91_register_uart(AT91SAM9263_ID_US0, 0, ATMEL_UART_CTS | ATMEL_UART_RTS);
+> Yes, but that's a consequence of not being able to access those fields 
+> in their naturally aligned position anymore.  Hence the addition of the 
+> align attribute to tell the compiler that we know that the structure is 
+> still aligned to a certain degree letting the compiler to avoid 
+> byte-oriented instructions when possible.
 
--       /* set serial console to ttyS0 (ie, DBGU) */
--       at91_set_serial_console(0);
-+       /* set serial console to ttyS1 (ie, DBGU) */
-+       at91_set_serial_console(1);
- }
+which is predicated on the assumption that "packed" is needed.
 
- /*
-
-Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Alan Cox <alan@linux.intel.com>
-Cc: Hans-Christian Egtvedt <hans-christian.egtvedt@atmel.com>
----
- drivers/tty/serial/atmel_serial.c |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
-
-diff --git a/drivers/tty/serial/atmel_serial.c b/drivers/tty/serial/atmel_serial.c
-index 6d5d6e6..af9b781 100644
---- a/drivers/tty/serial/atmel_serial.c
-+++ b/drivers/tty/serial/atmel_serial.c
-@@ -1709,12 +1709,13 @@ static int atmel_serial_resume(struct platform_device *pdev)
- static int __devinit atmel_serial_probe(struct platform_device *pdev)
- {
- 	struct atmel_uart_port *port;
-+	struct atmel_uart_data *pdata = pdev->dev.platform_data;
- 	void *data;
- 	int ret;
- 
- 	BUILD_BUG_ON(ATMEL_SERIAL_RINGSIZE & (ATMEL_SERIAL_RINGSIZE - 1));
- 
--	port = &atmel_ports[pdev->id];
-+	port = &atmel_ports[pdata->num];
- 	port->backup_imr = 0;
- 
- 	atmel_init_port(port, pdev);
--- 
-1.7.4.1
+Alan Stern
