@@ -1,54 +1,51 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 22 Jun 2011 00:57:58 +0200
-Subject: [PATCH 6/6] ARM: mxc: clean up imx-dma device registration
-In-Reply-To: <20110620145054.GA24184@S2100-06.ap.freescale.net>
-References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
-	<1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
-	<20110620145054.GA24184@S2100-06.ap.freescale.net>
-Message-ID: <20110621225758.GG6069@pengutronix.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 21 Jun 2011 15:58:23 -0700
+Subject: [PATCH 4/4] ARM: zImage: allow supplementing appended DTB with
+	traditional ATAG data
+In-Reply-To: <1308632955-11070-5-git-send-email-nico@fluxnic.net> (Nicolas
+	Pitre's message of "Tue, 21 Jun 2011 01:09:15 -0400")
+References: <1308632955-11070-1-git-send-email-nico@fluxnic.net>
+	<1308632955-11070-5-git-send-email-nico@fluxnic.net>
+Message-ID: <8yaliwueqr4.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 10:50:55PM +0800, Shawn Guo wrote:
-> Hi Sascha,
-> 
-> Any comment on this one?
->
+On Mon, Jun 20 2011, Nicolas Pitre wrote:
 
-Please respin this series on the for-next branch. Fabio has
-added i.MX53 support in the meantime and this does not apply anymore.
+> +void *memmove(void *__dest, __const void *__src, size_t __n)
+> +{
+> +	unsigned char *d = __dest;
+> +	const unsigned char *s = __src;
+> +
+> +	if (__dest == __src)
+> +		return __dest;
+> +
+> +	if (__dest < __src)
+> +		return memcpy(__dest, __src, __n);
+> +
+> +	while (--__n >= 0)
+> +		d[__n] = s[__n];
+> +
+> +	return __dest;
+> +}
 
-Sascha
- 
-> Regards,
-> Shawn
-> 
-> On Mon, Jun 13, 2011 at 03:37:25PM +0800, Shawn Guo wrote:
-> > The patch follows the implementation of gpio-mxc device registration
-> > to break the concentrated imx-dma device registration into soc
-> > specific setup function.  Then we can avoid the churn of "#ifdef"
-> > and the cpu_is_mx checking on such a long list, which makes no sense,
-> > considering more soc supports need to be added and we need to support
-> > single image for multiple socs in the long run.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> > ---
-> >  arch/arm/mach-imx/mm-imx21.c                    |    3 +
-> >  arch/arm/mach-imx/mm-imx25.c                    |   26 +++
-> >  arch/arm/mach-imx/mm-imx27.c                    |    3 +
-> >  arch/arm/mach-imx/mm-imx31.c                    |   24 +++
-> >  arch/arm/mach-imx/mm-imx35.c                    |   44 +++++
-> >  arch/arm/mach-mx5/mm.c                          |   23 +++
-> >  arch/arm/plat-mxc/devices.c                     |   16 ++-
-> >  arch/arm/plat-mxc/devices/platform-imx-dma.c    |  202 ++---------------------
-> >  arch/arm/plat-mxc/include/mach/devices-common.h |    6 +
-> >  9 files changed, 157 insertions(+), 190 deletions(-)
-> > 
-> 
-> 
+Ahh, found it.  size_t is unsigned, so the while loop never terminates.
+Something like:
+
+	for (; __n; __n--)
+		d[__n] = s[__n];
+
+makes that work for me.
+
+This allows me to not need to pad or have any of the chosen attributes.
+I do need to have a memory attribute, however, and I'll see if I can
+figure out what is happening there.
+
+Fun debugging when the loop overwrites the code itself, but it keeps
+working because it is in the cache.
+
+David
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
