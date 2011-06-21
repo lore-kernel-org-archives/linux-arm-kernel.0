@@ -1,44 +1,34 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 21 Jun 2011 14:51:37 +0300
-Subject: [RFC][PATCH 2/5] ARM: SAMSUNG: Changing the build condition of
-	OTG platform device for samsung.
-In-Reply-To: <BANLkTikPt=_KNpoJ4Xawz_PYMmZg3PnR9g@mail.gmail.com>
-References: <0LN4003LQZBUSGU0@mailout4.samsung.com>
-	<BANLkTikPt=_KNpoJ4Xawz_PYMmZg3PnR9g@mail.gmail.com>
-Message-ID: <20110621115136.GC2531@legolas.emea.dhcp.ti.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 21 Jun 2011 13:52:36 +0200
+Subject: [PATCH v3 2/4] mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not
+	get cleared
+In-Reply-To: <1308566325-11600-3-git-send-email-shawn.guo@linaro.org>
+References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
+	<1308566325-11600-3-git-send-email-shawn.guo@linaro.org>
+Message-ID: <20110621115236.GA14004@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 20, 2011 at 06:38:43PM +0800, Shawn Guo wrote:
+> The function esdhc_readl_le intends to clear bit SDHCI_CARD_PRESENT,
+> when the card detect gpio tells there is no card.  But it does not
+> clear the bit actually.  The patch gives a fix on that.
+> 
+> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
 
-On Tue, Jun 21, 2011 at 05:20:25PM +0530, Praveen Paneri wrote:
-> > > @@ -37,7 +39,12 @@ static struct resource s3c_usb_hsotg_resources[] = {
-> > >??static u64 s3c_hsotg_dmamask = DMA_BIT_MASK(32);
-> > >
-> > >??struct platform_device s3c_device_usb_hsotg = {
-> > > +#ifdef CONFIG_S3C_DEV_USB_HSOTG
-> > >?? .name = "s3c-hsotg",
-> > > +#endif
-> > > +#ifdef CONFIG_S3C_DEV_DWC_OTG
-> > > + .name = "dwc_otg",
-> > > +#endif
-> >
-> > no, don't do that. See we're going through a big re-factor on the gadget
-> > framework to allow multiple UDC drivers to be compiled as modules. The
-> > idea is to be able to have distro-like kernels for embedded too.
-> It can be build as a module but need to make necessary modifications in
-> platform code. Will modify according to the gadget framework.
+For the third time ;)
 
-can't you do runtime detection of which platform you're running on ?
-Then you add one or the other platform_device. But ifdeferry won't help
-you in the long run.
+Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+
+Should go to stable.
 
 -- 
-balbi
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: not available
 Type: application/pgp-signature
-Size: 490 bytes
+Size: 198 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110621/a1b1e70c/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110621/e2753a7f/attachment.sig>
