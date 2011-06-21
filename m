@@ -1,52 +1,38 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 21 Jun 2011 11:39:44 +0200
-Subject: [GIT PULL] U300 and Ux500 patches for the arm-soc tree
-Message-ID: <BANLkTik5HgtT5vFhxfODh3_G2zJ9c1YKmQ@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
+Date: Tue, 21 Jun 2011 11:44:00 +0200
+Subject: [PATCH v3 0/4] Extend sdhci-esdhc-imx card_detect and
+	write_protect support for mx5
+In-Reply-To: <20110621013905.GB6294@S2101-09.ap.freescale.net> (Shawn Guo's
+	message of "Tue, 21 Jun 2011 09:39:06 +0800")
+References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
+	<20110621013905.GB6294@S2101-09.ap.freescale.net>
+Message-ID: <87oc1ra59b.fsf@lebrac.rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Shawn Guo <shawn.guo@freescale.com> writes:
 
-These are a number of trivial-and-simple patches that have been reviewed on
-the LAKML mailing list. They are independent patches that are mostly
-self-descriptive.
+> Hi Arnaud,
 
-The clock added for TWD play with a patch that will be merged out-of-order
-with this one, that makes the timer core reschedule events on the localtimer
-when the CPU changes frequency. Marc Zyngier is carrying that patch as
-part of the localtimer consolidation attempt.
+Hi,
 
-There might be more coming, but this is good to pull in as a base for
-the soc tree.
+>
+> Would you please give a test on the series, as it fixed the issue
+> you reported?  TIA.
 
-The following changes since commit 56299378726d5f2ba8d3c8cbbd13cb280ba45e4f:
+I've tested it yesterday on my efika platforms and the issue is
+gone. Moreover, the differents card slot on theses platforms are using
+each card detect type (internally connected, gpio, no card detect) and
+they are all working as expected. I'm a little bit annoyed by the
+polling on the slot without card detect but this has nothing to do with
+this patchset.
 
-  Linux 3.0-rc4 (2011-06-20 20:25:46 -0700)
+Side note: turns out that the driver is using dev_warn when failing to
+get cd gpio/irq. Given that in theses cases, it jumps to
+no_card_detect_pin and makes the probe fail, maybe a dev_err would be
+better ? 
 
-are available in the git repository at:
-  git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git
-for-arnd
+Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
 
-Linus Walleij (8):
-      mach-ux500: add HREFv60 Kconfig option
-      mach-ux500: fix HREFv60 regression
-      mach-ux500: correct MMC/SDI parameters
-      mach-ux500: activate USB in the U8500 defconfig
-      mach-ux500: complete regulator constraints for MOP500 board
-      mach-ux500: register a clock for the SMP TWD
-      mach-u300: cleanup clockevent code
-      mach-u300: set apropriate FIFO trigger levels
-
-Mattias Wallin (1):
-      mach-ux500: iomap PRCMU TCDM memory
-
- arch/arm/configs/u8500_defconfig              |    6 +++-
- arch/arm/mach-u300/spi.c                      |    4 +-
- arch/arm/mach-u300/timer.c                    |   33 ++++++-----------
- arch/arm/mach-ux500/Kconfig                   |    8 ++++-
- arch/arm/mach-ux500/board-mop500-regulators.c |    9 ++++-
- arch/arm/mach-ux500/board-mop500-sdi.c        |   42 +++++++++++++++------
- arch/arm/mach-ux500/board-mop500.c            |    3 ++
- arch/arm/mach-ux500/clock.c                   |   48 +++++++++++++++++++++++++
- arch/arm/mach-ux500/cpu-db5500.c              |    1 +
- 9 files changed, 116 insertions(+), 38 deletions(-)
+Thanks,
+Arnaud
