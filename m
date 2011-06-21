@@ -1,56 +1,31 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Tue, 21 Jun 2011 14:38:34 +0530
-Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
-In-Reply-To: <4DFF5F29.2000904@ti.com>
-References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
-	<20110620095053.GA2082@n2100.arm.linux.org.uk>
-	<20110620101438.GD2082@n2100.arm.linux.org.uk>
-	<4DFF20B3.7010209@ti.com>
-	<20110620104415.GF2082@n2100.arm.linux.org.uk>
-	<4DFF255E.5030308@ti.com>
-	<20110620111336.GG2082@n2100.arm.linux.org.uk>
-	<4DFF2E37.8030602@ti.com>
-	<20110620114019.GH2082@n2100.arm.linux.org.uk>
-	<20110620142338.GL2082@n2100.arm.linux.org.uk>
-	<4DFF5F29.2000904@ti.com>
-Message-ID: <4E005F92.8030208@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2011 10:15:29 +0100
+Subject: Bug in _und_usr on dual-core ARM?
+In-Reply-To: <BANLkTinY+_+tHatRWuRFUJewUibpmvkUqA@mail.gmail.com>
+References: <BANLkTinY+_+tHatRWuRFUJewUibpmvkUqA@mail.gmail.com>
+Message-ID: <20110621091529.GA22868@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+On Tue, Jun 21, 2011 at 04:31:19PM +0800, TAO HU wrote:
+> Hi, All
+> 
+> We got an issue on our OMAP4 SMP system.
+> Looks like __und_user(), which was triggered by a user space
+> exception, got a page fault hence lead to might_sleep() failure.
 
-On 6/20/2011 8:24 PM, Santosh Shilimkar wrote:
-> On 6/20/2011 7:53 PM, Russell King - ARM Linux wrote:
->> On Mon, Jun 20, 2011 at 12:40:19PM +0100, Russell King - ARM Linux wrote:
-[....]
+Could you see whether this patch prevents the warning please.
 
->> So, as loops_per_jiffy is not local to this function, the compiler has
->> to write out that zero value, before calling calibrate_delay_converge(),
->> and loops_per_jiffy only becomes non-zero _after_
->> calibrate_delay_converge()
->> has returned. This opens the window and allows the spinlock debugging
->> code to explode.
->>
->> This patch closes the window completely, by only writing to
->> loops_per_jiffy
->> only when we have a real value for it.
->>
->> This allows me to boot 3.0.0-rc3 on Versatile Express (4 CPU) whereas
->> without this it fails with spinlock lockup and rcu problems.
->>
->> init/calibrate.c | 14 ++++++++------
->> 1 files changed, 8 insertions(+), 6 deletions(-)
->>
-> I am away from my board now. Will test this change.
-Have tested your change and it seems to fix the crash I
-was observing. Are you planning to send this fix for rc5?
-
-> btw, the online-active race is still open even with this patch close
-> and should be fixed.
->
-The only problem remains is waiting for active mask before
-marking CPU online. Shall I refresh my patch with only
-this change then ?
-
-Regards
-Santosh
+diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+index bc0e1d8..d52b940 100644
+--- a/arch/arm/mm/fault.c
++++ b/arch/arm/mm/fault.c
+@@ -289,7 +289,7 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+ 	 * If we're in an interrupt or have no user
+ 	 * context, we must not take the fault..
+ 	 */
+-	if (in_atomic() || !mm)
++	if (in_atomic() || irqs_disabled() || !mm)
+ 		goto no_context;
+ 
+ 	/*
