@@ -1,101 +1,230 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Tue, 21 Jun 2011 09:05:25 -0700
-Subject: [PATCH v4 1/4] mmc: sdhci: fix interrupt storm from card detection
-In-Reply-To: <1308667311-1855-2-git-send-email-shawn.guo@linaro.org>
-References: <1308667311-1855-1-git-send-email-shawn.guo@linaro.org>
-	<1308667311-1855-2-git-send-email-shawn.guo@linaro.org>
-Message-ID: <6E4917C1-3CE0-48AD-A2B2-761488F39A2A@marvell.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Tue, 21 Jun 2011 17:17:39 +0100
+Subject: Git pull request: 64-bit atomic user helper
+In-Reply-To: <alpine.LFD.2.00.1106202134510.2142@xanadu.home>
+References: <alpine.LFD.2.00.1106202134510.2142@xanadu.home>
+Message-ID: <20110621161739.GA2519@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Jun 20, 2011 at 09:54:07PM -0400, Nicolas Pitre wrote:
+> Russell, please pull the following for the next merge window:
+> 
+> 	git://git.linaro.org/people/nico/linux.git cmpxchg64
+> 
+> This series cleans up the kuser documentation, then it adds 64-bit
+> cmpxchg support as needed by some user space applications.
+> 
+> Tested with the initial libgcc patches relying on this, using a 
+> kernel that has this series applied, and another without those 
+> patches to verify that the test for the availability of the needed 
+> helper does work as intended.
 
-On Jun 21, 2011, at 7:41 AM, Shawn Guo wrote:
+If you like:
 
-> The issue was initially found by Eric Benard as below.
-> 
-> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/108031
-> 
-> Not sure about other SDHCI based controller, but on Freescale eSDHC,
-> the SDHCI_INT_CARD_INSERT bits will be immediately set again when it
-> gets cleared, if a card is inserted. The driver need to mask the irq
-> to prevent interrupt storm which will freeze the system.  And the
-> SDHCI_INT_CARD_REMOVE gets the same situation.
-> 
-> The patch fixes the problem based on the initial idea from
-> Eric Benard.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-> Cc: Eric Benard <eric@eukrea.com>
-> Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> ---
-> drivers/mmc/host/sdhci.c |   29 +++++++++++++++++++++++++----
-> 1 files changed, 25 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
-> index 91d9892..790f959 100644
-> --- a/drivers/mmc/host/sdhci.c
-> +++ b/drivers/mmc/host/sdhci.c
-> @@ -127,11 +127,15 @@ static void sdhci_mask_irqs(struct sdhci_host *host, u32 irqs)
-> 
-> static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
-> {
-> -	u32 irqs = SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT;
-> +	u32 present, irqs;
-> 
-> 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
-> 		return;
-> 
-> +	present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
-> +			      SDHCI_CARD_PRESENT;
-> +	irqs = present ? SDHCI_INT_CARD_REMOVE : SDHCI_INT_CARD_INSERT;
-> +
-> 	if (enable)
-> 		sdhci_unmask_irqs(host, irqs);
-> 	else
-> @@ -2154,13 +2158,30 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
-> 		mmc_hostname(host->mmc), intmask);
-> 
-> 	if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
-> +		u32 present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
-> +			      SDHCI_CARD_PRESENT;
-> +
-> +		/*
-> +		 * There is a observation on i.mx esdhc.  INSERT bit will be
-> +		 * immediately set again when it gets cleared, if a card is
-> +		 * inserted.  We have to mask the irq to prevent interrupt
-> +		 * storm which will freeze the system.  And the REMOVE gets
-> +		 * the same situation.
-> +		 *
-> +		 * More testing are needed here to ensure it works for other
-> +		 * platforms though.
-> +		 */
-> +		sdhci_mask_irqs(host, present ? SDHCI_INT_CARD_INSERT :
-> +						SDHCI_INT_CARD_REMOVE);
-> +		sdhci_unmask_irqs(host, present ? SDHCI_INT_CARD_REMOVE :
-> +						  SDHCI_INT_CARD_INSERT);
-> +
-
-====
-> 		sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
-> -			SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
-> +			     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
-
-====
-Please keep the old formatting since code does not change anything.  Makes it easier to find
-the real change
-
-> +		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
-> 		tasklet_schedule(&host->card_tasklet);
-> 	}
-> 
-> -	intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
-> -
-> 	if (intmask & SDHCI_INT_CMD_MASK) {
-> 		sdhci_writel(host, intmask & SDHCI_INT_CMD_MASK,
-> 			SDHCI_INT_STATUS);
-> -- 
-> 1.7.4.1
-> 
+Tested-by: Dave Martin <dave.martin@linaro.org>
 
 
-Reviewed-by: Philip Rakity <prakity@marvell.com>
+Here's my silly test program.
+
+It passed on a pandaboard (2-core A9) with
+-O3 -DITERATIONS=1000000000ULL -DBITS64
+
+(Really, -O should not make a significant difference, though.)
+
+Since the test just loops around __kuser_cmpxchg64(), if the number
+of involuntary preemptions of a thread is non-trivial, some of those
+preemptions will occur inside the kuser helper.
+
+
+# ./tst-kuser 
+__kuser_helper_version = 5
+iterations * 8696638275910399085 = 7609822085224859648
+        Thread 0:            17992 preemptions
+        Thread 1:            17636 preemptions
+        Thread 2:            17885 preemptions
+        Thread 3:            17517 preemptions
+OK
+
+--- /dev/null	2011-06-20 16:05:05.019195001 +0000
++++ tst-kuser.c	2011-06-20 17:45:12.000000000 +0000
+@@ -0,0 +1,158 @@
++#include <stdlib.h>
++#include <stdio.h>
++#include <pthread.h>
++#include <unistd.h>
++#include <sys/syscall.h>
++#include <sys/types.h>
++
++#include "kuser.h"
++
++#ifndef ITERATIONS
++#define ITERATIONS 1000000000ULL
++#endif
++
++#ifndef INCREMENT
++#ifdef BITS64
++/*
++ * So that target visits every value before repeating,
++ * INCREMENT should be an odd number.
++ * So that imperfect atomicity does not go unnoticed,
++ * INCREMENT should have plenty of non-zero bits, so that
++ * many bits of target change each time INCREMENT is added.
++ */
++#define INCREMENT 0x78B0AA6F67B4746DULL
++#else
++#define INCREMENT 0x67B4746DU
++#endif
++#endif
++
++#ifndef THREADS
++#define THREADS 4
++#endif
++
++#ifdef BITS64
++static volatile long long target = 0;
++#else
++static volatile unsigned target = 0;
++#endif
++
++struct thread_struct {
++	pthread_t thread;
++	volatile unsigned preemption_count;
++};
++
++#ifdef BITS64
++static void atomic_inc(long long volatile *p)
++#else
++static void atomic_inc(unsigned volatile *p)
++#endif
++{
++#ifdef BITS64
++	long long i, j;
++#else
++	int i, j;
++#endif
++
++	do {
++
++		i = *p;
++		j = i + INCREMENT;
++#ifdef BITS64
++	} while(__kuser_cmpxchg64(&i, &j, p));
++#else
++	} while(__kuser_cmpxchg(i, j, p));
++#endif
++}
++
++static unsigned thread_involuntary_switches(void)
++{
++	unsigned result = 0;
++	FILE *f = NULL;
++	char buf[80];
++#define FORMAT "/proc/%d/sched"
++	char namebuf[sizeof FORMAT + 10];
++	pid_t tid;
++
++	tid = syscall(__NR_gettid);
++	if(snprintf(namebuf, sizeof namebuf, FORMAT, tid) >= sizeof namebuf)
++		goto error;
++	f = fopen(namebuf, "r");
++	if(!f)
++		goto error;
++
++	while(fgets(buf, sizeof buf, f))
++		if(sscanf(buf, "nr_involuntary_switches : %d", &result))
++			goto done;
++
++error:
++	fprintf(stderr,
++		"Warning: %d: unable to read nr_involuntary_switches count\n",
++		tid);
++done:
++	if(f)
++		fclose(f);
++	return result;
++}
++
++static void *thread_func(void *arg)
++{
++	struct thread_struct *me = arg;
++
++	unsigned i;
++
++	for(i = 0; i < ITERATIONS; i++)
++		atomic_inc(&target);
++
++	me->preemption_count = thread_involuntary_switches();
++
++	return me;
++}
++
++int main(void)
++{
++	unsigned i;
++	struct thread_struct threads[THREADS];
++
++	fprintf(stderr, "__kuser_helper_version = %d\n",
++		__kuser_helper_version);
++#ifdef BTIS64
++	if(__kuser_helper_version < 5) {
++#else
++	if(__kuser_helper_version < 3) {
++#endif
++		fputs("Kernel too old\n", stderr);
++		exit(EXIT_FAILURE);
++	}
++
++	for(i = 0; i < THREADS; i++)
++		pthread_create(&threads[i].thread, NULL,
++			thread_func, &threads[i]);
++
++	for(i = 0; i < THREADS; i++)
++		pthread_join(threads[i].thread, NULL);
++
++	/*
++	 * For now, just leave the signaller threads running.
++	 * They should be harmless.
++	 */
++
++#ifdef BITS64
++	fprintf(stderr, "iterations * %llu = %llu\n", INCREMENT, target);
++#else
++	fprintf(stderr, "iterations * %u = %u\n", INCREMENT, target);
++#endif
++
++	for(i = 0; i < THREADS; i++)
++		fprintf(stderr, "\tThread %u:\t%10u preemptions\n",
++			i, threads[i].preemption_count);	
++
++	if(ITERATIONS * INCREMENT * THREADS != target) {
++		fputs("Error: Wrong final value of target.\n", stderr);
++		return EXIT_FAILURE;
++	} else {
++		fputs("OK\n", stderr);
++		return EXIT_SUCCESS;
++	}
++
++	return 0;
++}
+--- /dev/null	2011-06-20 16:05:05.019195001 +0000
++++ kuser.h	2011-06-20 16:44:28.000000000 +0000
+@@ -0,0 +1,18 @@
++#ifndef __ARM_KUSER_H
++#define __ARM_KUSER_H
++
++#define __kuser_helper_version (*(int *)0xffff0ffc)
++
++#define __kuser_decl __attribute__ (( __unused__ )) static
++
++__kuser_decl int __kuser_cmpxchg64(const long long *oldval, const long long *newval, volatile long long *ptr)
++{
++	return ((int (*)(const long long *, const long long *, volatile long long *))0xffff0f60)(oldval, newval, ptr);
++}
++
++__kuser_decl int __kuser_cmpxchg(int oldval, int newval, volatile int *ptr)
++{
++	return ((int (*)(int oldval, int newval, volatile int *))0xffff0fc0)(oldval, newval, ptr);
++}
++
++#endif /* __ARM_KUSER_H */
