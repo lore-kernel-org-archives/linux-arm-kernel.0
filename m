@@ -1,46 +1,116 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 21 Jun 2011 10:58:47 +0900
-Subject: [PATCH v2 5/5] Samsung SoC: header file revised to prevent declaring
-	duplicated.
+Date: Tue, 21 Jun 2011 10:58:44 +0900
+Subject: [PATCH v2 2/5] Samsung SoC ADC: Channel selection for S5PV210,
+	S5PC110, and Exynos4
 In-Reply-To: <1308621527-2457-1-git-send-email-myungjoo.ham@samsung.com>
 References: <20110620101737.GA31864@opensource.wolfsonmicro.com>
 	<1308621527-2457-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1308621527-2457-6-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1308621527-2457-3-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There has been no #ifndef - #define - #endif protection for this header
-file.
-
-To compile EXYNOS4 with adc support without compiler errors, this patch is essential.
+In S5PV210/S5PC110/Exynos4, ADCMUX channel selection uses ADCMUX
+register, not ADCCON register. This patch corrects the behavior of
+Samsung-ADC for such cpus.
 
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
 Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 --
 v2: No changes from v1. Resubmitted as a series of patches
 ---
- arch/arm/plat-samsung/include/plat/devs.h |    5 +++++
- 1 files changed, 5 insertions(+), 0 deletions(-)
+ arch/arm/plat-samsung/adc.c                   |   24 +++++++++++++++++-------
+ arch/arm/plat-samsung/include/plat/regs-adc.h |    1 +
+ 2 files changed, 18 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-samsung/include/plat/devs.h
-index 4af108f..3c87779 100644
---- a/arch/arm/plat-samsung/include/plat/devs.h
-+++ b/arch/arm/plat-samsung/include/plat/devs.h
-@@ -12,6 +12,9 @@
-  * it under the terms of the GNU General Public License version 2 as
-  * published by the Free Software Foundation.
- */
-+#ifndef __PLAT_DEVS_H
-+#define __PLAT_DEVS_H __FILE__
-+
- #include <linux/platform_device.h>
+diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
+index 938f6e9..0233c69 100644
+--- a/arch/arm/plat-samsung/adc.c
++++ b/arch/arm/plat-samsung/adc.c
+@@ -41,8 +41,10 @@
  
- struct s3c24xx_uart_resources {
-@@ -159,3 +162,5 @@ extern struct platform_device s3c_device_ac97;
-  */
- extern void *s3c_set_platdata(void *pd, size_t pdsize,
- 			      struct platform_device *pdev);
-+
-+#endif /* __PLAT_DEVS_H */
+ enum s3c_cpu_type {
+ 	TYPE_S3C24XX,
+-	TYPE_S3C64XX
++	TYPE_S3C64XX,
++	TYPE_S5P,
+ };
++#define S3C64XX_OR_LATER(type)	((type) == TYPE_S3C64XX || (type) == TYPE_S5P)
+ 
+ struct s3c_adc_client {
+ 	struct platform_device	*pdev;
+@@ -93,6 +95,7 @@ static inline void s3c_adc_select(struct adc_device *adc,
+ 				  struct s3c_adc_client *client)
+ {
+ 	unsigned con = readl(adc->regs + S3C2410_ADCCON);
++	enum s3c_cpu_type cpu = platform_get_device_id(adc->pdev)->driver_data;
+ 
+ 	client->select_cb(client, 1);
+ 
+@@ -100,8 +103,12 @@ static inline void s3c_adc_select(struct adc_device *adc,
+ 	con &= ~S3C2410_ADCCON_STDBM;
+ 	con &= ~S3C2410_ADCCON_STARTMASK;
+ 
+-	if (!client->is_ts)
+-		con |= S3C2410_ADCCON_SELMUX(client->channel);
++	if (!client->is_ts) {
++		if (cpu == TYPE_S5P)
++			writel(client->channel & 0xf, adc->regs + S5P_ADCMUX);
++		else
++			con |= S3C2410_ADCCON_SELMUX(client->channel);
++	}
+ 
+ 	writel(con, adc->regs + S3C2410_ADCCON);
+ }
+@@ -287,8 +294,8 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ 
+ 	client->nr_samples--;
+ 
+-	if (cpu == TYPE_S3C64XX) {
+-		/* S3C64XX ADC resolution is 12-bit */
++	if (S3C64XX_OR_LATER(cpu)) {
++		/* S3C64XX/S5P ADC resolution is 12-bit */
+ 		data0 &= 0xfff;
+ 		data1 &= 0xfff;
+ 	} else {
+@@ -314,7 +321,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
+ 	}
+ 
+ exit:
+-	if (cpu == TYPE_S3C64XX) {
++	if (S3C64XX_OR_LATER(cpu)) {
+ 		/* Clear ADC interrupt */
+ 		writel(0, adc->regs + S3C64XX_ADCCLRINT);
+ 	}
+@@ -388,7 +395,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
+ 	clk_enable(adc->clk);
+ 
+ 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
+-	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C64XX) {
++	if (S3C64XX_OR_LATER(platform_get_device_id(pdev)->driver_data)) {
+ 		/* Enable 12-bit ADC resolution */
+ 		tmp |= S3C64XX_ADCCON_RESSEL;
+ 	}
+@@ -478,6 +485,9 @@ static struct platform_device_id s3c_adc_driver_ids[] = {
+ 	}, {
+ 		.name           = "s3c64xx-adc",
+ 		.driver_data    = TYPE_S3C64XX,
++	}, {
++		.name		= "s5p-adc",
++		.driver_data	= TYPE_S5P,
+ 	},
+ 	{ }
+ };
+diff --git a/arch/arm/plat-samsung/include/plat/regs-adc.h b/arch/arm/plat-samsung/include/plat/regs-adc.h
+index 7554c4f..035e8c3 100644
+--- a/arch/arm/plat-samsung/include/plat/regs-adc.h
++++ b/arch/arm/plat-samsung/include/plat/regs-adc.h
+@@ -21,6 +21,7 @@
+ #define S3C2410_ADCDAT1	   S3C2410_ADCREG(0x10)
+ #define S3C64XX_ADCUPDN		S3C2410_ADCREG(0x14)
+ #define S3C64XX_ADCCLRINT	S3C2410_ADCREG(0x18)
++#define S5P_ADCMUX		S3C2410_ADCREG(0x1C)
+ #define S3C64XX_ADCCLRINTPNDNUP	S3C2410_ADCREG(0x20)
+ 
+ 
 -- 
 1.7.4.1
