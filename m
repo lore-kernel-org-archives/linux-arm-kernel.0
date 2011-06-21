@@ -1,73 +1,88 @@
-From: davidb@codeaurora.org (David Brown)
-Date: Tue, 21 Jun 2011 10:32:19 -0700
-Subject: [PATCH 4/4] ARM: zImage: allow supplementing appended DTB with
-	traditional ATAG data
-In-Reply-To: <20110621070058.GA9228@S2101-09.ap.freescale.net> (Shawn Guo's
-	message of "Tue, 21 Jun 2011 15:00:59 +0800")
-References: <1308632955-11070-1-git-send-email-nico@fluxnic.net>
-	<1308632955-11070-5-git-send-email-nico@fluxnic.net>
-	<20110621070058.GA9228@S2101-09.ap.freescale.net>
-Message-ID: <8yad3i7nl98.fsf@huya.qualcomm.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Tue, 21 Jun 2011 14:49:35 -0300
+Subject: [PATCH 1/3] ARM: imx2: Fix GPIO iosize
+Message-ID: <1308678577-25277-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21 2011, Shawn Guo wrote:
+On MX1, MX21 and MX27 each GPIO port has an address space of 256 bytes.
 
-> On Tue, Jun 21, 2011 at 01:09:15AM -0400, Nicolas Pitre wrote:
->> From: Nicolas Pitre <nicolas.pitre@linaro.org>
->> 
->> Some old bootloaders can't be updated to a device tree capable one,
->> yet they provide ATAGs with memory configuration, the ramdisk address,
->> the kernel cmdline string, etc.  To allow a device tree enabled
->> kernel to be used with such bootloaders, it is necessary to convert those
->> ATAGs into FDT properties and fold them into the DTB appended to zImage.
->> 
->> Currently the following ATAGs are converted:
->> 
->> 	ATAG_CMDLINE
->> 	ATAG_MEM (up to 8 memory regions)
->> 	ATAG_INITRD2
->> 
->> If the corresponding information already exists in the appended DTB, it
->> is replaced, otherwise the required node is created to hold it.
->> 
->> The code looks for ATAGs at the location pointed by the value of r2 upon
->> entry into the zImage code.  If no ATAGs are found there, an attempt at
->> finding ATAGs at the typical 0x100 offset from start of RAM is made.
->> Otherwise the DTB is left unchanged.
->> 
->> Thisstarted from an older patch from John Bonesio <bones@secretlab.ca>,
->> with contributions from David Brown <davidb@codeaurora.org>.
->> 
->> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
->> ---
->
-> With this patch applied, I saw nothing coming from kernel on imx51
-> babbage serial port.
+Fix the iosize for these platforms.
 
-Can you try seeing if it works with padding in the DTB that you are
-using?  Right now, I'm using something like:
+Tested on a mx27_3ds board that can boot fine after this change.
 
-/ {
-	...
-	memory {
-		reg = <0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0>;
-	};
-	chosen {
-		bootargs = "                              "; /* Enough for arg */
-		linux,initrd-start = <0>;
-		linux,initrd-end = <0>;
-	};
-};
+Cc: Shawn Guo <shawn.guo@freescale.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+This applies on Sascha's for-next branch
 
-I get problems if the fdt code tries to expand the tree, even if I add
-padding when running the dtc (I've tried -p 1024).
+ arch/arm/mach-imx/mm-imx1.c  |   12 ++++++++----
+ arch/arm/mach-imx/mm-imx21.c |   12 ++++++------
+ arch/arm/mach-imx/mm-imx27.c |   12 ++++++------
+ 3 files changed, 20 insertions(+), 16 deletions(-)
 
-Hopefully, I'll get some time today to try and figure out what is going
-on.
-
-David
-
+diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
+index b486595..8a953fd 100644
+--- a/arch/arm/mach-imx/mm-imx1.c
++++ b/arch/arm/mach-imx/mm-imx1.c
+@@ -50,8 +50,12 @@ void __init mx1_init_irq(void)
+ 
+ void __init imx1_soc_init(void)
+ {
+-	mxc_register_gpio(0, MX1_GPIO1_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTA, 0);
+-	mxc_register_gpio(1, MX1_GPIO2_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTB, 0);
+-	mxc_register_gpio(2, MX1_GPIO3_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTC, 0);
+-	mxc_register_gpio(3, MX1_GPIO4_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTD, 0);
++	mxc_register_gpio(0, MX1_GPIO1_BASE_ADDR, SZ_256,
++						MX1_GPIO_INT_PORTA, 0);
++	mxc_register_gpio(1, MX1_GPIO2_BASE_ADDR, SZ_256,
++						MX1_GPIO_INT_PORTB, 0);
++	mxc_register_gpio(2, MX1_GPIO3_BASE_ADDR, SZ_256,
++						MX1_GPIO_INT_PORTC, 0);
++	mxc_register_gpio(3, MX1_GPIO4_BASE_ADDR, SZ_256,
++						MX1_GPIO_INT_PORTD, 0);
+ }
+diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
+index f0fb8bc..f8fb41c 100644
+--- a/arch/arm/mach-imx/mm-imx21.c
++++ b/arch/arm/mach-imx/mm-imx21.c
+@@ -76,10 +76,10 @@ void __init mx21_init_irq(void)
+ 
+ void __init imx21_soc_init(void)
+ {
+-	mxc_register_gpio(0, MX21_GPIO1_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
+-	mxc_register_gpio(1, MX21_GPIO2_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
+-	mxc_register_gpio(2, MX21_GPIO3_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
+-	mxc_register_gpio(3, MX21_GPIO4_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
+-	mxc_register_gpio(4, MX21_GPIO5_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
+-	mxc_register_gpio(5, MX21_GPIO6_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
++	mxc_register_gpio(0, MX21_GPIO1_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
++	mxc_register_gpio(1, MX21_GPIO2_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
++	mxc_register_gpio(2, MX21_GPIO3_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
++	mxc_register_gpio(3, MX21_GPIO4_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
++	mxc_register_gpio(4, MX21_GPIO5_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
++	mxc_register_gpio(5, MX21_GPIO6_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
+ }
+diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
+index d3700ce..acc6db4 100644
+--- a/arch/arm/mach-imx/mm-imx27.c
++++ b/arch/arm/mach-imx/mm-imx27.c
+@@ -76,10 +76,10 @@ void __init mx27_init_irq(void)
+ 
+ void __init imx27_soc_init(void)
+ {
+-	mxc_register_gpio(0, MX27_GPIO1_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
+-	mxc_register_gpio(1, MX27_GPIO2_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
+-	mxc_register_gpio(2, MX27_GPIO3_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
+-	mxc_register_gpio(3, MX27_GPIO4_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
+-	mxc_register_gpio(4, MX27_GPIO5_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
+-	mxc_register_gpio(5, MX27_GPIO6_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
++	mxc_register_gpio(0, MX27_GPIO1_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
++	mxc_register_gpio(1, MX27_GPIO2_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
++	mxc_register_gpio(2, MX27_GPIO3_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
++	mxc_register_gpio(3, MX27_GPIO4_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
++	mxc_register_gpio(4, MX27_GPIO5_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
++	mxc_register_gpio(5, MX27_GPIO6_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
+ }
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+1.6.0.4
