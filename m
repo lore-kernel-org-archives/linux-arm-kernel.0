@@ -1,47 +1,52 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 21 Jun 2011 22:12:25 +0800
-Subject: [PATCH v3 0/4] Extend sdhci-esdhc-imx card_detect and
-	write_protect support for mx5
-In-Reply-To: <87oc1ra59b.fsf@lebrac.rtp-net.org>
-References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
-	<20110621013905.GB6294@S2101-09.ap.freescale.net>
-	<87oc1ra59b.fsf@lebrac.rtp-net.org>
-Message-ID: <20110621141223.GD9228@S2101-09.ap.freescale.net>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Tue, 21 Jun 2011 16:03:41 +0200
+Subject: Slow spi_sync() on pxa2xx_spi
+In-Reply-To: <BANLkTinU+chEbZRpFSdRH_dPE2vhK_7pHg@mail.gmail.com>
+References: <20110616082112.GA10075@excalibur.local>
+	<BANLkTikuo_fHbw9FFMtorpg15vOnXMK-+g@mail.gmail.com>
+	<20110616091931.GB10075@excalibur.local>
+	<BANLkTinU+chEbZRpFSdRH_dPE2vhK_7pHg@mail.gmail.com>
+Message-ID: <20110621140341.GK3652@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 11:44:00AM +0200, Arnaud Patard wrote:
-> Shawn Guo <shawn.guo@freescale.com> writes:
-> 
-> > Hi Arnaud,
-> 
-> Hi,
-> 
+Hello.
+
+On Thu, 2011-06-16 at 17:44, Eric Miao wrote:
+> On Thu, Jun 16, 2011 at 5:19 PM, Stefan Schmidt
+> <stefan@datenfreihafen.org> wrote:
 > >
-> > Would you please give a test on the series, as it fixed the issue
-> > you reported?  TIA.
+> > Its either 8bit or 16bit for a message. The mentioned problem happens
+> > on a 8 bit message. It does nothing else then writing to a defined
+> > register address to trigger the hardware sending the data in the FIFO.
 > 
-> I've tested it yesterday on my efika platforms and the issue is
-> gone. Moreover, the differents card slot on theses platforms are using
-> each card detect type (internally connected, gpio, no card detect) and
-> they are all working as expected. I'm a little bit annoyed by the
-> polling on the slot without card detect but this has nothing to do with
-> this patchset.
-> 
-That's great.
+> This might get too much overhead. I didn't check the source code, but
+> my guess is it's waiting for interrupt for each message, and once the
+> interrupt of message being flushed out happens, it starts the next one
+> waiting for the FIFO empty interrupt coming. Did you try stuff more
+> bytes into a single message?
 
-> Side note: turns out that the driver is using dev_warn when failing to
-> get cd gpio/irq. Given that in theses cases, it jumps to
-> no_card_detect_pin and makes the probe fail, maybe a dev_err would be
-> better ? 
-> 
-Though it's the existing code, I respect the comment and will make the
-change in the v4.
+Took me some time to implement and test al kind of different
+scenarios. As you suggested I tried to stuff more bytes into a message
+as well as testing all kind of combination with tx and rx thresholds,
+timout, PIO and DMA, cs_change , etc. No change.
 
-> Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
-> 
-Thanks for testing.
+I then bit the bullet and changed the board to use the spi_gpio driver
+instead of pxa2xx. After some struggling (make sure you setup pin
+config correctly :)) I got it working but with the same result.
 
--- 
-Regards,
-Shawn
+My last test block was around using spi_async() instead of spi_sync
+and as well I was not able to reach my timing criteria. :(
+
+To me it seems right now as if it is just not possible to reach
+something in the 100 usec range with the SPI framework. Obviuously I
+would be loved to be proven wrong. :)
+
+As I'm running way out of time for this part of my project I'm back to
+the driver now trying to find a solution that avoids the tight timing
+criteria.
+
+Eric, thanks again for your fast and helpfull mails.
+
+regards
+Stefan Schmidt
