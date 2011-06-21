@@ -1,29 +1,32 @@
-From: vatsa@linux.vnet.ibm.com (Srivatsa Vaddagiri)
-Date: Tue, 21 Jun 2011 12:25:42 +0530
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of
-	arbitrary physical addresses
-In-Reply-To: <4DFF6E58.8090306@zytor.com>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
-	<4DFE89E0.5020509@zytor.com> <20110620074124.GB24716@elte.hu>
-	<4DFF6E58.8090306@zytor.com>
-Message-ID: <20110621065542.GA13432@linux.vnet.ibm.com>
+From: p.paneri@samsung.com (p.paneri at samsung.com)
+Date: Tue, 21 Jun 2011 12:33:42 +0530
+Subject: [RFC][PATCH 0/5] USB: DWC OTG: Add dwc_otg driver for S5P6440 samsung
+	SoC.
+Message-ID: <1308639827-2121-1-git-send-email-p.paneri@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 08:59:20AM -0700, H. Peter Anvin wrote:
-> We should either fix /dev/mem to work according to its specification or
-> rip it out.  The issue with test drivers is not spurious... I ran into
-> this one myself a few weeks ago while trying to do a memory test (by
-> limiting the amount of memory available to the kernel).  This is
-> something that is typically done on factory floors, and it would be nice
-> to be able to get those environments over to using Linux.
+From: Praveen Paneri <p.paneri@samsung.com>
 
-We came across a similar request from our manufacturing folks. They have a
-memory stress tool that needs to test how much bandwidth is possible between
-various cpus and memory modules. Essentially they want the tool to run on some
-chosen CPU and want it to drive traffic to some chosen memory module.
+These patches modify DWC OTG driver for ARM and add it for ARM based SoCs.
+Currently it has been tested for Samsung's S5P6440. The development is still 
+under process so these are not the best set of patches. They are just for review
+and not for merge. Intent of these patches is to show required modifications
+to make dwc_otg patches work on ARM.
 
-/dev/mem would be handy for such test programs ..
+Following features are tested for basic functions on SMDK6440
+board after modifications:
+OTG HOST: HID and mass-storage
+OTG DEVICE: mass-storage and adb
 
-- vatsa
+This patch series is based on below dwc_otg patches
+	http://patchwork.ozlabs.org/patch/89560/
+
+To: Tirumala Marri, Felipe Balbi
+[PATCH 1/5] USB: DWC OTG: Modification in DWC OTG driver for ARM based SoCs
+
+To: Kukjin Kim
+[PATCH 2/5] ARM: SAMSUNG: Changing the build condition of OTG platform device for samsung
+[PATCH 3/5] ARM: SAMSUNG: Adding IO mapping for OTG
+[PATCH 4/5] ARM: S5P64x0: Adding OTG PHY control code
+[PATCH 5/5] ARM: S5P64x0: Adding OTG device and initialization code for smdk6440
