@@ -1,79 +1,44 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 21 Jun 2011 23:11:17 +0200
-Subject: [PATCH] arm: mach-vt8500: add forgotten irq_data conversion
-Message-ID: <1308690677-19874-1-git-send-email-w.sang@pengutronix.de>
+From: davidb@codeaurora.org (David Brown)
+Date: Tue, 21 Jun 2011 14:59:38 -0700
+Subject: [PATCH 0/4] allow DTB to be appended to the ARM zImage with ATAG
+	conversion
+In-Reply-To: <1308632955-11070-1-git-send-email-nico@fluxnic.net> (Nicolas
+	Pitre's message of "Tue, 21 Jun 2011 01:09:11 -0400")
+References: <1308632955-11070-1-git-send-email-nico@fluxnic.net>
+Message-ID: <8yatybieth1.fsf@huya.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This platform has not been converted when the big pile was done and thus
-fails to compile. Tested on a JayPC-Tablet.
+On Mon, Jun 20 2011, Nicolas Pitre wrote:
 
-Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-Cc: Alexey Charkov <alchark@gmail.com>
-Cc: Lennert Buytenhek <buytenh@secretlab.ca>
-Cc: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mach-vt8500/irq.c |   21 ++++++++++++---------
- 1 files changed, 12 insertions(+), 9 deletions(-)
+> Yet another resend, this time with a patch to convert some ATAGs and
+> fold them into the appended DTB.  Additional ATAgs and their corresponding
+> DTB representation is still up for discussion.  In particular,
+> ATAG_REVISION and ATAG_SERIAL were mentioned as missing but there is
+> no direct DT equivalent for them.  One suggestion was to fold them into
+> the kernel cmdline string.  Anything else?
+>
+> Testing would also be appreciated.
+>
+> [PATCH 1/4] ARM: zImage: ensure it is always a multiple of 64 bits in size
+> [PATCH 2/4] ARM: zImage: Allow the appending of a device tree binary
+> [PATCH 3/4] ARM: zImage: make sure appended DTB doesn't get overwritten by kernel .bss
+> [PATCH 4/4] ARM: zImage: allow supplementing appended DTB with traditional ATAG data
 
-diff --git a/arch/arm/mach-vt8500/irq.c b/arch/arm/mach-vt8500/irq.c
-index 245140c..642de04 100644
---- a/arch/arm/mach-vt8500/irq.c
-+++ b/arch/arm/mach-vt8500/irq.c
-@@ -39,9 +39,10 @@
- static void __iomem *ic_regbase;
- static void __iomem *sic_regbase;
- 
--static void vt8500_irq_mask(unsigned int irq)
-+static void vt8500_irq_mask(struct irq_data *d)
- {
- 	void __iomem *base = ic_regbase;
-+	unsigned irq = d->irq;
- 	u8 edge;
- 
- 	if (irq >= 64) {
-@@ -64,9 +65,10 @@ static void vt8500_irq_mask(unsigned int irq)
- 	}
- }
- 
--static void vt8500_irq_unmask(unsigned int irq)
-+static void vt8500_irq_unmask(struct irq_data *d)
- {
- 	void __iomem *base = ic_regbase;
-+	unsigned irq = d->irq;
- 	u8 dctr;
- 
- 	if (irq >= 64) {
-@@ -78,10 +80,11 @@ static void vt8500_irq_unmask(unsigned int irq)
- 	writeb(dctr, base + VT8500_IC_DCTR + irq);
- }
- 
--static int vt8500_irq_set_type(unsigned int irq, unsigned int flow_type)
-+static int vt8500_irq_set_type(struct irq_data *d, unsigned int flow_type)
- {
- 	void __iomem *base = ic_regbase;
--	unsigned int orig_irq = irq;
-+	unsigned irq = d->irq;
-+	unsigned orig_irq = irq;
- 	u8 dctr;
- 
- 	if (irq >= 64) {
-@@ -114,11 +117,11 @@ static int vt8500_irq_set_type(unsigned int irq, unsigned int flow_type)
- }
- 
- static struct irq_chip vt8500_irq_chip = {
--	.name      = "vt8500",
--	.ack       = vt8500_irq_mask,
--	.mask      = vt8500_irq_mask,
--	.unmask    = vt8500_irq_unmask,
--	.set_type  = vt8500_irq_set_type,
-+	.name = "vt8500",
-+	.irq_ack = vt8500_irq_mask,
-+	.irq_mask = vt8500_irq_mask,
-+	.irq_unmask = vt8500_irq_unmask,
-+	.irq_set_type = vt8500_irq_set_type,
- };
- 
- void __init vt8500_init_irq(void)
+The first three appear to be in Grant's devicetree/arm branch (as far as
+I can tell), so I've tested the last one.
+
+I get the same behavior on MSM8660, this works as long as the DTB has
+the attributes with enough padding in them to hold the values written.
+If the fdt code tries expanding the tree (I create the DTB sith -p
+1024), then my device goes off in the weeds somewhere.  I'm trying to
+track this down, it seems to be failing in a memmove, even though that
+memmove appears valid to me.  I'm still investigating that.
+
+Otherwise, it looks good.
+
+David
+
 -- 
-1.7.2.5
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
