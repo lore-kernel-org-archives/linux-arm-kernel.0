@@ -1,51 +1,52 @@
-From: wmb@firmworks.com (Mitch Bradley)
-Date: Tue, 21 Jun 2011 09:04:33 -1000
-Subject: [PATCH 1/3] serial/imx: add device tree support
-In-Reply-To: <BANLkTiny9xDwiUww9Ys+jQZ0SHdQATABUA@mail.gmail.com>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
-	<20110618161934.GH8195@ponder.secretlab.ca>
-	<20110619073000.GA23171@S2100-06.ap.freescale.net>
-	<20110621135558.GB9228@S2101-09.ap.freescale.net>
-	<4E00E3D2.6050602@firmworks.com>
-	<BANLkTiny9xDwiUww9Ys+jQZ0SHdQATABUA@mail.gmail.com>
-Message-ID: <4E00EB41.9080606@firmworks.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 21 Jun 2011 12:09:45 -0700
+Subject: [PATCH] ARM: quiet sparse noise due to
+	__ARCH_WANT_SYS_RT_SIG(ACTION|SUSPEND)
+Message-ID: <201106211209.46462.hartleys@visionengravers.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/21/2011 8:42 AM, Grant Likely wrote:
-> On Tue, Jun 21, 2011 at 12:32 PM, Mitch Bradley<wmb@firmworks.com>  wrote:
->> I wonder if it makes sense to create a new device node "/linux-devices" to express a desired mapping from device nodes to /dev entries?  The properties could be the names of device special files and the values the corresponding node phandles.
->
-> I've been trying /really/ hard to avoid doing something like that
-> because a lot of the time the desired Linux dev name is a
-> implementation detail, and a potentially unstable one at that.  If
-> Linux requires certain devices to have certain names because that is
-> how it hooks up clocks (which is the current situation on some
-> platforms), then I'd rather have Linux encode a lookup of the
-> preferred name, at least until the that particular implementation
-> detail goes away.
->
-> As for enumerating devices, I don't think this is a Linux-specific
-> thing.  In this case it is entirely reasonable to want to say /this
-> node/ is the second serial port, and /that node/ is the third, which
-> is information needed regardless of the client OS.
+ARM defines __ARCH_WANT_SYS_RT_SIG(ACTION|SUSPEND) which
+produces the following sparse warnings in kernel/signal.c:
 
+  warning: symbol 'sys_rt_sigaction' was not declared. Should it be static?
+  warning: symbol 'sys_rt_sigsuspend' was not declared. Should it be static?
 
-This reminds me a little of the "slot-names" property defined by the PCI 
-bus binding.  It was intended to correlate PCI device numbers with the 
-corresponding externally-visible labeling of the slot, so that error 
-messages could identify a slot using a name that had some meaning to a user.
+Since ARM doesn't include <asm-generic/syscalls.h>, due to different
+calling conventions for some system calls, prototype the functions
+in <asm/unistd.h> to quiet the noise.
 
-The notion of "first" and "second" is, of course, rather difficult to 
-define precisely.  What aspect of the device establishes the order?
+Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+Cc: Russell King <linux@arm.linux.org.uk>
+Cc: Mikael Pettersson <mikpe@it.uu.se>
+Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+Cc: Mike Frysinger <vapier@gentoo.org>
+Cc: Tony Luck <tony.luck@intel.com>
 
-The "slot-names" property was useful for systems from e.g. Sun, where 
-one vendor controlled the whole system rollup.  It was almost useless 
-for cases where the one vendor supplied the motherboard and others put 
-it in various cases.
+---
 
->
-> g.
->
->
+diff --git a/arch/arm/include/asm/unistd.h b/arch/arm/include/asm/unistd.h
+index 2c04ed5..322c54e 100644
+--- a/arch/arm/include/asm/unistd.h
++++ b/arch/arm/include/asm/unistd.h
+@@ -467,6 +467,20 @@
+ #define __ARCH_WANT_SYS_SOCKETCALL
+ #endif
+ 
++#ifndef __ASSEMBLY__
++
++#include <linux/types.h>
++#include <linux/linkage.h>
++#include <linux/compiler.h>
++#include <linux/signal.h>
++
++asmlinkage long sys_rt_sigaction(int sig, const struct sigaction __user *act,
++				 struct sigaction __user *oact,
++				 size_t sigsetsize);
++asmlinkage long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize);
++
++#endif /* !__ASSEMBLY__ */
++
+ /*
+  * "Conditional" syscalls
+  *
