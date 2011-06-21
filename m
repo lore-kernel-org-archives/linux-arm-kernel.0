@@ -1,230 +1,270 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Tue, 21 Jun 2011 17:17:39 +0100
-Subject: Git pull request: 64-bit atomic user helper
-In-Reply-To: <alpine.LFD.2.00.1106202134510.2142@xanadu.home>
-References: <alpine.LFD.2.00.1106202134510.2142@xanadu.home>
-Message-ID: <20110621161739.GA2519@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2011 17:22:28 +0100
+Subject: [PATCH] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <1308556402-10955-1-git-send-email-bs14@csr.com>
+References: <1308556402-10955-1-git-send-email-bs14@csr.com>
+Message-ID: <20110621162228.GI23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 09:54:07PM -0400, Nicolas Pitre wrote:
-> Russell, please pull the following for the next merge window:
-> 
-> 	git://git.linaro.org/people/nico/linux.git cmpxchg64
-> 
-> This series cleans up the kuser documentation, then it adds 64-bit
-> cmpxchg support as needed by some user space applications.
-> 
-> Tested with the initial libgcc patches relying on this, using a 
-> kernel that has this series applied, and another without those 
-> patches to verify that the test for the availability of the needed 
-> helper does work as intended.
+Some comments inline, nothing really serious...
 
-If you like:
+On Mon, Jun 20, 2011 at 12:53:22AM -0700, Barry Song wrote:
+> +config ARCH_PRIMA2
+> +	bool "CSR SiRFSoC PRIMA2 ARM Cortex A9 Platform"
+> +	select CPU_V7
+> +	select GENERIC_TIME
+> +	select GENERIC_CLOCKEVENTS
+> +	select CLKDEV_LOOKUP
+> +	select USE_OF
+> +	select ISA_DMA_API
 
-Tested-by: Dave Martin <dave.martin@linaro.org>
+Do you really provide the old ISA DMA API?  Unless you're intending to use
+existing ISA drivers with their ISA DMA, you shouldn't define this.
 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index f5b2b39..79e6edf 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -191,6 +191,7 @@ machine-$(CONFIG_ARCH_VEXPRESS)		:= vexpress
+>  machine-$(CONFIG_ARCH_VT8500)		:= vt8500
+>  machine-$(CONFIG_ARCH_W90X900)		:= w90x900
+>  machine-$(CONFIG_ARCH_NUC93X)		:= nuc93x
+> +machine-$(CONFIG_ARCH_PRIMA2)		:= prima2
 
-Here's my silly test program.
+The comment at the start of this list says:
 
-It passed on a pandaboard (2-core A9) with
--O3 -DITERATIONS=1000000000ULL -DBITS64
+# Machine directory name.  This list is sorted alphanumerically
+# by CONFIG_* macro name.
 
-(Really, -O should not make a significant difference, though.)
+and I thank the NUC93x people for also missing it.  Please ignore the
+NUC93x entry and place yours appropriately.
 
-Since the test just loops around __kuser_cmpxchg64(), if the number
-of involuntary preemptions of a thread is non-trivial, some of those
-preemptions will occur inside the kuser helper.
+> diff --git a/arch/arm/boot/dts/prima2-cb.dts b/arch/arm/boot/dts/prima2-cb.dts
+> new file mode 100644
+> index 0000000..6e8b17c
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/prima2-cb.dts
+> @@ -0,0 +1,44 @@
+> +/dts-v1/;
+> +/ {
+> +        model = "SIRF Prima2 EVB";
+> +        compatible = "sirf,prima2-cb", "sirf,prima2";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	interrupt-parent = <&intc>;
+> +
+> +        memory {
+> +                reg = <0x00000000 0x20000000>;
+> +        };
+> +
+> +	chosen {
+> +		bootargs = "mem=512M real_root=/dev/mmcblk0p2 console=ttyS1 earlyprintk";
+> +		linux,stdout-path = &uart1;
+> +	};
+> +
+> +	amba {
 
+You declare that you have an AMBA bus, does it have primcells on it?
+Should you be selecting ARM_AMBA in your kconfig?
 
-# ./tst-kuser 
-__kuser_helper_version = 5
-iterations * 8696638275910399085 = 7609822085224859648
-        Thread 0:            17992 preemptions
-        Thread 1:            17636 preemptions
-        Thread 2:            17885 preemptions
-        Thread 3:            17517 preemptions
-OK
+> diff --git a/arch/arm/mach-prima2/include/mach/entry-macro.S b/arch/arm/mach-prima2/include/mach/entry-macro.S
+> new file mode 100644
+> index 0000000..af5611b
+> --- /dev/null
+> +++ b/arch/arm/mach-prima2/include/mach/entry-macro.S
+> @@ -0,0 +1,28 @@
+> +/*
+> + * arch/arm/mach-prima2/include/mach/entry-macro.S
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include <mach/hardware.h>
+> +
+> +#define SIRFSOC_INT_ID 0x38
+> +
+> +	.macro  get_irqnr_and_base, irqnr, irqstat, base, tmp
+> +        ldr \base, =SIRFSOC_INTR_VA_BASE
 
---- /dev/null	2011-06-20 16:05:05.019195001 +0000
-+++ tst-kuser.c	2011-06-20 17:45:12.000000000 +0000
-@@ -0,0 +1,158 @@
-+#include <stdlib.h>
-+#include <stdio.h>
-+#include <pthread.h>
-+#include <unistd.h>
-+#include <sys/syscall.h>
-+#include <sys/types.h>
-+
-+#include "kuser.h"
-+
-+#ifndef ITERATIONS
-+#define ITERATIONS 1000000000ULL
-+#endif
-+
-+#ifndef INCREMENT
-+#ifdef BITS64
-+/*
-+ * So that target visits every value before repeating,
-+ * INCREMENT should be an odd number.
-+ * So that imperfect atomicity does not go unnoticed,
-+ * INCREMENT should have plenty of non-zero bits, so that
-+ * many bits of target change each time INCREMENT is added.
-+ */
-+#define INCREMENT 0x78B0AA6F67B4746DULL
-+#else
-+#define INCREMENT 0x67B4746DU
-+#endif
-+#endif
-+
-+#ifndef THREADS
-+#define THREADS 4
-+#endif
-+
-+#ifdef BITS64
-+static volatile long long target = 0;
-+#else
-+static volatile unsigned target = 0;
-+#endif
-+
-+struct thread_struct {
-+	pthread_t thread;
-+	volatile unsigned preemption_count;
-+};
-+
-+#ifdef BITS64
-+static void atomic_inc(long long volatile *p)
-+#else
-+static void atomic_inc(unsigned volatile *p)
-+#endif
-+{
-+#ifdef BITS64
-+	long long i, j;
-+#else
-+	int i, j;
-+#endif
-+
-+	do {
-+
-+		i = *p;
-+		j = i + INCREMENT;
-+#ifdef BITS64
-+	} while(__kuser_cmpxchg64(&i, &j, p));
-+#else
-+	} while(__kuser_cmpxchg(i, j, p));
-+#endif
-+}
-+
-+static unsigned thread_involuntary_switches(void)
-+{
-+	unsigned result = 0;
-+	FILE *f = NULL;
-+	char buf[80];
-+#define FORMAT "/proc/%d/sched"
-+	char namebuf[sizeof FORMAT + 10];
-+	pid_t tid;
-+
-+	tid = syscall(__NR_gettid);
-+	if(snprintf(namebuf, sizeof namebuf, FORMAT, tid) >= sizeof namebuf)
-+		goto error;
-+	f = fopen(namebuf, "r");
-+	if(!f)
-+		goto error;
-+
-+	while(fgets(buf, sizeof buf, f))
-+		if(sscanf(buf, "nr_involuntary_switches : %d", &result))
-+			goto done;
-+
-+error:
-+	fprintf(stderr,
-+		"Warning: %d: unable to read nr_involuntary_switches count\n",
-+		tid);
-+done:
-+	if(f)
-+		fclose(f);
-+	return result;
-+}
-+
-+static void *thread_func(void *arg)
-+{
-+	struct thread_struct *me = arg;
-+
-+	unsigned i;
-+
-+	for(i = 0; i < ITERATIONS; i++)
-+		atomic_inc(&target);
-+
-+	me->preemption_count = thread_involuntary_switches();
-+
-+	return me;
-+}
-+
-+int main(void)
-+{
-+	unsigned i;
-+	struct thread_struct threads[THREADS];
-+
-+	fprintf(stderr, "__kuser_helper_version = %d\n",
-+		__kuser_helper_version);
-+#ifdef BTIS64
-+	if(__kuser_helper_version < 5) {
-+#else
-+	if(__kuser_helper_version < 3) {
-+#endif
-+		fputs("Kernel too old\n", stderr);
-+		exit(EXIT_FAILURE);
-+	}
-+
-+	for(i = 0; i < THREADS; i++)
-+		pthread_create(&threads[i].thread, NULL,
-+			thread_func, &threads[i]);
-+
-+	for(i = 0; i < THREADS; i++)
-+		pthread_join(threads[i].thread, NULL);
-+
-+	/*
-+	 * For now, just leave the signaller threads running.
-+	 * They should be harmless.
-+	 */
-+
-+#ifdef BITS64
-+	fprintf(stderr, "iterations * %llu = %llu\n", INCREMENT, target);
-+#else
-+	fprintf(stderr, "iterations * %u = %u\n", INCREMENT, target);
-+#endif
-+
-+	for(i = 0; i < THREADS; i++)
-+		fprintf(stderr, "\tThread %u:\t%10u preemptions\n",
-+			i, threads[i].preemption_count);	
-+
-+	if(ITERATIONS * INCREMENT * THREADS != target) {
-+		fputs("Error: Wrong final value of target.\n", stderr);
-+		return EXIT_FAILURE;
-+	} else {
-+		fputs("OK\n", stderr);
-+		return EXIT_SUCCESS;
-+	}
-+
-+	return 0;
-+}
---- /dev/null	2011-06-20 16:05:05.019195001 +0000
-+++ kuser.h	2011-06-20 16:44:28.000000000 +0000
-@@ -0,0 +1,18 @@
-+#ifndef __ARM_KUSER_H
-+#define __ARM_KUSER_H
-+
-+#define __kuser_helper_version (*(int *)0xffff0ffc)
-+
-+#define __kuser_decl __attribute__ (( __unused__ )) static
-+
-+__kuser_decl int __kuser_cmpxchg64(const long long *oldval, const long long *newval, volatile long long *ptr)
-+{
-+	return ((int (*)(const long long *, const long long *, volatile long long *))0xffff0f60)(oldval, newval, ptr);
-+}
-+
-+__kuser_decl int __kuser_cmpxchg(int oldval, int newval, volatile int *ptr)
-+{
-+	return ((int (*)(int oldval, int newval, volatile int *))0xffff0fc0)(oldval, newval, ptr);
-+}
-+
-+#endif /* __ARM_KUSER_H */
+Consider using get_irqnr_preamble to load the base address only once per
+IRQ exception.
+
+> diff --git a/arch/arm/mach-prima2/include/mach/isa-dma.h b/arch/arm/mach-prima2/include/mach/isa-dma.h
+> new file mode 100644
+> index 0000000..f07e264
+> --- /dev/null
+> +++ b/arch/arm/mach-prima2/include/mach/isa-dma.h
+> @@ -0,0 +1,14 @@
+> +/*
+> + * arch/arm/mach-prima2/include/mach/io.h
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#ifndef __MACH_PRIMA2_ISADMA_H
+> +#define __MACH_PRIMA2_ISADMA_H
+> +
+> +#define MAX_DMA_CHANNELS 32
+> +
+> +#endif
+
+You don't need this if you don't define ISA_DMA_API.
+
+> diff --git a/arch/arm/mach-prima2/include/mach/uncompress.h b/arch/arm/mach-prima2/include/mach/uncompress.h
+> new file mode 100644
+> index 0000000..e08d7b8
+> --- /dev/null
+> +++ b/arch/arm/mach-prima2/include/mach/uncompress.h
+> @@ -0,0 +1,42 @@
+> +/*
+> + * arch/arm/mach-prima2/include/mach/uncompress.h
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#ifndef __ASM_ARCH_UNCOMPRESS_H
+> +#define __ASM_ARCH_UNCOMPRESS_H
+> +
+> +#include <linux/bitops.h>
+> +#include <linux/io.h>
+> +#include <asm/processor.h>
+> +#include <mach/hardware.h>
+> +#include <mach/uart.h>
+
+If you include all that, then you're in for problems with the decompressor.
+The decompressor is a _really_ limited environment, and most stuff from
+linux/ or platfform stuff will not be available.
+
+> diff --git a/arch/arm/mach-prima2/irq.c b/arch/arm/mach-prima2/irq.c
+> new file mode 100644
+> index 0000000..af65481
+> --- /dev/null
+> +++ b/arch/arm/mach-prima2/irq.c
+> @@ -0,0 +1,81 @@
+...
+> +#define SIRFSOC_INT_PENDING0            0x0000
+> +#define SIRFSOC_INT_PENDING1            0x0004
+> +#define SIRFSOC_INT_IRQ_PENDING0        0x0008
+> +#define SIRFSOC_INT_IRQ_PENDING1        0x000C
+> +#define SIRFSOC_INT_FIQ_PENDING0        0x0010
+> +#define SIRFSOC_INT_FIQ_PENDING1        0x0014
+> +#define SIRFSOC_INT_RISC_MASK0          0x0018
+> +#define SIRFSOC_INT_RISC_MASK1          0x001C
+> +#define SIRFSOC_INT_RISC_LEVEL0         0x0020
+> +#define SIRFSOC_INT_RISC_LEVEL1         0x0024
+> +
+> +static void sirfsoc_irq_ack(struct irq_data *d)
+> +{
+> +}
+> +
+> +static void sirfsoc_irq_mask(struct irq_data *d)
+> +{
+> +	unsigned long mask;
+> +
+> +	mask = __raw_readl(SIRFSOC_INTR_VA_BASE + SIRFSOC_INT_RISC_MASK0 + (d->irq / 32) * 4) &
+> +		~(1 << ( d->irq % 32));
+> +	__raw_writel(mask, SIRFSOC_INTR_VA_BASE + SIRFSOC_INT_RISC_MASK0 + (d->irq / 32) * 4);
+> +}
+> +
+> +static void sirfsoc_irq_unmask(struct irq_data *d)
+> +{
+> +	unsigned long mask;
+> +
+> +	mask = __raw_readl(SIRFSOC_INTR_VA_BASE + SIRFSOC_INT_RISC_MASK0 + (d->irq / 32) * 4) |
+> +		(1 << ( d->irq % 32));
+> +	__raw_writel(mask, SIRFSOC_INTR_VA_BASE + SIRFSOC_INT_RISC_MASK0 + (d->irq / 32) * 4);
+> +}
+> +
+> +int sirfsoc_irq_settype(struct irq_data *d, unsigned int type)
+> +{
+> +	/*
+> +	 * Interrupt handler doesnt support setting trigger type
+> +	 */
+> +	if (type == IRQ_TYPE_NONE)
+> +		return 0;
+> +
+> +	return -EINVAL;
+> +}
+> +
+> +static struct irq_chip sirfsoc_irq_chip = {
+> +	.name = "SiRF SoC",
+> +	.irq_ack = sirfsoc_irq_ack,
+> +	.irq_mask = sirfsoc_irq_mask,
+> +	.irq_unmask = sirfsoc_irq_unmask,
+> +	.irq_set_type = sirfsoc_irq_settype,
+> +};
+
+Can you use the recently introduced generic irqchips stuff for this?
+
+> diff --git a/arch/arm/mach-prima2/timer.c b/arch/arm/mach-prima2/timer.c
+> new file mode 100644
+> index 0000000..f73928f
+> --- /dev/null
+> +++ b/arch/arm/mach-prima2/timer.c
+> @@ -0,0 +1,181 @@
+...
+> +/* initialize the kernel jiffy timer source */
+> +static void __init sirfsoc_timer_init(void)
+> +{
+> +	unsigned long rate;
+> +	/* timer's input clock is io clock */
+> +	struct clk *clk = clk_get(NULL, "io");
+
+Rather than going down this broken path of specifying clock names as
+connection IDs, it would be better to obtain it by function:
+	struct clk *clk = clk_get_sys("timer", NULL);
+
+Experience shows that people think that naming the clock signals themselves
+and passing strings around to drivers is easier.  After a few years they
+find that what they thought was easy, is actually inflexible and has
+become a huge problem which they need to rework.  (Samsung folk are
+currently going through this pain.)
+
+So please, don't fall into the trap of "lets give each clock signal a name
+and look up only by clock name".  Use the device names as the primary
+matching and don't allow yourself to get into the trap of passing clock
+names around.
+
+> +
+> +	BUG_ON(IS_ERR_OR_NULL(clk));
+
+	BUG_ON(IS_ERR(clk));
+
+If clk_get() may return NULL, then clk_get_rate() should be able to eat
+that value without choking.
+
+> +
+> +	rate = clk_get_rate(clk);
+> +	clk_put(clk);
+
+It's much preferable not to clk_put() a clock which you're going to
+continue using.
+
+> +
+> +	BUG_ON(rate < CLOCK_TICK_RATE);
+> +	BUG_ON(rate % CLOCK_TICK_RATE);
+> +
+> +	__raw_writel(rate / CLOCK_TICK_RATE / 2 - 1, SIRFSOC_TIMER_VA_BASE + SIRFSOC_TIMER_DIV);
+> +	__raw_writel(0, SIRFSOC_TIMER_VA_BASE + SIRFSOC_TIMER_COUNTER_LO);
+> +	__raw_writel(0, SIRFSOC_TIMER_VA_BASE + SIRFSOC_TIMER_COUNTER_HI);
+> +	__raw_writel(BIT(0), SIRFSOC_TIMER_VA_BASE + SIRFSOC_TIMER_STATUS);
+> +
+> +	if (clocksource_register_hz(&sirfsoc_clocksource, CLOCK_TICK_RATE))
+> +		BUG();
+
+Confused.  CLOCK_TICK_RATE is defined to be 100 * HZ, so 10kHz.  Do
+your timers really tick at 10kHz?  That seems needlessly slow for a
+64-bit counter.  Also consider BUG_ON()
+
+> +
+> +	if (setup_irq(sirfsoc_timer_irq.irq, &sirfsoc_timer_irq))
+> +		BUG();
+
+BUG_ON() here too.
