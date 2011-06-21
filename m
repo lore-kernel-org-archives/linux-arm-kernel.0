@@ -1,24 +1,47 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Tue, 21 Jun 2011 12:30:21 +0300
-Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
-In-Reply-To: <BANLkTimn-THKipuQVHLA9i3QSoO5RTqMtA@mail.gmail.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<BANLkTimn-THKipuQVHLA9i3QSoO5RTqMtA@mail.gmail.com>
-Message-ID: <BANLkTin3DeTK96nBo2qJGeg5NFZnDPSyxg@mail.gmail.com>
+From: tghk48@motorola.com (TAO HU)
+Date: Tue, 21 Jun 2011 17:37:31 +0800
+Subject: Bug in _und_usr on dual-core ARM?
+In-Reply-To: <20110621091529.GA22868@n2100.arm.linux.org.uk>
+References: <BANLkTinY+_+tHatRWuRFUJewUibpmvkUqA@mail.gmail.com>
+	<20110621091529.GA22868@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTinUYZm+Q3WBGLTQRXz1V2ca1AwE=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 10:50 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> root at omap4430-panda:~# cat /debug/remoteproc/omap-rproc.1/state
-> running (2)
+Hi, Russell
 
-At this point, the two remote M3 cores also start dumping trace logs to
-shared memory buffers, which are exposed by debugfs entries:
+Wouldn't it lead to oops with your patch?
+We're trying avoid oops actually.
 
-root at omap4430-panda:~# cat /debug/remoteproc/omap-rproc.1/trace0
-CORE0 starting..
-...
+On Tue, Jun 21, 2011 at 5:15 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Tue, Jun 21, 2011 at 04:31:19PM +0800, TAO HU wrote:
+>> Hi, All
+>>
+>> We got an issue on our OMAP4 SMP system.
+>> Looks like __und_user(), which was triggered by a user space
+>> exception, got a page fault hence lead to might_sleep() failure.
+>
+> Could you see whether this patch prevents the warning please.
+>
+> diff --git a/arch/arm/mm/fault.c b/arch/arm/mm/fault.c
+> index bc0e1d8..d52b940 100644
+> --- a/arch/arm/mm/fault.c
+> +++ b/arch/arm/mm/fault.c
+> @@ -289,7 +289,7 @@ do_page_fault(unsigned long addr, unsigned int fsr, struct pt_regs *regs)
+> ? ? ? ? * If we're in an interrupt or have no user
+> ? ? ? ? * context, we must not take the fault..
+> ? ? ? ? */
+> - ? ? ? if (in_atomic() || !mm)
+> + ? ? ? if (in_atomic() || irqs_disabled() || !mm)
+> ? ? ? ? ? ? ? ?goto no_context;
+>
+> ? ? ? ?/*
+>
+>
 
-root at omap4430-panda:~# cat /debug/remoteproc/omap-rproc.1/trace1
-CORE1 starting..
-...
+
+
+-- 
+Best Regards
+Hu Tao
