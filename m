@@ -1,32 +1,25 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Tue, 21 Jun 2011 02:54:19 -0700
-Subject: [PATCH 2/2] ARM: pxa168: correct nand pmu setting
-In-Reply-To: <1308650059-27226-1-git-send-email-leiwen@marvell.com>
-References: <1308650059-27226-1-git-send-email-leiwen@marvell.com>
-Message-ID: <1308650059-27226-2-git-send-email-leiwen@marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2011 10:58:18 +0100
+Subject: Bug in _und_usr on dual-core ARM?
+In-Reply-To: <BANLkTinUYZm+Q3WBGLTQRXz1V2ca1AwE=g@mail.gmail.com>
+References: <BANLkTinY+_+tHatRWuRFUJewUibpmvkUqA@mail.gmail.com>
+	<20110621091529.GA22868@n2100.arm.linux.org.uk>
+	<BANLkTinUYZm+Q3WBGLTQRXz1V2ca1AwE=g@mail.gmail.com>
+Message-ID: <20110621095818.GA23802@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original pair of <0x01db, 208000000> is invalid.
-Correct to the valid value.
+On Tue, Jun 21, 2011 at 05:37:31PM +0800, TAO HU wrote:
+> Hi, Russell
+> 
+> Wouldn't it lead to oops with your patch?
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
----
- arch/arm/mach-mmp/pxa168.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+The might_sleep() occurs because its trying to process the page fault.
+We shouldn't be trying to do that with IRQs disabled - instead, we
+should try to fix up the fault from kernel space by invoking the fixup
+for the ldrt instructions in __und_usr.
 
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 72b4e76..ab9f999 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -79,7 +79,7 @@ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
- static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
- static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
- 
--static APMU_CLK(nand, NAND, 0x01db, 208000000);
-+static APMU_CLK(nand, NAND, 0x19b, 156000000);
- static APMU_CLK(lcd, LCD, 0x7f, 312000000);
- 
- /* device and clock bindings */
--- 
-1.7.0.4
+This may throw the system into a loop against your process (which you
+should still be able to kill) which will suggest that there's dirty
+I-cache lines - we seem to be executing code in a non-present page
+(at 0xafd0ce5c).
