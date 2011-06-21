@@ -1,179 +1,238 @@
 From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 21 Jun 2011 09:05:53 +0200
+Date: Tue, 21 Jun 2011 09:14:54 +0200
 Subject: [PATCH v6 11/11] mmc: add handling for two parallel block
 	requests in issue_rw_rq
-In-Reply-To: <BANLkTimp1cu36uaky+zSWua+Civg_uQF+w@mail.gmail.com>
+In-Reply-To: <1308518257-9783-12-git-send-email-per.forlin@linaro.org>
 References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
 	<1308518257-9783-12-git-send-email-per.forlin@linaro.org>
-	<BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
-	<BANLkTimp1cu36uaky+zSWua+Civg_uQF+w@mail.gmail.com>
-Message-ID: <BANLkTikkjhjmv8oJ-coGSzPwQjZ_eUurqA@mail.gmail.com>
+Message-ID: <BANLkTi=+hvETqVS-=tA0fer1+kF3WqiKkg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2011 08:40, Per Forlin <per.forlin@linaro.org> wrote:
-> On 20 June 2011 17:17, Kishore Kadiyala <kishorek.kadiyala@gmail.com> wrote:
->> On Mon, Jun 20, 2011 at 2:47 AM, Per Forlin <per.forlin@linaro.org> wrote:
->>> Change mmc_blk_issue_rw_rq() to become asynchronous.
->>> The execution flow looks like this:
->>> The mmc-queue calls issue_rw_rq(), which sends the request
->>> to the host and returns back to the mmc-queue. The mmc-queue calls
->>> issue_rw_rq() again with a new request. This new request is prepared,
->>> in isuue_rw_rq(), then it waits for the active request to complete before
->>> pushing it to the host. When to mmc-queue is empty it will call
->>> isuue_rw_rq() with req=NULL to finish off the active request
->>> without starting a new request.
->>>
->>> Signed-off-by: Per Forlin <per.forlin@linaro.org>
->>> ---
->>> ?drivers/mmc/card/block.c | ?121 +++++++++++++++++++++++++++++++++-------------
->>> ?drivers/mmc/card/queue.c | ? 17 +++++--
->>> ?drivers/mmc/card/queue.h | ? ?1 +
->>> ?3 files changed, 101 insertions(+), 38 deletions(-)
->>>
->>> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
->>> index 6a84a75..66db77a 100644
->>> --- a/drivers/mmc/card/block.c
->>> +++ b/drivers/mmc/card/block.c
->>> @@ -108,6 +108,7 @@ static DEFINE_MUTEX(open_lock);
->>>
->>> ?enum mmc_blk_status {
->>> ? ? ? ?MMC_BLK_SUCCESS = 0,
->>> + ? ? ? MMC_BLK_PARTIAL,
->>> ? ? ? ?MMC_BLK_RETRY,
->>> ? ? ? ?MMC_BLK_DATA_ERR,
->>> ? ? ? ?MMC_BLK_CMD_ERR,
->>> @@ -668,14 +669,16 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
->>> ? ? ? ?}
->>> ?}
->>>
->>> -static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
->>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct request *req,
->>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_card *card,
->>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_blk_data *md)
->>> +static int mmc_blk_err_check(struct mmc_card *card,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_async_req *areq)
->>> ?{
->>> ? ? ? ?struct mmc_command cmd;
->>> ? ? ? ?u32 status = 0;
->>> ? ? ? ?enum mmc_blk_status ret = MMC_BLK_SUCCESS;
->>> + ? ? ? struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_active);
->>> + ? ? ? struct mmc_blk_request *brq = &mq_mrq->brq;
->>> + ? ? ? struct request *req = mq_mrq->req;
->>>
->>> ? ? ? ?/*
->>> ? ? ? ? * Check for errors here, but don't jump to cmd_err
->>> @@ -770,7 +773,11 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
->>> ? ? ? ? ? ? ? ?else
->>> ? ? ? ? ? ? ? ? ? ? ? ?ret = MMC_BLK_DATA_ERR;
->>> ? ? ? ?}
->>> -out:
->>> +
->>> + ? ? ? if (ret == MMC_BLK_SUCCESS &&
->>> + ? ? ? ? ? blk_rq_bytes(req) != brq->data.bytes_xfered)
->>> + ? ? ? ? ? ? ? ret = MMC_BLK_PARTIAL;
->>> + out:
->>> ? ? ? ?return ret;
->>> ?}
->>>
->>> @@ -901,27 +908,59 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
->>> ? ? ? ? ? ? ? ?brq->data.sg_len = i;
->>> ? ? ? ?}
->>>
->>> + ? ? ? mqrq->mmc_active.mrq = &brq->mrq;
->>> + ? ? ? mqrq->mmc_active.err_check = mmc_blk_err_check;
->>> +
->>> ? ? ? ?mmc_queue_bounce_pre(mqrq);
->>> ?}
->>>
->>> -static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
->>> +static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
->>> ?{
->>> ? ? ? ?struct mmc_blk_data *md = mq->data;
->>> ? ? ? ?struct mmc_card *card = md->queue.card;
->>> - ? ? ? struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
->>> - ? ? ? int ret = 1, disable_multi = 0;
->>> + ? ? ? struct mmc_blk_request *brq;
->>> + ? ? ? int ret = 1;
->>> + ? ? ? int disable_multi = 0;
->>> ? ? ? ?enum mmc_blk_status status;
->>> + ? ? ? struct mmc_queue_req *mq_rq;
->>> + ? ? ? struct request *req;
->>> + ? ? ? struct mmc_async_req *areq;
->>> +
->>> + ? ? ? if (!rqc && !mq->mqrq_prev->req)
->>> + ? ? ? ? ? ? ? goto out;
->>>
->>> ? ? ? ?do {
->>> - ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
->>> - ? ? ? ? ? ? ? mmc_wait_for_req(card->host, &brq->mrq);
->>> + ? ? ? ? ? ? ? if (rqc) {
->>> + ? ? ? ? ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
->>> + ? ? ? ? ? ? ? ? ? ? ? areq = &mq->mqrq_cur->mmc_active;
->>> + ? ? ? ? ? ? ? } else
->>> + ? ? ? ? ? ? ? ? ? ? ? areq = NULL;
->>> + ? ? ? ? ? ? ? areq = mmc_start_req(card->host, areq, (int *) &status);
->>
->> I think 'status' is used uninitialized.
-> status is an out parameter. From that perspective it is always initialised.
-> I should update the doc description of mmc_start_req to clarify this.
+On 19 June 2011 23:17, Per Forlin <per.forlin@linaro.org> wrote:
+> Change mmc_blk_issue_rw_rq() to become asynchronous.
+> The execution flow looks like this:
+> The mmc-queue calls issue_rw_rq(), which sends the request
+> to the host and returns back to the mmc-queue. The mmc-queue calls
+> issue_rw_rq() again with a new request. This new request is prepared,
+> in isuue_rw_rq(), then it waits for the active request to complete before
+> pushing it to the host. When to mmc-queue is empty it will call
+> isuue_rw_rq() with req=NULL to finish off the active request
+> without starting a new request.
 >
->> With this struct mmc_async_req *mmc_start_req in your first patch
->> if (error)
->> ? ? ? ?*error = err;
->> return data;
->> condition which always passes.
->>
->> You can have
->> enum mmc_blk_status status = MMC_BLK_SUCCESS;
-In core.c there is no access to the type "enum mmc_blk_status status",
-this type is block.c specific.
-The intention is to make this function available for SDIO as well.
-"int err = 0;" is set at the top of mmc_start_req(). Default err condition is 0.
-
-What do you think about the following changes?
-
-  *     @areq: async request to start
-- *     @error: non zero in case of error
-+ *     @error: out parameter returns 0 for success, otherwise non zero
-  *
-  *     Start a new MMC custom command request for a host.
-  *     If there is on ongoing async request wait for completion
-@@ -334,9 +334,7 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
-                                mmc_post_req(host, areq->mrq, -EINVAL);
-
-                        host->areq = NULL;
--                       if (error)
--                               *error = err;
--                       return data;
-+                       goto out;
-                }
-        }
-
-@@ -347,6 +345,7 @@ struct mmc_async_req *mmc_start_req(struct mmc_host *host,
-                mmc_post_req(host, host->areq->mrq, 0);
-
-        host->areq = areq;
-+ out:
-        if (error)
-                *error = err;
-        return data;
-
->>
->> struct mmc_async_req *mmc_start_req ?{
->> err = host->areq->err_check(host->card, host->areq);
->> ? ? ? ? ? ? ? ?if (err) {
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ...
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ...
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? *error = err;
->> ? ? ? ? ? ? ? ?}
->>
->> no need to update * error here in success case
->> return data
->> }
-> I agree, makes the code more clear.
+> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+> ---
+> ?drivers/mmc/card/block.c | ?121 +++++++++++++++++++++++++++++++++-------------
+> ?drivers/mmc/card/queue.c | ? 17 +++++--
+> ?drivers/mmc/card/queue.h | ? ?1 +
+> ?3 files changed, 101 insertions(+), 38 deletions(-)
 >
-> Thanks,
-> Per
+> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+> index 6a84a75..66db77a 100644
+> --- a/drivers/mmc/card/block.c
+> +++ b/drivers/mmc/card/block.c
+> @@ -108,6 +108,7 @@ static DEFINE_MUTEX(open_lock);
 >
+> ?enum mmc_blk_status {
+> ? ? ? ?MMC_BLK_SUCCESS = 0,
+> + ? ? ? MMC_BLK_PARTIAL,
+> ? ? ? ?MMC_BLK_RETRY,
+> ? ? ? ?MMC_BLK_DATA_ERR,
+> ? ? ? ?MMC_BLK_CMD_ERR,
+> @@ -668,14 +669,16 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
+> ? ? ? ?}
+> ?}
+>
+> -static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct request *req,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_card *card,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_blk_data *md)
+> +static int mmc_blk_err_check(struct mmc_card *card,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_async_req *areq)
+> ?{
+> ? ? ? ?struct mmc_command cmd;
+> ? ? ? ?u32 status = 0;
+> ? ? ? ?enum mmc_blk_status ret = MMC_BLK_SUCCESS;
+> + ? ? ? struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_active);
+> + ? ? ? struct mmc_blk_request *brq = &mq_mrq->brq;
+> + ? ? ? struct request *req = mq_mrq->req;
+>
+> ? ? ? ?/*
+> ? ? ? ? * Check for errors here, but don't jump to cmd_err
+> @@ -770,7 +773,11 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+> ? ? ? ? ? ? ? ?else
+> ? ? ? ? ? ? ? ? ? ? ? ?ret = MMC_BLK_DATA_ERR;
+> ? ? ? ?}
+> -out:
+> +
+> + ? ? ? if (ret == MMC_BLK_SUCCESS &&
+> + ? ? ? ? ? blk_rq_bytes(req) != brq->data.bytes_xfered)
+> + ? ? ? ? ? ? ? ret = MMC_BLK_PARTIAL;
+> + out:
+> ? ? ? ?return ret;
+> ?}
+>
+> @@ -901,27 +908,59 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
+> ? ? ? ? ? ? ? ?brq->data.sg_len = i;
+> ? ? ? ?}
+>
+> + ? ? ? mqrq->mmc_active.mrq = &brq->mrq;
+> + ? ? ? mqrq->mmc_active.err_check = mmc_blk_err_check;
+> +
+> ? ? ? ?mmc_queue_bounce_pre(mqrq);
+> ?}
+>
+> -static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
+> +static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
+> ?{
+> ? ? ? ?struct mmc_blk_data *md = mq->data;
+> ? ? ? ?struct mmc_card *card = md->queue.card;
+> - ? ? ? struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
+> - ? ? ? int ret = 1, disable_multi = 0;
+> + ? ? ? struct mmc_blk_request *brq;
+> + ? ? ? int ret = 1;
+> + ? ? ? int disable_multi = 0;
+> ? ? ? ?enum mmc_blk_status status;
+> + ? ? ? struct mmc_queue_req *mq_rq;
+> + ? ? ? struct request *req;
+> + ? ? ? struct mmc_async_req *areq;
+> +
+> + ? ? ? if (!rqc && !mq->mqrq_prev->req)
+> + ? ? ? ? ? ? ? goto out;
+>
+> ? ? ? ?do {
+> - ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
+> - ? ? ? ? ? ? ? mmc_wait_for_req(card->host, &brq->mrq);
+> + ? ? ? ? ? ? ? if (rqc) {
+> + ? ? ? ? ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
+> + ? ? ? ? ? ? ? ? ? ? ? areq = &mq->mqrq_cur->mmc_active;
+> + ? ? ? ? ? ? ? } else
+> + ? ? ? ? ? ? ? ? ? ? ? areq = NULL;
+> + ? ? ? ? ? ? ? areq = mmc_start_req(card->host, areq, (int *) &status);
+> + ? ? ? ? ? ? ? if (!areq)
+> + ? ? ? ? ? ? ? ? ? ? ? goto out;
+>
+> - ? ? ? ? ? ? ? mmc_queue_bounce_post(mq->mqrq_cur);
+> - ? ? ? ? ? ? ? status = mmc_blk_err_check(brq, req, card, md);
+> + ? ? ? ? ? ? ? mq_rq = container_of(areq, struct mmc_queue_req, mmc_active);
+> + ? ? ? ? ? ? ? brq = &mq_rq->brq;
+> + ? ? ? ? ? ? ? req = mq_rq->req;
+> + ? ? ? ? ? ? ? mmc_queue_bounce_post(mq_rq);
+>
+> ? ? ? ? ? ? ? ?switch (status) {
+> - ? ? ? ? ? ? ? case MMC_BLK_CMD_ERR:
+> - ? ? ? ? ? ? ? ? ? ? ? goto cmd_err;
+> + ? ? ? ? ? ? ? case MMC_BLK_SUCCESS:
+> + ? ? ? ? ? ? ? case MMC_BLK_PARTIAL:
+> + ? ? ? ? ? ? ? ? ? ? ? /*
+> + ? ? ? ? ? ? ? ? ? ? ? ?* A block was successfully transferred.
+> + ? ? ? ? ? ? ? ? ? ? ? ?*/
+> + ? ? ? ? ? ? ? ? ? ? ? spin_lock_irq(&md->lock);
+> + ? ? ? ? ? ? ? ? ? ? ? ret = __blk_end_request(req, 0,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? brq->data.bytes_xfered);
+> + ? ? ? ? ? ? ? ? ? ? ? spin_unlock_irq(&md->lock);
+> + ? ? ? ? ? ? ? ? ? ? ? if (status == MMC_BLK_SUCCESS && ret) {
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* If this happen it is a bug */
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "%s BUG rq_tot %d d_xfer %d\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, blk_rq_bytes(req),
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?brq->data.bytes_xfered);
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto cmd_err;
+> + ? ? ? ? ? ? ? ? ? ? ? }
+> ? ? ? ? ? ? ? ? ? ? ? ?break;
+> ? ? ? ? ? ? ? ?case MMC_BLK_RETRY:
+> ? ? ? ? ? ? ? ? ? ? ? ?disable_multi = 1;
+> @@ -934,36 +973,41 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
+> ? ? ? ? ? ? ? ? ? ? ? ? * read a single sector.
+> ? ? ? ? ? ? ? ? ? ? ? ? */
+> ? ? ? ? ? ? ? ? ? ? ? ?spin_lock_irq(&md->lock);
+> - ? ? ? ? ? ? ? ? ? ? ? ret = __blk_end_request(req, -EIO,
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? brq->data.blksz);
+> + ? ? ? ? ? ? ? ? ? ? ? ret = __blk_end_request(req, -EIO, brq->data.blksz);
+> ? ? ? ? ? ? ? ? ? ? ? ?spin_unlock_irq(&md->lock);
+> -
+> + ? ? ? ? ? ? ? ? ? ? ? if (!ret)
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? goto start_new_req;
+> ? ? ? ? ? ? ? ? ? ? ? ?break;
+> - ? ? ? ? ? ? ? case MMC_BLK_SUCCESS:
+> + ? ? ? ? ? ? ? case MMC_BLK_CMD_ERR:
+> + ? ? ? ? ? ? ? ? ? ? ? ret = 1;
+> + ? ? ? ? ? ? ? ? ? ? ? goto cmd_err;
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? }
+> +
+> + ? ? ? ? ? ? ? if (ret) {
+> ? ? ? ? ? ? ? ? ? ? ? ?/*
+> - ? ? ? ? ? ? ? ? ? ? ? ?* A block was successfully transferred.
+> + ? ? ? ? ? ? ? ? ? ? ? ?* In case of a none complete request
+> + ? ? ? ? ? ? ? ? ? ? ? ?* prepare it again and resend.
+> ? ? ? ? ? ? ? ? ? ? ? ? */
+> - ? ? ? ? ? ? ? ? ? ? ? spin_lock_irq(&md->lock);
+> - ? ? ? ? ? ? ? ? ? ? ? ret = __blk_end_request(req, 0, brq->data.bytes_xfered);
+> - ? ? ? ? ? ? ? ? ? ? ? spin_unlock_irq(&md->lock);
+> - ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq_rq, card, disable_multi, mq);
+> + ? ? ? ? ? ? ? ? ? ? ? mmc_start_req(card->host, &mq_rq->mmc_active, NULL);
+> ? ? ? ? ? ? ? ?}
+> ? ? ? ?} while (ret);
+>
+> ? ? ? ?return 1;
+> -
+> + out:
+> + ? ? ? return 0;
+> ?cmd_err:
+> - ? ? ? /*
+> - ? ? ? ?* If this is an SD card and we're writing, we can first
+> - ? ? ? ?* mark the known good sectors as ok.
+> - ? ? ? ?*
+> + ? ? ? /*
+> + ? ? ? ?* If this is an SD card and we're writing, we can first
+> + ? ? ? ?* mark the known good sectors as ok.
+> + ? ? ? ?*
+> ? ? ? ? * If the card is not SD, we can still ok written sectors
+> ? ? ? ? * as reported by the controller (which might be less than
+> ? ? ? ? * the real number of written sectors, but never more).
+> ? ? ? ? */
+> ? ? ? ?if (mmc_card_sd(card)) {
+> ? ? ? ? ? ? ? ?u32 blocks;
+> -
+> ? ? ? ? ? ? ? ?blocks = mmc_sd_num_wr_blocks(card);
+> ? ? ? ? ? ? ? ?if (blocks != (u32)-1) {
+> ? ? ? ? ? ? ? ? ? ? ? ?spin_lock_irq(&md->lock);
+> @@ -981,6 +1025,12 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
+> ? ? ? ? ? ? ? ?ret = __blk_end_request(req, -EIO, blk_rq_cur_bytes(req));
+> ? ? ? ?spin_unlock_irq(&md->lock);
+>
+> + start_new_req:
+> + ? ? ? if (rqc) {
+> + ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
+> + ? ? ? ? ? ? ? mmc_start_req(card->host, &mq->mqrq_cur->mmc_active, NULL);
+> + ? ? ? }
+> +
+> ? ? ? ?return 0;
+> ?}
+>
+> @@ -990,26 +1040,31 @@ static int mmc_blk_issue_rq(struct mmc_queue *mq, struct request *req)
+> ? ? ? ?struct mmc_blk_data *md = mq->data;
+> ? ? ? ?struct mmc_card *card = md->queue.card;
+>
+> - ? ? ? mmc_claim_host(card->host);
+> + ? ? ? if (req && !mq->mqrq_prev->req)
+> + ? ? ? ? ? ? ? /* claim host only for the first request */
+> + ? ? ? ? ? ? ? mmc_claim_host(card->host);
+> +
+> ? ? ? ?ret = mmc_blk_part_switch(card, md);
+> ? ? ? ?if (ret) {
+> ? ? ? ? ? ? ? ?ret = 0;
+> ? ? ? ? ? ? ? ?goto out;
+> ? ? ? ?}
+>
+> - ? ? ? if (req->cmd_flags & REQ_DISCARD) {
+> + ? ? ? if (req && req->cmd_flags & REQ_DISCARD) {
+		/* complete ongoing async transfer before issuing discard */
+		if (card->host->areq)
+			mmc_blk_issue_rw_rq(mq, NULL);
+
+prevent mmc_erase to run in parallel to mmc async request.
+
+/Per
