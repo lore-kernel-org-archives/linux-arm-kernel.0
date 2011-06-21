@@ -1,33 +1,46 @@
 From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 21 Jun 2011 22:10:34 +0800
-Subject: [PATCH v3 2/4] mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not
-	get cleared
-In-Reply-To: <20110621115236.GA14004@pengutronix.de>
+Date: Tue, 21 Jun 2011 22:12:25 +0800
+Subject: [PATCH v3 0/4] Extend sdhci-esdhc-imx card_detect and
+	write_protect support for mx5
+In-Reply-To: <87oc1ra59b.fsf@lebrac.rtp-net.org>
 References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
-	<1308566325-11600-3-git-send-email-shawn.guo@linaro.org>
-	<20110621115236.GA14004@pengutronix.de>
-Message-ID: <20110621141033.GC9228@S2101-09.ap.freescale.net>
+	<20110621013905.GB6294@S2101-09.ap.freescale.net>
+	<87oc1ra59b.fsf@lebrac.rtp-net.org>
+Message-ID: <20110621141223.GD9228@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 01:52:36PM +0200, Wolfram Sang wrote:
-> On Mon, Jun 20, 2011 at 06:38:43PM +0800, Shawn Guo wrote:
-> > The function esdhc_readl_le intends to clear bit SDHCI_CARD_PRESENT,
-> > when the card detect gpio tells there is no card.  But it does not
-> > clear the bit actually.  The patch gives a fix on that.
-> > 
-> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Tue, Jun 21, 2011 at 11:44:00AM +0200, Arnaud Patard wrote:
+> Shawn Guo <shawn.guo@freescale.com> writes:
 > 
-> For the third time ;)
+> > Hi Arnaud,
 > 
-> Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+> Hi,
 > 
-Sorry, my bad.  Will add in v4.
+> >
+> > Would you please give a test on the series, as it fixed the issue
+> > you reported?  TIA.
+> 
+> I've tested it yesterday on my efika platforms and the issue is
+> gone. Moreover, the differents card slot on theses platforms are using
+> each card detect type (internally connected, gpio, no card detect) and
+> they are all working as expected. I'm a little bit annoyed by the
+> polling on the slot without card detect but this has nothing to do with
+> this patchset.
+> 
+That's great.
 
-> Should go to stable.
+> Side note: turns out that the driver is using dev_warn when failing to
+> get cd gpio/irq. Given that in theses cases, it jumps to
+> no_card_detect_pin and makes the probe fail, maybe a dev_err would be
+> better ? 
 > 
-I suppose that Chris will take care of it, otherwise please let me
-know what I should do.  (I'm still new to the process)
+Though it's the existing code, I respect the comment and will make the
+change in the v4.
+
+> Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
+> 
+Thanks for testing.
 
 -- 
 Regards,
