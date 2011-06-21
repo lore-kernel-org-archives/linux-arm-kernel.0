@@ -1,36 +1,22 @@
-From: fujita.tomonori@lab.ntt.co.jp (FUJITA Tomonori)
-Date: Wed, 22 Jun 2011 02:44:47 +0900
-Subject: [PATCH v3 RESEND] dma-mapping: add new API for max_segment_number
-In-Reply-To: <20110617124035.GA19693@parisc-linux.org>
-References: <BANLkTi=-t9HVc6U6QY07su+c3WztsGoq3Q@mail.gmail.com>
-	<1308227453-2034-1-git-send-email-shawn.guo@linaro.org>
-	<20110617124035.GA19693@parisc-linux.org>
-Message-ID: <20110622023929W.fujita.tomonori@lab.ntt.co.jp>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 21 Jun 2011 15:09:40 -0300
+Subject: MX27PDK does not boot on 'for-next'
+In-Reply-To: <20110617005313.GB10154@S2100-06.ap.freescale.net>
+References: <BANLkTi=0g5ShRRWAdixWpF2w-ea5VMs8JQ@mail.gmail.com>
+	<20110617005313.GB10154@S2100-06.ap.freescale.net>
+Message-ID: <BANLkTikh6PZdN_tbnHQMbufMQrK3eV-9kA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Jun 2011 06:40:35 -0600
-Matthew Wilcox <matthew@wil.cx> wrote:
+Hi Shawn,
 
-> On Thu, Jun 16, 2011 at 08:30:53PM +0800, Shawn Guo wrote:
-> > Here is the user story that tells the need of the new api.  The
-> > mxs-mmc is the mmc host controller for Freescale MXS architecture.
-> > There are a pair of  mmc host specific parameters max_seg_size and
-> > max_segs that mxs-mmc host driver needs to tell mmc core, so that
-> > mmc core can know how big each data segment could be and how many
-> > segments could be handled one time in a scatter list by host driver.
-> > 
-> > The mxs-mmc driver is one user of dmaengine mxs-dma, and it will call
-> > mxs-dma to transfer data in scatter list.  That is to say mxs-mmc has
-> > no idea of what max_seg_size and max_segs should be, because they are
-> > all mxs-dma capability parameters, and mxs-mmc needs to query them
-> > from mxs-dma.
-> 
-> This approach would make sense if mxs-mmc were generic, but it's tied to
-> mxs-dma, so it can just as well call mxs-dma to find out how many segments
-> it supports.
+On Thu, Jun 16, 2011 at 9:53 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+...
+> I have to admit that I did not get the patch tested on mx27 because
+> I do not have hardware. ?Thanks for helping here.
 
-SCSI HBA drivers stores the max number of sg entries in
-host->sg_tablesize (and scsi-ml tells the block layer about the
-limit)? So if we have the generic API to handle the value, scsi HBA
-drivers (and scsi-ml) could use it too?
+I managed to fix this issue and have just submitted a patch.
+
+Regards,
+
+Fabio Estevam
