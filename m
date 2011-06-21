@@ -1,51 +1,71 @@
 From: inderpal.singh@linaro.org (Inderpal Singh)
-Date: Tue, 21 Jun 2011 11:03:05 +0530
-Subject: [PATCH] ARM: EXYNOS4: Fix secondary CPU boot after wake-up
-Message-ID: <1308634385-8544-1-git-send-email-inderpal.singh@linaro.org>
+Date: Tue, 21 Jun 2011 11:02:31 +0530
+Subject: [PATCH] ARM: EXYNOS4: Suspend to RAM fix
+Message-ID: <1308634351-8511-1-git-send-email-inderpal.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1. After wake-up, the system-wide flags register loses its value.
-   Hence, write the address of secondary startup function to
-   successfully boot the secondary CPU.
+From: Inderpal Singh <inderpal.s@samsung.com>
 
-2. Changes SGI1 to SGI0 for secondary CPU boot up
+This patch caters to the case when there is no wake up source. The system should abort the suspend and resume properly.
+
+1. It implements the pm_suspend function to save the core registers so  that they can be restored in pm_resume function.
+Earlier these resgisters were getting saved in pm_prepare, but pm_prepare never gets invoked when there is no wake up
+source enabled and restoration used to hang while resuming.
+
+2. As per the L2 cache controller spec, the cache controller registers should not be modified if cache is already enabled.
+Hence have made restoration of cache controller registers conditional based on whether it is already enabled or not.
 
 Signed-off-by: Inderpal Singh <inderpal.s@samsung.com>
 ---
-1. The below patch is mandatory to boot secondary CPU after wake-up from sleep
-http://permalink.gmane.org/gmane.linux.kernel.samsung-soc/4850
+ arch/arm/mach-exynos4/pm.c |   22 +++++++++++++++++-----
+ 1 files changed, 17 insertions(+), 5 deletions(-)
 
-2. The change SGI1 to SGI0 for secondary CPU boot up is done as discussed 
-at following link
-http://comments.gmane.org/gmane.linux.kernel.samsung-soc/4877
-
- arch/arm/mach-exynos4/platsmp.c |    9 ++++++++-
- 1 files changed, 8 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-exynos4/platsmp.c b/arch/arm/mach-exynos4/platsmp.c
-index c5e65a0..061260c 100644
---- a/arch/arm/mach-exynos4/platsmp.c
-+++ b/arch/arm/mach-exynos4/platsmp.c
-@@ -101,11 +101,18 @@ int __cpuinit boot_secondary(unsigned int cpu, struct task_struct *idle)
- 	write_pen_release(cpu);
+diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
+index 8755ca8..f483dae 100644
+--- a/arch/arm/mach-exynos4/pm.c
++++ b/arch/arm/mach-exynos4/pm.c
+@@ -324,8 +324,9 @@ static void exynos4_pm_prepare(void)
+ {
+ 	u32 tmp;
  
- 	/*
-+	* After wake-up, the system-wide flags register loses its value.
-+	* Hence, write the address of secondary startup function again.
-+	*/ 
-+	__raw_writel(BSYM(virt_to_phys(exynos4_secondary_startup)), S5P_VA_SYSRAM);
-+
-+
-+	/*
- 	 * Send the secondary CPU a soft interrupt, thereby causing
- 	 * the boot monitor to read the system wide flags register,
- 	 * and branch to the address found there.
- 	 */
--	gic_raise_softirq(cpumask_of(cpu), 1);
-+	gic_raise_softirq(cpumask_of(cpu), 0);
+-	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
++#ifdef CONFIG_CACHE_L2X0
+ 	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
++#endif
  
- 	timeout = jiffies + (1 * HZ);
- 	while (time_before(jiffies, timeout)) {
+ 	tmp = __raw_readl(S5P_INFORM1);
+ 
+@@ -410,15 +411,26 @@ static void exynos4_pm_resume(void)
+ 	exynos4_scu_enable(S5P_VA_SCU);
+ 
+ #ifdef CONFIG_CACHE_L2X0
+-	s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
+-	outer_inv_all();
+-	/* enable L2X0*/
+-	writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
++	/* Restore the cache controller registers only if it is not enabled already*/
++	if (!(__raw_readl(S5P_VA_L2CC + L2X0_CTRL)&1)) {
++
++		s3c_pm_do_restore_core(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
++		outer_inv_all();
++		/* enable L2X0*/
++		writel_relaxed(1, S5P_VA_L2CC + L2X0_CTRL);
++	}
+ #endif
+ }
+ 
++static int exynos4_pm_suspend(void)
++{
++	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
++	return 0;
++}
++
+ static struct syscore_ops exynos4_pm_syscore_ops = {
+ 	.resume		= exynos4_pm_resume,
++	.suspend	= exynos4_pm_suspend,
+ };
+ 
+ static __init int exynos4_pm_syscore_init(void)
 -- 
 1.7.1
