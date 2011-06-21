@@ -1,9 +1,10 @@
 From: eric.y.miao@gmail.com (Eric Miao)
-Date: Tue, 21 Jun 2011 18:07:23 +0800
-Subject: [PATCH 1/2] ARM: pxa910: correct nand pmu setting
-In-Reply-To: <1308650059-27226-1-git-send-email-leiwen@marvell.com>
+Date: Tue, 21 Jun 2011 18:09:51 +0800
+Subject: [PATCH 2/2] ARM: pxa168: correct nand pmu setting
+In-Reply-To: <1308650059-27226-2-git-send-email-leiwen@marvell.com>
 References: <1308650059-27226-1-git-send-email-leiwen@marvell.com>
-Message-ID: <BANLkTi=NZXhzYSTvwC0Rmue9iXyb+e-8VA@mail.gmail.com>
+	<1308650059-27226-2-git-send-email-leiwen@marvell.com>
+Message-ID: <BANLkTimKsHSODub79sc9MbNqVbtFqYzHDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,23 +14,30 @@ On Tue, Jun 21, 2011 at 5:54 PM, Lei Wen <leiwen@marvell.com> wrote:
 >
 > Signed-off-by: Lei Wen <leiwen@marvell.com>
 
-Applied.
+Lei,
+
+As pxa168 boards are available outside now, please describe more on this
+change. Due to silicon revision, erratum, or due to the original code was
+too long ago that it is no long valid.
+
+Note - check the pxa168 boards file, make sure the change will not affect
+them.
 
 > ---
-> ?arch/arm/mach-mmp/pxa910.c | ? ?2 +-
+> ?arch/arm/mach-mmp/pxa168.c | ? ?2 +-
 > ?1 files changed, 1 insertions(+), 1 deletions(-)
 >
-> diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
-> index 8f92ccd..1464607 100644
-> --- a/arch/arm/mach-mmp/pxa910.c
-> +++ b/arch/arm/mach-mmp/pxa910.c
-> @@ -110,7 +110,7 @@ static APBC_CLK(pwm2, PXA910_PWM2, 1, 13000000);
-> ?static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
-> ?static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
+> diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
+> index 72b4e76..ab9f999 100644
+> --- a/arch/arm/mach-mmp/pxa168.c
+> +++ b/arch/arm/mach-mmp/pxa168.c
+> @@ -79,7 +79,7 @@ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
+> ?static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
+> ?static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
 >
 > -static APMU_CLK(nand, NAND, 0x01db, 208000000);
 > +static APMU_CLK(nand, NAND, 0x19b, 156000000);
-> ?static APMU_CLK(u2o, USB, 0x1b, 480000000);
+> ?static APMU_CLK(lcd, LCD, 0x7f, 312000000);
 >
 > ?/* device and clock bindings */
 > --
