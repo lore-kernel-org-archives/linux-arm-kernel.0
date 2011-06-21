@@ -1,69 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Jun 2011 11:11:08 +0100
-Subject: [linux-pm] [RFC PATCH v4] ARM hibernation/suspend-to-disk support
-In-Reply-To: <20110609175313.GG24424@n2100.arm.linux.org.uk>
-References: <alpine.DEB.2.00.1106071722040.2236@localhost6.localdomain6>
-	<201106072348.44624.rjw@sisk.pl>
-	<alpine.DEB.2.00.1106091604180.11513@localhost6.localdomain6>
-	<20110609154058.GA24424@n2100.arm.linux.org.uk>
-	<4DF0F45A.3030103@ti.com>
-	<20110609164024.GB24424@n2100.arm.linux.org.uk>
-	<4DF0FA73.8050607@ti.com>
-	<20110609171255.GD24424@n2100.arm.linux.org.uk>
-	<20110609175313.GG24424@n2100.arm.linux.org.uk>
-Message-ID: <20110621101108.GE23234@n2100.arm.linux.org.uk>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Tue, 21 Jun 2011 18:14:15 +0800
+Subject: [PATCH 2/2] ARM: pxa168: correct nand pmu setting
+In-Reply-To: <BANLkTimKsHSODub79sc9MbNqVbtFqYzHDw@mail.gmail.com>
+References: <1308650059-27226-1-git-send-email-leiwen@marvell.com>
+	<1308650059-27226-2-git-send-email-leiwen@marvell.com>
+	<BANLkTimKsHSODub79sc9MbNqVbtFqYzHDw@mail.gmail.com>
+Message-ID: <BANLkTinLq82kj5JdWDFA93=86sUjVZJR2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 09, 2011 at 06:53:13PM +0100, Russell King - ARM Linux wrote:
-> On Thu, Jun 09, 2011 at 06:12:55PM +0100, Russell King - ARM Linux wrote:
-> > > 3. Avoid direct write to AUXCTRL in generic suspend code.
-> > 
-> > This is the only problematical one that I can see.  We need to restore
-> > this on systems running in secure mode.  What we could do is rather than
-> > writing to the register, read it first and compare its value with what
-> > was saved to see whether we need to write it.
-> > 
-> > Then, if platforms run in non-secure mode, they are responsible for
-> > restoring that register back to its pre-suspend value before their
-> > assembly calls cpu_resume().
-> 
-> And here's a patch which does that:
+Hi Eric,
 
-Ping.
+On Tue, Jun 21, 2011 at 6:09 PM, Eric Miao <eric.y.miao@gmail.com> wrote:
+> On Tue, Jun 21, 2011 at 5:54 PM, Lei Wen <leiwen@marvell.com> wrote:
+>> The original pair of <0x01db, 208000000> is invalid.
+>> Correct to the valid value.
+>>
+>> Signed-off-by: Lei Wen <leiwen@marvell.com>
+>
+> Lei,
+>
+> As pxa168 boards are available outside now, please describe more on this
+> change. Due to silicon revision, erratum, or due to the original code was
+> too long ago that it is no long valid.
+>
+> Note - check the pxa168 boards file, make sure the change will not affect
+> them.
 
-> 8<-----------
-> From: Russell King <rmk+kernel@arm.linux.org.uk>
-> ARM: Avoid writing to auxctrl register unless it needs to be updated
-> 
-> As the auxiliary control register is not writable in non-secure mode
-> such as on OMAP, we must avoid writing the register when resuming in
-> non-secure mode.  Avoid this by moving the responsibility to the
-> SoC code in this case to ensure that the auxiliary control register
-> is restored before cpu_resume() is called.
-> 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> --
->  arch/arm/mm/proc-v7.S |    4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> index 3c38678..fa1e6d5 100644
-> --- a/arch/arm/mm/proc-v7.S
-> +++ b/arch/arm/mm/proc-v7.S
-> @@ -237,7 +237,9 @@ ENTRY(cpu_v7_do_resume)
->  	mcr	p15, 0, r7, c2, c0, 0	@ TTB 0
->  	mcr	p15, 0, r8, c2, c0, 1	@ TTB 1
->  	mcr	p15, 0, ip, c2, c0, 2	@ TTB control register
-> -	mcr	p15, 0, r10, c1, c0, 1	@ Auxiliary control register
-> +	mrc	p15, 0, r4, c1, c0, 1	@ Read auxiliary control register
-> +	teq	r4, r10
-> +	mcrne	p15, 0, r10, c1, c0, 1	@ Auxiliary control register
->  	mcr	p15, 0, r11, c1, c0, 2	@ Co-processor access control
->  	ldr	r4, =PRRR		@ PRRR
->  	ldr	r5, =NMRR		@ NMRR
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+That value 0x01db only means 78Mhz, and from all doc I could refer to
+the 0x01db never reach
+to 208MHZ...
+
+Do you means I should keep the 0x1db register value?
+
+Thanks,
+Lei
