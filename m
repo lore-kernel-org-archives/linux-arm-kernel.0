@@ -1,55 +1,29 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 21 Jun 2011 08:51:08 +0200
-Subject: [PATCH v6 02/11] omap_hsmmc: add support for pre_req and post_req
-In-Reply-To: <BANLkTi=+o496k8Uz_k33AH=Zr8+MaFOEig@mail.gmail.com>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-	<1308518257-9783-3-git-send-email-per.forlin@linaro.org>
-	<BANLkTi=+o496k8Uz_k33AH=Zr8+MaFOEig@mail.gmail.com>
-Message-ID: <BANLkTinNG2h747MggWfoJfMp4wOSTaTKSg@mail.gmail.com>
+From: vatsa@linux.vnet.ibm.com (Srivatsa Vaddagiri)
+Date: Tue, 21 Jun 2011 12:25:42 +0530
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of
+	arbitrary physical addresses
+In-Reply-To: <4DFF6E58.8090306@zytor.com>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu> <4DFE7FF9.9070406@gmail.com>
+	<4DFE89E0.5020509@zytor.com> <20110620074124.GB24716@elte.hu>
+	<4DFF6E58.8090306@zytor.com>
+Message-ID: <20110621065542.GA13432@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2011 07:41, Kishore Kadiyala <kishorek.kadiyala@gmail.com> wrote:
-> <snip>
->
->> +
->> +static void omap_hsmmc_pre_req(struct mmc_host *mmc, struct mmc_request *mrq,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?bool is_first_req)
->
-> I don't see the usage of "is_first_req" below.
-> Is it required?
->
-It is not required. It is only an indication that this request is the
-first in a series of request. The host driver may do various
-optimisations based on this information. The first request in a series
-of jobs can't be prepared in parallel to the previous job. The host
-driver can do the following to minimise latency for the first job.
- * Preparing the cache while the MMC read/write cmd is being
-processed. In this case the pre_req could do nothing and the job is
-instead run in parallel to the read/write cmd being sent. If the
-is_first_req is false pre_req will run in parallel to an active
-transfer, in this case it is more efficient to prepare the request in
-pre_req.
- * Run PIO mode instead of DMA
- * Maybe there can be power related optimisations based on if it is
-one single transfer or multiple ones.
+On Mon, Jun 20, 2011 at 08:59:20AM -0700, H. Peter Anvin wrote:
+> We should either fix /dev/mem to work according to its specification or
+> rip it out.  The issue with test drivers is not spurious... I ran into
+> this one myself a few weeks ago while trying to do a memory test (by
+> limiting the amount of memory available to the kernel).  This is
+> something that is typically done on factory floors, and it would be nice
+> to be able to get those environments over to using Linux.
 
->> +{
->> + ? ? ? struct omap_hsmmc_host *host = mmc_priv(mmc);
->> +
->> + ? ? ? if (mrq->data->host_cookie) {
->> + ? ? ? ? ? ? ? mrq->data->host_cookie = 0;
->> + ? ? ? ? ? ? ? return ;
->> + ? ? ? }
->> +
->> + ? ? ? if (host->use_dma)
->> + ? ? ? ? ? ? ? if (omap_hsmmc_pre_dma_transfer(host, mrq->data,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &host->next_data))
->> + ? ? ? ? ? ? ? ? ? ? ? mrq->data->host_cookie = 0;
->> +}
->> +
->> ?/*
->
+We came across a similar request from our manufacturing folks. They have a
+memory stress tool that needs to test how much bandwidth is possible between
+various cpus and memory modules. Essentially they want the tool to run on some
+chosen CPU and want it to drive traffic to some chosen memory module.
 
-Thanks for your comments,
-Per
+/dev/mem would be handy for such test programs ..
+
+- vatsa
