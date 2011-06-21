@@ -1,141 +1,95 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 21 Jun 2011 23:01:10 +0200
-Subject: [PATCH v6 11/11] mmc: add handling for two parallel block
-	requests in issue_rw_rq
-In-Reply-To: <BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-	<1308518257-9783-12-git-send-email-per.forlin@linaro.org>
-	<BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
-Message-ID: <BANLkTinZs4Jae84jFbfkfPCg31a4ba2m9g@mail.gmail.com>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 21 Jun 2011 16:08:09 -0500
+Subject: [PATCH] ARM: quiet sparse noise due to
+	__ARCH_WANT_SYS_RT_SIG(ACTION|SUSPEND)
+In-Reply-To: <20110621191624.GK23234@n2100.arm.linux.org.uk>
+References: <201106211209.46462.hartleys@visionengravers.com>
+	<20110621191624.GK23234@n2100.arm.linux.org.uk>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F38227C2CB@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2011 17:17, Kishore Kadiyala <kishorek.kadiyala@gmail.com> wrote:
-> On Mon, Jun 20, 2011 at 2:47 AM, Per Forlin <per.forlin@linaro.org> wrote:
->> Change mmc_blk_issue_rw_rq() to become asynchronous.
->> The execution flow looks like this:
->> The mmc-queue calls issue_rw_rq(), which sends the request
->> to the host and returns back to the mmc-queue. The mmc-queue calls
->> issue_rw_rq() again with a new request. This new request is prepared,
->> in isuue_rw_rq(), then it waits for the active request to complete before
->> pushing it to the host. When to mmc-queue is empty it will call
->> isuue_rw_rq() with req=NULL to finish off the active request
->> without starting a new request.
->>
->> Signed-off-by: Per Forlin <per.forlin@linaro.org>
->> ---
->> ?drivers/mmc/card/block.c | ?121 +++++++++++++++++++++++++++++++++-------------
->> ?drivers/mmc/card/queue.c | ? 17 +++++--
->> ?drivers/mmc/card/queue.h | ? ?1 +
->> ?3 files changed, 101 insertions(+), 38 deletions(-)
->>
->> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
->> index 6a84a75..66db77a 100644
->> --- a/drivers/mmc/card/block.c
->> +++ b/drivers/mmc/card/block.c
->> @@ -108,6 +108,7 @@ static DEFINE_MUTEX(open_lock);
->>
->> ?enum mmc_blk_status {
->> ? ? ? ?MMC_BLK_SUCCESS = 0,
->> + ? ? ? MMC_BLK_PARTIAL,
->> ? ? ? ?MMC_BLK_RETRY,
->> ? ? ? ?MMC_BLK_DATA_ERR,
->> ? ? ? ?MMC_BLK_CMD_ERR,
->> @@ -668,14 +669,16 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
->> ? ? ? ?}
->> ?}
->>
->> -static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct request *req,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_card *card,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_blk_data *md)
->> +static int mmc_blk_err_check(struct mmc_card *card,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_async_req *areq)
->> ?{
->> ? ? ? ?struct mmc_command cmd;
->> ? ? ? ?u32 status = 0;
->> ? ? ? ?enum mmc_blk_status ret = MMC_BLK_SUCCESS;
->> + ? ? ? struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_active);
->> + ? ? ? struct mmc_blk_request *brq = &mq_mrq->brq;
->> + ? ? ? struct request *req = mq_mrq->req;
->>
->> ? ? ? ?/*
->> ? ? ? ? * Check for errors here, but don't jump to cmd_err
->> @@ -770,7 +773,11 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
->> ? ? ? ? ? ? ? ?else
->> ? ? ? ? ? ? ? ? ? ? ? ?ret = MMC_BLK_DATA_ERR;
->> ? ? ? ?}
->> -out:
->> +
->> + ? ? ? if (ret == MMC_BLK_SUCCESS &&
->> + ? ? ? ? ? blk_rq_bytes(req) != brq->data.bytes_xfered)
->> + ? ? ? ? ? ? ? ret = MMC_BLK_PARTIAL;
->> + out:
->> ? ? ? ?return ret;
->> ?}
->>
->> @@ -901,27 +908,59 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
->> ? ? ? ? ? ? ? ?brq->data.sg_len = i;
->> ? ? ? ?}
->>
->> + ? ? ? mqrq->mmc_active.mrq = &brq->mrq;
->> + ? ? ? mqrq->mmc_active.err_check = mmc_blk_err_check;
->> +
->> ? ? ? ?mmc_queue_bounce_pre(mqrq);
->> ?}
->>
->> -static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
->> +static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
->> ?{
->> ? ? ? ?struct mmc_blk_data *md = mq->data;
->> ? ? ? ?struct mmc_card *card = md->queue.card;
->> - ? ? ? struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
->> - ? ? ? int ret = 1, disable_multi = 0;
->> + ? ? ? struct mmc_blk_request *brq;
->> + ? ? ? int ret = 1;
->> + ? ? ? int disable_multi = 0;
->> ? ? ? ?enum mmc_blk_status status;
->> + ? ? ? struct mmc_queue_req *mq_rq;
->> + ? ? ? struct request *req;
->> + ? ? ? struct mmc_async_req *areq;
->> +
->> + ? ? ? if (!rqc && !mq->mqrq_prev->req)
->> + ? ? ? ? ? ? ? goto out;
->>
->> ? ? ? ?do {
->> - ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
->> - ? ? ? ? ? ? ? mmc_wait_for_req(card->host, &brq->mrq);
->> + ? ? ? ? ? ? ? if (rqc) {
->> + ? ? ? ? ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
->> + ? ? ? ? ? ? ? ? ? ? ? areq = &mq->mqrq_cur->mmc_active;
->> + ? ? ? ? ? ? ? } else
->> + ? ? ? ? ? ? ? ? ? ? ? areq = NULL;
->> + ? ? ? ? ? ? ? areq = mmc_start_req(card->host, areq, (int *) &status);
+On Tuesday, June 21, 2011 12:16 PM, Russell King wrote:
+> On Tue, Jun 21, 2011 at 12:09:45PM -0700, H Hartley Sweeten wrote:
+>> ARM defines __ARCH_WANT_SYS_RT_SIG(ACTION|SUSPEND) which
+>> produces the following sparse warnings in kernel/signal.c:
+>> 
+>>   warning: symbol 'sys_rt_sigaction' was not declared. Should it be static?
+>>   warning: symbol 'sys_rt_sigsuspend' was not declared. Should it be static?
+>> 
+>> Since ARM doesn't include <asm-generic/syscalls.h>, due to different
+>> calling conventions for some system calls, prototype the functions
+>> in <asm/unistd.h> to quiet the noise.
 >
-> I think 'status' is used uninitialized.
-> With this struct mmc_async_req *mmc_start_req in your first patch
-> if (error)
-> ? ? ? ?*error = err;
-> return data;
-> condition which always passes.
-It's valid to pass in NULL as status.
-Do you suggest to make the status pointer mandatory?
+> NAK.
+>
+> asm/unistd.h is an exported header.  Please don't pollute it with kernel
+> internal stuff.  Instead, follow the hint in asm-generic and create a new
+> header file to describe syscalls called... asm/syscalls.h.
+>
+> And.. the problem is a lot larger than you mention above:
+>
+>     arch/arm/kernel/signal.c:68:16: warning: symbol 'sys_sigsuspend' was not declared. Should it be static?
+>     arch/arm/kernel/signal.c:84:1: warning: symbol 'sys_sigaction' was not declared. Should it be static?
+>     arch/arm/kernel/signal.c:328:16: warning: symbol 'sys_sigreturn' was not declared. Should it be static?
+>     arch/arm/kernel/signal.c:360:16: warning: symbol 'sys_rt_sigreturn' was not declared. Should it be static?
+>     arch/arm/kernel/sys_arm.c:34:16: warning: symbol 'sys_fork' was not declared. Should it be static?
+>     arch/arm/kernel/sys_arm.c:47:16: warning: symbol 'sys_clone' was not declared. Should it be static?
+>     arch/arm/kernel/sys_arm.c:57:16: warning: symbol 'sys_vfork' was not declared. Should it be static?
+>     arch/arm/kernel/sys_arm.c:65:16: warning: symbol 'sys_execve' was not declared. Should it be static?
+>     arch/arm/kernel/sys_arm.c:129:17: warning: symbol 'sys_arm_fadvise64_64' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:144:17: warning: symbol 'sys_oabi_stat64' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:154:17: warning: symbol 'sys_oabi_lstat64' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:164:17: warning: symbol 'sys_oabi_fstat64' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:174:17: warning: symbol 'sys_oabi_fstatat64' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:196:17: warning: symbol 'sys_oabi_fcntl64' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:249:17: warning: symbol 'sys_oabi_epoll_ctl' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:270:17: warning: symbol 'sys_oabi_epoll_wait' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:304:17: warning: symbol 'sys_oabi_semtimedop' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:343:17: warning: symbol 'sys_oabi_semop' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:349:16: warning: symbol 'sys_oabi_ipc' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:367:17: warning: symbol 'sys_oabi_bind' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:377:17: warning: symbol 'sys_oabi_connect' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:387:17: warning: symbol 'sys_oabi_sendto' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:400:17: warning: symbol 'sys_oabi_sendmsg' was not declared. Should it be static?
+>     arch/arm/kernel/sys_oabi-compat.c:426:17: warning: symbol 'sys_oabi_socketcall' was not declared. Should it be static?
+>     arch/arm/kernel/traps.c:464:16: warning: symbol 'arm_syscall' was not declared. Should it be static?
+> 
+> So you actually need something like this (pasted, so whitespace
+> damaged).  I'll pull it out of my low priority queue and queue it up
+> for the next merge window.
 
->
-> You can have
-> enum mmc_blk_status status = MMC_BLK_SUCCESS;
->
-status will be set to MMC_BLK_SUCCESS for the first iteration of the
-do-while loop.
-It may look like:
-MMC_BLK_RETRY
-MMC_BLK_PARTIAL
-MMC_BLK_PARTIAL
-MMC_BLK_PARTIAL
-MMC_BLK_SUCCESS
+Yes, the problem is bigger than just sys_rt_sig(action|suspend).
 
-This means mmc_start_req needs to return MMC_BLK_SUCCESS.
+I was also working on fixing the issues above by adding an asm/syscalls.h.
+I just wasn't sure how to handle the sys_rt_sig(action|suspend) functions.
+
+Your patch was whitespace damaged so I applied it by hand to test.
+
+It does fix the sparse issues you list above.  So FWIW....
+
+Tested-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+
+But, it still does not fix the sparse warnings in kernel/signal.c:
+
+	kernel/signal.c:2718:1: warning: symbol 'sys_rt_sigaction' was not declared. Should it be static?
+	kernel/signal.c:2810:1: warning: symbol 'sys_rt_sigsuspend' was not declared. Should it be static?
+
+
+FYI, there are a couple other related sparse warnings in arch/arm/kernel, but
+these are not exactly "syscalls":
+
+	arch/arm/kernel/ptrace.c:795:16: warning: symbol 'syscall_trace' was not declared. Should it be static?
+	arch/arm/kernel/signal.c:787:1: warning: symbol 'do_notify_resume' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:343:29: warning: symbol 'do_undefinstr' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:386:17: warning: symbol 'do_unexp_fiq' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:398:17: warning: symbol 'bad_mode' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:661:6: warning: symbol '__bad_xchg' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:674:1: warning: symbol 'baddataabort' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:706:6: warning: symbol '__readwrite_bug' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:728:17: warning: symbol '__div0' was not declared. Should it be static?
+	arch/arm/kernel/traps.c:735:6: warning: symbol 'abort' was not declared. Should it be static?
 
 Regards,
-Per
+Hartley
