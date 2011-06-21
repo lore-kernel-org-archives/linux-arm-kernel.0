@@ -1,55 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Jun 2011 11:00:57 +0100
-Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
-In-Reply-To: <4E005F92.8030208@ti.com>
-References: <20110620101438.GD2082@n2100.arm.linux.org.uk>
-	<4DFF20B3.7010209@ti.com>
-	<20110620104415.GF2082@n2100.arm.linux.org.uk>
-	<4DFF255E.5030308@ti.com>
-	<20110620111336.GG2082@n2100.arm.linux.org.uk>
-	<4DFF2E37.8030602@ti.com>
-	<20110620114019.GH2082@n2100.arm.linux.org.uk>
-	<20110620142338.GL2082@n2100.arm.linux.org.uk>
-	<4DFF5F29.2000904@ti.com> <4E005F92.8030208@ti.com>
-Message-ID: <20110621100057.GB23802@n2100.arm.linux.org.uk>
+From: eric.y.miao@gmail.com (Eric Miao)
+Date: Tue, 21 Jun 2011 18:07:23 +0800
+Subject: [PATCH 1/2] ARM: pxa910: correct nand pmu setting
+In-Reply-To: <1308650059-27226-1-git-send-email-leiwen@marvell.com>
+References: <1308650059-27226-1-git-send-email-leiwen@marvell.com>
+Message-ID: <BANLkTi=NZXhzYSTvwC0Rmue9iXyb+e-8VA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 02:38:34PM +0530, Santosh Shilimkar wrote:
-> Russell,
+On Tue, Jun 21, 2011 at 5:54 PM, Lei Wen <leiwen@marvell.com> wrote:
+> The original pair of <0x01db, 208000000> is invalid.
+> Correct to the valid value.
 >
-> On 6/20/2011 8:24 PM, Santosh Shilimkar wrote:
->> On 6/20/2011 7:53 PM, Russell King - ARM Linux wrote:
->>> So, as loops_per_jiffy is not local to this function, the compiler has
->>> to write out that zero value, before calling calibrate_delay_converge(),
->>> and loops_per_jiffy only becomes non-zero _after_
->>> calibrate_delay_converge()
->>> has returned. This opens the window and allows the spinlock debugging
->>> code to explode.
->>>
->>> This patch closes the window completely, by only writing to
->>> loops_per_jiffy
->>> only when we have a real value for it.
->>>
->>> This allows me to boot 3.0.0-rc3 on Versatile Express (4 CPU) whereas
->>> without this it fails with spinlock lockup and rcu problems.
->>>
->>> init/calibrate.c | 14 ++++++++------
->>> 1 files changed, 8 insertions(+), 6 deletions(-)
->>>
->> I am away from my board now. Will test this change.
-> Have tested your change and it seems to fix the crash I
-> was observing. Are you planning to send this fix for rc5?
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
 
-Yes.  I think sending CPUs into infinite loops in the spinlock code is
-definitely sufficiently serious that it needs to go to Linus ASAP.
-It'd be nice to have a tested-by line though.
+Applied.
 
->> btw, the online-active race is still open even with this patch close
->> and should be fixed.
->>
-> The only problem remains is waiting for active mask before
-> marking CPU online. Shall I refresh my patch with only
-> this change then ?
-
-I already have that as a separate change.
+> ---
+> ?arch/arm/mach-mmp/pxa910.c | ? ?2 +-
+> ?1 files changed, 1 insertions(+), 1 deletions(-)
+>
+> diff --git a/arch/arm/mach-mmp/pxa910.c b/arch/arm/mach-mmp/pxa910.c
+> index 8f92ccd..1464607 100644
+> --- a/arch/arm/mach-mmp/pxa910.c
+> +++ b/arch/arm/mach-mmp/pxa910.c
+> @@ -110,7 +110,7 @@ static APBC_CLK(pwm2, PXA910_PWM2, 1, 13000000);
+> ?static APBC_CLK(pwm3, PXA910_PWM3, 1, 13000000);
+> ?static APBC_CLK(pwm4, PXA910_PWM4, 1, 13000000);
+>
+> -static APMU_CLK(nand, NAND, 0x01db, 208000000);
+> +static APMU_CLK(nand, NAND, 0x19b, 156000000);
+> ?static APMU_CLK(u2o, USB, 0x1b, 480000000);
+>
+> ?/* device and clock bindings */
+> --
+> 1.7.0.4
+>
+>
