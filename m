@@ -1,34 +1,32 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 21 Jun 2011 10:58:19 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <alpine.LFD.2.00.1106201824320.2142@xanadu.home>
-Message-ID: <Pine.LNX.4.44L0.1106211054460.2327-100000@iolanthe.rowland.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 21 Jun 2011 16:58:29 +0200
+Subject: [PATCH v3 2/4] mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not
+	get cleared
+In-Reply-To: <20110621141033.GC9228@S2101-09.ap.freescale.net>
+References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
+	<1308566325-11600-3-git-send-email-shawn.guo@linaro.org>
+	<20110621115236.GA14004@pengutronix.de>
+	<20110621141033.GC9228@S2101-09.ap.freescale.net>
+Message-ID: <20110621145829.GB14004@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Nicolas Pitre wrote:
 
-> > We don't fall into any of these cases, and therefore as you say, we
-> > don't need packed.  Arnd and I have both explained this.  So why do you 
-> > keep arguing that we do need it?
-> 
-> Please show me where I keep arguing that you need it?
+> > Should go to stable.
+> > 
+> I suppose that Chris will take care of it,
 
-Not explicitly perhaps.  But you did write:
+That's correct. You can add the cc as Chris suggested, so the maintainer knows
+that you think it should go to stable. The final decission is up to the
+maintainer, though.
 
-> Doesn't mean that because it used to work that it is strictly correct.  
-> Wouldn't be the first time that a GCC upgrade broke the kernel because 
-> the kernel wasn't describing things properly enough.
-
-which strongly implies that "packed" is needed.  You also wrote:
-
-> Yes, but that's a consequence of not being able to access those fields 
-> in their naturally aligned position anymore.  Hence the addition of the 
-> align attribute to tell the compiler that we know that the structure is 
-> still aligned to a certain degree letting the compiler to avoid 
-> byte-oriented instructions when possible.
-
-which is predicated on the assumption that "packed" is needed.
-
-Alan Stern
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110621/158f175c/attachment.sig>
