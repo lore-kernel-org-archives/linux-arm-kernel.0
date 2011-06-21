@@ -1,30 +1,54 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Wed, 22 Jun 2011 00:52:47 +0200
-Subject: [PATCH 1/3] serial/imx: add device tree support
-In-Reply-To: <BANLkTikBUo3jO=R0amkdxU1V3QMJoOUkEw@mail.gmail.com>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
-	<20110618161934.GH8195@ponder.secretlab.ca>
-	<20110619073000.GA23171@S2100-06.ap.freescale.net>
-	<20110621135558.GB9228@S2101-09.ap.freescale.net>
-	<BANLkTim4vunTm1176MRw3pqRZnunu4=9jg@mail.gmail.com>
-	<4E00F290.2010303@firmworks.com>
-	<BANLkTik9LXTJ--fRwUBscokWraPwOZnpHA@mail.gmail.com>
-	<4E011678.4030208@firmworks.com>
-	<BANLkTikBUo3jO=R0amkdxU1V3QMJoOUkEw@mail.gmail.com>
-Message-ID: <ba379b3b42f1659f4f6649c78b8bb1b2@kernel.crashing.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 22 Jun 2011 00:57:58 +0200
+Subject: [PATCH 6/6] ARM: mxc: clean up imx-dma device registration
+In-Reply-To: <20110620145054.GA24184@S2100-06.ap.freescale.net>
+References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+	<1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
+	<20110620145054.GA24184@S2100-06.ap.freescale.net>
+Message-ID: <20110621225758.GG6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Ah, we're having an impedance mismatch.  I'm thinking specifically
-> about the device tree compiler and some syntactic sugar for using the
-> label definition to generate /also/ create alias properties. The
-> hairiness is related to that and the way that dtc is implemented, not
-> with the final aliases themselves.
+On Mon, Jun 20, 2011 at 10:50:55PM +0800, Shawn Guo wrote:
+> Hi Sascha,
+> 
+> Any comment on this one?
+>
 
-You can generate DTC-style aliases from OFW-style aliases instead (or
-as well), it has other advantages (like being more readable, and having
-the aliases grouped together).
+Please respin this series on the for-next branch. Fabio has
+added i.MX53 support in the meantime and this does not apply anymore.
 
+Sascha
+ 
+> Regards,
+> Shawn
+> 
+> On Mon, Jun 13, 2011 at 03:37:25PM +0800, Shawn Guo wrote:
+> > The patch follows the implementation of gpio-mxc device registration
+> > to break the concentrated imx-dma device registration into soc
+> > specific setup function.  Then we can avoid the churn of "#ifdef"
+> > and the cpu_is_mx checking on such a long list, which makes no sense,
+> > considering more soc supports need to be added and we need to support
+> > single image for multiple socs in the long run.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/mach-imx/mm-imx21.c                    |    3 +
+> >  arch/arm/mach-imx/mm-imx25.c                    |   26 +++
+> >  arch/arm/mach-imx/mm-imx27.c                    |    3 +
+> >  arch/arm/mach-imx/mm-imx31.c                    |   24 +++
+> >  arch/arm/mach-imx/mm-imx35.c                    |   44 +++++
+> >  arch/arm/mach-mx5/mm.c                          |   23 +++
+> >  arch/arm/plat-mxc/devices.c                     |   16 ++-
+> >  arch/arm/plat-mxc/devices/platform-imx-dma.c    |  202 ++---------------------
+> >  arch/arm/plat-mxc/include/mach/devices-common.h |    6 +
+> >  9 files changed, 157 insertions(+), 190 deletions(-)
+> > 
+> 
+> 
 
-Segher
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
