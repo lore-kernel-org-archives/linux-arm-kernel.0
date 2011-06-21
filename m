@@ -1,48 +1,141 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 21 Jun 2011 16:41:59 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
-	packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106211054460.2327-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1106211054460.2327-100000@iolanthe.rowland.org>
-Message-ID: <alpine.LFD.2.00.1106211636190.2142@xanadu.home>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Tue, 21 Jun 2011 23:01:10 +0200
+Subject: [PATCH v6 11/11] mmc: add handling for two parallel block
+	requests in issue_rw_rq
+In-Reply-To: <BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
+References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
+	<1308518257-9783-12-git-send-email-per.forlin@linaro.org>
+	<BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
+Message-ID: <BANLkTinZs4Jae84jFbfkfPCg31a4ba2m9g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Jun 2011, Alan Stern wrote:
+On 20 June 2011 17:17, Kishore Kadiyala <kishorek.kadiyala@gmail.com> wrote:
+> On Mon, Jun 20, 2011 at 2:47 AM, Per Forlin <per.forlin@linaro.org> wrote:
+>> Change mmc_blk_issue_rw_rq() to become asynchronous.
+>> The execution flow looks like this:
+>> The mmc-queue calls issue_rw_rq(), which sends the request
+>> to the host and returns back to the mmc-queue. The mmc-queue calls
+>> issue_rw_rq() again with a new request. This new request is prepared,
+>> in isuue_rw_rq(), then it waits for the active request to complete before
+>> pushing it to the host. When to mmc-queue is empty it will call
+>> isuue_rw_rq() with req=NULL to finish off the active request
+>> without starting a new request.
+>>
+>> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+>> ---
+>> ?drivers/mmc/card/block.c | ?121 +++++++++++++++++++++++++++++++++-------------
+>> ?drivers/mmc/card/queue.c | ? 17 +++++--
+>> ?drivers/mmc/card/queue.h | ? ?1 +
+>> ?3 files changed, 101 insertions(+), 38 deletions(-)
+>>
+>> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
+>> index 6a84a75..66db77a 100644
+>> --- a/drivers/mmc/card/block.c
+>> +++ b/drivers/mmc/card/block.c
+>> @@ -108,6 +108,7 @@ static DEFINE_MUTEX(open_lock);
+>>
+>> ?enum mmc_blk_status {
+>> ? ? ? ?MMC_BLK_SUCCESS = 0,
+>> + ? ? ? MMC_BLK_PARTIAL,
+>> ? ? ? ?MMC_BLK_RETRY,
+>> ? ? ? ?MMC_BLK_DATA_ERR,
+>> ? ? ? ?MMC_BLK_CMD_ERR,
+>> @@ -668,14 +669,16 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
+>> ? ? ? ?}
+>> ?}
+>>
+>> -static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct request *req,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_card *card,
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_blk_data *md)
+>> +static int mmc_blk_err_check(struct mmc_card *card,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_async_req *areq)
+>> ?{
+>> ? ? ? ?struct mmc_command cmd;
+>> ? ? ? ?u32 status = 0;
+>> ? ? ? ?enum mmc_blk_status ret = MMC_BLK_SUCCESS;
+>> + ? ? ? struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_active);
+>> + ? ? ? struct mmc_blk_request *brq = &mq_mrq->brq;
+>> + ? ? ? struct request *req = mq_mrq->req;
+>>
+>> ? ? ? ?/*
+>> ? ? ? ? * Check for errors here, but don't jump to cmd_err
+>> @@ -770,7 +773,11 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
+>> ? ? ? ? ? ? ? ?else
+>> ? ? ? ? ? ? ? ? ? ? ? ?ret = MMC_BLK_DATA_ERR;
+>> ? ? ? ?}
+>> -out:
+>> +
+>> + ? ? ? if (ret == MMC_BLK_SUCCESS &&
+>> + ? ? ? ? ? blk_rq_bytes(req) != brq->data.bytes_xfered)
+>> + ? ? ? ? ? ? ? ret = MMC_BLK_PARTIAL;
+>> + out:
+>> ? ? ? ?return ret;
+>> ?}
+>>
+>> @@ -901,27 +908,59 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
+>> ? ? ? ? ? ? ? ?brq->data.sg_len = i;
+>> ? ? ? ?}
+>>
+>> + ? ? ? mqrq->mmc_active.mrq = &brq->mrq;
+>> + ? ? ? mqrq->mmc_active.err_check = mmc_blk_err_check;
+>> +
+>> ? ? ? ?mmc_queue_bounce_pre(mqrq);
+>> ?}
+>>
+>> -static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
+>> +static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
+>> ?{
+>> ? ? ? ?struct mmc_blk_data *md = mq->data;
+>> ? ? ? ?struct mmc_card *card = md->queue.card;
+>> - ? ? ? struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
+>> - ? ? ? int ret = 1, disable_multi = 0;
+>> + ? ? ? struct mmc_blk_request *brq;
+>> + ? ? ? int ret = 1;
+>> + ? ? ? int disable_multi = 0;
+>> ? ? ? ?enum mmc_blk_status status;
+>> + ? ? ? struct mmc_queue_req *mq_rq;
+>> + ? ? ? struct request *req;
+>> + ? ? ? struct mmc_async_req *areq;
+>> +
+>> + ? ? ? if (!rqc && !mq->mqrq_prev->req)
+>> + ? ? ? ? ? ? ? goto out;
+>>
+>> ? ? ? ?do {
+>> - ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
+>> - ? ? ? ? ? ? ? mmc_wait_for_req(card->host, &brq->mrq);
+>> + ? ? ? ? ? ? ? if (rqc) {
+>> + ? ? ? ? ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
+>> + ? ? ? ? ? ? ? ? ? ? ? areq = &mq->mqrq_cur->mmc_active;
+>> + ? ? ? ? ? ? ? } else
+>> + ? ? ? ? ? ? ? ? ? ? ? areq = NULL;
+>> + ? ? ? ? ? ? ? areq = mmc_start_req(card->host, areq, (int *) &status);
+>
+> I think 'status' is used uninitialized.
+> With this struct mmc_async_req *mmc_start_req in your first patch
+> if (error)
+> ? ? ? ?*error = err;
+> return data;
+> condition which always passes.
+It's valid to pass in NULL as status.
+Do you suggest to make the status pointer mandatory?
 
-> On Mon, 20 Jun 2011, Nicolas Pitre wrote:
-> 
-> > > We don't fall into any of these cases, and therefore as you say, we
-> > > don't need packed.  Arnd and I have both explained this.  So why do you 
-> > > keep arguing that we do need it?
-> > 
-> > Please show me where I keep arguing that you need it?
-> 
-> Not explicitly perhaps.  But you did write:
-> 
-> > Doesn't mean that because it used to work that it is strictly correct.  
-> > Wouldn't be the first time that a GCC upgrade broke the kernel because 
-> > the kernel wasn't describing things properly enough.
-> 
-> which strongly implies that "packed" is needed.  You also wrote:
+>
+> You can have
+> enum mmc_blk_status status = MMC_BLK_SUCCESS;
+>
+status will be set to MMC_BLK_SUCCESS for the first iteration of the
+do-while loop.
+It may look like:
+MMC_BLK_RETRY
+MMC_BLK_PARTIAL
+MMC_BLK_PARTIAL
+MMC_BLK_PARTIAL
+MMC_BLK_SUCCESS
 
-In this case ...
+This means mmc_start_req needs to return MMC_BLK_SUCCESS.
 
-> > Yes, but that's a consequence of not being able to access those fields 
-> > in their naturally aligned position anymore.  Hence the addition of the 
-> > align attribute to tell the compiler that we know that the structure is 
-> > still aligned to a certain degree letting the compiler to avoid 
-> > byte-oriented instructions when possible.
-> 
-> which is predicated on the assumption that "packed" is needed.
-
-... and also in this case, I was talking about proper use of the packed 
-attribute in general, not at all about a specific case.  I wanted to 
-provide a broader view to some people who expressed doubts and 
-misunderstanding in the hope that the archive could keep this knowledge 
-base available.
-
-I apologize if that wasn't clear to you.
-
-
-Nicolas
+Regards,
+Per
