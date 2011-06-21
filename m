@@ -1,116 +1,88 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Tue, 21 Jun 2011 10:58:44 +0900
-Subject: [PATCH v2 2/5] Samsung SoC ADC: Channel selection for S5PV210,
-	S5PC110, and Exynos4
-In-Reply-To: <1308621527-2457-1-git-send-email-myungjoo.ham@samsung.com>
-References: <20110620101737.GA31864@opensource.wolfsonmicro.com>
-	<1308621527-2457-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1308621527-2457-3-git-send-email-myungjoo.ham@samsung.com>
+Date: Tue, 21 Jun 2011 11:07:13 +0900
+Subject: [PATCH v2 4/4] Exynos4 NURI: support for NTC thermistor
+In-Reply-To: <1308622033-2521-1-git-send-email-myungjoo.ham@samsung.com>
+References: <20110620103124.GD31864@opensource.wolfsonmicro.com>
+	<1308622033-2521-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1308622033-2521-5-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In S5PV210/S5PC110/Exynos4, ADCMUX channel selection uses ADCMUX
-register, not ADCCON register. This patch corrects the behavior of
-Samsung-ADC for such cpus.
-
 Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
---
-v2: No changes from v1. Resubmitted as a series of patches
 ---
- arch/arm/plat-samsung/adc.c                   |   24 +++++++++++++++++-------
- arch/arm/plat-samsung/include/plat/regs-adc.h |    1 +
- 2 files changed, 18 insertions(+), 7 deletions(-)
+ arch/arm/mach-exynos4/mach-nuri.c |   46 +++++++++++++++++++++++++++++++++++++
+ 1 files changed, 46 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/plat-samsung/adc.c b/arch/arm/plat-samsung/adc.c
-index 938f6e9..0233c69 100644
---- a/arch/arm/plat-samsung/adc.c
-+++ b/arch/arm/plat-samsung/adc.c
-@@ -41,8 +41,10 @@
- 
- enum s3c_cpu_type {
- 	TYPE_S3C24XX,
--	TYPE_S3C64XX
-+	TYPE_S3C64XX,
-+	TYPE_S5P,
- };
-+#define S3C64XX_OR_LATER(type)	((type) == TYPE_S3C64XX || (type) == TYPE_S5P)
- 
- struct s3c_adc_client {
- 	struct platform_device	*pdev;
-@@ -93,6 +95,7 @@ static inline void s3c_adc_select(struct adc_device *adc,
- 				  struct s3c_adc_client *client)
- {
- 	unsigned con = readl(adc->regs + S3C2410_ADCCON);
-+	enum s3c_cpu_type cpu = platform_get_device_id(adc->pdev)->driver_data;
- 
- 	client->select_cb(client, 1);
- 
-@@ -100,8 +103,12 @@ static inline void s3c_adc_select(struct adc_device *adc,
- 	con &= ~S3C2410_ADCCON_STDBM;
- 	con &= ~S3C2410_ADCCON_STARTMASK;
- 
--	if (!client->is_ts)
--		con |= S3C2410_ADCCON_SELMUX(client->channel);
-+	if (!client->is_ts) {
-+		if (cpu == TYPE_S5P)
-+			writel(client->channel & 0xf, adc->regs + S5P_ADCMUX);
-+		else
-+			con |= S3C2410_ADCCON_SELMUX(client->channel);
-+	}
- 
- 	writel(con, adc->regs + S3C2410_ADCCON);
+diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
+index 51f55b4..dc6fc36 100644
+--- a/arch/arm/mach-exynos4/mach-nuri.c
++++ b/arch/arm/mach-exynos4/mach-nuri.c
+@@ -16,6 +16,7 @@
+ #include <linux/i2c-gpio.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/gpio.h>
++#include <linux/platform_data/ntc_thermistor.h>
+ #include <linux/power/max17042_battery.h>
+ #include <linux/regulator/machine.h>
+ #include <linux/regulator/fixed.h>
+@@ -1006,6 +1007,50 @@ static void __init nuri_ehci_init(void)
+ 	s5p_ehci_set_platdata(pdata);
  }
-@@ -287,8 +294,8 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
  
- 	client->nr_samples--;
- 
--	if (cpu == TYPE_S3C64XX) {
--		/* S3C64XX ADC resolution is 12-bit */
-+	if (S3C64XX_OR_LATER(cpu)) {
-+		/* S3C64XX/S5P ADC resolution is 12-bit */
- 		data0 &= 0xfff;
- 		data1 &= 0xfff;
- 	} else {
-@@ -314,7 +321,7 @@ static irqreturn_t s3c_adc_irq(int irq, void *pw)
- 	}
- 
- exit:
--	if (cpu == TYPE_S3C64XX) {
-+	if (S3C64XX_OR_LATER(cpu)) {
- 		/* Clear ADC interrupt */
- 		writel(0, adc->regs + S3C64XX_ADCCLRINT);
- 	}
-@@ -388,7 +395,7 @@ static int s3c_adc_probe(struct platform_device *pdev)
- 	clk_enable(adc->clk);
- 
- 	tmp = adc->prescale | S3C2410_ADCCON_PRSCEN;
--	if (platform_get_device_id(pdev)->driver_data == TYPE_S3C64XX) {
-+	if (S3C64XX_OR_LATER(platform_get_device_id(pdev)->driver_data)) {
- 		/* Enable 12-bit ADC resolution */
- 		tmp |= S3C64XX_ADCCON_RESSEL;
- 	}
-@@ -478,6 +485,9 @@ static struct platform_device_id s3c_adc_driver_ids[] = {
- 	}, {
- 		.name           = "s3c64xx-adc",
- 		.driver_data    = TYPE_S3C64XX,
-+	}, {
-+		.name		= "s5p-adc",
-+		.driver_data	= TYPE_S5P,
- 	},
- 	{ }
++/* NTC Thermistor */
++static struct platform_device nuri_ncp15wb473_thermistor;
++static int read_thermistor_uV(void)
++{
++	static struct s3c_adc_client *adc;
++	int val;
++	s64 converted;
++
++	if (!adc) {
++		adc = s3c_adc_register(&nuri_ncp15wb473_thermistor,
++				NULL, NULL, 0);
++		if (IS_ERR_OR_NULL(adc)) {
++			pr_err("%s: Cannot get adc.\n", __func__);
++			return adc ? PTR_ERR(adc) : -ENODEV;
++		}
++	}
++
++	if (IS_ERR_OR_NULL(adc))
++		return adc ? PTR_ERR(adc) : -ENODEV;
++
++	val = s3c_adc_read(adc, 6);
++
++	converted = 3300000LL * (s64) val;
++	converted >>= 12;
++
++	pr_emerg("%s: %d -> %llduV\n", __func__, val, converted);
++	return converted;
++}
++
++static struct ntc_thermistor_platform_data ncp15wb473_pdata = {
++	.read_uV	= read_thermistor_uV,
++	.pullup_uV	= 3300000, /* VADC_3.3V_C210 */
++	.pullup_ohm	= 100000, /* R613 in SLP 7 0105 */
++	.pulldown_ohm	= 100000, /* R615 in SLP 7 0105 */
++	.connect	= NTC_CONNECTED_GROUND,
++};
++
++static struct platform_device nuri_ncp15wb473_thermistor = {
++	.name			= "ncp15wb473",
++	.dev			= {
++		.platform_data = &ncp15wb473_pdata,
++	},
++};
++
+ static struct platform_device *nuri_devices[] __initdata = {
+ 	/* Samsung Platform Devices */
+ 	&emmc_fixed_voltage,
+@@ -1024,6 +1069,7 @@ static struct platform_device *nuri_devices[] __initdata = {
+ 	&nuri_gpio_keys,
+ 	&nuri_lcd_device,
+ 	&nuri_backlight_device,
++	&nuri_ncp15wb473_thermistor,
  };
-diff --git a/arch/arm/plat-samsung/include/plat/regs-adc.h b/arch/arm/plat-samsung/include/plat/regs-adc.h
-index 7554c4f..035e8c3 100644
---- a/arch/arm/plat-samsung/include/plat/regs-adc.h
-+++ b/arch/arm/plat-samsung/include/plat/regs-adc.h
-@@ -21,6 +21,7 @@
- #define S3C2410_ADCDAT1	   S3C2410_ADCREG(0x10)
- #define S3C64XX_ADCUPDN		S3C2410_ADCREG(0x14)
- #define S3C64XX_ADCCLRINT	S3C2410_ADCREG(0x18)
-+#define S5P_ADCMUX		S3C2410_ADCREG(0x1C)
- #define S3C64XX_ADCCLRINTPNDNUP	S3C2410_ADCREG(0x20)
  
- 
+ static void __init nuri_map_io(void)
 -- 
 1.7.4.1
