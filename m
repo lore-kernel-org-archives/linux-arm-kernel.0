@@ -1,66 +1,64 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Tue, 21 Jun 2011 09:39:06 +0800
-Subject: [PATCH v3 0/4] Extend sdhci-esdhc-imx card_detect and
-	write_protect support for mx5
-In-Reply-To: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
-References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110621013905.GB6294@S2101-09.ap.freescale.net>
+From: david@gibson.dropbear.id.au (David Gibson)
+Date: Tue, 21 Jun 2011 11:40:59 +1000
+Subject: [PATCH 0/3] patches to allow DTB to be appended to the ARM zImage
+In-Reply-To: <20110612112219.GD16318@ibawizard.net>
+References: <1307858800-16712-1-git-send-email-nicolas.pitre@linaro.org>
+	<20110612081541.GA10283@n2100.arm.linux.org.uk>
+	<20110612083414.GA29516@S2100-06.ap.freescale.net>
+	<20110612112219.GD16318@ibawizard.net>
+Message-ID: <20110621014059.GN16214@yookeroo.fritz.box>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+On Sun, Jun 12, 2011 at 01:22:19PM +0200, Petr ?tetiar wrote:
+> Shawn Guo <shawn.guo@freescale.com> [2011-06-12 16:34:15]:
+> 
+> > On Sun, Jun 12, 2011 at 09:15:41AM +0100, Russell King - ARM Linux wrote:
+> > > 
+> > > One thing which has been bugging me for some time is that the DT stuff
+> > > completely overrides the ATAGs.  This is wrong with solutions like this.
+> > > 
+> > > We have a set of perfectly good boot loaders which provide correct
+> > > information to the kernel via ATAGs.  If we start moving everything
+> > > over to DT, then we run into a problem because the ATAGs are ignored -
+> > > stuff such as the RAM size and command line passed from the boot loader
+> > > will be entirely ignored, instead these having to be encoded into the
+> > > kernel at build time.
+> > > 
+> > What u-boot does right now is replacing the parameters in dtb with
+> > its for those it's interested in, for example command line is one,
+> > before it passes dtb to kernel.
+> 
+> If I understand it all correctly, there must be some 'legacy bootloader
+> support' added to the kernel, layer which would convert the ATAGs to the DT.
+> Or something like that.
 
-Would you please give a test on the series, as it fixed the issue
-you reported?  TIA.
+More likely combine the ATAGs information with a skeleton DT, but yes,
+you probably want something like this.  On powerpc, this role is
+usually taken by the zImage wrapper code, sitting between the platform
+firmware and the kernel proper.  However, there's no inherent reason
+it couldn't be early code in the vmlinux instead.  Just as long as
+there is a well defined point after which the DT information is
+authoritative.
+
+> Please note, that there are some boards out there, which use some kind of
+> proprietary bootloaders, so you can't update or change them easily. You either
+> don't have source code, you're limited by the available space (2KB eeprom) so
+> you can't add much more things into that bootloader or you're limited by the
+> size of the MBR (yes, even such bootloaders exists).
+
+Right.  Sams situation on powerpc - and indeed there are lots of
+crappy proprietary bootloaders each with their own whacky way of
+conveying the scraps of information they give you.  For this reason we
+have a variety of platform-specific bootwrappers which handle these
+bootloaders, transforming their information into DT form for the
+kernel proper to consume.
+
+No reason you can't do the same thing on ARM, whether the glue
+wrappers are wrappers as such, or special early pieces of kernel code.
 
 -- 
-Regards,
-Shawn
-
-On Mon, Jun 20, 2011 at 06:38:41PM +0800, Shawn Guo wrote:
-> The card-present polling for sdhci based driver is very expensive
-> in terms of the impact to system performance.  We observe a few
-> system performance issues from Freescale and Linaro on mx5 platforms,
-> which have been proved card polling related.
-> 
-> The patch set extends the current sdhci-esdhc-imx card_detect and
-> write_protect support to cover mx5 platforms, and solves above
-> performance issues.
-> 
-> Changes since v2:
->  * Fix the issue reported by Arnaud Patard:
->    http://article.gmane.org/gmane.linux.ports.arm.kernel/120790
-> 
-> Changes since v1:
->  * Rebase on today's linux-next
->  * Take the suggestion from Arnaud Patard to add default pdata in
->    imx_add_sdhci_esdhc_imx(), to avoid touching every single board
->    file for the platform_data changes
->  * Add comment for sdhci.c change
->  * Change ESDHC_CD(WP)_SIGNAL to ESDHC_CD(WP)_CONTROLLER for a more
->    descriptive name
->  * Add missing NONE case handling in esdhc_pltfm_get_ro
->  * Improve a couple comment wording per suggestion from Wolfram Sang
-> 
-> Shawn Guo (4):
->       mmc: sdhci: fix interrupt storm from card detection
->       mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not get cleared
->       mmc: sdhci-esdhc-imx: remove "WP" from flag ESDHC_FLAG_GPIO_FOR_CD_WP
->       mmc: sdhci-esdhc-imx: extend card_detect and write_protect support for mx5
-> 
->  arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |    3 +-
->  arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |    3 +-
->  arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
->  arch/arm/mach-imx/mach-pcm043.c                    |    2 +
->  arch/arm/mach-mx5/board-mx51_babbage.c             |   14 +-
->  arch/arm/mach-mx5/board-mx53_loco.c                |    4 +
->  .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   12 ++
->  arch/arm/plat-mxc/include/mach/esdhc.h             |   25 +++-
->  drivers/mmc/host/sdhci-esdhc-imx.c                 |  136 ++++++++++++--------
->  drivers/mmc/host/sdhci.c                           |   27 ++++-
->  10 files changed, 161 insertions(+), 67 deletions(-)
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-mmc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+David Gibson			| I'll have my music baroque, and my code
+david AT gibson.dropbear.id.au	| minimalist, thank you.  NOT _the_ _other_
+				| _way_ _around_!
+http://www.ozlabs.org/~dgibson
