@@ -1,39 +1,66 @@
-From: schnitzeltony@gmx.de (Andreas Mueller)
-Date: Tue, 21 Jun 2011 16:16:28 +0200
-Subject: mach-mxs pwm implementation question
-Message-ID: <201106211616.28872.schnitzeltony@gmx.de>
+From: stefan@datenfreihafen.org (Stefan Schmidt)
+Date: Tue, 21 Jun 2011 16:20:25 +0200
+Subject: Slow spi_sync() on pxa2xx_spi
+In-Reply-To: <BANLkTi=S+WJYqMJJZptMCxtzSUU=W2UL0Q@mail.gmail.com>
+References: <20110616082112.GA10075@excalibur.local>
+	<BANLkTikuo_fHbw9FFMtorpg15vOnXMK-+g@mail.gmail.com>
+	<20110616091931.GB10075@excalibur.local>
+	<BANLkTinU+chEbZRpFSdRH_dPE2vhK_7pHg@mail.gmail.com>
+	<20110621140341.GK3652@excalibur.local>
+	<BANLkTi=S+WJYqMJJZptMCxtzSUU=W2UL0Q@mail.gmail.com>
+Message-ID: <20110621142025.GL3652@excalibur.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello.
 
-For a karo tx28 (freescale imx28 or mach-mxs) I try to build a kernel 2.6.39.1 
-with LCD backlight enabled and get
+On Tue, 2011-06-21 at 22:08, Eric Miao wrote:
+> On Tue, Jun 21, 2011 at 10:03 PM, Stefan Schmidt
+> <stefan@datenfreihafen.org> wrote:
+> > On Thu, 2011-06-16 at 17:44, Eric Miao wrote:
+> > > On Thu, Jun 16, 2011 at 5:19 PM, Stefan Schmidt
+> > > <stefan@datenfreihafen.org> wrote:
+> > > >
+> > > > Its either 8bit or 16bit for a message. The mentioned problem happens
+> > > > on a 8 bit message. It does nothing else then writing to a defined
+> > > > register address to trigger the hardware sending the data in the FIFO.
+> > >
+> > > This might get too much overhead. I didn't check the source code, but
+> > > my guess is it's waiting for interrupt for each message, and once the
+> > > interrupt of message being flushed out happens, it starts the next one
+> > > waiting for the FIFO empty interrupt coming. Did you try stuff more
+> > > bytes into a single message?
+> >
+> > Took me some time to implement and test al kind of different
+> > scenarios. As you suggested I tried to stuff more bytes into a message
+> > as well as testing all kind of combination with tx and rx thresholds,
+> > timout, PIO and DMA, cs_change , etc. No change.
+> >
+> > I then bit the bullet and changed the board to use the spi_gpio driver
+> > instead of pxa2xx. After some struggling (make sure you setup pin
+> > config correctly :)) I got it working but with the same result.
+> >
+> > My last test block was around using spi_async() instead of spi_sync
+> > and as well I was not able to reach my timing criteria. :(
+> >
+> > To me it seems right now as if it is just not possible to reach
+> > something in the 100 usec range with the SPI framework. Obviuously I
+> > would be loved to be proven wrong. :)
+> >
+> > As I'm running way out of time for this part of my project I'm back to
+> > the driver now trying to find a solution that avoids the tight timing
+> > criteria.
+> 
+> I think for a time budget like this, you may want to try a dedicated
+> polling driver avoid all the interrupt/wait stuff, that's going to maximize
+> the throughput. If that's even not possible, it might be HW limitations.
 
-| drivers/built-in.o: In function `pwm_backlight_suspend':
-| clkdev.c:(.text+0xfe38): undefined reference to `pwm_config'
-| clkdev.c:(.text+0xfe40): undefined reference to `pwm_disable'
-| drivers/built-in.o: In function `pwm_backlight_remove':
-| clkdev.c:(.text+0xfe84): undefined reference to `pwm_config'
-| clkdev.c:(.text+0xfe8c): undefined reference to `pwm_disable'
-| clkdev.c:(.text+0xfe94): undefined reference to `pwm_free'
-| drivers/built-in.o: In function `pwm_backlight_update_status':
-| clkdev.c:(.text+0xff14): undefined reference to `pwm_config'
-| clkdev.c:(.text+0xff1c): undefined reference to `pwm_disable'
-| clkdev.c:(.text+0xff48): undefined reference to `pwm_config'
-| clkdev.c:(.text+0xff50): undefined reference to `pwm_enable'
-| drivers/built-in.o: In function `pwm_backlight_probe':
-| clkdev.c:(.text+0x10020): undefined reference to `pwm_request'
-| clkdev.c:(.text+0x100a0): undefined reference to `pwm_free'
+You mean like configuring the pins as plain GPIO and have some small
+bitbang functions on my own without the SPI framework? Just trying to
+understand in what direction you are pointing me. :)
 
-I saw in [1] that there was an attempt to create a pwm-framework with mxs 
-implementation as example but it did not find its way to mainline because of a 
-better pwm framework already available ( rejected implemetation still can be 
-downloaded at karo website ). Before trying to do myself: Is anybody working on 
-a implementation fitting linux/pwm.h?
+I might have to try this if it turns out that wrokign around it in the
+driver does not work (lets hope at least _something_ works). :)
 
-Regards
-
-Andreas
-
-[1] https://lkml.org/lkml/2011/1/28/91
+regards
+Stefan Schmidt
