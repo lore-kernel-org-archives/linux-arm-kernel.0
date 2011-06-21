@@ -1,46 +1,45 @@
-From: kishorek.kadiyala@gmail.com (Kishore Kadiyala)
-Date: Tue, 21 Jun 2011 19:26:36 +0530
-Subject: [PATCH v6 02/11] omap_hsmmc: add support for pre_req and post_req
-In-Reply-To: <BANLkTinNG2h747MggWfoJfMp4wOSTaTKSg@mail.gmail.com>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-	<1308518257-9783-3-git-send-email-per.forlin@linaro.org>
-	<BANLkTi=+o496k8Uz_k33AH=Zr8+MaFOEig@mail.gmail.com>
-	<BANLkTinNG2h747MggWfoJfMp4wOSTaTKSg@mail.gmail.com>
-Message-ID: <BANLkTi=UzZtKQU+-7iicEH2Jk7XED9yRRQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 21 Jun 2011 10:57:14 -0300
+Subject: [PATCH 3/6] ARM: mach-imx/mx27_3ds: Add LCD support
+In-Reply-To: <BANLkTimWSxWcpO=z69eqruyZkt7CMo9x2Q@mail.gmail.com>
+References: <1308588522-16586-1-git-send-email-fabio.estevam@freescale.com>
+	<1308588522-16586-2-git-send-email-fabio.estevam@freescale.com>
+	<1308588522-16586-3-git-send-email-fabio.estevam@freescale.com>
+	<20110621121105.GZ23771@pengutronix.de>
+	<BANLkTimWSxWcpO=z69eqruyZkt7CMo9x2Q@mail.gmail.com>
+Message-ID: <BANLkTinmCVrMLEfPR5BwAOStHbR2faO=Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Per,
+Hi Sascha,
 
-On Tue, Jun 21, 2011 at 12:21 PM, Per Forlin <per.forlin@linaro.org> wrote:
-> On 21 June 2011 07:41, Kishore Kadiyala <kishorek.kadiyala@gmail.com> wrote:
->> <snip>
+On Tue, Jun 21, 2011 at 9:59 AM, Fabio Estevam <festevam@gmail.com> wrote:
+> Hi Sascha,
+>
+> On Tue, Jun 21, 2011 at 9:11 AM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> ...
+>>> ? ? ? mxc_gpio_mode(SPI2_SS0 | GPIO_GPIO | GPIO_OUT);
+>>> ? ? ? mxc_gpio_mode(PMIC_INT | GPIO_GPIO | GPIO_IN);
+>>> + ? ? mxc_gpio_mode(SPI1_SS0 | GPIO_GPIO | GPIO_OUT);
+>>> + ? ? mxc_gpio_mode(LCD_ENABLE | GPIO_GPIO | GPIO_OUT);
+>>> + ? ? mxc_gpio_mode(LCD_RESET | GPIO_GPIO | GPIO_OUT);
 >>
->>> +
->>> +static void omap_hsmmc_pre_req(struct mmc_host *mmc, struct mmc_request *mrq,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?bool is_first_req)
->>
->> I don't see the usage of "is_first_req" below.
->> Is it required?
->>
-> It is not required. It is only an indication that this request is the
-> first in a series of request. The host driver may do various
-> optimisations based on this information. The first request in a series
-> of jobs can't be prepared in parallel to the previous job. The host
-> driver can do the following to minimise latency for the first job.
-> ?* Preparing the cache while the MMC read/write cmd is being
-> processed. In this case the pre_req could do nothing and the job is
-> instead run in parallel to the read/write cmd being sent. If the
-> is_first_req is false pre_req will run in parallel to an active
-> transfer, in this case it is more efficient to prepare the request in
-> pre_req.
-> ?* Run PIO mode instead of DMA
-> ?* Maybe there can be power related optimisations based on if it is
-> one single transfer or multiple ones.
+>> You can add these to the static pin array instead.
+>
+> I tried that initially and it caused all the gpio_request calls to fail.
+>
+> The only way I could make gpio_request to work is when I define the
+> pin as gpio mode via mxc_gpio_mode.
 
-Ok, thanks for making things clear.
 
-<snip>
+I managed to put these definitions in the static pin array as you suggested.
 
-Regards,
-Kishore
+In order to do so, I had to fix iomux-v1.c. I will send a v2 version
+including the iomux-v1 fix.
+
+Please let me know if you have any other comments in the other patches
+so that I can consider them for v2.
+
+Thanks,
+
+Fabio Estevam
