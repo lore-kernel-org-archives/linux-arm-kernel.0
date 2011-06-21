@@ -1,143 +1,46 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 21 Jun 2011 08:40:32 +0200
-Subject: [PATCH v6 11/11] mmc: add handling for two parallel block
-	requests in issue_rw_rq
-In-Reply-To: <BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-	<1308518257-9783-12-git-send-email-per.forlin@linaro.org>
-	<BANLkTi=+di-5yciD7KVx3LySHVj-L1yfrg@mail.gmail.com>
-Message-ID: <BANLkTimp1cu36uaky+zSWua+Civg_uQF+w@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 21 Jun 2011 15:00:59 +0800
+Subject: [PATCH 4/4] ARM: zImage: allow supplementing appended DTB with
+	traditional ATAG data
+In-Reply-To: <1308632955-11070-5-git-send-email-nico@fluxnic.net>
+References: <1308632955-11070-1-git-send-email-nico@fluxnic.net>
+	<1308632955-11070-5-git-send-email-nico@fluxnic.net>
+Message-ID: <20110621070058.GA9228@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 June 2011 17:17, Kishore Kadiyala <kishorek.kadiyala@gmail.com> wrote:
-> On Mon, Jun 20, 2011 at 2:47 AM, Per Forlin <per.forlin@linaro.org> wrote:
->> Change mmc_blk_issue_rw_rq() to become asynchronous.
->> The execution flow looks like this:
->> The mmc-queue calls issue_rw_rq(), which sends the request
->> to the host and returns back to the mmc-queue. The mmc-queue calls
->> issue_rw_rq() again with a new request. This new request is prepared,
->> in isuue_rw_rq(), then it waits for the active request to complete before
->> pushing it to the host. When to mmc-queue is empty it will call
->> isuue_rw_rq() with req=NULL to finish off the active request
->> without starting a new request.
->>
->> Signed-off-by: Per Forlin <per.forlin@linaro.org>
->> ---
->> ?drivers/mmc/card/block.c | ?121 +++++++++++++++++++++++++++++++++-------------
->> ?drivers/mmc/card/queue.c | ? 17 +++++--
->> ?drivers/mmc/card/queue.h | ? ?1 +
->> ?3 files changed, 101 insertions(+), 38 deletions(-)
->>
->> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
->> index 6a84a75..66db77a 100644
->> --- a/drivers/mmc/card/block.c
->> +++ b/drivers/mmc/card/block.c
->> @@ -108,6 +108,7 @@ static DEFINE_MUTEX(open_lock);
->>
->> ?enum mmc_blk_status {
->> ? ? ? ?MMC_BLK_SUCCESS = 0,
->> + ? ? ? MMC_BLK_PARTIAL,
->> ? ? ? ?MMC_BLK_RETRY,
->> ? ? ? ?MMC_BLK_DATA_ERR,
->> ? ? ? ?MMC_BLK_CMD_ERR,
->> @@ -668,14 +669,16 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
->> ? ? ? ?}
->> ?}
->>
->> -static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct request *req,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_card *card,
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_blk_data *md)
->> +static int mmc_blk_err_check(struct mmc_card *card,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct mmc_async_req *areq)
->> ?{
->> ? ? ? ?struct mmc_command cmd;
->> ? ? ? ?u32 status = 0;
->> ? ? ? ?enum mmc_blk_status ret = MMC_BLK_SUCCESS;
->> + ? ? ? struct mmc_queue_req *mq_mrq = container_of(areq, struct mmc_queue_req,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_active);
->> + ? ? ? struct mmc_blk_request *brq = &mq_mrq->brq;
->> + ? ? ? struct request *req = mq_mrq->req;
->>
->> ? ? ? ?/*
->> ? ? ? ? * Check for errors here, but don't jump to cmd_err
->> @@ -770,7 +773,11 @@ static enum mmc_blk_status mmc_blk_err_check(struct mmc_blk_request *brq,
->> ? ? ? ? ? ? ? ?else
->> ? ? ? ? ? ? ? ? ? ? ? ?ret = MMC_BLK_DATA_ERR;
->> ? ? ? ?}
->> -out:
->> +
->> + ? ? ? if (ret == MMC_BLK_SUCCESS &&
->> + ? ? ? ? ? blk_rq_bytes(req) != brq->data.bytes_xfered)
->> + ? ? ? ? ? ? ? ret = MMC_BLK_PARTIAL;
->> + out:
->> ? ? ? ?return ret;
->> ?}
->>
->> @@ -901,27 +908,59 @@ static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
->> ? ? ? ? ? ? ? ?brq->data.sg_len = i;
->> ? ? ? ?}
->>
->> + ? ? ? mqrq->mmc_active.mrq = &brq->mrq;
->> + ? ? ? mqrq->mmc_active.err_check = mmc_blk_err_check;
->> +
->> ? ? ? ?mmc_queue_bounce_pre(mqrq);
->> ?}
->>
->> -static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
->> +static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *rqc)
->> ?{
->> ? ? ? ?struct mmc_blk_data *md = mq->data;
->> ? ? ? ?struct mmc_card *card = md->queue.card;
->> - ? ? ? struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
->> - ? ? ? int ret = 1, disable_multi = 0;
->> + ? ? ? struct mmc_blk_request *brq;
->> + ? ? ? int ret = 1;
->> + ? ? ? int disable_multi = 0;
->> ? ? ? ?enum mmc_blk_status status;
->> + ? ? ? struct mmc_queue_req *mq_rq;
->> + ? ? ? struct request *req;
->> + ? ? ? struct mmc_async_req *areq;
->> +
->> + ? ? ? if (!rqc && !mq->mqrq_prev->req)
->> + ? ? ? ? ? ? ? goto out;
->>
->> ? ? ? ?do {
->> - ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
->> - ? ? ? ? ? ? ? mmc_wait_for_req(card->host, &brq->mrq);
->> + ? ? ? ? ? ? ? if (rqc) {
->> + ? ? ? ? ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
->> + ? ? ? ? ? ? ? ? ? ? ? areq = &mq->mqrq_cur->mmc_active;
->> + ? ? ? ? ? ? ? } else
->> + ? ? ? ? ? ? ? ? ? ? ? areq = NULL;
->> + ? ? ? ? ? ? ? areq = mmc_start_req(card->host, areq, (int *) &status);
->
-> I think 'status' is used uninitialized.
-status is an out parameter. From that perspective it is always initialised.
-I should update the doc description of mmc_start_req to clarify this.
+On Tue, Jun 21, 2011 at 01:09:15AM -0400, Nicolas Pitre wrote:
+> From: Nicolas Pitre <nicolas.pitre@linaro.org>
+> 
+> Some old bootloaders can't be updated to a device tree capable one,
+> yet they provide ATAGs with memory configuration, the ramdisk address,
+> the kernel cmdline string, etc.  To allow a device tree enabled
+> kernel to be used with such bootloaders, it is necessary to convert those
+> ATAGs into FDT properties and fold them into the DTB appended to zImage.
+> 
+> Currently the following ATAGs are converted:
+> 
+> 	ATAG_CMDLINE
+> 	ATAG_MEM (up to 8 memory regions)
+> 	ATAG_INITRD2
+> 
+> If the corresponding information already exists in the appended DTB, it
+> is replaced, otherwise the required node is created to hold it.
+> 
+> The code looks for ATAGs at the location pointed by the value of r2 upon
+> entry into the zImage code.  If no ATAGs are found there, an attempt at
+> finding ATAGs at the typical 0x100 offset from start of RAM is made.
+> Otherwise the DTB is left unchanged.
+> 
+> Thisstarted from an older patch from John Bonesio <bones@secretlab.ca>,
+> with contributions from David Brown <davidb@codeaurora.org>.
+> 
+> Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> ---
 
-> With this struct mmc_async_req *mmc_start_req in your first patch
-> if (error)
-> ? ? ? ?*error = err;
-> return data;
-> condition which always passes.
->
-> You can have
-> enum mmc_blk_status status = MMC_BLK_SUCCESS;
->
-> struct mmc_async_req *mmc_start_req ?{
-> err = host->areq->err_check(host->card, host->areq);
-> ? ? ? ? ? ? ? ?if (err) {
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ...
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ...
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? *error = err;
-> ? ? ? ? ? ? ? ?}
->
-> no need to update * error here in success case
-> return data
-> }
-I agree, makes the code more clear.
+With this patch applied, I saw nothing coming from kernel on imx51
+babbage serial port.
 
-Thanks,
-Per
+-- 
+Regards,
+Shawn
