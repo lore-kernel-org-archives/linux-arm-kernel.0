@@ -1,38 +1,73 @@
-From: kmpark@infradead.org (Kyungmin Park)
-Date: Tue, 21 Jun 2011 09:01:01 +0900
-Subject: [PATCH 0/7] ARM: EXYNOS4: Adds External GIC
-In-Reply-To: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-References: <1308555258-4322-1-git-send-email-chaos.youn@samsung.com>
-Message-ID: <BANLkTiksfkfzs1nQS0C5uE=pizoOWcnPzA@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 21 Jun 2011 09:34:17 +0800
+Subject: [PATCH v3 1/4] mmc: sdhci: fix interrupt storm from card detection
+In-Reply-To: <AA2705EE-033E-4340-8CF1-774F444E143E@marvell.com>
+References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
+	<1308566325-11600-2-git-send-email-shawn.guo@linaro.org>
+	<AA2705EE-033E-4340-8CF1-774F444E143E@marvell.com>
+Message-ID: <20110621013416.GA6294@S2101-09.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Jun 20, 2011 at 08:59:38AM -0700, Philip Rakity wrote:
+> 
+> On Jun 20, 2011, at 3:38 AM, Shawn Guo wrote:
+> 
+> > The issue was initially found by Eric Benard as below.
+> > 
+> > http://permalink.gmane.org/gmane.linux.ports.arm.kernel/108031
+> > 
+> > Not sure about other SDHCI based controller, but on Freescale eSDHC,
+> > the SDHCI_INT_CARD_INSERT bits will be immediately set again when it
+> > gets cleared, if a card is inserted. The driver need to mask the irq
+> > to prevent interrupt storm which will freeze the system.  And the
+> > SDHCI_INT_CARD_REMOVE gets the same situation.
+> > 
+> > The patch fixes the problem based on the initial idea from
+> > Eric Benard.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > Cc: Eric Benard <eric@eukrea.com>
+> > ---
+> > drivers/mmc/host/sdhci.c |   27 +++++++++++++++++++++++----
+> > 1 files changed, 23 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> > index 91d9892..d94e2b4 100644
+> > --- a/drivers/mmc/host/sdhci.c
+> > +++ b/drivers/mmc/host/sdhci.c
+> > @@ -127,7 +127,9 @@ static void sdhci_mask_irqs(struct sdhci_host *host, u32 irqs)
+> > 
+> > static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
+> > {
+> > -	u32 irqs = SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT;
+> > +	u32 present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
+> > +		      SDHCI_CARD_PRESENT;
+> > +	u32 irqs = present ? SDHCI_INT_CARD_REMOVE : SDHCI_INT_CARD_INSERT;
+> > 
+> > 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+> > 		return;
+> 
+> 
+> Accessing off chip registers is slow.  It would be better to check for the quirk first
+> and then read the present state register.
+> 
+> eg
+> 	
+> 	u32 present;
+> 	u32 irqs;	
+> 
+> > 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
+> > 		return;
+> 
+> >  	present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
+> > 		      SDHCI_CARD_PRESENT;
+> 
+> 
+> > 	irqs = present ? SDHCI_INT_CARD_REMOVE : SDHCI_INT_CARD_INSERT;
+> 
+Makes sense.  Will do.
 
-There are some boards which use the EVT0 chip. some SMDKV310 and
-Universal-C210.
-With this changes, it can't use these boards.
-
-Do you want to remove EVT0 based boards?
-
-Thank you,
-Kyungmin Park
-
-On Mon, Jun 20, 2011 at 4:34 PM, Changhwan Youn <chaos.youn@samsung.com> wrote:
-> This patch adds implementation External GIC on EXYNOS4 SoC.
->
-> Note: need to update timer codes for supporting old type of
-> EXYNOS4 SoCs.
->
-> [PATCH 1/7] ARM: EXYNOS4: Add external GIC io memory mapping
-> [PATCH 2/7] ARM: EXYNOS4: modify interrupt mappings for external GIC
-> [PATCH 3/7] ARM: EXYNOS4: set the affinity of mct1 interrupt using IRQ_MCT_L1
-> [PATCH 4/7] ARM: GIC: move gic_chip_data structure declaration to header
-> [PATCH 5/7] ARM: EXYNOS4: Add support external GIC
-> [PATCH 6/7] ARM: EXYNOS4: Remove clock event timers using ARM private timers
-> [PATCH 7/7] ARM: EXYNOS4: Add chained enrty/exit function to uart interrupt handler
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+Regards,
+Shawn
