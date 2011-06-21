@@ -1,34 +1,31 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Tue, 21 Jun 2011 13:52:36 +0200
-Subject: [PATCH v3 2/4] mmc: sdhci-esdhc-imx: SDHCI_CARD_PRESENT does not
-	get cleared
-In-Reply-To: <1308566325-11600-3-git-send-email-shawn.guo@linaro.org>
-References: <1308566325-11600-1-git-send-email-shawn.guo@linaro.org>
-	<1308566325-11600-3-git-send-email-shawn.guo@linaro.org>
-Message-ID: <20110621115236.GA14004@pengutronix.de>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 21 Jun 2011 12:56:57 +0100
+Subject: [PATCH v2 1/4] Exynos4 NURI: configure regulators and PMIC
+In-Reply-To: <4E00853A.7010003@linaro.org>
+References: <20110620103124.GD31864@opensource.wolfsonmicro.com>
+	<1308622033-2521-1-git-send-email-myungjoo.ham@samsung.com>
+	<1308622033-2521-2-git-send-email-myungjoo.ham@samsung.com>
+	<4E002D18.2080401@linaro.org>
+	<20110621111010.GH22177@opensource.wolfsonmicro.com>
+	<4E00853A.7010003@linaro.org>
+Message-ID: <20110621115657.GE25032@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 06:38:43PM +0800, Shawn Guo wrote:
-> The function esdhc_readl_le intends to clear bit SDHCI_CARD_PRESENT,
-> when the card detect gpio tells there is no card.  But it does not
-> clear the bit actually.  The patch gives a fix on that.
-> 
-> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+On Tue, Jun 21, 2011 at 05:19:14PM +0530, Tushar Behera wrote:
+> On Tuesday 21 June 2011 04:40 PM, Mark Brown wrote:
 
-For the third time ;)
+>> If the board is similar enough in design to be sharing the PMIC code
+>> that sounds like it should be sharing a lot more of the board setup
+>> code.
 
-Acked-by: Wolfram Sang <w.sang@pengutronix.de>
+> Origen board details can be found at http://www.origenboard.org/
 
-Should go to stable.
+> Under 'Documents' section, there are some schematics for the board.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110621/e2753a7f/attachment.sig>
+> As for other peripherals, I am not sure how much similar this is w.r.t.  
+> NURI (I don't have NURI board schematics).
+
+Right, and we can't really make the assessment about sharing the code if
+we can't do a contrast and compare between the two schematics (or look
+at the resulting code).
