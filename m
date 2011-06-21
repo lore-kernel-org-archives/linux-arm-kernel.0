@@ -1,39 +1,35 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Tue, 21 Jun 2011 11:06:37 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <alpine.LFD.2.00.1106201653450.2142@xanadu.home>
-Message-ID: <Pine.LNX.4.44L0.1106211058250.2327-100000@iolanthe.rowland.org>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Tue, 21 Jun 2011 17:13:26 +0200
+Subject: [PATCH 6/6] ARM: mxc: clean up imx-dma device registration
+In-Reply-To: <20110621144138.GA24939@S2100-06.ap.freescale.net>
+References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+	<1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
+	<20110620145054.GA24184@S2100-06.ap.freescale.net>
+	<20110621144138.GA24939@S2100-06.ap.freescale.net>
+Message-ID: <20110621151326.GC14004@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Jun 2011, Nicolas Pitre wrote:
 
-> On Mon, 20 Jun 2011, Alan Stern wrote:
-> 
-> > On Mon, 20 Jun 2011, Nicolas Pitre wrote:
-> > 
-> > > > As far as I can tell, the other structures in ehci.h have 
-> > > > ((aligned(32)) simply in order to save space, since there can be large 
-> > > > numbers of these structures allocated.
-> > > 
-> > > How can increasing the alignment to 32 bytes save space?
-> > 
-> > No, no -- the alignment is _decreased_ to 32 bits.  Without the 
-> > attribute the alignment would have been 64 bits.
-> 
-> The aligned attribute requires a byte value not a bit value.
-> Maybe what you meant is ((aligned(4)) ?
+> The patch has been out there for a while with no comments.  My
+> understanding is you will need to either give comments or apply
+> the patch, no?
 
-Ah, very good point!  No, I meant ((aligned(32))).  Do "grep aligned 
-drivers/usb/host/ehci.h" and you'll see.
+Yes, but there is no timeframe guaranteed. We try our best to respond as fast
+as possible, but we (like most others) have a couple of things on our
+todo-list.
 
-So my understanding was wrong; these structure really are being forced 
-to a strict alignment.  And indeed, now that I go back and look at the 
-EHCI spec, it turns out that this alignment is required by the 
-hardware.
+Regards,
 
-Okay, so this digression was irrelevant to our discussion.  Forget I 
-mentioned it...
+   Wolfram
 
-Alan Stern
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110621/078457e4/attachment.sig>
