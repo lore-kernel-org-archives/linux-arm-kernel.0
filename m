@@ -1,69 +1,51 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Jun 2011 13:47:03 +0200
-Subject: [Linaro-mm-sig] [PATCH 3/8] ARM: dma-mapping: use
-	asm-generic/dma-mapping-common.h
-In-Reply-To: <BANLkTimHE2jzQAav465WaG3iWVeHPyNRNQ@mail.gmail.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
-	<BANLkTimHE2jzQAav465WaG3iWVeHPyNRNQ@mail.gmail.com>
-Message-ID: <002501cc3008$f000d600$d0028200$%szyprowski@samsung.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Tue, 21 Jun 2011 15:47:04 +0400
+Subject: [RFC][PATCH 2/5] ARM: SAMSUNG: Changing the build condition of
+	OTG platform device for samsung.
+In-Reply-To: <1308639827-2121-3-git-send-email-p.paneri@samsung.com>
+References: <1308639827-2121-1-git-send-email-p.paneri@samsung.com>
+	<1308639827-2121-3-git-send-email-p.paneri@samsung.com>
+Message-ID: <4E0084B8.1040201@ru.mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Hello.
 
-On Monday, June 20, 2011 4:33 PM KyongHo Cho wrote:
+On 21-06-2011 11:03, p.paneri at samsung.com wrote:
 
-> On Mon, Jun 20, 2011 at 4:50 PM, Marek Szyprowski
-> <m.szyprowski@samsung.com> wrote:
-> > +static inline void set_dma_ops(struct device *dev, struct dma_map_ops
-> *ops)
-> > +{
-> > + ? ? ? dev->archdata.dma_ops = ops;
-> > +}
-> > +
-> 
-> Who calls set_dma_ops()?
-> In the mach. initialization part?
+> From: Praveen Paneri<p.paneri@samsung.com>
 
-Yes, some board, machine or device bus initialization code is supposed to
-call this function. Just 'git grep dma_set_ops' and you will see. In my
-patch series one of the clients of set_dma_ops function is dmabounce 
-framework (it is called in dmabounce_register_dev() function).
+> Adding dwc driver name in existing platform device
+> to probe DWC OTG driver.
+> Introduced otg_set_platdata function to pass platform data
+> Added selectable config option to add DWC OTG driver for different
+> machines.
 
-> What if a device driver does not want to use arch's dma_map_ops
-> when machine init procedure set a dma_map_ops?
+> Signed-off-by: Praveen Paneri<p.paneri@samsung.com>
+[...]
 
-Could you elaborate on this case? The whole point of dma-mapping framework
-is to hide the implementation of DMA mapping operation from the driver. 
-The driver should never fiddle with dma map ops directly.
+> diff --git a/arch/arm/plat-samsung/dev-usb-hsotg.c b/arch/arm/plat-samsung/dev-usb-hsotg.c
+> index 33a844a..7e6228b 100644
+> --- a/arch/arm/plat-samsung/dev-usb-hsotg.c
+> +++ b/arch/arm/plat-samsung/dev-usb-hsotg.c
+[...]
+> @@ -37,7 +39,12 @@ static struct resource s3c_usb_hsotg_resources[] = {
+>   static u64 s3c_hsotg_dmamask = DMA_BIT_MASK(32);
+>
+>   struct platform_device s3c_device_usb_hsotg = {
+> +#ifdef CONFIG_S3C_DEV_USB_HSOTG
+>   	.name		= "s3c-hsotg",
+> +#endif
+> +#ifdef CONFIG_S3C_DEV_DWC_OTG
+> +	.name		= "dwc_otg",
+> +#endif
 
-> Even though, may arch defiens their dma_map_ops in archdata of device
-> structure,
-> I think it is not a good idea that is device structure contains a
-> pointer to dma_map_ops
-> that may not be common to all devices in a board.
+    I'd done it as:
 
-It is up to the board/bus startup code to set dma ops correctly.
++#if defined(CONFIG_S3C_DEV_USB_HSOTG)
+   	.name		= "s3c-hsotg",
++#elif defined(CONFIG_S3C_DEV_DWC_OTG)
++	.name		= "dwc_otg",
++#endif
 
-> I also think that it is better to attach and to detach dma_map_ops
-> dynamically.
-
-What's the point of such operations? Why do you want to change dma
-mapping methods in runtime?
-
-> Moreover, a mapping is not permanent in our Exynos platform
-> because a System MMU may be turned off while runtime.
-
-This is theoretically possible. The System MMU (Samsung IOMMU
-controller) driver can change dma_map_ops back to NULL on remove moving
-back the client device to generic ARM dma mapping implementation.
-
-> DMA API must come with IOMMU API to initialize IOMMU in runtime.
-
-I don't understand what's the problem here. 
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+WBR, Sergei
