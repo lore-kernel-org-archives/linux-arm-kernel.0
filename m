@@ -1,27 +1,38 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 21 Jun 2011 03:41:49 -0700
-Subject: [PATCH] locomo: drop special locomo_{read/write}l in favor of
-	io{read/write}16
-In-Reply-To: <201106201454.18070.hartleys@visionengravers.com>
-References: <201106201454.18070.hartleys@visionengravers.com>
-Message-ID: <20110621104148.GB8468@core.coreip.homeip.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Tue, 21 Jun 2011 11:43:57 +0100
+Subject: [PATCH v2 1/5] Samsung SoC ADC: use regulator (VDD for ADC).
+In-Reply-To: <1308621527-2457-2-git-send-email-myungjoo.ham@samsung.com>
+References: <20110620101737.GA31864@opensource.wolfsonmicro.com>
+	<1308621527-2457-1-git-send-email-myungjoo.ham@samsung.com>
+	<1308621527-2457-2-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <20110621104357.GE22177@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 02:54:17PM -0700, H Hartley Sweeten wrote:
-> All the locomo registers are 16-bit ioremap'ed memory addresses.  
-> 
-> Make the locomo drivers use generic purpose io routines: ioread16
-> and iowrite16 instead of directly accessing memory.
-> 
-> There are still a couple checkpatch warnings about lines exceeding
-> 79 characters.
-> 
-> Signed-off-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+On Tue, Jun 21, 2011 at 10:58:43AM +0900, MyungJoo Ham wrote:
 
-Input parts look good to me.
+> +	ret = regulator_enable(adc->vdd);
+> +	if (!ret)
+> +		goto err_ioremap;
+> +
 
-Acked-by: Dmitry Torokhov <dtor@mail.ru>
+This test looks the wrong way round?  regulator_enable() should return 0
+on success but this will treat that as an error.
 
--- 
-Dmitry
+>  static int s3c_adc_resume(struct platform_device *pdev)
+>  {
+>  	struct adc_device *adc = platform_get_drvdata(pdev);
+> +	int ret;
+>  
+> +	ret = regulator_enable(adc->vdd);
+>  	clk_enable(adc->clk);
+>  	enable_irq(adc->irq);
+>  
+>  	writel(adc->prescale | S3C2410_ADCCON_PRSCEN,
+>  	       adc->regs + S3C2410_ADCCON);
+>  
+> -	return 0;
+> +	return ret;
+
+Seems better to return as soon as we notice the error, no point in
+starting anything else up if we don't have power.
