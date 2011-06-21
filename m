@@ -1,38 +1,45 @@
-From: cjb@laptop.org (Chris Ball)
-Date: Tue, 21 Jun 2011 12:23:30 -0400
-Subject: [PATCH 0/3] Improve MMC error handling (3rd rev)
-In-Reply-To: <20110620190945.GK26089@n2100.arm.linux.org.uk> (Russell King's
-	message of "Mon, 20 Jun 2011 20:09:45 +0100")
-References: <20110620190945.GK26089@n2100.arm.linux.org.uk>
-Message-ID: <m2y60vrw59.fsf@bob.laptop.org>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 21 Jun 2011 09:24:27 -0700
+Subject: [stable] [PATCH v2] msm: timer: compensate for timer shift in
+	msm_read_timer_count
+In-Reply-To: <8ya7h8gozhn.fsf@huya.qualcomm.com>
+References: <1308344138-2862-1-git-send-email-johlstei@codeaurora.org>
+	<20110620215922.GA21909@kroah.com>
+	<8ya7h8gozhn.fsf@huya.qualcomm.com>
+Message-ID: <20110621162427.GA28836@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Mon, Jun 20, 2011 at 04:27:16PM -0700, David Brown wrote:
+> On Mon, Jun 20 2011, Greg KH wrote:
+> 
+> > On Fri, Jun 17, 2011 at 01:55:38PM -0700, Jeff Ohlstein wrote:
+> >> Some msm targets have timers whose lower bits are unreliable. So, we
+> >> present our timers as lower frequency than they actually are, and ignore
+> >> the bottom 5 bits on such targets. This compensation was erroneously
+> >> removed from the msm_read_timer_count function, so restore it.
+> >> 
+> >> This was broken by 94790ec25 "msm: timer: SMP timer support for msm".
+> >> 
+> >> Signed-off-by: Jeff Ohlstein <johlstei@codeaurora.org>
+> >> ---
+> >>  arch/arm/mach-msm/timer.c |    6 +++++-
+> >>  1 files changed, 5 insertions(+), 1 deletions(-)
+> >> 
+> >
+> > <formletter>
+> >
+> > This is not the correct way to submit patches for inclusion in the
+> > stable kernel tree.  Please read Documentation/stable_kernel_rules.txt
+> > for how to do this properly.
+> >
+> > </formletter>
+> 
+> I don't think this patch was intended for stable in the first place.
+> Jeff, this is a fix for 3.0-rcx, right?
 
-On Mon, Jun 20 2011, Russell King - ARM Linux wrote:
-> This is the third revision of my improvements to the MMC block
-> device error handling, which makes error handling more robust
-> and permits MMC/SD to continue working in the presence of
-> not-quite-perfect setups.
->
-> Without this, my Versatile Express tends to fail to mount its rootfs
-> on SD.  With this, it can successfully read and write data from the
-> card in the presence of FIFO overruns and underruns, and also sensibly
-> recover from command channel errors.
->
-> There is more to come, but this is the "safer" bits of the improvements.
->
->  drivers/mmc/card/block.c |  279 ++++++++++++++++++++++++++++++++++-----------
->  include/linux/mmc/mmc.h  |   10 ++
->  2 files changed, 221 insertions(+), 68 deletions(-)
+Then why was it sent to stable at kernel.org?
 
-Thanks, pushed to mmc-next for 3.1.
+confused,
 
-(I'll do some more testing myself and let you know if I find anything
-unexpected.)
-
-- Chris.
--- 
-Chris Ball   <cjb@laptop.org>   <http://printf.net/>
-One Laptop Per Child
+greg k-h
