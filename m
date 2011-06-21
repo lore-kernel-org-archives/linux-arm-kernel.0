@@ -1,60 +1,57 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Tue, 21 Jun 2011 22:41:50 +0800
-Subject: [PATCH v4 3/4] mmc: sdhci-esdhc-imx: remove "WP" from flag
-	ESDHC_FLAG_GPIO_FOR_CD_WP
-In-Reply-To: <1308667311-1855-1-git-send-email-shawn.guo@linaro.org>
-References: <1308667311-1855-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1308667311-1855-4-git-send-email-shawn.guo@linaro.org>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Tue, 21 Jun 2011 22:41:40 +0800
+Subject: [PATCH 6/6] ARM: mxc: clean up imx-dma device registration
+In-Reply-To: <20110620145054.GA24184@S2100-06.ap.freescale.net>
+References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+	<1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
+	<20110620145054.GA24184@S2100-06.ap.freescale.net>
+Message-ID: <20110621144138.GA24939@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of flag ESDHC_FLAG_GPIO_FOR_CD_WP is all CD related.  It does
-not necessarily need to bother WP in the flag name.
+On Mon, Jun 20, 2011 at 10:50:55PM +0800, Shawn Guo wrote:
+> Hi Sascha,
+> 
+> Any comment on this one?
+> 
+One more ping: any comment?
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- drivers/mmc/host/sdhci-esdhc-imx.c |    8 ++++----
- 1 files changed, 4 insertions(+), 4 deletions(-)
+The patch has been out there for a while with no comments.  My
+understanding is you will need to either give comments or apply
+the patch, no?
 
-diff --git a/drivers/mmc/host/sdhci-esdhc-imx.c b/drivers/mmc/host/sdhci-esdhc-imx.c
-index 94097c0..79b7a9a 100644
---- a/drivers/mmc/host/sdhci-esdhc-imx.c
-+++ b/drivers/mmc/host/sdhci-esdhc-imx.c
-@@ -29,7 +29,7 @@
- #define SDHCI_VENDOR_SPEC		0xC0
- #define  SDHCI_VENDOR_SPEC_SDIO_QUIRK	0x00000002
- 
--#define ESDHC_FLAG_GPIO_FOR_CD_WP	(1 << 0)
-+#define ESDHC_FLAG_GPIO_FOR_CD		(1 << 0)
- /*
-  * The CMDTYPE of the CMD register (offset 0xE) should be set to
-  * "11" when the STOP CMD12 is issued on imx53 to abort one
-@@ -77,7 +77,7 @@ static u32 esdhc_readl_le(struct sdhci_host *host, int reg)
- 	u32 val = readl(host->ioaddr + reg);
- 
- 	if (unlikely((reg == SDHCI_PRESENT_STATE)
--			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP))) {
-+			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD))) {
- 		struct esdhc_platform_data *boarddata =
- 				host->mmc->parent->platform_data;
- 
-@@ -99,7 +99,7 @@ static void esdhc_writel_le(struct sdhci_host *host, u32 val, int reg)
- 	struct pltfm_imx_data *imx_data = pltfm_host->priv;
- 
- 	if (unlikely((reg == SDHCI_INT_ENABLE || reg == SDHCI_SIGNAL_ENABLE)
--			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD_WP)))
-+			&& (imx_data->flags & ESDHC_FLAG_GPIO_FOR_CD)))
- 		/*
- 		 * these interrupts won't work with a custom card_detect gpio
- 		 * (only applied to mx25/35)
-@@ -308,7 +308,7 @@ static int __devinit sdhci_esdhc_imx_probe(struct platform_device *pdev)
- 			goto no_card_detect_irq;
- 		}
- 
--		imx_data->flags |= ESDHC_FLAG_GPIO_FOR_CD_WP;
-+		imx_data->flags |= ESDHC_FLAG_GPIO_FOR_CD;
- 		/* Now we have a working card_detect again */
- 		host->quirks &= ~SDHCI_QUIRK_BROKEN_CARD_DETECTION;
- 	}
+> Regards,
+> Shawn
+> 
+> On Mon, Jun 13, 2011 at 03:37:25PM +0800, Shawn Guo wrote:
+> > The patch follows the implementation of gpio-mxc device registration
+> > to break the concentrated imx-dma device registration into soc
+> > specific setup function.  Then we can avoid the churn of "#ifdef"
+> > and the cpu_is_mx checking on such a long list, which makes no sense,
+> > considering more soc supports need to be added and we need to support
+> > single image for multiple socs in the long run.
+> > 
+> > Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+> > ---
+> >  arch/arm/mach-imx/mm-imx21.c                    |    3 +
+> >  arch/arm/mach-imx/mm-imx25.c                    |   26 +++
+> >  arch/arm/mach-imx/mm-imx27.c                    |    3 +
+> >  arch/arm/mach-imx/mm-imx31.c                    |   24 +++
+> >  arch/arm/mach-imx/mm-imx35.c                    |   44 +++++
+> >  arch/arm/mach-mx5/mm.c                          |   23 +++
+> >  arch/arm/plat-mxc/devices.c                     |   16 ++-
+> >  arch/arm/plat-mxc/devices/platform-imx-dma.c    |  202 ++---------------------
+> >  arch/arm/plat-mxc/include/mach/devices-common.h |    6 +
+> >  9 files changed, 157 insertions(+), 190 deletions(-)
+> > 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.7.4.1
+Regards,
+Shawn
