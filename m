@@ -1,77 +1,137 @@
-From: stefan@datenfreihafen.org (Stefan Schmidt)
-Date: Tue, 21 Jun 2011 17:18:39 +0200
-Subject: Slow spi_sync() on pxa2xx_spi
-In-Reply-To: <BANLkTi=+oNHYYL_=gYUCC+zFBfnkxZqJWA@mail.gmail.com>
-References: <20110616082112.GA10075@excalibur.local>
-	<BANLkTikuo_fHbw9FFMtorpg15vOnXMK-+g@mail.gmail.com>
-	<20110616091931.GB10075@excalibur.local>
-	<BANLkTinU+chEbZRpFSdRH_dPE2vhK_7pHg@mail.gmail.com>
-	<20110621140341.GK3652@excalibur.local>
-	<BANLkTi=S+WJYqMJJZptMCxtzSUU=W2UL0Q@mail.gmail.com>
-	<20110621142025.GL3652@excalibur.local>
-	<BANLkTi=+oNHYYL_=gYUCC+zFBfnkxZqJWA@mail.gmail.com>
-Message-ID: <20110621151839.GM3652@excalibur.local>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 21 Jun 2011 16:50:30 +0100
+Subject: parallel load of modules on an ARM multicore
+In-Reply-To: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
+References: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
+Message-ID: <20110621155030.GA21245@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On Tue, 2011-06-21 at 23:04, Eric Miao wrote:
-> On Tue, Jun 21, 2011 at 10:20 PM, Stefan Schmidt
-> <stefan@datenfreihafen.org> wrote:
-> >
-> > On Tue, 2011-06-21 at 22:08, Eric Miao wrote:
-> >> On Tue, Jun 21, 2011 at 10:03 PM, Stefan Schmidt
-> >> <stefan@datenfreihafen.org> wrote:
-> >> > On Thu, 2011-06-16 at 17:44, Eric Miao wrote:
-> >> > > On Thu, Jun 16, 2011 at 5:19 PM, Stefan Schmidt
-> >> > > <stefan@datenfreihafen.org> wrote:
-> >> > > >
-> >> > > > Its either 8bit or 16bit for a message. The mentioned problem happens
-> >> > > > on a 8 bit message. It does nothing else then writing to a defined
-> >> > > > register address to trigger the hardware sending the data in the FIFO.
-> >> > >
-> >> > > This might get too much overhead. I didn't check the source code, but
-> >> > > my guess is it's waiting for interrupt for each message, and once the
-> >> > > interrupt of message being flushed out happens, it starts the next one
-> >> > > waiting for the FIFO empty interrupt coming. Did you try stuff more
-> >> > > bytes into a single message?
-> >> >
-> >> > Took me some time to implement and test al kind of different
-> >> > scenarios. As you suggested I tried to stuff more bytes into a message
-> >> > as well as testing all kind of combination with tx and rx thresholds,
-> >> > timout, PIO and DMA, cs_change , etc. No change.
-> >> >
-> >> > I then bit the bullet and changed the board to use the spi_gpio driver
-> >> > instead of pxa2xx. After some struggling (make sure you setup pin
-> >> > config correctly :)) I got it working but with the same result.
-> >> >
-> >> > My last test block was around using spi_async() instead of spi_sync
-> >> > and as well I was not able to reach my timing criteria. :(
-> >> >
-> >> > To me it seems right now as if it is just not possible to reach
-> >> > something in the 100 usec range with the SPI framework. Obviuously I
-> >> > would be loved to be proven wrong. :)
-> >> >
-> >> > As I'm running way out of time for this part of my project I'm back to
-> >> > the driver now trying to find a solution that avoids the tight timing
-> >> > criteria.
-> >>
-> >> I think for a time budget like this, you may want to try a dedicated
-> >> polling driver avoid all the interrupt/wait stuff, that's going to maximize
-> >> the throughput. If that's even not possible, it might be HW limitations.
-> >
-> > You mean like configuring the pins as plain GPIO and have some small
-> > bitbang functions on my own without the SPI framework? Just trying to
-> > understand in what direction you are pointing me. :)
+On Mon, Jun 20, 2011 at 03:43:27PM +0200, EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31) wrote:
+> I'm getting unexpected results from loading several modules - some
+> of them in parallel - on an ARM11 MPcore system.
 > 
-> I mean just to have a small driver, configure the SPI controller with
-> hardcoded values, and try writing to the SSDR all by yourself, and
-> polling the SSSR status bits. Not something simulating SPI w/ GPIO,
-> that will be slow.
+> The system does not use "single sequential" modprobe commands - instead it
+> starts several shells doing insmod sequences like this:
+> 
+> shell A:
+> insmod a
+> insmod ab
+> insmod abc
+> 
+> shell B:
+> insmod b
+> insmod bc
+> insmod bcd
+> 
+> shell C:
+> insmod c
+> insmod cd
+> insmod cde
+> 
+> This is done to crash^H^H^H^H^Hboot faster ;)
+> 
+> While one insmod operation is protected via the module_mutex - I'm wondering
+> what happens with the instruction cache invalidation.
+> AFAICT the flush_icache_range only invalidates the ICache on the running cpu.
+> The module_mutex is unlocked after _loading_ the module, do_mod_ctors() and
+> do_one_initcall() are called without that lock - can they run on a different cpu?
+> It's an preemptible system (SMP PREEMPT armv6l).
+> 
+> Wouldn't it be required to flush the icache on _all_ cpus?
 
-Wow, that is something I like to avoid doing at all. :) Thanks for the
-pointer though. Something to have in mind if everythings else fails.
+I theory, you would need to flush both the I and D cache on all the CPUs
+but that's not easily possible (well, I don't think there are many users
+of flush_icache_range(), so we could make this do an
+smp_call_function().
 
-regards
-Stefan Schmidt
+I think what happens (I'm looking at a 3.0-rc3 kernel) is that the
+module code is copied into RAM and the process could migrate to another
+CPU before flush_icache_range() gets called (this function is called
+outside the mutex_lock regions). We therefore don't flush the data out
+of the D-cache that was allocated during copy_from_user().
+
+You can try the patch below (I haven't tested it for some time), it may
+fix the issue.
+
+8<-----------------------------------------------
+
+ARM: Allow lazy cache flushing on ARM11MPCore
+
+From: Catalin Marinas <catalin.marinas@arm.com>
+
+The ARM11MPCore doesn't broadcast the cache maintenance operations in
+hardware, therefore the flush_dcache_page() currently performs the cache
+flushing non-lazily. But since not all drivers call this function after
+writing to a page cache page, the kernel needs a different approach like
+using read-for-ownership on the CPU flushing the cache to force the
+dirty cache lines migration from other CPUs. This way the cache flushing
+operation can be done lazily via __sync_icache_dcache().
+
+Since we cannot force read-for-ownership on the I-cache, the patch
+invalidates the whole I-cache when a thread migrates to another CPU.
+
+Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+---
+ arch/arm/include/asm/mmu_context.h |    3 ++-
+ arch/arm/mm/cache-v6.S             |    8 ++++++++
+ arch/arm/mm/flush.c                |    3 +--
+ 3 files changed, 11 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/include/asm/mmu_context.h b/arch/arm/include/asm/mmu_context.h
+index 71605d9..d116a23 100644
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -114,7 +114,8 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ #ifdef CONFIG_SMP
+ 	/* check for possible thread migration */
+ 	if (!cpumask_empty(mm_cpumask(next)) &&
+-	    !cpumask_test_cpu(cpu, mm_cpumask(next)))
++	    (cache_ops_need_broadcast() ||
++	     !cpumask_test_cpu(cpu, mm_cpumask(next))))
+ 		__flush_icache_all();
+ #endif
+ 	if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {
+diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
+index 73b4a8b..bdc1cc1 100644
+--- a/arch/arm/mm/cache-v6.S
++++ b/arch/arm/mm/cache-v6.S
+@@ -133,6 +133,10 @@ ENTRY(v6_coherent_user_range)
+ #ifdef HARVARD_CACHE
+ 	bic	r0, r0, #CACHE_LINE_SIZE - 1
+ 1:
++#ifdef CONFIG_SMP
++	/* no cache maintenance broadcasting on ARM11MPCore */
++ USER(	ldr	r2, [r0]		)	@ read for ownership
++#endif
+  USER(	mcr	p15, 0, r0, c7, c10, 1	)	@ clean D line
+ 	add	r0, r0, #CACHE_LINE_SIZE
+ 2:
+@@ -178,6 +182,10 @@ ENTRY(v6_flush_kern_dcache_area)
+ 	add	r1, r0, r1
+ 	bic	r0, r0, #D_CACHE_LINE_SIZE - 1
+ 1:
++#ifdef CONFIG_SMP
++	/* no cache maintenance broadcasting on ARM11MPCore */
++	ldr	r2, [r0]			@ read for ownership
++#endif
+ #ifdef HARVARD_CACHE
+ 	mcr	p15, 0, r0, c7, c14, 1		@ clean & invalidate D line
+ #else
+diff --git a/arch/arm/mm/flush.c b/arch/arm/mm/flush.c
+index 1a8d4aa..72f9333 100644
+--- a/arch/arm/mm/flush.c
++++ b/arch/arm/mm/flush.c
+@@ -291,8 +291,7 @@ void flush_dcache_page(struct page *page)
+ 
+ 	mapping = page_mapping(page);
+ 
+-	if (!cache_ops_need_broadcast() &&
+-	    mapping && !mapping_mapped(mapping))
++	if (mapping && !mapping_mapped(mapping))
+ 		clear_bit(PG_dcache_clean, &page->flags);
+ 	else {
+ 		__flush_dcache_page(mapping, page);
+
+-- 
+Catalin
