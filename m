@@ -1,104 +1,68 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 22 Jun 2011 00:27:31 +0200
-Subject: [PATCH 1/3] ARM: imx2: Fix GPIO iosize
-In-Reply-To: <1308678577-25277-1-git-send-email-fabio.estevam@freescale.com>
-References: <1308678577-25277-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110621222731.GE6069@pengutronix.de>
+From: hartleys@visionengravers.com (H Hartley Sweeten)
+Date: Tue, 21 Jun 2011 17:32:04 -0500
+Subject: [PATCH] ARM: quiet sparse noise due to
+	__ARCH_WANT_SYS_RT_SIG(ACTION|SUSPEND)
+In-Reply-To: <BANLkTi=8mstQAWKxBBBFH_+byGoXr8ieRg@mail.gmail.com>
+References: <201106211209.46462.hartleys@visionengravers.com>
+	<BANLkTi=8mstQAWKxBBBFH_+byGoXr8ieRg@mail.gmail.com>
+Message-ID: <ADE657CA350FB648AAC2C43247A983F001F38227C321@AUSP01VMBX24.collaborationhost.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All applied for next.
+On Tuesday, June 21, 2011 12:31 PM, Mike Frysinger wrote:
+> On Tue, Jun 21, 2011 at 15:09, H Hartley Sweeten wrote:
+>> --- a/arch/arm/include/asm/unistd.h
+>> +++ b/arch/arm/include/asm/unistd.h
+>> @@ -467,6 +467,20 @@
+>> +#ifndef __ASSEMBLY__
+>> +
+>> +#include <linux/types.h>
+>> +#include <linux/linkage.h>
+>> +#include <linux/compiler.h>
+>> +#include <linux/signal.h>
+>> +
+>> +asmlinkage long sys_rt_sigaction(int sig, const struct sigaction __user *act,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct sigaction __user *oact,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?size_t sigsetsize);
+>> +asmlinkage long sys_rt_sigsuspend(sigset_t __user *unewset, size_t sigsetsize);
+>> +
+>> +#endif /* !__ASSEMBLY__ */
+>
+> yikes ... this really the only way to fix the sparse warning ?
 
-Sascha
+Not sure...
 
-On Tue, Jun 21, 2011 at 02:49:35PM -0300, Fabio Estevam wrote:
-> On MX1, MX21 and MX27 each GPIO port has an address space of 256 bytes.
-> 
-> Fix the iosize for these platforms.
-> 
-> Tested on a mx27_3ds board that can boot fine after this change.
-> 
-> Cc: Shawn Guo <shawn.guo@freescale.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
-> This applies on Sascha's for-next branch
-> 
->  arch/arm/mach-imx/mm-imx1.c  |   12 ++++++++----
->  arch/arm/mach-imx/mm-imx21.c |   12 ++++++------
->  arch/arm/mach-imx/mm-imx27.c |   12 ++++++------
->  3 files changed, 20 insertions(+), 16 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mm-imx1.c b/arch/arm/mach-imx/mm-imx1.c
-> index b486595..8a953fd 100644
-> --- a/arch/arm/mach-imx/mm-imx1.c
-> +++ b/arch/arm/mach-imx/mm-imx1.c
-> @@ -50,8 +50,12 @@ void __init mx1_init_irq(void)
->  
->  void __init imx1_soc_init(void)
->  {
-> -	mxc_register_gpio(0, MX1_GPIO1_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTA, 0);
-> -	mxc_register_gpio(1, MX1_GPIO2_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTB, 0);
-> -	mxc_register_gpio(2, MX1_GPIO3_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTC, 0);
-> -	mxc_register_gpio(3, MX1_GPIO4_BASE_ADDR, SZ_4K, MX1_GPIO_INT_PORTD, 0);
-> +	mxc_register_gpio(0, MX1_GPIO1_BASE_ADDR, SZ_256,
-> +						MX1_GPIO_INT_PORTA, 0);
-> +	mxc_register_gpio(1, MX1_GPIO2_BASE_ADDR, SZ_256,
-> +						MX1_GPIO_INT_PORTB, 0);
-> +	mxc_register_gpio(2, MX1_GPIO3_BASE_ADDR, SZ_256,
-> +						MX1_GPIO_INT_PORTC, 0);
-> +	mxc_register_gpio(3, MX1_GPIO4_BASE_ADDR, SZ_256,
-> +						MX1_GPIO_INT_PORTD, 0);
->  }
-> diff --git a/arch/arm/mach-imx/mm-imx21.c b/arch/arm/mach-imx/mm-imx21.c
-> index f0fb8bc..f8fb41c 100644
-> --- a/arch/arm/mach-imx/mm-imx21.c
-> +++ b/arch/arm/mach-imx/mm-imx21.c
-> @@ -76,10 +76,10 @@ void __init mx21_init_irq(void)
->  
->  void __init imx21_soc_init(void)
->  {
-> -	mxc_register_gpio(0, MX21_GPIO1_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
-> -	mxc_register_gpio(1, MX21_GPIO2_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
-> -	mxc_register_gpio(2, MX21_GPIO3_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
-> -	mxc_register_gpio(3, MX21_GPIO4_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
-> -	mxc_register_gpio(4, MX21_GPIO5_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
-> -	mxc_register_gpio(5, MX21_GPIO6_BASE_ADDR, SZ_4K, MX21_INT_GPIO, 0);
-> +	mxc_register_gpio(0, MX21_GPIO1_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
-> +	mxc_register_gpio(1, MX21_GPIO2_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
-> +	mxc_register_gpio(2, MX21_GPIO3_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
-> +	mxc_register_gpio(3, MX21_GPIO4_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
-> +	mxc_register_gpio(4, MX21_GPIO5_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
-> +	mxc_register_gpio(5, MX21_GPIO6_BASE_ADDR, SZ_256, MX21_INT_GPIO, 0);
->  }
-> diff --git a/arch/arm/mach-imx/mm-imx27.c b/arch/arm/mach-imx/mm-imx27.c
-> index d3700ce..acc6db4 100644
-> --- a/arch/arm/mach-imx/mm-imx27.c
-> +++ b/arch/arm/mach-imx/mm-imx27.c
-> @@ -76,10 +76,10 @@ void __init mx27_init_irq(void)
->  
->  void __init imx27_soc_init(void)
->  {
-> -	mxc_register_gpio(0, MX27_GPIO1_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
-> -	mxc_register_gpio(1, MX27_GPIO2_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
-> -	mxc_register_gpio(2, MX27_GPIO3_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
-> -	mxc_register_gpio(3, MX27_GPIO4_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
-> -	mxc_register_gpio(4, MX27_GPIO5_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
-> -	mxc_register_gpio(5, MX27_GPIO6_BASE_ADDR, SZ_4K, MX27_INT_GPIO, 0);
-> +	mxc_register_gpio(0, MX27_GPIO1_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
-> +	mxc_register_gpio(1, MX27_GPIO2_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
-> +	mxc_register_gpio(2, MX27_GPIO3_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
-> +	mxc_register_gpio(3, MX27_GPIO4_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
-> +	mxc_register_gpio(4, MX27_GPIO5_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
-> +	mxc_register_gpio(5, MX27_GPIO6_BASE_ADDR, SZ_256, MX27_INT_GPIO, 0);
->  }
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
+Russell's patch to add an asm/syscalls.h fixes the other system call
+sparse warnings in arm/arm/kernel/* but it doesn't fix the ones in
+kernel/signal.c.  This patch does but, as Russell said, asm/unistd.h
+is exported to it's a bit ugly.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+BTW, arch/ia64 does something very similar:
+
+
+#if !defined(__ASSEMBLY__) && !defined(ASSEMBLER)
+
+#include <linux/types.h>
+#include <linux/linkage.h>
+#include <linux/compiler.h>
+
+extern long __ia64_syscall (long a0, long a1, long a2, long a3, long a4, long nr);
+
+asmlinkage unsigned long sys_mmap(
+				unsigned long addr, unsigned long len,
+				int prot, int flags,
+				int fd, long off);
+asmlinkage unsigned long sys_mmap2(
+				unsigned long addr, unsigned long len,
+				int prot, int flags,
+				int fd, long pgoff);
+struct pt_regs;
+struct sigaction;
+asmlinkage long sys_ia64_pipe(void);
+asmlinkage long sys_rt_sigaction(int sig,
+				 const struct sigaction __user *act,
+				 struct sigaction __user *oact,
+				 size_t sigsetsize);
+
+Regards,
+Hartley
