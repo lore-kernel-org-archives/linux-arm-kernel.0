@@ -1,78 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Jun 2011 11:40:51 +0100
-Subject: [PATCH] dt: early platform devices support
-Message-ID: <mailman.31.1308654850.24103.linux-arm-kernel@lists.infradead.org>
+From: banajit.goswami@gmail.com (Banajit Goswami)
+Date: Tue, 21 Jun 2011 16:48:38 +0530
+Subject: [RFC][PATCH 3/5] ARM: SAMSUNG: Adding IO mapping for OTG PHY.
+In-Reply-To: <1308639827-2121-4-git-send-email-p.paneri@samsung.com>
+References: <1308639827-2121-1-git-send-email-p.paneri@samsung.com>
+	<1308639827-2121-4-git-send-email-p.paneri@samsung.com>
+Message-ID: <BANLkTintiDOi1mtc0M_qKbxYm+YmDU_Ttw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for populating early platform devices from the device
-tree, by walking the tree and adding nodes whose 'device_type'
-property matches the 'class' string passed as a parameter.
+Hi Praveen,
 
-This allows devices to be probed long before the whole device
-insfrastructure is available.
+On Tue, Jun 21, 2011 at 12:33 PM, <p.paneri@samsung.com> wrote:
+>
+> From: Praveen Paneri <p.paneri@samsung.com>
+>
+> Adding virtual addresses for OTG PHY.
+>
+> Signed-off-by: Praveen Paneri <p.paneri@samsung.com>
+> ---
+> ?arch/arm/mach-s5p64x0/cpu.c | ? ?5 +++++
+> ?1 files changed, 5 insertions(+), 0 deletions(-)
+>
+> diff --git a/arch/arm/mach-s5p64x0/cpu.c b/arch/arm/mach-s5p64x0/cpu.c
+> index a5c0095..8dc6f20 100644
+> --- a/arch/arm/mach-s5p64x0/cpu.c
+> +++ b/arch/arm/mach-s5p64x0/cpu.c
+> @@ -57,6 +57,11 @@ static struct map_desc s5p64x0_iodesc[] __initdata = {
+> ? ? ? ? ? ? ? ?.pfn ? ? ? ? ? ?= __phys_to_pfn(S5P64X0_PA_VIC1),
+> ? ? ? ? ? ? ? ?.length ? ? ? ? = SZ_16K,
+> ? ? ? ? ? ? ? ?.type ? ? ? ? ? = MT_DEVICE,
+> + ? ? ? }, {
+> + ? ? ? ? ? ? ? .virtual ? ? ? ?= (unsigned long)S3C_VA_USB_HSPHY,
+> + ? ? ? ? ? ? ? .pfn ? ? ? ? ? ?= __phys_to_pfn(S5P64X0_PA_USB_HSPHY),
+> + ? ? ? ? ? ? ? .length ? ? ? ? = SZ_1M,
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/of/platform.c       |   31 +++++++++++++++++++++++++++++++
- include/linux/of_platform.h |    2 ++
- 2 files changed, 33 insertions(+), 0 deletions(-)
+Do we really need 1M for this??
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index 9b785be..976a9ea 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -326,4 +326,35 @@ int of_platform_populate(struct device_node *root,
- =09of_node_put(root);
- =09return rc;
- }
-+
-+/**
-+ * of_early_platform_populate() - Populate early platform devices from DT
-+ * @class: string matching the device type to register
-+ *
-+ * This function walks the device tree and register devices whose
-+ * 'device_type' property matches the 'class' parameter.
-+ *
-+ * Returns 0 on success, < 0 on failure.
-+ */
-+int of_early_platform_populate(const char *class)
-+{
-+=09struct platform_device *pdev;
-+=09struct device_node *np =3D NULL;
-+=09int id =3D 0, rc =3D 0;
-+
-+=09while ((np =3D of_find_node_by_type(np, class))) {
-+=09=09pdev =3D kzalloc(sizeof(*pdev), GFP_KERNEL);
-+=09=09if (!pdev) {
-+=09=09=09of_node_put(np);
-+=09=09=09rc =3D -ENOMEM;
-+=09=09=09break;
-+=09=09}
-+=09=09pdev->name =3D np->name;
-+=09=09pdev->id =3D id++;
-+=09=09pdev->dev.of_node =3D of_node_get(np);
-+=09=09early_platform_add_devices(&pdev, 1);
-+=09}
-+
-+=09return rc;
-+}
- #endif /* !CONFIG_SPARC */
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index 43c723d..fee17f7 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -58,6 +58,8 @@ extern int of_platform_bus_probe(struct device_node *root=
-,
- extern int of_platform_populate(struct device_node *root,
- =09=09=09=09const struct of_device_id *matches,
- =09=09=09=09struct device *parent);
-+
-+extern int of_early_platform_populate(const char *class);
- #endif /* !CONFIG_SPARC */
-=20
- #endif /* CONFIG_OF_DEVICE */
---=20
-1.7.0.4
-
---------------030209090305050208070106--
+> + ? ? ? ? ? ? ? .type ? ? ? ? ? = MT_DEVICE,
+> ? ? ? ?},
+> ?};
+>
+> --
+> 1.7.0.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
