@@ -1,35 +1,56 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Tue, 21 Jun 2011 10:21:42 +0200
-Subject: Trouble with newer kernels on Gumstix Overo boards
-In-Reply-To: <4DFF4BCB.1000206@visionsystems.de>
-References: <BANLkTimJTBpj30EKf_EucvOf2yCHHbRrkQ@mail.gmail.com>
-	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047B99E7E7AD@dbde03.ent.ti.com>
-	<BANLkTimfeS1Xin779eg=8cdjqmqcQeB6HA@mail.gmail.com>
-	<4DFF4BCB.1000206@visionsystems.de>
-Message-ID: <BANLkTim8Sh7kZp=92jhoU3NxgzAu0YgoWw@mail.gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 21 Jun 2011 14:38:34 +0530
+Subject: [RFC PATCH] ARM: smp: Fix the CPU hotplug race with scheduler.
+In-Reply-To: <4DFF5F29.2000904@ti.com>
+References: <1308561839-18407-1-git-send-email-santosh.shilimkar@ti.com>
+	<20110620095053.GA2082@n2100.arm.linux.org.uk>
+	<20110620101438.GD2082@n2100.arm.linux.org.uk>
+	<4DFF20B3.7010209@ti.com>
+	<20110620104415.GF2082@n2100.arm.linux.org.uk>
+	<4DFF255E.5030308@ti.com>
+	<20110620111336.GG2082@n2100.arm.linux.org.uk>
+	<4DFF2E37.8030602@ti.com>
+	<20110620114019.GH2082@n2100.arm.linux.org.uk>
+	<20110620142338.GL2082@n2100.arm.linux.org.uk>
+	<4DFF5F29.2000904@ti.com>
+Message-ID: <4E005F92.8030208@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 3:31 PM, Yegor Yefremov
-<yegor_sub1@visionsystems.de> wrote:
-> Am 17.06.2011 17:11, schrieb Daniel Mack:
->> On Fri, Jun 17, 2011 at 4:03 PM, Gadiyar, Anand <gadiyar@ti.com> wrote:
->>>> console=ttyS2,115200 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait
->>>
->>> Here is your problem. We now use the OMAP-serial driver for the UARTs.
+Russell,
+
+On 6/20/2011 8:24 PM, Santosh Shilimkar wrote:
+> On 6/20/2011 7:53 PM, Russell King - ARM Linux wrote:
+>> On Mon, Jun 20, 2011 at 12:40:19PM +0100, Russell King - ARM Linux wrote:
+[....]
+
+>> So, as loops_per_jiffy is not local to this function, the compiler has
+>> to write out that zero value, before calling calibrate_delay_converge(),
+>> and loops_per_jiffy only becomes non-zero _after_
+>> calibrate_delay_converge()
+>> has returned. This opens the window and allows the spinlock debugging
+>> code to explode.
 >>
->> Which breaks backward-compatibility with bootloaders set up for older
->> kernels. Now I have to deploy kernels with CONFIG_CMDLINE_FORCE=y. Was
->> that really necessary?
+>> This patch closes the window completely, by only writing to
+>> loops_per_jiffy
+>> only when we have a real value for it.
 >>
->>> Change the ttyS2 to ttyO2 and you should be fine.
+>> This allows me to boot 3.0.0-rc3 on Versatile Express (4 CPU) whereas
+>> without this it fails with spinlock lockup and rcu problems.
 >>
->> You're right, that did the trick. Thanks a lot!
+>> init/calibrate.c | 14 ++++++++------
+>> 1 files changed, 8 insertions(+), 6 deletions(-)
+>>
+> I am away from my board now. Will test this change.
+Have tested your change and it seems to fix the crash I
+was observing. Are you planning to send this fix for rc5?
+
+> btw, the online-active race is still open even with this patch close
+> and should be fixed.
 >
-> Are you using some extra patches? I have a custom board based on am3517 SoC and I have much more errors during booting as I can see from your boot log. I have no problems booting 2.6.32/37 though. Any idea?
+The only problem remains is waiting for active mask before
+marking CPU online. Shall I refresh my patch with only
+this change then ?
 
-I don't use any extra patches. Just a plain 3.0.0-rc3 from Linus'
-master branch plus the patch I've sent some days ago to this list.
-With that setup, and console=ttyO2, my systems runs just fine.
-
-Daniel
+Regards
+Santosh
