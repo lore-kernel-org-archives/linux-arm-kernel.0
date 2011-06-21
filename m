@@ -1,33 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 21 Jun 2011 13:36:15 -0700
-Subject: [RFC] Add Arm cpu topology definition
-In-Reply-To: <BANLkTi=ik=iRtDb3K__CPxSH_8GusoBHKA@mail.gmail.com>
-References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>	<4DFA5C2E.40507@codeaurora.org>
-	<BANLkTi=ik=iRtDb3K__CPxSH_8GusoBHKA@mail.gmail.com>
-Message-ID: <4E0100BF.6080500@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 21 Jun 2011 16:41:59 -0400 (EDT)
+Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
+	packed attribute
+In-Reply-To: <Pine.LNX.4.44L0.1106211054460.2327-100000@iolanthe.rowland.org>
+References: <Pine.LNX.4.44L0.1106211054460.2327-100000@iolanthe.rowland.org>
+Message-ID: <alpine.LFD.2.00.1106211636190.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/16/2011 11:54 PM, Vincent Guittot wrote:
-> On 16 June 2011 21:40, Stephen Boyd <sboyd@codeaurora.org> wrote:
->> The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
->> different vendors may attribute different meaning to these fields if
->> they wish. Does that mean this should be a platform_*() function?
->>
-> The ARM ARM also provides a recommended use of the fields of this
-> register and the TRM of each Cortex adds some details. On the cortex
-> A9, each platform can only set the value of the Cluster ID with the
-> CLUSTERID pins. I have tried to consolidate the value of MPIDR  across
-> several platforms and they all match with the description.
->
-> Have you got an example of a MPIDR register which doesn't match with
-> the implementation ?
+On Tue, 21 Jun 2011, Alan Stern wrote:
 
-Not that I know of. I'm more concerned with how the ARM ARM has two
-recommended usages for these fields depending on virtualization or not.
-I suppose we can handle that issue when it arises (or does your
-implementation already handle that?)
+> On Mon, 20 Jun 2011, Nicolas Pitre wrote:
+> 
+> > > We don't fall into any of these cases, and therefore as you say, we
+> > > don't need packed.  Arnd and I have both explained this.  So why do you 
+> > > keep arguing that we do need it?
+> > 
+> > Please show me where I keep arguing that you need it?
+> 
+> Not explicitly perhaps.  But you did write:
+> 
+> > Doesn't mean that because it used to work that it is strictly correct.  
+> > Wouldn't be the first time that a GCC upgrade broke the kernel because 
+> > the kernel wasn't describing things properly enough.
+> 
+> which strongly implies that "packed" is needed.  You also wrote:
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+In this case ...
+
+> > Yes, but that's a consequence of not being able to access those fields 
+> > in their naturally aligned position anymore.  Hence the addition of the 
+> > align attribute to tell the compiler that we know that the structure is 
+> > still aligned to a certain degree letting the compiler to avoid 
+> > byte-oriented instructions when possible.
+> 
+> which is predicated on the assumption that "packed" is needed.
+
+... and also in this case, I was talking about proper use of the packed 
+attribute in general, not at all about a specific case.  I wanted to 
+provide a broader view to some people who expressed doubts and 
+misunderstanding in the hope that the archive could keep this knowledge 
+base available.
+
+I apologize if that wasn't clear to you.
+
+
+Nicolas
