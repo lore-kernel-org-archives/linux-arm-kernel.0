@@ -1,36 +1,36 @@
-From: leiwen@marvell.com (Lei Wen)
-Date: Tue, 21 Jun 2011 05:37:47 -0700
-Subject: [PATCH 2/2] ARM: pxa168: correct nand pmu setting
-In-Reply-To: <BANLkTikcuu7SaWLH2h0xPWfpr-D6F0hyWA@mail.gmail.com>
-References: <BANLkTikcuu7SaWLH2h0xPWfpr-D6F0hyWA@mail.gmail.com>
-Message-ID: <1308659867-28154-1-git-send-email-leiwen@marvell.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 21 Jun 2011 13:39:48 +0100
+Subject: [RFC][PATCH 4/5] ARM: S5P64x0: Adding OTG PHY control code
+In-Reply-To: <BANLkTim+idO=XDtcvYZdfUToROnb8ju+kQ@mail.gmail.com>
+References: <0LN4003P2ZGJSGU0@mailout4.samsung.com>
+	<BANLkTim+idO=XDtcvYZdfUToROnb8ju+kQ@mail.gmail.com>
+Message-ID: <20110621123948.GF23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The original pair of <0x01db, 208000000> is invalid.
-Correct to the valid value.
+On Tue, Jun 21, 2011 at 05:56:05PM +0530, Praveen Paneri wrote:
+> Hi,
+> 
+> On Tue, Jun 21, 2011 at 4:20 PM, PRAVEEN PANERI <p.paneri@samsung.com> wrote:
 
-The 6th bit of the NFC APMU register indicates NFC works whether
-at 156Mhz or 78Mhz. So 0x19b indicates NFC works at 156Mhz, and
-0x1db indicates it works at 78Mhz
+Err, that attributation is wrong.
 
-Signed-off-by: Lei Wen <leiwen@marvell.com>
----
- arch/arm/mach-mmp/pxa168.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+> > On Tue, Jun 21, 2011 at 12:33:46PM +0530, p.paneri at samsung.com wrote:
+> > > +#include
+> > > +#include
+> > > +#include
+> > > +#include
+> > > +#include
+> > > +#include
+> > > +#include
+> >
+> > linux/gpio.h please.
+> will change it
 
-diff --git a/arch/arm/mach-mmp/pxa168.c b/arch/arm/mach-mmp/pxa168.c
-index 72b4e76..ab9f999 100644
---- a/arch/arm/mach-mmp/pxa168.c
-+++ b/arch/arm/mach-mmp/pxa168.c
-@@ -79,7 +79,7 @@ static APBC_CLK(ssp4, PXA168_SSP4, 4, 0);
- static APBC_CLK(ssp5, PXA168_SSP5, 4, 0);
- static APBC_CLK(keypad, PXA168_KPC, 0, 32000);
- 
--static APMU_CLK(nand, NAND, 0x01db, 208000000);
-+static APMU_CLK(nand, NAND, 0x19b, 156000000);
- static APMU_CLK(lcd, LCD, 0x7f, 312000000);
- 
- /* device and clock bindings */
--- 
-1.7.0.4
+You should question why your mailer decided to remove the contents after
+the "#include" when quoting.  Maybe you need to get a better mailer, fix
+some configuration setting, or complain to google that gmail is messing
+with emails in ways it shouldn't.
+
+However, I doubt that gmail itself is as broken as it appears to be
+above... but whatever it is, it needs fixing.
