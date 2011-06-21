@@ -1,26 +1,41 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 21 Jun 2011 10:09:16 +0200
-Subject: [PATCH v6 00/11] mmc: use nonblock mmc requests to minimize
-	latency
-In-Reply-To: <20110621075319.GN26089@n2100.arm.linux.org.uk>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-	<20110621075319.GN26089@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTikOA3G0Gt4Cxua3EDnAzbFKLAk6Yw@mail.gmail.com>
+From: zonque@gmail.com (Daniel Mack)
+Date: Tue, 21 Jun 2011 10:20:06 +0200
+Subject: Trouble with newer kernels on Gumstix Overo boards
+In-Reply-To: <20110621072220.GA21159@atomide.com>
+References: <BANLkTimJTBpj30EKf_EucvOf2yCHHbRrkQ@mail.gmail.com>
+	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047B99E7E7AD@dbde03.ent.ti.com>
+	<BANLkTimfeS1Xin779eg=8cdjqmqcQeB6HA@mail.gmail.com>
+	<20110621072220.GA21159@atomide.com>
+Message-ID: <BANLkTim5H3340RChbaVUOpSYb4tQr9X9YA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 June 2011 09:53, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Sun, Jun 19, 2011 at 11:17:26PM +0200, Per Forlin wrote:
->> How significant is the cache maintenance over head?
+On Tue, Jun 21, 2011 at 9:22 AM, Tony Lindgren <tony@atomide.com> wrote:
+> * Daniel Mack <zonque@gmail.com> [110617 18:06]:
+>> On Fri, Jun 17, 2011 at 4:03 PM, Gadiyar, Anand <gadiyar@ti.com> wrote:
+>> >> console=ttyS2,115200 root=/dev/mmcblk0p2 rw rootfstype=ext3 rootwait
+>> >
+>> > Here is your problem. We now use the OMAP-serial driver for the UARTs.
+>>
+>> Which breaks backward-compatibility with bootloaders set up for older
+>> kernels. Now I have to deploy kernels with CONFIG_CMDLINE_FORCE=y. Was
+>> that really necessary?
 >
-> Per,
->
-> Can you measure how much difference this has before and after your
-> patch set please?
-Absolutely, I can run the mmc_tests to get the measurement. The cache
-affect is greater the faster the flash memory is. Currently I only
-have access to a SD card (20 MiB/S). By the end of this week I can run
-on eMMC (45 MiB/s) if this will be needed.
+> In most cases you can just setenv cmdline then saveenv in u-boot.
 
-Thanks for your input,
-Per
+Well, it doesn't really affect me as I just use this as a development
+platform for now. But please consider that there is hardware out there
+which gets software updates through automated download and install
+procedures. In such cases, you want as little dependencies between the
+bootloader and the kernel, so you can boot both older and newer
+kernels (and full software distribution images) with no pain. Or maybe
+quickly switch from one version to the other for testing. Depending on
+the complexity of the system, the bootloader might also add extra
+parameters to the cmdline dynamically.
+
+The serial console change breaks this approach, at it forces the
+kernel to ship its own CMDLINE and override the one the bootloader
+provides. I'm sure this is a problem that affects people out there.
+
+
+Daniel
