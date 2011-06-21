@@ -1,43 +1,51 @@
 From: tushar.behera@linaro.org (Tushar Behera)
-Date: Tue, 21 Jun 2011 10:18:53 +0530
-Subject: [PATCH 2/2] video: omap2: Compile omap2 support only when needed
-In-Reply-To: <1308575201.2076.57.camel@deskari>
+Date: Tue, 21 Jun 2011 10:30:16 +0530
+Subject: [PATCH 1/2] config: omap2+: force fb and dss support as built-in
+In-Reply-To: <1308575086.2076.55.camel@deskari>
 References: <1308566761-2850-1-git-send-email-tushar.behera@linaro.org>	
-	<1308566761-2850-3-git-send-email-tushar.behera@linaro.org>
-	<1308575201.2076.57.camel@deskari>
-Message-ID: <4E0022B5.9000500@linaro.org>
+	<1308566761-2850-2-git-send-email-tushar.behera@linaro.org>
+	<1308575086.2076.55.camel@deskari>
+Message-ID: <4E002560.90301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Monday 20 June 2011 06:36 PM, Tomi Valkeinen wrote:
+On Monday 20 June 2011 06:34 PM, Tomi Valkeinen wrote:
 > On Mon, 2011-06-20 at 16:16 +0530, Tushar Behera wrote:
->> Currently display support for omap2 is selected by default and
->> it gets built for all the configurations.
->>
->> Instead of it being a built-in feature, it's compilation should
->> depend on the config option CONFIG_FB_OMAP2.
+>> In certain board files, there are references to vram related functions
+>> which are defined in drivers/video/omap2/vram.c. Because of this direct
+>> dependency, CONFIG_FB_OMAP2 should be a built-in feature.
 >
-> No, I don't think so. omap2 directory contains vram, vrfb and omapdss,
-> all of which can be used without omapfb driver. vram and vrfb can be
-> even used without omapdss driver.
-Even if I build the kernel with i386_defconfig, I get some compiled 
-files within drivers/video/omap2.
-
-$ make ARCH=x86 i386_defconfig O=out_dir
-$ make ARCH=x86 O=out_dir
-
-$ ls out_dir/drivers/video/omap2
-built-in.o  displays  modules.builtin  modules.order
-
-IMHO, drivers/video/omap2/ should not be compiled if the kernel is not 
-built for omap2.
+> arch/arm/plat-omap/include/plat/vram.h defines dummy inline function in
+> case vram.c is not compiled in, so the board files should compile fine.
 >
-> Is this patch fixing some real problem?
-This patch does not fix any other problem.
+>> As per the current architecture, CONFIG_FB_OMAP2 is dependent on
+>> CONFIG_OMAP2_DSS. Hence CONFIG_OMAP2_DSS support should also be selected
+>> by default.
+>
+> The configuration is fine as it is. And anyway, if things do not compile
+> when something is configured as a module, the correct fix is hardly just
+> changing the feature to be compiled built-in =).
+Agreed. :)
+I am not an expert in DSS. I just wanted to raise my concern.
+>
+>> Cc: Tony Lindgren<tony@atomide.com>
+>> Cc: Samreen<samreen@ti.com>
+>> Signed-off-by: Tushar Behera<tushar.behera@linaro.org>
+>> ---
+>> arch/arm/mach-omap2/built-in.o: In function `rx51_video_mem_init':
+>> linux-linaro-2.6.39/arch/arm/mach-omap2/board-rx51-video.c:97: undefined reference to `omap_vram_set_sdram_vram'
+>> arch/arm/plat-omap/built-in.o: In function `omap_reserve':
+>> linux-linaro-2.6.39/arch/arm/plat-omap/common.c:66: undefined reference to `omap_vram_reserve_sdram_memblock'
+>> arch/arm/plat-omap/built-in.o: In function `omap_detect_sram':
+>> linux-linaro-2.6.39/arch/arm/plat-omap/sram.c:179: undefined reference to `omap_vram_reserve_sram'
+>> make[1]: *** [.tmp_vmlinux1] Error 1
+>> make: *** [sub-make] Error 2
+>
+> Compiles fine for me. Perhaps you are using some old kernel?
+As mentioned in the cover letter, we get this error only if 2/2 is 
+applied and 1/2 is not applied.
 
-
+I tested this by applying 2/2 on v3.0-rc4 and using omap2plus_defconfig.
 >
 >   Tomi
 >
