@@ -1,26 +1,146 @@
-From: alchark@gmail.com (Alexey Charkov)
-Date: Wed, 22 Jun 2011 12:41:01 +0400
-Subject: [PATCH] arm: mach-vt8500: add forgotten irq_data conversion
-In-Reply-To: <1308690677-19874-1-git-send-email-w.sang@pengutronix.de>
-References: <1308690677-19874-1-git-send-email-w.sang@pengutronix.de>
-Message-ID: <BANLkTi=E49kmTA3WBBd6HWZxNV2GCyw7bQ@mail.gmail.com>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 22 Jun 2011 10:45:16 +0200
+Subject: [PATCH v7 01/11] mmc: add non-blocking mmc request function
+In-Reply-To: <BANLkTikhZRb5GWFvTVG0bFjD6rAyJPka1w@mail.gmail.com>
+References: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
+	<1308699521-20556-2-git-send-email-per.forlin@linaro.org>
+	<BANLkTikhZRb5GWFvTVG0bFjD6rAyJPka1w@mail.gmail.com>
+Message-ID: <BANLkTi=TY3wrH2GH1B2p+L506aUKOjg9uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/22 Wolfram Sang <w.sang@pengutronix.de>:
-> This platform has not been converted when the big pile was done and thus
-> fails to compile. Tested on a JayPC-Tablet.
->
-> Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Alexey Charkov <alchark@gmail.com>
-> Cc: Lennert Buytenhek <buytenh@secretlab.ca>
-> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+On 22 June 2011 09:42, Venkatraman S <svenkatr@ti.com> wrote:
+> On Wed, Jun 22, 2011 at 5:08 AM, Per Forlin <per.forlin@linaro.org> wrote:
+>> Previously there has only been one function mmc_wait_for_req()
+>> to start and wait for a request. This patch adds
+>> ?* mmc_start_req() - starts a request wihtout waiting
+>> ? If there is on ongoing request wait for completion
+>> ? of that request and start the new one and return.
+>> ? Does not wait for the new command to complete.
+>>
+>> This patch also adds new function members in struct mmc_host_ops
+>> only called from core.c
+>> ?* pre_req - asks the host driver to prepare for the next job
+>> ?* post_req - asks the host driver to clean up after a completed job
+>>
+>> The intention is to use pre_req() and post_req() to do cache maintenance
+>> while a request is active. pre_req() can be called while a request is active
+>> to minimize latency to start next job. post_req() can be used after the next
+>> job is started to clean up the request. This will minimize the host driver
+>> request end latency. post_req() is typically used before ending the block
+>> request and handing over the buffer to the block layer.
+>>
+>> Add a host-private member in mmc_data to be used by
+>> pre_req to mark the data. The host driver will then
+>> check this mark to see if the data is prepared or not.
+>>
+>> Signed-off-by: Per Forlin <per.forlin@linaro.org>
+>> ---
+>> ?drivers/mmc/core/core.c ?| ?110 +++++++++++++++++++++++++++++++++++++++++----
+>> ?include/linux/mmc/core.h | ? ?6 ++-
+>> ?include/linux/mmc/host.h | ? 21 +++++++++
+>> ?3 files changed, 126 insertions(+), 11 deletions(-)
+>>
+>> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
+>> index 68091dd..c82fa3b 100644
+>> --- a/drivers/mmc/core/core.c
+>> +++ b/drivers/mmc/core/core.c
+>> @@ -198,9 +198,106 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
+>>
+>> ?static void mmc_wait_done(struct mmc_request *mrq)
+>> ?{
+>> - ? ? ? complete(mrq->done_data);
+>> + ? ? ? complete(&mrq->completion);
+>> ?}
+>>
+>> +static void __mmc_start_req(struct mmc_host *host, struct mmc_request *mrq)
+>> +{
+>> + ? ? ? init_completion(&mrq->completion);
+>> + ? ? ? mrq->done = mmc_wait_done;
+>> + ? ? ? mmc_start_request(host, mrq);
+>> +}
+>> +
+>> +static void mmc_wait_for_req_done(struct mmc_host *host,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
+>> +{
+>> + ? ? ? wait_for_completion(&mrq->completion);
+>> +}
+>> +
+>> +/**
+>> + * ? ? mmc_pre_req - Prepare for a new request
+>> + * ? ? @host: MMC host to prepare command
+>> + * ? ? @mrq: MMC request to prepare for
+>> + * ? ? @is_first_req: true if there is no previous started request
+>> + * ? ? ? ? ? ? ? ? ? ? that may run in parellel to this call, otherwise false
+>> + *
+>> + * ? ? mmc_pre_req() is called in prior to mmc_start_req() to let
+>> + * ? ? host prepare for the new request. Preparation of a request may be
+>> + * ? ? performed while another request is running on the host.
+>> + */
+>> +static void mmc_pre_req(struct mmc_host *host, struct mmc_request *mrq,
+>> + ? ? ? ? ? ? ? ?bool is_first_req)
+>> +{
+>> + ? ? ? if (host->ops->pre_req)
+>> + ? ? ? ? ? ? ? host->ops->pre_req(host, mrq, is_first_req);
+>> +}
+>> +
+>> +/**
+>> + * ? ? mmc_post_req - Post process a completed request
+>> + * ? ? @host: MMC host to post process command
+>> + * ? ? @mrq: MMC request to post process for
+>> + * ? ? @err: Error, if non zero, clean up any resources made in pre_req
+>> + *
+>> + * ? ? Let the host post process a completed request. Post processing of
+>> + * ? ? a request may be performed while another reuqest is running.
+>> + */
+>> +static void mmc_post_req(struct mmc_host *host, struct mmc_request *mrq,
+>> + ? ? ? ? ? ? ? ? ? ? ? ?int err)
+>> +{
+>> + ? ? ? if (host->ops->post_req)
+>> + ? ? ? ? ? ? ? host->ops->post_req(host, mrq, err);
+>> +}
+>> +
+>> +/**
+>> + * ? ? mmc_start_req - start a non-blocking request
+>> + * ? ? @host: MMC host to start command
+>> + * ? ? @areq: async request to start
+>> + * ? ? @error: out parameter returns 0 for success, otherwise non zero
+>> + *
+>> + * ? ? Start a new MMC custom command request for a host.
+>> + * ? ? If there is on ongoing async request wait for completion
+>> + * ? ? of that request and start the new one and return.
+>> + * ? ? Does not wait for the new request to complete.
+>> + *
+>> + * ? ? Returns the completed async request, NULL in case of none completed.
+>> + */
+>> +struct mmc_async_req *mmc_start_req(struct mmc_host *host,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_async_req *areq, int *error)
+>> +{
+>> + ? ? ? int err = 0;
+>> + ? ? ? struct mmc_async_req *data = host->areq;
+>> +
+>> + ? ? ? /* Prepare a new request */
+>> + ? ? ? if (areq)
+>> + ? ? ? ? ? ? ? mmc_pre_req(host, areq->mrq, !host->areq);
+>> +
+>> + ? ? ? if (host->areq) {
+>> + ? ? ? ? ? ? ? mmc_wait_for_req_done(host, host->areq->mrq);
+>> + ? ? ? ? ? ? ? err = host->areq->err_check(host->card, host->areq);
+>> + ? ? ? ? ? ? ? if (err) {
+>> + ? ? ? ? ? ? ? ? ? ? ? mmc_post_req(host, host->areq->mrq, 0);
+>> + ? ? ? ? ? ? ? ? ? ? ? if (areq)
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_post_req(host, areq->mrq, -EINVAL);
+>> +
+>> + ? ? ? ? ? ? ? ? ? ? ? host->areq = NULL;
+>> + ? ? ? ? ? ? ? ? ? ? ? goto out;
+> In this sequence, would the return value (data) have the previous areq ?
+> Is that intentional - doesn't seem to fit with the description.
+It will return the data that belongs to the completed request. The
+completed request will be the same as the previous request. The
+mmc_start_req will start a new request and return data for the
+completed request, if any.
 
-Acked-by: Alexey Charkov <alchark@gmail.com>
+Do you think I should clarify the description?
 
-This is exactly what has been done in our development repo on
-Gitorious, but we have not yet submitted the changes for inclusion.
-Thank you, Wolfram!
-
-Best regards,
-Alexey
+Regards,
+Per
