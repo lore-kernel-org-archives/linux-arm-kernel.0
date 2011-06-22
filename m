@@ -1,60 +1,45 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 22 Jun 2011 18:19:03 +0300
-Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
-In-Reply-To: <Pine.LNX.4.44L0.1106221055030.1977-100000@iolanthe.rowland.org>
-References: <20110622143216.GE27654@legolas.emea.dhcp.ti.com>
-	<Pine.LNX.4.44L0.1106221055030.1977-100000@iolanthe.rowland.org>
-Message-ID: <20110622151902.GN27654@legolas.emea.dhcp.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jun 2011 16:14:07 +0100
+Subject: i.MX consolidation patches
+In-Reply-To: <201106221710.39687.arnd@arndb.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110622090321.GO23234@n2100.arm.linux.org.uk>
+	<20110622145828.GL6069@pengutronix.de>
+	<201106221710.39687.arnd@arndb.de>
+Message-ID: <20110622151407.GU23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 22, 2011 at 05:10:39PM +0200, Arnd Bergmann wrote:
+> On Wednesday 22 June 2011, Sascha Hauer wrote:
+> > --- a/arch/arm/boot/Makefile
+> > +++ b/arch/arm/boot/Makefile
+> > @@ -59,6 +59,11 @@ $(obj)/zImage:       $(obj)/compressed/vmlinux FORCE
+> >  
+> >  endif
+> >  
+> > +ifneq ($(words $(ZRELADDR)), 1)
+> > +$(obj)/uImage: FORCE
+> > +       @echo 'Multiple zreladdrs, cannot build uImage'
+> > +       exit 1
+> > +else
+> 
+> Failing the build for a possible configuration is not nice, I would
+> be happier if this could be prevented in Kconfig. I have recently
+> worked on getting all 'randconfig' build working for a bunch of platforms
+> (patches will follow), so it would be a shame to have another
+> guaranteed failure built into the kernel.
 
-On Wed, Jun 22, 2011 at 11:02:27AM -0400, Alan Stern wrote:
-> On Wed, 22 Jun 2011, Felipe Balbi wrote:
-> 
-> > > In fact, something like this is _necessary_ for all UDC/PHY drivers
-> > > unless the device can guarantee that it will automatically wake up from
-> > > suspend in time to service a USB packet (note that the window for
-> > > responding to a packet is only a few microseconds).  Otherwise the
-> > > device would appear to the host to be unresponsive and broken -- better
-> > > to do a clean disconnect.
-> > > 
-> > > If suspending the device while it is in use would cause problems ...  
-> > > then don't suspend it when it is in use!
-> > 
-> > I second your thoughts, but today we don't have enough infrastructure to
-> > communicate between PHY and Link, so a clean solution isn't possible,
-> > right ?
-> > 
-> > Should we block this patch due to that ?
-> 
-> No, the patch is appropriate.
-> 
-> We don't need better communication.  If g_mass_storage (for example)  
-> knows that the device is in use, it can block suspends by returning
-> -EBUSY from its own suspend callback.  The UDC driver doesn't need to
-> worry about these matters; it should assume that such things have
-> already been handled elsewhere.  That's what Dmitry meant when he was
-> talking about a "higher level driver" -- maybe "lower level" would have
-> been a better choice of words.  :-)
-> 
-> Until recently, ordering of the suspend callbacks didn't present any 
-> problem.  The gadget device was a child of the UDC device and therefore 
-> its suspend callback would always be invoked first.
-> 
-> With the new UDC framework, I don't know if this is true any more.  
-> It's something to consider.
+Arnd,
 
-it's still true, but with one extra device in the middle. e.g.:
-musb is parent to udc-core which is parent to g_zero.
+I don't think you're _thinking_.  If you issue 'make uImage', how is the
+kernel configuration stuff to know that it should not enable multiple
+platforms which would make building a uImage technically impossible
+(and lead to the created uImage being non-bootable on some of those
+platforms.)
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110622/4af441b7/attachment.sig>
+The answer is: you can't.
+
+The best we can do is if the configuration encounters this problem, then
+fail to build a uImage.  If that concerns you, then don't ask the kernel
+to build an inherently fragile boot loader format in the first place.
