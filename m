@@ -1,79 +1,47 @@
 From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 22 Jun 2011 16:20:16 +0400
-Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
-Message-ID: <1308745217-10883-1-git-send-email-dbaryshkov@gmail.com>
+Date: Wed, 22 Jun 2011 16:20:17 +0400
+Subject: [PATCH 2/2] mioa701: move gpio-pullup functionality to gpio-vbus
+In-Reply-To: <1308745217-10883-1-git-send-email-dbaryshkov@gmail.com>
+References: <1308745217-10883-1-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <1308745217-10883-2-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some platforms would like to disable D+ pullup on suspend, to drain as
-low power, as possible. E.g. this was requested by mioa701 board
-maintainers.
+gpio-vbus can (and should?) handle D+ pullup gpio for us. Move gpio-pullup handling
+to gpio-vbus and stop providing udc_info as it's empty now.
 
 Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
 ---
- drivers/usb/otg/gpio_vbus.c   |   32 ++++++++++++++++++++++++++++++++
- include/linux/usb/gpio_vbus.h |    1 +
- 2 files changed, 33 insertions(+), 0 deletions(-)
+ arch/arm/mach-pxa/mioa701.c |    7 +------
+ 1 files changed, 1 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
-index 52733d9..44527bd 100644
---- a/drivers/usb/otg/gpio_vbus.c
-+++ b/drivers/usb/otg/gpio_vbus.c
-@@ -327,6 +327,34 @@ static int __exit gpio_vbus_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
-+#ifdef CONFIG_PM
-+static int gpio_vbus_suspend(struct platform_device *pdev, pm_message_t state)
-+{
-+	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
-+	struct gpio_vbus_mach_info *pdata = gpio_vbus->dev->platform_data;
-+
-+	if (gpio_vbus->otg.gadget && pdata->disconnect_on_suspend) {
-+		/* optionally disable D+ pullup */
-+		if (gpio_is_valid(pdata->gpio_pullup))
-+			gpio_set_value(pdata->gpio_pullup,
-+					pdata->gpio_pullup_inverted);
-+
-+		set_vbus_draw(gpio_vbus, 0);
-+	}
-+	return 0;
-+}
-+
-+static int gpio_vbus_resume(struct platform_device *pdev)
-+{
-+	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
-+
-+	if (gpio_vbus->otg.gadget)
-+		schedule_work(&gpio_vbus->work);
-+
-+	return 0;
-+}
-+#endif
-+
- /* NOTE:  the gpio-vbus device may *NOT* be hotplugged */
- 
- MODULE_ALIAS("platform:gpio-vbus");
-@@ -337,6 +365,10 @@ static struct platform_driver gpio_vbus_driver = {
- 		.owner = THIS_MODULE,
- 	},
- 	.remove  = __exit_p(gpio_vbus_remove),
-+#ifdef CONFIG_PM
-+	.suspend	= gpio_vbus_suspend,
-+	.resume		= gpio_vbus_resume
-+#endif
+diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+index bcbd359..e712c9d 100644
+--- a/arch/arm/mach-pxa/mioa701.c
++++ b/arch/arm/mach-pxa/mioa701.c
+@@ -402,14 +402,10 @@ static void gsm_exit(void)
+ /*
+  * USB UDC
+  */
+-static struct pxa2xx_udc_mach_info mioa701_udc_info = {
+-	.gpio_pullup	  = GPIO22_USB_ENABLE,
+-};
+-
+ struct gpio_vbus_mach_info gpio_vbus_data = {
+ 	.gpio_vbus = GPIO13_nUSB_DETECT,
+ 	.gpio_vbus_inverted = 1,
+-	.gpio_pullup = -1,
++	.gpio_pullup = GPIO22_USB_ENABLE,
  };
  
- static int __init gpio_vbus_init(void)
-diff --git a/include/linux/usb/gpio_vbus.h b/include/linux/usb/gpio_vbus.h
-index d9f03cc..2faa38d 100644
---- a/include/linux/usb/gpio_vbus.h
-+++ b/include/linux/usb/gpio_vbus.h
-@@ -27,4 +27,5 @@ struct gpio_vbus_mach_info {
- 	int gpio_pullup;
- 	bool gpio_vbus_inverted;
- 	bool gpio_pullup_inverted;
-+	bool disconnect_on_suspend;
- };
+ /*
+@@ -770,7 +766,6 @@ static void __init mioa701_machine_init(void)
+ 	pxa_set_fb_info(NULL, &mioa701_pxafb_info);
+ 	pxa_set_mci_info(&mioa701_mci_info);
+ 	pxa_set_keypad_info(&mioa701_keypad_info);
+-	pxa_set_udc_info(&mioa701_udc_info);
+ 	pxa_set_ac97_info(&mioa701_ac97_info);
+ 	pm_power_off = mioa701_poweroff;
+ 	arm_pm_restart = mioa701_restart;
 -- 
 1.7.5.3
