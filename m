@@ -1,146 +1,82 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 22 Jun 2011 10:45:16 +0200
-Subject: [PATCH v7 01/11] mmc: add non-blocking mmc request function
-In-Reply-To: <BANLkTikhZRb5GWFvTVG0bFjD6rAyJPka1w@mail.gmail.com>
-References: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
-	<1308699521-20556-2-git-send-email-per.forlin@linaro.org>
-	<BANLkTikhZRb5GWFvTVG0bFjD6rAyJPka1w@mail.gmail.com>
-Message-ID: <BANLkTi=TY3wrH2GH1B2p+L506aUKOjg9uA@mail.gmail.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Wed, 22 Jun 2011 14:23:15 +0530
+Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping framework
+	redesign
+In-Reply-To: <001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<4E017539.30505@gmail.com>
+	<001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>
+Message-ID: <4E01AD7B.3070806@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2011 09:42, Venkatraman S <svenkatr@ti.com> wrote:
-> On Wed, Jun 22, 2011 at 5:08 AM, Per Forlin <per.forlin@linaro.org> wrote:
->> Previously there has only been one function mmc_wait_for_req()
->> to start and wait for a request. This patch adds
->> ?* mmc_start_req() - starts a request wihtout waiting
->> ? If there is on ongoing request wait for completion
->> ? of that request and start the new one and return.
->> ? Does not wait for the new command to complete.
->>
->> This patch also adds new function members in struct mmc_host_ops
->> only called from core.c
->> ?* pre_req - asks the host driver to prepare for the next job
->> ?* post_req - asks the host driver to clean up after a completed job
->>
->> The intention is to use pre_req() and post_req() to do cache maintenance
->> while a request is active. pre_req() can be called while a request is active
->> to minimize latency to start next job. post_req() can be used after the next
->> job is started to clean up the request. This will minimize the host driver
->> request end latency. post_req() is typically used before ending the block
->> request and handing over the buffer to the block layer.
->>
->> Add a host-private member in mmc_data to be used by
->> pre_req to mark the data. The host driver will then
->> check this mark to see if the data is prepared or not.
->>
->> Signed-off-by: Per Forlin <per.forlin@linaro.org>
->> ---
->> ?drivers/mmc/core/core.c ?| ?110 +++++++++++++++++++++++++++++++++++++++++----
->> ?include/linux/mmc/core.h | ? ?6 ++-
->> ?include/linux/mmc/host.h | ? 21 +++++++++
->> ?3 files changed, 126 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
->> index 68091dd..c82fa3b 100644
->> --- a/drivers/mmc/core/core.c
->> +++ b/drivers/mmc/core/core.c
->> @@ -198,9 +198,106 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
->>
->> ?static void mmc_wait_done(struct mmc_request *mrq)
->> ?{
->> - ? ? ? complete(mrq->done_data);
->> + ? ? ? complete(&mrq->completion);
->> ?}
->>
->> +static void __mmc_start_req(struct mmc_host *host, struct mmc_request *mrq)
->> +{
->> + ? ? ? init_completion(&mrq->completion);
->> + ? ? ? mrq->done = mmc_wait_done;
->> + ? ? ? mmc_start_request(host, mrq);
->> +}
->> +
->> +static void mmc_wait_for_req_done(struct mmc_host *host,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
->> +{
->> + ? ? ? wait_for_completion(&mrq->completion);
->> +}
->> +
->> +/**
->> + * ? ? mmc_pre_req - Prepare for a new request
->> + * ? ? @host: MMC host to prepare command
->> + * ? ? @mrq: MMC request to prepare for
->> + * ? ? @is_first_req: true if there is no previous started request
->> + * ? ? ? ? ? ? ? ? ? ? that may run in parellel to this call, otherwise false
->> + *
->> + * ? ? mmc_pre_req() is called in prior to mmc_start_req() to let
->> + * ? ? host prepare for the new request. Preparation of a request may be
->> + * ? ? performed while another request is running on the host.
->> + */
->> +static void mmc_pre_req(struct mmc_host *host, struct mmc_request *mrq,
->> + ? ? ? ? ? ? ? ?bool is_first_req)
->> +{
->> + ? ? ? if (host->ops->pre_req)
->> + ? ? ? ? ? ? ? host->ops->pre_req(host, mrq, is_first_req);
->> +}
->> +
->> +/**
->> + * ? ? mmc_post_req - Post process a completed request
->> + * ? ? @host: MMC host to post process command
->> + * ? ? @mrq: MMC request to post process for
->> + * ? ? @err: Error, if non zero, clean up any resources made in pre_req
->> + *
->> + * ? ? Let the host post process a completed request. Post processing of
->> + * ? ? a request may be performed while another reuqest is running.
->> + */
->> +static void mmc_post_req(struct mmc_host *host, struct mmc_request *mrq,
->> + ? ? ? ? ? ? ? ? ? ? ? ?int err)
->> +{
->> + ? ? ? if (host->ops->post_req)
->> + ? ? ? ? ? ? ? host->ops->post_req(host, mrq, err);
->> +}
->> +
->> +/**
->> + * ? ? mmc_start_req - start a non-blocking request
->> + * ? ? @host: MMC host to start command
->> + * ? ? @areq: async request to start
->> + * ? ? @error: out parameter returns 0 for success, otherwise non zero
->> + *
->> + * ? ? Start a new MMC custom command request for a host.
->> + * ? ? If there is on ongoing async request wait for completion
->> + * ? ? of that request and start the new one and return.
->> + * ? ? Does not wait for the new request to complete.
->> + *
->> + * ? ? Returns the completed async request, NULL in case of none completed.
->> + */
->> +struct mmc_async_req *mmc_start_req(struct mmc_host *host,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_async_req *areq, int *error)
->> +{
->> + ? ? ? int err = 0;
->> + ? ? ? struct mmc_async_req *data = host->areq;
->> +
->> + ? ? ? /* Prepare a new request */
->> + ? ? ? if (areq)
->> + ? ? ? ? ? ? ? mmc_pre_req(host, areq->mrq, !host->areq);
->> +
->> + ? ? ? if (host->areq) {
->> + ? ? ? ? ? ? ? mmc_wait_for_req_done(host, host->areq->mrq);
->> + ? ? ? ? ? ? ? err = host->areq->err_check(host->card, host->areq);
->> + ? ? ? ? ? ? ? if (err) {
->> + ? ? ? ? ? ? ? ? ? ? ? mmc_post_req(host, host->areq->mrq, 0);
->> + ? ? ? ? ? ? ? ? ? ? ? if (areq)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_post_req(host, areq->mrq, -EINVAL);
->> +
->> + ? ? ? ? ? ? ? ? ? ? ? host->areq = NULL;
->> + ? ? ? ? ? ? ? ? ? ? ? goto out;
-> In this sequence, would the return value (data) have the previous areq ?
-> Is that intentional - doesn't seem to fit with the description.
-It will return the data that belongs to the completed request. The
-completed request will be the same as the previous request. The
-mmc_start_req will start a new request and return data for the
-completed request, if any.
 
-Do you think I should clarify the description?
+
+On 06/22/2011 12:29 PM, Marek Szyprowski wrote:
+> Hello,
+>
+> On Wednesday, June 22, 2011 6:53 AM Subash Patel wrote:
+>
+>> On 06/20/2011 01:20 PM, Marek Szyprowski wrote:
+>>> Hello,
+>>>
+>>> This patch series is a continuation of my works on implementing generic
+>>> IOMMU support in DMA mapping framework for ARM architecture. Now I
+>>> focused on the DMA mapping framework itself. It turned out that adding
+>>> support for common dma_map_ops structure was not that hard as I initally
+>>> thought. After some modification most of the code fits really well to
+>>> the generic dma_map_ops methods.
+>>>
+>>> The only change required to dma_map_ops is a new alloc function. During
+>>> the discussion on Linaro Memory Management meeting in Budapest we got
+>>> the idea that we can have only one alloc/free/mmap function with
+>>> additional attributes argument. This way all different kinds of
+>>> architecture specific buffer mappings can be hidden behind the
+>>> attributes without the need of creating several versions of dma_alloc_
+>>> function. I also noticed that the dma_alloc_noncoherent() function can
+>>> be also implemented this way with DMA_ATTRIB_NON_COHERENT attribute.
+>>> Systems that just defines dma_alloc_noncoherent as dma_alloc_coherent
+>>> will just ignore such attribute.
+>>>
+>>> Another good use case for alloc methods with attributes is the
+>>> possibility to allocate buffer without a valid kernel mapping. There are
+>>> a number of drivers (mainly V4L2 and ALSA) that only exports the DMA
+>>> buffers to user space. Such drivers don't touch the buffer data at all.
+>>> For such buffers we can avoid the creation of a mapping in kernel
+>>> virtual address space, saving precious vmalloc area. Such buffers might
+>>> be allocated once a new attribute DMA_ATTRIB_NO_KERNEL_MAPPING.
+>>
+>> Are you trying to say here, that the buffer would be allocated in the
+>> user space, and we just use it to map it to the device in DMA+IOMMU
+>> framework?
+>
+> Nope. I proposed an extension which would allow you to allocate a buffer
+> without creating the kernel mapping for it. Right now dma_alloc_coherent()
+> performs 3 operations:
+> 1. allocates memory for the buffer
+> 2. creates coherent kernel mapping for the buffer
+> 3. translates physical buffer address to DMA address that can be used by
+> the hardware.
+>
+> dma_mmap_coherent makes additional mapping for the buffer in user process
+> virtual address space.
+>
+> I want make the step 2 in dma_alloc_coherent() optional to save virtual
+> address space: it is really limited resource. I really want to avoid
+> wasting it for mapping 128MiB buffers just to create full-HD processing
+> hardware pipeline, where no drivers will use kernel mapping at all.
+>
+
+I think by (2) above, you are referring to 
+__dma_alloc_remap()->arm_vmregion_alloc() to allocate the kernel virtual 
+address for the drivers use. That makes sense now.
+
+I have a query in similar lines, but related to user virtual address 
+space. Is it feasible to extend these DMA interfaces(and IOMMU), to map 
+a user allocated buffer into the hardware?
+
+> Best regards
 
 Regards,
-Per
+Subash
+SISO-SLG
