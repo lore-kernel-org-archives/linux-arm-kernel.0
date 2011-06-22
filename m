@@ -1,21 +1,54 @@
-From: joerg.roedel@amd.com (Joerg Roedel)
-Date: Wed, 22 Jun 2011 12:16:44 +0200
-Subject: [PATCH v2 0/4] drivers/iommu/ relocations
-In-Reply-To: <1307742947-32118-1-git-send-email-ohad@wizery.com>
-References: <1307742947-32118-1-git-send-email-ohad@wizery.com>
-Message-ID: <1308737806-2658-1-git-send-email-joerg.roedel@amd.com>
+From: amit.kucheria@linaro.org (Amit Kucheria)
+Date: Wed, 22 Jun 2011 13:19:02 +0300
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <20110622091727.GA1195@1n450.cable.virginmedia.net>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+	<4DFA5C2E.40507@codeaurora.org>
+	<BANLkTi=ik=iRtDb3K__CPxSH_8GusoBHKA@mail.gmail.com>
+	<4E0100BF.6080500@codeaurora.org>
+	<20110622091727.GA1195@1n450.cable.virginmedia.net>
+Message-ID: <20110622101902.GC2402@matterhorn1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Okay, I applied the patches to move forward with them. On-top I also put
-two additional patches which are sent as a follow-up to this mail.
+On 11 Jun 22, Catalin Marinas wrote:
+> On Tue, Jun 21, 2011 at 01:36:15PM -0700, Stephen Boyd wrote:
+> > On 06/16/2011 11:54 PM, Vincent Guittot wrote:
+> > > On 16 June 2011 21:40, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> > >> The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
+> > >> different vendors may attribute different meaning to these fields if
+> > >> they wish. Does that mean this should be a platform_*() function?
+> > >>
+> > > The ARM ARM also provides a recommended use of the fields of this
+> > > register and the TRM of each Cortex adds some details. On the cortex
+> > > A9, each platform can only set the value of the Cluster ID with the
+> > > CLUSTERID pins. I have tried to consolidate the value of MPIDR  across
+> > > several platforms and they all match with the description.
+> > >
+> > > Have you got an example of a MPIDR register which doesn't match with
+> > > the implementation ?
+> > 
+> > Not that I know of. I'm more concerned with how the ARM ARM has two
+> > recommended usages for these fields depending on virtualization or not.
+> > I suppose we can handle that issue when it arises (or does your
+> > implementation already handle that?)
+> 
+> According to the ARM ARM:
+> 
+> 	MPIDR provides a mechanism with up to three levels of affinity
+> 	information, but the meaning of those levels of affinity is
+> 	entirely IMPLEMENTATION DEFINED.
+> 
+> So we can't really tell the meaning of the affinity bits. There are two
+> recommended ways indeed (with or without virtualisation) which are not
+> that different with regards to the topology (just introducing another
+> level for virtual CPUs).
+> 
+> But I think a more general solution would be for the CPU topology to be
+> provided via the FDT.
 
-These changes are at 
+Agreed. That will be the next step.
 
-	git://git.kernel.org/pub/scm/linux/kernel/git/joro/iommu.git
-
-in the core branch.
-
-Thanks,
-
-	Joerg
+We decided on doing it this way to allow non-DT-enabled platforms to be able
+to use the feature and to allow DT-enabled platforms to settle down in the
+mean time.
