@@ -1,69 +1,71 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 22 Jun 2011 17:46:44 +0900
-Subject: [PATCH 6/7] ARM: EXYNOS4: Add save/restore for more ARM registers
+Date: Wed, 22 Jun 2011 17:46:45 +0900
+Subject: [PATCH 7/7] ARM: EXYNOS4: Move S5P_CENTRAL_SEQ_CONFIGURATION setting
+	for PM
 In-Reply-To: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
 References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1308732405-16664-7-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1308732405-16664-8-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jaecheol Lee <jc.lee@samsung.com>
 
-This patch adds save/restore for Power Control Register and
-Diagnostic Register.
+We need to balance between set and check S5P_CENTRAL_SEQ_CONFIGURATION
+register in syscore_ops suspend/resume function when failure in enter
+suspend mode. Moved this register setting for PM for the purpose of balancing.
 
 Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos4/sleep.S |   22 ++++++++++++++++++++++
- 1 files changed, 22 insertions(+), 0 deletions(-)
+ arch/arm/mach-exynos4/pm.c |   22 ++++++++++++++--------
+ 1 files changed, 14 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/sleep.S b/arch/arm/mach-exynos4/sleep.S
-index d55d38c..4fe13fc 100644
---- a/arch/arm/mach-exynos4/sleep.S
-+++ b/arch/arm/mach-exynos4/sleep.S
-@@ -42,6 +42,15 @@
- ENTRY(s3c_cpu_save)
+diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
+index b037fba..a103c13 100644
+--- a/arch/arm/mach-exynos4/pm.c
++++ b/arch/arm/mach-exynos4/pm.c
+@@ -249,14 +249,6 @@ static struct sleep_save exynos4_l2cc_save[] = {
  
- 	stmfd	sp!, { r3 - r12, lr }
-+
-+	adr	r0, sleep_save_misc
-+
-+	mrc	p15, 0, r2, c15, c0, 0	@ read power control register
-+	str	r2, [r0], #4
-+
-+	mrc	p15, 0, r2, c15, c0, 1	@ read diagnostic register
-+	str	r2, [r0], #4
-+
- 	ldr	r3, =resume_with_mmu
- 	bl	cpu_suspend
+ void exynos4_cpu_suspend(void)
+ {
+-	unsigned long tmp;
+-
+-	/* Setting Central Sequence Register for power down mode */
+-
+-	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
+-	tmp &= ~(S5P_CENTRAL_LOWPWR_CFG);
+-	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
+-
+ 	outer_flush_all();
  
-@@ -56,6 +65,14 @@ ENTRY(s3c_cpu_save)
- 	b	early_wakeup
+ 	/* issue the standby signal into the pm unit. */
+@@ -413,6 +405,19 @@ static __init int exynos4_pm_drvinit(void)
+ }
+ arch_initcall(exynos4_pm_drvinit);
  
- resume_with_mmu:
-+	adr	r0, sleep_save_misc
++static int exynos4_pm_suspend(void)
++{
++	unsigned long tmp;
 +
-+	ldr	r1, [r0], #4
-+	mcr	p15, 0, r1, c15, c0, 0	@ write power control register
++	/* Setting Central Sequence Register for power down mode */
 +
-+	ldr	r1, [r0], #4
-+	mcr	p15, 0, r1, c15, c0, 1	@ write diagnostic register
++	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
++	tmp &= ~(S5P_CENTRAL_LOWPWR_CFG);
++	__raw_writel(tmp, S5P_CENTRAL_SEQ_CONFIGURATION);
 +
- 	mov	r0, #1
++	return 0;
++}
++
+ static void exynos4_pm_resume(void)
+ {
+ 	unsigned long tmp;
+@@ -459,6 +464,7 @@ early_wakeup:
+ }
  
- early_wakeup:
-@@ -71,6 +88,11 @@ early_wakeup:
+ static struct syscore_ops exynos4_pm_syscore_ops = {
++	.suspend	= exynos4_pm_suspend,
+ 	.resume		= exynos4_pm_resume,
+ };
  
- 	.word	0x2bedf00d
- 
-+	 /* To save more cpu register */
-+sleep_save_misc:
-+	.long	0
-+	.long	0
-+
- 	/*
- 	 * s3c_cpu_resume
- 	 *
 -- 
 1.7.1
