@@ -1,62 +1,52 @@
-From: pullip.cho@samsung.com (KyongHo Cho)
-Date: Wed, 22 Jun 2011 15:53:55 +0900
-Subject: [Linaro-mm-sig] [PATCH 8/8] ARM: dma-mapping: use alloc, mmap,
-	free from dma_ops
-In-Reply-To: <1308556213-24970-9-git-send-email-m.szyprowski@samsung.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-9-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <BANLkTikE6qziSZhcyx4HxWqpmg0eZhR+wg@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 22 Jun 2011 15:54:39 +0900
+Subject: [PATCH 0/3] Fixes for breakage resulting from syscore_ops patch on
+	s3c24xx
+In-Reply-To: <4DE62CEF.80507@embtoolkit.org>
+References: <201106011348.47145.heiko@sntech.de>
+	<4DE62CEF.80507@embtoolkit.org>
+Message-ID: <009e01cc30a9$4538fa30$cfaaee90$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+Abdoulaye Walsimou GAYE wrote:
+> 
+> Heiko St?bner wrote:
+> > The syscore_ops patch from Rafael J. Wysocki introduced some small
+> > glitches for the S3C24XX cpus resulting in compile errors.
+> >
+> > Heiko Stuebner (3):
+> >    Fix missing struct for s3c2410_dma_chan in s3c2410_dma_suspend_chan
+> >    Move s3c24xx_irq_syscore_ops to plat-s3c24xx/irq.c
+> >    remove the now empty mach-s3c2410/irq.c
+> >
+> >   arch/arm/mach-s3c2410/Makefile |    1 -
+> >   arch/arm/mach-s3c2410/irq.c    |   34
+----------------------------------
+> >   arch/arm/plat-s3c24xx/dma.c    |    2 +-
+> >   arch/arm/plat-s3c24xx/irq.c    |    6 ++++++
+> >   4 files changed, 7 insertions(+), 36 deletions(-)
+> >   delete mode 100644 arch/arm/mach-s3c2410/irq.c
+> >
+> 
+> I submitted same patches days ago [1], but without more explanations
+> than "ARM: s3c24xx: fix build errors introduced by bb072c3cf21d1", so
+> 
+> Acked-by : Abdoulaye Walsimou Gaye <awg@embtoolkit.org>
+> 
+> [1]
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/117812/focus=117814
 
-On Mon, Jun 20, 2011 at 4:50 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
+Hello Abdoulaye Walsimou Gaye,
 
-> -extern void *dma_alloc_coherent(struct device *, size_t, dma_addr_t *, gfp_t);
-> +extern void *arm_dma_alloc(struct device *dev, size_t size, dma_addr_t *handle,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ?gfp_t gfp, struct dma_attrs *attrs);
-> +
-> +#define dma_alloc_coherent(d,s,h,f) dma_alloc_attrs(d,s,h,f,NULL)
-> +
-> +static inline void *dma_alloc_attrs(struct device *dev, size_t size,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?dma_addr_t *dma_handle, gfp_t flag,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?struct dma_attrs *attrs)
-> +{
-> + ? ? ? struct dma_map_ops *ops = get_dma_ops(dev);
-> + ? ? ? void *cpu_addr;
-> + ? ? ? BUG_ON(!ops);
-> +
-> + ? ? ? cpu_addr = ops->alloc(dev, size, dma_handle, flag, attrs);
-> + ? ? ? debug_dma_alloc_coherent(dev, size, *dma_handle, cpu_addr);
-> + ? ? ? return cpu_addr;
-> +}
->
+Oops, sorry that I missed your patch at that time :(
+I found your patch just now...
 
-Apart from the necessity of alloc_attr,
-I hope the callback implementations to check if a function pointer is NULL.
-Suppose that a system want to use default ARM implementation of dma_alloc_*()
-while it uses its own implementations of dma_map_*().
+As you know, I can't add your ack on this...
+Anyway thanks for your effort and time.
 
-
-With your suggestion,
-we have only one option:
-
-void *my_alloc(...) {
-return dma_alloc_coherent(NULL, ...);
-}
-
-struct dma_map_ops ops = {
-.alloc_coherent = &my_alloc,
-...
-};
-
-
-
-I think the following method is simpler:
-
-struct dma_map_ops ops = {
-.alloc_coherent = NULL,
-...
-};
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
