@@ -1,385 +1,160 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Wed, 22 Jun 2011 14:20:54 +0200
-Subject: [RFC PATCH v2] Add ARM cpu topology definition
-In-Reply-To: <20110622101423.GB2402@matterhorn1>
-References: <1308568795-1985-1-git-send-email-vincent.guittot@linaro.org>
-	<20110622101423.GB2402@matterhorn1>
-Message-ID: <BANLkTikpasc40ubaHZvJoTVehLWtxvYQqQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jun 2011 14:34:27 +0200
+Subject: [PATCH] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <BANLkTinuY286Lae7sHn0qLrDbEx6dMqn0A@mail.gmail.com>
+References: <1308556402-10955-1-git-send-email-bs14@csr.com>
+	<201106211753.59376.arnd@arndb.de>
+	<BANLkTinuY286Lae7sHn0qLrDbEx6dMqn0A@mail.gmail.com>
+Message-ID: <201106221434.27286.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2011 12:14, Amit Kucheria <amit.kucheria@linaro.org> wrote:
-> Some nits below.
->
-> After you fix them, you can add a
-> Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
->
-> On 11 Jun 20, Vincent Guittot wrote:
->> The affinity between ARM processors is defined in the MPIDR register.
->> We can identify which processors are in the same cluster,
->> and which ones have performance interdependency.We can define the
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ^^ space between full-stop
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? and next word
->> cpu topology of ARM platform, which is used by sched_mc and sched_smt.
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?^^^^^^^^ change to 'that is then'
->> The default state of sched_mc and sched_smt config is disable.
->
-> Change to "sched_mc and sched_smt is disabled by default"
->
->> When enable, the behavior of the scheduler can be modified with
-> ? ? ? ? ? ? ^ enabled
->> sched_mc_power_savings and sched_smt_power_savings sysfs interfaces.
->>
->> Changes since v1 :
->> * Update the commit message
->> * Add read_cpuid_mpidr in arch/arm/include/asm/cputype.h
->> * Modify header of arch/arm/kernel/topology.c
->> * Modify tests and manipulation of MPIDR's bitfields
->> * Modify the place and dependancy of the config
->> * Modify Noop functions
->>
->> Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
->> ---
->> ?arch/arm/Kconfig ? ? ? ? ? ? ? ?| ? 25 +++++++
->> ?arch/arm/include/asm/cputype.h ?| ? ?6 ++
->> ?arch/arm/include/asm/topology.h | ? 33 +++++++++
->> ?arch/arm/kernel/Makefile ? ? ? ?| ? ?1 +
->> ?arch/arm/kernel/smp.c ? ? ? ? ? | ? ?6 ++
->> ?arch/arm/kernel/topology.c ? ? ?| ?145 +++++++++++++++++++++++++++++++++++++++
->> ?6 files changed, 216 insertions(+), 0 deletions(-)
->> ?create mode 100644 arch/arm/kernel/topology.c
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 9adc278..c7b4ff9 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -1344,6 +1344,31 @@ config SMP_ON_UP
->>
->> ? ? ? ? If you don't know what to do here, say Y.
->>
->> +config ARM_CPU_TOPOLOGY
->> + ? ? bool "Support cpu topology definition"
->> + ? ? depends on SMP && CPU_V7
->> + ? ? default y
->> + ? ? help
->> + ? ? ? Support ARM cpu topology definition. The MPIDR register defines
->> + ? ? ? affinity between processors which is used to set the cpu
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?^^^^^^^^^^^^^^^^^ change to 'which is then
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?used to describe the'
->> + ? ? ? topology of an ARM System.
->> +
->> +config SCHED_MC
->> + ? ? bool "Multi-core scheduler support"
->> + ? ? depends on ARM_CPU_TOPOLOGY
->> + ? ? help
->> + ? ? ? Multi-core scheduler support improves the CPU scheduler's decision
->> + ? ? ? making when dealing with multi-core CPU chips at a cost of slightly
->> + ? ? ? increased overhead in some places. If unsure say N here.
->> +
->> +config SCHED_SMT
->> + ? ? bool "SMT scheduler support"
->> + ? ? depends on ARM_CPU_TOPOLOGY
->> + ? ? help
->> + ? ? ? Improves the CPU scheduler's decision making when dealing with
->> + ? ? ? MultiThreading at a cost of slightly increased overhead in some
->> + ? ? ? places. If unsure say N here.
->> +
->> ?config HAVE_ARM_SCU
->> ? ? ? bool
->> ? ? ? depends on SMP
->> diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
->> index cd4458f..cb47d28 100644
->> --- a/arch/arm/include/asm/cputype.h
->> +++ b/arch/arm/include/asm/cputype.h
->> @@ -8,6 +8,7 @@
->> ?#define CPUID_CACHETYPE ? ? ?1
->> ?#define CPUID_TCM ? ?2
->> ?#define CPUID_TLBTYPE ? ? ? ?3
->> +#define CPUID_MPIDR ?5
->>
->> ?#define CPUID_EXT_PFR0 ? ? ? "c1, 0"
->> ?#define CPUID_EXT_PFR1 ? ? ? "c1, 1"
->> @@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
->> ? ? ? return read_cpuid(CPUID_TCM);
->> ?}
->>
->> +static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
->> +{
->> + ? ? return read_cpuid(CPUID_MPIDR);
->> +}
->> +
->> ?/*
->> ? * Intel's XScale3 core supports some v6 features (supersections, L2)
->> ? * but advertises itself as v5 as it does not support the v6 ISA. ?For
->> diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
->> index accbd7c..63a7454 100644
->> --- a/arch/arm/include/asm/topology.h
->> +++ b/arch/arm/include/asm/topology.h
->> @@ -1,6 +1,39 @@
->> ?#ifndef _ASM_ARM_TOPOLOGY_H
->> ?#define _ASM_ARM_TOPOLOGY_H
->>
->> +#ifdef CONFIG_ARM_CPU_TOPOLOGY
->> +
->> +#include <linux/cpumask.h>
->> +
->> +struct cputopo_arm {
->> + ? ? int thread_id;
->> + ? ? int core_id;
->> + ? ? int socket_id;
->> + ? ? cpumask_t thread_sibling;
->> + ? ? cpumask_t core_sibling;
->> +};
->> +
->> +extern struct cputopo_arm cpu_topology[NR_CPUS];
->> +
->> +#define topology_physical_package_id(cpu) ? ?(cpu_topology[cpu].socket_id)
->> +#define topology_core_id(cpu) ? ? ? ? ? ? ? ?(cpu_topology[cpu].core_id)
->> +#define topology_core_cpumask(cpu) ? (&(cpu_topology[cpu].core_sibling))
->> +#define topology_thread_cpumask(cpu) (&(cpu_topology[cpu].thread_sibling))
->
-> These #defines are not used anywhere.
+On Wednesday 22 June 2011, Barry Song wrote:
+> >
+> > The "compatible" properties should really be more specific than this. You can
+> > list multiple alternatives in there, but please always have one that identifies
+> > the exact version of each of the macros uniquely.
+> 
+> i guess you mean compatible =  "sirf,uart", "sirf,prima2-uart",
+> "sirf,altas6-uart" ?
 
-They are used in topology.c driver and sched.c
+It depends on how specific prima2 and atlas6 really are. Are these specific
+pieces of silicon, or are they each a family of similar chips? Is one a superset
+of the other?
 
->
->> +#define mc_capable() (cpu_topology[0].socket_id != -1)
->> +#define smt_capable() ? ? ? ?(cpu_topology[0].thread_id != -1)
->
-> Neither are these.
+If your device tree describes a board with a prima2 SoC on it, and all prima2
+chips are identical, then ("sirf,uart", "sirf,prima2-uart") is fine. If
+prima2 is itself a family of chips, you should add a third entry like
+"sirf,prima2-1234-uart" where 1234 is the model number of that chip.
 
-They are used in sched.c
+My understanding is that prima2 and atlas6 are two separate chips, so you
+should not list them both in one device tree.
 
->
->> +void init_cpu_topology(void);
->> +void store_cpu_topology(unsigned int cpuid);
->> +const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
->> +
->> +#else
->> +
->> +static inline void init_cpu_topology(void) { };
->> +static inline void store_cpu_topology(unsigned int cpuid) { };
->> +
->> +#endif
->> +
->> ?#include <asm-generic/topology.h>
->>
->> ?#endif /* _ASM_ARM_TOPOLOGY_H */
->> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
->> index a5b31af..816a481 100644
->> --- a/arch/arm/kernel/Makefile
->> +++ b/arch/arm/kernel/Makefile
->> @@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT) ? ? ? ? ? ? ? ?+= iwmmxt.o
->> ?obj-$(CONFIG_CPU_HAS_PMU) ? ?+= pmu.o
->> ?obj-$(CONFIG_HW_PERF_EVENTS) += perf_event.o
->> ?AFLAGS_iwmmxt.o ? ? ? ? ? ? ? ? ? ? ?:= -Wa,-mcpu=iwmmxt
->> +obj-$(CONFIG_ARM_CPU_TOPOLOGY) ?+= topology.o
->>
->> ?ifneq ($(CONFIG_ARCH_EBSA110),y)
->> ? ?obj-y ? ? ? ? ? ? ?+= io.o
->> diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
->> index 344e52b..3e8dc3b 100644
->> --- a/arch/arm/kernel/smp.c
->> +++ b/arch/arm/kernel/smp.c
->> @@ -31,6 +31,7 @@
->> ?#include <asm/cacheflush.h>
->> ?#include <asm/cpu.h>
->> ?#include <asm/cputype.h>
->> +#include <asm/topology.h>
->> ?#include <asm/mmu_context.h>
->> ?#include <asm/pgtable.h>
->> ?#include <asm/pgalloc.h>
->> @@ -268,6 +269,9 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
->> ? ? ? struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
->>
->> ? ? ? cpu_info->loops_per_jiffy = loops_per_jiffy;
->> +
->> + ? ? store_cpu_topology(cpuid);
->> +
->> ?}
->>
->> ?/*
->> @@ -354,6 +358,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
->> ?{
->> ? ? ? unsigned int ncores = num_possible_cpus();
->>
->> + ? ? init_cpu_topology();
->> +
->> ? ? ? smp_store_cpu_info(smp_processor_id());
->>
->> ? ? ? /*
->> diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
->> new file mode 100644
->> index 0000000..dc9e4be
->> --- /dev/null
->> +++ b/arch/arm/kernel/topology.c
->> @@ -0,0 +1,145 @@
->> +/*
->> + * arch/arm/kernel/topology.c
->> + *
->> + * Copyright (C) 2011 Linaro Limited.
->> + * Written by: Vincent Guittot
->> + *
->> + * based on arch/sh/kernel/topology.c
->> + *
->> + * This file is subject to the terms and conditions of the GNU General Public
->> + * License. ?See the file "COPYING" in the main directory of this archive
->> + * for more details.
->> + */
->> +
->> +#include <linux/cpu.h>
->> +#include <linux/cpumask.h>
->> +#include <linux/init.h>
->> +#include <linux/percpu.h>
->> +#include <linux/node.h>
->> +#include <linux/nodemask.h>
->> +#include <linux/sched.h>
->> +
->> +#include <asm/cputype.h>
->> +#include <asm/topology.h>
->> +
->> +#define MPIDR_SMP_BITMASK (0x3 << 30)
->> +#define MPIDR_SMP_VALUE (0x2 << 30)
->> +
->> +#define MPIDR_MT_BITMASK (0x1 << 24)
->> +
->> +#define MPIDR_LEVEL0_MASK 0x3
->
-> Perhaps add a comment reflecting the discussion on IRC. For Cortex-A9, only
-> 2 bits are supported for LEVEL0 and 4 bits for LEVEL1. In the future, each of
-> the LEVELS can use all 8 bits.
->
+If your hardware design team has an official nomenclature for different
+versions of the uart macro, you can also add that. E.g. if prima1 and atlas5
+use version 3.1 of the uart, while prima2 and atlas6 use version 3.2, you
+can list that version too. A driver can then match on the uart version
+and doesn't have to know about the soc it's used in. This depends on how
+your hardware design team works.
 
-ok
+Also, if you buy hardware macros from other companies, it's useful to
+list those in the compatible property as well, to let the same driver
+automatically work across SoCs from multiple vendors that have licensed
+the same core, like you do for the ARM l2 cache controller.
 
->> +#define MPIDR_LEVEL0_SHIFT 0
->> +
->> +#define MPIDR_LEVEL1_MASK 0xF
->> +#define MPIDR_LEVEL1_SHIFT 8
->> +
->> +#define MPIDR_LEVEL2_MASK 0xFF
->> +#define MPIDR_LEVEL2_SHIFT 16
->> +
->> +struct cputopo_arm cpu_topology[NR_CPUS];
->> +
->> +const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
->> +{
->> + ? ? return &(cpu_topology[cpu].core_sibling);
->> +}
->> +
->> +/*
->> + * store_cpu_topology is called at boot when only one cpu is running
->> + * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
->> + * which prevents simultaneous write access to cpu_topology array
->> + */
->> +void store_cpu_topology(unsigned int cpuid)
->> +{
->> + ? ? struct cputopo_arm *cpuid_topo = &(cpu_topology[cpuid]);
->> + ? ? unsigned int mpidr;
->> + ? ? unsigned int cpu;
->> +
->> + ? ? /* If the cpu topology has been already set, just return */
->> + ? ? if (cpuid_topo->core_id != -1)
->> + ? ? ? ? ? ? return;
->> +
->> + ? ? mpidr = read_cpuid_mpidr();
->> +
->> + ? ? /* create cpu topology mapping */
->> + ? ? if ((mpidr & MPIDR_SMP_BITMASK) == MPIDR_SMP_VALUE) {
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* This is a multiprocessor system
->> + ? ? ? ? ? ? ?* multiprocessor format & multiprocessor mode field are set
->> + ? ? ? ? ? ? ?*/
->> +
->> + ? ? ? ? ? ? if (mpidr & MPIDR_MT_BITMASK) {
->> + ? ? ? ? ? ? ? ? ? ? /* core performance interdependency */
->> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->thread_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? & MPIDR_LEVEL0_MASK);
->> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->core_id = ?((mpidr >> MPIDR_LEVEL1_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? & MPIDR_LEVEL1_MASK);
->> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL2_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? & MPIDR_LEVEL2_MASK);
->> + ? ? ? ? ? ? } else {
->> + ? ? ? ? ? ? ? ? ? ? /* normal core interdependency */
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ^^^^^^ Normal or No?
+> > Do you have any PCI or PCMCIA devices?
+> 
+> we do have an internal PCI bridge. but it seems it is completely
+> transparent to users and softwares just like we have no PCI bridge at
+> all.
+> anyway, i need the final confirmation from IC guys.
 
-ARM ARM says "largely independent". I can use this description
+I don't completely understand. If you have actual PCI devices with a
+proper configuration space in the system, I would strongly suggest that
+you export the PCI host bridge instead of the individual devices and
+let the PCI probing code take care of that.
 
->
->> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->thread_id = -1;
->> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->core_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? & MPIDR_LEVEL0_MASK);
->> + ? ? ? ? ? ? ? ? ? ? cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL1_SHIFT)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? & MPIDR_LEVEL1_MASK);
->> + ? ? ? ? ? ? }
->> + ? ? } else {
->> + ? ? ? ? ? ? /*
->> + ? ? ? ? ? ? ?* This is an uniprocessor system
->> + ? ? ? ? ? ? ?* we are in multiprocessor format but uniprocessor system
->> + ? ? ? ? ? ? ?* or in the old uniprocessor format
->> + ? ? ? ? ? ? ?*/
->
-> These are 3 different conditions, I think. Separate with commas.
+Using hardware probing mechanisms is normally preferred, because it
+means you don't have to list every device in the device tree.
 
-we are either in the "multiprocessor register format but an uniprocessor"
-or in the "old uniprocessor register format"
+> Most platforms without PCI define io.h by giving a simple comment
+> "We don't actually have real ISA nor PCI buses, but there is so many
+> drivers out there that might just work if we fake them...".
 
->
->> +
->> + ? ? ? ? ? ? cpuid_topo->thread_id = -1;
->> + ? ? ? ? ? ? cpuid_topo->core_id = 0;
->> + ? ? ? ? ? ? cpuid_topo->socket_id = -1;
->> + ? ? }
->> +
->> + ? ? /* update core and thread sibling masks */
->> + ? ? for_each_possible_cpu(cpu) {
->> + ? ? ? ? ? ? struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
->> +
->> + ? ? ? ? ? ? if (cpuid_topo->socket_id == cpu_topo->socket_id) {
->> + ? ? ? ? ? ? ? ? ? ? cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
->> + ? ? ? ? ? ? ? ? ? ? if (cpu != cpuid)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? cpumask_set_cpu(cpu,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cpuid_topo->core_sibling);
->> +
->> + ? ? ? ? ? ? ? ? ? ? if (cpuid_topo->core_id == cpu_topo->core_id) {
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? cpumask_set_cpu(cpuid,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cpu_topo->thread_sibling);
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? if (cpu != cpuid)
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? cpumask_set_cpu(cpu,
->> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? &cpuid_topo->thread_sibling);
->> + ? ? ? ? ? ? ? ? ? ? }
->> + ? ? ? ? ? ? }
->> + ? ? }
->> + ? ? smp_wmb();
->> +
->> + ? ? printk(KERN_INFO "cpu %u : thread %d cpu %d, socket %d, mpidr %x\n",
->> + ? ? ? ? ? ? cpuid, cpu_topology[cpuid].thread_id,
->> + ? ? ? ? ? ? cpu_topology[cpuid].core_id,
->> + ? ? ? ? ? ? cpu_topology[cpuid].socket_id, mpidr);
->> +
->> +}
->> +
->> +/*
->> + * init_cpu_topology is called at boot when only one cpu is running
->> + * which prevent simultaneous write access to cpu_topology array
->> + */
->> +void init_cpu_topology(void)
->> +{
->> + ? ? unsigned int cpu;
->> +
->> + ? ? /* init core mask */
->> + ? ? for_each_possible_cpu(cpu) {
->> + ? ? ? ? ? ? struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
->> +
->> + ? ? ? ? ? ? cpu_topo->thread_id = -1;
->> + ? ? ? ? ? ? cpu_topo->core_id = ?-1;
->> + ? ? ? ? ? ? cpu_topo->socket_id = -1;
->> + ? ? ? ? ? ? cpumask_clear(&cpu_topo->core_sibling);
->> + ? ? ? ? ? ? cpumask_clear(&cpu_topo->thread_sibling);
->> + ? ? }
->> + ? ? smp_wmb();
->> +}
->> --
->> 1.7.4.1
->>
->
+It's on my list to look into.
+
+> >> --- /dev/null
+> >> +++ b/arch/arm/mach-prima2/include/mach/map.h
+> >> +
+> >> +#define SIRFSOC_VA(x)                        (VMALLOC_END + ((x) & 0x00FFF000))
+> >> +
+> >> +/* INTR */
+> >> +#define SIRFSOC_INTR_PA_BASE         0x80020000
+> >> +#define SIRFSOC_INTR_VA_BASE         SIRFSOC_VA(0x002000)
+> >> +#define SIRFSOC_INTR_SIZE            SZ_4K
+> >> +
+> >> +/* L2 CACHE */
+> >> +#define SIRFSOC_L2CC_PA_BASE         0x80040000
+> >> +#define SIRFSOC_L2CC_VA_BASE         SIRFSOC_VA(0x004000)
+> >> +#define SIRFSOC_L2CC_SIZE            SZ_4K
+> >> +
+> >> +/* CLOCK */
+> >> +#define SIRFSOC_CLOCK_PA_BASE                0x88000000
+> >> +#define SIRFSOC_CLOCK_VA_BASE                SIRFSOC_VA(0x005000)
+> >> +#define SIRFSOC_CLOCK_SIZE           SZ_4K
+> >> +
+> >> +/* RESET CONTROLLER */
+> >> +#define SIRFSOC_RSTC_PA_BASE         0x88010000
+> >> +#define SIRFSOC_RSTC_VA_BASE         SIRFSOC_VA(0x006000)
+> >> +#define SIRFSOC_RSTC_SIZE            SZ_4K
+> >> +
+> >> +/* OS TIMER */
+> >> +#define SIRFSOC_TIMER_PA_BASE                0xb0020000
+> >> +#define SIRFSOC_TIMER_VA_BASE                SIRFSOC_VA(0x00c000)
+> >> +#define SIRFSOC_TIMER_SIZE           SZ_4K
+> >> +
+> >> +/* UART-1: used as serial debug port */
+> >> +#define SIRFSOC_UART1_PA_BASE                0xb0060000
+> >> +#define SIRFSOC_UART1_VA_BASE                SIRFSOC_VA(0x060000)
+> >> +#define SIRFSOC_UART1_SIZE           SZ_4K
+> >> +
+> >> +/* RAM BASE*/
+> >> +#define SIRFSOC_SDRAM_PA             0x00000000
+> >> +
+> >> +#endif
+> >
+> > I think these should all be converted into device tree properties if
+> > possible. Anything that can be initialized late enough should just
+> > do an ioremap at the time when you first need to access the registers.
+> 
+> i totally agree with your opinion. but i guess
+> SIRFSOC_UART1_PA_BASE/SIRFSOC_UART1_VA_BASE is necessary here since
+> they are mapped very early for DEBUG_LL.
+
+Please make that code optional and dependent on CONFIG_DEBUG_LL then.
+
+I would also recommend splitting out all code related to DEBUG_LL
+into one separate patch so we can look at the base code independent
+of that.
+
+I believe we already have a problem with DEBUG_LL as soon as we get
+to multi-platform kernels. 
+
+> Another issue is that .init_early(fot this case, it is
+> sirfsoc_init_clk)  is called earlier than kernel mm init and later
+> than .map_io(for this case, it is sirfsoc_map_io),  the early static
+> mapping makes .init_early can access mapped virtual memory too.
+
+But does sirfsoc_init_clk have to be called from init_early, or can
+you do it a bit later?
+
+> >> +/*
+> >> + * Restrict DMA-able region to workaround silicon limitation.
+> >> + * The limitation restricts buffers available for DMA to SD/MMC
+> >> + * hardware to be below 256MB
+> >> + */
+> >> +#define ARM_DMA_ZONE_SIZE    (SZ_256M)
+> >> +
+> >
+> > This is very unfortunate, but I guess there is no real way to avoid
+> > doing this, right?
+> 
+> a hardware issue limits DMA address must be less than 256MB for SD
+> controller. to make sure SD controller get DMA buffer below 256MB, we
+> need that DMA zone.
+> But guess the size of the zone doesn't matter at all, it even can be
+> 1MB, 2MB or any value less than 256MB. Anyway, we only need a DMA
+> buffer for SD.
+> if we reserve an area for SD DMA buffer, it seems ugly too?
+
+Probably yes, it would also make the I/O slower because then you have
+to alway do bounce-buffering, while now you only have to do it when
+the user buffer is above 256 MB.
+
+You should definitely make sure that the SD device has the correct
+dma_mask set, which is required for correctness, while the right
+ARM_DMA_ZONE_SIZE is more a question of performance. When we get to
+multi-platform kernels, we can then just set the minimum of the
+configured platforms.
+
+	Arnd
