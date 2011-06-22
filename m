@@ -1,183 +1,212 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Jun 2011 19:33:03 +0200
-Subject: [PATCH 1/3] leds: create a trigger for ARM CPU activity
-Message-ID: <1308763983-24749-1-git-send-email-linus.walleij@stericsson.com>
+From: rdunlap@xenotime.net (Randy Dunlap)
+Date: Wed, 22 Jun 2011 10:55:24 -0700
+Subject: [RFC 1/8] drivers: add generic remoteproc framework
+In-Reply-To: <1308640714-17961-2-git-send-email-ohad@wizery.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-2-git-send-email-ohad@wizery.com>
+Message-ID: <20110622105524.b95c4df1.rdunlap@xenotime.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+On Tue, 21 Jun 2011 10:18:27 +0300 Ohad Ben-Cohen wrote:
 
-Attempting to consolidate the ARM LED code, this removes the
-custom RealView LED trigger code to turn LEDs on and off in
-response to CPU activity and replace it with a standard trigger.
-It uses the existing kernel hooks deep inside <asm/leds.h> to
-get CPU activity.
+Hi,
+Just a few minor nits inline...
 
-Cc: Bryan Wu <bryan.wu@canonical.com>
-Cc: Richard Purdie <rpurdie@rpsys.net>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+
+> diff --git a/Documentation/remoteproc.txt b/Documentation/remoteproc.txt
+> new file mode 100644
+> index 0000000..3075813
+> --- /dev/null
+> +++ b/Documentation/remoteproc.txt
+> @@ -0,0 +1,170 @@
+> +Remote Processor Framework
+> +
+> +1. Introduction
+> +
+> +Modern SoCs typically have heterogeneous remote processor devices in asymmetric
+> +multiprocessing (AMP) configurations, which may be running different instances
+> +of operating system, whether it's Linux or any other flavor of real-time OS.
+> +
+> +OMAP4, for example, has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP.
+> +In a typical configuration, the dual cortex-A9 is running Linux in a SMP
+> +configuration, and each of the other three cores (two M3 cores and a DSP)
+> +is running its own instance of RTOS in an AMP configuration.
+> +
+> +The generic remoteproc driver allows different platforms/architectures to
+> +control (power on, load firmware, power off) those remote processors while
+> +abstracting the hardware differences, so the entire driver doesn't need to be
+> +duplicated.
+> +
+> +2. User API
+> +
+> +  struct rproc *rproc_get(const char *name);
+> +   - power up the remote processor, identified by the 'name' argument,
+> +     and boot it. If the remote processor is already powered on, the
+> +     function immediately succeeds.
+> +     On success, returns the rproc handle. On failure, NULL is returned.
+> +
+> +  void rproc_put(struct rproc *rproc);
+> +   - power off the remote processor, identified by the rproc handle.
+> +     Every call to rproc_get() must be (eventually) accompanied by a call
+> +     to rproc_put(). Calling rproc_put() redundantly is a bug.
+> +     Note: the remote processor will actually be powered off only when the
+> +     last user calls rproc_put().
+> +
+> +3. Typical usage
+> +
+> +#include <linux/remoteproc.h>
+> +
+> +int dummy_rproc_example(void)
+> +{
+> +	struct rproc *my_rproc;
+> +
+> +	/* let's power on and boot the image processing unit */
+> +	my_rproc = rproc_get("ipu");
+> +	if (!my_rproc) {
+> +		/*
+> +		 * something went wrong. handle it and leave.
+> +		 */
+> +	}
+> +
+> +	/*
+> +	 * the 'ipu' remote processor is now powered on... let it work !
+> +	 */
+> +
+> +	/* if we no longer need ipu's services, power it down */
+> +	rproc_put(my_rproc);
+> +}
+> +
+> +4. API for implementors
+> +
+> +  int rproc_register(struct device *dev, const char *name,
+> +				const struct rproc_ops *ops,
+> +				const char *firmware,
+> +				const struct rproc_mem_entry *memory_maps,
+> +				struct module *owner);
+> +   - should be called from the underlying platform-specific implementation, in
+> +     order to register a new remoteproc device. 'dev' is the underlying
+> +     device, 'name' is the name of the remote processor, which will be
+> +     specified by users calling rproc_get(), 'ops' is the platform-specific
+> +     start/stop handlers, 'firmware' is the name of the firmware file to
+> +     boot the processor with, 'memory_maps' is a table of da<->pa memory
+> +     mappings which should be used to configure the IOMMU (if not relevant,
+> +     just pass NULL here), 'owner' is the underlying module that should
+> +     not be removed while the remote processor is in use.
+> +
+> +     Returns 0 on success, or an appropriate error code on failure.
+> +
+> +  int rproc_unregister(const char *name);
+> +   - should be called from the underlying platform-specific implementation, in
+> +     order to unregister a remoteproc device that was previously registered
+> +     with rproc_register().
+> +
+> +5. Implementation callbacks
+> +
+> +Every remoteproc implementation must provide these handlers:
+> +
+> +struct rproc_ops {
+> +	int (*start)(struct rproc *rproc, u64 bootaddr);
+> +	int (*stop)(struct rproc *rproc);
+> +};
+> +
+> +The ->start() handler takes a rproc handle and an optional bootaddr argument,
+
+                               an rproc
+
+> +and should power on the device and boot it (using the bootaddr argument
+> +if the hardware requires one).
+> +On success, 0 is returned, and on failure, an appropriate error code.
+> +
+> +The ->stop() handler takes a rproc handle and powers the device off.
+
+                              an rproc
+
+> +On success, 0 is returned, and on failure, an appropriate error code.
+> +
+> +6. Binary Firmware Structure
+> +
+> +The following enums and structures define the binary format of the images
+> +remoteproc loads and boot the remote processors with.
+
+                        boots
+
+> +
+> +The general binary format is as follows:
+> +
+> +struct {
+> +      char magic[4] = { 'R', 'P', 'R', 'C' };
+> +      u32 version;
+> +      u32 header_len;
+> +      char header[...] = { header_len bytes of unformatted, textual header };
+> +      struct section {
+> +          u32 type;
+> +          u64 da;
+> +          u32 len;
+> +          u8 content[...] = { len bytes of binary data };
+> +      } [ no limit on number of sections ];
+> +} __packed;
+> +
+> +The image begins with a 4-bytes "RPRC" magic, a version number, and a
+> +free-style textual header that users can easily read.
+> +
+> +After the header, the firmware contains several sections that should be
+> +loaded to memory so the remote processor can access them.
+> +
+> +Every section begins with its type, device address (da) where the remote
+> +processor expects to find this section at (exact meaning depends whether
+
+                            drop:         at
+
+> +the device accesses memory through an IOMMU or not. if not, da might just
+> +be physical addresses), the section length and its content.
+> +
+> +Most of the sections are either text or data (which currently are treated
+> +exactly the same), but there is one special "resource" section that allows
+> +the remote processor to announce/request certain resources from the host.
+> +
+> +A resource section is just a packed array of the following struct:
+> +
+> +struct fw_resource {
+> +	u32 type;
+> +	u64 da;
+> +	u64 pa;
+> +	u32 len;
+> +	u32 flags;
+> +	u8 name[48];
+> +} __packed;
+> +
+> +The way a resource is really handled strongly depends on its type.
+> +Some resources are just one-way announcements, e.g., a RSC_TRACE type means
+> +that the remote processor will be writing log messages into a trace buffer
+> +which is located at the address specified in 'da'. In that case, 'len' is
+> +the size of that buffer. A RSC_BOOTADDR resource type announces the boot
+> +address (i.e. the first instruction the remote processor should be booted with)
+> +in 'da'.
+> +
+> +Other resources entries might be a two-way request/respond negotiation where
+> +a certain resource (memory or any other hardware resource) is requested
+> +by specifying the appropriate type and name. The host should then allocate
+> +such a resource and "reply" by writing the identifier (physical address
+> +or any other device id that will be meaningful to the remote processor)
+> +back into the relevant member of the resource structure. Obviously this
+> +approach can only be used _before_ booting the remote processor. After
+> +the remote processor is powered up, the resource section is expected
+> +to stay static. Runtime resource management (i.e. handling requests after
+> +the remote processor has booted) will be achieved using a dedicated rpmsg
+> +driver.
+> +
+> +The latter two-way approach is still preliminary and has not been implemented
+> +yet. It's left to see how this all works out.
+> +
+> +Most likely this kind of static allocations of hardware resources for
+> +remote processors can also use DT, so it's interesting to see how
+> +this all work out when DT materializes.
+
+            works out
+
+
+thanks,
 ---
- drivers/leds/Kconfig           |   15 +++++
- drivers/leds/Makefile          |    1 +
- drivers/leds/ledtrig-arm-cpu.c |  114 ++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 130 insertions(+), 0 deletions(-)
- create mode 100644 drivers/leds/ledtrig-arm-cpu.c
-
-diff --git a/drivers/leds/Kconfig b/drivers/leds/Kconfig
-index 713d43b..f725ae2 100644
---- a/drivers/leds/Kconfig
-+++ b/drivers/leds/Kconfig
-@@ -446,6 +446,21 @@ config LEDS_TRIGGER_BACKLIGHT
- 
- 	  If unsure, say N.
- 
-+# Notice that this uses the CONFIG_LEDS i.e. the "old" LEDS
-+config LEDS_TRIGGER_ARM_CPU
-+	bool "LED ARM CPU Trigger"
-+	depends on LEDS_TRIGGERS && ARM
-+	select LEDS
-+	select LEDS_CPU
-+	default y if ARCH_REALVIEW
-+	default y if ARCH_VERSATILE
-+	help
-+	  This allows LEDs to be controlled by active ARM CPUs. This
-+	  shows the active CPUs across an array of LEDs so you can see
-+	  what CPUs are active on the system at any given moment.
-+
-+	  If unsure, say N.
-+
- config LEDS_TRIGGER_GPIO
- 	tristate "LED GPIO Trigger"
- 	depends on LEDS_TRIGGERS
-diff --git a/drivers/leds/Makefile b/drivers/leds/Makefile
-index bbfd2e3..a32a99c 100644
---- a/drivers/leds/Makefile
-+++ b/drivers/leds/Makefile
-@@ -53,4 +53,5 @@ obj-$(CONFIG_LEDS_TRIGGER_IDE_DISK)	+= ledtrig-ide-disk.o
- obj-$(CONFIG_LEDS_TRIGGER_HEARTBEAT)	+= ledtrig-heartbeat.o
- obj-$(CONFIG_LEDS_TRIGGER_BACKLIGHT)	+= ledtrig-backlight.o
- obj-$(CONFIG_LEDS_TRIGGER_GPIO)		+= ledtrig-gpio.o
-+obj-$(CONFIG_LEDS_TRIGGER_ARM_CPU)	+= ledtrig-arm-cpu.o
- obj-$(CONFIG_LEDS_TRIGGER_DEFAULT_ON)	+= ledtrig-default-on.o
-diff --git a/drivers/leds/ledtrig-arm-cpu.c b/drivers/leds/ledtrig-arm-cpu.c
-new file mode 100644
-index 0000000..7776d61
---- /dev/null
-+++ b/drivers/leds/ledtrig-arm-cpu.c
-@@ -0,0 +1,114 @@
-+/*
-+ * ledtrig-arm-cpu.c - LED trigger based on ARM CPU activity
-+ *
-+ * Copyright 2011 Linus Walleij <linus.walleij@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+
-+#include <linux/module.h>
-+#include <linux/kernel.h>
-+#include <linux/init.h>
-+#include <linux/leds.h>
-+#include <linux/slab.h>
-+#include <linux/percpu.h>
-+#include <asm/leds.h>
-+#include "leds.h"
-+
-+struct arm_cpu_trig_data {
-+	struct led_classdev *led;
-+};
-+
-+static DEFINE_PER_CPU(struct arm_cpu_trig_data *, arm_cpu_triggers);
-+
-+void arm_cpu_leds_event(led_event_t ledevt)
-+{
-+	struct arm_cpu_trig_data *trigdata = __get_cpu_var(arm_cpu_triggers);
-+
-+	if (!trigdata)
-+		return;
-+
-+	/* Locate the correct CPU LED */
-+
-+	switch (ledevt) {
-+	case led_halted:
-+	case led_idle_start:
-+		/* Will turn the LED off */
-+		if (trigdata->led)
-+			led_set_brightness(trigdata->led, LED_OFF);
-+		break;
-+
-+	case led_idle_end:
-+		/* Will turn the LED on, max brightness */
-+		if (trigdata->led)
-+			led_set_brightness(trigdata->led,
-+					   trigdata->led->max_brightness);
-+		break;
-+
-+	default:
-+		/* Will leave the LED as it is */
-+		break;
-+	}
-+}
-+
-+static void arm_cpu_trig_activate_cpu(void *data)
-+{
-+	struct arm_cpu_trig_data *arm_cpu_data;
-+	struct led_classdev *led = data;
-+	int my_cpu = smp_processor_id();
-+	unsigned long target_cpu = (unsigned long) led->trigger_data;
-+
-+	if (target_cpu != my_cpu)
-+		return;
-+
-+	arm_cpu_data = kzalloc(sizeof(*arm_cpu_data), GFP_KERNEL);
-+	if (!arm_cpu_data)
-+		return;
-+
-+	dev_info(led->dev, "led %s indicate activity on CPU %d\n",
-+		 led->name, my_cpu);
-+
-+	arm_cpu_data->led = led;
-+	__get_cpu_var(arm_cpu_triggers) = arm_cpu_data;
-+}
-+
-+static void arm_cpu_trig_activate(struct led_classdev *led)
-+{
-+	on_each_cpu(arm_cpu_trig_activate_cpu, led, 1);
-+
-+	/* Hook into ARM core kernel event callback */
-+	leds_event = arm_cpu_leds_event;
-+}
-+
-+static void arm_cpu_trig_deactivate(struct led_classdev *led)
-+{
-+	struct arm_cpu_trig_data *arm_cpu_data = led->trigger_data;
-+
-+	if (arm_cpu_data)
-+		kfree(arm_cpu_data);
-+}
-+
-+static struct led_trigger arm_cpu_led_trigger = {
-+	.name		= "arm-cpu",
-+	.activate	= arm_cpu_trig_activate,
-+	.deactivate	= arm_cpu_trig_deactivate,
-+};
-+
-+static int __init arm_cpu_trig_init(void)
-+{
-+	return led_trigger_register(&arm_cpu_led_trigger);
-+}
-+module_init(arm_cpu_trig_init);
-+
-+static void __exit arm_cpu_trig_exit(void)
-+{
-+	led_trigger_unregister(&arm_cpu_led_trigger);
-+}
-+module_exit(arm_cpu_trig_exit);
-+
-+MODULE_AUTHOR("Linus Walleij <linus.walleij@linaro.org>");
-+MODULE_DESCRIPTION("ARM CPU LED trigger");
-+MODULE_LICENSE("GPL");
--- 
-1.7.3.2
+~Randy
+*** Remember to use Documentation/SubmitChecklist when testing your code ***
