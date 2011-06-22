@@ -1,30 +1,46 @@
-From: wim@iguana.be (Wim Van Sebroeck)
-Date: Wed, 22 Jun 2011 11:05:20 +0200
-Subject: [PATCH 3/6] watchdog: s3c2410: Add support for device tree
-	based probe
-In-Reply-To: <BANLkTikkxpOC6M1R0g=dGvDXvCkG6EOJhQ@mail.gmail.com>
-References: <1308567752-13451-1-git-send-email-thomas.abraham@linaro.org>
-	<1308567752-13451-4-git-send-email-thomas.abraham@linaro.org>
-	<BANLkTikkxpOC6M1R0g=dGvDXvCkG6EOJhQ@mail.gmail.com>
-Message-ID: <20110622090520.GT23305@infomag.iguana.be>
+From: per.forlin@linaro.org (Per Forlin)
+Date: Wed, 22 Jun 2011 11:31:16 +0200
+Subject: [PATCH v7 02/11] omap_hsmmc: add support for pre_req and post_req
+In-Reply-To: <BANLkTikqeKg=Mr9BxVYL7x=9k_jzGeLnQQ@mail.gmail.com>
+References: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
+	<1308699521-20556-3-git-send-email-per.forlin@linaro.org>
+	<BANLkTikqeKg=Mr9BxVYL7x=9k_jzGeLnQQ@mail.gmail.com>
+Message-ID: <BANLkTi=GT=1u0YEtUaJre24BOhRyDNGUSg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas, Grant,
+On 22 June 2011 10:51, Nickolay Nickolaev <nicknickolaev@gmail.com> wrote:
+> Hello,
+>
+> this one's causing me compilation trouble troubles when CONFIG_DMA_ENGINE is
+> not defined.
+>
+I don't see this issue when I compile the kernel for a Pandaboard
+without CONFIG_DMA_ENGINE being set. Could you please clarify or show
+me your build log?
+I don't see how host->next_data.cookie is connected to DMA_ENGINE.
 
-> On Mon, Jun 20, 2011 at 5:02 AM, Thomas Abraham
-> <thomas.abraham@linaro.org> wrote:
-> > This patch adds the of_match_table to enable s3c2410-wdt driver
-> > to be probed when watchdog device node is found in the device tree.
-> >
-> > Signed-off-by: Thomas Abraham <thomas.abraham@linaro.org>
-> 
-> Acked-by: Grant Likely <grant.likely@secretlab.ca>
-> 
-> You need to send this to Wim and the linux-watchdog mailing lists.  As
-> far as I'm concerned, it can be merged immediately.
+> On Wed, Jun 22, 2011 at 2:38 AM, Per Forlin <per.forlin@linaro.org> wrote:
+>>
+>> @@ -2077,6 +2155,7 @@ static int __init omap_hsmmc_probe(struct
+>> platform_device *pdev)
+>> ? ? ? ?host->mapbase ? = res->start;
+>> ? ? ? ?host->base ? ? ?= ioremap(host->mapbase, SZ_4K);
+>> ? ? ? ?host->power_mode = MMC_POWER_OFF;
+>> + ? ? ? host->next_data.cookie = 1;
+>>
+>> ? ? ? ?platform_set_drvdata(pdev, host);
+>> ? ? ? ?INIT_WORK(&host->mmc_carddetect_work, omap_hsmmc_detect);
+>> --
+>> 1.7.4.1
+>>
+>>
+>
+> Maybe we can wrap it in a function as the others.
+>
+> regards,
+> Nikolay Nikolaev
+>
 
-Yep, it looks OK. Please sent the patch so that it can be included.
-
-Kind regards,
-Wim.
+Regards,
+Per
