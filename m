@@ -1,31 +1,24 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Wed, 22 Jun 2011 22:41:27 +0800
-Subject: [PATCH v2 2/6] ARM: mxc: sdma on imx25 is a V2 block
-In-Reply-To: <1308753691-14442-1-git-send-email-shawn.guo@linaro.org>
-References: <1308753691-14442-1-git-send-email-shawn.guo@linaro.org>
-Message-ID: <1308753691-14442-3-git-send-email-shawn.guo@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jun 2011 15:54:52 +0100
+Subject: [PATCH 6/7] ARM: EXYNOS4: Add save/restore for more ARM registers
+In-Reply-To: <1308732405-16664-7-git-send-email-kgene.kim@samsung.com>
+References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
+	<1308732405-16664-7-git-send-email-kgene.kim@samsung.com>
+Message-ID: <20110622145452.GR23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sdma on soc imx25 is not a V1 but V2 block.
+On Wed, Jun 22, 2011 at 05:46:44PM +0900, Kukjin Kim wrote:
+> From: Jaecheol Lee <jc.lee@samsung.com>
+> 
+> This patch adds save/restore for Power Control Register and
+> Diagnostic Register.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
----
- arch/arm/plat-mxc/devices/platform-imx-dma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+NAK.  Please see my further suspend consolidation patches posted earlier.
+I've also recently (last few days) moved these further forward and this
+code no longer exists in this file (all it contains is the early
+resume stuff.)
 
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-dma.c b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-index 1c737db..1fc3522 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-dma.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-dma.c
-@@ -33,7 +33,7 @@ struct imx_imx_sdma_data {
- 
- #ifdef CONFIG_SOC_IMX25
- struct imx_imx_sdma_data imx25_imx_sdma_data __initconst =
--	imx_imx_sdma_data_entry_single(MX25, 1, "imx25", 0);
-+	imx_imx_sdma_data_entry_single(MX25, 2, "imx25", 0);
- #endif /* ifdef CONFIG_SOC_IMX25 */
- 
- #ifdef CONFIG_SOC_IMX31
--- 
-1.7.4.1
+My guess is that these two registers are samsung specific, and so they
+should be saved and restored by higher level code (eg, a syscore_ops
+for exynos4 specific stuff.)
