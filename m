@@ -1,43 +1,68 @@
-From: vladoman@gmail.com (Vladimir Pantelic)
-Date: Wed, 22 Jun 2011 08:57:06 +0200
-Subject: Trouble with newer kernels on Gumstix Overo boards
-In-Reply-To: <BANLkTim5H3340RChbaVUOpSYb4tQr9X9YA@mail.gmail.com>
-References: <BANLkTimJTBpj30EKf_EucvOf2yCHHbRrkQ@mail.gmail.com>
-	<ADF30F4D7BDE934D9B632CE7D5C7ACA4047B99E7E7AD@dbde03.ent.ti.com>
-	<BANLkTimfeS1Xin779eg=8cdjqmqcQeB6HA@mail.gmail.com>
-	<20110621072220.GA21159@atomide.com>
-	<BANLkTim5H3340RChbaVUOpSYb4tQr9X9YA@mail.gmail.com>
-Message-ID: <4E019242.1050503@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 22 Jun 2011 08:59:24 +0200
+Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping framework
+	redesign
+In-Reply-To: <4E017539.30505@gmail.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<4E017539.30505@gmail.com>
+Message-ID: <001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Mack wrote:
+Hello,
 
-> Well, it doesn't really affect me as I just use this as a development
-> platform for now. But please consider that there is hardware out there
-> which gets software updates through automated download and install
-> procedures. In such cases, you want as little dependencies between the
-> bootloader and the kernel, so you can boot both older and newer
+On Wednesday, June 22, 2011 6:53 AM Subash Patel wrote:
 
-If you want *minimal* dependency, then a compiled-in command line is
-the way to go and the bootloader only providing a few board identifying
-tags
+> On 06/20/2011 01:20 PM, Marek Szyprowski wrote:
+> > Hello,
+> >
+> > This patch series is a continuation of my works on implementing generic
+> > IOMMU support in DMA mapping framework for ARM architecture. Now I
+> > focused on the DMA mapping framework itself. It turned out that adding
+> > support for common dma_map_ops structure was not that hard as I initally
+> > thought. After some modification most of the code fits really well to
+> > the generic dma_map_ops methods.
+> >
+> > The only change required to dma_map_ops is a new alloc function. During
+> > the discussion on Linaro Memory Management meeting in Budapest we got
+> > the idea that we can have only one alloc/free/mmap function with
+> > additional attributes argument. This way all different kinds of
+> > architecture specific buffer mappings can be hidden behind the
+> > attributes without the need of creating several versions of dma_alloc_
+> > function. I also noticed that the dma_alloc_noncoherent() function can
+> > be also implemented this way with DMA_ATTRIB_NON_COHERENT attribute.
+> > Systems that just defines dma_alloc_noncoherent as dma_alloc_coherent
+> > will just ignore such attribute.
+> >
+> > Another good use case for alloc methods with attributes is the
+> > possibility to allocate buffer without a valid kernel mapping. There are
+> > a number of drivers (mainly V4L2 and ALSA) that only exports the DMA
+> > buffers to user space. Such drivers don't touch the buffer data at all.
+> > For such buffers we can avoid the creation of a mapping in kernel
+> > virtual address space, saving precious vmalloc area. Such buffers might
+> > be allocated once a new attribute DMA_ATTRIB_NO_KERNEL_MAPPING.
+> 
+> Are you trying to say here, that the buffer would be allocated in the
+> user space, and we just use it to map it to the device in DMA+IOMMU
+> framework?
 
-> kernels (and full software distribution images) with no pain. Or maybe
-> quickly switch from one version to the other for testing. Depending on
-> the complexity of the system, the bootloader might also add extra
-> parameters to the cmdline dynamically.
+Nope. I proposed an extension which would allow you to allocate a buffer
+without creating the kernel mapping for it. Right now dma_alloc_coherent()
+performs 3 operations:
+1. allocates memory for the buffer
+2. creates coherent kernel mapping for the buffer
+3. translates physical buffer address to DMA address that can be used by
+the hardware.
 
-AFAIK there is way to have the bootloader provided cmdline appended
-to the compiled-in one
+dma_mmap_coherent makes additional mapping for the buffer in user process
+virtual address space.
 
-> The serial console change breaks this approach, at it forces the
-> kernel to ship its own CMDLINE and override the one the bootloader
-> provides. I'm sure this is a problem that affects people out there.
+I want make the step 2 in dma_alloc_coherent() optional to save virtual
+address space: it is really limited resource. I really want to avoid 
+wasting it for mapping 128MiB buffers just to create full-HD processing
+hardware pipeline, where no drivers will use kernel mapping at all.
 
-FWIW, for our firmware update deployment it's not a problem at all,
-since we do *not* want to rely on a kernel commandline provided by
-the bootloader for the exact same reason. Kernels change and thus
-the kernel command line belongs to the kernel. What does not change
-is e.g. the board id or revision or mem size, that (and only that)
-is provided by the bootloader to the kernel.
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
