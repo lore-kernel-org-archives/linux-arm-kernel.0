@@ -1,27 +1,26 @@
-From: levinsasha928@gmail.com (Sasha Levin)
-Date: Tue, 21 Jun 2011 23:11:27 -0400
-Subject: [RFC 7/8] drivers: introduce rpmsg, a remote-processor
-	messaging bus
-In-Reply-To: <87liwu8u3q.fsf@rustcorp.com.au>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-8-git-send-email-ohad@wizery.com>
-	<87liwu8u3q.fsf@rustcorp.com.au>
-Message-ID: <1308712287.11435.4.camel@lappy>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 22 Jun 2011 11:38:58 +0800
+Subject: MX27PDK does not boot on 'for-next'
+In-Reply-To: <BANLkTikh6PZdN_tbnHQMbufMQrK3eV-9kA@mail.gmail.com>
+References: <BANLkTi=0g5ShRRWAdixWpF2w-ea5VMs8JQ@mail.gmail.com>
+	<20110617005313.GB10154@S2100-06.ap.freescale.net>
+	<BANLkTikh6PZdN_tbnHQMbufMQrK3eV-9kA@mail.gmail.com>
+Message-ID: <20110622033857.GD25234@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-06-22 at 12:12 +0930, Rusty Russell wrote:
-> > +#define VIRTIO_ID_RPMSG		10 /* virtio remote processor messaging */
+On Tue, Jun 21, 2011 at 03:09:40PM -0300, Fabio Estevam wrote:
+> Hi Shawn,
 > 
-> I think you want 6.  Plan 9 jumped ahead to grab 9 :)
-
-Maybe it's worth adding an appendix to the virtio spec as part of this
-(and really any) patch series which takes a virtio ID.
-
-Also, I understand that virtio itself as an idea isn't Linux specific,
-but maybe it's worth including the spec (or at least a variation of it)
-as part of the kernel documentation.
+> On Thu, Jun 16, 2011 at 9:53 PM, Shawn Guo <shawn.guo@freescale.com> wrote:
+> ...
+> > I have to admit that I did not get the patch tested on mx27 because
+> > I do not have hardware. ?Thanks for helping here.
+> 
+> I managed to fix this issue and have just submitted a patch.
+> 
+Great.  Thanks, Fabio.
 
 -- 
-
-Sasha.
+Regards,
+Shawn
