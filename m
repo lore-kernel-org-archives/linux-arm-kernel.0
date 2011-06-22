@@ -1,34 +1,32 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Wed, 22 Jun 2011 11:31:00 -0300
-Subject: [PATCH] ARM: mxc: iomux-v1: Fix build warning
-Message-ID: <1308753060-14489-1-git-send-email-fabio.estevam@freescale.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Wed, 22 Jun 2011 10:30:18 -0400 (EDT)
+Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
+In-Reply-To: <20110622132314.GG23598@legolas.emea.dhcp.ti.com>
+Message-ID: <Pine.LNX.4.44L0.1106221025270.1977-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix the following warning:
+On Wed, 22 Jun 2011, Felipe Balbi wrote:
 
-CC      arch/arm/plat-mxc/iomux-v1.o
-arch/arm/plat-mxc/iomux-v1.c: In function 'mxc_gpio_setup_multiple_pins':
-arch/arm/plat-mxc/iomux-v1.c:160: warning: 'ret' may be used uninitialized in this function
-arch/arm/plat-mxc/iomux-v1.c:160: note: 'ret' was declared here
+> Hi,
+> 
+> On Wed, Jun 22, 2011 at 04:20:16PM +0400, Dmitry Eremin-Solenikov wrote:
+> > Some platforms would like to disable D+ pullup on suspend, to drain as
+> > low power, as possible. E.g. this was requested by mioa701 board
+> > maintainers.
+> 
+> I think this makes sense to many platforms, but by doing so, you would
+> loose connection to the Host PC, so you need to make sure your device
+> isn't been used before you go down this road.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/iomux-v1.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+In fact, something like this is _necessary_ for all UDC/PHY drivers
+unless the device can guarantee that it will automatically wake up from
+suspend in time to service a USB packet (note that the window for
+responding to a packet is only a few microseconds).  Otherwise the
+device would appear to the host to be unresponsive and broken -- better
+to do a clean disconnect.
 
-diff --git a/arch/arm/plat-mxc/iomux-v1.c b/arch/arm/plat-mxc/iomux-v1.c
-index d76f3ac..1f73963 100644
---- a/arch/arm/plat-mxc/iomux-v1.c
-+++ b/arch/arm/plat-mxc/iomux-v1.c
-@@ -157,7 +157,7 @@ EXPORT_SYMBOL(mxc_gpio_mode);
- static int imx_iomuxv1_setup_multiple(const int *list, unsigned count)
- {
- 	size_t i;
--	int ret;
-+	int ret = 0;
- 
- 	for (i = 0; i < count; ++i) {
- 		ret = mxc_gpio_mode(list[i]);
--- 
-1.6.0.4
+If suspending the device while it is in use would cause problems ...  
+then don't suspend it when it is in use!
+
+Alan Stern
