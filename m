@@ -1,52 +1,46 @@
-From: andre.silva@freescale.com (Andre Silva)
-Date: Wed, 22 Jun 2011 16:33:04 -0300
-Subject: [PATCH 1/2] ARM:mx53: Add I2C3 support
-Message-ID: <1308771185-4491-1-git-send-email-andre.silva@freescale.com>
+From: lost.distance@yahoo.com (Paul Parsons)
+Date: Wed, 22 Jun 2011 19:31:49 +0000
+Subject: [PATCH REPOST] pxa/hx4700: Add ASIC3 LED support
+Message-ID: <E1QZT9S-0004Vb-Hv@outmx03.plus.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Andre Silva <andre.silva@freescale.com>
+Add LED support for the HTC ASIC3. Underlying support is provided by the mfd/asic3 and leds/leds-asic3 drivers. An example configuration is provided by the pxa/hx4700 platform.
 
+Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
 ---
- arch/arm/mach-mx5/clock-mx51-mx53.c          |    3 +++
- arch/arm/plat-mxc/devices/platform-imx-i2c.c |    3 ++-
- 2 files changed, 5 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index bbc837b..4fb63d9 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1279,6 +1279,8 @@ DEFINE_CLOCK(i2c2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG10_OFFSET,
- 	NULL, NULL, &ipg_clk, NULL);
- DEFINE_CLOCK(hsi2c_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
- 	NULL, NULL, &ipg_clk, NULL);
-+DEFINE_CLOCK(i2c3_mx53_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG11_OFFSET,
-+	NULL, NULL, &ipg_clk, NULL);
- 
- /* FEC */
- DEFINE_CLOCK(fec_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG12_OFFSET,
-@@ -1467,6 +1469,7 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
- 	_REGISTER_CLOCK("imx-i2c.0", NULL, i2c1_clk)
- 	_REGISTER_CLOCK("imx-i2c.1", NULL, i2c2_clk)
-+	_REGISTER_CLOCK("imx-i2c.2", NULL, i2c3_mx53_clk)
- 	_REGISTER_CLOCK("sdhci-esdhc-imx.0", NULL, esdhc1_clk)
- 	_REGISTER_CLOCK("sdhci-esdhc-imx.1", NULL, esdhc2_mx53_clk)
- 	_REGISTER_CLOCK("sdhci-esdhc-imx.2", NULL, esdhc3_mx53_clk)
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-i2c.c b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
-index 2ab74f0..afe60f7 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-i2c.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-i2c.c
-@@ -94,8 +94,9 @@ const struct imx_imx_i2c_data imx53_imx_i2c_data[] __initconst = {
- 	imx_imx_i2c_data_entry(MX53, _id, _hwid, SZ_4K)
- 	imx53_imx_i2c_data_entry(0, 1),
- 	imx53_imx_i2c_data_entry(1, 2),
-+	imx53_imx_i2c_data_entry(2, 3),
+This part of the HTC ASIC3 LED driver patch set was seemingly dropped, hence repost.
+
+--- clean-3.0-rc4/arch/arm/mach-pxa/hx4700.c	2011-06-21 04:25:46.000000000 +0100
++++ linux-3.0-rc4/arch/arm/mach-pxa/hx4700.c	2011-06-22 10:43:18.986382990 +0100
+@@ -280,6 +280,21 @@ static u16 asic3_gpio_config[] = {
+ 	ASIC3_GPIOD15_nPIOW,
  };
--#endif /* ifdef CONFIG_SOC_IMX51 */
-+#endif /* ifdef CONFIG_SOC_IMX53 */
  
- struct platform_device *__init imx_add_imx_i2c(
- 		const struct imx_imx_i2c_data *data,
--- 
-1.7.5.4
++static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
++	[0] = {
++		.name = "hx4700:amber",
++		.default_trigger = "ds2760-battery.0-charging-blink-full-solid",
++	},
++	[1] = {
++		.name = "hx4700:green",
++		.default_trigger = "unused",
++	},
++	[2] = {
++		.name = "hx4700:blue",
++		.default_trigger = "hx4700-radio",
++	},
++};
++
+ static struct resource asic3_resources[] = {
+ 	/* GPIO part */
+ 	[0] = {
+@@ -310,6 +325,7 @@ static struct asic3_platform_data asic3_
+ 	.gpio_config_num = ARRAY_SIZE(asic3_gpio_config),
+ 	.irq_base        = IRQ_BOARD_START,
+ 	.gpio_base       = HX4700_ASIC3_GPIO_BASE,
++	.leds            = asic3_leds,
+ };
+ 
+ static struct platform_device asic3 = {
