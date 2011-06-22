@@ -1,74 +1,92 @@
-From: daeinki@gmail.com (InKi Dae)
-Date: Wed, 22 Jun 2011 16:50:58 +0900
-Subject: Some questions about DRM(Direct Rendering Manager)
-In-Reply-To: <4E0185E7.8020708@samsung.com>
-References: <4E016EDC.30200@samsung.com>
-	<4E0185E7.8020708@samsung.com>
-Message-ID: <BANLkTim6xvD5U9GJ2pHu-=OrYccRHSj7Fg@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 22 Jun 2011 09:56:15 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <20110601142406.GJ3660@n2100.arm.linux.org.uk>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+	<20110601142406.GJ3660@n2100.arm.linux.org.uk>
+Message-ID: <20110622075615.GJ6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It adds dri-devel at lists.freedesktop.org to this mail thread.
-Thank you.
+On Wed, Jun 01, 2011 at 03:24:06PM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 01, 2011 at 04:18:47PM +0200, Sascha Hauer wrote:
+> > diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+> > index 9128fdd..e3b6f02 100644
+> > --- a/arch/arm/boot/Makefile
+> > +++ b/arch/arm/boot/Makefile
+> > @@ -59,6 +59,11 @@ $(obj)/zImage:	$(obj)/compressed/vmlinux FORCE
+> >  
+> >  endif
+> >  
+> > +ifeq ($(CONFIG_ARM_PATCH_PHYS_VIRT),y)
+> > +$(obj)/uImage: $(obj)/zImage FORCE
+> > +	@echo 'building uImages is incompatible with CONFIG_ARM_PATCH_PHYS_VIRT'
+> > +	@false
+> 
+> It may be better to drop the zImage dependency too, so that folk don't get
+> the message at the end of an otherwise successful kernel build - they may
+> decide to turn p2v patching off which would result in a rebuild.
+> 
+> Or it could suggest the mkimage command which should be run, but with
+> <LOAD-ADDRESS> inserted into it at the appropriate point - iow something
+> like:
+> 
+>   mkimage -A arm -O linux -T kernel -C none \
+> 	-a <LOAD-ADDRESS> -e <START-ADDRESS> \
+> 	-n 'Linux-$(KERNELRELEASE)' -d arch/arm/boot/zImage uImage.<PLATFORM>
+> 
 
-2011? 6? 22? ?? 3:04, daeinki <inki.dae@samsung.com>?? ?:
-> below is additional comments.
->
-> daeinki ? ?:
->> Hi all,
->>
->> I'm writing Samsung SoC based DRM framework and this one includes FIMD
->> and HDMI driver as hardware dependent modules. and for now, encoder,
->> connector, crtc and fb module has been materialized almost. but I'm
->> contending with  framebuffer setting issue(created fb_info should be
->> registered to linux framebuffer through register_framebuffer() or not)as
->> default framebuffer at booting time.
->>
->> at drm_fb_helper_single_fb_probe() of drm_fb_helper.c file, fb_helper's
->> fb_probe callback is called and this one creates new framebuffer and
->> returns a value more then 0 if true. internally, this process creates an
->> fb_info object and drm_framebuffer and then drm_framebuffer would be
->> added to mode_config.fb_list of the drm_device.
->>
-> it's my mistake. return value is 0 if true, nonzero otherwise.
->
->> a value returned, new_fb is used to decide that it calls
->> register_framebuffer() or drm_fb_helper_set_par(). at this point, I am
->> confused it's a good way to call register_framebuffer() otherwise
->> drm_fb_helper_set_par(). if register_framebuffer() is called then I
->> guess drm_fb_helper_set_par() or drm_crtc_helper_set_config() should be
->> called somewhere subsequently to apply this one to real hardware because
->> previous process is just for maintaining data logically.(not set up data
->> to h/w)
->>
->> it's a right way to call register_framebuffer() and then
->> drm_fb_helper_set_par() or drm_crtc_helper_set_config()? otherwise just
->> only drm_fb_helper_set_par() or drm_crtc_helper_set_config() ignoring
->> register_framebuffer()? and what is the purpose of using
->> register_framebuffer()?
->>
-> I understood that if fb_probe() callback is fail then fb_info object is
-> registered to linux framebuffer through register_framebuffer()
-> otherwise(if true) hardware configuration would be completed by
-> drm_fb_helper_set_par() so the reason of using register_framebuffer() is
-> that the case of failing fb_probe() callback, it is for drawing on only
-> linux framebuffer. is it right?
->
->> In my case, first, register_framebuffer() is called and then if desired
->> default crtc id is matched with drm_fb_helper->crtc_info[0 ~ n].crtc_id,
->> it gets mode_set of drm_fb_helper->crtc_info[n] and then  it calls
->> drm_crtc_helper_set_config(mode_set). at this time, all the hardware
->> configurations would be completed.
->>
->> thank you in advance.
->>
->> Best Regards
->> Inki Dae.
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Coming back to this topic after a longer time, here is an updated
+patch doing exactly this.
+
+8<------------------------------------------------------
+
+[PATCH] ARM: do not allow to build uImages with ARM_PATCH_PHYS_VIRT
+
+U-Boot uImages expect a load address and a entry point in
+the image header. With CONFIG_ARM_PATCH_PHYS_VIRT these
+become variable and thus can not be compiled into the uImage.
+Instead of just failing we give a hint to the user how to
+generate an uImage for his hardware.
+
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+---
+ arch/arm/boot/Makefile |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/boot/Makefile b/arch/arm/boot/Makefile
+index 9128fdd..934a67a 100644
+--- a/arch/arm/boot/Makefile
++++ b/arch/arm/boot/Makefile
+@@ -72,9 +72,19 @@ endif
+ 
+ $(obj)/uImage: STARTADDR=$(LOADADDR)
+ 
++ifeq ($(CONFIG_ARM_PATCH_PHYS_VIRT),y)
++$(obj)/uImage:  $(obj)/zImage FORCE
++	@echo 'CONFIG_ARM_PATCH_PHYS_VIRT is enabled, cannot build an uImage'
++	@echo 'with multiple start/load addresses. To generate an uImage'
++	@echo 'suitable for you hardware run:'
++	@echo '$(MKIMAGE) -A arm -O linux -T kernel -C none -a <LOADADDR> \
++		-e <STARTADDR> -n 'Linux-$(KERNELRELEASE)' -d $< $@'
++	@false
++else
+ $(obj)/uImage:	$(obj)/zImage FORCE
+ 	$(call if_changed,uimage)
+ 	@echo '  Image $@ is ready'
++endif
+ 
+ $(obj)/bootp/bootp: $(obj)/zImage initrd FORCE
+ 	$(Q)$(MAKE) $(build)=$(obj)/bootp $@
+-- 
+1.7.5.3
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
