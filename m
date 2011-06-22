@@ -1,68 +1,83 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 22 Jun 2011 12:49:24 +0300
-Subject: [RFC][PATCH 4/5] ARM: S5P64x0: Adding OTG PHY control code
-In-Reply-To: <BANLkTikDDBQjE2RCeeBB50vokSTcnCO46A@mail.gmail.com>
-References: <0LN400HTOZEQDIL0@mailout1.samsung.com>
-	<BANLkTikDDBQjE2RCeeBB50vokSTcnCO46A@mail.gmail.com>
-Message-ID: <20110622094923.GA23598@legolas.emea.dhcp.ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 22 Jun 2011 18:55:32 +0900
+Subject: [PATCH] ARM: conditional ioremap() fix for copy_oldmem_page()
+In-Reply-To: <20110622034445.1936.16176.sendpatchset@t400s>
+References: <20110622034445.1936.16176.sendpatchset@t400s>
+Message-ID: <20110622095525.GC9215@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 22, 2011 at 12:44:45PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm@opensource.se>
+> 
+> Update the copy_oldmem_page() function to ioremap() only
+> when accessing memory that is outside the regular range
+> of system memory that is managed by the kernel.
+> 
+> Without this patch a warning is triggered in the ARM-specific
+> ioremap implementation, see WARN_ON(pfn_valid()) in ioremap.c
+> 
+> The copy_oldmem_page() function is used by the secondary crash
+> kernel to access memory using the /proc/vmcore code implemented
+> in fs/proc/vmcore.c. To pass information from the first kernel
+> to the secondary crash kernel a kernel command line option is
+> used to point out where the elf core hdr is located.
+> 
+> The crash kernel is loaded through kexec-tools which also contains
+> code that reserves memory for the elfcorehdr= option. This memory
+> block is reserved _inside_ the main system memory of the secondary
+> kernel. The /proc/vmcore code in the secondary kernel is however
+> using copy_oldmem_page() to access both this elfcorehdr area and
+> the rest of the memory used by the the first kernel.
+> 
+> So the copy_oldmem_page() function is used to access data that
+> may be located in system memory, or it may be outside. Always
+> using ioremap will not work, so this patch makes it conditional
+> based on pfn_valid().
+> 
+> For more details please look at the sh7372-based example here:
+> http://permalink.gmane.org/gmane.linux.ports.sh.devel/11502
+> 
+> Signed-off-by: Magnus Damm <damm@opensource.se>
 
-On Wed, Jun 22, 2011 at 01:56:25PM +0530, Praveen Paneri wrote:
-> > > diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
-> > > index ae6bf6f..611fb3a 100644
-> > > --- a/arch/arm/mach-s5p64x0/Makefile
-> > > +++ b/arch/arm/mach-s5p64x0/Makefile
-> > > @@ -28,3 +28,4 @@ obj-y += dev-audio.o
-> > >??obj-$(CONFIG_S3C64XX_DEV_SPI) += dev-spi.o
-> > >
-> > >??obj-$(CONFIG_S5P64X0_SETUP_I2C1) += setup-i2c1.o
-> > > +obj-$(CONFIG_S3C_DEV_DWC_OTG) += setup-otg-phy.o
-> > > diff --git a/arch/arm/mach-s5p64x0/include/mach/map.h b/arch/arm/mach-s5p64x0/include/mach/map.h
-> > > index 95c9125..717c279 100644
-> > > --- a/arch/arm/mach-s5p64x0/include/mach/map.h
-> > > +++ b/arch/arm/mach-s5p64x0/include/mach/map.h
-> > > @@ -44,6 +44,8 @@
-> > >??#define S5P64X0_PA_SPI1 0xEC500000
-> > >
-> > >??#define S5P64X0_PA_HSOTG 0xED100000
-> > > +#define S5P64X0_PA_USB_HSPHY 0xED200000
-> > > +#define S5P64X0_VA_USB_HSPHY S3C_ADDR_CPU(0x00100000)
-> > >
-> > >??#define S5P64X0_PA_HSMMC(x) (0xED800000 + ((x) * 0x100000))
-> > >
-> > > @@ -71,6 +73,8 @@
-> > >??#define S5P_PA_TIMER S5P64X0_PA_TIMER
-> > >
-> > >??#define SAMSUNG_PA_ADC S5P64X0_PA_ADC
-> > > +#define S3C_PA_USB_HSOTG S5P64X0_PA_HSOTG
-> > > +#define S3C_VA_USB_HSPHY????????S5P64X0_VA_USB_HSPHY
-> > >
-> > >??/* UART */
-> > >
-> > > diff --git a/arch/arm/mach-s5p64x0/setup-otg-phy.c b/arch/arm/mach-s5p64x0/setup-otg-phy.c
-> >
-> > drivers should not live in arch/arm/*, why don't you move this to
-> > drivers/usb/otg where the PHYs are staying right now ?
-> PHY init/exit code can vary across SoCs. Wouldn't it be better to have it in the
-> SoC specific location?
+Reviewed-by:  Simon Horman <horms@verge.net.au>
 
-It will vary how ? If it's only regarding e.g. a different GPIO pin or a
-different IRQ number, you handle that by passing data down to driver
-(via platform_data or struct resource), now if it varies because a
-different board uses a different PHY, then another driver should be
-written (well, as long as it's really different from the one you have
-now, otherwise you should see if it's worth making the existing driver
-more flexible).
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110622/40104a24/attachment-0001.sig>
+> ---
+> 
+>  arch/arm/kernel/crash_dump.c |   14 ++++++++++----
+>  1 file changed, 10 insertions(+), 4 deletions(-)
+> 
+> --- 0001/arch/arm/kernel/crash_dump.c
+> +++ work/arch/arm/kernel/crash_dump.c	2011-06-18 20:59:49.000000000 +0900
+> @@ -39,9 +39,13 @@ ssize_t copy_oldmem_page(unsigned long p
+>  	if (!csize)
+>  		return 0;
+>  
+> -	vaddr = ioremap(pfn << PAGE_SHIFT, PAGE_SIZE);
+> -	if (!vaddr)
+> -		return -ENOMEM;
+> +	if (pfn_valid(pfn)) {
+> +		vaddr = phys_to_virt(pfn << PAGE_SHIFT);
+> +	} else {
+> +		vaddr = ioremap(pfn << PAGE_SHIFT, PAGE_SIZE);
+> +		if (!vaddr)
+> +			return -ENOMEM;
+> +	}
+>  
+>  	if (userbuf) {
+>  		if (copy_to_user(buf, vaddr + offset, csize)) {
+> @@ -52,6 +56,8 @@ ssize_t copy_oldmem_page(unsigned long p
+>  		memcpy(buf, vaddr + offset, csize);
+>  	}
+>  
+> -	iounmap(vaddr);
+> +	if (!pfn_valid(pfn))
+> +		iounmap(vaddr);
+> +
+>  	return csize;
+>  }
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
