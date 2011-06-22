@@ -1,86 +1,19 @@
-From: robdclark@gmail.com (Rob Clark)
-Date: Wed, 22 Jun 2011 08:07:06 -0500
-Subject: Some questions about DRM(Direct Rendering Manager)
-In-Reply-To: <BANLkTim6xvD5U9GJ2pHu-=OrYccRHSj7Fg@mail.gmail.com>
-References: <4E016EDC.30200@samsung.com> <4E0185E7.8020708@samsung.com>
-	<BANLkTim6xvD5U9GJ2pHu-=OrYccRHSj7Fg@mail.gmail.com>
-Message-ID: <BANLkTinv1uGUPBX4RE2DGw4Ca_P5x0g+DA@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 22 Jun 2011 16:09:35 +0300
+Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
+In-Reply-To: <201106221505.32531.arnd@arndb.de>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<201106211620.02065.arnd@arndb.de>
+	<BANLkTim1kN2f41Cfz70=g4a_+gPPrWDacA@mail.gmail.com>
+	<201106221505.32531.arnd@arndb.de>
+Message-ID: <BANLkTi=1LPxiQFUbsLG+Dp1c0P9p_Ew6xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fwiw, drm_fb_helper_single_fb_probe() calls register_framebuffer() (if
-that was the question?)
+On Wed, Jun 22, 2011 at 4:05 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Ok, I see. In that case I agree that using debugfs is fine, but I would
+> recommend trying to use fewer macros and just open-coding the file
+> operations for better readability.
 
-BR,
--R
-
-2011/6/22 InKi Dae <daeinki@gmail.com>:
-> It adds dri-devel at lists.freedesktop.org to this mail thread.
-> Thank you.
->
-> 2011? 6? 22? ?? 3:04, daeinki <inki.dae@samsung.com>?? ?:
->> below is additional comments.
->>
->> daeinki ? ?:
->>> Hi all,
->>>
->>> I'm writing Samsung SoC based DRM framework and this one includes FIMD
->>> and HDMI driver as hardware dependent modules. and for now, encoder,
->>> connector, crtc and fb module has been materialized almost. but I'm
->>> contending with  framebuffer setting issue(created fb_info should be
->>> registered to linux framebuffer through register_framebuffer() or not)as
->>> default framebuffer at booting time.
->>>
->>> at drm_fb_helper_single_fb_probe() of drm_fb_helper.c file, fb_helper's
->>> fb_probe callback is called and this one creates new framebuffer and
->>> returns a value more then 0 if true. internally, this process creates an
->>> fb_info object and drm_framebuffer and then drm_framebuffer would be
->>> added to mode_config.fb_list of the drm_device.
->>>
->> it's my mistake. return value is 0 if true, nonzero otherwise.
->>
->>> a value returned, new_fb is used to decide that it calls
->>> register_framebuffer() or drm_fb_helper_set_par(). at this point, I am
->>> confused it's a good way to call register_framebuffer() otherwise
->>> drm_fb_helper_set_par(). if register_framebuffer() is called then I
->>> guess drm_fb_helper_set_par() or drm_crtc_helper_set_config() should be
->>> called somewhere subsequently to apply this one to real hardware because
->>> previous process is just for maintaining data logically.(not set up data
->>> to h/w)
->>>
->>> it's a right way to call register_framebuffer() and then
->>> drm_fb_helper_set_par() or drm_crtc_helper_set_config()? otherwise just
->>> only drm_fb_helper_set_par() or drm_crtc_helper_set_config() ignoring
->>> register_framebuffer()? and what is the purpose of using
->>> register_framebuffer()?
->>>
->> I understood that if fb_probe() callback is fail then fb_info object is
->> registered to linux framebuffer through register_framebuffer()
->> otherwise(if true) hardware configuration would be completed by
->> drm_fb_helper_set_par() so the reason of using register_framebuffer() is
->> that the case of failing fb_probe() callback, it is for drawing on only
->> linux framebuffer. is it right?
->>
->>> In my case, first, register_framebuffer() is called and then if desired
->>> default crtc id is matched with drm_fb_helper->crtc_info[0 ~ n].crtc_id,
->>> it gets mode_set of drm_fb_helper->crtc_info[n] and then  it calls
->>> drm_crtc_helper_set_config(mode_set). at this time, all the hardware
->>> configurations would be completed.
->>>
->>> thank you in advance.
->>>
->>> Best Regards
->>> Inki Dae.
->>>
->>
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
->
+Sure thing. It didn't end up saving much code eventually, too, so I'll
+just remove it.
