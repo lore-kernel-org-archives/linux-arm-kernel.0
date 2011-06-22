@@ -1,121 +1,72 @@
-From: prakity@marvell.com (Philip Rakity)
-Date: Tue, 21 Jun 2011 21:41:40 -0700
-Subject: [PATCH v4 1/4] mmc: sdhci: fix interrupt storm from card detection
-In-Reply-To: <20110622044043.GA25389@S2100-06.ap.freescale.net>
-References: <1308667311-1855-1-git-send-email-shawn.guo@linaro.org>
-	<1308667311-1855-2-git-send-email-shawn.guo@linaro.org>
-	<6E4917C1-3CE0-48AD-A2B2-761488F39A2A@marvell.com>
-	<20110622044043.GA25389@S2100-06.ap.freescale.net>
-Message-ID: <665AD69D-860E-4C2E-8757-9F75EDD1C9D0@marvell.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Wed, 22 Jun 2011 10:23:13 +0530
+Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping framework
+	redesign
+In-Reply-To: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <4E017539.30505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Marek,
 
-On Jun 21, 2011, at 9:40 PM, Shawn Guo wrote:
+On 06/20/2011 01:20 PM, Marek Szyprowski wrote:
+> Hello,
+>
+> This patch series is a continuation of my works on implementing generic
+> IOMMU support in DMA mapping framework for ARM architecture. Now I
+> focused on the DMA mapping framework itself. It turned out that adding
+> support for common dma_map_ops structure was not that hard as I initally
+> thought. After some modification most of the code fits really well to
+> the generic dma_map_ops methods.
+>
+> The only change required to dma_map_ops is a new alloc function. During
+> the discussion on Linaro Memory Management meeting in Budapest we got
+> the idea that we can have only one alloc/free/mmap function with
+> additional attributes argument. This way all different kinds of
+> architecture specific buffer mappings can be hidden behind the
+> attributes without the need of creating several versions of dma_alloc_
+> function. I also noticed that the dma_alloc_noncoherent() function can
+> be also implemented this way with DMA_ATTRIB_NON_COHERENT attribute.
+> Systems that just defines dma_alloc_noncoherent as dma_alloc_coherent
+> will just ignore such attribute.
+>
+> Another good use case for alloc methods with attributes is the
+> possibility to allocate buffer without a valid kernel mapping. There are
+> a number of drivers (mainly V4L2 and ALSA) that only exports the DMA
+> buffers to user space. Such drivers don't touch the buffer data at all.
+> For such buffers we can avoid the creation of a mapping in kernel
+> virtual address space, saving precious vmalloc area. Such buffers might
+> be allocated once a new attribute DMA_ATTRIB_NO_KERNEL_MAPPING.
 
-> On Tue, Jun 21, 2011 at 09:05:25AM -0700, Philip Rakity wrote:
->> 
->> On Jun 21, 2011, at 7:41 AM, Shawn Guo wrote:
->> 
->>> The issue was initially found by Eric Benard as below.
->>> 
->>> http://permalink.gmane.org/gmane.linux.ports.arm.kernel/108031
->>> 
->>> Not sure about other SDHCI based controller, but on Freescale eSDHC,
->>> the SDHCI_INT_CARD_INSERT bits will be immediately set again when it
->>> gets cleared, if a card is inserted. The driver need to mask the irq
->>> to prevent interrupt storm which will freeze the system.  And the
->>> SDHCI_INT_CARD_REMOVE gets the same situation.
->>> 
->>> The patch fixes the problem based on the initial idea from
->>> Eric Benard.
->>> 
->>> Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
->>> Cc: Eric Benard <eric@eukrea.com>
->>> Tested-by: Arnaud Patard <arnaud.patard@rtp-net.org>
->>> ---
->>> drivers/mmc/host/sdhci.c |   29 +++++++++++++++++++++++++----
->>> 1 files changed, 25 insertions(+), 4 deletions(-)
->>> 
->>> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
->>> index 91d9892..790f959 100644
->>> --- a/drivers/mmc/host/sdhci.c
->>> +++ b/drivers/mmc/host/sdhci.c
->>> @@ -127,11 +127,15 @@ static void sdhci_mask_irqs(struct sdhci_host *host, u32 irqs)
->>> 
->>> static void sdhci_set_card_detection(struct sdhci_host *host, bool enable)
->>> {
->>> -	u32 irqs = SDHCI_INT_CARD_REMOVE | SDHCI_INT_CARD_INSERT;
->>> +	u32 present, irqs;
->>> 
->>> 	if (host->quirks & SDHCI_QUIRK_BROKEN_CARD_DETECTION)
->>> 		return;
->>> 
->>> +	present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
->>> +			      SDHCI_CARD_PRESENT;
->>> +	irqs = present ? SDHCI_INT_CARD_REMOVE : SDHCI_INT_CARD_INSERT;
->>> +
->>> 	if (enable)
->>> 		sdhci_unmask_irqs(host, irqs);
->>> 	else
->>> @@ -2154,13 +2158,30 @@ static irqreturn_t sdhci_irq(int irq, void *dev_id)
->>> 		mmc_hostname(host->mmc), intmask);
->>> 
->>> 	if (intmask & (SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE)) {
->>> +		u32 present = sdhci_readl(host, SDHCI_PRESENT_STATE) &
->>> +			      SDHCI_CARD_PRESENT;
->>> +
->>> +		/*
->>> +		 * There is a observation on i.mx esdhc.  INSERT bit will be
->>> +		 * immediately set again when it gets cleared, if a card is
->>> +		 * inserted.  We have to mask the irq to prevent interrupt
->>> +		 * storm which will freeze the system.  And the REMOVE gets
->>> +		 * the same situation.
->>> +		 *
->>> +		 * More testing are needed here to ensure it works for other
->>> +		 * platforms though.
->>> +		 */
->>> +		sdhci_mask_irqs(host, present ? SDHCI_INT_CARD_INSERT :
->>> +						SDHCI_INT_CARD_REMOVE);
->>> +		sdhci_unmask_irqs(host, present ? SDHCI_INT_CARD_REMOVE :
->>> +						  SDHCI_INT_CARD_INSERT);
->>> +
->> 
->> ====
->>> 		sdhci_writel(host, intmask & (SDHCI_INT_CARD_INSERT |
->>> -			SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
->>> +			     SDHCI_INT_CARD_REMOVE), SDHCI_INT_STATUS);
->> 
->> ====
->> Please keep the old formatting since code does not change anything.  Makes it easier to find
->> the real change
->> 
-> 
-> I actually rewrote the body of the if-statement, and fixed one
-> indentation in that specific line.
+Are you trying to say here, that the buffer would be allocated in the 
+user space, and we just use it to map it to the device in DMA+IOMMU 
+framework?
 
-understand -- I'm happy with the results !  
-Philip
+>
+> All the changes introduced in this patch series are intended to prepare
+> a good ground for upcoming generic IOMMU integration to DMA mapping
+> framework on ARM architecture.
+>
+> For more information about proof-of-concept IOMMU implementation in DMA
+> mapping framework, please refer to my previous set of patches:
+> http://www.spinics.net/lists/linux-mm/msg19856.html
+>
+> I've tried to split the redesign into a set of single-step changes for
+> easier review and understanding. If there is anything that needs further
+> clarification, please don't hesitate to ask.
+>
+> The patches are prepared on top of Linux Kernel v3.0-rc3.
+>
+> The proposed changes have been tested on Samsung Exynos4 platform. I've
+> also tested dmabounce code (by manually registering support for DMA
+> bounce for some of the devices available on my board), although my
+> hardware have no such strict requirements. Would be great if one could
+> test my patches on different ARM architectures to check if I didn't
+> break anything.
+>
+> Best regards
 
-> 
->>> +		intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
->>> 		tasklet_schedule(&host->card_tasklet);
->>> 	}
->>> 
->>> -	intmask &= ~(SDHCI_INT_CARD_INSERT | SDHCI_INT_CARD_REMOVE);
->>> -
->>> 	if (intmask & SDHCI_INT_CMD_MASK) {
->>> 		sdhci_writel(host, intmask & SDHCI_INT_CMD_MASK,
->>> 			SDHCI_INT_STATUS);
->>> -- 
->>> 1.7.4.1
->>> 
->> 
->> 
->> Reviewed-by: Philip Rakity <prakity@marvell.com>
->> 
-> 
-> -- 
-> Regards,
-> Shawn
-> 
+Regards,
+Subash
+SISO-SLG
