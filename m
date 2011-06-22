@@ -1,34 +1,37 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Jun 2011 13:35:07 +0200
-Subject: [PATCH 2/6] mach-ux500: setting proper uart for snowball
-Message-ID: <1308742507-24132-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 22 Jun 2011 13:35:30 +0200
+Subject: [PATCH 5/6] mach-ux500: Kconfig for snowball board
+Message-ID: <1308742530-25097-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Mathieu J. Poirier <mathieu.poirier@linaro.org>
 
-The UART setting in uncompress.h changes on the Snowball board.
+This adds the necessary Kconfig entry for a Snowball board.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 Signed-off-by: Robert Marklund <robert.marklund@stericsson.com>
 ---
- arch/arm/mach-ux500/include/mach/uncompress.h |    3 ++-
- 1 files changed, 2 insertions(+), 1 deletions(-)
+ arch/arm/mach-ux500/Kconfig |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/include/mach/uncompress.h b/arch/arm/mach-ux500/include/mach/uncompress.h
-index 088b550..7dd0807 100644
---- a/arch/arm/mach-ux500/include/mach/uncompress.h
-+++ b/arch/arm/mach-ux500/include/mach/uncompress.h
-@@ -54,7 +54,8 @@ static inline void arch_decomp_setup(void)
- 	if (machine_is_u8500() ||
- 	    machine_is_svp8500v1() ||
- 	    machine_is_svp8500v2() ||
--	    machine_is_hrefv60())
-+	    machine_is_hrefv60()   ||
-+	    machine_is_snowball())
- 		ux500_uart_base = U8500_UART2_BASE;
- 	else if (machine_is_u5500())
- 		ux500_uart_base = U5500_UART0_BASE;
+diff --git a/arch/arm/mach-ux500/Kconfig b/arch/arm/mach-ux500/Kconfig
+index 96d546c..4210cb4 100644
+--- a/arch/arm/mach-ux500/Kconfig
++++ b/arch/arm/mach-ux500/Kconfig
+@@ -35,6 +35,13 @@ config MACH_HREFV60
+        help
+          Include support for the HREFv60 new development platform.
+ 
++config MACH_SNOWBALL
++	bool "U8500 Snowball platform"
++	depends on UX500_SOC_DB8500
++	select MACH_U8500
++	help
++	  Include support for the snowball development platform.
++
+ config MACH_U5500
+ 	bool "U5500 Development platform"
+ 	depends on UX500_SOC_DB5500
 -- 
 1.7.3.2
