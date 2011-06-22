@@ -1,23 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 22:01:47 +0100
-Subject: [PATCH 00/25 v2] Re-jig cpu_suspend for a saner calling convention
-In-Reply-To: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-Message-ID: <20110622210147.GC9449@n2100.arm.linux.org.uk>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 22 Jun 2011 23:20:14 +0200
+Subject: [PATCH 2/2] rtc: vt8500: use define instead of hardcoded value for
+	status bit
+In-Reply-To: <1308777614-19043-1-git-send-email-w.sang@pengutronix.de>
+References: <1308777614-19043-1-git-send-email-w.sang@pengutronix.de>
+Message-ID: <1308777614-19043-2-git-send-email-w.sang@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 04:08:16PM +0100, Russell King - ARM Linux wrote:
-> Tested on Assabet (SA1100) and 3430LDP only.
+Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+Cc: Alexey Charkov <alchark@gmail.com>
+Cc: John Stultz <john.stultz@linaro.org>
+---
 
-Correction - because suspend only goes into retention mode, these
-changes have not been tested on the 3430.  Someone who knows what
-they're doing with the mega-complicated OMAPs (and so knows how to
-trigger the required modes to test these code paths) needs to test
-this.
+I guess 3.1 is fine for this one.
 
-It will currently fail when trying to call cpu_resume() because we're
-trying the virtual address for that function, whereas it needs to be
-the physical address.  That's left as an exercise to solve (easiest
-way is probably to pass virt_to_phys(cpu_resume) into _omap_sram_idle
-and get it to save that away in SRAM.)
+ drivers/rtc/rtc-vt8500.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/rtc/rtc-vt8500.c b/drivers/rtc/rtc-vt8500.c
+index efd6066..f93f412 100644
+--- a/drivers/rtc/rtc-vt8500.c
++++ b/drivers/rtc/rtc-vt8500.c
+@@ -74,6 +74,8 @@
+ #define VT8500_RTC_CR_SM_SEC	(1 << 3)	/* 0: 1Hz/60, 1: 1Hz */
+ #define VT8500_RTC_CR_CALIB	(1 << 4)	/* Enable calibration */
+ 
++#define VT8500_RTC_IS_ALARM	(1 << 0)	/* Alarm interrupt status */
++
+ struct vt8500_rtc {
+ 	void __iomem		*regbase;
+ 	struct resource		*res;
+@@ -96,7 +98,7 @@ static irqreturn_t vt8500_rtc_irq(int irq, void *dev_id)
+ 
+ 	spin_unlock(&vt8500_rtc->lock);
+ 
+-	if (isr & 1)
++	if (isr & VT8500_RTC_IS_ALARM)
+ 		events |= RTC_AF | RTC_IRQF;
+ 
+ 	rtc_update_irq(vt8500_rtc->rtc, 1, events);
+@@ -161,8 +163,8 @@ static int vt8500_rtc_read_alarm(struct device *dev, struct rtc_wkalrm *alrm)
+ 	alrm->time.tm_sec = bcd2bin((alarm & TIME_SEC_MASK));
+ 
+ 	alrm->enabled = (alarm & ALARM_ENABLE_MASK) ? 1 : 0;
++	alrm->pending = (isr & VT8500_RTC_IS_ALARM) ? 1 : 0;
+ 
+-	alrm->pending = (isr & 1) ? 1 : 0;
+ 	return rtc_valid_tm(&alrm->time);
+ }
+ 
+-- 
+1.7.2.5
