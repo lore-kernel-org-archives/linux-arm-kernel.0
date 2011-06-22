@@ -1,74 +1,88 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 16:13:35 +0100
-Subject: [PATCH 15/25] ARM: pm: sa1100: move cpu_suspend into C code
+Date: Wed, 22 Jun 2011 16:13:15 +0100
+Subject: [PATCH 14/25] ARM: pm: pxa: cleanup PXA suspend code
 In-Reply-To: <20110622150816.GT23234@n2100.arm.linux.org.uk>
 References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-Message-ID: <E1QZP7X-0002Wj-Pl@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QZP7D-0002Wf-As@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We don't need a veneer for cpu_suspend, it can be called directly from
-C code now.  Move it into sa11x0_pm_enter() along with the re-enabling
-of clock switching.
+Remove now redundant stacking of registers.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/mach-sa1100/pm.c    |    7 +++++--
- arch/arm/mach-sa1100/sleep.S |   12 ++----------
- 2 files changed, 7 insertions(+), 12 deletions(-)
+ arch/arm/mach-pxa/sleep.S |   33 +++++++++++++--------------------
+ 1 files changed, 13 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-sa1100/pm.c b/arch/arm/mach-sa1100/pm.c
-index c4661aa..7d8f80e 100644
---- a/arch/arm/mach-sa1100/pm.c
-+++ b/arch/arm/mach-sa1100/pm.c
-@@ -32,7 +32,7 @@
- #include <asm/system.h>
- #include <asm/mach/time.h>
+diff --git a/arch/arm/mach-pxa/sleep.S b/arch/arm/mach-pxa/sleep.S
+index 3a67887..cd39293 100644
+--- a/arch/arm/mach-pxa/sleep.S
++++ b/arch/arm/mach-pxa/sleep.S
+@@ -33,11 +33,15 @@ ENTRY(pxa3xx_cpu_suspend)
+ #ifndef CONFIG_IWMMXT
+ 	mra	r2, r3, acc0
+ #endif
+-	stmfd	sp!, {r2 - r12, lr}	@ save registers on stack
++	stmfd	sp!, {r2, r3, lr}	@ save registers on stack
+ 	mov	r1, r0
+ 	adr	r3, BSYM(pxa3xx_finish_suspend)
+ 	bl	cpu_suspend
+-	b	pxa_cpu_resume
++	ldmfd	sp!, {r2, r3, lr}
++#ifndef CONFIG_IWMMXT
++	mar	acc0, r2, r3
++#endif
++	mov	pc, lr
  
--extern void sa1100_cpu_suspend(long);
-+extern void sa1100_finish_suspend(unsigned long);
+ pxa3xx_finish_suspend:
+ 	mov	r0, #0x06		@ S2D3C4 mode
+@@ -60,11 +64,15 @@ ENTRY(pxa27x_cpu_suspend)
+ #ifndef CONFIG_IWMMXT
+ 	mra	r2, r3, acc0
+ #endif
+-	stmfd	sp!, {r2 - r12, lr}		@ save registers on stack
++	stmfd	sp!, {r2, r3, lr}		@ save registers on stack
+ 	mov	r2, r0				@ save sleep mode
+ 	adr	r3, BSYM(pxa27x_finish_suspend)
+ 	bl	cpu_suspend
+-	b	pxa_cpu_resume
++	ldmfd	sp!, {r2, r3, lr}
++#ifndef CONFIG_IWMMXT
++	mar	acc0, r2, r3
++#endif
++	mov	pc, lr
  
- #define SAVE(x)		sleep_save[SLEEP_SAVE_##x] = x
- #define RESTORE(x)	x = sleep_save[SLEEP_SAVE_##x]
-@@ -75,7 +75,10 @@ static int sa11x0_pm_enter(suspend_state_t state)
- 	PSPR = virt_to_phys(cpu_resume);
- 
- 	/* go zzz */
--	sa1100_cpu_suspend(PLAT_PHYS_OFFSET - PAGE_OFFSET);
-+	cpu_suspend(0, PHYS_OFFSET - PAGE_OFFSET, 0, sa1100_finish_suspend);
-+
-+	/* Re-enable clock switching */
-+	asm volatile("mcr p15, 0, %0, c15, c1, 2" : : "r" (0));
- 
- 	cpu_init();
- 
-diff --git a/arch/arm/mach-sa1100/sleep.S b/arch/arm/mach-sa1100/sleep.S
-index e814b60..e822331 100644
---- a/arch/arm/mach-sa1100/sleep.S
-+++ b/arch/arm/mach-sa1100/sleep.S
-@@ -22,21 +22,13 @@
- 
- 		.text
- /*
-- * sa1100_cpu_suspend()
-+ * sa1100_finish_suspend()
-  *
-  * Causes sa11x0 to enter sleep state
-  *
+ pxa27x_finish_suspend:
+ 	@ Put the processor to sleep
+@@ -112,11 +120,9 @@ pxa27x_finish_suspend:
   */
  
--ENTRY(sa1100_cpu_suspend)
--	mov	r9, lr
--	mov	r1, r0
--	adr	r3, BSYM(sa1100_finish_suspend)
+ ENTRY(pxa25x_cpu_suspend)
+-	stmfd	sp!, {r2 - r12, lr}		@ save registers on stack
+ 	mov	r2, r0				@ save sleep mode
+ 	adr	r3, BSYM(pxa25x_finish_suspend)
 -	bl	cpu_suspend
--	mcr	p15, 0, r1, c15, c1, 2		@ enable clock switching
--	mov	pc, r9				@ return to caller
--
--sa1100_finish_suspend:
-+ENTRY(sa1100_finish_suspend)
- 	@ disable clock switching
- 	mcr	p15, 0, r1, c15, c2, 2
+-	b	pxa_cpu_resume
++	b	cpu_suspend
  
+ pxa25x_finish_suspend:
+ 	@ prepare value for sleep mode
+@@ -202,16 +208,3 @@ pxa_cpu_do_suspend:
+ 	mcr	p14, 0, r1, c7, c0, 0		@ PWRMODE
+ 
+ 20:	b	20b				@ loop waiting for sleep
+-
+-/*
+- * pxa_cpu_resume()
+- *
+- * entry point from bootloader into kernel during resume
+- */
+-	.align 5
+-pxa_cpu_resume:
+-	ldmfd	sp!, {r2, r3}
+-#ifndef CONFIG_IWMMXT
+-	mar	acc0, r2, r3
+-#endif
+-	ldmfd	sp!, {r4 - r12, pc}		@ return to caller
 -- 
 1.7.4.4
