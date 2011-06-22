@@ -1,112 +1,174 @@
 From: p.paneri@samsung.com (Praveen Paneri)
-Date: Wed, 22 Jun 2011 13:43:54 +0530
-Subject: [RFC][PATCH 0/5] USB: DWC OTG: Add dwc_otg driver for S5P6440
-	samsung SoC.
-In-Reply-To: <004301cc3011$d92e28c0$8b8a7a40$%szyprowski@samsung.com>
-References: <0LN400GHXZI488M0@mailout1.samsung.com>
-	<BANLkTi=P-kwd-sd2-91mNUkSbVs==bxrqw@mail.gmail.com>
-	<004301cc3011$d92e28c0$8b8a7a40$%szyprowski@samsung.com>
-Message-ID: <BANLkTi=UenDcD4=vC+37mL7r8CHCguySZg@mail.gmail.com>
+Date: Wed, 22 Jun 2011 13:56:25 +0530
+Subject: [RFC][PATCH 4/5] ARM: S5P64x0: Adding OTG PHY control code
+In-Reply-To: <0LN400HTOZEQDIL0@mailout1.samsung.com>
+References: <0LN400HTOZEQDIL0@mailout1.samsung.com>
+Message-ID: <BANLkTikDDBQjE2RCeeBB50vokSTcnCO46A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marek,
+Hi,
 
-On Tue, Jun 21, 2011 at 6:20 PM, Marek Szyprowski
-<m.szyprowski@samsung.com> wrote:
-> Hello,
+On Tue, Jun 21, 2011 at 4:19 PM, PRAVEEN PANERI <p.paneri@samsung.com> wrote:
 >
-> On Tuesday, June 21, 2011 2:36 PM Praveen Paneri wrote:
 >
->> On Tue, Jun 21, 2011 at 4:21 PM, PRAVEEN PANERI <p.paneri@samsung.com>
->> wrote:
->> Hi,
->> >
->> > Hello,
->> >
->> > On Tuesday, June 21, 2011 9:04 AM p.paneri at samsung.com wrote:
->> >
->> > > From: Praveen Paneri
->> > >
->> > > These patches modify DWC OTG driver for ARM and add it for ARM based
->> SoCs.
->> > > Currently it has been tested for Samsung's S5P6440. The development is
->> > > still
->> > > under process so these are not the best set of patches. They are just
->> for
->> > > review
->> > > and not for merge. Intent of these patches is to show required
->> > > modifications
->> > > to make dwc_otg patches work on ARM.
->> >
->> > What are the differences between DWC OTG hardware and OTG hardware found
->> > in s3c64xx/s5pc100/s5pv210 and Exynos4 SoCs series? I've did a brief look
->> > at register definitions and most of them looks same. Can this driver be
->> > merged with s3c-hsotg.c driver?
->> Yes they are same because they all use the same OTG IP. This driver
->> provides
->> functionalities of both host and gadget while s3c-hsotg.c is only a
->> gadget driver.
 >
-> I'm perfectly aware that s3c-hsotg is just for UDC functionality. I
-> just wanted to ask if this driver can replace s3c-hsotg.c driver
-> completely?
-Yes it can, given we are ready for required modification in this for all the
-gadgets(if required) to work as expected.
+> Hi,
 >
->> If you think this can be merged in s3c-hsotg to make that work in
->> smiler fashion
->> then go ahead but will that work on platforms other than ARM?
+> On Tue, Jun 21, 2011 at 12:33:46PM +0530, p.paneri at samsung.com wrote:
+> > From: Praveen Paneri
+> >
+> > A generic method to initialize and exit OTG PHY which can be
+> > used for all the samsung SoCs.
+> > OTG platdata structure added in platform to pass required
+> > platform specific functions and data to the driver.
+> >
+> > Signed-off-by: Praveen Paneri
+> > ---
+> >??arch/arm/mach-s5p64x0/Makefile?????????? |????1 +
+> >??arch/arm/mach-s5p64x0/include/mach/map.h |????4 +
+> >??arch/arm/mach-s5p64x0/setup-otg-phy.c????|?? 89 ++++++++++++++++++++++++++++++
+> >??arch/arm/plat-s5p/include/plat/otg.h???? |?? 29 ++++++++++
+> >??4 files changed, 123 insertions(+), 0 deletions(-)
+> >??create mode 100644 arch/arm/mach-s5p64x0/setup-otg-phy.c
+> >??create mode 100644 arch/arm/plat-s5p/include/plat/otg.h
+> >
+> > diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
+> > index ae6bf6f..611fb3a 100644
+> > --- a/arch/arm/mach-s5p64x0/Makefile
+> > +++ b/arch/arm/mach-s5p64x0/Makefile
+> > @@ -28,3 +28,4 @@ obj-y += dev-audio.o
+> >??obj-$(CONFIG_S3C64XX_DEV_SPI) += dev-spi.o
+> >
+> >??obj-$(CONFIG_S5P64X0_SETUP_I2C1) += setup-i2c1.o
+> > +obj-$(CONFIG_S3C_DEV_DWC_OTG) += setup-otg-phy.o
+> > diff --git a/arch/arm/mach-s5p64x0/include/mach/map.h b/arch/arm/mach-s5p64x0/include/mach/map.h
+> > index 95c9125..717c279 100644
+> > --- a/arch/arm/mach-s5p64x0/include/mach/map.h
+> > +++ b/arch/arm/mach-s5p64x0/include/mach/map.h
+> > @@ -44,6 +44,8 @@
+> >??#define S5P64X0_PA_SPI1 0xEC500000
+> >
+> >??#define S5P64X0_PA_HSOTG 0xED100000
+> > +#define S5P64X0_PA_USB_HSPHY 0xED200000
+> > +#define S5P64X0_VA_USB_HSPHY S3C_ADDR_CPU(0x00100000)
+> >
+> >??#define S5P64X0_PA_HSMMC(x) (0xED800000 + ((x) * 0x100000))
+> >
+> > @@ -71,6 +73,8 @@
+> >??#define S5P_PA_TIMER S5P64X0_PA_TIMER
+> >
+> >??#define SAMSUNG_PA_ADC S5P64X0_PA_ADC
+> > +#define S3C_PA_USB_HSOTG S5P64X0_PA_HSOTG
+> > +#define S3C_VA_USB_HSPHY????????S5P64X0_VA_USB_HSPHY
+> >
+> >??/* UART */
+> >
+> > diff --git a/arch/arm/mach-s5p64x0/setup-otg-phy.c b/arch/arm/mach-s5p64x0/setup-otg-phy.c
 >
-> You can always create so called variants of the driver that exports
-> different functionality depending on the platform data the driver has
-> been bound to. Usually it is used to distinguish different models of
-> the hardware that has a lot in common. For example please refer to
-> driver/media/video/s5p-fimc/fimc-core.c and fimc_driver_ids array in
-> the bottom of the code.
-That is why this exercise is done. We do not want to create different varients
-and want to make it work across SoCs. That is the challenge. I have it
-working for
-S5P64X0 and may be it can work for others too with minimal changes only in the
-platform side code and not in the driver. I am yet to try this with
-other boards.
+> drivers should not live in arch/arm/*, why don't you move this to
+> drivers/usb/otg where the PHYs are staying right now ?
+PHY init/exit code can vary across SoCs. Wouldn't it be better to have it in the
+SoC specific location?
 >
->> >
->> > > Following features are tested for basic functions on SMDK6440
->> > > board after modifications:
->> > > OTG HOST: HID and mass-storage
->> > > OTG DEVICE: mass-storage and adb
->> >
->> > Does it mean that HID or mass-storage (both host or gadget drivers) needs
->> > modifications to get them working with this DWC OTG driver?
->>
->> Why would we need any other driver if DWC OTG driver is working both
->> as host and gadget?
+> > new file mode 100644
+> > index 0000000..c351554
+> > --- /dev/null
+> > +++ b/arch/arm/mach-s5p64x0/setup-otg-phy.c
+> > @@ -0,0 +1,89 @@
+> > +/*
+> > + * Copyright (C) 2011 Samsung Electronics Co.Ltd
+> > + * Author: Praveen Paneri
+> > + * based on arch/arm/mach-exynos4/setup-usb-phy.c
+> > + * written by Joonyoung Shim
+> > + *
+> > + *??This program is free software; you can redistribute??it and/or modify it
+> > + *??under??the terms of??the GNU General??Public License as published by the
+> > + *??Free Software Foundation;??either version 2 of the??License, or (at your
+> > + *??option) any later version.
+> > + *
+> > + */
+> > +
+> > +#include
+> > +#include
+> > +#include
+> > +#include
+> > +#include
+> > +#include
+> > +#include
+> > +#include
+> > +#include
+> > +
+> > +struct clk *otg_clk;
+> > +static int s5p64x0_otg_phy_init(struct platform_device *pdev)
+> > +{
+> > + int err;
+> > +
+> > + otg_clk = clk_get(&pdev->dev, "otg");
+> > + if (IS_ERR(otg_clk)) {
+> > + dev_err(&pdev->dev, "Failed to get otg clock\n");
+> > + return PTR_ERR(otg_clk);
+> > + }
+> > +
+> > + err = clk_enable(otg_clk);
+> > + if (err) {
+> > + clk_put(otg_clk);
+> > + return err;
+> > + }
+> > +
+> > + if (gpio_is_valid(S5P6440_GPN(1))) {
+> > + err = gpio_request(S5P6440_GPN(1), "GPN");
+> > + if (err)
+> > + printk(KERN_ERR "failed to request GPN1\n");
+> > + gpio_direction_output(S5P6440_GPN(1), 1);
+> > + }
+> > +
+> > + writel(readl(S5P64X0_OTHERS)&~S5P64X0_OTHERS_USB_SIG_MASK,
+> > + S5P64X0_OTHERS);
+> > + writel(0x0, S3C_PHYPWR);???????? /* Power up */
+> > + writel(S3C_PHYCLK_CLKSEL_12M, S3C_PHYCLK);
+> > + writel(S3C_RSTCON_PHY, S3C_RSTCON);
+> > +
+> > + udelay(50);
+> > + writel(0x0, S3C_RSTCON);
+> > + udelay(50);
+> > +
+> > + return 0;
+> > +}
+> > +
+> > +static int s5p64x0_otg_phy_exit(struct platform_device *pdev)
+> > +{
+> > + writel(readl(S3C_PHYPWR)|(0x1F<<1), S3C_PHYPWR);
+> > + writel(readl(S5P64X0_OTHERS)&~S5P64X0_OTHERS_USB_SIG_MASK,
+> > + S5P64X0_OTHERS);
+> > +
+> > + gpio_free(S5P6440_GPN(1));
+> > +
+> > + clk_disable(otg_clk);
+> > + clk_put(otg_clk);
+> > +
+> > + return 0;
+> > +}
+> > +
+> > +int s5p_usb_phy_init(struct platform_device *pdev, int type)
+> > +{
+> > + if (type == S5P_USB_PHY_DEVICE)
+> > + return s5p64x0_otg_phy_init(pdev);
+> > +
+> > + return -EINVAL;
+> > +}
+> > +
+> > +int s5p_usb_phy_exit(struct platform_device *pdev, int type)
+> > +{
+> > + if (type == S5P_USB_PHY_DEVICE)
+> > + return s5p64x0_otg_phy_exit(pdev);
+> > +
+> > + return -EINVAL;
+> > +}
 >
-> You got me wrong. I wanted to ask if one needs to tweak in mass storage
-> driver to get it working with DWC OTG driver? I'm asking because I've
-> already seen a lot of scary code on some public Android trees, where mass
-> storage was hacked to workaround bugs (or flaws) in the OTG driver.
-Okay, No changes required in mass storage driver. Just the changes shown
-in the patch.
+> no way to make this a real driver instead of set a exported functions ??
 >
-> Have you tried your DWC OTG driver with some more demanding gadget
-> drivers? One of such is g_multi which exports 3 usb functions (RNDIS,
-> ACM serial and Mass Storage) in a composite device.
-No,Only with adb and mass storage. But I am planning to do that off-course.
-
+> --
+> balbi
+>
 paneri
->
-> Best regards
-> --
-> Marek Szyprowski
-> Samsung Poland R&D Center
->
->
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
