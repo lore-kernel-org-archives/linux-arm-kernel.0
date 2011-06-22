@@ -1,49 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 22 Jun 2011 10:17:27 +0100
-Subject: [RFC] Add Arm cpu topology definition
-In-Reply-To: <4E0100BF.6080500@codeaurora.org>
-References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-	<4DFA5C2E.40507@codeaurora.org>
-	<BANLkTi=ik=iRtDb3K__CPxSH_8GusoBHKA@mail.gmail.com>
-	<4E0100BF.6080500@codeaurora.org>
-Message-ID: <20110622091727.GA1195@1n450.cable.virginmedia.net>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 22 Jun 2011 18:17:18 +0900
+Subject: [PATCH v2 1/4] Exynos4 NURI: configure regulators and PMIC
+In-Reply-To: <4E0164E8.8060708@linaro.org>
+References: <20110620103124.GD31864@opensource.wolfsonmicro.com>
+	<1308622033-2521-1-git-send-email-myungjoo.ham@samsung.com>
+	<1308622033-2521-2-git-send-email-myungjoo.ham@samsung.com>
+	<4E002D18.2080401@linaro.org>
+	<BANLkTi=pv=y+1XC5bYEHgL1sy48JPztiOg@mail.gmail.com>
+	<4E0164E8.8060708@linaro.org>
+Message-ID: <00bf01cc30bd$350b7fc0$9f227f40$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 01:36:15PM -0700, Stephen Boyd wrote:
-> On 06/16/2011 11:54 PM, Vincent Guittot wrote:
-> > On 16 June 2011 21:40, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> >> The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
-> >> different vendors may attribute different meaning to these fields if
-> >> they wish. Does that mean this should be a platform_*() function?
-> >>
-> > The ARM ARM also provides a recommended use of the fields of this
-> > register and the TRM of each Cortex adds some details. On the cortex
-> > A9, each platform can only set the value of the Cluster ID with the
-> > CLUSTERID pins. I have tried to consolidate the value of MPIDR  across
-> > several platforms and they all match with the description.
-> >
-> > Have you got an example of a MPIDR register which doesn't match with
-> > the implementation ?
+Tushar Behera wrote:
 > 
-> Not that I know of. I'm more concerned with how the ARM ARM has two
-> recommended usages for these fields depending on virtualization or not.
-> I suppose we can handle that issue when it arises (or does your
-> implementation already handle that?)
+> On Wednesday 22 June 2011 08:01 AM, MyungJoo Ham wrote:
+> > On Tue, Jun 21, 2011 at 2:33 PM, Tushar Behera<tushar.behera@linaro.org>
+> wrote:
+> >> On Tuesday 21 June 2011 07:37 AM, MyungJoo Ham wrote:
+> >>>
+> >>> Signed-off-by: MyungJoo Ham<myungjoo.ham@samsung.com>
+> >>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
+> >>>
+> >>> --
+> >>> Changes from v1. Thanks so much for your valuable comments, Mark.
+> >>> - Removed unnecessary initialization data
+> >>> - Add __initdata where necessary
+> >>> - Corrected a regulator name for ADC
+> >>> ---
+> >>>   arch/arm/mach-exynos4/mach-nuri.c |  622
+> >>> ++++++++++++++++++++++++++++++++++++-
+> >>>   1 files changed, 621 insertions(+), 1 deletions(-)
+> >>>
+> >> Will it be possible to move PMIC specific defines to a common file and make
+> >> appropriate calls in the board-specific file?
+> >>
+> >> In that way, we can re-use this PMIC code on some other boards (e.g.
+> >> Insignal low-cost board Origen featuring Exynos4210 also features MAX8997).
+> >>
+> >
+> > Yes, we have tried creating PMIC defines at a seperated file in our
+> > local repositories (still doing so in those repositories).
+> > However, that ended up creating multiple PMIC defines (one PMIC define
+> > file for each board); the connections between LDO# and devices are
+> > different.
+> >
+> In that case, we can first post the Origen board support and PMIC code
+> on the ML, then we would see if we can consolidate.
+> 
+> That looks more logical as per Mark's suggestion also.
+> >>
 
-According to the ARM ARM:
+Hi Tushar,
 
-	MPIDR provides a mechanism with up to three levels of affinity
-	information, but the meaning of those levels of affinity is
-	entirely IMPLEMENTATION DEFINED.
+When you need to add similar or same functionality on your board, you can/should move it in common part.
+Maybe 'should'...basically, nobody will apply same function into both place...
 
-So we can't really tell the meaning of the affinity bits. There are two
-recommended ways indeed (with or without virtualisation) which are not
-that different with regards to the topology (just introducing another
-level for virtual CPUs).
+Thanks.
 
-But I think a more general solution would be for the CPU topology to be
-provided via the FDT.
-
--- 
-Catalin
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
