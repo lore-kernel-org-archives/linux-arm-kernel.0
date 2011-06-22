@@ -1,35 +1,48 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Wed, 22 Jun 2011 10:43:48 +0800
-Subject: [PATCH 6/6] ARM: mxc: clean up imx-dma device registration
-In-Reply-To: <20110621151326.GC14004@pengutronix.de>
-References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
-	<1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
-	<20110620145054.GA24184@S2100-06.ap.freescale.net>
-	<20110621144138.GA24939@S2100-06.ap.freescale.net>
-	<20110621151326.GC14004@pengutronix.de>
-Message-ID: <20110622024347.GB25234@S2100-06.ap.freescale.net>
+From: rusty@rustcorp.com.au (Rusty Russell)
+Date: Wed, 22 Jun 2011 12:12:33 +0930
+Subject: [RFC 7/8] drivers: introduce rpmsg,
+	a remote-processor messaging bus
+In-Reply-To: <1308640714-17961-8-git-send-email-ohad@wizery.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-8-git-send-email-ohad@wizery.com>
+Message-ID: <87liwu8u3q.fsf@rustcorp.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 05:13:26PM +0200, Wolfram Sang wrote:
-> 
-> > The patch has been out there for a while with no comments.  My
-> > understanding is you will need to either give comments or apply
-> > the patch, no?
-> 
-> Yes, but there is no timeframe guaranteed. We try our best to respond as fast
-> as possible, but we (like most others) have a couple of things on our
-> todo-list.
-> 
-Totally understandable.  I could have hold this second ping for
-another few days.  But I saw Sascha picked up Fabio's mx53 SDMA
-patch which grows the stuff I'm trying to clean up.  It actually
-is Fabio's patch reminding me to send the patch clean this stuff
-up.
+On Tue, 21 Jun 2011 10:18:33 +0300, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+> Add a virtio-based IPC bus, which enables kernel users to communicate
+> with remote processors over shared memory using a simple messaging
+> protocol.
 
-So in this particular case, it's not about time frame but picking
-up the right patch in the right order.
+Wow, sometimes one writes a standard and people use it.  Thanks!
 
--- 
-Regards,
-Shawn
+I'm still digesting exactly what you're doing, but this is a bit
+unconventional:
+
+> +	/* Platform must supply pre-allocated uncached buffers for now */
+> +	vdev->config->get(vdev, VPROC_BUF_ADDR, &addr, sizeof(addr));
+> +	vdev->config->get(vdev, VPROC_BUF_NUM, &num_bufs, sizeof(num_bufs));
+> +	vdev->config->get(vdev, VPROC_BUF_SZ, &buf_size, sizeof(buf_size));
+> +	vdev->config->get(vdev, VPROC_BUF_PADDR, &vrp->phys_base,
+> +						sizeof(vrp->phys_base));
+
+The normal way is to think of the config space as a structure, and use
+offsets rather than using an enum value to distinguish the fields.
+
+> +#define RPMSG_NAME_SIZE			32
+> +#define RPMSG_DEVICE_MODALIAS_FMT	"rpmsg:%s"
+> +
+> +struct rpmsg_device_id {
+> +	char name[RPMSG_NAME_SIZE];
+> +	kernel_ulong_t driver_data	/* Data private to the driver */
+> +			__attribute__((aligned(sizeof(kernel_ulong_t))));
+> +};
+
+This alignment directive seems overkill...
+
+> +#define VIRTIO_ID_RPMSG		10 /* virtio remote processor messaging */
+
+I think you want 6.  Plan 9 jumped ahead to grab 9 :)
+
+Cheers,
+Rusty.
