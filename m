@@ -1,276 +1,47 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 22 Jun 2011 01:38:37 +0200
-Subject: [PATCH v7 07/11] mmc: add a block request prepare function
-In-Reply-To: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
-References: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <1308699521-20556-8-git-send-email-per.forlin@linaro.org>
+From: pullip.cho@samsung.com (KyongHo Cho)
+Date: Wed, 22 Jun 2011 09:00:54 +0900
+Subject: [Linaro-mm-sig] [PATCH 7/8] common: dma-mapping: change
+	alloc/free_coherent method to more generic alloc/free_attrs
+In-Reply-To: <002401cc3005$a941c010$fbc54030$%szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-8-git-send-email-m.szyprowski@samsung.com>
+	<BANLkTikFdrOuXsLCfvyA_V+p7S_fd72dyQ@mail.gmail.com>
+	<002401cc3005$a941c010$fbc54030$%szyprowski@samsung.com>
+Message-ID: <BANLkTinDN-FF5=8uj9pP58Ny0-LUMtjh=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Break out code from mmc_blk_issue_rw_rq to create a
-block request prepare function. This doesn't change
-any functionallity. This helps when handling more
-than one active block request.
+2011/6/21 Marek Szyprowski <m.szyprowski@samsung.com>:
+>
+> You already got a reply that dropping dma_alloc_writecombine() is no
+> go on ARM.
+>
+Yes.
 
-Signed-off-by: Per Forlin <per.forlin@linaro.org>
----
- drivers/mmc/card/block.c |  222 ++++++++++++++++++++++++----------------------
- 1 files changed, 117 insertions(+), 105 deletions(-)
+> That's not a problem. Once we agree on dma_alloc_attrs(), the drivers
+> can be changed to use DMA_ATTR_WRITE_COMBINE attribute. If the platform
+> doesn't support the attribute, it is just ignored. That's the whole
+> point of the attributes extension. Once a driver is converted to
+> dma_alloc_attrs(), it can be used without any changes either on platforms
+> that supports some specific attributes or the one that doesn't implement
+> support for any of them.
+>
+I just worried that removing an existing construct is not a simple job.
+You introduced 3 attributes: DMA_ATTR_WRITE_COMBINE, ***COHERENT and
+***NO_KERNEL_VADDR
 
-diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-index 3d11690..7a0fabd 100644
---- a/drivers/mmc/card/block.c
-+++ b/drivers/mmc/card/block.c
-@@ -661,12 +661,15 @@ static inline void mmc_apply_rel_rw(struct mmc_blk_request *brq,
- 	}
- }
- 
--static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
-+static void mmc_blk_rw_rq_prep(struct mmc_queue_req *mqrq,
-+			       struct mmc_card *card,
-+			       int disable_multi,
-+			       struct mmc_queue *mq)
- {
-+	u32 readcmd, writecmd;
-+	struct mmc_blk_request *brq = &mqrq->brq;
-+	struct request *req = mqrq->req;
- 	struct mmc_blk_data *md = mq->data;
--	struct mmc_card *card = md->queue.card;
--	struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
--	int ret = 1, disable_multi = 0;
- 
- 	/*
- 	 * Reliable writes are used to implement Forced Unit Access and
-@@ -677,120 +680,129 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
- 		(rq_data_dir(req) == WRITE) &&
- 		(md->flags & MMC_BLK_REL_WR);
- 
--	do {
--		struct mmc_command cmd = {0};
--		u32 readcmd, writecmd, status = 0;
--
--		memset(brq, 0, sizeof(struct mmc_blk_request));
--		brq->mrq.cmd = &brq->cmd;
--		brq->mrq.data = &brq->data;
--
--		brq->cmd.arg = blk_rq_pos(req);
--		if (!mmc_card_blockaddr(card))
--			brq->cmd.arg <<= 9;
--		brq->cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
--		brq->data.blksz = 512;
--		brq->stop.opcode = MMC_STOP_TRANSMISSION;
--		brq->stop.arg = 0;
--		brq->stop.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
--		brq->data.blocks = blk_rq_sectors(req);
--
--		/*
--		 * The block layer doesn't support all sector count
--		 * restrictions, so we need to be prepared for too big
--		 * requests.
--		 */
--		if (brq->data.blocks > card->host->max_blk_count)
--			brq->data.blocks = card->host->max_blk_count;
-+	memset(brq, 0, sizeof(struct mmc_blk_request));
-+	brq->mrq.cmd = &brq->cmd;
-+	brq->mrq.data = &brq->data;
- 
--		/*
--		 * After a read error, we redo the request one sector at a time
--		 * in order to accurately determine which sectors can be read
--		 * successfully.
--		 */
--		if (disable_multi && brq->data.blocks > 1)
--			brq->data.blocks = 1;
-+	brq->cmd.arg = blk_rq_pos(req);
-+	if (!mmc_card_blockaddr(card))
-+		brq->cmd.arg <<= 9;
-+	brq->cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
-+	brq->data.blksz = 512;
-+	brq->stop.opcode = MMC_STOP_TRANSMISSION;
-+	brq->stop.arg = 0;
-+	brq->stop.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
-+	brq->data.blocks = blk_rq_sectors(req);
- 
--		if (brq->data.blocks > 1 || do_rel_wr) {
--			/* SPI multiblock writes terminate using a special
--			 * token, not a STOP_TRANSMISSION request.
--			 */
--			if (!mmc_host_is_spi(card->host) ||
--			    rq_data_dir(req) == READ)
--				brq->mrq.stop = &brq->stop;
--			readcmd = MMC_READ_MULTIPLE_BLOCK;
--			writecmd = MMC_WRITE_MULTIPLE_BLOCK;
--		} else {
--			brq->mrq.stop = NULL;
--			readcmd = MMC_READ_SINGLE_BLOCK;
--			writecmd = MMC_WRITE_BLOCK;
--		}
--		if (rq_data_dir(req) == READ) {
--			brq->cmd.opcode = readcmd;
--			brq->data.flags |= MMC_DATA_READ;
--		} else {
--			brq->cmd.opcode = writecmd;
--			brq->data.flags |= MMC_DATA_WRITE;
--		}
-+	/*
-+	 * The block layer doesn't support all sector count
-+	 * restrictions, so we need to be prepared for too big
-+	 * requests.
-+	 */
-+	if (brq->data.blocks > card->host->max_blk_count)
-+		brq->data.blocks = card->host->max_blk_count;
- 
--		if (do_rel_wr)
--			mmc_apply_rel_rw(&brq, card, req);
-+	/*
-+	 * After a read error, we redo the request one sector at a time
-+	 * in order to accurately determine which sectors can be read
-+	 * successfully.
-+	 */
-+	if (disable_multi && brq->data.blocks > 1)
-+		brq->data.blocks = 1;
- 
--		/*
--		 * Pre-defined multi-block transfers are preferable to
--		 * open ended-ones (and necessary for reliable writes).
--		 * However, it is not sufficient to just send CMD23,
--		 * and avoid the final CMD12, as on an error condition
--		 * CMD12 (stop) needs to be sent anyway. This, coupled
--		 * with Auto-CMD23 enhancements provided by some
--		 * hosts, means that the complexity of dealing
--		 * with this is best left to the host. If CMD23 is
--		 * supported by card and host, we'll fill sbc in and let
--		 * the host deal with handling it correctly. This means
--		 * that for hosts that don't expose MMC_CAP_CMD23, no
--		 * change of behavior will be observed.
--		 *
--		 * N.B: Some MMC cards experience perf degradation.
--		 * We'll avoid using CMD23-bounded multiblock writes for
--		 * these, while retaining features like reliable writes.
-+	if (brq->data.blocks > 1 || do_rel_wr) {
-+		/* SPI multiblock writes terminate using a special
-+		 * token, not a STOP_TRANSMISSION request.
- 		 */
-+		if (!mmc_host_is_spi(card->host) ||
-+		    rq_data_dir(req) == READ)
-+			brq->mrq.stop = &brq->stop;
-+		readcmd = MMC_READ_MULTIPLE_BLOCK;
-+		writecmd = MMC_WRITE_MULTIPLE_BLOCK;
-+	} else {
-+		brq->mrq.stop = NULL;
-+		readcmd = MMC_READ_SINGLE_BLOCK;
-+		writecmd = MMC_WRITE_BLOCK;
-+	}
-+	if (rq_data_dir(req) == READ) {
-+		brq->cmd.opcode = readcmd;
-+		brq->data.flags |= MMC_DATA_READ;
-+	} else {
-+		brq->cmd.opcode = writecmd;
-+		brq->data.flags |= MMC_DATA_WRITE;
-+	}
- 
--		if ((md->flags & MMC_BLK_CMD23) &&
--		    mmc_op_multi(brq->cmd.opcode) &&
--		    (do_rel_wr || !(card->quirks & MMC_QUIRK_BLK_NO_CMD23))) {
--			brq->sbc.opcode = MMC_SET_BLOCK_COUNT;
--			brq->sbc.arg = brq->data.blocks |
--				(do_rel_wr ? (1 << 31) : 0);
--			brq->sbc.flags = MMC_RSP_R1 | MMC_CMD_AC;
--			brq->mrq.sbc = &brq->sbc;
--		}
-+	if (do_rel_wr)
-+		mmc_apply_rel_rw(brq, card, req);
- 
--		mmc_set_data_timeout(&brq->data, card);
-+	/*
-+	 * Pre-defined multi-block transfers are preferable to
-+	 * open ended-ones (and necessary for reliable writes).
-+	 * However, it is not sufficient to just send CMD23,
-+	 * and avoid the final CMD12, as on an error condition
-+	 * CMD12 (stop) needs to be sent anyway. This, coupled
-+	 * with Auto-CMD23 enhancements provided by some
-+	 * hosts, means that the complexity of dealing
-+	 * with this is best left to the host. If CMD23 is
-+	 * supported by card and host, we'll fill sbc in and let
-+	 * the host deal with handling it correctly. This means
-+	 * that for hosts that don't expose MMC_CAP_CMD23, no
-+	 * change of behavior will be observed.
-+	 *
-+	 * N.B: Some MMC cards experience perf degradation.
-+	 * We'll avoid using CMD23-bounded multiblock writes for
-+	 * these, while retaining features like reliable writes.
-+	 */
- 
--		brq->data.sg = mq->mqrq_cur->sg;
--		brq->data.sg_len = mmc_queue_map_sg(mq, mq->mqrq_cur);
-+	if ((md->flags & MMC_BLK_CMD23) &&
-+	    mmc_op_multi(brq->cmd.opcode) &&
-+	    (do_rel_wr || !(card->quirks & MMC_QUIRK_BLK_NO_CMD23))) {
-+		brq->sbc.opcode = MMC_SET_BLOCK_COUNT;
-+		brq->sbc.arg = brq->data.blocks |
-+			(do_rel_wr ? (1 << 31) : 0);
-+		brq->sbc.flags = MMC_RSP_R1 | MMC_CMD_AC;
-+		brq->mrq.sbc = &brq->sbc;
-+	}
- 
--		/*
--		 * Adjust the sg list so it is the same size as the
--		 * request.
--		 */
--		if (brq->data.blocks != blk_rq_sectors(req)) {
--			int i, data_size = brq->data.blocks << 9;
--			struct scatterlist *sg;
--
--			for_each_sg(brq->data.sg, sg, brq->data.sg_len, i) {
--				data_size -= sg->length;
--				if (data_size <= 0) {
--					sg->length += data_size;
--					i++;
--					break;
--				}
-+	mmc_set_data_timeout(&brq->data, card);
-+
-+	brq->data.sg = mqrq->sg;
-+	brq->data.sg_len = mmc_queue_map_sg(mq, mqrq);
-+
-+	/*
-+	 * Adjust the sg list so it is the same size as the
-+	 * request.
-+	 */
-+	if (brq->data.blocks != blk_rq_sectors(req)) {
-+		int i, data_size = brq->data.blocks << 9;
-+		struct scatterlist *sg;
-+
-+		for_each_sg(brq->data.sg, sg, brq->data.sg_len, i) {
-+			data_size -= sg->length;
-+			if (data_size <= 0) {
-+				sg->length += data_size;
-+				i++;
-+				break;
- 			}
--			brq->data.sg_len = i;
- 		}
-+		brq->data.sg_len = i;
-+	}
-+
-+	mmc_queue_bounce_pre(mqrq);
-+}
- 
--		mmc_queue_bounce_pre(mq->mqrq_cur);
-+static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
-+{
-+	struct mmc_blk_data *md = mq->data;
-+	struct mmc_card *card = md->queue.card;
-+	struct mmc_blk_request *brq = &mq->mqrq_cur->brq;
-+	int ret = 1, disable_multi = 0;
-+
-+	do {
-+		struct mmc_command cmd;
-+		u32 status = 0;
- 
-+		mmc_blk_rw_rq_prep(mq->mqrq_cur, card, disable_multi, mq);
- 		mmc_wait_for_req(card->host, &brq->mrq);
- 
- 		mmc_queue_bounce_post(mq->mqrq_cur);
--- 
-1.7.4.1
+I replied earlier, I also indicated that write combining option for
+dma_alloc_*() is required.
+But it does not mean dma_map_ops must support that.
+I think dma_alloc_writecombine() can be implemented regardless of dma_map_ops.
+
+> Allocation is a separate operation from mapping to userspace. Mmap
+> operation should just map the buffer (represented by a cookie of type
+> dma_addr_t) to user address space.
+>
+> Note that some drivers (like framebuffer drivers for example) also
+> needs to have both types of mapping - one for user space and one for
+> kernel virtual space.
+
+I meant that I think DMA_ATTR_NOKERNELVADDR is not required because
+you also introduced mmap callback.
