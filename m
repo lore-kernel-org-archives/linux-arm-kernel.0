@@ -1,67 +1,47 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Wed, 22 Jun 2011 09:03:30 +0200
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
-	Allocator added
-In-Reply-To: <201106150937.18524.arnd@arndb.de>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<000501cc2b2b$789a54b0$69cefe10$%szyprowski@samsung.com>
-	<201106150937.18524.arnd@arndb.de>
-Message-ID: <201106220903.31065.hverkuil@xs4all.nl>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 22 Jun 2011 09:09:47 +0200
+Subject: [PATCHv7] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <874o3i9x89.fsf@lebrac.rtp-net.org>
+References: <1301325297-24126-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<87k4cfa550.fsf@lebrac.rtp-net.org>
+	<20110621223527.GF6069@pengutronix.de>
+	<874o3i9x89.fsf@lebrac.rtp-net.org>
+Message-ID: <20110622070947.GH6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, June 15, 2011 09:37:18 Arnd Bergmann wrote:
-> On Wednesday 15 June 2011 09:11:39 Marek Szyprowski wrote:
-> > I see your concerns, but I really wonder how to determine the properties
-> > of the global/default cma pool. You definitely don't want to give all
-> > available memory o CMA, because it will have negative impact on kernel
-> > operation (kernel really needs to allocate unmovable pages from time to
-> > time). 
+On Wed, Jun 22, 2011 at 08:49:42AM +0200, Arnaud Patard wrote:
+> Sascha Hauer <s.hauer@pengutronix.de> writes:
+> Hi,
 > 
-> Exactly. This is a hard problem, so I would prefer to see a solution for
-> coming up with reasonable defaults.
-> 
-> > The only solution I see now is to provide Kconfig entry to determine
-> > the size of the global CMA pool, but this still have some issues,
-> > especially for multi-board kernels (each board probably will have
-> > different amount of RAM and different memory-consuming devices
-> > available). It looks that each board startup code still might need to
-> > tweak the size of CMA pool. I can add a kernel command line option for
-> > it, but such solution also will not solve all the cases (afair there
-> > was a discussion about kernel command line parameters for memory 
-> > configuration and the conclusion was that it should be avoided).
-> 
-> The command line option can be a last resort if the heuristics fail,
-> but it's not much better than a fixed Kconfig setting.
-> 
-> How about a Kconfig option that defines the percentage of memory
-> to set aside for contiguous allocations?
+> > On Tue, Jun 21, 2011 at 11:46:35AM +0200, Arnaud Patard wrote:
+> >> <Dinh.Nguyen@freescale.com> writes:
+> >> 
+> >> Hi,
+> >> 
+> >> > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> >> >
+> >> > Adds initial low power suspend functionality to MX51.
+> >> > Supports "mem" and "standby" modes.
+> >> >
+> >> > Tested on mx51-babbage.
+> >> >
+> >> > Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> >> 
+> >> I fail to see this patch in imx tree. Did it get merged in some other
+> >> tree ?
+> >
+> > Not yet. Have you tested this patch?
+> >
+> Yes, it works fine on my platforms.
 
-I would actually like to see a cma_size kernel option of some sort. This would
-be for the global CMA pool only as I don't think we should try to do anything
-more complicated here.
+I took this as a tested-by and applied the patch.
 
-While it is relatively easy for embedded systems to do a recompile every time
-you need to change the pool size, this isn't an option on 'normal' desktop
-systems.
+Sascha
 
-While usually you have more than enough memory on such systems and don't need
-CMA, there are a number of cases where you do want to reserve sufficient
-memory. Usually these involve lots of video capture cards in one system.
 
-What I was wondering about is how this patch series changes the allocation
-in case it can't allocate from the CMA pool. Will it attempt to fall back
-to a 'normal' allocation?
-
-The reason I ask is that for desktop systems you could just start with a CMA
-pool of size 0. And only in specific situations would you need to add a
-cma_size kernel parameter depending on your needs. But this scheme would
-require a fallback scenario in case of a global CMA pool of size 0.
-
-Hmm, perhaps this fallback scenario is more driver specific. For SoC platform
-video devices you may not want a fallback, whereas for PCI(e)/USB devices you
-do. I don't know what's best, frankly.
-
-Regards,
-
-	Hans
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
