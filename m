@@ -1,30 +1,30 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Wed, 22 Jun 2011 08:23:44 +0200
-Subject: [PATCH] USB: ehci: use packed,aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <alpine.LFD.2.00.1106211636190.2142@xanadu.home>
-References: <Pine.LNX.4.44L0.1106211054460.2327-100000@iolanthe.rowland.org>
-	<alpine.LFD.2.00.1106211636190.2142@xanadu.home>
-Message-ID: <4E018A70.1060706@ahsoftware.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 22 Jun 2011 08:33:16 +0200
+Subject: [PATCH 6/6] ARM: mxc: clean up imx-dma device registration
+In-Reply-To: <20110622024347.GB25234@S2100-06.ap.freescale.net>
+References: <1307950645-26529-1-git-send-email-shawn.guo@linaro.org>
+	<1307950645-26529-7-git-send-email-shawn.guo@linaro.org>
+	<20110620145054.GA24184@S2100-06.ap.freescale.net>
+	<20110621144138.GA24939@S2100-06.ap.freescale.net>
+	<20110621151326.GC14004@pengutronix.de>
+	<20110622024347.GB25234@S2100-06.ap.freescale.net>
+Message-ID: <20110622063316.GA14114@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+> So in this particular case, it's not about time frame but picking
+> up the right patch in the right order.
 
-On 21.06.2011 22:41, Nicolas Pitre wrote:
+Ah, okay. That's a perfectly valid reason, of course. Would be nice to state
+the reason in the "ping"-mail next time :)
 
-> ... and also in this case, I was talking about proper use of the packed 
-> attribute in general, not at all about a specific case.  I wanted to 
-> provide a broader view to some people who expressed doubts and 
-> misunderstanding in the hope that the archive could keep this knowledge 
-> base available.
-> 
-> I apologize if that wasn't clear to you.
-
-If you meant the abomination writing one, thanks, but I never expressed
-doubts or misunderstandings.
-
-I said doubts may arise because the standard (C99) doesn't say anything
-about if or how structs are packed (or aligned).
-
-Alexander
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110622/023d23e9/attachment-0001.sig>
