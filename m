@@ -1,35 +1,101 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Jun 2011 15:39:23 +0200
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous
-	=?iso-8859-1?q?Memory=09Allocator?= added
-In-Reply-To: <003701cc30de$7a159710$6e40c530$%szyprowski@samsung.com>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106221442.20848.arnd@arndb.de>
-	<003701cc30de$7a159710$6e40c530$%szyprowski@samsung.com>
-Message-ID: <201106221539.24044.arnd@arndb.de>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 22 Jun 2011 17:52:18 +0400
+Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
+In-Reply-To: <20110622132314.GG23598@legolas.emea.dhcp.ti.com>
+References: <1308745217-10883-1-git-send-email-dbaryshkov@gmail.com>
+	<20110622132314.GG23598@legolas.emea.dhcp.ti.com>
+Message-ID: <BANLkTimK0B-620-3DfRY4yGURGs=Y4uDQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 June 2011, Marek Szyprowski wrote:
-> Sounds really good, but it might be really hard to implemnt, at least for
-> CMA, because it needs to tweak parameters of memory management internal 
-> structures very early, when buddy allocator has not been activated yet.
+On 6/22/11, Felipe Balbi <balbi@ti.com> wrote:
+> Hi,
+>
+> On Wed, Jun 22, 2011 at 04:20:16PM +0400, Dmitry Eremin-Solenikov wrote:
+>> Some platforms would like to disable D+ pullup on suspend, to drain as
+>> low power, as possible. E.g. this was requested by mioa701 board
+>> maintainers.
+>
+> I think this makes sense to many platforms, but by doing so, you would
+> loose connection to the Host PC, so you need to make sure your device
+> isn't been used before you go down this road.
 
-Why that? I would expect you can do the same that hugepages (used to) do
-and just attempt high-order allocations. If they succeed, you can add them
-as a CMA region and free them again, into the movable set of pages, otherwise
-you just fail the  request from user space when the memory is already
-fragmented.
- 
-> > These essentially fight over the same memory (though things are slightly
-> > different with dynamic hugepages), and they all face the same basic problem
-> > of getting as much for themselves without starving the other three.
-> 
-> I'm not sure we can solve all such issues in the first version. Maybe we should
-> first have each of the above fully working in mainline separately and then
-> start the integration works.
+I've thought about this. Should UDC driver should somehow call into OTG
+layer on suspend? My understanding is that otg_set_suspend isn't the call
+that should be done here, is it true?
 
-Yes, makes sense. We just need to be careful not to introduce user-visible
-interfaces that we cannot change any more in the process.
+My idea was that board can ask for D+ disabling, knowing itself the behaviour
+of the platform driver on suspend (e.g. PXA27x does disable UDC on suspend,
+but I dunno what effect this will cause on Host PC).
 
-	Arnd
+>> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+>> ---
+>>  drivers/usb/otg/gpio_vbus.c   |   32 ++++++++++++++++++++++++++++++++
+>>  include/linux/usb/gpio_vbus.h |    1 +
+>>  2 files changed, 33 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
+>> index 52733d9..44527bd 100644
+>> --- a/drivers/usb/otg/gpio_vbus.c
+>> +++ b/drivers/usb/otg/gpio_vbus.c
+>> @@ -327,6 +327,34 @@ static int __exit gpio_vbus_remove(struct
+>> platform_device *pdev)
+>>  	return 0;
+>>  }
+>>
+>> +#ifdef CONFIG_PM
+>> +static int gpio_vbus_suspend(struct platform_device *pdev, pm_message_t
+>> state)
+>> +{
+>> +	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
+>> +	struct gpio_vbus_mach_info *pdata = gpio_vbus->dev->platform_data;
+>> +
+>> +	if (gpio_vbus->otg.gadget && pdata->disconnect_on_suspend) {
+>> +		/* optionally disable D+ pullup */
+>> +		if (gpio_is_valid(pdata->gpio_pullup))
+>> +			gpio_set_value(pdata->gpio_pullup,
+>> +					pdata->gpio_pullup_inverted);
+>> +
+>> +		set_vbus_draw(gpio_vbus, 0);
+>> +	}
+>> +	return 0;
+>> +}
+>> +
+>> +static int gpio_vbus_resume(struct platform_device *pdev)
+>> +{
+>> +	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
+>> +
+>> +	if (gpio_vbus->otg.gadget)
+>> +		schedule_work(&gpio_vbus->work);
+>> +
+>> +	return 0;
+>> +}
+>
+> actually, the correct way would be to use dev_pm_ops.
+
+Could I use SIMPLE_DEV_PM_OPS here?
+
+>
+>> +#endif
+>> +
+>>  /* NOTE:  the gpio-vbus device may *NOT* be hotplugged */
+>>
+>>  MODULE_ALIAS("platform:gpio-vbus");
+>> @@ -337,6 +365,10 @@ static struct platform_driver gpio_vbus_driver = {
+>>  		.owner = THIS_MODULE,
+>>  	},
+>>  	.remove  = __exit_p(gpio_vbus_remove),
+>> +#ifdef CONFIG_PM
+>> +	.suspend	= gpio_vbus_suspend,
+>> +	.resume		= gpio_vbus_resume
+>> +#endif
+>
+> also, avoid the ifdef on the driver structure.
+
+Ack. Was just C&P from gpio-vbus, but it's not an excuse
+to follow bad style.
+
+
+-- 
+With best wishes
+Dmitry
