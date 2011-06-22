@@ -1,51 +1,68 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Wed, 22 Jun 2011 11:38:41 +0200
-Subject: [PATCH v7 02/11] omap_hsmmc: add support for pre_req and post_req
-In-Reply-To: <BANLkTi=GT=1u0YEtUaJre24BOhRyDNGUSg@mail.gmail.com>
-References: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
-	<1308699521-20556-3-git-send-email-per.forlin@linaro.org>
-	<BANLkTikqeKg=Mr9BxVYL7x=9k_jzGeLnQQ@mail.gmail.com>
-	<BANLkTi=GT=1u0YEtUaJre24BOhRyDNGUSg@mail.gmail.com>
-Message-ID: <BANLkTi=udZv3g-jB+FBWyaXqhQie3B2EaA@mail.gmail.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 22 Jun 2011 12:49:24 +0300
+Subject: [RFC][PATCH 4/5] ARM: S5P64x0: Adding OTG PHY control code
+In-Reply-To: <BANLkTikDDBQjE2RCeeBB50vokSTcnCO46A@mail.gmail.com>
+References: <0LN400HTOZEQDIL0@mailout1.samsung.com>
+	<BANLkTikDDBQjE2RCeeBB50vokSTcnCO46A@mail.gmail.com>
+Message-ID: <20110622094923.GA23598@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 June 2011 11:31, Per Forlin <per.forlin@linaro.org> wrote:
-> On 22 June 2011 10:51, Nickolay Nickolaev <nicknickolaev@gmail.com> wrote:
->> Hello,
->>
->> this one's causing me compilation trouble troubles when CONFIG_DMA_ENGINE is
->> not defined.
->>
-> I don't see this issue when I compile the kernel for a Pandaboard
-> without CONFIG_DMA_ENGINE being set. Could you please clarify or show
-> me your build log?
-> I don't see how host->next_data.cookie is connected to DMA_ENGINE.
->
-I think you are referring to the mmci-patch. I'll fix the issue in mmci.
+Hi,
 
->> On Wed, Jun 22, 2011 at 2:38 AM, Per Forlin <per.forlin@linaro.org> wrote:
->>>
->>> @@ -2077,6 +2155,7 @@ static int __init omap_hsmmc_probe(struct
->>> platform_device *pdev)
->>> ? ? ? ?host->mapbase ? = res->start;
->>> ? ? ? ?host->base ? ? ?= ioremap(host->mapbase, SZ_4K);
->>> ? ? ? ?host->power_mode = MMC_POWER_OFF;
->>> + ? ? ? host->next_data.cookie = 1;
->>>
->>> ? ? ? ?platform_set_drvdata(pdev, host);
->>> ? ? ? ?INIT_WORK(&host->mmc_carddetect_work, omap_hsmmc_detect);
->>> --
->>> 1.7.4.1
->>>
->>>
->>
->> Maybe we can wrap it in a function as the others.
->>
->> regards,
->> Nikolay Nikolaev
->>
->
-> Regards,
-> Per
->
+On Wed, Jun 22, 2011 at 01:56:25PM +0530, Praveen Paneri wrote:
+> > > diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
+> > > index ae6bf6f..611fb3a 100644
+> > > --- a/arch/arm/mach-s5p64x0/Makefile
+> > > +++ b/arch/arm/mach-s5p64x0/Makefile
+> > > @@ -28,3 +28,4 @@ obj-y += dev-audio.o
+> > >??obj-$(CONFIG_S3C64XX_DEV_SPI) += dev-spi.o
+> > >
+> > >??obj-$(CONFIG_S5P64X0_SETUP_I2C1) += setup-i2c1.o
+> > > +obj-$(CONFIG_S3C_DEV_DWC_OTG) += setup-otg-phy.o
+> > > diff --git a/arch/arm/mach-s5p64x0/include/mach/map.h b/arch/arm/mach-s5p64x0/include/mach/map.h
+> > > index 95c9125..717c279 100644
+> > > --- a/arch/arm/mach-s5p64x0/include/mach/map.h
+> > > +++ b/arch/arm/mach-s5p64x0/include/mach/map.h
+> > > @@ -44,6 +44,8 @@
+> > >??#define S5P64X0_PA_SPI1 0xEC500000
+> > >
+> > >??#define S5P64X0_PA_HSOTG 0xED100000
+> > > +#define S5P64X0_PA_USB_HSPHY 0xED200000
+> > > +#define S5P64X0_VA_USB_HSPHY S3C_ADDR_CPU(0x00100000)
+> > >
+> > >??#define S5P64X0_PA_HSMMC(x) (0xED800000 + ((x) * 0x100000))
+> > >
+> > > @@ -71,6 +73,8 @@
+> > >??#define S5P_PA_TIMER S5P64X0_PA_TIMER
+> > >
+> > >??#define SAMSUNG_PA_ADC S5P64X0_PA_ADC
+> > > +#define S3C_PA_USB_HSOTG S5P64X0_PA_HSOTG
+> > > +#define S3C_VA_USB_HSPHY????????S5P64X0_VA_USB_HSPHY
+> > >
+> > >??/* UART */
+> > >
+> > > diff --git a/arch/arm/mach-s5p64x0/setup-otg-phy.c b/arch/arm/mach-s5p64x0/setup-otg-phy.c
+> >
+> > drivers should not live in arch/arm/*, why don't you move this to
+> > drivers/usb/otg where the PHYs are staying right now ?
+> PHY init/exit code can vary across SoCs. Wouldn't it be better to have it in the
+> SoC specific location?
+
+It will vary how ? If it's only regarding e.g. a different GPIO pin or a
+different IRQ number, you handle that by passing data down to driver
+(via platform_data or struct resource), now if it varies because a
+different board uses a different PHY, then another driver should be
+written (well, as long as it's really different from the one you have
+now, otherwise you should see if it's worth making the existing driver
+more flexible).
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110622/40104a24/attachment-0001.sig>
