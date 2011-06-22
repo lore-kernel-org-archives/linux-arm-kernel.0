@@ -1,65 +1,103 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 22 Jun 2011 18:17:18 +0900
-Subject: [PATCH v2 1/4] Exynos4 NURI: configure regulators and PMIC
-In-Reply-To: <4E0164E8.8060708@linaro.org>
-References: <20110620103124.GD31864@opensource.wolfsonmicro.com>
-	<1308622033-2521-1-git-send-email-myungjoo.ham@samsung.com>
-	<1308622033-2521-2-git-send-email-myungjoo.ham@samsung.com>
-	<4E002D18.2080401@linaro.org>
-	<BANLkTi=pv=y+1XC5bYEHgL1sy48JPztiOg@mail.gmail.com>
-	<4E0164E8.8060708@linaro.org>
-Message-ID: <00bf01cc30bd$350b7fc0$9f227f40$%kim@samsung.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Wed, 22 Jun 2011 11:27:55 +0200
+Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping framework
+	redesign
+In-Reply-To: <4E01AD7B.3070806@gmail.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<4E017539.30505@gmail.com>
+	<001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>
+	<4E01AD7B.3070806@gmail.com>
+Message-ID: <002701cc30be$ab296cc0$017c4640$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tushar Behera wrote:
-> 
-> On Wednesday 22 June 2011 08:01 AM, MyungJoo Ham wrote:
-> > On Tue, Jun 21, 2011 at 2:33 PM, Tushar Behera<tushar.behera@linaro.org>
-> wrote:
-> >> On Tuesday 21 June 2011 07:37 AM, MyungJoo Ham wrote:
-> >>>
-> >>> Signed-off-by: MyungJoo Ham<myungjoo.ham@samsung.com>
-> >>> Signed-off-by: Kyungmin Park<kyungmin.park@samsung.com>
-> >>>
-> >>> --
-> >>> Changes from v1. Thanks so much for your valuable comments, Mark.
-> >>> - Removed unnecessary initialization data
-> >>> - Add __initdata where necessary
-> >>> - Corrected a regulator name for ADC
-> >>> ---
-> >>>   arch/arm/mach-exynos4/mach-nuri.c |  622
-> >>> ++++++++++++++++++++++++++++++++++++-
-> >>>   1 files changed, 621 insertions(+), 1 deletions(-)
-> >>>
-> >> Will it be possible to move PMIC specific defines to a common file and make
-> >> appropriate calls in the board-specific file?
-> >>
-> >> In that way, we can re-use this PMIC code on some other boards (e.g.
-> >> Insignal low-cost board Origen featuring Exynos4210 also features MAX8997).
-> >>
+Hello,
+
+On Wednesday, June 22, 2011 10:53 AM Subash Patel wrote:
+
+> On 06/22/2011 12:29 PM, Marek Szyprowski wrote:
+> > Hello,
 > >
-> > Yes, we have tried creating PMIC defines at a seperated file in our
-> > local repositories (still doing so in those repositories).
-> > However, that ended up creating multiple PMIC defines (one PMIC define
-> > file for each board); the connections between LDO# and devices are
-> > different.
+> > On Wednesday, June 22, 2011 6:53 AM Subash Patel wrote:
 > >
-> In that case, we can first post the Origen board support and PMIC code
-> on the ML, then we would see if we can consolidate.
-> 
-> That looks more logical as per Mark's suggestion also.
+> >> On 06/20/2011 01:20 PM, Marek Szyprowski wrote:
+> >>> Hello,
+> >>>
+> >>> This patch series is a continuation of my works on implementing generic
+> >>> IOMMU support in DMA mapping framework for ARM architecture. Now I
+> >>> focused on the DMA mapping framework itself. It turned out that adding
+> >>> support for common dma_map_ops structure was not that hard as I
+> initally
+> >>> thought. After some modification most of the code fits really well to
+> >>> the generic dma_map_ops methods.
+> >>>
+> >>> The only change required to dma_map_ops is a new alloc function. During
+> >>> the discussion on Linaro Memory Management meeting in Budapest we got
+> >>> the idea that we can have only one alloc/free/mmap function with
+> >>> additional attributes argument. This way all different kinds of
+> >>> architecture specific buffer mappings can be hidden behind the
+> >>> attributes without the need of creating several versions of dma_alloc_
+> >>> function. I also noticed that the dma_alloc_noncoherent() function can
+> >>> be also implemented this way with DMA_ATTRIB_NON_COHERENT attribute.
+> >>> Systems that just defines dma_alloc_noncoherent as dma_alloc_coherent
+> >>> will just ignore such attribute.
+> >>>
+> >>> Another good use case for alloc methods with attributes is the
+> >>> possibility to allocate buffer without a valid kernel mapping. There
+> are
+> >>> a number of drivers (mainly V4L2 and ALSA) that only exports the DMA
+> >>> buffers to user space. Such drivers don't touch the buffer data at all.
+> >>> For such buffers we can avoid the creation of a mapping in kernel
+> >>> virtual address space, saving precious vmalloc area. Such buffers might
+> >>> be allocated once a new attribute DMA_ATTRIB_NO_KERNEL_MAPPING.
 > >>
+> >> Are you trying to say here, that the buffer would be allocated in the
+> >> user space, and we just use it to map it to the device in DMA+IOMMU
+> >> framework?
+> >
+> > Nope. I proposed an extension which would allow you to allocate a buffer
+> > without creating the kernel mapping for it. Right now
+> dma_alloc_coherent()
+> > performs 3 operations:
+> > 1. allocates memory for the buffer
+> > 2. creates coherent kernel mapping for the buffer
+> > 3. translates physical buffer address to DMA address that can be used by
+> > the hardware.
+> >
+> > dma_mmap_coherent makes additional mapping for the buffer in user process
+> > virtual address space.
+> >
+> > I want make the step 2 in dma_alloc_coherent() optional to save virtual
+> > address space: it is really limited resource. I really want to avoid
+> > wasting it for mapping 128MiB buffers just to create full-HD processing
+> > hardware pipeline, where no drivers will use kernel mapping at all.
+> >
+> 
+> I think by (2) above, you are referring to
+> __dma_alloc_remap()->arm_vmregion_alloc() to allocate the kernel virtual
+> address for the drivers use. That makes sense now.
 
-Hi Tushar,
+Well, this is particular implementation which is used on ARM. Other 
+architectures might implement it differently, that's why I used generic 
+description and didn't point to any particular function.
 
-When you need to add similar or same functionality on your board, you can/should move it in common part.
-Maybe 'should'...basically, nobody will apply same function into both place...
+> I have a query in similar lines, but related to user virtual address
+> space. Is it feasible to extend these DMA interfaces(and IOMMU), to map
+> a user allocated buffer into the hardware?
 
-Thanks.
+This can be done with the current API, although it may not look so 
+straightforward. You just need to create a scatter list of user pages
+(these can be gathered with get_user_pages function) and use dma_map_sg()
+function. If the dma-mapping support iommu, it can map all these pages
+into a single contiguous buffer on device (DMA) address space.
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+Some additional 'magic' might be required to get access to pages that are
+mapped with pure PFN (VM_PFNMAP flag), but imho it still can be done.
+
+I will try to implement this feature in videobuf2-dma-config allocator
+together with the next version of my patches for dma-mapping&iommu.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
