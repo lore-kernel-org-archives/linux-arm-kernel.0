@@ -1,36 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Jun 2011 17:10:39 +0200
-Subject: i.MX consolidation patches
-In-Reply-To: <20110622145828.GL6069@pengutronix.de>
-References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
-	<20110622090321.GO23234@n2100.arm.linux.org.uk>
-	<20110622145828.GL6069@pengutronix.de>
-Message-ID: <201106221710.39687.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jun 2011 16:10:52 +0100
+Subject: [PATCH 07/25] ARM: pm: move sa1100 to use proper suspend func arg0
+In-Reply-To: <20110622150816.GT23234@n2100.arm.linux.org.uk>
+References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
+Message-ID: <E1QZP4u-0002WC-6c@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 June 2011, Sascha Hauer wrote:
-> --- a/arch/arm/boot/Makefile
-> +++ b/arch/arm/boot/Makefile
-> @@ -59,6 +59,11 @@ $(obj)/zImage:       $(obj)/compressed/vmlinux FORCE
->  
->  endif
->  
-> +ifneq ($(words $(ZRELADDR)), 1)
-> +$(obj)/uImage: FORCE
-> +       @echo 'Multiple zreladdrs, cannot build uImage'
-> +       exit 1
-> +else
+In the previous commit, we introduced an official way to supply an
+argument to the suspend function.  Convert the sa1100 suspend code
+to use this method.
 
-Failing the build for a possible configuration is not nice, I would
-be happier if this could be prevented in Kconfig. I have recently
-worked on getting all 'randconfig' build working for a bunch of platforms
-(patches will follow), so it would be a shame to have another
-guaranteed failure built into the kernel.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/mach-pxa/sleep.S |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
 
-Your patch is ok by itself, in order to detect the case when Kconfig
-logic has failed, but we should also have a way to prevent enabling
-uImage building in Kconfig for configurations that are known to
-not work.
-
-	Arnd
+diff --git a/arch/arm/mach-pxa/sleep.S b/arch/arm/mach-pxa/sleep.S
+index 6f53688..613ddfa 100644
+--- a/arch/arm/mach-pxa/sleep.S
++++ b/arch/arm/mach-pxa/sleep.S
+@@ -59,7 +59,7 @@ ENTRY(pxa27x_cpu_suspend)
+ 	mra	r2, r3, acc0
+ #endif
+ 	stmfd	sp!, {r2 - r12, lr}		@ save registers on stack
+-	mov	r4, r0				@ save sleep mode
++	mov	r2, r0				@ save sleep mode
+ 	ldr	r3, =pxa_cpu_resume		@ resume function
+ 	bl	cpu_suspend
+ 
+@@ -67,7 +67,7 @@ ENTRY(pxa27x_cpu_suspend)
+ 	@ (also workaround for sighting 28071)
+ 
+ 	@ prepare value for sleep mode
+-	mov	r1, r4				@ sleep mode
++	mov	r1, r0				@ sleep mode
+ 
+ 	@ prepare pointer to physical address 0 (virtual mapping in generic.c)
+ 	mov	r2, #UNCACHED_PHYS_0
+@@ -109,11 +109,11 @@ ENTRY(pxa27x_cpu_suspend)
+ 
+ ENTRY(pxa25x_cpu_suspend)
+ 	stmfd	sp!, {r2 - r12, lr}		@ save registers on stack
+-	mov	r4, r0				@ save sleep mode
++	mov	r2, r0				@ save sleep mode
+ 	ldr	r3, =pxa_cpu_resume		@ resume function
+ 	bl	cpu_suspend
+ 	@ prepare value for sleep mode
+-	mov	r1, r4				@ sleep mode
++	mov	r1, r0				@ sleep mode
+ 
+ 	@ prepare pointer to physical address 0 (virtual mapping in generic.c)
+ 	mov	r2, #UNCACHED_PHYS_0
+-- 
+1.7.4.4
