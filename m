@@ -1,63 +1,40 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 22 Jun 2011 16:40:52 +0400
-Subject: [PATCH 2/2] mioa701: move gpio-pullup functionality to gpio-vbus
-In-Reply-To: <1308745217-10883-2-git-send-email-dbaryshkov@gmail.com>
-References: <1308745217-10883-1-git-send-email-dbaryshkov@gmail.com>
-	<1308745217-10883-2-git-send-email-dbaryshkov@gmail.com>
-Message-ID: <BANLkTintf_rraxYLEB__4JWOfHw1-qm8pQ@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jun 2011 14:42:20 +0200
+Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
+	Allocator added
+In-Reply-To: <201106220903.31065.hverkuil@xs4all.nl>
+References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
+	<201106150937.18524.arnd@arndb.de>
+	<201106220903.31065.hverkuil@xs4all.nl>
+Message-ID: <201106221442.20848.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Oops... See bellow,
+On Wednesday 22 June 2011, Hans Verkuil wrote:
+> > How about a Kconfig option that defines the percentage of memory
+> > to set aside for contiguous allocations?
+> 
+> I would actually like to see a cma_size kernel option of some sort. This would
+> be for the global CMA pool only as I don't think we should try to do anything
+> more complicated here.
 
-On 6/22/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
-> gpio-vbus can (and should?) handle D+ pullup gpio for us. Move gpio-pullup
-> handling
-> to gpio-vbus and stop providing udc_info as it's empty now.
->
-> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
-> ---
->  arch/arm/mach-pxa/mioa701.c |    7 +------
->  1 files changed, 1 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
-> index bcbd359..e712c9d 100644
-> --- a/arch/arm/mach-pxa/mioa701.c
-> +++ b/arch/arm/mach-pxa/mioa701.c
-> @@ -402,14 +402,10 @@ static void gsm_exit(void)
->  /*
->   * USB UDC
->   */
-> -static struct pxa2xx_udc_mach_info mioa701_udc_info = {
-> -	.gpio_pullup	  = GPIO22_USB_ENABLE,
-> -};
-> -
->  struct gpio_vbus_mach_info gpio_vbus_data = {
->  	.gpio_vbus = GPIO13_nUSB_DETECT,
->  	.gpio_vbus_inverted = 1,
-> -	.gpio_pullup = -1,
-> +	.gpio_pullup = GPIO22_USB_ENABLE,
+A command line is probably good to override the compile-time default, yes.
 
-This should be also
-+	.disconnect_on_suspend = 1,
+We could also go further and add a runtime sysctl mechanism like the one
+for hugepages, where you can grow the pool at run time as long as there is
+enough free contiguous memory (e.g. from init scripts), or shrink it later
+if you want to allow larger nonmovable allocations.
 
->  };
->
->  /*
-> @@ -770,7 +766,6 @@ static void __init mioa701_machine_init(void)
->  	pxa_set_fb_info(NULL, &mioa701_pxafb_info);
->  	pxa_set_mci_info(&mioa701_mci_info);
->  	pxa_set_keypad_info(&mioa701_keypad_info);
-> -	pxa_set_udc_info(&mioa701_udc_info);
->  	pxa_set_ac97_info(&mioa701_ac97_info);
->  	pm_power_off = mioa701_poweroff;
->  	arm_pm_restart = mioa701_restart;
-> --
-> 1.7.5.3
->
->
+My feeling is that we need to find a way to integrate the global settings
+for four kinds of allocations:
 
+* nonmovable kernel pages
+* hugetlb pages
+* CMA
+* memory hotplug
 
--- 
-With best wishes
-Dmitry
+These essentially fight over the same memory (though things are slightly
+different with dynamic hugepages), and they all face the same basic problem
+of getting as much for themselves without starving the other three.
+
+	Arnd
