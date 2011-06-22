@@ -1,53 +1,49 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 22 Jun 2011 18:10:35 +0900
-Subject: [PATCH] Samsung SoC: header file revised to prevent declaring
-	duplicated.
-In-Reply-To: <1308214064-12796-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1308213184-6607-1-git-send-email-myungjoo.ham@samsung.com>
-	<1308214064-12796-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <00be01cc30bc$450ee250$cf2ca6f0$%kim@samsung.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 22 Jun 2011 10:17:27 +0100
+Subject: [RFC] Add Arm cpu topology definition
+In-Reply-To: <4E0100BF.6080500@codeaurora.org>
+References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
+	<4DFA5C2E.40507@codeaurora.org>
+	<BANLkTi=ik=iRtDb3K__CPxSH_8GusoBHKA@mail.gmail.com>
+	<4E0100BF.6080500@codeaurora.org>
+Message-ID: <20110622091727.GA1195@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+On Tue, Jun 21, 2011 at 01:36:15PM -0700, Stephen Boyd wrote:
+> On 06/16/2011 11:54 PM, Vincent Guittot wrote:
+> > On 16 June 2011 21:40, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> >> The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
+> >> different vendors may attribute different meaning to these fields if
+> >> they wish. Does that mean this should be a platform_*() function?
+> >>
+> > The ARM ARM also provides a recommended use of the fields of this
+> > register and the TRM of each Cortex adds some details. On the cortex
+> > A9, each platform can only set the value of the Cluster ID with the
+> > CLUSTERID pins. I have tried to consolidate the value of MPIDR  across
+> > several platforms and they all match with the description.
+> >
+> > Have you got an example of a MPIDR register which doesn't match with
+> > the implementation ?
 > 
-> There has been no #ifndef - #define - #endif protection for this header
-> file. The patch adds it for Exynos4-ADC support
-> 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> ---
->  arch/arm/plat-samsung/include/plat/devs.h |    5 +++++
->  1 files changed, 5 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/plat-samsung/include/plat/devs.h b/arch/arm/plat-
-> samsung/include/plat/devs.h
-> index 4af108f..3c87779 100644
-> --- a/arch/arm/plat-samsung/include/plat/devs.h
-> +++ b/arch/arm/plat-samsung/include/plat/devs.h
-> @@ -12,6 +12,9 @@
->   * it under the terms of the GNU General Public License version 2 as
->   * published by the Free Software Foundation.
->  */
-> +#ifndef __PLAT_DEVS_H
-> +#define __PLAT_DEVS_H __FILE__
-> +
->  #include <linux/platform_device.h>
-> 
->  struct s3c24xx_uart_resources {
-> @@ -159,3 +162,5 @@ extern struct platform_device s3c_device_ac97;
->   */
->  extern void *s3c_set_platdata(void *pd, size_t pdsize,
->  			      struct platform_device *pdev);
-> +
-> +#endif /* __PLAT_DEVS_H */
-> --
-> 1.7.4.1
+> Not that I know of. I'm more concerned with how the ARM ARM has two
+> recommended usages for these fields depending on virtualization or not.
+> I suppose we can handle that issue when it arises (or does your
+> implementation already handle that?)
 
-OK, applied.
-Thanks.
+According to the ARM ARM:
 
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+	MPIDR provides a mechanism with up to three levels of affinity
+	information, but the meaning of those levels of affinity is
+	entirely IMPLEMENTATION DEFINED.
+
+So we can't really tell the meaning of the affinity bits. There are two
+recommended ways indeed (with or without virtualisation) which are not
+that different with regards to the topology (just introducing another
+level for virtual CPUs).
+
+But I think a more general solution would be for the CPU topology to be
+provided via the FDT.
+
+-- 
+Catalin
