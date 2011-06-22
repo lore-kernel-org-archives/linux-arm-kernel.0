@@ -1,60 +1,60 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 16:10:11 +0100
-Subject: [PATCH 05/25] ARM: pm: reallocate registers to avoid r2, r3
-In-Reply-To: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-Message-ID: <E1QZP4F-0002W2-BC@rmk-PC.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 22 Jun 2011 18:19:03 +0300
+Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
+In-Reply-To: <Pine.LNX.4.44L0.1106221055030.1977-100000@iolanthe.rowland.org>
+References: <20110622143216.GE27654@legolas.emea.dhcp.ti.com>
+	<Pine.LNX.4.44L0.1106221055030.1977-100000@iolanthe.rowland.org>
+Message-ID: <20110622151902.GN27654@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid using r2 and r3 in the suspend code, allowing these to be
-passed further into the function as arguments.
+Hi,
 
-Acked-by: Frank Hofmann <frank.hofmann@tomtom.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/sleep.S |   18 +++++++++---------
- 1 files changed, 9 insertions(+), 9 deletions(-)
+On Wed, Jun 22, 2011 at 11:02:27AM -0400, Alan Stern wrote:
+> On Wed, 22 Jun 2011, Felipe Balbi wrote:
+> 
+> > > In fact, something like this is _necessary_ for all UDC/PHY drivers
+> > > unless the device can guarantee that it will automatically wake up from
+> > > suspend in time to service a USB packet (note that the window for
+> > > responding to a packet is only a few microseconds).  Otherwise the
+> > > device would appear to the host to be unresponsive and broken -- better
+> > > to do a clean disconnect.
+> > > 
+> > > If suspending the device while it is in use would cause problems ...  
+> > > then don't suspend it when it is in use!
+> > 
+> > I second your thoughts, but today we don't have enough infrastructure to
+> > communicate between PHY and Link, so a clean solution isn't possible,
+> > right ?
+> > 
+> > Should we block this patch due to that ?
+> 
+> No, the patch is appropriate.
+> 
+> We don't need better communication.  If g_mass_storage (for example)  
+> knows that the device is in use, it can block suspends by returning
+> -EBUSY from its own suspend callback.  The UDC driver doesn't need to
+> worry about these matters; it should assume that such things have
+> already been handled elsewhere.  That's what Dmitry meant when he was
+> talking about a "higher level driver" -- maybe "lower level" would have
+> been a better choice of words.  :-)
+> 
+> Until recently, ordering of the suspend callbacks didn't present any 
+> problem.  The gadget device was a child of the UDC device and therefore 
+> its suspend callback would always be invoked first.
+> 
+> With the new UDC framework, I don't know if this is true any more.  
+> It's something to consider.
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 8dbca93..358be13 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -20,26 +20,26 @@ ENTRY(cpu_suspend)
- 	mov	r9, lr
- #ifdef MULTI_CPU
- 	ldr	r10, =processor
--	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
-+	ldr	r5, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
- 	ldr	ip, [r10, #CPU_DO_RESUME] @ virtual resume function
- #else
--	ldr	r0, =cpu_suspend_size
-+	ldr	r5, =cpu_suspend_size
- 	ldr	ip, =cpu_do_resume
- #endif
--	mov	r2, sp			@ current virtual SP
--	sub	sp, sp, r0		@ allocate CPU state on stack
-+	mov	r6, sp			@ current virtual SP
-+	sub	sp, sp, r5		@ allocate CPU state on stack
- 	mov	r0, sp			@ save pointer
- 	add	ip, ip, r1		@ convert resume fn to phys
--	stmfd	sp!, {r1, r2, ip}	@ save v:p, virt SP, phys resume fn
--	ldr	r3, =sleep_save_sp
--	add	r2, sp, r1		@ convert SP to phys
-+	stmfd	sp!, {r1, r6, ip}	@ save v:p, virt SP, phys resume fn
-+	ldr	r5, =sleep_save_sp
-+	add	r6, sp, r1		@ convert SP to phys
- #ifdef CONFIG_SMP
- 	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
- 	ALT_UP(mov lr, #0)
- 	and	lr, lr, #15
--	str	r2, [r3, lr, lsl #2]	@ save phys SP
-+	str	r6, [r5, lr, lsl #2]	@ save phys SP
- #else
--	str	r2, [r3]		@ save phys SP
-+	str	r6, [r5]		@ save phys SP
- #endif
- #ifdef MULTI_CPU
- 	mov	lr, pc
+it's still true, but with one extra device in the middle. e.g.:
+musb is parent to udc-core which is parent to g_zero.
+
 -- 
-1.7.4.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110622/4af441b7/attachment.sig>
