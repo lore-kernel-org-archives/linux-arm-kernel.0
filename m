@@ -1,36 +1,37 @@
 From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 23 Jun 2011 04:56:26 +0530
-Subject: [PATCH 00/25 v2] Re-jig cpu_suspend for a saner calling convention
-In-Reply-To: <20110622210147.GC9449@n2100.arm.linux.org.uk>
-References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-	<20110622210147.GC9449@n2100.arm.linux.org.uk>
-Message-ID: <4E027A22.6020503@ti.com>
+Date: Thu, 23 Jun 2011 05:03:39 +0530
+Subject: [PATCH 25/25] ARM: pm: omap34xx: convert to generic suspend/resume
+	support
+In-Reply-To: <20110622161021.GB9449@n2100.arm.linux.org.uk>
+References: <20110622150816.GT23234@n2100.arm.linux.org.uk>	<E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
+	<20110622161021.GB9449@n2100.arm.linux.org.uk>
+Message-ID: <4E027BD3.6030500@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/23/2011 2:31 AM, Russell King - ARM Linux wrote:
-> On Wed, Jun 22, 2011 at 04:08:16PM +0100, Russell King - ARM Linux wrote:
->> Tested on Assabet (SA1100) and 3430LDP only.
+On 6/22/2011 9:40 PM, Russell King - ARM Linux wrote:
+> A couple of things to point out here:
 >
-> Correction - because suspend only goes into retention mode, these
-> changes have not been tested on the 3430.  Someone who knows what
-> they're doing with the mega-complicated OMAPs (and so knows how to
-> trigger the required modes to test these code paths) needs to test
-> this.
+> On Wed, Jun 22, 2011 at 04:16:58PM +0100, Russell King - ARM Linux wrote:
+>> -	mrc	p15, 0, r4, c13, c0, 1	@ Context ID
+>> -	mrc	p15, 0, r5, c13, c0, 2	@ User r/w thread and process ID
+>> -	mrc	p15, 0, r6, c12, c0, 0	@ Secure or NS vector base address
+>> -	mrs	r7, cpsr		@ Store current cpsr
+>> -	stmia	r8!, {r4-r7}
 >
-> It will currently fail when trying to call cpu_resume() because we're
-> trying the virtual address for that function, whereas it needs to be
-> the physical address.  That's left as an exercise to solve (easiest
-> way is probably to pass virt_to_phys(cpu_resume) into _omap_sram_idle
-> and get it to save that away in SRAM.)
+> 1. The User r/w thread and process ID is not saved/restored by Linux over
+> context switches, so it doesn't serve any useful purpose to save and
+> restore over resume.
 >
-Firstly thanks for taking time to include OMAP this time. Even if the
-changes are not tested, we can get them working with necessary fixes.
+It will be needed for CPUIDLE I guess.
 
-Have looked at your series briefly and have some comments for the same.
-Am planning to test these patches, but it might take bit more time.
-
-Will update the results as soon as I have them.
+> 2. Compare the instruction saving and restoring the vector base address
+> (see below for the restore code.)
+>
+That's typo. It should have been mcr. Actually VBAR isn't used on GP
+devices but might be used on secure devices. I know that common suspend
+code doesn't consider this register. It's fine to keep it that way
+and if OMAP needs it, it can save/restored outside common code.
 
 Regards
 Santosh
