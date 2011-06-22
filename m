@@ -1,54 +1,63 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 22 Jun 2011 13:19:02 +0300
-Subject: [RFC] Add Arm cpu topology definition
-In-Reply-To: <20110622091727.GA1195@1n450.cable.virginmedia.net>
-References: <BANLkTinRGRUxKB=C_2Y2F93czWScEUo+Jw@mail.gmail.com>
-	<4DFA5C2E.40507@codeaurora.org>
-	<BANLkTi=ik=iRtDb3K__CPxSH_8GusoBHKA@mail.gmail.com>
-	<4E0100BF.6080500@codeaurora.org>
-	<20110622091727.GA1195@1n450.cable.virginmedia.net>
-Message-ID: <20110622101902.GC2402@matterhorn1>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 22 Jun 2011 13:46:37 +0300
+Subject: [RFC 7/8] drivers: introduce rpmsg,
+	a remote-processor messaging bus
+In-Reply-To: <87liwu8u3q.fsf@rustcorp.com.au>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-8-git-send-email-ohad@wizery.com>
+	<87liwu8u3q.fsf@rustcorp.com.au>
+Message-ID: <BANLkTi=7TBMqnEf2qustrmSaubtTam79Bw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 Jun 22, Catalin Marinas wrote:
-> On Tue, Jun 21, 2011 at 01:36:15PM -0700, Stephen Boyd wrote:
-> > On 06/16/2011 11:54 PM, Vincent Guittot wrote:
-> > > On 16 June 2011 21:40, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > >> The ARM ARM says these fields are IMPLEMENTATION DEFINED meaning that
-> > >> different vendors may attribute different meaning to these fields if
-> > >> they wish. Does that mean this should be a platform_*() function?
-> > >>
-> > > The ARM ARM also provides a recommended use of the fields of this
-> > > register and the TRM of each Cortex adds some details. On the cortex
-> > > A9, each platform can only set the value of the Cluster ID with the
-> > > CLUSTERID pins. I have tried to consolidate the value of MPIDR  across
-> > > several platforms and they all match with the description.
-> > >
-> > > Have you got an example of a MPIDR register which doesn't match with
-> > > the implementation ?
-> > 
-> > Not that I know of. I'm more concerned with how the ARM ARM has two
-> > recommended usages for these fields depending on virtualization or not.
-> > I suppose we can handle that issue when it arises (or does your
-> > implementation already handle that?)
-> 
-> According to the ARM ARM:
-> 
-> 	MPIDR provides a mechanism with up to three levels of affinity
-> 	information, but the meaning of those levels of affinity is
-> 	entirely IMPLEMENTATION DEFINED.
-> 
-> So we can't really tell the meaning of the affinity bits. There are two
-> recommended ways indeed (with or without virtualisation) which are not
-> that different with regards to the topology (just introducing another
-> level for virtual CPUs).
-> 
-> But I think a more general solution would be for the CPU topology to be
-> provided via the FDT.
+On Wed, Jun 22, 2011 at 5:42 AM, Rusty Russell <rusty@rustcorp.com.au> wrote:
+> On Tue, 21 Jun 2011 10:18:33 +0300, Ohad Ben-Cohen <ohad@wizery.com> wrote:
+>> Add a virtio-based IPC bus, which enables kernel users to communicate
+>> with remote processors over shared memory using a simple messaging
+>> protocol.
+>
+> Wow, sometimes one writes a standard and people use it. ?Thanks!
 
-Agreed. That will be the next step.
+And we really liked it: virtio_rpmsg_bus.c, the virtio driver which
+does most of the magic here ended up pretty small thanks to virtio.
+and the performance numbers are really good, too.
 
-We decided on doing it this way to allow non-DT-enabled platforms to be able
-to use the feature and to allow DT-enabled platforms to settle down in the
-mean time.
+>> + ? ? /* Platform must supply pre-allocated uncached buffers for now */
+>> + ? ? vdev->config->get(vdev, VPROC_BUF_ADDR, &addr, sizeof(addr));
+>> + ? ? vdev->config->get(vdev, VPROC_BUF_NUM, &num_bufs, sizeof(num_bufs));
+>> + ? ? vdev->config->get(vdev, VPROC_BUF_SZ, &buf_size, sizeof(buf_size));
+>> + ? ? vdev->config->get(vdev, VPROC_BUF_PADDR, &vrp->phys_base,
+>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? sizeof(vrp->phys_base));
+>
+> The normal way is to think of the config space as a structure, and use
+> offsets rather than using an enum value to distinguish the fields.
+
+Yes, I was (mis-)using the config space for now to talk with
+platform-specific code (on the host), and not with the peer, so I
+opted for simplicity.
+
+But this is definitely one thing that is going away: I don't see any
+reason why not just use dma_alloc_coherent (or even dma_pool_create)
+directly from the driver here in order to get those buffers.
+
+>> +#define RPMSG_NAME_SIZE ? ? ? ? ? ? ? ? ? ? ?32
+>> +#define RPMSG_DEVICE_MODALIAS_FMT ? ?"rpmsg:%s"
+>> +
+>> +struct rpmsg_device_id {
+>> + ? ? char name[RPMSG_NAME_SIZE];
+>> + ? ? kernel_ulong_t driver_data ? ? ?/* Data private to the driver */
+>> + ? ? ? ? ? ? ? ? ? ? __attribute__((aligned(sizeof(kernel_ulong_t))));
+>> +};
+>
+> This alignment directive seems overkill...
+
+Yes, looks like I can remove this. thanks.
+
+>> +#define VIRTIO_ID_RPMSG ? ? ? ? ? ? ?10 /* virtio remote processor messaging */
+>
+> I think you want 6. ?Plan 9 jumped ahead to grab 9 :)
+
+6 it is :)
+
+Thanks,
+Ohad.
