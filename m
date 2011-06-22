@@ -1,37 +1,291 @@
-From: arnaud.patard@rtp-net.org (Arnaud Patard (Rtp))
-Date: Wed, 22 Jun 2011 08:49:42 +0200
-Subject: [PATCHv7] ARM: mx51: Add support for low power suspend on MX51
-In-Reply-To: <20110621223527.GF6069@pengutronix.de> (Sascha Hauer's message of
-	"Wed, 22 Jun 2011 00:35:27 +0200")
-References: <1301325297-24126-1-git-send-email-Dinh.Nguyen@freescale.com>
-	<87k4cfa550.fsf@lebrac.rtp-net.org>
-	<20110621223527.GF6069@pengutronix.de>
-Message-ID: <874o3i9x89.fsf@lebrac.rtp-net.org>
+From: naveenkrishna.ch@gmail.com (Naveen Krishna Ch)
+Date: Wed, 22 Jun 2011 12:21:43 +0530
+Subject: [PATCH v2 3/3] ARM: EXYNOS4: Add EPLL clock operations
+In-Reply-To: <1308655463-8787-4-git-send-email-ch.naveen@samsung.com>
+References: <1308655463-8787-1-git-send-email-ch.naveen@samsung.com>
+	<1308655463-8787-4-git-send-email-ch.naveen@samsung.com>
+Message-ID: <BANLkTim_0yj8hSefv5BUg5Z1vLh5SWhqjA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sascha Hauer <s.hauer@pengutronix.de> writes:
-Hi,
+Hi Every one,
 
-> On Tue, Jun 21, 2011 at 11:46:35AM +0200, Arnaud Patard wrote:
->> <Dinh.Nguyen@freescale.com> writes:
->> 
->> Hi,
->> 
->> > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->> >
->> > Adds initial low power suspend functionality to MX51.
->> > Supports "mem" and "standby" modes.
->> >
->> > Tested on mx51-babbage.
->> >
->> > Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
->> 
->> I fail to see this patch in imx tree. Did it get merged in some other
->> tree ?
->
-> Not yet. Have you tested this patch?
->
-Yes, it works fine on my platforms.
+1. Both S5P6440 and S5P6450 uses PLL90XX for EPLL.
+  However, the same epll_ops is duplicated in the following files
+  arch/arm/mach-s5p64x0/clock-s5p6440.c
+  arch/arm/mach-s5p64x0/clock-s5p6450.c
 
-Arnaud
+  Please find attached patch which moves it to the common clock.c
+  Attachment: "0001-ARM-S5P64X0-Move-duplicated-epll-code.patch"
+
+2. Also, S5PV210, C110, C100, 6450/6440 and EXYNOS4 define their own
+  epll_ops.
+
+  The following attachment consolidates the same on the basis of PLL types
+  "Eg: PLL90XX. PLL46XX, PLL45XX and PLL65XX"
+
+  Kindly, review the approach and comment.
+  Attachment: "0001-ARM-Samsung-organize-duplicated-EPLL-code.patch"
+
+Thanks & Best regards,
+Naveen Krishna Chatradhi
+
+On 21 June 2011 16:54, Naveen Krishna Chatradhi <ch.naveen@samsung.com> wrote:
+> S5PV210 and EXYNOS4 uses similar PLL(PLL46XX) for EPLL.
+> So, The EPLL set rate function is duplicated.
+>
+> Note: Moved common code to plat-s5p, as commented by Kukjin Kim.
+>
+> Signed-off-by: Naveen Krishna Chatradhi <ch.naveen@samsung.com>
+> ---
+> ?arch/arm/mach-exynos4/clock.c ? ? ? ?| ? ?1 +
+> ?arch/arm/mach-s5pv210/clock.c ? ? ? ?| ? 78 +---------------------------------
+> ?arch/arm/plat-s5p/clock.c ? ? ? ? ? ?| ? 77 +++++++++++++++++++++++++++++++++
+> ?arch/arm/plat-s5p/include/plat/pll.h | ? ?3 +
+> ?4 files changed, 82 insertions(+), 77 deletions(-)
+>
+> diff --git a/arch/arm/mach-exynos4/clock.c b/arch/arm/mach-exynos4/clock.c
+> index feeb27e..7687087 100644
+> --- a/arch/arm/mach-exynos4/clock.c
+> +++ b/arch/arm/mach-exynos4/clock.c
+> @@ -1294,6 +1294,7 @@ void __init_or_cpufreq exynos4_setup_clocks(void)
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__raw_readl(S5P_VPLL_CON1), pll_4650);
+>
+> ? ? ? ?clk_fout_apll.ops = &exynos4_fout_apll_ops;
+> + ? ? ? clk_fout_epll.ops = &pll46xx_epll_ops;
+> ? ? ? ?clk_fout_mpll.rate = mpll;
+> ? ? ? ?clk_fout_epll.rate = epll;
+> ? ? ? ?clk_fout_vpll.rate = vpll;
+> diff --git a/arch/arm/mach-s5pv210/clock.c b/arch/arm/mach-s5pv210/clock.c
+> index ae72f87..dd77c2c 100644
+> --- a/arch/arm/mach-s5pv210/clock.c
+> +++ b/arch/arm/mach-s5pv210/clock.c
+> @@ -979,82 +979,6 @@ static struct clksrc_clk *sysclks[] = {
+> ? ? ? ?&clk_sclk_spdif,
+> ?};
+>
+> -static u32 epll_div[][6] = {
+> - ? ? ? { ?48000000, 0, 48, 3, 3, 0 },
+> - ? ? ? { ?96000000, 0, 48, 3, 2, 0 },
+> - ? ? ? { 144000000, 1, 72, 3, 2, 0 },
+> - ? ? ? { 192000000, 0, 48, 3, 1, 0 },
+> - ? ? ? { 288000000, 1, 72, 3, 1, 0 },
+> - ? ? ? { ?32750000, 1, 65, 3, 4, 35127 },
+> - ? ? ? { ?32768000, 1, 65, 3, 4, 35127 },
+> - ? ? ? { ?45158400, 0, 45, 3, 3, 10355 },
+> - ? ? ? { ?45000000, 0, 45, 3, 3, 10355 },
+> - ? ? ? { ?45158000, 0, 45, 3, 3, 10355 },
+> - ? ? ? { ?49125000, 0, 49, 3, 3, 9961 },
+> - ? ? ? { ?49152000, 0, 49, 3, 3, 9961 },
+> - ? ? ? { ?67737600, 1, 67, 3, 3, 48366 },
+> - ? ? ? { ?67738000, 1, 67, 3, 3, 48366 },
+> - ? ? ? { ?73800000, 1, 73, 3, 3, 47710 },
+> - ? ? ? { ?73728000, 1, 73, 3, 3, 47710 },
+> - ? ? ? { ?36000000, 1, 32, 3, 4, 0 },
+> - ? ? ? { ?60000000, 1, 60, 3, 3, 0 },
+> - ? ? ? { ?72000000, 1, 72, 3, 3, 0 },
+> - ? ? ? { ?80000000, 1, 80, 3, 3, 0 },
+> - ? ? ? { ?84000000, 0, 42, 3, 2, 0 },
+> - ? ? ? { ?50000000, 0, 50, 3, 3, 0 },
+> -};
+> -
+> -static int s5pv210_epll_set_rate(struct clk *clk, unsigned long rate)
+> -{
+> - ? ? ? unsigned int epll_con, epll_con_k;
+> - ? ? ? unsigned int i;
+> -
+> - ? ? ? /* Return if nothing changed */
+> - ? ? ? if (clk->rate == rate)
+> - ? ? ? ? ? ? ? return 0;
+> -
+> - ? ? ? epll_con = __raw_readl(S5P_EPLL_CON);
+> - ? ? ? epll_con_k = __raw_readl(S5P_EPLL_CON1);
+> -
+> - ? ? ? epll_con_k &= ~PLL46XX_KDIV_MASK;
+> - ? ? ? epll_con &= ~(1 << 27 |
+> - ? ? ? ? ? ? ? ? ? ? ? PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT |
+> - ? ? ? ? ? ? ? ? ? ? ? PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT |
+> - ? ? ? ? ? ? ? ? ? ? ? PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT);
+> -
+> - ? ? ? for (i = 0; i < ARRAY_SIZE(epll_div); i++) {
+> - ? ? ? ? ? ? ? if (epll_div[i][0] == rate) {
+> - ? ? ? ? ? ? ? ? ? ? ? epll_con_k |= epll_div[i][5] << 0;
+> - ? ? ? ? ? ? ? ? ? ? ? epll_con |= (epll_div[i][1] << 27 |
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? epll_div[i][2] << PLL46XX_MDIV_SHIFT |
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? epll_div[i][3] << PLL46XX_PDIV_SHIFT |
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? epll_div[i][4] << PLL46XX_SDIV_SHIFT);
+> - ? ? ? ? ? ? ? ? ? ? ? break;
+> - ? ? ? ? ? ? ? }
+> - ? ? ? }
+> -
+> - ? ? ? if (i == ARRAY_SIZE(epll_div)) {
+> - ? ? ? ? ? ? ? printk(KERN_ERR "%s: Invalid Clock EPLL Frequency\n",
+> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__);
+> - ? ? ? ? ? ? ? return -EINVAL;
+> - ? ? ? }
+> -
+> - ? ? ? __raw_writel(epll_con, S5P_EPLL_CON);
+> - ? ? ? __raw_writel(epll_con_k, S5P_EPLL_CON1);
+> -
+> - ? ? ? printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
+> - ? ? ? ? ? ? ? ? ? ? ? clk->rate, rate);
+> -
+> - ? ? ? clk->rate = rate;
+> -
+> - ? ? ? return 0;
+> -}
+> -
+> -static struct clk_ops s5pv210_epll_ops = {
+> - ? ? ? .set_rate = s5pv210_epll_set_rate,
+> - ? ? ? .get_rate = s5p_epll_get_rate,
+> -};
+> -
+> ?void __init_or_cpufreq s5pv210_setup_clocks(void)
+> ?{
+> ? ? ? ?struct clk *xtal_clk;
+> @@ -1075,7 +999,7 @@ void __init_or_cpufreq s5pv210_setup_clocks(void)
+>
+> ? ? ? ?/* Set functions for clk_fout_epll */
+> ? ? ? ?clk_fout_epll.enable = s5p_epll_enable;
+> - ? ? ? clk_fout_epll.ops = &s5pv210_epll_ops;
+> + ? ? ? clk_fout_epll.ops = &pll46xx_epll_ops;
+>
+> ? ? ? ?printk(KERN_DEBUG "%s: registering clocks\n", __func__);
+>
+> diff --git a/arch/arm/plat-s5p/clock.c b/arch/arm/plat-s5p/clock.c
+> index 02af235..2a4678d 100644
+> --- a/arch/arm/plat-s5p/clock.c
+> +++ b/arch/arm/plat-s5p/clock.c
+> @@ -24,6 +24,7 @@
+> ?#include <mach/regs-clock.h>
+>
+> ?#include <plat/clock.h>
+> +#include <plat/pll.h>
+> ?#include <plat/clock-clksrc.h>
+> ?#include <plat/s5p-clock.h>
+>
+> @@ -203,6 +204,82 @@ struct clk_ops s5p_sclk_spdif_ops = {
+> ? ? ? ?.get_rate ? ? ? = s5p_spdif_get_rate,
+> ?};
+>
+> +static u32 epll_div[][6] = {
+> + ? ? ? { ?48000000, 0, 48, 3, 3, 0 },
+> + ? ? ? { ?96000000, 0, 48, 3, 2, 0 },
+> + ? ? ? { 144000000, 1, 72, 3, 2, 0 },
+> + ? ? ? { 192000000, 0, 48, 3, 1, 0 },
+> + ? ? ? { 288000000, 1, 72, 3, 1, 0 },
+> + ? ? ? { ?32750000, 1, 65, 3, 4, 35127 },
+> + ? ? ? { ?32768000, 1, 65, 3, 4, 35127 },
+> + ? ? ? { ?45158400, 0, 45, 3, 3, 10355 },
+> + ? ? ? { ?45000000, 0, 45, 3, 3, 10355 },
+> + ? ? ? { ?45158000, 0, 45, 3, 3, 10355 },
+> + ? ? ? { ?49125000, 0, 49, 3, 3, 9961 },
+> + ? ? ? { ?49152000, 0, 49, 3, 3, 9961 },
+> + ? ? ? { ?67737600, 1, 67, 3, 3, 48366 },
+> + ? ? ? { ?67738000, 1, 67, 3, 3, 48366 },
+> + ? ? ? { ?73800000, 1, 73, 3, 3, 47710 },
+> + ? ? ? { ?73728000, 1, 73, 3, 3, 47710 },
+> + ? ? ? { ?36000000, 1, 32, 3, 4, 0 },
+> + ? ? ? { ?60000000, 1, 60, 3, 3, 0 },
+> + ? ? ? { ?72000000, 1, 72, 3, 3, 0 },
+> + ? ? ? { ?80000000, 1, 80, 3, 3, 0 },
+> + ? ? ? { ?84000000, 0, 42, 3, 2, 0 },
+> + ? ? ? { ?50000000, 0, 50, 3, 3, 0 },
+> +};
+> +
+> +int pll46xx_epll_set_rate(struct clk *clk, unsigned long rate)
+> +{
+> + ? ? ? unsigned int epll_con, epll_con_k;
+> + ? ? ? unsigned int i;
+> +
+> + ? ? ? /* Return if nothing changed */
+> + ? ? ? if (clk->rate == rate)
+> + ? ? ? ? ? ? ? return 0;
+> +
+> + ? ? ? epll_con = __raw_readl(S5P_EPLL_CON);
+> + ? ? ? epll_con_k = __raw_readl(S5P_EPLL_CON1);
+> +
+> + ? ? ? epll_con_k &= ~PLL46XX_KDIV_MASK;
+> + ? ? ? epll_con &= ~(1 << 27 |
+> + ? ? ? ? ? ? ? ? ? ? ? PLL46XX_MDIV_MASK << PLL46XX_MDIV_SHIFT |
+> + ? ? ? ? ? ? ? ? ? ? ? PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT |
+> + ? ? ? ? ? ? ? ? ? ? ? PLL46XX_SDIV_MASK << PLL46XX_SDIV_SHIFT);
+> +
+> + ? ? ? for (i = 0; i < ARRAY_SIZE(epll_div); i++) {
+> + ? ? ? ? ? ? ? if (epll_div[i][0] == rate) {
+> + ? ? ? ? ? ? ? ? ? ? ? epll_con_k |= epll_div[i][5] << 0;
+> + ? ? ? ? ? ? ? ? ? ? ? epll_con |= (epll_div[i][1] << 27 |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? epll_div[i][2] << PLL46XX_MDIV_SHIFT |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? epll_div[i][3] << PLL46XX_PDIV_SHIFT |
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? epll_div[i][4] << PLL46XX_SDIV_SHIFT);
+> + ? ? ? ? ? ? ? ? ? ? ? break;
+> + ? ? ? ? ? ? ? }
+> + ? ? ? }
+> +
+> + ? ? ? if (i == ARRAY_SIZE(epll_div)) {
+> + ? ? ? ? ? ? ? printk(KERN_ERR "%s: Invalid Clock EPLL Frequency\n",
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? __func__);
+> + ? ? ? ? ? ? ? return -EINVAL;
+> + ? ? ? }
+> +
+> + ? ? ? __raw_writel(epll_con, S5P_EPLL_CON);
+> + ? ? ? __raw_writel(epll_con_k, S5P_EPLL_CON1);
+> +
+> + ? ? ? printk(KERN_WARNING "EPLL Rate changes from %lu to %lu\n",
+> + ? ? ? ? ? ? ? ? ? ? ? clk->rate, rate);
+> +
+> + ? ? ? clk->rate = rate;
+> +
+> + ? ? ? return 0;
+> +}
+> +
+> +struct clk_ops pll46xx_epll_ops = {
+> + ? ? ? .set_rate = pll46xx_epll_set_rate,
+> + ? ? ? .get_rate = s5p_epll_get_rate,
+> +};
+> +
+> ?static struct clk *s5p_clks[] __initdata = {
+> ? ? ? ?&clk_ext_xtal_mux,
+> ? ? ? ?&clk_48m,
+> diff --git a/arch/arm/plat-s5p/include/plat/pll.h b/arch/arm/plat-s5p/include/plat/pll.h
+> index bf28fad..911a20e 100644
+> --- a/arch/arm/plat-s5p/include/plat/pll.h
+> +++ b/arch/arm/plat-s5p/include/plat/pll.h
+> @@ -94,6 +94,9 @@ static inline unsigned long s5p_get_pll46xx(unsigned long baseclk,
+> ? ? ? ?return result;
+> ?}
+>
+> +extern int pll46xx_epll_set_rate(struct clk *clk, unsigned long rate);
+> +extern struct clk_ops pll46xx_epll_ops;
+> +
+> ?#define PLL90XX_MDIV_MASK ? ? ?(0xFF)
+> ?#define PLL90XX_PDIV_MASK ? ? ?(0x3F)
+> ?#define PLL90XX_SDIV_MASK ? ? ?(0x7)
+> --
+> 1.7.2.3
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
+
+
+
+-- 
+Shine bright,
+(: Nav :)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-S5P64X0-Move-duplicated-epll-code.patch
+Type: application/octet-stream
+Size: 7901 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110622/a315f4a7/attachment-0002.obj>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-ARM-Samsung-organize-duplicated-EPLL-code.patch
+Type: application/octet-stream
+Size: 30605 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110622/a315f4a7/attachment-0003.obj>
