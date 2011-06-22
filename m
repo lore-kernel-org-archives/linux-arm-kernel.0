@@ -1,44 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 16:22:51 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jun 2011 17:23:45 +0200
 Subject: i.MX consolidation patches
-In-Reply-To: <20110622145828.GL6069@pengutronix.de>
-References: <20110530075745.GA31492@S2100-06.ap.freescale.net>
-	<20110601123522.GE23771@pengutronix.de>
-	<20110601134749.GI3660@n2100.arm.linux.org.uk>
-	<20110601141847.GG23771@pengutronix.de>
-	<20110601142406.GJ3660@n2100.arm.linux.org.uk>
-	<20110622075615.GJ6069@pengutronix.de>
-	<20110622081141.GN23234@n2100.arm.linux.org.uk>
-	<20110622083257.GK6069@pengutronix.de>
-	<20110622090321.GO23234@n2100.arm.linux.org.uk>
-	<20110622145828.GL6069@pengutronix.de>
-Message-ID: <20110622152251.GV23234@n2100.arm.linux.org.uk>
+In-Reply-To: <20110622151407.GU23234@n2100.arm.linux.org.uk>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<201106221710.39687.arnd@arndb.de>
+	<20110622151407.GU23234@n2100.arm.linux.org.uk>
+Message-ID: <201106221723.45813.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 04:58:28PM +0200, Sascha Hauer wrote:
-> On Wed, Jun 22, 2011 at 10:03:21AM +0100, Russell King - ARM Linux wrote:
-> > That's rather my point: PATCH_PHYS_TO_VIRT=y does not mean that the
-> > uImage is unbootable - it's only unbootable if the uImage has a
-> > load/start address which is invalid for the platform.
-> > 
-> > So, maybe the idea of changing LOADADDR is better.  Or maybe providing
-> > Makefile.boot with a new variable 'nouimage' which can provide the
-> > same functionality - and you may wish to provide LOADADDR on the command
-> > line and detect that, in which case it should override this lockout.
+On Wednesday 22 June 2011, Russell King - ARM Linux wrote:
+> I don't think you're _thinking_.  If you issue 'make uImage', how is the
+> kernel configuration stuff to know that it should not enable multiple
+> platforms which would make building a uImage technically impossible
+> (and lead to the created uImage being non-bootable on some of those
+> platforms.)
 > 
-> Then I have the same problem in my platform because I have no clear
-> condition on which to set this variable. Currently there is no "more
-> than one zreladdr" indicator. Maybe a variant of the following patch
-> is the least of all evils. A mechanism to specify the load address on
-> the command line could be added.
+> The answer is: you can't.
+> 
+> The best we can do is if the configuration encounters this problem, then
+> fail to build a uImage.  If that concerns you, then don't ask the kernel
+> to build an inherently fragile boot loader format in the first place.
 
-I think your patch looks good so far, but with one exception - we probably
-want to detect off LOADADDR so that we can override it by passing
-'make uImage LOADADDR=blah'.  That would allow uImage's to be generated
-without having to learn all the silly the mkimage command line arguments.
+Ok, I see.
 
-The other issue here is that having multiple words in ZRELADDR without
-AUTO_ZRELADDR enabled in the decompressor is going to lead to decompressor
-link time errors - so that's something else which needs thinking about.
-(Do you ensure that it's already set somehow?)
+I still need to learn about a lot of ways in which ARM differs from
+other architectures I've worked with. I was thinking of
+CONFIG_DEFAULT_UIMAGE on powerpc, which causes the uimage to be built
+as a default make target.
+
+Since ARM doesn't have that option, this obviously isn't a problem
+for randconfig builds.
+Sorry for the noise.
+
+	Arnd
