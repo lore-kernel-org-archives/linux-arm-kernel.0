@@ -1,86 +1,86 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Wed, 22 Jun 2011 15:06:52 +0200
-Subject: [PATCH] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <BANLkTimk0+2LUeo5sq8w4ohRq-qCe_2t_Q@mail.gmail.com>
-References: <1308712645-5986-1-git-send-email-leiwen@marvell.com>
-	<BANLkTinQB-hXMRy5+BXKQSrPq=sVrorCVA@mail.gmail.com>
-	<BANLkTimk0+2LUeo5sq8w4ohRq-qCe_2t_Q@mail.gmail.com>
-Message-ID: <BANLkTim54jEKmxAQFNMGCyWwAu+FhVu0KA@mail.gmail.com>
+From: robdclark@gmail.com (Rob Clark)
+Date: Wed, 22 Jun 2011 08:07:06 -0500
+Subject: Some questions about DRM(Direct Rendering Manager)
+In-Reply-To: <BANLkTim6xvD5U9GJ2pHu-=OrYccRHSj7Fg@mail.gmail.com>
+References: <4E016EDC.30200@samsung.com> <4E0185E7.8020708@samsung.com>
+	<BANLkTim6xvD5U9GJ2pHu-=OrYccRHSj7Fg@mail.gmail.com>
+Message-ID: <BANLkTinv1uGUPBX4RE2DGw4Ca_P5x0g+DA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lei,
+fwiw, drm_fb_helper_single_fb_probe() calls register_framebuffer() (if
+that was the question?)
 
-On Wed, Jun 22, 2011 at 2:21 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
-> Hi Daniel,
+BR,
+-R
+
+2011/6/22 InKi Dae <daeinki@gmail.com>:
+> It adds dri-devel at lists.freedesktop.org to this mail thread.
+> Thank you.
 >
-> On Wed, Jun 22, 2011 at 7:39 PM, Daniel Mack <zonque@gmail.com> wrote:
->> On Wed, Jun 22, 2011 at 5:17 AM, Lei Wen <leiwen@marvell.com> wrote:
->>> Current pxa3xx_nand controller has two chip select which
->>> both be workable. This patch enable this feature.
->>>
->>> Update platform driver to support this feature.
->>>
->>> Another notice should be taken that:
->>> When you want to use this feature, you should not enable the
->>> keep configuration feature, for two chip select could be
->>> attached with different nand chip. The different page size
->>> and timing requirement make the keep configuration impossible.
->>>
->>> Signed-off-by: Lei Wen <leiwen@marvell.com>
->>> ---
->>> ?arch/arm/mach-mmp/aspenite.c ? ? ? ? ? ? ? ? | ? ?5 +-
->>> ?arch/arm/mach-pxa/cm-x300.c ? ? ? ? ? ? ? ? ?| ? ?5 +-
->>> ?arch/arm/mach-pxa/colibri-pxa3xx.c ? ? ? ? ? | ? ?5 +-
->>> ?arch/arm/mach-pxa/littleton.c ? ? ? ? ? ? ? ?| ? ?5 +-
->>> ?arch/arm/mach-pxa/mxm8x10.c ? ? ? ? ? ? ? ? ?| ? ?9 +-
->>> ?arch/arm/mach-pxa/raumfeld.c ? ? ? ? ? ? ? ? | ? ?5 +-
->>> ?arch/arm/mach-pxa/zylonite.c ? ? ? ? ? ? ? ? | ? ?5 +-
->>> ?arch/arm/plat-pxa/include/plat/pxa3xx_nand.h | ? ?8 +-
->>> ?drivers/mtd/nand/pxa3xx_nand.c ? ? ? ? ? ? ? | ?735 +++++++++++++++-----------
->>> ?9 files changed, 444 insertions(+), 338 deletions(-)
+> 2011? 6? 22? ?? 3:04, daeinki <inki.dae@samsung.com>?? ?:
+>> below is additional comments.
 >>
->> This patch doesn't apply for me on top of Linus' master branch. Which
->> tree are you based on currently?
->
-> Actually it is based on Linux 3.0-rc2 and add two patches pending to
-> l2-mtd-2.6.git already:
->
-> mtd: pxa3xx_nand: fix nand detection issue
-> mtd: pxa3xx_nand: Fix blank page ECC mismatch
-
-I have a similar setup, also with those two patches on top, but
-applying your patch gives me:
-
-Applying: MTD: pxa3xx_nand: enable multiple chip select support
-error: patch failed: drivers/mtd/nand/pxa3xx_nand.c:477
-error: drivers/mtd/nand/pxa3xx_nand.c: patch does not apply
-Patch failed at 0001 MTD: pxa3xx_nand: enable multiple chip select support
-When you have resolved this problem run "git am --resolved".
-If you would prefer to skip this patch, instead run "git am --skip".
-To restore the original branch and stop patching run "git am --abort".
-
-Could you push your branch somewhere?
-
->>> ?#ifdef CONFIG_PM
->>> @@ -1183,8 +1278,8 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
->>> ? ? ? ?struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
->>> ? ? ? ?struct mtd_info *mtd = info->mtd;
+>> daeinki ? ?:
+>>> Hi all,
 >>>
->>> - ? ? ? nand_writel(info, NDTR0CS0, info->ndtr0cs0);
->>> - ? ? ? nand_writel(info, NDTR1CS0, info->ndtr1cs0);
->>> + ? ? ? nand_writel(nand, NDTR0CS0, info->ndtr0cs0);
->>> + ? ? ? nand_writel(nand, NDTR1CS0, info->ndtr1cs0);
->>> ? ? ? ?clk_enable(info->clk);
+>>> I'm writing Samsung SoC based DRM framework and this one includes FIMD
+>>> and HDMI driver as hardware dependent modules. and for now, encoder,
+>>> connector, crtc and fb module has been materialized almost. but I'm
+>>> contending with  framebuffer setting issue(created fb_info should be
+>>> registered to linux framebuffer through register_framebuffer() or not)as
+>>> default framebuffer at booting time.
+>>>
+>>> at drm_fb_helper_single_fb_probe() of drm_fb_helper.c file, fb_helper's
+>>> fb_probe callback is called and this one creates new framebuffer and
+>>> returns a value more then 0 if true. internally, this process creates an
+>>> fb_info object and drm_framebuffer and then drm_framebuffer would be
+>>> added to mode_config.fb_list of the drm_device.
+>>>
+>> it's my mistake. return value is 0 if true, nonzero otherwise.
 >>
->> This won't compile.
+>>> a value returned, new_fb is used to decide that it calls
+>>> register_framebuffer() or drm_fb_helper_set_par(). at this point, I am
+>>> confused it's a good way to call register_framebuffer() otherwise
+>>> drm_fb_helper_set_par(). if register_framebuffer() is called then I
+>>> guess drm_fb_helper_set_par() or drm_crtc_helper_set_config() should be
+>>> called somewhere subsequently to apply this one to real hardware because
+>>> previous process is just for maintaining data logically.(not set up data
+>>> to h/w)
+>>>
+>>> it's a right way to call register_framebuffer() and then
+>>> drm_fb_helper_set_par() or drm_crtc_helper_set_config()? otherwise just
+>>> only drm_fb_helper_set_par() or drm_crtc_helper_set_config() ignoring
+>>> register_framebuffer()? and what is the purpose of using
+>>> register_framebuffer()?
+>>>
+>> I understood that if fb_probe() callback is fail then fb_info object is
+>> registered to linux framebuffer through register_framebuffer()
+>> otherwise(if true) hardware configuration would be completed by
+>> drm_fb_helper_set_par() so the reason of using register_framebuffer() is
+>> that the case of failing fb_probe() callback, it is for drawing on only
+>> linux framebuffer. is it right?
+>>
+>>> In my case, first, register_framebuffer() is called and then if desired
+>>> default crtc id is matched with drm_fb_helper->crtc_info[0 ~ n].crtc_id,
+>>> it gets mode_set of drm_fb_helper->crtc_info[n] and then  it calls
+>>> drm_crtc_helper_set_config(mode_set). at this time, all the hardware
+>>> configurations would be completed.
+>>>
+>>> thank you in advance.
+>>>
+>>> Best Regards
+>>> Inki Dae.
+>>>
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
 >
-> Could you post your build log?
-
-I didn't compile it because I couldn't, but "nand" is certainly
-undefined in this context now. Did you compile and test this code with
-"CONFIG_PM=y"?
-
-
-Thanks,
-Daniel
