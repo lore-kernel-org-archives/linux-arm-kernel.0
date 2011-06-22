@@ -1,44 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 22 Jun 2011 16:44:35 -0300
-Subject: [PATCH REPOST] pxa/hx4700: Add ASIC3 LED support
-In-Reply-To: <E1QZT9S-0004Vb-Hv@outmx03.plus.net>
-References: <E1QZT9S-0004Vb-Hv@outmx03.plus.net>
-Message-ID: <BANLkTimRPRwP+6WnunJTpsCKj-79_ZNe2Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 22 Jun 2011 21:19:28 +0100
+Subject: [PATCH] ARM: report present cpus in /proc/cpuinfo
+In-Reply-To: <4E0241D3.4060303@nvidia.com>
+References: <4E012198.6010405@nvidia.com>
+	<20110621230512.GL23234@n2100.arm.linux.org.uk>
+	<4E012820.2090208@nvidia.com>
+	<20110621233619.GM23234@n2100.arm.linux.org.uk>
+	<4E01326C.1060808@nvidia.com>
+	<20110622093623.GP23234@n2100.arm.linux.org.uk>
+	<4E0241D3.4060303@nvidia.com>
+Message-ID: <20110622201928.GW23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 4:31 PM, Paul Parsons <lost.distance@yahoo.com> wrote:
-> Add LED support for the HTC ASIC3. Underlying support is provided by the mfd/asic3 and leds/leds-asic3 drivers. An example configuration is provided by the pxa/hx4700 platform.
+On Wed, Jun 22, 2011 at 12:26:11PM -0700, Jon Mayo wrote:
+> On 06/22/2011 02:36 AM, Russell King - ARM Linux wrote:
+>> Think about it - if you have real hot-pluggable CPUs (servers do), do
+>> you _really_ want to try to bring online a possible CPU (iow, there's
+>> a socket on the board) but one which isn't present (iow, the socket is
+>> empty.)
+>>
+>> That's what the possible + !present case caters for.  Possible tells
+>> the kernel how many CPUs to allocate per-cpu data structures for.
+>> present tells it whether a CPU can be onlined or not.
+>>
 >
-> Signed-off-by: Paul Parsons <lost.distance@yahoo.com>
-> ---
->
-> This part of the HTC ASIC3 LED driver patch set was seemingly dropped, hence repost.
->
-> --- clean-3.0-rc4/arch/arm/mach-pxa/hx4700.c ? ?2011-06-21 04:25:46.000000000 +0100
-> +++ linux-3.0-rc4/arch/arm/mach-pxa/hx4700.c ? ?2011-06-22 10:43:18.986382990 +0100
-> @@ -280,6 +280,21 @@ static u16 asic3_gpio_config[] = {
-> ? ? ? ?ASIC3_GPIOD15_nPIOW,
-> ?};
->
-> +static struct asic3_led asic3_leds[ASIC3_NUM_LEDS] = {
-> + ? ? ? [0] = {
-> + ? ? ? ? ? ? ? .name = "hx4700:amber",
-> + ? ? ? ? ? ? ? .default_trigger = "ds2760-battery.0-charging-blink-full-solid",
-> + ? ? ? },
-> + ? ? ? [1] = {
-> + ? ? ? ? ? ? ? .name = "hx4700:green",
-> + ? ? ? ? ? ? ? .default_trigger = "unused",
-> + ? ? ? },
-> + ? ? ? [2] = {
-> + ? ? ? ? ? ? ? .name = "hx4700:blue",
-> + ? ? ? ? ? ? ? .default_trigger = "hx4700-radio",
-> + ? ? ? },
-> +};
+> Yes, that's the difference between present and possible. I'm not  
+> suggesting we report cpus that do not exist. I'm suggesting we report  
+> cpus that are present, online or not.
 
-Can't you use the generic LED driver instead? See an example here:
-http://git.pengutronix.de/?p=imx/linux-2.6.git;a=commitdiff;h=cf1738dad02f22781ae1f08414634086fc613d81
+Which is _what_ we do.  The problem is that mach-tegra is causing
+the established well defined APIs to mean something else, and then
+you're complaining that those APIs don't mean what they were defined
+to be.
 
-Regards,
+You're really shooting yourself in the foot here, and at this point
+there is nothing left to discuss.
 
-Fabio Estevam
+I can't help you.  You need to discuss this with folk who look after
+the hotplug CPU stuff.
+
+You no longer have an ARM architecture problem, your problem is that
+you're abusing stuff to get what you want and then complaining that
+stuff doesn't work as you want it.
