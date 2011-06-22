@@ -1,118 +1,210 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 22 Jun 2011 17:46:40 +0900
-Subject: [PATCH 2/7] ARM: EXYNOS4: Remove PMU configuration for S2RAM
+Date: Wed, 22 Jun 2011 17:46:43 +0900
+Subject: [PATCH 5/7] ARM: EXYNOS4: Add save/restore function for PLL
 In-Reply-To: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
 References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
-Message-ID: <1308732405-16664-3-git-send-email-kgene.kim@samsung.com>
+Message-ID: <1308732405-16664-6-git-send-email-kgene.kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jaecheol Lee <jc.lee@samsung.com>
 
-PMU(Power Management Unit) configuraion for S2RAM(SLEEP) is removed
-and using function which provided by PMU support code to configure
-PMU register.
+The PLL restore routine supports waiting pll locking. If PLL is
+enabled in restoring sequence, it should wait until PLL is locked.
 
 Signed-off-by: Jaecheol Lee <jc.lee@samsung.com>
 Signed-off-by: Kukjin Kim <kgene.kim@samsung.com>
 ---
- arch/arm/mach-exynos4/pm.c |   77 +------------------------------------------
- 1 files changed, 2 insertions(+), 75 deletions(-)
+ arch/arm/mach-exynos4/include/mach/regs-clock.h |    9 ++
+ arch/arm/mach-exynos4/pm.c                      |   96 ++++++++++++++++++++++-
+ 2 files changed, 101 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm/mach-exynos4/include/mach/regs-clock.h b/arch/arm/mach-exynos4/include/mach/regs-clock.h
+index 6e311c1..64bdd24 100644
+--- a/arch/arm/mach-exynos4/include/mach/regs-clock.h
++++ b/arch/arm/mach-exynos4/include/mach/regs-clock.h
+@@ -25,6 +25,9 @@
+ #define S5P_CLKDIV_STAT_RIGHTBUS	S5P_CLKREG(0x08600)
+ #define S5P_CLKGATE_IP_RIGHTBUS		S5P_CLKREG(0x08800)
+ 
++#define S5P_EPLL_LOCK			S5P_CLKREG(0x0C010)
++#define S5P_VPLL_LOCK			S5P_CLKREG(0x0C020)
++
+ #define S5P_EPLL_CON0			S5P_CLKREG(0x0C110)
+ #define S5P_EPLL_CON1			S5P_CLKREG(0x0C114)
+ #define S5P_VPLL_CON0			S5P_CLKREG(0x0C120)
+@@ -120,6 +123,12 @@
+ #define S5P_APLL_VAL_1000		((250 << 16) | (6 << 8) | 1)
+ #define S5P_APLL_VAL_800		((200 << 16) | (6 << 8) | 1)
+ 
++#define S5P_EPLLCON0_ENABLE_SHIFT	(31)
++#define S5P_EPLLCON0_LOCKED_SHIFT	(29)
++
++#define S5P_VPLLCON0_ENABLE_SHIFT	(31)
++#define S5P_VPLLCON0_LOCKED_SHIFT	(29)
++
+ #define S5P_CLKSRC_CPU_MUXCORE_SHIFT	(16)
+ #define S5P_CLKMUX_STATCPU_MUXCORE_MASK	(0x7 << S5P_CLKSRC_CPU_MUXCORE_SHIFT)
+ 
 diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
-index 8755ca8..a073a01 100644
+index f4d52b5..b037fba 100644
 --- a/arch/arm/mach-exynos4/pm.c
 +++ b/arch/arm/mach-exynos4/pm.c
-@@ -30,80 +30,7 @@
- #include <mach/regs-clock.h>
- #include <mach/regs-pmu.h>
- #include <mach/pm-core.h>
--
--static struct sleep_save exynos4_sleep[] = {
--	{ .reg = S5P_ARM_CORE0_LOWPWR			, .val = 0x2, },
--	{ .reg = S5P_DIS_IRQ_CORE0			, .val = 0x0, },
--	{ .reg = S5P_DIS_IRQ_CENTRAL0			, .val = 0x0, },
--	{ .reg = S5P_ARM_CORE1_LOWPWR			, .val = 0x2, },
--	{ .reg = S5P_DIS_IRQ_CORE1			, .val = 0x0, },
--	{ .reg = S5P_DIS_IRQ_CENTRAL1			, .val = 0x0, },
--	{ .reg = S5P_ARM_COMMON_LOWPWR			, .val = 0x2, },
--	{ .reg = S5P_L2_0_LOWPWR			, .val = 0x3, },
--	{ .reg = S5P_L2_1_LOWPWR			, .val = 0x3, },
--	{ .reg = S5P_CMU_ACLKSTOP_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_SCLKSTOP_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_APLL_SYSCLK_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_MPLL_SYSCLK_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_VPLL_SYSCLK_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_EPLL_SYSCLK_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_GPS_ALIVE_LOWPWR	, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_GPSALIVE_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_CAM_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_TV_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_MFC_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_G3D_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_LCD0_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_LCD1_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_MAUDIO_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_CLKSTOP_GPS_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_CAM_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_TV_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_MFC_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_G3D_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_LCD0_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_LCD1_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_MAUDIO_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CMU_RESET_GPS_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_TOP_BUS_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_TOP_RETENTION_LOWPWR		, .val = 0x1, },
--	{ .reg = S5P_TOP_PWR_LOWPWR			, .val = 0x3, },
--	{ .reg = S5P_LOGIC_RESET_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_ONENAND_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_MODIMIF_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_G2D_ACP_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_USBOTG_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_HSMMC_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_CSSYS_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_SECSS_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_PCIE_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_SATA_MEM_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_DRAM_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_MAUDIO_LOWPWR	, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_GPIO_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_UART_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_MMCA_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_MMCB_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_EBIA_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_EBIB_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_ISOLATION_LOWPWR	, .val = 0x0, },
--	{ .reg = S5P_PAD_RETENTION_ALV_SEL_LOWPWR	, .val = 0x0, },
--	{ .reg = S5P_XUSBXTI_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_XXTI_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_EXT_REGULATOR_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_GPIO_MODE_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_GPIO_MODE_MAUDIO_LOWPWR		, .val = 0x0, },
--	{ .reg = S5P_CAM_LOWPWR				, .val = 0x0, },
--	{ .reg = S5P_TV_LOWPWR				, .val = 0x0, },
--	{ .reg = S5P_MFC_LOWPWR				, .val = 0x0, },
--	{ .reg = S5P_G3D_LOWPWR				, .val = 0x0, },
--	{ .reg = S5P_LCD0_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_LCD1_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_MAUDIO_LOWPWR			, .val = 0x0, },
--	{ .reg = S5P_GPS_LOWPWR				, .val = 0x0, },
--	{ .reg = S5P_GPS_ALIVE_LOWPWR			, .val = 0x0, },
--};
-+#include <mach/pmu.h>
+@@ -18,12 +18,15 @@
+ #include <linux/suspend.h>
+ #include <linux/syscore_ops.h>
+ #include <linux/io.h>
++#include <linux/err.h>
++#include <linux/clk.h>
  
- static struct sleep_save exynos4_set_clksrc[] = {
- 	{ .reg = S5P_CLKSRC_MASK_TOP			, .val = 0x00000001, },
-@@ -331,7 +258,7 @@ static void exynos4_pm_prepare(void)
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/cache-l2x0.h>
  
- 	/* Set value of power down register for sleep mode */
+ #include <plat/cpu.h>
+ #include <plat/pm.h>
++#include <plat/pll.h>
  
--	s3c_pm_do_restore_core(exynos4_sleep, ARRAY_SIZE(exynos4_sleep));
-+	exynos4_sys_powerdown_conf(SYS_SLEEP);
- 	__raw_writel(S5P_CHECK_SLEEP, S5P_INFORM1);
+ #include <mach/regs-irq.h>
+ #include <mach/regs-gpio.h>
+@@ -45,16 +48,22 @@ static struct sleep_save exynos4_set_clksrc[] = {
+ 	{ .reg = S5P_CLKSRC_MASK_DMC			, .val = 0x00010000, },
+ };
  
- 	/* ensure at least INFORM0 has the resume address */
++static struct sleep_save exynos4_epll_save[] = {
++	SAVE_ITEM(S5P_EPLL_CON0),
++	SAVE_ITEM(S5P_EPLL_CON1),
++};
++
++static struct sleep_save exynos4_vpll_save[] = {
++	SAVE_ITEM(S5P_VPLL_CON0),
++	SAVE_ITEM(S5P_VPLL_CON1),
++};
++
+ static struct sleep_save exynos4_core_save[] = {
+ 	/* CMU side */
+ 	SAVE_ITEM(S5P_CLKDIV_LEFTBUS),
+ 	SAVE_ITEM(S5P_CLKGATE_IP_LEFTBUS),
+ 	SAVE_ITEM(S5P_CLKDIV_RIGHTBUS),
+ 	SAVE_ITEM(S5P_CLKGATE_IP_RIGHTBUS),
+-	SAVE_ITEM(S5P_EPLL_CON0),
+-	SAVE_ITEM(S5P_EPLL_CON1),
+-	SAVE_ITEM(S5P_VPLL_CON0),
+-	SAVE_ITEM(S5P_VPLL_CON1),
+ 	SAVE_ITEM(S5P_CLKSRC_TOP0),
+ 	SAVE_ITEM(S5P_CLKSRC_TOP1),
+ 	SAVE_ITEM(S5P_CLKSRC_CAM),
+@@ -260,6 +269,8 @@ static void exynos4_pm_prepare(void)
+ 
+ 	s3c_pm_do_save(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
+ 	s3c_pm_do_save(exynos4_l2cc_save, ARRAY_SIZE(exynos4_l2cc_save));
++	s3c_pm_do_save(exynos4_epll_save, ARRAY_SIZE(exynos4_epll_save));
++	s3c_pm_do_save(exynos4_vpll_save, ARRAY_SIZE(exynos4_vpll_save));
+ 
+ 	tmp = __raw_readl(S5P_INFORM1);
+ 
+@@ -307,12 +318,80 @@ void exynos4_scu_enable(void __iomem *scu_base)
+ 	flush_cache_all();
+ }
+ 
++static unsigned long pll_base_rate;
++
++static void exynos4_restore_pll(void)
++{
++	unsigned long pll_con, locktime, lockcnt;
++	unsigned long pll_in_rate;
++	unsigned int p_div, epll_wait = 0, vpll_wait = 0;
++
++	if (pll_base_rate == 0)
++		return;
++
++	pll_in_rate = pll_base_rate;
++
++	/* EPLL */
++	pll_con = exynos4_epll_save[0].val;
++
++	if (pll_con & (1 << 31)) {
++		pll_con &= (PLL46XX_PDIV_MASK << PLL46XX_PDIV_SHIFT);
++		p_div = (pll_con >> PLL46XX_PDIV_SHIFT);
++
++		pll_in_rate /= 1000000;
++
++		locktime = (3000 / pll_in_rate) * p_div;
++		lockcnt = locktime * 10000 / (10000 / pll_in_rate);
++
++		__raw_writel(lockcnt, S5P_EPLL_LOCK);
++
++		s3c_pm_do_restore_core(exynos4_epll_save,
++					ARRAY_SIZE(exynos4_epll_save));
++		epll_wait = 1;
++	}
++
++	pll_in_rate = pll_base_rate;
++
++	/* VPLL */
++	pll_con = exynos4_vpll_save[0].val;
++
++	if (pll_con & (1 << 31)) {
++		pll_in_rate /= 1000000;
++		/* 750us */
++		locktime = 750;
++		lockcnt = locktime * 10000 / (10000 / pll_in_rate);
++
++		__raw_writel(lockcnt, S5P_VPLL_LOCK);
++
++		s3c_pm_do_restore_core(exynos4_vpll_save,
++					ARRAY_SIZE(exynos4_vpll_save));
++		vpll_wait = 1;
++	}
++
++	/* Wait PLL locking */
++
++	do {
++		if (epll_wait) {
++			pll_con = __raw_readl(S5P_EPLL_CON0);
++			if (pll_con & (1 << S5P_EPLLCON0_LOCKED_SHIFT))
++				epll_wait = 0;
++		}
++
++		if (vpll_wait) {
++			pll_con = __raw_readl(S5P_VPLL_CON0);
++			if (pll_con & (1 << S5P_VPLLCON0_LOCKED_SHIFT))
++				vpll_wait = 0;
++		}
++	} while (epll_wait || vpll_wait);
++}
++
+ static struct sysdev_driver exynos4_pm_driver = {
+ 	.add		= exynos4_pm_add,
+ };
+ 
+ static __init int exynos4_pm_drvinit(void)
+ {
++	struct clk *pll_base;
+ 	unsigned int tmp;
+ 
+ 	s3c_pm_init();
+@@ -323,6 +402,13 @@ static __init int exynos4_pm_drvinit(void)
+ 	tmp |= ((0xFF << 8) | (0x1F << 1));
+ 	__raw_writel(tmp, S5P_WAKEUP_MASK);
+ 
++	pll_base = clk_get(NULL, "xtal");
++
++	if (!IS_ERR(pll_base)) {
++		pll_base_rate = clk_get_rate(pll_base);
++		clk_put(pll_base);
++	}
++
+ 	return sysdev_driver_register(&exynos4_sysclass, &exynos4_pm_driver);
+ }
+ arch_initcall(exynos4_pm_drvinit);
+@@ -357,6 +443,8 @@ static void exynos4_pm_resume(void)
+ 
+ 	s3c_pm_do_restore_core(exynos4_core_save, ARRAY_SIZE(exynos4_core_save));
+ 
++	exynos4_restore_pll();
++
+ 	exynos4_scu_enable(S5P_VA_SCU);
+ 
+ #ifdef CONFIG_CACHE_L2X0
 -- 
 1.7.1
