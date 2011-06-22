@@ -1,81 +1,122 @@
 From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Wed, 22 Jun 2011 13:35:22 +0200
-Subject: [PATCH 4/6] mach-ux500: Add pin configuration for snowball board
-Message-ID: <1308742522-24974-1-git-send-email-linus.walleij@stericsson.com>
+Date: Wed, 22 Jun 2011 13:35:38 +0200
+Subject: [PATCH 6/6] mach-ux500: add configs for snowball board
+Message-ID: <1308742538-25343-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Robert Marklund <robert.marklund@stericsson.com>
 
-This sets up a few GPIO pins and some pinmuxing on platform boot
-for the Snowball board. Based on work from Mathieu J. Poirier
-<mathieu.poirier@linaro.org>.
+Adds defconfig entries needed to boot a single ux500 kernel
+on the Snowball board.
 
 Signed-off-by: Robert Marklund <robert.marklund@stericsson.com>
 ---
- arch/arm/mach-ux500/board-mop500-pins.c |   43 +++++++++++++++++++++++++++++++
- 1 files changed, 43 insertions(+), 0 deletions(-)
+ arch/arm/configs/u8500_defconfig |   26 +++++++++++++++++++-------
+ 1 files changed, 19 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/mach-ux500/board-mop500-pins.c b/arch/arm/mach-ux500/board-mop500-pins.c
-index fd4cf1c..7013d00 100644
---- a/arch/arm/mach-ux500/board-mop500-pins.c
-+++ b/arch/arm/mach-ux500/board-mop500-pins.c
-@@ -228,6 +228,46 @@ static pin_cfg_t mop500_pins_hrefv60[] = {
- 
- };
- 
-+static pin_cfg_t snowball_pins[] = {
-+	/* SSP0, to AB8500 */
-+	GPIO143_SSP0_CLK,
-+	GPIO144_SSP0_FRM,
-+	GPIO145_SSP0_RXD	| PIN_PULL_DOWN,
-+	GPIO146_SSP0_TXD,
-+
-+	/* MMC0: MicroSD card */
-+	GPIO21_MC0_DAT31DIR     | PIN_OUTPUT_HIGH,
-+
-+	/* MMC2: LAN */
-+	GPIO86_SM_ADQ0,
-+	GPIO87_SM_ADQ1,
-+	GPIO88_SM_ADQ2,
-+	GPIO89_SM_ADQ3,
-+	GPIO90_SM_ADQ4,
-+	GPIO91_SM_ADQ5,
-+	GPIO92_SM_ADQ6,
-+	GPIO93_SM_ADQ7,
-+
-+	GPIO94_SM_ADVn,
-+	GPIO95_SM_CS0n,
-+	GPIO96_SM_OEn,
-+	GPIO97_SM_WEn,
-+
-+	GPIO128_SM_CKO,
-+	GPIO130_SM_FBCLK,
-+	GPIO131_SM_ADQ8,
-+	GPIO132_SM_ADQ9,
-+	GPIO133_SM_ADQ10,
-+	GPIO134_SM_ADQ11,
-+	GPIO135_SM_ADQ12,
-+	GPIO136_SM_ADQ13,
-+	GPIO137_SM_ADQ14,
-+	GPIO138_SM_ADQ15,
-+
-+	/* RSTn_LAN */
-+	GPIO141_GPIO		| PIN_OUTPUT_HIGH,
-+};
-+
- void __init mop500_pins_init(void)
- {
- 	nmk_config_pins(mop500_pins_common,
-@@ -235,6 +275,9 @@ void __init mop500_pins_init(void)
- 	if (machine_is_hrefv60())
- 		nmk_config_pins(mop500_pins_hrefv60,
- 				ARRAY_SIZE(mop500_pins_hrefv60));
-+	else if (machine_is_snowball())
-+		nmk_config_pins(snowball_pins,
-+				ARRAY_SIZE(snowball_pins));
- 	else
- 		nmk_config_pins(mop500_pins_default,
- 				ARRAY_SIZE(mop500_pins_default));
+diff --git a/arch/arm/configs/u8500_defconfig b/arch/arm/configs/u8500_defconfig
+index e1d6020..97d31a4 100644
+--- a/arch/arm/configs/u8500_defconfig
++++ b/arch/arm/configs/u8500_defconfig
+@@ -11,12 +11,12 @@ CONFIG_ARCH_U8500=y
+ CONFIG_UX500_SOC_DB5500=y
+ CONFIG_UX500_SOC_DB8500=y
+ CONFIG_MACH_U8500=y
++CONFIG_MACH_SNOWBALL=y
+ CONFIG_MACH_U5500=y
+ CONFIG_NO_HZ=y
+ CONFIG_HIGH_RES_TIMERS=y
+ CONFIG_SMP=y
+ CONFIG_NR_CPUS=2
+-CONFIG_HOTPLUG_CPU=y
+ CONFIG_PREEMPT=y
+ CONFIG_AEABI=y
+ CONFIG_CMDLINE="root=/dev/ram0 console=ttyAMA2,115200n8"
+@@ -25,8 +25,13 @@ CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
+ CONFIG_VFP=y
+ CONFIG_NEON=y
+ CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_NETFILTER=y
+ CONFIG_PHONET=y
+-CONFIG_PHONET_PIPECTRLR=y
+ # CONFIG_WIRELESS is not set
+ CONFIG_CAIF=y
+ CONFIG_UEVENT_HELPER_PATH="/sbin/hotplug"
+@@ -35,6 +40,13 @@ CONFIG_BLK_DEV_RAM_SIZE=65536
+ CONFIG_MISC_DEVICES=y
+ CONFIG_AB8500_PWM=y
+ CONFIG_SENSORS_BH1780=y
++CONFIG_NETDEVICES=y
++CONFIG_SMSC_PHY=y
++CONFIG_NET_ETHERNET=y
++CONFIG_SMSC911X=y
++# CONFIG_NETDEV_1000 is not set
++# CONFIG_NETDEV_10000 is not set
++# CONFIG_WLAN is not set
+ # CONFIG_INPUT_MOUSEDEV_PSAUX is not set
+ CONFIG_INPUT_EVDEV=y
+ # CONFIG_KEYBOARD_ATKBD is not set
+@@ -49,9 +61,9 @@ CONFIG_INPUT_MISC=y
+ CONFIG_INPUT_AB8500_PONKEY=y
+ # CONFIG_SERIO is not set
+ CONFIG_VT_HW_CONSOLE_BINDING=y
++# CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_AMBA_PL011=y
+ CONFIG_SERIAL_AMBA_PL011_CONSOLE=y
+-# CONFIG_LEGACY_PTYS is not set
+ CONFIG_HW_RANDOM=y
+ CONFIG_HW_RANDOM_NOMADIK=y
+ CONFIG_I2C=y
+@@ -64,7 +76,6 @@ CONFIG_GPIO_TC3589X=y
+ CONFIG_MFD_STMPE=y
+ CONFIG_MFD_TC3589X=y
+ CONFIG_AB8500_CORE=y
+-CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_AB8500=y
+ # CONFIG_HID_SUPPORT is not set
+ CONFIG_USB_MUSB_HDRC=y
+@@ -73,9 +84,11 @@ CONFIG_MUSB_PIO_ONLY=y
+ CONFIG_USB_GADGET=y
+ CONFIG_AB8500_USB=y
+ CONFIG_MMC=y
++CONFIG_MMC_CLKGATE=y
+ CONFIG_MMC_ARMMMCI=y
+ CONFIG_NEW_LEDS=y
+ CONFIG_LEDS_CLASS=y
++CONFIG_LEDS_LM3530=y
+ CONFIG_LEDS_LP5521=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_AB8500=y
+@@ -83,7 +96,6 @@ CONFIG_RTC_DRV_PL031=y
+ CONFIG_DMADEVICES=y
+ CONFIG_STE_DMA40=y
+ CONFIG_STAGING=y
+-# CONFIG_STAGING_EXCLUDE_BUILD is not set
+ CONFIG_TOUCHSCREEN_SYNAPTICS_I2C_RMI4=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT2_FS_XATTR=y
+@@ -95,6 +107,8 @@ CONFIG_TMPFS=y
+ CONFIG_TMPFS_POSIX_ACL=y
+ CONFIG_CONFIGFS_FS=m
+ # CONFIG_MISC_FILESYSTEMS is not set
++CONFIG_NFS_FS=y
++CONFIG_ROOT_NFS=y
+ CONFIG_NLS_CODEPAGE_437=y
+ CONFIG_NLS_ISO8859_1=y
+ CONFIG_MAGIC_SYSRQ=y
+@@ -103,7 +117,5 @@ CONFIG_DEBUG_KERNEL=y
+ # CONFIG_SCHED_DEBUG is not set
+ # CONFIG_DEBUG_PREEMPT is not set
+ CONFIG_DEBUG_INFO=y
+-# CONFIG_RCU_CPU_STALL_DETECTOR is not set
+ # CONFIG_FTRACE is not set
+ CONFIG_DEBUG_USER=y
+-CONFIG_DEBUG_ERRORS=y
 -- 
 1.7.3.2
