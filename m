@@ -1,153 +1,74 @@
-From: svenkatr@ti.com (Venkatraman S)
-Date: Wed, 22 Jun 2011 13:12:28 +0530
-Subject: [PATCH v7 01/11] mmc: add non-blocking mmc request function
-In-Reply-To: <1308699521-20556-2-git-send-email-per.forlin@linaro.org>
-References: <1308699521-20556-1-git-send-email-per.forlin@linaro.org>
-	<1308699521-20556-2-git-send-email-per.forlin@linaro.org>
-Message-ID: <BANLkTikhZRb5GWFvTVG0bFjD6rAyJPka1w@mail.gmail.com>
+From: daeinki@gmail.com (InKi Dae)
+Date: Wed, 22 Jun 2011 16:50:58 +0900
+Subject: Some questions about DRM(Direct Rendering Manager)
+In-Reply-To: <4E0185E7.8020708@samsung.com>
+References: <4E016EDC.30200@samsung.com>
+	<4E0185E7.8020708@samsung.com>
+Message-ID: <BANLkTim6xvD5U9GJ2pHu-=OrYccRHSj7Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 5:08 AM, Per Forlin <per.forlin@linaro.org> wrote:
-> Previously there has only been one function mmc_wait_for_req()
-> to start and wait for a request. This patch adds
-> ?* mmc_start_req() - starts a request wihtout waiting
-> ? If there is on ongoing request wait for completion
-> ? of that request and start the new one and return.
-> ? Does not wait for the new command to complete.
->
-> This patch also adds new function members in struct mmc_host_ops
-> only called from core.c
-> ?* pre_req - asks the host driver to prepare for the next job
-> ?* post_req - asks the host driver to clean up after a completed job
->
-> The intention is to use pre_req() and post_req() to do cache maintenance
-> while a request is active. pre_req() can be called while a request is active
-> to minimize latency to start next job. post_req() can be used after the next
-> job is started to clean up the request. This will minimize the host driver
-> request end latency. post_req() is typically used before ending the block
-> request and handing over the buffer to the block layer.
->
-> Add a host-private member in mmc_data to be used by
-> pre_req to mark the data. The host driver will then
-> check this mark to see if the data is prepared or not.
->
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> ---
-> ?drivers/mmc/core/core.c ?| ?110 +++++++++++++++++++++++++++++++++++++++++----
-> ?include/linux/mmc/core.h | ? ?6 ++-
-> ?include/linux/mmc/host.h | ? 21 +++++++++
-> ?3 files changed, 126 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/mmc/core/core.c b/drivers/mmc/core/core.c
-> index 68091dd..c82fa3b 100644
-> --- a/drivers/mmc/core/core.c
-> +++ b/drivers/mmc/core/core.c
-> @@ -198,9 +198,106 @@ mmc_start_request(struct mmc_host *host, struct mmc_request *mrq)
->
-> ?static void mmc_wait_done(struct mmc_request *mrq)
-> ?{
-> - ? ? ? complete(mrq->done_data);
-> + ? ? ? complete(&mrq->completion);
-> ?}
->
-> +static void __mmc_start_req(struct mmc_host *host, struct mmc_request *mrq)
-> +{
-> + ? ? ? init_completion(&mrq->completion);
-> + ? ? ? mrq->done = mmc_wait_done;
-> + ? ? ? mmc_start_request(host, mrq);
-> +}
-> +
-> +static void mmc_wait_for_req_done(struct mmc_host *host,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_request *mrq)
-> +{
-> + ? ? ? wait_for_completion(&mrq->completion);
-> +}
-> +
-> +/**
-> + * ? ? mmc_pre_req - Prepare for a new request
-> + * ? ? @host: MMC host to prepare command
-> + * ? ? @mrq: MMC request to prepare for
-> + * ? ? @is_first_req: true if there is no previous started request
-> + * ? ? ? ? ? ? ? ? ? ? that may run in parellel to this call, otherwise false
-> + *
-> + * ? ? mmc_pre_req() is called in prior to mmc_start_req() to let
-> + * ? ? host prepare for the new request. Preparation of a request may be
-> + * ? ? performed while another request is running on the host.
-> + */
-> +static void mmc_pre_req(struct mmc_host *host, struct mmc_request *mrq,
-> + ? ? ? ? ? ? ? ?bool is_first_req)
-> +{
-> + ? ? ? if (host->ops->pre_req)
-> + ? ? ? ? ? ? ? host->ops->pre_req(host, mrq, is_first_req);
-> +}
-> +
-> +/**
-> + * ? ? mmc_post_req - Post process a completed request
-> + * ? ? @host: MMC host to post process command
-> + * ? ? @mrq: MMC request to post process for
-> + * ? ? @err: Error, if non zero, clean up any resources made in pre_req
-> + *
-> + * ? ? Let the host post process a completed request. Post processing of
-> + * ? ? a request may be performed while another reuqest is running.
-> + */
-> +static void mmc_post_req(struct mmc_host *host, struct mmc_request *mrq,
-> + ? ? ? ? ? ? ? ? ? ? ? ?int err)
-> +{
-> + ? ? ? if (host->ops->post_req)
-> + ? ? ? ? ? ? ? host->ops->post_req(host, mrq, err);
-> +}
-> +
-> +/**
-> + * ? ? mmc_start_req - start a non-blocking request
-> + * ? ? @host: MMC host to start command
-> + * ? ? @areq: async request to start
-> + * ? ? @error: out parameter returns 0 for success, otherwise non zero
-> + *
-> + * ? ? Start a new MMC custom command request for a host.
-> + * ? ? If there is on ongoing async request wait for completion
-> + * ? ? of that request and start the new one and return.
-> + * ? ? Does not wait for the new request to complete.
-> + *
-> + * ? ? Returns the completed async request, NULL in case of none completed.
-> + */
-> +struct mmc_async_req *mmc_start_req(struct mmc_host *host,
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct mmc_async_req *areq, int *error)
-> +{
-> + ? ? ? int err = 0;
-> + ? ? ? struct mmc_async_req *data = host->areq;
-> +
-> + ? ? ? /* Prepare a new request */
-> + ? ? ? if (areq)
-> + ? ? ? ? ? ? ? mmc_pre_req(host, areq->mrq, !host->areq);
-> +
-> + ? ? ? if (host->areq) {
-> + ? ? ? ? ? ? ? mmc_wait_for_req_done(host, host->areq->mrq);
-> + ? ? ? ? ? ? ? err = host->areq->err_check(host->card, host->areq);
-> + ? ? ? ? ? ? ? if (err) {
-> + ? ? ? ? ? ? ? ? ? ? ? mmc_post_req(host, host->areq->mrq, 0);
-> + ? ? ? ? ? ? ? ? ? ? ? if (areq)
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? mmc_post_req(host, areq->mrq, -EINVAL);
-> +
-> + ? ? ? ? ? ? ? ? ? ? ? host->areq = NULL;
-> + ? ? ? ? ? ? ? ? ? ? ? goto out;
-In this sequence, would the return value (data) have the previous areq ?
-Is that intentional - doesn't seem to fit with the description.
+It adds dri-devel at lists.freedesktop.org to this mail thread.
+Thank you.
 
-> + ? ? ? ? ? ? ? }
-> + ? ? ? }
-> +
-> + ? ? ? if (areq)
-> + ? ? ? ? ? ? ? __mmc_start_req(host, areq->mrq);
-> +
-> + ? ? ? if (host->areq)
-> + ? ? ? ? ? ? ? mmc_post_req(host, host->areq->mrq, 0);
-> +
-> + ? ? ? host->areq = areq;
-> + out:
-> + ? ? ? if (error)
-> + ? ? ? ? ? ? ? *error = err;
-> + ? ? ? return data;
-> +}
-> +EXPORT_SYMBOL(mmc_start_req);
-> +
+2011? 6? 22? ?? 3:04, daeinki <inki.dae@samsung.com>?? ?:
+> below is additional comments.
+>
+> daeinki ? ?:
+>> Hi all,
+>>
+>> I'm writing Samsung SoC based DRM framework and this one includes FIMD
+>> and HDMI driver as hardware dependent modules. and for now, encoder,
+>> connector, crtc and fb module has been materialized almost. but I'm
+>> contending with  framebuffer setting issue(created fb_info should be
+>> registered to linux framebuffer through register_framebuffer() or not)as
+>> default framebuffer at booting time.
+>>
+>> at drm_fb_helper_single_fb_probe() of drm_fb_helper.c file, fb_helper's
+>> fb_probe callback is called and this one creates new framebuffer and
+>> returns a value more then 0 if true. internally, this process creates an
+>> fb_info object and drm_framebuffer and then drm_framebuffer would be
+>> added to mode_config.fb_list of the drm_device.
+>>
+> it's my mistake. return value is 0 if true, nonzero otherwise.
+>
+>> a value returned, new_fb is used to decide that it calls
+>> register_framebuffer() or drm_fb_helper_set_par(). at this point, I am
+>> confused it's a good way to call register_framebuffer() otherwise
+>> drm_fb_helper_set_par(). if register_framebuffer() is called then I
+>> guess drm_fb_helper_set_par() or drm_crtc_helper_set_config() should be
+>> called somewhere subsequently to apply this one to real hardware because
+>> previous process is just for maintaining data logically.(not set up data
+>> to h/w)
+>>
+>> it's a right way to call register_framebuffer() and then
+>> drm_fb_helper_set_par() or drm_crtc_helper_set_config()? otherwise just
+>> only drm_fb_helper_set_par() or drm_crtc_helper_set_config() ignoring
+>> register_framebuffer()? and what is the purpose of using
+>> register_framebuffer()?
+>>
+> I understood that if fb_probe() callback is fail then fb_info object is
+> registered to linux framebuffer through register_framebuffer()
+> otherwise(if true) hardware configuration would be completed by
+> drm_fb_helper_set_par() so the reason of using register_framebuffer() is
+> that the case of failing fb_probe() callback, it is for drawing on only
+> linux framebuffer. is it right?
+>
+>> In my case, first, register_framebuffer() is called and then if desired
+>> default crtc id is matched with drm_fb_helper->crtc_info[0 ~ n].crtc_id,
+>> it gets mode_set of drm_fb_helper->crtc_info[n] and then  it calls
+>> drm_crtc_helper_set_config(mode_set). at this time, all the hardware
+>> configurations would be completed.
+>>
+>> thank you in advance.
+>>
+>> Best Regards
+>> Inki Dae.
+>>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
