@@ -1,47 +1,36 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 16:09:50 +0100
-Subject: [PATCH 04/25] ARM: pm: preserve r4 - r11 across a suspend
-In-Reply-To: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-Message-ID: <E1QZP3u-0002Vy-Tw@rmk-PC.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 22 Jun 2011 17:10:39 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <20110622145828.GL6069@pengutronix.de>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110622090321.GO23234@n2100.arm.linux.org.uk>
+	<20110622145828.GL6069@pengutronix.de>
+Message-ID: <201106221710.39687.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make cpu_suspend()..return function preserve r4 to r11 across a suspend
-cycle.  This is in preparation of relieving platform support code from
-this task.
+On Wednesday 22 June 2011, Sascha Hauer wrote:
+> --- a/arch/arm/boot/Makefile
+> +++ b/arch/arm/boot/Makefile
+> @@ -59,6 +59,11 @@ $(obj)/zImage:       $(obj)/compressed/vmlinux FORCE
+>  
+>  endif
+>  
+> +ifneq ($(words $(ZRELADDR)), 1)
+> +$(obj)/uImage: FORCE
+> +       @echo 'Multiple zreladdrs, cannot build uImage'
+> +       exit 1
+> +else
 
-Acked-by: Frank Hofmann <frank.hofmann@tomtom.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/sleep.S |    5 +++--
- 1 files changed, 3 insertions(+), 2 deletions(-)
+Failing the build for a possible configuration is not nice, I would
+be happier if this could be prevented in Kconfig. I have recently
+worked on getting all 'randconfig' build working for a bunch of platforms
+(patches will follow), so it would be a shame to have another
+guaranteed failure built into the kernel.
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index 0a778c3..8dbca93 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -12,10 +12,11 @@
-  *  r1 = v:p offset
-  *  r3 = virtual return function
-  * Note: sp is decremented to allocate space for CPU state on stack
-- * r0-r3,r9,r10,lr corrupted
-+ * r0-r3,ip,lr corrupted
-  */
- ENTRY(cpu_suspend)
- 	stmfd	sp!, {r3}
-+	stmfd	sp!, {r4 - r11}
- 	mov	r9, lr
- #ifdef MULTI_CPU
- 	ldr	r10, =processor
-@@ -88,7 +89,7 @@ ENDPROC(cpu_resume_turn_mmu_on)
- cpu_resume_after_mmu:
- 	str	r5, [r2, r4, lsl #2]	@ restore old mapping
- 	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
--	ldmfd	sp!, {pc}
-+	ldmfd	sp!, {r4 - r11, pc}
- ENDPROC(cpu_resume_after_mmu)
- 
- /*
--- 
-1.7.4.4
+Your patch is ok by itself, in order to detect the case when Kconfig
+logic has failed, but we should also have a way to prevent enabling
+uImage building in Kconfig for configurations that are known to
+not work.
+
+	Arnd
