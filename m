@@ -1,40 +1,39 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 22 Jun 2011 14:42:20 +0200
-Subject: [Linaro-mm-sig] [PATCH 08/10] mm: cma: Contiguous Memory
-	Allocator added
-In-Reply-To: <201106220903.31065.hverkuil@xs4all.nl>
-References: <1307699698-29369-1-git-send-email-m.szyprowski@samsung.com>
-	<201106150937.18524.arnd@arndb.de>
-	<201106220903.31065.hverkuil@xs4all.nl>
-Message-ID: <201106221442.20848.arnd@arndb.de>
+Date: Wed, 22 Jun 2011 15:05:32 +0200
+Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
+In-Reply-To: <BANLkTim1kN2f41Cfz70=g4a_+gPPrWDacA@mail.gmail.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<201106211620.02065.arnd@arndb.de>
+	<BANLkTim1kN2f41Cfz70=g4a_+gPPrWDacA@mail.gmail.com>
+Message-ID: <201106221505.32531.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 22 June 2011, Hans Verkuil wrote:
-> > How about a Kconfig option that defines the percentage of memory
-> > to set aside for contiguous allocations?
+On Wednesday 22 June 2011, Ohad Ben-Cohen wrote:
+> > One point I noticed is the use of debugfs, which you should probably
+> > replace at some point with a stable API, e.g. your own debugfs-like
+> > file system, but there is no hurry to do that now.
 > 
-> I would actually like to see a cma_size kernel option of some sort. This would
-> be for the global CMA pool only as I don't think we should try to do anything
-> more complicated here.
+> debugfs is only being used to expose debugging info (namely the power
+> state of the remote processor and its trace log messages), which is
+> mostly useful for developers trying to understand what went wrong.
+> 
+> It seems like debugfs fits quite nicely here (e.g. it's perfectly fine
+> if this is completely compiled out on production systems), but sure,
+> we can always revisit this later too.
 
-A command line is probably good to override the compile-time default, yes.
+Ok, I see. In that case I agree that using debugfs is fine, but I would
+recommend trying to use fewer macros and just open-coding the file
+operations for better readability.
 
-We could also go further and add a runtime sysctl mechanism like the one
-for hugepages, where you can grow the pool at run time as long as there is
-enough free contiguous memory (e.g. from init scripts), or shrink it later
-if you want to allow larger nonmovable allocations.
+> > Unfortunately require __packed. It would be better to sort the members
+> > differently so that each member is naturally aligned in order to
+> > avoid the need for padding or __packed attributes
+> 
+> Definitely. __packed is being used just to be on the safe side; we
+> didn't intend to introduce unnatural alignment intentionally. will be
+> fixed.
 
-My feeling is that we need to find a way to integrate the global settings
-for four kinds of allocations:
-
-* nonmovable kernel pages
-* hugetlb pages
-* CMA
-* memory hotplug
-
-These essentially fight over the same memory (though things are slightly
-different with dynamic hugepages), and they all face the same basic problem
-of getting as much for themselves without starving the other three.
+Ok.
 
 	Arnd
