@@ -1,35 +1,68 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 16:11:33 +0100
-Subject: [PATCH 09/25] ARM: pm: plat-s3c24xx: cleanup s3c_cpu_save
+Date: Wed, 22 Jun 2011 16:09:30 +0100
+Subject: [PATCH 03/25] ARM: pm: extract common code from MULTI_CPU/!MULTI_CPU
+	paths
 In-Reply-To: <20110622150816.GT23234@n2100.arm.linux.org.uk>
 References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-Message-ID: <E1QZP5Z-0002WK-47@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QZP3a-0002Vu-E1@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-s3c_cpu_save does not need to save any registers with the new
-cpu_suspend calling convention.  Remove these redundant instructions.
+Very little code is different between these two paths now, so extract
+the common code.
 
+Acked-by: Frank Hofmann <frank.hofmann@tomtom.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/plat-s3c24xx/sleep.S |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+ arch/arm/kernel/sleep.S |   24 ++++++------------------
+ 1 files changed, 6 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/plat-s3c24xx/sleep.S b/arch/arm/plat-s3c24xx/sleep.S
-index f822e62..6ada459 100644
---- a/arch/arm/plat-s3c24xx/sleep.S
-+++ b/arch/arm/plat-s3c24xx/sleep.S
-@@ -48,10 +48,8 @@
- 	*/
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index f8e9251..0a778c3 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -19,29 +19,13 @@ ENTRY(cpu_suspend)
+ 	mov	r9, lr
+ #ifdef MULTI_CPU
+ 	ldr	r10, =processor
+-	mov	r2, sp			@ current virtual SP
+ 	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
+ 	ldr	ip, [r10, #CPU_DO_RESUME] @ virtual resume function
+-	sub	sp, sp, r0		@ allocate CPU state on stack
+-	mov	r0, sp			@ save pointer
+-	add	ip, ip, r1		@ convert resume fn to phys
+-	stmfd	sp!, {r1, r2, ip}	@ save v:p, virt SP, phys resume fn
+-	ldr	r3, =sleep_save_sp
+-	add	r2, sp, r1		@ convert SP to phys
+-#ifdef CONFIG_SMP
+-	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
+-	ALT_UP(mov lr, #0)
+-	and	lr, lr, #15
+-	str	r2, [r3, lr, lsl #2]	@ save phys SP
+ #else
+-	str	r2, [r3]		@ save phys SP
+-#endif
+-	mov	lr, pc
+-	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
+-#else
+-	mov	r2, sp			@ current virtual SP
+ 	ldr	r0, =cpu_suspend_size
+ 	ldr	ip, =cpu_do_resume
++#endif
++	mov	r2, sp			@ current virtual SP
+ 	sub	sp, sp, r0		@ allocate CPU state on stack
+ 	mov	r0, sp			@ save pointer
+ 	add	ip, ip, r1		@ convert resume fn to phys
+@@ -56,6 +40,10 @@ ENTRY(cpu_suspend)
+ #else
+ 	str	r2, [r3]		@ save phys SP
+ #endif
++#ifdef MULTI_CPU
++	mov	lr, pc
++	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
++#else
+ 	bl	cpu_do_suspend
+ #endif
  
- ENTRY(s3c_cpu_save)
--	stmfd	sp!, { r4 - r12, lr }
- 	adr	r3, BSYM(s3c24xx_finish_suspend)
--	bl	cpu_suspend
--	ldmfd	sp!, { r4 - r12, pc }
-+	b	cpu_suspend
- 
- s3c24xx_finish_suspend:
- 	@@ jump to final code to send system to sleep
 -- 
 1.7.4.4
