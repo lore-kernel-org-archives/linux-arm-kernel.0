@@ -1,225 +1,88 @@
-From: jmayo@nvidia.com (Jon Mayo)
-Date: Wed, 22 Jun 2011 12:26:11 -0700
-Subject: [PATCH] ARM: report present cpus in /proc/cpuinfo
-In-Reply-To: <20110622093623.GP23234@n2100.arm.linux.org.uk>
-References: <4E012198.6010405@nvidia.com>
-	<20110621230512.GL23234@n2100.arm.linux.org.uk>
-	<4E012820.2090208@nvidia.com>
-	<20110621233619.GM23234@n2100.arm.linux.org.uk>
-	<4E01326C.1060808@nvidia.com>
-	<20110622093623.GP23234@n2100.arm.linux.org.uk>
-Message-ID: <4E0241D3.4060303@nvidia.com>
+From: andre.silva@freescale.com (Andre Silva)
+Date: Wed, 22 Jun 2011 16:33:05 -0300
+Subject: [PATCH 2/2] ARM:mach-mx5/mx53_ard: Add I2C2 and I2C3 support
+In-Reply-To: <1308771185-4491-1-git-send-email-andre.silva@freescale.com>
+References: <1308771185-4491-1-git-send-email-andre.silva@freescale.com>
+Message-ID: <1308771185-4491-2-git-send-email-andre.silva@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/22/2011 02:36 AM, Russell King - ARM Linux wrote:
-> On Tue, Jun 21, 2011 at 05:08:12PM -0700, Jon Mayo wrote:
->> This issue has had me concerned for a while. Because in userspace it can
->> be advantageous to allocate per-cpu structures on start-up for some
->> threading tricks. but if you use the wrong count, funny things can
->> happen.
->
-> Again, if you look at the glibc sources, you'll find that they (in
-> theory) provide two different calls - getconf(_SC_NPROCESSORS_CONF)
-> and getconf(_SC_NPROCESSORS_ONLN).  See sysdeps/posix/sysconf.c.
->
-> That suggests you you should be using getconf(_SC_NPROCESSORS_CONF).
->
-> However, these are provided by __get_nprocs_conf() and __get_nprocs()
-> respectively. See sysdeps/unix/sysv/linux/getsysstats.c.  Notice this
-> comment:
->
-> /* As far as I know Linux has no separate numbers for configured and
->     available processors.  So make the `get_nprocs_conf' function an
->     alias.  */
-> strong_alias (__get_nprocs, __get_nprocs_conf)
->
-> So, getconf(_SC_NPROCESSORS_CONF) and getconf(_SC_NPROCESSORS_ONLN)
-> will probably return the same thing - and it seems to me that you
-> require that to be fixed.  That's not for us in ARM to sort out -
-> that's a _generic_ kernel and glibc issue, and needs to be discussed
-> elsewhere.
->
+Signed-off-by: Andre Silva <andre.silva@freescale.com>
 
-Thanks for that. I don't look at glibc too much. I tend to run 
-everything but glibc.
+---
+Add support for I2C2 and I2C3 on i.MX53 ARD Board.
+Also removes a space in a comment.
 
->>>> I don't think the behavior of ARM linux makes sense. Neither change is
->>>> truly correct in my mind. What I feel is the correct behavior is a list
->>>> (in both stat and cpuinfo) of all cpus either running a task or ready to
->>>> run a task.
->>>
->>> That _is_ what you have listed in /proc/cpuinfo and /proc/stat.
->>>
->>
->> What I see is my idle cpus are not there because we hot unplug them so
->> their power domains can be turned off. scheduling them can happen, but
->> only if an extra step occurs. From user space it's transparent, from
->> kernel space, there is a whole framework making decisions about when to
->> dynamically turn on what.
->
-> Exactly.  You're complaining that the kernels interpretation of the masks
-> is not correct because you're driving it with a user program which
-> effectively changes that behaviour.
->
+ arch/arm/mach-mx5/Kconfig          |    1 +
+ arch/arm/mach-mx5/board-mx53_ard.c |   21 ++++++++++++++++++++-
+ 2 files changed, 21 insertions(+), 1 deletions(-)
 
-small correction to your statement. I'm driving it entirely with the 
-kernel. And presenting something that isn't quite what user programs expect.
-
-> So, if we change the interpretation of the masks, we'll then have people
-> who aren't using your user program complaining that the masks are wrong
-> for them.  It's a no-win situation - there is no overall benefit to
-> changing the kernel.
->
-> The fact that you're using a user program which dynamically hot-plugs
-> CPUs means that _you're_ changing the system behaviour by running that
-> program, and _you're_ changing the meaning of those masks.
->
-
-yea, I'm not doing that. This is stuff in mach-tegra that dynamically 
-hotplugs CPUs.
-
->>>> cpu_possible_mask, cpu_present_mask, and cpu_online_mask
->>>> don't have semantics on ARM that I feel is right. (I don't understand
->>>> what cpu_active_mask is, but it's probably not what I want either)
->>>
->>> They have their defined meaning.
->>>
->>> cpu_possible_mask - the CPU number may be available
->>> cpu_present_mask - the CPU number is present and is available to be brought
->>> 	online upon request by the hotplug code
->>> cpu_online_mask - the CPU is becoming available for scheduling
->>> cpu_active_mask - the CPU is fully online and available for scheduling
->>>
->>> CPUs only spend a _very_ short time in the online but !active state
->>> (about the time it takes the CPU asking for it to be brought up to
->>> notice that it has been brought up, and for the scheduler migration
->>> code to receive the notification that the CPU is now online.)  So
->>> you can regard the active mask as a mere copy of the online mask for
->>> most purposes.
->>>
->>> CPUs may be set in the possible mask but not the present mask - that
->>> can happen if you limit the number of CPUs on the kernel command line.
->>> However, we have no way to bring those CPUs to "present" status, and
->>> so they are not available for bringing online - as far as the software
->>> is concerned, they're as good as being physically unplugged.
->>>
->>
->> I don't see a use for that semantic. Why shouldn't we add a couple lines
->> of code to the kernel to scrub out unusable situations?
->
-> Think about it - if you have real hot-pluggable CPUs (servers do), do
-> you _really_ want to try to bring online a possible CPU (iow, there's
-> a socket on the board) but one which isn't present (iow, the socket is
-> empty.)
->
-> That's what the possible + !present case caters for.  Possible tells
-> the kernel how many CPUs to allocate per-cpu data structures for.
-> present tells it whether a CPU can be onlined or not.
->
-
-Yes, that's the difference between present and possible. I'm not 
-suggesting we report cpus that do not exist. I'm suggesting we report 
-cpus that are present, online or not.
-
->>> So, we (in arch/arm) can't change that decision.  Same for online&&
->>> active must both be set in order for any process to be scheduled onto
->>> that CPU - if any process is on a CPU which is going offline (and
->>> therefore !active, !online) then it will be migrated off that CPU by
->>> generic code before the CPU goes offline.
->>>
->>
->> I will accept that. But then does that mean we (either arch/arm or
->> mach-tegra) have used the cpu hotplug system incorrectly?
->
-> It means you're using it in ways that it was not originally designed
-> to be used - which is for the physical act of hot-plugging CPUs in
-> servers.  CPU hotplug was never designed from the outset for this
-> kind of dynamic CPU power management.
->
-> Yes, you _can_ use the CPU hotplug interfaces to do this, but as you're
-> finding, there are problems with doing this.
->
-> We can't go around making ARM use CPU hotplug differently from everyone
-> else because that'll make things extremely fragile.  As you've already
-> found out, glibc getconf() ultimately uses /proc/stat to return the
-> number of CPUs.  So in order to allow dynamic hotplugging _and_ return
-> the sensible 'online CPUs' where 'online' means both those which are
-> currently running and dormant, you need to change generic code.
->
-
-I agree 100%.
-
-> Plus, there's the issue of CPU affinity for processes and IRQs.  With
-> current CPU hotplug, a process which has chosen to bind to a particular
-> CPU will have that binding destroyed when the CPU is hot unplugged, and
-> its affinity will be broken.  It will be run on a different CPU.  This
-> is probably not the semantics you desire.
->
-
-Or maybe it is. I haven't decided yet. For power reasons I might want to 
-ignore the affinity until demand goes up for more cores.
-
-> I'd argue that trying to do dynamic hotplugging is the wrong approach,
-> especially as there is CPUidle (see below.)
->
->>> I think what you're getting confused over is that within nvidia, you're
->>> probably dynamically hotplugging CPUs, and so offline CPUs are apparantly
->>> available to the system if the load on the system rises.  That's not
->>> something in the generic kernel, and is a custom addition.  Such an
->>> addition _can_ be seen to change the definition of the above masks,
->>> but that's not the fault of the kernel - that's the way you're driving
->>> the hotplug system.
->>>
->>
->> sorry. I thought we weren't the only one in arm driving it this way. if
->> what we've done is strange, I'd like to correct it.
->
-> I'm aware of ARM having done something like this in their SMP group
-> in the early days of SMP support, but I wasn't aware that it was still
-> being actively persued.  I guess that it never really got out of the
-> prototyping stage (or maybe it did but they chose not to address these
-> issues.)
->
->> Like if I were to think of a big mainframe or xeon server with hotplug
->> cpus, the way the masks work makes perfect sense. I push a button, all
->> the processes get cleared from the cpu, it is marked ass offline. I pull
->> the card from the cabinet, and then it is !present. and maybe instead a
->> new card at a later date. it's just like any other sort of hotplug thing.
->>
->> I think my issue with cpuinfo/stat's output is with the semantics for
->> "online" being different for this one architecture (mach-tegra) and
->> possibly others (??) than what I would expect.
->
-> No, it's no different.  As I've explained above, the difference is that
-> you're running a userspace program which automatically does the
-> hotplugging depending on the system load.
->
-
-no. I'm not. no user space program at all.
-
-> That _can_ be viewed as fundamentally changing the system behaviour
-> because CPUs which are offlined are still available for scheduling
-> should the system load become high enough to trigger it.
->
-> I think there's an easier way to solve this problem: there is the CPU
-> idle infrastructure, which allows idle CPUs to remain online while
-> allowing them to power down when they're not required.  Because they
-> remain online, the scheduler will migrate tasks to them if they're
-> not doing anything, and maybe that's something else to look at.
->
-> The other advantage of CPUidle is that you're not breaking the affinity
-> of anything when the CPU is powered down, unlike hotplug.
->
-> So, I think you really should be looking at CPUidle, rather than trying
-> to do dynamic hotplugging based on system load.
-
-The disadvantage of CPUidle is there is no way, that I can see, to 
-handle asymmetric power domains. I don't ever want to turn off cpu0, 
-it's power domain is coupled to a bunch of other things. but any 
-additional cores (1 or more) are on a different power domain (shared 
-between all additional cores).
-
-if cpu0 is idle, I will want to kick everyone off cpu1 and push them 
-onto cpu0, then shut cpu1 off. It gets worse with more cores (a bunch of 
-companies announced 4 core ARMs already, for example).
+diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+index 5b16f39..6a47d4c 100644
+--- a/arch/arm/mach-mx5/Kconfig
++++ b/arch/arm/mach-mx5/Kconfig
+@@ -213,6 +213,7 @@ config MACH_MX53_ARD
+ 	bool "Support MX53 ARD platforms"
+ 	select SOC_IMX53
+ 	select IMX_HAVE_PLATFORM_IMX2_WDT
++	select IMX_HAVE_PLATFORM_IMX_I2C
+ 	select IMX_HAVE_PLATFORM_IMX_UART
+ 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+ 	help
+diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
+index 7dd54b9..eff2a57 100644
+--- a/arch/arm/mach-mx5/board-mx53_ard.c
++++ b/arch/arm/mach-mx5/board-mx53_ard.c
+@@ -84,6 +84,12 @@ static iomux_v3_cfg_t mx53_ard_pads[] = {
+ 	MX53_PAD_PATA_DATA11__ESDHC1_DAT7,
+ 	MX53_PAD_GPIO_1__GPIO1_1,
+ 	MX53_PAD_GPIO_9__GPIO1_9,
++	/* I2C2 */
++	MX53_PAD_EIM_EB2__I2C2_SCL,
++	MX53_PAD_KEY_ROW3__I2C2_SDA,
++	/* I2C3 */
++	MX53_PAD_GPIO_3__I2C3_SCL,
++	MX53_PAD_GPIO_16__I2C3_SDA,
+ };
+ 
+ static struct resource ard_smsc911x_resources[] = {
+@@ -120,6 +126,14 @@ static const struct esdhc_platform_data mx53_ard_sd1_data __initconst = {
+ 	.wp_gpio = ARD_SD1_WP,
+ };
+ 
++static struct imxi2c_platform_data mx53_ard_i2c2_data = {
++	.bitrate = 50000,
++};
++
++static struct imxi2c_platform_data mx53_ard_i2c3_data = {
++	.bitrate = 400000,
++};
++
+ static void __init mx53_ard_io_init(void)
+ {
+ 	mxc_iomux_v3_setup_multiple_pads(mx53_ard_pads,
+@@ -127,9 +141,12 @@ static void __init mx53_ard_io_init(void)
+ 
+ 	gpio_request(ARD_ETHERNET_INT_B, "eth-int-b");
+ 	gpio_direction_input(ARD_ETHERNET_INT_B);
++
++	gpio_request(ARD_I2CPORTEXP_B, "i2cptexp-rst");
++	gpio_direction_output(ARD_I2CPORTEXP_B, 1);
+ }
+ 
+- /* Config CS1 settings for ethernet controller */
++/* Config CS1 settings for ethernet controller */
+ static int weim_cs_config(void)
+ {
+ 	u32 reg;
+@@ -179,6 +196,8 @@ static void __init mx53_ard_board_init(void)
+ 
+ 	imx53_add_sdhci_esdhc_imx(0, &mx53_ard_sd1_data);
+ 	imx53_add_imx2_wdt(0, NULL);
++	imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
++	imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
+ }
+ 
+ static void __init mx53_ard_timer_init(void)
+-- 
+1.7.1
