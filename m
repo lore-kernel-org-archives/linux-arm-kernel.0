@@ -1,174 +1,60 @@
-From: p.paneri@samsung.com (Praveen Paneri)
-Date: Wed, 22 Jun 2011 13:56:25 +0530
-Subject: [RFC][PATCH 4/5] ARM: S5P64x0: Adding OTG PHY control code
-In-Reply-To: <0LN400HTOZEQDIL0@mailout1.samsung.com>
-References: <0LN400HTOZEQDIL0@mailout1.samsung.com>
-Message-ID: <BANLkTikDDBQjE2RCeeBB50vokSTcnCO46A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 22 Jun 2011 10:32:57 +0200
+Subject: i.MX consolidation patches
+In-Reply-To: <20110622081141.GN23234@n2100.arm.linux.org.uk>
+References: <1305823648-2428-1-git-send-email-s.hauer@pengutronix.de>
+	<20110530075745.GA31492@S2100-06.ap.freescale.net>
+	<20110601123522.GE23771@pengutronix.de>
+	<20110601134749.GI3660@n2100.arm.linux.org.uk>
+	<20110601141847.GG23771@pengutronix.de>
+	<20110601142406.GJ3660@n2100.arm.linux.org.uk>
+	<20110622075615.GJ6069@pengutronix.de>
+	<20110622081141.GN23234@n2100.arm.linux.org.uk>
+Message-ID: <20110622083257.GK6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Jun 22, 2011 at 09:11:41AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 22, 2011 at 09:56:15AM +0200, Sascha Hauer wrote:
+> > Coming back to this topic after a longer time, here is an updated
+> > patch doing exactly this.
+> 
+> I'm not sure that this is actually correct.  Whether ARM_PATCH_PHYS_VIRT
+> is enabled or not only affects the Image and not the zImage - provided
+> the mach-* provides the zreladdr in their Makefile.boot, you can build
+> a uImage with ARM_PATCH_PHYS_VIRT.
+> 
+> Where things become sticky is when AUTO_ZRELADDR is enabled - this is where
+> the ZRELADDR may be omitted, and therefore there is no load/start address
+> which can be provided to uboot.
+> 
+> >  $(obj)/uImage: STARTADDR=$(LOADADDR)
+> >  
+> > +ifeq ($(CONFIG_ARM_PATCH_PHYS_VIRT),y)
+> 
+> So maybe this wants to be ifeq ($(LOADADDR),) or CONFIG_AUTO_ZRELADDR?
 
-On Tue, Jun 21, 2011 at 4:19 PM, PRAVEEN PANERI <p.paneri@samsung.com> wrote:
->
->
->
-> Hi,
->
-> On Tue, Jun 21, 2011 at 12:33:46PM +0530, p.paneri at samsung.com wrote:
-> > From: Praveen Paneri
-> >
-> > A generic method to initialize and exit OTG PHY which can be
-> > used for all the samsung SoCs.
-> > OTG platdata structure added in platform to pass required
-> > platform specific functions and data to the driver.
-> >
-> > Signed-off-by: Praveen Paneri
-> > ---
-> >??arch/arm/mach-s5p64x0/Makefile?????????? |????1 +
-> >??arch/arm/mach-s5p64x0/include/mach/map.h |????4 +
-> >??arch/arm/mach-s5p64x0/setup-otg-phy.c????|?? 89 ++++++++++++++++++++++++++++++
-> >??arch/arm/plat-s5p/include/plat/otg.h???? |?? 29 ++++++++++
-> >??4 files changed, 123 insertions(+), 0 deletions(-)
-> >??create mode 100644 arch/arm/mach-s5p64x0/setup-otg-phy.c
-> >??create mode 100644 arch/arm/plat-s5p/include/plat/otg.h
-> >
-> > diff --git a/arch/arm/mach-s5p64x0/Makefile b/arch/arm/mach-s5p64x0/Makefile
-> > index ae6bf6f..611fb3a 100644
-> > --- a/arch/arm/mach-s5p64x0/Makefile
-> > +++ b/arch/arm/mach-s5p64x0/Makefile
-> > @@ -28,3 +28,4 @@ obj-y += dev-audio.o
-> >??obj-$(CONFIG_S3C64XX_DEV_SPI) += dev-spi.o
-> >
-> >??obj-$(CONFIG_S5P64X0_SETUP_I2C1) += setup-i2c1.o
-> > +obj-$(CONFIG_S3C_DEV_DWC_OTG) += setup-otg-phy.o
-> > diff --git a/arch/arm/mach-s5p64x0/include/mach/map.h b/arch/arm/mach-s5p64x0/include/mach/map.h
-> > index 95c9125..717c279 100644
-> > --- a/arch/arm/mach-s5p64x0/include/mach/map.h
-> > +++ b/arch/arm/mach-s5p64x0/include/mach/map.h
-> > @@ -44,6 +44,8 @@
-> >??#define S5P64X0_PA_SPI1 0xEC500000
-> >
-> >??#define S5P64X0_PA_HSOTG 0xED100000
-> > +#define S5P64X0_PA_USB_HSPHY 0xED200000
-> > +#define S5P64X0_VA_USB_HSPHY S3C_ADDR_CPU(0x00100000)
-> >
-> >??#define S5P64X0_PA_HSMMC(x) (0xED800000 + ((x) * 0x100000))
-> >
-> > @@ -71,6 +73,8 @@
-> >??#define S5P_PA_TIMER S5P64X0_PA_TIMER
-> >
-> >??#define SAMSUNG_PA_ADC S5P64X0_PA_ADC
-> > +#define S3C_PA_USB_HSOTG S5P64X0_PA_HSOTG
-> > +#define S3C_VA_USB_HSPHY????????S5P64X0_VA_USB_HSPHY
-> >
-> >??/* UART */
-> >
-> > diff --git a/arch/arm/mach-s5p64x0/setup-otg-phy.c b/arch/arm/mach-s5p64x0/setup-otg-phy.c
->
-> drivers should not live in arch/arm/*, why don't you move this to
-> drivers/usb/otg where the PHYs are staying right now ?
-PHY init/exit code can vary across SoCs. Wouldn't it be better to have it in the
-SoC specific location?
->
-> > new file mode 100644
-> > index 0000000..c351554
-> > --- /dev/null
-> > +++ b/arch/arm/mach-s5p64x0/setup-otg-phy.c
-> > @@ -0,0 +1,89 @@
-> > +/*
-> > + * Copyright (C) 2011 Samsung Electronics Co.Ltd
-> > + * Author: Praveen Paneri
-> > + * based on arch/arm/mach-exynos4/setup-usb-phy.c
-> > + * written by Joonyoung Shim
-> > + *
-> > + *??This program is free software; you can redistribute??it and/or modify it
-> > + *??under??the terms of??the GNU General??Public License as published by the
-> > + *??Free Software Foundation;??either version 2 of the??License, or (at your
-> > + *??option) any later version.
-> > + *
-> > + */
-> > +
-> > +#include
-> > +#include
-> > +#include
-> > +#include
-> > +#include
-> > +#include
-> > +#include
-> > +#include
-> > +#include
-> > +
-> > +struct clk *otg_clk;
-> > +static int s5p64x0_otg_phy_init(struct platform_device *pdev)
-> > +{
-> > + int err;
-> > +
-> > + otg_clk = clk_get(&pdev->dev, "otg");
-> > + if (IS_ERR(otg_clk)) {
-> > + dev_err(&pdev->dev, "Failed to get otg clock\n");
-> > + return PTR_ERR(otg_clk);
-> > + }
-> > +
-> > + err = clk_enable(otg_clk);
-> > + if (err) {
-> > + clk_put(otg_clk);
-> > + return err;
-> > + }
-> > +
-> > + if (gpio_is_valid(S5P6440_GPN(1))) {
-> > + err = gpio_request(S5P6440_GPN(1), "GPN");
-> > + if (err)
-> > + printk(KERN_ERR "failed to request GPN1\n");
-> > + gpio_direction_output(S5P6440_GPN(1), 1);
-> > + }
-> > +
-> > + writel(readl(S5P64X0_OTHERS)&~S5P64X0_OTHERS_USB_SIG_MASK,
-> > + S5P64X0_OTHERS);
-> > + writel(0x0, S3C_PHYPWR);???????? /* Power up */
-> > + writel(S3C_PHYCLK_CLKSEL_12M, S3C_PHYCLK);
-> > + writel(S3C_RSTCON_PHY, S3C_RSTCON);
-> > +
-> > + udelay(50);
-> > + writel(0x0, S3C_RSTCON);
-> > + udelay(50);
-> > +
-> > + return 0;
-> > +}
-> > +
-> > +static int s5p64x0_otg_phy_exit(struct platform_device *pdev)
-> > +{
-> > + writel(readl(S3C_PHYPWR)|(0x1F<<1), S3C_PHYPWR);
-> > + writel(readl(S5P64X0_OTHERS)&~S5P64X0_OTHERS_USB_SIG_MASK,
-> > + S5P64X0_OTHERS);
-> > +
-> > + gpio_free(S5P6440_GPN(1));
-> > +
-> > + clk_disable(otg_clk);
-> > + clk_put(otg_clk);
-> > +
-> > + return 0;
-> > +}
-> > +
-> > +int s5p_usb_phy_init(struct platform_device *pdev, int type)
-> > +{
-> > + if (type == S5P_USB_PHY_DEVICE)
-> > + return s5p64x0_otg_phy_init(pdev);
-> > +
-> > + return -EINVAL;
-> > +}
-> > +
-> > +int s5p_usb_phy_exit(struct platform_device *pdev, int type)
-> > +{
-> > + if (type == S5P_USB_PHY_DEVICE)
-> > + return s5p64x0_otg_phy_exit(pdev);
-> > +
-> > + return -EINVAL;
-> > +}
->
-> no way to make this a real driver instead of set a exported functions ??
->
-> --
-> balbi
->
-paneri
+LOADADDR is always set. Given the following in Makefile.boot:
+
+zreladdr-$(CONFIG_ARCH_MX1)     := 0x08008000
+zreladdr-$(CONFIG_MACH_MX21)    := 0xC0008000
+zreladdr-$(CONFIG_ARCH_MX25)    := 0x80008000
+zreladdr-$(CONFIG_MACH_MX27)    := 0xA0008000
+
+LOADADDR ends up being 0xA0008000 when all of the above are enabled.
+Another idea I had was to replace the := with += so that we can
+count the words in zreladdr-y and bail out if we have multiple
+zreladdrs. I haven't really followed this approach as it means adjusting
+all Makefile.boot.
+
+CONFIG_AUTO_ZRELADDR=y also does not necessarily mean that the resulting
+uImage will not work. In the above example the image will work on i.MX27
+
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
