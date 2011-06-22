@@ -1,34 +1,63 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Wed, 22 Jun 2011 15:39:39 +0300
-Subject: [RFC PATCH v2] Add ARM cpu topology definition
-In-Reply-To: <BANLkTikpasc40ubaHZvJoTVehLWtxvYQqQ@mail.gmail.com>
-References: <1308568795-1985-1-git-send-email-vincent.guittot@linaro.org>
-	<20110622101423.GB2402@matterhorn1>
-	<BANLkTikpasc40ubaHZvJoTVehLWtxvYQqQ@mail.gmail.com>
-Message-ID: <BANLkTikQt8dgikHUM5NfYLjWwHgwLbeQrg@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 22 Jun 2011 16:40:52 +0400
+Subject: [PATCH 2/2] mioa701: move gpio-pullup functionality to gpio-vbus
+In-Reply-To: <1308745217-10883-2-git-send-email-dbaryshkov@gmail.com>
+References: <1308745217-10883-1-git-send-email-dbaryshkov@gmail.com>
+	<1308745217-10883-2-git-send-email-dbaryshkov@gmail.com>
+Message-ID: <BANLkTintf_rraxYLEB__4JWOfHw1-qm8pQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 3:20 PM, Vincent Guittot
-<vincent.guittot@linaro.org> wrote:
-> On 22 June 2011 12:14, Amit Kucheria <amit.kucheria@linaro.org> wrote:
->>> +
->>> +#define topology_physical_package_id(cpu) ? ?(cpu_topology[cpu].socket_id)
->>> +#define topology_core_id(cpu) ? ? ? ? ? ? ? ?(cpu_topology[cpu].core_id)
->>> +#define topology_core_cpumask(cpu) ? (&(cpu_topology[cpu].core_sibling))
->>> +#define topology_thread_cpumask(cpu) (&(cpu_topology[cpu].thread_sibling))
->>
->> These #defines are not used anywhere.
+Oops... See bellow,
+
+On 6/22/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
+> gpio-vbus can (and should?) handle D+ pullup gpio for us. Move gpio-pullup
+> handling
+> to gpio-vbus and stop providing udc_info as it's empty now.
 >
-> They are used in topology.c driver and sched.c
+> Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+> ---
+>  arch/arm/mach-pxa/mioa701.c |    7 +------
+>  1 files changed, 1 insertions(+), 6 deletions(-)
 >
->>
->>> +#define mc_capable() (cpu_topology[0].socket_id != -1)
->>> +#define smt_capable() ? ? ? ?(cpu_topology[0].thread_id != -1)
->>
->> Neither are these.
+> diff --git a/arch/arm/mach-pxa/mioa701.c b/arch/arm/mach-pxa/mioa701.c
+> index bcbd359..e712c9d 100644
+> --- a/arch/arm/mach-pxa/mioa701.c
+> +++ b/arch/arm/mach-pxa/mioa701.c
+> @@ -402,14 +402,10 @@ static void gsm_exit(void)
+>  /*
+>   * USB UDC
+>   */
+> -static struct pxa2xx_udc_mach_info mioa701_udc_info = {
+> -	.gpio_pullup	  = GPIO22_USB_ENABLE,
+> -};
+> -
+>  struct gpio_vbus_mach_info gpio_vbus_data = {
+>  	.gpio_vbus = GPIO13_nUSB_DETECT,
+>  	.gpio_vbus_inverted = 1,
+> -	.gpio_pullup = -1,
+> +	.gpio_pullup = GPIO22_USB_ENABLE,
+
+This should be also
++	.disconnect_on_suspend = 1,
+
+>  };
 >
-> They are used in sched.c
+>  /*
+> @@ -770,7 +766,6 @@ static void __init mioa701_machine_init(void)
+>  	pxa_set_fb_info(NULL, &mioa701_pxafb_info);
+>  	pxa_set_mci_info(&mioa701_mci_info);
+>  	pxa_set_keypad_info(&mioa701_keypad_info);
+> -	pxa_set_udc_info(&mioa701_udc_info);
+>  	pxa_set_ac97_info(&mioa701_ac97_info);
+>  	pm_power_off = mioa701_poweroff;
+>  	arm_pm_restart = mioa701_restart;
+> --
+> 1.7.5.3
+>
 >
 
-Ahh, sorry for the noise. Documentation/cputopology.txt is most illuminating.
+
+-- 
+With best wishes
+Dmitry
