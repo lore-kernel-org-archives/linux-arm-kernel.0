@@ -1,68 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 22 Jun 2011 16:09:30 +0100
-Subject: [PATCH 03/25] ARM: pm: extract common code from MULTI_CPU/!MULTI_CPU
-	paths
+Date: Wed, 22 Jun 2011 16:10:11 +0100
+Subject: [PATCH 05/25] ARM: pm: reallocate registers to avoid r2, r3
 In-Reply-To: <20110622150816.GT23234@n2100.arm.linux.org.uk>
 References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-Message-ID: <E1QZP3a-0002Vu-E1@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QZP4F-0002W2-BC@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Very little code is different between these two paths now, so extract
-the common code.
+Avoid using r2 and r3 in the suspend code, allowing these to be
+passed further into the function as arguments.
 
 Acked-by: Frank Hofmann <frank.hofmann@tomtom.com>
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/sleep.S |   24 ++++++------------------
- 1 files changed, 6 insertions(+), 18 deletions(-)
+ arch/arm/kernel/sleep.S |   18 +++++++++---------
+ 1 files changed, 9 insertions(+), 9 deletions(-)
 
 diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index f8e9251..0a778c3 100644
+index 8dbca93..358be13 100644
 --- a/arch/arm/kernel/sleep.S
 +++ b/arch/arm/kernel/sleep.S
-@@ -19,29 +19,13 @@ ENTRY(cpu_suspend)
+@@ -20,26 +20,26 @@ ENTRY(cpu_suspend)
  	mov	r9, lr
  #ifdef MULTI_CPU
  	ldr	r10, =processor
--	mov	r2, sp			@ current virtual SP
- 	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
+-	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
++	ldr	r5, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
  	ldr	ip, [r10, #CPU_DO_RESUME] @ virtual resume function
+ #else
+-	ldr	r0, =cpu_suspend_size
++	ldr	r5, =cpu_suspend_size
+ 	ldr	ip, =cpu_do_resume
+ #endif
+-	mov	r2, sp			@ current virtual SP
 -	sub	sp, sp, r0		@ allocate CPU state on stack
--	mov	r0, sp			@ save pointer
--	add	ip, ip, r1		@ convert resume fn to phys
++	mov	r6, sp			@ current virtual SP
++	sub	sp, sp, r5		@ allocate CPU state on stack
+ 	mov	r0, sp			@ save pointer
+ 	add	ip, ip, r1		@ convert resume fn to phys
 -	stmfd	sp!, {r1, r2, ip}	@ save v:p, virt SP, phys resume fn
 -	ldr	r3, =sleep_save_sp
 -	add	r2, sp, r1		@ convert SP to phys
--#ifdef CONFIG_SMP
--	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
--	ALT_UP(mov lr, #0)
--	and	lr, lr, #15
++	stmfd	sp!, {r1, r6, ip}	@ save v:p, virt SP, phys resume fn
++	ldr	r5, =sleep_save_sp
++	add	r6, sp, r1		@ convert SP to phys
+ #ifdef CONFIG_SMP
+ 	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
+ 	ALT_UP(mov lr, #0)
+ 	and	lr, lr, #15
 -	str	r2, [r3, lr, lsl #2]	@ save phys SP
++	str	r6, [r5, lr, lsl #2]	@ save phys SP
  #else
 -	str	r2, [r3]		@ save phys SP
--#endif
--	mov	lr, pc
--	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
--#else
--	mov	r2, sp			@ current virtual SP
- 	ldr	r0, =cpu_suspend_size
- 	ldr	ip, =cpu_do_resume
-+#endif
-+	mov	r2, sp			@ current virtual SP
- 	sub	sp, sp, r0		@ allocate CPU state on stack
- 	mov	r0, sp			@ save pointer
- 	add	ip, ip, r1		@ convert resume fn to phys
-@@ -56,6 +40,10 @@ ENTRY(cpu_suspend)
- #else
- 	str	r2, [r3]		@ save phys SP
++	str	r6, [r5]		@ save phys SP
  #endif
-+#ifdef MULTI_CPU
-+	mov	lr, pc
-+	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
-+#else
- 	bl	cpu_do_suspend
- #endif
- 
+ #ifdef MULTI_CPU
+ 	mov	lr, pc
 -- 
 1.7.4.4
