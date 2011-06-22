@@ -1,45 +1,38 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Wed, 22 Jun 2011 09:54:50 +0900
-Subject: [RFC PATCH 00/16] Consolidation: move SMP local timers to
-	driver/clocksource
-In-Reply-To: <20110620083216.GB26089@n2100.arm.linux.org.uk>
-References: <1308251204-16719-1-git-send-email-marc.zyngier@arm.com>
-	<201106171707.23989.arnd@arndb.de> <4DFB8E20.60802@gmail.com>
-	<4DFF03FA.8030906@arm.com>
-	<20110620083216.GB26089@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTin2-MJkHyBQqaeuJvMC=5-HnigMSw@mail.gmail.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 22 Jun 2011 10:21:59 +0800
+Subject: [PATCHv7] ARM: mx51: Add support for low power suspend on MX51
+In-Reply-To: <20110621223527.GF6069@pengutronix.de>
+References: <1301325297-24126-1-git-send-email-Dinh.Nguyen@freescale.com>
+	<87k4cfa550.fsf@lebrac.rtp-net.org>
+	<20110621223527.GF6069@pengutronix.de>
+Message-ID: <20110622022157.GA25234@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 20, 2011 at 5:32 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 20, 2011 at 09:25:30AM +0100, Marc Zyngier wrote:
->> On 17/06/11 18:25, Rob Herring wrote:
->> > If this is the direction to go, then there are a lot of other timers
->> > that can be moved besides just local timers. But Russell didn't really
->> > like the shmobile patches for early platform devices which this relies
->> > on. So we should get agreement on the small bit of infrastructure needed
->> > first, then start moving individual timers.
->>
->> I'm open to suggestions. Should the early platform infrastructure be
->> flagged as unsuitable, I'd be happy to switch to something else, as long
->> as it is minimal, and does not create another ARM-specific API (been
->> there, done that...).
->
-> I am most certainly not a fan of the early platform device stuff as I've
-> said in the past.
->
-> It looks to me like:
->
-> 1. it's overcomplex and fragile.
-> 2. it abuses the early command line system.
-> 3. it abuses platform devices etc.
-> 4. it requires more initialization calls.
->
-> Lastly, and probably more importantly for the direction we're going, I
-> can't see how it would hook into DT other than using the DT provided
-> command line, which also appears to be an abuse there too.
->
-> Surely there's a better solution.
+On Wed, Jun 22, 2011 at 12:35:27AM +0200, Sascha Hauer wrote:
+> On Tue, Jun 21, 2011 at 11:46:35AM +0200, Arnaud Patard wrote:
+> > <Dinh.Nguyen@freescale.com> writes:
+> > 
+> > Hi,
+> > 
+> > > From: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> > >
+> > > Adds initial low power suspend functionality to MX51.
+> > > Supports "mem" and "standby" modes.
+> > >
+> > > Tested on mx51-babbage.
+> > >
+> > > Signed-off-by: Dinh Nguyen <Dinh.Nguyen@freescale.com>
+> > 
+> > I fail to see this patch in imx tree. Did it get merged in some other
+> > tree ?
+> 
+> Not yet. Have you tested this patch?
+> 
+I did.
 
-Which is?
+Tested-by: Shawn Guo <shawn.guo@linaro.org>
+
+-- 
+Regards,
+Shawn
