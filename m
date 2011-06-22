@@ -1,48 +1,79 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Wed, 22 Jun 2011 16:10:45 +0400
-Subject: [PATCH 7/7] ARM: EXYNOS4: Move S5P_CENTRAL_SEQ_CONFIGURATION
-	setting	for PM
-In-Reply-To: <1308732405-16664-8-git-send-email-kgene.kim@samsung.com>
-References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
-	<1308732405-16664-8-git-send-email-kgene.kim@samsung.com>
-Message-ID: <4E01DBC5.7000006@ru.mvista.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 22 Jun 2011 16:20:16 +0400
+Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
+Message-ID: <1308745217-10883-1-git-send-email-dbaryshkov@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Some platforms would like to disable D+ pullup on suspend, to drain as
+low power, as possible. E.g. this was requested by mioa701 board
+maintainers.
 
-On 22-06-2011 12:46, Kukjin Kim wrote:
+Signed-off-by: Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
+---
+ drivers/usb/otg/gpio_vbus.c   |   32 ++++++++++++++++++++++++++++++++
+ include/linux/usb/gpio_vbus.h |    1 +
+ 2 files changed, 33 insertions(+), 0 deletions(-)
 
-> From: Jaecheol Lee<jc.lee@samsung.com>
-
-> We need to balance between set and check S5P_CENTRAL_SEQ_CONFIGURATION
-> register in syscore_ops suspend/resume function when failure in enter
-> suspend mode. Moved this register setting for PM for the purpose of balancing.
-
-> Signed-off-by: Jaecheol Lee<jc.lee@samsung.com>
-> Signed-off-by: Kukjin Kim<kgene.kim@samsung.com>
-> ---
->   arch/arm/mach-exynos4/pm.c |   22 ++++++++++++++--------
->   1 files changed, 14 insertions(+), 8 deletions(-)
-
-> diff --git a/arch/arm/mach-exynos4/pm.c b/arch/arm/mach-exynos4/pm.c
-> index b037fba..a103c13 100644
-> --- a/arch/arm/mach-exynos4/pm.c
-> +++ b/arch/arm/mach-exynos4/pm.c
-[...]
-> @@ -413,6 +405,19 @@ static __init int exynos4_pm_drvinit(void)
->   }
->   arch_initcall(exynos4_pm_drvinit);
->
-> +static int exynos4_pm_suspend(void)
-> +{
-> +	unsigned long tmp;
-> +
-> +	/* Setting Central Sequence Register for power down mode */
-> +
-> +	tmp = __raw_readl(S5P_CENTRAL_SEQ_CONFIGURATION);
-> +	tmp &= ~(S5P_CENTRAL_LOWPWR_CFG);
-
-    Could drop useless parens, while at it.
-
-WBR, Sergei
+diff --git a/drivers/usb/otg/gpio_vbus.c b/drivers/usb/otg/gpio_vbus.c
+index 52733d9..44527bd 100644
+--- a/drivers/usb/otg/gpio_vbus.c
++++ b/drivers/usb/otg/gpio_vbus.c
+@@ -327,6 +327,34 @@ static int __exit gpio_vbus_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int gpio_vbus_suspend(struct platform_device *pdev, pm_message_t state)
++{
++	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
++	struct gpio_vbus_mach_info *pdata = gpio_vbus->dev->platform_data;
++
++	if (gpio_vbus->otg.gadget && pdata->disconnect_on_suspend) {
++		/* optionally disable D+ pullup */
++		if (gpio_is_valid(pdata->gpio_pullup))
++			gpio_set_value(pdata->gpio_pullup,
++					pdata->gpio_pullup_inverted);
++
++		set_vbus_draw(gpio_vbus, 0);
++	}
++	return 0;
++}
++
++static int gpio_vbus_resume(struct platform_device *pdev)
++{
++	struct gpio_vbus_data *gpio_vbus = platform_get_drvdata(pdev);
++
++	if (gpio_vbus->otg.gadget)
++		schedule_work(&gpio_vbus->work);
++
++	return 0;
++}
++#endif
++
+ /* NOTE:  the gpio-vbus device may *NOT* be hotplugged */
+ 
+ MODULE_ALIAS("platform:gpio-vbus");
+@@ -337,6 +365,10 @@ static struct platform_driver gpio_vbus_driver = {
+ 		.owner = THIS_MODULE,
+ 	},
+ 	.remove  = __exit_p(gpio_vbus_remove),
++#ifdef CONFIG_PM
++	.suspend	= gpio_vbus_suspend,
++	.resume		= gpio_vbus_resume
++#endif
+ };
+ 
+ static int __init gpio_vbus_init(void)
+diff --git a/include/linux/usb/gpio_vbus.h b/include/linux/usb/gpio_vbus.h
+index d9f03cc..2faa38d 100644
+--- a/include/linux/usb/gpio_vbus.h
++++ b/include/linux/usb/gpio_vbus.h
+@@ -27,4 +27,5 @@ struct gpio_vbus_mach_info {
+ 	int gpio_pullup;
+ 	bool gpio_vbus_inverted;
+ 	bool gpio_pullup_inverted;
++	bool disconnect_on_suspend;
+ };
+-- 
+1.7.5.3
