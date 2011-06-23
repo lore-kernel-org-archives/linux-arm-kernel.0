@@ -1,51 +1,42 @@
-From: jj@chaosbits.net (Jesper Juhl)
-Date: Fri, 24 Jun 2011 00:08:17 +0200 (CEST)
-Subject: [PATCH 07/37] Remove unneeded version.h includes from arch/arm/
-In-Reply-To: <alpine.LNX.2.00.1106232344480.17688@swampdragon.chaosbits.net>
-References: <alpine.LNX.2.00.1106232344480.17688@swampdragon.chaosbits.net>
-Message-ID: <alpine.LNX.2.00.1106240007150.17688@swampdragon.chaosbits.net>
+From: m.k.edwards@gmail.com (Michael K. Edwards)
+Date: Thu, 23 Jun 2011 15:09:55 -0700
+Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping framework
+	redesign
+In-Reply-To: <BANLkTikzTwNvaaUSk26qzONemogBAGuBRg@mail.gmail.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<4E017539.30505@gmail.com>
+	<001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>
+	<4E01AD7B.3070806@gmail.com>
+	<002701cc30be$ab296cc0$017c4640$%szyprowski@samsung.com>
+	<4E02119F.4000901@codeaurora.org> <4E033AFF.4020603@gmail.com>
+	<BANLkTikzTwNvaaUSk26qzONemogBAGuBRg@mail.gmail.com>
+Message-ID: <BANLkTimi2FAmcb7ZWnjRqb-Cb8acXWsCTw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It was pointed out by 'make versioncheck' that some includes of
-linux/version.h are not needed in arch/arm/.
-This patch removes them.
+Jonathan -
 
-Signed-off-by: Jesper Juhl <jj@chaosbits.net>
----
- arch/arm/mach-bcmring/irq.c   |    1 -
- arch/arm/mach-bcmring/timer.c |    1 -
- 2 files changed, 0 insertions(+), 2 deletions(-)
+I'm inviting you to this conversation (and to linaro-mm-sig, if you'd
+care to participate!), because I'd really like your commentary on what
+it takes to make write-combining fully effective on various ARMv7
+implementations.
 
-diff --git a/arch/arm/mach-bcmring/irq.c b/arch/arm/mach-bcmring/irq.c
-index c48feaf..437fa68 100644
---- a/arch/arm/mach-bcmring/irq.c
-+++ b/arch/arm/mach-bcmring/irq.c
-@@ -20,7 +20,6 @@
- #include <linux/stddef.h>
- #include <linux/list.h>
- #include <linux/timer.h>
--#include <linux/version.h>
- #include <linux/io.h>
- 
- #include <mach/hardware.h>
-diff --git a/arch/arm/mach-bcmring/timer.c b/arch/arm/mach-bcmring/timer.c
-index 2d415d2..af9c3d7 100644
---- a/arch/arm/mach-bcmring/timer.c
-+++ b/arch/arm/mach-bcmring/timer.c
-@@ -12,7 +12,6 @@
- * consent.
- *****************************************************************************/
- 
--#include <linux/version.h>
- #include <linux/types.h>
- #include <linux/module.h>
- #include <csp/tmrHw.h>
--- 
-1.7.5.2
+The current threads:
+  http://lists.linaro.org/pipermail/linaro-mm-sig/2011-June/000334.html
+  http://lists.linaro.org/pipermail/linaro-mm-sig/2011-June/000263.html
 
+Archive link for a related discussion:
+  http://lists.linaro.org/pipermail/linaro-mm-sig/2011-April/000003.html
 
--- 
-Jesper Juhl <jj@chaosbits.net>       http://www.chaosbits.net/
-Don't top-post http://www.catb.org/jargon/html/T/top-post.html
-Plain text mails only, please.
+Getting full write-combining performance on Intel architectures
+involves a somewhat delicate dance:
+  http://software.intel.com/en-us/articles/copying-accelerated-video-decode-frame-buffers/
+
+And I expect something similar to be necessary in order to avoid the
+read-modify-write penalty for write-combining buffers on ARMv7.  (NEON
+store-multiple operations can fill an entire 64-byte entry in the
+victim buffer in one opcode; I don't know whether this is enough to
+stop the L3 memory system from reading the data before clobbering it.)
+
+Cheers,
+- Michael
