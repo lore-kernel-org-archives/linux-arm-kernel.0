@@ -1,69 +1,139 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 23 Jun 2011 18:50:39 +0100
-Subject: [PATCH v3 31/40] Subject: ARM: mm: proc-v7: Use the new processor
-	struct macros
+Date: Thu, 23 Jun 2011 18:50:40 +0100
+Subject: [PATCH v3 32/40] Subject: ARM: mm: proc-xsc3: Use new generic struct
+	definition macros
 In-Reply-To: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
 References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1308851448-25139-32-git-send-email-dave.martin@linaro.org>
+Message-ID: <1308851448-25139-33-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/mm/proc-v7.S |   31 +++++--------------------------
- 1 files changed, 5 insertions(+), 26 deletions(-)
+ arch/arm/mm/proc-xsc3.S |   90 +++++++++--------------------------------------
+ 1 files changed, 17 insertions(+), 73 deletions(-)
 
-diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-index b3b566e..929892b 100644
---- a/arch/arm/mm/proc-v7.S
-+++ b/arch/arm/mm/proc-v7.S
-@@ -171,8 +171,7 @@ ENTRY(cpu_v7_set_pte_ext)
+diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
+index 5962136..87c99d1 100644
+--- a/arch/arm/mm/proc-xsc3.S
++++ b/arch/arm/mm/proc-xsc3.S
+@@ -335,17 +335,8 @@ ENTRY(xsc3_dma_unmap_area)
  	mov	pc, lr
- ENDPROC(cpu_v7_set_pte_ext)
+ ENDPROC(xsc3_dma_unmap_area)
  
--cpu_v7_name:
--	.ascii	"ARMv7 Processor"
-+	string	cpu_v7_name, "ARMv7 Processor"
- 	.align
+-ENTRY(xsc3_cache_fns)
+-	.long	xsc3_flush_icache_all
+-	.long	xsc3_flush_kern_cache_all
+-	.long	xsc3_flush_user_cache_all
+-	.long	xsc3_flush_user_cache_range
+-	.long	xsc3_coherent_kern_range
+-	.long	xsc3_coherent_user_range
+-	.long	xsc3_flush_kern_dcache_area
+-	.long	xsc3_dma_map_area
+-	.long	xsc3_dma_unmap_area
+-	.long	xsc3_dma_flush_range
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions xsc3, default=xsc3
  
- 	/*
-@@ -405,33 +404,13 @@ __v7_setup_stack:
+ ENTRY(cpu_xsc3_dcache_clean_area)
+ 1:	mcr	p15, 0, r0, c7, c10, 1		@ clean L1 D line
+@@ -503,52 +494,24 @@ xsc3_crval:
  
  	__INITDATA
  
--	.type	v7_processor_functions, #object
--ENTRY(v7_processor_functions)
--	.word	v7_early_abort
--	.word	v7_pabort
--	.word	cpu_v7_proc_init
--	.word	cpu_v7_proc_fin
--	.word	cpu_v7_reset
--	.word	cpu_v7_do_idle
--	.word	cpu_v7_dcache_clean_area
--	.word	cpu_v7_switch_mm
--	.word	cpu_v7_set_pte_ext
--	.word	0
--	.word	0
--	.word	0
--	.size	v7_processor_functions, . - v7_processor_functions
+-/*
+- * Purpose : Function pointers used to access above functions - all calls
+- *	     come through these
+- */
+-
+-	.type	xsc3_processor_functions, #object
+-ENTRY(xsc3_processor_functions)
+-	.word	v5t_early_abort
+-	.word	legacy_pabort
+-	.word	cpu_xsc3_proc_init
+-	.word	cpu_xsc3_proc_fin
+-	.word	cpu_xsc3_reset
+-	.word	cpu_xsc3_do_idle
+-	.word	cpu_xsc3_dcache_clean_area
+-	.word	cpu_xsc3_switch_mm
+-	.word	cpu_xsc3_set_pte_ext
+-	.word	cpu_xsc3_suspend_size
+-	.word	cpu_xsc3_do_suspend
+-	.word	cpu_xsc3_do_resume
+-	.size	xsc3_processor_functions, . - xsc3_processor_functions
 +	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
-+	define_processor_functions v7, dabort=v7_early_abort, pabort=v7_pabort
++	define_processor_functions xsc3, dabort=v5t_early_abort, pabort=legacy_pabort, suspend=1
  
  	.section ".rodata"
  
 -	.type	cpu_arch_name, #object
 -cpu_arch_name:
--	.asciz	"armv7"
+-	.asciz	"armv5te"
 -	.size	cpu_arch_name, . - cpu_arch_name
 -
 -	.type	cpu_elf_name, #object
 -cpu_elf_name:
--	.asciz	"v7"
+-	.asciz	"v5"
 -	.size	cpu_elf_name, . - cpu_elf_name
-+	string	cpu_arch_name, "armv7"
-+	string	cpu_elf_name, "v7"
+-
+-	.type	cpu_xsc3_name, #object
+-cpu_xsc3_name:
+-	.asciz	"XScale-V3 based processor"
+-	.size	cpu_xsc3_name, . - cpu_xsc3_name
++	string	cpu_arch_name, "armv5te"
++	string	cpu_elf_name, "v5"
++	string	cpu_xsc3_name, "XScale-V3 based processor"
+ 
  	.align
  
  	.section ".proc.info.init", #alloc, #execinstr
+ 
+-	.type	__xsc3_proc_info,#object
+-__xsc3_proc_info:
+-	.long	0x69056000
+-	.long	0xffffe000
++.macro xsc3_proc_info name:req, cpu_val:req, cpu_mask:req
++	.type	__\name\()_proc_info,#object
++__\name\()_proc_info:
++	.long	\cpu_val
++	.long	\cpu_mask
+ 	.long	PMD_TYPE_SECT | \
+ 		PMD_SECT_BUFFERABLE | \
+ 		PMD_SECT_CACHEABLE | \
+@@ -566,29 +529,10 @@ __xsc3_proc_info:
+ 	.long	v4wbi_tlb_fns
+ 	.long	xsc3_mc_user_fns
+ 	.long	xsc3_cache_fns
+-	.size	__xsc3_proc_info, . - __xsc3_proc_info
++	.size	__\name\()_proc_info, . - __\name\()_proc_info
++.endm
+ 
+-/* Note: PXA935 changed its implementor ID from Intel to Marvell */
++	xsc3_proc_info xsc3, 0x69056000, 0xffffe000
+ 
+-	.type	__xsc3_pxa935_proc_info,#object
+-__xsc3_pxa935_proc_info:
+-	.long	0x56056000
+-	.long	0xffffe000
+-	.long	PMD_TYPE_SECT | \
+-		PMD_SECT_BUFFERABLE | \
+-		PMD_SECT_CACHEABLE | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	.long	PMD_TYPE_SECT | \
+-		PMD_SECT_AP_WRITE | \
+-		PMD_SECT_AP_READ
+-	b	__xsc3_setup
+-	.long	cpu_arch_name
+-	.long	cpu_elf_name
+-	.long	HWCAP_SWP|HWCAP_HALF|HWCAP_THUMB|HWCAP_FAST_MULT|HWCAP_EDSP
+-	.long	cpu_xsc3_name
+-	.long	xsc3_processor_functions
+-	.long	v4wbi_tlb_fns
+-	.long	xsc3_mc_user_fns
+-	.long	xsc3_cache_fns
+-	.size	__xsc3_pxa935_proc_info, . - __xsc3_pxa935_proc_info
++/* Note: PXA935 changed its implementor ID from Intel to Marvell */
++	xsc3_proc_info xsc3_pxa935, 0x56056000, 0xffffe000
 -- 
 1.7.4.1
