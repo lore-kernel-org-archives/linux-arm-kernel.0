@@ -1,69 +1,54 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Thu, 23 Jun 2011 09:04:20 -0600 (MDT)
-Subject: [PATCH 5/8] OMAP4: PM: TEMP: Prevent l3init from idling/force
-	sleep
-In-Reply-To: <1307616853-28395-6-git-send-email-rnayak@ti.com>
-References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
-	<1307616853-28395-2-git-send-email-rnayak@ti.com>
-	<1307616853-28395-3-git-send-email-rnayak@ti.com>
-	<1307616853-28395-4-git-send-email-rnayak@ti.com>
-	<1307616853-28395-5-git-send-email-rnayak@ti.com>
-	<1307616853-28395-6-git-send-email-rnayak@ti.com>
-Message-ID: <alpine.DEB.2.00.1106230819540.12954@utopia.booyaka.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 23 Jun 2011 08:05:07 -0700
+Subject: [PATCH 06/10] omap2+: Remove gptimer_wakeup for now
+In-Reply-To: <20110620094846.GG23145@atomide.com> (Tony Lindgren's message of
+	"Mon, 20 Jun 2011 02:48:46 -0700")
+References: <20110620091754.357.56441.stgit@kaulin>
+	<20110620092341.357.14183.stgit@kaulin> <4DFF1558.4020509@ti.com>
+	<20110620094846.GG23145@atomide.com>
+Message-ID: <87oc1obnbw.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra,
+Tony Lindgren <tony@atomide.com> writes:
 
-On Thu, 9 Jun 2011, Rajendra Nayak wrote:
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110620 02:35]:
+>> On 6/20/2011 2:53 PM, Tony Lindgren wrote:
+>> >This removes the support for setting the wake-up timer for debugging.
+>> >
+>> >Later on we can reserve gptimer1 for PM code only and have similar
+>> >functionality.
+>> >
+>> >Signed-off-by: Tony Lindgren<tony@atomide.com>
+>> >Reviewed-by: Kevin Hilman<khilman@ti.com>
+>> >---
+>> 
+>> Kevin cleaned up this with a better patch.
+>> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg50015.html
+>> 
+>> May be we can use that patch instead of this.
+>
+> The thing is that it's a omap specific debug interface.
 
-> Since MMC driver is yet to be adapted to
-> runtime PM and still uses direct clock
-> calls to enable/disable module, its needed
-> that the clockdomain (for MMC) is always kept force
-> enabled since the next few patches move
-> the clockdomain handling from clock framework
-> to hwmod framework and break MMC.
-> 
-> This will certainlly gate any CORE low power
-> transitions.
-> 
-> Signed-off-by: Rajendra Nayak <rnayak@ti.com>
-> ---
->  arch/arm/mach-omap2/clockdomains44xx_data.c |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/clockdomains44xx_data.c b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> index a607ec1..ff38764 100644
-> --- a/arch/arm/mach-omap2/clockdomains44xx_data.c
-> +++ b/arch/arm/mach-omap2/clockdomains44xx_data.c
-> @@ -493,7 +493,7 @@ static struct clockdomain l3_init_44xx_clkdm = {
->  	.dep_bit	  = OMAP4430_L3INIT_STATDEP_SHIFT,
->  	.wkdep_srcs	  = l3_init_wkup_sleep_deps,
->  	.sleepdep_srcs	  = l3_init_wkup_sleep_deps,
-> -	.flags		  = CLKDM_CAN_HWSUP_SWSUP,
-> +	.flags		  = CLKDM_CAN_FORCE_WAKEUP,
->  	.omap_chip	  = OMAP_CHIP_INIT(CHIP_IS_OMAP4430),
->  };
+What's wrong with OMAP-specific debug interfaces?   We have plenty of
+them: clock, omap_mux and pm_debug.
 
-Since this is basically a hack to work around limitations of the current 
-MMC driver, if we accept something like this, I think it should come with 
-a big warning message and comment.  Something like this in 
-omap44xx_clockdomains_init():
+> I'd rather just get rid of it until there's some generic way
+> of doing it. 
 
-	/*
-	 * XXX The OMAP L3 interconnect hardware is able to enter
-	 * hardware-supervised idle.  But because the OMAP HSMMC
-	 * driver still hasn't been converted to use runtime PM, if
-	 * the L3 is allowed to enter hwsup idle, the kernel will
-	 * crash.  Once the MMC driver is fixed (which patches have
-	 * been posted to do, with subject line "OMAP: HSMMC: cleanup
-	 * and runtime pm") the change to the l3_init_44xx_clkdm
-	 * flags should be dropped.  It limits the low-power state that
-	 * the chip can enter.
-	 */
-	pr_warn("WARNING: OMAP4 low power states artificially limited, due 
-to unconverted HSMMC driver\n");
+Well, we won't have a truly generic way of doing it until we have a
+generic way of doing HW timers.
 
+The implementation is now mostly generic in the patch Santosh referened
+above in that the timer programming is now done as part of the
+clockevent code, and not external timer programming.
 
-- Paul
+So now, the only thing OMAP-specific is the debugfs file used to trigger
+it.
+
+> Maybe Kevin can just carry it along in the PM branch for now?
+
+I'd prefer to keep it in mainline as this is a very important feature
+for the PM functionality already in mainline.
+
+Kevin
