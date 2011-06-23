@@ -1,32 +1,47 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 23 Jun 2011 12:05:28 -0700
-Subject: [PATCH 25/25] ARM: pm: omap34xx: convert to generic
-	suspend/resume support
-In-Reply-To: <E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk> (Russell King's
-	message of "Wed, 22 Jun 2011 16:16:58 +0100")
-References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-	<E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
-Message-ID: <874o3g9xmv.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Jun 2011 20:11:23 +0100
+Subject: [PATCH 07/25] ARM: pm: preserve r4 - r11 across a suspend
+In-Reply-To: <20110623190900.GH9449@n2100.arm.linux.org.uk>
+References: <20110623190900.GH9449@n2100.arm.linux.org.uk>
+Message-ID: <E1QZpJD-0005m7-LO@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Make cpu_suspend()..return function preserve r4 to r11 across a suspend
+cycle.  This is in preparation of relieving platform support code from
+this task.
 
-Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+Acked-by: Frank Hofmann <frank.hofmann@tomtom.com>
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/sleep.S |    5 +++--
+ 1 files changed, 3 insertions(+), 2 deletions(-)
 
-> Convert sa11x0 to use the generic CPU suspend/resume support, rather
-> than implementing its own version.  Tested on 3430 LDP.
->
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-
-I tested this on 3430/n900 and 3530/Overo and it worked fine for
-retention, but not for off.
-
-Testing with off-mode, I found the MULTI_CPU path to be broken in
-cpu_suspend (jumping to zero.)  Rebuilding for only OMAP3, it worked
-fine for full-chip retention in suspend and idle as well as full-chip
-off in suspend and idle.
-
-I'm digging into the MULTI_CPU path now.
-
-Kevin
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 0a778c3..8dbca93 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -12,10 +12,11 @@
+  *  r1 = v:p offset
+  *  r3 = virtual return function
+  * Note: sp is decremented to allocate space for CPU state on stack
+- * r0-r3,r9,r10,lr corrupted
++ * r0-r3,ip,lr corrupted
+  */
+ ENTRY(cpu_suspend)
+ 	stmfd	sp!, {r3}
++	stmfd	sp!, {r4 - r11}
+ 	mov	r9, lr
+ #ifdef MULTI_CPU
+ 	ldr	r10, =processor
+@@ -88,7 +89,7 @@ ENDPROC(cpu_resume_turn_mmu_on)
+ cpu_resume_after_mmu:
+ 	str	r5, [r2, r4, lsl #2]	@ restore old mapping
+ 	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
+-	ldmfd	sp!, {pc}
++	ldmfd	sp!, {r4 - r11, pc}
+ ENDPROC(cpu_resume_after_mmu)
+ 
+ /*
+-- 
+1.7.4.4
