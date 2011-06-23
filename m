@@ -1,60 +1,113 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 23 Jun 2011 18:02:42 +0100
-Subject: parallel load of modules on an ARM multicore
-In-Reply-To: <20110623153424.GA22786@1n450.cable.virginmedia.net>
-References: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
-	<20110621155030.GA21245@1n450.cable.virginmedia.net>
-	<274124B9C6907D4B8CE985903EAA19E9185A92978D@SI-MBX06.de.bosch.com>
-	<20110623145229.GA18409@1n450.cable.virginmedia.net>
-	<20110623151249.GA23234@n2100.arm.linux.org.uk>
-	<20110623153424.GA22786@1n450.cable.virginmedia.net>
-Message-ID: <20110623170242.GA23285@1n450.cable.virginmedia.net>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 23 Jun 2011 10:07:10 -0700
+Subject: [PATCH 05/10] omap2+: Use dmtimer macros for clockevent
+In-Reply-To: <20110620092339.357.10396.stgit@kaulin> (Tony Lindgren's message
+	of "Mon, 20 Jun 2011 02:23:39 -0700")
+References: <20110620091754.357.56441.stgit@kaulin>
+	<20110620092339.357.10396.stgit@kaulin>
+Message-ID: <87r56ka341.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 23, 2011 at 04:34:24PM +0100, Catalin Marinas wrote:
-> On Thu, Jun 23, 2011 at 04:12:49PM +0100, Russell King - ARM Linux wrote:
-> > On Thu, Jun 23, 2011 at 03:52:29PM +0100, Catalin Marinas wrote:
-> > > Peter,
-> > > 
-> > > On Thu, Jun 23, 2011 at 04:39:01PM +0200, EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31) wrote:
-> > > > it's interesting that you almost agree with me.
-> > > > 
-> > > > But isn't it really expensive to flush the icache on switch_mm?
-> > > > Is that meant as a test to see if the problem goes away?
-> > > 
-> > > Who said anything about flushing the icache on switch_mm()? My patch
-> > > doesn't do this, it actually reduces the amount of cache flushing on
-> > > ARM11MPCore.
-> > 
-> > Ahem, your patch does:
-> > 
-> > --- a/arch/arm/include/asm/mmu_context.h
-> > +++ b/arch/arm/include/asm/mmu_context.h
-> > @@ -114,7 +114,8 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
-> >  #ifdef CONFIG_SMP
-> >         /* check for possible thread migration */
-> >         if (!cpumask_empty(mm_cpumask(next)) &&
-> > -           !cpumask_test_cpu(cpu, mm_cpumask(next)))
-> > +           (cache_ops_need_broadcast() ||
-> > +            !cpumask_test_cpu(cpu, mm_cpumask(next))))
-> >                 __flush_icache_all();
-> >  #endif
-> >         if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {
-> > 
-> > This means that if cache_ops_need_broadcast() is true, we will flush
-> > the I-cache at every MM context switch as very few MMs will have an
-> > empty mm_cpumask().
-> 
-> Ah, I forgot about this. That's left over from some earlier version of
-> the patch where cache_ops_need_broadcast() was set to 0 for ARMv6 SMP
-> but then I realised that it is still needed for some ptrace stuff and
-> re-instated it.
-> 
-> So this hunk is definitely not needed.
+Tony Lindgren <tony@atomide.com> writes:
 
-BTW, do we actually need the I-cache invalidation during thread
-migration with cache ops broadcasting in hardware?
+> This patch makes timer-gp.c to use only a subset of dmtimer
+> functions without the need to initialize dmtimer code early.
+>
+> Also note that now with the inline functions, timer_set_next_event
+> becomes more efficient in the lines of assembly code.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
 
--- 
-Catalin
+In order for this to work, *all* the dmtimer functions need to be
+converted.  Some still call the real driver, which may not yet be
+initialized (as pointed out for [7/10]...
+
+[...]
+
+> +static int __init omap_dm_timer_init_one(struct omap_dm_timer *timer,
+> +						int gptimer_id,
+> +						const char *fck_source)
+>  {
+> -	u32 tick_rate;
+> -	int src;
+> -	char clockevent_hwmod_name[8]; /* 8 = sizeof("timerXX0") */
+> +	char name[10]; /* 10 = sizeof("gptXX_Xck0") */
+> +	struct omap_hwmod *oh;
+> +	size_t size;
+> +	int res = 0;
+> +
+> +	sprintf(name, "timer%d", gptimer_id);
+> +	omap_hwmod_setup_one(name);
+> +	oh = omap_hwmod_lookup(name);
+> +	if (!oh)
+> +		return -ENODEV;
+> +
+> +	timer->irq = oh->mpu_irqs[0].irq;
+> +	timer->phys_base = oh->slaves[0]->addr->pa_start;
+> +	size = oh->slaves[0]->addr->pa_end - timer->phys_base;
+> +
+> +	/* Static mapping, never released */
+> +	timer->io_base = ioremap(timer->phys_base, size);
+> +	if (!timer->io_base)
+> +		return -ENXIO;
+> +
+> +	/* After the dmtimer is using hwmod these clocks won't be needed */
+> +	sprintf(name, "gpt%d_fck", gptimer_id);
+> +	timer->fclk = clk_get(NULL, name);
+> +	if (IS_ERR(timer->fclk))
+> +		return -ENODEV;
+> +
+> +	sprintf(name, "gpt%d_ick", gptimer_id);
+> +	timer->iclk = clk_get(NULL, name);
+> +	if (IS_ERR(timer->iclk)) {
+> +		clk_put(timer->fclk);
+> +		return -ENODEV;
+> +	}
+>  
+> -	inited = 1;
+> +	omap_hwmod_enable(oh);
+> +
+> +	if (gptimer_id != 12) {
+> +		struct clk *src;
+> +
+> +		src = clk_get(NULL, fck_source);
+> +		if (IS_ERR(src)) {
+> +			res = -EINVAL;
+> +		} else {
+> +			res = __omap_dm_timer_set_source(timer->fclk, src);
+> +			if (IS_ERR_VALUE(res))
+> +				pr_warning("%s: timer%i cannot set source\n",
+> +						__func__, gptimer_id);
+> +			clk_put(src);
+> +		}
+> +	}
+> +	__omap_dm_timer_reset(timer->io_base, 1, 1);
+> +	timer->posted = 1;
+> +
+> +	timer->rate = clk_get_rate(timer->fclk);
+>  
+> -	sprintf(clockevent_hwmod_name, "timer%d", gptimer_id);
+> -	omap_hwmod_setup_one(clockevent_hwmod_name);
+> +	timer->reserved = 1;
+>  
+>  	gptimer = omap_dm_timer_request_specific(gptimer_id);
+
+Here remains a call to the real driver, which is not yet initialized
+when called from sys_timer.init.
+
+>  	BUG_ON(gptimer == NULL);
+>  	gptimer_wakeup = gptimer;
+>  
+> -#if defined(CONFIG_OMAP_32K_TIMER)
+> -	src = OMAP_TIMER_SRC_32_KHZ;
+> -#else
+> -	src = OMAP_TIMER_SRC_SYS_CLK;
+> -	WARN(gptimer_id == 12, "WARNING: GPTIMER12 can only use the "
+> -	     "secure 32KiHz clock source\n");
+> -#endif
+> +	return res;
+> +}
+
+Kevin
