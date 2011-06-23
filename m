@@ -1,40 +1,84 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 23 Jun 2011 18:50:16 +0100
-Subject: [PATCH v3 08/40] Subject: ARM: mm: cache-v6: Use the new processor
-	struct macros
+Date: Thu, 23 Jun 2011 18:50:18 +0100
+Subject: [PATCH v3 10/40] Subject: ARM: mm: proc-arm1020: Use the new
+	processor struct macros
 In-Reply-To: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
 References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1308851448-25139-9-git-send-email-dave.martin@linaro.org>
+Message-ID: <1308851448-25139-11-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/mm/cache-v6.S |   15 ++-------------
- 1 files changed, 2 insertions(+), 13 deletions(-)
+ arch/arm/mm/proc-arm1020.S |   45 +++++--------------------------------------
+ 1 files changed, 6 insertions(+), 39 deletions(-)
 
-diff --git a/arch/arm/mm/cache-v6.S b/arch/arm/mm/cache-v6.S
-index 73b4a8b..e14084a 100644
---- a/arch/arm/mm/cache-v6.S
-+++ b/arch/arm/mm/cache-v6.S
-@@ -330,16 +330,5 @@ ENDPROC(v6_dma_unmap_area)
+diff --git a/arch/arm/mm/proc-arm1020.S b/arch/arm/mm/proc-arm1020.S
+index 6c4e7fd..9cf3b4a 100644
+--- a/arch/arm/mm/proc-arm1020.S
++++ b/arch/arm/mm/proc-arm1020.S
+@@ -364,17 +364,8 @@ ENTRY(arm1020_dma_unmap_area)
+ 	mov	pc, lr
+ ENDPROC(arm1020_dma_unmap_area)
+ 
+-ENTRY(arm1020_cache_fns)
+-	.long	arm1020_flush_icache_all
+-	.long	arm1020_flush_kern_cache_all
+-	.long	arm1020_flush_user_cache_all
+-	.long	arm1020_flush_user_cache_range
+-	.long	arm1020_coherent_kern_range
+-	.long	arm1020_coherent_user_range
+-	.long	arm1020_flush_kern_dcache_area
+-	.long	arm1020_dma_map_area
+-	.long	arm1020_dma_unmap_area
+-	.long	arm1020_dma_flush_range
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions arm1020, default=arm1020
+ 
+ 	.align	5
+ ENTRY(cpu_arm1020_dcache_clean_area)
+@@ -477,38 +468,14 @@ arm1020_crval:
+ 	crval	clear=0x0000593f, mmuset=0x00003935, ucset=0x00001930
  
  	__INITDATA
++	@ define struct processor (see <asm/proc-fns.h> and proc-macros.S)
++	define_processor_functions arm1020, dabort=v4t_early_abort, pabort=legacy_pabort
  
--	.type	v6_cache_fns, #object
--ENTRY(v6_cache_fns)
--	.long	v6_flush_icache_all
--	.long	v6_flush_kern_cache_all
--	.long	v6_flush_user_cache_all
--	.long	v6_flush_user_cache_range
--	.long	v6_coherent_kern_range
--	.long	v6_coherent_user_range
--	.long	v6_flush_kern_dcache_area
--	.long	v6_dma_map_area
--	.long	v6_dma_unmap_area
--	.long	v6_dma_flush_range
--	.size	v6_cache_fns, . - v6_cache_fns
-+	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
-+	define_cache_functions v6, default=v6
+-/*
+- * Purpose : Function pointers used to access above functions - all calls
+- *	     come through these
+- */
+-	.type	arm1020_processor_functions, #object
+-arm1020_processor_functions:
+-	.word	v4t_early_abort
+-	.word	legacy_pabort
+-	.word	cpu_arm1020_proc_init
+-	.word	cpu_arm1020_proc_fin
+-	.word	cpu_arm1020_reset
+-	.word	cpu_arm1020_do_idle
+-	.word	cpu_arm1020_dcache_clean_area
+-	.word	cpu_arm1020_switch_mm
+-	.word	cpu_arm1020_set_pte_ext
+-	.word	0
+-	.word	0
+-	.word	0
+-	.size	arm1020_processor_functions, . - arm1020_processor_functions
+ 
+ 	.section ".rodata"
+ 
+-	.type	cpu_arch_name, #object
+-cpu_arch_name:
+-	.asciz	"armv5t"
+-	.size	cpu_arch_name, . - cpu_arch_name
+-
+-	.type	cpu_elf_name, #object
+-cpu_elf_name:
+-	.asciz	"v5"
+-	.size	cpu_elf_name, . - cpu_elf_name
++	string	cpu_arch_name, "armv5t"
++	string	cpu_elf_name, "v5"
+ 
+ 	.type	cpu_arm1020_name, #object
+ cpu_arm1020_name:
 -- 
 1.7.4.1
