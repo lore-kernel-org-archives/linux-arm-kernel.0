@@ -1,35 +1,51 @@
 From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Thu, 23 Jun 2011 15:39:02 +0900
-Subject: [PATCH 6/7] ARM: EXYNOS4: Add save/restore for more ARM	registers
-In-Reply-To: <20110622145452.GR23234@n2100.arm.linux.org.uk>
-References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
-	<1308732405-16664-7-git-send-email-kgene.kim@samsung.com>
-	<20110622145452.GR23234@n2100.arm.linux.org.uk>
-Message-ID: <015801cc3170$42695800$c73c0800$%kim@samsung.com>
+Date: Thu, 23 Jun 2011 15:47:14 +0900
+Subject: [PATCH] ARM:SAMSUNG: Move S3C DMA driver to drivers/dma
+In-Reply-To: <BANLkTimqi=NcQ8jVjYpe4zo1-nPazV=HOg@mail.gmail.com>
+References: <1307432901-22781-1-git-send-email-alim.akhtar@samsung.com>
+	<BANLkTintADbXSiV07VTMbFfmUV+4-q2-gw@mail.gmail.com>
+	<BANLkTimjWNf3PxHXj3o5qubH5g7gMHjhFg@mail.gmail.com>
+	<20110607081527.GB20929@n2100.arm.linux.org.uk>
+	<BANLkTin66PhYGmVSOJcuZr8wDH_iNgjhZQ@mail.gmail.com>
+	<20110607182923.GA28451@n2100.arm.linux.org.uk>
+	<BANLkTikLFCyzU3UApjjwfX0Vjujo9WAFZA@mail.gmail.com>
+	<20110607223614.GC28451@n2100.arm.linux.org.uk>
+	<4DF10FC1.9030406@samsung.com>
+	<BANLkTimqi=NcQ8jVjYpe4zo1-nPazV=HOg@mail.gmail.com>
+Message-ID: <015901cc3171$658d5b50$30a811f0$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
+kyungmin78 at gmail.com wrote:
 > 
-> On Wed, Jun 22, 2011 at 05:46:44PM +0900, Kukjin Kim wrote:
-> > From: Jaecheol Lee <jc.lee@samsung.com>
+> 2011/6/10 Kukjin Kim <kgene.kim@samsung.com>:
+> > On 06/07/11 15:36, Russell King - ARM Linux wrote:
+> >> I see no effort from the Samsung folk to even start considering moving
+> >> to common APIs - I see precisely the opposite. ?They seem to have a
+> >> strong desire to invent their own new APIs all the time rather than
+> >> look at existing APIs and discuss how they can be used or adapted so
+> >> they work for Samsung.
+> >>
+> >> That is not sustainable, and if it continues, it will probably result
+> >> in Samsung stuff being chucked out of mainline. ?We are most definitely
+> >> at the point where custom APIs are no longer permissible, especially
+> >> for any new SoCs.
 > >
-> > This patch adds save/restore for Power Control Register and
-> > Diagnostic Register.
-> 
-> NAK.  Please see my further suspend consolidation patches posted earlier.
-> I've also recently (last few days) moved these further forward and this
-> code no longer exists in this file (all it contains is the early
-> resume stuff.)
-> 
-Oops :(
-OK, will re-work based on latest rmk/for-next :)
+> > Hi Russell and everyone,
+> >
+> > Sorry for late participation on this :(
+> > I'm out of my office for biz. trip so it was hard to check my e-mail
+> > and will be back to my country this weekend.
+> >
+> > Anyway, I and my colleagues know what we have to do for Linux world.
+> > And as I know, we are preparing some stuff for it so please don't
+> > expect the worst :)
+> >
+> > I should be back on this after discussing with my colleagues.
+> Any updates? still need more time?
 
-> My guess is that these two registers are samsung specific, and so they
-> should be saved and restored by higher level code (eg, a syscore_ops
-> for exynos4 specific stuff.)
-
-Let me think again.
+As a note, our engineers are working on this now.
+If any updates about that, will post...
 
 Thanks.
 
