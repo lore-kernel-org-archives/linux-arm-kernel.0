@@ -1,41 +1,40 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 23 Jun 2011 09:46:21 +0200
-Subject: [PATCH v2 1/6] ARM: mach-imx/mx27_3ds: Use the standard i.MX
-	macro for GPIO numbering
-In-Reply-To: <1308745528-22089-1-git-send-email-fabio.estevam@freescale.com>
-References: <1308745528-22089-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110623074621.GO6069@pengutronix.de>
+Date: Thu, 23 Jun 2011 09:46:37 +0200
+Subject: [PATCH] ARM: mxc: iomux-v1: Fix build warning
+In-Reply-To: <1308753060-14489-1-git-send-email-fabio.estevam@freescale.com>
+References: <1308753060-14489-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110623074637.GP6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All applpied to -next
+Applied
 
-On Wed, Jun 22, 2011 at 09:25:23AM -0300, Fabio Estevam wrote:
+On Wed, Jun 22, 2011 at 11:31:00AM -0300, Fabio Estevam wrote:
+> Fix the following warning:
+> 
+> CC      arch/arm/plat-mxc/iomux-v1.o
+> arch/arm/plat-mxc/iomux-v1.c: In function 'mxc_gpio_setup_multiple_pins':
+> arch/arm/plat-mxc/iomux-v1.c:160: warning: 'ret' may be used uninitialized in this function
+> arch/arm/plat-mxc/iomux-v1.c:160: note: 'ret' was declared here
+> 
 > Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 > ---
-> Changes since v1:
-> - Rebased on Sascha's for-next branch
+>  arch/arm/plat-mxc/iomux-v1.c |    2 +-
+>  1 files changed, 1 insertions(+), 1 deletions(-)
 > 
->  arch/arm/mach-imx/mach-mx27_3ds.c |    6 +++---
->  1 files changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mach-mx27_3ds.c b/arch/arm/mach-imx/mach-mx27_3ds.c
-> index 09ec036..3a58448 100644
-> --- a/arch/arm/mach-imx/mach-mx27_3ds.c
-> +++ b/arch/arm/mach-imx/mach-mx27_3ds.c
-> @@ -42,9 +42,9 @@
+> diff --git a/arch/arm/plat-mxc/iomux-v1.c b/arch/arm/plat-mxc/iomux-v1.c
+> index d76f3ac..1f73963 100644
+> --- a/arch/arm/plat-mxc/iomux-v1.c
+> +++ b/arch/arm/plat-mxc/iomux-v1.c
+> @@ -157,7 +157,7 @@ EXPORT_SYMBOL(mxc_gpio_mode);
+>  static int imx_iomuxv1_setup_multiple(const int *list, unsigned count)
+>  {
+>  	size_t i;
+> -	int ret;
+> +	int ret = 0;
 >  
->  #include "devices-imx27.h"
->  
-> -#define SD1_EN_GPIO (GPIO_PORTB + 25)
-> -#define OTG_PHY_RESET_GPIO (GPIO_PORTB + 23)
-> -#define SPI2_SS0 (GPIO_PORTD + 21)
-> +#define SD1_EN_GPIO		IMX_GPIO_NR(2, 25)
-> +#define OTG_PHY_RESET_GPIO	IMX_GPIO_NR(2, 23)
-> +#define SPI2_SS0		IMX_GPIO_NR(4, 21)
->  #define EXPIO_PARENT_INT	gpio_to_irq(IMX_GPIO_NR(3, 28))
->  
->  static const int mx27pdk_pins[] __initconst = {
+>  	for (i = 0; i < count; ++i) {
+>  		ret = mxc_gpio_mode(list[i]);
 > -- 
 > 1.6.0.4
 > 
