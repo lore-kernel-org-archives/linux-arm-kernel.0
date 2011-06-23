@@ -1,37 +1,57 @@
-From: santosh.shilimkar@ti.com (Santosh Shilimkar)
-Date: Thu, 23 Jun 2011 05:03:39 +0530
-Subject: [PATCH 25/25] ARM: pm: omap34xx: convert to generic suspend/resume
-	support
-In-Reply-To: <20110622161021.GB9449@n2100.arm.linux.org.uk>
-References: <20110622150816.GT23234@n2100.arm.linux.org.uk>	<E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
-	<20110622161021.GB9449@n2100.arm.linux.org.uk>
-Message-ID: <4E027BD3.6030500@ti.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Thu, 23 Jun 2011 08:12:35 +0800
+Subject: [PATCH 1/3] serial/imx: add device tree support
+In-Reply-To: <BANLkTimsk2eWKPi2hnHbaAn-vSMKmdYsGQ@mail.gmail.com>
+References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
+	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
+	<20110618161934.GH8195@ponder.secretlab.ca>
+	<20110619073000.GA23171@S2100-06.ap.freescale.net>
+	<20110621135558.GB9228@S2101-09.ap.freescale.net>
+	<BANLkTim4vunTm1176MRw3pqRZnunu4=9jg@mail.gmail.com>
+	<20110622153353.GA25799@S2100-06.ap.freescale.net>
+	<BANLkTimsk2eWKPi2hnHbaAn-vSMKmdYsGQ@mail.gmail.com>
+Message-ID: <20110623001234.GB25799@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/22/2011 9:40 PM, Russell King - ARM Linux wrote:
-> A couple of things to point out here:
->
-> On Wed, Jun 22, 2011 at 04:16:58PM +0100, Russell King - ARM Linux wrote:
->> -	mrc	p15, 0, r4, c13, c0, 1	@ Context ID
->> -	mrc	p15, 0, r5, c13, c0, 2	@ User r/w thread and process ID
->> -	mrc	p15, 0, r6, c12, c0, 0	@ Secure or NS vector base address
->> -	mrs	r7, cpsr		@ Store current cpsr
->> -	stmia	r8!, {r4-r7}
->
-> 1. The User r/w thread and process ID is not saved/restored by Linux over
-> context switches, so it doesn't serve any useful purpose to save and
-> restore over resume.
->
-It will be needed for CPUIDLE I guess.
+On Wed, Jun 22, 2011 at 09:52:11AM -0600, Grant Likely wrote:
+[...]
+> 
+> >> > - ? ? ? line = of_get_property(node, "id", NULL);
+> >> > - ? ? ? if (!line)
+> >> > + ? ? ? line = of_get_device_index(node, "serial");
+> >> > + ? ? ? if (IS_ERR_VALUE(line))
+> >> > ? ? ? ? ? ? ? ?return -ENODEV;
+> >>
+> >> Personally, it an alias isn't present, then I'd dynamically assign a port id.
+> >>
+> > We probably can not. ?The driver works with being told the correct
+> > port id which is defined by soc. ?Instead of dynamically assigning
+> > a port id, we have to tell the driver the exact hardware port id of
+> > the device that is being probed.
+> 
+> Are you sure?  It doesn't look like the driver behaviour uses id for
+> anything other than an index into the statically allocated serial port
+> instance table.  I don't see any change of behaviour based on the port
+> number anywhere.
+> 
+Sorry, I did not make this clear.  In serial_imx_probe(), the port
+gets created and then saved as below.
 
-> 2. Compare the instruction saving and restoring the vector base address
-> (see below for the restore code.)
->
-That's typo. It should have been mcr. Actually VBAR isn't used on GP
-devices but might be used on secure devices. I know that common suspend
-code doesn't consider this register. It's fine to keep it that way
-and if OMAP needs it, it can save/restored outside common code.
+	imx_ports[sport->port.line] = sport;
 
-Regards
-Santosh
+While in imx_console_setup(), it addresses the port as following.
+
+	sport = imx_ports[co->index];
+
+When users specify their console as ttymxc0, they mean they are
+using the first i.mx uart hardware port, in turn ttymxc1 for the
+second port ...
+
+That said, imx_port[0] has to be the first hardware port, imx_port[1]
+has to be the second one ...  That's why port id sport->port.line
+can not be dynamically assigned, otherwise console may not work.
+
+-- 
+Regards,
+Shawn
