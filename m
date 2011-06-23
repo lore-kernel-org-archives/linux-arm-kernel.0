@@ -1,61 +1,27 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Thu, 23 Jun 2011 11:47:18 +0200
-Subject: [PATCH] USB: ehci: use packed,	aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <201106202207.23104.arnd@arndb.de>
-References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>	<alpine.LFD.2.00.1106201306210.2142@xanadu.home>	<4DFF85D6.1090104@ahsoftware.de>
-	<201106202207.23104.arnd@arndb.de>
-Message-ID: <4E030BA6.8060407@ahsoftware.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Jun 2011 11:06:10 +0100
+Subject: [PATCH 25/25] ARM: pm: omap34xx: convert to generic
+	suspend/resume support
+In-Reply-To: <E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
+References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
+	<E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
+Message-ID: <20110623100610.GD9449@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 20.06.2011 22:07, schrieb Arnd Bergmann:
-> On Monday 20 June 2011 19:39:34 Alexander Holler wrote:
->> That packed without an additional aligned() caused errors on ARM with
->> gcc 4.6 is another problem which got (currently) fixed by removing packed.
->
-> Packed caused errors because it is *wrong*. The code as it was used undefined
-> behavior in the language.
+On Wed, Jun 22, 2011 at 04:16:58PM +0100, Russell King - ARM Linux wrote:
+> +	/* Now branch to the common CPU resume function */
+> +	ldr	r0, =cpu_resume
+> +	bx	r0
+>  
+> +	.ltorg
 
-I don't see why using just packed was wrong. The problem occured because 
-the latest gcc now uses or inforces aligned(1) for a packed struct 
-without any aligned and because of that the assignment in readl() is 
-done byte by byte. I'm missing the required arm knowledge and experience 
-to discuss this further, I don't have a reason to look further into that 
-and never wanted to make any judgement about the cause.
+A slight correction - firstly this code does not run from SRAM.
+Secondly, this will try to branch to the virtual address of cpu_resume
+which is not a good idea.
 
->> But this introduces imho doubts and uncertainty about if padding bytes
->> could be between the members, therefore I would prefer to use packed
->> with aligned instead of removing the packed.
->
-> Packing was never an issue here, please stop talking about it.
+Replace this with:
+	b	cpu_resume
 
-Sorry, I never wanted to talk about the issue itself (I've already said 
-that), I just wanted to bring in some additional clarity for people 
-looking at the code.
-
-I think if there is a packed,aligned(4) most people reading that are 
-able to imaging how the struct looks like, whereas nothing (without 
-packed) might leave doubts which than requires to read compiler docs or 
-the generated code, if one searches a problem in that area.
-
-Maybe my english is that bad that nobody understood that.
-
-But it's ok. For me, that discussion was long over, two people already 
-said that they prefer the struct without any packed.
-
-About the background:
-I've posted that patch, because I though I might have been the source of 
-the removal of packed instead of using packed along with aligned, 
-because I first posted such (removing the packed) at the mailing list 
-for u-boot and only later on thought that using what was hinted to me 
-over a third person (packed, aligned(4), which means the one who 
-originally found and fixed the problem used packed, aligned(4) too) 
-might be better (what I than posted there too).
-
-Sorry for becoming that verbose, I normally don't gabble that much and I 
-would like it if I never would have posted that silly patch.
-
-Regards,
-
-Alexander
+and comment out the auxillary control register write in proc-v7.S, and
+it should work on OMAP3.
