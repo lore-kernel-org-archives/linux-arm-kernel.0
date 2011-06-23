@@ -1,57 +1,106 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Thu, 23 Jun 2011 08:12:35 +0800
-Subject: [PATCH 1/3] serial/imx: add device tree support
-In-Reply-To: <BANLkTimsk2eWKPi2hnHbaAn-vSMKmdYsGQ@mail.gmail.com>
-References: <1308410354-21387-1-git-send-email-shawn.guo@linaro.org>
-	<1308410354-21387-2-git-send-email-shawn.guo@linaro.org>
-	<20110618161934.GH8195@ponder.secretlab.ca>
-	<20110619073000.GA23171@S2100-06.ap.freescale.net>
-	<20110621135558.GB9228@S2101-09.ap.freescale.net>
-	<BANLkTim4vunTm1176MRw3pqRZnunu4=9jg@mail.gmail.com>
-	<20110622153353.GA25799@S2100-06.ap.freescale.net>
-	<BANLkTimsk2eWKPi2hnHbaAn-vSMKmdYsGQ@mail.gmail.com>
-Message-ID: <20110623001234.GB25799@S2100-06.ap.freescale.net>
+From: inki.dae@samsung.com (daeinki)
+Date: Thu, 23 Jun 2011 10:55:50 +0900
+Subject: Some questions about DRM(Direct Rendering Manager)
+In-Reply-To: <BANLkTinv1uGUPBX4RE2DGw4Ca_P5x0g+DA@mail.gmail.com>
+References: <4E016EDC.30200@samsung.com> <4E0185E7.8020708@samsung.com>
+	<BANLkTim6xvD5U9GJ2pHu-=OrYccRHSj7Fg@mail.gmail.com>
+	<BANLkTinv1uGUPBX4RE2DGw4Ca_P5x0g+DA@mail.gmail.com>
+Message-ID: <4E029D26.1050902@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 09:52:11AM -0600, Grant Likely wrote:
-[...]
+Hi Rob Clark,
+
+I'm sorry for that my mean didn't convey to you so I condensed that into
+brief again.
+
+I know drm_fb_helper_single_fb_probe() calls register_framebuffer(),
+My question is that it's right way to call only drm_fb_helper_set_par()
+if fb_helper->funcs->fb_probe() returns nonzero.
+
+In this case, if fb_helper->funcs->fb_probe() returns zero then
+register_framebuffer() isn't called and this means linux framebuffer
+isn't used anymore.
+
+one more question, otherwise if it uses drm based framebuffer,
+register_framebuffer() should be called necessarily at booting time?
+
+Thank you.
+
+Rob Clark ? ?:
+> fwiw, drm_fb_helper_single_fb_probe() calls register_framebuffer() (if
+> that was the question?)
 > 
-> >> > - ? ? ? line = of_get_property(node, "id", NULL);
-> >> > - ? ? ? if (!line)
-> >> > + ? ? ? line = of_get_device_index(node, "serial");
-> >> > + ? ? ? if (IS_ERR_VALUE(line))
-> >> > ? ? ? ? ? ? ? ?return -ENODEV;
-> >>
-> >> Personally, it an alias isn't present, then I'd dynamically assign a port id.
-> >>
-> > We probably can not. ?The driver works with being told the correct
-> > port id which is defined by soc. ?Instead of dynamically assigning
-> > a port id, we have to tell the driver the exact hardware port id of
-> > the device that is being probed.
+> BR,
+> -R
 > 
-> Are you sure?  It doesn't look like the driver behaviour uses id for
-> anything other than an index into the statically allocated serial port
-> instance table.  I don't see any change of behaviour based on the port
-> number anywhere.
+> 2011/6/22 InKi Dae <daeinki@gmail.com>:
+>> It adds dri-devel at lists.freedesktop.org to this mail thread.
+>> Thank you.
+>>
+>> 2011? 6? 22? ?? 3:04, daeinki <inki.dae@samsung.com>?? ?:
+>>> below is additional comments.
+>>>
+>>> daeinki ? ?:
+>>>> Hi all,
+>>>>
+>>>> I'm writing Samsung SoC based DRM framework and this one includes FIMD
+>>>> and HDMI driver as hardware dependent modules. and for now, encoder,
+>>>> connector, crtc and fb module has been materialized almost. but I'm
+>>>> contending with  framebuffer setting issue(created fb_info should be
+>>>> registered to linux framebuffer through register_framebuffer() or not)as
+>>>> default framebuffer at booting time.
+>>>>
+>>>> at drm_fb_helper_single_fb_probe() of drm_fb_helper.c file, fb_helper's
+>>>> fb_probe callback is called and this one creates new framebuffer and
+>>>> returns a value more then 0 if true. internally, this process creates an
+>>>> fb_info object and drm_framebuffer and then drm_framebuffer would be
+>>>> added to mode_config.fb_list of the drm_device.
+>>>>
+>>> it's my mistake. return value is 0 if true, nonzero otherwise.
+>>>
+>>>> a value returned, new_fb is used to decide that it calls
+>>>> register_framebuffer() or drm_fb_helper_set_par(). at this point, I am
+>>>> confused it's a good way to call register_framebuffer() otherwise
+>>>> drm_fb_helper_set_par(). if register_framebuffer() is called then I
+>>>> guess drm_fb_helper_set_par() or drm_crtc_helper_set_config() should be
+>>>> called somewhere subsequently to apply this one to real hardware because
+>>>> previous process is just for maintaining data logically.(not set up data
+>>>> to h/w)
+>>>>
+>>>> it's a right way to call register_framebuffer() and then
+>>>> drm_fb_helper_set_par() or drm_crtc_helper_set_config()? otherwise just
+>>>> only drm_fb_helper_set_par() or drm_crtc_helper_set_config() ignoring
+>>>> register_framebuffer()? and what is the purpose of using
+>>>> register_framebuffer()?
+>>>>
+>>> I understood that if fb_probe() callback is fail then fb_info object is
+>>> registered to linux framebuffer through register_framebuffer()
+>>> otherwise(if true) hardware configuration would be completed by
+>>> drm_fb_helper_set_par() so the reason of using register_framebuffer() is
+>>> that the case of failing fb_probe() callback, it is for drawing on only
+>>> linux framebuffer. is it right?
+>>>
+>>>> In my case, first, register_framebuffer() is called and then if desired
+>>>> default crtc id is matched with drm_fb_helper->crtc_info[0 ~ n].crtc_id,
+>>>> it gets mode_set of drm_fb_helper->crtc_info[n] and then  it calls
+>>>> drm_crtc_helper_set_config(mode_set). at this time, all the hardware
+>>>> configurations would be completed.
+>>>>
+>>>> thank you in advance.
+>>>>
+>>>> Best Regards
+>>>> Inki Dae.
+>>>>
+>>>
+>>> _______________________________________________
+>>> linux-arm-kernel mailing list
+>>> linux-arm-kernel at lists.infradead.org
+>>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+>>
 > 
-Sorry, I did not make this clear.  In serial_imx_probe(), the port
-gets created and then saved as below.
-
-	imx_ports[sport->port.line] = sport;
-
-While in imx_console_setup(), it addresses the port as following.
-
-	sport = imx_ports[co->index];
-
-When users specify their console as ttymxc0, they mean they are
-using the first i.mx uart hardware port, in turn ttymxc1 for the
-second port ...
-
-That said, imx_port[0] has to be the first hardware port, imx_port[1]
-has to be the second one ...  That's why port id sport->port.line
-can not be dynamically assigned, otherwise console may not work.
-
--- 
-Regards,
-Shawn
