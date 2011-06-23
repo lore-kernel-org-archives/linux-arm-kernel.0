@@ -1,68 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jun 2011 20:11:03 +0100
-Subject: [PATCH 06/25] ARM: pm: extract common code from MULTI_CPU/!MULTI_CPU
-	paths
-In-Reply-To: <20110623190900.GH9449@n2100.arm.linux.org.uk>
-References: <20110623190900.GH9449@n2100.arm.linux.org.uk>
-Message-ID: <E1QZpIt-0005m2-I0@rmk-PC.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 23 Jun 2011 12:05:28 -0700
+Subject: [PATCH 25/25] ARM: pm: omap34xx: convert to generic
+	suspend/resume support
+In-Reply-To: <E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk> (Russell King's
+	message of "Wed, 22 Jun 2011 16:16:58 +0100")
+References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
+	<E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
+Message-ID: <874o3g9xmv.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Very little code is different between these two paths now, so extract
-the common code.
+Hi Russell,
 
-Acked-by: Frank Hofmann <frank.hofmann@tomtom.com>
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/kernel/sleep.S |   24 ++++++------------------
- 1 files changed, 6 insertions(+), 18 deletions(-)
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
-index f8e9251..0a778c3 100644
---- a/arch/arm/kernel/sleep.S
-+++ b/arch/arm/kernel/sleep.S
-@@ -19,29 +19,13 @@ ENTRY(cpu_suspend)
- 	mov	r9, lr
- #ifdef MULTI_CPU
- 	ldr	r10, =processor
--	mov	r2, sp			@ current virtual SP
- 	ldr	r0, [r10, #CPU_SLEEP_SIZE] @ size of CPU sleep state
- 	ldr	ip, [r10, #CPU_DO_RESUME] @ virtual resume function
--	sub	sp, sp, r0		@ allocate CPU state on stack
--	mov	r0, sp			@ save pointer
--	add	ip, ip, r1		@ convert resume fn to phys
--	stmfd	sp!, {r1, r2, ip}	@ save v:p, virt SP, phys resume fn
--	ldr	r3, =sleep_save_sp
--	add	r2, sp, r1		@ convert SP to phys
--#ifdef CONFIG_SMP
--	ALT_SMP(mrc p15, 0, lr, c0, c0, 5)
--	ALT_UP(mov lr, #0)
--	and	lr, lr, #15
--	str	r2, [r3, lr, lsl #2]	@ save phys SP
- #else
--	str	r2, [r3]		@ save phys SP
--#endif
--	mov	lr, pc
--	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
--#else
--	mov	r2, sp			@ current virtual SP
- 	ldr	r0, =cpu_suspend_size
- 	ldr	ip, =cpu_do_resume
-+#endif
-+	mov	r2, sp			@ current virtual SP
- 	sub	sp, sp, r0		@ allocate CPU state on stack
- 	mov	r0, sp			@ save pointer
- 	add	ip, ip, r1		@ convert resume fn to phys
-@@ -56,6 +40,10 @@ ENTRY(cpu_suspend)
- #else
- 	str	r2, [r3]		@ save phys SP
- #endif
-+#ifdef MULTI_CPU
-+	mov	lr, pc
-+	ldr	pc, [r10, #CPU_DO_SUSPEND] @ save CPU state
-+#else
- 	bl	cpu_do_suspend
- #endif
- 
--- 
-1.7.4.4
+> Convert sa11x0 to use the generic CPU suspend/resume support, rather
+> than implementing its own version.  Tested on 3430 LDP.
+>
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+I tested this on 3430/n900 and 3530/Overo and it worked fine for
+retention, but not for off.
+
+Testing with off-mode, I found the MULTI_CPU path to be broken in
+cpu_suspend (jumping to zero.)  Rebuilding for only OMAP3, it worked
+fine for full-chip retention in suspend and idle as well as full-chip
+off in suspend and idle.
+
+I'm digging into the MULTI_CPU path now.
+
+Kevin
