@@ -1,81 +1,101 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Thu, 23 Jun 2011 14:55:06 -0600
-Subject: [PATCH 3/5] drivers/amba: create devices from device tree
-In-Reply-To: <4E00F9ED.1020500@gmail.com>
-References: <20110621181127.18176.1384.stgit@ponder>
-	<20110621184503.18176.88260.stgit@ponder>
-	<4E00F9ED.1020500@gmail.com>
-Message-ID: <BANLkTi=x0rPAg--t+_eP-JJ2uPEYgwPPLw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 23 Jun 2011 14:27:10 -0700
+Subject: [PATCH 24/25] ARM: pm: hide 1st and 2nd arguments to cpu_suspend
+	from platform code
+In-Reply-To: <E1QZpOm-0005nx-T1@rmk-PC.arm.linux.org.uk> (Russell King's
+	message of "Thu, 23 Jun 2011 20:17:08 +0100")
+References: <20110623190900.GH9449@n2100.arm.linux.org.uk>
+	<E1QZpOm-0005nx-T1@rmk-PC.arm.linux.org.uk>
+Message-ID: <87mxh88ci9.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 2:07 PM, Rob Herring <robherring2@gmail.com> wrote:
-> Grant,
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
+
+> The first and second arguments shouldn't concern platform code, so
+> hide them from each platforms caller.
 >
-> On 06/21/2011 01:45 PM, Grant Likely wrote:
->> Add a function to create amba_devices (i.e. primecell peripherals)
->> from device tree nodes. The device tree scanning is done by the
->> of_platform_populate() function which can call of_amba_device_create
->> based on a match table entry.
->>
->> Nodes with a "arm,primecell-periphid" property can override the h/w
->> peripheral id value.
->>
->> Based on the original work by Jeremy Kerr.
->>
->> Signed-off-by: Jeremy Kerr <jeremy.kerr@canonical.com>
->> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Rob Herring <rob.herring@calxeda.com>
->> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->> [grant.likely: add Jeremy's original s-o-b line, changes from review
->> ? ? ? ? ? ? ? ?comments, and moved all code to drivers/of/platform.c]
->> Signed-off-by: Grant Likely <grant.likely@secretlab.ca>
->> ---
->> ?.../devicetree/bindings/arm/primecell.txt ? ? ? ? ?| ? 21 ++++++
->> ?drivers/of/platform.c ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? 71 ++++++++++++++++++++
->> ?2 files changed, 92 insertions(+), 0 deletions(-)
->> ?create mode 100644 Documentation/devicetree/bindings/arm/primecell.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/primecell.txt b/Documentation/devicetree/bindings/arm/primecell.txt
->> new file mode 100644
->> index 0000000..1d5d7a8
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/primecell.txt
->> @@ -0,0 +1,21 @@
->> +* ARM Primecell Peripherals
->> +
->> +ARM, Ltd. Primecell peripherals have a standard id register that can be used to
->> +identify the peripheral type, vendor, and revision. This value can be used for
->> +driver matching.
->> +
->> +Required properties:
->> +
->> +- compatible : should be a specific value for peripheral and "arm,primecell"
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> ---
+>  arch/arm/include/asm/suspend.h |   19 +++++++++++++++++++
+>  arch/arm/include/asm/system.h  |    2 --
+>  arch/arm/kernel/sleep.S        |    2 +-
+>  arch/arm/mach-omap2/pm34xx.c   |    5 +++--
+>  arch/arm/mach-pxa/palmz72.c    |    1 +
+>  arch/arm/mach-pxa/pxa25x.c     |    4 ++--
+>  arch/arm/mach-pxa/pxa27x.c     |    4 ++--
+>  arch/arm/mach-pxa/pxa3xx.c     |    3 ++-
+>  arch/arm/mach-pxa/zeus.c       |    4 ++--
+>  arch/arm/mach-sa1100/pm.c      |    3 ++-
+>  arch/arm/plat-samsung/pm.c     |    3 ++-
+>  11 files changed, 36 insertions(+), 14 deletions(-)
+>  create mode 100644 arch/arm/include/asm/suspend.h
 >
-> Can I review what I wrote... Perhaps we should put strings in for all
-> existing drivers in the kernel. This should be a complete list:
->
-> arm,pl010
-> arm,pl011
-> st,pl011
-> arm,pl022
-> st,pl022
-> st,pl023
-> arm,pl030
-> arm,pl031
-> st,pl031
-> arm,pl061
-> arm,pl050
-> arm,pl080
-> arm,pl081
-> st,pl080
-> arm,pl110
-> arm,pl180
-> arm,pl330
-> arm,sp804
-> arm,sp805
+> diff --git a/arch/arm/include/asm/suspend.h b/arch/arm/include/asm/suspend.h
+> new file mode 100644
+> index 0000000..8d5b446
+> --- /dev/null
+> +++ b/arch/arm/include/asm/suspend.h
+> @@ -0,0 +1,19 @@
+> +#ifndef __ASM_ARM_SUSPEND_H
+> +#define __ASM_ARM_SUSPEND_H
+> +
+> +#include <asm/memory.h>
+> +
+> +extern void cpu_resume(void);
+> +
+> +/*
+> + * Hide the first two arguments to __cpu_suspend - these are an implementation
+> + * detail which platform code shouldn't have to know about.
+> + */
+> +static inline void cpu_suspend(unsigned long arg, void (*fn)(unsigned long))
+> +{
+> +	extern void __cpu_suspend(int, long, unsigned long,
+> +				  void (*)(unsigned long));
+> +	__cpu_suspend(0, PHYS_OFFSET - PAGE_OFFSET, arg, fn);
+> +}
+> +
+> +#endif
+> diff --git a/arch/arm/include/asm/system.h b/arch/arm/include/asm/system.h
+> index 50be605..832888d 100644
+> --- a/arch/arm/include/asm/system.h
+> +++ b/arch/arm/include/asm/system.h
+> @@ -106,8 +106,6 @@ extern void __show_regs(struct pt_regs *);
+>  
+>  extern int cpu_architecture(void);
+>  extern void cpu_init(void);
+> -extern void cpu_suspend(int, long, unsigned long, void (*)(unsigned long));
+> -extern void cpu_resume(void);
+>  
+>  void arm_machine_restart(char mode, const char *cmd);
+>  extern void (*arm_pm_restart)(char str, const char *cmd);
+> diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+> index 5392274..0bdcc72 100644
+> --- a/arch/arm/kernel/sleep.S
+> +++ b/arch/arm/kernel/sleep.S
+> @@ -14,7 +14,7 @@
+>   *  r3 = suspend function
+>   * Note: does not return until system resumes
+>   */
+> -ENTRY(cpu_suspend)
+> +ENTRY(__cpu_suspend)
+
+You missed also changing the ENDPROC here, so it doesn't compile
+without:
+
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index 0bdcc72..c156d0e 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -56,7 +56,7 @@ ENTRY(__cpu_suspend)
+        bl      __cpuc_flush_kern_all
+ #endif
+        ldmfd   sp!, {r0, pc}           @ call suspend fn
+-ENDPROC(cpu_suspend)
++ENDPROC(__cpu_suspend)
+        .ltorg
+ 
+ /*
 
 
-Yes, this whole list should be added.
-
-g.
+Kevin
