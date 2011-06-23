@@ -1,39 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jun 2011 16:22:49 +0100
-Subject: [PATCH 5/8] OMAP4: PM: TEMP: Prevent l3init from idling/force
-	sleep
-In-Reply-To: <alpine.DEB.2.00.1106230819540.12954@utopia.booyaka.com>
-References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
-	<1307616853-28395-2-git-send-email-rnayak@ti.com>
-	<1307616853-28395-3-git-send-email-rnayak@ti.com>
-	<1307616853-28395-4-git-send-email-rnayak@ti.com>
-	<1307616853-28395-5-git-send-email-rnayak@ti.com>
-	<1307616853-28395-6-git-send-email-rnayak@ti.com>
-	<alpine.DEB.2.00.1106230819540.12954@utopia.booyaka.com>
-Message-ID: <20110623152249.GG9449@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 23 Jun 2011 08:28:02 -0700
+Subject: [PATCH 08/10] omap2+: Use dmtimer macros for clocksource
+In-Reply-To: <20110620092345.357.11154.stgit@kaulin> (Tony Lindgren's message
+	of "Mon, 20 Jun 2011 02:23:45 -0700")
+References: <20110620091754.357.56441.stgit@kaulin>
+	<20110620092345.357.11154.stgit@kaulin>
+Message-ID: <87iprwbm9p.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 23, 2011 at 09:04:20AM -0600, Paul Walmsley wrote:
-> Since this is basically a hack to work around limitations of the current 
-> MMC driver, if we accept something like this, I think it should come with 
-> a big warning message and comment.  Something like this in 
-> omap44xx_clockdomains_init():
-> 
-> 	/*
-> 	 * XXX The OMAP L3 interconnect hardware is able to enter
-> 	 * hardware-supervised idle.  But because the OMAP HSMMC
-> 	 * driver still hasn't been converted to use runtime PM, if
-> 	 * the L3 is allowed to enter hwsup idle, the kernel will
-> 	 * crash.  Once the MMC driver is fixed (which patches have
-> 	 * been posted to do, with subject line "OMAP: HSMMC: cleanup
-> 	 * and runtime pm") the change to the l3_init_44xx_clkdm
-> 	 * flags should be dropped.  It limits the low-power state that
-> 	 * the chip can enter.
-> 	 */
-> 	pr_warn("WARNING: OMAP4 low power states artificially limited, due 
-> to unconverted HSMMC driver\n");
+Tony Lindgren <tony@atomide.com> writes:
 
-Do you really want to continue pissing Linus off with churn like this
-rather than pressing to get problems fixed _properly_ (eg, getting the
-HSMMC driver fixed) ?
+> Use dmtimer macros for clocksource. As with the clockevent,
+> this allows us to initialize the rest of dmtimer code later on.
+>
+> Note that eventually we will be initializing the timesource
+> from init_early so sched_clock will work properly for
+> CONFIG_PRINTK_TIME.
+>
+> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Reviewed-by: Kevin Hilman <khilman@ti.com>
+
+[...]
+
+> +/* Setup free-running counter for clocksource */
+> +static void __init omap2_gp_clocksource_init(int gptimer_id,
+> +						const char *fck_source)
+> +{
+> +	int res;
+> +
+> +	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source);
+> +	BUG_ON(res);
+
+This is a change from previous code where the clocksource was requesting
+any timer, not a specific one.   
+
+Also, you're using the same gptimer_id here as the clockevent, which
+means this is guaranteed to fail.
+
+Kevin
