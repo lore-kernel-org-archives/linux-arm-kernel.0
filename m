@@ -1,212 +1,58 @@
-From: sshtylyov@mvista.com (Sergei Shtylyov)
-Date: Thu, 23 Jun 2011 19:27:52 +0400
-Subject: [RFC 5/8] remoteproc: add davinci implementation
-In-Reply-To: <1308640714-17961-6-git-send-email-ohad@wizery.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-6-git-send-email-ohad@wizery.com>
-Message-ID: <4E035B78.3080200@mvista.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 23 Jun 2011 16:34:24 +0100
+Subject: parallel load of modules on an ARM multicore
+In-Reply-To: <20110623151249.GA23234@n2100.arm.linux.org.uk>
+References: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
+	<20110621155030.GA21245@1n450.cable.virginmedia.net>
+	<274124B9C6907D4B8CE985903EAA19E9185A92978D@SI-MBX06.de.bosch.com>
+	<20110623145229.GA18409@1n450.cable.virginmedia.net>
+	<20110623151249.GA23234@n2100.arm.linux.org.uk>
+Message-ID: <20110623153424.GA22786@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+On Thu, Jun 23, 2011 at 04:12:49PM +0100, Russell King - ARM Linux wrote:
+> On Thu, Jun 23, 2011 at 03:52:29PM +0100, Catalin Marinas wrote:
+> > Peter,
+> > 
+> > On Thu, Jun 23, 2011 at 04:39:01PM +0200, EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31) wrote:
+> > > it's interesting that you almost agree with me.
+> > > 
+> > > But isn't it really expensive to flush the icache on switch_mm?
+> > > Is that meant as a test to see if the problem goes away?
+> > 
+> > Who said anything about flushing the icache on switch_mm()? My patch
+> > doesn't do this, it actually reduces the amount of cache flushing on
+> > ARM11MPCore.
+> 
+> Ahem, your patch does:
+> 
+> --- a/arch/arm/include/asm/mmu_context.h
+> +++ b/arch/arm/include/asm/mmu_context.h
+> @@ -114,7 +114,8 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+>  #ifdef CONFIG_SMP
+>         /* check for possible thread migration */
+>         if (!cpumask_empty(mm_cpumask(next)) &&
+> -           !cpumask_test_cpu(cpu, mm_cpumask(next)))
+> +           (cache_ops_need_broadcast() ||
+> +            !cpumask_test_cpu(cpu, mm_cpumask(next))))
+>                 __flush_icache_all();
+>  #endif
+>         if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {
+> 
+> This means that if cache_ops_need_broadcast() is true, we will flush
+> the I-cache at every MM context switch as very few MMs will have an
+> empty mm_cpumask().
 
-Ohad Ben-Cohen wrote:
+Ah, I forgot about this. That's left over from some earlier version of
+the patch where cache_ops_need_broadcast() was set to 0 for ARMv6 SMP
+but then I realised that it is still needed for some ptrace stuff and
+re-instated it.
 
-> From: Mark Grosen <mgrosen@ti.com>
+So this hunk is definitely not needed.
 
-> Add remoteproc implementation for da850, so we can boot its DSP.
+BTW, the patch (with the fix above) would be useful for the cases where
+we have block drivers not calling flush_dcache_page().
 
-> Signed-off-by: Mark Grosen <mgrosen@ti.com>
-> Signed-off-by: Ohad Ben-Cohen <ohad@wizery.com>
-> ---
->  arch/arm/mach-davinci/include/mach/remoteproc.h |   28 +++++
->  drivers/remoteproc/Kconfig                      |   16 +++
->  drivers/remoteproc/Makefile                     |    1 +
->  drivers/remoteproc/davinci_remoteproc.c         |  147 +++++++++++++++++++++++
->  4 files changed, 192 insertions(+), 0 deletions(-)
->  create mode 100644 arch/arm/mach-davinci/include/mach/remoteproc.h
->  create mode 100644 drivers/remoteproc/davinci_remoteproc.c
-
-> diff --git a/arch/arm/mach-davinci/include/mach/remoteproc.h b/arch/arm/mach-davinci/include/mach/remoteproc.h
-> new file mode 100644
-> index 0000000..af6e88c
-> --- /dev/null
-> +++ b/arch/arm/mach-davinci/include/mach/remoteproc.h
-> @@ -0,0 +1,28 @@
-> +/*
-> + * Remote Processor
-> + *
-> + * Copyright (C) 2011 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef _DAVINCI_REMOTEPROC_H
-> +#define _DAVINCI_REMOTEPROC_H
-> +
-> +#include <linux/remoteproc.h>
-> +
-> +struct davinci_rproc_pdata {
-> +	struct rproc_ops *ops;
-> +	char *name;
-> +	char *clk_name;
-> +	char *firmware;
-> +};
-> +
-> +#endif /* _DAVINCI_REMOTEPROC_H */
-> diff --git a/drivers/remoteproc/Kconfig b/drivers/remoteproc/Kconfig
-> index 88421bd..1e594b5 100644
-> --- a/drivers/remoteproc/Kconfig
-> +++ b/drivers/remoteproc/Kconfig
-> @@ -26,3 +26,19 @@ config OMAP_REMOTE_PROC
->  
->  	  It's safe to say n here if you're not interested in multimedia
->  	  offloading or just want a bare minimum kernel.
-> +
-> +config DAVINCI_REMOTE_PROC
-> +	tristate "Davinci remoteproc support"
-> +	depends on ARCH_DAVINCI_DA850
-
-    It should work on DA830 as well, but not on real DaVinci, so the name is 
-misleading...
-
-[...]
-> diff --git a/drivers/remoteproc/davinci_remoteproc.c b/drivers/remoteproc/davinci_remoteproc.c
-> new file mode 100644
-> index 0000000..0e26fe9
-> --- /dev/null
-> +++ b/drivers/remoteproc/davinci_remoteproc.c
-> @@ -0,0 +1,147 @@
-> +/*
-> + * Remote processor machine-specific module for Davinci
-> + *
-> + * Copyright (C) 2011 Texas Instruments, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or
-> + * modify it under the terms of the GNU General Public License
-> + * version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#define pr_fmt(fmt)    "%s: " fmt, __func__
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/err.h>
-> +#include <linux/printk.h>
-> +#include <linux/bitops.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/remoteproc.h>
-> +#include <linux/clk.h>
-> +#include <linux/io.h>
-> +
-> +#include <mach/da8xx.h>
-> +#include <mach/cputype.h>
-> +#include <mach/psc.h>
-> +#include <mach/remoteproc.h>
-> +
-> +/*
-> + * Technical Reference:
-> + * OMAP-L138 Applications Processor System Reference Guide
-> + * http://www.ti.com/litv/pdf/sprugm7d
-> + */
-> +
-> +/* local reset bit (0 is asserted) in MDCTL15 register (section 9.6.18) */
-> +#define LRST		BIT(8)
-
-    Perhaps this should be named nLRST or something if the sense is inverted?
-
-> +/* next state bits in MDCTL15 register (section 9.6.18) */
-> +#define NEXT_ENABLED	0x3
-
-    Isn't this already declared in <mach/psc.h> as PSC_STATE_ENABLED?
-
-> +/* register for DSP boot address in SYSCFG0 module (section 11.5.6) */
-> +#define HOST1CFG	0x44
-
-    Worth declaring in <mach/da8xx.h> instead...
-
-> +static inline int davinci_rproc_start(struct rproc *rproc, u64 bootaddr)
-> +{
-> +	struct device *dev = rproc->dev;
-> +	struct davinci_rproc_pdata *pdata = dev->platform_data;
-> +	struct davinci_soc_info *soc_info = &davinci_soc_info;
-> +	void __iomem *psc_base;
-> +	struct clk *dsp_clk;
-> +
-> +	/* hw requires the start (boot) address be on 1KB boundary */
-> +	if (bootaddr & 0x3ff) {
-> +		dev_err(dev, "invalid boot address: must be aligned to 1KB\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	dsp_clk = clk_get(dev, pdata->clk_name);
-
-    We could match using clkdev functionality, but the clock entry would need to 
-be changed then...
-
-> +	if (IS_ERR_OR_NULL(dsp_clk)) {
-> +		dev_err(dev, "clk_get error: %ld\n", PTR_ERR(dsp_clk));
-> +		return PTR_ERR(dsp_clk);
-> +	}
-> +
-> +	clk_enable(dsp_clk);
-
-     This seems rather senseless activity as on DA8xx the DSP core boots the ARM 
-core, so the DSP clock will be already enabled.
-
-> +	rproc->priv = dsp_clk;
-> +
-> +	psc_base = ioremap(soc_info->psc_bases[0], SZ_4K);
-> +
-> +	/* insure local reset is asserted before writing start address */
-> +	__raw_writel(NEXT_ENABLED, psc_base + MDCTL + 4 * DA8XX_LPSC0_GEM);
-> +
-> +	__raw_writel(bootaddr, DA8XX_SYSCFG0_VIRT(HOST1CFG));
-
-    DA8XX_SYSCFG0_VIRT() is not supposed to be used outside mach-davinci. The 
-variable it refers is not exported, so driver module won't work.
-
-> +	/* de-assert local reset to start the dsp running */
-> +	__raw_writel(LRST | NEXT_ENABLED, psc_base + MDCTL +
-> +		4 * DA8XX_LPSC0_GEM);
-> +
-> +	iounmap(psc_base);
-> +
-> +	return 0;
-> +}
-> +
-> +static inline int davinci_rproc_stop(struct rproc *rproc)
-> +{
-> +	struct davinci_soc_info *soc_info = &davinci_soc_info;
-> +	void __iomem *psc_base;
-> +	struct clk *dsp_clk = rproc->priv;
-> +
-> +	psc_base = ioremap(soc_info->psc_bases[0], SZ_4K);
-> +
-> +	/* halt the dsp by asserting local reset */
-> +	__raw_writel(NEXT_ENABLED, psc_base + MDCTL + 4 * DA8XX_LPSC0_GEM);
-> +
-> +	clk_disable(dsp_clk);
-> +	clk_put(dsp_clk);
-> +
-> +	iounmap(psc_base);
-> +
-> +	return 0;
-> +}
-
-    All this is DA8xx specific code which won't fly on real DaVincis, so I 
-suggest that you rename the file to da8xx_remoteproc.c for clarity; and rename 
-the patch as well...
-
-WBR, Sergei
+-- 
+Catalin
