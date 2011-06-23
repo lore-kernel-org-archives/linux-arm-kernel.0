@@ -1,143 +1,132 @@
-From: michael.williamson@criticallink.com (Michael Williamson)
-Date: Thu, 23 Jun 2011 08:23:29 -0400
-Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
-In-Reply-To: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-Message-ID: <4E033041.9090606@criticallink.com>
+From: subashrp@gmail.com (Subash Patel)
+Date: Thu, 23 Jun 2011 18:39:19 +0530
+Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping
+	framework	redesign
+In-Reply-To: <4E02119F.4000901@codeaurora.org>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>	<4E017539.30505@gmail.com>	<001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>	<4E01AD7B.3070806@gmail.com>
+	<002701cc30be$ab296cc0$017c4640$%szyprowski@samsung.com>
+	<4E02119F.4000901@codeaurora.org>
+Message-ID: <4E033AFF.4020603@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/21/2011 3:18 AM, Ohad Ben-Cohen wrote:
-> Modern SoCs typically employ a central symmetric multiprocessing (SMP)
-> application processor running Linux, with several other asymmetric
-> multiprocessing (AMP) heterogeneous processors running different instances
-> of operating system, whether Linux or any other flavor of real-time OS.
+Hi Jordan,
+
+On 06/22/2011 09:30 PM, Jordan Crouse wrote:
+> On 06/22/2011 03:27 AM, Marek Szyprowski wrote:
+>> Hello,
+>>
+>> On Wednesday, June 22, 2011 10:53 AM Subash Patel wrote:
+>>
+>>> On 06/22/2011 12:29 PM, Marek Szyprowski wrote:
+>>>> Hello,
+>>>>
+>>>> On Wednesday, June 22, 2011 6:53 AM Subash Patel wrote:
+>>>>
+>>>>> On 06/20/2011 01:20 PM, Marek Szyprowski wrote:
+>>>>>> Hello,
+>>>>>>
+>>>>>> This patch series is a continuation of my works on implementing
+>>>>>> generic
+>>>>>> IOMMU support in DMA mapping framework for ARM architecture. Now I
+>>>>>> focused on the DMA mapping framework itself. It turned out that
+>>>>>> adding
+>>>>>> support for common dma_map_ops structure was not that hard as I
+>>> initally
+>>>>>> thought. After some modification most of the code fits really well to
+>>>>>> the generic dma_map_ops methods.
+>>>>>>
+>>>>>> The only change required to dma_map_ops is a new alloc function.
+>>>>>> During
+>>>>>> the discussion on Linaro Memory Management meeting in Budapest we got
+>>>>>> the idea that we can have only one alloc/free/mmap function with
+>>>>>> additional attributes argument. This way all different kinds of
+>>>>>> architecture specific buffer mappings can be hidden behind the
+>>>>>> attributes without the need of creating several versions of
+>>>>>> dma_alloc_
+>>>>>> function. I also noticed that the dma_alloc_noncoherent() function
+>>>>>> can
+>>>>>> be also implemented this way with DMA_ATTRIB_NON_COHERENT attribute.
+>>>>>> Systems that just defines dma_alloc_noncoherent as dma_alloc_coherent
+>>>>>> will just ignore such attribute.
+>>>>>>
+>>>>>> Another good use case for alloc methods with attributes is the
+>>>>>> possibility to allocate buffer without a valid kernel mapping. There
+>>> are
+>>>>>> a number of drivers (mainly V4L2 and ALSA) that only exports the DMA
+>>>>>> buffers to user space. Such drivers don't touch the buffer data at
+>>>>>> all.
+>>>>>> For such buffers we can avoid the creation of a mapping in kernel
+>>>>>> virtual address space, saving precious vmalloc area. Such buffers
+>>>>>> might
+>>>>>> be allocated once a new attribute DMA_ATTRIB_NO_KERNEL_MAPPING.
+>>>>>
+>>>>> Are you trying to say here, that the buffer would be allocated in the
+>>>>> user space, and we just use it to map it to the device in DMA+IOMMU
+>>>>> framework?
+>>>>
+>>>> Nope. I proposed an extension which would allow you to allocate a
+>>>> buffer
+>>>> without creating the kernel mapping for it. Right now
+>>> dma_alloc_coherent()
+>>>> performs 3 operations:
+>>>> 1. allocates memory for the buffer
+>>>> 2. creates coherent kernel mapping for the buffer
+>>>> 3. translates physical buffer address to DMA address that can be
+>>>> used by
+>>>> the hardware.
+>>>>
+>>>> dma_mmap_coherent makes additional mapping for the buffer in user
+>>>> process
+>>>> virtual address space.
+>>>>
+>>>> I want make the step 2 in dma_alloc_coherent() optional to save virtual
+>>>> address space: it is really limited resource. I really want to avoid
+>>>> wasting it for mapping 128MiB buffers just to create full-HD processing
+>>>> hardware pipeline, where no drivers will use kernel mapping at all.
+>>>>
+>>>
+>>> I think by (2) above, you are referring to
+>>> __dma_alloc_remap()->arm_vmregion_alloc() to allocate the kernel virtual
+>>> address for the drivers use. That makes sense now.
+>>
+>> Well, this is particular implementation which is used on ARM. Other
+>> architectures might implement it differently, that's why I used generic
+>> description and didn't point to any particular function.
+>>
+>>> I have a query in similar lines, but related to user virtual address
+>>> space. Is it feasible to extend these DMA interfaces(and IOMMU), to map
+>>> a user allocated buffer into the hardware?
+>>
+>> This can be done with the current API, although it may not look so
+>> straightforward. You just need to create a scatter list of user pages
+>> (these can be gathered with get_user_pages function) and use dma_map_sg()
+>> function. If the dma-mapping support iommu, it can map all these pages
+>> into a single contiguous buffer on device (DMA) address space.
+>>
+>> Some additional 'magic' might be required to get access to pages that are
+>> mapped with pure PFN (VM_PFNMAP flag), but imho it still can be done.
+>>
+>> I will try to implement this feature in videobuf2-dma-config allocator
+>> together with the next version of my patches for dma-mapping&iommu.
 >
-> OMAP4, for example, has dual Cortex-A9, dual Cortex-M3 and a C64x+ DSP.
-> Typically, the dual cortex-A9 is running Linux in a SMP configuration, and
-> each of the other three cores (two M3 cores and a DSP) is running its own
-> instance of RTOS in an AMP configuration.
->
-> AMP remote processors typically employ dedicated DSP codecs and multimedia
-> hardware accelerators, and therefore are often used to offload cpu-intensive
-> multimedia tasks from the main application processor. They could also be
-> used to control latency-sensitive sensors, drive "random" hardware blocks,
-> or just perform background tasks while the main CPU is idling.
->
-> Users of those remote processors can either be userland apps (e.g.
-> multimedia frameworks talking with remote OMX components) or kernel drivers
-> (controlling hardware accessible only by the remote processor, reserving
-> kernel-controlled resources on behalf of the remote processor, etc..).
->
-> This patch set adds a generic AMP/IPC framework which makes it possible to
-> control (power on, boot, power off) and communicate (simply send and receive
-> messages) with those remote processors.
->
-> Specifically, we're adding:
->
-> * Rpmsg: a virtio-based messaging bus that allows kernel drivers to
-> communicate with remote processors available on the system. In turn,
-> drivers could then expose appropriate user space interfaces, if needed
-> (tasks running on remote processors often have direct access to sensitive
-> resources like the system's physical memory, gpios, i2c buses, dma
-> controllers, etc..  so one normally wouldn't want to allow userland to
-> send everything/everywhere it wants).
->
-> Every rpmsg device is a communication channel with a service running on a
-> remote processor (thus rpmsg devices are called channels). Channels are
-> identified by a textual name (which is used to match drivers to devices)
-> and have a local ("source") rpmsg address, and remote ("destination") rpmsg
-> address. When a driver starts listening on a channel (most commonly when it
-> is probed), the bus assigns the driver a unique rpmsg src address (a 32 bit
-> integer) and binds it with the driver's rx callback handler. This way
-> when inbound messages arrive to this src address, the rpmsg core dispatches
-> them to that driver, by invoking the driver's rx handler with the payload
-> of the incoming message.
->
-> Once probed, rpmsg drivers can also immediately start sending messages to the
-> remote rpmsg service by using simple sending API; no need even to specify
-> a destination address, since that's part of the rpmsg channel, and the rpmsg
-> bus uses the channel's dst address when it constructs the message (for
-> more demanding use cases, there's also an extended API, which does allow
-> full control of both the src and dst addresses).
->
-> The rpmsg bus is using virtio to send and receive messages: every pair
-> of processors share two vrings, which are used to send and receive the
-> messages over shared memory (one vring is used for tx, and the other one
-> for rx). Kicking the remote processor (i.e. letting it know it has a pending
-> message on its vring) is accomplished by means available on the platform we
-> run on (e.g. OMAP is using its mailbox to both interrupt the remote processor
-> and tell it which vring is kicked at the same time). The header of every
-> message sent on the rpmsg bus contains src and dst addresses, which make it
-> possible to multiplex several rpmsg channels on the same vring.
->
-> One nice property of the rpmsg bus is that device creation is completely
-> dynamic: remote processors can announce the existence of remote rpmsg
-> services by sending a "name service" messages (which contain the name and
-> rpmsg addr of the remote service). Those messages are picked by the rpmsg
-> bus, which in turn dynamically creates and registers the rpmsg channels
-> (i.e devices) which represents the remote services. If/when a relevant rpmsg
-> driver is registered, it will be immediately probed by the bus, and can then
-> start "talking" to the remote service.
->
-> Similarly, we can use this technique to dynamically create virtio devices
-> (and new vrings) which would then represent e.g. remote network, console
-> and block devices that will be driven by the existing virtio drivers
-> (this is still not implemented though; it requires some RTOS work as we're
-> not booting Linux on OMAP's remote processors). Creating new vrings might
-> also be desired by users who just don't want to use the shared rpmsg vrings
-> (for performance or any other functionality reasons).
->
-> In addition to dynamic creation of rpmsg channels, the rpmsg bus also
-> supports creation of static channels. This is needed in two cases:
-> - when a certain remote processor doesn't support sending those "name
->   service" announcements. In that case, a static table of remote rpmsg
->   services must be used to create the rpmsg channels.
-> - to support rpmsg server drivers, which aren't bound to a specific remote
->   rpmsg address. Instead, they just listen on a local address, waiting for
->   incoming messages. To send a message, those server drivers need to use
->   the rpmsg_sendto() API, so they can explicitly indicate the dst address
->   every time.
->
-> There are already several immediate use cases for rpmsg drivers: OMX
-> offloading (already being used on OMAP4), hardware resource manager (remote
-> processors on OMAP4 need to ask Linux to enable/disable hardware resources
-> on its behalf), remote display driver on Netra (dm8168), where the display
-> is controlled by a remote M3 processor (and a Linux v4l2/fbdev driver will
-> use rpmsg to communicate with that remote display driver).
->
-> * Remoteproc: a generic driver that maintains the state of the remote
-> processor(s). Simple rproc_get() and rproc_put() API is exposed, which
-> drivers can use when needed (first driver to call get() will load a firmware,
-> configure an iommu if needed, and boot the remote processor, while last
-> driver to call put() will power it down).
->
-> Hardware differences are abstracted as usual: a platform-specific driver
-> registers its own start/stop handlers in the generic remoteproc driver,
-> and those are invoked when its time to power up/down the processor. As a
-> reference, this patch set include remoteproc support for both OMAP4's
-> cortex-M3 and Davinci's DSP, tested on the pandaboard and hawkboard,
-> respectively.
->
-> The gory part of remoteproc is the firmware handling. We tried to come up
-> with a simple binary format that will require minimum kernel code to handle,
-> but at the same time be generic enough in the hopes that it would prove
-> useful to others as well. We're not at all hang onto the binary format
-> we picked: if there's any technical reason to change it to support other
-> platforms, please let us know. We do realize that a single binary firmware
-> structure might eventually not work for everyone. it did prove useful for
-> us though; we adopted both the OMAP and Davinci platforms (and their
-> completely different remote processor devices) to this simple binary
-> structure, so we don't have to duplicate the firmware handling code.
+> With luck DMA_ATTRIB_NO_KERNEL_MAPPING should remove any lingering
+> arguments
+> for trying to map user pages. Given that our ultimate goal here is buffer
+> sharing, user allocated pages have limited value and appeal. If anything, I
+> vote that this be a far lower priority compared to the rest of the win you
+> have here.
 >
 
-I'd like to kick the tires on this with a da850 based platform (MityDSP-L138).
-Any chance you might be able to share the stuff you did on the remote side
-(DSP/BIOS adaptations for rpmsg,  utils for ELF or COFF conversion to
-firmware format, etc.) for the DSP side of your tests done with the hawkboard?
+We have some rare cases, where requirements like above are also there. 
+So we require to have flexibility to map user allocated buffers to 
+devices as well.
 
-It looks like, at least for the da850, this subsumes or obsoletes DSPLINK in order
-to drive a more general purpose architecture (which looks great, so far, BTW). 
-Is that the intent?
+Please refer to my email 
+(http://lists.linaro.org/pipermail/linaro-mm-sig/2011-June/000273.html)
 
--Mike
+Regards,
+Subash
+
+> Jordan
+>
