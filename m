@@ -1,92 +1,40 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Thu, 23 Jun 2011 14:22:11 +0800
-Subject: [PATCH] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <BANLkTim54jEKmxAQFNMGCyWwAu+FhVu0KA@mail.gmail.com>
-References: <1308712645-5986-1-git-send-email-leiwen@marvell.com>
-	<BANLkTinQB-hXMRy5+BXKQSrPq=sVrorCVA@mail.gmail.com>
-	<BANLkTimk0+2LUeo5sq8w4ohRq-qCe_2t_Q@mail.gmail.com>
-	<BANLkTim54jEKmxAQFNMGCyWwAu+FhVu0KA@mail.gmail.com>
-Message-ID: <BANLkTinsw59F-X2LFrdu3Xtau5xY-=CSnA@mail.gmail.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Thu, 23 Jun 2011 15:39:02 +0900
+Subject: [PATCH 6/7] ARM: EXYNOS4: Add save/restore for more ARM	registers
+In-Reply-To: <20110622145452.GR23234@n2100.arm.linux.org.uk>
+References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
+	<1308732405-16664-7-git-send-email-kgene.kim@samsung.com>
+	<20110622145452.GR23234@n2100.arm.linux.org.uk>
+Message-ID: <015801cc3170$42695800$c73c0800$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Russell King - ARM Linux wrote:
+> 
+> On Wed, Jun 22, 2011 at 05:46:44PM +0900, Kukjin Kim wrote:
+> > From: Jaecheol Lee <jc.lee@samsung.com>
+> >
+> > This patch adds save/restore for Power Control Register and
+> > Diagnostic Register.
+> 
+> NAK.  Please see my further suspend consolidation patches posted earlier.
+> I've also recently (last few days) moved these further forward and this
+> code no longer exists in this file (all it contains is the early
+> resume stuff.)
+> 
+Oops :(
+OK, will re-work based on latest rmk/for-next :)
 
-On Wed, Jun 22, 2011 at 9:06 PM, Daniel Mack <zonque@gmail.com> wrote:
-> Hi Lei,
->
-> On Wed, Jun 22, 2011 at 2:21 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
->> Hi Daniel,
->>
->> On Wed, Jun 22, 2011 at 7:39 PM, Daniel Mack <zonque@gmail.com> wrote:
->>> On Wed, Jun 22, 2011 at 5:17 AM, Lei Wen <leiwen@marvell.com> wrote:
->>>> Current pxa3xx_nand controller has two chip select which
->>>> both be workable. This patch enable this feature.
->>>>
->>>> Update platform driver to support this feature.
->>>>
->>>> Another notice should be taken that:
->>>> When you want to use this feature, you should not enable the
->>>> keep configuration feature, for two chip select could be
->>>> attached with different nand chip. The different page size
->>>> and timing requirement make the keep configuration impossible.
->>>>
->>>> Signed-off-by: Lei Wen <leiwen@marvell.com>
->>>> ---
->>>> ?arch/arm/mach-mmp/aspenite.c ? ? ? ? ? ? ? ? | ? ?5 +-
->>>> ?arch/arm/mach-pxa/cm-x300.c ? ? ? ? ? ? ? ? ?| ? ?5 +-
->>>> ?arch/arm/mach-pxa/colibri-pxa3xx.c ? ? ? ? ? | ? ?5 +-
->>>> ?arch/arm/mach-pxa/littleton.c ? ? ? ? ? ? ? ?| ? ?5 +-
->>>> ?arch/arm/mach-pxa/mxm8x10.c ? ? ? ? ? ? ? ? ?| ? ?9 +-
->>>> ?arch/arm/mach-pxa/raumfeld.c ? ? ? ? ? ? ? ? | ? ?5 +-
->>>> ?arch/arm/mach-pxa/zylonite.c ? ? ? ? ? ? ? ? | ? ?5 +-
->>>> ?arch/arm/plat-pxa/include/plat/pxa3xx_nand.h | ? ?8 +-
->>>> ?drivers/mtd/nand/pxa3xx_nand.c ? ? ? ? ? ? ? | ?735 +++++++++++++++-----------
->>>> ?9 files changed, 444 insertions(+), 338 deletions(-)
->>>
->>> This patch doesn't apply for me on top of Linus' master branch. Which
->>> tree are you based on currently?
->>
->> Actually it is based on Linux 3.0-rc2 and add two patches pending to
->> l2-mtd-2.6.git already:
->>
->> mtd: pxa3xx_nand: fix nand detection issue
->> mtd: pxa3xx_nand: Fix blank page ECC mismatch
->
-> I have a similar setup, also with those two patches on top, but
-> applying your patch gives me:
->
-> Applying: MTD: pxa3xx_nand: enable multiple chip select support
-> error: patch failed: drivers/mtd/nand/pxa3xx_nand.c:477
-> error: drivers/mtd/nand/pxa3xx_nand.c: patch does not apply
-> Patch failed at 0001 MTD: pxa3xx_nand: enable multiple chip select support
-> When you have resolved this problem run "git am --resolved".
-> If you would prefer to skip this patch, instead run "git am --skip".
-> To restore the original branch and stop patching run "git am --abort".
->
-> Could you push your branch somewhere?
->
->>>> ?#ifdef CONFIG_PM
->>>> @@ -1183,8 +1278,8 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
->>>> ? ? ? ?struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
->>>> ? ? ? ?struct mtd_info *mtd = info->mtd;
->>>>
->>>> - ? ? ? nand_writel(info, NDTR0CS0, info->ndtr0cs0);
->>>> - ? ? ? nand_writel(info, NDTR1CS0, info->ndtr1cs0);
->>>> + ? ? ? nand_writel(nand, NDTR0CS0, info->ndtr0cs0);
->>>> + ? ? ? nand_writel(nand, NDTR1CS0, info->ndtr1cs0);
->>>> ? ? ? ?clk_enable(info->clk);
->>>
->>> This won't compile.
->>
->> Could you post your build log?
->
-> I didn't compile it because I couldn't, but "nand" is certainly
-> undefined in this context now. Did you compile and test this code with
-> "CONFIG_PM=y"?
+> My guess is that these two registers are samsung specific, and so they
+> should be saved and restored by higher level code (eg, a syscore_ops
+> for exynos4 specific stuff.)
 
-You're right, I haven't take open PM config...
-I would rebase this patch over l2-mtd-2.6.git for next post.
+Let me think again.
 
-Thanks,
-Lei
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
