@@ -1,65 +1,61 @@
-From: kosaki.motohiro@jp.fujitsu.com (KOSAKI Motohiro)
-Date: Thu, 23 Jun 2011 17:31:33 +0900
-Subject: [PATCH 3/3] arm: replace old cpumask functions with new one.
-In-Reply-To: <4E02F9A2.4040204@jp.fujitsu.com>
-References: <4E02F92C.7070203@jp.fujitsu.com> <4E02F9A2.4040204@jp.fujitsu.com>
-Message-ID: <4E02F9E5.6040200@jp.fujitsu.com>
+From: holler@ahsoftware.de (Alexander Holler)
+Date: Thu, 23 Jun 2011 11:47:18 +0200
+Subject: [PATCH] USB: ehci: use packed,	aligned(4) instead of removing
+	the packed attribute
+In-Reply-To: <201106202207.23104.arnd@arndb.de>
+References: <Pine.LNX.4.44L0.1106201240240.2113-100000@iolanthe.rowland.org>	<alpine.LFD.2.00.1106201306210.2142@xanadu.home>	<4DFF85D6.1090104@ahsoftware.de>
+	<201106202207.23104.arnd@arndb.de>
+Message-ID: <4E030BA6.8060407@ahsoftware.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now cpus_xx() cpumask functions are marked as deprecated. This
-patch replace them with modern one.
+Am 20.06.2011 22:07, schrieb Arnd Bergmann:
+> On Monday 20 June 2011 19:39:34 Alexander Holler wrote:
+>> That packed without an additional aligned() caused errors on ARM with
+>> gcc 4.6 is another problem which got (currently) fixed by removing packed.
+>
+> Packed caused errors because it is *wrong*. The code as it was used undefined
+> behavior in the language.
 
-Signed-off-by: KOSAKI Motohiro <kosaki.motohiro@jp.fujitsu.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: linux-arm-kernel at lists.infradead.org
----
- arch/arm/common/gic.c     |    2 +-
- arch/arm/kernel/kprobes.c |    2 +-
- arch/arm/kernel/smp.c     |    5 +++--
- 3 files changed, 5 insertions(+), 4 deletions(-)
+I don't see why using just packed was wrong. The problem occured because 
+the latest gcc now uses or inforces aligned(1) for a packed struct 
+without any aligned and because of that the assignment in readl() is 
+done byte by byte. I'm missing the required arm knowledge and experience 
+to discuss this further, I don't have a reason to look further into that 
+and never wanted to make any judgement about the cause.
 
-diff --git a/arch/arm/common/gic.c b/arch/arm/common/gic.c
-index 4ddd0a6..ebd6b3b 100644
---- a/arch/arm/common/gic.c
-+++ b/arch/arm/common/gic.c
-@@ -389,7 +389,7 @@ void __cpuinit gic_enable_ppi(unsigned int irq)
- #ifdef CONFIG_SMP
- void gic_raise_softirq(const struct cpumask *mask, unsigned int irq)
- {
--	unsigned long map = *cpus_addr(*mask);
-+	unsigned long map = *cpumask_bits(mask);
+>> But this introduces imho doubts and uncertainty about if padding bytes
+>> could be between the members, therefore I would prefer to use packed
+>> with aligned instead of removing the packed.
+>
+> Packing was never an issue here, please stop talking about it.
 
- 	/*
- 	 * Ensure that stores to Normal memory are visible to the
-diff --git a/arch/arm/kernel/kprobes.c b/arch/arm/kernel/kprobes.c
-index 1656c87..4ecc5ce 100644
---- a/arch/arm/kernel/kprobes.c
-+++ b/arch/arm/kernel/kprobes.c
-@@ -102,7 +102,7 @@ int __kprobes __arch_disarm_kprobe(void *p)
+Sorry, I never wanted to talk about the issue itself (I've already said 
+that), I just wanted to bring in some additional clarity for people 
+looking at the code.
 
- void __kprobes arch_disarm_kprobe(struct kprobe *p)
- {
--	stop_machine(__arch_disarm_kprobe, p, &cpu_online_map);
-+	stop_machine(__arch_disarm_kprobe, p, cpu_online_mask);
- }
+I think if there is a packed,aligned(4) most people reading that are 
+able to imaging how the struct looks like, whereas nothing (without 
+packed) might leave doubts which than requires to read compiler docs or 
+the generated code, if one searches a problem in that area.
 
- void __kprobes arch_remove_kprobe(struct kprobe *p)
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 344e52b..98a48ab 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -601,8 +601,9 @@ void smp_send_stop(void)
- 	unsigned long timeout;
+Maybe my english is that bad that nobody understood that.
 
- 	if (num_online_cpus() > 1) {
--		cpumask_t mask = cpu_online_map;
--		cpu_clear(smp_processor_id(), mask);
-+		cpumask_t mask;
-+		cpumask_copy(&mask, cpu_online_mask);
-+		cpumask_clear_cpu(smp_processor_id(), &mask);
+But it's ok. For me, that discussion was long over, two people already 
+said that they prefer the struct without any packed.
 
- 		smp_cross_call(&mask, IPI_CPU_STOP);
- 	}
--- 
-1.7.3.1
+About the background:
+I've posted that patch, because I though I might have been the source of 
+the removal of packed instead of using packed along with aligned, 
+because I first posted such (removing the packed) at the mailing list 
+for u-boot and only later on thought that using what was hinted to me 
+over a third person (packed, aligned(4), which means the one who 
+originally found and fixed the problem used packed, aligned(4) too) 
+might be better (what I than posted there too).
+
+Sorry for becoming that verbose, I normally don't gabble that much and I 
+would like it if I never would have posted that silly patch.
+
+Regards,
+
+Alexander
