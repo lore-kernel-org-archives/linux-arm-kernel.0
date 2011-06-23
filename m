@@ -1,40 +1,40 @@
 From: dave.martin@linaro.org (Dave Martin)
-Date: Thu, 23 Jun 2011 18:50:10 +0100
-Subject: [PATCH v3 02/40] Subject: ARM: assembler.h: Add string declaration
-	macro
+Date: Thu, 23 Jun 2011 18:50:13 +0100
+Subject: [PATCH v3 05/40] Subject: ARM: mm: cache-v4: Use the new processor
+	struct macros
 In-Reply-To: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
 References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <1308851448-25139-3-git-send-email-dave.martin@linaro.org>
+Message-ID: <1308851448-25139-6-git-send-email-dave.martin@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Declaring strings in assembler source involves a certain amount of
-tedious boilerplate code in order to annotate the resulting symbol
-correctly.
-
-Encapsulating this boilerplate in a macro should help to avoid some
-duplication and the occasional mistake.
-
 Signed-off-by: Dave Martin <dave.martin@linaro.org>
 ---
- arch/arm/include/asm/assembler.h |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ arch/arm/mm/cache-v4.S |   15 ++-------------
+ 1 files changed, 2 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-index bc2d2d7..9e1e952 100644
---- a/arch/arm/include/asm/assembler.h
-+++ b/arch/arm/include/asm/assembler.h
-@@ -290,3 +290,11 @@
- 	.macro	ldrusr, reg, ptr, inc, cond=al, rept=1, abort=9001f
- 	usracc	ldr, \reg, \ptr, \inc, \cond, \rept, \abort
- 	.endm
-+
-+/* Utility macro for declaring string literals */
-+	.macro	string name:req, string
-+	.type \name , #object
-+\name:
-+	.asciz "\string"
-+	.size \name , . - \name
-+	.endm
+diff --git a/arch/arm/mm/cache-v4.S b/arch/arm/mm/cache-v4.S
+index a8fefb5..8aa5a7f 100644
+--- a/arch/arm/mm/cache-v4.S
++++ b/arch/arm/mm/cache-v4.S
+@@ -141,16 +141,5 @@ ENDPROC(v4_dma_map_area)
+ 
+ 	__INITDATA
+ 
+-	.type	v4_cache_fns, #object
+-ENTRY(v4_cache_fns)
+-	.long	v4_flush_icache_all
+-	.long	v4_flush_kern_cache_all
+-	.long	v4_flush_user_cache_all
+-	.long	v4_flush_user_cache_range
+-	.long	v4_coherent_kern_range
+-	.long	v4_coherent_user_range
+-	.long	v4_flush_kern_dcache_area
+-	.long	v4_dma_map_area
+-	.long	v4_dma_unmap_area
+-	.long	v4_dma_flush_range
+-	.size	v4_cache_fns, . - v4_cache_fns
++	@ define struct cpu_cache_fns (see <asm/cacheflush.h> and proc-macros.S)
++	define_cache_functions v4, default=v4
 -- 
 1.7.4.1
