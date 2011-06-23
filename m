@@ -1,27 +1,55 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jun 2011 11:06:10 +0100
-Subject: [PATCH 25/25] ARM: pm: omap34xx: convert to generic
-	suspend/resume support
-In-Reply-To: <E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
-References: <20110622150816.GT23234@n2100.arm.linux.org.uk>
-	<E1QZPAo-0002XO-9G@rmk-PC.arm.linux.org.uk>
-Message-ID: <20110623100610.GD9449@n2100.arm.linux.org.uk>
+From: banajit.goswami@gmail.com (Banajit Goswami)
+Date: Thu, 23 Jun 2011 15:42:09 +0530
+Subject: [PATCH] ARM: EXYNOS4: Add PWM backlight support on Samsung
+	SMDKV310
+In-Reply-To: <BANLkTi=SqB7NHQ7vStegFgQjihoQRmzVCw@mail.gmail.com>
+References: <22693111.118621308725759945.JavaMail.weblogic@epv6ml03>
+	<BANLkTi=SqB7NHQ7vStegFgQjihoQRmzVCw@mail.gmail.com>
+Message-ID: <BANLkTikb33PCQtiVmcVm38-ptZPMXMk60g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 22, 2011 at 04:16:58PM +0100, Russell King - ARM Linux wrote:
-> +	/* Now branch to the common CPU resume function */
-> +	ldr	r0, =cpu_resume
-> +	bx	r0
->  
-> +	.ltorg
+> From: JinGoo Han <jg1.han@samsung.com>
+>
+> Hi, Banajit.
+Hi Jingoo,
 
-A slight correction - firstly this code does not run from SRAM.
-Secondly, this will try to branch to the virtual address of cpu_resume
-which is not a good idea.
+>>
+>> Signed-off-by: Banajit Goswami <banajit.g@samsung.com>
+>> ---
+...
+<snip>
+...
+>> + ? ? .pwm_period_ns ?= 78770,
+> Please use 1000 as pwm_period_ns instead of 78770 as follows:
+> - ? ? ? .pwm_period_ns ?= 78770,
+> + ? ? ? .pwm_period_ns ?= 1000,
+>
+Yes, I will modify the period value and send updated patch
 
-Replace this with:
-	b	cpu_resume
+> The value '78770' makes noise related to resonance at LCD board.
+>
+> I will explain how I get the value of PWM period.
+>
+> The SMDK boards use LT3591 as backlight LED driver of LTE480WV LCD
+> According to the LT3591 datasheet, the switching frequency should
+> be 1MHz. So, PWM period is calculated by following formula:
+> ? ? ? ?PWM period = 1/switching frequency
+> ? ? ? ? ? ? ? ? ? ? ? = 1/1MHz
+> ? ? ? ? ? ? ? ? ? ? ? = 1000 ns
+>
+Thanks for the explanation.
 
-and comment out the auxillary control register write in proc-v7.S, and
-it should work on OMAP3.
+> You can find LT3591 datasheet easily on the Internet. Please refer to it
+> for more information.
+> Good luck.
+Thanks you.
+
+>> + ? ? .init ? ? ? ? ? = smdkv310_backlight_init,
+...
+<snip>
+...
+>
+
+Regards,
+Banajit
