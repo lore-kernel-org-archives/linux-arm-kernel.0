@@ -1,27 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Jun 2011 14:37:02 +0100
-Subject: [PATCH v6 00/11] mmc: use nonblock mmc requests to minimize
-	latency
-In-Reply-To: <BANLkTimfxrcKWLZJmVC+1zL27th7j4uzEA@mail.gmail.com>
-References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
-	<20110621075319.GN26089@n2100.arm.linux.org.uk>
-	<BANLkTikOA3G0Gt4Cxua3EDnAzbFKLAk6Yw@mail.gmail.com>
-	<BANLkTimfxrcKWLZJmVC+1zL27th7j4uzEA@mail.gmail.com>
-Message-ID: <20110623133702.GZ23234@n2100.arm.linux.org.uk>
+From: banajit.goswami@gmail.com (Banajit Goswami)
+Date: Thu, 23 Jun 2011 19:23:07 +0530
+Subject: [PATCH] ARM: EXYNOS4: Add PWM backlight support on Samsung
+	SMDKV310
+In-Reply-To: <017201cc319a$f2571660$d7054320$%kim@samsung.com>
+References: <22693111.118621308725759945.JavaMail.weblogic@epv6ml03>
+	<BANLkTi=SqB7NHQ7vStegFgQjihoQRmzVCw@mail.gmail.com>
+	<BANLkTikb33PCQtiVmcVm38-ptZPMXMk60g@mail.gmail.com>
+	<017201cc319a$f2571660$d7054320$%kim@samsung.com>
+Message-ID: <BANLkTin3XUaSYALWCQqdaPWY7Ys=wE1R2A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 21, 2011 at 11:26:27AM +0200, Per Forlin wrote:
-> Here are the results.
+On Thu, Jun 23, 2011 at 5:14 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> Banajit Goswami wrote:
+>>
+>> > From: JinGoo Han <jg1.han@samsung.com>
+>> >
+>> > Hi, Banajit.
+>> Hi Jingoo,
+>>
+> Hi all,
+Hello,
 
-It looks like this patch is either a no-op or slightly worse.  As
-people have been telling me that dsb is rather expensive, and this
-patch results in less dsbs, I'm finding these results hard to believe.
-It seems to be saying that dsb is an effective no-op on your platform.
+> Hmm...
+> If the same code is required into each boards, please don't add them on both.
+>
+> I think, we can avoid duplication...
+Yes, I have already started working on it.
+I can send it by tomorrow.
 
-So either people are wrong about dsb being expensive, the patch is
-wrong, or there's something wrong with these results/test method.
+> Thanks.
+>
+> Best regards,
+> Kgene.
 
-You do have an error in the ported patch, as that hasn't updated the
-v7 cache cleaning code to remove the dsb() there, but that would only
-affect the write tests.
+Thanks,
+Banajit
