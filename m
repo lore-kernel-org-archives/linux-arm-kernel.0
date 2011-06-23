@@ -1,54 +1,46 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 23 Jun 2011 08:05:07 -0700
-Subject: [PATCH 06/10] omap2+: Remove gptimer_wakeup for now
-In-Reply-To: <20110620094846.GG23145@atomide.com> (Tony Lindgren's message of
-	"Mon, 20 Jun 2011 02:48:46 -0700")
-References: <20110620091754.357.56441.stgit@kaulin>
-	<20110620092341.357.14183.stgit@kaulin> <4DFF1558.4020509@ti.com>
-	<20110620094846.GG23145@atomide.com>
-Message-ID: <87oc1obnbw.fsf@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Jun 2011 16:12:49 +0100
+Subject: parallel load of modules on an ARM multicore
+In-Reply-To: <20110623145229.GA18409@1n450.cable.virginmedia.net>
+References: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
+	<20110621155030.GA21245@1n450.cable.virginmedia.net>
+	<274124B9C6907D4B8CE985903EAA19E9185A92978D@SI-MBX06.de.bosch.com>
+	<20110623145229.GA18409@1n450.cable.virginmedia.net>
+Message-ID: <20110623151249.GA23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Thu, Jun 23, 2011 at 03:52:29PM +0100, Catalin Marinas wrote:
+> Peter,
+> 
+> On Thu, Jun 23, 2011 at 04:39:01PM +0200, EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31) wrote:
+> > it's interesting that you almost agree with me.
+> > 
+> > But isn't it really expensive to flush the icache on switch_mm?
+> > Is that meant as a test to see if the problem goes away?
+> 
+> Who said anything about flushing the icache on switch_mm()? My patch
+> doesn't do this, it actually reduces the amount of cache flushing on
+> ARM11MPCore.
 
-> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110620 02:35]:
->> On 6/20/2011 2:53 PM, Tony Lindgren wrote:
->> >This removes the support for setting the wake-up timer for debugging.
->> >
->> >Later on we can reserve gptimer1 for PM code only and have similar
->> >functionality.
->> >
->> >Signed-off-by: Tony Lindgren<tony@atomide.com>
->> >Reviewed-by: Kevin Hilman<khilman@ti.com>
->> >---
->> 
->> Kevin cleaned up this with a better patch.
->> http://www.mail-archive.com/linux-omap at vger.kernel.org/msg50015.html
->> 
->> May be we can use that patch instead of this.
->
-> The thing is that it's a omap specific debug interface.
+Ahem, your patch does:
 
-What's wrong with OMAP-specific debug interfaces?   We have plenty of
-them: clock, omap_mux and pm_debug.
+--- a/arch/arm/include/asm/mmu_context.h
++++ b/arch/arm/include/asm/mmu_context.h
+@@ -114,7 +114,8 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ #ifdef CONFIG_SMP
+        /* check for possible thread migration */
+        if (!cpumask_empty(mm_cpumask(next)) &&
+-           !cpumask_test_cpu(cpu, mm_cpumask(next)))
++           (cache_ops_need_broadcast() ||
++            !cpumask_test_cpu(cpu, mm_cpumask(next))))
+                __flush_icache_all();
+ #endif
+        if (!cpumask_test_and_set_cpu(cpu, mm_cpumask(next)) || prev != next) {
 
-> I'd rather just get rid of it until there's some generic way
-> of doing it. 
+This means that if cache_ops_need_broadcast() is true, we will flush
+the I-cache at every MM context switch as very few MMs will have an
+empty mm_cpumask().
 
-Well, we won't have a truly generic way of doing it until we have a
-generic way of doing HW timers.
-
-The implementation is now mostly generic in the patch Santosh referened
-above in that the timer programming is now done as part of the
-clockevent code, and not external timer programming.
-
-So now, the only thing OMAP-specific is the debugfs file used to trigger
-it.
-
-> Maybe Kevin can just carry it along in the PM branch for now?
-
-I'd prefer to keep it in mainline as this is a very important feature
-for the PM functionality already in mainline.
-
-Kevin
+Far from reducing the number of I-cache flushes, this will significantly
+increase the flushing.
