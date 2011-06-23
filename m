@@ -1,83 +1,92 @@
-From: ratbert.chuang@gmail.com (Po-Yu Chuang)
-Date: Thu, 23 Jun 2011 14:17:48 +0800
-Subject: [PATCH] arm: add Faraday SoC A320
-In-Reply-To: <1308212578-1615-1-git-send-email-ratbert.chuang@gmail.com>
-References: <1308212578-1615-1-git-send-email-ratbert.chuang@gmail.com>
-Message-ID: <BANLkTi=VOF=428hU_TZf7FmGZv8AiUpHbw@mail.gmail.com>
+From: adrian.wenl@gmail.com (Lei Wen)
+Date: Thu, 23 Jun 2011 14:22:11 +0800
+Subject: [PATCH] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <BANLkTim54jEKmxAQFNMGCyWwAu+FhVu0KA@mail.gmail.com>
+References: <1308712645-5986-1-git-send-email-leiwen@marvell.com>
+	<BANLkTinQB-hXMRy5+BXKQSrPq=sVrorCVA@mail.gmail.com>
+	<BANLkTimk0+2LUeo5sq8w4ohRq-qCe_2t_Q@mail.gmail.com>
+	<BANLkTim54jEKmxAQFNMGCyWwAu+FhVu0KA@mail.gmail.com>
+Message-ID: <BANLkTinsw59F-X2LFrdu3Xtau5xY-=CSnA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Hi Daniel,
 
-On Thu, Jun 16, 2011 at 4:22 PM, Po-Yu Chuang <ratbert.chuang@gmail.com> wrote:
-> From: Po-Yu Chuang <ratbert@faraday-tech.com>
+On Wed, Jun 22, 2011 at 9:06 PM, Daniel Mack <zonque@gmail.com> wrote:
+> Hi Lei,
 >
+> On Wed, Jun 22, 2011 at 2:21 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
+>> Hi Daniel,
+>>
+>> On Wed, Jun 22, 2011 at 7:39 PM, Daniel Mack <zonque@gmail.com> wrote:
+>>> On Wed, Jun 22, 2011 at 5:17 AM, Lei Wen <leiwen@marvell.com> wrote:
+>>>> Current pxa3xx_nand controller has two chip select which
+>>>> both be workable. This patch enable this feature.
+>>>>
+>>>> Update platform driver to support this feature.
+>>>>
+>>>> Another notice should be taken that:
+>>>> When you want to use this feature, you should not enable the
+>>>> keep configuration feature, for two chip select could be
+>>>> attached with different nand chip. The different page size
+>>>> and timing requirement make the keep configuration impossible.
+>>>>
+>>>> Signed-off-by: Lei Wen <leiwen@marvell.com>
+>>>> ---
+>>>> ?arch/arm/mach-mmp/aspenite.c ? ? ? ? ? ? ? ? | ? ?5 +-
+>>>> ?arch/arm/mach-pxa/cm-x300.c ? ? ? ? ? ? ? ? ?| ? ?5 +-
+>>>> ?arch/arm/mach-pxa/colibri-pxa3xx.c ? ? ? ? ? | ? ?5 +-
+>>>> ?arch/arm/mach-pxa/littleton.c ? ? ? ? ? ? ? ?| ? ?5 +-
+>>>> ?arch/arm/mach-pxa/mxm8x10.c ? ? ? ? ? ? ? ? ?| ? ?9 +-
+>>>> ?arch/arm/mach-pxa/raumfeld.c ? ? ? ? ? ? ? ? | ? ?5 +-
+>>>> ?arch/arm/mach-pxa/zylonite.c ? ? ? ? ? ? ? ? | ? ?5 +-
+>>>> ?arch/arm/plat-pxa/include/plat/pxa3xx_nand.h | ? ?8 +-
+>>>> ?drivers/mtd/nand/pxa3xx_nand.c ? ? ? ? ? ? ? | ?735 +++++++++++++++-----------
+>>>> ?9 files changed, 444 insertions(+), 338 deletions(-)
+>>>
+>>> This patch doesn't apply for me on top of Linus' master branch. Which
+>>> tree are you based on currently?
+>>
+>> Actually it is based on Linux 3.0-rc2 and add two patches pending to
+>> l2-mtd-2.6.git already:
+>>
+>> mtd: pxa3xx_nand: fix nand detection issue
+>> mtd: pxa3xx_nand: Fix blank page ECC mismatch
 >
-> Signed-off-by: Po-Yu Chuang <ratbert@faraday-tech.com>
-> ---
-> ?arch/arm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? | ? 10 +
-> ?arch/arm/Makefile ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?arch/arm/include/asm/serial.h ? ? ? ? ? ? ? ? ? ?| ? ?6 +
-> ?arch/arm/mach-faraday/Kconfig ? ? ? ? ? ? ? ? ? ?| ? 31 ++
-> ?arch/arm/mach-faraday/Makefile ? ? ? ? ? ? ? ? ? | ? 11 +
-> ?arch/arm/mach-faraday/Makefile.boot ? ? ? ? ? ? ?| ? ?4 +
-> ?arch/arm/mach-faraday/board-a320.c ? ? ? ? ? ? ? | ?239 +++++++++++
-> ?arch/arm/mach-faraday/clock.c ? ? ? ? ? ? ? ? ? ?| ? 92 +++++
-> ?arch/arm/mach-faraday/clock.h ? ? ? ? ? ? ? ? ? ?| ? 40 ++
-> ?arch/arm/mach-faraday/ftintc010.c ? ? ? ? ? ? ? ?| ?458 ++++++++++++++++++++++
-> ?arch/arm/mach-faraday/ftpmu010.c ? ? ? ? ? ? ? ? | ?296 ++++++++++++++
-> ?arch/arm/mach-faraday/fttmr010.c ? ? ? ? ? ? ? ? | ?283 +++++++++++++
-> ?arch/arm/mach-faraday/include/mach/board-a320.h ?| ? 66 +++
-> ?arch/arm/mach-faraday/include/mach/clkdev.h ? ? ?| ? 26 ++
-> ?arch/arm/mach-faraday/include/mach/debug-macro.S | ? 44 ++
-> ?arch/arm/mach-faraday/include/mach/entry-macro.S | ? 87 ++++
-> ?arch/arm/mach-faraday/include/mach/ftintc010.h ? | ? 57 +++
-> ?arch/arm/mach-faraday/include/mach/ftpmu010.h ? ?| ?166 ++++++++
-> ?arch/arm/mach-faraday/include/mach/fttmr010.h ? ?| ? 86 ++++
-> ?arch/arm/mach-faraday/include/mach/hardware.h ? ?| ? 24 ++
-> ?arch/arm/mach-faraday/include/mach/io.h ? ? ? ? ?| ? 27 ++
-> ?arch/arm/mach-faraday/include/mach/irqs-a320.h ? | ? 59 +++
-> ?arch/arm/mach-faraday/include/mach/irqs.h ? ? ? ?| ? 28 ++
-> ?arch/arm/mach-faraday/include/mach/memory.h ? ? ?| ? 27 ++
-> ?arch/arm/mach-faraday/include/mach/serial-a320.h | ? 53 +++
-> ?arch/arm/mach-faraday/include/mach/serial.h ? ? ?| ? 34 ++
-> ?arch/arm/mach-faraday/include/mach/system.h ? ? ?| ? 34 ++
-> ?arch/arm/mach-faraday/include/mach/timex.h ? ? ? | ? 25 ++
-> ?arch/arm/mach-faraday/include/mach/uncompress.h ?| ? 47 +++
-> ?arch/arm/mach-faraday/include/mach/vmalloc.h ? ? | ? 24 ++
-> ?arch/arm/mm/Kconfig ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| ? ?4 +-
-> ?arch/arm/tools/mach-types ? ? ? ? ? ? ? ? ? ? ? ?| ? ?1 +
-> ?32 files changed, 2388 insertions(+), 2 deletions(-)
-> ?create mode 100644 arch/arm/mach-faraday/Kconfig
-> ?create mode 100644 arch/arm/mach-faraday/Makefile
-> ?create mode 100644 arch/arm/mach-faraday/Makefile.boot
-> ?create mode 100644 arch/arm/mach-faraday/board-a320.c
-> ?create mode 100644 arch/arm/mach-faraday/clock.c
-> ?create mode 100644 arch/arm/mach-faraday/clock.h
-> ?create mode 100644 arch/arm/mach-faraday/ftintc010.c
-> ?create mode 100644 arch/arm/mach-faraday/ftpmu010.c
-> ?create mode 100644 arch/arm/mach-faraday/fttmr010.c
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/board-a320.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/clkdev.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/debug-macro.S
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/entry-macro.S
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/ftintc010.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/ftpmu010.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/fttmr010.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/hardware.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/io.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/irqs-a320.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/irqs.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/memory.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/serial-a320.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/serial.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/system.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/timex.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/uncompress.h
-> ?create mode 100644 arch/arm/mach-faraday/include/mach/vmalloc.h
+> I have a similar setup, also with those two patches on top, but
+> applying your patch gives me:
 >
+> Applying: MTD: pxa3xx_nand: enable multiple chip select support
+> error: patch failed: drivers/mtd/nand/pxa3xx_nand.c:477
+> error: drivers/mtd/nand/pxa3xx_nand.c: patch does not apply
+> Patch failed at 0001 MTD: pxa3xx_nand: enable multiple chip select support
+> When you have resolved this problem run "git am --resolved".
+> If you would prefer to skip this patch, instead run "git am --skip".
+> To restore the original branch and stop patching run "git am --abort".
+>
+> Could you push your branch somewhere?
+>
+>>>> ?#ifdef CONFIG_PM
+>>>> @@ -1183,8 +1278,8 @@ static int pxa3xx_nand_resume(struct platform_device *pdev)
+>>>> ? ? ? ?struct pxa3xx_nand_info *info = platform_get_drvdata(pdev);
+>>>> ? ? ? ?struct mtd_info *mtd = info->mtd;
+>>>>
+>>>> - ? ? ? nand_writel(info, NDTR0CS0, info->ndtr0cs0);
+>>>> - ? ? ? nand_writel(info, NDTR1CS0, info->ndtr1cs0);
+>>>> + ? ? ? nand_writel(nand, NDTR0CS0, info->ndtr0cs0);
+>>>> + ? ? ? nand_writel(nand, NDTR1CS0, info->ndtr1cs0);
+>>>> ? ? ? ?clk_enable(info->clk);
+>>>
+>>> This won't compile.
+>>
+>> Could you post your build log?
+>
+> I didn't compile it because I couldn't, but "nand" is certainly
+> undefined in this context now. Did you compile and test this code with
+> "CONFIG_PM=y"?
 
-Any comments are appreciated.
+You're right, I haven't take open PM config...
+I would rebase this patch over l2-mtd-2.6.git for next post.
 
-Best regards,
-Po-Yu Chuang
+Thanks,
+Lei
