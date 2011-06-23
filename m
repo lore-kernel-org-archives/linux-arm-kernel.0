@@ -1,90 +1,39 @@
-From: external.Peter.Waechtler@de.bosch.com (EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31))
-Date: Thu, 23 Jun 2011 17:20:39 +0200
-Subject: AW: parallel load of modules on an ARM multicore
-In-Reply-To: <20110623145229.GA18409@1n450.cable.virginmedia.net>
-References: <274124B9C6907D4B8CE985903EAA19E9185A92923E@SI-MBX06.de.bosch.com>
-	<20110621155030.GA21245@1n450.cable.virginmedia.net>
-	<274124B9C6907D4B8CE985903EAA19E9185A92978D@SI-MBX06.de.bosch.com>
-	<20110623145229.GA18409@1n450.cable.virginmedia.net>
-Message-ID: <274124B9C6907D4B8CE985903EAA19E9185A92978E@SI-MBX06.de.bosch.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Jun 2011 16:22:49 +0100
+Subject: [PATCH 5/8] OMAP4: PM: TEMP: Prevent l3init from idling/force
+	sleep
+In-Reply-To: <alpine.DEB.2.00.1106230819540.12954@utopia.booyaka.com>
+References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
+	<1307616853-28395-2-git-send-email-rnayak@ti.com>
+	<1307616853-28395-3-git-send-email-rnayak@ti.com>
+	<1307616853-28395-4-git-send-email-rnayak@ti.com>
+	<1307616853-28395-5-git-send-email-rnayak@ti.com>
+	<1307616853-28395-6-git-send-email-rnayak@ti.com>
+	<alpine.DEB.2.00.1106230819540.12954@utopia.booyaka.com>
+Message-ID: <20110623152249.GG9449@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No, you didn't say that, but the patch ;)
+On Thu, Jun 23, 2011 at 09:04:20AM -0600, Paul Walmsley wrote:
+> Since this is basically a hack to work around limitations of the current 
+> MMC driver, if we accept something like this, I think it should come with 
+> a big warning message and comment.  Something like this in 
+> omap44xx_clockdomains_init():
+> 
+> 	/*
+> 	 * XXX The OMAP L3 interconnect hardware is able to enter
+> 	 * hardware-supervised idle.  But because the OMAP HSMMC
+> 	 * driver still hasn't been converted to use runtime PM, if
+> 	 * the L3 is allowed to enter hwsup idle, the kernel will
+> 	 * crash.  Once the MMC driver is fixed (which patches have
+> 	 * been posted to do, with subject line "OMAP: HSMMC: cleanup
+> 	 * and runtime pm") the change to the l3_init_44xx_clkdm
+> 	 * flags should be dropped.  It limits the low-power state that
+> 	 * the chip can enter.
+> 	 */
+> 	pr_warn("WARNING: OMAP4 low power states artificially limited, due 
+> to unconverted HSMMC driver\n");
 
---- a/arch/arm/include/asm/mmu_context.h
-+++ b/arch/arm/include/asm/mmu_context.h
-@@ -114,7 +114,8 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
- #ifdef CONFIG_SMP
-        /* check for possible thread migration */
-        if (!cpumask_empty(mm_cpumask(next)) &&
--           !cpumask_test_cpu(cpu, mm_cpumask(next)))
-+           (cache_ops_need_broadcast() ||
-+            !cpumask_test_cpu(cpu, mm_cpumask(next))))
-                __flush_icache_all();
-
-
-On ARM11MPcore cache_ops_need_broadcast() returns true -
-with that, anytime the thread migrates the icache is flushed?
-
-
-Mit freundlichen Gr??en / Best regards
-
-Peter W?chtler
-
-> -----Urspr?ngliche Nachricht-----
-> Von: Catalin Marinas [mailto:catalin.marinas at gmail.com] Im
-> Auftrag von Catalin Marinas
-> Gesendet: Donnerstag, 23. Juni 2011 16:52
-> An: EXTERNAL Waechtler Peter (Fa. TCP, CM-AI/PJ-CF31)
-> Cc: linux-arm-kernel at lists.infradead.org
-> Betreff: Re: parallel load of modules on an ARM multicore
->
-> Peter,
->
-> On Thu, Jun 23, 2011 at 04:39:01PM +0200, EXTERNAL Waechtler
-> Peter (Fa. TCP, CM-AI/PJ-CF31) wrote:
-> > it's interesting that you almost agree with me.
-> >
-> > But isn't it really expensive to flush the icache on switch_mm?
-> > Is that meant as a test to see if the problem goes away?
->
-> Who said anything about flushing the icache on switch_mm()? My patch
-> doesn't do this, it actually reduces the amount of cache flushing on
-> ARM11MPCore.
->
-> > Wouldn't it suffice to get_cpu/put_cpu to disable preemption while
-> > load_module() works?
->
-> It may work, just give it a try.
->
-> > I think the other way will cause trouble: the module is loaded on
-> > cpu0 for example, preempted, woken up on cpu1 with a stale icache
-> > line not holding the "newly loaded code" and running mod->init peng!
-> > Nobody told cpu1 to revalidate it's icache.
-> > Don't know if this is possible though.
->
-> That's possible as well if the pages allocated for the module
-> code have
-> been previously used for other code.
->
-> To resolve the stale I-cache lines, you would have to broadcast the
-> cache maintenance to all the CPUs. For the D-cache we could trick the
-> CPU via some reading to force the dirty cache lines migration
-> but that's
-> not possible for the I-cache.
->
-> > The data of the module won't get through the icache anyway.
->
-> No but the module is copied into the new allocated space via the
-> D-cache. This needs to be flushed so that the I-cache would get the
-> right instructions.
->
-> > AFAIK we are not able to reproduce quickly and it will take some
-> > time before I can try...
->
-> OK, just let us know how it goes.
->
-> --
-> Catalin
->
+Do you really want to continue pissing Linus off with churn like this
+rather than pressing to get problems fixed _properly_ (eg, getting the
+HSMMC driver fixed) ?
