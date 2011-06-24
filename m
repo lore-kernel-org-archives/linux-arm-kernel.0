@@ -1,43 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Jun 2011 15:10:57 +0100
-Subject: [RFC PATCH 2/4] ARM: dt: register local timers as early platform
-	devices
-In-Reply-To: <1308924659-31894-1-git-send-email-marc.zyngier@arm.com>
-References: <1308924659-31894-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1308924659-31894-3-git-send-email-marc.zyngier@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Jun 2011 15:14:02 +0100
+Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2EF2@dbde02.ent.ti.com>
+References: <1308923618-5333-1-git-send-email-premi@ti.com>
+	<20110624140142.GM9449@n2100.arm.linux.org.uk>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2EF2@dbde02.ent.ti.com>
+Message-ID: <20110624141402.GN9449@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use of_early_platform_populate() to collect nodes with the
-"localtimer" compatible property and register them with
-the early platform "bus".
+On Fri, Jun 24, 2011 at 07:39:41PM +0530, Premi, Sanjeev wrote:
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+> > Sent: Friday, June 24, 2011 7:32 PM
+> > To: Premi, Sanjeev
+> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> > Subject: Re: [PATCHv2] omap2+: pm: cpufreq: Fix 
+> > loops_per_jiffy calculation
+> 
+> [snip]...[snip]
+> 
+> > > 
+> > > +#ifdef CONFIG_SMP
+> > > +	/* Adjust jiffies before transition */
+> > > +	for_each_cpu(i, policy->cpus) {
+> > > +		unsigned long lpj = per_cpu(cpu_data, 
+> > i).loops_per_jiffy;
+> > > +
+> > > +		per_cpu(cpu_data, i).loops_per_jiffy = 
+> > cpufreq_scale(lpj,
+> > > +							freqs.old,
+> > > +							freqs.new);
+> > > +	}
+> > > +#endif
+> > > +
+> > 
+> > You didn't listen to what I told you.  It'll be quicker for 
+> > me to write
+> > this patch myself if you send me the *original* file.
+> > 
+> 
+> Russell,
+> 
+> The function adjust_jiffies() is no-op for CONFIG_SMP - but it
+> is not the case with cpufreq_scale().
+> 
+> So, when CONFIG_SMP is defined, then loops_per_jiffy would be
+> calculated for both UP and SMP processors.
+> 
+> Did I miss something else?
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/kernel/time.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-index 32d0df8..08a28ef 100644
---- a/arch/arm/kernel/time.c
-+++ b/arch/arm/kernel/time.c
-@@ -25,6 +25,7 @@
- #include <linux/timer.h>
- #include <linux/irq.h>
- #include <linux/platform_device.h>
-+#include <linux/of_platform.h>
- 
- #include <linux/mc146818rtc.h>
- 
-@@ -156,6 +157,9 @@ static void __init __arm_late_time_init(void)
- 		arm_late_time_init();
- 
- #ifdef CONFIG_LOCAL_TIMER_DEVICES
-+#ifdef CONFIG_OF_FLATTREE
-+	of_early_platform_populate("localtimer");
-+#endif
- 	early_platform_driver_register_all("localtimer");
- 	early_platform_driver_probe("localtimer", 1, 0);
- #endif
--- 
-1.7.0.4
+Yes you have, and you've not sent me the file, so I can't show you where
+you've gone wrong.
