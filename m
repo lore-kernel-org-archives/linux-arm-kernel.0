@@ -1,28 +1,58 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Fri, 24 Jun 2011 22:40:06 +0200
-Subject: I can' t compile a new kernel version
-In-Reply-To: <1308940265.2194.77.camel@sacarino>
-References: <1308940265.2194.77.camel@sacarino>
-Message-ID: <BANLkTimugaX+WWM8ynaeQLKR=RYRwuW36A@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Fri, 24 Jun 2011 15:28:19 -0700
+Subject: [PATCH v3 02/12] OMAP2+: UART: Remove uart clock handling code
+	from serial.c
+In-Reply-To: <1307532194-13039-3-git-send-email-govindraj.raja@ti.com>
+	(Govindraj R.'s message of "Wed, 8 Jun 2011 16:53:04 +0530")
+References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+	<1307532194-13039-3-git-send-email-govindraj.raja@ti.com>
+Message-ID: <877h8ax3ss.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2011 at 8:31 PM, Jorge Yesid Rios Ortiz
-<jyrios@die.upm.es> wrote:
-> If you have some idea about how to compile a new kernel's version I
-> appreciated Very much.
+"Govindraj.R" <govindraj.raja@ti.com> writes:
 
-I can recommend the buildroot project to you for such things:
+> Cleanup serial.c file in preparation to addition of runtime api's in omap-serial
+> file. Remove all clock handling mechanism as this will be taken care with
+> pm runtime api's in omap-serial.c file itself.
+>
+> 1.) Remove omap-device enable and disable. We can can use get_sync/put_sync api's
+> 2.) Remove context save/restore can be done with runtime_resume callback for
+>     get_sync call. No need to save context as all reg details available in
+>     uart_port structure can be used for restore, so add missing regs in
+>     uart port struct.
+> 3.) Add func to identify console uart.
+> 4.) Erratum handling informed as flag to driver and func to handle erratum
+>     can be moved to omap-serial driver itself.
+>
+> Acked-by: Alan Cox <alan@linux.intel.com>
+> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
 
-  http://buildroot.uclibc.org/
+[...]
 
-Assuming that you have an up-to-date Linux on your development box,
-using buildroot should be easy. Just select your board configuration
-and the packages you need, and buildroot will download, extract and
-build everything you need, including a kernel if you want to. For more
-information, make sure to read
-http://buildroot.uclibc.org/downloads/buildroot.html
+> @@ -47,65 +40,9 @@
+>  #include "control.h"
+>  #include "mux.h"
+>  
+> -#define UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV	0x52
+> -#define UART_OMAP_WER		0x17	/* Wake-up enable register */
+> -
+> -#define UART_ERRATA_FIFO_FULL_ABORT	(0x1 << 0)
+> -#define UART_ERRATA_i202_MDR1_ACCESS	(0x1 << 1)
+> -
+> -/*
+> - * NOTE: By default the serial timeout is disabled as it causes lost characters
+> - * over the serial ports. This means that the UART clocks will stay on until
+> - * disabled via sysfs. This also causes that any deeper omap sleep states are
+> - * blocked. 
+> - */
+> -#define DEFAULT_TIMEOUT 0
+> -
+> -#define MAX_UART_HWMOD_NAME_LEN		16
+> +#define MAX_UART_HWMOD_NAME_LEN                16
 
+Minor: only whitespace change here, you converted tabs to spaces.
 
-HTH,
-Daniel
+Rest of this looks fine.
+
+Kevin
