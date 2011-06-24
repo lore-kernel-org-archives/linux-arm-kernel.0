@@ -1,344 +1,156 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Fri, 24 Jun 2011 20:38:44 +0200
-Subject: [PATCH v3] Add ARM cpu topology definition
-Message-ID: <1308940724-2099-1-git-send-email-vincent.guittot@linaro.org>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 24 Jun 2011 11:48:24 -0700
+Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
+In-Reply-To: <20110624151201.GO9449@n2100.arm.linux.org.uk>
+References: <1308923618-5333-1-git-send-email-premi@ti.com>	<20110624140142.GM9449@n2100.arm.linux.org.uk>	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2EF2@dbde02.ent.ti.com>	<20110624141402.GN9449@n2100.arm.linux.org.uk>
+	<20110624151201.GO9449@n2100.arm.linux.org.uk>
+Message-ID: <4E04DBF8.1050401@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The affinity between ARM processors is defined in the MPIDR register.
-We can identify which processors are in the same cluster,
-and which ones have performance interdependency. We can define the
-cpu topology of ARM platform, that is then used by sched_mc and sched_smt.
+Russell,
 
-The default state of sched_mc and sched_smt config is disable.
-When enabled, the behavior of the scheduler can be modified with
-sched_mc_power_savings and sched_smt_power_savings sysfs interfaces.
+On 6/24/2011 8:12 AM, Russell King - ARM Linux wrote:
+> Right, thanks for the file.  Here's the patch.
+>
 
-Changes since v2 :
-* Update the commit message and some comments
+[.....]
 
-Changes since v1 :
-* Update the commit message
-* Add read_cpuid_mpidr in arch/arm/include/asm/cputype.h
-* Modify header of arch/arm/kernel/topology.c
-* Modify tests and manipulation of MPIDR's bitfields
-* Modify the place and dependancy of the config
-* Modify Noop functions
+> Notice how we adjust _both_ the per-cpu loops_per_jiffy, and that we
+> adjust them with reference to the initial values.
+>
+> If you adjust lpj with reference to the last, then you _will_ build up
+> a progressively bigger and bigger error in the value over time.
+>
+Thanks Russell for the change. This change should fix the global
+lpj for UP machine as well when build with SMP_ON_UP.
 
-Signed-off-by: Vincent Guittot <vincent.guittot@linaro.org>
-Reviewed-by: Amit Kucheria <amit.kucheria@linaro.org>
+Can you have a look at below complete change which should
+make the BOGOMIPS happy on all OMAP2PLUS machines. Generated
+against Kevin's cpufreq branch.
+
+url = 
+git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git 
+pm-wip/cpufreq.
+
+Just compile tested with UP and SMP OMAP builds. After your
+review, I can give a test.
+
+Regards
+Santosh
+
+ From 9a6154c0f68e39c4d1fbc4ef3fef5ce577ba87d4 Mon Sep 17 00:00:00 2001
+From: Russell King <rmk+kernel@arm.linux.org.uk>
+Date: Fri, 24 Jun 2011 10:51:17 -0700
+Subject: [PATCH] OMAP2+: CPUfreq: update lpj with refernce value to 
+avoid progressive error.
+
+Adjust _both_ the per-cpu loops_per_jiffy and global lpj. Calibrate them
+with with reference to the initial values to avoid a progressively
+bigger and bigger error in the value over time.
+
+While at this also re-use the notifiers for UP/SMP since on
+UP machine or UP_ON_SMP policy->cpus mask would contain only
+the one CPU.
+
+Signed-off-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
+[santosh.shilimkar at ti.com: rebased against omap cpufreq upstream branch]
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Kevin Hilman <khilman@ti.com>
 ---
- arch/arm/Kconfig                |   25 +++++++
- arch/arm/include/asm/cputype.h  |    6 ++
- arch/arm/include/asm/topology.h |   33 +++++++++
- arch/arm/kernel/Makefile        |    1 +
- arch/arm/kernel/smp.c           |    6 ++
- arch/arm/kernel/topology.c      |  150 +++++++++++++++++++++++++++++++++++++++
- 6 files changed, 221 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/kernel/topology.c
+  arch/arm/mach-omap2/omap2plus-cpufreq.c |   48 
++++++++++++++++++-------------
+  1 files changed, 27 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 9adc278..f327e55 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1344,6 +1344,31 @@ config SMP_ON_UP
- 
- 	  If you don't know what to do here, say Y.
- 
-+config ARM_CPU_TOPOLOGY
-+	bool "Support cpu topology definition"
-+	depends on SMP && CPU_V7
-+	default y
-+	help
-+	  Support ARM cpu topology definition. The MPIDR register defines
-+	  affinity between processors which is then used to describe the cpu
-+	  topology of an ARM System.
-+
-+config SCHED_MC
-+	bool "Multi-core scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Multi-core scheduler support improves the CPU scheduler's decision
-+	  making when dealing with multi-core CPU chips at a cost of slightly
-+	  increased overhead in some places. If unsure say N here.
-+
-+config SCHED_SMT
-+	bool "SMT scheduler support"
-+	depends on ARM_CPU_TOPOLOGY
-+	help
-+	  Improves the CPU scheduler's decision making when dealing with
-+	  MultiThreading at a cost of slightly increased overhead in some
-+	  places. If unsure say N here.
-+
- config HAVE_ARM_SCU
- 	bool
- 	depends on SMP
-diff --git a/arch/arm/include/asm/cputype.h b/arch/arm/include/asm/cputype.h
-index cd4458f..cb47d28 100644
---- a/arch/arm/include/asm/cputype.h
-+++ b/arch/arm/include/asm/cputype.h
-@@ -8,6 +8,7 @@
- #define CPUID_CACHETYPE	1
- #define CPUID_TCM	2
- #define CPUID_TLBTYPE	3
-+#define CPUID_MPIDR	5
- 
- #define CPUID_EXT_PFR0	"c1, 0"
- #define CPUID_EXT_PFR1	"c1, 1"
-@@ -70,6 +71,11 @@ static inline unsigned int __attribute_const__ read_cpuid_tcmstatus(void)
- 	return read_cpuid(CPUID_TCM);
- }
- 
-+static inline unsigned int __attribute_const__ read_cpuid_mpidr(void)
-+{
-+	return read_cpuid(CPUID_MPIDR);
-+}
-+
- /*
-  * Intel's XScale3 core supports some v6 features (supersections, L2)
-  * but advertises itself as v5 as it does not support the v6 ISA.  For
-diff --git a/arch/arm/include/asm/topology.h b/arch/arm/include/asm/topology.h
-index accbd7c..63a7454 100644
---- a/arch/arm/include/asm/topology.h
-+++ b/arch/arm/include/asm/topology.h
-@@ -1,6 +1,39 @@
- #ifndef _ASM_ARM_TOPOLOGY_H
- #define _ASM_ARM_TOPOLOGY_H
- 
-+#ifdef CONFIG_ARM_CPU_TOPOLOGY
-+
-+#include <linux/cpumask.h>
-+
-+struct cputopo_arm {
-+	int thread_id;
-+	int core_id;
-+	int socket_id;
-+	cpumask_t thread_sibling;
-+	cpumask_t core_sibling;
+diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c 
+b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+index 1f3b2e1..434698e 100644
+--- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
++++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+@@ -38,6 +38,16 @@
+
+  #include <mach/hardware.h>
+
++#ifdef CONFIG_SMP
++struct lpj_info {
++	unsigned long	ref;
++	unsigned int	freq;
 +};
 +
-+extern struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+#define topology_physical_package_id(cpu)	(cpu_topology[cpu].socket_id)
-+#define topology_core_id(cpu)		(cpu_topology[cpu].core_id)
-+#define topology_core_cpumask(cpu)	(&(cpu_topology[cpu].core_sibling))
-+#define topology_thread_cpumask(cpu)	(&(cpu_topology[cpu].thread_sibling))
-+
-+#define mc_capable()	(cpu_topology[0].socket_id != -1)
-+#define smt_capable()	(cpu_topology[0].thread_id != -1)
-+
-+void init_cpu_topology(void);
-+void store_cpu_topology(unsigned int cpuid);
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu);
-+
-+#else
-+
-+static inline void init_cpu_topology(void) { };
-+static inline void store_cpu_topology(unsigned int cpuid) { };
-+
++static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
++static struct lpj_info global_lpj_ref;
 +#endif
 +
- #include <asm-generic/topology.h>
- 
- #endif /* _ASM_ARM_TOPOLOGY_H */
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index a5b31af..816a481 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -61,6 +61,7 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
- obj-$(CONFIG_CPU_HAS_PMU)	+= pmu.o
- obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
- AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-+obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
- 
- ifneq ($(CONFIG_ARCH_EBSA110),y)
-   obj-y		+= io.o
-diff --git a/arch/arm/kernel/smp.c b/arch/arm/kernel/smp.c
-index 344e52b..3e8dc3b 100644
---- a/arch/arm/kernel/smp.c
-+++ b/arch/arm/kernel/smp.c
-@@ -31,6 +31,7 @@
- #include <asm/cacheflush.h>
- #include <asm/cpu.h>
- #include <asm/cputype.h>
-+#include <asm/topology.h>
- #include <asm/mmu_context.h>
- #include <asm/pgtable.h>
- #include <asm/pgalloc.h>
-@@ -268,6 +269,9 @@ static void __cpuinit smp_store_cpu_info(unsigned int cpuid)
- 	struct cpuinfo_arm *cpu_info = &per_cpu(cpu_data, cpuid);
- 
- 	cpu_info->loops_per_jiffy = loops_per_jiffy;
-+
-+	store_cpu_topology(cpuid);
-+
- }
- 
- /*
-@@ -354,6 +358,8 @@ void __init smp_prepare_cpus(unsigned int max_cpus)
- {
- 	unsigned int ncores = num_possible_cpus();
- 
-+	init_cpu_topology();
-+
- 	smp_store_cpu_info(smp_processor_id());
- 
- 	/*
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-new file mode 100644
-index 0000000..52f5265
---- /dev/null
-+++ b/arch/arm/kernel/topology.c
-@@ -0,0 +1,150 @@
-+/*
-+ * arch/arm/kernel/topology.c
-+ *
-+ * Copyright (C) 2011 Linaro Limited.
-+ * Written by: Vincent Guittot
-+ *
-+ * based on arch/sh/kernel/topology.c
-+ *
-+ * This file is subject to the terms and conditions of the GNU General Public
-+ * License.  See the file "COPYING" in the main directory of this archive
-+ * for more details.
-+ */
-+
-+#include <linux/cpu.h>
-+#include <linux/cpumask.h>
-+#include <linux/init.h>
-+#include <linux/percpu.h>
-+#include <linux/node.h>
-+#include <linux/nodemask.h>
-+#include <linux/sched.h>
-+
-+#include <asm/cputype.h>
-+#include <asm/topology.h>
-+
-+#define MPIDR_SMP_BITMASK (0x3 << 30)
-+#define MPIDR_SMP_VALUE (0x2 << 30)
-+
-+#define MPIDR_MT_BITMASK (0x1 << 24)
-+
-+/*
-+ * These masks reflect the current use of the affinity levels.
-+ * The affinity level can be up to 16 bits according to ARM ARM
-+ */
-+
-+#define MPIDR_LEVEL0_MASK 0x3
-+#define MPIDR_LEVEL0_SHIFT 0
-+
-+#define MPIDR_LEVEL1_MASK 0xF
-+#define MPIDR_LEVEL1_SHIFT 8
-+
-+#define MPIDR_LEVEL2_MASK 0xFF
-+#define MPIDR_LEVEL2_SHIFT 16
-+
-+struct cputopo_arm cpu_topology[NR_CPUS];
-+
-+const struct cpumask *cpu_coregroup_mask(unsigned int cpu)
-+{
-+	return &(cpu_topology[cpu].core_sibling);
-+}
-+
-+/*
-+ * store_cpu_topology is called@boot when only one cpu is running
-+ * and with the mutex cpu_hotplug.lock locked, when several cpus have booted,
-+ * which prevents simultaneous write access to cpu_topology array
-+ */
-+void store_cpu_topology(unsigned int cpuid)
-+{
-+	struct cputopo_arm *cpuid_topo = &(cpu_topology[cpuid]);
-+	unsigned int mpidr;
-+	unsigned int cpu;
-+
-+	/* If the cpu topology has been already set, just return */
-+	if (cpuid_topo->core_id != -1)
-+		return;
-+
-+	mpidr = read_cpuid_mpidr();
-+
-+	/* create cpu topology mapping */
-+	if ((mpidr & MPIDR_SMP_BITMASK) == MPIDR_SMP_VALUE) {
-+		/*
-+		 * This is a multiprocessor system
-+		 * multiprocessor format & multiprocessor mode field are set
-+		 */
-+
-+		if (mpidr & MPIDR_MT_BITMASK) {
-+			/* core performance interdependency */
-+			cpuid_topo->thread_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK);
-+			cpuid_topo->core_id =  ((mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK);
-+			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL2_SHIFT)
-+				& MPIDR_LEVEL2_MASK);
-+		} else {
-+			/* largely independent cores */
-+			cpuid_topo->thread_id = -1;
-+			cpuid_topo->core_id = ((mpidr >> MPIDR_LEVEL0_SHIFT)
-+				& MPIDR_LEVEL0_MASK);
-+			cpuid_topo->socket_id = ((mpidr >> MPIDR_LEVEL1_SHIFT)
-+				& MPIDR_LEVEL1_MASK);
+  static struct cpufreq_frequency_table *freq_table;
+  static atomic_t freq_table_users = ATOMIC_INIT(0);
+  static struct clk *mpu_clk;
+@@ -96,11 +106,6 @@ static int omap_target(struct cpufreq_policy *policy,
+  	if (freqs.old == freqs.new && policy->cur == freqs.new)
+  		return ret;
+
+-	if (!is_smp()) {
+-		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+-		goto set_freq;
+-	}
+-
+  	/* notifiers */
+  	for_each_cpu(i, policy->cpus) {
+  		freqs.cpu = i;
+@@ -114,19 +119,7 @@ set_freq:
+
+  	ret = clk_set_rate(mpu_clk, freqs.new * 1000);
+
+-	/*
+-	 * Generic CPUFREQ driver jiffy update is under !SMP. So jiffies
+-	 * won't get updated when UP machine cpufreq build with
+-	 * CONFIG_SMP enabled. Below code is added only to manage that
+-	 * scenario
+-	 */
+  	freqs.new = omap_getspeed(policy->cpu);
+-	if (!is_smp()) {
+-		loops_per_jiffy =
+-			 cpufreq_scale(loops_per_jiffy, freqs.old, freqs.new);
+-		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+-		goto skip_lpj;
+-	}
+
+  #ifdef CONFIG_SMP
+  	/*
+@@ -134,10 +127,24 @@ set_freq:
+  	 * cpufreq driver. So, update the per-CPU loops_per_jiffy value
+  	 * on frequency transition. We need to update all dependent CPUs.
+  	 */
+-	for_each_cpu(i, policy->cpus)
++	for_each_cpu(i, policy->cpus) {
++		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
++		if (!lpj->freq) {
++			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
++			lpj->freq = freqs.old;
 +		}
-+	} else {
-+		/*
-+		 * This is an uniprocessor system
-+		 * we are in multiprocessor format but uniprocessor system
-+		 * or in the old uniprocessor format
-+		 */
 +
-+		cpuid_topo->thread_id = -1;
-+		cpuid_topo->core_id = 0;
-+		cpuid_topo->socket_id = -1;
+  		per_cpu(cpu_data, i).loops_per_jiffy =
+-			cpufreq_scale(per_cpu(cpu_data, i).loops_per_jiffy,
+-					freqs.old, freqs.new);
++			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
 +	}
 +
-+	/* update core and thread sibling masks */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		if (cpuid_topo->socket_id == cpu_topo->socket_id) {
-+			cpumask_set_cpu(cpuid, &cpu_topo->core_sibling);
-+			if (cpu != cpuid)
-+				cpumask_set_cpu(cpu,
-+					&cpuid_topo->core_sibling);
-+
-+			if (cpuid_topo->core_id == cpu_topo->core_id) {
-+				cpumask_set_cpu(cpuid,
-+					&cpu_topo->thread_sibling);
-+				if (cpu != cpuid)
-+					cpumask_set_cpu(cpu,
-+						&cpuid_topo->thread_sibling);
-+			}
-+		}
++	/* And don't forget to adjust the global one */
++	if (!global_lpj_ref.freq) {
++		global_lpj_ref.ref = loops_per_jiffy;
++		global_lpj_ref.freq = freqs.old;
 +	}
-+	smp_wmb();
-+
-+	printk(KERN_INFO "cpu %u : thread %d cpu %d, socket %d, mpidr %x\n",
-+		cpuid, cpu_topology[cpuid].thread_id,
-+		cpu_topology[cpuid].core_id,
-+		cpu_topology[cpuid].socket_id, mpidr);
-+
-+}
-+
-+/*
-+ * init_cpu_topology is called at boot when only one cpu is running
-+ * which prevent simultaneous write access to cpu_topology array
-+ */
-+void init_cpu_topology(void)
-+{
-+	unsigned int cpu;
-+
-+	/* init core mask */
-+	for_each_possible_cpu(cpu) {
-+		struct cputopo_arm *cpu_topo = &(cpu_topology[cpu]);
-+
-+		cpu_topo->thread_id = -1;
-+		cpu_topo->core_id =  -1;
-+		cpu_topo->socket_id = -1;
-+		cpumask_clear(&cpu_topo->core_sibling);
-+		cpumask_clear(&cpu_topo->thread_sibling);
-+	}
-+	smp_wmb();
-+}
++	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, global_lpj_ref.freq,
++					freqs.new);
+  #endif
+
+  	/* notifiers */
+@@ -146,7 +153,6 @@ set_freq:
+  		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+  	}
+
+-skip_lpj:
+  	return ret;
+  }
+
 -- 
 1.7.4.1
