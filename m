@@ -1,53 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Jun 2011 14:01:41 +0100
-Subject: [PATCH] ARM: clocksource/arm_smp_twd: remove superfluous per_cpu v=
-Message-ID: <mailman.33.1308921297.24103.linux-arm-kernel@lists.infradead.org>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Fri, 24 Jun 2011 09:32:27 -0400 (EDT)
+Subject: [PATCH v3 00/40] ARM: mm: Add generic macros for declaring
+	various CPU structs
+In-Reply-To: <20110624101054.GA2342@arm.com>
+References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1106231721270.2142@xanadu.home>
+	<20110624101054.GA2342@arm.com>
+Message-ID: <alpine.LFD.2.00.1106240921500.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ariable
+On Fri, 24 Jun 2011, Dave Martin wrote:
 
-The twd_ce variable was used to track the per-cpu clock event devices
-in the previous incarnation of the driver. As these clock event
-devices are now directly accessible inside the driver, just get rid
-of it and access the real thing directly.
+> On Thu, Jun 23, 2011 at 07:44:44PM -0400, Nicolas Pitre wrote:
+> > On Thu, 23 Jun 2011, Dave Martin wrote:
+> > 
+> > >   - This series introduces a few lines slightly longer than 80
+> > >     characters.  I don't think that splitting these lines will
+> > >     do a lot to help readability, but this can be done if
+> > >     people prefer.
+> > 
+> > Please don't.
+> 
+> You mean "don't split", right?  (Not "don't introduce"?)
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- drivers/clocksource/arm_smp_twd.c |    4 +---
- 1 files changed, 1 insertions(+), 3 deletions(-)
+Don't split if there is no obvious readability gain.  Human judgement is 
+necessary here which can't be substituted by checkpatch.pl.
 
-diff --git a/drivers/clocksource/arm_smp_twd.c b/drivers/clocksource/arm_sm=
-p_twd.c
-index 4d58975..65f4669 100644
---- a/drivers/clocksource/arm_smp_twd.c
-+++ b/drivers/clocksource/arm_smp_twd.c
-@@ -40,7 +40,6 @@ static void __iomem *twd_base;
- static int twd_ppi;
-=20
- static struct clk *twd_clk;
--static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
- static unsigned long twd_timer_rate;
- static DEFINE_PER_CPU(bool, irq_reqd);
- static struct clock_event_device __percpu *twd_evt;
-@@ -106,7 +105,7 @@ static void twd_update_frequency(void *data)
- {
- =09twd_timer_rate =3D clk_get_rate(twd_clk);
-=20
--=09clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
-+=09clockevents_update_freq(__get_cpu_var(twd_evt), twd_timer_rate);
- }
-=20
- static int twd_cpufreq_transition(struct notifier_block *nb,
-@@ -238,7 +237,6 @@ static void __cpuinit twd_setup(void *data)
- =09=09return;
- =09}
-=20
--=09__get_cpu_var(twd_ce) =3D clk;
- =09clockevents_config_and_register(clk, twd_timer_rate,
- =09=09=09=09=090xf, 0xffffffff);
- }
---=20
-1.7.0.4
+> > mohawk_flush_icache_all:
+> > 	mov	r0, #0
+> > 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
+> > 	mov	pc, lr
+> > 
+> > The "mov r0, #0" is probably unnecessary, but this is a common pattern.
+> 
+> Thanks, merged locally.
+> 
+> OK if I add your S-o-B to that patch?
 
---------------040203090205030102060702--
+Sure.
+
+> > >   Subject: ARM: mm: cache-fa: Use the new processor struct macros
+> > >   Subject: ARM: mm: cache-v3: Use the new processor struct macros
+> > >   Subject: ARM: mm: cache-v4: Use the new processor struct macros
+> > > [...]
+> > 
+> > Something is wrong in your Git setup.  You have a spurious "Subject: " 
+> > prefix everywhere.
+> > 
+> > >   Subject: ARM: mm: proc-feroceon: Use the new processor struct macros
+> 
+> Hmmm, I had some scripts sqashing this down from a local 106-patch series.
+> I guess my logic for pasting subject lines into the merged patches went
+> wrong somewhere.  I was pretty much a zombie by that stage...
+
+:-)
+
+Alternatively, using 'git rebase -i' and its squash and or fold commands 
+(which can be abbreviated to the first letter) is pretty handy.  Might 
+save you the time to write the script in the first place.
+
+
+Nicolas
