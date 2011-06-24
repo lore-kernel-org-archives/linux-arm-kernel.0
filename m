@@ -1,104 +1,28 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 24 Jun 2011 13:16:48 -0700
-Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
-In-Reply-To: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-Message-ID: <4E04F0B0.4030408@codeaurora.org>
+From: zonque@gmail.com (Daniel Mack)
+Date: Fri, 24 Jun 2011 22:40:06 +0200
+Subject: I can' t compile a new kernel version
+In-Reply-To: <1308940265.2194.77.camel@sacarino>
+References: <1308940265.2194.77.camel@sacarino>
+Message-ID: <BANLkTimugaX+WWM8ynaeQLKR=RYRwuW36A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/21/2011 12:18 AM, Ohad Ben-Cohen wrote:
-> * Rpmsg: a virtio-based messaging bus that allows kernel drivers to
-> communicate with remote processors available on the system. In turn,
-> drivers could then expose appropriate user space interfaces, if needed
-> (tasks running on remote processors often have direct access to sensitive
-> resources like the system's physical memory, gpios, i2c buses, dma
-> controllers, etc..  so one normally wouldn't want to allow userland to
-> send everything/everywhere it wants).
->
-> Every rpmsg device is a communication channel with a service running on a
-> remote processor (thus rpmsg devices are called channels). Channels are
-> identified by a textual name (which is used to match drivers to devices)
-> and have a local ("source") rpmsg address, and remote ("destination") rpmsg
-> address. When a driver starts listening on a channel (most commonly when it
-> is probed), the bus assigns the driver a unique rpmsg src address (a 32 bit
-> integer) and binds it with the driver's rx callback handler. This way
-> when inbound messages arrive to this src address, the rpmsg core dispatches
-> them to that driver, by invoking the driver's rx handler with the payload
-> of the incoming message.
->
-[snip]
->
-> In addition to dynamic creation of rpmsg channels, the rpmsg bus also
-> supports creation of static channels. This is needed in two cases:
-> - when a certain remote processor doesn't support sending those "name
->   service" announcements. In that case, a static table of remote rpmsg
->   services must be used to create the rpmsg channels.
-> - to support rpmsg server drivers, which aren't bound to a specific remote
->   rpmsg address. Instead, they just listen on a local address, waiting for
->   incoming messages. To send a message, those server drivers need to use
->   the rpmsg_sendto() API, so they can explicitly indicate the dst address
->   every time.
->
+On Fri, Jun 24, 2011 at 8:31 PM, Jorge Yesid Rios Ortiz
+<jyrios@die.upm.es> wrote:
+> If you have some idea about how to compile a new kernel's version I
+> appreciated Very much.
 
-This sounds a lot like SMD (shared memory driver) on MSM. The main
-difference I see is that SMD uses the platform bus instead of the virtio
-bus and it has its own protocol for channel allocation.
+I can recommend the buildroot project to you for such things:
 
->
-> * Remoteproc: a generic driver that maintains the state of the remote
-> processor(s). Simple rproc_get() and rproc_put() API is exposed, which
-> drivers can use when needed (first driver to call get() will load a firmware,
-> configure an iommu if needed, and boot the remote processor, while last
-> driver to call put() will power it down).
->
-> Hardware differences are abstracted as usual: a platform-specific driver
-> registers its own start/stop handlers in the generic remoteproc driver,
-> and those are invoked when its time to power up/down the processor. As a
-> reference, this patch set include remoteproc support for both OMAP4's
-> cortex-M3 and Davinci's DSP, tested on the pandaboard and hawkboard,
-> respectively.
+  http://buildroot.uclibc.org/
 
-This remote proc code is eerily similar to PIL (peripheral image loader,
-yes we love our acronyms) which I posted a few months back[1]. Was it
-inspiration for this patch series?
+Assuming that you have an up-to-date Linux on your development box,
+using buildroot should be easy. Just select your board configuration
+and the packages you need, and buildroot will download, extract and
+build everything you need, including a kernel if you want to. For more
+information, make sure to read
+http://buildroot.uclibc.org/downloads/buildroot.html
 
-In terms of API, s/pil/rproc/ and it would be 95% identical. There are
-some low-level differences though (see below).
 
->
-> The gory part of remoteproc is the firmware handling. We tried to come up
-> with a simple binary format that will require minimum kernel code to handle,
-> but at the same time be generic enough in the hopes that it would prove
-> useful to others as well. We're not at all hang onto the binary format
-> we picked: if there's any technical reason to change it to support other
-> platforms, please let us know. We do realize that a single binary firmware
-> structure might eventually not work for everyone. it did prove useful for
-> us though; we adopted both the OMAP and Davinci platforms (and their
-> completely different remote processor devices) to this simple binary
-> structure, so we don't have to duplicate the firmware handling code.
-
-This is an important difference between remote proc and PIL. In PIL, we
-do image authentication in addition to processor boot. In this case, we
-need to give the authentication engine the elf header and program
-headers for the firmware so that it knows what parts of memory need to
-be authenticated. Instead of devising a new firmware format, we decided
-to just stick with elf and parse the headers in the kernel because we
-needed them for authentication anyway. Is this reason enough to move to
-an ELF format instead?
-
-Another difference is inter-processor dependencies. For example, on
-msm8660 the modem can't boot until the dsp has been booted. I suppose we
-could hide this detail in the platform specific get() implementation by
-calling rproc_get() on the dependent processor (hopefully no locking
-issues arise). I'd rather have it built into the core though as it isn't
-really specific to the hardware.
-
-If we can resolve these differences I think we can easily support remote
-processor boot on MSM via remoteproc.
-
-[1] https://lkml.org/lkml/2011/3/9/490
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+HTH,
+Daniel
