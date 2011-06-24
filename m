@@ -1,62 +1,232 @@
-From: dave.martin@linaro.org (Dave Martin)
-Date: Fri, 24 Jun 2011 14:54:33 +0100
-Subject: [PATCH v3 00/40] ARM: mm: Add generic macros for declaring
-	various CPU structs
-In-Reply-To: <alpine.LFD.2.00.1106240921500.2142@xanadu.home>
-References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-	<alpine.LFD.2.00.1106231721270.2142@xanadu.home>
-	<20110624101054.GA2342@arm.com>
-	<alpine.LFD.2.00.1106240921500.2142@xanadu.home>
-Message-ID: <20110624135433.GB2342@arm.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Fri, 24 Jun 2011 19:29:48 +0530
+Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
+In-Reply-To: <1308923618-5333-1-git-send-email-premi@ti.com>
+References: <1308923618-5333-1-git-send-email-premi@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2EE5@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2011 at 09:32:27AM -0400, Nicolas Pitre wrote:
-
-[...]
-
-> Don't split if there is no obvious readability gain.  Human judgement is 
-> necessary here which can't be substituted by checkpatch.pl.
-
-That's what I thought; just wanted to check I'd understood correctly.
-
+> -----Original Message-----
+> From: Premi, Sanjeev 
+> Sent: Friday, June 24, 2011 7:24 PM
+> To: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Cc: Premi, Sanjeev
+> Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy 
+> calculation
 > 
-> > > mohawk_flush_icache_all:
-> > > 	mov	r0, #0
-> > > 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
-> > > 	mov	pc, lr
-> > > 
-> > > The "mov r0, #0" is probably unnecessary, but this is a common pattern.
-> > 
-> > Thanks, merged locally.
-> > 
-> > OK if I add your S-o-B to that patch?
+> Currently, loops_per_jiffy is being calculated twice for
+> non-SMP processors.
+>  - Before calling cpufreq_notify_transition()
+>  - From within cpufreq_notify_transition()
+> 
+> Double adjustment leads to incorrect value being assigned to
+> loops_per_jiffy. This manifests as incorrect BogoMIPS in
+> "cat /proc/cpuinfo".
+> 
+> The value of loops_per_jiffy needs to be calculated only
+> when CONFIG_SMP is true. It is the core change included
+> in this patch.
+> 
+> The patch also leverages the definition of for_each_cpu()
+> with and without CONFIG_SMP to consolidate the mechanism
+> to call cpufreq_notify_transition().
+> 
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> ---
+>  Changes since v1:
+>    * loops_per_jiffy are updated when CONFIG_SMP is true.
+>    * leverage definition of for_each_cpu()
+> 
+>  Tested on OMAP3EVM with and without CONFIG_SMP.
+>  Since the log is rather long, will be posting the log in
+>  a follow-up mail.
+> 
+[snip]...[snip]
 
-Done.  Thanks for the code.
+Snapshot of test log - with and without SMP included here:
 
-[...]
+To ensure compile-time and run-time checks for SMP are visible,
+the patch was tested with this code inserted at enty of function
+omap_target().
 
-> Alternatively, using 'git rebase -i' and its squash and or fold commands 
-> (which can be abbreviated to the first letter) is pretty handy.  Might 
-> save you the time to write the script in the first place.
+#ifdef CONFIG_SMP
+	printk (KERN_ERR "I am defined SMP!\n");
+#else
+	printk (KERN_ERR "I am not defined SMP!\n");
+#endif
+	if (is_smp())
+		printk (KERN_ERR "Runtime evaluating to SMP!\n");
+	else
+		printk (KERN_ERR "Runtime evaluating to no SMP!\n");
 
-I have just been "educated" on this point by someone else too -- autosquash
-would have suited my purposes exactly in this case ... I'll definitely
-do that next time.  Always good to learn something new :)
 
+With CONFIG_SMP disabled
+========================
 
-The above fixes have been applied and pushed to the branch referenced
-below.
+[root at OMAP3EVM /]# cd /sys/devices/system/cpu/cpu0/cpufreq/
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat scaling_available_frequencies
+300000 600000 800000 1000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# echo 300000 > scaling_setspeed
+[   56.278137] I am not defined SMP!
+[   56.281768] Runtime evaluating to no SMP!
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat cpuinfo_cur_freq
+300000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 2 (v7l)
+BogoMIPS        : 298.32
+Features        : swp half thumb fastmult vfp edsp thumbee neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x3
+CPU part        : 0xc08
+CPU revision    : 2
 
-This should get merged via Will's tree for the next merge window,
-providing that Russell is happy and nobody else objects.
+Hardware        : OMAP3 EVM
+Revision        : 0020
+Serial          : 0000000000000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# echo 800000 > scaling_setspeed
+[   96.938049] I am not defined SMP!
+[   96.941833] Runtime evaluating to no SMP!
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 2 (v7l)
+BogoMIPS        : 796.19
+Features        : swp half thumb fastmult vfp edsp thumbee neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x3
+CPU part        : 0xc08
+CPU revision    : 2
 
-Cheers
----Dave
+Hardware        : OMAP3 EVM
+Revision        : 0020
+Serial          : 0000000000000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# echo 100000 > scaling_setspeed
+[  110.865631] I am not defined SMP!
+[  110.870025] Runtime evaluating to no SMP!
+[root at OMAP3EVM cpufreq]# echo 1000000 > scaling_setspeed
+[  116.258941] I am not defined SMP!
+[  116.262725] Runtime evaluating to no SMP!
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat cpuinfo_cur_freq
+1000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 2 (v7l)
+BogoMIPS        : 996.74
+Features        : swp half thumb fastmult vfp edsp thumbee neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x3
+CPU part        : 0xc08
+CPU revision    : 2
 
-The changes since commit 56299378726d5f2ba8d3c8cbbd13cb280ba45e4f:
+Hardware        : OMAP3 EVM
+Revision        : 0020
+Serial          : 0000000000000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
 
-  Linux 3.0-rc4 (2011-06-20 20:25:46 -0700)
+With CONFIG_SMP enabled
+========================
 
-are available in the git repository at:
-  git://git.linaro.org/people/dmart/linux-2.6-arm.git arm/proc-macros
+[root at OMAP3EVM /]# cd /sys/devices/system/cpu/cpu0/cpufreq/
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat scaling_available_frequencies
+300000 600000 800000 1000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# echo 300000 > scaling_setspeed
+[   25.040496] I am defined SMP!
+[   25.043884] Runtime evaluating to no SMP!
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 2 (v7l)
+processor       : 0
+BogoMIPS        : 298.32
+
+Features        : swp half thumb fastmult vfp edsp thumbee neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x3
+CPU part        : 0xc08
+CPU revision    : 2
+
+Hardware        : OMAP3 EVM
+Revision        : 0020
+Serial          : 0000000000000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat cpuinfo_cur_freq
+300000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# echo 800000 > scaling_setspeed
+[   46.333618] I am defined SMP!
+[   46.336822] Runtime evaluating to no SMP!
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat cpuinfo_cur_freq
+800000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 2 (v7l)
+processor       : 0
+BogoMIPS        : 796.19
+
+Features        : swp half thumb fastmult vfp edsp thumbee neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x3
+CPU part        : 0xc08
+CPU revision    : 2
+
+Hardware        : OMAP3 EVM
+Revision        : 0020
+Serial          : 0000000000000000
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# echo 600000 > scaling_setspeed
+[ 1344.705413] I am defined SMP!
+[ 1344.709259] Runtime evaluating to no SMP!
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]#
+[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
+Processor       : ARMv7 Processor rev 2 (v7l)
+processor       : 0
+BogoMIPS        : 597.64
+
+Features        : swp half thumb fastmult vfp edsp thumbee neon vfpv3
+CPU implementer : 0x41
+CPU architecture: 7
+CPU variant     : 0x3
+CPU part        : 0xc08
+CPU revision    : 2
+
+Hardware        : OMAP3 EVM
+Revision        : 0020
+Serial          : 0000000000000000
