@@ -1,47 +1,33 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Thu, 23 Jun 2011 17:37:15 -0700
-Subject: [GIT PULL] misc. OMAP PM updates for v3.1
-Message-ID: <87vcvw5akk.fsf@ti.com>
+From: wad@chromium.org (Will Drewry)
+Date: Thu, 23 Jun 2011 19:36:46 -0500
+Subject: [PATCH v9 07/13] arm: select HAVE_SECCOMP_FILTER
+In-Reply-To: <1308875813-20122-1-git-send-email-wad@chromium.org>
+References: <1308875813-20122-1-git-send-email-wad@chromium.org>
+Message-ID: <1308875813-20122-7-git-send-email-wad@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony,
+Enable support for CONFIG_SECCOMP_FILTER by selecting HAVE_SECCOMP_FILTER by
+default.
 
-Please pull the following misc. OMAP PM updates targetted for v3.1.
+v9: rebase on to bccaeafd7c117acee36e90d37c7e05c19be9e7bf
 
-This branch is based on your 'fixes' branch due to some dependencies.
+Signed-off-by: Will Drewry <wad@chromium.org>
+---
+ arch/arm/Kconfig |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-Kevin
-
-
-The following changes since commit b8ce9fb8e18af7466e0b915bb5979322cdace322:
-
-  Merge branch 'fixes-v3.0-rc3' into devel-fixes (2011-06-14 05:53:42 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/pm-misc
-
-Kevin Hilman (4):
-      OMAP3: PM debug: remove sleep_while_idle feature
-      OMAP2: PM debug: remove register dumping
-      OMAP3: PM debug: remove register dumping
-      OMAP2: PM debug: move wakeup timer into clockevent code
-
-Nishanth Menon (4):
-      OMAP3+: SR: make notify independent of class
-      OMAP3+: SR: disable interrupt by default
-      OMAP3+: SR: enable/disable SR only on need
-      OMAP3+: SR: fix cosmetic indentation
-
-Sanjeev Premi (1):
-      OMAP2+: PM: fix section mismatch in pm_dbg_init()
-
- arch/arm/mach-omap2/pm-debug.c            |  364 +----------------------------
- arch/arm/mach-omap2/pm.h                  |    9 -
- arch/arm/mach-omap2/pm24xx.c              |    6 +-
- arch/arm/mach-omap2/pm34xx.c              |    6 -
- arch/arm/mach-omap2/smartreflex.c         |   38 ++--
- arch/arm/mach-omap2/timer-gp.c            |   33 +++-
- arch/arm/plat-omap/include/plat/dmtimer.h |    1 -
- 7 files changed, 53 insertions(+), 404 deletions(-)
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 9adc278..537ad16 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -16,6 +16,7 @@ config ARM
+ 	select HAVE_FTRACE_MCOUNT_RECORD if (!XIP_KERNEL)
+ 	select HAVE_DYNAMIC_FTRACE if (!XIP_KERNEL)
+ 	select HAVE_FUNCTION_GRAPH_TRACER if (!THUMB2_KERNEL)
++	select HAVE_SECCOMP_FILTER
+ 	select HAVE_GENERIC_DMA_COHERENT
+ 	select HAVE_KERNEL_GZIP
+ 	select HAVE_KERNEL_LZO
+-- 
+1.7.0.4
