@@ -1,54 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Jun 2011 15:14:02 +0100
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2EF2@dbde02.ent.ti.com>
-References: <1308923618-5333-1-git-send-email-premi@ti.com>
-	<20110624140142.GM9449@n2100.arm.linux.org.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2EF2@dbde02.ent.ti.com>
-Message-ID: <20110624141402.GN9449@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Fri, 24 Jun 2011 16:26:12 +0200
+Subject: [PATCH/RFC 0/8] ARM: DMA-mapping framework redesign
+In-Reply-To: <20110624091807.GC29299@8bytes.org>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<20110624091807.GC29299@8bytes.org>
+Message-ID: <001801cc327a$ab4b75f0$01e261d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2011 at 07:39:41PM +0530, Premi, Sanjeev wrote:
-> > -----Original Message-----
-> > From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-> > Sent: Friday, June 24, 2011 7:32 PM
-> > To: Premi, Sanjeev
-> > Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCHv2] omap2+: pm: cpufreq: Fix 
-> > loops_per_jiffy calculation
-> 
-> [snip]...[snip]
-> 
-> > > 
-> > > +#ifdef CONFIG_SMP
-> > > +	/* Adjust jiffies before transition */
-> > > +	for_each_cpu(i, policy->cpus) {
-> > > +		unsigned long lpj = per_cpu(cpu_data, 
-> > i).loops_per_jiffy;
-> > > +
-> > > +		per_cpu(cpu_data, i).loops_per_jiffy = 
-> > cpufreq_scale(lpj,
-> > > +							freqs.old,
-> > > +							freqs.new);
-> > > +	}
-> > > +#endif
-> > > +
-> > 
-> > You didn't listen to what I told you.  It'll be quicker for 
-> > me to write
-> > this patch myself if you send me the *original* file.
-> > 
-> 
-> Russell,
-> 
-> The function adjust_jiffies() is no-op for CONFIG_SMP - but it
-> is not the case with cpufreq_scale().
-> 
-> So, when CONFIG_SMP is defined, then loops_per_jiffy would be
-> calculated for both UP and SMP processors.
-> 
-> Did I miss something else?
+Hello,
 
-Yes you have, and you've not sent me the file, so I can't show you where
-you've gone wrong.
+On Friday, June 24, 2011 11:18 AM Joerg Roedel wrote:
+
+> On Mon, Jun 20, 2011 at 09:50:05AM +0200, Marek Szyprowski wrote:
+> > This patch series is a continuation of my works on implementing generic
+> > IOMMU support in DMA mapping framework for ARM architecture. Now I
+> > focused on the DMA mapping framework itself. It turned out that adding
+> > support for common dma_map_ops structure was not that hard as I initally
+> > thought. After some modification most of the code fits really well to
+> > the generic dma_map_ops methods.
+> 
+> I appreciate your progress on this generic dma_ops implementation. But
+> for now it looks very ARM specific. Do you have plans to extend it to
+> non-ARM iommu-api implementations too?
+
+These works are just a first step to create an environment for real iommu 
+& dma-mapping integration. It is much easier to work on IOMMU integration
+once the dma-mapping operations can be easily changed for particular devices.
+dma_map_ops gives such flexibility. It is also a de-facto standard interface
+for other architectures so it was really desired to work on iommu
+implementation on top of dma_map_ops.
+
+Of course my patches will be ARM-centric, but I hope to isolate ARM-specific
+from generic parts, which can be easily reused on other platforms. 
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
