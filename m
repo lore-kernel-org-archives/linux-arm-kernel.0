@@ -1,74 +1,99 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 23 Jun 2011 19:44:44 -0400 (EDT)
-Subject: [PATCH v3 00/40] ARM: mm: Add generic macros for declaring
-	various CPU structs
-In-Reply-To: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <alpine.LFD.2.00.1106231721270.2142@xanadu.home>
+From: agust@denx.de (Anatolij Gustschin)
+Date: Fri, 24 Jun 2011 02:03:08 +0200
+Subject: [PATCH] usb: fsl_udc_core: fix build breakage when building for ARM
+	arch
+Message-ID: <1308873788-22881-1-git-send-email-agust@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 23 Jun 2011, Dave Martin wrote:
+Commit 09ba0def introduced build breakage on ARM arch.
+Fix it by setting accessors using a static inline function
+which is a nop when compiling the driver for ARM arch.
 
-> General notes:
-> 
->   - This patch supersedes Peter Chubb's patch for the typo in
->     proc-arm7tdmi.S (see
-> http://lists.arm.linux.org.uk/lurker/message/20110530.235513.4e1a0d16.en.html),
-> which I believe hasn't been merged.  If it has merged or is
-> pending, I can easily rebase on top of it.
+Don't use flush_dcache_range(), convert to the DMA API
+usage instead. USB2.0CV Halt Endpoint Test succeeds on
+PPC. Tested both on ARM i.MX31 and mpc5121 PPC.
 
-See commit 9a819d8ac8 in mainline (v3.0-rc2).
+Signed-off-by: Anatolij Gustschin <agust@denx.de>
+---
+ drivers/usb/gadget/fsl_udc_core.c |   30 +++++++++++++++++++-----------
+ 1 files changed, 19 insertions(+), 11 deletions(-)
 
->   - This series introduces a few lines slightly longer than 80
->     characters.  I don't think that splitting these lines will
->     do a lot to help readability, but this can be done if
->     people prefer.
-
-Please don't.
-
-> 4       proc-mohawk: missing mohawk_flush_icache_all now
->         referenced and needs to be defined to un-break this file
->         ** needs review **
-
-mohawk_flush_icache_all:
-	mov	r0, #0
-	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
-	mov	pc, lr
-
-The "mov r0, #0" is probably unnecessary, but this is a common pattern.
-
-> 5       proc-xscale: missing flush_icache_all funtion in
->         xscale_80200_A0_A1_cache_fns assumed to be the same as for
->         xscale_cache_fns **needs review**
-
-ACK.
-
-> Dave Martin (40):
->   Subject: ARM: mm: prop-macros Add generic proc/cache/tlb struct
->     definition macros
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
->   Subject: ARM: assembler.h: Add string declaration macro
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
->   Subject: ARM: mm: cache-fa: Use the new processor struct macros
->   Subject: ARM: mm: cache-v3: Use the new processor struct macros
->   Subject: ARM: mm: cache-v4: Use the new processor struct macros
-> [...]
-
-Something is wrong in your Git setup.  You have a spurious "Subject: " 
-prefix everywhere.
-
->   Subject: ARM: mm: proc-feroceon: Use the new processor struct macros
-
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
->  40 files changed, 452 insertions(+), 1968 deletions(-)
-
-Nice work!
-
-
-Nicolas
+diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
+index 2cd9a60..eab033f 100644
+--- a/drivers/usb/gadget/fsl_udc_core.c
++++ b/drivers/usb/gadget/fsl_udc_core.c
+@@ -46,7 +46,6 @@
+ #include <asm/system.h>
+ #include <asm/unaligned.h>
+ #include <asm/dma.h>
+-#include <asm/cacheflush.h>
+ 
+ #include "fsl_usb2_udc.h"
+ 
+@@ -118,6 +117,17 @@ static void (*_fsl_writel)(u32 v, unsigned __iomem *p);
+ #define fsl_readl(p)		(*_fsl_readl)((p))
+ #define fsl_writel(v, p)	(*_fsl_writel)((v), (p))
+ 
++static inline void fsl_set_accessors(struct fsl_usb2_platform_data *pdata)
++{
++	if (pdata->big_endian_mmio) {
++		_fsl_readl = _fsl_readl_be;
++		_fsl_writel = _fsl_writel_be;
++	} else {
++		_fsl_readl = _fsl_readl_le;
++		_fsl_writel = _fsl_writel_le;
++	}
++}
++
+ static inline u32 cpu_to_hc32(const u32 x)
+ {
+ 	return udc_controller->pdata->big_endian_desc
+@@ -132,6 +142,8 @@ static inline u32 hc32_to_cpu(const u32 x)
+ 		: le32_to_cpu((__force __le32)x);
+ }
+ #else /* !CONFIG_PPC32 */
++static inline void fsl_set_accessors(struct fsl_usb2_platform_data *pdata) {}
++
+ #define fsl_readl(addr)		readl(addr)
+ #define fsl_writel(val32, addr) writel(val32, addr)
+ #define cpu_to_hc32(x)		cpu_to_le32(x)
+@@ -1348,9 +1360,6 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
+ 	/* Fill in the reqest structure */
+ 	*((u16 *) req->req.buf) = cpu_to_le16(tmp);
+ 
+-	/* flush cache for the req buffer */
+-	flush_dcache_range((u32)req->req.buf, (u32)req->req.buf + 8);
+-
+ 	req->ep = ep;
+ 	req->req.length = 2;
+ 	req->req.status = -EINPROGRESS;
+@@ -1358,6 +1367,11 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
+ 	req->req.complete = NULL;
+ 	req->dtd_count = 0;
+ 
++	dma_sync_single_for_device(udc->gadget.dev.parent,
++		req->req.dma, req->req.length,
++		ep_is_in(ep) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
++	req->mapped = 0;
++
+ 	/* prime the data phase */
+ 	if ((fsl_req_to_dtd(req) == 0))
+ 		fsl_queue_td(ep, req);
+@@ -2470,13 +2484,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	/* Set accessors only after pdata->init() ! */
+-	if (pdata->big_endian_mmio) {
+-		_fsl_readl = _fsl_readl_be;
+-		_fsl_writel = _fsl_writel_be;
+-	} else {
+-		_fsl_readl = _fsl_readl_le;
+-		_fsl_writel = _fsl_writel_le;
+-	}
++	fsl_set_accessors(pdata);
+ 
+ #ifndef CONFIG_ARCH_MXC
+ 	if (pdata->have_sysif_regs)
+-- 
+1.7.1
