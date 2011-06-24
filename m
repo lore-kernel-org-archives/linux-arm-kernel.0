@@ -1,63 +1,286 @@
-From: holler@ahsoftware.de (Alexander Holler)
-Date: Fri, 24 Jun 2011 13:40:27 +0200
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing
-	the packed attribute
-In-Reply-To: <Pine.LNX.4.44L0.1106231022500.2033-100000@iolanthe.rowland.org>
-References: <Pine.LNX.4.44L0.1106231022500.2033-100000@iolanthe.rowland.org>
-Message-ID: <4E0477AB.3080400@ahsoftware.de>
+From: thomas.abraham@linaro.org (Thomas Abraham)
+Date: Fri, 24 Jun 2011 17:57:59 +0530
+Subject: [PATCH 2/6] serial: samsung: Add device tree support for s5pv210
+	uart driver
+In-Reply-To: <BANLkTi=EVA6LckzWSFMQ07okD4gw-z5Zag@mail.gmail.com>
+References: <1308567752-13451-1-git-send-email-thomas.abraham@linaro.org>
+	<1308567752-13451-3-git-send-email-thomas.abraham@linaro.org>
+	<BANLkTi=+FKz-uPtSv572y5ORorMeGR8Anw@mail.gmail.com>
+	<BANLkTi=RxEpBrALEQbBD_z6ZiEW24-wsng@mail.gmail.com>
+	<BANLkTi=EVA6LckzWSFMQ07okD4gw-z5Zag@mail.gmail.com>
+Message-ID: <BANLkTimyEQfRjfbOj9ULnTcmQ3GLJnWxrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 23.06.2011 16:25, schrieb Alan Stern:
-> On Thu, 23 Jun 2011, Alexander Holler wrote:
+Hi Grant,
+
+On 24 June 2011 01:38, Grant Likely <grant.likely@secretlab.ca> wrote:
+> Despite the fact that this is exactly what I asked you to write, this
+> ends up being rather ugly. ?(I originally put in the '*4' to match the
+> behaviour of the existing of_read_number(), but that was a mistake.
+> tglx also pointed it out). ?How about this instead:
+
+Your draft implementation below is suggesting that the offset should
+be in bytes and not cells and so maybe you are suggesting the new
+approach to support multi-format property values. I have changed the
+implementation as per your code below.
+
 >
->> Sorry, I never wanted to talk about the issue itself (I've already said
->> that), I just wanted to bring in some additional clarity for people
->> looking at the code.
->>
->> I think if there is a packed,aligned(4) most people reading that are
->> able to imaging how the struct looks like, whereas nothing (without
->> packed) might leave doubts which than requires to read compiler docs or
->> the generated code, if one searches a problem in that area.
+> int of_read_property_u32(struct property *prop, unsigned int offset,
+> u32 *out_value)
+> {
+> ? ? ? ?if (!prop || !out_value)
+> ? ? ? ? ? ? ? ?return -EINVAL;
+> ? ? ? ?if (!prop->value)
+> ? ? ? ? ? ? ? ?return -ENODATA;
+> ? ? ? ?if (offset + sizeof(*out_value) > prop->length)
+> ? ? ? ? ? ? ? ?return -EOVERFLOW;
+> ? ? ? ?*out_value = be32_to_cpup(prop->data + offset);
+> ? ? ? ?return 0;
+> }
+
+[...]
+
+>> +/**
+>> + * of_read_property_string - Returns a pointer to a indexed null terminated
+>> + * ? ? ? ? ? ? ? ? ? ? ? ? ? ? property value string
+>> + * @prop: ? ? ?property to read from.
+>> + * @offset: ? ?index of the property string to be read.
+>> + * @string: ? ?pointer to a null terminated string, valid only if the return
+>> + * ? ? ? ? ? ? value is 0.
+>> + *
+>> + * Returns a pointer to a indexed null terminated property cell string, -EINVAL
+>> + * in case the cell does not exist.
+>> + */
+>> +int of_read_property_string(struct property *prop, int offset, char **string)
+>> +{
+>> + ? ? ? char *c;
+>> +
+>> + ? ? ? if (!prop || !prop->value)
+>> + ? ? ? ? ? ? ? return -EINVAL;
 >
-> I disagree.  If there are no annotations at all (no packed), there
-> should be no doubts.  The compiler will add padding wherever it is
-> needed for internal alignment and perhaps also at the end of the
-> structure.  Nowhere else.
+> Ditto here about return values.
+>
+>> +
+>> + ? ? ? c = (char *)prop->value;
+>
+> You don't need the cast. ?prop->value is a void* pointer. ?However,
+> 'c' does need to be const char.
+>
+>> + ? ? ? while (offset--)
+>> + ? ? ? ? ? ? ? while (*c++)
+>> + ? ? ? ? ? ? ? ? ? ? ? ;
+>
+> Rather than open coding this, you should use the string library
+> functions. ?Something like:
+>
+> ? ? ? ?c = prop->value;
+> ? ? ? ?while (offset-- && (c - prop->value) < prop->size)
+> ? ? ? ? ? ? ? ?c += strlen(c) + 1;
+> ? ? ? ?if ((c - prop->value) + strlen(c) >= prop->size)
+> ? ? ? ? ? ? ? ?return -EOVERFLOW;
+> ? ? ? ?*out_value = c;
+>
+> Plus it catches more error conditions that way.
 
-I agree to disagree but I assume thats ok. ;)
+If we change the offset to represent bytes and not cell index in the
+u32 and u64 versions, shouldn't offset represent bytes for the string
+version as well? In case of multi-format property values, there could
+be u32 or u64 values intermixed with string values. So, some
+modifications have been made to your above implementation of the
+string version.
 
-Let me finally add some maybe interesting or informational points for 
-those who are working or examing the issue and/or who might be involved 
-in other discussions on the reason for removing the packed:
+The new diff is listed below. Would there be any changes required. If
+this is acceptable, I will submit a separate patch.
 
-- I didn't have any problems booting from ehci with kernels compiled 
-with gcc 4.6 on armv5 (or x86*).
+ drivers/of/base.c  |  142 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/of.h |   12 ++++
+ 2 files changed, 154 insertions(+), 0 deletions(-)
 
-- 2.6.38.4 (and below) compiled with gcc 4.6 booted from ehci (on a 
-classic beagleboard c4, armv7), whereas everything from 2.6.38.5 upwards 
-didn't (same compiler, same config). I've discovered that before having 
-seen that this might be the issue with the packed, therefor I haven't 
-tested if 2.6.38.5 might work without a packed and have just used gcc 
-4.5.x for 2.6.38.x. I have tested that a 2,6,39.x compiled with gcc 4.6 
-and with a removed packed boots from ehci on the beagleboard, so the 
-patch which removes the packed might be a candidate for the stable tree. 
-The reason why booting from ehci stopped with 2.6.38.5+ (gcc 4.6) might 
-be interesting for someone. Looking at the git log I haven't seen 
-something special and I don't know why anything below 2.6.38.5 worked 
-with gcc 4.6 and the packed.
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 632ebae..e9acbea 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -596,6 +596,148 @@ struct device_node
+*of_find_node_by_phandle(phandle handle)
+ EXPORT_SYMBOL(of_find_node_by_phandle);
 
-- I don't like the idea that every member of every packed struct 
-(without an aligned) might be handled byte by byte. It might be 
-necessary but I still don't like it and would prefer the old behaviour 
-of gcc. I've added this point just to express my personal humble opinion 
-and I don't want to get involved in a discussion on that topic. ;)
+ /**
++ * of_read_property_u32 - Reads a 32-bit property value
++ * @prop:	property to read from.
++ * @offset:	offset into property value to read from (in bytes).
++ * @out_value:	returned value.
++ *
++ * Returns a 32-bit value from a property. Returns -EINVAL, if the
+property does
++ * not exist, -ENODATA, if property does not have a value, -EOVERFLOW, if
++ * reading from offset overshoots the length of the property.
++ */
++int of_read_property_u32(struct property *prop, u32 offset, u32 *out_value)
++{
++	if (!prop || !out_value)
++		return -EINVAL;
++	if (!prop->value)
++		return -ENODATA;
++	if (offset + sizeof(*out_value) > prop->length)
++		return -EOVERFLOW;
++
++	*out_value = be32_to_cpup(prop->value + offset);
++	return 0;
++}
++EXPORT_SYMBOL_GPL(of_read_property_u32);
++
++/**
++ * of_getprop_u32 - Find a property in a device node and read a 32-bit value
++ * @np:		device node from which the property value is to be read.
++ * @propname	name of the property to be searched.
++ * @offset:	offset into property value to read from (in bytes).
++ * @out_value:	returned value.
++ *
++ * Search for a property in a device node and read a 32-bit value from a
++ * property. Returns -EINVAL, if the property does not exist, -ENODATA, if
++ * property does not have a value, -EOVERFLOW, if reading from offset
+overshoots
++ * the length of the property.
++ */
++int of_getprop_u32(struct device_node *np, char *propname, int offset,
++			u32 *out_value)
++{
++	return of_read_property_u32(of_find_property(np, propname, NULL),
++					offset, out_value);
++}
++EXPORT_SYMBOL_GPL(of_getprop_u32);
++
++/**
++ * of_read_property_u64 - Reads a 64-bit property value
++ * @prop:	property to read from.
++ * @offset:	offset into property value to read from (in bytes).
++ * @out_value:	returned value.
++ *
++ * Returns a 64-bit value from a property. Returns -EINVAL, if the
+property does
++ * not exist, -ENODATA, if property does not have a value, -EOVERFLOW, if
++ * reading from offset overshoots the length of the property.
++ */
++int of_read_property_u64(struct property *prop, int offset, u64 *out_value)
++{
++	if (!prop || !out_value)
++		return -EINVAL;
++	if (!prop->value)
++		return -ENODATA;
++	if (offset + sizeof(*out_value) > prop->length)
++		return -EOVERFLOW;
++	*out_value = be32_to_cpup(prop->value + offset);
++	*out_value = (*out_value << 32) |
++			be32_to_cpup(prop->value + offset + sizeof(u32));
++	return 0;
++}
++EXPORT_SYMBOL_GPL(of_read_property_u64);
++
++/**
++ * of_getprop_u64 - Find a property in a device node and read a 64-bit value
++ * @np:		device node from which the property value is to be read.
++ * @propname	name of the property to be searched.
++ * @offset:	offset into property value to read from (in bytes).
++ * @out_value:	returned value.
++ *
++ * Search for a property in a device node and read a 64-bit value from a
++ * property. Returns -EINVAL, if the property does not exist, -ENODATA, if
++ * property does not have a value, -EOVERFLOW, if reading from offset
+overshoots
++ * the length of the property.
++ */
++int of_getprop_u64(struct device_node *np, char *propname, int offset,
++			u64 *out_value)
++{
++	return of_read_property_u64(of_find_property(np, propname, NULL),
++					offset, out_value);
++}
++EXPORT_SYMBOL_GPL(of_getprop_u64);
++
++/**
++ * of_read_property_string - Returns a pointer to a null terminated
++ *				property string value
++ * @prop:	property to read from.
++ * @offset:	offset into property value to read from (in bytes).
++ * @string:	pointer to a null terminated string, valid only if the return
++ *		value is 0.
++ *
++ * Returns a pointer to a null terminated property string value.
+Returns -EINVAL,
++ * if the property does not exist, -ENODATA, if property does not have a value,
++ * -EOVERFLOW, if the offset overshoots the length of the property, -EILSEQ, if
++ * the string is not null-terminated within the length of the property.
++ */
++int
++of_read_property_string(struct property *prop, int offset, char **out_string)
++{
++	if (!prop || !out_string)
++		return -EINVAL;
++	if (!prop->value)
++		return -ENODATA;
++	if (offset >= prop->length)
++		return -EOVERFLOW;
++	if (strnlen(prop->value + offset, prop->length - offset)
++			+ offset == prop->length)
++		return -EILSEQ;
++	*out_string = prop->value + offset;
++	return 0;
++}
++EXPORT_SYMBOL_GPL(of_read_property_string);
++
++/**
++ * of_getprop_string - Find a property in a device node and read a null
++ *			terminated string value
++ * @np:		device node from which the property value is to be read.
++ * @propname	name of the property to be searched.
++ * @offset:	offset into property value to read from (in bytes).
++ * @out_string:	pointer to a null terminated string, valid only if the return
++ *		value is 0.
++ *
++ * Search for a property in a device node and return a pointer to a string
++ * value of a property. Returns -EINVAL, if the property does not exist,
++ * -ENODATA, if property does not have a value, -EOVERFLOW, if the offset
++ * overshoots the length of the property, -EILSEQ, if the string is not
++ * null-terminated within the length of the property.
++ */
++int of_getprop_string(struct device_node *np, char *propname, int offset,
++			char **out_string)
++{
++	return of_read_property_string(of_find_property(np, propname, NULL),
++					offset, out_string);
++}
++EXPORT_SYMBOL_GPL(of_getprop_string);
++
++/**
+  * of_parse_phandle - Resolve a phandle property to a device_node pointer
+  * @np: Pointer to device node holding phandle property
+  * @phandle_name: Name of property holding a phandle value
+diff --git a/include/linux/of.h b/include/linux/of.h
+index bfc0ed1..f5c1065 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -195,6 +195,18 @@ extern struct device_node *of_find_node_with_property(
+ extern struct property *of_find_property(const struct device_node *np,
+ 					 const char *name,
+ 					 int *lenp);
++extern int of_read_property_u32(struct property *prop, u32 offset,
++				u32 *out_value);
++extern int of_getprop_u32(struct device_node *np, char *propname, int offset,
++				u32 *out_value);
++extern int of_read_property_u64(struct property *prop, int offset,
++				u64 *out_value);
++extern int of_getprop_u64(struct device_node *np, char *propname, int offset,
++				u64 *out_value);
++extern int of_read_property_string(struct property *prop, int offset,
++				char **out_string);
++extern int of_getprop_string(struct device_node *np, char *propname,
+int offset,
++				char **out_string);
+ extern int of_device_is_compatible(const struct device_node *device,
+ 				   const char *);
+ extern int of_device_is_available(const struct device_node *device);
 
-I've just got involved on that topic by accident and never have had a 
-real reason to do something there (I've done that just for fun). 
-Therefore I now prefer to disappear, which means there is absolutely no 
-reason to respond (to me) or to explain anything to me.
 
-Regards and sorry if I wasted someones time,
-
-Alexander
+Thanks,
+Thomas.
