@@ -1,96 +1,72 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Fri, 24 Jun 2011 21:04:56 +0530
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-In-Reply-To: <20110624151201.GO9449@n2100.arm.linux.org.uk>
-References: <1308923618-5333-1-git-send-email-premi@ti.com>
-	<20110624140142.GM9449@n2100.arm.linux.org.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2EF2@dbde02.ent.ti.com>
-	<20110624141402.GN9449@n2100.arm.linux.org.uk>
-	<20110624151201.GO9449@n2100.arm.linux.org.uk>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2F26@dbde02.ent.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 24 Jun 2011 17:36:43 +0200
+Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
+In-Reply-To: <1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <201106241736.43576.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-> Sent: Friday, June 24, 2011 8:42 PM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCHv2] omap2+: pm: cpufreq: Fix 
-> loops_per_jiffy calculation
+On Monday 20 June 2011, Marek Szyprowski wrote:
+> This patch modifies dma-mapping implementation on ARM architecture to
+> use common dma_map_ops structure and asm-generic/dma-mapping-common.h
+> helpers.
 > 
-> Right, thanks for the file.  Here's the patch.
-> 
-> --- omap2plus-cpufreq.c~	2011-06-24 15:50:32.000000000 +0100
-> +++ omap2plus-cpufreq.c	2011-06-24 16:00:08.000000000 +0100
-> @@ -44,6 +44,16 @@
->  static char *mpu_clk_name;
->  static struct device *mpu_dev;
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+This is a good idea in general, but I have a few concerns about details:
+
+First of all, should we only allow using dma_map_ops on ARM, or do we
+also want to support a case where these are all inlined as before?
+
+I suppose for the majority of the cases, the overhead of the indirect
+function call is near-zero, compared to the overhead of the cache
+management operation, so it would only make a difference for coherent
+systems without an IOMMU. Do we care about micro-optimizing those?
+
+> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
+> index 799669d..f4e4968 100644
+> --- a/arch/arm/include/asm/dma-mapping.h
+> +++ b/arch/arm/include/asm/dma-mapping.h
+> @@ -10,6 +10,27 @@
+>  #include <asm-generic/dma-coherent.h>
+>  #include <asm/memory.h>
 >  
-> +#ifdef CONFIG_SMP
-> +struct lpj_info {
-> +	unsigned long	ref;
-> +	unsigned int	freq;
-> +};
+> +extern struct dma_map_ops dma_ops;
 > +
-> +static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
-> +static struct lpj_info global_lpj_ref;
-> +#endif
-> +
->  static int omap_verify_speed(struct cpufreq_policy *policy)
->  {
->  	if (!freq_table)
-> @@ -109,14 +119,25 @@
->  	freqs.new = omap_getspeed(policy->cpu);
->  
->  #ifdef CONFIG_SMP
-> -	/* Adjust jiffies before transition */
-> +	/* Adjust per-cpu loops_per_jiffy before transition */
->  	for_each_cpu(i, policy->cpus) {
-> -		unsigned long lpj = per_cpu(cpu_data, 
-> i).loops_per_jiffy;
+> +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> +{
+> +	if (dev->archdata.dma_ops)
+> +		return dev->archdata.dma_ops;
+> +	return &dma_ops;
+> +}
+
+I would not name the global structure just 'dma_ops', the identifier could
+too easily conflict with a local variable in some driver. How about
+arm_dma_ops or linear_dma_ops instead?
+
+>  /*
+>   * The scatter list versions of the above methods.
+>   */
+> -extern int dma_map_sg(struct device *, struct scatterlist *, int,
+> -		enum dma_data_direction);
+> -extern void dma_unmap_sg(struct device *, struct scatterlist *, int,
+> +extern int arm_dma_map_sg(struct device *, struct scatterlist *, int,
+> +		enum dma_data_direction, struct dma_attrs *attrs);
+> +extern void arm_dma_unmap_sg(struct device *, struct scatterlist *, int,
+> +		enum dma_data_direction, struct dma_attrs *attrs);
+> +extern void arm_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
+>  		enum dma_data_direction);
+> -extern void dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
+> +extern void arm_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
+>  		enum dma_data_direction);
+> -extern void dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
+> -		enum dma_data_direction);
 > -
-> -		per_cpu(cpu_data, i).loops_per_jiffy = 
-> cpufreq_scale(lpj,
-> -							freqs.old,
-> -							freqs.new);
-> +		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
-> +		if (!lpj->freq) {
-> +			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
-> +			lpj->freq = freqs.old;
-> +		}
-> +
-> +		per_cpu(cpu_data, i).loops_per_jiffy =
-> +			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
-> +	}
-> +
-> +	/* And don't forget to adjust the global one */
-> +	if (!global_lpj_ref.freq) {
-> +		global_lpj_ref.ref = loops_per_jiffy;
-> +		global_lpj_ref.freq = freqs.old;
->  	}
-> +	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, 
-> global_lpj_ref.freq,
-> +					freqs.new);
->  #endif
->  
->  	/* Notify transitions */
-> 
-> 
-> Notice how we adjust _both_ the per-cpu loops_per_jiffy, and that we
-> adjust them with reference to the initial values.
-> 
-> If you adjust lpj with reference to the last, then you _will_ build up
-> a progressively bigger and bigger error in the value over time.
 
-Russell,
+You should not need to make these symbols visible in the header file any
+more unless they are used outside of the main file later.
 
-I definitely didn't see so many things through your comments. But
-that may just be reflection of my naivety with SMP!
-
-I am currently testing another patch for beagle - will apply and
-test on OMAP3EVM (just to be sure).
-
-Can I include it in my next patch rev?
-
-~sanjeev
+	Arnd
