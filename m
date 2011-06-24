@@ -1,72 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Jun 2011 17:36:43 +0200
-Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
-In-Reply-To: <1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
-Message-ID: <201106241736.43576.arnd@arndb.de>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Fri, 24 Jun 2011 21:13:49 +0530
+Subject: [RFC 5/8] remoteproc: add davinci implementation
+In-Reply-To: <4E04A9AE.3030801@mvista.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-6-git-send-email-ohad@wizery.com>
+	<4E035B78.3080200@mvista.com>
+	<FFF198FBBF957F4393BA834040FEFFA202D66E@DFLE35.ent.ti.com>
+	<4E04A9AE.3030801@mvista.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2F29@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 20 June 2011, Marek Szyprowski wrote:
-> This patch modifies dma-mapping implementation on ARM architecture to
-> use common dma_map_ops structure and asm-generic/dma-mapping-common.h
-> helpers.
+Hi Mark,
+
+On Fri, Jun 24, 2011 at 20:43:50, Sergei Shtylyov wrote:
+
+> >>> +	rproc->priv = dsp_clk;
+> >>> +
+> >>> +	psc_base = ioremap(soc_info->psc_bases[0], SZ_4K);
+> >>> +
+> >>> +	/* insure local reset is asserted before writing start address */
+> >>> +	__raw_writel(NEXT_ENABLED, psc_base + MDCTL + 4 *
+> >> DA8XX_LPSC0_GEM);
+> >>> +
+> >>> +	__raw_writel(bootaddr, DA8XX_SYSCFG0_VIRT(HOST1CFG));
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+> >>     DA8XX_SYSCFG0_VIRT() is not supposed to be used outside mach-davinci. The
+> >> variable it refers is not exported, so driver module won't work.
+> 
+> > Ooops, I clearly did not build this as a module. Suggestion how to fix this?
+> 
+>     Using the normal ioremap() of SYSCFG0 space, I suppose.
 
-This is a good idea in general, but I have a few concerns about details:
+Since procedure to set the boot address varies across DaVinci
+platforms, you could have a callback populated in platform data
+which will be implemented differently for original DaVinci and
+DA8xx devices.
 
-First of all, should we only allow using dma_map_ops on ARM, or do we
-also want to support a case where these are all inlined as before?
+Also, all PSC accesses are better off going through clock
+framework to ensure proper locking and modularity.
 
-I suppose for the majority of the cases, the overhead of the indirect
-function call is near-zero, compared to the overhead of the cache
-management operation, so it would only make a difference for coherent
-systems without an IOMMU. Do we care about micro-optimizing those?
+To assert/de-assert local reset when enabling or disabling PSC,
+you could use a flag in the clock structure to indicate the need
+for this. This way, if there is any other module needing a local
+reset, it can just define the same flag. Similarly, if the DSP
+does not need a local reset on a particular platform, that
+platform can simply skip the flag.
 
-> diff --git a/arch/arm/include/asm/dma-mapping.h b/arch/arm/include/asm/dma-mapping.h
-> index 799669d..f4e4968 100644
-> --- a/arch/arm/include/asm/dma-mapping.h
-> +++ b/arch/arm/include/asm/dma-mapping.h
-> @@ -10,6 +10,27 @@
->  #include <asm-generic/dma-coherent.h>
->  #include <asm/memory.h>
->  
-> +extern struct dma_map_ops dma_ops;
-> +
-> +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> +{
-> +	if (dev->archdata.dma_ops)
-> +		return dev->archdata.dma_ops;
-> +	return &dma_ops;
-> +}
+This can be done in a manner similar to how the support for
+a forced transition PSC was added here:
 
-I would not name the global structure just 'dma_ops', the identifier could
-too easily conflict with a local variable in some driver. How about
-arm_dma_ops or linear_dma_ops instead?
+https://patchwork.kernel.org/patch/662941/
 
->  /*
->   * The scatter list versions of the above methods.
->   */
-> -extern int dma_map_sg(struct device *, struct scatterlist *, int,
-> -		enum dma_data_direction);
-> -extern void dma_unmap_sg(struct device *, struct scatterlist *, int,
-> +extern int arm_dma_map_sg(struct device *, struct scatterlist *, int,
-> +		enum dma_data_direction, struct dma_attrs *attrs);
-> +extern void arm_dma_unmap_sg(struct device *, struct scatterlist *, int,
-> +		enum dma_data_direction, struct dma_attrs *attrs);
-> +extern void arm_dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
->  		enum dma_data_direction);
-> -extern void dma_sync_sg_for_cpu(struct device *, struct scatterlist *, int,
-> +extern void arm_dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
->  		enum dma_data_direction);
-> -extern void dma_sync_sg_for_device(struct device *, struct scatterlist *, int,
-> -		enum dma_data_direction);
-> -
-
-You should not need to make these symbols visible in the header file any
-more unless they are used outside of the main file later.
-
-	Arnd
+Thanks,
+Sekhar
