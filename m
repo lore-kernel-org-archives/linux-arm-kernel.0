@@ -1,99 +1,191 @@
-From: agust@denx.de (Anatolij Gustschin)
-Date: Fri, 24 Jun 2011 02:03:08 +0200
-Subject: [PATCH] usb: fsl_udc_core: fix build breakage when building for ARM
-	arch
-Message-ID: <1308873788-22881-1-git-send-email-agust@denx.de>
+From: khilman@ti.com (Kevin Hilman)
+Date: Thu, 23 Jun 2011 17:16:14 -0700
+Subject: [PATCH] OMAP3: PM: remove get_*_restore_pointer functions,
+	directly use entry points
+Message-ID: <1308874574-30663-1-git-send-email-khilman@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 09ba0def introduced build breakage on ARM arch.
-Fix it by setting accessors using a static inline function
-which is a nop when compiling the driver for ARM arch.
+Upon return from off-mode, the ROM code jumps to a restore function
+saved in the scratchpad.  Based on SoC revision or errata, this
+restore entry point is different.  Current code uses some helper
+functions in sleep34xx.S (get_*_restore_pointer) to get the restore
+function entry point.
 
-Don't use flush_dcache_range(), convert to the DMA API
-usage instead. USB2.0CV Halt Endpoint Test succeeds on
-PPC. Tested both on ARM i.MX31 and mpc5121 PPC.
+When returning from off-mode, this code is executed from SDRAM, so
+there's no reason to use these helper functions when using the SDRAM
+entry points directly would work just fine.
 
-Signed-off-by: Anatolij Gustschin <agust@denx.de>
+This patch uses ENTRY/ENDPROC to create "real" entry points for these
+functions, and uses those values directly when writing the scratchpad.
+
+Tested all three entry points
+- restore_es3: 3430/n900
+- restore_3630: 3630/Zoom3
+- restore: 3530/Overo
+
+Suggested-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Cc: Jean Pihet <jean.pihet@newoldbits.com>
+Signed-off-by: Kevin Hilman <khilman@ti.com>
 ---
- drivers/usb/gadget/fsl_udc_core.c |   30 +++++++++++++++++++-----------
- 1 files changed, 19 insertions(+), 11 deletions(-)
+Applies on top of Russell's suspend cleanup/rejig, and available
+(along with Russell's series) in my pm-wip/idle-suspend branch.
 
-diff --git a/drivers/usb/gadget/fsl_udc_core.c b/drivers/usb/gadget/fsl_udc_core.c
-index 2cd9a60..eab033f 100644
---- a/drivers/usb/gadget/fsl_udc_core.c
-+++ b/drivers/usb/gadget/fsl_udc_core.c
-@@ -46,7 +46,6 @@
- #include <asm/system.h>
- #include <asm/unaligned.h>
- #include <asm/dma.h>
--#include <asm/cacheflush.h>
- 
- #include "fsl_usb2_udc.h"
- 
-@@ -118,6 +117,17 @@ static void (*_fsl_writel)(u32 v, unsigned __iomem *p);
- #define fsl_readl(p)		(*_fsl_readl)((p))
- #define fsl_writel(v, p)	(*_fsl_writel)((v), (p))
- 
-+static inline void fsl_set_accessors(struct fsl_usb2_platform_data *pdata)
-+{
-+	if (pdata->big_endian_mmio) {
-+		_fsl_readl = _fsl_readl_be;
-+		_fsl_writel = _fsl_writel_be;
-+	} else {
-+		_fsl_readl = _fsl_readl_le;
-+		_fsl_writel = _fsl_writel_le;
-+	}
-+}
+Russell, since it depends on your series, feel free to add it to your
+series if you like.  Or if you prefer, we can take it through the OMAP
+tree.
+
+ arch/arm/mach-omap2/control.c   |    7 ++--
+ arch/arm/mach-omap2/control.h   |    6 ++--
+ arch/arm/mach-omap2/sleep34xx.S |   61 +++++++-------------------------------
+ 3 files changed, 19 insertions(+), 55 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/control.c b/arch/arm/mach-omap2/control.c
+index da53ba3..aab884f 100644
+--- a/arch/arm/mach-omap2/control.c
++++ b/arch/arm/mach-omap2/control.c
+@@ -286,14 +286,15 @@ void omap3_save_scratchpad_contents(void)
+ 	scratchpad_contents.boot_config_ptr = 0x0;
+ 	if (cpu_is_omap3630())
+ 		scratchpad_contents.public_restore_ptr =
+-			virt_to_phys(get_omap3630_restore_pointer());
++			virt_to_phys(omap3_restore_3630);
+ 	else if (omap_rev() != OMAP3430_REV_ES3_0 &&
+ 					omap_rev() != OMAP3430_REV_ES3_1)
+ 		scratchpad_contents.public_restore_ptr =
+-			virt_to_phys(get_restore_pointer());
++			virt_to_phys(omap3_restore);
+ 	else
+ 		scratchpad_contents.public_restore_ptr =
+-			virt_to_phys(get_es3_restore_pointer());
++			virt_to_phys(omap3_restore_es3);
 +
- static inline u32 cpu_to_hc32(const u32 x)
- {
- 	return udc_controller->pdata->big_endian_desc
-@@ -132,6 +142,8 @@ static inline u32 hc32_to_cpu(const u32 x)
- 		: le32_to_cpu((__force __le32)x);
- }
- #else /* !CONFIG_PPC32 */
-+static inline void fsl_set_accessors(struct fsl_usb2_platform_data *pdata) {}
-+
- #define fsl_readl(addr)		readl(addr)
- #define fsl_writel(val32, addr) writel(val32, addr)
- #define cpu_to_hc32(x)		cpu_to_le32(x)
-@@ -1348,9 +1360,6 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
- 	/* Fill in the reqest structure */
- 	*((u16 *) req->req.buf) = cpu_to_le16(tmp);
+ 	if (omap_type() == OMAP2_DEVICE_TYPE_GP)
+ 		scratchpad_contents.secure_ram_restore_ptr = 0x0;
+ 	else
+diff --git a/arch/arm/mach-omap2/control.h b/arch/arm/mach-omap2/control.h
+index a016c8b..d4ef75d 100644
+--- a/arch/arm/mach-omap2/control.h
++++ b/arch/arm/mach-omap2/control.h
+@@ -386,9 +386,9 @@ extern void omap4_ctrl_pad_writel(u32 val, u16 offset);
  
--	/* flush cache for the req buffer */
--	flush_dcache_range((u32)req->req.buf, (u32)req->req.buf + 8);
+ extern void omap3_save_scratchpad_contents(void);
+ extern void omap3_clear_scratchpad_contents(void);
+-extern u32 *get_restore_pointer(void);
+-extern u32 *get_es3_restore_pointer(void);
+-extern u32 *get_omap3630_restore_pointer(void);
++extern void omap3_restore(void);
++extern void omap3_restore_es3(void);
++extern void omap3_restore_3630(void);
+ extern u32 omap3_arm_context[128];
+ extern void omap3_control_save_context(void);
+ extern void omap3_control_restore_context(void);
+diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+index 9a1349e..177f70f 100644
+--- a/arch/arm/mach-omap2/sleep34xx.S
++++ b/arch/arm/mach-omap2/sleep34xx.S
+@@ -74,46 +74,6 @@
+  * API functions
+  */
+ 
+-/*
+- * The "get_*restore_pointer" functions are used to provide a
+- * physical restore address where the ROM code jumps while waking
+- * up from MPU OFF/OSWR state.
+- * The restore pointer is stored into the scratchpad.
+- */
 -
- 	req->ep = ep;
- 	req->req.length = 2;
- 	req->req.status = -EINPROGRESS;
-@@ -1358,6 +1367,11 @@ static void ch9getstatus(struct fsl_udc *udc, u8 request_type, u16 value,
- 	req->req.complete = NULL;
- 	req->dtd_count = 0;
+-	.text
+-/* Function call to get the restore pointer for resume from OFF */
+-ENTRY(get_restore_pointer)
+-	stmfd	sp!, {lr}	@ save registers on stack
+-	adr	r0, restore
+-	ldmfd	sp!, {pc}	@ restore regs and return
+-ENDPROC(get_restore_pointer)
+-	.align
+-ENTRY(get_restore_pointer_sz)
+-	.word	. - get_restore_pointer
+-
+-	.text
+-/* Function call to get the restore pointer for 3630 resume from OFF */
+-ENTRY(get_omap3630_restore_pointer)
+-	stmfd	sp!, {lr}	@ save registers on stack
+-	adr	r0, restore_3630
+-	ldmfd	sp!, {pc}	@ restore regs and return
+-ENDPROC(get_omap3630_restore_pointer)
+-	.align
+-ENTRY(get_omap3630_restore_pointer_sz)
+-	.word	. - get_omap3630_restore_pointer
+-
+-	.text
+-/* Function call to get the restore pointer for ES3 to resume from OFF */
+-ENTRY(get_es3_restore_pointer)
+-	stmfd	sp!, {lr}	@ save registers on stack
+-	adr	r0, restore_es3
+-	ldmfd	sp!, {pc}	@ restore regs and return
+-ENDPROC(get_es3_restore_pointer)
+-	.align
+-ENTRY(get_es3_restore_pointer_sz)
+-	.word	. - get_es3_restore_pointer
+-
+ 	.text
+ /*
+  * L2 cache needs to be toggled for stable OFF mode functionality on 3630.
+@@ -316,12 +276,12 @@ omap3_do_wfi:
+  *  restore_3630: applies to 36xx
+  *  restore: common code for 3xxx
+  */
+-restore_es3:
++ENTRY(omap3_restore_es3)
+ 	ldr	r5, pm_prepwstst_core_p
+ 	ldr	r4, [r5]
+ 	and	r4, r4, #0x3
+ 	cmp	r4, #0x0	@ Check if previous power state of CORE is OFF
+-	bne	restore
++	bne	omap3_restore
+ 	adr	r0, es3_sdrc_fix
+ 	ldr	r1, sram_base
+ 	ldr	r2, es3_sdrc_fix_sz
+@@ -333,22 +293,24 @@ copy_to_sram:
+ 	bne	copy_to_sram
+ 	ldr	r1, sram_base
+ 	blx	r1
+-	b	restore
+-
+-restore_3630:
++	b	omap3_restore
++ENDPROC(omap3_restore_es3)
++	
++ENTRY(omap3_restore_3630)
+ 	ldr	r1, pm_prepwstst_core_p
+ 	ldr	r2, [r1]
+ 	and	r2, r2, #0x3
+ 	cmp	r2, #0x0	@ Check if previous power state of CORE is OFF
+-	bne	restore
++	bne	omap3_restore
+ 	/* Disable RTA before giving control */
+ 	ldr	r1, control_mem_rta
+ 	mov	r2, #OMAP36XX_RTA_DISABLE
+ 	str	r2, [r1]
+-
++ENDPROC(omap3_restore_3630)
++	
+ 	/* Fall through to common code for the remaining logic */
  
-+	dma_sync_single_for_device(udc->gadget.dev.parent,
-+		req->req.dma, req->req.length,
-+		ep_is_in(ep) ? DMA_TO_DEVICE : DMA_FROM_DEVICE);
-+	req->mapped = 0;
-+
- 	/* prime the data phase */
- 	if ((fsl_req_to_dtd(req) == 0))
- 		fsl_queue_td(ep, req);
-@@ -2470,13 +2484,7 @@ static int __init fsl_udc_probe(struct platform_device *pdev)
- 	}
+-restore:
++ENTRY(omap3_restore)
+ 	/*
+ 	 * Read the pwstctrl register to check the reason for mpu reset.
+ 	 * This tells us what was lost.
+@@ -438,7 +400,8 @@ skipl2reen:
  
- 	/* Set accessors only after pdata->init() ! */
--	if (pdata->big_endian_mmio) {
--		_fsl_readl = _fsl_readl_be;
--		_fsl_writel = _fsl_writel_be;
--	} else {
--		_fsl_readl = _fsl_readl_le;
--		_fsl_writel = _fsl_writel_le;
--	}
-+	fsl_set_accessors(pdata);
+ 	/* Now branch to the common CPU resume function */
+ 	b	cpu_resume
+-
++ENDPROC(omap3_restore)
++	
+ 	.ltorg
  
- #ifndef CONFIG_ARCH_MXC
- 	if (pdata->have_sysif_regs)
+ /*
 -- 
-1.7.1
+1.7.4
