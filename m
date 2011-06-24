@@ -1,316 +1,112 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Fri, 24 Jun 2011 19:06:54 +0900
-Subject: [PATCH] ARM: EXYNOS4: Support for generic I/O power domains on
-	EXYNOS4210
-Message-ID: <4E0461BE.5030304@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Jun 2011 11:22:46 +0100
+Subject: [PATCH 4/7] ARM: EXYNOS4: Support early wakeup while entering
+	sleep mode
+In-Reply-To: <20110624093750.GD23234@n2100.arm.linux.org.uk>
+References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
+	<1308732405-16664-5-git-send-email-kgene.kim@samsung.com>
+	<20110622145715.GS23234@n2100.arm.linux.org.uk>
+	<007401cc3242$48947160$d9bd5420$%kim@samsung.com>
+	<20110624093750.GD23234@n2100.arm.linux.org.uk>
+Message-ID: <20110624102246.GF23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the generic power domains support to implement support
-for power domain on EXYNOS4210.
+On Fri, Jun 24, 2011 at 10:37:50AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Jun 24, 2011 at 04:42:26PM +0900, Kukjin Kim wrote:
+> > Russell King - ARM Linux wrote:
+> > 
+> > > Stop bodging stuff (like you have for the SCU stuff.) and start _talking_
+> > > to people if the code doesn't do what you need it to do.
+> > 
+> > Hi Russell and all,
+> > 
+> > I'd like to share requirement of EXYNOS4210 PM.
+> > 
+> > Now if there is wakeup source which is pending before entering suspend mode,
+> > PMU(Power Management Unit) handles WFI instruction as NOP on EXYNOS4210. But
+> > it seems that current cpu_suspend() cannot support this. So how can/should
+> > we handle this case?
+> 
+> See patch from June 13th posted to the hibernate thread.  This allows
+> the finisher function to return, though it should only return if it is
+> certain that the system will not enter suspend.
+> 
+> Is this true of the current exynos4 code?  It seems that the current
+> code will panic() if the WFI is executed as a NOP.
 
-This patch is based on your "pm-domains" branch.(v7)
+Here's an updated patch for it against the v3 set of patches.
 
-Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
-Signed-off-by: Myungjoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin.park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos4/Kconfig                      |    1 +
- arch/arm/mach-exynos4/Makefile                     |    1 +
- arch/arm/mach-exynos4/include/mach/pm-exynos4210.h |   78 ++++++++++++
- arch/arm/mach-exynos4/mach-nuri.c                  |   20 +++
- arch/arm/mach-exynos4/pm-exynos4210.c              |  131 ++++++++++++++++++++
- 5 files changed, 231 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
- create mode 100644 arch/arm/mach-exynos4/pm-exynos4210.c
+ arch/arm/include/asm/suspend.h |    9 +++++----
+ arch/arm/kernel/sleep.S        |   11 +++++++++--
+ 2 files changed, 14 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-index 1435fc3..266e7f6 100644
---- a/arch/arm/mach-exynos4/Kconfig
-+++ b/arch/arm/mach-exynos4/Kconfig
-@@ -183,6 +183,7 @@ config MACH_NURI
- 	select EXYNOS4_SETUP_SDHCI
- 	select EXYNOS4_SETUP_USB_PHY
- 	select SAMSUNG_DEV_PWM
-+	select PM_GENERIC_DOMAINS
- 	help
- 	  Machine support for Samsung Mobile NURI Board.
- 
-diff --git a/arch/arm/mach-exynos4/Makefile b/arch/arm/mach-exynos4/Makefile
-index 60fe5ec..0e9461f 100644
---- a/arch/arm/mach-exynos4/Makefile
-+++ b/arch/arm/mach-exynos4/Makefile
-@@ -17,6 +17,7 @@ obj-$(CONFIG_CPU_EXYNOS4210)	+= setup-i2c0.o irq-eint.o dma.o
- obj-$(CONFIG_PM)		+= pm.o sleep.o
- obj-$(CONFIG_CPU_FREQ)		+= cpufreq.o
- obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
-+obj-$(CONFIG_CPU_EXYNOS4210)	+= pm-exynos4210.o
- 
- obj-$(CONFIG_SMP)		+= platsmp.o headsmp.o
- 
-diff --git a/arch/arm/mach-exynos4/include/mach/pm-exynos4210.h b/arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
-new file mode 100644
-index 0000000..fa1c7a0
---- /dev/null
-+++ b/arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
-@@ -0,0 +1,78 @@
-+/* linux/arch/arm/mach-exynos4/include/mach/pm-exynos4.h
-+ *
-+ * Exynos4 Power management support
-+ *
-+ * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#ifndef __PM_EXYNOS4210_H__
-+#define __PM_EXYNOS4210_H__
-+
-+#include <linux/pm_domain.h>
-+
-+struct platform_device;
-+
-+struct exynos4210_pm_domain {
-+	struct generic_pm_domain genpd;
-+
-+	const char *name;
-+	void __iomem *base;
-+	int boot_on;
-+};
-+
-+static inline struct exynos4210_pm_domain *to_exynos4210_pd(
-+		struct generic_pm_domain *pd)
-+{
-+	return container_of(pd, struct exynos4210_pm_domain, genpd);
-+}
-+
-+#ifdef CONFIG_PM
-+enum exynos4210_pd_data {
-+	EXYNOS4210_PD_MFC,
-+	EXYNOS4210_PD_G3D,
-+	EXYNOS4210_PD_LCD0,
-+	EXYNOS4210_PD_LCD1,
-+	EXYNOS4210_PD_TV,
-+	EXYNOS4210_PD_CAM,
-+	EXYNOS4210_PD_GPS,
-+	EXYNOS4210_PD_MAX_NUM
-+};
-+
-+extern struct exynos4210_pm_domain exynos4210_pd_list[EXYNOS4210_PD_MAX_NUM];
-+#define EXYNOS4210_MFC		(&exynos4210_pd_list[EXYNOS4210_PD_MFC])
-+#define EXYNOS4210_G3D		(&exynos4210_pd_list[EXYNOS4210_PD_G3D])
-+#define EXYNOS4210_LCD0		(&exynos4210_pd_list[EXYNOS4210_PD_LCD0])
-+#define EXYNOS4210_LCD1		(&exynos4210_pd_list[EXYNOS4210_PD_LCD1])
-+#define EXYNOS4210_TV		(&exynos4210_pd_list[EXYNOS4210_PD_TV])
-+#define EXYNOS4210_CAM		(&exynos4210_pd_list[EXYNOS4210_PD_CAM])
-+#define EXYNOS4210_GPS		(&exynos4210_pd_list[EXYNOS4210_PD_GPS])
-+
-+extern int exynos4210_pd_init(struct exynos4210_pm_domain *domain);
-+extern int exynos4210_add_device_to_domain(struct exynos4210_pm_domain *domain,
-+				struct platform_device *pdev);
-+#else
-+#define EXYNOS4210_MFC		NULL
-+#define EXYNOS4210_G3D		NULL
-+#define EXYNOS4210_LCD0		NULL
-+#define EXYNOS4210_LCD1		NULL
-+#define EXYNOS4210_TV		NULL
-+#define EXYNOS4210_CAM		NULL
-+#define EXYNOS4210_GPS		NULL
-+
-+extern int exynos4210_pd_init(struct exynos4210_pm_domain *domain)
-+{
-+	return 0;
-+}
-+extern int exynos4_add_device_to_domain(struct exynos4210_pm_domain *domain,
-+				struct platform_device *pdev)
-+{
-+	return 0;
-+}
-+#endif /* CONFIG_PM */
-+
-+#endif /* __PM_EXYNOS4210_H__ */
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index 642702b..3e5c42c 100644
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -37,6 +37,7 @@
- #include <plat/iic.h>
- 
- #include <mach/map.h>
-+#include <mach/pm-exynos4210.h>
- 
- /* Following are default values for UCON, ULCON and UFCON UART registers */
- #define NURI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-@@ -376,6 +377,23 @@ static struct platform_device *nuri_devices[] __initdata = {
- 	&nuri_backlight_device,
- };
- 
-+static void __init nuri_power_domain_init(void)
-+{
-+	int i;
-+
-+	for (i = 0 ; i < EXYNOS4210_PD_MAX_NUM ; i++)
-+		exynos4210_pd_init(&exynos4210_pd_list[i]);
-+
-+	/* Add device to power-domain */
-+	exynos4210_add_device_to_domain(EXYNOS4210_MFC, NULL);
-+	exynos4210_add_device_to_domain(EXYNOS4210_G3D, NULL);
-+	exynos4210_add_device_to_domain(EXYNOS4210_LCD0, &nuri_lcd_device);
-+	exynos4210_add_device_to_domain(EXYNOS4210_LCD1, NULL);
-+	exynos4210_add_device_to_domain(EXYNOS4210_TV, NULL);
-+	exynos4210_add_device_to_domain(EXYNOS4210_CAM, NULL);
-+	exynos4210_add_device_to_domain(EXYNOS4210_GPS, NULL);
-+}
-+
- static void __init nuri_map_io(void)
+diff --git a/arch/arm/include/asm/suspend.h b/arch/arm/include/asm/suspend.h
+index f8db9d0..54821b5 100644
+--- a/arch/arm/include/asm/suspend.h
++++ b/arch/arm/include/asm/suspend.h
+@@ -10,12 +10,13 @@ extern void cpu_resume(void);
+  * Hide the first two arguments to __cpu_suspend - these are an implementation
+  * detail which platform code shouldn't have to know about.
+  */
+-static inline void cpu_suspend(unsigned long arg, void (*fn)(unsigned long))
++static inline int cpu_suspend(unsigned long arg, void (*fn)(unsigned long))
  {
- 	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-@@ -398,6 +416,8 @@ static void __init nuri_machine_init(void)
- 
- 	/* Last */
- 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
-+
-+	nuri_power_domain_init();
+-	extern void __cpu_suspend(int, long, unsigned long,
+-				  void (*)(unsigned long));
+-	__cpu_suspend(0, PHYS_OFFSET - PAGE_OFFSET, arg, fn);
++	extern int __cpu_suspend(int, long, unsigned long,
++				 void (*)(unsigned long));
++	int ret = __cpu_suspend(0, PHYS_OFFSET - PAGE_OFFSET, arg, fn);
+ 	flush_tlb_all();
++	return ret;
  }
  
- MACHINE_START(NURI, "NURI")
-diff --git a/arch/arm/mach-exynos4/pm-exynos4210.c b/arch/arm/mach-exynos4/pm-exynos4210.c
-new file mode 100644
-index 0000000..8e95d49
---- /dev/null
-+++ b/arch/arm/mach-exynos4/pm-exynos4210.c
-@@ -0,0 +1,131 @@
-+/* linux/arch/arm/mach-exynos4/pm-exynos4210.c
-+ *
-+ * Exynos4210 Power management support
-+ *
-+ * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
+ #endif
+diff --git a/arch/arm/kernel/sleep.S b/arch/arm/kernel/sleep.S
+index c156d0e..dc902f2 100644
+--- a/arch/arm/kernel/sleep.S
++++ b/arch/arm/kernel/sleep.S
+@@ -12,7 +12,6 @@
+  *  r1 = v:p offset
+  *  r2 = suspend function arg0
+  *  r3 = suspend function
+- * Note: does not return until system resumes
+  */
+ ENTRY(__cpu_suspend)
+ 	stmfd	sp!, {r4 - r11, lr}
+@@ -26,7 +25,7 @@ ENTRY(__cpu_suspend)
+ #endif
+ 	mov	r6, sp			@ current virtual SP
+ 	sub	sp, sp, r5		@ allocate CPU state on stack
+-	mov	r0, sp			@ save pointer
++	mov	r0, sp			@ save pointer to CPU save block
+ 	add	ip, ip, r1		@ convert resume fn to phys
+ 	stmfd	sp!, {r1, r6, ip}	@ save v:p, virt SP, phys resume fn
+ 	ldr	r5, =sleep_save_sp
+@@ -55,10 +54,17 @@ ENTRY(__cpu_suspend)
+ #else
+ 	bl	__cpuc_flush_kern_all
+ #endif
++	adr	lr, BSYM(cpu_suspend_abort)
+ 	ldmfd	sp!, {r0, pc}		@ call suspend fn
+ ENDPROC(__cpu_suspend)
+ 	.ltorg
+ 
++cpu_suspend_abort:
++	ldmia	sp!, {r1 - r3}		@ pop v:p, virt SP, phys resume fn
++	mov	sp, r2
++	ldmfd	sp!, {r4 - r11, pc}
++ENDPROC(cpu_suspend_abort)
 +
-+#include <linux/pm.h>
-+#include <linux/module.h>
-+#include <linux/delay.h>
-+#include <linux/err.h>
-+#include <linux/slab.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_runtime.h>
-+#include <linux/pm_domain.h>
-+#include <linux/io.h>
-+
-+#include <mach/regs-pmu.h>
-+#include <mach/regs-clock.h>
-+#include <mach/pm-exynos4210.h>
-+
-+struct exynos4210_pm_domain exynos4210_pd_list[] = {
-+	{
-+		.name		= "PD_MFC",
-+		.base		= S5P_PMU_MFC_CONF,
-+		.boot_on	= 0,
-+	}, {
-+		.name		= "PD_G3D",
-+		.base		= S5P_PMU_G3D_CONF,
-+		.boot_on	= 0,
-+	}, {
-+		.name		= "PD_LCD0",
-+		.base		= S5P_PMU_LCD0_CONF,
-+		.boot_on	= 1,
-+	}, {
-+		.name		= "PD_LCD1",
-+		.base		= S5P_PMU_LCD1_CONF,
-+		.boot_on	= 0,
-+	}, {
-+		.name		= "PD_TV",
-+		.base		= S5P_PMU_TV_CONF,
-+		.boot_on	= 0,
-+	}, {
-+		.name		= "PD_CAM",
-+		.base		= S5P_PMU_CAM_CONF,
-+		.boot_on	= 0,
-+	}, {
-+		.name		= "PD_GPS",
-+		.base		= S5P_PMU_GPS_CONF,
-+		.boot_on	= 0,
-+	},
-+};
-+
-+static int pd_power_down(struct generic_pm_domain *genpd)
-+{
-+	struct exynos4210_pm_domain *domain = to_exynos4210_pd(genpd);
-+	u32 timeout;
-+
-+	__raw_writel(0, domain->base);
-+
-+	/* Wait max 1ms */
-+	timeout = 10;
-+	while (__raw_readl(domain->base + 0x4) & S5P_INT_LOCAL_PWR_EN) {
-+		if (timeout == 0) {
-+			printk(KERN_ERR "Power domain %s disable failed.\n",
-+				domain->name);
-+			return -ETIMEDOUT;
-+		}
-+		timeout--;
-+		udelay(100);
-+	}
-+
-+	return 0;
-+}
-+
-+static int pd_power_up(struct generic_pm_domain *genpd)
-+{
-+	struct exynos4210_pm_domain *domain = to_exynos4210_pd(genpd);
-+	u32 timeout;
-+
-+	__raw_writel(S5P_INT_LOCAL_PWR_EN, domain->base);
-+
-+	/* Wait max 1ms */
-+	timeout = 10;
-+	while ((__raw_readl(domain->base + 0x4) & S5P_INT_LOCAL_PWR_EN)
-+		!= S5P_INT_LOCAL_PWR_EN) {
-+		if (timeout == 0) {
-+			printk(KERN_ERR "Power domain %s enable failed.\n",
-+				domain->name);
-+			return -ETIMEDOUT;
-+		}
-+		timeout--;
-+		udelay(100);
-+	}
-+
-+	return 0;
-+}
-+
-+int exynos4210_pd_init(struct exynos4210_pm_domain *domain)
-+{
-+	struct generic_pm_domain *genpd = &domain->genpd;
-+
-+	pm_genpd_init(genpd, NULL, false);
-+
-+	genpd->stop_device = pm_runtime_clk_suspend;
-+	genpd->start_device = pm_runtime_clk_resume;
-+	genpd->power_off = pd_power_down;
-+	genpd->power_on = pd_power_up;
-+
-+	if (domain->boot_on)
-+		pd_power_up(genpd);
-+
-+	return 0;
-+}
-+
-+int exynos4210_add_device_to_domain(struct exynos4210_pm_domain *domain,
-+				struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct generic_pm_domain *genpd = &domain->genpd;
-+
-+	if (pdev != NULL)
-+		return pm_genpd_add_device(genpd, dev);
-+	else
-+		return -EINVAL;
-+}
+ /*
+  * r0 = control register value
+  * r1 = v:p offset (preserved by cpu_do_resume)
+@@ -89,6 +95,7 @@ cpu_resume_after_mmu:
+ 	str	r5, [r2, r4, lsl #2]	@ restore old mapping
+ 	mcr	p15, 0, r0, c1, c0, 0	@ turn on D-cache
+ 	bl	cpu_init		@ restore the und/abt/irq banked regs
++	mov	r0, #0			@ return zero on success
+ 	ldmfd	sp!, {r4 - r11, pc}
+ ENDPROC(cpu_resume_after_mmu)
+ 
