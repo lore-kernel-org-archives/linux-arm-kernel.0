@@ -1,85 +1,62 @@
-From: premi@ti.com (Sanjeev Premi)
-Date: Fri, 24 Jun 2011 19:23:38 +0530
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-Message-ID: <1308923618-5333-1-git-send-email-premi@ti.com>
+From: dave.martin@linaro.org (Dave Martin)
+Date: Fri, 24 Jun 2011 14:54:33 +0100
+Subject: [PATCH v3 00/40] ARM: mm: Add generic macros for declaring
+	various CPU structs
+In-Reply-To: <alpine.LFD.2.00.1106240921500.2142@xanadu.home>
+References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
+	<alpine.LFD.2.00.1106231721270.2142@xanadu.home>
+	<20110624101054.GA2342@arm.com>
+	<alpine.LFD.2.00.1106240921500.2142@xanadu.home>
+Message-ID: <20110624135433.GB2342@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, loops_per_jiffy is being calculated twice for
-non-SMP processors.
- - Before calling cpufreq_notify_transition()
- - From within cpufreq_notify_transition()
+On Fri, Jun 24, 2011 at 09:32:27AM -0400, Nicolas Pitre wrote:
 
-Double adjustment leads to incorrect value being assigned to
-loops_per_jiffy. This manifests as incorrect BogoMIPS in
-"cat /proc/cpuinfo".
+[...]
 
-The value of loops_per_jiffy needs to be calculated only
-when CONFIG_SMP is true. It is the core change included
-in this patch.
+> Don't split if there is no obvious readability gain.  Human judgement is 
+> necessary here which can't be substituted by checkpatch.pl.
 
-The patch also leverages the definition of for_each_cpu()
-with and without CONFIG_SMP to consolidate the mechanism
-to call cpufreq_notify_transition().
+That's what I thought; just wanted to check I'd understood correctly.
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
----
- Changes since v1:
-   * loops_per_jiffy are updated when CONFIG_SMP is true.
-   * leverage definition of for_each_cpu()
+> 
+> > > mohawk_flush_icache_all:
+> > > 	mov	r0, #0
+> > > 	mcr	p15, 0, r0, c7, c5, 0		@ invalidate I cache
+> > > 	mov	pc, lr
+> > > 
+> > > The "mov r0, #0" is probably unnecessary, but this is a common pattern.
+> > 
+> > Thanks, merged locally.
+> > 
+> > OK if I add your S-o-B to that patch?
 
- Tested on OMAP3EVM with and without CONFIG_SMP.
- Since the log is rather long, will be posting the log in
- a follow-up mail.
+Done.  Thanks for the code.
 
- arch/arm/mach-omap2/omap2plus-cpufreq.c |   27 +++++++++++++++------------
- 1 files changed, 15 insertions(+), 12 deletions(-)
+[...]
 
-diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-index 346519e..0263cae 100644
---- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
-+++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
-@@ -97,12 +97,8 @@ static int omap_target(struct cpufreq_policy *policy,
- 		return ret;
+> Alternatively, using 'git rebase -i' and its squash and or fold commands 
+> (which can be abbreviated to the first letter) is pretty handy.  Might 
+> save you the time to write the script in the first place.
 
- 	/* Notify transitions */
--	if (is_smp()) {
--		for_each_cpu(i, policy->cpus) {
--			freqs.cpu = i;
--			cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
--		}
--	} else {
-+	for_each_cpu(i, policy->cpus) {
-+		freqs.cpu = i;
- 		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
- 	}
+I have just been "educated" on this point by someone else too -- autosquash
+would have suited my purposes exactly in this case ... I'll definitely
+do that next time.  Always good to learn something new :)
 
-@@ -114,13 +110,20 @@ static int omap_target(struct cpufreq_policy *policy,
 
- 	freqs.new = omap_getspeed(policy->cpu);
+The above fixes have been applied and pushed to the branch referenced
+below.
 
-+#ifdef CONFIG_SMP
-+	/* Adjust jiffies before transition */
-+	for_each_cpu(i, policy->cpus) {
-+		unsigned long lpj = per_cpu(cpu_data, i).loops_per_jiffy;
-+
-+		per_cpu(cpu_data, i).loops_per_jiffy = cpufreq_scale(lpj,
-+							freqs.old,
-+							freqs.new);
-+	}
-+#endif
-+
- 	/* Notify transitions */
--	if (is_smp()) {
--		for_each_cpu(i, policy->cpus) {
--			freqs.cpu = i;
--			cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
--		}
--	} else {
-+	for_each_cpu(i, policy->cpus) {
-+		freqs.cpu = i;
- 		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
- 	}
+This should get merged via Will's tree for the next merge window,
+providing that Russell is happy and nobody else objects.
 
---
-1.7.2.2
+Cheers
+---Dave
+
+The changes since commit 56299378726d5f2ba8d3c8cbbd13cb280ba45e4f:
+
+  Linux 3.0-rc4 (2011-06-20 20:25:46 -0700)
+
+are available in the git repository at:
+  git://git.linaro.org/people/dmart/linux-2.6-arm.git arm/proc-macros
