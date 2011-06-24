@@ -1,28 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Jun 2011 10:01:43 +0100
-Subject: [PATCH] ARM: amba: Link fb device to its parent
-In-Reply-To: <20110624080721.GC24184@linux-sh.org>
-References: <1308602657-28783-1-git-send-email-loic.minier@linaro.org>
-	<20110624080721.GC24184@linux-sh.org>
-Message-ID: <20110624090143.GC23234@n2100.arm.linux.org.uk>
+From: joro@8bytes.org (Joerg Roedel)
+Date: Fri, 24 Jun 2011 11:18:07 +0200
+Subject: [PATCH/RFC 0/8] ARM: DMA-mapping framework redesign
+In-Reply-To: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+Message-ID: <20110624091807.GC29299@8bytes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2011 at 05:07:21PM +0900, Paul Mundt wrote:
-> On Mon, Jun 20, 2011 at 10:44:17PM +0200, Lo??c Minier wrote:
-> > Some pieces of userspace like debian-installer expect to find the fb0
-> > driver name by readlink-ing /sys/class/graphics/fb0/device/driver but
-> > this was broken with amba-clcd as it sets up fb_info manually and missed
-> > the .device parent pointer.
-> > 
-> > Signed-off-by: Lo??c Minier <loic.minier@linaro.org>
-> > Cc: Russell King <linux@arm.linux.org.uk>
-> > Cc: Paul Mundt <lethal@linux-sh.org>
-> > ---
-> >  drivers/video/amba-clcd.c |    2 ++
-> >  1 files changed, 2 insertions(+), 0 deletions(-)
-> > 
-> While this is titled as an ARM patch it's certainly fbdev-specific. I'll
-> apply it barring any objections from Russell.
+Hi Marek,
 
-Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+On Mon, Jun 20, 2011 at 09:50:05AM +0200, Marek Szyprowski wrote:
+> This patch series is a continuation of my works on implementing generic
+> IOMMU support in DMA mapping framework for ARM architecture. Now I
+> focused on the DMA mapping framework itself. It turned out that adding
+> support for common dma_map_ops structure was not that hard as I initally
+> thought. After some modification most of the code fits really well to
+> the generic dma_map_ops methods.
+
+I appreciate your progress on this generic dma_ops implementation. But
+for now it looks very ARM specific. Do you have plans to extend it to
+non-ARM iommu-api implementations too?
+
+	Joerg
