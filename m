@@ -1,36 +1,90 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Fri, 24 Jun 2011 22:15:27 +0530
-Subject: [PATCH 1/4] davinci: psc.h: clean up indentation done using spaces
-In-Reply-To: <1301072400-4036-1-git-send-email-nsekhar@ti.com>
-References: <1301072400-4036-1-git-send-email-nsekhar@ti.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2F3E@dbde02.ent.ti.com>
+From: jaswinder.singh@linaro.org (Jaswinder Singh)
+Date: Fri, 24 Jun 2011 22:37:56 +0530
+Subject: [PATCH] OMAP4: PANDA, SDP: Fix EHCI regulator supply
+In-Reply-To: <1308926240-13888-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1308926240-13888-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <BANLkTin=-cRC_ax8AakMD1UZtU+AQ0H==w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell, SubArch team,
+[CC'ing Liam and Mark as well]
 
-This series of 4 patches added SATA support on DaVinci
-DA850 platform. This was ready for last merge window,
-but was not queued because of the negative diffstat
-rule.
+On 24 June 2011 20:07, Jassi Brar <jaswinder.singh@linaro.org> wrote:
+> VUSB is a fixed level line and hence have no set_voltage
+> callback in regulator ops, but has apply_uV set to true.
+> As a result it fails to register with the regulator core.
+> Remove setting apply_uV.
+>
+> Also, assign name to VUSB supply, without which regulator core
+> fails to find it and assigns the default 'dummy' regulator to
+> the ehci-omap device.
+>
+> Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+> ---
+> ?arch/arm/mach-omap2/board-4430sdp.c ? ?| ? ?6 +++++-
+> ?arch/arm/mach-omap2/board-omap4panda.c | ? ?6 +++++-
+> ?2 files changed, 10 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+> index 63de2d3..1ec60be 100644
+> --- a/arch/arm/mach-omap2/board-4430sdp.c
+> +++ b/arch/arm/mach-omap2/board-4430sdp.c
+> @@ -504,16 +504,20 @@ static struct regulator_init_data sdp4430_vdac = {
+> ? ? ? ?},
+> ?};
+>
+> +static struct regulator_consumer_supply sdp4430_vusb_supply =
+> + ? ? ? REGULATOR_SUPPLY("hsusb0", "ehci-omap.0");
+> +
+> ?static struct regulator_init_data sdp4430_vusb = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 3300000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 3300000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= ? ? ?REGULATOR_CHANGE_MODE
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_CHANGE_STATUS,
+> ? ? ? ?},
+> + ? ? ? .num_consumer_supplies ?= 1,
+> + ? ? ? .consumer_supplies ? ? ?= &sdp4430_vusb_supply,
+> ?};
+>
+> ?static struct regulator_init_data sdp4430_clk32kg = {
+> diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+> index d4f9879..7429f7e 100644
+> --- a/arch/arm/mach-omap2/board-omap4panda.c
+> +++ b/arch/arm/mach-omap2/board-omap4panda.c
+> @@ -362,16 +362,20 @@ static struct regulator_init_data omap4_panda_vdac = {
+> ? ? ? ?},
+> ?};
+>
+> +static struct regulator_consumer_supply omap4_panda_vusb_supply =
+> + ? ? ? REGULATOR_SUPPLY("hsusb0", "ehci-omap.0");
+> +
+> ?static struct regulator_init_data omap4_panda_vusb = {
+> ? ? ? ?.constraints = {
+> ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 3300000,
+> ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 3300000,
+> - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+> ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+> ? ? ? ? ? ? ? ?.valid_ops_mask ?= ? ? ?REGULATOR_CHANGE_MODE
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_CHANGE_STATUS,
+> ? ? ? ?},
+> + ? ? ? .num_consumer_supplies ?= 1,
+> + ? ? ? .consumer_supplies ? ? ?= &omap4_panda_vusb_supply,
+> ?};
+>
+> ?static struct regulator_init_data omap4_panda_clk32kg = {
+> --
+> 1.7.4.1
+>
+>
 
-Is there a possibility of queuing this for the v3.1 merge?
 
-Here is the archive link of this posting:
 
-http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2011-March/022473.html
-
-Here is the summary diffstat:
-
- arch/arm/mach-davinci/board-da850-evm.c    |    7 ++
- arch/arm/mach-davinci/clock.c              |    8 +-
- arch/arm/mach-davinci/clock.h              |    1 +
- arch/arm/mach-davinci/da850.c              |    9 ++
- arch/arm/mach-davinci/devices-da8xx.c      |  122 ++++++++++++++++++++++
- arch/arm/mach-davinci/include/mach/da8xx.h |    2 +
- arch/arm/mach-davinci/include/mach/psc.h   |  151 ++++++++++++++--------------
- arch/arm/mach-davinci/psc.c                |    4 +-
- 8 files changed, 225 insertions(+), 79 deletions(-)
-
-Thanks,
-Sekhar
+-- 
+Linaro.org ? Open source software for ARM SoCs | Follow Linaro
+http://facebook.com/pages/Linaro/155974581091106 ?-
+http://twitter.com/#!/linaroorg - http://linaro.org/linaro-blog
