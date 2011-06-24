@@ -1,76 +1,60 @@
-From: jaswinder.singh@linaro.org (Jassi Brar)
-Date: Fri, 24 Jun 2011 20:07:20 +0530
-Subject: [PATCH] OMAP4: PANDA, SDP: Fix EHCI regulator supply
-Message-ID: <1308926240-13888-1-git-send-email-jaswinder.singh@linaro.org>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Fri, 24 Jun 2011 20:10:29 +0530
+Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
+In-Reply-To: <4E04A0AB.40608@ti.com>
+References: <1308923618-5333-1-git-send-email-premi@ti.com>
+	<4E04A0AB.40608@ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2F08@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-VUSB is a fixed level line and hence have no set_voltage
-callback in regulator ops, but has apply_uV set to true.
-As a result it fails to register with the regulator core.
-Remove setting apply_uV.
+> -----Original Message-----
+> From: Shilimkar, Santosh 
+> Sent: Friday, June 24, 2011 8:05 PM
+> To: Premi, Sanjeev
+> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCHv2] omap2+: pm: cpufreq: Fix 
+> loops_per_jiffy calculation
+> 
+> On 6/24/2011 7:23 PM, Sanjeev Premi wrote:
+> > Currently, loops_per_jiffy is being calculated twice for
+> > non-SMP processors.
+> >   - Before calling cpufreq_notify_transition()
+> >   - From within cpufreq_notify_transition()
+> >
+> > Double adjustment leads to incorrect value being assigned to
+> > loops_per_jiffy. This manifests as incorrect BogoMIPS in
+> > "cat /proc/cpuinfo".
+> >
+> > The value of loops_per_jiffy needs to be calculated only
+> > when CONFIG_SMP is true. It is the core change included
+> > in this patch.
+> >
+> > The patch also leverages the definition of for_each_cpu()
+> > with and without CONFIG_SMP to consolidate the mechanism
+> > to call cpufreq_notify_transition().
+> >
+> > Signed-off-by: Sanjeev Premi<premi@ti.com>
+> 
+> NAK. This patch again doesn't make sense considering your issue.
+> Also jiffies should not be undated before changing the freq.
+> If the set_rate failed for some reason then you will have wrong
+> jiffies value.
+> 
+> I understand your issue now. The code for global lpj updation
+> should have been checking smp_on_up() instead of is_smp().
+> That one line change is enough. I will post a patch on
+> the same once I reach to office.
 
-Also, assign name to VUSB supply, without which regulator core
-fails to find it and assigns the default 'dummy' regulator to
-the ehci-omap device.
+[sp] Suggest reading the patch before NAKing.
+     The patch is updating the loops_per_jiffy value "AFTER"
+     the frequency change has happenned and "BEFORE" post
+     change notification is sent.
 
-Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
----
- arch/arm/mach-omap2/board-4430sdp.c    |    6 +++++-
- arch/arm/mach-omap2/board-omap4panda.c |    6 +++++-
- 2 files changed, 10 insertions(+), 2 deletions(-)
+~sanjeev
 
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 63de2d3..1ec60be 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -504,16 +504,20 @@ static struct regulator_init_data sdp4430_vdac = {
- 	},
- };
- 
-+static struct regulator_consumer_supply sdp4430_vusb_supply =
-+	REGULATOR_SUPPLY("hsusb0", "ehci-omap.0");
-+
- static struct regulator_init_data sdp4430_vusb = {
- 	.constraints = {
- 		.min_uV			= 3300000,
- 		.max_uV			= 3300000,
--		.apply_uV		= true,
- 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
- 					| REGULATOR_MODE_STANDBY,
- 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &sdp4430_vusb_supply,
- };
- 
- static struct regulator_init_data sdp4430_clk32kg = {
-diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
-index d4f9879..7429f7e 100644
---- a/arch/arm/mach-omap2/board-omap4panda.c
-+++ b/arch/arm/mach-omap2/board-omap4panda.c
-@@ -362,16 +362,20 @@ static struct regulator_init_data omap4_panda_vdac = {
- 	},
- };
- 
-+static struct regulator_consumer_supply omap4_panda_vusb_supply =
-+	REGULATOR_SUPPLY("hsusb0", "ehci-omap.0");
-+
- static struct regulator_init_data omap4_panda_vusb = {
- 	.constraints = {
- 		.min_uV			= 3300000,
- 		.max_uV			= 3300000,
--		.apply_uV		= true,
- 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
- 					| REGULATOR_MODE_STANDBY,
- 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
- 					| REGULATOR_CHANGE_STATUS,
- 	},
-+	.num_consumer_supplies	= 1,
-+	.consumer_supplies	= &omap4_panda_vusb_supply,
- };
- 
- static struct regulator_init_data omap4_panda_clk32kg = {
--- 
-1.7.4.1
+
+> 
+> Regards
+> Santosh
+> 
