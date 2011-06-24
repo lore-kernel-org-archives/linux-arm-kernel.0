@@ -1,21 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Jun 2011 08:55:23 +0100
-Subject: [PATCH] OMAP3: PM: remove get_*_restore_pointer functions,
-	directly use entry points
-In-Reply-To: <1308874574-30663-1-git-send-email-khilman@ti.com>
-References: <1308874574-30663-1-git-send-email-khilman@ti.com>
-Message-ID: <20110624075523.GJ9449@n2100.arm.linux.org.uk>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Fri, 24 Jun 2011 17:07:21 +0900
+Subject: [PATCH] ARM: amba: Link fb device to its parent
+In-Reply-To: <1308602657-28783-1-git-send-email-loic.minier@linaro.org>
+References: <1308602657-28783-1-git-send-email-loic.minier@linaro.org>
+Message-ID: <20110624080721.GC24184@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 23, 2011 at 05:16:14PM -0700, Kevin Hilman wrote:
-> Applies on top of Russell's suspend cleanup/rejig, and available
-> (along with Russell's series) in my pm-wip/idle-suspend branch.
+On Mon, Jun 20, 2011 at 10:44:17PM +0200, Lo??c Minier wrote:
+> Some pieces of userspace like debian-installer expect to find the fb0
+> driver name by readlink-ing /sys/class/graphics/fb0/device/driver but
+> this was broken with amba-clcd as it sets up fb_info manually and missed
+> the .device parent pointer.
 > 
-> Russell, since it depends on your series, feel free to add it to your
-> series if you like.  Or if you prefer, we can take it through the OMAP
-> tree.
-
-Thanks, I've picked it up, and changed the prefix on the subject line
-to match the rest of my series.  Also cleaned up the trailing tabs
-and added Santosh's ack.
+> Signed-off-by: Lo??c Minier <loic.minier@linaro.org>
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Cc: Paul Mundt <lethal@linux-sh.org>
+> ---
+>  drivers/video/amba-clcd.c |    2 ++
+>  1 files changed, 2 insertions(+), 0 deletions(-)
+> 
+While this is titled as an ARM patch it's certainly fbdev-specific. I'll
+apply it barring any objections from Russell.
