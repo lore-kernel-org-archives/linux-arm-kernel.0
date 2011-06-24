@@ -1,32 +1,55 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 24 Jun 2011 18:23:01 +0200
-Subject: [PATCH 7/8] common: dma-mapping: change alloc/free_coherent
-	method to more generic alloc/free_attrs
-In-Reply-To: <1308932147.5929.0.camel@mulgrave>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<201106241751.35655.arnd@arndb.de>
-	<1308932147.5929.0.camel@mulgrave>
-Message-ID: <201106241823.01273.arnd@arndb.de>
+From: premi@ti.com (Sanjeev Premi)
+Date: Fri, 24 Jun 2011 21:53:45 +0530
+Subject: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+Message-ID: <1308932625-17632-1-git-send-email-premi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 24 June 2011, James Bottomley wrote:
-> On Fri, 2011-06-24 at 17:51 +0200, Arnd Bergmann wrote:
-> > Yes, I think that is good, but the change needs to be done atomically
-> > across all architectures. This should be easy enough as I believe
-> > all other architectures that use dma_map_ops don't even require
-> > dma_alloc_noncoherent
-> 
-> This statement is definitely not true of parisc, and also, I believe,
-> not true of sh, so that would have to figure in the conversion work too.
+The current selection of the GPTIMER on was result of
+a hardware issue in early versions of the Beagleboards
+(Ax and B1 thru B4). [1] [2]
 
-As far as I can tell, parisc uses its own hppa_dma_ops, not
-dma_map_ops, and arch/sh/include/asm/dma-mapping.h contains an
-unconditional
+Its been long since the hardware issue has been fixed.
+This patch uses GPTIMER 1 for all newer board revisions
+incl. Beagleboard XM.
 
-#define dma_alloc_noncoherent(d, s, h, f) dma_alloc_coherent(d, s, h, f)
+ [1] http://thread.gmane.org/gmane.comp.hardware.beagleboard.general/91
+ [2] Errata #7 at http://elinux.org/BeagleBoard#Errata
 
-If you want to change parisc to use dma_map_ops then I would suggest
-adding another attribute for alloc_noncoherent.
+Signed-off-by: Sanjeev Premi <premi@ti.com>
+Cc: Paul Walmsley <paul@pwsan.com>
+---
 
-	Arnd
+  * The patch has been boot tested with Beagleboard-XM.
+    Verified that GPTIMER1 is indeed being used.
+
+  * Browsing through the code, it appears that similar
+    change could be applied for these boards:
+     - devkit8000
+     - omap3stalker
+     - omap3touchbook
+    However, I don't have access to any of these;
+    or information on their revisions.
+    I can update this patch based on confirmations.
+
+ arch/arm/mach-omap2/board-omap3beagle.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
+index 4b113b2..edc1596 100644
+--- a/arch/arm/mach-omap2/board-omap3beagle.c
++++ b/arch/arm/mach-omap2/board-omap3beagle.c
+@@ -509,7 +509,10 @@ static void __init omap3_beagle_init_irq(void)
+ {
+ 	omap_init_irq();
+ #ifdef CONFIG_OMAP_32K_TIMER
+-	omap2_gp_clockevent_set_gptimer(12);
++	if (omap3_beagle_version == OMAP3BEAGLE_BOARD_AXBX)
++		omap2_gp_clockevent_set_gptimer(12);
++	else
++		omap2_gp_clockevent_set_gptimer(1);
+ #endif
+ }
+ 
+-- 
+1.7.2.2
