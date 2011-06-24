@@ -1,60 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Jun 2011 15:01:42 +0100
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Fri, 24 Jun 2011 20:05:23 +0530
 Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
 In-Reply-To: <1308923618-5333-1-git-send-email-premi@ti.com>
 References: <1308923618-5333-1-git-send-email-premi@ti.com>
-Message-ID: <20110624140142.GM9449@n2100.arm.linux.org.uk>
+Message-ID: <4E04A0AB.40608@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2011 at 07:23:38PM +0530, Sanjeev Premi wrote:
-> @@ -97,12 +97,8 @@ static int omap_target(struct cpufreq_policy *policy,
->  		return ret;
-> 
->  	/* Notify transitions */
-> -	if (is_smp()) {
-> -		for_each_cpu(i, policy->cpus) {
-> -			freqs.cpu = i;
-> -			cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
-> -		}
-> -	} else {
-> +	for_each_cpu(i, policy->cpus) {
-> +		freqs.cpu = i;
->  		cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
->  	}
-> 
+On 6/24/2011 7:23 PM, Sanjeev Premi wrote:
+> Currently, loops_per_jiffy is being calculated twice for
+> non-SMP processors.
+>   - Before calling cpufreq_notify_transition()
+>   - From within cpufreq_notify_transition()
+>
+> Double adjustment leads to incorrect value being assigned to
+> loops_per_jiffy. This manifests as incorrect BogoMIPS in
+> "cat /proc/cpuinfo".
+>
+> The value of loops_per_jiffy needs to be calculated only
+> when CONFIG_SMP is true. It is the core change included
+> in this patch.
+>
+> The patch also leverages the definition of for_each_cpu()
+> with and without CONFIG_SMP to consolidate the mechanism
+> to call cpufreq_notify_transition().
+>
+> Signed-off-by: Sanjeev Premi<premi@ti.com>
 
-Ok.
+NAK. This patch again doesn't make sense considering your issue.
+Also jiffies should not be undated before changing the freq.
+If the set_rate failed for some reason then you will have wrong
+jiffies value.
 
-> @@ -114,13 +110,20 @@ static int omap_target(struct cpufreq_policy *policy,
-> 
->  	freqs.new = omap_getspeed(policy->cpu);
-> 
-> +#ifdef CONFIG_SMP
-> +	/* Adjust jiffies before transition */
-> +	for_each_cpu(i, policy->cpus) {
-> +		unsigned long lpj = per_cpu(cpu_data, i).loops_per_jiffy;
-> +
-> +		per_cpu(cpu_data, i).loops_per_jiffy = cpufreq_scale(lpj,
-> +							freqs.old,
-> +							freqs.new);
-> +	}
-> +#endif
-> +
+I understand your issue now. The code for global lpj updation
+should have been checking smp_on_up() instead of is_smp().
+That one line change is enough. I will post a patch on
+the same once I reach to office.
 
-You didn't listen to what I told you.  It'll be quicker for me to write
-this patch myself if you send me the *original* file.
-
->  	/* Notify transitions */
-> -	if (is_smp()) {
-> -		for_each_cpu(i, policy->cpus) {
-> -			freqs.cpu = i;
-> -			cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
-> -		}
-> -	} else {
-> +	for_each_cpu(i, policy->cpus) {
-> +		freqs.cpu = i;
->  		cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
->  	}
-
-Ok.
+Regards
+Santosh
