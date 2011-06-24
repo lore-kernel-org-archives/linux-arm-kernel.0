@@ -1,254 +1,276 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Fri, 24 Jun 2011 23:20:44 +0530
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-In-Reply-To: <20110624151201.GO9449@n2100.arm.linux.org.uk>
-References: <1308923618-5333-1-git-send-email-premi@ti.com>
-	<20110624140142.GM9449@n2100.arm.linux.org.uk>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2EF2@dbde02.ent.ti.com>
-	<20110624141402.GN9449@n2100.arm.linux.org.uk>
-	<20110624151201.GO9449@n2100.arm.linux.org.uk>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2F56@dbde02.ent.ti.com>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Sat, 25 Jun 2011 02:04:32 +0800
+Subject: [PATCH v2 1/5] dt: add of_alias_scan and of_alias_get_id
+In-Reply-To: <1308938676-31121-1-git-send-email-shawn.guo@linaro.org>
+References: <1308938676-31121-1-git-send-email-shawn.guo@linaro.org>
+Message-ID: <1308938676-31121-2-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
-> Sent: Friday, June 24, 2011 8:42 PM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCHv2] omap2+: pm: cpufreq: Fix 
-> loops_per_jiffy calculation
-> 
-> Right, thanks for the file.  Here's the patch.
-> 
-> --- omap2plus-cpufreq.c~	2011-06-24 15:50:32.000000000 +0100
-> +++ omap2plus-cpufreq.c	2011-06-24 16:00:08.000000000 +0100
-> @@ -44,6 +44,16 @@
->  static char *mpu_clk_name;
->  static struct device *mpu_dev;
->  
-> +#ifdef CONFIG_SMP
-> +struct lpj_info {
-> +	unsigned long	ref;
-> +	unsigned int	freq;
-> +};
-> +
-> +static DEFINE_PER_CPU(struct lpj_info, lpj_ref);
-> +static struct lpj_info global_lpj_ref;
-> +#endif
-> +
->  static int omap_verify_speed(struct cpufreq_policy *policy)
->  {
->  	if (!freq_table)
-> @@ -109,14 +119,25 @@
->  	freqs.new = omap_getspeed(policy->cpu);
->  
->  #ifdef CONFIG_SMP
-> -	/* Adjust jiffies before transition */
-> +	/* Adjust per-cpu loops_per_jiffy before transition */
->  	for_each_cpu(i, policy->cpus) {
-> -		unsigned long lpj = per_cpu(cpu_data, 
-> i).loops_per_jiffy;
-> -
-> -		per_cpu(cpu_data, i).loops_per_jiffy = 
-> cpufreq_scale(lpj,
-> -							freqs.old,
-> -							freqs.new);
-> +		struct lpj_info *lpj = &per_cpu(lpj_ref, i);
-> +		if (!lpj->freq) {
-> +			lpj->ref = per_cpu(cpu_data, i).loops_per_jiffy;
-> +			lpj->freq = freqs.old;
-> +		}
-> +
-> +		per_cpu(cpu_data, i).loops_per_jiffy =
-> +			cpufreq_scale(lpj->ref, lpj->freq, freqs.new);
-> +	}
-> +
-> +	/* And don't forget to adjust the global one */
-> +	if (!global_lpj_ref.freq) {
-> +		global_lpj_ref.ref = loops_per_jiffy;
-> +		global_lpj_ref.freq = freqs.old;
->  	}
-> +	loops_per_jiffy = cpufreq_scale(global_lpj_ref.ref, 
-> global_lpj_ref.freq,
-> +					freqs.new);
->  #endif
->  
->  	/* Notify transitions */
-> 
-> 
-> Notice how we adjust _both_ the per-cpu loops_per_jiffy, and that we
-> adjust them with reference to the initial values.
-> 
-> If you adjust lpj with reference to the last, then you _will_ build up
-> a progressively bigger and bigger error in the value over time.
-> 
+The patch adds function of_alias_scan to populate a global lookup
+table with the properties of 'aliases' node and function
+of_alias_get_id for drivers to find alias id from the lookup table.
 
-Russell,
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Grant Likely <grant.likely@secretlab.ca>
+---
+ drivers/of/base.c  |  181 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/of/fdt.c   |    6 ++
+ include/linux/of.h |    7 ++
+ 3 files changed, 194 insertions(+), 0 deletions(-)
 
-I was able to test BogoMIPS calculations via /proc/cpuinfo for
-both with & without CONFIG_SMP selected.
-
-For most part things work fine - but I do notice occassional Oops
-and segmentation faults while doing "cat /proc/cpuinfo"
-
-With CONFIG_SMP enabled, system doesn't recover from the Oops;
-but without SMP - I noticed segmentation faults/ BUG but system
-does recover.
-
-They could be unrelated - but i didn't see any of these earlier
-today. I will continue debug on MON.
-
-Here are details:
-
-[1] This log comes corresponds to CONFIG_SMP enabled.
-
-[2] This corresponds to running "cat /proc/cpuinfo" in a tight
-    loop. (CONFIG_SMP disabled).
-    
-[3] Saw only once today - but had seen it few days ago. None
-    of my local changes included. (CONFIG_SMP disabled).
-    [http://marc.info/?l=linux-omap&m=130884641524123&w=2]
-
-~sanjeev
-
-=== [1]
-
-[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
-[   73.832366] Internal error: Oops - undefined instruction: 0 [#1] SMP
-[   73.839019] Modules linked in:
-[   73.842193] CPU: 0    Not tainted  (3.0.0-rc3-14002-g40b6752-dirty #21)
-[   73.849121] PC is at __do_fault+0x1c0/0x450
-[   73.853485] LR is at __do_fault+0x2b0/0x450
-[   73.857879] pc : [<c010fa18>]    lr : [<c010fb08>]    psr: 00000113
-[   73.857879] sp : c7907d48  ip : 00000000  fp : c5d518c0
-[   73.869873] r10: 00000200  r9 : 40214000  r8 : 00000000
-[   73.875335] r7 : c2692f98  r6 : c0ad7600  r5 : 87fb018f  r4 : 00000000
-[   73.882141] r3 : 87fb0a3e  r2 : 00000800  r1 : 87fb01cf  r0 : c5d518c0
-[   73.888977] Flags: nzcv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   73.896423] Control: 10c5387d  Table: 8795c019  DAC: 00000015
-[   73.902435] Process cat (pid: 449, stack limit = 0xc79062f8)
-[   73.908355] Stack: (0xc7907d48 to 0xc7908000)
-[   73.912902] 7d40:                   00000008 c795d008 00000000 00000000 c5d4d050 c5d518f4
-[   73.921447] 7d60: 00000000 0000000c 40214000 c0ad7600 00000002 0000000c c795d008 00000000
-[   73.929992] 7d80: 40214000 c5d518c0 40214000 c2692f98 be91579c c0110760 0000000c 00000000
-[   73.938537] 7da0: 00000000 c00bb088 00000002 c5d518c0 00000000 c03111a0 00000000 c795c000
-[   73.947113] 7dc0: c795d008 00000201 40214000 c5d518c0 00000000 c2692f98 be91579c c0111184
-[   73.955657] 7de0: c795d008 00000000 c2692f98 c7907fb0 00000017 402140ea c5d518c0 402140ea
-[   73.964202] 7e00: c5d51914 c031138c c78c6180 00000000 00000002 0000002f 00000017 c78c6180
-[   73.972747] 7e20: c08da030 c00b9184 c08da030 c00b9184 c5d518c4 c00b7860 c78c6180 c78c6180
-[   73.981292] 7e40: c04787dc 00000000 c04af0e0 0000013e 00000000 00000000 00000002 c00b9184
-[   73.989868] 7e60: 00000000 00000000 c78c6180 00000001 c78c6180 00000000 a2217a4d 3caba335
-[   73.998413] 7e80: 89831c46 a201fb19 4c802a1d c78c65e0 0000002f 00000000 0895e1ee 8cafea22
-[   74.006958] 7ea0: 2f5807fc 70396d1c 752baa3e 00000001 c78c6180 00000007 00000006 000080d0
-[   74.015502] 7ec0: c2692b78 00000000 00000000 00000000 00000000 c5d51928 00000002 60000093
-[   74.024047] 7ee0: 00000000 c00bb088 00000002 c044d374 0001b900 00000017 c7907fb0 402140ea
-[   74.032592] 7f00: 402140ea 4032d068 be91579c c003e480 60000013 00001000 c5d51914 00000003
-[   74.041168] 7f20: be915a14 c030e788 00000002 00000000 c021e1b4 00000000 c048cb1c c7906000
-[   74.049713] 7f40: 4008e000 00000000 c78c6180 c030ecf4 00000000 00000000 00001000 c00b7ba0
-[   74.058258] 7f60: c5d51918 60000013 00000000 c030ecf4 c78c6180 c030f1d8 000004b0 4021051c
-[   74.066802] 7f80: 4021c998 c00b7ba0 ffffffff 0001b900 000004b0 c030f1d8 ffffffff 0001b900
-[   74.075347] 7fa0: 000004b0 4021051c 4021c998 c030f50c 402140ea 4005c950 be91587c 4005cb08
-[   74.083892] 7fc0: 00000015 0001b900 000004b0 4021051c 4021c998 402140ea 4032d068 be91579c
-[   74.092468] 7fe0: 00000000 be9156d0 400403f8 4003e6f4 20000010 ffffffff ffffffff ffffffff
-[   74.101013] [<c010fa18>] (__do_fault+0x1c0/0x450) from [<c0110760>] (handle_pte_fault+0x74/0x674)
-[   74.110290] [<c0110760>] (handle_pte_fault+0x74/0x674) from [<c0111184>] (handle_mm_fault+0x94/0xc4)
-[   74.119842] [<c0111184>] (handle_mm_fault+0x94/0xc4) from [<c031138c>] (do_page_fault+0x2b8/0x358)
-[   74.129211] [<c031138c>] (do_page_fault+0x2b8/0x358) from [<c003e480>] (do_DataAbort+0x38/0x98)
-[   74.138336] [<c003e480>] (do_DataAbort+0x38/0x98) from [<c030f50c>] (ret_from_exception+0x0/0x10)
-[   74.147613] Exception stack(0xc7907fb0 to 0xc7907ff8)
-[   74.152862] 7fa0:                                     402140ea 4005c950 be91587c 4005cb08
-[   74.161437] 7fc0: 00000015 0001b900 000004b0 4021051c 4021c998 402140ea 4032d068 be91579c
-[   74.169982] 7fe0: 00000000 be9156d0 400403f8 4003e6f4 20000010 ffffffff
-[   74.176879] Code: e1a01005 e3a02000 ebfd1694 e59d0014 (eb07fcba)
-[   74.183380] ---[ end trace 9fe8ca36c9812c43 ]---
-[   86.665679] BUG: spinlock lockup on CPU#0, cat/449, c5d518f4
-[   86.671661] [<c00509c4>] (unwind_backtrace+0x0/0xf8) from [<c0227320>] (do_raw_spin_lock+0xec/0x178)
-[   86.681213] [<c0227320>] (do_raw_spin_lock+0xec/0x178) from [<c0112578>] (unmap_vmas+0x188/0x620)
-[   86.690521] [<c0112578>] (unmap_vmas+0x188/0x620) from [<c0114fd4>] (exit_mmap+0x10c/0x23c)
-[   86.699279] [<c0114fd4>] (exit_mmap+0x10c/0x23c) from [<c007f4bc>] (mmput+0x54/0x118)
-[   86.707489] [<c007f4bc>] (mmput+0x54/0x118) from [<c00838a0>] (exit_mm+0x13c/0x194)
-[   86.715545] [<c00838a0>] (exit_mm+0x13c/0x194) from [<c0085864>] (do_exit+0x660/0x714)
-[   86.723846] [<c0085864>] (do_exit+0x660/0x714) from [<c004dafc>] (die+0x2d8/0x2f4)
-[   86.731781] [<c004dafc>] (die+0x2d8/0x2f4) from [<c003e204>] (do_undefinstr+0x14c/0x150)
-[   86.740264] [<c003e204>] (do_undefinstr+0x14c/0x150) from [<c030f0e4>] (__und_svc+0x44/0x60)
-[   86.749114] Exception stack(0xc7907cc0 to 0xc7907d08)
-[   86.754394] 7cc0: c5d518c0 87fb01cf 00000800 87fb0a3e 00000000 87fb018f c0ad7600 c2692f98
-[   86.762969] 7ce0: 00000000 40214000 00000200 c5d518c0 00000000 c7907d48 c010fb08 c010fa18
-[   86.771514] 7d00: 00000113 ffffffff
-[   86.775177] [<c030f0e4>] (__und_svc+0x44/0x60) from [<c010fa18>] (__do_fault+0x1c0/0x450)
-[   86.783752] [<c010fa18>] (__do_fault+0x1c0/0x450) from [<c0110760>] (handle_pte_fault+0x74/0x674)
-[   86.793060] [<c0110760>] (handle_pte_fault+0x74/0x674) from [<c0111184>] (handle_mm_fault+0x94/0xc4)
-[   86.802612] [<c0111184>] (handle_mm_fault+0x94/0xc4) from [<c031138c>] (do_page_fault+0x2b8/0x358)
-[   86.812011] [<c031138c>] (do_page_fault+0x2b8/0x358) from [<c003e480>] (do_DataAbort+0x38/0x98)
-[   86.821136] [<c003e480>] (do_DataAbort+0x38/0x98) from [<c030f50c>] (ret_from_exception+0x0/0x10)
-[   86.830444] Exception stack(0xc7907fb0 to 0xc7907ff8)
-[   86.835723] 7fa0:                                     402140ea 4005c950 be91587c 4005cb08
-[   86.844299] 7fc0: 00000015 0001b900 000004b0 4021051c 4021c998 402140ea 4032d068 be91579c
-[   86.852874] 7fe0: 00000000 be9156d0 400403f8 4003e6f4 20000010 ffffffff
-
-
-=== [2]
-
-[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
-[   99.083923] Unable to handle kernel paging request at virtual address 85d44831
-[   99.091583] pgd = c5d30000
-[   99.094390] [85d44831] *pgd=00000000
-[   99.098175] Internal error: Oops: 5 [#1]
-[   99.102264] Modules linked in:
-[   99.105468] CPU: 0    Not tainted  (3.0.0-rc3-14002-g40b6752-dirty #22)
-[   99.112365] PC is at find_get_pages+0xd8/0x170
-[   99.117004] LR is at 0x2
-[   99.119659] pc : [<c00d3cc4>]    lr : [<00000002>]    psr: 60000113
-[   99.119659] sp : c7945d08  ip : 00000001  fp : c7945d58
-[   99.131652] r10: c759b89c  r9 : c5d3e860  r8 : c7945d58
-[   99.137115] r7 : 00000013  r6 : 00000000  r5 : c5d37900  r4 : c5d31000
-[   99.143951] r3 : c759b758  r2 : 85d44831  r1 : 00000001  r0 : c759b89c
-[   99.150756] Flags: nZCv  IRQs on  FIQs on  Mode SVC_32  ISA ARM  Segment user
-[   99.158203] Control: 10c5387d  Table: 85d30019  DAC: 00000015
-[   99.164215] Process sh (pid: 446, stack limit = 0xc79442f0)
-[   99.170043] Stack: (0xc7945d08 to 0xc7946000)
-[   99.174591] 5d00:                   c78cc280 c78cc6c0 00000001 00000001 c759b758 00000001
-[   99.183135] 5d20: c5d472b4 c5d31000 00000000 00000000 c5d3e860 c7945d58 400d3000 c5d3e860
-[   99.191680] 5d40: c5d47280 c00edf20 00000129 00000000 00000000 c5d472e8 00000000 00000013
-[   99.200256] 5d60: 400d3000 00000000 00000002 00000013 c5d31000 00000000 400d3000 c5d47280
-[   99.208801] 5d80: 400d3000 c5d3e860 00000000 c00eedf8 00000013 00000000 00000000 c00a1114
-[   99.217346] 5da0: 00000002 c5d47280 00000000 c02e4760 00000000 c5d30000 c5d31000 00000200
-[   99.225891] 5dc0: 400d3000 c5d47280 00000000 c5d3e860 00000000 c00ef89c c5d31000 00000000
-[   99.234436] 5de0: c5d3e860 c7945fb0 00000007 400d3c6c c5d47280 400584b0 c5d472d4 c02e4948
-[   99.242980] 5e00: 00000000 c02e47d0 c0413fc0 c043f468 80000007 c78cc280 0000081f c78cc280
-[   99.251525] 5e20: 00000002 60000093 00000000 c00a1114 00000000 c042c204 00000000 00000001
-[   99.260070] 5e40: c045d510 00000044 00000006 c5e3c000 00000000 00000000 c78cc280 00000001
-[   99.268646] 5e60: c78cc280 c02e258c 00000000 c781e8c0 c5e3c000 c009dd48 c5e3c0ac 60000013
-[   99.277191] 5e80: 00000000 c78cc6c0 00000044 00000000 beacd7ec c0229940 00000001 00000000
-[   99.285736] 5ea0: c0229894 0000000b 20000113 00000000 00000002 00000000 c78cc280 00000000
-[   99.294281] 5ec0: 00000000 00000000 00000000 c5e32694 00000002 60000093 00000000 c00a1114
-[   99.302825] 5ee0: 00000002 c03fff0c 000d72cc 00000007 c03fff7c c7945fb0 400584b0 400d3c6c
-[   99.311370] 5f00: 00000000 c0034208 000d7008 c00342a4 c78cc280 c02e2554 c7945f84 c78cc280
-[   99.319915] 5f20: c5e321ac c009dd48 c5e32684 00000003 c7945f84 c02e2554 0000000a c007b0a8
-[   99.328491] 5f40: c7944000 00000000 000d7008 00000000 c7945f84 00000003 00000000 c7945f84
-[   99.337036] 5f60: 000000ae c003f8a8 00000000 c007b26c c78cc280 c02e2c7c 00000000 000d727c
-[   99.345581] 5f80: 400584b0 c009dd48 ffffffff 000d72cc 00000000 ffffffff 000d72cc 00000000
-[   99.354125] 5fa0: 000d727c 400584b0 000d727c c02e2c8c 000d72cc 000d726c 000d727c 000d6dfc
-[   99.362670] 5fc0: 000d726c 000d72cc 00000000 000d727c 400584b0 400584b0 000d727c 00000000
-[   99.371215] 5fe0: 000d450c beacd804 000d4104 400d3c6c 60000010 ffffffff 00000000 00000000
-[   99.379791] [<c00d3cc4>] (find_get_pages+0xd8/0x170) from [<c5d3e860>] (0xc5d3e860)
-[   99.387786] Code: e1a0c001 eafffff2 e5942000 e5903000 (e5923000)
-[   99.394195] ---[ end trace a04771993a740cbe ]---
-Segmentation fault
-[root at OMAP3EVM cpufreq]#
-
-=== [3]
-
-[root at OMAP3EVM cpufreq]# cat /proc/cpuinfo
-[   90.313537] BUG: looking up invalid subclass: 3348054496
-[   90.319122] turning off the locking correctness validator.
-[   90.324859] [<c00509c4>] (unwind_backtrace+0x0/0xf8) from [<c00ba6b4>] (__lock_acquire+0x1984/0x1d90)
-[   90.334503] [<c00ba6b4>] (__lock_acquire+0x1984/0x1d90) from [<c00bb088>] (lock_acquire+0xd4/0xf8)
-[   90.343902] [<c00bb088>] (lock_acquire+0xd4/0xf8) from [<c030e780>] (_raw_spin_lock_irqsave+0x44/0x58)
-[   90.353637] [<c030e780>] (_raw_spin_lock_irqsave+0x44/0x58) from [<c021e44c>] (__down_read_trylock+0x14/0x54)
-[   90.364013] [<c021e44c>] (__down_read_trylock+0x14/0x54) from [<c00a69a4>] (down_read_trylock+0x14/0x54)
-[   90.373931] [<c00a69a4>] (down_read_trylock+0x14/0x54) from [<c03111a0>] (do_page_fault+0xcc/0x358)
-[   90.383392] [<c03111a0>] (do_page_fault+0xcc/0x358) from [<c003e480>] (do_DataAbort+0x38/0x98)
-[   90.392395] [<c003e480>] (do_DataAbort+0x38/0x98) from [<c030f50c>] (ret_from_exception+0x0/0x10)
-[   90.401672] Exception stack(0xc796ffb0 to 0xc796fff8)
+diff --git a/drivers/of/base.c b/drivers/of/base.c
+index 632ebae..89efd10 100644
+--- a/drivers/of/base.c
++++ b/drivers/of/base.c
+@@ -17,14 +17,38 @@
+  *      as published by the Free Software Foundation; either version
+  *      2 of the License, or (at your option) any later version.
+  */
++#include <linux/bootmem.h>
++#include <linux/ctype.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/spinlock.h>
+ #include <linux/slab.h>
+ #include <linux/proc_fs.h>
+ 
++/**
++ * struct alias_prop - Alias property in 'aliases' node
++ * @link:	List node to link the structure in aliases_lookup list
++ * @alias:	Alias property name
++ * @np:		Pointer to device_node that the alias stands for
++ * @alias_id:	Alias id decoded from alias
++ * @alias_stem:	Alias stem name decoded from alias
++ *
++ * The structure represents one alias property of 'aliases' node as
++ * an entry in aliases_lookup list.
++ */
++struct alias_prop {
++	struct list_head link;
++	const char *alias;
++	struct device_node *np;
++	int alias_id;
++	char alias_stem[0];
++};
++
++static LIST_HEAD(aliases_lookup);
++
+ struct device_node *allnodes;
+ struct device_node *of_chosen;
++struct device_node *of_aliases;
+ 
+ /* use when traversing tree through the allnext, child, sibling,
+  * or parent members of struct device_node.
+@@ -922,3 +946,160 @@ out_unlock:
+ }
+ #endif /* defined(CONFIG_OF_DYNAMIC) */
+ 
++/*
++ * of_alias_find_available_id - Find an available id for the given device_node
++ * @np:		Pointer to the given device_node
++ * @stem:	Alias stem of the given device_node
++ *
++ * The function travels the lookup table to find an available id for the
++ * given device_node with given alias stem.  It returns the id found.
++ */
++static int of_alias_find_available_id(struct device_node *np, const char *stem)
++{
++	struct alias_prop *app;
++	int id = 0;
++
++	while (1) {
++		bool used = false;
++		list_for_each_entry(app, &aliases_lookup, link) {
++			if (!strcmp(app->alias_stem, stem) &&
++			    app->alias_id == id) {
++				used = true;
++				break;
++			}
++		}
++
++		if (used)
++			id++;
++		else
++			return id;
++	}
++}
++
++/**
++ * of_alias_lookup_add - Add alias into lookup table
++ * @alias:	Alias name
++ * @id:		Alias id
++ * @stem:	Alias stem name
++ * @np:		Pointer to device_node
++ *
++ * The function adds one alias into the lookup table and populate it
++ * with the info passed in.  It returns 0 in sucess, or error code.
++ */
++static int of_alias_lookup_add(char *alias, int id, const char *stem,
++			       struct device_node *np)
++{
++	struct alias_prop *app;
++	size_t sz = sizeof(*app) + strlen(stem) + 1;
++
++	app = kzalloc(sz, GFP_KERNEL);
++	if (!app) {
++		/*
++		 * It may fail due to being called by boot code,
++		 * so try alloc_bootmem before return error.
++		 */
++		app = alloc_bootmem(sz);
++		if (!app)
++			return -ENOMEM;
++	}
++
++	app->np = np;
++	app->alias = alias;
++	app->alias_id = id;
++	strcpy(app->alias_stem, stem);
++	list_add_tail(&app->link, &aliases_lookup);
++
++	return 0;
++}
++
++/**
++ * of_alias_decode - Decode alias stem and id from alias name
++ * @alias:	Alias name to be decoded
++ * @stem:	Pointer used to return stem name
++ *
++ * The function decodes alias stem name and alias id from the given
++ * alias name.  It returns stem name via parameter 'stem', and stem id
++ * via the return value.  If no id is found in alias name, it returns 0
++ * as the default.
++ */
++static int of_alias_decode(char *alias, char *stem)
++{
++	int len = strlen(alias);
++	char *end = alias + len;
++
++	while (isdigit(*--end))
++		len--;
++
++	strncpy(stem, alias, len);
++	stem[len] = '\0';
++
++	return strlen(++end) ? simple_strtoul(end, NULL, 10) : 0;
++}
++
++/**
++ * of_alias_scan - Scan all properties of 'aliases' node
++ *
++ * The function scans all the properties of 'aliases' node and populate
++ * the the global lookup table with the properties.  It returns the
++ * number of alias_prop found, or error code in error case.
++ */
++int of_alias_scan(void)
++{
++	struct property *pp;
++	int ret, num = 0;
++
++	if (!of_aliases)
++		return -ENODEV;
++
++	for_each_property(pp, of_aliases->properties) {
++		char stem[32];
++		int id = of_alias_decode(pp->name, stem);
++
++		/* Skip those we do not want to proceed */
++		if (!strcmp(pp->name, "name") ||
++		    !strcmp(pp->name, "phandle") ||
++		    !strcmp(pp->name, "linux,phandle"))
++			continue;
++
++		ret = of_alias_lookup_add(pp->name, id, stem,
++					  of_find_node_by_path(pp->value));
++		if (ret < 0)
++			return ret;
++		else
++			num++;
++	}
++
++	return num;
++}
++
++/**
++ * of_alias_get_id - Get alias id for the given device_node
++ * @np:		Pointer to the given device_node
++ * @stem:	Alias stem of the given device_node
++ *
++ * The function travels the lookup table to get alias id for the given
++ * device_node and alias stem.  It returns the alias id if find it.
++ * If not, dynamically creates one in the lookup table and returns it,
++ * or returns error code if fail to create.
++ */
++int of_alias_get_id(struct device_node *np, const char *stem)
++{
++	struct alias_prop *app;
++	int id = -1;
++
++	list_for_each_entry(app, &aliases_lookup, link) {
++		if (np == app->np) {
++			id = app->alias_id;
++			break;
++		}
++	}
++
++	if (id == -1) {
++		id = of_alias_find_available_id(np, stem);
++		if (of_alias_lookup_add(NULL, id, stem, np) < 0)
++			return -ENODEV;
++	}
++
++	return id;
++}
++EXPORT_SYMBOL_GPL(of_alias_get_id);
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index 65200af..998dc63 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -711,6 +711,12 @@ void __init unflatten_device_tree(void)
+ 	of_chosen = of_find_node_by_path("/chosen");
+ 	if (of_chosen == NULL)
+ 		of_chosen = of_find_node_by_path("/chosen at 0");
++
++	of_aliases = of_find_node_by_path("/aliases");
++	if (of_aliases == NULL)
++		of_aliases = of_find_node_by_path("/aliases@0");
++
++	of_alias_scan();
+ }
+ 
+ #endif /* CONFIG_OF_EARLY_FLATTREE */
+diff --git a/include/linux/of.h b/include/linux/of.h
+index bfc0ed1..c35cc47 100644
+--- a/include/linux/of.h
++++ b/include/linux/of.h
+@@ -68,6 +68,7 @@ struct device_node {
+ /* Pointer for first entry in chain of all nodes. */
+ extern struct device_node *allnodes;
+ extern struct device_node *of_chosen;
++extern struct device_node *of_aliases;
+ extern rwlock_t devtree_lock;
+ 
+ static inline bool of_have_populated_dt(void)
+@@ -201,6 +202,9 @@ extern int of_device_is_available(const struct device_node *device);
+ extern const void *of_get_property(const struct device_node *node,
+ 				const char *name,
+ 				int *lenp);
++#define for_each_property(pp, properties) \
++	for (pp = properties; pp != NULL; pp = pp->next)
++
+ extern int of_n_addr_cells(struct device_node *np);
+ extern int of_n_size_cells(struct device_node *np);
+ extern const struct of_device_id *of_match_node(
+@@ -213,6 +217,9 @@ extern int of_parse_phandles_with_args(struct device_node *np,
+ 	const char *list_name, const char *cells_name, int index,
+ 	struct device_node **out_node, const void **out_args);
+ 
++extern int of_alias_scan(void);
++extern int of_alias_get_id(struct device_node *np, const char *stem);
++
+ extern int of_machine_is_compatible(const char *compat);
+ 
+ extern int prom_add_property(struct device_node* np, struct property* prop);
+-- 
+1.7.4.1
