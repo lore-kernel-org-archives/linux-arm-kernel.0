@@ -1,51 +1,53 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 24 Jun 2011 14:14:50 +0100
-Subject: [PATCH] clocksource/arm_smp_twd: handle frequency changes
-In-Reply-To: <1308559687-30768-1-git-send-email-linus.walleij@stericsson.com>
-References: <1308559687-30768-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <4E048DCA.8070700@arm.com>
+Date: Fri, 24 Jun 2011 14:01:41 +0100
+Subject: [PATCH] ARM: clocksource/arm_smp_twd: remove superfluous per_cpu v=
+Message-ID: <mailman.33.1308921297.24103.linux-arm-kernel@lists.infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/06/11 09:48, Linus Walleij wrote:
-> From: Colin Cross <ccross@android.com>
-> 
-> First add a clock called "smp_twd" that is used to determine the
-> twd frequency, which can also be used at init time to avoid
-> calibrating the twd frequency since we already know it.
-> 
-> Then the localtimer's clock changes with the cpu clock, since the
-> block has only one clock input. After a cpufreq transition, update
-> the clockevent's frequency and reprogram the next clock event
-> so we stay tight on the scheduled timeline.
-> 
-> Clock changes are based on Rob Herring's work.
-> 
-> This patch depends on the whole localtimer rewrite and move
-> shebang from Marc Zyngier, and that in turn depends on other
-> stuff.
-> 
-> Signed-off-by: Colin Cross <ccross@android.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Acked-by: Rob Herring <rob.herring@calxeda.com>
-> Acked-by: Santosh Shilimkar <santosh.shilimkar@ti.com>
-> [ifdef:ed CPUfreq stuff - rebased to Marc Z patches]
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> Marc, if you're pursuing this series, consider merging this on top,
-> it is needed for the new ARM A9 small-form factor reference platform
-> whatever it is called.
+ariable
 
-Linus,
+The twd_ce variable was used to track the per-cpu clock event devices
+in the previous incarnation of the driver. As these clock event
+devices are now directly accessible inside the driver, just get rid
+of it and access the real thing directly.
 
-I've applied the attached patch on top of this one, just removing a now
-superfluous variable. No functional changes.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ drivers/clocksource/arm_smp_twd.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
 
-Cheers,
+diff --git a/drivers/clocksource/arm_smp_twd.c b/drivers/clocksource/arm_sm=
+p_twd.c
+index 4d58975..65f4669 100644
+--- a/drivers/clocksource/arm_smp_twd.c
++++ b/drivers/clocksource/arm_smp_twd.c
+@@ -40,7 +40,6 @@ static void __iomem *twd_base;
+ static int twd_ppi;
+=20
+ static struct clk *twd_clk;
+-static DEFINE_PER_CPU(struct clock_event_device *, twd_ce);
+ static unsigned long twd_timer_rate;
+ static DEFINE_PER_CPU(bool, irq_reqd);
+ static struct clock_event_device __percpu *twd_evt;
+@@ -106,7 +105,7 @@ static void twd_update_frequency(void *data)
+ {
+ =09twd_timer_rate =3D clk_get_rate(twd_clk);
+=20
+-=09clockevents_update_freq(__get_cpu_var(twd_ce), twd_timer_rate);
++=09clockevents_update_freq(__get_cpu_var(twd_evt), twd_timer_rate);
+ }
+=20
+ static int twd_cpufreq_transition(struct notifier_block *nb,
+@@ -238,7 +237,6 @@ static void __cpuinit twd_setup(void *data)
+ =09=09return;
+ =09}
+=20
+-=09__get_cpu_var(twd_ce) =3D clk;
+ =09clockevents_config_and_register(clk, twd_timer_rate,
+ =09=09=09=09=090xf, 0xffffffff);
+ }
+--=20
+1.7.0.4
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+--------------040203090205030102060702--
