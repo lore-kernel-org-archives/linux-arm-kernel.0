@@ -1,25 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 24 Jun 2011 08:42:26 +0100
-Subject: [PATCH 23/25] ARM: pm: omap34xx: convert to generic
-	suspend/resume support
-In-Reply-To: <BANLkTim2ZL8vV9TUofCdq5F=pbFheHQ=Mg@mail.gmail.com>
-References: <20110623190900.GH9449@n2100.arm.linux.org.uk>
-	<E1QZpOS-0005nt-Fq@rmk-PC.arm.linux.org.uk>
-	<BANLkTim2ZL8vV9TUofCdq5F=pbFheHQ=Mg@mail.gmail.com>
-Message-ID: <20110624074226.GI9449@n2100.arm.linux.org.uk>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Fri, 24 Jun 2011 16:42:26 +0900
+Subject: [PATCH 4/7] ARM: EXYNOS4: Support early wakeup while entering
+	sleep mode
+In-Reply-To: <20110622145715.GS23234@n2100.arm.linux.org.uk>
+References: <1308732405-16664-1-git-send-email-kgene.kim@samsung.com>
+	<1308732405-16664-5-git-send-email-kgene.kim@samsung.com>
+	<20110622145715.GS23234@n2100.arm.linux.org.uk>
+Message-ID: <007401cc3242$48947160$d9bd5420$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 24, 2011 at 09:37:03AM +0200, Jean Pihet wrote:
-> Russell,
-> 
-> Just a minor remark:
-> On Thu, Jun 23, 2011 at 9:16 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Convert sa11x0 to use the generic CPU suspend/resume support, rather
->                ^^^^^^^ should be 'OMAP3'
-> > than implementing its own version. ?Tested on 3430 LDP.
-> >
-> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+Russell King - ARM Linux wrote:
 
-Thanks, fixed.
+> Stop bodging stuff (like you have for the SCU stuff.) and start _talking_
+> to people if the code doesn't do what you need it to do.
+
+Hi Russell and all,
+
+I'd like to share requirement of EXYNOS4210 PM.
+
+Now if there is wakeup source which is pending before entering suspend mode,
+PMU(Power Management Unit) handles WFI instruction as NOP on EXYNOS4210. But
+it seems that current cpu_suspend() cannot support this. So how can/should
+we handle this case?
+
+And this is another case. For example, assume that ARM is power down mode
+and outer cache(L2 cache) data is retention state to use L2 cache data after
+wakeup. In this case, according to wakeup sequence, firstly L1 cache is
+enabled in cpu_resume() then L2 cache will be enabled which is implemented
+in Samsung SoC specific code. So how can be handled the coherency problem
+between L1 cache and L2 cache?
+
+Thanks.
+
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
