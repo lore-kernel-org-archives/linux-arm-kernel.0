@@ -1,38 +1,66 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Sat, 25 Jun 2011 10:33:49 +0200
-Subject: [PATCH] ARM: mach-mx5/mx53_ard: Add missing definition
-In-Reply-To: <1308938870-3062-1-git-send-email-festevam@gmail.com>
-References: <1308938870-3062-1-git-send-email-festevam@gmail.com>
-Message-ID: <20110625083349.GA6588@pengutronix.de>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 25 Jun 2011 11:26:09 +0200
+Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
+In-Reply-To: <20110622151902.GN27654@legolas.emea.dhcp.ti.com>
+References: <20110622143216.GE27654@legolas.emea.dhcp.ti.com>
+	<Pine.LNX.4.44L0.1106221055030.1977-100000@iolanthe.rowland.org>
+	<20110622151902.GN27654@legolas.emea.dhcp.ti.com>
+Message-ID: <4E05A9B1.5090000@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On 06/22/2011 05:19 PM, Felipe Balbi wrote:
+> Hi,
+>
+> On Wed, Jun 22, 2011 at 11:02:27AM -0400, Alan Stern wrote:
+>> No, the patch is appropriate.
+Indeed.
+>>
+>> We don't need better communication.  If g_mass_storage (for example)
+>> knows that the device is in use, it can block suspends by returning
+>> -EBUSY from its own suspend callback.  The UDC driver doesn't need to
+>> worry about these matters; it should assume that such things have
+>> already been handled elsewhere.  That's what Dmitry meant when he was
+>> talking about a "higher level driver" -- maybe "lower level" would have
+>> been a better choice of words.  :-)
+The suspend at driver level should not care about filesystem in use, etc 
+... A disconnected cable cannot be prevented by the kernel, and the 
+effect in fine is the same as the suspend.
 
-On Fri, Jun 24, 2011 at 03:07:50PM -0300, Fabio Estevam wrote:
-> commit 9203d59 (ARM:mach-mx5/mx53_ard: Add I2C2 and I2C3 support) missed to include
-> the define for ARD_I2CPORTEXP_B.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/mach-mx5/board-mx53_ard.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
-> index 70ae25e..b94ddeb 100644
-> --- a/arch/arm/mach-mx5/board-mx53_ard.c
-> +++ b/arch/arm/mach-mx5/board-mx53_ard.c
-> @@ -38,6 +38,7 @@
->  #define ARD_ETHERNET_INT_B	IMX_GPIO_NR(2, 31)
->  #define ARD_SD1_CD		IMX_GPIO_NR(1, 1)
->  #define ARD_SD1_WP		IMX_GPIO_NR(1, 9)
-> +#define ARD_I2CPORTEXP_B        IMX_GPIO_NR(2, 3)
-The other ARD symbols are indented with tabs, you used spaces.  Care to
-redo this to be consistent?
+>> Until recently, ordering of the suspend callbacks didn't present any
+>> problem.  The gadget device was a child of the UDC device and therefore
+>> its suspend callback would always be invoked first.
+>>
+>> With the new UDC framework, I don't know if this is true any more.
+>> It's something to consider.
+That true also for the UDC driver, which should be suspended before the 
+transciever, so that it can complete its shutdown properly.
+That's what bothers me with the patch.
 
-Best regards
-Uwe
+And we should not confuse the 2 suspends :
+  (1) driver suspend, which happens at suspendToRam or suspendToDisk 
+(the one we're discussing here)
+  (2) USB suspend (which if I remember correctly is a special USB 
+command while the USB bus remains powered).
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+The order of suspend in (1) requires :
+  - gadget (gzero, gether, ...) suspended first
+  - UDC suspended second
+  - transceiver suspended last
+
+The order of suspend in (2) doesn't require anything AFAIR.
+
+For order in (1) :
+  - gadget before UDC should be enforced by the framework, as the UDC 
+usb_gadget_probe_driver() method calls device_add() on the gadget<
+  - UDC before transceiver is enforced in some drivers by directly 
+manipulating the gpio line.
+
+So Dimitry, do you have an idea as how to guarantee order of suspend in 
+(1), between UDC driver and gpio_vbus ? Maybe an otg_*() call would do 
+the trick ?
+
+Cheers.
+
+--
+Robert
