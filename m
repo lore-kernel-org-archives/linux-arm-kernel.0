@@ -1,60 +1,120 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Fri, 24 Jun 2011 20:17:39 -0500
-Subject: [RFC PATCH 3/7] OMAP: mailbox: use OMAP's naming convention for
-	devices
+Date: Fri, 24 Jun 2011 20:17:40 -0500
+Subject: [RFC PATCH 4/7] OMAP: mailbox: move framework functions under header
+	file
 In-Reply-To: <1308964663-5669-1-git-send-email-omar.ramirez@ti.com>
 References: <1308964663-5669-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1308964663-5669-4-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1308964663-5669-5-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use "omap_XXX" as the OMAP device naming convention.
+Move API functions to common framework like save/restore_ctx,
+enable/disable_irq instead of being under a header file. While
+at it dropping their static inline declarations.
 
 Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 ---
- arch/arm/mach-omap1/mailbox.c |    2 +-
- arch/arm/mach-omap2/devices.c |    2 +-
- arch/arm/mach-omap2/mailbox.c |    2 +-
- 3 files changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/plat-omap/include/plat/mailbox.h |   35 +++-------------------------
+ arch/arm/plat-omap/mailbox.c              |   35 +++++++++++++++++++++++++++++
+ 2 files changed, 39 insertions(+), 31 deletions(-)
 
-diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
-index c0e1f48..2845652 100644
---- a/arch/arm/mach-omap1/mailbox.c
-+++ b/arch/arm/mach-omap1/mailbox.c
-@@ -175,7 +175,7 @@ static struct platform_driver omap1_mbox_driver = {
- 	.probe	= omap1_mbox_probe,
- 	.remove	= __devexit_p(omap1_mbox_remove),
- 	.driver	= {
--		.name	= "omap-mailbox",
-+		.name	= "omap_mailbox",
- 	},
- };
+diff --git a/arch/arm/plat-omap/include/plat/mailbox.h b/arch/arm/plat-omap/include/plat/mailbox.h
+index 337b93c..271905a 100644
+--- a/arch/arm/plat-omap/include/plat/mailbox.h
++++ b/arch/arm/plat-omap/include/plat/mailbox.h
+@@ -78,36 +78,9 @@ void omap_mbox_put(struct omap_mbox *mbox, struct notifier_block *nb);
+ int omap_mbox_register(struct device *parent, struct omap_mbox **);
+ int omap_mbox_unregister(void);
  
-diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index e1110f2..779b2f3 100644
---- a/arch/arm/mach-omap2/devices.c
-+++ b/arch/arm/mach-omap2/devices.c
-@@ -287,7 +287,7 @@ static inline void omap_init_mbox(void)
- 	mb_attr = oh->dev_attr;
- 	pdata.nr_mbox = mb_attr->nr_mbox;
+-static inline void omap_mbox_save_ctx(struct omap_mbox *mbox)
+-{
+-	if (!mbox->ops->save_ctx) {
+-		dev_err(mbox->dev, "%s:\tno save\n", __func__);
+-		return;
+-	}
+-
+-	mbox->ops->save_ctx(mbox);
+-}
+-
+-static inline void omap_mbox_restore_ctx(struct omap_mbox *mbox)
+-{
+-	if (!mbox->ops->restore_ctx) {
+-		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
+-		return;
+-	}
+-
+-	mbox->ops->restore_ctx(mbox);
+-}
+-
+-static inline void omap_mbox_enable_irq(struct omap_mbox *mbox,
+-					omap_mbox_irq_t irq)
+-{
+-	mbox->ops->enable_irq(mbox, irq);
+-}
+-
+-static inline void omap_mbox_disable_irq(struct omap_mbox *mbox,
+-					 omap_mbox_irq_t irq)
+-{
+-	mbox->ops->disable_irq(mbox, irq);
+-}
++void omap_mbox_save_ctx(struct omap_mbox *mbox);
++void omap_mbox_restore_ctx(struct omap_mbox *mbox);
++void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq);
++void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq);
  
--	od = omap_device_build("omap-mailbox", -1, oh, &pdata, sizeof(pdata),
-+	od = omap_device_build("omap_mailbox", -1, oh, &pdata, sizeof(pdata),
- 				mbox_latencies, ARRAY_SIZE(mbox_latencies), 0);
- 	WARN(IS_ERR(od), "%s: could not build device, err %ld\n",
- 						__func__, PTR_ERR(od));
-diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
-index 86d564a..946a70a 100644
---- a/arch/arm/mach-omap2/mailbox.c
-+++ b/arch/arm/mach-omap2/mailbox.c
-@@ -397,7 +397,7 @@ static struct platform_driver omap2_mbox_driver = {
- 	.probe = omap2_mbox_probe,
- 	.remove = __devexit_p(omap2_mbox_remove),
- 	.driver = {
--		.name = "omap-mailbox",
-+		.name = "omap_mailbox",
- 	},
- };
+ #endif /* MAILBOX_H */
+diff --git a/arch/arm/plat-omap/mailbox.c b/arch/arm/plat-omap/mailbox.c
+index 69ddc9f..98b36dc 100644
+--- a/arch/arm/plat-omap/mailbox.c
++++ b/arch/arm/plat-omap/mailbox.c
+@@ -60,6 +60,18 @@ static inline int mbox_fifo_full(struct omap_mbox *mbox)
+ }
  
+ /* Mailbox IRQ handle functions */
++void omap_mbox_enable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
++{
++	mbox->ops->enable_irq(mbox, irq);
++}
++EXPORT_SYMBOL(omap_mbox_enable_irq);
++
++void omap_mbox_disable_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
++{
++	mbox->ops->disable_irq(mbox, irq);
++}
++EXPORT_SYMBOL(omap_mbox_disable_irq);
++
+ static inline void ack_mbox_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+ {
+ 	if (mbox->ops->ack_irq)
+@@ -70,6 +82,29 @@ static inline int is_mbox_irq(struct omap_mbox *mbox, omap_mbox_irq_t irq)
+ 	return mbox->ops->is_irq(mbox, irq);
+ }
+ 
++/* Mailbox context functions */
++void omap_mbox_save_ctx(struct omap_mbox *mbox)
++{
++	if (!mbox->ops->save_ctx) {
++		dev_err(mbox->dev, "%s:\tno save\n", __func__);
++		return;
++	}
++
++	mbox->ops->save_ctx(mbox);
++}
++EXPORT_SYMBOL(omap_mbox_save_ctx);
++
++void omap_mbox_restore_ctx(struct omap_mbox *mbox)
++{
++	if (!mbox->ops->restore_ctx) {
++		dev_err(mbox->dev, "%s:\tno restore\n", __func__);
++		return;
++	}
++
++	mbox->ops->restore_ctx(mbox);
++}
++EXPORT_SYMBOL(omap_mbox_restore_ctx);
++
+ /*
+  * message sender
+  */
 -- 
 1.7.0.4
