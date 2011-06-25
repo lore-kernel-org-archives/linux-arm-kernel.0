@@ -1,34 +1,21 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 25 Jun 2011 10:09:04 +0200
-Subject: [PATCH] USB: ehci: use packed,
-	aligned(4) instead of removing the packed attribute
-In-Reply-To: <alpine.LFD.2.00.1106242122390.2142@xanadu.home>
-References: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
-	<201106211325.16777.arnd@arndb.de>
-	<alpine.LFD.2.00.1106242122390.2142@xanadu.home>
-Message-ID: <201106251009.04624.arnd@arndb.de>
+From: koen@dominion.thruhere.net (Koen Kooi)
+Date: Sat, 25 Jun 2011 10:16:35 +0200
+Subject: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+In-Reply-To: <1308932625-17632-1-git-send-email-premi@ti.com>
+References: <1308932625-17632-1-git-send-email-premi@ti.com>
+Message-ID: <86CFE860-E18E-4B96-A753-11EB7C5C1C86@dominion.thruhere.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 25 June 2011, Nicolas Pitre wrote:
-> > which means that the dma_buf variable is dereferenced before the
-> > volatile mmio_reg variable, which opens up a race: An interrupt may have
-> > signalled us that a DMA is in progress, so we read a MMIO register from
-> > the device (this is guaranteed to flush the DMA on PCI and similar buses).
-> > If we read the dma_buf before we read the mmio register, the data we get
-> > back may be stale.
-> > 
-> > Adding a barrier() between the two turns the assembly into the expected
-> > 
-> >         ldr     r3, [r1, #0]
-> >         ldr     r0, [r0, #0]
-> >         bx      lr
+
+Op 24 jun 2011, om 18:23 heeft Sanjeev Premi het volgende geschreven:
+
+> The current selection of the GPTIMER on was result of
+> a hardware issue in early versions of the Beagleboards
+> (Ax and B1 thru B4). [1] [2]
 > 
-> But isn't the usual dma_unmap_*() API call providing that barrier 
-> already?
+> Its been long since the hardware issue has been fixed.
+> This patch uses GPTIMER 1 for all newer board revisions
+> incl. Beagleboard XM.
 
-Yes, for the streaming mapping that would be sufficient, but not
-for a coherent mapping, which doesn't need dma_unmap_* or dma_sync*
-calls before accessing the buffer.
-
-	Arnd
+What's the reason for switching away from gptimer12? Nothing in your patch or changelog says why.
