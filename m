@@ -1,56 +1,118 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Sat, 25 Jun 2011 14:33:56 +0400
-Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
-In-Reply-To: <4E05A9B1.5090000@free.fr>
-References: <20110622143216.GE27654@legolas.emea.dhcp.ti.com>
-	<Pine.LNX.4.44L0.1106221055030.1977-100000@iolanthe.rowland.org>
-	<20110622151902.GN27654@legolas.emea.dhcp.ti.com>
-	<4E05A9B1.5090000@free.fr>
-Message-ID: <BANLkTik_OPVYwucvVO1ODwSDhjFgXC07oA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 25 Jun 2011 12:11:42 +0100
+Subject: [RFC PATCH 1/4] dt: early platform devices support
+In-Reply-To: <BANLkTi=7cM2dXniHM4mnXs46KaTc05hh-Q@mail.gmail.com>
+References: <1308924659-31894-1-git-send-email-marc.zyngier@arm.com>
+	<1308924659-31894-2-git-send-email-marc.zyngier@arm.com>
+	<BANLkTi=7cM2dXniHM4mnXs46KaTc05hh-Q@mail.gmail.com>
+Message-ID: <20110625121142.4c73ca70@taxman.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/11, Robert Jarzmik <robert.jarzmik@free.fr> wrote:
-> On 06/22/2011 05:19 PM, Felipe Balbi wrote:
->> On Wed, Jun 22, 2011 at 11:02:27AM -0400, Alan Stern wrote:
->>> Until recently, ordering of the suspend callbacks didn't present any
->>> problem.  The gadget device was a child of the UDC device and therefore
->>> its suspend callback would always be invoked first.
->>>
->>> With the new UDC framework, I don't know if this is true any more.
->>> It's something to consider.
-> That true also for the UDC driver, which should be suspended before the
-> transciever, so that it can complete its shutdown properly.
-> That's what bothers me with the patch.
->
-> And we should not confuse the 2 suspends :
->   (1) driver suspend, which happens at suspendToRam or suspendToDisk
-> (the one we're discussing here)
->   (2) USB suspend (which if I remember correctly is a special USB
-> command while the USB bus remains powered).
->
-> The order of suspend in (1) requires :
->   - gadget (gzero, gether, ...) suspended first
->   - UDC suspended second
->   - transceiver suspended last
->
-> The order of suspend in (2) doesn't require anything AFAIR.
->
-> For order in (1) :
->   - gadget before UDC should be enforced by the framework, as the UDC
-> usb_gadget_probe_driver() method calls device_add() on the gadget<
->   - UDC before transceiver is enforced in some drivers by directly
-> manipulating the gpio line.
->
-> So Dimitry, do you have an idea as how to guarantee order of suspend in
-> (1), between UDC driver and gpio_vbus ? Maybe an otg_*() call would do
-> the trick ?
+On Fri, 24 Jun 2011 22:49:56 -0600
+Grant Likely <grant.likely@secretlab.ca> wrote:
 
-That is simple: UDC driver acquires transceiver via otg_*() calls, so
-transceiver
-is already registered at the point of probing UDC. I'll check the order of calls
-during suspend though.
+> [cc'ing linux kernel since I discuss driver core issues]
+> [cc'ing greg and kay, 'cause I've included a patch I'd like you to
+> look at (see end of email)]
+> 
+> On Fri, Jun 24, 2011 at 8:10 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> > Add support for populating early platform devices from the device
+> > tree, by walking the tree and adding nodes whose 'compatible'
+> > property matches the 'class' string passed as a parameter.
+> >
+> > This allows devices to be probed long before the whole device
+> > infrastructure is available.
+> >
+> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> > ---
+> > ?drivers/of/platform.c ? ? ? | ? 26 ++++++++++++++++++++++++++
+> > ?include/linux/of_platform.h | ? ?1 +
+> > ?2 files changed, 27 insertions(+), 0 deletions(-)
+> >
+> > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> > index e75af39..2a323ee 100644
+> > --- a/drivers/of/platform.c
+> > +++ b/drivers/of/platform.c
+> > @@ -458,4 +458,30 @@ int of_platform_populate(struct device_node *root,
+> > ? ? ? ?of_node_put(root);
+> > ? ? ? ?return rc;
+> > ?}
+> > +
+> > +/**
+> > + * of_early_platform_populate() - Populate early platform devices from DT
+> > + * @class: string to compare to the 'compatible' attributes
+> > + *
+> > + * This function walks the device tree and register devices whose
+> > + * 'compatible' property matches the 'class' parameter.
+> > + *
+> > + * Returns 0 on success, < 0 on failure.
+> > + */
+> > +int of_early_platform_populate(const char *class)
+> > +{
+> > + ? ? ? struct platform_device *pdev;
+> > + ? ? ? struct device_node *np = NULL;
+> > +
+> > + ? ? ? while ((np = of_find_compatible_node(np, NULL, class))) {
+> 
+> for_each_compatible_node()
+> 
+> > + ? ? ? ? ? ? ? pdev = of_device_alloc(np, NULL, NULL);
+> > + ? ? ? ? ? ? ? if (!pdev)
+> > + ? ? ? ? ? ? ? ? ? ? ? return -ENOMEM;
+> > + ? ? ? ? ? ? ? list_del(&pdev->dev.devres_head);
+> > + ? ? ? ? ? ? ? memset(&pdev->dev.devres_head, 0, sizeof(pdev->dev.devres_head));
+> > + ? ? ? ? ? ? ? early_platform_add_devices(&pdev, 1);
+> 
+> I'm not sure this will work reliably.  The of_platform semantics are
+> still slightly different from 'regular' platform devices (which I do
+> intend to fix though), so it may cause problems with how the device
+> name gets assigned.  I'd need to dig into it though.
+> 
+> > + ? ? ? }
+> > +
+> > + ? ? ? return 0;
+> > +}
+> 
+> Hmmm, I'd really rather not go down the path of having different
+> 'classes' of devices that need to be registered at different times.
+> There just isn't a really good generic way to know which devices
+> should be the 'early' ones, it gets hairy with regard to making sure
+> devices don't get registered twice, and it doesn't actually solve the
+> problem that there is no way to handle dependencies between devices in
+> the Linux device model.
+> 
+> What I /want/ to do is allow drivers to defer initialization at .probe
+> time if some of the resources it needs aren't yet available.
+> Unfortunately, that doesn't work so well for interrupt controllers
+> since irq numbers are expected to be correctly populated in the
+> platform device resource table.  What complicates things further is
+> that most gpio controllers are doubling as irq controllers nowdays,
+> and those are typically modelled with platform devices themselves.
 
+While I totally agree with all the above, this patch tries to address a
+slightly different problem. On top of device/device dependencies, there
+is also a number of implicit dependencies.
+
+In the case I'm currently trying to solve, the kernel expects a timer
+to be up and running when hitting the delay loop calibration. At that
+stage, it is impossible to register a platform device, hence the use
+(abuse?) of early platform devices.
+
+The current ARM code relies on the timers *not* being a standard
+device, and being directly setup by an board specific method. The SMP
+timers are even worse, as they are directly called by the core code,
+meaning that we can only have *one* implementation at a time in the
+kernel.
+
+So the early platform stuff is a potential solution for that, though
+there is no way it would handle any kind of dependency. What I dream of
+is to have the full device/driver infrastructure available much
+earlier, before the rest of the kernel starts relying on some hardware
+being up and running...
+
+Cheers,
+
+	M.
 -- 
-With best wishes
-Dmitry
+I'm the slime oozin' out from your TV set...
