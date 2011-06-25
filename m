@@ -1,131 +1,55 @@
 From: grant.likely@secretlab.ca (Grant Likely)
-Date: Sat, 25 Jun 2011 14:44:35 -0600
-Subject: [RFC PATCH 1/4] dt: early platform devices support
-In-Reply-To: <20110625121142.4c73ca70@taxman.wild-wind.fr.eu.org>
+Date: Sat, 25 Jun 2011 14:47:42 -0600
+Subject: [RFC PATCH 2/4] ARM: dt: register local timers as early platform
+	devices
+In-Reply-To: <1308924659-31894-3-git-send-email-marc.zyngier@arm.com>
 References: <1308924659-31894-1-git-send-email-marc.zyngier@arm.com>
-	<1308924659-31894-2-git-send-email-marc.zyngier@arm.com>
-	<BANLkTi=7cM2dXniHM4mnXs46KaTc05hh-Q@mail.gmail.com>
-	<20110625121142.4c73ca70@taxman.wild-wind.fr.eu.org>
-Message-ID: <20110625204435.GA15026@ponder.secretlab.ca>
+	<1308924659-31894-3-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20110625204742.GB15026@ponder.secretlab.ca>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 25, 2011 at 12:11:42PM +0100, Marc Zyngier wrote:
-> On Fri, 24 Jun 2011 22:49:56 -0600
-> Grant Likely <grant.likely@secretlab.ca> wrote:
+On Fri, Jun 24, 2011 at 03:10:57PM +0100, Marc Zyngier wrote:
+> Use of_early_platform_populate() to collect nodes with the
+> "localtimer" compatible property and register them with
+> the early platform "bus".
 > 
-> > [cc'ing linux kernel since I discuss driver core issues]
-> > [cc'ing greg and kay, 'cause I've included a patch I'd like you to
-> > look at (see end of email)]
-> > 
-> > On Fri, Jun 24, 2011 at 8:10 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> > > Add support for populating early platform devices from the device
-> > > tree, by walking the tree and adding nodes whose 'compatible'
-> > > property matches the 'class' string passed as a parameter.
-> > >
-> > > This allows devices to be probed long before the whole device
-> > > infrastructure is available.
-> > >
-> > > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > > ---
-> > > ?drivers/of/platform.c ? ? ? | ? 26 ++++++++++++++++++++++++++
-> > > ?include/linux/of_platform.h | ? ?1 +
-> > > ?2 files changed, 27 insertions(+), 0 deletions(-)
-> > >
-> > > diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> > > index e75af39..2a323ee 100644
-> > > --- a/drivers/of/platform.c
-> > > +++ b/drivers/of/platform.c
-> > > @@ -458,4 +458,30 @@ int of_platform_populate(struct device_node *root,
-> > > ? ? ? ?of_node_put(root);
-> > > ? ? ? ?return rc;
-> > > ?}
-> > > +
-> > > +/**
-> > > + * of_early_platform_populate() - Populate early platform devices from DT
-> > > + * @class: string to compare to the 'compatible' attributes
-> > > + *
-> > > + * This function walks the device tree and register devices whose
-> > > + * 'compatible' property matches the 'class' parameter.
-> > > + *
-> > > + * Returns 0 on success, < 0 on failure.
-> > > + */
-> > > +int of_early_platform_populate(const char *class)
-> > > +{
-> > > + ? ? ? struct platform_device *pdev;
-> > > + ? ? ? struct device_node *np = NULL;
-> > > +
-> > > + ? ? ? while ((np = of_find_compatible_node(np, NULL, class))) {
-> > 
-> > for_each_compatible_node()
-> > 
-> > > + ? ? ? ? ? ? ? pdev = of_device_alloc(np, NULL, NULL);
-> > > + ? ? ? ? ? ? ? if (!pdev)
-> > > + ? ? ? ? ? ? ? ? ? ? ? return -ENOMEM;
-> > > + ? ? ? ? ? ? ? list_del(&pdev->dev.devres_head);
-> > > + ? ? ? ? ? ? ? memset(&pdev->dev.devres_head, 0, sizeof(pdev->dev.devres_head));
-> > > + ? ? ? ? ? ? ? early_platform_add_devices(&pdev, 1);
-> > 
-> > I'm not sure this will work reliably.  The of_platform semantics are
-> > still slightly different from 'regular' platform devices (which I do
-> > intend to fix though), so it may cause problems with how the device
-> > name gets assigned.  I'd need to dig into it though.
-> > 
-> > > + ? ? ? }
-> > > +
-> > > + ? ? ? return 0;
-> > > +}
-> > 
-> > Hmmm, I'd really rather not go down the path of having different
-> > 'classes' of devices that need to be registered at different times.
-> > There just isn't a really good generic way to know which devices
-> > should be the 'early' ones, it gets hairy with regard to making sure
-> > devices don't get registered twice, and it doesn't actually solve the
-> > problem that there is no way to handle dependencies between devices in
-> > the Linux device model.
-> > 
-> > What I /want/ to do is allow drivers to defer initialization at .probe
-> > time if some of the resources it needs aren't yet available.
-> > Unfortunately, that doesn't work so well for interrupt controllers
-> > since irq numbers are expected to be correctly populated in the
-> > platform device resource table.  What complicates things further is
-> > that most gpio controllers are doubling as irq controllers nowdays,
-> > and those are typically modelled with platform devices themselves.
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kernel/time.c |    4 ++++
+>  1 files changed, 4 insertions(+), 0 deletions(-)
 > 
-> While I totally agree with all the above, this patch tries to address a
-> slightly different problem. On top of device/device dependencies, there
-> is also a number of implicit dependencies.
-> 
-> In the case I'm currently trying to solve, the kernel expects a timer
-> to be up and running when hitting the delay loop calibration. At that
-> stage, it is impossible to register a platform device, hence the use
-> (abuse?) of early platform devices.
+> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
+> index 32d0df8..08a28ef 100644
+> --- a/arch/arm/kernel/time.c
+> +++ b/arch/arm/kernel/time.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/timer.h>
+>  #include <linux/irq.h>
+>  #include <linux/platform_device.h>
+> +#include <linux/of_platform.h>
+>  
+>  #include <linux/mc146818rtc.h>
+>  
+> @@ -156,6 +157,9 @@ static void __init __arm_late_time_init(void)
+>  		arm_late_time_init();
+>  
+>  #ifdef CONFIG_LOCAL_TIMER_DEVICES
+> +#ifdef CONFIG_OF_FLATTREE
+> +	of_early_platform_populate("localtimer");
+> +#endif
 
-:-)  Unfortunately I never did get a chance to read through your
-entire patch set, so I missed this.
+Rather than #ifdeffing around the function call, it is often cleaner
+to have an #else in the header file that defines an empty static
+inline.
 
-> The current ARM code relies on the timers *not* being a standard
-> device, and being directly setup by an board specific method. The SMP
-> timers are even worse, as they are directly called by the core code,
-> meaning that we can only have *one* implementation at a time in the
-> kernel.
-> 
-> So the early platform stuff is a potential solution for that, though
-> there is no way it would handle any kind of dependency. What I dream of
-> is to have the full device/driver infrastructure available much
-> earlier, before the rest of the kernel starts relying on some hardware
-> being up and running...
+>  	early_platform_driver_register_all("localtimer");
+>  	early_platform_driver_probe("localtimer", 1, 0);
 
-My suggestion: don't use platform_device for this.  I think it is
-entirely the wrong model.  Keep the timers *not* standard devices.
-
-Instead, use a timer setup function that accepts a list of compatible
-properties and an initialization hook for each timer type.  Since
-timers have exist, have to be called by core code, and cannot ever be
-built as modules, the Linux device model really doesn't offer much
-advantage.
-
-It is completely valid and often done to access device tree data from
-early setup code without any context of a struct device.
+I suggested in my other reply that early_platform_driver should not be
+used.  It looks like it is already being used, so I'll back off a bit
+from that position.  However, the structure of the code really
+shouldn't be any different between clock devices being statically
+declared vs. clock data being obtained from the DT.
 
 g.
