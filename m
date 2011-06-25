@@ -1,44 +1,39 @@
-From: zonque@gmail.com (Daniel Mack)
-Date: Sat, 25 Jun 2011 13:48:56 +0200
-Subject: [PATCH 2/2] MTD: pxa3xx_nand: Fix blank page ECC mismatch
-In-Reply-To: <BANLkTin_Z8ndAjp9vw6QcNb5bT82uoR9ng@mail.gmail.com>
-References: <1307440867-18993-1-git-send-email-leiwen@marvell.com>
-	<1307440867-18993-2-git-send-email-leiwen@marvell.com>
-	<1307445467.11104.80.camel@localhost>
-	<BANLkTin_Z8ndAjp9vw6QcNb5bT82uoR9ng@mail.gmail.com>
-Message-ID: <BANLkTi=7f2+LK32p6WG1doXzYWGf1wJQJQ@mail.gmail.com>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Sat, 25 Jun 2011 08:02:20 -0400 (EDT)
+Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
+In-Reply-To: <4E05A9B1.5090000@free.fr>
+Message-ID: <Pine.LNX.4.44L0.1106250758250.1039-100000@netrider.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 7, 2011 at 2:28 PM, Lei Wen <adrian.wenl@gmail.com> wrote:
-> On Tue, Jun 7, 2011 at 7:17 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
->> On Tue, 2011-06-07 at 03:01 -0700, Lei Wen wrote:
->>> From: Daniel Mack <zonque@gmail.com>
->>>
->>> This bug was introduced in f8155a40 ("mtd: pxa3xx_nand: rework irq
->>> logic") and causes the PXA3xx NAND controller fail to operate with NAND
->>> flash that has empty pages. According to the comment in this block, the
->>> hardware controller will report a double-bit error for empty pages,
->>> which can and must be ignored.
->>>
->>> This patch restores the original behaviour of the driver.
->>>
->>> Signed-off-by: Daniel Mack <zonque@gmail.com>
->>> Acked-by: Lei Wen <leiwen@marvell.com>
->>> Cc: Haojian Zhuang <haojian.zhuang@marvell.com>
->>> Cc: David Woodhouse <David.Woodhouse@intel.com>
->>> Cc: stable at kernel.org
->>
->> This was introduced in 2.6.38, so let's make it:
->>
->> Cc: stable at kernel.org [2.6.38+]
->>
-> Thanks for correcting this.
+On Sat, 25 Jun 2011, Robert Jarzmik wrote:
 
-Has anyone queued this for 3.0 yet? This fixes a serious regression,
-so we need this merged, along with Lei's other patch titled "MTD:
-pxa3xx_nand: fix nand detection issue".
+> On 06/22/2011 05:19 PM, Felipe Balbi wrote:
+> > Hi,
+> >
+> > On Wed, Jun 22, 2011 at 11:02:27AM -0400, Alan Stern wrote:
+> >> No, the patch is appropriate.
+> Indeed.
+> >>
+> >> We don't need better communication.  If g_mass_storage (for example)
+> >> knows that the device is in use, it can block suspends by returning
+> >> -EBUSY from its own suspend callback.  The UDC driver doesn't need to
+> >> worry about these matters; it should assume that such things have
+> >> already been handled elsewhere.  That's what Dmitry meant when he was
+> >> talking about a "higher level driver" -- maybe "lower level" would have
+> >> been a better choice of words.  :-)
+> The suspend at driver level should not care about filesystem in use, etc 
+> ... A disconnected cable cannot be prevented by the kernel, and the 
+> effect in fine is the same as the suspend.
 
+This is a little ironic, because the mass-storage gadget driver has no
+idea whether a filesystem is in use or not.  All it knows is whether it
+is currently connected to a host.  Besides, it's questionable whether
+the gadget driver should prevent the gadget from suspending.  This is a
+policy matter which must be decided by the user, not by the kernel.
 
-Thanks,
-Daniel
+Nevertheless...  The fact that the kernel can do nothing about a
+disconnected cable shouldn't stop us from handling system sleep
+correctly.  After all, the kernel _can_ do something about that.
+
+Alan Stern
