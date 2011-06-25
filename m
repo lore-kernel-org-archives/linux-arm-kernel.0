@@ -1,52 +1,60 @@
 From: omar.ramirez@ti.com (Omar Ramirez Luna)
-Date: Fri, 24 Jun 2011 20:17:38 -0500
-Subject: [RFC PATCH 2/7] OMAP2+: devices: get the number of supported mailboxes
+Date: Fri, 24 Jun 2011 20:17:39 -0500
+Subject: [RFC PATCH 3/7] OMAP: mailbox: use OMAP's naming convention for
+	devices
 In-Reply-To: <1308964663-5669-1-git-send-email-omar.ramirez@ti.com>
 References: <1308964663-5669-1-git-send-email-omar.ramirez@ti.com>
-Message-ID: <1308964663-5669-3-git-send-email-omar.ramirez@ti.com>
+Message-ID: <1308964663-5669-4-git-send-email-omar.ramirez@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use hwmod data attributes to get the defined number of mailboxes on
-our current chip, and pass it through platform data.
+Use "omap_XXX" as the OMAP device naming convention.
 
 Signed-off-by: Omar Ramirez Luna <omar.ramirez@ti.com>
 ---
- arch/arm/mach-omap2/devices.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ arch/arm/mach-omap1/mailbox.c |    2 +-
+ arch/arm/mach-omap2/devices.c |    2 +-
+ arch/arm/mach-omap2/mailbox.c |    2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/mach-omap1/mailbox.c b/arch/arm/mach-omap1/mailbox.c
+index c0e1f48..2845652 100644
+--- a/arch/arm/mach-omap1/mailbox.c
++++ b/arch/arm/mach-omap1/mailbox.c
+@@ -175,7 +175,7 @@ static struct platform_driver omap1_mbox_driver = {
+ 	.probe	= omap1_mbox_probe,
+ 	.remove	= __devexit_p(omap1_mbox_remove),
+ 	.driver	= {
+-		.name	= "omap-mailbox",
++		.name	= "omap_mailbox",
+ 	},
+ };
+ 
 diff --git a/arch/arm/mach-omap2/devices.c b/arch/arm/mach-omap2/devices.c
-index 5b8ca68..e1110f2 100644
+index e1110f2..779b2f3 100644
 --- a/arch/arm/mach-omap2/devices.c
 +++ b/arch/arm/mach-omap2/devices.c
-@@ -25,6 +25,7 @@
+@@ -287,7 +287,7 @@ static inline void omap_init_mbox(void)
+ 	mb_attr = oh->dev_attr;
+ 	pdata.nr_mbox = mb_attr->nr_mbox;
  
- #include <plat/tc.h>
- #include <plat/board.h>
-+#include <plat/mailbox.h>
- #include <plat/mcbsp.h>
- #include <mach/gpio.h>
- #include <plat/mmc.h>
-@@ -274,6 +275,8 @@ static inline void omap_init_mbox(void)
- {
- 	struct omap_hwmod *oh;
- 	struct omap_device *od;
-+	struct omap_mailbox_dev_attr *mb_attr;
-+	struct omap_mailbox_platform_data pdata;
- 
- 	oh = omap_hwmod_lookup("mailbox");
- 	if (!oh) {
-@@ -281,7 +284,10 @@ static inline void omap_init_mbox(void)
- 		return;
- 	}
- 
--	od = omap_device_build("omap-mailbox", -1, oh, NULL, 0,
-+	mb_attr = oh->dev_attr;
-+	pdata.nr_mbox = mb_attr->nr_mbox;
-+
-+	od = omap_device_build("omap-mailbox", -1, oh, &pdata, sizeof(pdata),
+-	od = omap_device_build("omap-mailbox", -1, oh, &pdata, sizeof(pdata),
++	od = omap_device_build("omap_mailbox", -1, oh, &pdata, sizeof(pdata),
  				mbox_latencies, ARRAY_SIZE(mbox_latencies), 0);
  	WARN(IS_ERR(od), "%s: could not build device, err %ld\n",
  						__func__, PTR_ERR(od));
+diff --git a/arch/arm/mach-omap2/mailbox.c b/arch/arm/mach-omap2/mailbox.c
+index 86d564a..946a70a 100644
+--- a/arch/arm/mach-omap2/mailbox.c
++++ b/arch/arm/mach-omap2/mailbox.c
+@@ -397,7 +397,7 @@ static struct platform_driver omap2_mbox_driver = {
+ 	.probe = omap2_mbox_probe,
+ 	.remove = __devexit_p(omap2_mbox_remove),
+ 	.driver = {
+-		.name = "omap-mailbox",
++		.name = "omap_mailbox",
+ 	},
+ };
+ 
 -- 
 1.7.0.4
