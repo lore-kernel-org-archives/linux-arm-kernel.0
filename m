@@ -1,40 +1,44 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Sat, 25 Jun 2011 20:51:35 +0800
-Subject: [PATCH] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <BANLkTimY2+qV_A7gSWOjAk0f54zKRC2wCg@mail.gmail.com>
-References: <4E031900.50108@compulab.co.il>
-	<1309000666-5242-1-git-send-email-leiwen@marvell.com>
-	<BANLkTimY2+qV_A7gSWOjAk0f54zKRC2wCg@mail.gmail.com>
-Message-ID: <BANLkTinyjRFdzBzmhnREOTN+B4cCQMyqXg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 25 Jun 2011 14:21:12 +0100
+Subject: IRQS off tracer - is it useful or not?
+Message-ID: <20110625132112.GH23234@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+I've just been looking at the IRQS off tracer for the first time.  I'm
+getting output such as:
 
-On Sat, Jun 25, 2011 at 8:32 PM, Daniel Mack <zonque@gmail.com> wrote:
-> On Sat, Jun 25, 2011 at 1:17 PM, Lei Wen <leiwen@marvell.com> wrote:
->> Current pxa3xx_nand controller has two chip select which
->> both be workable. This patch enable this feature.
->>
->> Update platform driver to support this feature.
->>
->> Another notice should be taken that:
->> When you want to use this feature, you should not enable the
->> keep configuration feature, for two chip select could be
->> attached with different nand chip. The different page size
->> and timing requirement make the keep configuration impossible.
->>
->> Signed-off-by: Lei Wen <leiwen@marvell.com>
->
-> I tested this on a PXA303 platform with one chipselect only, at at
-> least I can say that this patch doesn't seem to cause any regression
-> here. But I couldn't test the new feature it adds.
->
-> So, FWIW:
->
-> Tested-by: Daniel Mack <zonque@gmail.com>
+  <idle>-0       0d.s3    0us!: _raw_spin_lock_irqsave <-_raw_spin_lock_irqsave
+  <idle>-0       0dNs4 1709us+: _raw_spin_unlock_irqrestore <-_raw_spin_unlock_irqrestore
+  <idle>-0       0dNs4 1770us : time_hardirqs_on <-_raw_spin_unlock_irqrestore
+  <idle>-0       0dNs4 1770us : <stack trace>
 
-Thanks for testing!
+from it, which doesn't seem to be very useful.  Figuring out that it
+may be because the EABI unwinder doesn't work too well with my toolchain,
+I decided to try going for the more reliable frame pointer stuff.  This
+gives me:
 
-Best regards,
-Lei
+kjournal-423     0d.s4    0us : trace_hardirqs_on <-_raw_spin_unlock_irq
+kjournal-423     0d.s4    0us : time_hardirqs_on <-_raw_spin_unlock_irq
+kjournal-423     0d.s3    0us!: trace_hardirqs_off <-_raw_spin_lock_irqsave
+kjournal-423     0d.s4 1709us+: trace_hardirqs_on <-_raw_spin_unlock_irqrestore
+kjournal-423     0d.s4 1770us : time_hardirqs_on <-_raw_spin_unlock_irqrestore
+kjournal-423     0d.s4 1770us : <stack trace>
+ => time_hardirqs_on
+ => trace_hardirqs_on_caller
+ => trace_hardirqs_on
+ => _raw_spin_unlock_irqrestore
+ => cfq_idle_slice_timer
+ => run_timer_softirq
+ => __do_softirq
+ => irq_exit
+
+which is no better.  It's telling me that {trace,time}_hardirqs_o{n,ff} is
+involved is absurd - of course that function is involved, because that's
+how these events are reported and that detail is just not interesting.
+And yet again, we still don't get to find out where IRQs were disabled.
+
+So, from what I can see, the irqsoff tracing support is next to useless,
+and given that, anyone got a good reason why I should care about its
+hooks?  If I should care about them, it really needs to be fixed so it
+actually provides useful information.
