@@ -1,9 +1,21 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Sat, 25 Jun 2011 14:21:12 +0100
+From: murali@embeddedwireless.com (murali at embeddedwireless.com)
+Date: Sat, 25 Jun 2011 13:42:36 +0000
 Subject: IRQS off tracer - is it useful or not?
-Message-ID: <20110625132112.GH23234@n2100.arm.linux.org.uk>
+In-Reply-To: <20110625132112.GH23234@n2100.arm.linux.org.uk>
+References: <20110625132112.GH23234@n2100.arm.linux.org.uk>
+Message-ID: <592347787-1309010355-cardhu_decombobulator_blackberry.rim.net-61933352-@b16.c1.bise3.blackberry>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+     
+Sent by Maxis from my BlackBerry? smartphone
+
+-----Original Message-----
+From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Sender: <linux-arm-kernel-bounces@lists.infradead.org>
+Date: Sat, 25 Jun 2011 14:21:12 
+To: <linux-arm-kernel@lists.infradead.org>
+Subject: IRQS off tracer - is it useful or not?
 
 I've just been looking at the IRQS off tracer for the first time.  I'm
 getting output such as:
@@ -42,3 +54,8 @@ So, from what I can see, the irqsoff tracing support is next to useless,
 and given that, anyone got a good reason why I should care about its
 hooks?  If I should care about them, it really needs to be fixed so it
 actually provides useful information.
+
+_______________________________________________
+linux-arm-kernel mailing list
+linux-arm-kernel at lists.infradead.org
+http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
