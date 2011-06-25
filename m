@@ -1,32 +1,48 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 25 Jun 2011 13:28:53 -0300
-Subject: [PATCH v2] ARM: mach-mx5/mx53_ard: Add missing definition
-Message-ID: <1309019333-1977-1-git-send-email-festevam@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 25 Jun 2011 19:48:19 +0200
+Subject: [PATCH 1/4] davinci: psc.h: clean up indentation done using spaces
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D6C2F3E@dbde02.ent.ti.com>
+References: <1301072400-4036-1-git-send-email-nsekhar@ti.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2F3E@dbde02.ent.ti.com>
+Message-ID: <201106251948.19834.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit 9203d59 (ARM:mach-mx5/mx53_ard: Add I2C2 and I2C3 support) missed to include
-the define for ARD_I2CPORTEXP_B.
+On Friday 24 June 2011, Nori, Sekhar wrote:
+> This series of 4 patches added SATA support on DaVinci
+> DA850 platform. This was ready for last merge window,
+> but was not queued because of the negative diffstat
+> rule.
+> 
+> Is there a possibility of queuing this for the v3.1 merge?
+> 
+> Here is the archive link of this posting:
+> 
+> http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2011-March/022473.html
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Used tab instead of spaces
+My general idea is to have multiple branches per subarchitecture,
+and I started merging stuff into the tree now.
 
- arch/arm/mach-mx5/board-mx53_ard.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+Your series contains both cleanups and support for additional
+features, and I'd like to see those split into separate branches.
 
-diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
-index 70ae25e..b94ddeb 100644
---- a/arch/arm/mach-mx5/board-mx53_ard.c
-+++ b/arch/arm/mach-mx5/board-mx53_ard.c
-@@ -38,6 +38,7 @@
- #define ARD_ETHERNET_INT_B	IMX_GPIO_NR(2, 31)
- #define ARD_SD1_CD		IMX_GPIO_NR(1, 1)
- #define ARD_SD1_WP		IMX_GPIO_NR(1, 9)
-+#define ARD_I2CPORTEXP_B	IMX_GPIO_NR(2, 3)
- 
- static iomux_v3_cfg_t mx53_ard_pads[] = {
- 	/* UART1 */
--- 
-1.7.1
+Please make sure the patches apply on top of 2.6.39 and resubmit
+them, separating out the first cleanup patch from the others.
+
+We can definitely forward all cleanups and bug fixes in the each
+merge window. For new features, it mostly depends on how much
+code gets added that should not really be needed in a perfect
+world, relative to the amount of cleanups that is actually
+going into the platform in order to get there.
+
+In case of the SATA support, the feature is relatively small
+and requires little board-specific code, which is good.
+However, if you are planning to push a lot of small additions
+like this, I would expect you spend much more effort on
+consolidation within davinci and migration towards device
+tree probing first.
+
+What else do you have pending for davinci in 3.1? Can you
+send pull requests for cleanups/fixes/device-tree/features?
+
+	Arnd
