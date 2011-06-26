@@ -1,245 +1,45 @@
-From: snjw23@gmail.com (Sylwester Nawrocki)
-Date: Sun, 26 Jun 2011 19:30:45 +0200
-Subject: [PATCH] ARM: EXYNOS4: Support for generic I/O power domains on
-	EXYNOS4210
-In-Reply-To: <4E0461BE.5030304@samsung.com>
-References: <4E0461BE.5030304@samsung.com>
-Message-ID: <4E076CC5.3000908@gmail.com>
+From: grant.likely@secretlab.ca (glikely@secretlab.ca)
+Date: Sun, 26 Jun 2011 15:24:43 -0600
+Subject: "Early" devices and the DT
+In-Reply-To: <4E0786FF.9010002@firmworks.com>
+References: <1308924659-31894-1-git-send-email-marc.zyngier@arm.com>
+	<1308924659-31894-3-git-send-email-marc.zyngier@arm.com>
+	<20110625204742.GB15026@ponder.secretlab.ca>
+	<4E06513B.4030706@gmail.com>
+	<BANLkTimy6iyQyyvNUK3Kc6skSKyVxBwWPA@mail.gmail.com>
+	<4E0786FF.9010002@firmworks.com>
+Message-ID: <4f20d688-0cbb-48e7-830c-69cf57d902ba@email.android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
 
-On 06/24/2011 12:06 PM, Chanwoo Choi wrote:
-> Use the generic power domains support to implement support
-> for power domain on EXYNOS4210.
-> 
-> This patch is based on your "pm-domains" branch.(v7)
-> 
-> Signed-off-by: Chanwoo Choi<cw00.choi@samsung.com>
-> Signed-off-by: Myungjoo Ham<myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin.park<kyungmin.park@samsung.com>
-> ---
->   arch/arm/mach-exynos4/Kconfig                      |    1 +
->   arch/arm/mach-exynos4/Makefile                     |    1 +
->   arch/arm/mach-exynos4/include/mach/pm-exynos4210.h |   78 ++++++++++++
->   arch/arm/mach-exynos4/mach-nuri.c                  |   20 +++
->   arch/arm/mach-exynos4/pm-exynos4210.c              |  131 ++++++++++++++++++++
->   5 files changed, 231 insertions(+), 0 deletions(-)
->   create mode 100644 arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
->   create mode 100644 arch/arm/mach-exynos4/pm-exynos4210.c
-> 
-...
 
-> diff --git a/arch/arm/mach-exynos4/include/mach/pm-exynos4210.h b/arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
-> new file mode 100644
-> index 0000000..fa1c7a0
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos4/include/mach/pm-exynos4210.h
-> @@ -0,0 +1,78 @@
-> +/* linux/arch/arm/mach-exynos4/include/mach/pm-exynos4.h
-> + *
-> + * Exynos4 Power management support
-> + *
-> + * Copyright (c) 2010-2011 Samsung Electronics Co., Ltd.
-> + *		http://www.samsung.com
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#ifndef __PM_EXYNOS4210_H__
-> +#define __PM_EXYNOS4210_H__
-> +
-> +#include<linux/pm_domain.h>
-> +
-> +struct platform_device;
-> +
-> +struct exynos4210_pm_domain {
-> +	struct generic_pm_domain genpd;
-> +
-> +	const char *name;
-> +	void __iomem *base;
-> +	int boot_on;
-> +};
-> +
-> +static inline struct exynos4210_pm_domain *to_exynos4210_pd(
-> +		struct generic_pm_domain *pd)
-> +{
-> +	return container_of(pd, struct exynos4210_pm_domain, genpd);
-> +}
-> +
-> +#ifdef CONFIG_PM
-> +enum exynos4210_pd_data {
-> +	EXYNOS4210_PD_MFC,
-> +	EXYNOS4210_PD_G3D,
-> +	EXYNOS4210_PD_LCD0,
-> +	EXYNOS4210_PD_LCD1,
-> +	EXYNOS4210_PD_TV,
-> +	EXYNOS4210_PD_CAM,
-> +	EXYNOS4210_PD_GPS,
-> +	EXYNOS4210_PD_MAX_NUM
-> +};
-> +
-> +extern struct exynos4210_pm_domain exynos4210_pd_list[EXYNOS4210_PD_MAX_NUM];
+Mitch Bradley <wmb@firmworks.com> wrote:
 
-Could this array be made static in ../pm-exynos4210.c ?
-It looks like all functions using it are there. Plus you have already
-enum exynos4210_pd_data to identify each power domain.
+>Some solutions to the early device problem
+>
+>a) Most complex:  Use new properties to create a dependency graph. 
+>This 
+>is probably the most general solution, but also probably the hardest
+>for 
+>people to think about and maintain.
+>
+>b) Define a set of init phases 0,1,2,...  and mark each early device 
+>node with a phase number property.  Scan the tree for each phase and 
+>handle only the devices with that phase number.  Unmarked nodes are 
+>handled last.
+>
+>c) Similar to b, but instead of properties in nodes, have properties 
+>like "linux-phase0", "linux-phase1", etc in /chosen, whose values are 
+>lists of phandles.
 
-> +#define EXYNOS4210_MFC		(&exynos4210_pd_list[EXYNOS4210_PD_MFC])
-> +#define EXYNOS4210_G3D		(&exynos4210_pd_list[EXYNOS4210_PD_G3D])
-> +#define EXYNOS4210_LCD0		(&exynos4210_pd_list[EXYNOS4210_PD_LCD0])
-> +#define EXYNOS4210_LCD1		(&exynos4210_pd_list[EXYNOS4210_PD_LCD1])
-> +#define EXYNOS4210_TV		(&exynos4210_pd_list[EXYNOS4210_PD_TV])
-> +#define EXYNOS4210_CAM		(&exynos4210_pd_list[EXYNOS4210_PD_CAM])
-> +#define EXYNOS4210_GPS		(&exynos4210_pd_list[EXYNOS4210_PD_GPS])
-> +
-> +extern int exynos4210_pd_init(struct exynos4210_pm_domain *domain);
-> +extern int exynos4210_add_device_to_domain(struct exynos4210_pm_domain *domain,
-> +				struct platform_device *pdev);
+d) don't try to encode init order at all in the DT, and let device drivers request probe to be deferred.  If this works out, it will be by far the least complex and won't require anybody to sit and work out the init order for each machine.  I've even already posted a draft patch to do this.
 
-Is there any advantage of having these functions marked as "extern" ?
+e) work out probe order dynamically by looking at known phandle types at device registration time. This is potentially more 'efficient' than option d, but it requires a lot of knowledge to be built into the registration code which will get really complex in a hurry.
 
-> +#else
-> +#define EXYNOS4210_MFC		NULL
-> +#define EXYNOS4210_G3D		NULL
-> +#define EXYNOS4210_LCD0		NULL
-> +#define EXYNOS4210_LCD1		NULL
-> +#define EXYNOS4210_TV		NULL
-> +#define EXYNOS4210_CAM		NULL
-> +#define EXYNOS4210_GPS		NULL
-> +
-> +extern int exynos4210_pd_init(struct exynos4210_pm_domain *domain)
+Right now I'm strongly leaning in the direction of option d.
 
-Shouldn't it be "static inline" instead ?
+g.
 
-> +{
-> +	return 0;
-> +}
-> +extern int exynos4_add_device_to_domain(struct exynos4210_pm_domain *domain,
-> +				struct platform_device *pdev)
-
-Ditto.
-
-...
-> diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-> index 642702b..3e5c42c 100644
-> --- a/arch/arm/mach-exynos4/mach-nuri.c
-> +++ b/arch/arm/mach-exynos4/mach-nuri.c
-> @@ -37,6 +37,7 @@
->   #include<plat/iic.h>
-> 
->   #include<mach/map.h>
-> +#include<mach/pm-exynos4210.h>
-> 
->   /* Following are default values for UCON, ULCON and UFCON UART registers */
->   #define NURI_UCON_DEFAULT	(S3C2410_UCON_TXILEVEL |	\
-> @@ -376,6 +377,23 @@ static struct platform_device *nuri_devices[] __initdata = {
->   	&nuri_backlight_device,
->   };
-> 
-> +static void __init nuri_power_domain_init(void)
-> +{
-> +	int i;
-> +
-> +	for (i = 0 ; i<  EXYNOS4210_PD_MAX_NUM ; i++)
-> +		exynos4210_pd_init(&exynos4210_pd_list[i]);
-> +
-> +	/* Add device to power-domain */
-> +	exynos4210_add_device_to_domain(EXYNOS4210_MFC, NULL);
-> +	exynos4210_add_device_to_domain(EXYNOS4210_G3D, NULL);
-> +	exynos4210_add_device_to_domain(EXYNOS4210_LCD0,&nuri_lcd_device);
-> +	exynos4210_add_device_to_domain(EXYNOS4210_LCD1, NULL);
-> +	exynos4210_add_device_to_domain(EXYNOS4210_TV, NULL);
-> +	exynos4210_add_device_to_domain(EXYNOS4210_CAM, NULL);
-> +	exynos4210_add_device_to_domain(EXYNOS4210_GPS, NULL);
-> +}
-> +
->   static void __init nuri_map_io(void)
->   {
->   	s5p_init_io(NULL, 0, S5P_VA_CHIPID);
-> @@ -398,6 +416,8 @@ static void __init nuri_machine_init(void)
-> 
->   	/* Last */
->   	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
-> +
-> +	nuri_power_domain_init();
->   }
-> 
->   MACHINE_START(NURI, "NURI")
-> diff --git a/arch/arm/mach-exynos4/pm-exynos4210.c b/arch/arm/mach-exynos4/pm-exynos4210.c
-> new file mode 100644
-> index 0000000..8e95d49
-> --- /dev/null
-> +++ b/arch/arm/mach-exynos4/pm-exynos4210.c
-> @@ -0,0 +1,131 @@
-> +/* linux/arch/arm/mach-exynos4/pm-exynos4210.c
-> + *
-...
-> +
-> +struct exynos4210_pm_domain exynos4210_pd_list[] = {
-> +	{
-> +		.name		= "PD_MFC",
-> +		.base		= S5P_PMU_MFC_CONF,
-> +		.boot_on	= 0,
-> +	}, {
-> +		.name		= "PD_G3D",
-> +		.base		= S5P_PMU_G3D_CONF,
-> +		.boot_on	= 0,
-> +	}, {
-...
-> +
-> +int exynos4210_pd_init(struct exynos4210_pm_domain *domain)
-> +{
-> +	struct generic_pm_domain *genpd =&domain->genpd;
-> +
-> +	pm_genpd_init(genpd, NULL, false);
-> +
-> +	genpd->stop_device = pm_runtime_clk_suspend;
-> +	genpd->start_device = pm_runtime_clk_resume;
-
-Have you considered handling the S5P_CLKGATE_BLOCK register to make
-sure the clock domains are enabled ? AFAICS it is not properly handled
-by current clock API on mach-exynos4. Thus if bootloader clears
-S5P_CLKGATE_BLOCK register clocks remain globally masked.
-
-This issue have been attempted to be resolved in this patch:
-http://git.infradead.org/users/kmpark/linux-2.6-samsung/commit/39a81876d034dcbdc2a4c4c4b847b3b49e38870c
-
-While at here, it might be good to resolve this either on power domains
-or the clock API level.
-
-> +	genpd->power_off = pd_power_down;
-> +	genpd->power_on = pd_power_up;
-> +
-> +	if (domain->boot_on)
-> +		pd_power_up(genpd);
-> +
-> +	return 0;
-> +}
-> +
-> +int exynos4210_add_device_to_domain(struct exynos4210_pm_domain *domain,
-> +				struct platform_device *pdev)
-> +{
-> +	struct device *dev =&pdev->dev;
-> +	struct generic_pm_domain *genpd =&domain->genpd;
-> +
-> +	if (pdev != NULL)
-> +		return pm_genpd_add_device(genpd, dev);
-> +	else
-> +		return -EINVAL;
-
-You could do instead:
-
-+	if (pdev)
-+		return pm_genpd_add_device(genpd, dev);
-+
-+	return -EINVAL;
-
-> +}
-
---
-Regards,
-Sylwester
+-- 
+Sent from my Android phone with K-9 Mail. Please excuse my brevity.
