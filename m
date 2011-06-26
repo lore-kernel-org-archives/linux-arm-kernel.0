@@ -1,59 +1,37 @@
-From: khc@pm.waw.pl (Krzysztof Halasa)
-Date: Sun, 26 Jun 2011 15:38:05 +0200
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-In-Reply-To: <20110530084307.GA28953@riccoc20.at.omicron.at> (Richard
-	Cochran's message of "Mon, 30 May 2011 10:43:07 +0200")
-References: <20110530084307.GA28953@riccoc20.at.omicron.at>
-Message-ID: <m362nspvb6.fsf@intrepid.localdomain>
+From: lethal@linux-sh.org (Paul Mundt)
+Date: Mon, 27 Jun 2011 01:20:08 +0900
+Subject: [PATCH] ARM: amba: Link fb device to its parent
+In-Reply-To: <alpine.LFD.2.00.1106240949590.2142@xanadu.home>
+References: <1308602657-28783-1-git-send-email-loic.minier@linaro.org>
+	<20110624080721.GC24184@linux-sh.org>
+	<alpine.LFD.2.00.1106240949590.2142@xanadu.home>
+Message-ID: <20110626162008.GA7312@linux-sh.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
->
->    clocksource: convert ARM 32-bit up counting clocksources
->
-> broke the build for ixp4xx and made big endian operation impossible.
-> This commit restores the original behaviour.
-
-So, what do we do with this?
-It would be nice to have the fix in the tree before 3.0.
-I guess I'll add this if nothing better shows up.
-
-Richard Cochran <richardcochran@gmail.com> writes:
-
->
-> Signed-off-by: Richard Cochran <richard.cochran@omicron.at>
-> ---
->  arch/arm/mach-ixp4xx/common.c |   10 ++++++++--
->  1 files changed, 8 insertions(+), 2 deletions(-)
->
-> diff --git a/arch/arm/mach-ixp4xx/common.c b/arch/arm/mach-ixp4xx/common.c
-> index 74ed81a..0777257 100644
-> --- a/arch/arm/mach-ixp4xx/common.c
-> +++ b/arch/arm/mach-ixp4xx/common.c
-> @@ -419,14 +419,20 @@ static void notrace ixp4xx_update_sched_clock(void)
->  /*
->   * clocksource
->   */
-> +
-> +static cycle_t ixp4xx_clocksource_read(struct clocksource *c)
-> +{
-> +	return *IXP4XX_OSTS;
-> +}
-> +
->  unsigned long ixp4xx_timer_freq = IXP4XX_TIMER_FREQ;
->  EXPORT_SYMBOL(ixp4xx_timer_freq);
->  static void __init ixp4xx_clocksource_init(void)
->  {
->  	init_sched_clock(&cd, ixp4xx_update_sched_clock, 32, ixp4xx_timer_freq);
->  
-> -	clocksource_mmio_init(&IXP4XX_OSTS, "OSTS", ixp4xx_timer_freq, 200, 32,
-> -			clocksource_mmio_readl_up);
-> +	clocksource_mmio_init(NULL, "OSTS", ixp4xx_timer_freq, 200, 32,
-> +			ixp4xx_clocksource_read);
->  }
->  
->  /*
-
--- 
-Krzysztof Halasa
+On Fri, Jun 24, 2011 at 09:57:06AM -0400, Nicolas Pitre wrote:
+> On Fri, 24 Jun 2011, Paul Mundt wrote:
+> 
+> > On Mon, Jun 20, 2011 at 10:44:17PM +0200, Lo??c Minier wrote:
+> > > Some pieces of userspace like debian-installer expect to find the fb0
+> > > driver name by readlink-ing /sys/class/graphics/fb0/device/driver but
+> > > this was broken with amba-clcd as it sets up fb_info manually and missed
+> > > the .device parent pointer.
+> > > 
+> > > Signed-off-by: Lo??c Minier <loic.minier@linaro.org>
+> > > Cc: Russell King <linux@arm.linux.org.uk>
+> > > Cc: Paul Mundt <lethal@linux-sh.org>
+> > > ---
+> > >  drivers/video/amba-clcd.c |    2 ++
+> > >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > > 
+> > While this is titled as an ARM patch it's certainly fbdev-specific. I'll
+> > apply it barring any objections from Russell.
+> 
+> BTW this should be "Lo?c Minier" not "Lo??c Minier" The original email 
+> was fine with proper UTF-8 in that regard.  Maybe you should have a look 
+> at your MUA config so the resulting patch log going into git is not 
+> dammaged.
+> 
+My MUA ignores UTF-8 intentionally, but this has no bearing on the status
+in my git tree.
