@@ -1,80 +1,94 @@
-From: jonathan.morton@movial.com (Jonathan Morton)
-Date: Sun, 26 Jun 2011 03:06:30 +0300
-Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping framework
-	redesign
-In-Reply-To: <BANLkTi=y6PGMdHq0uT9QJ7aej3nU6cKW2g@mail.gmail.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<4E017539.30505@gmail.com>
-	<001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>
-	<4E01AD7B.3070806@gmail.com>
-	<002701cc30be$ab296cc0$017c4640$%szyprowski@samsung.com>
-	<4E02119F.4000901@codeaurora.org> <4E033AFF.4020603@gmail.com>
-	<BANLkTikzTwNvaaUSk26qzONemogBAGuBRg@mail.gmail.com>
-	<BANLkTimi2FAmcb7ZWnjRqb-Cb8acXWsCTw@mail.gmail.com>
-	<BANLkTinUCZrd-JuMc3TkaF4f1VBmOu9nxQ@mail.gmail.com>
-	<BANLkTi=y6PGMdHq0uT9QJ7aej3nU6cKW2g@mail.gmail.com>
-Message-ID: <BANLkTi=uNVLOy4oTTBpr8niRMX+m6wgWBg@mail.gmail.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Sun, 26 Jun 2011 04:11:47 +0300
+Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
+In-Reply-To: <4E04F0B0.4030408@codeaurora.org>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<4E04F0B0.4030408@codeaurora.org>
+Message-ID: <BANLkTi=sFtwam29i4TZdi=RO7BoytTTdrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 June 2011 12:55, Michael K. Edwards <m.k.edwards@gmail.com> wrote:
-> With regard to the use of NEON for data moves, I have appended a
-> snippet of a conversation from the BeagleBoard list that veered off
-> into a related direction. ?(My response is lightly edited, since I
-> made some stupid errors in the original.) ?While this is somewhat
-> off-topic from Marek's patch set, I think it's relevant to the
-> question of whether "user-allocated" buffers are an important design
-> consideration for his otherwise DMA-centric API. ?(And more to the
-> point, buffers allocated suitably for one or more on-chip devices, and
-> also mapped as uncacheable to userland.)
+Hi Stephen,
 
-As far as userspace is concerned, dealing with the memory hierarchy's
-quirks is already pretty much a black art, and that's *before* you
-start presenting it with uncached buffers.  The best rule of thumb
-userspace can follow is to keep things in cache if they can, and use
-the biggest memory-move instructions (and prefetching if available) if
-they can't.  Everything else they have to rely on the hardware to
-optimise for them.  Indeed, when working in C, you barely even get
-*that* level of control (optimised copy routines have been known to
-use double simply because it is reliably 64 bits that can be loaded
-and stored efficiently), and most other languages are worse.
+On Fri, Jun 24, 2011 at 11:16 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> This sounds a lot like SMD (shared memory driver) on MSM. The main
+> difference I see is that SMD uses the platform bus instead of the virtio
+> bus and it has its own protocol for channel allocation.
 
-Small wonder that userspace code that knows it has to work with
-uncached buffers sometimes - such as Pixman - relies heavily on
-handwritten SIMD assembler.
+Yeah, virtio is a key factor in this work; it was suggested to us by
+Arnd at the AMP plumbers discussions last year, where it was apparent
+that many vendors have their own IPC drivers/buses/channels over
+shared memory with some vendor-ish binary protocol. I must say we
+really liked virtio: it considerably simplified the code (we're not
+adding any new binary protocol), it's very nicely optimized and
+flexible, and it comes with a set of virtio drivers (e.g. network,
+console, block) so we don't have to write our own.
 
-Video decoders are a particularly fun case, because the correct
-solution is actually to DMA the output buffer to the GPU (or, better,
-to map one onto the other so that zero-copy semantics result) so that
-the CPU doesn't have to touch it.  But then you have to find a common
-format that both VPU and GPU support, and you have to have a free DMA
-channel and a way to use it.  Frankly though, this is a solution from
-the 20th century (remember MPEG2 decoders sitting beside the SVGA
-card?).
+We also cared about adding this functionality as an IPC bus, so the
+driver core will help matching drivers to channels - it simplified the
+code (in both setup and tear down of channels) and kept it flexible.
+It will also facilitate error recovery (on remote crash, we just
+remove the virtio device, and then the driver core will in turn start
+->remove()ing the rpmsg drivers) and power management (via runtime
+PM).
 
-We *have* had to occasionally deal with hardware where no such common
-format could be found, although often this has been due to inadequate
-documentation or driver support (a familiar refrain).  In one case I
-wrote a NEON NV12-to-RGB32 conversion routine which read directly from
-the video buffer and wrote directly into a texture buffer, both of
-which were of course uncached.  This halved the CPU consumption of the
-video playback applet, but prefixing it with a routine which copied
-the video buffer into cached memory (using 32-byte VLD1 instead of
-16-byte versions) halved it again.  Profiling showed that the vast
-majority of the time was spent in the prefix copy loop.  No doubt if
-further savings had been required, I'd have tried using VLDM in the
-copy loop.  (There weren't enough registers to widen the load stage of
-the conversion routine itself.)
+About SMD: I'm not familiar with it too much, but Brian naturally is
+(just for the sake of everyone who are not reading headers - Brian
+Swetland wrote the Linux SMD driver, and is also an author of this
+Google+TI joint work).
 
-The takeaway from this is that if your code has to read from uncached
-memory at all, that will undoubtedly dominate it's performance.  A
-read-modify-write cycle is at least as bad (because the memory has to
-go through at least one CAS latency and a write-to-read turnaround
-before the next read can be serviced).  A pure write is, however, no
-problem.
+Btw, I'm sure SMD is conceptually not MSM-specific, and have wondered
+whether you guys would like to use rpmsg/virtio (I know you have
+several drivers like network/tty/etc over SMD, somewhat similarly to
+virtio). Probably the biggest reason why not to is the pain in
+changing the binary protocol with the modem/dsp side. If you ever do
+think about it, I'd be happy to work with you to make it happen.
 
-On cached memory, the L2 cache of most modern (even ARM) CPUs has an
-auto-prefetcher which will help out with sequential transfers.  This
-should get somewhere reasonably close to optimal performance.
+> This remote proc code is eerily similar to PIL (peripheral image loader,
+> yes we love our acronyms) which I posted a few months back[1]. Was it
+> inspiration for this patch series?
 
- - Jonathan Morton
+No, we weren't (or at least I wasn't) aware of PIL.
+
+> In terms of API, s/pil/rproc/ and it would be 95% identical. There are
+> some low-level differences though (see below).
+
+Indeed, eerily similar :O
+
+I just guess the API is so simple that probably most kernel hackers
+would use refcounting get/put semantics here.
+
+> This is an important difference between remote proc and PIL. In PIL, we
+> do image authentication in addition to processor boot.
+
+Yes, we have this too (secure code will need to authenticate the image
+in some use cases) - but that's not ready yet for submission and we
+decided to start off with the basics first and then evolve.
+
+> Instead of devising a new firmware format, we decided
+> to just stick with elf and parse the headers in the kernel because we
+> needed them for authentication anyway. Is this reason enough to move to
+> an ELF format instead?
+
+I think that consolidation of code is enough reason to make an effort.
+I know that our firmware format was chosen for simplicity, but I'm not
+sure if we have the tools yet to build standard ELF files for the
+remote processors (IIRC it's in the works though). I'll let Mark
+comment this one.
+
+> Another difference is inter-processor dependencies. For example, on
+> msm8660 the modem can't boot until the dsp has been booted. I suppose we
+> could hide this detail in the platform specific get() implementation by
+> calling rproc_get() on the dependent processor (hopefully no locking
+> issues arise). I'd rather have it built into the core though as it isn't
+> really specific to the hardware.
+
+No problems, I'm sure we can solve this one easily.
+
+> If we can resolve these differences I think we can easily support remote
+> processor boot on MSM via remoteproc.
+
+That'd be very cool, I sure do hope we can work together.
+
+Thanks for your comments !
+Ohad.
