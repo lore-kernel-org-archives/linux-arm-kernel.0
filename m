@@ -1,44 +1,80 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Sat, 25 Jun 2011 16:49:25 -0600 (MDT)
-Subject: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
-In-Reply-To: <1308932625-17632-1-git-send-email-premi@ti.com>
-References: <1308932625-17632-1-git-send-email-premi@ti.com>
-Message-ID: <alpine.DEB.2.00.1106251647110.30205@utopia.booyaka.com>
+From: jonathan.morton@movial.com (Jonathan Morton)
+Date: Sun, 26 Jun 2011 03:06:30 +0300
+Subject: [Linaro-mm-sig] [PATCH/RFC 0/8] ARM: DMA-mapping framework
+	redesign
+In-Reply-To: <BANLkTi=y6PGMdHq0uT9QJ7aej3nU6cKW2g@mail.gmail.com>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<4E017539.30505@gmail.com>
+	<001d01cc30a9$ebe5e460$c3b1ad20$%szyprowski@samsung.com>
+	<4E01AD7B.3070806@gmail.com>
+	<002701cc30be$ab296cc0$017c4640$%szyprowski@samsung.com>
+	<4E02119F.4000901@codeaurora.org> <4E033AFF.4020603@gmail.com>
+	<BANLkTikzTwNvaaUSk26qzONemogBAGuBRg@mail.gmail.com>
+	<BANLkTimi2FAmcb7ZWnjRqb-Cb8acXWsCTw@mail.gmail.com>
+	<BANLkTinUCZrd-JuMc3TkaF4f1VBmOu9nxQ@mail.gmail.com>
+	<BANLkTi=y6PGMdHq0uT9QJ7aej3nU6cKW2g@mail.gmail.com>
+Message-ID: <BANLkTi=uNVLOy4oTTBpr8niRMX+m6wgWBg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Jun 2011, Sanjeev Premi wrote:
+On 25 June 2011 12:55, Michael K. Edwards <m.k.edwards@gmail.com> wrote:
+> With regard to the use of NEON for data moves, I have appended a
+> snippet of a conversation from the BeagleBoard list that veered off
+> into a related direction. ?(My response is lightly edited, since I
+> made some stupid errors in the original.) ?While this is somewhat
+> off-topic from Marek's patch set, I think it's relevant to the
+> question of whether "user-allocated" buffers are an important design
+> consideration for his otherwise DMA-centric API. ?(And more to the
+> point, buffers allocated suitably for one or more on-chip devices, and
+> also mapped as uncacheable to userland.)
 
-> The current selection of the GPTIMER on was result of
-> a hardware issue in early versions of the Beagleboards
-> (Ax and B1 thru B4). [1] [2]
-> 
-> Its been long since the hardware issue has been fixed.
-> This patch uses GPTIMER 1 for all newer board revisions
-> incl. Beagleboard XM.
-> 
->  [1] http://thread.gmane.org/gmane.comp.hardware.beagleboard.general/91
->  [2] Errata #7 at http://elinux.org/BeagleBoard#Errata
-> 
-> Signed-off-by: Sanjeev Premi <premi@ti.com>
-> Cc: Paul Walmsley <paul@pwsan.com>
+As far as userspace is concerned, dealing with the memory hierarchy's
+quirks is already pretty much a black art, and that's *before* you
+start presenting it with uncached buffers.  The best rule of thumb
+userspace can follow is to keep things in cache if they can, and use
+the biggest memory-move instructions (and prefetching if available) if
+they can't.  Everything else they have to rely on the hardware to
+optimise for them.  Indeed, when working in C, you barely even get
+*that* level of control (optimised copy routines have been known to
+use double simply because it is reliably 64 bits that can be loaded
+and stored efficiently), and most other languages are worse.
 
-Reviewed-by: Paul Walmsley <paul@pwsan.com>
+Small wonder that userspace code that knows it has to work with
+uncached buffers sometimes - such as Pixman - relies heavily on
+handwritten SIMD assembler.
 
->   * Browsing through the code, it appears that similar
->     change could be applied for these boards:
->      - devkit8000
->      - omap3stalker
->      - omap3touchbook
->     However, I don't have access to any of these;
->     or information on their revisions.
->     I can update this patch based on confirmations.
+Video decoders are a particularly fun case, because the correct
+solution is actually to DMA the output buffer to the GPU (or, better,
+to map one onto the other so that zero-copy semantics result) so that
+the CPU doesn't have to touch it.  But then you have to find a common
+format that both VPU and GPU support, and you have to have a free DMA
+channel and a way to use it.  Frankly though, this is a solution from
+the 20th century (remember MPEG2 decoders sitting beside the SVGA
+card?).
 
-You might want to send an E-mail to the people who are listed as authors 
-in git for these boards.  Otherwise they will probably miss it in the 
-onslaught of mailing list traffic.  Unless the PCB designs are based on 
-A or B revisions of the BeagleBoard, it should be safe for them to switch 
-to GPTIMER1.
+We *have* had to occasionally deal with hardware where no such common
+format could be found, although often this has been due to inadequate
+documentation or driver support (a familiar refrain).  In one case I
+wrote a NEON NV12-to-RGB32 conversion routine which read directly from
+the video buffer and wrote directly into a texture buffer, both of
+which were of course uncached.  This halved the CPU consumption of the
+video playback applet, but prefixing it with a routine which copied
+the video buffer into cached memory (using 32-byte VLD1 instead of
+16-byte versions) halved it again.  Profiling showed that the vast
+majority of the time was spent in the prefix copy loop.  No doubt if
+further savings had been required, I'd have tried using VLDM in the
+copy loop.  (There weren't enough registers to widen the load stage of
+the conversion routine itself.)
 
+The takeaway from this is that if your code has to read from uncached
+memory at all, that will undoubtedly dominate it's performance.  A
+read-modify-write cycle is at least as bad (because the memory has to
+go through at least one CAS latency and a write-to-read turnaround
+before the next read can be serviced).  A pure write is, however, no
+problem.
 
-- Paul
+On cached memory, the L2 cache of most modern (even ARM) CPUs has an
+auto-prefetcher which will help out with sequential transfers.  This
+should get somewhere reasonably close to optimal performance.
+
+ - Jonathan Morton
