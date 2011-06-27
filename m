@@ -1,43 +1,42 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Jun 2011 01:08:05 -0700
-Subject: [PATCH 06/10] omap2+: Remove gptimer_wakeup for now
-In-Reply-To: <4E035835.50405@ti.com>
-References: <20110620091754.357.56441.stgit@kaulin>
-	<20110620092341.357.14183.stgit@kaulin> <4DFF1558.4020509@ti.com>
-	<20110620094846.GG23145@atomide.com> <87oc1obnbw.fsf@ti.com>
-	<4E035835.50405@ti.com>
-Message-ID: <20110627080804.GG23145@atomide.com>
+From: jaswinder.singh@linaro.org (Jaswinder Singh)
+Date: Mon, 27 Jun 2011 13:38:54 +0530
+Subject: [PATCH] OMAP4: PANDA, SDP: Fix EHCI regulator supply
+In-Reply-To: <20110627080036.GB2508@legolas.emea.dhcp.ti.com>
+References: <1308926240-13888-1-git-send-email-jaswinder.singh@linaro.org>
+	<BANLkTin=-cRC_ax8AakMD1UZtU+AQ0H==w@mail.gmail.com>
+	<20110627080036.GB2508@legolas.emea.dhcp.ti.com>
+Message-ID: <BANLkTinVdWjoS-qdGnSxGnmrPKHSDNV7hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Santosh Shilimkar <santosh.shilimkar@ti.com> [110623 08:09]:
-> On 6/23/2011 8:35 PM, Kevin Hilman wrote:
-> >Tony Lindgren<tony@atomide.com>  writes:
-> >
-> >So now, the only thing OMAP-specific is the debugfs file used to trigger
-> >it.
-> >
-> >>Maybe Kevin can just carry it along in the PM branch for now?
-> >
-> >I'd prefer to keep it in mainline as this is a very important feature
-> >for the PM functionality already in mainline.
-> >
-> I agree with Kevin and that's what have been saying from begining when
-> we decided to drop this feature. The new patch from Kevin is already
-> doing this in more generic way than that was before.
+Hi Felipe,
 
-To me Kevin's later patch makes more sense, but still has few issues:
+On 27 June 2011 13:30, Felipe Balbi <balbi@ti.com> wrote:
 
-- It keeps the dependency between PM debug code and sys_timer code.
-  That's yet another artificial blocker for making PM code a loadable
-  module. We really don't want to export anything from the sys_timer code.
+>> >
+>> > +static struct regulator_consumer_supply sdp4430_vusb_supply =
+>> > + ? ? ? REGULATOR_SUPPLY("hsusb0", "ehci-omap.0");
+>
+> this should be an array.
+Ok, I can make it an array of _one_ element.
+Though I am not sure why is that a good thing, or are we to use another
+possible VUSB supply on Panda/SDP boards ?  Please suggest so that
+I can add that too.
 
-- The interface for programming a wake-up timer should be Linux generic,
-  not omap specific.
+>> > ?static struct regulator_init_data sdp4430_vusb = {
+>> > ? ? ? ?.constraints = {
+>> > ? ? ? ? ? ? ? ?.min_uV ? ? ? ? ? ? ? ? = 3300000,
+>> > ? ? ? ? ? ? ? ?.max_uV ? ? ? ? ? ? ? ? = 3300000,
+>> > - ? ? ? ? ? ? ? .apply_uV ? ? ? ? ? ? ? = true,
+>> > ? ? ? ? ? ? ? ?.valid_modes_mask ? ? ? = REGULATOR_MODE_NORMAL
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_MODE_STANDBY,
+>> > ? ? ? ? ? ? ? ?.valid_ops_mask ?= ? ? ?REGULATOR_CHANGE_MODE
+>> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?| REGULATOR_CHANGE_STATUS,
+>> > ? ? ? ?},
+>> > + ? ? ? .num_consumer_supplies ?= 1,
+>
+> ARRAY_SIZE()
+Yes, of course if we are to switch to single-element array.
 
-Further, it's a CONFIG_PM_DEBUG patch. So that code should not be
-in the mainline kernel.
-
-Regards,
-
-Tony
+Thanks,
+Jassi
