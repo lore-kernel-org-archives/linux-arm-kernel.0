@@ -1,57 +1,48 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 27 Jun 2011 09:26:11 -0700
-Subject: IRQS off tracer - is it useful or not?
-In-Reply-To: <20110625132112.GH23234@n2100.arm.linux.org.uk>
-References: <20110625132112.GH23234@n2100.arm.linux.org.uk>
-Message-ID: <4E08AF23.2060901@codeaurora.org>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 27 Jun 2011 09:30:08 -0700
+Subject: [PATCH 06/10] omap2+: Remove gptimer_wakeup for now
+In-Reply-To: <20110627080804.GG23145@atomide.com> (Tony Lindgren's message of
+	"Mon, 27 Jun 2011 01:08:05 -0700")
+References: <20110620091754.357.56441.stgit@kaulin>
+	<20110620092341.357.14183.stgit@kaulin> <4DFF1558.4020509@ti.com>
+	<20110620094846.GG23145@atomide.com> <87oc1obnbw.fsf@ti.com>
+	<4E035835.50405@ti.com> <20110627080804.GG23145@atomide.com>
+Message-ID: <87hb7bdypb.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/25/2011 6:21 AM, Russell King - ARM Linux wrote:
-> I've just been looking at the IRQS off tracer for the first time.  I'm
-> getting output such as:
+Tony Lindgren <tony@atomide.com> writes:
+
+> * Santosh Shilimkar <santosh.shilimkar@ti.com> [110623 08:09]:
+>> On 6/23/2011 8:35 PM, Kevin Hilman wrote:
+>> >Tony Lindgren<tony@atomide.com>  writes:
+>> >
+>> >So now, the only thing OMAP-specific is the debugfs file used to trigger
+>> >it.
+>> >
+>> >>Maybe Kevin can just carry it along in the PM branch for now?
+>> >
+>> >I'd prefer to keep it in mainline as this is a very important feature
+>> >for the PM functionality already in mainline.
+>> >
+>> I agree with Kevin and that's what have been saying from begining when
+>> we decided to drop this feature. The new patch from Kevin is already
+>> doing this in more generic way than that was before.
 >
->   <idle>-0       0d.s3    0us!: _raw_spin_lock_irqsave <-_raw_spin_lock_irqsave
->   <idle>-0       0dNs4 1709us+: _raw_spin_unlock_irqrestore <-_raw_spin_unlock_irqrestore
->   <idle>-0       0dNs4 1770us : time_hardirqs_on <-_raw_spin_unlock_irqrestore
->   <idle>-0       0dNs4 1770us : <stack trace>
+> To me Kevin's later patch makes more sense, but still has few issues:
 >
-> from it, which doesn't seem to be very useful.  Figuring out that it
-> may be because the EABI unwinder doesn't work too well with my toolchain,
-> I decided to try going for the more reliable frame pointer stuff.  This
-> gives me:
+> - It keeps the dependency between PM debug code and sys_timer code.
+>   That's yet another artificial blocker for making PM code a loadable
+>   module. We really don't want to export anything from the sys_timer code.
 >
-> kjournal-423     0d.s4    0us : trace_hardirqs_on <-_raw_spin_unlock_irq
-> kjournal-423     0d.s4    0us : time_hardirqs_on <-_raw_spin_unlock_irq
-> kjournal-423     0d.s3    0us!: trace_hardirqs_off <-_raw_spin_lock_irqsave
-> kjournal-423     0d.s4 1709us+: trace_hardirqs_on <-_raw_spin_unlock_irqrestore
-> kjournal-423     0d.s4 1770us : time_hardirqs_on <-_raw_spin_unlock_irqrestore
-> kjournal-423     0d.s4 1770us : <stack trace>
->  => time_hardirqs_on
->  => trace_hardirqs_on_caller
->  => trace_hardirqs_on
->  => _raw_spin_unlock_irqrestore
->  => cfq_idle_slice_timer
->  => run_timer_softirq
->  => __do_softirq
->  => irq_exit
+> - The interface for programming a wake-up timer should be Linux generic,
+>   not omap specific.
 >
-> which is no better.  It's telling me that {trace,time}_hardirqs_o{n,ff} is
-> involved is absurd - of course that function is involved, because that's
-> how these events are reported and that detail is just not interesting.
-> And yet again, we still don't get to find out where IRQs were disabled.
+> Further, it's a CONFIG_PM_DEBUG patch. So that code should not be
+> in the mainline kernel.
 
-Is ftrace enabled (/proc/sys/kernel/ftrace_enabled)? If it is you should
-a least see the functions that were called while irqs were off.
+Huh?  
 
-There should also be a
+Please clarify why PM debug code shouldn't be in mainline?
 
- => started at: func_irq_off
- => ended at:  func_irq_on
-
-near the top of the latency trace although it may not be entirely useful
-unless spinlocks are inlined. Perhaps we should start inlining spinlocks?
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
+Kevin
