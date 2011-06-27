@@ -1,122 +1,62 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Mon, 27 Jun 2011 20:43:26 +0900
-Subject: [PATCH 3/3] rtc: rtc-s3c: allow multiple open / allow no-ioctl-open'ed
-	rtc to have irq.
-In-Reply-To: <1309175006-9218-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1309175006-9218-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1309175006-9218-4-git-send-email-myungjoo.ham@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 27 Jun 2011 13:44:43 +0200
+Subject: [PATCH 0/2] RFC: gpio: driver-local pin configuration
+In-Reply-To: <BANLkTinxptCJRETreCpUoV-nU2K4fuFcmQ@mail.gmail.com>
+References: <1307695731-28018-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTinxptCJRETreCpUoV-nU2K4fuFcmQ@mail.gmail.com>
+Message-ID: <BANLkTimMSChGFUSnFWFHv3nNUca_Fyawaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The previous rtc-s3c had two issues related with its IRQ.
-1. Users cannot open rtc multiple times because an open operation calls
-request_irq on the same IRQ. (e.g., two user processes wants to open and
-read RTC time from rtc-s3c at the same time)
-2. If alarm is set and no one has the rtc opened with filesystem
-(either the alarm is set by kernel/boot-loader or user set an alarm
-and closed rtc dev file), the pending bit is not cleared and no further
-interrupt is invoked. When the alarm is used by the system itself such
-as a resume from suspend-to-RAM or other Low-power modes/idle, this is a
-critical issue.
+On Mon, Jun 27, 2011 at 12:57 PM, Stijn Devriendt <highguy@gmail.com> wrote:
+> On Fri, Jun 10, 2011 at 10:48 AM, Linus Walleij
+> <linus.walleij@stericsson.com> wrote:
+>>
+>> Background: Grant didn't like the idea of an ioctl() like
+>> configuration function in the struct gpio_chip vtable, so we
+>> decided to see if it was wiser to go back to the initial suggestion
+>> of making it possible for drivers to dereference the struct
+>> gpio_chip and perform driver-local operations via regular
+>> function calls instead.
+>>
+> I couldn't find Grant's rationale in an e-mail thread somewhere, but
+> except from the few comments I passed on, I liked the approach.
 
-This patch mitigates these issue by calling request_irq at probe and
-free_irq at remove.
+Grant gave me these comments in person. Grant, maybe you
+can restate? I might be referring it the wrong way.
 
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- drivers/rtc/rtc-s3c.c |   63 ++++++++++++++----------------------------------
- 1 files changed, 19 insertions(+), 44 deletions(-)
+> I rather dislike exposing the gpio_to_chip. It makes implementations
+> work around gpiolib completely. We might as well strip it out
+> completely then and go back to drivers doing platform specific GPIO
+> register accesses.
 
-diff --git a/drivers/rtc/rtc-s3c.c b/drivers/rtc/rtc-s3c.c
-index be85ea5..8d2807f 100644
---- a/drivers/rtc/rtc-s3c.c
-+++ b/drivers/rtc/rtc-s3c.c
-@@ -320,50 +320,7 @@ static int s3c_rtc_proc(struct device *dev, struct seq_file *seq)
- 	return 0;
- }
- 
--static int s3c_rtc_open(struct device *dev)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct rtc_device *rtc_dev = platform_get_drvdata(pdev);
--	int ret;
--
--	ret = request_irq(s3c_rtc_alarmno, s3c_rtc_alarmirq,
--			  IRQF_DISABLED,  "s3c2410-rtc alarm", rtc_dev);
--
--	if (ret) {
--		dev_err(dev, "IRQ%d error %d\n", s3c_rtc_alarmno, ret);
--		return ret;
--	}
--
--	ret = request_irq(s3c_rtc_tickno, s3c_rtc_tickirq,
--			  IRQF_DISABLED,  "s3c2410-rtc tick", rtc_dev);
--
--	if (ret) {
--		dev_err(dev, "IRQ%d error %d\n", s3c_rtc_tickno, ret);
--		goto tick_err;
--	}
--
--	return ret;
--
-- tick_err:
--	free_irq(s3c_rtc_alarmno, rtc_dev);
--	return ret;
--}
--
--static void s3c_rtc_release(struct device *dev)
--{
--	struct platform_device *pdev = to_platform_device(dev);
--	struct rtc_device *rtc_dev = platform_get_drvdata(pdev);
--
--	/* do not clear AIE here, it may be needed for wake */
--
--	free_irq(s3c_rtc_alarmno, rtc_dev);
--	free_irq(s3c_rtc_tickno, rtc_dev);
--}
--
--
- static const struct rtc_class_ops s3c_rtcops = {
--	.open		= s3c_rtc_open,
--	.release	= s3c_rtc_release,
- 	.read_time	= s3c_rtc_gettime,
- 	.set_time	= s3c_rtc_settime,
- 	.read_alarm	= s3c_rtc_getalarm,
-@@ -427,6 +384,9 @@ static int __devexit s3c_rtc_remove(struct platform_device *dev)
- {
- 	struct rtc_device *rtc = platform_get_drvdata(dev);
- 
-+	free_irq(s3c_rtc_alarmno, rtc);
-+	free_irq(s3c_rtc_tickno, rtc);
-+
- 	platform_set_drvdata(dev, NULL);
- 	rtc_device_unregister(rtc);
- 
-@@ -553,8 +513,23 @@ static int __devinit s3c_rtc_probe(struct platform_device *pdev)
- 
- 	clk_disable(rtc_clk);
- 
--	return 0;
-+	ret = request_irq(s3c_rtc_alarmno, s3c_rtc_alarmirq,
-+			  IRQF_DISABLED,  "s3c2410-rtc alarm", rtc);
- 
-+	if (ret) {
-+		dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_alarmno, ret);
-+		return ret;
-+	}
-+
-+	ret = request_irq(s3c_rtc_tickno, s3c_rtc_tickirq,
-+			  IRQF_DISABLED,  "s3c2410-rtc tick", rtc);
-+
-+	if (ret) {
-+		dev_err(&pdev->dev, "IRQ%d error %d\n", s3c_rtc_tickno, ret);
-+		free_irq(s3c_rtc_alarmno, rtc);
-+	}
-+
-+	return ret;
-  err_nortc:
- 	s3c_rtc_enable(pdev, 0);
- 	clk_disable(rtc_clk);
--- 
-1.7.4.1
+Myself I am pretty neutral and happy with any of these two
+approaches, I just want to be able to migrate my U300 and Nomadik
+drivers to gpio_chip and irq_chip, and without a handle on the memory
+map I cannot do that.
+
+>> This one is then exposed in the chip-specific header ?in
+>> <linux/gpio/u300.h>, and all the configuration defines that
+>> were previously globally generic in <linux/gpio.h> are also
+>> moved there and made driver-specific without any attempt of
+>> generalizing this.
+>>
+> How about a SPI flash that has its chip select hooked up to a
+> GPIO that requires setting open-drain for example. Now that
+> SPI-driver needs to be aware of each independent gpio-chip
+> implementation.
+
+Yes. To make the driver platform neutral, it needs to for example
+provide a callback in the platform data like (* set_pin_bias) or so,
+and then your platform has to implement this biasing.
+
+In this specific case that kind of stuff would likely be preferable
+to have in the platform anyway, but I understand what you mean.
+
+In the pinctrl framework I try to handle all such pin control stuff
+with the intention of letting the GPIO drivers wrap it if they
+prefer, but in this framework platforms could also handle GPIO
+and pin control in an orthogonal way, which would likely be
+preferable in most cases.
+
+Linus Walleij
