@@ -1,79 +1,68 @@
-From: teawater@gmail.com (Hui Zhu)
-Date: Mon, 27 Jun 2011 22:11:05 +0800
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <4E088DE1.2060809@gmail.com>
-References: <20110627125306.GA30646@doriath.ww600.siemens.net>
-	<20110627132735.GE16103@n2100.arm.linux.org.uk>
-	<4E088DE1.2060809@gmail.com>
-Message-ID: <BANLkTin1qv4+W2yrJQgKQSBUWKQGJsnWUw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 27 Jun 2011 16:20:44 +0200
+Subject: [PATCH 5/8] ARM: dma-mapping: move all dma bounce code to separate
+	dma ops structure
+In-Reply-To: <201106241747.03113.arnd@arndb.de>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<20110620144247.GF26089@n2100.arm.linux.org.uk>
+	<000901cc2f5f$237795a0$6a66c0e0$%szyprowski@samsung.com>
+	<201106241747.03113.arnd@arndb.de>
+Message-ID: <000901cc34d5$66ff7d80$34fe7880$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If I remember is right, kernel didn't supply enough debug info in
-entry-armv.S.  So GDB cannot got enough debug info, then got some
-frame parse bug inside it.
+Hello,
 
-I think add some cfi
-code(http://sourceware.org/binutils/docs/as/CFI-directives.html) like
-x86 entry did can handle this issue.
+On Friday, June 24, 2011 5:47 PM Arnd Bergmann wrote:
 
-Thanks,
-Hui
+> On Monday 20 June 2011, Marek Szyprowski wrote:
+> > On Monday, June 20, 2011 4:43 PM Russell King - ARM Linux wrote:
+> >
+> > > On Mon, Jun 20, 2011 at 09:50:10AM +0200, Marek Szyprowski wrote:
+> > > > This patch removes dma bounce hooks from the common dma mapping
+> > > > implementation on ARM architecture and creates a separate set of
+> > > > dma_map_ops for dma bounce devices.
+> > >
+> > > Why all this additional indirection for no gain?
+> >
+> > I've did it to really separate dmabounce code and let it be completely
+> > independent of particular internal functions of the main generic dma-
+> mapping
+> > code.
+> >
+> > dmabounce is just one of possible dma-mapping implementation and it is
+> really
+> > convenient to have it closed into common interface (dma_map_ops) rather
+> than
+> > having it spread around and hardcoded behind some #ifdefs in generic ARM
+> > dma-mapping.
+> >
+> > There will be also other dma-mapping implementations in the future - I
+> > thinking mainly of some iommu capable versions.
+> >
+> > In terms of speed I really doubt that these changes have any impact on
+> the
+> > system performance, but they significantly improves the code readability
+> > (see next patch with cleanup of dma-mapping.c).
+> 
+> Yes. I believe the main effect of splitting out dmabounce into its own
+> set of operations is improved readability for people that are not
+> familiar with the existing code (which excludes Russell ;-) ), by
+> separating the two codepaths and losing various #ifdef.
+> 
+> The simplification becomes more obvious when you look at patch 6, which
+> removes a lot of the code that becomes redundant after this one.
 
-On Mon, Jun 27, 2011 at 22:04, Dmitry Eremin-Solenikov
-<dbaryshkov@gmail.com> wrote:
-> Hello,
->
-> On 27.06.2011 17:27, Russell King - ARM Linux wrote:
->>
->> On Mon, Jun 27, 2011 at 04:53:06PM +0400, Dmitry Eremin-Solenikov wrote:
->>>
->>> I've got into a problem when trying to debug irq handlers on PXA (in
->>> qemu). backtrace is really strange from my POV (a target is just a qemu
->>> running a bit modified 3.0-rc2 kernel):
->>
->> ...
->>>
->>> Breakpoint 1, handle_level_irq (irq=42, desc=0xc3e06000) at
->>> kernel/irq/chip.c:329
->>> 329 ? ? ? ? ? ? mask_ack_irq(desc);
->>> (gdb) bt
->>> #0 ?handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
->>> #1 ?0xc0085f64 in generic_handle_irq_desc (irq=42) at
->>> include/linux/irqdesc.h:111
->>> #2 ?generic_handle_irq (irq=42) at kernel/irq/irqdesc.c:304
->>> #3 ?0xc0033060 in asm_do_IRQ (irq=42, regs=<value optimized out>) at
->>> arch/arm/kernel/irq.c:90
->>> #4 ?0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #5 ?0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #6 ?0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #7 ?0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #8 ?0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #9 ?0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #10 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #11 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>> #12 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
->>>
->>> ... and so on it continues ad infinitum. Is it the expected behaviour?
->>> Because I'm pretty much sure that this isn't a desired behaviour.
->>
->> My guess is that gdb is trying to unwind using the unwind information.
->> However, I don't think we actually give the assembler the full information
->> to be able to unwind this. ?I've no idea how to solve this as I'm no
->> expert at the debug info.
->>
->> We _really_ _do_ want to unwind through this so that we can see the
->> parent kernel context information in backtraces - and the fact that
->> the kernel itself can unwind through these means we can't tell the
->> unwinder not to.
->>
->> So, no idea. ?I think you need someone who knows debug info to sort
->> this one out.
->
-> Adding gdb ML to cc in the hope to get any assistance.
->
-> --
-> With best wishes
-> Dmitry
->
->
+This separation might also help in future with code consolidation across
+different architectures. It was suggested that ARM DMA bounce code has a lot
+in common with SWIOTBL (if I'm right) dma-mapping implementation.
+
+The separation will also help in integrating the IOMMU based dma-mapping,
+which will probably share again some code with linear dma-mapping code.
+Having these 3 implementations mixed together might not help in code
+readability.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
