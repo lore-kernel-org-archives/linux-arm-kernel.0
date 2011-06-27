@@ -1,59 +1,46 @@
-From: premi@ti.com (Sanjeev Premi)
-Date: Mon, 27 Jun 2011 16:06:49 +0530
-Subject: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
-Message-ID: <1309171009-8075-1-git-send-email-premi@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jun 2011 11:38:32 +0100
+Subject: how to suspend on arm smp platform
+In-Reply-To: <BANLkTimYxi2rUwp+pkRxNWAXKhob7AJHmQ@mail.gmail.com>
+References: <BANLkTimYxi2rUwp+pkRxNWAXKhob7AJHmQ@mail.gmail.com>
+Message-ID: <20110627103832.GB16103@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
+On Mon, Jun 27, 2011 at 06:14:13PM +0800, JiSheng Zhang wrote:
+> I need your help about suspend on SMP.
+> 
+> I notice that there's some smp support code in
+> arch/arm/kernel/sleep.S. cpu hotplug code is similar as realview
+> platform--just put the non-boot cpu into WFI state. So how do non-boot
+> cpu resume back to the hotplug code path? If resume doesn't make use
+> of the hotplug, then how to resume non-boot cpus? Currently, UP kernel
+> suspend works perfectly on my SoC, I need your help about SMP suspend.
 
-Present current selection of the GPTIMER on Beagleboard
-was result of a hardware issue in early versions of the
-Beagleboards (Ax and B1 thru B4). [1][2]
+You're mixing two different things together.
 
-Its been long since the hardware issue has been fixed.
-This patch uses GPTIMER 1 for all newer board revisions
-incl. Beagleboard XM.
+System suspend to RAM support works by hot-unplugging the secondary
+CPUs, thereby placing the system in a UP environment.  Suspend then
+happens as per UP systems, which should be using or moving over to use
+arch/arm/kernel/sleep.S.
 
-Also, the clock source for GPTIMER12 is much less frequency
-stable than clock sources for GPTIMER1. Using GPTIMER12 can
-result in major time skew over a fairly short interval.
+arch/arm/kernel/sleep.S supports two things: uniprocessor suspend, and
+cpuidle based suspend of multiple CPUs.  It does *not* handle hotplug.
 
- [1] http://thread.gmane.org/gmane.comp.hardware.beagleboard.general/91
- [2] Errata #7 at http://elinux.org/BeagleBoard#Errata
+Now, to move on to hotplug.  Those platforms which support hotplug don't
+support hotplug very well - many of them have taken a copy of the Realview
+or Versatile Express hotplug code as their implementation.  These platforms
+support _no_ power management, and so their hotplug code is implemented
+in such a way to emulate what's required to be able to test the hotplug
+paths.  (Their original implementation was to spin in a loop external to
+the main idle loop waiting to be brought back up, at which point they
+returned to the idle loop.)
 
-Signed-off-by: Sanjeev Premi <premi@ti.com>
-Reviewed-by: Paul Walmsley <paul@pwsan.com>
-Cc: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
-Cc: Thomas Weber <weber@corscience.de>
-Cc: Jason Lam <lzg@ema-tech.com>
-Cc: Gregoire Gentil <gregoire@gentil.com>
----
+In effect, a hot unplug of a CPU should cause the CPU to be placed into
+a low power mode.  Hot-plugging the CPU should cause the CPU to be reset
+and enter the kernel in exactly the same way as it would do during normal
+system boot.
 
- Changes since v1:
-   * Updated description with details from Paul Walmsley.
-   * Changed author to Hrishikesh.
-   * Expanded cc: to include original authors for other
-     boards that are still using GPTIMER12.
-
- arch/arm/mach-omap2/board-omap3beagle.c |    5 ++++-
- 1 files changed, 4 insertions(+), 1 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-omap3beagle.c b/arch/arm/mach-omap2/board-omap3beagle.c
-index 4b113b2..edc1596 100644
---- a/arch/arm/mach-omap2/board-omap3beagle.c
-+++ b/arch/arm/mach-omap2/board-omap3beagle.c
-@@ -509,7 +509,10 @@ static void __init omap3_beagle_init_irq(void)
- {
- 	omap_init_irq();
- #ifdef CONFIG_OMAP_32K_TIMER
--	omap2_gp_clockevent_set_gptimer(12);
-+	if (omap3_beagle_version == OMAP3BEAGLE_BOARD_AXBX)
-+		omap2_gp_clockevent_set_gptimer(12);
-+	else
-+		omap2_gp_clockevent_set_gptimer(1);
- #endif
- }
- 
--- 
-1.7.2.2
+Note that the system expects (or should expect) complete loss of state on
+an unplugged CPU, which is another reason why the cpu_suspend paths in
+arch/arm/kernel/sleep.S are not appropriate for CPU hotplug.
