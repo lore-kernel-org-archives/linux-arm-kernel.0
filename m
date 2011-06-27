@@ -1,90 +1,67 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Mon, 27 Jun 2011 19:57:17 +0530
-Subject: [PATCH 1/4] davinci: psc.h: clean up indentation done using spaces
-In-Reply-To: <201106251948.19834.arnd@arndb.de>
-References: <1301072400-4036-1-git-send-email-nsekhar@ti.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2F3E@dbde02.ent.ti.com>
-	<201106251948.19834.arnd@arndb.de>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7934B5@dbde02.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 27 Jun 2011 16:29:26 +0200
+Subject: [PATCH 2/8] ARM: dma-mapping: implement dma_map_single on top of
+	dma_map_page
+In-Reply-To: <201106241724.21113.arnd@arndb.de>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<20110620143911.GD26089@n2100.arm.linux.org.uk>
+	<000101cc2f5c$ec21da40$c4658ec0$%szyprowski@samsung.com>
+	<201106241724.21113.arnd@arndb.de>
+Message-ID: <000a01cc34d6$9e4576e0$dad064a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Hello,
 
-On Sat, Jun 25, 2011 at 23:18:19, Arnd Bergmann wrote:
-> On Friday 24 June 2011, Nori, Sekhar wrote:
-> > This series of 4 patches added SATA support on DaVinci
-> > DA850 platform. This was ready for last merge window,
-> > but was not queued because of the negative diffstat
-> > rule.
-> > 
-> > Is there a possibility of queuing this for the v3.1 merge?
-> > 
-> > Here is the archive link of this posting:
-> > 
-> > http://linux.davincidsp.com/pipermail/davinci-linux-open-source/2011-March/022473.html
+On Friday, June 24, 2011 5:24 PM Arnd Bergmann wrote:
+
+> On Monday 20 June 2011, Marek Szyprowski wrote:
+> > > This also breaks dmabounce when used with a highmem-enabled system -
+> > > dmabounce refuses the dma_map_page() API but allows the
+> dma_map_single()
+> > > API.
+> >
+> > I really not sure how this change will break dma bounce code.
+> >
+> > Does it mean that it is allowed to call dma_map_single() on kmapped
+> > HIGH_MEM page?
 > 
-> My general idea is to have multiple branches per subarchitecture,
-> and I started merging stuff into the tree now.
-> 
-> Your series contains both cleanups and support for additional
-> features, and I'd like to see those split into separate branches.
+> dma_map_single on a kmapped page already doesn't work, the argument needs
+> to be inside of the linear mapping in order for virt_to_page to work.
 
-Okay.
+Then I got really confused.
 
-> 
-> Please make sure the patches apply on top of 2.6.39 and resubmit
-> them, separating out the first cleanup patch from the others.
+Documentation/DMA-mapping.txt says that dma_map_single() can be used only
+with kernel linear mapping, while dma_map_page() can be also called on 
+HIGHMEM pages.
 
-Is it 2.6.39 or v3.0-rc? Linux-next is currently at v3.0-rc4.
+Now, lets go to arch/arm/common/dmabounce.c code:
 
-I can create a branch with just the clean-up stuff and
-another branch with the features (and its dependencies
-from fixes/clean-up).
+dma_addr_t __dma_map_page(struct device *dev, struct page *page,
+                unsigned long offset, size_t size, enum dma_data_direction dir)
+{
+        dev_dbg(dev, "%s(page=%p,off=%#lx,size=%zx,dir=%x)\n",
+                __func__, page, offset, size, dir);
 
-By "resubmit" I assume you are not asking for a re-send
-of the patches to the mailing list (I can do that if you
-want).
+        BUG_ON(!valid_dma_direction(dir));
 
-> We can definitely forward all cleanups and bug fixes in the each
-> merge window. For new features, it mostly depends on how much
-> code gets added that should not really be needed in a perfect
-> world, relative to the amount of cleanups that is actually
-> going into the platform in order to get there.
+        if (PageHighMem(page)) {
+                dev_err(dev, "DMA buffer bouncing of HIGHMEM pages "
+                             "is not supported\n");
+                return ~0;
+        }
 
-Okay.
+        return map_single(dev, page_address(page) + offset, size, dir);
+}
+EXPORT_SYMBOL(__dma_map_page);
 
-> In case of the SATA support, the feature is relatively small
-> and requires little board-specific code, which is good.
-> However, if you are planning to push a lot of small additions
-> like this, I would expect you spend much more effort on
-> consolidation within davinci and migration towards device
-> tree probing first.
+Am I right that there is something mixed here? I really don't get why there is
+high mem check in dma_map_page implementation. dma_map_single doesn't perform
+such check and works with kmapped highmem pages...
 
-I don't see new SoCs/boards getting added to the DaVinci
-tree in the near term but there are some features of existing
-platforms (like USB on DM365 or SATA on DA850) which are missing
-in mainline for which there are patches being sent. 
+Russell also pointed that my patch broke dma bounch with high mem enabled.
 
-To my knowledge, there isn't any ongoing work on moving DaVinci
-to device tree. I am working on getting the low(er) hanging things
-like GPIO movement to drivers/gpio done. DaVinci will eventually
-move to device-tree, but may be not as soon as OMAP where
-there is a lot more active work ongoing.
-
-> What else do you have pending for davinci in 3.1? Can you
-> send pull requests for cleanups/fixes/device-tree/features?
-
-Actually not quite a lot at the moment, but there are some
-patches which are waiting for acks/dependencies and some
-pending re-work.
-
-I will send a pull request with what has been reviewed and
-accepted already.
-
-I guess I also need to ask Stephen Rothwell to remove the
-DaVinci next branch from the list of branches he is merging
-for linux-next.
-
-Thanks,
-Sekhar
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
