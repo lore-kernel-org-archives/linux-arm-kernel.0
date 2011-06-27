@@ -1,149 +1,56 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 27 Jun 2011 19:05:06 +0530
-Subject: [PATCH v3 05/12] OMAP: Serial: Hold console lock for console
-	usage.
-In-Reply-To: <87boxmsrjt.fsf@ti.com>
-References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-	<1307532194-13039-6-git-send-email-govindraj.raja@ti.com>
-	<87boxmsrjt.fsf@ti.com>
-Message-ID: <BANLkTi=Zcre6cXrD4bRw-K6DtPKX3=O7jA@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon, 27 Jun 2011 18:04:17 +0400
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <20110627132735.GE16103@n2100.arm.linux.org.uk>
+References: <20110627125306.GA30646@doriath.ww600.siemens.net>
+	<20110627132735.GE16103@n2100.arm.linux.org.uk>
+Message-ID: <4E088DE1.2060809@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 25, 2011 at 5:36 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> Acquire console lock before enabling and writing to console-uart
->> to avoid any recursive prints from console write.
->> for ex:
->> ? ? ? ? --> printk
->> ? ? ? ? ? --> uart_console_write
->> ? ? ? ? ? ? --> get_sync
->> ? ? ? ? ? ? ? --> printk from omap_device enable
->> ? ? ? ? ? ? ? ? --> uart_console write
+Hello,
+
+On 27.06.2011 17:27, Russell King - ARM Linux wrote:
+> On Mon, Jun 27, 2011 at 04:53:06PM +0400, Dmitry Eremin-Solenikov wrote:
+>> I've got into a problem when trying to debug irq handlers on PXA (in
+>> qemu). backtrace is really strange from my POV (a target is just a qemu
+>> running a bit modified 3.0-rc2 kernel):
+> ...
+>> Breakpoint 1, handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+>> 329		mask_ack_irq(desc);
+>> (gdb) bt
+>> #0  handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+>> #1  0xc0085f64 in generic_handle_irq_desc (irq=42) at include/linux/irqdesc.h:111
+>> #2  generic_handle_irq (irq=42) at kernel/irq/irqdesc.c:304
+>> #3  0xc0033060 in asm_do_IRQ (irq=42, regs=<value optimized out>) at arch/arm/kernel/irq.c:90
+>> #4  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #5  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #6  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #7  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #8  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #9  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #10 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #11 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+>> #12 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
 >>
->> Use RPM_SUSPENDING check to avoid below scenario during bootup
->> As during bootup console_lock is not available.
->> ? ? ? ?--> uart_add_one_port
->> ? ? ? ? ? ?--> console_register
->> ? ? ? ? ? ? ? ?--> console_lock
->> ? ? ? ? ? ? ? ? --> console_unlock
->> ? ? ? ? ? ? ? ? ? ? ?--> call_console_drivers (here yet console_lock is not released)
->> ? ? ? ? ? ? ? ? ? ? ? ? ? --> uart_console_write
->>
->> Acked-by: Alan Cox <alan@linux.intel.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->> ---
->> ?drivers/tty/serial/omap-serial.c | ? 20 +++++++++++++++++++-
->> ?1 files changed, 19 insertions(+), 1 deletions(-)
->>
->> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
->> index 897416f..ee94291 100644
->> --- a/drivers/tty/serial/omap-serial.c
->> +++ b/drivers/tty/serial/omap-serial.c
->> @@ -1008,7 +1008,22 @@ serial_omap_console_write(struct console *co, const char *s,
->> ? ? ? struct uart_omap_port *up = serial_omap_console_ports[co->index];
->> ? ? ? unsigned long flags;
->> ? ? ? unsigned int ier;
->> - ? ? int locked = 1;
->> + ? ? int console_lock = 0, locked = 1;
->> +
->> + ? ? if (console_trylock())
->> + ? ? ? ? ? ? console_lock = 1;
+>> ... and so on it continues ad infinitum. Is it the expected behaviour?
+>> Because I'm pretty much sure that this isn't a desired behaviour.
 >
-> So now we take the console lock on *every* console write? ?Even if the
-> device is not about to be idled? ? This is rather over-protective, don't
-> you think?
+> My guess is that gdb is trying to unwind using the unwind information.
+> However, I don't think we actually give the assembler the full information
+> to be able to unwind this.  I've no idea how to solve this as I'm no
+> expert at the debug info.
 >
-
-This scenario is because of print from
-omap_uart_console_write --> get_sync --> omap_enable_enable
-trying to print worst activate or deactivate latency some times.
-
-will result in recursive print scenario.
-
-holding console lock will only ensure that the print from get_sync gets
-logged to be printed later to console.
-
->> + ? ? /*
->> + ? ? ?* If console_lock is not available and we are in suspending
->> + ? ? ?* state then we can avoid the console usage scenario
+> We _really_ _do_ want to unwind through this so that we can see the
+> parent kernel context information in backtraces - and the fact that
+> the kernel itself can unwind through these means we can't tell the
+> unwinder not to.
 >
-> s/in suspending state/runtime suspending/
+> So, no idea.  I think you need someone who knows debug info to sort
+> this one out.
 
-ok.
+Adding gdb ML to cc in the hope to get any assistance.
 
->
->> + ? ? ?* as this may introduce recursive prints.
->> + ? ? ?* Basically this scenario occurs during boot while
->> + ? ? ?* printing debug bootlogs.
->
-> The exact scenario for triggering this still not well described, and
-> thus still I don't get it.
->
-
-scenario is same as said above.
-
-omap_uart_console_write --> get_sync --> omap_device
-
-printk worst activate latency calls omap_uart_console write.
-
-after boot up we have access to console lock,
-but during boot up we don't have console lock available
-and results in printk recursiveness.
-
-> I still don't fully understand this problem,
-
-basically its due to recursive printk during bootup
-and also after bootup as said above.
-
-> but if it's isolated to
-> runtime suspending, maybe you need a console lock in the runtime_suspend
-> path (like you already have in the static suspend path.)
-
-console_lock in runtime_suspend will not help
-during bootup and due to printk emerging out from
-omap_device enable after system bootup.
-
-
->
->> + ? ? ?*/
->> +
->> + ? ? if (!console_lock &&
->> + ? ? ? ? ? ? up->pdev->dev.power.runtime_status == RPM_SUSPENDING)
->> + ? ? ? ? ? ? return;
->
-> Assuming this was a printk, it's now lost, right? ? Not sure that's an
-> acceptable solution.
->
-
-AFAIK it gets logged prints later.
-
-to summarize holding console lock helps after bootup
-since during boot up console lock is not available need to use
-above runtime_status check.
-
---
-Thanks,
-Govindraj.R
-
-
->> ? ? ? local_irq_save(flags);
->> ? ? ? if (up->port.sysrq)
->> @@ -1044,6 +1059,9 @@ serial_omap_console_write(struct console *co, const char *s,
->> ? ? ? if (up->msr_saved_flags)
->> ? ? ? ? ? ? ? check_modem_status(up);
->>
->> + ? ? if (console_lock)
->> + ? ? ? ? ? ? console_unlock();
->> +
->> ? ? ? serial_omap_port_disable(up);
->> ? ? ? if (locked)
->> ? ? ? ? ? ? ? spin_unlock(&up->port.lock);
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+With best wishes
+Dmitry
