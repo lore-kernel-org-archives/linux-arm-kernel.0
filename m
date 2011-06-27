@@ -1,60 +1,93 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Jun 2011 09:35:32 -0700
-Subject: [GIT PULL] misc. OMAP PM updates for v3.1
-In-Reply-To: <20110627112843.GN23145@atomide.com> (Tony Lindgren's message of
-	"Mon, 27 Jun 2011 04:28:43 -0700")
-References: <87vcvw5akk.fsf@ti.com> <20110627112843.GN23145@atomide.com>
-Message-ID: <87aad3dygb.fsf@ti.com>
+From: vijay.kilari@stericsson.com (Vijaya Kumar K-1)
+Date: Mon, 27 Jun 2011 18:34:52 +0200
+Subject: [PATCH v6 00/11] mmc: use nonblock mmc requests to minimize
+	latency
+In-Reply-To: <BANLkTi=NTqQ-U8AhL0SUYzBTs1RF==aD5g@mail.gmail.com>
+References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
+	<20110621075319.GN26089@n2100.arm.linux.org.uk>
+	<BANLkTikOA3G0Gt4Cxua3EDnAzbFKLAk6Yw@mail.gmail.com>
+	<BANLkTimfxrcKWLZJmVC+1zL27th7j4uzEA@mail.gmail.com>
+	<20110623133702.GZ23234@n2100.arm.linux.org.uk>
+	<BANLkTi=8Awu4Z3ESizE9WDEyWNw0r9N0ug@mail.gmail.com>
+	<BANLkTinK88QT_7Zr2YF1sTAiM778Xp9rFQ@mail.gmail.com>
+	<20110627100212.GA16103@n2100.arm.linux.org.uk>
+	<BANLkTi=NTqQ-U8AhL0SUYzBTs1RF==aD5g@mail.gmail.com>
+Message-ID: <747C1E83C744F44E9ACFB89FAEEC2C7B1CAA1029EC@EXDCVYMBSTM005.EQ1STM.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+Hi,
 
-> * Kevin Hilman <khilman@ti.com> [110623 17:32]:
->> Tony,
->> 
->> Please pull the following misc. OMAP PM updates targetted for v3.1.
->> 
->> This branch is based on your 'fixes' branch due to some dependencies.
->>       OMAP2: PM debug: move wakeup timer into clockevent code
->
-> This won't work with the devel-timer branch. I think we should just
-> drop it for now based on what I mentioned in the other thread.
+  The below are the timings on clean & flush.
 
-OK, dropped the timer patch.  Updated pull request below.
+/*
+Size	 Clean	 Dirty_clean	Flush 	Dirty_Flush
+	 T1(ns)       T2(ns)	      T3(ns)      T2(ns)
+============================================================
+4096	 30517	  30517		30517	      30517
+8192	 30517	  30517		30517	      30517
+16384	 30518	  30518		30518	      30518
+32768	 30518	  30518		30518	      61035<--
+36864	 61036	  61036		61035	      61035
+65536	 91553	  91553		91553	      91553
+131072 183106	  183106		183106	183106
+
+Full	 30518	  30518		30518	      30518<--
+Cache 
+
+*/
+/* Based on Above values, 32768 size is breakeven for flushing/cleaning
+ * full D cache
+ */
+
+I have noticed with 32KB DLIMIT, there is small reduction about 1fps in 
+skiamark profile after this change. It could be because of full flush or
+clean is causing more cache misses later on in the execution.
+
+However with 64KB DLIMIT, there is further degrade in skiamark performance.
+So I think 32KB is good value.
+
+However the problems are seen in the Android UI. Small artifacts are 
+seen during Video playback on UI widgets.
+
+This artifacts are not seen if clean is called for each cpu.
+
+Also I find it takes some effort to implement clean_all / flush_all
+API's in cache-V7.S (asm) file to execute on each cpu.
+And hence it was parked aside.
+
+And I have not investigated, why flush on both cases in case of flush all on
+Both cpu's always works?
+
+Thanks & Regards
+Vijay
+
+
+
+-----Original Message-----
+From: Linus Walleij [mailto:linus.walleij at linaro.org] 
+Sent: Monday, June 27, 2011 5:30 PM
+To: Russell King - ARM Linux; Srinidhi KASAGAR; Vijaya Kumar K-1
+Cc: Per Forlin; Nicolas Pitre; Chris Ball; linaro-dev at lists.linaro.org; linux-mmc at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Robert Fekete
+Subject: Re: [PATCH v6 00/11] mmc: use nonblock mmc requests to minimize latency
+
+On Mon, Jun 27, 2011 at 12:02 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+
+> The next thing to think about in DMA-land is whether we should total up
+> the size of the SG list and choose whether to flush the individual SG
+> elements or do a full cache flush. ?There becomes a point where the full
+> cache flush becomes cheaper than flushing each SG element individually.
+
+We noticed that even for a single (large) buffer, any cache flush operation
+above a certain threshold flushing indiviudal lines become more expensive
+than flushing the entire cache.
+
+I requested colleagues to look into implenting this threshold in the
+arch/arm/mm/cache-v7.S file. but I think they ran into trouble and
+eventually had to give up on it.
+
+Vijay or Srinidhi, can you share your findings?
 
 Thanks,
-
-Kevin
-
-
-
-
-The following changes since commit b8ce9fb8e18af7466e0b915bb5979322cdace322:
-
-  Merge branch 'fixes-v3.0-rc3' into devel-fixes (2011-06-14 05:53:42 -0700)
-
-are available in the git repository at:
-
-  ssh://master.kernel.org/pub/scm/linux/kernel/git/khilman/linux-omap-pm.git for_3.1/pm-misc
-
-Kevin Hilman (3):
-      OMAP3: PM debug: remove sleep_while_idle feature
-      OMAP2: PM debug: remove register dumping
-      OMAP3: PM debug: remove register dumping
-
-Nishanth Menon (4):
-      OMAP3+: SR: make notify independent of class
-      OMAP3+: SR: disable interrupt by default
-      OMAP3+: SR: enable/disable SR only on need
-      OMAP3+: SR: fix cosmetic indentation
-
-Sanjeev Premi (1):
-      OMAP2+: PM: fix section mismatch in pm_dbg_init()
-
- arch/arm/mach-omap2/pm-debug.c    |  345 +------------------------------------
- arch/arm/mach-omap2/pm.h          |    6 -
- arch/arm/mach-omap2/pm24xx.c      |    6 +-
- arch/arm/mach-omap2/pm34xx.c      |    2 -
- arch/arm/mach-omap2/smartreflex.c |   38 ++--
- 5 files changed, 23 insertions(+), 374 deletions(-)
+Linus Walleij
