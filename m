@@ -1,39 +1,25 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Jun 2011 10:32:26 -0700
-Subject: [PATCH 06/10] omap2+: Remove gptimer_wakeup for now
-In-Reply-To: <20110620092341.357.14183.stgit@kaulin> (Tony Lindgren's message
-	of "Mon, 20 Jun 2011 02:23:41 -0700")
-References: <20110620091754.357.56441.stgit@kaulin>
-	<20110620092341.357.14183.stgit@kaulin>
-Message-ID: <8762nrch91.fsf@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Jun 2011 19:46:26 +0200
+Subject: [PATCH] mach-ux500: fix USB build error
+In-Reply-To: <1309191570-3978-1-git-send-email-linus.walleij@stericsson.com>
+References: <1309191570-3978-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <201106271946.26257.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tony Lindgren <tony@atomide.com> writes:
+On Monday 27 June 2011 18:19:30 Linus Walleij wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> The mach-ux500/usb.c was referencing DMA macros, but not
+> including <linux/dma-mapping.h> so it didn't compile. Fixed by
+> a proper #include.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 
-> This removes the support for setting the wake-up timer for debugging.
->
-> Later on we can reserve gptimer1 for PM code only and have similar
-> functionality.
->
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
-> Reviewed-by: Kevin Hilman <khilman@ti.com>
+Applied.
 
-Another minor change to fold into patch: gptimer_wakeup doesn't exist
-anymore, so should probably be removed from dmtimer.h
+Thanks,
 
-Kevin
-
-
-diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
-index 40d7936..d0f3a2d 100644
---- a/arch/arm/plat-omap/include/plat/dmtimer.h
-+++ b/arch/arm/plat-omap/include/plat/dmtimer.h
-@@ -59,7 +59,6 @@
-  */
- #define OMAP_TIMER_IP_VERSION_1                        0x1
- struct omap_dm_timer;
--extern struct omap_dm_timer *gptimer_wakeup;
- struct clk;
- 
- struct omap_dm_timer *omap_dm_timer_request(void);
+	Arnd
