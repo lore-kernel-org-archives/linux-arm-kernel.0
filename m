@@ -1,25 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Jun 2011 19:46:26 +0200
-Subject: [PATCH] mach-ux500: fix USB build error
-In-Reply-To: <1309191570-3978-1-git-send-email-linus.walleij@stericsson.com>
-References: <1309191570-3978-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <201106271946.26257.arnd@arndb.de>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Jun 2011 11:00:27 -0700
+Subject: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D793464@dbde02.ent.ti.com>
+References: <1309171009-8075-1-git-send-email-premi@ti.com>
+	<20110627111556.GM23145@atomide.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D7933C0@dbde02.ent.ti.com>
+	<20110627123140.GP23145@atomide.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D793464@dbde02.ent.ti.com>
+Message-ID: <20110627180027.GR23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 June 2011 18:19:30 Linus Walleij wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+* Premi, Sanjeev <premi@ti.com> [110627 06:24]:
 > 
-> The mach-ux500/usb.c was referencing DMA macros, but not
-> including <linux/dma-mapping.h> so it didn't compile. Fixed by
-> a proper #include.
+> [sp] While I take my time understanding things on devel-timer;
+>      I had a quick question - at risk of being flamed.
 > 
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>      Adding a new machine ID would trickle to u-boot and same
+>      uImage (default) may not work across board revisions.
 
-Applied.
+Yes that's a hassle :( Until we have device tree, maybe see if
+u-boot passes ATAG_REVISION that's available as system_rev in
+kernel?
+ 
+>      How does this scheme look like:
+>      - GPTIMER1 is used as default - as it works for most boards.
+>      - GPTIMER12 is used based on a static config option OR a
+>        board specific bootarg
+> 
+>      I know both these options aren't general practice. Still
+>      wanted to know your views in the current context.
 
-Thanks,
+Let's not do a Kconfig option, but a cmdline option should work
+if done in a generic way. If you decide to go that way, then
+please add that to timer.c against devel-timer branch.
 
-	Arnd
+Regards,
+
+Tony
