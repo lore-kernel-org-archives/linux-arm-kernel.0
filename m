@@ -1,32 +1,83 @@
-From: minipli@googlemail.com (Mathias Krause)
-Date: Mon, 27 Jun 2011 06:29:12 +0200
-Subject: [PATCH] arm, exec: remove redundant set_fs(USER_DS)
-In-Reply-To: <BANLkTimFL44XRDeA6z6pvKGw-zpcdsNUEw@mail.gmail.com>
-References: <BANLkTiknCeAxe30MJdVTxDom+ko8+EDQ4A@mail.gmail.com>
-	<1307642718-22257-1-git-send-email-minipli@googlemail.com>
-	<20110609155630.0f734351.akpm@linux-foundation.org>
-	<1307711337-4042-1-git-send-email-minipli@googlemail.com>
-	<20110610134821.GL24424@n2100.arm.linux.org.uk>
-	<BANLkTimFL44XRDeA6z6pvKGw-zpcdsNUEw@mail.gmail.com>
-Message-ID: <BANLkTikzPx8rTa9YSqccXA+zjM0YNJmyOw@mail.gmail.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Mon, 27 Jun 2011 10:15:35 +0530
+Subject: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+In-Reply-To: <DE79F8F5-7D8A-46B8-8C8C-C2A7515E9117@dominion.thruhere.net>
+References: <1308932625-17632-1-git-send-email-premi@ti.com>
+	<86CFE860-E18E-4B96-A753-11EB7C5C1C86@dominion.thruhere.net>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2FE2@dbde02.ent.ti.com>
+	<DE79F8F5-7D8A-46B8-8C8C-C2A7515E9117@dominion.thruhere.net>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D6C30EE@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jun 10, 2011 at 3:53 PM, Mathias Krause <minipli@googlemail.com> wrote:
-> On Fri, Jun 10, 2011 at 3:48 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Fri, Jun 10, 2011 at 03:08:57PM +0200, Mathias Krause wrote:
->>> The address limit is already set in flush_old_exec() so this
->>> set_fs(USER_DS) is redundant.
->>
->> Please show where and how this is done. ?I've looked and can't see
->> any equivalent call to set_fs() in flush_old_exec().
->
-> Before dac853a (exec: delay address limit change until point of no
-> return) it was done in search_binary_handler(), now it is done in
-> flush_old_exec(). Either way set_fs(USER_DS) was/gets called before
-> start_thread() so the call there is redundant.
+> -----Original Message-----
+> From: linux-omap-owner at vger.kernel.org 
+> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Koen Kooi
+> Sent: Sunday, June 26, 2011 1:41 AM
+> To: linux-omap at vger.kernel.org List
+> Cc: linux-arm-kernel; Paul Walmsley
+> Subject: Re: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+> 
+> 
+> Op 25 jun 2011, om 20:51 heeft Premi, Sanjeev het volgende geschreven:
+> 
+> >> -----Original Message-----
+> >> From: linux-omap-owner at vger.kernel.org 
+> >> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Koen Kooi
+> >> Sent: Saturday, June 25, 2011 1:47 PM
+> >> To: linux-omap at vger.kernel.org List
+> >> Cc: linux-arm-kernel; Paul Walmsley
+> >> Subject: Re: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+> >> 
+> >> 
+> >> Op 24 jun 2011, om 18:23 heeft Sanjeev Premi het volgende 
+> geschreven:
+> >> 
+> >>> The current selection of the GPTIMER on was result of
+> >>> a hardware issue in early versions of the Beagleboards
+> >>> (Ax and B1 thru B4). [1] [2]
+> >>> 
+> >>> Its been long since the hardware issue has been fixed.
+> >>> This patch uses GPTIMER 1 for all newer board revisions
+> >>> incl. Beagleboard XM.
+> > 
+> > [sp] I didn't include a reason - because the problem may not
+> >     be reproducible on the public trees.
+> > 
+> >     During tests performed in internal development trees, the
+> >     BogoMIPS calculations @ 1GHz wouldn't go beyond "830-850"
+> >     range. While there was no such inconsistency on OMAP3EVM.
+> > 
+> >     After few days of debug GPTIMER12 came to be only difference.
+> >     Tracing GPTIMER12 in the spec proved quite a challenge; the
+> >     as timer is not included in the TRM and corresponding interrupt
+> >     is marked reserved. Paul (in cc:) obviously had access to
+> >     documents that we don't.
+> > 
+> >     This patch is merely trying to bring parity in use of GPTIMER
+> >     across OMAP3 boards (AND use documented IP) - taking note of
+> >     many Beagleboards where current code is necessary.
+> 
+> I get a value of 1010 ?10 bogoMIPS consistently with .39 + 
+> dvfs patches. Having said that, this patch does seem to be an 
+> improvement, but has it actually been tested on real 
+> beagleboard hardware with a recent kernel?
 
-Russell, any new opinion on this?
+[sp] It was tested on BeagleXM RevB on top of linux-omap master - as
+     on day of submitting th patch.
 
-Mathias
+> Especially on the 
+> boards affected by the capacitor issue on the external clock.--
+
+[sp] The patch relies on the check for board revision to continue using
+     GPTIMER12 on affected boards - which I am assuming to be right.
+
+     I don't have access to any of these versions, trying to find some
+     early users. Hope someone on the list with Ax/Bx version can share
+     the result...
+
+> To unsubscribe from this list: send the line "unsubscribe 
+> linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
