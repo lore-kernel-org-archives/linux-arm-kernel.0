@@ -1,23 +1,59 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Mon, 27 Jun 2011 13:02:57 +0100
-Subject: [PATCH 0/2] RFC: gpio: driver-local pin configuration
-In-Reply-To: <BANLkTimMSChGFUSnFWFHv3nNUca_Fyawaw@mail.gmail.com>
-References: <1307695731-28018-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTinxptCJRETreCpUoV-nU2K4fuFcmQ@mail.gmail.com>
-	<BANLkTimMSChGFUSnFWFHv3nNUca_Fyawaw@mail.gmail.com>
-Message-ID: <20110627120256.GA19531@opensource.wolfsonmicro.com>
+From: premi@ti.com (Premi, Sanjeev)
+Date: Mon, 27 Jun 2011 17:42:36 +0530
+Subject: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
+In-Reply-To: <20110627111556.GM23145@atomide.com>
+References: <1309171009-8075-1-git-send-email-premi@ti.com>
+	<20110627111556.GM23145@atomide.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7933C0@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 01:44:43PM +0200, Linus Walleij wrote:
+> -----Original Message-----
+> From: Tony Lindgren [mailto:tony at atomide.com] 
+> Sent: Monday, June 27, 2011 4:46 PM
+> To: Premi, Sanjeev
+> Cc: linux-omap at vger.kernel.org; 
+> linux-arm-kernel at lists.infradead.org; Gregoire Gentil; 
+> Bhandiwad, Hrishikesh; Jason Lam; Thomas Weber
+> Subject: Re: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
+> 
+> * Sanjeev Premi <premi@ti.com> [110627 03:33]:
+> > From: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
+> > 
+> > Present current selection of the GPTIMER on Beagleboard
+> > was result of a hardware issue in early versions of the
+> > Beagleboards (Ax and B1 thru B4). [1][2]
+> > 
+> > Its been long since the hardware issue has been fixed.
+> > This patch uses GPTIMER 1 for all newer board revisions
+> > incl. Beagleboard XM.
+> > 
+> > Also, the clock source for GPTIMER12 is much less frequency
+> > stable than clock sources for GPTIMER1. Using GPTIMER12 can
+> > result in major time skew over a fairly short interval.
+> 
+> I don't think omap3_beagle_init_rev is even called when
+> the timer is set?
 
-> Yes. To make the driver platform neutral, it needs to for example
-> provide a callback in the platform data like (* set_pin_bias) or so,
-> and then your platform has to implement this biasing.
+[sp] I verified the patch based on the print indicating that
+     GPTIMER1 being used as clockevent source.
+     http://marc.info/?l=linux-omap&m=130893319726456&w=2
 
-> In this specific case that kind of stuff would likely be preferable
-> to have in the platform anyway, but I understand what you mean.
+> 
+> But even if it was, this is not a good fix because of the
+> dependency issues it causes to mux and gpio framework in
+> omap3_beagle_rev_init.
+> 
+> The best way to fix this is to set a separate machine ID
+> for the working beagle boards like I commented earlier.
+> It allows just setting the .timer based on that, the rest
+> of the code can be shared.
 
-How about device tree usage?  I guess there we'd end up doing it by
-putting the configuration on the GPIO end of things rather than on the
-GPIO user side?
+[sp] Sorry missed reading your comment. I wasn't checking
+     mails while sending the updated patch.
+
+> 
+> Regards,
+> 
+> Tony
+> 
