@@ -1,49 +1,71 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 27 Jun 2011 16:24:01 -0600
-Subject: [RFC 1/8] drivers: add generic remoteproc framework
-In-Reply-To: <FFF198FBBF957F4393BA834040FEFFA202EE00@DFLE35.ent.ti.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-2-git-send-email-ohad@wizery.com>
-	<20110627204958.GB20865@ponder.secretlab.ca>
-	<FFF198FBBF957F4393BA834040FEFFA202EE00@DFLE35.ent.ti.com>
-Message-ID: <20110627222401.GE20865@ponder.secretlab.ca>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 27 Jun 2011 15:28:57 -0700
+Subject: [PATCH v3 11/12] OMAP2: Serial: Add has_async_wake flag.
+In-Reply-To: <BANLkTik9ZLyA4+1VMFj08Zke151OqAhATQ@mail.gmail.com> (Govindraj's
+	message of "Mon, 27 Jun 2011 18:39:54 +0530")
+References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+	<1307532194-13039-12-git-send-email-govindraj.raja@ti.com>
+	<87y60qpxcq.fsf@ti.com>
+	<BANLkTik9ZLyA4+1VMFj08Zke151OqAhATQ@mail.gmail.com>
+Message-ID: <877h86aoye.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 09:52:30PM +0000, Grosen, Mark wrote:
-> > From: Grant Likely
-> > Sent: Monday, June 27, 2011 1:50 PM
-> 
-> Grant, thanks for the feedback. I'll try to answer one of your
-> questions below and leave the rest for Ohad.
-> 
-> Mark
->  
-> > > +Every remoteproc implementation must provide these handlers:
-> > > +
-> > > +struct rproc_ops {
-> > > +	int (*start)(struct rproc *rproc, u64 bootaddr);
-> > > +	int (*stop)(struct rproc *rproc);
-> > > +};
-> > > +
-> > > +The ->start() handler takes a rproc handle and an optional bootaddr
-> > argument,
-> > > +and should power on the device and boot it (using the bootaddr
-> > argument
-> > > +if the hardware requires one).
-> > 
-> > Naive question: Why is bootaddr an argument?  Wouldn't rproc drivers
-> > keep track of the boot address in their driver private data?
->  
-> Our AMPs (remote processors) have a variety of boot mechanisms that vary
-> across the different SoCs (yes, TI likes HW diversity). In some cases, the
-> boot address is more like an entry point and that comes from the firmware,
-> so it is not a static attribute of a driver. Correct me if I misunderstood
-> your question.
+Govindraj <govindraj.ti@gmail.com> writes:
 
-More to the point, I would expect the boot_address to be a property of
-the rproc instance because it represents the configuration of the
-remote processor.  It seems odd that the caller of ->start would know
-better than the rproc driver about the entry point of the processor.
+> On Sat, Jun 25, 2011 at 5:59 AM, Kevin Hilman <khilman@ti.com> wrote:
+>> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>>
+>>> Prior to this patch the uart_clock was cut using prepare/resume calls since
+>>> these funcs are no more available with runtime changes use has_async_wake
+>>> flag to keep clock active during bootup otherwise uart port will disabled
+>>> during boot-up and cannot be enabled back.
+>>
+>> Is this only a bootup issue, or a runtime PM issue? ?It appears to me
+>> that with this patch, runtime PM is effectively disabled for the whole
+>> time.
+>>
+>
+> it boots up fine, its a runtime PM issue where there is
+> no mechanism to wakeup after clock cutting from
+> runtime autosuspend.
+>
+>
+>> Why not just use pm_runtime_disable() in _probe() for devices with no
+>> async wakeup.
+>>
+>
+> Agree.
+> can drop of this patch and bind below changes in runtime conversion patch  04/12
+>
+> do pm_runtime_enable only if device_may_wakeup
+> is true in probe.
+>
+> <<SNIP>>
+> in serial_omap_probe
+>
+> if (device_may_wakeup(&pdev->dev)) {
+> 	pm_runtime_use_autosuspend(&pdev->dev);
+> 	pm_runtime_set_autosuspend_delay(&pdev->dev,
+> 				OMAP_UART_AUTOSUSPEND_DELAY);
+> 	pm_runtime_enable(&pdev->dev);
+> 	pm_runtime_irq_safe(&pdev->dev);
+> }
 
-g.
+Well, I think only the _enable() should be conditional.
+
+>>> Also based on this flag we can disable uart port during suspend and
+>>> enable back during resume for omap_socs that have not set
+>>> has_async_wake.
+>>
+>> Then you can use pm_runtime_enable() in ->prepare() and
+>> pm_runtime_disable() in ->complete()
+>>
+>
+> u mean runtime enable in suspend and runtime disable in resume
+> if device_may_wakeup is false.
+
+No, I meant the .prepare (runs before .suspend) and .complete (runs
+after .resume) callbacks.  
+
+Kevin
