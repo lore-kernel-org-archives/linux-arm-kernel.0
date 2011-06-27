@@ -1,64 +1,40 @@
-From: wdgvip@gmail.com (daoguang wu)
-Date: Mon, 27 Jun 2011 16:57:48 +0800
-Subject: [PATCH] INPUT:Add ABS_PRESSURE input event support for
-	touchscreen driver
-In-Reply-To: <a8885a55-bf77-43d7-8491-045137aa38ee@email.android.com>
-References: <1308881738-6392-1-git-send-email-wdgvip@gmail.com>
-	<20110624124154.GC19804@sirena.org.uk>
-	<BANLkTi=O44wyaFB_B83LGiQhAVtFOp64pyhMaCKCf_YZz6b1GA@mail.gmail.com>
-	<5EB3BFCD089AD643B9BB63439F5FD5E937BB882D@SHAASIEXM01.ASIA.ROOT.PRI>
-	<a8885a55-bf77-43d7-8491-045137aa38ee@email.android.com>
-Message-ID: <BANLkTi=wU04jiOE-5GDDG9Pd4PgVnN61bTkqGfnkShHKo7iVFg@mail.gmail.com>
+From: sshtylyov@mvista.com (Sergei Shtylyov)
+Date: Mon, 27 Jun 2011 13:17:54 +0400
+Subject: [PATCH] NET: AX88796: Tighten up Kconfig dependencies
+In-Reply-To: <20110625180050.GA9620@linux-mips.org>
+References: <20110625180050.GA9620@linux-mips.org>
+Message-ID: <4E084AC2.5060908@mvista.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/27 Dmitry Torokhov <dmitry.torokhov@gmail.com>:
->
->
-> Baohua Song <Baohua.Song@csr.com> wrote:
->
->>
->>
->>> -----Original Message-----
->>> From: linux-arm-kernel-bounces at lists.infradead.org
->>> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of
->>daoguang
->>> wu
->>> Sent: 2011?6?27? 10:15
->>> To: Mark Brown
->>> Cc: kgene.kim at samsung.com; ben-linux at fluff.org;
->>> dmitry.torokhov at gmail.com; linux-kernel at vger.kernel.org;
->>> wdgvip at gamil.com; linux-input at vger.kernel.org;
->>> linux-arm-kernel at lists.infradead.org
->>> Subject: Re: [PATCH] INPUT:Add ABS_PRESSURE input event support for
->>> touchscreen driver
->>>
->>> 2011/6/24 Mark Brown <broonie@opensource.wolfsonmicro.com>:
->>> > On Fri, Jun 24, 2011 at 10:15:38AM +0800, Wu DaoGuang wrote:
->>> >> The touchscreen driver s3c2410_ts.c doesn't work well when using
->>> >> the tslib, an abstraction layer for touchscreen panel events.
->>> >> Tslib needs ABS_X ABS_Y and ABS_PRESSURE events to report, but
->>only
->>> >> the former two the driver can provide.
->>> >
->>> > It seems much more sane to fix this in tslib, the kernel is not
->>actually
->>> > reporting pressure meaningfully here and there's already BTN_TOUCH
->>to
->>> > report if the pen is down.
->>> >
->>> yeah,I will try to fix it in tslib.
->>
->>You may send a patch to tslib.
->>
->
-> This has already been fixed in tslib a couple years ago. I'm not sure if a
-> new version was cut or not.
-> --
-> Dmitry
+Hello.
 
-I try the latest tslib ,and find there is no such problem and the
-latest version of tslib  can be downloaded from
-git://github.com/kergoth/tslib.git.
+On 25-06-2011 22:00, Ralf Baechle wrote:
 
-Thanks a lot.
+> In def47c5095d53814512bb0c62ec02dfdec769db1 the AX88796 driver got
+
+    Please also specify the summary of that commit.
+
+> restricted to just be build for ARM and MIPS on the sole merrit that it
+
+    Merit?
+
+> was written for some ARM sytems and the driver had the missfortune to
+
+    Misfortune?
+
+> just build on MIPS, so MIPS was throw into the dependency for a good
+> measure.  Later 8687991a734a67f1638782c968f46fff0f94bb1f added SH but
+
+    Summary here too, please.
+
+> only one in-tree SH system actually has an AX88796.
+
+> Tighten up dependencies by using an auxilliary config sysmbol
+> HAS_NET_AX88796 which is selected only by the platforms that actually
+> have or may have an AX88796.  This also means the driver won't be built
+> anymore for any MIPS platform.
+
+> Signed-off-by: Ralf Baechle<ralf@linux-mips.org>
+
+WBR, Sergei
