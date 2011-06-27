@@ -1,105 +1,235 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 27 Jun 2011 17:06:13 +0200
-Subject: [PATCH 2/8] ARM: dma-mapping: implement dma_map_single on top of
-	dma_map_page
-In-Reply-To: <201106271653.44892.arnd@arndb.de>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<201106241724.21113.arnd@arndb.de>
-	<000a01cc34d6$9e4576e0$dad064a0$%szyprowski@samsung.com>
-	<201106271653.44892.arnd@arndb.de>
-Message-ID: <001101cc34db$c16e3850$444aa8f0$%szyprowski@samsung.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 27 Jun 2011 20:33:48 +0530
+Subject: [PATCH v3 10/12] OMAP: Serial: Use resume call from prcm to
+	enable uart
+In-Reply-To: <87aad6rc6z.fsf@ti.com>
+References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+	<1307532194-13039-11-git-send-email-govindraj.raja@ti.com>
+	<87aad6rc6z.fsf@ti.com>
+Message-ID: <BANLkTi=jyrt6+vXikdH0RdeOxEAkasigLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Sat, Jun 25, 2011 at 5:53 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> Use resume idle call from prcm_irq to enable uart_port from low power states.
+>
+> Comment is valid for OMAP3 but not for OMAP2. ?Maybe [01/12] should just
+> leave this call in for OMAP2 instead of having to add it back here?
+>
+>> Add api to check pad wakeup status which will we used from uart_resume func.
+>> to enable back uart port if a wakeup event occurred.
+>
+> s/api/API/ ?(same for PRCM, UART, int subject)
+>
+>> UART_Resume func. can be removed once we have irq_chaining functionality
+>> available.
+>
+> Have you tested removing this when using with Tero's series?
 
-On Monday, June 27, 2011 4:54 PM Arnd Bergmann wrote:
+I added Tero's v3 patch 1,2,3,4 on top of my runtime changes
 
-> On Monday 27 June 2011, Marek Szyprowski wrote:
-> > On Friday, June 24, 2011 5:24 PM Arnd Bergmann wrote:
-> >
-> > > On Monday 20 June 2011, Marek Szyprowski wrote:
-> > > > > This also breaks dmabounce when used with a highmem-enabled system
-> -
-> > > > > dmabounce refuses the dma_map_page() API but allows the
-> > > dma_map_single()
-> > > > > API.
-> > > >
-> > > > I really not sure how this change will break dma bounce code.
-> > > >
-> > > > Does it mean that it is allowed to call dma_map_single() on kmapped
-> > > > HIGH_MEM page?
-> > >
-> > > dma_map_single on a kmapped page already doesn't work, the argument
-> needs
-> > > to be inside of the linear mapping in order for virt_to_page to work.
-> >
-> > Then I got really confused.
-> >
-> > Documentation/DMA-mapping.txt says that dma_map_single() can be used only
-> > with kernel linear mapping, while dma_map_page() can be also called on
-> > HIGHMEM pages.
-> 
-> Right, this is true in general.
+console gets looped with below prints during bootup [1]
+not sure whats happening need to look into it.
 
-Ok, so I see no reasons for not implementing dma_map_single() on top of 
-dma_map_page() like it has been done in asm-generic/dma-mapping-common.h
- 
-> > Now, lets go to arch/arm/common/dmabounce.c code:
-> >
-> > dma_addr_t __dma_map_page(struct device *dev, struct page *page,
-> >                 unsigned long offset, size_t size, enum
-> dma_data_direction dir)
-> > {
-> >         dev_dbg(dev, "%s(page=%p,off=%#lx,size=%zx,dir=%x)\n",
-> >                 __func__, page, offset, size, dir);
-> >
-> >         BUG_ON(!valid_dma_direction(dir));
-> >
-> >         if (PageHighMem(page)) {
-> >                 dev_err(dev, "DMA buffer bouncing of HIGHMEM pages "
-> >                              "is not supported\n");
-> >                 return ~0;
-> >         }
-> >
-> >         return map_single(dev, page_address(page) + offset, size, dir);
-> > }
-> > EXPORT_SYMBOL(__dma_map_page);
-> >
-> > Am I right that there is something mixed here? I really don't get why
-> there is
-> > high mem check in dma_map_page implementation. dma_map_single doesn't
-> perform
-> > such check and works with kmapped highmem pages...
-> >
-> > Russell also pointed that my patch broke dma bounch with high mem enabled.
-> 
-> The version of __dma_map_page that you cited is the one used with dmabounce
-> enabled, when CONFIG_DMABOUNCE is disabled, the following version is used:
-> 
-> static inline dma_addr_t __dma_map_page(struct device *dev, struct page
-> *page,
->              unsigned long offset, size_t size, enum dma_data_direction
-> dir)
-> {
->         __dma_page_cpu_to_dev(page, offset, size, dir);
->         return pfn_to_dma(dev, page_to_pfn(page)) + offset;
-> }
-> 
-> This does not have the check, because the kernel does not need to touch
-> the kernel mapping in that case.
-> 
-> If you pass a kmapped page into dma_map_single, it should also not
-> work because of the BUG_ON in ___dma_single_cpu_to_dev -- it warns
-> you that you would end up flushing the cache for the wrong page (if any).
+[1]:
+http://pastebin.com/C55gtGhp
 
-Yes, I know that the flow is different when dma bounce is not used. Non-dma
-bounce version will still work correctly after my patch. 
+<<SNIP>>
 
-However I still don't get how my patch broke dma bounce code with HIGHMEM,
-what has been pointed by Russell...
+[    2.740692] Registering the dns_resolver key type
+[    2.746490] VFP support v0.3: implementor 41 architecture 3 part 30
+variant c rev 1
+[    2.754669] ThumbEE CPU extension supported.
+[    2.772583] irq 368, desc: c0635540, depth: 1, count: 0, unhandled: 0
+[    2.779388] ->handle_irq():  c00e494c, handle_bad_irq+0x0/0x260
+[    2.785675] ->irq_data.chip(): c067f254, no_irq_chip+0x0/0x5c
+[    2.791748] ->action():   (null)
+[    2.795166]    IRQ_NOPROBE set
+[    2.798370]  IRQ_NOREQUEST set
+[    2.801605] irq 368, desc: c0635540, depth: 1, count: 0, unhandled: 0
+[    2.808380] ->handle_irq():  c00e494c, handle_bad_irq+0x0/0x260
+[    2.814636] ->irq_data.chip(): c067f254, no_irq_chip+0x0/0x5c
+[    2.820709] ->action():   (null)
+[    2.824127]    IRQ_NOPROBE set
+[    2.827331]  IRQ_NOREQUEST set
+[    2.830566] irq 368, desc: c0635540, depth: 1, count: 0, unhandled: 0
+[    2.837371] ->handle_irq():  c00e494c, handle_bad_irq+0x0/0x260
+[    2.843627] ->irq_data.chip(): c067f254, no_irq_chip+0x0/0x5c
+[    2.849700] ->action():   (null)
 
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+<<SNIP>>
+
+--
+Thanks,
+Govindraj.R
+
+>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>> ---
+>> ?arch/arm/mach-omap2/pm24xx.c ? ? ? ? ? ? ? ? ?| ? ?2 ++
+>> ?arch/arm/mach-omap2/pm34xx.c ? ? ? ? ? ? ? ? ?| ? ?2 ++
+>> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 23 +++++++++++++++++++++++
+>> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?2 ++
+>> ?arch/arm/plat-omap/include/plat/serial.h ? ? ?| ? ?1 +
+>> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 23 +++++++++++++++++++++++
+>> ?6 files changed, 53 insertions(+), 0 deletions(-)
+>>
+>> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
+>> index c405bda..ba58a1d 100644
+>> --- a/arch/arm/mach-omap2/pm24xx.c
+>> +++ b/arch/arm/mach-omap2/pm24xx.c
+>> @@ -137,6 +137,8 @@ static void omap2_enter_full_retention(void)
+>> ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
+>> ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP_SDRC_REGADDR(SDRC_POWER));
+>>
+>> + ? ? omap_uart_resume_idle();
+>> +
+>> ?no_sleep:
+>> ? ? ? if (omap2_pm_debug) {
+>> ? ? ? ? ? ? ? unsigned long long tmp;
+>> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+>> index ac7b7f8..3997e92 100644
+>> --- a/arch/arm/mach-omap2/pm34xx.c
+>> +++ b/arch/arm/mach-omap2/pm34xx.c
+>> @@ -216,6 +216,8 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs)
+>>
+>> ? ? ? wkst = omap2_prm_read_mod_reg(module, wkst_off);
+>> ? ? ? wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
+>> +
+>> + ? ? c += omap_uart_resume_idle();
+>> ? ? ? if (wkst) {
+>> ? ? ? ? ? ? ? iclk = omap2_cm_read_mod_reg(module, iclk_off);
+>> ? ? ? ? ? ? ? fclk = omap2_cm_read_mod_reg(module, fclk_off);
+>> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
+>> index 6ac078f..4bc5914 100644
+>> --- a/arch/arm/mach-omap2/serial.c
+>> +++ b/arch/arm/mach-omap2/serial.c
+>> @@ -199,6 +199,28 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
+>> ? ? ? }
+>> ?}
+>>
+>> +/* TBD: Will be removed once we have irq-chaing mechanism */
+>
+> s/TBD/FIXME/
+>
+>> +static bool omap_uart_chk_wakeup(struct platform_device *pdev)
+>> +{
+>> + ? ? struct omap_uart_port_info *up = pdev->dev.platform_data;
+>> + ? ? struct omap_device *od;
+>> + ? ? u32 wkst = 0;
+>> + ? ? bool ret = false;
+>> +
+>> + ? ? od = to_omap_device(pdev);
+>> + ? ? if (omap_hmwod_pad_get_wakeup_status(od->hwmods[0]))
+>> + ? ? ? ? ? ? ret = true;
+>> +
+>> + ? ? /* Check for normal UART wakeup (and clear it) */
+>> + ? ? wkst = __raw_readl(up->wk_st) & up->wk_mask;
+>> + ? ? if (wkst) {
+>> + ? ? ? ? ? ? __raw_writel(wkst, up->wk_st);
+>> + ? ? ? ? ? ? ret = true;
+>> + ? ? }
+>> +
+>> + ? ? return ret;
+>> +}
+>> +
+>> ?static void omap_uart_wakeup_enable(struct platform_device *pdev, bool enable)
+>> ?{
+>> ? ? ? struct omap_uart_port_info *up = pdev->dev.platform_data;
+>> @@ -369,6 +391,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
+>> ? ? ? pdata->uartclk = OMAP24XX_BASE_BAUD * 16;
+>> ? ? ? pdata->flags = UPF_BOOT_AUTOCONF;
+>> ? ? ? pdata->enable_wakeup = omap_uart_wakeup_enable;
+>> + ? ? pdata->chk_wakeup = omap_uart_chk_wakeup;
+>> ? ? ? pdata->dma_enabled = info->dma_enabled;
+>> ? ? ? pdata->dma_rx_buf_size = info->dma_rx_buf_size;
+>> ? ? ? pdata->dma_rx_poll_rate = info->dma_rx_poll_rate;
+>> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
+>> index c5f4dd9..b5117bd 100644
+>> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
+>> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
+>> @@ -75,6 +75,7 @@ struct omap_uart_port_info {
+>> ? ? ? unsigned int ? ? ? ? ? ?auto_sus_timeout; /* Auto_suspend timeout */
+>>
+>> ? ? ? void (*enable_wakeup)(struct platform_device *, bool);
+>> + ? ? bool (*chk_wakeup)(struct platform_device *);
+>> ? ? ? void __iomem *wk_st;
+>> ? ? ? void __iomem *wk_en;
+>> ? ? ? u32 wk_mask;
+>> @@ -132,6 +133,7 @@ struct uart_omap_port {
+>> ? ? ? unsigned long ? ? ? ? ? port_activity;
+>> ? ? ? unsigned int ? ? ? ? ? ?errata;
+>> ? ? ? void (*enable_wakeup)(struct platform_device *, bool);
+>> + ? ? bool (*chk_wakeup)(struct platform_device *);
+>> ?};
+>>
+>> ?#endif /* __OMAP_SERIAL_H__ */
+>> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
+>> index ee758d4..44a42aa 100644
+>> --- a/arch/arm/plat-omap/include/plat/serial.h
+>> +++ b/arch/arm/plat-omap/include/plat/serial.h
+>> @@ -109,6 +109,7 @@ extern void omap_serial_init(void);
+>> ?extern void omap_serial_board_init(struct omap_uart_port_info *platform_data);
+>> ?extern void omap_serial_init_port(struct omap_board_data *bdata,
+>> ? ? ? ? ? ? ? struct omap_uart_port_info *platform_data);
+>> +extern u32 omap_uart_resume_idle(void);
+>> ?#endif
+>>
+>> ?#endif
+>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>> index 307b7c6..c3561dd 100644
+>> --- a/drivers/tty/serial/omap-serial.c
+>> +++ b/drivers/tty/serial/omap-serial.c
+>> @@ -43,6 +43,7 @@
+>> ?#include <plat/dmtimer.h>
+>> ?#include <plat/omap-serial.h>
+>> ?#include <plat/omap_device.h>
+>> +#include <plat/serial.h>
+>>
+>> ?static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
+>>
+>> @@ -108,6 +109,27 @@ static inline void serial_omap_port_enable(struct uart_omap_port *up)
+>> ? ? ? pm_runtime_get_sync(&up->pdev->dev);
+>> ?}
+>>
+>> +/* TBD: Should be removed once we irq-chaining mechanism in place */
+>> +u32 omap_uart_resume_idle()
+>> +{
+>> + ? ? int i;
+>> + ? ? u32 ret = 0;
+>> +
+>> + ? ? for (i = 0; i < OMAP_MAX_HSUART_PORTS; i++) {
+>> + ? ? ? ? ? ? struct uart_omap_port *up = ui[i];
+>> +
+>> + ? ? ? ? ? ? if (!up)
+>> + ? ? ? ? ? ? ? ? ? ? continue;
+>> +
+>> + ? ? ? ? ? ? if (up->chk_wakeup(up->pdev)) {
+>> + ? ? ? ? ? ? ? ? ? ? serial_omap_port_enable(up);
+>> + ? ? ? ? ? ? ? ? ? ? serial_omap_port_disable(up);
+>> + ? ? ? ? ? ? ? ? ? ? ret++;
+>> + ? ? ? ? ? ? }
+>> + ? ? }
+>> + ? ? return ret;
+>> +}
+>> +
+>> ?static void serial_omap_stop_rxdma(struct uart_omap_port *up)
+>> ?{
+>> ? ? ? if (up->uart_dma.rx_dma_used) {
+>> @@ -1392,6 +1414,7 @@ static int serial_omap_probe(struct platform_device *pdev)
+>> ? ? ? up->uart_dma.uart_base = mem->start;
+>> ? ? ? up->errata = omap_up_info->errata;
+>> ? ? ? up->enable_wakeup = omap_up_info->enable_wakeup;
+>> + ? ? up->chk_wakeup = omap_up_info->chk_wakeup;
+>>
+>> ? ? ? if (omap_up_info->dma_enabled) {
+>> ? ? ? ? ? ? ? up->uart_dma.uart_dma_tx = dma_tx->start;
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
