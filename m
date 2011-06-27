@@ -1,71 +1,171 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Jun 2011 15:28:57 -0700
-Subject: [PATCH v3 11/12] OMAP2: Serial: Add has_async_wake flag.
-In-Reply-To: <BANLkTik9ZLyA4+1VMFj08Zke151OqAhATQ@mail.gmail.com> (Govindraj's
-	message of "Mon, 27 Jun 2011 18:39:54 +0530")
+Date: Mon, 27 Jun 2011 15:41:39 -0700
+Subject: [PATCH v3 05/12] OMAP: Serial: Hold console lock for console
+	usage.
+In-Reply-To: <BANLkTi=Zcre6cXrD4bRw-K6DtPKX3=O7jA@mail.gmail.com> (Govindraj's
+	message of "Mon, 27 Jun 2011 19:05:06 +0530")
 References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-	<1307532194-13039-12-git-send-email-govindraj.raja@ti.com>
-	<87y60qpxcq.fsf@ti.com>
-	<BANLkTik9ZLyA4+1VMFj08Zke151OqAhATQ@mail.gmail.com>
-Message-ID: <877h86aoye.fsf@ti.com>
+	<1307532194-13039-6-git-send-email-govindraj.raja@ti.com>
+	<87boxmsrjt.fsf@ti.com>
+	<BANLkTi=Zcre6cXrD4bRw-K6DtPKX3=O7jA@mail.gmail.com>
+Message-ID: <878vsm99ss.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Govindraj <govindraj.ti@gmail.com> writes:
 
-> On Sat, Jun 25, 2011 at 5:59 AM, Kevin Hilman <khilman@ti.com> wrote:
+> On Sat, Jun 25, 2011 at 5:36 AM, Kevin Hilman <khilman@ti.com> wrote:
 >> "Govindraj.R" <govindraj.raja@ti.com> writes:
 >>
->>> Prior to this patch the uart_clock was cut using prepare/resume calls since
->>> these funcs are no more available with runtime changes use has_async_wake
->>> flag to keep clock active during bootup otherwise uart port will disabled
->>> during boot-up and cannot be enabled back.
+>>> Acquire console lock before enabling and writing to console-uart
+>>> to avoid any recursive prints from console write.
+>>> for ex:
+>>> ? ? ? ? --> printk
+>>> ? ? ? ? ? --> uart_console_write
+>>> ? ? ? ? ? ? --> get_sync
+>>> ? ? ? ? ? ? ? --> printk from omap_device enable
+>>> ? ? ? ? ? ? ? ? --> uart_console write
+>>>
+>>> Use RPM_SUSPENDING check to avoid below scenario during bootup
+>>> As during bootup console_lock is not available.
+>>> ? ? ? ?--> uart_add_one_port
+>>> ? ? ? ? ? ?--> console_register
+>>> ? ? ? ? ? ? ? ?--> console_lock
+>>> ? ? ? ? ? ? ? ? --> console_unlock
+>>> ? ? ? ? ? ? ? ? ? ? ?--> call_console_drivers (here yet console_lock is not released)
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? --> uart_console_write
+>>>
+>>> Acked-by: Alan Cox <alan@linux.intel.com>
+>>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>>> ---
+>>> ?drivers/tty/serial/omap-serial.c | ? 20 +++++++++++++++++++-
+>>> ?1 files changed, 19 insertions(+), 1 deletions(-)
+>>>
+>>> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
+>>> index 897416f..ee94291 100644
+>>> --- a/drivers/tty/serial/omap-serial.c
+>>> +++ b/drivers/tty/serial/omap-serial.c
+>>> @@ -1008,7 +1008,22 @@ serial_omap_console_write(struct console *co, const char *s,
+>>> ? ? ? struct uart_omap_port *up = serial_omap_console_ports[co->index];
+>>> ? ? ? unsigned long flags;
+>>> ? ? ? unsigned int ier;
+>>> - ? ? int locked = 1;
+>>> + ? ? int console_lock = 0, locked = 1;
+>>> +
+>>> + ? ? if (console_trylock())
+>>> + ? ? ? ? ? ? console_lock = 1;
 >>
->> Is this only a bootup issue, or a runtime PM issue? ?It appears to me
->> that with this patch, runtime PM is effectively disabled for the whole
->> time.
+>> So now we take the console lock on *every* console write? ?Even if the
+>> device is not about to be idled? ? This is rather over-protective, don't
+>> you think?
 >>
 >
-> it boots up fine, its a runtime PM issue where there is
-> no mechanism to wakeup after clock cutting from
-> runtime autosuspend.
+> This scenario is because of print from
+> omap_uart_console_write --> get_sync --> omap_enable_enable
+> trying to print worst activate or deactivate latency some times.
 >
+> will result in recursive print scenario.
 >
->> Why not just use pm_runtime_disable() in _probe() for devices with no
->> async wakeup.
->>
->
-> Agree.
-> can drop of this patch and bind below changes in runtime conversion patch  04/12
->
-> do pm_runtime_enable only if device_may_wakeup
-> is true in probe.
->
-> <<SNIP>>
-> in serial_omap_probe
->
-> if (device_may_wakeup(&pdev->dev)) {
-> 	pm_runtime_use_autosuspend(&pdev->dev);
-> 	pm_runtime_set_autosuspend_delay(&pdev->dev,
-> 				OMAP_UART_AUTOSUSPEND_DELAY);
-> 	pm_runtime_enable(&pdev->dev);
-> 	pm_runtime_irq_safe(&pdev->dev);
-> }
+> holding console lock will only ensure that the print from get_sync gets
+> logged to be printed later to console.
 
-Well, I think only the _enable() should be conditional.
+Yes, but my problem is you now hold a lock for *every* console write,
+even when the UART is not in the process of being enabled/disabled.
 
->>> Also based on this flag we can disable uart port during suspend and
->>> enable back during resume for omap_socs that have not set
->>> has_async_wake.
+The point is that it should only be held when you're about to disable
+the UART (or you know it's already disabled), and the point where you
+know this is exactly at the .runtime_suspend callback.
+
+>>> + ? ? /*
+>>> + ? ? ?* If console_lock is not available and we are in suspending
+>>> + ? ? ?* state then we can avoid the console usage scenario
 >>
->> Then you can use pm_runtime_enable() in ->prepare() and
->> pm_runtime_disable() in ->complete()
+>> s/in suspending state/runtime suspending/
+>
+> ok.
+>
+>>
+>>> + ? ? ?* as this may introduce recursive prints.
+>>> + ? ? ?* Basically this scenario occurs during boot while
+>>> + ? ? ?* printing debug bootlogs.
+>>
+>> The exact scenario for triggering this still not well described, and
+>> thus still I don't get it.
 >>
 >
-> u mean runtime enable in suspend and runtime disable in resume
-> if device_may_wakeup is false.
+> scenario is same as said above.
 
-No, I meant the .prepare (runs before .suspend) and .complete (runs
-after .resume) callbacks.  
+Which as I said, is not well described.
+
+> omap_uart_console_write --> get_sync --> omap_device
+>
+> printk worst activate latency calls omap_uart_console write.
+>
+> after boot up we have access to console lock,
+> but during boot up we don't have console lock available
+> and results in printk recursiveness.
+
+Then leave UART runtime PM disabled during bootup.
+
+>> I still don't fully understand this problem,
+>
+> basically its due to recursive printk during bootup
+> and also after bootup as said above.
+
+You've said all of these things, but are mixing them together in a way
+that is very difficult to understand.
+
+Please separate out the boot-up problem from the recursive write problem
+and make 2 separate patches with two separate descriptive changelogs for
+them.
+
+>> but if it's isolated to
+>> runtime suspending, maybe you need a console lock in the runtime_suspend
+>> path (like you already have in the static suspend path.)
+>
+> console_lock in runtime_suspend will not help
+> during bootup 
+
+I understand it wont help when the console lock has not been
+initialized, and this is a separate problem (and needs a separate fix),
+but...
+
+> and due to printk emerging out from omap_device enable after system
+> bootup.
+
+Why doesn't a printk after an omap_device *enable* work?  The UART
+should be enabled by that point.
+ 
+In any case, the omap_device_enable is the result of a runtime PM
+request, so the locking for this problem should be handled in the
+runtime PM callbacks.
+
+>
+>>
+>>> + ? ? ?*/
+>>> +
+>>> + ? ? if (!console_lock &&
+>>> + ? ? ? ? ? ? up->pdev->dev.power.runtime_status == RPM_SUSPENDING)
+>>> + ? ? ? ? ? ? return;
+>>
+>> Assuming this was a printk, it's now lost, right? ? Not sure that's an
+>> acceptable solution.
+>>
+>
+> AFAIK it gets logged prints later.
+
+How will it get written later?  There is no return value to this
+function, so he caller can't know if it has succeeded or failed, so it
+obviously assumes that the data was written to the UART.
+
+> to summarize holding console lock helps after bootup
+> since during boot up console lock is not available need to use
+> above runtime_status check.
+
+The point is you've fixed a small problem with a very big-hammer
+solution.
+
+The problem you have occurs because of two different causes that need
+two different well-targeted solutions.
 
 Kevin
