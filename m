@@ -1,103 +1,106 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 27 Jun 2011 17:12:08 -0300
-Subject: [PATCH 1/4] ARM: mx53: Add support for missing UARTs
-Message-ID: <1309205531-18103-1-git-send-email-fabio.estevam@freescale.com>
+From: gilles.chanteperdrix@xenomai.org (Gilles Chanteperdrix)
+Date: Mon, 27 Jun 2011 22:17:01 +0200
+Subject: IRQS off tracer - is it useful or not?
+In-Reply-To: <20110627165423.GA6222@n2100.arm.linux.org.uk>
+References: <20110625132112.GH23234@n2100.arm.linux.org.uk>	<4E08AF23.2060901@codeaurora.org>
+	<20110627165423.GA6222@n2100.arm.linux.org.uk>
+Message-ID: <4E08E53D.4050209@xenomai.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MX53 has five UART ports.
+On 06/27/2011 06:54 PM, Russell King - ARM Linux wrote:
+> On Mon, Jun 27, 2011 at 09:26:11AM -0700, Stephen Boyd wrote:
+>> On 6/25/2011 6:21 AM, Russell King - ARM Linux wrote:
+>>> I've just been looking at the IRQS off tracer for the first time.  I'm
+>>> getting output such as:
+>>>
+>>>   <idle>-0       0d.s3    0us!: _raw_spin_lock_irqsave <-_raw_spin_lock_irqsave
+>>>   <idle>-0       0dNs4 1709us+: _raw_spin_unlock_irqrestore <-_raw_spin_unlock_irqrestore
+>>>   <idle>-0       0dNs4 1770us : time_hardirqs_on <-_raw_spin_unlock_irqrestore
+>>>   <idle>-0       0dNs4 1770us : <stack trace>
+>>>
+>>> from it, which doesn't seem to be very useful.  Figuring out that it
+>>> may be because the EABI unwinder doesn't work too well with my toolchain,
+>>> I decided to try going for the more reliable frame pointer stuff.  This
+>>> gives me:
+>>>
+>>> kjournal-423     0d.s4    0us : trace_hardirqs_on <-_raw_spin_unlock_irq
+>>> kjournal-423     0d.s4    0us : time_hardirqs_on <-_raw_spin_unlock_irq
+>>> kjournal-423     0d.s3    0us!: trace_hardirqs_off <-_raw_spin_lock_irqsave
+>>> kjournal-423     0d.s4 1709us+: trace_hardirqs_on <-_raw_spin_unlock_irqrestore
+>>> kjournal-423     0d.s4 1770us : time_hardirqs_on <-_raw_spin_unlock_irqrestore
+>>> kjournal-423     0d.s4 1770us : <stack trace>
+>>>  => time_hardirqs_on
+>>>  => trace_hardirqs_on_caller
+>>>  => trace_hardirqs_on
+>>>  => _raw_spin_unlock_irqrestore
+>>>  => cfq_idle_slice_timer
+>>>  => run_timer_softirq
+>>>  => __do_softirq
+>>>  => irq_exit
+>>>
+>>> which is no better.  It's telling me that {trace,time}_hardirqs_o{n,ff} is
+>>> involved is absurd - of course that function is involved, because that's
+>>> how these events are reported and that detail is just not interesting.
+>>> And yet again, we still don't get to find out where IRQs were disabled.
+>>
+>> Is ftrace enabled (/proc/sys/kernel/ftrace_enabled)? If it is you should
+>> a least see the functions that were called while irqs were off.
+>>
+>> There should also be a
+>>
+>>  => started at: func_irq_off
+>>  => ended at:  func_irq_on
+>>
+>> near the top of the latency trace although it may not be entirely useful
+>> unless spinlocks are inlined. Perhaps we should start inlining spinlocks?
+> 
+> I tried enabling ftrace too, and while that improved things, it also
+> made the latency results unbelievable.
+> 
+> 1. ftrace didn't log entry into every function in paths - some were
+> skipped despite there being an mcount call.
+> 2. (and this is the more serious) the overhead of ftrace is _far_ too
+> large to draw any meaningful conclusions from the results.
+> 
+> Are IRQs really disabled for 3ms on OMAP - does it really take 120us
+> to get into an interrupt handler through all the NO_HZ stuff - does it
+> really take 250us to do a few writes to the DMA controller?
 
-Add support for the missing UART4 and UART5 ports.
+Hi Russell,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/mach-mx5/clock-mx51-mx53.c           |   10 ++++++++++
- arch/arm/mach-mx5/crm_regs.h                  |    2 ++
- arch/arm/plat-mxc/devices/platform-imx-uart.c |    2 ++
- arch/arm/plat-mxc/include/mach/mx53.h         |    4 ++--
- 4 files changed, 16 insertions(+), 2 deletions(-)
+Maybe this post is off-topic, but I worked on reducing latencies on
+omap3 with xenomai. Most paths are common with Linux, maybe this could
+be of interest for this list. The reasons for big latencies with xenomai
+on omap3 were:
+- the gpio masking/acking function calls nesting, this can be reduced by
+inlining some functions, especially when not compiling for multiple
+omaps (but my guess is that if you want the lowest latency, you are not
+going to compile for all the omaps anyway);
+- the gpio demuxing, which is one big irqs off section, this can be
+reduced by re-enabling irqs in the middle of it;
+- the gptimer 0/1 programming latency, this can be reduced by using
+other gptimer, and configuring the timer used as clockevent to be "non
+posted".
 
-diff --git a/arch/arm/mach-mx5/clock-mx51-mx53.c b/arch/arm/mach-mx5/clock-mx51-mx53.c
-index 4fb63d9..789c6cf 100644
---- a/arch/arm/mach-mx5/clock-mx51-mx53.c
-+++ b/arch/arm/mach-mx5/clock-mx51-mx53.c
-@@ -1254,12 +1254,20 @@ DEFINE_CLOCK(uart2_ipg_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG5_OFFSET,
- 	NULL,  NULL, &ipg_clk, &aips_tz1_clk);
- DEFINE_CLOCK(uart3_ipg_clk, 2, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG7_OFFSET,
- 	NULL,  NULL, &ipg_clk, &spba_clk);
-+DEFINE_CLOCK(uart4_ipg_clk, 3, MXC_CCM_CCGR7, MXC_CCM_CCGRx_CG4_OFFSET,
-+	NULL,  NULL, &ipg_clk, &spba_clk);
-+DEFINE_CLOCK(uart5_ipg_clk, 4, MXC_CCM_CCGR7, MXC_CCM_CCGRx_CG6_OFFSET,
-+	NULL,  NULL, &ipg_clk, &spba_clk);
- DEFINE_CLOCK(uart1_clk, 0, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG4_OFFSET,
- 	NULL,  NULL, &uart_root_clk, &uart1_ipg_clk);
- DEFINE_CLOCK(uart2_clk, 1, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG6_OFFSET,
- 	NULL,  NULL, &uart_root_clk, &uart2_ipg_clk);
- DEFINE_CLOCK(uart3_clk, 2, MXC_CCM_CCGR1, MXC_CCM_CCGRx_CG8_OFFSET,
- 	NULL,  NULL, &uart_root_clk, &uart3_ipg_clk);
-+DEFINE_CLOCK(uart4_clk, 3, MXC_CCM_CCGR7, MXC_CCM_CCGRx_CG5_OFFSET,
-+	NULL,  NULL, &uart_root_clk, &uart4_ipg_clk);
-+DEFINE_CLOCK(uart5_clk, 4, MXC_CCM_CCGR7, MXC_CCM_CCGRx_CG7_OFFSET,
-+	NULL,  NULL, &uart_root_clk, &uart5_ipg_clk);
- 
- /* GPT */
- DEFINE_CLOCK(gpt_ipg_clk, 0, MXC_CCM_CCGR2, MXC_CCM_CCGRx_CG10_OFFSET,
-@@ -1464,6 +1472,8 @@ static struct clk_lookup mx53_lookups[] = {
- 	_REGISTER_CLOCK("imx-uart.0", NULL, uart1_clk)
- 	_REGISTER_CLOCK("imx-uart.1", NULL, uart2_clk)
- 	_REGISTER_CLOCK("imx-uart.2", NULL, uart3_clk)
-+	_REGISTER_CLOCK("imx-uart.3", NULL, uart4_clk)
-+	_REGISTER_CLOCK("imx-uart.4", NULL, uart5_clk)
- 	_REGISTER_CLOCK(NULL, "gpt", gpt_clk)
- 	_REGISTER_CLOCK("fec.0", NULL, fec_clk)
- 	_REGISTER_CLOCK(NULL, "iim_clk", iim_clk)
-diff --git a/arch/arm/mach-mx5/crm_regs.h b/arch/arm/mach-mx5/crm_regs.h
-index 87c0c58..5e11ba7 100644
---- a/arch/arm/mach-mx5/crm_regs.h
-+++ b/arch/arm/mach-mx5/crm_regs.h
-@@ -114,6 +114,8 @@
- #define MXC_CCM_CCGR4		(MX51_CCM_BASE + 0x78)
- #define MXC_CCM_CCGR5		(MX51_CCM_BASE + 0x7C)
- #define MXC_CCM_CCGR6		(MX51_CCM_BASE + 0x80)
-+#define MXC_CCM_CCGR7		(MX51_CCM_BASE + 0x84)
-+
- #define MXC_CCM_CMEOR		(MX51_CCM_BASE + 0x84)
- 
- /* Define the bits in register CCR */
-diff --git a/arch/arm/plat-mxc/devices/platform-imx-uart.c b/arch/arm/plat-mxc/devices/platform-imx-uart.c
-index 3c854c2..cfce8c9 100644
---- a/arch/arm/plat-mxc/devices/platform-imx-uart.c
-+++ b/arch/arm/plat-mxc/devices/platform-imx-uart.c
-@@ -123,6 +123,8 @@ const struct imx_imx_uart_1irq_data imx53_imx_uart_data[] __initconst = {
- 	imx53_imx_uart_data_entry(0, 1),
- 	imx53_imx_uart_data_entry(1, 2),
- 	imx53_imx_uart_data_entry(2, 3),
-+	imx53_imx_uart_data_entry(3, 4),
-+	imx53_imx_uart_data_entry(4, 5),
- };
- #endif /* ifdef CONFIG_SOC_IMX53 */
- 
-diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
-index e14a4f0..7b54eb6 100644
---- a/arch/arm/plat-mxc/include/mach/mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/mx53.h
-@@ -241,7 +241,7 @@
- #define MX53_INT_IPU_ERR	10
- #define MX53_INT_IPU_SYN	11
- #define MX53_INT_GPU	12
--#define MX53_INT_RESV13	13
-+#define MX53_INT_UART4	13
- #define MX53_INT_USB_H1	14
- #define MX53_INT_EMI	15
- #define MX53_INT_USB_H2	16
-@@ -314,7 +314,7 @@
- #define MX53_INT_CAN2	83
- #define MX53_INT_GPU2_IRQ	84
- #define MX53_INT_GPU2_BUSY	85
--#define MX53_INT_RESV86	86
-+#define MX53_INT_UART5	86
- #define MX53_INT_FEC	87
- #define MX53_INT_OWIRE	88
- #define MX53_INT_CTI1_TG2	89
+On omap4, the reasons for high latencies (on 2.6.37, sorry, may be
+outdated) are:
+- gic mask/ack handlers which take a spinlock then call writel, which
+ends up with a call to outer_clean, which takes another spinlock. Solved
+by usin a writel_relaxed, and remove the spinlock for mask and ack, and
+also implement the mask_ack callback to avoid a function call by
+address, which ends up calling two other functions by address, which
+take two spinlocks, etc...
+- the l2 cache flushes in general, protected by a spinlock, currently
+unsolved.
+- the gptimer again, but here, we have another clocksource, the cortex
+a9 global timer (but maybe not usable with CONFIG_PM?).
+- the twd had a lot of early shots because the frequency calibration was
+too imprecise (503.6 MHz instead of 504MHz on the board I have), this is
+solved by the patches relying on clock frequency instead.
+
+Regards.
+
+
 -- 
-1.6.0.4
+                                                                Gilles.
