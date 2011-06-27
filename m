@@ -1,53 +1,31 @@
-From: abbatemp@gmail.com (Mark Abbate)
-Date: Mon, 27 Jun 2011 15:14:51 -0700
-Subject: Mark Abbate wants to chat
-Message-ID: <BANLkTim0XvKAXYV8Hwmjs39d2VFq_1n-Bw@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Mon, 27 Jun 2011 15:15:18 -0700
+Subject: [PATCH v4 00/18] I2C: OMAP: I2C fixes, removal of cpu_is...
+	from driver
+In-Reply-To: <1309212726.6231.14.camel@vence>
+References: <1306973984-15165-1-git-send-email-khilman@ti.com>
+	<20110615213637.GH15795@trinity.fluff.org>  <87k4cm1xgj.fsf@ti.com>
+	<1309212726.6231.14.camel@vence>
+Message-ID: <1309212918.6231.16.camel@vence>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
------------------------------------------------------------------------
+On Mon, 2011-06-27 at 15:12 -0700, Kevin Hilman wrote:
 
-Mark Abbate wants to stay in better touch using some of Google's coolest new
-products.
+> Ping.  I don't see this in linux-next yet.
+> 
+> Are you planning to queue this for v3.1?
+> 
 
-If you already have Gmail or Google Talk, visit:
-http://mail.google.com/mail/b-be8e79fba6-4813e1cd6a-1CiqQNpibfMdg4wv_In589mIdhI
-You'll need to click this link to be able to chat with Mark Abbate.
+Oops, pushed send too soon on this...
 
-To get Gmail - a free email account from Google with over 2,800 megabytes of
-storage - and chat with Mark Abbate, visit:
-http://mail.google.com/mail/a-be8e79fba6-4813e1cd6a-1CiqQNpibfMdg4wv_In589mIdhI
+As this series touches various data files in arch/arm/mach-omap2/* and
+we have a handful of other changes to that data for this merge window, I
+think it would be better for conflict avoidance if this series is merged
+via Tony's linux-omap tree.
 
-Gmail offers:
-- Instant messaging right inside Gmail
-- Powerful spam protection
-- Built-in search for finding your messages and a helpful way of organizing
-  emails into "conversations"
-- No pop-up ads or untargeted banners - just text ads and related information
-  that are relevant to the content of your messages
-
-All this, and its yours for free. But wait, there's more! By opening a Gmail
-account, you also get access to Google Talk, Google's instant messaging
-service:
-
-http://www.google.com/talk/
-
-Google Talk offers:
-- Web-based chat that you can use anywhere, without a download
-- A contact list that's synchronized with your Gmail account
-- Free, high quality PC-to-PC voice calls when you download the Google Talk
-  client
-
-We're working hard to add new features and make improvements, so we might also
-ask for your comments and suggestions periodically. We appreciate your help in
-making our products even better!
+With your Ack, we'll merge it via OMAP.
 
 Thanks,
-The Google Team
 
-To learn more about Gmail and Google Talk, visit:
-http://mail.google.com/mail/help/about.html
-http://www.google.com/talk/about.html
-
-(If clicking the URLs in this message does not work, copy and paste them into
-the address bar of your browser).
+Kevin
