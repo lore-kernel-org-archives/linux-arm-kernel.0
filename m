@@ -1,43 +1,32 @@
-From: shawn.guo@freescale.com (Shawn Guo)
-Date: Mon, 27 Jun 2011 12:23:46 +0800
-Subject: [PATCH v4 0/4] Extend sdhci-esdhc-imx card_detect and
-	write_protect support for mx5
-In-Reply-To: <m27h88djf6.fsf@bob.laptop.org>
-References: <1308667311-1855-1-git-send-email-shawn.guo@linaro.org>
-	<20110627013826.GB21415@S2100-06.ap.freescale.net>
-	<m27h88djf6.fsf@bob.laptop.org>
-Message-ID: <20110627042345.GA21757@S2100-06.ap.freescale.net>
+From: minipli@googlemail.com (Mathias Krause)
+Date: Mon, 27 Jun 2011 06:29:12 +0200
+Subject: [PATCH] arm, exec: remove redundant set_fs(USER_DS)
+In-Reply-To: <BANLkTimFL44XRDeA6z6pvKGw-zpcdsNUEw@mail.gmail.com>
+References: <BANLkTiknCeAxe30MJdVTxDom+ko8+EDQ4A@mail.gmail.com>
+	<1307642718-22257-1-git-send-email-minipli@googlemail.com>
+	<20110609155630.0f734351.akpm@linux-foundation.org>
+	<1307711337-4042-1-git-send-email-minipli@googlemail.com>
+	<20110610134821.GL24424@n2100.arm.linux.org.uk>
+	<BANLkTimFL44XRDeA6z6pvKGw-zpcdsNUEw@mail.gmail.com>
+Message-ID: <BANLkTikzPx8rTa9YSqccXA+zjM0YNJmyOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2011 at 11:47:57PM -0400, Chris Ball wrote:
-> Hi Shawn,
-> 
-> On Sun, Jun 26 2011, Shawn Guo wrote: 
-> >>  arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |    3 +-
-> >>  arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |    3 +-
-> >>  arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
-> >>  arch/arm/mach-imx/mach-pcm043.c                    |    2 +
-> >>  arch/arm/mach-mx5/board-mx51_babbage.c             |   14 +-
-> >>  arch/arm/mach-mx5/board-mx53_loco.c                |    4 +
-> >>  .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   12 ++
-> >>  arch/arm/plat-mxc/include/mach/esdhc.h             |   25 +++-
-> >>  drivers/mmc/host/sdhci-esdhc-imx.c                 |  140 ++++++++++++--------
-> >>  drivers/mmc/host/sdhci.c                           |   29 ++++-
-> >>  10 files changed, 165 insertions(+), 69 deletions(-)
-> >
-> > Is the series ready for being merged?  Or is there anything needs
-> > to be done before you do so?
-> 
-> I'll need to rebase mmc-next onto linux-next before I can merge it,
-> because the mach-imx/ board files you're modifying do not exist in
-> Linus' tree.  (I don't mind doing that, but it might be easier if
-> you had the ARM patches go in via a different tree instead.)
-> 
-I can ask Sascha to pick up patch #4 with your ack.  But the problem
-is patch #4 has to work with #1 applied first, otherwise the CD
-interrupt storm will freeze the system.
+On Fri, Jun 10, 2011 at 3:53 PM, Mathias Krause <minipli@googlemail.com> wrote:
+> On Fri, Jun 10, 2011 at 3:48 PM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+>> On Fri, Jun 10, 2011 at 03:08:57PM +0200, Mathias Krause wrote:
+>>> The address limit is already set in flush_old_exec() so this
+>>> set_fs(USER_DS) is redundant.
+>>
+>> Please show where and how this is done. ?I've looked and can't see
+>> any equivalent call to set_fs() in flush_old_exec().
+>
+> Before dac853a (exec: delay address limit change until point of no
+> return) it was done in search_binary_handler(), now it is done in
+> flush_old_exec(). Either way set_fs(USER_DS) was/gets called before
+> start_thread() so the call there is redundant.
 
--- 
-Regards,
-Shawn
+Russell, any new opinion on this?
+
+Mathias
