@@ -1,31 +1,44 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 27 Jun 2011 14:37:32 +0200
-Subject: [PATCH 0/2] RFC: gpio: driver-local pin configuration
-In-Reply-To: <20110627120256.GA19531@opensource.wolfsonmicro.com>
-References: <1307695731-28018-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTinxptCJRETreCpUoV-nU2K4fuFcmQ@mail.gmail.com>
-	<BANLkTimMSChGFUSnFWFHv3nNUca_Fyawaw@mail.gmail.com>
-	<20110627120256.GA19531@opensource.wolfsonmicro.com>
-Message-ID: <BANLkTikpMdakfTU+RRsXQVnpO4-KGkOGJQ@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Jun 2011 05:37:55 -0700
+Subject: [PATCH] Use MMIO clocksource for 32kHz counter
+In-Reply-To: <20110627123315.GB1777@n2100.arm.linux.org.uk>
+References: <20110627123315.GB1777@n2100.arm.linux.org.uk>
+Message-ID: <20110627123754.GQ23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 2:02 PM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
-> On Mon, Jun 27, 2011 at 01:44:43PM +0200, Linus Walleij wrote:
->
->> Yes. To make the driver platform neutral, it needs to for example
->> provide a callback in the platform data like (* set_pin_bias) or so,
->> and then your platform has to implement this biasing.
->
->> In this specific case that kind of stuff would likely be preferable
->> to have in the platform anyway, but I understand what you mean.
->
-> How about device tree usage? ?I guess there we'd end up doing it by
-> putting the configuration on the GPIO end of things rather than on the
-> GPIO user side?
+* Russell King - ARM Linux <linux@arm.linux.org.uk> [110627 05:28]:
+> --- a/arch/arm/plat-omap/counter_32k.c
+> +++ b/arch/arm/plat-omap/counter_32k.c
+> +#ifdef CONFIG_ARCH_OMAP16XX
+> +		else if (cpu_is_omap16xx())
+> +			base = OMAP2_L4_IO_ADDRESS(OMAP16XX_TIMER_32K_SYNCHRONIZED);
+> +#endif
+> +#ifdef CONFIG_SOC_OMAP2420
+>  		else if (cpu_is_omap2420())
+> -			clocksource_32k.read = omap2420_32k_read;
+> +			base = OMAP2_L4_IO_ADDRESS(OMAP2420_32KSYNCT_BASE + 0x10);
+> +#endif
+> +#ifdef CONFIG_SOC_OMAP2430
+>  		else if (cpu_is_omap2430())
+> -			clocksource_32k.read = omap2430_32k_read;
+> +			base = OMAP2_L4_IO_ADDRESS(OMAP2430_32KSYNCT_BASE + 0x10);
+> +#endif
+> +#ifdef CONFIG_ARCH_OMAP3
+>  		else if (cpu_is_omap34xx())
+> -			clocksource_32k.read = omap34xx_32k_read;
+> +			base = OMAP2_L4_IO_ADDRESS(OMAP3430_32KSYNCT_BASE + 0x10);
+> +#endif
+> +#ifdef CONFIG_ARCH_OMAP4
+>  		else if (cpu_is_omap44xx())
+> -			clocksource_32k.read = omap44xx_32k_read;
+> +			base = OMAP2_L4_IO_ADDRESS(OMAP4430_32KSYNCT_BASE + 0x10);
+> +#endif
+>  		else
+>  			return -ENODEV;
+>  
 
-Sorry I can't quite understand that, please elaborate!
+You should be able to replace the above with just ioremap as we now
+have the static mappings.
 
-Thanks,
-Linus Walleij
+Tony
