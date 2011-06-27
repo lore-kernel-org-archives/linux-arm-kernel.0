@@ -1,53 +1,46 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Mon, 27 Jun 2011 18:58:54 +0530
-Subject: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
-In-Reply-To: <20110627123140.GP23145@atomide.com>
-References: <1309171009-8075-1-git-send-email-premi@ti.com>
-	<20110627111556.GM23145@atomide.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D7933C0@dbde02.ent.ti.com>
-	<20110627123140.GP23145@atomide.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D793464@dbde02.ent.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jun 2011 14:27:35 +0100
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <20110627125306.GA30646@doriath.ww600.siemens.net>
+References: <20110627125306.GA30646@doriath.ww600.siemens.net>
+Message-ID: <20110627132735.GE16103@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com] 
-> Sent: Monday, June 27, 2011 6:02 PM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Gregoire Gentil; 
-> Bhandiwad, Hrishikesh; Jason Lam; Thomas Weber
-> Subject: Re: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
+On Mon, Jun 27, 2011 at 04:53:06PM +0400, Dmitry Eremin-Solenikov wrote:
+> I've got into a problem when trying to debug irq handlers on PXA (in
+> qemu). backtrace is really strange from my POV (a target is just a qemu
+> running a bit modified 3.0-rc2 kernel):
+...
+> Breakpoint 1, handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+> 329		mask_ack_irq(desc);
+> (gdb) bt
+> #0  handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+> #1  0xc0085f64 in generic_handle_irq_desc (irq=42) at include/linux/irqdesc.h:111
+> #2  generic_handle_irq (irq=42) at kernel/irq/irqdesc.c:304
+> #3  0xc0033060 in asm_do_IRQ (irq=42, regs=<value optimized out>) at arch/arm/kernel/irq.c:90
+> #4  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #5  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #6  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #7  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #8  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #9  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #10 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #11 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> #12 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
 > 
-> * Premi, Sanjeev <premi@ti.com> [110627 05:08]:
-> > > From: Tony Lindgren [mailto:tony at atomide.com] 
-> > > 
-> > > I don't think omap3_beagle_init_rev is even called when
-> > > the timer is set?
-> > 
-> > [sp] I verified the patch based on the print indicating that
-> >      GPTIMER1 being used as clockevent source.
-> >      http://marc.info/?l=linux-omap&m=130893319726456&w=2
-> 
-> I suspect the test always fails though, so it probably never
-> gets set to gptimer12 on any board :)
->
+> ... and so on it continues ad infinitum. Is it the expected behaviour?
+> Because I'm pretty much sure that this isn't a desired behaviour.
 
-[sp] While I take my time understanding things on devel-timer;
-     I had a quick question - at risk of being flamed.
+My guess is that gdb is trying to unwind using the unwind information.
+However, I don't think we actually give the assembler the full information
+to be able to unwind this.  I've no idea how to solve this as I'm no
+expert at the debug info.
 
-     Adding a new machine ID would trickle to u-boot and same
-     uImage (default) may not work across board revisions.
+We _really_ _do_ want to unwind through this so that we can see the
+parent kernel context information in backtraces - and the fact that
+the kernel itself can unwind through these means we can't tell the
+unwinder not to.
 
-     How does this scheme look like:
-     - GPTIMER1 is used as default - as it works for most boards.
-     - GPTIMER12 is used based on a static config option OR a
-       board specific bootarg
-
-     I know both these options aren't general practice. Still
-     wanted to know your views in the current context.
-
-~sanjeev
-
-> Tony
->
+So, no idea.  I think you need someone who knows debug info to sort
+this one out.
