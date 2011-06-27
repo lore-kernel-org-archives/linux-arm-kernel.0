@@ -1,57 +1,41 @@
-From: Baohua.Song@csr.com (Baohua Song)
-Date: Mon, 27 Jun 2011 03:05:32 +0000
-Subject: [PATCH] INPUT:Add ABS_PRESSURE input event support for
-	touchscreen driver
-In-Reply-To: <BANLkTi=O44wyaFB_B83LGiQhAVtFOp64pyhMaCKCf_YZz6b1GA@mail.gmail.com>
-References: <1308881738-6392-1-git-send-email-wdgvip@gmail.com>
-	<20110624124154.GC19804@sirena.org.uk>
-	<BANLkTi=O44wyaFB_B83LGiQhAVtFOp64pyhMaCKCf_YZz6b1GA@mail.gmail.com>
-Message-ID: <5EB3BFCD089AD643B9BB63439F5FD5E937BB882D@SHAASIEXM01.ASIA.ROOT.PRI>
+From: cjb@laptop.org (Chris Ball)
+Date: Sun, 26 Jun 2011 23:47:57 -0400
+Subject: [PATCH v4 0/4] Extend sdhci-esdhc-imx card_detect and
+	write_protect support for mx5
+In-Reply-To: <20110627013826.GB21415@S2100-06.ap.freescale.net> (Shawn Guo's
+	message of "Mon, 27 Jun 2011 09:38:27 +0800")
+References: <1308667311-1855-1-git-send-email-shawn.guo@linaro.org>
+	<20110627013826.GB21415@S2100-06.ap.freescale.net>
+Message-ID: <m27h88djf6.fsf@bob.laptop.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Shawn,
 
+On Sun, Jun 26 2011, Shawn Guo wrote: 
+>>  arch/arm/mach-imx/eukrea_mbimxsd25-baseboard.c     |    3 +-
+>>  arch/arm/mach-imx/eukrea_mbimxsd35-baseboard.c     |    3 +-
+>>  arch/arm/mach-imx/mach-mx25_3ds.c                  |    2 +
+>>  arch/arm/mach-imx/mach-pcm043.c                    |    2 +
+>>  arch/arm/mach-mx5/board-mx51_babbage.c             |   14 +-
+>>  arch/arm/mach-mx5/board-mx53_loco.c                |    4 +
+>>  .../plat-mxc/devices/platform-sdhci-esdhc-imx.c    |   12 ++
+>>  arch/arm/plat-mxc/include/mach/esdhc.h             |   25 +++-
+>>  drivers/mmc/host/sdhci-esdhc-imx.c                 |  140 ++++++++++++--------
+>>  drivers/mmc/host/sdhci.c                           |   29 ++++-
+>>  10 files changed, 165 insertions(+), 69 deletions(-)
+>
+> Is the series ready for being merged?  Or is there anything needs
+> to be done before you do so?
 
-> -----Original Message-----
-> From: linux-arm-kernel-bounces at lists.infradead.org
-> [mailto:linux-arm-kernel-bounces at lists.infradead.org] On Behalf Of daoguang
-> wu
-> Sent: 2011?6?27? 10:15
-> To: Mark Brown
-> Cc: kgene.kim at samsung.com; ben-linux at fluff.org;
-> dmitry.torokhov at gmail.com; linux-kernel at vger.kernel.org;
-> wdgvip at gamil.com; linux-input at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH] INPUT:Add ABS_PRESSURE input event support for
-> touchscreen driver
-> 
-> 2011/6/24 Mark Brown <broonie@opensource.wolfsonmicro.com>:
-> > On Fri, Jun 24, 2011 at 10:15:38AM +0800, Wu DaoGuang wrote:
-> >> The touchscreen driver s3c2410_ts.c doesn't work well when using
-> >> the tslib, an abstraction layer for touchscreen panel events.
-> >> Tslib needs ABS_X ABS_Y and ABS_PRESSURE events to report, but only
-> >> the former two the driver can provide.
-> >
-> > It seems much more sane to fix this in tslib, the kernel is not actually
-> > reporting pressure meaningfully here and there's already BTN_TOUCH to
-> > report if the pen is down.
-> >
-> yeah,I will try to fix it in tslib.
+I'll need to rebase mmc-next onto linux-next before I can merge it,
+because the mach-imx/ board files you're modifying do not exist in
+Linus' tree.  (I don't mind doing that, but it might be easier if
+you had the ARM patches go in via a different tree instead.)
 
-You may send a patch to tslib. 
+Thanks,
 
-> Thanks a lot.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
->  To report this email as spam click
-> https://www.mailcontrol.com/sr/wQw0zmjPoHdJTZGyOCrrhg==
-> t4zoc+!n!INSV2C4qhUHSr1YUlPAL0C6yBmfTIRMbBnxawg== .
-
-
-Member of the CSR plc group of companies. CSR plc registered in England and Wales, registered number 4187346, registered office Churchill House, Cambridge Business Park, Cowley Road, Cambridge, CB4 0WZ, United Kingdom
-More information can be found at www.csr.com. Follow CSR on Twitter at http://twitter.com/CSR_PLC and read our blog at www.csr.com/blog
+- Chris.
+-- 
+Chris Ball   <cjb@laptop.org>   <http://printf.net/>
+One Laptop Per Child
