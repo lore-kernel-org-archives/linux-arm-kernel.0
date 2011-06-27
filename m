@@ -1,46 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Jun 2011 14:27:35 +0100
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <20110627125306.GA30646@doriath.ww600.siemens.net>
-References: <20110627125306.GA30646@doriath.ww600.siemens.net>
-Message-ID: <20110627132735.GE16103@n2100.arm.linux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 27 Jun 2011 15:30:59 +0200
+Subject: [PATCH 7/8] common: dma-mapping: change alloc/free_coherent method
+	to more generic alloc/free_attrs
+In-Reply-To: <201106271522.05486.arnd@arndb.de>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<201106241751.35655.arnd@arndb.de>
+	<000701cc34c5$0c50b800$24f22800$%szyprowski@samsung.com>
+	<201106271522.05486.arnd@arndb.de>
+Message-ID: <000801cc34ce$739df1e0$5ad9d5a0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 04:53:06PM +0400, Dmitry Eremin-Solenikov wrote:
-> I've got into a problem when trying to debug irq handlers on PXA (in
-> qemu). backtrace is really strange from my POV (a target is just a qemu
-> running a bit modified 3.0-rc2 kernel):
-...
-> Breakpoint 1, handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
-> 329		mask_ack_irq(desc);
-> (gdb) bt
-> #0  handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
-> #1  0xc0085f64 in generic_handle_irq_desc (irq=42) at include/linux/irqdesc.h:111
-> #2  generic_handle_irq (irq=42) at kernel/irq/irqdesc.c:304
-> #3  0xc0033060 in asm_do_IRQ (irq=42, regs=<value optimized out>) at arch/arm/kernel/irq.c:90
-> #4  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #5  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #6  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #7  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #8  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #9  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #10 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #11 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> #12 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+Hello,
+
+On Monday, June 27, 2011 3:22 PM Arnd Bergmann wrote:
+
+> On Monday 27 June 2011, Marek Szyprowski wrote:
+> > > On a related note, do you plan to make the CMA work use this
+> > > transparently, or do you want to have a DMA_ATTR_LARGE or
+> > > DMA_ATTR_CONTIGUOUS for CMA?
+> >
+> > IMHO it will be better to hide the CMA from the drivers. Memory allocated
+> > from CMA doesn't really differ from the one allocated by
+> dma_alloc_coherent()
+> > (which internally use alloc_pages()), so I really see no reason for
+> adding
+> > additional attribute for it.
 > 
-> ... and so on it continues ad infinitum. Is it the expected behaviour?
-> Because I'm pretty much sure that this isn't a desired behaviour.
+> Ok, fair enough. On a semi-related topic, IIRC we still need to make sure
+> that dma_alloc_coherent() pages are unmapped from the linear mapping. I
+> hope
+> this is independent of both CMA and this patch.
 
-My guess is that gdb is trying to unwind using the unwind information.
-However, I don't think we actually give the assembler the full information
-to be able to unwind this.  I've no idea how to solve this as I'm no
-expert at the debug info.
+Right, that's one more big item that is still on the TODO list.
 
-We _really_ _do_ want to unwind through this so that we can see the
-parent kernel context information in backtraces - and the fact that
-the kernel itself can unwind through these means we can't tell the
-unwinder not to.
-
-So, no idea.  I think you need someone who knows debug info to sort
-this one out.
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
