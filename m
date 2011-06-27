@@ -1,44 +1,70 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Jun 2011 05:37:55 -0700
-Subject: [PATCH] Use MMIO clocksource for 32kHz counter
-In-Reply-To: <20110627123315.GB1777@n2100.arm.linux.org.uk>
-References: <20110627123315.GB1777@n2100.arm.linux.org.uk>
-Message-ID: <20110627123754.GQ23145@atomide.com>
+From: govindraj.ti@gmail.com (Govindraj)
+Date: Mon, 27 Jun 2011 18:19:55 +0530
+Subject: [PATCH v3 02/12] OMAP2+: UART: Remove uart clock handling code
+	from serial.c
+In-Reply-To: <877h8ax3ss.fsf@ti.com>
+References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
+	<1307532194-13039-3-git-send-email-govindraj.raja@ti.com>
+	<877h8ax3ss.fsf@ti.com>
+Message-ID: <BANLkTim1fEnfqu4KaN6FkG_CT93=joZC_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@arm.linux.org.uk> [110627 05:28]:
-> --- a/arch/arm/plat-omap/counter_32k.c
-> +++ b/arch/arm/plat-omap/counter_32k.c
-> +#ifdef CONFIG_ARCH_OMAP16XX
-> +		else if (cpu_is_omap16xx())
-> +			base = OMAP2_L4_IO_ADDRESS(OMAP16XX_TIMER_32K_SYNCHRONIZED);
-> +#endif
-> +#ifdef CONFIG_SOC_OMAP2420
->  		else if (cpu_is_omap2420())
-> -			clocksource_32k.read = omap2420_32k_read;
-> +			base = OMAP2_L4_IO_ADDRESS(OMAP2420_32KSYNCT_BASE + 0x10);
-> +#endif
-> +#ifdef CONFIG_SOC_OMAP2430
->  		else if (cpu_is_omap2430())
-> -			clocksource_32k.read = omap2430_32k_read;
-> +			base = OMAP2_L4_IO_ADDRESS(OMAP2430_32KSYNCT_BASE + 0x10);
-> +#endif
-> +#ifdef CONFIG_ARCH_OMAP3
->  		else if (cpu_is_omap34xx())
-> -			clocksource_32k.read = omap34xx_32k_read;
-> +			base = OMAP2_L4_IO_ADDRESS(OMAP3430_32KSYNCT_BASE + 0x10);
-> +#endif
-> +#ifdef CONFIG_ARCH_OMAP4
->  		else if (cpu_is_omap44xx())
-> -			clocksource_32k.read = omap44xx_32k_read;
-> +			base = OMAP2_L4_IO_ADDRESS(OMAP4430_32KSYNCT_BASE + 0x10);
-> +#endif
->  		else
->  			return -ENODEV;
->  
+On Sat, Jun 25, 2011 at 3:58 AM, Kevin Hilman <khilman@ti.com> wrote:
+> "Govindraj.R" <govindraj.raja@ti.com> writes:
+>
+>> Cleanup serial.c file in preparation to addition of runtime api's in omap-serial
+>> file. Remove all clock handling mechanism as this will be taken care with
+>> pm runtime api's in omap-serial.c file itself.
+>>
+>> 1.) Remove omap-device enable and disable. We can can use get_sync/put_sync api's
+>> 2.) Remove context save/restore can be done with runtime_resume callback for
+>> ? ? get_sync call. No need to save context as all reg details available in
+>> ? ? uart_port structure can be used for restore, so add missing regs in
+>> ? ? uart port struct.
+>> 3.) Add func to identify console uart.
+>> 4.) Erratum handling informed as flag to driver and func to handle erratum
+>> ? ? can be moved to omap-serial driver itself.
+>>
+>> Acked-by: Alan Cox <alan@linux.intel.com>
+>> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
+>
+> [...]
+>
+>> @@ -47,65 +40,9 @@
+>> ?#include "control.h"
+>> ?#include "mux.h"
+>>
+>> -#define UART_OMAP_NO_EMPTY_FIFO_READ_IP_REV ?0x52
+>> -#define UART_OMAP_WER ? ? ? ? ? ? ? ?0x17 ? ?/* Wake-up enable register */
+>> -
+>> -#define UART_ERRATA_FIFO_FULL_ABORT ?(0x1 << 0)
+>> -#define UART_ERRATA_i202_MDR1_ACCESS (0x1 << 1)
+>> -
+>> -/*
+>> - * NOTE: By default the serial timeout is disabled as it causes lost characters
+>> - * over the serial ports. This means that the UART clocks will stay on until
+>> - * disabled via sysfs. This also causes that any deeper omap sleep states are
+>> - * blocked.
+>> - */
+>> -#define DEFAULT_TIMEOUT 0
+>> -
+>> -#define MAX_UART_HWMOD_NAME_LEN ? ? ? ? ? ? ?16
+>> +#define MAX_UART_HWMOD_NAME_LEN ? ? ? ? ? ? ? ?16
+>
+> Minor: only whitespace change here, you converted tabs to spaces.
 
-You should be able to replace the above with just ioremap as we now
-have the static mappings.
+yes, will correct this.
 
-Tony
+--
+Govindraj.R
+
+>
+> Rest of this looks fine.
+>
+> Kevin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
+>
