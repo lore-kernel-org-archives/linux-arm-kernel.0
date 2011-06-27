@@ -1,23 +1,46 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Jun 2011 04:28:43 -0700
-Subject: [GIT PULL] misc. OMAP PM updates for v3.1
-In-Reply-To: <87vcvw5akk.fsf@ti.com>
-References: <87vcvw5akk.fsf@ti.com>
-Message-ID: <20110627112843.GN23145@atomide.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Jun 2011 12:37:08 +0100
+Subject: [PATCH 1/1] Add Thread Support for the Context ID Register of
+	ARM v6 & v7 Architectures
+In-Reply-To: <3a6d2636489958d097cd013cad646fed012421dd.1309163073.git.wolfgang.betz@st.com>
+References: <cover.1309163073.git.wolfgang.betz@st.com>
+	<3a6d2636489958d097cd013cad646fed012421dd.1309163073.git.wolfgang.betz@st.com>
+Message-ID: <20110627113707.GD16103@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@ti.com> [110623 17:32]:
-> Tony,
+On Mon, Jun 27, 2011 at 01:12:27PM +0200, Wolfgang BETZ wrote:
+> The aim of this patch is to enable thread support in the context ID register
+> (CONTEXTIDR) as it comes with ARM architectures v6 & v7.
 > 
-> Please pull the following misc. OMAP PM updates targetted for v3.1.
+>  On ARMv6 & v7, we have the following structure in the context ID:
 > 
-> This branch is based on your 'fixes' branch due to some dependencies.
->       OMAP2: PM debug: move wakeup timer into clockevent code
+>    31                         7          0
+>    +-------------------------+-----------+
+>    |      process ID         |   ASID    |
+>    +-------------------------+-----------+
+>    |              context ID             |
+>    +-------------------------------------+
+> 
+> - The ASID is used to tag entries in the CPU caches and TLBs.
+> - The context ID is used by debuggers and trace logic, and
+>   should be unique within all running processes.
 
-This won't work with the devel-timer branch. I think we should just
-drop it for now based on what I mentioned in the other thread.
+When I added ARMv6 and v7 support to the kernel, I purposely ignored that
+detail because it's silly.
 
-Regards,
+The issue here is that the debuggers and trace logic use both the
+process ID and the ASID together, and the ASID does not have a stable
+value for any particular process in the system.  When we have used
+the last ASID (255), the next request for a new ASID causes the ASID
+generation to increment, which in turn causes all processes in the
+system to have their ASIDs reassigned.
 
-Tony
+At that point, if you have debugging/trace hardware setup to look for
+a process with a particular process ID+ASID, you're no longer going to
+get matches for your original process.
+
+This makes the whole concept of debuggers/tracing using the context ID
+rather pointless especially in a multiprocessor system.
+
+How are you working around this issue?
