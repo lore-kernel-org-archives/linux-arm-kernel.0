@@ -1,46 +1,33 @@
-From: bryan.wu@canonical.com (Bryan Wu)
-Date: Mon, 27 Jun 2011 14:00:25 +0800
-Subject: [PATCH 2/4] ARM: use new LEDS CPU trigger stub to replace old one
-In-Reply-To: <BANLkTinCWcjNOR6uoGno1riRb+LBZLJ+Gg@mail.gmail.com>
-References: <1309039804-659-1-git-send-email-bryan.wu@canonical.com>
-	<1309039804-659-3-git-send-email-bryan.wu@canonical.com>
-	<BANLkTinCWcjNOR6uoGno1riRb+LBZLJ+Gg@mail.gmail.com>
-Message-ID: <BANLkTimDfs0SG7ZYAHcMqMSV1N7gheo2Rg@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 27 Jun 2011 00:34:11 -0600 (MDT)
+Subject: [PATCH 4/8] OMAP2+: PM: idle clkdms only if already in idle
+In-Reply-To: <4DF1FE6A.3010202@ti.com>
+References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
+	<1307616853-28395-2-git-send-email-rnayak@ti.com>
+	<1307616853-28395-3-git-send-email-rnayak@ti.com>
+	<1307616853-28395-4-git-send-email-rnayak@ti.com>
+	<1307616853-28395-5-git-send-email-rnayak@ti.com>
+	<20110610001556.GA9159@google.com> <4DF1FE6A.3010202@ti.com>
+Message-ID: <alpine.DEB.2.00.1106270012410.460@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2011 at 7:08 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> Hi Bryan, notice that this:
->
-> 2011/6/26 Bryan Wu <bryan.wu@canonical.com>:
->
->> - ? ? ? ? ? ? ? leds_event(led_idle_start);
->> + ? ? ? ? ? ? ? ledtrig_cpu(CPU_LED_IDLE_START);
-> (...)
->> - ? ? ? ? ? ? ? leds_event(led_idle_end);
->> + ? ? ? ? ? ? ? ledtrig_cpu(CPU_LED_IDLE_END);
->
-> That breaks all the old users of the CPU activity LEDs.
->
-> I only fixed up RealView and Versatile!
->
-> grep -r led_idle_start arch/arm/
->
-> Gives you a hint that you also have to retire custom LEDs from
-> orion, omap, at91, footbridge, sa1100, ks8695, shark, clps711x,
-> pxa and omap1.
->
-> You have to write a patch each an every one of these, and
-> since they all are already using that mechanism actively
-> you need to select the LED trigger in their Kconfig.
->
+Hi Rajendra, Todd,
 
-No problem, I will clean them up soon.
+On Fri, 10 Jun 2011, Rajendra Nayak wrote:
 
-Thanks,
--- 
-Bryan Wu <bryan.wu@canonical.com>
-Kernel Developer ? ?+86.138-1617-6545 Mobile
-Ubuntu Kernel Team
-Canonical Ltd. ? ? ?www.canonical.com
-Ubuntu - Linux for human beings | www.ubuntu.com
+> Paul/Benoit any thoughts on if a per-clkdm lock seems reasonable?
+
+Sounds okay to me.
+
+The experimental patch that you sent didn't add the locking to the *wkdep, 
+*sleepdep functions; I guess we'd better add it there at the same time, 
+since some of the register access there does a read-modify-write.
+
+It should be possible to get rid of the atomic_t usage in the clockdomain 
+code as part of the same series.
+
+Todd, thanks for pointing this out.
+
+
+- Paul
