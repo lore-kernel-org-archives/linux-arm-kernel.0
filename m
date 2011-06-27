@@ -1,59 +1,43 @@
-From: ptesarik@suse.cz (Petr Tesarik)
-Date: Mon, 27 Jun 2011 09:46:12 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of
-	arbitrary physical addresses
-In-Reply-To: <BANLkTi=MeNcOhxU2TYvaC+xwebxcROnjcw@mail.gmail.com>
-References: <201106171038.25988.ptesarik@suse.cz>
-	<20110617093032.GA19235@elte.hu> <201106171155.32062.ptesarik@suse.cz>
-	<BANLkTi=MeNcOhxU2TYvaC+xwebxcROnjcw@mail.gmail.com>
-Message-ID: <1309160772.7689.9.camel@nathan.suse.cz>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Jun 2011 00:48:57 -0700
+Subject: [PATCH 07/10] omap2+: Reserve clocksource and timesource and
+	initialize dmtimer later
+In-Reply-To: <87wrgca3dr.fsf@ti.com>
+References: <20110620091754.357.56441.stgit@kaulin>
+	<20110620092343.357.60445.stgit@kaulin> <87wrgca3dr.fsf@ti.com>
+Message-ID: <20110627074856.GD23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am?rico Wang p??e v Po 20. 06. 2011 v 10:42 +0800:
-> On Fri, Jun 17, 2011 at 5:55 PM, Petr Tesarik <ptesarik@suse.cz> wrote:
-> > Dne P? 17. ?ervna 2011 11:30:32 Ingo Molnar napsal(a):
-> >> * Petr Tesarik <ptesarik@suse.cz> wrote:
-> >> > This patch series enhances /dev/mem, so that read and write is
-> >> > possible at any address. The patchset includes actual
-> >> > implementation for x86.
-> >>
-> >> This series lacks a description of why this is desired.
-> >
-> > Hi Ingo,
-> >
-> >> My strong opinion is that it's not desired at all: /dev/mem never
-> >> worked beyond 4G addresses so by today it has become largely obsolete
-> >> and is on the way out really.
-> >>
-> >> I'm aware of these current /dev/mem uses:
-> >>
-> >>  - Xorg maps below 4G non-RAM addresses and the video BIOS
-> >>
-> >>  - It used to have some debugging role but these days kexec and kgdb
-> >>    has largely taken over that role - partly due to the 4G limit.
-> >
-> > It is still used as a "memory source" by Dave Anderson's crash utility for
-> > live examination of a running system. Redhat has "overcome" the /dev/mem
-> > deficiencies by writing an out-of-tree re-implementation of /dev/mem, which
-> > uses /dev/crash instead. As it is an "unnecessary duplication of an existing
-> > driver", this method was rejected by the project manager here at SUSE.
-> >
-> > The suggested alternative was to enhance (or fix) the existing driver. Without
-> > this patch series there is no way to access high memory. In conjunction with
-> > CONFIG_HIGHPTE, it makes the crash utility near to useless on anything with
-> > high memory, because crash can no longer translate virtual to physical
-> > addresses.
-> >
+* Kevin Hilman <khilman@ti.com> [110623 09:56]:
+> Tony Lindgren <tony@atomide.com> writes:
 > 
-> How about /proc/kcore? AFAIK, it can access highmem, but Dave didn't consider
-> it for some reason.
+> > There's no need to initialize the dmtimer framework early.
+> 
+> Actually, there is, because it's being used from the early code.
+> 
+> The sys_timer.init functions are called before arch_initcalls, so before
+> omap_dm_timer_init() is called, you have:
+> 
+> omap3_timer_init()
+>     omap2_gp_clockevent_init()
+>         omap_dm_timer_init_one()
+>            omap_dm_timer_request_specific()
+>                
+> 
+> Among other things, the spinlock is taken before it has been initialized
+> in omap_dm_timer_init() (that's how I noticed this problem), but the
+> rest of the init of course hasn't been done either.
+> 
+> Basically, the problem is that this "early init" code is not only using
+> the new macros, but it's also using functions from the "real" driver,
+> which is not yet initialized.
 
-(Sorry for the dealy, I was on vacation.)
+Sounds like you did not apply the previous patch to remove the PM hack?
 
-/proc/kcore is in fact supported by the crash utility and it does work
-with highmem to some extent. Unfortunately, it cannot handle all of it,
-because it is ELF32 format, so there's no way to describe regions beyond
-4GB.
+There's no need to call to omap_dm_timer_request_specific here unless
+you added back the PM hack.
 
-Petr Tesarik
+Regards,
+
+Tony
