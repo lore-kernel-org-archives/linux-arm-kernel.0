@@ -1,33 +1,39 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 27 Jun 2011 00:34:11 -0600 (MDT)
-Subject: [PATCH 4/8] OMAP2+: PM: idle clkdms only if already in idle
-In-Reply-To: <4DF1FE6A.3010202@ti.com>
-References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
-	<1307616853-28395-2-git-send-email-rnayak@ti.com>
-	<1307616853-28395-3-git-send-email-rnayak@ti.com>
-	<1307616853-28395-4-git-send-email-rnayak@ti.com>
-	<1307616853-28395-5-git-send-email-rnayak@ti.com>
-	<20110610001556.GA9159@google.com> <4DF1FE6A.3010202@ti.com>
-Message-ID: <alpine.DEB.2.00.1106270012410.460@utopia.booyaka.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Jun 2011 00:39:24 -0700
+Subject: [PATCH 05/10] omap2+: Use dmtimer macros for clockevent
+In-Reply-To: <87r56ka341.fsf@ti.com>
+References: <20110620091754.357.56441.stgit@kaulin>
+	<20110620092339.357.10396.stgit@kaulin> <87r56ka341.fsf@ti.com>
+Message-ID: <20110627073923.GC23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rajendra, Todd,
+* Kevin Hilman <khilman@ti.com> [110623 10:02]:
+> Tony Lindgren <tony@atomide.com> writes:
+> 
+> > This patch makes timer-gp.c to use only a subset of dmtimer
+> > functions without the need to initialize dmtimer code early.
+> >
+> > Also note that now with the inline functions, timer_set_next_event
+> > becomes more efficient in the lines of assembly code.
+> >
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
+> > Reviewed-by: Kevin Hilman <khilman@ti.com>
+> 
+> In order for this to work, *all* the dmtimer functions need to be
+> converted.  Some still call the real driver, which may not yet be
+> initialized (as pointed out for [7/10]...
 
-On Fri, 10 Jun 2011, Rajendra Nayak wrote:
+Well omap_dm_timer_init_one is a static omap2plus specific
+implementation that can then be then passed as a function pointer
+to the dmtimer device driver in later patches.
+ 
+> >  	gptimer = omap_dm_timer_request_specific(gptimer_id);
+> 
+> Here remains a call to the real driver, which is not yet initialized
+> when called from sys_timer.init.
 
-> Paul/Benoit any thoughts on if a per-clkdm lock seems reasonable?
+There's no need for omap_dm_timer_request_specific after the later
+patches. It gets removed in the PM_DEBUG sysfs interface removal patch.
 
-Sounds okay to me.
-
-The experimental patch that you sent didn't add the locking to the *wkdep, 
-*sleepdep functions; I guess we'd better add it there at the same time, 
-since some of the register access there does a read-modify-write.
-
-It should be possible to get rid of the atomic_t usage in the clockdomain 
-code as part of the same series.
-
-Todd, thanks for pointing this out.
-
-
-- Paul
+Tony
