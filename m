@@ -1,235 +1,78 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 27 Jun 2011 20:33:48 +0530
-Subject: [PATCH v3 10/12] OMAP: Serial: Use resume call from prcm to
-	enable uart
-In-Reply-To: <87aad6rc6z.fsf@ti.com>
-References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-	<1307532194-13039-11-git-send-email-govindraj.raja@ti.com>
-	<87aad6rc6z.fsf@ti.com>
-Message-ID: <BANLkTi=jyrt6+vXikdH0RdeOxEAkasigLw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 27 Jun 2011 17:25:14 +0200
+Subject: [PATCH 1/4] davinci: psc.h: clean up indentation done using spaces
+In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D7934B5@dbde02.ent.ti.com>
+References: <1301072400-4036-1-git-send-email-nsekhar@ti.com>
+	<201106251948.19834.arnd@arndb.de>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D7934B5@dbde02.ent.ti.com>
+Message-ID: <201106271725.14310.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 25, 2011 at 5:53 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> Use resume idle call from prcm_irq to enable uart_port from low power states.
->
-> Comment is valid for OMAP3 but not for OMAP2. ?Maybe [01/12] should just
-> leave this call in for OMAP2 instead of having to add it back here?
->
->> Add api to check pad wakeup status which will we used from uart_resume func.
->> to enable back uart port if a wakeup event occurred.
->
-> s/api/API/ ?(same for PRCM, UART, int subject)
->
->> UART_Resume func. can be removed once we have irq_chaining functionality
->> available.
->
-> Have you tested removing this when using with Tero's series?
+On Monday 27 June 2011, Nori, Sekhar wrote:
+> On Sat, Jun 25, 2011 at 23:18:19, Arnd Bergmann wrote:
+> > On Friday 24 June 2011, Nori, Sekhar wrote:
+> > Please make sure the patches apply on top of 2.6.39 and resubmit
+> > them, separating out the first cleanup patch from the others.
+> 
+> Is it 2.6.39 or v3.0-rc? Linux-next is currently at v3.0-rc4.
 
-I added Tero's v3 patch 1,2,3,4 on top of my runtime changes
+If there are no conflicts with 3.0-rc changes, submitting
+based on the previous release (2.6.39) is ok, otherwise just
+pick the most recent -rc release. Best avoid basing on top
+of an arbitrary commit between two -rc though.
 
-console gets looped with below prints during bootup [1]
-not sure whats happening need to look into it.
+> I can create a branch with just the clean-up stuff and
+> another branch with the features (and its dependencies
+> from fixes/clean-up).
+> 
+> By "resubmit" I assume you are not asking for a re-send
+> of the patches to the mailing list (I can do that if you
+> want).
 
-[1]:
-http://pastebin.com/C55gtGhp
+I'd prefer submission in form of a git-pull request in this
+case, but sending to the mailing list is ok, too.
 
-<<SNIP>>
+> > In case of the SATA support, the feature is relatively small
+> > and requires little board-specific code, which is good.
+> > However, if you are planning to push a lot of small additions
+> > like this, I would expect you spend much more effort on
+> > consolidation within davinci and migration towards device
+> > tree probing first.
+> 
+> I don't see new SoCs/boards getting added to the DaVinci
+> tree in the near term but there are some features of existing
+> platforms (like USB on DM365 or SATA on DA850) which are missing
+> in mainline for which there are patches being sent. 
+> 
+> To my knowledge, there isn't any ongoing work on moving DaVinci
+> to device tree. I am working on getting the low(er) hanging things
+> like GPIO movement to drivers/gpio done. DaVinci will eventually
+> move to device-tree, but may be not as soon as OMAP where
+> there is a lot more active work ongoing.
 
-[    2.740692] Registering the dns_resolver key type
-[    2.746490] VFP support v0.3: implementor 41 architecture 3 part 30
-variant c rev 1
-[    2.754669] ThumbEE CPU extension supported.
-[    2.772583] irq 368, desc: c0635540, depth: 1, count: 0, unhandled: 0
-[    2.779388] ->handle_irq():  c00e494c, handle_bad_irq+0x0/0x260
-[    2.785675] ->irq_data.chip(): c067f254, no_irq_chip+0x0/0x5c
-[    2.791748] ->action():   (null)
-[    2.795166]    IRQ_NOPROBE set
-[    2.798370]  IRQ_NOREQUEST set
-[    2.801605] irq 368, desc: c0635540, depth: 1, count: 0, unhandled: 0
-[    2.808380] ->handle_irq():  c00e494c, handle_bad_irq+0x0/0x260
-[    2.814636] ->irq_data.chip(): c067f254, no_irq_chip+0x0/0x5c
-[    2.820709] ->action():   (null)
-[    2.824127]    IRQ_NOPROBE set
-[    2.827331]  IRQ_NOREQUEST set
-[    2.830566] irq 368, desc: c0635540, depth: 1, count: 0, unhandled: 0
-[    2.837371] ->handle_irq():  c00e494c, handle_bad_irq+0x0/0x260
-[    2.843627] ->irq_data.chip(): c067f254, no_irq_chip+0x0/0x5c
-[    2.849700] ->action():   (null)
+Yes, makes sense since you are working on both.
 
-<<SNIP>>
+> > What else do you have pending for davinci in 3.1? Can you
+> > send pull requests for cleanups/fixes/device-tree/features?
+> 
+> Actually not quite a lot at the moment, but there are some
+> patches which are waiting for acks/dependencies and some
+> pending re-work.
+> 
+> I will send a pull request with what has been reviewed and
+> accepted already.
 
---
-Thanks,
-Govindraj.R
+Ok. Do you also have a public tree with all the patches that
+you would hope to get merged eventually? I'd just like to
+get an impression of what's to come.
 
->
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->> ---
->> ?arch/arm/mach-omap2/pm24xx.c ? ? ? ? ? ? ? ? ?| ? ?2 ++
->> ?arch/arm/mach-omap2/pm34xx.c ? ? ? ? ? ? ? ? ?| ? ?2 ++
->> ?arch/arm/mach-omap2/serial.c ? ? ? ? ? ? ? ? ?| ? 23 +++++++++++++++++++++++
->> ?arch/arm/plat-omap/include/plat/omap-serial.h | ? ?2 ++
->> ?arch/arm/plat-omap/include/plat/serial.h ? ? ?| ? ?1 +
->> ?drivers/tty/serial/omap-serial.c ? ? ? ? ? ? ?| ? 23 +++++++++++++++++++++++
->> ?6 files changed, 53 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/pm24xx.c b/arch/arm/mach-omap2/pm24xx.c
->> index c405bda..ba58a1d 100644
->> --- a/arch/arm/mach-omap2/pm24xx.c
->> +++ b/arch/arm/mach-omap2/pm24xx.c
->> @@ -137,6 +137,8 @@ static void omap2_enter_full_retention(void)
->> ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP_SDRC_REGADDR(SDRC_DLLA_CTRL),
->> ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP_SDRC_REGADDR(SDRC_POWER));
->>
->> + ? ? omap_uart_resume_idle();
->> +
->> ?no_sleep:
->> ? ? ? if (omap2_pm_debug) {
->> ? ? ? ? ? ? ? unsigned long long tmp;
->> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
->> index ac7b7f8..3997e92 100644
->> --- a/arch/arm/mach-omap2/pm34xx.c
->> +++ b/arch/arm/mach-omap2/pm34xx.c
->> @@ -216,6 +216,8 @@ static int prcm_clear_mod_irqs(s16 module, u8 regs)
->>
->> ? ? ? wkst = omap2_prm_read_mod_reg(module, wkst_off);
->> ? ? ? wkst &= omap2_prm_read_mod_reg(module, grpsel_off);
->> +
->> + ? ? c += omap_uart_resume_idle();
->> ? ? ? if (wkst) {
->> ? ? ? ? ? ? ? iclk = omap2_cm_read_mod_reg(module, iclk_off);
->> ? ? ? ? ? ? ? fclk = omap2_cm_read_mod_reg(module, fclk_off);
->> diff --git a/arch/arm/mach-omap2/serial.c b/arch/arm/mach-omap2/serial.c
->> index 6ac078f..4bc5914 100644
->> --- a/arch/arm/mach-omap2/serial.c
->> +++ b/arch/arm/mach-omap2/serial.c
->> @@ -199,6 +199,28 @@ static void omap_serial_fill_default_pads(struct omap_board_data *bdata)
->> ? ? ? }
->> ?}
->>
->> +/* TBD: Will be removed once we have irq-chaing mechanism */
->
-> s/TBD/FIXME/
->
->> +static bool omap_uart_chk_wakeup(struct platform_device *pdev)
->> +{
->> + ? ? struct omap_uart_port_info *up = pdev->dev.platform_data;
->> + ? ? struct omap_device *od;
->> + ? ? u32 wkst = 0;
->> + ? ? bool ret = false;
->> +
->> + ? ? od = to_omap_device(pdev);
->> + ? ? if (omap_hmwod_pad_get_wakeup_status(od->hwmods[0]))
->> + ? ? ? ? ? ? ret = true;
->> +
->> + ? ? /* Check for normal UART wakeup (and clear it) */
->> + ? ? wkst = __raw_readl(up->wk_st) & up->wk_mask;
->> + ? ? if (wkst) {
->> + ? ? ? ? ? ? __raw_writel(wkst, up->wk_st);
->> + ? ? ? ? ? ? ret = true;
->> + ? ? }
->> +
->> + ? ? return ret;
->> +}
->> +
->> ?static void omap_uart_wakeup_enable(struct platform_device *pdev, bool enable)
->> ?{
->> ? ? ? struct omap_uart_port_info *up = pdev->dev.platform_data;
->> @@ -369,6 +391,7 @@ void __init omap_serial_init_port(struct omap_board_data *bdata,
->> ? ? ? pdata->uartclk = OMAP24XX_BASE_BAUD * 16;
->> ? ? ? pdata->flags = UPF_BOOT_AUTOCONF;
->> ? ? ? pdata->enable_wakeup = omap_uart_wakeup_enable;
->> + ? ? pdata->chk_wakeup = omap_uart_chk_wakeup;
->> ? ? ? pdata->dma_enabled = info->dma_enabled;
->> ? ? ? pdata->dma_rx_buf_size = info->dma_rx_buf_size;
->> ? ? ? pdata->dma_rx_poll_rate = info->dma_rx_poll_rate;
->> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
->> index c5f4dd9..b5117bd 100644
->> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
->> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
->> @@ -75,6 +75,7 @@ struct omap_uart_port_info {
->> ? ? ? unsigned int ? ? ? ? ? ?auto_sus_timeout; /* Auto_suspend timeout */
->>
->> ? ? ? void (*enable_wakeup)(struct platform_device *, bool);
->> + ? ? bool (*chk_wakeup)(struct platform_device *);
->> ? ? ? void __iomem *wk_st;
->> ? ? ? void __iomem *wk_en;
->> ? ? ? u32 wk_mask;
->> @@ -132,6 +133,7 @@ struct uart_omap_port {
->> ? ? ? unsigned long ? ? ? ? ? port_activity;
->> ? ? ? unsigned int ? ? ? ? ? ?errata;
->> ? ? ? void (*enable_wakeup)(struct platform_device *, bool);
->> + ? ? bool (*chk_wakeup)(struct platform_device *);
->> ?};
->>
->> ?#endif /* __OMAP_SERIAL_H__ */
->> diff --git a/arch/arm/plat-omap/include/plat/serial.h b/arch/arm/plat-omap/include/plat/serial.h
->> index ee758d4..44a42aa 100644
->> --- a/arch/arm/plat-omap/include/plat/serial.h
->> +++ b/arch/arm/plat-omap/include/plat/serial.h
->> @@ -109,6 +109,7 @@ extern void omap_serial_init(void);
->> ?extern void omap_serial_board_init(struct omap_uart_port_info *platform_data);
->> ?extern void omap_serial_init_port(struct omap_board_data *bdata,
->> ? ? ? ? ? ? ? struct omap_uart_port_info *platform_data);
->> +extern u32 omap_uart_resume_idle(void);
->> ?#endif
->>
->> ?#endif
->> diff --git a/drivers/tty/serial/omap-serial.c b/drivers/tty/serial/omap-serial.c
->> index 307b7c6..c3561dd 100644
->> --- a/drivers/tty/serial/omap-serial.c
->> +++ b/drivers/tty/serial/omap-serial.c
->> @@ -43,6 +43,7 @@
->> ?#include <plat/dmtimer.h>
->> ?#include <plat/omap-serial.h>
->> ?#include <plat/omap_device.h>
->> +#include <plat/serial.h>
->>
->> ?static struct uart_omap_port *ui[OMAP_MAX_HSUART_PORTS];
->>
->> @@ -108,6 +109,27 @@ static inline void serial_omap_port_enable(struct uart_omap_port *up)
->> ? ? ? pm_runtime_get_sync(&up->pdev->dev);
->> ?}
->>
->> +/* TBD: Should be removed once we irq-chaining mechanism in place */
->> +u32 omap_uart_resume_idle()
->> +{
->> + ? ? int i;
->> + ? ? u32 ret = 0;
->> +
->> + ? ? for (i = 0; i < OMAP_MAX_HSUART_PORTS; i++) {
->> + ? ? ? ? ? ? struct uart_omap_port *up = ui[i];
->> +
->> + ? ? ? ? ? ? if (!up)
->> + ? ? ? ? ? ? ? ? ? ? continue;
->> +
->> + ? ? ? ? ? ? if (up->chk_wakeup(up->pdev)) {
->> + ? ? ? ? ? ? ? ? ? ? serial_omap_port_enable(up);
->> + ? ? ? ? ? ? ? ? ? ? serial_omap_port_disable(up);
->> + ? ? ? ? ? ? ? ? ? ? ret++;
->> + ? ? ? ? ? ? }
->> + ? ? }
->> + ? ? return ret;
->> +}
->> +
->> ?static void serial_omap_stop_rxdma(struct uart_omap_port *up)
->> ?{
->> ? ? ? if (up->uart_dma.rx_dma_used) {
->> @@ -1392,6 +1414,7 @@ static int serial_omap_probe(struct platform_device *pdev)
->> ? ? ? up->uart_dma.uart_base = mem->start;
->> ? ? ? up->errata = omap_up_info->errata;
->> ? ? ? up->enable_wakeup = omap_up_info->enable_wakeup;
->> + ? ? up->chk_wakeup = omap_up_info->chk_wakeup;
->>
->> ? ? ? if (omap_up_info->dma_enabled) {
->> ? ? ? ? ? ? ? up->uart_dma.uart_dma_tx = dma_tx->start;
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+> I guess I also need to ask Stephen Rothwell to remove the
+> DaVinci next branch from the list of branches he is merging
+> for linux-next.
+
+Yes, that would be good, but we might need to do that in a
+more coordinated way for all the ARM platforms once they
+are reasonably merged into my tree.
+
+	Arnd
