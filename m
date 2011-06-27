@@ -1,27 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Jun 2011 15:22:05 +0200
-Subject: [PATCH 7/8] common: dma-mapping: change alloc/free_coherent
-	method to more generic alloc/free_attrs
-In-Reply-To: <000701cc34c5$0c50b800$24f22800$%szyprowski@samsung.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<201106241751.35655.arnd@arndb.de>
-	<000701cc34c5$0c50b800$24f22800$%szyprowski@samsung.com>
-Message-ID: <201106271522.05486.arnd@arndb.de>
+Date: Mon, 27 Jun 2011 15:26:12 +0200
+Subject: [PATCH V2 0/3] Add drivers/pwm and drivers/pwm/st_pwm.c
+In-Reply-To: <4E086590.8080100@st.com>
+References: <cover.1306831238.git.viresh.kumar@st.com>
+	<4E086590.8080100@st.com>
+Message-ID: <201106271526.12848.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 June 2011, Marek Szyprowski wrote:
-> > On a related note, do you plan to make the CMA work use this
-> > transparently, or do you want to have a DMA_ATTR_LARGE or
-> > DMA_ATTR_CONTIGUOUS for CMA?
-> 
-> IMHO it will be better to hide the CMA from the drivers. Memory allocated
-> from CMA doesn't really differ from the one allocated by dma_alloc_coherent()
-> (which internally use alloc_pages()), so I really see no reason for adding
-> additional attribute for it.
+On Monday 27 June 2011, viresh kumar wrote:
+> On 05/31/2011 02:21 PM, Viresh KUMAR wrote:
+> > This patchset adds drivers/pwm directory as suggested by Arnd Bergmann in
+> > following discussion:
+> > 
+> > http://comments.gmane.org/gmane.linux.ports.arm.kernel/118651
+> > 
+> > and also adds support for ST Microelectronics Pulse Width Modulator. This is
+> > currently used by ST's SPEAr platform and tested on the same.
+> > 
+> > Changes since V1:
+> >  - Moved driver to drivers/pwm/ directory from drivers/misc
+> >  - arch/arm/configs/spear3xx_defconfig updated accordingly.
+> > 
+> > Changes since earlier patchset:
+> >  - Moved driver to drivers/misc/ directory.
+> > 
+> > It was earlier reviewed as part of following patchset:
+> > "[PATCH V6 00/17] Adding devices support for all spear machines"
+> > 
+> > Viresh Kumar (3):
+> >   drivers/pwm st_pwm: Add support for ST's Pulse Width Modulator
+> >   SPEAr3xx: Add machine support for ST's PWM IP
+> >   SPEAr3xx: Update defconfig for ST's PWM
+>
+> Will you push this patchset through your tree or somebody else will do?
 
-Ok, fair enough. On a semi-related topic, IIRC we still need to make sure
-that dma_alloc_coherent() pages are unmapped from the linear mapping. I hope
-this is independent of both CMA and this patch.
+Good question. If Sascha is able to come up with the patch to introduce
+the generic layer, I think it would be good to have it go though him.
+
+Otherwise I guess I can carry it, but I'd start a new tree for
+drivers/{misc,char} then and put it in there, along with patches to
+move the other pwm drivers.
 
 	Arnd
