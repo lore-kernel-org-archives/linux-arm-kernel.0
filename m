@@ -1,40 +1,29 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Jun 2011 11:00:27 -0700
-Subject: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D793464@dbde02.ent.ti.com>
-References: <1309171009-8075-1-git-send-email-premi@ti.com>
-	<20110627111556.GM23145@atomide.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D7933C0@dbde02.ent.ti.com>
-	<20110627123140.GP23145@atomide.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D793464@dbde02.ent.ti.com>
-Message-ID: <20110627180027.GR23145@atomide.com>
+Date: Mon, 27 Jun 2011 11:03:51 -0700
+Subject: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+In-Reply-To: <alpine.DEB.2.00.1106271053000.460@utopia.booyaka.com>
+References: <1308932625-17632-1-git-send-email-premi@ti.com>
+	<86CFE860-E18E-4B96-A753-11EB7C5C1C86@dominion.thruhere.net>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2FE2@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1106251635340.30205@utopia.booyaka.com>
+	<20110627101427.GH23145@atomide.com>
+	<alpine.DEB.2.00.1106270910210.460@utopia.booyaka.com>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D793501@dbde02.ent.ti.com>
+	<alpine.DEB.2.00.1106271053000.460@utopia.booyaka.com>
+Message-ID: <20110627180351.GS23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Premi, Sanjeev <premi@ti.com> [110627 06:24]:
+* Paul Walmsley <paul@pwsan.com> [110627 09:50]:
+> On Mon, 27 Jun 2011, Premi, Sanjeev wrote:
 > 
-> [sp] While I take my time understanding things on devel-timer;
->      I had a quick question - at risk of being flamed.
+> > [sp] Can you look at my query to Tony? Will that be an acceptable
+> >      workaround until DT. Going to two machine IDs and then unifying
+> >      back again could cause confusion - esp. during transition times.
 > 
->      Adding a new machine ID would trickle to u-boot and same
->      uImage (default) may not work across board revisions.
+> It's up to Tony, he's the maintainer...
 
-Yes that's a hassle :( Until we have device tree, maybe see if
-u-boot passes ATAG_REVISION that's available as system_rev in
-kernel?
- 
->      How does this scheme look like:
->      - GPTIMER1 is used as default - as it works for most boards.
->      - GPTIMER12 is used based on a static config option OR a
->        board specific bootarg
-> 
->      I know both these options aren't general practice. Still
->      wanted to know your views in the current context.
-
-Let's not do a Kconfig option, but a cmdline option should work
-if done in a generic way. If you decide to go that way, then
-please add that to timer.c against devel-timer branch.
-
-Regards,
+For the record, replied something to the other thread about system_rev
+and cmdline options.
 
 Tony
