@@ -1,42 +1,36 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Jun 2011 09:41:42 -0700
-Subject: [PATCH 08/10] omap2+: Use dmtimer macros for clocksource
-In-Reply-To: <20110627104815.GL23145@atomide.com> (Tony Lindgren's message of
-	"Mon, 27 Jun 2011 03:48:16 -0700")
-References: <20110620091754.357.56441.stgit@kaulin>
-	<20110620092345.357.11154.stgit@kaulin> <87iprwa2xx.fsf@ti.com>
-	<20110627075429.GF23145@atomide.com>
-	<20110627104815.GL23145@atomide.com>
-Message-ID: <87zkl3cjll.fsf@ti.com>
+Date: Mon, 27 Jun 2011 09:50:15 -0700
+Subject: [GIT PULL] misc. OMAP PM updates for v3.1
+In-Reply-To: <20110627112843.GN23145@atomide.com> (Tony Lindgren's message of
+	"Mon, 27 Jun 2011 04:28:43 -0700")
+References: <87vcvw5akk.fsf@ti.com> <20110627112843.GN23145@atomide.com>
+Message-ID: <87oc1jcj7c.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Tony Lindgren <tony@atomide.com> writes:
 
-> * Tony Lindgren <tony@atomide.com> [110627 00:50]:
->> * Kevin Hilman <khilman@ti.com> [110623 10:06]:
->> > Tony Lindgren <tony@atomide.com> writes:
->> > > +
->> > > +	res = omap_dm_timer_init_one(&clksrc, gptimer_id, fck_source);
->> > 
->> > This function makes calls into "real" driver, but is called from
->> > sys_timer.init so happens before driver is initialized.
+> * Kevin Hilman <khilman@ti.com> [110623 17:32]:
+>> Tony,
 >> 
->> That one is the static omap2+ specific function that can be passed
->> to the dmtimer device driver as a function pointer in the later
->> patches. 
->>  
->> > > +	omap_dm_timer_set_load_start(&clksrc, 1, 0);
->> > 
->> > Here's another call into the real driver.  I think you need
->> > __omap_dm_timer_set_load_start() here.
+>> Please pull the following misc. OMAP PM updates targetted for v3.1.
 >> 
->> Thanks, that's correct. Will fix that one.
+>> This branch is based on your 'fixes' branch due to some dependencies.
+>>       OMAP2: PM debug: move wakeup timer into clockevent code
 >
-> Here's this one updated. Looks like I still have your Reviewed-by
-> lines from the last time this series got posted. Can you please check
-> if those are still valid?
+> This won't work with the devel-timer branch. I think we should just
+> drop it for now based on what I mentioned in the other thread.
 
-Yes, they're still valid as I've now been through the whole series.
+Hmm, so it's not just the wakeup timer that conflicts between
+devel-timer and my pm-misc branch.
+
+My branch also removes a bunch of other stuff from pm-debug.c and pm.h
+so it has overlapping changes with your devel-timer branch.
+
+The conflicts are easy enough to resolve since both branches are just
+removing code.
+
+Is your devel-timer branch stable now?  Should I rebase my branch on top
+of devel-timer?  or can you just handle the conflicts?
 
 Kevin
