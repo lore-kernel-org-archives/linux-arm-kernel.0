@@ -1,60 +1,84 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Mon, 27 Jun 2011 12:04:17 -0700
-Subject: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D793464@dbde02.ent.ti.com>
-	(Sanjeev Premi's message of "Mon, 27 Jun 2011 18:58:54 +0530")
-References: <1309171009-8075-1-git-send-email-premi@ti.com>
-	<20110627111556.GM23145@atomide.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D7933C0@dbde02.ent.ti.com>
-	<20110627123140.GP23145@atomide.com>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D793464@dbde02.ent.ti.com>
-Message-ID: <87vcvrayfi.fsf@ti.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Jun 2011 12:11:02 -0700
+Subject: [PATCH] Use MMIO clocksource for 32kHz counter
+In-Reply-To: <20110627123754.GQ23145@atomide.com>
+References: <20110627123315.GB1777@n2100.arm.linux.org.uk>
+	<20110627123754.GQ23145@atomide.com>
+Message-ID: <20110627191102.GV23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Premi, Sanjeev" <premi@ti.com> writes:
+* Tony Lindgren <tony@atomide.com> [110627 05:33]:
+> * Russell King - ARM Linux <linux@arm.linux.org.uk> [110627 05:28]:
+> > --- a/arch/arm/plat-omap/counter_32k.c
+> > +++ b/arch/arm/plat-omap/counter_32k.c
+> > +#ifdef CONFIG_ARCH_OMAP16XX
+> > +		else if (cpu_is_omap16xx())
+> > +			base = OMAP2_L4_IO_ADDRESS(OMAP16XX_TIMER_32K_SYNCHRONIZED);
 
->> -----Original Message-----
->> From: Tony Lindgren [mailto:tony at atomide.com] 
->> Sent: Monday, June 27, 2011 6:02 PM
->> To: Premi, Sanjeev
->> Cc: linux-omap at vger.kernel.org; 
->> linux-arm-kernel at lists.infradead.org; Gregoire Gentil; 
->> Bhandiwad, Hrishikesh; Jason Lam; Thomas Weber
->> Subject: Re: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
->> 
->> * Premi, Sanjeev <premi@ti.com> [110627 05:08]:
->> > > From: Tony Lindgren [mailto:tony at atomide.com] 
->> > > 
->> > > I don't think omap3_beagle_init_rev is even called when
->> > > the timer is set?
->> > 
->> > [sp] I verified the patch based on the print indicating that
->> >      GPTIMER1 being used as clockevent source.
->> >      http://marc.info/?l=linux-omap&m=130893319726456&w=2
->> 
->> I suspect the test always fails though, so it probably never
->> gets set to gptimer12 on any board :)
->>
->
-> [sp] While I take my time understanding things on devel-timer;
->      I had a quick question - at risk of being flamed.
->
->      Adding a new machine ID would trickle to u-boot and same
->      uImage (default) may not work across board revisions.
->
->      How does this scheme look like:
->      - GPTIMER1 is used as default - as it works for most boards.
->      - GPTIMER12 is used based on a static config option OR a
->        board specific bootarg
->
->      I know both these options aren't general practice. Still
->      wanted to know your views in the current context.
->
+BTW, the above should have been OMAP1_IO_ADDRESS instead..
+  
+> You should be able to replace the above with just ioremap as we now
+> have the static mappings.
 
-Another option may be to always use GPTIMER1 on early boot for all
-boards.  Later in the boot, when the old rev boards are detected, a new
-GPT12 clockevent could be registered (with a higher rating) such that
-the clockevent core would switch to the new source.
+..here's a patch to use ioremap with comment added about the static
+mapping requirements.
 
-Kevin
+Thanks for getting rid of hopefully the last remaining omap_readl
+for omap2+ BTW :)
+
+Tony
+
+
+--- a/arch/arm/plat-omap/counter_32k.c
++++ b/arch/arm/plat-omap/counter_32k.c
+@@ -106,34 +106,30 @@ int __init omap_init_clocksource_32k(void)
+ 			"%s: can't register clocksource!\n";
+ 
+ 	if (cpu_is_omap16xx() || cpu_class_is_omap2()) {
++		u32 pbase;
++		unsigned long size = SZ_4K;
+ 		void __iomem *base;
+ 		struct clk *sync_32k_ick;
+ 
+-		if (0)
+-			base = NULL;
+-#ifdef CONFIG_ARCH_OMAP16XX
+-		else if (cpu_is_omap16xx())
+-			base = OMAP2_L4_IO_ADDRESS(OMAP16XX_TIMER_32K_SYNCHRONIZED);
+-#endif
+-#ifdef CONFIG_SOC_OMAP2420
+-		else if (cpu_is_omap2420())
+-			base = OMAP2_L4_IO_ADDRESS(OMAP2420_32KSYNCT_BASE + 0x10);
+-#endif
+-#ifdef CONFIG_SOC_OMAP2430
++		if (cpu_is_omap16xx()) {
++			pbase = OMAP16XX_TIMER_32K_SYNCHRONIZED;
++			size = SZ_1K;
++		} else if (cpu_is_omap2420())
++			pbase = OMAP2420_32KSYNCT_BASE + 0x10;
+ 		else if (cpu_is_omap2430())
+-			base = OMAP2_L4_IO_ADDRESS(OMAP2430_32KSYNCT_BASE + 0x10);
+-#endif
+-#ifdef CONFIG_ARCH_OMAP3
++			pbase = OMAP2430_32KSYNCT_BASE + 0x10;
+ 		else if (cpu_is_omap34xx())
+-			base = OMAP2_L4_IO_ADDRESS(OMAP3430_32KSYNCT_BASE + 0x10);
+-#endif
+-#ifdef CONFIG_ARCH_OMAP4
++			pbase = OMAP3430_32KSYNCT_BASE + 0x10;
+ 		else if (cpu_is_omap44xx())
+-			base = OMAP2_L4_IO_ADDRESS(OMAP4430_32KSYNCT_BASE + 0x10);
+-#endif
++			pbase = OMAP4430_32KSYNCT_BASE + 0x10;
+ 		else
+ 			return -ENODEV;
+ 
++		/* For this to work we must have a static mapping in io.c for this area */
++		base = ioremap(pbase, size);
++		if (!base)
++			return -ENODEV;
++
+ 		sync_32k_ick = clk_get(NULL, "omap_32ksync_ick");
+ 		if (!IS_ERR(sync_32k_ick))
+ 			clk_enable(sync_32k_ick);
