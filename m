@@ -1,43 +1,37 @@
-From: toddpoynor@google.com (Todd Poynor)
-Date: Mon, 27 Jun 2011 13:38:10 -0700
-Subject: IRQS off tracer - is it useful or not?
-In-Reply-To: <20110625132112.GH23234@n2100.arm.linux.org.uk>
-References: <20110625132112.GH23234@n2100.arm.linux.org.uk>
-Message-ID: <20110627203810.GD6187@google.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Mon, 27 Jun 2011 22:39:07 +0200
+Subject: [PATCH 1/2] gpio-vbus: support disabling D+ pullup on suspend
+In-Reply-To: <Pine.LNX.4.44L0.1106250758250.1039-100000@netrider.rowland.org>
+References: <Pine.LNX.4.44L0.1106250758250.1039-100000@netrider.rowland.org>
+Message-ID: <4E08EA6B.90302@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I used IRQs off tracing on 2.6.36 on Tegra (and am responsible for
-sending the fixups to make it work better on ARM).  The tracing did
-help find probably 2-3 real problems with drivers performing too much
-processing with IRQs disabled (I can go dig up which problems if
-that would be useful).  I didn't usually pay close attention
-to any values printed that were in the sub-millisecond range, mostly
-looking for larger outliers.
+On 06/25/2011 02:02 PM, Alan Stern wrote:
+> Nevertheless...  The fact that the kernel can do nothing about a
+> disconnected cable shouldn't stop us from handling system sleep
+> correctly.  After all, the kernel _can_ do something about that.
 
-I did have a couple of problems with it.  One, as already noted,
-the tracing points aren't necessarily positioned such that the
-return address points to the caller of interest.  As I recall, it
-looked like various config options could change whether the place
-with the trace point was called directly by the code of interest
-or whether that function was likely to be an intermediary --
-options such as CONFIG_INLINE_SPIN_UNLOCK_IRQRESTORE=n probably
-broke the assumptions, and other things like
-CONFIG_DEBUG_LOCK_ALLOC and CONFIG_DEBUG_SPINLOCK could also
-affect what was inlined.  I did hack these up to get to the real
-caller where I found something of possible interest.
+Well, it depends of which level of driver we speek about.
+I was speeking about UDC driver, ie. a hardware driver. My point was 
+that the hardware driver should only care about the hardware register 
+manipulations, and check their success. If they succeed, then it should 
+suspend itself without care of filesystem not in sync.
 
-There was another problem with an approximate 2500ms time
-delta in impossible places.  I debugged it some and found that
-it was likely due to something already been fixed in later kernels,
-so I just discarded those results.  (I made a note at the time that it
-was probably fixed in 69d1b839 "ring-buffer: Bind time extend and data
-events together", but I can't recall the details at the moment.)
+I didn't meant that the filesystem driver shouldn't care about the 
+suspend, or even the mass-storage gadget. I don't have a strong opinion 
+on these higher levels. The question if the kernel can do something 
+about it is much more complicated :
+  - should userspace sync/umount and check filesystem before suspending 
+(as umount usb storage before suspending)
+  - should the kernel block a suspend because a usb key was "forgotten" 
+in an USB slot ?
 
-Having stuck my neck for out for the feature having some use, I can
-volunteer my time to help clean things up if folks think it's worth
-it.
+For these questions, I'll let others battle. For the hardware related 
+drivers, I'm pretty convinced all they should care about is the success 
+or failure of hardware suspend manipulation, and the correct suspend order.
 
+Cheers.
 
-Todd
- 
+--
+Robert
