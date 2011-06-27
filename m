@@ -1,98 +1,57 @@
-From: govindraj.ti@gmail.com (Govindraj)
-Date: Mon, 27 Jun 2011 18:23:23 +0530
-Subject: [PATCH v3 07/12] OMAP: Serial: Allow UART parameters to be
-	configured from board file.
-In-Reply-To: <87vcvurcom.fsf@ti.com>
-References: <1307532194-13039-1-git-send-email-govindraj.raja@ti.com>
-	<1307532194-13039-8-git-send-email-govindraj.raja@ti.com>
-	<87vcvurcom.fsf@ti.com>
-Message-ID: <BANLkTiksPZfsJ9u0dDi5LaxsLtRdA4R2yg@mail.gmail.com>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Mon, 27 Jun 2011 16:53:06 +0400
+Subject: Problem with GDB when debugging IRQ handlers
+Message-ID: <20110627125306.GA30646@doriath.ww600.siemens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Jun 25, 2011 at 5:42 AM, Kevin Hilman <khilman@ti.com> wrote:
-> "Govindraj.R" <govindraj.raja@ti.com> writes:
->
->> The following UART parameters are defined within the UART driver:
->>
->> 1). Whether the UART uses DMA (dma_enabled), by default set to 0
->> 2). The size of dma buffer (set to 4096 bytes)
->> 3). The time after which the dma should stop if no more data is received.
->> 4). The auto suspend delay that will be passed for pm_runtime_autosuspend
->> ? ? where uart will be disabled after timeout
->>
->> Different UARTs may be used for different purpose such as the console,
->> for interfacing bluetooth chip, for interfacing to a modem chip, etc.
->> Therefore, it is necessary to be able to customize the above settings
->> for a given board on a per UART basis.
->>
->> This change allows these parameters to be configured from the board file
->> and allows the parameters to be configured for each UART independently.
->>
->> If a board does not define its own custom parameters for the UARTs, then
->> use the default parameters in the structure "omap_serial_default_info".
->> The default parameters are defined to be the same as the current settings
->> in the UART driver to avoid breaking the UART for any board. By default,
->> make all boards use the default UART parameters.
->>
->> Signed-off-by: Deepak K <deepak.k@ti.com>
->> Signed-off-by: Jon Hunter <jon-hunter@ti.com>
->> Signed-off-by: Govindraj.R <govindraj.raja@ti.com>
->
-> Nice. ?some minor comments below.
->
-> [...]
->
->> diff --git a/arch/arm/plat-omap/include/plat/omap-serial.h b/arch/arm/plat-omap/include/plat/omap-serial.h
->> index ac30de8..4e2dcdc 100644
->> --- a/arch/arm/plat-omap/include/plat/omap-serial.h
->> +++ b/arch/arm/plat-omap/include/plat/omap-serial.h
->> @@ -51,7 +51,12 @@
->>
->> ?#define OMAP_UART_DMA_CH_FREE ? ? ? ?-1
->>
->> -#define RX_TIMEOUT ? ? ? ? ? (3 * HZ)
->> +#define RX_TIMEOUT ? ? ? ? ? (3 * HZ) ? ? ? ?/* RX DMA timeout (jiffies) */
->> +#define DEFAULT_RXDMA_TIMEOUT ? ? ? ?1 ? ? ? ? ? ? ? /* RX DMA polling rate (us) */
->> +#define DEFAULT_RXDMA_BUFSIZE ? ? ? ?4096 ? ? ? ? ? ?/* RX DMA buffer size */
->> +#define DEFAULT_AUTOSUSPEND_DELAY (30 * HZ) /* Runtime autosuspend (msecs) */
->
-> These don't need to be in omap-serial.h since neither the driver code or
-> the board file should be using them. ?They can stay in mach-omap2/serial.c
->
+Hello, colleagues,
 
-Yes fine will move them to serial.c
+I've got into a problem when trying to debug irq handlers on PXA (in
+qemu). backtrace is really strange from my POV (a target is just a qemu
+running a bit modified 3.0-rc2 kernel):
 
->> +
->> ?#define OMAP_MAX_HSUART_PORTS ? ? ? ?4
->>
->> ?#define MSR_SAVE_FLAGS ? ? ? ? ? ? ? UART_MSR_ANY_DELTA
->> @@ -64,6 +69,9 @@ struct omap_uart_port_info {
->> ? ? ? upf_t ? ? ? ? ? ? ? ? ? flags; ? ? ? ? ?/* UPF_* flags */
->> ? ? ? unsigned int ? ? ? ? ? ?errata;
->> ? ? ? unsigned int ? ? ? ? ? ?console_uart;
->> + ? ? unsigned int ? ? ? ? ? ?dma_rx_buf_size;/* DMA Rx Buffer Size */
->> + ? ? unsigned int ? ? ? ? ? ?dma_rx_timeout; /* DMA RX timeout */
->
-> Comments don't add value over variable name.
->
+arm-linux-gnueabi-gdb vmlinux
+GNU gdb (GDB) 7.2-debian
+Copyright (C) 2010 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "--host=i486-linux-gnu --target=arm-linux-gnueabi".
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>...
+Reading symbols from vmlinux...done.
+(gdb) target localhost:1234
+Undefined target command: "localhost:1234".  Try "help target".
+(gdb) target remote:1234
+break handle_Remote debugging using :1234
+0xa0000000 in ?? ()
+(gdb) break handle_level_irq
+Breakpoint 1 at 0xc008811c: file kernel/irq/chip.c, line 329.
+(gdb) cont
+Continuing.
 
-will drop those comments.
+Breakpoint 1, handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+329		mask_ack_irq(desc);
+(gdb) bt
+#0  handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+#1  0xc0085f64 in generic_handle_irq_desc (irq=42) at include/linux/irqdesc.h:111
+#2  generic_handle_irq (irq=42) at kernel/irq/irqdesc.c:304
+#3  0xc0033060 in asm_do_IRQ (irq=42, regs=<value optimized out>) at arch/arm/kernel/irq.c:90
+#4  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#5  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#6  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#7  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#8  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#9  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#10 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#11 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+#12 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
 
->> + ? ? unsigned int ? ? ? ? ? ?auto_sus_timeout; /* Auto_suspend timeout */
->
-> rename to autosuspend_timeout, drop comment.
+... and so on it continues ad infinitum. Is it the expected behaviour?
+Because I'm pretty much sure that this isn't a desired behaviour.
 
-ok.
-
---
-Thanks,
-Govindraj.R
-
->
-> Kevin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-serial" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+-- 
+With best wishes
+Dmitry
