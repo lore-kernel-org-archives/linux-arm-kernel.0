@@ -1,74 +1,37 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Mon, 27 Jun 2011 21:10:38 +0530
-Subject: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
-In-Reply-To: <alpine.DEB.2.00.1106270910210.460@utopia.booyaka.com>
-References: <1308932625-17632-1-git-send-email-premi@ti.com>
-	<86CFE860-E18E-4B96-A753-11EB7C5C1C86@dominion.thruhere.net>
-	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2FE2@dbde02.ent.ti.com>
-	<alpine.DEB.2.00.1106251635340.30205@utopia.booyaka.com>
-	<20110627101427.GH23145@atomide.com>
-	<alpine.DEB.2.00.1106270910210.460@utopia.booyaka.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D793501@dbde02.ent.ti.com>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Mon, 27 Jun 2011 18:19:30 +0200
+Subject: [PATCH] mach-ux500: fix USB build error
+Message-ID: <1309191570-3978-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Paul Walmsley [mailto:paul at pwsan.com] 
-> Sent: Monday, June 27, 2011 9:00 PM
-> To: Premi, Sanjeev; Tony Lindgren
-> Cc: Koen Kooi; linux-omap at vger.kernel.org List; linux-arm-kernel
-> Subject: Re: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
-> 
-> On Mon, 27 Jun 2011, Tony Lindgren wrote:
-> 
-> > This fix will cause bad dependency issues with sys_timer.
-> > 
-> > This patch has a dependency to omap3_beagle_init_rev, which 
-> depends on
-> > the mux framework and gpio framework. Not cool for 
-> init_early. We just
-> > want to initialize sys_timer early without any complicated 
-> dependencies.
-> > 
-> > The best way to fix this is to set a separate machine ID 
-> for the properly
-> > working beagle boards like xm, then just set the .timer 
-> entry to omap3_timer
-> > for working beagle boards and omap3_secure_timer for 
-> non-working beagle
-> > boards. The rest of the board-*.c file can be shared.
-> 
-> Sanjeev, want to take care of this?  Machine ID update info is in 
-> linux/arch/arm/tools/mach-types.  
-> 
-> This strategy will unfortunately involve patching 
-> bootloaders.  But if the 
-> default is to use GPT12, it should work out okay.
+From: Linus Walleij <linus.walleij@linaro.org>
 
-[sp] Just sent another query to Tony on this specific issue.
-     But, if different mach-type is the way forward, then
-     I will take it forward.
+The mach-ux500/usb.c was referencing DMA macros, but not
+including <linux/dma-mapping.h> so it didn't compile. Fixed by
+a proper #include.
 
-> 
-> Hopefully we won't have to do the same thing for the other 
-> Beagle-derived 
-> boards, Devkit8000, Touchbook, etc. etc.  Then again, I 
-> suppose this will 
-> eventually just be another property passed in via DT, with a single 
-> machine ID.
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Mian Yousaf Kaukab <mian.yousaf.kaukab@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+Arnd: please merge this atop of the st-ericsson stuff in arm-soc
+so that the -next tree compiles when it get pulled in.
+---
+ arch/arm/mach-ux500/usb.c |    1 +
+ 1 files changed, 1 insertions(+), 0 deletions(-)
 
-[sp] Can you look at my query to Tony? Will that be an acceptable
-     workaround until DT. Going to two machine IDs and then unifying
-     back again could cause confusion - esp. during transition times.
-
-~sanjeev
-
-> 
-> > The above assumes the patches in devel-timer branch where 
-> we no longer
-> > have the non-standard timer interface, but use the sys_timer entries
-> > instead like we should.
-> 
-> 
-> - Paul
-> 
+diff --git a/arch/arm/mach-ux500/usb.c b/arch/arm/mach-ux500/usb.c
+index 82e5359..0a01cbd 100644
+--- a/arch/arm/mach-ux500/usb.c
++++ b/arch/arm/mach-ux500/usb.c
+@@ -6,6 +6,7 @@
+  */
+ #include <linux/platform_device.h>
+ #include <linux/usb/musb.h>
++#include <linux/dma-mapping.h>
+ #include <plat/ste_dma40.h>
+ #include <mach/hardware.h>
+ #include <mach/usb.h>
+-- 
+1.7.3.2
