@@ -1,41 +1,47 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Jun 2011 00:16:22 +0100
-Subject: Missing volatile in hard_smp_processor_id.
-In-Reply-To: <4E090C4D.1000309@xenomai.org>
-References: <4E090C4D.1000309@xenomai.org>
-Message-ID: <20110627231622.GB6222@n2100.arm.linux.org.uk>
+Date: Tue, 28 Jun 2011 00:29:03 +0100
+Subject: [RFC 1/8] drivers: add generic remoteproc framework
+In-Reply-To: <20110627204958.GB20865@ponder.secretlab.ca>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-2-git-send-email-ohad@wizery.com>
+	<20110627204958.GB20865@ponder.secretlab.ca>
+Message-ID: <20110627232903.GB7736@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 01:03:41AM +0200, Gilles Chanteperdrix wrote:
-> I know hard_smp_processor_id() disappeared after Linux 2.6.37, but this
-> may be interesting for the stable and long term support branches. This
-> issue is suspected to cause random segmentation faults on OMAP4 with 
-> CONFIG_HIGHMEM on.
+On Mon, Jun 27, 2011 at 02:49:58PM -0600, Grant Likely wrote:
+> > +struct {
+> > +      char magic[4] = { 'R', 'P', 'R', 'C' };
+> > +      u32 version;
+> > +      u32 header_len;
+> > +      char header[...] = { header_len bytes of unformatted, textual header };
+> > +      struct section {
+> > +          u32 type;
+> > +          u64 da;
+> > +          u32 len;
+> > +          u8 content[...] = { len bytes of binary data };
+> > +      } [ no limit on number of sections ];
+> > +} __packed;
+> 
+> Other have commented on the image format, so I'll skip this bit other
+> than saying that I agree it would be great to have a common format.
 
-1. hard_smp_processor_id() was only used in the platform hotplug code
-to verify that the intended CPU number was the same as the hardware
-CPU number.  These checks were removed by bbc81fd (ARM: CPU hotplug:
-remove bug checks in platform_cpu_die()).
+(Don't have the original message to reply to...)
 
-2. OMAP - and as a general principle, no one else - does not and should
-not make use of this macro.  CPU numbers within Linux are 'logical' and
-may not correspond with the hardware CPU number.  However, there are
-three places where we make the assumption that they're the same:
+Do we really want to end up with header being 5 bytes, header_len set
+as 5, and having to load/store all this data using byte loads/stores ?
 
-a) CPU bringup code
-b) GIC cross-call code
-c) Hotplug code
+If we don't want that, then I suggest we get rid of the packed attribute,
+and require stuff to be naturally aligned.
 
-Even these places make no reference to the MPIDR register - the only
-place which does is the very early assembly code.
+First issue is that struct section could be much better layed out:
 
-_Anything_ which uses hard_smp_processor_id() is probably buggy.  We have
-get_cpu()..put_cpu() to deal with preemption etc, and in any case the
-logical CPU number should always be used for indexing data structures.
+struct section {
+	u32 type;
+	u32 len;
+	u64 da;
+	u8 content[];
+};
 
-Finally, there is no code merged into mainline which mis-uses this
-macro.
-
-So, all in all I see no reason to submit patches to stable trees for
-something which doesn't cause a problem in those trees themselves.
+and require sizeof(struct section) % sizeof(u64) == 0 - iow, to find
+the next section, round len up to sizeof(u64).  Ditto for the header.
