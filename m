@@ -1,86 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Jun 2011 15:19:43 +0200
-Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
-In-Reply-To: <000601cc34c4$430f91f0$c92eb5d0$%szyprowski@samsung.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<201106241736.43576.arnd@arndb.de>
-	<000601cc34c4$430f91f0$c92eb5d0$%szyprowski@samsung.com>
-Message-ID: <201106271519.43581.arnd@arndb.de>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Mon, 27 Jun 2011 16:22:05 +0300
+Subject: [PATCH] MTD: pxa3xx_nand: enable multiple chip select support
+In-Reply-To: <1309000666-5242-1-git-send-email-leiwen@marvell.com>
+References: <4E031900.50108@compulab.co.il>
+	<1309000666-5242-1-git-send-email-leiwen@marvell.com>
+Message-ID: <4E0883FD.3080707@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 June 2011, Marek Szyprowski wrote:
+On 06/25/11 14:17, Lei Wen wrote:
 
-> On Friday, June 24, 2011 5:37 PM Arnd Bergmann wrote:
-> 
-> > On Monday 20 June 2011, Marek Szyprowski wrote:
-> > > This patch modifies dma-mapping implementation on ARM architecture to
-> > > use common dma_map_ops structure and asm-generic/dma-mapping-common.h
-> > > helpers.
-> > >
-> > > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> > 
-> > This is a good idea in general, but I have a few concerns about details:
-> > 
-> > First of all, should we only allow using dma_map_ops on ARM, or do we
-> > also want to support a case where these are all inlined as before?
-> 
-> I really wonder if it is possible to have a clean implementation of 
-> dma_map_ops based and linear inlined dma-mapping framework together.
-> Theoretically it should be possible, but it will end with a lot of
-> #ifdef hackery which is really hard to follow and understand for 
-> anyone but the authors.
+> Current pxa3xx_nand controller has two chip select which
+> both be workable. This patch enable this feature.
+>
+> Update platform driver to support this feature.
+>
+> Another notice should be taken that:
+> When you want to use this feature, you should not enable the
+> keep configuration feature, for two chip select could be
+> attached with different nand chip. The different page size
+> and timing requirement make the keep configuration impossible.
+>
+> Signed-off-by: Lei Wen <leiwen@marvell.com>
+> ---
+>  arch/arm/mach-mmp/aspenite.c                 |    5 +-
+>  arch/arm/mach-pxa/cm-x300.c                  |    5 +-
+>  arch/arm/mach-pxa/colibri-pxa3xx.c           |    5 +-
+>  arch/arm/mach-pxa/littleton.c                |    5 +-
+>  arch/arm/mach-pxa/mxm8x10.c                  |    9 +-
+>  arch/arm/mach-pxa/raumfeld.c                 |    5 +-
+>  arch/arm/mach-pxa/zylonite.c                 |    5 +-
+>  arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |   19 +-
+>  drivers/mtd/nand/pxa3xx_nand.c               |  512 +++++++++++++++-----------
+>  9 files changed, 346 insertions(+), 224 deletions(-)
 
-Right. It's probably not worth unless there is a significant overhead
-in terms of code size or performance in the coherent linear case.
+~100 lines less - nice!
 
-> > I suppose for the majority of the cases, the overhead of the indirect
-> > function call is near-zero, compared to the overhead of the cache
-> > management operation, so it would only make a difference for coherent
-> > systems without an IOMMU. Do we care about micro-optimizing those?
-> 
-> Even in coherent case, the overhead caused by additional function call
-> should have really negligible impact on drivers performance.
+[...]
 
-What about object code size? I guess since ixp23xx is the only platform
-that announces itself as coherent, we probably don't need to worry about
-it too much either. Lennert?
+> diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+> index b7db1b2..0825b7d 100644
+> --- a/drivers/mtd/nand/pxa3xx_nand.c
+> +++ b/drivers/mtd/nand/pxa3xx_nand.c
 
-On everything else, we only replace a direct functin call with an
-indirect one.
+[...]
 
->  > > diff --git a/arch/arm/include/asm/dma-mapping.h
-> > b/arch/arm/include/asm/dma-mapping.h
-> > > index 799669d..f4e4968 100644
-> > > --- a/arch/arm/include/asm/dma-mapping.h
-> > > +++ b/arch/arm/include/asm/dma-mapping.h
-> > > @@ -10,6 +10,27 @@
-> > >  #include <asm-generic/dma-coherent.h>
-> > >  #include <asm/memory.h>
-> > >
-> > > +extern struct dma_map_ops dma_ops;
-> > > +
-> > > +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
-> > > +{
-> > > +	if (dev->archdata.dma_ops)
-> > > +		return dev->archdata.dma_ops;
-> > > +	return &dma_ops;
-> > > +}
-> > 
-> > I would not name the global structure just 'dma_ops', the identifier could
-> > too easily conflict with a local variable in some driver. How about
-> > arm_dma_ops or linear_dma_ops instead?
-> 
-> I'm fine with both of them. Even arm_linear_dma_ops make some sense.
+> @@ -616,7 +627,7 @@ static int prepare_command_pool(struct pxa3xx_nand_info *info, int command,
+>  
+>  	default:
+>  		exec_cmd = 0;
+> -		printk(KERN_ERR "pxa3xx-nand: non-supported"
+> +		dev_err(&info->pdev->dev, "pxa3xx-nand: non-supported"
 
-Ok, just pick one then if nobody has a strong opinion either way.
+If you use dev_err(), why do you still need pxa3xx-nand in the message?
 
-> > You should not need to make these symbols visible in the header file any
-> > more unless they are used outside of the main file later.
-> 
-> They are used by the dma bounce code once converted to dma_map_ops framework.
 
-Ok, I see.
-
-	Arnd
+-- 
+Regards,
+Igor.
