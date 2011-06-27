@@ -1,59 +1,51 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Mon, 27 Jun 2011 17:35:49 -0600
-Subject: [RFC 1/8] drivers: add generic remoteproc framework
-In-Reply-To: <20110627232903.GB7736@n2100.arm.linux.org.uk>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-2-git-send-email-ohad@wizery.com>
-	<20110627204958.GB20865@ponder.secretlab.ca>
-	<20110627232903.GB7736@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=MDSuiGb64Se1T7zCWG6syxXbhTg@mail.gmail.com>
+From: rnayak@ti.com (Rajendra Nayak)
+Date: Mon, 27 Jun 2011 16:36:26 -0700
+Subject: [PATCH 4/8] OMAP2+: PM: idle clkdms only if already in idle
+In-Reply-To: <alpine.DEB.2.00.1106270012410.460@utopia.booyaka.com>
+References: <1307616853-28395-1-git-send-email-rnayak@ti.com>
+	<1307616853-28395-2-git-send-email-rnayak@ti.com>
+	<1307616853-28395-3-git-send-email-rnayak@ti.com>
+	<1307616853-28395-4-git-send-email-rnayak@ti.com>
+	<1307616853-28395-5-git-send-email-rnayak@ti.com>
+	<20110610001556.GA9159@google.com> <4DF1FE6A.3010202@ti.com>
+	<alpine.DEB.2.00.1106270012410.460@utopia.booyaka.com>
+Message-ID: <4E0913FA.9030607@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 5:29 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Jun 27, 2011 at 02:49:58PM -0600, Grant Likely wrote:
->> > +struct {
->> > + ? ? ?char magic[4] = { 'R', 'P', 'R', 'C' };
->> > + ? ? ?u32 version;
->> > + ? ? ?u32 header_len;
->> > + ? ? ?char header[...] = { header_len bytes of unformatted, textual header };
->> > + ? ? ?struct section {
->> > + ? ? ? ? ?u32 type;
->> > + ? ? ? ? ?u64 da;
->> > + ? ? ? ? ?u32 len;
->> > + ? ? ? ? ?u8 content[...] = { len bytes of binary data };
->> > + ? ? ?} [ no limit on number of sections ];
->> > +} __packed;
->>
->> Other have commented on the image format, so I'll skip this bit other
->> than saying that I agree it would be great to have a common format.
->
-> (Don't have the original message to reply to...)
->
-> Do we really want to end up with header being 5 bytes, header_len set
-> as 5, and having to load/store all this data using byte loads/stores ?
->
-> If we don't want that, then I suggest we get rid of the packed attribute,
-> and require stuff to be naturally aligned.
->
-> First issue is that struct section could be much better layed out:
->
-> struct section {
-> ? ? ? ?u32 type;
-> ? ? ? ?u32 len;
-> ? ? ? ?u64 da;
-> ? ? ? ?u8 content[];
-> };
->
-> and require sizeof(struct section) % sizeof(u64) == 0 - iow, to find
-> the next section, round len up to sizeof(u64). ?Ditto for the header.
+Hi Paul,
 
-Hopefully this will all be moot since it has been proposed to use elf
-images directly.
+On 6/26/2011 11:34 PM, Paul Walmsley wrote:
+> Hi Rajendra, Todd,
+>
+> On Fri, 10 Jun 2011, Rajendra Nayak wrote:
+>
+>> Paul/Benoit any thoughts on if a per-clkdm lock seems reasonable?
+>
+> Sounds okay to me.
+>
+> The experimental patch that you sent didn't add the locking to the *wkdep,
+> *sleepdep functions; I guess we'd better add it there at the same time,
+> since some of the register access there does a read-modify-write.
 
-g.
+My initial idea was to just guard the functions which program the
+target clockdomain state, since that's something which had a possibility
+of racing.
+For the sleepdep/wkupdep programming, I thought they are all done from
+within frameworks and during pm-core init at boot and might not run into
+concurrency issues. But maybe it makes sense to guard those as well.
 
--- 
-Grant Likely, B.Sc., P.Eng.
-Secret Lab Technologies Ltd.
+>
+> It should be possible to get rid of the atomic_t usage in the clockdomain
+> code as part of the same series.
+
+Sure, I'll get rid of those.
+
+Thanks,
+Rajendra
+
+>
+> Todd, thanks for pointing this out.
+>
+>
+> - Paul
