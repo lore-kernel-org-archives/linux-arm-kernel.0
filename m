@@ -1,81 +1,80 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Jun 2011 16:53:44 +0200
-Subject: [PATCH 2/8] ARM: dma-mapping: implement dma_map_single on top of
-	dma_map_page
-In-Reply-To: <000a01cc34d6$9e4576e0$dad064a0$%szyprowski@samsung.com>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<201106241724.21113.arnd@arndb.de>
-	<000a01cc34d6$9e4576e0$dad064a0$%szyprowski@samsung.com>
-Message-ID: <201106271653.44892.arnd@arndb.de>
+From: jaswinder.singh@linaro.org (Jassi Brar)
+Date: Mon, 27 Jun 2011 20:32:03 +0530
+Subject: [PATCHv2] OMAP4: PANDA, SDP: Fix EHCI regulator supply
+In-Reply-To: <1308926240-13888-1-git-send-email-jaswinder.singh@linaro.org>
+References: <1308926240-13888-1-git-send-email-jaswinder.singh@linaro.org>
+Message-ID: <1309186923-29192-1-git-send-email-jaswinder.singh@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 27 June 2011, Marek Szyprowski wrote:
-> On Friday, June 24, 2011 5:24 PM Arnd Bergmann wrote:
-> 
-> > On Monday 20 June 2011, Marek Szyprowski wrote:
-> > > > This also breaks dmabounce when used with a highmem-enabled system -
-> > > > dmabounce refuses the dma_map_page() API but allows the
-> > dma_map_single()
-> > > > API.
-> > >
-> > > I really not sure how this change will break dma bounce code.
-> > >
-> > > Does it mean that it is allowed to call dma_map_single() on kmapped
-> > > HIGH_MEM page?
-> > 
-> > dma_map_single on a kmapped page already doesn't work, the argument needs
-> > to be inside of the linear mapping in order for virt_to_page to work.
-> 
-> Then I got really confused.
-> 
-> Documentation/DMA-mapping.txt says that dma_map_single() can be used only
-> with kernel linear mapping, while dma_map_page() can be also called on 
-> HIGHMEM pages.
+VUSB is a fixed level line and hence have no set_voltage
+callback in regulator ops, but has apply_uV set to true.
+As a result it fails to register with the regulator core.
+Remove setting apply_uV.
 
-Right, this is true in general.
+Also, assign name to VUSB supply, without which regulator core
+fails to find it and assigns the default 'dummy' regulator to
+the ehci-omap device.
 
-> Now, lets go to arch/arm/common/dmabounce.c code:
-> 
-> dma_addr_t __dma_map_page(struct device *dev, struct page *page,
->                 unsigned long offset, size_t size, enum dma_data_direction dir)
-> {
->         dev_dbg(dev, "%s(page=%p,off=%#lx,size=%zx,dir=%x)\n",
->                 __func__, page, offset, size, dir);
-> 
->         BUG_ON(!valid_dma_direction(dir));
-> 
->         if (PageHighMem(page)) {
->                 dev_err(dev, "DMA buffer bouncing of HIGHMEM pages "
->                              "is not supported\n");
->                 return ~0;
->         }
-> 
->         return map_single(dev, page_address(page) + offset, size, dir);
-> }
-> EXPORT_SYMBOL(__dma_map_page);
->
-> Am I right that there is something mixed here? I really don't get why there is
-> high mem check in dma_map_page implementation. dma_map_single doesn't perform
-> such check and works with kmapped highmem pages...
->
-> Russell also pointed that my patch broke dma bounch with high mem enabled.
+Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
+---
+ arch/arm/mach-omap2/board-4430sdp.c    |    7 ++++++-
+ arch/arm/mach-omap2/board-omap4panda.c |    7 ++++++-
+ 2 files changed, 12 insertions(+), 2 deletions(-)
 
-The version of __dma_map_page that you cited is the one used with dmabounce
-enabled, when CONFIG_DMABOUNCE is disabled, the following version is used:
-
-static inline dma_addr_t __dma_map_page(struct device *dev, struct page *page,
-             unsigned long offset, size_t size, enum dma_data_direction dir)
-{
-        __dma_page_cpu_to_dev(page, offset, size, dir);
-        return pfn_to_dma(dev, page_to_pfn(page)) + offset;
-}
-
-This does not have the check, because the kernel does not need to touch
-the kernel mapping in that case.
-
-If you pass a kmapped page into dma_map_single, it should also not
-work because of the BUG_ON in ___dma_single_cpu_to_dev -- it warns
-you that you would end up flushing the cache for the wrong page (if any).
-
-	Arnd
+diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
+index 63de2d3..9493cd3 100644
+--- a/arch/arm/mach-omap2/board-4430sdp.c
++++ b/arch/arm/mach-omap2/board-4430sdp.c
+@@ -504,16 +504,21 @@ static struct regulator_init_data sdp4430_vdac = {
+ 	},
+ };
+ 
++static struct regulator_consumer_supply sdp4430_vusb_supply[] = {
++	REGULATOR_SUPPLY("hsusb0", "ehci-omap.0"),
++};
++
+ static struct regulator_init_data sdp4430_vusb = {
+ 	.constraints = {
+ 		.min_uV			= 3300000,
+ 		.max_uV			= 3300000,
+-		.apply_uV		= true,
+ 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+ 					| REGULATOR_MODE_STANDBY,
+ 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
+ 					| REGULATOR_CHANGE_STATUS,
+ 	},
++	.num_consumer_supplies	= ARRAY_SIZE(sdp4430_vusb_supply),
++	.consumer_supplies	= sdp4430_vusb_supply,
+ };
+ 
+ static struct regulator_init_data sdp4430_clk32kg = {
+diff --git a/arch/arm/mach-omap2/board-omap4panda.c b/arch/arm/mach-omap2/board-omap4panda.c
+index d4f9879..2beb0d5 100644
+--- a/arch/arm/mach-omap2/board-omap4panda.c
++++ b/arch/arm/mach-omap2/board-omap4panda.c
+@@ -362,16 +362,21 @@ static struct regulator_init_data omap4_panda_vdac = {
+ 	},
+ };
+ 
++static struct regulator_consumer_supply omap4_panda_vusb_supply[] = {
++	REGULATOR_SUPPLY("hsusb0", "ehci-omap.0"),
++};
++
+ static struct regulator_init_data omap4_panda_vusb = {
+ 	.constraints = {
+ 		.min_uV			= 3300000,
+ 		.max_uV			= 3300000,
+-		.apply_uV		= true,
+ 		.valid_modes_mask	= REGULATOR_MODE_NORMAL
+ 					| REGULATOR_MODE_STANDBY,
+ 		.valid_ops_mask	 =	REGULATOR_CHANGE_MODE
+ 					| REGULATOR_CHANGE_STATUS,
+ 	},
++	.num_consumer_supplies	= ARRAY_SIZE(omap4_panda_vusb_supply),
++	.consumer_supplies	= omap4_panda_vusb_supply,
+ };
+ 
+ static struct regulator_init_data omap4_panda_clk32kg = {
+-- 
+1.7.4.1
