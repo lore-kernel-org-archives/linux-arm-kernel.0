@@ -1,59 +1,98 @@
-From: premi@ti.com (Premi, Sanjeev)
-Date: Mon, 27 Jun 2011 17:42:36 +0530
-Subject: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
-In-Reply-To: <20110627111556.GM23145@atomide.com>
-References: <1309171009-8075-1-git-send-email-premi@ti.com>
-	<20110627111556.GM23145@atomide.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7933C0@dbde02.ent.ti.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Mon, 27 Jun 2011 14:18:02 +0200
+Subject: [PATCH 3/8] ARM: dma-mapping: use asm-generic/dma-mapping-common.h
+In-Reply-To: <201106241736.43576.arnd@arndb.de>
+References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
+	<1308556213-24970-4-git-send-email-m.szyprowski@samsung.com>
+	<201106241736.43576.arnd@arndb.de>
+Message-ID: <000601cc34c4$430f91f0$c92eb5d0$%szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Tony Lindgren [mailto:tony at atomide.com] 
-> Sent: Monday, June 27, 2011 4:46 PM
-> To: Premi, Sanjeev
-> Cc: linux-omap at vger.kernel.org; 
-> linux-arm-kernel at lists.infradead.org; Gregoire Gentil; 
-> Bhandiwad, Hrishikesh; Jason Lam; Thomas Weber
-> Subject: Re: [PATCHv2] omap3: beagle: Use GPTIMER1 for clockevents
-> 
-> * Sanjeev Premi <premi@ti.com> [110627 03:33]:
-> > From: Hrishikesh Bhandiwad <hrishikesh.b@ti.com>
-> > 
-> > Present current selection of the GPTIMER on Beagleboard
-> > was result of a hardware issue in early versions of the
-> > Beagleboards (Ax and B1 thru B4). [1][2]
-> > 
-> > Its been long since the hardware issue has been fixed.
-> > This patch uses GPTIMER 1 for all newer board revisions
-> > incl. Beagleboard XM.
-> > 
-> > Also, the clock source for GPTIMER12 is much less frequency
-> > stable than clock sources for GPTIMER1. Using GPTIMER12 can
-> > result in major time skew over a fairly short interval.
-> 
-> I don't think omap3_beagle_init_rev is even called when
-> the timer is set?
+Hello,
 
-[sp] I verified the patch based on the print indicating that
-     GPTIMER1 being used as clockevent source.
-     http://marc.info/?l=linux-omap&m=130893319726456&w=2
+On Friday, June 24, 2011 5:37 PM Arnd Bergmann wrote:
 
+> On Monday 20 June 2011, Marek Szyprowski wrote:
+> > This patch modifies dma-mapping implementation on ARM architecture to
+> > use common dma_map_ops structure and asm-generic/dma-mapping-common.h
+> > helpers.
+> >
+> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
 > 
-> But even if it was, this is not a good fix because of the
-> dependency issues it causes to mux and gpio framework in
-> omap3_beagle_rev_init.
+> This is a good idea in general, but I have a few concerns about details:
 > 
-> The best way to fix this is to set a separate machine ID
-> for the working beagle boards like I commented earlier.
-> It allows just setting the .timer based on that, the rest
-> of the code can be shared.
+> First of all, should we only allow using dma_map_ops on ARM, or do we
+> also want to support a case where these are all inlined as before?
 
-[sp] Sorry missed reading your comment. I wasn't checking
-     mails while sending the updated patch.
+I really wonder if it is possible to have a clean implementation of 
+dma_map_ops based and linear inlined dma-mapping framework together.
+Theoretically it should be possible, but it will end with a lot of
+#ifdef hackery which is really hard to follow and understand for 
+anyone but the authors.
 
+> I suppose for the majority of the cases, the overhead of the indirect
+> function call is near-zero, compared to the overhead of the cache
+> management operation, so it would only make a difference for coherent
+> systems without an IOMMU. Do we care about micro-optimizing those?
+
+Even in coherent case, the overhead caused by additional function call
+should have really negligible impact on drivers performance.
+
+ > > diff --git a/arch/arm/include/asm/dma-mapping.h
+> b/arch/arm/include/asm/dma-mapping.h
+> > index 799669d..f4e4968 100644
+> > --- a/arch/arm/include/asm/dma-mapping.h
+> > +++ b/arch/arm/include/asm/dma-mapping.h
+> > @@ -10,6 +10,27 @@
+> >  #include <asm-generic/dma-coherent.h>
+> >  #include <asm/memory.h>
+> >
+> > +extern struct dma_map_ops dma_ops;
+> > +
+> > +static inline struct dma_map_ops *get_dma_ops(struct device *dev)
+> > +{
+> > +	if (dev->archdata.dma_ops)
+> > +		return dev->archdata.dma_ops;
+> > +	return &dma_ops;
+> > +}
 > 
-> Regards,
+> I would not name the global structure just 'dma_ops', the identifier could
+> too easily conflict with a local variable in some driver. How about
+> arm_dma_ops or linear_dma_ops instead?
+
+I'm fine with both of them. Even arm_linear_dma_ops make some sense.
+
+> >  /*
+> >   * The scatter list versions of the above methods.
+> >   */
+> > -extern int dma_map_sg(struct device *, struct scatterlist *, int,
+> > -		enum dma_data_direction);
+> > -extern void dma_unmap_sg(struct device *, struct scatterlist *, int,
+> > +extern int arm_dma_map_sg(struct device *, struct scatterlist *, int,
+> > +		enum dma_data_direction, struct dma_attrs *attrs);
+> > +extern void arm_dma_unmap_sg(struct device *, struct scatterlist *, int,
+> > +		enum dma_data_direction, struct dma_attrs *attrs);
+> > +extern void arm_dma_sync_sg_for_cpu(struct device *, struct scatterlist
+> *, int,
+> >  		enum dma_data_direction);
+> > -extern void dma_sync_sg_for_cpu(struct device *, struct scatterlist *,
+> int,
+> > +extern void arm_dma_sync_sg_for_device(struct device *, struct
+> scatterlist *, int,
+> >  		enum dma_data_direction);
+> > -extern void dma_sync_sg_for_device(struct device *, struct scatterlist *,
+> int,
+> > -		enum dma_data_direction);
+> > -
 > 
-> Tony
-> 
+> You should not need to make these symbols visible in the header file any
+> more unless they are used outside of the main file later.
+
+They are used by the dma bounce code once converted to dma_map_ops framework.
+
+Best regards
+-- 
+Marek Szyprowski
+Samsung Poland R&D Center
