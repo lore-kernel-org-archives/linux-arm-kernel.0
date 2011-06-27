@@ -1,65 +1,69 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Mon, 27 Jun 2011 14:23:40 +0200
-Subject: [PATCH 7/8] common: dma-mapping: change alloc/free_coherent method
-	to more generic alloc/free_attrs
-In-Reply-To: <201106241751.35655.arnd@arndb.de>
-References: <1308556213-24970-1-git-send-email-m.szyprowski@samsung.com>
-	<1308556213-24970-8-git-send-email-m.szyprowski@samsung.com>
-	<201106241751.35655.arnd@arndb.de>
-Message-ID: <000701cc34c5$0c50b800$24f22800$%szyprowski@samsung.com>
+From: jic23@cam.ac.uk (Jonathan Cameron)
+Date: Mon, 27 Jun 2011 13:32:25 +0100
+Subject: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+In-Reply-To: <DE79F8F5-7D8A-46B8-8C8C-C2A7515E9117@dominion.thruhere.net>
+References: <1308932625-17632-1-git-send-email-premi@ti.com>
+	<86CFE860-E18E-4B96-A753-11EB7C5C1C86@dominion.thruhere.net>
+	<B85A65D85D7EB246BE421B3FB0FBB593024D6C2FE2@dbde02.ent.ti.com>
+	<DE79F8F5-7D8A-46B8-8C8C-C2A7515E9117@dominion.thruhere.net>
+Message-ID: <4E087859.5010901@cam.ac.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-
-On Friday, June 24, 2011 5:52 PM Arnd Bergmann wrote:
-
-> On Monday 20 June 2011, Marek Szyprowski wrote:
-> > Introduce new alloc/free/mmap methods that take attributes argument.
-> > alloc/free_coherent can be implemented on top of the new alloc/free
-> > calls with NULL attributes. dma_alloc_non_coherent can be implemented
-> > using DMA_ATTR_NONCOHERENT attribute, dma_alloc_writecombine can also
-> > use separate DMA_ATTR_WRITECOMBINE attribute. This way the drivers will
-> > get more generic, platform independent way of allocating dma memory
-> > buffers with specific parameters.
-> >
-> > One more attribute can be usefull: DMA_ATTR_NOKERNELVADDR. Buffers with
-> > such attribute will not have valid kernel virtual address. They might be
-> > usefull for drivers that only exports the DMA buffers to userspace (like
-> > for example V4L2 or ALSA).
-> >
-> > mmap method is introduced to let the drivers create a user space mapping
-> > for a DMA buffer in generic, architecture independent way.
-> >
-> > TODO: update all dma_map_ops clients for all architectures
-> >
-> > Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> > Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On 06/25/11 21:10, Koen Kooi wrote:
 > 
-> Yes, I think that is good, but the change needs to be done atomically
-> across all architectures.
+> Op 25 jun 2011, om 20:51 heeft Premi, Sanjeev het volgende geschreven:
+> 
+>>> -----Original Message-----
+>>> From: linux-omap-owner at vger.kernel.org 
+>>> [mailto:linux-omap-owner at vger.kernel.org] On Behalf Of Koen Kooi
+>>> Sent: Saturday, June 25, 2011 1:47 PM
+>>> To: linux-omap at vger.kernel.org List
+>>> Cc: linux-arm-kernel; Paul Walmsley
+>>> Subject: Re: [PATCH] omap3: beagle: Use GPTIMERi 1 for clockevents
+>>>
+>>>
+>>> Op 24 jun 2011, om 18:23 heeft Sanjeev Premi het volgende geschreven:
+>>>
+>>>> The current selection of the GPTIMER on was result of
+>>>> a hardware issue in early versions of the Beagleboards
+>>>> (Ax and B1 thru B4). [1] [2]
+>>>>
+>>>> Its been long since the hardware issue has been fixed.
+>>>> This patch uses GPTIMER 1 for all newer board revisions
+>>>> incl. Beagleboard XM.
+>>
+>> [sp] I didn't include a reason - because the problem may not
+>>     be reproducible on the public trees.
+>>
+>>     During tests performed in internal development trees, the
+>>     BogoMIPS calculations @ 1GHz wouldn't go beyond "830-850"
+>>     range. While there was no such inconsistency on OMAP3EVM.
+>>
+>>     After few days of debug GPTIMER12 came to be only difference.
+>>     Tracing GPTIMER12 in the spec proved quite a challenge; the
+>>     as timer is not included in the TRM and corresponding interrupt
+>>     is marked reserved. Paul (in cc:) obviously had access to
+>>     documents that we don't.
+>>
+>>     This patch is merely trying to bring parity in use of GPTIMER
+>>     across OMAP3 boards (AND use documented IP) - taking note of
+>>     many Beagleboards where current code is necessary.
+> 
 
-Yes, I'm aware of this and I will include such changes in the next version
-of my patches.
+> I get a value of 1010 ?10 bogoMIPS consistently with .39 + dvfs
+> patches. Having said that, this patch does seem to be an improvement,
+> but has it actually been tested on real beagleboard hardware with a
+> recent kernel? Especially on the boards affected by the capacitor
+> issue on the external clock.--
+Hi Koen,
 
-> This should be easy enough as I believe
-> all other architectures that use dma_map_ops don't even require
-> dma_alloc_noncoherent but just define it to dma_alloc_coherent
-> because they have only coherent memory in regular device drivers.
+Probably obvious to anyone else here, but which dvfs patches?
 
-Right, this should be quite simple. I will also add DMA_ATTR_NON_COHERENT
-attribute for implementing dma_alloc_noncoherent() call.
+I've only recently acquired an xm and hence wasn't following these threads.
+Don't suppose you could point me to a tree with them in or the relevant
+thread?
 
-> On a related note, do you plan to make the CMA work use this
-> transparently, or do you want to have a DMA_ATTR_LARGE or
-> DMA_ATTR_CONTIGUOUS for CMA?
+Cheers,
 
-IMHO it will be better to hide the CMA from the drivers. Memory allocated
-from CMA doesn't really differ from the one allocated by dma_alloc_coherent()
-(which internally use alloc_pages()), so I really see no reason for adding
-additional attribute for it.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+Jonathan
