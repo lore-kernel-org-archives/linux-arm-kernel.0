@@ -1,31 +1,47 @@
-From: silesh@ti.com (Silesh C V)
-Date: Tue, 28 Jun 2011 11:26:24 +0530
-Subject: [PATCH] OMAP: 4430SDP: Register the card detect GPIO properly
-Message-ID: <1309240584-17401-1-git-send-email-silesh@ti.com>
+From: saeed.bishara@gmail.com (saeed bishara)
+Date: Tue, 28 Jun 2011 09:22:20 +0300
+Subject: [PATCH v6 00/11] mmc: use nonblock mmc requests to minimize
+	latency
+In-Reply-To: <20110627110234.GC16103@n2100.arm.linux.org.uk>
+References: <1308518257-9783-1-git-send-email-per.forlin@linaro.org>
+	<20110621075319.GN26089@n2100.arm.linux.org.uk>
+	<BANLkTimnuEK_9RedmD1OgcunX3rPvd-O0Q@mail.gmail.com>
+	<20110627110234.GC16103@n2100.arm.linux.org.uk>
+Message-ID: <BANLkTin80Z34=_uQaP=Dbv7eDxU1PH_qSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Without this the HSMMC driver takes GPIO 0 to be the card detect gpio
-and requests/configures it. This will give rise to issues when another
-driver needs to use GPIO 0. On 4430SDP, the card detection is through
-TWL 6030.
+On Mon, Jun 27, 2011 at 2:02 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Jun 27, 2011 at 01:34:48PM +0300, saeed bishara wrote:
+>> Russell,
+>> ? I'm curious about the correctness of this patch for systems with
+>> outer cache. shouldn't the dsb be issued before the outer cache
+>> maintenance?
+>
+> Maybe we should do two passes over SG lists then - one for the inner and
+> another for the outer cache?
+>
+> In effect we could do three passes:
+>
+> 1. Calculate the total size of the SG list to determine whether full
+> ? cache flush is more efficient.
+> 2. Flush inner cache
+> ? Then dsb()
+> 3. Flush outer cache
+> ? Another dsb()
+>
+looking at l2x0 cache, it seems to me that it would be possible to do
+asynchronous l2 cache maintenance for
+range operations, so maybe that can be utilized in order to
+parallelism between inner cache and outer cache maintenance,
+so the flow can be:
+2. Flush sg buffer from inner cache
+3. dsb()
+4. start Flush outer cache for that buffer
+5. Flush next sg buffer from inner cache
+6. dsb
+7. goto 4.
+8. when no more buffers left, wait for outer cache operations
 
-Signed-off-by: Silesh C V <silesh@ti.com>
----
- arch/arm/mach-omap2/board-4430sdp.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/board-4430sdp.c b/arch/arm/mach-omap2/board-4430sdp.c
-index 63de2d3..7a1460f 100644
---- a/arch/arm/mach-omap2/board-4430sdp.c
-+++ b/arch/arm/mach-omap2/board-4430sdp.c
-@@ -327,6 +327,7 @@ static struct omap2_hsmmc_info mmc[] = {
- 	{
- 		.mmc		= 1,
- 		.caps		= MMC_CAP_4_BIT_DATA | MMC_CAP_8_BIT_DATA,
-+		.gpio_cd	= -EINVAL,
- 		.gpio_wp	= -EINVAL,
- 	},
- 	{}	/* Terminator */
--- 
-1.7.1
+saeed
