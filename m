@@ -1,33 +1,48 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Tue, 28 Jun 2011 15:10:56 +0200
-Subject: [PATCH] arm: fix regression in ixp4xx clocksource
-In-Reply-To: <m362nspvb6.fsf@intrepid.localdomain>
-References: <20110530084307.GA28953@riccoc20.at.omicron.at>
-	<m362nspvb6.fsf@intrepid.localdomain>
-Message-ID: <20110628131056.GB12676@riccoc20.at.omicron.at>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 Jun 2011 14:15:38 +0100
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <20110627132735.GE16103@n2100.arm.linux.org.uk>
+References: <20110627125306.GA30646@doriath.ww600.siemens.net>
+	<20110627132735.GE16103@n2100.arm.linux.org.uk>
+Message-ID: <20110628131538.GA7255@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Jun 26, 2011 at 03:38:05PM +0200, Krzysztof Halasa wrote:
-> > Commit 234b6ceddb4fc2a4bc5b9a7670f070f6e69e0868
-> >
-> >    clocksource: convert ARM 32-bit up counting clocksources
-> >
-> > broke the build for ixp4xx and made big endian operation impossible.
-> > This commit restores the original behaviour.
+On Mon, Jun 27, 2011 at 02:27:35PM +0100, Russell King - ARM Linux wrote:
+> On Mon, Jun 27, 2011 at 04:53:06PM +0400, Dmitry Eremin-Solenikov wrote:
+> > I've got into a problem when trying to debug irq handlers on PXA (in
+> > qemu). backtrace is really strange from my POV (a target is just a qemu
+> > running a bit modified 3.0-rc2 kernel):
+> ...
+> > Breakpoint 1, handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+> > 329		mask_ack_irq(desc);
+> > (gdb) bt
+> > #0  handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
+> > #1  0xc0085f64 in generic_handle_irq_desc (irq=42) at include/linux/irqdesc.h:111
+> > #2  generic_handle_irq (irq=42) at kernel/irq/irqdesc.c:304
+> > #3  0xc0033060 in asm_do_IRQ (irq=42, regs=<value optimized out>) at arch/arm/kernel/irq.c:90
+> > #4  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #5  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #6  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #7  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #8  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #9  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #10 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #11 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > #12 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
+> > 
+> > ... and so on it continues ad infinitum. Is it the expected behaviour?
+> > Because I'm pretty much sure that this isn't a desired behaviour.
 > 
-> So, what do we do with this?
-> It would be nice to have the fix in the tree before 3.0.
-> I guess I'll add this if nothing better shows up.
+> My guess is that gdb is trying to unwind using the unwind information.
+> However, I don't think we actually give the assembler the full information
+> to be able to unwind this.  I've no idea how to solve this as I'm no
+> expert at the debug info.
 
-I'll say it once again:
+I don't think gdb is using the unwind information that we get in the
+kernel (that's actually the information used for C++ exceptions). Gdb is
+in general using the dwarf information in the vmlinux file (which we
+don't get in the final Image file).
 
-If IXP is the only machine that needs this exception, then I think my
-patch is okay. Otherwise, we would want a set of big-endian-friendly
-clock reading methods.
-
-But I really don't know whether IXP is all alone in this...
-
-Just my 2 cents,
-
-Richard
+-- 
+Catalin
