@@ -1,53 +1,58 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Jun 2011 15:59:37 +0100
-Subject: [RFC PATCH] MTD: atmel_nand: optimize read/write buffer functions
-In-Reply-To: <20110628111043.GH6588@pengutronix.de>
-References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628111043.GH6588@pengutronix.de>
-Message-ID: <20110628145937.GG21898@n2100.arm.linux.org.uk>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 Jun 2011 16:06:32 +0100
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
+References: <20110627125306.GA30646@doriath.ww600.siemens.net>
+	<20110627132735.GE16103@n2100.arm.linux.org.uk>
+	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
+	<20110628103946.GC21898@n2100.arm.linux.org.uk>
+	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
+	<20110628142045.GC7255@1n450.cable.virginmedia.net>
+	<20110628143014.GD7255@1n450.cable.virginmedia.net>
+	<BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
+	<BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
+Message-ID: <20110628150631.GD24904@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 01:10:43PM +0200, Uwe Kleine-K?nig wrote:
-> > @@ -265,33 +234,53 @@ err_buf:
-> >  static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
-> >  {
-> >  	struct nand_chip *chip = mtd->priv;
-> > -	struct atmel_nand_host *host = chip->priv;
-> > +	u32 align;
-> > +	u8 *pbuf;
-> >  
-> >  	if (use_dma && len > mtd->oobsize)
-> >  		/* only use DMA for bigger than oob size: better performances */
-> >  		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
-> >  			return;
-> >  
-> > -	if (host->board->bus_width_16)
-> > -		atmel_read_buf16(mtd, buf, len);
-> > -	else
-> > -		atmel_read_buf8(mtd, buf, len);
-> > +	/* if no DMA operation possible, use PIO */
-> > +	pbuf = buf;
-> > +	align = 0x03 & ((unsigned)pbuf);
-> > +
-> > +	if (align) {
-> > +		u32 align_len = 4 - align;
-> > +
-> > +		/* non aligned buffer: re-align to next word boundary */
-> > +		ioread8_rep(chip->IO_ADDR_R, pbuf, align_len);
-> > +		pbuf += align_len;
-> > +		len -= align_len;
-> > +	}
-> > +	memcpy((void *)pbuf, chip->IO_ADDR_R, len);
-> I think you don't need to cast to (void *). I think you need to cast the
-> 2nd parameter instead because sparse don't like you passing an void
-> __iomem *.
-> Is it correct to read from chip->IO_ADDR_R, don't you need
-> chip->IO_ADDR_R + align_len? Taking this into account, does it really
-> help to align pbuf?
+On Tue, Jun 28, 2011 at 03:54:11PM +0100, Dmitry Eremin-Solenikov wrote:
+> On 6/28/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
+> > On 6/28/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> >> Actually since the return address is in S_PC (which maybe gdb assumes it
+> >> would be the saved LR), this is probably not be correct. After SVC
+> >> entry, we have he following structure on the stack:
+> >>
+> >> 	ORIG_r0
+> >> 	CPSR
+> >> 		<--- assuming this is the Call Frame Address (SP+S_PC+4)
+> >> 	PC	<--- CFA - 4
+> >> 	LR	<--- don't care
+> >> 	SP	<--- CFA - 12
+> >> 	...
+> >>
+> >>
+> >> So we tell gdb about this with something like below (untested):
+> >>
+> >> 	.cfi_def_cfa_offset S_PC + 4
+> >> 	.cfi_offset 14, -4
+> >> 	.cfi_offset 13, -12
+> >
+> > This brings "unknown CFA rule" gdb exception, but it seems I got your idea.
+> 
+> No, this seems to work, it was my fault. I got more or less reasonable
+> backtrace now.
 
-I think you need to read Documentation/bus-virt-phys-mapping.txt,
-particularly the part after "NOTE NOTE NOTE".
+Does gdb manage to get into the parent stack frame?
 
-Dereferencing ioremap'd memory is not permitted.  That includes passing
-it to memcpy.  Even with a cast.
+BTW, are you compiling with FRAME_POINTER enabled? In this case you
+would need to set some offset for the FP register (11). If you don't
+mind missing the first part in the parent context, maybe something like
+below:
+
+	.cfi_def_cfa_offset S_PC
+	.cfi_offset 14, -4
+	.cfi_offset 13, -8
+	.cfi_offset 11, -16
+
+-- 
+Catalin
