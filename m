@@ -1,44 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Jun 2011 10:00:04 +0100
-Subject: [PATCH 1/1] Add Thread Support for the Context ID Register of
-	ARM v6 & v7 Architectures
-In-Reply-To: <20110627113707.GD16103@n2100.arm.linux.org.uk>
-References: <cover.1309163073.git.wolfgang.betz@st.com>
-	<3a6d2636489958d097cd013cad646fed012421dd.1309163073.git.wolfgang.betz@st.com>
-	<20110627113707.GD16103@n2100.arm.linux.org.uk>
-Message-ID: <20110628090004.GA16009@e102144-lin.cambridge.arm.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 28 Jun 2011 17:02:40 +0800
+Subject: [PATCH 0/3] Add generic idle notifiers
+In-Reply-To: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
+References: <1309229190-25006-1-git-send-email-toddpoynor@google.com>
+Message-ID: <BANLkTi=1ZfWfDpUkSV0f1KoWmkJbxHg=_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Tue, Jun 28, 2011 at 10:46 AM, Todd Poynor <toddpoynor@google.com> wrote:
+> Add notifiers for idle entry and exit, called with IDLE_START when a
+> CPU goes idle and IDLE_END when it goes out of idle, based on the
+> existing idle notifiers for the x86_64 arch.
+>
+> Convert x86_64 to use these notifiers, and call the notifiers on ARM.
+>
+> Convert the ARM LEDs events for idle start/end to these notifiers.
+>
 
-On Mon, Jun 27, 2011 at 12:37:08PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 27, 2011 at 01:12:27PM +0200, Wolfgang BETZ wrote:
-> > The aim of this patch is to enable thread support in the context ID register
-> > (CONTEXTIDR) as it comes with ARM architectures v6 & v7.
-> > 
-> >  On ARMv6 & v7, we have the following structure in the context ID:
-> > 
-> >    31                         7          0
-> >    +-------------------------+-----------+
-> >    |      process ID         |   ASID    |
-> >    +-------------------------+-----------+
-> >    |              context ID             |
-> >    +-------------------------------------+
-> > 
-> > - The ASID is used to tag entries in the CPU caches and TLBs.
-> > - The context ID is used by debuggers and trace logic, and
-> >   should be unique within all running processes.
-> 
-> When I added ARMv6 and v7 support to the kernel, I purposely ignored that
-> detail because it's silly.
+LinusW and I is working on consolidation LED events interface in ARM.
+Please take a look at https://patchwork.kernel.org/patch/918792/
 
-[...]
+I do like to add notifiers into ledtrig-cpu driver, which can be also
+shared by x86
 
-> How are you working around this issue?
+Thanks,
+-Bryan
 
-I don't know how you could get around this with current implementations, but
-for Cortex-A15 w/ LPAE the ASID lives in the TTBR rather than the context
-ID register, so using the PID is straightforward in that case.
+> ?arch/arm/kernel/leds.c ? ? ? | ? 27 ++++++++++++++++++++++++++-
+> ?arch/arm/kernel/process.c ? ?| ? ?5 ++---
+> ?arch/x86/include/asm/idle.h ?| ? ?7 -------
+> ?arch/x86/kernel/process_64.c | ? 18 ++----------------
+> ?include/linux/cpu.h ? ? ? ? ?| ? ?7 +++++++
+> ?kernel/cpu.c ? ? ? ? ? ? ? ? | ? 20 ++++++++++++++++++++
+> ?6 files changed, 57 insertions(+), 27 deletions(-)
+>
+> --
+> 1.7.3.1
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
 
-Will
+
+
+-- 
+Bryan Wu <bryan.wu@canonical.com>
+Kernel Developer ? ?+86.138-1617-6545 Mobile
+Ubuntu Kernel Team
+Canonical Ltd. ? ? ?www.canonical.com
+Ubuntu - Linux for human beings | www.ubuntu.com
