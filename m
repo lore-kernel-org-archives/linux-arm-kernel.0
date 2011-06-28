@@ -1,75 +1,107 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 28 Jun 2011 15:26:51 +0300
-Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
-In-Reply-To: <4E09C573.2030607@atmel.com>
-References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628103549.GG2612@legolas.emea.dhcp.ti.com>
-	<4E09C573.2030607@atmel.com>
-Message-ID: <20110628122650.GK2612@legolas.emea.dhcp.ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Jun 2011 14:27:04 +0200
+Subject: [PATCH 1/2] PWM: add pwm framework support
+In-Reply-To: <1309255368-9775-2-git-send-email-s.hauer@pengutronix.de>
+References: <1309255368-9775-1-git-send-email-s.hauer@pengutronix.de>
+	<1309255368-9775-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <201106281427.04373.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Jun 28, 2011 at 02:13:39PM +0200, Nicolas Ferre wrote:
-> Le 28/06/2011 12:35, Felipe Balbi :
-> > On Tue, Jun 28, 2011 at 01:35:27PM +0200, Nicolas Ferre wrote:
-> >> Add this Kconfig variable to ease the submission of this chip support.
-> >> As this chip/board inclusion is dealayed due to deep consolidation of
-> >> arm/mach-at91 sources, we include this dummy configuration variable to allow
-> >> submission of SAM9x5 related drivers in other subsystems.
-> > 
-> > Why are the drivers even depending on this ? They should be portable
-> > enough. Can you share a few drivers so we have a look ?
+On Tuesday 28 June 2011, Sascha Hauer wrote:
+> This patch adds framework support for PWM (pulse width modulation) devices.
 > 
-> Yes sure. The dependence is only on the Kconfig side: I plan to make
-> some drivers dependent on this configuration variable.
-> The goal is to submit the final driver addition without having to send
-> again a correction to the Kconfig after the chip/board support is merged.
+> The is a barebone PWM API already in the kernel under include/linux/pwm.h,
+> but it does not allow for multiple drivers as each of them implements the
+> pwm_*() functions.
 
-my point is that the drivers shouldn't need that ;-) Are the controllers
-Atmel's specific or are you guys sourcing from somewhere else ?
+Hi Sascha,
 
-> This will ease the submission process at the cost of a two lines dummy
-> patch and will remove interdependence between subsystem trees: it worth
-> it, is not it?
+This looks very nice.
+I have only trivial comments, except for the suggestion to use idr.
+ 
+> +PWM core
+> +M:	Sascha Hauer <s.hauer@pengutronix.de>
+> +L:	linux-kernel at vger.kernel.org
+> +S:	Maintained
 
-if you remove any architecture dependency from the driver, why do you
-even need these two lines ? ;-)
+I would add
 
-> > IMHO, the whole idea of the consolidation is beyond arch/arm, drivers
-> > should be affected too.
-> 
-> Yes sure, I also understood like this.
-> I will not spread ARCH_AT91SAM9X5 ifdef in driver code...
+F:	drivers/pwm/
 
-yet you will prevent the driver from being easily used by other
-architectures. What will happen is that a certain amount of:
+> diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
+> new file mode 100644
+> index 0000000..93c1052
+> --- /dev/null
+> +++ b/drivers/pwm/Kconfig
+> @@ -0,0 +1,12 @@
+> +menuconfig PWM
+> +	bool "PWM Support"
+> +	help
+> +	  This enables PWM support through the generic PWM framework.
+> +	  You only need to enable this, if you also want to enable
+> +	  one or more of the PWM drivers below.
 
-depends on (ARCH_AT91SAM9X5 || ARCH_FOO || ARCH_BAR || ARCH_BAZ)
+Remove the comma.
 
-will continue to proliferate.
+> +
+> +/*
+> + * The next pwm id to assign. We do not bother to fill gaps which
+> + * occur during dynamic registering/deregistering of pwms, but
+> + * instead assign a uniq id to each new pwm.
+                       unique
 
-Here are a few questions:
+> + */
+> +static int next_pwm_id;
 
-i) The drivers you're willing to send, are those for Atmel's IPs or are
-	the IPs sourced from some other company ?
+How about using idr? It provides you a fast lookup and handles giving
+out unique numbers.
 
-ii) Even if they are Atmel-specific, do you see the possibility of Atmel
-	licensing them ?
+> +
+> +/**
+> + * pwmchip_reserve() - reserve range of pwms to use with platform code only
+> + * @npwms: number of pwms to reserve
+> + * Context: platform init
+> + *
+> + * Maybe called only once. It reserves the first pwm_ids for platform use so
 
-iii) Does your driver current depend on asm/ or mach/ headers ?
+I assume you mean "May only be called once".
 
-iv) Is there a generic header which you could use instead of asm/ mach/ ?
+> +/**
+> + * struct pwm_ops - PWM operations
+> + * @request: optional hook for requesting a PWM
+> + * @free: optional hook for freeing a PWM
+> + * @config: configure duty cycles and period length for this PWM
+> + * @enable: enable PWM output toggling
+> + * @disable: disable PWM output toggling
+> + */
+> +struct pwm_ops {
+> +	int			(*request)(struct pwm_chip *chip);
+> +	void			(*free)(struct pwm_chip *chip);
+> +	int			(*config)(struct pwm_chip *chip, int duty_ns,
+> +						int period_ns);
+> +	int			(*enable)(struct pwm_chip *chip);
+> +	void			(*disable)(struct pwm_chip *chip);
+> +};
+>
+> +/**
+> + * struct pwm_chip - abstract a PWM
+> + * @label: for diagnostics
+> + * @owner: helps prevent removal of modules exporting active PWMs
+> + * @ops: The callbacks for this PWM
+> + */
+> +struct pwm_chip {
+> +	int			pwm_id;
+> +	const char		*label;
+> +	struct module		*owner;
+> +	struct pwm_ops		*ops;
+> +};
 
-If you could share the driver, it would be easier to review on that one.
+I think the "owner" field should be in the pwm_ops, not in the pwm_chip,
+because the pwm_ops is likely to be statically allocated, while the
+pwm_chip is probably runtime allocated and cannot be preinitialized.
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110628/af4fe8d8/attachment.sig>
+Should a pwm_chip contain a "struct device" so you can refer to it in
+sysfs and add attributes?
+
+	Arnd
