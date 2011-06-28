@@ -1,27 +1,35 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Jun 2011 13:13:34 +0100
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
-References: <20110627125306.GA30646@doriath.ww600.siemens.net>
-	<20110627132735.GE16103@n2100.arm.linux.org.uk>
-	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
-	<20110628103946.GC21898@n2100.arm.linux.org.uk>
-	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
-Message-ID: <20110628121334.GE21898@n2100.arm.linux.org.uk>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Tue, 28 Jun 2011 12:23:58 +0000 (UTC)
+Subject: [RFC] implement a generic PWM framework - once again
+References: <1309255368-9775-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <iuch4t$6ba$1@dough.gmane.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 04:06:11PM +0400, Dmitry Eremin-Solenikov wrote:
-> For the reference I'm providing the patch in the attachment.
-> 
-> Russell, will you agree to merge at least this partial solution, so
-> that gdb chokes,
-> but doesn't go to indefinite recursion? If you'd agree, I'll submit it
-> with proper
-> headers and sign-off.
+Hi,
 
-It looks like it does the right thing, but I think we need someone who
-knows how the debug info is supposed to work comment.
+Sascha Hauer wrote:
 
-Adding Catalin to the thread to see whether Catalin has any comments;
-Catalin added the original unwinder annotations.
+> Hi All,
+>
+> The following implements a generic pwm framework and adds a user
+> for it. I already posted this series back in January. Based on
+> the comments I received I added some details about the motivation
+> for adding such a framework and not using the led or hwmon framework
+> to patch 1/2.
+> I also added some documentation to Documentation/pwm.txt.
+>
+> This patch does not change the user API for PWMs, in particular
+> it does not enforce any sleep/nonsleep context to the PWM users.
+> The patch merely puts the status quo into a core wrapper to be able
+> to register multiple PWM drivers in the system. Improvements to
+> the API can still be made later once we have at least a place
+> in the kernel to collect the existing PWM drivers.
+
+Just a small question: on PXA (just for example) PWMs are registered
+from arch/arm via arch_initcall. Will your subsystem work for such early
+registration (of course after moving PXA driver to drivers/pwm)?
+
+-- 
+With best wishes
+Dmitry
