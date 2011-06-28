@@ -1,54 +1,261 @@
 From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Tue, 28 Jun 2011 14:49:17 +0200
-Subject: [PATCH 5/5] mach-s3c2410: remove unused spi-gpio.h file
+Date: Tue, 28 Jun 2011 14:49:16 +0200
+Subject: [PATCH 4/5] spi: remove obsolete spi-s3c24xx-gpio driver
 In-Reply-To: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
 References: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <1309265357-15879-6-git-send-email-jacmet@sunsite.dk>
+Message-ID: <1309265357-15879-5-git-send-email-jacmet@sunsite.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Not used anymore as the spi_s3c24xx_gpio driver is gone (replaced by
-the generic spi-gpio).
+It was equivalent to spi-gpio, and there's no longer any in-tree users
+of it, so get rid of it.
 
 Signed-off-by: Peter Korsgaard <jacmet@sunsite.dk>
 ---
- arch/arm/mach-s3c2410/include/mach/spi-gpio.h |   28 -------------------------
- 1 files changed, 0 insertions(+), 28 deletions(-)
- delete mode 100644 arch/arm/mach-s3c2410/include/mach/spi-gpio.h
+ drivers/spi/Kconfig            |   10 --
+ drivers/spi/Makefile           |    1 -
+ drivers/spi/spi-s3c24xx-gpio.c |  200 ----------------------------------------
+ 3 files changed, 0 insertions(+), 211 deletions(-)
+ delete mode 100644 drivers/spi/spi-s3c24xx-gpio.c
 
-diff --git a/arch/arm/mach-s3c2410/include/mach/spi-gpio.h b/arch/arm/mach-s3c2410/include/mach/spi-gpio.h
+diff --git a/drivers/spi/Kconfig b/drivers/spi/Kconfig
+index c013481..9aafa98 100644
+--- a/drivers/spi/Kconfig
++++ b/drivers/spi/Kconfig
+@@ -313,16 +313,6 @@ config SPI_S3C24XX_FIQ
+ 	  no free DMA channels, or when doing transfers that required both
+ 	  TX and RX data paths.
+ 
+-config SPI_S3C24XX_GPIO
+-	tristate "Samsung S3C24XX series SPI by GPIO"
+-	depends on ARCH_S3C2410 && EXPERIMENTAL
+-	select SPI_BITBANG
+-	help
+-	  SPI driver for Samsung S3C24XX series ARM SoCs using
+-	  GPIO lines to provide the SPI bus. This can be used where
+-	  the inbuilt hardware cannot provide the transfer mode, or
+-	  where the board is using non hardware connected pins.
+-
+ config SPI_S3C64XX
+ 	tristate "Samsung S3C64XX series type SPI"
+ 	depends on (ARCH_S3C64XX || ARCH_S5P64X0)
+diff --git a/drivers/spi/Makefile b/drivers/spi/Makefile
+index b60b04b..61c3261 100644
+--- a/drivers/spi/Makefile
++++ b/drivers/spi/Makefile
+@@ -44,7 +44,6 @@ obj-$(CONFIG_SPI_PL022)			+= spi-pl022.o
+ obj-$(CONFIG_SPI_PPC4xx)		+= spi-ppc4xx.o
+ obj-$(CONFIG_SPI_PXA2XX)		+= spi-pxa2xx.o
+ obj-$(CONFIG_SPI_PXA2XX_PCI)		+= spi-pxa2xx-pci.o
+-obj-$(CONFIG_SPI_S3C24XX_GPIO)		+= spi-s3c24xx-gpio.o
+ obj-$(CONFIG_SPI_S3C24XX)		+= spi-s3c24xx-hw.o
+ spi-s3c24xx-hw-y			:= spi-s3c24xx.o
+ spi-s3c24xx-hw-$(CONFIG_SPI_S3C24XX_FIQ) += spi-s3c24xx-fiq.o
+diff --git a/drivers/spi/spi-s3c24xx-gpio.c b/drivers/spi/spi-s3c24xx-gpio.c
 deleted file mode 100644
-index dcef228..0000000
---- a/arch/arm/mach-s3c2410/include/mach/spi-gpio.h
+index 2d3c085..0000000
+--- a/drivers/spi/spi-s3c24xx-gpio.c
 +++ /dev/null
-@@ -1,28 +0,0 @@
--/* arch/arm/mach-s3c2410/include/mach/spi-gpio.h
-- *
+@@ -1,200 +0,0 @@
+-/*
+- * Copyright (c) 2006 Ben Dooks
 - * Copyright (c) 2006 Simtec Electronics
-- *	Ben Dooks <ben@simtec.co.uk>
 - *
-- * S3C2410 - SPI Controller platform_device info
+- * S3C24XX GPIO based SPI driver
 - *
 - * This program is free software; you can redistribute it and/or modify
 - * it under the terms of the GNU General Public License version 2 as
 - * published by the Free Software Foundation.
+- *
 -*/
 -
--#ifndef __ASM_ARCH_SPIGPIO_H
--#define __ASM_ARCH_SPIGPIO_H __FILE__
+-#include <linux/kernel.h>
+-#include <linux/init.h>
+-#include <linux/delay.h>
+-#include <linux/spinlock.h>
+-#include <linux/workqueue.h>
+-#include <linux/platform_device.h>
+-#include <linux/gpio.h>
 -
--struct s3c2410_spigpio_info {
--	unsigned long		 pin_clk;
--	unsigned long		 pin_mosi;
--	unsigned long		 pin_miso;
+-#include <linux/spi/spi.h>
+-#include <linux/spi/spi_bitbang.h>
 -
--	int			 num_chipselect;
--	int			 bus_num;
+-#include <mach/regs-gpio.h>
+-#include <mach/spi-gpio.h>
+-#include <mach/hardware.h>
 -
--	void (*chip_select)(struct s3c2410_spigpio_info *spi, int cs);
+-struct s3c2410_spigpio {
+-	struct spi_bitbang		 bitbang;
+-
+-	struct s3c2410_spigpio_info	*info;
+-	struct platform_device		*dev;
 -};
 -
+-static inline struct s3c2410_spigpio *spidev_to_sg(struct spi_device *spi)
+-{
+-	return spi_master_get_devdata(spi->master);
+-}
 -
--#endif /* __ASM_ARCH_SPIGPIO_H */
+-static inline void setsck(struct spi_device *dev, int on)
+-{
+-	struct s3c2410_spigpio *sg = spidev_to_sg(dev);
+-	s3c2410_gpio_setpin(sg->info->pin_clk, on ? 1 : 0);
+-}
+-
+-static inline void setmosi(struct spi_device *dev, int on)
+-{
+-	struct s3c2410_spigpio *sg = spidev_to_sg(dev);
+-	s3c2410_gpio_setpin(sg->info->pin_mosi, on ? 1 : 0);
+-}
+-
+-static inline u32 getmiso(struct spi_device *dev)
+-{
+-	struct s3c2410_spigpio *sg = spidev_to_sg(dev);
+-	return s3c2410_gpio_getpin(sg->info->pin_miso) ? 1 : 0;
+-}
+-
+-#define spidelay(x) ndelay(x)
+-
+-#include "spi-bitbang-txrx.h"
+-
+-
+-static u32 s3c2410_spigpio_txrx_mode0(struct spi_device *spi,
+-				      unsigned nsecs, u32 word, u8 bits)
+-{
+-	return bitbang_txrx_be_cpha0(spi, nsecs, 0, 0, word, bits);
+-}
+-
+-static u32 s3c2410_spigpio_txrx_mode1(struct spi_device *spi,
+-				      unsigned nsecs, u32 word, u8 bits)
+-{
+-	return bitbang_txrx_be_cpha1(spi, nsecs, 0, 0, word, bits);
+-}
+-
+-static u32 s3c2410_spigpio_txrx_mode2(struct spi_device *spi,
+-				      unsigned nsecs, u32 word, u8 bits)
+-{
+-	return bitbang_txrx_be_cpha0(spi, nsecs, 1, 0, word, bits);
+-}
+-
+-static u32 s3c2410_spigpio_txrx_mode3(struct spi_device *spi,
+-				      unsigned nsecs, u32 word, u8 bits)
+-{
+-	return bitbang_txrx_be_cpha1(spi, nsecs, 1, 0, word, bits);
+-}
+-
+-
+-static void s3c2410_spigpio_chipselect(struct spi_device *dev, int value)
+-{
+-	struct s3c2410_spigpio *sg = spidev_to_sg(dev);
+-
+-	if (sg->info && sg->info->chip_select)
+-		(sg->info->chip_select)(sg->info, value);
+-}
+-
+-static int s3c2410_spigpio_probe(struct platform_device *dev)
+-{
+-	struct s3c2410_spigpio_info *info;
+-	struct spi_master	*master;
+-	struct s3c2410_spigpio  *sp;
+-	int ret;
+-
+-	master = spi_alloc_master(&dev->dev, sizeof(struct s3c2410_spigpio));
+-	if (master == NULL) {
+-		dev_err(&dev->dev, "failed to allocate spi master\n");
+-		ret = -ENOMEM;
+-		goto err;
+-	}
+-
+-	sp = spi_master_get_devdata(master);
+-
+-	platform_set_drvdata(dev, sp);
+-
+-	/* copy in the plkatform data */
+-	info = sp->info = dev->dev.platform_data;
+-
+-	/* setup spi bitbang adaptor */
+-	sp->bitbang.master = spi_master_get(master);
+-	sp->bitbang.master->bus_num = info->bus_num;
+-	sp->bitbang.master->num_chipselect = info->num_chipselect;
+-	sp->bitbang.chipselect = s3c2410_spigpio_chipselect;
+-
+-	sp->bitbang.txrx_word[SPI_MODE_0] = s3c2410_spigpio_txrx_mode0;
+-	sp->bitbang.txrx_word[SPI_MODE_1] = s3c2410_spigpio_txrx_mode1;
+-	sp->bitbang.txrx_word[SPI_MODE_2] = s3c2410_spigpio_txrx_mode2;
+-	sp->bitbang.txrx_word[SPI_MODE_3] = s3c2410_spigpio_txrx_mode3;
+-
+-	/* set state of spi pins, always assume that the clock is
+-	 * available, but do check the MOSI and MISO. */
+-	s3c2410_gpio_setpin(info->pin_clk, 0);
+-	s3c2410_gpio_cfgpin(info->pin_clk, S3C2410_GPIO_OUTPUT);
+-
+-	if (info->pin_mosi < S3C2410_GPH10) {
+-		s3c2410_gpio_setpin(info->pin_mosi, 0);
+-		s3c2410_gpio_cfgpin(info->pin_mosi, S3C2410_GPIO_OUTPUT);
+-	}
+-
+-	if (info->pin_miso != S3C2410_GPA0 && info->pin_miso < S3C2410_GPH10)
+-		s3c2410_gpio_cfgpin(info->pin_miso, S3C2410_GPIO_INPUT);
+-
+-	ret = spi_bitbang_start(&sp->bitbang);
+-	if (ret)
+-		goto err_no_bitbang;
+-
+-	return 0;
+-
+- err_no_bitbang:
+-	spi_master_put(sp->bitbang.master);
+- err:
+-	return ret;
+-
+-}
+-
+-static int s3c2410_spigpio_remove(struct platform_device *dev)
+-{
+-	struct s3c2410_spigpio *sp = platform_get_drvdata(dev);
+-
+-	spi_bitbang_stop(&sp->bitbang);
+-	spi_master_put(sp->bitbang.master);
+-
+-	return 0;
+-}
+-
+-/* all gpio should be held over suspend/resume, so we should
+- * not need to deal with this
+-*/
+-
+-#define s3c2410_spigpio_suspend NULL
+-#define s3c2410_spigpio_resume NULL
+-
+-/* work with hotplug and coldplug */
+-MODULE_ALIAS("platform:spi_s3c24xx_gpio");
+-
+-static struct platform_driver s3c2410_spigpio_drv = {
+-	.probe		= s3c2410_spigpio_probe,
+-        .remove		= s3c2410_spigpio_remove,
+-        .suspend	= s3c2410_spigpio_suspend,
+-        .resume		= s3c2410_spigpio_resume,
+-        .driver		= {
+-		.name	= "spi_s3c24xx_gpio",
+-		.owner	= THIS_MODULE,
+-        },
+-};
+-
+-static int __init s3c2410_spigpio_init(void)
+-{
+-        return platform_driver_register(&s3c2410_spigpio_drv);
+-}
+-
+-static void __exit s3c2410_spigpio_exit(void)
+-{
+-        platform_driver_unregister(&s3c2410_spigpio_drv);
+-}
+-
+-module_init(s3c2410_spigpio_init);
+-module_exit(s3c2410_spigpio_exit);
+-
+-MODULE_DESCRIPTION("S3C24XX SPI Driver");
+-MODULE_AUTHOR("Ben Dooks, <ben@simtec.co.uk>");
+-MODULE_LICENSE("GPL");
 -- 
 1.7.5.4
