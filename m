@@ -1,33 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Jun 2011 23:22:57 +0200
-Subject: [PATCH] ARM: mach-s3c24a0: delete
-In-Reply-To: <20110628211712.GF21138@trinity.fluff.org>
-References: <alpine.LFD.2.00.1106281613380.2142@xanadu.home>
-	<20110628211712.GF21138@trinity.fluff.org>
-Message-ID: <201106282322.57631.arnd@arndb.de>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Tue, 28 Jun 2011 22:24:43 +0100
+Subject: [PATCH 0/5] remove spi-s3c24xx-gpio driver
+In-Reply-To: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
+References: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
+Message-ID: <20110628212443.GI21138@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 June 2011 23:17:12 Ben Dooks wrote:
-> On Tue, Jun 28, 2011 at 04:17:30PM -0400, Nicolas Pitre wrote:
-> > 
-> > Commit bcae8aeb32 "[ARM] S3C24A0: Initial architecture support files"
-> > brought in a bunch of files while explicitly leaving out the corresponding
-> > Kconfig entry, stating that the series is not complete.
-> > 
-> > More than 2.5 years later, the support for this has not seen any progress.
-> > This is therefore dead code.  If someone wants to revive this code, it is
-> > always possible to retrieve it from the Git repository.
+On Tue, Jun 28, 2011 at 02:49:12PM +0200, Peter Korsgaard wrote:
+> The spi-s3c24xx-gpio driver is functionally equivalent to the spi-gpio
+> driver (but precedes it). The driver has seen very little development 
+> since it got added back in 2006, and there's only 2 in-tree users of it.
 > 
-> Ok, there was never much interest in this getting merged and removing
-> it is probably the best thing as I do not have the time to finish it
-> off...
->  
-> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> Acked-by: Ben Dooks <ben-linux@fluff.org>
+> This patch series moves the remaining users to the spi-gpio driver and
+> then finally removes the driver.
 > 
+> Compile tested only as I don't have access to the hardware.
 
-On a related note, what about mach-s3c2400? It seems to be even more
-incomplete.
+I've not really got much in the way of access either, however the
+series looks sane to me.
 
-	Arnd
+Acked-by: Ben Dooks <ben-linux@fluff.org>
+ 
+>  arch/arm/mach-s3c2410/include/mach/spi-gpio.h |   28 ----
+>  arch/arm/mach-s3c2410/mach-qt2410.c           |   34 +----
+>  arch/arm/mach-s3c2412/mach-jive.c             |   41 ++----
+>  arch/arm/mach-s3c2440/mach-gta02.c            |    1 -
+>  drivers/spi/Kconfig                           |   10 --
+>  drivers/spi/Makefile                          |    1 -
+>  drivers/spi/spi-s3c24xx-gpio.c                |  200 -------------------------
+>  7 files changed, 22 insertions(+), 293 deletions(-)
+> 
+> --
+> Bye, Peter Korsgaard
+
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
