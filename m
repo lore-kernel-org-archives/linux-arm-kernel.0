@@ -1,52 +1,59 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Jun 2011 12:04:38 +0200
-Subject: [PATCH V2 0/3] Add drivers/pwm and drivers/pwm/st_pwm.c
-In-Reply-To: <201106271526.12848.arnd@arndb.de>
-References: <cover.1306831238.git.viresh.kumar@st.com>
-	<4E086590.8080100@st.com> <201106271526.12848.arnd@arndb.de>
-Message-ID: <20110628100438.GI6069@pengutronix.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 28 Jun 2011 13:17:57 +0200
+Subject: [PATCH 3/3] dmaengine: at_hdmac: add slave config operation
+In-Reply-To: <fb4657207f9eb34784c10333e11c48b5638542ed.1309259835.git.nicolas.ferre@atmel.com>
+References: <fb4657207f9eb34784c10333e11c48b5638542ed.1309259835.git.nicolas.ferre@atmel.com>
+Message-ID: <1151852b20789636633095406a180335364f4afb.1309259835.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 03:26:12PM +0200, Arnd Bergmann wrote:
-> On Monday 27 June 2011, viresh kumar wrote:
-> > On 05/31/2011 02:21 PM, Viresh KUMAR wrote:
-> > > This patchset adds drivers/pwm directory as suggested by Arnd Bergmann in
-> > > following discussion:
-> > > 
-> > > http://comments.gmane.org/gmane.linux.ports.arm.kernel/118651
-> > > 
-> > > and also adds support for ST Microelectronics Pulse Width Modulator. This is
-> > > currently used by ST's SPEAr platform and tested on the same.
-> > > 
-> > > Changes since V1:
-> > >  - Moved driver to drivers/pwm/ directory from drivers/misc
-> > >  - arch/arm/configs/spear3xx_defconfig updated accordingly.
-> > > 
-> > > Changes since earlier patchset:
-> > >  - Moved driver to drivers/misc/ directory.
-> > > 
-> > > It was earlier reviewed as part of following patchset:
-> > > "[PATCH V6 00/17] Adding devices support for all spear machines"
-> > > 
-> > > Viresh Kumar (3):
-> > >   drivers/pwm st_pwm: Add support for ST's Pulse Width Modulator
-> > >   SPEAr3xx: Add machine support for ST's PWM IP
-> > >   SPEAr3xx: Update defconfig for ST's PWM
-> >
-> > Will you push this patchset through your tree or somebody else will do?
-> 
-> Good question. If Sascha is able to come up with the patch to introduce
-> the generic layer, I think it would be good to have it go though him.
+Only change source/destination peripheral register access width.
 
-Just posted a rebased and documented series again. Let's see what
-happens. The time seems good to finally get this into the kernel.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/dma/at_hdmac.c |   29 +++++++++++++++++++++++++++++
+ 1 files changed, 29 insertions(+), 0 deletions(-)
 
-Sascha
-
-
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 7096adb..9cb8044 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -954,6 +954,35 @@ static int atc_control(struct dma_chan *chan, enum dma_ctrl_cmd cmd,
+ 		clear_bit(ATC_IS_PAUSED, &atchan->status);
+ 
+ 		spin_unlock_irqrestore(&atchan->lock, flags);
++	} else if (cmd == DMA_SLAVE_CONFIG) {
++		struct dma_slave_config *dmaengine_cfg = (void *)arg;
++		struct at_dma_slave	*atslave = chan->private;
++		enum dma_slave_buswidth sdma_width;
++		enum at_dma_slave_width	atdma_width;
++
++		/* only modify transfer size width */
++		if (!atslave)
++			return -ENXIO;
++
++		if (dmaengine_cfg->direction == DMA_FROM_DEVICE)
++			sdma_width = dmaengine_cfg->src_addr_width;
++		else
++			sdma_width = dmaengine_cfg->dst_addr_width;
++
++		switch (sdma_width) {
++		case DMA_SLAVE_BUSWIDTH_1_BYTE:
++			atdma_width = AT_DMA_SLAVE_WIDTH_8BIT;
++			break;
++		case DMA_SLAVE_BUSWIDTH_2_BYTES:
++			atdma_width = AT_DMA_SLAVE_WIDTH_16BIT;
++			break;
++		case DMA_SLAVE_BUSWIDTH_4_BYTES:
++			atdma_width = AT_DMA_SLAVE_WIDTH_32BIT;
++			break;
++		default:
++			return -EINVAL;
++		}
++		atslave->reg_width = atdma_width;
+ 	} else if (cmd == DMA_TERMINATE_ALL) {
+ 		struct at_desc	*desc, *_desc;
+ 		/*
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+1.7.3
