@@ -1,78 +1,36 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Tue, 28 Jun 2011 18:18:42 +0200
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Jun 2011 19:03:05 +0200
 Subject: [PATCH 1/2] PWM: add pwm framework support
-In-Reply-To: <201106281427.04373.arnd@arndb.de>
+In-Reply-To: <20110628161842.GK6069@pengutronix.de>
 References: <1309255368-9775-1-git-send-email-s.hauer@pengutronix.de>
-	<1309255368-9775-2-git-send-email-s.hauer@pengutronix.de>
 	<201106281427.04373.arnd@arndb.de>
-Message-ID: <20110628161842.GK6069@pengutronix.de>
+	<20110628161842.GK6069@pengutronix.de>
+Message-ID: <201106281903.06121.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 02:27:04PM +0200, Arnd Bergmann wrote:
-> On Tuesday 28 June 2011, Sascha Hauer wrote:
-> > This patch adds framework support for PWM (pulse width modulation) devices.
-> > 
-> > The is a barebone PWM API already in the kernel under include/linux/pwm.h,
-> > but it does not allow for multiple drivers as each of them implements the
-> > pwm_*() functions.
+On Tuesday 28 June 2011, Sascha Hauer wrote:
+> > How about using idr? It provides you a fast lookup and handles giving
+> > out unique numbers.
 > 
-> Hi Sascha,
-> 
-> This looks very nice.
-> I have only trivial comments, except for the suggestion to use idr.
->  
-> > +PWM core
-> > +M:	Sascha Hauer <s.hauer@pengutronix.de>
-> > +L:	linux-kernel at vger.kernel.org
-> > +S:	Maintained
-> 
-> I would add
-> 
-> F:	drivers/pwm/
-> 
-> > diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> > new file mode 100644
-> > index 0000000..93c1052
-> > --- /dev/null
-> > +++ b/drivers/pwm/Kconfig
-> > @@ -0,0 +1,12 @@
-> > +menuconfig PWM
-> > +	bool "PWM Support"
-> > +	help
-> > +	  This enables PWM support through the generic PWM framework.
-> > +	  You only need to enable this, if you also want to enable
-> > +	  one or more of the PWM drivers below.
-> 
-> Remove the comma.
-> 
-> > +
-> > +/*
-> > + * The next pwm id to assign. We do not bother to fill gaps which
-> > + * occur during dynamic registering/deregistering of pwms, but
-> > + * instead assign a uniq id to each new pwm.
->                        unique
-> 
-> > + */
-> > +static int next_pwm_id;
-> 
-> How about using idr? It provides you a fast lookup and handles giving
-> out unique numbers.
+> Sounds like a good idea, but is idr compatible with the pwmchip_reserve
+> function below? idr gives no guarantee that the first id is zero, but I
+> need exactly this to make the ids for the internal PWMs known at compile
+> time.
 
-Sounds like a good idea, but is idr compatible with the pwmchip_reserve
-function below? idr gives no guarantee that the first id is zero, but I
-need exactly this to make the ids for the internal PWMs known at compile
-time.
+You can certainly use ida_get_new_above to guarantee that implicit
+number allocation doesn't interfere with the reserved numbers. Whether
+that guarantees that you get the reserved numbers when you ask for them,
+I don't know.
 
-(In the longer term it probably makes sense to implement a
-pwm_get(struct device *, const char *id) similar to the clk api, I just
-wanted to stay compatible to the current PWM API for now)
+A possible way to deal with that would be to allocate an array of pointers
+for the reserved space but use IDR for the rest, but at that point the
+complexity is probably higher than what you have now ;-)
 
-Sascha
+Another question is whether the dynamic allocation even makes sense. How
+does a driver that wants to use a PWM find out what number to ask for
+when it's not reserved for the platform to start with. Maybe the
+answer is to just use an array or tree for the lookup and refuse to
+register multiple PWMs to the same number.
 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+	Arnd
