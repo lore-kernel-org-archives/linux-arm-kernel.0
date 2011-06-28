@@ -1,48 +1,33 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 Jun 2011 14:15:38 +0100
+Date: Tue, 28 Jun 2011 14:24:07 +0100
 Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <20110627132735.GE16103@n2100.arm.linux.org.uk>
+In-Reply-To: <20110628120928.GD21898@n2100.arm.linux.org.uk>
 References: <20110627125306.GA30646@doriath.ww600.siemens.net>
 	<20110627132735.GE16103@n2100.arm.linux.org.uk>
-Message-ID: <20110628131538.GA7255@1n450.cable.virginmedia.net>
+	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
+	<20110628103946.GC21898@n2100.arm.linux.org.uk>
+	<BANLkTi=zjTerne0VbYq-6NaPBuXcZBDGjA@mail.gmail.com>
+	<20110628120928.GD21898@n2100.arm.linux.org.uk>
+Message-ID: <20110628132407.GB7255@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 02:27:35PM +0100, Russell King - ARM Linux wrote:
-> On Mon, Jun 27, 2011 at 04:53:06PM +0400, Dmitry Eremin-Solenikov wrote:
-> > I've got into a problem when trying to debug irq handlers on PXA (in
-> > qemu). backtrace is really strange from my POV (a target is just a qemu
-> > running a bit modified 3.0-rc2 kernel):
-> ...
-> > Breakpoint 1, handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
-> > 329		mask_ack_irq(desc);
-> > (gdb) bt
-> > #0  handle_level_irq (irq=42, desc=0xc3e06000) at kernel/irq/chip.c:329
-> > #1  0xc0085f64 in generic_handle_irq_desc (irq=42) at include/linux/irqdesc.h:111
-> > #2  generic_handle_irq (irq=42) at kernel/irq/irqdesc.c:304
-> > #3  0xc0033060 in asm_do_IRQ (irq=42, regs=<value optimized out>) at arch/arm/kernel/irq.c:90
-> > #4  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #5  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #6  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #7  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #8  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #9  0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #10 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #11 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > #12 0xc0033b50 in __irq_svc () at arch/arm/kernel/entry-armv.S:202
-> > 
-> > ... and so on it continues ad infinitum. Is it the expected behaviour?
-> > Because I'm pretty much sure that this isn't a desired behaviour.
+On Tue, Jun 28, 2011 at 01:09:28PM +0100, Russell King - ARM Linux wrote:
+> On Tue, Jun 28, 2011 at 08:06:27PM +0800, Hui Zhu wrote:
+> > If this kernel didn't open FRAME_POINTER, what will happen?
 > 
-> My guess is that gdb is trying to unwind using the unwind information.
-> However, I don't think we actually give the assembler the full information
-> to be able to unwind this.  I've no idea how to solve this as I'm no
-> expert at the debug info.
+> I can't answer that question directly, as I don't use a toolchain new
+> enough to generate proper unwind information.
+> 
+> However, I haven't seen any problems being reported on the list with
+> bad/broken backtraces from the kernel, so my _assumption_ is that the
+> kernel is fine with its own debug info.
 
-I don't think gdb is using the unwind information that we get in the
-kernel (that's actually the information used for C++ exceptions). Gdb is
-in general using the dwarf information in the vmlinux file (which we
-don't get in the final Image file).
+I tested this when contributing the unwinding support and it was ok. The
+reason is that the svc_entry macro in entry-armv.S adds some annotations
+line .fnstart and .save that generate the correct unwinding bytecodes
+(but as I said, that's different from the dwarf information which
+probably needs different annotations).
 
 -- 
 Catalin
