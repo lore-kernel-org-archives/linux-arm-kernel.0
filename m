@@ -1,59 +1,51 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Tue, 28 Jun 2011 16:50:11 +0300
-Subject: [PATCH] OMAP: HSMMC: Fix GPIO muxing
-In-Reply-To: <1309250759-18472-1-git-send-email-silesh@ti.com>
-References: <1309250759-18472-1-git-send-email-silesh@ti.com>
-Message-ID: <4E09DC13.3010304@compulab.co.il>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Jun 2011 14:57:06 +0100
+Subject: [PATCH] ARM: automatically select OMAP3_PMU if we try to use
+	perf on OMAP3
+In-Reply-To: <1309268265-2685-1-git-send-email-bryan.wu@canonical.com>
+References: <1309268265-2685-1-git-send-email-bryan.wu@canonical.com>
+Message-ID: <20110628135706.GA28871@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Silesh,
 
-On 06/28/11 11:45, Silesh C V wrote:
+Hi Bryan,
 
-> Use generic gpio call to check the validity of the gpio. Note that
-> this includes gpio 0 also which was missing before.
->
-> Signed-off-by: Silesh C V <silesh@ti.com>
+On Tue, Jun 28, 2011 at 02:37:45PM +0100, Bryan Wu wrote:
+> For our Ubuntu kernel on OMAP4 machine, we need to enable OMAP3 as well as
+> OMAP4. OMAP3_EMU has to be enabled manully to make CPU_HAS_PMU=y, which is
+> required by perf.
+> 
+> So this patch will select the OMAP3_EMU if ARCH_OMAP3 is enabled.
+> 
+> Cc: Ming Lei <ming.lei@canonical.com>
+> Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
 > ---
->  arch/arm/mach-omap2/hsmmc.c |    7 +++----
->  1 files changed, 3 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
-> index 66868c5..a9b45c7 100644
-> --- a/arch/arm/mach-omap2/hsmmc.c
-> +++ b/arch/arm/mach-omap2/hsmmc.c
-> @@ -13,6 +13,7 @@
->  #include <linux/slab.h>
->  #include <linux/string.h>
->  #include <linux/delay.h>
-> +#include <linux/gpio.h>
->  #include <mach/hardware.h>
->  #include <plat/mmc.h>
->  #include <plat/omap-pm.h>
-> @@ -213,12 +214,10 @@ static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
->  static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
->  			int controller_nr)
->  {
-> -	if ((mmc_controller->slots[0].switch_pin > 0) && \
-> -		(mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
-> +	if (gpio_is_valid(mmc_controller->slots[0].switch_pin))
->  		omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
->  					OMAP_PIN_INPUT_PULLUP);
-> -	if ((mmc_controller->slots[0].gpio_wp > 0) && \
-> -		(mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
-> +	if (gpio_is_valid(mmc_controller->slots[0].gpio_wp))
->  		omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
->  					OMAP_PIN_INPUT_PULLUP);
->  	if (cpu_is_omap34xx()) {
+>  arch/arm/Kconfig |    4 ++--
+>  1 files changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 2fd0911..53d0eba 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1084,10 +1084,10 @@ config XSCALE_PMU
+>  	default y
+>  
+>  config CPU_HAS_PMU
+> -	depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
+> -		   (!ARCH_OMAP3 || OMAP3_EMU)
+> +	depends on CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU
+>  	default y
+>  	bool
+> +	select OMAP3_EMU if ARCH_OMAP3
+>  
+>  config MULTI_IRQ_HANDLER
+>  	bool
 
-IMHO, you should not separate the patches
-(this one and OMAP: 4430SDP: Register the card detect GPIO properly),
-because the 4430sdp fix should come before or together with this patch,
-otherwise 4430sdp will be broken, once this patch is applied.
+This issue has been discussed on the list in the past and I still think that
+it would be better for your config to select OMAP3_EMU explicitly. If we do
+that here unconditionally then we end up also bringing in OC_ETM which isn't
+something that sounds like a good idea (may have implications for power
+consumption in production hardware?).
 
-You can either make it a one patch or make it a single properly numbered series.
-
--- 
-Regards,
-Igor.
+Will
