@@ -1,51 +1,77 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 28 Jun 2011 12:58:36 -0300
-Subject: [PATCH] ARM: mx53: Fix some interrupts marked as reserved.
-Message-ID: <1309276716-12828-1-git-send-email-fabio.estevam@freescale.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 Jun 2011 17:11:27 +0100
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <BANLkTi=dzYV5tdHaZL91oHjMfuVtXUCD5A@mail.gmail.com>
+References: <4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
+	<20110628103946.GC21898@n2100.arm.linux.org.uk>
+	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
+	<20110628142045.GC7255@1n450.cable.virginmedia.net>
+	<20110628143014.GD7255@1n450.cable.virginmedia.net>
+	<BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
+	<BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
+	<20110628150631.GD24904@e102109-lin.cambridge.arm.com>
+	<BANLkTi=dzYV5tdHaZL91oHjMfuVtXUCD5A@mail.gmail.com>
+Message-ID: <20110628161127.GG24904@e102109-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark the actual interrupt source for some interrupts currently marked as reserved.
+On Tue, Jun 28, 2011 at 04:45:52PM +0100, Dmitry Eremin-Solenikov wrote:
+> Here is a part of gdb log generated using the attached patch:
+[...]
+> #11 0xc0033810 in kernel_thread_helper ()
+> #12 0xc0033810 in kernel_thread_helper ()
+> Backtrace stopped: previous frame identical to this frame (corrupt stack?)
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
- arch/arm/plat-mxc/include/mach/mx53.h |   10 +++++-----
- 1 files changed, 5 insertions(+), 5 deletions(-)
+Maybe you can add something similar to the kernel_thread_helper in
+arch/arm/kernel/process.c? I'm not sure whether there is something like
+.cantunwind (as for the kernel unwinding information).
 
-diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
-index 3128af7..5e3c323 100644
---- a/arch/arm/plat-mxc/include/mach/mx53.h
-+++ b/arch/arm/plat-mxc/include/mach/mx53.h
-@@ -233,7 +233,7 @@
- #define MX53_INT_ESDHC2	2
- #define MX53_INT_ESDHC3	3
- #define MX53_INT_ESDHC4	4
--#define MX53_INT_RESV5	5
-+#define MX53_INT_DAP	5
- #define MX53_INT_SDMA	6
- #define MX53_INT_IOMUX	7
- #define MX53_INT_NFC	8
-@@ -262,8 +262,8 @@
- #define MX53_INT_UART1	31
- #define MX53_INT_UART2	32
- #define MX53_INT_UART3	33
--#define MX53_INT_RESV34	34
--#define MX53_INT_RESV35	35
-+#define MX53_INT_RTC	34
-+#define MX53_INT_PTP	35
- #define MX53_INT_ECSPI1	36
- #define MX53_INT_ECSPI2	37
- #define MX53_INT_CSPI	38
-@@ -293,8 +293,8 @@
- #define MX53_INT_I2C1	62
- #define MX53_INT_I2C2	63
- #define MX53_INT_I2C3	64
--#define MX53_INT_RESV65	65
--#define MX53_INT_RESV66	66
-+#define MX53_INT_MLB	65
-+#define MX53_INT_ASRC	66
- #define MX53_INT_SPDIF	67
- #define MX53_INT_SIM_DAT	68
- #define MX53_INT_IIM	69
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index e8d8856..44daf40 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -28,6 +28,7 @@
+>  #include "entry-header.S"
+>  #include <asm/entry-macro-multi.S>
+>  
+> +	.cfi_sections	.debug_frame
+>  /*
+>   * Interrupt handling.  Preserves r7, r8, r9
+>   */
+> @@ -113,6 +114,7 @@ ENDPROC(__und_invalid)
+>  
+>  	.macro	svc_entry, stack_hole=0
+>   UNWIND(.fnstart		)
+> +	.cfi_startproc
+>   UNWIND(.save {r0 - pc}		)
+>  	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
+>  #ifdef CONFIG_THUMB2_KERNEL
+> @@ -146,6 +148,24 @@ ENDPROC(__und_invalid)
+>  	@  r4 - orig_r0 (see pt_regs definition in ptrace.h)
+>  	@
+>  	stmia	r5, {r0 - r4}
+> +	.cfi_def_cfa_offset S_PC + 4
+> +	.cfi_offset 14, -4
+> +#define	CFI_REG_OFF(r) .cfi_offset r, (r - 16) * 4
+> +	CFI_REG_OFF(13)
+> +	CFI_REG_OFF(12)
+> +	CFI_REG_OFF(11)
+> +	CFI_REG_OFF(10)
+> +	CFI_REG_OFF(9)
+> +	CFI_REG_OFF(8)
+> +	CFI_REG_OFF(7)
+> +	CFI_REG_OFF(6)
+> +	CFI_REG_OFF(5)
+> +	CFI_REG_OFF(4)
+> +	CFI_REG_OFF(3)
+> +	CFI_REG_OFF(2)
+> +	CFI_REG_OFF(1)
+> +	CFI_REG_OFF(0)
+> +#undef CFI_REG_OFF
+>  	.endm
+
+Do we need all the registers in here for gdb stack unwinding? In general
+we would only need LR, SP and FP.
+
 -- 
-1.6.0.4
+Catalin
