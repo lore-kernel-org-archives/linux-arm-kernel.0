@@ -1,109 +1,35 @@
-From: matthias@kaehlcke.net (Matthias Kaehlcke)
-Date: Tue, 28 Jun 2011 21:40:40 +0200
-Subject: [PATCH 1/2] PWM: add pwm framework support
-In-Reply-To: <1309255368-9775-2-git-send-email-s.hauer@pengutronix.de>
-References: <1309255368-9775-1-git-send-email-s.hauer@pengutronix.de>
-	<1309255368-9775-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20110628194040.GE15091@darwin>
+From: s-anna@ti.com (Anna, Suman)
+Date: Tue, 28 Jun 2011 14:46:33 -0500
+Subject: [PATCH] omap: iommu: fix pte attributes for super section
+In-Reply-To: <20110516.101157.344277473342871979.Hiroshi.DOYU@nokia.com>
+References: <BANLkTinqPkftv7KmghCCBpEdULh0cNivHg@mail.gmail.com>
+	<20110516.101157.344277473342871979.Hiroshi.DOYU@nokia.com>
+Message-ID: <BANLkTinX=jCjh0yK=yS1hDifUtTwUVZvKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-El Tue, Jun 28, 2011 at 12:02:47PM +0200 Sascha Hauer ha dit:
+On Mon, May 16, 2011 at 2:11 AM, Hiroshi DOYU <Hiroshi.DOYU@nokia.com> wrote:
+> From: "ext Anna, Suman" <s-anna@ti.com>
+> Subject: [PATCH] omap: iommu: fix pte attributes for super section
+> Date: Tue, 10 May 2011 10:25:17 -0700
+>
+>> From 5796d8d8a0ea5aee342b78ca6ead229971cff6c5 Mon Sep 17 00:00:00 2001
+>> From: Suman Anna <s-anna@ti.com>
+>> Date: Wed, 4 May 2011 17:45:37 -0500
+>> Subject: [PATCH] omap: iommu: fix pte attributes for super section
+>>
+>> The PTE programming causes a 16MB entry to be interpreted
+>> as a 4K entry because of the bitwise check, and therefore does
+>> not set the attributes properly in the first-level descriptor
+>> table. The bitwise check has been replaced appropriately.
+>>
+>> Signed-off-by: Suman Anna <s-anna@ti.com>
+> Acked-by: Hiroshi DOYU <Hiroshi.DOYU@nokia.com>
 
-> This patch adds framework support for PWM (pulse width modulation) devices.
-[...]
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> new file mode 100644
-> index 0000000..79dc051
-> --- /dev/null
-> +++ b/drivers/pwm/core.c
-[...]
-> +/**
-> + * pwmchip_add() - register a new pwm
-> + * @chip: the pwm
-> + *
-> + * register a new pwm. pwm->pwm_id must be initialized. if pwm_id < 0 then
-> + * a dynamically assigned id will be used, otherwise the id specified,
-> + */
-> +int pwmchip_add(struct pwm_chip *chip)
-> +{
-> +	struct pwm_device *pwm;
-> +	int ret = 0;
-> +
-> +	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
-> +	if (!pwm)
-> +		return -ENOMEM;
-> +
-> +	pwm->chip = chip;
-> +
-> +	mutex_lock(&pwm_lock);
-> +
-> +	if (chip->pwm_id >= 0 && find_pwm(chip->pwm_id)) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	if (chip->pwm_id < 0)
-> +		chip->pwm_id = next_pwm_id++;
-> +
-> +	list_add_tail(&pwm->node, &pwm_list);
-> +out:
-> +	mutex_unlock(&pwm_lock);
-> +
-> +	kfree(pwm);
+Tony,
+Can this patch be queued up for the next rc, or is there any reason
+for this to remain archived?
+https://patchwork.kernel.org/patch/774932/
 
-as already pointed out by kurt, pwm should only be freed in case of an
-error
-
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(pwmchip_add);
-> +
-> +/**
-> + * pwmchip_remove() - remove a pwm
-> + * @chip: the pwm
-> + *
-> + * remove a pwm. This function may return busy if the pwm is still requested.
-> + */
-> +int pwmchip_remove(struct pwm_chip *chip)
-> +{
-> +	struct pwm_device *pwm;
-> +	int ret = 0;
-> +
-> +	mutex_lock(&pwm_lock);
-> +
-> +	pwm = find_pwm(chip->pwm_id);
-> +	if (!pwm) {
-> +		ret = -ENOENT;
-> +		goto out;
-> +	}
-> +
-> +	if (test_bit(FLAG_REQUESTED, &pwm->flags)) {
-> +		ret = -EBUSY;
-> +		goto out;
-> +	}
-> +
-> +	list_del(&pwm->node);
-  +	kfree(pwm);
-> +out:
-> +	mutex_unlock(&pwm_lock);
-> +
-> +	return ret;
-> +}
-
-[...]
-
-best regards
-
--- 
-Matthias Kaehlcke
-Embedded Linux Developer
-Amsterdam
-
-             It always seems impossible until it's done
-                        (Nelson Mandela)
-                                                                 .''`.
-    using free software / Debian GNU/Linux | http://debian.org  : :'  :
-                                                                `. `'`
-gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
+regards
+Suman
