@@ -1,38 +1,78 @@
-From: axel.lin@gmail.com (Axel Lin)
-Date: Tue, 28 Jun 2011 17:05:43 +0800
-Subject: [PATCH] omap1: select GENERIC_IRQ_CHIP for TI OMAP1
-Message-ID: <1309251943.3984.1.camel@phoenix>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 28 Jun 2011 15:06:22 +0530
+Subject: [RFC 5/8] remoteproc: add davinci implementation
+In-Reply-To: <FFF198FBBF957F4393BA834040FEFFA202EC68@DFLE35.ent.ti.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-6-git-send-email-ohad@wizery.com>
+	<4E035B78.3080200@mvista.com>
+	<FFF198FBBF957F4393BA834040FEFFA202D66E@DFLE35.ent.ti.com>
+	<4E04A9AE.3030801@mvista.com>
+	<FFF198FBBF957F4393BA834040FEFFA202EC68@DFLE35.ent.ti.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7938F3@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The gpio-omap driver has been converted to use generic IRQ chip.
-Thus select GENERIC_IRQ_CHIP for TI OMAP1 to fix below build error.
+Hi Mark,
 
-  LD      vmlinux
-drivers/built-in.o: In function `omap_mpuio_alloc_gc':
-drivers/gpio/gpio-omap.c:1087: undefined reference to `irq_alloc_generic_chip'
-drivers/gpio/gpio-omap.c:1100: undefined reference to `irq_setup_generic_chip'
-drivers/built-in.o: In function `omap_gpio_show_rev':
-drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_clr_bit'
-drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_set_bit'
-make: *** [vmlinux] Error 1
-
-Signed-off-by: Axel Lin <axel.lin@gmail.com>
----
- arch/arm/plat-omap/Kconfig |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
-
-diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-index 49a4c75..9a4a6bf 100644
---- a/arch/arm/plat-omap/Kconfig
-+++ b/arch/arm/plat-omap/Kconfig
-@@ -13,6 +13,7 @@ config ARCH_OMAP1
- 	bool "TI OMAP1"
- 	select CLKDEV_LOOKUP
- 	select CLKSRC_MMIO
-+	select GENERIC_IRQ_CHIP
- 	help
- 	  "Systems based on omap7xx, omap15xx or omap16xx"
+On Mon, Jun 27, 2011 at 23:50:25, Grosen, Mark wrote:
  
--- 
-1.7.4.1
+> > >>> +static inline int davinci_rproc_start(struct rproc *rproc, u64
+> > >> bootaddr)
+> > >>> +{
+> > >>> +	struct device *dev = rproc->dev;
+> > >>> +	struct davinci_rproc_pdata *pdata = dev->platform_data;
+> > >>> +	struct davinci_soc_info *soc_info = &davinci_soc_info;
+> > >>> +	void __iomem *psc_base;
+> > >>> +	struct clk *dsp_clk;
+> > >>> +
+> > >>> +	/* hw requires the start (boot) address be on 1KB boundary */
+> > >>> +	if (bootaddr & 0x3ff) {
+> > >>> +		dev_err(dev, "invalid boot address: must be aligned to
+> > >> 1KB\n");
+> > >>> +		return -EINVAL;
+> > >>> +	}
+> > >>> +
+> > >>> +	dsp_clk = clk_get(dev, pdata->clk_name);
+> > 
+> > >>     We could match using clkdev functionality, but the clock entry
+> > >> would need to be changed then...
+> > 
+> > > I followed the existing pattern I saw in other drivers.
+> > 
+> > Probably MUSB? We're trying to move away from passing the clock name to thge
+> > drivers, using match by device instead.
+> > 
+> > > If there is a new, better way, please point me to an example.
+> > 
+> >     Look at the da850_clks[] in mach-davinci/da850.c: if the device name is
+> > specified as a first argument to CLK() macro (instead of clock name the second
+> > argument), the matching is done by device, so you don't need to specify the
+> > clock name to clk_get(), passing NULL instead.
+> 
+> Thanks, I'll look at this and ask for Sekhar and Kevin's preferences.
+
+The second argument is not a (SoC specific)
+clock name, it is the "connection id" which
+is specific to the IP (not to the SoC).
+
+For example, the EMAC IP may want to deal
+with interface clock, functional clock and
+mii clock. So, it passes a connection identifier
+to tell the clock framework which particular
+clock it is interested in. The names of these
+connection identifiers will not change with SoC
+as they are IP property. So, it will not be
+right to get this through platform data.
+
+If there is no connection identifier in
+your case, you can just pass the second
+argument as NULL. The clock matching will
+happen using device name (which should
+remain same across SoCs too).
+
+Of course, this means that any incorrectly defined
+clock lookup structures for dsp clock in platform
+code needs to be corrected.
+
+Thanks,
+Sekhar
