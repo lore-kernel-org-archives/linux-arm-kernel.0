@@ -1,34 +1,22 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 28 Jun 2011 19:24:22 -0400 (EDT)
-Subject: [RFC PATCH 0/4] ARM: make mach/hardware.h optional
-In-Reply-To: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Jun 2011 00:24:29 +0100
+Subject: [PATCH 2/4] ARM: remove unnecessary mach/hardware.h includes
+In-Reply-To: <1309301859-17651-3-git-send-email-robherring2@gmail.com>
 References: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
-Message-ID: <alpine.LFD.2.00.1106281919310.2142@xanadu.home>
+	<1309301859-17651-3-git-send-email-robherring2@gmail.com>
+Message-ID: <20110628232429.GI21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Jun 2011, Rob Herring wrote:
-
+On Tue, Jun 28, 2011 at 05:57:37PM -0500, Rob Herring wrote:
 > From: Rob Herring <rob.herring@calxeda.com>
 > 
-> Currently, all ARM platforms must have a mach/hardware.h include. This is
-> because it is ultimately included by linux/pci.h which is included in many
-> places even for !CONFIG_PCI.
-> 
-> This could be fixed simply with an ifdef around the include of mach/hardware.h
-> in asm/pci.h. However, in the interest of fixing this for single kernel
-> binary builds, this series removes the include of mach/hardware.h outside of
-> mach-* and plat-*. What's used from hardware.h is a couple of PCI defines. 
-> Converting them to variables allows each platform to set the values as needed.
+> Remove some includes of mach/hardware.h which are not needed. hardware.h will
+> be removed completely for tegra and cns3xxx in follow on patch.
 
-Excellent !  This is certainly moving things in the right direction.
+At least this one is incorrect:
 
-For the 4 patches, you can add:
+arch/arm/mach-rpc/include/mach/hardware.h:#define IO_EC_MEMC_BASE              0x80000000
+arch/arm/kernel/ecard.c:                    address = IO_EC_MEMC_BASE + (slot << 12);
 
-Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-
-Obviously for patch 1/4 it would be nice to have the opinion of the PCI 
-maintainer as well.
-
-
-Nicolas
+That's just one of the defines that ecard.c uses from mach/hardare.h.
