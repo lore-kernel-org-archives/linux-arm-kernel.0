@@ -1,72 +1,126 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Jun 2011 11:39:47 +0100
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <4E089AB3.1090801@codesourcery.com>
-References: <20110627125306.GA30646@doriath.ww600.siemens.net>
-	<20110627132735.GE16103@n2100.arm.linux.org.uk>
-	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
-Message-ID: <20110628103946.GC21898@n2100.arm.linux.org.uk>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 28 Jun 2011 13:50:56 +0200
+Subject: [RFC PATCH] MTD: atmel_nand: optimize read/write buffer functions
+Message-ID: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Jun 27, 2011 at 10:58:59PM +0800, Yao Qi wrote:
-> On 06/27/2011 10:04 PM, Dmitry Eremin-Solenikov wrote:
-> > Hello,
-> > 
-> > On 27.06.2011 17:27, Russell King - ARM Linux wrote:
-> >> We _really_ _do_ want to unwind through this so that we can see the
-> >> parent kernel context information in backtraces - and the fact that
-> 
-> I am not sure GDB is able to unwind stacks across processes (from child
-> to parent).
+For PIO NAND access functions, we use the features of the SMC:
+- no need to take into account the NAND bus width: SMC will deal with this
+- a word aligned memcpy on the NAND chip-select space is able to generate
+  proper SMC behavior while optimizing AHB bus usage thanks to optimized memcpy
+  implementation.
 
-It's not about unwinding across processes.  It's still the same process.
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |   71 +++++++++++++++++-----------------------
+ 1 files changed, 30 insertions(+), 41 deletions(-)
 
-Let me give you a recent example.  This may be using frame pointers rather
-than the unwinder, but serves to illustrate what we - as kernel developers -
-absolutely must have from the kernel:
-
-Internal error: Oops: 17 [#1] PREEMPT
-Modules linked in: uinput g_ether cryptomgr aead arc4 crypto_algapi rt2800usb rt2800lib rt2x00usb rt2x00lib mac80211 cfg80211 sg pcmciamtd mousedev snd_soc_wm8750 snd_soc_pxa2xx_i2s snd_soc_core ohci_hcd usbcore pxa27x_udc physmap snd_pcm_oss snd_pcm snd_timer snd_page_alloc snd_mixer_oss snd soundcore rfcomm pxaficp_ir ircomm_tty ircomm irda ipv6 hidp hid bluetooth rfkill crc16
-CPU: 0    Not tainted  (3.0.0-rc4+ #5)
-PC is at complete+0x28/0x7c
-LR is at complete+0x28/0x7c
-pc : [<c0036b6c>]    lr : [<c0036b6c>]    psr: 80000093
-sp : c3897b68  ip : c3897b68  fp : c3897b84
-r10: c4806000  r9 : c381f3e0  r8 : 0000000a
-r7 : c30f0da8  r6 : 00000000  r5 : 00000000  r4 : a0000013
-r3 : c3896000  r2 : 00000000  r1 : 00000103  r0 : 00000004
-Flags: Nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
-Control: 0000397f  Table: a080c000  DAC: 00000017
-Process kswapd0 (pid: 270, stack limit = 0xc3896278)
-[<c0036b6c>] (complete+0x28/0x7c) from [<c01e9b0c>] (spi_complete+0x10/0x14)
-[<c01e9b0c>] (spi_complete+0x10/0x14) from [<c01eac2c>] (giveback+0x114/0x12c)
-[<c01eac2c>] (giveback+0x114/0x12c) from [<c01eb60c>] (pump_transfers+0x13c/0x6f8)
-[<c01eb60c>] (pump_transfers+0x13c/0x6f8) from [<c0044924>] (tasklet_action+0x90/0xf0)
-[<c0044924>] (tasklet_action+0x90/0xf0) from [<c0044eb8>] (__do_softirq+0x98/0x138)
-[<c0044eb8>] (__do_softirq+0x98/0x138) from [<c00453a0>] (irq_exit+0x4c/0xa8)
-[<c00453a0>] (irq_exit+0x4c/0xa8) from [<c002406c>] (asm_do_IRQ+0x6c/0x8c)
-[<c002406c>] (asm_do_IRQ+0x6c/0x8c) from [<c0024b84>] (__irq_svc+0x44/0xcc)
-Exception stack(0xc3897c78 to 0xc3897cc0)
-7c60:                                                       4022d320 4022e000
-7c80: 08000075 00001000 c32273c0 c03ce1c0 c2b49b78 4022d000 c2b420b4 00000001
-7ca0: 00000000 c3897cfc 00000000 c3897cc0 c00afc54 c002edd8 00000013 ffffffff
-[<c0024b84>] (__irq_svc+0x44/0xcc) from [<c002edd8>] (xscale_flush_user_cache_range+0x18/0x3c)
-[<c002edd8>] (xscale_flush_user_cache_range+0x18/0x3c) from [<c00affd8>] (try_to_unmap_file+0x98/0x4ec)
-[<c00affd8>] (try_to_unmap_file+0x98/0x4ec) from [<c00b07ac>] (try_to_unmap+0x40/0x60)
-[<c00b07ac>] (try_to_unmap+0x40/0x60) from [<c009b940>] (shrink_page_list+0x2a8/0x8cc)
-[<c009b940>] (shrink_page_list+0x2a8/0x8cc) from [<c009c448>] (shrink_inactive_list+0x218/0x344)
-[<c009c448>] (shrink_inactive_list+0x218/0x344) from [<c009c8f8>] (shrink_zone+0x384/0x4ac)
-[<c009c8f8>] (shrink_zone+0x384/0x4ac) from [<c009ceb0>] (kswapd+0x490/0x7d0)
-[<c009ceb0>] (kswapd+0x490/0x7d0) from [<c0059be0>] (kthread+0x90/0x98)
-[<c0059be0>] (kthread+0x90/0x98) from [<c00258d8>] (kernel_thread_exit+0x0/0x8)
-Code: e3843080 e121f003 e3a00001 ebfff96a (e5953000)
-
-This shows that we've unwound from 'complete' to '__irq_svc'.  That
-may not be the full story though - the problem may relate to where we
-were when we were interrupted (or indeed took the data or prefetch
-abort).  So the unwinding from __irq_svc right back to kthread is
-just as important.
-
-This is all the same process - kthread() created PID270 (kswapd0) which
-is the same process which was present when the interrupt happened.
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index b300705..cb8a04b 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -160,37 +160,6 @@ static int atmel_nand_device_ready(struct mtd_info *mtd)
+                 !!host->board->rdy_pin_active_low;
+ }
+ 
+-/*
+- * Minimal-overhead PIO for data access.
+- */
+-static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
+-{
+-	struct nand_chip	*nand_chip = mtd->priv;
+-
+-	__raw_readsb(nand_chip->IO_ADDR_R, buf, len);
+-}
+-
+-static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
+-{
+-	struct nand_chip	*nand_chip = mtd->priv;
+-
+-	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
+-}
+-
+-static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
+-{
+-	struct nand_chip	*nand_chip = mtd->priv;
+-
+-	__raw_writesb(nand_chip->IO_ADDR_W, buf, len);
+-}
+-
+-static void atmel_write_buf16(struct mtd_info *mtd, const u8 *buf, int len)
+-{
+-	struct nand_chip	*nand_chip = mtd->priv;
+-
+-	__raw_writesw(nand_chip->IO_ADDR_W, buf, len / 2);
+-}
+-
+ static void dma_complete_func(void *completion)
+ {
+ 	complete(completion);
+@@ -265,33 +234,53 @@ err_buf:
+ static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+-	struct atmel_nand_host *host = chip->priv;
++	u32 align;
++	u8 *pbuf;
+ 
+ 	if (use_dma && len > mtd->oobsize)
+ 		/* only use DMA for bigger than oob size: better performances */
+ 		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
+ 			return;
+ 
+-	if (host->board->bus_width_16)
+-		atmel_read_buf16(mtd, buf, len);
+-	else
+-		atmel_read_buf8(mtd, buf, len);
++	/* if no DMA operation possible, use PIO */
++	pbuf = buf;
++	align = 0x03 & ((unsigned)pbuf);
++
++	if (align) {
++		u32 align_len = 4 - align;
++
++		/* non aligned buffer: re-align to next word boundary */
++		ioread8_rep(chip->IO_ADDR_R, pbuf, align_len);
++		pbuf += align_len;
++		len -= align_len;
++	}
++	memcpy((void *)pbuf, chip->IO_ADDR_R, len);
+ }
+ 
+ static void atmel_write_buf(struct mtd_info *mtd, const u8 *buf, int len)
+ {
+ 	struct nand_chip *chip = mtd->priv;
+-	struct atmel_nand_host *host = chip->priv;
++	u32 align;
++	const u8 *pbuf;
+ 
+ 	if (use_dma && len > mtd->oobsize)
+ 		/* only use DMA for bigger than oob size: better performances */
+ 		if (atmel_nand_dma_op(mtd, (void *)buf, len, 0) == 0)
+ 			return;
+ 
+-	if (host->board->bus_width_16)
+-		atmel_write_buf16(mtd, buf, len);
+-	else
+-		atmel_write_buf8(mtd, buf, len);
++	/* if no DMA operation possible, use PIO */
++	pbuf = buf;
++	align = 0x03 & ((unsigned)pbuf);
++
++	if (align) {
++		u32 align_len = 4 - align;
++
++		/* non aligned buffer: re-align to next word boundary */
++		iowrite8_rep(chip->IO_ADDR_W, pbuf, align_len);
++		pbuf += align_len;
++		len -= align_len;
++	}
++	memcpy(chip->IO_ADDR_W, (void *)pbuf, len);
+ }
+ 
+ /*
+-- 
+1.7.3
