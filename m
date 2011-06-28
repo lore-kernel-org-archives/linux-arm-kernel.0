@@ -1,44 +1,24 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Tue, 28 Jun 2011 16:53:27 +0530
-Subject: [PATCH] davinci: da850: add a .set_rate method to ref_clk
-In-Reply-To: <1308073157-22993-1-git-send-email-christian.riesch@omicron.at>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024D4CF84E@dbde02.ent.ti.com>
-	<1308073157-22993-1-git-send-email-christian.riesch@omicron.at>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7939D4@dbde02.ent.ti.com>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Tue, 28 Jun 2011 14:26:01 +0300
+Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
+In-Reply-To: <FFF198FBBF957F4393BA834040FEFFA202EDA3@DFLE35.ent.ti.com>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<4E04F0B0.4030408@codeaurora.org>
+	<BANLkTi=sFtwam29i4TZdi=RO7BoytTTdrw@mail.gmail.com>
+	<FFF198FBBF957F4393BA834040FEFFA202EDA3@DFLE35.ent.ti.com>
+Message-ID: <BANLkTiniBEuHKnmhoJEaVELpMefZ=Xk=bA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christian,
+On Tue, Jun 28, 2011 at 12:22 AM, Grosen, Mark <mgrosen@ti.com> wrote:
+> 2. We added a special section (resource table) that is interpreted as part
+> of the loading process. The tool that generates our simple format just
+> recognizes a named section (".resource_table"), so perhaps that could be
+> done with the PIL ELF loader.
 
-On Tue, Jun 14, 2011 at 23:09:17, Christian Riesch wrote:
-> This patch allows setting the input clock frequency of the SoC from
-> the board specific using the davinci_set_refclk_rate function.
-
-"board specific code"
-
-> 
-> Suggested-by: Kevin Hilman <khilman@ti.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
-> ---
-> 
-> This patch applies on top of Sekhar's patch.
-> Best regards, Christian
-> 
->  arch/arm/mach-davinci/da850.c |    1 +
->  1 files changed, 1 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-> index 133aac4..27fe3ac 100644
-> --- a/arch/arm/mach-davinci/da850.c
-> +++ b/arch/arm/mach-davinci/da850.c
-> @@ -58,6 +58,7 @@ static struct pll_data pll0_data = {
->  static struct clk ref_clk = {
->  	.name		= "ref_clk",
->  	.rate		= DA850_REF_FREQ,
-> +	.set_rate       = davinci_simple_set_rate,
-
-Please use tabs for indentation.
-
-Thanks,
-Sekhar
+I hope that DT will completely replace that "resource table" section
+eventually. We still need to try it out (as soon as DT materializes on
+ARM/pandaboard) and see how it all fits together, but in general it
+looks like DT could provide all the necessary static resource
+configuration, and then we just need to expose it to the remote
+processor.
