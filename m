@@ -1,92 +1,104 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 29 Jun 2011 02:26:28 +0400
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <20110628161127.GG24904@e102109-lin.cambridge.arm.com>
-References: <4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
-	<20110628103946.GC21898@n2100.arm.linux.org.uk>
-	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
-	<20110628142045.GC7255@1n450.cable.virginmedia.net>
-	<20110628143014.GD7255@1n450.cable.virginmedia.net>
-	<BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
-	<BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
-	<20110628150631.GD24904@e102109-lin.cambridge.arm.com>
-	<BANLkTi=dzYV5tdHaZL91oHjMfuVtXUCD5A@mail.gmail.com>
-	<20110628161127.GG24904@e102109-lin.cambridge.arm.com>
-Message-ID: <BANLkTinLG1LSB0iBrGZC6KYcTxF_NDgdqA@mail.gmail.com>
+From: ccross@google.com (Colin Cross)
+Date: Tue, 28 Jun 2011 15:29:57 -0700
+Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
+In-Reply-To: <1308923618-5333-1-git-send-email-premi@ti.com>
+References: <1308923618-5333-1-git-send-email-premi@ti.com>
+Message-ID: <CAMbhsRQUKBZbC3jJt8XpjTW2n7uA529D6G0g4eT5iLEHn2iNLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/28/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Jun 28, 2011 at 04:45:52PM +0100, Dmitry Eremin-Solenikov wrote:
->> Here is a part of gdb log generated using the attached patch:
-> [...]
->> #11 0xc0033810 in kernel_thread_helper ()
->> #12 0xc0033810 in kernel_thread_helper ()
->> Backtrace stopped: previous frame identical to this frame (corrupt stack?)
->
-> Maybe you can add something similar to the kernel_thread_helper in
-> arch/arm/kernel/process.c? I'm not sure whether there is something like
-> .cantunwind (as for the kernel unwinding information).
->
->> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
->> index e8d8856..44daf40 100644
->> --- a/arch/arm/kernel/entry-armv.S
->> +++ b/arch/arm/kernel/entry-armv.S
->> @@ -28,6 +28,7 @@
->>  #include "entry-header.S"
->>  #include <asm/entry-macro-multi.S>
->>
->> +	.cfi_sections	.debug_frame
->>  /*
->>   * Interrupt handling.  Preserves r7, r8, r9
->>   */
->> @@ -113,6 +114,7 @@ ENDPROC(__und_invalid)
->>
->>  	.macro	svc_entry, stack_hole=0
->>   UNWIND(.fnstart		)
->> +	.cfi_startproc
->>   UNWIND(.save {r0 - pc}		)
->>  	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
->>  #ifdef CONFIG_THUMB2_KERNEL
->> @@ -146,6 +148,24 @@ ENDPROC(__und_invalid)
->>  	@  r4 - orig_r0 (see pt_regs definition in ptrace.h)
->>  	@
->>  	stmia	r5, {r0 - r4}
->> +	.cfi_def_cfa_offset S_PC + 4
->> +	.cfi_offset 14, -4
->> +#define	CFI_REG_OFF(r) .cfi_offset r, (r - 16) * 4
->> +	CFI_REG_OFF(13)
->> +	CFI_REG_OFF(12)
->> +	CFI_REG_OFF(11)
->> +	CFI_REG_OFF(10)
->> +	CFI_REG_OFF(9)
->> +	CFI_REG_OFF(8)
->> +	CFI_REG_OFF(7)
->> +	CFI_REG_OFF(6)
->> +	CFI_REG_OFF(5)
->> +	CFI_REG_OFF(4)
->> +	CFI_REG_OFF(3)
->> +	CFI_REG_OFF(2)
->> +	CFI_REG_OFF(1)
->> +	CFI_REG_OFF(0)
->> +#undef CFI_REG_OFF
->>  	.endm
->
-> Do we need all the registers in here for gdb stack unwinding? In general
-> we would only need LR, SP and FP.
+<resending as plain text>
 
-CFI info isn't only related to stack unwinding. IIUC (I'll have to run
-more experiments)
-these instrutions will help me to get correct variables/arguments
-values in the before-exception stack frames.
+On Fri, Jun 24, 2011 at 6:53 AM, Sanjeev Premi <premi@ti.com> wrote:
+>
+> Currently, loops_per_jiffy is being calculated twice for
+> non-SMP processors.
+> ?- Before calling cpufreq_notify_transition()
+> ?- From within cpufreq_notify_transition()
+>
+> Double adjustment leads to incorrect value being assigned to
+> loops_per_jiffy. This manifests as incorrect BogoMIPS in
+> "cat /proc/cpuinfo".
+>
+> The value of loops_per_jiffy needs to be calculated only
+> when CONFIG_SMP is true. It is the core change included
+> in this patch.
+>
+> The patch also leverages the definition of for_each_cpu()
+> with and without CONFIG_SMP to consolidate the mechanism
+> to call cpufreq_notify_transition().
+>
+> Signed-off-by: Sanjeev Premi <premi@ti.com>
+> ---
+> ?Changes since v1:
+> ? * loops_per_jiffy are updated when CONFIG_SMP is true.
+> ? * leverage definition of for_each_cpu()
+>
+> ?Tested on OMAP3EVM with and without CONFIG_SMP.
+> ?Since the log is rather long, will be posting the log in
+> ?a follow-up mail.
+>
+> ?arch/arm/mach-omap2/omap2plus-cpufreq.c | ? 27 +++++++++++++++------------
+> ?1 files changed, 15 insertions(+), 12 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/omap2plus-cpufreq.c b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> index 346519e..0263cae 100644
+> --- a/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> +++ b/arch/arm/mach-omap2/omap2plus-cpufreq.c
+> @@ -97,12 +97,8 @@ static int omap_target(struct cpufreq_policy *policy,
+> ? ? ? ? ? ? ? ?return ret;
+>
+> ? ? ? ?/* Notify transitions */
+> - ? ? ? if (is_smp()) {
+> - ? ? ? ? ? ? ? for_each_cpu(i, policy->cpus) {
+> - ? ? ? ? ? ? ? ? ? ? ? freqs.cpu = i;
+> - ? ? ? ? ? ? ? ? ? ? ? cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> - ? ? ? ? ? ? ? }
+> - ? ? ? } else {
+> + ? ? ? for_each_cpu(i, policy->cpus) {
+> + ? ? ? ? ? ? ? freqs.cpu = i;
+> ? ? ? ? ? ? ? ?cpufreq_notify_transition(&freqs, CPUFREQ_PRECHANGE);
+> ? ? ? ?}
+>
+> @@ -114,13 +110,20 @@ static int omap_target(struct cpufreq_policy *policy,
+>
+> ? ? ? ?freqs.new = omap_getspeed(policy->cpu);
+>
+> +#ifdef CONFIG_SMP
+> + ? ? ? /* Adjust jiffies before transition */
+> + ? ? ? for_each_cpu(i, policy->cpus) {
+> + ? ? ? ? ? ? ? unsigned long lpj = per_cpu(cpu_data, i).loops_per_jiffy;
+> +
+> + ? ? ? ? ? ? ? per_cpu(cpu_data, i).loops_per_jiffy = cpufreq_scale(lpj,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs.old,
+> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs.new);
+Can't this rewrite the loops_per_jiffy for the other CPU while it is
+in a udelay?  If it has already calculated the number of loops
+necessary, and the CPU frequency increases, it could end up returning
+too early from udelay.
 
+There were previous discussions about polling a fixed-frequency timer
+for udelay on SMP systems.
+
+> + ? ? ? }
+> +#endif
+> +
+> ? ? ? ?/* Notify transitions */
+> - ? ? ? if (is_smp()) {
+> - ? ? ? ? ? ? ? for_each_cpu(i, policy->cpus) {
+> - ? ? ? ? ? ? ? ? ? ? ? freqs.cpu = i;
+> - ? ? ? ? ? ? ? ? ? ? ? cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> - ? ? ? ? ? ? ? }
+> - ? ? ? } else {
+> + ? ? ? for_each_cpu(i, policy->cpus) {
+> + ? ? ? ? ? ? ? freqs.cpu = i;
+> ? ? ? ? ? ? ? ?cpufreq_notify_transition(&freqs, CPUFREQ_POSTCHANGE);
+> ? ? ? ?}
 >
 > --
-> Catalin
+> 1.7.2.2
 >
->
-
-
--- 
-With best wishes
-Dmitry
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
