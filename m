@@ -1,38 +1,49 @@
-From: mgrosen@ti.com (Grosen, Mark)
-Date: Mon, 27 Jun 2011 23:54:30 +0000
-Subject: [RFC 1/8] drivers: add generic remoteproc framework
-In-Reply-To: <20110627222401.GE20865@ponder.secretlab.ca>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-2-git-send-email-ohad@wizery.com>
-	<20110627204958.GB20865@ponder.secretlab.ca>
-	<FFF198FBBF957F4393BA834040FEFFA202EE00@DFLE35.ent.ti.com>
-	<20110627222401.GE20865@ponder.secretlab.ca>
-Message-ID: <FFF198FBBF957F4393BA834040FEFFA202EF28@DFLE35.ent.ti.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Tue, 28 Jun 2011 09:40:56 +0900
+Subject: [PATCH v2] NET: AX88796: Tighten up Kconfig dependencies
+In-Reply-To: <20110627111259.GA13620@linux-mips.org>
+References: <20110627111259.GA13620@linux-mips.org>
+Message-ID: <BANLkTikDxsOJKpiJs0NpMXbjVOFMHL7RZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Grant Likely
-> Sent: Monday, June 27, 2011 3:24 PM
+Hi Ralf,
 
-> > Our AMPs (remote processors) have a variety of boot mechanisms that vary
-> > across the different SoCs (yes, TI likes HW diversity). In some cases, the
-> > boot address is more like an entry point and that comes from the firmware,
-> > so it is not a static attribute of a driver. Correct me if I misunderstood
-> > your question.
-> 
-> More to the point, I would expect the boot_address to be a property of
-> the rproc instance because it represents the configuration of the
-> remote processor.  It seems odd that the caller of ->start would know
-> better than the rproc driver about the entry point of the processor.
-> 
-> g.
+On Mon, Jun 27, 2011 at 8:13 PM, Ralf Baechle <ralf@linux-mips.org> wrote:
+> In def47c5095d53814512bb0c62ec02dfdec769db1 [[netdrvr] Fix dependencies for
+> ax88796 ne2k clone driver] the AX88796 driver got restricted to just be
+> build for ARM and MIPS on the sole merrit that it was written for some ARM
+> sytems and the driver had the misfortune to just build on MIPS, so MIPS was
+> throw into the dependency for a good measure. ?Later
+> 8687991a734a67f1638782c968f46fff0f94bb1f [ax88796: add superh to kconfig
+> dependencies] added SH but only one in-tree SH system actually has an
+> AX88796.
+>
+> Tighten up dependencies by using an auxilliary config sysmbol
+> HAS_NET_AX88796 which is selected only by the platforms that actually
+> have or may have an AX88796. ?This also means the driver won't be built
+> anymore for any MIPS platform.
+>
+> Signed-off-by: Ralf Baechle <ralf@linux-mips.org>
+> ---
+> v2: fixed Sergei's complaints about the log message
 
-Yes, in many cases the boot_address will be defined by the HW. However, we have
-processors that are "soft" - the boot_address comes from the particular firmware
-being loaded and can (will) be different with each firmware image. We factored
-out the firmware loader to be device-independent (in remoteproc.c) so it's not
-repeated in each device-specific implementation like omap_remoteproc.c and
-davinci_remoteproc.c. In the cases where the HW dictates what happens, the start()
-method should just ignore the boot_address.
+I'm the one who added the SuperH bits a few years ago. Judging by the
+text above it seems like you prefer not to build this driver for MIPS.
+Which is totally fine with me.
 
-Mark
+As for SH and SH-Mobile ARM, unless explicitly requested we usually
+don't restrict our platform drivers. Allowing them to build on any
+system helps to catch compile errors. It also makes it possible to add
+board support by simply adding platform data to the board file and
+then updating the kconfig. Keeping the amount of code at the bare
+minimum makes back porting rather easy too.
+
+I'm not sure if the ax88796 driver does something non-standard to
+require special symbols, but usually platform drivers are rather clean
+and can be compiled for any architecture or platform. At least in
+theory. =)
+
+Cheers,
+
+/ magnus
