@@ -1,36 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 28 Jun 2011 19:03:05 +0200
-Subject: [PATCH 1/2] PWM: add pwm framework support
-In-Reply-To: <20110628161842.GK6069@pengutronix.de>
-References: <1309255368-9775-1-git-send-email-s.hauer@pengutronix.de>
-	<201106281427.04373.arnd@arndb.de>
-	<20110628161842.GK6069@pengutronix.de>
-Message-ID: <201106281903.06121.arnd@arndb.de>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Tue, 28 Jun 2011 10:25:13 -0700
+Subject: [next][bug] rcu_dyntick_kick_cpu() kills ARM SMP.
+In-Reply-To: <4E09EE75.9040204@arm.com>
+References: <4E09EE75.9040204@arm.com>
+Message-ID: <20110628172513.GB2294@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 June 2011, Sascha Hauer wrote:
-> > How about using idr? It provides you a fast lookup and handles giving
-> > out unique numbers.
+On Tue, Jun 28, 2011 at 04:08:37PM +0100, Marc Zyngier wrote:
+> Paul,
 > 
-> Sounds like a good idea, but is idr compatible with the pwmchip_reserve
-> function below? idr gives no guarantee that the first id is zero, but I
-> need exactly this to make the ids for the internal PWMs known at compile
-> time.
+> I've updated my -next tree (to next-20110628) today, and discovered 
+> that my favorite ARM board wouldn't boot anymore:
+> 
+> [...]
+> Hierarchical RCU implementation.
+> NR_IRQS:128 nr_irqs:128 128
+> Console: colour dummy device 80x30
+> Calibrating delay loop... 83.35 BogoMIPS (lpj=416768)
+> pid_max: default: 32768 minimum: 301
+> Mount-cache hash table entries: 512
+> CPU: Testing write buffer coherency: ok
+> Calibrating local timer... 104.04MHz.
+> CPU1: Booted secondary processor
+> CPU1: Unknown IPI message 0x1
+> CPU2: Booted secondary processor
+> CPU2: Unknown IPI message 0x1
+> CPU3: Booted secondary processor
+> CPU3: Unknown IPI message 0x1
+> Brought up 4 CPUs
+> SMP: Total of 4 processors activated (333.92 BogoMIPS).
+> ------------[ cut here ]------------
+> WARNING: at kernel/smp.c:320 smp_call_function_single+0xe4/0x1c0()
+> NET: Registered protocol family 16
+> Modules linked in:
+> [<c00415d4>] (unwind_backtrace+0x0/0xf4) from [<c0056184>] (warn_slowpath_common+0x4c/0x64)
+> [<c0056184>] (warn_slowpath_common+0x4c/0x64) from [<c00561b8>] (warn_slowpath_null+0x1c/0x24)
+> [<c00561b8>] (warn_slowpath_null+0x1c/0x24) from [<c0088218>] (smp_call_function_single+0xe4/0x1c0)
+> [<c0088218>] (smp_call_function_single+0xe4/0x1c0) from [<c0094804>] (rcu_start_gp+0x184/0x310)
+> [<c0094804>] (rcu_start_gp+0x184/0x310) from [<c00955b0>] (__rcu_process_callbacks+0x274/0x398)
+> [<c00955b0>] (__rcu_process_callbacks+0x274/0x398) from [<c0095708>] (rcu_process_callbacks+0x34/0x5c)
+> [<c0095708>] (rcu_process_callbacks+0x34/0x5c) from [<c005c964>] (__do_softirq+0xa4/0x16c)
+> [<c005c964>] (__do_softirq+0xa4/0x16c) from [<c005cc0c>] (irq_exit+0x80/0x9c)
+> [<c005cc0c>] (irq_exit+0x80/0x9c) from [<c00353cc>] (do_local_timer+0x54/0x70)
+> [<c00353cc>] (do_local_timer+0x54/0x70) from [<c003b618>] (__irq_svc+0x38/0xc0)
+> Exception stack(0xdf467f90 to 0xdf467fd8)
+> 7f80:                                     df466000 00000000 df467fd8 00000000
+> 7fa0: df466000 c045dd24 c034f6cc 00000000 c0445514 410fb020 70409ddc 00000000
+> 7fc0: 00000000 df467fd8 c003c4ac c003c4b0 60000013 ffffffff
+> [<c003b618>] (__irq_svc+0x38/0xc0) from [<c003c4b0>] (default_idle+0x24/0x28)
+> [<c003c4b0>] (default_idle+0x24/0x28) from [<c003ccd0>] (cpu_idle+0x9c/0xdc)
+> [<c003ccd0>] (cpu_idle+0x9c/0xdc) from [<70348734>] (0x70348734)
+> ---[ end trace 1b75b31a2719ed1c ]---
+> 
+> ... and here it dies.
+> 
+> The offending commit is b983032b7 (rcu: Avoid grace-period overflow for 
+> long dyntick-idle periods). rcu_dyntick_kick_cpu() tries to do a CPU 
+> cross-call with interrupts disabled, which kills the box. Reverting this
+> patch results in a working system.
 
-You can certainly use ida_get_new_above to guarantee that implicit
-number allocation doesn't interfere with the reserved numbers. Whether
-that guarantees that you get the reserved numbers when you ask for them,
-I don't know.
+That does sound problematic...
 
-A possible way to deal with that would be to allocate an array of pointers
-for the reserved space but use IDR for the rest, but at that point the
-complexity is probably higher than what you have now ;-)
+> My RCU-foo being rather low, I haven't dug deeper into this. Please let
+> me know if you want me to test anything.
 
-Another question is whether the dynamic allocation even makes sense. How
-does a driver that wants to use a PWM find out what number to ask for
-when it's not reserved for the platform to start with. Maybe the
-answer is to just use an array or tree for the lookup and refuse to
-register multiple PWMs to the same number.
+I will put together a patch to defer the actual cross-call until irqs
+are enabled.  The call would be from softirq -- that is OK, correct?
 
-	Arnd
+And thank you for testing this!
+
+							Thanx, Paul
