@@ -1,71 +1,144 @@
-From: ccross@google.com (Colin Cross)
-Date: Tue, 28 Jun 2011 15:56:46 -0700
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-In-Reply-To: <4E0A5982.8040002@ti.com>
-References: <1308923618-5333-1-git-send-email-premi@ti.com>
-	<CAMbhsRQUKBZbC3jJt8XpjTW2n7uA529D6G0g4eT5iLEHn2iNLg@mail.gmail.com>
-	<4E0A5982.8040002@ti.com>
-Message-ID: <CAMbhsRRsEy_oXZO10fMEpM+puJwqTLesXenFBB1Ngj9-=tcV8A@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 28 Jun 2011 17:57:36 -0500
+Subject: [PATCH 1/4] microblaze: move pci flag functions into asm-generic
+In-Reply-To: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
+References: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
+Message-ID: <1309301859-17651-2-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-<resending as plain text again, sorry, mailer troubles>
+From: Rob Herring <rob.herring@calxeda.com>
 
-On Tue, Jun 28, 2011 at 3:45 PM, Santosh Shilimkar
-<santosh.shilimkar@ti.com> wrote:
->
-> On 6/28/2011 3:29 PM, Colin Cross wrote:
->>
->> <resending as plain text>
->>
->> On Fri, Jun 24, 2011 at 6:53 AM, Sanjeev Premi<premi@ti.com> ?wrote:
->>>
->
->>> +#ifdef CONFIG_SMP
->>> + ? ? ? /* Adjust jiffies before transition */
->>> + ? ? ? for_each_cpu(i, policy->cpus) {
->>> + ? ? ? ? ? ? ? unsigned long lpj = per_cpu(cpu_data, i).loops_per_jiffy;
->>> +
->>> + ? ? ? ? ? ? ? per_cpu(cpu_data, i).loops_per_jiffy = cpufreq_scale(lpj,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs.old,
->>> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? freqs.new);
->
-> This isn't the right patch since it does suffer from the progressive
-> error. There was an updated patch on this thread from Russell which
-> I re-based.
+Move pci_set_flags, pci_add_flags, and pci_has_flag into
+asm-generic/pci-bridge.h so other archs can use them.
 
-Both patches have the same issue - they update loops_per_jiffy, which
-is unsafe on an SMP system.
+Signed-off-by: Rob Herring <rob.herring@calxeda.com>
+---
+ arch/microblaze/include/asm/pci-bridge.h |   36 +-----------------
+ include/asm-generic/pci-bridge.h         |   62 ++++++++++++++++++++++++++++++
+ 2 files changed, 63 insertions(+), 35 deletions(-)
+ create mode 100644 include/asm-generic/pci-bridge.h
 
->>
->> Can't this rewrite the loops_per_jiffy for the other CPU while it is
->> in a udelay? ?If it has already calculated the number of loops
->> necessary, and the CPU frequency increases, it could end up returning
->> too early from udelay.
->>
->> There were previous discussions about polling a fixed-frequency timer
->> for udelay on SMP systems.
->>
-> The udelay code doesn't use the per-cpu lpj variable. It uses the global
-> lpj. Secondly the calibration of no. of loops to be done is
-> precalculateed so overwrite shouldn't impact the scenario you mentioned.
->
-> Though it has an issue where, pre-calculated loops can become short/long
-> based on new clock change which impacts both CPU's on OMAP, when the other CPU is in in the middle of u-delay routine..
-
-The precalculated loops is exactly the problem I described.
-udelay(100) can return in 50 microseconds if the cpu speed is doubled.
- On OMAP4, frequencies can range from 350Mhz to 1.5GHz, so udelay can
-be more than 4 times too short.  That breaks the guarantees of udelay.
-
-> When CPU can scale independently, then we have bigger problem since
-> global lpj based udelay becomes always error prone in all scenario's.
->
-> So for the OMAP, where the whole CPU cluster is scaled together,
-> I don't see this as a bigger problem.
->
-> Regards
-> Santosh
->
->
->
+diff --git a/arch/microblaze/include/asm/pci-bridge.h b/arch/microblaze/include/asm/pci-bridge.h
+index 746df91..ad1480f 100644
+--- a/arch/microblaze/include/asm/pci-bridge.h
++++ b/arch/microblaze/include/asm/pci-bridge.h
+@@ -10,6 +10,7 @@
+ #include <linux/pci.h>
+ #include <linux/list.h>
+ #include <linux/ioport.h>
++#include <asm-generic/pci-bridge.h>
+ 
+ struct device_node;
+ 
+@@ -164,40 +165,5 @@ extern struct pci_controller *pcibios_alloc_controller(struct device_node *dev);
+ extern void pcibios_free_controller(struct pci_controller *phb);
+ extern void pcibios_setup_phb_resources(struct pci_controller *hose);
+ 
+-#ifdef CONFIG_PCI
+-extern unsigned int pci_flags;
+-
+-static inline void pci_set_flags(int flags)
+-{
+-	pci_flags = flags;
+-}
+-
+-static inline void pci_add_flags(int flags)
+-{
+-	pci_flags |= flags;
+-}
+-
+-static inline int pci_has_flag(int flag)
+-{
+-	return pci_flags & flag;
+-}
+-
+-extern struct list_head hose_list;
+-
+-extern int pcibios_vaddr_is_ioport(void __iomem *address);
+-#else
+-static inline int pcibios_vaddr_is_ioport(void __iomem *address)
+-{
+-	return 0;
+-}
+-
+-static inline void pci_set_flags(int flags) { }
+-static inline void pci_add_flags(int flags) { }
+-static inline int pci_has_flag(int flag)
+-{
+-	return 0;
+-}
+-#endif	/* CONFIG_PCI */
+-
+ #endif	/* __KERNEL__ */
+ #endif	/* _ASM_MICROBLAZE_PCI_BRIDGE_H */
+diff --git a/include/asm-generic/pci-bridge.h b/include/asm-generic/pci-bridge.h
+new file mode 100644
+index 0000000..4a5aca2
+--- /dev/null
++++ b/include/asm-generic/pci-bridge.h
+@@ -0,0 +1,62 @@
++/*
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; either version
++ * 2 of the License, or (at your option) any later version.
++ */
++#ifndef _ASM_GENERIC_PCI_BRIDGE_H
++#define _ASM_GENERIC_PCI_BRIDGE_H
++
++#ifdef __KERNEL__
++
++enum {
++	/* Force re-assigning all resources (ignore firmware
++	 * setup completely)
++	 */
++	PCI_REASSIGN_ALL_RSRC	= 0x00000001,
++
++	/* Re-assign all bus numbers */
++	PCI_REASSIGN_ALL_BUS	= 0x00000002,
++
++	/* Do not try to assign, just use existing setup */
++	PCI_PROBE_ONLY		= 0x00000004,
++
++	/* Don't bother with ISA alignment unless the bridge has
++	 * ISA forwarding enabled
++	 */
++	PCI_CAN_SKIP_ISA_ALIGN	= 0x00000008,
++
++	/* Enable domain numbers in /proc */
++	PCI_ENABLE_PROC_DOMAINS	= 0x00000010,
++	/* ... except for domain 0 */
++	PCI_COMPAT_DOMAIN_0	= 0x00000020,
++};
++
++#ifdef CONFIG_PCI
++extern unsigned int pci_flags;
++
++static inline void pci_set_flags(int flags)
++{
++	pci_flags = flags;
++}
++
++static inline void pci_add_flags(int flags)
++{
++	pci_flags |= flags;
++}
++
++static inline int pci_has_flag(int flag)
++{
++	return pci_flags & flag;
++}
++#else
++static inline void pci_set_flags(int flags) { }
++static inline void pci_add_flags(int flags) { }
++static inline int pci_has_flag(int flag)
++{
++	return 0;
++}
++#endif	/* CONFIG_PCI */
++
++#endif	/* __KERNEL__ */
++#endif	/* _ASM_GENERIC_PCI_BRIDGE_H */
+-- 
+1.7.4.1
