@@ -1,30 +1,72 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 28 Jun 2011 13:35:50 +0300
-Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
-In-Reply-To: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20110628103549.GG2612@legolas.emea.dhcp.ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Jun 2011 11:39:47 +0100
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <4E089AB3.1090801@codesourcery.com>
+References: <20110627125306.GA30646@doriath.ww600.siemens.net>
+	<20110627132735.GE16103@n2100.arm.linux.org.uk>
+	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
+Message-ID: <20110628103946.GC21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 01:35:27PM +0200, Nicolas Ferre wrote:
-> Add this Kconfig variable to ease the submission of this chip support.
-> As this chip/board inclusion is dealayed due to deep consolidation of
-> arm/mach-at91 sources, we include this dummy configuration variable to allow
-> submission of SAM9x5 related drivers in other subsystems.
+On Mon, Jun 27, 2011 at 10:58:59PM +0800, Yao Qi wrote:
+> On 06/27/2011 10:04 PM, Dmitry Eremin-Solenikov wrote:
+> > Hello,
+> > 
+> > On 27.06.2011 17:27, Russell King - ARM Linux wrote:
+> >> We _really_ _do_ want to unwind through this so that we can see the
+> >> parent kernel context information in backtraces - and the fact that
+> 
+> I am not sure GDB is able to unwind stacks across processes (from child
+> to parent).
 
-Why are the drivers even depending on this ? They should be portable
-enough. Can you share a few drivers so we have a look ?
+It's not about unwinding across processes.  It's still the same process.
 
-IMHO, the whole idea of the consolidation is beyond arch/arm, drivers
-should be affected too.
+Let me give you a recent example.  This may be using frame pointers rather
+than the unwinder, but serves to illustrate what we - as kernel developers -
+absolutely must have from the kernel:
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110628/46dfaa3e/attachment.sig>
+Internal error: Oops: 17 [#1] PREEMPT
+Modules linked in: uinput g_ether cryptomgr aead arc4 crypto_algapi rt2800usb rt2800lib rt2x00usb rt2x00lib mac80211 cfg80211 sg pcmciamtd mousedev snd_soc_wm8750 snd_soc_pxa2xx_i2s snd_soc_core ohci_hcd usbcore pxa27x_udc physmap snd_pcm_oss snd_pcm snd_timer snd_page_alloc snd_mixer_oss snd soundcore rfcomm pxaficp_ir ircomm_tty ircomm irda ipv6 hidp hid bluetooth rfkill crc16
+CPU: 0    Not tainted  (3.0.0-rc4+ #5)
+PC is at complete+0x28/0x7c
+LR is at complete+0x28/0x7c
+pc : [<c0036b6c>]    lr : [<c0036b6c>]    psr: 80000093
+sp : c3897b68  ip : c3897b68  fp : c3897b84
+r10: c4806000  r9 : c381f3e0  r8 : 0000000a
+r7 : c30f0da8  r6 : 00000000  r5 : 00000000  r4 : a0000013
+r3 : c3896000  r2 : 00000000  r1 : 00000103  r0 : 00000004
+Flags: Nzcv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment kernel
+Control: 0000397f  Table: a080c000  DAC: 00000017
+Process kswapd0 (pid: 270, stack limit = 0xc3896278)
+[<c0036b6c>] (complete+0x28/0x7c) from [<c01e9b0c>] (spi_complete+0x10/0x14)
+[<c01e9b0c>] (spi_complete+0x10/0x14) from [<c01eac2c>] (giveback+0x114/0x12c)
+[<c01eac2c>] (giveback+0x114/0x12c) from [<c01eb60c>] (pump_transfers+0x13c/0x6f8)
+[<c01eb60c>] (pump_transfers+0x13c/0x6f8) from [<c0044924>] (tasklet_action+0x90/0xf0)
+[<c0044924>] (tasklet_action+0x90/0xf0) from [<c0044eb8>] (__do_softirq+0x98/0x138)
+[<c0044eb8>] (__do_softirq+0x98/0x138) from [<c00453a0>] (irq_exit+0x4c/0xa8)
+[<c00453a0>] (irq_exit+0x4c/0xa8) from [<c002406c>] (asm_do_IRQ+0x6c/0x8c)
+[<c002406c>] (asm_do_IRQ+0x6c/0x8c) from [<c0024b84>] (__irq_svc+0x44/0xcc)
+Exception stack(0xc3897c78 to 0xc3897cc0)
+7c60:                                                       4022d320 4022e000
+7c80: 08000075 00001000 c32273c0 c03ce1c0 c2b49b78 4022d000 c2b420b4 00000001
+7ca0: 00000000 c3897cfc 00000000 c3897cc0 c00afc54 c002edd8 00000013 ffffffff
+[<c0024b84>] (__irq_svc+0x44/0xcc) from [<c002edd8>] (xscale_flush_user_cache_range+0x18/0x3c)
+[<c002edd8>] (xscale_flush_user_cache_range+0x18/0x3c) from [<c00affd8>] (try_to_unmap_file+0x98/0x4ec)
+[<c00affd8>] (try_to_unmap_file+0x98/0x4ec) from [<c00b07ac>] (try_to_unmap+0x40/0x60)
+[<c00b07ac>] (try_to_unmap+0x40/0x60) from [<c009b940>] (shrink_page_list+0x2a8/0x8cc)
+[<c009b940>] (shrink_page_list+0x2a8/0x8cc) from [<c009c448>] (shrink_inactive_list+0x218/0x344)
+[<c009c448>] (shrink_inactive_list+0x218/0x344) from [<c009c8f8>] (shrink_zone+0x384/0x4ac)
+[<c009c8f8>] (shrink_zone+0x384/0x4ac) from [<c009ceb0>] (kswapd+0x490/0x7d0)
+[<c009ceb0>] (kswapd+0x490/0x7d0) from [<c0059be0>] (kthread+0x90/0x98)
+[<c0059be0>] (kthread+0x90/0x98) from [<c00258d8>] (kernel_thread_exit+0x0/0x8)
+Code: e3843080 e121f003 e3a00001 ebfff96a (e5953000)
+
+This shows that we've unwound from 'complete' to '__irq_svc'.  That
+may not be the full story though - the problem may relate to where we
+were when we were interrupted (or indeed took the data or prefetch
+abort).  So the unwinding from __irq_svc right back to kthread is
+just as important.
+
+This is all the same process - kthread() created PID270 (kswapd0) which
+is the same process which was present when the interrupt happened.
