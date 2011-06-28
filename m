@@ -1,89 +1,38 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 28 Jun 2011 17:57:35 -0500
-Subject: [RFC PATCH 0/4] ARM: make mach/hardware.h optional
-Message-ID: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
+From: santosh.shilimkar@ti.com (Santosh Shilimkar)
+Date: Tue, 28 Jun 2011 16:07:58 -0700
+Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
+In-Reply-To: <20110628230358.GB23312@n2100.arm.linux.org.uk>
+References: <1308923618-5333-1-git-send-email-premi@ti.com>
+	<CAMbhsRQUKBZbC3jJt8XpjTW2n7uA529D6G0g4eT5iLEHn2iNLg@mail.gmail.com>
+	<4E0A5982.8040002@ti.com>
+	<20110628230358.GB23312@n2100.arm.linux.org.uk>
+Message-ID: <4E0A5ECE.5080508@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Rob Herring <rob.herring@calxeda.com>
+On 6/28/2011 4:03 PM, Russell King - ARM Linux wrote:
+> On Tue, Jun 28, 2011 at 03:45:22PM -0700, Santosh Shilimkar wrote:
+>> The udelay code doesn't use the per-cpu lpj variable. It uses the global
+>> lpj. Secondly the calibration of no. of loops to be done is
+>> precalculateed so overwrite shouldn't impact the scenario you mentioned.
+>>
+>> Though it has an issue where, pre-calculated loops can become short/long
+>> based on new clock change which impacts both CPU's on OMAP, when the
+>> other CPU is in in the middle of u-delay routine..
+>
+> And there's also the issue where you can start a udelay loop on one CPU,
+> be pre-empted and end up running it on a different CPU running at a
+> different speed.
+>
+Indeed.
 
-Currently, all ARM platforms must have a mach/hardware.h include. This is
-because it is ultimately included by linux/pci.h which is included in many
-places even for !CONFIG_PCI.
+> The thing to bear in mind is that udelays are approximate at best - I did
+> some investigation into the accuracy of the loops_per_jiffy calculation,
+> and it _will_ produce shorter delays than expected by the fact that
+> what is being calibrated is the udelay() loop _plus_ the timer interrupt
+> overhead.
+ >
+Sure but as Colin pointed out 4 times shorter delay will be too much.
 
-This could be fixed simply with an ifdef around the include of mach/hardware.h
-in asm/pci.h. However, in the interest of fixing this for single kernel
-binary builds, this series removes the include of mach/hardware.h outside of
-mach-* and plat-*. What's used from hardware.h is a couple of PCI defines. 
-Converting them to variables allows each platform to set the values as needed.
-
-This does not address the inclusion of mach/hardware.h under drivers/*. This
-appears to be mostly older platforms. There could also be some indirect
-inclusions from other mach/* headers.
-
-I've compile tested on most affected platforms.
-
-Rob
-
-Rob Herring (4):
-  microblaze: move pci flag functions into asm-generic
-  ARM: remove unnecessary mach/hardware.h includes
-  ARM: pci: make pcibios_assign_all_busses use pci_has_flag
-  ARM: convert PCI defines to variables
-
- arch/arm/include/asm/pci.h                       |   16 +++++-
- arch/arm/include/asm/vga.h                       |    2 +-
- arch/arm/kernel/ecard.c                          |    1 -
- arch/arm/lib/ecard.S                             |    1 -
- arch/arm/lib/io-readsw-armv3.S                   |    1 -
- arch/arm/lib/io-writesw-armv3.S                  |    1 -
- arch/arm/mach-bcmring/include/mach/hardware.h    |    2 -
- arch/arm/mach-cns3xxx/cns3420vb.c                |    1 -
- arch/arm/mach-cns3xxx/include/mach/hardware.h    |   22 --------
- arch/arm/mach-dove/include/mach/hardware.h       |    7 ---
- arch/arm/mach-dove/pcie.c                        |    4 ++
- arch/arm/mach-ep93xx/include/mach/hardware.h     |    2 -
- arch/arm/mach-footbridge/common.c                |    4 +-
- arch/arm/mach-footbridge/dc21285.c               |    4 ++
- arch/arm/mach-footbridge/include/mach/hardware.h |    7 +--
- arch/arm/mach-integrator/include/mach/hardware.h |    7 ---
- arch/arm/mach-integrator/pci_v3.c                |    4 ++
- arch/arm/mach-iop13xx/include/mach/hardware.h    |    7 ---
- arch/arm/mach-iop13xx/pci.c                      |    4 +-
- arch/arm/mach-iop32x/include/mach/hardware.h     |    3 -
- arch/arm/mach-iop33x/include/mach/hardware.h     |    3 -
- arch/arm/mach-ixp2000/include/mach/hardware.h    |    8 ---
- arch/arm/mach-ixp2000/pci.c                      |    2 +
- arch/arm/mach-ixp23xx/include/mach/hardware.h    |    4 --
- arch/arm/mach-ixp23xx/pci.c                      |    4 ++
- arch/arm/mach-ixp4xx/common-pci.c                |    6 ++
- arch/arm/mach-ixp4xx/include/mach/hardware.h     |    5 --
- arch/arm/mach-kirkwood/include/mach/hardware.h   |    7 ---
- arch/arm/mach-kirkwood/pcie.c                    |    4 ++
- arch/arm/mach-ks8695/include/mach/hardware.h     |    9 ---
- arch/arm/mach-mv78xx0/include/mach/hardware.h    |    7 ---
- arch/arm/mach-mv78xx0/pcie.c                     |    4 ++
- arch/arm/mach-orion5x/include/mach/hardware.h    |    7 ---
- arch/arm/mach-orion5x/pci.c                      |    4 ++
- arch/arm/mach-pxa/include/mach/hardware.h        |    3 -
- arch/arm/mach-sa1100/include/mach/hardware.h     |    8 ---
- arch/arm/mach-shark/include/mach/hardware.h      |    6 --
- arch/arm/mach-shark/pci.c                        |   11 +++-
- arch/arm/mach-tegra/include/mach/hardware.h      |   28 ----------
- arch/arm/mach-tegra/include/mach/system.h        |    1 -
- arch/arm/mach-tegra/io.c                         |    1 -
- arch/arm/mach-tegra/pcie.c                       |    2 +
- arch/arm/mach-tegra/platsmp.c                    |    1 -
- arch/arm/mach-versatile/include/mach/hardware.h  |    6 --
- arch/arm/mach-versatile/pci.c                    |    3 +
- arch/arm/mm/iomap.c                              |   12 ++++
- arch/arm/mm/proc-xsc3.S                          |    1 -
- arch/microblaze/include/asm/pci-bridge.h         |   36 +------------
- include/asm-generic/pci-bridge.h                 |   62 ++++++++++++++++++++++
- 49 files changed, 144 insertions(+), 211 deletions(-)
- delete mode 100644 arch/arm/mach-cns3xxx/include/mach/hardware.h
- delete mode 100644 arch/arm/mach-tegra/include/mach/hardware.h
- create mode 100644 include/asm-generic/pci-bridge.h
-
--- 
-1.7.4.1
+Regards
+Santosh
