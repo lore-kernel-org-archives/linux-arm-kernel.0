@@ -1,40 +1,58 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Tue, 28 Jun 2011 22:24:43 +0100
-Subject: [PATCH 0/5] remove spi-s3c24xx-gpio driver
-In-Reply-To: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
-References: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
-Message-ID: <20110628212443.GI21138@trinity.fluff.org>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 28 Jun 2011 14:01:12 -0700
+Subject: [PATCH v5 1/1] drivers:staging:pruss: add pruss staging mfd
+	driver.
+In-Reply-To: <1306827939-4133-2-git-send-email-subhasish@mistralsolutions.com>
+References: <1306827939-4133-1-git-send-email-subhasish@mistralsolutions.com>
+	<1306827939-4133-2-git-send-email-subhasish@mistralsolutions.com>
+Message-ID: <20110628210112.GA31081@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 02:49:12PM +0200, Peter Korsgaard wrote:
-> The spi-s3c24xx-gpio driver is functionally equivalent to the spi-gpio
-> driver (but precedes it). The driver has seen very little development 
-> since it got added back in 2006, and there's only 2 in-tree users of it.
+On Tue, May 31, 2011 at 01:15:39PM +0530, Subhasish Ghosh wrote:
+> This patch adds the pruss MFD driver and associated include files.
+> For details regarding the PRUSS please refer the folowing link:
+> http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
 > 
-> This patch series moves the remaining users to the spi-gpio driver and
-> then finally removes the driver.
+> The rational behind the MFD driver being the fact that multiple devices can
+> be implemented on the cores independently. This is determined by the nature
+> of the program which is loaded into the PRU's instruction memory.
+> A device may be de-initialized and another loaded or two different devices
+> can be run simultaneously on the two cores.
+> It's also possible, as in our case, to implement a single device on both
+> the PRU's resulting in improved load sharing.
 > 
-> Compile tested only as I don't have access to the hardware.
+> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
 
-I've not really got much in the way of access either, however the
-series looks sane to me.
+Please refresh my memory as to why this can't get merged into the
+"normal" part of the kernel?
 
-Acked-by: Ben Dooks <ben-linux@fluff.org>
- 
->  arch/arm/mach-s3c2410/include/mach/spi-gpio.h |   28 ----
->  arch/arm/mach-s3c2410/mach-qt2410.c           |   34 +----
->  arch/arm/mach-s3c2412/mach-jive.c             |   41 ++----
->  arch/arm/mach-s3c2440/mach-gta02.c            |    1 -
->  drivers/spi/Kconfig                           |   10 --
->  drivers/spi/Makefile                          |    1 -
->  drivers/spi/spi-s3c24xx-gpio.c                |  200 -------------------------
->  7 files changed, 22 insertions(+), 293 deletions(-)
-> 
-> --
-> Bye, Peter Korsgaard
+> --- /dev/null
+> +++ b/drivers/staging/pruss/TODO
+> @@ -0,0 +1,14 @@
+> +TODO:
+> +
+> +0. Functionality wise, everything works.
+> +
+> +1. Currently the plan is to add sysfs attributes for
+> +	a. prux/load
+> +	b. prux/unload
+> +	c. prux/run
+> +	d. prux/halt
+> +   These will add to a more dynamic firmware management for the PRU.
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
+Why sysfs?
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+
+> +
+> +2. But, not sure how the fdt will effect these entries.
+> +
+> +Please send patches to Greg Kroah-Hartman <greg@kroah.com>.
+
+Don't you want people to Cc: you as well?
+
+I'm not going to adopt this driver, I have enough as it is :)
+
+thanks,
+
+greg k-h
