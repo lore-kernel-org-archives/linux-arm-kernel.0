@@ -1,41 +1,34 @@
-From: ben@trinity.fluff.org (Ben Dooks)
-Date: Tue, 28 Jun 2011 22:27:49 +0100
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 28 Jun 2011 17:32:56 -0400 (EDT)
 Subject: [PATCH] ARM: mach-s3c24a0: delete
-In-Reply-To: <201106282322.57631.arnd@arndb.de>
+In-Reply-To: <201106282312.28285.arnd@arndb.de>
 References: <alpine.LFD.2.00.1106281613380.2142@xanadu.home>
-	<20110628211712.GF21138@trinity.fluff.org>
-	<201106282322.57631.arnd@arndb.de>
-Message-ID: <20110628212749.GJ21138@trinity.fluff.org>
+	<201106282312.28285.arnd@arndb.de>
+Message-ID: <alpine.LFD.2.00.1106281731250.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 11:22:57PM +0200, Arnd Bergmann wrote:
-> On Tuesday 28 June 2011 23:17:12 Ben Dooks wrote:
-> > On Tue, Jun 28, 2011 at 04:17:30PM -0400, Nicolas Pitre wrote:
-> > > 
-> > > Commit bcae8aeb32 "[ARM] S3C24A0: Initial architecture support files"
-> > > brought in a bunch of files while explicitly leaving out the corresponding
-> > > Kconfig entry, stating that the series is not complete.
-> > > 
-> > > More than 2.5 years later, the support for this has not seen any progress.
-> > > This is therefore dead code.  If someone wants to revive this code, it is
-> > > always possible to retrieve it from the Git repository.
+On Tue, 28 Jun 2011, Arnd Bergmann wrote:
+
+> On Tuesday 28 June 2011 22:17:30 Nicolas Pitre wrote:
+> > Commit bcae8aeb32 "[ARM] S3C24A0: Initial architecture support files"
+> > brought in a bunch of files while explicitly leaving out the corresponding
+> > Kconfig entry, stating that the series is not complete.
 > > 
-> > Ok, there was never much interest in this getting merged and removing
-> > it is probably the best thing as I do not have the time to finish it
-> > off...
-> >  
-> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-> > Acked-by: Ben Dooks <ben-linux@fluff.org>
+> > More than 2.5 years later, the support for this has not seen any progress.
+> > This is therefore dead code.  If someone wants to revive this code, it is
+> > always possible to retrieve it from the Git repository.
 > > 
+> > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 > 
-> On a related note, what about mach-s3c2400? It seems to be even more
-> incomplete.
+> Good catch!
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Do you want to submit that into a new branch for removing obsolete stuff?
 
-Probably the same fate awaits that. It is so old that there's little
-incentive to do anything with it.
+Have no fear.  I have more than a hundred of patches to submit soon 
+removing quite a bunch of files. Stay tuned.
 
--- 
-Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-Large Hadron Colada: A large Pina Colada that makes the universe disappear.
+Nicolas
