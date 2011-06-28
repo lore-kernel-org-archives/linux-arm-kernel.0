@@ -1,25 +1,39 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 28 Jun 2011 10:37:59 -0300
-Subject: [PATCH 1/4] ARM: mx53: Add support for missing UARTs
-In-Reply-To: <20110628062604.GD6069@pengutronix.de>
-References: <1309205531-18103-1-git-send-email-fabio.estevam@freescale.com>
-	<20110628062604.GD6069@pengutronix.de>
-Message-ID: <4E09D937.3070407@freescale.com>
+From: bryan.wu@canonical.com (Bryan Wu)
+Date: Tue, 28 Jun 2011 21:37:45 +0800
+Subject: [PATCH] ARM: automatically select OMAP3_PMU if we try to use perf on
+	OMAP3
+Message-ID: <1309268265-2685-1-git-send-email-bryan.wu@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/28/2011 3:26 AM, Sascha Hauer wrote:
-> 
-> All applied for next.
-> 
+For our Ubuntu kernel on OMAP4 machine, we need to enable OMAP3 as well as
+OMAP4. OMAP3_EMU has to be enabled manully to make CPU_HAS_PMU=y, which is
+required by perf.
 
-Thanks, Sascha.
+So this patch will select the OMAP3_EMU if ARCH_OMAP3 is enabled.
 
-Could you please also apply:
-http://www.spinics.net/lists/arm-kernel/msg129980.html ?
+Cc: Ming Lei <ming.lei@canonical.com>
+Signed-off-by: Bryan Wu <bryan.wu@canonical.com>
+---
+ arch/arm/Kconfig |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
 
-This fixes the build for mx53_ard on your for-next tree.
-
-Thanks,
-
-Fabio Estevam
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 2fd0911..53d0eba 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -1084,10 +1084,10 @@ config XSCALE_PMU
+ 	default y
+ 
+ config CPU_HAS_PMU
+-	depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
+-		   (!ARCH_OMAP3 || OMAP3_EMU)
++	depends on CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU
+ 	default y
+ 	bool
++	select OMAP3_EMU if ARCH_OMAP3
+ 
+ config MULTI_IRQ_HANDLER
+ 	bool
+-- 
+1.7.4.1
