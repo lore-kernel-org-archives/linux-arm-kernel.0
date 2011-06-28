@@ -1,122 +1,59 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 28 Jun 2011 15:58:01 +0200
-Subject: [RFC PATCH] MTD: atmel_nand: optimize read/write buffer functions
-In-Reply-To: <20110628111043.GH6588@pengutronix.de>
-References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628111043.GH6588@pengutronix.de>
-Message-ID: <4E09DDE9.2070900@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 28 Jun 2011 15:20:45 +0100
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
+References: <20110627125306.GA30646@doriath.ww600.siemens.net>
+	<20110627132735.GE16103@n2100.arm.linux.org.uk>
+	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
+	<20110628103946.GC21898@n2100.arm.linux.org.uk>
+	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
+Message-ID: <20110628142045.GC7255@1n450.cable.virginmedia.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/06/2011 13:10, Uwe Kleine-K?nig :
-> On Tue, Jun 28, 2011 at 01:50:56PM +0200, Nicolas Ferre wrote:
->> For PIO NAND access functions, we use the features of the SMC:
->> - no need to take into account the NAND bus width: SMC will deal with this
->> - a word aligned memcpy on the NAND chip-select space is able to generate
->>   proper SMC behavior while optimizing AHB bus usage thanks to optimized memcpy
->>   implementation.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> ---
->>  drivers/mtd/nand/atmel_nand.c |   71 +++++++++++++++++-----------------------
->>  1 files changed, 30 insertions(+), 41 deletions(-)
->>
->> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
->> index b300705..cb8a04b 100644
->> --- a/drivers/mtd/nand/atmel_nand.c
->> +++ b/drivers/mtd/nand/atmel_nand.c
->> @@ -160,37 +160,6 @@ static int atmel_nand_device_ready(struct mtd_info *mtd)
->>                  !!host->board->rdy_pin_active_low;
->>  }
->>  
->> -/*
->> - * Minimal-overhead PIO for data access.
->> - */
->> -static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
->> -{
->> -	struct nand_chip	*nand_chip = mtd->priv;
->> -
->> -	__raw_readsb(nand_chip->IO_ADDR_R, buf, len);
->> -}
->> -
->> -static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
->> -{
->> -	struct nand_chip	*nand_chip = mtd->priv;
->> -
->> -	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
->> -}
->> -
->> -static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
->> -{
->> -	struct nand_chip	*nand_chip = mtd->priv;
->> -
->> -	__raw_writesb(nand_chip->IO_ADDR_W, buf, len);
->> -}
->> -
->> -static void atmel_write_buf16(struct mtd_info *mtd, const u8 *buf, int len)
->> -{
->> -	struct nand_chip	*nand_chip = mtd->priv;
->> -
->> -	__raw_writesw(nand_chip->IO_ADDR_W, buf, len / 2);
->> -}
->> -
->>  static void dma_complete_func(void *completion)
->>  {
->>  	complete(completion);
->> @@ -265,33 +234,53 @@ err_buf:
->>  static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
->>  {
->>  	struct nand_chip *chip = mtd->priv;
->> -	struct atmel_nand_host *host = chip->priv;
->> +	u32 align;
->> +	u8 *pbuf;
->>  
->>  	if (use_dma && len > mtd->oobsize)
->>  		/* only use DMA for bigger than oob size: better performances */
->>  		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
->>  			return;
->>  
->> -	if (host->board->bus_width_16)
->> -		atmel_read_buf16(mtd, buf, len);
->> -	else
->> -		atmel_read_buf8(mtd, buf, len);
->> +	/* if no DMA operation possible, use PIO */
->> +	pbuf = buf;
->> +	align = 0x03 & ((unsigned)pbuf);
->> +
->> +	if (align) {
->> +		u32 align_len = 4 - align;
->> +
->> +		/* non aligned buffer: re-align to next word boundary */
->> +		ioread8_rep(chip->IO_ADDR_R, pbuf, align_len);
->> +		pbuf += align_len;
->> +		len -= align_len;
->> +	}
->> +	memcpy((void *)pbuf, chip->IO_ADDR_R, len);
-> I think you don't need to cast to (void *). I think you need to cast the
-> 2nd parameter instead because sparse don't like you passing an void
-> __iomem *.
+On Tue, Jun 28, 2011 at 04:06:11PM +0400, Dmitry Eremin-Solenikov wrote:
+> On 6/28/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+> I did some checks. It seems, the problem isn't related to unwinder. At least
+> it looks like kernel has all necessary unwinding subops. It looks like the
+> problem is really related to the lack of necessary .cfi information. At least
+> when i added .cfi_startproc/.cfi_endproc annotations to entry-armv.S code,
+> gdb stopped decoding backtrace with the "previous frame identical to this frame"
+> error. Unfortunately I don't have enough knowledge to add .cfi annotations to
+> irq handlers.
 
-Yes but if I try to cast it, sparse will notice it anyway. So yes, it
-seems that I am doing something _bad_ and that the use of memcpy() here
-is not the preferred way to deal with hardware FIFO.
-On the other hand, the memcpy_fromio() function is far from being as
-optimized as the ARM memcpy() implementation... I am wandering what is
-the best solution?
+I think it may have stopped decoding because of some information it
+reads from the stack doesn't look sane. But I wonder whether we could
+get it looping again depending on the register values in the interrupted
+context.
 
-> Is it correct to read from chip->IO_ADDR_R, don't you need
-> chip->IO_ADDR_R + align_len?
+> diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+> index e8d8856..d77f9d7 100644
+> --- a/arch/arm/kernel/entry-armv.S
+> +++ b/arch/arm/kernel/entry-armv.S
+> @@ -28,6 +28,7 @@
+>  #include "entry-header.S"
+>  #include <asm/entry-macro-multi.S>
+>  
+> +	.cfi_sections	.debug_frame
+>  /*
+>   * Interrupt handling.  Preserves r7, r8, r9
+>   */
+> @@ -113,6 +114,7 @@ ENDPROC(__und_invalid)
+>  
+>  	.macro	svc_entry, stack_hole=0
+>   UNWIND(.fnstart		)
+> +	.cfi_startproc
+>   UNWIND(.save {r0 - pc}		)
+>  	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
 
-No, it is a FIFO, so each reading from it will give the next data.
+Could you add some directives like below in the svc_entry macro (after
+"sub sp...", not sure if it matters) and check whether gdb behaves
+better:
 
-> Taking this into account, does it really help to align pbuf?
+	.cfi_def_cfa_offset S_PC
+	.cfi_offset 14, -4
 
-Aligning to next 32bit word address avoid having to deal with memcpy()
-alignment management that reads twice to rearrange data (loosing datas
-in the case of a FIFO ;-)). So yes, aligning really helps.
+Thanks.
 
-So, all this leads me to append RFC to this patch title...
-
-Best regards,
 -- 
-Nicolas Ferre
+Catalin
