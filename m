@@ -1,26 +1,31 @@
 From: khilman@ti.com (Kevin Hilman)
-Date: Tue, 28 Jun 2011 07:54:57 -0700
-Subject: [PATCH] OMAP1: enable GENERIC_IRQ_CHIP
-In-Reply-To: <20110614115056.GT3352@atomide.com>
-References: <1307491366-28793-1-git-send-email-khilman@ti.com>
-	<20110614115056.GT3352@atomide.com>
-Message-ID: <1309272897.6231.24.camel@vence>
+Date: Tue, 28 Jun 2011 07:56:14 -0700
+Subject: [PATCH] omap1: select GENERIC_IRQ_CHIP for TI OMAP1
+In-Reply-To: <1309251943.3984.1.camel@phoenix> (Axel Lin's message of "Tue, 28
+	Jun 2011 17:05:43 +0800")
+References: <1309251943.3984.1.camel@phoenix>
+Message-ID: <87boxi2eep.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2011-06-14 at 04:50 -0700, Tony Lindgren wrote:
-> * Kevin Hilman <khilman@ti.com> [110607 16:58]:
-> > OMAP1 needs this also since GPIO driver (common for all OMAPs) is
-> > being converted to use generic IRQ chip.
-> > 
-> > Signed-off-by: Kevin Hilman <khilman@ti.com>
-> 
-> Maybe queue this together with your GPIO patches?
-> 
-> Acked-by: Tony Lindgren <tony@atomide.com>
+Axel Lin <axel.lin@gmail.com> writes:
 
-Since this only touches arch/arm/plat-omap/*, this should probably go
-through your tree, and I don't have any more GPIO fixes to queue for
-this merge window.
+> The gpio-omap driver has been converted to use generic IRQ chip.
+> Thus select GENERIC_IRQ_CHIP for TI OMAP1 to fix below build error.
+>
+>   LD      vmlinux
+> drivers/built-in.o: In function `omap_mpuio_alloc_gc':
+> drivers/gpio/gpio-omap.c:1087: undefined reference to `irq_alloc_generic_chip'
+> drivers/gpio/gpio-omap.c:1100: undefined reference to `irq_setup_generic_chip'
+> drivers/built-in.o: In function `omap_gpio_show_rev':
+> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_clr_bit'
+> drivers/gpio/gpio-omap.c:998: undefined reference to `irq_gc_mask_set_bit'
+> make: *** [vmlinux] Error 1
+>
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+
+Thanks, I have a fix for this already queued for v3.0-rc3 series:
+
+        http://marc.info/?l=linux-omap&m=130749135312468&w=2
 
 Kevin
