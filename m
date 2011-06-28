@@ -1,44 +1,77 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Tue, 28 Jun 2011 10:32:36 +0300
-Subject: [PATCH] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <1309000666-5242-1-git-send-email-leiwen@marvell.com>
-References: <4E031900.50108@compulab.co.il>
-	<1309000666-5242-1-git-send-email-leiwen@marvell.com>
-Message-ID: <1309246361.23597.30.camel@sauron>
+From: linus.walleij@stericsson.com (Linus Walleij)
+Date: Tue, 28 Jun 2011 09:57:25 +0200
+Subject: [PATCH 1/4] mmci: use StartBitErr to detect bad connections
+Message-ID: <1309247845-17105-1-git-send-email-linus.walleij@stericsson.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 2011-06-25 at 04:17 -0700, Lei Wen wrote:
-> Current pxa3xx_nand controller has two chip select which
-> both be workable. This patch enable this feature.
-> 
-> Update platform driver to support this feature.
-> 
-> Another notice should be taken that:
-> When you want to use this feature, you should not enable the
-> keep configuration feature, for two chip select could be
-> attached with different nand chip. The different page size
-> and timing requirement make the keep configuration impossible.
-> 
-> Signed-off-by: Lei Wen <leiwen@marvell.com>
-> ---
->  arch/arm/mach-mmp/aspenite.c                 |    5 +-
->  arch/arm/mach-pxa/cm-x300.c                  |    5 +-
->  arch/arm/mach-pxa/colibri-pxa3xx.c           |    5 +-
->  arch/arm/mach-pxa/littleton.c                |    5 +-
->  arch/arm/mach-pxa/mxm8x10.c                  |    9 +-
->  arch/arm/mach-pxa/raumfeld.c                 |    5 +-
->  arch/arm/mach-pxa/zylonite.c                 |    5 +-
->  arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |   19 +-
->  drivers/mtd/nand/pxa3xx_nand.c               |  512 +++++++++++++++-----------
->  9 files changed, 346 insertions(+), 224 deletions(-)
+From: Ulf Hansson <ulf.hansson@stericsson.com>
 
-In general huge patches like this are not encouraged and it is better to
-split them. At least the printk changes can be in a separate patch. Then
-re-naming host to info probably could be another patch. Could you please
-rather do a series of smaller patches? Also, if you use dev_info and the
-like functions, you probably do not need the pxa3xx_nand prefix anymore.
+Stresstesting insert/remove of SD-cards can trigger
+a StartBitErr. This made the driver to hang in forever
+waiting for a non ocurring data timeout.
 
+This bit and interrupt is documented in the original
+PL180 TRM, just never implemented until now.
+
+Signed-off-by: Ulf Hansson <ulf.hansson@stericsson.com>
+Reviewed-by: Linus Walleij <linus.walleij@stericsson.com>
+Reviewed-by: Jonas Aberg <jonas.aberg@stericsson.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/mmc/host/mmci.c |    2 ++
+ drivers/mmc/host/mmci.h |    5 ++++-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/mmc/host/mmci.c b/drivers/mmc/host/mmci.c
+index 7721de9..fe14072 100644
+--- a/drivers/mmc/host/mmci.c
++++ b/drivers/mmc/host/mmci.c
+@@ -582,6 +582,8 @@ mmci_data_irq(struct mmci_host *host, struct mmc_data *data,
+ 			data->error = -EILSEQ;
+ 		} else if (status & MCI_DATATIMEOUT) {
+ 			data->error = -ETIMEDOUT;
++		} else if (status & MCI_STARTBITERR) {
++			data->error = -ECOMM;
+ 		} else if (status & MCI_TXUNDERRUN) {
+ 			data->error = -EIO;
+ 		} else if (status & MCI_RXOVERRUN) {
+diff --git a/drivers/mmc/host/mmci.h b/drivers/mmc/host/mmci.h
+index bb32e21..2164e8c 100644
+--- a/drivers/mmc/host/mmci.h
++++ b/drivers/mmc/host/mmci.h
+@@ -86,6 +86,7 @@
+ #define MCI_CMDRESPEND		(1 << 6)
+ #define MCI_CMDSENT		(1 << 7)
+ #define MCI_DATAEND		(1 << 8)
++#define MCI_STARTBITERR		(1 << 9)
+ #define MCI_DATABLOCKEND	(1 << 10)
+ #define MCI_CMDACTIVE		(1 << 11)
+ #define MCI_TXACTIVE		(1 << 12)
+@@ -112,6 +113,7 @@
+ #define MCI_CMDRESPENDCLR	(1 << 6)
+ #define MCI_CMDSENTCLR		(1 << 7)
+ #define MCI_DATAENDCLR		(1 << 8)
++#define MCI_STARTBITERRCLR	(1 << 9)
+ #define MCI_DATABLOCKENDCLR	(1 << 10)
+ /* Extended status bits for the ST Micro variants */
+ #define MCI_ST_SDIOITC		(1 << 22)
+@@ -127,6 +129,7 @@
+ #define MCI_CMDRESPENDMASK	(1 << 6)
+ #define MCI_CMDSENTMASK		(1 << 7)
+ #define MCI_DATAENDMASK		(1 << 8)
++#define MCI_STARTBITERRMASK	(1 << 9)
+ #define MCI_DATABLOCKENDMASK	(1 << 10)
+ #define MCI_CMDACTIVEMASK	(1 << 11)
+ #define MCI_TXACTIVEMASK	(1 << 12)
+@@ -150,7 +153,7 @@
+ #define MCI_IRQENABLE	\
+ 	(MCI_CMDCRCFAILMASK|MCI_DATACRCFAILMASK|MCI_CMDTIMEOUTMASK|	\
+ 	MCI_DATATIMEOUTMASK|MCI_TXUNDERRUNMASK|MCI_RXOVERRUNMASK|	\
+-	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK)
++	MCI_CMDRESPENDMASK|MCI_CMDSENTMASK|MCI_STARTBITERRMASK)
+ 
+ /* These interrupts are directed to IRQ1 when two IRQ lines are available */
+ #define MCI_IRQ1MASK \
 -- 
-Best Regards,
-Artem Bityutskiy
+1.7.3.2
