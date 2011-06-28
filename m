@@ -1,58 +1,41 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 28 Jun 2011 14:01:12 -0700
-Subject: [PATCH v5 1/1] drivers:staging:pruss: add pruss staging mfd
-	driver.
-In-Reply-To: <1306827939-4133-2-git-send-email-subhasish@mistralsolutions.com>
-References: <1306827939-4133-1-git-send-email-subhasish@mistralsolutions.com>
-	<1306827939-4133-2-git-send-email-subhasish@mistralsolutions.com>
-Message-ID: <20110628210112.GA31081@kroah.com>
+From: ben@trinity.fluff.org (Ben Dooks)
+Date: Tue, 28 Jun 2011 22:27:49 +0100
+Subject: [PATCH] ARM: mach-s3c24a0: delete
+In-Reply-To: <201106282322.57631.arnd@arndb.de>
+References: <alpine.LFD.2.00.1106281613380.2142@xanadu.home>
+	<20110628211712.GF21138@trinity.fluff.org>
+	<201106282322.57631.arnd@arndb.de>
+Message-ID: <20110628212749.GJ21138@trinity.fluff.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, May 31, 2011 at 01:15:39PM +0530, Subhasish Ghosh wrote:
-> This patch adds the pruss MFD driver and associated include files.
-> For details regarding the PRUSS please refer the folowing link:
-> http://processors.wiki.ti.com/index.php/Programmable_Realtime_Unit_Subsystem
+On Tue, Jun 28, 2011 at 11:22:57PM +0200, Arnd Bergmann wrote:
+> On Tuesday 28 June 2011 23:17:12 Ben Dooks wrote:
+> > On Tue, Jun 28, 2011 at 04:17:30PM -0400, Nicolas Pitre wrote:
+> > > 
+> > > Commit bcae8aeb32 "[ARM] S3C24A0: Initial architecture support files"
+> > > brought in a bunch of files while explicitly leaving out the corresponding
+> > > Kconfig entry, stating that the series is not complete.
+> > > 
+> > > More than 2.5 years later, the support for this has not seen any progress.
+> > > This is therefore dead code.  If someone wants to revive this code, it is
+> > > always possible to retrieve it from the Git repository.
+> > 
+> > Ok, there was never much interest in this getting merged and removing
+> > it is probably the best thing as I do not have the time to finish it
+> > off...
+> >  
+> > > Signed-off-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+> > Acked-by: Ben Dooks <ben-linux@fluff.org>
+> > 
 > 
-> The rational behind the MFD driver being the fact that multiple devices can
-> be implemented on the cores independently. This is determined by the nature
-> of the program which is loaded into the PRU's instruction memory.
-> A device may be de-initialized and another loaded or two different devices
-> can be run simultaneously on the two cores.
-> It's also possible, as in our case, to implement a single device on both
-> the PRU's resulting in improved load sharing.
-> 
-> Signed-off-by: Subhasish Ghosh <subhasish@mistralsolutions.com>
+> On a related note, what about mach-s3c2400? It seems to be even more
+> incomplete.
 
-Please refresh my memory as to why this can't get merged into the
-"normal" part of the kernel?
+Probably the same fate awaits that. It is so old that there's little
+incentive to do anything with it.
 
-> --- /dev/null
-> +++ b/drivers/staging/pruss/TODO
-> @@ -0,0 +1,14 @@
-> +TODO:
-> +
-> +0. Functionality wise, everything works.
-> +
-> +1. Currently the plan is to add sysfs attributes for
-> +	a. prux/load
-> +	b. prux/unload
-> +	c. prux/run
-> +	d. prux/halt
-> +   These will add to a more dynamic firmware management for the PRU.
+-- 
+Ben Dooks, ben at fluff.org, http://www.fluff.org/ben/
 
-Why sysfs?
-
-
-> +
-> +2. But, not sure how the fdt will effect these entries.
-> +
-> +Please send patches to Greg Kroah-Hartman <greg@kroah.com>.
-
-Don't you want people to Cc: you as well?
-
-I'm not going to adopt this driver, I have enough as it is :)
-
-thanks,
-
-greg k-h
+Large Hadron Colada: A large Pina Colada that makes the universe disappear.
