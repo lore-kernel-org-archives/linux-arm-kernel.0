@@ -1,45 +1,34 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 00:17:11 +0100
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-In-Reply-To: <CAMbhsRQjMmXrULVmFg9CoM0wzZ29wcHqEaT480NaDhB8hHEKZg@mail.gmail.com>
-References: <1308923618-5333-1-git-send-email-premi@ti.com>
-	<CAMbhsRQUKBZbC3jJt8XpjTW2n7uA529D6G0g4eT5iLEHn2iNLg@mail.gmail.com>
-	<20110628225523.GA23312@n2100.arm.linux.org.uk>
-	<CAMbhsRQjMmXrULVmFg9CoM0wzZ29wcHqEaT480NaDhB8hHEKZg@mail.gmail.com>
-Message-ID: <20110628231711.GC23312@n2100.arm.linux.org.uk>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Tue, 28 Jun 2011 19:24:22 -0400 (EDT)
+Subject: [RFC PATCH 0/4] ARM: make mach/hardware.h optional
+In-Reply-To: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
+References: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
+Message-ID: <alpine.LFD.2.00.1106281919310.2142@xanadu.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 03:58:57PM -0700, Colin Cross wrote:
-> On Tue, Jun 28, 2011 at 3:55 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Tue, Jun 28, 2011 at 03:29:57PM -0700, Colin Cross wrote:
-> >> Can't this rewrite the loops_per_jiffy for the other CPU while it is
-> >> in a udelay? ?If it has already calculated the number of loops
-> >> necessary, and the CPU frequency increases, it could end up returning
-> >> too early from udelay.
-> >
-> > udelay uses the global loops_per_jiffy.
-> >
+On Tue, 28 Jun 2011, Rob Herring wrote:
+
+> From: Rob Herring <rob.herring@calxeda.com>
 > 
-> The problem is still the same - loops_per_jiffy applies to both CPUs,
-> and the frequency of the other CPU cannot be changed if it is in a
-> udelay.
+> Currently, all ARM platforms must have a mach/hardware.h include. This is
+> because it is ultimately included by linux/pci.h which is included in many
+> places even for !CONFIG_PCI.
+> 
+> This could be fixed simply with an ifdef around the include of mach/hardware.h
+> in asm/pci.h. However, in the interest of fixing this for single kernel
+> binary builds, this series removes the include of mach/hardware.h outside of
+> mach-* and plat-*. What's used from hardware.h is a couple of PCI defines. 
+> Converting them to variables allows each platform to set the values as needed.
 
-If you have a SMP system where both CPUs scale together then you will
-get both CPUs being impacted, which may result in udelay() terminating
-well early or taking much longer than was originally intended.
+Excellent !  This is certainly moving things in the right direction.
 
-That's rather unavoidable with software timing loops - we could add a
-rw spinlock around udelay, but that would require interrupts to be
-disabled and that wouldn't be nice in general to have every udelay
-running with IRQs off.
+For the 4 patches, you can add:
 
-That's why people have proposed hardware-timer based delay loops -
-these screw up the bogomips value (it no longer refers to the CPU
-but to the timer used for the delays) and the code proposed thus far
-probably has a severe negative impact on ARMs running at low clock
-rates (the calculation cost of the number of loops to run becomes
-significant for CPUs below 100MHz for short delays with the existing
-optimized assembler, so moving it into C and introducing function
-pointers will only make it worse.)
+Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
+
+Obviously for patch 1/4 it would be nice to have the opinion of the PCI 
+maintainer as well.
+
+
+Nicolas
