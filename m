@@ -1,96 +1,53 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Tue, 28 Jun 2011 18:54:11 +0400
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
-References: <20110627125306.GA30646@doriath.ww600.siemens.net>
-	<20110627132735.GE16103@n2100.arm.linux.org.uk>
-	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
-	<20110628103946.GC21898@n2100.arm.linux.org.uk>
-	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
-	<20110628142045.GC7255@1n450.cable.virginmedia.net>
-	<20110628143014.GD7255@1n450.cable.virginmedia.net>
-	<BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
-Message-ID: <BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Jun 2011 15:59:37 +0100
+Subject: [RFC PATCH] MTD: atmel_nand: optimize read/write buffer functions
+In-Reply-To: <20110628111043.GH6588@pengutronix.de>
+References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
+	<20110628111043.GH6588@pengutronix.de>
+Message-ID: <20110628145937.GG21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/28/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
-> On 6/28/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> On Tue, Jun 28, 2011 at 03:20:45PM +0100, Catalin Marinas wrote:
->>> On Tue, Jun 28, 2011 at 04:06:11PM +0400, Dmitry Eremin-Solenikov wrote:
->>> > On 6/28/11, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
->>> > I did some checks. It seems, the problem isn't related to unwinder. At
->>> > least
->>> > it looks like kernel has all necessary unwinding subops. It looks like
->>> > the
->>> > problem is really related to the lack of necessary .cfi information.
->>> > At
->>> > least
->>> > when i added .cfi_startproc/.cfi_endproc annotations to entry-armv.S
->>> > code,
->>> > gdb stopped decoding backtrace with the "previous frame identical to
->>> > this frame"
->>> > error. Unfortunately I don't have enough knowledge to add .cfi
->>> > annotations to
->>> > irq handlers.
->>>
->>> I think it may have stopped decoding because of some information it
->>> reads from the stack doesn't look sane. But I wonder whether we could
->>> get it looping again depending on the register values in the interrupted
->>> context.
->>>
->>> > diff --git a/arch/arm/kernel/entry-armv.S
->>> > b/arch/arm/kernel/entry-armv.S
->>> > index e8d8856..d77f9d7 100644
->>> > --- a/arch/arm/kernel/entry-armv.S
->>> > +++ b/arch/arm/kernel/entry-armv.S
->>> > @@ -28,6 +28,7 @@
->>> >  #include "entry-header.S"
->>> >  #include <asm/entry-macro-multi.S>
->>> >
->>> > +	.cfi_sections	.debug_frame
->>> >  /*
->>> >   * Interrupt handling.  Preserves r7, r8, r9
->>> >   */
->>> > @@ -113,6 +114,7 @@ ENDPROC(__und_invalid)
->>> >
->>> >  	.macro	svc_entry, stack_hole=0
->>> >   UNWIND(.fnstart		)
->>> > +	.cfi_startproc
->>> >   UNWIND(.save {r0 - pc}		)
->>> >  	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
->>>
->>> Could you add some directives like below in the svc_entry macro (after
->>> "sub sp...", not sure if it matters) and check whether gdb behaves
->>> better:
->>>
->>> 	.cfi_def_cfa_offset S_PC
->>> 	.cfi_offset 14, -4
->>
->> Actually since the return address is in S_PC (which maybe gdb assumes it
->> would be the saved LR), this is probably not be correct. After SVC
->> entry, we have he following structure on the stack:
->>
->> 	ORIG_r0
->> 	CPSR
->> 		<--- assuming this is the Call Frame Address (SP+S_PC+4)
->> 	PC	<--- CFA - 4
->> 	LR	<--- don't care
->> 	SP	<--- CFA - 12
->> 	...
->>
->>
->> So we tell gdb about this with something like below (untested):
->>
->> 	.cfi_def_cfa_offset S_PC + 4
->> 	.cfi_offset 14, -4
->> 	.cfi_offset 13, -12
->
-> This brings "unknown CFA rule" gdb exception, but it seems I got your idea.
+On Tue, Jun 28, 2011 at 01:10:43PM +0200, Uwe Kleine-K?nig wrote:
+> > @@ -265,33 +234,53 @@ err_buf:
+> >  static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
+> >  {
+> >  	struct nand_chip *chip = mtd->priv;
+> > -	struct atmel_nand_host *host = chip->priv;
+> > +	u32 align;
+> > +	u8 *pbuf;
+> >  
+> >  	if (use_dma && len > mtd->oobsize)
+> >  		/* only use DMA for bigger than oob size: better performances */
+> >  		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
+> >  			return;
+> >  
+> > -	if (host->board->bus_width_16)
+> > -		atmel_read_buf16(mtd, buf, len);
+> > -	else
+> > -		atmel_read_buf8(mtd, buf, len);
+> > +	/* if no DMA operation possible, use PIO */
+> > +	pbuf = buf;
+> > +	align = 0x03 & ((unsigned)pbuf);
+> > +
+> > +	if (align) {
+> > +		u32 align_len = 4 - align;
+> > +
+> > +		/* non aligned buffer: re-align to next word boundary */
+> > +		ioread8_rep(chip->IO_ADDR_R, pbuf, align_len);
+> > +		pbuf += align_len;
+> > +		len -= align_len;
+> > +	}
+> > +	memcpy((void *)pbuf, chip->IO_ADDR_R, len);
+> I think you don't need to cast to (void *). I think you need to cast the
+> 2nd parameter instead because sparse don't like you passing an void
+> __iomem *.
+> Is it correct to read from chip->IO_ADDR_R, don't you need
+> chip->IO_ADDR_R + align_len? Taking this into account, does it really
+> help to align pbuf?
 
-No, this seems to work, it was my fault. I got more or less reasonable
-backtrace now.
+I think you need to read Documentation/bus-virt-phys-mapping.txt,
+particularly the part after "NOTE NOTE NOTE".
 
--- 
-With best wishes
-Dmitry
+Dereferencing ioremap'd memory is not permitted.  That includes passing
+it to memcpy.  Even with a cast.
