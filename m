@@ -1,37 +1,51 @@
-From: swetland@google.com (Brian Swetland)
-Date: Tue, 28 Jun 2011 04:36:46 -0700
-Subject: [RFC 0/8] Introducing a generic AMP/IPC framework
-In-Reply-To: <BANLkTiniBEuHKnmhoJEaVELpMefZ=Xk=bA@mail.gmail.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<4E04F0B0.4030408@codeaurora.org>
-	<BANLkTi=sFtwam29i4TZdi=RO7BoytTTdrw@mail.gmail.com>
-	<FFF198FBBF957F4393BA834040FEFFA202EDA3@DFLE35.ent.ti.com>
-	<BANLkTiniBEuHKnmhoJEaVELpMefZ=Xk=bA@mail.gmail.com>
-Message-ID: <CANqkERATQbXU7ooHkUX+qieEejMAejRRvSRr606e5mF2d_qtbA@mail.gmail.com>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Tue, 28 Jun 2011 17:07:05 +0530
+Subject: [PATCH] OMAP: HSMMC: Fix GPIO muxing
+In-Reply-To: <1309250759-18472-1-git-send-email-silesh@ti.com>
+References: <1309250759-18472-1-git-send-email-silesh@ti.com>
+Message-ID: <BANLkTin39hkDNa+v=29PLMZRdBtWGCfseA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 4:26 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Tue, Jun 28, 2011 at 12:22 AM, Grosen, Mark <mgrosen@ti.com> wrote:
->> 2. We added a special section (resource table) that is interpreted as part
->> of the loading process. The tool that generates our simple format just
->> recognizes a named section (".resource_table"), so perhaps that could be
->> done with the PIL ELF loader.
+On Tue, Jun 28, 2011 at 2:15 PM, Silesh C V <silesh@ti.com> wrote:
+> Use generic gpio call to check the validity of the gpio. Note that
+> this includes gpio 0 also which was missing before.
 >
-> I hope that DT will completely replace that "resource table" section
-> eventually. We still need to try it out (as soon as DT materializes on
-> ARM/pandaboard) and see how it all fits together, but in general it
-> looks like DT could provide all the necessary static resource
-> configuration, and then we just need to expose it to the remote
-> processor.
+> Signed-off-by: Silesh C V <silesh@ti.com>
+> ---
+> ?arch/arm/mach-omap2/hsmmc.c | ? ?7 +++----
+> ?1 files changed, 3 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/hsmmc.c b/arch/arm/mach-omap2/hsmmc.c
+> index 66868c5..a9b45c7 100644
+> --- a/arch/arm/mach-omap2/hsmmc.c
+> +++ b/arch/arm/mach-omap2/hsmmc.c
+> @@ -13,6 +13,7 @@
+> ?#include <linux/slab.h>
+> ?#include <linux/string.h>
+> ?#include <linux/delay.h>
+> +#include <linux/gpio.h>
+> ?#include <mach/hardware.h>
+> ?#include <plat/mmc.h>
+> ?#include <plat/omap-pm.h>
+> @@ -213,12 +214,10 @@ static int nop_mmc_set_power(struct device *dev, int slot, int power_on,
+> ?static inline void omap_hsmmc_mux(struct omap_mmc_platform_data *mmc_controller,
+> ? ? ? ? ? ? ? ? ? ? ? ?int controller_nr)
+> ?{
+> - ? ? ? if ((mmc_controller->slots[0].switch_pin > 0) && \
+> - ? ? ? ? ? ? ? (mmc_controller->slots[0].switch_pin < OMAP_MAX_GPIO_LINES))
+> + ? ? ? if (gpio_is_valid(mmc_controller->slots[0].switch_pin))
+> ? ? ? ? ? ? ? ?omap_mux_init_gpio(mmc_controller->slots[0].switch_pin,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP_PIN_INPUT_PULLUP);
+> - ? ? ? if ((mmc_controller->slots[0].gpio_wp > 0) && \
+> - ? ? ? ? ? ? ? (mmc_controller->slots[0].gpio_wp < OMAP_MAX_GPIO_LINES))
+> + ? ? ? if (gpio_is_valid(mmc_controller->slots[0].gpio_wp))
+> ? ? ? ? ? ? ? ?omap_mux_init_gpio(mmc_controller->slots[0].gpio_wp,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?OMAP_PIN_INPUT_PULLUP);
+> ? ? ? ?if (cpu_is_omap34xx()) {
+> --
+> 1.7.1
+>
 
-I'm not sure I see the benefit to pulling the resource information out
-of the firmware image.  The resource information is a description of
-what resources the firmware requires to work properly (it needs
-certain amounts of working memory, timers, peripheral interfaces like
-i2c to control camera hw, etc), which will be specific to a given
-firmware build.  Pulling that information out into another place adds
-new ways for things to break as the firmware and its resource
-requirements are now separate and could get out of sync, etc.
-
-Brian
+Looks good to me.
+Reviewed-by: Venkatraman S <svenkatr@ti.com>
