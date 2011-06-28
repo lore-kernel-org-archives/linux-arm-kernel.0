@@ -1,106 +1,44 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 28 Jun 2011 13:10:43 +0200
-Subject: [RFC PATCH] MTD: atmel_nand: optimize read/write buffer functions
-In-Reply-To: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <20110628111043.GH6588@pengutronix.de>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Tue, 28 Jun 2011 16:53:27 +0530
+Subject: [PATCH] davinci: da850: add a .set_rate method to ref_clk
+In-Reply-To: <1308073157-22993-1-git-send-email-christian.riesch@omicron.at>
+References: <B85A65D85D7EB246BE421B3FB0FBB593024D4CF84E@dbde02.ent.ti.com>
+	<1308073157-22993-1-git-send-email-christian.riesch@omicron.at>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7939D4@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 01:50:56PM +0200, Nicolas Ferre wrote:
-> For PIO NAND access functions, we use the features of the SMC:
-> - no need to take into account the NAND bus width: SMC will deal with this
-> - a word aligned memcpy on the NAND chip-select space is able to generate
->   proper SMC behavior while optimizing AHB bus usage thanks to optimized memcpy
->   implementation.
+Hi Christian,
+
+On Tue, Jun 14, 2011 at 23:09:17, Christian Riesch wrote:
+> This patch allows setting the input clock frequency of the SoC from
+> the board specific using the davinci_set_refclk_rate function.
+
+"board specific code"
+
 > 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Suggested-by: Kevin Hilman <khilman@ti.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
 > ---
->  drivers/mtd/nand/atmel_nand.c |   71 +++++++++++++++++-----------------------
->  1 files changed, 30 insertions(+), 41 deletions(-)
 > 
-> diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
-> index b300705..cb8a04b 100644
-> --- a/drivers/mtd/nand/atmel_nand.c
-> +++ b/drivers/mtd/nand/atmel_nand.c
-> @@ -160,37 +160,6 @@ static int atmel_nand_device_ready(struct mtd_info *mtd)
->                  !!host->board->rdy_pin_active_low;
->  }
->  
-> -/*
-> - * Minimal-overhead PIO for data access.
-> - */
-> -static void atmel_read_buf8(struct mtd_info *mtd, u8 *buf, int len)
-> -{
-> -	struct nand_chip	*nand_chip = mtd->priv;
-> -
-> -	__raw_readsb(nand_chip->IO_ADDR_R, buf, len);
-> -}
-> -
-> -static void atmel_read_buf16(struct mtd_info *mtd, u8 *buf, int len)
-> -{
-> -	struct nand_chip	*nand_chip = mtd->priv;
-> -
-> -	__raw_readsw(nand_chip->IO_ADDR_R, buf, len / 2);
-> -}
-> -
-> -static void atmel_write_buf8(struct mtd_info *mtd, const u8 *buf, int len)
-> -{
-> -	struct nand_chip	*nand_chip = mtd->priv;
-> -
-> -	__raw_writesb(nand_chip->IO_ADDR_W, buf, len);
-> -}
-> -
-> -static void atmel_write_buf16(struct mtd_info *mtd, const u8 *buf, int len)
-> -{
-> -	struct nand_chip	*nand_chip = mtd->priv;
-> -
-> -	__raw_writesw(nand_chip->IO_ADDR_W, buf, len / 2);
-> -}
-> -
->  static void dma_complete_func(void *completion)
->  {
->  	complete(completion);
-> @@ -265,33 +234,53 @@ err_buf:
->  static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
->  {
->  	struct nand_chip *chip = mtd->priv;
-> -	struct atmel_nand_host *host = chip->priv;
-> +	u32 align;
-> +	u8 *pbuf;
->  
->  	if (use_dma && len > mtd->oobsize)
->  		/* only use DMA for bigger than oob size: better performances */
->  		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
->  			return;
->  
-> -	if (host->board->bus_width_16)
-> -		atmel_read_buf16(mtd, buf, len);
-> -	else
-> -		atmel_read_buf8(mtd, buf, len);
-> +	/* if no DMA operation possible, use PIO */
-> +	pbuf = buf;
-> +	align = 0x03 & ((unsigned)pbuf);
-> +
-> +	if (align) {
-> +		u32 align_len = 4 - align;
-> +
-> +		/* non aligned buffer: re-align to next word boundary */
-> +		ioread8_rep(chip->IO_ADDR_R, pbuf, align_len);
-> +		pbuf += align_len;
-> +		len -= align_len;
-> +	}
-> +	memcpy((void *)pbuf, chip->IO_ADDR_R, len);
-I think you don't need to cast to (void *). I think you need to cast the
-2nd parameter instead because sparse don't like you passing an void
-__iomem *.
-Is it correct to read from chip->IO_ADDR_R, don't you need
-chip->IO_ADDR_R + align_len? Taking this into account, does it really
-help to align pbuf?
+> This patch applies on top of Sekhar's patch.
+> Best regards, Christian
+> 
+>  arch/arm/mach-davinci/da850.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
+> index 133aac4..27fe3ac 100644
+> --- a/arch/arm/mach-davinci/da850.c
+> +++ b/arch/arm/mach-davinci/da850.c
+> @@ -58,6 +58,7 @@ static struct pll_data pll0_data = {
+>  static struct clk ref_clk = {
+>  	.name		= "ref_clk",
+>  	.rate		= DA850_REF_FREQ,
+> +	.set_rate       = davinci_simple_set_rate,
 
-Best regards
-Uwe
+Please use tabs for indentation.
 
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Thanks,
+Sekhar
