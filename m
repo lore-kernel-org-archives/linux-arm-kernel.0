@@ -1,36 +1,31 @@
-From: christian.riesch@omicron.at (Christian Riesch)
-Date: Tue, 28 Jun 2011 17:10:51 +0200
-Subject: [PATCH v2] davinci: da850: add a .set_rate method to ref_clk
-In-Reply-To: <B85A65D85D7EB246BE421B3FB0FBB593024D7939D4@dbde02.ent.ti.com>
-References: <B85A65D85D7EB246BE421B3FB0FBB593024D7939D4@dbde02.ent.ti.com>
-Message-ID: <1309273851-9238-1-git-send-email-christian.riesch@omicron.at>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 28 Jun 2011 17:13:15 +0200
+Subject: [PATCH V2 0/3] Add drivers/pwm and drivers/pwm/st_pwm.c
+In-Reply-To: <20110628100438.GI6069@pengutronix.de>
+References: <cover.1306831238.git.viresh.kumar@st.com>
+	<201106271526.12848.arnd@arndb.de>
+	<20110628100438.GI6069@pengutronix.de>
+Message-ID: <201106281713.16099.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows setting the input clock frequency of the SoC from
-the board specific code using the davinci_set_refclk_rate function.
+On Tuesday 28 June 2011, Sascha Hauer wrote:
+> > 
+> > Good question. If Sascha is able to come up with the patch to introduce
+> > the generic layer, I think it would be good to have it go though him.
+> 
+> Just posted a rebased and documented series again. Let's see what
+> happens. The time seems good to finally get this into the kernel.
 
-Suggested-by: Kevin Hilman <khilman@ti.com>
-Signed-off-by: Christian Riesch <christian.riesch@omicron.at>
----
+I'd say let's go forward with your framework. The two patches currently
+because they both add Makefile/Kconfig files in drivers/pwm.
 
-v2: fixed the commit message and indentation.
-Regards, Christian
+Maybe you can add Viresh's patch to your series, and wait for him
+to follow up with a patch to convert it?
 
- arch/arm/mach-davinci/da850.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+I've tried to blindly do the conversion myself, but got stuck with the
+definition of the platform device that has multiple pwms in it.
+I wonder if it would be better to change the st-pwm platform
+interface to define one platform_device for each of them.
 
-diff --git a/arch/arm/mach-davinci/da850.c b/arch/arm/mach-davinci/da850.c
-index 133aac4..27fe3ac 100644
---- a/arch/arm/mach-davinci/da850.c
-+++ b/arch/arm/mach-davinci/da850.c
-@@ -58,6 +58,7 @@ static struct pll_data pll0_data = {
- static struct clk ref_clk = {
- 	.name		= "ref_clk",
- 	.rate		= DA850_REF_FREQ,
-+	.set_rate	= davinci_simple_set_rate,
- };
- 
- static struct clk pll0_clk = {
--- 
-1.7.0.4
+	Arnd
