@@ -1,46 +1,109 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 28 Jun 2011 14:51:17 -0400 (EDT)
-Subject: [PATCH] USB: ehci: use packed, aligned(4) instead of removing the
-	packed attribute
-In-Reply-To: <201106251009.04624.arnd@arndb.de>
-References: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
-	<201106211325.16777.arnd@arndb.de>
-	<alpine.LFD.2.00.1106242122390.2142@xanadu.home>
-	<201106251009.04624.arnd@arndb.de>
-Message-ID: <alpine.LFD.2.00.1106261027070.2142@xanadu.home>
+From: matthias@kaehlcke.net (Matthias Kaehlcke)
+Date: Tue, 28 Jun 2011 21:40:40 +0200
+Subject: [PATCH 1/2] PWM: add pwm framework support
+In-Reply-To: <1309255368-9775-2-git-send-email-s.hauer@pengutronix.de>
+References: <1309255368-9775-1-git-send-email-s.hauer@pengutronix.de>
+	<1309255368-9775-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20110628194040.GE15091@darwin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 25 Jun 2011, Arnd Bergmann wrote:
+El Tue, Jun 28, 2011 at 12:02:47PM +0200 Sascha Hauer ha dit:
 
-> On Saturday 25 June 2011, Nicolas Pitre wrote:
-> > > which means that the dma_buf variable is dereferenced before the
-> > > volatile mmio_reg variable, which opens up a race: An interrupt may have
-> > > signalled us that a DMA is in progress, so we read a MMIO register from
-> > > the device (this is guaranteed to flush the DMA on PCI and similar buses).
-> > > If we read the dma_buf before we read the mmio register, the data we get
-> > > back may be stale.
-> > > 
-> > > Adding a barrier() between the two turns the assembly into the expected
-> > > 
-> > >         ldr     r3, [r1, #0]
-> > >         ldr     r0, [r0, #0]
-> > >         bx      lr
-> > 
-> > But isn't the usual dma_unmap_*() API call providing that barrier 
-> > already?
-> 
-> Yes, for the streaming mapping that would be sufficient, but not
-> for a coherent mapping, which doesn't need dma_unmap_* or dma_sync*
-> calls before accessing the buffer.
+> This patch adds framework support for PWM (pulse width modulation) devices.
+[...]
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> new file mode 100644
+> index 0000000..79dc051
+> --- /dev/null
+> +++ b/drivers/pwm/core.c
+[...]
+> +/**
+> + * pwmchip_add() - register a new pwm
+> + * @chip: the pwm
+> + *
+> + * register a new pwm. pwm->pwm_id must be initialized. if pwm_id < 0 then
+> + * a dynamically assigned id will be used, otherwise the id specified,
+> + */
+> +int pwmchip_add(struct pwm_chip *chip)
+> +{
+> +	struct pwm_device *pwm;
+> +	int ret = 0;
+> +
+> +	pwm = kzalloc(sizeof(*pwm), GFP_KERNEL);
+> +	if (!pwm)
+> +		return -ENOMEM;
+> +
+> +	pwm->chip = chip;
+> +
+> +	mutex_lock(&pwm_lock);
+> +
+> +	if (chip->pwm_id >= 0 && find_pwm(chip->pwm_id)) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	if (chip->pwm_id < 0)
+> +		chip->pwm_id = next_pwm_id++;
+> +
+> +	list_add_tail(&pwm->node, &pwm_list);
+> +out:
+> +	mutex_unlock(&pwm_lock);
+> +
+> +	kfree(pwm);
 
-OK, so that leaves only that case.  Obviously that must not be all that 
-critical in practice given the time it has been "broken" already.
+as already pointed out by kurt, pwm should only be freed in case of an
+error
 
-So I'm wondering if this might be a better idea to augment the API with 
-explicit barriers to cover the case above which is still a much less 
-frequent pattern than successive readl()/writel()'s where the implicit 
-memory barrier is really badly affecting the generated code.
+> +
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(pwmchip_add);
+> +
+> +/**
+> + * pwmchip_remove() - remove a pwm
+> + * @chip: the pwm
+> + *
+> + * remove a pwm. This function may return busy if the pwm is still requested.
+> + */
+> +int pwmchip_remove(struct pwm_chip *chip)
+> +{
+> +	struct pwm_device *pwm;
+> +	int ret = 0;
+> +
+> +	mutex_lock(&pwm_lock);
+> +
+> +	pwm = find_pwm(chip->pwm_id);
+> +	if (!pwm) {
+> +		ret = -ENOENT;
+> +		goto out;
+> +	}
+> +
+> +	if (test_bit(FLAG_REQUESTED, &pwm->flags)) {
+> +		ret = -EBUSY;
+> +		goto out;
+> +	}
+> +
+> +	list_del(&pwm->node);
+  +	kfree(pwm);
+> +out:
+> +	mutex_unlock(&pwm_lock);
+> +
+> +	return ret;
+> +}
 
+[...]
 
-Nicolas
+best regards
+
+-- 
+Matthias Kaehlcke
+Embedded Linux Developer
+Amsterdam
+
+             It always seems impossible until it's done
+                        (Nelson Mandela)
+                                                                 .''`.
+    using free software / Debian GNU/Linux | http://debian.org  : :'  :
+                                                                `. `'`
+gpg --keyserver pgp.mit.edu --recv-keys 47D8E5D4                  `-
