@@ -1,65 +1,91 @@
-From: per.forlin@linaro.org (Per Forlin)
-Date: Tue, 28 Jun 2011 11:39:41 +0200
-Subject: [PATCH v8 12/12] mmc: block: add handling for two parallel block
-	requests in issue_rw_rq
-In-Reply-To: <1309248717-14606-13-git-send-email-per.forlin@linaro.org>
+From: kmpark@infradead.org (Kyungmin Park)
+Date: Tue, 28 Jun 2011 18:54:50 +0900
+Subject: [PATCH v8 00/12] use nonblock mmc requests to minimize latency
+In-Reply-To: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
 References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
-	<1309248717-14606-13-git-send-email-per.forlin@linaro.org>
-Message-ID: <BANLkTikkv+RQKZCX2PeZUDhM1gnVXCKO2w@mail.gmail.com>
+Message-ID: <BANLkTinzOj-Uw3o__2=kHYqHwMW1BtAktQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 June 2011 10:11, Per Forlin <per.forlin@linaro.org> wrote:
-> Change mmc_blk_issue_rw_rq() to become asynchronous.
-> The execution flow looks like this:
-> The mmc-queue calls issue_rw_rq(), which sends the request
-> to the host and returns back to the mmc-queue. The mmc-queue calls
-> issue_rw_rq() again with a new request. This new request is prepared,
-> in isuue_rw_rq(), then it waits for the active request to complete before
-> pushing it to the host. When to mmc-queue is empty it will call
-> isuue_rw_rq() with req=NULL to finish off the active request
-> without starting a new request.
+This patches are tested on samsung exynos4 platform.
+
+Acked-by: Kyungmin Park <kyungmin.park@samsung.com>
+
+On Tue, Jun 28, 2011 at 5:11 PM, Per Forlin <per.forlin@linaro.org> wrote:
+> How significant is the cache maintenance over head?
+> It depends, the eMMC are much faster now
+> compared to a few years ago and cache maintenance cost more due to
+> multiple cache levels and speculative cache pre-fetch. In relation the
+> cost for handling the caches have increased and is now a bottle neck
+> dealing with fast eMMC together with DMA.
 >
-> Signed-off-by: Per Forlin <per.forlin@linaro.org>
-> ---
-> ?drivers/mmc/card/block.c | ? 80 +++++++++++++++++++++++++++++++++++++--------
-> ?drivers/mmc/card/queue.c | ? 17 +++++++---
-> ?drivers/mmc/card/queue.h | ? ?1 +
-> ?3 files changed, 78 insertions(+), 20 deletions(-)
+> The intention for introducing non-blocking mmc requests is to minimize the
+> time between a mmc request ends and another mmc request starts. In the
+> current implementation the MMC controller is idle when dma_map_sg and
+> dma_unmap_sg is processing. Introducing non-blocking mmc request makes it
+> possible to prepare the caches for next job in parallel to an active
+> mmc request.
 >
-> diff --git a/drivers/mmc/card/block.c b/drivers/mmc/card/block.c
-> index 7ed2c68..825741e 100644
-> --- a/drivers/mmc/card/block.c
-> +++ b/drivers/mmc/card/block.c
-...
-> @@ -1066,6 +1085,13 @@ static int mmc_blk_issue_rw_rq(struct mmc_queue *mq, struct request *req)
-> ? ? ? ? ? ? ? ? ? ? ? ?ret = __blk_end_request(req, 0,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?brq->data.bytes_xfered);
-> ? ? ? ? ? ? ? ? ? ? ? ?spin_unlock_irq(&md->lock);
-> + ? ? ? ? ? ? ? ? ? ? ? if (status == MMC_BLK_SUCCESS && ret) {
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? /* If this happen it is a bug */
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? printk(KERN_ERR "%s BUG rq_tot %d d_xfer %d\n",
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?__func__, blk_rq_bytes(req),
-> + ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?brq->data.bytes_xfered);
-+ rqc = NULL
-If there is a new request (rqc != NULL)  it will already be started
-when reaching this point.
-If rqc is set it will be started again at start_new_req.
-
-I wonder if this paranoia check is necessary. If "status ==
-MMC_BLK_SUCCESS" all bytes are transferred and no error returned from
-mmc layer.
- __blk_end_request would always return 0 in this case, please comment
-if you disagree.
-
-...
-> + start_new_req:
-> + ? ? ? if (rqc) {
-> + ? ? ? ? ? ? ? mmc_blk_rw_rq_prep(mq->mqrq_cur, card, 0, mq);
-> + ? ? ? ? ? ? ? mmc_start_req(card->host, &mq->mqrq_cur->mmc_active, NULL);
-> + ? ? ? }
-> +
-> ? ? ? ?return 0;
-> ?}
-
-/Per
+> This is done by making the issue_rw_rq() non-blocking.
+> The increase in throughput is proportional to the time it takes to
+> prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
+> a request and how fast the memory is. The faster the MMC/SD is
+> the more significant the prepare request time becomes. Measurements on U5500
+> and Panda on eMMC and SD shows significant performance gain for large
+> reads when running DMA mode. In the PIO case the performance is unchanged.
+>
+> There are two optional hooks pre_req() and post_req() that the host driver
+> may implement in order to move work to before and after the actual mmc_request
+> function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
+> the dma descriptor and post_req runs the dma_unmap_sg.
+>
+> Details on measurements from IOZone and mmc_test:
+> https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
+>
+> Changes since v7:
+> ?* rebase on mmc-next, on top of Russell's updated error handling.
+> ?* Clarify description of mmc_start_req()
+> ?* Resolve compile without CONFIG_DMA_ENIGNE issue for mmci
+> ?* Add mmc test to measure how performance is affected by sg length
+> ?* Add missing wait_for_busy in mmc_test non-blocking test. This call got lost
+> ? in v4 of this patchset when refactoring mmc_start_req.
+> ?* Add sub-prefix (core block queue) to relevant patches.
+>
+> Per Forlin (12):
+> ?mmc: core: add non-blocking mmc request function
+> ?omap_hsmmc: add support for pre_req and post_req
+> ?mmci: implement pre_req() and post_req()
+> ?mmc: mmc_test: add debugfs file to list all tests
+> ?mmc: mmc_test: add test for non-blocking transfers
+> ?mmc: mmc_test: test to measure how sg_len affect performance
+> ?mmc: block: add member in mmc queue struct to hold request data
+> ?mmc: block: add a block request prepare function
+> ?mmc: block: move error code in issue_rw_rq to a separate function.
+> ?mmc: queue: add a second mmc queue request member
+> ?mmc: core: add random fault injection
+> ?mmc: block: add handling for two parallel block requests in
+> ? ?issue_rw_rq
+>
+> ?drivers/mmc/card/block.c ? ? ?| ?505 ++++++++++++++++++++++++-----------------
+> ?drivers/mmc/card/mmc_test.c ? | ?491 ++++++++++++++++++++++++++++++++++++++--
+> ?drivers/mmc/card/queue.c ? ? ?| ?184 ++++++++++------
+> ?drivers/mmc/card/queue.h ? ? ?| ? 33 ++-
+> ?drivers/mmc/core/core.c ? ? ? | ?167 +++++++++++++-
+> ?drivers/mmc/core/debugfs.c ? ?| ? ?5 +
+> ?drivers/mmc/host/mmci.c ? ? ? | ?147 +++++++++++-
+> ?drivers/mmc/host/mmci.h ? ? ? | ? ?8 +
+> ?drivers/mmc/host/omap_hsmmc.c | ? 87 +++++++-
+> ?include/linux/mmc/core.h ? ? ?| ? ?6 +-
+> ?include/linux/mmc/host.h ? ? ?| ? 24 ++
+> ?lib/Kconfig.debug ? ? ? ? ? ? | ? 11 +
+> ?12 files changed, 1345 insertions(+), 323 deletions(-)
+>
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
