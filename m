@@ -1,58 +1,67 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 28 Jun 2011 16:06:32 +0100
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
-References: <20110627125306.GA30646@doriath.ww600.siemens.net>
-	<20110627132735.GE16103@n2100.arm.linux.org.uk>
-	<4E088DE1.2060809@gmail.com> <4E089AB3.1090801@codesourcery.com>
-	<20110628103946.GC21898@n2100.arm.linux.org.uk>
-	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
-	<20110628142045.GC7255@1n450.cable.virginmedia.net>
-	<20110628143014.GD7255@1n450.cable.virginmedia.net>
-	<BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
-	<BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
-Message-ID: <20110628150631.GD24904@e102109-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 28 Jun 2011 16:08:37 +0100
+Subject: [next][bug] rcu_dyntick_kick_cpu() kills ARM SMP.
+Message-ID: <4E09EE75.9040204@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 03:54:11PM +0100, Dmitry Eremin-Solenikov wrote:
-> On 6/28/11, Dmitry Eremin-Solenikov <dbaryshkov@gmail.com> wrote:
-> > On 6/28/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> >> Actually since the return address is in S_PC (which maybe gdb assumes it
-> >> would be the saved LR), this is probably not be correct. After SVC
-> >> entry, we have he following structure on the stack:
-> >>
-> >> 	ORIG_r0
-> >> 	CPSR
-> >> 		<--- assuming this is the Call Frame Address (SP+S_PC+4)
-> >> 	PC	<--- CFA - 4
-> >> 	LR	<--- don't care
-> >> 	SP	<--- CFA - 12
-> >> 	...
-> >>
-> >>
-> >> So we tell gdb about this with something like below (untested):
-> >>
-> >> 	.cfi_def_cfa_offset S_PC + 4
-> >> 	.cfi_offset 14, -4
-> >> 	.cfi_offset 13, -12
-> >
-> > This brings "unknown CFA rule" gdb exception, but it seems I got your idea.
-> 
-> No, this seems to work, it was my fault. I got more or less reasonable
-> backtrace now.
+Paul,
 
-Does gdb manage to get into the parent stack frame?
+I've updated my -next tree (to next-20110628) today, and discovered 
+that my favorite ARM board wouldn't boot anymore:
 
-BTW, are you compiling with FRAME_POINTER enabled? In this case you
-would need to set some offset for the FP register (11). If you don't
-mind missing the first part in the parent context, maybe something like
-below:
+[...]
+Hierarchical RCU implementation.
+NR_IRQS:128 nr_irqs:128 128
+Console: colour dummy device 80x30
+Calibrating delay loop... 83.35 BogoMIPS (lpj=416768)
+pid_max: default: 32768 minimum: 301
+Mount-cache hash table entries: 512
+CPU: Testing write buffer coherency: ok
+Calibrating local timer... 104.04MHz.
+CPU1: Booted secondary processor
+CPU1: Unknown IPI message 0x1
+CPU2: Booted secondary processor
+CPU2: Unknown IPI message 0x1
+CPU3: Booted secondary processor
+CPU3: Unknown IPI message 0x1
+Brought up 4 CPUs
+SMP: Total of 4 processors activated (333.92 BogoMIPS).
+------------[ cut here ]------------
+WARNING: at kernel/smp.c:320 smp_call_function_single+0xe4/0x1c0()
+NET: Registered protocol family 16
+Modules linked in:
+[<c00415d4>] (unwind_backtrace+0x0/0xf4) from [<c0056184>] (warn_slowpath_common+0x4c/0x64)
+[<c0056184>] (warn_slowpath_common+0x4c/0x64) from [<c00561b8>] (warn_slowpath_null+0x1c/0x24)
+[<c00561b8>] (warn_slowpath_null+0x1c/0x24) from [<c0088218>] (smp_call_function_single+0xe4/0x1c0)
+[<c0088218>] (smp_call_function_single+0xe4/0x1c0) from [<c0094804>] (rcu_start_gp+0x184/0x310)
+[<c0094804>] (rcu_start_gp+0x184/0x310) from [<c00955b0>] (__rcu_process_callbacks+0x274/0x398)
+[<c00955b0>] (__rcu_process_callbacks+0x274/0x398) from [<c0095708>] (rcu_process_callbacks+0x34/0x5c)
+[<c0095708>] (rcu_process_callbacks+0x34/0x5c) from [<c005c964>] (__do_softirq+0xa4/0x16c)
+[<c005c964>] (__do_softirq+0xa4/0x16c) from [<c005cc0c>] (irq_exit+0x80/0x9c)
+[<c005cc0c>] (irq_exit+0x80/0x9c) from [<c00353cc>] (do_local_timer+0x54/0x70)
+[<c00353cc>] (do_local_timer+0x54/0x70) from [<c003b618>] (__irq_svc+0x38/0xc0)
+Exception stack(0xdf467f90 to 0xdf467fd8)
+7f80:                                     df466000 00000000 df467fd8 00000000
+7fa0: df466000 c045dd24 c034f6cc 00000000 c0445514 410fb020 70409ddc 00000000
+7fc0: 00000000 df467fd8 c003c4ac c003c4b0 60000013 ffffffff
+[<c003b618>] (__irq_svc+0x38/0xc0) from [<c003c4b0>] (default_idle+0x24/0x28)
+[<c003c4b0>] (default_idle+0x24/0x28) from [<c003ccd0>] (cpu_idle+0x9c/0xdc)
+[<c003ccd0>] (cpu_idle+0x9c/0xdc) from [<70348734>] (0x70348734)
+---[ end trace 1b75b31a2719ed1c ]---
 
-	.cfi_def_cfa_offset S_PC
-	.cfi_offset 14, -4
-	.cfi_offset 13, -8
-	.cfi_offset 11, -16
+... and here it dies.
 
+The offending commit is b983032b7 (rcu: Avoid grace-period overflow for 
+long dyntick-idle periods). rcu_dyntick_kick_cpu() tries to do a CPU 
+cross-call with interrupts disabled, which kills the box. Reverting this
+patch results in a working system.
+
+My RCU-foo being rather low, I haven't dug deeper into this. Please let
+me know if you want me to test anything.
+
+Cheers,
+
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
