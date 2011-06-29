@@ -1,53 +1,44 @@
-From: grinberg@compulab.co.il (Igor Grinberg)
-Date: Wed, 29 Jun 2011 12:00:32 +0300
-Subject: [PATCH V3 0/9] pxa3xx_nand: add two chip select support
-In-Reply-To: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
-References: <1309246361.23597.30.camel@sauron>
-	<1309319494-17951-1-git-send-email-leiwen@marvell.com>
-Message-ID: <4E0AE9B0.7000908@compulab.co.il>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 29 Jun 2011 11:03:33 +0200
+Subject: [PATCH v2] implement a generic PWM framework
+Message-ID: <1309338215-10702-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lei,
+Thanks for the comments to the last version, hopefully I addressed
+them all. Here is another round of the patches.
 
-On 06/29/11 06:51, Lei Wen wrote:
+changes since last version:
 
-> V2:
-> Choose to at most keep original pxa3xx_nand_info structure to reduce
-> patch size
->
-> V3:
-> Seperate original one patch into a patch set
->
-> Lei Wen (9):
->   MTD: pxa3xx_nand: convert all printk into dev_*
->   MTD: pxa3xx_nand: enable multiple chip select support
->   ARM: aspenite: fix nand platform data
->   ARM: cm-x300: fix nand platform data
->   ARM: colibri-pxa3xx: fix nand platform data
->   ARM: littleton: fix nand platform data
->   ARM: mxm8x10: fix nand platform data
->   ARM: raumfeld: fix nand platform data
->   ARM: zylonite: fix nand platform data
+- only kfree() in case of errors
+- add missing kfree() in pwmchip_remove()
+- drop dynamic pwm id support
+- fix typos, remove unused variables
+- instantiate pwm_base_common in mxs-pwm driver from resources
 
-While I agree with Artem, that reviewing patch sets are much more easier,
-than a one single big patch, I think you should keep the
-"fix nand platform data" changes all in one patch.
-All of them do the same change, but for different boards.
+The following changes since commit b0af8dfdd67699e25083478c63eedef2e72ebd85:
 
->  arch/arm/mach-mmp/aspenite.c                 |    5 +-
->  arch/arm/mach-pxa/cm-x300.c                  |    5 +-
->  arch/arm/mach-pxa/colibri-pxa3xx.c           |    5 +-
->  arch/arm/mach-pxa/littleton.c                |    5 +-
->  arch/arm/mach-pxa/mxm8x10.c                  |    9 +-
->  arch/arm/mach-pxa/raumfeld.c                 |    5 +-
->  arch/arm/mach-pxa/zylonite.c                 |    5 +-
->  arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |   19 +-
->  drivers/mtd/nand/pxa3xx_nand.c               |  512 +++++++++++++++-----------
->  9 files changed, 346 insertions(+), 224 deletions(-)
->
->
+  Linux 3.0-rc5 (2011-06-27 19:12:22 -0700)
 
--- 
-Regards,
-Igor.
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git pwm
+
+Sascha Hauer (2):
+      PWM: add pwm framework support
+      pwm: Add a i.MX23/28 pwm driver
+
+ Documentation/pwm.txt |   56 +++++++++
+ MAINTAINERS           |    5 +
+ drivers/Kconfig       |    2 +
+ drivers/Makefile      |    1 +
+ drivers/pwm/Kconfig   |   16 +++
+ drivers/pwm/Makefile  |    2 +
+ drivers/pwm/core.c    |  220 +++++++++++++++++++++++++++++++++
+ drivers/pwm/mxs-pwm.c |  321 +++++++++++++++++++++++++++++++++++++++++++++++++
+ include/linux/pwm.h   |   37 ++++++
+ 9 files changed, 660 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/pwm.txt
+ create mode 100644 drivers/pwm/Kconfig
+ create mode 100644 drivers/pwm/Makefile
+ create mode 100644 drivers/pwm/core.c
+ create mode 100644 drivers/pwm/mxs-pwm.c
