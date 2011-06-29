@@ -1,47 +1,26 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Wed, 29 Jun 2011 13:20:00 +0300
-Subject: [PATCH V3 0/9] pxa3xx_nand: add two chip select support
-In-Reply-To: <4E0AE9B0.7000908@compulab.co.il>
-References: <1309246361.23597.30.camel@sauron>
-	<1309319494-17951-1-git-send-email-leiwen@marvell.com>
-	<4E0AE9B0.7000908@compulab.co.il>
-Message-ID: <1309342805.23597.136.camel@sauron>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 29 Jun 2011 03:31:16 -0700
+Subject: [RFC 1/2] omap: mcbsp: Drop SPI mode support
+In-Reply-To: <6027329.5ZCJWRgjcM@barack>
+References: <1308050632-4733-1-git-send-email-jhnikula@gmail.com>
+	<6027329.5ZCJWRgjcM@barack>
+Message-ID: <20110629103116.GC23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-06-29 at 12:00 +0300, Igor Grinberg wrote:
-> Hi Lei,
+* P?ter Ujfalusi <peter.ujfalusi@ti.com> [110614 05:34]:
+> On Tuesday 14 June 2011 13:23:51 Jarkko Nikula wrote:
+> > We haven't seen any use for the SPI API in McBSP driver over the years. More
+> > over, Peter Ujfalusi <peter.ujfalusi@ti.com> noticed that SPI mode is not
+> > even supported since OMAP2430 so it's very unlikely that we'll see any use
+> > for it in the future either.
+> > 
+> > Signed-off-by: Jarkko Nikula <jhnikula@gmail.com>
 > 
-> On 06/29/11 06:51, Lei Wen wrote:
+> Either now or later, but for both:
 > 
-> > V2:
-> > Choose to at most keep original pxa3xx_nand_info structure to reduce
-> > patch size
-> >
-> > V3:
-> > Seperate original one patch into a patch set
-> >
-> > Lei Wen (9):
-> >   MTD: pxa3xx_nand: convert all printk into dev_*
-> >   MTD: pxa3xx_nand: enable multiple chip select support
-> >   ARM: aspenite: fix nand platform data
-> >   ARM: cm-x300: fix nand platform data
-> >   ARM: colibri-pxa3xx: fix nand platform data
-> >   ARM: littleton: fix nand platform data
-> >   ARM: mxm8x10: fix nand platform data
-> >   ARM: raumfeld: fix nand platform data
-> >   ARM: zylonite: fix nand platform data
-> 
-> While I agree with Artem, that reviewing patch sets are much more easier,
-> than a one single big patch, I think you should keep the
-> "fix nand platform data" changes all in one patch.
-> All of them do the same change, but for different boards.
+> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-Yeah, I did not suggest to split a large patch to a number of
-micro-patches plus another large patch :-) My suggestion is to have a
-set of easily reviewable patches. If you do the same thing in many
-platform data structures, it is reviewable and can be in one patch.
+Applying both of these into devel-cleanup branch.
 
--- 
-Best Regards,
-Artem Bityutskiy
+Tony
