@@ -1,102 +1,81 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 29 Jun 2011 18:39:33 +0300
-Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
-In-Reply-To: <4E0B43BA.803@atmel.com>
-References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628103549.GG2612@legolas.emea.dhcp.ti.com>
-	<4E09C573.2030607@atmel.com>
-	<20110628122650.GK2612@legolas.emea.dhcp.ti.com>
-	<4E0B43BA.803@atmel.com>
-Message-ID: <20110629153932.GB2760@legolas.emea.dhcp.ti.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 29 Jun 2011 18:54:19 +0200
+Subject: [PATCH 1/2] MMC: PM: add suspend/resume in atmel-mci
+Message-ID: <1ef60c032bc39531302c1603bfcb841d2d437ccc.1309366360.git.nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Take care of slots while going to suspend state.
 
-On Wed, Jun 29, 2011 at 05:24:42PM +0200, Nicolas Ferre wrote:
-> > yet you will prevent the driver from being easily used by other
-> > architectures. What will happen is that a certain amount of:
-> > 
-> > depends on (ARCH_AT91SAM9X5 || ARCH_FOO || ARCH_BAR || ARCH_BAZ)
-> 
-> Yes, exactly like:
-> 
-> config USB_GADGET_ATMEL_USBA
-> [..]
->         depends on AVR32 || ARCH_AT91CAP9 || ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
-> 
-> or
-> 
-> config MMC_ATMELMCI_DMA
-> [..]
->         depends on MMC_ATMELMCI && (AVR32 || ARCH_AT91SAM9G45) && DMA_ENGINE && EXPERIMENTAL
-> 
-> or 
-> 
-> config TOUCHSCREEN_ATMEL_TSADCC
-> [..]
->         depends on ARCH_AT91SAM9RL || ARCH_AT91SAM9G45
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ drivers/mmc/host/atmel-mci.c |   51 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 51 insertions(+), 0 deletions(-)
 
-are you saying that's correct ? Well, I see those are platform_drivers,
-so it's probably some IP integrated inside ATMEL chips. Now, what if the
-same IP is used by some other SoC ? I mean, other than AT91* even.
-
-> Those are places where I wanted to add my little ARCH_AT91SAM9X5...
-
-After a couple years, someone else comes with another patch adding
-ARCH_AT91SAMXXX and ARCH_AT91SAMYYY and ARCH_AT91_SAMZZZ...
-
-But then again, at the end of the day Russell is the final judge :-) I
-just wanted to say that it's far better to remove those dependencies and
-allow those drivers to be built as modules rather than keep adding
-dependencies to the end of times ;-)
-
-> And as Jean-Christophe said, when those lines are getting too long, we
-> change this to a nice: HAVE_xxx config option.
-> 
-> > will continue to proliferate.
-> 
-> So what?
-> It will:
-> - ease xconfig/menuconfig reading by user: who cares about my Atmel
-> driver while running OMAPs?
-
-what if in a couple of years comes one OMAP with the same IP that you're
-using ? ;-)
-
-it's rather unlikely, but for a simple example look at how many
-Cortex-A9 MPCore Interrupt Controller drivers we have under arch/arm/
-where it would be simpler to have _one_ driver being re-used by many
-archs ;-)
-
-> - ease user choice by selecting default values depending on chip
-> availability
-
-IMHO, it's far simpler to answer 'M' to a driver such as a touchscreen
-controller without even thinking about it ;-)
-
-> > Here are a few questions:
-> > i) The drivers you're willing to send, are those for Atmel's IPs or are
-> > 	the IPs sourced from some other company ?
-> > ii) Even if they are Atmel-specific, do you see the possibility of Atmel
-> > 	licensing them ?
-> > iii) Does your driver current depend on asm/ or mach/ headers ?
-> > iv) Is there a generic header which you could use instead of asm/ mach/ ?
-> 
-> I just want to hide drivers that are not relevant for others: I have
-> the feeling that it is a good practice. This tiny patch will ease this
-> during my publication flow. Do you seriously care?
-
-Well, it's not that I care. I just don't see the point in hiding the
-drivers. For starters we loose the very nice linux-next infrastructure
-for giving us compile tests ;-)
-
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index aa8039f..c414ebe 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -1878,8 +1878,59 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int atmci_suspend(struct platform_device *pdev, pm_message_t mesg)
++{
++	struct atmel_mci *host = platform_get_drvdata(pdev);
++	struct atmel_mci_slot *slot;
++	int i, ret;
++
++	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
++		slot = host->slot[i];
++		if (!slot)
++			continue;
++		ret = mmc_suspend_host(slot->mmc);
++		if (ret < 0) {
++			while (--i >= 0) {
++				slot = host->slot[i];
++				if (slot)
++					mmc_resume_host(host->slot[i]->mmc);
++			}
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int atmci_resume(struct platform_device *pdev)
++{
++	struct atmel_mci *host = platform_get_drvdata(pdev);
++	struct atmel_mci_slot *slot;
++	int i, ret;
++
++	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
++		slot = host->slot[i];
++		if (!slot)
++			continue;
++		ret = mmc_resume_host(slot->mmc);
++		if (ret < 0)
++			return ret;
++	}
++
++	return 0;
++}
++#else
++#define atmci_suspend	NULL
++#define atmci_resume	NULL
++#endif
++
++
++
+ static struct platform_driver atmci_driver = {
+ 	.remove		= __exit_p(atmci_remove),
++	.suspend	= atmci_suspend,
++	.resume		= atmci_resume,
+ 	.driver		= {
+ 		.name		= "atmel_mci",
+ 	},
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 490 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110629/e06d0926/attachment.sig>
+1.7.3
