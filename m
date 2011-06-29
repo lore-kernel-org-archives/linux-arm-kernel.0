@@ -1,49 +1,68 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Jun 2011 08:18:59 +0200
-Subject: [PATCH 0/2] RFC: gpio: driver-local pin configuration
-In-Reply-To: <BANLkTinWmdWgGD9ui+WVV7DyCzy73S5AkQ@mail.gmail.com>
-References: <1307695731-28018-1-git-send-email-linus.walleij@stericsson.com>
-	<BANLkTinxptCJRETreCpUoV-nU2K4fuFcmQ@mail.gmail.com>
-	<BANLkTimMSChGFUSnFWFHv3nNUca_Fyawaw@mail.gmail.com>
-	<20110627120256.GA19531@opensource.wolfsonmicro.com>
-	<BANLkTikpMdakfTU+RRsXQVnpO4-KGkOGJQ@mail.gmail.com>
-	<BANLkTinWmdWgGD9ui+WVV7DyCzy73S5AkQ@mail.gmail.com>
-Message-ID: <BANLkTikkxkDBOgQpGr9ZGzqFeHLmWGg+GQ@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 29 Jun 2011 08:27:26 +0200
+Subject: [PATCH] ARM: mx53: Fix some interrupts marked as reserved.
+In-Reply-To: <1309276716-12828-1-git-send-email-fabio.estevam@freescale.com>
+References: <1309276716-12828-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <20110629062726.GL6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2011/6/28 Stijn Devriendt <highguy@gmail.com>:
-> On Mon, Jun 27, 2011 at 2:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Mon, Jun 27, 2011 at 2:02 PM, Mark Brown
->>> How about device tree usage? ?I guess there we'd end up doing it by
->>> putting the configuration on the GPIO end of things rather than on the
->>> GPIO user side?
->>
->> Sorry I can't quite understand that, please elaborate!
->>
->
-> I have some code doing this as well (in a very limited fashion):
->
-> int of_request_gpio(..., int* remaining_flags)
-> {
-> ?of_get_gpio_flags(of_dev, i, remaining_flags)
-> ?if (flags & bias_X) {
-> ? ? gpio_set_bias(gpio, ...)
-> ? ? flags &= ~bias_X
-> ?}
-> ?// interpret all generic flags here
-> };
->
-> So drivers need not worry about all gpio flags and special things.
-> They just request the pin; what they receive is a fully configured
-> pin (with the exception of unknown flags passed out via
-> remaining_flags).
+On Tue, Jun 28, 2011 at 12:58:36PM -0300, Fabio Estevam wrote:
+> Mark the actual interrupt source for some interrupts currently marked as reserved.
 
-Sorry there is something I don't get here or there is something you
-assume, maybe.
+applied for next.
 
-How does this kind of design account for the case where you need
-to change the biasing at runtime?
+Sascha
 
-Thanks,
-Linus Walleij
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+> ---
+>  arch/arm/plat-mxc/include/mach/mx53.h |   10 +++++-----
+>  1 files changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
+> index 3128af7..5e3c323 100644
+> --- a/arch/arm/plat-mxc/include/mach/mx53.h
+> +++ b/arch/arm/plat-mxc/include/mach/mx53.h
+> @@ -233,7 +233,7 @@
+>  #define MX53_INT_ESDHC2	2
+>  #define MX53_INT_ESDHC3	3
+>  #define MX53_INT_ESDHC4	4
+> -#define MX53_INT_RESV5	5
+> +#define MX53_INT_DAP	5
+>  #define MX53_INT_SDMA	6
+>  #define MX53_INT_IOMUX	7
+>  #define MX53_INT_NFC	8
+> @@ -262,8 +262,8 @@
+>  #define MX53_INT_UART1	31
+>  #define MX53_INT_UART2	32
+>  #define MX53_INT_UART3	33
+> -#define MX53_INT_RESV34	34
+> -#define MX53_INT_RESV35	35
+> +#define MX53_INT_RTC	34
+> +#define MX53_INT_PTP	35
+>  #define MX53_INT_ECSPI1	36
+>  #define MX53_INT_ECSPI2	37
+>  #define MX53_INT_CSPI	38
+> @@ -293,8 +293,8 @@
+>  #define MX53_INT_I2C1	62
+>  #define MX53_INT_I2C2	63
+>  #define MX53_INT_I2C3	64
+> -#define MX53_INT_RESV65	65
+> -#define MX53_INT_RESV66	66
+> +#define MX53_INT_MLB	65
+> +#define MX53_INT_ASRC	66
+>  #define MX53_INT_SPDIF	67
+>  #define MX53_INT_SIM_DAT	68
+>  #define MX53_INT_IIM	69
+> -- 
+> 1.6.0.4
+> 
+> 
+> 
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
