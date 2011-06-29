@@ -1,40 +1,30 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 29 Jun 2011 09:31:19 -0600
-Subject: [RFC 2/8] remoteproc: add omap implementation
-In-Reply-To: <BANLkTi=4Pp1UYWFsBywRvLL1n=ggCZgAeA@mail.gmail.com>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-3-git-send-email-ohad@wizery.com>
-	<20110627210007.GC20865@ponder.secretlab.ca>
-	<BANLkTi=4Pp1UYWFsBywRvLL1n=ggCZgAeA@mail.gmail.com>
-Message-ID: <BANLkTikGaYjjuXOb0ANM4+-j3nWFJ1BaCg@mail.gmail.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Wed, 29 Jun 2011 18:41:16 +0200
+Subject: [PATCH] MTD: atmel_nand: fix wrong use of 0 as NULL
+Message-ID: <1309365676-19210-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 9:04 AM, Ohad Ben-Cohen <ohad@wizery.com> wrote:
-> On Tue, Jun 28, 2011 at 12:00 AM, Grant Likely
-> <grant.likely@secretlab.ca> wrote:
->> Very little for me to comment on here. ?However, something I just
->> noticed. ?Why is it necessary to pass in THIS_MODULE to the
->> rproc_register function? ?Having a reference to the pdev gives you the
->> pointer to the driver, which has the THIS_MODULE value in it. ?That
->> should be sufficient.
->
-> Nice one, thanks !
->
->> /me also isn't sure if incrementing the refcount on the module is the
->> best way to prevent the rproc from going away, but I haven't dug into
->> the details in the driver code to find out. ?Drivers can get unbound
->> from devices without the driver being unloaded, so I imagine there is
->> an in-use count on the device itself that would prevent driver
->> unbinding.
->
-> Yes, increasing the module refcount is necessary to prevent the user
-> from removing the driver when the rproc is used.
+Fixing this error:
+atmel_nand.c:718:20: warning: Using plain integer as NULL pointer
 
-That prevents removing the module which necessitates unbinding the
-device.  However, I believe it is possible to unbind a driver
-/without/ the module being unloaded.  My question (for which I don't
-have an answer) is whether or not there is a way to increment a
-refcount on users of the driver bound to the device..
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ drivers/mtd/nand/atmel_nand.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
-g.
+diff --git a/drivers/mtd/nand/atmel_nand.c b/drivers/mtd/nand/atmel_nand.c
+index b300705..bbdf062 100644
+--- a/drivers/mtd/nand/atmel_nand.c
++++ b/drivers/mtd/nand/atmel_nand.c
+@@ -593,7 +593,7 @@ static int __init atmel_nand_probe(struct platform_device *pdev)
+ 
+ 		dma_cap_zero(mask);
+ 		dma_cap_set(DMA_MEMCPY, mask);
+-		host->dma_chan = dma_request_channel(mask, 0, NULL);
++		host->dma_chan = dma_request_channel(mask, NULL, NULL);
+ 		if (!host->dma_chan) {
+ 			dev_err(host->dev, "Failed to request DMA channel\n");
+ 			use_dma = 0;
+-- 
+1.7.3
