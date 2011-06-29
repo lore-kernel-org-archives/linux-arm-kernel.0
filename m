@@ -1,46 +1,145 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 29 Jun 2011 01:12:43 -0700
-Subject: [PATCH] omap: cleanup NAND platform data
-In-Reply-To: <BANLkTimXxOcr4q2fkD0hjq4pMVPC0StBFw@mail.gmail.com>
-References: <1307130993-15265-1-git-send-email-notasas@gmail.com>
-	<BANLkTimnP-HuvVruB5hNSMHVnQUmned8Pg@mail.gmail.com>
-	<BANLkTimXxOcr4q2fkD0hjq4pMVPC0StBFw@mail.gmail.com>
-Message-ID: <20110629081243.GA23145@atomide.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 29 Jun 2011 16:21:26 +0800
+Subject: [PATCH V4 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <20110629080558.GJ6588@pengutronix.de>
+References: <1309334082-9501-1-git-send-email-b32955@freescale.com>
+	<1309334082-9501-2-git-send-email-b32955@freescale.com>
+	<20110629080558.GJ6588@pengutronix.de>
+Message-ID: <4E0AE086.5030202@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Grazvydas Ignotas <notasas@gmail.com> [110603 15:01]:
-> On Sat, Jun 4, 2011 at 12:14 AM, Vimal Singh <vimal.newwork@gmail.com> wrote:
-> > On Sat, Jun 4, 2011 at 1:26 AM, Grazvydas Ignotas <notasas@gmail.com> wrote:
-> >>
-> >> -static int omap2_nand_gpmc_retime(void)
-> >> +static int omap2_nand_gpmc_retime(struct omap_nand_platform_data *gpmc_nand_data)
-> >> ?{
-> >> ? ? ? ?struct gpmc_timings t;
-> >> ? ? ? ?int err;
-> >> @@ -83,13 +81,11 @@ static int omap2_nand_gpmc_retime(void)
-> >> ? ? ? ?return 0;
-> >> ?}
-> >>
-> >> -int __init gpmc_nand_init(struct omap_nand_platform_data *_nand_data)
-> >> +int __init gpmc_nand_init(struct omap_nand_platform_data *gpmc_nand_data)
-> >> ?{
-> >> ? ? ? ?int err = 0;
-> >> ? ? ? ?struct device *dev = &gpmc_nand_device.dev;
-> >>
-> >> - ? ? ? gpmc_nand_data = _nand_data;
-> >> - ? ? ? gpmc_nand_data->nand_setup = omap2_nand_gpmc_retime;
-> >
-> > Purpose of doing this was to be able to utilise
-> > 'omap2_nand_gpmc_retime', when DVFS is ready to use it,
-> > for changing timing parameter dynamically when a frequency change is done.
-> 
-> Well but it seems currently ...retime() only does single static
-> configuration, I guess when it's updated to do DVFS stuff callback can
-> easily be added back..
+Hi:
+> On Wed, Jun 29, 2011 at 03:54:40PM +0800, Huang Shijie wrote:
+>> add GPMI-NFC support for imx23 and imx28.
+>>
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> ---
+>>   arch/arm/mach-mxs/Kconfig                 |    2 +
+>>   arch/arm/mach-mxs/include/mach/gpmi-nfc.h |   71 +++++++++++++++++++++++++++++
+>>   2 files changed, 73 insertions(+), 0 deletions(-)
+>>   create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+>>
+>> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+>> index 1d3985f..a5b753a 100644
+>> --- a/arch/arm/mach-mxs/Kconfig
+>> +++ b/arch/arm/mach-mxs/Kconfig
+>> @@ -32,6 +32,7 @@ config MACH_MX23EVK
+>>   	select SOC_IMX23
+>>   	select MXS_HAVE_AMBA_DUART
+>>   	select MXS_HAVE_PLATFORM_AUART
+>> +	select MXS_HAVE_PLATFORM_GPMI_NFC
+> This symbol is only introduced in patch 2, so the select doesn't belong
+> here.
+>
+ok. I can move the symbol to this patch.
 
-Applying this into devel-cleanup.
+thanks.
+>>   	select MXS_HAVE_PLATFORM_MXS_MMC
+>>   	select MXS_HAVE_PLATFORM_MXSFB
+>>   	help
+>> @@ -46,6 +47,7 @@ config MACH_MX28EVK
+>>   	select MXS_HAVE_PLATFORM_AUART
+>>   	select MXS_HAVE_PLATFORM_FEC
+>>   	select MXS_HAVE_PLATFORM_FLEXCAN
+>> +	select MXS_HAVE_PLATFORM_GPMI_NFC
+>>   	select MXS_HAVE_PLATFORM_MXS_MMC
+>>   	select MXS_HAVE_PLATFORM_MXSFB
+>>   	select MXS_OCOTP
+>> diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+>> new file mode 100644
+>> index 0000000..25fc605
+>> --- /dev/null
+>> +++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+>> @@ -0,0 +1,71 @@
+>> +/*
+>> + * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License, or
+>> + * (at your option) any later version.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along
+>> + * with this program; if not, write to the Free Software Foundation, Inc.,
+>> + * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+>> + */
+>> +
+>> +#ifndef __INCLUDE_GPMI_NFC_H
+>> +#define __INCLUDE_GPMI_NFC_H
+> Applying the scheme other files in arch/arm/mach-mxs/include/mach this
+> should read:
+>
+> 	#ifndef __MACH_MXS_GPMI_NFC_H__
+>
+> (though it's not consistent, so you could choose between
+>
+> 	__MACH_MXS_GPMI_NFC_H__
+> 	__MACH_GPMI_NFC_H__
+> 	__MACH_GPMI_NFC_H
+>
+> )
+thanks.
+I will change it in the next version.
 
-Regards,
-
-Tony
+Best Regards
+Huang Shijie
+>> +
+>> +/* The size of the resource is fixed. */
+>> +#define RES_SIZE	6
+>> +
+>> +/* Resource names for the GPMI NFC driver. */
+>> +#define GPMI_NFC_GPMI_REGS_ADDR_RES_NAME  "GPMI NFC GPMI Registers"
+>> +#define GPMI_NFC_GPMI_INTERRUPT_RES_NAME  "GPMI NFC GPMI Interrupt"
+>> +#define GPMI_NFC_BCH_REGS_ADDR_RES_NAME   "GPMI NFC BCH Registers"
+>> +#define GPMI_NFC_BCH_INTERRUPT_RES_NAME   "GPMI NFC BCH Interrupt"
+>> +#define GPMI_NFC_DMA_CHANNELS_RES_NAME    "GPMI NFC DMA Channels"
+>> +#define GPMI_NFC_DMA_INTERRUPT_RES_NAME   "GPMI NFC DMA Interrupt"
+>> +
+>> +/**
+>> + * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
+>> + *
+>> + * This structure communicates platform-specific information to the GPMI NFC
+>> + * driver that can't be expressed as resources.
+>> + *
+>> + * @platform_init:           A pointer to a function the driver will call to
+>> + *                           initialize the platform (e.g., set up the pin mux).
+>> + * @platform_exit:           A pointer to a function the driver will call to
+>> + *                           exit the platform (e.g., free pins).
+>> + * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
+>> + *                           from the NAND Flash device, in nanoseconds.
+>> + * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
+>> + *                           from the NAND Flash device, in nanoseconds.
+>> + * @max_chip_count:          The maximum number of chips for which the driver
+>> + *                           should configure the hardware. This value most
+>> + *                           likely reflects the number of pins that are
+>> + *                           connected to a NAND Flash device. If this is
+>> + *                           greater than the SoC hardware can support, the
+>> + *                           driver will print a message and fail to initialize.
+>> + * @partitions:              An optional pointer to an array of partition
+>> + *                           descriptions.
+>> + * @partition_count:         The number of elements in the partitions array.
+>> + */
+>> +struct gpmi_nfc_platform_data {
+>> +	/* SoC hardware information. */
+>> +	int		(*platform_init)(void);
+>> +	void		(*platform_exit)(void);
+>> +
+>> +	/* NAND Flash information. */
+>> +	unsigned int	min_prop_delay_in_ns;
+>> +	unsigned int	max_prop_delay_in_ns;
+>> +	unsigned int	max_chip_count;
+>> +
+>> +	/* Medium information. */
+>> +	struct mtd_partition *partitions;
+>> +	unsigned	partition_count;
+>> +};
+>> +#endif
+> Best regards
+> Uwe
+>
