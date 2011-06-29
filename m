@@ -1,49 +1,185 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 29 Jun 2011 14:49:02 +0200
-Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
-	controller driver
-In-Reply-To: <20110629124214.GN21898@n2100.arm.linux.org.uk>
-References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
-	<1309335878-16678-2-git-send-email-b32955@freescale.com>
-	<20110629100658.GE1992@pengutronix.de>
-	<20110629103337.GF1992@pengutronix.de>
-	<4E0B0296.6060902@freescale.com>
-	<20110629122942.GH1992@pengutronix.de>
-	<20110629124214.GN21898@n2100.arm.linux.org.uk>
-Message-ID: <20110629124902.GI1992@pengutronix.de>
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Wed, 29 Jun 2011 18:30:38 +0530
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+Message-ID: <20110629130038.GA7909@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 01:42:14PM +0100, Russell King - ARM Linux wrote:
-> On Wed, Jun 29, 2011 at 02:29:42PM +0200, Wolfram Sang wrote:
-> > 
-> > > > Still, the problem exists: When a second channel GPMI channel is
-> > > > requested, dmaengine will return -EBUSY, because the DMAIRQ is already
-> > > > taken.
-> > > >
-> > > Yes, we should change the DMA code, it is a DMA bug.
-> > > I ever submitted a patch about the issue:
-> > > http://patchwork.ozlabs.org/patch/87145/
-> > 
-> > That approach was rejected because it would register the same handler
-> > n-times where one time would do. Your other approach puts too much
-> > mach-specific details into the driver IMO and probably won't scale very
-> > well. Maybe we should add something to the private dma_data (like flags
-> > indicating SHARED) and then do some refcounting?
+Hi,
+
+On Fri, May 27, 2011 at 06:01:28PM +0530, Ankita Garg wrote:
+> Hi,
 > 
-> Why not just request the interrupt once when the mxs-dma stuff probes,
-> rather than requesting it every time a channel is allocated?
+> Modern systems offer higher CPU performance and large amount of memory in
+> each generation in order to support application demands.  Memory subsystem has
+> began to offer wide range of capabilities for managing power consumption,
+> which is driving the need to relook at the way memory is managed by the
+> operating system. Linux VM subsystem has sophisticated algorithms to
+> optimally  manage the scarce resources for best overall system performance.
+> Apart from the capacity and location of memory areas, the VM subsystem tracks
+> special addressability restrictions in zones and relative distance from CPU as
+> NUMA nodes if necessary. Power management capabilities in the memory subsystem
+> and inclusion of different class of main memory like PCM, or non-volatile RAM,
+> brings in new boundaries and attributes that needs to be tagged within the
+> Linux VM subsystem for exploitation by the kernel and applications.
+>
 
-It is only the NAND DMA channels which share one dma-irq. All other
-channels have a seperate interrupt.
+Below is the summary of the discussion we have had on this thread so
+far, along with details of hardware capabilities and the VM requirements
+to support memory power management.
 
+Details of the hardware capabilities -
+
+1) Dynamic Power Transition: The memory controller can have the ability
+to automatically transition regions of memory into lower power states
+when they are devoid of references for a pre-defined threshold amount of
+time. Memory contents are preserved in the low power states and accessing
+memory that is at a low power state takes a latency hit.
+
+2) Dynamic Power Off: If a region is free/unallocated, the software can
+indicate to the controller to completely turn off power to a certain
+region. Memory contents are lost and hence the software has to be
+absolutely sure about the usage statistics of the particular region. This
+is a runtime capability, where the required amount of memory can be
+powered 'ON' to match the workload demands.
+
+3) Partial Array Self-Refresh (PASR): If a certain regions of memory is
+free/unallocated, the software can indicate to the controller to not
+refresh that region when the system goes to suspend-to-ram state and
+thereby save standby power consumption.
+
+Many embedded devices support one or more of the above capabilities.
+
+Given the above capabilities, different levels of support is needed in
+the OS, to exploit the hardware features. In general we need an artificial
+threshold that guards against crossing over to the next region, along with
+accurate statistics on how much memory is allocated in which region, so
+that reclaim can target the regions with less pages and possibly evacuate
+them.  Below are some details on potential approaches for each feature:
+
+I) Dynamic Power Transition
+
+The goal here is to ensure that as much as possible, on an idle system,
+the memory references do not get spread across the entire RAM, a problem
+similar to memory fragmentation. The proposed approach is as below:
+
+1) One of the first things is to ensure that the memory allocations do
+not spill over to more number of regions. Thus the allocator needs to
+be aware of the address boundary of the different regions.
+
+2) At the time of allocation, before spilling over allocations to the
+next logical region, the allocator needs to make a best attempt to
+reclaim some memory from within the existing region itself first. The
+reclaim here needs to be in LRU order within the region.  However, if
+it is ascertained that the reclaim would take a lot of time, like there
+are quite a fe write-backs needed, then we can spill over to the next
+memory region (just like our NUMA node allocation policy now).
+
+II) Dynamic Power Off & PASR
+
+The goal here is to ensure that as much as possible, on an idle system,
+memory allocations are consolidated and most of the regions are kept
+devoid of allocations.  The OS can then indicate to the controller to
+turn off power to the specific regions. The requirements and proposed
+approach is as below:
+
+1) As mentioned above, one of the first things is to ensure that memory
+is allocated sequentially across the regions and best effort is made to
+allocate memory within a region, before going over to the next one.
+
+2) Design OS callbacks to hardware, to track first page allocation and
+last page deallocation, to better communicate to the hardware about
+when to power on/off the region respectively. Alternatively, in the
+absence of such notifications also, heuristics could be used to decide
+on the threshold for the callbacks to decide when to trigger the power
+related operation.
+
+3) On some platforms like the Samsung Exynos 4210, while dynamic
+power transition takes place at one granularity, dynamic power off is
+performed at a different and a higher granularity. So, the OS needs
+to be able to associate these regions into groups, to aid in making
+allocation/deallocation/reclaim decisions.
+
+Approaches -
+
+Memory Regions
+
+> 
+>              -----------------------------
+>              |N0 |N1 |N2 |N3 |.. |.. |Nn |   
+>              -----------------------------   
+>              / \ \
+>             /   \  \
+>            /     \   \
+>  ------------    |  ------------
+>  | Mem Rgn0 |    |  | Mem Rgn3 |             
+>  ------------    |  ------------             
+>     |            |         |
+>     |      ------------    | ---------
+>     |      | Mem Rgn1 |    ->| zones |
+>     |      ------------      ---------
+>     |          |     ---------
+>     |          ----->| zones |
+>     | ---------      ---------
+>     ->| zones |
+>       ---------
+> 
+
+(a) A data structure to capture the hardware memory region boundaries
+and also enable grouping of certain regions together for the purpose of
+higher order power saving operations.
+
+(b) Enable gathering of accurate page allocation statistics on a
+per-memory region granularity
+
+(c) Allow memory to be allocated from within a hardware region first,
+target easily reclaimable pages within the current region and only then
+spill over to the other regions if memory pressure is high. In an empty
+region, allocation will happen sequentially anyway, but need a mechanism
+to do targeted reclaim in LRU order within a region, to keep allocations
+from spreading easily to other regions.
+
+(d) Targeted reclaims of memory from within a memory region when its
+utilization (allocation) is very low. Once the utilization of a region
+falls below a certain threshold, move the remaining pages to other active
+(fairly utilized) regions and evacuate the underutilized ones. This
+would basically consolidate all allocated memory into less number of
+memory regions.
+
+The proposed memory regions approach has the advantages of catering to
+all of the above requirements, but has the disadvantage of fragmenting
+zones in the system.
+
+Alternative suggestions that came up:
+
+- Hacking the buddy allocator to free up chunks of pages to exploit PASR
+
+  The buddy allocator does not take any address boundary into account.
+  However, one approach would be to keep the boundary information in a
+  parallel data structure, and at the time of allocation, look hard for
+  the pages belonging to a particular region.
+
+- Using lumpy reclaim as a mechanism to free-up region sized and aligned
+  pages from the buddy allocator, but will not help in shaping
+  allocations
+
+- The LRU reclaimer presently operates within a zone and does not take
+  into account the physical addresses. One approach could be to extend it
+  to reclaim the LRU pages within a given address range
+
+- A balloon driver to offline contiguous chunks of pages. However, we
+  would still need a mechanism to group sections that belong to the same
+  region and also bias the allocations
+
+- Modify the buddy allocator to be "picky" about when it lets you get
+  access to the regions
+ 
 -- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110629/4ebf5f45/attachment.sig>
+Regards,
+Ankita Garg (ankita at in.ibm.com)
+Linux Technology Center
+IBM India Systems & Technology Labs,
+Bangalore, India
