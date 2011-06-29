@@ -1,43 +1,39 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Wed, 29 Jun 2011 14:29:42 +0200
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 29 Jun 2011 13:38:03 +0100
 Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
 	controller driver
-In-Reply-To: <4E0B0296.6060902@freescale.com>
+In-Reply-To: <1309335878-16678-2-git-send-email-b32955@freescale.com>
 References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
 	<1309335878-16678-2-git-send-email-b32955@freescale.com>
-	<20110629100658.GE1992@pengutronix.de>
-	<20110629103337.GF1992@pengutronix.de>
-	<4E0B0296.6060902@freescale.com>
-Message-ID: <20110629122942.GH1992@pengutronix.de>
+Message-ID: <20110629123803.GM21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Jun 29, 2011 at 04:24:36PM +0800, Huang Shijie wrote:
+> +	dma_addr_t destination_phys = ~0;
+> +
+> +	if (virt_addr_valid(destination))
+> +		destination_phys = dma_map_single(dev, destination,
+> +						length, DMA_FROM_DEVICE);
+> +
+> +	if (dma_mapping_error(dev, destination_phys)) {
 
-> > Still, the problem exists: When a second channel GPMI channel is
-> > requested, dmaengine will return -EBUSY, because the DMAIRQ is already
-> > taken.
-> >
-> Yes, we should change the DMA code, it is a DMA bug.
-> I ever submitted a patch about the issue:
-> http://patchwork.ozlabs.org/patch/87145/
+This is buggy.  There is no guarantee that we'll keep using ~0 as the
+value for dma_mapping_error().  Please don't rely on this, but instead
+code this better to avoid having to play these games.
 
-That approach was rejected because it would register the same handler
-n-times where one time would do. Your other approach puts too much
-mach-specific details into the driver IMO and probably won't scale very
-well. Maybe we should add something to the private dma_data (like flags
-indicating SHARED) and then do some refcounting?
+> +static int send_page_prepare(struct gpmi_nfc_data *this,
+> +			const void *source, unsigned length,
+> +			void *alt_virt, dma_addr_t alt_phys, unsigned alt_size,
+> +			const void **use_virt, dma_addr_t *use_phys)
+> +{
+> +	dma_addr_t source_phys = ~0;
+> +	struct device *dev = this->dev;
+> +
+> +	if (virt_addr_valid(source))
+> +		source_phys = dma_map_single(dev,
+> +				(void *)source, length, DMA_TO_DEVICE);
+> +
+> +	if (dma_mapping_error(dev, source_phys)) {
 
-Regards,
-
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110629/7f3e7426/attachment.sig>
+Ditto.
