@@ -1,55 +1,135 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 19:43:31 +0100
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-In-Reply-To: <4E0B6F09.7010401@codeaurora.org>
-References: <1308923618-5333-1-git-send-email-premi@ti.com>
-	<CAMbhsRQUKBZbC3jJt8XpjTW2n7uA529D6G0g4eT5iLEHn2iNLg@mail.gmail.com>
-	<20110628225523.GA23312@n2100.arm.linux.org.uk>
-	<CAMbhsRQjMmXrULVmFg9CoM0wzZ29wcHqEaT480NaDhB8hHEKZg@mail.gmail.com>
-	<20110628231711.GC23312@n2100.arm.linux.org.uk>
-	<4E0B6F09.7010401@codeaurora.org>
-Message-ID: <20110629184331.GG23312@n2100.arm.linux.org.uk>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 29 Jun 2011 12:06:07 -0700
+Subject: [PATCH] OMAP3: run the ASM sleep code from DDR
+In-Reply-To: <20110629180535.GF23312@n2100.arm.linux.org.uk> (Russell King's
+	message of "Wed, 29 Jun 2011 19:05:35 +0100")
+References: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
+	<87mxh0tuk2.fsf@ti.com>
+	<20110629180535.GF23312@n2100.arm.linux.org.uk>
+Message-ID: <8762nosbj4.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 11:29:29AM -0700, Stephen Boyd wrote:
-> On 06/28/2011 04:17 PM, Russell King - ARM Linux wrote:
-> >
-> > That's why people have proposed hardware-timer based delay loops -
-> > these screw up the bogomips value (it no longer refers to the CPU
-> > but to the timer used for the delays) and the code proposed thus far
-> > probably has a severe negative impact on ARMs running at low clock
-> > rates (the calculation cost of the number of loops to run becomes
-> > significant for CPUs below 100MHz for short delays with the existing
-> > optimized assembler, so moving it into C and introducing function
-> > pointers will only make it worse.)
-> 
-> Am I people? ;-)
+Russell King - ARM Linux <linux@arm.linux.org.uk> writes:
 
-That depends if you're a multiple personality person!
+> On Wed, Jun 29, 2011 at 10:29:49AM -0700, Kevin Hilman wrote:
+>> Russell, if you're OK with it, can you add it to your suspend branch for
+>> the upcoming merge window?
+>
+> Yes - though I think we can go a little bit further - this patch is on
+> top of my code so far, and is untested.  There isn't a need for the
+> saving of these registers to be in assembly because we can read them
+> just as easily from C code.
 
-> The code I've proposed doesn't seem to have a negative impact on our
-> targets even when the processor is running at 19.2 Mhz. Before and after
-> the patches I get the same lpj value (this is all described in the
-> commit text). I've also shown that rewriting delay.S into C doesn't
-> negatively affect the hand optimized assembly as the before and after
-> object code is nearly identical modulo register allocation. The only
-> issue would be the one function pointer which I haven't heard anyone
-> complain about until now.
-> 
-> Even if the time to get into the __delay() routine increases by a few
-> instructions I don't see how this harms anything as udelay() is a
-> minimum time guarantee. We should strive to make it as close as possible
-> to the time requested by the caller, but we shouldn't balk at the
-> introduction of a few more cycles along the setup path. Finally, since
-> the calibration takes into account most of the new instructions I doubt
-> it will even be noticeable overhead to have the function pointers.
-> 
-> What more can I do to convince you to take this patch?
+Indeed
 
-What I'm aware of is that I did create a kernel-side parport jtag driver,
-and the limiting factor in that was udelay(), or rather udelay(1) not
-giving a delay of 1us but several us longer - and that was tracked down
-to the overhead of the CPU getting into __delay.
+> Comments?
 
-So, having experienced that problem I'm over-sensitive towards it...
+Looks good to me (although untested) care to respin on top of $SUBJECT
+patch?  
+
+Minor comments below...
+
+>  arch/arm/mach-omap2/pm.h        |    2 +-
+>  arch/arm/mach-omap2/pm34xx.c    |   19 +++++++++++++++++--
+>  arch/arm/mach-omap2/sleep34xx.S |   12 ++----------
+>  3 files changed, 20 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
+> index 45bcfce..4984cca 100644
+> --- a/arch/arm/mach-omap2/pm.h
+> +++ b/arch/arm/mach-omap2/pm.h
+> @@ -92,7 +92,7 @@ extern void omap24xx_idle_loop_suspend(void);
+>  
+>  extern void omap24xx_cpu_suspend(u32 dll_ctrl, void __iomem *sdrc_dlla_ctrl,
+>  					void __iomem *sdrc_power);
+> -extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
+> +extern void omap34xx_cpu_suspend(int save_state);
+>  extern int save_secure_ram_context(u32 *addr);
+>  extern void omap3_save_scratchpad_contents(void);
+>  
+> diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+> index 3e9a13e..6366352 100644
+> --- a/arch/arm/mach-omap2/pm34xx.c
+> +++ b/arch/arm/mach-omap2/pm34xx.c
+> @@ -78,7 +78,7 @@ struct power_state {
+>  
+>  static LIST_HEAD(pwrst_list);
+>  
+> -static void (*_omap_sram_idle)(u32 *addr, int save_state);
+> +static void (*_omap_sram_idle)(int save_state);
+>  
+>  static int (*_omap_save_secure_sram)(u32 *addr);
+>  
+> @@ -307,9 +307,22 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> +static void omap34xx_save_context(u32 *save)
+> +{
+> +	u32 val;
+> +
+> +	asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (val));
+
+Minor: for those of us who don't have all these registers memorized when
+looking at the assembly, maybe keeping the original comments (e.g. "Read
+AUX 
+
+> +	*save++ = 1;
+> +	*save++ = val;
+> +
+> +	asm("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
+> +	*save++ = 1;
+> +	*save++ = val;
+> +}
+> +
+>  static void omap34xx_do_sram_idle(unsigned long save_state)
+>  {
+> -	_omap_sram_idle(omap3_arm_context, save_state);
+> +	_omap_sram_idle(save_state);
+>  }
+>  
+>  void omap_sram_idle(void)
+> @@ -412,6 +425,8 @@ void omap_sram_idle(void)
+>  	 * get saved. The rest is placed on the stack, and restored
+>  	 * from there before resuming.
+>  	 */
+> +	if (save_state)
+> +		omap34xx_save_context(omap3_arm_context);
+>  	if (save_state == 1 || save_state == 3)
+>  		cpu_suspend(save_state, omap34xx_do_sram_idle);
+>  	else
+> diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
+> index d18f52e..3335753 100644
+> --- a/arch/arm/mach-omap2/sleep34xx.S
+> +++ b/arch/arm/mach-omap2/sleep34xx.S
+> @@ -150,8 +150,7 @@ ENTRY(omap34xx_cpu_suspend)
+>  	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
+>  
+>  	/*
+> -	 * r0 contains CPU context save/restore pointer in sdram
+> -	 * r1 contains information about saving context:
+> +	 * r0 contains information about saving context:
+>  	 *   0 - No context lost
+>  	 *   1 - Only L1 and logic lost
+>  	 *   2 - Only L2 lost (Even L1 is retained we clean it along with L2)
+> @@ -159,18 +158,11 @@ ENTRY(omap34xx_cpu_suspend)
+>  	 */
+>  
+>  	/* Directly jump to WFI is the context save is not required */
+> -	cmp	r1, #0x0
+> +	cmp	r0, #0x0
+>  	beq	omap3_do_wfi
+>  
+>  	/* Otherwise fall through to the save context code */
+>  save_context_wfi:
+> -	mov	r8, r0			@ Store SDRAM address in r8
+> -	mrc	p15, 0, r5, c1, c0, 1	@ Read Auxiliary Control Register
+> -	mov	r4, #0x1		@ Number of parameters for restore call
+> -	stmia	r8!, {r4-r5}		@ Push parameters for restore call
+> -	mrc	p15, 1, r5, c9, c0, 2	@ Read L2 AUX ctrl register
+> -	stmia	r8!, {r4-r5}		@ Push parameters for restore call
+> -
+>  	/*
+>  	 * jump out to kernel flush routine
+>  	 *  - reuse that code is better
