@@ -1,49 +1,87 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 10:22:55 +0100
-Subject: [PATCH 12/23] ARM: entry: instrument svc undefined exception handler
-	with irqtrace
+Date: Wed, 29 Jun 2011 10:23:15 +0100
+Subject: [PATCH 13/23] ARM: entry: instrument usr exception handlers with
+	irqsoff tracing
 In-Reply-To: <20110629091853.GK21898@n2100.arm.linux.org.uk>
 References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
-Message-ID: <E1Qbqz1-0002Fm-8I@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1QbqzL-0002Fq-C1@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add irqtrace function calls to the undefined exception handler, so
-that we get sane lockdep traces from locking problems in undefined
-exception handlers.
+As we no longer re-enable interrupts in these exception handlers, add
+the irqsoff tracing calls to them so that the kernel tracks the state
+more accurately.
+
+Note that these calls are conditional on IRQSOFF_TRACER:
+
+  kernel ----------> user ---------> kernel
+          ^ irqs enabled   ^ irqs disabled
+
+No kernel code can run on the local CPU until we've re-entered the
+kernel through one of the exception handlers - and userspace can not
+take any locks etc.  So, the kernel doesn't care about the IRQ mask
+state while userspace is running unless we're doing IRQ off latency
+tracing.  So, we can (and do) avoid the overhead of updating the IRQ
+mask state on every kernel->user and user->kernel transition.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/entry-armv.S |   10 ++++++++++
- 1 files changed, 10 insertions(+), 0 deletions(-)
+ arch/arm/kernel/entry-armv.S |   17 ++++++++++++++++-
+ 1 files changed, 16 insertions(+), 1 deletions(-)
 
 diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 8048056..474934c 100644
+index 474934c..c01cdb1 100644
 --- a/arch/arm/kernel/entry-armv.S
 +++ b/arch/arm/kernel/entry-armv.S
-@@ -268,6 +268,10 @@ __und_svc:
- 	svc_entry
- #endif
- 
-+#ifdef CONFIG_TRACE_IRQFLAGS
+@@ -421,6 +421,11 @@ ENDPROC(__pabt_svc)
+ 	.align	5
+ __dabt_usr:
+ 	usr_entry
++
++#ifdef CONFIG_IRQSOFF_TRACER
 +	bl	trace_hardirqs_off
 +#endif
 +
- 	@
- 	@ call emulation code, which returns using r9 if it has emulated
- 	@ the instruction, or the more conventional lr if we are to treat
-@@ -300,6 +304,12 @@ __und_svc:
- 	@ restore SPSR and restart the instruction
- 	@
- 	ldr	r5, [sp, #S_PSR]		@ Get SVC cpsr
-+#ifdef CONFIG_TRACE_IRQFLAGS
-+	tst	r5, #PSR_I_BIT
-+	bleq	trace_hardirqs_on
-+	tst	r5, #PSR_I_BIT
-+	blne	trace_hardirqs_off
+ 	kuser_cmpxchg_check
+ 	dabt_helper
+ 
+@@ -433,12 +438,12 @@ ENDPROC(__dabt_usr)
+ 	.align	5
+ __irq_usr:
+ 	usr_entry
+-	kuser_cmpxchg_check
+ 
+ #ifdef CONFIG_IRQSOFF_TRACER
+ 	bl	trace_hardirqs_off
+ #endif
+ 
++	kuser_cmpxchg_check
+ 	irq_handler
+ 	get_thread_info tsk
+ 	mov	why, #0
+@@ -451,6 +456,11 @@ ENDPROC(__irq_usr)
+ 	.align	5
+ __und_usr:
+ 	usr_entry
++
++#ifdef CONFIG_IRQSOFF_TRACER
++	bl	trace_hardirqs_off
 +#endif
- 	svc_exit r5				@ return from exception
-  UNWIND(.fnend		)
- ENDPROC(__und_svc)
++
+ 	mov	r2, r4
+ 	mov	r3, r5
+ 
+@@ -669,6 +679,11 @@ ENDPROC(__und_usr_unknown)
+ 	.align	5
+ __pabt_usr:
+ 	usr_entry
++
++#ifdef CONFIG_IRQSOFF_TRACER
++	bl	trace_hardirqs_off
++#endif
++
+ 	pabt_helper
+ 	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
 -- 
 1.7.4.4
