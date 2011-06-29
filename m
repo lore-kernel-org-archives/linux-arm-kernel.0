@@ -1,65 +1,60 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Wed, 29 Jun 2011 15:09:59 +0200
-Subject: [RFC PATCH] MTD: atmel_nand: optimize read/write buffer	functions
-In-Reply-To: <20110628145937.GG21898@n2100.arm.linux.org.uk>
-References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628111043.GH6588@pengutronix.de>
-	<20110628145937.GG21898@n2100.arm.linux.org.uk>
-Message-ID: <4E0B2427.9020202@atmel.com>
+From: nsekhar@ti.com (Nori, Sekhar)
+Date: Wed, 29 Jun 2011 18:42:22 +0530
+Subject: [RFC PATCH v4] Consolidate SRAM support
+In-Reply-To: <1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
+References: <20110512174546.GB8633@n2100.arm.linux.org.uk>
+	<1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7941B6@dbde02.ent.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 28/06/2011 16:59, Russell King - ARM Linux :
-> On Tue, Jun 28, 2011 at 01:10:43PM +0200, Uwe Kleine-K?nig wrote:
->>> @@ -265,33 +234,53 @@ err_buf:
->>>  static void atmel_read_buf(struct mtd_info *mtd, u8 *buf, int len)
->>>  {
->>>  	struct nand_chip *chip = mtd->priv;
->>> -	struct atmel_nand_host *host = chip->priv;
->>> +	u32 align;
->>> +	u8 *pbuf;
->>>  
->>>  	if (use_dma && len > mtd->oobsize)
->>>  		/* only use DMA for bigger than oob size: better performances */
->>>  		if (atmel_nand_dma_op(mtd, buf, len, 1) == 0)
->>>  			return;
->>>  
->>> -	if (host->board->bus_width_16)
->>> -		atmel_read_buf16(mtd, buf, len);
->>> -	else
->>> -		atmel_read_buf8(mtd, buf, len);
->>> +	/* if no DMA operation possible, use PIO */
->>> +	pbuf = buf;
->>> +	align = 0x03 & ((unsigned)pbuf);
->>> +
->>> +	if (align) {
->>> +		u32 align_len = 4 - align;
->>> +
->>> +		/* non aligned buffer: re-align to next word boundary */
->>> +		ioread8_rep(chip->IO_ADDR_R, pbuf, align_len);
->>> +		pbuf += align_len;
->>> +		len -= align_len;
->>> +	}
->>> +	memcpy((void *)pbuf, chip->IO_ADDR_R, len);
->> I think you don't need to cast to (void *). I think you need to cast the
->> 2nd parameter instead because sparse don't like you passing an void
->> __iomem *.
->> Is it correct to read from chip->IO_ADDR_R, don't you need
->> chip->IO_ADDR_R + align_len? Taking this into account, does it really
->> help to align pbuf?
+Hi Jean-Christophe,
+
+On Thu, May 26, 2011 at 06:32:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
 > 
-> I think you need to read Documentation/bus-virt-phys-mapping.txt,
-> particularly the part after "NOTE NOTE NOTE".
+> We have two SoCs using SRAM, both with their own allocation systems,
+> and both with their own ways of copying functions into the SRAM.
 > 
-> Dereferencing ioremap'd memory is not permitted.  That includes passing
-> it to memcpy.  Even with a cast.
+> Let's unify this before we have additional SoCs re-implementing this
+> obviously common functionality themselves.
+> 
+> For this use the generic allocator and the newly introduce
+> gen_pool_add_virt and gen_pool_virt_to_phys
+> 
+> Uio_pruss should probably take the SRAM pool pointer via
+> platform data so that it doesn't have to include Davinci specific
+> includes.
+> 
+> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+> Cc: Sekhar Nori <nsekhar@ti.com>
+> Cc: Kevin Hilman <khilman@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Sascha Hauer <kernel@pengutronix.de>
 
-So that means that I should use memcpy_fromio() even if the code if far
-less optimized.
+Is this patch slated to be merged for v3.1?
+I did not find it in linux-next.
 
-Shouldn't I re-implement some kind of IO copying function to deal with
-this IO memory so that I could take advantage of 8 words bursts?
+There is some further cleanup done by Ben
+Gardiner for DaVinci which depends on this patch.
 
-Best regards,
--- 
-Nicolas Ferre
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index f4b7dfa..5ec5e5f 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -848,6 +848,7 @@ config ARCH_DAVINCI
+>  	bool "TI DaVinci"
+>  	select GENERIC_CLOCKEVENTS
+>  	select ARCH_REQUIRE_GPIOLIB
+> +	select GENERIC_ALLOCATOR
+>  	select ZONE_DMA
+>  	select HAVE_IDE
+>  	select CLKDEV_LOOKUP
+
+Just noticed that GENERIC_ALLOCATOR is already selected
+For DaVinci (it is right below the CLKDEV_LOOKUP selection)
+so this part of the patch can be dropped.
+
+Thanks,
+Sekhar
