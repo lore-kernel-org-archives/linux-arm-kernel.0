@@ -1,231 +1,54 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 29 Jun 2011 15:54:41 +0800
-Subject: [PATCH V4 2/3] ARM: mxs: add GPMI-NFC device for imx23
-In-Reply-To: <1309334082-9501-1-git-send-email-b32955@freescale.com>
-References: <1309334082-9501-1-git-send-email-b32955@freescale.com>
-Message-ID: <1309334082-9501-3-git-send-email-b32955@freescale.com>
+From: highguy@gmail.com (Stijn Devriendt)
+Date: Wed, 29 Jun 2011 09:39:46 +0200
+Subject: [PATCH 0/2] RFC: gpio: driver-local pin configuration
+In-Reply-To: <BANLkTikkxkDBOgQpGr9ZGzqFeHLmWGg+GQ@mail.gmail.com>
+References: <1307695731-28018-1-git-send-email-linus.walleij@stericsson.com>
+	<BANLkTinxptCJRETreCpUoV-nU2K4fuFcmQ@mail.gmail.com>
+	<BANLkTimMSChGFUSnFWFHv3nNUca_Fyawaw@mail.gmail.com>
+	<20110627120256.GA19531@opensource.wolfsonmicro.com>
+	<BANLkTikpMdakfTU+RRsXQVnpO4-KGkOGJQ@mail.gmail.com>
+	<BANLkTinWmdWgGD9ui+WVV7DyCzy73S5AkQ@mail.gmail.com>
+	<BANLkTikkxkDBOgQpGr9ZGzqFeHLmWGg+GQ@mail.gmail.com>
+Message-ID: <BANLkTikxn6QQ5DF5xq7+SvKQ--F4ka0ZLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add the gpmi-nfc device for imx23.
+On Wed, Jun 29, 2011 at 8:18 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> 2011/6/28 Stijn Devriendt <highguy@gmail.com>:
+>> On Mon, Jun 27, 2011 at 2:37 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> On Mon, Jun 27, 2011 at 2:02 PM, Mark Brown
+>>>> How about device tree usage? ?I guess there we'd end up doing it by
+>>>> putting the configuration on the GPIO end of things rather than on the
+>>>> GPIO user side?
+>>>
+>>> Sorry I can't quite understand that, please elaborate!
+>>>
+>>
+>> I have some code doing this as well (in a very limited fashion):
+>>
+>> int of_request_gpio(..., int* remaining_flags)
+>> {
+>> ?of_get_gpio_flags(of_dev, i, remaining_flags)
+>> ?if (flags & bias_X) {
+>> ? ? gpio_set_bias(gpio, ...)
+>> ? ? flags &= ~bias_X
+>> ?}
+>> ?// interpret all generic flags here
+>> };
+>>
+>> So drivers need not worry about all gpio flags and special things.
+>> They just request the pin; what they receive is a fully configured
+>> pin (with the exception of unknown flags passed out via
+>> remaining_flags).
+>
+> Sorry there is something I don't get here or there is something you
+> assume, maybe.
+>
+> How does this kind of design account for the case where you need
+> to change the biasing at runtime?
+>
+You're right, it doesn't. It only accounts for preconfiguring pins from
+device-tree of platform data.
 
-Signed-off-by: Huang Shijie <b32955@freescale.com>
----
- arch/arm/mach-mxs/clock-mx23.c                  |    1 +
- arch/arm/mach-mxs/devices-mx23.h                |    4 +
- arch/arm/mach-mxs/devices/Kconfig               |    3 +
- arch/arm/mach-mxs/devices/Makefile              |    1 +
- arch/arm/mach-mxs/devices/platform-gpmi-nfc.c   |   71 +++++++++++++++++++++++
- arch/arm/mach-mxs/include/mach/devices-common.h |   10 +++
- arch/arm/mach-mxs/mach-mx23evk.c                |   37 ++++++++++++
- 7 files changed, 127 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nfc.c
-
-diff --git a/arch/arm/mach-mxs/clock-mx23.c b/arch/arm/mach-mxs/clock-mx23.c
-index 0163b6d..e190c53 100644
---- a/arch/arm/mach-mxs/clock-mx23.c
-+++ b/arch/arm/mach-mxs/clock-mx23.c
-@@ -456,6 +456,7 @@ static struct clk_lookup lookups[] = {
- 	_REGISTER_CLOCK("mxs-pwm.3", NULL, pwm_clk)
- 	_REGISTER_CLOCK("mxs-pwm.4", NULL, pwm_clk)
- 	_REGISTER_CLOCK("imx23-fb", NULL, lcdif_clk)
-+	_REGISTER_CLOCK("imx23-gpmi-nfc", NULL, gpmi_clk)
- };
- 
- static int clk_misc_init(void)
-diff --git a/arch/arm/mach-mxs/devices-mx23.h b/arch/arm/mach-mxs/devices-mx23.h
-index c6f345f..a9c495d 100644
---- a/arch/arm/mach-mxs/devices-mx23.h
-+++ b/arch/arm/mach-mxs/devices-mx23.h
-@@ -21,6 +21,10 @@ extern const struct mxs_auart_data mx23_auart_data[] __initconst;
- #define mx23_add_auart0()		mx23_add_auart(0)
- #define mx23_add_auart1()		mx23_add_auart(1)
- 
-+extern const struct mxs_gpmi_nfc_data mx23_gpmi_nfc_data __initconst;
-+#define mx23_add_gpmi_nfc(pdata)	\
-+	mxs_add_gpmi_nfc(pdata, &mx23_gpmi_nfc_data)
-+
- extern const struct mxs_mxs_mmc_data mx23_mxs_mmc_data[] __initconst;
- #define mx23_add_mxs_mmc(id, pdata) \
- 	mxs_add_mxs_mmc(&mx23_mxs_mmc_data[id], pdata)
-diff --git a/arch/arm/mach-mxs/devices/Kconfig b/arch/arm/mach-mxs/devices/Kconfig
-index acf9eea..b42a14b 100644
---- a/arch/arm/mach-mxs/devices/Kconfig
-+++ b/arch/arm/mach-mxs/devices/Kconfig
-@@ -12,6 +12,9 @@ config MXS_HAVE_PLATFORM_FLEXCAN
- 	select HAVE_CAN_FLEXCAN if CAN
- 	bool
- 
-+config MXS_HAVE_PLATFORM_GPMI_NFC
-+	bool
-+
- config MXS_HAVE_PLATFORM_MXS_I2C
- 	bool
- 
-diff --git a/arch/arm/mach-mxs/devices/Makefile b/arch/arm/mach-mxs/devices/Makefile
-index 351915c..972abdc 100644
---- a/arch/arm/mach-mxs/devices/Makefile
-+++ b/arch/arm/mach-mxs/devices/Makefile
-@@ -3,6 +3,7 @@ obj-$(CONFIG_MXS_HAVE_PLATFORM_AUART) += platform-auart.o
- obj-y += platform-dma.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_FEC) += platform-fec.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_FLEXCAN) += platform-flexcan.o
-+obj-$(CONFIG_MXS_HAVE_PLATFORM_GPMI_NFC) += platform-gpmi-nfc.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_I2C) += platform-mxs-i2c.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_MMC) += platform-mxs-mmc.o
- obj-$(CONFIG_MXS_HAVE_PLATFORM_MXS_PWM) += platform-mxs-pwm.o
-diff --git a/arch/arm/mach-mxs/devices/platform-gpmi-nfc.c b/arch/arm/mach-mxs/devices/platform-gpmi-nfc.c
-new file mode 100644
-index 0000000..5a68370
---- /dev/null
-+++ b/arch/arm/mach-mxs/devices/platform-gpmi-nfc.c
-@@ -0,0 +1,71 @@
-+/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
-+#include <asm/sizes.h>
-+#include <mach/mx23.h>
-+#include <mach/devices-common.h>
-+
-+#define RES_MEM(soc, _id, _s, _n)				\
-+	{							\
-+		.start = soc ##_## _id ## _BASE_ADDR,		\
-+		.end   = soc ##_## _id ## _BASE_ADDR + (_s) - 1,\
-+		.name  = (_n),					\
-+		.flags = IORESOURCE_MEM,			\
-+	}
-+
-+#define RES_IRQ(soc, _id, _n)			\
-+	{					\
-+		.start = soc ##_INT_## _id,	\
-+		.end   = soc ##_INT_## _id,	\
-+		.name  = (_n),			\
-+		.flags = IORESOURCE_IRQ,	\
-+	}
-+
-+#define RES_DMA(soc, _i_s, _i_e, _n)		\
-+	{					\
-+		.start = soc ##_## _i_s,	\
-+		.end   = soc ##_## _i_e,	\
-+		.name  = (_n),			\
-+		.flags = IORESOURCE_DMA,	\
-+	}
-+
-+#ifdef CONFIG_SOC_IMX23
-+const struct mxs_gpmi_nfc_data mx23_gpmi_nfc_data __initconst = {
-+	.devid = "imx23-gpmi-nfc",
-+	.res = {
-+		/* GPMI */
-+		RES_MEM(MX23, GPMI, SZ_8K, GPMI_NFC_GPMI_REGS_ADDR_RES_NAME),
-+		RES_IRQ(MX23, GPMI_ATTENTION, GPMI_NFC_GPMI_INTERRUPT_RES_NAME),
-+		/* BCH */
-+		RES_MEM(MX23, BCH, SZ_8K, GPMI_NFC_BCH_REGS_ADDR_RES_NAME),
-+		RES_IRQ(MX23, BCH, GPMI_NFC_BCH_INTERRUPT_RES_NAME),
-+		/* DMA */
-+		RES_DMA(MX23, DMA_GPMI0, DMA_GPMI3,
-+					GPMI_NFC_DMA_CHANNELS_RES_NAME),
-+		RES_IRQ(MX23, GPMI_DMA, GPMI_NFC_DMA_INTERRUPT_RES_NAME),
-+	},
-+};
-+#endif
-+
-+struct platform_device *__init
-+mxs_add_gpmi_nfc(const struct gpmi_nfc_platform_data *pdata,
-+		const struct mxs_gpmi_nfc_data *data)
-+{
-+	return mxs_add_platform_device_dmamask(data->devid, -1,
-+				data->res, RES_SIZE,
-+				pdata, sizeof(*pdata), DMA_BIT_MASK(32));
-+}
-diff --git a/arch/arm/mach-mxs/include/mach/devices-common.h b/arch/arm/mach-mxs/include/mach/devices-common.h
-index 812d7a8..e032120 100644
---- a/arch/arm/mach-mxs/include/mach/devices-common.h
-+++ b/arch/arm/mach-mxs/include/mach/devices-common.h
-@@ -66,6 +66,16 @@ struct platform_device *__init mxs_add_flexcan(
- 		const struct mxs_flexcan_data *data,
- 		const struct flexcan_platform_data *pdata);
- 
-+/* gpmi-nfc */
-+#include <mach/gpmi-nfc.h>
-+struct mxs_gpmi_nfc_data {
-+	const char *devid;
-+	const struct resource res[RES_SIZE];
-+};
-+struct platform_device *__init
-+mxs_add_gpmi_nfc(const struct gpmi_nfc_platform_data *pdata,
-+		const struct mxs_gpmi_nfc_data *data);
-+
- /* i2c */
- struct mxs_mxs_i2c_data {
- 	int id;
-diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
-index 3c2de33..772b373 100644
---- a/arch/arm/mach-mxs/mach-mx23evk.c
-+++ b/arch/arm/mach-mxs/mach-mx23evk.c
-@@ -107,6 +107,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
- 		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
- };
- 
-+/* gpmi-nfc */
-+#define MXS_PAD_GPMI_NFC	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
-+static iomux_cfg_t mx23evk_gpmi_nfc_pads[] = {
-+	MX23_PAD_GPMI_D00__GPMI_D00 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_D01__GPMI_D01 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_D02__GPMI_D02 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_D03__GPMI_D03 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_D04__GPMI_D04 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_D05__GPMI_D05 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_D06__GPMI_D06 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_D07__GPMI_D07 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_WPN__GPMI_WPN | MXS_PAD_GPMI_NFC,
-+	MX23_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_GPMI_NFC,
-+	MX23_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_GPMI_NFC,
-+	MX23_PAD_GPMI_RDY0__GPMI_RDY0 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_RDY1__GPMI_RDY1 | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
-+	MX23_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
-+};
-+
-+static int mx23evk_gpmi_nfc_platform_init(void)
-+{
-+	return mxs_iomux_setup_multiple_pads(mx23evk_gpmi_nfc_pads,
-+				ARRAY_SIZE(mx23evk_gpmi_nfc_pads));
-+}
-+
-+static const
-+struct gpmi_nfc_platform_data mx23evk_gpmi_nfc_data __initconst = {
-+	.platform_init		= mx23evk_gpmi_nfc_platform_init,
-+	.min_prop_delay_in_ns	= 5,
-+	.max_prop_delay_in_ns	= 9,
-+	.max_chip_count		= 1,
-+};
-+
- /* mxsfb (lcdif) */
- static struct fb_videomode mx23evk_video_modes[] = {
- 	{
-@@ -166,6 +202,7 @@ static void __init mx23evk_init(void)
- 	else
- 		gpio_set_value(MX23EVK_BL_ENABLE, 1);
- 
-+	mx23_add_gpmi_nfc(&mx23evk_gpmi_nfc_data);
- 	mx23_add_mxsfb(&mx23evk_mxsfb_pdata);
- }
- 
--- 
-1.7.0.4
+Regards,
+Stijn
