@@ -1,80 +1,53 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Jun 2011 09:58:50 +0100
-Subject: [next][bug] rcu_dyntick_kick_cpu() kills ARM SMP.
-In-Reply-To: <20110628172513.GB2294@linux.vnet.ibm.com>
-References: <4E09EE75.9040204@arm.com>
-	<20110628172513.GB2294@linux.vnet.ibm.com>
-Message-ID: <4E0AE94A.7000306@arm.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Wed, 29 Jun 2011 12:00:32 +0300
+Subject: [PATCH V3 0/9] pxa3xx_nand: add two chip select support
+In-Reply-To: <1309319494-17951-1-git-send-email-leiwen@marvell.com>
+References: <1309246361.23597.30.camel@sauron>
+	<1309319494-17951-1-git-send-email-leiwen@marvell.com>
+Message-ID: <4E0AE9B0.7000908@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/06/11 18:25, Paul E. McKenney wrote:
-> On Tue, Jun 28, 2011 at 04:08:37PM +0100, Marc Zyngier wrote:
->> Paul,
->>
->> I've updated my -next tree (to next-20110628) today, and discovered 
->> that my favorite ARM board wouldn't boot anymore:
->>
->> [...]
->> Hierarchical RCU implementation.
->> NR_IRQS:128 nr_irqs:128 128
->> Console: colour dummy device 80x30
->> Calibrating delay loop... 83.35 BogoMIPS (lpj=416768)
->> pid_max: default: 32768 minimum: 301
->> Mount-cache hash table entries: 512
->> CPU: Testing write buffer coherency: ok
->> Calibrating local timer... 104.04MHz.
->> CPU1: Booted secondary processor
->> CPU1: Unknown IPI message 0x1
->> CPU2: Booted secondary processor
->> CPU2: Unknown IPI message 0x1
->> CPU3: Booted secondary processor
->> CPU3: Unknown IPI message 0x1
->> Brought up 4 CPUs
->> SMP: Total of 4 processors activated (333.92 BogoMIPS).
->> ------------[ cut here ]------------
->> WARNING: at kernel/smp.c:320 smp_call_function_single+0xe4/0x1c0()
->> NET: Registered protocol family 16
->> Modules linked in:
->> [<c00415d4>] (unwind_backtrace+0x0/0xf4) from [<c0056184>] (warn_slowpath_common+0x4c/0x64)
->> [<c0056184>] (warn_slowpath_common+0x4c/0x64) from [<c00561b8>] (warn_slowpath_null+0x1c/0x24)
->> [<c00561b8>] (warn_slowpath_null+0x1c/0x24) from [<c0088218>] (smp_call_function_single+0xe4/0x1c0)
->> [<c0088218>] (smp_call_function_single+0xe4/0x1c0) from [<c0094804>] (rcu_start_gp+0x184/0x310)
->> [<c0094804>] (rcu_start_gp+0x184/0x310) from [<c00955b0>] (__rcu_process_callbacks+0x274/0x398)
->> [<c00955b0>] (__rcu_process_callbacks+0x274/0x398) from [<c0095708>] (rcu_process_callbacks+0x34/0x5c)
->> [<c0095708>] (rcu_process_callbacks+0x34/0x5c) from [<c005c964>] (__do_softirq+0xa4/0x16c)
->> [<c005c964>] (__do_softirq+0xa4/0x16c) from [<c005cc0c>] (irq_exit+0x80/0x9c)
->> [<c005cc0c>] (irq_exit+0x80/0x9c) from [<c00353cc>] (do_local_timer+0x54/0x70)
->> [<c00353cc>] (do_local_timer+0x54/0x70) from [<c003b618>] (__irq_svc+0x38/0xc0)
->> Exception stack(0xdf467f90 to 0xdf467fd8)
->> 7f80:                                     df466000 00000000 df467fd8 00000000
->> 7fa0: df466000 c045dd24 c034f6cc 00000000 c0445514 410fb020 70409ddc 00000000
->> 7fc0: 00000000 df467fd8 c003c4ac c003c4b0 60000013 ffffffff
->> [<c003b618>] (__irq_svc+0x38/0xc0) from [<c003c4b0>] (default_idle+0x24/0x28)
->> [<c003c4b0>] (default_idle+0x24/0x28) from [<c003ccd0>] (cpu_idle+0x9c/0xdc)
->> [<c003ccd0>] (cpu_idle+0x9c/0xdc) from [<70348734>] (0x70348734)
->> ---[ end trace 1b75b31a2719ed1c ]---
->>
->> ... and here it dies.
->>
->> The offending commit is b983032b7 (rcu: Avoid grace-period overflow for 
->> long dyntick-idle periods). rcu_dyntick_kick_cpu() tries to do a CPU 
->> cross-call with interrupts disabled, which kills the box. Reverting this
->> patch results in a working system.
-> 
-> That does sound problematic...
-> 
->> My RCU-foo being rather low, I haven't dug deeper into this. Please let
->> me know if you want me to test anything.
-> 
-> I will put together a patch to defer the actual cross-call until irqs
-> are enabled.  The call would be from softirq -- that is OK, correct?
+Hi Lei,
 
-That should indeed fix the problem, as interrupts are normally enabled
-in softirq.
+On 06/29/11 06:51, Lei Wen wrote:
 
-Cheers,
+> V2:
+> Choose to at most keep original pxa3xx_nand_info structure to reduce
+> patch size
+>
+> V3:
+> Seperate original one patch into a patch set
+>
+> Lei Wen (9):
+>   MTD: pxa3xx_nand: convert all printk into dev_*
+>   MTD: pxa3xx_nand: enable multiple chip select support
+>   ARM: aspenite: fix nand platform data
+>   ARM: cm-x300: fix nand platform data
+>   ARM: colibri-pxa3xx: fix nand platform data
+>   ARM: littleton: fix nand platform data
+>   ARM: mxm8x10: fix nand platform data
+>   ARM: raumfeld: fix nand platform data
+>   ARM: zylonite: fix nand platform data
 
-	M.
+While I agree with Artem, that reviewing patch sets are much more easier,
+than a one single big patch, I think you should keep the
+"fix nand platform data" changes all in one patch.
+All of them do the same change, but for different boards.
+
+>  arch/arm/mach-mmp/aspenite.c                 |    5 +-
+>  arch/arm/mach-pxa/cm-x300.c                  |    5 +-
+>  arch/arm/mach-pxa/colibri-pxa3xx.c           |    5 +-
+>  arch/arm/mach-pxa/littleton.c                |    5 +-
+>  arch/arm/mach-pxa/mxm8x10.c                  |    9 +-
+>  arch/arm/mach-pxa/raumfeld.c                 |    5 +-
+>  arch/arm/mach-pxa/zylonite.c                 |    5 +-
+>  arch/arm/plat-pxa/include/plat/pxa3xx_nand.h |   19 +-
+>  drivers/mtd/nand/pxa3xx_nand.c               |  512 +++++++++++++++-----------
+>  9 files changed, 346 insertions(+), 224 deletions(-)
+>
+>
+
 -- 
-Jazz is not dead. It just smells funny...
+Regards,
+Igor.
