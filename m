@@ -1,31 +1,45 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 14:31:24 +0100
-Subject: [RFC PATCH] MTD: atmel_nand: optimize read/write buffer functions
-In-Reply-To: <4E0B2427.9020202@atmel.com>
-References: <1309261856-27402-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110628111043.GH6588@pengutronix.de>
-	<20110628145937.GG21898@n2100.arm.linux.org.uk>
-	<4E0B2427.9020202@atmel.com>
-Message-ID: <20110629133124.GO21898@n2100.arm.linux.org.uk>
+From: jean.pihet@newoldbits.com (Jean Pihet)
+Date: Wed, 29 Jun 2011 15:32:24 +0200
+Subject: [PATCHv2 0/4] ARM: pmu: improve PMU type identification
+In-Reply-To: <20110629104213.GC2589@pulham.picochip.com>
+References: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
+	<20110629092622.GL21898@n2100.arm.linux.org.uk>
+	<20110629093652.GH1181@e102144-lin.cambridge.arm.com>
+	<20110629104213.GC2589@pulham.picochip.com>
+Message-ID: <BANLkTimWRz=h4RpBT9sWKkfMTKANGF_+gA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 03:09:59PM +0200, Nicolas Ferre wrote:
-> Le 28/06/2011 16:59, Russell King - ARM Linux :
-> > I think you need to read Documentation/bus-virt-phys-mapping.txt,
-> > particularly the part after "NOTE NOTE NOTE".
-> > 
-> > Dereferencing ioremap'd memory is not permitted.  That includes passing
-> > it to memcpy.  Even with a cast.
-> 
-> So that means that I should use memcpy_fromio() even if the code if far
-> less optimized.
-> 
-> Shouldn't I re-implement some kind of IO copying function to deal with
-> this IO memory so that I could take advantage of 8 words bursts?
+On Wed, Jun 29, 2011 at 12:42 PM, Jamie Iles <jamie@jamieiles.com> wrote:
+> On Wed, Jun 29, 2011 at 10:36:53AM +0100, Will Deacon wrote:
+Hi Will,
 
-You could improve the IO memcpy/set etc implementations, which are
-currently mostly unloved - I think that's a catch-22 which really needs
-solving.  They're not efficient because no one has taken the time to use
-them, and everyone's avoiding them because they're not very efficient.
-So, as no one's using them no one's motivated to improve them.
+>> Russell,
+>>
+>> On Wed, Jun 29, 2011 at 10:26:22AM +0100, Russell King - ARM Linux wrote:
+>> > On Wed, Jun 15, 2011 at 03:40:00PM +0100, Mark Rutland wrote:
+>> > > can be used similarly (the macros make entries look identical apart from the
+>> > > {plat,of} prefix). This allows us to stop (ab)using platform_device::id, and
+>> > > should allow for easier addition/modification of PMU driver bindings.
+>> > >
+>> > > BSPs need no longer care about the Type of PMUs they register; as long as a
+>> > > binding exists the type will be assigned correctly.
+>> >
+>> > Could someone please look at adding an entry to the MAINTAINERS file
+>> > for the ARM PMU stuff, so we know who should be looking after this stuff?
+>>
+>> I'm happy to maintain this stuff if nobody has any objections.
+>
+> No objections from me, I think that sounds like a very good idea!
+No objections! I would be glad to lend a hand if neeeded!
+
+Regards,
+Jean
+>
+> Jamie
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
