@@ -1,69 +1,165 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 29 Jun 2011 10:59:09 -0700
-Subject: [PATCH 4/5] ASoC: atmel_ssc_dai/atmel-pcm: adapt to dmaengine
-	usage
-In-Reply-To: <7fd26c605d5cfa422d0fc37a7b790fb9a837d7e3.1309368631.git.nicolas.ferre@atmel.com>
-References: <7fd26c605d5cfa422d0fc37a7b790fb9a837d7e3.1309368631.git.nicolas.ferre@atmel.com>
-Message-ID: <20110629175905.GC13051@opensource.wolfsonmicro.com>
+From: swarren@nvidia.com (Stephen Warren)
+Date: Wed, 29 Jun 2011 14:23:12 -0700
+Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
+In-Reply-To: <BANLkTinXKgdcsGPxGUbS7sv71mQi8eL_bQ@mail.gmail.com>
+References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04992C02AC@HQMAIL01.nvidia.com>
+	<BANLkTinNmPVEM4Eu4efxkuwrCU_FVWFaAg@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04992C049D@HQMAIL01.nvidia.com>
+	<BANLkTikFLbU70uJO0yrf8HipcVEwbUHgsw@mail.gmail.com>
+	<74CDBE0F657A3D45AFBB94109FB122FF04992C07E1@HQMAIL01.nvidia.com>
+	<BANLkTinXKgdcsGPxGUbS7sv71mQi8eL_bQ@mail.gmail.com>
+Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E21B833@HQMAIL01.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 08:00:18PM +0200, Nicolas Ferre wrote:
+Linus Walleij wrote at Monday, June 27, 2011 8:35 AM:
+> On Thu, Jun 16, 2011 at 9:10 PM, Stephen Warren <swarren@nvidia.com> wrote:
 
-> +static const struct snd_pcm_hardware atmel_pcm_dma_hardware = {
-> +	.info			= SNDRV_PCM_INFO_MMAP |
-> +				  SNDRV_PCM_INFO_MMAP_VALID |
+...
+> > Now, we can have multiple entries with the same .map_name:
+> >
+> > static struct pinmux_map pmx_mapping[] = {
+> > ? ? ? {
+> > ? ? ? ? ? ? ? .dev_name = "tegra-sdhci.0",
+> > ? ? ? ? ? ? ? .map_name = "4 bit", # Note this is 4 now
+> > ? ? ? ? ? ? ? .function = "mmc0-1:0",
+> > ? ? ? },
+> > ? ? ? {
+> > ? ? ? ? ? ? ? .dev_name = "tegra-sdhci.0",
+> > ? ? ? ? ? ? ? .map_name = "4 bit",
+> > ? ? ? ? ? ? ? .function = "mmc0-3:2",
+> > ? ? ? },
+> >
+> > This means that if a client request map name "4 bit", then both functions
+> > "mmc0-1:0" and "mmc0-3:2" are part of that mapping.
+> 
+> (...)
+> 
+> > In terms of implementation, this is still pretty easy; all we do when
+> > reserving or activating a given mapping is to walk the entire list, find
+> > *all* entries that match the client's search terms, and operate on all of
+> > them, instead of stopping at the first one.
+> 
+> So:
+> pmx = pinmux_get(dev, "4 bit");
+> 
+> in this case would reserve pins for two functions on pinmux_get() and
+> activate two different functions after one another when
+> we pinmux_enable(pmx) on this, "mmc0-1:0" and "mmc0-3:2" in some
+> undefined order (inferenced across namespace).
+> 
+> I don't think it's as simple as you say, this gets hairy pretty quickly:
+> 
+> Since my previous pinmux_get() would create a struct pinmux * cookie
+> for each map entry, assuming a 1:1 relationship between map entries
+> and pinmuxes, we now break this, and you need to introduce
+> more complex logic to search through the pinmux_list and dynamically
+> add more functions to each entry with a matching map_name.
 
-The naming here looks a bit undescriptive but I'm not sure what a better
-name would be - obviously both DMA controllers are DMA controllers.  It
-feels like it would be more sensible to just write a separate DMA driver
-as I'm not sure how much code actually ends up being shared here but it
-looks pretty small from the diff...
+In the patch you posted, pinmux_get looked up a single specific
+pinmux_map* and stored it in the struct pinmux. You're right that
+continuing to do something similar means needing to store an array of
+pinmux_map* in the struct pinmux, and dynamically adding more and more
+entries as you search through the mapping table. A bit painful.
 
-> +static bool filter(struct dma_chan *chan, void *slave)
-> +{
-> +	struct	at_dma_slave		*sl = slave;
-> +
+However, if instead of that, you store the original parameters to
+pinmux_get() in struct pinmux, there's nothing to dynamically store
+there. Instead, the implementation of pinmux_get and pinmux_enable is
+very roughly:
 
-Odd whitespace here.
+pinmux_get:
 
-> +static int atmel_pcm_dma_alloc(struct snd_pcm_substream *substream,
-> +	struct snd_pcm_hw_params *params)
-> +{
-> +	struct snd_pcm_runtime *runtime = substream->runtime;
-> +	struct atmel_runtime_data *prtd = runtime->private_data;
-> +	struct ssc_device *ssc = prtd->params->ssc;
-> +	struct at_dma_slave *sdata = NULL;
-> +
-> +	if (ssc->pdev)
-> +		sdata = ssc->pdev->dev.platform_data;
+Allocate struct pinmux, fill it in:
+list_for_each_entry(mapping table)
+    if (matches search terms)
+        check_not_already_in_use
+        acquire_pins()
+        // Note: no break here
 
-Why wouldn't we have a device, and why is there a separate copy of the
-device?
+pinmux_enable:
 
-> +	if (!prtd->dma_chan) {
-> +		pr_err("atmel-pcm: "
-> +			"DMA channel not available, unable to use SSC-audio\n");
-> +		return -EBUSY;
+// Note we redo the whole search here based on the original terms
+// rather than having pinmux_get pre-calculate the search result
+list_for_each_entry(mapping table)
+    if (matches search terms)
+        ops->enable()
 
-dev_err() and don't split strings over lines.
+In fact, I'd imagine that the list_for_each_entry call above could be
+placed into a utility function that implements the searching logic, to
+keep the code in one place, with a function parameter:
 
-> +	switch (prtd->params->data_xfer_size) {
-> +	case 1:
-> +		buswidth = DMA_SLAVE_BUSWIDTH_1_BYTE;
-> +		break;
-> +	case 2:
-> +		buswidth = DMA_SLAVE_BUSWIDTH_2_BYTES;
-> +		break;
-> +	case 4:
-> +		buswidth = DMA_SLAVE_BUSWIDTH_4_BYTES;
-> +		break;
-> +	default:
-> +		return;
-> +	}
+pinmux_search(terms, callback):
 
-It strikes me that this mapping of bytes to DMA_SLAVE_ is likely to be
-quite common and might be nice as a helper in dmaengine.
+list_for_each_entry(mapping table)
+    if (matches search terms)
+        callback()
 
-I'd also expect to see something complain (even if just with BUG()) if we
-hit the default case.
+pinmux_get_body():
+    check_not_already_in_use
+    acquire_pins()
+
+pinmux_get(terms):
+
+Allocate struct pinmux, fill it in:
+pinmux_search(terms, pinmux_get_body)
+
+pinmux_enable_body():
+    ops->enable()
+
+pinmux_enable():
+
+pinmux_search(terms, pinmux_enable_body)
+
+Alternatively, each map entry contains a list node that's set up.
+The list is set up by pinmux_get, and contains all mapping entries
+associated with the original search terms. Struct pinmux points at
+the head of the list. pinmux_enable then just needs to iterate over
+that list, not the whole mapping array, and doesn't need to implement
+the search algorithm. That might actually be simpler. Since each
+mapping entry would only be get'd once, there'd be no conflicts with
+multiple things trying to use the one list node at once.
+
+> Then you need to take care of the case where acquiring pins for
+> one of the functions fail: then you need to go back and free the
+> already acquired pins in the error path.
+
+That's not that hard; just iterate over the whole list again, applying
+a function that undoes what you did before. It's just like the error
+handling code that already exists in acquire_pins for example. The only
+hard part might be stopping when you get to the point you already got
+to in the first loop, but actually that's just a matter of passing in
+a "stop at this index" parameter to the pinmux_search() I mentioned
+above.
+
+> I tried quickly to see if I could code this up, and it got very complex
+> real quick, sadly. Maybe if I can just get to iterate a v4 first, I
+> could venture down this track.
+> 
+> But if you can code up the patch for this, I'm pretty much game for
+> it!
+
+Sure, I can add the extra looping to the code if you want. It'd be easiest
+if you set up the data structures in the initial patch such that all the
+fields exist in the mapping table (i.e. how I showed in the concept header
+files I posted). That way, there'd be no type or semantic changes in my
+patch, just support for acting on N instead of just 1 mapping entry at a
+time.
+
+...
+> > * The same point, but think about a SW bit-banged bus consisting of 8
+> > GPIOs for the bus and 100 pins on the device. Each permutation of 8 out
+> > of 100 is scary... I'd love a board to be able to represent a single
+> > mapping for a particular board's set of GPIOs in this case, but not for
+> > the pinmux driver to expose all possibilities!
+> 
+> Is this a real world problem or a theoretical one? Seems like the
+> latter, and as stated in the documentation this subsystem is not about
+> solving discrete maths permutation spaces, but practical enumerations.
+
+That's theoretical in terms of the boards/code I'm currently dealing with.
+However, solving this seems pretty simple, and I can't imagine nobody will
+ever want to do that.
+
+-- 
+nvpublic
