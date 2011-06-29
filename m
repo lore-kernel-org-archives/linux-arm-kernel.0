@@ -1,185 +1,74 @@
-From: ankita@in.ibm.com (Ankita Garg)
-Date: Wed, 29 Jun 2011 18:30:38 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-Message-ID: <20110629130038.GA7909@in.ibm.com>
+From: wolfgang.betz@st.com (Wolfgang BETZ)
+Date: Wed, 29 Jun 2011 15:05:42 +0200
+Subject: [PATCH 1/1] Add Thread Support for the Context ID Register of
+	ARM v6 & v7 Architectures
+In-Reply-To: <20110628090004.GA16009@e102144-lin.cambridge.arm.com>
+References: <cover.1309163073.git.wolfgang.betz@st.com>
+	<3a6d2636489958d097cd013cad646fed012421dd.1309163073.git.wolfgang.betz@st.com>
+	<20110627113707.GD16103@n2100.arm.linux.org.uk>
+	<20110628090004.GA16009@e102144-lin.cambridge.arm.com>
+Message-ID: <4E0B2326.8090808@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Ciao Will,
 
-On Fri, May 27, 2011 at 06:01:28PM +0530, Ankita Garg wrote:
-> Hi,
-> 
-> Modern systems offer higher CPU performance and large amount of memory in
-> each generation in order to support application demands.  Memory subsystem has
-> began to offer wide range of capabilities for managing power consumption,
-> which is driving the need to relook at the way memory is managed by the
-> operating system. Linux VM subsystem has sophisticated algorithms to
-> optimally  manage the scarce resources for best overall system performance.
-> Apart from the capacity and location of memory areas, the VM subsystem tracks
-> special addressability restrictions in zones and relative distance from CPU as
-> NUMA nodes if necessary. Power management capabilities in the memory subsystem
-> and inclusion of different class of main memory like PCM, or non-volatile RAM,
-> brings in new boundaries and attributes that needs to be tagged within the
-> Linux VM subsystem for exploitation by the kernel and applications.
+thanks a lot for your statement regarding the ASID overflow issue.
+In fact, we have never even tried to resolve this issue, not only 
+because most likely there is no perfect solution to it in current 
+implementations (i.e. v6 & v7 architectures), but also because it was 
+out of our scope.
+In STMicroelectronics we are simply customers of Lauterbach's TRACE32 
+tool and are very interested in getting an as precise as possible 
+insight in what goes on in our systems when running Linux based 
+environments, with a particular focus on SMP. Together with Lauterbach 
+we are currently working on improving their tool with respect to SMP in 
+general and the tracing of context switches in particular. One result of 
+this collaboration is the patch I have submitted to the ARM kernel 
+mailing list this Monday.
+Again, we do not aim in improving the handling of ASIDs, but are just 
+caring about getting also the current process ID out of the trace logic. 
+As the way to achieve this is not platform-specific, we thought it might 
+be a good idea to implement it as an architectural feature and provide 
+it through a kernel configuration variable (THREAD_CONTEXTID) for any 
+platform supporting the CONTEXTIDR.
+Furthermore, we thought it would be a good thing to mainline this 
+modification and provide it to the open-source community. I do not know 
+if you had the time to take a closer look to our patch, but for sure 
+your feedback would be more than welcome.
+
+Best regards,
+Wolfgang
+
+
+On 06/28/2011 11:00 AM, Will Deacon wrote:
+> Hi Russell,
 >
-
-Below is the summary of the discussion we have had on this thread so
-far, along with details of hardware capabilities and the VM requirements
-to support memory power management.
-
-Details of the hardware capabilities -
-
-1) Dynamic Power Transition: The memory controller can have the ability
-to automatically transition regions of memory into lower power states
-when they are devoid of references for a pre-defined threshold amount of
-time. Memory contents are preserved in the low power states and accessing
-memory that is at a low power state takes a latency hit.
-
-2) Dynamic Power Off: If a region is free/unallocated, the software can
-indicate to the controller to completely turn off power to a certain
-region. Memory contents are lost and hence the software has to be
-absolutely sure about the usage statistics of the particular region. This
-is a runtime capability, where the required amount of memory can be
-powered 'ON' to match the workload demands.
-
-3) Partial Array Self-Refresh (PASR): If a certain regions of memory is
-free/unallocated, the software can indicate to the controller to not
-refresh that region when the system goes to suspend-to-ram state and
-thereby save standby power consumption.
-
-Many embedded devices support one or more of the above capabilities.
-
-Given the above capabilities, different levels of support is needed in
-the OS, to exploit the hardware features. In general we need an artificial
-threshold that guards against crossing over to the next region, along with
-accurate statistics on how much memory is allocated in which region, so
-that reclaim can target the regions with less pages and possibly evacuate
-them.  Below are some details on potential approaches for each feature:
-
-I) Dynamic Power Transition
-
-The goal here is to ensure that as much as possible, on an idle system,
-the memory references do not get spread across the entire RAM, a problem
-similar to memory fragmentation. The proposed approach is as below:
-
-1) One of the first things is to ensure that the memory allocations do
-not spill over to more number of regions. Thus the allocator needs to
-be aware of the address boundary of the different regions.
-
-2) At the time of allocation, before spilling over allocations to the
-next logical region, the allocator needs to make a best attempt to
-reclaim some memory from within the existing region itself first. The
-reclaim here needs to be in LRU order within the region.  However, if
-it is ascertained that the reclaim would take a lot of time, like there
-are quite a fe write-backs needed, then we can spill over to the next
-memory region (just like our NUMA node allocation policy now).
-
-II) Dynamic Power Off & PASR
-
-The goal here is to ensure that as much as possible, on an idle system,
-memory allocations are consolidated and most of the regions are kept
-devoid of allocations.  The OS can then indicate to the controller to
-turn off power to the specific regions. The requirements and proposed
-approach is as below:
-
-1) As mentioned above, one of the first things is to ensure that memory
-is allocated sequentially across the regions and best effort is made to
-allocate memory within a region, before going over to the next one.
-
-2) Design OS callbacks to hardware, to track first page allocation and
-last page deallocation, to better communicate to the hardware about
-when to power on/off the region respectively. Alternatively, in the
-absence of such notifications also, heuristics could be used to decide
-on the threshold for the callbacks to decide when to trigger the power
-related operation.
-
-3) On some platforms like the Samsung Exynos 4210, while dynamic
-power transition takes place at one granularity, dynamic power off is
-performed at a different and a higher granularity. So, the OS needs
-to be able to associate these regions into groups, to aid in making
-allocation/deallocation/reclaim decisions.
-
-Approaches -
-
-Memory Regions
-
-> 
->              -----------------------------
->              |N0 |N1 |N2 |N3 |.. |.. |Nn |   
->              -----------------------------   
->              / \ \
->             /   \  \
->            /     \   \
->  ------------    |  ------------
->  | Mem Rgn0 |    |  | Mem Rgn3 |             
->  ------------    |  ------------             
->     |            |         |
->     |      ------------    | ---------
->     |      | Mem Rgn1 |    ->| zones |
->     |      ------------      ---------
->     |          |     ---------
->     |          ----->| zones |
->     | ---------      ---------
->     ->| zones |
->       ---------
-> 
-
-(a) A data structure to capture the hardware memory region boundaries
-and also enable grouping of certain regions together for the purpose of
-higher order power saving operations.
-
-(b) Enable gathering of accurate page allocation statistics on a
-per-memory region granularity
-
-(c) Allow memory to be allocated from within a hardware region first,
-target easily reclaimable pages within the current region and only then
-spill over to the other regions if memory pressure is high. In an empty
-region, allocation will happen sequentially anyway, but need a mechanism
-to do targeted reclaim in LRU order within a region, to keep allocations
-from spreading easily to other regions.
-
-(d) Targeted reclaims of memory from within a memory region when its
-utilization (allocation) is very low. Once the utilization of a region
-falls below a certain threshold, move the remaining pages to other active
-(fairly utilized) regions and evacuate the underutilized ones. This
-would basically consolidate all allocated memory into less number of
-memory regions.
-
-The proposed memory regions approach has the advantages of catering to
-all of the above requirements, but has the disadvantage of fragmenting
-zones in the system.
-
-Alternative suggestions that came up:
-
-- Hacking the buddy allocator to free up chunks of pages to exploit PASR
-
-  The buddy allocator does not take any address boundary into account.
-  However, one approach would be to keep the boundary information in a
-  parallel data structure, and at the time of allocation, look hard for
-  the pages belonging to a particular region.
-
-- Using lumpy reclaim as a mechanism to free-up region sized and aligned
-  pages from the buddy allocator, but will not help in shaping
-  allocations
-
-- The LRU reclaimer presently operates within a zone and does not take
-  into account the physical addresses. One approach could be to extend it
-  to reclaim the LRU pages within a given address range
-
-- A balloon driver to offline contiguous chunks of pages. However, we
-  would still need a mechanism to group sections that belong to the same
-  region and also bias the allocations
-
-- Modify the buddy allocator to be "picky" about when it lets you get
-  access to the regions
- 
--- 
-Regards,
-Ankita Garg (ankita at in.ibm.com)
-Linux Technology Center
-IBM India Systems & Technology Labs,
-Bangalore, India
+> On Mon, Jun 27, 2011 at 12:37:08PM +0100, Russell King - ARM Linux wrote:
+>> On Mon, Jun 27, 2011 at 01:12:27PM +0200, Wolfgang BETZ wrote:
+>>> The aim of this patch is to enable thread support in the context ID register
+>>> (CONTEXTIDR) as it comes with ARM architectures v6&  v7.
+>>>
+>>>   On ARMv6&  v7, we have the following structure in the context ID:
+>>>
+>>>     31                         7          0
+>>>     +-------------------------+-----------+
+>>>     |      process ID         |   ASID    |
+>>>     +-------------------------+-----------+
+>>>     |              context ID             |
+>>>     +-------------------------------------+
+>>>
+>>> - The ASID is used to tag entries in the CPU caches and TLBs.
+>>> - The context ID is used by debuggers and trace logic, and
+>>>    should be unique within all running processes.
+>> When I added ARMv6 and v7 support to the kernel, I purposely ignored that
+>> detail because it's silly.
+> [...]
+>
+>> How are you working around this issue?
+> I don't know how you could get around this with current implementations, but
+> for Cortex-A15 w/ LPAE the ASID lives in the TTBR rather than the context
+> ID register, so using the PID is straightforward in that case.
+>
+> Will
+>
