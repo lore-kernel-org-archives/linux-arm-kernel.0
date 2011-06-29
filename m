@@ -1,93 +1,140 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 10:23:55 +0100
-Subject: [PATCH 15/23] ARM: entry: re-allocate registers in irq entry
-	assembly macros
+Date: Wed, 29 Jun 2011 10:24:15 +0100
+Subject: [PATCH 16/23] ARM: entry: prefetch abort: tail-call the main
+	prefetch abort handler
 In-Reply-To: <20110629091853.GK21898@n2100.arm.linux.org.uk>
 References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
-Message-ID: <E1Qbqzz-0002Fz-Is@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Qbr0J-0002G3-M8@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This avoids the irq entry assembly corrupting r5, thereby allowing it
-to be preserved through to the svc exit code.
+Tail-call the main C prefetch abort handler code from the per-CPU
+helper code.  Also note that the helper function becomes ABI
+compliant in terms of the registers preserved.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/include/asm/entry-macro-multi.S |   14 +++++++-------
- arch/arm/kernel/entry-armv.S             |   10 +++++-----
- 2 files changed, 12 insertions(+), 12 deletions(-)
+ arch/arm/kernel/entry-armv.S |    8 +++-----
+ arch/arm/mm/pabort-legacy.S  |    9 +++++----
+ arch/arm/mm/pabort-v6.S      |    9 +++++----
+ arch/arm/mm/pabort-v7.S      |   11 ++++++-----
+ 4 files changed, 19 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm/include/asm/entry-macro-multi.S b/arch/arm/include/asm/entry-macro-multi.S
-index 2da8547..2f1e209 100644
---- a/arch/arm/include/asm/entry-macro-multi.S
-+++ b/arch/arm/include/asm/entry-macro-multi.S
-@@ -4,8 +4,8 @@
-  * Interrupt handling.  Preserves r7, r8, r9
-  */
- 	.macro	arch_irq_handler_default
--	get_irqnr_preamble r5, lr
--1:	get_irqnr_and_base r0, r6, r5, lr
-+	get_irqnr_preamble r6, lr
-+1:	get_irqnr_and_base r0, r2, r6, lr
- 	movne	r1, sp
- 	@
- 	@ routine called with r0 = irq number, r1 = struct pt_regs *
-@@ -17,17 +17,17 @@
- 	/*
- 	 * XXX
- 	 *
--	 * this macro assumes that irqstat (r6) and base (r5) are
-+	 * this macro assumes that irqstat (r2) and base (r6) are
- 	 * preserved from get_irqnr_and_base above
- 	 */
--	ALT_SMP(test_for_ipi r0, r6, r5, lr)
-+	ALT_SMP(test_for_ipi r0, r2, r6, lr)
- 	ALT_UP_B(9997f)
- 	movne	r1, sp
- 	adrne	lr, BSYM(1b)
- 	bne	do_IPI
- 
- #ifdef CONFIG_LOCAL_TIMERS
--	test_for_ltirq r0, r6, r5, lr
-+	test_for_ltirq r0, r2, r6, lr
- 	movne	r0, sp
- 	adrne	lr, BSYM(1b)
- 	bne	do_local_timer
-@@ -40,7 +40,7 @@
- 	.align	5
- 	.global \symbol_name
- \symbol_name:
--	mov	r4, lr
-+	mov	r8, lr
- 	arch_irq_handler_default
--	mov     pc, r4
-+	mov     pc, r8
- 	.endm
 diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 1da985f..b7c4792 100644
+index b7c4792..54c07a8 100644
 --- a/arch/arm/kernel/entry-armv.S
 +++ b/arch/arm/kernel/entry-armv.S
-@@ -29,16 +29,16 @@
- #include <asm/entry-macro-multi.S>
+@@ -45,7 +45,7 @@
+ 	.endm
+ 
+ 	.macro	pabt_helper
+-	@ PABORT handler takes fault address in r4
++	@ PABORT handler takes pt_regs in r2, fault address in r4 and psr in r5
+ #ifdef MULTI_PABORT
+ 	ldr	ip, .LCprocfns
+ 	mov	lr, pc
+@@ -306,9 +306,8 @@ ENDPROC(__und_svc)
+ 	.align	5
+ __pabt_svc:
+ 	svc_entry
+-	pabt_helper
+ 	mov	r2, sp				@ regs
+-	bl	do_PrefetchAbort		@ call abort handler
++	pabt_helper
+ 
+ 	@
+ 	@ IRQs off again before pulling preserved data off the stack
+@@ -653,9 +652,8 @@ ENDPROC(__und_usr_unknown)
+ 	.align	5
+ __pabt_usr:
+ 	usr_entry
+-	pabt_helper
+ 	mov	r2, sp				@ regs
+-	bl	do_PrefetchAbort		@ call abort handler
++	pabt_helper
+  UNWIND(.fnend		)
+ 	/* fall through */
+ /*
+diff --git a/arch/arm/mm/pabort-legacy.S b/arch/arm/mm/pabort-legacy.S
+index 8a5d8aa..8bbff02 100644
+--- a/arch/arm/mm/pabort-legacy.S
++++ b/arch/arm/mm/pabort-legacy.S
+@@ -4,10 +4,11 @@
+ /*
+  * Function: legacy_pabort
+  *
+- * Params  : r4 = address of aborted instruction
++ * Params  : r2 = pt_regs
++ *	   : r4 = address of aborted instruction
++ *	   : r5 = psr for parent context
+  *
+- * Returns : r0 = address of abort
+- *	   : r1 = Simulated IFSR with section translation fault status
++ * Returns : r4 - r11, r13 preserved
+  *
+  * Purpose : obtain information about current prefetch abort.
+  */
+@@ -16,5 +17,5 @@
+ ENTRY(legacy_pabort)
+ 	mov	r0, r4
+ 	mov	r1, #5
+-	mov	pc, lr
++	b	do_PrefetchAbort
+ ENDPROC(legacy_pabort)
+diff --git a/arch/arm/mm/pabort-v6.S b/arch/arm/mm/pabort-v6.S
+index eaac1cb..9627646 100644
+--- a/arch/arm/mm/pabort-v6.S
++++ b/arch/arm/mm/pabort-v6.S
+@@ -4,10 +4,11 @@
+ /*
+  * Function: v6_pabort
+  *
+- * Params  : r4 = address of aborted instruction
++ * Params  : r2 = pt_regs
++ *	   : r4 = address of aborted instruction
++ *	   : r5 = psr for parent context
+  *
+- * Returns : r0 = address of abort
+- *	   : r1 = IFSR
++ * Returns : r4 - r11, r13 preserved
+  *
+  * Purpose : obtain information about current prefetch abort.
+  */
+@@ -16,5 +17,5 @@
+ ENTRY(v6_pabort)
+ 	mov	r0, r4
+ 	mrc	p15, 0, r1, c5, c0, 1		@ get IFSR
+-	mov	pc, lr
++	b	do_PrefetchAbort
+ ENDPROC(v6_pabort)
+diff --git a/arch/arm/mm/pabort-v7.S b/arch/arm/mm/pabort-v7.S
+index b515e0b..875761f 100644
+--- a/arch/arm/mm/pabort-v7.S
++++ b/arch/arm/mm/pabort-v7.S
+@@ -2,12 +2,13 @@
+ #include <asm/assembler.h>
  
  /*
-- * Interrupt handling.  Preserves r7, r8, r9
-+ * Interrupt handling.
+- * Function: v6_pabort
++ * Function: v7_pabort
+  *
+- * Params  : r4 = address of aborted instruction
++ * Params  : r2 = pt_regs
++ *	   : r4 = address of aborted instruction
++ *	   : r5 = psr for parent context
+  *
+- * Returns : r0 = address of abort
+- *	   : r1 = IFSR
++ * Returns : r4 - r11, r13 preserved
+  *
+  * Purpose : obtain information about current prefetch abort.
   */
- 	.macro	irq_handler
- #ifdef CONFIG_MULTI_IRQ_HANDLER
--	ldr	r5, =handle_arch_irq
-+	ldr	r1, =handle_arch_irq
- 	mov	r0, sp
--	ldr	r5, [r5]
-+	ldr	r1, [r1]
- 	adr	lr, BSYM(9997f)
--	teq	r5, #0
--	movne	pc, r5
-+	teq	r1, #0
-+	movne	pc, r1
- #endif
- 	arch_irq_handler_default
- 9997:
+@@ -16,5 +17,5 @@
+ ENTRY(v7_pabort)
+ 	mrc	p15, 0, r0, c6, c0, 2		@ get IFAR
+ 	mrc	p15, 0, r1, c5, c0, 1		@ get IFSR
+-	mov	pc, lr
++	b	do_PrefetchAbort
+ ENDPROC(v7_pabort)
 -- 
 1.7.4.4
