@@ -1,72 +1,83 @@
-From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
-Date: Wed, 29 Jun 2011 15:20:58 +0400
-Subject: Problem with GDB when debugging IRQ handlers
-In-Reply-To: <20110629090941.GD10623@e102109-lin.cambridge.arm.com>
-References: <20110628103946.GC21898@n2100.arm.linux.org.uk>
-	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
-	<20110628142045.GC7255@1n450.cable.virginmedia.net>
-	<20110628143014.GD7255@1n450.cable.virginmedia.net>
-	<BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
-	<BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
-	<20110628150631.GD24904@e102109-lin.cambridge.arm.com>
-	<BANLkTi=dzYV5tdHaZL91oHjMfuVtXUCD5A@mail.gmail.com>
-	<20110628161127.GG24904@e102109-lin.cambridge.arm.com>
-	<BANLkTinLG1LSB0iBrGZC6KYcTxF_NDgdqA@mail.gmail.com>
-	<20110629090941.GD10623@e102109-lin.cambridge.arm.com>
-Message-ID: <BANLkTinqnW7sY0Nf5bR1KhVZa2ouyh2x0Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Jun 2011 13:37:15 +0200
+Subject: [PATCH 2/2] pwm: Add a i.MX23/28 pwm driver
+In-Reply-To: <1309338215-10702-3-git-send-email-s.hauer@pengutronix.de>
+References: <1309338215-10702-1-git-send-email-s.hauer@pengutronix.de>
+	<1309338215-10702-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <201106291337.15336.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6/29/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Tue, Jun 28, 2011 at 11:26:28PM +0100, Dmitry Eremin-Solenikov wrote:
->> On 6/28/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
->> > On Tue, Jun 28, 2011 at 04:45:52PM +0100, Dmitry Eremin-Solenikov wrote:
->> >>  	.macro	svc_entry, stack_hole=0
->> >>   UNWIND(.fnstart		)
->> >> +	.cfi_startproc
->> >>   UNWIND(.save {r0 - pc}		)
->> >>  	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
->> >>  #ifdef CONFIG_THUMB2_KERNEL
->> >> @@ -146,6 +148,24 @@ ENDPROC(__und_invalid)
->> >>  	@  r4 - orig_r0 (see pt_regs definition in ptrace.h)
->> >>  	@
->> >>  	stmia	r5, {r0 - r4}
->> >> +	.cfi_def_cfa_offset S_PC + 4
->> >> +	.cfi_offset 14, -4
->> >> +#define	CFI_REG_OFF(r) .cfi_offset r, (r - 16) * 4
->> >> +	CFI_REG_OFF(13)
->> >> +	CFI_REG_OFF(12)
->> >> +	CFI_REG_OFF(11)
->> >> +	CFI_REG_OFF(10)
->> >> +	CFI_REG_OFF(9)
->> >> +	CFI_REG_OFF(8)
->> >> +	CFI_REG_OFF(7)
->> >> +	CFI_REG_OFF(6)
->> >> +	CFI_REG_OFF(5)
->> >> +	CFI_REG_OFF(4)
->> >> +	CFI_REG_OFF(3)
->> >> +	CFI_REG_OFF(2)
->> >> +	CFI_REG_OFF(1)
->> >> +	CFI_REG_OFF(0)
->> >> +#undef CFI_REG_OFF
->> >>  	.endm
->> >
->> > Do we need all the registers in here for gdb stack unwinding? In general
->> > we would only need LR, SP and FP.
->>
->> CFI info isn't only related to stack unwinding. IIUC (I'll have to run
->> more experiments) these instrutions will help me to get correct
->> variables/arguments values in the before-exception stack frames.
->
-> OK, in this case we may need to add some annotations. You could actually
-> generate a .s file from and existing C one (including -g) and see what
-> .cfi directives it generates.
+On Wednesday 29 June 2011, Sascha Hauer wrote:
+> +/*
+> + * each pwm has a separate register space but all share a common
+> + * enable register.
+> + */
+> +static int mxs_pwm_common_get(struct platform_device *pdev)
+> +{
+> +       struct resource *r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +       resource_size_t start = r->start & ~0xfff;
+> +       int ret = 0;
+> +
+> +       if (!num_instances) {
+> +               r = request_mem_region(start, 0x10, "mxs-pwm-common");
+> +               if (!r)
+> +                       goto err_request;
 
-Yes, that actually gave me some ideas. Unfortunately entry*.S files are
-a bit ... uncommon, so there are nearly no 1-1 cases. BTW: It seems x86
-has .cfi annotations connected to most if not all assembler commands.
-I think this is a bit too much, but you got the idea.
+Yes, this looks better than the original approach, but it still feels
+a bit awkward: 
 
--- 
-With best wishes
-Dmitry
+You are requesting a region outside of the platform device resource.
+This will cause problems with the device tree conversion, where the
+idea is to list all registers that are used for each device.
+It also becomes a problem if a system has multiple PWM regions
+that are a page long each -- you only map one of them currently,
+so the first one would win.
+
+When you model the pwm device in the device tree, the most logical
+representation IMHO would be to have a nested device, like:
+
+/amba/pwm_core at 0fa0000/pwm at 0
+                      /pwm at 1
+                      /pwm at 2
+
+The pwm_core then has the MMIO registers and provides an interface
+for the individual pwms to access the registers, like an MFD
+device. The resources for the slave devices are not MMIO ranges
+but simply offsets. The pwm_enable function will then do something
+like 
+
+static void __pwm_enable(struct mxs_pwm_device *pwm, int enable)
+{
+	struct device *parent = &pwm->chip.dev.parent->parent;
+	void __iomem *pwm_base_common = dev_get_drvdata(parent);
+
+        if (enable)
+                reg = pwm_base_common + REG_PWM_CTRL_SET;
+        else
+                reg = pwm_base_common + REG_PWM_CTRL_CLEAR;
+ 
+        writel(PWM_ENABLE(pwm->chip.pwm_id), reg);
+}
+
+The pwm driver obviously has to register for both device types,
+the parent and the child, and do different things in the two
+cases, e.g.
+
+static int __devinit mxs_pwm_probe(struct platform_device *pdev)
+{
+	switch (pdev->id_entry->driver_data) {
+	case MXS_PWM_MASTER:
+		return mxs_pwm_map_master_resources(pdev);
+	case MXS_PWM_SLAVE:
+		return mxs_pwm_register_pwmchip(pdev, to_platform_device(pdev->dev.parent));
+	}
+	return -ENODEV;
+}
+
+I'm normally not that picky, but I think we should have the best
+possible solution for this in the mx23 driver, because it will
+likely be used as an example for other drivers that have the
+same problem.
+
+	Arnd
