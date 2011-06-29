@@ -1,165 +1,326 @@
-From: swarren@nvidia.com (Stephen Warren)
-Date: Wed, 29 Jun 2011 14:23:12 -0700
-Subject: [PATCH 1/2] drivers: create a pinmux subsystem v3
-In-Reply-To: <BANLkTinXKgdcsGPxGUbS7sv71mQi8eL_bQ@mail.gmail.com>
-References: <1307984291-9774-1-git-send-email-linus.walleij@stericsson.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04992C02AC@HQMAIL01.nvidia.com>
-	<BANLkTinNmPVEM4Eu4efxkuwrCU_FVWFaAg@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04992C049D@HQMAIL01.nvidia.com>
-	<BANLkTikFLbU70uJO0yrf8HipcVEwbUHgsw@mail.gmail.com>
-	<74CDBE0F657A3D45AFBB94109FB122FF04992C07E1@HQMAIL01.nvidia.com>
-	<BANLkTinXKgdcsGPxGUbS7sv71mQi8eL_bQ@mail.gmail.com>
-Message-ID: <74CDBE0F657A3D45AFBB94109FB122FF049E21B833@HQMAIL01.nvidia.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Jun 2011 23:29:44 +0200
+Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <1309231954-23260-1-git-send-email-bs14@csr.com>
+References: <1309231954-23260-1-git-send-email-bs14@csr.com>
+Message-ID: <201106292329.44447.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij wrote at Monday, June 27, 2011 8:35 AM:
-> On Thu, Jun 16, 2011 at 9:10 PM, Stephen Warren <swarren@nvidia.com> wrote:
+On Tuesday 28 June 2011, Barry Song wrote:
+> This patch adds the basic support for this SoC and EVB board based on device
+> tree. It is following the ZYNQ of Grant Likely in some degree.
 
-...
-> > Now, we can have multiple entries with the same .map_name:
-> >
-> > static struct pinmux_map pmx_mapping[] = {
-> > ? ? ? {
-> > ? ? ? ? ? ? ? .dev_name = "tegra-sdhci.0",
-> > ? ? ? ? ? ? ? .map_name = "4 bit", # Note this is 4 now
-> > ? ? ? ? ? ? ? .function = "mmc0-1:0",
-> > ? ? ? },
-> > ? ? ? {
-> > ? ? ? ? ? ? ? .dev_name = "tegra-sdhci.0",
-> > ? ? ? ? ? ? ? .map_name = "4 bit",
-> > ? ? ? ? ? ? ? .function = "mmc0-3:2",
-> > ? ? ? },
-> >
-> > This means that if a client request map name "4 bit", then both functions
-> > "mmc0-1:0" and "mmc0-3:2" are part of that mapping.
+Hi Barry,
+
+There are a few more things I noticed this time around, and some comments
+about code that changed since v1.
+
+> the device hierarchy in SiRFprimaII is as below
 > 
-> (...)
+> AXI(0-0x3FFFFFFF)
+>             memory
+> AXI(0x40000000-0xC0000000)
+>             CPUIF(sirf-iobus)
+>                          INTC
+>                          MEMC
+>                          LCD
+>                          VPP
+>                          GRAPHIC
+>                          MULTIMEDIA
+>                          GPS
+>                          UART
+>                          ...
+>                          hard-coded PCI bridge
+>                                  SD/MMC
+>                          rtc-iobrg
+>                                  RTC
 > 
-> > In terms of implementation, this is still pretty easy; all we do when
-> > reserving or activating a given mapping is to walk the entire list, find
-> > *all* entries that match the client's search terms, and operate on all of
-> > them, instead of stopping at the first one.
+
+Is this really just one bus with a huge address space, or rather some
+nested buses? I'd prefer to have the device tree representation as
+close as possible to the actual layout.
+
+This also includes using bus-local addresses for the 'reg' properties,
+rather than global addresses.
+
+>  1. clock: use dev_id instead of con_id
+>  2. Kconfig: delete ISA_DMA
+>  3. irq: implement int controller based on DT
+> 	 move to GENERIC_IRQ_CHIP framework
+>  4. timer: implement timer based on DT
+>  5. entry-macro.S: use get_irqnr_preamble to load the base address only once
+>     per IRQ exception.
+>  6. others:
+> 	use readl_relaxed instead of __raw_readl
+> 	adjust Kconfig order for PRIMA2
+> 	use clk_get_sys instead of clk_get for system level clock
+> 	use BUG_ON(IS_ERR(clk)) instead of BUG_ON(IS_ERR_OR_NULL(clk));
+> 	fix typo for CLOCK_TICK_RATE
+> 	("sirf,xxx", "sirf,prima2-xxx")  instead of ("sirf,xxx") in dts
 > 
-> So:
-> pmx = pinmux_get(dev, "4 bit");
-> 
-> in this case would reserve pins for two functions on pinmux_get() and
-> activate two different functions after one another when
-> we pinmux_enable(pmx) on this, "mmc0-1:0" and "mmc0-3:2" in some
-> undefined order (inferenced across namespace).
-> 
-> I don't think it's as simple as you say, this gets hairy pretty quickly:
-> 
-> Since my previous pinmux_get() would create a struct pinmux * cookie
-> for each map entry, assuming a 1:1 relationship between map entries
-> and pinmuxes, we now break this, and you need to introduce
-> more complex logic to search through the pinmux_list and dynamically
-> add more functions to each entry with a matching map_name.
 
-In the patch you posted, pinmux_get looked up a single specific
-pinmux_map* and stored it in the struct pinmux. You're right that
-continuing to do something similar means needing to store an array of
-pinmux_map* in the struct pinmux, and dynamically adding more and more
-entries as you search through the mapping table. A bit painful.
+Good progress!
 
-However, if instead of that, you store the original parameters to
-pinmux_get() in struct pinmux, there's nothing to dynamically store
-there. Instead, the implementation of pinmux_get and pinmux_enable is
-very roughly:
+> new file mode 100644
+> index 0000000..1777e98
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/prima2-cb.dts
+> @@ -0,0 +1,50 @@
+> +/dts-v1/;
+> +/ {
+> +	model = "SIRF Prima2 EVB";
+> +	compatible = "sirf,prima2-cb", "sirf,prima2";
+> +	#address-cells = <1>;
+> +	#size-cells = <1>;
+> +	interrupt-parent = <&intc>;
+> +
+> +	memory {
+> +		reg = <0x00000000 0x20000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "mem=512M real_root=/dev/mmcblk0p2 console=ttyS1 earlyprintk";
+> +		linux,stdout-path = &uart1;
+> +	};
+> +
+> +	amba {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		intc: interrupt-controller at 0x80020000 {
+> +			interrupt-controller;
+> +			compatible = "sirf,intc", "sirf,prima2-intc";
+> +			reg = <0x80020000 0x1000>;
+> +			#interrupt-cells = <1>;
+> +		};
 
-pinmux_get:
+Some more commends on the device tree properties:
 
-Allocate struct pinmux, fill it in:
-list_for_each_entry(mapping table)
-    if (matches search terms)
-        check_not_already_in_use
-        acquire_pins()
-        // Note: no break here
+I think the namespace for the compatible values is supposed to start with
+the stock ticker name of the company making the device as a unique
+identifier. This means you'd have to use 
+"csrxf,sirf-intc", "csrxf,sirf-prima2-intc" as the value, instead
+of starting with the product name. I don't know exactly how strictly
+we apply that rule, but I've taken the devicetree-discuss at lists.ozlabs.org
+mailing list on Cc, maybe someone can clarify.
 
-pinmux_enable:
+> +		timer0: timer at 0xb0020000 {
+> +			compatible = "sirf,tick", "sirf,prima2-tick";
+> +			reg = <0xb0020000 0x1000>;
+> +			interrupts = <0>;
+> +		};
+> +
+> +		uart0: uart at 0xb0050000 {
+> +			compatible = "sirf,uart", "sirf,prima2-uart";
+> +			reg = <0xb0050000 0x1000>;
+> +			interrupts = <17>;
+> +		};
+> +
+> +		uart1: uart at 0xb0060000 {
+> +			compatible = "sirf,uart", "sirf,prima2-uart";
+> +			reg = <0xb0060000 0x1000>;
+> +			interrupts = <18>;
+> +		};
+> +	};
+> +};
 
-// Note we redo the whole search here based on the original terms
-// rather than having pinmux_get pre-calculate the search result
-list_for_each_entry(mapping table)
-    if (matches search terms)
-        ops->enable()
+When you use local addresses, this would become something like
 
-In fact, I'd imagine that the list_for_each_entry call above could be
-placed into a utility function that implements the searching logic, to
-keep the code in one place, with a function parameter:
+	axi1 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges <0 0x80000000 0x10000000>;
 
-pinmux_search(terms, callback):
+		intc: interrupt-controller at 20000 {
+			interrupt-controller;
+			compatible = "sirf,intc", "sirf,prima2-intc";
+			reg = <0x20000 0x1000>;
+			#interrupt-cells = <1>;
+		};
+	}
+	axi2 {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges <0 0xb0000000 0x10000000>;
 
-list_for_each_entry(mapping table)
-    if (matches search terms)
-        callback()
+		timer0: timer at 20000 {
+			reg = <0x20000 0x1000>;
+		};
 
-pinmux_get_body():
-    check_not_already_in_use
-    acquire_pins()
+		uart0: uart at 50000 {
+			reg = <0x50000 0x1000>;
+		};
 
-pinmux_get(terms):
+		uart1: uart at 60000 {
+			reg = <0x60000 0x1000>;
+		};
+	};
 
-Allocate struct pinmux, fill it in:
-pinmux_search(terms, pinmux_get_body)
 
-pinmux_enable_body():
-    ops->enable()
 
-pinmux_enable():
+> +
+> diff --git a/arch/arm/mach-prima2/Makefile b/arch/arm/mach-prima2/Makefile
+> new file mode 100644
+> index 0000000..c51d60d
+> --- /dev/null
+> +++ b/arch/arm/mach-prima2/Makefile
+> @@ -0,0 +1 @@
+> +obj-y := timer.o irq.o clock.o common.o board_dt.o
 
-pinmux_search(terms, pinmux_enable_body)
+Minor detail:
 
-Alternatively, each map entry contains a list node that's set up.
-The list is set up by pinmux_get, and contains all mapping entries
-associated with the original search terms. Struct pinmux points at
-the head of the list. pinmux_enable then just needs to iterate over
-that list, not the whole mapping array, and doesn't need to implement
-the search algorithm. That might actually be simpler. Since each
-mapping entry would only be get'd once, there'd be no conflicts with
-multiple things trying to use the one list node at once.
+better put these in a list with one file per line, like
 
-> Then you need to take care of the case where acquiring pins for
-> one of the functions fail: then you need to go back and free the
-> already acquired pins in the error path.
+obj-y	+= timer.o
+obj-y	+= irq.o
 
-That's not that hard; just iterate over the whole list again, applying
-a function that undoes what you did before. It's just like the error
-handling code that already exists in acquire_pins for example. The only
-hard part might be stopping when you get to the point you already got
-to in the first loop, but actually that's just a matter of passing in
-a "stop at this index" parameter to the pinmux_search() I mentioned
-above.
+That makes the list more consistent when you add conditional files.
 
-> I tried quickly to see if I could code this up, and it got very complex
-> real quick, sadly. Maybe if I can just get to iterate a v4 first, I
-> could venture down this track.
-> 
-> But if you can code up the patch for this, I'm pretty much game for
-> it!
+> +++ b/arch/arm/mach-prima2/board_dt.c
+> @@ -0,0 +1,28 @@
+> +/*
+> + * This file contains code for boards with device tree support.
+> + *
+> + * Copyright (c) 2011 Cambridge Silicon Radio Limited, a CSR plc group company.
+> + *
+> + * Licensed under GPLv2 or later.
+> + */
+> +
+> +#include <linux/of.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/mach-types.h>
+> +#include <mach/hardware.h>
+> +#include "common.h"
+> +
+> +static const char *prima2cb_dt_match[] __initdata = {
+> +       "sirf,prima2-cb",
+> +       NULL
+> +};
+> +
+> +MACHINE_START(PRIMA2_EVB, "prima2cb")
+> +       .boot_params    = SIRFSOC_SDRAM_PA + 0x100,
+> +       .init_early     = sirfsoc_init_clk,
+> +       .map_io         = sirfsoc_map_io,
+> +       .init_irq       = sirfsoc_of_init_irq,
+> +       .timer          = &sirfsoc_timer,
+> +       .init_machine   = sirfsoc_mach_init,
+> +       .dt_compat      = prima2cb_dt_match,
+> +MACHINE_END
 
-Sure, I can add the extra looping to the code if you want. It'd be easiest
-if you set up the data structures in the initial patch such that all the
-fields exist in the mapping table (i.e. how I showed in the concept header
-files I posted). That way, there'd be no type or semantic changes in my
-patch, just support for acting on N instead of just 1 mapping entry at a
-time.
+How about removing the remaining board file entirely and merging the contents into
+common.c? We don't want to have board specific files any more, so the naming
+and the split is rather obsolete.
 
-...
-> > * The same point, but think about a SW bit-banged bus consisting of 8
-> > GPIOs for the bus and 100 pins on the device. Each permutation of 8 out
-> > of 100 is scary... I'd love a board to be able to represent a single
-> > mapping for a particular board's set of GPIOs in this case, but not for
-> > the pinmux driver to expose all possibilities!
-> 
-> Is this a real world problem or a theoretical one? Seems like the
-> latter, and as stated in the documentation this subsystem is not about
-> solving discrete maths permutation spaces, but practical enumerations.
+It probably makes sense to pick a new name for the combined file, too, but I
+can't think of a good one. Maybe one of platform.c, prima2.c or core.c.
 
-That's theoretical in terms of the boards/code I'm currently dealing with.
-However, solving this seems pretty simple, and I can't imagine nobody will
-ever want to do that.
+> +#define IOTABLE_ENTRY(region) {\
+> +	.virtual 	= SIRFSOC_##region##_VA_BASE, \
+> +	.pfn	 	= __phys_to_pfn(SIRFSOC_##region##_PA_BASE),\
+> +	.length		= SIRFSOC_##region##_SIZE, \
+> +	.type 		= MT_DEVICE, \
+> +}
+> +
+> +static struct map_desc sirfsoc_iodesc[] __initdata = {
+> +	IOTABLE_ENTRY(UART1),
+> +	IOTABLE_ENTRY(CLOCK),
+> +	IOTABLE_ENTRY(RSTC),
+> +#ifdef CONFIG_CACHE_L2X0
+> +	IOTABLE_ENTRY(L2CC),
+> +#endif
+> +};
 
--- 
-nvpublic
+I've thought about this some more, and I think you can get rid of most
+entries in the global table after all:
+
+* sirfsoc_init_clk() can get the physical address from the device tree
+and call iotable_init for just one entry.
+
+* RSTC does not seem to be needed early at all, you can simply ioremap it.
+
+* L2CC is only accessed from an arch_initcall, which is late enough
+  for ioremap.
+
+* UART1 is only needed for early printk, so I would put the function
+  that does this remaining iotable_init() call into a separate file
+  that only gets compiled when that is enabled.
+
+> +void __init sirfsoc_map_io(void)
+> +{
+> +	iotable_init(sirfsoc_iodesc, ARRAY_SIZE(sirfsoc_iodesc));
+> +}
+> +
+> +#define L2X0_ADDR_FILTERING_START       0xC00
+> +#define L2X0_ADDR_FILTERING_END         0xC04
+> +
+> +static int __init sirfsoc_init(void)
+> +{
+> +#ifdef CONFIG_CACHE_L2X0
+> +	if (!(readl_relaxed(SIRFSOC_L2CC_VA_BASE + L2X0_CTRL) & 1)) {
+> +		/*
+> +		 * set the physical memory windows L2 cache will cover
+> +		 */
+> +		writel_relaxed(PHYS_OFFSET + 1024 * 1024 * 1024,
+> +			SIRFSOC_L2CC_VA_BASE + L2X0_ADDR_FILTERING_END);
+> +		writel_relaxed(PHYS_OFFSET | 0x1,
+> +			SIRFSOC_L2CC_VA_BASE + L2X0_ADDR_FILTERING_START);
+> +
+> +		writel_relaxed(0,
+> +			SIRFSOC_L2CC_VA_BASE + L2X0_TAG_LATENCY_CTRL);
+> +		writel_relaxed(0,
+> +			SIRFSOC_L2CC_VA_BASE + L2X0_DATA_LATENCY_CTRL);
+> +	}
+> +	l2x0_init((void __iomem *)SIRFSOC_L2CC_VA_BASE, 0x00040000,
+> +		0x00000000);
+> +#endif
+> +
+> +	return 0;
+> +}
+> +arch_initcall(sirfsoc_init);
+
+I would also suggest moving the l2x0 code into a new l2x0.c file that
+is conditionally compiled. In the header file, you then do
+
+#ifdef CONFIG_CACHE_L2X0
+extern void sirfsoc_l2x0_init(void);
+#else
+static inline void sirfsoc_l2x0_init(void) {}
+#endif
+
+> +#ifndef __ASM_ARCH_IRQS_H
+> +#define __ASM_ARCH_IRQS_H
+> +
+> +#define SIRFSOC_INTENAL_IRQ_START  0
+> +#define SIRFSOC_INTENAL_IRQ_END    59
+
+Typo, I assume: INTERNAL, not INTENAL
+
+
+> +
+> +static struct of_device_id intc_ids[]  = {
+> +	{ .compatible = "sirf,intc" },
+> +	{ .compatible = "sirf,prima2-intc" },
+> +};
+
+You should only list one of these in the driver: The idea is that as 
+long as all variants of the hardware are identical, you can just list
+the most general name (sirf,intc), and if you need to tell the difference
+you list the more specific names and add a .data=... member that you
+use to differentiate between them. Note that it's usually easier to
+change the code than to change the device tree, so we want to have 
+the full list in the device tree, but the code just needs to pick
+one that fits the purpose.
+
+It's the same for the other drivers.
+
+> +static void __init sirfsoc_of_timer_map(void);
+
+You can remove this forward declaration if you move the sched_clock()
+function down.
+
+	Arnd
