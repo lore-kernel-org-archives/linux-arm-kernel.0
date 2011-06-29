@@ -1,95 +1,31 @@
-From: ccross@google.com (Colin Cross)
-Date: Wed, 29 Jun 2011 09:57:18 -0700
-Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
-In-Reply-To: <20110629140059.GE23312@n2100.arm.linux.org.uk>
-References: <1308923618-5333-1-git-send-email-premi@ti.com>
-	<CAMbhsRQUKBZbC3jJt8XpjTW2n7uA529D6G0g4eT5iLEHn2iNLg@mail.gmail.com>
-	<20110628225523.GA23312@n2100.arm.linux.org.uk>
-	<CAMbhsRQjMmXrULVmFg9CoM0wzZ29wcHqEaT480NaDhB8hHEKZg@mail.gmail.com>
-	<20110628231711.GC23312@n2100.arm.linux.org.uk>
-	<CAMbhsRQUg75R=1TvqYwgcF5eCSFq3WFaAg7EsJ=yaT9VgcfJNA@mail.gmail.com>
-	<20110628234621.GD23312@n2100.arm.linux.org.uk>
-	<CAMbhsRRBhT5YX6E4Nkyvns5YykqzqV3-g4JhR2KPcxBhj0ABww@mail.gmail.com>
-	<20110629140059.GE23312@n2100.arm.linux.org.uk>
-Message-ID: <CAMbhsRSWh0j-ZUx0bVZYcK-+K=z1ywwofJws6P_vrru9U8NKHQ@mail.gmail.com>
+From: jacmet@sunsite.dk (Peter Korsgaard)
+Date: Wed, 29 Jun 2011 19:00:53 +0200
+Subject: [PATCH 0/5] remove spi-s3c24xx-gpio driver
+In-Reply-To: <20110628212443.GI21138@trinity.fluff.org> (Ben Dooks's message
+	of "Tue, 28 Jun 2011 22:24:43 +0100")
+References: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
+	<20110628212443.GI21138@trinity.fluff.org>
+Message-ID: <87ipro4loa.fsf@macbook.be.48ers.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 7:00 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Tue, Jun 28, 2011 at 04:59:57PM -0700, Colin Cross wrote:
->> On Tue, Jun 28, 2011 at 4:46 PM, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > On Tue, Jun 28, 2011 at 04:37:08PM -0700, Colin Cross wrote:
->> >> I don't think it affects bogomips - loops_per_jiffy can still be
->> >> calibrated and updated by cpufreq, udelay just wont use them.
->> >
->> > No, you can't avoid it. ?__delay(), udelay(), and the global
->> > loops_per_jiffy are all linked together - for instance this is how
->> > the spinlock code has a 1s timeout:
->> >
->> > static void __spin_lock_debug(raw_spinlock_t *lock)
->> > {
->> > ? ? ? ?u64 loops = loops_per_jiffy * HZ;
->> > ? ? ? ?int print_once = 1;
->> >
->> > ? ? ? ?for (;;) {
->> > ? ? ? ? ? ? ? ?for (i = 0; i < loops; i++) {
->> > ? ? ? ? ? ? ? ? ? ? ? ?if (arch_spin_trylock(&lock->raw_lock))
->> > ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?return;
->> > ? ? ? ? ? ? ? ? ? ? ? ?__delay(1);
->> > ? ? ? ? ? ? ? ?}
->> >
->> > which goes wrong for all the same reasons you're pointing out about
->> > udelay(). ?So just restricting your argument to udelay() is not
->> > realistic.
->> >
->>
->> True, there are a few other users of loops_per_jiffy and __delay, but
->> it looks like __spin_lock_debug is the only one worth worrying about,
->> and it's timing is not as critical as udelay - worst case here is that
->> the warning occurs after 250 ms instead of 1s. ?Leaving
->> loops_per_jiffy and __delay intact, and fixing udelay, would still be
->> a net gain.
->
-> Other users of loops_per_jiffy are incorrect in any case:
+>>>>> "Ben" == Ben Dooks <ben@trinity.fluff.org> writes:
 
-The same conclusion I came to on a quick scan of other uses of
-loops_per_jiffy...
+ >> The spi-s3c24xx-gpio driver is functionally equivalent to the spi-gpio
+ >> driver (but precedes it). The driver has seen very little development 
+ >> since it got added back in 2006, and there's only 2 in-tree users of it.
+ >> 
+ >> This patch series moves the remaining users to the spi-gpio driver and
+ >> then finally removes the driver.
+ >> 
+ >> Compile tested only as I don't have access to the hardware.
 
-<snip>
+ Ben> I've not really got much in the way of access either, however the
+ Ben> series looks sane to me.
 
-> And strangely the major offender of this stuff are ARM drivers, not other
-> peoples stuff and not stuff in drivers/staging.
->
-> So I don't think its sane to ignore loops_per_jiffy and __delay, and just
-> concentrate on udelay().
+ Ben> Acked-by: Ben Dooks <ben-linux@fluff.org>
 
-But this I don't understand.  Every other use I found of
-loops_per_jiffy is incorrect and should be changed.  Fixing udelay now
-would not make them any worse - they would stay just as broken as they
-were, so there is no need to couple a fix to udelay with fixing other
-users of loops_per_jiffy.  Why block a legitimate fix because some
-other broken code uses a variable whose behavior would not change?
+Great, will you handle the series or should it go through the spi tree?
 
-If you are requesting an alternate change that would allow __delay to
-continue to be used to time loops while irqs are off and jiffies is
-not being updated, but also allows loops_per_jiffy to change in the
-middle of a loop, while not increasing the number of instructions
-executed in __delay, I don't think that is possible.  You could
-replace __delay with a function that tests against a timer, and
-loops_per_jiffy with the frequency of the counter divided by HZ, but
-that would limit your spinlock spins to the frequency of the counter -
-1MHz on Tegra.
-
-Are there ever other legitimate uses of loops_per_jiffy/__delay?  I
-don't think even the spinlock_debug use is correct - the number of
-instructions executed in the loop before the __delay call (I count 17)
-is going to be much higher than the instructions in the __delay(1)
-call (3 instructions).  The spinlock debug timeout is already going to
-be much longer than expected.  It looks to me like the only legitimate
-use of loops_per_jiffy is to calculate the number of loops and call
-__delay(loops) (exactly what udelay does), the overhead of doing
-anything else will swamp the __delay call.  spinlock debug can get
-away with its incorrect usage, because it doesn't really care how long
-the delay is, and must have a minimum overhead.
+-- 
+Bye, Peter Korsgaard
