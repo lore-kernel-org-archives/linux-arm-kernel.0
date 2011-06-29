@@ -1,59 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 10:25:56 +0100
-Subject: [PATCH 21/23] ARM: entry: data abort: always use r6 for offset
-In-Reply-To: <20110629091853.GK21898@n2100.arm.linux.org.uk>
-References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
-Message-ID: <E1Qbr1w-0002Ga-8w@rmk-PC.arm.linux.org.uk>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 29 Jun 2011 12:30:34 +0300
+Subject: [PATCH] AT91: add AT91SAM9X5 dummy configuration variable
+In-Reply-To: <20110628160252.GQ17355@game.jcrosoft.org>
+References: <1309260927-11411-1-git-send-email-nicolas.ferre@atmel.com>
+	<20110628103549.GG2612@legolas.emea.dhcp.ti.com>
+	<4E09C573.2030607@atmel.com>
+	<20110628122650.GK2612@legolas.emea.dhcp.ti.com>
+	<20110628160252.GQ17355@game.jcrosoft.org>
+Message-ID: <20110629093033.GB2760@legolas.emea.dhcp.ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- arch/arm/mm/abort-lv4t.S  |    6 +++---
- arch/arm/mm/proc-arm6_7.S |    6 +++---
- 2 files changed, 6 insertions(+), 6 deletions(-)
+Hi,
 
-diff --git a/arch/arm/mm/abort-lv4t.S b/arch/arm/mm/abort-lv4t.S
-index 921aaab..54b6d27 100644
---- a/arch/arm/mm/abort-lv4t.S
-+++ b/arch/arm/mm/abort-lv4t.S
-@@ -102,13 +102,13 @@ ENTRY(v4t_late_abort)
- 	tst	r8, #1 << 21			@ check writeback bit
- 	beq	do_DataAbort			@ no writeback -> no fixup
- .data_arm_lateldrpostconst:
--	movs	r9, r8, lsl #20			@ Get offset
-+	movs	r6, r8, lsl #20			@ Get offset
- 	beq	do_DataAbort			@ zero -> no fixup
- 	and	r5, r8, #15 << 16		@ Extract 'n' from instruction
- 	ldr	r7, [r2, r5, lsr #14]		@ Get register 'Rn'
- 	tst	r8, #1 << 23			@ Check U bit
--	subne	r7, r7, r9, lsr #20		@ Undo increment
--	addeq	r7, r7, r9, lsr #20		@ Undo decrement
-+	subne	r7, r7, r6, lsr #20		@ Undo increment
-+	addeq	r7, r7, r6, lsr #20		@ Undo decrement
- 	str	r7, [r2, r5, lsr #14]		@ Put register 'Rn'
- 	b	do_DataAbort
- 
-diff --git a/arch/arm/mm/proc-arm6_7.S b/arch/arm/mm/proc-arm6_7.S
-index 141906e..4d96311 100644
---- a/arch/arm/mm/proc-arm6_7.S
-+++ b/arch/arm/mm/proc-arm6_7.S
-@@ -116,13 +116,13 @@ ENTRY(cpu_arm6_data_abort)
- 	tst	r8, #1 << 21			@ check writeback bit
- 	beq	do_DataAbort			@ no writeback -> no fixup
- .data_arm_lateldrpostconst:
--	movs	r9, r8, lsl #20			@ Get offset
-+	movs	r6, r8, lsl #20			@ Get offset
- 	beq	do_DataAbort			@ zero -> no fixup
- 	and	r5, r8, #15 << 16		@ Extract 'n' from instruction
- 	ldr	r7, [r2, r5, lsr #14]		@ Get register 'Rn'
- 	tst	r8, #1 << 23			@ Check U bit
--	subne	r7, r7, r9, lsr #20		@ Undo increment
--	addeq	r7, r7, r9, lsr #20		@ Undo decrement
-+	subne	r7, r7, r6, lsr #20		@ Undo increment
-+	addeq	r7, r7, r6, lsr #20		@ Undo decrement
- 	str	r7, [r2, r5, lsr #14]		@ Put register 'Rn'
- 	b	do_DataAbort
- 
+On Tue, Jun 28, 2011 at 06:02:52PM +0200, Jean-Christophe PLAGNIOL-VILLARD wrote:
+> > yet you will prevent the driver from being easily used by other
+> > architectures. What will happen is that a certain amount of:
+> > 
+> > depends on (ARCH_AT91SAM9X5 || ARCH_FOO || ARCH_BAR || ARCH_BAZ)
+> no I disagree this is done to allow only the drivers on proper arch
+> 
+> and we do not need the multiple depend we usally create a HAVE_xxx config
+> that the ARCH select and we just depend on it
+
+I still think it isn't good enough. Ideally, drivers will always be
+portable without any arch dependency or the HAVE_XXX trick. Still, it's
+not worth to continue this discussion, I rather look at a driver which
+now depends on ARCH_AT91SAM9X5.
+
 -- 
-1.7.4.4
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 490 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110629/2806b1c1/attachment.sig>
