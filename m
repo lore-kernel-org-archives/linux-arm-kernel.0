@@ -1,26 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Jun 2011 13:00:28 +0200
-Subject: [PATCH 1/2] PWM: add pwm framework support
-In-Reply-To: <20110629085046.GM6069@pengutronix.de>
-References: <1309255368-9775-1-git-send-email-s.hauer@pengutronix.de>
-	<201106281903.06121.arnd@arndb.de>
-	<20110629085046.GM6069@pengutronix.de>
-Message-ID: <201106291300.28533.arnd@arndb.de>
+From: dbaryshkov@gmail.com (Dmitry Eremin-Solenikov)
+Date: Wed, 29 Jun 2011 15:20:58 +0400
+Subject: Problem with GDB when debugging IRQ handlers
+In-Reply-To: <20110629090941.GD10623@e102109-lin.cambridge.arm.com>
+References: <20110628103946.GC21898@n2100.arm.linux.org.uk>
+	<BANLkTinvrJ5MAZABDmdmQk6UZHDKJQo1+A@mail.gmail.com>
+	<20110628142045.GC7255@1n450.cable.virginmedia.net>
+	<20110628143014.GD7255@1n450.cable.virginmedia.net>
+	<BANLkTinL7-Kjx5fHrwHYHHhgjJ-6ex3=eA@mail.gmail.com>
+	<BANLkTinoLB89VAWh-tSswq+H9EcmcQWnXQ@mail.gmail.com>
+	<20110628150631.GD24904@e102109-lin.cambridge.arm.com>
+	<BANLkTi=dzYV5tdHaZL91oHjMfuVtXUCD5A@mail.gmail.com>
+	<20110628161127.GG24904@e102109-lin.cambridge.arm.com>
+	<BANLkTinLG1LSB0iBrGZC6KYcTxF_NDgdqA@mail.gmail.com>
+	<20110629090941.GD10623@e102109-lin.cambridge.arm.com>
+Message-ID: <BANLkTinqnW7sY0Nf5bR1KhVZa2ouyh2x0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 29 June 2011, Sascha Hauer wrote:
-> The other type is some mfd drivers which implement the pwm API themselves
-> right now. These are currently incompatible with the pwm framework anyway.
-> If a board wants to connect the mfd pwm to its backlight, the current
-> pwm_request based on an integer id is not suitable anymore. We need
-> a (struct device *dev, char *id) based pwm_request function then.
-> So my plan is to change the pwm API once we have all in tree drivers
-> in drivers/pwm.
+On 6/29/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Jun 28, 2011 at 11:26:28PM +0100, Dmitry Eremin-Solenikov wrote:
+>> On 6/28/11, Catalin Marinas <catalin.marinas@arm.com> wrote:
+>> > On Tue, Jun 28, 2011 at 04:45:52PM +0100, Dmitry Eremin-Solenikov wrote:
+>> >>  	.macro	svc_entry, stack_hole=0
+>> >>   UNWIND(.fnstart		)
+>> >> +	.cfi_startproc
+>> >>   UNWIND(.save {r0 - pc}		)
+>> >>  	sub	sp, sp, #(S_FRAME_SIZE + \stack_hole - 4)
+>> >>  #ifdef CONFIG_THUMB2_KERNEL
+>> >> @@ -146,6 +148,24 @@ ENDPROC(__und_invalid)
+>> >>  	@  r4 - orig_r0 (see pt_regs definition in ptrace.h)
+>> >>  	@
+>> >>  	stmia	r5, {r0 - r4}
+>> >> +	.cfi_def_cfa_offset S_PC + 4
+>> >> +	.cfi_offset 14, -4
+>> >> +#define	CFI_REG_OFF(r) .cfi_offset r, (r - 16) * 4
+>> >> +	CFI_REG_OFF(13)
+>> >> +	CFI_REG_OFF(12)
+>> >> +	CFI_REG_OFF(11)
+>> >> +	CFI_REG_OFF(10)
+>> >> +	CFI_REG_OFF(9)
+>> >> +	CFI_REG_OFF(8)
+>> >> +	CFI_REG_OFF(7)
+>> >> +	CFI_REG_OFF(6)
+>> >> +	CFI_REG_OFF(5)
+>> >> +	CFI_REG_OFF(4)
+>> >> +	CFI_REG_OFF(3)
+>> >> +	CFI_REG_OFF(2)
+>> >> +	CFI_REG_OFF(1)
+>> >> +	CFI_REG_OFF(0)
+>> >> +#undef CFI_REG_OFF
+>> >>  	.endm
+>> >
+>> > Do we need all the registers in here for gdb stack unwinding? In general
+>> > we would only need LR, SP and FP.
+>>
+>> CFI info isn't only related to stack unwinding. IIUC (I'll have to run
+>> more experiments) these instrutions will help me to get correct
+>> variables/arguments values in the before-exception stack frames.
+>
+> OK, in this case we may need to add some annotations. You could actually
+> generate a .s file from and existing C one (including -g) and see what
+> .cfi directives it generates.
 
-Ok, sounds good. I don't much like the idea of using a string identifier
-for this, but let's discuss that when we get there. Using fixed numbers
-for the first version seems totally reasonable, as it keeps the existing
-API.
+Yes, that actually gave me some ideas. Unfortunately entry*.S files are
+a bit ... uncommon, so there are nearly no 1-1 cases. BTW: It seems x86
+has .cfi annotations connected to most if not all assembler commands.
+I think this is a bit too much, but you got the idea.
 
-	Arnd
+-- 
+With best wishes
+Dmitry
