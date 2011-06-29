@@ -1,58 +1,34 @@
-From: adrian.wenl@gmail.com (Lei Wen)
-Date: Wed, 29 Jun 2011 15:16:29 +0800
-Subject: [PATCH 2/9] MTD: pxa3xx_nand: enable multiple chip select support
-In-Reply-To: <1309331487.23597.131.camel@sauron>
-References: <1309246361.23597.30.camel@sauron>
-	<1309319494-17951-3-git-send-email-leiwen@marvell.com>
-	<1309331487.23597.131.camel@sauron>
-Message-ID: <BANLkTinSuSFYcsAnfyxgef8o30UcQ_T9ew@mail.gmail.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Wed, 29 Jun 2011 15:54:39 +0800
+Subject: [PATCH V4 0/3] add the GPMI-NFC support for imx23/imx28
+Message-ID: <1309334082-9501-1-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Artem,
+The patch is based on branch "imx-for-3.1" of tree :
+      git://git.pengutronix.de/git/imx/linux-2.6.git
 
-On Wed, Jun 29, 2011 at 3:11 PM, Artem Bityutskiy <dedekind1@gmail.com> wrote:
-> On Tue, 2011-06-28 at 20:51 -0700, Lei Wen wrote:
->> Current pxa3xx_nand controller has two chip select which
->> both be workable. This patch enable this feature.
->>
->> Update platform driver to support this feature.
->>
->> Another notice should be taken that:
->> When you want to use this feature, you should not enable the
->> keep configuration feature, for two chip select could be
->> attached with different nand chip. The different page size
->> and timing requirement make the keep configuration impossible.
->>
->> Signed-off-by: Lei Wen <leiwen@marvell.com>
->> ---
->> ?arch/arm/plat-pxa/include/plat/pxa3xx_nand.h | ? 19 +-
->> ?drivers/mtd/nand/pxa3xx_nand.c ? ? ? ? ? ? ? | ?493 +++++++++++++++----------
->> ?2 files changed, 313 insertions(+), 199 deletions(-)
->
-> If someone can review this patch - good let's see how many Reviewed-by
-> tags we get. But I think it is not very reviewable because of the size.
->
-> AFAICK, what you do here is
->
-> 1. Introduce new structure struct pxa3xx_nand_host
-> 2. Move several fields from struct pxa3xx_nand_info to struct
-> pxa3xx_nand_host
->
-> And only this alone adds a lot of noise to the patch.
->
-> And also you have some real functional changes.
->
-> So I'd suggest you to split this patch at least on 2 - the first one
-> would introduce struct pxa3xx_nand_host, moved some fields, and do all
-> the host<->info renamings. You can split this on several steps and move
-> only several fields at a time.
->
-> Then a separate patch would do some more functional changes. How does
-> this sound?
->
+v3 --> v4:
+	merge the GPMI-NFC device code to the new branch.
 
-I'm ok with this, patches to come.
 
-Thanks,
-Lei
+Huang Shijie (3):
+  ARM: mxs: add GPMI-NFC support for imx23/imx28
+  ARM: mxs: add GPMI-NFC device for imx23
+  ARM: mxs: add GPMI-NFC device for imx28
+
+ arch/arm/mach-mxs/Kconfig                       |    2 +
+ arch/arm/mach-mxs/clock-mx23.c                  |    1 +
+ arch/arm/mach-mxs/clock-mx28.c                  |    1 +
+ arch/arm/mach-mxs/devices-mx23.h                |    4 +
+ arch/arm/mach-mxs/devices-mx28.h                |    4 +
+ arch/arm/mach-mxs/devices/Kconfig               |    3 +
+ arch/arm/mach-mxs/devices/Makefile              |    1 +
+ arch/arm/mach-mxs/devices/platform-gpmi-nfc.c   |   90 +++++++++++++++++++++++
+ arch/arm/mach-mxs/include/mach/devices-common.h |   10 +++
+ arch/arm/mach-mxs/include/mach/gpmi-nfc.h       |   71 ++++++++++++++++++
+ arch/arm/mach-mxs/mach-mx23evk.c                |   37 +++++++++
+ arch/arm/mach-mxs/mach-mx28evk.c                |   37 +++++++++
+ 12 files changed, 261 insertions(+), 0 deletions(-)
+ create mode 100644 arch/arm/mach-mxs/devices/platform-gpmi-nfc.c
+ create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
