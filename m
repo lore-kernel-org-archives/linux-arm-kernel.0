@@ -1,69 +1,36 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 28 Jun 2011 21:32:13 -0500
-Subject: [PATCH 4/4] ARM: convert PCI defines to variables
-In-Reply-To: <20110628234130.GJ21898@n2100.arm.linux.org.uk>
+Date: Tue, 28 Jun 2011 21:41:29 -0500
+Subject: [PATCH 2/4] ARM: remove unnecessary mach/hardware.h includes
+In-Reply-To: <20110628232429.GI21898@n2100.arm.linux.org.uk>
 References: <1309301859-17651-1-git-send-email-robherring2@gmail.com>
-	<1309301859-17651-5-git-send-email-robherring2@gmail.com>
-	<20110628234130.GJ21898@n2100.arm.linux.org.uk>
-Message-ID: <4E0A8EAD.40800@gmail.com>
+	<1309301859-17651-3-git-send-email-robherring2@gmail.com>
+	<20110628232429.GI21898@n2100.arm.linux.org.uk>
+Message-ID: <4E0A90D9.1060601@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/28/2011 06:41 PM, Russell King - ARM Linux wrote:
-> On Tue, Jun 28, 2011 at 05:57:39PM -0500, Rob Herring wrote:
+On 06/28/2011 06:24 PM, Russell King - ARM Linux wrote:
+> On Tue, Jun 28, 2011 at 05:57:37PM -0500, Rob Herring wrote:
 >> From: Rob Herring <rob.herring@calxeda.com>
 >>
->> Convert PCIBIOS_MIN_IO, PCIBIOS_MIN_MEM, and PCIMEM_BASE to variables to allow
->> multi-platform builds. This also removes the requirement for a platform to
->> have a mach/hardware.h.
+>> Remove some includes of mach/hardware.h which are not needed. hardware.h will
+>> be removed completely for tegra and cns3xxx in follow on patch.
 > 
-> Please don't include PCIMEM_BASE in that - move that into asm/vga.h and
-> call it VGA_BASE because that's really what it is.  There's also the
-> matter of a definition of a HAS_ symbol...
+> At least this one is incorrect:
 > 
-Okay. I'm still setting vga_base (no point in this case for a define) in
-the platforms' pci code as in all cases vga_base is set to PCI memory
-space.
+> arch/arm/mach-rpc/include/mach/hardware.h:#define IO_EC_MEMC_BASE              0x80000000
+> arch/arm/kernel/ecard.c:                    address = IO_EC_MEMC_BASE + (slot << 12);
+> 
+> That's just one of the defines that ecard.c uses from mach/hardare.h.
+> 
+It happens to still compile, so it's getting included thru another
+include. I see these options:
 
-I don't follow your comment about HAS_ symbol.
+-Revert this change. RPC is not going to be built in a multi-platform
+kernel anyway. Leaving it could affect how include paths get setup for
+multi-platform builds.
+-Move ecard.c into mach-rpc. It doesn't appear to be used by anything else.
 
->> diff --git a/arch/arm/include/asm/vga.h b/arch/arm/include/asm/vga.h
->> index 250a4dd..86290df 100644
->> --- a/arch/arm/include/asm/vga.h
->> +++ b/arch/arm/include/asm/vga.h
->> @@ -2,7 +2,7 @@
->>  #define ASMARM_VGA_H
->>  
->>  #include <linux/io.h>
->> -#include <mach/hardware.h>
->> +#include <asm/pci.h>
->>  
->>  #define VGA_MAP_MEM(x,s)	(PCIMEM_BASE + (x))
->>  
-> 
-> VGA is not dependent on having PCI - there have been ARM platforms which
-> have VGA without PCI.
-> 
->> diff --git a/arch/arm/mach-pxa/include/mach/hardware.h b/arch/arm/mach-pxa/include/mach/hardware.h
->> index b4ea392..de63ca3 100644
->> --- a/arch/arm/mach-pxa/include/mach/hardware.h
->> +++ b/arch/arm/mach-pxa/include/mach/hardware.h
->> @@ -337,8 +337,6 @@ extern unsigned long get_clock_tick_rate(void);
->>  #endif
->>  
->>  #if defined(CONFIG_MACH_ARMCORE) && defined(CONFIG_PCI)
->> -#define PCIBIOS_MIN_IO		0
->> -#define PCIBIOS_MIN_MEM		0
->>  #define ARCH_HAS_DMA_SET_COHERENT_MASK
->>  #endif
->>  
-> 
-> This definitely breaks because ARCH_HAS_DMA_SET_COHERENT_MASK needs to
-> be picked up by linux/dma-mapping.h.  However, this may already be
-> broken as there's no clear path where this reliably happens.
-
-Looks like moving it to mach/memory.h would be the right header. This is
-also something to make run-time. Hopefully, the dma mapping work will
-address that.
+I'll do the 1st option for now.
 
 Rob
