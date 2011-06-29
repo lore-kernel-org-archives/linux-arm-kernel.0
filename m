@@ -1,35 +1,53 @@
-From: grant.likely@secretlab.ca (Grant Likely)
-Date: Wed, 29 Jun 2011 11:17:51 -0600
-Subject: [PATCH 0/5] remove spi-s3c24xx-gpio driver
-In-Reply-To: <87ipro4loa.fsf@macbook.be.48ers.dk>
-References: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
-	<20110628212443.GI21138@trinity.fluff.org>
-	<87ipro4loa.fsf@macbook.be.48ers.dk>
-Message-ID: <BANLkTi=693aHH=8BTAyrKWc1padiozpT6A@mail.gmail.com>
+From: khilman@ti.com (Kevin Hilman)
+Date: Wed, 29 Jun 2011 10:29:49 -0700
+Subject: [PATCH] OMAP3: run the ASM sleep code from DDR
+In-Reply-To: <1309365623-14704-1-git-send-email-j-pihet@ti.com> (jean pihet's
+	message of "Wed, 29 Jun 2011 18:40:23 +0200")
+References: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
+Message-ID: <87mxh0tuk2.fsf@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 11:00 AM, Peter Korsgaard <jacmet@sunsite.dk> wrote:
->>>>>> "Ben" == Ben Dooks <ben@trinity.fluff.org> writes:
->
-> ?>> The spi-s3c24xx-gpio driver is functionally equivalent to the spi-gpio
-> ?>> driver (but precedes it). The driver has seen very little development
-> ?>> since it got added back in 2006, and there's only 2 in-tree users of it.
-> ?>>
-> ?>> This patch series moves the remaining users to the spi-gpio driver and
-> ?>> then finally removes the driver.
-> ?>>
-> ?>> Compile tested only as I don't have access to the hardware.
->
-> ?Ben> I've not really got much in the way of access either, however the
-> ?Ben> series looks sane to me.
->
-> ?Ben> Acked-by: Ben Dooks <ben-linux@fluff.org>
->
-> Great, will you handle the series or should it go through the spi tree?
+jean.pihet at newoldbits.com writes:
 
-With the big spi driver rename, it should probably either go via the
-spi tree, or be put into a topic branch that can be merged by both the
-spi and samsung trees.
+> From: Jean Pihet <j-pihet@ti.com>
+>
+> Most of the ASM sleep code (in arch/arm/mach-omap2/sleep34xx.S)
+> is copied to internal SRAM at boot and after wake-up from CORE OFF mode.
+> However only a small part of the code really needs to run from internal SRAM.
+>
+> This fix lets most of the ASM idle code run from the DDR
+> in order to minimize the SRAM usage and the overhead in the code copy.
+>
+> The only pieces of code that are mandatory in SRAM are:
+> - the i443 erratum WA,
+> - the i581 erratum WA,
+> - the security extension code.
+>
+> SRAM usage:
+> - original code:
+>   . 560 bytes for omap3_sram_configure_core_dpll (used by DVFS),
+>   . 852 bytes for omap_sram_idle (used by suspend/resume in RETention),
+>   . 124 bytes for es3_sdrc_fix (used by suspend/resume in OFF mode on ES3.x),
+>   . 108 bytes for save_secure_ram_context (used on HS parts only).
+>
+> With this fix the usage for suspend/resume in RETention goes down 288 bytes,
+> so the gain in SRAM usage for suspend/resume is 564 bytes.
+>
+> Also fixed the SRAM initialization sequence to avoid an unnecessary
+> copy to SRAM at boot time and for readability.
+>
+> Tested on Beagleboard (ES2.x) in idle with full RET and OFF modes.
+>
+> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-g.
+Reviewed-by: Kevin Hilman <khilman@ti.com>
+
+Also tested retention and off on 3430/n900, 3530/Overo and 3630/Zoom3
+
+Tested-by: Kevin Hilman <khilman@ti.com>
+
+Russell, if you're OK with it, can you add it to your suspend branch for
+the upcoming merge window?
+
+Kevin
