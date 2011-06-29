@@ -1,68 +1,80 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 29 Jun 2011 08:27:26 +0200
-Subject: [PATCH] ARM: mx53: Fix some interrupts marked as reserved.
-In-Reply-To: <1309276716-12828-1-git-send-email-fabio.estevam@freescale.com>
-References: <1309276716-12828-1-git-send-email-fabio.estevam@freescale.com>
-Message-ID: <20110629062726.GL6069@pengutronix.de>
+From: ohad@wizery.com (Ohad Ben-Cohen)
+Date: Wed, 29 Jun 2011 09:30:38 +0300
+Subject: [RFC 7/8] drivers: introduce rpmsg,
+	a remote-processor messaging bus
+In-Reply-To: <20110628164453.aa85c85c.rdunlap@xenotime.net>
+References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
+	<1308640714-17961-8-git-send-email-ohad@wizery.com>
+	<20110628164453.aa85c85c.rdunlap@xenotime.net>
+Message-ID: <BANLkTinDX9ETcqZ=hvSGaao2s=ZcM-JsAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 12:58:36PM -0300, Fabio Estevam wrote:
-> Mark the actual interrupt source for some interrupts currently marked as reserved.
+Hi Randy,
 
-applied for next.
+Thanks for your comments !
 
-Sascha
+On Wed, Jun 29, 2011 at 2:44 AM, Randy Dunlap <rdunlap@xenotime.net> wrote:
+>> +hardware accelerators, and therefore are often used to offload cpu-intensive
+>
+> prefer: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CPU-
+> throughout.
 
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
-> ---
->  arch/arm/plat-mxc/include/mach/mx53.h |   10 +++++-----
->  1 files changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/arch/arm/plat-mxc/include/mach/mx53.h b/arch/arm/plat-mxc/include/mach/mx53.h
-> index 3128af7..5e3c323 100644
-> --- a/arch/arm/plat-mxc/include/mach/mx53.h
-> +++ b/arch/arm/plat-mxc/include/mach/mx53.h
-> @@ -233,7 +233,7 @@
->  #define MX53_INT_ESDHC2	2
->  #define MX53_INT_ESDHC3	3
->  #define MX53_INT_ESDHC4	4
-> -#define MX53_INT_RESV5	5
-> +#define MX53_INT_DAP	5
->  #define MX53_INT_SDMA	6
->  #define MX53_INT_IOMUX	7
->  #define MX53_INT_NFC	8
-> @@ -262,8 +262,8 @@
->  #define MX53_INT_UART1	31
->  #define MX53_INT_UART2	32
->  #define MX53_INT_UART3	33
-> -#define MX53_INT_RESV34	34
-> -#define MX53_INT_RESV35	35
-> +#define MX53_INT_RTC	34
-> +#define MX53_INT_PTP	35
->  #define MX53_INT_ECSPI1	36
->  #define MX53_INT_ECSPI2	37
->  #define MX53_INT_CSPI	38
-> @@ -293,8 +293,8 @@
->  #define MX53_INT_I2C1	62
->  #define MX53_INT_I2C2	63
->  #define MX53_INT_I2C3	64
-> -#define MX53_INT_RESV65	65
-> -#define MX53_INT_RESV66	66
-> +#define MX53_INT_MLB	65
-> +#define MX53_INT_ASRC	66
->  #define MX53_INT_SPDIF	67
->  #define MX53_INT_SIM_DAT	68
->  #define MX53_INT_IIM	69
-> -- 
-> 1.6.0.4
-> 
-> 
-> 
+Isn't that changing the meaning a bit ? Let's stick with the original
+version, I think it's more clear.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+>> +system's physical memory and/or other sensitive hardware resources (e.g. on
+>> +OMAP4, remote cores (/hardware accelerators) may have direct access to the
+>> +physical memory, gpio banks, dma controllers, i2c bus, gptimers, mailbox
+>> +devices, hwspinlocks, etc..). Moreover, those remote processors might be
+>> +running RTOS where every task can access the entire memory/devices exposed
+>> +to the processor. To minimize the risks of rogue (/buggy) userland code
+>
+> What is with the leading / here and above (/hardware) and below?
+
+/ here means "or". You can read the sentence twice, either without the
+(/ ..) options or with them, and then you get two (different)
+examples.
+
+Any idea how to make it more readable ? I prefer not to drop the
+second example, as it's adding information.
+
+>> +if RPMSG
+>> +
+>> +# OK, it's a little counter-intuitive to do this, but it puts it neatly under
+>> +# the rpmsg menu (and it's the approach preferred by the virtio folks).
+>> +
+>> +source "drivers/virtio/Kconfig"
+>
+> It seems odd to have that Kconfig file sourced in multiple places.
+> Are the kconfig tools happy with that?
+
+They are, probably because these places are mutually exclusive today:
+
+$ git grep "drivers/virtio/Kconfig"
+arch/ia64/kvm/Kconfig:source drivers/virtio/Kconfig
+arch/mips/Kconfig:source drivers/virtio/Kconfig
+arch/powerpc/kvm/Kconfig:source drivers/virtio/Kconfig
+arch/s390/kvm/Kconfig:source drivers/virtio/Kconfig
+arch/sh/Kconfig:source drivers/virtio/Kconfig
+arch/tile/kvm/Kconfig:source drivers/virtio/Kconfig
+arch/x86/kvm/Kconfig:source drivers/virtio/Kconfig
+
+Now that we start using virtio for inter-processor communications,
+too, we might soon bump into a situation where virtio will be sourced
+twice.
+
+Probably the solution is to move 'source "drivers/virtio/Kconfig"'
+into drivers/Kconfig, and remove all other instances.
+
+Rusty, are you ok with that ?
+
+Thanks,
+Ohad.
+
+> Sorry about the delay. ?I had most of this in my drafts folder and
+> forgot about it...
+
+Np, thanks a lot !
+
+Ohad.
