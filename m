@@ -1,31 +1,50 @@
-From: jacmet@sunsite.dk (Peter Korsgaard)
-Date: Wed, 29 Jun 2011 19:00:53 +0200
-Subject: [PATCH 0/5] remove spi-s3c24xx-gpio driver
-In-Reply-To: <20110628212443.GI21138@trinity.fluff.org> (Ben Dooks's message
-	of "Tue, 28 Jun 2011 22:24:43 +0100")
-References: <1309265357-15879-1-git-send-email-jacmet@sunsite.dk>
-	<20110628212443.GI21138@trinity.fluff.org>
-Message-ID: <87ipro4loa.fsf@macbook.be.48ers.dk>
+From: dave@linux.vnet.ibm.com (Dave Hansen)
+Date: Wed, 29 Jun 2011 10:06:24 -0700
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <20110629130038.GA7909@in.ibm.com>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+Message-ID: <1309367184.11430.594.camel@nimitz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>>>> "Ben" == Ben Dooks <ben@trinity.fluff.org> writes:
+I was kinda hoping for something a bit simpler than that.  I'd boil down
+what you were saying to this:
 
- >> The spi-s3c24xx-gpio driver is functionally equivalent to the spi-gpio
- >> driver (but precedes it). The driver has seen very little development 
- >> since it got added back in 2006, and there's only 2 in-tree users of it.
- >> 
- >> This patch series moves the remaining users to the spi-gpio driver and
- >> then finally removes the driver.
- >> 
- >> Compile tested only as I don't have access to the hardware.
+     1. The kernel must be aware of how the pieces of hardware are
+        mapped in to the system's physical address space
+     2. The kernel must have a mechanism in place to minimize access to
+        specific pieces of hardware 
+     3. For destructive power-down operations, the kernel should have a
+        mechanism in place to ensure that no valuable data is contained
+        in the memory to be powered down.
 
- Ben> I've not really got much in the way of access either, however the
- Ben> series looks sane to me.
+Is that complete?
 
- Ben> Acked-by: Ben Dooks <ben-linux@fluff.org>
+On Wed, 2011-06-29 at 18:30 +0530, Ankita Garg wrote:
+> 1) Dynamic Power Transition: The memory controller can have the ability
+> to automatically transition regions of memory into lower power states
+> when they are devoid of references for a pre-defined threshold amount of
+> time. Memory contents are preserved in the low power states and accessing
+> memory that is at a low power state takes a latency hit.
+> 
+> 2) Dynamic Power Off: If a region is free/unallocated, the software can
+> indicate to the controller to completely turn off power to a certain
+> region. Memory contents are lost and hence the software has to be
+> absolutely sure about the usage statistics of the particular region. This
+> is a runtime capability, where the required amount of memory can be
+> powered 'ON' to match the workload demands.
+> 
+> 3) Partial Array Self-Refresh (PASR): If a certain regions of memory is
+> free/unallocated, the software can indicate to the controller to not
+> refresh that region when the system goes to suspend-to-ram state and
+> thereby save standby power consumption.
 
-Great, will you handle the series or should it go through the spi tree?
+(3) is simply a subset of (2), but with the additional restriction that
+the power off can only occur during a suspend operation.  
 
--- 
-Bye, Peter Korsgaard
+Let's say we fully implemented support for (2).  What would be missing
+to support PASR?
+
+-- Dave
