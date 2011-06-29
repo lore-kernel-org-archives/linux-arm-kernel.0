@@ -1,51 +1,43 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 29 Jun 2011 15:29:23 +0300
-Subject: [RFC 7/8] drivers: introduce rpmsg,
-	a remote-processor messaging bus
-In-Reply-To: <201106291359.14026.arnd@arndb.de>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<20110628164453.aa85c85c.rdunlap@xenotime.net>
-	<BANLkTinDX9ETcqZ=hvSGaao2s=ZcM-JsAg@mail.gmail.com>
-	<201106291359.14026.arnd@arndb.de>
-Message-ID: <BANLkTiki0fZuVB4it1mOVbEYVZ8tUx0BTA@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Wed, 29 Jun 2011 14:29:42 +0200
+Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
+	controller driver
+In-Reply-To: <4E0B0296.6060902@freescale.com>
+References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
+	<1309335878-16678-2-git-send-email-b32955@freescale.com>
+	<20110629100658.GE1992@pengutronix.de>
+	<20110629103337.GF1992@pengutronix.de>
+	<4E0B0296.6060902@freescale.com>
+Message-ID: <20110629122942.GH1992@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 2:59 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 29 June 2011, Ohad Ben-Cohen wrote:
->> On Wed, Jun 29, 2011 at 2:44 AM, Randy Dunlap <rdunlap@xenotime.net> wrote:
->> >> +hardware accelerators, and therefore are often used to offload cpu-intensive
->> >
->> > prefer: ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? CPU-
->> > throughout.
->>
->> Isn't that changing the meaning a bit ? Let's stick with the original
->> version, I think it's more clear.
->
-> I think you misunderstood Randy, he meant you should do 's/cpu/CPU/' globally,
 
-Oh, sorry, Randy. For some reason I thought you meant
-s/cpu-intensive/CPU-throughout/ which didn't make a lot of sense to me
-:)
+> > Still, the problem exists: When a second channel GPMI channel is
+> > requested, dmaengine will return -EBUSY, because the DMAIRQ is already
+> > taken.
+> >
+> Yes, we should change the DMA code, it is a DMA bug.
+> I ever submitted a patch about the issue:
+> http://patchwork.ozlabs.org/patch/87145/
 
-s/cpu/CPU/ is of course nicer. thanks !
+That approach was rejected because it would register the same handler
+n-times where one time would do. Your other approach puts too much
+mach-specific details into the driver IMO and probably won't scale very
+well. Maybe we should add something to the private dma_data (like flags
+indicating SHARED) and then do some refcounting?
 
-> The easiest way would be to replace it with 'or', as in
->
-> ... remote cores (or hardware accelerators) may have ...
+Regards,
 
-yeah, i'll do it, thanks.
+   Wolfram
 
-It's a bit harder to get rid of the parentheses in the second
-sentence, but I'll think of something too.
-
->> Probably the solution is to move 'source "drivers/virtio/Kconfig"'
->> into drivers/Kconfig, and remove all other instances.
->
-> I think changing that would be good. However, you need to at least
-> restructure the contents, or they will show up in the main driver menu.
-
-I'll do that.
-
-Thanks,
-Ohad.
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110629/7f3e7426/attachment.sig>
