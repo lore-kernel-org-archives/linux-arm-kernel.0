@@ -1,267 +1,125 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Jun 2011 11:46:59 -0500
-Subject: [PATCH 6/6] ARM: set vga memory base at run-time
+Date: Wed, 29 Jun 2011 11:46:56 -0500
+Subject: [PATCH 3/6] ARM: remove unnecessary mach/hardware.h includes
 In-Reply-To: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
 References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1309366019-24379-7-git-send-email-robherring2@gmail.com>
+Message-ID: <1309366019-24379-4-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Convert the incorrectly named PCIMEM_BASE to a variable called vga_base.
-This removes the dependency on mach/hardware.h.
+Remove some includes of mach/hardware.h which are not needed. hardware.h
+will be removed completely for tegra and cns3xxx in follow on patch.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
 ---
- arch/arm/include/asm/vga.h                       |    5 +++--
- arch/arm/mach-dove/include/mach/hardware.h       |    3 ---
- arch/arm/mach-dove/pcie.c                        |    3 +++
- arch/arm/mach-footbridge/dc21285.c               |    1 +
- arch/arm/mach-integrator/include/mach/hardware.h |    2 --
- arch/arm/mach-integrator/pci_v3.c                |    2 ++
- arch/arm/mach-kirkwood/include/mach/hardware.h   |    3 ---
- arch/arm/mach-kirkwood/pcie.c                    |    2 ++
- arch/arm/mach-mv78xx0/include/mach/hardware.h    |    3 ---
- arch/arm/mach-mv78xx0/pcie.c                     |    2 ++
- arch/arm/mach-orion5x/include/mach/hardware.h    |    3 ---
- arch/arm/mach-orion5x/pci.c                      |    1 +
- arch/arm/mach-shark/include/mach/hardware.h      |    2 --
- arch/arm/mach-shark/pci.c                        |    2 ++
- arch/arm/mm/iomap.c                              |    3 +++
- 15 files changed, 19 insertions(+), 18 deletions(-)
+ arch/arm/lib/ecard.S                      |    1 -
+ arch/arm/lib/io-readsw-armv3.S            |    1 -
+ arch/arm/lib/io-writesw-armv3.S           |    1 -
+ arch/arm/mach-cns3xxx/cns3420vb.c         |    1 -
+ arch/arm/mach-tegra/include/mach/system.h |    1 -
+ arch/arm/mach-tegra/io.c                  |    1 -
+ arch/arm/mach-tegra/platsmp.c             |    1 -
+ arch/arm/mm/proc-xsc3.S                   |    1 -
+ 8 files changed, 0 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm/include/asm/vga.h b/arch/arm/include/asm/vga.h
-index 250a4dd..91f4021 100644
---- a/arch/arm/include/asm/vga.h
-+++ b/arch/arm/include/asm/vga.h
-@@ -2,9 +2,10 @@
- #define ASMARM_VGA_H
- 
- #include <linux/io.h>
+diff --git a/arch/arm/lib/ecard.S b/arch/arm/lib/ecard.S
+index 8678eb2..e6057fa 100644
+--- a/arch/arm/lib/ecard.S
++++ b/arch/arm/lib/ecard.S
+@@ -12,7 +12,6 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
 -#include <mach/hardware.h>
  
--#define VGA_MAP_MEM(x,s)	(PCIMEM_BASE + (x))
-+extern unsigned long vga_base;
-+
-+#define VGA_MAP_MEM(x,s)	(vga_base + (x))
+ #define CPSR2SPSR(rt) \
+ 		mrs	rt, cpsr; \
+diff --git a/arch/arm/lib/io-readsw-armv3.S b/arch/arm/lib/io-readsw-armv3.S
+index 9aaf7c7..88487c8 100644
+--- a/arch/arm/lib/io-readsw-armv3.S
++++ b/arch/arm/lib/io-readsw-armv3.S
+@@ -9,7 +9,6 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+-#include <mach/hardware.h>
  
- #define vga_readb(x)	(*((volatile unsigned char *)x))
- #define vga_writeb(x,y)	(*((volatile unsigned char *)y) = (x))
-diff --git a/arch/arm/mach-dove/include/mach/hardware.h b/arch/arm/mach-dove/include/mach/hardware.h
-index 94c5a2c..f1368b9 100644
---- a/arch/arm/mach-dove/include/mach/hardware.h
-+++ b/arch/arm/mach-dove/include/mach/hardware.h
-@@ -11,9 +11,6 @@
+ .Linsw_bad_alignment:
+ 		adr	r0, .Linsw_bad_align_msg
+diff --git a/arch/arm/lib/io-writesw-armv3.S b/arch/arm/lib/io-writesw-armv3.S
+index cd34503..49b8004 100644
+--- a/arch/arm/lib/io-writesw-armv3.S
++++ b/arch/arm/lib/io-writesw-armv3.S
+@@ -9,7 +9,6 @@
+  */
+ #include <linux/linkage.h>
+ #include <asm/assembler.h>
+-#include <mach/hardware.h>
  
- #include "dove.h"
- 
--#define PCIMEM_BASE			DOVE_PCIE0_MEM_PHYS_BASE
--
--
- /* Macros below are required for compatibility with PXA AC'97 driver.	*/
- #define __REG(x)	(*((volatile u32 *)((x) - DOVE_SB_REGS_PHYS_BASE + \
- 				DOVE_SB_REGS_VIRT_BASE)))
-diff --git a/arch/arm/mach-dove/pcie.c b/arch/arm/mach-dove/pcie.c
-index 4810426..021579a 100644
---- a/arch/arm/mach-dove/pcie.c
-+++ b/arch/arm/mach-dove/pcie.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/mbus.h>
-+#include <video/vga.h>
- #include <asm/mach/pci.h>
+ .Loutsw_bad_alignment:
+ 		adr	r0, .Loutsw_bad_align_msg
+diff --git a/arch/arm/mach-cns3xxx/cns3420vb.c b/arch/arm/mach-cns3xxx/cns3420vb.c
+index 08e5c87..85e6390 100644
+--- a/arch/arm/mach-cns3xxx/cns3420vb.c
++++ b/arch/arm/mach-cns3xxx/cns3420vb.c
+@@ -29,7 +29,6 @@
  #include <asm/mach/arch.h>
- #include <asm/setup.h>
-@@ -230,6 +231,8 @@ void __init dove_pcie_init(int init_port0, int init_port1)
- {
- 	pcibios_min_io = 0x1000;
- 	pcibios_min_mem = 0x01000000;
-+	vga_base = DOVE_PCIE0_MEM_PHYS_BASE;
-+
- 	if (init_port0)
- 		add_pcie_port(0, DOVE_PCIE0_VIRT_BASE);
+ #include <asm/mach/map.h>
+ #include <asm/mach/time.h>
+-#include <mach/hardware.h>
+ #include <mach/cns3xxx.h>
+ #include <mach/irqs.h>
+ #include "core.h"
+diff --git a/arch/arm/mach-tegra/include/mach/system.h b/arch/arm/mach-tegra/include/mach/system.h
+index d0183d8..027c421 100644
+--- a/arch/arm/mach-tegra/include/mach/system.h
++++ b/arch/arm/mach-tegra/include/mach/system.h
+@@ -21,7 +21,6 @@
+ #ifndef __MACH_TEGRA_SYSTEM_H
+ #define __MACH_TEGRA_SYSTEM_H
  
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index e7ce279..5821fdd 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -297,6 +297,7 @@ void __init dc21285_preinit(void)
+-#include <mach/hardware.h>
+ #include <mach/iomap.h>
  
- 	pcibios_min_io = 0x1000;
- 	pcibios_min_mem = 0x81000000;
-+	vga_base = PCIMEM_BASE;
- 
- 	mem_size = (unsigned int)high_memory - PAGE_OFFSET;
- 	for (mem_mask = 0x00100000; mem_mask < 0x10000000; mem_mask <<= 1)
-diff --git a/arch/arm/mach-integrator/include/mach/hardware.h b/arch/arm/mach-integrator/include/mach/hardware.h
-index 0ce5212..65fed7c 100644
---- a/arch/arm/mach-integrator/include/mach/hardware.h
-+++ b/arch/arm/mach-integrator/include/mach/hardware.h
-@@ -32,8 +32,6 @@
- #define IO_SIZE			0x0B000000                 // How much?
- #define IO_START		INTEGRATOR_HDR_BASE        // PA of IO
- 
--#define PCIMEM_BASE		PCI_MEMORY_VADDR
--
- /* macro to get@IO space when running virtually */
- #ifdef CONFIG_MMU
- #define IO_ADDRESS(x)	(((x) & 0x000fffff) | (((x) >> 4) & 0x0ff00000) | IO_BASE)
-diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
-index 11b86e5..dd56bfb 100644
---- a/arch/arm/mach-integrator/pci_v3.c
-+++ b/arch/arm/mach-integrator/pci_v3.c
-@@ -27,6 +27,7 @@
- #include <linux/spinlock.h>
- #include <linux/init.h>
- #include <linux/io.h>
-+#include <video/vga.h>
- 
- #include <mach/hardware.h>
- #include <mach/platform.h>
-@@ -504,6 +505,7 @@ void __init pci_v3_preinit(void)
- 
- 	pcibios_min_io = 0x6000;
- 	pcibios_min_mem = 0x00100000;
-+	vga_base = PCI_MEMORY_VADDR;
- 
- 	/*
- 	 * Hook in our fault handler for PCI errors
-diff --git a/arch/arm/mach-kirkwood/include/mach/hardware.h b/arch/arm/mach-kirkwood/include/mach/hardware.h
-index 470899b..742b74f 100644
---- a/arch/arm/mach-kirkwood/include/mach/hardware.h
-+++ b/arch/arm/mach-kirkwood/include/mach/hardware.h
-@@ -11,7 +11,4 @@
- 
- #include "kirkwood.h"
- 
--#define PCIMEM_BASE			KIRKWOOD_PCIE_MEM_PHYS_BASE /* mem base for VGA */
--
--
- #endif
-diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
-index 6e32b8a..b53002c 100644
---- a/arch/arm/mach-kirkwood/pcie.c
-+++ b/arch/arm/mach-kirkwood/pcie.c
-@@ -12,6 +12,7 @@
- #include <linux/pci.h>
- #include <linux/slab.h>
- #include <linux/mbus.h>
-+#include <video/vga.h>
- #include <asm/irq.h>
- #include <asm/mach/pci.h>
- #include <plat/pcie.h>
-@@ -273,6 +274,7 @@ void __init kirkwood_pcie_init(unsigned int portmask)
- {
- 	pcibios_min_io = 0x00001000;
- 	pcibios_min_mem = 0x01000000;
-+	vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
- 
- 	if (portmask & KW_PCIE0)
- 		add_pcie_port(0, PCIE_VIRT_BASE);
-diff --git a/arch/arm/mach-mv78xx0/include/mach/hardware.h b/arch/arm/mach-mv78xx0/include/mach/hardware.h
-index 29e37ed..67cab0a 100644
---- a/arch/arm/mach-mv78xx0/include/mach/hardware.h
-+++ b/arch/arm/mach-mv78xx0/include/mach/hardware.h
-@@ -11,7 +11,4 @@
- 
- #include "mv78xx0.h"
- 
--#define PCIMEM_BASE			MV78XX0_PCIE_MEM_PHYS_BASE /* mem base for VGA */
--
--
- #endif
-diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
-index cc9d1b9..bafd1ed 100644
---- a/arch/arm/mach-mv78xx0/pcie.c
-+++ b/arch/arm/mach-mv78xx0/pcie.c
-@@ -11,6 +11,7 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/mbus.h>
-+#include <video/vga.h>
- #include <asm/irq.h>
- #include <asm/mach/pci.h>
- #include <plat/pcie.h>
-@@ -299,6 +300,7 @@ void __init mv78xx0_pcie_init(int init_port0, int init_port1)
- {
- 	pcibios_min_io = 0x00001000;
- 	pcibios_min_mem = 0x01000000;
-+	vga_base = MV78XX0_PCIE_MEM_PHYS_BASE;
- 
- 	if (init_port0) {
- 		add_pcie_port(0, 0, PCIE00_VIRT_BASE);
-diff --git a/arch/arm/mach-orion5x/include/mach/hardware.h b/arch/arm/mach-orion5x/include/mach/hardware.h
-index b6d55bc..3957354 100644
---- a/arch/arm/mach-orion5x/include/mach/hardware.h
-+++ b/arch/arm/mach-orion5x/include/mach/hardware.h
-@@ -11,7 +11,4 @@
- 
- #include "orion5x.h"
- 
--#define PCIMEM_BASE		ORION5X_PCIE_MEM_PHYS_BASE
--
--
- #endif
-diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
-index d80aeef..7dc672c 100644
---- a/arch/arm/mach-orion5x/pci.c
-+++ b/arch/arm/mach-orion5x/pci.c
-@@ -562,6 +562,7 @@ int __init orion5x_pci_sys_setup(int nr, struct pci_sys_data *sys)
- 
- 	pcibios_min_io = 0x00001000;
- 	pcibios_min_mem = 0x01000000;
-+	vga_base = ORION5X_PCIE_MEM_PHYS_BASE;
- 
- 	if (nr == 0) {
- 		orion_pcie_set_local_bus_nr(PCIE_BASE, sys->busnr);
-diff --git a/arch/arm/mach-shark/include/mach/hardware.h b/arch/arm/mach-shark/include/mach/hardware.h
-index 4342931..663f952 100644
---- a/arch/arm/mach-shark/include/mach/hardware.h
-+++ b/arch/arm/mach-shark/include/mach/hardware.h
-@@ -12,7 +12,5 @@
- 
- #define UNCACHEABLE_ADDR        0xdf010000
- 
--#define PCIMEM_BASE		0xe8000000
--
- #endif
- 
-diff --git a/arch/arm/mach-shark/pci.c b/arch/arm/mach-shark/pci.c
-index 4aea637..92d7227 100644
---- a/arch/arm/mach-shark/pci.c
-+++ b/arch/arm/mach-shark/pci.c
-@@ -8,6 +8,7 @@
- #include <linux/kernel.h>
- #include <linux/pci.h>
- #include <linux/init.h>
-+#include <video/vga.h>
- 
- #include <asm/irq.h>
- #include <asm/mach/pci.h>
-@@ -42,6 +43,7 @@ static int __init shark_pci_init(void)
- 
- 	pcibios_min_io = 0x6000;
- 	pcibios_min_mem = 0x50000000;
-+	vga_base = 0xe8000000;
- 
- 	pci_common_init(&shark_pci);
- 
-diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
-index 8946326..476ad1a 100644
---- a/arch/arm/mm/iomap.c
-+++ b/arch/arm/mm/iomap.c
-@@ -9,6 +9,9 @@
- #include <linux/ioport.h>
+ extern void (*arch_reset)(char mode, const char *cmd);
+diff --git a/arch/arm/mach-tegra/io.c b/arch/arm/mach-tegra/io.c
+index 31848a9..ea50fe2 100644
+--- a/arch/arm/mach-tegra/io.c
++++ b/arch/arm/mach-tegra/io.c
+@@ -24,7 +24,6 @@
+ #include <linux/mm.h>
  #include <linux/io.h>
  
-+unsigned long vga_base;
-+EXPORT_SYMBOL(vga_base);
-+
- #ifdef __io
- void __iomem *ioport_map(unsigned long port, unsigned int nr)
- {
+-#include <mach/hardware.h>
+ #include <asm/page.h>
+ #include <asm/mach/map.h>
+ 
+diff --git a/arch/arm/mach-tegra/platsmp.c b/arch/arm/mach-tegra/platsmp.c
+index b8ae3c9..deb3851 100644
+--- a/arch/arm/mach-tegra/platsmp.c
++++ b/arch/arm/mach-tegra/platsmp.c
+@@ -21,7 +21,6 @@
+ 
+ #include <asm/cacheflush.h>
+ #include <asm/hardware/gic.h>
+-#include <mach/hardware.h>
+ #include <asm/mach-types.h>
+ #include <asm/smp_scu.h>
+ 
+diff --git a/arch/arm/mm/proc-xsc3.S b/arch/arm/mm/proc-xsc3.S
+index 5962136..9ab25b4 100644
+--- a/arch/arm/mm/proc-xsc3.S
++++ b/arch/arm/mm/proc-xsc3.S
+@@ -28,7 +28,6 @@
+ #include <linux/init.h>
+ #include <asm/assembler.h>
+ #include <asm/hwcap.h>
+-#include <mach/hardware.h>
+ #include <asm/pgtable.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/page.h>
 -- 
 1.7.4.1
