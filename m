@@ -1,85 +1,137 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 10:23:15 +0100
-Subject: [PATCH 13/23] ARM: entry: instrument usr exception handlers with
-	irqsoff tracing
+Date: Wed, 29 Jun 2011 10:23:35 +0100
+Subject: [PATCH 14/23] ARM: entry: consolidate trace_hardirqs_off into
+	(svc|usr)_entry macros
 In-Reply-To: <20110629091853.GK21898@n2100.arm.linux.org.uk>
 References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
-Message-ID: <E1QbqzL-0002Fq-C1@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Qbqzf-0002Fv-FB@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we no longer re-enable interrupts in these exception handlers, add
-the irqsoff tracing calls to them so that the kernel tracks the state
-more accurately.
-
-Note that these calls are conditional on IRQSOFF_TRACER:
-
-  kernel ----------> user ---------> kernel
-          ^ irqs enabled   ^ irqs disabled
-
-No kernel code can run on the local CPU until we've re-entered the
-kernel through one of the exception handlers - and userspace can not
-take any locks etc.  So, the kernel doesn't care about the IRQ mask
-state while userspace is running unless we're doing IRQ off latency
-tracing.  So, we can (and do) avoid the overhead of updating the IRQ
-mask state on every kernel->user and user->kernel transition.
+All handlers now call trace_hardirqs_off, so move this common code into
+the (svc|usr)_entry assembler macros.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/entry-armv.S |   17 ++++++++++++++++-
- 1 files changed, 16 insertions(+), 1 deletions(-)
+ arch/arm/kernel/entry-armv.S |   47 +++++++----------------------------------
+ 1 files changed, 8 insertions(+), 39 deletions(-)
 
 diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index 474934c..c01cdb1 100644
+index c01cdb1..1da985f 100644
 --- a/arch/arm/kernel/entry-armv.S
 +++ b/arch/arm/kernel/entry-armv.S
-@@ -421,6 +421,11 @@ ENDPROC(__pabt_svc)
+@@ -179,16 +179,15 @@ ENDPROC(__und_invalid)
+ 	@  r6 - orig_r0 (see pt_regs definition in ptrace.h)
+ 	@
+ 	stmia	r7, {r2 - r6}
+-	.endm
+-
+-	.align	5
+-__dabt_svc:
+-	svc_entry
+ 
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	bl	trace_hardirqs_off
+ #endif
++	.endm
+ 
++	.align	5
++__dabt_svc:
++	svc_entry
+ 	dabt_helper
+ 
+ 	@
+@@ -219,11 +218,6 @@ ENDPROC(__dabt_svc)
+ 	.align	5
+ __irq_svc:
+ 	svc_entry
+-
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off
+-#endif
+-
+ 	irq_handler
+ 
+ #ifdef CONFIG_PREEMPT
+@@ -267,11 +261,6 @@ __und_svc:
+ #else
+ 	svc_entry
+ #endif
+-
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off
+-#endif
+-
+ 	@
+ 	@ call emulation code, which returns using r9 if it has emulated
+ 	@ the instruction, or the more conventional lr if we are to treat
+@@ -317,11 +306,6 @@ ENDPROC(__und_svc)
+ 	.align	5
+ __pabt_svc:
+ 	svc_entry
+-
+-#ifdef CONFIG_TRACE_IRQFLAGS
+-	bl	trace_hardirqs_off
+-#endif
+-
+ 	pabt_helper
+ 	mov	r2, sp				@ regs
+ 	bl	do_PrefetchAbort		@ call abort handler
+@@ -401,6 +385,10 @@ ENDPROC(__pabt_svc)
+ 	@ Clear FP to mark the first stack frame
+ 	@
+ 	zero_fp
++
++#ifdef CONFIG_IRQSOFF_TRACER
++	bl	trace_hardirqs_off
++#endif
+ 	.endm
+ 
+ 	.macro	kuser_cmpxchg_check
+@@ -421,11 +409,6 @@ ENDPROC(__pabt_svc)
  	.align	5
  __dabt_usr:
  	usr_entry
-+
-+#ifdef CONFIG_IRQSOFF_TRACER
-+	bl	trace_hardirqs_off
-+#endif
-+
+-
+-#ifdef CONFIG_IRQSOFF_TRACER
+-	bl	trace_hardirqs_off
+-#endif
+-
  	kuser_cmpxchg_check
  	dabt_helper
  
-@@ -433,12 +438,12 @@ ENDPROC(__dabt_usr)
+@@ -438,11 +421,6 @@ ENDPROC(__dabt_usr)
  	.align	5
  __irq_usr:
  	usr_entry
--	kuser_cmpxchg_check
- 
- #ifdef CONFIG_IRQSOFF_TRACER
- 	bl	trace_hardirqs_off
- #endif
- 
-+	kuser_cmpxchg_check
+-
+-#ifdef CONFIG_IRQSOFF_TRACER
+-	bl	trace_hardirqs_off
+-#endif
+-
+ 	kuser_cmpxchg_check
  	irq_handler
  	get_thread_info tsk
- 	mov	why, #0
-@@ -451,6 +456,11 @@ ENDPROC(__irq_usr)
- 	.align	5
+@@ -457,10 +435,6 @@ ENDPROC(__irq_usr)
  __und_usr:
  	usr_entry
-+
-+#ifdef CONFIG_IRQSOFF_TRACER
-+	bl	trace_hardirqs_off
-+#endif
-+
+ 
+-#ifdef CONFIG_IRQSOFF_TRACER
+-	bl	trace_hardirqs_off
+-#endif
+-
  	mov	r2, r4
  	mov	r3, r5
  
-@@ -669,6 +679,11 @@ ENDPROC(__und_usr_unknown)
+@@ -679,11 +653,6 @@ ENDPROC(__und_usr_unknown)
  	.align	5
  __pabt_usr:
  	usr_entry
-+
-+#ifdef CONFIG_IRQSOFF_TRACER
-+	bl	trace_hardirqs_off
-+#endif
-+
+-
+-#ifdef CONFIG_IRQSOFF_TRACER
+-	bl	trace_hardirqs_off
+-#endif
+-
  	pabt_helper
  	mov	r2, sp				@ regs
  	bl	do_PrefetchAbort		@ call abort handler
