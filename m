@@ -1,119 +1,73 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 19:05:35 +0100
-Subject: [PATCH] OMAP3: run the ASM sleep code from DDR
-In-Reply-To: <87mxh0tuk2.fsf@ti.com>
-References: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
-	<87mxh0tuk2.fsf@ti.com>
-Message-ID: <20110629180535.GF23312@n2100.arm.linux.org.uk>
+From: svaidy@linux.vnet.ibm.com (Vaidyanathan Srinivasan)
+Date: Wed, 29 Jun 2011 23:37:33 +0530
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <1309367184.11430.594.camel@nimitz>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+	<1309367184.11430.594.camel@nimitz>
+Message-ID: <20110629180733.GF3646@dirshya.in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 10:29:49AM -0700, Kevin Hilman wrote:
-> Russell, if you're OK with it, can you add it to your suspend branch for
-> the upcoming merge window?
+* Dave Hansen <dave@linux.vnet.ibm.com> [2011-06-29 10:06:24]:
 
-Yes - though I think we can go a little bit further - this patch is on
-top of my code so far, and is untested.  There isn't a need for the
-saving of these registers to be in assembly because we can read them
-just as easily from C code.
+> I was kinda hoping for something a bit simpler than that.  I'd boil down
+> what you were saying to this:
+> 
+>      1. The kernel must be aware of how the pieces of hardware are
+>         mapped in to the system's physical address space
+>      2. The kernel must have a mechanism in place to minimize access to
+>         specific pieces of hardware 
+          (mainly by controlling allocations and reclaim)
+                
 
-Comments?
+>      3. For destructive power-down operations, the kernel should have a
+>         mechanism in place to ensure that no valuable data is contained
+>         in the memory to be powered down.
+> 
+> Is that complete?
 
- arch/arm/mach-omap2/pm.h        |    2 +-
- arch/arm/mach-omap2/pm34xx.c    |   19 +++++++++++++++++--
- arch/arm/mach-omap2/sleep34xx.S |   12 ++----------
- 3 files changed, 20 insertions(+), 13 deletions(-)
+At a high level these are the main requirements, except that different
+operations/features can happen at different/higher granularity.  The
+infrastructure should be able to related groups of regions and act
+upon for a specific optimization.  Like granularity for (2) may be
+512MB, while (3) could be a pair of 512MB blocks. This is relatively
+a minor issue to solve.
 
-diff --git a/arch/arm/mach-omap2/pm.h b/arch/arm/mach-omap2/pm.h
-index 45bcfce..4984cca 100644
---- a/arch/arm/mach-omap2/pm.h
-+++ b/arch/arm/mach-omap2/pm.h
-@@ -92,7 +92,7 @@ extern void omap24xx_idle_loop_suspend(void);
- 
- extern void omap24xx_cpu_suspend(u32 dll_ctrl, void __iomem *sdrc_dlla_ctrl,
- 					void __iomem *sdrc_power);
--extern void omap34xx_cpu_suspend(u32 *addr, int save_state);
-+extern void omap34xx_cpu_suspend(int save_state);
- extern int save_secure_ram_context(u32 *addr);
- extern void omap3_save_scratchpad_contents(void);
- 
-diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
-index 3e9a13e..6366352 100644
---- a/arch/arm/mach-omap2/pm34xx.c
-+++ b/arch/arm/mach-omap2/pm34xx.c
-@@ -78,7 +78,7 @@ struct power_state {
- 
- static LIST_HEAD(pwrst_list);
- 
--static void (*_omap_sram_idle)(u32 *addr, int save_state);
-+static void (*_omap_sram_idle)(int save_state);
- 
- static int (*_omap_save_secure_sram)(u32 *addr);
- 
-@@ -307,9 +307,22 @@ static irqreturn_t prcm_interrupt_handler (int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
-+static void omap34xx_save_context(u32 *save)
-+{
-+	u32 val;
-+
-+	asm("mrc p15, 0, %0, c1, c0, 1" : "=r" (val));
-+	*save++ = 1;
-+	*save++ = val;
-+
-+	asm("mrc p15, 1, %0, c9, c0, 2" : "=r" (val));
-+	*save++ = 1;
-+	*save++ = val;
-+}
-+
- static void omap34xx_do_sram_idle(unsigned long save_state)
- {
--	_omap_sram_idle(omap3_arm_context, save_state);
-+	_omap_sram_idle(save_state);
- }
- 
- void omap_sram_idle(void)
-@@ -412,6 +425,8 @@ void omap_sram_idle(void)
- 	 * get saved. The rest is placed on the stack, and restored
- 	 * from there before resuming.
- 	 */
-+	if (save_state)
-+		omap34xx_save_context(omap3_arm_context);
- 	if (save_state == 1 || save_state == 3)
- 		cpu_suspend(save_state, omap34xx_do_sram_idle);
- 	else
-diff --git a/arch/arm/mach-omap2/sleep34xx.S b/arch/arm/mach-omap2/sleep34xx.S
-index d18f52e..3335753 100644
---- a/arch/arm/mach-omap2/sleep34xx.S
-+++ b/arch/arm/mach-omap2/sleep34xx.S
-@@ -150,8 +150,7 @@ ENTRY(omap34xx_cpu_suspend)
- 	stmfd	sp!, {r4 - r11, lr}	@ save registers on stack
- 
- 	/*
--	 * r0 contains CPU context save/restore pointer in sdram
--	 * r1 contains information about saving context:
-+	 * r0 contains information about saving context:
- 	 *   0 - No context lost
- 	 *   1 - Only L1 and logic lost
- 	 *   2 - Only L2 lost (Even L1 is retained we clean it along with L2)
-@@ -159,18 +158,11 @@ ENTRY(omap34xx_cpu_suspend)
- 	 */
- 
- 	/* Directly jump to WFI is the context save is not required */
--	cmp	r1, #0x0
-+	cmp	r0, #0x0
- 	beq	omap3_do_wfi
- 
- 	/* Otherwise fall through to the save context code */
- save_context_wfi:
--	mov	r8, r0			@ Store SDRAM address in r8
--	mrc	p15, 0, r5, c1, c0, 1	@ Read Auxiliary Control Register
--	mov	r4, #0x1		@ Number of parameters for restore call
--	stmia	r8!, {r4-r5}		@ Push parameters for restore call
--	mrc	p15, 1, r5, c9, c0, 2	@ Read L2 AUX ctrl register
--	stmia	r8!, {r4-r5}		@ Push parameters for restore call
--
- 	/*
- 	 * jump out to kernel flush routine
- 	 *  - reuse that code is better
+> On Wed, 2011-06-29 at 18:30 +0530, Ankita Garg wrote:
+> > 1) Dynamic Power Transition: The memory controller can have the ability
+> > to automatically transition regions of memory into lower power states
+> > when they are devoid of references for a pre-defined threshold amount of
+> > time. Memory contents are preserved in the low power states and accessing
+> > memory that is at a low power state takes a latency hit.
+> > 
+> > 2) Dynamic Power Off: If a region is free/unallocated, the software can
+> > indicate to the controller to completely turn off power to a certain
+> > region. Memory contents are lost and hence the software has to be
+> > absolutely sure about the usage statistics of the particular region. This
+> > is a runtime capability, where the required amount of memory can be
+> > powered 'ON' to match the workload demands.
+> > 
+> > 3) Partial Array Self-Refresh (PASR): If a certain regions of memory is
+> > free/unallocated, the software can indicate to the controller to not
+> > refresh that region when the system goes to suspend-to-ram state and
+> > thereby save standby power consumption.
+> 
+> (3) is simply a subset of (2), but with the additional restriction that
+> the power off can only occur during a suspend operation.  
+> 
+> Let's say we fully implemented support for (2).  What would be missing
+> to support PASR?
+
+The similarity between (2) and (3) here is the need for accurate
+statistics to know allocation status. The difference is the
+actuation/trigger part... in case of (2) the trigger would happen
+during allocation/free while in case of (3) it happens only at suspend
+time.  Also the granularity could be different, generally PASR is very
+fine grain as compared for power-off at controller level.
+
+We can combine them and look at just how to track allocations at
+different (or multiple) physical boundaries.
+
+--Vaidy
