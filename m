@@ -1,37 +1,66 @@
-From: ohad@wizery.com (Ohad Ben-Cohen)
-Date: Wed, 29 Jun 2011 18:04:37 +0300
-Subject: [RFC 2/8] remoteproc: add omap implementation
-In-Reply-To: <20110627210007.GC20865@ponder.secretlab.ca>
-References: <1308640714-17961-1-git-send-email-ohad@wizery.com>
-	<1308640714-17961-3-git-send-email-ohad@wizery.com>
-	<20110627210007.GC20865@ponder.secretlab.ca>
-Message-ID: <BANLkTi=4Pp1UYWFsBywRvLL1n=ggCZgAeA@mail.gmail.com>
+From: frank.hofmann@tomtom.com (Frank Hofmann)
+Date: Wed, 29 Jun 2011 16:14:23 +0100 (BST)
+Subject: [RFC PATCH v5] ARM hibernation / suspend-to-disk (fwd)
+In-Reply-To: <4E0B3C48.1060101@parrot.com>
+References: <alpine.DEB.2.00.1106131303290.25153@localhost6.localdomain6>
+	<20110613122601.GC12325@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106131400090.25153@localhost6.localdomain6>
+	<20110613164452.GE13643@n2100.arm.linux.org.uk>
+	<alpine.DEB.2.00.1106151349520.11405@localhost6.localdomain6>
+	<4E0B3C48.1060101@parrot.com>
+Message-ID: <alpine.DEB.2.00.1106291555330.2266@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 12:00 AM, Grant Likely
-<grant.likely@secretlab.ca> wrote:
-> Very little for me to comment on here. ?However, something I just
-> noticed. ?Why is it necessary to pass in THIS_MODULE to the
-> rproc_register function? ?Having a reference to the pdev gives you the
-> pointer to the driver, which has the THIS_MODULE value in it. ?That
-> should be sufficient.
 
-Nice one, thanks !
 
-> /me also isn't sure if incrementing the refcount on the module is the
-> best way to prevent the rproc from going away, but I haven't dug into
-> the details in the driver code to find out. ?Drivers can get unbound
-> from devices without the driver being unloaded, so I imagine there is
-> an in-use count on the device itself that would prevent driver
-> unbinding.
+On Wed, 29 Jun 2011, Matthieu CASTET wrote:
 
-Yes, increasing the module refcount is necessary to prevent the user
-from removing the driver when the rproc is used.
+> Frank Hofmann a ?crit :
+>> On Mon, 13 Jun 2011, Russell King - ARM Linux wrote:
+>>
+>> Hi Russell,
+>>
+>>
+>> this change is perfect; with this, the hibernation support code turns into
+>> the attached.
+>>
+>> That's both better and simpler to perform a full suspend/resume cycle (via
+>> resetting in the cpu_suspend "finisher") after the snapshot image has been
+>> created, instead of shoehorning a return into this.
+>>
+>> FrankH.
+>
+>
+>>
+>> +
+>> +u8 __swsusp_resume_stk[PAGE_SIZE/2] __nosavedata;
+> It look like dangerous : there is no alignment constraint, but the stack should
+> be aligned on a 8 Bytes.
 
-If the underlying device goes away while rproc is used, then
-rproc_unregister should return -EBUSY, which would fail the underlying
-driver's ->remove() handler (gpiolib is doing something very similar).
-I have forgotten to add this check, and will add it now.
+Uh - sorry. I used to have both the __nosavedata and 
+__attribute__((__aligned__(PAGE_SIZE/2))) attributes there. That must've 
+gone lost at one point.
 
-Thanks !
+
+It's an artifact of the build that things turn out ok by default; the 
+__nosavedata forces a separate section (page), and arch/arm is linked 
+before kernel/power (the other user of __nosavedata), hence this block, 
+due to the way the kernel build works, ends up just fine.
+
+But as you say, not by intent / declaration.
+
+
+Have you seen Will Deacon's suggested kexec changes ? That keeps a "reset 
+stack" page around, _elsewhere_, and I've been considering using that. In 
+the end, all swsusp_arch_resume() really requires is a stack page that's 
+guaranteed to be outside the target kernel data, thereby left alone by the 
+restore. __nosavedata is merely one way.
+
+>
+>
+> Matthieu
+>
+Thanks,
+
+FrankH.
