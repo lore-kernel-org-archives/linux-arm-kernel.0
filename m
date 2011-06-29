@@ -1,64 +1,61 @@
-From: kgene.kim@samsung.com (Kukjin Kim)
-Date: Wed, 29 Jun 2011 22:52:01 +0900
-Subject: [PATCH v2 3/5] ARM: Exynos4: Support ADC
-In-Reply-To: <1308621527-2457-4-git-send-email-myungjoo.ham@samsung.com>
-References: <20110620101737.GA31864@opensource.wolfsonmicro.com>
-	<1308621527-2457-1-git-send-email-myungjoo.ham@samsung.com>
-	<1308621527-2457-4-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <004b01cc3663$bb458760$31d09620$%kim@samsung.com>
+From: shawn.guo@freescale.com (Shawn Guo)
+Date: Wed, 29 Jun 2011 22:00:39 +0800
+Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC controller
+	driver
+In-Reply-To: <20110629122942.GH1992@pengutronix.de>
+References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
+	<1309335878-16678-2-git-send-email-b32955@freescale.com>
+	<20110629100658.GE1992@pengutronix.de>
+	<20110629103337.GF1992@pengutronix.de>
+	<4E0B0296.6060902@freescale.com>
+	<20110629122942.GH1992@pengutronix.de>
+Message-ID: <20110629140038.GB25931@S2100-06.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-MyungJoo Ham wrote:
+On Wed, Jun 29, 2011 at 02:29:42PM +0200, Wolfram Sang wrote:
 > 
-> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-> --
-> v2: No changes from v1. Resubmitted as a series of patches
-> ---
->  arch/arm/mach-exynos4/Kconfig             |    1 +
->  arch/arm/mach-exynos4/cpu.c               |    4 ++++
->  arch/arm/mach-exynos4/include/mach/irqs.h |    8 ++++++++
->  arch/arm/mach-exynos4/include/mach/map.h  |    5 +++++
->  4 files changed, 18 insertions(+), 0 deletions(-)
+> > > Still, the problem exists: When a second channel GPMI channel is
+> > > requested, dmaengine will return -EBUSY, because the DMAIRQ is already
+> > > taken.
+> > >
+> > Yes, we should change the DMA code, it is a DMA bug.
+> > I ever submitted a patch about the issue:
+> > http://patchwork.ozlabs.org/patch/87145/
 > 
-> diff --git a/arch/arm/mach-exynos4/Kconfig b/arch/arm/mach-exynos4/Kconfig
-> index 1435fc3..61fdf68 100644
-> --- a/arch/arm/mach-exynos4/Kconfig
-> +++ b/arch/arm/mach-exynos4/Kconfig
-> @@ -183,6 +183,7 @@ config MACH_NURI
->  	select EXYNOS4_SETUP_SDHCI
->  	select EXYNOS4_SETUP_USB_PHY
->  	select SAMSUNG_DEV_PWM
-> +	select SAMSUNG_DEV_ADC
->  	help
->  	  Machine support for Samsung Mobile NURI Board.
+> That approach was rejected because it would register the same handler
+> n-times where one time would do. Your other approach puts too much
+> mach-specific details into the driver IMO and probably won't scale very
+> well. Maybe we should add something to the private dma_data (like flags
+> indicating SHARED) and then do some refcounting?
 > 
-> diff --git a/arch/arm/mach-exynos4/cpu.c b/arch/arm/mach-exynos4/cpu.c
-> index 9babe44..c9af2f9 100644
+I would suggest leave this gpmi specific quirk to gpmi driver to sort
+out.  With the following mxs-dma change, it should work if gpmi driver
+can pass the valid gpmi irq number for only one gpmi channel, and -1
+for all others.
 
-(snip)
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 88aad4f..ea27002 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -327,10 +327,12 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
 
-> 
-> +#define IRQ_ADC0                COMBINER_IRQ(19, 0)
-> +#define IRQ_PEN0                COMBINER_IRQ(19, 1)
-> +#define IRQ_ADC1                COMBINER_IRQ(19, 2)
-> +#define IRQ_PEN1                COMBINER_IRQ(19, 3)
-> +
+        memset(mxs_chan->ccw, 0, PAGE_SIZE);
 
-As you know, we need to use external GIC instead of current internal on
-EXYNOS4210.
-So could you please re-make this based on that?
+-       ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
+-                               0, "mxs-dma", mxs_dma);
+-       if (ret)
+-               goto err_irq;
++       if (mxs_chan->chan_irq >= 0) {
++               ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
++                                       0, "mxs-dma", mxs_dma);
++               if (ret)
++                       goto err_irq;
++       }
 
-I will make some branch or will apply external GIC patches into for-next
-soon.
+        ret = clk_enable(mxs_dma->clk);
+        if (ret)
 
-(snip)
-
-Thanks.
-
-Best regards,
-Kgene.
---
-Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
-SW Solution Development Team, Samsung Electronics Co., Ltd.
+-- 
+Regards,
+Shawn
