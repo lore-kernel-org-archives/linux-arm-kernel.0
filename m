@@ -1,146 +1,267 @@
 From: robherring2@gmail.com (Rob Herring)
-Date: Wed, 29 Jun 2011 11:46:54 -0500
-Subject: [PATCH 1/6] microblaze: move pci flag functions into asm-generic
+Date: Wed, 29 Jun 2011 11:46:59 -0500
+Subject: [PATCH 6/6] ARM: set vga memory base at run-time
 In-Reply-To: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
 References: <1309366019-24379-1-git-send-email-robherring2@gmail.com>
-Message-ID: <1309366019-24379-2-git-send-email-robherring2@gmail.com>
+Message-ID: <1309366019-24379-7-git-send-email-robherring2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Rob Herring <rob.herring@calxeda.com>
 
-Move pci_set_flags, pci_add_flags, and pci_has_flag into
-asm-generic/pci-bridge.h so other archs can use them.
+Convert the incorrectly named PCIMEM_BASE to a variable called vga_base.
+This removes the dependency on mach/hardware.h.
 
 Signed-off-by: Rob Herring <rob.herring@calxeda.com>
 Acked-by: Nicolas Pitre <nicolas.pitre@linaro.org>
-Cc: Jesse Barnes <jbarnes@virtuousgeek.org>
 ---
- arch/microblaze/include/asm/pci-bridge.h |   36 +-----------------
- include/asm-generic/pci-bridge.h         |   62 ++++++++++++++++++++++++++++++
- 2 files changed, 63 insertions(+), 35 deletions(-)
- create mode 100644 include/asm-generic/pci-bridge.h
+ arch/arm/include/asm/vga.h                       |    5 +++--
+ arch/arm/mach-dove/include/mach/hardware.h       |    3 ---
+ arch/arm/mach-dove/pcie.c                        |    3 +++
+ arch/arm/mach-footbridge/dc21285.c               |    1 +
+ arch/arm/mach-integrator/include/mach/hardware.h |    2 --
+ arch/arm/mach-integrator/pci_v3.c                |    2 ++
+ arch/arm/mach-kirkwood/include/mach/hardware.h   |    3 ---
+ arch/arm/mach-kirkwood/pcie.c                    |    2 ++
+ arch/arm/mach-mv78xx0/include/mach/hardware.h    |    3 ---
+ arch/arm/mach-mv78xx0/pcie.c                     |    2 ++
+ arch/arm/mach-orion5x/include/mach/hardware.h    |    3 ---
+ arch/arm/mach-orion5x/pci.c                      |    1 +
+ arch/arm/mach-shark/include/mach/hardware.h      |    2 --
+ arch/arm/mach-shark/pci.c                        |    2 ++
+ arch/arm/mm/iomap.c                              |    3 +++
+ 15 files changed, 19 insertions(+), 18 deletions(-)
 
-diff --git a/arch/microblaze/include/asm/pci-bridge.h b/arch/microblaze/include/asm/pci-bridge.h
-index 746df91..ad1480f 100644
---- a/arch/microblaze/include/asm/pci-bridge.h
-+++ b/arch/microblaze/include/asm/pci-bridge.h
-@@ -10,6 +10,7 @@
+diff --git a/arch/arm/include/asm/vga.h b/arch/arm/include/asm/vga.h
+index 250a4dd..91f4021 100644
+--- a/arch/arm/include/asm/vga.h
++++ b/arch/arm/include/asm/vga.h
+@@ -2,9 +2,10 @@
+ #define ASMARM_VGA_H
+ 
+ #include <linux/io.h>
+-#include <mach/hardware.h>
+ 
+-#define VGA_MAP_MEM(x,s)	(PCIMEM_BASE + (x))
++extern unsigned long vga_base;
++
++#define VGA_MAP_MEM(x,s)	(vga_base + (x))
+ 
+ #define vga_readb(x)	(*((volatile unsigned char *)x))
+ #define vga_writeb(x,y)	(*((volatile unsigned char *)y) = (x))
+diff --git a/arch/arm/mach-dove/include/mach/hardware.h b/arch/arm/mach-dove/include/mach/hardware.h
+index 94c5a2c..f1368b9 100644
+--- a/arch/arm/mach-dove/include/mach/hardware.h
++++ b/arch/arm/mach-dove/include/mach/hardware.h
+@@ -11,9 +11,6 @@
+ 
+ #include "dove.h"
+ 
+-#define PCIMEM_BASE			DOVE_PCIE0_MEM_PHYS_BASE
+-
+-
+ /* Macros below are required for compatibility with PXA AC'97 driver.	*/
+ #define __REG(x)	(*((volatile u32 *)((x) - DOVE_SB_REGS_PHYS_BASE + \
+ 				DOVE_SB_REGS_VIRT_BASE)))
+diff --git a/arch/arm/mach-dove/pcie.c b/arch/arm/mach-dove/pcie.c
+index 4810426..021579a 100644
+--- a/arch/arm/mach-dove/pcie.c
++++ b/arch/arm/mach-dove/pcie.c
+@@ -11,6 +11,7 @@
+ #include <linux/kernel.h>
  #include <linux/pci.h>
- #include <linux/list.h>
+ #include <linux/mbus.h>
++#include <video/vga.h>
+ #include <asm/mach/pci.h>
+ #include <asm/mach/arch.h>
+ #include <asm/setup.h>
+@@ -230,6 +231,8 @@ void __init dove_pcie_init(int init_port0, int init_port1)
+ {
+ 	pcibios_min_io = 0x1000;
+ 	pcibios_min_mem = 0x01000000;
++	vga_base = DOVE_PCIE0_MEM_PHYS_BASE;
++
+ 	if (init_port0)
+ 		add_pcie_port(0, DOVE_PCIE0_VIRT_BASE);
+ 
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index e7ce279..5821fdd 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -297,6 +297,7 @@ void __init dc21285_preinit(void)
+ 
+ 	pcibios_min_io = 0x1000;
+ 	pcibios_min_mem = 0x81000000;
++	vga_base = PCIMEM_BASE;
+ 
+ 	mem_size = (unsigned int)high_memory - PAGE_OFFSET;
+ 	for (mem_mask = 0x00100000; mem_mask < 0x10000000; mem_mask <<= 1)
+diff --git a/arch/arm/mach-integrator/include/mach/hardware.h b/arch/arm/mach-integrator/include/mach/hardware.h
+index 0ce5212..65fed7c 100644
+--- a/arch/arm/mach-integrator/include/mach/hardware.h
++++ b/arch/arm/mach-integrator/include/mach/hardware.h
+@@ -32,8 +32,6 @@
+ #define IO_SIZE			0x0B000000                 // How much?
+ #define IO_START		INTEGRATOR_HDR_BASE        // PA of IO
+ 
+-#define PCIMEM_BASE		PCI_MEMORY_VADDR
+-
+ /* macro to get@IO space when running virtually */
+ #ifdef CONFIG_MMU
+ #define IO_ADDRESS(x)	(((x) & 0x000fffff) | (((x) >> 4) & 0x0ff00000) | IO_BASE)
+diff --git a/arch/arm/mach-integrator/pci_v3.c b/arch/arm/mach-integrator/pci_v3.c
+index 11b86e5..dd56bfb 100644
+--- a/arch/arm/mach-integrator/pci_v3.c
++++ b/arch/arm/mach-integrator/pci_v3.c
+@@ -27,6 +27,7 @@
+ #include <linux/spinlock.h>
+ #include <linux/init.h>
+ #include <linux/io.h>
++#include <video/vga.h>
+ 
+ #include <mach/hardware.h>
+ #include <mach/platform.h>
+@@ -504,6 +505,7 @@ void __init pci_v3_preinit(void)
+ 
+ 	pcibios_min_io = 0x6000;
+ 	pcibios_min_mem = 0x00100000;
++	vga_base = PCI_MEMORY_VADDR;
+ 
+ 	/*
+ 	 * Hook in our fault handler for PCI errors
+diff --git a/arch/arm/mach-kirkwood/include/mach/hardware.h b/arch/arm/mach-kirkwood/include/mach/hardware.h
+index 470899b..742b74f 100644
+--- a/arch/arm/mach-kirkwood/include/mach/hardware.h
++++ b/arch/arm/mach-kirkwood/include/mach/hardware.h
+@@ -11,7 +11,4 @@
+ 
+ #include "kirkwood.h"
+ 
+-#define PCIMEM_BASE			KIRKWOOD_PCIE_MEM_PHYS_BASE /* mem base for VGA */
+-
+-
+ #endif
+diff --git a/arch/arm/mach-kirkwood/pcie.c b/arch/arm/mach-kirkwood/pcie.c
+index 6e32b8a..b53002c 100644
+--- a/arch/arm/mach-kirkwood/pcie.c
++++ b/arch/arm/mach-kirkwood/pcie.c
+@@ -12,6 +12,7 @@
+ #include <linux/pci.h>
+ #include <linux/slab.h>
+ #include <linux/mbus.h>
++#include <video/vga.h>
+ #include <asm/irq.h>
+ #include <asm/mach/pci.h>
+ #include <plat/pcie.h>
+@@ -273,6 +274,7 @@ void __init kirkwood_pcie_init(unsigned int portmask)
+ {
+ 	pcibios_min_io = 0x00001000;
+ 	pcibios_min_mem = 0x01000000;
++	vga_base = KIRKWOOD_PCIE_MEM_PHYS_BASE;
+ 
+ 	if (portmask & KW_PCIE0)
+ 		add_pcie_port(0, PCIE_VIRT_BASE);
+diff --git a/arch/arm/mach-mv78xx0/include/mach/hardware.h b/arch/arm/mach-mv78xx0/include/mach/hardware.h
+index 29e37ed..67cab0a 100644
+--- a/arch/arm/mach-mv78xx0/include/mach/hardware.h
++++ b/arch/arm/mach-mv78xx0/include/mach/hardware.h
+@@ -11,7 +11,4 @@
+ 
+ #include "mv78xx0.h"
+ 
+-#define PCIMEM_BASE			MV78XX0_PCIE_MEM_PHYS_BASE /* mem base for VGA */
+-
+-
+ #endif
+diff --git a/arch/arm/mach-mv78xx0/pcie.c b/arch/arm/mach-mv78xx0/pcie.c
+index cc9d1b9..bafd1ed 100644
+--- a/arch/arm/mach-mv78xx0/pcie.c
++++ b/arch/arm/mach-mv78xx0/pcie.c
+@@ -11,6 +11,7 @@
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/mbus.h>
++#include <video/vga.h>
+ #include <asm/irq.h>
+ #include <asm/mach/pci.h>
+ #include <plat/pcie.h>
+@@ -299,6 +300,7 @@ void __init mv78xx0_pcie_init(int init_port0, int init_port1)
+ {
+ 	pcibios_min_io = 0x00001000;
+ 	pcibios_min_mem = 0x01000000;
++	vga_base = MV78XX0_PCIE_MEM_PHYS_BASE;
+ 
+ 	if (init_port0) {
+ 		add_pcie_port(0, 0, PCIE00_VIRT_BASE);
+diff --git a/arch/arm/mach-orion5x/include/mach/hardware.h b/arch/arm/mach-orion5x/include/mach/hardware.h
+index b6d55bc..3957354 100644
+--- a/arch/arm/mach-orion5x/include/mach/hardware.h
++++ b/arch/arm/mach-orion5x/include/mach/hardware.h
+@@ -11,7 +11,4 @@
+ 
+ #include "orion5x.h"
+ 
+-#define PCIMEM_BASE		ORION5X_PCIE_MEM_PHYS_BASE
+-
+-
+ #endif
+diff --git a/arch/arm/mach-orion5x/pci.c b/arch/arm/mach-orion5x/pci.c
+index d80aeef..7dc672c 100644
+--- a/arch/arm/mach-orion5x/pci.c
++++ b/arch/arm/mach-orion5x/pci.c
+@@ -562,6 +562,7 @@ int __init orion5x_pci_sys_setup(int nr, struct pci_sys_data *sys)
+ 
+ 	pcibios_min_io = 0x00001000;
+ 	pcibios_min_mem = 0x01000000;
++	vga_base = ORION5X_PCIE_MEM_PHYS_BASE;
+ 
+ 	if (nr == 0) {
+ 		orion_pcie_set_local_bus_nr(PCIE_BASE, sys->busnr);
+diff --git a/arch/arm/mach-shark/include/mach/hardware.h b/arch/arm/mach-shark/include/mach/hardware.h
+index 4342931..663f952 100644
+--- a/arch/arm/mach-shark/include/mach/hardware.h
++++ b/arch/arm/mach-shark/include/mach/hardware.h
+@@ -12,7 +12,5 @@
+ 
+ #define UNCACHEABLE_ADDR        0xdf010000
+ 
+-#define PCIMEM_BASE		0xe8000000
+-
+ #endif
+ 
+diff --git a/arch/arm/mach-shark/pci.c b/arch/arm/mach-shark/pci.c
+index 4aea637..92d7227 100644
+--- a/arch/arm/mach-shark/pci.c
++++ b/arch/arm/mach-shark/pci.c
+@@ -8,6 +8,7 @@
+ #include <linux/kernel.h>
+ #include <linux/pci.h>
+ #include <linux/init.h>
++#include <video/vga.h>
+ 
+ #include <asm/irq.h>
+ #include <asm/mach/pci.h>
+@@ -42,6 +43,7 @@ static int __init shark_pci_init(void)
+ 
+ 	pcibios_min_io = 0x6000;
+ 	pcibios_min_mem = 0x50000000;
++	vga_base = 0xe8000000;
+ 
+ 	pci_common_init(&shark_pci);
+ 
+diff --git a/arch/arm/mm/iomap.c b/arch/arm/mm/iomap.c
+index 8946326..476ad1a 100644
+--- a/arch/arm/mm/iomap.c
++++ b/arch/arm/mm/iomap.c
+@@ -9,6 +9,9 @@
  #include <linux/ioport.h>
-+#include <asm-generic/pci-bridge.h>
+ #include <linux/io.h>
  
- struct device_node;
- 
-@@ -164,40 +165,5 @@ extern struct pci_controller *pcibios_alloc_controller(struct device_node *dev);
- extern void pcibios_free_controller(struct pci_controller *phb);
- extern void pcibios_setup_phb_resources(struct pci_controller *hose);
- 
--#ifdef CONFIG_PCI
--extern unsigned int pci_flags;
--
--static inline void pci_set_flags(int flags)
--{
--	pci_flags = flags;
--}
--
--static inline void pci_add_flags(int flags)
--{
--	pci_flags |= flags;
--}
--
--static inline int pci_has_flag(int flag)
--{
--	return pci_flags & flag;
--}
--
--extern struct list_head hose_list;
--
--extern int pcibios_vaddr_is_ioport(void __iomem *address);
--#else
--static inline int pcibios_vaddr_is_ioport(void __iomem *address)
--{
--	return 0;
--}
--
--static inline void pci_set_flags(int flags) { }
--static inline void pci_add_flags(int flags) { }
--static inline int pci_has_flag(int flag)
--{
--	return 0;
--}
--#endif	/* CONFIG_PCI */
--
- #endif	/* __KERNEL__ */
- #endif	/* _ASM_MICROBLAZE_PCI_BRIDGE_H */
-diff --git a/include/asm-generic/pci-bridge.h b/include/asm-generic/pci-bridge.h
-new file mode 100644
-index 0000000..4a5aca2
---- /dev/null
-+++ b/include/asm-generic/pci-bridge.h
-@@ -0,0 +1,62 @@
-+/*
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; either version
-+ * 2 of the License, or (at your option) any later version.
-+ */
-+#ifndef _ASM_GENERIC_PCI_BRIDGE_H
-+#define _ASM_GENERIC_PCI_BRIDGE_H
++unsigned long vga_base;
++EXPORT_SYMBOL(vga_base);
 +
-+#ifdef __KERNEL__
-+
-+enum {
-+	/* Force re-assigning all resources (ignore firmware
-+	 * setup completely)
-+	 */
-+	PCI_REASSIGN_ALL_RSRC	= 0x00000001,
-+
-+	/* Re-assign all bus numbers */
-+	PCI_REASSIGN_ALL_BUS	= 0x00000002,
-+
-+	/* Do not try to assign, just use existing setup */
-+	PCI_PROBE_ONLY		= 0x00000004,
-+
-+	/* Don't bother with ISA alignment unless the bridge has
-+	 * ISA forwarding enabled
-+	 */
-+	PCI_CAN_SKIP_ISA_ALIGN	= 0x00000008,
-+
-+	/* Enable domain numbers in /proc */
-+	PCI_ENABLE_PROC_DOMAINS	= 0x00000010,
-+	/* ... except for domain 0 */
-+	PCI_COMPAT_DOMAIN_0	= 0x00000020,
-+};
-+
-+#ifdef CONFIG_PCI
-+extern unsigned int pci_flags;
-+
-+static inline void pci_set_flags(int flags)
-+{
-+	pci_flags = flags;
-+}
-+
-+static inline void pci_add_flags(int flags)
-+{
-+	pci_flags |= flags;
-+}
-+
-+static inline int pci_has_flag(int flag)
-+{
-+	return pci_flags & flag;
-+}
-+#else
-+static inline void pci_set_flags(int flags) { }
-+static inline void pci_add_flags(int flags) { }
-+static inline int pci_has_flag(int flag)
-+{
-+	return 0;
-+}
-+#endif	/* CONFIG_PCI */
-+
-+#endif	/* __KERNEL__ */
-+#endif	/* _ASM_GENERIC_PCI_BRIDGE_H */
+ #ifdef __io
+ void __iomem *ioport_map(unsigned long port, unsigned int nr)
+ {
 -- 
 1.7.4.1
