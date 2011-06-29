@@ -1,49 +1,45 @@
-From: svaidy@linux.vnet.ibm.com (Vaidyanathan Srinivasan)
-Date: Wed, 29 Jun 2011 23:47:55 +0530
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <1309370342.11430.604.camel@nimitz>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110629130038.GA7909@in.ibm.com>
-	<1309367184.11430.594.camel@nimitz>
-	<20110629174220.GA9152@in.ibm.com>
-	<1309370342.11430.604.camel@nimitz>
-Message-ID: <20110629181755.GG3646@dirshya.in.ibm.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 29 Jun 2011 11:29:29 -0700
+Subject: [PATCHv2] omap2+: pm: cpufreq: Fix loops_per_jiffy calculation
+In-Reply-To: <20110628231711.GC23312@n2100.arm.linux.org.uk>
+References: <1308923618-5333-1-git-send-email-premi@ti.com>	<CAMbhsRQUKBZbC3jJt8XpjTW2n7uA529D6G0g4eT5iLEHn2iNLg@mail.gmail.com>	<20110628225523.GA23312@n2100.arm.linux.org.uk>	<CAMbhsRQjMmXrULVmFg9CoM0wzZ29wcHqEaT480NaDhB8hHEKZg@mail.gmail.com>
+	<20110628231711.GC23312@n2100.arm.linux.org.uk>
+Message-ID: <4E0B6F09.7010401@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Hansen <dave@linux.vnet.ibm.com> [2011-06-29 10:59:02]:
+On 06/28/2011 04:17 PM, Russell King - ARM Linux wrote:
+>
+> That's why people have proposed hardware-timer based delay loops -
+> these screw up the bogomips value (it no longer refers to the CPU
+> but to the timer used for the delays) and the code proposed thus far
+> probably has a severe negative impact on ARMs running at low clock
+> rates (the calculation cost of the number of loops to run becomes
+> significant for CPUs below 100MHz for short delays with the existing
+> optimized assembler, so moving it into C and introducing function
+> pointers will only make it worse.)
 
-> On Wed, 2011-06-29 at 23:12 +0530, Ankita Garg wrote:
-> > 	4. The kernel must have a mechanism to maintain utilization
-> > 	   statistics pertaining to a piece of hardware, so that it can
-> > 	   trigger the hardware to power it off
-> 
-> Having statistics like this would certainly be nice, but how important
-> _is_ it?  Is it really a show-stopper?  There's some stuff today, like
-> the NPT/EPT support in KVM where we don't even have visibility in to
-> when a given page is referenced.
-> 
-> It's also going to be a pain to track kernel references.  On x86, our
-> kernel linear mapping uses 1GB pages when it can, and those are greater
-> than the 512MB granularity that we've been talking about here.  It's
-> even larger on powerpc.  I'm also pretty sure we don't even _look_ at
-> the referenced bits in the kernel page tables.  We'll definitely need
-> some infrastructure to do that.
+Am I people? ;-)
 
-Utilization is all about allocated vs free and at most 'type of
-allocation'.  We are not looking at actual reference rates from page
-tables.  A free or unallocated page is not going to be referenced.
+The code I've proposed doesn't seem to have a negative impact on our
+targets even when the processor is running at 19.2 Mhz. Before and after
+the patches I get the same lpj value (this is all described in the
+commit text). I've also shown that rewriting delay.S into C doesn't
+negatively affect the hand optimized assembly as the before and after
+object code is nearly identical modulo register allocation. The only
+issue would be the one function pointer which I haven't heard anyone
+complain about until now.
 
+Even if the time to get into the __delay() routine increases by a few
+instructions I don't see how this harms anything as udelay() is a
+minimum time guarantee. We should strive to make it as close as possible
+to the time requested by the caller, but we shouldn't balk at the
+introduction of a few more cycles along the setup path. Finally, since
+the calibration takes into account most of the new instructions I doubt
+it will even be noticeable overhead to have the function pointers.
 
-> > 	5. Being able to group these pieces of hardware for purpose of
-> > 	   higher savings. 
-> 
-> Do you really mean group, or do you mean "turn as many off as possible"?
+What more can I do to convince you to take this patch?
 
-Grouping based on hardware topology could help save more power at
-higher granularity.  In most cases just turning as many off as
-possible will work.  But the design should allow grouping based on
-certain rules or hierarchies.
-
---Vaidy
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
