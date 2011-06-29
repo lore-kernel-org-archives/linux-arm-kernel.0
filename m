@@ -1,45 +1,36 @@
-From: jean.pihet@newoldbits.com (Jean Pihet)
-Date: Wed, 29 Jun 2011 15:32:24 +0200
-Subject: [PATCHv2 0/4] ARM: pmu: improve PMU type identification
-In-Reply-To: <20110629104213.GC2589@pulham.picochip.com>
-References: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
-	<20110629092622.GL21898@n2100.arm.linux.org.uk>
-	<20110629093652.GH1181@e102144-lin.cambridge.arm.com>
-	<20110629104213.GC2589@pulham.picochip.com>
-Message-ID: <BANLkTimWRz=h4RpBT9sWKkfMTKANGF_+gA@mail.gmail.com>
+From: axel.lin@gmail.com (Axel Lin)
+Date: Wed, 29 Jun 2011 21:33:57 +0800
+Subject: [PATCH] mach-ux500: fix build error due to unknown 'regulator_en'
+	field
+Message-ID: <1309354437.10872.1.camel@phoenix>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 12:42 PM, Jamie Iles <jamie@jamieiles.com> wrote:
-> On Wed, Jun 29, 2011 at 10:36:53AM +0100, Will Deacon wrote:
-Hi Will,
+Fix below build error:
 
->> Russell,
->>
->> On Wed, Jun 29, 2011 at 10:26:22AM +0100, Russell King - ARM Linux wrote:
->> > On Wed, Jun 15, 2011 at 03:40:00PM +0100, Mark Rutland wrote:
->> > > can be used similarly (the macros make entries look identical apart from the
->> > > {plat,of} prefix). This allows us to stop (ab)using platform_device::id, and
->> > > should allow for easier addition/modification of PMU driver bindings.
->> > >
->> > > BSPs need no longer care about the Type of PMUs they register; as long as a
->> > > binding exists the type will be assigned correctly.
->> >
->> > Could someone please look at adding an entry to the MAINTAINERS file
->> > for the ARM PMU stuff, so we know who should be looking after this stuff?
->>
->> I'm happy to maintain this stuff if nobody has any objections.
->
-> No objections from me, I think that sounds like a very good idea!
-No objections! I would be glad to lend a hand if neeeded!
+  CC      arch/arm/mach-ux500/board-mop500-u8500uib.o
+arch/arm/mach-ux500/board-mop500-u8500uib.c:35: error: unknown field 'regulator_en' specified in initializer
+arch/arm/mach-ux500/board-mop500-u8500uib.c:35: warning: excess elements in struct initializer
+arch/arm/mach-ux500/board-mop500-u8500uib.c:35: warning: (near initialization for 'rmi4_i2c_dev_platformdata')
+make[1]: *** [arch/arm/mach-ux500/board-mop500-u8500uib.o] Error 1
+make: *** [arch/arm/mach-ux500] Error 2
 
-Regards,
-Jean
->
-> Jamie
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+Signed-off-by: Axel Lin <axel.lin@gmail.com>
+---
+ arch/arm/mach-ux500/board-mop500-u8500uib.c |    1 -
+ 1 files changed, 0 insertions(+), 1 deletions(-)
+
+diff --git a/arch/arm/mach-ux500/board-mop500-u8500uib.c b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+index d8a8734..1af7228 100644
+--- a/arch/arm/mach-ux500/board-mop500-u8500uib.c
++++ b/arch/arm/mach-ux500/board-mop500-u8500uib.c
+@@ -32,7 +32,6 @@ static struct synaptics_rmi4_platform_data rmi4_i2c_dev_platformdata = {
+ 	.irq_type       = (IRQF_TRIGGER_FALLING | IRQF_SHARED),
+ 	.x_flip		= false,
+ 	.y_flip		= true,
+-	.regulator_en   = false,
+ };
+ 
+ static struct i2c_board_info __initdata mop500_i2c3_devices_u8500[] = {
+-- 
+1.7.4.1
