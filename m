@@ -1,21 +1,56 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 10:26:22 +0100
-Subject: [PATCHv2 0/4] ARM: pmu: improve PMU type identification
-In-Reply-To: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
-References: <1308148804-5518-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20110629092622.GL21898@n2100.arm.linux.org.uk>
+Date: Wed, 29 Jun 2011 10:26:36 +0100
+Subject: [PATCH 23/23] ARM: entry: no need to reload the SPSR value from
+	struct pt_regs
+In-Reply-To: <20110629091853.GK21898@n2100.arm.linux.org.uk>
+References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
+Message-ID: <E1Qbr2a-0002Gi-Fw@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 15, 2011 at 03:40:00PM +0100, Mark Rutland wrote:
-> can be used similarly (the macros make entries look identical apart from the
-> {plat,of} prefix). This allows us to stop (ab)using platform_device::id, and
-> should allow for easier addition/modification of PMU driver bindings.
-> 
-> BSPs need no longer care about the Type of PMUs they register; as long as a
-> binding exists the type will be assigned correctly.
+The SVC IRQ, prefetch and data abort handlers preserve the SPSR value
+via r5 across the exception.  Rather than re-loading it from pt_regs,
+use the preserved value instead.
 
-Could someone please look at adding an entry to the MAINTAINERS file
-for the ARM PMU stuff, so we know who should be looking after this stuff?
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ arch/arm/kernel/entry-armv.S |   10 +---------
+ 1 files changed, 1 insertions(+), 9 deletions(-)
 
-Thanks.
+diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
+index 3fa90ae..047ed5d 100644
+--- a/arch/arm/kernel/entry-armv.S
++++ b/arch/arm/kernel/entry-armv.S
+@@ -195,10 +195,6 @@ __dabt_svc:
+ 	@
+ 	disable_irq_notrace
+ 
+-	@
+-	@ restore SPSR and restart the instruction
+-	@
+-	ldr	r5, [sp, #S_PSR]
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	tst	r5, #PSR_I_BIT
+ 	bleq	trace_hardirqs_on
+@@ -223,7 +219,7 @@ __irq_svc:
+ 	tst	r0, #_TIF_NEED_RESCHED
+ 	blne	svc_preempt
+ #endif
+-	ldr	r5, [sp, #S_PSR]
++
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	@ The parent context IRQs must have been enabled to get here in
+ 	@ the first place, so there's no point checking the PSR I bit.
+@@ -308,10 +304,6 @@ __pabt_svc:
+ 	@
+ 	disable_irq_notrace
+ 
+-	@
+-	@ restore SPSR and restart the instruction
+-	@
+-	ldr	r5, [sp, #S_PSR]
+ #ifdef CONFIG_TRACE_IRQFLAGS
+ 	tst	r5, #PSR_I_BIT
+ 	bleq	trace_hardirqs_on
+-- 
+1.7.4.4
