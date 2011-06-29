@@ -1,139 +1,93 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Jun 2011 10:23:35 +0100
-Subject: [PATCH 14/23] ARM: entry: consolidate trace_hardirqs_off into
-	(svc|usr)_entry macros
+Date: Wed, 29 Jun 2011 10:23:55 +0100
+Subject: [PATCH 15/23] ARM: entry: re-allocate registers in irq entry
+	assembly macros
 In-Reply-To: <20110629091853.GK21898@n2100.arm.linux.org.uk>
 References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
-Message-ID: <E1Qbqzf-0002Fv-FB@rmk-PC.arm.linux.org.uk>
+Message-ID: <E1Qbqzz-0002Fz-Is@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All handlers now call trace_hardirqs_off, so move this common code into
-the (svc|usr)_entry assembler macros.
+This avoids the irq entry assembly corrupting r5, thereby allowing it
+to be preserved through to the svc exit code.
 
 Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
 ---
- arch/arm/kernel/entry-armv.S |   47 +++++++----------------------------------
- 1 files changed, 8 insertions(+), 39 deletions(-)
+ arch/arm/include/asm/entry-macro-multi.S |   14 +++++++-------
+ arch/arm/kernel/entry-armv.S             |   10 +++++-----
+ 2 files changed, 12 insertions(+), 12 deletions(-)
 
+diff --git a/arch/arm/include/asm/entry-macro-multi.S b/arch/arm/include/asm/entry-macro-multi.S
+index 2da8547..2f1e209 100644
+--- a/arch/arm/include/asm/entry-macro-multi.S
++++ b/arch/arm/include/asm/entry-macro-multi.S
+@@ -4,8 +4,8 @@
+  * Interrupt handling.  Preserves r7, r8, r9
+  */
+ 	.macro	arch_irq_handler_default
+-	get_irqnr_preamble r5, lr
+-1:	get_irqnr_and_base r0, r6, r5, lr
++	get_irqnr_preamble r6, lr
++1:	get_irqnr_and_base r0, r2, r6, lr
+ 	movne	r1, sp
+ 	@
+ 	@ routine called with r0 = irq number, r1 = struct pt_regs *
+@@ -17,17 +17,17 @@
+ 	/*
+ 	 * XXX
+ 	 *
+-	 * this macro assumes that irqstat (r6) and base (r5) are
++	 * this macro assumes that irqstat (r2) and base (r6) are
+ 	 * preserved from get_irqnr_and_base above
+ 	 */
+-	ALT_SMP(test_for_ipi r0, r6, r5, lr)
++	ALT_SMP(test_for_ipi r0, r2, r6, lr)
+ 	ALT_UP_B(9997f)
+ 	movne	r1, sp
+ 	adrne	lr, BSYM(1b)
+ 	bne	do_IPI
+ 
+ #ifdef CONFIG_LOCAL_TIMERS
+-	test_for_ltirq r0, r6, r5, lr
++	test_for_ltirq r0, r2, r6, lr
+ 	movne	r0, sp
+ 	adrne	lr, BSYM(1b)
+ 	bne	do_local_timer
+@@ -40,7 +40,7 @@
+ 	.align	5
+ 	.global \symbol_name
+ \symbol_name:
+-	mov	r4, lr
++	mov	r8, lr
+ 	arch_irq_handler_default
+-	mov     pc, r4
++	mov     pc, r8
+ 	.endm
 diff --git a/arch/arm/kernel/entry-armv.S b/arch/arm/kernel/entry-armv.S
-index c01cdb1..1da985f 100644
+index 1da985f..b7c4792 100644
 --- a/arch/arm/kernel/entry-armv.S
 +++ b/arch/arm/kernel/entry-armv.S
-@@ -179,16 +179,15 @@ ENDPROC(__und_invalid)
- 	@  r6 - orig_r0 (see pt_regs definition in ptrace.h)
- 	@
- 	stmia	r7, {r2 - r6}
--	.endm
--
--	.align	5
--__dabt_svc:
--	svc_entry
+@@ -29,16 +29,16 @@
+ #include <asm/entry-macro-multi.S>
  
- #ifdef CONFIG_TRACE_IRQFLAGS
- 	bl	trace_hardirqs_off
+ /*
+- * Interrupt handling.  Preserves r7, r8, r9
++ * Interrupt handling.
+  */
+ 	.macro	irq_handler
+ #ifdef CONFIG_MULTI_IRQ_HANDLER
+-	ldr	r5, =handle_arch_irq
++	ldr	r1, =handle_arch_irq
+ 	mov	r0, sp
+-	ldr	r5, [r5]
++	ldr	r1, [r1]
+ 	adr	lr, BSYM(9997f)
+-	teq	r5, #0
+-	movne	pc, r5
++	teq	r1, #0
++	movne	pc, r1
  #endif
-+	.endm
- 
-+	.align	5
-+__dabt_svc:
-+	svc_entry
- 	dabt_helper
- 
- 	@
-@@ -219,11 +218,6 @@ ENDPROC(__dabt_svc)
- 	.align	5
- __irq_svc:
- 	svc_entry
--
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_off
--#endif
--
- 	irq_handler
- 
- #ifdef CONFIG_PREEMPT
-@@ -267,11 +261,6 @@ __und_svc:
- #else
- 	svc_entry
- #endif
--
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_off
--#endif
--
- 	@
- 	@ call emulation code, which returns using r9 if it has emulated
- 	@ the instruction, or the more conventional lr if we are to treat
-@@ -317,11 +306,6 @@ ENDPROC(__und_svc)
- 	.align	5
- __pabt_svc:
- 	svc_entry
--
--#ifdef CONFIG_TRACE_IRQFLAGS
--	bl	trace_hardirqs_off
--#endif
--
- 	pabt_helper
- 	mov	r2, sp				@ regs
- 	bl	do_PrefetchAbort		@ call abort handler
-@@ -401,6 +385,10 @@ ENDPROC(__pabt_svc)
- 	@ Clear FP to mark the first stack frame
- 	@
- 	zero_fp
-+
-+#ifdef CONFIG_IRQSOFF_TRACER
-+	bl	trace_hardirqs_off
-+#endif
- 	.endm
- 
- 	.macro	kuser_cmpxchg_check
-@@ -421,11 +409,6 @@ ENDPROC(__pabt_svc)
- 	.align	5
- __dabt_usr:
- 	usr_entry
--
--#ifdef CONFIG_IRQSOFF_TRACER
--	bl	trace_hardirqs_off
--#endif
--
- 	kuser_cmpxchg_check
- 	dabt_helper
- 
-@@ -438,11 +421,6 @@ ENDPROC(__dabt_usr)
- 	.align	5
- __irq_usr:
- 	usr_entry
--
--#ifdef CONFIG_IRQSOFF_TRACER
--	bl	trace_hardirqs_off
--#endif
--
- 	kuser_cmpxchg_check
- 	irq_handler
- 	get_thread_info tsk
-@@ -457,10 +435,6 @@ ENDPROC(__irq_usr)
- __und_usr:
- 	usr_entry
- 
--#ifdef CONFIG_IRQSOFF_TRACER
--	bl	trace_hardirqs_off
--#endif
--
- 	mov	r2, r4
- 	mov	r3, r5
- 
-@@ -679,11 +653,6 @@ ENDPROC(__und_usr_unknown)
- 	.align	5
- __pabt_usr:
- 	usr_entry
--
--#ifdef CONFIG_IRQSOFF_TRACER
--	bl	trace_hardirqs_off
--#endif
--
- 	pabt_helper
- 	mov	r2, sp				@ regs
- 	bl	do_PrefetchAbort		@ call abort handler
+ 	arch_irq_handler_default
+ 9997:
 -- 
 1.7.4.4
