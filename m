@@ -1,60 +1,83 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 29 Jun 2011 18:46:46 +0800
-Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC controller
-	driver
-In-Reply-To: <20110629103337.GF1992@pengutronix.de>
-References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
-	<1309335878-16678-2-git-send-email-b32955@freescale.com>
-	<20110629100658.GE1992@pengutronix.de>
-	<20110629103337.GF1992@pengutronix.de>
-Message-ID: <4E0B0296.6060902@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Jun 2011 12:56:27 +0200
+Subject: [PATCH] USB: ehci: use packed,
+	aligned(4) instead of removing the packed attribute
+In-Reply-To: <alpine.LFD.2.00.1106261027070.2142@xanadu.home>
+References: <alpine.LFD.2.00.1106201306210.2142@xanadu.home>
+	<201106251009.04624.arnd@arndb.de>
+	<alpine.LFD.2.00.1106261027070.2142@xanadu.home>
+Message-ID: <201106291256.27746.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram:
->>> +static int __devinit acquire_interrupt(struct gpmi_nfc_data *this,
->>> +			const char *resource_name,
->>> +			irq_handler_t interrupt_handler, int *lno, int *hno)
->>> +{
->>> +	struct platform_device *pdev = this->pdev;
->>> +	struct resource *r;
->>> +	int err;
->>> +
->>> +	r = platform_get_resource_byname(pdev, IORESOURCE_IRQ, resource_name);
->>> +	if (!r) {
->>> +		pr_info("Can't get resource for %s\n", resource_name);
->>> +		return -ENXIO;
->>> +	}
->>> +
->>> +	BUG_ON(r->start != r->end);
->>> +	err = request_irq(r->start, interrupt_handler, 0, resource_name, this);
->>> +	if (err) {
->>> +		pr_info("Can't own %s\n", resource_name);
->>> +		return err;
->>> +	}
->>> +
->>> +	*lno = r->start;
->>> +	*hno = r->end;
->>> +	return 0;
->>> +}
->> This will not work if max_chip_count > 1, because the irq is already
->> taken. (Also, I am not convinced of the resource handling, but I need to
-> Doh, I wrote that below the wrong codepath. This is another irq here.
-> Still, the problem exists: When a second channel GPMI channel is
-> requested, dmaengine will return -EBUSY, because the DMAIRQ is already
-> taken.
->
-Yes, we should change the DMA code, it is a DMA bug.
-I ever submitted a patch about the issue:
-http://patchwork.ozlabs.org/patch/87145/
+On Tuesday 28 June 2011, Nicolas Pitre wrote:
+> On Sat, 25 Jun 2011, Arnd Bergmann wrote:
+> 
+> > On Saturday 25 June 2011, Nicolas Pitre wrote:
+> > > > which means that the dma_buf variable is dereferenced before the
+> > > > volatile mmio_reg variable, which opens up a race: An interrupt may have
+> > > > signalled us that a DMA is in progress, so we read a MMIO register from
+> > > > the device (this is guaranteed to flush the DMA on PCI and similar buses).
+> > > > If we read the dma_buf before we read the mmio register, the data we get
+> > > > back may be stale.
+> > > > 
+> > > > Adding a barrier() between the two turns the assembly into the expected
+> > > > 
+> > > >         ldr     r3, [r1, #0]
+> > > >         ldr     r0, [r0, #0]
+> > > >         bx      lr
+> > > 
+> > > But isn't the usual dma_unmap_*() API call providing that barrier 
+> > > already?
+> > 
+> > Yes, for the streaming mapping that would be sufficient, but not
+> > for a coherent mapping, which doesn't need dma_unmap_* or dma_sync*
+> > calls before accessing the buffer.
+> 
+> OK, so that leaves only that case.  Obviously that must not be all that 
+> critical in practice given the time it has been "broken" already.
 
-Best Regards
-Huang Shijie
+It's not all that critical for a number reasons:
 
+* In many cases, the compiler does not actually reorder the accesses,
+  even if it is allowed to. Whether it does or not depends a lot on
+  the toolchain version and compiler flags.
+* Even if the code is reordered, the race is very small, and in a lot
+  of cases the data will already be there anyway.
+* Most drivers that rely on the ordering guarantees of readl() are
+  probably for PCI hardware, which explicitly defines its interface
+  in these terms. Most ARM implementations nowadays don't have PCI,
+  or are used with a very limited set of PCI hardware.
 
+None of these however mean that we shouldn't try to fix the problem.
 
+I'm also not convinced that the case I constructed is the only one
+that is broken now or in the future, as gcc is adding more
+optimizations. Even if I was not able to construct a case where
+memory accesses are reorganized around a writel() in practice,
+I think it's clear that the compiler is allowed to do it in the
+current definition (without a wmb()), while the PCI driver API
+assumes that there is a barrier.
 
-> Regards,
->
->    Wolfram
->
+> So I'm wondering if this might be a better idea to augment the API with 
+> explicit barriers to cover the case above which is still a much less 
+> frequent pattern than successive readl()/writel()'s where the implicit 
+> memory barrier is really badly affecting the generated code.
+
+Didn't we just introduce the _relaxed() variants specifically to avoid
+the extra barriers? Surely the effect of the outer_flush() for writel
+on modern cores must be much more severe than the memory barrier
+implied by it.
+
+I think the best solution would be to have a set of architecture-
+independent I/O accessors that do not observe strict PCI ordering
+rules of iowrite32 and writel but instead put that in the hands of
+the driver writer.
+This can be either the writel_relaxed() family we have on arm
+and sh, or out_le32 as on m68k, microblaze, powerpc and extensa,
+or something new.
+
+We should probably also define a variant that is native-endian,
+to provide a replacement for the __raw_writel family.
+
+	Arnd
