@@ -1,33 +1,63 @@
-From: andi@firstfloor.org (Andi Kleen)
-Date: Wed, 29 Jun 2011 13:11:00 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory Power
-	Management
-In-Reply-To: <1309370342.11430.604.camel@nimitz> (Dave Hansen's message of
-	"Wed, 29 Jun 2011 10:59:02 -0700")
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110629130038.GA7909@in.ibm.com> <1309367184.11430.594.camel@nimitz>
-	<20110629174220.GA9152@in.ibm.com> <1309370342.11430.604.camel@nimitz>
-Message-ID: <m2y60k1jqj.fsf@firstfloor.org>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 29 Jun 2011 22:25:46 +0200
+Subject: [PATCH] arm: mxs: include asm/processor.h for cpu_relax()
+In-Reply-To: <20110629071026.GA22630@S2100-06.ap.freescale.net>
+References: <1306316097-27926-1-git-send-email-w.sang@pengutronix.de>
+	<20110629071026.GA22630@S2100-06.ap.freescale.net>
+Message-ID: <20110629202546.GN6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Hansen <dave@linux.vnet.ibm.com> writes:
->
-> It's also going to be a pain to track kernel references.  On x86, our
+On Wed, Jun 29, 2011 at 03:10:27PM +0800, Shawn Guo wrote:
+> Hi Sascha,
+> 
+> Can you apply this patch on your for-next?
 
-Even if you tracked them what would you do with them?
+Done
 
-It's quite hard to stop using arbitary kernel memory (see all the dancing
-memory-failure does) 
+Sascha
 
-You need to track the direct accesses to user data which happens
-to be accessed through the direct mapping.
-
-Also it will be always unreliable because this all won't track DMA.
-For that you would also need to track in the dma_* infrastructure,
-which will likely get seriously expensive.
-
--Andi
+> 
+> Regards,
+> Shawn
+> 
+> On Wed, May 25, 2011 at 11:34:57AM +0200, Wolfram Sang wrote:
+> > I get this build error as of today:
+> > 
+> > arch/arm/mach-mxs/ocotp.c: In function 'mxs_get_ocotp':
+> > arch/arm/mach-mxs/ocotp.c:54: error: implicit declaration of function 'cpu_relax'
+> > make[2]: *** [arch/arm/mach-mxs/ocotp.o] Error 1
+> > 
+> > Looks like it has been indirectly included before which broke now.
+> > Include it directly.
+> > 
+> > Signed-off-by: Wolfram Sang <w.sang@pengutronix.de>
+> > Cc: Shawn Guo <shawn.guo@freescale.com>
+> > ---
+> >  arch/arm/mach-mxs/ocotp.c |    2 ++
+> >  1 files changed, 2 insertions(+), 0 deletions(-)
+> > 
+> > diff --git a/arch/arm/mach-mxs/ocotp.c b/arch/arm/mach-mxs/ocotp.c
+> > index 65157a3..54add60 100644
+> > --- a/arch/arm/mach-mxs/ocotp.c
+> > +++ b/arch/arm/mach-mxs/ocotp.c
+> > @@ -16,6 +16,8 @@
+> >  #include <linux/err.h>
+> >  #include <linux/mutex.h>
+> >  
+> > +#include <asm/processor.h>	/* for cpu_relax() */
+> > +
+> >  #include <mach/mxs.h>
+> >  
+> >  #define OCOTP_WORD_OFFSET		0x20
+> > -- 
+> > 1.7.2.5
+> > 
+> 
+> 
 
 -- 
-ak at linux.intel.com -- Speaking for myself only
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
