@@ -1,35 +1,47 @@
-From: dave@linux.vnet.ibm.com (Dave Hansen)
-Date: Wed, 29 Jun 2011 10:59:02 -0700
-Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
-	Power Management
-In-Reply-To: <20110629174220.GA9152@in.ibm.com>
-References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
-	<20110629130038.GA7909@in.ibm.com> <1309367184.11430.594.camel@nimitz>
-	<20110629174220.GA9152@in.ibm.com>
-Message-ID: <1309370342.11430.604.camel@nimitz>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 29 Jun 2011 18:59:38 +0100
+Subject: [PATCH] ARM: MAINTAINERS: add entry for ARM PMU profiling and
+	debugging
+Message-ID: <1309370378-30301-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-06-29 at 23:12 +0530, Ankita Garg wrote:
-> 	4. The kernel must have a mechanism to maintain utilization
-> 	   statistics pertaining to a piece of hardware, so that it can
-> 	   trigger the hardware to power it off
+Following a request from Russell King:
 
-Having statistics like this would certainly be nice, but how important
-_is_ it?  Is it really a show-stopper?  There's some stuff today, like
-the NPT/EPT support in KVM where we don't even have visibility in to
-when a given page is referenced.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2011-June/055031.html
 
-It's also going to be a pain to track kernel references.  On x86, our
-kernel linear mapping uses 1GB pages when it can, and those are greater
-than the 512MB granularity that we've been talking about here.  It's
-even larger on powerpc.  I'm also pretty sure we don't even _look_ at
-the referenced bits in the kernel page tables.  We'll definitely need
-some infrastructure to do that.
+Add myself as the ARM PMU profiling and debugging maintainer. This
+covers the ARM implementations of perf, oprofile and hw_breakpoint along
+with the glue for this to work on different platforms.
 
-> 	5. Being able to group these pieces of hardware for purpose of
-> 	   higher savings. 
+Cc: Jean Pihet <j-pihet@ti.com>
+Acked-by: Jamie Iles <jamie@jamieiles.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ MAINTAINERS |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
 
-Do you really mean group, or do you mean "turn as many off as possible"?
-
--- Dave
+diff --git a/MAINTAINERS b/MAINTAINERS
+index f0358cd..3e7898c 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -594,6 +594,16 @@ S:	Maintained
+ F:	arch/arm/lib/floppydma.S
+ F:	arch/arm/include/asm/floppy.h
+ 
++ARM PMU PROFILING AND DEBUGGING
++M:	Will Deacon <will.deacon@arm.com>
++S:	Maintained
++F:	arch/arm/kernel/perf_event*
++F:	arch/arm/oprofile/common.c
++F:	arch/arm/kernel/pmu.c
++F:	arch/arm/include/asm/pmu.h
++F:	arch/arm/kernel/hw_breakpoint.c
++F:	arch/arm/include/asm/hw_breakpoint.h
++
+ ARM PORT
+ M:	Russell King <linux@arm.linux.org.uk>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+-- 
+1.7.0.4
