@@ -1,117 +1,140 @@
 From: b32955@freescale.com (Huang Shijie)
-Date: Wed, 29 Jun 2011 15:54:40 +0800
-Subject: [PATCH V4 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+Date: Wed, 29 Jun 2011 15:54:42 +0800
+Subject: [PATCH V4 3/3] ARM: mxs: add GPMI-NFC device for imx28
 In-Reply-To: <1309334082-9501-1-git-send-email-b32955@freescale.com>
 References: <1309334082-9501-1-git-send-email-b32955@freescale.com>
-Message-ID: <1309334082-9501-2-git-send-email-b32955@freescale.com>
+Message-ID: <1309334082-9501-4-git-send-email-b32955@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add GPMI-NFC support for imx23 and imx28.
+add GPMI-NFC device for imx28.
 
 Signed-off-by: Huang Shijie <b32955@freescale.com>
 ---
- arch/arm/mach-mxs/Kconfig                 |    2 +
- arch/arm/mach-mxs/include/mach/gpmi-nfc.h |   71 +++++++++++++++++++++++++++++
- 2 files changed, 73 insertions(+), 0 deletions(-)
- create mode 100644 arch/arm/mach-mxs/include/mach/gpmi-nfc.h
+ arch/arm/mach-mxs/clock-mx28.c                |    1 +
+ arch/arm/mach-mxs/devices-mx28.h              |    4 +++
+ arch/arm/mach-mxs/devices/platform-gpmi-nfc.c |   19 +++++++++++++
+ arch/arm/mach-mxs/mach-mx28evk.c              |   37 +++++++++++++++++++++++++
+ 4 files changed, 61 insertions(+), 0 deletions(-)
 
-diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-index 1d3985f..a5b753a 100644
---- a/arch/arm/mach-mxs/Kconfig
-+++ b/arch/arm/mach-mxs/Kconfig
-@@ -32,6 +32,7 @@ config MACH_MX23EVK
- 	select SOC_IMX23
- 	select MXS_HAVE_AMBA_DUART
- 	select MXS_HAVE_PLATFORM_AUART
-+	select MXS_HAVE_PLATFORM_GPMI_NFC
- 	select MXS_HAVE_PLATFORM_MXS_MMC
- 	select MXS_HAVE_PLATFORM_MXSFB
- 	help
-@@ -46,6 +47,7 @@ config MACH_MX28EVK
- 	select MXS_HAVE_PLATFORM_AUART
- 	select MXS_HAVE_PLATFORM_FEC
- 	select MXS_HAVE_PLATFORM_FLEXCAN
-+	select MXS_HAVE_PLATFORM_GPMI_NFC
- 	select MXS_HAVE_PLATFORM_MXS_MMC
- 	select MXS_HAVE_PLATFORM_MXSFB
- 	select MXS_OCOTP
-diff --git a/arch/arm/mach-mxs/include/mach/gpmi-nfc.h b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
-new file mode 100644
-index 0000000..25fc605
---- /dev/null
-+++ b/arch/arm/mach-mxs/include/mach/gpmi-nfc.h
-@@ -0,0 +1,71 @@
-+/*
-+ * Copyright (C) 2011 Freescale Semiconductor, Inc. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program; if not, write to the Free Software Foundation, Inc.,
-+ * 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
-+ */
+diff --git a/arch/arm/mach-mxs/clock-mx28.c b/arch/arm/mach-mxs/clock-mx28.c
+index 5dcc59d..0397f65 100644
+--- a/arch/arm/mach-mxs/clock-mx28.c
++++ b/arch/arm/mach-mxs/clock-mx28.c
+@@ -614,6 +614,7 @@ static struct clk_lookup lookups[] = {
+ 	_REGISTER_CLOCK("duart", NULL, uart_clk)
+ 	_REGISTER_CLOCK("imx28-fec.0", NULL, fec_clk)
+ 	_REGISTER_CLOCK("imx28-fec.1", NULL, fec_clk)
++	_REGISTER_CLOCK("imx28-gpmi-nfc", NULL, gpmi_clk)
+ 	_REGISTER_CLOCK("mxs-auart.0", NULL, uart_clk)
+ 	_REGISTER_CLOCK("mxs-auart.1", NULL, uart_clk)
+ 	_REGISTER_CLOCK("mxs-auart.2", NULL, uart_clk)
+diff --git a/arch/arm/mach-mxs/devices-mx28.h b/arch/arm/mach-mxs/devices-mx28.h
+index 79b9452..bbc8f0c 100644
+--- a/arch/arm/mach-mxs/devices-mx28.h
++++ b/arch/arm/mach-mxs/devices-mx28.h
+@@ -34,6 +34,10 @@ extern const struct mxs_flexcan_data mx28_flexcan_data[] __initconst;
+ #define mx28_add_flexcan0(pdata)	mx28_add_flexcan(0, pdata)
+ #define mx28_add_flexcan1(pdata)	mx28_add_flexcan(1, pdata)
+ 
++extern const struct mxs_gpmi_nfc_data mx28_gpmi_nfc_data __initconst;
++#define mx28_add_gpmi_nfc(pdata)	\
++	mxs_add_gpmi_nfc(pdata, &mx28_gpmi_nfc_data)
 +
-+#ifndef __INCLUDE_GPMI_NFC_H
-+#define __INCLUDE_GPMI_NFC_H
-+
-+/* The size of the resource is fixed. */
-+#define RES_SIZE	6
-+
-+/* Resource names for the GPMI NFC driver. */
-+#define GPMI_NFC_GPMI_REGS_ADDR_RES_NAME  "GPMI NFC GPMI Registers"
-+#define GPMI_NFC_GPMI_INTERRUPT_RES_NAME  "GPMI NFC GPMI Interrupt"
-+#define GPMI_NFC_BCH_REGS_ADDR_RES_NAME   "GPMI NFC BCH Registers"
-+#define GPMI_NFC_BCH_INTERRUPT_RES_NAME   "GPMI NFC BCH Interrupt"
-+#define GPMI_NFC_DMA_CHANNELS_RES_NAME    "GPMI NFC DMA Channels"
-+#define GPMI_NFC_DMA_INTERRUPT_RES_NAME   "GPMI NFC DMA Interrupt"
-+
-+/**
-+ * struct gpmi_nfc_platform_data - GPMI NFC driver platform data.
-+ *
-+ * This structure communicates platform-specific information to the GPMI NFC
-+ * driver that can't be expressed as resources.
-+ *
-+ * @platform_init:           A pointer to a function the driver will call to
-+ *                           initialize the platform (e.g., set up the pin mux).
-+ * @platform_exit:           A pointer to a function the driver will call to
-+ *                           exit the platform (e.g., free pins).
-+ * @min_prop_delay_in_ns:    Minimum propagation delay of GPMI signals to and
-+ *                           from the NAND Flash device, in nanoseconds.
-+ * @max_prop_delay_in_ns:    Maximum propagation delay of GPMI signals to and
-+ *                           from the NAND Flash device, in nanoseconds.
-+ * @max_chip_count:          The maximum number of chips for which the driver
-+ *                           should configure the hardware. This value most
-+ *                           likely reflects the number of pins that are
-+ *                           connected to a NAND Flash device. If this is
-+ *                           greater than the SoC hardware can support, the
-+ *                           driver will print a message and fail to initialize.
-+ * @partitions:              An optional pointer to an array of partition
-+ *                           descriptions.
-+ * @partition_count:         The number of elements in the partitions array.
-+ */
-+struct gpmi_nfc_platform_data {
-+	/* SoC hardware information. */
-+	int		(*platform_init)(void);
-+	void		(*platform_exit)(void);
-+
-+	/* NAND Flash information. */
-+	unsigned int	min_prop_delay_in_ns;
-+	unsigned int	max_prop_delay_in_ns;
-+	unsigned int	max_chip_count;
-+
-+	/* Medium information. */
-+	struct mtd_partition *partitions;
-+	unsigned	partition_count;
+ extern const struct mxs_mxs_i2c_data mx28_mxs_i2c_data[] __initconst;
+ #define mx28_add_mxs_i2c(id)		mxs_add_mxs_i2c(&mx28_mxs_i2c_data[id])
+ 
+diff --git a/arch/arm/mach-mxs/devices/platform-gpmi-nfc.c b/arch/arm/mach-mxs/devices/platform-gpmi-nfc.c
+index 5a68370..ae88672 100644
+--- a/arch/arm/mach-mxs/devices/platform-gpmi-nfc.c
++++ b/arch/arm/mach-mxs/devices/platform-gpmi-nfc.c
+@@ -17,6 +17,7 @@
+  */
+ #include <asm/sizes.h>
+ #include <mach/mx23.h>
++#include <mach/mx28.h>
+ #include <mach/devices-common.h>
+ 
+ #define RES_MEM(soc, _id, _s, _n)				\
+@@ -61,6 +62,24 @@ const struct mxs_gpmi_nfc_data mx23_gpmi_nfc_data __initconst = {
+ };
+ #endif
+ 
++#ifdef CONFIG_SOC_IMX28
++const struct mxs_gpmi_nfc_data mx28_gpmi_nfc_data __initconst = {
++	.devid = "imx28-gpmi-nfc",
++	.res = {
++		/* GPMI */
++		RES_MEM(MX28, GPMI, SZ_8K, GPMI_NFC_GPMI_REGS_ADDR_RES_NAME),
++		RES_IRQ(MX28, GPMI, GPMI_NFC_GPMI_INTERRUPT_RES_NAME),
++		/* BCH */
++		RES_MEM(MX28, BCH, SZ_8K, GPMI_NFC_BCH_REGS_ADDR_RES_NAME),
++		RES_IRQ(MX28, BCH, GPMI_NFC_BCH_INTERRUPT_RES_NAME),
++		/* DMA */
++		RES_DMA(MX28, DMA_GPMI0, DMA_GPMI7,
++					GPMI_NFC_DMA_CHANNELS_RES_NAME),
++		RES_IRQ(MX28, GPMI_DMA, GPMI_NFC_DMA_INTERRUPT_RES_NAME),
++	},
 +};
 +#endif
++
+ struct platform_device *__init
+ mxs_add_gpmi_nfc(const struct gpmi_nfc_platform_data *pdata,
+ 		const struct mxs_gpmi_nfc_data *data)
+diff --git a/arch/arm/mach-mxs/mach-mx28evk.c b/arch/arm/mach-mxs/mach-mx28evk.c
+index eaaf6ff..74d0868 100644
+--- a/arch/arm/mach-mxs/mach-mx28evk.c
++++ b/arch/arm/mach-mxs/mach-mx28evk.c
+@@ -314,6 +314,42 @@ static const struct flexcan_platform_data
+ 	}
+ };
+ 
++/* gpmi-nfc */
++#define MXS_PAD_GPMI_NFC	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
++static iomux_cfg_t mx28evk_gpmi_nfc_pads[] = {
++	MX28_PAD_GPMI_D00__GPMI_D0 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_D01__GPMI_D1 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_D02__GPMI_D2 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_D03__GPMI_D3 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_D04__GPMI_D4 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_D05__GPMI_D5 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_D06__GPMI_D6 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_D07__GPMI_D7 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_RDY0__GPMI_READY0 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_RDY1__GPMI_READY1 | MXS_PAD_CTRL,
++	MX28_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_GPMI_NFC,
++	MX28_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_GPMI_NFC,
++	MX28_PAD_GPMI_RESETN__GPMI_RESETN | MXS_PAD_GPMI_NFC,
++};
++
++static int mx28evk_gpmi_nfc_platform_init(void)
++{
++	return mxs_iomux_setup_multiple_pads(mx28evk_gpmi_nfc_pads,
++				ARRAY_SIZE(mx28evk_gpmi_nfc_pads));
++}
++
++static const struct gpmi_nfc_platform_data
++mx28evk_gpmi_nfc_data __initconst = {
++	.platform_init		= mx28evk_gpmi_nfc_platform_init,
++	.min_prop_delay_in_ns	= 5,
++	.max_prop_delay_in_ns	= 9,
++	.max_chip_count		= 1,
++};
++
+ /* mxsfb (lcdif) */
+ static struct fb_videomode mx28evk_video_modes[] = {
+ 	{
+@@ -390,6 +426,7 @@ static void __init mx28evk_init(void)
+ 	else
+ 		gpio_set_value(MX28EVK_BL_ENABLE, 1);
+ 
++	mx28_add_gpmi_nfc(&mx28evk_gpmi_nfc_data);
+ 	mx28_add_mxsfb(&mx28evk_mxsfb_pdata);
+ 
+ 	/* power on mmc slot by writing 0 to the gpio */
 -- 
 1.7.0.4
