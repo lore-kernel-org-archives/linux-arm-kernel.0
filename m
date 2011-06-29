@@ -1,17 +1,69 @@
 From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Wed, 29 Jun 2011 10:48:26 -0700
-Subject: [PATCH 2/5] ASoC: atmel-ssc: add phybase in device structure
-In-Reply-To: <a128473d585314a01420a5869949065a549119e3.1309368631.git.nicolas.ferre@atmel.com>
-References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
-	<a128473d585314a01420a5869949065a549119e3.1309368631.git.nicolas.ferre@atmel.com>
-Message-ID: <20110629174822.GB13051@opensource.wolfsonmicro.com>
+Date: Wed, 29 Jun 2011 10:59:09 -0700
+Subject: [PATCH 4/5] ASoC: atmel_ssc_dai/atmel-pcm: adapt to dmaengine
+	usage
+In-Reply-To: <7fd26c605d5cfa422d0fc37a7b790fb9a837d7e3.1309368631.git.nicolas.ferre@atmel.com>
+References: <7fd26c605d5cfa422d0fc37a7b790fb9a837d7e3.1309368631.git.nicolas.ferre@atmel.com>
+Message-ID: <20110629175905.GC13051@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 08:00:16PM +0200, Nicolas Ferre wrote:
+On Wed, Jun 29, 2011 at 08:00:18PM +0200, Nicolas Ferre wrote:
 
->  struct ssc_device {
->  	struct list_head	list;
-> +	resource_size_t		phybase;
+> +static const struct snd_pcm_hardware atmel_pcm_dma_hardware = {
+> +	.info			= SNDRV_PCM_INFO_MMAP |
+> +				  SNDRV_PCM_INFO_MMAP_VALID |
 
-The type here looks rather wrong?
+The naming here looks a bit undescriptive but I'm not sure what a better
+name would be - obviously both DMA controllers are DMA controllers.  It
+feels like it would be more sensible to just write a separate DMA driver
+as I'm not sure how much code actually ends up being shared here but it
+looks pretty small from the diff...
+
+> +static bool filter(struct dma_chan *chan, void *slave)
+> +{
+> +	struct	at_dma_slave		*sl = slave;
+> +
+
+Odd whitespace here.
+
+> +static int atmel_pcm_dma_alloc(struct snd_pcm_substream *substream,
+> +	struct snd_pcm_hw_params *params)
+> +{
+> +	struct snd_pcm_runtime *runtime = substream->runtime;
+> +	struct atmel_runtime_data *prtd = runtime->private_data;
+> +	struct ssc_device *ssc = prtd->params->ssc;
+> +	struct at_dma_slave *sdata = NULL;
+> +
+> +	if (ssc->pdev)
+> +		sdata = ssc->pdev->dev.platform_data;
+
+Why wouldn't we have a device, and why is there a separate copy of the
+device?
+
+> +	if (!prtd->dma_chan) {
+> +		pr_err("atmel-pcm: "
+> +			"DMA channel not available, unable to use SSC-audio\n");
+> +		return -EBUSY;
+
+dev_err() and don't split strings over lines.
+
+> +	switch (prtd->params->data_xfer_size) {
+> +	case 1:
+> +		buswidth = DMA_SLAVE_BUSWIDTH_1_BYTE;
+> +		break;
+> +	case 2:
+> +		buswidth = DMA_SLAVE_BUSWIDTH_2_BYTES;
+> +		break;
+> +	case 4:
+> +		buswidth = DMA_SLAVE_BUSWIDTH_4_BYTES;
+> +		break;
+> +	default:
+> +		return;
+> +	}
+
+It strikes me that this mapping of bytes to DMA_SLAVE_ is likely to be
+quite common and might be nice as a helper in dmaengine.
+
+I'd also expect to see something complain (even if just with BUG()) if we
+hit the default case.
