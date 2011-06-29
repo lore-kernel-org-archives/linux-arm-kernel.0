@@ -1,53 +1,69 @@
-From: khilman@ti.com (Kevin Hilman)
-Date: Wed, 29 Jun 2011 10:29:49 -0700
-Subject: [PATCH] OMAP3: run the ASM sleep code from DDR
-In-Reply-To: <1309365623-14704-1-git-send-email-j-pihet@ti.com> (jean pihet's
-	message of "Wed, 29 Jun 2011 18:40:23 +0200")
-References: <1309365623-14704-1-git-send-email-j-pihet@ti.com>
-Message-ID: <87mxh0tuk2.fsf@ti.com>
+From: ankita@in.ibm.com (Ankita Garg)
+Date: Wed, 29 Jun 2011 23:12:20 +0530
+Subject: [PATCH 00/10] mm: Linux VM Infrastructure to support Memory
+	Power Management
+In-Reply-To: <1309367184.11430.594.camel@nimitz>
+References: <1306499498-14263-1-git-send-email-ankita@in.ibm.com>
+	<20110629130038.GA7909@in.ibm.com>
+	<1309367184.11430.594.camel@nimitz>
+Message-ID: <20110629174220.GA9152@in.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-jean.pihet at newoldbits.com writes:
+Hi,
 
-> From: Jean Pihet <j-pihet@ti.com>
+On Wed, Jun 29, 2011 at 10:06:24AM -0700, Dave Hansen wrote:
+> I was kinda hoping for something a bit simpler than that.  I'd boil down
+> what you were saying to this:
+> 
+>      1. The kernel must be aware of how the pieces of hardware are
+>         mapped in to the system's physical address space
+>      2. The kernel must have a mechanism in place to minimize access to
+>         specific pieces of hardware 
+>      3. For destructive power-down operations, the kernel should have a
+>         mechanism in place to ensure that no valuable data is contained
+>         in the memory to be powered down.
 >
-> Most of the ASM sleep code (in arch/arm/mach-omap2/sleep34xx.S)
-> is copied to internal SRAM at boot and after wake-up from CORE OFF mode.
-> However only a small part of the code really needs to run from internal SRAM.
->
-> This fix lets most of the ASM idle code run from the DDR
-> in order to minimize the SRAM usage and the overhead in the code copy.
->
-> The only pieces of code that are mandatory in SRAM are:
-> - the i443 erratum WA,
-> - the i581 erratum WA,
-> - the security extension code.
->
-> SRAM usage:
-> - original code:
->   . 560 bytes for omap3_sram_configure_core_dpll (used by DVFS),
->   . 852 bytes for omap_sram_idle (used by suspend/resume in RETention),
->   . 124 bytes for es3_sdrc_fix (used by suspend/resume in OFF mode on ES3.x),
->   . 108 bytes for save_secure_ram_context (used on HS parts only).
->
-> With this fix the usage for suspend/resume in RETention goes down 288 bytes,
-> so the gain in SRAM usage for suspend/resume is 564 bytes.
->
-> Also fixed the SRAM initialization sequence to avoid an unnecessary
-> copy to SRAM at boot time and for readability.
->
-> Tested on Beagleboard (ES2.x) in idle with full RET and OFF modes.
->
-> Signed-off-by: Jean Pihet <j-pihet@ti.com>
 
-Reviewed-by: Kevin Hilman <khilman@ti.com>
+	4. The kernel must have a mechanism to maintain utilization
+	   statistics pertaining to a piece of hardware, so that it can
+	   trigger the hardware to power it off
+	5. Being able to group these pieces of hardware for purpose of
+	   higher savings. 
 
-Also tested retention and off on 3430/n900, 3530/Overo and 3630/Zoom3
+> Is that complete?
+> 
+> On Wed, 2011-06-29 at 18:30 +0530, Ankita Garg wrote:
+> > 1) Dynamic Power Transition: The memory controller can have the ability
+> > to automatically transition regions of memory into lower power states
+> > when they are devoid of references for a pre-defined threshold amount of
+> > time. Memory contents are preserved in the low power states and accessing
+> > memory that is at a low power state takes a latency hit.
+> > 
+> > 2) Dynamic Power Off: If a region is free/unallocated, the software can
+> > indicate to the controller to completely turn off power to a certain
+> > region. Memory contents are lost and hence the software has to be
+> > absolutely sure about the usage statistics of the particular region. This
+> > is a runtime capability, where the required amount of memory can be
+> > powered 'ON' to match the workload demands.
+> > 
+> > 3) Partial Array Self-Refresh (PASR): If a certain regions of memory is
+> > free/unallocated, the software can indicate to the controller to not
+> > refresh that region when the system goes to suspend-to-ram state and
+> > thereby save standby power consumption.
+> 
+> (3) is simply a subset of (2), but with the additional restriction that
+> the power off can only occur during a suspend operation.  
+> 
+> Let's say we fully implemented support for (2).  What would be missing
+> to support PASR?
+> 
 
-Tested-by: Kevin Hilman <khilman@ti.com>
+Yes, PASR is a subset of (2) from implementation perspective.
 
-Russell, if you're OK with it, can you add it to your suspend branch for
-the upcoming merge window?
-
-Kevin
+-- 
+Regards,
+Ankita Garg (ankita at in.ibm.com)
+Linux Technology Center
+IBM India Systems & Technology Labs,
+Bangalore, India
