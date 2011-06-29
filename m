@@ -1,60 +1,43 @@
-From: nsekhar@ti.com (Nori, Sekhar)
-Date: Wed, 29 Jun 2011 18:42:22 +0530
-Subject: [RFC PATCH v4] Consolidate SRAM support
-In-Reply-To: <1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
-References: <20110512174546.GB8633@n2100.arm.linux.org.uk>
-	<1306371777-20431-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <B85A65D85D7EB246BE421B3FB0FBB593024D7941B6@dbde02.ent.ti.com>
+From: kgene.kim@samsung.com (Kukjin Kim)
+Date: Wed, 29 Jun 2011 22:13:34 +0900
+Subject: [PATCH 0/2] ARM: S5PV210: GONI board update for CIF camera support
+In-Reply-To: <1308760452-30676-1-git-send-email-s.nawrocki@samsung.com>
+References: <1308760452-30676-1-git-send-email-s.nawrocki@samsung.com>
+Message-ID: <004601cc365e$5e2f5dd0$1a8e1970$%kim@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean-Christophe,
-
-On Thu, May 26, 2011 at 06:32:57, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> From: Russell King - ARM Linux <linux@arm.linux.org.uk>
+Sylwester Nawrocki wrote:
 > 
-> We have two SoCs using SRAM, both with their own allocation systems,
-> and both with their own ways of copying functions into the SRAM.
+> This patchset adds platform data definition for NOON010PC30 camera sensor
+> for GONI board and renames sclk_cam clocks on S5PV210 platform which is
+> needed
+> for FIMC media device driver.
 > 
-> Let's unify this before we have additional SoCs re-implementing this
-> obviously common functionality themselves.
+> The whole patches converting s5p-fimc to media controller API can be found
+at:
 > 
-> For this use the generic allocator and the newly introduce
-> gen_pool_add_virt and gen_pool_virt_to_phys
+> http://git.infradead.org/users/kmpark/linux-2.6-samsung
+> branch: s5p-fimc-next
 > 
-> Uio_pruss should probably take the SRAM pool pointer via
-> platform data so that it doesn't have to include Davinci specific
-> includes.
+> Sylwester Nawrocki (2):
+>   ARM: S5PV210: Rename sclk_cam clocks for FIMC media driver
+>   ARM: S5PV210: Add support for NOON010PC30 sensor on GONI board
 > 
-> Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
-> Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
-> Cc: Sekhar Nori <nsekhar@ti.com>
-> Cc: Kevin Hilman <khilman@ti.com>
-> Cc: Tony Lindgren <tony@atomide.com>
-> Cc: Sascha Hauer <kernel@pengutronix.de>
+>  arch/arm/mach-s5pv210/Kconfig     |    1 +
+>  arch/arm/mach-s5pv210/clock.c     |    6 +---
+>  arch/arm/mach-s5pv210/mach-goni.c |   52
+> +++++++++++++++++++++++++++++++++++++
+>  3 files changed, 55 insertions(+), 4 deletions(-)
+> 
+> Created against for-next branch at:
+> git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
 
-Is this patch slated to be merged for v3.1?
-I did not find it in linux-next.
+Looks ok to me, applied.
+Thanks.
 
-There is some further cleanup done by Ben
-Gardiner for DaVinci which depends on this patch.
-
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index f4b7dfa..5ec5e5f 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -848,6 +848,7 @@ config ARCH_DAVINCI
->  	bool "TI DaVinci"
->  	select GENERIC_CLOCKEVENTS
->  	select ARCH_REQUIRE_GPIOLIB
-> +	select GENERIC_ALLOCATOR
->  	select ZONE_DMA
->  	select HAVE_IDE
->  	select CLKDEV_LOOKUP
-
-Just noticed that GENERIC_ALLOCATOR is already selected
-For DaVinci (it is right below the CLKDEV_LOOKUP selection)
-so this part of the patch can be dropped.
-
-Thanks,
-Sekhar
+Best regards,
+Kgene.
+--
+Kukjin Kim <kgene.kim@samsung.com>, Senior Engineer,
+SW Solution Development Team, Samsung Electronics Co., Ltd.
