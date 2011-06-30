@@ -1,125 +1,58 @@
-From: linus.walleij@stericsson.com (Linus Walleij)
-Date: Thu, 30 Jun 2011 16:07:19 +0200
-Subject: [PATCH 1/3] ARM: enhance TCM robustness
-Message-ID: <1309442839-4314-1-git-send-email-linus.walleij@stericsson.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Jun 2011 07:27:02 -0700
+Subject: [RFC PATCH 1/5] OMAP3:I2C: Add device tree nodes for beagle board
+In-Reply-To: <1309426647-31587-2-git-send-email-manjugk@ti.com>
+References: <1309426647-31587-1-git-send-email-manjugk@ti.com>
+	<1309426647-31587-2-git-send-email-manjugk@ti.com>
+Message-ID: <20110630142702.GV23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Linus Walleij <linus.walleij@linaro.org>
+Hi,
 
-The PB11MPCore reports "3" DTCM banks, but anything above 2 is an
-"undefined" value, so push this to become 0. Further add some checks
-if code is compiled to TCM even if there is no D/ITCM present in the
-system, and if we can really fit the compiled code. We don't do the
-BUG() since it's not helpful, it's better to deal with non-present
-TCM dynamically. If there is nothing compiled to the TCM and no TCM
-is detected, it will now just shut up even if TCM support is enabled.
+Few comments on the .dts data layout below.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/kernel/tcm.c |   47 +++++++++++++++++++++++++++++++++++++++--------
- 1 files changed, 39 insertions(+), 8 deletions(-)
+* G, Manjunath Kondaiah <manjugk@ti.com> [110630 02:44]:
+> --- a/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle-nunchuck.dts
+> @@ -2,11 +2,6 @@
+>  
+>  / {
+>  	i2c at 48072000 {
+> -		compatible = "ti,omap3-i2c";
+> -		reg = <0x48072000 0x80>;
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+>  		eeprom at 50 {
+>  			compatible = "at,at24c01";
+>  			reg = < 0x50 >;
 
-diff --git a/arch/arm/kernel/tcm.c b/arch/arm/kernel/tcm.c
-index f5cf660..d402d48 100644
---- a/arch/arm/kernel/tcm.c
-+++ b/arch/arm/kernel/tcm.c
-@@ -134,6 +134,10 @@ static int __init setup_tcm_bank(u8 type, u8 bank, u8 banks,
- 			(tcm_region & 1) ? "" : "not ");
- 	}
- 
-+	/* Not much fun you can do with a size 0 bank */
-+	if (tcm_size == 0)
-+		return 0;
-+
- 	/* Force move the TCM bank to where we want it, enable */
- 	tcm_region = *offset | (tcm_region & 0x00000ffeU) | 1;
- 
-@@ -165,12 +169,20 @@ void __init tcm_init(void)
- 	u32 tcm_status = read_cpuid_tcmstatus();
- 	u8 dtcm_banks = (tcm_status >> 16) & 0x03;
- 	u8 itcm_banks = (tcm_status & 0x03);
-+	size_t dtcm_code_sz = &__edtcm_data - &__sdtcm_data;
-+	size_t itcm_code_sz = &__eitcm_text - &__sitcm_text;
- 	char *start;
- 	char *end;
- 	char *ram;
- 	int ret;
- 	int i;
- 
-+	/* Values greater than 2 for D/ITCM banks are "reserved" */
-+	if (dtcm_banks > 2)
-+		dtcm_banks = 0;
-+	if (itcm_banks > 2)
-+		itcm_banks = 0;
-+
- 	/* Setup DTCM if present */
- 	if (dtcm_banks > 0) {
- 		for (i = 0; i < dtcm_banks; i++) {
-@@ -178,6 +190,13 @@ void __init tcm_init(void)
- 			if (ret)
- 				return;
- 		}
-+		/* This means you compiled more code than fits into DTCM */
-+		if (dtcm_code_sz > (dtcm_end - DTCM_OFFSET)) {
-+			pr_info("CPU DTCM: %u bytes of code compiled to "
-+				"DTCM but only %lu bytes of DTCM present\n",
-+				dtcm_code_sz, (dtcm_end - DTCM_OFFSET));
-+			goto no_dtcm;
-+		}
- 		dtcm_res.end = dtcm_end - 1;
- 		request_resource(&iomem_resource, &dtcm_res);
- 		dtcm_iomap[0].length = dtcm_end - DTCM_OFFSET;
-@@ -186,12 +205,15 @@ void __init tcm_init(void)
- 		start = &__sdtcm_data;
- 		end   = &__edtcm_data;
- 		ram   = &__dtcm_start;
--		/* This means you compiled more code than fits into DTCM */
--		BUG_ON((end - start) > (dtcm_end - DTCM_OFFSET));
--		memcpy(start, ram, (end-start));
--		pr_debug("CPU DTCM: copied data from %p - %p\n", start, end);
-+		memcpy(start, ram, dtcm_code_sz);
-+		pr_debug("CPU DTCM: copied data from %p - %p\n",
-+			 start, end);
-+	} else if (dtcm_code_sz) {
-+		pr_info("CPU DTCM: %u bytes of code compiled to DTCM but no "
-+			"DTCM banks present in CPU\n", dtcm_code_sz);
- 	}
- 
-+no_dtcm:
- 	/* Setup ITCM if present */
- 	if (itcm_banks > 0) {
- 		for (i = 0; i < itcm_banks; i++) {
-@@ -199,6 +221,13 @@ void __init tcm_init(void)
- 			if (ret)
- 				return;
- 		}
-+		/* This means you compiled more code than fits into ITCM */
-+		if (itcm_code_sz > (itcm_end - ITCM_OFFSET)) {
-+			pr_info("CPU ITCM: %u bytes of code compiled to "
-+				"ITCM but only %lu bytes of ITCM present\n",
-+				itcm_code_sz, (itcm_end - ITCM_OFFSET));
-+			return;
-+		}
- 		itcm_res.end = itcm_end - 1;
- 		request_resource(&iomem_resource, &itcm_res);
- 		itcm_iomap[0].length = itcm_end - ITCM_OFFSET;
-@@ -207,10 +236,12 @@ void __init tcm_init(void)
- 		start = &__sitcm_text;
- 		end   = &__eitcm_text;
- 		ram   = &__itcm_start;
--		/* This means you compiled more code than fits into ITCM */
--		BUG_ON((end - start) > (itcm_end - ITCM_OFFSET));
--		memcpy(start, ram, (end-start));
--		pr_debug("CPU ITCM: copied code from %p - %p\n", start, end);
-+		memcpy(start, ram, itcm_code_sz);
-+		pr_debug("CPU ITCM: copied code from %p - %p\n",
-+			 start, end);
-+	} else if (itcm_code_sz) {
-+		pr_info("CPU ITCM: %u bytes of code compiled to ITCM but no "
-+			"ITCM banks present in CPU\n", itcm_code_sz);
- 	}
- }
- 
--- 
-1.7.3.2
+The board .dts file should include the omap3 SoC .dts file.
+
+The omap3 SoC .dts file should have the devices mapped to L3 and L4
+busses, and the then i2c at 1 would just contain the bus offset.
+
+Then the i2c at 1 entry would be repeated in the board specific
+.dts and tell that the i2c at 1 is enabled.
+
+> --- a/arch/arm/boot/dts/omap3-beagle.dts
+> +++ b/arch/arm/boot/dts/omap3-beagle.dts
+> @@ -4,4 +4,46 @@
+>  / {
+>  	model = "TI OMAP3 BeagleBoard";
+>  	compatible = "ti,omap3-beagle";
+> +	interrupt-parent = <&gic>;
+> +
+> +	gic: interrupt-controller at 48241000 {
+> +		compatible = "ti,omap-gic", "arm,gic";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		reg = <0x48200000 0x1000>;
+> +	};
+
+There's no GIC on omap3, that's only on Cortex A9 systems.
+
+Regards,
+
+Tony
