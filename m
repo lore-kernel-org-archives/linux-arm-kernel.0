@@ -1,30 +1,61 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 30 Jun 2011 16:49:34 +0900
-Subject: [PATCH v3 5/6] ARM: S5PC110/S5PV210: Support ADC
-In-Reply-To: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1309420175-10301-6-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 30 Jun 2011 16:50:48 +0900
+Subject: [PATCH v2 2/5] Samsung SoC ADC: Channel selection for S5PV210,
+	S5PC110, and Exynos4
+In-Reply-To: <004a01cc3662$65751a90$305f4fb0$%kim@samsung.com>
+References: <20110620101737.GA31864@opensource.wolfsonmicro.com>
+	<1308621527-2457-1-git-send-email-myungjoo.ham@samsung.com>
+	<1308621527-2457-3-git-send-email-myungjoo.ham@samsung.com>
+	<004a01cc3662$65751a90$305f4fb0$%kim@samsung.com>
+Message-ID: <BANLkTik-k+9=8coWpZO_zToYCm8iHfO3CQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-s5pv210/cpu.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+On Wed, Jun 29, 2011 at 10:42 PM, Kukjin Kim <kgene.kim@samsung.com> wrote:
+> MyungJoo Ham wrote:
+>>
+>> In S5PV210/S5PC110/Exynos4, ADCMUX channel selection uses ADCMUX
+>> register, not ADCCON register. This patch corrects the behavior of
+>> Samsung-ADC for such cpus.
+>>
+>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+>> --
+>> v2: No changes from v1. Resubmitted as a series of patches
+>> ---
+[]
+>>
+>> ?enum s3c_cpu_type {
+>> ? ? ? TYPE_S3C24XX,
+>> - ? ? TYPE_S3C64XX
+>> + ? ? TYPE_S3C64XX,
+>> + ? ? TYPE_S5P,
+>> ?};
+>
+> How about S5PC100? Following is better for next if we cannot distinguish it
+> by CPU.
+>
+> -enum s3c_cpu_type {
+> - ? ? ? TYPE_S3C24XX,
+> - ? ? ? TYPE_S3C64XX
+> +enum samsung_adc_type {
+> + ? ? ? TYPE_ADC24, ? ? ?/* S3C24XX */
+> + ? ? ? TYPE_ADC64, ? ? ?/* S3C64XX, S5P64X0, S5PC100 */
+> + ? ? ? TYPE_ADCV3 ? ? ?/* S5PV210, EXYNOS4210 */
+> ?};
+> ...
+>
+> TYPE_ADCV1 and V2?...
+> Of course, the name can be changed...
 
-diff --git a/arch/arm/mach-s5pv210/cpu.c b/arch/arm/mach-s5pv210/cpu.c
-index 61e6c24..79907ec 100644
---- a/arch/arm/mach-s5pv210/cpu.c
-+++ b/arch/arm/mach-s5pv210/cpu.c
-@@ -126,7 +126,7 @@ void __init s5pv210_map_io(void)
- 	s5pv210_default_sdhci2();
- 	s5pv210_default_sdhci3();
- 
--	s3c_adc_setname("s3c64xx-adc");
-+	s3c_adc_setname("samsung-adc-v3");
- 
- 	s3c_cfcon_setname("s5pv210-pata");
- 
+I don't mind about these names as they are just internal values of adc.c.
+Anyway, I prefer the last suggestion and I'll use TYPE_ADCV1/V2/V3.
+
+Thanks.
+
 -- 
-1.7.4.1
+MyungJoo Ham (???), Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
