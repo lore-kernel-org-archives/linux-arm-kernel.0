@@ -1,71 +1,70 @@
-From: myungjoo.ham@gmail.com (MyungJoo Ham)
-Date: Thu, 30 Jun 2011 18:03:06 +0900
-Subject: [PATCH v3 1/6] Samsung SoC ADC: use regulator (VDD for ADC).
-In-Reply-To: <201106301122.50800.anarsoul@gmail.com>
-References: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309420175-10301-2-git-send-email-myungjoo.ham@samsung.com>
-	<201106301122.50800.anarsoul@gmail.com>
-Message-ID: <BANLkTimwqF3APEbJnTGcO5mh+AnS=N787g@mail.gmail.com>
+From: padma.kvr@gmail.com (padma venkat)
+Date: Thu, 30 Jun 2011 14:35:35 +0530
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
+References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
+	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
+	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
+Message-ID: <BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 5:22 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> On Thursday 30 June 2011 10:49:30 MyungJoo Ham wrote:
->> This patch allows the Samsung ADC driver to enable VDD regulator at
->> probe and resume and to disable at exit and suspend.
->> In a platform where ADC's VDD regulator is not "always-on", this control
->> is required although this patch does not provide fine-grained power
->> control (turning on the regulator only when being accessed).
+Hi,
+
+On Thu, Jun 30, 2011 at 12:38 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+> On Thu, Jun 30, 2011 at 6:08 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+>> Fixed the bug in transmission status check for 64 bytes FIFO
+>> level.
 >>
->> However, if VDD regulator ("vdd" for the adc device) is not provided,
->> the regulator control will not be activated because there are platforms
->> that do not provide regulator for ADC device.
+>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>> ---
+>> ?drivers/spi/spi_s3c64xx.c | ? ?4 +---
+>> ?1 files changed, 1 insertions(+), 3 deletions(-)
 >>
->> arch_initcall has been modified to module_init in order to allow
->> regulators to be available at probe.
+>> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.hc
+>> index 795828b..8945e20 100644
+>> --- a/drivers/spi/spi_s3c64xx.c
+>> +++ b/drivers/spi/spi_s3c64xx.c
+>> @@ -116,9 +116,7 @@
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(((i)->fifo_lvl_mask + 1))) \
+>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?? 1 : 0)
 >>
->> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
->> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
-[]
->> + ? ? adc->vdd = regulator_get(dev, "vdd");
->> + ? ? if (IS_ERR(adc->vdd)) {
->> + ? ? ? ? ? ? dev_err(dev, "operating without regulator \"vdd\" .\n");
->> + ? ? ? ? ? ? ret = PTR_ERR(adc->vdd);
->> + ? ? ? ? ? ? goto err_alloc;
->> + ? ? }
->> +
+>> -#define S3C64XX_SPI_ST_TX_DONE(v, i) ((((v) >> (i)->rx_lvl_offset) & \
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (((i)->fifo_lvl_mask + 1) << 1)) \
+>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1 : 0)
+>> +#define S3C64XX_SPI_ST_TX_DONE(v, i) (((v) & (1 << (i)->tx_st_done)) ? 1 : 0)
 >
-> NACK. Make it optional, otherwise it breaks s3c24xx.
+> IIRC the macro is already designed to deduct tx-done levels from other fields.
+> Could you please _explain_ with one example where it fails ? It is
+> difficult to see without
+> numbers.
+The existing macro fails for following scenarios.
+1) S5P64X0 channel 1
+2) S5PV210 channel 1
+3) S5PV310 channel 1 and channel 2
+
+The FIFO data level supported in the above SoCs either 64 or 256
+bytes depending on the channel. Because of this the TX_DONE
+is the 25 bit in the status register.
+
+The existing macro works for the following scenarios
+1) S3C6410 all channels
+2) S5PC100 all channels
+
+The FIFO data level supported in the above SoCs 64 bytes
+on all the channels. Because of this the TX_DONE is the 21 bit
+in the status register.
+
+So when we use the existing macro for the non-working SoCs
+it is not anding with the TX_DONE bit but it is only anding the bits
+earlier to TX_DONE bit.
+
 >
-
-Ok. Now, I've got the issue I've worried in the previous patch revision.
-
-Anyway, Mark once stated:
---- quote starts ---
-On Sun, Jun 19, 2011 at 12:06 AM, Mark Brown
-<broonie@opensource.wolfsonmicro.com> wrote:
->> +     if (IS_ERR_OR_NULL(adc->vdd)) {
->> +             dev_dbg(dev, "operating without regulator %s.\n", S3C_ADC_REGULATOR_NAME);
->> +             adc->vdd = NULL; /* Do not control regulator */
->> +     }
->> +
+> Thanks,
+> -Jassi
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
 >
-> No, don't do this.  Just unconditionally assume the regulator is present
-> if power is essential for use of the device.  The regulator API will
-> stub out correctly if it's not in use to allow things to proceed and if
-> vdd is genuinely not hooked up then the driver can't function.
---- quote ends ---
-
-Then, how about unconditionally using ADC VDD for TYPE_ADCV3
-(S5PC110/S5PV210/Exynos4210) and forget VDD for older ADC types?
-
-
-Thanks.
-
-- MyungJoo
--- 
-MyungJoo Ham, Ph.D.
-Mobile Software Platform Lab,
-Digital Media and Communications (DMC) Business
-Samsung Electronics
-cell: 82-10-6714-2858
