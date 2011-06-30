@@ -1,64 +1,33 @@
-From: B32955@freescale.com (Huang Shijie-B32955)
-Date: Thu, 30 Jun 2011 15:30:48 +0000
-Subject: reply: [PATCH v7 0/3]  add the GPMI controller driver for IMX23/IMX28
-Message-ID: <14C4E31473AF7E4B98176CB73615181C19FB66@039-SN1MPN1-006.039d.mgd.msft.net>
+From: morpheus.ibis@gmail.com (Pavel Herrmann)
+Date: Thu, 30 Jun 2011 17:36:57 +0200
+Subject: kernel panic in spi_complete() on spitz (PXA270)
+In-Reply-To: <201106301709.48818.marek.vasut@gmail.com>
+References: <1308845380.4533.54.camel@oct.suse.cz>
+	<1309445118.4406.47.camel@oct.suse.cz>
+	<201106301709.48818.marek.vasut@gmail.com>
+Message-ID: <22208110.jIqhYvKY9h@bloomfield>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Wolfram:
+On Thursday, June 30, 2011 04:45:18 PM Stanislav Brabec wrote:
+> Then I tried to apply "[PATCH] MAX1111: Fix race condition causing NULL
+> pointer exception", connected charger that periodically disconnects and
+> not seen the crash again. No OOPS was seen after ~100 reconnects.
+> 
+> So I guess that MAX1111 AC voltage reading (via SPI) was involved in an
+> incorrect moment and race happened there and your MAX1111 race condition
+> fix fixes it.
 
-Thanks for your hard work.
+Hi,
 
-On Wed, Jun 29, 2011 at 04:24:35PM +0800, Huang Shijie wrote:
-> The general-purpose media interface(GPMI) controller is a flexible interface
-> to up to several NAND flashs.
->
-> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
->
-> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
-> not.
->
-> This driver is a _pure_ MTD NAND controller driver now.
+Are you using the first or second version of the patch? if the former, please 
+use v2 (sent a few days later), which has solved the same problem by using a 
+mutex instead of allocating message data on stack (which is not good for DMA)
 
-It seems writing does not work for me. I use a MX28EVK, NAND is reported as:
+as for the backstory, this crash ocurrs when a short (measured in time spent) 
+message was enqueued after a long message, so that the short one finished first 
+(the actual bug was present even if the long one finished first, but in that 
+case there was double complete() on the one completion instead of a NULL 
+dereference)
 
-[    1.670000] NAND device: Manufacturer ID: 0x2c, Chip ID: 0xdc (Micron MT29F4G08ABADAWP)
-
-With ubiformat or the mtd_stresstest-module, I get stuff like this:
-
-root at device:~ ubiformat /dev/mtd0
-ubiformat: mtd0 (nand), size 536870912 bytes (512.0 MiB), 4096 eraseblocks of 131072 bytes (128.0 KiB), min. I/O size 2048 bytes
-libscan: scanning eraseblock 4095 -- 100 % complete
-ubiformat: 4094 eraseblocks are supposedly empty
-ubiformat: 2 bad eraseblocks found, numbers: 1243, 3935
-ubiformat: formatting eraseblock 2 --  0 % complete
-[  172.430000] [ start_dma_without_bch_irq : 393 ] DMA timeout!!!
-[  173.430000] [ start_dma_with_bch_irq : 424 ] bch timeout!!!
-[  173.430000] [ mil_ecc_write_page : 1647 ] Error in ECC-based write: -110
-[  173.440000] [ send_command : 305 ] step 1 error
-[  173.440000] [ mil_cmd_ctrl : 1369 ] Chip: 0, Error -1
-[  173.450000] [ send_command : 305 ] step 1 error
-[  173.450000] [ mil_cmd_ctrl : 1369 ] Chip: 0, Error -1
-[  173.460000] [ read_data : 386 ] step 1 error
-...
-
-Reading works though, mtd_readtest passes. Wild guess: something wrong
-with the safe timings, perhaps?
-------------------------------------------------------------------------------------------------------
-The log shows that it's a DMA failure.
-
-I will debug it when i am free.
-
-Best Regards
-Huang Shijie
-
-
-------------------------------------------------------------------------------------------------------
-
-Regards,
-
-   Wolfram
-
---
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Pavel
