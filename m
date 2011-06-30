@@ -1,52 +1,23 @@
-From: B32955@freescale.com (Huang Shijie-B32955)
-Date: Thu, 30 Jun 2011 15:21:21 +0000
-Subject: reply: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
-	controller driver
-Message-ID: <14C4E31473AF7E4B98176CB73615181C19FB3C@039-SN1MPN1-006.039d.mgd.msft.net>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Thu, 30 Jun 2011 08:22:07 -0700
+Subject: [PATCH 1/5] ASoC: wm8731: rework power management
+In-Reply-To: <4E0C80B8.7030006@atmel.com>
+References: <1309370419-22810-1-git-send-email-nicolas.ferre@atmel.com>
+	<ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
+	<20110629171148.GB10798@opensource.wolfsonmicro.com>
+	<4E0C80B8.7030006@atmel.com>
+Message-ID: <20110630152203.GB3249@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Jun 30, 2011 at 03:57:12PM +0200, Nicolas Ferre wrote:
 
-Hi Wolfram:
+Please fix your mailer to line wrap within paragraphs.
 
-> +static int mil_ecc_write_oob(struct mtd_info *mtd,
-> +                             struct nand_chip *nand, int page)
-> +{
-> +     struct gpmi_nfc_data *this = nand->priv;
-> +     struct device *dev = this->dev;
-> +     struct mil *mil = &this->mil;
-> +     uint8_t *block_mark;
-> +     int block_mark_column;
-> +     int status;
-> +     int error = 0;
-> +
-> +     /* Only marking a block bad is permitted to write the OOB. */
-> +     if (!mil->marking_a_bad_block) {
-> +             dev_emerg(dev, "This driver doesn't support writing the OOB\n");
-> +             WARN_ON(1);
-> +             error = -EIO;
-> +             goto exit;
-> +     }
+> First of all, I experienced issues while not having OSC enabled during
+> suspend/resume cycle. Am I right supposing that, if using oscillator
+> to clock the codec, I have to keep it running during a suspend/resume
+> cycle?
 
-Huh? Why is that? This will break JFFS2, for example.
-
------------------------------------------------------------------
-The GPMI-NFC driver will use the OOB(BCH will use the OOB for a special layout), so we forbid any others to use the OOB.
-But marking a block bad is permitted.
-
-If the JFFS2 use the OOB, we have to disable it
-We use UBIFS by default.
-
-Thanks.
-
-Best Regards
-Huang Shijie
-
-
-
-
------------------------------------------------------------------
-
---
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+No, not at all.  What makes you believe that you would you need to do
+that?
