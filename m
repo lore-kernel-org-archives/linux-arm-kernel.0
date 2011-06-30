@@ -1,57 +1,151 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 30 Jun 2011 15:44:08 +0530
-Subject: [PATCH 0/7] ARM: SAMSUNG: Cleanup SPI platform specific code
-In-Reply-To: <BANLkTimaMiFgKa95Zm4AtQVFdbSqukBfwg@mail.gmail.com>
-References: <1309436723-662-1-git-send-email-padma.v@samsung.com>
-	<BANLkTin2MAsTn3UhJDOLVvsams=xRR=REQ@mail.gmail.com>
-	<BANLkTimaMiFgKa95Zm4AtQVFdbSqukBfwg@mail.gmail.com>
-Message-ID: <BANLkTi=P=-eJFV8vQbcLKoFe3hto7tNGRw@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Jun 2011 02:10:20 -0700
+Subject: [GIT PULL] omap clean-up for v3.1 merge window
+Message-ID: <20110630091019.GJ23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 2:57 PM, padma venkat <padma.kvr@gmail.com> wrote:
-> Hi,
->
-> On Thu, Jun 30, 2011 at 1:01 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Thu, Jun 30, 2011 at 5:55 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
->>> This patchset does the following:
->>>
->>> 1. Move duplicated code to common place
->>> [PATCH 1/7] ARM: SAMSUNG: Move SPI device definitions to plat-samsung
->>> SPI platform devices are defined in respective machine folder of
->>> Samsung S3C64XX and S5P series SoCs.This is duplicated for every SoC.
->>> So all SPI platform devices are moved to a common place.
->>
->> The machine specific code is put in machine specific location for some reason.
->> And the code is not duplicated, it's mostly data structures
->> initialized with machine
->> specific values.
->>
->> Have you considered if it would still be possible to build kernel
->> image supporting
->> more than 1 soc after your changes ?
-> I didn't consider the single image scenario. Because as far as I know,
-> the existing Samsung code doesn't have support for building a single kernel
-> image for multiple SoCs.
+Hi Arnd & Nico,
 
-Samsung did use to support during 24xx days. Unfortunately not much with
-new generation SoCs.
-This patch-set only takes us further away from having multiple SoCs
-supported in a single kernel image some day.
+Please pull omap clean-up patches from:
 
->
-> The intention behind my changes were
-> 1) To reuse the dev-spi files for all the SoCs, as this reduces the code size.
-I already decided in favor of being able to support multiple SoCs in
-single image.
+git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-cleanup
 
-> Also future SoCs with SPI can use the same file.
-Only if they have _exactly_ same SPI block. Then most probably they'll have most
-other blocks identical too (not sure if I can name such examples in public) and
-can be supported under the same SoC name.
-Otherwise different SoCs spanning last 5yrs are already supported by
-the same SPI
-driver. We must provide SoC specific bits to the driver either via one
-place or the other.
+This branch contains little bit more of omap code shrinkage
+for regulators and PM debug.
 
--j
+It also contains cleanup of irq and timer init code, and some
+fixes.
+
+I have not added this into linux next assuming that you will
+do it. If not, please let me know and I will add it.
+
+Regards,
+
+Tony
+
+
+The following changes since commit b0af8dfdd67699e25083478c63eedef2e72ebd85:
+  Linus Torvalds (1):
+        Linux 3.0-rc5
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap-2.6.git devel-cleanup
+
+Grazvydas Ignotas (1):
+      omap: cleanup NAND platform data
+
+Jarkko Nikula (2):
+      omap: mcbsp: Drop SPI mode support
+      omap: mcbsp: Drop in-driver transfer support
+
+Kevin Hilman (3):
+      OMAP3: PM debug: remove sleep_while_idle feature
+      OMAP2: PM debug: remove register dumping
+      OMAP3: PM debug: remove register dumping
+
+Nishanth Menon (4):
+      OMAP3+: SR: make notify independent of class
+      OMAP3+: SR: disable interrupt by default
+      OMAP3+: SR: enable/disable SR only on need
+      OMAP3+: SR: fix cosmetic indentation
+
+Oleg Drokin (2):
+      cleanup regulator supply definitions in mach-omap2
+      Remove old-style supply.dev assignments common in hsmmc init
+
+Peter Ujfalusi (1):
+      omap: board-omap3evm: Fix compilation error
+
+Sanjeev Premi (1):
+      OMAP2+: PM: fix section mismatch in pm_dbg_init()
+
+Tony Lindgren (12):
+      omap: Use separate init_irq functions to avoid cpu_is_omap tests early
+      omap: Set separate timer init functions to avoid cpu_is_omap tests
+      omap: Move dmtimer defines to dmtimer.h
+      omap: Make a subset of dmtimer functions into inline functions
+      omap2+: Use dmtimer macros for clockevent
+      omap2+: Remove gptimer_wakeup for now
+      omap2+: Reserve clocksource and timesource and initialize dmtimer later
+      omap2+: Use dmtimer macros for clocksource
+      omap2+: Remove omap2_gp_clockevent_set_gptimer
+      omap2+: Rename timer-gp.c into timer.c to combine timer init functions
+      Merge branch 'devel-timer' into devel-cleanup
+      Merge branch 'for_3.1/pm-misc' of git://git.kernel.org/.../khilman/linux-omap-pm into devel-cleanup
+
+ arch/arm/mach-omap1/board-ams-delta.c        |    4 +-
+ arch/arm/mach-omap1/board-fsample.c          |    4 +-
+ arch/arm/mach-omap1/board-generic.c          |    4 +-
+ arch/arm/mach-omap1/board-h2.c               |    4 +-
+ arch/arm/mach-omap1/board-h3.c               |    4 +-
+ arch/arm/mach-omap1/board-htcherald.c        |    4 +-
+ arch/arm/mach-omap1/board-innovator.c        |    4 +-
+ arch/arm/mach-omap1/board-nokia770.c         |    4 +-
+ arch/arm/mach-omap1/board-osk.c              |    4 +-
+ arch/arm/mach-omap1/board-palmte.c           |    4 +-
+ arch/arm/mach-omap1/board-palmtt.c           |    4 +-
+ arch/arm/mach-omap1/board-palmz71.c          |    4 +-
+ arch/arm/mach-omap1/board-perseus2.c         |    4 +-
+ arch/arm/mach-omap1/board-sx1.c              |    4 +-
+ arch/arm/mach-omap1/board-voiceblue.c        |    4 +-
+ arch/arm/mach-omap1/irq.c                    |    2 +-
+ arch/arm/mach-omap1/time.c                   |    6 +-
+ arch/arm/mach-omap1/timer32k.c               |    4 -
+ arch/arm/mach-omap2/Makefile                 |    2 +-
+ arch/arm/mach-omap2/board-2430sdp.c          |    4 +-
+ arch/arm/mach-omap2/board-3430sdp.c          |    4 +-
+ arch/arm/mach-omap2/board-3630sdp.c          |    4 +-
+ arch/arm/mach-omap2/board-4430sdp.c          |   19 +-
+ arch/arm/mach-omap2/board-am3517crane.c      |    4 +-
+ arch/arm/mach-omap2/board-am3517evm.c        |    4 +-
+ arch/arm/mach-omap2/board-apollon.c          |    4 +-
+ arch/arm/mach-omap2/board-cm-t35.c           |   44 +-
+ arch/arm/mach-omap2/board-cm-t3517.c         |    5 +-
+ arch/arm/mach-omap2/board-devkit8000.c       |   36 +-
+ arch/arm/mach-omap2/board-flash.c            |    4 -
+ arch/arm/mach-omap2/board-generic.c          |    4 +-
+ arch/arm/mach-omap2/board-h4.c               |    4 +-
+ arch/arm/mach-omap2/board-igep0020.c         |   35 +-
+ arch/arm/mach-omap2/board-ldp.c              |   14 +-
+ arch/arm/mach-omap2/board-n8x0.c             |   12 +-
+ arch/arm/mach-omap2/board-omap3beagle.c      |   37 +-
+ arch/arm/mach-omap2/board-omap3evm.c         |   51 ++--
+ arch/arm/mach-omap2/board-omap3logic.c       |   19 +-
+ arch/arm/mach-omap2/board-omap3pandora.c     |   67 ++--
+ arch/arm/mach-omap2/board-omap3stalker.c     |   37 +-
+ arch/arm/mach-omap2/board-omap3touchbook.c   |   44 +-
+ arch/arm/mach-omap2/board-omap4panda.c       |   19 +-
+ arch/arm/mach-omap2/board-overo.c            |   32 +-
+ arch/arm/mach-omap2/board-rm680.c            |    4 +-
+ arch/arm/mach-omap2/board-rx51-peripherals.c |   29 +-
+ arch/arm/mach-omap2/board-rx51.c             |    4 +-
+ arch/arm/mach-omap2/board-ti8168evm.c        |    9 +-
+ arch/arm/mach-omap2/board-zoom-peripherals.c |   49 +--
+ arch/arm/mach-omap2/board-zoom.c             |    8 +-
+ arch/arm/mach-omap2/common-board-devices.c   |    6 +-
+ arch/arm/mach-omap2/gpmc-nand.c              |   10 +-
+ arch/arm/mach-omap2/io.c                     |   17 +-
+ arch/arm/mach-omap2/irq.c                    |   32 +-
+ arch/arm/mach-omap2/omap4-common.c           |   10 +-
+ arch/arm/mach-omap2/pm-debug.c               |  372 +----------------
+ arch/arm/mach-omap2/pm.h                     |   16 -
+ arch/arm/mach-omap2/pm24xx.c                 |    6 +-
+ arch/arm/mach-omap2/pm34xx.c                 |    6 -
+ arch/arm/mach-omap2/smartreflex.c            |   38 +-
+ arch/arm/mach-omap2/timer-gp.c               |  266 ------------
+ arch/arm/mach-omap2/timer-gp.h               |   16 -
+ arch/arm/mach-omap2/timer.c                  |  342 +++++++++++++++
+ arch/arm/plat-omap/counter_32k.c             |    2 +-
+ arch/arm/plat-omap/dmtimer.c                 |  209 ++--------
+ arch/arm/plat-omap/include/plat/common.h     |    6 +-
+ arch/arm/plat-omap/include/plat/dmtimer.h    |  250 +++++++++++-
+ arch/arm/plat-omap/include/plat/irqs.h       |    6 +-
+ arch/arm/plat-omap/include/plat/mcbsp.h      |   62 ---
+ arch/arm/plat-omap/include/plat/nand.h       |    6 +-
+ arch/arm/plat-omap/mcbsp.c                   |  596 +-------------------------
+ 70 files changed, 1016 insertions(+), 1942 deletions(-)
+ delete mode 100644 arch/arm/mach-omap2/timer-gp.c
+ delete mode 100644 arch/arm/mach-omap2/timer-gp.h
+ create mode 100644 arch/arm/mach-omap2/timer.c
