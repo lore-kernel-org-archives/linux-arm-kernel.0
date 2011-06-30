@@ -1,59 +1,62 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 30 Jun 2011 19:02:29 +0200
-Subject: [PATCH 1/3] PWM: add pwm framework support
-In-Reply-To: <BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
-References: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
-	<1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
-	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
-	<201106301441.24493.arnd@arndb.de>
-	<BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
-Message-ID: <20110630170229.GP6069@pengutronix.de>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 30 Jun 2011 19:04:32 +0200
+Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC controller
+	driver
+In-Reply-To: <20110630102728.GB1997@pengutronix.de>
+References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
+	<1309335878-16678-2-git-send-email-b32955@freescale.com>
+	<20110630102728.GB1997@pengutronix.de>
+Message-ID: <20110630170432.GA20948@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Bill,
-
-On Thu, Jun 30, 2011 at 11:17:54AM -0500, Bill Gatliff wrote:
-> Guys:
+On Thu, Jun 30, 2011 at 12:27:28PM +0200, Wolfram Sang wrote:
 > 
-> On Thu, Jun 30, 2011 at 7:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > +static int mil_ecc_write_oob(struct mtd_info *mtd,
+> > +				struct nand_chip *nand, int page)
+> > +{
+> > +	struct gpmi_nfc_data *this = nand->priv;
+> > +	struct device *dev = this->dev;
+> > +	struct mil *mil	= &this->mil;
+> > +	uint8_t *block_mark;
+> > +	int block_mark_column;
+> > +	int status;
+> > +	int error = 0;
+> > +
+> > +	/* Only marking a block bad is permitted to write the OOB. */
+> > +	if (!mil->marking_a_bad_block) {
+> > +		dev_emerg(dev, "This driver doesn't support writing the OOB\n");
+> > +		WARN_ON(1);
+> > +		error = -EIO;
+> > +		goto exit;
+> > +	}
 > 
-> > A lot of people want to see a framework get merged, and I think it's
-> > great that Sascha has volunteered to do the work to push that
-> > through this time, especially since you have not been able to
-> > finish your work.
-> 
-> Sascha is wasting his time by reinventing the wheel.  He's traveling
-> over exactly the same path I have already covered.  In fact, some of
-> his reviewer comments are almost word-for-word the same as those I
-> have received and addressed in the past.
-> 
-> My patches were always kept current in this mailing list and others,
-> and Sascha clearly has the skills necessary to make improvements and
-> corrections should he have chosen to do so.
+> Huh? Why is that? This will break JFFS2, for example.
 
-I think that you made the fundamental mistake to completly ignore the
-existing pwm API and its users. With a competing api we are basically
-stuck. We can't convert the existing hardware drivers to the new API
-because leds-pwm.c, pwm_bl.c and others still depend on the old API and
-boards using it would break. We can't convert the function drivers
-either because again this would break boards for which only an old style
-pwm driver exists.  So the logical thing to do is to put a step in
-between: Consolidate the existing drivers and *then* change the API
-atomically so that nothing breaks. Your patches don't do this, so I
-don't think at all that what I did is duplication of work.
+-----------------------------------------------------------------
+The GPMI-NFC driver will use the OOB(BCH will use the OOB for a special layout), so we forbid any others to use the OOB.
+But marking a block bad is permitted.
 
-Given the current rush to move drivers out of arch/ it probably won't
-take long until all pwm drivers are moved to drivers/pwm/ and converted
-to use the framework, and then you have a good base to put your work onto.
-So please don't complain too much: We are currently only doing the work
-you didn't want to do.
+If the JFFS2 use the OOB, we have to disable it
+We use UBIFS by default.
 
+-----------------------------------------------------------------
 
-Sascha
+(Please use a proper mailer)
+
+Why can't you define a nand_ecclayout with no free space?
+
+Regards,
+
+   Wolfram
 
 -- 
-Pengutronix e.K.                           |                             |
+Pengutronix e.K.                           | Wolfram Sang                |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110630/d4438e44/attachment.sig>
