@@ -1,39 +1,38 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 30 Jun 2011 16:04:07 -0300
-Subject: [PATCH 1/1] net/fec: iMX53 needs gasket for both MII and RMII
-In-Reply-To: <4E0BAC50.3030007@boundarydevices.com>
-References: <1309387098-30680-1-git-send-email-troy.kisky@boundarydevices.com>
-	<4E0BAC50.3030007@boundarydevices.com>
-Message-ID: <BANLkTimSkDOQDZ=K1Y+qeiG91cSEmXuGMg@mail.gmail.com>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Thu, 30 Jun 2011 14:45:11 -0500
+Subject: [PATCH 1/3] PWM: add pwm framework support
+In-Reply-To: <20110630170229.GP6069@pengutronix.de>
+References: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
+	<1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
+	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
+	<201106301441.24493.arnd@arndb.de>
+	<BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
+	<20110630170229.GP6069@pengutronix.de>
+Message-ID: <BANLkTikEigJk0nzyhXsWKWGSJQBbTVSerg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 7:50 PM, Troy Kisky
-<troy.kisky@boundarydevices.com> wrote:
-> On 6/29/2011 3:38 PM, Troy Kisky wrote:
->> Currently, only RMII interfaces are using the gasket.
->> But, the iMX53 needs to enable the gasket for MII
->> mode as well. The iMX51 has no gasket registers. So,
->> add a use_gasket field to fec_platform_data to not restrict
->> same kernel for both iMX51/53 boards.
->>
->> iMX28 boards don't need use_gasket, as they have
->> FEC_QUIRK_ENET_MAC.
->> ---
->> ?arch/arm/mach-mx5/board-mx50_rdp.c ?| ? ?1 +
->> ?arch/arm/mach-mx5/board-mx53_evk.c ?| ? ?1 +
->> ?arch/arm/mach-mx5/board-mx53_loco.c | ? ?1 +
->> ?arch/arm/mach-mx5/board-mx53_smd.c ?| ? ?1 +
->> ?drivers/net/fec.c ? ? ? ? ? ? ? ? ? | ? 11 ++++++++---
->> ?include/linux/fec.h ? ? ? ? ? ? ? ? | ? ?1 +
->> ?6 files changed, 13 insertions(+), 3 deletions(-)
+Sascha:
 
-I think you should split your patch: one for the driver part and
-another for the board files.
+On Thu, Jun 30, 2011 at 12:02 PM, Sascha Hauer <s.hauer@pengutronix.de> wrote:
+> So please don't complain too much: We are currently only doing the work
+> you didn't want to do.
 
-You should copy linux-netdev mailing list when posting
-drivers/net/fec.c related changes.
+Per request of some the early reviewers, my plan was to migrate
+existing users over to the new API after the API itself was committed
+to mainstream.
 
-Regards,
+At any rate, this isn't a question of work I didn't "want" to do.  On
+the one hand, I was simply doing what was asked of me.  On the other
+hand, I was trying to make progress while simultaneously dealing with
+serious family matters that are still unresolved.
 
-Fabio Estevam
+At any rate, it's clear that your patches are going in, and mine
+aren't--- I have no choice but to accept that.  I'm just frustrated by
+the duplication of effort.
+
+
+b.g.
+-- 
+Bill Gatliff
+bgat at billgatliff.com
