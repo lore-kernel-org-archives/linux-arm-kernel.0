@@ -1,26 +1,32 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Jun 2011 17:26:36 +0100
-Subject: reply: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
-	controller driver
-In-Reply-To: <14C4E31473AF7E4B98176CB73615181C19FB3C@039-SN1MPN1-006.039d.mgd.msft.net>
-References: <14C4E31473AF7E4B98176CB73615181C19FB3C@039-SN1MPN1-006.039d.mgd.msft.net>
-Message-ID: <20110630162636.GB21898@n2100.arm.linux.org.uk>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 30 Jun 2011 09:36:20 -0700
+Subject: [PATCH] arm: platsmp: Allow secondary cpu hotplug with	maxcpus=1
+In-Reply-To: <20110630131154.GJ23312@n2100.arm.linux.org.uk>
+References: <1309372300-28911-1-git-send-email-sboyd@codeaurora.org>
+	<20110630131154.GJ23312@n2100.arm.linux.org.uk>
+Message-ID: <4E0CA604.5080802@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please can to use a mailer which:
+On 6/30/2011 6:11 AM, Russell King - ARM Linux wrote:
+> On Wed, Jun 29, 2011 at 11:31:39AM -0700, Stephen Boyd wrote:
+>>  void __init platform_smp_prepare_cpus(unsigned int max_cpus)
+>>  {
+>> -	int i;
+>> -
+>>  	/*
+>>  	 * Initialise the present map, which describes the set of CPUs
+>>  	 * actually populated at the present time.
+>>  	 */
+>> -	for (i = 0; i < max_cpus; i++)
+>> -		set_cpu_present(i, true);
+>> +	init_cpu_present(&cpu_possible_map);
+> Ok, if we're now doing this in every platform, it might as well go into
+> arch/arm/kernel/smp.c - platforms can re-initialize the present map
+> in this callback if they need to do something different.
 
-1. Understands the convention for subject lines which are replies
-   (iow doesn't prefix it with "reply")
-2. Understands threading enough to put In-reply-to: and/or References:
-   headers into your emails.
+That sounds better. V2 coming soon.
 
-Your current mailer makes all your messages look like new threads of
-conversation, and are completely disconnected from their real thread.
-Not only does that makes it hard to follow the threads, but also
-makes it harder to filter messages for reading.
-
-With the amount of email on these mailing lists, this should be a
-mandatory requirement for everyone sending messages there.
-
-Thanks.
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum.
