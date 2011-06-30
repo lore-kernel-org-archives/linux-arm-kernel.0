@@ -1,48 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2011 15:12:46 +0200
-Subject: [PATCH v8 00/12] use nonblock mmc requests to minimize latency
-In-Reply-To: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
-References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <201106301512.46788.arnd@arndb.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 30 Jun 2011 15:13:42 +0200
+Subject: [PATCH V2] MMC: PM: add suspend/resume in atmel-mci
+In-Reply-To: <1309441781-11012-1-git-send-email-nicolas.ferre@atmel.com>
+References: <201106292339.12402.rjw@sisk.pl>
+	<1309441781-11012-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20110630131342.GK11559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 28 June 2011, Per Forlin wrote:
-> How significant is the cache maintenance over head?
-> It depends, the eMMC are much faster now
-> compared to a few years ago and cache maintenance cost more due to
-> multiple cache levels and speculative cache pre-fetch. In relation the
-> cost for handling the caches have increased and is now a bottle neck
-> dealing with fast eMMC together with DMA.
+Hello Nicolas,
+
+On Thu, Jun 30, 2011 at 03:49:41PM +0200, Nicolas Ferre wrote:
+> Take care of slots while going to suspend state.
 > 
-> The intention for introducing non-blocking mmc requests is to minimize the
-> time between a mmc request ends and another mmc request starts. In the
-> current implementation the MMC controller is idle when dma_map_sg and
-> dma_unmap_sg is processing. Introducing non-blocking mmc request makes it
-> possible to prepare the caches for next job in parallel to an active
-> mmc request.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+> ---
+> V2: move to pm_ops
 > 
-> This is done by making the issue_rw_rq() non-blocking.
-> The increase in throughput is proportional to the time it takes to
-> prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
-> a request and how fast the memory is. The faster the MMC/SD is
-> the more significant the prepare request time becomes. Measurements on U5500
-> and Panda on eMMC and SD shows significant performance gain for large
-> reads when running DMA mode. In the PIO case the performance is unchanged.
+>  drivers/mmc/host/atmel-mci.c |   47 ++++++++++++++++++++++++++++++++++++++++++
+>  1 files changed, 47 insertions(+), 0 deletions(-)
 > 
-> There are two optional hooks pre_req() and post_req() that the host driver
-> may implement in order to move work to before and after the actual mmc_request
-> function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
-> the dma descriptor and post_req runs the dma_unmap_sg.
+> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+> index aa8039f..058f1842 100644
+> --- a/drivers/mmc/host/atmel-mci.c
+> +++ b/drivers/mmc/host/atmel-mci.c
+> @@ -1878,10 +1878,57 @@ static int __exit atmci_remove(struct platform_device *pdev)
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM
+> +static int atmci_suspend(struct device *dev)
+> +{
+> +	struct atmel_mci *host = dev_get_drvdata(dev);
+> +	struct atmel_mci_slot *slot;
+> +	int i, ret;
+slot and ret can have a more local scope.
 
-I think this looks good enough to merge into the linux-mmc tree, the code is
-clean and the benefits are clear.
+> +
+> +	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+> +		slot = host->slot[i];
+> +		if (!slot)
+> +			continue;
+> +		ret = mmc_suspend_host(slot->mmc);
+> +		if (ret < 0) {
+> +			while (--i >= 0) {
+> +				slot = host->slot[i];
+> +				if (slot)
+> +					mmc_resume_host(host->slot[i]->mmc);
+hmm, mmc_resume_host could fail. But probably you cannot handle that in
+a sane way, do you?
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+> +			}
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int atmci_resume(struct device *dev)
+> +{
+> +	struct atmel_mci *host = dev_get_drvdata(dev);
+> +	struct atmel_mci_slot *slot;
+> +	int i, ret;
+> +
+> +	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+> +		slot = host->slot[i];
+> +		if (!slot)
+> +			continue;
+> +		ret = mmc_resume_host(slot->mmc);
+> +		if (ret < 0)
+> +			return ret;
+Maybe you should try to resume host 5 even if resuming host 4 failed?
 
-One logical follow-up as both a cleanup and performance optimization would be
-to get rid of the mmc_queue_thread completely. When mmc_blk_issue_rq() is
-non-blocking always, you can call it directly from the mmc_request()
-function, instead of waking up another thread to do it for you.
+> +	}
+> +
+> +	return 0;
+> +}
+> +#endif
+> +static SIMPLE_DEV_PM_OPS(atmci_pm, atmci_suspend, atmci_resume);
+> +
+> +
+For my taste a single empty line is enough.
 
-	Arnd
+>  static struct platform_driver atmci_driver = {
+>  	.remove		= __exit_p(atmci_remove),
+>  	.driver		= {
+>  		.name		= "atmel_mci",
+> +		.pm		= &atmci_pm,
+>  	},
+>  };
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
