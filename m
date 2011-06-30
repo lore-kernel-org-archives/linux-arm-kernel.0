@@ -1,104 +1,59 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 30 Jun 2011 16:07:10 +0530
-Subject: [PATCH] ARM:SAMSUNG: DMA Cleanup as per sparse
-In-Reply-To: <1309428980-20176-1-git-send-email-sangwook.lee@linaro.org>
-References: <1309428980-20176-1-git-send-email-sangwook.lee@linaro.org>
-Message-ID: <BANLkTimCWFP18o7ZmO5puzs2HMU+DmkfAQ@mail.gmail.com>
+From: w.sang@pengutronix.de (Wolfram Sang)
+Date: Thu, 30 Jun 2011 12:40:09 +0200
+Subject: [PATCH v7 0/3]  add the GPMI controller driver for IMX23/IMX28
+In-Reply-To: <1309335878-16678-1-git-send-email-b32955@freescale.com>
+References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
+Message-ID: <20110630104009.GC1997@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 3:46 PM, Sangwook Lee <sangwook.lee@linaro.org> wrote:
-> Function declaration differs between file:s3c-pl330.c and file:dma.h
-> and SPARSE (Documentation/sparse.txt) gives error messages
->
-> Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
+On Wed, Jun 29, 2011 at 04:24:35PM +0800, Huang Shijie wrote:
+> The general-purpose media interface(GPMI) controller is a flexible interface
+> to up to several NAND flashs.
+> 
+> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
+> 
+> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
+> not.
+> 
+> This driver is a _pure_ MTD NAND controller driver now.
 
-Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
+It seems writing does not work for me. I use a MX28EVK, NAND is reported as:
 
-> ---
-> ?arch/arm/plat-samsung/include/plat/dma.h | ? 16 ++++++++--------
-> ?1 files changed, 8 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
-> index 2e8f8c6..7365f46 100644
-> --- a/arch/arm/plat-samsung/include/plat/dma.h
-> +++ b/arch/arm/plat-samsung/include/plat/dma.h
-> @@ -62,7 +62,7 @@ typedef int ?(*s3c2410_dma_opfn_t)(struct s3c2410_dma_chan *,
-> ?* request a dma channel exclusivley
-> ?*/
->
-> -extern int s3c2410_dma_request(unsigned int channel,
-> +extern int s3c2410_dma_request(enum dma_ch id,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct s3c2410_dma_client *, void *dev);
->
->
-> @@ -71,14 +71,14 @@ extern int s3c2410_dma_request(unsigned int channel,
-> ?* change the state of the dma channel
-> ?*/
->
-> -extern int s3c2410_dma_ctrl(unsigned int channel, enum s3c2410_chan_op op);
-> +extern int s3c2410_dma_ctrl(enum dma_ch id, enum s3c2410_chan_op op);
->
-> ?/* s3c2410_dma_setflags
-> ?*
-> ?* set the channel's flags to a given state
-> ?*/
->
-> -extern int s3c2410_dma_setflags(unsigned int channel,
-> +extern int s3c2410_dma_setflags(enum dma_ch id,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int flags);
->
-> ?/* s3c2410_dma_free
-> @@ -86,7 +86,7 @@ extern int s3c2410_dma_setflags(unsigned int channel,
-> ?* free the dma channel (will also abort any outstanding operations)
-> ?*/
->
-> -extern int s3c2410_dma_free(unsigned int channel, struct s3c2410_dma_client *);
-> +extern int s3c2410_dma_free(enum dma_ch id, struct s3c2410_dma_client *);
->
-> ?/* s3c2410_dma_enqueue
-> ?*
-> @@ -95,7 +95,7 @@ extern int s3c2410_dma_free(unsigned int channel, struct s3c2410_dma_client *);
-> ?* drained before the buffer is given to the DMA system.
-> ?*/
->
-> -extern int s3c2410_dma_enqueue(unsigned int channel, void *id,
-> +extern int s3c2410_dma_enqueue(enum dma_ch idx, void *id,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t data, int size);
->
-> ?/* s3c2410_dma_config
-> @@ -103,14 +103,14 @@ extern int s3c2410_dma_enqueue(unsigned int channel, void *id,
-> ?* configure the dma channel
-> ?*/
->
-> -extern int s3c2410_dma_config(unsigned int channel, int xferunit);
-> +extern int s3c2410_dma_config(enum dma_ch id, int xferunit);
->
-> ?/* s3c2410_dma_devconfig
-> ?*
-> ?* configure the device we're talking to
-> ?*/
->
-> -extern int s3c2410_dma_devconfig(unsigned int channel,
-> +extern int s3c2410_dma_devconfig(enum dma_ch id,
-> ? ? ? ? ? ? ? ?enum s3c2410_dmasrc source, unsigned long devaddr);
->
-> ?/* s3c2410_dma_getposition
-> @@ -118,7 +118,7 @@ extern int s3c2410_dma_devconfig(unsigned int channel,
-> ?* get the position that the dma transfer is currently at
-> ?*/
->
-> -extern int s3c2410_dma_getposition(unsigned int channel,
-> +extern int s3c2410_dma_getposition(enum dma_ch id,
-> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t *src, dma_addr_t *dest);
->
-> ?extern int s3c2410_dma_set_opfn(unsigned int, s3c2410_dma_opfn_t rtn);
-> --
-> 1.7.4.1
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
+[    1.670000] NAND device: Manufacturer ID: 0x2c, Chip ID: 0xdc (Micron MT29F4G08ABADAWP)
+
+With ubiformat or the mtd_stresstest-module, I get stuff like this:
+
+root at device:~ ubiformat /dev/mtd0
+ubiformat: mtd0 (nand), size 536870912 bytes (512.0 MiB), 4096 eraseblocks of 131072 bytes (128.0 KiB), min. I/O size 2048 bytes
+libscan: scanning eraseblock 4095 -- 100 % complete  
+ubiformat: 4094 eraseblocks are supposedly empty
+ubiformat: 2 bad eraseblocks found, numbers: 1243, 3935
+ubiformat: formatting eraseblock 2 --  0 % complete  
+[  172.430000] [ start_dma_without_bch_irq : 393 ] DMA timeout!!!
+[  173.430000] [ start_dma_with_bch_irq : 424 ] bch timeout!!!
+[  173.430000] [ mil_ecc_write_page : 1647 ] Error in ECC-based write: -110
+[  173.440000] [ send_command : 305 ] step 1 error
+[  173.440000] [ mil_cmd_ctrl : 1369 ] Chip: 0, Error -1
+[  173.450000] [ send_command : 305 ] step 1 error
+[  173.450000] [ mil_cmd_ctrl : 1369 ] Chip: 0, Error -1
+[  173.460000] [ read_data : 386 ] step 1 error
+...
+
+Reading works though, mtd_readtest passes. Wild guess: something wrong
+with the safe timings, perhaps?
+
+Regards,
+
+   Wolfram
+
+-- 
+Pengutronix e.K.                           | Wolfram Sang                |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110630/391f685e/attachment.sig>
