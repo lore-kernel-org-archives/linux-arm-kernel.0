@@ -1,117 +1,73 @@
-From: dedekind1@gmail.com (Artem Bityutskiy)
-Date: Thu, 30 Jun 2011 10:55:25 +0300
-Subject: [PATCH] mtd: OneNAND: samsung: Write DMA support
-In-Reply-To: <20110608101804.GA5527@july>
-References: <20110608101804.GA5527@july>
-Message-ID: <1309420530.23597.153.camel@sauron>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 30 Jun 2011 09:55:01 +0200
+Subject: [PATCH v5 2/3] ARM: mxs/mx23evk: add GPMI-NFC device
+In-Reply-To: <1309406028-2924-3-git-send-email-b32955@freescale.com>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<1309406028-2924-3-git-send-email-b32955@freescale.com>
+Message-ID: <20110630075501.GE11559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2011-06-08 at 19:18 +0900, Kyungmin Park wrote:
-> From: Kyungmin Park <kyungmin.park@samsung.com>
-> 
-> Implement the write DMA feature. It can reduce the CPU usage when write.
-> 
-> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+On Thu, Jun 30, 2011 at 11:53:47AM +0800, Huang Shijie wrote:
+> add the GPMI-NFC device for mx23evk borad.
+s/borad/board/
+
+> Signed-off-by: Huang Shijie <b32955@freescale.com>
 > ---
-> diff --git a/drivers/mtd/onenand/samsung.c b/drivers/mtd/onenand/samsung.c
-> index 3306b5b..f24cb6f 100644
-> --- a/drivers/mtd/onenand/samsung.c
-> +++ b/drivers/mtd/onenand/samsung.c
-> @@ -712,6 +712,74 @@ normal:
->  	return 0;
->  }
+>  arch/arm/mach-mxs/Kconfig        |    1 +
+>  arch/arm/mach-mxs/mach-mx23evk.c |   37 +++++++++++++++++++++++++++++++++++++
+>  2 files changed, 38 insertions(+), 0 deletions(-)
+> 
+> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+> index 1d3985f..f55bcfe 100644
+> --- a/arch/arm/mach-mxs/Kconfig
+> +++ b/arch/arm/mach-mxs/Kconfig
+> @@ -32,6 +32,7 @@ config MACH_MX23EVK
+>  	select SOC_IMX23
+>  	select MXS_HAVE_AMBA_DUART
+>  	select MXS_HAVE_PLATFORM_AUART
+> +	select MXS_HAVE_PLATFORM_GPMI_NFC
+>  	select MXS_HAVE_PLATFORM_MXS_MMC
+>  	select MXS_HAVE_PLATFORM_MXSFB
+>  	help
+> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+> index 3c2de33..772b373 100644
+> --- a/arch/arm/mach-mxs/mach-mx23evk.c
+> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+> @@ -107,6 +107,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+>  		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+>  };
 >  
-> +static int s5pc110_write_bufferram(struct mtd_info *mtd, int area,
-> +		const unsigned char *buffer, int offset, size_t count)
-> +{
-> +	struct onenand_chip *this = mtd->priv;
-> +	struct device *dev = &onenand->pdev->dev;
-> +	void __iomem *p;
-> +	void *buf = (void *) buffer;
+> +/* gpmi-nfc */
+> +#define MXS_PAD_GPMI_NFC	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
+Maybe put that into a more central place, as mach-mx28evk uses it, too?
+OTOH the name sounds more generic than its use. Do you really need 12mA
+for the Write protect pin? If not, you could rename it to
+MXS_PAD_GPMI_NFC_STROBE.
 
-No, this is bad - if buffer is marked as const then it should be
-constant, or remove the const modifier in the function declaration. And
-when you remove the const modifier you can kill the cast, because
-assigning to a void pointer does not require it. 
+> +static iomux_cfg_t mx23evk_gpmi_nfc_pads[] = {
+> +	MX23_PAD_GPMI_D00__GPMI_D00 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_D01__GPMI_D01 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_D02__GPMI_D02 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_D03__GPMI_D03 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_D04__GPMI_D04 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_D05__GPMI_D05 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_D06__GPMI_D06 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_D07__GPMI_D07 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_WPN__GPMI_WPN | MXS_PAD_GPMI_NFC,
+> +	MX23_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_GPMI_NFC,
+> +	MX23_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_GPMI_NFC,
+> +	MX23_PAD_GPMI_RDY0__GPMI_RDY0 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_RDY1__GPMI_RDY1 | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
+> +	MX23_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
+> +};
 
-> +	dma_addr_t dma_src, dma_dst;
-> +	int err, ofs, page_dma = 0;
-> +
-> +	p = this->base + area;
-> +	if (ONENAND_CURRENT_BUFFERRAM(this)) {
-> +		if (area == ONENAND_DATARAM)
-> +			p += this->writesize;
-> +		else
-> +			p += mtd->oobsize;
-> +	}
-> +
-> +	if (count != mtd->writesize || offset & 3 || (size_t) buf & 3)
-> +		goto normal;
-> +
-> +	/* Handle vmalloc address */
-> +	if (buf >= high_memory) {
-> +		struct page *page;
-
-OK, Russell will yell at this, but we do DMA vmalloc'ed addresses for
-many years in the OneNAND driver and it works, and there are products
-out there with this code (e.g., Nokia N900) and it works. But I'd like
-to understand better why exactly this is a no-no, and why this works in
-practice - were we lucky and how exactly ....
-
-> +
-> +		if (((size_t) buf & PAGE_MASK) !=
-> +		    ((size_t) (buf + count - 1) & PAGE_MASK))
-
-Something is fishy with these size_t casts, could you revisit this piece
-of code - and turn it to something simpler, if possible?
-
-> +			goto normal;
-> +
-> +		page = vmalloc_to_page(buf);
-> +		if (unlikely(!page))
-> +			goto normal;
-> +
-> +		/* Page offset */
-> +		ofs = ((size_t) buf & ~PAGE_MASK);
-> +		page_dma = 1;
-> +
-> +		/* DMA routine */
-> +		dma_src = dma_map_page(dev, page, ofs, count, DMA_TO_DEVICE);
-> +		dma_dst = onenand->phys_base + (p - this->base);
-> +	} else {
-> +		/* DMA routine */
-> +		dma_src = dma_map_single(dev, buf, count, DMA_TO_DEVICE);
-> +		dma_dst = onenand->phys_base + (p - this->base);
-> +	}
-> +
-> +	if (dma_mapping_error(dev, dma_src)) {
-> +		dev_err(dev, "Couldn't map a %d byte buffer for DMA\n", count);
-> +		goto normal;
-> +	}
-> +
-> +	err = s5pc110_dma_ops((void *) dma_dst, (void *) dma_src,
-> +			count, S5PC110_DMA_DIR_WRITE);
-
-Why casting to void? Please, revise all casts you do.
-
-> +
-> +	if (page_dma)
-> +		dma_unmap_page(dev, dma_src, count, DMA_TO_DEVICE);
-> +	else
-> +		dma_unmap_single(dev, dma_src, count, DMA_TO_DEVICE);
-> +
-> +	if (!err)
-> +		return 0;
-> +
-> +normal:
-> +	memcpy(p + offset, buffer, count);
-
-p is iomem, and it cannot be involved in memcpy as Russell pointed
-recently in another e-mail, see Documentation/bus-virt-phys-mapping.txt
-
-Please, re-send this with the arm mailing list in CC.
+Best regards
+Uwe
 
 -- 
-Best Regards,
-Artem Bityutskiy
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
