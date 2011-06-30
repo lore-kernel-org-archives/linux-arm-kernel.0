@@ -1,68 +1,54 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 30 Jun 2011 11:01:10 -0700
-Subject: kernel panic in spi_complete() on spitz (PXA270)
-In-Reply-To: <4E0CB518.2080703@compulab.co.il>
-References: <1308845380.4533.54.camel@oct.suse.cz>
-	<201106301352.21684.marek.vasut@gmail.com>
-	<1309445118.4406.47.camel@oct.suse.cz>
-	<4E0C957F.8080807@compulab.co.il>
-	<1309450406.4406.59.camel@oct.suse.cz>
-	<4E0CB518.2080703@compulab.co.il>
-Message-ID: <20110630180105.GA5064@opensource.wolfsonmicro.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Thu, 30 Jun 2011 11:49:16 -0700
+Subject: [PATCH 1/1] net/fec: iMX53 needs gasket for both MII and RMII
+In-Reply-To: <20110630161935.GA7977@S2100-06.ap.freescale.net>
+References: <1309387098-30680-1-git-send-email-troy.kisky@boundarydevices.com>
+	<20110630161935.GA7977@S2100-06.ap.freescale.net>
+Message-ID: <4E0CC52C.6010306@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 08:40:40PM +0300, Igor Grinberg wrote:
-> On 06/30/11 19:13, Stanislav Brabec wrote:
-> > Igor Grinberg wrote:
+On 6/30/2011 9:19 AM, Shawn Guo wrote:
+> Hi Troy,
+> 
+> On Wed, Jun 29, 2011 at 03:38:18PM -0700, Troy Kisky wrote:
+>> Currently, only RMII interfaces are using the gasket.
+>> But, the iMX53 needs to enable the gasket for MII
+>> mode as well. The iMX51 has no gasket registers. So,
+>> add a use_gasket field to fec_platform_data to not restrict
+>> same kernel for both iMX51/53 boards.
+>>
+> 
+> Right, on those early SoCs with fec, like imx27/35/51, there is no
+> gasket, while on those recent ones, like imx25/50/53, there is gasket,
+> and the gasket should be enabled for not only MII mode but also  RMII
+> mode.  I guess you caught this problem when using a MII phy with
+> imx53?
+> 
+> Though I agree this is something we need to fix, I'm unsure using
+> platform_data is the best way.  IMO, this gasket is rather SoC
+> specific thing than platform (board).  If we are running fec on
+> imx25/50/53, we need to enable the gasket, no matter what boards
+> we are using and how the boards are designed.
+> 
+> Since platform_device_id is already being used to distinguish imx28
+> from other imx SoCs, maybe we can extend it to handle gasket too?
+> 
+> Regards,
+> Shawn
+> 
+>> iMX28 boards don't need use_gasket, as they have
+>> FEC_QUIRK_ENET_MAC.
 
-> >> I thought we've finished discussing the regulator issue...
+When I saw how FEC_QUIRK_ENET_MAC was handled, it thought about changing
+to do it that way. It really does look better that way. But the current
+change looks more efficient memory-wise. Though, I guess that would
+depend on how many boards your kernel supports and whether more option
+are to be added later.
 
-> > The discussion ended without a fix (at least for spitz).
+I'm fine with redoing your way if I can get a tentative OK first.
 
-> Well, the discussion was mainly about how the regulator API should be used.
-> The proposed patch, used the regulator API incorrectly.
-> If I recall correctly, in the end of the discussion,
-> Mark provided another option for configuring the regulator API,
-> which is number 3 below.
+Is	.name = 'g-fec' OK?
 
-The discussion ended with you guys having the three different options
-that would work, you just need to use one of them.
-
-> >  I seen two
-> > proposals:
-> > - As ADS7846 hardware does not require dedicated regulator, don't
-> >   require it in driver and fail only on platforms that have a dedicated
-> >   regulator.
-
-> The thing is that ads7846 chip itself just requires power supply
-
-Right, and the regulator API hides the non-switchability of the supply
-from the driver so there's no need for the driver to worry about how the
-supplies are wired up.  It just turns the regulator on when it needs it
-and turns it off when it doesn't.
-
-> >> 1) add regulator definition for ads7846 into the board file
-> > There is no dedicated regulator on spitz, ADS7846 uses common always-on
-> > power supply.
-
-> Is there a kind of regulator for this case (except dummy)?
-> Some kind of fixed regulator which is not binded to any supply?
-
-This is just a fixed voltage regulator, support for that has been in the
-kernel since the regulator API was merged.  This is the best solution,
-it ensures that you don't mistakenly activate dummy reglators for
-supplies that really need software control.
-
-> > i2c i2c-1: Retrying transmission
-> > i2c i2c-1: setting to bus master
-> > i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000045, ICR=000007e1, IBMR=00
-> > i2c i2c-1: state:i2c_pxa_irq_txempty:932: ISR=00000005, ICR=000017ee, IBMR=00
-> > i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000087, ICR=000017e6, IBMR=00
-
-This looks like you've got I2C I/O issues talking to something.
-
-> > print_constraints: vcc_core range: 850 <--> 1600 mV at 1350 mV 
-> > print_constraints: vcc_core range: 1100 mV 
-
-This looks like there's two definitions for vcc_core.
+Thanks
+Troy
