@@ -1,54 +1,62 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 30 Jun 2011 11:25:34 +0200
-Subject: [PATCH 0/7] ARM: SAMSUNG: Cleanup SPI platform specific code
-In-Reply-To: <1309436723-662-1-git-send-email-padma.v@samsung.com>
-References: <1309436723-662-1-git-send-email-padma.v@samsung.com>
-Message-ID: <005701cc3707$aa914e50$ffb3eaf0$%szyprowski@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 10:27:02 +0100
+Subject: [PATCH 11/23] ARM: entry: avoid enabling interrupts in
+	prefetch/data abort handlers
+In-Reply-To: <20110629200522.GB12421@e102144-lin.cambridge.arm.com>
+References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
+	<E1Qbqyh-0002Fh-3Y@rmk-PC.arm.linux.org.uk>
+	<20110629200522.GB12421@e102144-lin.cambridge.arm.com>
+Message-ID: <20110630092702.GS21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, Jun 29, 2011 at 09:05:23PM +0100, Will Deacon wrote:
+> Hi Russell,
+> 
+> This looks good, thanks. Minor comment inline.
+> 
+> On Wed, Jun 29, 2011 at 10:22:35AM +0100, Russell King - ARM Linux wrote:
+> > Avoid enabling interrupts if the parent context had interrupts enabled
+> > in the abort handler assembly code, and move this into the breakpoint/
+> > page/alignment fault handlers instead.
+> > 
+> > This gets rid of some special-casing for the breakpoint fault handlers
+> > from the low level abort handler path.
+> > 
+> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+> > ---
+> >  arch/arm/kernel/entry-armv.S    |   43 +++++++++++++++++---------------------
+> >  arch/arm/kernel/entry-header.S  |   19 -----------------
+> >  arch/arm/kernel/hw_breakpoint.c |    6 +++-
+> >  arch/arm/mm/alignment.c         |    3 ++
+> >  arch/arm/mm/fault.c             |    4 +++
+> >  5 files changed, 30 insertions(+), 45 deletions(-)
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/kernel/hw_breakpoint.c b/arch/arm/kernel/hw_breakpoint.c
+> > index 87acc25..b813e1e 100644
+> > --- a/arch/arm/kernel/hw_breakpoint.c
+> > +++ b/arch/arm/kernel/hw_breakpoint.c
+> > @@ -804,8 +804,10 @@ static int hw_breakpoint_pending(unsigned long addr, unsigned int fsr,
+> >  	int ret = 0;
+> >  	u32 dscr;
+> >  
+> > -	/* We must be called with preemption disabled. */
+> > -	WARN_ON(preemptible());
+> > +	preempt_disable();
+> > +
+> > +	if (interrupts_enabled(regs))
+> > +		local_irq_enable();
+> >  
+> >  	/* We only handle watchpoints and hardware breakpoints. */
+> >  	ARM_DBG_READ(c1, 0, dscr);
+> 
+> Could you also update the comments for this function too please? There's one
+> immediately before the function that states we are called with preemption
+> disabled and there's another one where we re-enable preemption stating that
+> it was disabled by the low-level exception handling code.
 
-On Thursday, June 30, 2011 2:25 PM Padmavathi Venna wrote:
-
-> This patchset does the following:
-> 
-> 1. Move duplicated code to common place
-> [PATCH 1/7] ARM: SAMSUNG: Move SPI device definitions to plat-samsung
-> SPI platform devices are defined in respective machine folder of
-> Samsung S3C64XX and S5P series SoCs.This is duplicated for every SoC.
-> So all SPI platform devices are moved to a common place.
-> 
-> [PATCH 2/7] ARM: SAMSUNG: Define common macro for SPI physical address
-> 
-> [PATCH 3/7] ARM: SAMSUNG: Add SPI clock definitions for SAMSUNG SoCs
-> Each SoC has it's own set of clock sources for SPI.So they are defined in
-> respective machine folder.
-> 
-> [PATCH 4/7] ARM: SAMSUNG: Create SPI device setup files in
-> respective machine folder
-> 
-> [PATCH 5/7] ARM: SAMSUNG: Add SPI platform specific code
-> As SPI platform devices are moved to common place some platform specific
-> code need to be initialized in the respective machine file.
-> 
-> [PATCH 6/7] SPI: S5PC100: Enable the SPI driver for S5PC100
-> 
-> [PATCH 7/7] SPI: S5PV210: Enable the SPI driver for S5PV210
-
-These patch set improves a bit platform part of SPI driver, but I really
-wonder if we really need to pass so many SoC version specific data 
-with platform data. Are all these data (clock list, fifo parameters)
-specific to SoC version or particular board configuration/implementation?
-
-Maybe it will be much easier to convert the SPI driver to use driver id 
-feature and use different platform id's for each SoC version? (please 
-refer to drivers/video/s3c-fb.c and plat-samsung/include/plat/fb-core.h
-for more information). This will remove the need for SoC specific
-parameters in platform data and will group all version dependent 
-information in the driver.
-
-Best regards
--- 
-Marek Szyprowski
-Samsung Poland R&D Center
+I'll change the one before the function thusly s/preemption/interrupts/ 
+and remove the other entirely because it no longer serves much purpose.
+Ok?
