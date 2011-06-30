@@ -1,30 +1,34 @@
 From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 30 Jun 2011 17:15:23 +0900
-Subject: [PATCH v3 0/6] ARM: EXYNOS4: NURI Board Configuration Update
-Message-ID: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
+Date: Thu, 30 Jun 2011 17:15:24 +0900
+Subject: [PATCH v3 1/6] ARM: EXYNOS4: Increase NR_IRQS for devices with more
+	IRQs
+In-Reply-To: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
+References: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <1309421729-11172-2-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-1/6: Increase NR_IRQS for MAX8997
-2/6: Add MAX8997 PMIC
-3/6: Add MAX17042 Fuel Gauge
-4/6: Add ADC
-5/6: Add MAX8903 Secondary Charger
-6/6: Add RTC-S3C
+MAX8997/17042, which are used by Exynos4-NURI, use additional IRQ
+numbers after GPIO's IRQs. The patch creates some room for those
+devices.
 
-ps. Tushar, I didn't seperated MAX8997 support code out of mach-nuri.c, yet because I still have no idea about how similar the Origen board is with NURI board.
-
-MyungJoo Ham (6):
-  ARM: EXYNOS4: Increase NR_IRQS for devices with more IRQs
-  Exynos4 NURI: configure regulators and PMIC (MAX8997)
-  Exynos4 NURI: configure MAX17042 fuel gauge
-  Exynos4 NURI: configure ADC.
-  Exynos4 NURI: configure MAX8903 secondary charger
-  Exynos4 NURI: configure rtc-s3c.
-
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
  arch/arm/mach-exynos4/include/mach/irqs.h |    2 +-
- arch/arm/mach-exynos4/mach-nuri.c         |  739 ++++++++++++++++++++++++++++-
- 2 files changed, 739 insertions(+), 2 deletions(-)
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
+diff --git a/arch/arm/mach-exynos4/include/mach/irqs.h b/arch/arm/mach-exynos4/include/mach/irqs.h
+index 31f6bed..51b5db5 100644
+--- a/arch/arm/mach-exynos4/include/mach/irqs.h
++++ b/arch/arm/mach-exynos4/include/mach/irqs.h
+@@ -154,6 +154,6 @@
+ #define IRQ_GPIO_END		(S5P_GPIOINT_BASE + S5P_GPIOINT_COUNT)
+ 
+ /* Set the default NR_IRQS */
+-#define NR_IRQS			(IRQ_GPIO_END)
++#define NR_IRQS			(IRQ_GPIO_END + 64)
+ 
+ #endif /* __ASM_ARCH_IRQS_H */
 -- 
 1.7.4.1
