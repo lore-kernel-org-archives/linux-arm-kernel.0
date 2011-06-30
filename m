@@ -1,99 +1,81 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jun 2011 10:30:56 +0200
-Subject: [PATCH 1/2] MMC: PM: add suspend/resume in atmel-mci
-In-Reply-To: <201106292339.12402.rjw@sisk.pl>
-References: <1ef60c032bc39531302c1603bfcb841d2d437ccc.1309366360.git.nicolas.ferre@atmel.com>
-	<20110629160110.GD2760@legolas.emea.dhcp.ti.com>
-	<201106292339.12402.rjw@sisk.pl>
-Message-ID: <4E0C3440.9010802@atmel.com>
+From: b32955@freescale.com (Huang Shijie)
+Date: Thu, 30 Jun 2011 16:37:48 +0800
+Subject: [PATCH v5 2/3] ARM: mxs/mx23evk: add GPMI-NFC device
+In-Reply-To: <20110630075501.GE11559@pengutronix.de>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<1309406028-2924-3-git-send-email-b32955@freescale.com>
+	<20110630075501.GE11559@pengutronix.de>
+Message-ID: <4E0C35DC.2040107@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 29/06/2011 23:39, Rafael J. Wysocki :
-> On Wednesday, June 29, 2011, Felipe Balbi wrote:
->> Hi,
+Hi:
+> On Thu, Jun 30, 2011 at 11:53:47AM +0800, Huang Shijie wrote:
+>> add the GPMI-NFC device for mx23evk borad.
+> s/borad/board/
+>
+>> Signed-off-by: Huang Shijie<b32955@freescale.com>
+>> ---
+>>   arch/arm/mach-mxs/Kconfig        |    1 +
+>>   arch/arm/mach-mxs/mach-mx23evk.c |   37 +++++++++++++++++++++++++++++++++++++
+>>   2 files changed, 38 insertions(+), 0 deletions(-)
 >>
->> On Wed, Jun 29, 2011 at 06:54:19PM +0200, Nicolas Ferre wrote:
->>> Take care of slots while going to suspend state.
->>>
->>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->>> ---
->>>  drivers/mmc/host/atmel-mci.c |   51 ++++++++++++++++++++++++++++++++++++++++++
->>>  1 files changed, 51 insertions(+), 0 deletions(-)
->>>
->>> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
->>> index aa8039f..c414ebe 100644
->>> --- a/drivers/mmc/host/atmel-mci.c
->>> +++ b/drivers/mmc/host/atmel-mci.c
->>> @@ -1878,8 +1878,59 @@ static int __exit atmci_remove(struct platform_device *pdev)
->>>  	return 0;
->>>  }
->>>  
->>> +#ifdef CONFIG_PM
->>> +static int atmci_suspend(struct platform_device *pdev, pm_message_t mesg)
->>> +{
->>> +	struct atmel_mci *host = platform_get_drvdata(pdev);
->>> +	struct atmel_mci_slot *slot;
->>> +	int i, ret;
->>> +
->>> +	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
->>> +		slot = host->slot[i];
->>> +		if (!slot)
->>> +			continue;
->>> +		ret = mmc_suspend_host(slot->mmc);
->>> +		if (ret < 0) {
->>> +			while (--i >= 0) {
->>> +				slot = host->slot[i];
->>> +				if (slot)
->>> +					mmc_resume_host(host->slot[i]->mmc);
->>> +			}
->>> +			return ret;
->>> +		}
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>> +
->>> +static int atmci_resume(struct platform_device *pdev)
->>> +{
->>> +	struct atmel_mci *host = platform_get_drvdata(pdev);
->>> +	struct atmel_mci_slot *slot;
->>> +	int i, ret;
->>> +
->>> +	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
->>> +		slot = host->slot[i];
->>> +		if (!slot)
->>> +			continue;
->>> +		ret = mmc_resume_host(slot->mmc);
->>> +		if (ret < 0)
->>> +			return ret;
->>> +	}
->>> +
->>> +	return 0;
->>> +}
->>> +#else
->>> +#define atmci_suspend	NULL
->>> +#define atmci_resume	NULL
->>> +#endif
->>> +
->>> +
->>> +
->>>  static struct platform_driver atmci_driver = {
->>>  	.remove		= __exit_p(atmci_remove),
->>> +	.suspend	= atmci_suspend,
->>> +	.resume		= atmci_resume,
+>> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
+>> index 1d3985f..f55bcfe 100644
+>> --- a/arch/arm/mach-mxs/Kconfig
+>> +++ b/arch/arm/mach-mxs/Kconfig
+>> @@ -32,6 +32,7 @@ config MACH_MX23EVK
+>>   	select SOC_IMX23
+>>   	select MXS_HAVE_AMBA_DUART
+>>   	select MXS_HAVE_PLATFORM_AUART
+>> +	select MXS_HAVE_PLATFORM_GPMI_NFC
+>>   	select MXS_HAVE_PLATFORM_MXS_MMC
+>>   	select MXS_HAVE_PLATFORM_MXSFB
+>>   	help
+>> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
+>> index 3c2de33..772b373 100644
+>> --- a/arch/arm/mach-mxs/mach-mx23evk.c
+>> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
+>> @@ -107,6 +107,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
+>>   		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
+>>   };
 >>
->> should this be using dev_pm_ops instead ?
-> 
-> It should.  Also, please remember to initialize the hibernate callback
-> pointers too, e.g. via the SIMPLE_DEV_PM_OPS() macro.
+>> +/* gpmi-nfc */
+>> +#define MXS_PAD_GPMI_NFC	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
+> Maybe put that into a more central place, as mach-mx28evk uses it, too?
+yes. The mach-mx28evk needs it too.
 
-Felipe, Rafael,
-Thanks for your feedback. I will implement this in a v2 patch.
+If I put it into the iomux.h, what's the name for it?
+      MXS_PAD_CTRL_12MA , or something else ?
 
-BTW, should I use #ifdef CONFIG_PM or #ifdef CONFIG_PM_SLEEP?
+> OTOH the name sounds more generic than its use. Do you really need 12mA
+Yes, I need the 12mA for the Write protect pin, and other two pins.
 
-Best regards,
--- 
-Nicolas Ferre
+
+Best Regards
+Huang Shijie
+> for the Write protect pin? If not, you could rename it to
+> MXS_PAD_GPMI_NFC_STROBE.
+>
+>> +static iomux_cfg_t mx23evk_gpmi_nfc_pads[] = {
+>> +	MX23_PAD_GPMI_D00__GPMI_D00 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_D01__GPMI_D01 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_D02__GPMI_D02 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_D03__GPMI_D03 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_D04__GPMI_D04 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_D05__GPMI_D05 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_D06__GPMI_D06 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_D07__GPMI_D07 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_WPN__GPMI_WPN | MXS_PAD_GPMI_NFC,
+>> +	MX23_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_GPMI_NFC,
+>> +	MX23_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_GPMI_NFC,
+>> +	MX23_PAD_GPMI_RDY0__GPMI_RDY0 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_RDY1__GPMI_RDY1 | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
+>> +	MX23_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
+>> +};
+> Best regards
+> Uwe
+>
