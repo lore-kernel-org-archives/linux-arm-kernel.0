@@ -1,46 +1,99 @@
-From: myungjoo.ham@samsung.com (MyungJoo Ham)
-Date: Thu, 30 Jun 2011 17:26:27 +0900
-Subject: [PATCH 3/3] Exynos4 NURI: support for NTC thermistor
-In-Reply-To: <1309422387-11546-1-git-send-email-myungjoo.ham@samsung.com>
-References: <1309422387-11546-1-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <1309422387-11546-4-git-send-email-myungjoo.ham@samsung.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 30 Jun 2011 10:30:56 +0200
+Subject: [PATCH 1/2] MMC: PM: add suspend/resume in atmel-mci
+In-Reply-To: <201106292339.12402.rjw@sisk.pl>
+References: <1ef60c032bc39531302c1603bfcb841d2d437ccc.1309366360.git.nicolas.ferre@atmel.com>
+	<20110629160110.GD2760@legolas.emea.dhcp.ti.com>
+	<201106292339.12402.rjw@sisk.pl>
+Message-ID: <4E0C3440.9010802@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
-Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
----
- arch/arm/mach-exynos4/mach-nuri.c |    4 ++++
- 1 files changed, 4 insertions(+), 0 deletions(-)
+Le 29/06/2011 23:39, Rafael J. Wysocki :
+> On Wednesday, June 29, 2011, Felipe Balbi wrote:
+>> Hi,
+>>
+>> On Wed, Jun 29, 2011 at 06:54:19PM +0200, Nicolas Ferre wrote:
+>>> Take care of slots while going to suspend state.
+>>>
+>>> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+>>> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+>>> ---
+>>>  drivers/mmc/host/atmel-mci.c |   51 ++++++++++++++++++++++++++++++++++++++++++
+>>>  1 files changed, 51 insertions(+), 0 deletions(-)
+>>>
+>>> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+>>> index aa8039f..c414ebe 100644
+>>> --- a/drivers/mmc/host/atmel-mci.c
+>>> +++ b/drivers/mmc/host/atmel-mci.c
+>>> @@ -1878,8 +1878,59 @@ static int __exit atmci_remove(struct platform_device *pdev)
+>>>  	return 0;
+>>>  }
+>>>  
+>>> +#ifdef CONFIG_PM
+>>> +static int atmci_suspend(struct platform_device *pdev, pm_message_t mesg)
+>>> +{
+>>> +	struct atmel_mci *host = platform_get_drvdata(pdev);
+>>> +	struct atmel_mci_slot *slot;
+>>> +	int i, ret;
+>>> +
+>>> +	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+>>> +		slot = host->slot[i];
+>>> +		if (!slot)
+>>> +			continue;
+>>> +		ret = mmc_suspend_host(slot->mmc);
+>>> +		if (ret < 0) {
+>>> +			while (--i >= 0) {
+>>> +				slot = host->slot[i];
+>>> +				if (slot)
+>>> +					mmc_resume_host(host->slot[i]->mmc);
+>>> +			}
+>>> +			return ret;
+>>> +		}
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static int atmci_resume(struct platform_device *pdev)
+>>> +{
+>>> +	struct atmel_mci *host = platform_get_drvdata(pdev);
+>>> +	struct atmel_mci_slot *slot;
+>>> +	int i, ret;
+>>> +
+>>> +	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+>>> +		slot = host->slot[i];
+>>> +		if (!slot)
+>>> +			continue;
+>>> +		ret = mmc_resume_host(slot->mmc);
+>>> +		if (ret < 0)
+>>> +			return ret;
+>>> +	}
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +#else
+>>> +#define atmci_suspend	NULL
+>>> +#define atmci_resume	NULL
+>>> +#endif
+>>> +
+>>> +
+>>> +
+>>>  static struct platform_driver atmci_driver = {
+>>>  	.remove		= __exit_p(atmci_remove),
+>>> +	.suspend	= atmci_suspend,
+>>> +	.resume		= atmci_resume,
+>>
+>> should this be using dev_pm_ops instead ?
+> 
+> It should.  Also, please remember to initialize the hibernate callback
+> pointers too, e.g. via the SIMPLE_DEV_PM_OPS() macro.
 
-diff --git a/arch/arm/mach-exynos4/mach-nuri.c b/arch/arm/mach-exynos4/mach-nuri.c
-index bdf7a5c..cd8bc06 100644
---- a/arch/arm/mach-exynos4/mach-nuri.c
-+++ b/arch/arm/mach-exynos4/mach-nuri.c
-@@ -40,6 +40,7 @@
- #include <plat/clock.h>
- #include <plat/gpio-cfg.h>
- #include <plat/iic.h>
-+#include <plat/adc-ntc.h>
- 
- #include <mach/map.h>
- 
-@@ -1098,6 +1099,7 @@ static struct platform_device *nuri_devices[] __initdata = {
- 	&s3c_device_i2c3,
- 	&i2c9_gpio,
- 	&s3c_device_adc,
-+	&s3c_device_adc_ntc_thermistor,
- 	&s3c_device_rtc,
- 
- 	/* NURI Devices */
-@@ -1133,6 +1135,8 @@ static void __init nuri_machine_init(void)
- 	nuri_ehci_init();
- 	clk_xusbxti.rate = 24000000;
- 
-+	s3c_adc_ntc_init(6); /* NTC Thermistor uses ADC port 6 */
-+
- 	/* Last */
- 	platform_add_devices(nuri_devices, ARRAY_SIZE(nuri_devices));
- }
+Felipe, Rafael,
+Thanks for your feedback. I will implement this in a v2 patch.
+
+BTW, should I use #ifdef CONFIG_PM or #ifdef CONFIG_PM_SLEEP?
+
+Best regards,
 -- 
-1.7.4.1
+Nicolas Ferre
