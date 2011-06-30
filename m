@@ -1,135 +1,170 @@
 From: simon@sequanux.org (Simon Guinot)
-Date: Thu, 30 Jun 2011 23:39:12 +0200
-Subject: [PATCH] genirq: replace irq_gc_ack with {set,clr}_bit variants
-In-Reply-To: <20110630095223.GH31228@kw.sim.vm.gnt>
-References: <20110630095223.GH31228@kw.sim.vm.gnt>
-Message-ID: <1309469952-32242-1-git-send-email-simon@sequanux.org>
+Date: Thu, 30 Jun 2011 21:49:10 +0000
+Subject: [PATCH v2] ARM: kirkwood: Add support for Buffalo LS-XHL
+In-Reply-To: <BANLkTim-qB+ArwxX0o8dAqU3--Uex4TWBw@mail.gmail.com>
+References: <1307655488-12811-1-git-send-email-michael@walle.cc>
+	<1307655488-12811-2-git-send-email-michael@walle.cc>
+	<BANLkTim-qB+ArwxX0o8dAqU3--Uex4TWBw@mail.gmail.com>
+Message-ID: <20110630214910.GI31228@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Simon Guinot <sguinot@lacie.com>
+Hi Bj?rn,
 
-This patch fix the edge GPIO interrupts support for Orion based SoCs.
-For this devices, edge interrupt acknowledgement is done by clearing a
-cause register. Replace irq_gc_ack with {set,clr}_bit variants allows
-to address such cases.
+On Thu, Jun 30, 2011 at 10:58:15PM +0200, Bj?rn Forsman wrote:
+> Hi Michael,
+> 
+> On 9 June 2011 23:38, Michael Walle <michael@walle.cc> wrote:
+> > Add support for the Buffalo Linkstation XHL. This NAS box is based on a
+> > Marvell Kirkwood chip at 1.2 GHz and features 256 MB RAM, 512kb SPI boot
+> > flash, gigabit ethernet and one SATA port.
+> >
+> > Signed-off-by: Michael Walle <michael@walle.cc>
+> > ---
+> > ?arch/arm/configs/kirkwood_defconfig ?| ? ?1 +
+> > ?arch/arm/mach-kirkwood/Kconfig ? ? ? | ? ?6 +
+> > ?arch/arm/mach-kirkwood/Makefile ? ? ?| ? ?1 +
+> > ?arch/arm/mach-kirkwood/lsxhl-setup.c | ?313 ++++++++++++++++++++++++++++++++++
+> > ?arch/arm/tools/mach-types ? ? ? ? ? ?| ? ?1 +
+> > ?5 files changed, 322 insertions(+), 0 deletions(-)
+> > ?create mode 100644 arch/arm/mach-kirkwood/lsxhl-setup.c
+> 
+> First, thanks a lot for posting this, I've been wanting mainline
+> support for this device for a long time :-)
+> 
+> I tried this patch on my LS-XHL and found two issues:
+> 
+> 1) When setting the fan speed to 0, the system produces a lot of GPIO
+> fan alarm IRQs and then the kernel reports that it's disabling the
+> GPIO fan alarm IRQ altogether:
+> 
+> $ echo 0 | sudo tee /sys/bus/platform/devices/gpio-fan/fan1_target
+> Message from syslogd at localhost at Jun 30 22:44:28 ...
+>  kernel:Disabling IRQ #104
+> $ dmesg
+> [...]
+> irq 104: nobody cared (try booting with the "irqpoll" option)
+> [<c0031210>] (unwind_backtrace+0x0/0xf0) from [<c0072d44>]
+> (__report_bad_irq.clone.6+0x24/0xec)
+> [<c0072d44>] (__report_bad_irq.clone.6+0x24/0xec) from [<c0073040>]
+> (note_interrupt+0x1d4/0x234)
+> [<c0073040>] (note_interrupt+0x1d4/0x234) from [<c00717d4>]
+> (handle_irq_event_percpu+0xa8/0x1ac)
+> [<c00717d4>] (handle_irq_event_percpu+0xa8/0x1ac) from [<c007192c>]
+> (handle_irq_event+0x54/0x84)
+> [<c007192c>] (handle_irq_event+0x54/0x84) from [<c0073bac>]
+> (handle_edge_irq+0xa4/0x1a0)
+> [<c0073bac>] (handle_edge_irq+0xa4/0x1a0) from [<c0071144>]
+> (generic_handle_irq+0x30/0x44)
+> [<c0071144>] (generic_handle_irq+0x30/0x44) from [<c00361d4>]
+> (orion_gpio_irq_handler+0xa4/0xb4)
+> [<c00361d4>] (orion_gpio_irq_handler+0xa4/0xb4) from [<c0071144>]
+> (generic_handle_irq+0x30/0x44)
+> [<c0071144>] (generic_handle_irq+0x30/0x44) from [<c002c030>]
+> (asm_do_IRQ+0x30/0x84)
+> [<c002c030>] (asm_do_IRQ+0x30/0x84) from [<c0391348>] (__irq_svc+0x48/0xa8)
+> Exception stack(0xc2181f18 to 0xc2181f60)
+> 1f00:                                                       c2181f60 fed20204
+> 1f20: 00000000 20000013 00000202 c05609c4 c2180000 00000001 c05609c4 c04bdbd8
+> 1f40: c05609a0 0000000a 006881e0 c2181f60 c0043580 c0043070 20000013 ffffffff
+> [<c0391348>] (__irq_svc+0x48/0xa8) from [<c0043070>] (__do_softirq+0x4c/0x124)
+> [<c0043070>] (__do_softirq+0x4c/0x124) from [<c0043580>] (irq_exit+0x90/0x98)
+> [<c0043580>] (irq_exit+0x90/0x98) from [<c002c034>] (asm_do_IRQ+0x34/0x84)
+> [<c002c034>] (asm_do_IRQ+0x34/0x84) from [<c039154c>] (__irq_usr+0x4c/0xa0)
+> Exception stack(0xc2181fb0 to 0xc2181ff8)
+> 1fa0:                                     00000001 bef0ead0 0000003f 00000001
+> 1fc0: 0009c9cd 0000006f 00000004 bef0eaf8 0009c9c8 00000036 00000001 00000002
+> 1fe0: 00000005 bef0eaf8 00077bd0 00077be4 00000010 ffffffff
+> handlers:
+> [<c0280ed8>] fan_alarm_irq_handler
+> Disabling IRQ #104
+> 
+> $ cat /proc/interrupts
+>            CPU0
+>   1:      14919  orion_irq  orion_tick
+>   5:          2  orion_irq  mv_xor.0
+>   6:          2  orion_irq  mv_xor.1
+>   7:          2  orion_irq  mv_xor.2
+>   8:          2  orion_irq  mv_xor.3
+>  15:       2714  orion_irq  eth1
+>  19:          0  orion_irq  ehci_hcd:usb1
+>  21:       4560  orion_irq  sata_mv
+>  22:          0  orion_irq  mv_crypto
+>  33:        279  orion_irq
+>  46:         36  orion_irq  mv643xx_eth
+>  47:          0  orion_irq  mv643xx_eth
+>  53:          0  orion_irq  rtc-mv
+> 104:     100000         -  GPIO fan alarm
+> 105:          0         -  Function Button
+> 106:          0         -  Power-auto Switch
+> 107:          0         -  Power-on Switch
+> Err:          0
+> 
+> 
+> 2) Pressing the FUNC button or moving the power switch seems to hang
+> the device; my SSH connection freezes and the only way back is a
+> reboot. One time I managed to capture this output before the box froze
+> (I only moved the power switch this time):
+> 
+> $ evtest  /dev/input/event0
+> Input driver version is 1.0.1
+> Input device ID: bus 0x19 vendor 0x1 product 0x1 version 0x100
+> Input device name: "gpio-keys"
+> Supported events:
+>   Event type 0 (Sync)
+>   Event type 5 (?)
+>     Event code 0 (?)
+>     Event code 1 (?)
+> Testing ... (interrupt to exit)
+> Event: time 1309463461.949923, type 5 (?), code 1 (?), value 1
+> Event: time 1309463461.949926, -------------- Report Sync ------------
+> Event: time 1309463462.070543, type 5 (?), code 1 (?), value 0
+> Event: time 1309463462.070545, -------------- Report Sync ------------
+> Event: time 1309463462.070658, type 5 (?), code 0 (?), value 1
+> Event: time 1309463462.070660, -------------- Report Sync ------------
+> 
+> And at the same time, in another terminal:
+> 
+> $ cat /proc/interrupts
+>            CPU0
+>   1:      15567  orion_irq  orion_tick
+>   5:          2  orion_irq  mv_xor.0
+>   6:          2  orion_irq  mv_xor.1
+>   7:          2  orion_irq  mv_xor.2
+>   8:          2  orion_irq  mv_xor.3
+>  15:       1965  orion_irq  eth1
+>  19:          0  orion_irq  ehci_hcd:usb1
+>  21:       4675  orion_irq  sata_mv
+>  22:          0  orion_irq  mv_crypto
+>  33:        268  orion_irq
+>  46:         36  orion_irq  mv643xx_eth
+>  47:          0  orion_irq  mv643xx_eth
+>  53:          0  orion_irq  rtc-mv
+> 104:          0         -  GPIO fan alarm
+> 105:          0         -  Function Button
+> 106:        775         -  Power-auto Switch
+> 107:   10154532         -  Power-on Switch
+> Err:          0
+> 
+> So, the power switch also seem to suffer from some interrupt overload;
+> 10154532 IRQs for Power-auto Switch is not right...right?
+> 
+> Have you seen this behaviour?
+> 
+> I can do more testing if someone can point me in the right direction.
+> (I don't have serial port access to the box, so it's a bit of a
+> crippled development environment. But it will have to do.)
 
-Tested on Network Space v2.
+It is probably related to a edge GPIO interrupts bug:
+http://lists.arm.linux.org.uk/lurker/message/20110629.200122.012d23be.en.html
 
-Reported-by: Joey Oravec <joravec@drewtech.com>
-Signed-off-by: Simon Guinot <sguinot@lacie.com>
----
- arch/arm/mach-davinci/irq.c      |    2 +-
- arch/arm/plat-orion/gpio.c       |    2 +-
- arch/arm/plat-s5p/irq-gpioint.c  |    2 +-
- arch/arm/plat-samsung/irq-uart.c |    2 +-
- include/linux/irq.h              |    3 ++-
- kernel/irq/generic-chip.c        |   18 ++++++++++++++++--
- 6 files changed, 22 insertions(+), 7 deletions(-)
+Regards,
 
-diff --git a/arch/arm/mach-davinci/irq.c b/arch/arm/mach-davinci/irq.c
-index bfe68ec..d8c1af0 100644
---- a/arch/arm/mach-davinci/irq.c
-+++ b/arch/arm/mach-davinci/irq.c
-@@ -53,7 +53,7 @@ davinci_alloc_gc(void __iomem *base, unsigned int irq_start, unsigned int num)
- 
- 	gc = irq_alloc_generic_chip("AINTC", 1, irq_start, base, handle_edge_irq);
- 	ct = gc->chip_types;
--	ct->chip.irq_ack = irq_gc_ack;
-+	ct->chip.irq_ack = irq_gc_ack_set_bit;
- 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
- 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
- 
-diff --git a/arch/arm/plat-orion/gpio.c b/arch/arm/plat-orion/gpio.c
-index 5b4fffa..41ab97e 100644
---- a/arch/arm/plat-orion/gpio.c
-+++ b/arch/arm/plat-orion/gpio.c
-@@ -432,7 +432,7 @@ void __init orion_gpio_init(int gpio_base, int ngpio,
- 	ct->regs.mask = ochip->mask_offset + GPIO_EDGE_MASK_OFF;
- 	ct->regs.ack = GPIO_EDGE_CAUSE_OFF;
- 	ct->type = IRQ_TYPE_EDGE_RISING | IRQ_TYPE_EDGE_FALLING;
--	ct->chip.irq_ack = irq_gc_ack;
-+	ct->chip.irq_ack = irq_gc_ack_clr_bit;
- 	ct->chip.irq_mask = irq_gc_mask_clr_bit;
- 	ct->chip.irq_unmask = irq_gc_mask_set_bit;
- 	ct->chip.irq_set_type = gpio_irq_set_type;
-diff --git a/arch/arm/plat-s5p/irq-gpioint.c b/arch/arm/plat-s5p/irq-gpioint.c
-index 135abda..327ab9f 100644
---- a/arch/arm/plat-s5p/irq-gpioint.c
-+++ b/arch/arm/plat-s5p/irq-gpioint.c
-@@ -152,7 +152,7 @@ static __init int s5p_gpioint_add(struct s3c_gpio_chip *chip)
- 	if (!gc)
- 		return -ENOMEM;
- 	ct = gc->chip_types;
--	ct->chip.irq_ack = irq_gc_ack;
-+	ct->chip.irq_ack = irq_gc_ack_set_bit;
- 	ct->chip.irq_mask = irq_gc_mask_set_bit;
- 	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
- 	ct->chip.irq_set_type = s5p_gpioint_set_type,
-diff --git a/arch/arm/plat-samsung/irq-uart.c b/arch/arm/plat-samsung/irq-uart.c
-index 32582c0..0e46588 100644
---- a/arch/arm/plat-samsung/irq-uart.c
-+++ b/arch/arm/plat-samsung/irq-uart.c
-@@ -55,7 +55,7 @@ static void __init s3c_init_uart_irq(struct s3c_uart_irq *uirq)
- 	gc = irq_alloc_generic_chip("s3c-uart", 1, uirq->base_irq, reg_base,
- 				    handle_level_irq);
- 	ct = gc->chip_types;
--	ct->chip.irq_ack = irq_gc_ack;
-+	ct->chip.irq_ack = irq_gc_ack_set_bit;
- 	ct->chip.irq_mask = irq_gc_mask_set_bit;
- 	ct->chip.irq_unmask = irq_gc_mask_clr_bit;
- 	ct->regs.ack = S3C64XX_UINTP;
-diff --git a/include/linux/irq.h b/include/linux/irq.h
-index 8b45384..baa397e 100644
---- a/include/linux/irq.h
-+++ b/include/linux/irq.h
-@@ -676,7 +676,8 @@ void irq_gc_mask_disable_reg(struct irq_data *d);
- void irq_gc_mask_set_bit(struct irq_data *d);
- void irq_gc_mask_clr_bit(struct irq_data *d);
- void irq_gc_unmask_enable_reg(struct irq_data *d);
--void irq_gc_ack(struct irq_data *d);
-+void irq_gc_ack_set_bit(struct irq_data *d);
-+void irq_gc_ack_clr_bit(struct irq_data *d);
- void irq_gc_mask_disable_reg_and_ack(struct irq_data *d);
- void irq_gc_eoi(struct irq_data *d);
- int irq_gc_set_wake(struct irq_data *d, unsigned int on);
-diff --git a/kernel/irq/generic-chip.c b/kernel/irq/generic-chip.c
-index 31a9db7..3a2cab4 100644
---- a/kernel/irq/generic-chip.c
-+++ b/kernel/irq/generic-chip.c
-@@ -101,10 +101,10 @@ void irq_gc_unmask_enable_reg(struct irq_data *d)
- }
- 
- /**
-- * irq_gc_ack - Ack pending interrupt
-+ * irq_gc_ack_set_bit - Ack pending interrupt via setting bit
-  * @d: irq_data
-  */
--void irq_gc_ack(struct irq_data *d)
-+void irq_gc_ack_set_bit(struct irq_data *d)
- {
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 	u32 mask = 1 << (d->irq - gc->irq_base);
-@@ -115,6 +115,20 @@ void irq_gc_ack(struct irq_data *d)
- }
- 
- /**
-+ * irq_gc_ack_clr_bit - Ack pending interrupt via clearing bit
-+ * @d: irq_data
-+ */
-+void irq_gc_ack_clr_bit(struct irq_data *d)
-+{
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
-+	u32 mask = ~(1 << (d->irq - gc->irq_base));
-+
-+	irq_gc_lock(gc);
-+	irq_reg_writel(mask, gc->reg_base + cur_regs(d)->ack);
-+	irq_gc_unlock(gc);
-+}
-+
-+/**
-  * irq_gc_mask_disable_reg_and_ack- Mask and ack pending interrupt
-  * @d: irq_data
-  */
--- 
-1.7.5.1
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110630/c9d3e94f/attachment.sig>
