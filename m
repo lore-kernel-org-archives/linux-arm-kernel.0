@@ -1,44 +1,35 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 30 Jun 2011 09:50:15 +0800
-Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC	controller
-	driver
-In-Reply-To: <20110629123803.GM21898@n2100.arm.linux.org.uk>
-References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
-	<1309335878-16678-2-git-send-email-b32955@freescale.com>
-	<20110629123803.GM21898@n2100.arm.linux.org.uk>
-Message-ID: <4E0BD657.3070400@freescale.com>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 30 Jun 2011 10:52:29 +0900
+Subject: [PATCH 1/2] Samsung SoC: Allow to enable wakeup with IRQs.
+Message-ID: <1309398750-25859-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell:
-> On Wed, Jun 29, 2011 at 04:24:36PM +0800, Huang Shijie wrote:
->> +	dma_addr_t destination_phys = ~0;
->> +
->> +	if (virt_addr_valid(destination))
->> +		destination_phys = dma_map_single(dev, destination,
->> +						length, DMA_FROM_DEVICE);
->> +
->> +	if (dma_mapping_error(dev, destination_phys)) {
-> This is buggy.  There is no guarantee that we'll keep using ~0 as the
-> value for dma_mapping_error().  Please don't rely on this, but instead
-> code this better to avoid having to play these games.
->
-thanks a lot. I will change it in the next version.
+s3c_irq_wake is required by some external .c files to setup WAKEUP-MASK
+bits based on IRQ numbers.
 
->> +static int send_page_prepare(struct gpmi_nfc_data *this,
->> +			const void *source, unsigned length,
->> +			void *alt_virt, dma_addr_t alt_phys, unsigned alt_size,
->> +			const void **use_virt, dma_addr_t *use_phys)
->> +{
->> +	dma_addr_t source_phys = ~0;
->> +	struct device *dev = this->dev;
->> +
->> +	if (virt_addr_valid(source))
->> +		source_phys = dma_map_single(dev,
->> +				(void *)source, length, DMA_TO_DEVICE);
->> +
->> +	if (dma_mapping_error(dev, source_phys)) {
-> Ditto.
->
-Best Regards
-Huang Shijie
+Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+---
+ arch/arm/plat-samsung/include/plat/pm.h |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/arch/arm/plat-samsung/include/plat/pm.h b/arch/arm/plat-samsung/include/plat/pm.h
+index 7fb6f6b..1279bc7 100644
+--- a/arch/arm/plat-samsung/include/plat/pm.h
++++ b/arch/arm/plat-samsung/include/plat/pm.h
+@@ -105,10 +105,12 @@ extern void s3c_pm_do_restore_core(struct sleep_save *ptr, int count);
+ extern int s3c_irqext_wake(struct irq_data *data, unsigned int state);
+ extern int s3c24xx_irq_suspend(void);
+ extern void s3c24xx_irq_resume(void);
++extern int s3c_irq_wake(struct irq_data *data, unsigned int state);
+ #else
+ #define s3c_irqext_wake NULL
+ #define s3c24xx_irq_suspend NULL
+ #define s3c24xx_irq_resume  NULL
++#define s3c_irq_wake NULL
+ #endif
+ 
+ extern struct syscore_ops s3c24xx_irq_syscore_ops;
+-- 
+1.7.4.1
