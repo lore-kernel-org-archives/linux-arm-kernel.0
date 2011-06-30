@@ -1,74 +1,44 @@
-From: bgat@billgatliff.com (Bill Gatliff)
-Date: Thu, 30 Jun 2011 11:17:54 -0500
-Subject: [PATCH 1/3] PWM: add pwm framework support
-In-Reply-To: <201106301441.24493.arnd@arndb.de>
-References: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
-	<1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
-	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
-	<201106301441.24493.arnd@arndb.de>
-Message-ID: <BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Thu, 30 Jun 2011 18:22:02 +0200
+Subject: kernel panic in spi_complete() on spitz (PXA270)
+In-Reply-To: <22208110.jIqhYvKY9h@bloomfield>
+References: <1308845380.4533.54.camel@oct.suse.cz>
+	<1309445118.4406.47.camel@oct.suse.cz>
+	<201106301709.48818.marek.vasut@gmail.com>
+	<22208110.jIqhYvKY9h@bloomfield>
+Message-ID: <1309450922.4406.66.camel@oct.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Guys:
+Pavel Herrmann wrote:
+> On Thursday, June 30, 2011 04:45:18 PM Stanislav Brabec wrote:
+> > Then I tried to apply "[PATCH] MAX1111: Fix race condition causing NULL
+>  
+> > So I guess that MAX1111 AC voltage reading (via SPI) was involved in an
+> > incorrect moment and race happened there and your MAX1111 race condition
+> > fix fixes it.
 
-On Thu, Jun 30, 2011 at 7:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Are you using the first or second version of the patch? if the former, please 
+> use v2 (sent a few days later), which has solved the same problem by using a 
+> mutex instead of allocating message data on stack (which is not good for DMA)
 
-> A lot of people want to see a framework get merged, and I think it's
-> great that Sascha has volunteered to do the work to push that
-> through this time, especially since you have not been able to
-> finish your work.
+I guess the second one with mutex.
+This is my work-in-progress-mix patch:
+http://www.penguin.cz/~utx/zaurus/feed/images/spitz/zImage-3.0.0-rc5+-spitz.diff
 
-Sascha is wasting his time by reinventing the wheel.  He's traveling
-over exactly the same path I have already covered.  In fact, some of
-his reviewer comments are almost word-for-word the same as those I
-have received and addressed in the past.
+Several hours later, charging was turned on/off at least 1000 times
+without any crash. So it seems that it was the correct race condition
+fix.
 
-My patches were always kept current in this mailing list and others,
-and Sascha clearly has the skills necessary to make improvements and
-corrections should he have chosen to do so.
+> as for the backstory, this crash ocurrs when a short (measured in time spent) 
+> message was enqueued after a long message, so that the short one finished first 
+> (the actual bug was present even if the long one finished first, but in that 
+> case there was double complete() on the one completion instead of a NULL 
+> dereference)
 
-> What I think would be the best plan forward is to merge Sascha's
-> patches as soon as we can, then get all currently existing pwm
-> drivers converted to that and moved to drivers/pwm, and finally
-> do the interface changes that you have proposed earlier.
+I guess that inserting of power supply initiates reading of voltages on
+MAX1111. The long one may be touchscreen or LCD control.
 
-That's a real duplication of work.  That makes no sense.
-
-> I would also hope that you can give constructive feedback to
-> the submission and point out potential problems that you see
-> where the code should be changed now in order to make your
-> interface changes more easy later.
-
-My code has already moved past that point.  And if I had the time to
-evaluate and improve Sascha's patches, I would have the time to finish
-my own.  Sascha is more than welcome to apply his efforts to the
-preexisting PWM API patches already present in the LKML archives.
-
-> I realize that it's annoying to spend a lot of time on a specific
-> implementation and then see competing code get merged.
-
-Annoyed isn't the word you are looking for.
-
-My code has been reviewed, tested and actively used as posted in LKML
-by several reviewers (including myself) in actual hardware.  We are
-consciously choosing to discard a known entity and restart the whole
-process with new code.  That's a waste of everyone's time and risk
-exposure.
-
-I don't consider Sascha's code to be "competing" with mine, as
-apparently nobody has bothered to consider one against the other.
-
-
-> Unfortunately,
-> this happens all the time, and the code we merge is often not
-> the one that has had the most effort spent on it, but the one that
-> looks most promising at the time when it gets merged.
-
-Your definition of "promsing" apparently correlates with "new and shiny".
-
-
-b.g.
 -- 
-Bill Gatliff
-bgat at billgatliff.com
+Stanislav Brabec
+http://www.penguin.cz/~utx
