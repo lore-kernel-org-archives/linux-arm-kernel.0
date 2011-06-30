@@ -1,25 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Jun 2011 14:11:54 +0100
-Subject: [PATCH] arm: platsmp: Allow secondary cpu hotplug with maxcpus=1
-In-Reply-To: <1309372300-28911-1-git-send-email-sboyd@codeaurora.org>
-References: <1309372300-28911-1-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20110630131154.GJ23312@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jun 2011 15:27:02 +0200
+Subject: [PATCH] ARM: automatically select OMAP3_PMU if we try to use perf
+	on OMAP3
+In-Reply-To: <CAK5ve-LQcY6XQENBJw6JaarLffULA7EtjJMxCtpzhwPCfs2OuA@mail.gmail.com>
+References: <1309268265-2685-1-git-send-email-bryan.wu@canonical.com>
+	<20110628135706.GA28871@e102144-lin.cambridge.arm.com>
+	<CAK5ve-LQcY6XQENBJw6JaarLffULA7EtjJMxCtpzhwPCfs2OuA@mail.gmail.com>
+Message-ID: <201106301527.02528.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 11:31:39AM -0700, Stephen Boyd wrote:
->  void __init platform_smp_prepare_cpus(unsigned int max_cpus)
->  {
-> -	int i;
-> -
->  	/*
->  	 * Initialise the present map, which describes the set of CPUs
->  	 * actually populated at the present time.
->  	 */
-> -	for (i = 0; i < max_cpus; i++)
-> -		set_cpu_present(i, true);
-> +	init_cpu_present(&cpu_possible_map);
+On Thursday 30 June 2011, Bryan Wu wrote:
+> On Tue, Jun 28, 2011 at 9:57 PM, Will Deacon <will.deacon@arm.com> wrote:
 
-Ok, if we're now doing this in every platform, it might as well go into
-arch/arm/kernel/smp.c - platforms can re-initialize the present map
-in this callback if they need to do something different.
+> >
+> > This issue has been discussed on the list in the past and I still think that
+> > it would be better for your config to select OMAP3_EMU explicitly. If we do
+> > that here unconditionally then we end up also bringing in OC_ETM which isn't
+> > something that sounds like a good idea (may have implications for power
+> > consumption in production hardware?).
+> >
+> I quite understand your concern. How about this one?
+> ----
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 2fd0911..e53f9e4 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1084,10 +1084,10 @@ config XSCALE_PMU
+>         default y
+> 
+>  config CPU_HAS_PMU
+> -       depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
+> -                  (!ARCH_OMAP3 || OMAP3_EMU)
+> +       depends on CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU
+>         default y
+>         bool
+> +       select OMAP3_EMU if (PERF_EVENTS && ARCH_OMAP3)
+> 
+>  config MULTI_IRQ_HANDLER
+>         bool
+> 
+
+As far as I can tell, it still has the same issue. I think the existing
+code is better. If you want to support HW_PERF_EVENTS on OMAP3, just
+turn on OMAP3_EMU. Where's the problem with that?
+
+In general, specifying clear dependencies is preferred over 'select'
+statements, which are the equivalent to the 'comefrom' statement
+in programming languages [1].
+
+	Arnd
+
+[1] http://en.wikipedia.org/wiki/COMEFROM
