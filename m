@@ -1,49 +1,30 @@
-From: shawn.guo@linaro.org (Shawn Guo)
-Date: Thu, 30 Jun 2011 16:06:33 +0800
-Subject: [PATCH] dmaengine: mxs-dma: skip request_irq for NO_IRQ
-In-Reply-To: <20110630052855.GE25931@S2100-06.ap.freescale.net>
-References: <20110630052855.GE25931@S2100-06.ap.freescale.net>
-Message-ID: <1309421193-7785-1-git-send-email-shawn.guo@linaro.org>
+From: myungjoo.ham@samsung.com (MyungJoo Ham)
+Date: Thu, 30 Jun 2011 17:15:23 +0900
+Subject: [PATCH v3 0/6] ARM: EXYNOS4: NURI Board Configuration Update
+Message-ID: <1309421729-11172-1-git-send-email-myungjoo.ham@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In general, the mxs-dma users get separate irq for each channel,
-but gpmi is special one which has only one irq shared by all gpmi
-channels.  It causes mxs_dma channel allocation function fail for
-all other gpmi channels except the first one calling into the
-function.
+1/6: Increase NR_IRQS for MAX8997
+2/6: Add MAX8997 PMIC
+3/6: Add MAX17042 Fuel Gauge
+4/6: Add ADC
+5/6: Add MAX8903 Secondary Charger
+6/6: Add RTC-S3C
 
-The patch gets request_irq call skipped for NO_IRQ case, and leaves
-this gpmi specific quirk to gpmi driver to sort out.  It will fix
-above problem if gpmi driver sets chan_irq as gpmi irq for only one
-channel and NO_IRQ for all the rest channels.
+ps. Tushar, I didn't seperated MAX8997 support code out of mach-nuri.c, yet because I still have no idea about how similar the Origen board is with NURI board.
 
-Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
-Cc: Vinod Koul <vinod.koul@intel.com>
----
- drivers/dma/mxs-dma.c |   10 ++++++----
- 1 files changed, 6 insertions(+), 4 deletions(-)
+MyungJoo Ham (6):
+  ARM: EXYNOS4: Increase NR_IRQS for devices with more IRQs
+  Exynos4 NURI: configure regulators and PMIC (MAX8997)
+  Exynos4 NURI: configure MAX17042 fuel gauge
+  Exynos4 NURI: configure ADC.
+  Exynos4 NURI: configure MAX8903 secondary charger
+  Exynos4 NURI: configure rtc-s3c.
 
-diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
-index 88aad4f..2870d91 100644
---- a/drivers/dma/mxs-dma.c
-+++ b/drivers/dma/mxs-dma.c
-@@ -327,10 +327,12 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
- 
- 	memset(mxs_chan->ccw, 0, PAGE_SIZE);
- 
--	ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
--				0, "mxs-dma", mxs_dma);
--	if (ret)
--		goto err_irq;
-+	if (mxs_chan->chan_irq != NO_IRQ) {
-+		ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
-+					0, "mxs-dma", mxs_dma);
-+		if (ret)
-+			goto err_irq;
-+	}
- 
- 	ret = clk_enable(mxs_dma->clk);
- 	if (ret)
+ arch/arm/mach-exynos4/include/mach/irqs.h |    2 +-
+ arch/arm/mach-exynos4/mach-nuri.c         |  739 ++++++++++++++++++++++++++++-
+ 2 files changed, 739 insertions(+), 2 deletions(-)
+
 -- 
 1.7.4.1
