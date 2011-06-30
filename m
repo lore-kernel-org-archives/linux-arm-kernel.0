@@ -1,43 +1,34 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 30 Jun 2011 12:27:28 +0200
-Subject: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
-	controller driver
-In-Reply-To: <1309335878-16678-2-git-send-email-b32955@freescale.com>
-References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
-	<1309335878-16678-2-git-send-email-b32955@freescale.com>
-Message-ID: <20110630102728.GB1997@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 11:34:32 +0100
+Subject: [PATCH v3] Add ARM cpu topology definition
+In-Reply-To: <1308940724-2099-1-git-send-email-vincent.guittot@linaro.org>
+References: <1308940724-2099-1-git-send-email-vincent.guittot@linaro.org>
+Message-ID: <20110630103432.GV21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> +static int mil_ecc_write_oob(struct mtd_info *mtd,
-> +				struct nand_chip *nand, int page)
-> +{
-> +	struct gpmi_nfc_data *this = nand->priv;
-> +	struct device *dev = this->dev;
-> +	struct mil *mil	= &this->mil;
-> +	uint8_t *block_mark;
-> +	int block_mark_column;
-> +	int status;
-> +	int error = 0;
+On Fri, Jun 24, 2011 at 08:38:44PM +0200, Vincent Guittot wrote:
+> +	printk(KERN_INFO "cpu %u : thread %d cpu %d, socket %d, mpidr %x\n",
+> +		cpuid, cpu_topology[cpuid].thread_id,
+> +		cpu_topology[cpuid].core_id,
+> +		cpu_topology[cpuid].socket_id, mpidr);
 > +
-> +	/* Only marking a block bad is permitted to write the OOB. */
-> +	if (!mil->marking_a_bad_block) {
-> +		dev_emerg(dev, "This driver doesn't support writing the OOB\n");
-> +		WARN_ON(1);
-> +		error = -EIO;
-> +		goto exit;
-> +	}
+> +}
 
-Huh? Why is that? This will break JFFS2, for example.
+Please remove that empty blank line before the closing brace.
 
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110630/1c60291e/attachment.sig>
+Also...
+
+cpu 0 : thread -1 cpu 0, socket 0, mpidr 80000000
+Calibrating local timer... 199.99MHz.
+hw perfevents: enabled with ARMv7 Cortex-A9 PMU driver, 7 counters available
+CPU1: Booted secondary processor
+cpu 1 : thread -1 cpu 1, socket 0, mpidr 80000001
+CPU2: Booted secondary processor
+cpu 2 : thread -1 cpu 2, socket 0, mpidr 80000002
+CPU3: Booted secondary processor
+cpu 3 : thread -1 cpu 3, socket 0, mpidr 80000003
+Brought up 4 CPUs
+
+It'd be better to have some consistency there - please change from
+"cpu %u :" to "CPU%u:".
