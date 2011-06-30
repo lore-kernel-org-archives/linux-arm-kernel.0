@@ -1,42 +1,88 @@
-From: vincent.guittot@linaro.org (Vincent Guittot)
-Date: Thu, 30 Jun 2011 14:49:29 +0200
-Subject: [PATCH v3] Add ARM cpu topology definition
-In-Reply-To: <20110630103432.GV21898@n2100.arm.linux.org.uk>
-References: <1308940724-2099-1-git-send-email-vincent.guittot@linaro.org>
-	<20110630103432.GV21898@n2100.arm.linux.org.uk>
-Message-ID: <BANLkTi=XA4Ny0x1U-wYu5DH4FuyY05g3Aw@mail.gmail.com>
+From: svenkatr@ti.com (S, Venkatraman)
+Date: Thu, 30 Jun 2011 18:41:57 +0530
+Subject: [PATCH v8 00/12] use nonblock mmc requests to minimize latency
+In-Reply-To: <BANLkTinSt3D+5r9bOL5rTjw5BiuiSDvGvA@mail.gmail.com>
+References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
+	<BANLkTinSt3D+5r9bOL5rTjw5BiuiSDvGvA@mail.gmail.com>
+Message-ID: <BANLkTimMEfo3LpDRK1mP2qVPm=Dn2B7Bpw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 June 2011 12:34, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> On Fri, Jun 24, 2011 at 08:38:44PM +0200, Vincent Guittot wrote:
->> + ? ? printk(KERN_INFO "cpu %u : thread %d cpu %d, socket %d, mpidr %x\n",
->> + ? ? ? ? ? ? cpuid, cpu_topology[cpuid].thread_id,
->> + ? ? ? ? ? ? cpu_topology[cpuid].core_id,
->> + ? ? ? ? ? ? cpu_topology[cpuid].socket_id, mpidr);
->> +
->> +}
+On Thu, Jun 30, 2011 at 6:06 PM, Poddar, Sourav <sourav.poddar@ti.com> wrote:
+> On Tue, Jun 28, 2011 at 1:41 PM, Per Forlin <per.forlin@linaro.org> wrote:
+>> How significant is the cache maintenance over head?
+>> It depends, the eMMC are much faster now
+>> compared to a few years ago and cache maintenance cost more due to
+>> multiple cache levels and speculative cache pre-fetch. In relation the
+>> cost for handling the caches have increased and is now a bottle neck
+>> dealing with fast eMMC together with DMA.
+>>
+>> The intention for introducing non-blocking mmc requests is to minimize the
+>> time between a mmc request ends and another mmc request starts. In the
+>> current implementation the MMC controller is idle when dma_map_sg and
+>> dma_unmap_sg is processing. Introducing non-blocking mmc request makes it
+>> possible to prepare the caches for next job in parallel to an active
+>> mmc request.
+>>
+>> This is done by making the issue_rw_rq() non-blocking.
+>> The increase in throughput is proportional to the time it takes to
+>> prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
+>> a request and how fast the memory is. The faster the MMC/SD is
+>> the more significant the prepare request time becomes. Measurements on U5500
+>> and Panda on eMMC and SD shows significant performance gain for large
+>> reads when running DMA mode. In the PIO case the performance is unchanged.
+>>
+>> There are two optional hooks pre_req() and post_req() that the host driver
+>> may implement in order to move work to before and after the actual mmc_request
+>> function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
+>> the dma descriptor and post_req runs the dma_unmap_sg.
+>>
+>> Details on measurements from IOZone and mmc_test:
+>> https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
+>>
+>> Changes since v7:
+>> ?* rebase on mmc-next, on top of Russell's updated error handling.
+>> ?* Clarify description of mmc_start_req()
+>> ?* Resolve compile without CONFIG_DMA_ENIGNE issue for mmci
+>> ?* Add mmc test to measure how performance is affected by sg length
+>> ?* Add missing wait_for_busy in mmc_test non-blocking test. This call got lost
+>> ? in v4 of this patchset when refactoring mmc_start_req.
+>> ?* Add sub-prefix (core block queue) to relevant patches.
+>>
+>> Per Forlin (12):
+>> ?mmc: core: add non-blocking mmc request function
+>> ?omap_hsmmc: add support for pre_req and post_req
+>> ?mmci: implement pre_req() and post_req()
+>> ?mmc: mmc_test: add debugfs file to list all tests
+>> ?mmc: mmc_test: add test for non-blocking transfers
+>> ?mmc: mmc_test: test to measure how sg_len affect performance
+>> ?mmc: block: add member in mmc queue struct to hold request data
+>> ?mmc: block: add a block request prepare function
+>> ?mmc: block: move error code in issue_rw_rq to a separate function.
+>> ?mmc: queue: add a second mmc queue request member
+>> ?mmc: core: add random fault injection
+>> ?mmc: block: add handling for two parallel block requests in
+>> ? ?issue_rw_rq
+>>
+>> ?drivers/mmc/card/block.c ? ? ?| ?505 ++++++++++++++++++++++++-----------------
+>> ?drivers/mmc/card/mmc_test.c ? | ?491 ++++++++++++++++++++++++++++++++++++++--
+>> ?drivers/mmc/card/queue.c ? ? ?| ?184 ++++++++++------
+>> ?drivers/mmc/card/queue.h ? ? ?| ? 33 ++-
+>> ?drivers/mmc/core/core.c ? ? ? | ?167 +++++++++++++-
+>> ?drivers/mmc/core/debugfs.c ? ?| ? ?5 +
+>> ?drivers/mmc/host/mmci.c ? ? ? | ?147 +++++++++++-
+>> ?drivers/mmc/host/mmci.h ? ? ? | ? ?8 +
+>> ?drivers/mmc/host/omap_hsmmc.c | ? 87 +++++++-
+>> ?include/linux/mmc/core.h ? ? ?| ? ?6 +-
+>> ?include/linux/mmc/host.h ? ? ?| ? 24 ++
+>> ?lib/Kconfig.debug ? ? ? ? ? ? | ? 11 +
+>> ?12 files changed, 1345 insertions(+), 323 deletions(-)
 >
-> Please remove that empty blank line before the closing brace.
 >
-
-ok
-
-> Also...
 >
-> cpu 0 : thread -1 cpu 0, socket 0, mpidr 80000000
-> Calibrating local timer... 199.99MHz.
-> hw perfevents: enabled with ARMv7 Cortex-A9 PMU driver, 7 counters available
-> CPU1: Booted secondary processor
-> cpu 1 : thread -1 cpu 1, socket 0, mpidr 80000001
-> CPU2: Booted secondary processor
-> cpu 2 : thread -1 cpu 2, socket 0, mpidr 80000002
-> CPU3: Booted secondary processor
-> cpu 3 : thread -1 cpu 3, socket 0, mpidr 80000003
-> Brought up 4 CPUs
+> Boot tested on Omap4430 Blaze board.
 >
-> It'd be better to have some consistency there - please change from
-> "cpu %u :" to "CPU%u:".
+> Tested-by: Sourav Poddar<sourav.poddar@ti.com>
 >
-
-ok
+Reviewed for OMAP along with Sourav's tests..
+Reviewed-by: Venkatraman S <svenkatr@ti.com>
