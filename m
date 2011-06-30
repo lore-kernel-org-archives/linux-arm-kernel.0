@@ -1,51 +1,46 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Thu, 30 Jun 2011 10:29:39 -0400 (EDT)
-Subject: Git pull request: 64-bit atomic user helper
-In-Reply-To: <20110630100755.GU21898@n2100.arm.linux.org.uk>
-References: <alpine.LFD.2.00.1106202134510.2142@xanadu.home>
-	<20110630100755.GU21898@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.00.1106301024280.2142@xanadu.home>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 15:33:38 +0100
+Subject: [PATCH 4/4] mmci: fixup sg buffer handling in pio_write
+In-Reply-To: <1309247869-17220-1-git-send-email-linus.walleij@stericsson.com>
+References: <1309247869-17220-1-git-send-email-linus.walleij@stericsson.com>
+Message-ID: <20110630143338.GA21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Jun 2011, Russell King - ARM Linux wrote:
-
-> On Mon, Jun 20, 2011 at 09:54:07PM -0400, Nicolas Pitre wrote:
-> > Russell, please pull the following for the next merge window:
-> > 
-> > 	git://git.linaro.org/people/nico/linux.git cmpxchg64
-> > 
-> > This series cleans up the kuser documentation, then it adds 64-bit
-> > cmpxchg support as needed by some user space applications.
-> > 
-> > Tested with the initial libgcc patches relying on this, using a 
-> > kernel that has this series applied, and another without those 
-> > patches to verify that the test for the availability of the needed 
-> > helper does work as intended.
-> > 
-> > Nicolas Pitre (2):
-> >       ARM: kuser: move interface documentation out of the source code
-> >       ARM: add a kuser_cmpxchg64 user space helper
-> > 
-> >  Documentation/arm/kernel_user_helpers.txt |  267 +++++++++++++++++++++++
-> >  arch/arm/kernel/entry-armv.S              |  246 ++++++++-------------
-> >  2 files changed, 361 insertions(+), 152 deletions(-)
+On Tue, Jun 28, 2011 at 09:57:49AM +0200, Linus Walleij wrote:
+> From: Ulf Hansson <ulf.hansson@stericsson.com>
 > 
-> As these clash with the entry rework which I have, I'd much prefer
-> them to be in patch form rather than git form so I don't have to keep
-> remembering to fix the (broken) git rerere merge.  git rerere is fine
-> if you get it right first time but if not, then it keeps doing it wrong
-> each and every time.
+> Earlier code in pio_write was expecting that each
+> scatter-gather buffer was 4-bytes aligned which is
+> not always the case, especially when dealing with long
+> chains of SDIO packages. This patch fix the problem by
+> using a 4 bytes buffer to cache unaligned data between
+> each unaligned pio_write operation.
+> 
+> In the last transaction we pad the last write access
+> with zeroes.
+> 
+> Remove older fix for ST Micro since it was not a
+> variant-specific problem.
 
-In that case you may use
+This is horrid, and will probably cause MMCI to underrun on ARM platforms
+where it hasn't done so previously due to all the extra overhead at the
+start of the interrupt.
 
-	git rerere forget <pathspec>
+Therefore, I don't think this is acceptable.
 
-and it will discard any resolution it has in cache for that path, at 
-which point you'll be able to have it record another one.
+Plus, what exactly is it trying to solve - writesl() handles unaligned
+buffers already.
 
-Alternatively you may cherry-pick or rebase this branch as you see fit, 
-which should be even simpler than if I put them in the patch system.
+> +		if (len > sg_miter->consumed)
+> +			len = sg_miter->consumed;
+> +		else
+> +			sg_miter->consumed = len;
 
+sg_miter is supposed to _always_ be written with the number of bytes
+consumed.  To start playing these games with it is inviting trouble,
+and to start return a length greater than 'remain' from mmci_pio_write
+is just silly.
 
-Nicolas
+What is probably a better approach is to detect this condition when
+we receive the request, and copy the data into a bounce buffer.
