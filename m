@@ -1,60 +1,52 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 30 Jun 2011 17:11:38 +0200
-Subject: [PATCH 3/3] pwm: Add a i.MX23/28 pwm driver
-In-Reply-To: <201106301342.36088.arnd@arndb.de>
-References: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
-	<1309430517-23821-4-git-send-email-s.hauer@pengutronix.de>
-	<201106301342.36088.arnd@arndb.de>
-Message-ID: <20110630151138.GB9349@pengutronix.de>
+From: B32955@freescale.com (Huang Shijie-B32955)
+Date: Thu, 30 Jun 2011 15:21:21 +0000
+Subject: reply: [PATCH v7 1/3] MTD : add the common code for GPMI-NFC
+	controller driver
+Message-ID: <14C4E31473AF7E4B98176CB73615181C19FB3C@039-SN1MPN1-006.039d.mgd.msft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 01:42:35PM +0200, Arnd Bergmann wrote:
-> On Thursday 30 June 2011, Sascha Hauer wrote:
-> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> 
-> Hi Sascha,
-> 
-> The probing looks good to me now. I would have added extra code to avoid
-> ioremapping the same page multiple times, but I see this as a matter of
-> different preferences, so I'm fine with that.
-> 
-> You are still missing a description of the driver, both in the changelog
-> above and in the Kconfig patch. A small sentence to spell out PWM
-> in the changelog and to list the devices that will use this driver
-> would be helpful to the causal reader.
 
-Ok, will add.
+Hi Wolfram:
 
-> 
-> Provided that you add that:
-> 
-> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> > diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-> > index 93c1052..5694574 100644
-> > --- a/drivers/pwm/Kconfig
-> > +++ b/drivers/pwm/Kconfig
-> > @@ -2,11 +2,15 @@ menuconfig PWM
-> >  	bool "PWM Support"
-> >  	help
-> >  	  This enables PWM support through the generic PWM framework.
-> > -	  You only need to enable this, if you also want to enable
-> > +	  You only need to enable this if you also want to enable
-> >  	  one or more of the PWM drivers below.
-> >  
-> >  	  If unsure, say N.
-> >  
-> 
-> I think this hunk should have been in the other first patch.
+> +static int mil_ecc_write_oob(struct mtd_info *mtd,
+> +                             struct nand_chip *nand, int page)
+> +{
+> +     struct gpmi_nfc_data *this = nand->priv;
+> +     struct device *dev = this->dev;
+> +     struct mil *mil = &this->mil;
+> +     uint8_t *block_mark;
+> +     int block_mark_column;
+> +     int status;
+> +     int error = 0;
+> +
+> +     /* Only marking a block bad is permitted to write the OOB. */
+> +     if (!mil->marking_a_bad_block) {
+> +             dev_emerg(dev, "This driver doesn't support writing the OOB\n");
+> +             WARN_ON(1);
+> +             error = -EIO;
+> +             goto exit;
+> +     }
 
-Indeed, will fix.
+Huh? Why is that? This will break JFFS2, for example.
 
-Sascha
+-----------------------------------------------------------------
+The GPMI-NFC driver will use the OOB(BCH will use the OOB for a special layout), so we forbid any others to use the OOB.
+But marking a block bad is permitted.
+
+If the JFFS2 use the OOB, we have to disable it
+We use UBIFS by default.
+
+Thanks.
+
+Best Regards
+Huang Shijie
 
 
--- 
-Pengutronix e.K.                           |                             |
+
+
+-----------------------------------------------------------------
+
+--
+Pengutronix e.K.                           | Wolfram Sang                |
 Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
