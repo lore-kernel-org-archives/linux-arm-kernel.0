@@ -1,54 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Jun 2011 06:35:38 -0700
-Subject: [PATCH 3/3] Update Nook Color machine 3284 to common Encore name.
-In-Reply-To: <1308066307-415-4-git-send-email-green@linuxhacker.ru>
-References: <1308066307-415-1-git-send-email-green@linuxhacker.ru>
-	<1308066307-415-4-git-send-email-green@linuxhacker.ru>
-Message-ID: <20110630133537.GP23145@atomide.com>
+From: dedekind1@gmail.com (Artem Bityutskiy)
+Date: Thu, 30 Jun 2011 16:38:33 +0300
+Subject: [PATCH] mtd: OneNAND: samsung: Write DMA support
+In-Reply-To: <20110630112354.GW21898@n2100.arm.linux.org.uk>
+References: <20110608101804.GA5527@july> <1309420530.23597.153.camel@sauron>
+	<20110630091951.GQ21898@n2100.arm.linux.org.uk>
+	<1309430735.23597.165.camel@sauron>
+	<20110630112354.GW21898@n2100.arm.linux.org.uk>
+Message-ID: <1309441118.23597.198.camel@sauron>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* green at linuxhacker.ru <green@linuxhacker.ru> [110614 08:42]:
-> From: Oleg Drokin <green@linuxhacker.ru>
+On Thu, 2011-06-30 at 12:23 +0100, Russell King - ARM Linux wrote:
+> It's probably going to be better to have a MTD block API for DMA which
+> provides a scatterlist to the MTD block driver, and which knows whether
+> the memory is from vmalloc.  When it is, it takes care of the flushing
+> via those two functions I referred to in cachetlb.txt.
 > 
-> Machine database already updated:
-> http://www.arm.linux.org.uk/developer/machines/list.php?id=3284
-> 
-> Signed-off-by: Oleg Drokin <green@linuxhacker.ru>
+> This keeps the magic out of the individual MTD block drivers, and stops
+> them replicating the same mistakes time and time again - and also means
+> that you won't have to teach everyone about this.
 
-Russell, do have some immutable branch containing the mach-types changes
-that I could pull for my devel-board branch for this?
+Yeah, something like this. The MTD API is not very suitable for this and
+would need some rework to make sure we achieve 2 goals:
 
-If you want me to apply this one along with the related board-*.c
-changes please ack.
+1. No need to change current MTD API users
+2. Keep the vmalloced memory handling in one place and not replicate it
+   in each driver.
 
-Regards,
+Currently only OneNAND drivers do these hacks, so I guess Kyungmin will
+suffer most...
 
-Tony
+> It doesn't make sense for the DMA API to deal with vmalloc - MTD is
+> one of the very few (the only?) subsystems which does this.
 
+OK, thank you!
 
-
-> ---
->  arch/arm/tools/mach-types |    2 +-
->  1 files changed, 1 insertions(+), 1 deletions(-)
-> 
-> diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-> index 3b3776d..fff68d0 100644
-> --- a/arch/arm/tools/mach-types
-> +++ b/arch/arm/tools/mach-types
-> @@ -910,7 +910,7 @@ omapl138_case_a3	MACH_OMAPL138_CASE_A3	OMAPL138_CASE_A3	3280
->  uemd			MACH_UEMD		UEMD			3281
->  ccwmx51mut		MACH_CCWMX51MUT		CCWMX51MUT		3282
->  rockhopper		MACH_ROCKHOPPER		ROCKHOPPER		3283
-> -nookcolor		MACH_NOOKCOLOR		NOOKCOLOR		3284
-> +encore			MACH_ENCORE		ENCORE			3284
->  hkdkc100		MACH_HKDKC100		HKDKC100		3285
->  ts42xx			MACH_TS42XX		TS42XX			3286
->  aebl			MACH_AEBL		AEBL			3287
-> -- 
-> 1.7.4.4
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Best Regards,
+Artem Bityutskiy
