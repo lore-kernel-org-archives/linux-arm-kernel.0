@@ -1,59 +1,45 @@
-From: w.sang@pengutronix.de (Wolfram Sang)
-Date: Thu, 30 Jun 2011 12:40:09 +0200
-Subject: [PATCH v7 0/3]  add the GPMI controller driver for IMX23/IMX28
-In-Reply-To: <1309335878-16678-1-git-send-email-b32955@freescale.com>
-References: <1309335878-16678-1-git-send-email-b32955@freescale.com>
-Message-ID: <20110630104009.GC1997@pengutronix.de>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Thu, 30 Jun 2011 12:41:54 +0200
+Subject: [PATCH v3] implement a generic PWM framework
+Message-ID: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jun 29, 2011 at 04:24:35PM +0800, Huang Shijie wrote:
-> The general-purpose media interface(GPMI) controller is a flexible interface
-> to up to several NAND flashs.
-> 
-> The Bose Ray-Choudhury Hocquenghem(BCH) module is a hardware ECC accelerator.
-> 
-> With the help of BCH, the GPMI controller can choose to do the hardware ECC or
-> not.
-> 
-> This driver is a _pure_ MTD NAND controller driver now.
+3rd version. No changes to the core except that I added F: drivers/pwm/ to
+MAINTAINERS. Arnd, I looked through the comments to the first series again
+and this was the only thing I could find I forgot. You referred to three
+things. Is there more I forgot?
 
-It seems writing does not work for me. I use a MX28EVK, NAND is reported as:
+What changed though is the mxs pwm driver. I now register a pwm core
+device which handles the shared enable register as suggested by Arnd.
 
-[    1.670000] NAND device: Manufacturer ID: 0x2c, Chip ID: 0xdc (Micron MT29F4G08ABADAWP)
+Sascha
 
-With ubiformat or the mtd_stresstest-module, I get stuff like this:
+The following changes since commit b0af8dfdd67699e25083478c63eedef2e72ebd85:
 
-root at device:~ ubiformat /dev/mtd0
-ubiformat: mtd0 (nand), size 536870912 bytes (512.0 MiB), 4096 eraseblocks of 131072 bytes (128.0 KiB), min. I/O size 2048 bytes
-libscan: scanning eraseblock 4095 -- 100 % complete  
-ubiformat: 4094 eraseblocks are supposedly empty
-ubiformat: 2 bad eraseblocks found, numbers: 1243, 3935
-ubiformat: formatting eraseblock 2 --  0 % complete  
-[  172.430000] [ start_dma_without_bch_irq : 393 ] DMA timeout!!!
-[  173.430000] [ start_dma_with_bch_irq : 424 ] bch timeout!!!
-[  173.430000] [ mil_ecc_write_page : 1647 ] Error in ECC-based write: -110
-[  173.440000] [ send_command : 305 ] step 1 error
-[  173.440000] [ mil_cmd_ctrl : 1369 ] Chip: 0, Error -1
-[  173.450000] [ send_command : 305 ] step 1 error
-[  173.450000] [ mil_cmd_ctrl : 1369 ] Chip: 0, Error -1
-[  173.460000] [ read_data : 386 ] step 1 error
-...
+  Linux 3.0-rc5 (2011-06-27 19:12:22 -0700)
 
-Reading works though, mtd_readtest passes. Wild guess: something wrong
-with the safe timings, perhaps?
+are available in the git repository at:
+  git://git.pengutronix.de/git/imx/linux-2.6.git pwm
 
-Regards,
+Sascha Hauer (3):
+      PWM: add pwm framework support
+      ARM mxs: adjust pwm resources to what the driver expects
+      pwm: Add a i.MX23/28 pwm driver
 
-   Wolfram
-
--- 
-Pengutronix e.K.                           | Wolfram Sang                |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110630/391f685e/attachment.sig>
+ Documentation/pwm.txt                        |   56 +++++
+ MAINTAINERS                                  |    6 +
+ arch/arm/mach-mxs/devices/platform-mxs-pwm.c |   32 +++-
+ drivers/Kconfig                              |    2 +
+ drivers/Makefile                             |    1 +
+ drivers/pwm/Kconfig                          |   16 ++
+ drivers/pwm/Makefile                         |    2 +
+ drivers/pwm/core.c                           |  220 ++++++++++++++++++
+ drivers/pwm/mxs-pwm.c                        |  312 ++++++++++++++++++++++++++
+ include/linux/pwm.h                          |   37 +++
+ 10 files changed, 681 insertions(+), 3 deletions(-)
+ create mode 100644 Documentation/pwm.txt
+ create mode 100644 drivers/pwm/Kconfig
+ create mode 100644 drivers/pwm/Makefile
+ create mode 100644 drivers/pwm/core.c
+ create mode 100644 drivers/pwm/mxs-pwm.c
