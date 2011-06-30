@@ -1,81 +1,95 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Thu, 30 Jun 2011 16:37:48 +0800
-Subject: [PATCH v5 2/3] ARM: mxs/mx23evk: add GPMI-NFC device
-In-Reply-To: <20110630075501.GE11559@pengutronix.de>
-References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
-	<1309406028-2924-3-git-send-email-b32955@freescale.com>
-	<20110630075501.GE11559@pengutronix.de>
-Message-ID: <4E0C35DC.2040107@freescale.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 10:00:13 +0100
+Subject: [PATCH 2/3] Samsung SoC: ready to use NTC value inside kernel
+In-Reply-To: <1309422387-11546-3-git-send-email-myungjoo.ham@samsung.com>
+References: <1309422387-11546-1-git-send-email-myungjoo.ham@samsung.com>
+	<1309422387-11546-3-git-send-email-myungjoo.ham@samsung.com>
+Message-ID: <20110630090013.GP21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi:
-> On Thu, Jun 30, 2011 at 11:53:47AM +0800, Huang Shijie wrote:
->> add the GPMI-NFC device for mx23evk borad.
-> s/borad/board/
->
->> Signed-off-by: Huang Shijie<b32955@freescale.com>
->> ---
->>   arch/arm/mach-mxs/Kconfig        |    1 +
->>   arch/arm/mach-mxs/mach-mx23evk.c |   37 +++++++++++++++++++++++++++++++++++++
->>   2 files changed, 38 insertions(+), 0 deletions(-)
->>
->> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
->> index 1d3985f..f55bcfe 100644
->> --- a/arch/arm/mach-mxs/Kconfig
->> +++ b/arch/arm/mach-mxs/Kconfig
->> @@ -32,6 +32,7 @@ config MACH_MX23EVK
->>   	select SOC_IMX23
->>   	select MXS_HAVE_AMBA_DUART
->>   	select MXS_HAVE_PLATFORM_AUART
->> +	select MXS_HAVE_PLATFORM_GPMI_NFC
->>   	select MXS_HAVE_PLATFORM_MXS_MMC
->>   	select MXS_HAVE_PLATFORM_MXSFB
->>   	help
->> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
->> index 3c2de33..772b373 100644
->> --- a/arch/arm/mach-mxs/mach-mx23evk.c
->> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
->> @@ -107,6 +107,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
->>   		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->>   };
->>
->> +/* gpmi-nfc */
->> +#define MXS_PAD_GPMI_NFC	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
-> Maybe put that into a more central place, as mach-mx28evk uses it, too?
-yes. The mach-mx28evk needs it too.
+On Thu, Jun 30, 2011 at 05:26:26PM +0900, MyungJoo Ham wrote:
+> diff --git a/arch/arm/plat-samsung/dev-adc.c b/arch/arm/plat-samsung/dev-adc.c
+> index 622972c..526097a 100644
+> --- a/arch/arm/plat-samsung/dev-adc.c
+> +++ b/arch/arm/plat-samsung/dev-adc.c
+> @@ -22,6 +22,8 @@
+>  #include <plat/devs.h>
+>  #include <plat/cpu.h>
+>  
+> +#include "../../../fs/sysfs/sysfs.h"
 
-If I put it into the iomux.h, what's the name for it?
-      MXS_PAD_CTRL_12MA , or something else ?
+That is a big hint that you're doing something wrong.
 
-> OTOH the name sounds more generic than its use. Do you really need 12mA
-Yes, I need the 12mA for the Write protect pin, and other two pins.
+> @@ -101,3 +103,63 @@ struct platform_device s3c_device_adc_ntc_thermistor = {
+>  		.platform_data = &ntc_adc_pdata,
+>  	},
+>  };
+> +
+> +static struct device_attribute *ntc_attr;
+> +
+> +static int init_s3c_adc_ntc_read(void)
+> +{
+> +	struct kobject *ntc;
+> +	struct sysfs_dirent *ntc_d;
+> +
+> +	ntc = &s3c_device_adc_ntc_thermistor.dev.kobj;
+> +	ntc_d = sysfs_get_dirent(ntc->sd, get_ktype(ntc)->namespace(ntc),
+> +				 "temp1_input");
+> +	if (!ntc_d || sysfs_type(ntc_d) != SYSFS_KOBJ_ATTR) {
+> +		dev_err(&s3c_device_adc_ntc_thermistor.dev,
+> +			"Cannot initialize thermistor dirent info.\n");
+> +		if (ntc_d)
+> +			sysfs_put(ntc_d);
+> +		return -ENODEV;
+> +	}
+> +	ntc_attr = container_of(ntc_d->s_attr.attr, struct device_attribute,
+> +				attr);
+> +
+> +	sysfs_put(ntc_d);
+> +	if (IS_ERR(ntc_attr)) {
+> +		dev_err(&s3c_device_adc_ntc_thermistor.dev,
+> +			"Cannot access NTC thermistor.\n");
+> +		return PTR_ERR(ntc_attr);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +/* A helper function to read values from NTC, in 1/1000 Centigrade */
+> +int read_s3c_adc_ntc(int *mC)
+> +{
+> +	char buf[32];
+> +	int ret;
+> +
+> +	/* init should be done after ADC and NTC are probed */
+> +	if (ntc_attr == NULL) {
+> +		ret = init_s3c_adc_ntc_read();
+> +		if (ret) {
+> +			if (ntc_attr == NULL)
+> +				ntc_attr = ERR_PTR(ret);
+> +			return ret;
+> +		}
+> +	}
+> +
+> +	if (IS_ERR(ntc_attr))
+> +		return -ENODEV;
+> +
+> +	if (!ntc_attr->show)
+> +		return -EINVAL;
+> +
+> +	ret = ntc_attr->show(&s3c_device_adc_ntc_thermistor.dev, ntc_attr, buf);
+> +	if (ret < 0)
+> +		return ret;
+> +	sscanf(buf, "%d", mC);
+> +
+> +	return 0;
+> +}
 
+This is wrong on just about every level.  It needs to be rewritten to
+avoid poking about in subsystem internal data structures, and you really
+should not be sprint-ing a value to only sscanf it later.
 
-Best Regards
-Huang Shijie
-> for the Write protect pin? If not, you could rename it to
-> MXS_PAD_GPMI_NFC_STROBE.
->
->> +static iomux_cfg_t mx23evk_gpmi_nfc_pads[] = {
->> +	MX23_PAD_GPMI_D00__GPMI_D00 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_D01__GPMI_D01 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_D02__GPMI_D02 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_D03__GPMI_D03 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_D04__GPMI_D04 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_D05__GPMI_D05 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_D06__GPMI_D06 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_D07__GPMI_D07 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_WPN__GPMI_WPN | MXS_PAD_GPMI_NFC,
->> +	MX23_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_GPMI_NFC,
->> +	MX23_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_GPMI_NFC,
->> +	MX23_PAD_GPMI_RDY0__GPMI_RDY0 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_RDY1__GPMI_RDY1 | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
->> +	MX23_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
->> +};
-> Best regards
-> Uwe
->
+Plus, container_of doesn't return a pointer-error code.
+
+You need to come up with a far better way of doing this altogether.
