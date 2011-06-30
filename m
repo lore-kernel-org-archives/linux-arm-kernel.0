@@ -1,61 +1,60 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Jun 2011 10:19:51 +0100
-Subject: [PATCH] mtd: OneNAND: samsung: Write DMA support
-In-Reply-To: <1309420530.23597.153.camel@sauron>
-References: <20110608101804.GA5527@july> <1309420530.23597.153.camel@sauron>
-Message-ID: <20110630091951.GQ21898@n2100.arm.linux.org.uk>
+Date: Thu, 30 Jun 2011 10:23:49 +0100
+Subject: [PATCH net-next] net: am79c961a: Omit check for multicast bit
+	in netdev_for_each_mc_addr
+In-Reply-To: <1309349686-1506-1-git-send-email-tklauser@distanz.ch>
+References: <1309349686-1506-1-git-send-email-tklauser@distanz.ch>
+Message-ID: <20110630092349.GR21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 10:55:25AM +0300, Artem Bityutskiy wrote:
-> > +	/* Handle vmalloc address */
-> > +	if (buf >= high_memory) {
-> > +		struct page *page;
+On Wed, Jun 29, 2011 at 02:14:46PM +0200, Tobias Klauser wrote:
+> There is no need to check for the address being a multicast address in
+> the netdev_for_each_mc_addr loop, so remove it.
 > 
-> OK, Russell will yell at this, but we do DMA vmalloc'ed addresses for
+> Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
 
-I most certainly will, because its broken.
+Thanks.
 
-> > +
-> > +		if (((size_t) buf & PAGE_MASK) !=
-> > +		    ((size_t) (buf + count - 1) & PAGE_MASK))
+Acked-by: Russell King <rmk+kernel@arm.linux.org.uk>
+
+> ---
+>  drivers/net/arm/am79c961a.c |   14 ++++++--------
+>  1 files changed, 6 insertions(+), 8 deletions(-)
 > 
-> Something is fishy with these size_t casts, could you revisit this piece
-> of code - and turn it to something simpler, if possible?
+> diff --git a/drivers/net/arm/am79c961a.c b/drivers/net/arm/am79c961a.c
+> index 7b3e23f..52fe21e 100644
+> --- a/drivers/net/arm/am79c961a.c
+> +++ b/drivers/net/arm/am79c961a.c
+> @@ -199,17 +199,15 @@ am79c961_ramtest(struct net_device *dev, unsigned int val)
+>  
+>  static void am79c961_mc_hash(char *addr, u16 *hash)
+>  {
+> -	if (addr[0] & 0x01) {
+> -		int idx, bit;
+> -		u32 crc;
+> +	int idx, bit;
+> +	u32 crc;
+>  
+> -		crc = ether_crc_le(ETH_ALEN, addr);
+> +	crc = ether_crc_le(ETH_ALEN, addr);
+>  
+> -		idx = crc >> 30;
+> -		bit = (crc >> 26) & 15;
+> +	idx = crc >> 30;
+> +	bit = (crc >> 26) & 15;
+>  
+> -		hash[idx] |= 1 << bit;
+> -	}
+> +	hash[idx] |= 1 << bit;
+>  }
+>  
+>  static unsigned int am79c961_get_rx_mode(struct net_device *dev, u16 *hash)
+> -- 
+> 1.7.5.4
 > 
-> > +			goto normal;
-> > +
-> > +		page = vmalloc_to_page(buf);
-> > +		if (unlikely(!page))
-> > +			goto normal;
-> > +
-> > +		/* Page offset */
-> > +		ofs = ((size_t) buf & ~PAGE_MASK);
-> > +		page_dma = 1;
-> > +
-> > +		/* DMA routine */
-> > +		dma_src = dma_map_page(dev, page, ofs, count, DMA_TO_DEVICE);
-
-Which is that this code is trying to work around the restriction in the
-DMA API that dma_map_single() can only take virtual addresses in the
-kernel direct mapped region.
-
-The key thing here is that with CPUs which lookup by virtual address,
-like ARMs, you _must_ handle the cache aliases associated with the mapping
-which you are accessing the memory via.
-
-This means if you are accessing a DMA buffer at address X, and address X
-is cacheable, address X needs cache maintainence performed on it.  Address
-Y, which may correspond with the same memory as X through a different
-mapping is no good.  It has to be X.
-
-However, there is NO API for mapping DMA buffers from vmalloc space.
-What we do now have are a pair of functions which must be used _correctly_
-(iow, one before and one after) to ensure that virtual cached architectures
-can access the data correctly - and its documented at the bottom of
-cachetlb.txt.
-
-As this is something which keeps coming up in connection with MTD, it
-may be a good idea if MTD gave driver authors a helping hand with DMA
-setup/teardown so that the chances of driver authors getting this right
-is greater...
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
