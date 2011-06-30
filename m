@@ -1,47 +1,72 @@
-From: simon@sequanux.org (Simon Guinot)
-Date: Thu, 30 Jun 2011 09:52:23 +0000
-Subject: plat-orion gpio regression for edge-sensitive on mv78xx0
-In-Reply-To: <4E0B8492.2030201@drewtech.com>
-References: <4E0B8492.2030201@drewtech.com>
-Message-ID: <20110630095223.GH31228@kw.sim.vm.gnt>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 30 Jun 2011 15:22:20 +0530
+Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
+	level
+In-Reply-To: <BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
+References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
+	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
+	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
+	<BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
+Message-ID: <BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 30, 2011 at 2:35 PM, padma venkat <padma.kvr@gmail.com> wrote:
+> Hi,
+>
+> On Thu, Jun 30, 2011 at 12:38 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
+>> On Thu, Jun 30, 2011 at 6:08 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
+>>> Fixed the bug in transmission status check for 64 bytes FIFO
+>>> level.
+>>>
+>>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
+>>> ---
+>>> ?drivers/spi/spi_s3c64xx.c | ? ?4 +---
+>>> ?1 files changed, 1 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.hc
+>>> index 795828b..8945e20 100644
+>>> --- a/drivers/spi/spi_s3c64xx.c
+>>> +++ b/drivers/spi/spi_s3c64xx.c
+>>> @@ -116,9 +116,7 @@
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(((i)->fifo_lvl_mask + 1))) \
+>>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?? 1 : 0)
+>>>
+>>> -#define S3C64XX_SPI_ST_TX_DONE(v, i) ((((v) >> (i)->rx_lvl_offset) & \
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (((i)->fifo_lvl_mask + 1) << 1)) \
+>>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1 : 0)
+>>> +#define S3C64XX_SPI_ST_TX_DONE(v, i) (((v) & (1 << (i)->tx_st_done)) ? 1 : 0)
+>>
+>> IIRC the macro is already designed to deduct tx-done levels from other fields.
+>> Could you please _explain_ with one example where it fails ? It is
+>> difficult to see without
+>> numbers.
+> The existing macro fails for following scenarios.
+> 1) S5P64X0 channel 1
+> 2) S5PV210 channel 1
+> 3) S5PV310 channel 1 and channel 2
+>
+> The FIFO data level supported in the above SoCs either 64 or 256
+> bytes depending on the channel. Because of this the TX_DONE
+> is the 25 bit in the status register.
+>
+> The existing macro works for the following scenarios
+> 1) S3C6410 all channels
+> 2) S5PC100 all channels
+>
+> The FIFO data level supported in the above SoCs 64 bytes
+> on all the channels. Because of this the TX_DONE is the 21 bit
+> in the status register.
+>
+> So when we use the existing macro for the non-working SoCs
+> it is not anding with the TX_DONE bit but it is only anding the bits
+> earlier to TX_DONE bit.
+>
 
-On Wed, Jun 29, 2011 at 04:01:22PM -0400, Joey Oravec wrote:
-> Nicolas, Lennert -
-> 
-> I just tested linux kernel 3.0-rc5 today. There were some major
-> changes to arch/arm/plat-orion/gpio.c and I think they introduced a
-> bug for edge sensitive interrupts. I have not tested any other types
-> yet. This new version of the code specifies
+I see.
+I don't have access to post s3c64xx datasheets. Please confirm if TX_DONE
+bit at same offset for all channels of an SoC. If so, I am OK with
+these 2 patches.
 
-As level interrupts don't need to be acked, it should be ok.
-
-> 
-> ct->chip.irq_ack = irq_gc_ack;
-> 
-> But it looks like kernel/irq/generic-chip.c generates a positive
-> mask (1 to clear) and the MV78200 wants the opposite (0 to clear).
-> The result is that the interrupt never gets ACKed and the handler
-> will keep getting called.
-
-Maybe we could introduce some irq_gc_ack{_set_bit,_clear_bit}
-variants (as for the mask functions) ?
-
-As an another option, we could define an Orion specific irq_ack
-function.
-
-I don't know what is the better choice for rc5.
-
-Regards,
-
-Simon
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 198 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20110630/b77176e8/attachment.sig>
+Thanks,
+Jassi
