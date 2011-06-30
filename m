@@ -1,57 +1,29 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Jun 2011 22:51:09 +0100
-Subject: [PATCH] ARM: automatically select OMAP3_PMU if we try to use
-	perf on OMAP3
-In-Reply-To: <201106301527.02528.arnd@arndb.de>
-References: <1309268265-2685-1-git-send-email-bryan.wu@canonical.com>
-	<20110628135706.GA28871@e102144-lin.cambridge.arm.com>
-	<CAK5ve-LQcY6XQENBJw6JaarLffULA7EtjJMxCtpzhwPCfs2OuA@mail.gmail.com>
-	<201106301527.02528.arnd@arndb.de>
-Message-ID: <20110630215109.GB11011@e102144-lin.cambridge.arm.com>
+Date: Thu, 30 Jun 2011 22:51:56 +0100
+Subject: [PATCH 11/23] ARM: entry: avoid enabling interrupts in
+	prefetch/data abort handlers
+In-Reply-To: <20110630092702.GS21898@n2100.arm.linux.org.uk>
+References: <20110629091853.GK21898@n2100.arm.linux.org.uk>
+	<E1Qbqyh-0002Fh-3Y@rmk-PC.arm.linux.org.uk>
+	<20110629200522.GB12421@e102144-lin.cambridge.arm.com>
+	<20110630092702.GS21898@n2100.arm.linux.org.uk>
+Message-ID: <20110630215156.GC11011@e102144-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 02:27:02PM +0100, Arnd Bergmann wrote:
-> On Thursday 30 June 2011, Bryan Wu wrote:
-> > On Tue, Jun 28, 2011 at 9:57 PM, Will Deacon <will.deacon@arm.com> wrote:
+On Thu, Jun 30, 2011 at 10:27:02AM +0100, Russell King - ARM Linux wrote:
+> On Wed, Jun 29, 2011 at 09:05:23PM +0100, Will Deacon wrote:
+> > Could you also update the comments for this function too please? There's one
+> > immediately before the function that states we are called with preemption
+> > disabled and there's another one where we re-enable preemption stating that
+> > it was disabled by the low-level exception handling code.
 > 
-> > >
-> > > This issue has been discussed on the list in the past and I still think that
-> > > it would be better for your config to select OMAP3_EMU explicitly. If we do
-> > > that here unconditionally then we end up also bringing in OC_ETM which isn't
-> > > something that sounds like a good idea (may have implications for power
-> > > consumption in production hardware?).
-> > >
-> > I quite understand your concern. How about this one?
-> > ----
-> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> > index 2fd0911..e53f9e4 100644
-> > --- a/arch/arm/Kconfig
-> > +++ b/arch/arm/Kconfig
-> > @@ -1084,10 +1084,10 @@ config XSCALE_PMU
-> >         default y
-> > 
-> >  config CPU_HAS_PMU
-> > -       depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
-> > -                  (!ARCH_OMAP3 || OMAP3_EMU)
-> > +       depends on CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU
-> >         default y
-> >         bool
-> > +       select OMAP3_EMU if (PERF_EVENTS && ARCH_OMAP3)
-> > 
-> >  config MULTI_IRQ_HANDLER
-> >         bool
-> > 
-> 
-> As far as I can tell, it still has the same issue. I think the existing
-> code is better. If you want to support HW_PERF_EVENTS on OMAP3, just
-> turn on OMAP3_EMU. Where's the problem with that?
+> I'll change the one before the function thusly s/preemption/interrupts/ 
+> and remove the other entirely because it no longer serves much purpose.
+> Ok?
 
-Yup. Although the new patch does address my previous technical concerns, I'm
-still not happy with it. Just select OMAP3_EMU!
+Sounds good to me, you add my ack with those changes.
 
-> [1] http://en.wikipedia.org/wiki/COMEFROM
-
-Ha, that really is horrible!
+Thanks,
 
 Will
