@@ -1,67 +1,74 @@
-From: utx@penguin.cz (Stanislav Brabec)
-Date: Thu, 30 Jun 2011 18:13:26 +0200
-Subject: kernel panic in spi_complete() on spitz (PXA270)
-In-Reply-To: <4E0C957F.8080807@compulab.co.il>
-References: <1308845380.4533.54.camel@oct.suse.cz>
-	<201106301352.21684.marek.vasut@gmail.com>
-	<1309445118.4406.47.camel@oct.suse.cz>
-	<4E0C957F.8080807@compulab.co.il>
-Message-ID: <1309450406.4406.59.camel@oct.suse.cz>
+From: bgat@billgatliff.com (Bill Gatliff)
+Date: Thu, 30 Jun 2011 11:17:54 -0500
+Subject: [PATCH 1/3] PWM: add pwm framework support
+In-Reply-To: <201106301441.24493.arnd@arndb.de>
+References: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
+	<1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
+	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
+	<201106301441.24493.arnd@arndb.de>
+Message-ID: <BANLkTin_htv2z3D9Bbf6N8Y7UKFRvPtvOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Igor Grinberg wrote:
-> On 06/30/11 17:45, Stanislav Brabec wrote:
-> I want to
-> > add .needs_regulator bool to ads7846.c and send the patch again to the
-> > list.
-> 
-> Please, don't...
-> I thought we've finished discussing the regulator issue...
+Guys:
 
-The discussion ended without a fix (at least for spitz). I seen two
-proposals:
-- As ADS7846 hardware does not require dedicated regulator, don't
-  require it in driver and fail only on platforms that have a dedicated
-  regulator.
-- Use dummy regulators for all platforms without dedicated ADS7846
-  regulator.
+On Thu, Jun 30, 2011 at 7:41 AM, Arnd Bergmann <arnd@arndb.de> wrote:
 
->1) add regulator definition for ads7846 into the board file
-There is no dedicated regulator on spitz, ADS7846 uses common always-on
-power supply.
+> A lot of people want to see a framework get merged, and I think it's
+> great that Sascha has volunteered to do the work to push that
+> through this time, especially since you have not been able to
+> finish your work.
 
->2) enable the CONFIG_REGULATOR_DUMMY in your kernel configuration
->3) use regulator_use_dummy_regulator() call in the board file.
+Sascha is wasting his time by reinventing the wheel.  He's traveling
+over exactly the same path I have already covered.  In fact, some of
+his reviewer comments are almost word-for-word the same as those I
+have received and addressed in the past.
 
-OK, I will do 2 or 3. In the new kernel spitz has a regulator, but it is
-not related to ADS7846. And it is actually broken:
+My patches were always kept current in this mailing list and others,
+and Sascha clearly has the skills necessary to make improvements and
+corrections should he have chosen to do so.
 
-I2C: i2c-0: PXA I2C adapter
-Resetting I2C Controller Unit
- (null): i2c_pxa_abort: called in slave mode
-i2c i2c-1: adapter [pxa_i2c-i2c.1] registered
-i2c 1-000c: uevent
-isl6271a 1-000c: probe
-i2c i2c-1: master_xfer[0] R, addr=0x0c, len=1
-i2c i2c-1: setting to bus master
-i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000442, ICR=000007e0, IBMR=03
-i2c i2c-1: state:i2c_pxa_irq_txempty:932: ISR=00000002, ICR=000007e0, IBMR=03
-i2c i2c-1: Retrying transmission
-i2c i2c-1: setting to bus master
-i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000045, ICR=000007e1, IBMR=00
-i2c i2c-1: state:i2c_pxa_irq_txempty:932: ISR=00000005, ICR=000017ee, IBMR=00
-i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000087, ICR=000017e6, IBMR=00
-print_constraints: vcc_core range: 850 <--> 1600 mV at 1350 mV 
-print_constraints: vcc_core range: 1100 mV 
-isl6271a 1-000c: Failed to set supply vcc_core
-isl6271a 1-000c: failed to register isl6271a
-isl6271a: probe of 1-000c failed with error -16
-i2c i2c-1: client [isl6271a] registered with bus id 1-000c
-I2C: i2c-1: PXA I2C adapter
-...
-cpufreq: Didn't find vcc_core regulator
+> What I think would be the best plan forward is to merge Sascha's
+> patches as soon as we can, then get all currently existing pwm
+> drivers converted to that and moved to drivers/pwm, and finally
+> do the interface changes that you have proposed earlier.
 
+That's a real duplication of work.  That makes no sense.
+
+> I would also hope that you can give constructive feedback to
+> the submission and point out potential problems that you see
+> where the code should be changed now in order to make your
+> interface changes more easy later.
+
+My code has already moved past that point.  And if I had the time to
+evaluate and improve Sascha's patches, I would have the time to finish
+my own.  Sascha is more than welcome to apply his efforts to the
+preexisting PWM API patches already present in the LKML archives.
+
+> I realize that it's annoying to spend a lot of time on a specific
+> implementation and then see competing code get merged.
+
+Annoyed isn't the word you are looking for.
+
+My code has been reviewed, tested and actively used as posted in LKML
+by several reviewers (including myself) in actual hardware.  We are
+consciously choosing to discard a known entity and restart the whole
+process with new code.  That's a waste of everyone's time and risk
+exposure.
+
+I don't consider Sascha's code to be "competing" with mine, as
+apparently nobody has bothered to consider one against the other.
+
+
+> Unfortunately,
+> this happens all the time, and the code we merge is often not
+> the one that has had the most effort spent on it, but the one that
+> looks most promising at the time when it gets merged.
+
+Your definition of "promsing" apparently correlates with "new and shiny".
+
+
+b.g.
 -- 
-Stanislav Brabec
-http://www.penguin.cz/~utx
+Bill Gatliff
+bgat at billgatliff.com
