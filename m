@@ -1,67 +1,43 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Thu, 30 Jun 2011 17:04:02 +0200
-Subject: [alsa-devel] [PATCH 1/5] ASoC: wm8731: rework power management
-In-Reply-To: <4E0C80B8.7030006@atmel.com>
-References: <1309370419-22810-1-git-send-email-nicolas.ferre@atmel.com>	<ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>	<20110629171148.GB10798@opensource.wolfsonmicro.com>
-	<4E0C80B8.7030006@atmel.com>
-Message-ID: <4E0C9062.4010901@atmel.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 30 Jun 2011 17:09:48 +0200
+Subject: kernel panic in spi_complete() on spitz (PXA270)
+In-Reply-To: <1309445118.4406.47.camel@oct.suse.cz>
+References: <1308845380.4533.54.camel@oct.suse.cz>
+	<201106301352.21684.marek.vasut@gmail.com>
+	<1309445118.4406.47.camel@oct.suse.cz>
+Message-ID: <201106301709.48818.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/06/2011 15:57, Nicolas Ferre :
-> Le 29/06/2011 19:11, Mark Brown :
->> On Wed, Jun 29, 2011 at 08:00:15PM +0200, Nicolas Ferre wrote:
->>
->> Don't mix multiple changes into a single patch!  There's no perceptible
->> code overlap between these so I don't understand why you've merged them,
->> it just makes review harder and the changelog less descriptive.
+On Thursday, June 30, 2011 04:45:18 PM Stanislav Brabec wrote:
+> Marek Vasut wrote:
+> > On Thursday, June 23, 2011 06:09:40 PM Stanislav Brabec wrote:
+> > > Hallo.
+> > > 
+> > > These Oops and kernel panic were observed on a Zaurus (spitz) machine
+> > > (ARMv5, PXA270).
+> > 
+> > Looks similar to "Re: [PATCH v2] Input: Make ADS7846 independent on
+> > regulator"
 > 
-> Ok.
+> I don't see any trace in that thread. But yes, I was testing your patch
+> from this thread. Without it, ADS7846 does not work on spitz (ADS7846
+> does not have any dedicated regulator there). I want to
+> add .needs_regulator bool to ads7846.c and send the patch again to the
+> list.
 > 
->>> - preserve crystal oscillator across suspend/resume sequence:
->>>   enabled by default, it should be kept enabled on resume.
->>
->> This isn't what your code does...
->>
->>>  		snd_soc_write(codec, WM8731_ACTIVE, 0x0);
->>> -		snd_soc_write(codec, WM8731_PWR, 0xffff);
->>> +		/* standby: keep crystal oscillator enabled */
->>> +		snd_soc_write(codec, WM8731_PWR, 0x00df);
->>
->> This doesn't keep the crystal oscillator enabled, this forces it on in
->> suspend (and without looking at the datasheet it also changes way more
->> than the one register bit I'd expect to be changed).  If the system
->> isn't using the oscillator then that's not good.
->>
->> I'd expect to see a change to using snd_soc_update_bits() based on your
->> description, or more likely something more involved.
+> After sending the trace I was able to reproduced it several times by
+> attaching of external charger.
 > 
-> First of all, I experienced issues while not having OSC enabled during suspend/resume cycle. Am I right supposing that, if using oscillator to clock the codec, I have to keep it running during a suspend/resume cycle?
+> Then I tried to apply "[PATCH] MAX1111: Fix race condition causing NULL
+> pointer exception", connected charger that periodically disconnects and
+> not seen the crash again. No OOPS was seen after ~100 reconnects.
 > 
-> Is something like this sounds like an acceptable option or we need something more sophisticated?
-> 
-> @@ -481,7 +481,10 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
->                 break;
->         case SND_SOC_BIAS_OFF:
->                 snd_soc_write(codec, WM8731_ACTIVE, 0x0);
-> -               snd_soc_write(codec, WM8731_PWR, 0xffff);
-> +               reg = 0xdf;
-> +               if (wm8731->sysclk_type == WM8731_SYSCLK_XTAL)
+> So I guess that MAX1111 AC voltage reading (via SPI) was involved in an
+> incorrect moment and race happened there and your MAX1111 race condition
+> fix fixes it.
 
-Actually it is: if... != WM8731_SYSCLK_XTAL
+It's not mine, it's from Pavel Herrmann actually ;-)
 
-> +                               reg |= 1 << 0x5;
-> +               snd_soc_update_bits(codec, WM8731_PWR, 0x00ff, reg);
-
-And maybe here a simple snd_soc_write() is sufficient...
-
->                 regulator_bulk_disable(ARRAY_SIZE(wm8731->supplies),
->                                        wm8731->supplies);
->                 break;
-> 
-> And, yes, there is only 8 bits dedicated to power down control in this register.
-> 
-> Best regards,
-
--- 
-Nicolas Ferre
+But yes, it's likely either this or the regulator stuff again (which I believed 
+was fixed).
