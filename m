@@ -1,46 +1,39 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Jun 2011 15:33:38 +0100
-Subject: [PATCH 4/4] mmci: fixup sg buffer handling in pio_write
-In-Reply-To: <1309247869-17220-1-git-send-email-linus.walleij@stericsson.com>
-References: <1309247869-17220-1-git-send-email-linus.walleij@stericsson.com>
-Message-ID: <20110630143338.GA21898@n2100.arm.linux.org.uk>
+From: utx@penguin.cz (Stanislav Brabec)
+Date: Thu, 30 Jun 2011 16:45:18 +0200
+Subject: kernel panic in spi_complete() on spitz (PXA270)
+In-Reply-To: <201106301352.21684.marek.vasut@gmail.com>
+References: <1308845380.4533.54.camel@oct.suse.cz>
+	<201106301352.21684.marek.vasut@gmail.com>
+Message-ID: <1309445118.4406.47.camel@oct.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 09:57:49AM +0200, Linus Walleij wrote:
-> From: Ulf Hansson <ulf.hansson@stericsson.com>
+Marek Vasut wrote:
+> On Thursday, June 23, 2011 06:09:40 PM Stanislav Brabec wrote:
+> > Hallo.
+> > 
+> > These Oops and kernel panic were observed on a Zaurus (spitz) machine
+> > (ARMv5, PXA270).
 > 
-> Earlier code in pio_write was expecting that each
-> scatter-gather buffer was 4-bytes aligned which is
-> not always the case, especially when dealing with long
-> chains of SDIO packages. This patch fix the problem by
-> using a 4 bytes buffer to cache unaligned data between
-> each unaligned pio_write operation.
-> 
-> In the last transaction we pad the last write access
-> with zeroes.
-> 
-> Remove older fix for ST Micro since it was not a
-> variant-specific problem.
+> Looks similar to "Re: [PATCH v2] Input: Make ADS7846 independent on regulator"
 
-This is horrid, and will probably cause MMCI to underrun on ARM platforms
-where it hasn't done so previously due to all the extra overhead at the
-start of the interrupt.
+I don't see any trace in that thread. But yes, I was testing your patch
+from this thread. Without it, ADS7846 does not work on spitz (ADS7846
+does not have any dedicated regulator there). I want to
+add .needs_regulator bool to ads7846.c and send the patch again to the
+list.
 
-Therefore, I don't think this is acceptable.
+After sending the trace I was able to reproduced it several times by
+attaching of external charger.
 
-Plus, what exactly is it trying to solve - writesl() handles unaligned
-buffers already.
+Then I tried to apply "[PATCH] MAX1111: Fix race condition causing NULL
+pointer exception", connected charger that periodically disconnects and
+not seen the crash again. No OOPS was seen after ~100 reconnects.
 
-> +		if (len > sg_miter->consumed)
-> +			len = sg_miter->consumed;
-> +		else
-> +			sg_miter->consumed = len;
+So I guess that MAX1111 AC voltage reading (via SPI) was involved in an
+incorrect moment and race happened there and your MAX1111 race condition
+fix fixes it.
 
-sg_miter is supposed to _always_ be written with the number of bytes
-consumed.  To start playing these games with it is inviting trouble,
-and to start return a length greater than 'remain' from mmci_pio_write
-is just silly.
-
-What is probably a better approach is to detect this condition when
-we receive the request, and copy the data into a bounce buffer.
+-- 
+Stanislav Brabec
+http://www.penguin.cz/~utx
