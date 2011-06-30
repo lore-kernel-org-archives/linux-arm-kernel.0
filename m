@@ -1,54 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2011 15:27:02 +0200
-Subject: [PATCH] ARM: automatically select OMAP3_PMU if we try to use perf
-	on OMAP3
-In-Reply-To: <CAK5ve-LQcY6XQENBJw6JaarLffULA7EtjJMxCtpzhwPCfs2OuA@mail.gmail.com>
-References: <1309268265-2685-1-git-send-email-bryan.wu@canonical.com>
-	<20110628135706.GA28871@e102144-lin.cambridge.arm.com>
-	<CAK5ve-LQcY6XQENBJw6JaarLffULA7EtjJMxCtpzhwPCfs2OuA@mail.gmail.com>
-Message-ID: <201106301527.02528.arnd@arndb.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 14:30:03 +0100
+Subject: [PATCH v8 00/12] use nonblock mmc requests to minimize latency
+In-Reply-To: <201106301512.46788.arnd@arndb.de>
+References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
+	<201106301512.46788.arnd@arndb.de>
+Message-ID: <20110630133003.GZ21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 June 2011, Bryan Wu wrote:
-> On Tue, Jun 28, 2011 at 9:57 PM, Will Deacon <will.deacon@arm.com> wrote:
-
-> >
-> > This issue has been discussed on the list in the past and I still think that
-> > it would be better for your config to select OMAP3_EMU explicitly. If we do
-> > that here unconditionally then we end up also bringing in OC_ETM which isn't
-> > something that sounds like a good idea (may have implications for power
-> > consumption in production hardware?).
-> >
-> I quite understand your concern. How about this one?
-> ----
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 2fd0911..e53f9e4 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -1084,10 +1084,10 @@ config XSCALE_PMU
->         default y
+On Thu, Jun 30, 2011 at 03:12:46PM +0200, Arnd Bergmann wrote:
+> I think this looks good enough to merge into the linux-mmc tree, the code is
+> clean and the benefits are clear.
 > 
->  config CPU_HAS_PMU
-> -       depends on (CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU) && \
-> -                  (!ARCH_OMAP3 || OMAP3_EMU)
-> +       depends on CPU_V6 || CPU_V6K || CPU_V7 || XSCALE_PMU
->         default y
->         bool
-> +       select OMAP3_EMU if (PERF_EVENTS && ARCH_OMAP3)
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > 
->  config MULTI_IRQ_HANDLER
->         bool
-> 
+> One logical follow-up as both a cleanup and performance optimization would be
+> to get rid of the mmc_queue_thread completely. When mmc_blk_issue_rq() is
+> non-blocking always, you can call it directly from the mmc_request()
+> function, instead of waking up another thread to do it for you.
 
-As far as I can tell, it still has the same issue. I think the existing
-code is better. If you want to support HW_PERF_EVENTS on OMAP3, just
-turn on OMAP3_EMU. Where's the problem with that?
+It isn't anywhere near that - because you need to wait for the
+request to complete, then analyze the results and if there has been
+an error, send more commands and wait for their response.
 
-In general, specifying clear dependencies is preferred over 'select'
-statements, which are the equivalent to the 'comefrom' statement
-in programming languages [1].
+To do all that in an asynchronous fashion will just create a mess of
+small little functions with hard to understand code.  It's far better
+to do all that in a clear procedural way in a thread.
 
-	Arnd
+We've been here before - with PCMCIA's card insertion code, where you
+have to go through a sequence of events (insert, power up, reset, etc).
+The PCMCIA code used to have a collection of small functions to do
+each step, one chained after the other in a state machine fashion.
+The result was horrid.  That's exactly what you'll end up with here.
 
-[1] http://en.wikipedia.org/wiki/COMEFROM
+Threads have their place, and this is one of them.
