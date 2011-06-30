@@ -1,23 +1,41 @@
-From: broonie@opensource.wolfsonmicro.com (Mark Brown)
-Date: Thu, 30 Jun 2011 08:22:07 -0700
-Subject: [PATCH 1/5] ASoC: wm8731: rework power management
-In-Reply-To: <4E0C80B8.7030006@atmel.com>
-References: <1309370419-22810-1-git-send-email-nicolas.ferre@atmel.com>
-	<ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
-	<20110629171148.GB10798@opensource.wolfsonmicro.com>
-	<4E0C80B8.7030006@atmel.com>
-Message-ID: <20110630152203.GB3249@opensource.wolfsonmicro.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 30 Jun 2011 18:25:51 +0300
+Subject: kernel panic in spi_complete() on spitz (PXA270)
+In-Reply-To: <1309445118.4406.47.camel@oct.suse.cz>
+References: <1308845380.4533.54.camel@oct.suse.cz>	
+	<201106301352.21684.marek.vasut@gmail.com>
+	<1309445118.4406.47.camel@oct.suse.cz>
+Message-ID: <4E0C957F.8080807@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 03:57:12PM +0200, Nicolas Ferre wrote:
+On 06/30/11 17:45, Stanislav Brabec wrote:
 
-Please fix your mailer to line wrap within paragraphs.
+> Marek Vasut wrote:
+>> On Thursday, June 23, 2011 06:09:40 PM Stanislav Brabec wrote:
+>>> Hallo.
+>>>
+>>> These Oops and kernel panic were observed on a Zaurus (spitz) machine
+>>> (ARMv5, PXA270).
+>> Looks similar to "Re: [PATCH v2] Input: Make ADS7846 independent on regulator"
+> I don't see any trace in that thread. But yes, I was testing your patch
+> from this thread. Without it, ADS7846 does not work on spitz (ADS7846
+> does not have any dedicated regulator there). I want to
+> add .needs_regulator bool to ads7846.c and send the patch again to the
+> list.
 
-> First of all, I experienced issues while not having OSC enabled during
-> suspend/resume cycle. Am I right supposing that, if using oscillator
-> to clock the codec, I have to keep it running during a suspend/resume
-> cycle?
+Please, don't...
+I thought we've finished discussing the regulator issue...
 
-No, not at all.  What makes you believe that you would you need to do
-that?
+Instead of patching the driver and the platform data and the board file,
+you should do _either_ of the following:
+1) add regulator definition for ads7846 into the board file
+2) enable the CONFIG_REGULATOR_DUMMY in your kernel configuration
+3) use regulator_use_dummy_regulator() call in the board file.
+
+Using either of the above, you will not need the patch for ads7846, only for the board file.
+
+
+-- 
+Regards,
+Igor.
