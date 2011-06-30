@@ -1,62 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Jun 2011 05:33:38 -0700
-Subject: [GIT PULL] omap clean-up for v3.1 merge window
-In-Reply-To: <201106301325.02204.arnd@arndb.de>
-References: <20110630091019.GJ23145@atomide.com>
-	<201106301325.02204.arnd@arndb.de>
-Message-ID: <20110630123338.GL23145@atomide.com>
+From: marek.vasut@gmail.com (Marek Vasut)
+Date: Thu, 30 Jun 2011 14:36:25 +0200
+Subject: [PATCH] MAX1111: Fix race condition causing NULL pointer exception
+In-Reply-To: <20110518214744.GA22034@atrey.karlin.mff.cuni.cz>
+References: <1305731918-20164-1-git-send-email-morpheus.ibis@gmail.com>
+	<20110518214744.GA22034@atrey.karlin.mff.cuni.cz>
+Message-ID: <201106301436.26105.marek.vasut@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Arnd Bergmann <arnd@arndb.de> [110630 04:20]:
-> On Thursday 30 June 2011, Tony Lindgren wrote:
+On Wednesday, May 18, 2011 11:47:44 PM Cyril Hrubis wrote:
+> Hi!
+> I've applied this patch over 2.6.39-rc3 and did couple of suspends. After
+> about ten of them I've got attached trace (instead of the usuall NULL
+> pointer dereference in complete()).
 > 
-> The cleanups all look great, with one exception (see below). In the
-> future, I'd prefer to get separate pull requests for cleanups and
-> bug fixes, but no need to worry about it this time.
+> And yes, the MMC is still broken after this change it seems that there are
+> more bugs in zaurus SPI drivers.
 
-Sure no problem.
- 
-> > I have not added this into linux next assuming that you will
-> > do it. If not, please let me know and I will add it.
-> 
-> Right, I'll ask Stephen to add the master branch of the arm-soc
-> tree to linux-next soon, after I've made sure that there are no
-> conflicts with existing branches that get merged there.
+Looks like corgi-bl, I think there was a patch for this I had, dunno if it was 
+applied.
 
-Thanks. It merged fine into yesterday's linux-next when I tried.
- 
-> For our upstream submission, my preference would be to send them
-> piecemeal to Linus and group them across the branches as
-> appropriate.
-
-Sure. We need to base omap board-*.c related changes on top of
-this branch though to avoid build failures with merges.
-
-> >       omap: Set separate timer init functions to avoid cpu_is_omap tests
-> 
-> This commit causes a build regression for me in some configurations.
-> If you agree, I'd apply this patch on top:
-> 
-> 8<-------
-> omap2+: fix build regression
-> 
-> board-generic.c now contains a reference to omap3_timer, but depends only
-> on ARCH_OMAP2, not on ARCH_OMAP3, which controls that symbol.
-> omap2_timer seems to be more appropriate anyway, so use that instead.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Thanks for fixing that, here's my ack:
-
-Acked-by: Tony Lindgren <tony@atomide.com>
- 
-> --- a/arch/arm/mach-omap2/board-generic.c
-> +++ b/arch/arm/mach-omap2/board-generic.c
-> @@ -72,5 +72,5 @@ MACHINE_START(OMAP_GENERIC, "Generic OMAP24xx")
->         .init_early     = omap_generic_init_early,
->         .init_irq       = omap2_init_irq,
->         .init_machine   = omap_generic_init,
-> -       .timer          = &omap3_timer,
-> +       .timer          = &omap2_timer,
->  MACHINE_END
+Eric, was that gpio_set_value_cansleep() for corgi-bl merged ?
