@@ -1,70 +1,61 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Thu, 30 Jun 2011 14:35:35 +0530
-Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
-	level
-In-Reply-To: <BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
-References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
-	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
-	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
-Message-ID: <BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 10:19:51 +0100
+Subject: [PATCH] mtd: OneNAND: samsung: Write DMA support
+In-Reply-To: <1309420530.23597.153.camel@sauron>
+References: <20110608101804.GA5527@july> <1309420530.23597.153.camel@sauron>
+Message-ID: <20110630091951.GQ21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 30, 2011 at 10:55:25AM +0300, Artem Bityutskiy wrote:
+> > +	/* Handle vmalloc address */
+> > +	if (buf >= high_memory) {
+> > +		struct page *page;
+> 
+> OK, Russell will yell at this, but we do DMA vmalloc'ed addresses for
 
-On Thu, Jun 30, 2011 at 12:38 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Thu, Jun 30, 2011 at 6:08 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
->> Fixed the bug in transmission status check for 64 bytes FIFO
->> level.
->>
->> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->> ---
->> ?drivers/spi/spi_s3c64xx.c | ? ?4 +---
->> ?1 files changed, 1 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.hc
->> index 795828b..8945e20 100644
->> --- a/drivers/spi/spi_s3c64xx.c
->> +++ b/drivers/spi/spi_s3c64xx.c
->> @@ -116,9 +116,7 @@
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(((i)->fifo_lvl_mask + 1))) \
->> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?? 1 : 0)
->>
->> -#define S3C64XX_SPI_ST_TX_DONE(v, i) ((((v) >> (i)->rx_lvl_offset) & \
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (((i)->fifo_lvl_mask + 1) << 1)) \
->> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1 : 0)
->> +#define S3C64XX_SPI_ST_TX_DONE(v, i) (((v) & (1 << (i)->tx_st_done)) ? 1 : 0)
->
-> IIRC the macro is already designed to deduct tx-done levels from other fields.
-> Could you please _explain_ with one example where it fails ? It is
-> difficult to see without
-> numbers.
-The existing macro fails for following scenarios.
-1) S5P64X0 channel 1
-2) S5PV210 channel 1
-3) S5PV310 channel 1 and channel 2
+I most certainly will, because its broken.
 
-The FIFO data level supported in the above SoCs either 64 or 256
-bytes depending on the channel. Because of this the TX_DONE
-is the 25 bit in the status register.
+> > +
+> > +		if (((size_t) buf & PAGE_MASK) !=
+> > +		    ((size_t) (buf + count - 1) & PAGE_MASK))
+> 
+> Something is fishy with these size_t casts, could you revisit this piece
+> of code - and turn it to something simpler, if possible?
+> 
+> > +			goto normal;
+> > +
+> > +		page = vmalloc_to_page(buf);
+> > +		if (unlikely(!page))
+> > +			goto normal;
+> > +
+> > +		/* Page offset */
+> > +		ofs = ((size_t) buf & ~PAGE_MASK);
+> > +		page_dma = 1;
+> > +
+> > +		/* DMA routine */
+> > +		dma_src = dma_map_page(dev, page, ofs, count, DMA_TO_DEVICE);
 
-The existing macro works for the following scenarios
-1) S3C6410 all channels
-2) S5PC100 all channels
+Which is that this code is trying to work around the restriction in the
+DMA API that dma_map_single() can only take virtual addresses in the
+kernel direct mapped region.
 
-The FIFO data level supported in the above SoCs 64 bytes
-on all the channels. Because of this the TX_DONE is the 21 bit
-in the status register.
+The key thing here is that with CPUs which lookup by virtual address,
+like ARMs, you _must_ handle the cache aliases associated with the mapping
+which you are accessing the memory via.
 
-So when we use the existing macro for the non-working SoCs
-it is not anding with the TX_DONE bit but it is only anding the bits
-earlier to TX_DONE bit.
+This means if you are accessing a DMA buffer at address X, and address X
+is cacheable, address X needs cache maintainence performed on it.  Address
+Y, which may correspond with the same memory as X through a different
+mapping is no good.  It has to be X.
 
->
-> Thanks,
-> -Jassi
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
+However, there is NO API for mapping DMA buffers from vmalloc space.
+What we do now have are a pair of functions which must be used _correctly_
+(iow, one before and one after) to ensure that virtual cached architectures
+can access the data correctly - and its documented at the bottom of
+cachetlb.txt.
+
+As this is something which keeps coming up in connection with MTD, it
+may be a good idea if MTD gave driver authors a helping hand with DMA
+setup/teardown so that the chances of driver authors getting this right
+is greater...
