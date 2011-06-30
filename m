@@ -1,33 +1,61 @@
-From: morpheus.ibis@gmail.com (Pavel Herrmann)
-Date: Thu, 30 Jun 2011 17:36:57 +0200
-Subject: kernel panic in spi_complete() on spitz (PXA270)
-In-Reply-To: <201106301709.48818.marek.vasut@gmail.com>
-References: <1308845380.4533.54.camel@oct.suse.cz>
-	<1309445118.4406.47.camel@oct.suse.cz>
-	<201106301709.48818.marek.vasut@gmail.com>
-Message-ID: <22208110.jIqhYvKY9h@bloomfield>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Thu, 30 Jun 2011 17:49:39 +0200
+Subject: [PATCH] ARM i.MX23/28: platform-mxsfb: Add missing include of
+	linux/dma-mapping.h
+In-Reply-To: <1309440903.22791.1.camel@phoenix>
+References: <1309440903.22791.1.camel@phoenix>
+Message-ID: <20110630154939.GN11559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, June 30, 2011 04:45:18 PM Stanislav Brabec wrote:
-> Then I tried to apply "[PATCH] MAX1111: Fix race condition causing NULL
-> pointer exception", connected charger that periodically disconnects and
-> not seen the crash again. No OOPS was seen after ~100 reconnects.
+On Thu, Jun 30, 2011 at 09:35:03PM +0800, Axel Lin wrote:
+> Fix below build error:
+>   CC      arch/arm/mach-mxs/devices/platform-mxsfb.o
+> arch/arm/mach-mxs/devices/platform-mxsfb.c: In function 'mx23_add_mxsfb':
+> arch/arm/mach-mxs/devices/platform-mxsfb.c:27: error: implicit declaration of function 'DMA_BIT_MASK'
+> make[2]: *** [arch/arm/mach-mxs/devices/platform-mxsfb.o] Error 1
+> make[1]: *** [arch/arm/mach-mxs/devices] Error 2
+> make: *** [arch/arm/mach-mxs] Error 2
+I bisected the problem and it occurs since 
+
+	b7f080c (net: remove mm.h inclusion from netdevice.h)
+
+which is currently in next (pulled in via net-next-2.6).
+
+Tested-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+
+Best regards
+Uwe
+ 
+> Signed-off-by: Axel Lin <axel.lin@gmail.com>
+> ---
+>  arch/arm/mach-mxs/devices/platform-mxsfb.c |    1 +
+>  1 files changed, 1 insertions(+), 0 deletions(-)
 > 
-> So I guess that MAX1111 AC voltage reading (via SPI) was involved in an
-> incorrect moment and race happened there and your MAX1111 race condition
-> fix fixes it.
+> diff --git a/arch/arm/mach-mxs/devices/platform-mxsfb.c b/arch/arm/mach-mxs/devices/platform-mxsfb.c
+> index bf72c9b..5a75b71 100644
+> --- a/arch/arm/mach-mxs/devices/platform-mxsfb.c
+> +++ b/arch/arm/mach-mxs/devices/platform-mxsfb.c
+> @@ -5,6 +5,7 @@
+>   * the terms of the GNU General Public License version 2 as published by the
+>   * Free Software Foundation.
+>   */
+> +#include <linux/dma-mapping.h>
+>  #include <asm/sizes.h>
+>  #include <mach/mx23.h>
+>  #include <mach/mx28.h>
+> -- 
+> 1.7.4.1
+> 
+> 
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
-Hi,
-
-Are you using the first or second version of the patch? if the former, please 
-use v2 (sent a few days later), which has solved the same problem by using a 
-mutex instead of allocating message data on stack (which is not good for DMA)
-
-as for the backstory, this crash ocurrs when a short (measured in time spent) 
-message was enqueued after a long message, so that the short one finished first 
-(the actual bug was present even if the long one finished first, but in that 
-case there was double complete() on the one completion instead of a NULL 
-dereference)
-
-Pavel
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
