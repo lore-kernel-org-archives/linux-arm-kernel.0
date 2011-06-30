@@ -1,83 +1,63 @@
-From: sourav.poddar@ti.com (Poddar, Sourav)
-Date: Thu, 30 Jun 2011 18:06:39 +0530
-Subject: [PATCH v8 00/12] use nonblock mmc requests to minimize latency
-In-Reply-To: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
-References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
-Message-ID: <BANLkTinSt3D+5r9bOL5rTjw5BiuiSDvGvA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 30 Jun 2011 14:41:24 +0200
+Subject: [PATCH 1/3] PWM: add pwm framework support
+In-Reply-To: <BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
+References: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
+	<1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
+	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
+Message-ID: <201106301441.24493.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Jun 28, 2011 at 1:41 PM, Per Forlin <per.forlin@linaro.org> wrote:
-> How significant is the cache maintenance over head?
-> It depends, the eMMC are much faster now
-> compared to a few years ago and cache maintenance cost more due to
-> multiple cache levels and speculative cache pre-fetch. In relation the
-> cost for handling the caches have increased and is now a bottle neck
-> dealing with fast eMMC together with DMA.
->
-> The intention for introducing non-blocking mmc requests is to minimize the
-> time between a mmc request ends and another mmc request starts. In the
-> current implementation the MMC controller is idle when dma_map_sg and
-> dma_unmap_sg is processing. Introducing non-blocking mmc request makes it
-> possible to prepare the caches for next job in parallel to an active
-> mmc request.
->
-> This is done by making the issue_rw_rq() non-blocking.
-> The increase in throughput is proportional to the time it takes to
-> prepare (major part of preparations is dma_map_sg and dma_unmap_sg)
-> a request and how fast the memory is. The faster the MMC/SD is
-> the more significant the prepare request time becomes. Measurements on U5500
-> and Panda on eMMC and SD shows significant performance gain for large
-> reads when running DMA mode. In the PIO case the performance is unchanged.
->
-> There are two optional hooks pre_req() and post_req() that the host driver
-> may implement in order to move work to before and after the actual mmc_request
-> function is called. In the DMA case pre_req() may do dma_map_sg() and prepare
-> the dma descriptor and post_req runs the dma_unmap_sg.
->
-> Details on measurements from IOZone and mmc_test:
-> https://wiki.linaro.org/WorkingGroups/Kernel/Specs/StoragePerfMMC-async-req
->
-> Changes since v7:
-> ?* rebase on mmc-next, on top of Russell's updated error handling.
-> ?* Clarify description of mmc_start_req()
-> ?* Resolve compile without CONFIG_DMA_ENIGNE issue for mmci
-> ?* Add mmc test to measure how performance is affected by sg length
-> ?* Add missing wait_for_busy in mmc_test non-blocking test. This call got lost
-> ? in v4 of this patchset when refactoring mmc_start_req.
-> ?* Add sub-prefix (core block queue) to relevant patches.
->
-> Per Forlin (12):
-> ?mmc: core: add non-blocking mmc request function
-> ?omap_hsmmc: add support for pre_req and post_req
-> ?mmci: implement pre_req() and post_req()
-> ?mmc: mmc_test: add debugfs file to list all tests
-> ?mmc: mmc_test: add test for non-blocking transfers
-> ?mmc: mmc_test: test to measure how sg_len affect performance
-> ?mmc: block: add member in mmc queue struct to hold request data
-> ?mmc: block: add a block request prepare function
-> ?mmc: block: move error code in issue_rw_rq to a separate function.
-> ?mmc: queue: add a second mmc queue request member
-> ?mmc: core: add random fault injection
-> ?mmc: block: add handling for two parallel block requests in
-> ? ?issue_rw_rq
->
-> ?drivers/mmc/card/block.c ? ? ?| ?505 ++++++++++++++++++++++++-----------------
-> ?drivers/mmc/card/mmc_test.c ? | ?491 ++++++++++++++++++++++++++++++++++++++--
-> ?drivers/mmc/card/queue.c ? ? ?| ?184 ++++++++++------
-> ?drivers/mmc/card/queue.h ? ? ?| ? 33 ++-
-> ?drivers/mmc/core/core.c ? ? ? | ?167 +++++++++++++-
-> ?drivers/mmc/core/debugfs.c ? ?| ? ?5 +
-> ?drivers/mmc/host/mmci.c ? ? ? | ?147 +++++++++++-
-> ?drivers/mmc/host/mmci.h ? ? ? | ? ?8 +
-> ?drivers/mmc/host/omap_hsmmc.c | ? 87 +++++++-
-> ?include/linux/mmc/core.h ? ? ?| ? ?6 +-
-> ?include/linux/mmc/host.h ? ? ?| ? 24 ++
-> ?lib/Kconfig.debug ? ? ? ? ? ? | ? 11 +
-> ?12 files changed, 1345 insertions(+), 323 deletions(-)
+On Thursday 30 June 2011, Bill Gatliff wrote:
+> I'm completely against this effort.
+> 
+> The objections to my submission weren't ever because I was changing
+> the user-visible API, so I don't think you can claim any advantage to
+> mine in that regard.
+> 
+> I will take some blame for not getting my API finished, but I have
+> been fighting some serious non-work issues that have consumed nearly
+> all of my available time--- including the professional time I would
+> otherwise have to invest in getting my code finished.
+> 
+> Is there the possibility that we could cooperate to get my patches
+> finished, rather than discarding and reinventing them completely?
 
+I've looked at your patches again, and it seems that you are doing
+two distinct changes, both good:
 
+1. You provide a generic framework for pwm drivers that makes it
+possible for multiple drivers to coexist and simplifies the way
+that these drivers interact with the core OS.
 
-Boot tested on Omap4430 Blaze board.
+2. You extend and fix a number of aspects in the global PWM API.
 
-Tested-by: Sourav Poddar<sourav.poddar@ti.com>
+Sascha's patch does only part 1, not part 2, but I don't think that
+makes his patches any worse. The introduction of the framework
+now is very similar to what you had suggested, and you should
+probably be mentioned in the changelog, even though the two
+implementations were done independently.
+
+A lot of people want to see a framework get merged, and I think it's
+great that Sascha has volunteered to do the work to push that
+through this time, especially since you have not been able to
+finish your work.
+
+What I think would be the best plan forward is to merge Sascha's
+patches as soon as we can, then get all currently existing pwm
+drivers converted to that and moved to drivers/pwm, and finally
+do the interface changes that you have proposed earlier.
+
+I would also hope that you can give constructive feedback to
+the submission and point out potential problems that you see
+where the code should be changed now in order to make your
+interface changes more easy later.
+
+I realize that it's annoying to spend a lot of time on a specific
+implementation and then see competing code get merged. Unfortunately,
+this happens all the time, and the code we merge is often not
+the one that has had the most effort spent on it, but the one that
+looks most promising at the time when it gets merged.
+
+	Arnd
