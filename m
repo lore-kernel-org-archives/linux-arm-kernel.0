@@ -1,73 +1,49 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Thu, 30 Jun 2011 09:55:01 +0200
-Subject: [PATCH v5 2/3] ARM: mxs/mx23evk: add GPMI-NFC device
-In-Reply-To: <1309406028-2924-3-git-send-email-b32955@freescale.com>
-References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
-	<1309406028-2924-3-git-send-email-b32955@freescale.com>
-Message-ID: <20110630075501.GE11559@pengutronix.de>
+From: shawn.guo@linaro.org (Shawn Guo)
+Date: Thu, 30 Jun 2011 16:06:33 +0800
+Subject: [PATCH] dmaengine: mxs-dma: skip request_irq for NO_IRQ
+In-Reply-To: <20110630052855.GE25931@S2100-06.ap.freescale.net>
+References: <20110630052855.GE25931@S2100-06.ap.freescale.net>
+Message-ID: <1309421193-7785-1-git-send-email-shawn.guo@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 11:53:47AM +0800, Huang Shijie wrote:
-> add the GPMI-NFC device for mx23evk borad.
-s/borad/board/
+In general, the mxs-dma users get separate irq for each channel,
+but gpmi is special one which has only one irq shared by all gpmi
+channels.  It causes mxs_dma channel allocation function fail for
+all other gpmi channels except the first one calling into the
+function.
 
-> Signed-off-by: Huang Shijie <b32955@freescale.com>
-> ---
->  arch/arm/mach-mxs/Kconfig        |    1 +
->  arch/arm/mach-mxs/mach-mx23evk.c |   37 +++++++++++++++++++++++++++++++++++++
->  2 files changed, 38 insertions(+), 0 deletions(-)
-> 
-> diff --git a/arch/arm/mach-mxs/Kconfig b/arch/arm/mach-mxs/Kconfig
-> index 1d3985f..f55bcfe 100644
-> --- a/arch/arm/mach-mxs/Kconfig
-> +++ b/arch/arm/mach-mxs/Kconfig
-> @@ -32,6 +32,7 @@ config MACH_MX23EVK
->  	select SOC_IMX23
->  	select MXS_HAVE_AMBA_DUART
->  	select MXS_HAVE_PLATFORM_AUART
-> +	select MXS_HAVE_PLATFORM_GPMI_NFC
->  	select MXS_HAVE_PLATFORM_MXS_MMC
->  	select MXS_HAVE_PLATFORM_MXSFB
->  	help
-> diff --git a/arch/arm/mach-mxs/mach-mx23evk.c b/arch/arm/mach-mxs/mach-mx23evk.c
-> index 3c2de33..772b373 100644
-> --- a/arch/arm/mach-mxs/mach-mx23evk.c
-> +++ b/arch/arm/mach-mxs/mach-mx23evk.c
-> @@ -107,6 +107,42 @@ static const iomux_cfg_t mx23evk_pads[] __initconst = {
->  		(MXS_PAD_4MA | MXS_PAD_3V3 | MXS_PAD_NOPULL),
->  };
->  
-> +/* gpmi-nfc */
-> +#define MXS_PAD_GPMI_NFC	(MXS_PAD_12MA | MXS_PAD_3V3 | MXS_PAD_NOPULL)
-Maybe put that into a more central place, as mach-mx28evk uses it, too?
-OTOH the name sounds more generic than its use. Do you really need 12mA
-for the Write protect pin? If not, you could rename it to
-MXS_PAD_GPMI_NFC_STROBE.
+The patch gets request_irq call skipped for NO_IRQ case, and leaves
+this gpmi specific quirk to gpmi driver to sort out.  It will fix
+above problem if gpmi driver sets chan_irq as gpmi irq for only one
+channel and NO_IRQ for all the rest channels.
 
-> +static iomux_cfg_t mx23evk_gpmi_nfc_pads[] = {
-> +	MX23_PAD_GPMI_D00__GPMI_D00 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_D01__GPMI_D01 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_D02__GPMI_D02 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_D03__GPMI_D03 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_D04__GPMI_D04 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_D05__GPMI_D05 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_D06__GPMI_D06 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_D07__GPMI_D07 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_CLE__GPMI_CLE | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_ALE__GPMI_ALE | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_WPN__GPMI_WPN | MXS_PAD_GPMI_NFC,
-> +	MX23_PAD_GPMI_WRN__GPMI_WRN | MXS_PAD_GPMI_NFC,
-> +	MX23_PAD_GPMI_RDN__GPMI_RDN | MXS_PAD_GPMI_NFC,
-> +	MX23_PAD_GPMI_RDY0__GPMI_RDY0 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_RDY1__GPMI_RDY1 | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_CE0N__GPMI_CE0N | MXS_PAD_CTRL,
-> +	MX23_PAD_GPMI_CE1N__GPMI_CE1N | MXS_PAD_CTRL,
-> +};
+Signed-off-by: Shawn Guo <shawn.guo@linaro.org>
+Cc: Vinod Koul <vinod.koul@intel.com>
+---
+ drivers/dma/mxs-dma.c |   10 ++++++----
+ 1 files changed, 6 insertions(+), 4 deletions(-)
 
-Best regards
-Uwe
-
+diff --git a/drivers/dma/mxs-dma.c b/drivers/dma/mxs-dma.c
+index 88aad4f..2870d91 100644
+--- a/drivers/dma/mxs-dma.c
++++ b/drivers/dma/mxs-dma.c
+@@ -327,10 +327,12 @@ static int mxs_dma_alloc_chan_resources(struct dma_chan *chan)
+ 
+ 	memset(mxs_chan->ccw, 0, PAGE_SIZE);
+ 
+-	ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
+-				0, "mxs-dma", mxs_dma);
+-	if (ret)
+-		goto err_irq;
++	if (mxs_chan->chan_irq != NO_IRQ) {
++		ret = request_irq(mxs_chan->chan_irq, mxs_dma_int_handler,
++					0, "mxs-dma", mxs_dma);
++		if (ret)
++			goto err_irq;
++	}
+ 
+ 	ret = clk_enable(mxs_dma->clk);
+ 	if (ret)
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.7.4.1
