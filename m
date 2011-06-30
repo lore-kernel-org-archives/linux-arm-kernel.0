@@ -1,95 +1,71 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Jun 2011 10:00:13 +0100
-Subject: [PATCH 2/3] Samsung SoC: ready to use NTC value inside kernel
-In-Reply-To: <1309422387-11546-3-git-send-email-myungjoo.ham@samsung.com>
-References: <1309422387-11546-1-git-send-email-myungjoo.ham@samsung.com>
-	<1309422387-11546-3-git-send-email-myungjoo.ham@samsung.com>
-Message-ID: <20110630090013.GP21898@n2100.arm.linux.org.uk>
+From: myungjoo.ham@gmail.com (MyungJoo Ham)
+Date: Thu, 30 Jun 2011 18:03:06 +0900
+Subject: [PATCH v3 1/6] Samsung SoC ADC: use regulator (VDD for ADC).
+In-Reply-To: <201106301122.50800.anarsoul@gmail.com>
+References: <1309420175-10301-1-git-send-email-myungjoo.ham@samsung.com>
+	<1309420175-10301-2-git-send-email-myungjoo.ham@samsung.com>
+	<201106301122.50800.anarsoul@gmail.com>
+Message-ID: <BANLkTimwqF3APEbJnTGcO5mh+AnS=N787g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 05:26:26PM +0900, MyungJoo Ham wrote:
-> diff --git a/arch/arm/plat-samsung/dev-adc.c b/arch/arm/plat-samsung/dev-adc.c
-> index 622972c..526097a 100644
-> --- a/arch/arm/plat-samsung/dev-adc.c
-> +++ b/arch/arm/plat-samsung/dev-adc.c
-> @@ -22,6 +22,8 @@
->  #include <plat/devs.h>
->  #include <plat/cpu.h>
->  
-> +#include "../../../fs/sysfs/sysfs.h"
+On Thu, Jun 30, 2011 at 5:22 PM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> On Thursday 30 June 2011 10:49:30 MyungJoo Ham wrote:
+>> This patch allows the Samsung ADC driver to enable VDD regulator at
+>> probe and resume and to disable at exit and suspend.
+>> In a platform where ADC's VDD regulator is not "always-on", this control
+>> is required although this patch does not provide fine-grained power
+>> control (turning on the regulator only when being accessed).
+>>
+>> However, if VDD regulator ("vdd" for the adc device) is not provided,
+>> the regulator control will not be activated because there are platforms
+>> that do not provide regulator for ADC device.
+>>
+>> arch_initcall has been modified to module_init in order to allow
+>> regulators to be available at probe.
+>>
+>> Signed-off-by: MyungJoo Ham <myungjoo.ham@samsung.com>
+>> Signed-off-by: Kyungmin Park <kyungmin.park@samsung.com>
+[]
+>> + ? ? adc->vdd = regulator_get(dev, "vdd");
+>> + ? ? if (IS_ERR(adc->vdd)) {
+>> + ? ? ? ? ? ? dev_err(dev, "operating without regulator \"vdd\" .\n");
+>> + ? ? ? ? ? ? ret = PTR_ERR(adc->vdd);
+>> + ? ? ? ? ? ? goto err_alloc;
+>> + ? ? }
+>> +
+>
+> NACK. Make it optional, otherwise it breaks s3c24xx.
+>
 
-That is a big hint that you're doing something wrong.
+Ok. Now, I've got the issue I've worried in the previous patch revision.
 
-> @@ -101,3 +103,63 @@ struct platform_device s3c_device_adc_ntc_thermistor = {
->  		.platform_data = &ntc_adc_pdata,
->  	},
->  };
-> +
-> +static struct device_attribute *ntc_attr;
-> +
-> +static int init_s3c_adc_ntc_read(void)
-> +{
-> +	struct kobject *ntc;
-> +	struct sysfs_dirent *ntc_d;
-> +
-> +	ntc = &s3c_device_adc_ntc_thermistor.dev.kobj;
-> +	ntc_d = sysfs_get_dirent(ntc->sd, get_ktype(ntc)->namespace(ntc),
-> +				 "temp1_input");
-> +	if (!ntc_d || sysfs_type(ntc_d) != SYSFS_KOBJ_ATTR) {
-> +		dev_err(&s3c_device_adc_ntc_thermistor.dev,
-> +			"Cannot initialize thermistor dirent info.\n");
-> +		if (ntc_d)
-> +			sysfs_put(ntc_d);
-> +		return -ENODEV;
-> +	}
-> +	ntc_attr = container_of(ntc_d->s_attr.attr, struct device_attribute,
-> +				attr);
-> +
-> +	sysfs_put(ntc_d);
-> +	if (IS_ERR(ntc_attr)) {
-> +		dev_err(&s3c_device_adc_ntc_thermistor.dev,
-> +			"Cannot access NTC thermistor.\n");
-> +		return PTR_ERR(ntc_attr);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +/* A helper function to read values from NTC, in 1/1000 Centigrade */
-> +int read_s3c_adc_ntc(int *mC)
-> +{
-> +	char buf[32];
-> +	int ret;
-> +
-> +	/* init should be done after ADC and NTC are probed */
-> +	if (ntc_attr == NULL) {
-> +		ret = init_s3c_adc_ntc_read();
-> +		if (ret) {
-> +			if (ntc_attr == NULL)
-> +				ntc_attr = ERR_PTR(ret);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	if (IS_ERR(ntc_attr))
-> +		return -ENODEV;
-> +
-> +	if (!ntc_attr->show)
-> +		return -EINVAL;
-> +
-> +	ret = ntc_attr->show(&s3c_device_adc_ntc_thermistor.dev, ntc_attr, buf);
-> +	if (ret < 0)
-> +		return ret;
-> +	sscanf(buf, "%d", mC);
-> +
-> +	return 0;
-> +}
+Anyway, Mark once stated:
+--- quote starts ---
+On Sun, Jun 19, 2011 at 12:06 AM, Mark Brown
+<broonie@opensource.wolfsonmicro.com> wrote:
+>> +     if (IS_ERR_OR_NULL(adc->vdd)) {
+>> +             dev_dbg(dev, "operating without regulator %s.\n", S3C_ADC_REGULATOR_NAME);
+>> +             adc->vdd = NULL; /* Do not control regulator */
+>> +     }
+>> +
+>
+> No, don't do this.  Just unconditionally assume the regulator is present
+> if power is essential for use of the device.  The regulator API will
+> stub out correctly if it's not in use to allow things to proceed and if
+> vdd is genuinely not hooked up then the driver can't function.
+--- quote ends ---
 
-This is wrong on just about every level.  It needs to be rewritten to
-avoid poking about in subsystem internal data structures, and you really
-should not be sprint-ing a value to only sscanf it later.
+Then, how about unconditionally using ADC VDD for TYPE_ADCV3
+(S5PC110/S5PV210/Exynos4210) and forget VDD for older ADC types?
 
-Plus, container_of doesn't return a pointer-error code.
 
-You need to come up with a far better way of doing this altogether.
+Thanks.
+
+- MyungJoo
+-- 
+MyungJoo Ham, Ph.D.
+Mobile Software Platform Lab,
+Digital Media and Communications (DMC) Business
+Samsung Electronics
+cell: 82-10-6714-2858
