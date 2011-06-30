@@ -1,63 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2011 14:41:24 +0200
-Subject: [PATCH 1/3] PWM: add pwm framework support
-In-Reply-To: <BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
-References: <1309430517-23821-1-git-send-email-s.hauer@pengutronix.de>
-	<1309430517-23821-2-git-send-email-s.hauer@pengutronix.de>
-	<BANLkTikQGFA7XcuAtEEi7_4m-j6-00sZ6Q@mail.gmail.com>
-Message-ID: <201106301441.24493.arnd@arndb.de>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 30 Jun 2011 15:49:41 +0200
+Subject: [PATCH V2] MMC: PM: add suspend/resume in atmel-mci
+In-Reply-To: <201106292339.12402.rjw@sisk.pl>
+References: <201106292339.12402.rjw@sisk.pl>
+Message-ID: <1309441781-11012-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 June 2011, Bill Gatliff wrote:
-> I'm completely against this effort.
-> 
-> The objections to my submission weren't ever because I was changing
-> the user-visible API, so I don't think you can claim any advantage to
-> mine in that regard.
-> 
-> I will take some blame for not getting my API finished, but I have
-> been fighting some serious non-work issues that have consumed nearly
-> all of my available time--- including the professional time I would
-> otherwise have to invest in getting my code finished.
-> 
-> Is there the possibility that we could cooperate to get my patches
-> finished, rather than discarding and reinventing them completely?
+Take care of slots while going to suspend state.
 
-I've looked at your patches again, and it seems that you are doing
-two distinct changes, both good:
+Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+V2: move to pm_ops
 
-1. You provide a generic framework for pwm drivers that makes it
-possible for multiple drivers to coexist and simplifies the way
-that these drivers interact with the core OS.
+ drivers/mmc/host/atmel-mci.c |   47 ++++++++++++++++++++++++++++++++++++++++++
+ 1 files changed, 47 insertions(+), 0 deletions(-)
 
-2. You extend and fix a number of aspects in the global PWM API.
-
-Sascha's patch does only part 1, not part 2, but I don't think that
-makes his patches any worse. The introduction of the framework
-now is very similar to what you had suggested, and you should
-probably be mentioned in the changelog, even though the two
-implementations were done independently.
-
-A lot of people want to see a framework get merged, and I think it's
-great that Sascha has volunteered to do the work to push that
-through this time, especially since you have not been able to
-finish your work.
-
-What I think would be the best plan forward is to merge Sascha's
-patches as soon as we can, then get all currently existing pwm
-drivers converted to that and moved to drivers/pwm, and finally
-do the interface changes that you have proposed earlier.
-
-I would also hope that you can give constructive feedback to
-the submission and point out potential problems that you see
-where the code should be changed now in order to make your
-interface changes more easy later.
-
-I realize that it's annoying to spend a lot of time on a specific
-implementation and then see competing code get merged. Unfortunately,
-this happens all the time, and the code we merge is often not
-the one that has had the most effort spent on it, but the one that
-looks most promising at the time when it gets merged.
-
-	Arnd
+diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
+index aa8039f..058f1842 100644
+--- a/drivers/mmc/host/atmel-mci.c
++++ b/drivers/mmc/host/atmel-mci.c
+@@ -1878,10 +1878,57 @@ static int __exit atmci_remove(struct platform_device *pdev)
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int atmci_suspend(struct device *dev)
++{
++	struct atmel_mci *host = dev_get_drvdata(dev);
++	struct atmel_mci_slot *slot;
++	int i, ret;
++
++	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
++		slot = host->slot[i];
++		if (!slot)
++			continue;
++		ret = mmc_suspend_host(slot->mmc);
++		if (ret < 0) {
++			while (--i >= 0) {
++				slot = host->slot[i];
++				if (slot)
++					mmc_resume_host(host->slot[i]->mmc);
++			}
++			return ret;
++		}
++	}
++
++	return 0;
++}
++
++static int atmci_resume(struct device *dev)
++{
++	struct atmel_mci *host = dev_get_drvdata(dev);
++	struct atmel_mci_slot *slot;
++	int i, ret;
++
++	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
++		slot = host->slot[i];
++		if (!slot)
++			continue;
++		ret = mmc_resume_host(slot->mmc);
++		if (ret < 0)
++			return ret;
++	}
++
++	return 0;
++}
++#endif
++static SIMPLE_DEV_PM_OPS(atmci_pm, atmci_suspend, atmci_resume);
++
++
+ static struct platform_driver atmci_driver = {
+ 	.remove		= __exit_p(atmci_remove),
+ 	.driver		= {
+ 		.name		= "atmel_mci",
++		.pm		= &atmci_pm,
+ 	},
+ };
+ 
+-- 
+1.7.3
