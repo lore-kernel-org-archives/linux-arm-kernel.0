@@ -1,46 +1,26 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Thu, 30 Jun 2011 14:57:43 +0530
-Subject: [PATCH 0/7] ARM: SAMSUNG: Cleanup SPI platform specific code
-In-Reply-To: <BANLkTin2MAsTn3UhJDOLVvsams=xRR=REQ@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 10:30:24 +0100
+Subject: [PATCH 3/7] ARM: SAMSUNG: Add SPI clock definitions for
+	SAMSUNG SoCs
+In-Reply-To: <1309436723-662-4-git-send-email-padma.v@samsung.com>
 References: <1309436723-662-1-git-send-email-padma.v@samsung.com>
-	<BANLkTin2MAsTn3UhJDOLVvsams=xRR=REQ@mail.gmail.com>
-Message-ID: <BANLkTimaMiFgKa95Zm4AtQVFdbSqukBfwg@mail.gmail.com>
+	<1309436723-662-4-git-send-email-padma.v@samsung.com>
+Message-ID: <20110630093024.GT21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Jun 30, 2011 at 08:25:19AM -0400, Padmavathi Venna wrote:
+> SPI Clocks were defined in dev-spi.c of machine specific folder.
+> To make SPI devices common across all SoCs,dev-spi.c is moved
+> from machine specific folder to plat-samsung. So SPI clock
+> definitions has been moved from dev-spi.c to SoC specific machine
+> folder for S3C64XX,S5P64X0,S5PC100 and S5PV210
 
-On Thu, Jun 30, 2011 at 1:01 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Thu, Jun 30, 2011 at 5:55 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
->> This patchset does the following:
->>
->> 1. Move duplicated code to common place
->> [PATCH 1/7] ARM: SAMSUNG: Move SPI device definitions to plat-samsung
->> SPI platform devices are defined in respective machine folder of
->> Samsung S3C64XX and S5P series SoCs.This is duplicated for every SoC.
->> So all SPI platform devices are moved to a common place.
->
-> The machine specific code is put in machine specific location for some reason.
-> And the code is not duplicated, it's mostly data structures
-> initialized with machine
-> specific values.
->
-> Have you considered if it would still be possible to build kernel
-> image supporting
-> more than 1 soc after your changes ?
-I didn't consider the single image scenario. Because as far as I know,
-the existing Samsung code doesn't have support for building a single kernel
-image for multiple SoCs.
+This just shows how sick the Samsung code is by abusing the clk API.
+If it stopped that abuse and switched over to clkdev none of this would
+be necessary.
 
-The intention behind my changes were
-1) To reuse the dev-spi files for all the SoCs, as this reduces the code size.
-Also future SoCs with SPI can use the same file.
-2) To be in line with other IPs like i2c,sdhci etc
-
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at ?http://vger.kernel.org/majordomo-info.html
->
-Thanks&Regards
-Padma
+So I'm going to NAK this until the Samsung clk code moves over to clkdev.
+Sorry, I've made enough requests of Samsung people to do this, and its
+time for more effective persuasion by standing in the way of other patches
+to make it happen.
