@@ -1,87 +1,94 @@
-From: daiane.angolini@freescale.com (Daiane Angolini)
-Date: Thu, 30 Jun 2011 14:41:46 -0300
-Subject: [PATCH] ARM: mach-mx5/mx53_ard: Add gpio_keys support
-Message-ID: <1309455706-9509-1-git-send-email-daiane.angolini@freescale.com>
+From: grinberg@compulab.co.il (Igor Grinberg)
+Date: Thu, 30 Jun 2011 20:40:40 +0300
+Subject: kernel panic in spi_complete() on spitz (PXA270)
+In-Reply-To: <1309450406.4406.59.camel@oct.suse.cz>
+References: <1308845380.4533.54.camel@oct.suse.cz>	
+	<201106301352.21684.marek.vasut@gmail.com>	
+	<1309445118.4406.47.camel@oct.suse.cz>
+	<4E0C957F.8080807@compulab.co.il>
+	<1309450406.4406.59.camel@oct.suse.cz>
+Message-ID: <4E0CB518.2080703@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Daiane Angolini <daiane.angolini@freescale.com>
----
- arch/arm/mach-mx5/Kconfig          |    1 +
- arch/arm/mach-mx5/board-mx53_ard.c |   35 +++++++++++++++++++++++++++++++++++
- 2 files changed, 36 insertions(+), 0 deletions(-)
+On 06/30/11 19:13, Stanislav Brabec wrote:
 
-diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
-index 6a47d4c..b4e7c58 100644
---- a/arch/arm/mach-mx5/Kconfig
-+++ b/arch/arm/mach-mx5/Kconfig
-@@ -216,6 +216,7 @@ config MACH_MX53_ARD
- 	select IMX_HAVE_PLATFORM_IMX_I2C
- 	select IMX_HAVE_PLATFORM_IMX_UART
- 	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
-+	select IMX_HAVE_PLATFORM_GPIO_KEYS
- 	help
- 	  Include support for MX53 ARD platform. This includes specific
- 	  configurations for the board and its peripherals.
-diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
-index 280cefc..e2b8b2f 100644
---- a/arch/arm/mach-mx5/board-mx53_ard.c
-+++ b/arch/arm/mach-mx5/board-mx53_ard.c
-@@ -39,6 +39,11 @@
- #define ARD_SD1_CD		IMX_GPIO_NR(1, 1)
- #define ARD_SD1_WP		IMX_GPIO_NR(1, 9)
- #define ARD_I2CPORTEXP_B	IMX_GPIO_NR(2, 3)
-+#define ARD_VOLUMEDOWN		IMX_GPIO_NR(4, 0)
-+#define ARD_HOME			IMX_GPIO_NR(5, 10)
-+#define ARD_BACK			IMX_GPIO_NR(5, 11)
-+#define ARD_PROG			IMX_GPIO_NR(5, 12)
-+#define ARD_VOLUMEUP		IMX_GPIO_NR(5, 13)
- 
- static iomux_v3_cfg_t mx53_ard_pads[] = {
- 	/* UART1 */
-@@ -91,6 +96,35 @@ static iomux_v3_cfg_t mx53_ard_pads[] = {
- 	/* I2C3 */
- 	MX53_PAD_GPIO_3__I2C3_SCL,
- 	MX53_PAD_GPIO_16__I2C3_SDA,
-+	/* GPIO */
-+	MX53_PAD_DISP0_DAT16__GPIO5_10,	/* home */
-+	MX53_PAD_DISP0_DAT17__GPIO5_11,	/* back */
-+	MX53_PAD_DISP0_DAT18__GPIO5_12,	/* prog */
-+	MX53_PAD_DISP0_DAT19__GPIO5_13,	/* vol up */
-+	MX53_PAD_GPIO_10__GPIO4_0,		/* vol down */
-+};
-+
-+#define GPIO_BUTTON(gpio_num, ev_code, act_low, descr, wake)	\
-+{							\
-+	.gpio		= gpio_num,				\
-+	.type		= EV_KEY,				\
-+	.code		= ev_code,				\
-+	.active_low	= act_low,				\
-+	.desc		= "btn " descr,			\
-+	.wakeup		= wake,					\
-+}
-+
-+static struct gpio_keys_button ard_buttons[] = {
-+	GPIO_BUTTON(ARD_HOME, KEY_HOME, 1, "home", 0),
-+	GPIO_BUTTON(ARD_BACK, KEY_BACK, 1, "back", 0),
-+	GPIO_BUTTON(ARD_PROG, KEY_PROGRAM, 1, "program", 0),
-+	GPIO_BUTTON(ARD_VOLUMEUP, KEY_VOLUMEUP, 1, "volume-up", 0),
-+	GPIO_BUTTON(ARD_VOLUMEDOWN, KEY_VOLUMEDOWN, 1, "volume-down", 0),
-+};
-+
-+static const struct gpio_keys_platform_data ard_button_data __initconst = {
-+	.buttons        = ard_buttons,
-+	.nbuttons       = ARRAY_SIZE(ard_buttons),
- };
- 
- static struct resource ard_smsc911x_resources[] = {
-@@ -199,6 +233,7 @@ static void __init mx53_ard_board_init(void)
- 	imx53_add_imx2_wdt(0, NULL);
- 	imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
- 	imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
-+	imx_add_gpio_keys(&ard_button_data);
- }
- 
- static void __init mx53_ard_timer_init(void)
+> Igor Grinberg wrote:
+>> On 06/30/11 17:45, Stanislav Brabec wrote:
+>> I want to
+>>> add .needs_regulator bool to ads7846.c and send the patch again to the
+>>> list.
+>> Please, don't...
+>> I thought we've finished discussing the regulator issue...
+> The discussion ended without a fix (at least for spitz).
+
+Well, the discussion was mainly about how the regulator API should be used.
+The proposed patch, used the regulator API incorrectly.
+If I recall correctly, in the end of the discussion,
+Mark provided another option for configuring the regulator API,
+which is number 3 below.
+
+>  I seen two
+> proposals:
+> - As ADS7846 hardware does not require dedicated regulator, don't
+>   require it in driver and fail only on platforms that have a dedicated
+>   regulator.
+
+The thing is that ads7846 chip itself just requires power supply
+(as most of the peripheral chips), the one who decides if it will be switchable
+is the board vendor and the vendor may use any source for the power supply.
+It can be fixed, it can be some kind of discrete LDO or one of the power
+supplies coming from the system PMIC.
+The ads7846 driver provides the regulator functionality via the regulator API
+and it is up to board code to provide the appropriate regulator definitions or
+configure the regulator API so the ads7846 will function correctly.
+
+> - Use dummy regulators for all platforms without dedicated ADS7846
+>   regulator.
+
+IMO, this is the right way.
+
+>> 1) add regulator definition for ads7846 into the board file
+> There is no dedicated regulator on spitz, ADS7846 uses common always-on
+> power supply.
+
+Mark,
+
+Is there a kind of regulator for this case (except dummy)?
+Some kind of fixed regulator which is not binded to any supply?
+
+>> 2) enable the CONFIG_REGULATOR_DUMMY in your kernel configuration
+>> 3) use regulator_use_dummy_regulator() call in the board file.
+> OK, I will do 2 or 3. In the new kernel spitz has a regulator, but it is
+> not related to ADS7846. And it is actually broken:
+>
+> I2C: i2c-0: PXA I2C adapter
+> Resetting I2C Controller Unit
+>  (null): i2c_pxa_abort: called in slave mode
+> i2c i2c-1: adapter [pxa_i2c-i2c.1] registered
+> i2c 1-000c: uevent
+> isl6271a 1-000c: probe
+> i2c i2c-1: master_xfer[0] R, addr=0x0c, len=1
+> i2c i2c-1: setting to bus master
+> i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000442, ICR=000007e0, IBMR=03
+> i2c i2c-1: state:i2c_pxa_irq_txempty:932: ISR=00000002, ICR=000007e0, IBMR=03
+> i2c i2c-1: Retrying transmission
+> i2c i2c-1: setting to bus master
+> i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000045, ICR=000007e1, IBMR=00
+> i2c i2c-1: state:i2c_pxa_irq_txempty:932: ISR=00000005, ICR=000017ee, IBMR=00
+> i2c i2c-1: state:i2c_pxa_handler:981: ISR=00000087, ICR=000017e6, IBMR=00
+> print_constraints: vcc_core range: 850 <--> 1600 mV at 1350 mV 
+> print_constraints: vcc_core range: 1100 mV 
+> isl6271a 1-000c: Failed to set supply vcc_core
+> isl6271a 1-000c: failed to register isl6271a
+> isl6271a: probe of 1-000c failed with error -16
+> i2c i2c-1: client [isl6271a] registered with bus id 1-000c
+> I2C: i2c-1: PXA I2C adapter
+> ...
+> cpufreq: Didn't find vcc_core regulator
+
+This looks like the regulator definitions for spitz are broken and need to be fixed.
+
 -- 
-1.7.4.1
+Regards,
+Igor.
