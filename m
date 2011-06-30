@@ -1,198 +1,104 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Jun 2011 12:36:25 +0200
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <BANLkTinfKCMcutMDQ+mpdD4EUy9mCpZs+w@mail.gmail.com>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201106292329.44447.arnd@arndb.de>
-	<BANLkTinfKCMcutMDQ+mpdD4EUy9mCpZs+w@mail.gmail.com>
-Message-ID: <201106301236.25822.arnd@arndb.de>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Thu, 30 Jun 2011 16:07:10 +0530
+Subject: [PATCH] ARM:SAMSUNG: DMA Cleanup as per sparse
+In-Reply-To: <1309428980-20176-1-git-send-email-sangwook.lee@linaro.org>
+References: <1309428980-20176-1-git-send-email-sangwook.lee@linaro.org>
+Message-ID: <BANLkTimCWFP18o7ZmO5puzs2HMU+DmkfAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 30 June 2011, Barry Song wrote:
+On Thu, Jun 30, 2011 at 3:46 PM, Sangwook Lee <sangwook.lee@linaro.org> wrote:
+> Function declaration differs between file:s3c-pl330.c and file:dma.h
+> and SPARSE (Documentation/sparse.txt) gives error messages
+>
+> Signed-off-by: Sangwook Lee <sangwook.lee@linaro.org>
 
-> > Is this really just one bus with a huge address space, or rather some
-> > nested buses? I'd prefer to have the device tree representation as
-> > close as possible to the actual layout.
-> 
-> there are two AXI buses in prima2. AXI-1 connect to memory, AXI-2 is
-> transferred to CSR self-defined IOBUS by CPUIF, then 1 intterupt
-> controller and 9 IO bridges are connected to the IOBUS .
-> The 9 IO bridges are SYSIOBG, PERIIOBG,CPURTCIOBG, UUSIOBG, GRAPHIOBG,
-> MEDIAIOBG, DSPIOBG, DISPIOBG, MEMIOBG. Every iobrg connect to a group
-> of controllers.
-> For example, DISPIOBG connect to VPP and LCD, SYSIOBG connect to CLKC,
-> RSTC, RSC and CPHIFBG, DSPIOBG connect to DSPIF, GPS and DSP.
-> PERIIOBG connect to TIMER, NAND, AUDIO, UART0, UART1, UART2, USP0,
-> USP1, USP2, SPI0, I2C0, I2C1, GPIO, *SYS2PCI* and so on. Then
-> *SYS2PCI* connect to SD.
-> 
-> The indendation descible the device hierarchy
-> AXI-1
->          Memory
-> AXI-2
->          interrupt controller
->          IOBG...
->                   xxxx
->          IOBG...
->                   xxxx
->          IOBG...
->                   xxxx
->          IOBG...
->                   xxxx
->          IOBG...
->                   xxxx
->          IOBG...
->                   SYS2PCI
->                             SD
-> 
-> i have get the IC guy Weizeng involved, maybe he can explain better than me :-)
+Acked-by: Jassi Brar <jassisinghbrar@gmail.com>
 
-I think it would be good to represent the IOBG devices in the device tree then.
-You don't need to represent AXI-1 because memory is special anyway, and I would
-not bother to list SYS2PCI if the intention of that block was to hide the fact
-that it's PCI behind it. Properly instantiating it as a PCI bridge would be
-a lot of work that is probably not worth it.
-
-My usual plea to hardware developers: Please make the registers
-autodiscoverable from software! On an AMBA bus, please use the PrimeCell
-register layout. If you always have an IOBG device behind, they should
-all have the same identifier for that kind of bus bridge.
-
-For the IOBG, it would be ideal to have a similar way of finding and
-configuring the connected hardware, including:
-
-* unique identifier for each distinct IP block
-* revision of that block
-* MMIO ranges and sizes, relative to the bus
-* interrupt numbers, relative to a local interrupt controller
-* location identifier (like PCI bus/device/fn number) that can be
-  referred to by other devices
-* clock management for that device
-* power management for that device
-
-If your IODB infrastructure already has this, you should create a new
-bus-type for this in Linux, which will let you detect all devices
-in a consistent manner without having to list them in the device tree.
-
-> > I think the namespace for the compatible values is supposed to start with
-> > the stock ticker name of the company making the device as a unique
-> > identifier. This means you'd have to use
-> > "csrxf,sirf-intc", "csrxf,sirf-prima2-intc" as the value, instead
-> > of starting with the product name. I don't know exactly how strictly
-> > we apply that rule, but I've taken the devicetree-discuss at lists.ozlabs.org
-> > mailing list on Cc, maybe someone can clarify.
-> 
-> in fact, SiRF is a company name. it was merged into CSR 4 years ago.
-> Due to history reason, now the SoC names are still headed by sirf.
-> the logo in SiRFprimaII chip is CSR.
-> So the "SiRF" of SiRFprimaII should mean two things: old company name,
->  heritable CPU production-line. Anyway, "csr, sirf-intc" seems to make
-> more senses than "sirf, intc".
-> 
-> could we change "csrxf,sirf-intc", "csrxf,sirf-prima2-intc" to
-> "csr,sirf-intc", "csr,sirf-prima2-intc"?
-
-Not sure how strict we interpret the rules about stock ticker symbols.
-'CSR' on wallstreet is 'China Security & Surveillance Tech. Inc'. If they
-ever decide to produce embedded Linux machines, we'd get a conflict, unless
-they also use "csst" (their .com domain name) as a prefix.
-
-> > better put these in a list with one file per line, like
-> >
-> > obj-y   += timer.o
-> > obj-y   += irq.o
-> >
-> > That makes the list more consistent when you add conditional files.
-> 
-> Then it could be:
-> obj-y += timer.o
-> obj-y += irq.o
-> obj-y += clock.o
-> obj-y += common.o
-> obj-$(CONFIG_CACHE_L2X0) := l2x0.o
-
-
-Right. Note that you have a := in there, which needs to be +=.
-
-
-> > It probably makes sense to pick a new name for the combined file, too, but I
-> > can't think of a good one. Maybe one of platform.c, prima2.c or core.c.
-> 
-> i am not sure the original purpose of board_dt.c. and i am guessing
-> whether Grant created that single board file to contain multiple
-> boards. For example:
-> 
-> MACHINE_START(PRIMA2_XXX, "prima2xxx")
->        .boot_params    = SIRFSOC_SDRAM_PA + 0x100,
->        .init_early     = sirfsoc_init_clk,
->        .map_io         = sirfsoc_map_io,
->        .init_irq       = sirfsoc_of_init_irq,
->        .timer          = &sirfsoc_timer,
->        .init_machine   = sirfsoc_mach_init,
->        .dt_compat      = prima2xxx_dt_match,
-> MACHINE_END
-> 
-> MACHINE_START(PRIMA2_YYY, "prima2yyy")
->        .boot_params    = SIRFSOC_SDRAM_PA + 0x100,
->        .init_early     = sirfsoc_init_clk,
->        .map_io         = sirfsoc_map_io,
->        .init_irq       = sirfsoc_of_init_irq,
->        .timer          = &sirfsoc_timer,
->        .init_machine   = sirfsoc_mach_init,
->        .dt_compat      = prima2yyy_dt_match,
-> MACHINE_END
-
-No, this wouldn't make any sense when the only difference is the dt_compat
-field: At that point you would just list all the possible boards in the
-global dt_match table.
-
-> after creating a new file named mach-prima2/l2x0.c,  it seems we only
-> need to change Makefile to:
-> obj-$(CONFIG_CACHE_L2X0) := l2x0.o
-> the head file is not needed.
-> 
-> Currently, rob's OF-based L2 cache is not merged yet. then i only
-> write the following:
-> 
-> static int __init sirfsoc_of_l2x_init(void)
-> {
->         struct device_node *np;
->         void __iomem *sirfsoc_l2x_base;
-> 
->         np = of_find_matching_node(NULL, l2x_ids);
->         if (!np)
->                 panic("unable to find compatible intc node in dtb\n");
-> 
->         sirfsoc_l2x_base = of_iomap(np, 0);
->         if (!sirfsoc_l2x_base)
->                 panic("unable to map l2x cpu registers\n");
-> 
->         of_node_put(np);
-> 
->         if (!(readl_relaxed(sirfsoc_l2x_base + L2X0_CTRL) & 1)) {
->                 /*
->                  * set the physical memory windows L2 cache will cover
->                  */
->                 writel_relaxed(PLAT_PHYS_OFFSET + 1024 * 1024 * 1024,
->                         sirfsoc_l2x_base + L2X0_ADDR_FILTERING_END);
->                 writel_relaxed(PLAT_PHYS_OFFSET | 0x1,
->                         sirfsoc_l2x_base + L2X0_ADDR_FILTERING_START);
-> 
->                 writel_relaxed(0,
->                         sirfsoc_l2x_base + L2X0_TAG_LATENCY_CTRL);
->                 writel_relaxed(0,
->                         sirfsoc_l2x_base + L2X0_DATA_LATENCY_CTRL);
->         }
->         l2x0_init((void __iomem *)sirfsoc_l2x_base, 0x00040000,
->                 0x00000000);
-> 
->         return 0;
-> }
-> early_initcall(sirfsoc_of_l2x_init);
-> 
-> After Rob's patch is merged, i think sirfsoc_of_l2x_init can be much simpler.
-> 
-Yes. Rob/Olof, what's the status of that patch?
-
-	Arnd
+> ---
+> ?arch/arm/plat-samsung/include/plat/dma.h | ? 16 ++++++++--------
+> ?1 files changed, 8 insertions(+), 8 deletions(-)
+>
+> diff --git a/arch/arm/plat-samsung/include/plat/dma.h b/arch/arm/plat-samsung/include/plat/dma.h
+> index 2e8f8c6..7365f46 100644
+> --- a/arch/arm/plat-samsung/include/plat/dma.h
+> +++ b/arch/arm/plat-samsung/include/plat/dma.h
+> @@ -62,7 +62,7 @@ typedef int ?(*s3c2410_dma_opfn_t)(struct s3c2410_dma_chan *,
+> ?* request a dma channel exclusivley
+> ?*/
+>
+> -extern int s3c2410_dma_request(unsigned int channel,
+> +extern int s3c2410_dma_request(enum dma_ch id,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? struct s3c2410_dma_client *, void *dev);
+>
+>
+> @@ -71,14 +71,14 @@ extern int s3c2410_dma_request(unsigned int channel,
+> ?* change the state of the dma channel
+> ?*/
+>
+> -extern int s3c2410_dma_ctrl(unsigned int channel, enum s3c2410_chan_op op);
+> +extern int s3c2410_dma_ctrl(enum dma_ch id, enum s3c2410_chan_op op);
+>
+> ?/* s3c2410_dma_setflags
+> ?*
+> ?* set the channel's flags to a given state
+> ?*/
+>
+> -extern int s3c2410_dma_setflags(unsigned int channel,
+> +extern int s3c2410_dma_setflags(enum dma_ch id,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?unsigned int flags);
+>
+> ?/* s3c2410_dma_free
+> @@ -86,7 +86,7 @@ extern int s3c2410_dma_setflags(unsigned int channel,
+> ?* free the dma channel (will also abort any outstanding operations)
+> ?*/
+>
+> -extern int s3c2410_dma_free(unsigned int channel, struct s3c2410_dma_client *);
+> +extern int s3c2410_dma_free(enum dma_ch id, struct s3c2410_dma_client *);
+>
+> ?/* s3c2410_dma_enqueue
+> ?*
+> @@ -95,7 +95,7 @@ extern int s3c2410_dma_free(unsigned int channel, struct s3c2410_dma_client *);
+> ?* drained before the buffer is given to the DMA system.
+> ?*/
+>
+> -extern int s3c2410_dma_enqueue(unsigned int channel, void *id,
+> +extern int s3c2410_dma_enqueue(enum dma_ch idx, void *id,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t data, int size);
+>
+> ?/* s3c2410_dma_config
+> @@ -103,14 +103,14 @@ extern int s3c2410_dma_enqueue(unsigned int channel, void *id,
+> ?* configure the dma channel
+> ?*/
+>
+> -extern int s3c2410_dma_config(unsigned int channel, int xferunit);
+> +extern int s3c2410_dma_config(enum dma_ch id, int xferunit);
+>
+> ?/* s3c2410_dma_devconfig
+> ?*
+> ?* configure the device we're talking to
+> ?*/
+>
+> -extern int s3c2410_dma_devconfig(unsigned int channel,
+> +extern int s3c2410_dma_devconfig(enum dma_ch id,
+> ? ? ? ? ? ? ? ?enum s3c2410_dmasrc source, unsigned long devaddr);
+>
+> ?/* s3c2410_dma_getposition
+> @@ -118,7 +118,7 @@ extern int s3c2410_dma_devconfig(unsigned int channel,
+> ?* get the position that the dma transfer is currently at
+> ?*/
+>
+> -extern int s3c2410_dma_getposition(unsigned int channel,
+> +extern int s3c2410_dma_getposition(enum dma_ch id,
+> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? dma_addr_t *src, dma_addr_t *dest);
+>
+> ?extern int s3c2410_dma_set_opfn(unsigned int, s3c2410_dma_opfn_t rtn);
+> --
+> 1.7.4.1
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
