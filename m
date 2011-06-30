@@ -1,72 +1,35 @@
-From: jassisinghbrar@gmail.com (Jassi Brar)
-Date: Thu, 30 Jun 2011 15:22:20 +0530
-Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
-	level
-In-Reply-To: <BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
-References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
-	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
-	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
-	<BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
-Message-ID: <BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Jun 2011 11:07:55 +0100
+Subject: Git pull request: 64-bit atomic user helper
+In-Reply-To: <alpine.LFD.2.00.1106202134510.2142@xanadu.home>
+References: <alpine.LFD.2.00.1106202134510.2142@xanadu.home>
+Message-ID: <20110630100755.GU21898@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 2:35 PM, padma venkat <padma.kvr@gmail.com> wrote:
-> Hi,
->
-> On Thu, Jun 30, 2011 at 12:38 PM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
->> On Thu, Jun 30, 2011 at 6:08 PM, Padmavathi Venna <padma.v@samsung.com> wrote:
->>> Fixed the bug in transmission status check for 64 bytes FIFO
->>> level.
->>>
->>> Signed-off-by: Padmavathi Venna <padma.v@samsung.com>
->>> ---
->>> ?drivers/spi/spi_s3c64xx.c | ? ?4 +---
->>> ?1 files changed, 1 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/spi/spi_s3c64xx.c b/drivers/spi/spi_s3c64xx.hc
->>> index 795828b..8945e20 100644
->>> --- a/drivers/spi/spi_s3c64xx.c
->>> +++ b/drivers/spi/spi_s3c64xx.c
->>> @@ -116,9 +116,7 @@
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?(((i)->fifo_lvl_mask + 1))) \
->>> ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ?? 1 : 0)
->>>
->>> -#define S3C64XX_SPI_ST_TX_DONE(v, i) ((((v) >> (i)->rx_lvl_offset) & \
->>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? (((i)->fifo_lvl_mask + 1) << 1)) \
->>> - ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? ? 1 : 0)
->>> +#define S3C64XX_SPI_ST_TX_DONE(v, i) (((v) & (1 << (i)->tx_st_done)) ? 1 : 0)
->>
->> IIRC the macro is already designed to deduct tx-done levels from other fields.
->> Could you please _explain_ with one example where it fails ? It is
->> difficult to see without
->> numbers.
-> The existing macro fails for following scenarios.
-> 1) S5P64X0 channel 1
-> 2) S5PV210 channel 1
-> 3) S5PV310 channel 1 and channel 2
->
-> The FIFO data level supported in the above SoCs either 64 or 256
-> bytes depending on the channel. Because of this the TX_DONE
-> is the 25 bit in the status register.
->
-> The existing macro works for the following scenarios
-> 1) S3C6410 all channels
-> 2) S5PC100 all channels
->
-> The FIFO data level supported in the above SoCs 64 bytes
-> on all the channels. Because of this the TX_DONE is the 21 bit
-> in the status register.
->
-> So when we use the existing macro for the non-working SoCs
-> it is not anding with the TX_DONE bit but it is only anding the bits
-> earlier to TX_DONE bit.
->
+On Mon, Jun 20, 2011 at 09:54:07PM -0400, Nicolas Pitre wrote:
+> Russell, please pull the following for the next merge window:
+> 
+> 	git://git.linaro.org/people/nico/linux.git cmpxchg64
+> 
+> This series cleans up the kuser documentation, then it adds 64-bit
+> cmpxchg support as needed by some user space applications.
+> 
+> Tested with the initial libgcc patches relying on this, using a 
+> kernel that has this series applied, and another without those 
+> patches to verify that the test for the availability of the needed 
+> helper does work as intended.
+> 
+> Nicolas Pitre (2):
+>       ARM: kuser: move interface documentation out of the source code
+>       ARM: add a kuser_cmpxchg64 user space helper
+> 
+>  Documentation/arm/kernel_user_helpers.txt |  267 +++++++++++++++++++++++
+>  arch/arm/kernel/entry-armv.S              |  246 ++++++++-------------
+>  2 files changed, 361 insertions(+), 152 deletions(-)
 
-I see.
-I don't have access to post s3c64xx datasheets. Please confirm if TX_DONE
-bit at same offset for all channels of an SoC. If so, I am OK with
-these 2 patches.
-
-Thanks,
-Jassi
+As these clash with the entry rework which I have, I'd much prefer
+them to be in patch form rather than git form so I don't have to keep
+remembering to fix the (broken) git rerere merge.  git rerere is fine
+if you get it right first time but if not, then it keeps doing it wrong
+each and every time.
