@@ -1,29 +1,55 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Fri, 1 Jul 2011 20:33:14 +0200
-Subject: AT91: Fix pull requset
-In-Reply-To: <201107011709.40359.arnd@arndb.de>
-References: <20110701065411.GD14408@game.jcrosoft.org>
-	<201107011709.40359.arnd@arndb.de>
-Message-ID: <20110701183313.GV11559@pengutronix.de>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Fri, 01 Jul 2011 11:53:39 -0700
+Subject: [PATCH 2/2] ARM: plat-mxc: Fix pwm frequency
+In-Reply-To: <20110701080311.GS6069@pengutronix.de>
+References: <1309485035-5964-1-git-send-email-troy.kisky@boundarydevices.com>
+	<20110701080311.GS6069@pengutronix.de>
+Message-ID: <4E0E17B3.7050409@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 01, 2011 at 05:09:40PM +0200, Arnd Bergmann wrote:
-> On Friday 01 July 2011, Jean-Christophe PLAGNIOL-VILLARD wrote:
-> > HI Linus, Russell, Arnd
-> For every bug fix you commit, please check if it applies to older
-> kernels as well, and mark with 'Cc: stable at kernel.org' if so. Do you
-> want to update the changelog and send another pull request?
-Or alternatively (i.e. if you don't want to rewrite your tree) just
-writing to stable at kernel.org and indicating the upstream commit ids is
-usually OK, too.
-The other extreme is to point out the affected versions, e.g. by using 
+On 7/1/2011 1:03 AM, Sascha Hauer wrote:
+> On Thu, Jun 30, 2011 at 06:50:35PM -0700, Troy Kisky wrote:
+>> The PWMPR register is number of clocks + 2, so include
+>> a -2 when setting the register. There is currently no rounding
+>> up, so this may give a higher frequency than requested.
+> 
+> Have you checked this applies to mx2/3 aswell?
+> 
+> Sascha
+> 
+>>
+>> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
+>> ---
+>>  arch/arm/plat-mxc/pwm.c |    8 +++++++-
+>>  1 files changed, 7 insertions(+), 1 deletions(-)
+>>
+>> diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
+>> index 73f17b2..844415e 100644
+>> --- a/arch/arm/plat-mxc/pwm.c
+>> +++ b/arch/arm/plat-mxc/pwm.c
+>> @@ -76,7 +76,13 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+>>  		duty_cycles = c;
+>>  
+>>  		writel(duty_cycles, pwm->mmio_base + MX3_PWMSAR);
+>> -		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
+>> +		if (period_cycles < 2)
+>> +			period_cycles = 2;
+>> +		/*
+>> +		 * manual says - "A value of zero in the PWMPR will result in
+>> +		 * a period of two clock cycles for the output signal.
+>> +		 */
+>> +		writel(period_cycles - 2, pwm->mmio_base + MX3_PWMPR);
+>>  
+>>  		cr = MX3_PWMCR_PRESCALER(prescale) | MX3_PWMCR_EN;
+>>  
+>> -- 
+>> 1.7.0.4
+>>
+>>
+> 
+I just checked. It applies to mx27, mx31, mx25, mx51, mx53.
 
-	Cc: stable at kernel.org [2.6.xy+]
+Thanks for the reminder.
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Troy
