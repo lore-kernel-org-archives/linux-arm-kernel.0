@@ -1,37 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Jul 2011 11:10:28 +0100
-Subject: [PATCH v3 00/40] ARM: mm: Add generic macros for declaring
-	various CPU structs
-In-Reply-To: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-References: <1308851448-25139-1-git-send-email-dave.martin@linaro.org>
-Message-ID: <20110701101027.GA976@e102144-lin.cambridge.arm.com>
+From: kishon@ti.com (ABRAHAM, KISHON VIJAY)
+Date: Fri, 1 Jul 2011 16:04:34 +0530
+Subject: [RFC 10/12] omap: mcbsp: Move sidetone clock management to
+	mach-omap2/mcbsp.c
+In-Reply-To: <alpine.DEB.2.00.1107010331230.27025@utopia.booyaka.com>
+References: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
+	<1309510356-27147-11-git-send-email-jhnikula@gmail.com>
+	<alpine.DEB.2.00.1107010317460.27025@utopia.booyaka.com>
+	<4E0D92CC.5030006@ti.com>
+	<alpine.DEB.2.00.1107010331230.27025@utopia.booyaka.com>
+Message-ID: <BANLkTinzyxT-zzZV+tvQ-4v2ZNtnwhV2aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On Fri, Jul 1, 2011 at 3:04 PM, Paul Walmsley <paul@pwsan.com> wrote:
+> cc'ing Kishon
+>
+> On Fri, 1 Jul 2011, Cousson, Benoit wrote:
+>
+>> On 7/1/2011 11:23 AM, Paul Walmsley wrote:
+>> > On Fri, 1 Jul 2011, Jarkko Nikula wrote:
+>> >
+>> > > Active sidetone requires that McBSP interface clock doesn't idle and there
+>> > > is no mechanism in hwmod to turn autoidling on/off in runtime. McBSP2 and
+>> > > 3
+>> > > in OMAP34xx share their interface clock with McBSP sidetone module and
+>> > > that interface clock must be active when the sidetone is operating.
+>> > >
+>> > > Sidetone has its own autoidle bit which should keep the interface clock
+>> > > active but it is broken. Putting the McBSP core to no-idle mode when the
+>> > > sidetone is active is no good either since it results to higher power
+>> > > consumption when using the threshold based DMA transfers.
+>> >
+>> > In the hwmod code/data, we've got the OCPIF_SWSUP_IDLE flag that can be
+>> > set on a struct omap_hwmod_ocp_if. ?I think this is probably what's needed
+>> > here. ?The only problem is that we haven't linked that to the clock code
+>> > to deny idle on the interface clock yet (see omap_hwmod.c:_setup()).
+>> > Adding that code in, plus adding that OCPIF_SWSUP_IDLE flag to the
+>> > McBSP2/3 data, seems like the right approach here.
+>> >
+>> > I guess we also will need some basic usecounting for denying idle in the
+>> > clock code.
+>> >
+>> > Otherwise these direct register manipulations of clock registers, outside
+>> > the clock code, could turn into a mess :-(
+>>
+>> AFAIR Kishon did submit some patches to expose this feature to the driver
+>> through omap_device API. The point is that other broken IP like SDMA of USB
+>> will require such feature.
+>>
+>> Didn't we pull them?
 
-On Thu, Jun 23, 2011 at 06:50:08PM +0100, Dave Martin wrote:
-> This series adds macros for declaring some CPU-related structured
-> defined in assembler, and ports the various processors, cache and
-> tlb implementations to use the macros.
-> 
-> Where multiple proc_info structures are defined by a single source
-> file, the common elements are collapsed out of these by defining
-> and invoking an additional local macro for this purpose.
-> 
-> A primary goal for this series is to introduce no API or binary
-> changes except for fixing the few obvious bugs which became apparent
-> when working on the series.
-> 
-> NOTE: There is an overlap between this series and Will/Pawel's patches
-> to include Cortex-A5 support (see
-> http://lists.arm.linux.org.uk/lurker/message/20110617.081930.2ed0934d.en.html).
-> Will has agreed to merge with my series in his tree so that it can all
-> be pulled from there, providing that my series has been accepted by
-> the community.
+I'll repost by early next week.
 
-It looks like this has settled down now so I'll pull your arm/proc-macros
-branch from git://git.linaro.org/people/dmart/linux-2.6-arm.git into my
-tree and rebase the A5/A15 stuff on top of it.
-
-Will
+>
+> You sent him some comments on March 1 but it looks like the series never
+> got updated and reposted, at least not that I can find in my mail
+> archive. ?Kishon?
+>
+> Anyway, those patches won't help in this case if the sidetone AUTOIDLE bit
+> is broken - looks like the interface clock autoidle bit is what needs to
+> change.
+>
+>
+> - Paul
+>
