@@ -1,48 +1,99 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 1 Jul 2011 10:03:11 +0200
-Subject: [PATCH 2/2] ARM: plat-mxc: Fix pwm frequency
-In-Reply-To: <1309485035-5964-1-git-send-email-troy.kisky@boundarydevices.com>
-References: <1309485035-5964-1-git-send-email-troy.kisky@boundarydevices.com>
-Message-ID: <20110701080311.GS6069@pengutronix.de>
+Date: Fri, 1 Jul 2011 10:04:14 +0200
+Subject: [PATCH] ARM: mach-mx5/mx53_ard: Add gpio_keys support
+In-Reply-To: <1309455706-9509-1-git-send-email-daiane.angolini@freescale.com>
+References: <1309455706-9509-1-git-send-email-daiane.angolini@freescale.com>
+Message-ID: <20110701080414.GT6069@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Jun 30, 2011 at 06:50:35PM -0700, Troy Kisky wrote:
-> The PWMPR register is number of clocks + 2, so include
-> a -2 when setting the register. There is currently no rounding
-> up, so this may give a higher frequency than requested.
+On Thu, Jun 30, 2011 at 02:41:46PM -0300, Daiane Angolini wrote:
+> Signed-off-by: Daiane Angolini <daiane.angolini@freescale.com>
 
-Have you checked this applies to mx2/3 aswell?
+Applied for next.
 
 Sascha
 
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 > ---
->  arch/arm/plat-mxc/pwm.c |    8 +++++++-
->  1 files changed, 7 insertions(+), 1 deletions(-)
+>  arch/arm/mach-mx5/Kconfig          |    1 +
+>  arch/arm/mach-mx5/board-mx53_ard.c |   35 +++++++++++++++++++++++++++++++++++
+>  2 files changed, 36 insertions(+), 0 deletions(-)
 > 
-> diff --git a/arch/arm/plat-mxc/pwm.c b/arch/arm/plat-mxc/pwm.c
-> index 73f17b2..844415e 100644
-> --- a/arch/arm/plat-mxc/pwm.c
-> +++ b/arch/arm/plat-mxc/pwm.c
-> @@ -76,7 +76,13 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
->  		duty_cycles = c;
+> diff --git a/arch/arm/mach-mx5/Kconfig b/arch/arm/mach-mx5/Kconfig
+> index 6a47d4c..b4e7c58 100644
+> --- a/arch/arm/mach-mx5/Kconfig
+> +++ b/arch/arm/mach-mx5/Kconfig
+> @@ -216,6 +216,7 @@ config MACH_MX53_ARD
+>  	select IMX_HAVE_PLATFORM_IMX_I2C
+>  	select IMX_HAVE_PLATFORM_IMX_UART
+>  	select IMX_HAVE_PLATFORM_SDHCI_ESDHC_IMX
+> +	select IMX_HAVE_PLATFORM_GPIO_KEYS
+>  	help
+>  	  Include support for MX53 ARD platform. This includes specific
+>  	  configurations for the board and its peripherals.
+> diff --git a/arch/arm/mach-mx5/board-mx53_ard.c b/arch/arm/mach-mx5/board-mx53_ard.c
+> index 280cefc..e2b8b2f 100644
+> --- a/arch/arm/mach-mx5/board-mx53_ard.c
+> +++ b/arch/arm/mach-mx5/board-mx53_ard.c
+> @@ -39,6 +39,11 @@
+>  #define ARD_SD1_CD		IMX_GPIO_NR(1, 1)
+>  #define ARD_SD1_WP		IMX_GPIO_NR(1, 9)
+>  #define ARD_I2CPORTEXP_B	IMX_GPIO_NR(2, 3)
+> +#define ARD_VOLUMEDOWN		IMX_GPIO_NR(4, 0)
+> +#define ARD_HOME			IMX_GPIO_NR(5, 10)
+> +#define ARD_BACK			IMX_GPIO_NR(5, 11)
+> +#define ARD_PROG			IMX_GPIO_NR(5, 12)
+> +#define ARD_VOLUMEUP		IMX_GPIO_NR(5, 13)
 >  
->  		writel(duty_cycles, pwm->mmio_base + MX3_PWMSAR);
-> -		writel(period_cycles, pwm->mmio_base + MX3_PWMPR);
-> +		if (period_cycles < 2)
-> +			period_cycles = 2;
-> +		/*
-> +		 * manual says - "A value of zero in the PWMPR will result in
-> +		 * a period of two clock cycles for the output signal.
-> +		 */
-> +		writel(period_cycles - 2, pwm->mmio_base + MX3_PWMPR);
+>  static iomux_v3_cfg_t mx53_ard_pads[] = {
+>  	/* UART1 */
+> @@ -91,6 +96,35 @@ static iomux_v3_cfg_t mx53_ard_pads[] = {
+>  	/* I2C3 */
+>  	MX53_PAD_GPIO_3__I2C3_SCL,
+>  	MX53_PAD_GPIO_16__I2C3_SDA,
+> +	/* GPIO */
+> +	MX53_PAD_DISP0_DAT16__GPIO5_10,	/* home */
+> +	MX53_PAD_DISP0_DAT17__GPIO5_11,	/* back */
+> +	MX53_PAD_DISP0_DAT18__GPIO5_12,	/* prog */
+> +	MX53_PAD_DISP0_DAT19__GPIO5_13,	/* vol up */
+> +	MX53_PAD_GPIO_10__GPIO4_0,		/* vol down */
+> +};
+> +
+> +#define GPIO_BUTTON(gpio_num, ev_code, act_low, descr, wake)	\
+> +{							\
+> +	.gpio		= gpio_num,				\
+> +	.type		= EV_KEY,				\
+> +	.code		= ev_code,				\
+> +	.active_low	= act_low,				\
+> +	.desc		= "btn " descr,			\
+> +	.wakeup		= wake,					\
+> +}
+> +
+> +static struct gpio_keys_button ard_buttons[] = {
+> +	GPIO_BUTTON(ARD_HOME, KEY_HOME, 1, "home", 0),
+> +	GPIO_BUTTON(ARD_BACK, KEY_BACK, 1, "back", 0),
+> +	GPIO_BUTTON(ARD_PROG, KEY_PROGRAM, 1, "program", 0),
+> +	GPIO_BUTTON(ARD_VOLUMEUP, KEY_VOLUMEUP, 1, "volume-up", 0),
+> +	GPIO_BUTTON(ARD_VOLUMEDOWN, KEY_VOLUMEDOWN, 1, "volume-down", 0),
+> +};
+> +
+> +static const struct gpio_keys_platform_data ard_button_data __initconst = {
+> +	.buttons        = ard_buttons,
+> +	.nbuttons       = ARRAY_SIZE(ard_buttons),
+>  };
 >  
->  		cr = MX3_PWMCR_PRESCALER(prescale) | MX3_PWMCR_EN;
+>  static struct resource ard_smsc911x_resources[] = {
+> @@ -199,6 +233,7 @@ static void __init mx53_ard_board_init(void)
+>  	imx53_add_imx2_wdt(0, NULL);
+>  	imx53_add_imx_i2c(1, &mx53_ard_i2c2_data);
+>  	imx53_add_imx_i2c(2, &mx53_ard_i2c3_data);
+> +	imx_add_gpio_keys(&ard_button_data);
+>  }
 >  
+>  static void __init mx53_ard_timer_init(void)
 > -- 
-> 1.7.0.4
+> 1.7.4.1
+> 
 > 
 > 
 
