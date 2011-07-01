@@ -1,34 +1,34 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Fri, 1 Jul 2011 16:47:09 +0300
-Subject: [RFC 11/12] omap: mcbsp: Remove conditional compilation for OMAP3
-In-Reply-To: <CA+HSevqQhPP9YD=m_1Z7E=44hY0i4FFSoq7C1uP-aTsNXcMsiw@mail.gmail.com>
-References: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
-	<1309510356-27147-12-git-send-email-jhnikula@gmail.com>
-	<CA+HSevqQhPP9YD=m_1Z7E=44hY0i4FFSoq7C1uP-aTsNXcMsiw@mail.gmail.com>
-Message-ID: <20110701164709.3bc6dcbf.jhnikula@gmail.com>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Fri, 1 Jul 2011 09:47:05 -0400
+Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
+	physical addresses
+In-Reply-To: <20110701125802.GE12605@elte.hu>
+References: <201106171038.25988.ptesarik@suse.cz>
+	<20110617093032.GA19235@elte.hu>
+	<201106291106.00070.ptesarik@suse.cz>
+	<20110701125802.GE12605@elte.hu>
+Message-ID: <20110701134705.GA6175@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Jul 2011 16:30:09 +0530
-"Varadarajan, Charulatha" <charu@ti.com> wrote:
+On Fri, Jul 01, 2011 at 02:58:02PM +0200, Ingo Molnar wrote:
+> So what was not mentioned in your series, what is *your* motivation 
+> and your usecase? Enabling closed-source userspace drivers? Enabling 
+> the crash utility?
 
-> > --- a/arch/arm/plat-omap/mcbsp.c
-> > +++ b/arch/arm/plat-omap/mcbsp.c
-> > @@ -63,7 +63,6 @@ static int omap_mcbsp_read(struct omap_mcbsp *mcbsp, u16 reg, bool from_cache)
-> > ? ? ? ?}
-> > ?}
-> >
-> > -#ifdef CONFIG_ARCH_OMAP3
-> 
-> Are there any plans to move the functions  omap_mcbsp_st_*
-> to mach-omap2/* as they are specific to OMAP3 only?
-> 
-I was thinking that for saving code space for non !OMAP3 builds but
-thats again is not generic code if sidetone IP gets ever reused in
-another silicon. Another platform device for sidetone could be one
-solution but I would like to preserve sidetone sysfs nodes to get
-registered to McBSP port for keeping the userspace API the same during
-the transition (or over a few kernel releases).
+He stated it pretty clearly in the thread, it's the crash utility.
 
--- 
-Jarkko
+> 
+> If the former then shame on you, if the latter then how do you 
+> explain that distros appear to disable the RAM aspect of /dev/mem:
+> 
+>  $ grep DEVMEM $(rpm -ql kernel-2.6.38-0.rc7.git2.3.fc16.x86_64 | grep config-2.6 )
+>  CONFIG_STRICT_DEVMEM=y
+> 
+> So the crash utility use-case does not work on unpatched, default 
+> kernels, right?
+
+Not if you have highmem.  That's why Redhat or Fedora to quote your
+example patch in the /dev/crash driver, which totally defeats the
+CONFIG_STRICT_DEVMEM setting.  But apparently it's good enough that no
+one either noticed or at least doesn't care.
