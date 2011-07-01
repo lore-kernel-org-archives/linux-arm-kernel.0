@@ -1,160 +1,90 @@
 From: plagnioj@jcrosoft.com (Jean-Christophe PLAGNIOL-VILLARD)
-Date: Fri,  1 Jul 2011 08:44:37 +0200
-Subject: [PATCH 3/8] at91: remove AT91_DBGU offset from dbgu register macro
+Date: Fri,  1 Jul 2011 08:44:42 +0200
+Subject: [PATCH 8/8] at91: add arch specific ioremap support
 In-Reply-To: <1309502682-16897-1-git-send-email-plagnioj@jcrosoft.com>
 References: <1309502682-16897-1-git-send-email-plagnioj@jcrosoft.com>
-Message-ID: <1309502682-16897-3-git-send-email-plagnioj@jcrosoft.com>
+Message-ID: <1309502682-16897-8-git-send-email-plagnioj@jcrosoft.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Jean-Christophe PLAGNIOL-VILLARD <plagnioj@jcrosoft.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+Cc: Patrice Vilchez <patrice.vilchez@atmel.com>
 ---
- arch/arm/mach-at91/at91sam9260.c              |    2 +-
- arch/arm/mach-at91/at91sam9rl.c               |    2 +-
- arch/arm/mach-at91/include/mach/at91_dbgu.h   |   27 +++++++++++++-----------
- arch/arm/mach-at91/include/mach/cpu.h         |    8 +++---
- arch/arm/mach-at91/include/mach/debug-macro.S |   14 ++++++------
- 5 files changed, 28 insertions(+), 25 deletions(-)
+ arch/arm/mach-at91/include/mach/io.h |   16 +++++++++++++++-
+ arch/arm/mach-at91/setup.c           |   19 +++++++++++++++++++
+ 2 files changed, 34 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-at91/at91sam9260.c b/arch/arm/mach-at91/at91sam9260.c
-index 164873f..57974b1 100644
---- a/arch/arm/mach-at91/at91sam9260.c
-+++ b/arch/arm/mach-at91/at91sam9260.c
-@@ -324,7 +324,7 @@ static void __init at91sam9xe_map_io(void)
- {
- 	unsigned long cidr, sram_size;
+diff --git a/arch/arm/mach-at91/include/mach/io.h b/arch/arm/mach-at91/include/mach/io.h
+index 0b0cccc..6ffc53b 100644
+--- a/arch/arm/mach-at91/include/mach/io.h
++++ b/arch/arm/mach-at91/include/mach/io.h
+@@ -21,14 +21,28 @@
+ #ifndef __ASM_ARCH_IO_H
+ #define __ASM_ARCH_IO_H
  
--	cidr = at91_sys_read(AT91_DBGU_CIDR);
-+	cidr = dbgu_readl(AT91_DBGU, CIDR);
- 
- 	switch (cidr & AT91_CIDR_SRAMSIZ) {
- 		case AT91_CIDR_SRAMSIZ_32K:
-diff --git a/arch/arm/mach-at91/at91sam9rl.c b/arch/arm/mach-at91/at91sam9rl.c
-index 9c87bac..0788adb 100644
---- a/arch/arm/mach-at91/at91sam9rl.c
-+++ b/arch/arm/mach-at91/at91sam9rl.c
-@@ -283,7 +283,7 @@ static void __init at91sam9rl_map_io(void)
- {
- 	unsigned long cidr, sram_size;
- 
--	cidr = at91_sys_read(AT91_DBGU_CIDR);
-+	cidr = dbgu_readl(AT91_DBGU, CIDR);
- 
- 	switch (cidr & AT91_CIDR_SRAMSIZ) {
- 		case AT91_CIDR_SRAMSIZ_32K:
-diff --git a/arch/arm/mach-at91/include/mach/at91_dbgu.h b/arch/arm/mach-at91/include/mach/at91_dbgu.h
-index 6dcaa77..dbfe455a 100644
---- a/arch/arm/mach-at91/include/mach/at91_dbgu.h
-+++ b/arch/arm/mach-at91/include/mach/at91_dbgu.h
-@@ -16,22 +16,25 @@
- #ifndef AT91_DBGU_H
- #define AT91_DBGU_H
- 
-+#define dbgu_readl(dbgu, field) \
-+	__raw_readl(AT91_VA_BASE_SYS + dbgu + AT91_DBGU_ ## field)
++#include <mach/hardware.h>
 +
- #ifdef AT91_DBGU
--#define AT91_DBGU_CR		(AT91_DBGU + 0x00)	/* Control Register */
--#define AT91_DBGU_MR		(AT91_DBGU + 0x04)	/* Mode Register */
--#define AT91_DBGU_IER		(AT91_DBGU + 0x08)	/* Interrupt Enable Register */
-+#define AT91_DBGU_CR		(0x00)	/* Control Register */
-+#define AT91_DBGU_MR		(0x04)	/* Mode Register */
-+#define AT91_DBGU_IER		(0x08)	/* Interrupt Enable Register */
- #define		AT91_DBGU_TXRDY		(1 << 1)		/* Transmitter Ready */
- #define		AT91_DBGU_TXEMPTY	(1 << 9)		/* Transmitter Empty */
--#define AT91_DBGU_IDR		(AT91_DBGU + 0x0c)	/* Interrupt Disable Register */
--#define AT91_DBGU_IMR		(AT91_DBGU + 0x10)	/* Interrupt Mask Register */
--#define AT91_DBGU_SR		(AT91_DBGU + 0x14)	/* Status Register */
--#define AT91_DBGU_RHR		(AT91_DBGU + 0x18)	/* Receiver Holding Register */
--#define AT91_DBGU_THR		(AT91_DBGU + 0x1c)	/* Transmitter Holding Register */
--#define AT91_DBGU_BRGR		(AT91_DBGU + 0x20)	/* Baud Rate Generator Register */
-+#define AT91_DBGU_IDR		(0x0c)	/* Interrupt Disable Register */
-+#define AT91_DBGU_IMR		(0x10)	/* Interrupt Mask Register */
-+#define AT91_DBGU_SR		(0x14)	/* Status Register */
-+#define AT91_DBGU_RHR		(0x18)	/* Receiver Holding Register */
-+#define AT91_DBGU_THR		(0x1c)	/* Transmitter Holding Register */
-+#define AT91_DBGU_BRGR		(0x20)	/* Baud Rate Generator Register */
+ #define IO_SPACE_LIMIT		0xFFFFFFFF
  
--#define AT91_DBGU_CIDR		(AT91_DBGU + 0x40)	/* Chip ID Register */
--#define AT91_DBGU_EXID		(AT91_DBGU + 0x44)	/* Chip ID Extension Register */
--#define AT91_DBGU_FNR		(AT91_DBGU + 0x48)	/* Force NTRST Register [SAM9 only] */
-+#define AT91_DBGU_CIDR		(0x40)	/* Chip ID Register */
-+#define AT91_DBGU_EXID		(0x44)	/* Chip ID Extension Register */
-+#define AT91_DBGU_FNR		(0x48)	/* Force NTRST Register [SAM9 only] */
- #define		AT91_DBGU_FNTRST	(1 << 0)		/* Force NTRST */
+ #define __io(a)		__typesafe_io(a)
+ #define __mem_pci(a)	(a)
  
- #endif /* AT91_DBGU */
-diff --git a/arch/arm/mach-at91/include/mach/cpu.h b/arch/arm/mach-at91/include/mach/cpu.h
-index df966c2..3cf6919 100644
---- a/arch/arm/mach-at91/include/mach/cpu.h
-+++ b/arch/arm/mach-at91/include/mach/cpu.h
-@@ -41,12 +41,12 @@
+-
+ #ifndef __ASSEMBLY__
  
- static inline unsigned long at91_cpu_identify(void)
++#ifndef CONFIG_ARCH_AT91X40
++#define __arch_ioremap	at91_ioremap
++#define __arch_iounmap	at91_iounmap
++#endif
++
++void __iomem *at91_ioremap(unsigned long phys, size_t size, unsigned int type);
++void at91_iounmap(volatile void __iomem *addr);
++
++static inline unsigned int at91_readl(unsigned int pa)
++{
++	return __raw_readl((void __iomem *)AT91_IO_P2V(pa));
++}
++
+ static inline unsigned int at91_sys_read(unsigned int reg_offset)
  {
--	return (at91_sys_read(AT91_DBGU_CIDR) & ~AT91_CIDR_VERSION);
-+	return (dbgu_readl(AT91_DBGU, CIDR) & ~AT91_CIDR_VERSION);
- }
+ 	void __iomem *addr = (void __iomem *)AT91_VA_BASE_SYS;
+diff --git a/arch/arm/mach-at91/setup.c b/arch/arm/mach-at91/setup.c
+index 816599f..aa64294 100644
+--- a/arch/arm/mach-at91/setup.c
++++ b/arch/arm/mach-at91/setup.c
+@@ -7,6 +7,7 @@
  
- static inline unsigned long at91_cpu_fully_identify(void)
- {
--	return at91_sys_read(AT91_DBGU_CIDR);
-+	return dbgu_readl(AT91_DBGU, CIDR);
- }
+ #include <linux/module.h>
+ #include <linux/io.h>
++#include <linux/mm.h>
  
- #define ARCH_EXID_AT91SAM9M11	0x00000001
-@@ -62,7 +62,7 @@ static inline unsigned long at91_cpu_fully_identify(void)
+ #include <asm/mach/map.h>
  
- static inline unsigned long at91_exid_identify(void)
- {
--	return at91_sys_read(AT91_DBGU_EXID);
-+	return dbgu_readl(AT91_DBGU, EXID);
- }
+@@ -72,6 +73,24 @@ static struct map_desc at91_io_desc __initdata = {
+ 	.type		= MT_DEVICE,
+ };
  
- 
-@@ -72,7 +72,7 @@ static inline unsigned long at91_exid_identify(void)
- 
- static inline unsigned long at91_arch_identify(void)
- {
--	return (at91_sys_read(AT91_DBGU_CIDR) & AT91_CIDR_ARCH);
-+	return (dbgu_readl(AT91_DBGU, CIDR) & AT91_CIDR_ARCH);
- }
- 
- #ifdef CONFIG_ARCH_AT91CAP9
-diff --git a/arch/arm/mach-at91/include/mach/debug-macro.S b/arch/arm/mach-at91/include/mach/debug-macro.S
-index 0f959fa..bc1e0b2 100644
---- a/arch/arm/mach-at91/include/mach/debug-macro.S
-+++ b/arch/arm/mach-at91/include/mach/debug-macro.S
-@@ -15,23 +15,23 @@
- #include <mach/at91_dbgu.h>
- 
- 	.macro	addruart, rp, rv
--	ldr	\rp, =(AT91_BASE_SYS + AT91_DBGU)		@ System peripherals (phys address)
--	ldr	\rv, =(AT91_VA_BASE_SYS	+ AT91_DBGU)		@ System peripherals (virt address)
-+	ldr	\rp, =(AT91_BASE_SYS + AT91_DBGU)	@ System peripherals (phys address)
-+	ldr	\rv, =(AT91_VA_BASE_SYS	+ AT91_DBGU)	@ System peripherals (virt address)
- 	.endm
- 
- 	.macro	senduart,rd,rx
--	strb	\rd, [\rx, #(AT91_DBGU_THR - AT91_DBGU)]	@ Write to Transmitter Holding Register
-+	strb	\rd, [\rx, #(AT91_DBGU_THR)]		@ Write to Transmitter Holding Register
- 	.endm
- 
- 	.macro	waituart,rd,rx
--1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR - AT91_DBGU)]		@ Read Status Register
--	tst	\rd, #AT91_DBGU_TXRDY				@ DBGU_TXRDY = 1 when ready to transmit
-+1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR)]		@ Read Status Register
-+	tst	\rd, #AT91_DBGU_TXRDY			@ DBGU_TXRDY = 1 when ready to transmit
- 	beq	1001b
- 	.endm
- 
- 	.macro	busyuart,rd,rx
--1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR - AT91_DBGU)]		@ Read Status Register
--	tst	\rd, #AT91_DBGU_TXEMPTY				@ DBGU_TXEMPTY = 1 when transmission complete
-+1001:	ldr	\rd, [\rx, #(AT91_DBGU_SR)]		@ Read Status Register
-+	tst	\rd, #AT91_DBGU_TXEMPTY			@ DBGU_TXEMPTY = 1 when transmission complete
- 	beq	1001b
- 	.endm
++void __iomem *at91_ioremap(unsigned long p, size_t size, unsigned int type)
++{
++	if (p >= AT91_BASE_SYS && p <= (AT91_BASE_SYS + SZ_16K - 1))
++		return (void __iomem *)AT91_IO_P2V(p);
++
++	return __arm_ioremap_caller(p, size, type, __builtin_return_address(0));
++}
++EXPORT_SYMBOL(at91_ioremap);
++
++void at91_iounmap(volatile void __iomem *addr)
++{
++	unsigned long virt = (unsigned long)addr;
++
++	if (virt >= VMALLOC_START && virt < VMALLOC_END)
++		__iounmap(addr);
++}
++EXPORT_SYMBOL(at91_iounmap);
++
+ #define AT91_DBGU0	0xfffff200
+ #define AT91_DBGU1	0xffffee00
  
 -- 
 1.7.4.1
