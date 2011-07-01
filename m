@@ -1,65 +1,30 @@
-From: b32955@freescale.com (Huang Shijie)
-Date: Fri, 1 Jul 2011 16:57:40 +0800
-Subject: reply: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for
-	imx23/imx28
-In-Reply-To: <201107010029.51965.arnd@arndb.de>
-References: <14C4E31473AF7E4B98176CB73615181C19FBD3@039-SN1MPN1-006.039d.mgd.msft.net>
-	<201107010029.51965.arnd@arndb.de>
-Message-ID: <4E0D8C04.6010409@freescale.com>
+From: jhnikula@gmail.com (Jarkko Nikula)
+Date: Fri,  1 Jul 2011 11:52:24 +0300
+Subject: [RFC 0/12] McBSP cleanup and generalization
+Message-ID: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi;
-> On Thursday 30 June 2011 18:12:27 Huang Shijie-B32955 wrote:
->> I think gpmi-nfc is much better then gpmi-nand or gpmi-flash.
-> Then how do you want to name the near field communication drivers?
->
-what's meaning of "near field communication" ?
+Hi
 
->>> I know that you didn't start this pattern, but I find these macros
->>> extremely annoying. It obscures the use of the macros with the
->>> string concatenation and the macro names are way too generic
->>> for something platform specific. If people think it's a good idea
->>> to have these, please submit a patch to add macros (without the
->>> string concatenation) into include/linux/ioport.h.
->>> Until then, better spell out the resources.
->> ==============================================
->> I ever tried several methods,  but  I can not find a better method to
->> replace the current method.
->>
->> It's annoying, but it really saves some lines.
-> It would save more lines if you introduce the macros globally and
-> convert all existing resource definitions ;-)
-The origin code did not use any macros.
-Some one suggested me to use macros.
-So i used the macros.
+Some cleanups to McBSP code and attempts to make it more generic. I'll be out
+of office in coming days but I'm happy to hear how does this set work on
+OMAP1 Amstrad Delta as there are changes around register definitions and
+access. I've tested this on 2420 and 3430 and build tested with omap1_defconfig
+and omap2plus_defconfig.
 
-Do i have to drop the macros?
+I added Paul's build fix first as it seems to got lost in l-o master during
+recent devel branch merges and my patches are made on top of it. Paul's
+patch can be found from commit 7150dfee80a1e7ed5064730994b704495a8c6b99.
 
+For is_omap removal I didn't invent any other new than reg_size and reg_step
+to platform data but in the future I think mcbsp_config_type is better to
+replace with some feature flags that come from hwmod so that there is no
+need to modify code for any new omap version.
 
+Long term plan is still bit open. If we go to merge McBSP with ASoC omap-mcbsp
+we can drop quite much of special API here as well as omap-mcbsp-dai
+platform devices.
 
-> Making code shorter is usually a good idea, but not when it conflicts
-> with readability. Adding custom macros that do string concatenation
-> is such a case.
->
->>> When adding new infrastructure, always keep in mind how you want it to look
->>> after the device tree conversion. The partitions and min/max_* are easily covered
->>> with that, but the init/exit function pointers are somewhat problematic.
->>> Fortunately, you don't really require these functions for this driver. The _exit
->>> function is completely unused, so just get rid of it.
->> ===================================================
->> I am reluctant to remove it, I am not sure whether I will use the _exit() in future.
->> But, yes, it can be removed now.
-> As a rule, you should never introduce infrastructure just because you might
-> need it in the future but don't know if you will really need it.
-thanks. I will remove it in next version.
-
-> This is even more important for the actual driver, as I mentioned in my other
-> mail. You have a hardware abstraction layer, but only one variant of the hardware
-> posted along with the driver. Without seeing different hardware, how should
-> anyone be able to tell whether the abstraction is really needed or if it's the
-> correct abstraction?
-Best Regards
-Huang Shijie
-> 	Arnd
->
+-- 
+Jarkko
