@@ -1,30 +1,43 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Jul 2011 00:12:27 -0700
-Subject: [RESEND] [PATCH 3.0] OMAP: drop __initdata tags from static
-	struct platform_device declarations
-In-Reply-To: <201106170318.32326.jkrzyszt@tis.icnet.pl>
-References: <201106170002.46387.jkrzyszt@tis.icnet.pl>
-	<20110616221832.GB9698@n2100.arm.linux.org.uk>
-	<201106170318.32326.jkrzyszt@tis.icnet.pl>
-Message-ID: <20110701071227.GA23145@atomide.com>
+Date: Fri, 1 Jul 2011 00:15:05 -0700
+Subject: [PATCH 9/10] arch/arm/mach-omap2/clock.c: add missing clk_put
+In-Reply-To: <alpine.DEB.2.00.1106021526220.26852@utopia.booyaka.com>
+References: <1306948213-20767-9-git-send-email-julia@diku.dk>
+	<alpine.DEB.2.00.1106021526220.26852@utopia.booyaka.com>
+Message-ID: <20110701071505.GB23145@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Janusz Krzysztofik <jkrzyszt@tis.icnet.pl> [110616 18:15]:
-> Pointers to statically declared platform device structures which are 
-> registered with platform_device_register() are then used during run time 
-> to access these structure members, for example from platform_uevent() 
-> and much more. Therefore, these structures should never be placed inside 
-> sections which are dropped after boot. Fix platform devices incorrectly 
-> tagged with __initdata which happen to exist inside OMAP sub-trees.
+* Paul Walmsley <paul@pwsan.com> [110602 14:22]:
+> On Wed, 1 Jun 2011, Julia Lawall wrote:
 > 
-> This bug has exhibited itself on my ARM/OMAP1 based Amstrad Delta 
-> videophone after commit 6d3163ce86dd386b4f7bda80241d7fea2bc0bb1d, "mm: 
-> check if any page in a pageblock is reserved before marking it 
-> MIGRATE_RESERVE", resulting in reading from several 
-> /sys/device/platform/*/uevent files always ending up with segmentation 
-> faults.
+> > From: Julia Lawall <julia@diku.dk>
+> > 
+> > Add missing call to clk_put.
+> > 
+> > A simplified version of the semantic match that finds this problem is as
+> > follows: (http://coccinelle.lip6.fr/)
+> > 
+> > // <smpl>
+> > @r exists@
+> > expression e1,e2;
+> > statement S;
+> > @@
+> > 
+> > e1 = clk_get at p1(...);
+> > ... when != e1 = e2
+> >     when != clk_put(e1)
+> >     when any
+> > if (...) { ... when != clk_put(e1)
+> >                when != if (...) { ... clk_put(e1) ... }
+> > * return at p3 ...;
+> >  } else S
+> > // </smpl>
+> > 
+> > Signed-off-by: Julia Lawall <julia@diku.dk>
+> 
+> Acked-by: Paul Walmsley <paul@pwsan.com>
 
-Thanks applying into devel-fixes.
+Adding this into devel-fixes branch.
 
 Tony
