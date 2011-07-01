@@ -1,36 +1,30 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 1 Jul 2011 17:24:19 +0100
-Subject: [PATCH v6 00/18] ARM: Add support for the Large Physical
-	Address Extensions
-In-Reply-To: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-References: <1306273164-18217-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20110701162419.GA3990@1n450.cable.virginmedia.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Jul 2011 18:26:57 +0200
+Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
+In-Reply-To: <BANLkTinkHcuXuWpCxq3tnU_10trPTjDucg@mail.gmail.com>
+References: <1309231954-23260-1-git-send-email-bs14@csr.com>
+	<201106301236.25822.arnd@arndb.de>
+	<BANLkTinkHcuXuWpCxq3tnU_10trPTjDucg@mail.gmail.com>
+Message-ID: <201107011826.57660.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+On Friday 01 July 2011, Barry Song wrote:
+> except Wall St and stock, i really didn't realize CSR is something
+> related with 'China Security & Surveillance Tech. Inc' . it seems CSR
+> is much more extensively known as a company in Wireless Technology,
+> Audio, Connectivity and GPS.
+> if we lost this name, people might not know it came from that CSR
+> focusing on Wireless/Audio/Connectivity/GPS. people will ask, what is
+> CSRXF? if we really use stock sticker symbols, CSR.L is the more
+> normal symbol in UK market. if we move to stock sticker symbol, could
+> we use CSR.L?
 
-On Tue, May 24, 2011 at 10:39:06PM +0100, Catalin Marinas wrote:
-> Catalin Marinas (14):
->   ARM: LPAE: Use long long printk format for displaying the pud
->   ARM: LPAE: Use unsigned long for __phys_to_virt and __virt_to_phys
->   ARM: LPAE: Use PMD_(SHIFT|SIZE|MASK) instead of PGDIR_*
->   ARM: LPAE: Factor out 2-level page table definitions into separate
->     files
->   ARM: LPAE: Add (pte|pmd|pgd|pgprot)val_t type definitions as u32
->   ARM: LPAE: Use a mask for physical addresses in page table entries
-[...]
-> Will Deacon (4):
->   ARM: LPAE: add ISBs around MMU enabling code
->   ARM: LPAE: Use generic dma_addr_t type definition
+CSR.L sounds ok to me, but I don't know if there are limitations on the
+character set used here, can we have dots?
 
-Since the core LPAE patches haven't got a proper review yet, would you
-please consider merging some of the LPAE preparation patches during the
-upcoming window? Above is a list that I think it's relatively trivial
-(or we can have an even smaller set of patches, any progress would be
-good).
+Maybe the best solution after all is to go with 'sirf,...': it is
+actually a company name, and you own the .com address, and there is
+no other company listed on wallstreet with that shortcut.
 
-Thanks.
-
--- 
-Catalin
+	Arnd
