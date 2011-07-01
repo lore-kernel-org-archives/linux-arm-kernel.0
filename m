@@ -1,113 +1,58 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri, 01 Jul 2011 16:22:14 +0200
+From: hans-christian.egtvedt@atmel.com (Hans-Christian Egtvedt)
+Date: Fri, 01 Jul 2011 16:32:34 +0200
 Subject: [PATCH V2] MMC: PM: add suspend/resume in atmel-mci
-In-Reply-To: <20110630131342.GK11559@pengutronix.de>
+In-Reply-To: <4E0DD816.7070104@atmel.com>
 References: <201106292339.12402.rjw@sisk.pl>
 	<1309441781-11012-1-git-send-email-nicolas.ferre@atmel.com>
-	<20110630131342.GK11559@pengutronix.de>
-Message-ID: <4E0DD816.7070104@atmel.com>
+	<20110630131342.GK11559@pengutronix.de>  <4E0DD816.7070104@atmel.com>
+Message-ID: <1309530754.4373.3.camel@hcegtvedt.norway.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 30/06/2011 15:13, Uwe Kleine-K?nig :
-> Hello Nicolas,
+On Fri, 2011-07-01 at 16:22 +0200, Nicolas Ferre wrote:
+> Le 30/06/2011 15:13, Uwe Kleine-K?nig :
+
+<snipp>
+
+> Well, actually for the current implementation the only return code is... 0.
+> And here I try to have a king of best effort approach ;-)
 > 
-> On Thu, Jun 30, 2011 at 03:49:41PM +0200, Nicolas Ferre wrote:
->> Take care of slots while going to suspend state.
->>
->> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
->> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->> ---
->> V2: move to pm_ops
->>
->>  drivers/mmc/host/atmel-mci.c |   47 ++++++++++++++++++++++++++++++++++++++++++
->>  1 files changed, 47 insertions(+), 0 deletions(-)
->>
->> diff --git a/drivers/mmc/host/atmel-mci.c b/drivers/mmc/host/atmel-mci.c
->> index aa8039f..058f1842 100644
->> --- a/drivers/mmc/host/atmel-mci.c
->> +++ b/drivers/mmc/host/atmel-mci.c
->> @@ -1878,10 +1878,57 @@ static int __exit atmci_remove(struct platform_device *pdev)
->>  	return 0;
->>  }
->>  
->> +#ifdef CONFIG_PM
->> +static int atmci_suspend(struct device *dev)
->> +{
->> +	struct atmel_mci *host = dev_get_drvdata(dev);
->> +	struct atmel_mci_slot *slot;
->> +	int i, ret;
-> slot and ret can have a more local scope.
-
-ok.
-
->> +
->> +	 for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
->> +		slot = host->slot[i];
->> +		if (!slot)
->> +			continue;
->> +		ret = mmc_suspend_host(slot->mmc);
->> +		if (ret < 0) {
->> +			while (--i >= 0) {
->> +				slot = host->slot[i];
->> +				if (slot)
->> +					mmc_resume_host(host->slot[i]->mmc);
-> hmm, mmc_resume_host could fail. But probably you cannot handle that in
-> a sane way, do you?
-
-Well, actually for the current implementation the only return code is... 0.
-And here I try to have a king of best effort approach ;-)
-
->> +			}
->> +			return ret;
->> +		}
->> +	}
->> +
->> +	return 0;
->> +}
->> +
->> +static int atmci_resume(struct device *dev)
->> +{
->> +	struct atmel_mci *host = dev_get_drvdata(dev);
->> +	struct atmel_mci_slot *slot;
->> +	int i, ret;
->> +
->> +	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
->> +		slot = host->slot[i];
->> +		if (!slot)
->> +			continue;
->> +		ret = mmc_resume_host(slot->mmc);
->> +		if (ret < 0)
->> +			return ret;
-> Maybe you should try to resume host 5 even if resuming host 4 failed?
-
-In fact all other drivers that are dealing with multiple slots are doing
-the same... So I have difficulties to know the truth.
-The question is: is it better to return an error to the "resume"
-function so that we are called later again or do we have to do our best
-to thaw everything out?
-
->> +	}
->> +
->> +	return 0;
->> +}
->> +#endif
->> +static SIMPLE_DEV_PM_OPS(atmci_pm, atmci_suspend, atmci_resume);
->> +
->> +
-> For my taste a single empty line is enough.
-
-Ok.
-
->>  static struct platform_driver atmci_driver = {
->>  	.remove		= __exit_p(atmci_remove),
->>  	.driver		= {
->>  		.name		= "atmel_mci",
->> +		.pm		= &atmci_pm,
->>  	},
->>  };
+> >> +			}
+> >> +			return ret;
+> >> +		}
+> >> +	}
+> >> +
+> >> +	return 0;
+> >> +}
+> >> +
+> >> +static int atmci_resume(struct device *dev)
+> >> +{
+> >> +	struct atmel_mci *host = dev_get_drvdata(dev);
+> >> +	struct atmel_mci_slot *slot;
+> >> +	int i, ret;
+> >> +
+> >> +	for (i = 0; i < ATMEL_MCI_MAX_NR_SLOTS; i++) {
+> >> +		slot = host->slot[i];
+> >> +		if (!slot)
+> >> +			continue;
+> >> +		ret = mmc_resume_host(slot->mmc);
+> >> +		if (ret < 0)
+> >> +			return ret;
+> > Maybe you should try to resume host 5 even if resuming host 4 failed?
 > 
+> In fact all other drivers that are dealing with multiple slots are doing
+> the same... So I have difficulties to know the truth.
+> The question is: is it better to return an error to the "resume"
+> function so that we are called later again or do we have to do our best
+> to thaw everything out?
 
-Thanks, best regards,
+Detect failures and return the error value, but also try to resume the
+other slots.
+
+You must however then keep track of which are restored for later calls
+to resume AFAICT.
+
+<snipp>
+
 -- 
-Nicolas Ferre
+Hans-Christian Egtvedt
