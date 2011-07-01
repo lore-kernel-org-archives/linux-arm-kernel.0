@@ -1,37 +1,63 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Fri,  1 Jul 2011 12:43:54 +0200
-Subject: [PATCH] ASoC: wm8731: set the ACTIVE bit if bias ON entered
-In-Reply-To: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
-References: <ccd4b125244271af7978948689cf1dcef37bc06b.1309368631.git.nicolas.ferre@atmel.com>
-Message-ID: <1309517034-26110-1-git-send-email-nicolas.ferre@atmel.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Fri, 1 Jul 2011 11:44:03 +0200
+Subject: [RFC PATCH 0/3] base board consolidation
+Message-ID: <20110701094403.GT11559@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resuming from a suspend/resume cycle, the ACTIVE bit was not set even if a
-stream had actually been processing.
-Setting this bit at entering SND_SOC_BIAS_ON level will ensure this.
+Hello,
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
----
-Supersed the wrong patch:
-"[PATCH 1/5] ASoC: wm8731: rework power management"
+for a customer who uses a SoC-module already supported in mainline but a
+custom base board I'm currently coding the umpteenth baseboard
+abstraction. So I tried to come up with a generic definition.
 
-now based on broonie/sound-2.6 git tree branch: for-3.1.
+I converted only one machine (mx31moboard) for now, possible other users
+I found are:
 
- sound/soc/codecs/wm8731.c |    1 +
- 1 files changed, 1 insertions(+), 0 deletions(-)
+	mx31lilly
+	mx31lite
+	colibri-pxa270
 
-diff --git a/sound/soc/codecs/wm8731.c b/sound/soc/codecs/wm8731.c
-index 2dc964b..ee4ec31 100644
---- a/sound/soc/codecs/wm8731.c
-+++ b/sound/soc/codecs/wm8731.c
-@@ -453,6 +453,7 @@ static int wm8731_set_bias_level(struct snd_soc_codec *codec,
- 
- 	switch (level) {
- 	case SND_SOC_BIAS_ON:
-+		snd_soc_write(codec, WM8731_ACTIVE, 0x0001);
- 		break;
- 	case SND_SOC_BIAS_PREPARE:
- 		break;
+but I wouldn't be surprised if there are more.
+
+Patch 2 keeps the existing kernel parameter for mx31moboard. That can be
+removed later as is done in patch 3. The latter shouldn't be applied now
+and is only included to improve the diffstat :-)
+
+At some time this will probably be obsoleted by device tree stuff, the
+upside of this approach is that it already works today without the need
+to adapt the bootloader.
+
+Best regards
+Uwe
+
+The following changes since commit ca56a95eedcc95f8fea7b49c87565cd961d74fe2:
+
+  Merge branch 'drm-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/airlied/drm-2.6 (2011-06-29 18:18:48 -0700)
+
+are available in the git repository at:
+
+  git.ptx:/git/ukl/linux-2.6.git baseboardconsolidation
+
+Uwe Kleine-K?nig (3):
+      ARM: common abstraction for specifying a baseboard
+      ARM: imx/mx31moboard: convert to new baseboard handling
+      ARM: imx/mx31moboard: remove obsolete baseboard handling
+
+ Documentation/kernel-parameters.txt                |    2 +
+ arch/arm/common/Kconfig                            |    3 +
+ arch/arm/common/Makefile                           |    1 +
+ arch/arm/common/baseboard.c                        |   58 ++++++++++++++++++++
+ arch/arm/include/asm/baseboard.h                   |   31 +++++++++++
+ arch/arm/mach-imx/Kconfig                          |    1 +
+ arch/arm/mach-imx/mach-mx31moboard.c               |   38 +++++++-------
+ arch/arm/mach-imx/mx31moboard-devboard.c           |    5 +-
+ arch/arm/mach-imx/mx31moboard-marxbot.c            |    5 +-
+ arch/arm/mach-imx/mx31moboard-smartbot.c           |   18 ++----
+ arch/arm/plat-mxc/include/mach/board-mx31moboard.h |   16 ++----
+ 11 files changed, 133 insertions(+), 45 deletions(-)
+ create mode 100644 arch/arm/common/baseboard.c
+ create mode 100644 arch/arm/include/asm/baseboard.h
 -- 
-1.7.3
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
