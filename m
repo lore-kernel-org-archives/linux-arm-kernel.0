@@ -1,64 +1,43 @@
 From: b-cousson@ti.com (Benoit Cousson)
-Date: Fri, 1 Jul 2011 22:54:01 +0200
-Subject: [PATCH v2 2/8] OMAP4: hwmod data: Add MSTANDBY_SMART_WKUP flag
+Date: Fri, 1 Jul 2011 22:54:02 +0200
+Subject: [PATCH v2 3/8] OMAP2+: hwmod: Enable module in shutdown to access
+	sysconfig
 In-Reply-To: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
 References: <1309553647-14624-1-git-send-email-b-cousson@ti.com>
-Message-ID: <1309553647-14624-3-git-send-email-b-cousson@ti.com>
+Message-ID: <1309553647-14624-4-git-send-email-b-cousson@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the flag to every IPs that support it to allow the
-framework to enable it instead of the SMART_STANDBY default
-mode.
-Without that, an IP with busmaster capability will not
-be able to wakeup the interconnect at all.
+From: Miguel Vadillo <vadillo@ti.com>
 
+When calling the shutdown, the module may be already in idle.
+Accessing the sysconfig register will then lead to a crash.
+In that case, re-enable the module in order to allow the access
+to the sysconfig register.
+
+Signed-off-by: Miguel Vadillo <vadillo@ti.com>
 Signed-off-by: Benoit Cousson <b-cousson@ti.com>
 Acked-by: Paul Walmsley <paul@pwsan.com>
 ---
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c |    9 +++++----
- 1 files changed, 5 insertions(+), 4 deletions(-)
+ arch/arm/mach-omap2/omap_hwmod.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-index 4bb12b8..5e9df34 100644
---- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-+++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
-@@ -661,7 +661,8 @@ static struct omap_hwmod_class_sysconfig omap44xx_aess_sysc = {
- 	.sysc_offs	= 0x0010,
- 	.sysc_flags	= (SYSC_HAS_MIDLEMODE | SYSC_HAS_SIDLEMODE),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
--			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART),
-+			   MSTANDBY_FORCE | MSTANDBY_NO | MSTANDBY_SMART |
-+			   MSTANDBY_SMART_WKUP),
- 	.sysc_fields	= &omap_hwmod_sysc_type2,
- };
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index 384d3c3..cbc2a8a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -1396,8 +1396,11 @@ static int _shutdown(struct omap_hwmod *oh)
+ 		}
+ 	}
  
-@@ -2089,7 +2090,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_hsi_sysc = {
- 			   SYSC_HAS_SOFTRESET | SYSS_HAS_RESET_STATUS),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- 			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
--			   MSTANDBY_SMART),
-+			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
- 	.sysc_fields	= &omap_hwmod_sysc_type1,
- };
+-	if (oh->class->sysc)
++	if (oh->class->sysc) {
++		if (oh->_state == _HWMOD_STATE_IDLE)
++			_enable(oh);
+ 		_shutdown_sysc(oh);
++	}
  
-@@ -2491,7 +2492,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_iss_sysc = {
- 			   SYSC_HAS_SIDLEMODE | SYSC_HAS_SOFTRESET),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- 			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
--			   MSTANDBY_SMART),
-+			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
- 	.sysc_fields	= &omap_hwmod_sysc_type2,
- };
- 
-@@ -3465,7 +3466,7 @@ static struct omap_hwmod_class_sysconfig omap44xx_mmc_sysc = {
- 			   SYSC_HAS_SOFTRESET),
- 	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
- 			   SIDLE_SMART_WKUP | MSTANDBY_FORCE | MSTANDBY_NO |
--			   MSTANDBY_SMART),
-+			   MSTANDBY_SMART | MSTANDBY_SMART_WKUP),
- 	.sysc_fields	= &omap_hwmod_sysc_type2,
- };
- 
+ 	/*
+ 	 * If an IP contains only one HW reset line, then assert it
 -- 
 1.7.0.4
