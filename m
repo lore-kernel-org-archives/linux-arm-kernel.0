@@ -1,89 +1,43 @@
-From: mingo@elte.hu (Ingo Molnar)
-Date: Fri, 1 Jul 2011 21:56:29 +0200
-Subject: [PATCH 00/10] Enhance /dev/mem to allow read/write of arbitrary
-	physical addresses
-In-Reply-To: <201107012134.45881.ptesarik@suse.cz>
-References: <201106171038.25988.ptesarik@suse.cz> <4E0DEF2C.3040504@zytor.com>
-	<20110701161345.GA29775@elte.hu>
-	<201107012134.45881.ptesarik@suse.cz>
-Message-ID: <20110701195629.GA19057@elte.hu>
+From: broonie@opensource.wolfsonmicro.com (Mark Brown)
+Date: Fri, 1 Jul 2011 13:10:18 -0700
+Subject: [PATCH 2/3] Samsung SoC: ready to use NTC value inside kernel
+In-Reply-To: <201107011923.13324.arnd@arndb.de>
+References: <1309422387-11546-1-git-send-email-myungjoo.ham@samsung.com>
+	<BANLkTin3bu4Xf0cS0EkASvYXG0AdW+eprQ@mail.gmail.com>
+	<20110701155941.GA23784@opensource.wolfsonmicro.com>
+	<201107011923.13324.arnd@arndb.de>
+Message-ID: <20110701201018.GA24949@opensource.wolfsonmicro.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Jul 01, 2011 at 07:23:13PM +0200, Arnd Bergmann wrote:
+> On Friday 01 July 2011, Mark Brown wrote:
 
-* Petr Tesarik <ptesarik@suse.cz> wrote:
+> > The other issue is that it's designed for high volume data and these
+> > AUXADCs tend to be relatively slow.  That said I've had some discussions
+> > with Jonathan about supporting these devices via IIO and he seems to be
+> > coming round to the idea that we could integrate support.  Not sure how
+> > fast IIO is progressing to mainline, though.
 
-> Dne P? 1. ?ervence 2011 18:13:45 Ingo Molnar napsal(a):
-> > * H. Peter Anvin <hpa@zytor.com> wrote:
-> > > On 07/01/2011 08:36 AM, Ingo Molnar wrote:
-> > > > So we could kill multiple birds with the same stone here:
-> > > >  - remove various ugly uses of /dev/mem (including the rootkit usage),
-> > > >  
-> > > >    with or without strict-devmem
-> > > >  
-> > > >  - extending it to above-4G for inspection purposes
-> > > >  
-> > > >  - allowing to kill /dev/mem access runtime similar to the
-> > > >  
-> > > >    disable_modules lock-down killswitch, for the so inclined.
-> > > > 
-> > > > Would you be interested in modifying your patch-set in such a
-> > > > fashion?
-> 
-> Yes, this works for me. How persistent should the kill-switch be? I 
-> assume it doesn't make much sense to make a sysfs toggle, because 
-> then it would still be open to abuse. I'd rather see it specified 
-> on boot and never changed. Agreed?
-> 
-> Something like "enable_dev_mem" on the kenrel command line (default 
-> is disabled).
-> 
-> On a similar note, I should probably rip off write_mem() completely 
-> and disallow PROT_WRITE mmapping of the device. Right?
+> I think IIO is progressing well and I would rather base products on that
+> while it's in staging than having a random out-of-tree driver. It seems
 
-Yeah - there's two things here: one is the boot option to turn it on, 
-the other is the kill-switch that is runtime and kills this method of 
-access permanently (until next reboot that is).
+It's certainly progressing well - looks really nice right now.
 
-the kill-switch works like modules_disabled: once you echo 1 into it 
-you cannot move it back to 0 anymore.
+> to fit the purpose of this driver, though not the in-kernel uses that
+> Linus mentioned above.
 
-The boot option would be a standard boot option - devmem=1 would be 
-the canonical naming? (but no strong feelings about the naming)
+The in kernel uses are the main usage of this sort of ADC in most
+systems - you get a general purpose ADC used for (usually) voltage and
+temperature monitoring with a few auxiliary inputs available for random
+system specific things but generally not actually used so often (jack
+detection stuff is the main use case).  The power supply and hwmon
+subsystems are the main users.
 
-Do you expect distros to enable this boot option by default? I.e. 
-would SuSE be willing to ship with a restrictive /dev/mem by default? 
-That's really the wider goal we want to work towards.
+> With regard to IIO, that could live on a higher level and just provide
+> a user interface on top of the generic in-kernel abstraction for adc.
 
-> > > There is another use that I have looked at, as well: for 
-> > > testing purposes, it would be extremely good to be able to 
-> > > dirty and/or flush an arbitrary physical cache line for testing 
-> > > purposes.
-> > > 
-> > > This is very very similar to /dev/mem usage -- access to an 
-> > > arbitrary chunk of memory -- and a fully enabled /dev/mem can 
-> > > of course support this use (just mmap the page with the 
-> > > relevant cache line).  However, it could also be a separate 
-> > > device which could have looser permissions than /dev/mem; or a 
-> > > set of ioctls on /dev/mem with a separate kill switch, because 
-> > > no data would ever be have modified or returned to user space.
-> > > 
-> > > Either way, though, we found that it would share a lot of code 
-> > > with the /dev/mem implementation, and as such fixing up the 
-> > > underlying machinery is the sanest way to upstream this.
-> > 
-> > To me that cache flush thing sounds obscure (but still useful) 
-> > enough to justify a new ioctl over /dev/mem.
-> > 
-> > Not sure it even needs a killswitch, unless there's some real 
-> > security problem related to it.
-> 
-> It can be used for DoS, but if you have permission for the ioctl(), 
-> then you probably also have easier ways to kill the system.
-
-Hm, why would the ability "dirty and/or flush an arbitrary physical 
-cache line for testing purposes" be a DoS?
-
-Thanks,
-
-	Ingo
+Yeah, that's roughly the option that Jonathan and myself had been
+discussing last time this came up - have the convertor level deliver
+events to a pluggable API layer with the IIO userspace be just one of
+those plugins.
