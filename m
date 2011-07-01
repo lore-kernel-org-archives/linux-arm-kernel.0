@@ -1,55 +1,74 @@
-From: padma.kvr@gmail.com (padma venkat)
-Date: Fri, 1 Jul 2011 11:29:02 +0530
-Subject: [PATCH 2/2] SPI: SAMSUNG: Bug fix for SPI with different FIFO
-	level
-In-Reply-To: <BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
-References: <1309437536-9315-1-git-send-email-padma.v@samsung.com>
-	<1309437536-9315-2-git-send-email-padma.v@samsung.com>
-	<BANLkTi=L7QeN75ebWFXdp_V5Pw1zEc-ZtA@mail.gmail.com>
-	<BANLkTimeWUbD2Ej16KKmuzwSCFz8HOhyKQ@mail.gmail.com>
-	<BANLkTi=9c5asfr=Jg6xwjQZW_a369UO64Q@mail.gmail.com>
-	<BANLkTinFnFwBGi693JTD_iDykA2VkV+HOw@mail.gmail.com>
-	<BANLkTik0LERxBHmJc5ZnRotnD4CSveR-UQ@mail.gmail.com>
-	<BANLkTim9wdrqDgXVUjxzMv9cdWViLww=Bg@mail.gmail.com>
-Message-ID: <BANLkTim40x4X_--K0z7gdodDjor0MUam5Q@mail.gmail.com>
+From: LW@KARO-electronics.de (=?utf-8?Q?Lothar_Wa=C3=9Fmann?=)
+Date: Fri, 1 Jul 2011 07:59:26 +0200
+Subject: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for imx23/imx28
+In-Reply-To: <201107010022.26597.arnd@arndb.de>
+References: <1309406028-2924-1-git-send-email-b32955@freescale.com>
+	<201106301555.19440.arnd@arndb.de>
+	<19980.36638.134045.743619@ipc1.ka-ro>
+	<201107010022.26597.arnd@arndb.de>
+Message-ID: <19981.25150.673498.516935@ipc1.ka-ro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jassi,
+Hi,
 
-On Fri, Jul 1, 2011 at 11:22 AM, Jassi Brar <jassisinghbrar@gmail.com> wrote:
-> On Fri, Jul 1, 2011 at 11:16 AM, padma venkat <padma.kvr@gmail.com> wrote:
->> Hi Tony,
->>
->> On Thu, Jun 30, 2011 at 4:30 PM, Tony Nadackal <tonykn@gmail.com> wrote:
->>> Hi Padma,
->>> With regards to your patch, even though one can check the tx done status
->>> using the TX_DONE bit, the present macro itself would work perfectly fine if
->>> the 'fifo_lvl_mask' is set properly.
->>> For example in 6450 channel 1, the fifo_lvl_mask should be 0x1ff (for 9bits,
->>> 15:23), while even in your patch, it is wrongly set as 0x7f(only 7bits).
->>>
->>> Thus, if this fifo_lvl_mask was defined correctly, the existing macro would
->>> itself have worked.
->> Thanks for your comment.
->> I considered changing to the fifo_lvl_mask to 1ff as you mentioned.
->> But I ?think that the fifo_lvl_mask reflects the actual FIFO capacity
->> in the SPI driver.
->> For the failing channels the FIFO trigger level is 64 bytes and so i
->> retained that value.
->> In the driver it polls till the FIFO capacity level otherwise it goes
->> for DMA.So if we keep
->> the FIFO level as 1ff when the actual capacity is 7f then it fails.
->>
->> Jassi what do you think about this?
->>
->
-> 'fifo_lvl_mask' is h/w specific and can't be set for convenience.
->
-> I don't have access to post-s3c64xx datasheets.
-> Please check and reply if TX_DONE bit is at same offset for all
-> channels of an SoC, because
-> I suspect it's otherwise.
->
-Yes. The TX_DONE bit is at the same offset for all the channels of an SoC.
-in S5P64X0,S5PV210 and S5PV310 it is at offset 25.
+Arnd Bergmann writes:
+> On Thursday 30 June 2011 16:58:38 Lothar Wa?mann wrote:
+> > > 
+> > > When adding new infrastructure, always keep in mind how you want it to look
+> > > after the device tree conversion. The partitions and min/max_* are easily covered
+> > > with that, but the init/exit function pointers are somewhat problematic.
+> > > 
+> > > Fortunately, you don't really require these functions for this driver. The _exit
+> > > function is completely unused, so just get rid of it.
+> > > 
+> > > The init function is used only to set up iomux, so the logical replacement is
+> > > a pointer to the iomux data, and calling mxs_iomux_setup_multiple_pads
+> > > directly from the driver.
+> > > 
+> > NO! I strongly object that. mxs_iomux_setup_multiple_pads() is a
+> > platform specific function and has no business inside a device driver
+> > that should be platform agnostic.
+> > Consider the same controller being part of a different SoC that
+> > requires you to call mxs_iomux_v2_setup_multiple_pads() instead. You
+> > would then have to check for the SoC type inside the driver to find
+> > the right function to call which is quite obscene.
+> 
+> Won't this problem just go away as soon as we get the mxs converted to the
+> generic pinmux subsystem that Linus Walleij is doing?
+> 
+> Obviously, you would not have to check the soc type really, you would have
+> to instead check for different versions of the gpmi, which you most likely
+> have to anyway because reusing the same hardware block in a new chip usually
+> comes with other changes as well. 
+> 
+The pin muxing is SoC specific, not GPMI specific. So the SoC version
+should be checked, not something else that may be loosely linked to
+it.
+
+> Note how the driver already does this with code like
+> 
+> +	if (GPMI_IS_MX23(this) || GPMI_IS_MX28(this))
+> +		nfc = &gpmi_nfc_hal_mxs;
+> 
+> If you really want to call out obsceneties, how about the fact that this
+> driver comes with an 805 line patch to add a HAL for a single chip!
+> 
+> Such abstractions should not be introduced as long as there is only
+> a single instance of the hardware.
+> 
+I had already commented on this in the first round of patches from
+Huang in March this year.
+
+
+Lothar Wa?mann
+-- 
+___________________________________________________________
+
+Ka-Ro electronics GmbH | Pascalstra?e 22 | D - 52076 Aachen
+Phone: +49 2408 1402-0 | Fax: +49 2408 1402-10
+Gesch?ftsf?hrer: Matthias Kaussen
+Handelsregistereintrag: Amtsgericht Aachen, HRB 4996
+
+www.karo-electronics.de | info at karo-electronics.de
+___________________________________________________________
