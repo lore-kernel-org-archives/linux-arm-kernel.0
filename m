@@ -1,30 +1,31 @@
-From: jhnikula@gmail.com (Jarkko Nikula)
-Date: Fri,  1 Jul 2011 11:52:24 +0300
-Subject: [RFC 0/12] McBSP cleanup and generalization
-Message-ID: <1309510356-27147-1-git-send-email-jhnikula@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 1 Jul 2011 11:09:26 +0200
+Subject: reply: [PATCH v5 1/3] ARM: mxs: add GPMI-NFC support for
+	imx23/imx28
+In-Reply-To: <4E0D8C04.6010409@freescale.com>
+References: <14C4E31473AF7E4B98176CB73615181C19FBD3@039-SN1MPN1-006.039d.mgd.msft.net>
+	<201107010029.51965.arnd@arndb.de> <4E0D8C04.6010409@freescale.com>
+Message-ID: <201107011109.27206.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Friday 01 July 2011 10:57:40 Huang Shijie wrote:
+> >> It's annoying, but it really saves some lines.
+> > It would save more lines if you introduce the macros globally and
+> > convert all existing resource definitions ;-)
+> The origin code did not use any macros.
+> Some one suggested me to use macros.
+> So i used the macros.
+> 
+> Do i have to drop the macros?
 
-Some cleanups to McBSP code and attempts to make it more generic. I'll be out
-of office in coming days but I'm happy to hear how does this set work on
-OMAP1 Amstrad Delta as there are changes around register definitions and
-access. I've tested this on 2420 and 3430 and build tested with omap1_defconfig
-and omap2plus_defconfig.
+Can you find out who made the suggestion? Let's first reach consensus
+about how we want to do these things in the future.
 
-I added Paul's build fix first as it seems to got lost in l-o master during
-recent devel branch merges and my patches are made on top of it. Paul's
-patch can be found from commit 7150dfee80a1e7ed5064730994b704495a8c6b99.
+My opinion is that we should not have macros like these in any platform
+specific code: If the macros are a good idea, we should define them
+globally and let everyone use the same macros. If we decide not to have
+them in global code, it would be even worse to have them in specific
+platforms.
 
-For is_omap removal I didn't invent any other new than reg_size and reg_step
-to platform data but in the future I think mcbsp_config_type is better to
-replace with some feature flags that come from hwmod so that there is no
-need to modify code for any new omap version.
-
-Long term plan is still bit open. If we go to merge McBSP with ASoC omap-mcbsp
-we can drop quite much of special API here as well as omap-mcbsp-dai
-platform devices.
-
--- 
-Jarkko
+	Arnd
