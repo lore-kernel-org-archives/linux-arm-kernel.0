@@ -1,30 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 1 Jul 2011 18:26:57 +0200
-Subject: [PATCH v2] ARM: CSR: Adding CSR SiRFprimaII board support
-In-Reply-To: <BANLkTinkHcuXuWpCxq3tnU_10trPTjDucg@mail.gmail.com>
-References: <1309231954-23260-1-git-send-email-bs14@csr.com>
-	<201106301236.25822.arnd@arndb.de>
-	<BANLkTinkHcuXuWpCxq3tnU_10trPTjDucg@mail.gmail.com>
-Message-ID: <201107011826.57660.arnd@arndb.de>
+Date: Fri, 1 Jul 2011 18:44:43 +0200
+Subject: [PATCH v8 00/12] use nonblock mmc requests to minimize latency
+In-Reply-To: <20110630133003.GZ21898@n2100.arm.linux.org.uk>
+References: <1309248717-14606-1-git-send-email-per.forlin@linaro.org>
+	<201106301512.46788.arnd@arndb.de>
+	<20110630133003.GZ21898@n2100.arm.linux.org.uk>
+Message-ID: <201107011844.44058.arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 01 July 2011, Barry Song wrote:
-> except Wall St and stock, i really didn't realize CSR is something
-> related with 'China Security & Surveillance Tech. Inc' . it seems CSR
-> is much more extensively known as a company in Wireless Technology,
-> Audio, Connectivity and GPS.
-> if we lost this name, people might not know it came from that CSR
-> focusing on Wireless/Audio/Connectivity/GPS. people will ask, what is
-> CSRXF? if we really use stock sticker symbols, CSR.L is the more
-> normal symbol in UK market. if we move to stock sticker symbol, could
-> we use CSR.L?
+On Thursday 30 June 2011, Russell King - ARM Linux wrote:
+> We've been here before - with PCMCIA's card insertion code, where you
+> have to go through a sequence of events (insert, power up, reset, etc).
+> The PCMCIA code used to have a collection of small functions to do
+> each step, one chained after the other in a state machine fashion.
+> The result was horrid.  That's exactly what you'll end up with here.
+> 
+> Threads have their place, and this is one of them.
 
-CSR.L sounds ok to me, but I don't know if there are limitations on the
-character set used here, can we have dots?
+Ok, fair enough. The performance enhancement is certainly here already
+with getting the cache management operations out of the hot path,
+and for the fully asynchronous case it's not getting better by trying
+to be smarter.
 
-Maybe the best solution after all is to go with 'sirf,...': it is
-actually a company name, and you own the .com address, and there is
-no other company listed on wallstreet with that shortcut.
+At least for ARM, the overhead of the DMA mapping operations will
+dwarf the overhead of the extra context switches for the foreseeable
+future, so we don't need to bother.
+
+Things might be different for coherent low-end CPU cores like Atom
+when mmc device become much faster and block access becomes CPU
+bound.
 
 	Arnd
