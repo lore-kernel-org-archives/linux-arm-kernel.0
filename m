@@ -1,31 +1,23 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Jul 2011 00:00:56 -0700
-Subject: [GIT PULL] omap iommu fixes for v3.0-rc
-In-Reply-To: <BANLkTi=vd2TE6JjueGmY=ydRQRygo8-Q1Q@mail.gmail.com>
-References: <BANLkTi=vd2TE6JjueGmY=ydRQRygo8-Q1Q@mail.gmail.com>
-Message-ID: <20110701070056.GZ23145@atomide.com>
+From: heechul@illinois.edu (heechul Yun)
+Date: Fri, 1 Jul 2011 00:04:42 -0700
+Subject: Unnecessary cache-line flush on page table updates ?
+Message-ID: <BANLkTin7aJXjpEH_WzJi5zaAtH8kFcTZeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Ohad Ben-Cohen <ohad@wizery.com> [110630 23:47]:
-> Hi Tony,
-> 
-> Please pull from:
-> 
-> git://github.com/ohadbc/omap-iommu.git for-tony
-> 
-> To receive trivial iommu/iovmm fixes (iommu clk name fix, pte fix and
-> a fix for iovmm's erroneous
-> usage of sg_dma_len as reported by Russell).
-> 
-> All three patches were submitted to linux-omap and linux-arm-kernel for review,
-> and are also attached below for convenience.
+Catalin,
 
-These look like real fixes, but can you please update the commits
-with something like "This fixes an issue with foo when doing bar".
+Based on TRM of Cortex A9, the MMU reads page table entries from L1-D
+cache not from memory. Then I think we do not need to flush the cache
+line in the following code because MMU will always see up-to-date view
+of page table in both UP and SMP systems.
 
-Otherwise it's easy to claim that these are "fixes for features that
-never worked" and it might be hard to justify them this late into
-the -rc cycle.
+linux/arch/arm/mm/proc-v7.S
 
-Tony
+ENTRY(cpu_v7_set_pte_ext)
+	...
+        mcr     p15, 0, r0, c7, c10, 1          @ flush_pte from
+D-cache // why we need this in A9?
+        ?
+
+If this is a necessary one, could you please explain the reason? Thanks.
